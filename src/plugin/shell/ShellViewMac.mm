@@ -5,6 +5,7 @@
 // The Objective-C class name carries the build (INFINITE_VIEW_CLASS): Instrument and FX are loaded
 // side by side in one host and must not share a class.
 #include "plugin/shell/ShellView.h"
+#include "core/License.h"
 
 #include "platform/common/Ipc.h"
 
@@ -134,6 +135,10 @@ namespace
    MacView* owner;
 }
 - (void)restart:(id)sender;
+- (void)pasteKey:(id)sender;
+- (void)enterKey:(id)sender;
+- (void)buy:(id)sender;
+- (void)refundCheck:(id)sender;
 @end
 
 namespace
@@ -214,6 +219,28 @@ namespace
          restart_.target = restartTarget_;
          restart_.action = @selector(restart:);
 
+         // Licence sheet (step 2.6): shown only while Unlicensed.
+         keyField_ = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 360, 24)];
+         keyField_.placeholderString = @"INF1\u2026";
+         keyField_.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
+         keyField_.target = restartTarget_;
+         keyField_.action = @selector(enterKey:);
+         [keyField_.cell setScrollable:YES];
+         [view_ addSubview:keyField_];
+         paste_ = [NSButton buttonWithTitle:@"Paste key" target:restartTarget_ action:@selector(pasteKey:)];
+         [paste_ retain];
+         paste_.bezelStyle = NSBezelStyleRounded;
+         [view_ addSubview:paste_];
+         buy_ = [NSButton buttonWithTitle:@"Buy" target:restartTarget_ action:@selector(buy:)];
+         [buy_ retain];
+         buy_.bezelStyle = NSBezelStyleRounded;
+         [view_ addSubview:buy_];
+         refund_ = [NSButton checkboxWithTitle:@"Weekly refund check" target:restartTarget_ action:@selector(refundCheck:)];
+         [refund_ retain];
+         refund_.state = License::RefundCheckOn() ? NSControlStateValueOn : NSControlStateValueOff;
+         [view_ addSubview:refund_];
+         [view_ registerForDraggedTypes:@[ NSPasteboardTypeFileURL, NSPasteboardTypeString ]];
+
          [parent addSubview:view_];
          UpdateOverlay();
          Layout();
@@ -270,6 +297,12 @@ namespace
          status_ = s;
          if (s != InfinitePlugin::EngineStatus::Running)
             shown_ = false;
+         UpdateOverlay();
+      }
+
+      void SetLicense(const std::string& message) override
+      {
+         license_ = message;
          UpdateOverlay();
       }
 
@@ -351,6 +384,48 @@ namespace
       }
       NSCursor* Cursor() const { return CursorFor(cursorId_); }
 
+      // ---- licence sheet ----
+      bool Unlicensed() const { return status_ == InfinitePlugin::EngineStatus::Unlicensed; }
+      void SubmitLicense(const std::string& text)
+      {
+         if (host_ && Unlicensed())
+            host_->ViewLicense(text);
+      }
+      // A button, not only Cmd+V in the field: some hosts keep Cmd+V for themselves.
+      void PasteKey()
+      {
+         NSString* str = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+         SubmitLicense(str ? std::string(str.UTF8String) : std::string());
+      }
+      void EnterKey() { SubmitLicense(std::string(keyField_.stringValue.UTF8String ?: "")); }
+      void Buy() { [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@(License::kBuyUrl)]]; }
+      void RefundCheck() { License::SetRefundCheck(refund_.state == NSControlStateValueOn); }
+
+      // A dropped .inflic (or any small text file holding a key), or dropped text.
+      bool CanDrop() const { return Unlicensed() && host_; }
+      bool Drop(NSPasteboard* pb)
+      {
+         if (!CanDrop())
+            return false;
+         NSArray<NSURL*>* urls = [pb readObjectsForClasses:@[ [NSURL class] ] options:@{ NSPasteboardURLReadingFileURLsOnlyKey: @YES }];
+         if (urls.count > 0)
+         {
+            NSData* data = [NSData dataWithContentsOfURL:urls[0]];
+            if (!data || data.length > 65536)
+            {
+               SubmitLicense(std::string());
+               return true;
+            }
+            SubmitLicense(std::string(static_cast<const char*>(data.bytes), data.length));
+            return true;
+         }
+         NSString* str = [pb stringForType:NSPasteboardTypeString];
+         if (!str)
+            return false;
+         SubmitLicense(std::string(str.UTF8String));
+         return true;
+      }
+
    private:
       static constexpr int32 kMinW = 640, kMinH = 400;
       static inline const ViewRect kDefault { 0, 0, 1280, 800 };
@@ -378,6 +453,27 @@ namespace
          const NSSize ls = label_.frame.size;
          const NSSize bs = restart_.frame.size;
          const bool button = !restart_.hidden;
+         if (!keyField_.hidden)
+         {
+            // label / key field / [Paste key] [Buy] / refund check, centred.
+            const CGFloat fw = std::floor(std::max<CGFloat>(120, std::min<CGFloat>(360, b.size.width - 32)));
+            [paste_ sizeToFit];
+            [buy_ sizeToFit];
+            [refund_ sizeToFit];
+            const NSSize ps = paste_.frame.size, us = buy_.frame.size, rs = refund_.frame.size;
+            const CGFloat total = ls.height + 12 + 24 + 12 + ps.height + 10 + rs.height;
+            CGFloat y = std::floor((b.size.height - total) * 0.5);
+            [label_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - ls.width) * 0.5), y)];
+            y += ls.height + 12;
+            [keyField_ setFrame:NSMakeRect(std::floor((b.size.width - fw) * 0.5), y, fw, 24)];
+            y += 24 + 12;
+            const CGFloat row = ps.width + 8 + us.width;
+            [paste_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - row) * 0.5), y)];
+            [buy_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - row) * 0.5) + ps.width + 8, y)];
+            y += ps.height + 10;
+            [refund_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - rs.width) * 0.5), y)];
+            return;
+         }
          const CGFloat total = ls.height + (button ? 12 + bs.height : 0);
          const CGFloat top = (b.size.height - total) * 0.5; // flipped: y down
          [label_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - ls.width) * 0.5), std::floor(top))];
@@ -392,8 +488,16 @@ namespace
          const bool stopped = status_ == EngineStatus::Stopped;
          const bool noGl = status_ == EngineStatus::NoGraphics;
          const bool popped = popped_ && status_ == EngineStatus::Running;
-         const bool overlay = stopped || noGl || popped || !shown_;
-         label_.stringValue = noGl ? @"No graphics on this machine"
+         const bool unlicensed = status_ == EngineStatus::Unlicensed;
+         const bool overlay = stopped || noGl || popped || unlicensed || !shown_;
+         keyField_.hidden = !unlicensed;
+         paste_.hidden = !unlicensed;
+         buy_.hidden = !unlicensed;
+         refund_.hidden = !unlicensed;
+         if (unlicensed)
+            refund_.state = License::RefundCheckOn() ? NSControlStateValueOn : NSControlStateValueOff;
+         label_.stringValue = unlicensed ? [NSString stringWithUTF8String:license_.c_str()] ?: @""
+                            : noGl ? @"No graphics on this machine"
                             : stopped ? @"Engine stopped"
                             : popped ? @"In its own window"
                                      : @"Starting";
@@ -423,6 +527,12 @@ namespace
 
       void Tick()
       {
+         // A key entered in another instance (or another host) starts this one within a second.
+         if (Unlicensed() && host_ && view_ && ++recheckTicks_ >= 120)
+         {
+            recheckTicks_ = 0;
+            host_->ViewLicenseRecheck();
+         }
          if (!frames_ || !view_ || popped_)
             return;
          if (!PluginFrames::Acquire(frames_, &front_))
@@ -480,9 +590,22 @@ namespace
             WriteStats();
             view_->owner = nullptr;
             restart_.target = nil;
+            keyField_.target = nil;
+            paste_.target = nil;
+            buy_.target = nil;
+            refund_.target = nil;
+            [view_ unregisterDraggedTypes];
             [view_ removeFromSuperview];
             [label_ release];
             [restart_ release];
+            [keyField_ release];
+            [paste_ release];
+            [buy_ release];
+            [refund_ release];
+            keyField_ = nil;
+            paste_ = nil;
+            buy_ = nil;
+            refund_ = nil;
             restartTarget_->owner = nullptr;
             [restartTarget_ release];
             [view_ release];
@@ -524,6 +647,12 @@ namespace
       INFINITE_VIEW_CLASS* view_ = nil;
       NSTextField* label_ = nil;
       NSButton* restart_ = nil;
+      NSTextField* keyField_ = nil;
+      NSButton* paste_ = nil;
+      NSButton* buy_ = nil;
+      NSButton* refund_ = nil;
+      std::string license_ = "Enter your key";
+      int recheckTicks_ = 0;
       INFINITE_RESTART_CLASS* restartTarget_ = nil; // NSButton holds its target weakly
       NSTimer* timer_ = nil;
       CGColorRef bg_ = nullptr;
@@ -640,6 +769,15 @@ namespace
    return YES;
 }
 
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)info
+{
+   return owner && owner->CanDrop() ? NSDragOperationCopy : NSDragOperationNone;
+}
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)info
+{
+   return owner && owner->Drop(info.draggingPasteboard);
+}
+
 - (BOOL)becomeFirstResponder
 {
    if (owner) owner->Push({ PluginFrames::kInFocus, 0, 1, 0, 0, 0 });
@@ -658,6 +796,10 @@ namespace
    if (owner)
       owner->Restart();
 }
+- (void)pasteKey:(id)sender { if (owner) owner->PasteKey(); }
+- (void)enterKey:(id)sender { if (owner) owner->EnterKey(); }
+- (void)buy:(id)sender { if (owner) owner->Buy(); }
+- (void)refundCheck:(id)sender { if (owner) owner->RefundCheck(); }
 @end
 
 namespace InfinitePlugin

@@ -22,6 +22,9 @@ namespace ViewCheck
    std::string Label(void* view);
    std::string Button(void* view);
    void Press(void* view);
+   // The licence sheet's key field (step 2.6): types text into it and presses Return. False when
+   // no editable field is showing.
+   bool TypeKey(void* view, const std::string& text);
    // On-screen windows owned by process pid (CGWindowList, layer 0).
    int OnScreenWindows(int pid);
    // The login screen is up: the window server stops updating what is on screen.

@@ -22,6 +22,7 @@
 //   2000..2127  MIDI CC 0..127   hidden, omni: VST3 hands CC to plugins only as parameters
 //   2128        Pitch bend       (IMidiMapping), turned back into MIDI for the engine here
 //   2129        Channel pressure
+#include "core/License.h"
 #include "plugin/ipc/PluginFrames.h"
 #include "plugin/ipc/PluginIpc.h"
 #include "plugin/shell/ShellView.h"
@@ -115,13 +116,18 @@ namespace InfinitePlugin
    constexpr uint32_t kMsgSlotEdit = 4;  // payload: SlotEdit
    constexpr uint32_t kMsgSlotNames = 5; // payload: 32 '\0'-terminated UTF-8 names
    constexpr uint32_t kMsgStateAuto = 11; // payload: the patch, pushed every 2 s while it changes
+   constexpr uint32_t kMsgLicense = 12;   // payload: uint32 License::Status; the refund list names this key
    // An engine whose audio thread stops beating this long is hung: killed, and the view offers Restart.
    constexpr uint64_t kHangNs = 3000000000ull;
    constexpr uint32_t kMsgGetState = 101;
    constexpr uint32_t kMsgSetState = 102;
    // View messages (kMsgFrames, kMsgViewCursor, kMsgView, kMsgViewInput) are in PluginFrames.h.
-   // Relay-only: the engine process started, came up or died (payload: one EngineStatus byte).
+   // Relay-only: the engine process started, came up or died (payload: one EngineStatus byte; for
+   // Unlicensed, the sheet's message follows as UTF-8).
    constexpr uint32_t kRelayEngine = 1000;
+
+   // The licence covers one major version (License.h): 1.x keys for every 1.y build.
+   inline int AppMajor() { return std::atoi(INFINITE_PLUGIN_VERSION); }
 
    // ---------------------------------------------------------------------------------------
    // Plugin state (README 8.3): what a host project stores for one instance.
@@ -425,6 +431,8 @@ namespace InfinitePlugin
       // The engine has loaded its patch (audio thread may read it).
       bool Ready() const { return ready_.load(std::memory_order_acquire); }
       bool Matches(double rate, uint32_t block) const { return Running() && rate_ == rate && block_ == block; }
+      // The engine's refund check named this key (kMsgLicense): it was stopped; play as unlicensed.
+      bool Revoked() const { return revoked_.load(std::memory_order_acquire); }
 
       // `patch` (the stored state, may be empty) becomes the engine's first message, so the engine
       // starts on the project's patch instead of loading the starting patch first.
@@ -462,6 +470,7 @@ namespace InfinitePlugin
             return;
          }
          spawnFailed_.store(false);
+         revoked_.store(false);
          noGraphics_ = false;
          dead_.store(false);
          stopReader_.store(false);
@@ -500,6 +509,24 @@ namespace InfinitePlugin
                         std::fprintf(stderr, "Infinite plugin: engine audio did not start: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
                      ready_.store(true);
                      PostEngine(InfinitePlugin::EngineStatus::Running);
+                  }
+                  else if (m.type == kMsgLicense)
+                  {
+                     // Refunded: stop the engine; the processor plays silence (Instrument) or dry (FX).
+                     revoked_.store(true, std::memory_order_release);
+                     Ipc::ChildSignalKill(child_);
+                     dead_.store(true);
+                     ready_.store(false);
+                     if (relay_)
+                     {
+                        UiRelay::Item it { kRelayEngine, { uint8_t(InfinitePlugin::EngineStatus::Unlicensed) } };
+                        License::Info info;
+                        info.status = License::Status::Revoked;
+                        const std::string text = License::Message(info);
+                        it.data.insert(it.data.end(), text.begin(), text.end());
+                        relay_->Post(it);
+                     }
+                     break;
                   }
                   else if (m.type == kMsgStateLoaded)
                   {
@@ -699,6 +726,7 @@ namespace InfinitePlugin
       std::atomic<bool> stopReader_ { false };
       std::atomic<bool> ready_ { false };
       std::atomic<bool> spawnFailed_ { false };
+      std::atomic<bool> revoked_ { false };
       bool noGraphics_ = false; // reader thread only (reset before it starts)
       std::atomic<bool> dead_ { false };
       std::atomic<bool> picture_ { false };
@@ -768,7 +796,19 @@ namespace InfinitePlugin
       {
          // The engine is spawned on the first activation and kept across deactivation (host suspend);
          // a new rate or block size needs a fresh region, so it restarts.
-         if (state && !link_.Matches(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock)))
+         if (state)
+         {
+            std::fill(dry_[0].begin(), dry_[0].end(), 0.0f);
+            std::fill(dry_[1].begin(), dry_[1].end(), 0.0f);
+            dryPos_ = 0;
+         }
+         // No licence: no engine (the sheet asks for a key; Instrument silent, FX dry).
+         if (state && !RefreshLicense())
+         {
+            TakeCurrentPatch();
+            link_.Stop();
+         }
+         else if (state && !link_.Matches(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock)))
          {
             // The restart keeps what the user built: take the patch from the old engine first.
             TakeCurrentPatch();
@@ -801,6 +841,8 @@ namespace InfinitePlugin
       // Message thread: (re)start on the current setup, or the host defaults before the first one.
       void StartEngine()
       {
+         if (!RefreshLicense())
+            return;
          const double rate = processSetup.sampleRate > 0.0 ? processSetup.sampleRate : 48000.0;
          const uint32_t block = processSetup.maxSamplesPerBlock > 0 ? uint32_t(processSetup.maxSamplesPerBlock) : 512u;
          TakeCurrentPatch();
@@ -866,10 +908,12 @@ namespace InfinitePlugin
             v.width = uint32_t(std::max<int64>(1, std::min<int64>(w, 8192)));
             v.height = uint32_t(std::max<int64>(1, std::min<int64>(h, 8192)));
             v.scale = float(scale);
+            const bool opened = v.open && !link_.View().open;
             link_.SetView(v);
             // A view opened before the host activated us (or after the engine died): the user wants
-            // to see Infinite, so start it on the setup so far.
-            if (v.open && !link_.Running())
+            // to see Infinite, so start it on the setup so far. Unlicensed, only on opening: a
+            // resize must not reset the sheet's message.
+            if (v.open && !link_.Running() && (opened || Licensed()))
                StartEngine();
             return kResultOk;
          }
@@ -884,6 +928,34 @@ namespace InfinitePlugin
          if (std::strcmp(id, "restart") == 0)
          {
             StartEngine();
+            return kResultOk;
+         }
+         // The licence sheet: a pasted or dropped key. Valid: stored for every instance, engine starts.
+         if (attr && std::strcmp(id, "license") == 0)
+         {
+            const void* data = nullptr;
+            uint32 size = 0;
+            std::string text;
+            if (attr->getBinary("text", data, size) == kResultOk && data)
+               text.assign(static_cast<const char*>(data), size);
+            const std::string key = License::Extract(text);
+            License::Info info = License::Check(key, License::ReadRevoked(), AppMajor());
+            if (info.status == License::Status::None)
+               info.status = License::Status::Malformed; // something was entered: "Not a valid key"
+            if (info.status == License::Status::Valid && License::WriteKey(key))
+            {
+               licensed_.store(true);
+               StartEngine();
+            }
+            else
+               PostUnlicensed(License::Message(info));
+            return kResultOk;
+         }
+         // While the sheet shows: a key stored by another instance starts this one. Silent otherwise.
+         if (std::strcmp(id, "licenseRecheck") == 0)
+         {
+            if (!Licensed() && License::Current(AppMajor()).status == License::Status::Valid)
+               StartEngine();
             return kResultOk;
          }
          if (attr && std::strcmp(id, "popout") == 0)
@@ -939,6 +1011,12 @@ namespace InfinitePlugin
          // Either says offline: Steinberg's auwrapper re-runs setupProcessing(kRealtime) on AU
          // Initialize and carries an earlier OfflineRender only in the per-block processMode.
          const bool offline = processSetup.processMode == kOffline || data.processMode == kOffline;
+         if (!Licensed())
+         {
+            ProcessUnlicensed(ins, outs, n);
+            outBus.silenceFlags = kFx ? 0 : ((uint64(1) << outBus.numChannels) - 1);
+            return kResultOk;
+         }
          if (offline)
             link_.WaitReadyOffline();
 
@@ -962,6 +1040,54 @@ namespace InfinitePlugin
       }
 
    private:
+      bool Licensed() const { return licensed_.load(std::memory_order_acquire) && !link_.Revoked(); }
+
+      // Message thread: the stored key, checked. Not valid: the view gets the sheet and its message.
+      bool RefreshLicense()
+      {
+         const License::Info info = License::Current(AppMajor());
+         const bool ok = info.status == License::Status::Valid;
+         licensed_.store(ok, std::memory_order_release);
+         if (!ok)
+            PostUnlicensed(License::Message(info));
+         return ok;
+      }
+
+      void PostUnlicensed(const std::string& text)
+      {
+         if (!relay_)
+            return;
+         UiRelay::Item it { kRelayEngine, { uint8_t(EngineStatus::Unlicensed) } };
+         it.data.insert(it.data.end(), text.begin(), text.end());
+         relay_->Post(it);
+      }
+
+      // Audio thread, no licence: Instrument silent; FX passes its input delayed by the reported
+      // latency (L = max block), so a project lines up the same with and without a key.
+      void ProcessUnlicensed(const float* const* ins, float* const* outs, uint32_t n)
+      {
+         const uint32_t len = uint32_t(std::max<int32>(1, std::min<int32>(processSetup.maxSamplesPerBlock, int32(PluginIpc::kMaxBlockLimit))));
+         if (!kFx)
+         {
+            std::memset(outs[0], 0, n * sizeof(float));
+            std::memset(outs[1], 0, n * sizeof(float));
+            return;
+         }
+         uint32_t pos = dryPos_ < len ? dryPos_ : 0;
+         for (uint32_t i = 0; i < n; i++)
+         {
+            for (int c = 0; c < 2; c++)
+            {
+               const float x = ins[c] ? ins[c][i] : 0.0f; // read first: the host may process in place
+               outs[c][i] = dry_[c][pos];
+               dry_[c][pos] = x;
+            }
+            if (++pos == len)
+               pos = 0;
+         }
+         dryPos_ = pos;
+      }
+
       void ReadParameters(ProcessData& data)
       {
          // Every slot at offset 0 once the engine is ready after a start or a state load (its Macros
@@ -1199,6 +1325,8 @@ namespace InfinitePlugin
          {
             msg->setMessageID("engine");
             msg->getAttributes()->setInt("status", it.data[0]);
+            if (it.data.size() > 1)
+               msg->getAttributes()->setBinary("text", it.data.data() + 1, uint32(it.data.size() - 1));
          }
          else
          {
@@ -1222,6 +1350,9 @@ namespace InfinitePlugin
       PluginIpc::ParamPoint params_[PluginIpc::kMaxParamPoints] {};
       uint32_t numParams_ = 0;
       std::vector<float> monoRight_ = std::vector<float>(PluginIpc::kMaxBlockLimit);
+      std::atomic<bool> licensed_ { false };
+      std::vector<float> dry_[2] = { std::vector<float>(PluginIpc::kMaxBlockLimit), std::vector<float>(PluginIpc::kMaxBlockLimit) };
+      uint32_t dryPos_ = 0;
    };
 
    // ---------------------------------------------------------------------------------------
@@ -1249,6 +1380,7 @@ namespace InfinitePlugin
          if (view_)
             view_->DropHost(); // a host that opens a second editor: the newest one is live
          view_ = v;
+         v->SetLicense(license_);
          v->SetEngine(engine_);
          v->SetPopped(popped_);
          return v;
@@ -1295,6 +1427,25 @@ namespace InfinitePlugin
          {
             msg->setMessageID("popout");
             msg->getAttributes()->setInt("on", 0);
+            sendMessage(msg);
+            msg->release();
+         }
+      }
+      void ViewLicense(const std::string& text) override
+      {
+         if (IMessage* msg = allocateMessage())
+         {
+            msg->setMessageID("license");
+            msg->getAttributes()->setBinary("text", text.data(), uint32(text.size()));
+            sendMessage(msg);
+            msg->release();
+         }
+      }
+      void ViewLicenseRecheck() override
+      {
+         if (IMessage* msg = allocateMessage())
+         {
+            msg->setMessageID("licenseRecheck");
             sendMessage(msg);
             msg->release();
          }
@@ -1404,7 +1555,15 @@ namespace InfinitePlugin
          {
             int64 st = 0;
             attr->getInt("status", st);
-            engine_ = EngineStatus(std::max<int64>(0, std::min<int64>(st, 3)));
+            engine_ = EngineStatus(std::max<int64>(0, std::min<int64>(st, int64(EngineStatus::Unlicensed))));
+            const void* text = nullptr;
+            uint32 size = 0;
+            if (engine_ == EngineStatus::Unlicensed && attr->getBinary("text", text, size) == kResultOk && text)
+            {
+               license_.assign(static_cast<const char*>(text), size);
+               if (view_)
+                  view_->SetLicense(license_);
+            }
             if (engine_ != EngineStatus::Running && popped_)
             {
                popped_ = false; // a new or dead engine has no window out
@@ -1494,6 +1653,7 @@ namespace InfinitePlugin
       ShellView* view_ = nullptr; // not owned: the host holds the view
       EngineStatus engine_ = EngineStatus::Starting;
       bool popped_ = false; // the engine's window is out on its own (step 2.4)
+      std::string license_ = "Enter your key"; // the licence sheet's message (step 2.6)
    };
 }
 

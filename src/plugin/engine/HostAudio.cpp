@@ -1,6 +1,7 @@
 #include "plugin/engine/HostAudio.h"
 
 #include "audio/AudioEngine.h"
+#include "core/License.h"
 #include "core/Transport.h"
 #include "platform/Platform.h"
 #include "platform/common/Ipc.h"
@@ -15,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <thread>
 
@@ -428,6 +430,42 @@ namespace PluginEngine
       std::string gSlotNames[kSlotCount];
       std::string gLastAuto;        // patch text last pushed as kMsgStateAuto
       uint64_t gLastAutoNs = 0;
+      // Refund check (step 2.6): once per engine, when the cached list is a week old. The worker only
+      // downloads and writes the cache; the main thread reads it back.
+      bool gRefundStarted = false;
+      std::atomic<bool> gRefundFetched { false };
+
+      void RefundCheckTick()
+      {
+         if (!gRefundStarted)
+         {
+            gRefundStarted = true;
+            int64_t fetched = 0;
+            License::ReadRevoked(&fetched);
+            const int64_t now = int64_t(std::time(nullptr));
+            if (!License::RefundCheckOn() || now - fetched < License::kRefundCheckEverySeconds)
+               return;
+            std::thread([now] {
+               std::string body, error;
+               if (Platform::HttpGet(License::RevokedUrl(), std::string("Infinite/") + INFINITE_VERSION_STRING, body, error, 10))
+                  License::WriteRevoked(body, now); // offline or a bad reply: the last list stays (fail open)
+               gRefundFetched.store(true);
+            }).detach();
+            return;
+         }
+         if (!gRefundFetched.exchange(false))
+            return;
+         std::string key;
+         if (!License::ReadKey(key))
+            return;
+         const std::string id = License::IdOf(License::Extract(key));
+         const std::vector<std::string> revoked = License::ReadRevoked();
+         if (!id.empty() && std::find(revoked.begin(), revoked.end(), id) != revoked.end())
+         {
+            const uint32_t status = uint32_t(License::Status::Revoked);
+            gSide.Messages().Send(kMsgLicense, 0, &status, sizeof status, 1000);
+         }
+      }
 
       void HandleMessage(const PluginIpc::Message& m)
       {
@@ -603,6 +641,8 @@ namespace PluginEngine
                gLastAuto = std::move(text);
          }
       }
+      if (gStarted && gFramesSinceStart > 3)
+         RefundCheckTick();
       if (!gStarted || gFramesSinceStart > 3)
          return;
       if (++gFramesSinceStart == 3)

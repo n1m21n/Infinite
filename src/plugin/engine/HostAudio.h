@@ -53,6 +53,7 @@ namespace PluginEngine
       kMsgSlotNames = 5,   // payload: 32 slot names, each '\0'-terminated UTF-8 ("" = unbound)
       // 6..10 are PluginFrames' (view) messages; one id space per direction.
       kMsgStateAuto = 11,  // unasked, every 2 s while the patch text changed; payload: the patch as .inf text
+      kMsgLicense = 12,    // the weekly refund list names this key (License.h); payload: uint32 License::Status. The shell stops the engine
       kMsgGetState = 101,  // payload: none
       kMsgSetState = 102,  // payload: the patch as .inf text; kMsgReady follows once it settles
    };

@@ -45,6 +45,8 @@
 #include <CoreFoundation/CoreFoundation.h>
 
 #include "ShellCheckMac.h"
+#include "core/License.h"
+#include "monocypher/monocypher-ed25519.h"
 
 #include <algorithm>
 #include <chrono>
@@ -52,8 +54,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <string>
 #include <thread>
@@ -76,6 +82,94 @@ namespace
       if (!ok)
          gFails++;
    }
+
+   // ---- licence fixture (step 2.6) ------------------------------------------------------------
+   // A test key pair from a fixed seed; the build accepts its public key through
+   // $INFINITE_LICENSE_PUBKEY (INFINITE_LICENSE_TEST_KEY builds only). Keys live in a temp folder
+   // ($INFINITE_LICENSE_DIR), never the user's own.
+   struct LicenseFixture
+   {
+      std::string dir;
+      uint8_t secret[64] = {}, pub[32] = {};
+
+      static std::string B64Url(const std::string& in)
+      {
+         static const char* a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+         std::string out;
+         uint32_t acc = 0;
+         int bits = 0;
+         for (unsigned char c : in)
+         {
+            acc = (acc << 8) | c;
+            bits += 8;
+            while (bits >= 6)
+            {
+               bits -= 6;
+               out += a[(acc >> bits) & 63];
+            }
+         }
+         if (bits > 0)
+            out += a[(acc << (6 - bits)) & 63];
+         return out;
+      }
+
+      std::string Key(const std::string& id, int major, int v = 1) const
+      {
+         const std::string payload = "{\"v\":" + std::to_string(v) + ",\"id\":\"" + id +
+                                     "\",\"email\":\"check@example.com\",\"txn\":\"txn_check\",\"seats\":1,\"major\":" +
+                                     std::to_string(major) + ",\"iat\":1762560000}";
+         const std::string signedPart = "INF1." + B64Url(payload);
+         uint8_t sig[64];
+         crypto_ed25519_sign(sig, secret, reinterpret_cast<const uint8_t*>(signedPart.data()), signedPart.size());
+         return signedPart + "." + B64Url(std::string(reinterpret_cast<const char*>(sig), 64));
+      }
+
+      static void Write(const std::string& path, const std::string& text)
+      {
+         std::ofstream f(path, std::ios::binary | std::ios::trunc);
+         f << text;
+      }
+      void WriteKey(const std::string& key) const { Write(dir + "/license.inflic", key + "\n"); }
+      void RemoveKey() const { std::remove((dir + "/license.inflic").c_str()); }
+      std::string StoredKey() const
+      {
+         std::ifstream f(dir + "/license.inflic");
+         std::string line;
+         std::getline(f, line);
+         return line;
+      }
+      // A fresh refund list: the engine does not fetch one.
+      void WriteRevoked(const std::string& idsJson, int64_t fetched) const
+      {
+         Write(dir + "/license-revoked.json", "{\"revoked\":[" + idsJson + "],\"fetched\":" + std::to_string(fetched) + "}");
+      }
+
+      void Setup()
+      {
+         char tmpl[] = "/tmp/infinite-license-check-XXXXXX";
+         dir = mkdtemp(tmpl) ? tmpl : "/tmp/infinite-license-check";
+         uint8_t seed[32];
+         for (int i = 0; i < 32; i++)
+            seed[i] = uint8_t(0xA5 ^ (i * 7));
+         crypto_ed25519_key_pair(secret, pub, seed);
+         char hex[65];
+         for (int i = 0; i < 32; i++)
+            std::snprintf(hex + 2 * i, 3, "%02x", pub[i]);
+         setenv("INFINITE_LICENSE_DIR", dir.c_str(), 1);
+         setenv("INFINITE_LICENSE_PUBKEY", hex, 1);
+         WriteKey(Key("INF-CHEC-K234", 1));
+         WriteRevoked("", int64_t(std::time(nullptr)));
+      }
+      ~LicenseFixture()
+      {
+         if (!dir.empty())
+         {
+            std::error_code ec;
+            std::filesystem::remove_all(dir, ec);
+         }
+      }
+   };
+   LicenseFixture gLicense;
 
    std::vector<int> EnginePids()
    {
@@ -1297,8 +1391,272 @@ namespace
    }
 }
 
+namespace
+{
+   // An editor on an instance with a controller, as a DAW opens one (offscreen window).
+   struct Editor
+   {
+      Instance a;
+      IPtr<IEditController> ec;
+      FUnknownPtr<IConnectionPoint> cpComp, cpCtrl;
+      IPtr<IPlugView> view;
+      void* parent = nullptr;
+      void* child = nullptr;
+      bool opened = false;
+
+      bool Open(Plugin& p, bool fx)
+      {
+         opened = a.Open(p, fx, kRealtime);
+         TUID cid;
+         if (opened && a.comp->getControllerClassId(cid) == kResultOk)
+            ec = p.mod->getFactory().createInstance<IEditController>(VST3::UID::fromTUID(cid));
+         if (!ec || ec->initialize(&gHost) != kResultOk)
+            return false;
+         cpComp = FUnknownPtr<IConnectionPoint>(a.comp);
+         cpCtrl = FUnknownPtr<IConnectionPoint>(ec);
+         if (!cpComp || !cpCtrl)
+            return false;
+         cpComp->connect(cpCtrl);
+         cpCtrl->connect(cpComp);
+         view = owned(ec->createView(ViewType::kEditor));
+         if (!view)
+            return false;
+         parent = ViewCheck::NewParent(1280, 800, nullptr);
+         ViewRect r { 0, 0, 1280, 800 };
+         view->onSize(&r);
+         view->attached(parent, kPlatformTypeNSView);
+         child = ViewCheck::Child(parent);
+         return child != nullptr;
+      }
+
+      // Pumps until pred() or the timeout; true when it held.
+      bool WaitFor(const std::function<bool()>& pred, double seconds)
+      {
+         const auto t0 = std::chrono::steady_clock::now();
+         while (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < seconds)
+         {
+            ViewCheck::Pump(20);
+            if (pred())
+               return true;
+         }
+         return pred();
+      }
+      std::string Label() { return child ? ViewCheck::Label(child) : std::string(); }
+
+      void Close()
+      {
+         if (view)
+         {
+            view->removed();
+            view = nullptr;
+         }
+         if (cpComp && cpCtrl)
+         {
+            cpComp->disconnect(cpCtrl);
+            cpCtrl->disconnect(cpComp);
+         }
+         if (ec)
+            ec->terminate();
+         ec = nullptr;
+         if (opened)
+            a.Close();
+         opened = false;
+         if (parent)
+            ViewCheck::FreeParent(parent);
+         parent = child = nullptr;
+      }
+   };
+
+   pid_t StartHttpServer(const std::string& dir, int port)
+   {
+      const pid_t pid = fork();
+      if (pid == 0)
+      {
+         const std::string p = std::to_string(port);
+         freopen("/dev/null", "w", stderr);
+         freopen("/dev/null", "w", stdout);
+         execlp("python3", "python3", "-m", "http.server", p.c_str(), "--bind", "127.0.0.1", "--directory", dir.c_str(), (char*)nullptr);
+         _exit(127);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(800));
+      return pid;
+   }
+
+   void RunLicenseChecks(Plugin& inst, Plugin& fx)
+   {
+      char d[256];
+      const std::string valid = gLicense.Key("INF-CHEC-K234", 1);
+
+      // ---- License.cpp on its own ----
+      {
+         const std::string wrapped = "Your key:\n  \"" + valid.substr(0, 40) + "\n  " + valid.substr(40) + "\"\n\nThanks";
+         Check(License::Extract(wrapped) == valid && License::Extract("no key here").empty(),
+               "licence: a key wrapped across lines, in quotes, is found; text without one gives none");
+         std::string tampered = valid;
+         const size_t at = tampered.size() - 20; // inside the signature
+         tampered[at] = tampered[at] == 'A' ? 'B' : 'A';
+         const License::Info ok = License::Check(valid, {}, 1);
+         const License::Info bad = License::Check(tampered, {}, 1);
+         const License::Info old = License::Check(gLicense.Key("INF-CHEC-K234", 0), {}, 1);
+         const License::Info newer = License::Check(gLicense.Key("INF-CHEC-K234", 2), {}, 1);
+         const License::Info v2 = License::Check(gLicense.Key("INF-CHEC-K234", 1, 2), {}, 1);
+         const License::Info refunded = License::Check(valid, { "INF-OTHR-2345", "INF-CHEC-K234" }, 1);
+         std::snprintf(d, sizeof d, "valid \"%s\", tampered \"%s\", major 0 \"%s\", refunded \"%s\"", License::Message(ok).c_str(),
+                       License::Message(bad).c_str(), License::Message(old).c_str(), License::Message(refunded).c_str());
+         Check(ok.status == License::Status::Valid && ok.id == "INF-CHEC-K234" && newer.status == License::Status::Valid &&
+                   bad.status == License::Status::BadSignature && old.status == License::Status::WrongMajor &&
+                   License::Message(old) == "Your key covers 0.x" && v2.status == License::Status::WrongVersion &&
+                   refunded.status == License::Status::Revoked && License::Message(refunded) == "This key was refunded",
+               "licence: signature, major, payload version and refund list checked", d);
+      }
+
+      // A licensed FX instance's state, to restore into an unlicensed one.
+      std::vector<uint8_t> blob;
+      {
+         Instance a;
+         if (a.Open(fx, true, kOffline))
+         {
+            Render(a, int64_t(kRate), false);
+            blob = GetBlob(a);
+            a.Close();
+         }
+      }
+
+      gLicense.RemoveKey();
+      const size_t baseline = EnginePids().size();
+
+      // ---- no key: Instrument silent, FX dry by exactly L, no engine, state untouched ----
+      {
+         Instance a;
+         const bool ok = a.Open(inst, false, kOffline);
+         Script s;
+         s.noteOnAt = 4800;
+         s.noteOffAt = 40000;
+         const auto r = ok ? Render(a, 48000, false, s) : std::vector<float>();
+         const size_t during = EnginePids().size();
+         a.Close();
+         double peak = 0.0;
+         for (float x : r)
+            peak = std::max(peak, double(std::fabs(x)));
+         std::snprintf(d, sizeof d, "peak %.3g, engines %zu -> %zu", peak, baseline, during);
+         Check(ok && !r.empty() && peak == 0.0 && during == baseline, "licence: no key, the Instrument is silent and spawns no engine", d);
+      }
+      {
+         Instance a;
+         const bool ok = a.Open(fx, true, kOffline);
+         const auto r = ok ? Render(a, int64_t(kRate) * 2, false) : std::vector<float>();
+         const size_t during = EnginePids().size();
+         std::vector<uint8_t> back;
+         bool stateOk = false;
+         if (ok && !blob.empty())
+         {
+            stateOk = SetBlob(a, blob) == kResultOk;
+            back = GetBlob(a);
+         }
+         a.Close();
+         double e = 0.0;
+         for (int64_t t = 0; t < int64_t(r.size()); t++)
+            e = std::max(e, double(std::fabs(r[size_t(t)] - (t >= kBlock ? Sine(t - kBlock) : 0.0f))));
+         std::snprintf(d, sizeof d, "max error vs input delayed %d: %.2e, engines %zu -> %zu", kBlock, e, baseline, during);
+         Check(ok && !r.empty() && e == 0.0 && during == baseline, "licence: no key, the FX passes its input dry, delayed by exactly L", d);
+         Check(stateOk && !blob.empty() && back == blob, "licence: no key, getState returns exactly what setState got");
+      }
+
+      // ---- the sheet: message, Paste key, bad and old keys refused, a valid key starts the engine ----
+      {
+         Editor e;
+         const bool ok = e.Open(inst, false);
+         const bool sheet = ok && e.WaitFor([&] { return e.Label() == "Enter your key"; }, 5.0);
+         const std::string button = e.child ? ViewCheck::Button(e.child) : std::string();
+         const size_t during = EnginePids().size();
+         std::snprintf(d, sizeof d, "label \"%s\", button \"%s\", engines %zu -> %zu", e.Label().c_str(), button.c_str(), baseline, during);
+         Check(sheet && button == "Paste key" && during == baseline, "licence: the editor shows the licence sheet, no engine", d);
+
+         const bool typed = e.child && ViewCheck::TypeKey(e.child, "hello");
+         const bool refused = typed && e.WaitFor([&] { return e.Label() == "Not a valid key"; }, 3.0);
+         ViewCheck::Pump(1500); // the once-a-second recheck must not clear the message
+         const bool kept = e.Label() == "Not a valid key";
+         ViewCheck::TypeKey(e.child, gLicense.Key("INF-CHEC-K234", 0));
+         const bool old = e.WaitFor([&] { return e.Label() == "Your key covers 0.x"; }, 3.0);
+         std::snprintf(d, sizeof d, "label \"%s\"", e.Label().c_str());
+         Check(refused && kept && old && EnginePids().size() == baseline, "licence: the sheet refuses a bad key and an older major's", d);
+
+         ViewCheck::TypeKey(e.child, "  " + valid + "\n");
+         const bool started = e.WaitFor([&] { return EnginePids().size() > baseline; }, 10.0);
+         const bool left = e.WaitFor([&] { return e.Label() != "Your key covers 0.x"; }, 5.0);
+         std::snprintf(d, sizeof d, "engine %s, label \"%s\", stored %s", started ? "started" : "none", e.Label().c_str(),
+                       gLicense.StoredKey() == valid ? "yes" : "no");
+         Check(started && left && gLicense.StoredKey() == valid, "licence: a valid key from the sheet is stored and starts the engine", d);
+         e.Close();
+         e.WaitFor([&] { return EnginePids().size() == baseline; }, 3.0);
+      }
+
+      // ---- a key stored by another instance starts this one (recheck while the sheet shows) ----
+      {
+         gLicense.RemoveKey();
+         Editor e;
+         const bool ok = e.Open(fx, true);
+         const bool sheet = ok && e.WaitFor([&] { return e.Label() == "Enter your key"; }, 5.0);
+         gLicense.WriteKey(valid);
+         const auto t0 = std::chrono::steady_clock::now();
+         const bool started = sheet && e.WaitFor([&] { return EnginePids().size() > baseline; }, 5.0);
+         const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+         std::snprintf(d, sizeof d, "engine after %.1f s", s);
+         Check(started && s < 3.0, "licence: a key entered in another instance starts this one", d);
+         e.Close();
+         e.WaitFor([&] { return EnginePids().size() == baseline; }, 3.0);
+      }
+
+      // ---- refunded: the engine's weekly check finds the id, the engine stops, the FX goes dry ----
+      {
+         const std::string served = gLicense.dir + "/served";
+         std::filesystem::create_directories(served);
+         LicenseFixture::Write(served + "/revoked.json", "{\"revoked\":[\"INF-CHEC-K234\"]}");
+         const int port = 18000 + int(getpid() % 1000);
+         const pid_t server = StartHttpServer(served, port);
+         setenv("INFINITE_LICENSE_REVOKED_URL", ("http://127.0.0.1:" + std::to_string(port) + "/revoked.json").c_str(), 1);
+         gLicense.WriteRevoked("", 0); // a week old: the engine fetches
+         gLicense.WriteKey(valid);
+         Instance a;
+         const bool ok = a.Open(fx, true, kRealtime);
+         const auto r = ok ? Render(a, int64_t(kRate) * 8, true) : std::vector<float>();
+         const size_t after = EnginePids().size();
+         a.Close();
+         const License::Info cur = License::Current(1);
+         const double e = MaxErrDelayed(r, int64_t(r.size()) - int64_t(kRate));
+         std::snprintf(d, sizeof d, "engines after %zu (baseline %zu), stored key \"%s\", dry error over the last second %.2e", after,
+                       baseline, License::Message(cur).c_str(), e);
+         Check(ok && after == baseline && cur.status == License::Status::Revoked && e == 0.0,
+               "licence: a refunded key stops the engine within the run; the FX plays dry", d);
+         unsetenv("INFINITE_LICENSE_REVOKED_URL");
+         if (server > 0)
+         {
+            kill(server, SIGTERM);
+            waitpid(server, nullptr, 0);
+         }
+         gLicense.WriteRevoked("", int64_t(std::time(nullptr)));
+      }
+   }
+}
+
 int main(int argc, char** argv)
 {
+   // Every check runs licensed (a temp key, never the user's); RunLicenseChecks takes it away.
+   gLicense.Setup();
+   // For au_check: a test key, its public key and a fresh refund list into <dir> (an out-of-process
+   // AU host gets no environment, so it reads them from the real per-user folder; remove after).
+   if (argc >= 3 && std::string(argv[1]) == "--write-license")
+   {
+      const std::string dir = argv[2];
+      std::filesystem::create_directories(dir);
+      char hex[65];
+      for (int i = 0; i < 32; i++)
+         std::snprintf(hex + 2 * i, 3, "%02x", gLicense.pub[i]);
+      LicenseFixture::Write(dir + "/license.inflic", gLicense.Key("INF-CHEC-K234", 1) + "\n");
+      LicenseFixture::Write(dir + "/license-test-key.hex", std::string(hex) + "\n");
+      LicenseFixture::Write(dir + "/license-revoked.json", "{\"revoked\":[],\"fetched\":" + std::to_string((long long)std::time(nullptr)) + "}");
+      return 0;
+   }
    if (argc >= 3 && std::string(argv[1]) == "--view")
    {
       Plugin inst;
@@ -1458,6 +1816,7 @@ int main(int argc, char** argv)
    RunViewChecks(inst);
    RunNoGraphicsCheck(inst);
    RunDrillChecks(inst, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/R1-instrument.inf");
+   RunLicenseChecks(inst, fx);
 
    std::this_thread::sleep_for(std::chrono::milliseconds(300));
    Check(EnginePids().size() == baseline, "no engine left after terminate");

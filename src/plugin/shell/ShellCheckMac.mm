@@ -129,6 +129,19 @@ namespace ViewCheck
          }
    }
 
+   bool TypeKey(void* view, const std::string& text)
+   {
+      for (NSView* sub in ((NSView*)view).subviews)
+         if ([sub isKindOfClass:[NSTextField class]] && !sub.hidden && ((NSTextField*)sub).editable)
+         {
+            NSTextField* f = (NSTextField*)sub;
+            f.stringValue = [NSString stringWithUTF8String:text.c_str()] ?: @"";
+            [f sendAction:f.action to:f.target];
+            return true;
+         }
+      return false;
+   }
+
    int OnScreenWindows(int pid)
    {
       int n = 0;

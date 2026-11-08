@@ -204,6 +204,14 @@ plutovg and lunasvg (Sketch drawing and SVG import, all platforms)
 2020-2025 (lunasvg) Samuel Ugochukwu. Full text in the `LICENSE` file of each
 folder.
 
+Monocypher 4.0.2 (plugin licence check, all platforms)
+------------------------------------------------------
+
+Ed25519 signature check for plugin licence keys (`external/monocypher/`,
+`src/core/License.cpp`). Dual licensed BSD-2-Clause or CC0-1.0; Copyright (c)
+2017-2023 Loup Vaillant, (c) 2017-2019 Michael Savage, (c) 2017-2023 Fabio
+Scotoni. Full text in `external/monocypher/LICENCE.md`.
+
 Steinberg ASIO SDK (Windows, optional)
 --------------------------------------
 

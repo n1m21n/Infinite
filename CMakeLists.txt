@@ -445,6 +445,9 @@ set(COMMON_SOURCES
     # Plugin engine mode (docs/plans/vst-au/README.md 8.1): host-driven audio for one plugin instance
     src/plugin/engine/HostAudio.cpp
     src/plugin/engine/PluginView.cpp
+    src/core/License.cpp
+    external/monocypher/monocypher.c
+    external/monocypher/monocypher-ed25519.c
     # src/app/**: code that used to live in src/main.cpp
     src/app/AppState.cpp
     src/app/Startup.cpp
@@ -1220,6 +1223,10 @@ add_executable(Infinite ${COMMON_SOURCES})
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
 # User-Agent header, etc.).
 target_compile_definitions(Infinite PRIVATE INFINITE_VERSION_STRING="${INFINITE_VERSION}")
+# Plugin licence (src/core/License.h): the engine reads only the key's id, for the refund check.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/worker/license/PUBLIC_KEY.txt" INFINITE_LICENSE_PUBKEY_HEX)
+string(STRIP "${INFINITE_LICENSE_PUBKEY_HEX}" INFINITE_LICENSE_PUBKEY_HEX)
+target_compile_definitions(Infinite PRIVATE INFINITE_LICENSE_PUBKEY_HEX="${INFINITE_LICENSE_PUBKEY_HEX}")
 # Debug only: Dear ImGui item hooks for the UI audit (src/app/selftest/UiAudit.cpp). Never in a release.
 target_compile_definitions(Infinite PRIVATE $<$<CONFIG:Debug>:IMGUI_ENABLE_TEST_ENGINE>)
 
