@@ -107,9 +107,9 @@ namespace app
       FormParts::Section(T("Licence"));
       FormParts::Label(L("Plugin"));
       ImGui::AlignTextToFramePadding();
-      ImGui::TextUnformatted(T("Paid. The standalone app stays free."));
+      ImGui::TextWrapped("%s", T("Infinite as a VST3/AU plugin runs inside your DAW, with your patch saved in the project. The plugin is a one-time purchase for two computers, with updates for life. The standalone app stays free."));
       FormParts::Label("");   // its own row, like the install actions: a chip beside text sits off the text line
-      if (FormParts::Button(L("Buy")))
+      if (FormParts::Button(L("Buy the plugin")))
          Platform::OpenExternalUrl(License::kBuyUrl);
    }
 }
