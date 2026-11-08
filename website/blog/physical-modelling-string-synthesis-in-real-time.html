@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="midnight">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>Physical Modelling String Synthesis in Real Time | Infinite</title>
+  <meta name="description" content="How physical modelling string synthesis works: digital waveguides, Karplus-Strong delay loops, allpass dispersion, bow friction, and acoustic modal bodies.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/physical-modelling-string-synthesis-in-real-time.html">
+  <meta property="og:title" content="Physical Modelling String Synthesis in Real Time | Infinite">
+  <meta property="og:description" content="How physical modelling string synthesis works: digital waveguides, Karplus-Strong delay loops, allpass dispersion, bow friction, and acoustic modal bodies.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/blog_physical-modelling-string-synthesis-in-real-time.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/physical-modelling-string-synthesis-in-real-time.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Physical Modelling String Synthesis in Real Time | Infinite">
+  <meta name="twitter:description" content="How physical modelling string synthesis works: digital waveguides, Karplus-Strong delay loops, allpass dispersion, bow friction, and acoustic modal bodies.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_physical-modelling-string-synthesis-in-real-time.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="../style.css?v=34878888">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
+  <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "BlogPosting"], "headline": "Physical modelling string synthesis in real time", "description": "How physical modelling string synthesis works: digital waveguides, Karplus-Strong delay loops, allpass dispersion, bow friction, and acoustic modal bodies.", "datePublished": "2026-11-08", "dateModified": "2026-11-08", "mainEntityOfPage": "https://infinitedevices.org/blog/physical-modelling-string-synthesis-in-real-time.html", "url": "https://infinitedevices.org/blog/physical-modelling-string-synthesis-in-real-time.html", "image": ["https://infinitedevices.org/assets/blog_physical-modelling-string-synthesis-in-real-time.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "physical modelling, digital waveguides, sound design, modular synthesis, dsp", "wordCount": 2715, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Physical modelling string synthesis in real time", "item": "https://infinitedevices.org/blog/physical-modelling-string-synthesis-in-real-time.html"}]}</script>
+  <link rel="stylesheet" href="../system.css?v=23625436">
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
+  <link rel="stylesheet" href="../search.css?v=96e10ca3">
+</head>
+<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
+          <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a class="btn btn-primary nav-sheet-cta" href="../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub repository" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Creative</p>
+          <h1>Physical modelling string synthesis in real time</h1>
+          <p class="post-lede">How physical modelling string synthesis works: digital waveguides, Karplus-Strong delay loops, allpass dispersion, bow friction, and acoustic modal bodies.</p>
+          <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">8 November 2026 · 12 min read</span></span></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/blog_physical-modelling-string-synthesis-in-real-time.png" alt="Technical architecture diagram of real-time physical modelling string synthesis showing digital waveguide delay loops, dispersion allpass filters, exciter models, and modal acoustic bodies" width="1200" height="675" decoding="async"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#what-physical-modelling-solves-in-computer-music">What physical modelling solves in computer music</a></li><li><a href="#digital-waveguides-bidirectional-delay-lines-and-wave-propagation">Digital waveguides: bidirectional delay lines and wave propagation</a></li><li><a href="#tuning-and-fractional-delay-solving-the-phase-allpass-filter">Tuning and fractional delay: solving the phase allpass filter</a></li><li><a href="#dispersion-and-stiffness-inharmonicity-across-higher-partials">Dispersion and stiffness: inharmonicity across higher partials</a></li><li><a href="#exciter-mechanics-pluck-hammer-strike-and-bow-friction">Exciter mechanics: pluck, hammer strike, and bow friction</a></li><li><a href="#acoustic-radiation-mode-tables-and-modal-bodies">Acoustic radiation: mode tables and modal bodies</a></li><li><a href="#building-an-audiovisual-physical-modelling-patch-in-infinite">Building an audiovisual physical modelling patch in Infinite</a></li><li><a href="#performance-characteristics-and-real-time-execution">Performance characteristics and real-time execution</a></li></ol></details>
+        <div class="prose">
+<p>Physical modelling synthesis generates sound by simulating the actual physical mechanics of vibrating matter rather than playing static wavetables or filtering raw geometric waveforms. While traditional subtractive synthesis uses mathematical approximations like saw and square waves, and sample libraries replay pre-recorded audio recordings of instruments, physical modelling calculates the physical wave propagation, boundary reflections, internal material damping, and structural resonance of acoustic objects in code.</p>
+<p>When you pluck, strike, or bow an acoustic string, its sonic timbre evolves dynamically across every note. The attack transient reflects the pick position along the string length, the mechanical stiffness produces subtle inharmonic frequency shifts across higher partials, and the wooden instrument body colours the acoustic radiation through dozens of coupled resonant modes.</p>
+<p>In real-time audiovisual environments like <a href="https://infinitedevices.org/">Infinite</a>, physical modelling provides an expressive foundation for both sound design and generative visuals. Because the underlying physical variables (such as string velocity, bridge displacement, and energy dissipation) are evaluated directly on the audio thread, they can be routed seamlessly into 3D geometry deformation and real-time shaders.</p>
+<p>Here is an in-depth examination of how digital waveguide physical modelling operates, how fractional allpass filters maintain pitch accuracy, how dispersion creates natural inharmonicity, how exciter mechanics simulate plucking, striking, and bowing, and how to patch a complete physical modelling instrument using native nodes.</p>
+<figure><img src="https://infinitedevices.org/assets/blog_physical-modelling-string-synthesis-in-real-time.png" alt="Technical architecture diagram of real-time physical modelling string synthesis showing digital waveguide delay loops, dispersion allpass filters, exciter models, and modal acoustic bodies" width="1200" height="675" loading="lazy" decoding="async"><figcaption>Technical architecture diagram of real-time physical modelling string synthesis showing digital waveguide delay loops, dispersion allpass filters, exciter models, and modal acoustic bodies</figcaption></figure>
+<h2 id="what-physical-modelling-solves-in-computer-music">What physical modelling solves in computer music</h2>
+<p>The central challenge with electronic instruments is acoustic realism and continuous expressiveness. A sampled acoustic guitar or cello can capture the timbre of an isolated note, but it struggles with real-time articulation. When a performer alters bow pressure, slides between frets, or alternates between fingerpicking and a sharp plectrum, a sample library must crossfade between distinct recordings. This often creates phase cancellation, unnatural chorusing, or static, repetitive transients known as the machine-gun effect.</p>
+<p>Subtractive synthesis offers continuous modulation through filters and envelopes, but its harmonic structure remains synthetic. An oscillator running through a resonant lowpass filter lacks the complex modal distribution and material losses of real wood and vibrating steel.</p>
+<p>Physical modelling solves this by simulating the physical acoustic system from first principles. When you alter a parameter like string stiffness or bow velocity, you are not adjusting an artificial audio filter: you are modifying the physical differential equation governing wave motion. The resulting acoustic response reacts organically, producing natural transients, sympathetic resonance, and expressive feedback.</p>
+<h2 id="digital-waveguides-bidirectional-delay-lines-and-wave-propagation">Digital waveguides: bidirectional delay lines and wave propagation</h2>
+<p>The foundation of modern string modelling is the digital waveguide, formulated by Julius O. Smith (1992) as an extension of the pioneering Karplus-Strong plucked string algorithm (1983).</p>
+<p>The physical motion of an ideal vibrating string is governed by the one-dimensional acoustic wave equation:</p>
+<pre><code>d^2 y / dt^2 = c^2 * (d^2 y / dx^2)</code></pre>
+<p>Where <code>y</code> represents transverse displacement, <code>t</code> is time, <code>x</code> is the spatial coordinate along the string, and <code>c</code> is the wave propagation speed determined by string tension <code>T</code> and linear mass density <code>mu</code> (<code>c = sqrt(T / mu)</code>).</p>
+<p>D'Alembert showed that any solution to this differential equation can be decomposed into two independent travelling waves moving in opposite directions:</p>
+<pre><code>y(x, t) = y_plus(t - x/c) + y_minus(t + x/c)</code></pre>
+<p>Here, <code>y_plus</code> represents a wave travelling to the right (towards the bridge), and <code>y_minus</code> represents a wave travelling to the left (towards the nut).</p>
+<h3 id="discretisation-into-digital-delay-lines">Discretisation into digital delay lines</h3>
+<p>In a computer simulation, continuous spatial wave propagation is discretised into two tapped delay lines. The total round-trip propagation time corresponds to the period of the fundamental frequency <code>f_0</code>:</p>
+<pre><code>Period T = 1.0 / f_0
+Delay samples N = f_s / f_0</code></pre>
+<p>Where <code>f_s</code> is the digital sample rate (such as 44,100 Hz or 48,000 Hz).</p>
+<p>At the string boundaries, the travelling waves undergo physical reflections:</p>
+<ol><li><strong>The nut (fret boundary)</strong>: Assumed to be rigid. The string displacement must be zero at <code>x = 0</code>, forcing an inverting reflection with reflection coefficient <code>R_0 = -1</code>. The wave reflects with inverted phase.</li><li><strong>The bridge</strong>: The string terminates at a bridge that transfers energy to the resonant instrument body. The bridge reflection is modelled by an inverting reflection combined with a frequency-dependent loop filter <code>H_loop(z)</code> that accounts for energy loss and phase delay.</li></ol>
+<p>When a pulse is injected into the bidirectional delay loop, it travels back and forth between the nut and bridge. Each round trip corresponds to one cycle of the fundamental pitch, producing a rich harmonic spectrum.</p>
+<h2 id="tuning-and-fractional-delay-solving-the-phase-allpass-filter">Tuning and fractional delay: solving the phase allpass filter</h2>
+<p>In a naive digital delay line, the buffer length is constrained to integer sample counts <code>N = floor(f_s / f_0)</code>.</p>
+<p>This creates a serious musical problem: pitch quantization. For high notes, the integer rounding error causes severe out-of-tune intonation. For instance, at a sample rate of 48 kHz:</p>
+<ul><li>A note at 1000 Hz requires <code>48000 / 1000 = 48.0</code> samples.</li><li>The next semitone up (1059.25 Hz) requires <code>48000 / 1059.25 = 45.315</code> samples.</li><li>Rounding to 45 samples produces 1066.67 Hz, an unacceptable tuning error of over 12 cents.</li></ul>
+<p>To achieve exact microtonal and chromatic intonation, the delay loop must support fractional sample delays.</p>
+<h3 id="the-first-order-allpass-filter">The first-order allpass filter</h3>
+<p>In the native <a href="https://infinitedevices.org/nodes/string.html"><code>String</code></a> node in Infinite, fractional delay is implemented using a first-order allpass filter:</p>
+<pre><code>A(z) = (a + z^-1) / (1.0 + a * z^-1)</code></pre>
+<p>An allpass filter has a flat magnitude frequency response of exactly 1.0 across all frequencies, but its phase response introduces a controllable group delay without causing any artificial attenuation or damping in the loop.</p>
+<p>The phase delay <code>D(w)</code> of the allpass filter at angular frequency <code>w</code> radians per sample is:</p>
+<pre><code>D(w) = - (atan2(-sin(w), a + cos(w)) - atan2(-a * sin(w), 1.0 + a * cos(w))) / w</code></pre>
+<p>Because delay decreases monotonically as coefficient <code>a</code> rises, the engine solves for the exact coefficient <code>a</code> using a numerical bisection solver across 40 iterations on every parameter update chunk:</p>
+<pre><code class="language-cpp">double SolveAllpass(double delay, double w)
+{
+   double lo = -0.95, hi = 0.95;
+   for (int it = 0; it &lt; 40; it++)
+   {
+      const double mid = 0.5 * (lo + hi);
+      if (AllpassDelay(mid, w) &gt; delay)
+         lo = mid;
+      else
+         hi = mid;
+   }
+   return 0.5 * (lo + hi);
+}</code></pre>
+<p>By subtracting the fractional delay of the allpass filter and loop filter from the total delay requirement, the fundamental pitch <code>f_0</code> remains mathematically exact, regardless of how other controls like decay, tone, and stiffness are adjusted.</p>
+<h2 id="dispersion-and-stiffness-inharmonicity-across-higher-partials">Dispersion and stiffness: inharmonicity across higher partials</h2>
+<p>In a purely flexible, mathematical string, all harmonic partials are exact integer multiples of the fundamental frequency: <code>f_k = k * f_0</code>.</p>
+<p>Real physical strings (such as piano wire, bass guitar strings, or harp strings), however, possess inherent bending stiffness. A stiff wire resists bending, introducing an additional restoring force governed by the Euler-Bernoulli beam equation:</p>
+<pre><code>d^2 y / dt^2 = c^2 * (d^2 y / dx^2) - kappa^2 * (d^4 y / dx^4)</code></pre>
+<p>Where <code>kappa</code> is the stiffness parameter.</p>
+<p>The consequence of this fourth-order derivative is dispersion: higher-frequency waves travel along the string faster than lower-frequency waves. As a result, the higher partials are displaced upwards in frequency, following the inharmonicity formula:</p>
+<pre><code>f_k = k * f_0 * sqrt(1.0 + B * k^2)</code></pre>
+<p>Where <code>B</code> is the inharmonicity coefficient.</p>
+<h3 id="modelling-dispersion-with-allpass-cascades">Modelling dispersion with allpass cascades</h3>
+<p>Without stiffness, a plucked digital string sounds sterile and electronic, resembling a simple comb-filtered pulse. When stiffness is introduced, the upper partials ring with the distinct metallic attack and organic complexity heard in real acoustic instruments.</p>
+<p>In Infinite's <code>String</code> node, dispersion is implemented using a cascade of four first-order allpass filters placed directly in the feedback path of the bridge. Each allpass stage adds frequency-dependent phase delay, slightly advancing the arrival time of higher harmonics relative to the fundamental.</p>
+<p>Modulating the <code>stiffness</code> parameter shifts the string character from a warm, flexible nylon classical guitar string to a taut, clanging steel piano wire or metallic bass string.</p>
+<h2 id="exciter-mechanics-pluck-hammer-strike-and-bow-friction">Exciter mechanics: pluck, hammer strike, and bow friction</h2>
+<p>A physical string model requires an excitation source to inject kinetic energy into the delay lines. The nature of this excitation dictates whether the instrument sounds plucked, struck, or bowed.</p>
+<p>The <code>String</code> node features three distinct physical exciter models:</p>
+<h3 id="1-pluck-excitation">1. Pluck excitation</h3>
+<p>A plectrum or finger plucks a string by displacing it at a specific normalised position <code>x_rel</code> (from 0.0 at the bridge to 1.0 at the nut). When released, the initial triangular displacement splits into two identical half-amplitude pulses propagating in opposite directions towards the nut and bridge.</p>
+<p>The point of excitation introduces comb filtering. Plucking near the bridge (<code>position = 0.1</code>) suppresses low frequencies and emphasizes sharp, nasal upper harmonics. Plucking near the centre (<code>position = 0.5</code>) eliminates even harmonics, producing a hollow, clarinet-like tone.</p>
+<p>The <code>hardness</code> parameter controls the pulse duration. A hard pick generates an instantaneous sharp spike, exciting high-frequency energy up to the Nyquist frequency. A soft finger widens the pulse up to tenfold, naturally rounding and softening the transient attack.</p>
+<h3 id="2-strike-excitation">2. Strike excitation</h3>
+<p>A strike models a piano or dulcimer felt hammer hitting the string. Unlike an instantaneous pluck, a felt hammer has physical mass and compliant elasticity.</p>
+<p>The interaction is non-linear: a soft strike compresses the felt gently, resulting in a prolonged contact duration and a warm, mellow tone. A heavy strike compresses the felt rapidly into its dense wooden core, drastically shortening the contact duration and releasing a burst of bright, forceful upper partials.</p>
+<p>In code, the pulse length scales dynamically with incoming note velocity:</p>
+<pre><code class="language-cpp">pulseLen = max(2, round(sampleRate * (0.004 - 0.003 * velocity)));</code></pre>
+<h3 id="3-bow-excitation-smith-s-friction-junction">3. Bow excitation (Smith's friction junction)</h3>
+<p>Bowing a string is a continuous, self-oscillating non-linear process driven by friction between sticky rosin-coated horsehair and the string.</p>
+<p>The bow moves at a constant speed <code>v_bow</code>. The interaction alternates rapidly between two phases:</p>
+<ul><li><strong>Stick phase</strong>: Static friction holds the string against the bow hair, dragging the string along with the bow until tension forces overcome friction.</li><li><strong>Slip phase</strong>: The string breaks free and snaps backwards towards its resting point under dynamic friction.</li></ul>
+<p>This stick-slip mechanism is modelled using a non-linear friction characteristic curve:</p>
+<pre><code>F_friction(v_rel) = sign(v_rel) * (mu_dynamic + (mu_static - mu_dynamic) * exp(-c * |v_rel|)) * F_bow</code></pre>
+<p>Where <code>v_rel = v_bow - v_string</code> is the relative velocity between bow and string, and <code>F_bow</code> is normal bow pressure.</p>
+<p>The <code>String</code> node implements bow friction with oversampled integration (up to 8x internal oversampling for high notes) to eliminate digital limit cycles. Modulating the <code>pressure</code> and <code>noise</code> parameters allows you to recreate authentic string scrapes, raspy rosin friction, and the smooth transition into pure sustained Helmholtz bowing.</p>
+<h2 id="acoustic-radiation-mode-tables-and-modal-bodies">Acoustic radiation: mode tables and modal bodies</h2>
+<p>An isolated vibrating string has very little surface area. In an acoustic instrument, virtually all audible sound radiates from the resonant wooden soundboard and body cavity (the body of a guitar, violin, or cello).</p>
+<p>The instrument body acts as a complex acoustic filter with dozens of closely spaced resonant peaks. Rather than running a static graphic equaliser, Infinite couples the string output to a shared modal resonator bank (<a href="https://infinitedevices.org/nodes/resonator-bank.html"><code>DenseBody</code></a>).</p>
+<p>The body simulation evaluates ten parallel second-order modal bandpass resonators, each configured with an exact centre frequency, bandwidth, and amplitude mode table:</p>
+<pre><code>y_body(t) = sum_{m=1}^{10} A_m * exp(-alpha_m * t) * sin(omega_m * t + phi_m)</code></pre>
+<p>Infinite includes five calibrated body profiles fitted from acoustic measurements of real instruments:</p>
+<div class="table-wrap"><table><thead><tr><th>Body profile</th><th>Key acoustic resonances</th><th>Sonic character</th></tr></thead><tbody><tr><td><strong>Box</strong></td><td>Helmholtz cavity (98 Hz) and primary plate mode (204 Hz)</td><td>Small hollow acoustic box with dry, woody decay</td></tr><tr><td><strong>Guitar</strong></td><td>Air mode A0 (99 Hz), top plate T(1,1) pair (199 Hz, 392 Hz)</td><td>Warm, balanced acoustic dreadnought and classical guitar</td></tr><tr><td><strong>Harp</strong></td><td>Soundboard resonance (211 Hz) and pillar modes (325 Hz)</td><td>Open, airy, resonant decay with singing sustain</td></tr><tr><td><strong>Violin</strong></td><td>Air mode A0 (281 Hz), corpus corpus modes B1-/B1+ (445 Hz, 535 Hz)</td><td>Focused, expressive acoustic projection with bite</td></tr><tr><td><strong>Cello</strong></td><td>Deep cavity mode (105 Hz) and body resonances (199 Hz, 320 Hz)</td><td>Rich, woody, authoritative low-frequency resonance</td></tr></tbody></table></div>
+<p>Because all active polyphonic voices feed into the same shared body filter, notes interact acoustically, vibrating the simulated soundboard and creating natural sympathetic depth.</p>
+<h2 id="building-an-audiovisual-physical-modelling-patch-in-infinite">Building an audiovisual physical modelling patch in Infinite</h2>
+<p>In Infinite, sound synthesis and visual rendering run on the same unified graph. You can patch an expressive physical modelling instrument and use its internal acoustics to deform 3D meshes in real time.</p>
+<pre><code>+----------------+      note       +------------------+      audio      +------------------+
+| Note Sequencer | --------------&gt; | String (Synth)   | --------------&gt; | Resonator Bank   |
++----------------+                 +------------------+                 +------------------+
+                                            ^                                    |
+                                            | pressure mod                       | audio
++----------------+                          |                                    v
+| LFO            | -------------------------+                           +------------------+
++----------------+                                                      | Audio Analyze    |
+                                                                        +------------------+
+                                                                                 |
+                                                                                 | spectral RMS
+                                                                                 v
++----------------+      mesh       +--------------------+      mesh     +------------------+
+| Cylinder Wire  | --------------&gt; | Audio Displacement | ------------&gt; | Render 3D        |
++----------------+                 +--------------------+               +------------------+</code></pre>
+<h3 id="step-1-create-the-note-driver-and-exciter">Step 1: Create the note driver and exciter</h3>
+<ol><li>Add a <a href="https://infinitedevices.org/nodes/note-sequencer.html"><code>Note Sequencer</code></a> node to the canvas. Set <code>division</code> to <code>1/16 sync</code> and program an arpeggiated melodic line.</li><li>Add a <a href="https://infinitedevices.org/nodes/string.html"><code>String</code></a> node. Connect the green note output of the <code>Note Sequencer</code> to the <code>notes</code> input of the <code>String</code> node.</li><li>On the <code>String</code> node, select <code>exciter: Bow</code> and choose <code>bodyType: Cello</code>.</li><li>Set <code>decay</code> to <code>2.4 s</code>, <code>stiffness</code> to <code>0.30</code>, and <code>tone</code> to <code>0.75</code>.</li></ol>
+<h3 id="step-2-add-dynamic-expressive-modulation">Step 2: Add dynamic expressive modulation</h3>
+<ol><li>Add an <a href="https://infinitedevices.org/nodes/lfo.html"><code>LFO</code></a> node. Set the shape to <code>Triangle</code> and tempo-sync the rate to <code>1/2 bar</code>.</li><li>Connect the LFO output cable to the <code>pressure</code> parameter of the <code>String</code> node. As the LFO oscillates, the simulated bow pressure increases and relaxes, moving naturally between gentle whispers and raspy, full-bodied string sustains.</li><li>Add a second slow LFO (or an envelope follower) routed to <code>position</code>, moving the bowing point between the bridge (sul ponticello) and the fingerboard (sul tasto).</li></ol>
+<h3 id="step-3-route-through-the-modal-resonator-and-analysis">Step 3: Route through the modal resonator and analysis</h3>
+<ol><li>Connect the audio output of <code>String</code> to a <a href="https://infinitedevices.org/nodes/resonator-bank.html"><code>Resonator Bank</code></a> node to introduce room resonance and spatial depth.</li><li>Connect the output to an <a href="https://infinitedevices.org/nodes/audio-analyze.html"><code>Audio Analyze</code></a> node. This extracts real-time amplitude envelopes, spectral RMS energy, and pitch tracking data on every audio buffer.</li></ol>
+<h3 id="step-4-deform-3d-geometry-in-render-3d">Step 4: Deform 3D geometry in Render 3D</h3>
+<ol><li>Add a <code>Cylinder</code> mesh primitive and set it to wireframe mode to represent a vibrating physical string.</li><li>Add an <a href="https://infinitedevices.org/nodes/audio-displacement.html"><code>Audio Displacement</code></a> node. Connect the mesh output into its geometry input, and connect the <code>spectralRms</code> output from <code>Audio Analyze</code> to the displacement amplitude.</li><li>Wire the resulting geometry into <a href="https://infinitedevices.org/nodes/render-3d.html"><code>Render 3D</code></a>.</li></ol>
+<p>When a note is bowed, the 3D string geometry physically vibrates with travelling wave deformations matching the exact frequency, damping, and decay of the acoustic digital waveguide.</p>
+<h2 id="performance-characteristics-and-real-time-execution">Performance characteristics and real-time execution</h2>
+<p>Running complex numerical differential equations and allpass filter cascades in real time requires strict computational discipline:</p>
+<ul><li><strong>Eight-voice polyphony</strong>: The <code>String</code> node supports up to 8 polyphonic voices. Unused voices are culled instantaneously when their decay envelope drops below -96 dB, conserving CPU cycles.</li><li><strong>Chunked parameter updates</strong>: Heavy mathematical operations (such as the 40-iteration allpass phase solver and modal coefficient recalculations) run once every 32 samples (0.7 ms at 48 kHz). Sample-rate audio buffers interpolate these values using lock-free atomic parameter mailboxes, avoiding audio dropouts or zipper noise.</li><li><strong>SIMD vectorisation</strong>: The modal body filter bank evaluates multiple biquad modes in parallel using AVX2 and ARM Neon vector instructions.</li><li><strong>Zero dynamic memory allocations</strong>: All waveguide ring buffers, allpass delay lines, and mode state arrays are statically pre-allocated at startup. The audio thread executes without heap allocations or mutex contention.</li></ul>
+<p>By combining the physical mathematics of acoustic wave propagation with real-time modular execution, physical modelling synthesis delivers responsive instruments that feel alive under your fingers and on screen.</p>
+<p>Explore native sound design and modular synthesis in the <a href="https://infinitedevices.org/library.html">Infinite Library</a>, inspect the full <a href="https://infinitedevices.org/nodes/">Node Reference</a>, or read our deep dive on <a href="https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html">audio-reactive GLSL shaders</a>.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="drum-and-bass-reese-bass-sound-design.html"><span class="mono">Creative</span><b>Drum and bass Reese bass sound design in modular synthesisers</b></a><a class="rel-card" href="granular-synthesis-modular-audio-sound-design.html"><span class="mono">Creative</span><b>Granular synthesis in modular audio: soundscapes and grain clouds</b></a><a class="rel-card" href="every-synthesizer-node-in-infinite-sound-design-guide.html"><span class="mono">Creative</span><b>Every synthesizer node in Infinite: the complete sound design guide</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../artists.html">Artists</a>
+          <a href="../musicians.html">Musicians</a>
+          <a href="../vjs.html">VJs</a>
+          <a href="../creative-coders.html">Creative coders</a>
+          <a href="../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../library.html">Library</a>
+          <a href="../samples/">Sample generator</a>
+          <a href="../artworks.html">Art gallery</a>
+          <a href="../nodes/">Nodes</a>
+          <a href="../embeds/">Embeds</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../index.html#learn">Get started</a>
+          <a href="../philosophy.html">Philosophy</a>
+          <a href="../chat.html">Agents &amp; terminal</a>
+          <a href="../blog/">Blog</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../benchmarks.html">Benchmarks</a>
+          <a href="../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting). <a href="../terms.html">Terms</a> · <a href="../refund.html">Refunds</a> · <a href="../privacy.html">Privacy</a></p>
+    </div>
+  </footer>
+  <script src="../site.js?v=21" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
+    <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="../chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+  <script src="../search.js?v=d89de447" defer></script>
+  <script src="../share.js?v=ad5e5392" defer></script>
+  <script src="../bird.js?v=d8c589b1" defer></script>
+</body>
+</html>
