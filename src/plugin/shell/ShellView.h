@@ -4,7 +4,8 @@
 // (src/plugin/ipc/PluginFrames.h); the view blits the newest one on a 120 Hz timer and sends mouse
 // and keys back. Everything the user sees (canvas, picture switch, Slots, xruns, pop-out) is drawn
 // by the engine in its top bar; the view draws natively only while there are no frames to show
-// ("Starting" / "Engine stopped" + Restart).
+// ("Starting" / "Engine stopped" + Restart, "In its own window" + Bring back, "No graphics on
+// this machine").
 //
 // macOS: ShellViewMac.mm (NSView). Windows and Linux views come in chunk 3; there createView
 // returns nullptr and hosts show their generic parameter editor.
@@ -25,6 +26,8 @@ namespace InfinitePlugin
       virtual void ViewState(const PluginFrames::ViewState& state) = 0;
       virtual void ViewInput(const PluginFrames::InputEvent* events, uint32_t count) = 0;
       virtual void ViewRestart() = 0;
+      // "Bring back": the engine's popped-out window returns into the view.
+      virtual void ViewPopIn() = 0;
       // The view is being destroyed: forget the pointer.
       virtual void ViewGone(ShellView* view) = 0;
    };
@@ -34,6 +37,8 @@ namespace InfinitePlugin
       Starting = 0,
       Running = 1,
       Stopped = 2,
+      // The engine could not open a GL window and quit (kMsgNoGraphics); no restart is offered.
+      NoGraphics = 3,
    };
 
    class ShellView : public Steinberg::CPluginView
@@ -46,6 +51,8 @@ namespace InfinitePlugin
       virtual void SetFrames(const char* name, uint64_t bytes) = 0;
       virtual void SetCursor(uint32_t cursor) = 0;
       virtual void SetEngine(EngineStatus status) = 0;
+      // The engine's window is out on its own: no frames, a "Bring back" button instead.
+      virtual void SetPopped(bool popped) = 0;
       // The controller is going away first: the view stops calling it.
       virtual void DropHost() = 0;
 

@@ -528,6 +528,15 @@ namespace app
       // Opaque window: a transparent background shows the checkerboard, as the node's own preview does,
       // never the canvas or desktop through the window (which read as a broken, frameless window).
       glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
+      // Plugin engine: the main window was made hidden and the hint is sticky; a projector is a
+      // real window on a real display, as in the app (README 8.2, step 2.4).
+      if (Platform::PluginModeActive())
+      {
+         Platform::AllowPluginEngineWindows();
+         glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+         glfwWindowHint(GLFW_FOCUSED, GLFW_TRUE);
+         glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
+      }
       GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
       if (projWindow == nullptr)
       {

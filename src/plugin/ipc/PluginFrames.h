@@ -88,9 +88,12 @@ namespace PluginFrames
    // shell -> engine
    constexpr uint32_t kMsgView = 103;      // payload: ViewState
    constexpr uint32_t kMsgViewInput = 104; // payload: InputEvent[]
+   constexpr uint32_t kMsgPopout = 105;    // payload: uint32_t, 1 = show the engine's own window, 0 = back into the view
    // engine -> shell
    constexpr uint32_t kMsgFrames = 6;      // payload: FramesInfo (a new region)
    constexpr uint32_t kMsgViewCursor = 7;  // payload: uint32_t Cursor
+   constexpr uint32_t kMsgPoppedOut = 8;   // payload: uint32_t, 1 while the engine's own window is showing (no readback)
+   constexpr uint32_t kMsgNoGraphics = 9;  // payload: reason text; the engine exits right after (step 2.4)
 
    struct ViewState
    {

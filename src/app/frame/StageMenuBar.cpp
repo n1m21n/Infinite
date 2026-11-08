@@ -12,6 +12,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "plugin/engine/PluginView.h"
 #include "app/ui/design/BrandLogo.gen.h"
 
 namespace app
@@ -1134,6 +1135,20 @@ void DrawMenuBar(FrameCtx& fc)
                   UpdateCheck::Dismiss();
                cursorX -= telemetryGap;
             }
+         }
+
+         // Inside a DAW (plugin mode): pop the UI out into its own window, or bring it back (step 2.4).
+         if (Platform::PluginModeActive() && cursorX - tok::tile - telemetryGap - telemetryW >= centreEndX + minGap)
+         {
+            cursorX -= tok::tile;
+            ImGui::SameLine(cursorX);
+            const bool popped = PluginView::Popped();
+            if (IconTile::Draw("##popout", IconsInfinite::PopOut, IconsInfinite::PopOut, popped, tok::tile,
+                               ImGui::GetFrameHeight()))
+               PluginView::RequestPopped(!popped);
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", popped ? T("Back to the plugin") : T("Pop out"));
+            cursorX -= telemetryGap;
          }
 
          // On a narrow window the readouts are dropped rather than drawn over the centred group.

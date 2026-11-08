@@ -6331,6 +6331,17 @@ namespace Platform
       }
    }
 
+   void AllowPluginEngineWindows()
+   {
+      @autoreleasepool
+      {
+         [NSApplication sharedApplication];
+         if (NSApp.activationPolicy != NSApplicationActivationPolicyAccessory)
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+         [NSApp activateIgnoringOtherApps:YES];
+      }
+   }
+
    void AttachConsoleForHeadless()
    {
    }

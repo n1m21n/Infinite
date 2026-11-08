@@ -273,6 +273,15 @@ namespace
          UpdateOverlay();
       }
 
+      void SetPopped(bool popped) override
+      {
+         if (popped_ == popped)
+            return;
+         popped_ = popped;
+         shown_ = false; // back in: the overlay stays until the next frame lands
+         UpdateOverlay();
+      }
+
       // ---- from the NSView ----
       void Push(const InputEvent& e) { if (host_ && view_) host_->ViewInput(&e, 1); }
 
@@ -330,9 +339,14 @@ namespace
 
       void Leave() { Push({ PluginFrames::kInLeave, 0, 0, 0, 0, 0 }); }
       void BackingChanged() { SendState(true); }
+      // The overlay's one button: "Bring back" while popped out, else "Restart".
       void Restart()
       {
-         if (host_)
+         if (!host_)
+            return;
+         if (popped_)
+            host_->ViewPopIn();
+         else
             host_->ViewRestart();
       }
       NSCursor* Cursor() const { return CursorFor(cursorId_); }
@@ -374,11 +388,18 @@ namespace
       {
          if (!view_)
             return;
-         const bool stopped = status_ == InfinitePlugin::EngineStatus::Stopped;
-         const bool overlay = stopped || !shown_;
-         label_.stringValue = stopped ? @"Engine stopped" : @"Starting";
+         using InfinitePlugin::EngineStatus;
+         const bool stopped = status_ == EngineStatus::Stopped;
+         const bool noGl = status_ == EngineStatus::NoGraphics;
+         const bool popped = popped_ && status_ == EngineStatus::Running;
+         const bool overlay = stopped || noGl || popped || !shown_;
+         label_.stringValue = noGl ? @"No graphics on this machine"
+                            : stopped ? @"Engine stopped"
+                            : popped ? @"In its own window"
+                                     : @"Starting";
          label_.hidden = !overlay;
-         restart_.hidden = !stopped;
+         restart_.title = popped ? @"Bring back" : @"Restart";
+         restart_.hidden = !(stopped || popped);
          if (overlay)
             view_.layer.contents = nil;
          Layout();
@@ -402,7 +423,7 @@ namespace
 
       void Tick()
       {
-         if (!frames_ || !view_)
+         if (!frames_ || !view_ || popped_)
             return;
          if (!PluginFrames::Acquire(frames_, &front_))
             return;
@@ -433,7 +454,7 @@ namespace
             firstSeq_ = info.seq;
          lastSeq_ = info.seq;
          blits_++;
-         if (!shown_ && status_ != InfinitePlugin::EngineStatus::Stopped)
+         if (!shown_ && status_ == InfinitePlugin::EngineStatus::Running)
          {
             shown_ = true;
             UpdateOverlay();
@@ -514,6 +535,7 @@ namespace
       uint32_t cursorId_ = PluginFrames::kCursorArrow;
       InfinitePlugin::EngineStatus status_ = InfinitePlugin::EngineStatus::Starting;
       bool shown_ = false;
+      bool popped_ = false;
       uint64_t blitUsSum_ = 0, blits_ = 0, firstSeq_ = 0, lastSeq_ = 0;
 
    };

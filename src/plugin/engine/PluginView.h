@@ -10,13 +10,21 @@ struct GLFWwindow;
 
 namespace PluginView
 {
-   // HostAudio's message loop: kMsgView and kMsgViewInput.
+   // HostAudio's message loop: kMsgView, kMsgViewInput and kMsgPopout.
    void HandleMessage(uint32_t type, const uint8_t* data, size_t size);
 
+   // A view is open and showing frames (not popped out).
    bool Open();
 
-   // After ImGui_ImplGlfw_NewFrame, before ImGui::NewFrame: applies the view's size to the hidden
-   // window and queues the view's input on ImGui's event queue.
+   // Pop-out (step 2.4): the hidden window becomes a real window on screen, at full frame rate, and
+   // the view stops reading frames back and says so. Asked from the top bar, the view ("Bring back")
+   // or the window's close button; applied at the next BeginFrame. No-op outside plugin mode.
+   void RequestPopped(bool popped);
+   bool Popped();
+
+   // After ImGui_ImplGlfw_NewFrame, before ImGui::NewFrame: shows or hides the window for a pop-out
+   // request, applies the view's size to the hidden window and queues the view's input on ImGui's
+   // event queue.
    void BeginFrame(GLFWwindow* window);
 
    // After ImGui_ImplOpenGL3_RenderDrawData into the default framebuffer (fbW x fbH pixels): starts

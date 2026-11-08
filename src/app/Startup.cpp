@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "plugin/engine/HostAudio.h"
+#include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
 #include "platform/PluginCrashGuard.h"
 #include "core/CliSetup.h"
@@ -1066,10 +1067,27 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          return 0;
    }
 
+   // Plugin engine without graphics (step 2.4): no dialog nobody can see inside a DAW - tell the
+   // shell, which shows "No graphics on this machine" in the editor, and quit. A GL-less engine that
+   // still plays audio comes with chunk 3 (Linux servers and VMs are where this happens).
+   // INFINITE_PLUGIN_NO_GL forces this path for tools/plugin checks.
+   const auto pluginNoGraphics = [&](const char* reason) -> bool
+   {
+      if (!pluginEngine)
+         return false;
+      fprintf(stderr, "plugin engine: no graphics: %s\n", reason);
+      PluginEngine::SendToShell(PluginFrames::kMsgNoGraphics, reason, strlen(reason), 1000);
+      return true;
+   };
+   if (pluginEngine && getenv("INFINITE_PLUGIN_NO_GL") != nullptr && pluginNoGraphics("forced (INFINITE_PLUGIN_NO_GL)"))
+      return 3;
+
    tPreWindow = Bench::ScopedStageTimer::NowMs();
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
+      if (pluginNoGraphics("glfwInit failed"))
+         return 3;
    if (HeadlessJobActive())
       {
          Headless::Status st;
@@ -1129,6 +1147,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
    if (!window)
    {
+      if (pluginNoGraphics("no OpenGL 3.3 window"))
+      {
+         glfwTerminate();
+         return 3;
+      }
       Platform::ShowFatalError("Infinite failed to start",
                                "glfwCreateWindow failed. This usually means the graphics "
                                "driver doesn't support the OpenGL version Infinite needs.");
@@ -1173,6 +1196,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    const int gladVersion = gladLoadGL((GLADloadfunc)glfwGetProcAddress);
    if (!gladVersion || !GLAD_GL_VERSION_3_3)
    {
+      if (pluginNoGraphics("the graphics driver has no OpenGL 3.3"))
+      {
+         glfwTerminate();
+         return 3;
+      }
       Platform::ShowFatalError(
          "Infinite failed to start",
          "This graphics driver does not support OpenGL 3.3, which Infinite requires. "

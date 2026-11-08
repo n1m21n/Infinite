@@ -456,6 +456,7 @@ namespace InfinitePlugin
             return;
          }
          spawnFailed_.store(false);
+         noGraphics_ = false;
          stopReader_.store(false);
          // The only reader of the engine's messages. In 1.5 it waits for "ready"; 2.1 adds state.
          reader_ = std::thread([this] {
@@ -476,8 +477,16 @@ namespace InfinitePlugin
                      if (!m.data.empty())
                         std::fprintf(stderr, "Infinite plugin: patch did not load: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
                   }
+                  else if (m.type == PluginFrames::kMsgNoGraphics)
+                  {
+                     // The engine could not open a GL window and exits; the view says so instead
+                     // of offering a restart that would fail the same way.
+                     std::fprintf(stderr, "Infinite plugin: no graphics: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
+                     noGraphics_ = true;
+                     PostEngine(InfinitePlugin::EngineStatus::NoGraphics);
+                  }
                   else if ((m.type == kMsgSlotEdit || m.type == kMsgSlotNames || m.type == PluginFrames::kMsgFrames ||
-                            m.type == PluginFrames::kMsgViewCursor) && relay_)
+                            m.type == PluginFrames::kMsgViewCursor || m.type == PluginFrames::kMsgPoppedOut) && relay_)
                      relay_->Post(UiRelay::Item { m.type, m.data });
                   else if (m.type == kMsgState)
                   {
@@ -488,7 +497,8 @@ namespace InfinitePlugin
                }
                else if (!Ipc::ChildAlive(child_))
                {
-                  PostEngine(InfinitePlugin::EngineStatus::Stopped); // crashed or killed
+                  if (!noGraphics_)
+                     PostEngine(InfinitePlugin::EngineStatus::Stopped); // crashed or killed
                   break;
                }
             }
@@ -510,6 +520,14 @@ namespace InfinitePlugin
       const PluginFrames::ViewState& View() const { return view_; }
 
       // Message thread: the view's mouse and keys.
+      // Message thread: pop the engine's window out (1) or back into the view (0).
+      void SendPopout(bool on)
+      {
+         const uint32_t v = on ? 1u : 0u;
+         if (Running())
+            Send(PluginFrames::kMsgPopout, &v, sizeof v, 200);
+      }
+
       void SendInput(const void* data, size_t size)
       {
          if (Running() && view_.open)
@@ -605,6 +623,7 @@ namespace InfinitePlugin
       std::atomic<bool> stopReader_ { false };
       std::atomic<bool> ready_ { false };
       std::atomic<bool> spawnFailed_ { false };
+      bool noGraphics_ = false; // reader thread only (reset before it starts)
       double rate_ = 0.0;
       uint32_t block_ = 0;
    };
@@ -769,6 +788,13 @@ namespace InfinitePlugin
          if (std::strcmp(id, "restart") == 0)
          {
             StartEngine();
+            return kResultOk;
+         }
+         if (attr && std::strcmp(id, "popout") == 0)
+         {
+            int64 on = 0;
+            attr->getInt("on", on);
+            link_.SendPopout(on != 0);
             return kResultOk;
          }
          return AudioEffect::notify(message);
@@ -1065,6 +1091,13 @@ namespace InfinitePlugin
             msg->setMessageID("cursor");
             msg->getAttributes()->setInt("cursor", c);
          }
+         else if (it.type == PluginFrames::kMsgPoppedOut && it.data.size() >= 4)
+         {
+            uint32_t on = 0;
+            std::memcpy(&on, it.data.data(), 4);
+            msg->setMessageID("popout");
+            msg->getAttributes()->setInt("on", on ? 1 : 0);
+         }
          else if (it.type == kRelayEngine && !it.data.empty())
          {
             msg->setMessageID("engine");
@@ -1119,6 +1152,7 @@ namespace InfinitePlugin
             view_->DropHost(); // a host that opens a second editor: the newest one is live
          view_ = v;
          v->SetEngine(engine_);
+         v->SetPopped(popped_);
          return v;
       }
 
@@ -1153,6 +1187,16 @@ namespace InfinitePlugin
          if (IMessage* msg = allocateMessage())
          {
             msg->setMessageID("restart");
+            sendMessage(msg);
+            msg->release();
+         }
+      }
+      void ViewPopIn() override
+      {
+         if (IMessage* msg = allocateMessage())
+         {
+            msg->setMessageID("popout");
+            msg->getAttributes()->setInt("on", 0);
             sendMessage(msg);
             msg->release();
          }
@@ -1262,9 +1306,24 @@ namespace InfinitePlugin
          {
             int64 st = 0;
             attr->getInt("status", st);
-            engine_ = EngineStatus(std::max<int64>(0, std::min<int64>(st, 2)));
+            engine_ = EngineStatus(std::max<int64>(0, std::min<int64>(st, 3)));
+            if (engine_ != EngineStatus::Running && popped_)
+            {
+               popped_ = false; // a new or dead engine has no window out
+               if (view_)
+                  view_->SetPopped(false);
+            }
             if (view_)
                view_->SetEngine(engine_);
+            return kResultOk;
+         }
+         if (attr && std::strcmp(message->getMessageID(), "popout") == 0)
+         {
+            int64 on = 0;
+            attr->getInt("on", on);
+            popped_ = on != 0;
+            if (view_)
+               view_->SetPopped(popped_);
             return kResultOk;
          }
          if (attr && std::strcmp(message->getMessageID(), "slotNames") == 0)
@@ -1336,6 +1395,7 @@ namespace InfinitePlugin
    private:
       ShellView* view_ = nullptr; // not owned: the host holds the view
       EngineStatus engine_ = EngineStatus::Starting;
+      bool popped_ = false; // the engine's window is out on its own (step 2.4)
    };
 }
 

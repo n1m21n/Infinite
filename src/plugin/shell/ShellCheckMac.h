@@ -1,6 +1,7 @@
 #pragma once
 // plugin_shell_check's AppKit helpers (ShellCheckMac.mm).
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace ViewCheck
@@ -16,6 +17,13 @@ namespace ViewCheck
    void Key(void* view, unsigned short keyCode, const char* chars, unsigned long mods, bool down);
    void Flags(void* view, unsigned short keyCode, unsigned long mods);
    void Mouse(void* view, int kind, double x, double y);
+   // The view's native overlay (step 2.4): the visible label's text ("" when hidden) and the
+   // visible button's title ("" when hidden); Press clicks that button.
+   std::string Label(void* view);
+   std::string Button(void* view);
+   void Press(void* view);
+   // On-screen windows owned by process pid (CGWindowList, layer 0).
+   int OnScreenWindows(int pid);
    // Runs the main run loop (the view's timer and the processor/controller relay) for ms.
    void Pump(int ms);
 }

@@ -868,6 +868,11 @@ namespace Platform
       // process with no window station presence of its own.
    }
 
+   void AllowPluginEngineWindows()
+   {
+      // Nothing to change: a hidden GLFW window shows and takes focus as soon as it is shown.
+   }
+
    void AttachConsoleForHeadless()
    {
       // Infinite.exe is a GUI-subsystem binary, so a launch from cmd or

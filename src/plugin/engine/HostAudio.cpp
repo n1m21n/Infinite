@@ -420,7 +420,7 @@ namespace PluginEngine
             // Ready again once the new graph has settled, so an offline render waits for it.
             SetStarted(gStartError);
          }
-         else if (m.type == PluginFrames::kMsgView || m.type == PluginFrames::kMsgViewInput)
+         else if (m.type == PluginFrames::kMsgView || m.type == PluginFrames::kMsgViewInput || m.type == PluginFrames::kMsgPopout)
             PluginView::HandleMessage(m.type, m.data.data(), m.data.size());
       }
    }

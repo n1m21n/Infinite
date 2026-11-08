@@ -759,6 +759,12 @@ namespace Platform
    // afterward - plugin or GLFW - can make the process visible.
    void SuppressAppUIForHeadlessProcess();
 
+   // Plugin engine (README 8.2, step 2.4), before it shows a window (pop-out, projector): lets this
+   // headless process own visible, focusable windows. macOS moves from Prohibited to Accessory (no
+   // Dock icon, windows can take keys) and activates; a hidden GLFW window needs nothing on Windows
+   // and Linux, so their sides are empty.
+   void AllowPluginEngineWindows();
+
    // Headless CLI runs (--render, --frame, ...) print one JSON status line. On
    // Windows Infinite.exe is a GUI-subsystem binary, so its stdout is not the
    // terminal that launched it; this attaches to the parent's console (only

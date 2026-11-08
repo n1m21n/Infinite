@@ -3,6 +3,7 @@
 #include "core/MediaCollect.h"
 #include "core/Notices.h"
 #include "platform/AppPaths.h"
+#include "plugin/engine/PluginView.h"
 
 namespace app
 {
@@ -445,6 +446,13 @@ namespace app
       // that leads here (see _glfwInputWindowCloseRequest) - undo that so
       // the app stays open until we know whether it's safe to close.
       glfwSetWindowShouldClose(window, GLFW_FALSE);
+      // Plugin engine: the host owns this process's lifetime, so closing (or quitting from) the
+      // popped-out window puts Infinite back into the plugin view.
+      if (Platform::PluginModeActive())
+      {
+         PluginView::RequestPopped(false);
+         return;
+      }
       GuardUnsavedChanges([window]() { TerminalGuardQuit([window]() { glfwSetWindowShouldClose(window, GLFW_TRUE); }); });
    }
 }

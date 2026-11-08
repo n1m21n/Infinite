@@ -41,6 +41,7 @@ namespace PluginView
       int gPboNext = 0;
 
       int gCursor = -1;
+      bool gPopped = false, gWantPopped = false;
       uint64_t gReadbackUsSum = 0, gReadbacks = 0;
 
       void DropPbos()
@@ -163,7 +164,13 @@ namespace PluginView
             CloseRegion();
          }
       }
-      else if (type == PluginFrames::kMsgViewInput && gView.open)
+      else if (type == PluginFrames::kMsgPopout && size >= sizeof(uint32_t))
+      {
+         uint32_t on = 0;
+         std::memcpy(&on, data, sizeof on);
+         gWantPopped = on != 0;
+      }
+      else if (type == PluginFrames::kMsgViewInput && gView.open && !gPopped)
       {
          const size_t n = size / sizeof(PluginFrames::InputEvent);
          const size_t at = gInput.size();
@@ -172,10 +179,55 @@ namespace PluginView
       }
    }
 
-   bool Open() { return Platform::PluginModeActive() && gView.open != 0; }
+   bool Open() { return Platform::PluginModeActive() && gView.open != 0 && !gPopped; }
+
+   void RequestPopped(bool popped)
+   {
+      if (Platform::PluginModeActive())
+         gWantPopped = popped;
+   }
+
+   bool Popped() { return gPopped; }
+
+   namespace
+   {
+      void ApplyPopped(GLFWwindow* window)
+      {
+         if (!window || gWantPopped == gPopped)
+            return;
+         gPopped = gWantPopped;
+         if (gPopped)
+         {
+            // The window keeps what the view showed: its size in points, centred on the main screen.
+            const int w = gView.open ? int(gView.width) : 1280, h = gView.open ? int(gView.height) : 800;
+            glfwSetWindowSize(window, w, h);
+            if (GLFWmonitor* m = glfwGetPrimaryMonitor())
+            {
+               int mx = 0, my = 0, mw = 0, mh = 0;
+               glfwGetMonitorWorkarea(m, &mx, &my, &mw, &mh);
+               glfwSetWindowPos(window, mx + std::max(0, (mw - w) / 2), my + std::max(0, (mh - h) / 2));
+            }
+            gPboFull[0] = gPboFull[1] = false; // no stale frame when it comes back
+            Platform::AllowPluginEngineWindows();
+            glfwShowWindow(window);
+            glfwFocusWindow(window);
+         }
+         else
+         {
+            glfwHideWindow(window);
+            gSizeApplied = false; // back to the view's size
+            gInput.clear();
+         }
+         const uint32_t on = gPopped ? 1 : 0;
+         PluginEngine::SendToShell(PluginFrames::kMsgPoppedOut, &on, sizeof on, 500);
+      }
+   }
 
    void BeginFrame(GLFWwindow* window)
    {
+      if (!Platform::PluginModeActive())
+         return;
+      ApplyPopped(window);
       if (!Open())
          return;
       Drain();

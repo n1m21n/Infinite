@@ -103,6 +103,45 @@ namespace ViewCheck
          [v mouseMoved:e];
    }
 
+   std::string Label(void* view)
+   {
+      for (NSView* sub in ((NSView*)view).subviews)
+         if ([sub isKindOfClass:[NSTextField class]] && !sub.hidden)
+            return std::string(((NSTextField*)sub).stringValue.UTF8String ?: "");
+      return std::string();
+   }
+
+   std::string Button(void* view)
+   {
+      for (NSView* sub in ((NSView*)view).subviews)
+         if ([sub isKindOfClass:[NSButton class]] && !sub.hidden)
+            return std::string(((NSButton*)sub).title.UTF8String ?: "");
+      return std::string();
+   }
+
+   void Press(void* view)
+   {
+      for (NSView* sub in ((NSView*)view).subviews)
+         if ([sub isKindOfClass:[NSButton class]] && !sub.hidden)
+         {
+            [(NSButton*)sub performClick:nil];
+            return;
+         }
+   }
+
+   int OnScreenWindows(int pid)
+   {
+      int n = 0;
+      CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+      if (!list)
+         return 0;
+      for (NSDictionary* w in (NSArray*)list)
+         if ([w[(id)kCGWindowOwnerPID] intValue] == pid && [w[(id)kCGWindowLayer] intValue] == 0)
+            n++;
+      CFRelease(list);
+      return n;
+   }
+
    void Pump(int ms)
    {
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, ms / 1000.0, false);

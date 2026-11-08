@@ -793,6 +793,77 @@ namespace
       return v;
    }
 
+   // No graphics (2.4): an engine that cannot open a GL window reports it and quits; the view says
+   // so and offers no Restart. INFINITE_PLUGIN_NO_GL forces the path.
+   void RunNoGraphicsCheck(Plugin& inst)
+   {
+      char d[256];
+      setenv("INFINITE_PLUGIN_NO_GL", "1", 1);
+      Instance a;
+      IPtr<IEditController> ec;
+      bool ok = a.Open(inst, false, kRealtime, false);
+      TUID cid;
+      if (ok && a.comp->getControllerClassId(cid) == kResultOk)
+         ec = inst.mod->getFactory().createInstance<IEditController>(VST3::UID::fromTUID(cid));
+      ok = ok && ec && ec->initialize(&gHost) == kResultOk;
+      FUnknownPtr<IConnectionPoint> cpComp(a.comp), cpCtrl(ec);
+      ok = ok && cpComp && cpCtrl;
+      if (ok)
+      {
+         cpComp->connect(cpCtrl);
+         cpCtrl->connect(cpComp);
+      }
+      IPtr<IPlugView> view;
+      if (ok)
+         view = owned(ec->createView(ViewType::kEditor));
+      void* parent = ViewCheck::NewParent(1280, 800, nullptr);
+      std::string label, button;
+      bool said = false;
+      if (view)
+      {
+         ViewRect r { 0, 0, 1280, 800 };
+         view->onSize(&r);
+         view->attached(parent, kPlatformTypeNSView);
+         void* child = ViewCheck::Child(parent);
+         const auto t0 = std::chrono::steady_clock::now();
+         while (child && std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 15.0)
+         {
+            ViewCheck::Pump(20);
+            if (ViewCheck::Label(child) == "No graphics on this machine")
+            {
+               said = true;
+               break;
+            }
+         }
+         ViewCheck::Pump(1000); // a Stopped from the engine's exit must not replace the message
+         if (child)
+         {
+            label = ViewCheck::Label(child);
+            button = ViewCheck::Button(child);
+         }
+      }
+      const bool gone = EnginePids().empty();
+      std::snprintf(d, sizeof d, "label \"%s\", button \"%s\", engine %s", label.c_str(), button.c_str(), gone ? "gone" : "still running");
+      Check(said && label == "No graphics on this machine" && button.empty() && gone,
+            "view: an engine with no graphics says so in the editor (no Restart) and quits", d);
+      if (view)
+      {
+         view->removed();
+         view = nullptr;
+      }
+      if (ok)
+      {
+         cpComp->disconnect(cpCtrl);
+         cpCtrl->disconnect(cpComp);
+      }
+      if (ec)
+         ec->terminate();
+      if (a.comp)
+         a.Close(false);
+      ViewCheck::FreeParent(parent);
+      unsetenv("INFINITE_PLUGIN_NO_GL");
+   }
+
    void RunViewChecks(Plugin& inst)
    {
       char d[256];
@@ -924,6 +995,46 @@ namespace
       std::snprintf(d, sizeof d, "%d x %d px", w, h);
       Check(resized, "view: a resize gives frames at the new size", d);
 
+      // Pop-out (2.4): what the top-bar tile asks for, sent as the processor message. The engine's
+      // window comes on screen, the view says so and offers Bring back; pressing it returns frames.
+      {
+         const auto pids = EnginePids();
+         const int pid = pids.empty() ? 0 : pids[0];
+         auto popout = [&](int on) {
+            IPtr<Vst::HostMessage> m = owned(new Vst::HostMessage);
+            m->setMessageID("popout");
+            m->getAttributes()->setInt("on", on);
+            cpComp->notify(m);
+         };
+         auto waitFor = [&](const std::function<bool()>& ok, int ms) {
+            const auto s = std::chrono::steady_clock::now();
+            while (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - s).count() < ms)
+            {
+               ViewCheck::Pump(10);
+               if (ok())
+                  return true;
+            }
+            return false;
+         };
+         const int before = ViewCheck::OnScreenWindows(pid);
+         popout(1);
+         const bool out = waitFor([&] { return ViewCheck::Label(child) == "In its own window" && ViewCheck::OnScreenWindows(pid) > before; }, 5000);
+         const bool blank = !ViewCheck::Surface(child, &w, &h, nullptr);
+         std::snprintf(d, sizeof d, "label \"%s\", button \"%s\", engine windows on screen %d -> %d",
+                       ViewCheck::Label(child).c_str(), ViewCheck::Button(child).c_str(), before, ViewCheck::OnScreenWindows(pid));
+         Check(out && blank && ViewCheck::Button(child) == "Bring back", "view: popped out, the engine's window is on screen and the view says so", d);
+         ViewCheck::Pump(500);
+         ViewCheck::Press(child);
+         const bool back = waitSize(int(1280 * scale), int(800 * scale), 5000);
+         const auto h0 = std::chrono::steady_clock::now();
+         const bool hidden = waitFor([&] { return ViewCheck::OnScreenWindows(pid) == before; }, 3000);
+         const double hideMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - h0).count();
+         std::snprintf(d, sizeof d, "label \"%s\", engine windows on screen %d (%.0f ms after frames returned)",
+                       ViewCheck::Label(child).c_str(), ViewCheck::OnScreenWindows(pid), hideMs);
+         Check(back && hidden && ViewCheck::Label(child).empty(),
+               "view: Bring back hides the engine's window and frames return", d);
+      }
+
       // Close, wait, reopen: no readback while closed, frames again after.
       view->removed();
       view = nullptr;
@@ -1043,6 +1154,7 @@ int main(int argc, char** argv)
          return 1;
       }
       RunViewChecks(inst);
+      RunNoGraphicsCheck(inst);
       std::this_thread::sleep_for(std::chrono::milliseconds(300));
       Check(EnginePids().empty(), "no engine left");
       std::printf("%s (%d failed)\n", gFails == 0 ? "ALL PASS" : "FAILURES", gFails);
@@ -1174,6 +1286,7 @@ int main(int argc, char** argv)
    RunSlotChecks(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S1-slot.inf");
    RunCcCheck(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S2-cc.inf");
    RunViewChecks(inst);
+   RunNoGraphicsCheck(inst);
 
    std::this_thread::sleep_for(std::chrono::milliseconds(300));
    Check(EnginePids().size() == baseline, "no engine left after terminate");
