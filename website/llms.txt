@@ -253,6 +253,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Acid House Accented Square Bass Synth](https://infinitedevices.org/library/acid-house-accented-square-bass-synth.html): Hollow, punchy Roland TB-303 square wave bass synthesizer with asymmetric pulse shaping, aggressive non-linear diode resonance sweep, fast accent decay envelope, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/acid-house-accented-square-bass-synth.inf)
 - [Future Garage Dusk Tape Delay FX](https://infinitedevices.org/library/future-garage-dusk-tape-delay-fx.html): Nocturnal UK future garage tape delay effect featuring dual stereo delay taps, subtle wow and flutter pitch modulation, warm feedback saturation, and gentle high-frequency tape damping. (file: https://infinitedevices.org/assets/templates/future-garage-dusk-tape-delay-fx.inf)
 - [Future Garage Vinyl Dust Reverb FX](https://infinitedevices.org/library/future-garage-vinyl-dust-reverb-fx.html): Atmospheric Burial-inspired space processor combining procedural vinyl surface crackle, diffuse multi-tap reverb diffusion, warm low-mid resonance, and dusk lowpass filtering. (file: https://infinitedevices.org/assets/templates/future-garage-vinyl-dust-reverb-fx.inf)
+- [Classic Trance Supersaw Anthem Lead Synth](https://infinitedevices.org/library/classic-trance-supersaw-anthem-lead-synth.html): Iconic late-90s euphoric trance lead synthesizer with 7 detuned unison saw oscillators, cascading 24dB resonant lowpass filter with envelope modulation, high-shelf air, and subtle chorus stereo width. (file: https://infinitedevices.org/assets/templates/classic-trance-supersaw-anthem-lead-synth.inf)
+- [Classic Trance Rolling Offbeat Bass Synth](https://infinitedevices.org/library/classic-trance-rolling-offbeat-bass-synth.html): High-energy rolling 16th-note trance bass synthesizer featuring paired saw and pulse sub-oscillators, snappy transistor envelope punch, 24dB resonant lowpass filter, and warm analog drive. (file: https://infinitedevices.org/assets/templates/classic-trance-rolling-offbeat-bass-synth.inf)
+- [Industrial Techno Warehouse Distortion Reverb FX](https://infinitedevices.org/library/industrial-techno-warehouse-distortion-reverb-fx.html): Cavernous Berlin warehouse reverb effect combining asymmetric pre-saturation drive, dense multi-tap delay diffusion network, resonant dark low-frequency room reflections, and high-frequency damping. (file: https://infinitedevices.org/assets/templates/industrial-techno-warehouse-distortion-reverb-fx.inf)
+- [Industrial Techno Grimy Bitcrush Saturator FX](https://infinitedevices.org/library/industrial-techno-grimy-bitcrush-saturator-fx.html): Punishing industrial waveshaper processor featuring asymmetric diode wavefolding, quantized bit-depth degradation, resonant post-overdrive lowpass filter, and parallel dry-wet blend. (file: https://infinitedevices.org/assets/templates/industrial-techno-grimy-bitcrush-saturator-fx.inf)
 
 ## Library: Community
 
@@ -613,7 +617,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 93 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 95 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -630,4 +634,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 78 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 80 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

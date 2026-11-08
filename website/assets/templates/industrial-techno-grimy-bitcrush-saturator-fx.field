@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Industrial Techno Grimy Bitcrush Saturator FX",
+    "author": "Infinite",
+    "description": "Punishing industrial waveshaper processor featuring asymmetric diode wavefolding, quantized bit-depth degradation, resonant post-overdrive lowpass filter, and parallel dry-wet blend.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float drive = 0.55 [0.0, 1.0]\nparam float crush = 0.45 [0.0, 0.9]\nparam float tone = 0.50 [0.1, 1.0]\nparam float warmth = 0.40 [0.0, 1.0]\nparam float mix = 0.60 [0.0, 1.0]\nstate float s1 = 0\nstate float s2 = 0\n\nsteps = clamp(floor(32.0 - crush * 24.0), 4.0, 32.0)\nqIn = floor(in * steps) / steps\n\npre = qIn * (1.0 + drive * 2.8)\nsat = (pre - (pre * pre * pre * 0.15)) / (1.0 + abs(pre * 0.4))\n\nfCut = clamp(0.08 + tone * 0.35, 0.02, 0.45)\ns1 = s1 + fCut * (sat - s1)\ns2 = s2 + fCut * (s1 - s2)\n\nwarm = s2 * (1.0 + warmth * 0.3)\nprocessed = in * (1.0 - mix) + warm * mix\nout = processed * 0.45\n",
+    "params": {
+      "drive": 0.55,
+      "crush": 0.45,
+      "tone": 0.5,
+      "warmth": 0.4,
+      "mix": 0.6
+    }
+  }
+}

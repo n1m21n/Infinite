@@ -465,6 +465,16 @@
       "slug": "indie-psychedelic-kaleido-prism-flower",
       "title": "Indie Psychedelic Kaleido Prism Flower",
       "description": "Audio-reactive psychedelic mandala visualizer featuring an 8-fold symmetric petal flower. Bass pulses inflate radial petal contours, mid frequencies drive chromatic prism refraction across electric magenta and marigold bands, and high frequencies ignite cyan perimeter highlights."
+    },
+    {
+      "slug": "op-art-concentric-moire-interference",
+      "title": "Op-Art Concentric Moir\u00e9 Interference",
+      "description": "Audio-reactive kinetic Op-Art visualizer featuring dual interfering circular wavefields that generate pulsating moir\u00e9 interference bands. Bass frequencies swell wave amplitude and radial spacing, mid frequencies modulate optical interference frequency, and high frequencies ignite vibrant electric crimson edge fringes."
+    },
+    {
+      "slug": "op-art-hypnotic-checkerboard-warp",
+      "title": "Op-Art Hypnotic Checkerboard Warp",
+      "description": "Audio-reactive Op-Art checkerboard visualizer driven by pulsating curvilinear barrel distortion. Bass pulses expand the center optical vortex, mid frequencies twist perspective sheer across alternating black and white tiles, and high frequencies trigger electric optical color shifts along tile boundaries."
     }
   ]
 }

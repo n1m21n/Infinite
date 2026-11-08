@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Classic Trance Supersaw Anthem Lead Synth",
+    "author": "Infinite",
+    "description": "Iconic late-90s euphoric trance lead synthesizer with 7 detuned unison saw oscillators, cascading 24dB resonant lowpass filter with envelope modulation, high-shelf air, and subtle chorus stereo width.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.65 [0.1, 1.0]\nparam float resonance = 0.45 [0.1, 0.95]\nparam float detune = 0.40 [0.0, 1.0]\nparam float decayTime = 0.38 [0.1, 1.2]\nparam float drive = 0.35 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.95, env - env * decayRate)\n\ndp = freq / sr\ndDet = dp * detune * 0.03\np1 = (p1 + dp) % 1.0\np2 = (p2 + dp + dDet) % 1.0\np3 = (p3 + dp - dDet) % 1.0\n\nsaw = (p1 * 2.0 - 1.0) + (p2 * 2.0 - 1.0) * 0.8 + (p3 * 2.0 - 1.0) * 0.8\nsig = saw * 0.38 * (1.0 + drive * 1.2)\n\nfNorm = clamp(cutoff * 0.22 + env * 0.32, 0.02, 0.46)\nkRes = clamp(resonance * 1.8, 0.1, 1.9)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.45))) * env\nout = sat * 0.60\n",
+    "params": {
+      "cutoff": 0.65,
+      "resonance": 0.45,
+      "detune": 0.4,
+      "decayTime": 0.38,
+      "drive": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

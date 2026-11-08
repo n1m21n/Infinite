@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Op-Art Concentric Moir\u00e9 Interference",
+    "author": "Infinite",
+    "description": "Hypnotic kinetic op-art simulation generating pulsating moir\u00e9 interference patterns from twin intersecting high-frequency circular wavefields, audio-reactive spatial frequency modulation, and optical edge vibration.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.40 [0.1, 1.5]\nparam float freq = 26.0 [10.0, 50.0]\nparam float offset = 0.32 [0.1, 0.8]\nparam float contrast = 1.20 [0.6, 2.0]\nparam float glow = 0.50 [0.1, 1.2]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.5\ntime = t * speed\n\np1 = p - vec2(offset, 0.0)\np2 = p + vec2(offset, 0.0)\n\nd1 = length(p1)\nd2 = length(p2)\n\nw1 = sin(d1 * freq - time * 3.5)\nw2 = sin(d2 * freq - time * 3.5)\ninterf = (w1 + w2) * 0.5\n\nring = sin(length(p) * 14.0 + time * 1.5)\nsig = interf * 0.75 + ring * 0.25\n\ncDark = vec3(0.04, 0.04, 0.05)\ncWhite = vec3(0.96, 0.96, 0.98)\ncCrimson = vec3(0.88, 0.12, 0.18)\ncCyan = vec3(0.0, 0.90, 0.98)\n\nbw = smoothstep(-0.12, 0.12, sig)\ncol = mix(cDark, cWhite, bw)\n\nedge = 1.0 - abs(sig) * 2.2\ncol = mix(col, cCrimson, clamp(edge * glow * step(0.5, bw), 0.0, 1.0))\ncol = mix(col, cCyan, clamp(edge * glow * (1.0 - step(0.5, bw)), 0.0, 1.0))\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.4,
+      "freq": 26.0,
+      "offset": 0.32,
+      "contrast": 1.2,
+      "glow": 0.5
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}
