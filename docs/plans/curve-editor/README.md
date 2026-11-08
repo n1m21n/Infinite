@@ -1,6 +1,6 @@
 # Curve Editor — plan
 
-Status: **APPROVED 2026-11-08** (Naman: "let's start executing this"). Block 1 in progress on `curve-editor/block-1`.
+Status: **APPROVED 2026-11-08** (Naman: "let's start executing this"). **All four blocks built 2026-11-09** on `curve-editor/block-1` (local, not merged or pushed); results in §10.
 Owner idea 2026-11-08. All 7 points from the idea are in scope; nothing dropped.
 
 ```
@@ -8,12 +8,12 @@ Owner idea 2026-11-08. All 7 points from the idea are in scope; nothing dropped.
  ┌───────┬──────────────────────────────────────────────┬──────────┐
  │ Block │ What lands on main                           │ Status   │
  ├───────┼──────────────────────────────────────────────┼──────────┤
- │ 1     │ Curve model + panel + core tools + time/loop │ building │
+ │ 1     │ Curve model + panel + core tools + time/loop │ built    │
  │       │ + click-to-assign                            │          │
- │ 2     │ Shape library + shape/transform tools        │ proposed │
- │ 3     │ Expression pages + recording (knob, CC learn)│ proposed │
- │ 4     │ Motion grade: frames/seconds, bezier handles,│ proposed │
- │       │ easing standards, channels, 3D driving       │ proposed │
+ │ 2     │ Shape library + shape/transform tools        │ built    │
+ │ 3     │ Expression pages + recording (knob, CC learn)│ built    │
+ │ 4     │ Motion grade: frames/seconds, bezier handles,│ built    │
+ │       │ easing standards, channels, 3D driving       │          │
  └───────┴──────────────────────────────────────────────┴──────────┘
  one block = one branch = one session; one commit per step inside
 ```
@@ -339,14 +339,27 @@ Filled in per block when it lands; each row links to §6 and §7.
 |---|---|---|---|
 | M1 draw + assign | ~8 steps | ≤ 3 / ≤ 10 s | Block 1: 3 with the panel open (stroke on the empty panel, Assign, knob), 4 from closed (+ Shift+E); stroke half proven by CURVEM1TEST; seconds not timed |
 | M2 preset → assigned | n/a | ≤ 2 clicks | Block 2: Shapes, pick, knob = 3 clicks; a pick on a page with no targets arms Assign, so preset to assigned is the pick plus one knob click (2). Not timed in a frame test |
-| M3 CC → editable | impossible | 1 arm, ≤ 64 pts | — |
-| M4 expression live | no | same frame | — |
-| M5 easing / Blender A/B | no easings | 1e-4 / 1e-3 | Block 2 formula half: 38 easings, worst 4.5e-7 against easings.net / CSS references (MSEGTEST); Blender half is Block 4 |
+| M3 CC → editable | impossible | 1 arm, ≤ 64 pts | Block 3: a 4-bar 7-bit CC take (481 samples) lands as 47 points, worst 0.009 from the hand (MSEGTEST); Touch, Latch and Overdub checked too. Arm = the Record chip, Learn is part of the take |
+| M4 expression live | no | same frame | Block 3: an edited f(t) shows on the next Evaluate, the frame the text changes (MSEGTEST) |
+| M5 easing / Blender A/B | no easings | 1e-4 / 1e-3 | Formula half: 38 easings, worst 4.5e-7 (MSEGTEST). Blender half: 6 F-curve cases (auto clamped, auto, vector, free over-long, aligned) through headless Blender 5.2 and MSEG, worst 3.2e-6 at every frame (`tools/blender-ab/fcurve.py`) |
 | M6 frame exact | n/a | identical per run/OS | Block 1: MSEGTEST frame checks pass at 24/30/60 fps on macOS; other OSes not yet run |
-| M7 audio cost | MSEG 32 pts | ≤ +10 % at 256 | Block 1: 44.4 ns vs 56.2 ns per sample, −21 % (hinted search beats the old walk); audio xrun bench not run |
-| M8 UI cost | — | +≤ 1 ms | Block 1: +0.26 to +0.32 ms (3 runs, CURVEBENCH, M2 8 GB) |
+| M7 audio cost | MSEG 32 pts | ≤ +10 % at 256 | 46.9 ns vs 59.3 ns per sample, −21 % after all blocks (hinted search beats the old walk); audio xrun bench not run |
+| M8 UI cost | — | +≤ 1 ms | +0.32 ms after all blocks (CURVEBENCH, 8 pages, M2 8 GB) |
 | M9 old patches | 3 patches | open/play/look right | Block 1: u0002, u0035, u0058 validate and play (−22.2, −30.8, −21.1 LUFS) |
-| M10 coverage | — | 7/7 points tested | — |
+| M10 coverage | — | 7/7 points tested | 7/7 plus the panel (table below) |
+
+M10 map, one driving test per owner point:
+
+| # | Owner point | Test that drives it |
+|---|---|---|
+| 0 | Panel, docks, pages | CURVEBENCH (8 pages open), CURVEM1TEST (drag on the empty panel makes a page) |
+| 1 | Expression | MSEGTEST M4 (edit shows on the next read) |
+| 2 | Recording, CC learn | MSEGTEST M3 (CC take → ≤ 64 points), Touch / Latch / Overdub checks |
+| 3 | Curve collection | MSEGTEST: every library shape valid, 38 easings within 1e-4 |
+| 4 | Assign | CURVEMOTIONTEST (bound pages drive their targets), MODAUDIT |
+| 5 | Deep tools | MSEGTEST draw thinning, line, crop, quantise, reverse, invert |
+| 6 | Time / quantise / loop | MSEGTEST seconds, frames, once, ping-pong, loop, trig, sustain, tempo |
+| 7 | 3D motion | CURVEMOTIONTEST (XYZ group on a Transform), Blender A/B, MSEGTEST frame checks |
 
 ## 11. Critique
 
@@ -401,4 +414,20 @@ Block 1, settled on the way (2026-11-08):
 | Assign | Stays armed while Shift is held; Esc or right-click stops; an MSEG never targets its own controls |
 | Polarity | Set by the Low / High of each target row (High below Low inverts); no separate switch |
 | Pages | Close hides a page (node stays, Reopen Page in the dock menu); Delete Curve removes the node |
-| Deferred | Value zoom (Alt+wheel), dragging chips to reorder, dragging a chip onto a knob, a Mod / Motion switch (Blocks 2 and 4) |
+| Deferred | None left: value zoom (Alt+wheel), chip reorder, chip onto a knob and the Mod / Motion switch all landed |
+
+Blocks 3 and 4, settled on the way (2026-11-09):
+
+| Area | Decision |
+|---|---|
+| Record | Built into the panel (a Record chip and card), not a separate page kind; the take clock is the frame's real time, so it is the same at any fps |
+| Record modes | Overwrite records one pass and stops; Touch lets go 0.35 s after the value stops; Latch writes from the first move until Stop |
+| Record length | Fixed fills the page; Auto rounds the take to whole bars on Stop and sets the page to that many beats |
+| Page kinds | The chip glyph says the kind: curve, formula, recorded take, motion group |
+| Blender handles | Matches Blender's classic auto handles (smoothing None). Blender 5.2 defaults new curves to Continuous Acceleration, which is a whole-curve solve; not matched, the A/B sets None |
+| Over-long handles | Each handle is cut to its segment on its own and the first root wins, as Blender does |
+| Mod / Motion | Header switch; Motion = seconds or frames time base, or a group channel. The switch follows the page on show |
+| Motion pages | Frames at the export fps, 2 s long, play once and hold, bezier keys; + opens Curve / Position / Rotation / Scale |
+| Groups | Three pages share a group id; bound to the selected node's move (offset, pos), rotate or scale x/y/z, flat at the value each holds; a closed card is probed for one frame first. Siblings draw in the 3D View's axis colours |
+| Value axis | The first target's name and range at the top and bottom lines |
+| Frames ruler | Frame numbers, timecode (m:ss) at whole seconds |
