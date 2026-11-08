@@ -59,6 +59,10 @@
     .plug-faq details { padding: 12px 16px; border-radius: 12px; background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
     .plug-faq summary { cursor: pointer; font-weight: 600; }
     .plug-faq p { margin: 8px 0 0; color: var(--muted); }
+    .plug-shot { margin: 0; display: grid; gap: 8px; }
+    .plug-shot img { width: 100%; height: auto; aspect-ratio: 16 / 10; display: block; border-radius: var(--web-media-radius, 16px); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+    .plug-shot figcaption { color: var(--muted); font-size: var(--size-caption); }
+    .plug-shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: var(--ui-sp-4, 16px); }
   </style>
   <link rel="stylesheet" href="system.css?v=23625436">
   <link rel="stylesheet" href="scale.css?v=f0c66d50">
@@ -141,6 +145,7 @@
           <a class="btn btn-ghost" href="index.html#download">Try the free app first</a>
         </div>
       </div>
+      <figure class="plug-shot"><img src="assets/plugin/daw-host-automation.webp" alt="Infinite Instrument open in Ableton Live, with three Infinite knobs listed as Ableton device parameters" width="2000" height="1250" fetchpriority="high" decoding="async"><figcaption>Host automation in Ableton Live</figcaption></figure>
       <section aria-label="What is inside">
         <h2>What is inside</h2>
         <ul class="plug-stats">
@@ -169,6 +174,10 @@
           <div><dt>Projects</dt><dd>The patch is saved inside your DAW project.</dd></div>
           <div><dt>Left to your DAW</dt><dd>Audio device, transport, offline render and updates.</dd></div>
         </dl>
+        <div class="plug-shots">
+          <figure class="plug-shot"><img src="assets/plugin/daw-sample-editor.webp" alt="The Infinite sample editor inside Ableton Live" width="2000" height="1250" loading="lazy" decoding="async"><figcaption>Sample editor</figcaption></figure>
+          <figure class="plug-shot"><img src="assets/plugin/daw-3d-view.webp" alt="A visual patch and the 3D view inside Ableton Live" width="2000" height="1250" loading="lazy" decoding="async"><figcaption>3D view</figcaption></figure>
+        </div>
       </section>
       <section aria-label="Panels">
         <h2>Panels</h2>
