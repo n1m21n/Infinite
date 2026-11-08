@@ -3,6 +3,7 @@ import { STEPS } from "./steps.js";
 //   POST /api/paddle/webhook   Paddle notification. transaction.completed issues a license; a refund adjustment revokes it.
 //   GET  /api/license/revoked  {"revoked":[ids]}  optional online check for the plugin
 //   POST /api/license/resend   {email} -> re-emails every active key on file for that address (always answers ok)
+//   GET  /api/license/admin/mail?limit=N         Bearer ADMIN_TOKEN -> recent Resend sends with their last event (delivered, bounced...)
 //   POST /api/license/notify-preorders  Bearer ADMIN_TOKEN, {send?} -> launch-day download mail to every pre-order buyer
 //                              not yet told (dry run unless send; 40 per call, answers {pending, sent, left}).
 //                              tools/license/notify_preorders.mjs drives it.
@@ -147,6 +148,18 @@ async function resend(request, env) {
   return json(200, { ok: true });   // same answer whether or not the address has a license
 }
 
+// Delivery check without the Resend key leaving Cloudflare: Resend's own list, cut to what a delivery question needs.
+async function mailLog(request, env) {
+  if (!env.ADMIN_TOKEN || (request.headers.get("Authorization") || "") !== `Bearer ${env.ADMIN_TOKEN}`) return json(401, { ok: false });
+  if (!env.RESEND_API_KEY) return json(503, { ok: false, error: "no RESEND_API_KEY" });
+  const limit = Math.min(100, Math.max(1, Number(new URL(request.url).searchParams.get("limit")) || 20));
+  const r = await fetch(`https://api.resend.com/emails?limit=${limit}`, { headers: { Authorization: `Bearer ${env.RESEND_API_KEY}` } });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) return json(502, { ok: false, status: r.status, error: body });
+  const mails = (body.data || []).map((m) => ({ id: m.id, to: m.to, from: m.from, subject: m.subject, created_at: m.created_at, last_event: m.last_event }));
+  return json(200, { ok: true, mails });
+}
+
 const BATCH = 40;   // stays under the Worker's subrequest cap (one mail = one fetch)
 async function notifyPreorders(request, env) {
   const auth = request.headers.get("Authorization") || "";
@@ -173,6 +186,7 @@ export default {
     try {
       if (request.method === "POST" && pathname === "/api/paddle/webhook") return await webhook(request, env);
       if (request.method === "POST" && pathname === "/api/license/resend") return await resend(request, env);
+      if (request.method === "GET" && pathname === "/api/license/admin/mail") return await mailLog(request, env);
       if (request.method === "POST" && pathname === "/api/license/notify-preorders") return await notifyPreorders(request, env);
       if (request.method === "GET" && pathname === "/api/license/revoked") {
         const { results } = await env.DB.prepare("SELECT id FROM licenses WHERE status = 'revoked'").all();
