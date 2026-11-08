@@ -7,7 +7,9 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -22,6 +24,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -38,7 +41,8 @@ uint64_t gCurveAssignUid = 0;
 namespace
 {
    constexpr float kMinHeight = 220.0f, kMinWidth = 360.0f;
-   constexpr float kIconW = 30.0f, kPageW = 140.0f, kInspectorW = 268.0f, kRulerH = 16.0f;
+   constexpr float kIconW = 30.0f, kPageW = 140.0f, kSideW = 300.0f, kRulerH = 16.0f;
+   constexpr float kGridW = 96.0f, kThinW = 110.0f, kAssignW = 80.0f;
    constexpr float kPad = 8.0f;     // graph edge to the 0 and 1 value lines
    constexpr float kHit = 7.0f;     // px a point or handle grabs from
    constexpr float kEraseR = 9.0f;  // px the eraser rubs out
@@ -81,6 +85,7 @@ namespace
       uint64_t lastSelected = 0;    // the canvas selection last followed
       std::vector<uint64_t> closed; // pages hidden from the strip (the nodes stay)
       bool ghost = false;           // other pages drawn faint behind this one
+      bool sideOpen = true;         // the properties column (N), as the 3D View's
       float v0 = 0.0f, v1 = 1.0f;   // the shape span on show
       Tool tool = Tool::Select;
       bool snap = true;
@@ -164,7 +169,8 @@ namespace
    void AddPage()
    {
       PushUndoCheckpoint("Add Curve");
-      GraphNode* gn = SpawnNode("MSEG", "Modulators", gViewCenterCanvas.x, gViewCenterCanvas.y);
+      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
+      GraphNode* gn = SpawnNode("MSEG", "Modulators", at.x, at.y);
       if (gn == nullptr)
          return;
       ShowPage(gn->uid);
@@ -255,13 +261,6 @@ namespace
          MenuParts::EndPopup();
       }
       return changed;
-   }
-
-   // A labelled dropdown row in the inspector.
-   bool PickRow(const char* label, const char* id, const std::vector<std::string>& items, int& cur)
-   {
-      FormParts::Label(label);
-      return Picker(id, items, cur, FormParts::ControlW());
    }
 
    // An inspector edit is one undo step: the checkpoint lands when the control is grabbed.
@@ -955,6 +954,8 @@ namespace
             s.v0 = 0.0f, s.v1 = 1.0f;
          if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
             Quantise(n);
+         if (ImGui::IsKeyPressed(ImGuiKey_N, false))
+            s.sideOpen = !s.sideOpen;
          if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
          {
             if (gCurveAssignUid != 0)
@@ -1026,12 +1027,11 @@ namespace
       }
    }
 
-   // The page strip: one chip per open page, then +, and the ghost toggle at the end.
+   // The page strip: one chip per open page, then +. Scrolls sideways when the pages outgrow it.
    void DrawPageStrip(float width)
    {
       State& s = S();
-      const float ghostW = kIconW + tok::space_2;
-      ImGui::BeginChild("##cePages", ImVec2(std::max(1.0f, width - ghostW), tok::tile), false, ImGuiWindowFlags_NoScrollbar);
+      ImGui::BeginChild("##cePages", ImVec2(std::max(1.0f, width), tok::tile), false, ImGuiWindowFlags_NoScrollbar);
       if (ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f)
          ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 40.0f);
       static uint64_t sMenuPage = 0;
@@ -1086,9 +1086,117 @@ namespace
          MenuParts::EndPopup();
       }
       ImGui::EndChild();
+   }
+
+   // ---- side panel rows: the 3D View's (View3DPanel.cpp Card/FieldLabel/...Row), so both panels read the same.
+
+   constexpr float kFieldLabelW = 100.0f;
+   float sFieldW = 160.0f;
+   std::string sCard; // the open card: rows share labels across cards ("Start" in Loop and Point)
+
+   std::string RowId(const char* label) { return FormParts::Id((sCard + "/" + label).c_str()); }
+
+   bool Card(const char* title, bool startOpen = true)
+   {
+      static std::map<std::string, bool> sOpen;
+      auto found = sOpen.find(title);
+      bool open = found != sOpen.end() ? found->second : startOpen;
+      SectionCard::Begin();
+      sCard = title;
+      ImGui::PushID(title);
+      const float h = ImGui::GetTextLineHeight() + 2.0f;
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float w = ImGui::GetContentRegionAvail().x;
+      if (ImGui::InvisibleButton("##head", ImVec2(w, h)))
+         open = !open;
+      sOpen[title] = open;
+      const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 c(p.x + 5.0f, p.y + h * 0.5f);
+      if (open)
+         dl->AddTriangleFilled(ImVec2(c.x - 4, c.y - 2), ImVec2(c.x + 4, c.y - 2), ImVec2(c.x, c.y + 3), text);
+      else
+         dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 4), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 4), text);
+      dl->AddText(ImVec2(p.x + 16.0f, p.y + 1.0f), text, title);
+      ImGui::PopID();
+      return open;
+   }
+
+   void FieldLabel(const char* text)
+   {
+      ImGui::AlignTextToFramePadding();
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float h = ImGui::GetFrameHeight();
+      ImGui::PushClipRect(p, ImVec2(p.x + kFieldLabelW - ImGui::GetCursorPosX() - 4.0f, p.y + h), true);
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", text);
+      ImGui::PopClipRect();
+      FormParts::Inline(kFieldLabelW);
+   }
+
+   // The checkpoint holds the value from before the grab, though the first frame of a drag already moved it.
+   void UndoableFrom(float* v, float was, const char* what)
+   {
+      if (!ImGui::IsItemActivated())
+         return;
+      const float now = *v;
+      *v = was;
+      PushUndoCheckpoint(what);
+      *v = now;
+   }
+
+   bool FloatRow(const char* label, float* v, float lo, float hi, const char* fmt, ImGuiSliderFlags flags = 0,
+                 const char* undo = "Edit Curve")
+   {
+      FieldLabel(label);
+      ImGui::SetNextItemWidth(sFieldW);
+      const float was = *v;
+      const bool changed = FieldWell::Slider(RowId(label).c_str(), v, lo, hi, fmt, flags);
+      UndoableFrom(v, was, undo);
+      return changed;
+   }
+
+   bool ComboRow(const char* label, int* v, const std::vector<std::string>& names, const char* undo = "Edit Curve")
+   {
+      FieldLabel(label);
+      ImGui::SetNextItemWidth(sFieldW);
+      const int shown = std::clamp(*v, 0, (int)names.size() - 1);
+      bool changed = false;
+      if (MenuParts::BeginCombo(RowId(label).c_str(), T(names[shown].c_str())))
+      {
+         for (int i = 0; i < (int)names.size(); i++)
+            if (MenuParts::Choice(T(names[i].c_str()), i == *v) && i != *v)
+            {
+               PushUndoCheckpoint(undo);
+               *v = i;
+               changed = true;
+            }
+         MenuParts::EndCombo();
+      }
+      return changed;
+   }
+
+   bool BoolRow(const char* label, bool* v, const char* undo = "Edit Curve")
+   {
+      const float rowY = ImGui::GetCursorPosY();
+      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
+      bool on = *v;
+      bool hit = CheckBox::Box(RowId(label).c_str(), &on);
       FormParts::Inline(0.0f, tok::space_2);
-      if (IconChip("##ceGhost", s.ghost ? IconsInfinite::Eye : IconsInfinite::EyeOff, s.ghost, T("Show other curves")))
-         s.ghost = !s.ghost;
+      ImGui::SetCursorPosY(rowY);
+      ImGui::AlignTextToFramePadding();
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
+      if (ImGui::IsItemClicked())
+      {
+         on = !on;
+         hit = true;
+      }
+      if (!hit)
+         return false;
+      PushUndoCheckpoint(undo);
+      *v = on;
+      return true;
    }
 
    std::string TargetName(int nodeIndex, int paramIndex)
@@ -1113,7 +1221,8 @@ namespace
 
    void DrawTargets(const GraphNode& gn)
    {
-      FormParts::Section(T("Targets"));
+      if (!Card(T("Targets")))
+         return;
       Modulation& mod = Modulation::Instance();
       std::vector<std::pair<Modulation::Key, Modulation::Source>> rows;
       for (const auto& link : mod.Links())
@@ -1146,10 +1255,8 @@ namespace
          float lo = src.lo, hi = src.hi;
          const float pmin = ref != nullptr ? ref->minValue : std::min(lo, hi);
          const float pmax = ref != nullptr ? ref->maxValue : std::max(lo, hi);
-         bool changed = FormParts::SliderFloat(T("Low"), &lo, pmin, pmax, "%.3g");
-         UndoOnGrab();
-         changed |= FormParts::SliderFloat(T("High"), &hi, pmin, pmax, "%.3g");
-         UndoOnGrab();
+         bool changed = FloatRow(T("Low"), &lo, pmin, pmax, "%.3g");
+         changed |= FloatRow(T("High"), &hi, pmin, pmax, "%.3g");
          if (changed)
          {
             mod.SetRange(key.first, key.second, lo, hi);
@@ -1162,182 +1269,218 @@ namespace
    void DrawInspector(GraphNode& gn, MSEGNode& n)
    {
       State& s = S();
-      FormParts::Narrow narrow(84.0f);
-      SectionCard::BeginWindow();
-
-      FormParts::Section(T("Time"));
-      int mode = n.rateMode;
-      if (PickRow(T("Time"), "##ceTimeBase", MSEGNode::RateModeNames(), mode))
+      sCard.clear();
+      if (Card(T("Time")))
       {
-         PushUndoCheckpoint("Curve Time Base");
-         n.rateMode = mode;
-      }
-      switch (n.rateMode)
-      {
-      case LFONode::kRateBeats:
-         FormParts::SliderFloat(T("Length"), &n.rateBeats, 0.0625f, 256.0f, "%.3g beats", ImGuiSliderFlags_Logarithmic);
-         UndoOnGrab();
-         break;
-      case LFONode::kRateSynced:
-      {
-         int div = MusicTime::NearestRateDivision(n.rateBeats);
-         if (PickRow(T("Length"), "##ceDivision", MusicTime::RateDivisionList(), div))
+         int mode = n.rateMode;
+         if (ComboRow(T("Time"), &mode, MSEGNode::RateModeNames(), "Curve Time Base"))
+            n.rateMode = mode;
+         switch (n.rateMode)
          {
-            PushUndoCheckpoint("Curve Length");
-            n.rateBeats = (float)MusicTime::BeatsFor((MusicTime::RateDivision)div);
+         case LFONode::kRateBeats: FloatRow(T("Length"), &n.rateBeats, 0.0625f, 256.0f, "%.3g beats", ImGuiSliderFlags_Logarithmic); break;
+         case LFONode::kRateSynced:
+         {
+            int div = MusicTime::NearestRateDivision(n.rateBeats);
+            if (ComboRow(T("Length"), &div, MusicTime::RateDivisionList(), "Curve Length"))
+               n.rateBeats = (float)MusicTime::BeatsFor((MusicTime::RateDivision)div);
+            break;
          }
-         break;
-      }
-      case LFONode::kRateHz:
-         FormParts::SliderFloat(T("Rate"), &n.rateHz, 0.01f, 40.0f, "%.2f Hz", ImGuiSliderFlags_Logarithmic);
-         UndoOnGrab();
-         break;
-      case MSEGNode::kRateSeconds:
-         FormParts::SliderFloat(T("Length"), &n.lengthSec, 0.01f, 600.0f, "%.2f s", ImGuiSliderFlags_Logarithmic);
-         UndoOnGrab();
-         break;
-      default:
-         FormParts::SliderFloat(T("Length"), &n.lengthFrames, 1.0f, 100000.0f, "%.0f frames", ImGuiSliderFlags_Logarithmic);
-         UndoOnGrab();
-         n.lengthFrames = std::max(1.0f, std::round(n.lengthFrames));
-         FormParts::SliderFloat(T("FPS"), &n.fps, 1.0f, 240.0f, "%.3g");
-         UndoOnGrab();
-         break;
-      }
-      FormParts::SliderFloat(T("Speed"), &n.speed, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
-      UndoOnGrab();
-      static const std::vector<std::string> kPlay = { "Repeat", "Once", "Ping-pong" };
-      int play = n.play;
-      if (PickRow(T("Play"), "##cePlay", kPlay, play))
-      {
-         PushUndoCheckpoint("Curve Play");
-         n.play = play;
-      }
-      bool freeRun = n.freeRun;
-      if (FormParts::Checkbox(T("Free run"), &freeRun))
-      {
-         PushUndoCheckpoint("Curve Free Run");
-         n.freeRun = freeRun;
+         case LFONode::kRateHz: FloatRow(T("Rate"), &n.rateHz, 0.01f, 40.0f, "%.2f Hz", ImGuiSliderFlags_Logarithmic); break;
+         case MSEGNode::kRateSeconds: FloatRow(T("Length"), &n.lengthSec, 0.01f, 600.0f, "%.2f s", ImGuiSliderFlags_Logarithmic); break;
+         default:
+            FloatRow(T("Length"), &n.lengthFrames, 1.0f, 100000.0f, "%.0f frames", ImGuiSliderFlags_Logarithmic);
+            n.lengthFrames = std::max(1.0f, std::round(n.lengthFrames));
+            FloatRow(T("FPS"), &n.fps, 1.0f, 240.0f, "%.3g");
+            break;
+         }
+         FloatRow(T("Speed"), &n.speed, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+         static const std::vector<std::string> kPlay = { "Repeat", "Once", "Ping-pong" };
+         int play = n.play;
+         if (ComboRow(T("Play"), &play, kPlay, "Curve Play"))
+            n.play = play;
+         BoolRow(T("Free run"), &n.freeRun, "Curve Free Run");
       }
 
-      FormParts::Section(T("Loop"));
-      bool loop = n.loop;
-      if (FormParts::Checkbox(T("Loop"), &loop))
+      if (Card(T("Loop")))
       {
-         PushUndoCheckpoint("Curve Loop");
-         n.loop = loop;
-      }
-      ImGui::BeginDisabled(!n.loop);
-      FormParts::SliderFloat(T("Start"), &n.loopStart, 0.0f, 1.0f, "%.3f");
-      UndoOnGrab();
-      FormParts::SliderFloat(T("End"), &n.loopEnd, 0.0f, 1.0f, "%.3f");
-      UndoOnGrab();
-      FormParts::Label(T("Keep"));
-      if (ActionButton::Draw(T("Crop to Loop"), ImVec2(FormParts::ControlW(), 0.0f)))
-      {
-         const float a = std::clamp(std::min(n.loopStart, n.loopEnd), 0.0f, 1.0f);
-         const float b = std::clamp(std::max(n.loopStart, n.loopEnd), 0.0f, 1.0f);
-         PushUndoCheckpoint("Crop Curve");
-         if (CurveEdit::Crop(n.points, a, b))
+         BoolRow(T("Loop"), &n.loop, "Curve Loop");
+         ImGui::BeginDisabled(!n.loop);
+         FloatRow(T("Start"), &n.loopStart, 0.0f, 1.0f, "%.3f");
+         FloatRow(T("End"), &n.loopEnd, 0.0f, 1.0f, "%.3f");
+         FieldLabel(T("Keep"));
+         if (ActionButton::Draw(T("Crop to Loop"), ImVec2(sFieldW, 0.0f)))
          {
-            const float kept = b - a;
-            switch (n.rateMode)
+            const float a = std::clamp(std::min(n.loopStart, n.loopEnd), 0.0f, 1.0f);
+            const float b = std::clamp(std::max(n.loopStart, n.loopEnd), 0.0f, 1.0f);
+            PushUndoCheckpoint("Crop Curve");
+            if (CurveEdit::Crop(n.points, a, b))
             {
-            case LFONode::kRateSynced: n.rateMode = LFONode::kRateBeats; [[fallthrough]];
-            case LFONode::kRateBeats: n.rateBeats *= kept; break;
-            case LFONode::kRateHz: n.rateHz /= kept; break;
-            case MSEGNode::kRateSeconds: n.lengthSec *= kept; break;
-            default: n.lengthFrames = std::max(1.0f, std::round(n.lengthFrames * kept)); break;
+               const float kept = b - a;
+               switch (n.rateMode)
+               {
+               case LFONode::kRateSynced: n.rateMode = LFONode::kRateBeats; [[fallthrough]];
+               case LFONode::kRateBeats: n.rateBeats *= kept; break;
+               case LFONode::kRateHz: n.rateHz /= kept; break;
+               case MSEGNode::kRateSeconds: n.lengthSec *= kept; break;
+               default: n.lengthFrames = std::max(1.0f, std::round(n.lengthFrames * kept)); break;
+               }
+               n.loop = false;
+               n.loopStart = 0.0f;
+               n.loopEnd = 1.0f;
+               n.Normalize();
+               ClearSelection();
             }
-            n.loop = false;
-            n.loopStart = 0.0f;
-            n.loopEnd = 1.0f;
-            n.Normalize();
-            ClearSelection();
          }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Keep only the looped part; the length shrinks to it"));
+         ImGui::EndDisabled();
       }
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Keep only the looped part; the length shrinks to it"));
-      ImGui::EndDisabled();
 
-      if (!s.sel.empty())
+      if (!s.sel.empty() && Card(s.sel.size() == 1 ? T("Point") : T("Points")))
       {
-         FormParts::Section(s.sel.size() == 1 ? T("Point") : T("Points"));
          static const std::vector<std::string> kInterp = { "Constant", "Linear", "Bend", "Bezier" };
          static const std::vector<std::string> kHandles = { "Auto Clamped", "Auto", "Vector", "Aligned", "Free" };
          const int first = s.sel.front();
          int interp = first < (int)n.points.size() ? n.points[first].interp : 0;
-         if (PickRow(T("Curve"), "##ceInterp", kInterp, interp))
-            SetInterp(n, interp);
+         FieldLabel(T("Curve"));
+         ImGui::SetNextItemWidth(sFieldW);
+         if (MenuParts::BeginCombo(RowId("Curve").c_str(), T(kInterp[std::clamp(interp, 0, 3)].c_str())))
+         {
+            for (int i = 0; i < (int)kInterp.size(); i++)
+               if (MenuParts::Choice(T(kInterp[i].c_str()), i == interp))
+                  SetInterp(n, i);
+            MenuParts::EndCombo();
+         }
          int handle = first < (int)n.points.size() ? n.points[first].handle : 0;
-         if (PickRow(T("Handles"), "##ceHandle", kHandles, handle))
-            SetHandle(n, handle);
+         FieldLabel(T("Handles"));
+         ImGui::SetNextItemWidth(sFieldW);
+         if (MenuParts::BeginCombo(RowId("Handles").c_str(), T(kHandles[std::clamp(handle, 0, 4)].c_str())))
+         {
+            for (int i = 0; i < (int)kHandles.size(); i++)
+               if (MenuParts::Choice(T(kHandles[i].c_str()), i == handle))
+                  SetHandle(n, i);
+            MenuParts::EndCombo();
+         }
          if (s.sel.size() == 1 && first < (int)n.points.size())
          {
             const MSEGNode::Point p = n.points[first];
             float x = p.x, y = p.y;
             ImGui::BeginDisabled(first == 0 || first == (int)n.points.size() - 1);
-            if (FormParts::SliderFloat(T("Time"), &x, 0.0f, 1.0f, "%.4f"))
+            FieldLabel(T("Time"));
+            ImGui::SetNextItemWidth(sFieldW);
+            if (FieldWell::Slider(RowId("Time").c_str(), &x, 0.0f, 1.0f, "%.4f"))
                n.MovePoint(first, x, p.y);
             UndoOnGrab();
             ImGui::EndDisabled();
-            if (FormParts::SliderFloat(T("Value"), &y, 0.0f, 1.0f, "%.4f"))
+            FieldLabel(T("Value"));
+            ImGui::SetNextItemWidth(sFieldW);
+            if (FieldWell::Slider(RowId("Value").c_str(), &y, 0.0f, 1.0f, "%.4f"))
                n.MovePoint(first, n.points[first].x, y);
             UndoOnGrab();
             if (p.interp == ModShapes::kInterpBend && first + 1 < (int)n.points.size())
-            {
-               FormParts::SliderFloat(T("Bend"), &n.points[first].curve, -1.0f, 1.0f, "%.2f");
-               UndoOnGrab();
-            }
+               FloatRow(T("Bend"), &n.points[first].curve, -1.0f, 1.0f, "%.2f");
          }
       }
 
       DrawTargets(gn);
 
-      FormParts::Section(T("Voices"));
-      bool voice = n.voice;
-      if (FormParts::Checkbox(T("Per voice"), &voice))
-      {
-         PushUndoCheckpoint("Curve Per Voice");
-         n.voice = voice;
-      }
-      SectionCard::EndWindow();
+      if (Card(T("Voices")))
+         BoolRow(T("Per voice"), &n.voice, "Curve Per Voice");
    }
 
-   // The footer under the graph: snap, grid, Draw's thinning; Assign and the target count on the right.
-   void DrawFooter(GraphNode& gn, MSEGNode& n, float width)
+   // The properties column, built as the 3D View's: a bordered panel, its title and close, then the cards.
+   void DrawSide(GraphNode& gn, MSEGNode& n, ImVec2 size)
+   {
+      PushDockedPanelStyle(/*isChild=*/true);
+      const ImVec2 savedPad = ImGui::GetStyle().WindowPadding;
+      ImGui::GetStyle().WindowPadding = ImVec2(tok::space_3, tok::space_3);
+      ImGui::BeginChild("##ceSide", size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+      ImGui::GetStyle().WindowPadding = savedPad;
+      PopDockedPanelStyle();
+      const float availW = ImGui::GetContentRegionAvail().x;
+      SectionCard::Title(T("Curve"));
+      FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
+      {
+         const float sz = 16.0f;
+         if (ImGui::InvisibleButton("##ceSideClose", ImVec2(sz, sz)))
+            S().sideOpen = false;
+         const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+         glyph::DrawX(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), sz * 0.65f,
+                      ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled));
+      }
+      // A child whose first card touches its top and sides (the 3D View's BeginCardColumn); only it scrolls.
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::kPad, 0.0f));
+      ImGui::BeginChild("##ceProps", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
+      ImGui::PopStyleVar();
+      SectionCard::BeginWindow();
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+      sFieldW = std::max(70.0f, ImGui::GetContentRegionAvail().x - kFieldLabelW);
+      DrawInspector(gn, n);
+      SectionCard::EndWindow();
+      ImGui::EndChild();
+      ImGui::EndChild();
+   }
+
+   // The editing controls the header carries after the pages: snap, grid, Draw's thinning, Assign.
+   float ControlsW()
+   {
+      const float sp = tok::space_1;
+      return kIconW + sp + kGridW + (S().tool == Tool::Draw ? sp + kThinW : 0.0f) + tok::space_3 + kAssignW;
+   }
+
+   void DrawControls(GraphNode& gn, MSEGNode& n)
    {
       State& s = S();
-      const float startX = ImGui::GetCursorPosX();
-      if (IconChip("##ceSnap", s.snap ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap, s.snap, T("Snap to grid (G)")))
+      if (IconChip("##ceSnap", IconsInfinite::Snap, s.snap, T("Snap to grid (G)")))
          s.snap = !s.snap;
       FormParts::Inline(0.0f, tok::space_1);
-      Picker("##ceGrid", GridNames(n), GridIndex(n), 96.0f, T("Grid"));
+      Picker("##ceGrid", GridNames(n), GridIndex(n), kGridW, T("Grid: snap and quantise (Q)"));
       if (s.tool == Tool::Draw)
       {
-         FormParts::Inline(0.0f, tok::space_3);
-         ImGui::SetNextItemWidth(110.0f);
+         FormParts::Inline(0.0f, tok::space_1);
+         ImGui::SetNextItemWidth(kThinW);
          float pct = s.thinning * 100.0f;
-         if (ImGui::SliderFloat("##ceThin", &pct, 0.1f, 10.0f, "thin %.1f%%", ImGuiSliderFlags_Logarithmic))
+         if (FieldWell::Slider("##ceThin", &pct, 0.1f, 10.0f, "thin %.1f%%", ImGuiSliderFlags_Logarithmic))
             s.thinning = pct / 100.0f;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Thinning"));
       }
-      const int targets = TargetCount(gn);
-      char count[48];
-      std::snprintf(count, sizeof count, targets == 1 ? T("%d target") : T("%d targets"), targets);
-      const float countW = ImGui::CalcTextSize(count).x;
-      constexpr float kAssignW = 80.0f;
-      const float right = startX + width - kAssignW - countW - tok::space_3;
-      ImGui::SameLine(std::max(ImGui::GetCursorPosX() + tok::space_3, right));
+      FormParts::Inline(0.0f, tok::space_3);
       const bool armed = gCurveAssignUid == gn.uid;
       if (ActionButton::Draw(T("Assign"), ImVec2(kAssignW, tok::tile), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
          gCurveAssignUid = armed ? 0 : gn.uid;
       if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Click a knob to drive it; Shift picks more, Esc stops"));
+      {
+         const int targets = TargetCount(gn);
+         char count[48];
+         std::snprintf(count, sizeof count, targets == 1 ? T("%d target") : T("%d targets"), targets);
+         HelpTip("%s. %s", T("Click a knob to drive it; Shift picks more, Esc stops"), count);
+      }
+   }
+
+   // Header: pages on the left; the controls, the ghost toggle and the properties toggle pinned right, as the 3D View
+   // pins its own. The side docks are too narrow for one row, so there the controls drop to their own row.
+   void DrawHeader(GraphNode* gn, MSEGNode* n, bool side)
+   {
+      State& s = S();
+      const float availW = ImGui::GetContentRegionAvail().x;
+      const float togglesW = n != nullptr ? 2.0f * kIconW + tok::space_1 : 0.0f;
+      const float controlsW = n != nullptr && !side ? ControlsW() + tok::space_3 : 0.0f;
+      DrawPageStrip(std::max(1.0f, availW - togglesW - controlsW - (n != nullptr ? tok::space_3 : 0.0f)));
+      if (n == nullptr)
+         return;
+      if (!side)
+      {
+         FormParts::Inline(0.0f, tok::space_3);
+         DrawControls(*gn, *n);
+      }
       FormParts::Inline(0.0f, tok::space_3);
-      ImGui::AlignTextToFramePadding();
-      ImGui::TextDisabled("%s", count);
+      if (IconChip("##ceGhost", s.ghost ? IconsInfinite::Eye : IconsInfinite::EyeOff, s.ghost, T("Show other curves")))
+         s.ghost = !s.ghost;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##ceSide", IconsInfinite::Edit, s.sideOpen, T("Properties (N)")))
+         s.sideOpen = !s.sideOpen;
    }
 
    void DrawDockMenu()
@@ -1419,7 +1562,7 @@ namespace
          gCurveAssignUid = 0;
 
       const bool side = gCurveEditorDock == 1 || gCurveEditorDock == 2;
-      DrawPageStrip(ImGui::GetContentRegionAvail().x);
+      DrawHeader(gn, n, side);
       if (n == nullptr)
       {
          const ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -1436,37 +1579,34 @@ namespace
       }
       HandleKeys(*n);
       const float gap = tok::space_2;
-      const float footerH = tok::tile + gap;
       if (side)
       {
-         // Rows: tools, graph, footer, inspector folded under it.
+         // Rows: tools, controls, graph, then the properties under it. Every height is exact, so nothing scrolls.
          DrawToolButtons(true);
+         DrawControls(*gn, *n);
          const ImVec2 avail = ImGui::GetContentRegionAvail();
-         DrawGraphArea(*n, ImVec2(avail.x, std::max(140.0f, avail.y * 0.5f)));
-         ImGui::Dummy(ImVec2(0.0f, gap * 0.5f));
-         DrawFooter(*gn, *n, avail.x);
-         ImGui::BeginChild("##ceInspector", ImVec2(avail.x, std::max(1.0f, ImGui::GetContentRegionAvail().y)), false);
-         DrawInspector(*gn, *n);
-         ImGui::EndChild();
+         const float spacing = ImGui::GetStyle().ItemSpacing.y;
+         const float graphH = s.sideOpen ? std::max(140.0f, avail.y * 0.5f) : std::max(1.0f, avail.y);
+         DrawGraphArea(*n, ImVec2(avail.x, graphH));
+         if (s.sideOpen)
+            DrawSide(*gn, *n, ImVec2(avail.x, std::max(1.0f, avail.y - graphH - spacing)));
          return;
       }
-      // Columns: tool rail, graph over its footer, inspector on the outer edge.
+      // Columns: tool rail, graph, properties on the outer edge. The widths add up to the row, so nothing scrolls.
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const float bodyH = std::max(1.0f, avail.y);
-      ImGui::BeginChild("##ceRail", ImVec2(kIconW, bodyH), false, ImGuiWindowFlags_NoScrollbar);
+      ImGui::BeginChild("##ceRail", ImVec2(kIconW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawToolButtons(false);
       ImGui::EndChild();
       FormParts::Inline(0.0f, gap);
-      const float graphW = std::max(80.0f, avail.x - kIconW - kInspectorW - 2.0f * gap);
-      ImGui::BeginGroup();
-      DrawGraphArea(*n, ImVec2(graphW, std::max(60.0f, bodyH - footerH)));
-      ImGui::Dummy(ImVec2(0.0f, gap * 0.5f));
-      DrawFooter(*gn, *n, graphW);
-      ImGui::EndGroup();
-      FormParts::Inline(0.0f, gap);
-      ImGui::BeginChild("##ceInspector", ImVec2(kInspectorW, bodyH), false);
-      DrawInspector(*gn, *n);
-      ImGui::EndChild();
+      const float sideW = s.sideOpen ? std::min(kSideW, avail.x * 0.4f) : 0.0f;
+      const float graphW = std::max(80.0f, avail.x - kIconW - gap - (s.sideOpen ? sideW + gap : 0.0f));
+      DrawGraphArea(*n, ImVec2(graphW, bodyH));
+      if (s.sideOpen)
+      {
+         FormParts::Inline(0.0f, gap);
+         DrawSide(*gn, *n, ImVec2(sideW, bodyH));
+      }
    }
 }
 
@@ -1524,7 +1664,7 @@ void DrawCurveEditorDocked(const char* id, const ImVec2& size)
    case 2: in.r = 0.0f; break;
    default: in.b = 0.0f; break;
    }
-   PanelFrame::BeginCard("##curvecontent", cardSize, in);
+   PanelFrame::BeginCard("##curvecontent", cardSize, in, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
    DrawPanel();
    PanelFrame::EndCard();
    if (!gripFirst)

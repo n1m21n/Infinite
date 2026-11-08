@@ -383,7 +383,10 @@ Block 1, settled on the way (2026-11-08):
 | Glyphs | New: Curve (rail), Pen tool, Line tool, Bend; Pointer, Hand, Pencil and Erase reused |
 | Key | Shift+E opens the panel; inside it Shift+1..5 set handle types (Shift+3 no longer reaches the 3D View there) |
 | Agent API | Panel name `curveeditor`, aliases `curve`, `curves`, `mseg` |
-| Grid | The grid picker sits in the footer beside snap, not in the inspector |
+| Header | No footer: pages left; magnet snap, grid, Draw's thinning, Assign, ghost and the pencil Properties toggle (N) pinned right, as the 3D View's header (side docks put the controls on their own row) |
+| Properties | A bordered side column titled Curve with a close X and collapsible cards (Time, Loop, Point, Targets, Voices), built from the 3D View's rows; only the card list scrolls |
+| Fit | Every height and width is exact and the panel card never scrolls, so there is no sideways two-finger scroll |
+| Placement | A page made in the panel spawns its MSEG with FindFreeSpawnPosition, beside nodes on screen, never on top |
 | Empty panel | A drag on it makes an MSEG page and draws its curve in one go (M1) |
 | New page | A page made in the panel is 4 bars (Synced, 16 beats) and opens on Draw; a card-spawned MSEG keeps 1 bar |
 | Draw | Strokes thin to 1 % by default (footer slider); drawn points are Linear |

@@ -680,6 +680,7 @@ namespace app
       { I18N_KEY("Curve Editor"), I18N_KEY("Handle Type"), "Shift+1 ... Shift+5", I18N_KEY("Auto Clamped, Auto, Vector, Aligned or Free handles for the selected points") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Snap"), "G / Alt", I18N_KEY("Toggle snap to the grid; hold Alt to drag past it, Ctrl to snap the value to eighths") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Quantise Points"), "Q", I18N_KEY("Move the selected points, or every point, onto the grid") },
+      { I18N_KEY("Curve Editor"), I18N_KEY("Properties"), "N", I18N_KEY("Show or hide the properties column") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Fit Curve"), "F", I18N_KEY("Show the whole curve") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Zoom / Pan Curve"), "Scroll / Shift+Scroll", I18N_KEY("Zoom around the pointer, or pan; middle-drag also pans") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Select All Points"), MODKEY "+A", I18N_KEY("Select every point") },
