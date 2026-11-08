@@ -261,3 +261,13 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 .ax-lab .pad { display: inline-flex; align-items: center; justify-content: center; min-height: var(--ctl-h, 40px); }
 .ax-lab .pad small { display: none; }
 @media (max-width: 640px) { .pr-tile { flex-direction: row; padding: 6px 10px; } }
+
+.ax-plug { display: flex; flex-wrap: wrap; gap: 12px; }
+.ax-maker { display: grid; gap: 24px; padding: 24px; border-radius: var(--r-lg); background: var(--surface-1, var(--card)); border: 1px solid var(--line); }
+.ax-maker h3 { margin: 0 0 8px; font: 700 var(--size-h3, 1.5rem)/1.2 'Geist', system-ui, sans-serif; color: var(--ink); }
+.ax-maker p { margin: 0 0 16px; color: var(--ink2); }
+.ax-albums { margin: 0; display: grid; gap: 8px; padding: 16px 20px; border-radius: var(--r-md, 16px); background: var(--deep); }
+.ax-albums div { display: flex; justify-content: space-between; gap: 16px; }
+.ax-albums dt { font-weight: 600; color: var(--ink); }
+.ax-albums dd { margin: 0; color: var(--ink2); font-family: 'Geist Mono', monospace; }
+@media (min-width: 760px) { .ax-maker { grid-template-columns: 1fr minmax(220px, 300px); align-items: center; } }
