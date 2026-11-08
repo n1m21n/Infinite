@@ -284,4 +284,16 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 .ax-name { display: flex; align-items: center; gap: 14px; margin: 0 0 10px; }
 .ax-name img { flex: none; width: 56px; height: 56px; object-fit: cover; border: 2.5px solid var(--r-ink); border-radius: 3px; box-shadow: 4px 4px 0 var(--r-mag); }
 .ax-name h3 { margin: 0; }
+
+.ax-albums img { flex: none; width: 40px; height: 40px; object-fit: cover; border: 2px solid var(--r-ink); border-radius: 3px; }
+.ax-albums dt { flex: 1; min-width: 0; }
 /* brand-lint: on */
+
+/* compact "Made in Infinite" and "Start with" on every audience page */
+.ax-shot { height: clamp(112px, 16vw, 148px); }
+.ax-reel { gap: 10px; padding-top: 4px; padding-bottom: 8px; }
+.ax-bento { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: 92px; gap: 10px; }
+.ax-bento-t.big { grid-column: auto; grid-row: auto; }
+.ax-bento-t:last-child:nth-child(even) { grid-column: auto; }
+.ax-bento-l { left: 12px; right: 12px; bottom: 10px; font-size: var(--size-caption); }
+@media (max-width: 640px) { .ax-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 84px; gap: 8px; } }
