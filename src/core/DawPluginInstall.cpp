@@ -68,7 +68,8 @@ namespace DawPlugin
          std::error_code ec;
          fs::create_directories(P(License::Dir()), ec);
          const fs::path dst = P(RecordPath());
-         const fs::path tmp = dst.string() + ".tmp";
+         fs::path tmp = dst; // dst.string() would be ANSI on Windows
+         tmp += ".tmp";
          {
             std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
             f << env.version << "\n" << env.engine << "\n";

@@ -25,6 +25,7 @@
 //   2000..2127  MIDI CC 0..127   hidden, omni: VST3 hands CC to plugins only as parameters
 //   2128        Pitch bend       (IMidiMapping), turned back into MIDI for the engine here
 //   2129        Channel pressure
+#include "platform/AppPaths.h"
 #include "core/DawPluginInstall.h"
 #include "core/License.h"
 #include "plugin/ipc/PluginFrames.h"
@@ -588,7 +589,7 @@ namespace InfinitePlugin
          // Development and tests (tools/plugin): start the engine on a given patch instead of the
          // build's starting patch. Like $INFINITE_PLUGIN_ENGINE, never set by a host.
          if (const char* patch = getenv("INFINITE_PLUGIN_PATCH"))
-            if (FILE* f = std::fopen(patch, "rb"))
+            if (FILE* f = AppPaths::OpenFile(patch, "rb"))
             {
                std::fclose(f);
                args.push_back(patch);

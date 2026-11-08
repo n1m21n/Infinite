@@ -17,7 +17,9 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SKIP_DIRS = ("src/platform/linux/", "src/platform/mac/", "src/app/selftest/")
+SKIP_DIRS = ("src/platform/linux/", "src/platform/mac/", "src/app/selftest/",
+             # plugin check tools: developer binaries run on the build machine, like tests
+             "src/plugin/shell/ShellCheck.cpp", "src/plugin/shell/TestLicense.cpp", "src/plugin/engine/PluginEngineCheck.cpp")
 SAFE_ARG = re.compile(r"^(AppPaths::)?FsPath\(|u8path\(|Utf8ToWide\(|WPATH\(")
 OPEN = re.compile(r"std::(i|o)?fstream(\s+\w+)?\s*\(|(?<![\w_])(std::)?fopen\s*\(|\.open\s*\(")
 
@@ -41,6 +43,12 @@ ALLOW = {
     ("src/core/InfiniteCli.cpp", "std::ifstream in(entry.path());"),
     ("src/core/chat/FindEval.cpp", "std::ifstream f(argv[1]);"),
     ("src/platform/common/ProcessTree.cpp", 'std::ifstream in("/proc/" + std::to_string(pid) + "/stat");'),
+    # already std::filesystem::path (P() and the licence paths are u8path, tmp is copied from them).
+    ("src/core/DawPluginInstall.cpp", "std::ifstream f(P(RecordPath()), std::ios::binary);"),
+    ("src/core/DawPluginInstall.cpp", "std::ofstream f(tmp, std::ios::binary | std::ios::trunc);"),
+    ("src/core/License.cpp", 'std::ifstream f(AppPaths::FsPath(Dir()) / "license-test-key.hex");'),
+    ("src/core/License.cpp", "std::ifstream f(p, std::ios::binary);"),
+    ("src/core/License.cpp", "std::ofstream f(tmp, std::ios::binary | std::ios::trunc);"),
     # sketch-check is a developer CLI that takes its own argv.
     ("src/core/sketch/SketchCheck.cpp", 'if (FILE* fp = std::fopen(path.c_str(), "wb"))'),
     ("src/core/sketch/SketchCheck.cpp", 'if (FILE* fp = std::fopen(argv[1], "wb"))'),

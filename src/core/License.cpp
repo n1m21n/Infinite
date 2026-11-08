@@ -1,4 +1,5 @@
 // Plugin licence check (License.h, docs/plans/vst-au/README.md 8.5).
+#include "platform/AppPaths.h"
 #include "core/License.h"
 
 #include "monocypher/monocypher-ed25519.h"
@@ -82,7 +83,7 @@ namespace License
 #if defined(INFINITE_LICENSE_TEST_KEY) && INFINITE_LICENSE_TEST_KEY
          if (const char* env = getenv("INFINITE_LICENSE_PUBKEY"); env && Hex32(env, out))
             return true;
-         std::ifstream f(std::filesystem::path(Dir()) / "license-test-key.hex");
+         std::ifstream f(AppPaths::FsPath(Dir()) / "license-test-key.hex");
          std::string line;
          if (f && std::getline(f, line) && Hex32(line, out))
             return true;
@@ -106,7 +107,8 @@ namespace License
       {
          std::error_code ec;
          std::filesystem::create_directories(p.parent_path(), ec);
-         const std::filesystem::path tmp = p.string() + ".tmp";
+         std::filesystem::path tmp = p; // p.string() would be ANSI on Windows
+         tmp += ".tmp";
          {
             std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
             if (!f)
@@ -215,11 +217,12 @@ namespace License
 
    std::string Dir()
    {
-      if (const char* env = getenv("INFINITE_LICENSE_DIR"); env && *env)
+      // UTF-8 on every OS: Windows' getenv and path::string() are ANSI, which mangles a user called "José".
+      if (std::string env; AppPaths::GetEnvUtf8("INFINITE_LICENSE_DIR", env) && !env.empty())
          return env;
 #if defined(_WIN32)
-      if (const char* appdata = getenv("APPDATA"); appdata && *appdata)
-         return (std::filesystem::path(appdata) / "Infinite").string();
+      if (std::string appdata; AppPaths::GetEnvUtf8("APPDATA", appdata) && !appdata.empty())
+         return (AppPaths::FsPath(appdata) / "Infinite").u8string();
       return std::string();
 #else
       // The account's real home, not $HOME: a sandboxed host points $HOME into its container.
@@ -243,13 +246,13 @@ namespace License
    bool ReadKey(std::string& key)
    {
       const std::string dir = Dir();
-      return !dir.empty() && ReadFile(std::filesystem::path(dir) / "license.inflic", key);
+      return !dir.empty() && ReadFile(AppPaths::FsPath(dir) / "license.inflic", key);
    }
 
    bool WriteKey(const std::string& key)
    {
       const std::string dir = Dir();
-      return !dir.empty() && WriteFile(std::filesystem::path(dir) / "license.inflic", key + "\n");
+      return !dir.empty() && WriteFile(AppPaths::FsPath(dir) / "license.inflic", key + "\n");
    }
 
    std::vector<std::string> ReadRevoked(int64_t* fetchedUnix)
@@ -259,7 +262,7 @@ namespace License
          *fetchedUnix = 0;
       std::string text;
       const std::string dir = Dir();
-      if (dir.empty() || !ReadFile(std::filesystem::path(dir) / "license-revoked.json", text))
+      if (dir.empty() || !ReadFile(AppPaths::FsPath(dir) / "license-revoked.json", text))
          return ids;
       const nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
       if (!j.is_object())
@@ -285,14 +288,14 @@ namespace License
             out["revoked"].push_back(v.get<std::string>());
       out["fetched"] = fetchedUnix;
       const std::string dir = Dir();
-      return !dir.empty() && WriteFile(std::filesystem::path(dir) / "license-revoked.json", out.dump());
+      return !dir.empty() && WriteFile(AppPaths::FsPath(dir) / "license-revoked.json", out.dump());
    }
 
    bool RefundCheckOn()
    {
       std::string text;
       const std::string dir = Dir();
-      if (dir.empty() || !ReadFile(std::filesystem::path(dir) / "license-settings.json", text))
+      if (dir.empty() || !ReadFile(AppPaths::FsPath(dir) / "license-settings.json", text))
          return true;
       const nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
       return !(j.is_object() && j.contains("refundCheck") && j["refundCheck"].is_boolean()) || j["refundCheck"].get<bool>();
@@ -302,7 +305,7 @@ namespace License
    {
       const std::string dir = Dir();
       if (!dir.empty())
-         WriteFile(std::filesystem::path(dir) / "license-settings.json", nlohmann::json { { "refundCheck", on } }.dump());
+         WriteFile(AppPaths::FsPath(dir) / "license-settings.json", nlohmann::json { { "refundCheck", on } }.dump());
    }
 
    std::string RevokedUrl()

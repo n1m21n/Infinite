@@ -1,3 +1,4 @@
+#include "platform/AppPaths.h"
 #include "plugin/engine/HostAudio.h"
 
 #include "audio/AudioEngine.h"
@@ -407,7 +408,7 @@ namespace PluginEngine
       {
          written = true;
          if (const char* path = std::getenv("INFINITE_PLUGIN_STATS"))
-            if (FILE* f = std::fopen(path, "w"))
+            if (FILE* f = AppPaths::OpenFile(path, "w"))
             {
                std::fprintf(f, "blocks %llu jumps %llu renders %llu peak %g parks %llu parkTimeouts %llu frames %llu readbackUs %llu\n", (unsigned long long)gBlocks.load(),
                             (unsigned long long)gJumps.load(), (unsigned long long)gRenders.load(), (double)gPeak.load(),
