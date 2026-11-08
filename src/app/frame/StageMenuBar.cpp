@@ -587,6 +587,8 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (tok::tile - ImGui::GetFontSize()) * 0.5f));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
+         // Right-edge items are placed at an absolute x on the bar's line.
+         auto TopBarPlaceAt = [](float x) { ImGui::SameLine(x); };
          auto TopBarSameLine = [](float spacing = 4.0f) {
             ImGui::SameLine(0.0f, spacing);
          };
@@ -1127,7 +1129,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (cursorX - updateWidth - telemetryGap - telemetryW >= centreEndX + minGap)
             {
                cursorX -= updateWidth;
-               ImGui::SameLine(cursorX);
+               TopBarPlaceAt(cursorX);
                ImGui::PushID("##updateicon");
                const bool clicked = ImGui::InvisibleButton("##update", ImVec2(tok::tile, tok::tile));
                ImGui::PopID();
@@ -1165,7 +1167,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (fits(tok::tile))
             {
                cursorX -= tok::tile;
-               ImGui::SameLine(cursorX);
+               TopBarPlaceAt(cursorX);
                const bool popped = PluginView::Popped();
                if (IconTile::Draw("##popout", IconsInfinite::PopOut, IconsInfinite::PopOut, popped, tok::tile,
                                   ImGui::GetFrameHeight()))
@@ -1177,7 +1179,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (fits(tok::tile))
             {
                cursorX -= tok::tile;
-               ImGui::SameLine(cursorX);
+               TopBarPlaceAt(cursorX);
                const bool picture = PluginView::Picture();
                if (IconTile::Draw("##picture", IconsInfinite::Viewport, IconsInfinite::ViewportFill, picture, tok::tile,
                                   ImGui::GetFrameHeight()))
@@ -1189,7 +1191,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (fits(tok::tile))
             {
                cursorX -= tok::tile;
-               ImGui::SameLine(cursorX);
+               TopBarPlaceAt(cursorX);
                if (IconTile::Draw("##slots", IconsInfinite::FamilyMacros, IconsInfinite::FamilyMacros,
                                   ImGui::IsPopupOpen("##slotsmap"), tok::tile, ImGui::GetFrameHeight()))
                   ImGui::OpenPopup("##slotsmap");
@@ -1221,7 +1223,7 @@ void DrawMenuBar(FrameCtx& fc)
                if (fits(w))
                {
                   cursorX -= w;
-                  ImGui::SameLine(cursorX);
+                  TopBarPlaceAt(cursorX);
                   TabLabel("topbar.hostxruns", xr, "99999 xruns", true);
                   if (ImGui::IsItemHovered())
                      ImGui::SetTooltip("%s", T("Late blocks the host played as silence"));
@@ -1235,7 +1237,7 @@ void DrawMenuBar(FrameCtx& fc)
          static const bool sHideTelemetry = getenv("INFINITE_HIDE_TELEMETRY") != nullptr;
          if (!sHideTelemetry && cursorX - telemetryW >= centreEndX + minGap)
          {
-            ImGui::SameLine(cursorX - telemetryW);
+            TopBarPlaceAt(cursorX - telemetryW);
             TabLabel("topbar.fps", readout, "99.9 fps   99.9 ms", true);
             TopBarSameLine(telemetryGap);
             TabLabel("topbar.cpu", cpuReadout, cpuWidest, true);

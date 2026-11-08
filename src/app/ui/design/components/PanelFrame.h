@@ -32,6 +32,20 @@ namespace PanelFrame
       ImGui::PopStyleVar(3);
    }
 
+   // Style for a full-bleed picture window (the plugin's picture view): no padding, no border, black backdrop.
+   // Pair with PopBareStyle() after End().
+   inline void PushBareStyle()
+   {
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32_BLACK);
+   }
+   inline void PopBareStyle()
+   {
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar(2);
+   }
+
    // Draw the card surface for the rect starting at the cursor with the given outer size.
    inline void DrawSurface(ImVec2 size, Insets in = {})
    {

@@ -2024,7 +2024,7 @@ namespace app
       if (Platform::PluginModeActive())
       {
          MacroHostSlotField(n->hostSlot, kPreviewSize * 0.48f, "##hostslotx", "x slot");
-         ImGui::SameLine();
+         FormParts::Inline();
          MacroHostSlotField(n->hostSlotY, kPreviewSize * 0.48f, "##hostsloty", "y slot");
       }
    }

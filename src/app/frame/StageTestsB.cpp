@@ -1,4 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
 #include "plugin/engine/PluginView.h"
 
@@ -688,9 +690,7 @@ int DrawTestsB(FrameCtx& fc)
          const ImVec2 size(vp->WorkSize.x, std::max(1.0f, vp->WorkSize.y - tok::bar_h));
          ImGui::SetNextWindowPos(pos);
          ImGui::SetNextWindowSize(size);
-         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-         ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 255));
+         PanelFrame::PushBareStyle();
          if (ImGui::Begin("##pluginpicture", nullptr,
                           ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoScrollWithMouse))
@@ -709,12 +709,11 @@ int DrawTestsB(FrameCtx& fc)
                const char* none = T("No Output");
                const ImVec2 ts = ImGui::CalcTextSize(none);
                ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + (size.x - ts.x) * 0.5f, pos.y + (size.y - ts.y) * 0.5f),
-                                                   IM_COL32(255, 255, 255, 110), none);
+                                                   tok::U32(tok::pal::c_FFFFFF6E), none);
             }
          }
          ImGui::End();
-         ImGui::PopStyleColor();
-         ImGui::PopStyleVar(2);
+         PanelFrame::PopBareStyle();
       }
 
       if (gOfflineRender.active)
