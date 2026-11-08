@@ -14,7 +14,7 @@ Paddle takes the payment. This Worker turns a completed payment into a signed li
 The private key lives only in the Worker secret `LICENSE_PRIVATE_KEY` and a 0600 backup at `~/.infinite-license-private-key.b64`. Lose both and old keys still verify, but no new ones can be signed with this public key.
 
 ## Where things live
-Paddle (sandbox now): product, $99 price, discount `LAUNCH79` ($20 off), webhook destination, client token. `website/paddle.json` holds the environment, client token, price id and launch code the buy page uses.
+Paddle (live): product, $149 price, discount `LAUNCH99` ($50 off), webhook destination, client token. `website/paddle.json` holds the environment, client token, price id and launch code the buy page uses.
 
 ## Going live
 1. Paddle live account approved, then create the same product, price and discount there.
