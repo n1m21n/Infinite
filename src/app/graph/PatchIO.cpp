@@ -1,6 +1,7 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include <algorithm>
 #include "app/AppShared.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "app/graph/LearningLog.h"
 #include "core/MediaCollect.h"
 #include "core/MovementLog.h"
@@ -383,6 +384,14 @@ namespace app
             gPianoRollHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelPianoRollDock")
             gPianoRollDock = (val == "3") ? 3 : 0;
+         else if (key == "panelCurveEditorOpen")
+            gCurveEditorOpen = (val != "0");
+         else if (key == "panelCurveEditorH")
+            gCurveEditorHeight = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelCurveEditorW")
+            gCurveEditorWidth = std::max(360.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelCurveEditorDock")
+            gCurveEditorDock = std::clamp(atoi(val.c_str()), 0, 3);
          else if (key == "panelTerminalOpen")
             gTerminalOpen = (val != "0");
          else if (key == "panelTerminalH")
@@ -445,6 +454,10 @@ namespace app
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
       file << "panelPianoRollH=" << gPianoRollHeight << "\n";
       file << "panelPianoRollDock=" << gPianoRollDock << "\n";
+      file << "panelCurveEditorOpen=" << (gCurveEditorOpen ? 1 : 0) << "\n";
+      file << "panelCurveEditorH=" << gCurveEditorHeight << "\n";
+      file << "panelCurveEditorW=" << gCurveEditorWidth << "\n";
+      file << "panelCurveEditorDock=" << gCurveEditorDock << "\n";
       file << "panelTerminalOpen=" << (gTerminalOpen ? 1 : 0) << "\n";
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";

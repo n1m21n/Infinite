@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/graph/LearningLog.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "platform/PluginCrashGuard.h"
 #include "core/CliSetup.h"
 #include "app/graph/NoteGen.h"
@@ -4315,6 +4316,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gSampleStudioOpen = o.find("studio") != std::string::npos;
       gPianoRollOpen = o.find("pianoroll") != std::string::npos;
       gTerminalOpen = o.find("terminal") != std::string::npos;
+      gCurveEditorOpen = o.find("curveeditor") != std::string::npos;
       if (o.find("chatcode") != std::string::npos)
          ChatShotOpenCode();
       gShotNodeMenu = o.find("nodemenu") != std::string::npos;

@@ -368,3 +368,18 @@ Filled in per block when it lands; each row links to §6 and §7.
 4. Block 3: Expression page (§8.8), Record page (§8.9) → tests (M3, M4).
 5. Block 4: motion grade (§8.10) → Blender A/B (M5) → M10 coverage sweep.
 6. After Block 4: fill §10, decide ship / iterate / abandon per block, then judge whether Arrange automation should reuse this.
+
+## 13. Decisions taken while building
+
+Block 1, settled on the way (2026-11-08):
+
+| Area | Decision |
+|---|---|
+| Save string | Each point is `x,y,curve[,interp,handle[,lx,ly,rx,ry]]`, so old patches read unchanged and a new patch only writes what differs |
+| Play modes | Repeat / Once / Ping-pong apply to free (untriggered) runs only; a trig still plays the shape once and holds, as before |
+| Free run | Off by default: the clock follows the transport; on, it runs on its own clock, transport or not |
+| Frames | The node holds its own fps (default 30), so a 24 fps export lands exactly on k/fps |
+| Card params | Speed, length (s), frames and fps use fixed ordinals 4–7, so existing modulation bindings keep their targets |
+| Glyphs | New: Curve (rail), Pen tool, Line tool, Bend; Pointer, Hand, Pencil and Erase reused |
+| Key | Shift+E opens the panel; inside it Shift+1..5 set handle types (Shift+3 no longer reaches the 3D View there) |
+| Agent API | Panel name `curveeditor`, aliases `curve`, `curves`, `mseg` |

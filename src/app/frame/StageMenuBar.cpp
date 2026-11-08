@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/CurveEditorPanel.h"
 #include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
@@ -56,6 +57,9 @@ static void DrawPanelRail()
       gTerminalOpen = !gTerminalOpen;
       gTerminalFocus = gTerminalOpen;
    }
+   if (PanelRail::Item("##railCurveEditor", top + 10.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
+                       T("Curve editor - draw and shape MSEG curves (Shift+E)")))
+      gCurveEditorOpen = !gCurveEditorOpen;
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
@@ -471,6 +475,30 @@ void DrawMenuBar(FrameCtx& fc)
                         FieldWell::Slider(L("Width"), &gTerminalWidth, 280.0f, 1400.0f, "%.0f px");
                      else
                         FieldWell::Slider(L("Height"), &gTerminalHeight, 160.0f, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               }
+               if (MenuParts::SubMenu(L("Curve Editor")))
+               {
+                  MenuParts::Check(L("Show Curve Editor"), &gCurveEditorOpen);
+                  if (gCurveEditorOpen)
+                  {
+                     static const char* kCurveDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     if (MenuParts::BeginCombo("##curvedock", T(kCurveDocks[gCurveEditorDock])))
+                     {
+                        for (int i = 0; i < 4; ++i)
+                           if (MenuParts::Choice(L(kCurveDocks[i]), i == gCurveEditorDock))
+                              gCurveEditorDock = i;
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     if (gCurveEditorDock == 1 || gCurveEditorDock == 2)
+                        FieldWell::Slider(L("Width"), &gCurveEditorWidth, 360.0f, 1400.0f, "%.0f px");
+                     else
+                        FieldWell::Slider(L("Height"), &gCurveEditorHeight, 220.0f, 800.0f, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
