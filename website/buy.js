@@ -11,7 +11,7 @@
   const q = (new URLSearchParams(location.search).get("code") || "").trim();
   const code = /^[A-Za-z0-9_-]{3,24}$/.test(q) ? q : cfg.launchCode;
   btn.textContent = cfg.released ? "Buy now" : "Pre-order";
-  if (cfg.released) $("buy-ship").hidden = true;
+  $("buy-ship").hidden = !!cfg.released;
   window.Paddle.Initialize({
     token: cfg.token,
     eventCallback: (e) => { if (e.name === "checkout.completed") { $("buy-done").hidden = false; $("buy-done").scrollIntoView({ behavior: "smooth", block: "center" }); } },
