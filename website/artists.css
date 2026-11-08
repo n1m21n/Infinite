@@ -287,6 +287,11 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 
 .ax-albums img { flex: none; width: 40px; height: 40px; object-fit: cover; border: 2px solid var(--r-ink); border-radius: 3px; }
 .ax-albums dt { flex: 1; min-width: 0; }
+.ax-albums div { position: relative; }
+.ax-albums dt a { color: inherit; text-decoration: none; }
+.ax-albums dt a::after { content: ""; position: absolute; inset: -4px -6px; }
+.ax-albums div:hover dt a, .ax-albums dt a:focus-visible { text-decoration: underline; text-decoration-thickness: 2px; }
+.ax-albums dt a:focus-visible { outline: 2px solid var(--r-ink); outline-offset: 2px; }
 /* brand-lint: on */
 
 /* compact "Made in Infinite" and "Start with" on every audience page */
