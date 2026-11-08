@@ -3,6 +3,8 @@
 #include "core/CurveEdit.h"
 #include "core/CurveLibrary.h"
 #include "core/CurveRecorder.h"
+#include <sstream>
+#include <fstream>
 #include "audio/dsp/ConvolutionKernel.h"
 #include "audio/dsp/SimdF4.h"
 #include "audio/MusicTime.h"
@@ -4386,6 +4388,92 @@ bool RunMSEGFixture()
       dub.Normalize();
       check("Overdub writes inside its range", dub.Evaluate(0.6f), 0.9, 1e-3);
       check("Overdub keeps outside its range", dub.Evaluate(0.1f), dubLeft, 1e-3);
+
+      // M5 Blender half: keys, handle types and free handles as Blender's F-curve took them (tools/blender-ab/fcurve.py
+      // writes the file); every frame within 1e-3.
+      if (const char* truth = getenv("INFINITE_CURVEBLENDER"))
+      {
+         std::ifstream in(truth);
+         std::string line, name;
+         struct Key { double f, v, lx, ly, rx, ry; std::string h; };
+         std::vector<Key> keys;
+         std::vector<std::pair<double, double>> samples;
+         double f0 = 0.0, f1 = 1.0;
+         int cases = 0;
+         auto run = [&]() {
+            if (keys.size() < 2)
+               return;
+            const double span = std::max(1e-9, f1 - f0);
+            MSEGNode b;
+            b.points.clear();
+            for (const Key& k : keys)
+            {
+               ModShapes::MsegPoint p {};
+               p.x = (float)((k.f - f0) / span);
+               p.y = (float)k.v;
+               p.interp = ModShapes::kInterpBezier;
+               p.handle = k.h == "AUTO" ? ModShapes::kHandleAuto : k.h == "VECTOR" ? ModShapes::kHandleVector
+                        : k.h == "ALIGNED" ? ModShapes::kHandleAligned : k.h == "FREE" ? ModShapes::kHandleFree : ModShapes::kHandleAutoClamped;
+               p.lx = (float)(k.lx / span); p.ly = (float)k.ly;
+               p.rx = (float)(k.rx / span); p.ry = (float)k.ry;
+               b.points.push_back(p);
+            }
+            b.Normalize();
+            double worst = 0.0, worstF = 0.0;
+            for (const auto& sm : samples)
+            {
+               const double e = std::fabs(b.Evaluate((float)((sm.first - f0) / span)) - sm.second);
+               if (e > worst)
+               {
+                  worst = e;
+                  worstF = sm.first;
+               }
+            }
+            double handleGap = 0.0;
+            for (size_t i = 0; i < keys.size(); i++)
+            {
+               if (i + 1 < keys.size())
+                  handleGap = std::max({ handleGap, std::fabs(b.points[i].rx * span - keys[i].rx), std::fabs(b.points[i].ry - keys[i].ry) });
+               if (i > 0)
+                  handleGap = std::max({ handleGap, std::fabs(b.points[i].lx * span - keys[i].lx), std::fabs(b.points[i].ly - keys[i].ly) });
+            }
+            if (handleGap > 1e-3)
+               for (size_t i = 0; i < keys.size(); i++)
+                  printf("MSEGTEST BLENDER   key %zu ours l(%.4f, %.4f) r(%.4f, %.4f) blender l(%.4f, %.4f) r(%.4f, %.4f)\n", i,
+                         b.points[i].lx * span, b.points[i].ly, b.points[i].rx * span, b.points[i].ry, keys[i].lx, keys[i].ly, keys[i].rx, keys[i].ry);
+            printf("MSEGTEST BLENDER %-18s worst %.2e at frame %.2f, handle gap %.2e (%d frames)\n", name.c_str(), worst, worstF, handleGap,
+                   (int)samples.size());
+            check(("BLENDER " + name + " within 1e-3 of Blender's F-curve").c_str(), worst <= 1e-3 ? 1.0 : 0.0, 1.0, 0.0);
+            cases++;
+         };
+         while (std::getline(in, line))
+         {
+            std::istringstream ls(line);
+            std::string tag;
+            ls >> tag;
+            if (tag == "case")
+            {
+               run();
+               keys.clear();
+               samples.clear();
+               ls >> name >> f0 >> f1;
+            }
+            else if (tag == "key")
+            {
+               Key k;
+               ls >> k.f >> k.v >> k.h >> k.lx >> k.ly >> k.rx >> k.ry;
+               keys.push_back(k);
+            }
+            else if (tag == "sample")
+            {
+               double f, v;
+               ls >> f >> v;
+               samples.push_back({ f, v });
+            }
+         }
+         run();
+         check("BLENDER cases read", cases > 0 ? 1.0 : 0.0, 1.0, 0.0);
+      }
    }
 
    // M7 (docs/plans/curve-editor/README.md §10): per-voice cost at 256 points against today's 32-point walk.

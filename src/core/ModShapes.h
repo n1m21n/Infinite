@@ -164,10 +164,10 @@ namespace ModShapes
       return y0 + (y1 - y0) * shaped;
    }
 
-   // A bezier segment's y at x. Handles longer than the segment are scaled
-   // down together (Blender's correct_bezpart), so x only ever rises and
-   // there is one y per x; x(t) = x is then solved by Newton, with bisection
-   // as the safety net.
+   // A bezier segment's y at x, as Blender's F-curve evaluates it: a handle
+   // longer than the segment is cut to the segment, each on its own. When the
+   // two handles then cross, x(t) can fold back and the first t reaching x
+   // wins; otherwise x(t) = x is solved by Newton, bisection as the net.
    inline float MsegBezier(const MsegPoint& a, const MsegPoint& b, float x)
    {
       const double span = (double)b.x - (double)a.x;
@@ -175,11 +175,15 @@ namespace ModShapes
          return x >= b.x ? b.y : a.y;
       double h1x = std::max(0.0, (double)a.rx), h1y = a.ry;
       double h2x = std::max(0.0, -(double)b.lx), h2y = -(double)b.ly;
-      const double len = h1x + h2x;
-      if (len > span)
+      if (h1x > span)
       {
-         const double f = span / len;
-         h1x *= f; h1y *= f; h2x *= f; h2y *= f;
+         h1y *= span / h1x;
+         h1x = span;
+      }
+      if (h2x > span)
+      {
+         h2y *= span / h2x;
+         h2x = span;
       }
       const double x0 = a.x, x1 = a.x + h1x, x2 = b.x - h2x, x3 = b.x;
       const double y0 = a.y, y1 = a.y + h1y, y2 = b.y - h2y, y3 = b.y;
@@ -187,6 +191,27 @@ namespace ModShapes
       const double c1 = 3.0 * (x1 - x0), c2 = 3.0 * (x0 - 2.0 * x1 + x2), c3 = x3 - x0 + 3.0 * (x1 - x2);
       const double target = std::clamp((double)x, x0, x3);
       double t = (target - x0) / span, lo = 0.0, hi = 1.0;
+      if (h1x + h2x > span)
+      {
+         // The handles cross, so x(t) can fold back: the first t that reaches x wins (Blender's root order).
+         auto fx = [&](double u) { return ((c3 * u + c2) * u + c1) * u + x0 - target; };
+         constexpr int kScan = 64;
+         for (int k = 1; k <= kScan; k++)
+            if (fx((double)k / kScan) >= 0.0)
+            {
+               lo = (double)(k - 1) / kScan;
+               hi = (double)k / kScan;
+               break;
+            }
+         for (int k = 0; k < 40; k++)
+         {
+            const double mid = 0.5 * (lo + hi);
+            (fx(mid) >= 0.0 ? hi : lo) = mid;
+         }
+         t = 0.5 * (lo + hi);
+         const double v = 1.0 - t;
+         return (float)(v * v * v * y0 + 3.0 * v * v * t * y1 + 3.0 * v * t * t * y2 + t * t * t * y3);
+      }
       for (int i = 0; i < 24; i++)
       {
          const double fx = ((c3 * t + c2) * t + c1) * t + x0 - target;
@@ -376,15 +401,23 @@ namespace ModShapes
             c.rx = dr / 3.0f;  c.ry = i + 1 < count ? (p[i + 1].y - c.y) / 3.0f : 0.0f;
             continue;
          }
+         // Blender's auto handles (F-curve, smoothing None, constant extrapolation; M5 A/B in
+         // tools/blender-ab/fcurve.py): the handle follows the mean of the two neighbour slopes and
+         // reaches 1/2.5614 of the gap on its side (at most five times the other side's); an end
+         // mirrors its one gap and lies flat.
+         constexpr float kReach = 1.0f / 2.5614f;
          float slope = 0.0f;
-         if (i > 0 && i + 1 < count && p[i + 1].x - p[i - 1].x > 1.0e-6f)
-            slope = (p[i + 1].y - p[i - 1].y) / (p[i + 1].x - p[i - 1].x);
-         else if (c.handle == kHandleAuto && i + 1 < count && dr > 1.0e-6f)
-            slope = (p[i + 1].y - c.y) / dr;
-         else if (c.handle == kHandleAuto && i > 0 && dl > 1.0e-6f)
-            slope = (c.y - p[i - 1].y) / dl;
-         c.lx = -dl / 3.0f; c.ly = -slope * dl / 3.0f;
-         c.rx = dr / 3.0f;  c.ry = slope * dr / 3.0f;
+         if (i > 0 && i + 1 < count)
+         {
+            const float sa = dl > 1.0e-6f ? (c.y - p[i - 1].y) / dl : 0.0f;
+            const float sb = dr > 1.0e-6f ? (p[i + 1].y - c.y) / dr : 0.0f;
+            slope = dl > 1.0e-6f && dr > 1.0e-6f ? 0.5f * (sa + sb) : (dl > 1.0e-6f ? sa : sb);
+         }
+         float gl = i > 0 ? dl : dr, gr = i + 1 < count ? dr : dl;
+         gl = std::min(gl, 5.0f * gr); // neither side reaches past five times the other's gap
+         gr = std::min(gr, 5.0f * gl);
+         c.lx = -gl * kReach; c.ly = -slope * gl * kReach;
+         c.rx = gr * kReach;  c.ry = slope * gr * kReach;
          if (c.handle == kHandleAutoClamped)
          {
             if (i == 0 || i + 1 == count)
