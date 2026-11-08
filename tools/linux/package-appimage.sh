@@ -68,6 +68,13 @@ else
   exit 1
 fi
 
+# DAW plugin bundles (docs/plans/vst-au/README.md 3.6): DawPlugin::SourceDir finds them here.
+if [ -n "${INFINITE_PLUGINS_DIR:-}" ]; then
+  [ -d "$INFINITE_PLUGINS_DIR/Infinite FX.vst3" ] || { echo "ERROR: no plugin bundles in $INFINITE_PLUGINS_DIR" >&2; exit 1; }
+  mkdir -p "$APPDIR/usr/share/infinite"
+  cp -r "$INFINITE_PLUGINS_DIR" "$APPDIR/usr/share/infinite/Plugins"
+fi
+
 mkdir -p "$APPDIR/usr/bin/assets/models"
 if [ -f "$BUILD_DIR/assets/models/u2netp.onnx" ]; then
   cp "$BUILD_DIR/assets/models/u2netp.onnx" "$APPDIR/usr/bin/assets/models/u2netp.onnx"

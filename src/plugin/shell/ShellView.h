@@ -7,8 +7,8 @@
 // ("Starting" / "Engine stopped" + Restart, "In its own window" + Bring back, "No graphics on
 // this machine", and the licence sheet: paste or drop a key, Buy, Refund check).
 //
-// macOS: ShellViewMac.mm (NSView). Windows and Linux views come in chunk 3; there createView
-// returns nullptr and hosts show their generic parameter editor.
+// macOS: ShellViewMac.mm (NSView); Windows: ShellViewWin.cpp (child HWND); Linux: ShellViewX11.cpp
+// (X11 child window on the host's IRunLoop). Other systems: ShellViewNone.cpp, no editor.
 #include "plugin/ipc/PluginFrames.h"
 #include "public.sdk/source/common/pluginview.h"
 

@@ -86,6 +86,16 @@ function(infinite_add_plugin target pkg fx)
         target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ShellViewMac.mm)
         target_compile_definitions(${target} PRIVATE INFINITE_VIEW_CLASS=InfiniteShellView_${target})
         target_link_libraries(${target} PRIVATE "-framework Cocoa" "-framework QuartzCore" "-framework IOSurface")
+    elseif(WIN32)
+        # Step 3.1: child HWND; its window class is named per build like the Mac view's.
+        target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ShellViewWin.cpp)
+        target_compile_definitions(${target} PRIVATE INFINITE_VIEW_CLASS=InfiniteShellView_${target})
+        target_link_libraries(${target} PRIVATE user32 gdi32 shell32)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # Step 3.2: X11 child window driven by the host's IRunLoop.
+        find_package(X11 REQUIRED)
+        target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ShellViewX11.cpp)
+        target_link_libraries(${target} PRIVATE X11::X11)
     else()
         target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ShellViewNone.cpp)
     endif()
@@ -170,6 +180,13 @@ if(APPLE)
     set_target_properties(au_check PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/Release)
     target_link_libraries(au_check PRIVATE "-framework AudioToolbox" "-framework Foundation" "-framework Cocoa" "-framework QuartzCore" "-framework IOSurface")
 endif()
+
+# Test licence writer for CI's pluginval runs on every OS (3.4/3.5).
+add_executable(plugin_test_license TestLicense.cpp ${INFINITE_ROOT}/external/monocypher/monocypher.c
+    ${INFINITE_ROOT}/external/monocypher/monocypher-ed25519.c)
+target_include_directories(plugin_test_license PRIVATE ${INFINITE_ROOT}/external)
+set_target_properties(plugin_test_license PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/Release
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/Release)
 
 # Loads the bundles like a DAW and checks them against a real engine.
 if(APPLE)

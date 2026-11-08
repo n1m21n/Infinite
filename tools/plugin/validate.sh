@@ -43,17 +43,24 @@ OS="$(uname -s)"
 if [ -z "${INFINITE_PLUGIN_ENGINE:-}" ]; then
    case "$OS" in
       Darwin) export INFINITE_PLUGIN_ENGINE="$PWD/build-c1/Infinite.app/Contents/MacOS/Infinite" ;;
+      MINGW*|MSYS*|CYGWIN*) export INFINITE_PLUGIN_ENGINE="$PWD/build/Release/Infinite.exe" ;;
       *) export INFINITE_PLUGIN_ENGINE="$PWD/build-c1/Infinite" ;;
    esac
 fi
 [ -x "$INFINITE_PLUGIN_ENGINE" ] || { echo "engine not found: $INFINITE_PLUGIN_ENGINE" >&2; exit 2; }
 
 if [ $LICENSED = 1 ]; then
-   CHECK="$BUILD/bin/Release/plugin_shell_check"
-   [ -x "$CHECK" ] || CHECK="$BUILD/bin/plugin_shell_check"
+   # plugin_test_license builds on every OS; plugin_shell_check (macOS) writes the same files.
    export INFINITE_LICENSE_DIR="$LOGDIR/licence"
    rm -rf "$INFINITE_LICENSE_DIR"
-   "$CHECK" --write-license "$INFINITE_LICENSE_DIR" >/dev/null || { echo "could not write a test licence" >&2; exit 2; }
+   TL="$BUILD/bin/Release/plugin_test_license"
+   if [ -x "$TL" ] || [ -x "$TL.exe" ]; then
+      "$TL" "$INFINITE_LICENSE_DIR" >/dev/null || { echo "could not write a test licence" >&2; exit 2; }
+   else
+      CHECK="$BUILD/bin/Release/plugin_shell_check"
+      [ -x "$CHECK" ] || CHECK="$BUILD/bin/plugin_shell_check"
+      "$CHECK" --write-license "$INFINITE_LICENSE_DIR" >/dev/null || { echo "could not write a test licence" >&2; exit 2; }
+   fi
 fi
 
 PV="${PLUGINVAL:-$HOME/infinite-plugin-tools/pluginval/pluginval.app/Contents/MacOS/pluginval}"

@@ -1382,13 +1382,14 @@ namespace InfinitePlugin
 
       tresult PLUGIN_API terminate() override
       {
+         std::lock_guard<std::recursive_mutex> lock(viewMutex_);
          if (view_)
             view_->DropHost();
          view_ = nullptr;
          return EditController::terminate();
       }
 
-      // The editor: Infinite's own UI, drawn by the engine (ShellView.h). macOS only until chunk 3.
+      // The editor: Infinite's own UI, drawn by the engine (ShellView.h; NSView, HWND or X11).
       IPlugView* PLUGIN_API createView(FIDString name) override
       {
          if (!name || std::strcmp(name, ViewType::kEditor) != 0 || !ShellView::Supported())
@@ -1396,6 +1397,7 @@ namespace InfinitePlugin
          ShellView* v = ShellView::Create(this);
          if (!v)
             return nullptr;
+         std::lock_guard<std::recursive_mutex> lock(viewMutex_);
          if (view_)
             view_->DropHost(); // a host that opens a second editor: the newest one is live
          view_ = v;
@@ -1471,6 +1473,7 @@ namespace InfinitePlugin
       }
       void ViewGone(ShellView* v) override
       {
+         std::lock_guard<std::recursive_mutex> lock(viewMutex_);
          if (view_ == v)
             view_ = nullptr;
       }
@@ -1549,6 +1552,9 @@ namespace InfinitePlugin
             }
             return kResultOk;
          }
+         // Linux delivers these on the reader thread (UiRelay) while the host opens and closes the
+         // editor on its UI thread: view_ is guarded; the X11 view queues the calls for its timer.
+         std::lock_guard<std::recursive_mutex> viewLock(viewMutex_);
          if (attr && std::strcmp(message->getMessageID(), "frames") == 0)
          {
             const void* data = nullptr;
@@ -1669,7 +1675,8 @@ namespace InfinitePlugin
       REFCOUNT_METHODS(EditController)
 
    private:
-      ShellView* view_ = nullptr; // not owned: the host holds the view
+      ShellView* view_ = nullptr; // not owned: the host holds the view; viewMutex_
+      std::recursive_mutex viewMutex_;
       EngineStatus engine_ = EngineStatus::Starting;
       bool popped_ = false; // the engine's window is out on its own (step 2.4)
       std::string license_ = "Enter your key"; // the licence sheet's message (step 2.6)

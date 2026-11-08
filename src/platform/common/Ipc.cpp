@@ -36,6 +36,7 @@ extern char** environ;
    #include <linux/futex.h>
    #include <sched.h>
    #include <poll.h>
+   #include <sys/resource.h>
    #include <sys/syscall.h>
    #ifndef SYS_pidfd_open
       #define SYS_pidfd_open 434
@@ -47,6 +48,62 @@ namespace Ipc
    namespace
    {
       std::atomic<uint32_t> gNameCounter{0};
+
+#if defined(__linux__)
+      // org.freedesktop.RealtimeKit1.MakeThreadRealtime(u64 thread, u32 priority) on the system bus,
+      // through libdbus loaded at run time (no build dependency; a machine without it returns false).
+      // rtkit refuses a process without RLIMIT_RTTIME, so that is set first.
+      bool RtkitMakeRealtime(uint64_t tid, uint32_t priority)
+      {
+         struct DBusError { const char* name; const char* message; unsigned d[4]; void* pad; };
+         static void* lib = dlopen("libdbus-1.so.3", RTLD_NOW | RTLD_LOCAL);
+         if (!lib) return false;
+         using GetFn = void* (*)(int, DBusError*);
+         using NewCallFn = void* (*)(const char*, const char*, const char*, const char*);
+         using AppendFn = int (*)(void*, int, ...);
+         using SendFn = void* (*)(void*, void*, int, DBusError*);
+         using UnrefFn = void (*)(void*);
+         using ErrInitFn = void (*)(DBusError*);
+         using ErrFreeFn = void (*)(DBusError*);
+         auto get = reinterpret_cast<GetFn>(dlsym(lib, "dbus_bus_get_private"));
+         auto newCall = reinterpret_cast<NewCallFn>(dlsym(lib, "dbus_message_new_method_call"));
+         auto append = reinterpret_cast<AppendFn>(dlsym(lib, "dbus_message_append_args"));
+         auto send = reinterpret_cast<SendFn>(dlsym(lib, "dbus_connection_send_with_reply_and_block"));
+         auto unrefMsg = reinterpret_cast<UnrefFn>(dlsym(lib, "dbus_message_unref"));
+         auto closeConn = reinterpret_cast<UnrefFn>(dlsym(lib, "dbus_connection_close"));
+         auto unrefConn = reinterpret_cast<UnrefFn>(dlsym(lib, "dbus_connection_unref"));
+         auto errInit = reinterpret_cast<ErrInitFn>(dlsym(lib, "dbus_error_init"));
+         auto errFree = reinterpret_cast<ErrFreeFn>(dlsym(lib, "dbus_error_free"));
+         if (!get || !newCall || !append || !send || !unrefMsg || !closeConn || !unrefConn || !errInit || !errFree)
+            return false;
+         rlimit rl{};
+         rl.rlim_cur = rl.rlim_max = 200000; // us of realtime CPU without a block, rtkit's requirement
+         setrlimit(RLIMIT_RTTIME, &rl);
+         DBusError err;
+         errInit(&err);
+         void* conn = get(1 /* DBUS_BUS_SYSTEM */, &err);
+         if (!conn) { errFree(&err); return false; }
+         void* msg = newCall("org.freedesktop.RealtimeKit1", "/org/freedesktop/RealtimeKit1",
+                             "org.freedesktop.RealtimeKit1", "MakeThreadRealtime");
+         bool ok = false;
+         if (msg)
+         {
+            unsigned long long t64 = tid;
+            uint32_t prio = priority;
+            if (append(msg, int('t'), &t64, int('u'), &prio, 0 /* DBUS_TYPE_INVALID */))
+            {
+               void* reply = send(conn, msg, 1000, &err);
+               ok = reply != nullptr;
+               if (reply) unrefMsg(reply);
+            }
+            unrefMsg(msg);
+         }
+         errFree(&err);
+         closeConn(conn);
+         unrefConn(conn);
+         return ok;
+      }
+#endif
 
 #if defined(_WIN32)
       std::wstring Widen(const std::string& s)
@@ -451,12 +508,30 @@ namespace Ipc
       return thread_policy_set(pthread_mach_thread_np(pthread_self()), THREAD_TIME_CONSTRAINT_POLICY,
                                (thread_policy_t)&p, THREAD_TIME_CONSTRAINT_POLICY_COUNT) == KERN_SUCCESS;
 #elif defined(__linux__)
-      // Needs RLIMIT_RTPRIO (most audio setups grant it); false otherwise and the thread stays normal.
+      // RLIMIT_RTPRIO first (most audio setups grant it); else ask rtkit over D-Bus, as PipeWire and
+      // JACK clients do. False when neither works and the thread stays normal.
       sched_param sp{};
       sp.sched_priority = 70;
-      return pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) == 0;
+      if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) == 0)
+         return true;
+      return RtkitMakeRealtime((uint64_t)syscall(SYS_gettid), 20);
+#elif defined(_WIN32)
+      // MMCSS "Pro Audio", as WASAPI / ASIO hosts register their audio threads. avrt.dll is loaded
+      // once at run time, so neither build links it.
+      using SetFn = HANDLE(WINAPI*)(LPCWSTR, LPDWORD);
+      using PrioFn = BOOL(WINAPI*)(HANDLE, int);
+      static HMODULE avrt = LoadLibraryW(L"avrt.dll");
+      if (!avrt) return false;
+      static auto setChar = reinterpret_cast<SetFn>(reinterpret_cast<void*>(GetProcAddress(avrt, "AvSetMmThreadCharacteristicsW")));
+      static auto setPrio = reinterpret_cast<PrioFn>(reinterpret_cast<void*>(GetProcAddress(avrt, "AvSetMmThreadPriority")));
+      if (!setChar) return false;
+      DWORD task = 0;
+      HANDLE h = setChar(L"Pro Audio", &task);
+      if (!h) return false;
+      if (setPrio) setPrio(h, 2 /* AVRT_PRIORITY_HIGH */);
+      return true;
 #else
-      return false; // MMCSS "Pro Audio" lands in step 3.1
+      return false;
 #endif
    }
 }

@@ -288,6 +288,36 @@ jobs:
             Write-Host "OK: $exe is statically linked, no vc_redist dependency."
           }
 
+      # DAW plugin (docs/plans/vst-au/README.md 3.1/3.4/3.6): the shipping VST3 bundles (no test
+      # key) ride in the zip's Plugins\ folder; Settings > DAW plugin copies them into
+      # %LOCALAPPDATA%\Programs\Common\VST3. The app itself is the engine.
+      - name: Plugin bundles
+        shell: bash
+        run: tools/plugin/build_bundles.sh dist-plugins --build build-dist-plugin --jobs 2
+
+      # A test-key build of the same bundles, checked against this build's engine: Steinberg's
+      # validator and pluginval at strictness 10 with a test licence (the licensed path).
+      - name: Plugin validation
+        if: matrix.arch == 'x64'
+        shell: bash
+        run: |
+          cmake -S src/plugin/shell -B build-plugin -DCMAKE_BUILD_TYPE=Release -DINFINITE_LICENSE_TEST_KEY=ON
+          for t in InfiniteInstrument_vst3 InfiniteFX_vst3 validator plugin_test_license; do
+            cmake --build build-plugin --config Release --target $t -- /maxcpucount:2
+          done
+          curl -fsSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip
+          mkdir -p pluginval && unzip -o -q pluginval.zip -d pluginval
+          PLUGINVAL="$PWD/pluginval/pluginval.exe" INFINITE_PLUGIN_ENGINE="$PWD/build/Release/Infinite.exe" \
+            LOGDIR="$PWD/plugin-logs" tools/plugin/validate.sh --build build-plugin --strictness 10 --licensed
+
+      - name: Upload plugin logs
+        if: always() && matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-logs-windows
+          path: plugin-logs
+          if-no-files-found: ignore
+
       # package.ps1 is the local developer path (it drives its own configure
       # and hardcodes x64); here the build already exists, so just stage it.
       - name: Stage
@@ -308,6 +338,7 @@ jobs:
           # fills it. Without it the Drum Sequencer's groove picker has no kit.
           cp -r build/Release/Resources dist/Infinite/
           cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
+          cp -r dist-plugins dist/Infinite/Plugins
 
       - name: Upload unsigned artifact
         id: upload-unsigned
@@ -416,6 +447,27 @@ jobs:
       # VST3SCANTEST etc. below have a real plugin to find instead of
       # SKIPping every run. Cached on the pinned DPF commit so most runs
       # reuse the built bundle instead of rebuilding it from source.
+      # DAW plugin (3.2/3.5): a test-key build of the VST3 bundles against this build's engine,
+      # Steinberg's validator and pluginval at strictness 10 (licensed, GUI tests under Xvfb).
+      - name: Plugin validation
+        if: matrix.compiler == 'gcc'
+        run: |
+          cmake -S src/plugin/shell -B build-plugin -G Ninja -DCMAKE_BUILD_TYPE=Release -DINFINITE_LICENSE_TEST_KEY=ON
+          ninja -C build-plugin -j2 InfiniteInstrument_vst3 InfiniteFX_vst3 validator plugin_test_license
+          curl -fsSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Linux.zip
+          mkdir -p pluginval && unzip -o -q pluginval.zip -d pluginval && chmod +x pluginval/pluginval
+          PLUGINVAL="$PWD/pluginval/pluginval" INFINITE_PLUGIN_ENGINE="$PWD/build-linux/Infinite" \
+            LOGDIR="$PWD/plugin-logs" xvfb-run -a -s "-screen 0 1920x1080x24" \
+            tools/plugin/validate.sh --build build-plugin --strictness 10 --licensed
+
+      - name: Upload plugin logs
+        if: always() && matrix.compiler == 'gcc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-logs-linux
+          path: plugin-logs
+          if-no-files-found: ignore
+
       - name: Cache VST3 test plugins
         uses: actions/cache@v4
         with:
@@ -587,8 +639,15 @@ jobs:
           fi
           echo "OK: no disallowed GL libraries linked directly."
 
+      # DAW plugin (3.6): shipping VST3 bundles at usr/share/infinite/Plugins; Settings > DAW
+      # plugin copies them into ~/.vst3 and records $APPIMAGE as the engine.
+      - name: Plugin bundles
+        run: |
+          export CC=clang CXX=clang++
+          tools/plugin/build_bundles.sh dist-plugins --build build-dist-plugin --jobs 2
+
       - name: Package AppImage
-        run: tools/linux/package-appimage.sh build-linux artifacts-linux
+        run: INFINITE_PLUGINS_DIR="$PWD/dist-plugins" tools/linux/package-appimage.sh build-linux artifacts-linux
 
       - name: Verify AppImage runtime has no libfuse dependency
         run: |
