@@ -55,10 +55,6 @@
     .plug-rows > div { display: grid; grid-template-columns: minmax(96px, 150px) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
     .plug-rows dt { font-weight: 600; } .plug-rows dd { margin: 0; color: var(--muted); }
     .plug-table { display: block; overflow-x: auto; }
-    .plug-faq { display: grid; gap: 8px; }
-    .plug-faq details { padding: 12px 16px; border-radius: 12px; background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
-    .plug-faq summary { cursor: pointer; font-weight: 600; }
-    .plug-faq p { margin: 8px 0 0; color: var(--muted); }
     .plug-shot { margin: 0; display: grid; gap: 8px; }
     .plug-shot img { width: 100%; height: auto; aspect-ratio: 16 / 10; display: block; border-radius: var(--web-media-radius, 16px); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
     .plug-shot figcaption { color: var(--muted); font-size: var(--size-caption); }
@@ -239,14 +235,14 @@
       </section>
       <section aria-label="Questions">
         <h2>Questions</h2>
-        <div class="plug-faq">
-          <details><summary>My DAW does not list it</summary><p>Rescan plugins first. Still missing? In Infinite, Settings, DAW plugin, press Copy path next to the folder, add that folder to your DAW's plugin folders, and rescan.</p></details>
-          <details><summary>Does the app need to be open?</summary><p>No. The plugin starts its own copy of Infinite in the background and closes it with your project.</p></details>
-          <details><summary>macOS says it cannot be opened</summary><p>Open Infinite from Applications once with right click, then Open. Install the plugin after that: the copy in your plugin folders no longer carries the download flag.</p></details>
-          <details><summary>Windows protected your PC</summary><p>SmartScreen stops apps it has not seen often. Choose More info, then Run anyway. You do this once.</p></details>
-          <details><summary>How many computers?</summary><p>Two that you own. One key file works on both.</p></details>
-          <details><summary>Updating</summary><p>Update the app and open it. The plugin follows. Close your DAW first so the old copy is not in use.</p></details>
-          <details><summary>Lost key or refunds</summary><p><a href="buy.html#resend">Get your key emailed again</a>. Refunds follow the <a href="refund.html">refund policy</a>.</p></details>
+        <div class="faq-list">
+          <details class="faq-item"><summary class="faq-question"><span>My DAW does not list it</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Rescan plugins first. Still missing? In Infinite, Settings, DAW plugin, press Copy path next to the folder, add that folder to your DAW's plugin folders, and rescan.</p></div></details>
+          <details class="faq-item"><summary class="faq-question"><span>Does the app need to be open?</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>No. The plugin starts its own copy of Infinite in the background and closes it with your project.</p></div></details>
+          <details class="faq-item"><summary class="faq-question"><span>macOS says it cannot be opened</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Open Infinite from Applications once with right click, then Open. Install the plugin after that: the copy in your plugin folders no longer carries the download flag.</p></div></details>
+          <details class="faq-item"><summary class="faq-question"><span>Windows protected your PC</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>SmartScreen stops apps it has not seen often. Choose More info, then Run anyway. You do this once.</p></div></details>
+          <details class="faq-item"><summary class="faq-question"><span>How many computers?</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Two that you own. One key file works on both.</p></div></details>
+          <details class="faq-item"><summary class="faq-question"><span>Updating</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Update the app and open it. The plugin follows. Close your DAW first so the old copy is not in use.</p></div></details>
+          <details class="faq-item"><summary class="faq-question"><span>Lost key or refunds</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p><a href="buy.html#resend">Get your key emailed again</a>. Refunds follow the <a href="refund.html">refund policy</a>.</p></div></details>
         </div>
       </section>
     </div>
