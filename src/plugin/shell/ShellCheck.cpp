@@ -43,6 +43,7 @@
 #include "pluginterfaces/vst/ivstmessage.h"
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <libproc.h>
 
 #include "ShellCheckMac.h"
 #include "core/License.h"
@@ -214,6 +215,7 @@ namespace
       bool fx = false;
       int32 mode = kOffline;
       int32 block = kBlock;
+      double rate = kRate; // C6 changes it between activations
 
       bool Open(Plugin& p, bool isFx, int32 processMode, bool activate = true, int32 maxBlock = kBlock)
       {
@@ -231,7 +233,7 @@ namespace
 
       bool Activate()
       {
-         ProcessSetup setup { mode, kSample32, block, kRate };
+         ProcessSetup setup { mode, kSample32, block, rate };
          if (proc->setupProcessing(setup) != kResultOk)
             return false;
          comp->activateBus(kAudio, kOutput, 0, true);
@@ -365,10 +367,10 @@ namespace
             }
          }
          ctx.state = ProcessContext::kPlaying | ProcessContext::kTempoValid | ProcessContext::kProjectTimeMusicValid;
-         ctx.sampleRate = kRate;
+         ctx.sampleRate = in.rate;
          ctx.tempo = 120.0;
          ctx.projectTimeSamples = t;
-         ctx.projectTimeMusic = double(t) / kRate * 2.0;
+         ctx.projectTimeMusic = double(t) / in.rate * 2.0;
          d.numSamples = n;
          in.proc->process(d);
          for (int32 i = 0; i < n; i++)
@@ -383,7 +385,7 @@ namespace
          }
          if (paced)
          {
-            next += std::chrono::nanoseconds(int64_t(1e9 * n / kRate));
+            next += std::chrono::nanoseconds(int64_t(1e9 * n / in.rate));
             std::this_thread::sleep_until(next);
          }
       }
@@ -1573,6 +1575,43 @@ namespace
       const long long first2 = ReadStatLine(viewStats, "view", "firstSeq", 1);
       std::snprintf(d, sizeof d, "last frame shown %lld, first after 2 s closed %lld", last1, first2);
       Check(reopened && last1 > 0 && first2 > last1 && first2 - last1 <= 6, "view: closed, the engine reads nothing back; reopened, frames return", d);
+      // C1 (README 8.8): a DAW user opens and closes the editor all session. Ten cycles, frames
+      // each time, the engine's physical footprint up by less than 20 MB.
+      {
+         const auto pids = EnginePids();
+         const int pid = pids.empty() ? 0 : pids[0];
+         auto footprintMb = [](int p) -> double {
+            rusage_info_v2 ri {};
+            if (p <= 0 || proc_pid_rusage(p, RUSAGE_INFO_V2, reinterpret_cast<rusage_info_t*>(&ri)) != 0)
+               return -1.0;
+            return double(ri.ri_phys_footprint) / (1024.0 * 1024.0);
+         };
+         // One warm cycle first: the first reopen after a long close regrows the shrunk window.
+         double fp0 = -1.0;
+         int good = 0;
+         for (int i = 0; i <= 10; i++)
+         {
+            IPtr<IPlugView> v = owned(ec->createView(ViewType::kEditor));
+            if (!v)
+               break;
+            v->onSize(&r2);
+            v->attached(parent, kPlatformTypeNSView);
+            child = ViewCheck::Child(parent);
+            const bool ok = child && waitSize(int(1280 * scale), int(800 * scale), 10000);
+            ViewCheck::Pump(300);
+            v->removed();
+            v = nullptr;
+            ViewCheck::Pump(300);
+            if (i == 0)
+               fp0 = footprintMb(pid);
+            else if (ok)
+               good++;
+         }
+         ViewCheck::Pump(1500);
+         const double fp1 = footprintMb(pid);
+         std::snprintf(d, sizeof d, "%d / 10 opens showed frames, engine footprint %.0f -> %.0f MB (%+.1f)", good, fp0, fp1, fp1 - fp0);
+         Check(good == 10 && fp0 > 0 && fp1 - fp0 < 20.0, "C1: editor open/close x10, frames each time, footprint up < 20 MB", d);
+      }
       // M-10 open time. Cold: no engine running, so spawn + GL + patch load + first frame (the OS
       // file cache is warm; a first launch after a reboot is slower). Warm: engine running, view reopened.
       std::snprintf(d, sizeof d, "cold %.2f s (<= 4), warm %.2f s (<= 1.5)", firstS, warmS);
@@ -2035,6 +2074,65 @@ int main(int argc, char** argv)
       std::snprintf(d, sizeof d, "max error %.2e", e);
       Check(e < 1e-4, "fx offline: starting patch passes the input, delayed by L, random block sizes", d);
       Check(ra == rb, "fx offline: two instances bit-identical");
+   }
+
+   // C6 (README 8.8): the DAW changes the sample rate with the project open (44.1 -> 48 -> 96 kHz):
+   // deactivate, setupProcessing at the new rate, activate. Note 60 must stay at 261.6 Hz.
+   {
+      Instance a;
+      bool ok = a.Open(inst, false, kOffline, false);
+      std::string d6;
+      bool all = ok;
+      for (double sr : { 44100.0, 48000.0, 96000.0 })
+      {
+         if (!ok)
+            break;
+         a.rate = sr;
+         if (!a.Activate())
+         {
+            all = false;
+            d6 += " activate failed at " + std::to_string(int(sr));
+            break;
+         }
+         Script s;
+         s.noteOnAt = int64_t(sr * 0.25);
+         s.noteOffAt = int64_t(sr * 1.75);
+         const auto r = Render(a, int64_t(sr * 2.0), false, s);
+         a.proc->setProcessing(false);
+         a.comp->setActive(false);
+         // Pitch by autocorrelation over 0.5 s of the held note, lags for 100..1000 Hz.
+         const int64_t from = int64_t(sr * 0.75), len = int64_t(sr * 0.5);
+         // A sub-octave oscillator makes 2x the period score as high as 1x, so take the first
+         // local peak within 90 % of the best rather than the best itself.
+         int bestLag = 0;
+         double best = 0.0;
+         const int lo = int(sr / 1000.0), hi = int(sr / 100.0);
+         std::vector<double> ac(size_t(hi + 2), 0.0);
+         if (int64_t(r.size()) >= from + len + hi + 1)
+            for (int lag = lo; lag <= hi + 1; lag++)
+            {
+               double acc = 0.0;
+               for (int64_t i = from; i < from + len; i++)
+                  acc += double(r[size_t(i)]) * double(r[size_t(i + lag)]);
+               ac[size_t(lag)] = acc;
+               best = std::max(best, acc);
+            }
+         for (int lag = lo + 1; lag <= hi && best > 0.0; lag++)
+            if (ac[size_t(lag)] >= 0.9 * best && ac[size_t(lag)] >= ac[size_t(lag - 1)] && ac[size_t(lag)] >= ac[size_t(lag + 1)])
+            {
+               bestLag = lag;
+               break;
+            }
+         const double hz = bestLag > 0 ? sr / double(bestLag) : 0.0;
+         const bool good = std::fabs(hz - 261.63) / 261.63 < 0.012;
+         all = all && good;
+         char b[64];
+         std::snprintf(b, sizeof b, " %.1f kHz: %.1f Hz;", sr / 1000.0, hz);
+         d6 += b;
+      }
+      if (ok)
+         a.comp->terminate();
+      Check(ok && all, "C6: sample rate 44.1 -> 48 -> 96 kHz, re-prepared, note 60 stays 261.6 Hz", d6);
    }
 
    // Instrument offline: note on -> sound; bypass -> silence.
