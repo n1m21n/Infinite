@@ -37,7 +37,7 @@ namespace app
          { "minimap", 1, "Minimap" }, { "cables", 1, "Cable Visibility" }, { "audio", 2, nullptr },
          { "devices", 2, "Audio Devices & Format" }, { "midi", 2, "MIDI Inputs" }, { "general", 3, nullptr },
          { "autosave", 3, "Autosave" }, { "performance", 3, "Performance & Rendering" }, { "movement-log", 3, "Movement Log" },
-         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" }, { "daw-plugin", 3, "DAW plugin" },
+         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" }, { "daw-plugin", 9, nullptr }, { "daw-sync", 9, nullptr },
          { "field", 4, nullptr }, { "globals", 5, nullptr }, { "extensions", 6, nullptr }, { "plugins", 7, nullptr },
          { "agents", 8, nullptr }, { "terminal", 8, nullptr },
       };
@@ -94,7 +94,7 @@ namespace app
       static const char* const kTabs[] = { I18N_KEY("Appearance"), I18N_KEY("Canvas & Workspace"), I18N_KEY("Audio"),
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
                                            I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins"),
-                                           I18N_KEY("Agents & Terminal") };
+                                           I18N_KEY("Agents & Terminal"), I18N_KEY("Infinite as VST3/AU") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -112,6 +112,8 @@ namespace app
             sTab = 5;
          if (o && strstr(o, "settingsterminal"))
             sTab = 8;
+         if (o && strstr(o, "settingsdaw"))
+            sTab = 9;
          // "settingstab=N": any tab by index, so the manuals can shoot every page.
          if (const char* st = o ? strstr(o, "settingstab=") : nullptr)
             sTab = std::clamp(atoi(st + 12), 0, kTabCount - 1);
@@ -846,28 +848,6 @@ namespace app
          // 4. General & Performance Tab
          if (sTab == 3)
          {
-            if (Platform::PluginModeActive())
-            {
-               // Who owns time inside the DAW (Transport::SetHostSync). Play and stop always follow the DAW.
-               ImGui::Spacing();
-               FormParts::Section(T("DAW sync"));
-               Transport& tr = Transport::Instance();
-               bool ownTempo = tr.OwnTempo(), ownHead = tr.OwnPlayhead(), ownLoop = tr.OwnLoop();
-               const std::string items = std::string(T("DAW")) + '\0' + "Infinite" + '\0';
-               int tempo = ownTempo ? 1 : 0, head = ownHead ? 1 : 0, loop = ownLoop ? 1 : 0;
-               bool changed = FormParts::Combo(L("Tempo"), &tempo, items.c_str());
-               ImGui::BeginDisabled(tempo == 1);
-               changed |= FormParts::Combo(L("Playhead"), &head, items.c_str());
-               ImGui::EndDisabled();
-               ImGui::BeginDisabled(tempo == 1 || head == 0);
-               changed |= FormParts::Combo(L("Loop"), &loop, items.c_str());
-               ImGui::EndDisabled();
-               if (changed)
-               {
-                  tr.SetHostSync(tempo == 1, head == 1, loop == 1);
-                  SaveWorkspaceSettings();
-               }
-            }
             if (!Platform::PluginModeActive()) // the DAW project saves the patch
             {
             ImGui::Spacing();
@@ -1063,8 +1043,6 @@ namespace app
                gShowUpdateCheckModal = true;
             }
 
-            ImGui::Spacing();
-            DrawDawPluginSection();
             }
 
             SectionCard::End();
@@ -1876,6 +1854,39 @@ namespace app
             ImGui::PopTextWrapPos();
             FormParts::PopReferenceStyle();
             LibraryParts::EndWell();
+            SectionCard::End();
+         }
+
+         // 10. "Infinite as VST3/AU" Tab: in the app, install the VST3/AU plugins; inside a DAW, who owns time.
+         if (sTab == 9)
+         {
+            if (Platform::PluginModeActive())
+            {
+               // Who owns time inside the DAW (Transport::SetHostSync). Play and stop always follow the DAW.
+               ImGui::Spacing();
+               FormParts::Section(T("DAW sync"));
+               Transport& tr = Transport::Instance();
+               bool ownTempo = tr.OwnTempo(), ownHead = tr.OwnPlayhead(), ownLoop = tr.OwnLoop();
+               const std::string items = std::string(T("DAW")) + '\0' + "Infinite" + '\0';
+               int tempo = ownTempo ? 1 : 0, head = ownHead ? 1 : 0, loop = ownLoop ? 1 : 0;
+               bool changed = FormParts::Combo(L("Tempo"), &tempo, items.c_str());
+               ImGui::BeginDisabled(tempo == 1);
+               changed |= FormParts::Combo(L("Playhead"), &head, items.c_str());
+               ImGui::EndDisabled();
+               ImGui::BeginDisabled(tempo == 1 || head == 0);
+               changed |= FormParts::Combo(L("Loop"), &loop, items.c_str());
+               ImGui::EndDisabled();
+               if (changed)
+               {
+                  tr.SetHostSync(tempo == 1, head == 1, loop == 1);
+                  SaveWorkspaceSettings();
+               }
+            }
+            if (!Platform::PluginModeActive())
+            {
+               ImGui::Spacing();
+               DrawDawPluginSection();
+            }
             SectionCard::End();
          }
 
