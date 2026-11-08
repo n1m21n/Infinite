@@ -7,6 +7,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "app/panels/CurveEditorPanel.h"
 
 namespace app
 {
@@ -955,6 +956,58 @@ void DrawPopupsB(FrameCtx& fc)
          if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          {
             gPerfAssigningElemIdx = -1;
+         }
+      }
+
+      // Curve Editor Assign (docs/plans/curve-editor/README.md §8.6): the same click-to-pick UX, binding the armed
+      // MSEG to the knob clicked. Shift keeps it armed for more; Esc or right-click stops.
+      if (gCurveAssignUid != 0)
+      {
+         GraphNode* srcGn = FindNodeByUid(gCurveAssignUid);
+         if (srcGn == nullptr || dynamic_cast<MSEGNode*>(srcGn->node.get()) == nullptr)
+            gCurveAssignUid = 0;
+         else
+         {
+            const ImVec2 mp = ImGui::GetMousePos();
+            const ImVec2 graphTL = ed::ScreenToCanvas(gGraphScreenTL);
+            const ImVec2 graphBR = ed::ScreenToCanvas(
+               ImVec2(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y));
+            int hoveredPinIdx = -1;
+            if (mp.x >= graphTL.x && mp.x <= graphBR.x && mp.y >= graphTL.y && mp.y <= graphBR.y)
+               for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
+               {
+                  const auto& pInfo = gParamPinScreenList[pi];
+                  if (pInfo.nodeIndex == srcGn->index)
+                     continue; // a curve never drives its own controls
+                  const bool inBounds = mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x && mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y;
+                  const float dx = mp.x - pInfo.screenPos.x, dy = mp.y - pInfo.screenPos.y;
+                  if (inBounds || dx * dx + dy * dy < 20.0f * 20.0f)
+                     hoveredPinIdx = (int)pi;
+               }
+            if (hoveredPinIdx >= 0)
+            {
+               const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
+               ImDrawList* hoverDl = ImGui::GetWindowDrawList();
+               if (pInfo.isCircle)
+                  StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
+               else
+                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
+               const std::string srcTitle = NodeTitleWithInstance(*srcGn);
+               ed::Suspend();
+               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+               ImGui::SetTooltip(T("Assign %s -> %s: %s"), srcTitle.c_str(), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
+               ed::Resume();
+               if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+               {
+                  PushUndoCheckpoint("Assign Curve");
+                  Modulation::Instance().Bind(pInfo.nodeIndex, pInfo.paramIndex, srcGn->index, 0);
+                  gPatchDirty = true;
+                  if (!ImGui::GetIO().KeyShift)
+                     gCurveAssignUid = 0;
+               }
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+               gCurveAssignUid = 0;
          }
       }
 

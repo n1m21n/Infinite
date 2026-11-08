@@ -1,6 +1,6 @@
-// Curve Editor panel (docs/plans/curve-editor/README.md §8.2-§8.5). Docks on any side like the Terminal; one page per
+// Curve Editor panel (docs/plans/curve-editor/README.md §8.2-§8.7). Docks on any side like the Terminal; one page per
 // MSEG node, following the canvas selection. The node is the model: every edit goes through MSEGNode and
-// core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: page, zoom, tool and selection.
+// core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: pages, zoom, tool and selection.
 #include "app/panels/CurveEditorPanel.h"
 
 #include "app/AppShared.h"
@@ -8,14 +8,15 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/EmptyState.h"
-#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/TimeRuler.h"
+#include "app/ui/design/components/ToolCursor.h"
 #include "audio/MusicTime.h"
 #include "core/CurveEdit.h"
+#include "core/Modulation.h"
 #include "nodes/ModulatorNodes.h"
 
 #include <algorithm>
@@ -32,13 +33,15 @@ float gCurveEditorHeight = 360.0f;
 float gCurveEditorWidth = 560.0f;
 bool gCurveEditorClaimedKeys = false;
 ImVec2 gCurveEditorRectMin(0.0f, 0.0f), gCurveEditorRectMax(0.0f, 0.0f);
+uint64_t gCurveAssignUid = 0;
 
 namespace
 {
    constexpr float kMinHeight = 220.0f, kMinWidth = 360.0f;
    constexpr float kIconW = 30.0f, kPageW = 140.0f, kInspectorW = 268.0f, kRulerH = 16.0f;
    constexpr float kPad = 8.0f;     // graph edge to the 0 and 1 value lines
-   constexpr float kHit = 7.0f;     // px a point grabs from
+   constexpr float kHit = 7.0f;     // px a point or handle grabs from
+   constexpr float kEraseR = 9.0f;  // px the eraser rubs out
    constexpr float kMinSpan = 1.0f / 512.0f;
 
    enum class Tool
@@ -58,7 +61,12 @@ namespace
       None,
       Points,
       Marquee,
-      Pan
+      Pan,
+      Handle,
+      Stroke,
+      Line,
+      Bend,
+      Erase
    };
 
    // Grid steps for the time bases that have no MusicTime table: seconds and frames.
@@ -71,18 +79,25 @@ namespace
    {
       uint64_t page = 0;            // the MSEG node on show
       uint64_t lastSelected = 0;    // the canvas selection last followed
+      std::vector<uint64_t> closed; // pages hidden from the strip (the nodes stay)
+      bool ghost = false;           // other pages drawn faint behind this one
       float v0 = 0.0f, v1 = 1.0f;   // the shape span on show
       Tool tool = Tool::Select;
       bool snap = true;
       int gridBeats = MusicTime::kSixteenth;
       int gridSeconds = 2, gridFrames = 0;
+      float thinning = 0.01f;       // Draw: how far (shape units) the points may stray from the stroke
       std::vector<int> sel;         // selected point indices, ascending
       size_t selCount = 0;          // the node's point count the selection was made against
       Drag drag = Drag::None;
       std::vector<MSEGNode::Point> base; // the points as the drag found them
-      int grab = -1;                // the point under the press
+      int grab = -1;                // the point (or segment, for Bend) under the press
+      int handleSide = 0;           // Handle drag: -1 left, +1 right; 0 = both, mirrored (the Pen's pull)
       ImVec2 from {};
       float panV0 = 0.0f;
+      std::vector<CurveEdit::XY> stroke;
+      CurveEdit::XY lineFrom {};
+      float bendBase = 0.0f, bendSign = 1.0f;
    };
 
    State& S()
@@ -93,23 +108,36 @@ namespace
 
    MSEGNode* AsMseg(GraphNode* gn) { return gn != nullptr ? dynamic_cast<MSEGNode*>(gn->node.get()) : nullptr; }
 
-   std::vector<GraphNode*> Pages()
+   bool IsClosed(uint64_t uid) { return std::find(S().closed.begin(), S().closed.end(), uid) != S().closed.end(); }
+
+   void Reopen(uint64_t uid) { S().closed.erase(std::remove(S().closed.begin(), S().closed.end(), uid), S().closed.end()); }
+
+   std::vector<GraphNode*> Pages(bool includeClosed = false)
    {
       std::vector<GraphNode*> out;
       for (GraphNode& gn : gNodes)
-         if (dynamic_cast<MSEGNode*>(gn.node.get()) != nullptr)
+         if (dynamic_cast<MSEGNode*>(gn.node.get()) != nullptr && (includeClosed || !IsClosed(gn.uid)))
             out.push_back(&gn);
       return out;
    }
 
    GraphNode* PageNode() { return S().page != 0 ? FindNodeByUid(S().page) : nullptr; }
 
-   std::string PageLabel(const GraphNode& gn) { return NodeTitleWithInstance(gn) + "##ce" + std::to_string(gn.uid); }
-
    void ClearSelection()
    {
       S().sel.clear();
       S().selCount = 0;
+   }
+
+   void ShowPage(uint64_t uid)
+   {
+      State& s = S();
+      Reopen(uid);
+      if (uid != s.page)
+      {
+         s.page = uid;
+         ClearSelection();
+      }
    }
 
    void FollowCanvasSelection()
@@ -128,11 +156,8 @@ namespace
       if (uid == s.lastSelected)
          return;
       s.lastSelected = uid;
-      if (uid != 0 && uid != s.page)
-      {
-         s.page = uid;
-         ClearSelection();
-      }
+      if (uid != 0)
+         ShowPage(uid); // selecting a closed page on the canvas reopens it
    }
 
    void AddPage()
@@ -141,10 +166,25 @@ namespace
       GraphNode* gn = SpawnNode("MSEG", "Modulators", gViewCenterCanvas.x, gViewCenterCanvas.y);
       if (gn == nullptr)
          return;
-      S().page = gn->uid;
+      ShowPage(gn->uid);
       S().v0 = 0.0f;
       S().v1 = 1.0f;
-      ClearSelection();
+   }
+
+   void DeletePage(uint64_t uid)
+   {
+      GraphNode* gn = FindNodeByUid(uid);
+      if (gn == nullptr)
+         return;
+      PushUndoCheckpoint("Delete Curve");
+      if (gCurveAssignUid == uid)
+         gCurveAssignUid = 0;
+      RemoveNodeByIndex(gn->index);
+      if (S().page == uid)
+      {
+         S().page = 0;
+         ClearSelection();
+      }
    }
 
    ImU32 Tint(float a) { return ImGui::GetColorU32(ImGuiCol_Text, a); }
@@ -189,14 +229,12 @@ namespace
       return MenuParts::BeginPopup(id);
    }
 
-   // A labelled dropdown row in the inspector. Returns true when the pick changed.
-   bool PickRow(const char* label, const char* id, const std::vector<std::string>& items, int& cur)
+   // A dropdown face of width w and its menu. Returns true when the pick changed.
+   bool Picker(const char* id, const std::vector<std::string>& items, int& cur, float w, const char* tip = nullptr)
    {
-      FormParts::Label(label);
-      const float w = FormParts::ControlW();
       ImVec2 bmin, bmax;
       const int shown = std::clamp(cur, 0, std::max(0, (int)items.size() - 1));
-      if (PickerFace(id, items.empty() ? "" : T(items[shown].c_str()), w, nullptr, bmin, bmax))
+      if (PickerFace(id, items.empty() ? "" : T(items[shown].c_str()), w, tip, bmin, bmax))
          ImGui::OpenPopup(id);
       bool changed = false;
       if (BeginPickerMenu(id, bmin, bmax, w))
@@ -212,6 +250,13 @@ namespace
       return changed;
    }
 
+   // A labelled dropdown row in the inspector.
+   bool PickRow(const char* label, const char* id, const std::vector<std::string>& items, int& cur)
+   {
+      FormParts::Label(label);
+      return Picker(id, items, cur, FormParts::ControlW());
+   }
+
    // An inspector edit is one undo step: the checkpoint lands when the control is grabbed.
    void UndoOnGrab()
    {
@@ -221,7 +266,7 @@ namespace
 
    // ---- time
 
-   // The shape span (0..1) one grid step covers, or 0 with snap off.
+   // The shape span (0..1) one grid step covers.
    double GridStep(const MSEGNode& n)
    {
       const State& s = S();
@@ -235,17 +280,35 @@ namespace
       return MusicTime::BeatsFor((MusicTime::RateDivision)s.gridBeats) / std::max(1e-6, n.BeatsPerPass());
    }
 
+   // Alt holds snap off for one gesture.
    float SnapX(const MSEGNode& n, float x)
    {
-      const ImGuiIO& io = ImGui::GetIO();
-      if (!S().snap || io.KeyAlt)
+      if (!S().snap || ImGui::GetIO().KeyAlt)
          return x;
       return CurveEdit::SnapX(x, (float)GridStep(n));
    }
 
-   float SnapY(float y)
+   float SnapY(float y) { return ImGui::GetIO().KeyCtrl ? std::round(y * 8.0f) / 8.0f : y; }
+
+   const std::vector<std::string>& GridNames(const MSEGNode& n)
    {
-      return ImGui::GetIO().KeyCtrl ? std::round(y * 8.0f) / 8.0f : y;
+      static const std::vector<std::string> frames(std::begin(kFrameNames), std::end(kFrameNames));
+      static const std::vector<std::string> seconds(std::begin(kSecondNames), std::end(kSecondNames));
+      if (n.rateMode == MSEGNode::kRateFrames)
+         return frames;
+      if (n.OnSeconds())
+         return seconds;
+      return MusicTime::RateDivisionList();
+   }
+
+   int& GridIndex(const MSEGNode& n)
+   {
+      State& s = S();
+      if (n.rateMode == MSEGNode::kRateFrames)
+         return s.gridFrames;
+      if (n.OnSeconds())
+         return s.gridSeconds;
+      return s.gridBeats;
    }
 
    // ---- the graph
@@ -257,7 +320,20 @@ namespace
       float U(float x) const { return S().v0 + (x - x0) / std::max(1.0f, x1 - x0) * (S().v1 - S().v0); }
       float Y(float v) const { return y1 - kPad - v * (y1 - y0 - 2.0f * kPad); }
       float V(float y) const { return (y1 - kPad - y) / std::max(1.0f, y1 - y0 - 2.0f * kPad); }
+      ImVec2 P(float u, float v) const { return ImVec2(X(u), Y(v)); }
    };
+
+   CurveEdit::XY MouseXY(const Areas& a, bool snap, const MSEGNode& n)
+   {
+      const ImVec2 m = ImGui::GetIO().MousePos;
+      float x = std::clamp(a.U(m.x), 0.0f, 1.0f), y = std::clamp(a.V(m.y), 0.0f, 1.0f);
+      if (snap)
+      {
+         x = SnapX(n, x);
+         y = SnapY(y);
+      }
+      return { x, y };
+   }
 
    void DrawRuler(ImDrawList* dl, const Areas& a, const MSEGNode& n)
    {
@@ -286,10 +362,35 @@ namespace
       }
    }
 
+   // The curve between u0 and u1, one sample per two pixels.
+   void DrawCurve(ImDrawList* dl, const Areas& a, const MSEGNode& n, ImU32 col, float thick, float u0 = 0.0f, float u1 = 1.0f)
+   {
+      const int count = (int)n.points.size();
+      if (count < 2)
+         return;
+      int hint = -1;
+      ImVec2 prev {};
+      bool have = false;
+      const float xa = std::max(a.x0, a.X(u0)), xb = std::min(a.x1, a.X(u1));
+      for (float x = xa; x <= xb + 1.99f; x += 2.0f)
+      {
+         const float u = std::clamp(a.U(std::min(x, xb)), u0, u1);
+         const ImVec2 p(std::min(x, xb), a.Y(ModShapes::MsegEvaluate(n.points.data(), count, u, hint)));
+         if (have)
+            dl->AddLine(prev, p, col, thick);
+         prev = p;
+         have = true;
+      }
+   }
+
+   // Which sides of point i show a bezier handle.
+   bool ShowsLeft(const MSEGNode& n, int i) { return i > 0 && n.points[i - 1].interp == ModShapes::kInterpBezier; }
+   bool ShowsRight(const MSEGNode& n, int i) { return i + 1 < (int)n.points.size() && n.points[i].interp == ModShapes::kInterpBezier; }
+
    void DrawGraph(ImDrawList* dl, const Areas& a, const MSEGNode& n, int hover)
    {
       const State& s = S();
-      const ImVec2 mn(a.x0, a.y0), mx(a.x1, a.y1);
+      const ImVec2 mn(a.x0, a.y0), mx(a.x1, a.y1), m = ImGui::GetIO().MousePos;
       dl->AddRectFilled(mn, mx, Tint(0.03f));
       dl->PushClipRect(mn, mx, true);
       // Outside the shape: shaded, the curve does not run there.
@@ -316,59 +417,65 @@ namespace
          const float hi = std::clamp(std::max(n.loopStart, n.loopEnd), 0.0f, 1.0f);
          TimeRuler::LoopBand(dl, a.X(lo), a.X(hi), a.y0, a.y1, false, 0);
       }
-      // The curve, one sample per two pixels.
+      if (s.ghost)
+         for (GraphNode* g : Pages())
+            if (g->uid != s.page)
+               if (const MSEGNode* other = AsMseg(g))
+                  DrawCurve(dl, a, *other, Tint(0.16f), 1.2f);
       const int count = (int)n.points.size();
-      const ImU32 line = LineCol();
-      int hint = -1;
-      ImVec2 prev {};
-      bool have = false;
-      for (float x = std::max(a.x0, a.X(0.0f)); x <= std::min(a.x1, a.X(1.0f)) + 0.5f; x += 2.0f)
+      const ImU32 selCol = SelCol(), ring = RingCol(), line = LineCol();
+      // Bend: the segment under the pointer, thicker.
+      if (s.tool == Tool::Bend && count >= 2 && (s.drag == Drag::Bend || (s.drag == Drag::None && ImGui::IsMouseHoveringRect(mn, mx))))
       {
-         const float u = std::clamp(a.U(x), 0.0f, 1.0f);
-         const ImVec2 p(x, a.Y(ModShapes::MsegEvaluate(n.points.data(), count, u, hint)));
-         if (have)
-            dl->AddLine(prev, p, line, 1.8f);
-         prev = p;
-         have = true;
+         const int seg = s.drag == Drag::Bend ? s.grab : ModShapes::MsegFindSegment(n.points.data(), count, std::clamp(a.U(m.x), 0.0f, 1.0f), -1);
+         if (seg >= 0 && seg + 1 < count)
+            DrawCurve(dl, a, n, (selCol & 0x00FFFFFF) | 0x80000000, 5.0f, n.points[seg].x, n.points[seg + 1].x);
       }
+      DrawCurve(dl, a, n, line, 1.8f);
       // Bezier handles of the selected points.
       for (int i : s.sel)
       {
          if (i < 0 || i >= count)
             continue;
          const MSEGNode::Point& p = n.points[i];
-         const bool showL = i > 0 && n.points[i - 1].interp == ModShapes::kInterpBezier;
-         const bool showR = i + 1 < count && p.interp == ModShapes::kInterpBezier;
-         const ImVec2 c(a.X(p.x), a.Y(p.y));
-         if (showL)
+         const ImVec2 c = a.P(p.x, p.y);
+         if (ShowsLeft(n, i))
          {
-            const ImVec2 h(a.X(p.x + p.lx), a.Y(p.y + p.ly));
+            const ImVec2 h = a.P(p.x + p.lx, p.y + p.ly);
             dl->AddLine(c, h, Tint(0.45f), 1.0f);
-            dl->AddCircleFilled(h, 3.0f, Tint(0.75f));
+            dl->AddCircleFilled(h, 3.5f, Tint(0.8f));
          }
-         if (showR)
+         if (ShowsRight(n, i))
          {
-            const ImVec2 h(a.X(p.x + p.rx), a.Y(p.y + p.ry));
+            const ImVec2 h = a.P(p.x + p.rx, p.y + p.ry);
             dl->AddLine(c, h, Tint(0.45f), 1.0f);
-            dl->AddCircleFilled(h, 3.0f, Tint(0.75f));
+            dl->AddCircleFilled(h, 3.5f, Tint(0.8f));
          }
       }
       // Points; selected ones in the live colour.
-      const ImU32 selCol = SelCol(), ring = RingCol();
       for (int i = 0; i < count; i++)
       {
-         const ImVec2 c(a.X(n.points[i].x), a.Y(n.points[i].y));
+         const ImVec2 c = a.P(n.points[i].x, n.points[i].y);
          const bool on = std::binary_search(s.sel.begin(), s.sel.end(), i);
          const float r = i == hover ? 6.0f : 4.5f;
          dl->AddCircleFilled(c, r, on ? selCol : line);
          dl->AddCircle(c, r, ring, 0, 1.5f);
       }
+      // Gestures in progress.
+      if (s.drag == Drag::Stroke)
+         for (size_t i = 1; i < s.stroke.size(); i++)
+            dl->AddLine(a.P(s.stroke[i - 1].x, s.stroke[i - 1].y), a.P(s.stroke[i].x, s.stroke[i].y), selCol, 2.0f);
+      if (s.drag == Drag::Line)
+      {
+         const CurveEdit::XY to = MouseXY(a, true, n);
+         dl->AddLine(a.P(s.lineFrom.x, s.lineFrom.y), a.P(to.x, to.y), selCol, 2.0f);
+      }
+      if (s.tool == Tool::Eraser && ImGui::IsMouseHoveringRect(mn, mx))
+         dl->AddCircle(m, kEraseR, selCol, 0, 1.5f);
       // Where the node is reading now.
-      const float px = n.Position();
-      TimeRuler::Playhead(dl, a.X(px), a.y0, a.y1);
+      TimeRuler::Playhead(dl, a.X(n.Position()), a.y0, a.y1);
       if (s.drag == Drag::Marquee)
       {
-         const ImVec2 m = ImGui::GetIO().MousePos;
          const ImVec2 r0(std::min(m.x, s.from.x), std::min(m.y, s.from.y)), r1(std::max(m.x, s.from.x), std::max(m.y, s.from.y));
          dl->AddRectFilled(r0, r1, (selCol & 0x00FFFFFF) | 0x22000000);
          dl->AddRect(r0, r1, selCol);
@@ -383,8 +490,8 @@ namespace
       float bestD = kHit;
       for (int i = 0; i < (int)n.points.size(); i++)
       {
-         const float dx = a.X(n.points[i].x) - m.x, dy = a.Y(n.points[i].y) - m.y;
-         const float d = std::sqrt(dx * dx + dy * dy);
+         const ImVec2 c = a.P(n.points[i].x, n.points[i].y);
+         const float d = std::hypot(c.x - m.x, c.y - m.y);
          if (d < bestD)
          {
             bestD = d;
@@ -392,6 +499,29 @@ namespace
          }
       }
       return best;
+   }
+
+   // A shown handle of a selected point under m: its point, and the side in `side`.
+   int HandleAt(const Areas& a, const MSEGNode& n, ImVec2 m, int& side)
+   {
+      for (int i : S().sel)
+      {
+         if (i < 0 || i >= (int)n.points.size())
+            continue;
+         const MSEGNode::Point& p = n.points[i];
+         const ImVec2 l = a.P(p.x + p.lx, p.y + p.ly), r = a.P(p.x + p.rx, p.y + p.ry);
+         if (ShowsRight(n, i) && std::hypot(r.x - m.x, r.y - m.y) < kHit)
+         {
+            side = 1;
+            return i;
+         }
+         if (ShowsLeft(n, i) && std::hypot(l.x - m.x, l.y - m.y) < kHit)
+         {
+            side = -1;
+            return i;
+         }
+      }
+      return -1;
    }
 
    void Zoom(const Areas& a, float factor, float atX)
@@ -410,7 +540,7 @@ namespace
    }
 
    // Moves the selection by the grabbed point's snapped offset, from the drag's base. Points keep their order:
-   // each moves after the neighbour it is heading towards, so it can never pass it.
+   // each moves after the neighbour it is heading towards, so it can never pass it. Shift locks to one axis.
    void MoveSelection(MSEGNode& n, const Areas& a)
    {
       State& s = S();
@@ -419,16 +549,58 @@ namespace
          return;
       const ImVec2 m = ImGui::GetIO().MousePos;
       const MSEGNode::Point& g = s.base[s.grab];
-      const float gx = SnapX(n, std::clamp(a.U(m.x), 0.0f, 1.0f));
-      const float gy = SnapY(std::clamp(a.V(m.y), 0.0f, 1.0f));
-      const float dx = ImGui::GetIO().KeyShift && std::fabs(m.y - s.from.y) > std::fabs(m.x - s.from.x) ? 0.0f : gx - g.x;
-      const float dy = gy - g.y;
+      const CurveEdit::XY to = MouseXY(a, true, n);
+      const bool shift = ImGui::GetIO().KeyShift;
+      const bool vertical = shift && std::fabs(m.y - s.from.y) > std::fabs(m.x - s.from.x);
+      const float dx = vertical ? 0.0f : to.x - g.x;
+      const float dy = shift && !vertical ? 0.0f : to.y - g.y;
       std::vector<int> order = s.sel;
       if (dx > 0.0f)
          std::reverse(order.begin(), order.end());
       for (int i : order)
          if (i >= 0 && i < (int)n.points.size())
             n.MovePoint(i, s.base[i].x + dx, s.base[i].y + dy);
+   }
+
+   // Pulls a handle to the pointer. A dragged auto handle becomes Aligned (Blender's rule); Aligned keeps the
+   // other side in line at its own length, Free leaves it. Side 0 pulls both, mirrored (the Pen's drag).
+   void DragHandle(MSEGNode& n, const Areas& a)
+   {
+      State& s = S();
+      if (s.grab < 0 || s.grab >= (int)n.points.size())
+         return;
+      MSEGNode::Point& p = n.points[s.grab];
+      const ImVec2 m = ImGui::GetIO().MousePos;
+      float ox = a.U(m.x) - p.x, oy = a.V(m.y) - p.y;
+      if (p.handle != ModShapes::kHandleAligned && p.handle != ModShapes::kHandleFree)
+         p.handle = ModShapes::kHandleAligned;
+      const int side = s.handleSide;
+      if (side == 0)
+      {
+         const float sx = ox >= 0.0f ? 1.0f : -1.0f;
+         p.rx = ox * sx, p.ry = oy * sx;
+         p.lx = -p.rx, p.ly = -p.ry;
+      }
+      else if (side > 0)
+      {
+         ox = std::max(0.0f, ox);
+         p.rx = ox, p.ry = oy;
+      }
+      else
+      {
+         ox = std::min(0.0f, ox);
+         p.lx = ox, p.ly = oy;
+      }
+      if (side != 0 && p.handle == ModShapes::kHandleAligned)
+      {
+         const float len = side > 0 ? std::hypot(p.lx, p.ly) : std::hypot(p.rx, p.ry);
+         const float d = std::max(1.0e-6f, std::hypot(ox, oy));
+         if (side > 0)
+            p.lx = -ox / d * len, p.ly = -oy / d * len;
+         else
+            p.rx = -ox / d * len, p.ry = -oy / d * len;
+      }
+      n.Normalize();
    }
 
    void SelectInRect(const Areas& a, const MSEGNode& n, ImVec2 p0, ImVec2 p1, bool add)
@@ -439,11 +611,19 @@ namespace
          s.sel.clear();
       for (int i = 0; i < (int)n.points.size(); i++)
       {
-         const float x = a.X(n.points[i].x), y = a.Y(n.points[i].y);
-         if (x >= r0.x && x <= r1.x && y >= r0.y && y <= r1.y && !std::binary_search(s.sel.begin(), s.sel.end(), i))
+         const ImVec2 c = a.P(n.points[i].x, n.points[i].y);
+         if (c.x >= r0.x && c.x <= r1.x && c.y >= r0.y && c.y <= r1.y && !std::binary_search(s.sel.begin(), s.sel.end(), i))
             s.sel.insert(std::upper_bound(s.sel.begin(), s.sel.end(), i), i);
       }
       s.selCount = n.points.size();
+   }
+
+   void SelectOnly(int i, const MSEGNode& n)
+   {
+      S().sel.clear();
+      if (i >= 0)
+         S().sel.push_back(i);
+      S().selCount = n.points.size();
    }
 
    void DeleteSelection(MSEGNode& n)
@@ -457,7 +637,7 @@ namespace
       ClearSelection();
    }
 
-   // The segments the selection's points start (one point: its own; none: every segment).
+   // The segments the selection's points start (none selected: every segment).
    std::pair<int, int> SelectionSpan(const MSEGNode& n)
    {
       const State& s = S();
@@ -478,6 +658,169 @@ namespace
       PushUndoCheckpoint("Curve Handles");
       const auto [first, last] = SelectionSpan(n);
       n.SetHandleType(first, last, handle);
+   }
+
+   // Moves the selected points (none selected: all) to the grid, one undo step.
+   void Quantise(MSEGNode& n)
+   {
+      std::vector<int> idx = S().sel;
+      if (idx.empty())
+         for (int i = 0; i < (int)n.points.size(); i++)
+            idx.push_back(i);
+      PushUndoCheckpoint("Quantise Curve");
+      CurveEdit::QuantiseX(n.points, idx, (float)GridStep(n));
+      n.Normalize();
+   }
+
+   // Rubs out the inner points within kEraseR px of the pointer. The ends stay.
+   bool EraseAt(const Areas& a, MSEGNode& n, ImVec2 m)
+   {
+      bool any = false;
+      for (int i = (int)n.points.size() - 2; i >= 1; i--)
+      {
+         const ImVec2 c = a.P(n.points[i].x, n.points[i].y);
+         if (std::hypot(c.x - m.x, c.y - m.y) <= kEraseR)
+         {
+            n.RemovePoint(i);
+            any = true;
+         }
+      }
+      return any;
+   }
+
+   void Press(const Areas& a, MSEGNode& n, int hover)
+   {
+      State& s = S();
+      const ImGuiIO& io = ImGui::GetIO();
+      const ImVec2 m = io.MousePos;
+      s.from = m;
+      const int count = (int)n.points.size();
+      int side = 0;
+      const int handle = (s.tool == Tool::Select || s.tool == Tool::Pen) ? HandleAt(a, n, m, side) : -1;
+      if (handle >= 0)
+      {
+         PushUndoCheckpoint("Curve Handle");
+         s.drag = Drag::Handle;
+         s.grab = handle;
+         s.handleSide = side;
+         return;
+      }
+      switch (s.tool)
+      {
+      case Tool::Draw:
+         s.drag = Drag::Stroke;
+         s.stroke = { MouseXY(a, false, n) };
+         return;
+      case Tool::Line:
+         s.drag = Drag::Line;
+         s.lineFrom = MouseXY(a, true, n);
+         return;
+      case Tool::Bend:
+      {
+         if (count < 2)
+            return;
+         const int seg = ModShapes::MsegFindSegment(n.points.data(), count, std::clamp(a.U(m.x), 0.0f, 1.0f), -1);
+         if (seg < 0 || seg + 1 >= count)
+            return;
+         PushUndoCheckpoint("Bend Curve");
+         n.points[seg].interp = ModShapes::kInterpBend;
+         s.drag = Drag::Bend;
+         s.grab = seg;
+         s.bendBase = n.points[seg].curve;
+         // A positive bend moves fast first: above the straight line on a rise, below it on a fall.
+         s.bendSign = n.points[seg + 1].y >= n.points[seg].y ? 1.0f : -1.0f;
+         return;
+      }
+      case Tool::Eraser:
+         PushUndoCheckpoint("Erase Curve Points");
+         s.drag = Drag::Erase;
+         if (EraseAt(a, n, m))
+            ClearSelection();
+         return;
+      default: break;
+      }
+      // Select and Pen.
+      if (hover >= 0)
+      {
+         const bool on = std::binary_search(s.sel.begin(), s.sel.end(), hover);
+         if (io.KeyShift && on)
+            s.sel.erase(std::lower_bound(s.sel.begin(), s.sel.end(), hover));
+         else if (!on)
+         {
+            if (!io.KeyShift)
+               s.sel.clear();
+            s.sel.insert(std::upper_bound(s.sel.begin(), s.sel.end(), hover), hover);
+         }
+         s.selCount = n.points.size();
+         if (std::binary_search(s.sel.begin(), s.sel.end(), hover))
+         {
+            PushUndoCheckpoint("Move Curve Points");
+            s.drag = Drag::Points;
+            s.grab = hover;
+            s.base = n.points;
+         }
+         return;
+      }
+      const bool addPoint = s.tool == Tool::Pen || ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+      if (!addPoint)
+      {
+         s.drag = Drag::Marquee;
+         return;
+      }
+      PushUndoCheckpoint("Add Curve Point");
+      const CurveEdit::XY at = MouseXY(a, true, n);
+      const int i = n.AddPoint(at.x, at.y);
+      SelectOnly(i, n);
+      if (i <= 0 || s.tool != Tool::Pen)
+         return;
+      // The Pen draws bezier: the segments into and out of the new point, and a drag pulls its handles.
+      n.points[i].interp = ModShapes::kInterpBezier;
+      n.points[i - 1].interp = ModShapes::kInterpBezier;
+      n.Normalize();
+      s.drag = Drag::Handle;
+      s.grab = i;
+      s.handleSide = 0;
+   }
+
+   void Release(const Areas& a, MSEGNode& n)
+   {
+      State& s = S();
+      const ImVec2 m = ImGui::GetIO().MousePos;
+      switch (s.drag)
+      {
+      case Drag::Marquee: SelectInRect(a, n, s.from, m, ImGui::GetIO().KeyShift); break;
+      case Drag::Stroke:
+      {
+         const std::vector<CurveEdit::XY> run = CurveEdit::Simplify(CurveEdit::CleanStroke(s.stroke), s.thinning);
+         if (run.size() >= 2 && run.back().x - run.front().x > 1.0e-4f)
+         {
+            PushUndoCheckpoint("Draw Curve");
+            CurveEdit::ReplaceRange(n.points, run, ModShapes::kInterpLinear, MSEGNode::kMaxPoints);
+            n.Normalize();
+            ClearSelection();
+         }
+         s.stroke.clear();
+         break;
+      }
+      case Drag::Line:
+      {
+         CurveEdit::XY p0 = s.lineFrom, p1 = MouseXY(a, true, n);
+         if (p1.x < p0.x)
+            std::swap(p0, p1);
+         if (p1.x - p0.x > 1.0e-4f)
+         {
+            PushUndoCheckpoint("Line Curve");
+            CurveEdit::ReplaceRange(n.points, { p0, p1 }, ModShapes::kInterpLinear, MSEGNode::kMaxPoints);
+            n.Normalize();
+            ClearSelection();
+         }
+         break;
+      }
+      default: break;
+      }
+      s.drag = Drag::None;
+      s.grab = -1;
+      s.base.clear();
    }
 
    void HandleGraphInput(const Areas& a, MSEGNode& n, bool hovered, int hover)
@@ -505,66 +848,48 @@ namespace
          s.panV0 = s.v0;
       }
       else if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && s.drag == Drag::None)
-      {
-         s.from = m;
-         if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && hover < 0)
-         {
-            PushUndoCheckpoint("Add Curve Point");
-            const int at = n.AddPoint(SnapX(n, std::clamp(a.U(m.x), 0.0f, 1.0f)), SnapY(std::clamp(a.V(m.y), 0.0f, 1.0f)));
-            s.sel.clear();
-            if (at >= 0)
-               s.sel.push_back(at);
-            s.selCount = n.points.size();
-         }
-         else if (hover >= 0)
-         {
-            const bool on = std::binary_search(s.sel.begin(), s.sel.end(), hover);
-            if (io.KeyShift && on)
-               s.sel.erase(std::lower_bound(s.sel.begin(), s.sel.end(), hover));
-            else if (!on)
-            {
-               if (!io.KeyShift)
-                  s.sel.clear();
-               s.sel.insert(std::upper_bound(s.sel.begin(), s.sel.end(), hover), hover);
-            }
-            s.selCount = n.points.size();
-            if (std::binary_search(s.sel.begin(), s.sel.end(), hover))
-            {
-               PushUndoCheckpoint("Move Curve Points");
-               s.drag = Drag::Points;
-               s.grab = hover;
-               s.base = n.points;
-            }
-         }
-         else
-            s.drag = Drag::Marquee;
-      }
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         Press(a, n, hover);
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && s.drag == Drag::None)
       {
          if (hover >= 0 && !std::binary_search(s.sel.begin(), s.sel.end(), hover))
-         {
-            s.sel = { hover };
-            s.selCount = n.points.size();
-         }
+            SelectOnly(hover, n);
          ImGui::OpenPopup("##curveMenu");
       }
 
-      if (s.drag == Drag::Pan)
+      switch (s.drag)
+      {
+      case Drag::Pan:
       {
          const float span = s.v1 - s.v0;
          s.v0 = s.panV0 - (m.x - s.from.x) / std::max(1.0f, a.x1 - a.x0) * span;
          s.v1 = s.v0 + span;
+         break;
       }
-      else if (s.drag == Drag::Points)
-         MoveSelection(n, a);
-      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsMouseDown(ImGuiMouseButton_Middle) && s.drag != Drag::None)
+      case Drag::Points: MoveSelection(n, a); break;
+      case Drag::Handle:
+         if (std::hypot(m.x - s.from.x, m.y - s.from.y) > 2.0f)
+            DragHandle(n, a);
+         break;
+      case Drag::Stroke:
       {
-         if (s.drag == Drag::Marquee)
-            SelectInRect(a, n, s.from, m, io.KeyShift);
-         s.drag = Drag::None;
-         s.grab = -1;
-         s.base.clear();
+         const CurveEdit::XY p = MouseXY(a, false, n);
+         if (std::fabs(a.X(p.x) - a.X(s.stroke.back().x)) >= 1.0f || std::fabs(a.Y(p.y) - a.Y(s.stroke.back().y)) >= 2.0f)
+            s.stroke.push_back(p);
+         break;
       }
+      case Drag::Bend:
+         if (s.grab >= 0 && s.grab < (int)n.points.size())
+            n.points[s.grab].curve =
+               std::clamp(s.bendBase + s.bendSign * (s.from.y - m.y) / std::max(1.0f, (a.y1 - a.y0) * 0.5f), -1.0f, 1.0f);
+         break;
+      case Drag::Erase:
+         if (EraseAt(a, n, m))
+            ClearSelection();
+         break;
+      default: break;
+      }
+      if (s.drag != Drag::None && !ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+         Release(a, n);
    }
 
    void DrawCurveMenu(MSEGNode& n)
@@ -586,6 +911,8 @@ namespace
                SetHandle(n, i);
          ImGui::EndMenu();
       }
+      if (MenuParts::Item(T("Quantise to Grid"), "Q"))
+         Quantise(n);
       MenuParts::Separator();
       if (MenuParts::Item(T("Delete"), "Del", false, !S().sel.empty()))
          DeleteSelection(n);
@@ -602,10 +929,28 @@ namespace
       const bool cmd = io.KeySuper || io.KeyCtrl;
       if (plain && !io.KeyShift)
       {
-         if (ImGui::IsKeyPressed(ImGuiKey_A, false)) s.tool = Tool::Select;
-         if (ImGui::IsKeyPressed(ImGuiKey_H, false)) s.tool = Tool::Hand;
-         if (ImGui::IsKeyPressed(ImGuiKey_G, false)) s.snap = !s.snap;
-         if (ImGui::IsKeyPressed(ImGuiKey_F, false)) s.v0 = 0.0f, s.v1 = 1.0f;
+         static const struct
+         {
+            ImGuiKey key;
+            Tool tool;
+         } kTools[] = { { ImGuiKey_A, Tool::Select }, { ImGuiKey_H, Tool::Hand }, { ImGuiKey_P, Tool::Pen }, { ImGuiKey_D, Tool::Draw },
+                        { ImGuiKey_L, Tool::Line },   { ImGuiKey_B, Tool::Bend }, { ImGuiKey_E, Tool::Eraser } };
+         for (const auto& t : kTools)
+            if (ImGui::IsKeyPressed(t.key, false))
+               s.tool = t.tool;
+         if (ImGui::IsKeyPressed(ImGuiKey_G, false))
+            s.snap = !s.snap;
+         if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+            s.v0 = 0.0f, s.v1 = 1.0f;
+         if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
+            Quantise(n);
+         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         {
+            if (gCurveAssignUid != 0)
+               gCurveAssignUid = 0;
+            else
+               ClearSelection();
+         }
       }
       if (plain && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
          DeleteSelection(n);
@@ -625,8 +970,6 @@ namespace
             s.sel.push_back(i);
          s.selCount = n.points.size();
       }
-      if (plain && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
-         ClearSelection();
    }
 
    // ---- columns
@@ -664,48 +1007,148 @@ namespace
       State& s = S();
       for (int i = 0; i < (int)Tool::Count; i++)
       {
-         const Tool t = (Tool)i;
          if (i > 0 && row)
             FormParts::Inline(0.0f, tok::space_1);
          const std::string id = "##ceTool" + std::to_string(i);
-         if (IconChip(id.c_str(), ToolGlyph(t), s.tool == t, ToolTip(t)))
-            s.tool = t;
+         if (IconChip(id.c_str(), ToolGlyph((Tool)i), s.tool == (Tool)i, ToolTip((Tool)i)))
+            s.tool = (Tool)i;
       }
-      if (row)
-         FormParts::Inline(0.0f, tok::space_3);
-      else
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-      if (IconChip("##ceSnap", s.snap ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap, s.snap, T("Snap to grid (G)")))
-         s.snap = !s.snap;
    }
 
-   void DrawPagePicker()
+   // The page strip: one chip per open page, then +, and the ghost toggle at the end.
+   void DrawPageStrip(float width)
    {
       State& s = S();
-      GraphNode* gn = PageNode();
-      ImVec2 bmin, bmax;
-      const std::string face = gn != nullptr ? NodeTitleWithInstance(*gn) : std::string(T("No curve"));
-      if (PickerFace("##cePage", face.c_str(), kPageW, T("Curves: every MSEG node in the patch"), bmin, bmax))
-         ImGui::OpenPopup("##cePageMenu");
-      if (BeginPickerMenu("##cePageMenu", bmin, bmax, kPageW))
+      const float ghostW = kIconW + tok::space_2;
+      ImGui::BeginChild("##cePages", ImVec2(std::max(1.0f, width - ghostW), tok::tile), false, ImGuiWindowFlags_NoScrollbar);
+      if (ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f)
+         ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 40.0f);
+      static uint64_t sMenuPage = 0;
+      bool openMenu = false;
+      bool first = true;
+      for (GraphNode* gn : Pages())
       {
-         for (GraphNode* p : Pages())
-            if (MenuParts::Choice(PageLabel(*p).c_str(), p->uid == s.page) && p->uid != s.page)
+         if (!first)
+            FormParts::Inline(0.0f, tok::space_1);
+         first = false;
+         const bool on = gn->uid == s.page;
+         const std::string title = NodeTitleWithInstance(*gn);
+         const std::string id = "##cePage" + std::to_string(gn->uid);
+         const float w = std::min(kPageW, ImGui::CalcTextSize(title.c_str()).x + tok::icon_md + 3.0f * tok::space_3);
+         ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+         if (ActionButton::Draw(id.c_str(), ImVec2(w, tok::tile)))
+            ShowPage(gn->uid);
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         {
+            sMenuPage = gn->uid;
+            openMenu = true;
+         }
+         const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+         const ImU32 col = on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float cy = (bmin.y + bmax.y) * 0.5f;
+         glyph::Draw(dl, ImVec2(bmin.x + tok::space_2 + tok::icon_md * 0.5f, cy), tok::icon_md * 0.8f, col, IconsInfinite::Curve);
+         dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);
+         dl->AddText(ImVec2(bmin.x + tok::space_2 + tok::icon_md + tok::space_1, cy - ImGui::GetFontSize() * 0.5f), col, title.c_str());
+         dl->PopClipRect();
+      }
+      if (!first)
+         FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##ceAdd", IconsInfinite::Plus, false, T("New curve")))
+         AddPage();
+      if (openMenu)
+         ImGui::OpenPopup("##cePageMenu");
+      if (MenuParts::BeginPopup("##cePageMenu"))
+      {
+         if (MenuParts::Item(T("Close Page")))
+         {
+            s.closed.push_back(sMenuPage);
+            if (s.page == sMenuPage)
             {
-               s.page = p->uid;
+               s.page = 0;
                ClearSelection();
             }
-         MenuParts::Separator();
-         if (MenuParts::Item(T("New Curve")))
-            AddPage();
+         }
+         if (MenuParts::Item(T("Delete Curve")))
+            DeletePage(sMenuPage);
          MenuParts::EndPopup();
       }
-      FormParts::Inline(0.0f, tok::space_1);
-      if (IconChip("##ceAdd", IconsInfinite::Plus, false, T("New curve: an MSEG node on the canvas")))
-         AddPage();
+      ImGui::EndChild();
+      FormParts::Inline(0.0f, tok::space_2);
+      if (IconChip("##ceGhost", s.ghost ? IconsInfinite::Eye : IconsInfinite::EyeOff, s.ghost, T("Show other curves")))
+         s.ghost = !s.ghost;
    }
 
-   void DrawInspector(MSEGNode& n)
+   std::string TargetName(int nodeIndex, int paramIndex)
+   {
+      std::string name;
+      if (GraphNode* gn = FindNodeByIndex(nodeIndex))
+         name = NodeTitleWithInstance(*gn);
+      const ParamRef* ref = Modulation::Instance().KnownParam(nodeIndex, paramIndex);
+      name += ": ";
+      name += ref != nullptr && !ref->name.empty() ? ref->name : std::string(T("param ")) + std::to_string(paramIndex);
+      return name;
+   }
+
+   int TargetCount(const GraphNode& gn)
+   {
+      int count = 0;
+      for (const auto& link : Modulation::Instance().Links())
+         if (link.second.nodeIndex == gn.index)
+            count++;
+      return count;
+   }
+
+   void DrawTargets(const GraphNode& gn)
+   {
+      FormParts::Section(T("Targets"));
+      Modulation& mod = Modulation::Instance();
+      std::vector<std::pair<Modulation::Key, Modulation::Source>> rows;
+      for (const auto& link : mod.Links())
+         if (link.second.nodeIndex == gn.index)
+            rows.push_back(link);
+      if (rows.empty())
+      {
+         ImGui::TextDisabled("%s", T("Assign, then click a knob"));
+         return;
+      }
+      for (const auto& [key, src] : rows)
+      {
+         ImGui::PushID(key.first * 4096 + key.second);
+         const std::string name = TargetName(key.first, key.second);
+         const float rowX = ImGui::GetCursorPosX(), rowW = ImGui::GetContentRegionAvail().x;
+         ImGui::AlignTextToFramePadding();
+         ImGui::PushClipRect(ImGui::GetCursorScreenPos(), ImVec2(ImGui::GetCursorScreenPos().x + rowW - kIconW - tok::space_2, 1.0e6f), true);
+         ImGui::TextUnformatted(name.c_str());
+         ImGui::PopClipRect();
+         ImGui::SameLine(rowX + rowW - kIconW);
+         if (IconChip("##ceUnbind", IconsInfinite::Close, false, T("Remove target")))
+         {
+            PushUndoCheckpoint("Remove Curve Target");
+            mod.Unbind(key.first, key.second);
+            gPatchDirty = true;
+            ImGui::PopID();
+            break;
+         }
+         const ParamRef* ref = mod.KnownParam(key.first, key.second);
+         float lo = src.lo, hi = src.hi;
+         const float pmin = ref != nullptr ? ref->minValue : std::min(lo, hi);
+         const float pmax = ref != nullptr ? ref->maxValue : std::max(lo, hi);
+         bool changed = FormParts::SliderFloat(T("Low"), &lo, pmin, pmax, "%.3g");
+         UndoOnGrab();
+         changed |= FormParts::SliderFloat(T("High"), &hi, pmin, pmax, "%.3g");
+         UndoOnGrab();
+         if (changed)
+         {
+            mod.SetRange(key.first, key.second, lo, hi);
+            gPatchDirty = true;
+         }
+         ImGui::PopID();
+      }
+   }
+
+   void DrawInspector(GraphNode& gn, MSEGNode& n)
    {
       State& s = S();
       FormParts::Narrow narrow(84.0f);
@@ -806,23 +1249,6 @@ namespace
          HelpTip("%s", T("Keep only the looped part; the length shrinks to it"));
       ImGui::EndDisabled();
 
-      FormParts::Section(T("Grid"));
-      bool snap = s.snap;
-      if (FormParts::Checkbox(T("Snap"), &snap))
-         s.snap = snap;
-      if (n.rateMode == MSEGNode::kRateFrames)
-      {
-         static const std::vector<std::string> names(std::begin(kFrameNames), std::end(kFrameNames));
-         PickRow(T("Grid"), "##ceGridF", names, s.gridFrames);
-      }
-      else if (n.OnSeconds())
-      {
-         static const std::vector<std::string> names(std::begin(kSecondNames), std::end(kSecondNames));
-         PickRow(T("Grid"), "##ceGridS", names, s.gridSeconds);
-      }
-      else
-         PickRow(T("Grid"), "##ceGridB", MusicTime::RateDivisionList(), s.gridBeats);
-
       if (!s.sel.empty())
       {
          FormParts::Section(s.sel.size() == 1 ? T("Point") : T("Points"));
@@ -837,7 +1263,7 @@ namespace
             SetHandle(n, handle);
          if (s.sel.size() == 1 && first < (int)n.points.size())
          {
-            MSEGNode::Point p = n.points[first];
+            const MSEGNode::Point p = n.points[first];
             float x = p.x, y = p.y;
             ImGui::BeginDisabled(first == 0 || first == (int)n.points.size() - 1);
             if (FormParts::SliderFloat(T("Time"), &x, 0.0f, 1.0f, "%.4f"))
@@ -855,6 +1281,8 @@ namespace
          }
       }
 
+      DrawTargets(gn);
+
       FormParts::Section(T("Voices"));
       bool voice = n.voice;
       if (FormParts::Checkbox(T("Per voice"), &voice))
@@ -863,6 +1291,42 @@ namespace
          n.voice = voice;
       }
       SectionCard::EndWindow();
+   }
+
+   // The footer under the graph: snap, grid, Draw's thinning; Assign and the target count on the right.
+   void DrawFooter(GraphNode& gn, MSEGNode& n, float width)
+   {
+      State& s = S();
+      const float startX = ImGui::GetCursorPosX();
+      if (IconChip("##ceSnap", s.snap ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap, s.snap, T("Snap to grid (G)")))
+         s.snap = !s.snap;
+      FormParts::Inline(0.0f, tok::space_1);
+      Picker("##ceGrid", GridNames(n), GridIndex(n), 96.0f, T("Grid"));
+      if (s.tool == Tool::Draw)
+      {
+         FormParts::Inline(0.0f, tok::space_3);
+         ImGui::SetNextItemWidth(110.0f);
+         float pct = s.thinning * 100.0f;
+         if (ImGui::SliderFloat("##ceThin", &pct, 0.1f, 10.0f, "thin %.1f%%", ImGuiSliderFlags_Logarithmic))
+            s.thinning = pct / 100.0f;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Thinning"));
+      }
+      const int targets = TargetCount(gn);
+      char count[48];
+      std::snprintf(count, sizeof count, targets == 1 ? T("%d target") : T("%d targets"), targets);
+      const float countW = ImGui::CalcTextSize(count).x;
+      constexpr float kAssignW = 80.0f;
+      const float right = startX + width - kAssignW - countW - tok::space_3;
+      ImGui::SameLine(std::max(ImGui::GetCursorPosX() + tok::space_3, right));
+      const bool armed = gCurveAssignUid == gn.uid;
+      if (ActionButton::Draw(T("Assign"), ImVec2(kAssignW, tok::tile), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
+         gCurveAssignUid = armed ? 0 : gn.uid;
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Click a knob to drive it; Shift picks more, Esc stops"));
+      FormParts::Inline(0.0f, tok::space_3);
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextDisabled("%s", count);
    }
 
    void DrawDockMenu()
@@ -881,7 +1345,18 @@ namespace
                   gCurveEditorDock = i;
             ImGui::EndMenu();
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         std::vector<GraphNode*> closed;
+         for (GraphNode* gn : Pages(true))
+            if (IsClosed(gn->uid))
+               closed.push_back(gn);
+         if (!closed.empty() && MenuParts::SubMenu(T("Reopen Page")))
+         {
+            for (GraphNode* gn : closed)
+               if (MenuParts::Item(NodeTitleWithInstance(*gn).c_str()))
+                  ShowPage(gn->uid);
+            ImGui::EndMenu();
+         }
+         MenuParts::Separator();
          if (MenuParts::Item(T("Close Curve Editor")))
             gCurveEditorOpen = false;
          MenuParts::EndPopup();
@@ -890,18 +1365,25 @@ namespace
 
    void DrawGraphArea(MSEGNode& n, ImVec2 size)
    {
+      State& s = S();
       const ImVec2 at = ImGui::GetCursorScreenPos();
       ImGui::InvisibleButton("##ceGraph", ImVec2(std::max(1.0f, size.x), std::max(1.0f, size.y)),
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
       const bool hovered = ImGui::IsItemHovered();
-      Areas a { at.x, at.x + size.x, at.y, at.y + kRulerH, at.y + size.y };
-      if (S().selCount != n.points.size())
+      const Areas a { at.x, at.x + size.x, at.y, at.y + kRulerH, at.y + size.y };
+      if (!s.sel.empty() && s.selCount != n.points.size() && s.drag == Drag::None)
          ClearSelection(); // the points changed elsewhere (card, undo, agent): indices no longer hold
       const int hover = hovered ? PointAt(a, n, ImGui::GetIO().MousePos) : -1;
       HandleGraphInput(a, n, hovered, hover);
-      if (S().tool == Tool::Hand || S().drag == Drag::Pan)
-         if (hovered)
+      if (!s.sel.empty())
+         s.selCount = n.points.size(); // edits made here keep the selection's count in step
+      if (hovered || s.drag != Drag::None)
+      {
+         if (s.tool == Tool::Hand || s.drag == Drag::Pan)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         else if (s.tool != Tool::Select && s.tool != Tool::Eraser)
+            ToolCursor::Badge(ToolGlyph(s.tool));
+      }
       DrawCurveMenu(n);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       DrawRuler(dl, a, n);
@@ -914,52 +1396,58 @@ namespace
       FollowCanvasSelection();
       DrawDockMenu();
       State& s = S();
-      MSEGNode* n = AsMseg(PageNode());
-      if (n == nullptr)
+      if (AsMseg(PageNode()) == nullptr || IsClosed(s.page))
       {
          const std::vector<GraphNode*> pages = Pages();
          s.page = pages.empty() ? 0 : pages.front()->uid;
-         n = AsMseg(PageNode());
          ClearSelection();
       }
+      GraphNode* gn = PageNode();
+      MSEGNode* n = AsMseg(gn);
+      if (gCurveAssignUid != 0 && AsMseg(FindNodeByUid(gCurveAssignUid)) == nullptr)
+         gCurveAssignUid = 0;
 
       const bool side = gCurveEditorDock == 1 || gCurveEditorDock == 2;
-      DrawPagePicker();
-      if (side && n != nullptr)
-      {
-         FormParts::Inline(0.0f, tok::space_3);
-         DrawToolButtons(true);
-      }
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      DrawPageStrip(ImGui::GetContentRegionAvail().x);
       if (n == nullptr)
       {
+         const ImVec2 avail = ImGui::GetContentRegionAvail();
          const ImVec2 mn = ImGui::GetCursorScreenPos();
          EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), T("No curve yet"), T("+ makes an MSEG node and opens it here"));
          return;
       }
       HandleKeys(*n);
       const float gap = tok::space_2;
+      const float footerH = tok::tile + gap;
       if (side)
       {
-         // Three rows: tools (above), graph, inspector folded under it.
-         const float graphH = std::max(140.0f, avail.y * 0.5f);
-         DrawGraphArea(*n, ImVec2(avail.x, graphH));
+         // Rows: tools, graph, footer, inspector folded under it.
+         DrawToolButtons(true);
+         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         DrawGraphArea(*n, ImVec2(avail.x, std::max(140.0f, avail.y * 0.5f)));
          ImGui::Dummy(ImVec2(0.0f, gap * 0.5f));
+         DrawFooter(*gn, *n, avail.x);
          ImGui::BeginChild("##ceInspector", ImVec2(avail.x, std::max(1.0f, ImGui::GetContentRegionAvail().y)), false);
-         DrawInspector(*n);
+         DrawInspector(*gn, *n);
          ImGui::EndChild();
          return;
       }
-      // Three columns: tool rail on the canvas side... here the left, inspector on the outer edge, the right.
-      ImGui::BeginChild("##ceRail", ImVec2(kIconW, avail.y), false, ImGuiWindowFlags_NoScrollbar);
+      // Columns: tool rail, graph over its footer, inspector on the outer edge.
+      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const float bodyH = std::max(1.0f, avail.y);
+      ImGui::BeginChild("##ceRail", ImVec2(kIconW, bodyH), false, ImGuiWindowFlags_NoScrollbar);
       DrawToolButtons(false);
       ImGui::EndChild();
       FormParts::Inline(0.0f, gap);
       const float graphW = std::max(80.0f, avail.x - kIconW - kInspectorW - 2.0f * gap);
-      DrawGraphArea(*n, ImVec2(graphW, avail.y));
+      ImGui::BeginGroup();
+      DrawGraphArea(*n, ImVec2(graphW, std::max(60.0f, bodyH - footerH)));
+      ImGui::Dummy(ImVec2(0.0f, gap * 0.5f));
+      DrawFooter(*gn, *n, graphW);
+      ImGui::EndGroup();
       FormParts::Inline(0.0f, gap);
-      ImGui::BeginChild("##ceInspector", ImVec2(kInspectorW, avail.y), false);
-      DrawInspector(*n);
+      ImGui::BeginChild("##ceInspector", ImVec2(kInspectorW, bodyH), false);
+      DrawInspector(*gn, *n);
       ImGui::EndChild();
    }
 }
@@ -967,11 +1455,7 @@ namespace
 void CurveEditorOpenNode(uint64_t uid)
 {
    gCurveEditorOpen = true;
-   if (uid != S().page)
-   {
-      S().page = uid;
-      ClearSelection();
-   }
+   ShowPage(uid);
 }
 
 void DrawCurveEditorDocked(const char* id, const ImVec2& size)
