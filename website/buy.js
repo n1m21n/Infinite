@@ -20,7 +20,7 @@
   btn.addEventListener("click", () => window.Paddle.Checkout.open({
     items: [{ priceId: cfg.priceId, quantity: 1 }],
     ...(code ? { discountCode: code } : {}),
-    settings: { displayMode: "overlay", theme: document.documentElement.dataset.mode === "paper" ? "light" : "dark" },
+    settings: { displayMode: "overlay", variant: "one-page", theme: document.documentElement.dataset.mode === "paper" ? "light" : "dark" },
   }));
   $("resend-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
