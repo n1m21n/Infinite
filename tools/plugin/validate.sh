@@ -2,10 +2,13 @@
 # Runs every plugin validator on the built bundles and prints one summary table
 # (docs/plans/vst-au/README.md, M-1 / M-2 / M-3). Builds nothing.
 #
-#   tools/plugin/validate.sh [--build DIR] [--strictness N] [--skip-pluginval] [--skip-auval]
+#   tools/plugin/validate.sh [--build DIR] [--strictness N] [--skip-pluginval] [--skip-auval] [--licensed] [--skip-gui]
 #
 #   --build        plugin build dir (default build-plugin)
 #   --strictness   pluginval strictness (default 5; 10 for a release candidate)
+#   --skip-gui     pass --skip-gui-tests to pluginval (machines with no display)
+#   --licensed     run with a test licence in a temp INFINITE_LICENSE_DIR (needs an
+#                  INFINITE_LICENSE_TEST_KEY build); without it the plugins take the unlicensed path
 #   PLUGINVAL      pluginval binary (default ~/infinite-plugin-tools/pluginval/pluginval.app/Contents/MacOS/pluginval,
 #                  else `pluginval` on PATH)
 #   INFINITE_PLUGIN_ENGINE  engine binary (default build-c1's Infinite.app on macOS)
@@ -19,12 +22,16 @@ BUILD=build-plugin
 STRICT=5
 DO_PV=1
 DO_AUVAL=1
+LICENSED=0
+GUI=1
 while [ $# -gt 0 ]; do
    case "$1" in
       --build) BUILD="$2"; shift 2 ;;
       --strictness) STRICT="$2"; shift 2 ;;
       --skip-pluginval) DO_PV=0; shift ;;
       --skip-auval) DO_AUVAL=0; shift ;;
+      --licensed) LICENSED=1; shift ;;
+      --skip-gui) GUI=0; shift ;;
       *) echo "unknown option $1" >&2; exit 2 ;;
    esac
 done
@@ -40,6 +47,14 @@ if [ -z "${INFINITE_PLUGIN_ENGINE:-}" ]; then
    esac
 fi
 [ -x "$INFINITE_PLUGIN_ENGINE" ] || { echo "engine not found: $INFINITE_PLUGIN_ENGINE" >&2; exit 2; }
+
+if [ $LICENSED = 1 ]; then
+   CHECK="$BUILD/bin/Release/plugin_shell_check"
+   [ -x "$CHECK" ] || CHECK="$BUILD/bin/plugin_shell_check"
+   export INFINITE_LICENSE_DIR="$LOGDIR/licence"
+   rm -rf "$INFINITE_LICENSE_DIR"
+   "$CHECK" --write-license "$INFINITE_LICENSE_DIR" >/dev/null || { echo "could not write a test licence" >&2; exit 2; }
+fi
 
 PV="${PLUGINVAL:-$HOME/infinite-plugin-tools/pluginval/pluginval.app/Contents/MacOS/pluginval}"
 [ -x "$PV" ] || PV="$(command -v pluginval || true)"
@@ -78,7 +93,7 @@ for B in "Infinite Instrument" "Infinite FX"; do
          row "M-2 pluginval $STRICT" "$B" FAIL "pluginval not found (set PLUGINVAL)"
       else
          LOG="$LOGDIR/pluginval_$TAG.txt"
-         "$PV" --strictness-level "$STRICT" --skip-gui-tests --timeout-ms 120000 --validate "$VST3" > "$LOG" 2>&1
+         "$PV" --strictness-level "$STRICT" $([ $GUI = 0 ] && echo --skip-gui-tests) --timeout-ms 120000 --validate "$VST3" > "$LOG" 2>&1
          RC=$?
          if [ $RC = 0 ] && grep -q "SUCCESS" "$LOG"; then
             row "M-2 pluginval $STRICT" "$B" PASS "exit 0"
