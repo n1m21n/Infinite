@@ -2,6 +2,7 @@
 #include "app/AppShared.h"
 #include "core/CurveEdit.h"
 #include "core/CurveLibrary.h"
+#include "core/CurveRecorder.h"
 #include "audio/dsp/ConvolutionKernel.h"
 #include "audio/dsp/SimdF4.h"
 #include "audio/MusicTime.h"
@@ -4315,6 +4316,76 @@ bool RunMSEGFixture()
          bakeErr = std::max(bakeErr, std::fabs(e.Evaluate(k / 200.0f) - (std::sin(k / 200.0 * 2 * pi) * 0.5 + 0.5)));
       check("Bake leaves points that follow the formula", bakeErr, 0.0, 0.005);
       check("Bake makes a points page", e.source, 0.0, 0.0);
+
+      // M4: a formula edit shows on the very next evaluation, with no other call between (the panel draws that frame).
+      e.source = 1;
+      e.expression = "t";
+      const float m4a = e.Evaluate(0.3f);
+      e.expression = "1 - t";
+      const float m4b = e.Evaluate(0.3f);
+      check("M4 expression edit lands in the same frame", std::fabs(m4a - 0.3f) < 1e-3f && std::fabs(m4b - 0.7f) < 1e-3f ? 1.0 : 0.0, 1.0, 0.0);
+
+      // M3 (§8.9): a 4-bar CC take (120 BPM, 60 fps, 7-bit steps, an uneven hand) becomes an editable curve of at most
+      // 64 points at the default thinning, and follows the hand.
+      auto hand = [](double t) { // 0..8 s: a slow rise, a wobble, a fall
+         const double u = t / 8.0;
+         return std::clamp(0.5 - 0.45 * std::cos(u * pi * 2.0) + 0.08 * std::sin(u * pi * 14.0), 0.0, 1.0);
+      };
+      CurveRecorder::Take take;
+      take.Begin(CurveRecorder::kOverwrite);
+      for (int f = 0; f <= 480; f++)
+      {
+         const double t = f == 0 ? 0.0 : f / 60.0 + 0.004 * ModShapes::Hash01(f); // frame timing jitters
+         take.Sample(t, (float)(t / 8.0), std::round((float)hand(t) * 127.0f) / 127.0f);
+      }
+      MSEGNode rec;
+      rec.Reset();
+      take.Commit(rec.points, 0.01f, MSEGNode::kMaxPoints);
+      rec.Normalize();
+      double recErr = 0.0;
+      int recWorst = 0;
+      for (int k = 0; k <= 400; k++)
+      {
+         const double e = std::fabs(rec.Evaluate(k / 400.0f) - hand(k / 400.0 * 8.0));
+         if (e > recErr)
+         {
+            recErr = e;
+            recWorst = k;
+         }
+      }
+      printf("MSEGTEST M3 worst at x %.3f: curve %.4f hand %.4f; ends %.3f,%.3f\n", recWorst / 400.0, rec.Evaluate(recWorst / 400.0f),
+             hand(recWorst / 50.0), rec.points.front().y, rec.points.back().y);
+      printf("MSEGTEST M3 4-bar CC take -> %d points (from %d samples), worst %.4f\n", (int)rec.points.size(), take.Samples(), recErr);
+      check("M3 a 4-bar CC take thins to <= 64 points", rec.points.size() <= 64 ? 1.0 : 0.0, 1.0, 0.0);
+      check("M3 the take follows the hand", recErr, 0.0, 0.03);
+
+      // Touch writes only while the hand moves; Latch from the first move on; Overdub keeps outside its range.
+      CurveRecorder::Take touch;
+      touch.Begin(CurveRecorder::kTouch);
+      for (int f = 0; f <= 100; f++)
+      {
+         const double t = f / 50.0; // 2 s pass; moves in 0..0.4 s and 1.2..1.6 s, still between
+         const float v = t < 0.4 ? (float)(t / 0.4) : (t < 1.2 ? 1.0f : (t < 1.6 ? (float)(1.0 - (t - 1.2) / 0.4) : 0.0f));
+         touch.Sample(t, (float)(t / 2.0), v);
+      }
+      check("Touch lets go while the hand is still", touch.runs.size() == 2 ? 1.0 : 0.0, 1.0, 0.0);
+      CurveRecorder::Take latch;
+      latch.Begin(CurveRecorder::kLatch);
+      for (int f = 0; f <= 100; f++)
+         latch.Sample(f / 50.0, f / 100.0f, f < 30 ? 0.2f : 0.2f + (f - 30) * 0.01f);
+      check("Latch writes from the first move to the stop",
+            latch.runs.size() == 1 && std::fabs(latch.runs[0].front().x - 0.30f) < 0.011f && latch.runs[0].back().x == 1.0f ? 1.0 : 0.0, 1.0, 0.0);
+      MSEGNode dub;
+      dub.Reset();
+      const float dubLeft = dub.Evaluate(0.1f);
+      CurveRecorder::Take over;
+      over.Begin(CurveRecorder::kOverwrite);
+      for (int f = 0; f <= 100; f++)
+         over.Sample(f / 50.0, f / 100.0f, 0.9f);
+      over.Commit(dub.points, 0.01f, MSEGNode::kMaxPoints, 1.0f, 0.5f, 0.75f);
+      dub.Normalize();
+      check("Overdub writes inside its range", dub.Evaluate(0.6f), 0.9, 1e-3);
+      check("Overdub keeps outside its range", dub.Evaluate(0.1f), dubLeft, 1e-3);
    }
 
    // M7 (docs/plans/curve-editor/README.md §10): per-voice cost at 256 points against today's 32-point walk.

@@ -685,6 +685,7 @@ namespace app
       { I18N_KEY("Curve Editor"), I18N_KEY("Zoom / Pan Curve"), "Scroll / Shift+Scroll", I18N_KEY("Zoom around the pointer, or pan; middle-drag also pans") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Zoom Value"), "Alt+Scroll", I18N_KEY("Zoom the value axis around the pointer") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Shapes"), "Shapes button", I18N_KEY("Replace the page with a shape, an easing or one of your saves; Mine saves this one") },
+      { I18N_KEY("Curve Editor"), I18N_KEY("Record"), "Record button", I18N_KEY("Record a take from a CC, a knob or the trig input into the page; Overwrite, Touch or Latch") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Select All Points"), MODKEY "+A", I18N_KEY("Select every point") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Delete Points"), "Delete / Backspace", I18N_KEY("Delete the selected points; the two ends stay") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Assign"), "Click a knob", I18N_KEY("After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops") },

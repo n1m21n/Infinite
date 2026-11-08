@@ -20,6 +20,9 @@
 #include "audio/MusicTime.h"
 #include "core/CurveEdit.h"
 #include "core/CurveLibrary.h"
+#include "core/CurveRecorder.h"
+#include "core/Transport.h"
+#include "platform/Platform.h"
 #include "platform/AppPaths.h"
 #include <filesystem>
 #include <fstream>
@@ -43,6 +46,7 @@ float gCurveEditorWidth = 560.0f;
 bool gCurveEditorClaimedKeys = false;
 ImVec2 gCurveEditorRectMin(0.0f, 0.0f), gCurveEditorRectMax(0.0f, 0.0f);
 uint64_t gCurveAssignUid = 0;
+bool gCurveRecordPicking = false;
 
 namespace
 {
@@ -479,6 +483,8 @@ namespace
    bool ShowsLeft(const MSEGNode& n, int i) { return i > 0 && n.points[i - 1].interp == ModShapes::kInterpBezier; }
    bool ShowsRight(const MSEGNode& n, int i) { return i + 1 < (int)n.points.size() && n.points[i].interp == ModShapes::kInterpBezier; }
 
+   void DrawTake(ImDrawList* dl, const Areas& a, ImU32 col);
+
    void DrawGraph(ImDrawList* dl, const Areas& a, const MSEGNode& n, int hover)
    {
       const State& s = S();
@@ -564,8 +570,9 @@ namespace
       }
       if (s.tool == Tool::Eraser && ImGui::IsMouseHoveringRect(mn, mx))
          dl->AddCircle(m, kEraseR, selCol, 0, 1.5f);
-      // Where the node is reading now.
+      // Where the node is reading now, and a take in progress.
       TimeRuler::Playhead(dl, a.X(n.Position()), a.y0, a.y1);
+      DrawTake(dl, a, selCol);
       if (s.drag == Drag::Marquee)
       {
          const ImVec2 r0(std::min(m.x, s.from.x), std::min(m.y, s.from.y)), r1(std::max(m.x, s.from.x), std::max(m.y, s.from.y));
@@ -1233,6 +1240,19 @@ namespace
    }
 
    // The page strip: one chip per open page, then +. Scrolls sideways when the pages outgrow it.
+   bool WasRecorded(uint64_t uid);
+
+   // The chip's kind (§8.2): a curve, a formula, a recorded take, or one channel of a motion group.
+   const char* PageGlyph(GraphNode& gn)
+   {
+      const MSEGNode* n = AsMseg(&gn);
+      if (n != nullptr && n->motionGroup != 0)
+         return IconsInfinite::Family3d;
+      if (n != nullptr && n->source == 1)
+         return IconsInfinite::Code;
+      return WasRecorded(gn.uid) ? IconsInfinite::RecordFill : IconsInfinite::Curve;
+   }
+
    void DrawPageStrip(float width)
    {
       State& s = S();
@@ -1290,7 +1310,7 @@ namespace
          const ImU32 col = on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const float cy = (bmin.y + bmax.y) * 0.5f;
-         glyph::Draw(dl, ImVec2(bmin.x + tok::space_2 + tok::icon_md * 0.5f, cy), tok::icon_md * 0.8f, col, IconsInfinite::Curve);
+         glyph::Draw(dl, ImVec2(bmin.x + tok::space_2 + tok::icon_md * 0.5f, cy), tok::icon_md * 0.8f, col, PageGlyph(*gn));
          dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);
          dl->AddText(ImVec2(bmin.x + tok::space_2 + tok::icon_md + tok::space_1, cy - ImGui::GetFontSize() * 0.5f), col, title.c_str());
          dl->PopClipRect();
@@ -1398,7 +1418,8 @@ namespace
          for (int i = 0; i < (int)names.size(); i++)
             if (MenuParts::Choice(T(names[i].c_str()), i == *v) && i != *v)
             {
-               PushUndoCheckpoint(undo);
+               if (undo != nullptr) // nullptr: a panel option, not the patch
+                  PushUndoCheckpoint(undo);
                *v = i;
                changed = true;
             }
@@ -1425,7 +1446,8 @@ namespace
       }
       if (!hit)
          return false;
-      PushUndoCheckpoint(undo);
+      if (undo != nullptr)
+         PushUndoCheckpoint(undo);
       *v = on;
       return true;
    }
@@ -1495,6 +1517,328 @@ namespace
          }
          ImGui::PopID();
       }
+   }
+
+   // ---- Record page (§8.9): a take from a CC, a knob or the wired input becomes points (D9)
+
+   enum class RecPhase
+   {
+      Idle,
+      Learning, // waiting for the next CC moved
+      Picking,  // waiting for a knob click on the canvas
+      Waiting,  // armed, waiting for the start (next bar, play)
+      Recording
+   };
+
+   struct Rec
+   {
+      int source = 0; // 0 Learn CC, 1 Any knob, 2 Wired input
+      int mode = CurveRecorder::kOverwrite;
+      int start = 0;  // 0 Now, 1 Next bar, 2 On play
+      int length = 0; // 0 Fixed (the page's length), 1 Auto (the stop sets it, in bars)
+      bool inLoop = false, quantise = false;
+      RecPhase phase = RecPhase::Idle;
+      uint64_t uid = 0;
+      bool cc = false;
+      int ccDevice = 0, ccChannel = 0, ccController = 0;
+      bool ccNote = false;
+      int knobNode = -1, knobParam = -1;
+      double clock = 0.0, passSec = 1.0;
+      long long bar = 0;
+      float x = 0.0f;
+      CurveRecorder::Take take;
+      std::vector<uint64_t> recorded; // pages a take landed on: their chip shows the record glyph
+      std::string error;
+   };
+
+   Rec& R()
+   {
+      static Rec r;
+      return r;
+   }
+
+   bool WasRecorded(uint64_t uid) { return std::find(R().recorded.begin(), R().recorded.end(), uid) != R().recorded.end(); }
+
+   std::string RecSourceName(const MSEGNode& n)
+   {
+      const Rec& r = R();
+      char buf[96];
+      switch (r.source)
+      {
+      case 0:
+         if (!r.cc)
+            return T("Next CC moved");
+         std::snprintf(buf, sizeof buf, "%s · ch %d", Platform::MidiBindingName(r.ccNote, r.ccController).c_str(), r.ccChannel + 1);
+         return buf;
+      case 1: return r.knobNode >= 0 ? TargetName(r.knobNode, r.knobParam) : std::string(T("Next knob clicked"));
+      default: return n.trigger != nullptr ? std::string(T("trig input")) : std::string(T("Nothing wired"));
+      }
+   }
+
+   bool ReadRecSource(MSEGNode& n, float& v)
+   {
+      Rec& r = R();
+      switch (r.source)
+      {
+      case 0:
+      {
+         Platform::MidiDeviceId dev = (Platform::MidiDeviceId)r.ccDevice;
+         Platform::MidiRebindStaleDevice(dev, r.ccChannel, r.ccController, r.ccNote);
+         r.ccDevice = (int)dev;
+         return Platform::MidiRead(dev, r.ccChannel, r.ccController, r.ccNote, v);
+      }
+      case 1:
+      {
+         const ParamRef* ref = Modulation::Instance().KnownParam(r.knobNode, r.knobParam);
+         if (ref == nullptr)
+            return false;
+         if (ref->valueToPos != nullptr)
+            v = ref->valueToPos(ref->shownValue, ref->minValue, ref->maxValue);
+         else
+            v = ref->maxValue > ref->minValue ? (ref->shownValue - ref->minValue) / (ref->maxValue - ref->minValue) : 0.0f;
+         v = std::clamp(v, 0.0f, 1.0f);
+         return true;
+      }
+      default:
+         if (n.trigger == nullptr)
+            return false;
+         v = std::clamp(n.trigger->Value01(), 0.0f, 1.0f);
+         return true;
+      }
+   }
+
+   double BarSeconds()
+   {
+      const Transport& tr = Transport::Instance();
+      return tr.BeatsPerBar() * 60.0 / std::max(1.0, (double)tr.Tempo());
+   }
+
+   double PassSeconds(const MSEGNode& n)
+   {
+      if (n.OnSeconds())
+         return 1.0 / std::max(1.0e-6, n.PassesPerSecond());
+      return n.BeatsPerPass() * 60.0 / std::max(1.0, (double)Transport::Instance().Tempo());
+   }
+
+   void RecWait()
+   {
+      Rec& r = R();
+      const Transport& tr = Transport::Instance();
+      r.bar = (long long)std::floor(tr.Beats() / tr.BeatsPerBar());
+      r.phase = RecPhase::Waiting;
+   }
+
+   void RecArm(const GraphNode& gn, MSEGNode& n)
+   {
+      Rec& r = R();
+      r.uid = gn.uid;
+      r.error.clear();
+      if (r.source == 0 && !r.cc)
+      {
+         std::string err;
+         if (!Platform::MidiStart(err))
+         {
+            r.error = err.empty() ? T("No MIDI input") : err;
+            return;
+         }
+         Platform::MidiCCValue stale;
+         Platform::MidiPollLastTouched(stale); // only a move after the arm counts
+         r.phase = RecPhase::Learning;
+         return;
+      }
+      if (r.source == 1 && r.knobNode < 0)
+      {
+         r.phase = RecPhase::Picking;
+         gCurveRecordPicking = true;
+         return;
+      }
+      if (r.source == 2 && n.trigger == nullptr)
+      {
+         r.error = T("Wire a modulator into trig");
+         return;
+      }
+      RecWait();
+   }
+
+   void RecStop(bool commit)
+   {
+      Rec& r = R();
+      GraphNode* gn = FindNodeByUid(r.uid);
+      MSEGNode* n = AsMseg(gn);
+      if (commit && r.phase == RecPhase::Recording && n != nullptr && r.take.Samples() >= 2)
+      {
+         PushUndoCheckpoint("Record Curve");
+         float scale = 1.0f;
+         if (r.length == 1)
+         {
+            const double barSec = BarSeconds();
+            const double bars = std::max(1.0, std::round(r.clock / barSec));
+            n->rateMode = LFONode::kRateBeats;
+            n->rateBeats = (float)(bars * Transport::Instance().BeatsPerBar() * std::clamp((double)n->speed, 0.25, 4.0));
+            scale = (float)(1.0 / (bars * barSec));
+         }
+         const bool inLoop = r.inLoop && n->loop;
+         const float a = inLoop ? std::min(n->loopStart, n->loopEnd) : 0.0f;
+         const float b = inLoop ? std::max(n->loopStart, n->loopEnd) : 1.0f;
+         r.take.Commit(n->points, S().thinning, MSEGNode::kMaxPoints, scale, a, b, r.quantise ? (float)GridStep(*n) : 0.0f);
+         n->source = 0;
+         n->Normalize();
+         if (S().page == r.uid)
+            ClearSelection();
+         if (!WasRecorded(r.uid))
+            r.recorded.push_back(r.uid);
+         gPatchDirty = true;
+      }
+      r.phase = RecPhase::Idle;
+      gCurveRecordPicking = false;
+   }
+
+   // Once a frame, whichever page is on show: learn, wait for the start, then sample the source.
+   void TickRecord()
+   {
+      Rec& r = R();
+      if (r.phase == RecPhase::Idle)
+         return;
+      MSEGNode* n = AsMseg(FindNodeByUid(r.uid));
+      if (n == nullptr || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+      {
+         RecStop(false);
+         return;
+      }
+      const Transport& tr = Transport::Instance();
+      switch (r.phase)
+      {
+      case RecPhase::Learning:
+      {
+         Platform::MidiCCValue last;
+         if (Platform::MidiPollLastTouched(last) && last.channel >= 0 && last.controller >= 0)
+         {
+            r.cc = true;
+            r.ccDevice = (int)last.device;
+            r.ccChannel = last.channel;
+            r.ccController = last.controller;
+            r.ccNote = last.isNote;
+            RecWait();
+         }
+         break;
+      }
+      case RecPhase::Picking:
+         if (!gCurveRecordPicking) // Esc or right-click on the canvas
+            r.phase = r.knobNode >= 0 ? RecPhase::Waiting : RecPhase::Idle;
+         if (r.phase == RecPhase::Waiting)
+            RecWait();
+         break;
+      case RecPhase::Waiting:
+      {
+         const long long bar = (long long)std::floor(tr.Beats() / tr.BeatsPerBar());
+         const bool go = r.start == 0 || (tr.IsPlaying() && (r.start == 2 || bar != r.bar));
+         if (!tr.IsPlaying())
+            r.bar = bar;
+         if (go)
+         {
+            r.phase = RecPhase::Recording;
+            r.clock = 0.0;
+            r.passSec = PassSeconds(*n);
+            r.take.Begin(r.mode);
+         }
+         else
+            break;
+      }
+         [[fallthrough]];
+      case RecPhase::Recording:
+      {
+         float v = 0.0f;
+         if (!ReadRecSource(*n, v))
+            break;
+         const bool once = r.length == 0 && r.mode == CurveRecorder::kOverwrite;
+         if (r.length == 1)
+            r.x = (float)r.clock;
+         else
+            r.x = once ? (float)std::min(1.0, r.clock / r.passSec) : (float)(std::fmod(r.clock, r.passSec) / r.passSec);
+         r.take.Sample(r.clock, r.x, v);
+         if (once && r.clock >= r.passSec)
+         {
+            RecStop(true); // Overwrite is one pass
+            break;
+         }
+         r.clock += std::clamp((double)ImGui::GetIO().DeltaTime, 0.0, 0.1);
+         break;
+      }
+      default: break;
+      }
+   }
+
+   // The take so far, over the graph: Auto stretches it to the width while it grows.
+   void DrawTake(ImDrawList* dl, const Areas& a, ImU32 col)
+   {
+      const Rec& r = R();
+      if (r.phase != RecPhase::Recording || r.uid != S().page)
+         return;
+      const float scale = r.length == 1 ? (float)(1.0 / std::max(r.clock, 1.0e-3)) : 1.0f;
+      for (const auto& run : r.take.runs)
+         for (size_t i = 1; i < run.size(); i++)
+            dl->AddLine(a.P(run[i - 1].x * scale, run[i - 1].y), a.P(run[i].x * scale, run[i].y), col, 2.0f);
+      TimeRuler::Playhead(dl, a.X(r.x * scale), a.y0, a.y1);
+   }
+
+   const char* RecTip()
+   {
+      switch (R().phase)
+      {
+      case RecPhase::Learning: return T("Move a CC to record it; Esc stops");
+      case RecPhase::Picking: return T("Click the knob to record; Esc stops");
+      case RecPhase::Waiting: return R().start == 1 ? T("Starts on the next bar") : T("Starts when the transport plays");
+      case RecPhase::Recording: return T("Recording: click to stop");
+      default: return T("Record a take into this curve");
+      }
+   }
+
+   void DrawRecordCard(GraphNode& gn, MSEGNode& n)
+   {
+      Rec& r = R();
+      if (!Card(T("Record"), false))
+         return;
+      static const std::vector<std::string> kSource = { "Learn CC", "Any knob", "Wired input" };
+      static const std::vector<std::string> kMode = { "Overwrite", "Touch", "Latch" };
+      static const std::vector<std::string> kStart = { "Now", "Next bar", "On play" };
+      static const std::vector<std::string> kLength = { "Fixed", "Auto" };
+      ImGui::BeginDisabled(r.phase != RecPhase::Idle);
+      int source = r.source;
+      if (ComboRow(T("Source"), &source, kSource, nullptr))
+         r.source = source;
+      FieldLabel(T("From"));
+      const std::string from = RecSourceName(n);
+      if (ActionButton::Draw((from + "##ceRecFrom").c_str(), ImVec2(sFieldW, 0.0f)))
+      {
+         r.cc = false; // learn again
+         r.knobNode = r.knobParam = -1;
+      }
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Click to pick again on the next take"));
+      ComboRow(T("Mode"), &r.mode, kMode, nullptr);
+      ComboRow(T("Start"), &r.start, kStart, nullptr);
+      ComboRow(T("Length"), &r.length, kLength, nullptr);
+      ImGui::BeginDisabled(!n.loop);
+      BoolRow(T("Loop only"), &r.inLoop, nullptr);
+      ImGui::EndDisabled();
+      BoolRow(T("Quantise"), &r.quantise, nullptr);
+      ImGui::EndDisabled();
+      FieldLabel(T("Take"));
+      const bool live = r.phase != RecPhase::Idle && r.uid == gn.uid;
+      if (ActionButton::Draw(live ? T("Stop") : T("Record"), ImVec2(sFieldW, 0.0f), live ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
+      {
+         if (live)
+            RecStop(true);
+         else
+         {
+            RecStop(false);
+            RecArm(gn, n);
+         }
+      }
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", RecTip());
+      if (!r.error.empty())
+         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "%s", r.error.c_str());
    }
 
    void DrawInspector(GraphNode& gn, MSEGNode& n)
@@ -1691,6 +2035,8 @@ namespace
             s.thinning = pct / 100.0f;
       }
 
+      DrawRecordCard(gn, n);
+
       DrawTargets(gn);
 
       if (Card(T("Voices")))
@@ -1822,7 +2168,7 @@ namespace
    }
 
    // The editing controls the header carries after the pages: snap, grid, Assign. One tile high each, like the 3D View's.
-   float ControlsW(const MSEGNode& n) { return 2.0f * (kIconW + tok::space_1) + GridW(n) + tok::space_3 + AssignW(); }
+   float ControlsW(const MSEGNode& n) { return 3.0f * (kIconW + tok::space_1) + GridW(n) + tok::space_3 + AssignW(); }
 
    // Every header item starts on the row's top: a mixed row (chips, a picker face, a text button) otherwise drifts by
    // the text-baseline offset ImGui carries between SameLine items.
@@ -1853,6 +2199,20 @@ namespace
       row.Next(tok::space_1);
       Picker("##ceGrid", GridNames(n), GridIndex(n), GridW(n), T("Grid: snap and quantise (Q)"));
       row.Next(tok::space_3);
+      {
+         const bool live = R().phase != RecPhase::Idle && R().uid == gn.uid;
+         if (IconChip("##ceRec", R().phase == RecPhase::Recording && live ? IconsInfinite::RecordFill : IconsInfinite::Record, live, RecTip()))
+         {
+            if (live)
+               RecStop(true);
+            else
+            {
+               RecStop(false);
+               RecArm(gn, n);
+            }
+         }
+      }
+      row.Next(tok::space_1);
       const bool armed = gCurveAssignUid == gn.uid;
       if (ActionButton::Draw(AssignLabel(), ImVec2(AssignW(), tok::tile), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
          gCurveAssignUid = armed ? 0 : gn.uid;
@@ -1969,6 +2329,7 @@ namespace
          s.page = pages.empty() ? 0 : pages.front()->uid;
          ClearSelection();
       }
+      TickRecord();
       GraphNode* gn = PageNode();
       MSEGNode* n = AsMseg(gn);
       if (gCurveAssignUid != 0 && AsMseg(FindNodeByUid(gCurveAssignUid)) == nullptr)
@@ -2024,6 +2385,13 @@ namespace
          DrawSide(*gn, *n, ImVec2(sideW, bodyH));
       }
    }
+}
+
+void CurveEditorRecordPicked(int nodeIndex, int paramIndex)
+{
+   R().knobNode = nodeIndex;
+   R().knobParam = paramIndex;
+   gCurveRecordPicking = false;
 }
 
 void CurveEditorOpenNode(uint64_t uid)

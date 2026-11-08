@@ -17,6 +17,8 @@ namespace app
    extern ImVec2 gCurveEditorRectMin, gCurveEditorRectMax;
    extern uint64_t gCurveAssignUid; // the MSEG whose Assign is armed: the next knob clicked on the canvas binds to it
 
+   extern bool gCurveRecordPicking; // Record (Any knob) waits for a knob click on the canvas
+   void CurveEditorRecordPicked(int nodeIndex, int paramIndex);
    void DrawCurveEditorDocked(const char* id, const ImVec2& size);
    void CurveEditorOpenNode(uint64_t uid); // open the panel on that MSEG node's page
 }

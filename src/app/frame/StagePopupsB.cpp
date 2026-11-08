@@ -1015,6 +1015,37 @@ void DrawPopupsB(FrameCtx& fc)
          }
       }
 
+      // Curve Editor Record, Any knob (§8.9): the knob clicked becomes the take's source; the same click starts its drag.
+      if (gCurveRecordPicking)
+      {
+         const ImVec2 mp = ImGui::GetMousePos();
+         int hoveredPinIdx = -1;
+         for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
+         {
+            const auto& pInfo = gParamPinScreenList[pi];
+            const bool inBounds = mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x && mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y;
+            const float dx = mp.x - pInfo.screenPos.x, dy = mp.y - pInfo.screenPos.y;
+            if (inBounds || dx * dx + dy * dy < 20.0f * 20.0f)
+               hoveredPinIdx = (int)pi;
+         }
+         if (hoveredPinIdx >= 0)
+         {
+            const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
+            ImDrawList* hoverDl = ImGui::GetWindowDrawList();
+            if (pInfo.isCircle)
+               StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
+            else
+               StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
+            ed::Suspend();
+            ImGui::SetTooltip(T("Record %s: %s"), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
+            ed::Resume();
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+               CurveEditorRecordPicked(pInfo.nodeIndex, pInfo.paramIndex);
+         }
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            gCurveRecordPicking = false;
+      }
+
       // Predictive Drift Follow leader picker - identical click-to-assign UX to the
       // performance-matrix picker just above, but resolves to a DriftNode's leaderNodeIndex/
       // leaderParamIndex instead of a perf element target. Deliberately stores the target's
