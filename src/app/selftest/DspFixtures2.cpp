@@ -4163,6 +4163,58 @@ bool RunMSEGFixture()
       live = nullptr;
    }
 
+   // M7 (docs/plans/curve-editor/README.md §10): per-voice cost at 256 points against today's 32-point walk.
+   // Reported, not gated: a timing in a shared test run is too noisy to fail on.
+   {
+      auto oldEval = [](const ModShapes::MsegPoint* p, int count, float x) { // the pre-curve-editor kernel, verbatim
+         x = std::clamp(x, 0.0f, 1.0f);
+         int i = 0;
+         while (i < count - 2 && x >= p[i + 1].x)
+            i++;
+         const float span = p[i + 1].x - p[i].x;
+         if (span <= 1.0e-6f)
+            return x >= p[i + 1].x ? p[i + 1].y : p[i].y;
+         return ModShapes::MsegSegment(p[i].y, p[i + 1].y, p[i].curve, (x - p[i].x) / span);
+      };
+      auto shape = [](int n) {
+         std::vector<ModShapes::MsegPoint> v;
+         for (int i = 0; i < n; i++)
+            v.push_back({ (float)i / (n - 1), ModShapes::Hash01(i), ModShapes::Hash01(i + 999) - 0.5f });
+         return v;
+      };
+      const auto p32 = shape(32), p256 = shape(256);
+      constexpr int kSamples = 48000, kPasses = 40;
+      volatile float sink = 0.0f;
+      auto best = [&](auto&& run) {
+         double b = 1e30;
+         for (int r = 0; r < 5; r++)
+         {
+            const auto t0 = std::chrono::steady_clock::now();
+            float acc = 0.0f;
+            for (int pass = 0; pass < kPasses; pass++)
+               acc += run();
+            sink = sink + acc;
+            b = std::min(b, std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - t0).count());
+         }
+         return b / ((double)kSamples * kPasses);
+      };
+      const double before = best([&] {
+         float a = 0.0f;
+         for (int k = 0; k < kSamples; k++)
+            a += oldEval(p32.data(), 32, (float)k / kSamples);
+         return a;
+      });
+      const double after = best([&] {
+         float a = 0.0f;
+         int hint = -1;
+         for (int k = 0; k < kSamples; k++)
+            a += ModShapes::MsegEvaluate(p256.data(), 256, (float)k / kSamples, hint);
+         return a;
+      });
+      printf("MSEGTEST M7 per-sample cost: 32 pts walk %.2f ns, 256 pts hinted %.2f ns (%+.0f %%, limit +10 %%)  %s\n",
+             before, after, (after / before - 1.0) * 100.0, after <= before * 1.10 ? "OK" : "OVER");
+   }
+
    live = nullptr;
    tr.SetPlaying(false);
    tr.Rewind();

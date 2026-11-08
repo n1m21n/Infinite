@@ -1,5 +1,6 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
 #include "app/AppShared.h"
+#include "app/panels/CurveEditorPanel.h"
 
 namespace app
 {
@@ -3094,5 +3095,136 @@ void FrameTest_BUGTEST(int frameId, GLFWwindow* window)
                             clothFollowsTransform && pathFollowsTransform;
          printf("%s\n", allOk ? "BUGFIXES OK" : "SUSPECT");
       }
+}
+
+// M8 (docs/plans/curve-editor/README.md §10): the Curve Editor open on 8 MSEG pages may add at most 1 ms
+// to a canvas frame. Swap interval 0 so frame-to-frame time is work, not vsync; closed and open runs
+// alternate four times and each run's median is kept, so a slow spell hits both sides.
+void FrameTest_CURVEBENCH(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_CURVEBENCH") == nullptr)
+      return;
+   static std::vector<uint64_t> sUids;
+   static double sLast = 0.0;
+   static std::vector<double> sRun;
+   static std::vector<double> sClosed, sOpen;
+   constexpr int kWarm = 20, kRun = 90, kRounds = 4;
+   if (frameId == 4)
+   {
+      SetCanvasSwapInterval(0);
+      for (int i = 0; i < 8; i++)
+         if (GraphNode* gn = SpawnNode("MSEG", "Modulators", 40.0f * i, 0.0f))
+            sUids.push_back(gn->uid);
+      for (uint64_t uid : sUids)
+         CurveEditorOpenNode(uid); // every page in the strip, the last one showing
+      gCurveEditorOpen = false;
+      sLast = glfwGetTime();
+      return;
+   }
+   if (frameId < 5)
+      return;
+   const double now = glfwGetTime();
+   const double dt = (now - sLast) * 1000.0;
+   sLast = now;
+   const int t = frameId - 5;
+   const int run = t / (kWarm + kRun);
+   const int inRun = t % (kWarm + kRun);
+   if (run >= 2 * kRounds)
+   {
+      auto median = [](std::vector<double> v) {
+         std::sort(v.begin(), v.end());
+         return v.empty() ? 0.0 : v[v.size() / 2];
+      };
+      const double closed = median(sClosed), open = median(sOpen);
+      const double delta = open - closed;
+      const bool pass = sUids.size() == 8 && delta <= 1.0;
+      printf("CURVEBENCH pages %d closed %.3f ms open %.3f ms delta %+.3f ms (limit 1.0)  %s\n", (int)sUids.size(),
+             closed, open, delta, pass ? "PASS" : "FAIL");
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      return;
+   }
+   if (inRun >= kWarm)
+      sRun.push_back(dt);
+   if (inRun == kWarm + kRun - 1)
+   {
+      std::vector<double> v = sRun;
+      std::sort(v.begin(), v.end());
+      ((run % 2) == 0 ? sClosed : sOpen).push_back(v[v.size() / 2]);
+      sRun.clear();
+      gCurveEditorOpen = (run % 2) == 0; // the next run is the other side
+   }
+}
+
+// M1 (docs/plans/curve-editor/README.md §10): the first of the three actions. A drag on the empty panel makes
+// an MSEG page 4 bars long and draws its curve; Assign then a knob click bind it (the Perf-assign hit test).
+void FrameTest_CURVEM1TEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_CURVEM1TEST") == nullptr)
+      return;
+   ImGuiIO& io = ImGui::GetIO();
+   io.ConfigInputTrickleEventQueue = false;
+   io.AddFocusEvent(true);
+   auto msegs = [] {
+      std::vector<GraphNode*> v;
+      for (GraphNode& gn : gNodes)
+         if (dynamic_cast<MSEGNode*>(gn.node.get()) != nullptr)
+            v.push_back(&gn);
+      return v;
+   };
+   static int sBefore = -1;
+   const ImVec2 mn = gCurveEditorRectMin, mx = gCurveEditorRectMax;
+   const float w = mx.x - mn.x, h = mx.y - mn.y;
+   auto at = [&](float u, float v) {
+      const float x = mn.x + w * u, y = mn.y + h * v;
+      io.AddMousePosEvent(x, y);
+      // The backend reads the OS cursor each frame, so move that too (as the envelope drag tests do).
+      glfwSetCursorPos(window, (double)(x * ImGui_ImplGlfw_GetPointScale()), (double)(y * ImGui_ImplGlfw_GetPointScale()));
+   };
+   constexpr int kDown = 12, kSteps = 20;
+   if (frameId == 4)
+   {
+      while (!msegs().empty())
+         RemoveNodeByIndex(msegs().front()->index);
+      gCurveEditorDock = 0;
+      gCurveEditorOpen = true;
+      sBefore = 0;
+   }
+   if (frameId >= kDown - 1 && frameId <= kDown + kSteps + 3)
+   {
+      // Every frame: the backend would otherwise put the real cursor back.
+      const float t = std::clamp((float)(frameId - kDown) / kSteps, 0.0f, 1.0f);
+      at(0.35f + 0.30f * t, 0.80f - 0.35f * t); // a rising stroke across the middle
+      if (frameId == kDown)
+         io.AddMouseButtonEvent(0, true);
+      if (frameId == kDown + kSteps + 1)
+         io.AddMouseButtonEvent(0, false);
+   }
+   if (frameId == kDown + kSteps + 4)
+   {
+      bool ok = true;
+      auto expect = [&](const char* what, bool pass) {
+         printf("CURVEM1 %s  %s\n", what, pass ? "OK" : "FAIL");
+         ok = ok && pass;
+      };
+      const std::vector<GraphNode*> after = msegs();
+      expect("the drag made one MSEG", (int)after.size() == sBefore + 1);
+      if (!after.empty())
+      {
+         MSEGNode* n = dynamic_cast<MSEGNode*>(after.front()->node.get());
+         printf("CURVEM1 rate mode %d, %.1f beats, %d points\n", n->rateMode, n->rateBeats, (int)n->points.size());
+         expect("it is 4 bars long", n->rateMode == LFONode::kRateSynced && n->rateBeats == 16.0f);
+         // The stroke rose left to right inside the drawn span: the curve rises there too.
+         float lo = 1.0f, hi = 0.0f;
+         for (const auto& p : n->points)
+            if (p.interp == ModShapes::kInterpLinear)
+            {
+               lo = std::min(lo, p.y);
+               hi = std::max(hi, p.y);
+            }
+         expect("the stroke drew linear points that rise", hi - lo > 0.1f);
+      }
+      printf("CURVEM1 %s\n", ok ? "PASS" : "FAIL");
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+   }
 }
 }

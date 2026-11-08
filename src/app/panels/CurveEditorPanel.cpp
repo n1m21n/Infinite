@@ -98,6 +98,7 @@ namespace
       std::vector<CurveEdit::XY> stroke;
       CurveEdit::XY lineFrom {};
       float bendBase = 0.0f, bendSign = 1.0f;
+      bool strokePending = false;   // a press on the empty panel made this page: its stroke starts next frame
    };
 
    State& S()
@@ -169,6 +170,12 @@ namespace
       ShowPage(gn->uid);
       S().v0 = 0.0f;
       S().v1 = 1.0f;
+      S().tool = Tool::Draw; // a fresh page is for drawing
+      if (MSEGNode* n = AsMseg(gn))
+      {
+         n->rateMode = LFONode::kRateSynced; // a page made here is a sweep: 4 bars, not the card's 1
+         n->rateBeats = 16.0f;
+      }
    }
 
    void DeletePage(uint64_t uid)
@@ -849,6 +856,10 @@ namespace
       }
       else if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && s.drag == Drag::None)
          Press(a, n, hover);
+      else if (s.strokePending && s.drag == Drag::None && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+               ImGui::IsMouseHoveringRect(ImVec2(a.x0, a.rulerY), ImVec2(a.x1, a.y1)))
+         Press(a, n, hover); // the empty panel's button still holds the press this frame, so not "hovered"
+      s.strokePending = false;
       if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && s.drag == Drag::None)
       {
          if (hover >= 0 && !std::binary_search(s.sel.begin(), s.sel.end(), hover))
@@ -1413,7 +1424,14 @@ namespace
       {
          const ImVec2 avail = ImGui::GetContentRegionAvail();
          const ImVec2 mn = ImGui::GetCursorScreenPos();
-         EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), T("No curve yet"), T("+ makes an MSEG node and opens it here"));
+         // A press here makes the page and the same drag draws its curve: draw, Assign, click a knob.
+         ImGui::InvisibleButton("##ceEmpty", ImVec2(std::max(1.0f, avail.x), std::max(1.0f, avail.y)));
+         if (ImGui::IsItemActivated())
+         {
+            AddPage();
+            S().strokePending = true;
+         }
+         EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), T("No curve yet"), T("Draw here to make one"));
          return;
       }
       HandleKeys(*n);

@@ -337,15 +337,15 @@ Filled in per block when it lands; each row links to §6 and §7.
 
 | Metric | Baseline (§6) | Target (§7) | Result |
 |---|---|---|---|
-| M1 draw + assign | ~8 steps | ≤ 3 / ≤ 10 s | — |
+| M1 draw + assign | ~8 steps | ≤ 3 / ≤ 10 s | Block 1: 3 with the panel open (stroke on the empty panel, Assign, knob), 4 from closed (+ Shift+E); stroke half proven by CURVEM1TEST; seconds not timed |
 | M2 preset → assigned | n/a | ≤ 2 clicks | — |
 | M3 CC → editable | impossible | 1 arm, ≤ 64 pts | — |
 | M4 expression live | no | same frame | — |
 | M5 easing / Blender A/B | no easings | 1e-4 / 1e-3 | — |
-| M6 frame exact | n/a | identical per run/OS | — |
-| M7 audio cost | MSEG 32 pts | ≤ +10 % at 256 | — |
-| M8 UI cost | — | +≤ 1 ms | — |
-| M9 old patches | 3 patches | open/play/look right | — |
+| M6 frame exact | n/a | identical per run/OS | Block 1: MSEGTEST frame checks pass at 24/30/60 fps on macOS; other OSes not yet run |
+| M7 audio cost | MSEG 32 pts | ≤ +10 % at 256 | Block 1: 44.4 ns vs 56.2 ns per sample, −21 % (hinted search beats the old walk); audio xrun bench not run |
+| M8 UI cost | — | +≤ 1 ms | Block 1: +0.26 to +0.32 ms (3 runs, CURVEBENCH, M2 8 GB) |
+| M9 old patches | 3 patches | open/play/look right | Block 1: u0002, u0035, u0058 validate and play (−22.2, −30.8, −21.1 LUFS) |
 | M10 coverage | — | 7/7 points tested | — |
 
 ## 11. Critique
@@ -383,3 +383,13 @@ Block 1, settled on the way (2026-11-08):
 | Glyphs | New: Curve (rail), Pen tool, Line tool, Bend; Pointer, Hand, Pencil and Erase reused |
 | Key | Shift+E opens the panel; inside it Shift+1..5 set handle types (Shift+3 no longer reaches the 3D View there) |
 | Agent API | Panel name `curveeditor`, aliases `curve`, `curves`, `mseg` |
+| Grid | The grid picker sits in the footer beside snap, not in the inspector |
+| Empty panel | A drag on it makes an MSEG page and draws its curve in one go (M1) |
+| New page | A page made in the panel is 4 bars (Synced, 16 beats) and opens on Draw; a card-spawned MSEG keeps 1 bar |
+| Draw | Strokes thin to 1 % by default (footer slider); drawn points are Linear |
+| Eraser | 9 px radius; the two end points never go |
+| Handles | Dragging an Auto handle turns that point Aligned |
+| Assign | Stays armed while Shift is held; Esc or right-click stops; an MSEG never targets its own controls |
+| Polarity | Set by the Low / High of each target row (High below Low inverts); no separate switch |
+| Pages | Close hides a page (node stays, Reopen Page in the dock menu); Delete Curve removes the node |
+| Deferred | Value zoom (Alt+wheel), dragging chips to reorder, dragging a chip onto a knob, a Mod / Motion switch (Blocks 2 and 4) |
