@@ -302,3 +302,6 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 .ax-bento-t:last-child:nth-child(even) { grid-column: auto; }
 .ax-bento-l { left: 12px; right: 12px; bottom: 10px; font-size: var(--size-caption); }
 @media (max-width: 640px) { .ax-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 84px; gap: 8px; } }
+.ax-ttl { left: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 3px 8px; font-size: var(--size-micro-mono, .75rem); font-weight: 500; }
+html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-mono, .75rem); font-weight: 500; }
+.ax-bento-l { left: 10px; right: 10px; bottom: 8px; font-size: var(--size-micro-mono, .75rem); font-weight: 500; line-height: 1.2; }
