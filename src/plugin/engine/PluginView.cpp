@@ -42,6 +42,7 @@ namespace PluginView
 
       int gCursor = -1;
       bool gPopped = false, gWantPopped = false;
+      bool gPicture = false;
       uint64_t gReadbackUsSum = 0, gReadbacks = 0;
 
       void DropPbos()
@@ -170,6 +171,12 @@ namespace PluginView
          std::memcpy(&on, data, sizeof on);
          gWantPopped = on != 0;
       }
+      else if (type == PluginFrames::kMsgPicture && size >= sizeof(uint32_t))
+      {
+         uint32_t on = 0;
+         std::memcpy(&on, data, sizeof on);
+         gPicture = on != 0;
+      }
       else if (type == PluginFrames::kMsgViewInput && gView.open && !gPopped)
       {
          const size_t n = size / sizeof(PluginFrames::InputEvent);
@@ -188,6 +195,17 @@ namespace PluginView
    }
 
    bool Popped() { return gPopped; }
+
+   void SetPicture(bool on)
+   {
+      if (!Platform::PluginModeActive() || on == gPicture)
+         return;
+      gPicture = on;
+      const uint32_t v = on ? 1 : 0;
+      PluginEngine::SendToShell(PluginFrames::kMsgPictureMode, &v, sizeof v, 500);
+   }
+
+   bool Picture() { return Platform::PluginModeActive() && gPicture; }
 
    namespace
    {

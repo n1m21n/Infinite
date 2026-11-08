@@ -114,6 +114,9 @@ namespace InfinitePlugin
    constexpr uint32_t kMsgStateLoaded = 3;
    constexpr uint32_t kMsgSlotEdit = 4;  // payload: SlotEdit
    constexpr uint32_t kMsgSlotNames = 5; // payload: 32 '\0'-terminated UTF-8 names
+   constexpr uint32_t kMsgStateAuto = 11; // payload: the patch, pushed every 2 s while it changes
+   // An engine whose audio thread stops beating this long is hung: killed, and the view offers Restart.
+   constexpr uint64_t kHangNs = 3000000000ull;
    constexpr uint32_t kMsgGetState = 101;
    constexpr uint32_t kMsgSetState = 102;
    // View messages (kMsgFrames, kMsgViewCursor, kMsgView, kMsgViewInput) are in PluginFrames.h.
@@ -132,6 +135,7 @@ namespace InfinitePlugin
    struct State
    {
       bool bypass = false;
+      bool picture = false;  // the view shows the Output picture instead of the canvas
       uint32_t slotsSet = 0; // slots the host has a value for
       float slots[kSlotCount] = {};
       std::string patch;
@@ -156,7 +160,7 @@ namespace InfinitePlugin
    {
       std::string h = "{\"format\":\"infinite-plugin-state\",\"v\":" + std::to_string(kStateVersion) +
                       ",\"appVersion\":\"" INFINITE_PLUGIN_VERSION "\",\"build\":\"" + std::string(kFx ? "fx" : "instrument") +
-                      "\",\"latencyMode\":\"block\",\"bypass\":" + (st.bypass ? "true" : "false") + ",\"slotsSet\":" + std::to_string(st.slotsSet) + ",\"slots\":[";
+                      "\",\"latencyMode\":\"block\",\"bypass\":" + (st.bypass ? "true" : "false") + ",\"picture\":" + (st.picture ? "true" : "false") + ",\"slotsSet\":" + std::to_string(st.slotsSet) + ",\"slots\":[";
       for (int32 i = 0; i < kSlotCount; i++)
       {
          char num[32];
@@ -195,6 +199,8 @@ namespace InfinitePlugin
       State out;
       const size_t by = h.find("\"bypass\":");
       out.bypass = by != std::string::npos && h.compare(by + 9, 4, "true") == 0;
+      const size_t pic = h.find("\"picture\":");
+      out.picture = pic != std::string::npos && h.compare(pic + 10, 4, "true") == 0;
       const size_t ss = h.find("\"slotsSet\":");
       if (ss != std::string::npos)
          out.slotsSet = uint32_t(std::strtoul(h.c_str() + ss + 11, nullptr, 10));
@@ -457,12 +463,35 @@ namespace InfinitePlugin
          }
          spawnFailed_.store(false);
          noGraphics_ = false;
+         dead_.store(false);
          stopReader_.store(false);
          // The only reader of the engine's messages. In 1.5 it waits for "ready"; 2.1 adds state.
          reader_ = std::thread([this] {
             PluginIpc::Message m;
+            // Hang watch (step 2.5): the engine's audio thread bumps the heartbeat at least every
+            // 100 ms, also while the host sends no blocks. Armed once it has moved after ready, so
+            // an engine whose audio never started is not taken for a hung one.
+            uint64_t beat = shell_.Heartbeat(), beatNs = Ipc::MonotonicNs();
+            bool armed = false;
             while (!stopReader_.load())
             {
+               const uint64_t now = Ipc::MonotonicNs(), b = shell_.Heartbeat();
+               if (b != beat)
+               {
+                  armed = armed || ready_.load();
+                  beat = b;
+                  beatNs = now;
+               }
+               else if (armed && now - beatNs > kHangNs)
+               {
+                  std::fprintf(stderr, "Infinite plugin: engine stopped responding for %.1f s; stopping it\n", double(now - beatNs) / 1e9);
+                  if (!Ipc::ChildSignalKill(child_))
+                     std::fprintf(stderr, "Infinite plugin: could not stop the engine (sandbox); it exits when the host quits\n");
+                  dead_.store(true);
+                  ready_.store(false);
+                  PostEngine(InfinitePlugin::EngineStatus::Stopped);
+                  break;
+               }
                if (shell_.Messages().Receive(&m, 200))
                {
                   if (m.type == kMsgReady)
@@ -494,9 +523,21 @@ namespace InfinitePlugin
                      replies_[m.id] = std::string(m.data.begin(), m.data.end());
                      replyCv_.notify_all();
                   }
+                  else if (m.type == kMsgStateAuto && !m.data.empty())
+                  {
+                     std::lock_guard<std::mutex> lock(autoMutex_);
+                     autoPatch_.assign(m.data.begin(), m.data.end());
+                  }
+                  else if (m.type == PluginFrames::kMsgPictureMode && m.data.size() >= 4)
+                  {
+                     uint32_t on = 0;
+                     std::memcpy(&on, m.data.data(), 4);
+                     picture_.store(on != 0);
+                  }
                }
                else if (!Ipc::ChildAlive(child_))
                {
+                  dead_.store(true);
                   if (!noGraphics_)
                      PostEngine(InfinitePlugin::EngineStatus::Stopped); // crashed or killed
                   break;
@@ -505,6 +546,11 @@ namespace InfinitePlugin
          });
          if (!patch.empty())
             Send(kMsgSetState, patch.data(), patch.size(), 5000);
+         if (picture_.load())
+         {
+            const uint32_t on = 1;
+            Send(PluginFrames::kMsgPicture, &on, sizeof on, 1000);
+         }
          // An open view: the new engine reads frames back from its first frame.
          if (view_.open)
             Send(PluginFrames::kMsgView, &view_, sizeof view_, 1000);
@@ -538,7 +584,7 @@ namespace InfinitePlugin
       // (then nothing has changed since the stored state), dead, or silent for timeoutMs.
       bool RequestPatch(std::string& out, int timeoutMs)
       {
-         if (!Running() || !ready_.load() || !Ipc::ChildAlive(child_))
+         if (!Running() || !ready_.load() || !Alive())
             return false;
          uint32_t id = 0;
          if (!Send(kMsgGetState, nullptr, 0, timeoutMs, &id))
@@ -555,7 +601,8 @@ namespace InfinitePlugin
       // that follows the load.
       void SendPatch(const std::string& patch)
       {
-         if (!Running() || !Ipc::ChildAlive(child_))
+         ClearAutoPatch(); // the host's state wins over what the last engine pushed
+         if (!Running() || !Alive())
             return;
          ready_.store(false);
          Send(kMsgSetState, patch.data(), patch.size(), 5000);
@@ -585,14 +632,43 @@ namespace InfinitePlugin
          if (ready_.load(std::memory_order_acquire) || spawnFailed_.load())
             return;
          const uint64_t t0 = Ipc::MonotonicNs();
-         while (!ready_.load(std::memory_order_acquire) && Ipc::ChildAlive(child_) && Ipc::MonotonicNs() - t0 < 60ull * 1000000000ull)
+         while (!ready_.load(std::memory_order_acquire) && Alive() && Ipc::MonotonicNs() - t0 < 60ull * 1000000000ull)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
 
       PluginIpc::Result Process(const PluginIpc::ProcessArgs& a) { return shell_.Process(a); }
       int64_t Pid() const { return child_.pid; }
 
+      // Crash restart (step 2.5): the patch the engine pushed last (every 2 s while it changes), for
+      // a restart after the engine died and can no longer answer RequestPatch.
+      bool LastPushedPatch(std::string& out)
+      {
+         std::lock_guard<std::mutex> lock(autoMutex_);
+         if (autoPatch_.empty())
+            return false;
+         out = autoPatch_;
+         return true;
+      }
+      void ClearAutoPatch()
+      {
+         std::lock_guard<std::mutex> lock(autoMutex_);
+         autoPatch_.clear();
+      }
+
+      // The picture/canvas choice: the user's last switch in the engine, or the saved one.
+      bool Picture() const { return picture_.load(); }
+      void SetPicture(bool on)
+      {
+         picture_.store(on);
+         const uint32_t v = on ? 1u : 0u;
+         if (Running() && Alive())
+            Send(PluginFrames::kMsgPicture, &v, sizeof v, 500);
+      }
+
    private:
+      // A hung engine was signalled but not reaped (the zombie still answers ChildAlive).
+      bool Alive() const { return !dead_.load() && Ipc::ChildAlive(child_); }
+
       // The channel to the engine has one writer at a time: getState can run on a host thread while
       // the UI thread sends view input.
       bool Send(uint32_t type, const void* data, size_t size, int timeoutMs, uint32_t* idOut = nullptr)
@@ -624,6 +700,10 @@ namespace InfinitePlugin
       std::atomic<bool> ready_ { false };
       std::atomic<bool> spawnFailed_ { false };
       bool noGraphics_ = false; // reader thread only (reset before it starts)
+      std::atomic<bool> dead_ { false };
+      std::atomic<bool> picture_ { false };
+      std::mutex autoMutex_;
+      std::string autoPatch_;
       double rate_ = 0.0;
       uint32_t block_ = 0;
    };
@@ -691,13 +771,31 @@ namespace InfinitePlugin
          if (state && !link_.Matches(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock)))
          {
             // The restart keeps what the user built: take the patch from the old engine first.
-            std::string current;
-            if (link_.RequestPatch(current, 2000))
-               patch_ = std::move(current);
+            TakeCurrentPatch();
             link_.Start(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock), patch_);
             resendSlots_.store(true); // a fresh engine knows no slot values yet
          }
+         if (!state)
+            release_.store(true);
          return AudioEffect::setActive(state);
+      }
+
+      // Host suspend (transport stop in some hosts, plugin switched off): the first block after it
+      // releases every held note, so nothing hangs on when processing comes back.
+      tresult PLUGIN_API setProcessing(TBool state) override
+      {
+         if (!state)
+            release_.store(true);
+         return AudioEffect::setProcessing(state);
+      }
+
+      // Message thread: the engine's patch into patch_ — asked from a live engine, else the last one
+      // a dead engine pushed (crash restart), else patch_ stays the stored state.
+      void TakeCurrentPatch()
+      {
+         std::string current;
+         if (link_.RequestPatch(current, 2000) || link_.LastPushedPatch(current))
+            patch_ = std::move(current);
       }
 
       // Message thread: (re)start on the current setup, or the host defaults before the first one.
@@ -705,9 +803,7 @@ namespace InfinitePlugin
       {
          const double rate = processSetup.sampleRate > 0.0 ? processSetup.sampleRate : 48000.0;
          const uint32_t block = processSetup.maxSamplesPerBlock > 0 ? uint32_t(processSetup.maxSamplesPerBlock) : 512u;
-         std::string current;
-         if (link_.RequestPatch(current, 2000))
-            patch_ = std::move(current);
+         TakeCurrentPatch();
          link_.Start(rate, block, patch_);
          resendSlots_.store(true);
       }
@@ -721,6 +817,7 @@ namespace InfinitePlugin
          if (!ReadAll(state, bytes) || !DecodeState(bytes, st))
             return kResultFalse;
          bypass_ = st.bypass;
+         link_.SetPicture(st.picture);
          std::memcpy(slots_, st.slots, sizeof slots_);
          slotsSet_.store(st.slotsSet);
          patch_ = std::move(st.patch);
@@ -735,11 +832,10 @@ namespace InfinitePlugin
       {
          if (!state)
             return kInvalidArgument;
-         std::string current;
-         if (link_.RequestPatch(current, 2000))
-            patch_ = std::move(current); // else the last known patch: a save never loses one
+         TakeCurrentPatch(); // a save never loses one
          State st;
          st.bypass = bypass_;
+         st.picture = link_.Picture();
          std::memcpy(st.slots, slots_, sizeof slots_);
          st.slotsSet = slotsSet_.load();
          st.patch = patch_;
@@ -852,7 +948,8 @@ namespace InfinitePlugin
          a.out = outs;
          a.numOut = 2;
          a.frames = n;
-         a.flags = (offline ? PluginIpc::kOffline : 0u) | (sidechain ? PluginIpc::kSidechain : 0u) | (bypass_ ? PluginIpc::kBypass : 0u);
+         a.flags = (offline ? PluginIpc::kOffline : 0u) | (sidechain ? PluginIpc::kSidechain : 0u) | (bypass_ ? PluginIpc::kBypass : 0u) |
+                   (release_.exchange(false, std::memory_order_relaxed) ? PluginIpc::kRelease : 0u);
          a.transport = ReadTransport(data.processContext);
          a.events = events_;
          a.numEvents = numEvents_;
@@ -1115,6 +1212,7 @@ namespace InfinitePlugin
       EngineLink link_;
       std::shared_ptr<UiRelay> relay_;
       std::atomic<bool> resendSlots_ { true };
+      std::atomic<bool> release_ { false };
       std::atomic<uint32_t> slotsSet_ { 0 };
       std::string patch_; // last known patch (.inf text); message thread only
       bool bypass_ = false;

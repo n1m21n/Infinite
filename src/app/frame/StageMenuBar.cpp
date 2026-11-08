@@ -12,6 +12,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "plugin/engine/HostAudio.h"
 #include "plugin/engine/PluginView.h"
 #include "app/ui/design/BrandLogo.gen.h"
 
@@ -1137,18 +1138,77 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
-         // Inside a DAW (plugin mode): pop the UI out into its own window, or bring it back (step 2.4).
-         if (Platform::PluginModeActive() && cursorX - tok::tile - telemetryGap - telemetryW >= centreEndX + minGap)
+         // Inside a DAW (plugin mode, README 12.4): pop-out, picture/canvas, the host slots, and
+         // blocks the host played as silence because the engine was late (only once there are any).
+         if (Platform::PluginModeActive())
          {
-            cursorX -= tok::tile;
-            ImGui::SameLine(cursorX);
-            const bool popped = PluginView::Popped();
-            if (IconTile::Draw("##popout", IconsInfinite::PopOut, IconsInfinite::PopOut, popped, tok::tile,
-                               ImGui::GetFrameHeight()))
-               PluginView::RequestPopped(!popped);
-            if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", popped ? T("Back to the plugin") : T("Pop out"));
-            cursorX -= telemetryGap;
+            auto fits = [&](float w) { return cursorX - w - telemetryGap - telemetryW >= centreEndX + minGap; };
+            if (fits(tok::tile))
+            {
+               cursorX -= tok::tile;
+               ImGui::SameLine(cursorX);
+               const bool popped = PluginView::Popped();
+               if (IconTile::Draw("##popout", IconsInfinite::PopOut, IconsInfinite::PopOut, popped, tok::tile,
+                                  ImGui::GetFrameHeight()))
+                  PluginView::RequestPopped(!popped);
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s", popped ? T("Back to the plugin") : T("Pop out"));
+               cursorX -= telemetryGap;
+            }
+            if (fits(tok::tile))
+            {
+               cursorX -= tok::tile;
+               ImGui::SameLine(cursorX);
+               const bool picture = PluginView::Picture();
+               if (IconTile::Draw("##picture", IconsInfinite::Viewport, IconsInfinite::ViewportFill, picture, tok::tile,
+                                  ImGui::GetFrameHeight()))
+                  PluginView::SetPicture(!picture);
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s", picture ? T("Canvas") : T("Picture"));
+               cursorX -= telemetryGap;
+            }
+            if (fits(tok::tile))
+            {
+               cursorX -= tok::tile;
+               ImGui::SameLine(cursorX);
+               if (IconTile::Draw("##slots", IconsInfinite::FamilyMacros, IconsInfinite::FamilyMacros,
+                                  ImGui::IsPopupOpen("##slotsmap"), tok::tile, ImGui::GetFrameHeight()))
+                  ImGui::OpenPopup("##slotsmap");
+               if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("##slotsmap"))
+                  ImGui::SetTooltip("%s", T("Host slots"));
+               if (ImGui::BeginPopup("##slotsmap"))
+               {
+                  int shown = 0;
+                  for (int i = 0; i < PluginEngine::kSlotCount; i++)
+                  {
+                     const std::string name = PluginEngine::SlotName(i);
+                     if (name.empty())
+                        continue;
+                     ImGui::Text("%02d  %s", i + 1, name.c_str());
+                     shown++;
+                  }
+                  if (shown == 0)
+                     ImGui::TextDisabled("%s", T("No Macro is on a host slot"));
+                  ImGui::EndPopup();
+               }
+               cursorX -= telemetryGap;
+            }
+            const uint64_t hostXruns = PluginEngine::HostXruns();
+            if (hostXruns > 0)
+            {
+               char xr[32];
+               snprintf(xr, sizeof(xr), "%llu xruns", (unsigned long long)hostXruns);
+               const float w = TabWidth("99999 xruns", xr);
+               if (fits(w))
+               {
+                  cursorX -= w;
+                  ImGui::SameLine(cursorX);
+                  TabLabel("topbar.hostxruns", xr, "99999 xruns", true);
+                  if (ImGui::IsItemHovered())
+                     ImGui::SetTooltip("%s", T("Late blocks the host played as silence"));
+                  cursorX -= telemetryGap;
+               }
+            }
          }
 
          // On a narrow window the readouts are dropped rather than drawn over the centred group.

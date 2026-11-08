@@ -22,6 +22,12 @@ namespace PluginView
    void RequestPopped(bool popped);
    bool Popped();
 
+   // Picture/canvas switch (step 2.5): the view shows the first Output picture full size instead of
+   // the canvas. A user switch tells the shell, which saves it in the project; the saved value comes
+   // back as kMsgPicture.
+   void SetPicture(bool on);
+   bool Picture();
+
    // After ImGui_ImplGlfw_NewFrame, before ImGui::NewFrame: shows or hides the window for a pop-out
    // request, applies the view's size to the hidden window and queues the view's input on ImGui's
    // event queue.

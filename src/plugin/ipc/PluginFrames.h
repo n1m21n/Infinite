@@ -94,6 +94,9 @@ namespace PluginFrames
    constexpr uint32_t kMsgViewCursor = 7;  // payload: uint32_t Cursor
    constexpr uint32_t kMsgPoppedOut = 8;   // payload: uint32_t, 1 while the engine's own window is showing (no readback)
    constexpr uint32_t kMsgNoGraphics = 9;  // payload: reason text; the engine exits right after (step 2.4)
+   constexpr uint32_t kMsgPictureMode = 10; // payload: uint32_t, 1 = the view shows the Output picture (user switched it)
+   // 1..5 and 11 are HostAudio.h's (state, slots); a new id takes the next free number on both lists.
+   constexpr uint32_t kMsgPicture = 107;    // payload: uint32_t, the saved picture/canvas choice for a new engine
 
    struct ViewState
    {

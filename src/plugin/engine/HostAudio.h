@@ -51,6 +51,8 @@ namespace PluginEngine
       kMsgStateLoaded = 3, // reply to kMsgSetState (same id); payload: empty, or the load error
       kMsgSlotEdit = 4,    // a bound Macro turned in Infinite; payload: SlotEdit
       kMsgSlotNames = 5,   // payload: 32 slot names, each '\0'-terminated UTF-8 ("" = unbound)
+      // 6..10 are PluginFrames' (view) messages; one id space per direction.
+      kMsgStateAuto = 11,  // unasked, every 2 s while the patch text changed; payload: the patch as .inf text
       kMsgGetState = 101,  // payload: none
       kMsgSetState = 102,  // payload: the patch as .inf text; kMsgReady follows once it settles
    };
@@ -110,6 +112,10 @@ namespace PluginEngine
    bool SlotFramePublishes();
    // Grid points served / park timeouts (tests, stats file).
    uint64_t SlotParks();
+   // Main thread: the name last sent for a slot ("" = no Macro on it), for the top bar's Slots list.
+   std::string SlotName(int slot);
+   // Blocks the shell had to answer with silence because the engine was late.
+   uint64_t HostXruns();
    uint64_t SlotParkTimeouts();
 
    // Blocks handled and transport jumps seen (tests). With INFINITE_PLUGIN_STATS=<path> set, the

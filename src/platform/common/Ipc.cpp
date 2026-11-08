@@ -354,6 +354,16 @@ namespace Ipc
       *c = Child{};
    }
 
+   bool ChildSignalKill(const Child& c)
+   {
+      if (c.pid <= 0) return false;
+#if defined(_WIN32)
+      return c.handle && TerminateProcess((HANDLE)c.handle, 1) != 0;
+#else
+      return kill((pid_t)c.pid, SIGKILL) == 0;
+#endif
+   }
+
    std::string HelperPathBesideModule(const char* helperName)
    {
 #if defined(_WIN32)

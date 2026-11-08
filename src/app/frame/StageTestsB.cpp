@@ -668,6 +668,55 @@ int DrawTestsB(FrameCtx& fc)
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
+      // Plugin view switched to the picture (README 12.4, step 2.5): the first Output, letterboxed on
+      // black, under the top bar and over everything else. It takes the clicks, so nothing on the
+      // hidden canvas moves.
+      if (PluginView::Picture())
+      {
+         unsigned int tex = 0;
+         int tw = 0, th = 0;
+         for (GraphNode& gn : gNodes)
+            if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()); out && out->GetOutputTexture() != 0)
+            {
+               tex = out->GetOutputTexture();
+               tw = out->GetOutputWidth();
+               th = out->GetOutputHeight();
+               break;
+            }
+         const ImGuiViewport* vp = ImGui::GetMainViewport();
+         const ImVec2 pos(vp->WorkPos.x, vp->WorkPos.y + tok::bar_h);
+         const ImVec2 size(vp->WorkSize.x, std::max(1.0f, vp->WorkSize.y - tok::bar_h));
+         ImGui::SetNextWindowPos(pos);
+         ImGui::SetNextWindowSize(size);
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+         ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 255));
+         if (ImGui::Begin("##pluginpicture", nullptr,
+                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                             ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoScrollWithMouse))
+         {
+            ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+            if (tex != 0 && tw > 0 && th > 0)
+            {
+               const float k = std::min(size.x / float(tw), size.y / float(th));
+               const ImVec2 d(float(tw) * k, float(th) * k);
+               const ImVec2 tl(pos.x + (size.x - d.x) * 0.5f, pos.y + (size.y - d.y) * 0.5f);
+               ImGui::GetWindowDrawList()->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + d.x, tl.y + d.y),
+                                                    ImVec2(0, 1), ImVec2(1, 0));
+            }
+            else
+            {
+               const char* none = T("No Output");
+               const ImVec2 ts = ImGui::CalcTextSize(none);
+               ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + (size.x - ts.x) * 0.5f, pos.y + (size.y - ts.y) * 0.5f),
+                                                   IM_COL32(255, 255, 255, 110), none);
+            }
+         }
+         ImGui::End();
+         ImGui::PopStyleColor();
+         ImGui::PopStyleVar(2);
+      }
+
       if (gOfflineRender.active)
          DrawOfflineRenderProgressWindow();
       DrawArrangeWavRenderProgressWindow();

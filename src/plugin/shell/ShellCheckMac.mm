@@ -142,6 +142,16 @@ namespace ViewCheck
       return n;
    }
 
+   bool ScreenLocked()
+   {
+      CFDictionaryRef d = CGSessionCopyCurrentDictionary();
+      if (!d)
+         return false;
+      const bool locked = [((NSDictionary*)d)[@"CGSSessionScreenIsLocked"] boolValue];
+      CFRelease(d);
+      return locked;
+   }
+
    void Pump(int ms)
    {
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, ms / 1000.0, false);

@@ -21,7 +21,9 @@
 // bit-identical (and parked), offline vs realtime null, a saved slot value comes back with the
 // project, and with a controller connected: the slot takes the Macro's name and value, and turning
 // the Macro in Infinite reaches the host as begin / perform / end. CC (S2): host CC reaches a MIDI CC
-// binding saved with a hardware device id. View (2.3, macOS; --view runs only these): an editor
+// binding saved with a hardware device id. Drill (2.5; --drill runs only these): crash restart
+// opens the last pushed patch, a SIGSTOPped engine is killed by the watchdog, a suspend releases
+// held notes, the picture choice round-trips. View (2.3, macOS; --view runs only these): an editor
 // opened before activation starts the engine and shows its frames at the view's size x backing
 // scale, Shift+M (modulation matrix) changes the picture within M-10's 50 ms p95, a resize gives
 // frames at the new size, a closed view stops the engine's readback and a reopened one shows frames
@@ -795,6 +797,155 @@ namespace
 
    // No graphics (2.4): an engine that cannot open a GL window reports it and quits; the view says
    // so and offers no Restart. INFINITE_PLUGIN_NO_GL forces the path.
+   // ---- failure drill (step 2.5; tools/plugin/crash_drill.py --self runs only these) --------
+
+   // Gone or a zombie waiting to be reaped: either way it runs no more.
+   bool ProcessGone(int pid)
+   {
+      char cmd[64];
+      std::snprintf(cmd, sizeof cmd, "ps -o stat= -p %d", pid);
+      std::string st;
+      if (FILE* f = popen(cmd, "r"))
+      {
+         char buf[32] = {};
+         if (std::fgets(buf, sizeof buf, f))
+            st = buf;
+         pclose(f);
+      }
+      return st.empty() || st[0] == 'Z';
+   }
+
+   void SendRestart(Instance& a)
+   {
+      FUnknownPtr<IConnectionPoint> cp(a.comp);
+      IPtr<Vst::HostMessage> m = owned(new Vst::HostMessage);
+      m->setMessageID("restart");
+      if (cp)
+         cp->notify(m);
+   }
+
+   int NewestEngine(const std::vector<int>& before)
+   {
+      for (int pid : EnginePids())
+         if (std::find(before.begin(), before.end(), pid) == before.end())
+            return pid;
+      return 0;
+   }
+
+   void RunDrillChecks(Plugin& inst, const std::string& r1)
+   {
+      char d[256];
+      const int64_t sec = int64_t(kRate);
+
+      // Crash restart: the engine starts on R1 with no setState (a session the host never saved),
+      // is killed, and Restart opens what was on screen, not the starting patch.
+      const auto before = EnginePids();
+      setenv("INFINITE_PLUGIN_PATCH", r1.c_str(), 1);
+      Instance a;
+      const bool ok = a.Open(inst, false, kRealtime);
+      unsetenv("INFINITE_PLUGIN_PATCH");
+      if (!ok)
+      {
+         Check(false, "drill: instrument opens");
+         return;
+      }
+      // Realtime start takes a few seconds (spawn, GL, first frames); getState carries a patch once
+      // the engine is ready, and it pushes the same text right after.
+      std::vector<uint8_t> blob1;
+      for (int i = 0; i < 20 && Inspect(blob1).patchBytes == 0; i++)
+      {
+         Render(a, sec, true);
+         blob1 = GetBlob(a);
+      }
+      Render(a, sec, true);
+      int pid = NewestEngine(before);
+      if (pid > 0)
+         kill(pid, SIGKILL);
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+      SendRestart(a);
+      Script probe;
+      probe.noteOnAt = 5 * sec;
+      probe.noteOffAt = 6 * sec;
+      const auto up = Render(a, 7 * sec, true, probe);
+      const std::vector<uint8_t> blob2 = GetBlob(a);
+      const BlobInfo i1 = Inspect(blob1), i2 = Inspect(blob2);
+      const double upRms = Rms(up, 5 * sec + kBlock + 1000, 6 * sec);
+      std::snprintf(d, sizeof d, "patch %u bytes before the kill, %u after the restart, note rms %.3g", i1.patchBytes, i2.patchBytes, upRms);
+      Check(pid > 0 && i1.patchBytes > 100 && blob2 == blob1 && upRms > 1e-3, "drill: after a crash, Restart opens the patch the engine last pushed", d);
+
+      // Hang: a stopped engine (SIGSTOP stands in for a deadlock) is killed by the watchdog; the host
+      // keeps running and the plugin plays silence.
+      pid = NewestEngine(before);
+      if (pid > 0)
+         kill(pid, SIGSTOP);
+      const auto t0 = std::chrono::steady_clock::now();
+      double goneAfter = -1.0;
+      Script watch;
+      watch.perBlock = [&] {
+         if (goneAfter < 0.0 && pid > 0 && ProcessGone(pid))
+            goneAfter = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+      };
+      const auto hung = Render(a, 7 * sec, true, watch);
+      double tail = 0.0;
+      for (size_t i = hung.size() - size_t(sec); i < hung.size(); i++)
+         tail = std::max(tail, double(std::fabs(hung[i])));
+      std::snprintf(d, sizeof d, "engine gone after %.1f s, peak in the last second %.3g", goneAfter, tail);
+      Check(pid > 0 && goneAfter > 2.0 && goneAfter < 6.0 && tail == 0.0, "drill: a hung engine is stopped in 3-6 s, the host plays silence", d);
+      if (pid > 0 && goneAfter < 0.0)
+         kill(pid, SIGKILL); // never leave a stopped engine behind
+
+      // Restart after the hang: a new engine with the same patch that plays.
+      SendRestart(a);
+      Script note;
+      note.noteOnAt = 5 * sec;
+      note.noteOffAt = 6 * sec;
+      const auto back = Render(a, 7 * sec, true, note);
+      const std::vector<uint8_t> blob3 = GetBlob(a);
+      const double rms = Rms(back, 5 * sec + kBlock + 1000, 6 * sec);
+      std::snprintf(d, sizeof d, "note rms %.3g, patch %u bytes", rms, Inspect(blob3).patchBytes);
+      Check(blob3 == blob1 && rms > 1e-3, "drill: Restart after a hang brings the engine back with its patch", d);
+      a.Close();
+
+      // Suspend: a note held across setProcessing(false/true) is released, like a host switching the
+      // plugin off and on with a key down. The control run holds the same note without the suspend.
+      auto heldTail = [&](bool suspend) {
+         Instance s;
+         if (!s.Open(inst, false, kRealtime))
+            return -1.0;
+         Script on;
+         on.noteOnAt = sec;
+         Render(s, 2 * sec, true, on);
+         if (suspend)
+         {
+            s.proc->setProcessing(false);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            s.proc->setProcessing(true);
+         }
+         const auto r = Render(s, 3 * sec, true);
+         s.Close();
+         return Rms(r, 2 * sec, 3 * sec);
+      };
+      const double held = heldTail(false), released = heldTail(true);
+      std::snprintf(d, sizeof d, "rms 2 s later: held %.3g, after suspend %.3g", held, released);
+      Check(held > 1e-3 && released >= 0.0 && released < held * 0.05, "drill: a host suspend releases held notes", d);
+
+      // Picture/canvas choice: saved in the header and restored by setState.
+      {
+         Instance p;
+         p.Open(inst, false, kOffline, false);
+         std::vector<uint8_t> b = GetBlob(p);
+         const std::string from = "\"picture\":false", to = "\"picture\":true ";
+         auto it = std::search(b.begin(), b.end(), from.begin(), from.end());
+         const bool had = it != b.end();
+         if (had)
+            std::copy(to.begin(), to.end(), it);
+         SetBlob(p, b);
+         const BlobInfo back = Inspect(GetBlob(p));
+         p.Close(false);
+         Check(had && back.header.find("\"picture\":true") != std::string::npos, "drill: the picture/canvas choice round-trips through the state");
+      }
+   }
+
    void RunNoGraphicsCheck(Plugin& inst)
    {
       char d[256];
@@ -1031,7 +1182,11 @@ namespace
          const double hideMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - h0).count();
          std::snprintf(d, sizeof d, "label \"%s\", engine windows on screen %d (%.0f ms after frames returned)",
                        ViewCheck::Label(child).c_str(), ViewCheck::OnScreenWindows(pid), hideMs);
-         Check(back && hidden && ViewCheck::Label(child).empty(),
+         // A locked screen freezes the window server's on-screen list, so only frames and label count then.
+         const bool locked = ViewCheck::ScreenLocked();
+         if (locked)
+            std::strncat(d, " (screen locked: window list not checked)", sizeof d - std::strlen(d) - 1);
+         Check(back && (hidden || locked) && ViewCheck::Label(child).empty(),
                "view: Bring back hides the engine's window and frames return", d);
       }
 
@@ -1160,6 +1315,21 @@ int main(int argc, char** argv)
       std::printf("%s (%d failed)\n", gFails == 0 ? "ALL PASS" : "FAILURES", gFails);
       return gFails == 0 ? 0 : 1;
    }
+   if (argc >= 3 && std::string(argv[1]) == "--drill")
+   {
+      Plugin inst;
+      std::string err;
+      if (!inst.Load(argv[2], err))
+      {
+         std::fprintf(stderr, "load failed: %s\n", err.c_str());
+         return 1;
+      }
+      RunDrillChecks(inst, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/R1-instrument.inf");
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+      Check(EnginePids().empty(), "no engine left");
+      std::printf("%s (%d failed)\n", gFails == 0 ? "ALL PASS" : "FAILURES", gFails);
+      return gFails == 0 ? 0 : 1;
+   }
    if (argc >= 6 && std::string(argv[1]) == "--metrics")
    {
       Plugin inst, fx;
@@ -1173,7 +1343,7 @@ int main(int argc, char** argv)
    }
    if (argc < 3)
    {
-      std::fprintf(stderr, "usage: INFINITE_PLUGIN_ENGINE=<Infinite binary> %s [--metrics] <Instrument.vst3> <FX.vst3> [<R1.inf> <R2.inf>]\n", argv[0]);
+      std::fprintf(stderr, "usage: INFINITE_PLUGIN_ENGINE=<Infinite binary> %s [--metrics | --view | --drill] <Instrument.vst3> <FX.vst3> [<R1.inf> <R2.inf>]\n", argv[0]);
       return 2;
    }
    Plugin inst, fx;
@@ -1287,6 +1457,7 @@ int main(int argc, char** argv)
    RunCcCheck(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S2-cc.inf");
    RunViewChecks(inst);
    RunNoGraphicsCheck(inst);
+   RunDrillChecks(inst, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/R1-instrument.inf");
 
    std::this_thread::sleep_for(std::chrono::milliseconds(300));
    Check(EnginePids().size() == baseline, "no engine left after terminate");

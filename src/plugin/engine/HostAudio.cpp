@@ -152,6 +152,9 @@ namespace PluginEngine
          gParks.fetch_add(1, std::memory_order_relaxed);
       }
 
+      // Audio thread: host notes that are down, so a suspend can let go of them (step 2.5).
+      bool gHeld[16][128] = {};
+
       void InjectEvent(const PluginIpc::Event& e, bool bypassed)
       {
          const uint8_t kind = e.status & 0xF0;
@@ -160,6 +163,8 @@ namespace PluginEngine
          // While bypassed only releases go through, so nothing sticks and nothing new starts.
          if (bypassed && !(kind == 0x80 || (kind == 0x90 && e.data2 == 0) || kind == 0xB0))
             return;
+         if (kind == 0x80 || kind == 0x90)
+            gHeld[e.status & 0x0F][e.data1 & 0x7F] = (kind == 0x90 && (e.data2 & 0x7F) > 0);
          const unsigned char bytes[3] = { e.status, (unsigned char)(e.data1 & 0x7F), (unsigned char)(e.data2 & 0x7F) };
          const size_t len = (kind == 0xC0 || kind == 0xD0) ? 2 : 3;
          Platform::MidiInjectBytes(bytes, len, Platform::kMidiHostDevice);
@@ -182,9 +187,29 @@ namespace PluginEngine
          gPeak.store(peak, std::memory_order_relaxed);
       }
 
+      // The host stopped processing with notes down (transport stop, plugin switched off): release
+      // them and the sustain pedal, so nothing hangs when it comes back.
+      void ReleaseHeld()
+      {
+         for (int ch = 0; ch < 16; ch++)
+         {
+            for (int n = 0; n < 128; n++)
+               if (gHeld[ch][n])
+               {
+                  gHeld[ch][n] = false;
+                  const unsigned char off[3] = { (unsigned char)(0x80 | ch), (unsigned char)n, 0 };
+                  Platform::MidiInjectBytes(off, 3, Platform::kMidiHostDevice);
+               }
+            const unsigned char pedal[3] = { (unsigned char)(0xB0 | ch), 64, 0 };
+            Platform::MidiInjectBytes(pedal, 3, Platform::kMidiHostDevice);
+         }
+      }
+
       void HandleBlock(const PluginIpc::BlockView& v)
       {
          const PluginIpc::BlockIn& b = *v.in;
+         if (b.flags & PluginIpc::kRelease)
+            ReleaseHeld();
          const uint32_t frames = v.frames;
          Platform::AudioRenderCallback cb = gCallback.load(std::memory_order_acquire);
          void* user = gUser.load(std::memory_order_acquire);
@@ -400,6 +425,9 @@ namespace PluginEngine
       int gFramesSinceStart = 0;
       SaveStateFn gSaveState = nullptr;
       LoadStateFn gLoadState = nullptr;
+      std::string gSlotNames[kSlotCount];
+      std::string gLastAuto;        // patch text last pushed as kMsgStateAuto
+      uint64_t gLastAutoNs = 0;
 
       void HandleMessage(const PluginIpc::Message& m)
       {
@@ -420,7 +448,8 @@ namespace PluginEngine
             // Ready again once the new graph has settled, so an offline render waits for it.
             SetStarted(gStartError);
          }
-         else if (m.type == PluginFrames::kMsgView || m.type == PluginFrames::kMsgViewInput || m.type == PluginFrames::kMsgPopout)
+         else if (m.type == PluginFrames::kMsgView || m.type == PluginFrames::kMsgViewInput || m.type == PluginFrames::kMsgPopout ||
+                  m.type == PluginFrames::kMsgPicture)
             PluginView::HandleMessage(m.type, m.data.data(), m.data.size());
       }
    }
@@ -531,6 +560,8 @@ namespace PluginEngine
       if (!gActive.load())
          return;
       std::string payload;
+      for (int i = 0; i < kSlotCount; i++)
+         gSlotNames[i] = names[i].substr(0, 127);
       for (const std::string& n : names)
       {
          payload += n.substr(0, 127);
@@ -540,6 +571,8 @@ namespace PluginEngine
    }
 
    uint64_t SlotParks() { return gParks.load(); }
+   std::string SlotName(int slot) { return slot >= 0 && slot < kSlotCount ? gSlotNames[slot] : std::string(); }
+   uint64_t HostXruns() { return gActive.load() ? gSide.Xruns() : 0; }
    uint64_t SlotParkTimeouts() { return gParkTimeouts.load(); }
 
    void MainFrameTick()
@@ -556,6 +589,20 @@ namespace PluginEngine
       PluginIpc::Message m;
       while (gSide.Messages().Receive(&m, 0))
          HandleMessage(m);
+      // Crash restart (step 2.5): every 2 s, push the patch if it changed, so a new engine after a
+      // crash opens what was on screen, not the project's last saved state.
+      if (gStarted && gFramesSinceStart > 3 && gSaveState)
+      {
+         const uint64_t now = Ipc::MonotonicNs();
+         if (now - gLastAutoNs >= 2000000000ull)
+         {
+            gLastAutoNs = now;
+            std::string text = gSaveState();
+            if (!text.empty() && text != gLastAuto &&
+                gSide.Messages().Send(kMsgStateAuto, 0, text.data(), text.size(), 200))
+               gLastAuto = std::move(text);
+         }
+      }
       if (!gStarted || gFramesSinceStart > 3)
          return;
       if (++gFramesSinceStart == 3)

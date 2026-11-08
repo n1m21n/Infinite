@@ -73,7 +73,8 @@ namespace PluginIpc
 
    enum BlockFlags : uint32_t
    {
-      kOffline = 1, kSidechain = 2, kBypass = 4
+      kOffline = 1, kSidechain = 2, kBypass = 4,
+      kRelease = 8 // first block after the host suspended processing: let go of held notes (step 2.5)
    };
 
    struct BlockIn
@@ -198,6 +199,8 @@ namespace PluginIpc
       bool WaitAttached(int timeoutMs, const Ipc::Child* engine);
       // Milliseconds since the heartbeat last changed; for the message thread's hang check.
       uint64_t HeartbeatAgeMs();
+      // The raw counter, for a second watcher with its own clock (the shell's reader thread).
+      uint64_t Heartbeat() const { return h_ ? h_->heartbeat.load(std::memory_order_relaxed) : 0; }
       void RequestQuit();
       uint64_t Xruns() const { return h_ ? h_->xruns.load() : 0; }
 
@@ -245,6 +248,8 @@ namespace PluginIpc
       bool QuitRequested() const { return !h_ || h_->quit.load(std::memory_order_acquire) != 0; }
       void Beat() { if (h_) h_->heartbeat.fetch_add(1, std::memory_order_relaxed); }
       uint64_t Gaps() const { return h_ ? h_->gaps.load() : 0; }
+      // Blocks the shell answered with silence because the engine was late (shown in the top bar).
+      uint64_t Xruns() const { return h_ ? h_->xruns.load(std::memory_order_relaxed) : 0; }
 
       Channel& Messages() { return chan_; }
 

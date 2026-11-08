@@ -61,6 +61,9 @@ namespace Ipc
    bool ChildWait(Child* c, int timeoutMs);
    // Kills and reaps. Safe on an already-exited or empty Child.
    void ChildKill(Child* c);
+   // Sends the kill only: no reap, `c` untouched, so another thread may own the Child (the plugin
+   // shell's watchdog). False when the signal was refused (sandbox).
+   bool ChildSignalKill(const Child& c);
 
    // Path of `helperName` beside the module (dylib, bundle, .so, .dll) that contains this code:
    //   macOS  X.vst3/Contents/MacOS/X  ->  X.vst3/Contents/Helpers/<helperName>

@@ -24,6 +24,8 @@ namespace ViewCheck
    void Press(void* view);
    // On-screen windows owned by process pid (CGWindowList, layer 0).
    int OnScreenWindows(int pid);
+   // The login screen is up: the window server stops updating what is on screen.
+   bool ScreenLocked();
    // Runs the main run loop (the view's timer and the processor/controller relay) for ms.
    void Pump(int ms);
 }
