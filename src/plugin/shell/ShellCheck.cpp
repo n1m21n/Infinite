@@ -21,13 +21,19 @@
 // bit-identical (and parked), offline vs realtime null, a saved slot value comes back with the
 // project, and with a controller connected: the slot takes the Macro's name and value, and turning
 // the Macro in Infinite reaches the host as begin / perform / end. CC (S2): host CC reaches a MIDI CC
-// binding saved with a hardware device id. PASS/FAIL per check; exit 0 only when all pass.
+// binding saved with a hardware device id. View (2.3, macOS; --view runs only these): an editor
+// opened before activation starts the engine and shows its frames at the view's size x backing
+// scale, Shift+M (modulation matrix) changes the picture within M-10's 50 ms p95, a resize gives
+// frames at the new size, a closed view stops the engine's readback and a reopened one shows frames
+// again; prints B-6 (readback) and the M-10 pixel pipe estimate. PASS/FAIL per check; exit 0 only
+// when all pass.
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/eventlist.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/module.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "pluginterfaces/base/funknown.h"
+#include "pluginterfaces/gui/iplugview.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
@@ -36,6 +42,9 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
+#include "ShellCheckMac.h"
+
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -764,6 +773,199 @@ namespace
       }
    }
 
+   // ---- View (2.3) ---------------------------------------------------------------------------
+   long long ReadStatLine(const std::string& path, const char* prefix, const char* key, int nth = 0)
+   {
+      long long v = -1;
+      if (FILE* f = std::fopen(path.c_str(), "r"))
+      {
+         char line[512] = {};
+         int seen = 0;
+         while (std::fgets(line, sizeof line, f))
+            if (std::strncmp(line, prefix, std::strlen(prefix)) == 0 && seen++ == nth)
+            {
+               if (const char* k = std::strstr(line, key))
+                  std::sscanf(k + std::strlen(key), " %lld", &v);
+               break;
+            }
+         std::fclose(f);
+      }
+      return v;
+   }
+
+   void RunViewChecks(Plugin& inst)
+   {
+      char d[256];
+      const std::string engineStats = "/tmp/infinite-plugin-stats-" + std::to_string(getpid()) + ".txt";
+      const std::string viewStats = "/tmp/infinite-plugin-view-" + std::to_string(getpid()) + ".txt";
+      std::remove(engineStats.c_str());
+      std::remove(viewStats.c_str());
+      setenv("INFINITE_PLUGIN_STATS", engineStats.c_str(), 1);
+      setenv("INFINITE_PLUGIN_VIEW_STATS", viewStats.c_str(), 1);
+
+      Instance a;
+      IPtr<IEditController> ec;
+      bool ok = a.Open(inst, false, kRealtime, false);
+      TUID cid;
+      if (ok && a.comp->getControllerClassId(cid) == kResultOk)
+         ec = inst.mod->getFactory().createInstance<IEditController>(VST3::UID::fromTUID(cid));
+      ok = ok && ec && ec->initialize(&gHost) == kResultOk;
+      FUnknownPtr<IConnectionPoint> cpComp(a.comp), cpCtrl(ec);
+      ok = ok && cpComp && cpCtrl;
+      if (ok)
+      {
+         cpComp->connect(cpCtrl);
+         cpCtrl->connect(cpComp);
+      }
+      IPtr<IPlugView> view;
+      if (ok)
+         view = owned(ec->createView(ViewType::kEditor));
+      Check(ok && view && view->isPlatformTypeSupported(kPlatformTypeNSView) == kResultTrue && view->canResize() == kResultTrue,
+            "view: createView gives a resizable NSView editor");
+      if (!view)
+      {
+         if (ec)
+            ec->terminate();
+         if (a.comp)
+            a.Close(false);
+         unsetenv("INFINITE_PLUGIN_STATS");
+         unsetenv("INFINITE_PLUGIN_VIEW_STATS");
+         return;
+      }
+
+      // M-10's size: 1600 x 1000 points; on a 2x screen that is B-6's 3200 x 2000 readback.
+      constexpr int kW = 1600, kH = 1000;
+      double scale = 1.0;
+      void* parent = ViewCheck::NewParent(kW, kH, &scale);
+      ViewRect r { 0, 0, kW, kH };
+      view->onSize(&r);
+      const auto t0 = std::chrono::steady_clock::now();
+      const bool attached = view->attached(parent, kPlatformTypeNSView) == kResultOk;
+      void* child = ViewCheck::Child(parent);
+      int w = 0, h = 0;
+      std::vector<uint32_t> px, base;
+      auto waitSize = [&](int ww, int hh, int ms) {
+         const auto s = std::chrono::steady_clock::now();
+         while (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - s).count() < ms)
+         {
+            ViewCheck::Pump(5);
+            if (ViewCheck::Surface(child, &w, &h, &px) && w == ww && h == hh)
+               return true;
+         }
+         return false;
+      };
+      const int pw = int(kW * scale), ph = int(kH * scale);
+      const bool first = attached && child && waitSize(pw, ph, 30000);
+      const double firstS = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+      size_t distinct = 0;
+      if (first)
+      {
+         std::vector<uint32_t> sorted = px;
+         std::sort(sorted.begin(), sorted.end());
+         distinct = size_t(std::unique(sorted.begin(), sorted.end()) - sorted.begin());
+      }
+      std::snprintf(d, sizeof d, "%d x %d px (scale %.0f) after %.1f s, %zu distinct colours in 96 x 96 samples", w, h, scale, firstS, distinct);
+      Check(first && distinct > 8, "view: opened before activation, the engine starts and its frames fill the view", d);
+
+      // Input -> pixels: Shift+M toggles the docked modulation matrix. Twenty trials, both ways.
+      constexpr unsigned long kShift = 1ul << 17; // NSEventModifierFlagShift
+      std::vector<double> lat;
+      int missed = 0;
+      std::string all;
+      constexpr int kTrials = 20;
+      for (int trial = 0; first && trial < kTrials; trial++)
+      {
+         ViewCheck::Pump(400);
+         ViewCheck::Surface(child, &w, &h, &base);
+         const auto k0 = std::chrono::steady_clock::now();
+         ViewCheck::Flags(child, 56, kShift);
+         ViewCheck::Key(child, 46, "M", kShift, true);
+         ViewCheck::Key(child, 46, "M", kShift, false);
+         ViewCheck::Flags(child, 56, 0);
+         double ms = -1.0;
+         while (ms < 0.0)
+         {
+            ViewCheck::Pump(1);
+            const double el = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - k0).count();
+            if (el > 1000.0)
+               break;
+            if (!ViewCheck::Surface(child, &w, &h, &px) || px.size() != base.size())
+               continue;
+            size_t diff = 0;
+            for (size_t i = 0; i < px.size(); i++)
+               diff += px[i] != base[i];
+            if (diff > px.size() / 100)
+               ms = el;
+         }
+         if (ms < 0.0)
+            missed++;
+         else
+            lat.push_back(ms);
+         char one[16];
+         std::snprintf(one, sizeof one, "%s%.0f", all.empty() ? "" : " ", ms);
+         all += one;
+      }
+      if (getenv("INFINITE_PLUGIN_VIEW_VERBOSE"))
+         std::printf("      latencies ms: %s\n", all.c_str());
+      std::sort(lat.begin(), lat.end());
+      const double p50 = lat.empty() ? -1.0 : lat[lat.size() / 2];
+      const double p95 = lat.empty() ? -1.0 : lat[std::min(lat.size() - 1, size_t(std::ceil(0.95 * double(lat.size()))) - 1)];
+      std::snprintf(d, sizeof d, "%zu / %d trials changed the picture, p50 %.1f ms, p95 %.1f ms", lat.size(), kTrials, p50, p95);
+      Check(first && missed == 0, "view: keys reach Infinite (Shift+M toggles the modulation matrix)", d);
+      Check(first && missed == 0 && p95 <= 50.0, "M-10 input to pixels <= 50 ms p95", d);
+
+      // A steady stretch at the M-10 size, for the readback and blit means.
+      ViewCheck::Pump(3000);
+
+      // Resize.
+      ViewRect r2 { 0, 0, 1280, 800 };
+      view->onSize(&r2);
+      const bool resized = waitSize(int(1280 * scale), int(800 * scale), 5000);
+      std::snprintf(d, sizeof d, "%d x %d px", w, h);
+      Check(resized, "view: a resize gives frames at the new size", d);
+
+      // Close, wait, reopen: no readback while closed, frames again after.
+      view->removed();
+      view = nullptr;
+      ViewCheck::Pump(2000);
+      IPtr<IPlugView> again = owned(ec->createView(ViewType::kEditor));
+      bool reopened = false;
+      if (again)
+      {
+         again->onSize(&r2);
+         again->attached(parent, kPlatformTypeNSView);
+         child = ViewCheck::Child(parent);
+         reopened = child && waitSize(int(1280 * scale), int(800 * scale), 10000);
+         ViewCheck::Pump(500);
+         again->removed();
+         again = nullptr;
+      }
+      ViewCheck::Pump(200);
+      const long long last1 = ReadStatLine(viewStats, "view", "lastSeq", 0);
+      const long long first2 = ReadStatLine(viewStats, "view", "firstSeq", 1);
+      std::snprintf(d, sizeof d, "last frame shown %lld, first after 2 s closed %lld", last1, first2);
+      Check(reopened && last1 > 0 && first2 > last1 && first2 - last1 <= 6, "view: closed, the engine reads nothing back; reopened, frames return", d);
+
+      cpComp->disconnect(cpCtrl);
+      cpCtrl->disconnect(cpComp);
+      ec->terminate();
+      a.Close(false);
+      ViewCheck::FreeParent(parent);
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+      const long long frames = ReadStat(engineStats, "frames");
+      const long long readUs = ReadStat(engineStats, "readbackUs");
+      const long long blitUs = ReadStatLine(viewStats, "view", "blitUs", 0);
+      const double cpu = (readUs >= 0 && blitUs >= 0) ? double(readUs + blitUs) * 30.0 / 1e6 * 100.0 : -1.0;
+      std::snprintf(d, sizeof d, "B-6 readback %lld us/frame (%lld frames), view blit %lld us/frame -> %.1f %% of one core at 30 fps",
+                    readUs, frames, blitUs, cpu);
+      Check(frames > 0 && cpu >= 0.0 && cpu <= 10.0, "M-10 pixel pipe <= 10 % of one core (1600 x 1000 @2x, 30 fps)", d);
+      unsetenv("INFINITE_PLUGIN_STATS");
+      unsetenv("INFINITE_PLUGIN_VIEW_STATS");
+      std::remove(engineStats.c_str());
+      std::remove(viewStats.c_str());
+   }
+
    int RunMetrics(Plugin& inst, Plugin& fx, const std::string& r1, const std::string& r2)
    {
       Script notes;
@@ -831,6 +1033,21 @@ namespace
 
 int main(int argc, char** argv)
 {
+   if (argc >= 3 && std::string(argv[1]) == "--view")
+   {
+      Plugin inst;
+      std::string err;
+      if (!inst.Load(argv[2], err))
+      {
+         std::fprintf(stderr, "load failed: %s\n", err.c_str());
+         return 1;
+      }
+      RunViewChecks(inst);
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+      Check(EnginePids().empty(), "no engine left");
+      std::printf("%s (%d failed)\n", gFails == 0 ? "ALL PASS" : "FAILURES", gFails);
+      return gFails == 0 ? 0 : 1;
+   }
    if (argc >= 6 && std::string(argv[1]) == "--metrics")
    {
       Plugin inst, fx;
@@ -956,6 +1173,7 @@ int main(int argc, char** argv)
    RunStateChecks(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/R2-fx.inf");
    RunSlotChecks(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S1-slot.inf");
    RunCcCheck(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S2-cc.inf");
+   RunViewChecks(inst);
 
    std::this_thread::sleep_for(std::chrono::milliseconds(300));
    Check(EnginePids().size() == baseline, "no engine left after terminate");

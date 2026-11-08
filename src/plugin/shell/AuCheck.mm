@@ -9,9 +9,13 @@
 //
 // Checks: FX offline render equals the input delayed by the reported latency (exact, random
 // slice sizes), FX realtime the same once the engine is up, Instrument note-on sounds and
-// note-off releases, no engine process left after dispose.
+// note-off releases, the editor (auwrapper's Cocoa UI) shows engine frames (in process only: an
+// out-of-process AU's view is remoted by the host), no engine process left after dispose.
 #import <AudioToolbox/AudioToolbox.h>
+#import <Cocoa/Cocoa.h>
 #import <Foundation/Foundation.h>
+#import <IOSurface/IOSurface.h>
+#import <QuartzCore/QuartzCore.h>
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +27,11 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+
+// AUCocoaUIBase (CoreAudioKit), declared here so the check needs only the selector.
+@protocol InfAUCocoaUI
+- (NSView*)uiViewForAudioUnit:(AudioUnit)au withSize:(NSSize)size;
+@end
 
 namespace
 {
@@ -231,12 +240,113 @@ namespace
       snprintf(buf, sizeof buf, "rms before %.4f, held %.3f, released %.4f", before, held, after);
       Report(rendered && before < 1e-4 && held > 0.05 && after < held * 0.1, "Instrument note", buf);
    }
+
+   // The first layer under `v` showing an IOSurface, and how many distinct colours a 64x64 sample has.
+   bool SurfaceColours(NSView* v, int* w, int* h, size_t* colours)
+   {
+      id contents = v.layer.contents;
+      if (contents && CFGetTypeID((CFTypeRef)contents) == IOSurfaceGetTypeID())
+      {
+         IOSurfaceRef s = (IOSurfaceRef)contents;
+         *w = int(IOSurfaceGetWidth(s));
+         *h = int(IOSurfaceGetHeight(s));
+         std::vector<uint32_t> px;
+         IOSurfaceLock(s, kIOSurfaceLockReadOnly, nullptr);
+         const uint8_t* base = static_cast<const uint8_t*>(IOSurfaceGetBaseAddress(s));
+         const size_t stride = IOSurfaceGetBytesPerRow(s);
+         for (int y = 0; y < 64; y++)
+            for (int x = 0; x < 64; x++)
+               px.push_back(*reinterpret_cast<const uint32_t*>(base + size_t((y * 2 + 1) * *h / 128) * stride +
+                                                              size_t((x * 2 + 1) * *w / 128) * 4));
+         IOSurfaceUnlock(s, kIOSurfaceLockReadOnly, nullptr);
+         std::sort(px.begin(), px.end());
+         *colours = size_t(std::unique(px.begin(), px.end()) - px.begin());
+         return true;
+      }
+      for (NSView* c in v.subviews)
+         if (SurfaceColours(c, w, h, colours))
+            return true;
+      return false;
+   }
+
+   // Instrument build: the host asks for the Cocoa UI, puts it in a window, and engine frames show.
+   void CheckView()
+   {
+      const char* what = "Editor view";
+      AudioUnit au = Open(kAudioUnitType_MusicDevice, 'InIn', false);
+      if (!au)
+         return Report(false, what, "component not found / instantiate failed");
+      if (!Setup(au, false, SilentCb))
+      {
+         Close(au);
+         return Report(false, what, "initialize failed");
+      }
+      AudioUnitCocoaViewInfo info{};
+      UInt32 sz = sizeof info;
+      if (AudioUnitGetProperty(au, kAudioUnitProperty_CocoaUI, kAudioUnitScope_Global, 0, &info, &sz) != noErr ||
+          !info.mCocoaAUViewBundleLocation)
+      {
+         Close(au);
+         return Report(false, what, "no kAudioUnitProperty_CocoaUI");
+      }
+      NSBundle* bundle = [NSBundle bundleWithURL:(__bridge NSURL*)info.mCocoaAUViewBundleLocation];
+      Class cls = [bundle classNamed:(__bridge NSString*)info.mCocoaAUViewClass[0]];
+      // Not released: auwrapper's CocoaUI getter does not hand these over retained.
+      if (!cls)
+      {
+         Close(au);
+         return Report(false, what, "view factory class not found");
+      }
+      [NSApplication sharedApplication];
+      int w = 0, h = 0;
+      size_t colours = 0;
+      double secs = -1;
+      bool made = false;
+      // Its own pool, drained before dispose, as a host's run loop does: objects the component
+      // autoreleases must not outlive its code.
+      @autoreleasepool
+      {
+      id<InfAUCocoaUI> factory = [[cls alloc] init];
+      NSView* view = [factory uiViewForAudioUnit:au withSize:NSMakeSize(1280, 800)];
+      NSWindow* win = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1280, 800)
+                                                  styleMask:NSWindowStyleMaskBorderless
+                                                    backing:NSBackingStoreBuffered
+                                                      defer:NO];
+      win.releasedWhenClosed = NO;
+      made = view != nil;
+      if (view)
+      {
+         [win.contentView addSubview:view];
+         const double t0 = CFAbsoluteTimeGetCurrent();
+         while (CFAbsoluteTimeGetCurrent() - t0 < 20)
+         {
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
+            if (SurfaceColours(view, &w, &h, &colours) && colours > 8)
+            {
+               secs = CFAbsoluteTimeGetCurrent() - t0;
+               break;
+            }
+         }
+         [view removeFromSuperview];
+         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.2, false);
+      }
+      [win close];
+      [win release];
+      [(id)factory release];
+      }
+      Close(au);
+      char buf[200];
+      snprintf(buf, sizeof buf, "%s, frame %dx%d, %zu colours%s", made ? "view made" : "no view", w, h, colours,
+               secs >= 0 ? (", after " + std::to_string(int(secs * 1000)) + " ms").c_str() : ", no frames in 20 s");
+      Report(made && secs >= 0, what, buf);
+   }
 }
 
 int main(int argc, char** argv)
 {
    @autoreleasepool
    {
+      setvbuf(stdout, nullptr, _IOLBF, 0);
       const bool oop = argc > 1 && std::string(argv[1]) == "out";
       if (!oop && !getenv("INFINITE_PLUGIN_ENGINE"))
          printf("note: INFINITE_PLUGIN_ENGINE not set; the AU falls back to the bundle / installed app\n");
@@ -245,6 +355,8 @@ int main(int argc, char** argv)
       CheckFx(oop, true);
       CheckFx(oop, false);
       CheckInstrument(oop);
+      if (!oop)
+         CheckView();
       int left = 0;
       for (int i = 0; i < 50 && (left = EngineCount() - enginesBefore) > 0; ++i)
          usleep(100000);

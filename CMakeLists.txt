@@ -444,6 +444,7 @@ set(COMMON_SOURCES
     src/main.cpp
     # Plugin engine mode (docs/plans/vst-au/README.md 8.1): host-driven audio for one plugin instance
     src/plugin/engine/HostAudio.cpp
+    src/plugin/engine/PluginView.cpp
     # src/app/**: code that used to live in src/main.cpp
     src/app/AppState.cpp
     src/app/Startup.cpp

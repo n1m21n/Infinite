@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "plugin/engine/PluginView.h"
 
 namespace app
 {
@@ -691,6 +692,8 @@ int DrawTestsB(FrameCtx& fc)
          glClear(GL_COLOR_BUFFER_BIT);
          ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
       }
+      // Plugin mode: this frame to the view in the DAW.
+      PluginView::Capture(fbW, fbH);
 
       if (const char* shotPath = getenv("IMAGERESYNTH_SCREENSHOT"))
       {

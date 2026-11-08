@@ -66,6 +66,14 @@ function(infinite_add_plugin target pkg fx)
     target_compile_definitions(${target} PRIVATE INFINITE_PLUGIN_FX=${fx} INFINITE_PLUGIN_VERSION="${INFINITE_VERSION}")
     target_link_libraries(${target} PRIVATE sdk infinite_shell_ipc)
     if(APPLE)
+        # The editor view (step 2.3); its Objective-C class is named per build (ShellViewMac.mm).
+        target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ShellViewMac.mm)
+        target_compile_definitions(${target} PRIVATE INFINITE_VIEW_CLASS=InfiniteShellView_${target})
+        target_link_libraries(${target} PRIVATE "-framework Cocoa" "-framework QuartzCore" "-framework IOSurface")
+    else()
+        target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ShellViewNone.cpp)
+    endif()
+    if(APPLE)
         smtg_target_set_bundle(${target}
             BUNDLE_IDENTIFIER org.infinitedevices.plugin.${target}
             COMPANY_NAME "Infinite")
@@ -144,14 +152,14 @@ if(APPLE)
     # Loads the installed AUs like Logic (in or out of process) against a real engine.
     add_executable(au_check AuCheck.mm)
     set_target_properties(au_check PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/Release)
-    target_link_libraries(au_check PRIVATE "-framework AudioToolbox" "-framework Foundation")
+    target_link_libraries(au_check PRIVATE "-framework AudioToolbox" "-framework Foundation" "-framework Cocoa" "-framework QuartzCore" "-framework IOSurface")
 endif()
 
 # Loads the bundles like a DAW and checks them against a real engine.
 if(APPLE)
-    add_executable(plugin_shell_check ShellCheck.cpp ${VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm)
+    add_executable(plugin_shell_check ShellCheck.cpp ShellCheckMac.mm ${VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm)
     set_source_files_properties(${VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
-    target_link_libraries(plugin_shell_check PRIVATE sdk_hosting "-framework Cocoa")
+    target_link_libraries(plugin_shell_check PRIVATE sdk_hosting "-framework Cocoa" "-framework QuartzCore" "-framework IOSurface")
     target_sources(plugin_shell_check PRIVATE ${VST3_SDK_DIR}/public.sdk/source/common/memorystream.cpp)
     target_compile_definitions(plugin_shell_check PRIVATE INFINITE_SOURCE_ROOT="${INFINITE_ROOT}")
 endif()

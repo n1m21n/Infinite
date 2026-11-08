@@ -22,11 +22,14 @@
 //   2000..2127  MIDI CC 0..127   hidden, omni: VST3 hands CC to plugins only as parameters
 //   2128        Pitch bend       (IMidiMapping), turned back into MIDI for the engine here
 //   2129        Channel pressure
+#include "plugin/ipc/PluginFrames.h"
 #include "plugin/ipc/PluginIpc.h"
+#include "plugin/shell/ShellView.h"
 #include "platform/common/Ipc.h"
 
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/base/ustring.h"
+#include "pluginterfaces/gui/iplugview.h"
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
@@ -113,6 +116,9 @@ namespace InfinitePlugin
    constexpr uint32_t kMsgSlotNames = 5; // payload: 32 '\0'-terminated UTF-8 names
    constexpr uint32_t kMsgGetState = 101;
    constexpr uint32_t kMsgSetState = 102;
+   // View messages (kMsgFrames, kMsgViewCursor, kMsgView, kMsgViewInput) are in PluginFrames.h.
+   // Relay-only: the engine process started, came up or died (payload: one EngineStatus byte).
+   constexpr uint32_t kRelayEngine = 1000;
 
    // ---------------------------------------------------------------------------------------
    // Plugin state (README 8.3): what a host project stores for one instance.
@@ -419,8 +425,12 @@ namespace InfinitePlugin
       void Start(double rate, uint32_t block, const std::string& patch)
       {
          Stop();
+         PostEngine(InfinitePlugin::EngineStatus::Starting);
          if (!shell_.Create(rate, block))
+         {
+            PostEngine(InfinitePlugin::EngineStatus::Stopped);
             return;
+         }
          rate_ = rate;
          block_ = block;
          ready_.store(false);
@@ -442,6 +452,7 @@ namespace InfinitePlugin
          {
             child_ = Ipc::Child {};
             spawnFailed_.store(true);
+            PostEngine(InfinitePlugin::EngineStatus::Stopped);
             return;
          }
          spawnFailed_.store(false);
@@ -458,13 +469,15 @@ namespace InfinitePlugin
                      if (!m.data.empty())
                         std::fprintf(stderr, "Infinite plugin: engine audio did not start: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
                      ready_.store(true);
+                     PostEngine(InfinitePlugin::EngineStatus::Running);
                   }
                   else if (m.type == kMsgStateLoaded)
                   {
                      if (!m.data.empty())
                         std::fprintf(stderr, "Infinite plugin: patch did not load: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
                   }
-                  else if ((m.type == kMsgSlotEdit || m.type == kMsgSlotNames) && relay_)
+                  else if ((m.type == kMsgSlotEdit || m.type == kMsgSlotNames || m.type == PluginFrames::kMsgFrames ||
+                            m.type == PluginFrames::kMsgViewCursor) && relay_)
                      relay_->Post(UiRelay::Item { m.type, m.data });
                   else if (m.type == kMsgState)
                   {
@@ -474,11 +487,33 @@ namespace InfinitePlugin
                   }
                }
                else if (!Ipc::ChildAlive(child_))
+               {
+                  PostEngine(InfinitePlugin::EngineStatus::Stopped); // crashed or killed
                   break;
+               }
             }
          });
          if (!patch.empty())
-            shell_.Messages().Send(kMsgSetState, NextId(), patch.data(), patch.size(), 5000);
+            Send(kMsgSetState, patch.data(), patch.size(), 5000);
+         // An open view: the new engine reads frames back from its first frame.
+         if (view_.open)
+            Send(PluginFrames::kMsgView, &view_, sizeof view_, 1000);
+      }
+
+      // Message thread: the editor opened, closed or changed size. Kept for an engine started later.
+      void SetView(const PluginFrames::ViewState& v)
+      {
+         view_ = v;
+         if (Running())
+            Send(PluginFrames::kMsgView, &view_, sizeof view_, 1000);
+      }
+      const PluginFrames::ViewState& View() const { return view_; }
+
+      // Message thread: the view's mouse and keys.
+      void SendInput(const void* data, size_t size)
+      {
+         if (Running() && view_.open)
+            Send(PluginFrames::kMsgViewInput, data, size, 50);
       }
 
       // Message thread. The engine's current patch; false when it is not running, not ready yet
@@ -487,8 +522,8 @@ namespace InfinitePlugin
       {
          if (!Running() || !ready_.load() || !Ipc::ChildAlive(child_))
             return false;
-         const uint32_t id = NextId();
-         if (!shell_.Messages().Send(kMsgGetState, id, nullptr, 0, timeoutMs))
+         uint32_t id = 0;
+         if (!Send(kMsgGetState, nullptr, 0, timeoutMs, &id))
             return false;
          std::unique_lock<std::mutex> lock(replyMutex_);
          if (!replyCv_.wait_for(lock, std::chrono::milliseconds(timeoutMs), [&] { return replies_.count(id) > 0; }))
@@ -505,7 +540,7 @@ namespace InfinitePlugin
          if (!Running() || !Ipc::ChildAlive(child_))
             return;
          ready_.store(false);
-         shell_.Messages().Send(kMsgSetState, NextId(), patch.data(), patch.size(), 5000);
+         Send(kMsgSetState, patch.data(), patch.size(), 5000);
       }
 
       void Stop()
@@ -540,13 +575,30 @@ namespace InfinitePlugin
       int64_t Pid() const { return child_.pid; }
 
    private:
-      uint32_t NextId() { return ++lastId_; }
+      // The channel to the engine has one writer at a time: getState can run on a host thread while
+      // the UI thread sends view input.
+      bool Send(uint32_t type, const void* data, size_t size, int timeoutMs, uint32_t* idOut = nullptr)
+      {
+         std::lock_guard<std::mutex> lock(sendMutex_);
+         const uint32_t id = ++lastId_;
+         if (idOut)
+            *idOut = id;
+         return shell_.Messages().Send(type, id, data, size, timeoutMs);
+      }
+
+      void PostEngine(InfinitePlugin::EngineStatus s)
+      {
+         if (relay_)
+            relay_->Post(UiRelay::Item { kRelayEngine, { uint8_t(s) } });
+      }
 
       PluginIpc::ShellSide shell_;
       std::mutex replyMutex_;
       std::condition_variable replyCv_;
       std::map<uint32_t, std::string> replies_;
+      std::mutex sendMutex_;
       uint32_t lastId_ = 0;
+      PluginFrames::ViewState view_;
       Ipc::Child child_;
       UiRelay* relay_ = nullptr;
       std::thread reader_;
@@ -629,6 +681,18 @@ namespace InfinitePlugin
          return AudioEffect::setActive(state);
       }
 
+      // Message thread: (re)start on the current setup, or the host defaults before the first one.
+      void StartEngine()
+      {
+         const double rate = processSetup.sampleRate > 0.0 ? processSetup.sampleRate : 48000.0;
+         const uint32_t block = processSetup.maxSamplesPerBlock > 0 ? uint32_t(processSetup.maxSamplesPerBlock) : 512u;
+         std::string current;
+         if (link_.RequestPatch(current, 2000))
+            patch_ = std::move(current);
+         link_.Start(rate, block, patch_);
+         resendSlots_.store(true);
+      }
+
       tresult PLUGIN_API setState(IBStream* state) override
       {
          if (!state)
@@ -665,6 +729,49 @@ namespace InfinitePlugin
          if (state->write(const_cast<uint8_t*>(bytes.data()), int32(bytes.size()), &wrote) != kResultOk || wrote != int32(bytes.size()))
             return kResultFalse;
          return kResultOk;
+      }
+
+      // From the controller (UI thread): the editor's size and input, and Restart.
+      tresult PLUGIN_API notify(IMessage* message) override
+      {
+         if (!message)
+            return kInvalidArgument;
+         IAttributeList* attr = message->getAttributes();
+         const char* id = message->getMessageID();
+         if (attr && std::strcmp(id, "view") == 0)
+         {
+            int64 open = 0, w = 0, h = 0;
+            double scale = 1.0;
+            attr->getInt("open", open);
+            attr->getInt("width", w);
+            attr->getInt("height", h);
+            attr->getFloat("scale", scale);
+            PluginFrames::ViewState v;
+            v.open = open ? 1 : 0;
+            v.width = uint32_t(std::max<int64>(1, std::min<int64>(w, 8192)));
+            v.height = uint32_t(std::max<int64>(1, std::min<int64>(h, 8192)));
+            v.scale = float(scale);
+            link_.SetView(v);
+            // A view opened before the host activated us (or after the engine died): the user wants
+            // to see Infinite, so start it on the setup so far.
+            if (v.open && !link_.Running())
+               StartEngine();
+            return kResultOk;
+         }
+         if (attr && std::strcmp(id, "viewInput") == 0)
+         {
+            const void* data = nullptr;
+            uint32 size = 0;
+            if (attr->getBinary("events", data, size) == kResultOk && data && size)
+               link_.SendInput(data, size);
+            return kResultOk;
+         }
+         if (std::strcmp(id, "restart") == 0)
+         {
+            StartEngine();
+            return kResultOk;
+         }
+         return AudioEffect::notify(message);
       }
 
       tresult PLUGIN_API process(ProcessData& data) override
@@ -942,6 +1049,27 @@ namespace InfinitePlugin
             msg->setMessageID("slotNames");
             msg->getAttributes()->setBinary("names", it.data.data(), uint32(it.data.size()));
          }
+         else if (it.type == PluginFrames::kMsgFrames && it.data.size() >= sizeof(PluginFrames::FramesInfo))
+         {
+            PluginFrames::FramesInfo f;
+            std::memcpy(&f, it.data.data(), sizeof f);
+            f.name[sizeof f.name - 1] = 0;
+            msg->setMessageID("frames");
+            msg->getAttributes()->setBinary("name", f.name, uint32(std::strlen(f.name) + 1));
+            msg->getAttributes()->setInt("bytes", int64(f.bytes));
+         }
+         else if (it.type == PluginFrames::kMsgViewCursor && it.data.size() >= 4)
+         {
+            uint32_t c = 0;
+            std::memcpy(&c, it.data.data(), 4);
+            msg->setMessageID("cursor");
+            msg->getAttributes()->setInt("cursor", c);
+         }
+         else if (it.type == kRelayEngine && !it.data.empty())
+         {
+            msg->setMessageID("engine");
+            msg->getAttributes()->setInt("status", it.data[0]);
+         }
          else
          {
             msg->release();
@@ -966,10 +1094,74 @@ namespace InfinitePlugin
    };
 
    // ---------------------------------------------------------------------------------------
-   class Controller : public EditController, public IMidiMapping
+   class Controller : public EditController, public IMidiMapping, public ViewHost
    {
    public:
       static FUnknown* Create(void*) { return static_cast<IEditController*>(new Controller); }
+
+      tresult PLUGIN_API terminate() override
+      {
+         if (view_)
+            view_->DropHost();
+         view_ = nullptr;
+         return EditController::terminate();
+      }
+
+      // The editor: Infinite's own UI, drawn by the engine (ShellView.h). macOS only until chunk 3.
+      IPlugView* PLUGIN_API createView(FIDString name) override
+      {
+         if (!name || std::strcmp(name, ViewType::kEditor) != 0 || !ShellView::Supported())
+            return nullptr;
+         ShellView* v = ShellView::Create(this);
+         if (!v)
+            return nullptr;
+         if (view_)
+            view_->DropHost(); // a host that opens a second editor: the newest one is live
+         view_ = v;
+         v->SetEngine(engine_);
+         return v;
+      }
+
+      // ---- ViewHost (UI thread) ----
+      void ViewState(const PluginFrames::ViewState& st) override
+      {
+         if (IMessage* msg = allocateMessage())
+         {
+            msg->setMessageID("view");
+            msg->getAttributes()->setInt("open", st.open);
+            msg->getAttributes()->setInt("width", st.width);
+            msg->getAttributes()->setInt("height", st.height);
+            msg->getAttributes()->setFloat("scale", st.scale);
+            sendMessage(msg);
+            msg->release();
+         }
+      }
+      void ViewInput(const PluginFrames::InputEvent* events, uint32_t count) override
+      {
+         if (!count)
+            return;
+         if (IMessage* msg = allocateMessage())
+         {
+            msg->setMessageID("viewInput");
+            msg->getAttributes()->setBinary("events", events, uint32(count * sizeof(PluginFrames::InputEvent)));
+            sendMessage(msg);
+            msg->release();
+         }
+      }
+      void ViewRestart() override
+      {
+         if (IMessage* msg = allocateMessage())
+         {
+            msg->setMessageID("restart");
+            sendMessage(msg);
+            msg->release();
+         }
+      }
+      void ViewGone(ShellView* v) override
+      {
+         if (view_ == v)
+            view_ = nullptr;
+      }
 
       tresult PLUGIN_API initialize(FUnknown* context) override
       {
@@ -1045,6 +1237,36 @@ namespace InfinitePlugin
             }
             return kResultOk;
          }
+         if (attr && std::strcmp(message->getMessageID(), "frames") == 0)
+         {
+            const void* data = nullptr;
+            uint32 size = 0;
+            int64 bytes = 0;
+            attr->getInt("bytes", bytes);
+            if (attr->getBinary("name", data, size) == kResultOk && data && size && view_)
+            {
+               const std::string name(static_cast<const char*>(data), strnlen(static_cast<const char*>(data), size));
+               view_->SetFrames(name.c_str(), uint64_t(bytes));
+            }
+            return kResultOk;
+         }
+         if (attr && std::strcmp(message->getMessageID(), "cursor") == 0)
+         {
+            int64 c = 0;
+            attr->getInt("cursor", c);
+            if (view_)
+               view_->SetCursor(uint32_t(c));
+            return kResultOk;
+         }
+         if (attr && std::strcmp(message->getMessageID(), "engine") == 0)
+         {
+            int64 st = 0;
+            attr->getInt("status", st);
+            engine_ = EngineStatus(std::max<int64>(0, std::min<int64>(st, 2)));
+            if (view_)
+               view_->SetEngine(engine_);
+            return kResultOk;
+         }
          if (attr && std::strcmp(message->getMessageID(), "slotNames") == 0)
          {
             const void* data = nullptr;
@@ -1110,6 +1332,10 @@ namespace InfinitePlugin
          DEF_INTERFACE(IMidiMapping)
       END_DEFINE_INTERFACES(EditController)
       REFCOUNT_METHODS(EditController)
+
+   private:
+      ShellView* view_ = nullptr; // not owned: the host holds the view
+      EngineStatus engine_ = EngineStatus::Starting;
    };
 }
 

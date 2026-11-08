@@ -9,6 +9,7 @@
 //               -> inject MIDI -> render each segment (<= kAudioMaxBlockFrames) -> Complete
 //
 // Audio In reads the host's main / sidechain buses through ReadHostInput while a segment renders.
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -53,6 +54,10 @@ namespace PluginEngine
       kMsgGetState = 101,  // payload: none
       kMsgSetState = 102,  // payload: the patch as .inf text; kMsgReady follows once it settles
    };
+
+   // Main thread: a message to the shell (view frames, cursor). False when not running or the ring
+   // stayed full for timeoutMs.
+   bool SendToShell(uint32_t type, const void* data, size_t size, int timeoutMs);
 
    // The app's patch <-> text (BuildPatchData + Patch::WriteText, Patch::ReadText + load), set by
    // Startup so this file stays free of app globals. Main thread only.

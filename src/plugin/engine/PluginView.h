@@ -1,0 +1,29 @@
+#pragma once
+// Engine side of the plugin view (docs/plans/vst-au/README.md 8.3, step 2.3): sizes the hidden
+// window to the view, feeds the view's mouse and keys to ImGui, and reads each drawn frame back into
+// the shared-memory triple buffer (src/plugin/ipc/PluginFrames.h). Main thread only. Every call is a
+// no-op outside plugin mode or while no view is open.
+#include <cstddef>
+#include <cstdint>
+
+struct GLFWwindow;
+
+namespace PluginView
+{
+   // HostAudio's message loop: kMsgView and kMsgViewInput.
+   void HandleMessage(uint32_t type, const uint8_t* data, size_t size);
+
+   bool Open();
+
+   // After ImGui_ImplGlfw_NewFrame, before ImGui::NewFrame: applies the view's size to the hidden
+   // window and queues the view's input on ImGui's event queue.
+   void BeginFrame(GLFWwindow* window);
+
+   // After ImGui_ImplOpenGL3_RenderDrawData into the default framebuffer (fbW x fbH pixels): starts
+   // this frame's readback and publishes the previous one. Also tells the view about cursor changes.
+   void Capture(int fbW, int fbH);
+
+   // Stats line: frames published and the mean readback cost (map + copy) in microseconds.
+   uint64_t FramesPublished();
+   uint64_t MeanReadbackUs();
+}

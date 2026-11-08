@@ -4,6 +4,8 @@
 #include "core/Transport.h"
 #include "platform/Platform.h"
 #include "platform/common/Ipc.h"
+#include "plugin/engine/PluginView.h"
+#include "plugin/ipc/PluginFrames.h"
 #include "plugin/ipc/PluginIpc.h"
 
 #include <algorithm>
@@ -381,9 +383,10 @@ namespace PluginEngine
          if (const char* path = std::getenv("INFINITE_PLUGIN_STATS"))
             if (FILE* f = std::fopen(path, "w"))
             {
-               std::fprintf(f, "blocks %llu jumps %llu renders %llu peak %g parks %llu parkTimeouts %llu\n", (unsigned long long)gBlocks.load(),
+               std::fprintf(f, "blocks %llu jumps %llu renders %llu peak %g parks %llu parkTimeouts %llu frames %llu readbackUs %llu\n", (unsigned long long)gBlocks.load(),
                             (unsigned long long)gJumps.load(), (unsigned long long)gRenders.load(), (double)gPeak.load(),
-                            (unsigned long long)gParks.load(), (unsigned long long)gParkTimeouts.load());
+                            (unsigned long long)gParks.load(), (unsigned long long)gParkTimeouts.load(),
+                            (unsigned long long)PluginView::FramesPublished(), (unsigned long long)PluginView::MeanReadbackUs());
                std::fclose(f);
             }
       }
@@ -417,6 +420,8 @@ namespace PluginEngine
             // Ready again once the new graph has settled, so an offline render waits for it.
             SetStarted(gStartError);
          }
+         else if (m.type == PluginFrames::kMsgView || m.type == PluginFrames::kMsgViewInput)
+            PluginView::HandleMessage(m.type, m.data.data(), m.data.size());
       }
    }
 
@@ -507,6 +512,11 @@ namespace PluginEngine
    }
 
    bool SlotFramePublishes() { return gFramesSinceServed > 2; }
+
+   bool SendToShell(uint32_t type, const void* data, size_t size, int timeoutMs)
+   {
+      return gActive.load() && gSide.Messages().Send(type, 0, data, size, timeoutMs);
+   }
 
    void SendSlotEdit(SlotEditKind kind, int slot, float value)
    {
