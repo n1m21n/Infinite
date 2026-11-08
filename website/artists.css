@@ -263,11 +263,21 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 @media (max-width: 640px) { .pr-tile { flex-direction: row; padding: 6px 10px; } }
 
 .ax-plug { display: flex; flex-wrap: wrap; gap: 12px; }
-.ax-maker { display: grid; gap: 24px; padding: 24px; border-radius: var(--r-lg); background: var(--surface-1, var(--card)); border: 1px solid var(--line); }
-.ax-maker h3 { margin: 0 0 8px; font: 700 var(--size-h3, 1.5rem)/1.2 'Geist', system-ui, sans-serif; color: var(--ink); }
-.ax-maker p { margin: 0 0 16px; color: var(--ink2); }
-.ax-albums { margin: 0; display: grid; gap: 8px; padding: 16px 20px; border-radius: var(--r-md, 16px); background: var(--deep); }
-.ax-albums div { display: flex; justify-content: space-between; gap: 16px; }
-.ax-albums dt { font-weight: 600; color: var(--ink); }
-.ax-albums dd { margin: 0; color: var(--ink2); font-family: 'Geist Mono', monospace; }
+/* brand-lint: off  (this card follows the n1m21n room brand book, direction B: sketchbook riso) */
+.ax-maker { --r-ink: #0A0618; --r-paper: #F1E9D2; --r-white: #FBF8E8; --r-blue: #2E3BDB; --r-mag: #E0368F; --r-gold: #F6E27A; display: grid; gap: 24px; padding: 22px; border-radius: 6px; background: var(--r-white); color: var(--r-ink); border: 2.5px solid var(--r-ink); box-shadow: 6px 6px 0 var(--r-blue); font-family: 'Bricolage Grotesque', 'Geist', system-ui, sans-serif; }
+.ax-maker h3 { position: relative; display: block; width: max-content; max-width: 100%; margin: 0 0 10px; font: 800 clamp(2.25rem, 1.6rem + 3vw, 3.5rem)/.95 'Bricolage Grotesque', sans-serif; font-stretch: 75%; letter-spacing: -.01em; text-transform: lowercase; color: transparent; }
+.ax-maker h3 span { position: absolute; inset: 0; mix-blend-mode: multiply; }
+.ax-maker h3 .base { position: static; visibility: hidden; }
+.ax-maker h3 .p1 { color: var(--r-blue); transform: translate(-3px, 2px); }
+.ax-maker h3 .p2 { color: var(--r-mag); transform: translate(3px, -2px); opacity: .92; }
+.ax-maker p { margin: 0 0 16px; font: 400 1rem/1.55 'Bricolage Grotesque', sans-serif; color: var(--r-ink); }
+.ax-maker .ax-plug { gap: 10px; }
+.ax-maker .btn { padding: 10px 18px; background: var(--r-gold); color: var(--r-ink); border: 2.5px solid var(--r-ink); border-radius: 999px; box-shadow: 4px 4px 0 var(--r-ink); font: 800 .95rem/1 'Bricolage Grotesque', sans-serif; text-transform: lowercase; }
+.ax-maker .btn-ghost { background: transparent; box-shadow: none; }
+.ax-maker .btn:hover { transform: translate(-1px, -1px); }
+.ax-albums { margin: 0; display: grid; gap: 10px; padding: 16px 18px; background: var(--r-paper); border: 2.5px solid var(--r-ink); border-radius: 6px; }
+.ax-albums div { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.ax-albums dt { font: 800 1.15rem/1.1 'Bricolage Grotesque', sans-serif; font-stretch: 80%; text-transform: lowercase; color: var(--r-ink); }
+.ax-albums dd { margin: 0; padding: 7px 10px; border: 1.5px solid var(--r-ink); border-radius: 4px; font: 500 .75rem/1 'DM Mono', ui-monospace, monospace; }
 @media (min-width: 760px) { .ax-maker { grid-template-columns: 1fr minmax(220px, 300px); align-items: center; } }
+/* brand-lint: on */
