@@ -39,6 +39,7 @@ GROUPS = [
         ("artworks.html", "Art gallery", "Made with Infinite"),
         ("nodes/", "Nodes", "Every node, with a patch"),
         ("embeds/", "Embeds", "Audio-reactive widgets for any page"),
+        ("plugin.html", "Plugin", "Infinite as a VST3 and AU plugin"),
     ]),
     ("learn", "Learn", [
         ("index.html#learn", "Get started", "Make a first sound and picture"),
@@ -58,6 +59,7 @@ FOOTER_COLS = [
     ]),
     ("Learn", [
         ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("blog/", "Blog"),
+        ("plugin.html", "Plugin"), ("buy.html", "Buy the plugin"),
     ]),
     ("Docs", [   # PDFs in website/assets
         ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference"),
@@ -125,6 +127,8 @@ NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-note
 
 
 def nav_icon(path):
+    if path == "plugin.html":
+        return PLUGIN_SVG
     f = os.path.join(ROOT, "art", "icons", "src", NAV_ICON[path] + "-20.svg")
     return open(f, encoding="utf-8").read().strip().replace("<svg ", '<svg class="ic" aria-hidden="true" ', 1).replace("\n", "")
 
@@ -142,6 +146,8 @@ def nav_html(rel):
             out.append(f'          <a href="{href(path, p)}"{link_attrs(path)}{c}>{nav_icon(path)}<span>{text}</span></a>')
         out.append("        </div>")
         out.append("      </div>")
+    pc = ' aria-current="page"' if is_current("plugin.html", rel) else ""
+    out.append(f'      <a href="{p}plugin.html"{pc}>Plugin</a>')
     out.append(f'      <a class="btn btn-primary nav-sheet-cta" href="{p}index.html#setup">Download Infinite</a>')
     out.append('      <div class="nav-sheet-social">')
     out.append(icon_links("        ", "{n}"))
@@ -150,6 +156,8 @@ def nav_html(rel):
     return "\n".join(out)
 
 
+# The paid plugin is its own stop, not a group: one tap to its page.
+PLUGIN_SVG = '<svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg>'
 DOCK_STOPS = [("for", "For you", "family-compositing"), ("explore", "Explore", "grid-dots"), ("learn", "Learn", "play")]
 
 
