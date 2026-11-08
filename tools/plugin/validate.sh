@@ -49,11 +49,14 @@ if [ -z "${INFINITE_PLUGIN_ENGINE:-}" ]; then
    esac
 fi
 [ -x "$INFINITE_PLUGIN_ENGINE" ] || { echo "engine not found: $INFINITE_PLUGIN_ENGINE" >&2; exit 2; }
+# Git bash on Windows: the plugin and engine are native programs and read these as Windows paths.
+winpath() { case "$OS" in MINGW*|MSYS*|CYGWIN*) cygpath -m "$1" ;; *) printf '%s' "$1" ;; esac; }
+export INFINITE_PLUGIN_ENGINE="$(winpath "$INFINITE_PLUGIN_ENGINE")"
 
 if [ $LICENSED = 1 ]; then
    # plugin_test_license builds on every OS; plugin_shell_check (macOS) writes the same files.
-   export INFINITE_LICENSE_DIR="$LOGDIR/licence"
-   rm -rf "$INFINITE_LICENSE_DIR"
+   rm -rf "$LOGDIR/licence"
+   export INFINITE_LICENSE_DIR="$(winpath "$LOGDIR/licence")"
    TL="$BUILD/bin/Release/plugin_test_license"
    if [ -x "$TL" ] || [ -x "$TL.exe" ]; then
       "$TL" "$INFINITE_LICENSE_DIR" >/dev/null || { echo "could not write a test licence" >&2; exit 2; }
