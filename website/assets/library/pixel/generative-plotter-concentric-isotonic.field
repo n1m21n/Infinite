@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Generative Plotter Concentric Isotonic",
+    "author": "Infinite",
+    "description": "Mathematical topographical contour line art featuring dense concentric isotonic rings, audio-reactive harmonic wave ripple modulation, and carbon and vermilion pen indexing.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.32 [0.1, 1.5]\nparam float rings = 28.0 [10.0, 60.0]\nparam float warp = 0.42 [0.1, 1.0]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float vermilion = 0.45 [0.0, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\ndisp = sin(theta * 6.0 + time * 2.2) * cos(r * 8.0 - time * 1.8) * warp * 0.25\nlens = r + disp\n\ncontour = sin(lens * rings * 2.0)\npenLine = smoothstep(0.20, -0.20, abs(contour) - 0.25)\n\ncross = sin(p.x * 24.0) * sin(p.y * 24.0)\nhatch = step(0.65, cross) * step(r, 0.65) * 0.25\n\ncPaper = vec3(0.961, 0.945, 0.902)\ncCarbon = vec3(0.067, 0.067, 0.067)\ncVermilion = vec3(0.820, 0.188, 0.122)\n\ncol = mix(cPaper, cCarbon, penLine)\ncol = mix(col, cCarbon, hatch)\n\nvortex = exp(-abs(contour - 0.5) * 6.0) * step(0.3, r) * step(r, 0.85)\ncol = mix(col, cVermilion, clamp(vortex * vermilion * 1.8, 0.0, 1.0))\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.32,
+      "rings": 28.0,
+      "warp": 0.42,
+      "contrast": 1.15,
+      "vermilion": 0.45
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

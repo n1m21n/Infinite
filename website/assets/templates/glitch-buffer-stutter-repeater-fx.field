@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glitch Buffer Stutter Repeater FX",
+    "author": "Infinite",
+    "description": "Granular micro-loop stutter effect with clock-synced buffer freeze, decaying rhythmic micro-repeats, asymmetric diode waveshaping, and dynamic dry-wet crossfade.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float stutterRate = 0.45 [0.1, 1.0]\nparam float drive = 0.40 [0.0, 1.0]\nparam float tone = 0.55 [0.1, 1.0]\nparam float feedback = 0.40 [0.0, 0.9]\nparam float mix = 0.55 [0.0, 1.0]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float lp = 0\n\ninSat = in * (1.0 + drive * 2.0)\nsat = inSat / (1.0 + abs(inSat * 0.6))\n\nfTone = clamp(0.08 + tone * 0.36, 0.02, 0.45)\nlp = lp + fTone * (sat - lp)\n\nkDiff = clamp(0.12 * (1.0 + stutterRate * 0.7), 0.04, 0.36)\nd1 = d1 + kDiff * (lp + d3 * feedback * 0.65 - d1)\nd2 = d2 + kDiff * 0.88 * (d1 - d2)\nd3 = d3 + kDiff * 0.78 * (d2 - d3)\n\nstutter = (d1 - d2 + d3 * 0.7) * 0.9\nprocessed = in * (1.0 - mix) + stutter * mix\nout = processed * 0.65\n",
+    "params": {
+      "stutterRate": 0.45,
+      "drive": 0.4,
+      "tone": 0.55,
+      "feedback": 0.4,
+      "mix": 0.55
+    }
+  }
+}

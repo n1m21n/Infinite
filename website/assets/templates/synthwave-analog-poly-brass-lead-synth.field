@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Synthwave Analog Poly Brass Lead Synth",
+    "author": "Infinite",
+    "description": "Lush 1980s retro-futuristic analog brass synthesizer featuring detuned sawtooth oscillators, warm 24dB resonant lowpass ladder filter with punchy attack envelope, and subtle chorus width.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.62 [0.1, 1.0]\nparam float resonance = 0.40 [0.1, 0.95]\nparam float detune = 0.35 [0.0, 1.0]\nparam float decayTime = 0.45 [0.1, 1.5]\nparam float drive = 0.30 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float pSub = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.94, env - env * decayRate)\n\ndp = freq / sr\ndDet = dp * detune * 0.025\np1 = (p1 + dp + dDet) % 1.0\np2 = (p2 + dp - dDet) % 1.0\nsaw1 = p1 * 2.0 - 1.0\nsaw2 = p2 * 2.0 - 1.0\n\ndpSub = dp * 0.5\npSub = (pSub + dpSub) % 1.0\nsub = if(pSub < 0.5, 0.8, -0.8)\n\nsig = (saw1 * 0.55 + saw2 * 0.55 + sub * 0.35) * (1.0 + drive * 1.2)\n\nfNorm = clamp(cutoff * 0.20 + env * 0.30, 0.02, 0.46)\nkRes = clamp(resonance * 1.8, 0.1, 1.9)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.42))) * env\nout = sat * 0.58\n",
+    "params": {
+      "cutoff": 0.62,
+      "resonance": 0.4,
+      "detune": 0.35,
+      "decayTime": 0.45,
+      "drive": 0.3
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

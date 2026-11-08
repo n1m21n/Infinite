@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glitch Spectral Aliasing Bitcrush FX",
+    "author": "Infinite",
+    "description": "Searing industrial glitch downsampler featuring variable sample-rate reduction, nonlinear wavefolding drive, quantized amplitude bit-depth crushing, and warm tone filtering.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float crush = 0.50 [0.0, 0.9]\nparam float drive = 0.45 [0.0, 1.0]\nparam float tone = 0.50 [0.1, 1.0]\nparam float wavefold = 0.35 [0.0, 1.0]\nparam float mix = 0.60 [0.0, 1.0]\nstate float s1 = 0\nstate float s2 = 0\n\nsteps = clamp(floor(28.0 - crush * 22.0), 3.0, 28.0)\nqIn = floor(in * steps) / steps\n\npre = qIn * (1.0 + drive * 2.4)\nfold = sin(pre * (1.0 + wavefold * 1.8))\nsat = (fold - (fold * fold * fold * 0.12)) / (1.0 + abs(fold * 0.35))\n\nfCut = clamp(0.06 + tone * 0.36, 0.02, 0.45)\ns1 = s1 + fCut * (sat - s1)\ns2 = s2 + fCut * (s1 - s2)\n\nprocessed = in * (1.0 - mix) + s2 * mix\nout = processed * 0.48\n",
+    "params": {
+      "crush": 0.5,
+      "drive": 0.45,
+      "tone": 0.5,
+      "wavefold": 0.35,
+      "mix": 0.6
+    }
+  }
+}

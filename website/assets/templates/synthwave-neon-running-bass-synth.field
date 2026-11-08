@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Synthwave Neon Running Bass Synth",
+    "author": "Infinite",
+    "description": "Driving 16th-note analog synthwave bass synthesizer with paired saw and square wave oscillators, snappy transistor decay envelope, tight resonant filter bite, and analog grit.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.55 [0.1, 1.0]\nparam float resonance = 0.58 [0.1, 0.95]\nparam float envMod = 0.65 [0.0, 1.0]\nparam float decayTime = 0.24 [0.06, 0.8]\nparam float drive = 0.38 [0.0, 1.0]\nstate float p1 = 0\nstate float pSub = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.08)\nenv = if(target > env, env + (target - env) * 0.96, env - env * decayRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\nsaw = p1 * 2.0 - 1.0\n\ndpSub = dp * 0.5\npSub = (pSub + dpSub) % 1.0\nsub = if(pSub < 0.5, 1.0, -1.0)\n\nsig = (saw * 0.70 + sub * 0.50) * (1.0 + drive * 1.3)\n\nfNorm = clamp(cutoff * 0.15 + env * envMod * 0.35, 0.015, 0.45)\nkRes = clamp(resonance * 1.82, 0.1, 1.9)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.48))) * env\nout = sat * 0.54\n",
+    "params": {
+      "cutoff": 0.55,
+      "resonance": 0.58,
+      "envMod": 0.65,
+      "decayTime": 0.24,
+      "drive": 0.38
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Generative Plotter Curvilinear Flowfield",
+    "author": "Infinite",
+    "description": "Algorithmic plotter line art simulating continuous ink pen streamlines through a harmonic turbulent vector flowfield, with audio-reactive displacement and vermilion ink accents.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.35 [0.1, 1.5]\nparam float density = 32.0 [12.0, 64.0]\nparam float curl = 0.45 [0.1, 1.0]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float vermilion = 0.40 [0.0, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nflow1 = sin(p.y * density * 0.4 + sin(p.x * 3.5 + time * 2.0) * curl * 4.0)\nflow2 = cos(p.x * density * 0.4 + cos(p.y * 3.5 - time * 2.0) * curl * 4.0)\nstream = (flow1 + flow2) * 0.5\n\nrings = sin(r * density * 0.8 - time * 3.0 + theta * 2.0)\nlines = sin(stream * 3.14159 + rings * 0.5)\n\ncPaper = vec3(0.961, 0.945, 0.902)\ncCarbon = vec3(0.067, 0.067, 0.067)\ncVermilion = vec3(0.820, 0.188, 0.122)\n\nink = smoothstep(0.15, -0.15, abs(lines) - 0.22)\ncol = mix(cPaper, cCarbon, ink)\n\naccent = exp(-abs(stream - 0.35) * 8.0) * exp(-r * 1.8)\ncol = mix(col, cVermilion, clamp(accent * vermilion * 2.2, 0.0, 1.0))\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.35,
+      "density": 32.0,
+      "curl": 0.45,
+      "contrast": 1.15,
+      "vermilion": 0.4
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

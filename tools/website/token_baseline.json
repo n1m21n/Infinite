@@ -488,6 +488,14 @@
   "embeds/op-art-hypnotic-checkerboard-warp.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/generative-plotter-curvilinear-flowfield.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/generative-plotter-concentric-isotonic.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

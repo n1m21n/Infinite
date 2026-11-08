@@ -257,6 +257,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Classic Trance Rolling Offbeat Bass Synth](https://infinitedevices.org/library/classic-trance-rolling-offbeat-bass-synth.html): High-energy rolling 16th-note trance bass synthesizer featuring paired saw and pulse sub-oscillators, snappy transistor envelope punch, 24dB resonant lowpass filter, and warm analog drive. (file: https://infinitedevices.org/assets/templates/classic-trance-rolling-offbeat-bass-synth.inf)
 - [Industrial Techno Warehouse Distortion Reverb FX](https://infinitedevices.org/library/industrial-techno-warehouse-distortion-reverb-fx.html): Cavernous Berlin warehouse reverb effect combining asymmetric pre-saturation drive, dense multi-tap delay diffusion network, resonant dark low-frequency room reflections, and high-frequency damping. (file: https://infinitedevices.org/assets/templates/industrial-techno-warehouse-distortion-reverb-fx.inf)
 - [Industrial Techno Grimy Bitcrush Saturator FX](https://infinitedevices.org/library/industrial-techno-grimy-bitcrush-saturator-fx.html): Punishing industrial waveshaper processor featuring asymmetric diode wavefolding, quantized bit-depth degradation, resonant post-overdrive lowpass filter, and parallel dry-wet blend. (file: https://infinitedevices.org/assets/templates/industrial-techno-grimy-bitcrush-saturator-fx.inf)
+- [Synthwave Analog Poly Brass Lead Synth](https://infinitedevices.org/library/synthwave-analog-poly-brass-lead-synth.html): Lush 1980s retro-futuristic analog brass synthesizer featuring detuned sawtooth oscillators, warm 24dB resonant lowpass ladder filter with punchy attack envelope, and subtle chorus width. (file: https://infinitedevices.org/assets/templates/synthwave-analog-poly-brass-lead-synth.inf)
+- [Synthwave Neon Running Bass Synth](https://infinitedevices.org/library/synthwave-neon-running-bass-synth.html): Driving 16th-note analog synthwave bass synthesizer with paired saw and square wave oscillators, snappy transistor decay envelope, tight resonant filter bite, and analog grit. (file: https://infinitedevices.org/assets/templates/synthwave-neon-running-bass-synth.inf)
+- [Glitch Buffer Stutter Repeater FX](https://infinitedevices.org/library/glitch-buffer-stutter-repeater-fx.html): Granular micro-loop stutter effect with clock-synced buffer freeze, decaying rhythmic micro-repeats, asymmetric diode waveshaping, and dynamic dry-wet crossfade. (file: https://infinitedevices.org/assets/templates/glitch-buffer-stutter-repeater-fx.inf)
+- [Glitch Spectral Aliasing Bitcrush FX](https://infinitedevices.org/library/glitch-spectral-aliasing-bitcrush-fx.html): Searing industrial glitch downsampler featuring variable sample-rate reduction, nonlinear wavefolding drive, quantized amplitude bit-depth crushing, and warm tone filtering. (file: https://infinitedevices.org/assets/templates/glitch-spectral-aliasing-bitcrush-fx.inf)
 
 ## Library: Community
 
@@ -617,7 +621,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 95 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 97 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -634,4 +638,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 80 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 82 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

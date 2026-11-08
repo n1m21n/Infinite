@@ -2169,6 +2169,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "synthwave-analog-poly-brass-lead-synth",
+      "name": "Synthwave Analog Poly Brass Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Lush 1980s retro-futuristic analog brass synthesizer featuring detuned sawtooth oscillators, warm 24dB resonant lowpass ladder filter with punchy attack envelope, and subtle chorus width.",
+      "price": 0,
+      "preview": "assets/templates/synthwave-analog-poly-brass-lead-synth.webp",
+      "file": "assets/templates/synthwave-analog-poly-brass-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "synthwave-neon-running-bass-synth",
+      "name": "Synthwave Neon Running Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Driving 16th-note analog synthwave bass synthesizer with paired saw and square wave oscillators, snappy transistor decay envelope, tight resonant filter bite, and analog grit.",
+      "price": 0,
+      "preview": "assets/templates/synthwave-neon-running-bass-synth.webp",
+      "file": "assets/templates/synthwave-neon-running-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "glitch-buffer-stutter-repeater-fx",
+      "name": "Glitch Buffer Stutter Repeater FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Granular micro-loop stutter effect with clock-synced buffer freeze, decaying rhythmic micro-repeats, asymmetric diode waveshaping, and dynamic dry-wet crossfade.",
+      "price": 0,
+      "preview": "assets/templates/glitch-buffer-stutter-repeater-fx.webp",
+      "file": "assets/templates/glitch-buffer-stutter-repeater-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "glitch-spectral-aliasing-bitcrush-fx",
+      "name": "Glitch Spectral Aliasing Bitcrush FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Searing industrial glitch downsampler featuring variable sample-rate reduction, nonlinear wavefolding drive, quantized amplitude bit-depth crushing, and warm tone filtering.",
+      "price": 0,
+      "preview": "assets/templates/glitch-spectral-aliasing-bitcrush-fx.webp",
+      "file": "assets/templates/glitch-spectral-aliasing-bitcrush-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }
