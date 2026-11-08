@@ -1,5 +1,6 @@
 // DSP self-test fixtures, part 2: sampler..granular (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/CurveEdit.h"
 #include "audio/dsp/ConvolutionKernel.h"
 #include "audio/dsp/SimdF4.h"
 #include "audio/MusicTime.h"
@@ -3806,6 +3807,215 @@ bool RunMSEGFixture()
       check("save string round trip (points and bends)", same ? 1 : 0, 1, 0);
       back.Decode("garbage");
       check("a bad save string leaves the shape alone (count)", (double)back.points.size(), 4, 0);
+   }
+
+   // --- curve model (docs/plans/curve-editor): interpolations, handles, 256 points
+   {
+      // Binary search finds the same segment the old left-to-right walk did.
+      MSEGNode n;
+      n.points.clear();
+      for (int i = 0; i < MSEGNode::kMaxPoints; i++)
+         n.points.push_back({ (float)i / (MSEGNode::kMaxPoints - 1), ModShapes::Hash01(i), (ModShapes::Hash01(i + 999) - 0.5f) });
+      n.points[100].x = n.points[101].x = n.points[102].x; // a run on one x: a step
+      n.Normalize();
+      check("256 points fit (count)", (double)n.points.size(), 256, 0);
+      double worst = 0.0;
+      for (int k = 0; k <= 4000; k++)
+      {
+         const float x = (float)k / 4000.0f;
+         int i = 0;
+         while (i < (int)n.points.size() - 2 && x >= n.points[i + 1].x)
+            i++;
+         const auto& a = n.points[i];
+         const auto& b = n.points[i + 1];
+         const float span = b.x - a.x;
+         const float want = span <= 1.0e-6f ? (x >= b.x ? b.y : a.y) : ModShapes::MsegSegment(a.y, b.y, a.curve, (x - a.x) / span);
+         worst = std::max(worst, (double)std::fabs(n.Evaluate(x) - want));
+      }
+      check("binary search = the linear walk, 256 points (worst error)", worst, 0.0, 1e-6);
+      n.points.push_back({ 0.5f, 0.5f, 0.0f });
+      n.Normalize();
+      check("a 257th point is dropped (count)", (double)n.points.size(), 256, 0);
+      check("a 257th point is refused by AddPoint", n.AddPoint(0.5f, 0.5f), -1, 0);
+   }
+   {
+      MSEGNode n;
+      n.points = { { 0.0f, 0.2f, 0.7f }, { 0.5f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
+      n.SetInterp(0, 0, ModShapes::kInterpConstant);
+      check("constant holds the left value", n.Evaluate(0.49f), 0.2, 1e-6);
+      check("constant lands on the next point", n.Evaluate(0.5f), 1.0, 1e-6);
+      n.SetInterp(0, 1, ModShapes::kInterpLinear);
+      check("linear ignores the bend", n.Evaluate(0.25f), 0.6, 1e-6);
+      check("linear second segment", n.Evaluate(0.75f), 0.5, 1e-6);
+      const int added = n.AddPoint(0.25f, 0.6f);
+      check("a split segment keeps its interpolation", n.points[added].interp, ModShapes::kInterpLinear, 0);
+      check("split linear still a line", n.Evaluate(0.125f), 0.4, 1e-6);
+   }
+   {
+      // Bezier: through every point, flat at the ends and peaks (auto
+      // clamped), never past 0..1, and zero handles make a straight line.
+      MSEGNode n;
+      n.points = { { 0.0f, 0.0f, 0.0f }, { 0.3f, 1.0f, 0.0f }, { 0.6f, 0.4f, 0.0f }, { 1.0f, 0.9f, 0.0f } };
+      n.SetInterp(0, 3, ModShapes::kInterpBezier);
+      bool through = true;
+      for (const auto& p : n.points)
+         through &= std::fabs(n.Evaluate(p.x) - p.y) < 1e-5f;
+      check("bezier passes through every point", through ? 1 : 0, 1, 0);
+      float lo = 1.0f, hi = 0.0f;
+      for (int k = 0; k <= 2000; k++)
+      {
+         const float v = n.Evaluate((float)k / 2000.0f);
+         lo = std::min(lo, v);
+         hi = std::max(hi, v);
+      }
+      check("auto clamped never undershoots 0", lo, 0.0, 1e-6);
+      check("auto clamped never overshoots 1", hi, 1.0, 1e-6);
+      check("auto clamped: flat at a peak (left handle y)", n.points[1].ly, 0.0, 1e-9);
+      const float e = 1.0e-3f;
+      check("auto clamped: flat slope leaving the start", (n.Evaluate(e) - n.Evaluate(0.0f)) / e, 0.0, 0.05);
+      const float mid = n.Evaluate(0.45f);
+      check("bezier is smooth between 1 and 0.4 (halfway lies between)", mid > 0.4f && mid < 1.0f ? 1 : 0, 1, 0);
+
+      MSEGNode straight;
+      straight.points = { { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } };
+      straight.SetHandleType(0, 1, ModShapes::kHandleFree);
+      straight.SetInterp(0, 1, ModShapes::kInterpBezier);
+      for (auto& p : straight.points)
+         p.lx = p.ly = p.rx = p.ry = 0.0f;
+      check("bezier with no handles is a line (0.3)", straight.Evaluate(0.3f), 0.3, 1e-5);
+      // Handles longer than the segment are scaled down: x stays one-to-one.
+      straight.points[0].rx = 2.0f; straight.points[0].ry = 0.0f;
+      straight.points[1].lx = -2.0f; straight.points[1].ly = 0.0f;
+      bool rising = true;
+      float last = -1.0f;
+      for (int k = 0; k <= 1000; k++)
+      {
+         const float v = straight.Evaluate((float)k / 1000.0f);
+         rising &= v >= last - 1e-6f;
+         last = v;
+      }
+      check("over-long handles still give one value per x (rises)", rising ? 1 : 0, 1, 0);
+      check("over-long flat handles: symmetric ease, halfway = 0.5", straight.Evaluate(0.5f), 0.5, 1e-4);
+
+      // Save string: every field back; an older 3-field string reads as bends.
+      n.SetHandleType(2, 2, ModShapes::kHandleFree);
+      n.points[2].ly = -0.07f;
+      n.points[2].rx = 0.05f;
+      MSEGNode back;
+      back.Decode(n.Encode());
+      bool same = back.points.size() == n.points.size();
+      for (size_t i = 0; same && i < n.points.size(); i++)
+      {
+         const auto& a = n.points[i];
+         const auto& b = back.points[i];
+         same = a.interp == b.interp && a.handle == b.handle && std::fabs(a.lx - b.lx) < 1e-5f && std::fabs(a.ly - b.ly) < 1e-5f &&
+                std::fabs(a.rx - b.rx) < 1e-5f && std::fabs(a.ry - b.ry) < 1e-5f && std::fabs(a.y - b.y) < 1e-5f;
+      }
+      check("save string round trip (interp, handle types, dragged handles)", same ? 1 : 0, 1, 0);
+      back.Decode("0,0,0.5;0.5,1,0;1,0,0");
+      check("older string: bend interpolation", back.points[0].interp, ModShapes::kInterpBend, 0);
+      check("older string: bend kept", back.points[0].curve, 0.5, 1e-6);
+      check("plain bends save the old 3-field form", back.Encode() == "0,0,0.5;0.5,1,0;1,0,0" ? 1 : 0, 1, 0);
+   }
+
+   // --- time bases and play modes (curve-editor §8.5)
+   {
+      auto rewind = [&] {
+         tr.SetPlaying(false);
+         tr.Rewind();
+         tr.SetPlaying(true);
+      };
+      MSEGNode n;
+      ramp(n);
+      n.SetInterp(0, 1, ModShapes::kInterpLinear);
+      rewind();
+      n.rateMode = MSEGNode::kRateSeconds;
+      n.lengthSec = 2.0f;
+      advance(0.5);
+      check("seconds: 2 s shape, 0.5 s in", n.Value01(), 0.25, 0.01);
+      n.speed = 2.0f;
+      check("speed 2: twice as far", n.Value01(), 0.5, 0.01);
+      n.speed = 1.0f;
+      n.rateMode = MSEGNode::kRateFrames;
+      n.lengthFrames = 48.0f;
+      n.fps = 24.0f;
+      check("frames: 48 at 24 fps = 2 s, 0.5 s in", n.Value01(), 0.25, 0.01);
+      rewind();
+      bool exact = true;
+      for (int k = 0; k < 48; k++)
+      {
+         if (k > 0)
+            tr.Tick(1.0f / 24.0f);
+         exact &= std::fabs(n.Value01() - (float)k / 48.0f) < 2e-4f;
+      }
+      check("frames: frame k reads k/48 at 24 fps", exact ? 1 : 0, 1, 0);
+      n.play = ModShapes::kPlayOnce;
+      rewind();
+      advance(3.0);
+      check("once: holds the end after the shape", n.Value01(), 1.0, 1e-6);
+      n.play = ModShapes::kPlayPingPong;
+      rewind();
+      advance(3.0);
+      check("ping-pong: on the way back, 1.5 passes in", n.Value01(), 0.5, 0.01);
+      n.play = ModShapes::kPlayRepeat;
+      rewind();
+      advance(3.0);
+      check("repeat: 1.5 passes in", n.Value01(), 0.5, 0.01);
+      n.rateMode = MSEGNode::kRateSeconds;
+      n.voice = true;
+      VoiceMod::Spec spec;
+      n.VoiceSpec(spec);
+      check("per voice: seconds run on the seconds clock", spec.hz ? 1 : 0, 1, 0);
+      check("per voice: 2 s shape = 0.5 passes a second", spec.rateHz, 0.5, 1e-6);
+      rewind();
+   }
+
+   // --- curve edits (core/CurveEdit.h, the panel's tools)
+   {
+      using CurveEdit::XY;
+      std::vector<XY> sine;
+      for (int i = 0; i <= 1000; i++)
+      {
+         const float x = (float)i / 1000.0f;
+         sine.push_back({ x, 0.5f + 0.5f * std::sin(x * 6.2831853f * 4.0f) });
+      }
+      const std::vector<XY> kept = CurveEdit::Simplify(sine, 0.01f);
+      MSEGNode n;
+      n.points.clear();
+      for (const XY& q : kept)
+      {
+         MSEGNode::Point p { q.x, q.y, 0.0f };
+         p.interp = ModShapes::kInterpLinear;
+         n.points.push_back(p);
+      }
+      n.Normalize();
+      float worst = 0.0f;
+      for (const XY& q : sine)
+         worst = std::max(worst, std::fabs(n.Evaluate(q.x) - q.y));
+      check("draw: a stroke thins to within its tolerance", worst, 0.0, 0.0101);
+      check("draw: 4 sine cycles thin to under 64 points", kept.size() < 64 ? 1 : 0, 1, 0);
+      MSEGNode line;
+      line.points = { { 0.0f, 0.0f, 0.0f }, { 0.25f, 1.0f, 0.0f }, { 0.5f, 0.0f, 0.0f }, { 0.75f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
+      CurveEdit::ReplaceRange(line.points, { { 0.2f, 0.1f }, { 0.8f, 0.9f } }, ModShapes::kInterpLinear, MSEGNode::kMaxPoints);
+      line.Normalize();
+      check("line: replaces what is under it (count)", (double)line.points.size(), 4, 0);
+      check("line: a straight ramp", line.Evaluate(0.5f), 0.5, 1e-5);
+      MSEGNode bend;
+      bend.points = { { 0.0f, 0.0f, 0.8f }, { 0.6f, 1.0f, -0.5f }, { 1.0f, 0.2f, 0.0f } };
+      MSEGNode cropped = bend;
+      CurveEdit::Crop(cropped.points, 0.2f, 0.9f);
+      cropped.Normalize();
+      worst = 0.0f;
+      for (int k = 0; k <= 500; k++)
+      {
+         const float u = (float)k / 500.0f;
+         worst = std::max(worst, std::fabs(cropped.Evaluate(u) - bend.Evaluate(0.2f + 0.7f * u)));
+      }
+      check("crop: the kept part keeps its exact shape", worst, 0.0, 2e-5);
+      MSEGNode q = line;
+      q.points[1].x = 0.27f;
+      CurveEdit::QuantiseX(q.points, { 1 }, 0.125f);
+      check("quantise: x to the grid", q.points[1].x, 0.25, 1e-6);
    }
 
    // --- nothing patched: follows the transport

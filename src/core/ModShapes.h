@@ -117,11 +117,39 @@ namespace ModShapes
       }
    }
 
+   // How the segment that leaves a point is drawn (Blender's keyframe
+   // interpolation: the left point of a segment decides it).
+   enum MsegInterp : uint8_t
+   {
+      kInterpConstant = 0, // hold this point's value until the next point
+      kInterpLinear,
+      kInterpBend,         // exponential bend set by `curve` (every older patch)
+      kInterpBezier,       // cubic through this point's right and the next point's left handle
+      kInterpCount
+   };
+   // Blender's handle types. The auto kinds are recomputed from the
+   // neighbours after every edit (MsegAutoHandles); Aligned and Free keep
+   // what was dragged.
+   enum MsegHandle : uint8_t
+   {
+      kHandleAutoClamped = 0, // smooth, flat at peaks and dips, never overshoots
+      kHandleAuto,
+      kHandleVector,          // points a third of the way at the neighbour
+      kHandleAligned,         // dragged, the two sides stay in one line
+      kHandleFree,            // dragged, each side on its own
+      kHandleCount
+   };
+
    struct MsegPoint
    {
       float x = 0.0f;     // 0..1 along the shape
       float y = 0.0f;     // 0..1
       float curve = 0.0f; // bend of the segment that leaves this point: -1..1, 0 = straight
+      uint8_t interp = kInterpBend;
+      uint8_t handle = kHandleAutoClamped;
+      // Bezier handles as offsets from the point, in shape units: left
+      // (lx <= 0) and right (rx >= 0).
+      float lx = 0.0f, ly = 0.0f, rx = 0.0f, ry = 0.0f;
    };
 
    // Exponential bend: (e^(k t) - 1) / (e^k - 1), k = -6 * curve. Positive curve
@@ -134,21 +162,150 @@ namespace ModShapes
       return y0 + (y1 - y0) * shaped;
    }
 
-   // Shape value at x (0..1) for points sorted by x.
-   inline float MsegEvaluate(const MsegPoint* points, int count, float x)
+   // A bezier segment's y at x. Handles longer than the segment are scaled
+   // down together (Blender's correct_bezpart), so x only ever rises and
+   // there is one y per x; x(t) = x is then solved by Newton, with bisection
+   // as the safety net.
+   inline float MsegBezier(const MsegPoint& a, const MsegPoint& b, float x)
+   {
+      const double span = (double)b.x - (double)a.x;
+      if (span <= 1.0e-9)
+         return x >= b.x ? b.y : a.y;
+      double h1x = std::max(0.0, (double)a.rx), h1y = a.ry;
+      double h2x = std::max(0.0, -(double)b.lx), h2y = -(double)b.ly;
+      const double len = h1x + h2x;
+      if (len > span)
+      {
+         const double f = span / len;
+         h1x *= f; h1y *= f; h2x *= f; h2y *= f;
+      }
+      const double x0 = a.x, x1 = a.x + h1x, x2 = b.x - h2x, x3 = b.x;
+      const double y0 = a.y, y1 = a.y + h1y, y2 = b.y - h2y, y3 = b.y;
+      // x(t) = c3 t^3 + c2 t^2 + c1 t + x0
+      const double c1 = 3.0 * (x1 - x0), c2 = 3.0 * (x0 - 2.0 * x1 + x2), c3 = x3 - x0 + 3.0 * (x1 - x2);
+      const double target = std::clamp((double)x, x0, x3);
+      double t = (target - x0) / span, lo = 0.0, hi = 1.0;
+      for (int i = 0; i < 24; i++)
+      {
+         const double fx = ((c3 * t + c2) * t + c1) * t + x0 - target;
+         if (std::fabs(fx) < 1.0e-9)
+            break;
+         if (fx > 0.0)
+            hi = t;
+         else
+            lo = t;
+         const double d = (3.0 * c3 * t + 2.0 * c2) * t + c1;
+         double next = d > 1.0e-12 ? t - fx / d : 0.5 * (lo + hi);
+         if (next <= lo || next >= hi)
+            next = 0.5 * (lo + hi);
+         t = next;
+      }
+      const double u = 1.0 - t;
+      return (float)(u * u * u * y0 + 3.0 * u * u * t * y1 + 3.0 * u * t * t * y2 + t * t * t * y3);
+   }
+
+   // The segment holding x: the last point at or before x among
+   // 0..count-2 (a run of points on one x resolves to its last, so a step
+   // lands on the new value). `hint` is the segment found last time: a curve
+   // read left to right finds x in it or the next one, so the per-voice
+   // kernel pays a compare or two, not a search. count >= 2.
+   inline int MsegFindSegment(const MsegPoint* points, int count, float x, int hint)
+   {
+      if (hint >= 0 && hint <= count - 2 && points[hint].x <= x)
+      {
+         if (hint == count - 2 || x < points[hint + 1].x)
+            return hint;
+         if (hint + 1 == count - 2 || x < points[hint + 2].x)
+            return hint + 1;
+      }
+      int lo = 1, hi = count - 1; // first index in 1..count-1 whose x > target
+      while (lo < hi)
+      {
+         const int mid = (lo + hi) >> 1;
+         if (points[mid].x <= x)
+            lo = mid + 1;
+         else
+            hi = mid;
+      }
+      return lo - 1;
+   }
+
+   // Shape value at x (0..1) for points sorted by x; `hint` as above, updated.
+   inline float MsegEvaluate(const MsegPoint* points, int count, float x, int& hint)
    {
       if (count < 2)
          return count <= 0 ? 0.0f : points[0].y;
       x = std::clamp(x, 0.0f, 1.0f);
-      int i = 0;
-      while (i < count - 2 && x >= points[i + 1].x)
-         i++;
+      const int i = hint = MsegFindSegment(points, count, x, hint);
       const MsegPoint& a = points[i];
       const MsegPoint& b = points[i + 1];
       const float span = b.x - a.x;
       if (span <= 1.0e-6f)
          return x >= b.x ? b.y : a.y; // two points on one x: a step
-      return MsegSegment(a.y, b.y, a.curve, (x - a.x) / span);
+      const float t = (x - a.x) / span;
+      switch (a.interp)
+      {
+         case kInterpConstant: return x >= b.x ? b.y : a.y;
+         case kInterpLinear: return a.y + (b.y - a.y) * std::clamp(t, 0.0f, 1.0f);
+         case kInterpBezier: return MsegBezier(a, b, x);
+         default: return MsegSegment(a.y, b.y, a.curve, t);
+      }
+   }
+
+   inline float MsegEvaluate(const MsegPoint* points, int count, float x)
+   {
+      int hint = -1;
+      return MsegEvaluate(points, count, x, hint);
+   }
+
+   // Recompute the handles of every auto-kind point from its neighbours,
+   // a third of the way along each side. Auto Clamped lies flat at a peak,
+   // a dip or an end and never lets a handle pass a neighbour's value, so a
+   // modulator never overshoots 0..1. Main thread, after an edit.
+   inline void MsegAutoHandles(MsegPoint* p, int count)
+   {
+      for (int i = 0; i < count; i++)
+      {
+         MsegPoint& c = p[i];
+         if (c.handle == kHandleAligned || c.handle == kHandleFree)
+            continue;
+         const float dl = i > 0 ? c.x - p[i - 1].x : 0.0f;
+         const float dr = i + 1 < count ? p[i + 1].x - c.x : 0.0f;
+         if (c.handle == kHandleVector)
+         {
+            c.lx = -dl / 3.0f; c.ly = i > 0 ? (p[i - 1].y - c.y) / 3.0f : 0.0f;
+            c.rx = dr / 3.0f;  c.ry = i + 1 < count ? (p[i + 1].y - c.y) / 3.0f : 0.0f;
+            continue;
+         }
+         float slope = 0.0f;
+         if (i > 0 && i + 1 < count && p[i + 1].x - p[i - 1].x > 1.0e-6f)
+            slope = (p[i + 1].y - p[i - 1].y) / (p[i + 1].x - p[i - 1].x);
+         else if (c.handle == kHandleAuto && i + 1 < count && dr > 1.0e-6f)
+            slope = (p[i + 1].y - c.y) / dr;
+         else if (c.handle == kHandleAuto && i > 0 && dl > 1.0e-6f)
+            slope = (c.y - p[i - 1].y) / dl;
+         c.lx = -dl / 3.0f; c.ly = -slope * dl / 3.0f;
+         c.rx = dr / 3.0f;  c.ry = slope * dr / 3.0f;
+         if (c.handle == kHandleAutoClamped)
+         {
+            if (i == 0 || i + 1 == count)
+            {
+               c.ly = c.ry = 0.0f;
+               continue;
+            }
+            const float yl = p[i - 1].y, yr = p[i + 1].y;
+            if ((c.y >= yl && c.y >= yr) || (c.y <= yl && c.y <= yr))
+            {
+               c.ly = c.ry = 0.0f; // peak or dip
+               continue;
+            }
+            // Keep each handle's value between this point and its neighbour.
+            const float kl = std::fabs(c.ly) > 1.0e-9f ? std::min(1.0f, std::fabs(yl - c.y) / std::fabs(c.ly)) : 1.0f;
+            const float kr = std::fabs(c.ry) > 1.0e-9f ? std::min(1.0f, std::fabs(yr - c.y) / std::fabs(c.ry)) : 1.0f;
+            const float k = std::min(kl, kr); // one factor keeps the two sides in line
+            c.ly *= k; c.ry *= k;
+         }
+      }
    }
 
    // Envelope: attack, hold, decay, sustain, release (times in ms), each
@@ -257,6 +414,32 @@ namespace ModShapes
       if (b - a < 1.0e-4)
          return (float)b; // sustain point
       return (float)(a + std::fmod(elapsed - a, b - a));
+   }
+
+   // How a shape nobody triggers runs along the transport (or its own clock).
+   enum MsegPlay
+   {
+      kPlayRepeat = 0, // over and over; with loop on, plays in then repeats the loop part
+      kPlayOnce,       // once from the start, then holds the last value
+      kPlayPingPong,   // forward, then back, over and over
+      kPlayCount
+   };
+
+   // Where along the shape a free run is, `elapsed` shape-lengths in.
+   inline float MsegPositionFree(double elapsed, int play, bool loop, float loopStart, float loopEnd)
+   {
+      if (elapsed <= 0.0)
+         return 0.0f;
+      switch (play)
+      {
+         case kPlayOnce: return (float)std::min(1.0, elapsed);
+         case kPlayPingPong:
+         {
+            const double f = std::fmod(elapsed, 2.0);
+            return (float)(f <= 1.0 ? f : 2.0 - f);
+         }
+         default: return MsegPositionHeld(elapsed, false, loop, loopStart, loopEnd);
+      }
    }
 
    // One step of a gated run already under way: `held` keeps it in the

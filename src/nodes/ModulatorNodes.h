@@ -778,9 +778,11 @@ class MSEGNode : public INode, public IModulator, public VoiceMod::IVoiceModSour
 {
 public:
    static INode* Create() { return new MSEGNode(); }
-   static constexpr int kMaxPoints = 32;
+   static constexpr int kMaxPoints = VoiceMod::kMaxPoints;
 
-   using Point = ModShapes::MsegPoint; // x, y (0..1) and the bend of the segment that leaves it
+   // x, y (0..1), how the segment that leaves it is drawn (interp, bend) and
+   // its bezier handles.
+   using Point = ModShapes::MsegPoint;
 
    MSEGNode() { Reset(); }
 
@@ -798,9 +800,23 @@ public:
 
    // Sorted by x; the first point is pinned to x = 0 and the last to x = 1.
    std::vector<Point> points;
+   // Time base: LFONode's Beats, Synced and Hz, plus a length in seconds or
+   // in frames (docs/plans/curve-editor §8.5). Seconds and frames run on the
+   // transport's seconds, which an export steps at exactly k / fps, so a
+   // frame-length shape lands on the same value per frame every run.
+   enum TimeBase { kRateSeconds = 3, kRateFrames = 4, kRateModeCount = 5 };
+   static const std::vector<std::string>& RateModeNames(); // LFONode's three, then Seconds, Frames
    int rateMode = LFONode::kRateSynced;
    float rateBeats = 4.0f; // the whole shape takes this many beats (Beats, Synced)
    float rateHz = 1.0f;    // times through per second (Hz)
+   float lengthSec = 2.0f;   // Seconds: the whole shape takes this long
+   float lengthFrames = 48.0f; // Frames: this many frames at `fps`
+   float fps = 30.0f;
+   float speed = 1.0f;     // 0.25..4: plays faster or slower without moving a point
+   int play = ModShapes::kPlayRepeat; // nothing on trig: ModShapes::MsegPlay
+   // Nothing on trig: false follows the transport (a seek moves it); true runs
+   // on its own clock from when it was made, transport or not.
+   bool freeRun = false;
    bool loop = false;
    float loopStart = 0.25f; // 0..1 along the shape
    float loopEnd = 0.75f;
@@ -813,6 +829,12 @@ public:
    int AddPoint(float x, float y); // index of the new point, or -1 at kMaxPoints
    void MovePoint(int index, float x, float y);
    void RemovePoint(int index); // the two end points stay
+   // Set how the segments leaving the points [first, last] are drawn.
+   void SetInterp(int first, int last, int interp);
+   void SetHandleType(int first, int last, int handle);
+   // After any edit to `points`: keeps them sorted with pinned ends and
+   // recomputes the auto handles. Edits through the methods above call it.
+   void Normalize();
    // Shape value at x (0..1).
    float Evaluate(float x) const;
    // Value of one segment at t (0..1) between y0 and y1 for a bend of curve.
@@ -823,15 +845,26 @@ public:
    // Position (0..1) at the last Value01(), for the playhead.
    float Position() const { return mShownX; }
 
-   // Round-tripped as one "x,y,curve;..." string.
+   // Round-tripped as one "x,y,curve;..." string. A point that is not a
+   // plain bend adds ",interp,handle" and, for dragged handles,
+   // ",lx,ly,rx,ry" (older builds read the first three and ignore the rest).
    std::string Encode() const;
    void Decode(const std::string& s);
+
+   // True when the shape runs on seconds (Hz, Seconds, Frames), not beats.
+   bool OnSeconds() const { return rateMode == LFONode::kRateHz || rateMode == kRateSeconds || rateMode == kRateFrames; }
+   // Times through the shape per second (on seconds) or beats per pass (on
+   // beats), speed included.
+   double PassesPerSecond() const;
+   double BeatsPerPass() const;
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("rateMode", rateMode); v.Float("rateBeats", rateBeats); v.Float("rateHz", rateHz);
       v.Bool("loop", loop); v.Float("loopStart", loopStart); v.Float("loopEnd", loopEnd);
       v.Bool("voice", voice);
+      v.Float("lengthSec", lengthSec); v.Float("lengthFrames", lengthFrames); v.Float("fps", fps);
+      v.Float("speed", speed); v.Int("play", play); v.Bool("freeRun", freeRun);
       std::string encoded = Encode();
       v.Text("points", encoded);
       Decode(encoded);
@@ -846,6 +879,9 @@ private:
    bool mReleased = true;  // the run has left the loop
    float mTrigLast = 0.0f;
    float mShownX = 0.0f;
+   mutable int mHint = -1; // segment read last
+   double mFreeClock = 0.0;     // freeRun: seconds this node has run
+   double mFreeLast = -1.0;     // steady-clock seconds at the last read
 };
 
 // A value per note, by its place among the notes held when it started: cabled
