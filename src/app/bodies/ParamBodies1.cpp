@@ -843,9 +843,21 @@ namespace app
    // control), a MusicTime division (exact, same menu as the note nodes) or
    // Hz. The beats slider keeps ordinal 0 in every mode (hidden when not
    // drawn); Hz takes the fixed ordinal `hzOrdinal`, above the body's count.
+   // `names` lists the modes the node offers; the first three are always
+   // LFONode's (beats, synced, Hz). MSEG adds Seconds and Frames after them
+   // and draws their controls itself.
+   void DrawModRateControls(int* rateMode, float* rateBeats, float* rateHz, int hzOrdinal,
+                            const std::vector<std::string>& names);
+
    void DrawModRateControls(int* rateMode, float* rateBeats, float* rateHz, int hzOrdinal)
    {
-      DropdownButton("rate in", LFONode::RateModeNames(), *rateMode,
+      DrawModRateControls(rateMode, rateBeats, rateHz, hzOrdinal, LFONode::RateModeNames());
+   }
+
+   void DrawModRateControls(int* rateMode, float* rateBeats, float* rateHz, int hzOrdinal,
+                            const std::vector<std::string>& names)
+   {
+      DropdownButton("rate in", names, *rateMode,
                      [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
       if (*rateMode == LFONode::kRateBeats)
       {

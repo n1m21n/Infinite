@@ -277,7 +277,7 @@ namespace app
       {
          best = 8.0f;
          for (int i = 0; i + 1 < (int)pts.size(); i++)
-            if (pts[i + 1].x - pts[i].x > 0.02f && dist(bendHandle(i)) < best)
+            if (pts[i].interp == ModShapes::kInterpBend && pts[i + 1].x - pts[i].x > 0.02f && dist(bendHandle(i)) < best)
             {
                best = dist(bendHandle(i));
                nearBend = i;
@@ -359,7 +359,7 @@ namespace app
          dl->AddLine(toScreen(x0, n->Evaluate(x0)), toScreen(x1, n->Evaluate(x1)), lineCol, 1.8f);
       }
       for (int i = 0; i + 1 < (int)pts.size(); i++)
-         if (pts[i + 1].x - pts[i].x > 0.02f)
+         if (pts[i].interp == ModShapes::kInterpBend && pts[i + 1].x - pts[i].x > 0.02f)
             dl->AddCircle(bendHandle(i), i == nearBend ? 4.5f : 3.0f, lineCol, 0, 1.2f);
       for (int i = 0; i < (int)pts.size(); i++)
       {
@@ -376,11 +376,42 @@ namespace app
    }
 
 
+   void DrawModRateControls(int* rateMode, float* rateBeats, float* rateHz, int hzOrdinal,
+                            const std::vector<std::string>& names); // ParamBodies1.cpp
+   void RegisterHiddenParam(float* value, float minV, float maxV, const char* name, int ordinal); // ParamBodies1.cpp
+
+   // A slider at a fixed ordinal, or (not shown) the same param registered
+   // hidden, so modulation keeps its slot whichever controls are on show.
+   static void FixedModSlider(bool shown, int ordinal, const char* label, float* v, float lo, float hi, const char* fmt)
+   {
+      FixedParamOrdinal at(ordinal);
+      if (shown)
+         ModSlider(label, v, lo, hi, fmt);
+      else
+      {
+         RegisterHiddenParam(v, lo, hi, label, ordinal);
+         NoteHiddenParamAnchorAtLastItem(ordinal);
+      }
+   }
+
+   static const std::vector<std::string>& MsegPlayNames() // ModShapes::MsegPlay order
+   {
+      static const std::vector<std::string> names = { "Repeat", "Once", "Ping-pong" };
+      return names;
+   }
+
    void DrawMSEGParams(MSEGNode* n)
    {
       const bool isLight = IsThemeLight();
       DrawMSEGEditor(n, isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_E6EBFAFF));
-      DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 3);
+      DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 3, MSEGNode::RateModeNames());
+      // Ordinals 4-7 come after the card's first four (rate, loop start,
+      // loop end, rate Hz) so saved cables keep their targets.
+      FixedModSlider(n->rateMode == MSEGNode::kRateSeconds, 5, "length", &n->lengthSec, 0.01f, 600.0f, "%.2f s");
+      FixedModSlider(n->rateMode == MSEGNode::kRateFrames, 6, "frames", &n->lengthFrames, 1.0f, 10000.0f, "%.0f");
+      FixedModSlider(n->rateMode == MSEGNode::kRateFrames, 7, "fps", &n->fps, 1.0f, 240.0f, "%.2f");
+      FixedModSlider(true, 4, "speed", &n->speed, 0.25f, 4.0f, "%.2fx");
+      DropdownButton("play", MsegPlayNames(), n->play, [n](int i) { PushUndoCheckpoint(); n->play = i; });
       PushCheckboxStyle();
       ModCheckbox("loop", &n->loop);
       PopCheckboxStyle();
@@ -390,6 +421,9 @@ namespace app
       ModSlider("loop end", &n->loopEnd, 0.0f, 1.0f);
       ImGui::EndDisabled();
       DrawPerVoiceCheckbox(&n->voice);
+      PushCheckboxStyle();
+      ModCheckbox("free run", &n->freeRun);
+      PopCheckboxStyle();
    }
 
 
