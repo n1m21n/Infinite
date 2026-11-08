@@ -121,11 +121,16 @@ namespace Ipc
 
    std::string SharedMemoryUniqueName(const char* prefix)
    {
+      // Every module that links this file has its own counter: the Instrument and FX bundles
+      // loaded in one host would both start at 0 and collide (the second create fails). The
+      // counter's address, folded to 32 bits, tells the copies apart.
+      uint64_t tag = (uint64_t)(uintptr_t)&gNameCounter;
+      tag ^= tag >> 32;
       char buf[64];
 #if defined(_WIN32)
-      snprintf(buf, sizeof buf, "Local\\%s.%lld.%u", prefix, (long long)SelfPid(), gNameCounter.fetch_add(1));
+      snprintf(buf, sizeof buf, "Local\\%s.%lld.%x.%u", prefix, (long long)SelfPid(), (unsigned)tag, gNameCounter.fetch_add(1));
 #else
-      snprintf(buf, sizeof buf, "/%s.%lld.%u", prefix, (long long)SelfPid(), gNameCounter.fetch_add(1));
+      snprintf(buf, sizeof buf, "/%s.%lld.%x.%u", prefix, (long long)SelfPid(), (unsigned)tag, gNameCounter.fetch_add(1));
 #endif
       return buf;
    }

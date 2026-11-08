@@ -30,7 +30,7 @@ namespace Ipc
       void* handle = nullptr; // Windows mapping handle
    };
 
-   // A name no other live process uses: "<prefix>.<pid>.<counter>" (POSIX names get a leading '/';
+   // A name no other live process or module uses: "<prefix>.<pid>.<module tag>.<counter>" (POSIX names get a leading '/';
    // Windows names live in the Local\ namespace). Keep the prefix short: macOS caps names at 31.
    std::string SharedMemoryUniqueName(const char* prefix);
 

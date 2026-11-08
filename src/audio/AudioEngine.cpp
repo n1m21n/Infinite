@@ -319,8 +319,9 @@ void AudioEngine::SetAudioThreads(int threads)
 int AudioEngine::WantedThreads() const
 {
    int want = mThreadEnv > 0 ? mThreadEnv : mThreadSetting.load(std::memory_order_relaxed);
+   static const int kHardware = (int)std::thread::hardware_concurrency(); // a sysctl; not per block
    if (want == 0)
-      want = (int)std::thread::hardware_concurrency();
+      want = kHardware;
    return std::clamp(want, 1, 16);
 }
 

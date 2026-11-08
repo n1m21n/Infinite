@@ -25,6 +25,10 @@ namespace PluginView
    {
       PluginFrames::ViewState gView;
       bool gSizeApplied = true;
+      // With no view open the hidden window shrinks: its drawables at 1600x1000 @2x were ~120 MB
+      // of IOSurfaces per engine doing nothing (step 2.7, M-9). The view's size comes back on open.
+      bool gShrunk = false;
+      constexpr int kClosedW = 400, kClosedH = 250;
       std::vector<PluginFrames::InputEvent> gInput;
 
       Ipc::SharedMemory gRegion;
@@ -219,6 +223,7 @@ namespace PluginView
             // The window keeps what the view showed: its size in points, centred on the main screen.
             const int w = gView.open ? int(gView.width) : 1280, h = gView.open ? int(gView.height) : 800;
             glfwSetWindowSize(window, w, h);
+            gShrunk = false;
             if (GLFWmonitor* m = glfwGetPrimaryMonitor())
             {
                int mx = 0, my = 0, mw = 0, mh = 0;
@@ -247,7 +252,15 @@ namespace PluginView
          return;
       ApplyPopped(window);
       if (!Open())
+      {
+         if (window && !gPopped && !gShrunk)
+         {
+            glfwSetWindowSize(window, kClosedW, kClosedH);
+            gShrunk = true;
+            gSizeApplied = false;
+         }
          return;
+      }
       Drain();
       if (!gSizeApplied && window)
       {
@@ -255,6 +268,7 @@ namespace PluginView
          // scale of the screen it is on, and ImGui lays out in points as in the app.
          glfwSetWindowSize(window, int(gView.width), int(gView.height));
          gSizeApplied = true;
+         gShrunk = false;
       }
       if (gInput.empty())
          return;

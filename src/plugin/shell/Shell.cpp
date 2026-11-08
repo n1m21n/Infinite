@@ -665,6 +665,8 @@ namespace InfinitePlugin
 
       PluginIpc::Result Process(const PluginIpc::ProcessArgs& a) { return shell_.Process(a); }
       int64_t Pid() const { return child_.pid; }
+      // Blocks the host played as silence because the engine was late or stalled (M-7), since spawn.
+      uint64_t Xruns() const { return shell_.Valid() ? shell_.Xruns() : 0; }
 
       // Crash restart (step 2.5): the patch the engine pushed last (every 2 s while it changes), for
       // a restart after the engine died and can no longer answer RequestPatch.
@@ -956,6 +958,15 @@ namespace InfinitePlugin
          {
             if (!Licensed() && License::Current(AppMajor()).status == License::Status::Valid)
                StartEngine();
+            return kResultOk;
+         }
+         // Read-only counters for a host-side soak (tools/plugin/soak.py, M-7): answered in the
+         // message's own attributes, so the asker needs no connection point.
+         if (attr && std::strcmp(id, "stats") == 0)
+         {
+            attr->setInt("xruns", int64(link_.Xruns()));
+            attr->setInt("enginePid", link_.Running() ? link_.Pid() : 0);
+            attr->setInt("licensed", Licensed() ? 1 : 0);
             return kResultOk;
          }
          if (attr && std::strcmp(id, "popout") == 0)

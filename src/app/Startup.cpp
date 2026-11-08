@@ -1010,10 +1010,16 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          fprintf(stderr, "plugin engine: %s\n", pluginErr.c_str());
          return 2;
       }
+      // One audio thread per engine: the DAW already spreads instances across its cores, and
+      // without a device workgroup the graph's workers are not realtime, so the engine's audio
+      // thread waited on descheduled workers and blocks came back late (step 2.7, M-7).
 #if defined(_WIN32)
       _putenv_s("INFINITE_NO_UPDATE_CHECK", "1");
+      if (!std::getenv("INFINITE_AUDIO_THREADS"))
+         _putenv_s("INFINITE_AUDIO_THREADS", "1");
 #else
       setenv("INFINITE_NO_UPDATE_CHECK", "1", 1);
+      setenv("INFINITE_AUDIO_THREADS", "1", 0);
 #endif
    }
 

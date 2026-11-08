@@ -46,9 +46,12 @@
 
 #include "ShellCheckMac.h"
 #include "core/License.h"
+#include "platform/common/Ipc.h"
 #include "monocypher/monocypher-ed25519.h"
 
 #include <algorithm>
+#include <atomic>
+#include <time.h>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -510,6 +513,268 @@ namespace
       }
       unsetenv("INFINITE_PLUGIN_PATCH");
       return r;
+   }
+
+   // ---- soak (step 2.7: M-7, M-8, M-9; driven by tools/plugin/soak.py) -----------------------
+   // One host audio thread processes every instance in turn each 256-sample block at 48 kHz, paced
+   // on absolute deadlines like a DAW's callback: R1 Instruments get a note pattern, R2 FX get
+   // Signal(). An idle phase (silence, no notes) comes first for the idle memory reading. Every
+   // `reportSec` one JSON line goes to stdout: phase, xruns per instance since the measured window
+   // began (the shell's own counter, "stats" message), engine pids, and the host thread's CPU per
+   // instance (thread CPU time inside process() / wall, M-8: the shell + IPC cost, as the engine
+   // runs in its own process). Exit 0 when no instance missed a block, none restarted, and every
+   // instance stayed under 3 % of a core.
+
+   struct SoakStats
+   {
+      int64 xruns = 0, pid = 0, licensed = 0;
+   };
+
+   SoakStats QueryStats(Instance& a)
+   {
+      SoakStats st;
+      FUnknownPtr<IConnectionPoint> cp(a.comp);
+      IPtr<Vst::HostMessage> m = owned(new Vst::HostMessage);
+      m->setMessageID("stats");
+      if (cp && cp->notify(m) == kResultOk)
+         if (IAttributeList* attr = m->getAttributes())
+         {
+            attr->getInt("xruns", st.xruns);
+            attr->getInt("enginePid", st.pid);
+            attr->getInt("licensed", st.licensed);
+         }
+      return st;
+   }
+
+   double ThreadCpuNs()
+   {
+      timespec ts {};
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+      return double(ts.tv_sec) * 1e9 + double(ts.tv_nsec);
+   }
+
+   // An Instrument and an FX in one host: two bundles, each with its own copy of the IPC code. Both
+   // must get an engine (2.7: their shared-memory names used to collide, so the FX never started).
+   void CheckMixedInstances(Plugin& instP, Plugin& fxP)
+   {
+      Instance a, b, c;
+      const bool ok = a.Open(instP, false, kRealtime) && b.Open(fxP, true, kRealtime) && c.Open(instP, false, kRealtime);
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      const SoakStats sa = ok ? QueryStats(a) : SoakStats {}, sb = ok ? QueryStats(b) : SoakStats {}, sc = ok ? QueryStats(c) : SoakStats {};
+      char d[128];
+      std::snprintf(d, sizeof d, "engine pids %lld, %lld, %lld", (long long)sa.pid, (long long)sb.pid, (long long)sc.pid);
+      Check(ok && sa.pid > 0 && sb.pid > 0 && sc.pid > 0 && sa.pid != sb.pid && sb.pid != sc.pid,
+            "Instrument + FX + Instrument active in one host: each gets its own engine", d);
+      for (Instance* x : { &a, &b, &c })
+         if (x->comp)
+            x->Close();
+   }
+
+   int RunSoak(Plugin& instP, Plugin& fxP, const std::string& r1, const std::string& r2, double minutes, int nInst, int nFx,
+               int idleSec, int reportSec)
+   {
+      constexpr int32 kSoakBlock = 256;
+      const int n = nInst + nFx;
+      std::vector<Instance> ins(static_cast<size_t>(n));
+      bool opened = true;
+      for (int i = 0; i < n && opened; i++)
+      {
+         const bool fx = i >= nInst;
+         setenv("INFINITE_PLUGIN_PATCH", (fx ? r2 : r1).c_str(), 1);
+         opened = ins[size_t(i)].Open(fx ? fxP : instP, fx, kRealtime, true, kSoakBlock);
+         unsetenv("INFINITE_PLUGIN_PATCH");
+      }
+      if (!opened)
+      {
+         Check(false, "soak: open instances");
+         return 1;
+      }
+
+      std::atomic<bool> stop { false }, playing { false };
+      std::atomic<int64_t> overruns { 0 }, maxCallNs { 0 }, frames { 0 };
+      std::vector<std::atomic<double>> cpuNs(static_cast<size_t>(n));
+      for (auto& c : cpuNs)
+         c.store(0.0);
+
+      std::atomic<int64_t> maxCallInst { -1 }, maxCallCpuNs { 0 };
+      std::atomic<bool> realtimeThread { false };
+      std::thread host([&] {
+         // A DAW's audio callback runs time-constrained; so does this one (the engine's does too).
+         realtimeThread.store(Ipc::SetThreadRealtime(kRate, kSoakBlock));
+         std::vector<float> il(kSoakBlock), ir(kSoakBlock), ol(kSoakBlock), orr(kSoakBlock);
+         float* inPtr[2] = { il.data(), ir.data() };
+         float* outPtr[2] = { ol.data(), orr.data() };
+         AudioBusBuffers ib, ob;
+         ib.numChannels = ob.numChannels = 2;
+         ib.channelBuffers32 = inPtr;
+         ob.channelBuffers32 = outPtr;
+         EventList events(64);
+         ParameterChanges params(4);
+         ProcessContext ctx {};
+         ProcessData d {};
+         d.processMode = kRealtime;
+         d.symbolicSampleSize = kSample32;
+         d.numOutputs = 1;
+         d.outputs = &ob;
+         d.inputEvents = &events;
+         d.inputParameterChanges = &params;
+         d.processContext = &ctx;
+         d.numSamples = kSoakBlock;
+         const int64_t period = int64_t(1e9 * kSoakBlock / kRate);
+         constexpr int64_t kNoteEvery = 24000, kNoteLen = 19200; // a note every 0.5 s, 0.4 s long
+         int64_t t = 0, playT = 0;
+         auto next = std::chrono::steady_clock::now();
+         while (!stop.load())
+         {
+            const bool play = playing.load();
+            for (int32 i = 0; i < kSoakBlock; i++)
+               il[size_t(i)] = ir[size_t(i)] = play ? Signal(playT + i) : 0.0f;
+            events.clear();
+            if (play)
+               for (int64_t at = (playT + kNoteEvery - 1) / kNoteEvery * kNoteEvery - kNoteEvery; at < playT + kSoakBlock; at += kNoteEvery)
+                  for (int on = 0; on < 2; on++)
+                  {
+                     const int64_t when = on ? at : at + kNoteLen;
+                     if (when < playT || when >= playT + kSoakBlock || at < 0)
+                        continue;
+                     Event e {};
+                     e.type = on ? Event::kNoteOnEvent : Event::kNoteOffEvent;
+                     e.sampleOffset = int32(when - playT);
+                     const int16 pitch = int16(48 + (at / kNoteEvery * 7) % 24);
+                     if (on)
+                     {
+                        e.noteOn.pitch = pitch;
+                        e.noteOn.velocity = 0.7f;
+                        e.noteOn.noteId = -1;
+                     }
+                     else
+                     {
+                        e.noteOff.pitch = pitch;
+                        e.noteOff.noteId = -1;
+                     }
+                     events.addEvent(e);
+                  }
+            ctx.state = ProcessContext::kTempoValid | ProcessContext::kProjectTimeMusicValid | (play ? ProcessContext::kPlaying : 0);
+            ctx.sampleRate = kRate;
+            ctx.tempo = 120.0;
+            ctx.projectTimeSamples = playT;
+            ctx.projectTimeMusic = double(playT) / kRate * 2.0;
+            const auto cycle0 = std::chrono::steady_clock::now();
+            for (int i = 0; i < n; i++)
+            {
+               Instance& a = ins[size_t(i)];
+               d.numInputs = a.fx ? 1 : 0;
+               d.inputs = a.fx ? &ib : nullptr;
+               params.clearQueue();
+               const double c0 = ThreadCpuNs();
+               const auto w0 = std::chrono::steady_clock::now();
+               a.proc->process(d);
+               const int64_t callNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - w0).count();
+               const double callCpu = ThreadCpuNs() - c0;
+               cpuNs[size_t(i)].store(cpuNs[size_t(i)].load() + callCpu);
+               if (callNs > maxCallNs.load())
+               {
+                  maxCallNs.store(callNs);
+                  maxCallInst.store(i);
+                  maxCallCpuNs.store(int64_t(callCpu));
+               }
+            }
+            if (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - cycle0).count() > period)
+               overruns.fetch_add(1);
+            t += kSoakBlock;
+            if (play)
+               playT += kSoakBlock;
+            frames.store(t);
+            next += std::chrono::nanoseconds(period);
+            std::this_thread::sleep_until(next);
+         }
+      });
+
+      auto report = [&](const char* phase, double elapsed, const std::vector<int64>& base, const std::vector<double>& cpu0, double wall,
+                        std::vector<SoakStats>& now) {
+         now.clear();
+         std::string x, p, c;
+         for (int i = 0; i < n; i++)
+         {
+            now.push_back(QueryStats(ins[size_t(i)]));
+            const double pct = wall > 0 ? 100.0 * (cpuNs[size_t(i)].load() - cpu0[size_t(i)]) / (wall * 1e9) : 0.0;
+            char b[64];
+            x += (i ? "," : "") + std::to_string((long long)(now.back().xruns - base[size_t(i)]));
+            p += (i ? "," : "") + std::to_string((long long)now.back().pid);
+            std::snprintf(b, sizeof b, "%s%.3f", i ? "," : "", pct);
+            c += b;
+         }
+         std::printf("{\"soak\":1,\"phase\":\"%s\",\"t\":%.1f,\"instruments\":%d,\"fx\":%d,\"xruns\":[%s],\"pids\":[%s],\"cpu_pct\":[%s],"
+                     "\"host_overruns\":%lld,\"max_call_us\":%.1f,\"max_call_inst\":%lld,\"max_call_cpu_us\":%.1f,\"rt\":%d}\n",
+                     phase, elapsed, nInst, nFx, x.c_str(), p.c_str(), c.c_str(), (long long)overruns.load(), maxCallNs.load() / 1000.0,
+                     (long long)maxCallInst.load(), maxCallCpuNs.load() / 1000.0, realtimeThread.load() ? 1 : 0);
+         std::fflush(stdout);
+      };
+
+      // Idle: engines start and load, the host plays silence with no notes.
+      const auto t0 = std::chrono::steady_clock::now();
+      auto since = [&](std::chrono::steady_clock::time_point a) { return std::chrono::duration<double>(std::chrono::steady_clock::now() - a).count(); };
+      while (since(t0) < idleSec)
+         ViewCheck::Pump(200);
+      std::vector<SoakStats> now;
+      std::vector<int64> zero(size_t(n), 0), base(size_t(n), 0);
+      std::vector<double> cpu0(size_t(n), 0.0);
+      report("idle", since(t0), zero, cpu0, since(t0), now);
+      std::vector<int64> pids0;
+      bool licensed = true;
+      for (int i = 0; i < n; i++)
+      {
+         base[size_t(i)] = now[size_t(i)].xruns;
+         pids0.push_back(now[size_t(i)].pid);
+         licensed = licensed && now[size_t(i)].licensed && now[size_t(i)].pid > 0;
+         cpu0[size_t(i)] = cpuNs[size_t(i)].load();
+      }
+      overruns.store(0);
+      maxCallNs.store(0);
+
+      // Measured window: notes and input for `minutes`.
+      playing.store(true);
+      const auto p0 = std::chrono::steady_clock::now();
+      double nextReport = reportSec;
+      while (since(p0) < minutes * 60.0)
+      {
+         ViewCheck::Pump(200);
+         if (since(p0) >= nextReport)
+         {
+            report("play", since(p0), base, cpu0, since(p0), now);
+            nextReport += reportSec;
+         }
+      }
+      report("end", since(p0), base, cpu0, since(p0), now);
+      const double wall = since(p0);
+      stop.store(true);
+      host.join();
+
+      int64 xruns = 0;
+      bool samePids = true;
+      double worstCpu = 0.0;
+      for (int i = 0; i < n; i++)
+      {
+         xruns += now[size_t(i)].xruns - base[size_t(i)];
+         samePids = samePids && now[size_t(i)].pid == pids0[size_t(i)];
+         worstCpu = std::max(worstCpu, 100.0 * (cpuNs[size_t(i)].load() - cpu0[size_t(i)]) / (wall * 1e9));
+      }
+      for (auto& a : ins)
+         a.Close();
+
+      char dsc[200];
+      std::snprintf(dsc, sizeof dsc, "%d instances (%d R1 + %d R2), 48 kHz / 256, %.1f min", n, nInst, nFx, wall / 60.0);
+      Check(licensed, "soak: every instance licensed with an engine", dsc);
+      std::snprintf(dsc, sizeof dsc, "%lld missed blocks; host thread overran its block %lld times, longest call %.0f us", (long long)xruns,
+                    (long long)overruns.load(), maxCallNs.load() / 1000.0);
+      Check(xruns == 0, "M-7: no engine deadline misses", dsc);
+      Check(samePids, "soak: no engine restarted");
+      std::snprintf(dsc, sizeof dsc, "worst %.2f %% of one core per instance", worstCpu);
+      Check(worstCpu <= 3.0, "M-8: shell + IPC <= 3 % of one core per instance", dsc);
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      Check(EnginePids().empty(), "no engine left");
+      std::printf("%s (%d failed)\n", gFails == 0 ? "ALL PASS" : "FAILURES", gFails);
+      return gFails == 0 ? 0 : 1;
    }
 
 
@@ -1290,12 +1555,15 @@ namespace
       ViewCheck::Pump(2000);
       IPtr<IPlugView> again = owned(ec->createView(ViewType::kEditor));
       bool reopened = false;
+      double warmS = -1.0;
       if (again)
       {
          again->onSize(&r2);
+         const auto o0 = std::chrono::steady_clock::now();
          again->attached(parent, kPlatformTypeNSView);
          child = ViewCheck::Child(parent);
          reopened = child && waitSize(int(1280 * scale), int(800 * scale), 10000);
+         warmS = std::chrono::duration<double>(std::chrono::steady_clock::now() - o0).count();
          ViewCheck::Pump(500);
          again->removed();
          again = nullptr;
@@ -1305,6 +1573,10 @@ namespace
       const long long first2 = ReadStatLine(viewStats, "view", "firstSeq", 1);
       std::snprintf(d, sizeof d, "last frame shown %lld, first after 2 s closed %lld", last1, first2);
       Check(reopened && last1 > 0 && first2 > last1 && first2 - last1 <= 6, "view: closed, the engine reads nothing back; reopened, frames return", d);
+      // M-10 open time. Cold: no engine running, so spawn + GL + patch load + first frame (the OS
+      // file cache is warm; a first launch after a reboot is slower). Warm: engine running, view reopened.
+      std::snprintf(d, sizeof d, "cold %.2f s (<= 4), warm %.2f s (<= 1.5)", firstS, warmS);
+      Check(first && reopened && firstS <= 4.0 && warmS <= 1.5, "M-10 editor open: cold <= 4 s, warm <= 1.5 s", d);
 
       cpComp->disconnect(cpCtrl);
       cpCtrl->disconnect(cpComp);
@@ -1688,6 +1960,19 @@ int main(int argc, char** argv)
       std::printf("%s (%d failed)\n", gFails == 0 ? "ALL PASS" : "FAILURES", gFails);
       return gFails == 0 ? 0 : 1;
    }
+   // --soak <minutes> <Instrument.vst3> <FX.vst3> <R1.inf> <R2.inf> [instruments fx idleSec reportSec]
+   if (argc >= 7 && std::string(argv[1]) == "--soak")
+   {
+      Plugin inst, fx;
+      std::string err;
+      if (!inst.Load(argv[3], err) || !fx.Load(argv[4], err))
+      {
+         std::fprintf(stderr, "load failed: %s\n", err.c_str());
+         return 1;
+      }
+      auto arg = [&](int i, int def) { return argc > i ? std::atoi(argv[i]) : def; };
+      return RunSoak(inst, fx, argv[5], argv[6], std::atof(argv[2]), arg(7, 2), arg(8, 2), arg(9, 20), arg(10, 10));
+   }
    if (argc >= 6 && std::string(argv[1]) == "--metrics")
    {
       Plugin inst, fx;
@@ -1701,7 +1986,7 @@ int main(int argc, char** argv)
    }
    if (argc < 3)
    {
-      std::fprintf(stderr, "usage: INFINITE_PLUGIN_ENGINE=<Infinite binary> %s [--metrics | --view | --drill] <Instrument.vst3> <FX.vst3> [<R1.inf> <R2.inf>]\n", argv[0]);
+      std::fprintf(stderr, "usage: INFINITE_PLUGIN_ENGINE=<Infinite binary> %s [--metrics | --view | --drill | --soak <minutes>] <Instrument.vst3> <FX.vst3> [<R1.inf> <R2.inf>]\n", argv[0]);
       return 2;
    }
    Plugin inst, fx;
@@ -1816,6 +2101,7 @@ int main(int argc, char** argv)
    RunViewChecks(inst);
    RunNoGraphicsCheck(inst);
    RunDrillChecks(inst, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/R1-instrument.inf");
+   CheckMixedInstances(inst, fx);
    RunLicenseChecks(inst, fx);
 
    std::this_thread::sleep_for(std::chrono::milliseconds(300));
