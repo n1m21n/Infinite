@@ -280,4 +280,8 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 .ax-albums dt { font: 800 1.15rem/1.1 'Bricolage Grotesque', sans-serif; font-stretch: 80%; text-transform: lowercase; color: var(--r-ink); }
 .ax-albums dd { margin: 0; padding: 7px 10px; border: 1.5px solid var(--r-ink); border-radius: 4px; font: 500 .75rem/1 'DM Mono', ui-monospace, monospace; }
 @media (min-width: 760px) { .ax-maker { grid-template-columns: 1fr minmax(220px, 300px); align-items: center; } }
+
+.ax-name { display: flex; align-items: center; gap: 14px; margin: 0 0 10px; }
+.ax-name img { flex: none; width: 56px; height: 56px; object-fit: cover; border: 2.5px solid var(--r-ink); border-radius: 3px; box-shadow: 4px 4px 0 var(--r-mag); }
+.ax-name h3 { margin: 0; }
 /* brand-lint: on */
