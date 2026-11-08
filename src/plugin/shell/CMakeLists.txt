@@ -43,7 +43,12 @@ if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 endif()
 
-project(infinite-plugin VERSION ${INFINITE_VERSION} LANGUAGES C CXX OBJC OBJCXX)
+project(infinite-plugin VERSION ${INFINITE_VERSION} LANGUAGES C CXX)
+if(APPLE)
+    # Mac only: on Windows an OBJC compiler (clang) makes the VST3 SDK take its Unix path and pass
+    # -Wno-multichar to MSVC.
+    enable_language(OBJC OBJCXX)
+endif()
 set(CMAKE_CXX_STANDARD 17)
 
 add_subdirectory(${VST3_SDK_DIR} vst3sdk)
