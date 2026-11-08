@@ -808,6 +808,7 @@ void DrawPopupsA(FrameCtx& fc)
                if (MenuParts::Item(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
+               DrawParamHostAutomationMenuItem(nodeIndex, paramIndex);
                if (!destRef->isBool)
                {
                   if (MenuParts::Item(L("Enter Expression")))
