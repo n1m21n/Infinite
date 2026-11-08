@@ -41,22 +41,61 @@ async function paddleGet(env, path) {
   return (await r.json()).data;
 }
 
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const ASSET = "https://github.com/n1m21n/Infinite/releases/latest/download/";
+const SITE = "https://infinitedevices.org";
+
+// Builds the key email: Midnight brand card (docs/brand/BRAND.md), table layout and inline styles for mail clients.
+export function keyEmail(env, lic, shipped = false) {
+  const released = env.RELEASED === "1";
+  const first = lic.name ? lic.name.split(" ")[0] : "";
+  const hello = shipped ? `The Infinite plugin is out${first ? ", " + first : ""}.` : `Thank you for buying Infinite${first ? ", " + first : ""}.`;
+  const sub = shipped ? "Thank you for pre-ordering. Here is your download." : released ? "Your key is below. Install, then paste it in." : "The plugin is still being finished. Your key is saved and works; we email the download the day it ships.";
+  const page = env.DOWNLOAD_URL || `${SITE}/download.html`;
+  const steps = [
+    "Download the installer for your computer and run it. It asks what to add: the Infinite app, VST3, AU.",
+    "In your DAW, add Infinite Instrument to an instrument track, or Infinite FX to an audio track.",
+    "The licence screen opens. Copy the key below and click Paste key.",
+  ];
+  const subject = shipped ? "Infinite is ready to download" : released ? "Your Infinite licence" : "Your Infinite licence (pre-order)";
+  const text = [
+    hello, sub, "",
+    ...(released ? ["Download:", `  macOS    ${ASSET}Infinite.pkg`, `  Windows  ${ASSET}Infinite-Setup-windows-x64.exe`, `  Linux    ${ASSET}Infinite-linux-x86_64.tar.gz`,
+      `How to open the installers (they are not code-signed yet): ${page}`, "", ...steps.map((t, i) => `${i + 1}. ${t}`), ""] : []),
+    "Your key:", "", lic.token, "",
+    `Licence ${lic.id} · ${lic.seats} computers · every update for life`,
+    "The key is also attached as license.inflic.", "",
+    `Lost this email? ${SITE}/buy.html#resend`, "Questions: reply to this email.",
+  ].join("\n");
+  const C = { ground: "#0D1020", card: "#151930", well: "#20263F", line: "#2A3052", ink: "#EEF1FA", ink2: "#A3AACB", ink3: "#8890B1", ember: "#FF6B35", signal: "#A7B1FF" };
+  const font = "font-family:Geist,Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
+  const mono = "font-family:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;";
+  const btn = (href, label, primary) => `<a href="${href}" style="${font}display:inline-block;padding:12px 18px;margin:0 8px 8px 0;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;${primary ? `background:${C.ember};color:${C.card};` : `background:${C.well};color:${C.ink};border:1px solid ${C.line};`}">${label}</a>`;
+  const row = (inner, pad = "0 32px 24px") => `<tr><td style="padding:${pad};">${inner}</td></tr>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>${esc(subject)}</title></head>
+<body style="margin:0;padding:0;background:${C.ground};">
+<div style="display:none;max-height:0;overflow:hidden;">${esc(sub)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.ground};"><tr><td align="center" style="padding:32px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${C.card};border:1px solid ${C.line};border-radius:24px;">
+${row(`<img src="${SITE}/assets/icon-96.png" width="40" height="40" alt="Infinite" style="display:block;border:0;border-radius:10px;">`, "32px 32px 16px")}
+${row(`<h1 style="${font}margin:0 0 8px;font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-0.02em;color:${C.ink};">${esc(hello)}</h1><p style="${font}margin:0;font-size:15px;line-height:1.5;color:${C.ink2};">${esc(sub)}</p>`)}
+${released ? row(`<p style="${font}margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${C.ink3};">1 · Download</p>${btn(ASSET + "Infinite.pkg", "macOS", true)}${btn(ASSET + "Infinite-Setup-windows-x64.exe", "Windows", false)}${btn(ASSET + "Infinite-linux-x86_64.tar.gz", "Linux", false)}<p style="${font}margin:4px 0 0;font-size:13px;line-height:1.5;color:${C.ink3};">Not code-signed yet, so your computer asks once. <a href="${page}" style="color:${C.signal};">How to open it</a></p>`) : ""}
+${row(`<p style="${font}margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${C.ink3};">${released ? "2 · " : ""}Your key</p>
+<div style="${mono}padding:14px 16px;border-radius:16px;background:${C.ground};border:1px solid ${C.line};font-size:12px;line-height:1.5;color:${C.ink};word-break:break-all;">${esc(lic.token)}</div>
+<p style="${font}margin:8px 0 0;font-size:13px;line-height:1.5;color:${C.ink3};">Also attached as license.inflic.</p>`)}
+${released ? row(`<p style="${font}margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${C.ink3};">3 · Install</p>
+<table role="presentation" cellpadding="0" cellspacing="0">${steps.map((t, i) => `<tr><td valign="top" style="${font}padding:0 12px 10px 0;font-size:15px;font-weight:700;color:${C.ember};">${i + 1}</td><td style="${font}padding:0 0 10px;font-size:15px;line-height:1.5;color:${C.ink};">${esc(t)}</td></tr>`).join("")}</table>`) : ""}
+${row(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${C.line};"><tr><td style="${font}padding-top:16px;font-size:13px;line-height:1.6;color:${C.ink3};">Licence <span style="${mono}color:${C.ink2};">${esc(lic.id)}</span> · ${esc(lic.seats)} computers · every update for life<br><a href="${SITE}/buy.html#resend" style="color:${C.signal};">Lost this email?</a> · Questions: reply to this email.</td></tr></table>`, "0 32px 32px")}
+</table></td></tr></table></body></html>`;
+  return { subject, text, html };
+}
+
 async function sendKeyEmail(env, lic, shipped = false) {
   if (!env.RESEND_API_KEY) return false;
-  const released = env.RELEASED === "1";
-  const text = [
-    shipped ? `The Infinite DAW plugin is out${lic.name ? ", " + lic.name.split(" ")[0] : ""}. Thank you for pre-ordering.`
-            : `Thank you for buying Infinite${lic.name ? ", " + lic.name.split(" ")[0] : ""}.`, "",
-    `Your license ID: ${lic.id}`,
-    `Seats: ${lic.seats} computers · Updates: all of version ${lic.major}.x`, "",
-    "Your license file is attached (license.inflic). In the plugin, open Settings > License and drop the file in, or paste this key:", "",
-    lic.token, "",
-    released ? `Download: ${env.DOWNLOAD_URL}\nInstall: https://infinitedevices.org/plugin` : "The plugin is still being finished. Your key already works and is saved; we will email the download link the day it ships.", "",
-    "Lost this email? Ask for it again at https://infinitedevices.org/buy#resend", "Questions: reply to this email.",
-  ].join("\n");
+  const { subject, text, html } = keyEmail(env, lic, shipped);
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: env.FROM, to: [lic.email], subject: shipped ? "Infinite is ready to download" : released ? "Your Infinite license" : "Your Infinite license (pre-order)", text,
+    body: JSON.stringify({ from: env.FROM, to: [lic.email], subject, text, html,
       attachments: [{ filename: "license.inflic", content: btoa(lic.token) }] }),
   });
   return r.ok;

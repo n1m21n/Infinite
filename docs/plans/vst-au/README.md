@@ -91,7 +91,7 @@ Note on location: private plans moved to `internal/plans/` in `458a1dd3`. This f
 | Build | `scripts/ibuild.py` (machine lock, adaptive -j, dev/asan/release/linux modes) | `build-discipline` | Every plugin build goes through it |
 | Licence backend | Worker `worker/license/` (Paddle webhook, D1, Resend), `PUBLIC_KEY.txt`, `GET /api/license/revoked` (1 h cache), `POST /api/license/resend`, `RELEASED` and `DOWNLOAD_URL` vars | `worker/license/index.js` | Plugin verifies offline; ship day flips `RELEASED` |
 | Ship-day mail to pre-order buyers | **No tool exists.** The Worker emails at purchase time only; `emailed_at` is purchase mail | `worker/license/schema.sql` | New tool in chunk 3 (tool-first) |
-| App version | v1.1.0 latest (`gh release list`, 2026-11-05); `INFINITE_VERSION "1.1.0"` | `CMakeLists.txt:22` | Plugin version = app version; licence `major 1` covers 1.x |
+| App version | v1.1.0 latest (`gh release list`, 2026-11-05); `INFINITE_VERSION "1.1.0"` | `CMakeLists.txt:22` | Plugin version = app version; licence `major` is recorded but not checked: updates are free for life (owner 2026-11-08) |
 | DAWs on this Mac | **None installed**; `~/Library/Audio/Plug-Ins/` has `Components`, `VST`, `Digidesign` | | DAW demo versions needed for testing (owner column: downloads, accounts) |
 | Machine | M2, 8 GB RAM, macOS 27.2 | `machine-is-m2-8gb` | Instance memory budget and one build at a time |
 
@@ -382,7 +382,7 @@ The source is MIT. The VST3 SDK is MIT since 3.8 (`external/vst3sdk/LICENSE.txt`
 | Topic | Decision |
 |---|---|
 | Verify | Offline Ed25519 over the payload of `INF1.<b64url payload>.<b64url sig>` with the 32-byte public key from `worker/license/PUBLIC_KEY.txt`, compiled into the engine as a constant by CMake (one source of truth). Library: Monocypher (vendored single file, CC0/BSD-2). JSON via the bundled nlohmann json |
-| Checks | Signature valid; `v == 1`; `major` >= the plugin's major (1); `id` not in the cached revoked list |
+| Checks | Signature valid; `v == 1`; `id` not in the cached revoked list (major not checked: lifetime updates, owner 2026-11-08) |
 | Where the code lives | `src/core/License.{h,cpp}`, built into the shell (`infinite_shell_ipc`) and the engine; the app never calls it. The shell checks the key before it spawns an engine and draws the sheet; the engine only reads the key's id for the weekly refund check and tells the shell (`kMsgLicense`) when that id is on the list |
 | Entering the key | Drop `license.inflic` on the plugin view, or paste the `INF1...` text into a paste box on the licence sheet. Same sheet in both builds |
 | Where it is stored | One per user, shared by both builds and all instances: macOS `~/Library/Application Support/Infinite/license.inflic`, Windows `%APPDATA%\Infinite\license.inflic`, Linux `$XDG_CONFIG_HOME/infinite/license.inflic` |
@@ -390,9 +390,9 @@ The source is MIT. The VST3 SDK is MIT since 3.8 (`external/vst3sdk/LICENSE.txt`
 | Revoked list | `GET /api/license/revoked` from the engine main thread, at most once per 7 days, only while licensed, no identifiers sent (the list is downloaded, not a lookup). Cached on disk. Network failure, timeout or bad JSON = keep the last cached list (**fail open**). Off switch in the licence sheet |
 | Trial | **None** (owner 2026-11-07). The free standalone app is the full instrument to try; the plugin is what people buy |
 | Unlicensed | The plugin loads, keeps and saves the patch (getState returns exactly what setState got, so no project is ever damaged), and its view shows only the licence sheet: "Enter key · Buy". Instrument outputs silence, FX passes its input through dry with the reported latency, so a track never jumps in time. The engine is not spawned until a key is valid |
-| Licensed | Everything; a valid key never expires (perpetual for its major), so bounce = live holds for every licensed user |
+| Licensed | Everything; a valid key never expires and covers every later version, so bounce = live holds for every licensed user |
 | Revoked key | Unlicensed, with the text "This key was refunded" |
-| Wrong major (future 2.x with a 1.x key) | Unlicensed, with "Your key covers 1.x" |
+| Wrong major | Not used: lifetime updates (owner 2026-11-08), so any major is valid |
 | Projects on another machine | Always open with the patch intact; play once that machine has a key (M-11 is tested licensed) |
 
 | Test keys | CMake option `INFINITE_LICENSE_TEST_KEY` (off by default, prints a warning when on): the build also trusts `$INFINITE_LICENSE_PUBKEY` or `<dir>/license-test-key.hex`, so the checks sign their own keys. Development only; a packaging build must configure it off. `$INFINITE_LICENSE_DIR` moves the licence folder and `$INFINITE_LICENSE_REVOKED_URL` the refund list in every build |
@@ -421,14 +421,14 @@ Signing without a paid Apple account:
 | Browser downloads carry the quarantine flag; DAWs then refuse an unnotarized plugin | **Primary route: Terminal installer.** `/download` shows one line: `curl -fsSL https://infinitedevices.org/install.sh \| bash`. curl adds no quarantine flag; the script downloads the app release from GitHub, checks its SHA-256 against the value baked into the script, installs the app and copies the plugin bundles (`--install-plugins`), done. No dialog |
 | Users who will not use Terminal | Zip download + the existing "Open Anyway" / `xattr -dr com.apple.quarantine` steps the website already shows for the app, rewritten for the two plugin folders |
 | Homebrew users | The existing app cask in `n1m21n/homebrew-infinite` gains `vst3_plugin` + `audio_unit_plugin` stanzas and a postflight that clears quarantine on the installed bundles |
-| `.pkg` installer | Not used: an unsigned `.pkg` hits the same Gatekeeper wall and adds admin rights |
+| `.pkg` installer | **Used for buyers (owner 2026-11-08).** `Infinite.pkg`, per user (CurrentUserHomeDirectory, no admin): Welcome, terms, a choice screen (Infinite app, VST3, AU), then next steps. Built by `tools/installer/mac/` in CI, art from `make_art.py`. Unsigned, so Gatekeeper asks once (Done, then Privacy & Security > Open Anyway); the download page and email show it. The app is always installed, since it is the plugin's engine |
 
 Windows and Linux:
 
 | OS | Route |
 |---|---|
-| Windows | Zip of the two bundles + a one-page "copy to Common Files\VST3" guide, and a PowerShell one-liner that does the copy. DAWs load unsigned VST3 DLLs. SignPath Foundation signs the app today; it is used for the plugin only if its terms allow a paid binary (checked in chunk 3, see risk R-6). Inno Setup installer is later, when there is a certificate |
-| Linux | `.tar.gz` of the bundles + `install.sh` copying to `~/.vst3` |
+| Windows | **Inno Setup installer** `Infinite-Setup-windows-{x64,ARM64}.exe` (`tools/installer/windows/Infinite.iss`): per user, terms, components (Infinite app, VST3), runs `Infinite.com --install-plugins vst3` into `%LOCALAPPDATA%\Programs\Common\VST3`. Unsigned: SmartScreen asks once (More info > Run anyway) |
+| Linux | `Infinite-linux-x86_64.tar.gz` with the AppImage, `TERMS.txt` and `tools/installer/linux/install.sh`: terms, app?, VST3?, `--yes`, `--uninstall`; everything in the home folder, no sudo |
 
 Updates and pages:
 
@@ -436,8 +436,8 @@ Updates and pages:
 |---|---|
 | Auto-update | **Through the app.** The app's `SelfUpdate` updates the app; the app re-copies the plugin on next launch (8.11). The engine only shows "Update in the Infinite app". No self-replacing binaries inside a running DAW |
 | Where binaries live | Inside the normal app release `vX.Y.Z` on `n1m21n/Infinite`, public (the binary is MIT; the free app is the demo; reach feeds income). No separate plugin release (8.11) |
-| `/download` page | `website/download.html`: per-OS buttons, the Terminal line for macOS, the first-run steps (drop the key), links to buy and support. Built from the site's tools (`tools/website/`), brand-linted (`tools/brand/brand_lint.py`) |
-| `/download` URL | Worker var `DOWNLOAD_URL = https://infinitedevices.org/download`; the purchase email already prints it when `RELEASED = "1"` |
+| `/download` page | `website/download.html` + `download.js`: OS tabs picked from the browser (ARM64 swap on Windows), one download button each, the unsigned first-run steps, then "Then your key": add the plugin, the licence screen opens, Paste key. Brand-linted, noindex |
+| `/download` URL | Worker var `DOWNLOAD_URL = https://infinitedevices.org/download.html`; the key email (HTML, Midnight card) links the three installers and this page when `RELEASED = "1"` |
 | Buy page | Stays; copy changes from "pre-order" to "buy" on ship day (`paddle.json` `released: true`) |
 
 Decision: ad-hoc signed bundles shipped inside the app; Terminal installer as the main macOS route, DMG + Open Anyway as the second, the app's Homebrew cask as the third.
@@ -672,7 +672,7 @@ Rule: the plugin never has its own version, tag, build, page, cask or update che
 | Homebrew | The existing app cask gains `vst3_plugin` and `audio_unit_plugin` stanzas; no second cask |
 | winget, npm, Docker | Unchanged: they carry the app, and the app carries the plugin |
 | Terminal installer | `install.sh` installs the app and runs the same copier with `--install-plugins`; no separate plugin installer |
-| `/download` page | One page: "Download Infinite", then "In a DAW: Settings > DAW plugin > Install, then drop your key" |
+| `/download` page | `website/download.html` + `download.js`: OS tabs picked from the browser (ARM64 swap on Windows), one download button each, the unsigned first-run steps, then "Then your key": add the plugin, the licence screen opens, Paste key. Brand-linted, noindex |
 
 Owner's ship work for a release that touches the plugin = the normal app release, nothing added.
 

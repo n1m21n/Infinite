@@ -47,7 +47,7 @@ assert.equal((await send({ ...txn, data: { ...txn.data, items: [{ price: { id: "
 let r = await (await send(txn)).json(); assert.match(r.issued, /^INF-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
 assert.equal(rows.size, 1); assert.equal(mails.length, 1);
 const lic = rows.get("txn_1");
-assert.equal(lic.email, "Buyer@Example.com"); assert.match(mails[0].subject, /pre-order/); assert.match(mails[0].text, /still being finished/);
+assert.equal(lic.email, "Buyer@Example.com"); assert.match(mails[0].subject, /pre-order/); assert.match(mails[0].text, /still being finished/); assert.doesNotMatch(mails[0].text, /Settings > License/); assert.match(mails[0].html, /<!doctype html>/); assert.doesNotMatch(mails[0].html, /Infinite\.pkg/);
 assert.equal(Buffer.from(mails[0].attachments[0].content, "base64").toString(), lic.token, "attachment is the key");
 
 const [tag, body, sig] = lic.token.split(".");   // the plugin's offline check, done here with node's own crypto
@@ -65,7 +65,7 @@ await resend("buyer@example.com"); assert.equal(mails.length, 2, "resend mails t
 await resend("buyer@example.com"); assert.equal(mails.length, 2, "resend rate-limited");
 
 env.RELEASED = "1"; env.DOWNLOAD_URL = "https://x.test/dl"; rows.set("txn_2", { ...lic, id: "INF-AAAA-BBBB", txn_id: "txn_2", resent_at: null, email: "z@z.co", emailed_at: null }); rows.get("txn_2").emailed_at = null;
-await resend("z@z.co"); assert.match(mails.at(-1).text, /Download: https:\/\/x.test\/dl/);
+await resend("z@z.co"); assert.match(mails.at(-1).text, /How to open the installers.*https:\/\/x.test\/dl/); assert.match(mails.at(-1).html, /releases\/latest\/download\/Infinite\.pkg/); assert.match(mails.at(-1).text, /click Paste key/);
 
 await send({ event_type: "adjustment.updated", data: { action: "refund", status: "pending_approval", transaction_id: "txn_1" } }); assert.equal(rows.get("txn_1").status, "active", "pending refund keeps the key");
 await send({ event_type: "adjustment.updated", data: { action: "refund", status: "approved", transaction_id: "txn_1" } }); assert.equal(rows.get("txn_1").status, "revoked");
@@ -83,6 +83,6 @@ assert.equal(mails.length, before, "dry run and refusal send nothing");
 n = await notify({ send: true }); assert.equal(n.sent.length, 40); assert.equal(n.left, 3);
 n = await notify({ send: true }); assert.equal(n.sent.length, 3); assert.equal(n.left, 0);
 n = await notify({ send: true }); assert.equal(n.sent.length, 0, "second pass sends nothing");
-assert.equal(mails.length - before, 43); assert.match(mails.at(-1).subject, /ready to download/); assert.match(mails.at(-1).text, /Download: https:\/\/x.test\/dl/);
+assert.equal(mails.length - before, 43); assert.match(mails.at(-1).subject, /ready to download/); assert.match(mails.at(-1).text, /How to open the installers.*https:\/\/x.test\/dl/);
 assert.ok(!mails.some((m) => m.to[0] === "p3@p.co" || m.to[0] === "p4@p.co"), "revoked and sandbox keys skipped");
 console.log("license worker: all checks passed");
