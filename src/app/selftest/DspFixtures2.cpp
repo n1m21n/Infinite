@@ -4345,18 +4345,8 @@ bool RunMSEGFixture()
       take.Commit(rec.points, 0.01f, MSEGNode::kMaxPoints);
       rec.Normalize();
       double recErr = 0.0;
-      int recWorst = 0;
       for (int k = 0; k <= 400; k++)
-      {
-         const double e = std::fabs(rec.Evaluate(k / 400.0f) - hand(k / 400.0 * 8.0));
-         if (e > recErr)
-         {
-            recErr = e;
-            recWorst = k;
-         }
-      }
-      printf("MSEGTEST M3 worst at x %.3f: curve %.4f hand %.4f; ends %.3f,%.3f\n", recWorst / 400.0, rec.Evaluate(recWorst / 400.0f),
-             hand(recWorst / 50.0), rec.points.front().y, rec.points.back().y);
+         recErr = std::max(recErr, (double)std::fabs(rec.Evaluate(k / 400.0f) - hand(k / 400.0 * 8.0)));
       printf("MSEGTEST M3 4-bar CC take -> %d points (from %d samples), worst %.4f\n", (int)rec.points.size(), take.Samples(), recErr);
       check("M3 a 4-bar CC take thins to <= 64 points", rec.points.size() <= 64 ? 1.0 : 0.0, 1.0, 0.0);
       check("M3 the take follows the hand", recErr, 0.0, 0.03);

@@ -2491,6 +2491,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // Curve Editor M1: a drag on the empty panel makes a 4-bar MSEG and draws it.
       FrameTest_CURVEM1TEST(frameId, window);
 
+      // Curve Editor motion grade: + Position on a selected Transform makes three bound X Y Z pages.
+      FrameTest_CURVEMOTIONTEST(frameId, window);
+
       // Keyed mod/expr on a Star: lands on the named control, survives a shape change.
       FrameTest_KEYEDSTARTEST(frameId, window);
 

@@ -686,6 +686,8 @@ namespace app
       { I18N_KEY("Curve Editor"), I18N_KEY("Zoom Value"), "Alt+Scroll", I18N_KEY("Zoom the value axis around the pointer") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Shapes"), "Shapes button", I18N_KEY("Replace the page with a shape, an easing or one of your saves; Mine saves this one") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Record"), "Record button", I18N_KEY("Record a take from a CC, a knob or the trig input into the page; Overwrite, Touch or Latch") },
+      { I18N_KEY("Curve Editor"), I18N_KEY("Mod / Motion"), "Header switch", I18N_KEY("Mod pages run on beats or Hz; Motion pages on seconds or frames at the export rate") },
+      { I18N_KEY("Curve Editor"), I18N_KEY("Motion group"), "+ in Motion", I18N_KEY("Position, Rotation or Scale make X, Y and Z pages bound to the selected node") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Select All Points"), MODKEY "+A", I18N_KEY("Select every point") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Delete Points"), "Delete / Backspace", I18N_KEY("Delete the selected points; the two ends stay") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Assign"), "Click a knob", I18N_KEY("After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops") },

@@ -100,6 +100,7 @@ namespace
       uint64_t lastSelected = 0;    // the canvas selection last followed
       std::vector<uint64_t> closed; // pages hidden from the strip (the nodes stay)
       bool ghost = false;           // other pages drawn faint behind this one
+      bool motion = false;          // Motion pages (time in seconds or frames, XYZ groups) instead of Mod pages
       bool sideOpen = true;         // the properties column (N), as the 3D View's
       float v0 = 0.0f, v1 = 1.0f;   // the shape span on show
       float y0 = 0.0f, y1 = 1.0f;   // the value span on show
@@ -221,6 +222,20 @@ namespace
 
    GraphNode* PageNode() { return S().page != 0 ? FindNodeByUid(S().page) : nullptr; }
 
+   // A Motion page runs on clock time (seconds or frames) or is one channel of an XYZ group; a Mod page on beats or Hz.
+   bool IsMotion(const MSEGNode& n)
+   {
+      return n.motionGroup != 0 || n.rateMode == MSEGNode::kRateSeconds || n.rateMode == MSEGNode::kRateFrames;
+   }
+
+   // The pages of the kind on show (Mod or Motion).
+   std::vector<GraphNode*> ModePages()
+   {
+      std::vector<GraphNode*> out = Pages();
+      out.erase(std::remove_if(out.begin(), out.end(), [](GraphNode* g) { return IsMotion(*AsMseg(g)) != S().motion; }), out.end());
+      return out;
+   }
+
    void ClearSelection()
    {
       S().sel.clear();
@@ -236,6 +251,8 @@ namespace
          s.page = uid;
          ClearSelection();
       }
+      if (const MSEGNode* n = AsMseg(FindNodeByUid(uid)))
+         s.motion = IsMotion(*n); // the switch follows the page shown
    }
 
    void FollowCanvasSelection()
@@ -258,23 +275,177 @@ namespace
          ShowPage(uid); // selecting a closed page on the canvas reopens it
    }
 
-   void AddPage()
+   // Motion defaults (§8.10): frames at the export rate, two seconds long, played once and held, bezier keys.
+   void MotionDefaults(MSEGNode& n, float y0, float y1)
    {
-      PushUndoCheckpoint("Add Curve");
+      n.rateMode = MSEGNode::kRateFrames;
+      n.fps = (float)std::clamp(gArrange.settings.renderFps, 1, 240);
+      n.lengthFrames = 2.0f * n.fps;
+      n.play = ModShapes::kPlayOnce;
+      MSEGNode::Point a, b;
+      a.x = 0.0f;
+      a.y = y0;
+      b.x = 1.0f;
+      b.y = y1;
+      a.interp = b.interp = ModShapes::kInterpBezier;
+      n.points = { a, b };
+      n.Normalize();
+   }
+
+   GraphNode* SpawnPage()
+   {
       const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
-      GraphNode* gn = SpawnNode("MSEG", "Modulators", at.x, at.y);
-      if (gn == nullptr)
-         return;
-      ShowPage(gn->uid);
+      return SpawnNode("MSEG", "Modulators", at.x, at.y);
+   }
+
+   void FreshView()
+   {
       S().v0 = 0.0f;
       S().v1 = 1.0f;
       S().y0 = 0.0f;
       S().y1 = 1.0f;
-      S().tool = Tool::Draw; // a fresh page is for drawing
+   }
+
+   void AddPage()
+   {
+      PushUndoCheckpoint("Add Curve");
+      GraphNode* gn = SpawnPage();
+      if (gn == nullptr)
+         return;
       if (MSEGNode* n = AsMseg(gn))
       {
-         n->rateMode = LFONode::kRateSynced; // a page made here is a sweep: 4 bars, not the card's 1
-         n->rateBeats = 16.0f;
+         if (S().motion)
+            MotionDefaults(*n, 0.0f, 1.0f);
+         else
+         {
+            n->rateMode = LFONode::kRateSynced; // a page made here is a sweep: 4 bars, not the card's 1
+            n->rateBeats = 16.0f;
+         }
+      }
+      ShowPage(gn->uid);
+      FreshView();
+      S().tool = Tool::Draw; // a fresh page is for drawing
+   }
+
+   // The first node selected on the canvas that is not a curve: the one a motion group drives.
+   int SelectedTarget()
+   {
+      int found = -1;
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      for (GraphNode& gn : gNodes)
+         if (dynamic_cast<MSEGNode*>(gn.node.get()) == nullptr && ed::IsNodeSelected(gn.NodeId()))
+         {
+            found = gn.index;
+            break;
+         }
+      ed::SetCurrentEditor(prevEditor);
+      return found;
+   }
+
+   // The target's control for one axis of a group: "move x" (or "offset x"), "rotate x", "scale x".
+   const ParamRef* GroupParam(int nodeIndex, int kind, int axis)
+   {
+      static const char* kStems[3][4] = { { "move", "offset", "pos", "position" }, { "rotate", "rotation", "", "" }, { "scale", "size", "", "" } };
+      for (const auto& [key, ref] : Modulation::Instance().AllKnownParams())
+      {
+         if (key.first != nodeIndex)
+            continue;
+         std::string name = ref.name;
+         for (char& c : name)
+            c = (char)std::tolower((unsigned char)c);
+         for (const char* stem : kStems[kind])
+            if (*stem != 0 && name == std::string(stem) + " " + "xyz"[axis])
+               return &ref;
+      }
+      return nullptr;
+   }
+
+   // A group waiting for its target's controls: a collapsed card registers them only when probed, a frame later.
+   struct PendingGroup
+   {
+      int target = -1, kind = 0, frames = 0;
+      uint64_t uids[3] = { 0, 0, 0 };
+   };
+
+   PendingGroup& Pending()
+   {
+      static PendingGroup p;
+      return p;
+   }
+
+   // Bind each page of the group to its axis control, each starting flat at the value the control holds now.
+   // False while the target's controls are not known yet.
+   bool BindGroup(const PendingGroup& g)
+   {
+      const ParamRef* refs[3] = {};
+      bool any = false;
+      for (int axis = 0; axis < 3; axis++)
+         any = (refs[axis] = GroupParam(g.target, g.kind, axis)) != nullptr || any;
+      if (!any)
+         return false;
+      for (int axis = 0; axis < 3; axis++)
+      {
+         GraphNode* gn = FindNodeByUid(g.uids[axis]);
+         MSEGNode* n = AsMseg(gn);
+         const ParamRef* ref = refs[axis];
+         if (n == nullptr || ref == nullptr)
+            continue;
+         const float y = ref->maxValue > ref->minValue
+                            ? std::clamp((ref->shownValue - ref->minValue) / (ref->maxValue - ref->minValue), 0.0f, 1.0f)
+                            : 0.5f;
+         for (MSEGNode::Point& p : n->points)
+            p.y = y;
+         n->Normalize();
+         Modulation::Instance().Bind(ref->nodeIndex, ref->paramIndex, gn->index, 0);
+         Modulation::Instance().SetRange(ref->nodeIndex, ref->paramIndex, ref->minValue, ref->maxValue);
+      }
+      gPatchDirty = true;
+      return true;
+   }
+
+   void TickGroup()
+   {
+      PendingGroup& g = Pending();
+      if (g.target < 0)
+         return;
+      if (BindGroup(g) || ++g.frames > 10)
+      {
+         if (gParamProbeNode == g.target)
+            gParamProbeNode = -1;
+         g = PendingGroup();
+      }
+      else
+         gParamProbeNode = g.target;
+   }
+
+   // + in Motion: Position, Rotation or Scale make three linked pages, X Y Z, bound to the selected node's
+   // matching controls when it has them.
+   void AddGroup(int kind)
+   {
+      PushUndoCheckpoint("Add Motion Group");
+      PendingGroup g;
+      g.target = SelectedTarget();
+      g.kind = kind;
+      for (int axis = 0; axis < 3; axis++)
+      {
+         GraphNode* gn = SpawnPage();
+         MSEGNode* n = AsMseg(gn);
+         if (n == nullptr)
+            return;
+         MotionDefaults(*n, 0.5f, 0.5f);
+         n->motionGroup = g.uids[0] != 0 ? g.uids[0] : gn->uid;
+         n->motionChannel = axis;
+         g.uids[axis] = gn->uid;
+      }
+      gPatchDirty = true;
+      ShowPage(g.uids[0]);
+      FreshView();
+      S().tool = Tool::Pen; // motion is keyed, not drawn
+      if (g.target >= 0 && !BindGroup(g))
+      {
+         gParamProbeNode = g.target; // its card is closed: register its controls next frame, then bind
+         Pending() = g;
       }
    }
 
@@ -439,7 +610,17 @@ namespace
          const double perPass = std::max(1.0, (double)n.lengthFrames) / std::clamp((double)n.speed, 0.25, 4.0);
          const TimeRuler::Axis axis { a.x0, a.x1, s.v0 * perPass, w / ((s.v1 - s.v0) * perPass), 4.0 };
          TimeRuler::Background(dl, axis, a.rulerY);
-         TimeRuler::DrawUnits(dl, axis, a.rulerY, 1.0, 1.0, [](double f, double) { return std::to_string((long long)std::llround(f)); });
+         const long long fps = std::max(1LL, (long long)std::llround(n.fps));
+         TimeRuler::DrawUnits(dl, axis, a.rulerY, 1.0, 1.0, [fps](double f, double) {
+            const long long frame = std::llround(f);
+            if (frame > 0 && frame % fps == 0) // whole seconds read as timecode
+            {
+               char tc[24];
+               std::snprintf(tc, sizeof tc, "%lld:%02lld", frame / fps / 60, (frame / fps) % 60);
+               return std::string(tc);
+            }
+            return std::to_string(frame);
+         });
       }
       else if (n.OnSeconds())
       {
@@ -485,6 +666,39 @@ namespace
 
    void DrawTake(ImDrawList* dl, const Areas& a, ImU32 col);
 
+   ImU32 AxisCol(int axis)
+   {
+      // The 3D View's axis colours, as the user reads them: X red, Y green, Z blue.
+      static constexpr unsigned kAxisHex[3] = { 0xFF3352, 0x8BDC00, 0x2890FF };
+      if (axis < 0 || axis >= 3)
+         return Tint(0.5f);
+      const unsigned h = kAxisHex[axis];
+      return IM_COL32((h >> 16) & 255, (h >> 8) & 255, h & 255, 255);
+   }
+
+   // The value axis in the first target's own units: its high at the top line, its low at the bottom.
+   void DrawUnitsLabels(ImDrawList* dl, const Areas& a)
+   {
+      const GraphNode* gn = PageNode();
+      if (gn == nullptr)
+         return;
+      for (const auto& [key, src] : Modulation::Instance().Links())
+      {
+         if (src.nodeIndex != gn->index)
+            continue;
+         const ParamRef* ref = Modulation::Instance().KnownParam(key.first, key.second);
+         if (ref == nullptr)
+            return;
+         char hi[48], lo[48];
+         std::snprintf(hi, sizeof hi, "%s %.3g", ref->name.c_str(), src.hi);
+         std::snprintf(lo, sizeof lo, "%.3g", src.lo);
+         const float fh = ImGui::GetFontSize();
+         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(1.0f) + 2.0f), Tint(0.45f), hi);
+         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(0.0f) - fh - 2.0f), Tint(0.45f), lo);
+         return;
+      }
+   }
+
    void DrawGraph(ImDrawList* dl, const Areas& a, const MSEGNode& n, int hover)
    {
       const State& s = S();
@@ -516,10 +730,16 @@ namespace
          TimeRuler::LoopBand(dl, a.X(lo), a.X(hi), a.y0, a.y1, false, 0);
       }
       if (s.ghost)
-         for (GraphNode* g : Pages())
+         for (GraphNode* g : ModePages())
             if (g->uid != s.page)
-               if (const MSEGNode* other = AsMseg(g))
+               if (const MSEGNode* other = AsMseg(g); other->motionGroup == 0 || other->motionGroup != n.motionGroup)
                   DrawCurve(dl, a, *other, Tint(0.16f), 1.2f);
+      // A motion group: the sibling channels behind this one, X red, Y green, Z blue.
+      if (n.motionGroup != 0)
+         for (GraphNode& g : gNodes)
+            if (const MSEGNode* other = AsMseg(&g); other != nullptr && other != &n && other->motionGroup == n.motionGroup)
+               DrawCurve(dl, a, *other, (AxisCol(other->motionChannel) & 0x00FFFFFF) | 0x99000000, 1.4f);
+      DrawUnitsLabels(dl, a);
       const int count = n.source == 1 ? 0 : (int)n.points.size(); // an expression page has no points to show
       const ImU32 selCol = SelCol(), ring = RingCol(), line = LineCol();
       // Bend: the segment under the pointer, thicker.
@@ -1262,13 +1482,16 @@ namespace
       static uint64_t sMenuPage = 0;
       bool openMenu = false;
       bool first = true;
-      for (GraphNode* gn : Pages())
+      for (GraphNode* gn : ModePages())
       {
          if (!first)
             FormParts::Inline(0.0f, tok::space_1);
          first = false;
          const bool on = gn->uid == s.page;
-         const std::string title = NodeTitleWithInstance(*gn);
+         const MSEGNode* pn = AsMseg(gn);
+         std::string title = NodeTitleWithInstance(*gn);
+         if (pn->motionGroup != 0 && pn->motionChannel >= 0 && pn->motionChannel < 3)
+            title += std::string(" ") + "XYZ"[pn->motionChannel];
          const std::string id = "##cePage" + std::to_string(gn->uid);
          const float w = std::min(kPageW, ImGui::CalcTextSize(title.c_str()).x + tok::icon_md + 3.0f * tok::space_3);
          ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
@@ -1318,7 +1541,23 @@ namespace
       if (!first)
          FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##ceAdd", IconsInfinite::Plus, false, T("New curve")))
-         AddPage();
+      {
+         if (s.motion)
+            ImGui::OpenPopup("##ceAddMenu");
+         else
+            AddPage();
+      }
+      if (MenuParts::BeginPopup("##ceAddMenu"))
+      {
+         if (MenuParts::Item(T("Curve")))
+            AddPage();
+         MenuParts::Separator();
+         static const char* kGroups[] = { "Position", "Rotation", "Scale" };
+         for (int k = 0; k < 3; k++)
+            if (MenuParts::Item(T(kGroups[k])))
+               AddGroup(k);
+         MenuParts::EndPopup();
+      }
       if (openMenu)
          ImGui::OpenPopup("##cePageMenu");
       if (MenuParts::BeginPopup("##cePageMenu"))
@@ -2235,7 +2474,32 @@ namespace
       const float startX = ImGui::GetCursorPosX();
       const float togglesW = n != nullptr ? 2.0f * kIconW + tok::space_1 : 0.0f;
       const float controlsW = n != nullptr && !side ? ControlsW(*n) + tok::space_3 : 0.0f;
-      DrawPageStrip(std::max(1.0f, availW - togglesW - controlsW - (n != nullptr ? tok::space_3 : 0.0f)));
+      // Mod | Motion: which kind of page the strip shows.
+      float switchW = 0.0f;
+      {
+         static const char* kKinds[] = { "Mod", "Motion" };
+         for (int k = 0; k < 2; k++)
+         {
+            const char* label = T(kKinds[k]);
+            const float w = ImGui::CalcTextSize(label).x + 2.0f * tok::space_3;
+            if (k > 0)
+               row.Next(tok::space_1);
+            ActionButton::Scoped() = s.motion == (k == 1) ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+            const std::string id = std::string(label) + "##ceKind" + std::to_string(k);
+            if (ActionButton::Draw(id.c_str(), ImVec2(w, tok::tile)) && s.motion != (k == 1))
+            {
+               s.motion = k == 1;
+               const std::vector<GraphNode*> pages = ModePages();
+               s.page = pages.empty() ? 0 : pages.front()->uid;
+               ClearSelection();
+            }
+            ActionButton::Scoped() = ActionButton::Kind::Plain;
+            switchW += w + (k > 0 ? tok::space_1 : 0.0f);
+         }
+         row.Next(tok::space_3);
+         switchW += tok::space_3;
+      }
+      DrawPageStrip(std::max(1.0f, availW - switchW - togglesW - controlsW - (n != nullptr ? tok::space_3 : 0.0f)));
       if (n == nullptr)
          return;
       const float rightX = startX + availW - togglesW;
@@ -2325,11 +2589,12 @@ namespace
       State& s = S();
       if (AsMseg(PageNode()) == nullptr || IsClosed(s.page))
       {
-         const std::vector<GraphNode*> pages = Pages();
+         const std::vector<GraphNode*> pages = ModePages();
          s.page = pages.empty() ? 0 : pages.front()->uid;
          ClearSelection();
       }
       TickRecord();
+      TickGroup();
       GraphNode* gn = PageNode();
       MSEGNode* n = AsMseg(gn);
       if (gCurveAssignUid != 0 && AsMseg(FindNodeByUid(gCurveAssignUid)) == nullptr)
@@ -2385,6 +2650,12 @@ namespace
          DrawSide(*gn, *n, ImVec2(sideW, bodyH));
       }
    }
+}
+
+void CurveEditorAddMotionGroup(int kind)
+{
+   S().motion = true;
+   AddGroup(kind);
 }
 
 void CurveEditorRecordPicked(int nodeIndex, int paramIndex)

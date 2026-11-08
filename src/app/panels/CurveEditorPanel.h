@@ -19,6 +19,7 @@ namespace app
 
    extern bool gCurveRecordPicking; // Record (Any knob) waits for a knob click on the canvas
    void CurveEditorRecordPicked(int nodeIndex, int paramIndex);
+   void CurveEditorAddMotionGroup(int kind); // 0 Position, 1 Rotation, 2 Scale: X Y Z pages bound to the canvas selection
    void DrawCurveEditorDocked(const char* id, const ImVec2& size);
    void CurveEditorOpenNode(uint64_t uid); // open the panel on that MSEG node's page
 }

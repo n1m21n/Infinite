@@ -3227,4 +3227,79 @@ void FrameTest_CURVEM1TEST(int frameId, GLFWwindow* window)
       glfwSetWindowShouldClose(window, GLFW_TRUE);
    }
 }
+
+// Owner point 7 (docs/plans/curve-editor/README.md §8.10, M10): + Position in Motion mode on a selected Transform
+// makes three linked pages X Y Z on frames at the export rate, played once, each bound to that node's move x/y/z;
+// raising the X page drives move x to its top.
+void FrameTest_CURVEMOTIONTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_CURVEMOTIONTEST") == nullptr)
+      return;
+   static int sXf = -1;
+   static bool sOk = true;
+   auto msegs = [] {
+      std::vector<GraphNode*> v;
+      for (GraphNode& gn : gNodes)
+         if (dynamic_cast<MSEGNode*>(gn.node.get()) != nullptr)
+            v.push_back(&gn);
+      return v;
+   };
+   auto expect = [&](const char* what, bool pass) {
+      printf("CURVEMOTION %s  %s\n", what, pass ? "OK" : "FAIL");
+      sOk = sOk && pass;
+   };
+   ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+   ed::SetCurrentEditor(gEditor);
+   if (frameId == 4)
+   {
+      NewPatch();
+      GraphNode* xf = SpawnNode("Transform", "3D", 0.0f, 0.0f);
+      sXf = xf != nullptr ? xf->index : -1;
+      gCurveEditorDock = 0;
+      gCurveEditorOpen = true;
+   }
+   if (frameId == 30 && sXf >= 0)
+   {
+      ed::ClearSelection();
+      ed::SelectNode(FindNodeByIndex(sXf)->NodeId(), false);
+   }
+   if (frameId == 40)
+      CurveEditorAddMotionGroup(0); // the Transform card is closed: its controls register a frame later
+   if (frameId == 46)
+   {
+      const std::vector<GraphNode*> pages = msegs();
+      expect("three pages", pages.size() == 3);
+      bool linked = !pages.empty(), timed = true, bound = true;
+      for (GraphNode* gn : pages)
+      {
+         MSEGNode* n = dynamic_cast<MSEGNode*>(gn->node.get());
+         linked = linked && n->motionGroup != 0 && n->motionGroup == dynamic_cast<MSEGNode*>(pages[0]->node.get())->motionGroup;
+         timed = timed && n->rateMode == MSEGNode::kRateFrames && n->fps == (float)gArrange.settings.renderFps &&
+                 n->play == ModShapes::kPlayOnce && n->points.size() == 2 && n->points[0].interp == ModShapes::kInterpBezier;
+         bool found = false;
+         for (const auto& [key, src] : Modulation::Instance().Links())
+            if (src.nodeIndex == gn->index && key.first == sXf)
+               if (const ParamRef* ref = Modulation::Instance().KnownParam(key.first, key.second))
+                  found = n->motionChannel >= 0 && n->motionChannel < 3 && ref->name == std::string("move ") + "xyz"[n->motionChannel];
+         bound = bound && found;
+         if (n->motionChannel == 0)
+            for (auto& p : n->points)
+               p.y = 1.0f; // X rises to the top of its range
+      }
+      expect("one group, channels X Y Z", linked);
+      expect("frames at the export rate, played once, bezier keys", timed);
+      expect("each bound to the Transform's move x / y / z", bound);
+   }
+   if (frameId == 60)
+   {
+      const GraphNode* xf = FindNodeByIndex(sXf);
+      const auto* op = xf != nullptr ? dynamic_cast<const GeometryOpNode*>(xf->node.get()) : nullptr;
+      printf("CURVEMOTION move x %.3f y %.3f z %.3f\n", op ? op->offsetX : -99.0f, op ? op->offsetY : -99.0f, op ? op->offsetZ : -99.0f);
+      expect("the X page drives move x to 3", op != nullptr && std::fabs(op->offsetX - 3.0f) < 1e-3f);
+      expect("Y and Z hold where they were", op != nullptr && std::fabs(op->offsetY) < 1e-3f && std::fabs(op->offsetZ) < 1e-3f);
+      printf("CURVEMOTION %s\n", sOk ? "PASS" : "FAIL");
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+   }
+   ed::SetCurrentEditor(prevEditor);
+}
 }
