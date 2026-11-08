@@ -36,6 +36,9 @@ static void RunNodeIssueFix(GraphNode& gn, const NodeIssue& issue)
 }
 void DrawNodeBodies(FrameCtx& fc)
 {
+   // Every envelope panel publishes its rect here each frame (PublishWtTestRect), not only the
+   // Wavetable body that clears it, so a patch with no Wavetable grew it forever (~1 MB/min).
+   gWtTestRects.clear();
    ImGuiIO& io = ImGui::GetIO();
    auto& frameId = fc.frameId;
    auto& benchB6Stages = fc.benchB6Stages;

@@ -482,6 +482,8 @@ namespace InfinitePlugin
             // an engine whose audio never started is not taken for a hung one.
             uint64_t beat = shell_.Heartbeat(), beatNs = Ipc::MonotonicNs();
             bool armed = false;
+            // Dev only: heap/leaks snapshots pause the engine for longer than kHangNs.
+            const bool noWatch = getenv("INFINITE_PLUGIN_NO_WATCHDOG") != nullptr;
             while (!stopReader_.load())
             {
                const uint64_t now = Ipc::MonotonicNs(), b = shell_.Heartbeat();
@@ -491,7 +493,7 @@ namespace InfinitePlugin
                   beat = b;
                   beatNs = now;
                }
-               else if (armed && now - beatNs > kHangNs)
+               else if (armed && !noWatch && now - beatNs > kHangNs)
                {
                   std::fprintf(stderr, "Infinite plugin: engine stopped responding for %.1f s; stopping it\n", double(now - beatNs) / 1e9);
                   if (!Ipc::ChildSignalKill(child_))
