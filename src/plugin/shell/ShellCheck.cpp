@@ -257,7 +257,7 @@ namespace
       }
    };
 
-   float Sine(int64_t t) { return 0.5f * float(std::sin(2.0 * M_PI * 220.0 * double(t) / kRate)); }
+   float Sine(int64_t t) { return 0.5f * float(std::sin(2.0 * 3.14159265358979323846 * 220.0 * double(t) / kRate)); }
 
    struct Script
    {
@@ -467,7 +467,7 @@ namespace
       h *= 2246822519u;
       h ^= h >> 13;
       const float noise = float(h & 0xffff) / 32768.0f - 1.0f;
-      return 0.35f * float(std::sin(2.0 * M_PI * 220.0 * double(t) / kRate)) + 0.1f * noise;
+      return 0.35f * float(std::sin(2.0 * 3.14159265358979323846 * 220.0 * double(t) / kRate)) + 0.1f * noise;
    }
 
    constexpr int64_t kImpulseAt = 4800;

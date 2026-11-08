@@ -197,7 +197,7 @@ namespace
       const uint32_t blocks = 200;
       std::vector<float> in(blocks * kBlock);
       for (size_t i = 0; i < in.size(); i++)
-         in[i] = 0.5f * (float)std::sin(2.0 * M_PI * 440.0 * (double)i / kRate);
+         in[i] = 0.5f * (float)std::sin(2.0 * 3.14159265358979323846 * 440.0 * (double)i / kRate);
       HostRun run;
       const bool ok = RunBlocks(e, blocks, &in, {}, ~0u, &run);
       Check(ok, "fx: offline blocks complete");
