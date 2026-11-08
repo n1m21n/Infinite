@@ -200,6 +200,9 @@ namespace app
       if (name == "Syphon In" || name == "Syphon Out")
          return false;
 #endif
+      // Inside a DAW, Infinite hosts no plugins (deferred): the node still loads, passing silence.
+      if (name == "Plugin" && Platform::PluginModeActive())
+         return false;
       // Field Graph stays registered (NodeFactory::MakeNode) so a patch saved
       // with one still loads, but is no longer creatable from the spawn menu
       // or search - see the device-catalog simplification's REGISTER_NODE

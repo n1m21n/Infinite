@@ -1320,23 +1320,27 @@ namespace app
             // format, range kind, sources and folder it was last rendered at
             // (WP7 #7). Only the file's name and the marker picks are
             // session-local: a filename belongs to a take, not to a document.
-            Arrange::Settings& rset = gArrange.settings;
-            const char* renderLabel = ArrangeRenderBusy() ? "Rendering..." : "Render";
-            const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
-            const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - tok::space_2, panelOrigin.y);
-            ImGui::SetCursorScreenPos(renderBtnPos);
-            ImGui::BeginDisabled(ArrangeRenderBusy());
-            if (ChipButton::Draw(renderLabel, false, tok::tile))
+            // Inside a DAW the DAW bounces: no Render.
+            if (!Platform::PluginModeActive())
             {
-               if (rset.renderRangeKind == kArrangeRangeCustom && rset.renderRangeEnd <= rset.renderRangeStart)
+               Arrange::Settings& rset = gArrange.settings;
+               const char* renderLabel = ArrangeRenderBusy() ? "Rendering..." : "Render";
+               const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
+               const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - tok::space_2, panelOrigin.y);
+               ImGui::SetCursorScreenPos(renderBtnPos);
+               ImGui::BeginDisabled(ArrangeRenderBusy());
+               if (ChipButton::Draw(renderLabel, false, tok::tile))
                {
-                  rset.renderRangeStart = 0;
-                  rset.renderRangeEnd = std::max<Arrange::Tick>(ArrangeRenderableEndTick(), Arrange::kPPQ);
+                  if (rset.renderRangeKind == kArrangeRangeCustom && rset.renderRangeEnd <= rset.renderRangeStart)
+                  {
+                     rset.renderRangeStart = 0;
+                     rset.renderRangeEnd = std::max<Arrange::Tick>(ArrangeRenderableEndTick(), Arrange::kPPQ);
+                  }
+                  gArrangeRenderPopupRequest = true;
                }
-               gArrangeRenderPopupRequest = true;
+               ImGui::EndDisabled();
+               ImGui::SetCursorScreenPos(savedCursor);
             }
-            ImGui::EndDisabled();
-            ImGui::SetCursorScreenPos(savedCursor);
             DrawArrangeRenderDialogs();
          }
 
@@ -4165,8 +4169,9 @@ namespace app
             }
 
 
-            MenuParts::Separator();
-            if (MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
+            if (!Platform::PluginModeActive())
+               MenuParts::Separator();
+            if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
             {
                ArrangeRenderJob job = ArrangeBuildLaneScopedRenderJob(
                   { ctxLaneId }, ctxLane->name.empty() ? ("Track " + std::to_string(ctxLaneId)) : ctxLane->name);

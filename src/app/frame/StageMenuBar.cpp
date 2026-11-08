@@ -541,15 +541,19 @@ void DrawMenuBar(FrameCtx& fc)
                gShowDiagnosticsModal = true;
             if (MenuParts::Item(L("About Infinite")))
                gShowAboutModal = true;
-            if (MenuParts::Item(L("Check for updates")))
+            // Inside a DAW: the app updates the plugin, and the DAW closes it.
+            if (!Platform::PluginModeActive())
             {
-               UpdateCheck::Start();
-               gShowUpdateCheckModal = true;
-            }
+               if (MenuParts::Item(L("Check for updates")))
+               {
+                  UpdateCheck::Start();
+                  gShowUpdateCheckModal = true;
+               }
 
-            MenuParts::Separator();
-            if (MenuParts::Item(L("Quit")))
-               RequestClose(window);
+               MenuParts::Separator();
+               if (MenuParts::Item(L("Quit")))
+                  RequestClose(window);
+            }
          }
             MenuParts::EndContent();
             ImGui::EndMenu();
@@ -731,8 +735,11 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::tile) * 0.5f));
          const float centreStartScreenX = ImGui::GetCursorScreenPos().x;
          // Transport sits just left of the tempo, audio power just right of it.
-         drawTransport();
-         SectionBreak();
+         if (!Platform::PluginModeActive()) // the DAW's transport plays and stops the plugin
+         {
+            drawTransport();
+            SectionBreak();
+         }
 
          static const int kDens[] = { 1, 2, 4, 8, 16 };
          auto SnapToValidDenominator = [](int val) -> int {
@@ -831,6 +838,15 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const ImVec2 mn(x, wellMin.y), mx(x + w, wellMin.y + TD::kHeight);
             ImGui::SetCursorScreenPos(mn);
+            if (Platform::PluginModeActive())
+            {
+               // Inside a DAW the host sets tempo and meter every block: show them, never edit them.
+               ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight));
+               TD::Value(id, x, w, wellMin.y, shown);
+               if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+                  HelpTip("%s", T("Set by the DAW"));
+               return;
+            }
             if (sActiveField == which)
             {
                // The field sits inside the cell with an even margin and its text centred, like the value it replaces.
@@ -1042,9 +1058,12 @@ void DrawMenuBar(FrameCtx& fc)
          }
 
          // Audio power, just right of the click.
-         SectionBreak();
-         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::tile * 0.5f));
-         drawAudio();
+         if (!Platform::PluginModeActive()) // the DAW owns the audio device
+         {
+            SectionBreak();
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::tile * 0.5f));
+            drawAudio();
+         }
 
          // Width of the centred group, measured for next frame's placement.
          sCentreW = ImGui::GetItemRectMax().x - centreStartScreenX;
@@ -1097,7 +1116,7 @@ void DrawMenuBar(FrameCtx& fc)
          // Update: a quiet icon tile (down arrow in an accent wash, with a dot) that only exists while a newer
          // version is available. Click opens the update dialog (Update now, in place); right-click dismisses until the
          // next version.
-         bool showUpdate = UpdateCheck::UpdateAvailable();
+         bool showUpdate = UpdateCheck::UpdateAvailable() && !Platform::PluginModeActive(); // the app updates, not the plugin
 #ifndef NDEBUG
          if (getenv("INFINITE_SHOW_UPDATE_ICON") != nullptr)
             showUpdate = true;

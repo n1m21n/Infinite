@@ -1520,10 +1520,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
    // No-ops under the self-test env vars, so headless/CI runs never touch
    // the network.
-   if (UpdateCheck::AutoCheckEnabled())
+   // Never inside a DAW: the app does both (an engine must not replace the bundle its DAW has loaded).
+   if (UpdateCheck::AutoCheckEnabled() && !Platform::PluginModeActive())
       UpdateCheck::Start();
    // An installed DAW plugin follows this app's version and location (DawPluginInstall.h).
-   if (!IsHeadlessProcess())
+   if (!IsHeadlessProcess() && !Platform::PluginModeActive())
       DawPluginLaunchRecopy();
 
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")

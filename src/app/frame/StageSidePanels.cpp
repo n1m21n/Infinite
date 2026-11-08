@@ -429,13 +429,17 @@ void DrawSidePanels(FrameCtx& fc)
             const PillGroup::Segment segs[5] = { { "lib.modules", T("Modules") }, { "lib.field", T("Field") },
                                                  { "lib.samples", T("Samples") }, { "lib.media", T("Media") },
                                                  { "lib.plugins", T("Plugins") } };
+            // Inside a DAW, Infinite hosts no plugins (deferred): no Plugins segment.
+            const int segCount = Platform::PluginModeActive() ? 4 : 5;
+            if (segCount == 4 && gSearchPanelMode == 3)
+               gSearchPanelMode = 0;
             int sel = 0;
-            for (int i = 0; i < 5; ++i)
+            for (int i = 0; i < segCount; ++i)
                if (kModes[i] == gSearchPanelMode)
                   sel = i;
             const ImVec2 cp = ImGui::GetCursorScreenPos();
             const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 32.0f };
-            const int hit = PillGroup::Draw("lib.tabs", r, segs, 5, sel, UiType::Size::Title);
+            const int hit = PillGroup::Draw("lib.tabs", r, segs, segCount, sel, UiType::Size::Title);
             if (hit >= 0)
                gSearchPanelMode = kModes[hit];
             ImGui::SetCursorScreenPos(cp);

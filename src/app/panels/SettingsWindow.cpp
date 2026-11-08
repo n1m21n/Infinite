@@ -135,8 +135,14 @@ namespace app
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + wellTop + SectionCard::kPad);
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::space_2);
+      // Inside a DAW: no plugin hosting, so no Plugins section.
+      constexpr int kPluginsTab = 7;
+      if (Platform::PluginModeActive() && sTab == kPluginsTab)
+         sTab = 2;
       for (int i = 0; i < kTabCount; i++)
       {
+         if (Platform::PluginModeActive() && i == kPluginsTab)
+            continue;
          const bool sel = (i == sTab);
          const float h = ImGui::GetFrameHeight();
          const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -525,6 +531,9 @@ namespace app
          if (sTab == 2)
          {
             ImGui::Spacing();
+            // Inside a DAW the host owns the audio device, rate and buffer.
+            if (!Platform::PluginModeActive())
+            {
             FormParts::Section(T("Audio Devices & Format"));
             const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
             const bool audioRunning = AudioEngine::Instance().SampleRate() > 0.0;
@@ -795,6 +804,7 @@ namespace app
             }
 
             SectionCard::End();
+            }
 
             FormParts::Section(T("MIDI Inputs"));
             ImGui::TextWrapped("%s", T("Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play."));
@@ -1008,6 +1018,9 @@ namespace app
             if (FormParts::Button(L("Reveal logs")))
                Platform::RevealLogs();
 
+            // Inside a DAW: no app updates or plugin install (the app does both).
+            if (!Platform::PluginModeActive())
+            {
             ImGui::Spacing();
             FormParts::Section(T("Application & Updates"));
             ImGui::Text(T("Version: %s"), INFINITE_VERSION_STRING);
@@ -1025,6 +1038,7 @@ namespace app
 
             ImGui::Spacing();
             DrawDawPluginSection();
+            }
 
             SectionCard::End();
          }

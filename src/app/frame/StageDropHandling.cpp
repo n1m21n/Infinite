@@ -416,7 +416,7 @@ void DrawDropHandling(FrameCtx& fc)
                if (spawned != nullptr)
                   static_cast<MidiFileNode*>(spawned->node.get())->path = path;
             }
-            else if (HasExtension(path, kPluginBundleExt))
+            else if (HasExtension(path, kPluginBundleExt) && !Platform::PluginModeActive()) // no hosting inside a DAW
             {
                const bool isVst3 = HasExtension(path, std::vector<std::string> { "vst3" });
 #if !INFINITE_ENABLE_VST3

@@ -8,6 +8,7 @@
 //
 // Program Change n picks entry n+1 (index n); PageDown / PageUp, the Menu tile
 // and OSC (/infinite/show/next, /prev, /go) step through it.
+#include "platform/Platform.h"
 #include "app/AppShared.h"
 
 #include "audio/AudioEngine.h"
@@ -296,8 +297,8 @@ namespace app
       }
    }
 
-   void LaunchRequestTogglePlay() { SayLaunch(Transport::Instance().RequestTogglePlay()); }
-   void LaunchRequestRewind() { SayLaunch(Transport::Instance().RequestRewind()); }
+   void LaunchRequestTogglePlay() { if (Platform::PluginModeActive()) return; /* the DAW plays and stops */ SayLaunch(Transport::Instance().RequestTogglePlay()); }
+   void LaunchRequestRewind() { if (Platform::PluginModeActive()) return; SayLaunch(Transport::Instance().RequestRewind()); }
    float& ShowSetFadeMs() { return gFadeMs; }
    const std::string& ShowSetPath() { return gSetPath; }
 

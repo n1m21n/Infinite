@@ -7482,7 +7482,8 @@ namespace
       ImGui::BeginDisabled(gOfflineRender.active || scene->activeCamera == 0);
       if (ActionButton::Draw(L("Render Image"), ImVec2(availW, 0)))
          RenderStill(scene);
-      if (ActionButton::Draw(L("Render Animation"), ImVec2(availW, 0), ActionButton::Kind::Primary))
+      if (!Platform::PluginModeActive() && // the DAW bounces
+          ActionButton::Draw(L("Render Animation"), ImVec2(availW, 0), ActionButton::Kind::Primary))
          StartRender(scene);
       ImGui::EndDisabled();
       ImGui::BeginDisabled(!gOfflineRender.active);
