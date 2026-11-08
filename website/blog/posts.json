@@ -9,6 +9,15 @@
   "url": "https://infinitedevices.org/blog/physical-modelling-string-synthesis-in-real-time.html"
  },
  {
+  "slug": "wave-terrain-synthesis-in-real-time",
+  "title": "Wave terrain synthesis: audio from 3D surfaces",
+  "description": "How wave terrain synthesis works: orbital trajectories, 3D surfaces, discrete Fourier transform anti-aliasing, and patching audio-visual synths in Infinite.",
+  "date": "2026-11-08",
+  "updated": "2026-11-08",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/wave-terrain-synthesis-in-real-time.html"
+ },
+ {
   "slug": "audio-reactive-particle-systems-in-real-time",
   "title": "Audio-reactive 3D particle systems in real time",
   "description": "How to build audio-reactive 3D particle systems: Euler physics, turbulent 3D noise force fields, spectral transient triggers, and GPU point rendering on a modular canvas.",
