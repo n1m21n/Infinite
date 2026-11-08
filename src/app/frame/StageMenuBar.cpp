@@ -18,7 +18,7 @@
 namespace app
 {
 // The rail of panel toggles down the right edge. Library leads on the top bar's centre line and the panels follow,
-// one tile apart; Edit history sits in the bottom corner with Settings just above it.
+// one tile apart; at the bottom, Settings in the corner, then Edit history, then the Terminal.
 static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
@@ -51,13 +51,7 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
-   if (PanelRail::Item("##railTerminal", top + 9.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
-                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
-   {
-      gTerminalOpen = !gTerminalOpen;
-      gTerminalFocus = gTerminalOpen;
-   }
-   if (PanelRail::Item("##railCurveEditor", top + 10.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
+   if (PanelRail::Item("##railCurveEditor", top + 9.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
                        T("Curve editor - draw and shape MSEG curves (Shift+E)")))
       gCurveEditorOpen = !gCurveEditorOpen;
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
@@ -67,6 +61,13 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railHistory", bottom - step, IconsInfinite::History, nullptr, gHistoryOpen,
                        T("Edit history - jump back to any earlier edit")))
       gHistoryOpen = !gHistoryOpen;
+   // The agents' shell sits with the tools at the bottom, above Edit history.
+   if (PanelRail::Item("##railTerminal", bottom - 2.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
+                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
+   {
+      gTerminalOpen = !gTerminalOpen;
+      gTerminalFocus = gTerminalOpen;
+   }
    PanelRail::End();
 }
 
