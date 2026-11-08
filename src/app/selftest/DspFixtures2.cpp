@@ -1,6 +1,7 @@
 // DSP self-test fixtures, part 2: sampler..granular (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 #include "core/CurveEdit.h"
+#include "core/CurveLibrary.h"
 #include "audio/dsp/ConvolutionKernel.h"
 #include "audio/dsp/SimdF4.h"
 #include "audio/MusicTime.h"
@@ -4161,6 +4162,159 @@ bool RunMSEGFixture()
       check("output stays in 0..1 (low)", lo, 0.0, 1e-6);
       check("output stays in 0..1 (high)", hi, 1.0, 0.02);
       live = nullptr;
+   }
+
+   // M5 formula half (docs/plans/curve-editor/README.md §7): every easing against a reference written apart from
+   // ModShapes (easings.net forms; CSS cubic-bezier by Newton on x, not bisection), at 999 points each.
+   {
+      constexpr double pi = 3.14159265358979323846;
+      auto bounceOut = [](double t) {
+         const double n1 = 7.5625, d1 = 2.75;
+         if (t < 1 / d1) return n1 * t * t;
+         if (t < 2 / d1) return n1 * (t - 1.5 / d1) * (t - 1.5 / d1) + 0.75;
+         if (t < 2.5 / d1) return n1 * (t - 2.25 / d1) * (t - 2.25 / d1) + 0.9375;
+         return n1 * (t - 2.625 / d1) * (t - 2.625 / d1) + 0.984375;
+      };
+      auto cubic = [](double x, double x1, double y1, double x2, double y2) {
+         auto bx = [&](double u) { return 3 * (1 - u) * (1 - u) * u * x1 + 3 * (1 - u) * u * u * x2 + u * u * u; };
+         auto dx = [&](double u) { return 3 * (1 - u) * (1 - u) * x1 + 6 * (1 - u) * u * (x2 - x1) + 3 * u * u * (1 - x2); };
+         double u = x;
+         for (int i = 0; i < 40; i++)
+         {
+            const double d = dx(u);
+            if (std::fabs(d) < 1e-9)
+               break;
+            u = std::clamp(u - (bx(u) - x) / d, 0.0, 1.0);
+         }
+         double lo = 0, hi = 1; // Newton can stall on a flat start: finish by bisection to the same tolerance
+         if (std::fabs(bx(u) - x) > 1e-9)
+            for (int i = 0; i < 60; i++)
+            {
+               u = (lo + hi) / 2;
+               (bx(u) < x ? lo : hi) = u;
+            }
+         return 3 * (1 - u) * (1 - u) * u * y1 + 3 * (1 - u) * u * u * y2 + u * u * u;
+      };
+      auto ref = [&](int id, double x) -> double {
+         const double c1 = 1.70158, c2 = c1 * 1.525, c3 = c1 + 1, c4 = 2 * pi / 3, c5 = 2 * pi / 4.5;
+         switch (id)
+         {
+         case 0: return 1 - std::cos(x * pi / 2);
+         case 1: return std::sin(x * pi / 2);
+         case 2: return -(std::cos(pi * x) - 1) / 2;
+         case 3: return x * x;
+         case 4: return 1 - (1 - x) * (1 - x);
+         case 5: return x < 0.5 ? 2 * x * x : 1 - std::pow(-2 * x + 2, 2) / 2;
+         case 6: return x * x * x;
+         case 7: return 1 - std::pow(1 - x, 3);
+         case 8: return x < 0.5 ? 4 * x * x * x : 1 - std::pow(-2 * x + 2, 3) / 2;
+         case 9: return x * x * x * x;
+         case 10: return 1 - std::pow(1 - x, 4);
+         case 11: return x < 0.5 ? 8 * std::pow(x, 4) : 1 - std::pow(-2 * x + 2, 4) / 2;
+         case 12: return std::pow(x, 5);
+         case 13: return 1 - std::pow(1 - x, 5);
+         case 14: return x < 0.5 ? 16 * std::pow(x, 5) : 1 - std::pow(-2 * x + 2, 5) / 2;
+         case 15: return x == 0 ? 0 : std::pow(2, 10 * x - 10);
+         case 16: return x == 1 ? 1 : 1 - std::pow(2, -10 * x);
+         case 17: return x == 0 ? 0 : x == 1 ? 1 : x < 0.5 ? std::pow(2, 20 * x - 10) / 2 : (2 - std::pow(2, -20 * x + 10)) / 2;
+         case 18: return 1 - std::sqrt(1 - x * x);
+         case 19: return std::sqrt(1 - (x - 1) * (x - 1));
+         case 20: return x < 0.5 ? (1 - std::sqrt(1 - 4 * x * x)) / 2 : (std::sqrt(1 - std::pow(-2 * x + 2, 2)) + 1) / 2;
+         case 21: return c3 * x * x * x - c1 * x * x;
+         case 22: return 1 + c3 * std::pow(x - 1, 3) + c1 * std::pow(x - 1, 2);
+         case 23: return x < 0.5 ? (std::pow(2 * x, 2) * ((c2 + 1) * 2 * x - c2)) / 2
+                                 : (std::pow(2 * x - 2, 2) * ((c2 + 1) * (x * 2 - 2) + c2) + 2) / 2;
+         case 24: return x == 0 ? 0 : x == 1 ? 1 : -std::pow(2, 10 * x - 10) * std::sin((x * 10 - 10.75) * c4);
+         case 25: return x == 0 ? 0 : x == 1 ? 1 : std::pow(2, -10 * x) * std::sin((x * 10 - 0.75) * c4) + 1;
+         case 26: return x == 0 ? 0 : x == 1 ? 1 : x < 0.5 ? -(std::pow(2, 20 * x - 10) * std::sin((20 * x - 11.125) * c5)) / 2
+                                                          : (std::pow(2, -20 * x + 10) * std::sin((20 * x - 11.125) * c5)) / 2 + 1;
+         case 27: return 1 - bounceOut(1 - x);
+         case 28: return bounceOut(x);
+         case 29: return x < 0.5 ? (1 - bounceOut(1 - 2 * x)) / 2 : (1 + bounceOut(2 * x - 1)) / 2;
+         case 30: return cubic(x, 0.25, 0.1, 0.25, 1.0);
+         case 31: return cubic(x, 0.42, 0.0, 1.0, 1.0);
+         case 32: return cubic(x, 0.0, 0.0, 0.58, 1.0);
+         case 33: return cubic(x, 0.42, 0.0, 0.58, 1.0);
+         case 34: return x;
+         case 35: return cubic(x, 1.0 / 3.0, 0.0, 2.0 / 3.0, 1.0); // AE Easy Ease, 33.3 % influence both sides
+         case 36: return cubic(x, 0.4, 0.0, 0.2, 1.0);           // Material standard
+         default: return cubic(x, 0.2, 0.0, 0.0, 1.0);           // Material emphasized (the single-curve form)
+         }
+      };
+      double worst = 0.0;
+      int worstId = 0;
+      for (int id = 0; id < ModShapes::kEaseCount; id++)
+         for (int k = 1; k < 1000; k++)
+         {
+            const double x = k / 1000.0, err = std::fabs(ModShapes::MsegEase(id, (float)x) - ref(id, x));
+            if (err > worst)
+               worst = err, worstId = id;
+         }
+      printf("MSEGTEST M5 worst easing error %.2e (%s)\n", worst, ModShapes::MsegEaseName(worstId));
+      check("M5 every easing within 1e-4 of its reference formula", worst <= 1e-4 ? 1.0 : 0.0, 1.0, 0.0);
+
+      // An easing segment between two points spans their values, and survives save and reopen.
+      MSEGNode n;
+      n.points = { { 0.0f, 0.2f, 0.0f }, { 1.0f, 0.8f, 0.0f } };
+      n.points[0].interp = ModShapes::kInterpEasing;
+      n.points[0].easing = 7; // Cubic Out
+      n.Normalize();
+      check("easing segment maps 0..1 onto its two values", n.Evaluate(0.5f), 0.2 + 0.6 * ref(7, 0.5), 1e-4);
+      MSEGNode back;
+      back.Decode(n.Encode());
+      check("easing id survives encode/decode", back.points.empty() ? -1.0 : back.points[0].easing, 7.0, 0.0);
+      check("easing survives encode/decode (value)", back.Evaluate(0.3f), n.Evaluate(0.3f), 1e-6);
+
+      // Reverse plays the curve backwards: In becomes Out.
+      CurveEdit::Points r = n.points;
+      CurveEdit::Reverse(r);
+      double revErr = 0.0;
+      for (int k = 0; k <= 100; k++)
+      {
+         const float x = k / 100.0f;
+         int h1 = -1, h2 = -1;
+         revErr = std::max(revErr, (double)std::fabs(ModShapes::MsegEvaluate(r.data(), (int)r.size(), x, h1) -
+                                                     ModShapes::MsegEvaluate(n.points.data(), (int)n.points.size(), 1.0f - x, h2)));
+      }
+      check("Reverse of an easing segment is the same curve backwards", revErr, 0.0, 1e-4);
+      CurveEdit::Points inv = n.points;
+      CurveEdit::Invert(inv);
+      int hi = -1;
+      check("Invert flips the value", ModShapes::MsegEvaluate(inv.data(), (int)inv.size(), 0.5f, hi), 1.0 - n.Evaluate(0.5f), 1e-5);
+
+      // Every library shape is a valid curve: 2..max points, x sorted from 0 to 1, values in 0..1.
+      int bad = 0;
+      for (int id = 0; id < CurveLibrary::count; id++)
+      {
+         const CurveEdit::Points pts = CurveLibrary::Make(id, 7, 5, 16);
+         bool ok = pts.size() >= 2 && (int)pts.size() <= MSEGNode::kMaxPoints && pts.front().x == 0.0f && pts.back().x == 1.0f;
+         for (size_t i = 0; ok && i < pts.size(); i++)
+            ok = pts[i].y >= 0.0f && pts[i].y <= 1.0f && (i == 0 || pts[i].x >= pts[i - 1].x);
+         if (!ok)
+         {
+            printf("MSEGTEST library shape %s is not a valid curve\n", CurveLibrary::presets[id].name);
+            bad++;
+         }
+      }
+      check("every library shape is a valid curve", bad, 0.0, 0.0);
+      const CurveEdit::Points a1 = CurveLibrary::Make(29, 3), a2 = CurveLibrary::Make(29, 3), b1 = CurveLibrary::Make(29, 4);
+      check("seeded random shapes repeat per seed", a1.size() == a2.size() && a1[40].y == a2[40].y ? 1.0 : 0.0, 1.0, 0.0);
+      check("a new seed gives a new shape", a1[40].y != b1[40].y ? 1.0 : 0.0, 1.0, 0.0);
+
+      // Expression source (§8.8): the formula drives the curve; Bake turns it into points that follow it.
+      MSEGNode e;
+      e.source = 1;
+      e.expression = "t * t";
+      check("expression source evaluates its formula", e.Evaluate(0.5f), 0.25, 1e-3);
+      e.expression = "t *";
+      check("a bad formula reports an error", e.RefreshExpression() ? 0.0 : 1.0, 1.0, 0.0);
+      e.expression = "sin(t * 2 * pi) * 0.5 + 0.5";
+      e.BakeExpression(0.001f);
+      double bakeErr = 0.0;
+      for (int k = 0; k <= 200; k++)
+         bakeErr = std::max(bakeErr, std::fabs(e.Evaluate(k / 200.0f) - (std::sin(k / 200.0 * 2 * pi) * 0.5 + 0.5)));
+      check("Bake leaves points that follow the formula", bakeErr, 0.0, 0.005);
+      check("Bake makes a points page", e.source, 0.0, 0.0);
    }
 
    // M7 (docs/plans/curve-editor/README.md §10): per-voice cost at 256 points against today's 32-point walk.

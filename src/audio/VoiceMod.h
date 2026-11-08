@@ -65,6 +65,8 @@ namespace VoiceMod
       bool loop = false;
       float loopStart = 0.0f;
       float loopEnd = 1.0f;
+      bool msegExpression = false;
+      float msegTable[1024] = {};
       int numPoints = 0;
       ModShapes::MsegPoint points[kMaxPoints];
       // Voice Spread (shape = ModShapes::SpreadMode)
@@ -330,6 +332,12 @@ namespace VoiceMod
                return ModShapes::Remap(ModShapes::RandomGlide(cur, next, ModShapes::Frac(st.pos), sp.smooth), sp.low, sp.high);
             }
             case kMseg:
+               if (sp.msegExpression)
+               {
+                  const float at = std::clamp((float)st.x, 0.0f, 1.0f) * 1023.0f;
+                  const int i = std::min(1022, (int)at);
+                  return sp.msegTable[i] + (sp.msegTable[i+1] - sp.msegTable[i]) * (at-i);
+               }
                return std::clamp(ModShapes::MsegEvaluate(sp.points, sp.numPoints, (float)st.x, st.msegHint), 0.0f, 1.0f);
             case kSpread:
                return ModShapes::Remap(ModShapes::Spread(sp.shape, st.index, sp.count), sp.low, sp.high);

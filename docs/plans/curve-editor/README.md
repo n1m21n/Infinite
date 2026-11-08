@@ -338,10 +338,10 @@ Filled in per block when it lands; each row links to §6 and §7.
 | Metric | Baseline (§6) | Target (§7) | Result |
 |---|---|---|---|
 | M1 draw + assign | ~8 steps | ≤ 3 / ≤ 10 s | Block 1: 3 with the panel open (stroke on the empty panel, Assign, knob), 4 from closed (+ Shift+E); stroke half proven by CURVEM1TEST; seconds not timed |
-| M2 preset → assigned | n/a | ≤ 2 clicks | — |
+| M2 preset → assigned | n/a | ≤ 2 clicks | Block 2: Shapes, pick, knob = 3 clicks; a pick on a page with no targets arms Assign, so preset to assigned is the pick plus one knob click (2). Not timed in a frame test |
 | M3 CC → editable | impossible | 1 arm, ≤ 64 pts | — |
 | M4 expression live | no | same frame | — |
-| M5 easing / Blender A/B | no easings | 1e-4 / 1e-3 | — |
+| M5 easing / Blender A/B | no easings | 1e-4 / 1e-3 | Block 2 formula half: 38 easings, worst 4.5e-7 against easings.net / CSS references (MSEGTEST); Blender half is Block 4 |
 | M6 frame exact | n/a | identical per run/OS | Block 1: MSEGTEST frame checks pass at 24/30/60 fps on macOS; other OSes not yet run |
 | M7 audio cost | MSEG 32 pts | ≤ +10 % at 256 | Block 1: 44.4 ns vs 56.2 ns per sample, −21 % (hinted search beats the old walk); audio xrun bench not run |
 | M8 UI cost | — | +≤ 1 ms | Block 1: +0.26 to +0.32 ms (3 runs, CURVEBENCH, M2 8 GB) |
@@ -386,6 +386,12 @@ Block 1, settled on the way (2026-11-08):
 | Header | No footer: pages left; magnet snap, grid, Draw's thinning, Assign, ghost and the pencil Properties toggle (N) pinned right, as the 3D View's header (side docks put the controls on their own row) |
 | Properties | A bordered side column titled Curve with a close X and collapsible cards (Time, Loop, Point, Targets, Voices), built from the 3D View's rows; only the card list scrolls |
 | Fit | Every height and width is exact and the panel card never scrolls, so there is no sideways two-finger scroll |
+| Shapes | A Shapes chip in the header opens the shelves, Motion easings and Mine; a pick replaces the page (one undo) and becomes the Stamp shape |
+| Mine | Saves are the MSEG points text in `<app support>/curves/<page title>.curve`, numbered when the name is taken |
+| Easing | Stored in the third point field (an easing segment has no bend), so older builds read it as a bend and nothing breaks; Reverse swaps In and Out |
+| Stamp N | N cycles the Stamp shape while Stamp is the tool, otherwise toggles Properties |
+| Draw thinning | Moved from the header to a Draw card in the properties column, so the header is one row of tiles |
+| Expression | Pulled forward from Block 3: Source card (Points / Expression), f(t) field with its error, Bake; Record page stays in Block 3 |
 | Placement | A page made in the panel spawns its MSEG with FindFreeSpawnPosition, beside nodes on screen, never on top |
 | Empty panel | A drag on it makes an MSEG page and draws its curve in one go (M1) |
 | New page | A page made in the panel is 4 bars (Synced, 16 beats) and opens on Draw; a card-spawned MSEG keeps 1 bar |

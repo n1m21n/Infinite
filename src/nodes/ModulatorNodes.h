@@ -800,6 +800,14 @@ public:
 
    // Sorted by x; the first point is pinned to x = 0 and the last to x = 1.
    std::vector<Point> points;
+   int source = 0; // 0 points, 1 expression
+   std::string expression = "sin(t * 2 * pi) * 0.5 + 0.5";
+   uint64_t motionGroup = 0;
+   int motionChannel = -1;
+   int editorOrder = 0;
+   bool RefreshExpression() const;
+   const std::string& ExpressionError() const { return mExpressionError; }
+   void BakeExpression(float tolerance = 0.001f);
    // Time base: LFONode's Beats, Synced and Hz, plus a length in seconds or
    // in frames (docs/plans/curve-editor §8.5). Seconds and frames run on the
    // transport's seconds, which an export steps at exactly k / fps, so a
@@ -865,6 +873,11 @@ public:
       v.Bool("voice", voice);
       v.Float("lengthSec", lengthSec); v.Float("lengthFrames", lengthFrames); v.Float("fps", fps);
       v.Float("speed", speed); v.Int("play", play); v.Bool("freeRun", freeRun);
+      v.Int("source", source); v.Text("expression", expression);
+      v.Int("motionChannel", motionChannel); v.Int("editorOrder", editorOrder);
+      std::string group = std::to_string(motionGroup);
+      v.Text("motionGroup", group);
+      try { motionGroup = std::stoull(group); } catch (...) { motionGroup = 0; }
       std::string encoded = Encode();
       v.Text("points", encoded);
       Decode(encoded);
@@ -872,6 +885,10 @@ public:
 
 private:
    float Advance();
+   mutable std::string mExpressionKey, mExpressionError;
+   mutable std::map<std::string, float> mExpressionGlobals;
+   mutable float mExpressionTable[1024] = {};
+   mutable double mExpressionSeconds = -1.0, mExpressionBeats = -1.0;
    mutable SyncedPeriodCache mPeriodCache;
    // trig patched: the run, advanced once per clock value.
    double mClockLast = -1.0;

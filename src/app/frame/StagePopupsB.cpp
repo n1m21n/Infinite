@@ -961,9 +961,13 @@ void DrawPopupsB(FrameCtx& fc)
 
       // Curve Editor Assign (docs/plans/curve-editor/README.md §8.6): the same click-to-pick UX, binding the armed
       // MSEG to the knob clicked. Shift keeps it armed for more; Esc or right-click stops.
-      if (gCurveAssignUid != 0)
+      const ImGuiPayload* curvePayload = ImGui::GetDragDropPayload();
+      const bool curveDragged = curvePayload != nullptr && curvePayload->IsDataType("INFINITE_CURVE_PAGE") &&
+                                curvePayload->DataSize == sizeof(uint64_t);
+      const uint64_t curveUid = curveDragged ? *static_cast<const uint64_t*>(curvePayload->Data) : gCurveAssignUid;
+      if (curveUid != 0)
       {
-         GraphNode* srcGn = FindNodeByUid(gCurveAssignUid);
+         GraphNode* srcGn = FindNodeByUid(curveUid);
          if (srcGn == nullptr || dynamic_cast<MSEGNode*>(srcGn->node.get()) == nullptr)
             gCurveAssignUid = 0;
          else
@@ -997,7 +1001,7 @@ void DrawPopupsB(FrameCtx& fc)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
                ImGui::SetTooltip(T("Assign %s -> %s: %s"), srcTitle.c_str(), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
                ed::Resume();
-               if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+               if (curveDragged ? ImGui::IsMouseReleased(ImGuiMouseButton_Left) : ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                {
                   PushUndoCheckpoint("Assign Curve");
                   Modulation::Instance().Bind(pInfo.nodeIndex, pInfo.paramIndex, srcGn->index, 0);

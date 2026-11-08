@@ -16,6 +16,52 @@ namespace CurveEdit
    using Point = ModShapes::MsegPoint;
    using Points = std::vector<Point>;
 
+   inline void Invert(Points& pts)
+   {
+      for (Point& p : pts) { p.y = 1.0f - p.y; p.ly = -p.ly; p.ry = -p.ry; }
+   }
+
+   inline void Reverse(Points& pts)
+   {
+      const Points before = pts;
+      for (size_t i = 0; i < pts.size(); ++i)
+      {
+         const size_t j = pts.size() - 1 - i;
+         Point p = before[j]; p.x = 1.0f - p.x;
+         p.lx = -before[j].rx; p.ly = before[j].ry;
+         p.rx = -before[j].lx; p.ry = before[j].ly;
+         if (j > 0)
+         {
+            p.interp = before[j-1].interp;
+            p.curve = -before[j-1].curve;
+            p.easing = ModShapes::MsegEaseReversed(before[j-1].easing);
+         }
+         pts[i] = p;
+      }
+   }
+
+   inline void Normalise(Points& pts)
+   {
+      if (pts.empty()) return;
+      float lo = 1.0f, hi = 0.0f;
+      for (const Point& p : pts) { lo = std::min(lo,p.y); hi = std::max(hi,p.y); }
+      if (hi-lo < 1.0e-6f) return;
+      for (Point& p : pts) { p.y = (p.y-lo)/(hi-lo); p.ly /= hi-lo; p.ry /= hi-lo; }
+   }
+
+   inline void Smooth(Points& pts, const std::vector<int>& selected, float strength = 0.5f)
+   {
+      const Points before = pts;
+      for (int i : selected)
+         if (i > 0 && i+1 < (int)pts.size())
+         {
+            const float dx = before[i+1].x-before[i-1].x;
+            const float t = dx > 1e-6f ? (before[i].x-before[i-1].x)/dx : .5f;
+            const float target = before[i-1].y*(1-t)+before[i+1].y*t;
+            pts[i].y += (target-before[i].y)*strength;
+         }
+   }
+
    struct XY
    {
       float x = 0.0f, y = 0.0f;

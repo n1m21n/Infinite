@@ -125,6 +125,7 @@ namespace ModShapes
       kInterpLinear,
       kInterpBend,         // exponential bend set by `curve` (every older patch)
       kInterpBezier,       // cubic through this point's right and the next point's left handle
+      kInterpEasing,
       kInterpCount
    };
    // Blender's handle types. The auto kinds are recomputed from the
@@ -147,6 +148,7 @@ namespace ModShapes
       float curve = 0.0f; // bend of the segment that leaves this point: -1..1, 0 = straight
       uint8_t interp = kInterpBend;
       uint8_t handle = kHandleAutoClamped;
+      uint8_t easing = 0;
       // Bezier handles as offsets from the point, in shape units: left
       // (lx <= 0) and right (rx >= 0).
       float lx = 0.0f, ly = 0.0f, rx = 0.0f, ry = 0.0f;
@@ -204,6 +206,102 @@ namespace ModShapes
       return (float)(u * u * u * y0 + 3.0 * u * u * t * y1 + 3.0 * u * t * t * y2 + t * t * t * y3);
    }
 
+   constexpr int kEaseCount = 38;
+   inline const char* MsegEaseName(int id)
+   {
+      static const char* names[kEaseCount] = {
+         "Sine In", "Sine Out", "Sine InOut", "Quad In", "Quad Out", "Quad InOut",
+         "Cubic In", "Cubic Out", "Cubic InOut", "Quart In", "Quart Out", "Quart InOut",
+         "Quint In", "Quint Out", "Quint InOut", "Expo In", "Expo Out", "Expo InOut",
+         "Circ In", "Circ Out", "Circ InOut", "Back In", "Back Out", "Back InOut",
+         "Elastic In", "Elastic Out", "Elastic InOut", "Bounce In", "Bounce Out", "Bounce InOut",
+         "CSS ease", "CSS ease-in", "CSS ease-out", "CSS ease-in-out", "CSS linear",
+         "Easy Ease", "Material standard", "Material emphasized"
+      };
+      return names[std::clamp(id, 0, kEaseCount - 1)];
+   }
+   // The easing that plays this one backwards in time: In and Out swap, InOut and the symmetric ones keep.
+   inline uint8_t MsegEaseReversed(uint8_t id)
+   {
+      if (id < 30 && id % 3 != 2)
+         return (uint8_t)(id % 3 == 0 ? id + 1 : id - 1);
+      if (id == 31 || id == 32)
+         return (uint8_t)(id == 31 ? 32 : 31);
+      return id;
+   }
+   inline double MsegBounceOut(double t)
+   {
+      constexpr double n = 7.5625, d = 2.75;
+      if (t < 1.0 / d) return n * t * t;
+      if (t < 2.0 / d) { t -= 1.5 / d; return n * t * t + 0.75; }
+      if (t < 2.5 / d) { t -= 2.25 / d; return n * t * t + 0.9375; }
+      t -= 2.625 / d; return n * t * t + 0.984375;
+   }
+   // CSS x handles may cross; do not shorten them like keyframe handles.
+   inline float MsegCubicEase(float t, double x1, double y1, double x2, double y2)
+   {
+      double lo = 0.0, hi = 1.0;
+      for (int i = 0; i < 32; ++i)
+      {
+         const double u = (lo + hi) * .5, v = 1.0 - u;
+         const double x = 3*v*v*u*x1 + 3*v*u*u*x2 + u*u*u;
+         if (x < t) lo = u; else hi = u;
+      }
+      const double u = (lo + hi) * .5, v = 1.0 - u;
+      return (float)(3*v*v*u*y1 + 3*v*u*u*y2 + u*u*u);
+   }
+   inline float MsegEase(int id, float time)
+   {
+      const double t = std::clamp((double)time, 0.0, 1.0);
+      if (t == 0.0 || t == 1.0) return (float)t;
+      id = std::clamp(id, 0, kEaseCount - 1);
+      if (id >= 30)
+      {
+         switch (id)
+         {
+            case 30: return MsegCubicEase((float)t, .25, .1, .25, 1);
+            case 31: return MsegCubicEase((float)t, .42, 0, 1, 1);
+            case 32: return MsegCubicEase((float)t, 0, 0, .58, 1);
+            case 33: return MsegCubicEase((float)t, .42, 0, .58, 1);
+            case 34: return (float)t;
+            case 35: return MsegCubicEase((float)t, 1.0/3, 0, 2.0/3, 1);
+            case 36: return MsegCubicEase((float)t, .4, 0, .2, 1);
+            default: return MsegCubicEase((float)t, .2, 0, 0, 1);
+         }
+      }
+      constexpr double pi = 3.14159265358979323846;
+      const int family = id / 3, mode = id % 3;
+      auto in = [family](double u) {
+         constexpr double pi = 3.14159265358979323846;
+         switch (family)
+         {
+            case 0: return 1.0 - std::cos(u*pi*.5);
+            case 1: return u*u;
+            case 2: return u*u*u;
+            case 3: return u*u*u*u;
+            case 4: return u*u*u*u*u;
+            case 5: return u == 0 ? 0.0 : std::pow(2.0, 10*u-10);
+            case 6: return 1.0 - std::sqrt(std::max(0.0, 1-u*u));
+            case 7: return 2.70158*u*u*u - 1.70158*u*u;
+            case 8: return u == 0 || u == 1 ? u : -std::pow(2.0, 10*u-10)*std::sin((10*u-10.75)*(2*pi/3));
+            default: return 1.0-MsegBounceOut(1-u);
+         }
+      };
+      if (mode == 0) return (float)in(t);
+      if (mode == 1) return (float)(1-in(1-t));
+      if (family == 7)
+      {
+         const double c = 1.70158*1.525, u = t < .5 ? 2*t : 2*t-2;
+         return (float)(t < .5 ? u*u*((c+1)*u-c)/2 : (u*u*((c+1)*u+c)+2)/2);
+      }
+      if (family == 8)
+      {
+         const double wave = std::sin((20*t-11.125)*(2*pi/4.5));
+         return (float)(t < .5 ? -std::pow(2.0,20*t-10)*wave/2 : std::pow(2.0,-20*t+10)*wave/2+1);
+      }
+      return (float)(t < .5 ? in(2*t)*.5 : 1-in(2-2*t)*.5);
+   }
+
    // The segment holding x: the last point at or before x among
    // 0..count-2 (a run of points on one x resolves to its last, so a step
    // lands on the new value). `hint` is the segment found last time: a curve
@@ -248,6 +346,7 @@ namespace ModShapes
          case kInterpConstant: return x >= b.x ? b.y : a.y;
          case kInterpLinear: return a.y + (b.y - a.y) * std::clamp(t, 0.0f, 1.0f);
          case kInterpBezier: return MsegBezier(a, b, x);
+         case kInterpEasing: return a.y + (b.y - a.y) * MsegEase(a.easing, t);
          default: return MsegSegment(a.y, b.y, a.curve, t);
       }
    }

@@ -10,6 +10,9 @@
 #include <sstream>
 
 #include "Transport.h"
+#include "core/Expression.h"
+#include "core/ExprGlobals.h"
+#include "core/CurveEdit.h"
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
 #include "platform/Platform.h"
@@ -969,6 +972,7 @@ int MSEGNode::AddPoint(float x, float y)
       at++;
    Point p { x, y, 0.0f };
    p.interp = points[at - 1].interp; // splitting a segment keeps how it was drawn
+   p.easing = points[at - 1].easing;
    points.insert(points.begin() + at, p);
    ModShapes::MsegAutoHandles(points.data(), (int)points.size());
    return at;
@@ -1003,8 +1007,60 @@ float MSEGNode::Segment(float y0, float y1, float curve, float t)
    return ModShapes::MsegSegment(y0, y1, curve, t);
 }
 
+bool MSEGNode::RefreshExpression() const
+{
+   const double seconds = OnSeconds() ? 1.0 / PassesPerSecond() : BeatsPerPass() * 60.0 / Transport::Instance().Tempo();
+   const double beats = OnSeconds() ? seconds * Transport::Instance().Tempo() / 60.0 : BeatsPerPass();
+   const auto& globals = ExprGlobals::Values();
+   if (mExpressionKey == expression && mExpressionGlobals == globals && mExpressionSeconds == seconds && mExpressionBeats == beats)
+      return mExpressionError.empty();
+   mExpressionKey = expression; mExpressionGlobals = globals;
+   mExpressionSeconds = seconds; mExpressionBeats = beats;
+   float table[1024];
+   std::map<std::string, float> vars;
+   for (int i = 0; i < 1024; ++i)
+   {
+      const float t = (float)i / 1023.0f;
+      vars["phase"] = t; vars["beat"] = (float)(t * beats);
+      vars["sec"] = (float)(t * seconds); vars["frame"] = (float)(t * seconds * fps);
+      if (!Expression::Evaluate(expression, t, &vars, &globals, table[i], mExpressionError) || !std::isfinite(table[i]))
+      {
+         if (mExpressionError.empty()) mExpressionError = "Expression must be finite";
+         return false;
+      }
+      table[i] = std::clamp(table[i], 0.0f, 1.0f);
+   }
+   std::copy(table, table + 1024, mExpressionTable);
+   mExpressionError.clear();
+   return true;
+}
+
+void MSEGNode::BakeExpression(float tolerance)
+{
+   if (!RefreshExpression()) return;
+   std::vector<CurveEdit::XY> samples;
+   for (int i = 0; i < 1024; ++i) samples.push_back({(float)i / 1023.0f, mExpressionTable[i]});
+   auto reduced = CurveEdit::Simplify(samples, std::max(0.00001f, tolerance));
+   while (reduced.size() > kMaxPoints)
+   {
+      tolerance = std::max(0.00001f, tolerance) * 1.5f;
+      reduced = CurveEdit::Simplify(samples, tolerance);
+   }
+   points.clear();
+   for (const auto& p : reduced) { Point q; q.x=p.x; q.y=p.y; q.interp=ModShapes::kInterpLinear; points.push_back(q); }
+   source = 0;
+   Normalize();
+}
+
 float MSEGNode::Evaluate(float x) const
 {
+   if (source == 1)
+   {
+      RefreshExpression();
+      const float at = std::clamp(x, 0.0f, 1.0f) * 1023.0f;
+      const int i = std::min(1022, (int)at);
+      return mExpressionTable[i] + (mExpressionTable[i+1] - mExpressionTable[i]) * (at-i);
+   }
    return ModShapes::MsegEvaluate(points.data(), (int)points.size(), x, mHint);
 }
 
@@ -1017,7 +1073,9 @@ std::string MSEGNode::Encode() const
          out += ";";
       const Point& p = points[i];
       char buf[192];
-      int n = snprintf(buf, sizeof(buf), "%.6g,%.6g,%.6g", (double)p.x, (double)p.y, (double)p.curve);
+      // An easing segment has no bend: its slot carries the easing id instead.
+      const double third = p.interp == ModShapes::kInterpEasing ? (double)p.easing : (double)p.curve;
+      int n = snprintf(buf, sizeof(buf), "%.6g,%.6g,%.6g", (double)p.x, (double)p.y, third);
       const bool dragged = p.handle == ModShapes::kHandleAligned || p.handle == ModShapes::kHandleFree;
       if (p.interp != ModShapes::kInterpBend || p.handle != ModShapes::kHandleAutoClamped)
          n += snprintf(buf + n, sizeof(buf) - n, ",%d,%d", (int)p.interp, (int)p.handle);
@@ -1057,6 +1115,11 @@ void MSEGNode::Decode(const std::string& s)
          {
             p.interp = (uint8_t)std::clamp((int)f[3], 0, 255);
             p.handle = (uint8_t)std::clamp((int)f[4], 0, 255);
+            if (p.interp == ModShapes::kInterpEasing)
+            {
+               p.easing = (uint8_t)std::clamp((int)std::lround(p.curve), 0, ModShapes::kEaseCount - 1);
+               p.curve = 0.0f;
+            }
          }
          if (nf >= 9)
          {
@@ -1148,6 +1211,12 @@ bool MSEGNode::VoiceSpec(VoiceMod::Spec& out)
    out.loop = loop;
    out.loopStart = loopStart;
    out.loopEnd = loopEnd;
+   if (source == 1)
+   {
+      RefreshExpression();
+      out.msegExpression = true;
+      std::copy(mExpressionTable, mExpressionTable + 1024, out.msegTable);
+   }
    out.numPoints = std::min((int)points.size(), VoiceMod::kMaxPoints);
    for (int i = 0; i < out.numPoints; i++)
       out.points[i] = points[i];
