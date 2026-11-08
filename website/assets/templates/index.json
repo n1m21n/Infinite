@@ -1971,6 +1971,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "gabber-distorted-909-kick-synth",
+      "name": "Gabber Distorted 909 Kick Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Rotterdam hardcore 909 kick drum synthesizer with steep exponential pitch drop, heavy wavefolded tanh saturation, punchy transient click, and tuned sub-harmonic body.",
+      "price": 0,
+      "preview": "assets/templates/gabber-distorted-909-kick-synth.webp",
+      "file": "assets/templates/gabber-distorted-909-kick-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "gabber-hoover-rave-stab-synth",
+      "name": "Gabber Hoover Rave Stab Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Iconic rave hoover chord stab synthesizer featuring multi-phase detuned pulse-saw oscillators, aggressive pitch glide envelope, resonant lowpass sweep, and saturated harmonic bite.",
+      "price": 0,
+      "preview": "assets/templates/gabber-hoover-rave-stab-synth.webp",
+      "file": "assets/templates/gabber-hoover-rave-stab-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "liquid-dnb-rhodes-lush-chorus-fx",
+      "name": "Liquid DnB Rhodes Lush Chorus FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Velvety multi-voice stereo chorus and spatial shimmer effect tailored for liquid drum & bass electric piano chords and pad textures, with dual quadrature LFOs and soft top-end roll-off.",
+      "price": 0,
+      "preview": "assets/templates/liquid-dnb-rhodes-lush-chorus-fx.webp",
+      "file": "assets/templates/liquid-dnb-rhodes-lush-chorus-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "liquid-dnb-sub-warmth-ladder-filter-fx",
+      "name": "Liquid DnB Sub Warmth Ladder Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Resonant 4-pole ladder lowpass filter with low-end resonance compensation, analog saturation warmth, and envelope following designed for warm rolling drum & bass sub-lines.",
+      "price": 0,
+      "preview": "assets/templates/liquid-dnb-sub-warmth-ladder-filter-fx.webp",
+      "file": "assets/templates/liquid-dnb-sub-warmth-ladder-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

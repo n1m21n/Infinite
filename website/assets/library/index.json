@@ -6724,6 +6724,216 @@
       "file": "assets/library/pixel/vaporwave-collage-prismatic-chroma-wave.field",
       "preview": "assets/library/previews/vaporwave-collage-prismatic-chroma-wave.jpg",
       "bytes": 1659
+    },
+    {
+      "id": "suprematist-blocks-kinetic-composition",
+      "name": "Suprematist Blocks Kinetic Composition",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "geometric",
+        "constructivism",
+        "abstract",
+        "composition",
+        "drawing"
+      ],
+      "description": "Russian avant-garde geometric abstraction study featuring floating cantilevered black quadrilaterals, dynamic diagonal red wedges, intersecting linear axes, and orbital tension points on warm canvas.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/suprematist-blocks-kinetic-composition.js",
+      "preview": "assets/library/previews/suprematist-blocks-kinetic-composition.jpg",
+      "bytes": 3041
+    },
+    {
+      "id": "suprematist-blocks-geometric-axis",
+      "name": "Suprematist Blocks Geometric Axis",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "constructivism",
+        "axis",
+        "geometric",
+        "cantilever",
+        "drawing"
+      ],
+      "description": "Dynamic constructivist balance of intersecting orthogonal coordinate bars, bold diagonal red cantilever beams, floating counterweight rectangles, and rhythmic cross-line markers.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/suprematist-blocks-geometric-axis.js",
+      "preview": "assets/library/previews/suprematist-blocks-geometric-axis.jpg",
+      "bytes": 2398
+    },
+    {
+      "id": "bauhaus-geometry-kinetic-mobile-3d",
+      "name": "Bauhaus Geometry Kinetic Mobile 3D",
+      "kind": "Generator",
+      "tags": [
+        "bauhaus",
+        "geometry",
+        "constructivism",
+        "kinetic",
+        "sculpture",
+        "3d"
+      ],
+      "description": "Constructivist kinetic 3D sculpture inspired by Moholy-Nagy and the Bauhaus Light-Space Modulator, featuring rotating primary color planar discs, cantilevered chrome balance arms, and orbital spheres.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/bauhaus-geometry-kinetic-mobile-3d.js",
+      "preview": "assets/library/previews/bauhaus-geometry-kinetic-mobile-3d.jpg",
+      "bytes": 3343
+    },
+    {
+      "id": "bauhaus-geometry-cantilever-monument-3d",
+      "name": "Bauhaus Geometry Cantilever Monument 3D",
+      "kind": "Generator",
+      "tags": [
+        "bauhaus",
+        "geometry",
+        "architecture",
+        "cantilever",
+        "monument",
+        "3d"
+      ],
+      "description": "Monumental architectural 3D study combining asymmetric stepped cantilever slabs, intersecting geometric pylons, cylindrical structural pivots, and bold primary color blocking.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/bauhaus-geometry-cantilever-monument-3d.js",
+      "preview": "assets/library/previews/bauhaus-geometry-cantilever-monument-3d.jpg",
+      "bytes": 2678
+    },
+    {
+      "id": "gabber-distorted-909-kick-synth",
+      "name": "Gabber Distorted 909 Kick Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "gabber",
+        "hardcore",
+        "kick",
+        "distortion",
+        "audio"
+      ],
+      "description": "Rotterdam hardcore 909 kick drum synthesizer with steep exponential pitch drop, heavy wavefolded tanh saturation, punchy transient click, and tuned sub-harmonic body.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/gabber-distorted-909-kick-synth.inf",
+      "preview": "assets/library/previews/gabber-distorted-909-kick-synth.jpg",
+      "bytes": 2408
+    },
+    {
+      "id": "gabber-hoover-rave-stab-synth",
+      "name": "Gabber Hoover Rave Stab Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "gabber",
+        "hoover",
+        "rave",
+        "stab",
+        "audio"
+      ],
+      "description": "Iconic rave hoover chord stab synthesizer featuring multi-phase detuned pulse-saw oscillators, aggressive pitch glide envelope, resonant lowpass sweep, and saturated harmonic bite.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/gabber-hoover-rave-stab-synth.inf",
+      "preview": "assets/library/previews/gabber-hoover-rave-stab-synth.jpg",
+      "bytes": 2383
+    },
+    {
+      "id": "liquid-dnb-rhodes-lush-chorus-fx",
+      "name": "Liquid DnB Rhodes Lush Chorus FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "liquid_dnb",
+        "chorus",
+        "rhodes",
+        "spatial",
+        "audio"
+      ],
+      "description": "Velvety multi-voice stereo chorus and spatial shimmer effect tailored for liquid drum & bass electric piano chords and pad textures, with dual quadrature LFOs and soft top-end roll-off.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/liquid-dnb-rhodes-lush-chorus-fx.inf",
+      "preview": "assets/library/previews/liquid-dnb-rhodes-lush-chorus-fx.jpg",
+      "bytes": 2172
+    },
+    {
+      "id": "liquid-dnb-sub-warmth-ladder-filter-fx",
+      "name": "Liquid DnB Sub Warmth Ladder Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "liquid_dnb",
+        "filter",
+        "ladder",
+        "sub",
+        "audio"
+      ],
+      "description": "Resonant 4-pole ladder lowpass filter with low-end resonance compensation, analog saturation warmth, and envelope following designed for warm rolling drum & bass sub-lines.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/liquid-dnb-sub-warmth-ladder-filter-fx.inf",
+      "preview": "assets/library/previews/liquid-dnb-sub-warmth-ladder-filter-fx.jpg",
+      "bytes": 2172
+    },
+    {
+      "id": "acid-graphics-iridescent-liquid-twirl",
+      "name": "Acid Graphics Iridescent Liquid Twirl",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "acid_graphics",
+        "liquid",
+        "iridescent",
+        "twirl",
+        "audioreactive"
+      ],
+      "description": "Audio-reactive liquid chrome vortex with logarithmic polar spiral coordinates, iridescent thin-film chromatic interference, and razor-sharp acid green and ultraviolet contours.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/acid-graphics-iridescent-liquid-twirl.field",
+      "preview": "assets/library/previews/acid-graphics-iridescent-liquid-twirl.jpg",
+      "bytes": 1618
+    },
+    {
+      "id": "acid-graphics-kaleido-chroma-warp",
+      "name": "Acid Graphics Kaleido Chroma Warp",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "acid_graphics",
+        "kaleidoscope",
+        "chroma",
+        "starburst",
+        "audioreactive"
+      ],
+      "description": "Audio-reactive 8-fold kaleidoscopic chromatic warp featuring undulating starburst lattices, acid typography contours, and high-voltage neon edge glow.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/acid-graphics-kaleido-chroma-warp.field",
+      "preview": "assets/library/previews/acid-graphics-kaleido-chroma-warp.jpg",
+      "bytes": 1546
     }
   ]
 }

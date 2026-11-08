@@ -445,6 +445,16 @@
       "slug": "vaporwave-collage-prismatic-chroma-wave",
       "title": "Vaporwave Collage Prismatic Chroma Wave",
       "description": "Audio-reactive vaporwave liquid refraction surface modeling chromatic wave dispersion. Bass frequencies drive deep tidal ripple swells, mids induce complex interference patterns across pastel pink and cyan gradients, and highs shimmer with radiant mint-green caustic highlights."
+    },
+    {
+      "slug": "acid-graphics-iridescent-liquid-twirl",
+      "title": "Acid Graphics Iridescent Liquid Twirl",
+      "description": "Audio-reactive acid graphics liquid simulation featuring a logarithmic spiral chrome vortex. Bass pulses expand and contract the central vortex aperture, mid frequencies modulate concentric liquid interference ripples, and high frequencies trigger vibrant chromatic aberration flares across electric lime and ultraviolet gradients."
+    },
+    {
+      "slug": "acid-graphics-kaleido-chroma-warp",
+      "title": "Acid Graphics Kaleido Chroma Warp",
+      "description": "Audio-reactive kaleidoscopic acid graphics visualizer featuring an 8-fold symmetric starburst field. Bass frequencies distort and swell the central radial lattice, mid frequencies ripple recursive polygonal contours across electric lime and neon magenta bands, and high frequencies ignite luminous iridescent perimeter caustics."
     }
   ]
 }

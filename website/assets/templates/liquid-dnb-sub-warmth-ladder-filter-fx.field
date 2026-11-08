@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Liquid DnB Sub Warmth Ladder Filter FX",
+    "author": "Infinite",
+    "description": "Resonant 4-pole ladder lowpass filter with low-end resonance compensation, analog saturation warmth, and envelope following designed for warm rolling drum & bass sub-lines.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float cutoff = 2400.0 [400.0, 8000.0]\nparam float resonance = 0.38 [0.0, 0.85]\nparam float drive = 0.45 [0.0, 1.0]\nparam float bassComp = 0.50 [0.0, 1.0]\nparam float mix = 0.70 [0.0, 1.0]\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float s4 = 0\nstate float lpBass = 0\n\nfCut = clamp(cutoff / sr * 2.0, 0.02, 0.42)\nfBass = clamp(160.0 / sr * 2.0, 0.005, 0.12)\nlpBass = lpBass + fBass * (in - lpBass)\n\nfb = resonance * 3.6\ninp = in - fb * s4 + lpBass * bassComp * 0.4\n\ndrv = inp * (1.0 + drive * 1.8)\nsat = drv / (1.0 + abs(drv * 0.5))\n\ns1 = s1 + fCut * (sat - s1)\ns2 = s2 + fCut * (s1 - s2)\ns3 = s3 + fCut * (s2 - s3)\ns4 = s4 + fCut * (s3 - s4)\n\nprocessed = in * (1.0 - mix) + s4 * mix\nout = processed * 1.30\n",
+    "params": {
+      "cutoff": 2400.0,
+      "resonance": 0.38,
+      "drive": 0.45,
+      "bassComp": 0.5,
+      "mix": 0.7
+    }
+  }
+}

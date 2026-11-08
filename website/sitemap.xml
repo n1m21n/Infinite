@@ -131,6 +131,8 @@
   <url><loc>https://infinitedevices.org/embeds/cymatics-sine-harmonic-quadrupole-field.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/vaporwave-collage-retro-sunset-grid.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/vaporwave-collage-prismatic-chroma-wave.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/acid-graphics-iridescent-liquid-twirl.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/acid-graphics-kaleido-chroma-warp.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/chat.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
@@ -266,6 +268,10 @@
   <url><loc>https://infinitedevices.org/library/footwork-rapid-fire-percussive-stab-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/amapiano-log-drum-warm-saturator-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/amapiano-lush-spatial-reverb-diffusion-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gabber-distorted-909-kick-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gabber-hoover-rave-stab-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liquid-dnb-rhodes-lush-chorus-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liquid-dnb-sub-warmth-ladder-filter-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
@@ -720,6 +726,16 @@
   <url><loc>https://infinitedevices.org/library/amapiano-lush-spatial-reverb-diffusion-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vaporwave-collage-retro-sunset-grid.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vaporwave-collage-prismatic-chroma-wave.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/suprematist-blocks-kinetic-composition.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/suprematist-blocks-geometric-axis.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bauhaus-geometry-kinetic-mobile-3d.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bauhaus-geometry-cantilever-monument-3d.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gabber-distorted-909-kick-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gabber-hoover-rave-stab-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liquid-dnb-rhodes-lush-chorus-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liquid-dnb-sub-warmth-ladder-filter-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/acid-graphics-iridescent-liquid-twirl.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/acid-graphics-kaleido-chroma-warp.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-08</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
