@@ -182,6 +182,25 @@ public:
    // Returns true when the block was a jump.
    bool FollowHost(const HostTime& host);
 
+   // Plugin settings (Settings > DAW sync): who owns tempo, playhead and loop inside a DAW.
+   // Tempo Infinite: the host tempo and meter are ignored, Infinite's own are used and editable.
+   // Playhead Infinite: a seek in Infinite sticks; host jumps (locate, loop wrap) move Infinite by
+   // the same amount, so both keep their offset. Loop Infinite (needs Playhead Infinite): Infinite's
+   // own loop region wraps and host jumps are ignored. Tempo Infinite implies both. Play and stop
+   // always follow the host.
+   void SetHostSync(bool ownTempo, bool ownPlayhead, bool ownLoop)
+   {
+      // At its own tempo Infinite's position cannot track the host's, so it owns all three.
+      ownPlayhead = ownPlayhead || ownTempo;
+      ownLoop = ownTempo || (ownPlayhead && ownLoop);
+      mOwnTempo.store(ownTempo, std::memory_order_relaxed);
+      mOwnPlayhead.store(ownPlayhead, std::memory_order_relaxed);
+      mOwnLoop.store(ownLoop, std::memory_order_relaxed);
+   }
+   bool OwnTempo() const { return mOwnTempo.load(std::memory_order_relaxed); }
+   bool OwnPlayhead() const { return mOwnPlayhead.load(std::memory_order_relaxed); }
+   bool OwnLoop() const { return mOwnLoop.load(std::memory_order_relaxed); }
+
    // The musical position at the START of the block the clock owner most
    // recently advanced over - captured before the advance, so it is the real
    // start even when that block crossed a loop end and Beats() has already
@@ -290,6 +309,8 @@ private:
    // it render the loop body forever. SetOfflineMode(true) suspends the wrap
    // without clearing the user's loop, and false restores it.
    std::atomic<bool> mLoopSuspended { false };
+   std::atomic<bool> mOwnTempo { false }, mOwnPlayhead { false }, mOwnLoop { false };
+   double mHostOffsetBeats = 0.0; // audio thread: host ppq minus Infinite's beats (Playhead Infinite)
 
    // Applies a staged tempo, rebasing the offsets first so Beats() doesn't
    // jump. Called only by the live clock owner, never by UI code.

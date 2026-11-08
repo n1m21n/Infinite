@@ -6,6 +6,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "core/Transport.h"
 #include "core/gl3.h"
 #include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/FormParts.h"
@@ -845,6 +846,28 @@ namespace app
          // 4. General & Performance Tab
          if (sTab == 3)
          {
+            if (Platform::PluginModeActive())
+            {
+               // Who owns time inside the DAW (Transport::SetHostSync). Play and stop always follow the DAW.
+               ImGui::Spacing();
+               FormParts::Section(T("DAW sync"));
+               Transport& tr = Transport::Instance();
+               bool ownTempo = tr.OwnTempo(), ownHead = tr.OwnPlayhead(), ownLoop = tr.OwnLoop();
+               const std::string items = std::string(T("DAW")) + '\0' + "Infinite" + '\0';
+               int tempo = ownTempo ? 1 : 0, head = ownHead ? 1 : 0, loop = ownLoop ? 1 : 0;
+               bool changed = FormParts::Combo(L("Tempo"), &tempo, items.c_str());
+               ImGui::BeginDisabled(tempo == 1);
+               changed |= FormParts::Combo(L("Playhead"), &head, items.c_str());
+               ImGui::EndDisabled();
+               ImGui::BeginDisabled(tempo == 1 || head == 0);
+               changed |= FormParts::Combo(L("Loop"), &loop, items.c_str());
+               ImGui::EndDisabled();
+               if (changed)
+               {
+                  tr.SetHostSync(tempo == 1, head == 1, loop == 1);
+                  SaveWorkspaceSettings();
+               }
+            }
             if (!Platform::PluginModeActive()) // the DAW project saves the patch
             {
             ImGui::Spacing();

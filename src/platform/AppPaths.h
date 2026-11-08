@@ -242,6 +242,28 @@ namespace AppPaths
       return dir;
    }
 
+   // Set once at start by the plugin engine (PluginEngine::Init), before any setting is read.
+   inline bool& PluginIdentity()
+   {
+      static bool on = false;
+      return on;
+   }
+
+   // Where settings and window state live: AppSupportDir() for the app, its "Plugin" folder for
+   // the plugin engine, so the plugin and the app each keep their own layout, panels, theme and
+   // preferences. Libraries stay shared in AppSupportDir(): licence, presets, devices, samples,
+   // grooves, extensions, learned taste.
+   inline std::string SettingsDir()
+   {
+      std::string dir = AppSupportDir();
+      if (dir.empty() || !PluginIdentity())
+         return dir;
+      dir += "/Plugin";
+      if (!EnsureDir(dir))
+         return {};
+      return dir;
+   }
+
    // One-shot migration for state that predates the AppSupportDir() layout.
    //
    // Routing every settings path through AppSupportDir() relocated two files

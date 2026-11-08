@@ -1603,8 +1603,9 @@ namespace app
 
          // Loop region toggle. The region itself is a Shift+drag on the
          // ruler; right-clicking the ruler disarms it.
-         // Inside a DAW the host's loop wins (Transport::FollowHost suspends this one): no toggle.
-         if (!Platform::PluginModeActive())
+         // Inside a DAW the host's loop wins (Transport::FollowHost suspends this one): no toggle,
+         // unless Settings > DAW sync gives the loop to Infinite.
+         if (!Platform::PluginModeActive() || Transport::Instance().OwnLoop())
          {
          ImGui::SameLine(0.0f, tok::space_1);
          const Arrange::LoopRange loopNow = gArrange.settings.loop; // the loop as of this frame

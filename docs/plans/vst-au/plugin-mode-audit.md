@@ -45,12 +45,12 @@ The tool exits 1 when a host or deferred item is unguarded, or when an item matc
 | Session play button | Session grid | Same no-op |
 | Render Group | Timeline group menu | The DAW bounces (Render Track was already hidden) |
 
-## Left for the owner (a real fix would be a new feature)
+## Owner items, settled 2026-11-08
 
-- **Seeks snap back.** Home, End and ruler clicks seek the Arrange playhead. `Transport::FollowHost` re-seats it to the host position on the next block, so the playhead jumps back. A fix needs a "seek the host" request, which VST3 and AU only partly offer.
-- **Loop region does nothing.** It can still be drawn: Shift+drag on the ruler, Cmd+L, I/O, and the Piano Roll's loop-selection key. The host loop wins. Hiding it would need a plugin-mode variant of the ruler and the Piano Roll.
-- **Session Record tooltip.** It ends with "ready to render with Render Take", and Render Take is hidden in plugin mode. Recording into the Timeline does work. Changing the text means a new string.
-- **Shared settings file.** The engine and the app share the general and workspace settings files. Terminal state is now protected, but any other panel the engine opens or closes is saved for the app too.
+- **Seeks and loop.** Settings > General > DAW sync picks who owns tempo, playhead and loop (DAW by default). Playhead Infinite: a seek in Infinite sticks, and DAW jumps and loops move Infinite by the same amount. Loop Infinite: Infinite's loop region wraps and the Timeline loop toggle shows. Tempo Infinite makes all three Infinite's, and the tempo and meter fields become editable. Play and stop always follow the DAW.
+- **Session Record tooltip.** In plugin mode it drops "ready to render with Render Take".
+- **Settings.** The plugin keeps its own settings, layout, theme and recents in the app support folder's `Plugin` subfolder (`AppPaths::SettingsDir`). Licence, presets, devices, samples, grooves, extensions and learned taste stay shared.
+- **Recording.** Node recorders (Sampler, Looper, Granular, Molder, Grain Molder) record their audio input: wire Audio In (Host main or sidechain) to record the track. Sample Studio's Record took the microphone; inside a DAW it now records the track (the host main bus, `PluginEngine::ReadHostTap`) and hides the device picker. Piano Roll records MIDI from the host.
 
 ## Table
 

@@ -440,7 +440,7 @@ bool gReduceMotion = false; // chrome eases become instant (UiAnim)
 
 std::string ThemePath()
 {
-   std::string dir = AppPaths::AppSupportDir();
+   std::string dir = AppPaths::SettingsDir();
    if (dir.empty())
       return std::string();
    const std::string path = dir + "/Infinite.theme";
@@ -452,7 +452,7 @@ std::string ThemePath()
 
 std::string AppearancePath()
 {
-   std::string dir = AppPaths::AppSupportDir();
+   std::string dir = AppPaths::SettingsDir();
    if (dir.empty())
       return std::string();
    return dir + "/Infinite.appearance";

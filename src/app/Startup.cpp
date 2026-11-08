@@ -1494,7 +1494,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    // Keep all mutable state (settings, indexes, imgui.ini) in the per-user
    // application-data directory rather than next to the executable.
-   std::string settingsDir = AppPaths::AppSupportDir();
+   std::string settingsDir = AppPaths::SettingsDir();
    // Restores whatever was indexed last run with no rescan - scanning only
    // ever happens from an explicit Refresh click in the Samples/Media panel.
    // A cached index is a convenience, never a reason the app fails to open: one that cannot be read is skipped.

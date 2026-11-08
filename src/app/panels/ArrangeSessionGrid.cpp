@@ -1749,7 +1749,9 @@ namespace app
          ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
             HelpTip("%s", rec ? T("Recording: every clip and scene you launch is written into the Timeline. Click to stop.")
-                              : T("Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take."));
+                              : Platform::PluginModeActive() // Render Take is the DAW's bounce here
+                                    ? T("Record your performance: the clips and scenes you launch are written into the Timeline.")
+                                    : T("Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take."));
          glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md,
                      rec ? tok::U32(tok::pal::c_FFFFFFFF) : RecordDotCol(), IconsInfinite::RecordFill);
          nextTo(tok::space_1);

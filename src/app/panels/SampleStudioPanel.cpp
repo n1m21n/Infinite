@@ -40,6 +40,8 @@
 #include "nodes/GranularNode.h"
 #include "nodes/MolderNode.h"
 #include "nodes/PaulStretchNode.h"
+#include "platform/Platform.h"
+#include "plugin/engine/HostAudio.h"
 #include "nodes/SamplerNode.h"
 #include "nodes/SlicerNode.h"
 #include "platform/Platform.h"
@@ -617,7 +619,8 @@ namespace
       return sInputs;
    }
 
-   bool HasAudioInput() { return !AudioInputs().empty(); }
+   // Inside a DAW the input is the track the plugin sits on (the host main bus), never a device.
+   bool HasAudioInput() { return Platform::PluginModeActive() || !AudioInputs().empty(); }
 
    void StopRecording(bool keep)
    {
@@ -625,7 +628,10 @@ namespace
       if (!s.recording)
          return;
       s.recording = false;
-      Platform::AudioInputCaptureRemoveRef();
+      if (Platform::PluginModeActive())
+         PluginEngine::HostTapRemoveRef();
+      else
+         Platform::AudioInputCaptureRemoveRef();
       if (keep && s.recL.size() > 1024)
       {
          const double sr = AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : kRate;
@@ -664,7 +670,13 @@ namespace
       s.recCursor = 0;
       s.recErr.clear();
       s.recording = true;
-      Platform::AudioInputCaptureAddRef();
+      if (Platform::PluginModeActive())
+      {
+         s.recCursor = PluginEngine::TapPosition();
+         PluginEngine::HostTapAddRef();
+      }
+      else
+         Platform::AudioInputCaptureAddRef();
       // The device rate is the recording's rate, so the engine has to be open before the first block.
       if (AudioEngine::Instance().SampleRate() <= 0.0)
       {
@@ -684,10 +696,24 @@ namespace
       Studio& s = S();
       if (!s.recording)
          return;
+      float bufL[4096], bufR[4096];
+      if (Platform::PluginModeActive())
+      {
+         for (int guard = 0; guard < 64; guard++)
+         {
+            const int got = PluginEngine::ReadHostTap(bufL, bufR, 4096, s.recCursor);
+            if (got <= 0)
+               break;
+            s.recL.insert(s.recL.end(), bufL, bufL + got);
+            s.recR.insert(s.recR.end(), bufR, bufR + got);
+         }
+         if (s.recL.size() > (size_t)kRate * 600)
+            StopRecording(true);
+         return;
+      }
       std::string err;
       Platform::AudioInputCapturePump(err);
       s.recErr = err;
-      float bufL[4096], bufR[4096];
       float* chans[2] = { bufL, bufR };
       for (int guard = 0; guard < 64; guard++)
       {
@@ -2915,7 +2941,7 @@ namespace
          if (!haveIn && !s.recording)
             ImGui::EndDisabled();
          // Which input Record takes, shared with Settings and the Audio In node.
-         if (haveIn && showInput)
+         if (haveIn && showInput && !Platform::PluginModeActive())
          {
             const std::vector<Platform::AudioDeviceInfo>& inputs = AudioInputs();
             std::vector<std::string> names { T("System default") };

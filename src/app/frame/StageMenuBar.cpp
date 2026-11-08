@@ -844,9 +844,10 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const ImVec2 mn(x, wellMin.y), mx(x + w, wellMin.y + TD::kHeight);
             ImGui::SetCursorScreenPos(mn);
-            if (Platform::PluginModeActive())
+            if (Platform::PluginModeActive() && !Transport::Instance().OwnTempo())
             {
-               // Inside a DAW the host sets tempo and meter every block: show them, never edit them.
+               // Inside a DAW the host sets tempo and meter every block (unless Settings > DAW sync gives tempo to
+                  // Infinite): show them, never edit them.
                ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight));
                TD::Value(id, x, w, wellMin.y, shown);
                if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))

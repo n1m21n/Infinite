@@ -2,6 +2,7 @@
 #include <algorithm>
 #include "app/AppShared.h"
 #include "app/graph/LearningLog.h"
+#include "core/Transport.h"
 #include "core/MediaCollect.h"
 #include "core/MovementLog.h"
 #include "core/Notices.h"
@@ -245,7 +246,7 @@ namespace app
 
    std::string AutosaveMarkerPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       if (dir.empty())
          return {};
       return dir + (UsingAutosaveTestPaths() ? "/Infinite.session-active-test" : "/Infinite.session-active");
@@ -259,7 +260,7 @@ namespace app
    // vsync fields and renaming it would strand existing users' autosave prefs.
    std::string GeneralSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.autosave-settings";
    }
 
@@ -308,7 +309,7 @@ namespace app
    // One flat preference file for the Canvas & Workspace settings tab.
    std::string WorkspaceSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.workspace-settings";
    }
 
@@ -327,7 +328,13 @@ namespace app
             continue;
          const std::string key = line.substr(0, eq);
          const std::string val = line.substr(eq + 1);
-         if (key == "snapToGrid")
+         if (key == "dawSync")
+         {
+            // Plugin only (the plugin keeps its own settings file): tempo, playhead, loop owner.
+            const int v = atoi(val.c_str());
+            Transport::Instance().SetHostSync((v & 1) != 0, (v & 2) != 0, (v & 4) != 0);
+         }
+         else if (key == "snapToGrid")
             gSnapToGrid = (val != "0");
          else if (key == "showCanvasGrid")
             gShowCanvasGrid = (val != "0");
@@ -424,6 +431,10 @@ namespace app
          return;
       std::ofstream file(AppPaths::FsPath(path));
       file << "snapToGrid=" << (gSnapToGrid ? 1 : 0) << "\n";
+      {
+         const Transport& tr = Transport::Instance();
+         file << "dawSync=" << ((tr.OwnTempo() ? 1 : 0) | (tr.OwnPlayhead() ? 2 : 0) | (tr.OwnLoop() ? 4 : 0)) << "\n";
+      }
       file << "showCanvasGrid=" << (gShowCanvasGrid ? 1 : 0) << "\n";
       file << "gridSnap=" << gGridSnap << "\n";
       file << "zoomSensitivity=" << gZoomSensitivity << "\n";
@@ -499,7 +510,7 @@ namespace app
    // One flat preference file for the Audio settings tab.
    std::string AudioSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.audio-settings";
    }
 
@@ -611,7 +622,7 @@ namespace app
    // a separate file: it is an app-wide preference, not part of a document.
    std::string ExprGlobalsSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.expression-globals";
    }
 

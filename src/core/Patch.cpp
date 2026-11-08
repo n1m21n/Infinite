@@ -27,7 +27,7 @@ namespace
 
    std::string RecentsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       if (dir.empty())
          return std::string();
       const std::string path = dir + "/Infinite.recents";

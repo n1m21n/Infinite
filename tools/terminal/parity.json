@@ -391,6 +391,9 @@
   "panels/SettingsWindow.cpp:Types: float, int, bool, vec2, vec3, vec4.": "Field language reference text; `code docs field` prints it",
   "panels/SettingsWindow.cpp:reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).": "Field language reference text; `code docs field` prints it",
   "panels/CliSetupSection.cpp": "sets up the Terminal tab and the user's coding agent from inside the app",
-  "frame/HostSlots.cpp": "plugin mode only, where the Terminal is hidden; the DAW automates the bound knob from its own lanes"
+  "frame/HostSlots.cpp": "plugin mode only, where the Terminal is hidden; the DAW automates the bound knob from its own lanes",
+  "panels/SettingsWindow.cpp:Tempo": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
+  "panels/SettingsWindow.cpp:Playhead": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
+  "panels/SettingsWindow.cpp:Loop": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop"
  }
 }

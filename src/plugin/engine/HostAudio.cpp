@@ -43,6 +43,28 @@ namespace PluginEngine
       uint32_t gInFrames = 0;
       bool gHasSidechain = false;
 
+      // Host main-bus tap for main-thread recorders (Sample Studio). Audio thread writes, one
+      // reader drains; about 5 s at 48 kHz, so a slow UI frame loses nothing.
+      constexpr uint32_t kTapFrames = 1u << 18;
+      float gTapL[kTapFrames] = {}, gTapR[kTapFrames] = {};
+      std::atomic<uint64_t> gTapWrite { 0 };
+      std::atomic<int> gTapWant { 0 };
+
+      void TapWrite(uint32_t n)
+      {
+         if (gTapWant.load(std::memory_order_relaxed) <= 0)
+            return;
+         uint64_t w = gTapWrite.load(std::memory_order_relaxed);
+         const float* l = gIn[0];
+         const float* r = gIn[1] ? gIn[1] : gIn[0];
+         for (uint32_t i = 0; i < n; i++, w++)
+         {
+            gTapL[w & (kTapFrames - 1)] = l ? l[i] : 0.0f;
+            gTapR[w & (kTapFrames - 1)] = r ? r[i] : 0.0f;
+         }
+         gTapWrite.store(w, std::memory_order_release);
+      }
+
       float gBypassGain = 0.0f; // 0 = processing, 1 = bypassed; ramps one block per change
 
       // ---- host slots (audio thread unless noted) ----
@@ -180,6 +202,7 @@ namespace PluginEngine
          for (uint32_t c = 0; c < PluginIpc::kInChannels; c++)
             gIn[c] = v.input[c] ? v.input[c] + pos : nullptr;
          gInFrames = n;
+         TapWrite(n);
          cb(out, 2, (int)n, user);
          gInFrames = 0;
          gRenders.fetch_add(1, std::memory_order_relaxed);
@@ -385,6 +408,7 @@ namespace PluginEngine
       if (opt.parentPid > 0)
          Ipc::ExitWhenParentDies(opt.parentPid);
       Platform::PluginModeFlag().store(true);
+      AppPaths::PluginIdentity() = true; // own settings and layout, apart from the app
       Platform::AudioDeviceOverrideRef() = &kHostDevice;
       // The host is always the MIDI source here: list it (kMidiHostDevice) from the start, so CC
       // bindings loaded with a patch reattach to it without anyone pressing Learn.
@@ -664,6 +688,25 @@ namespace PluginEngine
       std::memcpy(out[1], r, n * sizeof(float));
       return n;
    }
+
+   void HostTapAddRef() { gTapWant.fetch_add(1, std::memory_order_relaxed); }
+   void HostTapRemoveRef() { gTapWant.fetch_sub(1, std::memory_order_relaxed); }
+
+   int ReadHostTap(float* l, float* r, int maxFrames, uint64_t& cursor)
+   {
+      const uint64_t w = gTapWrite.load(std::memory_order_acquire);
+      if (cursor > w || w - cursor > kTapFrames)
+         cursor = w > kTapFrames ? w - kTapFrames : 0;
+      const int n = (int)std::min<uint64_t>(w - cursor, (uint64_t)maxFrames);
+      for (int i = 0; i < n; i++, cursor++)
+      {
+         l[i] = gTapL[cursor & (kTapFrames - 1)];
+         r[i] = gTapR[cursor & (kTapFrames - 1)];
+      }
+      return n;
+   }
+
+   uint64_t TapPosition() { return gTapWrite.load(std::memory_order_acquire); }
 
    uint64_t BlocksHandled() { return gBlocks.load(); }
    uint64_t JumpsSeen() { return gJumps.load(); }

@@ -247,7 +247,7 @@ namespace app
    // one file rather than four.
    std::string BrowserFilterPrefsPath()
    {
-      const std::string dir = AppPaths::AppSupportDir();
+      const std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.browserfilters";
    }
 

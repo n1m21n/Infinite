@@ -174,6 +174,8 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # .dll, nothing to link or include.
     set(ONNXRUNTIME_DML_VERSION "1.20.1")
     set(DIRECTML_VERSION "1.15.4")
+    # Microsoft.ML.OnnxRuntime (CPU) .nupkg, Linux and macOS headers.
+    set(ONNXRUNTIME_CPU_NUPKG_SHA256 "9c32108e9a1c78b090a95c2a219f244dd5f067d4caf68fb0f967103f3f20839c")
 
     if(WIN32)
         # Matches the -A argument package.ps1/build.yml pass to cmake's Visual
@@ -205,23 +207,30 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set(ONNXRUNTIME_DLL "${onnxruntime_dml_SOURCE_DIR}/runtimes/win-${INFINITE_WIN_ARCH}/native/onnxruntime.dll")
         set(DIRECTML_DLL "${directml_redist_SOURCE_DIR}/bin/${INFINITE_WIN_ARCH}-win/DirectML.dll")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(ONNX_LINUX_ARCH "x64")
-        set(ONNX_LINUX_SHA256 "67db4dc1561f1e3fd42e619575c82c601ef89849afc7ea85a003abbac1a1a105")
+        # Linux and macOS take the CPU NuGet package, the source Windows already uses: GitHub's
+        # microsoft/onnxruntime release downloads returned 504 for hours (2026-11-08) while NuGet served.
+        # Layout: build/native/include/*.h, runtimes/<rid>/native/libonnxruntime.so (soname .so.1).
+        set(ONNX_LINUX_RID "linux-x64")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-            set(ONNX_LINUX_ARCH "aarch64")
-            set(ONNX_LINUX_SHA256 "ae4fedbdc8c18d688c01306b4b50c63de3445cdf2dbd720e01a2fa3810b8106a")
+            set(ONNX_LINUX_RID "linux-arm64")
         endif()
 
         FetchContent_Declare(
             onnxruntime_linux
-            URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_DML_VERSION}/onnxruntime-linux-${ONNX_LINUX_ARCH}-${ONNXRUNTIME_DML_VERSION}.tgz"
-            URL_HASH SHA256=${ONNX_LINUX_SHA256}
+            URL "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime/${ONNXRUNTIME_DML_VERSION}"
+            URL_HASH SHA256=${ONNXRUNTIME_CPU_NUPKG_SHA256}
+            DOWNLOAD_NAME "onnxruntime-cpu-${ONNXRUNTIME_DML_VERSION}.zip"
         )
         FetchContent_MakeAvailable(onnxruntime_linux)
 
-        set(ONNXRUNTIME_INCLUDE_DIR "${onnxruntime_linux_SOURCE_DIR}/include")
-        set(ONNXRUNTIME_LIB "${onnxruntime_linux_SOURCE_DIR}/lib/libonnxruntime.so")
-        file(GLOB ONNXRUNTIME_SO_FILES "${onnxruntime_linux_SOURCE_DIR}/lib/libonnxruntime*.so*")
+        set(ONNXRUNTIME_INCLUDE_DIR "${onnxruntime_linux_SOURCE_DIR}/build/native/include")
+        set(ONNX_LINUX_LIBDIR "${onnxruntime_linux_SOURCE_DIR}/runtimes/${ONNX_LINUX_RID}/native")
+        set(ONNXRUNTIME_LIB "${ONNX_LINUX_LIBDIR}/libonnxruntime.so")
+        # The loader asks for the soname, which the package does not ship as its own file.
+        if(NOT EXISTS "${ONNX_LINUX_LIBDIR}/libonnxruntime.so.1")
+            configure_file("${ONNXRUNTIME_LIB}" "${ONNX_LINUX_LIBDIR}/libonnxruntime.so.1" COPYONLY)
+        endif()
+        file(GLOB ONNXRUNTIME_SO_FILES "${ONNX_LINUX_LIBDIR}/libonnxruntime*.so*")
     endif()
 endif()
 
@@ -232,11 +241,12 @@ if(APPLE)
     include(FetchContent)
     FetchContent_Declare(
         onnxruntime_mac_headers
-        URL "https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-osx-universal2-1.20.1.tgz"
-        URL_HASH SHA256=da4349e01a7e997f5034563183c7183d069caadc1d95f499b560961787813efd
+        URL "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime/1.20.1"
+        URL_HASH SHA256=9c32108e9a1c78b090a95c2a219f244dd5f067d4caf68fb0f967103f3f20839c
+        DOWNLOAD_NAME "onnxruntime-cpu-1.20.1.zip"
     )
     FetchContent_MakeAvailable(onnxruntime_mac_headers)
-    set(ORT_MAC_INCLUDE_DIR "${onnxruntime_mac_headers_SOURCE_DIR}/include")
+    set(ORT_MAC_INCLUDE_DIR "${onnxruntime_mac_headers_SOURCE_DIR}/build/native/include")
 endif()
 
 # FFmpeg, for Platform::VideoOpen/RecorderStart/CameraOpen's decode/encode/mux

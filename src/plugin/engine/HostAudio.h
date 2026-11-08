@@ -45,6 +45,14 @@ namespace PluginEngine
    // (0 = nothing: not inside a host render, or the bus is absent).
    int ReadHostInput(int bus, float* const* out, int frames, int channelOffset, bool mono);
 
+   // Main thread: records the host main bus for a recorder outside the graph (Sample Studio).
+   // AddRef starts the tap; ReadHostTap drains what arrived since `cursor` (start it at
+   // TapPosition()). Returns frames read.
+   void HostTapAddRef();
+   void HostTapRemoveRef();
+   uint64_t TapPosition();
+   int ReadHostTap(float* l, float* r, int maxFrames, uint64_t& cursor);
+
    // PluginIpc::Channel message types. Engine -> shell below 100, shell -> engine from 100.
    enum MessageType : uint32_t
    {
