@@ -5,12 +5,14 @@
 // The Objective-C class name carries the build (INFINITE_VIEW_CLASS): Instrument and FX are loaded
 // side by side in one host and must not share a class.
 #include "plugin/shell/ShellView.h"
+#include "plugin/shell/SheetStyle.h"
 #include "core/License.h"
 
 #include "platform/common/Ipc.h"
 
 #import <Carbon/Carbon.h> // kVK_* key codes (header constants only)
 #import <Cocoa/Cocoa.h>
+#import <CoreText/CoreText.h>
 #import <IOSurface/IOSurface.h>
 #import <QuartzCore/QuartzCore.h>
 
@@ -143,6 +145,61 @@ namespace
 
 namespace
 {
+   namespace Sheet = InfinitePlugin::Sheet;
+
+   NSColor* Col(uint32_t c) { return [NSColor colorWithSRGBRed:Sheet::R(c) green:Sheet::G(c) blue:Sheet::B(c) alpha:1.0]; }
+
+   // Inter and Geist Mono from the engine app, for this process only; system fonts when it is not found.
+   void RegisterFonts()
+   {
+      static bool done = false;
+      if (done)
+         return;
+      done = true;
+      const std::string dir = Sheet::EngineFontsDir();
+      if (dir.empty())
+         return;
+      for (const char* f : { "Inter-Regular.ttf", "Inter-SemiBold.ttf", "GeistMono-Regular.ttf" })
+         CTFontManagerRegisterFontsForURL((__bridge CFURLRef)[NSURL fileURLWithPath:@((dir + f).c_str())], kCTFontManagerScopeProcess, nullptr);
+   }
+   NSFont* Text(CGFloat size, bool semibold = false)
+   {
+      NSFont* f = [NSFont fontWithName:semibold ? @"Inter-SemiBold" : @"Inter-Regular" size:size];
+      return f ?: [NSFont systemFontOfSize:size weight:semibold ? NSFontWeightSemibold : NSFontWeightRegular];
+   }
+   NSFont* Mono(CGFloat size)
+   {
+      NSFont* f = [NSFont fontWithName:@"GeistMono-Regular" size:size];
+      return f ?: [NSFont monospacedSystemFontOfSize:size weight:NSFontWeightRegular];
+   }
+   NSAttributedString* Styled(NSString* s, NSFont* font, uint32_t color)
+   {
+      return [[[NSAttributedString alloc] initWithString:s ?: @"" attributes:@{ NSFontAttributeName: font, NSForegroundColorAttributeName: Col(color) }] autorelease];
+   }
+   // Flat brand button: Ember with a Midnight label (primary) or surface-2 with ink (secondary).
+   void StyleButton(NSButton* b, NSString* title, bool primary)
+   {
+      b.bordered = NO;
+      b.wantsLayer = YES;
+      b.layer.cornerRadius = Sheet::kButtonR;
+      b.layer.backgroundColor = Col(primary ? Sheet::kEmber : Sheet::kRaised).CGColor;
+      b.attributedTitle = Styled(title, Text(Sheet::kTextSize, true), primary ? Sheet::kGround : Sheet::kInk);
+   }
+   NSSize ButtonSize(NSButton* b)
+   {
+      return NSMakeSize(std::ceil(b.attributedTitle.size.width) + 2 * Sheet::kButtonPadX, Sheet::kButtonH);
+   }
+   NSView* Panel(uint32_t fill, uint32_t edge, CGFloat radius)
+   {
+      NSView* v = [[NSView alloc] initWithFrame:NSZeroRect];
+      v.wantsLayer = YES;
+      v.layer.backgroundColor = Col(fill).CGColor;
+      v.layer.borderColor = Col(edge).CGColor;
+      v.layer.borderWidth = 1;
+      v.layer.cornerRadius = radius;
+      return v;
+   }
+
    class MacView final : public InfinitePlugin::ShellView
    {
    public:
@@ -200,45 +257,67 @@ namespace
          view_->owner = this;
          view_.wantsLayer = YES;
          view_.layer.opaque = YES;
-         bg_ = CGColorCreateGenericRGB(0.09, 0.09, 0.10, 1.0);
+         bg_ = CGColorCreateSRGB(Sheet::R(Sheet::kGround), Sheet::G(Sheet::kGround), Sheet::B(Sheet::kGround), 1.0);
          view_.layer.backgroundColor = bg_;
          view_.layer.contentsGravity = kCAGravityResize;
          view_.layerContentsRedrawPolicy = NSViewLayerContentsRedrawNever;
+         view_.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]; // caret, checkbox
+         RegisterFonts();
+
+         // Licence sheet (step 2.6, SheetStyle.h): shown only while Unlicensed. Card and well are
+         // plain layers behind the controls.
+         card_ = Panel(Sheet::kCard, Sheet::kRaised, Sheet::kCardR);
+         [view_ addSubview:card_];
+         well_ = Panel(Sheet::kDeep, Sheet::kLine, Sheet::kWellR);
+         [view_ addSubview:well_];
 
          label_ = [NSTextField labelWithString:@""];
-         label_.textColor = [NSColor colorWithWhite:0.75 alpha:1.0];
-         label_.font = [NSFont systemFontOfSize:13];
+         label_.textColor = Col(Sheet::kInk2);
+         label_.font = Text(Sheet::kTextSize);
+         label_.lineBreakMode = NSLineBreakByTruncatingTail;
          [label_ retain];
          [view_ addSubview:label_];
          restart_ = [NSButton buttonWithTitle:@"Restart" target:nil action:nil];
          [restart_ retain];
-         restart_.bezelStyle = NSBezelStyleRounded;
+         StyleButton(restart_, @"Restart", false);
          [view_ addSubview:restart_];
          restartTarget_ = [[INFINITE_RESTART_CLASS alloc] init];
          restartTarget_->owner = this;
          restart_.target = restartTarget_;
          restart_.action = @selector(restart:);
 
-         // Licence sheet (step 2.6): shown only while Unlicensed.
-         keyField_ = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 360, 24)];
-         keyField_.placeholderString = @"INF1\u2026";
-         keyField_.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
+         keyField_ = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 360, 20)];
+         keyField_.bezeled = NO;
+         keyField_.bordered = NO;
+         keyField_.drawsBackground = YES;
+         keyField_.backgroundColor = Col(Sheet::kDeep);
+         keyField_.focusRingType = NSFocusRingTypeNone;
+         keyField_.textColor = Col(Sheet::kInk);
+         keyField_.font = Mono(Sheet::kMonoSize);
+         keyField_.placeholderAttributedString = Styled(@"INF1\u2026", Mono(Sheet::kMonoSize), Sheet::kInk3);
          keyField_.target = restartTarget_;
          keyField_.action = @selector(enterKey:);
          [keyField_.cell setScrollable:YES];
+         [keyField_.cell setUsesSingleLineMode:YES];
          [view_ addSubview:keyField_];
          paste_ = [NSButton buttonWithTitle:@"Paste key" target:restartTarget_ action:@selector(pasteKey:)];
          [paste_ retain];
-         paste_.bezelStyle = NSBezelStyleRounded;
+         StyleButton(paste_, @"Paste key", true);
          [view_ addSubview:paste_];
          buy_ = [NSButton buttonWithTitle:@"Buy" target:restartTarget_ action:@selector(buy:)];
          [buy_ retain];
-         buy_.bezelStyle = NSBezelStyleRounded;
+         StyleButton(buy_, @"Buy", false);
          [view_ addSubview:buy_];
          refund_ = [NSButton checkboxWithTitle:@"Weekly refund check" target:restartTarget_ action:@selector(refundCheck:)];
          [refund_ retain];
+         refund_.attributedTitle = Styled(@"Weekly refund check", Text(Sheet::kSmallSize), Sheet::kInk3);
          refund_.state = License::RefundCheckOn() ? NSControlStateValueOn : NSControlStateValueOff;
          [view_ addSubview:refund_];
+         // After label_: plugin_shell_check reads the first visible text field as the message.
+         title_ = [NSTextField labelWithString:@""];
+         title_.attributedStringValue = Styled(@(Sheet::kTitle), Text(Sheet::kTitleSize, true), Sheet::kInk);
+         [title_ retain];
+         [view_ addSubview:title_];
          [view_ registerForDraggedTypes:@[ NSPasteboardTypeFileURL, NSPasteboardTypeString ]];
 
          [parent addSubview:view_];
@@ -450,34 +529,45 @@ namespace
             return;
          const NSRect b = view_.bounds;
          [label_ sizeToFit];
-         const NSSize ls = label_.frame.size;
-         const NSSize bs = restart_.frame.size;
-         const bool button = !restart_.hidden;
+         NSSize ls = label_.frame.size;
          if (!keyField_.hidden)
          {
-            // label / key field / [Paste key] [Buy] / refund check, centred.
-            const CGFloat fw = std::floor(std::max<CGFloat>(120, std::min<CGFloat>(360, b.size.width - 32)));
-            [paste_ sizeToFit];
-            [buy_ sizeToFit];
+            // The card (SheetStyle.h), centred; its contents left-aligned at kPad.
+            const CGFloat pad = Sheet::kPad, gap = Sheet::kGap;
+            const CGFloat cw = std::floor(std::max<CGFloat>(200, std::min<CGFloat>(Sheet::kCardW, b.size.width - 32)));
+            const CGFloat inner = cw - 2 * pad;
+            [title_ sizeToFit];
             [refund_ sizeToFit];
-            const NSSize ps = paste_.frame.size, us = buy_.frame.size, rs = refund_.frame.size;
-            const CGFloat total = ls.height + 12 + 24 + 12 + ps.height + 10 + rs.height;
-            CGFloat y = std::floor((b.size.height - total) * 0.5);
-            [label_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - ls.width) * 0.5), y)];
-            y += ls.height + 12;
-            [keyField_ setFrame:NSMakeRect(std::floor((b.size.width - fw) * 0.5), y, fw, 24)];
-            y += 24 + 12;
-            const CGFloat row = ps.width + 8 + us.width;
-            [paste_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - row) * 0.5), y)];
-            [buy_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - row) * 0.5) + ps.width + 8, y)];
-            y += ps.height + 10;
-            [refund_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - rs.width) * 0.5), y)];
+            const NSSize ts = title_.frame.size, rs = refund_.frame.size;
+            const NSSize ps = ButtonSize(paste_), us = ButtonSize(buy_);
+            ls.width = std::min(ls.width, inner);
+            const CGFloat ch = pad + ts.height + 4 + ls.height + 16 + Sheet::kWellH + gap + Sheet::kButtonH + gap + rs.height + pad;
+            const CGFloat cx = std::floor((b.size.width - cw) * 0.5);
+            const CGFloat cy = std::max<CGFloat>(0, std::floor((b.size.height - ch) * 0.5));
+            [card_ setFrame:NSMakeRect(cx, cy, cw, ch)];
+            const CGFloat x = cx + pad;
+            CGFloat y = cy + pad;
+            [title_ setFrameOrigin:NSMakePoint(x, y)];
+            y += ts.height + 4;
+            [label_ setFrame:NSMakeRect(x, y, ls.width, ls.height)];
+            y += ls.height + 16;
+            [well_ setFrame:NSMakeRect(x, y, inner, Sheet::kWellH)];
+            [keyField_ sizeToFit];
+            const CGFloat fh = keyField_.frame.size.height;
+            [keyField_ setFrame:NSMakeRect(x + 12, y + std::floor((Sheet::kWellH - fh) * 0.5), inner - 24, fh)];
+            y += Sheet::kWellH + gap;
+            [paste_ setFrame:NSMakeRect(x, y, ps.width, ps.height)];
+            [buy_ setFrame:NSMakeRect(x + ps.width + 8, y, us.width, us.height)];
+            y += Sheet::kButtonH + gap;
+            [refund_ setFrameOrigin:NSMakePoint(x - 2, y)];
             return;
          }
-         const CGFloat total = ls.height + (button ? 12 + bs.height : 0);
+         const NSSize bs = ButtonSize(restart_);
+         const bool button = !restart_.hidden;
+         const CGFloat total = ls.height + (button ? 16 + bs.height : 0);
          const CGFloat top = (b.size.height - total) * 0.5; // flipped: y down
-         [label_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - ls.width) * 0.5), std::floor(top))];
-         [restart_ setFrameOrigin:NSMakePoint(std::floor((b.size.width - bs.width) * 0.5), std::floor(top + ls.height + 12))];
+         [label_ setFrame:NSMakeRect(std::floor((b.size.width - ls.width) * 0.5), std::floor(top), ls.width, ls.height)];
+         [restart_ setFrame:NSMakeRect(std::floor((b.size.width - bs.width) * 0.5), std::floor(top + ls.height + 16), bs.width, bs.height)];
       }
 
       void UpdateOverlay()
@@ -491,6 +581,9 @@ namespace
          const bool unlicensed = status_ == EngineStatus::Unlicensed;
          const bool overlay = stopped || noGl || popped || unlicensed || !shown_;
          keyField_.hidden = !unlicensed;
+         card_.hidden = !unlicensed;
+         well_.hidden = !unlicensed;
+         title_.hidden = !unlicensed;
          paste_.hidden = !unlicensed;
          buy_.hidden = !unlicensed;
          refund_.hidden = !unlicensed;
@@ -502,7 +595,7 @@ namespace
                             : popped ? @"In its own window"
                                      : @"Starting";
          label_.hidden = !overlay;
-         restart_.title = popped ? @"Bring back" : @"Restart";
+         StyleButton(restart_, popped ? @"Bring back" : @"Restart", false);
          restart_.hidden = !(stopped || popped);
          if (overlay)
             view_.layer.contents = nil;
@@ -602,6 +695,12 @@ namespace
             [paste_ release];
             [buy_ release];
             [refund_ release];
+            [title_ release];
+            [card_ release];
+            [well_ release];
+            title_ = nil;
+            card_ = nil;
+            well_ = nil;
             keyField_ = nil;
             paste_ = nil;
             buy_ = nil;
@@ -651,6 +750,9 @@ namespace
       NSButton* paste_ = nil;
       NSButton* buy_ = nil;
       NSButton* refund_ = nil;
+      NSTextField* title_ = nil;
+      NSView* card_ = nil; // licence sheet background (SheetStyle.h)
+      NSView* well_ = nil; // behind keyField_
       std::string license_ = "Enter your key";
       int recheckTicks_ = 0;
       INFINITE_RESTART_CLASS* restartTarget_ = nil; // NSButton holds its target weakly

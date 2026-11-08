@@ -22,6 +22,8 @@ namespace ViewCheck
    std::string Label(void* view);
    std::string Button(void* view);
    void Press(void* view);
+   // The view as a PNG (layer tree render), for looking at the licence sheet.
+   bool Snapshot(void* view, const char* pngPath);
    // The licence sheet's key field (step 2.6): types text into it and presses Return. False when
    // no editable field is showing.
    bool TypeKey(void* view, const std::string& text);

@@ -10,6 +10,7 @@
 // Set* calls only record the newest value under a mutex; the timer applies them on the UI thread.
 #include "plugin/shell/ShellView.h"
 #include "core/License.h"
+#include "plugin/shell/SheetStyle.h"
 #include "platform/common/Ipc.h"
 
 #include "pluginterfaces/gui/iplugview.h"
@@ -45,7 +46,9 @@ namespace
    {
       kIdNone = 0, kIdRestart, kIdKey, kIdPaste, kIdBuy, kIdRefund,
    };
-   constexpr unsigned long kBg = 0x17171A, kFg = 0xBEBEC3, kButton = 0x2C2C31, kField = 0x0F0F11, kLine = 0x46464C;
+   // SheetStyle.h, as 24-bit TrueColor pixels (the frame path needs depth 24 anyway).
+   namespace Sheet = InfinitePlugin::Sheet;
+   constexpr unsigned long kBg = Sheet::kGround;
 
    uint32_t Mods(unsigned state)
    {
@@ -256,6 +259,9 @@ namespace
             font_ = XLoadQueryFont(dpy_, "fixed");
          if (font_)
             XSetFont(dpy_, gc_, font_->fid);
+         titleFont_ = XLoadQueryFont(dpy_, "-*-dejavu sans-bold-r-normal--20-*-*-*-*-*-iso10646-1");
+         if (!titleFont_)
+            titleFont_ = XLoadQueryFont(dpy_, "-*-helvetica-bold-r-normal--18-*-*-*-*-*-*-*");
          clipboard_ = XInternAtom(dpy_, "CLIPBOARD", False);
          utf8_ = XInternAtom(dpy_, "UTF8_STRING", False);
          pasteProp_ = XInternAtom(dpy_, "INFINITE_PASTE", False);
@@ -650,16 +656,44 @@ namespace
          XSetForeground(dpy_, gc_, color);
          XDrawString(dpy_, win_, gc_, cx - TextWidth(s) / 2, y + Ascent(), s.c_str(), int(s.size()));
       }
-
-      void DrawButton(Box& box, int cx, int y, int w, int h, const std::string& label)
+      void DrawTextLeft(int x, int y, const std::string& s, unsigned long color)
       {
-         box = { cx - w / 2, y, w, h };
-         XSetForeground(dpy_, gc_, kButton);
-         XFillRectangle(dpy_, win_, gc_, box.x, box.y, unsigned(w), unsigned(h));
-         XSetForeground(dpy_, gc_, kLine);
-         XDrawRectangle(dpy_, win_, gc_, box.x, box.y, unsigned(w - 1), unsigned(h - 1));
-         DrawText(cx, y + (h - Ascent()) / 2 - 1, label, kFg);
+         XSetForeground(dpy_, gc_, color);
+         XDrawString(dpy_, win_, gc_, x, y + Ascent(), s.c_str(), int(s.size()));
       }
+
+      // A filled rounded rectangle, with a 1 px edge drawn as a slightly larger one underneath.
+      void RoundFill(int x, int y, int w, int h, int r, unsigned long fill, unsigned long edge)
+      {
+         auto shape = [&](int x0, int y0, int w0, int h0, int r0, unsigned long c) {
+            r0 = std::max(0, std::min(r0, std::min(w0, h0) / 2));
+            const int d = 2 * r0;
+            XSetForeground(dpy_, gc_, c);
+            XFillRectangle(dpy_, win_, gc_, x0 + r0, y0, unsigned(std::max(0, w0 - d)), unsigned(h0));
+            XFillRectangle(dpy_, win_, gc_, x0, y0 + r0, unsigned(w0), unsigned(std::max(0, h0 - d)));
+            if (d > 0)
+            {
+               XFillArc(dpy_, win_, gc_, x0, y0, unsigned(d), unsigned(d), 90 * 64, 90 * 64);
+               XFillArc(dpy_, win_, gc_, x0 + w0 - d - 1, y0, unsigned(d), unsigned(d), 0, 90 * 64);
+               XFillArc(dpy_, win_, gc_, x0, y0 + h0 - d - 1, unsigned(d), unsigned(d), 180 * 64, 90 * 64);
+               XFillArc(dpy_, win_, gc_, x0 + w0 - d - 1, y0 + h0 - d - 1, unsigned(d), unsigned(d), 270 * 64, 90 * 64);
+            }
+         };
+         if (edge != fill)
+            shape(x, y, w, h, r, edge);
+         shape(x + (edge != fill), y + (edge != fill), w - 2 * (edge != fill), h - 2 * (edge != fill), r - 1, fill);
+      }
+
+      // Ember with a Midnight label (primary) or surface-2 with ink; x is the left edge.
+      void DrawButton(Box& box, int x, int y, int w, int h, const std::string& label, bool primary)
+      {
+         box = { x, y, w, h };
+         const unsigned long fill = primary ? Sheet::kEmber : Sheet::kRaised;
+         RoundFill(x, y, w, h, int(float(Sheet::kButtonR) * scale_ + 0.5f), fill, fill);
+         XSetForeground(dpy_, gc_, primary ? Sheet::kGround : Sheet::kInk);
+         XDrawString(dpy_, win_, gc_, x + (w - TextWidth(label)) / 2, y + (h + Ascent()) / 2 - 2, label.c_str(), int(label.size()));
+      }
+      int ButtonW(const std::string& label) const { return TextWidth(label) + int(float(2 * Sheet::kButtonPadX) * scale_ + 0.5f); }
 
       void Redraw()
       {
@@ -680,39 +714,44 @@ namespace
          using InfinitePlugin::EngineStatus;
          const bool stopped = status_ == EngineStatus::Stopped;
          const bool popped = popped_ && status_ == EngineStatus::Running;
-         const int lh = px(22), bh = px(28);
+         const int lh = px(20), bh = px(Sheet::kButtonH);
          if (Unlicensed())
          {
-            const int fw = std::max(px(120), std::min(px(360), W - px(32))), fh = px(26);
-            int y = (H - (lh + px(12) + fh + px(12) + bh + px(10) + px(20))) / 2;
-            DrawText(W / 2, y, license_, kFg);
-            y += lh + px(12);
-            XSetForeground(dpy_, gc_, kField);
-            XFillRectangle(dpy_, win_, gc_, (W - fw) / 2, y, unsigned(fw), unsigned(fh));
-            XSetForeground(dpy_, gc_, kLine);
-            XDrawRectangle(dpy_, win_, gc_, (W - fw) / 2, y, unsigned(fw - 1), unsigned(fh - 1));
+            // The card (SheetStyle.h), centred; contents left-aligned at kPad.
+            const int pad = px(Sheet::kPad), gap = px(Sheet::kGap), wh = px(Sheet::kWellH), th = px(26), rh = px(20);
+            const int cw = std::max(px(200), std::min(px(Sheet::kCardW), W - px(32)));
+            const int inner = cw - 2 * pad;
+            const int ch = pad + th + px(4) + lh + px(16) + wh + gap + bh + gap + rh + pad;
+            const int cx = (W - cw) / 2, cy = std::max(0, (H - ch) / 2);
+            RoundFill(cx, cy, cw, ch, px(Sheet::kCardR), Sheet::kCard, Sheet::kRaised);
+            const int x = cx + pad;
+            int y = cy + pad;
+            XFontStruct* tf = titleFont_ ? titleFont_ : font_;
+            if (tf)
+               XSetFont(dpy_, gc_, tf->fid);
+            XSetForeground(dpy_, gc_, Sheet::kInk);
+            XDrawString(dpy_, win_, gc_, x, y + (tf ? tf->ascent : 16), Sheet::kTitle, int(std::strlen(Sheet::kTitle)));
+            if (font_)
+               XSetFont(dpy_, gc_, font_->fid);
+            y += th + px(4);
+            DrawTextLeft(x, y, license_, Sheet::kInk2);
+            y += lh + px(16);
+            RoundFill(x, y, inner, wh, px(Sheet::kWellR), Sheet::kDeep, Sheet::kLine);
             std::string shown = field_.empty() ? std::string("INF1...") : field_ + "_";
-            while (shown.size() > 1 && TextWidth(shown) > fw - px(12))
+            while (shown.size() > 1 && TextWidth(shown) > inner - px(24))
                shown.erase(0, 1);
-            XSetForeground(dpy_, gc_, field_.empty() ? kLine : kFg);
-            XDrawString(dpy_, win_, gc_, (W - fw) / 2 + px(6), y + (fh + Ascent()) / 2 - 1, shown.c_str(), int(shown.size()));
-            y += fh + px(12);
-            const int bw = px(96), gap = px(8);
-            DrawButton(pasteBox_, W / 2 - (bw + gap) / 2, y, bw, bh, "Paste key");
-            DrawButton(buyBox_, W / 2 + (bw + gap) / 2, y, bw, bh, "Buy");
-            y += bh + px(10);
+            XSetForeground(dpy_, gc_, field_.empty() ? Sheet::kInk3 : Sheet::kInk);
+            XDrawString(dpy_, win_, gc_, x + px(12), y + (wh + Ascent()) / 2 - 2, shown.c_str(), int(shown.size()));
+            y += wh + gap;
+            const int pw = ButtonW("Paste key");
+            DrawButton(pasteBox_, x, y, pw, bh, "Paste key", true);
+            DrawButton(buyBox_, x + pw + px(8), y, ButtonW("Buy"), bh, "Buy", false);
+            y += bh + gap;
             const int box = px(14), label = TextWidth("Weekly refund check");
-            const int x0 = W / 2 - (box + px(8) + label) / 2;
-            refundBox_ = { x0, y, box + px(8) + label, px(20) };
-            XSetForeground(dpy_, gc_, kLine);
-            XDrawRectangle(dpy_, win_, gc_, x0, y + px(3), unsigned(box), unsigned(box));
-            if (License::RefundCheckOn())
-            {
-               XSetForeground(dpy_, gc_, kFg);
-               XFillRectangle(dpy_, win_, gc_, x0 + px(3), y + px(6), unsigned(box - px(5)), unsigned(box - px(5)));
-            }
-            XSetForeground(dpy_, gc_, kFg);
-            XDrawString(dpy_, win_, gc_, x0 + box + px(8), y + px(3) + box - 2, "Weekly refund check", 19);
+            refundBox_ = { x, y, box + px(8) + label, rh };
+            const bool on = License::RefundCheckOn();
+            RoundFill(x, y + px(3), box, box, px(3), on ? Sheet::kInk2 : Sheet::kDeep, on ? Sheet::kInk2 : Sheet::kLine);
+            DrawTextLeft(x + box + px(8), y + px(3) + (box - Ascent()) / 2, "Weekly refund check", Sheet::kInk3);
          }
          else
          {
@@ -721,10 +760,14 @@ namespace
                                    : popped                              ? "In its own window"
                                                                          : "Starting";
             const bool button = stopped || popped;
-            const int top = (H - (lh + (button ? px(12) + bh : 0))) / 2;
-            DrawText(W / 2, top, text, kFg);
+            const int top = (H - (lh + (button ? px(16) + bh : 0))) / 2;
+            DrawText(W / 2, top, text, Sheet::kInk2);
             if (button)
-               DrawButton(restartBox_, W / 2, top + lh + px(12), px(110), bh, popped ? "Bring back" : "Restart");
+            {
+               const std::string b = popped ? "Bring back" : "Restart";
+               const int w = ButtonW(b);
+               DrawButton(restartBox_, (W - w) / 2, top + lh + px(16), w, bh, b, false);
+            }
          }
          XFlush(dpy_);
       }
@@ -795,7 +838,9 @@ namespace
             blank_ = 0;
             if (font_)
                XFreeFont(dpy_, font_);
-            font_ = nullptr;
+            if (titleFont_)
+               XFreeFont(dpy_, titleFont_);
+            font_ = titleFont_ = nullptr;
             if (gc_)
                XFreeGC(dpy_, gc_);
             gc_ = nullptr;
@@ -819,6 +864,7 @@ namespace
       int depth_ = 0;
       GC gc_ = nullptr;
       XFontStruct* font_ = nullptr;
+      XFontStruct* titleFont_ = nullptr; // the sheet's "Infinite"; font_ when missing
       Atom clipboard_ = 0, utf8_ = 0, pasteProp_ = 0;
       std::vector<std::pair<unsigned, Cursor>> cursors_;
       Cursor blank_ = 0;

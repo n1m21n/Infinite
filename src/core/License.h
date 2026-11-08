@@ -25,7 +25,7 @@ namespace License
       Malformed = 2,    // not an INF1 key
       BadSignature = 3, // not signed by Infinite (or edited)
       WrongVersion = 4, // payload v != 1
-      WrongMajor = 5,   // the key covers an older major
+      WrongMajor = 5,   // unused: keys carry lifetime updates (kept so the numbers stay stable)
       Revoked = 6,      // refunded
    };
 
@@ -37,7 +37,7 @@ namespace License
       int major = 0;
    };
 
-   // Signature, v == 1, major >= appMajor, id not in revoked.
+   // Signature, v == 1, id not in revoked. Any major works: lifetime updates.
    Info Check(const std::string& key, const std::vector<std::string>& revoked, int appMajor);
 
    // The first INF1 key in pasted text or a dropped file's contents (whitespace, quotes and line

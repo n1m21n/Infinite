@@ -1889,10 +1889,10 @@ namespace
          std::snprintf(d, sizeof d, "valid \"%s\", tampered \"%s\", major 0 \"%s\", refunded \"%s\"", License::Message(ok).c_str(),
                        License::Message(bad).c_str(), License::Message(old).c_str(), License::Message(refunded).c_str());
          Check(ok.status == License::Status::Valid && ok.id == "INF-CHEC-K234" && newer.status == License::Status::Valid &&
-                   bad.status == License::Status::BadSignature && old.status == License::Status::WrongMajor &&
-                   License::Message(old) == "Your key covers 0.x" && v2.status == License::Status::WrongVersion &&
+                   bad.status == License::Status::BadSignature && old.status == License::Status::Valid &&
+                   v2.status == License::Status::WrongVersion &&
                    refunded.status == License::Status::Revoked && License::Message(refunded) == "This key was refunded",
-               "licence: signature, major, payload version and refund list checked", d);
+               "licence: signature, payload version and refund list checked; any major is valid (lifetime)", d);
       }
 
       // A licensed FX instance's state, to restore into an unlicensed one.
@@ -1956,19 +1956,23 @@ namespace
          const size_t during = EnginePids().size();
          std::snprintf(d, sizeof d, "label \"%s\", button \"%s\", engines %zu -> %zu", e.Label().c_str(), button.c_str(), baseline, during);
          Check(sheet && button == "Paste key" && during == baseline, "licence: the editor shows the licence sheet, no engine", d);
+#if defined(__APPLE__)
+         if (const char* shot = getenv("INFINITE_SHEET_SHOT"); shot && e.child)
+            ViewCheck::Snapshot(e.child, shot);
+#endif
 
          const bool typed = e.child && ViewCheck::TypeKey(e.child, "hello");
          const bool refused = typed && e.WaitFor([&] { return e.Label() == "Not a valid key"; }, 3.0);
          ViewCheck::Pump(1500); // the once-a-second recheck must not clear the message
          const bool kept = e.Label() == "Not a valid key";
-         ViewCheck::TypeKey(e.child, gLicense.Key("INF-CHEC-K234", 0));
-         const bool old = e.WaitFor([&] { return e.Label() == "Your key covers 0.x"; }, 3.0);
+         ViewCheck::TypeKey(e.child, gLicense.Key("INF-CHEC-K234", 1, 2));
+         const bool old = e.WaitFor([&] { return e.Label() == "This key needs a newer Infinite"; }, 3.0);
          std::snprintf(d, sizeof d, "label \"%s\"", e.Label().c_str());
-         Check(refused && kept && old && EnginePids().size() == baseline, "licence: the sheet refuses a bad key and an older major's", d);
+         Check(refused && kept && old && EnginePids().size() == baseline, "licence: the sheet refuses a bad key and a newer payload version", d);
 
          ViewCheck::TypeKey(e.child, "  " + valid + "\n");
          const bool started = e.WaitFor([&] { return EnginePids().size() > baseline; }, 10.0);
-         const bool left = e.WaitFor([&] { return e.Label() != "Your key covers 0.x"; }, 5.0);
+         const bool left = e.WaitFor([&] { return e.Label() != "This key needs a newer Infinite"; }, 5.0);
          std::snprintf(d, sizeof d, "engine %s, label \"%s\", stored %s", started ? "started" : "none", e.Label().c_str(),
                        gLicense.StoredKey() == valid ? "yes" : "no");
          Check(started && left && gLicense.StoredKey() == valid, "licence: a valid key from the sheet is stored and starts the engine", d);

@@ -9,6 +9,7 @@
 // Sizes: VST3 view rects on Windows are physical pixels; the host tells the DPI scale through
 // IPlugViewContentScaleSupport, else the window's DPI is used. The engine gets points + scale.
 #include "plugin/shell/ShellView.h"
+#include "plugin/shell/SheetStyle.h"
 #include "core/License.h"
 #include "platform/common/Ipc.h"
 
@@ -51,6 +52,21 @@ namespace
    const wchar_t* const kClassName = INFINITE_WSTR(INFINITE_VIEW_CLASS);
 
    HINSTANCE Module() { return reinterpret_cast<HINSTANCE>(&__ImageBase); }
+
+   namespace Sheet = InfinitePlugin::Sheet;
+   COLORREF Ref(uint32_t c) { return RGB((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF); }
+
+   void RoundFill(HDC dc, const RECT& r, int radius, uint32_t fill, uint32_t edge)
+   {
+      HBRUSH b = CreateSolidBrush(Ref(fill));
+      HPEN p = CreatePen(PS_SOLID, 1, Ref(edge));
+      HGDIOBJ ob = SelectObject(dc, b), op = SelectObject(dc, p);
+      RoundRect(dc, r.left, r.top, r.right, r.bottom, radius * 2, radius * 2);
+      SelectObject(dc, ob);
+      SelectObject(dc, op);
+      DeleteObject(b);
+      DeleteObject(p);
+   }
 
    std::wstring Wide(const std::string& s)
    {
@@ -199,19 +215,43 @@ namespace
                                  rect.getHeight(), static_cast<HWND>(systemWindow), nullptr, Module(), this);
          if (!hwnd_)
             return;
-         font_ = CreateFontW(-15, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+         // Inter and Geist Mono from the engine app (process-private), else Segoe UI and Consolas.
+         static bool brand = [] {
+            const std::wstring dir = Wide(InfinitePlugin::Sheet::EngineFontsDir());
+            int ok = 0;
+            if (!dir.empty())
+               for (const wchar_t* f : { L"Inter-Regular.ttf", L"Inter-SemiBold.ttf", L"GeistMono-Regular.ttf" })
+                  ok += AddFontResourceExW((dir + f).c_str(), FR_PRIVATE, nullptr) > 0;
+            return ok == 3;
+         }();
+         const float sc = Scale();
+         auto font = [&](int pt, int weight, const wchar_t* face, const wchar_t* fallback) {
+            return CreateFontW(-int(pt * sc + 0.5f), 0, 0, 0, weight, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0,
+                               brand ? face : fallback);
+         };
+         font_ = font(Sheet::kTextSize, FW_NORMAL, L"Inter", L"Segoe UI");
+         titleFont_ = font(Sheet::kTitleSize, FW_SEMIBOLD, L"Inter", L"Segoe UI");
+         buttonFont_ = font(Sheet::kTextSize, FW_SEMIBOLD, L"Inter", L"Segoe UI");
+         monoFont_ = font(Sheet::kMonoSize, FW_NORMAL, L"Geist Mono", L"Consolas");
          auto make = [&](const wchar_t* cls, const wchar_t* text, DWORD style, int id) {
             HWND h = CreateWindowExW(0, cls, text, WS_CHILD | style, 0, 0, 10, 10, hwnd_,
                                      reinterpret_cast<HMENU>(INT_PTR(id)), Module(), nullptr);
             SendMessageW(h, WM_SETFONT, WPARAM(font_), TRUE);
             return h;
          };
-         label_ = make(L"STATIC", L"", SS_CENTER, 0);
-         restart_ = make(L"BUTTON", L"Restart", BS_PUSHBUTTON, kIdRestart);
-         keyField_ = make(L"EDIT", L"", WS_BORDER | ES_AUTOHSCROLL, kIdKey);
+         // Licence sheet look: SheetStyle.h. Buttons are owner-drawn (WM_DRAWITEM), the card and
+         // the key well are painted behind the controls (Paint).
+         label_ = make(L"STATIC", L"", SS_CENTER | SS_ENDELLIPSIS, 0);
+         title_ = make(L"STATIC", Wide(Sheet::kTitle).c_str(), SS_LEFT, 0);
+         SendMessageW(title_, WM_SETFONT, WPARAM(titleFont_), TRUE);
+         restart_ = make(L"BUTTON", L"Restart", BS_OWNERDRAW, kIdRestart);
+         keyField_ = make(L"EDIT", L"", ES_AUTOHSCROLL, kIdKey);
+         SendMessageW(keyField_, WM_SETFONT, WPARAM(monoFont_), TRUE);
          SendMessageW(keyField_, EM_SETCUEBANNER, TRUE, LPARAM(L"INF1…"));
-         paste_ = make(L"BUTTON", L"Paste key", BS_PUSHBUTTON, kIdPaste);
-         buy_ = make(L"BUTTON", L"Buy", BS_PUSHBUTTON, kIdBuy);
+         paste_ = make(L"BUTTON", L"Paste key", BS_OWNERDRAW, kIdPaste);
+         buy_ = make(L"BUTTON", L"Buy", BS_OWNERDRAW, kIdBuy);
+         for (HWND b : { restart_, paste_, buy_ })
+            SendMessageW(b, WM_SETFONT, WPARAM(buttonFont_), TRUE);
          refund_ = make(L"BUTTON", L"Weekly refund check", BS_AUTOCHECKBOX, kIdRefund);
          // Return in the key field submits it.
          SetWindowSubclassCompat(keyField_);
@@ -377,13 +417,25 @@ namespace
          case WM_DPICHANGED_AFTERPARENT:
             SendState(true);
             return 0;
-         case WM_CTLCOLORSTATIC:
+         case WM_CTLCOLORSTATIC: // labels and the refund checkbox
          {
             HDC dc = HDC(wp);
-            SetTextColor(dc, RGB(190, 190, 195));
-            SetBkColor(dc, RGB(23, 23, 26));
-            return LRESULT(Background());
+            const HWND c = HWND(lp);
+            const bool onCard = Unlicensed();
+            SetTextColor(dc, Ref(c == title_ ? Sheet::kInk : c == refund_ ? Sheet::kInk3 : Sheet::kInk2));
+            SetBkColor(dc, Ref(onCard ? Sheet::kCard : Sheet::kGround));
+            return LRESULT(onCard ? Brush(cardBrush_, Sheet::kCard) : Background());
          }
+         case WM_CTLCOLOREDIT:
+         {
+            HDC dc = HDC(wp);
+            SetTextColor(dc, Ref(Sheet::kInk));
+            SetBkColor(dc, Ref(Sheet::kDeep));
+            return LRESULT(Brush(deepBrush_, Sheet::kDeep));
+         }
+         case WM_DRAWITEM:
+            DrawButton(*reinterpret_cast<const DRAWITEMSTRUCT*>(lp));
+            return TRUE;
          case WM_COMMAND:
             Command(LOWORD(wp));
             return 0;
@@ -455,11 +507,43 @@ namespace
          RegisterClassExW(&wc);
       }
 
-      HBRUSH Background()
+      HBRUSH Background() { return Brush(bg_, Sheet::kGround); }
+      static HBRUSH Brush(HBRUSH& b, uint32_t c)
       {
-         if (!bg_)
-            bg_ = CreateSolidBrush(RGB(23, 23, 26));
-         return bg_;
+         if (!b)
+            b = CreateSolidBrush(Ref(c));
+         return b;
+      }
+
+      // Ember with a Midnight label (Paste key), surface-2 with ink (Buy, Restart).
+      void DrawButton(const DRAWITEMSTRUCT& di)
+      {
+         const bool primary = di.hwndItem == paste_;
+         const bool down = (di.itemState & ODS_SELECTED) != 0;
+         RECT r = di.rcItem;
+         FillRect(di.hDC, &r, Unlicensed() ? Brush(cardBrush_, Sheet::kCard) : Background());
+         const uint32_t fill = primary ? (down ? Sheet::kEmberDown : Sheet::kEmber) : (down ? Sheet::kLine : Sheet::kRaised);
+         RoundFill(di.hDC, r, int(Sheet::kButtonR * Scale() + 0.5f), fill, fill);
+         wchar_t text[64] = {};
+         GetWindowTextW(di.hwndItem, text, int(std::size(text)));
+         SetBkMode(di.hDC, TRANSPARENT);
+         SetTextColor(di.hDC, Ref(primary ? Sheet::kGround : Sheet::kInk));
+         HGDIOBJ of = SelectObject(di.hDC, buttonFont_);
+         DrawTextW(di.hDC, text, -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+         SelectObject(di.hDC, of);
+      }
+
+      int TextW(HWND h, HFONT f) const
+      {
+         wchar_t text[256] = {};
+         GetWindowTextW(h, text, int(std::size(text)));
+         HDC dc = GetDC(hwnd_);
+         HGDIOBJ of = SelectObject(dc, f);
+         SIZE sz {};
+         GetTextExtentPoint32W(dc, text, int(wcslen(text)), &sz);
+         SelectObject(dc, of);
+         ReleaseDC(hwnd_, dc);
+         return sz.cx;
       }
 
       float Scale() const
@@ -590,29 +674,42 @@ namespace
          const int W = c.right, H = c.bottom;
          const float s = Scale();
          auto px = [s](int v) { return int(v * s + 0.5f); };
-         const int lh = px(22), bh = px(28);
+         const int bh = px(Sheet::kButtonH), lh = px(20);
          if (IsWindowVisible(keyField_))
          {
-            const int fw = std::max(px(120), std::min(px(360), W - px(32)));
-            const int bw = px(96), cw = px(200);
-            const int total = lh + px(12) + px(24) + px(12) + bh + px(10) + px(20);
-            int y = (H - total) / 2;
-            MoveWindow(label_, 0, y, W, lh, TRUE);
-            y += lh + px(12);
-            MoveWindow(keyField_, (W - fw) / 2, y, fw, px(24), TRUE);
-            y += px(24) + px(12);
-            const int row = bw * 2 + px(8);
-            MoveWindow(paste_, (W - row) / 2, y, bw, bh, TRUE);
-            MoveWindow(buy_, (W - row) / 2 + bw + px(8), y, bw, bh, TRUE);
-            y += bh + px(10);
-            MoveWindow(refund_, (W - cw) / 2, y, cw, px(20), TRUE);
+            // The card (SheetStyle.h), centred; contents left-aligned at kPad.
+            const int pad = px(Sheet::kPad), gap = px(Sheet::kGap);
+            const int cw = std::max(px(200), std::min(px(Sheet::kCardW), W - px(32)));
+            const int inner = cw - 2 * pad;
+            const int th = px(28), rh = px(20), wh = px(Sheet::kWellH);
+            const int ch = pad + th + px(4) + lh + px(16) + wh + gap + bh + gap + rh + pad;
+            const int cx = (W - cw) / 2, cy = std::max(0, (H - ch) / 2);
+            card_ = { cx, cy, cx + cw, cy + ch };
+            const int x = cx + pad;
+            int y = cy + pad;
+            MoveWindow(title_, x, y, inner, th, TRUE);
+            y += th + px(4);
+            MoveWindow(label_, x, y, inner, lh, TRUE);
+            y += lh + px(16);
+            well_ = { x, y, x + inner, y + wh };
+            const int fh = px(18);
+            MoveWindow(keyField_, x + px(12), y + (wh - fh) / 2, inner - px(24), fh, TRUE);
+            y += wh + gap;
+            const int pw = TextW(paste_, buttonFont_) + px(2 * Sheet::kButtonPadX);
+            const int uw = TextW(buy_, buttonFont_) + px(2 * Sheet::kButtonPadX);
+            MoveWindow(paste_, x, y, pw, bh, TRUE);
+            MoveWindow(buy_, x + pw + px(8), y, uw, bh, TRUE);
+            y += bh + gap;
+            MoveWindow(refund_, x, y, inner, rh, TRUE);
             return;
          }
+         card_ = well_ = RECT {};
          const bool button = IsWindowVisible(restart_) != 0;
-         const int total = lh + (button ? px(12) + bh : 0);
+         const int total = lh + (button ? px(16) + bh : 0);
          const int top = (H - total) / 2;
          MoveWindow(label_, 0, top, W, lh, TRUE);
-         MoveWindow(restart_, (W - px(110)) / 2, top + lh + px(12), px(110), bh, TRUE);
+         const int rw = TextW(restart_, buttonFont_) + px(2 * Sheet::kButtonPadX);
+         MoveWindow(restart_, (W - rw) / 2, top + lh + px(16), rw, bh, TRUE);
       }
 
       void UpdateOverlay()
@@ -630,6 +727,9 @@ namespace
          ShowWindow(paste_, key);
          ShowWindow(buy_, key);
          ShowWindow(refund_, key);
+         ShowWindow(title_, key);
+         LONG_PTR st = GetWindowLongPtrW(label_, GWL_STYLE) & ~LONG_PTR(SS_TYPEMASK);
+         SetWindowLongPtrW(label_, GWL_STYLE, st | (unlicensed ? SS_LEFT : SS_CENTER));
          if (unlicensed)
             SendMessageW(refund_, BM_SETCHECK, License::RefundCheckOn() ? BST_CHECKED : BST_UNCHECKED, 0);
          const std::wstring text = unlicensed ? Wide(license_)
@@ -675,7 +775,15 @@ namespace
          RECT c;
          GetClientRect(hwnd_, &c);
          if (Overlay() || !haveFrame_ || !frames_)
+         {
             FillRect(dc, &c, Background());
+            if (Unlicensed() && card_.right > card_.left)
+            {
+               const float s = Scale();
+               RoundFill(dc, card_, int(Sheet::kCardR * s + 0.5f), Sheet::kCard, Sheet::kRaised);
+               RoundFill(dc, well_, int(Sheet::kWellR * s + 0.5f), Sheet::kDeep, Sheet::kLine);
+            }
+         }
          else
          {
             const PluginFrames::BufferInfo info = frames_->info[front_];
@@ -711,18 +819,20 @@ namespace
          }
          if (font_)
             DeleteObject(font_);
-         if (bg_)
-            DeleteObject(bg_);
-         font_ = nullptr;
-         bg_ = nullptr;
+         for (HGDIOBJ o : { HGDIOBJ(bg_), HGDIOBJ(cardBrush_), HGDIOBJ(deepBrush_), HGDIOBJ(titleFont_), HGDIOBJ(buttonFont_), HGDIOBJ(monoFont_) })
+            if (o)
+               DeleteObject(o);
+         font_ = titleFont_ = buttonFont_ = monoFont_ = nullptr;
+         bg_ = cardBrush_ = deepBrush_ = nullptr;
          CloseRegion();
       }
 
       InfinitePlugin::ViewHost* host_ = nullptr;
       HWND hwnd_ = nullptr, label_ = nullptr, restart_ = nullptr, keyField_ = nullptr, paste_ = nullptr,
-           buy_ = nullptr, refund_ = nullptr;
-      HFONT font_ = nullptr;
-      HBRUSH bg_ = nullptr;
+           buy_ = nullptr, refund_ = nullptr, title_ = nullptr;
+      HFONT font_ = nullptr, titleFont_ = nullptr, buttonFont_ = nullptr, monoFont_ = nullptr;
+      HBRUSH bg_ = nullptr, cardBrush_ = nullptr, deepBrush_ = nullptr;
+      RECT card_ {}, well_ {}; // licence sheet, painted behind the controls (client pixels)
       Ipc::SharedMemory region_ {};
       PluginFrames::Header* frames_ = nullptr;
       uint32_t front_ = 2;

@@ -119,6 +119,33 @@ namespace ViewCheck
       return std::string();
    }
 
+   bool Snapshot(void* view, const char* pngPath)
+   {
+      NSView* v = (NSView*)view;
+      [v.window displayIfNeeded];
+      [v displayIfNeeded];
+      const CGFloat scale = v.window ? v.window.backingScaleFactor : 2.0;
+      const size_t w = size_t(v.bounds.size.width * scale), h = size_t(v.bounds.size.height * scale);
+      CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+      CGContextRef ctx = CGBitmapContextCreate(nullptr, w, h, 8, 0, cs, kCGImageAlphaPremultipliedLast);
+      CGColorSpaceRelease(cs);
+      if (!ctx)
+         return false;
+      CGContextScaleCTM(ctx, scale, scale);
+      if (v.isFlipped)
+      {
+         CGContextTranslateCTM(ctx, 0, v.bounds.size.height);
+         CGContextScaleCTM(ctx, 1, -1);
+      }
+      [v.layer renderInContext:ctx];
+      CGImageRef img = CGBitmapContextCreateImage(ctx);
+      CGContextRelease(ctx);
+      NSBitmapImageRep* rep = [[[NSBitmapImageRep alloc] initWithCGImage:img] autorelease];
+      CGImageRelease(img);
+      NSData* png = [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+      return [png writeToFile:@(pngPath) atomically:YES];
+   }
+
    void Press(void* view)
    {
       for (NSView* sub in ((NSView*)view).subviews)

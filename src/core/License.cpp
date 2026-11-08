@@ -175,6 +175,7 @@ namespace License
 
    Info Check(const std::string& keyIn, const std::vector<std::string>& revoked, int appMajor)
    {
+      (void)appMajor;
       Info info;
       const std::string key = Extract(keyIn);
       if (key.empty())
@@ -206,8 +207,8 @@ namespace License
       info.major = j.contains("major") && j["major"].is_number() ? j["major"].get<int>() : 0;
       if (!j.contains("v") || !j["v"].is_number() || j["v"].get<int>() != 1)
          info.status = Status::WrongVersion;
-      else if (info.major < appMajor)
-         info.status = Status::WrongMajor;
+      // Lifetime updates: a key from any major works in every later build. "major" stays in the
+      // payload as a record of what was bought, and WrongMajor is never set.
       else if (!info.id.empty() && std::find(revoked.begin(), revoked.end(), info.id) != revoked.end())
          info.status = Status::Revoked;
       else

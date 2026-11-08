@@ -31,6 +31,7 @@
 #include "plugin/ipc/PluginFrames.h"
 #include "plugin/ipc/PluginIpc.h"
 #include "plugin/shell/ShellView.h"
+#include "plugin/shell/SheetStyle.h"
 #include "platform/common/Ipc.h"
 
 #include "pluginterfaces/base/ibstream.h"
@@ -140,7 +141,7 @@ namespace InfinitePlugin
    // Unlicensed, the sheet's message follows as UTF-8).
    constexpr uint32_t kRelayEngine = 1000;
 
-   // The licence covers one major version (License.h): 1.x keys for every 1.y build.
+   // Keys carry lifetime updates (License.h); the major is passed for the record only.
    inline int AppMajor() { return std::atoi(INFINITE_PLUGIN_VERSION); }
 
    // ---------------------------------------------------------------------------------------
@@ -418,6 +419,21 @@ namespace InfinitePlugin
          return rec;
 #endif
       return {};
+   }
+
+   std::string Sheet::EngineFontsDir()
+   {
+      const std::string exe = FindEngine();
+      const size_t slash = exe.find_last_of("/\\");
+      if (slash == std::string::npos)
+         return {};
+#if defined(__APPLE__)
+      return exe.substr(0, slash) + "/../Resources/fonts/";   // Infinite.app/Contents/MacOS/Infinite
+#elif defined(_WIN32)
+      return exe.substr(0, slash) + "\\Resources\\fonts\\";  // beside Infinite.exe
+#else
+      return {};   // the AppImage keeps its fonts inside; X11 core fonts are used
+#endif
    }
 
    struct SlotEdit
