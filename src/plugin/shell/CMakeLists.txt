@@ -54,6 +54,7 @@ add_library(infinite_shell_ipc STATIC
     ${INFINITE_ROOT}/src/platform/common/Ipc.cpp
     ${INFINITE_ROOT}/src/plugin/ipc/PluginIpc.cpp
     ${INFINITE_ROOT}/src/core/License.cpp
+    ${INFINITE_ROOT}/src/core/DawPluginInstall.cpp
     ${INFINITE_ROOT}/external/monocypher/monocypher.c
     ${INFINITE_ROOT}/external/monocypher/monocypher-ed25519.c
     ${INFINITE_ROOT}/external/miniz.c)

@@ -16,6 +16,7 @@ namespace app
    void DrawPluginScanControls(bool foldersOpen); // LibraryPanels.cpp
    void DrawPluginManagerList();
    void DrawCliSetupSection();     // CliSetupSection.cpp
+   void DrawDawPluginSection();    // DawPluginSection.cpp
 
    namespace
    {
@@ -35,7 +36,7 @@ namespace app
          { "minimap", 1, "Minimap" }, { "cables", 1, "Cable Visibility" }, { "audio", 2, nullptr },
          { "devices", 2, "Audio Devices & Format" }, { "midi", 2, "MIDI Inputs" }, { "general", 3, nullptr },
          { "autosave", 3, "Autosave" }, { "performance", 3, "Performance & Rendering" }, { "movement-log", 3, "Movement Log" },
-         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" },
+         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" }, { "daw-plugin", 3, "DAW plugin" },
          { "field", 4, nullptr }, { "globals", 5, nullptr }, { "extensions", 6, nullptr }, { "plugins", 7, nullptr },
          { "agents", 8, nullptr }, { "terminal", 8, nullptr },
       };
@@ -1022,6 +1023,8 @@ namespace app
                gShowUpdateCheckModal = true;
             }
 
+            ImGui::Spacing();
+            DrawDawPluginSection();
 
             SectionCard::End();
          }

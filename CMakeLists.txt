@@ -446,6 +446,7 @@ set(COMMON_SOURCES
     src/plugin/engine/HostAudio.cpp
     src/plugin/engine/PluginView.cpp
     src/core/License.cpp
+    src/core/DawPluginInstall.cpp
     external/monocypher/monocypher.c
     external/monocypher/monocypher-ed25519.c
     # src/app/**: code that used to live in src/main.cpp
@@ -533,6 +534,7 @@ set(COMMON_SOURCES
     src/app/panels/View3DPanel.cpp
     src/app/panels/TerminalPanel.cpp
     src/app/panels/CliSetupSection.cpp
+    src/app/panels/DawPluginSection.cpp
     src/app/panels/ChatPanel.cpp
     src/core/CliSetup.cpp
     src/core/chat/AgentStream.cpp

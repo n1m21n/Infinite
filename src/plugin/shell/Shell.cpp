@@ -22,6 +22,7 @@
 //   2000..2127  MIDI CC 0..127   hidden, omni: VST3 hands CC to plugins only as parameters
 //   2128        Pitch bend       (IMidiMapping), turned back into MIDI for the engine here
 //   2129        Channel pressure
+#include "core/DawPluginInstall.h"
 #include "core/License.h"
 #include "plugin/ipc/PluginFrames.h"
 #include "plugin/ipc/PluginIpc.h"
@@ -261,6 +262,7 @@ namespace InfinitePlugin
    // Where the engine is, first hit wins:
    //   $INFINITE_PLUGIN_ENGINE                      (development and tests)
    //   beside the plugin: Helpers/Infinite Engine.app (macOS) / infinite-engine(.exe)
+   //   the app that installed the plugin (Settings > DAW plugin writes its path, DawPluginInstall.h)
    //   the installed app
    std::string FindEngine()
    {
@@ -271,6 +273,8 @@ namespace InfinitePlugin
       const std::string beside = Ipc::HelperPathBesideModule("Infinite Engine.app/Contents/MacOS/Infinite");
       if (IsFile(beside))
          return beside;
+      if (const std::string rec = DawPlugin::RecordedEngine(); IsFile(rec))
+         return rec;
       if (const char* home = getenv("HOME"))
       {
          const std::string user = std::string(home) + "/Applications/Infinite.app/Contents/MacOS/Infinite";
@@ -284,6 +288,8 @@ namespace InfinitePlugin
       const std::string beside = Ipc::HelperPathBesideModule("infinite-engine");
       if (IsFile(beside))
          return beside;
+      if (const std::string rec = DawPlugin::RecordedEngine(); IsFile(rec))
+         return rec;
 #endif
       return {};
    }

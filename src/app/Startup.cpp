@@ -10,9 +10,13 @@
 #include "app/frame/FrameCtx.h"
 #include "platform/HeadTracker.h"
 #include "platform/AppPaths.h"
+#include "core/DawPluginInstall.h"
 
 namespace app
 {
+   DawPlugin::Env DawPluginEnv();   // DawPluginSection.cpp
+   void DawPluginLaunchRecopy();
+
 bool RunAliasTest(); // selftest/AliasTests.cpp
 extern bool gShotNodeMenu; // frame/StagePopupsA.cpp: review shots open the first node's menu
 bool RunOversampleTest(); // selftest/AliasTests.cpp
@@ -997,6 +1001,24 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   // `Infinite --install-plugins` / `--uninstall-plugins`: the Settings > DAW plugin copier without a
+   // window, for install.sh and the Homebrew cask (docs/plans/vst-au/README.md 3.6).
+   if (argc >= 2 && (std::strcmp(argv[1], "--install-plugins") == 0 || std::strcmp(argv[1], "--uninstall-plugins") == 0))
+   {
+      const bool install = std::strcmp(argv[1], "--install-plugins") == 0;
+      const DawPlugin::Env env = DawPluginEnv();
+      std::string err;
+      const bool ok = install ? DawPlugin::Install(env, err) : DawPlugin::Uninstall(env, err);
+      if (!ok)
+      {
+         fprintf(stderr, "%s\n", err.c_str());
+         return 1;
+      }
+      for (const DawPlugin::Bundle& b : DawPlugin::Bundles(env))
+         printf("%s %s\n", install ? "installed" : "removed", b.target.c_str());
+      return 0;
+   }
+
    // Plugin engine mode: this process is the engine of one VST3/AU instance
    // (src/plugin/engine/HostAudio.h). Must run before IsHeadlessProcess() is
    // first read below, since plugin mode is a headless process.
@@ -1500,6 +1522,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // the network.
    if (UpdateCheck::AutoCheckEnabled())
       UpdateCheck::Start();
+   // An installed DAW plugin follows this app's version and location (DawPluginInstall.h).
+   if (!IsHeadlessProcess())
+      DawPluginLaunchRecopy();
 
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")
                                                     : settingsDir + "/imgui.ini";

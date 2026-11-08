@@ -45,6 +45,11 @@ rm -f "$APP/Contents/Resources/Infinite.json" "$APP/Contents/Resources/imgui.ini
 # Licence texts travel with the app (before signing, so the seal covers them).
 cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES" "$APP/Contents/Resources/"
 
+# The DAW plugin rides inside the app (docs/plans/vst-au/README.md 8.11): Settings > DAW plugin
+# copies these into ~/Library/Audio/Plug-Ins, and the plugin runs this app as its engine.
+echo "==> building the DAW plugin bundles"
+"$ROOT/tools/plugin/build_bundles.sh" "$APP/Contents/Resources/Plugins" --jobs "${INFINITE_JOBS:-3}"
+
 echo "==> verifying the bundle is self-contained"
 if otool -L "$APP/Contents/MacOS/Infinite" | grep -qE '/opt/homebrew|/usr/local/(lib|opt)'; then
     echo "ERROR: bundle links a non-system library:"
