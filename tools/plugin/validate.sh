@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs every plugin validator on the built bundles and prints one summary table
-# (docs/plans/vst-au/README.md, M-1 / M-2 / M-3). Builds nothing.
+# (docs/plans/vst-au/README.md, M-1 / M-2 / M-3), plus the plugin-mode UI audit
+# (tools/plugin/plugin_mode_audit.py). Builds nothing.
 #
 #   tools/plugin/validate.sh [--build DIR] [--strictness N] [--skip-pluginval] [--skip-auval] [--licensed] [--skip-gui]
 #
@@ -143,6 +144,14 @@ if [ "$OS" = Darwin ] && [ $DO_AUVAL = 1 ]; then
          row "M-3 auval -strict" "$B" FAIL "exit $RC ($LOG)"
       fi
    done
+fi
+
+# Plugin-mode UI audit (source scan): every host-owned or deferred control is hidden inside a DAW.
+LOG="$LOGDIR/plugin_mode_audit.txt"
+if python3 tools/plugin/plugin_mode_audit.py > "$LOG" 2>&1; then
+   row "plugin-mode UI audit" "-" PASS "$(tail -1 "$LOG")"
+else
+   row "plugin-mode UI audit" "-" FAIL "$(tail -1 "$LOG") ($LOG)"
 fi
 
 LEFT=0

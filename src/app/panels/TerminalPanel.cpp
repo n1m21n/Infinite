@@ -1305,6 +1305,8 @@ bool HandleTerminalSessionRpc(const std::string& method, const nlohmann::json& p
 
 void TerminalToggleShortcut()
 {
+   if (Platform::PluginModeActive()) // no shell inside a DAW
+      return;
    if (!gTerminalOpen)
    {
       gTerminalOpen = true;

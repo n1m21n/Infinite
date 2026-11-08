@@ -135,13 +135,14 @@ namespace app
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + wellTop + SectionCard::kPad);
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::space_2);
-      // Inside a DAW: no plugin hosting, so no Plugins section.
-      constexpr int kPluginsTab = 7;
-      if (Platform::PluginModeActive() && sTab == kPluginsTab)
-         sTab = 2;
+      // Inside a DAW: the host owns audio and MIDI devices, there is no plugin hosting and no shell, so the Audio,
+      // Plugins and Agents & Terminal tabs go.
+      auto hiddenInDaw = [](int tab) { return Platform::PluginModeActive() && (tab == 2 || tab == 7 || tab == 8); };
+      if (hiddenInDaw(sTab))
+         sTab = 0;
       for (int i = 0; i < kTabCount; i++)
       {
-         if (Platform::PluginModeActive() && i == kPluginsTab)
+         if (hiddenInDaw(i))
             continue;
          const bool sel = (i == sTab);
          const float h = ImGui::GetFrameHeight();
@@ -844,6 +845,8 @@ namespace app
          // 4. General & Performance Tab
          if (sTab == 3)
          {
+            if (!Platform::PluginModeActive()) // the DAW project saves the patch
+            {
             ImGui::Spacing();
             FormParts::Section(T("Autosave"));
             if (gAutosaveFailed)
@@ -865,6 +868,7 @@ namespace app
                gAutosaveSeconds = seconds;
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();
+            }
 
             ImGui::Spacing();
             FormParts::Section(T("Performance & Rendering"));
@@ -1619,7 +1623,8 @@ namespace app
 
             const float btnW = 96.0f; // one action-button width for every row in this tab
             ImGui::Spacing();
-            if (UpdateCheck::GetStatus() == UpdateCheck::Status::UpdateAvailable)
+            if (!Platform::PluginModeActive() && // the plugin updates with the installer, not in place
+                UpdateCheck::GetStatus() == UpdateCheck::Status::UpdateAvailable)
             {
                // Infinite itself: same in-place update as the Check for updates window, surfaced where packs are.
                FormParts::Section(T("Infinite"));

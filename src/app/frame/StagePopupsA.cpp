@@ -356,7 +356,8 @@ void DrawPopupsA(FrameCtx& fc)
             MenuParts::Separator();
 
             // Information & Hierarchy
-            if (CliSetup::Prefs().face == "chat" && MenuParts::Item(L("Reference in chat")))
+            if (!Platform::PluginModeActive() && CliSetup::Prefs().face == "chat" &&
+                MenuParts::Item(L("Reference in chat"))) // no chat inside a DAW
                ChatReferenceNode(gn->index);
             if (MenuParts::Item(L("Help")))
             {

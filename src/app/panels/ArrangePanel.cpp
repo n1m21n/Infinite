@@ -1391,6 +1391,9 @@ namespace app
          // Infinite toolbar's own transport controls (see the top toolbar's
          // "##transportrewind" a bit further down in this file) rather than
          // plain text labels.
+         // Inside a DAW the host's transport plays and rewinds: no buttons here.
+         if (!Platform::PluginModeActive())
+         {
          ImGui::SameLine(0.0f, tok::space_4);
          const bool arrangeIsPlaying = tr.IsPlaying();
          PushToolbarChip(arrangeIsPlaying, /*green=*/true);
@@ -1428,6 +1431,7 @@ namespace app
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = arrangeIconCol;
             glyph::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
+         }
          }
 
          // Bars | Time: which unit the ruler, the clip popup and the loop
@@ -1599,6 +1603,9 @@ namespace app
 
          // Loop region toggle. The region itself is a Shift+drag on the
          // ruler; right-clicking the ruler disarms it.
+         // Inside a DAW the host's loop wins (Transport::FollowHost suspends this one): no toggle.
+         if (!Platform::PluginModeActive())
+         {
          ImGui::SameLine(0.0f, tok::space_1);
          const Arrange::LoopRange loopNow = gArrange.settings.loop; // the loop as of this frame
          const bool loopWasOn = loopNow.enabled; // see snapWasOn above
@@ -1616,6 +1623,7 @@ namespace app
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
+         }
          }
 
          // Add Marker (M): drops one at the playhead, on the snap grid.
@@ -4230,7 +4238,7 @@ namespace app
                ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
 
 
-            if (MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
+            if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
             {
                const std::vector<uint64_t> subtreeLanes = Arrange::LanesInTrackGroupRecursive(gArrange, ctxGroupId);
                if (!subtreeLanes.empty())

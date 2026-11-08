@@ -1276,7 +1276,11 @@ void DrawNodeBodies(FrameCtx& fc)
                      ImGui::TextDisabled(T("from: %s"), srcName.c_str());
                   }
 
-                  if (n->StopRequested() || n->IsFinalizing())
+                  // Inside a DAW there is no live video recording (the DAW records audio).
+                  if (Platform::PluginModeActive())
+                  {
+                  }
+                  else if (n->StopRequested() || n->IsFinalizing())
                   {
                      // StopRequested(): the actual StopRecordingAsync() call
                      // runs at the top of next frame, once this "finalizing"

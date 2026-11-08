@@ -52,7 +52,8 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
-   if (PanelRail::Item("##railTerminal", top + 9.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
+   if (!Platform::PluginModeActive() && // no shell or agents inside a DAW
+       PanelRail::Item("##railTerminal", top + 9.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
                        T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
    {
       gTerminalOpen = !gTerminalOpen;
@@ -452,7 +453,7 @@ void DrawMenuBar(FrameCtx& fc)
                dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
                dockedPanelMenu(L("3D View"), L("Show 3D View"), gView3DOpen, gView3DDock, gView3DHeight, "##view3ddock");
                dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
-               if (MenuParts::SubMenu(L("Terminal")))
+               if (!Platform::PluginModeActive() && MenuParts::SubMenu(L("Terminal"))) // no shell inside a DAW
                {
                   MenuParts::Check(L("Show Terminal"), &gTerminalOpen);
                   if (gTerminalOpen)
@@ -826,12 +827,15 @@ void DrawMenuBar(FrameCtx& fc)
          const float centreY = ImGui::GetCursorScreenPos().y + tok::tile * 0.5f;
          const ImVec2 wellMin(std::round(ImGui::GetCursorScreenPos().x), std::round(centreY - TD::kHeight * 0.5f));
          // The metronome is the display's last cell: a square the height of the well, set off by a hairline.
-         const float clickCellW = TD::kHeight;
+         // Not inside a DAW: the host plays its own click.
+         const bool showClick = !Platform::PluginModeActive();
+         const float clickCellW = showClick ? TD::kHeight : 0.0f;
          const ImVec2 wellMax(wellMin.x + tempoCellW + sigCellW + keyCellW + clickCellW, wellMin.y + TD::kHeight);
          TD::Well(wellMin, wellMax);
          TD::Divider(wellMin.x + tempoCellW, wellMin.y);
          TD::Divider(wellMin.x + tempoCellW + sigCellW, wellMin.y);
-         TD::Divider(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y);
+         if (showClick)
+            TD::Divider(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y);
 
          // One editable number: drag up/down, double-click or type to edit. `onDrag` gets the vertical delta in
          // points; `onCommit` gets the typed text.
@@ -1021,6 +1025,10 @@ void DrawMenuBar(FrameCtx& fc)
          }
 
          // The click: the same tile as the panel rail, inside the display's last cell.
+         if (!showClick)
+            AudioEngine::Instance().SetMetronome(false, gMetronomeVolume, gMetronomeAccent);
+         else
+         {
          ImGui::SetCursorScreenPos(ImVec2(wellMax.x - clickCellW + (clickCellW - tok::tile) * 0.5f, centreY - tok::tile * 0.5f));
          {
             // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
@@ -1057,6 +1065,7 @@ void DrawMenuBar(FrameCtx& fc)
                gMetronomeDirty = false;
             }
             AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
+         }
          }
 
          // Audio power, just right of the click.

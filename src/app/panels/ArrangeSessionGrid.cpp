@@ -1719,6 +1719,9 @@ namespace app
          nextTo(tok::space_4);
 
          // Play / Pause: the shared transport. Playing from here hands audio to the Session.
+         // Inside a DAW the host's transport plays: no button here.
+         if (!Platform::PluginModeActive())
+         {
          Transport& tr = Transport::Instance();
          const bool playing = tr.IsPlaying();
          ActionButton::Scoped() = playing ? ActionButton::Kind::Go : ActionButton::Kind::Plain;
@@ -1736,6 +1739,7 @@ namespace app
          else
             glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, iconCol);
          nextTo(tok::space_1);
+         }
 
          // Record: what you launch is written into the Timeline as clips; Render Take turns it into a movie.
          const bool rec = ArrangeSessionRecording();

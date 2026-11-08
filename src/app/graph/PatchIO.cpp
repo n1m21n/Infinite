@@ -9,6 +9,11 @@
 
 namespace app
 {
+   namespace
+   {
+      bool gTerminalOpenInApp = false; // the shared workspace file's Terminal state, kept as is by the plugin engine
+   }
+
    // ---- saving ----
    // Everything SavePatchTo used to build in place, minus the file write -
    // shared with undo/redo, which snapshots this same in-memory shape rather
@@ -387,7 +392,11 @@ namespace app
          else if (key == "panelPianoRollDock")
             gPianoRollDock = (val == "3") ? 3 : 0;
          else if (key == "panelTerminalOpen")
-            gTerminalOpen = (val != "0");
+         {
+            // Inside a DAW there is no shell: keep it closed, and write the app's value back untouched.
+            gTerminalOpenInApp = (val != "0");
+            gTerminalOpen = gTerminalOpenInApp && !Platform::PluginModeActive();
+         }
          else if (key == "panelTerminalH")
             gTerminalHeight = std::max(160.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelTerminalDock")
@@ -448,7 +457,7 @@ namespace app
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
       file << "panelPianoRollH=" << gPianoRollHeight << "\n";
       file << "panelPianoRollDock=" << gPianoRollDock << "\n";
-      file << "panelTerminalOpen=" << (gTerminalOpen ? 1 : 0) << "\n";
+      file << "panelTerminalOpen=" << ((Platform::PluginModeActive() ? gTerminalOpenInApp : gTerminalOpen) ? 1 : 0) << "\n";
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";
       file << "panelTerminalW=" << gTerminalWidth << "\n";
