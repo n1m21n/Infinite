@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <string>
 
+#include "plugin/ipc/PluginIpc.h"
+
 namespace PluginEngine
 {
    struct Options
@@ -80,31 +82,33 @@ namespace PluginEngine
    void MainFrameTick();
 
    // ---- host slots (README 8.2, step 2.2) ----------------------------------------------------
-   // The 32 host parameters drive Macro nodes whose "Host slot" field names them. The audio thread
+   // The 128 host parameters drive Macro nodes whose "Host slot" field names them, and any control
+   // given "Host automation" from its right-click menu. The audio thread
    // smooths each slot (one-pole 10 ms, stepped for switch-like macros) per 32-sample sub-block and
    // publishes a snapshot on a frame grid (round(sr/60/32)*32 samples). Offline, while a bound slot
    // moves, it parks at each grid point until the main thread has applied that snapshot and cooked
    // (a "served" frame, whose clock is pinned to the grid point), so a bounce is repeatable.
-   constexpr int kSlotCount = 32;
+   constexpr int kSlotCount = PluginIpc::kHostSlots;
+   using SlotMask = PluginIpc::SlotMask;
    // Sync: a newly bound Macro's value for a slot the host has no value for yet (no automation write).
    enum SlotEditKind : uint32_t { kSlotEditBegin = 0, kSlotEditPerform = 1, kSlotEditEnd = 2, kSlotEditSync = 3 };
    struct SlotEdit
    {
       uint32_t kind;
-      uint32_t slot; // 0..31
+      uint32_t slot; // 0..kSlotCount-1
       float value;   // normalised 0..1
    };
    struct SlotFrame
    {
       bool served = false;    // the audio thread is parked on this snapshot (offline lock)
-      uint32_t validMask = 0; // slots the host has set at least once
+      SlotMask validMask;      // slots the host has set at least once
       float values[kSlotCount] = {};
    };
    // Main thread, at the start of the modulation pass: the latest snapshot. Pins the frame clock
    // when it serves a parked grid point; MainFrameTick of the next frame releases it.
    void BeginSlotFrame(SlotFrame* out);
    // Main thread: which slots have a Macro bound, and which of those are stepped (no smoothing).
-   void SetSlotBindings(uint32_t boundMask, uint32_t steppedMask);
+   void SetSlotBindings(const SlotMask& boundMask, const SlotMask& steppedMask);
    // Main thread: Infinite -> host. The shell turns these into begin/perform/end edits.
    void SendSlotEdit(SlotEditKind kind, int slot, float value);
    void SendSlotNames(const std::string (&names)[kSlotCount]);

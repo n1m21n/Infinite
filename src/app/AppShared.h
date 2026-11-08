@@ -994,6 +994,18 @@ void DrawParamMidiLearnBanner();
 
 void DrawParamMidiLearnMenuItem(int nodeIndex, int paramIndex);
 
+// Plugin mode: a param the DAW automates through a host slot (right-click > Host automation).
+// Keyed by node uid; saved in the patch as "hostparam". HostSlotsFrame drives them.
+struct HostParamBinding
+{
+   uint64_t uid = 0;
+   int param = -1;
+   int slot = 0;        // 0..PluginIpc::kHostSlots-1
+   std::string name;    // last name sent to the host (the node may be off-screen later)
+};
+extern std::vector<HostParamBinding> gHostParams;
+void DrawParamHostAutomationMenuItem(int nodeIndex, int paramIndex);
+
 
    struct PerfMidiRuntimeState
    {

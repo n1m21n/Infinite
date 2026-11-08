@@ -9,7 +9,7 @@
 // measured offset == reported latency) on the R patches, via $INFINITE_PLUGIN_PATCH.
 //
 // Checks: class names and categories, a scan (initialize + terminate) spawns no engine, the
-// controller's 32 slots + bypass + 130 hidden MIDI-mapping parameters and their CC assignments,
+// controller's 128 slots (hidden until bound) + bypass + 130 hidden MIDI-mapping parameters and their CC assignments,
 // latency = max block and an infinite tail, FX offline pass-through with random block sizes
 // (exact, delayed by L), two offline FX instances bit-identical, Instrument note-on -> sound and
 // bypass -> silence, FX realtime paced, a killed engine leaves the host alive and the plugin
@@ -442,8 +442,8 @@ namespace
       }
       char d[160];
       std::snprintf(d, sizeof d, "%d params: %d slots, %d bypass, %d hidden", count, slots, bypass, hidden);
-      std::string what = std::string(label) + ": 32 slots + bypass + 130 hidden MIDI-mapping params";
-      Check(count == 163 && slots == 32 && bypass == 1 && hidden == 130, what.c_str(), d);
+      std::string what = std::string(label) + ": 128 hidden slots + bypass + 130 hidden MIDI-mapping params";
+      Check(count == 259 && slots == 0 && bypass == 1 && hidden == 258, what.c_str(), d);
 
       FUnknownPtr<IMidiMapping> mm(ec);
       ParamID cc7 = 0, cc7ch5 = 0, bend = 0, press = 0;
@@ -1065,8 +1065,8 @@ namespace
          SetBlob(b, blob);
          const auto rr = b.Activate() ? Render(b, len, false, plain.script) : std::vector<float>();
          b.Close();
-         std::snprintf(d, sizeof d, "%s, level %.1f dB re input", bi.header.find("\"slotsSet\":1,") != std::string::npos ? "slotsSet 1" : "no slotsSet", rel(rr, 0.5, 4.0));
-         Check(bi.header.find("\"slotsSet\":1,") != std::string::npos && rel(rr, 0.5, 4.0) < -50.0,
+         std::snprintf(d, sizeof d, "%s, level %.1f dB re input", bi.header.find("\"slotsSet\":[0]") != std::string::npos ? "slotsSet 1" : "no slotsSet", rel(rr, 0.5, 4.0));
+         Check(bi.header.find("\"slotsSet\":[0]") != std::string::npos && rel(rr, 0.5, 4.0) < -50.0,
                "slots: a saved slot value comes back with the project", d);
       }
 
@@ -1122,6 +1122,80 @@ namespace
          Check(ok && handler.begins >= 1 && handler.performs >= 1 && std::fabs(handler.lastValue - 0.25) < 1e-3 && handler.ends == handler.begins &&
                   !r.empty() && std::fabs(rel(r, 5.0, 6.0) + 45.0) < 2.0,
                "slots: turning the Macro in Infinite reaches the host as begin / perform / end", d);
+         // Only bound slots show in the host; the rest are hidden "Unused NN". The name is saved.
+         ParameterInfo p1 {};
+         if (ec)
+            ec->getParameterInfo(1, p1);
+         const bool shown = (pi.flags & ParameterInfo::kCanAutomate) && !(pi.flags & ParameterInfo::kIsHidden);
+         const bool hidden = (p1.flags & ParameterInfo::kIsHidden) && !(p1.flags & ParameterInfo::kCanAutomate) &&
+                             std::u16string(reinterpret_cast<const char16_t*>(p1.title)) == u"Unused 02";
+         const std::string hdr = ok ? Inspect(GetBlob(a)).header : std::string();
+         const bool saved = hdr.find("\"names\":[[0,\"Level\"]]") != std::string::npos;
+         std::snprintf(d, sizeof d, "slot 1 %s, slot 2 %s, %d params, names %s", shown ? "shown" : "not shown",
+                       hidden ? "hidden" : "not hidden", ec ? int(ec->getParameterCount()) : 0, saved ? "saved" : "not saved");
+         Check(ok && shown && hidden && saved, "slots: only bound slots show in the host, by name, saved with the project", d);
+         if (ok)
+         {
+            cpComp->disconnect(cpCtrl);
+            cpCtrl->disconnect(cpComp);
+            a.Close();
+         }
+         if (ec)
+         {
+            ec->setComponentHandler(nullptr);
+            ec->terminate();
+         }
+      }
+
+      // Right-click > Host automation on a plain knob (no Macro): automation drives it, and the
+      // host sees the node's name.
+      {
+         const std::string s2 = std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S2-hostparam.inf";
+         Case hp { "S2", &fx, true, s2, Script(), len };
+         hp.script.input = Signal;
+         hp.script.automation = SlotRamp;
+         const auto rh = RenderCase(hp, kOffline, kBlock);
+         const double low = rel(rh, 0.3, 0.9), high = rel(rh, 3.3, 4.0);
+         std::snprintf(d, sizeof d, "slot 0: %.1f dB, slot 1: %.1f dB re input", low, high);
+         Check(!rh.empty() && low < -50.0 && high > 6.0, "slots: host automation on a knob drives it", d);
+
+         setenv("INFINITE_PLUGIN_PATCH", s2.c_str(), 1);
+         Instance a;
+         TestHandler handler;
+         IPtr<IEditController> ec;
+         bool ok = a.Open(fx, true, kRealtime, false);
+         TUID cid;
+         if (ok && a.comp->getControllerClassId(cid) == kResultOk)
+            ec = fx.mod->getFactory().createInstance<IEditController>(VST3::UID::fromTUID(cid));
+         ok = ok && ec && ec->initialize(&gHost) == kResultOk;
+         FUnknownPtr<IConnectionPoint> cpComp(a.comp), cpCtrl(ec);
+         if (ok && cpComp && cpCtrl)
+         {
+            ec->setComponentHandler(&handler);
+            cpComp->connect(cpCtrl);
+            cpCtrl->connect(cpComp);
+            ok = a.Activate();
+         }
+         else
+            ok = false;
+         unsetenv("INFINITE_PLUGIN_PATCH");
+         if (ok)
+            for (int i = 0; i < 300; i++)
+            {
+               Pump();
+               std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+         ParameterInfo pi {};
+         if (ec)
+            ec->getParameterInfo(0, pi);
+         const std::u16string t(reinterpret_cast<const char16_t*>(pi.title));
+         const bool named = t == u"Gain";
+         std::string t8;
+         for (char16_t c : t)
+            t8 += c < 128 ? char(c) : '?';
+         std::snprintf(d, sizeof d, "slot 1 title \"%s\", %s", t8.c_str(),
+                       (pi.flags & ParameterInfo::kCanAutomate) ? "automatable" : "not automatable");
+         Check(ok && named && (pi.flags & ParameterInfo::kCanAutomate), "slots: a host-automated knob shows in the host by its node's name", d);
          if (ok)
          {
             cpComp->disconnect(cpCtrl);

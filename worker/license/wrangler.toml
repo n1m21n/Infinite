@@ -20,4 +20,4 @@ FROM = "Infinite <hello@infinitedevices.org>"
 SEATS = "2"
 MAJOR = "1"
 RELEASED = "0"                                      # "1" once the download exists
-DOWNLOAD_URL = "https://infinitedevices.org/download"
+DOWNLOAD_URL = "https://infinitedevices.org/#download"

@@ -40,6 +40,32 @@ namespace PluginIpc
    constexpr uint32_t kMessageRingBytes = 1u << 20; // per direction, power of two
    constexpr uint32_t kMessageChunk = 64u * 1024u;   // larger messages are split
 
+   // Host slots: automatable parameters 0..kHostSlots-1. More than Ableton's 64-parameter
+   // auto-populate threshold on purpose, so its device panel opens empty and holds only what the
+   // user configures (README 8.2).
+   constexpr int kHostSlots = 128;
+   struct SlotMask
+   {
+      uint32_t w[kHostSlots / 32] = {};
+      bool Test(int s) const { return (w[s >> 5] >> (s & 31)) & 1u; }
+      void Set(int s) { w[s >> 5] |= 1u << (s & 31); }
+      bool Any() const { for (uint32_t x : w) if (x) return true; return false; }
+      SlotMask operator&(const SlotMask& o) const { SlotMask r; for (int i = 0; i < kHostSlots / 32; i++) r.w[i] = w[i] & o.w[i]; return r; }
+      SlotMask operator|(const SlotMask& o) const { SlotMask r; for (int i = 0; i < kHostSlots / 32; i++) r.w[i] = w[i] | o.w[i]; return r; }
+      SlotMask operator~() const { SlotMask r; for (int i = 0; i < kHostSlots / 32; i++) r.w[i] = ~w[i]; return r; }
+      bool operator==(const SlotMask& o) const { for (int i = 0; i < kHostSlots / 32; i++) if (w[i] != o.w[i]) return false; return true; }
+      bool operator!=(const SlotMask& o) const { return !(*this == o); }
+   };
+   // Word-wise atomic: each word is atomic, the whole mask is not (callers only need per-slot truth).
+   struct AtomicSlotMask
+   {
+      std::atomic<uint32_t> w[kHostSlots / 32] {};
+      void Set(int s) { w[s >> 5].fetch_or(1u << (s & 31), std::memory_order_relaxed); }
+      bool Test(int s) const { return (w[s >> 5].load(std::memory_order_relaxed) >> (s & 31)) & 1u; }
+      SlotMask Load() const { SlotMask m; for (int i = 0; i < kHostSlots / 32; i++) m.w[i] = w[i].load(std::memory_order_relaxed); return m; }
+      void Store(const SlotMask& m) { for (int i = 0; i < kHostSlots / 32; i++) w[i].store(m.w[i], std::memory_order_relaxed); }
+   };
+
    struct Transport
    {
       double tempo = 120.0;
@@ -66,7 +92,7 @@ namespace PluginIpc
 
    struct ParamPoint
    {
-      uint16_t slot;     // 0..31 host slots, 32.. MIDI-mapping params (shell decides)
+      uint16_t slot;     // 0..kHostSlots-1 host slots
       uint16_t offset;   // sample offset in the block
       float value;       // normalized 0..1
    };

@@ -12,8 +12,11 @@
 //         setState()       -> stored; sent to the engine now, or as its first message when it starts
 //
 // Parameters (fixed forever: hosts cache them per plugin ID):
-//   0..31       Slot 01..Slot 32: drive the Macro nodes whose "Host slot" names them (2.2); a bound
-//               slot takes the Macro's name (kParamTitlesChanged), and turning the Macro in Infinite
+//   0..127      128 host slots (more than Ableton's 64 auto-populate threshold, so its panel opens
+//               empty and shows only what the user configures). A free slot is "Unused NN". A slot
+//               drives a Macro whose "Host slot" names it, or a control given "Host automation" from
+//               its right-click menu (2.2); a bound slot takes that name (kParamTitlesChanged), and
+//               turning the control in Infinite
 //               writes the slot back as a begin/perform/end edit (engine -> processor -> IMessage on
 //               the UI thread -> controller). Only slots the host has set (automation, an edit,
 //               a saved project: "slotsSet") are sent to the engine; a Macro bound to an unset slot
@@ -100,7 +103,16 @@ namespace InfinitePlugin
 #endif
 
    constexpr ParamID kSlotFirst = 0;
-   constexpr int32 kSlotCount = 32;
+   constexpr int32 kSlotCount = PluginIpc::kHostSlots;
+   static_assert(kSlotFirst + kSlotCount <= 1000, "slots run into the bypass id");
+   using SlotMask = PluginIpc::SlotMask;
+
+   std::string FreeSlotName(int32 i)
+   {
+      char name[16];
+      std::snprintf(name, sizeof name, "Unused %02d", i + 1);
+      return name;
+   }
    constexpr ParamID kBypassId = 1000;
    constexpr ParamID kMidiCcFirst = 2000;        // + cc number 0..127
    constexpr ParamID kMidiPitchBend = 2128;
@@ -136,17 +148,67 @@ namespace InfinitePlugin
    //   u32 "INFS" | u32 n | header JSON (n bytes) | u32 patch bytes | u32 compressed bytes | zlib
    //
    // header: {"format":"infinite-plugin-state","v":1,"appVersion":..,"build":"instrument"|"fx",
-   //          "latencyMode":"block","bypass":..,"slotsSet":<bit mask>,"slots":[32 values]}
+   //          "latencyMode":"block","bypass":..,"slotsSet":[slot indices],"slots":[128 values],
+   //          "names":[[slot,"name"],..]}   (bound slots only; the rest stay hidden in the host)
    // The patch is the .inf text the app saves; empty = the build's starting patch. The licence key
    // is never in here (8.5).
    struct State
    {
       bool bypass = false;
       bool picture = false;  // the view shows the Output picture instead of the canvas
-      uint32_t slotsSet = 0; // slots the host has a value for
+      SlotMask slotsSet;     // slots the host has a value for
       float slots[kSlotCount] = {};
+      std::string names[kSlotCount]; // empty = nothing bound: hidden in the host
       std::string patch;
    };
+
+   void PutJsonString(std::string& h, const std::string& s)
+   {
+      h += '"';
+      for (unsigned char c : s)
+      {
+         if (c == '"' || c == '\\')
+         {
+            h += '\\';
+            h += char(c);
+         }
+         else if (c < 0x20)
+            h += ' ';
+         else
+            h += char(c);
+      }
+      h += '"';
+   }
+
+   // c at the opening quote; returns past the closing one (nullptr if malformed).
+   const char* GetJsonString(const char* c, std::string& out)
+   {
+      if (*c != '"')
+         return nullptr;
+      for (c++; *c && *c != '"'; c++)
+      {
+         if (*c == '\\' && c[1])
+            c++;
+         out += *c;
+      }
+      return *c == '"' ? c + 1 : nullptr;
+   }
+
+   // The engine's slot-name blob: kSlotCount NUL-terminated names, "" = unbound.
+   void ParseNames(const void* data, size_t size, std::string (&names)[kSlotCount])
+   {
+      const char* p = static_cast<const char*>(data);
+      const char* end = p + size;
+      for (int32 i = 0; i < kSlotCount; i++)
+      {
+         names[i].clear();
+         const char* z = p < end ? static_cast<const char*>(std::memchr(p, 0, size_t(end - p))) : nullptr;
+         if (!z)
+            continue;
+         names[i].assign(p, z);
+         p = z + 1;
+      }
+   }
 
    void PutU32(std::vector<uint8_t>& b, uint32_t v)
    {
@@ -167,13 +229,31 @@ namespace InfinitePlugin
    {
       std::string h = "{\"format\":\"infinite-plugin-state\",\"v\":" + std::to_string(kStateVersion) +
                       ",\"appVersion\":\"" INFINITE_PLUGIN_VERSION "\",\"build\":\"" + std::string(kFx ? "fx" : "instrument") +
-                      "\",\"latencyMode\":\"block\",\"bypass\":" + (st.bypass ? "true" : "false") + ",\"picture\":" + (st.picture ? "true" : "false") + ",\"slotsSet\":" + std::to_string(st.slotsSet) + ",\"slots\":[";
+                      "\",\"latencyMode\":\"block\",\"bypass\":" + (st.bypass ? "true" : "false") + ",\"picture\":" + (st.picture ? "true" : "false") + ",\"slotsSet\":[";
+      bool first = true;
+      for (int32 i = 0; i < kSlotCount; i++)
+         if (st.slotsSet.Test(i))
+         {
+            h += (first ? "" : ",") + std::to_string(i);
+            first = false;
+         }
+      h += "],\"slots\":[";
       for (int32 i = 0; i < kSlotCount; i++)
       {
          char num[32];
          std::snprintf(num, sizeof num, "%s%.9g", i ? "," : "", double(st.slots[i]));
          h += num;
       }
+      h += "],\"names\":[";
+      first = true;
+      for (int32 i = 0; i < kSlotCount; i++)
+         if (!st.names[i].empty())
+         {
+            h += (first ? "[" : ",[") + std::to_string(i) + ",";
+            PutJsonString(h, st.names[i]);
+            h += "]";
+            first = false;
+         }
       h += "]}";
       std::vector<uint8_t> z(mz_compressBound(mz_ulong(st.patch.size())));
       mz_ulong zlen = mz_ulong(z.size());
@@ -209,8 +289,29 @@ namespace InfinitePlugin
       const size_t pic = h.find("\"picture\":");
       out.picture = pic != std::string::npos && h.compare(pic + 10, 4, "true") == 0;
       const size_t ss = h.find("\"slotsSet\":");
-      if (ss != std::string::npos)
-         out.slotsSet = uint32_t(std::strtoul(h.c_str() + ss + 11, nullptr, 10));
+      if (ss != std::string::npos && h[ss + 11] == '[')
+      {
+         const char* c = h.c_str() + ss + 12;
+         while (*c && *c != ']')
+         {
+            char* end = nullptr;
+            const long i = std::strtol(c, &end, 10);
+            if (end == c)
+               break;
+            if (i >= 0 && i < kSlotCount)
+               out.slotsSet.Set(int(i));
+            c = end;
+            while (*c == ',' || *c == ' ')
+               c++;
+         }
+      }
+      else if (ss != std::string::npos) // before 128 slots: a 32-bit mask
+      {
+         const unsigned long m = std::strtoul(h.c_str() + ss + 11, nullptr, 10);
+         for (int32 i = 0; i < 32; i++)
+            if (m & (1ul << i))
+               out.slotsSet.Set(i);
+      }
       const size_t sl = h.find("\"slots\":[");
       if (sl != std::string::npos)
       {
@@ -225,6 +326,30 @@ namespace InfinitePlugin
             c = end;
             while (*c == ',' || *c == ' ')
                c++;
+         }
+      }
+      const size_t nm = h.find("\"names\":[");
+      if (nm != std::string::npos)
+      {
+         const char* c = h.c_str() + nm + 9;
+         while (*c == '[' || *c == ',' || *c == ' ')
+         {
+            if (*c != '[')
+            {
+               c++;
+               continue;
+            }
+            char* end = nullptr;
+            const long i = std::strtol(c + 1, &end, 10);
+            if (end == c + 1 || *end != ',')
+               break;
+            std::string name;
+            const char* after = GetJsonString(end + 1, name);
+            if (!after || *after != ']')
+               break;
+            if (i >= 0 && i < kSlotCount)
+               out.names[i] = name;
+            c = after + 1;
          }
       }
       if (!GetU32(b, pos, raw) || !GetU32(b, pos, zlen) || pos + zlen > b.size())
@@ -871,7 +996,12 @@ namespace InfinitePlugin
          bypass_ = st.bypass;
          link_.SetPicture(st.picture);
          std::memcpy(slots_, st.slots, sizeof slots_);
-         slotsSet_.store(st.slotsSet);
+         slotsSet_.Store(st.slotsSet);
+         {
+            std::lock_guard<std::mutex> lock(namesMutex_);
+            for (int32 i = 0; i < kSlotCount; i++)
+               names_[i] = st.names[i];
+         }
          patch_ = std::move(st.patch);
          resendSlots_.store(true);
          // Not running yet: Start sends it. Running: the engine swaps to it now.
@@ -889,7 +1019,12 @@ namespace InfinitePlugin
          st.bypass = bypass_;
          st.picture = link_.Picture();
          std::memcpy(st.slots, slots_, sizeof slots_);
-         st.slotsSet = slotsSet_.load();
+         st.slotsSet = slotsSet_.Load();
+         {
+            std::lock_guard<std::mutex> lock(namesMutex_);
+            for (int32 i = 0; i < kSlotCount; i++)
+               st.names[i] = names_[i];
+         }
          st.patch = patch_;
          const std::vector<uint8_t> bytes = EncodeState(st);
          int32 wrote = 0;
@@ -1114,9 +1249,9 @@ namespace InfinitePlugin
          // and win (the engine sorts by offset, stable).
          if (link_.Ready() && resendSlots_.exchange(false))
          {
-            const uint32_t set = slotsSet_.load();
+            const SlotMask set = slotsSet_.Load();
             for (int32 i = 0; i < kSlotCount; i++)
-               if (set & (1u << i))
+               if (set.Test(i))
                   params_[numParams_++] = PluginIpc::ParamPoint { uint16_t(i), 0, slots_[i] };
          }
          IParameterChanges* changes = data.inputParameterChanges;
@@ -1142,7 +1277,7 @@ namespace InfinitePlugin
                else if (id < ParamID(kSlotFirst + kSlotCount))
                {
                   slots_[id - kSlotFirst] = float(v);
-                  slotsSet_.fetch_or(1u << (id - kSlotFirst));
+                  slotsSet_.Set(int(id - kSlotFirst));
                   if (numParams_ < PluginIpc::kMaxParamPoints)
                      params_[numParams_++] = PluginIpc::ParamPoint { uint16_t(id - kSlotFirst), uint16_t(offset), float(v) };
                }
@@ -1296,8 +1431,7 @@ namespace InfinitePlugin
                msg->release();
                return;
             }
-            const uint32_t bit = 1u << e.slot;
-            if (e.kind == 3 && (slotsSet_.load() & bit))
+            if (e.kind == 3 && slotsSet_.Test(int(e.slot)))
             {
                msg->release(); // the host has its own value; the engine gets it with the resend
                return;
@@ -1305,7 +1439,7 @@ namespace InfinitePlugin
             if (e.kind == 1 || e.kind == 3)
             {
                slots_[e.slot] = std::max(0.0f, std::min(1.0f, e.value)); // a save before the host echoes it
-               slotsSet_.fetch_or(bit);
+               slotsSet_.Set(int(e.slot));
             }
             msg->setMessageID("slotEdit");
             msg->getAttributes()->setInt("kind", e.kind);
@@ -1314,6 +1448,10 @@ namespace InfinitePlugin
          }
          else if (it.type == kMsgSlotNames)
          {
+            {
+               std::lock_guard<std::mutex> lock(namesMutex_);
+               ParseNames(it.data.data(), it.data.size(), names_);
+            }
             msg->setMessageID("slotNames");
             msg->getAttributes()->setBinary("names", it.data.data(), uint32(it.data.size()));
          }
@@ -1360,7 +1498,9 @@ namespace InfinitePlugin
       std::shared_ptr<UiRelay> relay_;
       std::atomic<bool> resendSlots_ { true };
       std::atomic<bool> release_ { false };
-      std::atomic<uint32_t> slotsSet_ { 0 };
+      PluginIpc::AtomicSlotMask slotsSet_;
+      std::mutex namesMutex_;
+      std::string names_[kSlotCount]; // as the engine last sent them; saved so a project reopens named
       std::string patch_; // last known patch (.inf text); message thread only
       bool bypass_ = false;
       float slots_[kSlotCount] = {};
@@ -1485,10 +1625,8 @@ namespace InfinitePlugin
             return r;
          for (int32 i = 0; i < kSlotCount; i++)
          {
-            char name[16];
-            std::snprintf(name, sizeof name, "Slot %02d", i + 1);
-            UString128 title(name);
-            parameters.addParameter(title, nullptr, 0, 0.0, ParameterInfo::kCanAutomate, kSlotFirst + ParamID(i));
+            UString128 title(FreeSlotName(i).c_str());
+            parameters.addParameter(title, nullptr, 0, 0.0, ParameterInfo::kIsHidden, kSlotFirst + ParamID(i));
          }
          parameters.addParameter(STR16("Bypass"), nullptr, 1, 0.0, ParameterInfo::kCanAutomate | ParameterInfo::kIsBypass, kBypassId);
          // Hidden MIDI-mapping parameters: the host writes them from CC; not automatable, not shown.
@@ -1515,7 +1653,37 @@ namespace InfinitePlugin
          setParamNormalized(kBypassId, st.bypass ? 1.0 : 0.0);
          for (int32 i = 0; i < kSlotCount; i++)
             setParamNormalized(kSlotFirst + ParamID(i), st.slots[i]);
+         ApplySlotNames(st.names);
          return kResultOk;
+      }
+
+      // A bound slot shows its name and is automatable; an unbound one is hidden ("Unused NN").
+      void ApplySlotNames(const std::string (&names)[kSlotCount])
+      {
+         bool changed = false;
+         for (int32 i = 0; i < kSlotCount; i++)
+         {
+            Parameter* param = parameters.getParameter(kSlotFirst + ParamID(i));
+            if (!param)
+               continue;
+            const bool bound = !names[i].empty();
+            const std::u16string u = Steinberg::StringConvert::convert(bound ? names[i] : FreeSlotName(i));
+            ParameterInfo& info = param->getInfo();
+            String128 title {};
+            const size_t n = std::min(u.size(), size_t(127));
+            for (size_t c = 0; c < n; c++)
+               title[c] = TChar(u[c]);
+            const int32 flags = bound ? ParameterInfo::kCanAutomate : ParameterInfo::kIsHidden;
+            if (std::memcmp(title, info.title, sizeof title) != 0 || info.flags != flags)
+            {
+               std::memcpy(info.title, title, sizeof title);
+               std::memcpy(info.shortTitle, title, sizeof title);
+               info.flags = flags;
+               changed = true;
+            }
+         }
+         if (changed && componentHandler)
+            componentHandler->restartComponent(kParamTitlesChanged);
       }
 
       // From the processor (UI thread): a bound Macro turned in Infinite, or the slot names changed.
@@ -1614,39 +1782,9 @@ namespace InfinitePlugin
             uint32 size = 0;
             if (attr->getBinary("names", data, size) != kResultOk || !data)
                return kResultFalse;
-            const char* p = static_cast<const char*>(data);
-            const char* end = p + size;
-            bool changed = false;
-            for (int32 i = 0; i < kSlotCount && p < end; i++)
-            {
-               const char* z = static_cast<const char*>(std::memchr(p, 0, size_t(end - p)));
-               if (!z)
-                  break;
-               std::string name(p, z);
-               p = z + 1;
-               if (name.empty())
-               {
-                  char def[16];
-                  std::snprintf(def, sizeof def, "Slot %02d", i + 1);
-                  name = def;
-               }
-               Parameter* param = parameters.getParameter(kSlotFirst + ParamID(i));
-               if (!param)
-                  continue;
-               const std::u16string u = Steinberg::StringConvert::convert(name);
-               ParameterInfo& info = param->getInfo();
-               String128 title {};
-               const size_t n = std::min(u.size(), size_t(127));
-               for (size_t c = 0; c < n; c++)
-                  title[c] = TChar(u[c]);
-               if (std::memcmp(title, info.title, sizeof title) != 0)
-               {
-                  std::memcpy(info.title, title, sizeof title);
-                  changed = true;
-               }
-            }
-            if (changed && componentHandler)
-               componentHandler->restartComponent(kParamTitlesChanged);
+            std::string names[kSlotCount];
+            ParseNames(data, size, names);
+            ApplySlotNames(names);
             return kResultOk;
          }
          return EditController::notify(message);

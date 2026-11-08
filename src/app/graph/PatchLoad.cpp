@@ -3,6 +3,7 @@
 #include "core/UndoDescribe.h"
 #include "core/MediaCollect.h"
 #include "core/Notices.h"
+#include "plugin/ipc/PluginIpc.h"
 
 namespace app
 {
@@ -277,6 +278,13 @@ namespace app
       for (const Patch::GlobalRecord& g : data.globals)
          ExprGlobals::All().push_back({ g.name, g.expr, 0.0f, std::string() });
 
+      gHostParams.clear();
+      for (const Patch::HostParamRecord& h : data.hostParams)
+      {
+         const GraphNode* dst = resolve(h.dstIndex);
+         if (dst != nullptr && h.slot >= 0 && h.slot < PluginIpc::kHostSlots && h.dstParam >= 0)
+            gHostParams.push_back({ dst->uid, h.dstParam, h.slot, std::string() });
+      }
       gPerfElements.clear();
       gPerfSelection.clear();
       for (const Patch::PerfRecord& p : data.performance)

@@ -608,6 +608,7 @@ void DrawPopupsA(FrameCtx& fc)
                if (MenuParts::Item(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
+               DrawParamHostAutomationMenuItem(nodeIndex, paramIndex);
                if (MenuParts::Item(L("View in Modulation Matrix")))
                {
                   gModMatrixOpen = true;

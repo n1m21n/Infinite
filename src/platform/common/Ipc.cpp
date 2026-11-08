@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <thread>
 
 #if defined(_WIN32)
    #ifndef NOMINMAX
@@ -17,7 +18,6 @@
    #include <spawn.h>
    #include <sys/mman.h>
    #include <sys/wait.h>
-   #include <thread>
    #include <time.h>
    #include <unistd.h>
 extern char** environ;

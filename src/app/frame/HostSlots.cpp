@@ -4,10 +4,15 @@
 //   Macro turned in Infinite -> begin / perform / end edit -> host automation
 //   Macro label -> slot name in the host
 //
-// A Macro's "Host slot" field (1..32, 0 = none) binds it; an XY pad binds X and Y separately.
+// A Macro's "Host slot" field (1..128, 0 = none) binds it; an XY pad binds X and Y separately.
+// Any other knob binds through its right-click menu (Host automation): gHostParams, named
+// "<node> <param>" in the host. Unbound slots are hidden in the host.
 #include "app/AppShared.h"
 #include "plugin/engine/HostAudio.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "platform/Platform.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <unordered_map>
@@ -16,23 +21,31 @@ namespace app
 {
 namespace
 {
-   enum class Kind { Knob, Slider, Bipolar, Toggle, Trigger, NumBox, Radio, StepGate, XYx, XYy };
+   enum class Kind { Knob, Slider, Bipolar, Toggle, Trigger, NumBox, Radio, StepGate, XYx, XYy, Param };
 
    struct Binding
    {
       INode* node = nullptr;
       Kind kind = Kind::Knob;
-      uint64_t key = 0; // node uid * 2 + axis
-      int slot = 0;     // 0..31
+      uint64_t key = 0; // node uid * 2 + axis; a Param: (uid * 4096 + param) | bit 63
+      int slot = 0;     // 0..kSlotCount-1
       std::string name;
+      const ParamRef* ref = nullptr; // Kind::Param: this frame's widget
    };
 
-   bool Stepped(Kind k) { return k == Kind::Toggle || k == Kind::Trigger || k == Kind::Radio || k == Kind::StepGate; }
+   bool Stepped(const Binding& b)
+   {
+      if (b.kind == Kind::Param)
+         return b.ref->isBool || b.ref->isEnum || b.ref->step > 0.0f;
+      const Kind k = b.kind;
+      return k == Kind::Toggle || k == Kind::Trigger || k == Kind::Radio || k == Kind::StepGate;
+   }
 
    float Read(const Binding& b)
    {
       switch (b.kind)
       {
+      case Kind::Param: return ParamToPos(*b.ref, *b.ref->value);
       case Kind::Knob: return static_cast<MacroKnobNode*>(b.node)->Value01();
       case Kind::Slider: return static_cast<MacroSliderNode*>(b.node)->Value01();
       case Kind::Bipolar: return static_cast<MacroBipolarKnobNode*>(b.node)->Value01();
@@ -52,6 +65,9 @@ namespace
       v = std::clamp(v, 0.0f, 1.0f);
       switch (b.kind)
       {
+      case Kind::Param:
+         *b.ref->value = b.ref->isBool ? (v >= 0.5f ? 1.0f : 0.0f) : ShapeToParam(*b.ref, PosToParam(*b.ref, v));
+         break;
       case Kind::Knob: static_cast<MacroKnobNode*>(b.node)->value = v; break;
       case Kind::Slider: static_cast<MacroSliderNode*>(b.node)->value = v; break;
       case Kind::Bipolar: static_cast<MacroBipolarKnobNode*>(b.node)->value = v * 2.0f - 1.0f; break;
@@ -113,6 +129,54 @@ namespace
             Add<MacroTriggerNode>(out, gn, Kind::Trigger) || Add<MacroNumBoxNode>(out, gn, Kind::NumBox) ||
             Add<MacroRadioSelectorNode>(out, gn, Kind::Radio) || Add<MacroStepGateNode>(out, gn, Kind::StepGate);
       }
+      if (gHostParams.empty())
+         return;
+      std::unordered_map<uint64_t, const ParamRef*> refs;
+      for (const ParamRef& r : Modulation::Instance().FrameParams())
+         if (r.value != nullptr)
+            refs.emplace((uint64_t)(uint32_t)r.nodeIndex << 32 | (uint32_t)r.paramIndex, &r);
+      for (HostParamBinding& h : gHostParams)
+      {
+         GraphNode* gn = FindNodeByUid(h.uid);
+         if (gn == nullptr || h.slot < 0 || h.slot >= PluginEngine::kSlotCount)
+            continue;
+         const auto it = refs.find((uint64_t)(uint32_t)gn->index << 32 | (uint32_t)h.param);
+         if (it != refs.end())
+         {
+            // "<Node> <Param>" as the app shows them, in Title Case for host lists ("Analog Cutoff");
+            // a one-param node is just its title ("Gain").
+            std::string node = NodeTitle(*gn), param = it->second->name;
+            std::string name = node;
+            std::string lo = node, plo = param;
+            for (char& c : lo) c = (char)std::tolower((unsigned char)c);
+            for (char& c : plo) c = (char)std::tolower((unsigned char)c);
+            if (!param.empty() && plo != lo)
+               name += " " + param;
+            for (size_t c = 0; c < name.size(); c++)
+               if (c == 0 || name[c - 1] == ' ')
+                  name[c] = (char)std::toupper((unsigned char)name[c]);
+            h.name = name;
+         }
+         Binding b;
+         b.node = gn->node.get();
+         b.kind = Kind::Param;
+         b.key = (h.uid * 4096 + (uint64_t)h.param) | (1ull << 63);
+         b.slot = h.slot;
+         b.name = h.name.empty() ? std::string("Param") : h.name;
+         b.ref = it != refs.end() ? it->second : nullptr;
+         out.push_back(b);
+      }
+   }
+
+   // Slots in use by a Macro or a host-automated param.
+   PluginEngine::SlotMask UsedSlots()
+   {
+      std::vector<Binding> binds;
+      Collect(binds);
+      PluginEngine::SlotMask m;
+      for (const Binding& b : binds)
+         m.Set(b.slot);
+      return m;
    }
 
    struct SlotState
@@ -156,7 +220,7 @@ void HostSlotsFrame()
          if (std::sscanf(e, "%d:%f", &sTestFrame, &sTestValue) != 2)
             sTestFrame = -1;
    }
-   if (sTestFrame >= 0 && (uint64_t)sTestFrame == sFrame && !binds.empty())
+   if (sTestFrame >= 0 && (uint64_t)sTestFrame == sFrame && !binds.empty() && (binds[0].kind != Kind::Param || binds[0].ref))
    {
       Write(binds[0], sTestValue);
       testEdit = true;
@@ -166,18 +230,19 @@ void HostSlotsFrame()
    const bool mouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
    const bool userInput = mouseDown || io.WantTextInput || testEdit;
 
-   uint32_t bound = 0, stepped = 0;
+   PluginEngine::SlotMask bound, stepped;
    std::string names[PluginEngine::kSlotCount];
    for (const Binding& b : binds)
    {
-      const uint32_t bit = 1u << b.slot;
-      if (!(bound & bit) && names[b.slot].empty())
+      if (!bound.Test(b.slot) && names[b.slot].empty())
          names[b.slot] = b.name.empty() ? std::string("Macro") : b.name;
-      bound |= bit;
-      if (Stepped(b.kind))
-         stepped |= bit;
+      if (b.kind == Kind::Param && b.ref == nullptr)
+         continue; // its widget is not drawn this frame: the slot keeps its name, values wait
+      bound.Set(b.slot);
+      if (Stepped(b))
+         stepped.Set(b.slot);
 
-      SlotState& st = sStates[b.key * 64 + (uint64_t)b.slot];
+      SlotState& st = sStates[b.key ^ ((uint64_t)b.slot << 52)];
       st.seen = sFrame;
       const bool fresh = std::isnan(st.lastApplied);
       const float cur = Read(b);
@@ -203,7 +268,7 @@ void HostSlotsFrame()
       }
 
       // Host -> Infinite.
-      if (frame.validMask & bit)
+      if (frame.validMask.Test(b.slot))
       {
          const float sv = frame.values[b.slot];
          if (st.editing || st.hold > 0)
@@ -222,7 +287,7 @@ void HostSlotsFrame()
          st.lastApplied = Read(b);
       // A new binding the host has no value for: the patch's value becomes the slot's (the shell
       // drops it if the host knew the slot after all, and its value then arrives here).
-      if (fresh && !(frame.validMask & bit))
+      if (fresh && !frame.validMask.Test(b.slot))
          PluginEngine::SendSlotEdit(PluginEngine::kSlotEditSync, b.slot, st.lastApplied);
    }
    for (auto it = sStates.begin(); it != sStates.end();)
@@ -241,4 +306,46 @@ void HostSlotsFrame()
       sNamesSent = true;
    }
 }
+
+void DrawParamHostAutomationMenuItem(int nodeIndex, int paramIndex)
+{
+   if (!Platform::PluginModeActive())
+      return;
+   const GraphNode* gn = FindNodeByIndex(nodeIndex);
+   if (gn == nullptr)
+      return;
+   for (size_t i = 0; i < gHostParams.size(); i++)
+   {
+      const HostParamBinding& h = gHostParams[i];
+      if (h.uid != gn->uid || h.param != paramIndex)
+         continue;
+      char label[64];
+      std::snprintf(label, sizeof label, "Remove host automation (%d)", h.slot + 1);
+      if (MenuParts::Item(label))
+      {
+         PushUndoCheckpoint("Remove host automation");
+         gHostParams.erase(gHostParams.begin() + (std::ptrdiff_t)i);
+      }
+      return;
+   }
+   const PluginEngine::SlotMask used = UsedSlots();
+   int slot = -1;
+   for (int s = 0; s < PluginEngine::kSlotCount && slot < 0; s++)
+      if (!used.Test(s))
+         slot = s;
+   if (slot < 0)
+   {
+      ImGui::BeginDisabled();
+      MenuParts::Item("Host automation (slots full)");
+      ImGui::EndDisabled();
+      return;
+   }
+   if (MenuParts::Item("Host automation"))
+   {
+      PushUndoCheckpoint("Host automation");
+      gHostParams.push_back({ gn->uid, paramIndex, slot, std::string() });
+   }
+}
+
+std::vector<HostParamBinding> gHostParams;
 }

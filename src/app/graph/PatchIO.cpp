@@ -197,6 +197,9 @@ namespace app
       for (const ExprGlobals::Global& g : ExprGlobals::All())
          data.globals.push_back({ g.name, g.expr });
       data.performance = gPerfElements;
+      for (const HostParamBinding& h : gHostParams)
+         if (const GraphNode* gn = FindNodeByUid(h.uid))
+            data.hostParams.push_back({ h.slot, gn->index, h.param });
       data.perfLayout = gPerfLayout;
       // gArrange is the only arrangement state there is (WP5b deleted the
       // seconds mirror), loop included.

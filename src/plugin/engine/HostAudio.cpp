@@ -49,18 +49,18 @@ namespace PluginEngine
       constexpr double kSlotSmoothSec = 0.010; // one-pole time constant
       constexpr uint64_t kParkTimeoutNs = 500ull * 1000ull * 1000ull;
       float gSlotTarget[kSlotCount] = {}, gSlotCur[kSlotCount] = {};
-      uint32_t gSlotValid = 0;
+      SlotMask gSlotValid;
       uint64_t gSamplePos = 0;    // samples handled since start (all blocks)
       uint64_t gSlotPos = 0;      // smoothing has run up to here
       uint32_t gGrid = 800;       // snapshot grid (samples), set from the rate at Init
       float gServed[kSlotCount] = {}; // last snapshot the main thread was parked on
-      uint32_t gServedValid = 0;
+      SlotMask gServedValid;
       // Main -> audio.
-      std::atomic<uint32_t> gBoundMask { 0 }, gSteppedMask { 0 };
+      PluginIpc::AtomicSlotMask gBoundMask, gSteppedMask;
       // Snapshot seqlock (audio writes, main reads).
       std::atomic<uint32_t> gSnapSeq { 0 };
       std::atomic<float> gSnapVal[kSlotCount];
-      std::atomic<uint32_t> gSnapValid { 0 };
+      PluginIpc::AtomicSlotMask gSnapValid;
       // Park handshake: audio raises gParkReq, main serves it (gParkServed) and acks it on its next
       // frame (gParkAck).
       std::atomic<uint64_t> gParkReq { 0 }, gParkAck { 0 };
@@ -71,7 +71,7 @@ namespace PluginEngine
          gSnapSeq.fetch_add(1, std::memory_order_acq_rel);
          for (int i = 0; i < kSlotCount; i++)
             gSnapVal[i].store(gSlotCur[i], std::memory_order_relaxed);
-         gSnapValid.store(gSlotValid, std::memory_order_relaxed);
+         gSnapValid.Store(gSlotValid);
          gSnapSeq.fetch_add(1, std::memory_order_acq_rel);
       }
 
@@ -82,7 +82,7 @@ namespace PluginEngine
       {
          const double tau = kSlotSmoothSec * gSide.SampleRate();
          const uint64_t end = gSamplePos + to;
-         const uint32_t stepped = gSteppedMask.load(std::memory_order_relaxed);
+         const SlotMask stepped = gSteppedMask.Load();
          while (true)
          {
             const uint32_t off = (uint32_t)(gSlotPos - gSamplePos);
@@ -93,9 +93,9 @@ namespace PluginEngine
                   continue;
                const float v = std::clamp(pts[pi].value, 0.0f, 1.0f);
                gSlotTarget[s] = v;
-               if (!(gSlotValid & (1u << s)))
+               if (!gSlotValid.Test(s))
                   gSlotCur[s] = v; // the first value lands at once
-               gSlotValid |= 1u << s;
+               gSlotValid.Set(s);
             }
             if (gSlotPos % gGrid == 0)
                PublishSnapshot();
@@ -109,9 +109,9 @@ namespace PluginEngine
             const float a = (float)std::exp(-n / tau);
             for (int s = 0; s < kSlotCount; s++)
             {
-               if (!(gSlotValid & (1u << s)) || gSlotCur[s] == gSlotTarget[s])
+               if (!gSlotValid.Test(s) || gSlotCur[s] == gSlotTarget[s])
                   continue;
-               if (stepped & (1u << s))
+               if (stepped.Test(s))
                   gSlotCur[s] = gSlotTarget[s];
                else
                {
@@ -128,11 +128,10 @@ namespace PluginEngine
       // wait until a frame has applied this snapshot and cooked (README 8.2, offline lock).
       void MaybePark()
       {
-         const uint32_t bound = gBoundMask.load(std::memory_order_relaxed);
-         const uint32_t valid = gSlotValid & bound;
-         bool changed = (valid & ~gServedValid) != 0;
+         const SlotMask valid = gSlotValid & gBoundMask.Load();
+         bool changed = (valid & ~gServedValid).Any();
          for (int s = 0; s < kSlotCount && !changed; s++)
-            if ((valid & (1u << s)) && gSlotCur[s] != gServed[s])
+            if (valid.Test(s) && gSlotCur[s] != gServed[s])
                changed = true;
          if (!changed)
             return;
@@ -252,7 +251,7 @@ namespace PluginEngine
          {
             // With a Macro bound, segments also end on the snapshot grid, so offline the engine can
             // park between them; unbound, segmentation stays as it was.
-            const bool bound = gBoundMask.load(std::memory_order_relaxed) != 0;
+            const bool bound = gBoundMask.Load().Any();
             const bool lock = bound && (b.flags & PluginIpc::kOffline) != 0;
             uint32_t pos = 0, ev = 0;
             while (pos < frames)
@@ -566,16 +565,16 @@ namespace PluginEngine
          }
          for (int i = 0; i < kSlotCount; i++)
             out->values[i] = gSnapVal[i].load(std::memory_order_relaxed);
-         out->validMask = gSnapValid.load(std::memory_order_relaxed);
+         out->validMask = gSnapValid.Load();
          if (gSnapSeq.load(std::memory_order_acquire) == s0)
             break;
       }
    }
 
-   void SetSlotBindings(uint32_t boundMask, uint32_t steppedMask)
+   void SetSlotBindings(const SlotMask& boundMask, const SlotMask& steppedMask)
    {
-      gSteppedMask.store(steppedMask, std::memory_order_relaxed);
-      gBoundMask.store(boundMask, std::memory_order_relaxed);
+      gSteppedMask.Store(steppedMask);
+      gBoundMask.Store(boundMask);
    }
 
    bool SlotFramePublishes() { return gFramesSinceServed > 2; }

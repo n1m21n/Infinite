@@ -34,7 +34,7 @@ file(STRINGS "${INFINITE_ROOT}/CMakeLists.txt" _ver REGEX "^set\\(INFINITE_VERSI
 string(REGEX REPLACE ".*\"([0-9.]+)\".*" "\\1" INFINITE_VERSION "${_ver}")
 
 set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES ON CACHE BOOL "" FORCE)   # the validator
+set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF CACHE BOOL "" FORCE)  # the validator builds anyway; editorhost would need GTK on Linux
 set(SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "" FORCE)
 set(SMTG_RUN_VST_VALIDATOR OFF CACHE BOOL "" FORCE)
 set(SMTG_CREATE_PLUGIN_LINK OFF CACHE BOOL "" FORCE)             # never touch ~/Library from a build

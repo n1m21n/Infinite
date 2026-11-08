@@ -296,6 +296,14 @@ namespace Patch
       bool midiIsNoteY    = false;
    };
 
+   // A param the plugin's host automates (right-click > Host automation): host slot 0..127.
+   struct HostParamRecord
+   {
+      int slot = 0;
+      int dstIndex = -1;
+      int dstParam = -1;
+   };
+
    struct PerfLayoutRecord
    {
       // What the panel can draw. A patch is outside input, so the loader
@@ -550,6 +558,7 @@ namespace Patch
       std::vector<ExprRecord> expressions;
       std::vector<GlobalRecord> globals;
       std::vector<PerfRecord> performance;
+      std::vector<HostParamRecord> hostParams;
       PerfLayoutRecord perfLayout;
       TransportRecord transport;
       std::vector<GestureRecord> gestures;
