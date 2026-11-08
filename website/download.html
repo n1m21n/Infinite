@@ -134,47 +134,49 @@
 
       <section class="dl-card" id="os-mac" role="tabpanel" aria-labelledby="tab-mac">
         <div class="dl-get"><a class="btn btn-primary" href="https://github.com/n1m21n/Infinite/releases/latest/download/Infinite.pkg">Download for macOS</a><span class="dl-note">Infinite.pkg · Apple silicon and Intel · macOS 12+</span></div>
+        <!-- steps:mac -->
         <ol class="dl-steps">
-          <li>Double-click <code>Infinite.pkg</code>. macOS says it cannot check it: click <b>Done</b>.</li>
-          <li>Open <b>System Settings › Privacy &amp; Security</b>, scroll down, click <b>Open Anyway</b> next to Infinite.pkg.</li>
-          <li>Tick what you want: Infinite app, VST3, AU. No admin password: it installs for your user.</li>
-          <li>Open your DAW and rescan plugins. Logic and GarageBand pick up the AU on their own.</li>
+          <li>Double-click <b>Infinite.pkg</b>. macOS says it cannot check it: click <b>Done</b>.</li>
+          <li>Open <b>System Settings › Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b> next to Infinite.pkg.</li>
+          <li>In the installer, read the Welcome and Terms, then tick what to add: <b>Infinite app</b>, <b>VST3</b>, <b>AU</b>. No admin password.</li>
         </ol>
+        <!-- /steps:mac -->
         <p class="dl-note">The installer is not notarised by Apple yet, so macOS asks once.</p>
       </section>
 
       <section class="dl-card" id="os-win" role="tabpanel" aria-labelledby="tab-win" hidden>
         <div class="dl-get"><a class="btn btn-primary" href="https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-Setup-windows-x64.exe">Download for Windows</a><span class="dl-note">x64 · Windows 10+ · <a href="https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-Setup-windows-ARM64.exe">ARM64</a></span></div>
+        <!-- steps:windows -->
         <ol class="dl-steps">
-          <li>Run <code>Infinite-Setup-windows-x64.exe</code>. If SmartScreen appears, click <b>More info</b>, then <b>Run anyway</b>.</li>
-          <li>Accept the terms and tick what you want: Infinite app, VST3. No admin rights needed.</li>
-          <li>Open your DAW and rescan. If it does not find Infinite, add this folder to its VST3 paths:</li>
+          <li>Run <b>Infinite-Setup-windows-x64.exe</b>. If SmartScreen appears, click <b>More info</b>, then <b>Run anyway</b>.</li>
+          <li>Accept the terms and tick what to add: <b>Infinite app</b>, <b>VST3</b>. No admin rights needed.</li>
+          <li>If your DAW does not find Infinite, add <code>%LOCALAPPDATA%\Programs\Common\VST3</code> to its VST3 folders.</li>
         </ol>
-        <pre><code>%LOCALAPPDATA%\Programs\Common\VST3</code></pre>
+        <!-- /steps:windows -->
         <p class="dl-note">The installer is not code-signed yet, so Windows asks once.</p>
       </section>
 
       <section class="dl-card" id="os-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
         <div class="dl-get"><a class="btn btn-primary" href="https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-linux-x86_64.tar.gz">Download for Linux</a><span class="dl-note">x86_64 · VST3</span></div>
+        <!-- steps:linux -->
         <ol class="dl-steps">
-          <li>Unpack it and run the installer. It asks what to add, no sudo:</li>
+          <li>Unpack it: <code>tar xzf Infinite-linux-x86_64.tar.gz</code>, then <code>cd Infinite-linux-x86_64</code>.</li>
+          <li>Run <code>./install.sh</code>. It asks what to add, no sudo. Remove it later with <code>./install.sh --uninstall</code>.</li>
         </ol>
-        <pre><code>tar xzf Infinite-linux-x86_64.tar.gz
-cd Infinite-linux-x86_64
-./install.sh</code></pre>
-        <ol class="dl-steps" start="2">
-          <li>Open your DAW and rescan <code>~/.vst3</code>.</li>
-        </ol>
-        <p class="dl-note">Remove it later with <code>./install.sh --uninstall</code>.</p>
+        <!-- /steps:linux -->
       </section>
 
       <section class="dl-card" aria-label="Your key">
-        <h2>Then your key</h2>
+        <h2>Then play</h2>
+        <!-- steps:play -->
         <ol class="dl-steps">
-          <li>Add <b>Infinite Instrument</b> to an instrument track, or <b>Infinite FX</b> to an audio track.</li>
-          <li>The licence screen opens. Copy the key from your email, click <b>Paste key</b>.</li>
-          <li>Done. It works offline on two computers, with every update for life.</li>
+          <li>Open your DAW and rescan plugins.</li>
+          <li>Add <b>Infinite Instrument</b> to an instrument track, or <b>Infinite FX</b> to an audio track, and open it.</li>
+          <li>The licence screen opens. Copy the key from your email and click <b>Paste key</b>.</li>
+          <li>Play a few notes.</li>
         </ol>
+        <!-- /steps:play -->
+        <p class="dl-note">Works offline on two computers, with every update for life.</p>
         <p class="dl-note"><a href="buy.html#resend">Lost your key?</a> · <a href="plugin.html">What is inside</a> · <a href="refund.html">Refunds</a></p>
       </section>
     </div>

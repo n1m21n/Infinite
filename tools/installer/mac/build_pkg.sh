@@ -28,9 +28,18 @@ W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
 mkdir -p "$W/res" "$W/pkgs" "$W/engine-root"
 
 # ---- pages ----
-cp "$HERE/resources/style.css" "$HERE/resources/conclusion.html" "$W/res/"
+cp "$HERE/resources/conclusion.html" "$W/res/"
 sed "s/__VERSION__/$VERSION/g" "$HERE/resources/welcome.html" > "$W/res/welcome.html"
 python3 "$ROOT/tools/installer/terms_page.py" "$ROOT/website/terms.html" "$W/res/license.html"
+# Installer.app does not load linked stylesheets: inline style.css so pages get the system font, not Times.
+python3 - "$HERE/resources/style.css" "$W/res"/*.html <<'PY'
+import sys
+css = open(sys.argv[1], encoding="utf-8").read()
+for p in sys.argv[2:]:
+    s = open(p, encoding="utf-8").read()
+    assert '<link rel="stylesheet" href="style.css">' in s, p
+    open(p, "w", encoding="utf-8").write(s.replace('<link rel="stylesheet" href="style.css">', "<style>\n" + css + "</style>"))
+PY
 python3 "$ROOT/tools/installer/make_art.py" "$W/art" >/dev/null
 cp "$W/art/mac/background.png" "$W/res/background.png"
 

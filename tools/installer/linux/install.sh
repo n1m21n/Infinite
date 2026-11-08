@@ -101,7 +101,10 @@ fi
 
 say ""
 say "${B}Infinite is installed.${R} Next:"
+# steps:begin (tools/installer/sync_steps.py)
 say "  1. Open your DAW and rescan plugins (~/.vst3)."
-say "  2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track."
-say "  3. Paste the key from your purchase email into the licence screen."
+say "  2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track, and open it."
+say "  3. The licence screen opens. Copy the key from your email and click Paste key."
+say "  4. Play a few notes."
+# steps:end
 say "${D}  Remove everything later with: ./install.sh --uninstall${R}"

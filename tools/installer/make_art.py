@@ -31,9 +31,10 @@ def font(size, weight="SemiBold"):
     return ImageFont.load_default()
 
 
-def mark(size):
+def mark(width):
+    # The mark is wide (512x219): scale by width, keep its shape.
     m = Image.open(MARK).convert("RGBA")
-    return m.resize((size, size), Image.LANCZOS)
+    return m.resize((width, round(width * m.height / m.width)), Image.LANCZOS)
 
 
 def mac(out, dark):
@@ -41,8 +42,8 @@ def mac(out, dark):
     S = 2
     W, H = 620, 418
     img = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
-    m = mark(64 * S)
-    img.alpha_composite(m, (28 * S, (H - 64 - 28) * S))
+    m = mark(96 * S)
+    img.alpha_composite(m, (28 * S, (H - 28) * S - m.height))
     img.save(out, dpi=(72 * S, 72 * S))
 
 
@@ -53,8 +54,8 @@ def wizard(out):
     img = Image.new("RGB", (W, H), MIDNIGHT)
     d = ImageDraw.Draw(img)
     d.rectangle([0, H - 64 * S, W, H], fill=DEEP)
-    m = mark(88 * S)
-    img.paste(m, ((W - m.width) // 2, 72 * S), m)
+    m = mark(112 * S)
+    img.paste(m, ((W - m.width) // 2, 72 * S + (88 * S - m.height) // 2), m)
     f = font(19 * S, "SemiBold")
     t = "Infinite"
     d.text(((W - d.textlength(t, font=f)) / 2, 178 * S), t, fill=MOON, font=f)

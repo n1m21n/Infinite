@@ -78,5 +78,7 @@ WelcomeLabel1=Infinite
 WelcomeLabel2=A visual instrument and effect for your DAW, and the standalone app.%n%nNext you choose what to install. Everything installs for your user account, so no admin rights are needed.
 SelectComponentsLabel2=Infinite app is the standalone app. VST3 adds Infinite Instrument and Infinite FX for your DAW.
 FinishedHeadingLabel=Infinite is installed
-FinishedLabelNoIcons=Next:%n%n1. Open your DAW and rescan plugins. If it does not find them, add this folder to its VST3 paths:%n   %LOCALAPPDATA%\Programs\Common\VST3%n%n2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track.%n%n3. Paste the key from your purchase email into the licence screen.
-FinishedLabel=Next:%n%n1. Open your DAW and rescan plugins. If it does not find them, add this folder to its VST3 paths:%n   %LOCALAPPDATA%\Programs\Common\VST3%n%n2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track.%n%n3. Paste the key from your purchase email into the licence screen.
+; steps:begin (tools/installer/sync_steps.py)
+FinishedLabelNoIcons=Next:%n%n1. Open your DAW and rescan plugins.%n%n2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track, and open it.%n%n3. The licence screen opens. Copy the key from your email and click Paste key.%n%n4. Play a few notes.%n%nIf your DAW does not find Infinite, add %LOCALAPPDATA%\Programs\Common\VST3 to its VST3 folders.
+FinishedLabel=Next:%n%n1. Open your DAW and rescan plugins.%n%n2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track, and open it.%n%n3. The licence screen opens. Copy the key from your email and click Paste key.%n%n4. Play a few notes.%n%nIf your DAW does not find Infinite, add %LOCALAPPDATA%\Programs\Common\VST3 to its VST3 folders.
+; steps:end

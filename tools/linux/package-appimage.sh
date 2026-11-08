@@ -195,7 +195,8 @@ echo "==> Bundling onnxruntime/FFmpeg shared libs and fixing RPATH"
 mkdir -p "$APPDIR/usr/lib"
 FOUND_PRIVATE_LIBS=0
 COPIED_PRIVATE_LIBS=()
-for libdir in "$BUILD_DIR"/_deps/onnxruntime_linux-src/lib "$BUILD_DIR"/_deps/ffmpeg_linux-src/lib; do
+# onnxruntime: release tarball keeps libs in lib/, the NuGet package in runtimes/<rid>/native.
+for libdir in "$BUILD_DIR"/_deps/onnxruntime_linux-src/lib "$BUILD_DIR"/_deps/onnxruntime_linux-src/runtimes/*/native "$BUILD_DIR"/_deps/ffmpeg_linux-src/lib; do
   if [ -d "$libdir" ]; then
     while IFS= read -r -d '' f; do
       cp -P "$f" "$APPDIR/usr/lib/"

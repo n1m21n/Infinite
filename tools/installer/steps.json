@@ -1,0 +1,23 @@
+{
+  "_": "The buyer's install-to-play steps, one copy. tools/installer/sync_steps.py writes them into the download page, plugin page, key email (worker/license/steps.js), Mac installer's last screen, Windows installer's Finished page and install.sh. Markup: **bold**, `code`.",
+  "mac": [
+    "Double-click **Infinite.pkg**. macOS says it cannot check it: click **Done**.",
+    "Open **System Settings › Privacy & Security**, scroll down and click **Open Anyway** next to Infinite.pkg.",
+    "In the installer, read the Welcome and Terms, then tick what to add: **Infinite app**, **VST3**, **AU**. No admin password."
+  ],
+  "windows": [
+    "Run **Infinite-Setup-windows-x64.exe**. If SmartScreen appears, click **More info**, then **Run anyway**.",
+    "Accept the terms and tick what to add: **Infinite app**, **VST3**. No admin rights needed.",
+    "If your DAW does not find Infinite, add `%LOCALAPPDATA%\\Programs\\Common\\VST3` to its VST3 folders."
+  ],
+  "linux": [
+    "Unpack it: `tar xzf Infinite-linux-x86_64.tar.gz`, then `cd Infinite-linux-x86_64`.",
+    "Run `./install.sh`. It asks what to add, no sudo. Remove it later with `./install.sh --uninstall`."
+  ],
+  "play": [
+    "Open your DAW and rescan plugins.",
+    "Add **Infinite Instrument** to an instrument track, or **Infinite FX** to an audio track, and open it.",
+    "The licence screen opens. Copy the key from your email and click **Paste key**.",
+    "Play a few notes."
+  ]
+}
