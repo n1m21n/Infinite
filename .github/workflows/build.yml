@@ -376,6 +376,31 @@ jobs:
             cp -r dist-signed/* dist/Infinite/
           fi
 
+      # Buyer installer (tools/installer/windows/Infinite.iss): Welcome, terms, Infinite app / VST3,
+      # finish page with the next steps. Per user, no admin. Built from the same staged folder, after
+      # signing, so it carries the signed exe when SignPath signed it.
+      - name: Installer
+        shell: bash
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 tools/installer/make_art.py installer-art
+          python3 tools/installer/terms_page.py website/terms.html installer-art/terms.txt --text
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -f "$ISCC" ]; then choco install innosetup -y --no-progress >/dev/null; fi
+          VERSION=$(sed -n 's/^set(INFINITE_VERSION "\(.*\)")/\1/p' CMakeLists.txt)
+          W() { cygpath -w "$1"; }
+          "$ISCC" /Q "/DSrc=$(W "$PWD/dist/Infinite")" "/DArt=$(W "$PWD/installer-art/windows")" \
+            "/DTerms=$(W "$PWD/installer-art/terms.txt")" "/DVersion=$VERSION" "/DArch=${{ matrix.arch }}" \
+            "/DOut=$(W "$PWD/dist-installer")" tools/installer/windows/Infinite.iss
+          ls -la dist-installer
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-Setup-windows-${{ matrix.arch }}
+          path: dist-installer/*.exe
+          if-no-files-found: error
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -665,6 +690,28 @@ jobs:
         with:
           name: Infinite-x86_64.AppImage
           path: artifacts-linux/Infinite-x86_64.AppImage
+          if-no-files-found: error
+
+      # Buyer installer (tools/installer/linux/install.sh): the AppImage + an install script that
+      # asks for the terms, the app and the VST3 plugins, all in the home folder.
+      - name: Installer tarball
+        run: |
+          D=Infinite-linux-x86_64
+          mkdir -p "$D"
+          cp artifacts-linux/Infinite-x86_64.AppImage tools/installer/linux/install.sh "$D/"
+          cp art/brand/logo/linux/infinite-512.png "$D/infinite.png"
+          python3 tools/installer/terms_page.py website/terms.html "$D/TERMS.txt" --text
+          tar -czf artifacts-linux/Infinite-linux-x86_64.tar.gz "$D"
+          # Smoke: a non-interactive install into a throwaway home finds the plugins and records the engine.
+          export HOME="$PWD/installer-home" XDG_DATA_HOME="$PWD/installer-home/.local/share"
+          mkdir -p "$HOME" && (cd "$D" && ./install.sh --yes)
+          test -d "$HOME/.vst3/Infinite FX.vst3" && test -x "$XDG_DATA_HOME/infinite/Infinite.AppImage"
+
+      - name: Upload Linux installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-linux-x86_64.tar.gz
+          path: artifacts-linux/Infinite-linux-x86_64.tar.gz
           if-no-files-found: error
 
   # Phase 5 task 5.3 (L3 smoke, validation.md's "L3" section): runs the

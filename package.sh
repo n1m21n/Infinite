@@ -87,6 +87,10 @@ echo "==> building dmg"
 "$ROOT/tools/dmg/layout.sh" "$STAGE" "$DMG"
 rm -rf "$STAGE"
 
+# The buyer installer: Installer.app screens, Infinite app / VST3 / Audio Unit (tools/installer).
+echo "==> building the installer"
+"$ROOT/tools/installer/mac/build_pkg.sh" "$APP" "$ROOT/dist/Infinite.pkg"
+
 if [ -d "$ROOT/website/assets" ]; then
     cp "$DMG" "$ROOT/website/assets/Infinite.dmg"
     echo "copied $DMG -> website/assets/Infinite.dmg"
@@ -94,4 +98,5 @@ fi
 
 echo
 echo "built $DMG ($(du -h "$DMG" | cut -f1))"
+echo "built $ROOT/dist/Infinite.pkg ($(du -h "$ROOT/dist/Infinite.pkg" | cut -f1))"
 

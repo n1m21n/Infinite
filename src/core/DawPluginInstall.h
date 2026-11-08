@@ -8,7 +8,8 @@
 //   target   macOS  ~/Library/Audio/Plug-Ins/{VST3,Components}
 //            Windows  %LOCALAPPDATA%\Programs\Common\VST3 (per user, no admin)
 //            Linux  ~/.vst3
-//   record   <License::Dir()>/plugin-install.txt: line 1 the app version, line 2 the engine path.
+//   record   <License::Dir()>/plugin-install.txt: line 1 the app version, line 2 the engine path,
+//            line 3 the formats chosen ("vst3", "au", "vst3,au"; missing = all).
 //            The shell reads line 2 to find its engine (Shell.cpp FindEngine).
 //
 // Copy-then-rename per bundle: a new copy lands beside the old one, the old one is renamed aside and
@@ -27,7 +28,10 @@ namespace DawPlugin
       std::string home;
       std::string localAppData; // Windows only
       std::string appDir;   // $APPDIR inside an AppImage
+      std::string formats;  // "vst3", "au", "vst3,au"; empty = every format this OS has
    };
+   // The formats an install chose (the installer's checkboxes), from `--install-plugins vst3,au`.
+   bool HasFormat(const Env& env, const char* format);
    Env CurrentEnv(const std::string& exe, const std::string& version);
 
    struct Bundle

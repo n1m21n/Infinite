@@ -1006,7 +1006,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (argc >= 2 && (std::strcmp(argv[1], "--install-plugins") == 0 || std::strcmp(argv[1], "--uninstall-plugins") == 0))
    {
       const bool install = std::strcmp(argv[1], "--install-plugins") == 0;
-      const DawPlugin::Env env = DawPluginEnv();
+      DawPlugin::Env env = DawPluginEnv();
+      if (argc >= 3 && install)
+         env.formats = argv[2]; // the installer's checkboxes: "vst3", "au" or "vst3,au"
       std::string err;
       const bool ok = install ? DawPlugin::Install(env, err) : DawPlugin::Uninstall(env, err);
       if (!ok)

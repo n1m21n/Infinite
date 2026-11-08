@@ -50,16 +50,21 @@ namespace DawPlugin
       }
 #endif
 
-      bool ReadRecord(std::string& version, std::string& engine)
+      bool ReadRecord(std::string& version, std::string& engine, std::string* formats = nullptr)
       {
          std::ifstream f(P(RecordPath()), std::ios::binary);
          if (!f)
             return false;
+         std::string fmt;
          std::getline(f, version);
          std::getline(f, engine);
+         std::getline(f, fmt);
          auto trim = [](std::string& s) { while (!s.empty() && (s.back() == '\r' || s.back() == ' ')) s.pop_back(); };
          trim(version);
          trim(engine);
+         trim(fmt);
+         if (formats)
+            *formats = fmt;
          return !version.empty();
       }
 
@@ -72,7 +77,7 @@ namespace DawPlugin
          tmp += ".tmp";
          {
             std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
-            f << env.version << "\n" << env.engine << "\n";
+            f << env.version << "\n" << env.engine << "\n" << env.formats << "\n";
             if (!f)
             {
                error = "Could not write " + S(dst);
@@ -198,6 +203,31 @@ namespace DawPlugin
 #endif
    }
 
+   namespace
+   {
+      // No formats asked for: keep the ones the last install chose (the installer's checkboxes).
+      Env Resolved(const Env& env)
+      {
+         Env out = env;
+         std::string version, engine;
+         if (out.formats.empty())
+            ReadRecord(version, engine, &out.formats);
+         return out;
+      }
+   }
+
+   bool HasFormat(const Env& env, const char* format)
+   {
+      if (env.formats.empty())
+         return true;
+      std::stringstream ss(env.formats);
+      std::string one;
+      while (std::getline(ss, one, ','))
+         if (one == format)
+            return true;
+      return false;
+   }
+
    std::vector<Bundle> Bundles(const Env& env)
    {
       std::vector<Bundle> out;
@@ -213,17 +243,20 @@ namespace DawPlugin
       for (const char* base : { "Infinite Instrument", "Infinite FX" })
       {
          const std::string v = std::string(base) + ".vst3";
-         out.push_back({ v, S(src / v), S(vst3 / v) });
+         if (HasFormat(env, "vst3"))
+            out.push_back({ v, S(src / v), S(vst3 / v) });
 #if defined(__APPLE__)
          const std::string c = std::string(base) + ".component";
-         out.push_back({ c, S(src / c), S(au / c) });
+         if (HasFormat(env, "au"))
+            out.push_back({ c, S(src / c), S(au / c) });
 #endif
       }
       return out;
    }
 
-   Status Describe(const Env& env)
+   Status Describe(const Env& asked)
    {
+      const Env env = Resolved(asked);
       Status st;
       st.bundles = Bundles(env);
       std::error_code ec;
@@ -252,8 +285,9 @@ namespace DawPlugin
       return st;
    }
 
-   bool Install(const Env& env, std::string& error)
+   bool Install(const Env& asked, std::string& error)
    {
+      const Env env = Resolved(asked);
       const Status st = Describe(env);
       if (!st.bundled)
       {
