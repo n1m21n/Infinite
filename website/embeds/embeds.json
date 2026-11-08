@@ -455,6 +455,16 @@
       "slug": "acid-graphics-kaleido-chroma-warp",
       "title": "Acid Graphics Kaleido Chroma Warp",
       "description": "Audio-reactive kaleidoscopic acid graphics visualizer featuring an 8-fold symmetric starburst field. Bass frequencies distort and swell the central radial lattice, mid frequencies ripple recursive polygonal contours across electric lime and neon magenta bands, and high frequencies ignite luminous iridescent perimeter caustics."
+    },
+    {
+      "slug": "indie-psychedelic-liquid-oil-wheel",
+      "title": "Indie Psychedelic Liquid Oil Wheel",
+      "description": "Audio-reactive psychedelic liquid oil wheel projection inspired by 1960s Joshua Light Show liquid experiments. Bass frequencies swell viscous oil droplet boundaries, mid frequencies modulate liquid shear turbulence across marigold and magenta pigments, and high frequencies illuminate iridescent emerald edges."
+    },
+    {
+      "slug": "indie-psychedelic-kaleido-prism-flower",
+      "title": "Indie Psychedelic Kaleido Prism Flower",
+      "description": "Audio-reactive psychedelic mandala visualizer featuring an 8-fold symmetric petal flower. Bass pulses inflate radial petal contours, mid frequencies drive chromatic prism refraction across electric magenta and marigold bands, and high frequencies ignite cyan perimeter highlights."
     }
   ]
 }

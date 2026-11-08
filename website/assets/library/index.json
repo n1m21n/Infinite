@@ -6934,6 +6934,216 @@
       "file": "assets/library/pixel/acid-graphics-kaleido-chroma-warp.field",
       "preview": "assets/library/previews/acid-graphics-kaleido-chroma-warp.jpg",
       "bytes": 1546
+    },
+    {
+      "id": "minimal-signal-oscilloscope-vector",
+      "name": "Minimal Signal Oscilloscope Vector",
+      "kind": "Generator",
+      "tags": [
+        "minimal",
+        "signal",
+        "oscilloscope",
+        "vector",
+        "waveform",
+        "drawing"
+      ],
+      "description": "Ultra-precise monochrome signal visualization featuring calibrated raster lines, sweeping sinusoidal waveform harmonics, orthogonal graticule rules, and an amber strobe trigger pip.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/minimal-signal-oscilloscope-vector.js",
+      "preview": "assets/library/previews/minimal-signal-oscilloscope-vector.jpg",
+      "bytes": 3868
+    },
+    {
+      "id": "minimal-signal-precision-graticule",
+      "name": "Minimal Signal Precision Graticule",
+      "kind": "Generator",
+      "tags": [
+        "minimal",
+        "signal",
+        "graticule",
+        "vector",
+        "telemetry",
+        "drawing"
+      ],
+      "description": "High-density technical vector graticule with calibrated sub-division scales, concentric radar sweep rings, binary telemetry data columns, and high-contrast signal crosshairs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/minimal-signal-precision-graticule.js",
+      "preview": "assets/library/previews/minimal-signal-precision-graticule.jpg",
+      "bytes": 3427
+    },
+    {
+      "id": "lilliputian-surreal-celestial-monolith-3d",
+      "name": "Lilliputian Surreal Celestial Monolith 3D",
+      "kind": "Generator",
+      "tags": [
+        "surreal",
+        "monolith",
+        "celestial",
+        "architecture",
+        "minimal",
+        "3d"
+      ],
+      "description": "Metaphysical surrealist architectural landscape featuring an immense monolithic gateway tower and giant planetary sphere standing in a vast terracotta plain, orbited by miniature geometric satellite cubes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/lilliputian-surreal-celestial-monolith-3d.js",
+      "preview": "assets/library/previews/lilliputian-surreal-celestial-monolith-3d.jpg",
+      "bytes": 3285
+    },
+    {
+      "id": "lilliputian-surreal-orbital-observatory-3d",
+      "name": "Lilliputian Surreal Orbital Observatory 3D",
+      "kind": "Generator",
+      "tags": [
+        "surreal",
+        "observatory",
+        "armillary",
+        "sculpture",
+        "celestial",
+        "3d"
+      ],
+      "description": "Monumental armillary sphere observatory rising from a stepped travertine plinth, featuring colossal intersecting equatorial rings, towering observation spires, and suspended micro-cube constellations.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/lilliputian-surreal-orbital-observatory-3d.js",
+      "preview": "assets/library/previews/lilliputian-surreal-orbital-observatory-3d.jpg",
+      "bytes": 3044
+    },
+    {
+      "id": "acid-house-303-saw-squelch-synth",
+      "name": "Acid House 303 Saw Squelch Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "acid",
+        "tb303",
+        "sawtooth",
+        "filter",
+        "audio"
+      ],
+      "description": "Authentic Chicago acid house bassline synthesizer featuring a band-limited sawtooth oscillator, cascading 4-pole diode ladder filter with screaming 18dB resonance, punchy accent decay, and tanh drive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/acid-house-303-saw-squelch-synth.inf",
+      "preview": "assets/library/previews/acid-house-303-saw-squelch-synth.jpg",
+      "bytes": 2249
+    },
+    {
+      "id": "acid-house-accented-square-bass-synth",
+      "name": "Acid House Accented Square Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "acid",
+        "tb303",
+        "square",
+        "bass",
+        "audio"
+      ],
+      "description": "Hollow, punchy Roland TB-303 square wave bass synthesizer with asymmetric pulse shaping, aggressive non-linear diode resonance sweep, fast accent decay envelope, and warm analog saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/acid-house-accented-square-bass-synth.inf",
+      "preview": "assets/library/previews/acid-house-accented-square-bass-synth.jpg",
+      "bytes": 2259
+    },
+    {
+      "id": "future-garage-dusk-tape-delay-fx",
+      "name": "Future Garage Dusk Tape Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "delay",
+        "tape",
+        "futuregarage",
+        "lofi",
+        "audio"
+      ],
+      "description": "Nocturnal UK future garage tape delay effect featuring dual stereo delay taps, subtle wow and flutter pitch modulation, warm feedback saturation, and gentle high-frequency tape damping.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/future-garage-dusk-tape-delay-fx.inf",
+      "preview": "assets/library/previews/future-garage-dusk-tape-delay-fx.jpg",
+      "bytes": 2434
+    },
+    {
+      "id": "future-garage-vinyl-dust-reverb-fx",
+      "name": "Future Garage Vinyl Dust Reverb FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "reverb",
+        "vinyl",
+        "dust",
+        "futuregarage",
+        "audio"
+      ],
+      "description": "Atmospheric Burial-inspired space processor combining procedural vinyl surface crackle, diffuse multi-tap reverb diffusion, warm low-mid resonance, and dusk lowpass filtering.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/future-garage-vinyl-dust-reverb-fx.inf",
+      "preview": "assets/library/previews/future-garage-vinyl-dust-reverb-fx.jpg",
+      "bytes": 2345
+    },
+    {
+      "id": "indie-psychedelic-liquid-oil-wheel",
+      "name": "Indie Psychedelic Liquid Oil Wheel",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "psychedelic",
+        "liquid",
+        "oil",
+        "fluid",
+        "shader"
+      ],
+      "description": "1960s Joshua Light Show liquid projector simulation with swirling immiscible colored oils, audio-reactive viscosity shear, undulating color separation, and warm psychedelic chromatic fringes.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/indie-psychedelic-liquid-oil-wheel.field",
+      "preview": "assets/library/previews/indie-psychedelic-liquid-oil-wheel.jpg",
+      "bytes": 1635
+    },
+    {
+      "id": "indie-psychedelic-kaleido-prism-flower",
+      "name": "Indie Psychedelic Kaleido Prism Flower",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "psychedelic",
+        "kaleidoscope",
+        "mandala",
+        "prism",
+        "shader"
+      ],
+      "description": "Breathing kaleidoscopic mandala unfolding radiating fractal petal rings, audio-reactive radial expansion, chromatic prism dispersion, and pulsating harmonic energy.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/indie-psychedelic-kaleido-prism-flower.field",
+      "preview": "assets/library/previews/indie-psychedelic-kaleido-prism-flower.jpg",
+      "bytes": 1583
     }
   ]
 }

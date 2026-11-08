@@ -249,6 +249,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Gabber Hoover Rave Stab Synth](https://infinitedevices.org/library/gabber-hoover-rave-stab-synth.html): Iconic rave hoover chord stab synthesizer featuring multi-phase detuned pulse-saw oscillators, aggressive pitch glide envelope, resonant lowpass sweep, and saturated harmonic bite. (file: https://infinitedevices.org/assets/templates/gabber-hoover-rave-stab-synth.inf)
 - [Liquid DnB Rhodes Lush Chorus FX](https://infinitedevices.org/library/liquid-dnb-rhodes-lush-chorus-fx.html): Velvety multi-voice stereo chorus and spatial shimmer effect tailored for liquid drum & bass electric piano chords and pad textures, with dual quadrature LFOs and soft top-end roll-off. (file: https://infinitedevices.org/assets/templates/liquid-dnb-rhodes-lush-chorus-fx.inf)
 - [Liquid DnB Sub Warmth Ladder Filter FX](https://infinitedevices.org/library/liquid-dnb-sub-warmth-ladder-filter-fx.html): Resonant 4-pole ladder lowpass filter with low-end resonance compensation, analog saturation warmth, and envelope following designed for warm rolling drum & bass sub-lines. (file: https://infinitedevices.org/assets/templates/liquid-dnb-sub-warmth-ladder-filter-fx.inf)
+- [Acid House 303 Saw Squelch Synth](https://infinitedevices.org/library/acid-house-303-saw-squelch-synth.html): Authentic Chicago acid house bassline synthesizer featuring a band-limited sawtooth oscillator, cascading 4-pole diode ladder filter with screaming 18dB resonance, punchy accent decay, and tanh drive. (file: https://infinitedevices.org/assets/templates/acid-house-303-saw-squelch-synth.inf)
+- [Acid House Accented Square Bass Synth](https://infinitedevices.org/library/acid-house-accented-square-bass-synth.html): Hollow, punchy Roland TB-303 square wave bass synthesizer with asymmetric pulse shaping, aggressive non-linear diode resonance sweep, fast accent decay envelope, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/acid-house-accented-square-bass-synth.inf)
+- [Future Garage Dusk Tape Delay FX](https://infinitedevices.org/library/future-garage-dusk-tape-delay-fx.html): Nocturnal UK future garage tape delay effect featuring dual stereo delay taps, subtle wow and flutter pitch modulation, warm feedback saturation, and gentle high-frequency tape damping. (file: https://infinitedevices.org/assets/templates/future-garage-dusk-tape-delay-fx.inf)
+- [Future Garage Vinyl Dust Reverb FX](https://infinitedevices.org/library/future-garage-vinyl-dust-reverb-fx.html): Atmospheric Burial-inspired space processor combining procedural vinyl surface crackle, diffuse multi-tap reverb diffusion, warm low-mid resonance, and dusk lowpass filtering. (file: https://infinitedevices.org/assets/templates/future-garage-vinyl-dust-reverb-fx.inf)
 
 ## Library: Community
 
@@ -609,7 +613,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 91 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 93 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -626,4 +630,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 76 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 78 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

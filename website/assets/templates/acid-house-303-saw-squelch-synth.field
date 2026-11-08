@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid House 303 Saw Squelch Synth",
+    "author": "Infinite",
+    "description": "Authentic Chicago acid house bassline synthesizer featuring a band-limited sawtooth oscillator, cascading 4-pole diode ladder filter with screaming 18dB resonance, punchy accent decay, and tanh drive.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.55 [0.1, 1.0]\nparam float resonance = 0.75 [0.1, 0.95]\nparam float envMod = 0.65 [0.0, 1.0]\nparam float decayTime = 0.32 [0.08, 0.9]\nparam float drive = 0.45 [0.0, 1.0]\nstate float phase = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float s4 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.06)\nenv = if(target > env, env + (target - env) * 0.94, env - env * decayRate)\n\ndp = freq / sr\nphase = phase + dp\nphase = if(phase >= 1.0, phase - 1.0, phase)\nsaw = phase * 2.0 - 1.0\n\nfNorm = clamp(cutoff * 0.18 + env * envMod * 0.32, 0.015, 0.46)\nkRes = clamp(resonance * 3.8, 0.2, 3.85)\n\nfb = s4 * kRes\ninSig = saw * (1.0 + drive * 1.8) - fb\ns1 = s1 + fNorm * (inSig - s1)\ns2 = s2 + fNorm * (s1 - s2)\ns3 = s3 + fNorm * (s2 - s3)\ns4 = s4 + fNorm * (s3 - s4)\n\nsat = (s4 / (1.0 + abs(s4 * 0.6))) * env\nout = sat * 0.44\n",
+    "params": {
+      "cutoff": 0.55,
+      "resonance": 0.75,
+      "envMod": 0.65,
+      "decayTime": 0.32,
+      "drive": 0.45
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

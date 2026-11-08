@@ -2037,6 +2037,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "acid-house-303-saw-squelch-synth",
+      "name": "Acid House 303 Saw Squelch Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Authentic Chicago acid house bassline synthesizer featuring a band-limited sawtooth oscillator, cascading 4-pole diode ladder filter with screaming 18dB resonance, punchy accent decay, and tanh drive.",
+      "price": 0,
+      "preview": "assets/templates/acid-house-303-saw-squelch-synth.webp",
+      "file": "assets/templates/acid-house-303-saw-squelch-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "acid-house-accented-square-bass-synth",
+      "name": "Acid House Accented Square Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Hollow, punchy Roland TB-303 square wave bass synthesizer with asymmetric pulse shaping, aggressive non-linear diode resonance sweep, fast accent decay envelope, and warm analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/acid-house-accented-square-bass-synth.webp",
+      "file": "assets/templates/acid-house-accented-square-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "future-garage-dusk-tape-delay-fx",
+      "name": "Future Garage Dusk Tape Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Nocturnal UK future garage tape delay effect featuring dual stereo delay taps, subtle wow and flutter pitch modulation, warm feedback saturation, and gentle high-frequency tape damping.",
+      "price": 0,
+      "preview": "assets/templates/future-garage-dusk-tape-delay-fx.webp",
+      "file": "assets/templates/future-garage-dusk-tape-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "future-garage-vinyl-dust-reverb-fx",
+      "name": "Future Garage Vinyl Dust Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Atmospheric Burial-inspired space processor combining procedural vinyl surface crackle, diffuse multi-tap reverb diffusion, warm low-mid resonance, and dusk lowpass filtering.",
+      "price": 0,
+      "preview": "assets/templates/future-garage-vinyl-dust-reverb-fx.webp",
+      "file": "assets/templates/future-garage-vinyl-dust-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

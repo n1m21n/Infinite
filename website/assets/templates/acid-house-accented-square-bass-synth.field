@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid House Accented Square Bass Synth",
+    "author": "Infinite",
+    "description": "Hollow, punchy Roland TB-303 square wave bass synthesizer with asymmetric pulse shaping, aggressive non-linear diode resonance sweep, fast accent decay envelope, and warm analog saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.50 [0.1, 1.0]\nparam float resonance = 0.72 [0.1, 0.95]\nparam float pulseWidth = 0.58 [0.2, 0.8]\nparam float decayTime = 0.26 [0.06, 0.8]\nparam float drive = 0.40 [0.0, 1.0]\nstate float phase = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float s4 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.08)\nenv = if(target > env, env + (target - env) * 0.95, env - env * decayRate)\n\ndp = freq / sr\nphase = phase + dp\nphase = if(phase >= 1.0, phase - 1.0, phase)\nsq = if(phase < pulseWidth, 1.0, -1.0)\n\nfNorm = clamp(cutoff * 0.16 + env * 0.34, 0.015, 0.45)\nkRes = clamp(resonance * 3.75, 0.2, 3.80)\n\nfb = s4 * kRes\ninSig = sq * (1.0 + drive * 1.6) - fb\ns1 = s1 + fNorm * (inSig - s1)\ns2 = s2 + fNorm * (s1 - s2)\ns3 = s3 + fNorm * (s2 - s3)\ns4 = s4 + fNorm * (s3 - s4)\n\nsat = (s4 / (1.0 + abs(s4 * 0.55))) * env\nout = sat * 0.42\n",
+    "params": {
+      "cutoff": 0.5,
+      "resonance": 0.72,
+      "pulseWidth": 0.58,
+      "decayTime": 0.26,
+      "drive": 0.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
