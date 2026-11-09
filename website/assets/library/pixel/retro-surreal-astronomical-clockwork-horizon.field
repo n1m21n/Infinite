@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Retro-Surreal Astronomical Clockwork Horizon",
+    "author": "Infinite",
+    "description": "Metaphysical audio-reactive visualizer featuring intersecting astrolabe rings, antique lunar crescent geometry, and twilight atmospheric gradients.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.28 [0.05, 1.0]\nparam float astrolabeRings = 16.0 [6.0, 32.0]\nparam float warpStrength = 0.40 [0.1, 0.9]\nparam float lunarPhase = 0.35 [0.0, 1.0]\nparam float contrast = 1.15 [0.8, 1.6]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\norbitWarp = sin(theta * 8.0 + time * 1.5) * cos(r * 12.0 - time * 1.2) * warpStrength * 0.24\nlensR = r + orbitWarp\n\nrings = sin(lensR * astrolabeRings * 2.2)\nastrolabeLines = smoothstep(0.24, -0.24, abs(rings) - 0.26)\n\nmeridian = sin(p.x * 14.0 + sin(p.y * 6.0) * 1.2)\nmeridianLines = smoothstep(0.20, -0.20, abs(meridian) - 0.25) * step(r, 0.95)\n\nlunarPos = p - vec2(0.25 * cos(time * 0.8), 0.20 * sin(time * 0.8))\nlunarR = length(lunarPos)\nlunarDisc = smoothstep(0.42, 0.38, lunarR)\n\nlunarCrescentDist = length(lunarPos - vec2(0.14, 0.08))\nlunarShadow = smoothstep(0.38, 0.34, lunarCrescentDist)\ncrescent = clamp(lunarDisc - lunarShadow, 0.0, 1.0)\n\nhorizon = p.y + sin(p.x * 6.0 + time * 0.5) * 0.08 + 0.35\nhorizonMask = step(horizon, 0.0)\n\ncross = sin(p.x * 28.0) * cos(p.y * 28.0)\nhatch = step(0.62, cross) * (1.0 - lunarDisc) * 0.32\n\ncTwilight = vec3(0.157, 0.188, 0.267)\ncTeal = vec3(0.235, 0.431, 0.443)\ncTerracotta = vec3(0.851, 0.420, 0.263)\ncParchment = vec3(0.851, 0.706, 0.561)\n\ncol = mix(cTwilight, cTeal, astrolabeLines * 0.70)\ncol = mix(col, cTerracotta, meridianLines * 0.65)\ncol = mix(col, cTerracotta, horizonMask * 0.55)\ncol = mix(col, cParchment, crescent * 0.95)\ncol = mix(col, cParchment, hatch)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.28,
+      "astrolabeRings": 16.0,
+      "warpStrength": 0.4,
+      "lunarPhase": 0.35,
+      "contrast": 1.15
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

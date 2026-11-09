@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Neo-Classical Chamber Strings Cello Synth",
+    "author": "Infinite",
+    "description": "Expressive neo-classical solo cello synthesizer with slow bow attack envelope, warm resonant formant filtering, subtle vibrato modulation, and rich acoustic string undertones.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.50 [0.1, 1.0]\nparam float resonance = 0.45 [0.1, 0.95]\nparam float bowSpeed = 0.40 [0.05, 1.0]\nparam float vibrato = 0.35 [0.0, 1.0]\nparam float warmth = 0.48 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float lfo = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nattackRate = clamp(1.0 / (sr * (0.04 + (1.0 - bowSpeed) * 0.12)), 0.0001, 0.1)\ndecayRate = clamp(1.0 / (sr * 0.45), 0.0001, 0.05)\nenv = if(target > env, env + attackRate * (target - env), env - env * decayRate)\n\nlfo = (lfo + 5.2 / sr) % 1.0\nvibMod = sin(lfo * 6.28318) * vibrato * 0.012\n\ndp = (freq / sr) * (1.0 + vibMod)\np1 = (p1 + dp) % 1.0\nsaw = p1 * 2.0 - 1.0\n\np2 = (p2 + dp * 1.004) % 1.0\nsubSaw = p2 * 2.0 - 1.0\n\nsig = (saw * 0.65 + subSaw * 0.55) * (1.0 + warmth * 0.8)\n\nfNorm = clamp(cutoff * 0.16 + env * 0.22, 0.02, 0.45)\nkRes = clamp(resonance * 1.6, 0.1, 1.85)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.40))) * env\nout = sat * 0.54\n",
+    "params": {
+      "cutoff": 0.5,
+      "resonance": 0.45,
+      "bowSpeed": 0.4,
+      "vibrato": 0.35,
+      "warmth": 0.48
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

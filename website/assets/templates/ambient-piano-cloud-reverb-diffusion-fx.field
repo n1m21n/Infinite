@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ambient Piano Cloud Reverb Diffusion FX",
+    "author": "Infinite",
+    "description": "Lush ambient space reverberator featuring multi-stage allpass diffusion network, soft tape saturation in the feedback path, and gentle high-cut air damping.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float decay = 0.55 [0.1, 0.9]\nparam float tone = 0.50 [0.1, 1.0]\nparam float size = 0.60 [0.1, 1.0]\nparam float shimmer = 0.35 [0.0, 1.0]\nparam float mix = 0.55 [0.0, 1.0]\nstate float a1 = 0\nstate float a2 = 0\nstate float a3 = 0\nstate float a4 = 0\nstate float lp = 0\n\nfTone = clamp(0.06 + tone * 0.36, 0.02, 0.45)\nlp = lp + fTone * (in - lp)\n\nkDiff = clamp(0.12 * (1.0 + size * 0.8), 0.04, 0.38)\nkDecay = clamp(decay * 0.82, 0.1, 0.88)\n\na1 = a1 + kDiff * (lp + a4 * kDecay - a1)\na2 = a2 + kDiff * 0.85 * (a1 - a2)\na3 = a3 + kDiff * 0.72 * (a2 - a3)\na4 = a4 + kDiff * 0.65 * (a3 - a4)\n\nshim = (a1 - a3) * shimmer * 0.4\ndiff = (a2 + a4 * 0.8 + shim) * 0.92\n\nsat = diff / (1.0 + abs(diff * 0.25))\nwet = sat * 0.85\nprocessed = in * (1.0 - mix) + wet * mix\nout = processed * 0.70\n",
+    "params": {
+      "decay": 0.55,
+      "tone": 0.5,
+      "size": 0.6,
+      "shimmer": 0.35,
+      "mix": 0.55
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Retro-Surreal Celestial Portal Matrix",
+    "author": "Infinite",
+    "description": "Audio-reactive retro-surrealist shader depicting an antique celestial sphere inside terracotta and teal nested archways with copperplate engraving hatching.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.30 [0.05, 1.0]\nparam float portalWarp = 0.45 [0.1, 1.0]\nparam float ringCount = 18.0 [6.0, 32.0]\nparam float celestialScale = 0.48 [0.2, 0.9]\nparam float contrast = 1.15 [0.8, 1.6]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\narchDist = max(abs(p.x) * 1.15, p.y + abs(p.x) * 0.4)\narch = smoothstep(0.75, 0.72, archDist)\n\nwarp = sin(theta * 6.0 + time * 1.8) * cos(r * 10.0 - time * 1.4) * portalWarp * 0.22\nrings = sin((r + warp) * ringCount * 2.5)\nringLines = smoothstep(0.22, -0.22, abs(rings) - 0.28)\n\nsunR = length(p - vec2(0.0, -0.15))\nsunDisc = smoothstep(celestialScale, celestialScale - 0.04, sunR)\nrays = sin(atan2(p.y + 0.15, p.x) * 16.0 + time * 2.0)\nsunRays = smoothstep(0.3, -0.3, abs(rays) - 0.4) * step(sunR, celestialScale * 1.6) * step(celestialScale * 0.8, sunR)\n\ncross = sin(p.x * 32.0 + p.y * 18.0) * cos(p.y * 32.0 - p.x * 18.0)\nhatch = step(0.60, cross) * (1.0 - arch) * 0.35\n\ncTwilight = vec3(0.157, 0.188, 0.267)\ncTeal = vec3(0.235, 0.431, 0.443)\ncTerracotta = vec3(0.851, 0.420, 0.263)\ncParchment = vec3(0.851, 0.706, 0.561)\n\ncol = mix(cTwilight, cTeal, ringLines * 0.75)\ncol = mix(col, cTerracotta, arch * 0.85)\ncol = mix(col, cParchment, sunDisc)\ncol = mix(col, cTerracotta, sunRays * 0.8)\ncol = mix(col, cParchment, hatch)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.3,
+      "portalWarp": 0.45,
+      "ringCount": 18.0,
+      "celestialScale": 0.48,
+      "contrast": 1.15
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

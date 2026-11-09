@@ -1,0 +1,68 @@
+infinite-patch 1
+# Neo-Classical Felt Piano Harmonic Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 60
+  i note1 60
+  i note2 67
+  i note3 64
+  i note4 60
+  i note5 67
+  i note6 65
+  i note7 67
+  i note8 57
+  i note9 57
+  i note10 64
+  i note11 60
+  i note12 55
+  i note13 59
+  i note14 62
+  i note15 64
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 0.54 [0.1, 1.0]\nparam float resonance = 0.32 [0.1, 0.9]\nparam float hardness = 0.40 [0.0, 1.0]\nparam float decayTime = 0.55 [0.1, 1.8]\nparam float felt = 0.45 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.95, env - env * decayRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\ntri = abs(p1 * 2.0 - 1.0) * 2.0 - 1.0\n\np2 = (p2 + dp * 2.002) % 1.0\nh2 = (p2 * 2.0 - 1.0) * 0.35 * hardness\n\nsig = (tri * 0.75 + h2 * 0.45) * 1.2\n\nfNorm = clamp(cutoff * 0.18 + env * (1.0 - felt * 0.6) * 0.25, 0.015, 0.44)\nkRes = clamp(resonance * 1.5, 0.1, 1.8)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.38))) * env\nout = sat * 0.56\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.18 0.22 0.32
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Neo-Classical Felt Piano Harmonic Synth. Intimate felt upright piano synthesizer featuring dual detuned acoustic hammer harmonics, warm soundboard body resonance, and gentle felt damping.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

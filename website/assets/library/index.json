@@ -7564,6 +7564,216 @@
       "file": "assets/library/pixel/generative-plotter-concentric-isotonic.field",
       "preview": "assets/library/previews/generative-plotter-concentric-isotonic.jpg",
       "bytes": 1583
+    },
+    {
+      "id": "ukiyoe-cartography-archipelago-wave-contour",
+      "name": "Ukiyo-e Cartography Archipelago Wave Contour",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "cartography",
+        "woodblock",
+        "archipelago",
+        "wave",
+        "drawing"
+      ],
+      "description": "Traditional Edo woodblock cartography rendering archipelagic coastline contours with rhythmic indigo sea wave ripples, ochre topographic mountain ridges, and cinnabar seal marks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/ukiyoe-cartography-archipelago-wave-contour.js",
+      "preview": "assets/library/previews/ukiyoe-cartography-archipelago-wave-contour.jpg",
+      "bytes": 4360
+    },
+    {
+      "id": "ukiyoe-cartography-mountain-strata-relief",
+      "name": "Ukiyo-e Cartography Mountain Strata Relief",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "cartography",
+        "mountain",
+        "strata",
+        "woodblock",
+        "drawing"
+      ],
+      "description": "Procedural woodblock relief map featuring logarithmic elevation strata lines, fine indigo shadow slope hatching, sacred summit crater snow contours, and cinnabar waypoints.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/ukiyoe-cartography-mountain-strata-relief.js",
+      "preview": "assets/library/previews/ukiyoe-cartography-mountain-strata-relief.jpg",
+      "bytes": 4229
+    },
+    {
+      "id": "chavetta-montage-assemblage-monolith-3d",
+      "name": "Chavetta Montage Assemblage Monolith 3D",
+      "kind": "Generator",
+      "tags": [
+        "chavetta",
+        "montage",
+        "assemblage",
+        "mixedmedia",
+        "cardboard",
+        "3d"
+      ],
+      "description": "Dynamic 3D mixed-media assemblage sculpture featuring rotated corrugated cardboard cantilever slabs, burnt sienna oil-stick steles, muted teal xerox planes, and deep structural shadow relief.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/chavetta-montage-assemblage-monolith-3d.js",
+      "preview": "assets/library/previews/chavetta-montage-assemblage-monolith-3d.jpg",
+      "bytes": 3114
+    },
+    {
+      "id": "chavetta-montage-cantilever-ephemera-3d",
+      "name": "Chavetta Montage Cantilever Ephemera 3D",
+      "kind": "Generator",
+      "tags": [
+        "chavetta",
+        "montage",
+        "cantilever",
+        "ephemera",
+        "cardboard",
+        "3d"
+      ],
+      "description": "Architectural 3D paperboard assemblage sculpture with interlocking offset rectilinear panels, raw burnt sienna geometric plates, and tactile paper layering.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/chavetta-montage-cantilever-ephemera-3d.js",
+      "preview": "assets/library/previews/chavetta-montage-cantilever-ephemera-3d.jpg",
+      "bytes": 3344
+    },
+    {
+      "id": "neo-classical-felt-piano-harmonic-synth",
+      "name": "Neo-Classical Felt Piano Harmonic Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "neoclassical",
+        "piano",
+        "felt",
+        "acoustic",
+        "audio"
+      ],
+      "description": "Intimate felt upright piano synthesizer featuring dual detuned acoustic hammer harmonics, warm soundboard body resonance, and gentle felt damping.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/neo-classical-felt-piano-harmonic-synth.inf",
+      "preview": "assets/library/previews/neo-classical-felt-piano-harmonic-synth.jpg",
+      "bytes": 2025
+    },
+    {
+      "id": "neo-classical-chamber-strings-cello-synth",
+      "name": "Neo-Classical Chamber Strings Cello Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "neoclassical",
+        "strings",
+        "cello",
+        "acoustic",
+        "audio"
+      ],
+      "description": "Expressive neo-classical solo cello synthesizer with slow bow attack envelope, warm resonant formant filtering, subtle vibrato modulation, and rich acoustic string undertones.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/neo-classical-chamber-strings-cello-synth.inf",
+      "preview": "assets/library/previews/neo-classical-chamber-strings-cello-synth.jpg",
+      "bytes": 2227
+    },
+    {
+      "id": "ambient-piano-cloud-reverb-diffusion-fx",
+      "name": "Ambient Piano Cloud Reverb Diffusion FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "ambient",
+        "reverb",
+        "diffusion",
+        "piano",
+        "audio"
+      ],
+      "description": "Lush ambient space reverberator featuring multi-stage allpass diffusion network, soft tape saturation in the feedback path, and gentle high-cut air damping.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/ambient-piano-cloud-reverb-diffusion-fx.inf",
+      "preview": "assets/library/previews/ambient-piano-cloud-reverb-diffusion-fx.jpg",
+      "bytes": 2061
+    },
+    {
+      "id": "ambient-piano-tape-flutter-delay-fx",
+      "name": "Ambient Piano Tape Flutter Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "ambient",
+        "tape",
+        "delay",
+        "flutter",
+        "audio"
+      ],
+      "description": "Warm vintage magnetic tape delay with slow capstan wow-and-flutter pitch modulation, resonant tone damping, and decaying tape saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/ambient-piano-tape-flutter-delay-fx.inf",
+      "preview": "assets/library/previews/ambient-piano-tape-flutter-delay-fx.jpg",
+      "bytes": 2041
+    },
+    {
+      "id": "retro-surreal-celestial-portal-matrix",
+      "name": "Retro-Surreal Celestial Portal Matrix",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "retrosurreal",
+        "portal",
+        "celestial",
+        "collage",
+        "shader"
+      ],
+      "description": "Audio-reactive retro-surrealist shader depicting an antique celestial sphere inside terracotta and teal nested archways with copperplate engraving hatching.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/retro-surreal-celestial-portal-matrix.field",
+      "preview": "assets/library/previews/retro-surreal-celestial-portal-matrix.jpg",
+      "bytes": 2028
+    },
+    {
+      "id": "retro-surreal-astronomical-clockwork-horizon",
+      "name": "Retro-Surreal Astronomical Clockwork Horizon",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "retrosurreal",
+        "astronomy",
+        "clockwork",
+        "lunar",
+        "shader"
+      ],
+      "description": "Metaphysical audio-reactive visualizer featuring intersecting astrolabe rings, antique lunar crescent geometry, and twilight atmospheric gradients.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/retro-surreal-astronomical-clockwork-horizon.field",
+      "preview": "assets/library/previews/retro-surreal-astronomical-clockwork-horizon.jpg",
+      "bytes": 2233
     }
   ]
 }

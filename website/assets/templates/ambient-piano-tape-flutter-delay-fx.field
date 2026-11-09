@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ambient Piano Tape Flutter Delay FX",
+    "author": "Infinite",
+    "description": "Warm vintage magnetic tape delay with slow capstan wow-and-flutter pitch modulation, resonant tone damping, and decaying tape saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float delayTime = 0.50 [0.1, 1.0]\nparam float flutter = 0.40 [0.0, 1.0]\nparam float tone = 0.52 [0.1, 1.0]\nparam float feedback = 0.45 [0.0, 0.85]\nparam float mix = 0.55 [0.0, 1.0]\nstate float lfo = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float lp = 0\n\nlfo = (lfo + 3.8 / sr) % 1.0\nflutterMod = sin(lfo * 6.28318) * flutter * 0.08\n\nkRate = clamp(0.10 * (1.0 + delayTime * 0.8) + flutterMod, 0.03, 0.35)\nfTone = clamp(0.06 + tone * 0.35, 0.02, 0.45)\n\ninSat = in / (1.0 + abs(in * 0.25))\nfbIn = inSat + d3 * feedback * 0.75\n\nlp = lp + fTone * (fbIn - lp)\n\nd1 = d1 + kRate * (lp - d1)\nd2 = d2 + kRate * 0.88 * (d1 - d2)\nd3 = d3 + kRate * 0.78 * (d2 - d3)\n\ndelaySig = (d2 * 0.65 + d3 * 0.55)\nprocessed = in * (1.0 - mix) + delaySig * mix\nout = processed * 0.68\n",
+    "params": {
+      "delayTime": 0.5,
+      "flutter": 0.4,
+      "tone": 0.52,
+      "feedback": 0.45,
+      "mix": 0.55
+    }
+  }
+}

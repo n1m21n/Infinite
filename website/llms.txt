@@ -261,6 +261,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Synthwave Neon Running Bass Synth](https://infinitedevices.org/library/synthwave-neon-running-bass-synth.html): Driving 16th-note analog synthwave bass synthesizer with paired saw and square wave oscillators, snappy transistor decay envelope, tight resonant filter bite, and analog grit. (file: https://infinitedevices.org/assets/templates/synthwave-neon-running-bass-synth.inf)
 - [Glitch Buffer Stutter Repeater FX](https://infinitedevices.org/library/glitch-buffer-stutter-repeater-fx.html): Granular micro-loop stutter effect with clock-synced buffer freeze, decaying rhythmic micro-repeats, asymmetric diode waveshaping, and dynamic dry-wet crossfade. (file: https://infinitedevices.org/assets/templates/glitch-buffer-stutter-repeater-fx.inf)
 - [Glitch Spectral Aliasing Bitcrush FX](https://infinitedevices.org/library/glitch-spectral-aliasing-bitcrush-fx.html): Searing industrial glitch downsampler featuring variable sample-rate reduction, nonlinear wavefolding drive, quantized amplitude bit-depth crushing, and warm tone filtering. (file: https://infinitedevices.org/assets/templates/glitch-spectral-aliasing-bitcrush-fx.inf)
+- [Neo-Classical Felt Piano Harmonic Synth](https://infinitedevices.org/library/neo-classical-felt-piano-harmonic-synth.html): Intimate felt upright piano synthesizer featuring dual detuned acoustic hammer harmonics, warm soundboard body resonance, and gentle felt damping. (file: https://infinitedevices.org/assets/templates/neo-classical-felt-piano-harmonic-synth.inf)
+- [Neo-Classical Chamber Strings Cello Synth](https://infinitedevices.org/library/neo-classical-chamber-strings-cello-synth.html): Expressive neo-classical solo cello synthesizer with slow bow attack envelope, warm resonant formant filtering, subtle vibrato modulation, and rich acoustic string undertones. (file: https://infinitedevices.org/assets/templates/neo-classical-chamber-strings-cello-synth.inf)
+- [Ambient Piano Cloud Reverb Diffusion FX](https://infinitedevices.org/library/ambient-piano-cloud-reverb-diffusion-fx.html): Lush ambient space reverberator featuring multi-stage allpass diffusion network, soft tape saturation in the feedback path, and gentle high-cut air damping. (file: https://infinitedevices.org/assets/templates/ambient-piano-cloud-reverb-diffusion-fx.inf)
+- [Ambient Piano Tape Flutter Delay FX](https://infinitedevices.org/library/ambient-piano-tape-flutter-delay-fx.html): Warm vintage magnetic tape delay with slow capstan wow-and-flutter pitch modulation, resonant tone damping, and decaying tape saturation. (file: https://infinitedevices.org/assets/templates/ambient-piano-tape-flutter-delay-fx.inf)
 
 ## Library: Community
 
@@ -621,7 +625,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 97 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 99 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -638,4 +642,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 82 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 84 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
