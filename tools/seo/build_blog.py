@@ -69,7 +69,7 @@ def chrome():
 
 def ensure_nav():
     """Add the Blog link to the top bar and footer of the hand-written pages (safe to run twice)."""
-    for name in ("index.html", "library.html", "extensions.html"):
+    for name in ("index.html", "library.html"):
         p = os.path.join(WEB, name)
         s = open(p, encoding="utf-8").read()
         if 'href="blog/"' in s:

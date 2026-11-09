@@ -15,7 +15,7 @@ Free motion tracking software is built into Infinite as an optional pack: it tur
 ## What you need
 
 - Infinite 0.5.0 or later.
-- The free Tracking pack (26 MB). Open Settings, then Extensions, and press Install next to Tracking. It installs while the app runs, with no restart. If you are offline, download the pack for your platform from the [Extensions page](https://infinitedevices.org/extensions.html) and use Install from file.
+- The free Tracking pack (26 MB). Open Settings, then Extensions, and press Install next to Tracking. It installs while the app runs, with no restart. If you are offline, download the pack for your platform from the [Extensions page](https://infinitedevices.org/library.html#extensions) and use Install from file.
 - A video source: a camera, a video file or a still image.
 
 The pack is optional on purpose. If you never track anything, you never download it.

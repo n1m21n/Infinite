@@ -10,7 +10,7 @@
  */
 (async function () {
   var PAGES = window.__auditPages || ['index.html', 'artists.html', 'musicians.html', 'vjs.html', 'creative-coders.html', 'developers.html', 'library.html',
-    'artworks.html', 'benchmarks.html', 'extensions.html', 'philosophy.html', 'system.html', 'blog/index.html', 'library/first-sound.html', 'embeds/index.html'];
+    'artworks.html', 'benchmarks.html', 'philosophy.html', 'system.html', 'blog/index.html', 'library/first-sound.html', 'embeds/index.html'];
   var SEL = 'button, a.btn, a[class*=btn], [role=button], [role=tab], input[type=submit], input[type=button], summary, a.pill, a.pw, a.ax-key, a.ax-ghost, a.reel-btn, .copy, .run';
   var sig = function (el) { return el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).filter(function (c) { return !/^(on|live|is-|active|open)/.test(c); }).join('.') : ''); };
   var out = {};

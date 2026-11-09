@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#151930">
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="theme.js?v=2"></script>
-  <title>Infinite chat: talk to your patch with Claude, ChatGPT or Gemini</title>
+  <title>Infinite agents &amp; terminal: talk to your patch with Claude, ChatGPT or Gemini</title>
   <meta name="description" content="Type what you want in plain words and your own Claude, ChatGPT or Gemini changes your Infinite project for you. Every change can be undone.">
   <link rel="canonical" href="https://infinitedevices.org/chat.html">
-  <meta property="og:title" content="Infinite chat: talk to your patch with Claude, ChatGPT or Gemini">
+  <meta property="og:title" content="Infinite agents &amp; terminal: talk to your patch with Claude, ChatGPT or Gemini">
   <meta property="og:description" content="Type what you want in plain words and your own Claude, ChatGPT or Gemini changes your Infinite project for you. Every change can be undone.">
-  <meta property="og:image" content="https://infinitedevices.org/assets/og/chat.jpg">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og/developers.jpg">
   <meta property="og:url" content="https://infinitedevices.org/chat.html">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Infinite">
@@ -28,7 +28,8 @@
   <link rel="stylesheet" href="glass.css?v=c25dae44">
   <link rel="stylesheet" href="blog.css?v=823c9183">
   <link rel="stylesheet" href="audience.css?v=dd614df4">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite chat: talk to your patch with Claude, ChatGPT or Gemini", "url": "https://infinitedevices.org/chat.html", "description": "Type what you want in plain words and your own Claude, ChatGPT or Gemini changes your Infinite project for you. Every change can be undone.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite agents & terminal: talk to your patch with Claude, ChatGPT or Gemini", "url": "https://infinitedevices.org/chat.html", "description": "Type what you want in plain words and your own Claude, ChatGPT or Gemini changes your Infinite project for you. Every change can be undone.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "ItemList", "name": "Infinite for developers: CLI, Python SDK and MCP: Key Features", "url": "https://infinitedevices.org/developers.html", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Text in, files out", "description": "A patch is plain text. Validate it, print the graph that was built, then render stills, a contact sheet, video or an audio report."}, {"@type": "ListItem", "position": 2, "name": "No window, no display", "description": "The renderer runs from the command line, so it fits a script, a cron job or a CI step. Hardware inputs are refused in headless mode."}, {"@type": "ListItem", "position": 3, "name": "Built for agents", "description": "Nine MCP tools let an agent write a shader, a synth or a mesh and see the result. Every tool result carries the credit line."}]}</script>
   <link rel="stylesheet" href="chat.css?v=3">
   <link rel="stylesheet" href="dev.css?v=824b2d87">
   <script>document.documentElement.classList.add('js-reveal')</script>
@@ -60,24 +61,22 @@
           <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
         </div>
       </div>
-      <div class="nav-group" data-current>
+      <div class="nav-group">
         <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
         <div class="nav-menu" id="nav-menu-explore">
           <a href="library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
-          <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Samples</span></a>
+          <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
           <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
           <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
           <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
-          <a href="chat.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Chat</span></a>
-          <a href="extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
-          <a href="benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
         </div>
       </div>
-      <div class="nav-group">
+      <div class="nav-group" data-current>
         <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
         <div class="nav-menu" id="nav-menu-learn">
           <a href="index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
           <a href="philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="chat.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
           <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
         </div>
       </div>
@@ -111,110 +110,55 @@
   <main class="dv">
     <section class="dv-hero">
       <div class="container">
-        <span class="blog-hand hand">chat</span>
-        <h1 class="slab">Talk to your patch</h1>
-        <p class="lead">Type what you want in plain words, like "make the notes brighter". An AI assistant you already use (Claude, ChatGPT or Gemini) changes your project for you. Every change can be undone.</p>
-        <ul class="facts"><li>No coding needed</li><li>Uses your own account</li><li>One click to undo</li></ul>
-        <div class="aud-cta"><a href="index.html#download" class="btn btn-primary">Download Infinite</a><a href="#start" class="btn btn-ghost">Start in 4 steps</a></div>
+        <span class="blog-hand hand">agents</span>
+        <h1 class="slab">Agents &amp; terminal</h1>
+        <p class="lead">Say what you want in plain words. Claude, ChatGPT or Gemini, on your own account, changes your project. Every change has an Undo.</p>
+        <div class="aud-cta"><a href="index.html#download" class="btn btn-primary">Download Infinite</a><a href="#start" class="btn btn-ghost">Start in 3 steps</a></div>
       </div>
     </section>
     <div class="container dv-grid">
-      <nav class="dv-toc" aria-label="On this page"><a href="#what"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>What is it?</span></a><a href="#see"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10C4.7 6.8 7.1 5.2 10 5.2S15.3 6.8 17 10C15.3 13.2 12.9 14.8 10 14.8S4.7 13.2 3 10Z"/><circle cx="10" cy="10" r="2.2" fill="currentColor" stroke="none"/></svg><span>What you will see</span></a><a href="#try"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Things you can say</span></a><a href="#how"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3L5 11h4.5L9 17l6-8h-4.5z"/></svg><span>How it works</span></a><a href="#accounts"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="9" width="11" height="8" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg><span>Connect an assistant</span></a><a href="#control"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15.19 8.49 L16.91 8.85 L16.91 11.15 L15.19 11.51 L14.73 12.60 L15.70 14.07 L14.07 15.70 L12.60 14.73 L11.51 15.19 L11.15 16.91 L8.85 16.91 L8.49 15.19 L7.40 14.73 L5.93 15.70 L4.30 14.07 L5.27 12.60 L4.81 11.51 L3.09 11.15 L3.09 8.85 L4.81 8.49 L5.27 7.40 L4.30 5.93 L5.93 4.30 L7.40 5.27 L8.49 4.81 L8.85 3.09 L11.15 3.09 L11.51 4.81 L12.60 5.27 L14.07 4.30 L15.70 5.93 L14.73 7.40 Z"/><circle cx="10" cy="10" r="2.4"/></svg><span>You stay in control</span></a><a href="#faq"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Questions</span></a><a href="#start"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="14" height="11" rx="1.5"/><path d="M6.5 8l2.5 2-2.5 2M10.5 12.5h3"/></svg><span>Start in 4 steps</span></a></nav>
+      <nav class="dv-toc" aria-label="On this page"><a href="#try"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Things you can say</span></a><a href="#accounts"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="9" width="11" height="8" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg><span>Connect an assistant</span></a><a href="#control"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15.19 8.49 L16.91 8.85 L16.91 11.15 L15.19 11.51 L14.73 12.60 L15.70 14.07 L14.07 15.70 L12.60 14.73 L11.51 15.19 L11.15 16.91 L8.85 16.91 L8.49 15.19 L7.40 14.73 L5.93 15.70 L4.30 14.07 L5.27 12.60 L4.81 11.51 L3.09 11.15 L3.09 8.85 L4.81 8.49 L5.27 7.40 L4.30 5.93 L5.93 4.30 L7.40 5.27 L8.49 4.81 L8.85 3.09 L11.15 3.09 L11.51 4.81 L12.60 5.27 L14.07 4.30 L15.70 5.93 L14.73 7.40 Z"/><circle cx="10" cy="10" r="2.4"/></svg><span>You stay in control</span></a><a href="#start"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="14" height="11" rx="1.5"/><path d="M6.5 8l2.5 2-2.5 2M10.5 12.5h3"/></svg><span>Start in 3 steps</span></a></nav>
       <div class="dv-main">
         <section class="dv-sec cx-stage" aria-label="The chat panel in Infinite">
-          <figure class="cx-shot "><img src="assets/chat/chat-window.webp" alt="The Infinite window: the node canvas on the left and the chat panel on the right, showing a reply with the changes it made" width="1800" height="1125" loading="lazy" decoding="async"><figcaption>The real app. The canvas is on the left. The chat is the panel on the right.</figcaption></figure>
-        </section>
-
-        <section class="dv-sec" id="what"><h2>What is it?</h2>
-          <p>Infinite is a program where you build music and visuals by connecting boxes called <strong>nodes</strong>. The chat is a panel inside it where you can simply <em>write</em> what you want, instead of finding the right box or knob yourself.</p>
-          <p>Think of it as a helper sitting next to you. You say "slow the notes down", and it turns the right knob. You can always see what it did, and take it back.</p>
-          <div class="dv-cards">
-            <article class="dv-card"><h2>You ask</h2><p>Write a sentence in the box at the bottom of the chat.</p></article>
-            <article class="dv-card"><h2>It changes your project</h2><p>The knobs and cables move on your canvas, live.</p></article>
-            <article class="dv-card"><h2>You check, or undo</h2><p>Every reply lists what changed, with an Undo button.</p></article>
-          </div>
-        </section>
-
-        <section class="dv-sec" id="see"><h2>What you will see</h2>
-          <div class="cx-split">
-            <figure class="cx-shot cx-tall"><img src="assets/chat/chat-panel.webp" alt="A chat reply in Infinite: the sentence &#x27;make wavetable brighter and slow the notes&#x27;, a Changed card with two small knobs, and a list of old and new values" width="760" height="1335" loading="lazy" decoding="async"><figcaption>A reply. Your sentence, then the exact knobs it turned.</figcaption></figure>
-            <ol class="cx-legend">
-              <li><strong>Your message.</strong> The grey bubble is what you wrote. Here: "make wavetable brighter and slow the notes".</li>
-              <li><strong>The Changed card.</strong> Small live knobs for every value that moved. You can turn them yourself right there.</li>
-              <li><strong>The short list.</strong> Each line reads <em>old value → new value</em>, for example <code>cutoff 2000 → 8000</code>.</li>
-              <li><strong>Coloured names.</strong> A node's name in the reply is a link. Click it and the canvas jumps to that node.</li>
-              <li><strong>The box at the bottom.</strong> Type here. Press <code>@</code> to pick a node by name. Press <strong>+</strong> to attach a file or picture.</li>
-            </ol>
-          </div>
+          <figure class="cx-shot "><img src="assets/chat/chat-window.webp" alt="The Infinite window: the node canvas on the left and the chat panel on the right, showing a reply with the changes it made" width="1800" height="1125" loading="lazy" decoding="async"><figcaption>Canvas on the left, chat on the right.</figcaption></figure>
         </section>
 
         <section class="dv-sec" id="try"><h2>Things you can say</h2>
-          <p>Start with any of these. Words that start with <code>@</code> are node names from your own project.</p>
           <div class="table-wrap"><table>
             <thead><tr><th>You type</th><th>What happens</th></tr></thead>
             <tbody>
-              <tr><td><code>make @wavetable brighter</code></td><td>The assistant opens the filter on that node.</td></tr>
-              <tr><td><code>@cube set size to 2</code></td><td>Runs instantly. This exact kind of sentence needs no AI.</td></tr>
-              <tr><td><code>connect @a to @b</code></td><td>Draws a cable between the two nodes, instantly.</td></tr>
-              <tr><td><code>make the rings feel like they are breathing</code></td><td>The assistant decides how, and shows you what it changed.</td></tr>
-              <tr><td><code>/explain</code></td><td>Describes your project in plain words.</td></tr>
+              <tr><td><code>@cube set size to 2</code></td><td>Runs instantly, no AI needed. <code>@</code> picks a node.</td></tr>
+              <tr><td><code>connect @a to @b</code></td><td>Draws the cable, instantly.</td></tr>
+              <tr><td><code>make the rings feel like they are breathing</code></td><td>Your assistant decides how, then lists what it changed.</td></tr>
               <tr><td><code>/undo</code></td><td>Takes back the last change.</td></tr>
-              <tr><td><code>/help</code></td><td>Lists every command.</td></tr>
             </tbody>
           </table></div>
         </section>
 
-        <section class="dv-sec" id="how"><h2>How it works</h2>
-          <ol class="cx-flow">
-            <li><span>1</span><div><h3>You type a sentence</h3><p>The box helps as you go. After <code>@</code> it suggests node names, then that node's knobs, then sensible values.</p></div></li>
-            <li><span>2</span><div><h3>Infinite checks it first</h3><p>If your sentence is an exact instruction, like <code>set</code>, <code>connect</code> or <code>add</code>, Infinite does it straight away. A small lightning bolt marks these.</p></div></li>
-            <li><span>3</span><div><h3>Anything else goes to your assistant</h3><p>An open-ended request such as "make it calmer" is handed to Claude, ChatGPT or Gemini, running on your own computer with your own account. A small spark marks these.</p></div></li>
-            <li><span>4</span><div><h3>It edits your open project</h3><p>The assistant uses the same commands as the <code>infinite</code> command line. If it makes a mistake, Infinite refuses that step instead of half-applying it.</p></div></li>
-            <li><span>5</span><div><h3>You get a list of what changed</h3><p>Each reply shows the changes and an Undo button.</p></div></li>
-          </ol>
-        </section>
-
         <section class="dv-sec" id="accounts"><h2>Connect an assistant</h2>
-          <p>The thinking is done by an assistant you already use. Infinite connects it to your project. It is not a new service, and Infinite has no login of its own.</p>
           <div class="table-wrap"><table>
             <thead><tr><th>Assistant</th><th>Made by</th><th>Signing in</th></tr></thead>
-            <tbody><tr><td><strong>Claude</strong></td><td>Anthropic</td><td>A browser page opens, you sign in, done.</td></tr><tr><td><strong>ChatGPT</strong></td><td>OpenAI</td><td>A browser page opens, you sign in, done.</td></tr><tr><td><strong>Gemini</strong></td><td>Google</td><td>A browser page opens, then you paste the short code it shows into the chat.</td></tr></tbody>
+            <tbody><tr><td><strong>Claude</strong></td><td>Anthropic</td><td>Sign in on the page that opens.</td></tr><tr><td><strong>ChatGPT</strong></td><td>OpenAI</td><td>Sign in on the page that opens.</td></tr><tr><td><strong>Gemini</strong></td><td>Google</td><td>Sign in, then paste the short code into the chat.</td></tr></tbody>
           </table></div>
-          <figure class="cx-shot "><img src="assets/chat/chat-settings.webp" alt="Infinite Settings, Agents and Terminal page: a row for Claude, ChatGPT and Gemini each with a Set up button, plus the model, folder and saved chats" width="1100" height="837" loading="lazy" decoding="async"><figcaption>Settings, Agents &amp; Terminal. One row per assistant, with a Set up button.</figcaption></figure>
-          <ul class="dev-list">
-            <li><strong>You sign in on the provider's own page.</strong> Infinite never sees or stores your password.</li>
-            <li><strong>It uses your plan.</strong> Usage counts against your own subscription, the same as using the assistant anywhere else.</li>
-            <li><strong>No account yet?</strong> Press <em>I don't have one</em> and create it on the provider's page.</li>
-            <li><strong>Setup is one button.</strong> Press <em>Set up</em> and Infinite installs what is missing and walks you through sign-in. If a step fails, it says why in one sentence.</li>
-          </ul>
+          <p>You sign in on the provider's own page, so Infinite never sees your password. Usage counts against your own plan.</p>
         </section>
 
         <section class="dv-sec" id="control"><h2>You stay in control</h2>
           <ul class="dev-list">
-            <li><strong>Undo.</strong> Every change card has an Undo button, and <code>/undo</code> does the same.</li>
-            <li><strong>Nothing hidden.</strong> If the assistant is not allowed to do something, the chat tells you in plain words.</li>
-            <li><strong>It works in one folder.</strong> You choose it in Settings. By default it is the folder of your open project.</li>
-            <li><strong>Your chats stay on your computer.</strong> Settings shows how many are saved, with a Clear all button.</li>
+            <li><strong>Undo.</strong> Every change card has an Undo button.</li>
+            <li><strong>One folder.</strong> The assistant only works in the folder you choose in Settings.</li>
+            <li><strong>Local chats.</strong> Your chats stay on your computer.</li>
+            <li><strong>Optional.</strong> Everything also works with the mouse and keyboard.</li>
           </ul>
         </section>
 
-        <section class="dv-sec" id="faq"><h2>Common questions</h2>
-          <ul class="dev-list">
-            <li><strong>Do I have to pay for Infinite or the chat?</strong> Infinite is free. The assistant is your own Claude, ChatGPT or Gemini account, so its normal plan applies.</li>
-            <li><strong>Can I use Infinite without the chat?</strong> Yes. The chat is optional. Everything works with the mouse and keyboard.</li>
-            <li><strong>Will it break my project?</strong> Every change can be undone, and bad steps are refused before they land.</li>
-            <li><strong>Why is it sometimes slow?</strong> Exact instructions (the lightning bolt) are instant. Open-ended ones wait for your assistant's model, which depends on the provider.</li>
-          </ul>
-        </section>
-
-        <section class="dv-sec" id="start"><h2>Start in 4 steps</h2>
+        <section class="dv-sec" id="start"><h2>Start in 3 steps</h2>
           <ol class="dev-list">
             <li><a href="index.html#download">Download Infinite</a> and open any project.</li>
-            <li>Open the chat panel on the right and press <em>Set up</em> next to Claude, ChatGPT or Gemini.</li>
-            <li>Finish signing in on the page that opens in your browser.</li>
+            <li>In the chat panel, press <em>Set up</em> next to your assistant and sign in.</li>
             <li>Type <code>@</code>, pick a node, and say what you want.</li>
           </ol>
-          <p>Building your own tools? The <a href="developers.html">developers page</a> covers the command line, Python SDK and MCP server the chat is built on.</p>
+          <p>Building your own tools? See the <a href="developers.html">developers page</a>.</p>
         </section>
       </div>
     </div>
@@ -258,18 +202,16 @@
         <div class="footer-col">
           <p class="footer-h">Explore</p>
           <a href="library.html">Library</a>
-          <a href="samples/">Samples</a>
+          <a href="samples/">Sample generator</a>
           <a href="artworks.html">Art gallery</a>
           <a href="nodes/">Nodes</a>
           <a href="embeds/">Embeds</a>
-          <a href="chat.html">Chat</a>
-          <a href="extensions.html">Extensions</a>
-          <a href="benchmarks.html">Benchmarks</a>
         </div>
         <div class="footer-col">
           <p class="footer-h">Learn</p>
           <a href="index.html#learn">Get started</a>
           <a href="philosophy.html">Philosophy</a>
+          <a href="chat.html">Agents &amp; terminal</a>
           <a href="blog/">Blog</a>
         </div>
         <div class="footer-col">
@@ -277,6 +219,7 @@
           <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
           <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
           <a href="assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="benchmarks.html">Benchmarks</a>
           <a href="assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
         </div>
         <div class="footer-col">
@@ -307,8 +250,8 @@
     <span class="dock-thumb" aria-hidden="true"></span>
     <a class="dock-stop" href="index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
     <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
-    <button type="button" class="dock-stop" data-group="explore" data-current aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
-    <button type="button" class="dock-stop" data-group="learn" aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
     <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
   </div>
   <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
@@ -320,17 +263,15 @@
   </div>
   <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
     <a href="library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
-    <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Samples</span></a>
+    <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
     <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
     <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
     <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
-    <a href="chat.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Chat</span></a>
-    <a href="extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
-    <a href="benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
   </div>
   <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
     <a href="index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
     <a href="philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="chat.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
     <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
   </div>
 </nav>

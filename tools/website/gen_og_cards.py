@@ -40,7 +40,6 @@ PAGES = {
     "benchmarks.html": ("benchmarks", "Benchmarks", "Made to be fast", "fast", "Audio, video and speed, measured.", NODE),
     "philosophy.html": ("philosophy", "Philosophy", "Built for you", "you", "Creative software, built for the person using it.", KIT),
     "system.html": ("system", "Design system", "One language", "language", "The tokens and components behind the site.", KIT),
-    "extensions.html": ("extensions", "Extensions", "Make it yours", "yours", "Add nodes, tools and panels.", KIT),
 }
 
 
