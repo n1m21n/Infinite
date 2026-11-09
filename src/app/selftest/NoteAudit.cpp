@@ -863,7 +863,8 @@ namespace
             if (c.setup)
                c.setup(a.node.get());
             a.node->CookIfNeeded(a.frame++);
-            cons.audio->SetNoteInbox(0, a.out, a.out->RegisterConsumer());
+            // ApplyNoteInbox, the engine's own rewire path (it keeps the slot's open-note list).
+            cons.audio->ApplyNoteInbox(0, a.out, a.out->RegisterConsumer());
             StartTransport(120.0);
             const double bypassAt = 0.55; // 9001, 9003, 9004 are held
             bool cut = false;
@@ -881,9 +882,9 @@ namespace
                         e.e.isNoteOn ? (void)(open[e.e.voiceId] = true) : (void)open.erase(e.e.voiceId);
                   voicesOnAtCut = (int)open.size();
                   if (mode == 0)
-                     cons.audio->SetNoteInbox(0, &a.in[0], a.in[0].RegisterConsumer());
+                     cons.audio->ApplyNoteInbox(0, &a.in[0], a.in[0].RegisterConsumer());
                   else
-                     cons.audio->SetNoteInbox(0, nullptr, -1);
+                     cons.audio->ApplyNoteInbox(0, nullptr, -1);
                }
                if (!cut)
                   a.Step(true);
@@ -902,10 +903,12 @@ namespace
             // Delete is reported only: a deleted producer cannot send note-offs, so every node leaves its
             // consumer's open voices open (the consumer drops to its free-running state, nothing sounds).
             if (mode == 0 && (p.stuck || p.orphanOff))
+            {
                flags.Flag("BYPASS", c.name, "bypass mid-note: stuck + orphan-off", p.stuck + p.orphanOff);
+               ok = false;
+            }
          }
       }
-      (void)ok;
    }
 
    // ---- CPU --------------------------------------------------------------

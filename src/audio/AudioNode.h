@@ -273,6 +273,7 @@ public:
    // unconnected pin.
    NoteEventQueue* appliedInbox[kMaxNoteSlots] = {};
    int appliedCursor[kMaxNoteSlots] = { -1, -1, -1, -1 };
+   NoteHeld noteHeld[kMaxNoteSlots];
 
    // Owning-thread-only (same rule as appliedInbox above - called only from
    // AudioEngine::ApplyNoteWiringIfNew, never from RebuildAudioTopology
@@ -285,6 +286,12 @@ public:
    {
       if (slot < 0 || slot >= kMaxNoteSlots)
          return;
+      // A different source (or none): every note the old one left open gets
+      // its note-off on this slot's next Pop - see NoteHeld.
+      if (appliedInbox[slot] != nullptr && appliedInbox[slot] != inbox)
+         noteHeld[slot].SourceChanged();
+      if (inbox != nullptr)
+         inbox->SetCursorTracker(cursor, &noteHeld[slot]);
       appliedInbox[slot] = inbox;
       appliedCursor[slot] = cursor;
       SetNoteInbox(slot, inbox, cursor);
