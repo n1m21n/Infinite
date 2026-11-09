@@ -175,6 +175,8 @@ def dock_html(rel):
     for gid, label, ic in DOCK_STOPS:
         cur = " data-current" if any(is_current(i[0], rel) for g in GROUPS if g[0] == gid for i in g[2]) else ""
         out.append(f'    <button type="button" class="dock-stop" data-group="{gid}"{cur} aria-expanded="false" aria-controls="dock-sheet-{gid}">{_svg(ic)}<span>{label}</span></button>')
+    pc = ' aria-current="page"' if is_current("plugin.html", rel) else ""
+    out.append(f'    <a class="dock-stop" href="{p}plugin.html"{pc}>{PLUGIN_SVG}<span>Plugin</span></a>')
     out.append('    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog">' + _svg("search") + '<span>Search</span></button>')
     out.append("  </div>")
     for gid, label, ic in DOCK_STOPS:

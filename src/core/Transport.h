@@ -164,6 +164,43 @@ public:
    // frame-driven one.
    void AdvanceAudioClock(int numFrames);
 
+   // Plugin mode (docs/plans/vst-au/README.md 8.1): the host owns time. Called on the audio
+   // thread before each host block, before AdvanceAudioClock. Tempo, time signature and
+   // play state follow the host; a host position that differs from where the clock expects to
+   // be by more than one sample is a jump (locate, scrub, loop wrap) and relocates the clock
+   // (reset epoch bumped; DSP state is kept). Infinite's own loop wrap is suspended, since the
+   // host loops itself. Values the host does not provide (valid flags false) are left alone.
+   struct HostTime
+   {
+      bool playing = false;
+      bool tempoValid = false;
+      double bpm = 120.0;
+      bool ppqValid = false;
+      double ppq = 0.0;
+      int sigNum = 0, sigDen = 0; // 0 = not provided
+   };
+   // Returns true when the block was a jump.
+   bool FollowHost(const HostTime& host);
+
+   // Plugin settings (Settings > DAW sync): who owns tempo, playhead and loop inside a DAW.
+   // Tempo Infinite: the host tempo and meter are ignored, Infinite's own are used and editable.
+   // Playhead Infinite: a seek in Infinite sticks; host jumps (locate, loop wrap) move Infinite by
+   // the same amount, so both keep their offset. Loop Infinite (needs Playhead Infinite): Infinite's
+   // own loop region wraps and host jumps are ignored. Tempo Infinite implies both. Play and stop
+   // always follow the host.
+   void SetHostSync(bool ownTempo, bool ownPlayhead, bool ownLoop)
+   {
+      // At its own tempo Infinite's position cannot track the host's, so it owns all three.
+      ownPlayhead = ownPlayhead || ownTempo;
+      ownLoop = ownTempo || (ownPlayhead && ownLoop);
+      mOwnTempo.store(ownTempo, std::memory_order_relaxed);
+      mOwnPlayhead.store(ownPlayhead, std::memory_order_relaxed);
+      mOwnLoop.store(ownLoop, std::memory_order_relaxed);
+   }
+   bool OwnTempo() const { return mOwnTempo.load(std::memory_order_relaxed); }
+   bool OwnPlayhead() const { return mOwnPlayhead.load(std::memory_order_relaxed); }
+   bool OwnLoop() const { return mOwnLoop.load(std::memory_order_relaxed); }
+
    // The musical position at the START of the block the clock owner most
    // recently advanced over - captured before the advance, so it is the real
    // start even when that block crossed a loop end and Beats() has already
@@ -179,6 +216,12 @@ public:
    // blocks ahead of the current video frame.
    void SetOfflineMode(bool active, double sampleRate = 0.0);
    bool IsOfflineMode() const { return mOfflineActive.load(std::memory_order_relaxed); }
+   // Plugin offline slot lock (docs/plans/vst-au/README.md 8.2): main thread only. While pinned
+   // the audio thread is parked on a grid point, so BeginFrameClock takes the exact engine
+   // position (as offline) and the frame's ramps last exactly delaySeconds.
+   void SetFramePinned(bool pinned, double delaySeconds = 0.0) { mFramePinned = pinned; mFramePinnedDelay = delaySeconds; }
+   bool FramePinned() const { return mFramePinned; }
+   double FramePinnedDelay() const { return mFramePinnedDelay; }
    double AudioSampleRate() const { return mAudioSampleRate.load(std::memory_order_relaxed); }
    void SetOfflineVideoTime(double seconds);
    void BeginOfflineAudioBlock(int numFrames);
@@ -266,6 +309,8 @@ private:
    // it render the loop body forever. SetOfflineMode(true) suspends the wrap
    // without clearing the user's loop, and false restores it.
    std::atomic<bool> mLoopSuspended { false };
+   std::atomic<bool> mOwnTempo { false }, mOwnPlayhead { false }, mOwnLoop { false };
+   double mHostOffsetBeats = 0.0; // audio thread: host ppq minus Infinite's beats (Playhead Infinite)
 
    // Applies a staged tempo, rebasing the offsets first so Beats() doesn't
    // jump. Called only by the live clock owner, never by UI code.
@@ -305,6 +350,8 @@ private:
    void DropFrameClock();
 
    std::atomic<bool> mOfflineActive { false };
+   bool mFramePinned = false;       // main thread only
+   double mFramePinnedDelay = 0.0;
    std::atomic<bool> mOfflineInAudioBlock { false };
    std::atomic<double> mOfflineVideoSeconds { 0.0 };
 };

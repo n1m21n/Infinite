@@ -237,6 +237,14 @@ namespace FormParts
    // Places the next widget on the same row. A component so surfaces never call ImGui::SameLine directly.
    inline void Inline(float offset = 0.0f, float spacing = -1.0f) { ImGui::SameLine(offset, spacing); }
 
+   // A scrolling child whose window padding is padX on the sides and zero above, so a card in it touches the top.
+   inline void BeginChildPadX(const char* id, float padX)
+   {
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padX, 0.0f));
+      ImGui::BeginChild(id, ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
+      ImGui::PopStyleVar();
+   }
+
    // titleInset moves the title text right of the content line (a window whose content is inset by a nav well).
    inline void PushWindowPad(float titleInset = 0.0f)
    {

@@ -1046,6 +1046,8 @@ namespace app
    // there is exactly one restart implementation, not two.
    void PollAudioRecovery()
    {
+      if (Platform::PluginModeActive())
+         return; // the host owns the device; a paused host is not a dead engine
       const bool willSleep = Platform::AudioWillSleep();
       const bool didWake = Platform::AudioDidWake();
       const bool configChanged = Platform::AudioDeviceConfigDidChange();

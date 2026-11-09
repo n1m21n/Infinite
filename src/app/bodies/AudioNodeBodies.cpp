@@ -252,7 +252,10 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
+      const bool canRecord = !Platform::PluginModeActive(); // inside a DAW the DAW records
       // Format selector: WAV | FLAC | MP3
+      if (canRecord)
+      {
       ImGui::BeginDisabled(recording);
       const float fmtBtnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
       const char* fmtNames[] = { "WAV", "FLAC", "MP3" };
@@ -273,6 +276,7 @@ namespace app
       }
       ImGui::EndDisabled();
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      }
 
       // Live: skip alignment against other Audio Outs (see AudioOutputNode::live).
       {
@@ -297,6 +301,8 @@ namespace app
       // recording - Choose... below only ever changes where the *next*
       // recording will land, never triggers one itself, so picking a folder
       // can't be mistaken for pressing Record.
+      if (canRecord)
+      {
       const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
       ImGui::BeginDisabled(!recording && !audioOn);
       if (ActionButton::Draw(recording ? "Stop##audioOutRec" : "Record##audioOutRec", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
@@ -331,6 +337,7 @@ namespace app
 
       const std::string destLabel = n->recordDirectory.empty() ? std::string("~/Desktop") : n->recordDirectory;
       ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s", destLabel.c_str());
+      }
 
       if (n->DroppedSampleCount() > 0)
          ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "dropped samples - device can't keep up");
@@ -369,9 +376,12 @@ namespace app
    {
       const bool recording = n->IsRecording();
       const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
-      ImGui::BeginDisabled(recording);
+      const bool canRecord = !Platform::PluginModeActive(); // inside a DAW the DAW records
       const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
       const float third = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+      if (canRecord)
+      {
+      ImGui::BeginDisabled(recording);
       const char* fmtNames[] = { "WAV", "FLAC" };
       for (int i = 0; i < 2; i++)
       {
@@ -400,6 +410,7 @@ namespace app
       if (ImGui::IsItemHovered())
          SetAudioReadout("depth", n->bit24 ? "24-bit file" : "16-bit file");
       ImGui::EndDisabled();
+      }
 
       const bool wasLive = n->live;
       if (wasLive)
@@ -430,6 +441,8 @@ namespace app
       if (ImGui::IsItemHovered())
          SetAudioReadout("render", n->renderMode == 1 ? "speaker-safe pan, no ear filtering" : "headphones: ear filtering on");
 
+      if (!canRecord)
+         return;
       const float btnW = half;
       ImGui::BeginDisabled(!recording && !audioOn);
       if (ActionButton::Draw(recording ? "Stop##spatialRec" : "Record##spatialRec", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))

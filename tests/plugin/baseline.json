@@ -1,0 +1,111 @@
+{
+  "recorded": "2026-11-07",
+  "machine": "Apple M2",
+  "app_version": "1.1.0",
+  "B-1": {
+    "value_mb": 62.8,
+    "how": "du -sk ../repo/build/Infinite.app"
+  },
+  "B-2": {
+    "value_mb": 194.9,
+    "how": "max RSS of headless --audio-summary assets/templates/first-music-image.inf 10 s",
+    "note": "headless peak, not idle; true idle RSS needs plugin mode (step 1.4)"
+  },
+  "B-3": {
+    "value_s": 0.34,
+    "how": "wall clock of headless --audio-summary --duration 0.1"
+  },
+  "B-4": {
+    "value_cpu_s_per_s": 0.056,
+    "wall_s": 0.65,
+    "how": "(user+sys)/10 for 10 s offline render of assets/templates/first-music-image.inf",
+    "note": "offline render of the stand-in patch; R1 is frozen in step 1.4 (needs host input)"
+  },
+  "B-5": {
+    "rows": [
+      {
+        "block": 32,
+        "block_us": 666.7,
+        "p50_us": 27.8,
+        "p99_us": 99.5,
+        "max_us": 607.4,
+        "p99_pct_of_block": 14.9,
+        "attach_ms": 3.36
+      },
+      {
+        "block": 64,
+        "block_us": 1333.3,
+        "p50_us": 36.0,
+        "p99_us": 120.4,
+        "max_us": 916.1,
+        "p99_pct_of_block": 9.0,
+        "attach_ms": 39.08
+      },
+      {
+        "block": 128,
+        "block_us": 2666.7,
+        "p50_us": 42.4,
+        "p99_us": 202.6,
+        "max_us": 7351.9,
+        "p99_pct_of_block": 7.6,
+        "attach_ms": 13.42
+      },
+      {
+        "block": 256,
+        "block_us": 5333.3,
+        "p50_us": 49.7,
+        "p99_us": 152.0,
+        "max_us": 2342.8,
+        "p99_pct_of_block": 2.8,
+        "attach_ms": 12.24
+      },
+      {
+        "block": 512,
+        "block_us": 10666.7,
+        "p50_us": 71.0,
+        "p99_us": 136.8,
+        "max_us": 895.2,
+        "p99_pct_of_block": 1.3,
+        "attach_ms": 12.16
+      },
+      {
+        "block": 1024,
+        "block_us": 21333.3,
+        "p50_us": 91.3,
+        "p99_us": 289.5,
+        "max_us": 46668.0,
+        "p99_pct_of_block": 1.4,
+        "attach_ms": 9.98
+      },
+      {
+        "block": 2048,
+        "block_us": 42666.7,
+        "p50_us": 108.7,
+        "p99_us": 200.8,
+        "max_us": 4287.0,
+        "p99_pct_of_block": 0.5,
+        "attach_ms": 10.85
+      }
+    ],
+    "how": "tools/plugin/spike/spike_bench, paced at 48 kHz, os_sync wake"
+  },
+  "B-6": {
+    "status": "pending",
+    "why": "readback_bench is built with the GUI pixel path (step 2.3)"
+  },
+  "B-7": {
+    "identical": true,
+    "patch": "assets/templates/first-music-image.inf",
+    "known_exception": "Field Notes + modulation, ~0.1 dB (docs/headless/GUIDE.md)",
+    "how": "tools/determinism-check.py --audio-only"
+  },
+  "B-8": {
+    "vst3_validator": {
+      "passed": 47,
+      "failed": 0
+    },
+    "auval": "not run (AU not installed)",
+    "how": "SDK validator on the spike VST3; auval -v when the spike AU is installed",
+    "note": "spike shell stands in for the empty 'again' sample; pluginval waits for step 1.7"
+  }
+}

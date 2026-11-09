@@ -2485,6 +2485,15 @@ void DrawFrameTestsA(FrameCtx& fc)
       // Debug builds: every item of every audited state checked, sliders dragged (docs/plans/ui-system/ui-audit.md).
       FrameTest_UIAUDIT(frameId, window);
 
+      // Curve Editor M8: open on 8 MSEG pages costs at most 1 ms a frame.
+      FrameTest_CURVEBENCH(frameId, window);
+
+      // Curve Editor M1: a drag on the empty panel makes a 4-bar MSEG and draws it.
+      FrameTest_CURVEM1TEST(frameId, window);
+
+      // Curve Editor motion grade: + Position on a selected Transform makes three bound X Y Z pages.
+      FrameTest_CURVEMOTIONTEST(frameId, window);
+
       // Keyed mod/expr on a Star: lands on the named control, survives a shape change.
       FrameTest_KEYEDSTARTEST(frameId, window);
 

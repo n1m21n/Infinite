@@ -1,5 +1,8 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "plugin/engine/HostAudio.h"
+#include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "platform/PluginCrashGuard.h"
 #include "core/CliSetup.h"
 #include "app/graph/NoteGen.h"
@@ -8,9 +11,13 @@
 #include "app/frame/FrameCtx.h"
 #include "platform/HeadTracker.h"
 #include "platform/AppPaths.h"
+#include "core/DawPluginInstall.h"
 
 namespace app
 {
+   DawPlugin::Env DawPluginEnv();   // DawPluginSection.cpp
+   void DawPluginLaunchRecopy();
+
 bool RunAliasTest(); // selftest/AliasTests.cpp
 extern bool gShotNodeMenu; // frame/StagePopupsA.cpp: review shots open the first node's menu
 bool RunOversampleTest(); // selftest/AliasTests.cpp
@@ -995,6 +1002,52 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   // `Infinite --install-plugins` / `--uninstall-plugins`: the Settings > DAW plugin copier without a
+   // window, for install.sh and the Homebrew cask (docs/plans/vst-au/README.md 3.6).
+   if (argc >= 2 && (std::strcmp(argv[1], "--install-plugins") == 0 || std::strcmp(argv[1], "--uninstall-plugins") == 0))
+   {
+      const bool install = std::strcmp(argv[1], "--install-plugins") == 0;
+      DawPlugin::Env env = DawPluginEnv();
+      if (argc >= 3 && install)
+         env.formats = argv[2]; // the installer's checkboxes: "vst3", "au" or "vst3,au"
+      std::string err;
+      const bool ok = install ? DawPlugin::Install(env, err) : DawPlugin::Uninstall(env, err);
+      if (!ok)
+      {
+         fprintf(stderr, "%s\n", err.c_str());
+         return 1;
+      }
+      for (const DawPlugin::Bundle& b : DawPlugin::Bundles(env))
+         printf("%s %s\n", install ? "installed" : "removed", b.target.c_str());
+      return 0;
+   }
+
+   // Plugin engine mode: this process is the engine of one VST3/AU instance
+   // (src/plugin/engine/HostAudio.h). Must run before IsHeadlessProcess() is
+   // first read below, since plugin mode is a headless process.
+   PluginEngine::Options pluginOpt;
+   const bool pluginEngine = PluginEngine::ParseArgs(argc, argv, &pluginOpt);
+   if (pluginEngine)
+   {
+      std::string pluginErr;
+      if (!PluginEngine::Init(pluginOpt, pluginErr))
+      {
+         fprintf(stderr, "plugin engine: %s\n", pluginErr.c_str());
+         return 2;
+      }
+      // One audio thread per engine: the DAW already spreads instances across its cores, and
+      // without a device workgroup the graph's workers are not realtime, so the engine's audio
+      // thread waited on descheduled workers and blocks came back late (step 2.7, M-7).
+#if defined(_WIN32)
+      _putenv_s("INFINITE_NO_UPDATE_CHECK", "1");
+      if (!std::getenv("INFINITE_AUDIO_THREADS"))
+         _putenv_s("INFINITE_AUDIO_THREADS", "1");
+#else
+      setenv("INFINITE_NO_UPDATE_CHECK", "1", 1);
+      setenv("INFINITE_AUDIO_THREADS", "1", 0);
+#endif
+   }
+
    // Dev/test harness runs (INFINITE_EXITAFTER) and screenshot mode
    // (IMAGERESYNTH_SCREENSHOT) create the window off-screen: a hidden window
    // still has a real GL context and still produces real ImGui frames, real GL
@@ -1035,7 +1088,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // already open hands the file to it and exits (macOS does this through Launch
    // Services). Dev harnesses that set INFINITE_EXITAFTER, and headless jobs, are
    // exempt so a test run never talks to the app someone has open.
-   if (!HeadlessJobActive() && getenv("INFINITE_EXITAFTER") == nullptr && getenv("INFINITE_NO_SINGLE_INSTANCE") == nullptr)
+   if (!HeadlessJobActive() && !pluginEngine && getenv("INFINITE_EXITAFTER") == nullptr && getenv("INFINITE_NO_SINGLE_INSTANCE") == nullptr)
    {
       std::string openArg;
       if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-' &&
@@ -1045,10 +1098,27 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          return 0;
    }
 
+   // Plugin engine without graphics (step 2.4): no dialog nobody can see inside a DAW - tell the
+   // shell, which shows "No graphics on this machine" in the editor, and quit. A GL-less engine that
+   // still plays audio comes with chunk 3 (Linux servers and VMs are where this happens).
+   // INFINITE_PLUGIN_NO_GL forces this path for tools/plugin checks.
+   const auto pluginNoGraphics = [&](const char* reason) -> bool
+   {
+      if (!pluginEngine)
+         return false;
+      fprintf(stderr, "plugin engine: no graphics: %s\n", reason);
+      PluginEngine::SendToShell(PluginFrames::kMsgNoGraphics, reason, strlen(reason), 1000);
+      return true;
+   };
+   if (pluginEngine && getenv("INFINITE_PLUGIN_NO_GL") != nullptr && pluginNoGraphics("forced (INFINITE_PLUGIN_NO_GL)"))
+      return 3;
+
    tPreWindow = Bench::ScopedStageTimer::NowMs();
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
+      if (pluginNoGraphics("glfwInit failed"))
+         return 3;
    if (HeadlessJobActive())
       {
          Headless::Status st;
@@ -1108,6 +1178,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
    if (!window)
    {
+      if (pluginNoGraphics("no OpenGL 3.3 window"))
+      {
+         glfwTerminate();
+         return 3;
+      }
       Platform::ShowFatalError("Infinite failed to start",
                                "glfwCreateWindow failed. This usually means the graphics "
                                "driver doesn't support the OpenGL version Infinite needs.");
@@ -1152,6 +1227,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    const int gladVersion = gladLoadGL((GLADloadfunc)glfwGetProcAddress);
    if (!gladVersion || !GLAD_GL_VERSION_3_3)
    {
+      if (pluginNoGraphics("the graphics driver has no OpenGL 3.3"))
+      {
+         glfwTerminate();
+         return 3;
+      }
       Platform::ShowFatalError(
          "Infinite failed to start",
          "This graphics driver does not support OpenGL 3.3, which Infinite requires. "
@@ -1417,7 +1497,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    // Keep all mutable state (settings, indexes, imgui.ini) in the per-user
    // application-data directory rather than next to the executable.
-   std::string settingsDir = AppPaths::AppSupportDir();
+   std::string settingsDir = AppPaths::SettingsDir();
    // Restores whatever was indexed last run with no rescan - scanning only
    // ever happens from an explicit Refresh click in the Samples/Media panel.
    // A cached index is a convenience, never a reason the app fails to open: one that cannot be read is skipped.
@@ -1443,8 +1523,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
    // No-ops under the self-test env vars, so headless/CI runs never touch
    // the network.
-   if (UpdateCheck::AutoCheckEnabled())
+   // Never inside a DAW: the app does both (an engine must not replace the bundle its DAW has loaded).
+   if (UpdateCheck::AutoCheckEnabled() && !Platform::PluginModeActive())
       UpdateCheck::Start();
+   // An installed DAW plugin follows this app's version and location (DawPluginInstall.h).
+   if (!IsHeadlessProcess() && !Platform::PluginModeActive())
+      DawPluginLaunchRecopy();
 
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")
                                                     : settingsDir + "/imgui.ini";
@@ -1577,9 +1661,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return std::string();
    });
    MovementLog::Start();
-   if (gHeadlessJob.mode == Headless::Mode::None)
+   if (gHeadlessJob.mode == Headless::Mode::None && !pluginEngine)
       LearningLog::Start(BundledResourcePath("starter-profile"));
-   if (gHeadlessJob.mode == Headless::Mode::None)
+   if (gHeadlessJob.mode == Headless::Mode::None && !pluginEngine)
       CliSetup::StartLaunchCheck();   // keeps the infinite launcher pointed at this app; no process spawned
    // Headless jobs neither read nor write the learned profiles: a render must not depend on (or change)
    // the user's accumulated data, or the same patch renders differently run to run.
@@ -4315,6 +4399,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gSampleStudioOpen = o.find("studio") != std::string::npos;
       gPianoRollOpen = o.find("pianoroll") != std::string::npos;
       gTerminalOpen = o.find("terminal") != std::string::npos;
+      gCurveEditorOpen = o.find("curveeditor") != std::string::npos;
       if (o.find("chatcode") != std::string::npos)
          ChatShotOpenCode();
       gShotNodeMenu = o.find("nodemenu") != std::string::npos;
@@ -4516,6 +4601,56 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          else
             LoadPatchFrom(gHeadlessJob.patch);
       }
+   }
+   else if (pluginEngine)
+   {
+      // The plugin's engine: load the shell's patch (the host project's state, sent as the first
+      // message), else a patch path, else the build's starting patch (FX: audio passes through;
+      // Instrument: MIDI Notes -> Analog), then run audio from the host.
+      PluginEngine::SetStateHandlers(
+         []() -> std::string
+         {
+            std::string text;
+            Patch::WriteText(BuildPatchData(), text);
+            return text;
+         },
+         [](const std::string& text, std::string& error) -> bool
+         {
+            Patch::Data data;
+            if (!Patch::ReadText(text, data, error))
+               return false;
+            if (!LoadPatchDataImpl(data, std::string(), true))
+            {
+               error = gPatchStatus;
+               return false;
+            }
+            return true;
+         });
+      bool fromState = false;
+      if (pluginOpt.initialState)
+      {
+         std::string text, error;
+         if (PluginEngine::TakeInitialState(text, 5000))
+         {
+            Patch::Data data;
+            fromState = Patch::ReadText(text, data, error) && LoadPatchDataImpl(data, std::string(), true);
+            if (!fromState)
+               fprintf(stderr, "plugin engine: stored state did not load: %s\n", error.empty() ? gPatchStatus.c_str() : error.c_str());
+         }
+      }
+      if (!fromState && !pluginOpt.patchPath.empty())
+         LoadPatchFrom(pluginOpt.patchPath);
+      else if (!fromState)
+      {
+         const std::string start = BundledResourcePath(pluginOpt.fx ? "plugin/fx.inf" : "plugin/instrument.inf");
+         std::error_code ec;
+         if (std::filesystem::exists(AppPaths::FsPath(start), ec))
+            LoadPatchFrom(start);
+      }
+      AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+      if (!StartAudioEngine(gAudioStartError))
+         fprintf(stderr, "plugin engine: audio did not start: %s\n", gAudioStartError.c_str());
+      PluginEngine::SetStarted(AudioEngine::Instance().SampleRate() > 0.0 ? std::string() : gAudioStartError);
    }
    else if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
    {

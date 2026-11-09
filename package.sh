@@ -45,6 +45,11 @@ rm -f "$APP/Contents/Resources/Infinite.json" "$APP/Contents/Resources/imgui.ini
 # Licence texts travel with the app (before signing, so the seal covers them).
 cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES" "$APP/Contents/Resources/"
 
+# The DAW plugin rides inside the app (docs/plans/vst-au/README.md 8.11): Settings > DAW plugin
+# copies these into ~/Library/Audio/Plug-Ins, and the plugin runs this app as its engine.
+echo "==> building the DAW plugin bundles"
+"$ROOT/tools/plugin/build_bundles.sh" "$APP/Contents/Resources/Plugins" --jobs "${INFINITE_JOBS:-3}"
+
 echo "==> verifying the bundle is self-contained"
 if otool -L "$APP/Contents/MacOS/Infinite" | grep -qE '/opt/homebrew|/usr/local/(lib|opt)'; then
     echo "ERROR: bundle links a non-system library:"
@@ -82,6 +87,10 @@ echo "==> building dmg"
 "$ROOT/tools/dmg/layout.sh" "$STAGE" "$DMG"
 rm -rf "$STAGE"
 
+# The buyer installer: Installer.app screens, Infinite app / VST3 / Audio Unit (tools/installer).
+echo "==> building the installer"
+"$ROOT/tools/installer/mac/build_pkg.sh" "$APP" "$ROOT/dist/Infinite.pkg"
+
 if [ -d "$ROOT/website/assets" ]; then
     cp "$DMG" "$ROOT/website/assets/Infinite.dmg"
     echo "copied $DMG -> website/assets/Infinite.dmg"
@@ -89,4 +98,5 @@ fi
 
 echo
 echo "built $DMG ($(du -h "$DMG" | cut -f1))"
+echo "built $ROOT/dist/Infinite.pkg ($(du -h "$ROOT/dist/Infinite.pkg" | cut -f1))"
 

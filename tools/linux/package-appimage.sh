@@ -68,6 +68,13 @@ else
   exit 1
 fi
 
+# DAW plugin bundles (docs/plans/vst-au/README.md 3.6): DawPlugin::SourceDir finds them here.
+if [ -n "${INFINITE_PLUGINS_DIR:-}" ]; then
+  [ -d "$INFINITE_PLUGINS_DIR/Infinite FX.vst3" ] || { echo "ERROR: no plugin bundles in $INFINITE_PLUGINS_DIR" >&2; exit 1; }
+  mkdir -p "$APPDIR/usr/share/infinite"
+  cp -r "$INFINITE_PLUGINS_DIR" "$APPDIR/usr/share/infinite/Plugins"
+fi
+
 mkdir -p "$APPDIR/usr/bin/assets/models"
 if [ -f "$BUILD_DIR/assets/models/u2netp.onnx" ]; then
   cp "$BUILD_DIR/assets/models/u2netp.onnx" "$APPDIR/usr/bin/assets/models/u2netp.onnx"
@@ -188,7 +195,8 @@ echo "==> Bundling onnxruntime/FFmpeg shared libs and fixing RPATH"
 mkdir -p "$APPDIR/usr/lib"
 FOUND_PRIVATE_LIBS=0
 COPIED_PRIVATE_LIBS=()
-for libdir in "$BUILD_DIR"/_deps/onnxruntime_linux-src/lib "$BUILD_DIR"/_deps/ffmpeg_linux-src/lib; do
+# onnxruntime: release tarball keeps libs in lib/, the NuGet package in runtimes/<rid>/native.
+for libdir in "$BUILD_DIR"/_deps/onnxruntime_linux-src/lib "$BUILD_DIR"/_deps/onnxruntime_linux-src/runtimes/*/native "$BUILD_DIR"/_deps/ffmpeg_linux-src/lib; do
   if [ -d "$libdir" ]; then
     while IFS= read -r -d '' f; do
       cp -P "$f" "$APPDIR/usr/lib/"

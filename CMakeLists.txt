@@ -19,12 +19,12 @@ project(Infinite LANGUAGES C CXX)
 # "am I current" comparison. Bump this (and INFINITE_VERSION_RC below it,
 # kept in sync by hand) when cutting a release; nothing else should hardcode
 # a version string.
-set(INFINITE_VERSION "1.1.0")
+set(INFINITE_VERSION "1.2.0")
 # VERSIONINFO (src/platform/win/Infinite.rc.in) wants four dot/comma-separated
 # numeric components but INFINITE_VERSION is three; kept as an explicit
 # second value rather than derived, so bump both together when cutting a
 # release.
-set(INFINITE_VERSION_RC "1,1,0,0")
+set(INFINITE_VERSION_RC "1,2,0,0")
 string(REPLACE "," "." INFINITE_VERSION_RC_STR "${INFINITE_VERSION_RC}")
 
 if(APPLE)
@@ -174,6 +174,8 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # .dll, nothing to link or include.
     set(ONNXRUNTIME_DML_VERSION "1.20.1")
     set(DIRECTML_VERSION "1.15.4")
+    # Microsoft.ML.OnnxRuntime (CPU) .nupkg, Linux and macOS headers.
+    set(ONNXRUNTIME_CPU_NUPKG_SHA256 "9c32108e9a1c78b090a95c2a219f244dd5f067d4caf68fb0f967103f3f20839c")
 
     if(WIN32)
         # Matches the -A argument package.ps1/build.yml pass to cmake's Visual
@@ -205,23 +207,30 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set(ONNXRUNTIME_DLL "${onnxruntime_dml_SOURCE_DIR}/runtimes/win-${INFINITE_WIN_ARCH}/native/onnxruntime.dll")
         set(DIRECTML_DLL "${directml_redist_SOURCE_DIR}/bin/${INFINITE_WIN_ARCH}-win/DirectML.dll")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(ONNX_LINUX_ARCH "x64")
-        set(ONNX_LINUX_SHA256 "67db4dc1561f1e3fd42e619575c82c601ef89849afc7ea85a003abbac1a1a105")
+        # Linux and macOS take the CPU NuGet package, the source Windows already uses: GitHub's
+        # microsoft/onnxruntime release downloads returned 504 for hours (2026-11-08) while NuGet served.
+        # Layout: build/native/include/*.h, runtimes/<rid>/native/libonnxruntime.so (soname .so.1).
+        set(ONNX_LINUX_RID "linux-x64")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-            set(ONNX_LINUX_ARCH "aarch64")
-            set(ONNX_LINUX_SHA256 "ae4fedbdc8c18d688c01306b4b50c63de3445cdf2dbd720e01a2fa3810b8106a")
+            set(ONNX_LINUX_RID "linux-arm64")
         endif()
 
         FetchContent_Declare(
             onnxruntime_linux
-            URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_DML_VERSION}/onnxruntime-linux-${ONNX_LINUX_ARCH}-${ONNXRUNTIME_DML_VERSION}.tgz"
-            URL_HASH SHA256=${ONNX_LINUX_SHA256}
+            URL "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime/${ONNXRUNTIME_DML_VERSION}"
+            URL_HASH SHA256=${ONNXRUNTIME_CPU_NUPKG_SHA256}
+            DOWNLOAD_NAME "onnxruntime-cpu-${ONNXRUNTIME_DML_VERSION}.zip"
         )
         FetchContent_MakeAvailable(onnxruntime_linux)
 
-        set(ONNXRUNTIME_INCLUDE_DIR "${onnxruntime_linux_SOURCE_DIR}/include")
-        set(ONNXRUNTIME_LIB "${onnxruntime_linux_SOURCE_DIR}/lib/libonnxruntime.so")
-        file(GLOB ONNXRUNTIME_SO_FILES "${onnxruntime_linux_SOURCE_DIR}/lib/libonnxruntime*.so*")
+        set(ONNXRUNTIME_INCLUDE_DIR "${onnxruntime_linux_SOURCE_DIR}/build/native/include")
+        set(ONNX_LINUX_LIBDIR "${onnxruntime_linux_SOURCE_DIR}/runtimes/${ONNX_LINUX_RID}/native")
+        set(ONNXRUNTIME_LIB "${ONNX_LINUX_LIBDIR}/libonnxruntime.so")
+        # The loader asks for the soname, which the package does not ship as its own file.
+        if(NOT EXISTS "${ONNX_LINUX_LIBDIR}/libonnxruntime.so.1")
+            configure_file("${ONNXRUNTIME_LIB}" "${ONNX_LINUX_LIBDIR}/libonnxruntime.so.1" COPYONLY)
+        endif()
+        file(GLOB ONNXRUNTIME_SO_FILES "${ONNX_LINUX_LIBDIR}/libonnxruntime*.so*")
     endif()
 endif()
 
@@ -232,11 +241,12 @@ if(APPLE)
     include(FetchContent)
     FetchContent_Declare(
         onnxruntime_mac_headers
-        URL "https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-osx-universal2-1.20.1.tgz"
-        URL_HASH SHA256=da4349e01a7e997f5034563183c7183d069caadc1d95f499b560961787813efd
+        URL "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime/1.20.1"
+        URL_HASH SHA256=9c32108e9a1c78b090a95c2a219f244dd5f067d4caf68fb0f967103f3f20839c
+        DOWNLOAD_NAME "onnxruntime-cpu-1.20.1.zip"
     )
     FetchContent_MakeAvailable(onnxruntime_mac_headers)
-    set(ORT_MAC_INCLUDE_DIR "${onnxruntime_mac_headers_SOURCE_DIR}/include")
+    set(ORT_MAC_INCLUDE_DIR "${onnxruntime_mac_headers_SOURCE_DIR}/build/native/include")
 endif()
 
 # FFmpeg, for Platform::VideoOpen/RecorderStart/CameraOpen's decode/encode/mux
@@ -262,8 +272,8 @@ endif()
 #   OFF: the "-lgpl-shared" build, no --enable-gpl, no x264. Required to
 #       exist and to actually work (not just compile) for distros that
 #       cannot ship a bundled H.264 encoder (Fedora, RHEL, Flathub's main
-#       repo) - see LICENSE's promise about INFINITE_ENABLE_VST3=OFF, which
-#       this mirrors. RecorderStart's H.264 path is unavailable in this
+#       repo) - see LICENSE, which promises this configuration stays MIT.
+#       RecorderStart's H.264 path is unavailable in this
 #       configuration; video decode/playback (no libx264 needed for that)
 #       still works, since decoding H.264 needs no patent-encumbered encoder.
 #
@@ -373,11 +383,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Linux FFmpeg: ${FFMPEG_ARCHIVE_NAME} (INFINITE_ENABLE_GPL_CODECS=${INFINITE_ENABLE_GPL_CODECS})")
 endif()
 
-# VST3 plugin hosting backend. On by default: the Steinberg VST3 SDK is
-# GPLv3-or-proprietary, and linking it makes the distributed binary GPLv3
-# too (see LICENSE). Do not flip this default without the user's explicit
-# sign-off - it's a licensing decision, not a technical one.
-option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" ON)
+# VST3 plugin hosting backend. On by default: the Steinberg VST3 SDK is MIT
+# licensed since 3.8 (external/vst3sdk/LICENSE.txt), so linking it adds no
+# copyleft terms (see LICENSE).
+option(INFINITE_ENABLE_VST3 "Build the VST3 plugin backend" ON)
 
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)
@@ -443,6 +452,13 @@ endif()
 
 set(COMMON_SOURCES
     src/main.cpp
+    # Plugin engine mode (docs/plans/vst-au/README.md 8.1): host-driven audio for one plugin instance
+    src/plugin/engine/HostAudio.cpp
+    src/plugin/engine/PluginView.cpp
+    src/core/License.cpp
+    src/core/DawPluginInstall.cpp
+    external/monocypher/monocypher.c
+    external/monocypher/monocypher-ed25519.c
     # src/app/**: code that used to live in src/main.cpp
     src/app/AppState.cpp
     src/app/Startup.cpp
@@ -461,6 +477,7 @@ set(COMMON_SOURCES
     src/app/bodies/SpatialMixerBody.cpp
     src/app/bodies/VmpcBody.cpp
     src/app/frame/CookFrame.cpp
+    src/app/frame/HostSlots.cpp
     src/app/frame/FrameStatics.cpp
     src/app/frame/FrameTests1.cpp
     src/app/frame/FrameTests2.cpp
@@ -524,9 +541,11 @@ set(COMMON_SOURCES
     src/app/panels/PatchOpenerCheck.cpp
     src/app/panels/HistoryPanel.cpp
     src/app/panels/PianoRollPanel.cpp
+    src/app/panels/CurveEditorPanel.cpp
     src/app/panels/View3DPanel.cpp
     src/app/panels/TerminalPanel.cpp
     src/app/panels/CliSetupSection.cpp
+    src/app/panels/DawPluginSection.cpp
     src/app/panels/ChatPanel.cpp
     src/core/CliSetup.cpp
     src/core/chat/AgentStream.cpp
@@ -1089,6 +1108,26 @@ endif()
 add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
 
+# Plugin build process plumbing (docs/plans/vst-au/README.md step 1.2): shared memory, spawn,
+# parent watch, realtime priority. A small library so the plugin shell links only this.
+find_package(Threads REQUIRED)
+add_library(infinite_ipc STATIC src/platform/common/Ipc.cpp)
+target_include_directories(infinite_ipc PUBLIC src)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(infinite_ipc PUBLIC rt Threads::Threads)
+elseif(NOT WIN32)
+    target_link_libraries(infinite_ipc PUBLIC Threads::Threads)
+endif()
+add_executable(ipc-check src/platform/common/IpcCheck.cpp)
+target_link_libraries(ipc-check PRIVATE infinite_ipc)
+# Plugin shell <-> engine protocol (docs/plans/vst-au/README.md step 1.3) and its bench/check tool.
+add_library(infinite_plugin_ipc STATIC src/plugin/ipc/PluginIpc.cpp)
+target_link_libraries(infinite_plugin_ipc PUBLIC infinite_ipc)
+add_executable(ipc_bench src/plugin/ipc/IpcBench.cpp)
+target_link_libraries(ipc_bench PRIVATE infinite_plugin_ipc)
+add_executable(plugin_engine_check src/plugin/engine/PluginEngineCheck.cpp)
+target_link_libraries(plugin_engine_check PRIVATE infinite_plugin_ipc)
+
 # `infinite find` ranking: top-3 hits over real asks (tests/chat/find_*.tsv; scores in src/core/chat/FindEval.cpp).
 add_executable(find-eval src/core/chat/FindEval.cpp src/core/chat/NodeFinder.cpp)
 target_include_directories(find-eval PRIVATE src src/core)
@@ -1197,6 +1236,10 @@ add_executable(Infinite ${COMMON_SOURCES})
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
 # User-Agent header, etc.).
 target_compile_definitions(Infinite PRIVATE INFINITE_VERSION_STRING="${INFINITE_VERSION}")
+# Plugin licence (src/core/License.h): the engine reads only the key's id, for the refund check.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/worker/license/PUBLIC_KEY.txt" INFINITE_LICENSE_PUBKEY_HEX)
+string(STRIP "${INFINITE_LICENSE_PUBKEY_HEX}" INFINITE_LICENSE_PUBKEY_HEX)
+target_compile_definitions(Infinite PRIVATE INFINITE_LICENSE_PUBKEY_HEX="${INFINITE_LICENSE_PUBKEY_HEX}")
 # Debug only: Dear ImGui item hooks for the UI audit (src/app/selftest/UiAudit.cpp). Never in a release.
 target_compile_definitions(Infinite PRIVATE $<$<CONFIG:Debug>:IMGUI_ENABLE_TEST_ENGINE>)
 
@@ -1298,6 +1341,7 @@ target_include_directories(Infinite PRIVATE
 )
 
 target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib vterm_lib)
+target_link_libraries(Infinite PRIVATE infinite_plugin_ipc)
 target_sources(Infinite PRIVATE ${TERMINAL_CORE_SOURCES})
 if(UNIX AND NOT APPLE)
     target_link_libraries(Infinite PRIVATE util)
@@ -1503,6 +1547,9 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/plugin"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/plugin"
         COMMENT "Copying bundled fonts and drum kit next to Infinite.exe")
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
@@ -1581,6 +1628,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/plugin"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/plugin"
         COMMENT "Copying bundled fonts, icon, drum kit, ONNX Runtime libraries and model next to Infinite")
     # THIRD_PARTY_NOTICES condition 3 / GPL source-offer condition 2: the
     # FFmpeg and x264 licence texts ship inside the bundle wherever the
@@ -1893,6 +1943,10 @@ if(APPLE)
     set_source_files_properties(${INFINITE_TEMPLATE_MEDIA} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/media")
     set_source_files_properties(${INFINITE_TEMPLATE_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates")
     set_source_files_properties(${INFINITE_TEMPLATE_THUMBS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/thumbs")
+    # Starting patches for the plugin builds (docs/plans/vst-au/README.md step 1.5).
+    file(GLOB INFINITE_PLUGIN_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/assets/plugin/*.inf")
+    target_sources(Infinite PRIVATE ${INFINITE_PLUGIN_PATCHES})
+    set_source_files_properties(${INFINITE_PLUGIN_PATCHES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/plugin")
     target_sources(Infinite PRIVATE ${INFINITE_DRUMKIT_FILES})
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
 endif()

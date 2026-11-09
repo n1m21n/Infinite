@@ -24,11 +24,12 @@ SOFTWARE.
 
 Infinite's own source code is licensed under the MIT License above.
 
-By default, the build links the Steinberg VST3 SDK (`INFINITE_ENABLE_VST3=ON`),
-which is licensed under the GNU General Public License version 3 (GPLv3). The
-distributed binary of a default build must therefore be distributed under the
-terms of the GPLv3. Building with `-DINFINITE_ENABLE_VST3=OFF` excludes the VST3
-SDK and the resulting binary remains under the plain MIT terms above.
+By default, the build links the Steinberg VST3 SDK (`INFINITE_ENABLE_VST3=ON`).
+Since version 3.8 the SDK is licensed under the MIT License (see
+`external/vst3sdk/LICENSE.txt`), so it adds no copyleft terms; a default macOS
+or Windows build stays under the plain MIT terms above. The Infinite plugin
+builds (VST3, and AU through the SDK's AU wrapper) also use Apple's
+AudioUnitSDK, licensed under the Apache License 2.0; see `THIRD_PARTY_NOTICES`.
 
 The Windows build bundles `assets/models/u2netp.onnx`, the small U^2-Net
 variant's weights, for on-device background removal (macOS uses Vision
@@ -44,9 +45,7 @@ prebuilt FFmpeg compiled with `--enable-gpl` and libx264 for H.264 video
 encoding (`Platform::RecorderStart` in `src/platform/linux/MediaLinux.cpp`).
 FFmpeg's own licensing already becomes GPL the moment `--enable-gpl` is
 turned on, and libx264 is GPLv2-or-later, so a default Linux build is GPLv3
-for this reason as well as (from P4 onward) the VST3 SDK reason above - the
-two reasons overlap rather than stack, since either alone already makes the
-combined work GPLv3. This is not new copyleft exposure for the project (see
+for this reason. This is not new copyleft exposure for the project (see
 `docs/plans/linux/phase-03-media.md`'s "Licence decision" for the full
 reasoning); it does mean video recording and camera capture, unlike on macOS
 and Windows, involve a bundled software H.264 encoder, and this project is
@@ -57,6 +56,5 @@ checksums, and where their licence texts ship inside the Linux build.
 Building with `-DINFINITE_ENABLE_GPL_CODECS=OFF` on Linux links LGPL FFmpeg
 instead (no `--enable-gpl`, no x264 linked in), for distros (Fedora, RHEL,
 Flathub's main repo) that cannot ship a bundled H.264 encoder. That
-configuration produces no video encoding capability. Combined with
-`-DINFINITE_ENABLE_VST3=OFF`, it is the only Linux build configuration that
-stays under the plain MIT terms above.
+configuration produces no video encoding capability. It is the only Linux
+build configuration that stays under the plain MIT terms above.

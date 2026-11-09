@@ -2796,3 +2796,140 @@ You're in	Du bist drin
 Your files	Deine Dateien
 This computer is missing curl, which downloads the setup. Install curl, then press Try again.	Auf diesem Computer fehlt curl, das die Einrichtung herunterlädt. Installiere curl und drücke Erneut versuchen.
 Send	Senden
+Back to the plugin	Zurück zum Plugin
+Canvas	Leinwand
+Copy path	Pfad kopieren
+DAW plugin	DAW-Plugin
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away	Doppelklick auf eine leere Stelle mit gedrückter Umschalttaste: Der Orbit-Drehpunkt gleitet zum 3D-Cursor zurück (Abstand und Winkel bleiben); Umschalt + Mitteltaste-Ziehen verschiebt ihn
+Host slots	Host-Slots
+Installed (%s)	Installiert (%s)
+Installed (%s), update ready	Installiert (%s), Update bereit
+Installed. Rescan plugins in your DAW.	Installiert. Plugins in der DAW neu scannen.
+Late blocks the host played as silence	Verspätete Blöcke, die der Host als Stille abgespielt hat
+No Macro is on a host slot	Kein Macro liegt auf einem Host-Slot
+No Output	Keine Ausgabe
+Not in this build	Nicht in diesem Build
+Reinstall	Neu installieren
+Reveal	Anzeigen
+Set by the DAW	Von der DAW vorgegeben
+Uninstall	Deinstallieren
+DAW sync	DAW-Sync
+DAW	DAW
+Playhead	Abspielposition
+Tempo	Tempo
+Record your performance: the clips and scenes you launch are written into the Timeline.	Nimm deine Performance auf: Die Clips und Szenen, die du startest, werden in die Timeline geschrieben.
+Not now	Nicht jetzt
+Make an account	Konto erstellen
+Transparent window	Transparentes Fenster
+Click to copy	Zum Kopieren klicken
+Buy	Kaufen
+Infinite as VST3/AU	Infinite als VST3/AU
+Plugin	Plugin
+Infinite as a VST3/AU plugin runs inside your DAW, with your patch saved in the project. The plugin is a one-time purchase for two computers, with updates for life. The standalone app stays free.	Infinite als VST3/AU-Plugin läuft in deiner DAW, dein Patch wird im Projekt gespeichert. Das Plugin ist ein einmaliger Kauf für zwei Computer, mit Updates auf Lebenszeit. Die eigenständige App bleibt kostenlos.
+Buy the plugin	Plugin kaufen
+%d target	%d Ziel
+%d targets	%d Ziele
+A shape you draw, played over time. Click empty space to add a point, drag to move it, right-click to remove it; the small ring on a Bend segment bends it. time sets how one pass is counted (beats, a synced division, Hz, seconds or frames), speed scales it, and play repeats, plays once or ping-pongs; free run ignores the transport. The Curve Editor (Shift+E) edits the same points with pens, snap and quantise. With nothing patched to trig it follows the transport. A trig cable starts the shape on each rising edge: loop off plays it once and holds the last value; loop on repeats the part between loop start and loop end while trig stays high and plays on to the end when it drops. Loop start = loop end is a sustain point.	Eine Kurve, die du zeichnest und die über die Zeit abgespielt wird. Klicke auf leere Fläche, um einen Punkt zu setzen, ziehe ihn zum Verschieben, Rechtsklick entfernt ihn; der kleine Ring an einem Bend-Segment krümmt es. time legt fest, wie ein Durchlauf gezählt wird (Beats, eine synchronisierte Teilung, Hz, Sekunden oder Frames), speed skaliert ihn, und play wiederholt, spielt einmal oder Ping-Pong; free run ignoriert den Transport. Der Curve Editor (Shift+E) bearbeitet dieselben Punkte mit Stiften, Einrasten und Quantisieren. Ohne Kabel an trig folgt die Kurve dem Transport. Ein Kabel an trig startet die Kurve bei jeder steigenden Flanke: loop aus spielt sie einmal und hält den letzten Wert; loop an wiederholt den Teil zwischen loop start und loop end, solange trig hoch bleibt, und spielt bis zum Ende weiter, wenn es fällt. Loop start = loop end ist ein Sustain-Punkt.
+Add Point	Punkt hinzufügen
+Add a point; the Pen adds one on a single click and a drag pulls its handles	Einen Punkt hinzufügen; der Stift setzt ihn mit einem Klick, Ziehen zieht seine Griffe heraus
+After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops	Nach Assign auf einen Regler im Canvas klicken, um ihn mit der Kurve zu steuern; Shift wählt weiter, Esc beendet
+Assign	Zuweisen
+Assign %s -> %s: %s	Zuweisen %s -> %s: %s
+Assign, then click a knob	Zuweisen, dann auf einen Regler klicken
+Auto Clamped, Auto, Vector, Aligned or Free handles for the selected points	Auto Clamped-, Auto-, Vector-, Aligned- oder Free-Griffe für die gewählten Punkte
+Bake	Umwandeln
+Bend (B)	Bend (B)
+Click a knob to drive it; Shift picks more, Esc stops	Auf einen Regler klicken, um ihn zu steuern; Shift wählt mehr, Esc beendet
+Click the knob to record; Esc stops	Auf den Regler klicken, um aufzunehmen; Esc beendet
+Click to pick again on the next take	Klicken, um bei der nächsten Aufnahme neu zu wählen
+Close Curve Editor	Curve Editor schließen
+Close Page	Seite schließen
+Constant, Linear, Bend, Bezier or Easing for the segments the selection starts (none selected: all)	Constant, Linear, Bend, Bezier oder Easing für die Segmente, die an der Auswahl beginnen (ohne Auswahl: alle)
+Crop to Loop	Auf Schleife zuschneiden
+Curve Editor	Curve Editor
+Curve Editor Panel	Curve-Editor-Panel
+Curve Tools	Kurvenwerkzeuge
+Curve editor - draw and shape MSEG curves (Shift+E)	Curve Editor: MSEG-Kurven zeichnen und formen (Shift+E)
+Delete Curve	Kurve löschen
+Delete Points	Punkte löschen
+Delete the selected points; the two ends stay	Löscht die gewählten Punkte; die beiden Enden bleiben
+Draw (D)	Zeichnen (D)
+Draw here to make one	Hier zeichnen, um eine anzulegen
+Easing	Easing
+End	Ende
+Eraser (E)	Radierer (E)
+FPS	FPS
+Fit Curve	Kurve einpassen
+Free run	Freilauf
+From	Von
+Grid: snap and quantise (Q)	Raster: Einrasten und Quantisieren (Q)
+Hand (H)	Hand (H)
+Handle Type	Griffart
+Handles	Griffe
+High	Hoch
+Keep	Behalten
+Keep only the looped part; the length shrinks to it	Behält nur den geloopten Teil; die Länge schrumpft darauf
+Line (L)	Linie (L)
+Loop only	Nur Schleife
+Low	Tief
+Mine	Eigene
+Mod / Motion	Mod / Motion
+Mod pages run on beats or Hz; Motion pages on seconds or frames at the export rate	Mod-Seiten laufen in Beats oder Hz; Motion-Seiten in Sekunden oder Frames mit der Exportrate
+Motion easings	Bewegungs-Easings
+Motion group	Bewegungsgruppe
+Move a CC to record it; Esc stops	Einen CC bewegen, um ihn aufzunehmen; Esc beendet
+Move the selected points, or every point, onto the grid	Verschiebt die gewählten Punkte oder alle auf das Raster
+New curve	Neue Kurve
+Next CC moved	Nächster bewegter CC
+Next knob clicked	Nächster angeklickter Regler
+No curve yet	Noch keine Kurve
+Nothing wired	Nichts verbunden
+Pen (P)	Stift (P)
+Per voice	Pro Stimme
+Point	Punkt
+Position, Rotation or Scale make X, Y and Z pages bound to the selected node	Position, Rotation oder Scale legen X-, Y- und Z-Seiten an, die an den gewählten Node gebunden sind
+Properties	Eigenschaften
+Pulses	Impulse
+Quantise Points	Punkte quantisieren
+Quantise to Grid	Auf Raster quantisieren
+Record	Aufnehmen
+Record %s: %s	%s aufnehmen: %s
+Record a take from a CC, a knob or the trig input into the page; Overwrite, Touch or Latch	Nimmt von einem CC, einem Regler oder dem trig-Eingang in die Seite auf; Overwrite, Touch oder Latch
+Record a take into this curve	Eine Aufnahme in diese Kurve aufnehmen
+Recording: click to stop	Aufnahme läuft: zum Stoppen klicken
+Remove target	Ziel entfernen
+Reopen Page	Seite wieder öffnen
+Replace the page with a shape, an easing or one of your saves; Mine saves this one	Ersetzt die Seite durch eine Form, ein Easing oder eine deiner Sicherungen; Eigene speichert diese
+Save This Shape	Diese Form speichern
+Segment Curve	Segmentkurve
+Select (A)	Auswählen (A)
+Select All Points	Alle Punkte auswählen
+Select every point	Alle Punkte auswählen
+Select, Hand, Pen, Draw, Line, Stamp, Bend, Eraser, Transform and Smooth, while the pointer is over the Curve Editor. Every key in this section needs the pointer there	Auswählen, Hand, Stift, Zeichnen, Linie, Stempel, Bend, Radierer, Transformieren und Glätten, solange der Zeiger über dem Curve Editor ist. Jede Taste in diesem Abschnitt braucht den Zeiger dort
+Shapes	Formen
+Show Curve Editor	Curve Editor anzeigen
+Show or hide the docked Curve Editor; it opens the MSEG node selected on the canvas	Blendet den angedockten Curve Editor ein oder aus; er öffnet den im Canvas gewählten MSEG-Node
+Show or hide the properties column; with Stamp, the next shape	Blendet die Eigenschaftsspalte ein oder aus; mit Stempel die nächste Form
+Show other curves	Andere Kurven zeigen
+Show the whole curve	Ganze Kurve zeigen
+Smooth (M)	Glätten (M)
+Snap to grid (G)	Am Raster einrasten (G)
+Stamp (S); N cycles shapes	Stempel (S); N wechselt die Form
+Starts on the next bar	Startet beim nächsten Takt
+Starts when the transport plays	Startet, wenn der Transport spielt
+Steps	Stufen
+Take	Take
+Targets	Ziele
+Thinning	Ausdünnung
+Toggle snap to the grid; hold Alt to drag past it, Ctrl to snap the value to eighths	Einrasten am Raster umschalten; Alt gedrückt halten, um darüber hinaus zu ziehen, Strg rastet den Wert auf Achtel
+Transform (T): drag to scale selection around its centre	Transformieren (T): ziehen, um die Auswahl um ihre Mitte zu skalieren
+Turn the formula into points you can edit	Wandelt die Formel in editierbare Punkte um
+Up/down zooms time, left/right moves along it; Alt zooms the value	Hoch/runter zoomt die Zeit, links/rechts bewegt sich darin; Alt zoomt den Wert
+Voices	Stimmen
+Wire a modulator into trig	Einen Modulator an trig anschließen
+Zoom / Pan Curve	Kurve zoomen / verschieben
+Zoom Value	Wert zoomen
+Zoom around the pointer, or pan; middle-drag also pans	Zoom um den Zeiger oder Verschieben; Ziehen mit der mittleren Taste verschiebt ebenfalls
+Zoom the value axis around the pointer	Zoomt die Werteachse um den Zeiger
+param 	Param 
+trig input	trig-Eingang

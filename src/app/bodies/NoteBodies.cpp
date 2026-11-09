@@ -19,6 +19,7 @@ namespace app
       std::string category;    // Device name or "System Default"
       uint32_t deviceId = 0;
       int channelMode = 0;     // 0 = Stereo (1+2), 1 = In 1, 2 = In 2, 3 = In 3...
+      int source = AudioInputNode::kSourceDefault;
    };
 
 
@@ -29,12 +30,27 @@ namespace app
    void DrawAudioInBody(GraphNode& gn, AudioInputNode* n)
    {
       std::vector<AudioInChoice> choices;
-      const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
+      const bool host = n->ReadsHost();
+      const std::vector<Platform::AudioDeviceInfo> devices = host ? std::vector<Platform::AudioDeviceInfo>() : Platform::AudioListDevices();
 
-      // System Default options
-      choices.push_back({ "Default: Stereo (1+2)", "Default: Stereo", "System Default", 0, 0 });
-      choices.push_back({ "Default: Input 1 (Mono)", "Default: In 1", "System Default", 0, 1 });
-      choices.push_back({ "Default: Input 2 (Mono)", "Default: In 2", "System Default", 0, 2 });
+      if (host)
+      {
+         // Inside the plugin: the host's buses, never a device.
+         const int kMain = AudioInputNode::kSourceHostMain, kSide = AudioInputNode::kSourceHostSidechain;
+         choices.push_back({ "Host: Stereo (1+2)", "Host: Stereo", "Host", 0, 0, kMain });
+         choices.push_back({ "Host: Input 1 (Mono)", "Host: In 1", "Host", 0, 1, kMain });
+         choices.push_back({ "Host: Input 2 (Mono)", "Host: In 2", "Host", 0, 2, kMain });
+         choices.push_back({ "Sidechain: Stereo (1+2)", "Sidechain: Stereo", "Sidechain", 0, 0, kSide });
+         choices.push_back({ "Sidechain: Input 1 (Mono)", "Sidechain: In 1", "Sidechain", 0, 1, kSide });
+         choices.push_back({ "Sidechain: Input 2 (Mono)", "Sidechain: In 2", "Sidechain", 0, 2, kSide });
+      }
+      else
+      {
+         // System Default options
+         choices.push_back({ "Default: Stereo (1+2)", "Default: Stereo", "System Default", 0, 0 });
+         choices.push_back({ "Default: Input 1 (Mono)", "Default: In 1", "System Default", 0, 1 });
+         choices.push_back({ "Default: Input 2 (Mono)", "Default: In 2", "System Default", 0, 2 });
+      }
 
       for (const Platform::AudioDeviceInfo& d : devices)
       {
@@ -64,8 +80,20 @@ namespace app
       }
 
       int currentIdx = 0;
+      const int wantSource = host ? (n->source == AudioInputNode::kSourceHostSidechain ? AudioInputNode::kSourceHostSidechain
+                                                                                         : AudioInputNode::kSourceHostMain)
+                                  : AudioInputNode::kSourceDefault;
       for (int i = 0; i < (int)choices.size(); i++)
       {
+         if (host)
+         {
+            if (choices[i].source == wantSource && choices[i].channelMode == n->channelMode)
+            {
+               currentIdx = i;
+               break;
+            }
+            continue;
+         }
          if (choices[i].channelMode == n->channelMode &&
              ((n->deviceId == 0 && choices[i].deviceId == 0) ||
               (n->deviceId != 0 && (choices[i].deviceId == (uint32_t)n->deviceId || choices[i].category == n->deviceName))))
@@ -87,7 +115,9 @@ namespace app
 
       const std::string& inputDesc = choices[currentIdx].shortName;
       char stat[96];
-      if (Platform::AudioInputCaptureIsRunning())
+      if (host)
+         snprintf(stat, sizeof(stat), "%+.1f dB   %s", n->gainDb, inputDesc.c_str());
+      else if (Platform::AudioInputCaptureIsRunning())
          snprintf(stat, sizeof(stat), "%+.1f dB   %s - live", n->gainDb, inputDesc.c_str());
       else if (!n->Status().empty())
          snprintf(stat, sizeof(stat), "%+.1f dB   %s", n->gainDb, n->Status().c_str());
@@ -110,6 +140,12 @@ namespace app
                {
                   PushUndoCheckpoint();
                   n->channelMode = choices[idx].channelMode;
+                  if (choices[idx].source != AudioInputNode::kSourceDefault)
+                  {
+                     n->source = choices[idx].source; // host bus: the device choice stays as it was
+                     return;
+                  }
+                  n->source = AudioInputNode::kSourceDefault;
                   n->deviceId = (int)choices[idx].deviceId;
                   n->deviceName = choices[idx].category;
                   Platform::AudioInputCaptureSetDevice(choices[idx].deviceId);

@@ -55,6 +55,10 @@
     .plug-rows > div { display: grid; grid-template-columns: minmax(96px, 150px) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
     .plug-rows dt { font-weight: 600; } .plug-rows dd { margin: 0; color: var(--muted); }
     .plug-table { display: block; overflow-x: auto; }
+    .plug-faq { display: grid; gap: 8px; }
+    .plug-faq details { padding: 12px 16px; border-radius: 12px; background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
+    .plug-faq summary { cursor: pointer; font-weight: 600; }
+    .plug-faq p { margin: 8px 0 0; color: var(--muted); }
     .plug-shot { margin: 0; display: grid; gap: 8px; }
     .plug-shot img { width: 100%; height: auto; aspect-ratio: 16 / 10; display: block; border-radius: var(--web-media-radius, 16px); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
     .plug-shot figcaption { color: var(--muted); font-size: var(--size-caption); }
@@ -88,7 +92,7 @@
           <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
         </div>
       </div>
-      <div class="nav-group" data-current>
+      <div class="nav-group">
         <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
         <div class="nav-menu" id="nav-menu-explore">
           <a href="library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
@@ -96,7 +100,6 @@
           <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
           <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
           <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
-          <a href="plugin.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
         </div>
       </div>
       <div class="nav-group">
@@ -108,6 +111,7 @@
           <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
         </div>
       </div>
+      <a href="plugin.html" aria-current="page">Plugin</a>
       <a class="btn btn-primary nav-sheet-cta" href="index.html#setup">Download Infinite</a>
       <div class="nav-sheet-social">
         <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
@@ -235,14 +239,14 @@
       </section>
       <section aria-label="Questions">
         <h2>Questions</h2>
-        <div class="faq-list">
-          <details class="faq-item"><summary class="faq-question"><span>My DAW does not list it</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Rescan plugins first. Still missing? In Infinite, Settings, DAW plugin, press Copy path next to the folder, add that folder to your DAW's plugin folders, and rescan.</p></div></details>
-          <details class="faq-item"><summary class="faq-question"><span>Does the app need to be open?</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>No. The plugin starts its own copy of Infinite in the background and closes it with your project.</p></div></details>
-          <details class="faq-item"><summary class="faq-question"><span>macOS says it cannot be opened</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Open Infinite from Applications once with right click, then Open. Install the plugin after that: the copy in your plugin folders no longer carries the download flag.</p></div></details>
-          <details class="faq-item"><summary class="faq-question"><span>Windows protected your PC</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>SmartScreen stops apps it has not seen often. Choose More info, then Run anyway. You do this once.</p></div></details>
-          <details class="faq-item"><summary class="faq-question"><span>How many computers?</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Two that you own. One key file works on both.</p></div></details>
-          <details class="faq-item"><summary class="faq-question"><span>Updating</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p>Update the app and open it. The plugin follows. Close your DAW first so the old copy is not in use.</p></div></details>
-          <details class="faq-item"><summary class="faq-question"><span>Lost key or refunds</span><svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg></summary><div class="faq-answer"><p><a href="buy.html#resend">Get your key emailed again</a>. Refunds follow the <a href="refund.html">refund policy</a>.</p></div></details>
+        <div class="plug-faq">
+          <details><summary>My DAW does not list it</summary><p>Rescan plugins first. Still missing? In Infinite, Settings, DAW plugin, press Copy path next to the folder, add that folder to your DAW's plugin folders, and rescan.</p></details>
+          <details><summary>Does the app need to be open?</summary><p>No. The plugin starts its own copy of Infinite in the background and closes it with your project.</p></details>
+          <details><summary>macOS says it cannot be opened</summary><p>Open Infinite from Applications once with right click, then Open. Install the plugin after that: the copy in your plugin folders no longer carries the download flag.</p></details>
+          <details><summary>Windows protected your PC</summary><p>SmartScreen stops apps it has not seen often. Choose More info, then Run anyway. You do this once.</p></details>
+          <details><summary>How many computers?</summary><p>Two that you own. One key file works on both.</p></details>
+          <details><summary>Updating</summary><p>Update the app and open it. The plugin follows. Close your DAW first so the old copy is not in use.</p></details>
+          <details><summary>Lost key or refunds</summary><p><a href="buy.html#resend">Get your key emailed again</a>. Refunds follow the <a href="refund.html">refund policy</a>.</p></details>
         </div>
       </section>
     </div>
@@ -291,8 +295,6 @@
           <a href="artworks.html">Art gallery</a>
           <a href="nodes/">Nodes</a>
           <a href="embeds/">Embeds</a>
-          <a href="plugin.html" aria-current="page">Plugin</a>
-          <a href="buy.html">Buy the plugin</a>
         </div>
         <div class="footer-col">
           <p class="footer-h">Learn</p>
@@ -300,6 +302,7 @@
           <a href="philosophy.html">Philosophy</a>
           <a href="chat.html">Agents &amp; terminal</a>
           <a href="blog/">Blog</a>
+              <a href="buy.html">Buy the plugin</a>
         </div>
         <div class="footer-col">
           <p class="footer-h">Docs</p>
@@ -330,8 +333,9 @@
     <span class="dock-thumb" aria-hidden="true"></span>
     <a class="dock-stop" href="index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
     <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
-    <button type="button" class="dock-stop" data-group="explore" data-current aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
     <button type="button" class="dock-stop" data-group="learn" aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <a class="dock-stop" href="plugin.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
     <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
   </div>
   <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
@@ -347,7 +351,6 @@
     <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
     <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
     <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
-    <a href="plugin.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
   </div>
   <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
     <a href="index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>

@@ -5766,6 +5766,18 @@ namespace Platform
    {
       if (gMidiRunning)
          return true;
+      if (PluginModeActive())
+      {
+         // Inside a plugin the host is the only MIDI source (PluginEngine injects its events);
+         // opening hardware ports would double every note the host also routes.
+         {
+            std::lock_guard<std::mutex> lock(gMidiState.mutex);
+            gMidiState.deviceNames[kMidiHostDevice] = kMidiHostDeviceName;
+         }
+         gMidiDeviceSummary = kMidiHostDeviceName;
+         gMidiRunning = true;
+         return true;
+      }
 
       OSStatus st = MIDIClientCreateWithBlock(CFSTR("Infinite"), &gMidiClient,
          ^(const MIDINotification* message) {
@@ -6316,6 +6328,17 @@ namespace Platform
       {
          [NSApplication sharedApplication];
          [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+      }
+   }
+
+   void AllowPluginEngineWindows()
+   {
+      @autoreleasepool
+      {
+         [NSApplication sharedApplication];
+         if (NSApp.activationPolicy != NSApplicationActivationPolicyAccessory)
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+         [NSApp activateIgnoringOtherApps:YES];
       }
    }
 

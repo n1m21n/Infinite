@@ -106,5 +106,10 @@
  "send": 59752,
  "spark": 59753,
  "code": 59754,
- "copy": 59755
+ "copy": 59755,
+ "pop-out": 59756,
+ "bend": 59757,
+ "curve": 59758,
+ "line-tool": 59759,
+ "pen-tool": 59760
 }

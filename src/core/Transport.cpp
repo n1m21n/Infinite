@@ -72,10 +72,11 @@ void Transport::BeginFrameClock()
    const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
    if (sr <= 0.0)
       return;
-   if (mOfflineActive.load(std::memory_order_relaxed))
+   if (mOfflineActive.load(std::memory_order_relaxed) || mFramePinned)
    {
       // Offline the engine clock only moves inside the pump's audio
-      // blocks, so "now" is exactly where the next block starts.
+      // blocks, so "now" is exactly where the next block starts (pinned:
+      // the plugin's audio thread is parked there).
       mEngineFrameSeconds = (double)mEngineSamples.load(std::memory_order_relaxed) / sr;
       return;
    }
@@ -372,6 +373,59 @@ void Transport::AdvanceAudioClock(int numFrames)
       mAudioSampleCounter.fetch_add((uint64_t)numFrames, std::memory_order_relaxed);
    WrapLoopIfNeeded();
    AdvanceEngineClock(numFrames, mAudioSampleRate.load(std::memory_order_relaxed));
+}
+
+bool Transport::FollowHost(const HostTime& host)
+{
+   const bool ownTempo = mOwnTempo.load(std::memory_order_relaxed);
+   const bool ownHead = mOwnPlayhead.load(std::memory_order_relaxed);
+   const bool ownLoop = ownHead && mOwnLoop.load(std::memory_order_relaxed);
+   mLoopSuspended.store(!ownLoop, std::memory_order_relaxed);
+   if (mPendingLaunch.load(std::memory_order_relaxed) != kLaunchNothing)
+      CancelLaunch(); // quantized launches belong to the app's own transport
+   if (!ownTempo && host.sigNum > 0 && host.sigDen > 0 &&
+       (host.sigNum != TimeSigNumerator() || host.sigDen != TimeSigDenominator()))
+      SetTimeSignature(host.sigNum, host.sigDen);
+   if (host.playing != mPlaying.load(std::memory_order_relaxed))
+      SetPlaying(host.playing);
+
+   const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
+   double bpm = mBpm.load(std::memory_order_relaxed);
+   if (!ownTempo && host.tempoValid && host.bpm > 0.0 && std::fabs(host.bpm - (double)Tempo()) > 1e-6)
+      SetTempo((float)host.bpm);
+   if (!ownTempo && host.tempoValid && host.bpm > 0.0)
+      bpm = host.bpm;
+   if (!ownHead)
+      mHostOffsetBeats = 0.0;
+   if (ownLoop || !host.ppqValid || sr <= 0.0)
+      return false; // Loop Infinite: Infinite's clock runs on its own
+
+   // Where the clock stands now is where the last block ended (a pending seek counts).
+   const double pendingSeek = mPendingSeekSeconds.load(std::memory_order_relaxed);
+   const double expected = pendingSeek >= 0.0 ? pendingSeek * (mBpm.load(std::memory_order_relaxed) / 60.0) : Beats();
+   if (ownHead && pendingSeek >= 0.0)
+   {
+      mHostOffsetBeats = host.ppq - expected; // a seek in Infinite sets the new offset
+      return false;
+   }
+   const double oneSample = bpm / (60.0 * sr);
+   if (std::fabs(host.ppq - mHostOffsetBeats - expected) <= oneSample + 1e-9)
+      return false;
+
+   // Jump: re-seat the clock at the host position (less the offset). The pending tempo (if any)
+   // is applied here, since the offsets are re-seated anyway.
+   const double target = std::max(0.0, host.ppq - mHostOffsetBeats);
+   const double pendingBpm = mPendingBpm.exchange(-1.0f, std::memory_order_relaxed);
+   if (pendingBpm > 0.0)
+      mBpm.store((float)pendingBpm, std::memory_order_relaxed);
+   const double useBpm = mBpm.load(std::memory_order_relaxed);
+   DropFrameClock();
+   mPendingSeekSeconds.store(-1.0, std::memory_order_relaxed);
+   mAudioBeatsOffset.store(target, std::memory_order_relaxed);
+   mAudioSecondsOffset.store(target * (60.0 / useBpm), std::memory_order_relaxed);
+   mAudioSampleCounter.store(0, std::memory_order_relaxed);
+   mResetEpoch.fetch_add(1, std::memory_order_relaxed);
+   return true;
 }
 
 Transport::LaunchAction Transport::RequestTogglePlay()

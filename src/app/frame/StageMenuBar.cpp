@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/CurveEditorPanel.h"
 #include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
@@ -12,12 +13,14 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "plugin/engine/HostAudio.h"
+#include "plugin/engine/PluginView.h"
 #include "app/ui/design/BrandLogo.gen.h"
 
 namespace app
 {
 // The rail of panel toggles down the right edge. Library leads on the top bar's centre line and the panels follow,
-// one tile apart; Edit history sits in the bottom corner with Settings just above it.
+// one tile apart; at the bottom, Settings in the corner, then Edit history, then the Terminal.
 static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
@@ -50,12 +53,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
-   if (PanelRail::Item("##railTerminal", top + 9.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
-                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
-   {
-      gTerminalOpen = !gTerminalOpen;
-      gTerminalFocus = gTerminalOpen;
-   }
+   if (PanelRail::Item("##railCurveEditor", top + 9.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
+                       T("Curve editor - draw and shape MSEG curves (Shift+E)")))
+      gCurveEditorOpen = !gCurveEditorOpen;
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
@@ -63,6 +63,14 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railHistory", bottom - step, IconsInfinite::History, nullptr, gHistoryOpen,
                        T("Edit history - jump back to any earlier edit")))
       gHistoryOpen = !gHistoryOpen;
+   // The agents' shell sits with the tools at the bottom, above Edit history.
+   if (!Platform::PluginModeActive() && // no shell or agents inside a DAW
+       PanelRail::Item("##railTerminal", bottom - 2.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
+                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
+   {
+      gTerminalOpen = !gTerminalOpen;
+      gTerminalFocus = gTerminalOpen;
+   }
    PanelRail::End();
 }
 
@@ -450,7 +458,7 @@ void DrawMenuBar(FrameCtx& fc)
                dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
                dockedPanelMenu(L("3D View"), L("Show 3D View"), gView3DOpen, gView3DDock, gView3DHeight, "##view3ddock");
                dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
-               if (MenuParts::SubMenu(L("Terminal")))
+               if (!Platform::PluginModeActive() && MenuParts::SubMenu(L("Terminal"))) // no shell inside a DAW
                {
                   MenuParts::Check(L("Show Terminal"), &gTerminalOpen);
                   if (gTerminalOpen)
@@ -471,6 +479,28 @@ void DrawMenuBar(FrameCtx& fc)
                         FieldWell::Slider(L("Width"), &gTerminalWidth, 280.0f, 1400.0f, "%.0f px");
                      else
                         FieldWell::Slider(L("Height"), &gTerminalHeight, 160.0f, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               }
+               if (MenuParts::SubMenu(L("Curve Editor")))
+               {
+                  MenuParts::Check(L("Show Curve Editor"), &gCurveEditorOpen);
+                  if (gCurveEditorOpen)
+                  {
+                     static const char* kCurveDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+                     static const int kCurveDockCodes[] = { 0, 3 };
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     if (MenuParts::BeginCombo("##curvedock", T(kCurveDocks[gCurveEditorDock == 3 ? 1 : 0])))
+                     {
+                        for (int i = 0; i < 2; ++i)
+                           if (MenuParts::Choice(L(kCurveDocks[i]), kCurveDockCodes[i] == gCurveEditorDock))
+                              gCurveEditorDock = kCurveDockCodes[i];
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::Slider(L("Height"), &gCurveEditorHeight, 220.0f, 800.0f, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -539,15 +569,19 @@ void DrawMenuBar(FrameCtx& fc)
                gShowDiagnosticsModal = true;
             if (MenuParts::Item(L("About Infinite")))
                gShowAboutModal = true;
-            if (MenuParts::Item(L("Check for updates")))
+            // Inside a DAW: the app updates the plugin, and the DAW closes it.
+            if (!Platform::PluginModeActive())
             {
-               UpdateCheck::Start();
-               gShowUpdateCheckModal = true;
-            }
+               if (MenuParts::Item(L("Check for updates")))
+               {
+                  UpdateCheck::Start();
+                  gShowUpdateCheckModal = true;
+               }
 
-            MenuParts::Separator();
-            if (MenuParts::Item(L("Quit")))
-               RequestClose(window);
+               MenuParts::Separator();
+               if (MenuParts::Item(L("Quit")))
+                  RequestClose(window);
+            }
          }
             MenuParts::EndContent();
             ImGui::EndMenu();
@@ -581,6 +615,8 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (tok::tile - ImGui::GetFontSize()) * 0.5f));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
+         // Right-edge items are placed at an absolute x on the bar's line.
+         auto TopBarPlaceAt = [](float x) { ImGui::SameLine(x); };
          auto TopBarSameLine = [](float spacing = 4.0f) {
             ImGui::SameLine(0.0f, spacing);
          };
@@ -729,8 +765,11 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::tile) * 0.5f));
          const float centreStartScreenX = ImGui::GetCursorScreenPos().x;
          // Transport sits just left of the tempo, audio power just right of it.
-         drawTransport();
-         SectionBreak();
+         if (!Platform::PluginModeActive()) // the DAW's transport plays and stops the plugin
+         {
+            drawTransport();
+            SectionBreak();
+         }
 
          static const int kDens[] = { 1, 2, 4, 8, 16 };
          auto SnapToValidDenominator = [](int val) -> int {
@@ -815,12 +854,15 @@ void DrawMenuBar(FrameCtx& fc)
          const float centreY = ImGui::GetCursorScreenPos().y + tok::tile * 0.5f;
          const ImVec2 wellMin(std::round(ImGui::GetCursorScreenPos().x), std::round(centreY - TD::kHeight * 0.5f));
          // The metronome is the display's last cell: a square the height of the well, set off by a hairline.
-         const float clickCellW = TD::kHeight;
+         // Not inside a DAW: the host plays its own click.
+         const bool showClick = !Platform::PluginModeActive();
+         const float clickCellW = showClick ? TD::kHeight : 0.0f;
          const ImVec2 wellMax(wellMin.x + tempoCellW + sigCellW + keyCellW + clickCellW, wellMin.y + TD::kHeight);
          TD::Well(wellMin, wellMax);
          TD::Divider(wellMin.x + tempoCellW, wellMin.y);
          TD::Divider(wellMin.x + tempoCellW + sigCellW, wellMin.y);
-         TD::Divider(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y);
+         if (showClick)
+            TD::Divider(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y);
 
          // One editable number: drag up/down, double-click or type to edit. `onDrag` gets the vertical delta in
          // points; `onCommit` gets the typed text.
@@ -829,6 +871,16 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const ImVec2 mn(x, wellMin.y), mx(x + w, wellMin.y + TD::kHeight);
             ImGui::SetCursorScreenPos(mn);
+            if (Platform::PluginModeActive() && !Transport::Instance().OwnTempo())
+            {
+               // Inside a DAW the host sets tempo and meter every block (unless Settings > DAW sync gives tempo to
+                  // Infinite): show them, never edit them.
+               ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight));
+               TD::Value(id, x, w, wellMin.y, shown);
+               if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+                  HelpTip("%s", T("Set by the DAW"));
+               return;
+            }
             if (sActiveField == which)
             {
                // The field sits inside the cell with an even margin and its text centred, like the value it replaces.
@@ -1001,6 +1053,10 @@ void DrawMenuBar(FrameCtx& fc)
          }
 
          // The click: the same tile as the panel rail, inside the display's last cell.
+         if (!showClick)
+            AudioEngine::Instance().SetMetronome(false, gMetronomeVolume, gMetronomeAccent);
+         else
+         {
          ImGui::SetCursorScreenPos(ImVec2(wellMax.x - clickCellW + (clickCellW - tok::tile) * 0.5f, centreY - tok::tile * 0.5f));
          {
             // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
@@ -1038,11 +1094,15 @@ void DrawMenuBar(FrameCtx& fc)
             }
             AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
          }
+         }
 
          // Audio power, just right of the click.
-         SectionBreak();
-         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::tile * 0.5f));
-         drawAudio();
+         if (!Platform::PluginModeActive()) // the DAW owns the audio device
+         {
+            SectionBreak();
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::tile * 0.5f));
+            drawAudio();
+         }
 
          // Width of the centred group, measured for next frame's placement.
          sCentreW = ImGui::GetItemRectMax().x - centreStartScreenX;
@@ -1095,7 +1155,7 @@ void DrawMenuBar(FrameCtx& fc)
          // Update: a quiet icon tile (down arrow in an accent wash, with a dot) that only exists while a newer
          // version is available. Click opens the update dialog (Update now, in place); right-click dismisses until the
          // next version.
-         bool showUpdate = UpdateCheck::UpdateAvailable();
+         bool showUpdate = UpdateCheck::UpdateAvailable() && !Platform::PluginModeActive(); // the app updates, not the plugin
 #ifndef NDEBUG
          if (getenv("INFINITE_SHOW_UPDATE_ICON") != nullptr)
             showUpdate = true;
@@ -1106,7 +1166,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (cursorX - updateWidth - telemetryGap - telemetryW >= centreEndX + minGap)
             {
                cursorX -= updateWidth;
-               ImGui::SameLine(cursorX);
+               TopBarPlaceAt(cursorX);
                ImGui::PushID("##updateicon");
                const bool clicked = ImGui::InvisibleButton("##update", ImVec2(tok::tile, tok::tile));
                ImGui::PopID();
@@ -1136,12 +1196,85 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
+         // Inside a DAW (plugin mode, README 12.4): pop-out, picture/canvas, the host slots, and
+         // blocks the host played as silence because the engine was late (only once there are any).
+         if (Platform::PluginModeActive())
+         {
+            auto fits = [&](float w) { return cursorX - w - telemetryGap - telemetryW >= centreEndX + minGap; };
+            if (fits(tok::tile))
+            {
+               cursorX -= tok::tile;
+               TopBarPlaceAt(cursorX);
+               const bool popped = PluginView::Popped();
+               if (IconTile::Draw("##popout", IconsInfinite::PopOut, IconsInfinite::PopOut, popped, tok::tile,
+                                  ImGui::GetFrameHeight()))
+                  PluginView::RequestPopped(!popped);
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s", popped ? T("Back to the plugin") : T("Pop out"));
+               cursorX -= telemetryGap;
+            }
+            if (fits(tok::tile))
+            {
+               cursorX -= tok::tile;
+               TopBarPlaceAt(cursorX);
+               const bool picture = PluginView::Picture();
+               if (IconTile::Draw("##picture", IconsInfinite::Viewport, IconsInfinite::ViewportFill, picture, tok::tile,
+                                  ImGui::GetFrameHeight()))
+                  PluginView::SetPicture(!picture);
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s", picture ? T("Canvas") : T("Picture"));
+               cursorX -= telemetryGap;
+            }
+            if (fits(tok::tile))
+            {
+               cursorX -= tok::tile;
+               TopBarPlaceAt(cursorX);
+               if (IconTile::Draw("##slots", IconsInfinite::FamilyMacros, IconsInfinite::FamilyMacros,
+                                  ImGui::IsPopupOpen("##slotsmap"), tok::tile, ImGui::GetFrameHeight()))
+                  ImGui::OpenPopup("##slotsmap");
+               if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("##slotsmap"))
+                  ImGui::SetTooltip("%s", T("Host slots"));
+               if (ImGui::BeginPopup("##slotsmap"))
+               {
+                  int shown = 0;
+                  for (int i = 0; i < PluginEngine::kSlotCount; i++)
+                  {
+                     const std::string name = PluginEngine::SlotName(i);
+                     if (name.empty())
+                        continue;
+                     ImGui::Text("%02d  %s", i + 1, name.c_str());
+                     shown++;
+                  }
+                  if (shown == 0)
+                     ImGui::TextDisabled("%s", T("No Macro is on a host slot"));
+                  ImGui::EndPopup();
+               }
+               cursorX -= telemetryGap;
+            }
+            const uint64_t hostXruns = PluginEngine::HostXruns();
+            if (hostXruns > 0)
+            {
+               char xr[32];
+               snprintf(xr, sizeof(xr), "%llu xruns", (unsigned long long)hostXruns);
+               const float w = TabWidth("99999 xruns", xr);
+               if (fits(w))
+               {
+                  cursorX -= w;
+                  TopBarPlaceAt(cursorX);
+                  TabLabel("topbar.hostxruns", xr, "99999 xruns", true);
+                  if (ImGui::IsItemHovered())
+                     ImGui::SetTooltip("%s", T("Late blocks the host played as silence"));
+                  cursorX -= telemetryGap;
+               }
+            }
+         }
+
          // On a narrow window the readouts are dropped rather than drawn over the centred group.
          // INFINITE_HIDE_TELEMETRY drops them for screenshot and manual runs, where a live frame rate is noise.
          static const bool sHideTelemetry = getenv("INFINITE_HIDE_TELEMETRY") != nullptr;
          if (!sHideTelemetry && cursorX - telemetryW >= centreEndX + minGap)
          {
-            ImGui::SameLine(cursorX - telemetryW);
+            TopBarPlaceAt(cursorX - telemetryW);
             TabLabel("topbar.fps", readout, "99.9 fps   99.9 ms", true);
             TopBarSameLine(telemetryGap);
             TabLabel("topbar.cpu", cpuReadout, cpuWidest, true);

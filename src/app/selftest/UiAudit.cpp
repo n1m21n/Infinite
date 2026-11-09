@@ -6,6 +6,7 @@
 // tools/ui-audit/run.py launches it, writes the report and holds it against the baseline.
 #include "app/AppShared.h"
 #include "app/selftest/UiAudit.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "core/Notices.h"
 
 #ifdef IMGUI_ENABLE_TEST_ENGINE
@@ -878,6 +879,7 @@ void FrameTest_UIAUDIT(int frameId, GLFWwindow* window)
    {
       const PanelFlag panels[] = { { "Settings", &gSettingsOpen }, { "Help", &gHelpOpen }, { "Shortcuts", &gShortcutsOpen },
                                    { "Templates", &gTemplatesOpen }, { "History", &gHistoryOpen }, { "Piano Roll", &gPianoRollOpen },
+                                   { "Curve Editor", &gCurveEditorOpen },
                                    { "Sample Studio", &gSampleStudioOpen }, { "Show Set", &gShowSetOpen },
                                    { "Node Panel", &gNodePanelOpen }, { "Viewport", &gViewportPanelOpen } };
       const size_t n = sizeof panels / sizeof panels[0];

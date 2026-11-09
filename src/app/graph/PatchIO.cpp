@@ -1,7 +1,9 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include <algorithm>
 #include "app/AppShared.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "app/graph/LearningLog.h"
+#include "core/Transport.h"
 #include "core/MediaCollect.h"
 #include "core/MovementLog.h"
 #include "core/Notices.h"
@@ -9,6 +11,11 @@
 
 namespace app
 {
+   namespace
+   {
+      bool gTerminalOpenInApp = false; // the shared workspace file's Terminal state, kept as is by the plugin engine
+   }
+
    // ---- saving ----
    // Everything SavePatchTo used to build in place, minus the file write -
    // shared with undo/redo, which snapshots this same in-memory shape rather
@@ -197,6 +204,9 @@ namespace app
       for (const ExprGlobals::Global& g : ExprGlobals::All())
          data.globals.push_back({ g.name, g.expr });
       data.performance = gPerfElements;
+      for (const HostParamBinding& h : gHostParams)
+         if (const GraphNode* gn = FindNodeByUid(h.uid))
+            data.hostParams.push_back({ h.slot, gn->index, h.param });
       data.perfLayout = gPerfLayout;
       // gArrange is the only arrangement state there is (WP5b deleted the
       // seconds mirror), loop included.
@@ -237,7 +247,7 @@ namespace app
 
    std::string AutosaveMarkerPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       if (dir.empty())
          return {};
       return dir + (UsingAutosaveTestPaths() ? "/Infinite.session-active-test" : "/Infinite.session-active");
@@ -251,7 +261,7 @@ namespace app
    // vsync fields and renaming it would strand existing users' autosave prefs.
    std::string GeneralSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.autosave-settings";
    }
 
@@ -300,7 +310,7 @@ namespace app
    // One flat preference file for the Canvas & Workspace settings tab.
    std::string WorkspaceSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.workspace-settings";
    }
 
@@ -319,7 +329,13 @@ namespace app
             continue;
          const std::string key = line.substr(0, eq);
          const std::string val = line.substr(eq + 1);
-         if (key == "snapToGrid")
+         if (key == "dawSync")
+         {
+            // Plugin only (the plugin keeps its own settings file): tempo, playhead, loop owner.
+            const int v = atoi(val.c_str());
+            Transport::Instance().SetHostSync((v & 1) != 0, (v & 2) != 0, (v & 4) != 0);
+         }
+         else if (key == "snapToGrid")
             gSnapToGrid = (val != "0");
          else if (key == "showCanvasGrid")
             gShowCanvasGrid = (val != "0");
@@ -383,8 +399,20 @@ namespace app
             gPianoRollHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelPianoRollDock")
             gPianoRollDock = (val == "3") ? 3 : 0;
+         else if (key == "panelCurveEditorOpen")
+            gCurveEditorOpen = (val != "0");
+         else if (key == "panelCurveEditorH")
+            gCurveEditorHeight = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelCurveEditorW")
+            gCurveEditorWidth = std::max(360.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelCurveEditorDock")
+            gCurveEditorDock = atoi(val.c_str()) == 3 ? 3 : 0; // bottom or top only
          else if (key == "panelTerminalOpen")
-            gTerminalOpen = (val != "0");
+         {
+            // Inside a DAW there is no shell: keep it closed, and write the app's value back untouched.
+            gTerminalOpenInApp = (val != "0");
+            gTerminalOpen = gTerminalOpenInApp && !Platform::PluginModeActive();
+         }
          else if (key == "panelTerminalH")
             gTerminalHeight = std::max(160.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelTerminalDock")
@@ -412,6 +440,10 @@ namespace app
          return;
       std::ofstream file(AppPaths::FsPath(path));
       file << "snapToGrid=" << (gSnapToGrid ? 1 : 0) << "\n";
+      {
+         const Transport& tr = Transport::Instance();
+         file << "dawSync=" << ((tr.OwnTempo() ? 1 : 0) | (tr.OwnPlayhead() ? 2 : 0) | (tr.OwnLoop() ? 4 : 0)) << "\n";
+      }
       file << "showCanvasGrid=" << (gShowCanvasGrid ? 1 : 0) << "\n";
       file << "gridSnap=" << gGridSnap << "\n";
       file << "zoomSensitivity=" << gZoomSensitivity << "\n";
@@ -445,7 +477,11 @@ namespace app
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
       file << "panelPianoRollH=" << gPianoRollHeight << "\n";
       file << "panelPianoRollDock=" << gPianoRollDock << "\n";
-      file << "panelTerminalOpen=" << (gTerminalOpen ? 1 : 0) << "\n";
+      file << "panelCurveEditorOpen=" << (gCurveEditorOpen ? 1 : 0) << "\n";
+      file << "panelCurveEditorH=" << gCurveEditorHeight << "\n";
+      file << "panelCurveEditorW=" << gCurveEditorWidth << "\n";
+      file << "panelCurveEditorDock=" << gCurveEditorDock << "\n";
+      file << "panelTerminalOpen=" << ((Platform::PluginModeActive() ? gTerminalOpenInApp : gTerminalOpen) ? 1 : 0) << "\n";
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";
       file << "panelTerminalW=" << gTerminalWidth << "\n";
@@ -487,7 +523,7 @@ namespace app
    // One flat preference file for the Audio settings tab.
    std::string AudioSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.audio-settings";
    }
 
@@ -599,7 +635,7 @@ namespace app
    // a separate file: it is an app-wide preference, not part of a document.
    std::string ExprGlobalsSettingsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       return dir.empty() ? std::string() : dir + "/Infinite.expression-globals";
    }
 

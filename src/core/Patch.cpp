@@ -27,7 +27,7 @@ namespace
 
    std::string RecentsPath()
    {
-      std::string dir = AppPaths::AppSupportDir();
+      std::string dir = AppPaths::SettingsDir();
       if (dir.empty())
          return std::string();
       const std::string path = dir + "/Infinite.recents";
@@ -369,6 +369,8 @@ static void WriteBody(std::ostream& file, const Data& data)
       for (size_t i = 0; i < data.perfLayout.pageNames.size(); i++)
          file << "perfname " << i << " " << EscapeLine(data.perfLayout.pageNames[i]) << "\n";
    }
+   for (const HostParamRecord& h : data.hostParams)
+      file << "hostparam " << h.slot << " " << h.dstIndex << " " << h.dstParam << "\n";
    for (size_t i = 0; i < data.performance.size(); i++)
    {
       const PerfRecord& p = data.performance[i];
@@ -972,6 +974,12 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                }
             }
          }
+      }
+      else if (tag == "hostparam")
+      {
+         HostParamRecord h;
+         if (in >> h.slot >> h.dstIndex >> h.dstParam)
+            outData.hostParams.push_back(h);
       }
       else if (tag == "perf")
       {

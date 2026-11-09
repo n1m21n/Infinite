@@ -3035,6 +3035,80 @@ namespace LooperMpcTest
    }
 }
 
+// Settings > DAW sync (Transport::SetHostSync): who owns tempo, playhead and loop inside a DAW.
+// Drives FollowHost + AdvanceAudioClock the way PluginEngine does, one 480-frame block at a time.
+static bool RunHostSyncFixture()
+{
+   Transport& tr = Transport::Instance();
+   const double sr = 48000.0;
+   const int n = 480;
+   bool ok = true;
+   auto check = [&](bool c, const char* what, double got)
+   {
+      printf("HOSTSYNCTEST %s %s (beats %.4f)\n", what, c ? "OK" : "FAIL", got);
+      ok &= c;
+   };
+   Transport::HostTime ht;
+   ht.playing = true;
+   ht.tempoValid = true;
+   ht.ppqValid = true;
+   ht.sigNum = 4;
+   ht.sigDen = 4;
+   auto start = [&](bool ownTempo, bool ownHead, bool ownLoop, double ppq)
+   {
+      tr.SetHostSync(ownTempo, ownHead, ownLoop);
+      tr.SetTempo(120.0f);
+      tr.SetPlaying(true);
+      tr.Rewind();
+      tr.NotifyAudioEngineStarted(sr);
+      tr.AdvanceAudioClock(0); // the rewind lands before the host's first block
+      ht.bpm = 120.0;
+      ht.ppq = ppq;
+   };
+   auto block = [&]()
+   {
+      tr.FollowHost(ht);
+      tr.AdvanceAudioClock(n);
+      ht.ppq += n * (ht.bpm / 60.0) / sr;
+   };
+   const double step = n * 2.0 / sr; // beats per block at 120 bpm
+   auto near = [](double a, double b) { return std::fabs(a - b) < 1e-6; };
+
+   // Playhead DAW: a seek in Infinite snaps back to the host.
+   start(false, false, false, 8.0);
+   block();
+   tr.SeekBeats(2.0);
+   block();
+   check(near(tr.Beats(), 8.0 + 2.0 * step), "daw playhead: seek snaps back", tr.Beats());
+
+   // Playhead Infinite: the seek sticks, and a host loop wrap moves Infinite by the same amount.
+   start(false, true, false, 8.0);
+   block();
+   tr.SeekBeats(6.0);
+   block();
+   check(near(tr.Beats(), 6.0 + step), "infinite playhead: seek sticks", tr.Beats());
+   block();
+   ht.ppq -= 4.0; // the DAW loops back one bar
+   block();
+   check(near(tr.Beats(), 2.0 + 3.0 * step), "infinite playhead: host jump keeps the offset", tr.Beats());
+
+   // Tempo Infinite: host tempo and jumps are ignored.
+   start(true, false, false, 8.0);
+   ht.bpm = 140.0;
+   block();
+   block();
+   check(std::fabs(tr.Tempo() - 120.0f) < 1e-4f && near(tr.Beats(), 2.0 * step), "infinite tempo: own tempo and position", tr.Beats());
+
+   // Leave the app's own loop live and the DAW owning time, for whatever runs next.
+   tr.SetHostSync(true, true, true);
+   ht.ppqValid = false;
+   tr.FollowHost(ht);
+   tr.SetHostSync(false, false, false);
+   tr.SetTempo(120.0f);
+   tr.Rewind();
+   return ok;
+}
+
 static bool RunLooperFixture()
 {
    using namespace LooperMpcTest;
@@ -3757,11 +3831,12 @@ int RunDspTest()
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool effectMixLimiterOk = RunEffectMixAndLimiterFixture();
    const bool decodeNonFiniteOk = RunDecodeNonFiniteFixture();
+   const bool hostSyncOk = RunHostSyncFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && slicerOk &&
                     paulStretchOk && granularOk && drumSeqOk && looperOk && mpcOk && wavetableShaperOk && eqOk && noteStackOk &&
                     freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk &&
-                    portableFftOk && effectMixLimiterOk && decodeNonFiniteOk;
+                    portableFftOk && effectMixLimiterOk && decodeNonFiniteOk && hostSyncOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }

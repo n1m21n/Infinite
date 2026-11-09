@@ -26,8 +26,9 @@ jobs:
       - name: Download artifacts
         run: |
           mkdir dl
-          for a in Infinite-windows-x64 Infinite-windows-ARM64 Infinite-x86_64.AppImage; do
-            gh run download "${{ inputs.run_id }}" -n "$a" -D "dl/$a"
+          for a in Infinite-windows-x64 Infinite-windows-ARM64 Infinite-x86_64.AppImage \
+                   Infinite-Setup-windows-x64 Infinite-Setup-windows-ARM64 Infinite-linux-x86_64.tar.gz; do
+            gh run download "${{ inputs.run_id }}" -n "$a" -D "dl/$a" || echo "no artifact $a"
           done
       - name: Zip the Windows builds
         run: |
@@ -39,4 +40,10 @@ jobs:
       - name: Upload to the release
         run: |
           gh release upload "${{ inputs.tag }}" Infinite-windows-x64.zip Infinite-windows-ARM64.zip \
-            dl/Infinite-x86_64.AppImage/Infinite-x86_64.AppImage --clobber
+            dl/Infinite-x86_64.AppImage/Infinite-x86_64.AppImage \
+            dl/Infinite-Setup-windows-x64/Infinite-Setup-windows-x64.exe \
+            dl/Infinite-linux-x86_64.tar.gz/Infinite-linux-x86_64.tar.gz --clobber
+          # ARM64 is best-effort in the Build run; attach its installer when it was built.
+          if [ -f dl/Infinite-Setup-windows-ARM64/Infinite-Setup-windows-ARM64.exe ]; then
+            gh release upload "${{ inputs.tag }}" dl/Infinite-Setup-windows-ARM64/Infinite-Setup-windows-ARM64.exe --clobber
+          fi

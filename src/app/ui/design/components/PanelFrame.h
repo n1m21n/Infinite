@@ -32,6 +32,20 @@ namespace PanelFrame
       ImGui::PopStyleVar(3);
    }
 
+   // Style for a full-bleed picture window (the plugin's picture view): no padding, no border, black backdrop.
+   // Pair with PopBareStyle() after End().
+   inline void PushBareStyle()
+   {
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32_BLACK);
+   }
+   inline void PopBareStyle()
+   {
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar(2);
+   }
+
    // Draw the card surface for the rect starting at the cursor with the given outer size.
    inline void DrawSurface(ImVec2 size, Insets in = {})
    {
@@ -48,14 +62,14 @@ namespace PanelFrame
    // Call after PushDockedPanelStyle(true) so ChildBg carries the panel fill the surface samples. `size` is the
    // outer size (both axes > 0); the child is the card rect itself, so content sits space_2 inside the card edge
    // on every side, whichever insets are 0.
-   inline void BeginCard(const char* id, ImVec2 size, Insets in = {})
+   inline void BeginCard(const char* id, ImVec2 size, Insets in = {}, ImGuiWindowFlags flags = 0)
    {
       DrawSurface(size, in);
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(p0.x + in.l, p0.y + in.t));
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-      ImGui::BeginChild(id, ImVec2(size.x - in.l - in.r, size.y - in.t - in.b), ImGuiChildFlags_AlwaysUseWindowPadding);
+      ImGui::BeginChild(id, ImVec2(size.x - in.l - in.r, size.y - in.t - in.b), ImGuiChildFlags_AlwaysUseWindowPadding, flags);
       ImGui::PopStyleVar();
       ImGui::PopStyleColor();
    }

@@ -1320,23 +1320,27 @@ namespace app
             // format, range kind, sources and folder it was last rendered at
             // (WP7 #7). Only the file's name and the marker picks are
             // session-local: a filename belongs to a take, not to a document.
-            Arrange::Settings& rset = gArrange.settings;
-            const char* renderLabel = ArrangeRenderBusy() ? "Rendering..." : "Render";
-            const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
-            const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - tok::space_2, panelOrigin.y);
-            ImGui::SetCursorScreenPos(renderBtnPos);
-            ImGui::BeginDisabled(ArrangeRenderBusy());
-            if (ChipButton::Draw(renderLabel, false, tok::tile))
+            // Inside a DAW the DAW bounces: no Render.
+            if (!Platform::PluginModeActive())
             {
-               if (rset.renderRangeKind == kArrangeRangeCustom && rset.renderRangeEnd <= rset.renderRangeStart)
+               Arrange::Settings& rset = gArrange.settings;
+               const char* renderLabel = ArrangeRenderBusy() ? "Rendering..." : "Render";
+               const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
+               const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - tok::space_2, panelOrigin.y);
+               ImGui::SetCursorScreenPos(renderBtnPos);
+               ImGui::BeginDisabled(ArrangeRenderBusy());
+               if (ChipButton::Draw(renderLabel, false, tok::tile))
                {
-                  rset.renderRangeStart = 0;
-                  rset.renderRangeEnd = std::max<Arrange::Tick>(ArrangeRenderableEndTick(), Arrange::kPPQ);
+                  if (rset.renderRangeKind == kArrangeRangeCustom && rset.renderRangeEnd <= rset.renderRangeStart)
+                  {
+                     rset.renderRangeStart = 0;
+                     rset.renderRangeEnd = std::max<Arrange::Tick>(ArrangeRenderableEndTick(), Arrange::kPPQ);
+                  }
+                  gArrangeRenderPopupRequest = true;
                }
-               gArrangeRenderPopupRequest = true;
+               ImGui::EndDisabled();
+               ImGui::SetCursorScreenPos(savedCursor);
             }
-            ImGui::EndDisabled();
-            ImGui::SetCursorScreenPos(savedCursor);
             DrawArrangeRenderDialogs();
          }
 
@@ -1387,6 +1391,9 @@ namespace app
          // Infinite toolbar's own transport controls (see the top toolbar's
          // "##transportrewind" a bit further down in this file) rather than
          // plain text labels.
+         // Inside a DAW the host's transport plays and rewinds: no buttons here.
+         if (!Platform::PluginModeActive())
+         {
          ImGui::SameLine(0.0f, tok::space_4);
          const bool arrangeIsPlaying = tr.IsPlaying();
          PushToolbarChip(arrangeIsPlaying, /*green=*/true);
@@ -1424,6 +1431,7 @@ namespace app
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = arrangeIconCol;
             glyph::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
+         }
          }
 
          // Bars | Time: which unit the ruler, the clip popup and the loop
@@ -1595,6 +1603,10 @@ namespace app
 
          // Loop region toggle. The region itself is a Shift+drag on the
          // ruler; right-clicking the ruler disarms it.
+         // Inside a DAW the host's loop wins (Transport::FollowHost suspends this one): no toggle,
+         // unless Settings > DAW sync gives the loop to Infinite.
+         if (!Platform::PluginModeActive() || Transport::Instance().OwnLoop())
+         {
          ImGui::SameLine(0.0f, tok::space_1);
          const Arrange::LoopRange loopNow = gArrange.settings.loop; // the loop as of this frame
          const bool loopWasOn = loopNow.enabled; // see snapWasOn above
@@ -1612,6 +1624,7 @@ namespace app
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
+         }
          }
 
          // Add Marker (M): drops one at the playhead, on the snap grid.
@@ -4165,8 +4178,9 @@ namespace app
             }
 
 
-            MenuParts::Separator();
-            if (MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
+            if (!Platform::PluginModeActive())
+               MenuParts::Separator();
+            if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
             {
                ArrangeRenderJob job = ArrangeBuildLaneScopedRenderJob(
                   { ctxLaneId }, ctxLane->name.empty() ? ("Track " + std::to_string(ctxLaneId)) : ctxLane->name);
@@ -4225,7 +4239,7 @@ namespace app
                ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
 
 
-            if (MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
+            if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
             {
                const std::vector<uint64_t> subtreeLanes = Arrange::LanesInTrackGroupRecursive(gArrange, ctxGroupId);
                if (!subtreeLanes.empty())

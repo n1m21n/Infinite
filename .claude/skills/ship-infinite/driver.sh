@@ -102,13 +102,15 @@ step_ci_gate() {
     echo "    Build run $run_id is green for HEAD - ok"
 }
 
-# After every upload: the release must hold the DMG, both Windows zips and the AppImage.
+# After every upload: the release must hold the DMG, both Windows zips and the AppImage, and the
+# buyer installers (Infinite.pkg, Infinite-Setup-windows-x64.exe, Infinite-linux-x86_64.tar.gz).
 # The release-windows / release-linux steps are best-effort and print a warning on a miss;
 # this is the loud check that a release is not missing a platform. Usage: verify-assets <tag>
 step_verify_assets() {
     local tag="${1:?tag required}" names missing=0 want
     names=$(gh release view "$tag" --json assets -q '.assets[].name' 2>/dev/null)
-    for want in "Infinite.dmg" "Infinite-windows-x64.zip" "Infinite-windows-ARM64.zip" "Infinite-x86_64.AppImage"; do
+    for want in "Infinite.dmg" "Infinite.pkg" "Infinite-windows-x64.zip" "Infinite-windows-ARM64.zip" "Infinite-x86_64.AppImage" \
+                "Infinite-Setup-windows-x64.exe" "Infinite-linux-x86_64.tar.gz"; do
         if printf '%s\n' "$names" | grep -qx "$want"; then
             echo "    ok       $want"
         else
@@ -181,6 +183,9 @@ step_release() {
     fi
     gh release upload "$tag" website/assets/Infinite.dmg --clobber
     echo "    uploaded website/assets/Infinite.dmg onto release $tag"
+    # The buyer installer (tools/installer/mac/build_pkg.sh), built by package.sh from the same app.
+    gh release upload "$tag" dist/Infinite.pkg --clobber
+    echo "    uploaded dist/Infinite.pkg onto release $tag"
 
     step_release_windows "$tag"
     step_release_linux "$tag"
@@ -277,6 +282,10 @@ step_release_windows() {
         (cd "$work/stage-$arch" && zip -qr "$work/$art.zip" Infinite)
         gh release upload "$tag" "$work/$art.zip" --clobber
         echo "    uploaded $art.zip onto release $tag"
+        if gh run download "$run_id" -n "Infinite-Setup-windows-$arch" -D "$work/setup-$arch" >/dev/null 2>&1; then
+            gh release upload "$tag" "$work/setup-$arch/Infinite-Setup-windows-$arch.exe" --clobber
+            echo "    uploaded Infinite-Setup-windows-$arch.exe onto release $tag"
+        fi
         ok=1
     done
     rm -rf "$work"
@@ -317,6 +326,10 @@ step_release_linux() {
     fi
     gh release upload "$tag" "$work/Infinite-x86_64.AppImage" --clobber
     echo "    uploaded Infinite-x86_64.AppImage onto release $tag"
+    if gh run download "$run_id" -n "Infinite-linux-x86_64.tar.gz" -D "$work" >/dev/null 2>&1; then
+        gh release upload "$tag" "$work/Infinite-linux-x86_64.tar.gz" --clobber
+        echo "    uploaded Infinite-linux-x86_64.tar.gz onto release $tag"
+    fi
     rm -rf "$work"
 }
 

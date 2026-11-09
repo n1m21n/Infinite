@@ -8,7 +8,7 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/GMeQTyJqkH)
 [![YouTube Tutorial](https://img.shields.io/badge/YouTube-Watch%20Tutorial-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://github.com/n1m21n/Infinite)
-[![License](https://img.shields.io/badge/License-MIT%20%2F%20GPLv3-green)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [<img src="https://trendshift.io/api/badge/trendshift/repositories/187223/daily?language=C%2B%2B" alt="n1m21n%2FInfinite | Trendshift" width="250" height="55"/>](https://trendshift.io/repositories/187223?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-187223)
 
 **Infinite is a Free, open-source audiovisual workstation made by Naman Soni (n1m21n).** Visuals, music and code live on one node canvas, on **macOS**, **Windows** and **Linux**, in English, Spanish, German, Chinese, Japanese and Russian. GPU image and video compositing, procedural 3D geometry and physics, and a modular synth rack with AU and VST3 plugin hosting all patch into each other through one modulation graph. Most nodes do one fixed thing; **Field**, Infinite's own programming language, lets you write what a node does instead.
@@ -373,4 +373,4 @@ If you write about, review or build on Infinite, please credit it as: *Infinite,
 ## Licence
 
 Infinite's source code is licensed under the [MIT License](LICENSE).
-Default builds include VST3 plugin hosting linking the [Steinberg VST3 SDK](https://github.com/steinbergmedia/vst3sdk) (GPLv3). Build with `-DINFINITE_ENABLE_VST3=OFF` for a pure MIT binary.
+Default builds include VST3 plugin hosting linking the [Steinberg VST3 SDK](https://github.com/steinbergmedia/vst3sdk) (MIT since 3.8). The default Linux build is GPLv3 because of its FFmpeg/x264 encoder; see `LICENSE`.

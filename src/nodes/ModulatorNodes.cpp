@@ -1,6 +1,7 @@
 #include "ModulatorNodes.h"
 
 #include <algorithm>
+#include <chrono>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -9,6 +10,9 @@
 #include <sstream>
 
 #include "Transport.h"
+#include "core/Expression.h"
+#include "core/ExprGlobals.h"
+#include "core/CurveEdit.h"
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
 #include "platform/Platform.h"
@@ -912,6 +916,49 @@ float ModCurveNode::Value01()
 void MSEGNode::Reset()
 {
    points = { { 0.0f, 0.0f, 0.0f }, { 0.1f, 1.0f, 0.6f }, { 0.5f, 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
+   Normalize();
+}
+
+void MSEGNode::Normalize()
+{
+   if (points.size() > (size_t)kMaxPoints)
+      points.resize(kMaxPoints);
+   if (points.empty())
+      return;
+   std::stable_sort(points.begin(), points.end(), [](const Point& a, const Point& b) { return a.x < b.x; });
+   for (Point& p : points)
+   {
+      p.x = std::clamp(p.x, 0.0f, 1.0f);
+      p.y = std::clamp(p.y, 0.0f, 1.0f);
+      p.curve = std::clamp(p.curve, -1.0f, 1.0f);
+      if (p.interp >= ModShapes::kInterpCount)
+         p.interp = ModShapes::kInterpBend;
+      if (p.handle >= ModShapes::kHandleCount)
+         p.handle = ModShapes::kHandleAutoClamped;
+      p.lx = std::min(0.0f, p.lx);
+      p.rx = std::max(0.0f, p.rx);
+   }
+   points.front().x = 0.0f;
+   points.back().x = 1.0f;
+   ModShapes::MsegAutoHandles(points.data(), (int)points.size());
+}
+
+void MSEGNode::SetInterp(int first, int last, int interp)
+{
+   if (interp < 0 || interp >= ModShapes::kInterpCount)
+      return;
+   for (int i = std::max(0, first); i <= last && i < (int)points.size(); i++)
+      points[i].interp = (uint8_t)interp;
+   Normalize();
+}
+
+void MSEGNode::SetHandleType(int first, int last, int handle)
+{
+   if (handle < 0 || handle >= ModShapes::kHandleCount)
+      return;
+   for (int i = std::max(0, first); i <= last && i < (int)points.size(); i++)
+      points[i].handle = (uint8_t)handle;
+   Normalize();
 }
 
 int MSEGNode::AddPoint(float x, float y)
@@ -923,7 +970,11 @@ int MSEGNode::AddPoint(float x, float y)
    int at = 1;
    while (at < (int)points.size() - 1 && points[at].x < x)
       at++;
-   points.insert(points.begin() + at, Point { x, y, 0.0f });
+   Point p { x, y, 0.0f };
+   p.interp = points[at - 1].interp; // splitting a segment keeps how it was drawn
+   p.easing = points[at - 1].easing;
+   points.insert(points.begin() + at, p);
+   ModShapes::MsegAutoHandles(points.data(), (int)points.size());
    return at;
 }
 
@@ -940,6 +991,7 @@ void MSEGNode::MovePoint(int index, float x, float y)
       p.x = 1.0f;
    else
       p.x = std::clamp(x, points[index - 1].x, points[index + 1].x); // a point never passes its neighbours
+   ModShapes::MsegAutoHandles(points.data(), (int)points.size());
 }
 
 void MSEGNode::RemovePoint(int index)
@@ -947,6 +999,7 @@ void MSEGNode::RemovePoint(int index)
    if (index <= 0 || index >= (int)points.size() - 1)
       return;
    points.erase(points.begin() + index);
+   ModShapes::MsegAutoHandles(points.data(), (int)points.size());
 }
 
 float MSEGNode::Segment(float y0, float y1, float curve, float t)
@@ -954,9 +1007,61 @@ float MSEGNode::Segment(float y0, float y1, float curve, float t)
    return ModShapes::MsegSegment(y0, y1, curve, t);
 }
 
+bool MSEGNode::RefreshExpression() const
+{
+   const double seconds = OnSeconds() ? 1.0 / PassesPerSecond() : BeatsPerPass() * 60.0 / Transport::Instance().Tempo();
+   const double beats = OnSeconds() ? seconds * Transport::Instance().Tempo() / 60.0 : BeatsPerPass();
+   const auto& globals = ExprGlobals::Values();
+   if (mExpressionKey == expression && mExpressionGlobals == globals && mExpressionSeconds == seconds && mExpressionBeats == beats)
+      return mExpressionError.empty();
+   mExpressionKey = expression; mExpressionGlobals = globals;
+   mExpressionSeconds = seconds; mExpressionBeats = beats;
+   float table[1024];
+   std::map<std::string, float> vars;
+   for (int i = 0; i < 1024; ++i)
+   {
+      const float t = (float)i / 1023.0f;
+      vars["phase"] = t; vars["beat"] = (float)(t * beats);
+      vars["sec"] = (float)(t * seconds); vars["frame"] = (float)(t * seconds * fps);
+      if (!Expression::Evaluate(expression, t, &vars, &globals, table[i], mExpressionError) || !std::isfinite(table[i]))
+      {
+         if (mExpressionError.empty()) mExpressionError = "Expression must be finite";
+         return false;
+      }
+      table[i] = std::clamp(table[i], 0.0f, 1.0f);
+   }
+   std::copy(table, table + 1024, mExpressionTable);
+   mExpressionError.clear();
+   return true;
+}
+
+void MSEGNode::BakeExpression(float tolerance)
+{
+   if (!RefreshExpression()) return;
+   std::vector<CurveEdit::XY> samples;
+   for (int i = 0; i < 1024; ++i) samples.push_back({(float)i / 1023.0f, mExpressionTable[i]});
+   auto reduced = CurveEdit::Simplify(samples, std::max(0.00001f, tolerance));
+   while (reduced.size() > kMaxPoints)
+   {
+      tolerance = std::max(0.00001f, tolerance) * 1.5f;
+      reduced = CurveEdit::Simplify(samples, tolerance);
+   }
+   points.clear();
+   for (const auto& p : reduced) { Point q; q.x=p.x; q.y=p.y; q.interp=ModShapes::kInterpLinear; points.push_back(q); }
+   source = 0;
+   Normalize();
+}
+
 float MSEGNode::Evaluate(float x) const
 {
-   return ModShapes::MsegEvaluate(points.data(), (int)points.size(), x);
+   if (source == 1)
+   {
+      RefreshExpression();
+      const float at = std::clamp(x, 0.0f, 1.0f) * 1023.0f;
+      const int i = std::min(1022, (int)at);
+      return mExpressionTable[i] + (mExpressionTable[i+1] - mExpressionTable[i]) * (at-i);
+   }
+   return ModShapes::MsegEvaluate(points.data(), (int)points.size(), x, mHint);
 }
 
 std::string MSEGNode::Encode() const
@@ -966,8 +1071,16 @@ std::string MSEGNode::Encode() const
    {
       if (i > 0)
          out += ";";
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%.6g,%.6g,%.6g", (double)points[i].x, (double)points[i].y, (double)points[i].curve);
+      const Point& p = points[i];
+      char buf[192];
+      // An easing segment has no bend: its slot carries the easing id instead.
+      const double third = p.interp == ModShapes::kInterpEasing ? (double)p.easing : (double)p.curve;
+      int n = snprintf(buf, sizeof(buf), "%.6g,%.6g,%.6g", (double)p.x, (double)p.y, third);
+      const bool dragged = p.handle == ModShapes::kHandleAligned || p.handle == ModShapes::kHandleFree;
+      if (p.interp != ModShapes::kInterpBend || p.handle != ModShapes::kHandleAutoClamped)
+         n += snprintf(buf + n, sizeof(buf) - n, ",%d,%d", (int)p.interp, (int)p.handle);
+      if (dragged)
+         snprintf(buf + n, sizeof(buf) - n, ",%.6g,%.6g,%.6g,%.6g", (double)p.lx, (double)p.ly, (double)p.rx, (double)p.ry);
       out += buf;
    }
    return out;
@@ -981,14 +1094,37 @@ void MSEGNode::Decode(const std::string& s)
    {
       const size_t sep = s.find(';', start);
       const std::string term = s.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
-      const size_t c1 = term.find(',');
-      const size_t c2 = c1 == std::string::npos ? std::string::npos : term.find(',', c1 + 1);
-      if (c1 != std::string::npos)
+      float f[9] = {};
+      int nf = 0;
+      size_t at = 0;
+      while (nf < 9)
+      {
+         const size_t comma = term.find(',', at);
+         f[nf++] = (float)atof(term.substr(at, comma == std::string::npos ? std::string::npos : comma - at).c_str());
+         if (comma == std::string::npos)
+            break;
+         at = comma + 1;
+      }
+      if (nf >= 2)
       {
          Point p;
-         p.x = std::clamp((float)atof(term.substr(0, c1).c_str()), 0.0f, 1.0f);
-         p.y = std::clamp((float)atof(term.substr(c1 + 1, c2 == std::string::npos ? std::string::npos : c2 - c1 - 1).c_str()), 0.0f, 1.0f);
-         p.curve = c2 == std::string::npos ? 0.0f : std::clamp((float)atof(term.substr(c2 + 1).c_str()), -1.0f, 1.0f);
+         p.x = f[0];
+         p.y = f[1];
+         p.curve = nf >= 3 ? f[2] : 0.0f;
+         if (nf >= 5)
+         {
+            p.interp = (uint8_t)std::clamp((int)f[3], 0, 255);
+            p.handle = (uint8_t)std::clamp((int)f[4], 0, 255);
+            if (p.interp == ModShapes::kInterpEasing)
+            {
+               p.easing = (uint8_t)std::clamp((int)std::lround(p.curve), 0, ModShapes::kEaseCount - 1);
+               p.curve = 0.0f;
+            }
+         }
+         if (nf >= 9)
+         {
+            p.lx = f[5]; p.ly = f[6]; p.rx = f[7]; p.ry = f[8];
+         }
          decoded.push_back(p);
       }
       if (sep == std::string::npos)
@@ -997,10 +1133,34 @@ void MSEGNode::Decode(const std::string& s)
    }
    if (decoded.size() < 2)
       return;
-   std::stable_sort(decoded.begin(), decoded.end(), [](const Point& a, const Point& b) { return a.x < b.x; });
-   decoded.front().x = 0.0f;
-   decoded.back().x = 1.0f;
    points = decoded;
+   Normalize();
+}
+
+const std::vector<std::string>& MSEGNode::RateModeNames()
+{
+   static const std::vector<std::string> kNames = [] {
+      std::vector<std::string> n = LFONode::RateModeNames();
+      n.push_back("Seconds");
+      n.push_back("Frames");
+      return n;
+   }();
+   return kNames;
+}
+
+double MSEGNode::PassesPerSecond() const
+{
+   const double sp = std::clamp((double)speed, 0.25, 4.0);
+   if (rateMode == kRateSeconds)
+      return sp / std::max(0.001, (double)lengthSec);
+   if (rateMode == kRateFrames)
+      return sp * std::max(1.0, (double)fps) / std::max(1.0, (double)lengthFrames);
+   return sp * (double)std::max(0.001f, rateHz);
+}
+
+double MSEGNode::BeatsPerPass() const
+{
+   return PeriodBeatsFor(rateMode, rateBeats, mPeriodCache) / std::clamp((double)speed, 0.25, 4.0);
 }
 
 float MSEGNode::PositionHeld(double elapsed, bool patched) const
@@ -1015,7 +1175,7 @@ float MSEGNode::PositionHeld(double elapsed, bool patched) const
 float MSEGNode::Advance()
 {
    Transport& tr = Transport::Instance();
-   const bool hz = rateMode == LFONode::kRateHz;
+   const bool hz = OnSeconds();
    const double clock = hz ? tr.Seconds() : tr.Beats();
    if (clock == mClockLast)
       return (float)mX;
@@ -1023,7 +1183,7 @@ float MSEGNode::Advance()
    if (step < 0.0)
       step = 0.0; // seek or loop wrap: hold, don't run backwards
    mClockLast = clock;
-   const double dx = hz ? step * (double)std::max(0.001f, rateHz) : step / PeriodBeatsFor(rateMode, rateBeats, mPeriodCache);
+   const double dx = hz ? step * PassesPerSecond() : step / BeatsPerPass();
 
    const float trig = trigger->Value01();
    const bool held = trig >= 0.5f;
@@ -1045,12 +1205,18 @@ bool MSEGNode::VoiceSpec(VoiceMod::Spec& out)
       return false;
    out = VoiceMod::Spec();
    out.kind = VoiceMod::kMseg;
-   out.hz = rateMode == LFONode::kRateHz;
-   out.rateHz = rateHz;
-   out.periodBeats = PeriodBeatsFor(rateMode, rateBeats, mPeriodCache);
+   out.hz = OnSeconds();
+   out.rateHz = (float)PassesPerSecond();
+   out.periodBeats = BeatsPerPass();
    out.loop = loop;
    out.loopStart = loopStart;
    out.loopEnd = loopEnd;
+   if (source == 1)
+   {
+      RefreshExpression();
+      out.msegExpression = true;
+      std::copy(mExpressionTable, mExpressionTable + 1024, out.msegTable);
+   }
    out.numPoints = std::min((int)points.size(), VoiceMod::kMaxPoints);
    for (int i = 0; i < out.numPoints; i++)
       out.points[i] = points[i];
@@ -1119,7 +1285,22 @@ float MSEGNode::Value01()
       mX = 1.0;
       mReleased = true;
       mTrigLast = 0.0f;
-      x = PositionHeld(RatePosition(rateMode, rateBeats, rateHz, mPeriodCache), false);
+      double elapsed;
+      if (freeRun)
+      {
+         const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+         if (mFreeLast >= 0.0)
+            mFreeClock += std::clamp(now - mFreeLast, 0.0, 0.25); // a stall does not jump the shape
+         mFreeLast = now;
+         elapsed = OnSeconds() ? mFreeClock * PassesPerSecond() : mFreeClock * (Transport::Instance().Tempo() / 60.0) / BeatsPerPass();
+      }
+      else
+      {
+         mFreeLast = -1.0;
+         Transport& tr = Transport::Instance();
+         elapsed = OnSeconds() ? tr.Seconds() * PassesPerSecond() : tr.Beats() / BeatsPerPass();
+      }
+      x = ModShapes::MsegPositionFree(elapsed, play, loop, loopStart, loopEnd);
    }
    mShownX = x;
    return std::clamp(Evaluate(x), 0.0f, 1.0f);

@@ -6,6 +6,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "core/Transport.h"
 #include "core/gl3.h"
 #include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/FormParts.h"
@@ -16,6 +17,7 @@ namespace app
    void DrawPluginScanControls(bool foldersOpen); // LibraryPanels.cpp
    void DrawPluginManagerList();
    void DrawCliSetupSection();     // CliSetupSection.cpp
+   void DrawDawPluginSection();    // DawPluginSection.cpp
 
    namespace
    {
@@ -35,7 +37,7 @@ namespace app
          { "minimap", 1, "Minimap" }, { "cables", 1, "Cable Visibility" }, { "audio", 2, nullptr },
          { "devices", 2, "Audio Devices & Format" }, { "midi", 2, "MIDI Inputs" }, { "general", 3, nullptr },
          { "autosave", 3, "Autosave" }, { "performance", 3, "Performance & Rendering" }, { "movement-log", 3, "Movement Log" },
-         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" },
+         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" }, { "daw-plugin", 9, nullptr }, { "daw-sync", 9, nullptr },
          { "field", 4, nullptr }, { "globals", 5, nullptr }, { "extensions", 6, nullptr }, { "plugins", 7, nullptr },
          { "agents", 8, nullptr }, { "terminal", 8, nullptr },
       };
@@ -92,7 +94,7 @@ namespace app
       static const char* const kTabs[] = { I18N_KEY("Appearance"), I18N_KEY("Canvas & Workspace"), I18N_KEY("Audio"),
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
                                            I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins"),
-                                           I18N_KEY("Agents & Terminal") };
+                                           I18N_KEY("Agents & Terminal"), I18N_KEY("Infinite as VST3/AU") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -110,6 +112,8 @@ namespace app
             sTab = 5;
          if (o && strstr(o, "settingsterminal"))
             sTab = 8;
+         if (o && strstr(o, "settingsdaw"))
+            sTab = 9;
          // "settingstab=N": any tab by index, so the manuals can shoot every page.
          if (const char* st = o ? strstr(o, "settingstab=") : nullptr)
             sTab = std::clamp(atoi(st + 12), 0, kTabCount - 1);
@@ -134,8 +138,15 @@ namespace app
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + wellTop + SectionCard::kPad);
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::space_2);
+      // Inside a DAW: the host owns audio and MIDI devices, there is no plugin hosting and no shell, so the Audio,
+      // Plugins and Agents & Terminal tabs go.
+      auto hiddenInDaw = [](int tab) { return Platform::PluginModeActive() && (tab == 2 || tab == 7 || tab == 8); };
+      if (hiddenInDaw(sTab))
+         sTab = 0;
       for (int i = 0; i < kTabCount; i++)
       {
+         if (hiddenInDaw(i))
+            continue;
          const bool sel = (i == sTab);
          const float h = ImGui::GetFrameHeight();
          const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -524,6 +535,9 @@ namespace app
          if (sTab == 2)
          {
             ImGui::Spacing();
+            // Inside a DAW the host owns the audio device, rate and buffer.
+            if (!Platform::PluginModeActive())
+            {
             FormParts::Section(T("Audio Devices & Format"));
             const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
             const bool audioRunning = AudioEngine::Instance().SampleRate() > 0.0;
@@ -794,6 +808,7 @@ namespace app
             }
 
             SectionCard::End();
+            }
 
             FormParts::Section(T("MIDI Inputs"));
             ImGui::TextWrapped("%s", T("Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play."));
@@ -833,6 +848,8 @@ namespace app
          // 4. General & Performance Tab
          if (sTab == 3)
          {
+            if (!Platform::PluginModeActive()) // the DAW project saves the patch
+            {
             ImGui::Spacing();
             FormParts::Section(T("Autosave"));
             if (gAutosaveFailed)
@@ -854,6 +871,7 @@ namespace app
                gAutosaveSeconds = seconds;
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();
+            }
 
             ImGui::Spacing();
             FormParts::Section(T("Performance & Rendering"));
@@ -1007,6 +1025,9 @@ namespace app
             if (FormParts::Button(L("Reveal logs")))
                Platform::RevealLogs();
 
+            // Inside a DAW: no app updates or plugin install (the app does both).
+            if (!Platform::PluginModeActive())
+            {
             ImGui::Spacing();
             FormParts::Section(T("Application & Updates"));
             ImGui::Text(T("Version: %s"), INFINITE_VERSION_STRING);
@@ -1022,6 +1043,7 @@ namespace app
                gShowUpdateCheckModal = true;
             }
 
+            }
 
             SectionCard::End();
          }
@@ -1602,7 +1624,8 @@ namespace app
 
             const float btnW = 96.0f; // one action-button width for every row in this tab
             ImGui::Spacing();
-            if (UpdateCheck::GetStatus() == UpdateCheck::Status::UpdateAvailable)
+            if (!Platform::PluginModeActive() && // the plugin updates with the installer, not in place
+                UpdateCheck::GetStatus() == UpdateCheck::Status::UpdateAvailable)
             {
                // Infinite itself: same in-place update as the Check for updates window, surfaced where packs are.
                FormParts::Section(T("Infinite"));
@@ -1831,6 +1854,39 @@ namespace app
             ImGui::PopTextWrapPos();
             FormParts::PopReferenceStyle();
             LibraryParts::EndWell();
+            SectionCard::End();
+         }
+
+         // 10. "Infinite as VST3/AU" Tab: in the app, install the VST3/AU plugins; inside a DAW, who owns time.
+         if (sTab == 9)
+         {
+            if (Platform::PluginModeActive())
+            {
+               // Who owns time inside the DAW (Transport::SetHostSync). Play and stop always follow the DAW.
+               ImGui::Spacing();
+               FormParts::Section(T("DAW sync"));
+               Transport& tr = Transport::Instance();
+               bool ownTempo = tr.OwnTempo(), ownHead = tr.OwnPlayhead(), ownLoop = tr.OwnLoop();
+               const std::string items = std::string(T("DAW")) + '\0' + "Infinite" + '\0';
+               int tempo = ownTempo ? 1 : 0, head = ownHead ? 1 : 0, loop = ownLoop ? 1 : 0;
+               bool changed = FormParts::Combo(L("Tempo"), &tempo, items.c_str());
+               ImGui::BeginDisabled(tempo == 1);
+               changed |= FormParts::Combo(L("Playhead"), &head, items.c_str());
+               ImGui::EndDisabled();
+               ImGui::BeginDisabled(tempo == 1 || head == 0);
+               changed |= FormParts::Combo(L("Loop"), &loop, items.c_str());
+               ImGui::EndDisabled();
+               if (changed)
+               {
+                  tr.SetHostSync(tempo == 1, head == 1, loop == 1);
+                  SaveWorkspaceSettings();
+               }
+            }
+            if (!Platform::PluginModeActive())
+            {
+               ImGui::Spacing();
+               DrawDawPluginSection();
+            }
             SectionCard::End();
          }
 

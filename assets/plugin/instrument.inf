@@ -1,0 +1,17 @@
+infinite-patch 1
+# Infinite Instrument starting patch: notes from the DAW play a synth.
+node 1 Notes MIDI Notes
+  id midi
+  pos 0 0
+end
+node 2 Synths Analog
+  id synth
+  f volume 0.5
+  pos 400 0
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 800 0
+end
+note synth 0 midi
+aud speakers 0 synth

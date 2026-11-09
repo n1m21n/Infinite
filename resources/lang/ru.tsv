@@ -2796,3 +2796,140 @@ You're in	Готово
 Your files	Ваши файлы
 This computer is missing curl, which downloads the setup. Install curl, then press Try again.	На компьютере нет curl, который скачивает установку. Установите curl и нажмите «Повторить».
 Send	Отправить
+Back to the plugin	Назад в плагин
+Canvas	Холст
+Copy path	Копировать путь
+DAW plugin	Плагин для DAW
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away	Двойной щелчок по пустому месту с Shift: центр орбиты плавно возвращается к 3D-курсору (расстояние и угол сохраняются); Shift + перетаскивание средней кнопкой сдвигает его
+Host slots	Слоты хоста
+Installed (%s)	Установлено (%s)
+Installed (%s), update ready	Установлено (%s), есть обновление
+Installed. Rescan plugins in your DAW.	Установлено. Пересканируйте плагины в DAW.
+Late blocks the host played as silence	Опоздавшие блоки, которые хост проиграл как тишину
+No Macro is on a host slot	Ни один Macro не назначен на слот хоста
+No Output	Нет выхода
+Not in this build	Нет в этой сборке
+Reinstall	Переустановить
+Reveal	Показать
+Set by the DAW	Задаёт DAW
+Uninstall	Удалить
+DAW sync	Синхронизация с DAW
+DAW	DAW
+Playhead	Курсор
+Tempo	Темп
+Record your performance: the clips and scenes you launch are written into the Timeline.	Запишите выступление: запущенные клипы и сцены записываются на таймлайн.
+Not now	Не сейчас
+Make an account	Создать аккаунт
+Transparent window	Прозрачное окно
+Click to copy	Нажмите, чтобы скопировать
+Buy	Купить
+Infinite as VST3/AU	Infinite как VST3/AU
+Plugin	Плагин
+Infinite as a VST3/AU plugin runs inside your DAW, with your patch saved in the project. The plugin is a one-time purchase for two computers, with updates for life. The standalone app stays free.	Infinite как плагин VST3/AU работает внутри вашей DAW, патч сохраняется в проекте. Плагин покупается один раз для двух компьютеров, с обновлениями навсегда. Отдельное приложение остаётся бесплатным.
+Buy the plugin	Купить плагин
+%d target	%d цель
+%d targets	целей: %d
+A shape you draw, played over time. Click empty space to add a point, drag to move it, right-click to remove it; the small ring on a Bend segment bends it. time sets how one pass is counted (beats, a synced division, Hz, seconds or frames), speed scales it, and play repeats, plays once or ping-pongs; free run ignores the transport. The Curve Editor (Shift+E) edits the same points with pens, snap and quantise. With nothing patched to trig it follows the transport. A trig cable starts the shape on each rising edge: loop off plays it once and holds the last value; loop on repeats the part between loop start and loop end while trig stays high and plays on to the end when it drops. Loop start = loop end is a sustain point.	Нарисованная вами форма, воспроизводимая во времени. Щёлкните по пустому месту, чтобы добавить точку, перетащите её, правый щелчок удаляет; маленькое кольцо на сегменте Bend изгибает его. time задаёт, как считается один проход (доли, синхронное деление, Гц, секунды или кадры), speed масштабирует его, а play повторяет, проигрывает один раз или туда и обратно; free run игнорирует транспорт. Curve Editor (Shift+E) правит те же точки пером, привязкой и квантованием. Если к trig ничего не подключено, форма следует за транспортом. Кабель на trig запускает форму по каждому нарастающему фронту: при выключенном loop она играет один раз и держит последнее значение; при включённом повторяет участок между loop start и loop end, пока trig высокий, и доигрывает до конца, когда он падает. Loop start = loop end — точка сустейна.
+Add Point	Добавить точку
+Add a point; the Pen adds one on a single click and a drag pulls its handles	Добавить точку; перо ставит её щелчком, а перетаскивание вытягивает рукоятки
+After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops	После Assign щёлкните по ручке на холсте, чтобы управлять ею кривой; Shift — выбирать дальше, Esc — стоп
+Assign	Назначить
+Assign %s -> %s: %s	Назначить %s -> %s: %s
+Assign, then click a knob	Назначьте, затем щёлкните по ручке
+Auto Clamped, Auto, Vector, Aligned or Free handles for the selected points	Рукоятки Auto Clamped, Auto, Vector, Aligned или Free для выбранных точек
+Bake	Запечь
+Bend (B)	Изгиб (B)
+Click a knob to drive it; Shift picks more, Esc stops	Щёлкните по ручке, чтобы управлять ею; Shift — ещё, Esc — стоп
+Click the knob to record; Esc stops	Щёлкните по ручке для записи; Esc — стоп
+Click to pick again on the next take	Щёлкните, чтобы выбрать заново на следующем дубле
+Close Curve Editor	Закрыть Curve Editor
+Close Page	Закрыть страницу
+Constant, Linear, Bend, Bezier or Easing for the segments the selection starts (none selected: all)	Constant, Linear, Bend, Bezier или Easing для сегментов, начинающихся в выделении (без выделения — все)
+Crop to Loop	Обрезать по циклу
+Curve Editor	Curve Editor
+Curve Editor Panel	Панель Curve Editor
+Curve Tools	Инструменты кривой
+Curve editor - draw and shape MSEG curves (Shift+E)	Curve Editor: рисуйте и формируйте кривые MSEG (Shift+E)
+Delete Curve	Удалить кривую
+Delete Points	Удалить точки
+Delete the selected points; the two ends stay	Удаляет выбранные точки; два крайних остаются
+Draw (D)	Рисовать (D)
+Draw here to make one	Рисуйте здесь, чтобы создать
+Easing	Easing
+End	Конец
+Eraser (E)	Ластик (E)
+FPS	FPS
+Fit Curve	Вписать кривую
+Free run	Свободный ход
+From	От
+Grid: snap and quantise (Q)	Сетка: привязка и квантование (Q)
+Hand (H)	Рука (H)
+Handle Type	Тип рукоятки
+Handles	Рукоятки
+High	Высокий
+Keep	Оставить
+Keep only the looped part; the length shrinks to it	Оставляет только участок цикла; длина сокращается до него
+Line (L)	Линия (L)
+Loop only	Только цикл
+Low	Низкий
+Mine	Мои
+Mod / Motion	Mod / Motion
+Mod pages run on beats or Hz; Motion pages on seconds or frames at the export rate	Страницы Mod работают в долях или Гц; страницы Motion — в секундах или кадрах с частотой экспорта
+Motion easings	Easing движения
+Motion group	Группа движения
+Move a CC to record it; Esc stops	Подвигайте CC для записи; Esc — стоп
+Move the selected points, or every point, onto the grid	Сдвигает выбранные точки (или все) на сетку
+New curve	Новая кривая
+Next CC moved	Следующий CC
+Next knob clicked	Следующая ручка
+No curve yet	Кривой пока нет
+Nothing wired	Ничего не подключено
+Pen (P)	Перо (P)
+Per voice	По голосам
+Point	Точка
+Position, Rotation or Scale make X, Y and Z pages bound to the selected node	Position, Rotation или Scale создают страницы X, Y и Z, привязанные к выбранному узлу
+Properties	Свойства
+Pulses	Импульсы
+Quantise Points	Квантовать точки
+Quantise to Grid	Квантовать по сетке
+Record	Запись
+Record %s: %s	Запись %s: %s
+Record a take from a CC, a knob or the trig input into the page; Overwrite, Touch or Latch	Записать дубль с CC, ручки или входа trig на страницу; Overwrite, Touch или Latch
+Record a take into this curve	Записать дубль в эту кривую
+Recording: click to stop	Идёт запись: щёлкните, чтобы остановить
+Remove target	Убрать цель
+Reopen Page	Открыть страницу снова
+Replace the page with a shape, an easing or one of your saves; Mine saves this one	Заменяет страницу формой, easing или вашим сохранением; «Мои» сохраняет текущую
+Save This Shape	Сохранить эту форму
+Segment Curve	Кривизна сегмента
+Select (A)	Выбор (A)
+Select All Points	Выбрать все точки
+Select every point	Выбрать каждую точку
+Select, Hand, Pen, Draw, Line, Stamp, Bend, Eraser, Transform and Smooth, while the pointer is over the Curve Editor. Every key in this section needs the pointer there	Выбор, Рука, Перо, Рисование, Линия, Штамп, Изгиб, Ластик, Трансформация и Сглаживание — когда указатель над Curve Editor. Все клавиши этого раздела работают, только пока указатель там
+Shapes	Формы
+Show Curve Editor	Показать Curve Editor
+Show or hide the docked Curve Editor; it opens the MSEG node selected on the canvas	Показать или скрыть закреплённый Curve Editor; он открывает выбранный на холсте узел MSEG
+Show or hide the properties column; with Stamp, the next shape	Показать или скрыть колонку свойств; со Штампом — следующая форма
+Show other curves	Показать другие кривые
+Show the whole curve	Показать всю кривую
+Smooth (M)	Сглаживание (M)
+Snap to grid (G)	Привязка к сетке (G)
+Stamp (S); N cycles shapes	Штамп (S); N переключает форму
+Starts on the next bar	Начало со следующего такта
+Starts when the transport plays	Начало при запуске транспорта
+Steps	Ступени
+Take	Дубль
+Targets	Цели
+Thinning	Прореживание
+Toggle snap to the grid; hold Alt to drag past it, Ctrl to snap the value to eighths	Включает привязку к сетке; Alt — перетаскивать мимо неё, Ctrl — привязывать значение к восьмым долям
+Transform (T): drag to scale selection around its centre	Трансформация (T): тащите, чтобы масштабировать выделение вокруг центра
+Turn the formula into points you can edit	Превращает формулу в редактируемые точки
+Up/down zooms time, left/right moves along it; Alt zooms the value	Вверх/вниз — масштаб времени, влево/вправо — перемещение; Alt — масштаб значения
+Voices	Голоса
+Wire a modulator into trig	Подключите модулятор к trig
+Zoom / Pan Curve	Масштаб / прокрутка кривой
+Zoom Value	Масштаб значения
+Zoom around the pointer, or pan; middle-drag also pans	Масштаб вокруг указателя или прокрутка; перетаскивание средней кнопкой тоже прокручивает
+Zoom the value axis around the pointer	Масштаб оси значений вокруг указателя
+param 	парам. 
+trig input	вход trig

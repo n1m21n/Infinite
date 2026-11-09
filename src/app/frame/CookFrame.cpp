@@ -2,6 +2,7 @@
 #include "app/graph/LearningLog.h"
 #include "app/AppShared.h"
 #include "audio/VoiceMod.h"
+#include "plugin/engine/HostAudio.h"
 
 namespace app
 {
@@ -169,6 +170,9 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // Live: pin this frame's clock to where the audio is now, interpolated
    // between audio callbacks, so every modulator read below sees the frame's
    // own time rather than the last block boundary (Block 2, F2).
+   // Plugin mode: host slot values land on their Macros first (may pin the frame clock).
+   if (Platform::PluginModeActive())
+      HostSlotsFrame();
    Transport::Instance().BeginFrameClock();
    // Set blocks: a GO waiting for the grid lands here, and every node learns
    // whether its block is off before anything cooks.
@@ -297,7 +301,12 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
          sDelay = sDelay > 0.0 ? sDelay + (want - sDelay) * 0.1 : want;
       }
       const double delay = std::clamp(sDelay, 0.002, 0.25);
-      ParamMailbox::PublishFrame(sDelay > 0.0 ? transport.EngineFrameSeconds() : -1.0, delay);
+      // Plugin offline slot lock: a served frame ramps over exactly one grid step from the
+      // parked position; a frame between served ones leaves that stamp alone.
+      if (transport.FramePinned())
+         ParamMailbox::PublishFrame(transport.EngineFrameSeconds(), transport.FramePinnedDelay());
+      else if (!Platform::PluginModeActive() || PluginEngine::SlotFramePublishes())
+         ParamMailbox::PublishFrame(sDelay > 0.0 ? transport.EngineFrameSeconds() : -1.0, delay);
    }
 
    // Per-destination smoothing (Modulation::Source::smoothMs) on the

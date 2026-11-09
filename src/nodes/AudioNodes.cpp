@@ -1,3 +1,4 @@
+#include "plugin/engine/HostAudio.h"
 #include "AudioNodes.h"
 
 #include <algorithm>
@@ -645,7 +646,11 @@ public:
       const int mode = mChannelMode.load(std::memory_order_relaxed);
       const int channelOffset = (mode <= 0) ? 0 : (mode - 1);
       const bool isMono = (mode > 0);
-      const int captured = Platform::AudioInputCaptureRead(chans, frames, 2, mReaderCursor, channelOffset, isMono);
+      // Inside the plugin the host feeds Audio In; decided here so it holds from the first block,
+      // before the main thread has cooked the node.
+      const int bus = Platform::PluginModeActive() ? (mSource.load(std::memory_order_relaxed) == AudioInputNode::kSourceHostSidechain ? 1 : 0) : -1;
+      const int captured = bus >= 0 ? PluginEngine::ReadHostInput(bus, chans, frames, channelOffset, isMono)
+                                    : Platform::AudioInputCaptureRead(chans, frames, 2, mReaderCursor, channelOffset, isMono);
 
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
@@ -663,10 +668,11 @@ public:
    }
 
    // Main thread only.
-   void PushParams(float gainDb, int channelMode)
+   void PushParams(float gainDb, int channelMode, int source)
    {
       mGainDb.store(gainDb, std::memory_order_relaxed);
       mChannelMode.store(channelMode, std::memory_order_relaxed);
+      mSource.store(source, std::memory_order_relaxed);
       mMailbox.Push(kGainDbParam, gainDb);
    }
 
@@ -679,13 +685,22 @@ private:
    MeterRing mMeter;
    std::atomic<float> mGainDb { 0.0f };
    std::atomic<int> mChannelMode { 0 };
+   std::atomic<int> mSource { 0 }; // AudioInputNode::Source
    uint64_t mReaderCursor = 0;
    float mScratch[2][kMaxCaptureFrames] = {};
 };
 
-AudioInputNode::AudioInputNode() { Platform::AudioInputCaptureAddRef(); }
+// The device tap is only held while the node reads the device: inside the plugin it reads the
+// host and never asks for the microphone.
+AudioInputNode::AudioInputNode() = default;
 
-AudioInputNode::~AudioInputNode() { Platform::AudioInputCaptureRemoveRef(); }
+AudioInputNode::~AudioInputNode()
+{
+   if (mDeviceRef)
+      Platform::AudioInputCaptureRemoveRef();
+}
+
+bool AudioInputNode::ReadsHost() const { return Platform::PluginModeActive(); }
 
 void AudioInputNode::CookIfNeeded(int frameId)
 {
@@ -694,7 +709,26 @@ void AudioInputNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioCaptureNode>();
-   mAudioNode->PushParams(gainDb, channelMode);
+   const bool host = ReadsHost();
+   mAudioNode->PushParams(gainDb, channelMode, source);
+   if (host)
+   {
+      if (mDeviceRef)
+      {
+         Platform::AudioInputCaptureRemoveRef();
+         mDeviceRef = false;
+      }
+      mStatus.clear();
+      float peak = 0.0f;
+      if (mAudioNode->Meter().ReadLatest(peak))
+         mLevel = peak;
+      return;
+   }
+   if (!mDeviceRef)
+   {
+      Platform::AudioInputCaptureAddRef();
+      mDeviceRef = true;
+   }
 
    if (deviceId != 0)
       Platform::AudioInputCaptureSetDevice((uint32_t)deviceId);
@@ -719,12 +753,17 @@ void AudioInputNode::VisitParams(ParamVisitor& v)
    v.Int("channelMode", channelMode);
    v.Int("deviceId", deviceId);
    v.Text("deviceName", deviceName);
+   v.Int("source", source);
+   source = std::clamp(source, (int)kSourceDefault, (int)kSourceHostSidechain);
 }
 
 AudioNode* AudioInputNode::GetAudioNode()
 {
    if (!mAudioNode)
+   {
       mAudioNode = std::make_unique<AudioCaptureNode>();
+      mAudioNode->PushParams(gainDb, channelMode, source);
+   }
    return mAudioNode.get();
 }
 

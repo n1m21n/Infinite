@@ -9,8 +9,8 @@ the latter is a misnamed duplicate of the same tip — use the feature branch).
 `src/platform/win/PluginVST3Win.cpp` hosts the SDK's
 `IComponent`/`IEditController`/`IAudioProcessor` directly: host glue classes,
 create/init/process/parameter/state logic, DLL loading, UTF-16 handling.
-`INFINITE_ENABLE_VST3` defaults `ON` (`CMakeLists.txt`; GPLv3 licensing
-consequence accepted, see `LICENSE`). SEH crash guarding
+`INFINITE_ENABLE_VST3` defaults `ON` (`CMakeLists.txt`; the SDK is MIT since 3.8,
+see `LICENSE`). SEH crash guarding
 (`RunPluginCallGuarded`) covers state save/restore.
 
 **Phase 2 — Editor window (HWND) hosting. Done, CI-confirmed compiling/linking.**

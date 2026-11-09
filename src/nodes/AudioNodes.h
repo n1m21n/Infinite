@@ -280,9 +280,18 @@ public:
    int channelMode = 0; // 0 = Stereo (1+2), 1 = Input 1 (mono), 2 = Input 2 (mono), 3 = Input 3 (mono)...
    int deviceId = 0;    // 0 = system default, or specific device ID
    std::string deviceName;
+   // Where the audio comes from: the input device, or (inside the VST3/AU plugin) the host's
+   // main or sidechain bus. Inside the plugin, Default means the host's main bus and the device
+   // is never opened; in the app, the host sources fall back to the device.
+   enum Source { kSourceDefault = 0, kSourceHostMain = 1, kSourceHostSidechain = 2 };
+   int source = kSourceDefault;
+
+   // True when this node reads the plugin host rather than an input device.
+   bool ReadsHost() const;
 
 private:
    std::unique_ptr<AudioCaptureNode> mAudioNode;
+   bool mDeviceRef = false;
    std::string mStatus;
    int mLastCookFrame = -1;
    float mLevel = 0.0f;

@@ -27,7 +27,7 @@ Switch: Settings > Audio > "Credit Infinite in exported files" (default on), or 
 Check a file: `python3 tools/credit/check_credit.py FILE...`.
 
 ## Layer 3: license
-MIT (see `LICENSE`; the default VST3 build carries a GPLv3 note). The name "Infinite" and the credit line are requested, not required, for output. Metadata can be stripped by anyone; agents cannot be forced to credit.
+MIT (see `LICENSE`; the default Linux build is GPLv3 for its H.264 encoder). The name "Infinite" and the credit line are requested, not required, for output. Metadata can be stripped by anyone; agents cannot be forced to credit.
 
 ## For agents passing files on
 Keep the metadata when re-encoding (for example `ffmpeg -map_metadata 0`).

@@ -441,6 +441,30 @@ namespace Platform
                         int requestedBufferFrames = 0);
    void AudioDeviceClose();
 
+   // ---- plugin mode (docs/plans/vst-au/README.md 8.1) ----
+   // True when this process is the engine behind a VST3/AU plugin instance: the host's audio
+   // replaces the audio device, the host's MIDI replaces hardware MIDI, and Audio In reads the
+   // host's buses. Set once at startup, before any node or audio code runs.
+   inline std::atomic<bool>& PluginModeFlag()
+   {
+      static std::atomic<bool> on { false };
+      return on;
+   }
+   inline bool PluginModeActive() { return PluginModeFlag().load(std::memory_order_relaxed); }
+   // Plugin mode's stand-in for AudioDeviceOpen/Close. AudioEngine calls these instead of the
+   // real device when they are set (src/plugin/engine/HostAudio.cpp sets them).
+   struct AudioDeviceOverride
+   {
+      bool (*open)(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError);
+      void (*close)();
+      int (*bufferFrames)();
+   };
+   inline const AudioDeviceOverride*& AudioDeviceOverrideRef()
+   {
+      static const AudioDeviceOverride* o = nullptr;
+      return o;
+   }
+
    // Audio graph worker threads (AudioWorkerPool). Called ON the worker:
    // puts it in the same realtime class as the device's own IO thread -
    // macOS joins the open output device's os_workgroup (with a
@@ -735,6 +759,12 @@ namespace Platform
    // afterward - plugin or GLFW - can make the process visible.
    void SuppressAppUIForHeadlessProcess();
 
+   // Plugin engine (README 8.2, step 2.4), before it shows a window (pop-out, projector): lets this
+   // headless process own visible, focusable windows. macOS moves from Prohibited to Accessory (no
+   // Dock icon, windows can take keys) and activates; a hidden GLFW window needs nothing on Windows
+   // and Linux, so their sides are empty.
+   void AllowPluginEngineWindows();
+
    // Headless CLI runs (--render, --frame, ...) print one JSON status line. On
    // Windows Infinite.exe is a GUI-subsystem binary, so its stdout is not the
    // terminal that launched it; this attaches to the parent's console (only
@@ -1012,6 +1042,11 @@ namespace Platform
    // every binding is now scoped to the device it was learned on, not just
    // its channel/controller number. 0 = no device / wildcard-unbound.
    using MidiDeviceId = unsigned int;
+   // Inside a plugin (PluginModeActive) the host is the only MIDI source: MidiStart lists it as this
+   // device and the engine injects host events under it, so MIDI learn and bindings work in a DAW.
+   // A binding learned on hardware in the app reattaches to it on first touch (MidiRebindStaleDevice).
+   constexpr MidiDeviceId kMidiHostDevice = 1;
+   constexpr const char* kMidiHostDeviceName = "Host";
 
    struct MidiCCValue
    {

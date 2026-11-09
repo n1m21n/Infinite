@@ -1132,7 +1132,7 @@ Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beat
          session scene|launch|stop|add|insert|send|sceneset|slot ...
          notes get|add|set|delete|move|quantize|transform|export <clip>  notes generate <type> [key=value]  perf ...
 Make     studio generate <part> [bars=n]  studio status|export [path=]|node <type>|get|set
-Nodes    node <node> rename <name>, params|viewport on|off, panel, window [close|fullscreen|display <n>], timeline|session [video|audio], preset <name>
+Nodes    node <node> rename <name>, params|viewport on|off, panel, window [close|fullscreen|transparent|display <n>], timeline|session [video|audio], preset <name>
          library list|add|remove|refresh samples|media [folder]
 See      shot <node> [out.png]  frame [p.inf] <t> <out.png>  render <p.inf> <out.mp4>  audio <p.inf> <out.json>
 Code     code kinds|new|check|push|pull|watch|errors|docs|examples
@@ -1187,6 +1187,7 @@ session       clip launcher for playing clips live
 samplestudio  record, generate, slice and shape samples, then drop the result on the canvas
 pianoroll     notes of the selected note clip or pattern
 view3d        3D View: arranges 3D outputs, camera and lights, before Render 3D
+curveeditor   draw, record and assign MSEG curves to any knob
 terminal      this Terminal and the agent chat
 showset       show set: patches to step through in a live set
 history       undo history

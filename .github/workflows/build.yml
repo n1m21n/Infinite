@@ -169,6 +169,14 @@ jobs:
         with:
           submodules: recursive
 
+      # DAW plugin (docs/plans/vst-au/README.md 3.1/3.4/3.6): the shipping VST3 bundles (no test
+      # key) ride in the zip's Plugins\ folder; Settings > DAW plugin copies them into
+      # %LOCALAPPDATA%\Programs\Common\VST3. The app itself is the engine. First, so a plugin
+      # build error shows in minutes, not after the app build.
+      - name: Plugin bundles
+        shell: bash
+        run: tools/plugin/build_bundles.sh dist-plugins --build build-dist-plugin --jobs 2
+
       - name: Configure
         # No -G: CMake takes the newest Visual Studio on the runner. The
         # windows-11-arm image moved past VS 2022 on 2026-09-22 and a pinned
@@ -288,6 +296,29 @@ jobs:
             Write-Host "OK: $exe is statically linked, no vc_redist dependency."
           }
 
+      # A test-key build of the same bundles, checked against this build's engine: Steinberg's
+      # validator and pluginval at strictness 10 with a test licence (the licensed path).
+      - name: Plugin validation
+        if: matrix.arch == 'x64'
+        shell: bash
+        run: |
+          cmake -S src/plugin/shell -B build-plugin -DCMAKE_BUILD_TYPE=Release -DINFINITE_LICENSE_TEST_KEY=ON
+          for t in InfiniteInstrument_vst3 InfiniteFX_vst3 validator plugin_test_license; do
+            cmake --build build-plugin --config Release --target $t -- /maxcpucount:2
+          done
+          curl -fsSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip
+          mkdir -p pluginval && unzip -o -q pluginval.zip -d pluginval
+          PLUGINVAL="$PWD/pluginval/pluginval.exe" INFINITE_PLUGIN_ENGINE="$PWD/build/Release/Infinite.exe" \
+            LOGDIR="$PWD/plugin-logs" tools/plugin/validate.sh --build build-plugin --strictness 10 --licensed
+
+      - name: Upload plugin logs
+        if: always() && matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-logs-windows
+          path: plugin-logs
+          if-no-files-found: ignore
+
       # package.ps1 is the local developer path (it drives its own configure
       # and hardcodes x64); here the build already exists, so just stage it.
       - name: Stage
@@ -308,6 +339,7 @@ jobs:
           # fills it. Without it the Drum Sequencer's groove picker has no kit.
           cp -r build/Release/Resources dist/Infinite/
           cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
+          cp -r dist-plugins dist/Infinite/Plugins
 
       - name: Upload unsigned artifact
         id: upload-unsigned
@@ -344,6 +376,36 @@ jobs:
           else
             cp -r dist-signed/* dist/Infinite/
           fi
+
+      # Buyer installer (tools/installer/windows/Infinite.iss): Welcome, terms, Infinite app / VST3,
+      # finish page with the next steps. Per user, no admin. Built from the same staged folder, after
+      # signing, so it carries the signed exe when SignPath signed it.
+      - name: Installer
+        shell: bash
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 tools/installer/make_art.py installer-art
+          python3 tools/installer/terms_page.py website/terms.html installer-art/terms.txt --text
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          # upgrade = install when missing; the script needs Inno 6.3+ (x64compatible / arm64)
+          choco upgrade innosetup -y --no-progress >/dev/null
+          test -f "$ISCC" || { echo "ISCC not found at $ISCC"; ls "/c/Program Files (x86)" | grep -i inno; exit 1; }
+          VERSION=$(sed -n 's/^set(INFINITE_VERSION "\(.*\)")/\1/p' CMakeLists.txt)
+          W() { cygpath -w "$1"; }
+          # Git bash (MSYS) rewrites arguments that start with "/" as POSIX paths, which mangles
+          # ISCC's /Q and /D switches; the paths below are already in Windows form.
+          export MSYS2_ARG_CONV_EXCL='*'
+          "$ISCC" /Q "/DSrc=$(W "$PWD/dist/Infinite")" "/DArt=$(W "$PWD/installer-art/windows")" \
+            "/DTerms=$(W "$PWD/installer-art/terms.txt")" "/DVersion=$VERSION" "/DArch=${{ matrix.arch }}" \
+            "/DOut=$(W "$PWD/dist-installer")" tools/installer/windows/Infinite.iss
+          ls -la dist-installer
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-Setup-windows-${{ matrix.arch }}
+          path: dist-installer/*.exe
+          if-no-files-found: error
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -416,6 +478,27 @@ jobs:
       # VST3SCANTEST etc. below have a real plugin to find instead of
       # SKIPping every run. Cached on the pinned DPF commit so most runs
       # reuse the built bundle instead of rebuilding it from source.
+      # DAW plugin (3.2/3.5): a test-key build of the VST3 bundles against this build's engine,
+      # Steinberg's validator and pluginval at strictness 10 (licensed, GUI tests under Xvfb).
+      - name: Plugin validation
+        if: matrix.compiler == 'gcc'
+        run: |
+          cmake -S src/plugin/shell -B build-plugin -G Ninja -DCMAKE_BUILD_TYPE=Release -DINFINITE_LICENSE_TEST_KEY=ON
+          ninja -C build-plugin -j2 InfiniteInstrument_vst3 InfiniteFX_vst3 validator plugin_test_license
+          curl -fsSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Linux.zip
+          mkdir -p pluginval && unzip -o -q pluginval.zip -d pluginval && chmod +x pluginval/pluginval
+          PLUGINVAL="$PWD/pluginval/pluginval" INFINITE_PLUGIN_ENGINE="$PWD/build-linux/Infinite" \
+            LOGDIR="$PWD/plugin-logs" xvfb-run -a -s "-screen 0 1920x1080x24" \
+            tools/plugin/validate.sh --build build-plugin --strictness 10 --licensed
+
+      - name: Upload plugin logs
+        if: always() && matrix.compiler == 'gcc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-logs-linux
+          path: plugin-logs
+          if-no-files-found: ignore
+
       - name: Cache VST3 test plugins
         uses: actions/cache@v4
         with:
@@ -587,8 +670,15 @@ jobs:
           fi
           echo "OK: no disallowed GL libraries linked directly."
 
+      # DAW plugin (3.6): shipping VST3 bundles at usr/share/infinite/Plugins; Settings > DAW
+      # plugin copies them into ~/.vst3 and records $APPIMAGE as the engine.
+      - name: Plugin bundles
+        run: |
+          export CC=clang CXX=clang++
+          tools/plugin/build_bundles.sh dist-plugins --build build-dist-plugin --jobs 2
+
       - name: Package AppImage
-        run: tools/linux/package-appimage.sh build-linux artifacts-linux
+        run: INFINITE_PLUGINS_DIR="$PWD/dist-plugins" tools/linux/package-appimage.sh build-linux artifacts-linux
 
       - name: Verify AppImage runtime has no libfuse dependency
         run: |
@@ -606,6 +696,28 @@ jobs:
         with:
           name: Infinite-x86_64.AppImage
           path: artifacts-linux/Infinite-x86_64.AppImage
+          if-no-files-found: error
+
+      # Buyer installer (tools/installer/linux/install.sh): the AppImage + an install script that
+      # asks for the terms, the app and the VST3 plugins, all in the home folder.
+      - name: Installer tarball
+        run: |
+          D=Infinite-linux-x86_64
+          mkdir -p "$D"
+          cp artifacts-linux/Infinite-x86_64.AppImage tools/installer/linux/install.sh "$D/"
+          cp art/brand/logo/linux/infinite-512.png "$D/infinite.png"
+          python3 tools/installer/terms_page.py website/terms.html "$D/TERMS.txt" --text
+          tar -czf artifacts-linux/Infinite-linux-x86_64.tar.gz "$D"
+          # Smoke: a non-interactive install into a throwaway home finds the plugins and records the engine.
+          export HOME="$PWD/installer-home" XDG_DATA_HOME="$PWD/installer-home/.local/share"
+          mkdir -p "$HOME" && (cd "$D" && ./install.sh --yes)
+          test -d "$HOME/.vst3/Infinite FX.vst3" && test -x "$XDG_DATA_HOME/infinite/Infinite.AppImage"
+
+      - name: Upload Linux installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-linux-x86_64.tar.gz
+          path: artifacts-linux/Infinite-linux-x86_64.tar.gz
           if-no-files-found: error
 
   # Phase 5 task 5.3 (L3 smoke, validation.md's "L3" section): runs the

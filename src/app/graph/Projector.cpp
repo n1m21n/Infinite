@@ -529,6 +529,15 @@ namespace app
       // "Transparent window" (Output window menu) asks for an alpha framebuffer so OBS window capture can key it.
       // The hint is sticky global state, so it is set explicitly every time.
       glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, transparent ? GLFW_TRUE : GLFW_FALSE);
+      // Plugin engine: the main window was made hidden and the hint is sticky; a projector is a
+      // real window on a real display, as in the app (README 8.2, step 2.4).
+      if (Platform::PluginModeActive())
+      {
+         Platform::AllowPluginEngineWindows();
+         glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+         glfwWindowHint(GLFW_FOCUSED, GLFW_TRUE);
+         glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
+      }
       GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
       glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
       if (projWindow == nullptr)

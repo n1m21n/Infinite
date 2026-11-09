@@ -364,7 +364,8 @@ void DrawPopupsA(FrameCtx& fc)
             MenuParts::Separator();
 
             // Information & Hierarchy
-            if (CliSetup::Prefs().face == "chat" && MenuParts::Item(L("Reference in chat")))
+            if (!Platform::PluginModeActive() && CliSetup::Prefs().face == "chat" &&
+                MenuParts::Item(L("Reference in chat"))) // no chat inside a DAW
                ChatReferenceNode(gn->index);
             if (MenuParts::Item(L("Help")))
             {
@@ -616,6 +617,7 @@ void DrawPopupsA(FrameCtx& fc)
                if (MenuParts::Item(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
+               DrawParamHostAutomationMenuItem(nodeIndex, paramIndex);
                if (MenuParts::Item(L("View in Modulation Matrix")))
                {
                   gModMatrixOpen = true;
@@ -806,6 +808,7 @@ void DrawPopupsA(FrameCtx& fc)
                if (MenuParts::Item(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
+               DrawParamHostAutomationMenuItem(nodeIndex, paramIndex);
                if (!destRef->isBool)
                {
                   if (MenuParts::Item(L("Enter Expression")))

@@ -9,6 +9,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
+#include "app/panels/CurveEditorPanel.h"
 
 // Field compile errors read "line N, col M: message". Show the message, then
 // the offending source line with the token at that column marked, so the user
@@ -429,13 +430,17 @@ void DrawSidePanels(FrameCtx& fc)
             const PillGroup::Segment segs[5] = { { "lib.modules", T("Modules") }, { "lib.field", T("Field") },
                                                  { "lib.samples", T("Samples") }, { "lib.media", T("Media") },
                                                  { "lib.plugins", T("Plugins") } };
+            // Inside a DAW, Infinite hosts no plugins (deferred): no Plugins segment.
+            const int segCount = Platform::PluginModeActive() ? 4 : 5;
+            if (segCount == 4 && gSearchPanelMode == 3)
+               gSearchPanelMode = 0;
             int sel = 0;
-            for (int i = 0; i < 5; ++i)
+            for (int i = 0; i < segCount; ++i)
                if (kModes[i] == gSearchPanelMode)
                   sel = i;
             const ImVec2 cp = ImGui::GetCursorScreenPos();
             const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 32.0f };
-            const int hit = PillGroup::Draw("lib.tabs", r, segs, 5, sel, UiType::Size::Title);
+            const int hit = PillGroup::Draw("lib.tabs", r, segs, segCount, sel, UiType::Size::Title);
             if (hit >= 0)
                gSearchPanelMode = kModes[hit];
             ImGui::SetCursorScreenPos(cp);
@@ -714,6 +719,9 @@ void DrawSidePanels(FrameCtx& fc)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
       if (gView3DOpen && gView3DDock != 3)
          DrawView3DDocked("##view3d_bottom", ImVec2(0, gView3DHeight));
+      // Curve Editor (View > Curve Editor or Shift+E) at the bottom; the other sides draw with their row.
+      if (gCurveEditorOpen && gCurveEditorDock == 0)
+         DrawCurveEditorDocked("##curveeditor_bottom", ImVec2(0, gCurveEditorHeight));
       // Terminal (View > Terminal or Ctrl+`) docked at the bottom; the other sides draw with their row.
       if (TerminalDocked() && gTerminalDock == 0)
          DrawTerminalDocked("##terminal_bottom", ImVec2(0, gTerminalHeight));

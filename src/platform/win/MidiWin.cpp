@@ -347,6 +347,17 @@ namespace Platform
       outError.clear();
       if (gRunning.load(std::memory_order_acquire))
          return true;
+      if (PluginModeActive())
+      {
+         // The host is the only MIDI source inside a plugin (see Platform.mm's MidiStart); it takes
+         // index 1 (kMidiHostDevice), as no hardware port is opened.
+         {
+            std::lock_guard<std::mutex> lock(gState.mutex);
+            gState.deviceNames.assign(1, kMidiHostDeviceName);
+         }
+         gRunning.store(true, std::memory_order_release);
+         return true;
+      }
 
       MidiStop(); // close any stale handles first
 
@@ -427,14 +438,14 @@ namespace Platform
    {
       std::vector<MidiSource> out;
       std::lock_guard<std::mutex> lock(gState.mutex);
-      for (size_t i = 0; i < gState.deviceNames.size() && i < gHandles.size(); i++)
+      for (size_t i = 0; i < gState.deviceNames.size(); i++)
          out.push_back({ (MidiDeviceId)(i + 1), gState.deviceNames[i] });
       return out;
    }
 
    std::string MidiDeviceName(MidiDeviceId device)
    {
-      if (device == 0 || device > gHandles.size())
+      if (device == 0)
          return {};
       std::lock_guard<std::mutex> lock(gState.mutex);
       return device <= gState.deviceNames.size() ? gState.deviceNames[device - 1] : std::string();

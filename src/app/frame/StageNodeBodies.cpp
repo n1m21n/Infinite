@@ -36,6 +36,9 @@ static void RunNodeIssueFix(GraphNode& gn, const NodeIssue& issue)
 }
 void DrawNodeBodies(FrameCtx& fc)
 {
+   // Every envelope panel publishes its rect here each frame (PublishWtTestRect), not only the
+   // Wavetable body that clears it, so a patch with no Wavetable grew it forever (~1 MB/min).
+   gWtTestRects.clear();
    ImGuiIO& io = ImGui::GetIO();
    auto& frameId = fc.frameId;
    auto& benchB6Stages = fc.benchB6Stages;
@@ -1273,7 +1276,11 @@ void DrawNodeBodies(FrameCtx& fc)
                      ImGui::TextDisabled(T("from: %s"), srcName.c_str());
                   }
 
-                  if (n->StopRequested() || n->IsFinalizing())
+                  // Inside a DAW there is no live video recording (the DAW records audio).
+                  if (Platform::PluginModeActive())
+                  {
+                  }
+                  else if (n->StopRequested() || n->IsFinalizing())
                   {
                      // StopRequested(): the actual StopRecordingAsync() call
                      // runs at the top of next frame, once this "finalizing"
@@ -1326,78 +1333,82 @@ void DrawNodeBodies(FrameCtx& fc)
                      PopTextWrapWidth();
                   }
 
-                  ImGui::Dummy(ImVec2(0, 8));
-                  NodeSeparator();
-                  ImGui::TextDisabled("%s", T("Offline Render"));
-
-                  // A take drives the whole patch's Transport/AudioEngine, not
-                  // just this node - only one can ever be in flight regardless
-                  // of which OutputNode started it, and it can't overlap this
-                  // node's own live recording either (both would fight over the
-                  // same recordVideoPath/EnsureFbo-sized mOut).
-                  const bool thisNodeRendering = gOfflineRender.node == n;
-                  const bool otherSessionActive = gOfflineRender.active && !thisNodeRendering;
-
-                  // Unit/caption lives inside the field's right edge (R1), not outside the node.
-                  auto fieldUnit = [](const char* unit)
+                  // Inside a DAW the DAW bounces: no offline take.
+                  if (!Platform::PluginModeActive())
                   {
-                     const ImVec2 mn = ImGui::GetItemRectMin();
-                     const ImVec2 mx = ImGui::GetItemRectMax();
-                     const ImVec2 ts = ImGui::CalcTextSize(unit);
-                     ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-                     dim.w *= 0.55f;
-                     ImGui::GetWindowDrawList()->AddText(ImVec2(mx.x - ts.x - 8.0f, mn.y + (mx.y - mn.y - ts.y) * 0.5f),
-                                                         ImGui::GetColorU32(dim), unit);
-                  };
-                  ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || gOfflineRender.active);
-                  ImGui::SetNextItemWidth(kParamWidth);
-                  FieldWell::InputInt("##renderfps", &n->offlineFps);
-                  fieldUnit(T("render fps"));
-                  n->offlineFps = std::clamp(n->offlineFps, 1, 240);
+                     ImGui::Dummy(ImVec2(0, 8));
+                     NodeSeparator();
+                     ImGui::TextDisabled("%s", T("Offline Render"));
 
-                  // Duration is typed, not dragged: a render queue's length is a
-                  // number the user knows ("give me 45 seconds"), and hitting an
-                  // exact value on a 1..600 slider is fiddly. The presets are
-                  // the common takes; the field takes anything up to an hour.
-                  ImGui::SetNextItemWidth(kParamWidth);
-                  FieldWell::InputInt("##renderdur", &n->offlineDurationSeconds);
-                  fieldUnit(T("duration (s)"));
-                  n->offlineDurationSeconds = std::clamp(n->offlineDurationSeconds, 1, 3600);
-                  for (int preset : { 15, 30, 45, 60 })
-                  {
-                     ImGui::PushID(preset);
-                     const bool selected = n->offlineDurationSeconds == preset;
-                     if (ActionButton::Draw((std::to_string(preset) + "s").c_str(), ImVec2(kParamWidth * 0.22f, 0),
-                                            selected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
-                        n->offlineDurationSeconds = preset;
-                     ImGui::PopID();
-                     if (preset != 60)
-                        ImGui::SameLine();
-                  }
+                     // A take drives the whole patch's Transport/AudioEngine, not
+                     // just this node - only one can ever be in flight regardless
+                     // of which OutputNode started it, and it can't overlap this
+                     // node's own live recording either (both would fight over the
+                     // same recordVideoPath/EnsureFbo-sized mOut).
+                     const bool thisNodeRendering = gOfflineRender.node == n;
+                     const bool otherSessionActive = gOfflineRender.active && !thisNodeRendering;
 
-                  ImGui::SetNextItemWidth(kParamWidth);
-                  FieldWell::InputInt("##renderpre", &n->offlinePrerollFrames);
-                  fieldUnit(T("preroll frames"));
-                  n->offlinePrerollFrames = std::clamp(n->offlinePrerollFrames, 0, 600);
-                  ImGui::EndDisabled();
+                     // Unit/caption lives inside the field's right edge (R1), not outside the node.
+                     auto fieldUnit = [](const char* unit)
+                     {
+                        const ImVec2 mn = ImGui::GetItemRectMin();
+                        const ImVec2 mx = ImGui::GetItemRectMax();
+                        const ImVec2 ts = ImGui::CalcTextSize(unit);
+                        ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                        dim.w *= 0.55f;
+                        ImGui::GetWindowDrawList()->AddText(ImVec2(mx.x - ts.x - 8.0f, mn.y + (mx.y - mn.y - ts.y) * 0.5f),
+                                                            ImGui::GetColorU32(dim), unit);
+                     };
+                     ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || gOfflineRender.active);
+                     ImGui::SetNextItemWidth(kParamWidth);
+                     FieldWell::InputInt("##renderfps", &n->offlineFps);
+                     fieldUnit(T("render fps"));
+                     n->offlineFps = std::clamp(n->offlineFps, 1, 240);
 
-                  ImGui::TextDisabled(T("%d frames @ %dfps"), n->offlineDurationSeconds * n->offlineFps, n->offlineFps);
+                     // Duration is typed, not dragged: a render queue's length is a
+                     // number the user knows ("give me 45 seconds"), and hitting an
+                     // exact value on a 1..600 slider is fiddly. The presets are
+                     // the common takes; the field takes anything up to an hour.
+                     ImGui::SetNextItemWidth(kParamWidth);
+                     FieldWell::InputInt("##renderdur", &n->offlineDurationSeconds);
+                     fieldUnit(T("duration (s)"));
+                     n->offlineDurationSeconds = std::clamp(n->offlineDurationSeconds, 1, 3600);
+                     for (int preset : { 15, 30, 45, 60 })
+                     {
+                        ImGui::PushID(preset);
+                        const bool selected = n->offlineDurationSeconds == preset;
+                        if (ActionButton::Draw((std::to_string(preset) + "s").c_str(), ImVec2(kParamWidth * 0.22f, 0),
+                                               selected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+                           n->offlineDurationSeconds = preset;
+                        ImGui::PopID();
+                        if (preset != 60)
+                           ImGui::SameLine();
+                     }
 
-                  if (thisNodeRendering)
-                  {
-                     // The floating DrawOfflineRenderProgressWindow carries the
-                     // live progress/Cancel button; this is just a disabled
-                     // placeholder so the button doesn't visually disappear.
-                     ImGui::BeginDisabled();
-                     ActionButton::Draw(L("Rendering..."), ImVec2(kPreviewSize, 0));
+                     ImGui::SetNextItemWidth(kParamWidth);
+                     FieldWell::InputInt("##renderpre", &n->offlinePrerollFrames);
+                     fieldUnit(T("preroll frames"));
+                     n->offlinePrerollFrames = std::clamp(n->offlinePrerollFrames, 0, 600);
                      ImGui::EndDisabled();
-                  }
-                  else
-                  {
-                     ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || otherSessionActive);
-                     if (ActionButton::Draw(L("Render"), ImVec2(kPreviewSize, 0)))
-                        StartOfflineRenderSession(n);
-                     ImGui::EndDisabled();
+
+                     ImGui::TextDisabled(T("%d frames @ %dfps"), n->offlineDurationSeconds * n->offlineFps, n->offlineFps);
+
+                     if (thisNodeRendering)
+                     {
+                        // The floating DrawOfflineRenderProgressWindow carries the
+                        // live progress/Cancel button; this is just a disabled
+                        // placeholder so the button doesn't visually disappear.
+                        ImGui::BeginDisabled();
+                        ActionButton::Draw(L("Rendering..."), ImVec2(kPreviewSize, 0));
+                        ImGui::EndDisabled();
+                     }
+                     else
+                     {
+                        ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || otherSessionActive);
+                        if (ActionButton::Draw(L("Render"), ImVec2(kPreviewSize, 0)))
+                           StartOfflineRenderSession(n);
+                        ImGui::EndDisabled();
+                     }
                   }
                }
                else if (auto* n = dynamic_cast<SyphonOutNode*>(gn.node.get()))

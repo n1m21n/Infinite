@@ -1,0 +1,20 @@
+/* Installer pages: docs/brand inks and Ember, system font (Geist is not on a fresh Mac). */
+html { font: 13px/1.5 -apple-system, "Helvetica Neue", sans-serif; color: #12152A; }
+body { margin: 0 0 0 4px; padding: 0 12px 0 0; }
+h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 6px 0 4px; }
+h2 { font-size: 13px; font-weight: 600; margin: 16px 0 4px; }
+p, li { color: #404660; margin: 0 0 8px; }
+ol, ul { padding-left: 20px; margin: 4px 0 8px; }
+.lede { font-size: 14px; color: #12152A; }
+.mono { font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: #12152A; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #EEEDF6; color: #12152A; font-weight: 600; }
+a { color: #B53700; text-decoration: none; }
+.note { color: #5A6180; font-size: 12px; }
+@media (prefers-color-scheme: dark) {
+  html { color: #EEF1FA; }
+  p, li { color: #A3AACB; }
+  .lede, .mono { color: #EEF1FA; }
+  .chip { background: #2A3052; color: #EEF1FA; }
+  a { color: #FF6B35; }
+  .note { color: #8890B1; }
+}

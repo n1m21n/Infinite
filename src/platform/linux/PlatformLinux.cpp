@@ -1248,6 +1248,11 @@ namespace Platform
    {
    }
 
+   void AllowPluginEngineWindows()
+   {
+      // Nothing to change: an X11/Wayland client shows windows as soon as GLFW maps them.
+   }
+
    void AttachConsoleForHeadless()
    {
    }

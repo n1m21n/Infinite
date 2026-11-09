@@ -5,6 +5,7 @@
 #include <cctype>
 #include <functional>
 #include "app/AppShared.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "imgui.h"
 #include "app/graph/LearningLog.h"
 
@@ -37,6 +38,7 @@ namespace app
             { "pianoroll", &gPianoRollOpen, &gPianoRollDock, false },
             { "view3d", &gView3DOpen, &gView3DDock, false },
             { "terminal", &gTerminalOpen, &gTerminalDock, true },
+            { "curveeditor", &gCurveEditorOpen, &gCurveEditorDock, false },
             { "showset", &gShowSetOpen, nullptr, false },
             { "history", &gHistoryOpen, nullptr, false },
             { "settings", &gSettingsOpen, nullptr, false },
@@ -62,7 +64,7 @@ namespace app
             { "samples", "samplestudio" }, { "matrix", "modmatrix" },
             { "modulation", "modmatrix" }, { "modulationmatrix", "modmatrix" }, { "performance", "perf" },
             { "arrange", "timeline" }, { "arrangement", "timeline" }, { "tracks", "timeline" }, { "3d", "view3d" },
-            { "3dview", "view3d" }, { "chat", "terminal" }, { "agent", "terminal" }, { "shell", "terminal" },
+            { "3dview", "view3d" }, { "chat", "terminal" }, { "agent", "terminal" }, { "shell", "terminal" }, { "curve", "curveeditor" }, { "curves", "curveeditor" }, { "mseg", "curveeditor" },
             { "preview", "viewport" }, { "output", "viewport" }, { "show", "showset" }, { "undo", "history" },
             { "keys", "shortcuts" }, { "keyboardshortcuts", "shortcuts" },
          };
