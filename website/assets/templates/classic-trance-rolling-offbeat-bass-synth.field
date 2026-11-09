@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Classic Trance Rolling Offbeat Bass Synth",
+    "author": "Infinite",
+    "description": "High-energy rolling 16th-note trance bass synthesizer featuring paired saw and pulse sub-oscillators, snappy transistor envelope punch, 24dB resonant lowpass filter, and warm analog drive.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.52 [0.1, 1.0]\nparam float resonance = 0.60 [0.1, 0.95]\nparam float envMod = 0.65 [0.0, 1.0]\nparam float decayTime = 0.22 [0.06, 0.6]\nparam float drive = 0.40 [0.0, 1.0]\nstate float p1 = 0\nstate float pSub = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.08)\nenv = if(target > env, env + (target - env) * 0.96, env - env * decayRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\nsaw = p1 * 2.0 - 1.0\n\ndpSub = dp * 0.5\npSub = (pSub + dpSub) % 1.0\nsub = if(pSub < 0.5, 1.0, -1.0)\n\nsig = (saw * 0.75 + sub * 0.55) * (1.0 + drive * 1.4)\n\nfNorm = clamp(cutoff * 0.16 + env * envMod * 0.34, 0.015, 0.45)\nkRes = clamp(resonance * 1.85, 0.1, 1.9)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.5))) * env\nout = sat * 0.55\n",
+    "params": {
+      "cutoff": 0.52,
+      "resonance": 0.6,
+      "envMod": 0.65,
+      "decayTime": 0.22,
+      "drive": 0.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

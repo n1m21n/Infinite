@@ -1,6 +1,7 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include <algorithm>
 #include "app/AppShared.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "app/graph/LearningLog.h"
 #include "core/Transport.h"
 #include "core/MediaCollect.h"
@@ -398,6 +399,14 @@ namespace app
             gPianoRollHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelPianoRollDock")
             gPianoRollDock = (val == "3") ? 3 : 0;
+         else if (key == "panelCurveEditorOpen")
+            gCurveEditorOpen = (val != "0");
+         else if (key == "panelCurveEditorH")
+            gCurveEditorHeight = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelCurveEditorW")
+            gCurveEditorWidth = std::max(360.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelCurveEditorDock")
+            gCurveEditorDock = atoi(val.c_str()) == 3 ? 3 : 0; // bottom or top only
          else if (key == "panelTerminalOpen")
          {
             // Inside a DAW there is no shell: keep it closed, and write the app's value back untouched.
@@ -468,6 +477,10 @@ namespace app
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
       file << "panelPianoRollH=" << gPianoRollHeight << "\n";
       file << "panelPianoRollDock=" << gPianoRollDock << "\n";
+      file << "panelCurveEditorOpen=" << (gCurveEditorOpen ? 1 : 0) << "\n";
+      file << "panelCurveEditorH=" << gCurveEditorHeight << "\n";
+      file << "panelCurveEditorW=" << gCurveEditorWidth << "\n";
+      file << "panelCurveEditorDock=" << gCurveEditorDock << "\n";
       file << "panelTerminalOpen=" << ((Platform::PluginModeActive() ? gTerminalOpenInApp : gTerminalOpen) ? 1 : 0) << "\n";
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";

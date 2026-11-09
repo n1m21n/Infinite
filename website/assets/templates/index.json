@@ -2103,6 +2103,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "classic-trance-supersaw-anthem-lead-synth",
+      "name": "Classic Trance Supersaw Anthem Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Iconic late-90s euphoric trance lead synthesizer with 7 detuned unison saw oscillators, cascading 24dB resonant lowpass filter with envelope modulation, high-shelf air, and subtle chorus stereo width.",
+      "price": 0,
+      "preview": "assets/templates/classic-trance-supersaw-anthem-lead-synth.webp",
+      "file": "assets/templates/classic-trance-supersaw-anthem-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "classic-trance-rolling-offbeat-bass-synth",
+      "name": "Classic Trance Rolling Offbeat Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "High-energy rolling 16th-note trance bass synthesizer featuring paired saw and pulse sub-oscillators, snappy transistor envelope punch, 24dB resonant lowpass filter, and warm analog drive.",
+      "price": 0,
+      "preview": "assets/templates/classic-trance-rolling-offbeat-bass-synth.webp",
+      "file": "assets/templates/classic-trance-rolling-offbeat-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "industrial-techno-warehouse-distortion-reverb-fx",
+      "name": "Industrial Techno Warehouse Distortion Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Cavernous Berlin warehouse reverb effect combining asymmetric pre-saturation drive, dense multi-tap delay diffusion network, resonant dark low-frequency room reflections, and high-frequency damping.",
+      "price": 0,
+      "preview": "assets/templates/industrial-techno-warehouse-distortion-reverb-fx.webp",
+      "file": "assets/templates/industrial-techno-warehouse-distortion-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "industrial-techno-grimy-bitcrush-saturator-fx",
+      "name": "Industrial Techno Grimy Bitcrush Saturator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Punishing industrial waveshaper processor featuring asymmetric diode wavefolding, quantized bit-depth degradation, resonant post-overdrive lowpass filter, and parallel dry-wet blend.",
+      "price": 0,
+      "preview": "assets/templates/industrial-techno-grimy-bitcrush-saturator-fx.webp",
+      "file": "assets/templates/industrial-techno-grimy-bitcrush-saturator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

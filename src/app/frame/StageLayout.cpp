@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "app/ui/design/components/FormParts.h"
 
 namespace app
@@ -132,7 +133,8 @@ void DrawLayout(FrameCtx& fc)
          gArrangeClaimedKeys = inArrange;
          gSessionClaimedKeys = inSession;
          gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                           (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys);
+                           (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
+                           (gCurveEditorOpen && gCurveEditorClaimedKeys);
 
          gPerfMatrixClaimedKeys = inPerf;
          gPerfMatrixFocused = inPerf && gPerfEditMode;
@@ -144,7 +146,8 @@ void DrawLayout(FrameCtx& fc)
          if (!gSessionPanelOpen)
             gSessionClaimedKeys = false;
          gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys);
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
+                           (gCurveEditorOpen && gCurveEditorClaimedKeys);
 
          if (!gPerfPanelOpen)
          {
@@ -286,6 +289,14 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gPianoRollHeight;
          topBottomRows++;
       }
+      if (gCurveEditorDock != 3)
+         gCurveEditorDock = 0; // bottom or top only
+      if (gCurveEditorOpen)
+      {
+         gCurveEditorHeight = std::clamp(gCurveEditorHeight, 220.0f, std::max(220.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         topBottom += gCurveEditorHeight;
+         topBottomRows++;
+      }
       if (TerminalDocked() && (gTerminalDock == 0 || gTerminalDock == 3))
       {
          gTerminalHeight = std::clamp(gTerminalHeight, 160.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
@@ -321,6 +332,8 @@ void DrawLayout(FrameCtx& fc)
          DrawPianoRollDocked("##pianoroll_top", ImVec2(0, gPianoRollHeight));
       if (gView3DOpen && gView3DDock == 3)
          DrawView3DDocked("##view3d_top", ImVec2(0, gView3DHeight));
+      if (gCurveEditorOpen && gCurveEditorDock == 3)
+         DrawCurveEditorDocked("##curveeditor_top", ImVec2(0, gCurveEditorHeight));
       if (TerminalDocked() && gTerminalDock == 3)
          DrawTerminalDocked("##terminal_top", ImVec2(0, gTerminalHeight));
       if (viewportLeft)

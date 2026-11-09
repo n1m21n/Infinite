@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/CurveEditorPanel.h"
 #include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
@@ -19,7 +20,7 @@
 namespace app
 {
 // The rail of panel toggles down the right edge. Library leads on the top bar's centre line and the panels follow,
-// one tile apart; Edit history sits in the bottom corner with Settings just above it.
+// one tile apart; at the bottom, Settings in the corner, then Edit history, then the Terminal.
 static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
@@ -52,13 +53,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
-   if (!Platform::PluginModeActive() && // no shell or agents inside a DAW
-       PanelRail::Item("##railTerminal", top + 9.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
-                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
-   {
-      gTerminalOpen = !gTerminalOpen;
-      gTerminalFocus = gTerminalOpen;
-   }
+   if (PanelRail::Item("##railCurveEditor", top + 9.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
+                       T("Curve editor - draw and shape MSEG curves (Shift+E)")))
+      gCurveEditorOpen = !gCurveEditorOpen;
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
@@ -66,6 +63,14 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railHistory", bottom - step, IconsInfinite::History, nullptr, gHistoryOpen,
                        T("Edit history - jump back to any earlier edit")))
       gHistoryOpen = !gHistoryOpen;
+   // The agents' shell sits with the tools at the bottom, above Edit history.
+   if (!Platform::PluginModeActive() && // no shell or agents inside a DAW
+       PanelRail::Item("##railTerminal", bottom - 2.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
+                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
+   {
+      gTerminalOpen = !gTerminalOpen;
+      gTerminalFocus = gTerminalOpen;
+   }
    PanelRail::End();
 }
 
@@ -474,6 +479,28 @@ void DrawMenuBar(FrameCtx& fc)
                         FieldWell::Slider(L("Width"), &gTerminalWidth, 280.0f, 1400.0f, "%.0f px");
                      else
                         FieldWell::Slider(L("Height"), &gTerminalHeight, 160.0f, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               }
+               if (MenuParts::SubMenu(L("Curve Editor")))
+               {
+                  MenuParts::Check(L("Show Curve Editor"), &gCurveEditorOpen);
+                  if (gCurveEditorOpen)
+                  {
+                     static const char* kCurveDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+                     static const int kCurveDockCodes[] = { 0, 3 };
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     if (MenuParts::BeginCombo("##curvedock", T(kCurveDocks[gCurveEditorDock == 3 ? 1 : 0])))
+                     {
+                        for (int i = 0; i < 2; ++i)
+                           if (MenuParts::Choice(L(kCurveDocks[i]), kCurveDockCodes[i] == gCurveEditorDock))
+                              gCurveEditorDock = kCurveDockCodes[i];
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::Slider(L("Height"), &gCurveEditorHeight, 220.0f, 800.0f, "%.0f px");
                   }
                   ImGui::EndMenu();
                }

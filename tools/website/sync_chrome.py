@@ -39,6 +39,7 @@ GROUPS = [
         ("artworks.html", "Art gallery", "Made with Infinite"),
         ("nodes/", "Nodes", "Every node, with a patch"),
         ("embeds/", "Embeds", "Audio-reactive widgets for any page"),
+        ("plugin.html", "Plugin", "Infinite as a VST3 and AU plugin"),
     ]),
     ("learn", "Learn", [
         ("index.html#learn", "Get started", "Make a first sound and picture"),
@@ -126,6 +127,8 @@ NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-note
 
 
 def nav_icon(path):
+    if path == "plugin.html":
+        return PLUGIN_SVG
     f = os.path.join(ROOT, "art", "icons", "src", NAV_ICON[path] + "-20.svg")
     return open(f, encoding="utf-8").read().strip().replace("<svg ", '<svg class="ic" aria-hidden="true" ', 1).replace("\n", "")
 

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Op-Art Hypnotic Checkerboard Warp",
+    "author": "Infinite",
+    "description": "Warping curvilinear optical checkerboard matrix with breathing radial barrel distortion, audio-reactive perspective shearing, hypnotic alternating black and white tile pulsations, and razor-sharp contrast.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.38 [0.1, 1.5]\nparam float tiles = 14.0 [6.0, 30.0]\nparam float warp_amp = 0.45 [0.1, 1.0]\nparam float contrast = 1.25 [0.6, 2.0]\nparam float flare = 0.45 [0.0, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nlens = r * (1.0 + r * r * warp_amp)\nshearU = lens * cos(theta + sin(lens * 4.0 - time * 2.5) * 0.35)\nshearV = lens * sin(theta + cos(lens * 4.0 - time * 2.5) * 0.35)\n\ntileX = mod(shearU * tiles + time * 0.8, 2.0)\ntileY = mod(shearV * tiles - time * 0.8, 2.0)\n\nbX = step(1.0, tileX)\nbY = step(1.0, tileY)\ncheck = abs(bX - bY)\n\ncDark = vec3(0.05, 0.05, 0.06)\ncWhite = vec3(0.96, 0.96, 0.98)\ncCrimson = vec3(0.92, 0.14, 0.20)\ncCyan = vec3(0.0, 0.88, 0.95)\n\nvortex = exp(-r * 3.5)\ncol = mix(cDark, cWhite, check)\ncol = mix(col, cCrimson, vortex * flare * 1.5)\n\nedge = exp(-abs(check - 0.5) * 6.0)\ncol = mix(col, cCyan, edge * flare * 0.6)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.38,
+      "tiles": 14.0,
+      "warp_amp": 0.45,
+      "contrast": 1.25,
+      "flare": 0.45
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

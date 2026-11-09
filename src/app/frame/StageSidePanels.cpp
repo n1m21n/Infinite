@@ -9,6 +9,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
+#include "app/panels/CurveEditorPanel.h"
 
 // Field compile errors read "line N, col M: message". Show the message, then
 // the offending source line with the token at that column marked, so the user
@@ -718,6 +719,9 @@ void DrawSidePanels(FrameCtx& fc)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
       if (gView3DOpen && gView3DDock != 3)
          DrawView3DDocked("##view3d_bottom", ImVec2(0, gView3DHeight));
+      // Curve Editor (View > Curve Editor or Shift+E) at the bottom; the other sides draw with their row.
+      if (gCurveEditorOpen && gCurveEditorDock == 0)
+         DrawCurveEditorDocked("##curveeditor_bottom", ImVec2(0, gCurveEditorHeight));
       // Terminal (View > Terminal or Ctrl+`) docked at the bottom; the other sides draw with their row.
       if (TerminalDocked() && gTerminalDock == 0)
          DrawTerminalDocked("##terminal_bottom", ImVec2(0, gTerminalHeight));

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Industrial Techno Warehouse Distortion Reverb FX",
+    "author": "Infinite",
+    "description": "Cavernous Berlin warehouse reverb effect combining asymmetric pre-saturation drive, dense multi-tap delay diffusion network, resonant dark low-frequency room reflections, and high-frequency damping.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float decay = 0.65 [0.1, 0.95]\nparam float drive = 0.45 [0.0, 1.0]\nparam float damping = 0.45 [0.0, 1.0]\nparam float roomSize = 0.55 [0.1, 1.0]\nparam float mix = 0.50 [0.0, 1.0]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float d4 = 0\nstate float lp = 0\n\ninSat = in * (1.0 + drive * 2.2)\nsat = inSat / (1.0 + abs(inSat * 0.7))\n\nfDamp = clamp(0.12 + (1.0 - damping) * 0.28, 0.03, 0.42)\nlp = lp + fDamp * (sat - lp)\n\nkDiff = clamp(0.10 * (1.0 + roomSize * 0.8), 0.03, 0.35)\nd1 = d1 + kDiff * (lp + d4 * 0.32 * decay - d1)\nd2 = d2 + kDiff * 0.89 * (d1 - d2)\nd3 = d3 + kDiff * 0.81 * (d2 - d3)\nd4 = d4 + kDiff * 0.73 * (d3 - d4)\n\nrev = (d2 - d3 + d4) * 0.85\nprocessed = in * (1.0 - mix) + rev * mix\nout = processed * 0.70\n",
+    "params": {
+      "decay": 0.65,
+      "drive": 0.45,
+      "damping": 0.45,
+      "roomSize": 0.55,
+      "mix": 0.5
+    }
+  }
+}

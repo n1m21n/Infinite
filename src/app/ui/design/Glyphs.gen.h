@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE96C;
+   inline constexpr unsigned kLast = 0xE970;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -113,4 +113,8 @@ namespace IconsInfinite
    inline constexpr const char* Code = "\xee\xa5\xaa"; // U+E96A code
    inline constexpr const char* Copy = "\xee\xa5\xab"; // U+E96B copy
    inline constexpr const char* PopOut = "\xee\xa5\xac"; // U+E96C pop-out
+   inline constexpr const char* Bend = "\xee\xa5\xad"; // U+E96D bend
+   inline constexpr const char* Curve = "\xee\xa5\xae"; // U+E96E curve
+   inline constexpr const char* LineTool = "\xee\xa5\xaf"; // U+E96F line-tool
+   inline constexpr const char* PenTool = "\xee\xa5\xb0"; // U+E970 pen-tool
 }

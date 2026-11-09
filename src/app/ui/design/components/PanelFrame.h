@@ -62,14 +62,14 @@ namespace PanelFrame
    // Call after PushDockedPanelStyle(true) so ChildBg carries the panel fill the surface samples. `size` is the
    // outer size (both axes > 0); the child is the card rect itself, so content sits space_2 inside the card edge
    // on every side, whichever insets are 0.
-   inline void BeginCard(const char* id, ImVec2 size, Insets in = {})
+   inline void BeginCard(const char* id, ImVec2 size, Insets in = {}, ImGuiWindowFlags flags = 0)
    {
       DrawSurface(size, in);
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(p0.x + in.l, p0.y + in.t));
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-      ImGui::BeginChild(id, ImVec2(size.x - in.l - in.r, size.y - in.t - in.b), ImGuiChildFlags_AlwaysUseWindowPadding);
+      ImGui::BeginChild(id, ImVec2(size.x - in.l - in.r, size.y - in.t - in.b), ImGuiChildFlags_AlwaysUseWindowPadding, flags);
       ImGui::PopStyleVar();
       ImGui::PopStyleColor();
    }

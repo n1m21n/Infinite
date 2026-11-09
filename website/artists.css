@@ -261,3 +261,47 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 .ax-lab .pad { display: inline-flex; align-items: center; justify-content: center; min-height: var(--ctl-h, 40px); }
 .ax-lab .pad small { display: none; }
 @media (max-width: 640px) { .pr-tile { flex-direction: row; padding: 6px 10px; } }
+
+.ax-plug { display: flex; flex-wrap: wrap; gap: 12px; }
+/* brand-lint: off  (this card follows the n1m21n room brand book, direction B: sketchbook riso) */
+.ax-maker { --r-ink: #0A0618; --r-paper: #F1E9D2; --r-white: #FBF8E8; --r-blue: #2E3BDB; --r-mag: #E0368F; --r-gold: #F6E27A; display: grid; gap: 24px; padding: 22px; border-radius: 6px; background: var(--r-white); color: var(--r-ink); border: 2.5px solid var(--r-ink); box-shadow: 6px 6px 0 var(--r-blue); font-family: 'Bricolage Grotesque', 'Geist', system-ui, sans-serif; }
+.ax-maker h3 { position: relative; display: block; width: max-content; max-width: 100%; margin: 0 0 10px; font: 800 clamp(2.25rem, 1.6rem + 3vw, 3.5rem)/.95 'Bricolage Grotesque', sans-serif; font-stretch: 75%; letter-spacing: -.01em; text-transform: lowercase; color: transparent; }
+.ax-maker h3 span { position: absolute; inset: 0; mix-blend-mode: multiply; }
+.ax-maker h3 .base { position: static; visibility: hidden; }
+.ax-maker h3 .p1 { color: var(--r-blue); transform: translate(-3px, 2px); }
+.ax-maker h3 .p2 { color: var(--r-mag); transform: translate(3px, -2px); opacity: .92; }
+.ax-maker p { margin: 0 0 16px; font: 400 1rem/1.55 'Bricolage Grotesque', sans-serif; color: var(--r-ink); }
+.ax-maker .ax-plug { gap: 10px; }
+.ax-maker .btn { padding: 10px 18px; background: var(--r-gold); color: var(--r-ink); border: 2.5px solid var(--r-ink); border-radius: 999px; box-shadow: 4px 4px 0 var(--r-ink); font: 800 .95rem/1 'Bricolage Grotesque', sans-serif; text-transform: lowercase; }
+.ax-maker .btn-ghost { background: transparent; box-shadow: none; }
+.ax-maker .btn:hover { transform: translate(-1px, -1px); }
+.ax-albums { margin: 0; display: grid; gap: 10px; padding: 16px 18px; background: var(--r-paper); border: 2.5px solid var(--r-ink); border-radius: 6px; }
+.ax-albums div { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.ax-albums dt { font: 800 1.15rem/1.1 'Bricolage Grotesque', sans-serif; font-stretch: 80%; text-transform: lowercase; color: var(--r-ink); }
+.ax-albums dd { margin: 0; padding: 7px 10px; border: 1.5px solid var(--r-ink); border-radius: 4px; font: 500 .75rem/1 'DM Mono', ui-monospace, monospace; }
+@media (min-width: 760px) { .ax-maker { grid-template-columns: 1fr minmax(220px, 300px); align-items: center; } }
+
+.ax-name { display: flex; align-items: center; gap: 14px; margin: 0 0 10px; }
+.ax-name img { flex: none; width: 56px; height: 56px; object-fit: cover; border: 2.5px solid var(--r-ink); border-radius: 3px; box-shadow: 4px 4px 0 var(--r-mag); }
+.ax-name h3 { margin: 0; }
+
+.ax-albums img { flex: none; width: 40px; height: 40px; object-fit: cover; border: 2px solid var(--r-ink); border-radius: 3px; }
+.ax-albums dt { flex: 1; min-width: 0; }
+.ax-albums div { position: relative; }
+.ax-albums dt a { color: inherit; text-decoration: none; }
+.ax-albums dt a::after { content: ""; position: absolute; inset: -4px -6px; }
+.ax-albums div:hover dt a, .ax-albums dt a:focus-visible { text-decoration: underline; text-decoration-thickness: 2px; }
+.ax-albums dt a:focus-visible { outline: 2px solid var(--r-ink); outline-offset: 2px; }
+/* brand-lint: on */
+
+/* compact "Made in Infinite" and "Start with" on every audience page */
+.ax-shot { height: clamp(112px, 16vw, 148px); }
+.ax-reel { gap: 10px; padding-top: 4px; padding-bottom: 8px; }
+.ax-bento { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: 92px; gap: 10px; }
+.ax-bento-t.big { grid-column: auto; grid-row: auto; }
+.ax-bento-t:last-child:nth-child(even) { grid-column: auto; }
+.ax-bento-l { left: 12px; right: 12px; bottom: 10px; font-size: var(--size-caption); }
+@media (max-width: 640px) { .ax-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 84px; gap: 8px; } }
+.ax-ttl { left: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 3px 8px; font-size: var(--size-micro-mono, .75rem); font-weight: 500; }
+html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-mono, .75rem); font-weight: 500; }
+.ax-bento-l { left: 10px; right: 10px; bottom: 8px; font-size: var(--size-micro-mono, .75rem); font-weight: 500; line-height: 1.2; }

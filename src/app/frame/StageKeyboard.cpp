@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/panels/CurveEditorPanel.h"
 #include "app/graph/NodeClipboard.h"
 
 namespace app
@@ -199,8 +200,12 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_R, false))
          gPianoRollOpen = !gPianoRollOpen;
 
-      // Shift+3: the 3D View
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_3, false))
+      // Shift+E: the docked Curve Editor
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_E, false))
+         gCurveEditorOpen = !gCurveEditorOpen;
+
+      // Shift+3: the 3D View (inside the Curve Editor, Shift+1..5 pick handle types)
+      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_3, false))
          gView3DOpen = !gView3DOpen;
 
       // Shift+Y: fit view to content, replacing the old menu-only entry
@@ -358,7 +363,8 @@ void DrawKeyboard(FrameCtx& fc)
       if (!gSessionPanelOpen)
          gSessionClaimedKeys = false;
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys);
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
+                        (gCurveEditorOpen && gCurveEditorClaimedKeys);
 
       bool doDelete = gRequestDelete ||
          (!typing && !gPerfMatrixFocused && !gArrangeFocused && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||

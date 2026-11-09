@@ -136,6 +136,8 @@
   <url><loc>https://infinitedevices.org/embeds/acid-graphics-kaleido-chroma-warp.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/indie-psychedelic-liquid-oil-wheel.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/indie-psychedelic-kaleido-prism-flower.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/op-art-concentric-moire-interference.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/op-art-hypnotic-checkerboard-warp.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/chat.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-11-08</lastmod><priority>0.7</priority></url>
@@ -279,6 +281,10 @@
   <url><loc>https://infinitedevices.org/library/acid-house-accented-square-bass-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/future-garage-dusk-tape-delay-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/future-garage-vinyl-dust-reverb-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-supersaw-anthem-lead-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-rolling-offbeat-bass-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-warehouse-distortion-reverb-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-grimy-bitcrush-saturator-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
@@ -753,6 +759,16 @@
   <url><loc>https://infinitedevices.org/library/future-garage-vinyl-dust-reverb-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-liquid-oil-wheel.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-kaleido-prism-flower.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/riso-manga-zine-screentone-burst.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/riso-manga-zine-speedline-panel.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/thundr-brutalist-modular-techwear-pylon-3d.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/thundr-brutalist-hazard-cantilever-tower-3d.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-supersaw-anthem-lead-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-rolling-offbeat-bass-synth.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-warehouse-distortion-reverb-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-grimy-bitcrush-saturator-fx.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-concentric-moire-interference.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-hypnotic-checkerboard-warp.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-08</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-08</lastmod><priority>0.5</priority></url>
