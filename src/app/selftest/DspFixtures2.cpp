@@ -4331,7 +4331,8 @@ bool RunMSEGFixture()
       // 64 points at the default thinning, and follows the hand.
       auto hand = [](double t) { // 0..8 s: a slow rise, a wobble, a fall
          const double u = t / 8.0;
-         return std::clamp(0.5 - 0.45 * std::cos(u * pi * 2.0) + 0.08 * std::sin(u * pi * 14.0), 0.0, 1.0);
+         constexpr double kPi = 3.14159265358979323846; // not the enclosing pi: MSVC will not use it uncaptured
+         return std::clamp(0.5 - 0.45 * std::cos(u * kPi * 2.0) + 0.08 * std::sin(u * kPi * 14.0), 0.0, 1.0);
       };
       CurveRecorder::Take take;
       take.Begin(CurveRecorder::kOverwrite);
