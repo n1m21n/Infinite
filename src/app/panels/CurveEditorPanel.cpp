@@ -1,4 +1,4 @@
-// Curve Editor panel (docs/plans/curve-editor/README.md §8.2-§8.7). Docks on any side like the Terminal; one page per
+// Curve Editor panel (docs/plans/curve-editor/README.md §8.2-§8.7). Docks bottom or top; one page per
 // MSEG node, following the canvas selection. The node is the model: every edit goes through MSEGNode and
 // core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: pages, zoom, tool and selection.
 #include "app/panels/CurveEditorPanel.h"
@@ -1184,7 +1184,16 @@ namespace
       State& s = S();
       ImGuiIO& io = ImGui::GetIO();
       const ImVec2 m = io.MousePos;
-      if (hovered && io.MouseWheel != 0.0f)
+      // Two fingers left/right move along the time like the Timeline; up/down zoom. The bigger axis wins, so a
+      // sideways swipe that drifts a little up or down does not zoom.
+      const bool sideways = std::fabs(io.MouseWheelH) > 0.01f && std::fabs(io.MouseWheelH) > std::fabs(io.MouseWheel) * 0.5f;
+      if (hovered && sideways && !io.KeyAlt)
+      {
+         const float span = s.v1 - s.v0;
+         s.v0 -= io.MouseWheelH * 40.0f / std::max(1.0f, a.x1 - a.x0) * span;
+         s.v1 = s.v0 + span;
+      }
+      else if (hovered && io.MouseWheel != 0.0f)
       {
          if (io.KeyAlt)
          {
@@ -2528,10 +2537,11 @@ namespace
       {
          if (MenuParts::SubMenu(T("Dock Position")))
          {
-            static const char* kDocks[] = { "Bottom", "Right", "Left", "Top" };
-            for (int i = 0; i < 4; i++)
-               if (MenuParts::Item(T(kDocks[i]), nullptr, gCurveEditorDock == i))
-                  gCurveEditorDock = i;
+            static const char* kDocks[] = { "Bottom", "Top" };
+            static const int kCodes[] = { 0, 3 };
+            for (int i = 0; i < 2; i++)
+               if (MenuParts::Item(T(kDocks[i]), nullptr, gCurveEditorDock == kCodes[i]))
+                  gCurveEditorDock = kCodes[i];
             ImGui::EndMenu();
          }
          std::vector<GraphNode*> closed;

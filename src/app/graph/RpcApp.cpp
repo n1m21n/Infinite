@@ -38,7 +38,7 @@ namespace app
             { "pianoroll", &gPianoRollOpen, &gPianoRollDock, false },
             { "view3d", &gView3DOpen, &gView3DDock, false },
             { "terminal", &gTerminalOpen, &gTerminalDock, true },
-            { "curveeditor", &gCurveEditorOpen, &gCurveEditorDock, true },
+            { "curveeditor", &gCurveEditorOpen, &gCurveEditorDock, false },
             { "showset", &gShowSetOpen, nullptr, false },
             { "history", &gHistoryOpen, nullptr, false },
             { "settings", &gSettingsOpen, nullptr, false },

@@ -414,6 +414,8 @@ Block 1, settled on the way (2026-11-08):
 | Assign | Stays armed while Shift is held; Esc or right-click stops; an MSEG never targets its own controls |
 | Polarity | Set by the Low / High of each target row (High below Low inverts); no separate switch |
 | Pages | Close hides a page (node stays, Reopen Page in the dock menu); Delete Curve removes the node |
+| Docks | Bottom or top only (owner 2026-11-09); old Right/Left patches open at the bottom |
+| Trackpad | Two fingers up/down zoom time, left/right move along it like the Timeline; the bigger axis wins |
 | Deferred | None left: value zoom (Alt+wheel), chip reorder, chip onto a knob and the Mod / Motion switch all landed |
 
 Blocks 3 and 4, settled on the way (2026-11-09):

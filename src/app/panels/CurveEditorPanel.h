@@ -10,9 +10,9 @@
 namespace app
 {
    extern bool gCurveEditorOpen;
-   extern int gCurveEditorDock;       // 0 bottom, 1 right, 2 left, 3 top (the Terminal's codes)
+   extern int gCurveEditorDock;       // 0 bottom, 3 top (the Terminal's codes; no side docks)
    extern float gCurveEditorHeight;   // bottom and top
-   extern float gCurveEditorWidth;    // right and left
+   extern float gCurveEditorWidth;    // unused since the side docks went; kept so old patches load
    extern bool gCurveEditorClaimedKeys; // the pointer is over the panel: its keys, not the canvas's
    extern ImVec2 gCurveEditorRectMin, gCurveEditorRectMax;
    extern uint64_t gCurveAssignUid; // the MSEG whose Assign is armed: the next knob clicked on the canvas binds to it

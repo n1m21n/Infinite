@@ -289,7 +289,9 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gPianoRollHeight;
          topBottomRows++;
       }
-      if (gCurveEditorOpen && (gCurveEditorDock == 0 || gCurveEditorDock == 3))
+      if (gCurveEditorDock != 3)
+         gCurveEditorDock = 0; // bottom or top only
+      if (gCurveEditorOpen)
       {
          gCurveEditorHeight = std::clamp(gCurveEditorHeight, 220.0f, std::max(220.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
          topBottom += gCurveEditorHeight;
@@ -354,13 +356,6 @@ void DrawLayout(FrameCtx& fc)
          DrawArrangePanelDocked("##arrangepanel_left", ImVec2(gArrangePanelWidth, graphHeight));
          ImGui::SameLine(0.0f, 0.0f);
       }
-      if (gCurveEditorOpen && (gCurveEditorDock == 1 || gCurveEditorDock == 2))
-         gCurveEditorWidth = std::clamp(gCurveEditorWidth, 360.0f, std::max(360.0f, ImGui::GetContentRegionAvail().x - 300.0f));
-      if (gCurveEditorOpen && gCurveEditorDock == 2)
-      {
-         DrawCurveEditorDocked("##curveeditor_left", ImVec2(gCurveEditorWidth, graphHeight));
-         FormParts::Inline(0.0f, 0.0f);
-      }
       if (TerminalDocked() && (gTerminalDock == 1 || gTerminalDock == 2))
          gTerminalWidth = std::clamp(gTerminalWidth, 280.0f, std::max(280.0f, ImGui::GetContentRegionAvail().x - 300.0f));
       if (TerminalDocked() && gTerminalDock == 2)
@@ -409,7 +404,6 @@ void DrawLayout(FrameCtx& fc)
       if (perfRight) rightReserved += gPerfPanelWidth;
       if (arrangeRight) rightReserved += gArrangePanelWidth;
       if (TerminalDocked() && gTerminalDock == 1) rightReserved += gTerminalWidth;
-      if (gCurveEditorOpen && gCurveEditorDock == 1) rightReserved += gCurveEditorWidth;
       if (gHistoryOpen)
       {
          gHistoryWidth = std::min(gHistoryWidth, std::max(220.0f, ImGui::GetContentRegionAvail().x * 0.5f));

@@ -408,13 +408,6 @@ void DrawSidePanels(FrameCtx& fc)
          DrawTerminalDocked("##terminal_right", ImVec2(gTerminalWidth, graphHeight));
       }
 
-      // Right-docked Curve Editor
-      if (gCurveEditorOpen && gCurveEditorDock == 1)
-      {
-         FormParts::Inline(0.0f, 0.0f);
-         DrawCurveEditorDocked("##curveeditor_right", ImVec2(gCurveEditorWidth, graphHeight));
-      }
-
       // Right-docked edit history (always right; Edit > History or Shift+U)
       if (gHistoryOpen)
       {

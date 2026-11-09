@@ -675,6 +675,7 @@ namespace app
       // Curve Editor
       { I18N_KEY("Curve Editor"), I18N_KEY("Curve Editor Panel"), "Shift+E", I18N_KEY("Show or hide the docked Curve Editor; it opens the MSEG node selected on the canvas") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Curve Tools"), "A / H / P / D / L / S / B / E / T / M", I18N_KEY("Select, Hand, Pen, Draw, Line, Stamp, Bend, Eraser, Transform and Smooth, while the pointer is over the Curve Editor. Every key in this section needs the pointer there") },
+      { I18N_KEY("Curve Editor"), I18N_KEY("Navigate"), "Two-finger scroll", I18N_KEY("Up/down zooms time, left/right moves along it; Alt zooms the value") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Add Point"), "Double-click", I18N_KEY("Add a point; the Pen adds one on a single click and a drag pulls its handles") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Segment Curve"), "1 / 2 / 3 / 4 / 5", I18N_KEY("Constant, Linear, Bend, Bezier or Easing for the segments the selection starts (none selected: all)") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Handle Type"), "Shift+1 ... Shift+5", I18N_KEY("Auto Clamped, Auto, Vector, Aligned or Free handles for the selected points") },

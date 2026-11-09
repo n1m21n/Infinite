@@ -391,7 +391,7 @@ namespace app
          else if (key == "panelCurveEditorW")
             gCurveEditorWidth = std::max(360.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelCurveEditorDock")
-            gCurveEditorDock = std::clamp(atoi(val.c_str()), 0, 3);
+            gCurveEditorDock = atoi(val.c_str()) == 3 ? 3 : 0; // bottom or top only
          else if (key == "panelTerminalOpen")
             gTerminalOpen = (val != "0");
          else if (key == "panelTerminalH")
