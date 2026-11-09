@@ -1384,14 +1384,18 @@ static bool RunDrumSequencerFixture()
       b->stepVel[0][0] = 0.8f;
       const auto looped = Render(*b, stepFrames * 4 * 3 + stepFrames, blockSize, sampleRate);
       transport.SetLoop(false, 0.0, 0.0);
+      // Each lap's hit sits exactly one loop after the first (the click has its own fixed onset latency).
       int laps = 0;
-      for (int lap = 1; lap <= 3; lap++)
+      const int first = FindOnset(looped, 0);
+      int at[4] = { first, -1, -1, -1 };
+      for (int lap = 1; lap <= 3 && first >= 0; lap++)
       {
-         const int at = lap * stepFrames * 4;
-         if (FindOnset(looped, at - 4) >= 0 && std::abs(FindOnset(looped, at - 4) - at) <= 2)
+         at[lap] = FindOnset(looped, first + lap * stepFrames * 4 - stepFrames / 2);
+         if (at[lap] >= 0 && std::abs(at[lap] - (first + lap * stepFrames * 4)) <= 2)
             laps++;
       }
-      printf("DRUMSEQTEST loop lap plays step 1 %s (%d/3 laps)\n", laps == 3 ? "OK" : "FAIL", laps);
+      printf("DRUMSEQTEST loop lap plays step 1 %s (%d/3 laps, onsets %d %d %d %d)\n", laps == 3 ? "OK" : "FAIL", laps,
+             at[0], at[1], at[2], at[3]);
       ok &= laps == 3;
 
       resetTransport();
