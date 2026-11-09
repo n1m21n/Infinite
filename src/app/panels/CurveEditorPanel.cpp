@@ -179,7 +179,7 @@ namespace
    bool LoadMine(MSEGNode& n, const std::string& name, CurveEdit::Points& out)
    {
       std::string text;
-      if (FILE* f = AppPaths::OpenFile(MineDir() / AppPaths::FsPath(name + ".curve"), "rb"))
+      if (FILE* f = AppPaths::OpenFile(AppPaths::AppSupportDir() + "/curves/" + name + ".curve", "rb"))
       {
          char buf[4096];
          for (size_t got; (got = std::fread(buf, 1, sizeof buf, f)) > 0;)
@@ -206,7 +206,7 @@ namespace
       std::string name = base;
       for (int i = 2; std::filesystem::exists(MineDir() / AppPaths::FsPath(name + ".curve"), ec); i++)
          name = base + " " + std::to_string(i);
-      if (FILE* f = AppPaths::OpenFile(MineDir() / AppPaths::FsPath(name + ".curve"), "wb"))
+      if (FILE* f = AppPaths::OpenFile(AppPaths::AppSupportDir() + "/curves/" + name + ".curve", "wb"))
       {
          const std::string text = n.Encode();
          std::fwrite(text.data(), 1, text.size(), f);
