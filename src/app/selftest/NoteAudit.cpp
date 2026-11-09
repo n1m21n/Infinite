@@ -599,6 +599,118 @@ namespace
    }
 
 
+   // ---- FIRST ------------------------------------------------------------
+   // The step under the playhead plays after anything that moves it: each loop lap starts on step 1,
+   // Return to Start plays step 1, Play after a rewind while stopped plays step 1, and a seek to
+   // between steps plays at most the step under the playhead, then the next step on time.
+   void AuditFirst(Flags& flags, bool& ok)
+   {
+      const double bpm = 120.0, spb = kRate * 60.0 / bpm, rate = 0.25, step = rate * spb;
+      for (const GridSrc& g : GridSrcs())
+      {
+         const auto make = [&](Rig& rig) {
+            if (!rig.Init(g.create(rate, 0.0f, 1), 512))
+               return false;
+            rig.node->CookIfNeeded(rig.frame++);
+            StartTransport(bpm);
+            if (g.needsInput)
+               Push(rig.in[0], 60, 0.8f, true, 777);
+            return true;
+         };
+         const auto onsIn = [](const Rig& rig, long long a, long long b) {
+            int n = 0;
+            long long last = -1;
+            for (const Evt& e : rig.got)
+               if (e.e.isNoteOn && !e.e.bendUpdate && e.sample >= a && e.sample < b && e.sample != last)
+               {
+                  n++;
+                  last = e.sample;
+               }
+            return n;
+         };
+         const auto firstOn = [](const Rig& rig, long long from) {
+            for (const Evt& e : rig.got)
+               if (e.e.isNoteOn && !e.e.bendUpdate && e.sample >= from)
+                  return e.sample;
+            return -1LL;
+         };
+         int bad = 0;
+         std::string why;
+         const auto fail = [&](const char* what, long long v) {
+            bad++;
+            why += std::string(" ") + what + "=" + std::to_string(v);
+         };
+
+         { // loop laps: 0..2 beats
+            Rig rig;
+            if (!make(rig))
+               continue;
+            Transport::Instance().SetLoop(true, 0.0, 2.0);
+            rig.Run(3.1);
+            Transport::Instance().SetLoop(false, 0.0, 4.0);
+            StopTransport();
+            for (int lap = 0; lap < 3; lap++)
+            {
+               const long long at = (long long)std::llround(lap * 2.0 * spb);
+               if (onsIn(rig, at - 1, at + 2) != 1)
+                  fail("lap", lap);
+            }
+         }
+         { // Return to Start while playing
+            Rig rig;
+            if (!make(rig))
+               continue;
+            rig.Run(1.3);
+            Transport::Instance().Seek(0.0);
+            const long long at = rig.pos;
+            rig.Run(0.5);
+            StopTransport();
+            if (firstOn(rig, at) != at)
+               fail("rewind", firstOn(rig, at) - at);
+            if (onsIn(rig, at, at + (long long)step) != 1)
+               fail("rewind-count", onsIn(rig, at, at + (long long)step));
+         }
+         { // rewind while stopped, then Play
+            Rig rig;
+            if (!make(rig))
+               continue;
+            rig.Run(1.3);
+            Transport::Instance().SetPlaying(false);
+            rig.Run(0.3);
+            Transport::Instance().Seek(0.0);
+            rig.Run(0.1);
+            Transport::Instance().SetPlaying(true);
+            const long long at = rig.pos;
+            rig.Run(0.5);
+            StopTransport();
+            if (firstOn(rig, at) != at)
+               fail("play", firstOn(rig, at) - at);
+         }
+         { // seek forward to between steps: 0.7 s = 1.4 beats, next step at 1.5 beats
+            Rig rig;
+            if (!make(rig))
+               continue;
+            rig.Run(0.3);
+            Transport::Instance().Seek(0.7);
+            const long long at = rig.pos;
+            rig.Run(0.5);
+            StopTransport();
+            const long long next = at + (long long)std::llround(0.1 * spb);
+            // The step under the playhead may chase in at the seek (StepClock), but only that one.
+            if (onsIn(rig, at, next - 1) > 1)
+               fail("seek-burst", onsIn(rig, at, next - 1));
+            if (onsIn(rig, next - 1, next + 2) != 1)
+               fail("seek-next", firstOn(rig, next - 1) - next);
+         }
+         printf("NOTEAUDIT FIRST %-18s %s%s\n", g.name, bad ? "FAIL" : "OK", why.c_str());
+         if (bad)
+         {
+            flags.Flag("FIRST", g.name, "first step missed or doubled after a lap/seek/play", bad);
+            ok = false;
+         }
+      }
+   }
+
    // ---- JITTER -----------------------------------------------------------
    // Pass-through nodes keep an event's frame offset: note-on sample out must be
    // note-on sample in at every block size the app runs (24/60/144 fps at 48 kHz
@@ -842,6 +954,8 @@ bool RunNoteAudit()
       AuditHuman(flags);
    if (want("LOOP"))
       AuditLoop(flags, ok);
+   if (want("FIRST"))
+      AuditFirst(flags, ok);
    if (want("JITTER"))
       AuditJitter(flags);
    if (want("BYPASS"))

@@ -152,7 +152,8 @@ namespace
    // span from BlockStartBeats() (as MIDI File and MIDI Out do) and splits it
    // at the loop end on the lap block, so the step at the loop start lands on
    // the wrap frame. The span after a seek, a start or a tempo jump fires the
-   // step under the playhead at the span's first frame, as polling did.
+   // step under the playhead at the span's first frame, as polling did. While
+   // the transport is stopped nothing fires.
    struct StepTick
    {
       long long step;
@@ -175,7 +176,14 @@ namespace
       int Ticks(double stepBeats, double bpm, double sampleRate, int numFrames, bool sampleAccurate, StepTick* out)
       {
          const Transport& tr = Transport::Instance();
-         if (!sampleAccurate || !tr.IsPlaying() || sampleRate <= 0.0 || numFrames <= 0)
+         if (!tr.IsPlaying())
+         {
+            // Stopped: nothing fires, and nothing counts as played, so Play after Return to Start
+            // plays the step under the playhead instead of having spent it on the stopped seek.
+            Reset();
+            return 0;
+         }
+         if (!sampleAccurate || sampleRate <= 0.0 || numFrames <= 0)
          {
             mExpectedBeat = -1.0;
             const long long step = (long long)std::floor(tr.Beats() / stepBeats);

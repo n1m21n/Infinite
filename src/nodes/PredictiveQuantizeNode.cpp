@@ -232,6 +232,7 @@ public:
    {
       mSampleRate = sampleRate;
       mSamplePos = 0;
+      mClock = 0.0;
       mHaveGroup = false;
       for (DeferredNote& s : mPending)
          s.active = false;
@@ -239,15 +240,17 @@ public:
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
-      Transport& tr = Transport::Instance();
-      Render(output.numFrames, tr.Beats(), (double)tr.Tempo());
+      Render(output.numFrames, (double)Transport::Instance().Tempo());
    }
 
    // The whole block, with the clock passed in so a test can drive it without a transport. Every
    // onset is captured (for the global profile) and corrected (against the currently-live one) in
    // the same pass - there is no learning/not-learning split anymore.
-   void Render(int numFrames, double beatsStart, double bpm)
+   // Spacing is all this node reads, so it keeps its own clock (beats elapsed since PrepareToPlay)
+   // instead of the transport's: a seek, a loop lap or a stopped transport can't fake a spacing.
+   void Render(int numFrames, double bpm)
    {
+      const double beatsStart = mClock;
       NoteEvent in[64];
       const int nIn = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, in, 64) : 0;
       NoteEvent out[kMaxBlockEvents];
@@ -295,6 +298,13 @@ public:
             // chord doesn't get pulled apart in time relative to itself (step-09 §5).
             correctedTicks = mGroupCorrectedTicks;
          }
+         else if (rawTicks - mGroupRawTicks > (double)NoteModel::kMaxIoiTicks)
+         {
+            // A pause, not a spacing: start a fresh group where it was played.
+            correctedTicks = rawTicks;
+            mGroupRawTicks = rawTicks;
+            mGroupCorrectedTicks = rawTicks;
+         }
          else
          {
             const double ioiTicks = rawTicks - mGroupRawTicks;
@@ -333,6 +343,7 @@ public:
       for (int i = 0; i < nOut; i++)
          mOutbox.Push(out[i]);
       mSamplePos += (uint64_t)numFrames;
+      mClock = blockEndBeat;
    }
 
    NoteEventQueue* NoteOutbox() override { return &mOutbox; }
@@ -445,6 +456,7 @@ private:
    int mNoteCursor = -1;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
+   double mClock = 0.0; // beats elapsed since PrepareToPlay: the time base for every spacing
 
    bool mHaveGroup = false;
    double mGroupRawTicks = 0.0;
@@ -513,8 +525,9 @@ void PredictiveQuantizeNode::DrainCaptures()
       {
          const int prevTick = NoteModel::SnapTicks(mLastCapturedBeat);
          const int tick = NoteModel::SnapTicks(c.beat);
-         const int ioi = std::clamp(tick - prevTick, 0, NoteModel::kMaxIoiTicks);
-         GlobalEngine::Instance().AddSample(ioi);
+         const int ioi = tick - prevTick;
+         if (ioi >= 0 && ioi <= NoteModel::kMaxIoiTicks) // a longer gap is a pause, not a feel
+            GlobalEngine::Instance().AddSample(ioi);
       }
       mLastCapturedBeat = c.beat;
       mHaveLastBeat = true;
@@ -626,7 +639,7 @@ namespace PredictiveQuantize
          inbox.Push(on);
 
          const int outCursor = node.NoteOutbox()->RegisterConsumer();
-         node.Render(512, 0.0, 120.0);
+         node.Render(512, 120.0);
 
          NoteEvent evts[8];
          const int n = node.NoteOutbox()->Pop(outCursor, evts, 8);
@@ -676,7 +689,7 @@ namespace PredictiveQuantize
          // block-boundary/deferred-note scheduling (covered by a real block size implicitly by
          // every other test here using a normal-sized block).
          const int outCursor = node.NoteOutbox()->RegisterConsumer();
-         node.Render(20000, 0.0, bpm);
+         node.Render(20000, bpm);
 
          NoteEvent evts[8];
          const int n = node.NoteOutbox()->Pop(outCursor, evts, 8);
@@ -721,7 +734,7 @@ namespace PredictiveQuantize
          inbox.Push(on2);
 
          const int outCursor = node.NoteOutbox()->RegisterConsumer();
-         node.Render(512, 0.0, 120.0);
+         node.Render(512, 120.0);
 
          NoteEvent evts[8];
          const int n = node.NoteOutbox()->Pop(outCursor, evts, 8);
@@ -750,11 +763,41 @@ namespace PredictiveQuantize
          inbox.Push(on);
 
          const int outCursor = node.NoteOutbox()->RegisterConsumer();
-         node.Render(512, 0.0, 120.0);
+         node.Render(512, 120.0);
 
          NoteEvent evts[8];
          const int n = node.NoteOutbox()->Pop(outCursor, evts, 8);
          PQ_CHECK(n == 1 && evts[0].frameOffset == 77, "cold start must be identity (got n=%d, frameOffset=%d)", n, n > 0 ? evts[0].frameOffset : -1);
+      }
+
+      // 6. A pause longer than any spacing isn't "corrected": the note after it plays where it was
+      //    played, instead of being pulled back toward the note before the pause.
+      {
+         AudioPredictiveQuantizeNode node;
+         node.PrepareToPlay(48000.0, 512);
+         ModeSet* m = new ModeSet();
+         m->count = 1;
+         m->tick[0] = 12.0f;
+         m->weight[0] = 1.0f;
+         node.Retire(node.SwapModes(m));
+         node.PushParams(1.0f);
+         NoteEventQueue inbox;
+         const int cursor = inbox.RegisterConsumer();
+         node.SetNoteInbox(&inbox, cursor);
+         const int outCursor = node.NoteOutbox()->RegisterConsumer();
+         NoteEvent on;
+         on.note = 60; on.velocity = 0.8f; on.isNoteOn = true; on.frameOffset = 10; on.voiceId = NextVoiceId();
+         inbox.Push(on);
+         node.Render(512, 120.0);
+         for (int b = 0; b < 1000; b++) // ~21 beats of silence
+            node.Render(512, 120.0);
+         NoteEvent evts[16];
+         node.NoteOutbox()->Pop(outCursor, evts, 16);
+         on.frameOffset = 300; on.voiceId = NextVoiceId();
+         inbox.Push(on);
+         node.Render(512, 120.0);
+         const int n = node.NoteOutbox()->Pop(outCursor, evts, 16);
+         PQ_CHECK(n == 1 && evts[0].frameOffset == 300, "the note after a pause moved (n=%d, frameOffset=%d)", n, n > 0 ? evts[0].frameOffset : -1);
       }
 
       // 5. The global profile's rolling window: a dominant early spacing is forgotten once enough

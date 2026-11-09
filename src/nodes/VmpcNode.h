@@ -246,6 +246,7 @@ private:
    double mLastTransport = 0.0;
    double mLastWall = 0.0;
    bool mWasPlaying = false;
+   double mLastEngineBeat = -1.0; // transport beat at the last Engine tick, -1 while stopped
    double mTestDt = -1.0;
 
    GLUtil::Fbo mOut;
