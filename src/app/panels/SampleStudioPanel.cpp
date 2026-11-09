@@ -2484,10 +2484,9 @@ namespace
       dl->PopClipRect();
       // Over the ruler too, so it sits on the same mark in all three panels.
       const float rulerTop = mn.y + kOverviewH + 1.0f;
-      if (headX >= g.mn.x && headX <= g.mx.x)
-         TimeRuler::Playhead(dl, headX, rulerTop, g.mx.y);
+      TimeRuler::Playhead(dl, headX, rulerTop, g.mx.y, g.mn.x, g.mx.x);
       if (s.scrubFrame >= 0.0)
-         TimeRuler::Playhead(dl, g.XOfW(s.scrubFrame), rulerTop, g.mx.y, true);
+         TimeRuler::Playhead(dl, g.XOfW(s.scrubFrame), rulerTop, g.mx.y, g.mn.x, g.mx.x, true);
    }
 
    // ---- the inspector ----

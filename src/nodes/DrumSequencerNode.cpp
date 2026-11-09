@@ -199,15 +199,31 @@ public:
       // never from an internal "steps fired so far" counter - see the class
       // comment on DrumSequencerNode. Transport::AdvanceAudioClock() has
       // already run for this block (AudioEngine::Process calls it before any
-      // node's ProcessBlock), so Beats() here is the block's *end* position;
-      // the previous call's end position (mPrevRawPos) is this block's start.
+      // node's ProcessBlock), so Beats() is the block's *end* and
+      // BlockStartBeats() its start (taken after a seek, before a loop wrap).
+      //
+      // Three cases the old "resync to the end on any backwards move" lost:
+      //  - a seek (Return to Start, a ruler click): the block starts at the
+      //    target, so a step sitting exactly there (step 1 at beat 0) fires on
+      //    the block's first frame instead of being skipped, and a forward
+      //    seek never bursts every step it jumped over;
+      //  - a loop lap: the block is split at the wrap frame, so the step at the
+      //    loop start fires there instead of being skipped every pass;
+      //  - a stopped clock: nothing fires, but a playhead parked on a step
+      //    (rewound while stopped) fires that step when Play starts.
+      const Transport& tr = Transport::Instance();
       const int rateDiv = mRate.load(std::memory_order_relaxed);
       const double beatsPerStep = std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)rateDiv));
       const int numSteps = std::clamp(mNumSteps.load(std::memory_order_relaxed), 1, kMaxSteps);
       const float swing = std::clamp(mSwing.load(std::memory_order_relaxed), 0.0f, 1.0f);
       const bool run = mRun.load(std::memory_order_relaxed);
 
-      const double rawPosNow = Transport::Instance().Beats() / beatsPerStep;
+      const double rawStart = tr.BlockStartBeats() / beatsPerStep;
+      const double rawPosNow = tr.Beats() / beatsPerStep;
+      // A start that is not where the last block ended is a jump (Reset()'s
+      // 1e-6 lead is well inside the tolerance, so it still reads as "here").
+      const bool jumped = std::fabs(rawStart - mPrevRawPos) > 1e-4;
+      const double from = jumped ? rawStart - 1e-6 : mPrevRawPos;
 
       struct FireEvent
       {
@@ -218,16 +234,13 @@ public:
       FireEvent stepEvts[64];
       int numStepEvts = 0;
 
-      if (rawPosNow < mPrevRawPos)
+      // Landmarks in (lo, hi] - or (lo, hi) when the span ends at a loop end,
+      // which belongs to the lap - placed over frames [f0, f1).
+      auto scan = [&](double lo, double hi, bool hiInclusive, int f0, int f1)
       {
-         // Rewind/scrub: don't iterate a negative range, just resync.
-         mPrevRawPos = rawPosNow;
-      }
-      else
-      {
-         const double span = rawPosNow - mPrevRawPos;
-         const int kStart = (int)std::floor(mPrevRawPos - 0.5);
-         const int kEnd = (int)std::ceil(rawPosNow);
+         const double span = hi - lo;
+         const int kStart = (int)std::floor(lo - 0.5);
+         const int kEnd = (int)std::ceil(hi);
          for (int lane = 0; lane < kNumLanes && numStepEvts < 64; lane++)
          {
             for (int k = kStart; k <= kEnd && numStepEvts < 64; k++)
@@ -235,20 +248,40 @@ public:
                const int stepIndex = ((k % numSteps) + numSteps) % numSteps;
                const bool odd = (stepIndex % 2) == 1;
                const double landmark = (double)k + (odd ? (double)swing * 0.5 : 0.0);
-               if (landmark > mPrevRawPos && landmark <= rawPosNow)
+               if (landmark > lo && (hiInclusive ? landmark <= hi : landmark < hi))
                {
                   const float v = mStepVel[lane][stepIndex].load(std::memory_order_relaxed);
                   if (v > 0.0f)
                   {
-                     const double frac = span > 1e-9 ? (landmark - mPrevRawPos) / span : 0.0;
+                     const double frac = span > 1e-9 ? (landmark - lo) / span : 0.0;
                      const int frameOffset =
-                        std::clamp((int)(frac * numFrames), 0, std::max(0, numFrames - 1));
+                        std::clamp(f0 + (int)(frac * (f1 - f0)), 0, std::max(0, numFrames - 1));
                      stepEvts[numStepEvts++] = { lane, frameOffset, v };
                   }
                }
             }
          }
+      };
+
+      if (!tr.IsPlaying())
+         mPrevRawPos = from;
+      else if (rawPosNow >= from)
+      {
+         scan(from, rawPosNow, true, 0, numFrames);
          mPrevRawPos = rawPosNow;
+      }
+      else
+      {
+         const double loopStart = tr.LoopStartBeats() / beatsPerStep;
+         const double loopEnd = tr.LoopEndBeats() / beatsPerStep;
+         if (tr.LoopEnabled() && loopEnd > loopStart && from < loopEnd && rawPosNow >= loopStart)
+         {
+            const double before = loopEnd - from, after = rawPosNow - loopStart;
+            const int wrapFrame = std::clamp((int)std::lround(before / std::max(1e-12, before + after) * numFrames), 0, numFrames);
+            scan(from, loopEnd, false, 0, wrapFrame);
+            scan(loopStart - 1e-6, rawPosNow, true, wrapFrame, numFrames);
+         }
+         mPrevRawPos = rawPosNow; // anything else moving backwards: resync
       }
 
       // Keep events time-ordered so the per-sample merge below is a single
