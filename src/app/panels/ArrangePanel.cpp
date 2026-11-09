@@ -2163,12 +2163,14 @@ namespace app
       const float loopX0 = tickToX(gArrange.settings.loop.start);
       const float loopX1 = tickToX(gArrange.settings.loop.end);
       const float kBorderHitRadius = 7.0f;
+      // An edge scrolled out of the view isn't drawn, so it can't be grabbed either.
+      const auto edgeInView = [&](float x) { return x >= rulerPos.x - 0.5f && x <= rulerPos.x + rulerSize.x + 0.5f; };
       const bool mouseInRuler = mouse.x >= rulerPos.x && mouse.x < rulerPos.x + rulerSize.x &&
                                 mouse.y >= rulerPos.y && mouse.y < rulerPos.y + rulerSize.y;
       const bool loopLeftBorderHovered = gArrange.settings.loop.enabled && mouseInRuler && !markerHoveredAny &&
-                                         (std::abs(mouse.x - loopX0) <= kBorderHitRadius);
+                                         edgeInView(loopX0) && (std::abs(mouse.x - loopX0) <= kBorderHitRadius);
       const bool loopRightBorderHovered = gArrange.settings.loop.enabled && mouseInRuler && !markerHoveredAny &&
-                                          (std::abs(mouse.x - loopX1) <= kBorderHitRadius);
+                                          edgeInView(loopX1) && (std::abs(mouse.x - loopX1) <= kBorderHitRadius);
       const bool loopHeaderHovered = gArrange.settings.loop.enabled && mouseInRuler && !markerHoveredAny &&
                                      !loopLeftBorderHovered && !loopRightBorderHovered &&
                                      (mouse.x > loopX0 && mouse.x < loopX1) &&

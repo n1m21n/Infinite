@@ -240,6 +240,24 @@ namespace NoteModel
    int MetricOf(double beatInBar) { return std::clamp((int)std::floor(beatInBar * 4.0 + 1e-6), 0, 15); }
    int SnapTicks(double beats) { return (int)std::lround(beats * (double)kTicksPerBeat); }
 
+   double AnchorBeat(const Tables& t, double fromBeats, double beatsPerBar)
+   {
+      if (t.onsetSlots == 0)
+         return -1.0;
+      const double bpb = std::max(1.0, beatsPerBar);
+      const int slots = std::clamp((int)std::ceil(bpb * 4.0 - 1e-6), 1, 16);
+      const double bar0 = std::floor(fromBeats / bpb + 1e-9);
+      for (int b = 0; b < 3; b++)
+         for (int s = 0; s < slots; s++)
+            if (t.onsetSlots & (1u << s))
+            {
+               const double at = (bar0 + b) * bpb + s * 0.25;
+               if (at >= fromBeats - 1e-6)
+                  return at;
+            }
+      return -1.0; // only slots past this meter's bar end were learned (meter changed)
+   }
+
    Tables* Build(const std::vector<Event>& eventsIn)
    {
       auto* T = new Tables();
@@ -250,6 +268,8 @@ namespace NoteModel
       const int n = (int)ev.size();
       T->nEvents = n;
       T->maxOrder = kMaxOrder;
+      for (const Event& e : ev)
+         T->onsetSlots |= (uint16_t)(1u << std::min<int>(e.metric, 15));
       const Seq q = MakeSeq(ev);
 
       uint64_t cap = 64;
@@ -502,7 +522,7 @@ namespace NoteModel
       return pick;
    }
 
-   void Player::Next(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar, Out& o)
+   void Player::Next(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar, Out& o, double atBeats)
    {
       const float stray = std::clamp(p.stray, 0.0f, 1.0f);
       const bool replay = stray < 0.05f;
@@ -515,11 +535,12 @@ namespace NoteModel
          return MetricOf(b);
       };
 
-      int ioi = SampleView(t, kIoi, order, metricAt(prevOnsetBeats), stray, replay, p);
+      const bool anchored = atBeats >= 0.0;
+      int ioi = anchored ? 0 : SampleView(t, kIoi, order, metricAt(prevOnsetBeats), stray, replay, p);
       if (ioi < 0)
          ioi = kTicksPerBeat / 4;
       o.ioiTicks = ioi;
-      o.onsetBeats = prevOnsetBeats + (double)ioi / (double)kTicksPerBeat;
+      o.onsetBeats = anchored ? atBeats : prevOnsetBeats + (double)ioi / (double)kTicksPerBeat;
       const int metric = metricAt(o.onsetBeats);
 
       int pitch = SampleView(t, kPitch, order, 0, stray, replay, p);
@@ -535,6 +556,8 @@ namespace NoteModel
       const int sy[kNumViewpoints] = { pitch, ioi, dur, vel };
       for (int v = 0; v < kNumViewpoints; v++)
       {
+         if (anchored && v == kIoi)
+            continue; // the spacing into an anchor was the jump, not the music
          for (int i = kMaxOrder - 1; i > 0; i--)
             mHist[v][i] = mHist[v][i - 1];
          mHist[v][0] = (uint16_t)sy[v];
@@ -551,7 +574,7 @@ namespace NoteModel
    }
 
    void Player::NextRhythm(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
-                            int rootNote, Out& o)
+                            int rootNote, Out& o, double atBeats)
    {
       const float stray = std::clamp(p.stray, 0.0f, 1.0f);
       const bool replay = stray < 0.05f;
@@ -564,11 +587,12 @@ namespace NoteModel
          return MetricOf(b);
       };
 
-      int ioi = SampleView(t, kIoi, order, metricAt(prevOnsetBeats), stray, replay, p);
+      const bool anchored = atBeats >= 0.0;
+      int ioi = anchored ? 0 : SampleView(t, kIoi, order, metricAt(prevOnsetBeats), stray, replay, p);
       if (ioi < 0)
          ioi = kTicksPerBeat / 4;
       o.ioiTicks = ioi;
-      o.onsetBeats = prevOnsetBeats + (double)ioi / (double)kTicksPerBeat;
+      o.onsetBeats = anchored ? atBeats : prevOnsetBeats + (double)ioi / (double)kTicksPerBeat;
       const int metric = metricAt(o.onsetBeats);
 
       int relSym = SampleView(t, kPitchRel, order, 0, stray, replay, p);
@@ -586,6 +610,8 @@ namespace NoteModel
       for (int i = 0; i < 4; i++)
       {
          const int v = viewpoints[i];
+         if (anchored && v == kIoi)
+            continue; // the spacing into an anchor was the jump, not the music
          for (int k = kMaxOrder - 1; k > 0; k--)
             mHist[v][k] = mHist[v][k - 1];
          mHist[v][0] = (uint16_t)symbols[i];

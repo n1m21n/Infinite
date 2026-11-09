@@ -42,33 +42,53 @@ public:
       mSampleRate = sampleRate;
       mSamplePos = 0;
       mHasNext = false;
+      mExpectedStart = 0.0;
+      mCapClock = 0.0;
       for (Pending& p : mPending)
          p.active = false;
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
+      // The block from where it started, not where it ends; a lap inside it is split at the wrap.
       Transport& tr = Transport::Instance();
-      Render(output.numFrames, tr.Beats(), (double)tr.Tempo(), tr.BeatsPerBar());
+      const double start = tr.BlockStartBeats();
+      const bool playing = tr.IsPlaying();
+      double lapEnd = -1.0, lapStart = 0.0;
+      if (playing && tr.LoopEnabled() && tr.Beats() < start - 1e-9)
+      {
+         lapEnd = tr.LoopEndBeats();
+         lapStart = tr.LoopStartBeats();
+      }
+      Render(output.numFrames, start, (double)tr.Tempo(), tr.BeatsPerBar(), playing, lapEnd, lapStart);
    }
 
    // The whole block, with the clock passed in so a test can drive it without a transport.
-   void Render(int numFrames, double beatsStart, double bpm, double bpb)
+   void Render(int numFrames, double beatsStart, double bpm, double bpb, bool playing = true,
+               double lapEnd = -1.0, double lapStart = 0.0)
    {
       NoteEvent in[64];
       const int nIn = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, in, 64) : 0;
       NoteEvent out[kMaxBlockEvents];
       int nOut = 0;
       const double bps = std::max(1.0, bpm) / 60.0 / mSampleRate; // beats per sample
-      const double end = beatsStart + (double)numFrames * bps;
+      // A lap splits the block at the wrap frame: [beatsStart, lapEnd) then [lapStart, end).
+      const bool lap = lapEnd > beatsStart;
+      const int wrapFrame = lap ? std::clamp((int)std::lround((lapEnd - beatsStart) / bps), 0, numFrames) : numFrames;
+      const double end = lap ? lapStart + (double)(numFrames - wrapFrame) * bps : beatsStart + (double)numFrames * bps;
       const bool learning = mLearning.load(std::memory_order_relaxed);
+      const auto posAt = [&](int frame) {
+         return frame < wrapFrame ? beatsStart + (double)frame * bps : lapStart + (double)(frame - wrapFrame) * bps;
+      };
 
-      if (beatsStart < mLastBeatsStart - 1e-6)
+      // Stopped, or the block doesn't start where the last one ended (a seek, Return to Start):
+      // drop the walk so it restarts on the new position instead of catching up to it.
+      if (!playing || std::fabs(beatsStart - mExpectedStart) > 1e-3)
       {
          mHasNext = false;
          FlushOffs(out, nOut);
       }
-      mLastBeatsStart = beatsStart;
+      mExpectedStart = end;
 
       const int srcMode = mSourceMode.load(std::memory_order_relaxed);
       if (srcMode == 1)
@@ -83,38 +103,50 @@ public:
          int nScale = NoteTheory::CollectScaleNotes(root, scale, lo, hi, scaleNotes, NoteTheory::kMaxScaleNotes);
          if (nScale > 0)
          {
-            const double stepBeats = 0.5; // 8th note grid
-            double nextStep = std::floor(beatsStart / stepBeats) * stepBeats;
-            while (nextStep < beatsStart)
-               nextStep += stepBeats;
-            while (nextStep < end && nOut < kMaxBlockEvents - 2)
+            const auto grid = [&](double s0, double s1, int f0, int f1)
             {
-               int noteIdx = (int)std::floor((std::sin(nextStep * 1.5) * 0.5 + 0.5) * (nScale - 1));
-               noteIdx = std::clamp(noteIdx, 0, nScale - 1);
-               int note = scaleNotes[noteIdx];
-               float vel = std::clamp(0.6f + 0.3f * (float)std::cos(nextStep * 2.0), 0.1f, 1.0f);
+               const double stepBeats = 0.5; // 8th note grid
+               double nextStep = std::floor(s0 / stepBeats) * stepBeats;
+               while (nextStep < s0)
+                  nextStep += stepBeats;
+               while (nextStep < s1 && nOut < kMaxBlockEvents - 2)
+               {
+                  int noteIdx = (int)std::floor((std::sin(nextStep * 1.5) * 0.5 + 0.5) * (nScale - 1));
+                  noteIdx = std::clamp(noteIdx, 0, nScale - 1);
+                  int note = scaleNotes[noteIdx];
+                  float vel = std::clamp(0.6f + 0.3f * (float)std::cos(nextStep * 2.0), 0.1f, 1.0f);
 
-               NoteEvent on;
-               on.note = note;
-               on.velocity = vel;
-               on.isNoteOn = true;
-               on.frameOffset = std::clamp((int)((nextStep - beatsStart) / bps), 0, numFrames - 1);
-               on.source = this;
-               on.voiceId = NextVoiceId();
-               out[nOut++] = on;
+                  NoteEvent on;
+                  on.note = note;
+                  on.velocity = vel;
+                  on.isNoteOn = true;
+                  on.frameOffset = std::clamp(f0 + (int)((nextStep - s0) / bps), f0, f1 - 1);
+                  on.source = this;
+                  on.voiceId = NextVoiceId();
+                  out[nOut++] = on;
 
-               NoteEvent off;
-               off.note = note;
-               off.velocity = 0.0f;
-               off.isNoteOn = false;
-               double offBeat = nextStep + stepBeats * 0.8;
-               off.frameOffset = std::clamp((int)((offBeat - beatsStart) / bps), on.frameOffset + 1, numFrames - 1);
-               off.source = this;
-               off.voiceId = on.voiceId;
-               out[nOut++] = off;
+                  NoteEvent off;
+                  off.note = note;
+                  off.velocity = 0.0f;
+                  off.isNoteOn = false;
+                  double offBeat = nextStep + stepBeats * 0.8;
+                  off.frameOffset = std::clamp(f0 + (int)((offBeat - s0) / bps), std::min(on.frameOffset + 1, numFrames - 1), numFrames - 1);
+                  off.source = this;
+                  off.voiceId = on.voiceId;
+                  out[nOut++] = off;
 
-               mLastNote.store(note, std::memory_order_relaxed);
-               nextStep += stepBeats;
+                  mLastNote.store(note, std::memory_order_relaxed);
+                  nextStep += stepBeats;
+               }
+            };
+            if (playing && !lap)
+               grid(beatsStart, end, 0, numFrames);
+            else if (playing)
+            {
+               if (wrapFrame > 0)
+                  grid(beatsStart, lapEnd, 0, wrapFrame);
+               if (wrapFrame < numFrames)
+                  grid(lapStart, end, wrapFrame, numFrames);
             }
          }
       }
@@ -126,7 +158,8 @@ public:
             if (!e.bendUpdate && e.note >= 0 && e.note <= 127)
             {
                Cap c;
-               c.beat = beatsStart + (double)e.frameOffset * bps;
+               c.beat = mCapClock + (double)e.frameOffset * bps;
+               c.pos = playing ? posAt(std::clamp(e.frameOffset, 0, numFrames)) : c.beat;
                c.voiceId = e.voiceId;
                c.note = (uint8_t)e.note;
                c.vel = (uint8_t)std::clamp((int)std::lround(e.velocity * 127.0f), 0, 127);
@@ -160,62 +193,88 @@ public:
                mPlayer.Reset(T, (uint32_t)mSeed.load(std::memory_order_relaxed));
                mHasNext = false;
             }
-            if (mHasNext && (mNext.onsetBeats > beatsStart + 64.0 || mNext.onsetBeats < beatsStart - 2.0))
-               mHasNext = false;
-            if (!mHasNext)
+            const auto gen = [&](double s0, double s1, int f0, int f1)
             {
-               mPrevOnset = std::floor(beatsStart * NoteModel::kTicksPerBeat) / NoteModel::kTicksPerBeat;
-               mPlayer.Next(*T, mParams, mPrevOnset, bpb, mNext);
-               mHasNext = true;
-            }
-            int guard = 0;
-            while (mNext.onsetBeats < end && guard++ < 64 && nOut < kMaxBlockEvents - 1)
-            {
-               Pending* slot = nullptr;
-               for (Pending& p : mPending)
-                  if (!p.active)
+               if (mHasNext && (mNext.onsetBeats > s0 + 64.0 || mNext.onsetBeats < s0 - 2.0))
+                  mHasNext = false;
+               if (!mHasNext)
+               {
+                  // Land on the first learned slot from here, so the downbeat after a jump plays.
+                  const double at = NoteModel::AnchorBeat(*T, s0, bpb);
+                  if (at >= 0.0)
                   {
-                     slot = &p;
-                     break;
+                     mPrevOnset = at;
+                     mPlayer.Next(*T, mParams, at, bpb, mNext, at);
                   }
-               if (slot != nullptr)
+                  else
+                  {
+                     mPrevOnset = std::floor(s0 * NoteModel::kTicksPerBeat) / NoteModel::kTicksPerBeat;
+                     mPlayer.Next(*T, mParams, mPrevOnset, bpb, mNext);
+                  }
+                  mHasNext = true;
+               }
+               int guard = 0;
+               while (mNext.onsetBeats < s1 && guard++ < 64 && nOut < kMaxBlockEvents - 1)
                {
-                  const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
-                  int outNote = mNext.note;
-                  if (useGlobal)
-                     outNote = MusicTime::SnapToScaleInRange(outNote, Transport::Instance().Key(), Transport::Instance().Scale(), mParams.lowNote, mParams.highNote);
+                  Pending* slot = nullptr;
+                  for (Pending& p : mPending)
+                     if (!p.active)
+                     {
+                        slot = &p;
+                        break;
+                     }
+                  if (slot != nullptr)
+                  {
+                     const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
+                     int outNote = mNext.note;
+                     if (useGlobal)
+                        outNote = MusicTime::SnapToScaleInRange(outNote, Transport::Instance().Key(), Transport::Instance().Scale(), mParams.lowNote, mParams.highNote);
 
-                  NoteEvent on;
-                  on.note = outNote;
-                  on.velocity = mNext.velocity;
-                  on.isNoteOn = true;
-                  on.frameOffset = std::clamp((int)((mNext.onsetBeats - beatsStart) / bps), 0, numFrames - 1);
-                  on.source = this;
-                  on.voiceId = NextVoiceId();
-                  out[nOut++] = on;
-                  slot->active = true;
-                  slot->note = outNote;
-                  slot->voiceId = on.voiceId;
-                  slot->offBeat = mNext.onsetBeats + mNext.durBeats;
-                  mLastNote.store(outNote, std::memory_order_relaxed);
+                     NoteEvent on;
+                     on.note = outNote;
+                     on.velocity = mNext.velocity;
+                     on.isNoteOn = true;
+                     on.frameOffset = std::clamp(f0 + (int)((mNext.onsetBeats - s0) / bps), f0, f1 - 1);
+                     on.source = this;
+                     on.voiceId = NextVoiceId();
+                     out[nOut++] = on;
+                     slot->active = true;
+                     slot->note = outNote;
+                     slot->voiceId = on.voiceId;
+                     slot->offBeat = mNext.onsetBeats + mNext.durBeats;
+                     mLastNote.store(outNote, std::memory_order_relaxed);
+                  }
+                  mPrevOnset = mNext.onsetBeats;
+                  mPlayer.Next(*T, mParams, mPrevOnset, bpb, mNext);
                }
-               mPrevOnset = mNext.onsetBeats;
-               mPlayer.Next(*T, mParams, mPrevOnset, bpb, mNext);
+               for (Pending& p : mPending)
+                  if (p.active && p.offBeat < s1 && nOut < kMaxBlockEvents)
+                  {
+                     NoteEvent off;
+                     off.note = p.note;
+                     off.velocity = 0.0f;
+                     off.isNoteOn = false;
+                     off.frameOffset = std::clamp(f0 + (int)((p.offBeat - s0) / bps), f0, f1 - 1);
+                     off.source = this;
+                     off.voiceId = p.voiceId;
+                     out[nOut++] = off;
+                     p.active = false;
+                  }
+               // Time order, note-offs before note-ons on a tie so a repeated pitch re-attacks cleanly.
+            };
+            if (!playing)
+               mHasNext = false;
+            else if (!lap)
+               gen(beatsStart, end, 0, numFrames);
+            else
+            {
+               if (wrapFrame > 0)
+                  gen(beatsStart, lapEnd, 0, wrapFrame);
+               FlushOffs(out, nOut, std::min(wrapFrame, numFrames - 1)); // notes end at the loop end
+               mHasNext = false;
+               if (wrapFrame < numFrames)
+                  gen(lapStart, end, wrapFrame, numFrames);
             }
-            for (Pending& p : mPending)
-               if (p.active && p.offBeat < end && nOut < kMaxBlockEvents)
-               {
-                  NoteEvent off;
-                  off.note = p.note;
-                  off.velocity = 0.0f;
-                  off.isNoteOn = false;
-                  off.frameOffset = std::clamp((int)((p.offBeat - beatsStart) / bps), 0, numFrames - 1);
-                  off.source = this;
-                  off.voiceId = p.voiceId;
-                  out[nOut++] = off;
-                  p.active = false;
-               }
-            // Time order, note-offs before note-ons on a tie so a repeated pitch re-attacks cleanly.
             std::stable_sort(out, out + nOut, [](const NoteEvent& a, const NoteEvent& b) {
                if (a.frameOffset != b.frameOffset)
                   return a.frameOffset < b.frameOffset;
@@ -226,6 +285,7 @@ public:
 
       for (int i = 0; i < nOut; i++)
          mOutbox.Push(out[i]);
+      mCapClock += (double)numFrames * bps;
       mSamplePos += (uint64_t)numFrames;
       mBlocks.fetch_add(1, std::memory_order_release);
    }
@@ -315,7 +375,7 @@ private:
       uint64_t stamp;
    };
 
-   void FlushOffs(NoteEvent* out, int& nOut)
+   void FlushOffs(NoteEvent* out, int& nOut, int frame = 0)
    {
       for (Pending& p : mPending)
          if (p.active && nOut < kMaxBlockEvents)
@@ -324,7 +384,7 @@ private:
             off.note = p.note;
             off.velocity = 0.0f;
             off.isNoteOn = false;
-            off.frameOffset = 0;
+            off.frameOffset = frame;
             off.source = this;
             off.voiceId = p.voiceId;
             out[nOut++] = off;
@@ -343,7 +403,8 @@ private:
    NoteModel::Out mNext;
    bool mHasNext = false;
    double mPrevOnset = 0.0;
-   double mLastBeatsStart = 0.0;
+   double mExpectedStart = 0.0; // where the next block starts if nothing jumped
+   double mCapClock = 0.0;      // Cap::beat: beats elapsed since PrepareToPlay
    Pending mPending[kMaxPending];
 
    std::atomic<Tables*> mLive { nullptr };
@@ -371,7 +432,7 @@ namespace
    // Learn stops lasts until the last captured beat.
    std::vector<Event> Assemble(const std::vector<PredictiveNotesNode::Cap>& caps, double bpb)
    {
-      struct Rec { double onset, dur; uint8_t note, vel; };
+      struct Rec { double onset, dur, pos; uint8_t note, vel; };
       std::vector<Rec> recs;
       struct Open { int voice; size_t idx; };
       std::vector<Open> open;
@@ -381,7 +442,7 @@ namespace
          lastBeat = std::max(lastBeat, c.beat);
          if (c.on)
          {
-            recs.push_back({ c.beat, -1.0, c.note, c.vel });
+            recs.push_back({ c.beat, -1.0, c.pos, c.note, c.vel });
             open.push_back({ c.voiceId, recs.size() - 1 });
          }
          else
@@ -411,7 +472,8 @@ namespace
          e.note = recs[i].note;
          e.vel = recs[i].vel;
          e.ioiTicks = (uint16_t)std::clamp(tick - prevTick, 0, NoteModel::kMaxIoiTicks);
-         const double bar = std::fmod((double)tick / NoteModel::kTicksPerBeat, std::max(1.0, bpb));
+         // The bar slot comes from where the transport was, so a looped or rewound take keeps its phase.
+         const double bar = std::fmod((double)NoteModel::SnapTicks(recs[i].pos) / NoteModel::kTicksPerBeat, std::max(1.0, bpb));
          e.metric = (uint8_t)NoteModel::MetricOf(bar < 0.0 ? bar + bpb : bar);
          e.durTicks = (uint16_t)std::clamp(NoteModel::SnapTicks(recs[i].dur), 1, NoteModel::kMaxIoiTicks);
          ev.push_back(e);
@@ -1052,8 +1114,8 @@ namespace PredictiveNotes
             for (int i = 0; i < 8; i++)
             {
                const int vid = NextVoiceId();
-               n.Audio()->PushCapture({ beat, vid, (uint8_t)loop[i], 100, true });
-               n.Audio()->PushCapture({ beat + 0.4, vid, (uint8_t)loop[i], 0, false });
+               n.Audio()->PushCapture({ beat, beat, vid, (uint8_t)loop[i], 100, true });
+               n.Audio()->PushCapture({ beat + 0.4, beat + 0.4, vid, (uint8_t)loop[i], 0, false });
                beat += 0.5;
             }
             n.CookIfNeeded(frame++);
@@ -1108,6 +1170,94 @@ namespace PredictiveNotes
          NoteTheory::VoiceChord(4, 3, 0, MusicTime::kMajor, prevVoicing, 3, v);
          const int move = std::abs(v[0] - 60) + std::abs(v[1] - 64) + std::abs(v[2] - 67);
          PM_CHECK(move <= 6 && v[0] < v[1] && v[1] < v[2], "I->V voicing moved %d semitones", move);
+      }
+
+      // 9. Timing. A take played through a 2-beat loop keeps its order (the old onset sort folded
+      //    the laps on top of each other); playback starts on the downbeat, lands on the bar after a
+      //    jump with no catch-up burst, re-anchors on a loop lap, and stays silent while stopped.
+      {
+         PredictiveNotesNode n;
+         n.GetAudioNode();
+         NoteEventQueue inQ;
+         const int icur = inQ.RegisterConsumer();
+         AudioPredictiveNotesNode* a = n.Audio();
+         a->PrepareToPlay(48000.0, 512);
+         a->SetNoteInbox(&inQ, icur);
+         n.SetLearning(true);
+         const double bpm = 120.0, bpb = 4.0, bps = bpm / 60.0 / 48000.0, blk = 512.0 * bps, loopLen = 2.0;
+         for (int b = 0; b < 2000; b++)
+         {
+            // note-on on every whole beat of elapsed time (24000 frames), note-off half a beat later
+            const long long f0 = (long long)b * 512;
+            for (long long f = f0; f < f0 + 512; f++)
+               if (f % 12000 == 0)
+               {
+                  const int k = (int)(f / 24000);
+                  NoteEvent e;
+                  e.note = 60 + (k % 2) * 2; e.velocity = 0.8f; e.isNoteOn = f % 24000 == 0;
+                  e.frameOffset = (int)(f - f0); e.voiceId = 5000 + k;
+                  inQ.Push(e);
+               }
+            const double pos = std::fmod((double)b * blk, loopLen);
+            if (pos + blk > loopLen)
+               a->Render(512, pos, bpm, bpb, true, loopLen, 0.0);
+            else
+               a->Render(512, pos, bpm, bpb);
+            n.CookIfNeeded(b + 1);
+         }
+         n.SetLearning(false);
+         n.WaitForBuild();
+         PM_CHECK(n.LearnedNotes() >= 16, "looped take learned only %d notes", n.LearnedNotes());
+
+         a->PrepareToPlay(48000.0, 512);
+         NoteEventQueue* outQ = a->NoteOutbox();
+         outQ->ResetConsumers();
+         const int ocur = outQ->RegisterConsumer();
+         n.stray = 0.0f;
+         
+         std::vector<double> ons;
+         const auto block = [&](double s, bool playing = true, double lapEnd = -1.0, double lapStart = 0.0) {
+            n.CookIfNeeded(5000);
+            a->Render(512, s, bpm, bpb, playing, lapEnd, lapStart);
+            const int wrap = lapEnd > s ? (int)std::lround((lapEnd - s) / bps) : 512;
+            NoteEvent e[64];
+            const int k = outQ->Pop(ocur, e, 64);
+            int got = 0;
+            for (int i = 0; i < k; i++)
+               if (e[i].isNoteOn)
+               {
+                  ons.push_back(e[i].frameOffset < wrap ? s + e[i].frameOffset * bps : lapStart + (e[i].frameOffset - wrap) * bps);
+                  got++;
+               }
+            return got;
+         };
+         double s = 0.0;
+         for (int b = 0; b < 200; b++, s += blk)
+            block(s);
+         PM_CHECK(!ons.empty() && ons[0] < 2.0 * bps, "playback did not start on the downbeat (first at %.4f)", ons.empty() ? -1.0 : ons[0]);
+         int offGrid = 0;
+         for (size_t i = 0; i < ons.size(); i++)
+            if (std::fabs(ons[i] - std::round(ons[i])) > 2.0 * bps || (i > 0 && ons[i] - ons[i - 1] < 0.5))
+               offGrid++;
+         PM_CHECK(ons.size() >= 4 && offGrid == 0, "looped take replayed off the beat grid (%d of %zu)", offGrid, ons.size());
+
+         ons.clear();
+         const int atJump = block(8.0); // forward jump to bar 3's downbeat
+         PM_CHECK(atJump == 1 && std::fabs(ons[0] - 8.0) < 2.0 * bps, "jump to 8.0 played %d notes, first at %.4f", atJump, ons.empty() ? -1.0 : ons[0]);
+
+         ons.clear();
+         s = 4.0 - 20.5 * blk;
+         for (int b = 0; b < 20; b++, s += blk)
+            block(s);
+         ons.clear();
+         block(s, true, 4.0, 0.0); // the loop end falls mid-block
+         PM_CHECK(!ons.empty() && std::fabs(ons.back()) < 2.0 * bps, "loop lap did not land on the loop start (%zu notes, last %.4f)", ons.size(), ons.empty() ? -1.0 : ons.back());
+
+         ons.clear();
+         int stopped = 0;
+         for (int b = 0; b < 50; b++)
+            stopped += block(0.0, false);
+         PM_CHECK(stopped == 0, "stopped transport still played %d notes", stopped);
       }
 
       std::printf("[PREDMIDITEST] %s\n", gFail == 0 ? "OK" : "FAIL");

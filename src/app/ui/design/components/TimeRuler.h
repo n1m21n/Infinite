@@ -114,7 +114,9 @@ namespace TimeRuler
          return;
       const ImU32 col = tok::U32(ghost ? tok::pal::c_EF444478 : tok::pal::c_EF4444FF);
       dl->AddLine(ImVec2(x, top), ImVec2(x, bottom), col, ghost ? 1.5f : 1.25f);
+      dl->PushClipRect(ImVec2(vx0, top), ImVec2(vx1, bottom), true); // the cap at bar 1 stays off the keys
       dl->AddTriangleFilled(ImVec2(x - kCap, top), ImVec2(x + kCap, top), ImVec2(x, top + kCap * 1.6f), col);
+      dl->PopClipRect();
    }
 
    // The armed loop, as brackets on the ruler and a band down the panel, clipped to the view [vx0, vx1]

@@ -2363,9 +2363,14 @@ namespace
       const Tick tick = (Tick)std::max(0.0, a.XTick(m.x));
       const Arrange::LoopRange& loop = gArrange.settings.loop;
       const ImGuiIO& io = ImGui::GetIO();
-      if (loop.enabled && std::fabs(m.x - a.TickX((double)loop.start)) <= TimeRuler::kEdgeHit)
+      // An edge scrolled out of the view isn't drawn, so it can't be grabbed either.
+      const auto grabs = [&](Tick t) {
+         const float x = a.TickX((double)t);
+         return x >= a.x0 - 0.5f && x <= a.x1 + 0.5f && std::fabs(m.x - x) <= TimeRuler::kEdgeHit;
+      };
+      if (loop.enabled && grabs(loop.start))
          BeginDrag(Drag::LoopStart, page, m, tick, 0, loop.start);
-      else if (loop.enabled && std::fabs(m.x - a.TickX((double)loop.end)) <= TimeRuler::kEdgeHit)
+      else if (loop.enabled && grabs(loop.end))
          BeginDrag(Drag::LoopEnd, page, m, tick, 0, loop.end);
       else
       {
