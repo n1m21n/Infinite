@@ -74,7 +74,7 @@ To resolve the phase cancellation dilemma, we split the output of the `Analog` n
 1. **Sub band (20 Hz to 110 Hz)**: Contains only the solid, monophonic fundamental frequency. This band bypasses all distortion, modulation, and spatial effects to remain completely mono and phase-stable.
 2. **Grit band (110 Hz to 20 kHz)**: Contains the rich detuned saw harmonics. This band is aggressively saturated, filtered, and widened.
 
-We implement this split using two [`Filter`](https://infinitedevices.org/nodes/filter.html) nodes operating in parallel.
+We implement this split using two [`Filter`](https://infinitedevices.org/nodes/audio-filter.html) nodes operating in parallel.
 
 ```
                      +---> [ Filter: Lowpass 110 Hz ] ---> (Sub Bus: Mono)

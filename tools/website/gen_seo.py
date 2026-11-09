@@ -178,7 +178,7 @@ def main():
         posts = []
     blog_pages = [("blog/", 0.8)] + [("blog/" + q["slug"] + ".html", 0.7) for q in posts if "slug" in q]
     embed_pages = [("embeds/" + i["slug"] + ".html", 0.7) for i in json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]]
-    pages = [("", 1.0), ("library.html", 0.8), ("samples/", 0.9)] + blog_pages + embed_pages + [("developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
+    pages = [("", 1.0), ("library.html", 0.8), ("samples/", 0.9)] + blog_pages + embed_pages + [("plugin.html", 0.9), ("buy.html", 0.9), ("developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
     open(os.path.join(W, "sitemap.xml"), "w").write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         "".join(f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n" for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its] + [(u, 0.8 if u == "nodes/" else 0.5) for u in gen_nodes.sitemap_paths()]) + "</urlset>\n")
     open(os.path.join(W, "robots.txt"), "w").write(
