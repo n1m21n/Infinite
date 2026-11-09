@@ -18,6 +18,8 @@
   "frame/StageMenuBar.cpp:Bypass selection": "bypass selected",
   "frame/StageMenuBar.cpp:Check for updates": "settings updates",
   "frame/StageMenuBar.cpp:Clear cards": "view clearcards",
+  "frame/StageMenuBar.cpp:Curve Editor": "panel curveeditor",
+  "frame/StageMenuBar.cpp:Show Curve Editor": "panel curveeditor open",
   "frame/StageMenuBar.cpp:Close viewport panel": "panel viewport close",
   "frame/StageMenuBar.cpp:Cut / Copy": "copy, then remove",
   "frame/StageMenuBar.cpp:Delete": "remove <node>",

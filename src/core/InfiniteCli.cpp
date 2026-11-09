@@ -1187,6 +1187,7 @@ session       clip launcher for playing clips live
 samplestudio  record, generate, slice and shape samples, then drop the result on the canvas
 pianoroll     notes of the selected note clip or pattern
 view3d        3D View: arranges 3D outputs, camera and lights, before Render 3D
+curveeditor   draw, record and assign MSEG curves to any knob
 terminal      this Terminal and the agent chat
 showset       show set: patches to step through in a live set
 history       undo history

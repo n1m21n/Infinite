@@ -178,8 +178,14 @@ namespace
    // A saved shape is the MSEG points text; the page decodes it, then its own points go back.
    bool LoadMine(MSEGNode& n, const std::string& name, CurveEdit::Points& out)
    {
-      std::ifstream in(MineDir() / AppPaths::FsPath(name + ".curve"));
-      std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      std::string text;
+      if (FILE* f = AppPaths::OpenFile(MineDir() / AppPaths::FsPath(name + ".curve"), "rb"))
+      {
+         char buf[4096];
+         for (size_t got; (got = std::fread(buf, 1, sizeof buf, f)) > 0;)
+            text.append(buf, got);
+         std::fclose(f);
+      }
       if (text.empty())
          return false;
       const CurveEdit::Points keep = n.points;
@@ -200,7 +206,12 @@ namespace
       std::string name = base;
       for (int i = 2; std::filesystem::exists(MineDir() / AppPaths::FsPath(name + ".curve"), ec); i++)
          name = base + " " + std::to_string(i);
-      std::ofstream(MineDir() / AppPaths::FsPath(name + ".curve")) << n.Encode();
+      if (FILE* f = AppPaths::OpenFile(MineDir() / AppPaths::FsPath(name + ".curve"), "wb"))
+      {
+         const std::string text = n.Encode();
+         std::fwrite(text.data(), 1, text.size(), f);
+         std::fclose(f);
+      }
       return name;
    }
 
@@ -1743,7 +1754,7 @@ namespace
          ImGui::PushClipRect(ImGui::GetCursorScreenPos(), ImVec2(ImGui::GetCursorScreenPos().x + rowW - kIconW - tok::space_2, 1.0e6f), true);
          ImGui::TextUnformatted(name.c_str());
          ImGui::PopClipRect();
-         ImGui::SameLine(rowX + rowW - kIconW);
+         FormParts::Inline(rowX + rowW - kIconW);
          if (IconChip("##ceUnbind", IconsInfinite::Close, false, T("Remove target")))
          {
             PushUndoCheckpoint("Remove Curve Target");
@@ -2086,7 +2097,7 @@ namespace
       if (ImGui::IsItemHovered())
          HelpTip("%s", RecTip());
       if (!r.error.empty())
-         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "%s", r.error.c_str());
+         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::danger_hover)), "%s", r.error.c_str());
    }
 
    void DrawInspector(GraphNode& gn, MSEGNode& n)
@@ -2117,7 +2128,7 @@ namespace
                n.expression = now;
             }
             if (!n.RefreshExpression())
-               ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "%s", n.ExpressionError().c_str());
+               ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::danger_hover)), "%s", n.ExpressionError().c_str());
             FieldLabel(T("Points"));
             if (ActionButton::Draw(T("Bake"), ImVec2(sFieldW, 0.0f)))
             {
@@ -2313,9 +2324,7 @@ namespace
                       ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled));
       }
       // A child whose first card touches its top and sides (the 3D View's BeginCardColumn); only it scrolls.
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::kPad, 0.0f));
-      ImGui::BeginChild("##ceProps", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
-      ImGui::PopStyleVar();
+      FormParts::BeginChildPadX("##ceProps", SectionCard::kPad);
       SectionCard::BeginWindow();
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
       sFieldW = std::max(70.0f, ImGui::GetContentRegionAvail().x - kFieldLabelW);
@@ -2426,7 +2435,7 @@ namespace
       HeaderRow() : y(ImGui::GetCursorPosY()) {}
       void Next(float spacing) const
       {
-         ImGui::SameLine(0.0f, spacing);
+         FormParts::Inline(0.0f, spacing);
          ImGui::SetCursorPosY(y);
       }
    };
