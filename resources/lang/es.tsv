@@ -2827,3 +2827,109 @@ Infinite as VST3/AU	Infinite como VST3/AU
 Plugin	Plugin
 Infinite as a VST3/AU plugin runs inside your DAW, with your patch saved in the project. The plugin is a one-time purchase for two computers, with updates for life. The standalone app stays free.	Infinite como plugin VST3/AU funciona dentro de tu DAW y guarda tu patch en el proyecto. El plugin es una compra única para dos ordenadores, con actualizaciones de por vida. La app independiente sigue siendo gratuita.
 Buy the plugin	Comprar el plugin
+%d target	%d destino
+%d targets	%d destinos
+A shape you draw, played over time. Click empty space to add a point, drag to move it, right-click to remove it; the small ring on a Bend segment bends it. time sets how one pass is counted (beats, a synced division, Hz, seconds or frames), speed scales it, and play repeats, plays once or ping-pongs; free run ignores the transport. The Curve Editor (Shift+E) edits the same points with pens, snap and quantise. With nothing patched to trig it follows the transport. A trig cable starts the shape on each rising edge: loop off plays it once and holds the last value; loop on repeats the part between loop start and loop end while trig stays high and plays on to the end when it drops. Loop start = loop end is a sustain point.	Una forma que dibujas, reproducida en el tiempo. Haz clic en un espacio vacío para añadir un punto, arrástralo para moverlo, clic derecho para quitarlo; el anillo pequeño de un segmento Bend lo curva. time define cómo se cuenta una pasada (tiempos, una división sincronizada, Hz, segundos o fotogramas), speed la escala y play repite, reproduce una vez o va y vuelve; free run ignora el transporte. El Curve Editor (Shift+E) edita los mismos puntos con plumas, ajuste y cuantización. Sin nada conectado a trig sigue el transporte. Un cable en trig inicia la forma en cada flanco ascendente: con loop desactivado se reproduce una vez y mantiene el último valor; con loop activado repite la parte entre loop start y loop end mientras trig siga alto y continúa hasta el final cuando baja. Loop start = loop end es un punto de sostenimiento.
+Add Point	Añadir punto
+Add a point; the Pen adds one on a single click and a drag pulls its handles	Añade un punto; la Pluma añade uno con un clic y al arrastrar saca sus tiradores
+After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops	Tras Assign, haz clic en un mando del lienzo para controlarlo con la curva; Shift sigue eligiendo, Esc termina
+Assign	Asignar
+Assign %s -> %s: %s	Asignar %s -> %s: %s
+Assign, then click a knob	Asigna y luego haz clic en un mando
+Auto Clamped, Auto, Vector, Aligned or Free handles for the selected points	Tiradores Auto Clamped, Auto, Vector, Aligned o Free para los puntos seleccionados
+Bake	Convertir en puntos
+Bend (B)	Bend (B)
+Click a knob to drive it; Shift picks more, Esc stops	Haz clic en un mando para controlarlo; Shift elige más, Esc termina
+Click the knob to record; Esc stops	Haz clic en el mando para grabar; Esc termina
+Click to pick again on the next take	Haz clic para elegir de nuevo en la próxima toma
+Close Curve Editor	Cerrar Curve Editor
+Close Page	Cerrar página
+Constant, Linear, Bend, Bezier or Easing for the segments the selection starts (none selected: all)	Constant, Linear, Bend, Bezier o Easing para los segmentos que empiezan en la selección (sin selección: todos)
+Crop to Loop	Recortar al bucle
+Curve Editor	Curve Editor
+Curve Editor Panel	Panel del Curve Editor
+Curve Tools	Herramientas de curva
+Curve editor - draw and shape MSEG curves (Shift+E)	Curve editor: dibuja y da forma a curvas MSEG (Shift+E)
+Delete Curve	Eliminar curva
+Delete Points	Eliminar puntos
+Delete the selected points; the two ends stay	Elimina los puntos seleccionados; los dos extremos permanecen
+Draw (D)	Dibujar (D)
+Draw here to make one	Dibuja aquí para crear una
+Easing	Easing
+End	Fin
+Eraser (E)	Borrador (E)
+FPS	FPS
+Fit Curve	Ajustar curva
+Free run	Libre
+From	Desde
+Grid: snap and quantise (Q)	Cuadrícula: ajuste y cuantización (Q)
+Hand (H)	Mano (H)
+Handle Type	Tipo de tirador
+Handles	Tiradores
+High	Alto
+Keep	Conservar
+Keep only the looped part; the length shrinks to it	Conserva solo la parte en bucle; la longitud se reduce a ella
+Line (L)	Línea (L)
+Loop only	Solo bucle
+Low	Bajo
+Mine	Mías
+Mod / Motion	Mod / Motion
+Mod pages run on beats or Hz; Motion pages on seconds or frames at the export rate	Las páginas Mod usan tiempos o Hz; las páginas Motion, segundos o fotogramas a la tasa de exportación
+Motion easings	Easings de movimiento
+Motion group	Grupo de movimiento
+Move a CC to record it; Esc stops	Mueve un CC para grabarlo; Esc termina
+Move the selected points, or every point, onto the grid	Mueve los puntos seleccionados, o todos, a la cuadrícula
+New curve	Nueva curva
+Next CC moved	Próximo CC movido
+Next knob clicked	Próximo mando pulsado
+No curve yet	Aún no hay curva
+Nothing wired	Nada conectado
+Pen (P)	Pluma (P)
+Per voice	Por voz
+Point	Punto
+Position, Rotation or Scale make X, Y and Z pages bound to the selected node	Position, Rotation o Scale crean páginas X, Y y Z enlazadas al nodo seleccionado
+Properties	Propiedades
+Pulses	Pulsos
+Quantise Points	Cuantizar puntos
+Quantise to Grid	Cuantizar a la cuadrícula
+Record	Grabar
+Record %s: %s	Grabar %s: %s
+Record a take from a CC, a knob or the trig input into the page; Overwrite, Touch or Latch	Graba una toma de un CC, un mando o la entrada trig en la página; Overwrite, Touch o Latch
+Record a take into this curve	Graba una toma en esta curva
+Recording: click to stop	Grabando: clic para detener
+Remove target	Quitar destino
+Reopen Page	Reabrir página
+Replace the page with a shape, an easing or one of your saves; Mine saves this one	Sustituye la página por una forma, un easing o uno de tus guardados; Mine guarda esta
+Save This Shape	Guardar esta forma
+Segment Curve	Curvatura del segmento
+Select (A)	Seleccionar (A)
+Select All Points	Seleccionar todos los puntos
+Select every point	Selecciona todos los puntos
+Select, Hand, Pen, Draw, Line, Stamp, Bend, Eraser, Transform and Smooth, while the pointer is over the Curve Editor. Every key in this section needs the pointer there	Seleccionar, Mano, Pluma, Dibujar, Línea, Sello, Bend, Borrador, Transformar y Suavizar, con el puntero sobre el Curve Editor. Todas las teclas de esta sección necesitan el puntero ahí
+Shapes	Formas
+Show Curve Editor	Mostrar Curve Editor
+Show or hide the docked Curve Editor; it opens the MSEG node selected on the canvas	Muestra u oculta el Curve Editor acoplado; abre el nodo MSEG seleccionado en el lienzo
+Show or hide the properties column; with Stamp, the next shape	Muestra u oculta la columna de propiedades; con Sello, la siguiente forma
+Show other curves	Mostrar otras curvas
+Show the whole curve	Mostrar toda la curva
+Smooth (M)	Suavizar (M)
+Snap to grid (G)	Ajustar a la cuadrícula (G)
+Stamp (S); N cycles shapes	Sello (S); N cambia de forma
+Starts on the next bar	Empieza en el próximo compás
+Starts when the transport plays	Empieza al reproducir el transporte
+Steps	Pasos
+Take	Toma
+Targets	Destinos
+Thinning	Simplificación
+Toggle snap to the grid; hold Alt to drag past it, Ctrl to snap the value to eighths	Activa o desactiva el ajuste a la cuadrícula; mantén Alt para arrastrar más allá, Ctrl para ajustar el valor a octavos
+Transform (T): drag to scale selection around its centre	Transformar (T): arrastra para escalar la selección alrededor de su centro
+Turn the formula into points you can edit	Convierte la fórmula en puntos editables
+Up/down zooms time, left/right moves along it; Alt zooms the value	Arriba/abajo hace zoom en el tiempo, izquierda/derecha se desplaza; Alt hace zoom en el valor
+Voices	Voces
+Wire a modulator into trig	Conecta un modulador a trig
+Zoom / Pan Curve	Zoom / Desplazar curva
+Zoom Value	Zoom del valor
+Zoom around the pointer, or pan; middle-drag also pans	Zoom alrededor del puntero, o desplazamiento; arrastrar con el botón central también desplaza
+Zoom the value axis around the pointer	Zoom del eje de valores alrededor del puntero
+param 	param 
+trig input	entrada trig

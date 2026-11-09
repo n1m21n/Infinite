@@ -2827,3 +2827,109 @@ Infinite as VST3/AU	Infinite 的 VST3/AU 版
 Plugin	插件
 Infinite as a VST3/AU plugin runs inside your DAW, with your patch saved in the project. The plugin is a one-time purchase for two computers, with updates for life. The standalone app stays free.	作为 VST3/AU 插件的 Infinite 在你的 DAW 中运行，补丁随项目保存。插件一次购买，可用于两台电脑，终身更新。独立应用保持免费。
 Buy the plugin	购买插件
+%d target	%d 个目标
+%d targets	%d 个目标
+A shape you draw, played over time. Click empty space to add a point, drag to move it, right-click to remove it; the small ring on a Bend segment bends it. time sets how one pass is counted (beats, a synced division, Hz, seconds or frames), speed scales it, and play repeats, plays once or ping-pongs; free run ignores the transport. The Curve Editor (Shift+E) edits the same points with pens, snap and quantise. With nothing patched to trig it follows the transport. A trig cable starts the shape on each rising edge: loop off plays it once and holds the last value; loop on repeats the part between loop start and loop end while trig stays high and plays on to the end when it drops. Loop start = loop end is a sustain point.	你绘制的形状，随时间播放。点击空白处添加点，拖动移动，右键删除；Bend 线段上的小圆环可弯曲该线段。time 决定一次循环如何计数（拍、同步分割、Hz、秒或帧），speed 缩放速度，play 可重复、播放一次或往返；free run 忽略走带。曲线编辑器（Shift+E）用钢笔、吸附和量化编辑同样的点。trig 未接线时跟随走带。trig 接线会在每个上升沿启动形状：loop 关闭时播放一次并保持最后的值；loop 开启时，在 trig 保持高电平期间重复 loop start 与 loop end 之间的部分，trig 变低后播放到结尾。loop start = loop end 为延音点。
+Add Point	添加点
+Add a point; the Pen adds one on a single click and a drag pulls its handles	添加一个点；钢笔单击即添加，拖动可拉出控制柄
+After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops	点击 Assign 后，在画布上点击旋钮即可用曲线驱动它；按住 Shift 继续选取，Esc 停止
+Assign	分配
+Assign %s -> %s: %s	分配 %s -> %s: %s
+Assign, then click a knob	点击分配，然后点击旋钮
+Auto Clamped, Auto, Vector, Aligned or Free handles for the selected points	所选点的控制柄类型：Auto Clamped、Auto、Vector、Aligned 或 Free
+Bake	烘焙
+Bend (B)	弯曲 (B)
+Click a knob to drive it; Shift picks more, Esc stops	点击旋钮以驱动它；Shift 继续选取，Esc 停止
+Click the knob to record; Esc stops	点击要录制的旋钮；Esc 停止
+Click to pick again on the next take	点击以便在下一次录制时重新选取
+Close Curve Editor	关闭曲线编辑器
+Close Page	关闭页面
+Constant, Linear, Bend, Bezier or Easing for the segments the selection starts (none selected: all)	所选点起始线段的插值：Constant、Linear、Bend、Bezier 或 Easing（未选择时为全部）
+Crop to Loop	裁剪到循环
+Curve Editor	曲线编辑器
+Curve Editor Panel	曲线编辑器面板
+Curve Tools	曲线工具
+Curve editor - draw and shape MSEG curves (Shift+E)	曲线编辑器：绘制并塑形 MSEG 曲线 (Shift+E)
+Delete Curve	删除曲线
+Delete Points	删除点
+Delete the selected points; the two ends stay	删除所选点；两端保留
+Draw (D)	绘制 (D)
+Draw here to make one	在此绘制以创建
+Easing	缓动
+End	结束
+Eraser (E)	橡皮擦 (E)
+FPS	FPS
+Fit Curve	适应曲线
+Free run	自由运行
+From	从
+Grid: snap and quantise (Q)	网格：吸附与量化 (Q)
+Hand (H)	抓手 (H)
+Handle Type	控制柄类型
+Handles	控制柄
+High	高
+Keep	保留
+Keep only the looped part; the length shrinks to it	仅保留循环部分；长度缩短为该部分
+Line (L)	直线 (L)
+Loop only	仅循环
+Low	低
+Mine	我的
+Mod / Motion	调制 / 运动
+Mod pages run on beats or Hz; Motion pages on seconds or frames at the export rate	Mod 页面按拍或 Hz 运行；Motion 页面按导出帧率的秒或帧运行
+Motion easings	运动缓动
+Motion group	运动组
+Move a CC to record it; Esc stops	移动一个 CC 即可录制；Esc 停止
+Move the selected points, or every point, onto the grid	将所选点（或所有点）移到网格上
+New curve	新建曲线
+Next CC moved	下一个被移动的 CC
+Next knob clicked	下一个被点击的旋钮
+No curve yet	暂无曲线
+Nothing wired	未连接
+Pen (P)	钢笔 (P)
+Per voice	每个声部
+Point	点
+Position, Rotation or Scale make X, Y and Z pages bound to the selected node	Position、Rotation 或 Scale 会创建绑定到所选节点的 X、Y、Z 页面
+Properties	属性
+Pulses	脉冲
+Quantise Points	量化点
+Quantise to Grid	量化到网格
+Record	录制
+Record %s: %s	录制 %s：%s
+Record a take from a CC, a knob or the trig input into the page; Overwrite, Touch or Latch	将 CC、旋钮或 trig 输入的一次录制写入页面；Overwrite、Touch 或 Latch
+Record a take into this curve	将一次录制写入此曲线
+Recording: click to stop	正在录制：点击停止
+Remove target	移除目标
+Reopen Page	重新打开页面
+Replace the page with a shape, an easing or one of your saves; Mine saves this one	用形状、缓动或你保存的曲线替换页面；“我的”可保存当前曲线
+Save This Shape	保存此形状
+Segment Curve	线段曲线
+Select (A)	选择 (A)
+Select All Points	选择所有点
+Select every point	选择每个点
+Select, Hand, Pen, Draw, Line, Stamp, Bend, Eraser, Transform and Smooth, while the pointer is over the Curve Editor. Every key in this section needs the pointer there	选择、抓手、钢笔、绘制、直线、图章、弯曲、橡皮擦、变换和平滑，指针需位于曲线编辑器上。本节所有按键都要求指针在那里
+Shapes	形状
+Show Curve Editor	显示曲线编辑器
+Show or hide the docked Curve Editor; it opens the MSEG node selected on the canvas	显示或隐藏停靠的曲线编辑器；它会打开画布上选中的 MSEG 节点
+Show or hide the properties column; with Stamp, the next shape	显示或隐藏属性栏；使用图章时为下一个形状
+Show other curves	显示其他曲线
+Show the whole curve	显示整条曲线
+Smooth (M)	平滑 (M)
+Snap to grid (G)	吸附到网格 (G)
+Stamp (S); N cycles shapes	图章 (S)；N 切换形状
+Starts on the next bar	在下一小节开始
+Starts when the transport plays	走带播放时开始
+Steps	阶梯
+Take	录音段
+Targets	目标
+Thinning	精简
+Toggle snap to the grid; hold Alt to drag past it, Ctrl to snap the value to eighths	切换网格吸附；按住 Alt 可越过网格拖动，按住 Ctrl 将数值吸附到八分之一
+Transform (T): drag to scale selection around its centre	变换 (T)：拖动以围绕中心缩放所选内容
+Turn the formula into points you can edit	将公式转换为可编辑的点
+Up/down zooms time, left/right moves along it; Alt zooms the value	上/下缩放时间，左/右沿时间移动；Alt 缩放数值
+Voices	声部
+Wire a modulator into trig	将调制器连接到 trig
+Zoom / Pan Curve	缩放 / 平移曲线
+Zoom Value	缩放数值
+Zoom around the pointer, or pan; middle-drag also pans	以指针为中心缩放，或平移；中键拖动也可平移
+Zoom the value axis around the pointer	以指针为中心缩放数值轴
+param 	参数 
+trig input	trig 输入

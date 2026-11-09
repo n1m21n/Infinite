@@ -2827,3 +2827,109 @@ Infinite as VST3/AU	VST3/AU 版 Infinite
 Plugin	プラグイン
 Infinite as a VST3/AU plugin runs inside your DAW, with your patch saved in the project. The plugin is a one-time purchase for two computers, with updates for life. The standalone app stays free.	VST3/AU プラグインとしての Infinite は DAW の中で動き、パッチはプロジェクトに保存されます。プラグインは 2 台のコンピューター向けの買い切りで、アップデートは永久に無料です。単体アプリは無料のままです。
 Buy the plugin	プラグインを購入
+%d target	%d 個のターゲット
+%d targets	%d 個のターゲット
+A shape you draw, played over time. Click empty space to add a point, drag to move it, right-click to remove it; the small ring on a Bend segment bends it. time sets how one pass is counted (beats, a synced division, Hz, seconds or frames), speed scales it, and play repeats, plays once or ping-pongs; free run ignores the transport. The Curve Editor (Shift+E) edits the same points with pens, snap and quantise. With nothing patched to trig it follows the transport. A trig cable starts the shape on each rising edge: loop off plays it once and holds the last value; loop on repeats the part between loop start and loop end while trig stays high and plays on to the end when it drops. Loop start = loop end is a sustain point.	自分で描いた形を時間に沿って再生します。空白をクリックでポイント追加、ドラッグで移動、右クリックで削除。Bend セグメントの小さなリングでセグメントを曲げます。time は1周の数え方（拍、同期した分割、Hz、秒、フレーム）、speed はその倍率、play は繰り返し・1回のみ・ピンポンを選びます。free run はトランスポートを無視します。カーブエディタ（Shift+E）では同じポイントをペン、スナップ、クオンタイズで編集できます。trig に何も接続しなければトランスポートに追従します。trig にケーブルをつなぐと立ち上がりごとに形を開始します。loop オフでは1回再生して最後の値を保持し、loop オンでは trig が High の間 loop start から loop end の区間を繰り返し、Low になると最後まで再生します。loop start = loop end はサステインポイントです。
+Add Point	ポイントを追加
+Add a point; the Pen adds one on a single click and a drag pulls its handles	ポイントを追加します。ペンは1クリックで追加し、ドラッグでハンドルを引き出します
+After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops	Assign の後、キャンバス上のノブをクリックするとカーブで駆動します。Shift で続けて選択、Esc で終了
+Assign	アサイン
+Assign %s -> %s: %s	アサイン %s -> %s: %s
+Assign, then click a knob	アサインしてからノブをクリック
+Auto Clamped, Auto, Vector, Aligned or Free handles for the selected points	選択したポイントのハンドル：Auto Clamped、Auto、Vector、Aligned、Free
+Bake	ベイク
+Bend (B)	ベンド (B)
+Click a knob to drive it; Shift picks more, Esc stops	ノブをクリックして駆動します。Shift で追加選択、Esc で終了
+Click the knob to record; Esc stops	録音するノブをクリック。Esc で終了
+Click to pick again on the next take	クリックすると次のテイクで選び直します
+Close Curve Editor	カーブエディタを閉じる
+Close Page	ページを閉じる
+Constant, Linear, Bend, Bezier or Easing for the segments the selection starts (none selected: all)	選択範囲から始まるセグメントの補間：Constant、Linear、Bend、Bezier、Easing（未選択なら全部）
+Crop to Loop	ループに切り抜く
+Curve Editor	カーブエディタ
+Curve Editor Panel	カーブエディタパネル
+Curve Tools	カーブツール
+Curve editor - draw and shape MSEG curves (Shift+E)	カーブエディタ：MSEG カーブを描いて整える (Shift+E)
+Delete Curve	カーブを削除
+Delete Points	ポイントを削除
+Delete the selected points; the two ends stay	選択したポイントを削除します。両端は残ります
+Draw (D)	描画 (D)
+Draw here to make one	ここに描くと作成されます
+Easing	イージング
+End	終了
+Eraser (E)	消しゴム (E)
+FPS	FPS
+Fit Curve	カーブに合わせる
+Free run	フリーラン
+From	から
+Grid: snap and quantise (Q)	グリッド：スナップとクオンタイズ (Q)
+Hand (H)	ハンド (H)
+Handle Type	ハンドルタイプ
+Handles	ハンドル
+High	高
+Keep	保持
+Keep only the looped part; the length shrinks to it	ループ部分だけを残し、長さをそれに縮めます
+Line (L)	ライン (L)
+Loop only	ループのみ
+Low	低
+Mine	マイ
+Mod / Motion	Mod / モーション
+Mod pages run on beats or Hz; Motion pages on seconds or frames at the export rate	Mod ページは拍または Hz、Motion ページは書き出しレートの秒またはフレームで動作します
+Motion easings	モーションイージング
+Motion group	モーショングループ
+Move a CC to record it; Esc stops	CC を動かすと録音されます。Esc で終了
+Move the selected points, or every point, onto the grid	選択したポイント（なければ全ポイント）をグリッドに合わせます
+New curve	新しいカーブ
+Next CC moved	次に動かした CC
+Next knob clicked	次にクリックしたノブ
+No curve yet	カーブはまだありません
+Nothing wired	接続なし
+Pen (P)	ペン (P)
+Per voice	ボイスごと
+Point	ポイント
+Position, Rotation or Scale make X, Y and Z pages bound to the selected node	Position、Rotation、Scale は選択したノードに結び付いた X・Y・Z ページを作ります
+Properties	プロパティ
+Pulses	パルス
+Quantise Points	ポイントをクオンタイズ
+Quantise to Grid	グリッドにクオンタイズ
+Record	録音
+Record %s: %s	録音 %s：%s
+Record a take from a CC, a knob or the trig input into the page; Overwrite, Touch or Latch	CC・ノブ・trig 入力からのテイクをページに録音します。Overwrite、Touch、Latch
+Record a take into this curve	このカーブにテイクを録音
+Recording: click to stop	録音中：クリックで停止
+Remove target	ターゲットを削除
+Reopen Page	ページを再度開く
+Replace the page with a shape, an easing or one of your saves; Mine saves this one	ページをシェイプ、イージング、保存済みのものに置き換えます。マイに現在のカーブを保存
+Save This Shape	このシェイプを保存
+Segment Curve	セグメントカーブ
+Select (A)	選択 (A)
+Select All Points	すべてのポイントを選択
+Select every point	すべてのポイントを選択します
+Select, Hand, Pen, Draw, Line, Stamp, Bend, Eraser, Transform and Smooth, while the pointer is over the Curve Editor. Every key in this section needs the pointer there	選択、ハンド、ペン、描画、ライン、スタンプ、ベンド、消しゴム、変形、スムーズ。ポインタがカーブエディタ上にあるとき有効です。このセクションのキーはすべてポインタがそこにある必要があります
+Shapes	シェイプ
+Show Curve Editor	カーブエディタを表示
+Show or hide the docked Curve Editor; it opens the MSEG node selected on the canvas	ドッキングしたカーブエディタを表示/非表示にします。キャンバスで選択中の MSEG ノードを開きます
+Show or hide the properties column; with Stamp, the next shape	プロパティ列を表示/非表示にします。スタンプ使用時は次のシェイプ
+Show other curves	他のカーブを表示
+Show the whole curve	カーブ全体を表示
+Smooth (M)	スムーズ (M)
+Snap to grid (G)	グリッドにスナップ (G)
+Stamp (S); N cycles shapes	スタンプ (S)；N でシェイプを切替
+Starts on the next bar	次の小節で開始
+Starts when the transport plays	トランスポート再生時に開始
+Steps	ステップ
+Take	テイク
+Targets	ターゲット
+Thinning	間引き
+Toggle snap to the grid; hold Alt to drag past it, Ctrl to snap the value to eighths	グリッドへのスナップを切り替えます。Alt を押しながらドラッグでグリッドを無視、Ctrl で値を8分割にスナップ
+Transform (T): drag to scale selection around its centre	変形 (T)：ドラッグで選択範囲を中心から拡大縮小
+Turn the formula into points you can edit	数式を編集可能なポイントに変換します
+Up/down zooms time, left/right moves along it; Alt zooms the value	上下で時間をズーム、左右で移動。Alt で値をズーム
+Voices	ボイス
+Wire a modulator into trig	モジュレーターを trig に接続
+Zoom / Pan Curve	カーブのズーム / パン
+Zoom Value	値をズーム
+Zoom around the pointer, or pan; middle-drag also pans	ポインタ中心にズーム、またはパン。中ボタンドラッグでもパンできます
+Zoom the value axis around the pointer	ポインタ中心に値軸をズーム
+param 	パラメータ 
+trig input	trig 入力
