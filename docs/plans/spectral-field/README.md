@@ -353,12 +353,80 @@ latency.
 
 ---
 
-## 8. Methodology (after sign-off)
+## 8. Methodology
 
-## 9. Solution trajectories (after sign-off)
+```
+compiler (spectral host)  ->  engine (STFT host)  ->  node + card  ->  self-test  ->  build + regressions
+  830f93ba, a7f11eee          58ebf49d                48818f7c         40d1acbc       dev build, 4 suites
+```
 
-## 10. Benchmark against baseline (after build)
+- Engine first, outside the app: a scratch harness compiled the engine and
+  compiler alone, so the DSP was proven (identity -138 dB) before any UI.
+- Then the node, mirroring Field Effect: same program swap, mailbox,
+  device file and pin reconcile, so nothing new on the threading side.
+- One headless test covers every section 7 row. It drives the real node
+  through `ProcessBlock`, not the engine.
+- CPU: the dev build is Debug (-O0), so the 3 % bar is checked under
+  `NDEBUG` only. The optimised figure comes from the -O2 harness on the same
+  engine path.
 
-## 11. Critique (after build)
+## 9. Solution trajectories
 
-## 12. Next steps (after build)
+| Decision | Taken | Why |
+|---|---|---|
+| Synthesis | raw when the kernel writes `phase`, else vocoder with identity phase locking | mag-only kernels reconstruct exactly; pitch and shift kernels keep partials coherent |
+| Unchanged bins | keep analysis phase when `freq` is left equal | identity in vocoder mode at -138 dB, not a resynth approximation |
+| Program swap | engine `ProgramSwapped()` flag | a reused allocation address could otherwise skip the state re-map |
+| Bin input | one, `input bin audio B`, `B.mag/phase/freq` and `.at(k)` | cross-synthesis needs one; more pins would be card clutter |
+| Mix | dry ring delayed by the latency | wet and dry stay aligned at every Size |
+| Gate metric | noise leak (output minus the same gate on the sine alone) | output minus the raw sine also counts the gate trimming the sine's own Hann skirt (-62 dBFS), which a spectral gate does by design |
+
+## 10. Benchmark against baseline
+
+`INFINITE_SPECTRALFIELDTEST`: OK, 0 failures.
+
+| # | Check | Result | Bar |
+|---|---|---|---|
+| 0 | identity raw, 512 / 2048 / 8192 | -139.0 / -138.6 / -138.2 dB | -90 dB |
+| 0b | identity vocoder, same sizes | -139.0 / -138.6 / -138.2 dB | -90 dB |
+| 1 | low-pass 2 kHz, band >= 2.5 kHz | -128.8 dB | -60 dB |
+| 2 | gate -40 dB, noise leak | -83.3 dBFS | -80 dB |
+| 3 | freeze, frame-to-frame | 0.10 dB max over 184 frames, 440.0 Hz | 0.5 dB, 440 Hz |
+| 4 | octave up | 880.0 Hz, 440 Hz at -105 dB | 880 Hz, -40 dB |
+| 5 | shift +200 | 1200.0 Hz | 1200 Hz |
+| 6 | flip centroid | 23612 vs 23669 Hz (0.2 %) | 5 % |
+| 7 | robot autocorr at hop / whisper flatness | 1.000 / x5647 | 0.8 / x3 |
+| 8 | cross-synth envelope r / pitch | 0.992 / 220.2 Hz | 0.9 / 220 +-3 % |
+| | Mix 0, Size latency, bad compile, allocation | exact dry, 2048 -> 8192, unchanged, 0 bytes | |
+
+CPU, stereo, per 512-sample block (10.67 ms), optimised:
+
+| Preset | 2048 | 8192 |
+|---|---|---|
+| Low-pass | 2.31 % | 2.06 % |
+| Gate | 2.01 % | 2.11 % |
+| Freeze | 1.94 % | 2.10 % |
+| Octave up | 2.10 % | 2.23 % |
+| Freq shift | 2.02 % | 2.19 % |
+| Flip | 2.17 % | 2.31 % |
+| Robot / whisper | 1.73 % | 1.88 % |
+| Cross-synth | 2.53 % | 2.71 % |
+
+Regressions: `INFINITE_FIELDTEST`, `INFINITE_DSPTEST`, `INFINITE_FIELDSAMPLETEST` OK.
+
+## 11. Critique
+
+- Cost is per sample, not per frame: 8192 costs about the same as 2048.
+  The interpreter runs bins x 4 per hop, so the kernel dominates, not the FFT.
+- The 3 % bar holds with little headroom (2.3 %) on a loaded 8 GB machine.
+- The gate row as first written measured the wrong thing; the leak metric
+  is the one that says whether noise gets through.
+- No in-app check of the card yet; verified by code and the headless test.
+- Help text is English only; the five language tables fall back to it.
+
+## 12. Next steps
+
+1. Rebase onto main (`git rebase --onto main fix/timeline-loop-bar1-rewind feat/spectral-field`) once that branch merges or is dropped.
+2. Release build, `scripts/deploy_desktop.sh`, owner checks the card and the editor.
+3. Audio sweeps for xruns with the node in a patch.
+4. Library panel entries for the eight presets, as Field Effect has.
