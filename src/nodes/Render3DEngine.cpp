@@ -4,6 +4,7 @@
 // only when the engine itself is unavailable - the unsupported features are simply not drawn.
 #include "Geometry3DNodes.h"
 #include "SceneNodes.h"
+#include "Transport.h"
 
 #include "gl3.h"
 #include "engine/Scene.h"
@@ -167,10 +168,11 @@ bool Render3DNode::CookEngine(int frameId)
       if ((int)fr.lights.size() >= engine::kMaxLights)
          return;
       engine::Light e;
-      e.type = (engine::LightType)std::max(0, std::min(l.type, 4));
+      e.type = (engine::LightType)std::max(0, std::min(l.type, 5));
       std::memcpy(e.vec, l.vec, 12); std::memcpy(e.aim, l.aim, 12); std::memcpy(e.colorSrgb, l.color, 12);
       e.intensity = l.intensity; e.falloff = l.falloff; e.spotAngleDeg = l.spotAngle; e.spotPenumbra = l.spotPenumbra;
       e.diffuse = l.diffuse; e.specular = l.specular; e.cutoff = l.cutoff;
+      e.areaW = std::max(0.001f, l.areaW); e.areaH = std::max(0.001f, l.areaH);
       fr.lights.push_back(e);
    };
    if (rig != nullptr && rig->hasLights)
@@ -236,7 +238,28 @@ bool Render3DNode::CookEngine(int frameId)
    const bool changed = hsh != E.sceneHash;
    E.sceneHash = hsh;
    bool traced = false;
-   if ((liveEngineFeatures & 8) != 0 && !changed)
+   const bool offline = Transport::Instance().IsOfflineMode();
+   if (offline && (liveEngineFeatures & 8) != 0)
+   {
+      // Export / --frame: every frame is the settled picture, traced in full before it is handed on.
+      const int target = std::clamp(ptSamples, 1, 4096), bounces = std::clamp(ptBounces, 1, 16);
+      traced = true;
+      for (int done = 0; done < target && traced; done += 16)
+         traced = E.raster->PathTrace(*E.img, fr, std::min(16, target - done), bounces, done == 0, nullptr);
+      E.settled = traced ? target : 0;
+   }
+   else if (offline)
+   {
+      // Live look on export: let the temporal GI / reflection history converge as it would on a held frame.
+      const int warm = (fr.gi || fr.rtReflections) ? 48 : 0;
+      for (int i = 0; i < warm; i++)
+      {
+         if (!E.raster->Render(*E.img, fr, nullptr))
+            return false;
+         fr.frameIndex = ++E.frame;
+      }
+   }
+   else if ((liveEngineFeatures & 8) != 0 && !changed)
    {
       const int target = std::clamp(ptSamples, 1, 4096);
       if (E.settled >= target)

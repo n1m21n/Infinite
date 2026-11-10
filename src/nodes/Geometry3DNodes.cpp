@@ -2077,7 +2077,11 @@ void Render3DNode::CookIfNeeded(int frameId)
    }
    else if (mPathTrace != nullptr)
       ReleasePathTrace();
-   static const bool sEngineEnv = std::getenv("INFINITE_LIVE_ENGINE") != nullptr; // owner opt-in until the face toggle is approved
+   // Owner opt-in until the face toggle is approved; a number 2..15 also sets liveEngineFeatures (1 = defaults).
+   static const char* sEngineEnvValue = std::getenv("INFINITE_LIVE_ENGINE");
+   static const bool sEngineEnv = sEngineEnvValue != nullptr;
+   if (sEngineEnv && std::atoi(sEngineEnvValue) > 1)
+      liveEngineFeatures = std::atoi(sEngineEnvValue) & 15;
    if ((liveEngine || sEngineEnv) && renderPass == 0 && mFaceOverride < 0 && !SolidActive() && CookEngine(frameId))
       return;
    // Supersampling only ever adds passes on an offline render; a live cook is

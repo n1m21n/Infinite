@@ -36,7 +36,7 @@ namespace engine
       size_t Count() const { return models.size() / 16; }
    };
 
-   enum class LightType { Directional = 0, Point = 1, Sun = 2, Ambient = 3, Spot = 4 };
+   enum class LightType { Directional = 0, Point = 1, Sun = 2, Ambient = 3, Spot = 4, Area = 5 };
 
    struct Light
    {
@@ -46,6 +46,7 @@ namespace engine
       float colorSrgb[3] = { 1, 1, 1 };
       float intensity = 1.0f;
       float spotAngleDeg = 45.0f, spotPenumbra = 0.2f;
+      float areaW = 1.0f, areaH = 1.0f; // area: a rectangle facing aim; traced as one, lit live from its centre
       float diffuse = 1.0f, specular = 1.0f;
       float falloff = 1.0f; // k of 1 / (1 + d^2 k); negative = inverse square
       float cutoff = 0.0f;  // 0 = none

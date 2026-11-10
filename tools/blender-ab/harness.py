@@ -226,7 +226,8 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
         "  c envGround %g %g %g" % tuple(sky), "  f envIntensity %g" % max(peak, 1.0),
         "  c ambient %g %g %g" % tuple(srgb([1 / 3] * 3)), "  f rim 0", "  f lightIntensity 0",
         "  c bg %g %g %g" % tuple(sky)] + (
-        ["  i engine 1", "  i ptSamples %d" % pt_samples, "  i ptBounces %d" % pt_bounces] if engine == "pt" else []))
+        ["  i engine 1", "  i ptSamples %d" % pt_samples, "  i ptBounces %d" % pt_bounces] if engine == "pt" else
+        ["  i ptSamples %d" % pt_samples, "  i ptBounces %d" % pt_bounces] if engine == "settle" else []))
     out = node("Utility", "Output", [])
     for j, g in enumerate(geos):
         wires.append("geo %d %d %d" % (render, j, g))
@@ -411,8 +412,9 @@ def main():
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--ao", action="store_true", help="also run the AO bake A/B (ab.py --gen)")
     ap.add_argument("--list", action="store_true")
-    ap.add_argument("--engine", choices=("raster", "pt"), default="raster",
-                    help="pt renders with Render 3D's path tracer; its files, board and baseline carry _pt")
+    ap.add_argument("--engine", choices=("raster", "pt", "live", "settle"), default="raster",
+                    help="pt: Render 3D's GL path tracer; live: the Metal engine's live picture (RT shadows, "
+                         "reflections, GI); settle: the Metal engine's path tracer. Files and baselines carry _<engine>")
     ap.add_argument("--pt-samples", type=int, default=256)
     ap.add_argument("--pt-bounces", type=int, default=8)
     a = ap.parse_args()
@@ -421,7 +423,10 @@ def main():
             print("%-12s %d objects, %d lights, %s" % (k, len(v["objects"]), len(v.get("lights", [])), v.get("view", "Standard")))
         return 0
     names = a.cases or list(CASES)
-    sfx = "_pt" if a.engine == "pt" else ""
+    sfx = "" if a.engine == "raster" else "_" + a.engine
+    if a.engine in ("live", "settle"):
+        # Render 3D's liveEngineFeatures: 7 = RT shadows + reflections + GI, 15 = also settle (path trace).
+        os.environ["INFINITE_LIVE_ENGINE"] = "7" if a.engine == "live" else "15"
     base = json.load(open(BASELINE)) if os.path.exists(BASELINE) else {}
     rows = []
     os.environ.setdefault("DEER_GLB", os.path.expanduser("~/Downloads/Assets/deer.glb"))

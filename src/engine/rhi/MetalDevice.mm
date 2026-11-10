@@ -33,7 +33,7 @@ fragment float4 tri_fs(VOut in [[stage_in]], constant float3& c [[buffer(0)]]) {
 #include <metal_raytracing>
 using namespace metal;
 using namespace metal::raytracing;
-struct LightU { float4 vec; float4 aim; float4 color; float4 terms; float4 spot; }; // terms: diffuse, specular, falloff, cutoff
+struct LightU { float4 vec; float4 aim; float4 color; float4 terms; float4 spot; }; // terms: diffuse, specular, falloff, cutoff; spot: angle, penumbra, area w, h
 struct FrameU
 {
    float4x4 viewProj;
@@ -132,7 +132,7 @@ float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas,
       const int type = int(L.vec.w);
       if (type == 3) { diff += L.color.xyz * L.terms.x; continue; }
       float3 ld; float atten = 1.0;
-      if (type == 1 || type == 4)
+      if (type == 1 || type == 4 || type == 5)
       {
          const float3 tl = L.vec.xyz - p; const float dist = length(tl);
          ld = tl / max(dist, 1e-4);
@@ -144,11 +144,12 @@ float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas,
             const float cosOuter = cos(L.spot.x * 0.017453292);
             atten *= cosCur > cosOuter ? 1.0 : 0.0;
          }
+         if (type == 5) atten *= max(dot(-ld, L.aim.xyz), 0.0);
       }
       else ld = normalize(L.vec.xyz);
       if (atten > 0.0 && !giMode)
       {
-         const float tm = (type == 1 || type == 4) ? max(length(L.vec.xyz - p) - 0.01, 0.0) : 1e4;
+         const float tm = (type == 1 || type == 4 || type == 5) ? max(length(L.vec.xyz - p) - 0.01, 0.0) : 1e4;
          if (occluded(tlas, p + n * f.shQ.w, ld, tm)) atten *= (1.0 - f.shP.w);
       }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x;
@@ -192,7 +193,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float3 radiance0 = L.color.xyz; // linear * intensity
       if (type == 3) { col += base * (1.0 - metal) * radiance0 * L.terms.x; continue; }
       float3 lightDir; float atten = 1.0;
-      if (type == 1 || type == 4)
+      if (type == 1 || type == 4 || type == 5)
       {
          const float3 toLight = L.vec.xyz - in.wp;
          const float dist = length(toLight);
@@ -208,6 +209,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
+         if (type == 5) atten *= max(dot(-lightDir, L.aim.xyz), 0.0);
       }
       else lightDir = normalize(L.vec.xyz);
       const float3 halfway = normalize(lightDir + viewDir);
@@ -226,7 +228,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       float shadow = (f.shP.x > 0.5 && i == int(f.shP.y)) ? shadowFactor(f, sm, in.wp, n, lightDir) : 1.0;
       if ((int(f.shQ.z + 0.5) & 1) != 0)
       {
-         const float tmax = (type == 1 || type == 4) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
+         const float tmax = (type == 1 || type == 4 || type == 5) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
          if (occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, tmax)) shadow = 1.0 - f.shP.w;
       }
       col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow;
@@ -324,6 +326,40 @@ float3 ggxSampleH(float3 n, float a, float u1, float u2)
    const float3 t = normalize(cross(up, n)); const float3 b = cross(n, t);
    return normalize(t * (sinT * cos(phi)) + b * (sinT * sin(phi)) + n * cosT);
 }
+// The path tracer's BSDF, ported from Render 3D's GL tracer (evalOpaqueTerms, lobeProbs) so the two agree:
+// height-correlated Smith visibility, Fresnel at the half vector, diffuse takes what the specular leaves.
+float ptS5(float c) { const float m = clamp(1.0 - c, 0.0, 1.0), m2 = m * m; return m2 * m2 * m; }
+float ptVis(float nV, float nL, float a)
+{
+   const float a2 = a * a;
+   const float gV = nL * sqrt(a2 + (1.0 - a2) * nV * nV), gL = nV * sqrt(a2 + (1.0 - a2) * nL * nL);
+   return 0.5 / max(gV + gL, 1e-7);
+}
+float ptD(float nH, float a) { const float a2 = a * a, d = nH * nH * (a2 - 1.0) + 1.0; return a2 / max(3.14159265 * d * d, 1e-7); }
+float2 ptProbs(float3 f0, float metal, float nV)
+{
+   const float f0s = max(f0.x, max(f0.y, f0.z)), fV = f0s + (1.0 - f0s) * ptS5(nV);
+   float spec = mix(fV, 1.0, metal);
+   const float diff = (1.0 - metal) * (1.0 - fV);
+   spec = max(spec, 0.05 * (spec + diff));
+   return float2(spec, diff) / max(spec + diff, 1e-6);
+}
+// f(V, L) * cos(L), and the pdf of drawing L by ptProbs. w: a light's diffuse and specular terms.
+float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, thread float& pdf)
+{
+   const float nL = dot(n, L);
+   if (nL <= 1e-6) { pdf = 0.0; return float3(0.0); }
+   const float nV = max(dot(n, V), 1e-4);
+   const float3 H = normalize(V + L);
+   const float nH = max(dot(n, H), 0.0), vH = max(dot(V, H), 1e-4);
+   const float a = max(0.002, rough * rough);
+   const float D = ptD(nH, a);
+   const float3 F = f0 + (float3(1.0) - f0) * ptS5(vH);
+   const float3 fr = D * ptVis(nV, nL, a) * F * w.y + (float3(1.0) - F) * (1.0 - metal) * base * (w.x / 3.14159265);
+   const float2 p = ptProbs(f0, metal, nV);
+   pdf = p.x * D * nH / max(4.0 * vH, 1e-6) + p.y * nL / 3.14159265;
+   return fr * nL;
+}
 fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], texture2d<float> prev [[texture(0)]])
 {
@@ -335,7 +371,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
    float3 o = f.eye.xyz;
    float3 d = normalize(pw.xyz / pw.w - o);
    float3 L = float3(0.0), T = float3(1.0);
-   float cov = 0.0; bool specBounce = true;
+   float cov = 0.0;
    const int maxB = int(u.info.y);
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
@@ -345,7 +381,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       intersection_result<triangle_data, instancing> h = it.intersect(r, rtArgs.tlas);
       if (h.type != intersection_type::triangle)
       {
-         if (b > 0) L += T * (specBounce ? sampleEnv(f, d, 0.0) : sampleEnv(f, d, 1.0) * f.ambient.xyz * 3.0);
+         if (b > 0) L += T * sampleEnv(f, d, 0.0); // the sky itself, as the GL tracer; the cosine is in the sampling
          break;
       }
       if (b == 0) cov = 1.0;
@@ -375,9 +411,18 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
          if (type == 3) continue; // ambient arrives through the bounces
          const float lw = float(count);
          float3 ld; float atten = 1.0; float tmax = 1e4;
-         if (type == 1 || type == 4)
+         if (type == 1 || type == 4 || type == 5)
          {
-            const float3 tl = Lt.vec.xyz - p; const float dist = length(tl);
+            float3 lp = Lt.vec.xyz;
+            if (type == 5)
+            {
+               // Area: a uniform point on the rectangle (Render 3D's basis), cosine at the light below.
+               float3 rgt = cross(float3(0.0, 1.0, 0.0), Lt.aim.xyz);
+               rgt = dot(rgt, rgt) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(rgt);
+               const float3 upv = cross(Lt.aim.xyz, rgt);
+               lp += rgt * ((rnd(seed) - 0.5) * Lt.spot.z) + upv * ((rnd(seed) - 0.5) * Lt.spot.w);
+            }
+            const float3 tl = lp - p; const float dist = length(tl);
             ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
             atten = lightFalloff(dist, Lt.terms.z);
             if (Lt.terms.w > 0.0 && dist > Lt.terms.w) atten = 0.0;
@@ -389,42 +434,24 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
                if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
                atten *= sa;
             }
+            if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
          }
          else ld = normalize(Lt.vec.xyz);
-         float nDotL = max(dot(n, ld), 0.0);
-         if (type == 2) nDotL = max((dot(n, ld) + 0.35) / 1.35, 0.0);
-         if (nDotL <= 0.0 || atten <= 0.0) continue;
+         if (dot(n, ld) <= 1e-5 || atten <= 0.0) continue;
          if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) continue;
-         const float3 hv = normalize(ld + V);
-         const float nDotH = max(dot(n, hv), 0.0);
-         const float g = geomSchlick(nDotV, rough) * geomSchlick(nDotL, rough);
-         const float3 fr = fresnel(max(dot(hv, V), 0.0), f0);
-         const float3 spec = (distGGX(nDotH, rough) * g * fr) / max(4.0 * nDotV * nDotL, 1e-7);
-         const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
-         L += T * (kD * base / 3.14159265 * Lt.terms.x + spec * Lt.terms.y) * Lt.color.xyz * atten * nDotL * lw;
+         float pdfL = 0.0;
+         L += T * ptEval(n, V, ld, base, metal, rough, f0, Lt.terms.xy, pdfL) * Lt.color.xyz * atten * lw;
       }
-      // next direction
-      const float3 F = fresnel(nDotV, f0);
-      const float ps = metal > 0.99 ? 1.0 : clamp(mix(dot(F, float3(0.3333)), 1.0, metal), 0.1, 0.9);
+      // next direction: one lobe picked by Render 3D's lobe weights, weighted by the full BSDF over the mixture pdf
+      const float2 lp = ptProbs(f0, metal, nDotV);
+      const float a = max(0.002, rough * rough);
       float3 nd;
-      if (rnd(seed) < ps)
-      {
-         const float a = rough * rough;
-         const float3 hv = ggxSampleH(n, a, rnd(seed), rnd(seed));
-         nd = reflect(d, hv);
-         const float nDotL = dot(n, nd);
-         if (nDotL <= 1e-4) break;
-         const float vDotH = max(dot(V, hv), 1e-4), nDotH = max(dot(n, hv), 1e-4);
-         const float g = geomSchlick(nDotV, rough) * geomSchlick(nDotL, rough);
-         T *= fresnel(vDotH, f0) * g * vDotH / (nDotV * nDotH) / ps;
-         specBounce = true;
-      }
-      else
-      {
-         nd = cosineDir(n, rnd(seed), rnd(seed));
-         T *= (float3(1.0) - F) * (1.0 - metal) * base / (1.0 - ps);
-         specBounce = false;
-      }
+      if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); }
+      else { nd = cosineDir(n, rnd(seed), rnd(seed)); }
+      float pdfB = 0.0;
+      const float3 fB = ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
+      if (pdfB <= 1e-6) break;
+      T *= fB / pdfB;
       if (b >= 2)
       {
          const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
@@ -486,7 +513,7 @@ fragment float4 rp_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], co
    {
       const LightU L = f.lights[0];
       const int type = int(L.vec.w);
-      ld = (type == 1 || type == 4) ? normalize(L.vec.xyz - in.wp) : normalize(L.vec.xyz);
+      ld = (type == 1 || type == 4 || type == 5) ? normalize(L.vec.xyz - in.wp) : normalize(L.vec.xyz);
       lc = L.color.xyz * L.terms.x;
    }
    float3 c = m.base.xyz * (f.ambient.xyz * 1.4 + lc * max(dot(n, ld), 0.0)) * f.params.x;
@@ -761,7 +788,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             std::memcpy(o.aim, l.aim, 12);
             Lin3(l.colorSrgb, o.color, l.intensity);
             o.terms[0] = l.diffuse; o.terms[1] = l.specular; o.terms[2] = l.falloff; o.terms[3] = l.cutoff;
-            o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra;
+            o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
          }
 
       }
@@ -1134,7 +1161,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       bool ShadowPass(id<MTLCommandBuffer> cb, const engine::Frame& fr, FrameU& f)
       {
          const engine::Shadow& sh = fr.shadow;
-         if (!sh.enabled || fr.lights.empty() || fr.lights[0].type == engine::LightType::Point ||
+         if (!sh.enabled || fr.lights.empty() || fr.lights[0].type == engine::LightType::Point || fr.lights[0].type == engine::LightType::Area ||
              fr.lights[0].type == engine::LightType::Ambient || !EnsureShadowTex(sh.size))
             return false;
          float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
