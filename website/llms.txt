@@ -265,6 +265,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Neo-Classical Chamber Strings Cello Synth](https://infinitedevices.org/library/neo-classical-chamber-strings-cello-synth.html): Expressive neo-classical solo cello synthesizer with slow bow attack envelope, warm resonant formant filtering, subtle vibrato modulation, and rich acoustic string undertones. (file: https://infinitedevices.org/assets/templates/neo-classical-chamber-strings-cello-synth.inf)
 - [Ambient Piano Cloud Reverb Diffusion FX](https://infinitedevices.org/library/ambient-piano-cloud-reverb-diffusion-fx.html): Lush ambient space reverberator featuring multi-stage allpass diffusion network, soft tape saturation in the feedback path, and gentle high-cut air damping. (file: https://infinitedevices.org/assets/templates/ambient-piano-cloud-reverb-diffusion-fx.inf)
 - [Ambient Piano Tape Flutter Delay FX](https://infinitedevices.org/library/ambient-piano-tape-flutter-delay-fx.html): Warm vintage magnetic tape delay with slow capstan wow-and-flutter pitch modulation, resonant tone damping, and decaying tape saturation. (file: https://infinitedevices.org/assets/templates/ambient-piano-tape-flutter-delay-fx.inf)
+- [Solo Piano Acoustic Hammer Felt Synth](https://infinitedevices.org/library/solo-piano-acoustic-hammer-felt-synth.html): Intimate solo acoustic felt piano synthesizer with dynamic hammer strike velocity, dual detuned acoustic string harmonics, warm soundboard wooden resonance, and delicate felt damping decay. (file: https://infinitedevices.org/assets/templates/solo-piano-acoustic-hammer-felt-synth.inf)
+- [Solo Piano Sympathetic Soundboard Resonance Synth](https://infinitedevices.org/library/solo-piano-sympathetic-soundboard-resonance-synth.html): Expressive acoustic solo piano synthesizer featuring sympathetic string resonance modeling, harmonic damper release envelope, warm wooden soundboard acoustic body filtering, and natural dynamic strike response. (file: https://infinitedevices.org/assets/templates/solo-piano-sympathetic-soundboard-resonance-synth.inf)
+- [Dark Ambient Subterranean Drone Resonator FX](https://infinitedevices.org/library/dark-ambient-subterranean-drone-resonator-fx.html): Subterranean dark ambient drone resonator with dual tuned low-frequency feedback combs, cavernous body resonance, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/dark-ambient-subterranean-drone-resonator-fx.inf)
+- [Dark Ambient Abyssal Space Diffusion Delay FX](https://infinitedevices.org/library/dark-ambient-abyssal-space-diffusion-delay-fx.html): Abyssal dark ambient space diffusion reverberator featuring multi-stage allpass delay network, dark spectral air damping, and decaying cavernous reflections. (file: https://infinitedevices.org/assets/templates/dark-ambient-abyssal-space-diffusion-delay-fx.inf)
 
 ## Library: Community
 
@@ -625,7 +629,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 99 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 101 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -642,4 +646,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 84 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 86 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

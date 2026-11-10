@@ -143,6 +143,8 @@
   <url><loc>https://infinitedevices.org/embeds/generative-plotter-concentric-isotonic.html</loc><lastmod>2026-11-10</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/retro-surreal-celestial-portal-matrix.html</loc><lastmod>2026-11-10</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/retro-surreal-astronomical-clockwork-horizon.html</loc><lastmod>2026-11-10</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/bauhaus-geometry-constructivist-orbital-harmony.html</loc><lastmod>2026-11-10</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/bauhaus-geometry-kinetic-quadrant-tessellation.html</loc><lastmod>2026-11-10</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-10</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-10</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-10</lastmod><priority>0.7</priority></url>
@@ -300,6 +302,10 @@
   <url><loc>https://infinitedevices.org/library/neo-classical-chamber-strings-cello-synth.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ambient-piano-cloud-reverb-diffusion-fx.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ambient-piano-tape-flutter-delay-fx.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/solo-piano-acoustic-hammer-felt-synth.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/solo-piano-sympathetic-soundboard-resonance-synth.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dark-ambient-subterranean-drone-resonator-fx.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dark-ambient-abyssal-space-diffusion-delay-fx.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
@@ -804,6 +810,16 @@
   <url><loc>https://infinitedevices.org/library/ambient-piano-tape-flutter-delay-fx.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/retro-surreal-celestial-portal-matrix.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/retro-surreal-astronomical-clockwork-horizon.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-plate-nodal-resonance.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-standing-wave-radial-ripples.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neo-brutalist-cantilever-monolith-bastion-3d.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neo-brutalist-stepped-colonnade-plinth-3d.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/solo-piano-acoustic-hammer-felt-synth.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/solo-piano-sympathetic-soundboard-resonance-synth.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dark-ambient-subterranean-drone-resonator-fx.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dark-ambient-abyssal-space-diffusion-delay-fx.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bauhaus-geometry-constructivist-orbital-harmony.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bauhaus-geometry-kinetic-quadrant-tessellation.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-10</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-10</lastmod><priority>0.5</priority></url>

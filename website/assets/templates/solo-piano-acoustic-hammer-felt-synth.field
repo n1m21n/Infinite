@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Solo Piano Acoustic Hammer Felt Synth",
+    "author": "Infinite",
+    "description": "Intimate solo acoustic felt piano synthesizer with dynamic hammer strike velocity, dual detuned acoustic string harmonics, warm soundboard wooden resonance, and delicate felt damping decay.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.52 [0.1, 1.0]\nparam float resonance = 0.28 [0.1, 0.85]\nparam float hammer = 0.42 [0.0, 1.0]\nparam float decayTime = 0.65 [0.1, 2.0]\nparam float feltDamp = 0.48 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float env = 0\nstate float strikeEnv = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.95, env - env * decayRate)\n\nstrikeRate = clamp(1.0 / (sr * 0.012), 0.001, 0.2)\nstrikeEnv = if(target > strikeEnv, strikeEnv + (target - strikeEnv) * 0.98, strikeEnv - strikeEnv * strikeRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\ntri = abs(p1 * 2.0 - 1.0) * 2.0 - 1.0\n\np2 = (p2 + dp * 2.003) % 1.0\nh2 = (p2 * 2.0 - 1.0) * 0.30 * hammer\n\nhammerImpulse = strikeEnv * hammer * 0.6\nsig = (tri * 0.72 + h2 * 0.38 + hammerImpulse * tri) * 1.15\n\nfNorm = clamp(cutoff * 0.17 + env * (1.0 - feltDamp * 0.55) * 0.24, 0.015, 0.44)\nkRes = clamp(resonance * 1.45, 0.1, 1.75)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.35))) * env\nout = sat * 0.54\n",
+    "params": {
+      "cutoff": 0.52,
+      "resonance": 0.28,
+      "hammer": 0.42,
+      "decayTime": 0.65,
+      "feltDamp": 0.48
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dark Ambient Abyssal Space Diffusion Delay FX",
+    "author": "Infinite",
+    "description": "Abyssal dark ambient space diffusion reverberator featuring multi-stage allpass delay network, dark spectral air damping, and decaying cavernous reflections.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float decay = 0.58 [0.1, 0.92]\nparam float tone = 0.42 [0.1, 1.0]\nparam float size = 0.65 [0.1, 1.0]\nparam float diffusion = 0.50 [0.0, 1.0]\nparam float mix = 0.55 [0.0, 1.0]\nstate float a1 = 0\nstate float a2 = 0\nstate float a3 = 0\nstate float a4 = 0\nstate float lp = 0\n\nfTone = clamp(0.04 + tone * 0.32, 0.015, 0.42)\nlp = lp + fTone * (in - lp)\n\nkDiff = clamp(0.10 * (1.0 + size * 0.85), 0.03, 0.36)\nkDecay = clamp(decay * 0.84, 0.1, 0.88)\n\na1 = a1 + kDiff * (lp + a4 * kDecay - a1)\na2 = a2 + kDiff * 0.82 * (a1 - a2)\na3 = a3 + kDiff * 0.70 * (a2 - a3)\na4 = a4 + kDiff * 0.60 * (a3 - a4)\n\ndiffSig = (a2 * 0.55 + a3 * 0.45 + a4 * 0.75) * (1.0 + diffusion * 0.5)\nsat = diffSig / (1.0 + abs(diffSig * 0.28))\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 0.72\n",
+    "params": {
+      "decay": 0.58,
+      "tone": 0.42,
+      "size": 0.65,
+      "diffusion": 0.5,
+      "mix": 0.55
+    }
+  }
+}

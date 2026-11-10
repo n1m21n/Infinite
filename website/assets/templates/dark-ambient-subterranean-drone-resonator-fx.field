@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dark Ambient Subterranean Drone Resonator FX",
+    "author": "Infinite",
+    "description": "Subterranean dark ambient drone resonator with dual tuned low-frequency feedback combs, cavernous body resonance, and warm analog saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float depth = 0.60 [0.1, 1.0]\nparam float tone = 0.44 [0.1, 1.0]\nparam float feedback = 0.52 [0.0, 0.88]\nparam float subGain = 0.45 [0.0, 1.0]\nparam float mix = 0.55 [0.0, 1.0]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float lp = 0\n\nfTone = clamp(0.04 + tone * 0.30, 0.015, 0.40)\nkRate = clamp(0.08 * (1.0 + depth * 0.75), 0.02, 0.32)\n\ninSat = in / (1.0 + abs(in * 0.30))\nfbIn = inSat + d3 * feedback * 0.80\n\nlp = lp + fTone * (fbIn - lp)\n\nd1 = d1 + kRate * (lp - d1)\nd2 = d2 + kRate * 0.85 * (d1 - d2)\nd3 = d3 + kRate * 0.75 * (d2 - d3)\n\nsubDrone = (d2 * 0.65 + d3 * 0.55) * (1.0 + subGain * 0.7)\nsat = subDrone / (1.0 + abs(subDrone * 0.28))\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 0.70\n",
+    "params": {
+      "depth": 0.6,
+      "tone": 0.44,
+      "feedback": 0.52,
+      "subGain": 0.45,
+      "mix": 0.55
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Solo Piano Sympathetic Soundboard Resonance Synth",
+    "author": "Infinite",
+    "description": "Expressive acoustic solo piano synthesizer featuring sympathetic string resonance modeling, harmonic damper release envelope, warm wooden soundboard acoustic body filtering, and natural dynamic strike response.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.56 [0.1, 1.0]\nparam float resonance = 0.34 [0.1, 0.90]\nparam float soundboard = 0.50 [0.0, 1.0]\nparam float decayTime = 0.70 [0.1, 2.2]\nparam float harmonics = 0.38 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.96, env - env * decayRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\ntri = abs(p1 * 2.0 - 1.0) * 2.0 - 1.0\n\np2 = (p2 + dp * 1.002) % 1.0\nsubTri = abs(p2 * 2.0 - 1.0) * 2.0 - 1.0\n\np3 = (p3 + dp * 3.004) % 1.0\nsymp = (p3 * 2.0 - 1.0) * 0.25 * harmonics\n\nsig = (tri * 0.60 + subTri * 0.45 + symp * 0.35) * (1.0 + soundboard * 0.5)\n\nfNorm = clamp(cutoff * 0.16 + env * 0.25, 0.018, 0.44)\nkRes = clamp(resonance * 1.5, 0.1, 1.8)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * 0.38))) * env\nout = sat * 0.52\n",
+    "params": {
+      "cutoff": 0.56,
+      "resonance": 0.34,
+      "soundboard": 0.5,
+      "decayTime": 0.7,
+      "harmonics": 0.38
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

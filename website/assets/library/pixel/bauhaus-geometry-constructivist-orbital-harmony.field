@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bauhaus Geometry Constructivist Orbital Harmony",
+    "author": "Infinite",
+    "description": "Audio-reactive Bauhaus constructivist shader featuring rotating primary color quadrant disks, intersecting diagonal geometric axes, and concentric orbital ring harmonies pulsing to bass, mid, and high frequencies.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.28 [0.05, 1.0]\nparam float orbitScale = 0.55 [0.2, 1.0]\nparam float ringCount = 14.0 [6.0, 28.0]\nparam float geometryWarp = 0.40 [0.0, 1.0]\nparam float contrast = 1.15 [0.8, 1.6]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nrot = theta + time * 0.6\nrotP = vec2(r * cos(rot), r * sin(rot))\n\nquadrant = step(0.0, rotP.x) * 2.0 + step(0.0, rotP.y)\n\nwarp = sin(theta * 4.0 + time * 1.5) * cos(r * 8.0 - time) * geometryWarp * 0.18\nrings = sin((r + warp) * ringCount * 2.2)\nringLines = smoothstep(0.25, -0.25, abs(rings) - 0.26)\n\ncenterDisc = smoothstep(orbitScale * 0.45, orbitScale * 0.45 - 0.03, r)\n\ndiagAxis = abs(p.x + p.y * 0.6)\ndiagLine = smoothstep(0.035, 0.015, diagAxis) * step(r, 0.95)\n\ndiagAxis2 = abs(p.x - p.y * 1.2)\ndiagLine2 = smoothstep(0.025, 0.010, diagAxis2) * step(r, 0.85)\n\nouterCircle = smoothstep(orbitScale * 1.35, orbitScale * 1.35 - 0.03, r) * (1.0 - smoothstep(orbitScale * 1.30, orbitScale * 1.30 - 0.03, r))\n\ncCream = vec3(0.957, 0.937, 0.886)\ncRed = vec3(0.839, 0.157, 0.157)\ncNavy = vec3(0.114, 0.208, 0.341)\ncYellow = vec3(0.988, 0.749, 0.286)\ncBlack = vec3(0.067, 0.067, 0.067)\n\nquadColor = mix(cRed, cNavy, step(1.5, quadrant))\nquadColor = mix(quadColor, cYellow, step(2.5, quadrant))\n\ncol = mix(cCream, quadColor, ringLines * 0.85)\ncol = mix(col, cNavy, outerCircle * 0.9)\ncol = mix(col, cBlack, diagLine)\ncol = mix(col, cYellow, diagLine2 * 0.8)\ncol = mix(col, cRed, centerDisc)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.28,
+      "orbitScale": 0.55,
+      "ringCount": 14.0,
+      "geometryWarp": 0.4,
+      "contrast": 1.15
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

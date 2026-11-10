@@ -7774,6 +7774,216 @@
       "file": "assets/library/pixel/retro-surreal-astronomical-clockwork-horizon.field",
       "preview": "assets/library/previews/retro-surreal-astronomical-clockwork-horizon.jpg",
       "bytes": 2233
+    },
+    {
+      "id": "cymatics-sine-chladni-plate-nodal-resonance",
+      "name": "Cymatics Sine Chladni Plate Nodal Resonance",
+      "kind": "Generator",
+      "tags": [
+        "cymatics",
+        "chladni",
+        "nodal",
+        "resonance",
+        "sand",
+        "drawing"
+      ],
+      "description": "Procedural Chladni acoustic pattern rendering two-dimensional standing wave nodal curves on a resonant brass plate with fine sand grain stippling and harmonic interference rings.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/cymatics-sine-chladni-plate-nodal-resonance.js",
+      "preview": "assets/library/previews/cymatics-sine-chladni-plate-nodal-resonance.jpg",
+      "bytes": 3791
+    },
+    {
+      "id": "cymatics-sine-standing-wave-radial-ripples",
+      "name": "Cymatics Sine Standing Wave Radial Ripples",
+      "kind": "Generator",
+      "tags": [
+        "cymatics",
+        "standingwave",
+        "bessel",
+        "ripples",
+        "brass",
+        "drawing"
+      ],
+      "description": "Mathematical acoustic standing wave visualization computing two-dimensional Bessel radial interference patterns, hyperbolic saddle nodes, and circular brass plate boundary rings.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/cymatics-sine-standing-wave-radial-ripples.js",
+      "preview": "assets/library/previews/cymatics-sine-standing-wave-radial-ripples.jpg",
+      "bytes": 3436
+    },
+    {
+      "id": "neo-brutalist-cantilever-monolith-bastion-3d",
+      "name": "Neo-Brutalist Cantilever Monolith Bastion 3D",
+      "kind": "Generator",
+      "tags": [
+        "neobrutalist",
+        "monolith",
+        "bastion",
+        "cantilever",
+        "concrete",
+        "3d"
+      ],
+      "description": "Monumental three-dimensional neo-brutalist architectural sculpture featuring heavy cast concrete stepped plinths, cantilevered horizontal monolith slabs, terracotta structural accent beams, and deep shadow relief.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/neo-brutalist-cantilever-monolith-bastion-3d.js",
+      "preview": "assets/library/previews/neo-brutalist-cantilever-monolith-bastion-3d.jpg",
+      "bytes": 3643
+    },
+    {
+      "id": "neo-brutalist-stepped-colonnade-plinth-3d",
+      "name": "Neo-Brutalist Stepped Colonnade Plinth 3D",
+      "kind": "Generator",
+      "tags": [
+        "neobrutalist",
+        "colonnade",
+        "plinth",
+        "stepped",
+        "concrete",
+        "3d"
+      ],
+      "description": "Architectural three-dimensional neo-brutalist colonnade sculpture with interlocking stepped geometric pylons, raw cast concrete plinths, and cantilevered terrace slabs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/neo-brutalist-stepped-colonnade-plinth-3d.js",
+      "preview": "assets/library/previews/neo-brutalist-stepped-colonnade-plinth-3d.jpg",
+      "bytes": 3835
+    },
+    {
+      "id": "solo-piano-acoustic-hammer-felt-synth",
+      "name": "Solo Piano Acoustic Hammer Felt Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "piano",
+        "felt",
+        "acoustic",
+        "hammer",
+        "audio"
+      ],
+      "description": "Intimate solo acoustic felt piano synthesizer with dynamic hammer strike velocity, dual detuned acoustic string harmonics, warm soundboard wooden resonance, and delicate felt damping decay.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/solo-piano-acoustic-hammer-felt-synth.inf",
+      "preview": "assets/library/previews/solo-piano-acoustic-hammer-felt-synth.jpg",
+      "bytes": 2331
+    },
+    {
+      "id": "solo-piano-sympathetic-soundboard-resonance-synth",
+      "name": "Solo Piano Sympathetic Soundboard Resonance Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "piano",
+        "soundboard",
+        "resonance",
+        "sympathetic",
+        "audio"
+      ],
+      "description": "Expressive acoustic solo piano synthesizer featuring sympathetic string resonance modeling, harmonic damper release envelope, warm wooden soundboard acoustic body filtering, and natural dynamic strike response.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/solo-piano-sympathetic-soundboard-resonance-synth.inf",
+      "preview": "assets/library/previews/solo-piano-sympathetic-soundboard-resonance-synth.jpg",
+      "bytes": 2232
+    },
+    {
+      "id": "dark-ambient-subterranean-drone-resonator-fx",
+      "name": "Dark Ambient Subterranean Drone Resonator FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "ambient",
+        "drone",
+        "resonator",
+        "subterranean",
+        "audio"
+      ],
+      "description": "Subterranean dark ambient drone resonator with dual tuned low-frequency feedback combs, cavernous body resonance, and warm analog saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dark-ambient-subterranean-drone-resonator-fx.inf",
+      "preview": "assets/library/previews/dark-ambient-subterranean-drone-resonator-fx.jpg",
+      "bytes": 2007
+    },
+    {
+      "id": "dark-ambient-abyssal-space-diffusion-delay-fx",
+      "name": "Dark Ambient Abyssal Space Diffusion Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "ambient",
+        "reverb",
+        "delay",
+        "diffusion",
+        "audio"
+      ],
+      "description": "Abyssal dark ambient space diffusion reverberator featuring multi-stage allpass delay network, dark spectral air damping, and decaying cavernous reflections.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dark-ambient-abyssal-space-diffusion-delay-fx.inf",
+      "preview": "assets/library/previews/dark-ambient-abyssal-space-diffusion-delay-fx.jpg",
+      "bytes": 2066
+    },
+    {
+      "id": "bauhaus-geometry-constructivist-orbital-harmony",
+      "name": "Bauhaus Geometry Constructivist Orbital Harmony",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "bauhaus",
+        "constructivist",
+        "geometry",
+        "orbital",
+        "shader"
+      ],
+      "description": "Audio-reactive Bauhaus constructivist shader featuring rotating primary color quadrant disks, intersecting diagonal geometric axes, and concentric orbital ring harmonies pulsing to bass, mid, and high frequencies.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/bauhaus-geometry-constructivist-orbital-harmony.field",
+      "preview": "assets/library/previews/bauhaus-geometry-constructivist-orbital-harmony.jpg",
+      "bytes": 2261
+    },
+    {
+      "id": "bauhaus-geometry-kinetic-quadrant-tessellation",
+      "name": "Bauhaus Geometry Kinetic Quadrant Tessellation",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "bauhaus",
+        "tessellation",
+        "quadrant",
+        "kinetic",
+        "shader"
+      ],
+      "description": "Audio-reactive Bauhaus geometric tessellation shader with rhythmic primary color concentric arcs, kinetic quadrant dividers, and constructivist diagonal bars reacting to bass impact, mid-range harmonics, and high-frequency flares.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/bauhaus-geometry-kinetic-quadrant-tessellation.field",
+      "preview": "assets/library/previews/bauhaus-geometry-kinetic-quadrant-tessellation.jpg",
+      "bytes": 2116
     }
   ]
 }

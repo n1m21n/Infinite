@@ -2301,6 +2301,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "solo-piano-acoustic-hammer-felt-synth",
+      "name": "Solo Piano Acoustic Hammer Felt Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Intimate solo acoustic felt piano synthesizer with dynamic hammer strike velocity, dual detuned acoustic string harmonics, warm soundboard wooden resonance, and delicate felt damping decay.",
+      "price": 0,
+      "preview": "assets/templates/solo-piano-acoustic-hammer-felt-synth.webp",
+      "file": "assets/templates/solo-piano-acoustic-hammer-felt-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "solo-piano-sympathetic-soundboard-resonance-synth",
+      "name": "Solo Piano Sympathetic Soundboard Resonance Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Expressive acoustic solo piano synthesizer featuring sympathetic string resonance modeling, harmonic damper release envelope, warm wooden soundboard acoustic body filtering, and natural dynamic strike response.",
+      "price": 0,
+      "preview": "assets/templates/solo-piano-sympathetic-soundboard-resonance-synth.webp",
+      "file": "assets/templates/solo-piano-sympathetic-soundboard-resonance-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dark-ambient-subterranean-drone-resonator-fx",
+      "name": "Dark Ambient Subterranean Drone Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Subterranean dark ambient drone resonator with dual tuned low-frequency feedback combs, cavernous body resonance, and warm analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/dark-ambient-subterranean-drone-resonator-fx.webp",
+      "file": "assets/templates/dark-ambient-subterranean-drone-resonator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dark-ambient-abyssal-space-diffusion-delay-fx",
+      "name": "Dark Ambient Abyssal Space Diffusion Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Abyssal dark ambient space diffusion reverberator featuring multi-stage allpass delay network, dark spectral air damping, and decaying cavernous reflections.",
+      "price": 0,
+      "preview": "assets/templates/dark-ambient-abyssal-space-diffusion-delay-fx.webp",
+      "file": "assets/templates/dark-ambient-abyssal-space-diffusion-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

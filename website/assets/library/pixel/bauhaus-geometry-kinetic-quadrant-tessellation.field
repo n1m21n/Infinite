@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bauhaus Geometry Kinetic Quadrant Tessellation",
+    "author": "Infinite",
+    "description": "Audio-reactive Bauhaus geometric tessellation shader with rhythmic primary color concentric arcs, kinetic quadrant dividers, and constructivist diagonal bars reacting to bass impact, mid-range harmonics, and high-frequency flares.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.26 [0.05, 1.0]\nparam float arcDensity = 16.0 [8.0, 32.0]\nparam float division = 4.0 [2.0, 8.0]\nparam float lineWeight = 0.35 [0.1, 0.8]\nparam float contrast = 1.15 [0.8, 1.6]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nrot = theta + sin(time * 0.8) * 0.3\nsec = floor((rot + 3.14159) / (6.28318 / division))\n\narcs = sin(r * arcDensity * 2.0 + sec * 1.2 - time * 2.0)\narcLines = smoothstep(lineWeight * 0.5, -lineWeight * 0.5, abs(arcs) - 0.3)\n\nrectFrame = max(abs(p.x), abs(p.y))\nframeBorder = smoothstep(0.85, 0.82, rectFrame) * (1.0 - smoothstep(0.82, 0.79, rectFrame))\n\nsubDisc = smoothstep(0.35, 0.32, r)\ninnerDisc = smoothstep(0.18, 0.15, r)\n\ncrossHatch = sin(p.x * 28.0 + p.y * 14.0) * cos(p.y * 28.0 - p.x * 14.0)\nhatchMask = step(0.65, crossHatch) * step(r, 0.75) * (1.0 - subDisc)\n\ncCream = vec3(0.957, 0.937, 0.886)\ncRed = vec3(0.839, 0.157, 0.157)\ncNavy = vec3(0.114, 0.208, 0.341)\ncYellow = vec3(0.988, 0.749, 0.286)\ncBlack = vec3(0.067, 0.067, 0.067)\n\nsecCol = mix(cRed, cNavy, step(1.0, mod(sec, 3.0)))\nsecCol = mix(secCol, cYellow, step(2.0, mod(sec, 3.0)))\n\ncol = mix(cCream, secCol, arcLines * 0.80)\ncol = mix(col, cNavy, hatchMask * 0.6)\ncol = mix(col, cBlack, frameBorder)\ncol = mix(col, cRed, subDisc)\ncol = mix(col, cYellow, innerDisc)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.26,
+      "arcDensity": 16.0,
+      "division": 4.0,
+      "lineWeight": 0.35,
+      "contrast": 1.15
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}
