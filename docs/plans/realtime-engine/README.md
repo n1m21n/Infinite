@@ -443,12 +443,19 @@ adaptively once a frame's error is low. Faster rays alone cannot close 14x on an
 | Before today's quality work (ad852432) | 48.7 | 20.2 / 24.4 |
 | Every hit shades all 8 lights with shadows | 18.8 | 53.0 / 58.2 |
 | One light per bounce hit | 29.3 | 34.0 / 37.7 |
-| + compact area loop, second GI bounce every other frame (b86d240e) | **31.0** | 32.2 / 37.2 |
+| + compact area loop, second GI bounce every other frame (b86d240e) | 31.0 | 32.2 / 37.2 |
+| + GI and reflections in a half-res pass, joint-bilateral upsample (aa088784) | **42.4** | 23.6 / 27.4 |
 
 Cost split (the 34 ms state, each item removed on its own): second GI bounce about 4 ms, GI hit shadows about
 2.5 ms, area-light loop shape about 1.4 ms (even with no area lights), denoiser about 1 ms, reflection bounce
-about 0. The gate passes with almost no headroom on a 4-object scene, and every ray is still traced at full
-1080p. The plan's 540p tracing (H2) is not built yet.
+about 0. With every ray traced at full 1080p the gate passed with almost no headroom.
+
+Half-res pass (aa088784): the raster pass now writes only demodulated GI and reflection weights. A separate
+pass `tr_fs` traces at 960x540. Each texel traces at one full-res pixel of its 2x2 block, rotating every frame,
+and rebuilds the position from the guide distance, which is now stored as RGBA32F. Every lane traces; the old
+1-in-4 pixel pattern left three of four quad lanes idle. The resolve upsamples from 3x3 texels weighted by
+distance, normal and depth, accumulates over time, then remodulates. Live A/B after it: Cornell 0.200, the
+other 8 cases 0.023–0.073, all within 0.002 of before.
 
 ### Where the gates stand (2026-11-10)
 
@@ -457,9 +464,9 @@ about 0. The gate passes with almost no headroom on a 4-object scene, and every 
 | R0 | Baseline recorded | B4 rows, paced and unpaced | PASS |
 | R1 | FLIP ≤ 0.02 vs GL | MAE 0.0009 | PASS |
 | R1 | ≥ 1.5x, ≥ 8 lights | 1.6–3.0x (test scene); B4 not bridged | PASS (test scene) |
-| R2 | ≤ 12 ms GPU | 9.1 ms shadows + reflections, full-res rays | PASS |
+| R2 | ≤ 12 ms GPU | 9.1 ms shadows + reflections (full-res rays, before the half-res pass) | PASS |
 | R2 | FLIP ≤ 0.12 | 8/9 live cases ≤ 0.064 | PASS except Cornell |
-| R3 | ≥ 30 fps, 10 min | 31.0 fps over 15 s after today's work; the 10-min soak (47 fps) predates it | PASS, re-soak due |
+| R3 | ≥ 30 fps, 10 min | 42.4 fps over 15 s after the half-res pass; the 10-min soak (47 fps) predates the quality work | PASS, re-soak due |
 | R3 | FLIP ≤ 0.15 | 8/9; Cornell 0.201 | **OPEN** |
 | R3 | 0 xruns, rig ≤ 1 ms | 0 deadline xruns in 180 s; rig p99 0.01 ms | PASS (synthetic patch) |
 | R3 | Hitches | 0 frames over 50 ms in the soak | PASS |
@@ -485,7 +492,7 @@ about 0. The gate passes with almost no headroom on a 4-object scene, and every 
 | C10 | Opportunity cost (v0.4.4 perf, VST/AU, agent-collab) | Medium | Gets a scheduled slot, not a side thread |
 | C11 | Field instance domain touches the language | Low | New domain under the same rules, like pixel and sample |
 | C12 | Every number is from a 4-object test scene or a Blender case, not a real patch | High | Bridge B4 (the real-patch scene) into engine mode and re-run R1–R3 on it before calling Milestone 1 |
-| C13 | Live headroom is gone: 31 fps with full-res rays on 4 objects | High | Trace GI and reflections at 540p and upsample with the denoiser guides (H2's plan); move GI into its own pass so the raster shader is small again |
+| C13 | Live headroom is gone: 31 fps with full-res rays on 4 objects | High | **Done (aa088784)**: GI and reflections traced at 540p in their own pass, upsampled with the guides; 42.4 fps, quality unchanged. Area-light shadow rays are still full-res |
 | C14 | Export is 14x off its gate | High | Denoise the settled frame and stop adaptively (R4 step 4); do not chase it with ray speed |
 | C15 | Settle misses Cycles on spot, materials and Cornell exactly where the GL tracer does | Medium | Fix in the shared BSDF (spot cone edge, lobe split), then A/B both tracers |
 | C16 | The live Cornell gap is noise, not bias (brightness 1.01) | Medium | Accumulate the direct area-light term like GI, or denoise it with the same a-trous guides |
@@ -496,7 +503,7 @@ Built so far: section 10. Remaining work in order (each keeps its gate from sect
 
 | # | Step | Gate it closes | Needs owner |
 |---|---|---|---|
-| 1 | Half-res GI and reflections in their own pass, upsampled with the normal/distance guides | Live headroom (C13), R3 fps on bigger scenes | no |
+| ~~1~~ | ~~Half-res GI and reflections in their own pass~~ (done, aa088784: 31.0 → 42.4 fps) | C13 | — |
 | 2 | Denoise the direct area-light term; re-run live Cornell | R3 FLIP ≤ 0.15 on Cornell | no |
 | 3 | Bridge B4 into engine mode; re-run R1 speed, R3 soak (10 min) and audio xruns on a real patch | C12, R1 on B4 | no |
 | 4 | Settle: denoised low-spp frames, adaptive stop; re-time the 1-minute export | R4 film ≤ 15 min | no |
