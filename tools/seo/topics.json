@@ -23,7 +23,8 @@
     {"q": "modular vst3 host lfo modulation", "track": "B", "persona": "engineering", "match": ["vst", "modular", "lfo"]},
     {"q": "bitwig grid free alternative", "track": "B", "persona": "electronic_musicians", "match": ["bitwig", "grid", "modular"]},
     {"q": "drum and bass reese bass sound design", "track": "B", "persona": "sound_design", "match": ["reese", "bass", "sound design"]},
-    {"q": "modular synth sub bass patch", "track": "B", "persona": "sound_design", "match": ["sub bass", "synth", "modular"]}
+    {"q": "modular synth sub bass patch", "track": "B", "persona": "sound_design", "match": ["sub bass", "synth", "modular"]},
+    {"q": "delaunay triangulation real time 3d", "track": "B", "persona": "creative_coding", "match": ["delaunay", "triangulation", "voronoi"]}
   ]
 }
 

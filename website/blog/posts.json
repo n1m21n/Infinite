@@ -1,5 +1,14 @@
 [
  {
+  "slug": "delaunay-triangulation-and-voronoi-geometry-in-real-time",
+  "title": "Delaunay triangulation and Voronoi geometry in real time",
+  "description": "How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson, polygon insetting, and audio-reactive 3D.",
+  "date": "2026-11-10",
+  "updated": "2026-11-10",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html"
+ },
+ {
   "slug": "physical-modelling-string-synthesis-in-real-time",
   "title": "Physical modelling string synthesis in real time",
   "description": "How physical modelling string synthesis works: digital waveguides, Karplus-Strong delay loops, allpass dispersion, bow friction, and acoustic modal bodies.",
