@@ -66,6 +66,11 @@ namespace engine
       float clearSrgb[3] = { 0.04f, 0.04f, 0.06f };
       Shadow shadow;
       bool rtShadows = false; // ray-traced hard shadows for every light (point and spot too); replaces the shadow map
+      bool gi = false;            // one-bounce diffuse GI: cosine-sampled rays, 3x3 + temporal accumulation (needs the TLAS)
+      int giRays = 1;
+      float giStrength = 1.0f;
+      float giBlend = 0.15f;      // temporal blend toward the new frame when the camera is still
+      unsigned frameIndex = 0;
       bool rtReflections = false; // one ray along the reflection vector for glossy surfaces (hit = flat shade, miss = env)
       float rayBias = 0.003f; // origin offset along the normal, scene units
    };

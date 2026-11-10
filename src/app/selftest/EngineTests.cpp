@@ -2,6 +2,7 @@
 // pixel by pixel and timed. R1's gate: FLIP-class error <= 0.02, >= 1.5x faster, >= 8 lights (docs/plans/realtime-engine).
 #include "app/AppShared.h"
 #include "engine/rhi/Rhi.h"
+#include "engine/MusicRig.h"
 
 namespace app
 {
@@ -159,6 +160,7 @@ bool RunEngineTest()
    std::memcpy(frame.clearSrgb, r.bgColor, 12);
    frame.shadow.enabled = r.shadowsEnabled;
    frame.rtShadows = getenv("INFINITE_ENGINETEST_RT") != nullptr;
+   frame.gi = getenv("INFINITE_ENGINETEST_GI") != nullptr; if (const char* gr = getenv("INFINITE_ENGINETEST_GIRAYS")) frame.giRays = atoi(gr);
    frame.rtReflections = getenv("INFINITE_ENGINETEST_REFL") != nullptr;
    frame.shadow.size = 2048; frame.shadow.bias = r.shadowBias; frame.shadow.strength = r.shadowStrength; frame.shadow.softness = r.shadowSoftness;
 
@@ -186,6 +188,8 @@ bool RunEngineTest()
    printf("  GL shadow size %d, shadows enabled %d\n", r.ActiveShadowSize(), (int)r.shadowsEnabled);
    check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), gl), "GL picture", (double)r.GetOutputWidth(), (double)r.GetOutputHeight());
    double gpuMs = 0.0;
+   for (int i = 0; i < (frame.gi ? 59 : 0); i++) { frame.frameIndex++; raster->Render(*img, frame, nullptr); }
+   frame.frameIndex++;
    check(raster->Render(*img, frame, &gpuMs), "Metal picture", gpuMs, 0);
    check(ReadRect(img->GlTexture(), W, H, mt), "Metal picture reads in GL", 0, 0);
    if (gl.size() != mt.size())
@@ -246,6 +250,7 @@ bool RunEngineTest()
    for (int i = 0; i < N + 10; i++)
    {
       frame.exposure = 1.0f + 0.0001f * (float)i;
+      frame.frameIndex++;
       const double t0 = NowMs();
       raster->Render(*img, frame, nullptr);
       if (i >= 10) tmt.push_back(NowMs() - t0);
@@ -256,6 +261,54 @@ bool RunEngineTest()
    check(nLights >= 8, "8 lights drawn", (double)nLights, 8);
    check(mGl / mMt >= 1.5, "at least 1.5x faster than Render 3D (R1 gate)", mGl / mMt, 1.5);
    check(glGetError() == GL_NO_ERROR, "no GL error", 0, 0);
+   if (const char* soakEnv = getenv("INFINITE_ENGINETEST_SOAK"))
+   {
+      // R3 soak: GI + RT shadows + RT reflections + music rig, unpaced, for N seconds. Reports fps and hitches.
+      const double seconds = atof(soakEnv);
+      engine::MusicRig mrig;
+      mrig.SetBindings({
+         { engine::RigSource::BeatPulse, engine::RigTarget::ScaleUniform, 1, 0.25f, 0.8f, 0.12f },
+         { engine::RigSource::Low, engine::RigTarget::OffsetY, 2, 0.4f, 0.6f, 0.1f },
+         { engine::RigSource::Mid, engine::RigTarget::ScaleY, 3, 0.3f, 0.5f, 0.15f },
+         { engine::RigSource::High, engine::RigTarget::LightIntensity, 1, 0.6f, 0.7f, 0.2f },
+         { engine::RigSource::BeatPulse, engine::RigTarget::Exposure, 0, 0.08f, 0.8f, 0.1f },
+      });
+      frame.gi = true; frame.rtShadows = true; frame.rtReflections = true;
+      std::vector<double> ft; std::vector<double> rigMs;
+      int over50 = 0; double worst = 0.0, last = 0.0;
+      const double start = NowMs();
+      double tPrev = start;
+      uint32_t rng = 12345;
+      while (NowMs() - start < seconds * 1000.0)
+      {
+         const double now = NowMs();
+         const double beat = (now - start) / 500.0; // 120 bpm
+         engine::MusicSignals sg;
+         sg.beatPhase = (float)(beat - std::floor(beat));
+         sg.beatPulse = std::exp(-4.0f * sg.beatPhase);
+         sg.low = 0.6f * sg.beatPulse; sg.mid = 0.5f + 0.5f * (float)std::sin(beat * 1.7);
+         rng = rng * 1664525u + 1013904223u; sg.high = (float)(rng >> 24) / 255.0f;
+         const double r0 = NowMs();
+         mrig.Apply(frame, sg);
+         rigMs.push_back(NowMs() - r0);
+         frame.frameIndex++;
+         raster->Render(*img, frame, nullptr);
+         const double t = NowMs();
+         const double dt = t - tPrev; tPrev = t;
+         ft.push_back(dt); worst = std::max(worst, dt); if (dt > 50.0) over50++;
+         if (t - last > 30000.0) { last = t; printf("  soak %.0fs: %zu frames, last %.1f ms, worst %.1f ms, >50ms %d\n", (t - start) / 1000.0, ft.size(), dt, worst, over50); fflush(stdout); }
+      }
+      std::sort(rigMs.begin(), rigMs.end());
+      std::vector<double> sorted = ft; std::sort(sorted.begin(), sorted.end());
+      const double total = (NowMs() - start) / 1000.0;
+      const double fps = (double)ft.size() / total;
+      const double p99 = sorted[(size_t)(sorted.size() * 0.99)];
+      printf("  SOAK %.0fs: %zu frames, %.1f fps avg, frame p50 %.1f p99 %.1f max %.1f ms, >50ms %d, rig p99 %.4f ms\n",
+             total, ft.size(), fps, sorted[sorted.size() / 2], p99, worst, over50, rigMs[(size_t)(rigMs.size() * 0.99)]);
+      check(fps >= 30.0, "R3: >= 30 fps sustained", fps, 30.0);
+      check(over50 == 0, "R3: 0 frames over 50 ms", over50, 0);
+      check(rigMs[(size_t)(rigMs.size() * 0.99)] <= 1.0, "R3: rig <= 1 ms", rigMs[(size_t)(rigMs.size() * 0.99)], 1.0);
+   }
    for (int i = 0; i < 4; i++)
       r.geometry[i] = nullptr;
    r.rig = nullptr;

@@ -44,6 +44,7 @@ struct FrameU
    float4x4 lightVP;
    float4 shP;      // enabled, light index, bias (depth units), strength
    float4 shQ;      // texel, softness
+   float4 gi;       // enabled, strength, frame index, rays
    LightU lights[8]; // vec.w = type, aim.w unused
 };
 struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; }; // base linear rgb; mr = metallic, roughness
@@ -89,6 +90,7 @@ float shadowFactor(constant FrameU& f, depth2d<float> sm, float3 wp, float3 n, f
          lit += sm.sample_compare(cs, uv + float2(float(x), float(y)) * f.shQ.x * f.shQ.y, z - bias);
    return mix(1.0, lit / 9.0, f.shP.w);
 }
+struct SkyOut { float4 pos [[position]]; };
 struct RTArgs { instance_acceleration_structure tlas; };
 bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tmax)
 {
@@ -101,13 +103,13 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
 }
 struct RInst { float4 bm; float4 rg; ulong vb; ulong ib; float4x4 normalM; };
 // One-bounce reflection: closest hit -> vertex normal, Lambert from every light (no shadows), ambient, env spec. Miss -> env.
-float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough)
+float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough, bool giMode = false)
 {
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    ray r(o, d, 0.0, 1e4);
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
-   if (h.type != intersection_type::triangle) return sampleEnv(f, d, rough);
+   if (h.type != intersection_type::triangle) return giMode ? sampleEnv(f, d, 1.0) * f.ambient.xyz * 3.0 : sampleEnv(f, d, rough);
    constant RInst& I = inst[h.instance_id];
    const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
    const device float* vb = reinterpret_cast<const device float*>(I.vb);
@@ -144,15 +146,31 @@ float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas,
          }
       }
       else ld = normalize(L.vec.xyz);
+      if (atten > 0.0 && !giMode)
+      {
+         const float tm = (type == 1 || type == 4) ? max(length(L.vec.xyz - p) - 0.01, 0.0) : 1e4;
+         if (occluded(tlas, p + n * f.shQ.w, ld, tm)) atten *= (1.0 - f.shP.w);
+      }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x;
    }
    const float3 spec = sampleEnv(f, reflect(d, n), I.rg.x) * metal * base;
    return base * (1.0 - metal) * diff / 3.14159265 * 3.0 + spec;
 }
+uint pcg(uint v) { v = v * 747796405u + 2891336453u; uint w = ((v >> ((v >> 28u) + 4u)) ^ v) * 277803737u; return (w >> 22u) ^ w; }
+float rnd(thread uint& s) { s = pcg(s); return float(s) * (1.0 / 4294967296.0); }
+float3 cosineDir(float3 n, float u1, float u2)
+{
+   const float r = sqrt(u1), phi = 6.2831853 * u2;
+   const float3 up = abs(n.y) < 0.99 ? float3(0, 1, 0) : float3(1, 0, 0);
+   const float3 t = normalize(cross(up, n)); const float3 b = cross(n, t);
+   return normalize(t * (r * cos(phi)) + b * (r * sin(phi)) + n * sqrt(max(1.0 - u1, 0.0)));
+}
+constant bool kMrt [[function_constant(0)]];
+struct FOut { float4 c0 [[color(0)]]; float4 c1 [[color(1), function_constant(kMrt)]]; float4 c2 [[color(2), function_constant(kMrt)]]; };
 float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
 
-fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
+fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
                      constant RInst* instInfo [[buffer(4)]])
 {
@@ -217,18 +235,82 @@ fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], con
    const float3 reflectDir = reflect(-viewDir, n);
    const float3 irradiance = sampleEnv(f, n, 1.0) * f.ambient.xyz * 3.0;
    float3 reflection = sampleEnv(f, reflectDir, rough);
+   float reflTraced = 0.0;
    if ((int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55)
    {
-      const float3 rc = traceReflection(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, reflectDir, rough);
+      uint rs = pcg(uint(in.pos.x) * 1973u + 9277u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 26699u + 7u);
+      float3 jd = reflectDir;
+      if (rough > 0.04)
+      {
+         const float3 v = cosineDir(reflectDir, rnd(rs), rnd(rs)); // lobe around the mirror direction
+         jd = normalize(mix(reflectDir, v, clamp(rough * 1.4, 0.0, 1.0)));
+         if (dot(jd, n) < 0.02) jd = normalize(jd + n * (0.02 - dot(jd, n)));
+      }
+      const float3 rc = traceReflection(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, jd, rough);
       reflection = mix(rc, reflection, smoothstep(0.3, 0.55, rough));
+      reflTraced = 1.0;
    }
    const float3 fAmb = fresnelRough(nDotV, f0, rough);
-   col += (float3(1.0) - fAmb) * (1.0 - metal) * base * irradiance;
-   col += reflection * fAmb;
+   float3 giOut = float3(0.0);
+   const bool giOn = f.gi.x > 0.5 && (int(f.shQ.z + 0.5) >= 0);
+   const bool giSample = giOn && ((uint(in.pos.x) & 1u) + 2u * (uint(in.pos.y) & 1u)) == (uint(f.gi.z) & 3u); // 1 of every 2x2 per frame
+   if (giSample)
+   {
+      uint seed = pcg(uint(in.pos.x) + 8192u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 9781u + 1u);
+      const int rays = max(int(f.gi.w), 1);
+      float3 acc = float3(0.0);
+      for (int k = 0; k < rays; k++)
+      {
+         const float3 dir = cosineDir(n, rnd(seed), rnd(seed));
+         acc += traceReflection(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, dir, 1.0, true);
+      }
+      giOut = (float3(1.0) - fAmb) * (1.0 - metal) * base * acc / float(rays) * f.gi.y;
+   }
+   else if (!giOn) col += (float3(1.0) - fAmb) * (1.0 - metal) * base * irradiance;
+   const float3 reflOut = reflection * fAmb;
    col += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
-   col *= f.params.x;
-   if (int(f.params.y) == 1) col = aces(col);
-   return float4(toSrgb(col), 1.0);
+   FOut o;
+   if (!kMrt)
+   {
+      float3 fin = (col + reflOut) * f.params.x;
+      if (int(f.params.y) == 1) fin = aces(fin);
+      o.c0 = float4(toSrgb(fin), 1.0);
+      return o;
+   }
+   o.c2 = float4(reflOut * f.params.x, reflTraced);
+   o.c0 = float4(col * f.params.x, 1.0); o.c1 = float4(giOut * f.params.x, giSample ? 1.0 : 0.0);
+   return o;
+}
+
+struct ResU { float4 p; float4 clear; }; // p: blend alpha, tonemap, history valid
+struct ResOut { float4 c0 [[color(0)]]; float4 c1 [[color(1)]]; float4 c2 [[color(2)]]; };
+fragment ResOut res_fs(SkyOut in [[stage_in]], constant ResU& u [[buffer(0)]], texture2d<float> hdr [[texture(0)]], texture2d<float> giT [[texture(1)]], texture2d<float> hist [[texture(2)]], texture2d<float> rfl [[texture(3)]], texture2d<float> rhist [[texture(4)]])
+{
+   const uint2 px = uint2(in.pos.xy);
+   const float4 c = hdr.read(px);
+   ResOut o;
+   if (c.a < 0.5) { o.c0 = float4(u.clear.xyz, 1.0); o.c1 = float4(0.0); o.c2 = float4(0.0); return o; }
+   float3 g = float3(0.0); float wsum = 0.0;
+   for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++)
+   {
+      const int2 q = int2(px) + int2(x, y);
+      if (q.x < 0 || q.y < 0 || q.x >= int(hdr.get_width()) || q.y >= int(hdr.get_height())) continue;
+      if (hdr.read(uint2(q)).a < 0.5) continue;
+      const float4 gs = giT.read(uint2(q)); if (gs.a < 0.5) continue;
+      g += gs.rgb; wsum += 1.0;
+   }
+   g /= max(wsum, 1.0);
+   const float3 h = hist.read(px).rgb;
+   const float3 acc = wsum > 0.5 ? (u.p.z > 0.5 ? mix(h, g, u.p.x) : g) : float3(0.0); // no sampled neighbour (GI off) -> no GI, never stale history
+   const float4 rc = rfl.read(px);
+   const float3 rh = rhist.read(px).rgb;
+   const float3 racc = (rc.a > 0.5 && u.clear.w > 0.5) ? mix(rh, rc.rgb, u.p.w) : rc.rgb;
+   float3 col = c.rgb + acc + racc;
+   if (int(u.p.y) == 1) col = aces(col);
+   o.c0 = float4(toSrgb(col), 1.0);
+   o.c1 = float4(acc, 1.0);
+   o.c2 = float4(racc, 1.0);
+   return o;
 }
 
 struct SOut { float4 pos [[position]]; };
@@ -240,7 +322,6 @@ vertex SOut sh_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], c
    SOut o; o.pos = c; return o;
 }
 
-struct SkyOut { float4 pos [[position]]; };
 vertex SkyOut sky_vs(uint vid [[vertex_id]]) { const float2 p[3] = { float2(-1, -1), float2(3, -1), float2(-1, 3) }; SkyOut o; o.pos = float4(p[vid], 1.0, 1.0); return o; }
 fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buffer(0)]]) { return float4(clearSrgb.xyz, 1.0); }
 )";
@@ -328,7 +409,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
    struct LightU { float vec[4], aim[4], color[4], terms[4], spot[4]; };
    struct FrameU
    {
-      float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4];
+      float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4];
       LightU lights[8];
    };
    struct InstU { float model[16], normalM[16], base[4], mr[4]; };
@@ -450,7 +531,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       {
          MetalImage& img = static_cast<MetalImage&>(target);
          const MTLPixelFormat fmt = img.Half() ? MTLPixelFormatRGBA16Float : MTLPixelFormatBGRA8Unorm;
-         if (!Pipeline(fmt) || !Depth(img.Width(), img.Height()))
+         if (!Pipeline(fmt) || !Depth(img.Width(), img.Height()) || !Targets(img.Width(), img.Height()))
             return false;
 
          FrameU f = {};
@@ -480,13 +561,26 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          const bool rtRefl = fr.rtReflections && haveTlas;
          if (rt || !ShadowPass(cb, fr, f))
             EnsureShadowTex(4);
+         const bool giOn = fr.gi && haveTlas;
+         f.gi[0] = giOn ? 1.0f : 0.0f; f.gi[1] = fr.giStrength; f.gi[2] = (float)fr.frameIndex; f.gi[3] = (float)fr.giRays;
          f.shQ[2] = (rt ? 1.0f : 0.0f) + (rtRefl ? 2.0f : 0.0f); f.shQ[3] = fr.rayBias;
          if (rt) { f.shP[1] = 0; f.shP[0] = 0; f.shP[3] = fr.shadow.strength; }
          MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
-         pass.colorAttachments[0].texture = img.Tex();
+         const bool mrt = giOn || rtRefl;
+         pass.colorAttachments[0].texture = mrt ? mHdr : img.Tex();
          pass.colorAttachments[0].loadAction = MTLLoadActionClear;
          pass.colorAttachments[0].storeAction = MTLStoreActionStore;
-         pass.colorAttachments[0].clearColor = MTLClearColorMake(fr.clearSrgb[0], fr.clearSrgb[1], fr.clearSrgb[2], 1.0);
+         pass.colorAttachments[0].clearColor = mrt ? MTLClearColorMake(0, 0, 0, 0) : MTLClearColorMake(fr.clearSrgb[0], fr.clearSrgb[1], fr.clearSrgb[2], 1.0);
+         if (mrt) {
+         pass.colorAttachments[1].texture = mGiT;
+         pass.colorAttachments[1].loadAction = MTLLoadActionClear;
+         pass.colorAttachments[1].storeAction = MTLStoreActionStore;
+         pass.colorAttachments[1].clearColor = MTLClearColorMake(0, 0, 0, 0);
+         pass.colorAttachments[2].texture = mRefl;
+         pass.colorAttachments[2].loadAction = MTLLoadActionClear;
+         pass.colorAttachments[2].storeAction = MTLStoreActionStore;
+         pass.colorAttachments[2].clearColor = MTLClearColorMake(0, 0, 0, 0);
+         }
          pass.depthAttachment.texture = mDepth;
          pass.depthAttachment.loadAction = MTLLoadActionClear;
          pass.depthAttachment.storeAction = MTLStoreActionDontCare;
@@ -514,7 +608,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             for (id<MTLAccelerationStructure> b in mBlas)
                [enc useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
          }
-         [enc setRenderPipelineState:mPso];
+         [enc setRenderPipelineState:mrt ? mPso : mPsoDir];
          [enc setDepthStencilState:mDs];
          [enc setCullMode:MTLCullModeBack];
          [enc setFrontFacingWinding:MTLWindingClockwise]; // GL counter-clockwise, mirrored by the y flip
@@ -552,6 +646,38 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib indexBufferOffset:0];
          }
          [enc endEncoding];
+         if (!mrt) { mHistValid = false; mRValid = false; }
+         else
+         {
+            const bool moved = std::memcmp(mLastVP, fr.viewProj, 64) != 0;
+            std::memcpy(mLastVP, fr.viewProj, 64);
+            const int prev = mHistCur, cur = 1 - mHistCur;
+            MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            rp.colorAttachments[0].texture = img.Tex();
+            rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+            rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            rp.colorAttachments[1].texture = mHist[cur];
+            rp.colorAttachments[1].loadAction = MTLLoadActionDontCare;
+            rp.colorAttachments[1].storeAction = MTLStoreActionStore;
+            rp.colorAttachments[2].texture = mRHist[cur];
+            rp.colorAttachments[2].loadAction = MTLLoadActionDontCare;
+            rp.colorAttachments[2].storeAction = MTLStoreActionStore;
+            id<MTLRenderCommandEncoder> re = [cb renderCommandEncoderWithDescriptor:rp];
+            float ru[8] = { moved ? 0.6f : fr.giBlend, (float)fr.tonemap, mHistValid ? 1.0f : 0.0f, moved ? 0.7f : 0.12f, 0, 0, 0, 0 };
+            Lin3(fr.clearSrgb, ru + 4); // clear colour is stored sRGB-encoded in the target, so undo Lin3
+            for (int i = 0; i < 3; i++) ru[4 + i] = fr.clearSrgb[i];
+            ru[7] = mRValid ? 1.0f : 0.0f;
+            [re setRenderPipelineState:mResPso];
+            [re setFragmentBytes:ru length:sizeof(ru) atIndex:0];
+            [re setFragmentTexture:mHdr atIndex:0];
+            [re setFragmentTexture:mGiT atIndex:1];
+            [re setFragmentTexture:mHist[prev] atIndex:2];
+            [re setFragmentTexture:mRefl atIndex:3];
+            [re setFragmentTexture:mRHist[prev] atIndex:4];
+            [re drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+            [re endEncoding];
+            mHistCur = cur; mHistValid = giOn; mRValid = true;
+         }
          [cb commit];
          [cb waitUntilCompleted];
          if (gpuMs)
@@ -672,12 +798,36 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             return true;
          MTLRenderPipelineDescriptor* pd = [MTLRenderPipelineDescriptor new];
          pd.vertexFunction = [mLib newFunctionWithName:@"r_vs"];
-         mFsFn = [mLib newFunctionWithName:@"r_fs"];
+         NSError* fe = nil;
+         MTLFunctionConstantValues* cvM = [MTLFunctionConstantValues new]; bool yes = true, no = false;
+         [cvM setConstantValue:&yes type:MTLDataTypeBool atIndex:0];
+         MTLFunctionConstantValues* cvD = [MTLFunctionConstantValues new];
+         [cvD setConstantValue:&no type:MTLDataTypeBool atIndex:0];
+         mFsFn = [mLib newFunctionWithName:@"r_fs" constantValues:cvM error:&fe];
+         id<MTLFunction> fsDir = [mLib newFunctionWithName:@"r_fs" constantValues:cvD error:&fe];
+         if (!mFsFn || !fsDir) NSLog(@"r_fs specialisation: %@", fe);
          pd.fragmentFunction = mFsFn;
-         pd.colorAttachments[0].pixelFormat = fmt;
+         pd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+         pd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
+         pd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
          pd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          NSError* err = nil;
          mPso = [mDev newRenderPipelineStateWithDescriptor:pd error:&err];
+         MTLRenderPipelineDescriptor* rd = [MTLRenderPipelineDescriptor new];
+         rd.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
+         rd.fragmentFunction = [mLib newFunctionWithName:@"res_fs"];
+         rd.colorAttachments[0].pixelFormat = fmt;
+         rd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
+         rd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
+         mResPso = [mDev newRenderPipelineStateWithDescriptor:rd error:&err];
+         MTLRenderPipelineDescriptor* dd2 = [MTLRenderPipelineDescriptor new];
+         dd2.vertexFunction = pd.vertexFunction;
+         dd2.fragmentFunction = fsDir;
+         dd2.colorAttachments[0].pixelFormat = fmt;
+         dd2.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+         mPsoDir = [mDev newRenderPipelineStateWithDescriptor:dd2 error:&err];
+         if (!mPsoDir) NSLog(@"direct pipeline: %@", err);
+         if (!mResPso) NSLog(@"resolve pipeline: %@", err);
          MTLDepthStencilDescriptor* dd = [MTLDepthStencilDescriptor new];
          dd.depthCompareFunction = MTLCompareFunctionLess;
          dd.depthWriteEnabled = YES;
@@ -687,7 +837,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          sd.vertexFunction = [mLib newFunctionWithName:@"sh_vs"];
          sd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          mShPso = [mDev newRenderPipelineStateWithDescriptor:sd error:&err];
-         return mPso != nil && mDs != nil && mShPso != nil;
+         return mPso != nil && mPsoDir != nil && mDs != nil && mShPso != nil && mResPso != nil;
       }
       bool Depth(int w, int h)
       {
@@ -714,6 +864,22 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       id<MTLBuffer> mArgBuf = nil;
       id<MTLAccelerationStructure> mArgTlas = nil;
       id<MTLRenderPipelineState> mShPso = nil;
+      id<MTLRenderPipelineState> mResPso = nil, mPsoDir = nil;
+      id<MTLTexture> mHdr = nil, mGiT = nil, mRefl = nil, mHist[2] = { nil, nil }, mRHist[2] = { nil, nil };
+      int mHistCur = 0; bool mHistValid = false, mRValid = false; float mLastVP[16] = {};
+      bool Targets(int w, int h)
+      {
+         if (mHdr && (int)mHdr.width == w && (int)mHdr.height == h)
+            return true;
+         MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float width:w height:h mipmapped:NO];
+         d.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+         d.storageMode = MTLStorageModePrivate;
+         mHdr = [mDev newTextureWithDescriptor:d]; mGiT = [mDev newTextureWithDescriptor:d];
+         mHist[0] = [mDev newTextureWithDescriptor:d]; mHist[1] = [mDev newTextureWithDescriptor:d];
+         mRefl = [mDev newTextureWithDescriptor:d]; mRHist[0] = [mDev newTextureWithDescriptor:d]; mRHist[1] = [mDev newTextureWithDescriptor:d];
+         mHistValid = false; mRValid = false;
+         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1];
+      }
       MTLPixelFormat mFmt = MTLPixelFormatInvalid;
       std::vector<Gpu> mMeshes;
    };

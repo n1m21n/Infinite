@@ -304,6 +304,32 @@ One ray per pixel along the reflection vector for surfaces with roughness < 0.55
 
 **Step 2b (same day):** hit shading now fetches vertex normals (GPU addresses of each mesh's vertex/index buffers, read in the shader by primitive id and barycentrics) and applies Lambert from every light at the hit. Cost unchanged (9.05 ms at 1080p). The floor in the sphere is now lit instead of dark. Still no shadows at the hit; one bounce.
 
+## R3 (2026-11-10): live GI + music rig, headless
+
+**What exists**
+- GI: one cosine-sampled bounce ray per pixel, traced for 1 of every 2x2 pixels per frame, gathered with a 3x3 filter over the sampled neighbours and blended over time (history, faster when the camera moves). Hit shading = vertex normal, Lambert from all lights, env on miss.
+- Reflections: ray direction jittered inside the roughness lobe, hit shaded with shadows, accumulated over time in its own history. This removed the hard seams on the cube and sphere (the earlier single sharp ray plus an unshadowed bright floor hit made a visible cut where the ray left the floor).
+- Two pixel paths: direct (single target, no extra passes) when GI and RT reflections are off, HDR + resolve (tonemap after accumulation) when either is on.
+- `src/engine/MusicRig.h`: beat pulse/sine and low/mid/high bands -> instance scale/offset, light intensity, exposure, with attack/release smoothing; pure CPU, no allocation per frame. It is an engine-side type only: the Music Rig node still needs owner approval before it is exposed.
+
+**Numbers (M2 8 GB, 1080p, 8 lights, test scene)**
+
+| Mode | Metal ms | vs GL |
+|---|---|---|
+| Direct raster + shadow map | 2.0 | 2.05x faster (R1 gate 1.5x holds) |
+| + RT shadows | 8.7 | |
+| + RT shadows + reflections + GI | 19.8 | |
+| Soak 10 min, everything on + rig | ~21 | |
+
+Soak, final build: SOAK 600s: 28443 frames, 47.4 fps avg, frame p50 20.7 p99 25.8 max 32.2 ms, >50ms 0, rig p99 0.0016 ms
+(An earlier run before the reflection fix: 60 fps, p99 18.3 ms, worst 20.6 ms.)
+
+**Not yet proven**
+- Audio xruns: the soak drives the rig from a synthetic beat, not the live audio engine, so "0 xruns at 128 samples" is untested.
+- Quality: FLIP ≤ 0.15 vs 1024-spp Cycles on 3 scenes not run (needs the Blender reference scenes).
+- Scene: a 4-object test scene, not the B4 or a real patch; no denoiser beyond 3x3 + temporal, so GI is soft and lags on fast change.
+- The engine is not wired to the live Render 3D node yet.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |
