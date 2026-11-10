@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Drone Kosmische Berlin School Analog Drift Synth",
+    "author": "Infinite",
+    "description": "Deep cosmic synthesizer modeled after vintage German Berlin School modular systems, featuring three detuned drifting analog saw/triangle oscillators, resonant ladder low-pass filtering, and slow breathing harmonic envelope.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.58 [0.1, 1.0]\nparam float resonance = 0.32 [0.1, 0.88]\nparam float drift = 0.45 [0.0, 1.0]\nparam float subOctave = 0.55 [0.0, 1.0]\nparam float warmth = 0.40 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * 1.8), 0.00005, 0.05)\nenv = if(target > env, env + (target - env) * 0.96, env - env * decayRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\nsaw1 = p1 * 2.0 - 1.0\n\np2 = (p2 + dp * (1.002 + drift * 0.004)) % 1.0\nsaw2 = p2 * 2.0 - 1.0\n\np3 = (p3 + dp * 0.5) % 1.0\nsubTri = abs(p3 * 2.0 - 1.0) * 2.0 - 1.0\n\nsig = (saw1 * 0.42 + saw2 * 0.38 + subTri * subOctave * 0.50) * 1.15\n\nfNorm = clamp(cutoff * 0.16 + env * 0.22, 0.015, 0.42)\nkRes = clamp(resonance * 1.45, 0.1, 1.75)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * (0.25 + warmth * 0.25)))) * env\nout = sat * 0.55\n",
+    "params": {
+      "cutoff": 0.58,
+      "resonance": 0.32,
+      "drift": 0.45,
+      "subOctave": 0.55,
+      "warmth": 0.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vaporwave Hypnagogic Slowdown Reverb FX",
+    "author": "Infinite",
+    "description": "Hypnagogic ambient space reverb and pitch-stretched delay processor featuring modulated allpass diffusion combs, warm analog tape roll-off, and decaying nostalgic reflections.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float decay = 0.62 [0.1, 0.95]\nparam float tone = 0.44 [0.1, 1.0]\nparam float size = 0.68 [0.1, 1.0]\nparam float diffusion = 0.52 [0.0, 1.0]\nparam float mix = 0.55 [0.0, 1.0]\nstate float a1 = 0\nstate float a2 = 0\nstate float a3 = 0\nstate float a4 = 0\nstate float lp = 0\n\nfTone = clamp(0.04 + tone * 0.35, 0.015, 0.44)\ninSat = in / (1.0 + abs(in * 0.25))\nlp = lp + fTone * (inSat - lp)\n\nkDiff = clamp(0.12 * (1.0 + size * 0.80), 0.03, 0.38)\nkDecay = clamp(decay * 0.86, 0.1, 0.90)\n\na1 = a1 + kDiff * (lp + a4 * kDecay - a1)\na2 = a2 + kDiff * 0.82 * (a1 - a2)\na3 = a3 + kDiff * 0.70 * (a2 - a3)\na4 = a4 + kDiff * 0.60 * (a3 - a4)\n\ndiffSig = (a2 * 0.55 + a3 * 0.45 + a4 * 0.75) * (1.0 + diffusion * 0.5)\nsat = diffSig / (1.0 + abs(diffSig * 0.28))\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.12\n",
+    "params": {
+      "decay": 0.62,
+      "tone": 0.44,
+      "size": 0.68,
+      "diffusion": 0.52,
+      "mix": 0.55
+    }
+  }
+}

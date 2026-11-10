@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Drone Kosmische Sub-Harmonic Meditation Generator Synth",
+    "author": "Infinite",
+    "description": "Sub-harmonic meditation drone synthesizer with rich fifth and sub-octave oscillator beating, warm saturation, and gentle analog filter frequency modulation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.54 [0.1, 1.0]\nparam float resonance = 0.35 [0.1, 0.90]\nparam float subBass = 0.55 [0.0, 1.0]\nparam float fifthHarmonic = 0.40 [0.0, 1.0]\nparam float drive = 0.35 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * 1.6), 0.00005, 0.05)\nenv = if(target > env, env + (target - env) * 0.95, env - env * decayRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\ntri1 = abs(p1 * 2.0 - 1.0) * 2.0 - 1.0\n\np2 = (p2 + dp * 0.501) % 1.0\nsubSaw = p2 * 2.0 - 1.0\n\np3 = (p3 + dp * 1.503) % 1.0\nfifthTri = abs(p3 * 2.0 - 1.0) * 2.0 - 1.0\n\nsig = (tri1 * 0.50 + subSaw * subBass * 0.45 + fifthTri * fifthHarmonic * 0.35) * 1.2\n\nfNorm = clamp(cutoff * 0.15 + env * 0.24, 0.016, 0.44)\nkRes = clamp(resonance * 1.5, 0.1, 1.8)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * (0.28 + drive * 0.30)))) * env\nout = sat * 0.54\n",
+    "params": {
+      "cutoff": 0.54,
+      "resonance": 0.35,
+      "subBass": 0.55,
+      "fifthHarmonic": 0.4,
+      "drive": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

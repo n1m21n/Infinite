@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vector Wireframe Phosphor Tesseract Hypercube",
+    "author": "Infinite",
+    "description": "Audio-reactive vector CRT phosphor shader rendering a rotating 4D tesseract hypercube projection with luminous green beam glow, perspective wireframe grid, and frequency-reactive vertex displacement.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.28 [0.05, 1.0]\nparam float beamGlow = 0.75 [0.2, 1.0]\nparam float gridDensity = 14.0 [6.0, 28.0]\nparam float cubeScale = 0.65 [0.2, 1.2]\nparam float contrast = 1.15 [0.8, 1.6]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nrot = theta + time * 0.4\nrotP = vec2(cos(rot) * r, sin(rot) * r)\n\nboxOuter = max(abs(rotP.x), abs(rotP.y))\nlineOuter = smoothstep(cubeScale * 0.53, cubeScale * 0.50, boxOuter) * (1.0 - smoothstep(cubeScale * 0.50, cubeScale * 0.47, boxOuter))\n\ninnerScale = cubeScale * 0.48\nboxInner = max(abs(p.x + sin(time) * 0.08), abs(p.y + cos(time) * 0.08))\nlineInner = smoothstep(innerScale * 0.53, innerScale * 0.50, boxInner) * (1.0 - smoothstep(innerScale * 0.50, innerScale * 0.47, boxInner))\n\ndiag1 = abs(p.x - p.y)\ndiag2 = abs(p.x + p.y)\ndiagLines = (smoothstep(0.024, 0.005, diag1) + smoothstep(0.024, 0.005, diag2)) * step(r, cubeScale * 0.72)\n\ngridY = (p.y + 0.65) / (abs(p.y + 0.95) + 0.1)\ngridX = p.x / (abs(p.y + 0.95) + 0.1)\nperspLines = smoothstep(0.08, 0.01, abs(fract(gridX * 4.0) - 0.5)) + smoothstep(0.08, 0.01, abs(fract(gridY * 4.0 - time * 1.5) - 0.5))\nperspMask = step(p.y, -0.10) * perspLines * clamp(1.0 - abs(p.y + 0.10) * 1.2, 0.0, 1.0)\n\ncBg = vec3(0.04, 0.06, 0.08)\ncGreen = vec3(0.0, 1.0, 0.42)\ncCyan = vec3(0.0, 0.90, 1.0)\ncWhite = vec3(0.95, 1.0, 0.95)\n\nglowRing = smoothstep(cubeScale * 0.85, cubeScale * 0.25, r) * 0.45\ncrtBevel = smoothstep(1.15, 0.95, max(abs(p.x), abs(p.y)))\n\ncol = cBg * crtBevel\ncol = mix(col, cCyan * 0.7, perspMask * 0.85)\ncol = mix(col, cGreen * 0.6, glowRing)\ncol = mix(col, cGreen, lineOuter * beamGlow * 1.5)\ncol = mix(col, cCyan, lineInner * beamGlow * 1.6)\ncol = mix(col, cWhite, diagLines * 1.1)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.28,
+      "beamGlow": 0.75,
+      "gridDensity": 14.0,
+      "cubeScale": 0.65,
+      "contrast": 1.15
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

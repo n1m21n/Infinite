@@ -7984,6 +7984,216 @@
       "file": "assets/library/pixel/bauhaus-geometry-kinetic-quadrant-tessellation.field",
       "preview": "assets/library/previews/bauhaus-geometry-kinetic-quadrant-tessellation.jpg",
       "bytes": 2116
+    },
+    {
+      "id": "liminal-void-infinite-colonnade-water-mirror",
+      "name": "Liminal Void Infinite Colonnade Water Mirror",
+      "kind": "Generator",
+      "tags": [
+        "liminal",
+        "void",
+        "colonnade",
+        "reflection",
+        "water",
+        "drawing"
+      ],
+      "description": "Procedural mathematical drawing of an infinite flooded concrete colonnade receding toward a twilight horizon with reflective water plane, dusk gradient atmosphere, and solitary monolithic pillars.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/liminal-void-infinite-colonnade-water-mirror.js",
+      "preview": "assets/library/previews/liminal-void-infinite-colonnade-water-mirror.jpg",
+      "bytes": 4480
+    },
+    {
+      "id": "liminal-void-submerged-monolith-stairwell",
+      "name": "Liminal Void Submerged Monolith Stairwell",
+      "kind": "Generator",
+      "tags": [
+        "liminal",
+        "void",
+        "stairwell",
+        "monolith",
+        "submerged",
+        "drawing"
+      ],
+      "description": "Mathematical architectural perspective drawing rendering submerged concrete brutalist staircases descending into dark reflective water beneath a heavy twilight sky with fine volumetric mist.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/liminal-void-submerged-monolith-stairwell.js",
+      "preview": "assets/library/previews/liminal-void-submerged-monolith-stairwell.jpg",
+      "bytes": 3938
+    },
+    {
+      "id": "suprematist-blocks-constructivist-proun-monolith-3d",
+      "name": "Suprematist Blocks Constructivist Proun Monolith 3D",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "constructivist",
+        "proun",
+        "monolith",
+        "cuboid",
+        "3d"
+      ],
+      "description": "Suprematist three-dimensional geometric construction with interlocking floating rectangular blocks, cantilevered tension bars, and constructivist diagonal planes inspired by El Lissitzky Proun compositions.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/suprematist-blocks-constructivist-proun-monolith-3d.js",
+      "preview": "assets/library/previews/suprematist-blocks-constructivist-proun-monolith-3d.jpg",
+      "bytes": 3006
+    },
+    {
+      "id": "suprematist-blocks-kinetic-intersecting-cuboids-3d",
+      "name": "Suprematist Blocks Kinetic Intersecting Cuboids 3D",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "cuboids",
+        "constructivist",
+        "isometric",
+        "geometry",
+        "3d"
+      ],
+      "description": "Three-dimensional constructivist spatial sculpture featuring intersecting orthogonal cuboids, dynamic diagonal counterweights, and severe primary geometric volumes suspended in balanced tension.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/suprematist-blocks-kinetic-intersecting-cuboids-3d.js",
+      "preview": "assets/library/previews/suprematist-blocks-kinetic-intersecting-cuboids-3d.jpg",
+      "bytes": 3603
+    },
+    {
+      "id": "drone-kosmische-berlin-school-analog-drift-synth",
+      "name": "Drone Kosmische Berlin School Analog Drift Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "kosmische",
+        "drone",
+        "berlin",
+        "modular",
+        "audio"
+      ],
+      "description": "Deep cosmic synthesizer modeled after vintage German Berlin School modular systems, featuring three detuned drifting analog saw/triangle oscillators, resonant ladder low-pass filtering, and slow breathing harmonic envelope.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/drone-kosmische-berlin-school-analog-drift-synth.inf",
+      "preview": "assets/library/previews/drone-kosmische-berlin-school-analog-drift-synth.jpg",
+      "bytes": 2222
+    },
+    {
+      "id": "drone-kosmische-sub-harmonic-meditation-generator-synth",
+      "name": "Drone Kosmische Sub-Harmonic Meditation Generator Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "kosmische",
+        "subharmonic",
+        "drone",
+        "meditation",
+        "audio"
+      ],
+      "description": "Sub-harmonic meditation drone synthesizer with rich fifth and sub-octave oscillator beating, warm saturation, and gentle analog filter frequency modulation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/drone-kosmische-sub-harmonic-meditation-generator-synth.inf",
+      "preview": "assets/library/previews/drone-kosmische-sub-harmonic-meditation-generator-synth.jpg",
+      "bytes": 2193
+    },
+    {
+      "id": "vaporwave-tape-warble-chorus-diffusion-fx",
+      "name": "Vaporwave Tape Warble Chorus Diffusion FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "vaporwave",
+        "chorus",
+        "tape",
+        "warble",
+        "audio"
+      ],
+      "description": "Dreamy vintage cassette tape chorus and spatial diffusion effect with pitch flutter, multi-tap bucket brigade modulation, warm low-end saturation, and airy stereo widening.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/vaporwave-tape-warble-chorus-diffusion-fx.inf",
+      "preview": "assets/library/previews/vaporwave-tape-warble-chorus-diffusion-fx.jpg",
+      "bytes": 2086
+    },
+    {
+      "id": "vaporwave-hypnagogic-slowdown-reverb-fx",
+      "name": "Vaporwave Hypnagogic Slowdown Reverb FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "vaporwave",
+        "reverb",
+        "hypnagogic",
+        "ambient",
+        "audio"
+      ],
+      "description": "Hypnagogic ambient space reverb and pitch-stretched delay processor featuring modulated allpass diffusion combs, warm analog tape roll-off, and decaying nostalgic reflections.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/vaporwave-hypnagogic-slowdown-reverb-fx.inf",
+      "preview": "assets/library/previews/vaporwave-hypnagogic-slowdown-reverb-fx.jpg",
+      "bytes": 2112
+    },
+    {
+      "id": "vector-wireframe-phosphor-tesseract-hypercube",
+      "name": "Vector Wireframe Phosphor Tesseract Hypercube",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "vector",
+        "wireframe",
+        "tesseract",
+        "phosphor",
+        "shader"
+      ],
+      "description": "Audio-reactive vector CRT phosphor shader rendering a rotating 4D tesseract hypercube projection with luminous green beam glow, perspective wireframe grid, and frequency-reactive vertex displacement.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/vector-wireframe-phosphor-tesseract-hypercube.field",
+      "preview": "assets/library/previews/vector-wireframe-phosphor-tesseract-hypercube.jpg",
+      "bytes": 2502
+    },
+    {
+      "id": "vector-wireframe-geodesic-radar-horizon",
+      "name": "Vector Wireframe Geodesic Radar Horizon",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "vector",
+        "radar",
+        "geodesic",
+        "wireframe",
+        "shader"
+      ],
+      "description": "Audio-reactive vector wireframe radar shader featuring a rotating geodesic radar dome over an infinite perspective grid with beam sweep echoes and reactive frequency pulses.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/vector-wireframe-geodesic-radar-horizon.field",
+      "preview": "assets/library/previews/vector-wireframe-geodesic-radar-horizon.jpg",
+      "bytes": 2356
     }
   ]
 }

@@ -2367,6 +2367,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "drone-kosmische-berlin-school-analog-drift-synth",
+      "name": "Drone Kosmische Berlin School Analog Drift Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Deep cosmic synthesizer modeled after vintage German Berlin School modular systems, featuring three detuned drifting analog saw/triangle oscillators, resonant ladder low-pass filtering, and slow breathing harmonic envelope.",
+      "price": 0,
+      "preview": "assets/templates/drone-kosmische-berlin-school-analog-drift-synth.webp",
+      "file": "assets/templates/drone-kosmische-berlin-school-analog-drift-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "drone-kosmische-sub-harmonic-meditation-generator-synth",
+      "name": "Drone Kosmische Sub-Harmonic Meditation Generator Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Sub-harmonic meditation drone synthesizer with rich fifth and sub-octave oscillator beating, warm saturation, and gentle analog filter frequency modulation.",
+      "price": 0,
+      "preview": "assets/templates/drone-kosmische-sub-harmonic-meditation-generator-synth.webp",
+      "file": "assets/templates/drone-kosmische-sub-harmonic-meditation-generator-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "vaporwave-tape-warble-chorus-diffusion-fx",
+      "name": "Vaporwave Tape Warble Chorus Diffusion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dreamy vintage cassette tape chorus and spatial diffusion effect with pitch flutter, multi-tap bucket brigade modulation, warm low-end saturation, and airy stereo widening.",
+      "price": 0,
+      "preview": "assets/templates/vaporwave-tape-warble-chorus-diffusion-fx.webp",
+      "file": "assets/templates/vaporwave-tape-warble-chorus-diffusion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "vaporwave-hypnagogic-slowdown-reverb-fx",
+      "name": "Vaporwave Hypnagogic Slowdown Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Hypnagogic ambient space reverb and pitch-stretched delay processor featuring modulated allpass diffusion combs, warm analog tape roll-off, and decaying nostalgic reflections.",
+      "price": 0,
+      "preview": "assets/templates/vaporwave-hypnagogic-slowdown-reverb-fx.webp",
+      "file": "assets/templates/vaporwave-hypnagogic-slowdown-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

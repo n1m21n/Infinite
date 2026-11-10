@@ -512,6 +512,14 @@
   "embeds/bauhaus-geometry-kinetic-quadrant-tessellation.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/vector-wireframe-phosphor-tesseract-hypercube.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/vector-wireframe-geodesic-radar-horizon.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

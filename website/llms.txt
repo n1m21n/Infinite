@@ -269,6 +269,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Solo Piano Sympathetic Soundboard Resonance Synth](https://infinitedevices.org/library/solo-piano-sympathetic-soundboard-resonance-synth.html): Expressive acoustic solo piano synthesizer featuring sympathetic string resonance modeling, harmonic damper release envelope, warm wooden soundboard acoustic body filtering, and natural dynamic strike response. (file: https://infinitedevices.org/assets/templates/solo-piano-sympathetic-soundboard-resonance-synth.inf)
 - [Dark Ambient Subterranean Drone Resonator FX](https://infinitedevices.org/library/dark-ambient-subterranean-drone-resonator-fx.html): Subterranean dark ambient drone resonator with dual tuned low-frequency feedback combs, cavernous body resonance, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/dark-ambient-subterranean-drone-resonator-fx.inf)
 - [Dark Ambient Abyssal Space Diffusion Delay FX](https://infinitedevices.org/library/dark-ambient-abyssal-space-diffusion-delay-fx.html): Abyssal dark ambient space diffusion reverberator featuring multi-stage allpass delay network, dark spectral air damping, and decaying cavernous reflections. (file: https://infinitedevices.org/assets/templates/dark-ambient-abyssal-space-diffusion-delay-fx.inf)
+- [Drone Kosmische Berlin School Analog Drift Synth](https://infinitedevices.org/library/drone-kosmische-berlin-school-analog-drift-synth.html): Deep cosmic synthesizer modeled after vintage German Berlin School modular systems, featuring three detuned drifting analog saw/triangle oscillators, resonant ladder low-pass filtering, and slow breathing harmonic envelope. (file: https://infinitedevices.org/assets/templates/drone-kosmische-berlin-school-analog-drift-synth.inf)
+- [Drone Kosmische Sub-Harmonic Meditation Generator Synth](https://infinitedevices.org/library/drone-kosmische-sub-harmonic-meditation-generator-synth.html): Sub-harmonic meditation drone synthesizer with rich fifth and sub-octave oscillator beating, warm saturation, and gentle analog filter frequency modulation. (file: https://infinitedevices.org/assets/templates/drone-kosmische-sub-harmonic-meditation-generator-synth.inf)
+- [Vaporwave Tape Warble Chorus Diffusion FX](https://infinitedevices.org/library/vaporwave-tape-warble-chorus-diffusion-fx.html): Dreamy vintage cassette tape chorus and spatial diffusion effect with pitch flutter, multi-tap bucket brigade modulation, warm low-end saturation, and airy stereo widening. (file: https://infinitedevices.org/assets/templates/vaporwave-tape-warble-chorus-diffusion-fx.inf)
+- [Vaporwave Hypnagogic Slowdown Reverb FX](https://infinitedevices.org/library/vaporwave-hypnagogic-slowdown-reverb-fx.html): Hypnagogic ambient space reverb and pitch-stretched delay processor featuring modulated allpass diffusion combs, warm analog tape roll-off, and decaying nostalgic reflections. (file: https://infinitedevices.org/assets/templates/vaporwave-hypnagogic-slowdown-reverb-fx.inf)
 
 ## Library: Community
 
@@ -629,7 +633,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 101 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 103 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -646,4 +650,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 86 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 88 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

@@ -505,6 +505,16 @@
       "slug": "bauhaus-geometry-kinetic-quadrant-tessellation",
       "title": "Bauhaus Geometry Kinetic Quadrant Tessellation",
       "description": "Audio-reactive Bauhaus geometric tessellation visualizer featuring rhythmic primary color concentric arcs, kinetic quadrant dividers, and constructivist diagonal bars. Bass modulates the central geometric core and quadrant expansion, mids drive concentric circular arc rotation, and highs activate crisp constructivist cross-hatch stippling."
+    },
+    {
+      "slug": "vector-wireframe-phosphor-tesseract-hypercube",
+      "title": "Vector Wireframe Phosphor Tesseract Hypercube",
+      "description": "Audio-reactive 1980s vector CRT visualizer rendering a rotating 4D tesseract wireframe with luminous phosphor glow. Bass pulses the outer hypercube scale and beam intensity, mids rotate inner 4D perspective axes, and highs trigger intense vector CRT electron bloom."
+    },
+    {
+      "slug": "vector-wireframe-geodesic-radar-horizon",
+      "title": "Vector Wireframe Geodesic Radar Horizon",
+      "description": "Audio-reactive vector wireframe radar visualizer featuring a spinning geodesic radar dome atop an infinite perspective vector terrain. Bass drives grid undulation, mids rotate geodesic radar azimuth, and highs emit phosphor sweep flares."
     }
   ]
 }
