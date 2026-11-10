@@ -257,6 +257,19 @@ faster. Cause unknown (machine state, ~3.5 GB swap in use, or a regression since
 against today's rows above, and bisecting the Sep difference is a separate job. The beat-reactive scene here
 uses the transport's beat only; band/note-driven parameters need the Music Rig node (R3).
 
+### R1 step 1: Metal raster vs Render 3D (2026-11-10, `INFINITE_ENGINETEST=1`, release, M2 8 GB)
+
+Same scene through both: floor, cube, metal sphere, torus; 8 lights (sun, points, spots); 1920x1080; no shadows, no MSAA, ACES, rim on; end-to-end ms per frame (CPU encode + GPU + wait).
+
+| | Render 3D (GL) | Engine (Metal) |
+|---|---|---|
+| ms/frame | 4.11 | 1.35 (GPU 5.2 ms on first frame, warm-up) |
+| speedup | | **3.05x** (gate 1.5x, kill <1.2x) |
+| error vs GL | | MAE 0.0009, p99 0.0039, max 0.0039, 0 pixels > 0.04 (gate 0.02) |
+| lights | 8 | 8 |
+
+Gates passed for this scope. Not yet covered: shadows, textures, clearcoat/sheen/SSS, HDR/bloom, area lights, the real-patch bridge (the B4 scene). The GL number is a light scene, not the B4 R0 baseline (14.7 ms); compare on B4 once the bridge exists.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

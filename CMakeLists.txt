@@ -610,6 +610,7 @@ set(COMMON_SOURCES
     src/app/selftest/ModelAbTests.cpp
     src/app/selftest/ThreeDBench.cpp
     src/app/selftest/RhiTests.cpp
+    src/app/selftest/EngineTests.cpp
     src/app/selftest/FlowTests.cpp
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp

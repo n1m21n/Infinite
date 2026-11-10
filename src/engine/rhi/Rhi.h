@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "engine/Scene.h"
+
 namespace rhi
 {
    enum class Format
@@ -30,12 +32,24 @@ namespace rhi
       virtual bool DrawTestTriangle(const float clearRgba[4], const float triRgb[3]) = 0;
    };
 
+   // Forward raster of an engine::Scene into a SharedImage: lit PBR (GGX), up to 8 lights, gradient sky, tonemap.
+   class RasterRenderer
+   {
+   public:
+      virtual ~RasterRenderer() = default;
+      // Static meshes, referenced by Instance::mesh. Replaces any earlier set.
+      virtual bool UploadMeshes(const std::vector<engine::MeshData>& meshes) = 0;
+      // Draws one frame and blocks until the GPU is done. gpuMs, if given, gets the GPU's own time for it.
+      virtual bool Render(SharedImage& target, const engine::Frame& frame, double* gpuMs) = 0;
+   };
+
    class Device
    {
    public:
       virtual ~Device() = default;
       virtual std::string Name() const = 0;
       virtual std::unique_ptr<SharedImage> CreateSharedImage(int width, int height, Format format) = 0;
+      virtual std::unique_ptr<RasterRenderer> CreateRasterRenderer() = 0;
    };
 
    // The backend for this platform, or null when there is none yet. Must be called with the app's GL context current.
