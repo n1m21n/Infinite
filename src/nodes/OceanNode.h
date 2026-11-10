@@ -42,6 +42,9 @@ public:
    float choppiness = 1.0f;
    int octaves = 4;
    float speed = 1.0f;
+   // How far the sea reaches, as a multiple of `size`: 1 is a square patch of water; above 1 the outer grid
+   // stretches out to the horizon (the middle keeps its detail).
+   float horizon = 1.0f;
 
    float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
    float uniformScale = 1.0f;
@@ -83,6 +86,7 @@ public:
       v.Float("steepness", steepness); v.Float("direction", direction);
       v.Float("choppiness", choppiness); v.Int("octaves", octaves);
       v.Float("speed", speed);
+      v.Float("horizon", horizon);
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("scale", uniformScale);
       v.Color("color", color); v.Float("metallic", metallic);
@@ -110,7 +114,7 @@ private:
    // re-uploads while playing. It still costs nothing while paused.
    int mBuiltResolution = -1, mBuiltOctaves = -1;
    float mBuiltSize = -1, mBuiltAmp = -1, mBuiltLength = -1;
-   float mBuiltSteep = -1, mBuiltDir = -999, mBuiltChop = -1;
+   float mBuiltSteep = -1, mBuiltDir = -999, mBuiltChop = -1, mBuiltHorizon = -1;
    double mBuiltTime = -1.0;
 
    ImageCable mTextureInput;

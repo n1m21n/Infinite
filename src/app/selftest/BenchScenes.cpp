@@ -277,8 +277,342 @@ void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& outRender3
       gn.showParams = true;
 }
 
+// The boat scene (realtime-engine "everything at once" check): a small wooden sloop floating on the
+// Ocean at sunset or under the moon, with the sky made here so the sun or moon disc sits exactly where its
+// light comes from. INFINITE_BENCH_B4SCALE=boat-sunset | boat-moon; the parts load from
+// INFINITE_BENCH_BOATDIR (default bench/assets/boat, made by bench/assets/make_boat.py). BenchBoatTick()
+// floats the boat on the waves every frame.
+namespace
+{
+struct BoatState
+{
+   int oceanIdx = -1;
+   std::vector<int> parts;
+   int lanternLightIdx = -1;
+   float y = 0, pitch = 0, roll = 0;
+   bool primed = false;
+};
+BoatState sBoat;
+
+float BoatHash(int x, int y)
+{
+   unsigned h = (unsigned)x * 374761393u + (unsigned)y * 668265263u;
+   h = (h ^ (h >> 13)) * 1274126177u;
+   return (float)((h ^ (h >> 16)) & 0xffffff) / (float)0xffffff;
+}
+float BoatNoise(float x, float y)
+{
+   const int xi = (int)std::floor(x), yi = (int)std::floor(y);
+   const float fx = x - xi, fy = y - yi;
+   const float sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+   const float a = BoatHash(xi, yi), b = BoatHash(xi + 1, yi), c = BoatHash(xi, yi + 1), d = BoatHash(xi + 1, yi + 1);
+   return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
+}
+float BoatFbm(float x, float y)
+{
+   float v = 0, amp = 0.5f;
+   for (int o = 0; o < 5; o++) { v += amp * BoatNoise(x, y); x *= 2.03f; y *= 2.03f; amp *= 0.5f; }
+   return v;
+}
+
+// Equirect sky in the engine's convention: u = atan2(z, x) / 2pi + 0.5, v = acos(y) / pi, row 0 at the top.
+void BoatSky(bool moon, float lightAzDeg, float lightElDeg, const std::string& path)
+{
+   const int w = 2048, h = 1024;
+   std::vector<float> px((size_t)w * h * 3);
+   const float az0 = lightAzDeg * 3.14159265f / 180.0f, el0 = lightElDeg * 3.14159265f / 180.0f;
+   const float L[3] = { std::cos(el0) * std::cos(az0), std::sin(el0), std::cos(el0) * std::sin(az0) };
+   const float discAng = (moon ? 0.9f : 0.8f) * 3.14159265f / 180.0f;
+   const float texelAng = 3.14159265f / (float)h;
+   // Disc coverage with a one-texel soft edge, so the magnified disc is round rather than stair-stepped.
+   auto disc = [&](float c) { return std::max(0.0f, std::min(1.0f, (discAng - std::acos(c)) / texelAng + 0.5f)); };
+   // The sky above the horizon at (az, el >= 0); pixel coordinates seed the stars.
+   auto sky = [&](float az, float el, int x, int y, float out[3])
+   {
+      const float d[3] = { std::cos(el) * std::cos(az), std::sin(el), std::cos(el) * std::sin(az) };
+      const float c = std::max(-1.0f, std::min(1.0f, d[0] * L[0] + d[1] * L[1] + d[2] * L[2]));
+      const float cp = std::max(0.0f, c);
+      const float hz = std::max(0.0f, std::cos(az - az0)); // toward the light along the horizon
+      float r, g, b;
+      if (!moon)
+      {
+         const float t = std::pow(1.0f - el / 1.5708f, 9.0f);
+         const float h2 = hz * hz * hz;
+         const float hr = 0.30f + 1.25f * h2, hg = 0.16f + 0.42f * h2, hb = 0.22f + 0.05f * h2;
+         r = 0.025f + (hr - 0.025f) * t; g = 0.045f + (hg - 0.045f) * t; b = 0.14f + (hb - 0.14f) * t;
+         const float glow = 2.5f * std::pow(cp, 64.0f) + 0.35f * std::pow(cp, 8.0f);
+         r += glow * 1.5f; g += glow * 0.58f; b += glow * 0.18f;
+         if (el < 0.30f)
+         {
+            // Low streaks of cloud, lit gold toward the sun, violet-grey away from it.
+            const float n = BoatFbm(az * 5.0f, el * 55.0f);
+            const float band = std::max(0.0f, 1.0f - std::abs(el - 0.10f) / 0.10f);
+            const float k = std::max(0.0f, std::min(1.0f, (n - 0.50f) * 4.0f)) * band;
+            const float lit = 0.10f + 2.4f * std::pow(cp, 4.0f) + 0.3f * h2;
+            r += (1.0f * lit + 0.05f - r) * k * 0.9f; g += (0.38f * lit + 0.04f - g) * k * 0.9f; b += (0.22f * lit + 0.07f - b) * k * 0.9f;
+         }
+         const float k = disc(c);
+         r += (900.0f - r) * k; g += (520.0f - g) * k; b += (260.0f - b) * k;
+      }
+      else
+      {
+         const float t = std::pow(1.0f - el / 1.5708f, 4.0f);
+         r = 0.0025f + 0.012f * t; g = 0.0045f + 0.020f * t; b = 0.012f + 0.040f * t;
+         const float halo = 0.25f * std::pow(cp, 220.0f) + 0.03f * std::pow(cp, 12.0f);
+         r += halo * 0.7f; g += halo * 0.8f; b += halo * 1.0f;
+         if (el > 0.04f && BoatHash(x, y) > 0.9975f)
+         {
+            // Dim enough not to saturate a whole magnified texel; a few brighter ones.
+            const float s = 0.03f + 0.5f * std::pow(BoatHash(y, x), 8.0f);
+            r += s * 0.9f; g += s * 0.95f; b += s;
+         }
+         if (el < 0.25f)
+         {
+            const float n = BoatFbm(az * 4.0f, el * 40.0f);
+            const float k = std::max(0.0f, std::min(1.0f, (n - 0.55f) * 3.0f)) * std::max(0.0f, 1.0f - el / 0.25f);
+            const float lit = 0.004f + 0.05f * std::pow(cp, 8.0f);
+            r += (lit * 0.8f - r) * k; g += (lit * 0.85f - g) * k; b += (lit - b) * k;
+         }
+         if (const float k = disc(c); k > 0.0f)
+         {
+            const float m = 0.80f + 0.20f * BoatFbm(az * 600.0f, el * 600.0f); // maria
+            r += (30.0f * m * 0.92f - r) * k; g += (30.0f * m * 0.95f - g) * k; b += (30.0f * m - b) * k;
+         }
+      }
+      out[0] = r; out[1] = g; out[2] = b;
+   };
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+      {
+         const float az = ((x + 0.5f) / w - 0.5f) * 6.2831853f;
+         const float el = (0.5f - (y + 0.5f) / h) * 3.14159265f;
+         float* o = &px[((size_t)y * w + x) * 3];
+         if (el >= 0.0f)
+         {
+            sky(az, el, x, y, o);
+            continue;
+         }
+         // Below the horizon is the far sea the Ocean mesh does not reach: the sky mirrored by Fresnel over
+         // dark water, with the light's glitter path widening toward the viewer.
+         float m[3];
+         sky(az, -el, x, h - 1 - y, m);
+         const float dep = -el;
+         const float fres = 0.02f + 0.98f * std::pow(1.0f - std::sin(dep), 5.0f);
+         const float deep[3] = { 0.002f, 0.006f, 0.010f };
+         float daz = std::fabs(az - az0);
+         if (daz > 3.14159265f) daz = 6.2831853f - daz;
+         const float width = 0.006f + 0.22f * dep;
+         const float jn = BoatFbm(az * 260.0f, dep * 1400.0f);
+         const float jitter = 3.0f * jn * jn * jn;
+         const float path = std::exp(-(daz * daz) / (width * width)) * std::exp(-dep * 6.0f) * jitter;
+         const float sunCol[3] = { moon ? 0.55f : 6.0f, moon ? 0.6f : 2.6f, moon ? 0.7f : 0.9f };
+         for (int k = 0; k < 3; k++)
+            o[k] = deep[k] * (1 - fres) + std::min(m[k], 4.0f) * fres * 0.85f + sunCol[k] * path;
+      }
+   stbi_write_hdr(path.c_str(), w, h, 3, px.data());
+}
+
+void BuildBenchBoatScene(bool moon, bool isAnim, int& outRender3DIdx, int& outOutputIdx, int& outCamIdx, int& outLfoIdx)
+{
+   auto nodeAt = [](int idx) { return FindNodeByIndex(idx)->node.get(); };
+   const char* dirEnv = getenv("INFINITE_BENCH_BOATDIR");
+   const std::string dir = (dirEnv && *dirEnv) ? dirEnv : "bench/assets/boat";
+
+   // Light first: the sky's disc is drawn where it says.
+   const float lightAz = moon ? 10.0f : 0.0f, lightEl = moon ? 11.0f : 3.5f;
+   const std::string envPath = TmpPath(moon ? "infinite_bench_boat_moon.hdr" : "infinite_bench_boat_sunset.hdr");
+   BoatSky(moon, lightAz, lightEl, envPath);
+
+   const int oceanIdx = SpawnNode("Ocean", "3D", 0.0f, 0.0f)->index;
+   auto* ocean = static_cast<OceanNode*>(nodeAt(oceanIdx));
+   ocean->resolution = 320;
+   ocean->size = 40.0f;
+   ocean->horizon = 60.0f; // out to 1.2 km: waves to the skyline
+
+   ocean->amplitude = 0.07f;
+   ocean->wavelength = 5.0f;
+   ocean->steepness = 0.55f;
+   ocean->choppiness = 0.8f;
+   ocean->octaves = 6;
+   ocean->direction = 25.0f;
+   ocean->speed = 0.5f;
+   ocean->color[0] = 0.006f; ocean->color[1] = 0.020f; ocean->color[2] = 0.032f;
+   ocean->roughness = 0.025f;
+   ocean->metallic = 0.0f;
+   ocean->ior = 1.33f;
+   ocean->specular = 0.5f;
+   sBoat = BoatState();
+   sBoat.oceanIdx = oceanIdx;
+
+   struct Part { const char* file; float r, g, b, metal, rough, clear, emit; };
+   const Part parts[] = {
+      { "hull", 0.035f, 0.07f, 0.13f, 0.0f, 0.32f, 0.6f, 0.0f },
+      { "deck", 0.40f, 0.25f, 0.12f, 0.0f, 0.60f, 0.0f, 0.0f },
+      { "cabin", 0.80f, 0.77f, 0.70f, 0.0f, 0.50f, 0.2f, 0.0f },
+      { "windows", 0.015f, 0.018f, 0.025f, 0.0f, 0.05f, 0.0f, 0.0f },
+      { "trim", 0.36f, 0.20f, 0.08f, 0.0f, 0.35f, 0.4f, 0.0f },
+      { "sail", 0.86f, 0.82f, 0.72f, 0.0f, 0.85f, 0.0f, 0.0f },
+      { "lantern", 1.0f, 0.62f, 0.28f, 0.0f, 0.30f, 0.0f, moon ? 14.0f : 1.5f },
+   };
+   const int groupIdx = SpawnNode("Group 3D", "3D", 260.0f, 260.0f)->index;
+   auto* group = static_cast<Group3DNode*>(nodeAt(groupIdx));
+   int slot = 0;
+   for (const Part& p : parts)
+   {
+      const int idx = SpawnNode("Model 3D", "3D", 0.0f, 260.0f + 120.0f * slot)->index;
+      auto* m = static_cast<ModelSourceNode*>(nodeAt(idx));
+      m->normalizeScale = false;
+      m->recenter = false;
+      if (!m->Load(dir + "/" + p.file + ".obj"))
+         fprintf(stderr, "BOAT: could not load %s/%s.obj\n", dir.c_str(), p.file);
+      m->color[0] = p.r; m->color[1] = p.g; m->color[2] = p.b;
+      m->metallic = p.metal;
+      m->roughness = p.rough;
+      m->clearcoat = p.clear;
+      m->emissionColor[0] = 1.0f; m->emissionColor[1] = 0.55f; m->emissionColor[2] = 0.22f;
+      m->emission = p.emit;
+      m->rotY = 0.35f; // bow a little off the light, so the glitter path runs past the hull
+      group->inputs[slot++] = m;
+      sBoat.parts.push_back(idx);
+   }
+
+   const int camIdx = SpawnNode("Camera", "3D", 520.0f, 0.0f)->index;
+   auto* cam = static_cast<CameraNode*>(nodeAt(camIdx));
+   cam->distance = moon ? 8.0f : 8.5f;
+   cam->elevation = moon ? 7.0f : 5.0f;
+   cam->azimuth = lightAz + 180.0f + (moon ? 17.0f : 24.0f);
+   cam->targetX = 0.0f; cam->targetY = moon ? 1.4f : 1.5f; cam->targetZ = 0.0f;
+   cam->fov = 38.0f;
+   cam->farPlane = 2000.0f;
+   outCamIdx = camIdx;
+
+   int lightIdx[3] = { -1, -1, -1 };
+   lightIdx[0] = SpawnNode("Light", "3D", 520.0f, 260.0f)->index;
+   auto* key = static_cast<LightNode*>(nodeAt(lightIdx[0]));
+   key->type = 2; // sun
+   key->azimuth = lightAz; key->elevation = lightEl;
+   if (!moon) { key->color[0] = 1.0f; key->color[1] = 0.55f; key->color[2] = 0.28f; key->intensity = 3.2f; }
+   else { key->color[0] = 0.62f; key->color[1] = 0.72f; key->color[2] = 1.0f; key->intensity = 0.55f; }
+   key->shadowRadius = moon ? 0.15f : 0.1f;
+   lightIdx[1] = SpawnNode("Light", "3D", 520.0f, 520.0f)->index;
+   auto* fill = static_cast<LightNode*>(nodeAt(lightIdx[1]));
+   fill->type = 3; // ambient: the sky's own wash
+   if (!moon) { fill->color[0] = 0.45f; fill->color[1] = 0.45f; fill->color[2] = 0.65f; fill->intensity = 0.20f; }
+   else { fill->color[0] = 0.25f; fill->color[1] = 0.35f; fill->color[2] = 0.6f; fill->intensity = 0.06f; }
+   if (moon)
+   {
+      // The stern lantern's own light: a warm point riding with the boat.
+      lightIdx[2] = SpawnNode("Light", "3D", 520.0f, 780.0f)->index;
+      auto* lan = static_cast<LightNode*>(nodeAt(lightIdx[2]));
+      lan->type = 1;
+      lan->color[0] = 1.0f; lan->color[1] = 0.58f; lan->color[2] = 0.25f;
+      lan->intensity = 1.6f;
+      lan->falloff = 2.0f;
+      lan->castShadow = true;
+      sBoat.lanternLightIdx = lightIdx[2];
+   }
+
+   const int envIdx = SpawnNode("HDRI", "3D", 520.0f, 1040.0f)->index;
+   static_cast<EnvironmentNode*>(nodeAt(envIdx))->Load(envPath);
+
+   const int renderIdx = SpawnNode("Render 3D", "3D", 780.0f, 0.0f)->index;
+   auto* render = static_cast<Render3DNode*>(nodeAt(renderIdx));
+   render->geometry[0] = ocean;
+   render->geometry[1] = group;
+   render->camera = cam;
+   for (int l = 0; l < 3; l++)
+      if (lightIdx[l] >= 0)
+         render->lights[l] = static_cast<LightNode*>(nodeAt(lightIdx[l]));
+   render->envInput.Connect(nodeAt(envIdx));
+   render->width = 1920.0f;
+   render->height = 1080.0f;
+   render->samples = 2;
+   render->tonemap = 3; // AgX: holds the sun and the lantern without clipping to flat white
+   render->exposure = moon ? 2.2f : 0.8f;
+   render->bloom = moon ? 0.25f : 0.35f;
+   render->shadowsEnabled = true;
+   render->shadowQuality = 1;
+   outRender3DIdx = renderIdx;
+
+   const int outIdx = SpawnNode("Output", "Utility", 1040.0f, 0.0f)->index;
+   if (ImageCable* in = CableFor(*FindNodeByIndex(outIdx), 0))
+      in->Connect(nodeAt(renderIdx));
+   outOutputIdx = outIdx;
+
+   outLfoIdx = -1; // the camera holds still; the sea and the boat move
+   Transport::Instance().SetPlaying(isAnim);
+   BenchBoatTick();
+   for (GraphNode& gn : gNodes)
+      gn.showParams = true;
+}
+} // namespace
+
+// Floats the boat: the sea height under bow, stern and both sides, from the Ocean's own mesh, eased so the
+// hull has some weight. Moves every part (and the lantern's light) together.
+void BenchBoatTick()
+{
+   if (sBoat.oceanIdx < 0 || sBoat.parts.empty())
+      return;
+   GraphNode* og = FindNodeByIndex(sBoat.oceanIdx);
+   if (og == nullptr)
+      return;
+   auto* ocean = static_cast<OceanNode*>(og->node.get());
+   const Mesh& mesh = ocean->GetMesh();
+   const float yaw = 0.35f;
+   const float cy = std::cos(yaw), sy = std::sin(yaw);
+   // Local hull points (x along the keel, z across), turned like the parts (Mat4::RotationY).
+   const float probe[4][2] = { { 1.3f, 0.0f }, { -1.3f, 0.0f }, { 0.0f, 0.5f }, { 0.0f, -0.5f } };
+   float hgt[4];
+   for (int k = 0; k < 4; k++)
+   {
+      const float lx = probe[k][0], lz = probe[k][1];
+      const float wx = cy * lx + sy * lz, wz = -sy * lx + cy * lz;
+      float sum = 0, wsum = 0;
+      for (const Vertex& v : mesh.vertices)
+      {
+         const float dx = v.px + ocean->posX - wx, dz = v.pz + ocean->posZ - wz;
+         const float d2 = dx * dx + dz * dz;
+         if (d2 < 0.09f) { const float wgt = 0.09f - d2; sum += v.py * wgt; wsum += wgt; }
+      }
+      hgt[k] = (wsum > 0 ? sum / wsum : 0.0f) + ocean->posY;
+   }
+   const float y = 0.25f * (hgt[0] + hgt[1] + hgt[2] + hgt[3]) - 0.04f;
+   const float pitch = std::atan2(hgt[0] - hgt[1], 2.6f) * 0.7f;
+   const float roll = std::atan2(hgt[2] - hgt[3], 1.0f) * 0.5f;
+   const float ease = sBoat.primed ? 0.12f : 1.0f;
+   sBoat.y += (y - sBoat.y) * ease;
+   sBoat.pitch += (pitch - sBoat.pitch) * ease;
+   sBoat.roll += (roll - sBoat.roll) * ease;
+   sBoat.primed = true;
+   for (int idx : sBoat.parts)
+      if (GraphNode* g = FindNodeByIndex(idx))
+      {
+         auto* m = static_cast<ModelSourceNode*>(g->node.get());
+         m->posY = sBoat.y;
+         m->rotZ = sBoat.pitch;
+         m->rotX = -sBoat.roll;
+      }
+   if (sBoat.lanternLightIdx >= 0)
+      if (GraphNode* g = FindNodeByIndex(sBoat.lanternLightIdx))
+      {
+         // The lantern sits on the stern post; place the point light just outboard of it.
+         auto* l = static_cast<LightNode*>(g->node.get());
+         const float lx = -1.45f, lz = 0.0f;
+         const float wx = cy * lx + sy * lz, wz = -sy * lx + cy * lz, wy = sBoat.y + 0.70f;
+         const float r = std::sqrt(wx * wx + wy * wy + wz * wz);
+         l->distance = r;
+         l->elevation = std::asin(wy / r) * 180.0f / 3.14159265f;
+         l->azimuth = std::atan2(wz, wx) * 180.0f / 3.14159265f;
+      }
+}
+
 void BuildBenchB4Scene(const std::string& scaleStr, const std::string& shadowStr, bool isAnim, int& outRender3DIdx, int& outOutputIdx, int& outCamIdx, int& outLfoIdx)
 {
+   if (scaleStr == "boat-sunset" || scaleStr == "boat-moon")
+   {
+      BuildBenchBoatScene(scaleStr == "boat-moon", isAnim, outRender3DIdx, outOutputIdx, outCamIdx, outLfoIdx);
+      return;
+   }
    int instances = 1000, arrayCount = 8, oceanRes = 96, shellDetail = 60;
    if (scaleStr == "m") { instances = 5000; arrayCount = 24; oceanRes = 160; shellDetail = 80; }
    else if (scaleStr == "l") { instances = 20000; arrayCount = 64; oceanRes = 256; shellDetail = 120; }

@@ -303,7 +303,7 @@ Chain: Icosphere -> Resynthesize 3D -> Render 3D
 Physics, the camera, the lights, and the render pass that turns geometry into a picture.
 
 ### Ocean Surface
-3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm.
+3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm; horizon stretches the outer grid so the sea reaches the skyline.
 )AGENTDOC"
 R"AGENTDOC(Try: drive wave amplitude straight from your track's bass so the sea swells with the low end.
 Chain: Audio Analyze (Bass) -> Ocean (Amplitude) -> Render 3D

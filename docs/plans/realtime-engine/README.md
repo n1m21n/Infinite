@@ -622,3 +622,24 @@ Built so far: section 10. Remaining work in order (each keeps its gate from sect
 | 7 | Discord demo, then the go/no-go on R5–R7 | C9 | yes |
 | — | Bisect the Sep 2026 B4 2x difference (section 10, R0) | baseline trust | no |
 | — | R5 next: per-copy colour, Field feed, batches in the RT structure; R6 Vulkan; R7 | after Milestone 1 | — |
+
+## Boat-on-ocean scene (everything at once)
+
+`INFINITE_BENCH_B4SCALE=boat-sunset | boat-moon` (+ `INFINITE_BENCH_BOATDIR=<abs>/bench/assets/boat`): a sloop
+modelled in Blender (`bench/assets/make_boat.py`, 7 OBJ parts, one material each, via Group 3D) floating on the
+Ocean (now stretched to the horizon with the new `horizon` param), a generated sky with the sun or moon disc on its
+light, warm stern lantern at night. `BenchBoatTick` floats the boat from the Ocean mesh each frame.
+`INFINITE_BENCH_BOATSAVE=<path.inf>` saves it as a patch with media.
+
+Animated, release, M2, 1080p, p50 / p95 ms:
+
+| Scene | GL | Raster | +Shadows | +Reflections | +GI | All |
+|---|---|---|---|---|---|---|
+| sunset | 11.4 / 15.5 | 16.3 / 20.5 | 23.6 / 28.4 | 25.7 / 36.7 | 34.0 / 39.0 | 55.7 / 67.1 |
+| moon | 12.9 / 16.2 | 16.7 / 17.6 | 26.7 / 36.9 | 29.9 / 38.3 | 40.4 / 45.9 | 67.0 / 75.9 |
+
+Still frames with settle on: p50 ~50, p95 260–375 (settle's refinement frames; with settle off p95 60).
+
+Picture verdict: reads as a real sunset / moonlit sea (ray-traced boat reflection, glitter path, contact with
+the water). Open gaps it exposes: GI fireflies (white speckle on sails and hull), no back-lit sail translucency,
+sky texels visible on the sun/moon disc at this zoom, raster 5 ms over GL on a 100k-vertex moving ocean.

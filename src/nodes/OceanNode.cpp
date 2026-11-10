@@ -13,12 +13,12 @@ void OceanNode::RebuildIfNeeded()
 
    if (mBuiltResolution == resolution && mBuiltOctaves == octaves &&
        mBuiltSize == size && mBuiltAmp == amplitude && mBuiltLength == wavelength &&
-       mBuiltSteep == steepness && mBuiltDir == direction && mBuiltChop == choppiness &&
+       mBuiltSteep == steepness && mBuiltDir == direction && mBuiltChop == choppiness && mBuiltHorizon == horizon &&
        mBuiltTime == quantised && !mMesh.Empty())
       return;
 
    mMesh = MeshOps::Ocean(resolution, size, amplitude, wavelength, steepness,
-                          direction * 3.14159265f / 180.0f, choppiness, octaves, (float)quantised);
+                          direction * 3.14159265f / 180.0f, choppiness, octaves, (float)quantised, horizon);
 
    mBuiltResolution = resolution;
    mBuiltOctaves = octaves;
@@ -28,6 +28,7 @@ void OceanNode::RebuildIfNeeded()
    mBuiltSteep = steepness;
    mBuiltDir = direction;
    mBuiltChop = choppiness;
+   mBuiltHorizon = horizon;
    mBuiltTime = quantised;
    mMeshRevision = NextMeshRevision();
 }

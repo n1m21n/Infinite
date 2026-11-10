@@ -358,6 +358,7 @@ namespace app
       NodeSeparator("surface");
       ModSliderInt("resolution", &n->resolution, 8, 300);
       ModSlider("size", &n->size, 0.5f, 20.0f);
+      ModSlider("horizon", &n->horizon, 1.0f, 100.0f);
 
       NodeSeparator("waves");
       ModSlider("amplitude", &n->amplitude, 0.0f, 1.0f);

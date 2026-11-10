@@ -2071,10 +2071,20 @@ namespace MeshOps
    }
 
    Mesh Ocean(int resolution, float size, float amplitude, float wavelength,
-              float steepness, float direction, float choppiness, int octaves, float time)
+              float steepness, float direction, float choppiness, int octaves, float time, float horizon)
    {
       Mesh out;
       const int n = std::max(2, std::min(resolution, 400));
+      // horizon > 1 stretches the outer grid out to horizon * size across while the middle keeps its
+      // spacing: same vertex count, the sea reaches the skyline instead of ending in a cliff. Waves too
+      // short for the widened cells there fade out, the way a far sea flattens to the eye.
+      const float reach = std::max(1.0f, horizon);
+      auto warp = [reach](float g) // g in [-0.5, 0.5] -> [-0.5 * reach, 0.5 * reach]
+      {
+         const float a = std::fabs(g) * 2.0f, a2 = a * a;
+         return g * (1.0f + (reach - 1.0f) * a2 * a2 * a2);
+      };
+      const float cell = size / (float)n;
       const int waveCount = std::max(1, std::min(octaves, 8));
 
       out.vertices.reserve((size_t)(n + 1) * (size_t)(n + 1));
@@ -2113,19 +2123,32 @@ namespace MeshOps
          {
             const float u = (float)x / (float)n;
             const float v = (float)z / (float)n;
-            const float px = (u - 0.5f) * size;
-            const float pz = (v - 0.5f) * size;
+            const float px = warp(u - 0.5f) * size;
+            const float pz = warp(v - 0.5f) * size;
+            // Local cell width (the wider axis), for the far-wave fade; exactly `cell` when not stretched.
+            const float spanX = (warp(u - 0.5f + 0.5f / (float)n) - warp(u - 0.5f - 0.5f / (float)n)) * size;
+            const float spanZ = (warp(v - 0.5f + 0.5f / (float)n) - warp(v - 0.5f - 0.5f / (float)n)) * size;
+            const float span = std::max(cell, std::max(spanX, spanZ));
 
             float dispX = 0.0f, dispY = 0.0f, dispZ = 0.0f;
             for (const Wave& w : waves)
             {
+               // A wave needs about four cells per length to draw; shorter ones fade over the next octave.
+               float fade = 1.0f;
+               if (reach > 1.0f)
+               {
+                  const float len = 6.28318530718f / w.k;
+                  fade = std::max(0.0f, std::min(1.0f, (len / (4.0f * span) - 0.6f) / 0.4f));
+                  if (fade <= 0.0f)
+                     continue;
+               }
                const float phase = w.k * (w.dx * px + w.dz * pz) - w.speed * w.k * time;
                const float c = std::cos(phase);
                const float s = std::sin(phase);
-               dispY += w.amp * s;
+               dispY += w.amp * fade * s;
                // The horizontal displacement is what makes a Gerstner crest
                // sharpen and a trough flatten, instead of a plain sine hump.
-               const float q = w.steep * steepNorm * w.amp * choppiness;
+               const float q = w.steep * steepNorm * w.amp * fade * choppiness;
                dispX += q * w.dx * c;
                dispZ += q * w.dz * c;
             }

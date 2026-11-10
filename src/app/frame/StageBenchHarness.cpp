@@ -219,6 +219,15 @@ void DrawBenchHarness(FrameCtx& fc)
          static AudioEngine::XrunCounts sB4Xr0;
          if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
          // INFINITE_BENCH_B4AUDIO=<buffer frames>: run the audio engine with the transport playing beside the render.
+         if (isBenchB4)
+            BenchBoatTick();
+         // INFINITE_BENCH_BOATSAVE=<path.inf>: save the built scene (with its sky and boat files) as a patch.
+         if (isBenchB4 && frameId == 5)
+            if (const char* sp = getenv("INFINITE_BENCH_BOATSAVE"))
+            {
+               std::string rep;
+               printf("BOATSAVE %s %s\n", SavePatchWithMediaTo(sp, rep) ? "ok" : "failed", rep.c_str());
+            }
          if (isBenchB4 && frameId == 3)
             if (const char* ab = getenv("INFINITE_BENCH_B4AUDIO"))
             {

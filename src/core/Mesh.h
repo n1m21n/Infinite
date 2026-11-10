@@ -355,7 +355,7 @@ namespace MeshOps
    // closed-form function of position and time, so it costs one evaluation per
    // vertex per frame with no state and no timestep to keep stable.
    Mesh Ocean(int resolution, float size, float amplitude, float wavelength,
-              float steepness, float direction, float choppiness, int octaves, float time);
+              float steepness, float direction, float choppiness, int octaves, float time, float horizon = 1.0f);
 
    // For each vertex, the index of the first vertex sharing its position.
    // Anything reasoning about connectivity needs this: the primitives duplicate
