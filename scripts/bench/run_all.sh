@@ -209,6 +209,15 @@ run_fixture "B4_complex_3d scale=l,shadow=2048,anim=0,gputimers=0" 160 \
    INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4ANIM=0 INFINITE_BENCH_GPUTIMERS=0
 run_fixture "B4_complex_3d scale=l,shadow=2048,anim=1,passes=1" 160 \
    INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4PASSES=1
+# Real-time engine R0 (docs/plans/realtime-engine): display out of the loop, and the beat-reactive scene.
+if [[ "${B4_RT:-0}" == 1 ]]; then
+for scale in s m l; do
+   run_fixture "B4_complex_3d scale=$scale,shadow=2048,anim=1,gputimers=0,unpaced=1" 160 \
+      INFINITE_BENCH_B4SCALE="$scale" INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0 INFINITE_BENCH_UNPACED=1
+done
+run_fixture "B4_complex_3d scale=m,shadow=2048,anim=1,gputimers=0,unpaced=1,music=1" 160 \
+   INFINITE_BENCH_B4SCALE=m INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0 INFINITE_BENCH_UNPACED=1 INFINITE_BENCH_B4MUSIC=1
+fi
 
 fi
 

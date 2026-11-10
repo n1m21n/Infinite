@@ -1643,6 +1643,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // uncapped regardless - they don't want to be paced by the display.
    if (!gHeadlessTestWindow)
       SetCanvasSwapInterval(gVsync ? 1 : 0);
+   // R0 of the real-time engine plan: a bench run with the display out of the loop, so frame_ms is the work
+   // and not the next vsync.
+   if (getenv("INFINITE_BENCH_UNPACED") != nullptr)
+      SetCanvasSwapInterval(0);
    LoadBrowserFilterPrefs();
    gBrowserFavorites.Load();
 
@@ -3903,6 +3907,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             sBenchB2Variant += ",passes=1";
          if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
             sBenchB2Variant += ",gputimers=0";
+         if (getenv("INFINITE_BENCH_UNPACED") != nullptr)
+            sBenchB2Variant += ",unpaced=1";
+         if (getenv("INFINITE_BENCH_B4MUSIC") != nullptr)
+            sBenchB2Variant += ",music=1";
 
          BuildBenchB4Scene(scaleStr, shadowStr, isAnim, sBenchB2Render3DIdx, sBenchB2OutputIdx, sBenchB4CamIdx, sBenchB4LfoIdx);
       }

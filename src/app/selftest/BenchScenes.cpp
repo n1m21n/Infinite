@@ -390,6 +390,17 @@ void BuildBenchB4Scene(const std::string& scaleStr, const std::string& shadowStr
       light->intensity = (l == 0) ? 2.0f : 1.2f;
    }
 
+   // Beat-reactive reference scene (realtime-engine R0): everything that can move on the beat does, so the
+   // render is judged on a scene like the Milestone 1 demo. The clock is the transport's beats.
+   if (getenv("INFINITE_BENCH_B4MUSIC") != nullptr)
+   {
+      torus->spinY = 0.5f;
+      glassGeo->spinY = 0.25f;
+      for (int l = 0; l < 3; l++)
+         static_cast<LightNode*>(nodeAt(lightIdx[l]))->orbitPerBeat = 15.0f * (float)(l + 1);
+      cam->orbitPerBeat = 5.0f;
+   }
+
    const int envIdx = SpawnNode("HDRI", "3D", 520.0f, 1040.0f)->index;
    static_cast<EnvironmentNode*>(nodeAt(envIdx))->Load(envPath);
 

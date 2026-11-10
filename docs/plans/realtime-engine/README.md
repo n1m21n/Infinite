@@ -240,10 +240,22 @@ Rows: `bench/baselines/realtime-r0-m2-8gb.jsonl`. 1080p, 3 lights, HDRI, ACES, a
 | l, still (cached) | 1.57M | 1.55 | 7.3 | 405 |
 | l, animated, passes=1 | 1.57M | 28.7 | 32.5 | 271 |
 
-Caveats: machine had ~3.5 GB swap in use and Safari/IDE were quit just before; the Sep rows read 4.9-13.5 ms
-for the same scales, so these p50s sit near one 60 Hz interval and may be vsync-paced, and the two runs are not
-directly comparable. Shadows cost about 1 ms of 14.6. **Still missing for R1's gate:** a free-running (unpaced)
-run and the music-reactive reference scene.
+Unpaced re-run (`B4_RT=1 scripts/bench/run_all.sh --only B4`, display out of the loop via
+`INFINITE_BENCH_UNPACED=1`; rows in `bench/baselines/realtime-r0-unpaced-m2-8gb.jsonl`):
+
+| Variant | p50 ms | p95 ms |
+|---|---|---|
+| s, 2048 | 12.6 | 16.4 |
+| m, 2048 | 14.7 | 16.8 |
+| l, 2048 | 18.6 | 24.5 |
+| m, 2048, **beat-reactive** (`INFINITE_BENCH_B4MUSIC=1`: shapes spin per beat, lights and camera orbit per beat) | 14.6 | 16.7 |
+
+**Result:** unpaced equals paced, so the frames are not vsync-bound. Live Render 3D is ~15 ms (≈68 fps) for the
+medium scene and ~19 ms (≈54 fps) for the large one; shadows are ~1 ms of that. Moving everything on the beat
+costs nothing extra. **Open:** the Sep 2026 rows read 4.9-13.5 ms for the same scenes at commit c602a0d, about 2x
+faster. Cause unknown (machine state, ~3.5 GB swap in use, or a regression since); R1's "≥1.5×" gate is measured
+against today's rows above, and bisecting the Sep difference is a separate job. The beat-reactive scene here
+uses the transport's beat only; band/note-driven parameters need the Music Rig node (R3).
 
 ## 11. Critique (first pass)
 
