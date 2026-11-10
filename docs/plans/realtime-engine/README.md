@@ -295,6 +295,13 @@ Metal RT on M2: per-mesh BLAS, per-frame instance TLAS, `intersector<triangle_da
 - Diff vs GL is the point/spot-light shadows GL cannot draw, plus hard edges against PCF; no acne or leaking visible.
 - Open: soft RT shadows (jittered/denoised), RT reflections, quality vs path-traced reference.
 
+## R2 step 2: ray-traced reflections (2026-11-10)
+
+One ray per pixel along the reflection vector for surfaces with roughness < 0.55 (blended to the env probe between 0.3 and 0.55). Hit = flat shade of the instance colour under ambient and env; miss = env. The gold sphere now shows the floor and the cube.
+
+- Cost: 9.09 ms total at 1080p with 8 RT-shadow lights + RT reflections (+1.4 ms over shadows alone), under the 12 ms R2 budget at full-res rays.
+- Known limits: hit shading has no vertex normals (uses the view ray), no lights or shadows at the hit, one bounce. Next: vertex fetch for hit normals and direct light at the hit, then compare against a path-traced reference (R4 dependency) for the FLIP ≤ 0.12 gate.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

@@ -66,6 +66,7 @@ namespace engine
       float clearSrgb[3] = { 0.04f, 0.04f, 0.06f };
       Shadow shadow;
       bool rtShadows = false; // ray-traced hard shadows for every light (point and spot too); replaces the shadow map
+      bool rtReflections = false; // one ray along the reflection vector for glossy surfaces (hit = flat shade, miss = env)
       float rayBias = 0.003f; // origin offset along the normal, scene units
    };
 

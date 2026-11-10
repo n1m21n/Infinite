@@ -99,11 +99,27 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
    return h.type == intersection_type::triangle;
 }
+// One-bounce reflection: closest hit -> flat shade (instance colour under ambient + env), miss -> env.
+float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant float4* inst, float3 o, float3 d, float rough)
+{
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   ray r(o, d, 0.0, 1e4);
+   intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
+   if (h.type != intersection_type::triangle) return sampleEnv(f, d, rough);
+   const float4 bm = inst[h.instance_id * 2];
+   const float3 nApprox = -d; // no vertex fetch yet: face the viewer ray
+   const float3 amb = sampleEnv(f, nApprox, 1.0) * f.ambient.xyz * 3.0;
+   const float3 diff = bm.xyz * (1.0 - bm.w) * (amb + float3(0.25));
+   const float3 spec = sampleEnv(f, d, inst[h.instance_id * 2 + 1].x) * bm.w * bm.xyz;
+   return diff + spec;
+}
 float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
 
 fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
-                     depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]])
+                     depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
+                     constant float4* instInfo [[buffer(4)]])
 {
    const float3 n = normalize(in.n);
    const float3 base = m.base.xyz;
@@ -155,7 +171,7 @@ fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], con
       const float3 radiance = radiance0 * atten;
       floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x;
       float shadow = (f.shP.x > 0.5 && i == int(f.shP.y)) ? shadowFactor(f, sm, in.wp, n, lightDir) : 1.0;
-      if (f.shQ.z > 0.5)
+      if ((int(f.shQ.z + 0.5) & 1) != 0)
       {
          const float tmax = (type == 1 || type == 4) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
          if (occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, tmax)) shadow = 1.0 - f.shP.w;
@@ -165,7 +181,12 @@ fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], con
    col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal);
    const float3 reflectDir = reflect(-viewDir, n);
    const float3 irradiance = sampleEnv(f, n, 1.0) * f.ambient.xyz * 3.0;
-   const float3 reflection = sampleEnv(f, reflectDir, rough);
+   float3 reflection = sampleEnv(f, reflectDir, rough);
+   if ((int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55)
+   {
+      const float3 rc = traceReflection(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, reflectDir, rough);
+      reflection = mix(rc, reflection, smoothstep(0.3, 0.55, rough));
+   }
    const float3 fAmb = fresnelRough(nDotV, f0, rough);
    col += (float3(1.0) - fAmb) * (1.0 - metal) * base * irradiance;
    col += reflection * fAmb;
@@ -421,9 +442,10 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
          const bool haveTlas = BuildTlas(cb, fr);
          const bool rt = fr.rtShadows && haveTlas;
+         const bool rtRefl = fr.rtReflections && haveTlas;
          if (rt || !ShadowPass(cb, fr, f))
             EnsureShadowTex(4);
-         f.shQ[2] = rt ? 1.0f : 0.0f; f.shQ[3] = fr.rayBias;
+         f.shQ[2] = (rt ? 1.0f : 0.0f) + (rtRefl ? 2.0f : 0.0f); f.shQ[3] = fr.rayBias;
          if (rt) { f.shP[1] = 0; f.shP[0] = 0; f.shP[3] = fr.shadow.strength; }
          MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
          pass.colorAttachments[0].texture = img.Tex();
@@ -458,6 +480,16 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          [enc setFrontFacingWinding:MTLWindingClockwise]; // GL counter-clockwise, mirrored by the y flip
          [enc setVertexBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
+         {
+            std::vector<float> info(fr.instances.size() * 8 + 8, 0.0f);
+            for (size_t i = 0; i < fr.instances.size(); i++)
+            {
+               float b[3]; Lin3(fr.instances[i].baseSrgb, b);
+               info[i * 8 + 0] = b[0]; info[i * 8 + 1] = b[1]; info[i * 8 + 2] = b[2];
+               info[i * 8 + 3] = fr.instances[i].metallic; info[i * 8 + 4] = fr.instances[i].roughness;
+            }
+            [enc setFragmentBytes:info.data() length:info.size() * 4 atIndex:4];
+         }
          for (const engine::Instance& in : fr.instances)
          {
             if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
