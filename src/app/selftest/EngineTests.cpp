@@ -164,7 +164,7 @@ bool RunEngineTest()
    std::memcpy(frame.clearSrgb, r.bgColor, 12);
    frame.shadow.enabled = r.shadowsEnabled;
    frame.rtShadows = getenv("INFINITE_ENGINETEST_RT") != nullptr;
-   frame.gi = getenv("INFINITE_ENGINETEST_GI") != nullptr; if (const char* gr = getenv("INFINITE_ENGINETEST_GIRAYS")) frame.giRays = atoi(gr);
+   frame.gi = getenv("INFINITE_ENGINETEST_GI") != nullptr; if (const char* dn = getenv("INFINITE_ENGINETEST_DENOISE")) frame.giDenoise = atoi(dn); if (const char* gr = getenv("INFINITE_ENGINETEST_GIRAYS")) frame.giRays = atoi(gr);
    frame.rtReflections = getenv("INFINITE_ENGINETEST_REFL") != nullptr;
    frame.shadow.size = 2048; frame.shadow.bias = r.shadowBias; frame.shadow.strength = r.shadowStrength; frame.shadow.softness = r.shadowSoftness;
 

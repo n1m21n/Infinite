@@ -105,7 +105,7 @@ struct RInst { float4 bm; float4 rg; ulong vb; ulong ib; float4x4 normalM; };
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
 float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
-                bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, bool withEnv = true)
+                bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, bool withEnv = true, int pick = -1)
 {
    alb = float3(0.0);
    intersector<triangle_data, instancing> it;
@@ -129,12 +129,16 @@ float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, consta
    const float3 envIrr = sampleEnv(f, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
    float3 diff = float3(0.0);
    const int count = int(f.params.w);
-   for (int i = 0; i < 8; i++)
+   // pick >= 0: one light chosen by the caller, weighted by the light count (unbiased, one shadow ray per bounce).
+   const int i0 = pick >= 0 ? min(pick, max(count - 1, 0)) : 0;
+   const int i1 = pick >= 0 ? i0 + 1 : count;
+   const float lw = pick >= 0 ? float(count) : 1.0;
+   for (int i = i0; i < 8; i++)
    {
-      if (i >= count) break;
+      if (i >= i1 || i >= count) break;
       constant LightU& L = f.lights[i];
       const int type = int(L.vec.w);
-      if (type == 3) { diff += L.color.xyz * L.terms.x * 3.14159265; continue; }
+      if (type == 3) { diff += L.color.xyz * L.terms.x * 3.14159265 * lw; continue; }
       float3 ld; float atten = 1.0;
       if (type == 1 || type == 4 || type == 5)
       {
@@ -156,7 +160,7 @@ float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, consta
          const float tm = (type == 1 || type == 4 || type == 5) ? max(length(L.vec.xyz - p) - 0.01, 0.0) : 1e4;
          if (occluded(tlas, p + n * f.shQ.w, ld, tm)) atten *= (1.0 - f.shP.w);
       }
-      diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x;
+      diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
    const float3 spec = sampleEnv(f, reflect(d, n), I.rg.x) * metal * base;
    hp = p; hn = n; alb = base * (1.0 - metal);
@@ -177,7 +181,8 @@ float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas,
    {
       float3 hp2, hn2, alb2;
       const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
-      L += alb * shadeHit(f, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2) * f.gi.y;
+      const int pk = int(rnd(seed) * f.params.w);
+      L += alb * shadeHit(f, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, true, pk) * f.gi.y;
    }
    return L;
 }
@@ -217,68 +222,75 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const int type = int(L.vec.w);
       const float3 radiance0 = L.color.xyz; // linear * intensity
       if (type == 3) { col += base * (1.0 - metal) * radiance0 * L.terms.x; continue; }
-      // Area lights: 8 stratified points on the rectangle, rotated per pixel and frame, so
-      // energy, shape and soft RT shadows match the tracer; everything else is one sample.
-      const int ns = type == 5 ? 8 : 1;
-      const float sw = 1.0 / float(ns);
-      float3 aR = float3(0.0), aU = float3(0.0);
-      uint ars = 0u;
+      // Area lights: a small visibility loop over 8 stratified points on the rectangle (rotated per pixel and
+      // frame) gives E = mean(falloff * cos at light * cos at surface * visible); the BRDF is evaluated once
+      // toward the centre. Diffuse energy, shape and soft RT shadows match the tracer; kept compact for occupancy.
+      float areaE = -1.0;
       if (type == 5)
       {
-         aR = cross(float3(0.0, 1.0, 0.0), L.aim.xyz);
+         float3 aR = cross(float3(0.0, 1.0, 0.0), L.aim.xyz);
          aR = dot(aR, aR) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(aR);
-         aU = cross(L.aim.xyz, aR);
-         ars = pcg(uint(in.pos.x) * 7919u + 104729u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 31337u + uint(i));
-      }
-      for (int si = 0; si < ns; si++)
-      {
-         float3 lp = L.vec.xyz;
-         if (type == 5)
+         const float3 aU = cross(L.aim.xyz, aR);
+         uint ars = pcg(uint(in.pos.x) * 7919u + 104729u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 31337u + uint(i));
+         const bool rtSh = (int(f.shQ.z + 0.5) & 1) != 0;
+         areaE = 0.0;
+         for (int si = 0; si < 8; si++)
          {
             const float jx = (float(si & 3) + rnd(ars)) * 0.25, jy = (float(si >> 2) + rnd(ars)) * 0.5;
-            lp += aR * ((jx - 0.5) * L.spot.z) + aU * ((jy - 0.5) * L.spot.w);
+            const float3 tl = L.vec.xyz + aR * ((jx - 0.5) * L.spot.z) + aU * ((jy - 0.5) * L.spot.w) - in.wp;
+            const float dist = length(tl); const float3 ld = tl / max(dist, 1e-4);
+            float e = lightFalloff(dist, L.terms.z) * max(dot(-ld, L.aim.xyz), 0.0) * max(dot(n, ld), 0.0);
+            if (L.terms.w > 0.0 && dist > L.terms.w) e = 0.0;
+            if (e > 0.0 && rtSh && occluded(rtArgs.tlas, in.wp + n * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
+            areaE += e * 0.125;
          }
-         float3 lightDir; float atten = 1.0;
-         if (type == 1 || type == 4 || type == 5)
+         if (areaE <= 0.0) continue;
+      }
+      float3 lightDir; float atten = 1.0;
+      if (type == 1 || type == 4 || type == 5)
+      {
+         const float3 toLight = L.vec.xyz - in.wp;
+         const float dist = length(toLight);
+         lightDir = toLight / max(dist, 1e-4);
+         atten = lightFalloff(dist, L.terms.z);
+         if (L.terms.w > 0.0 && dist > L.terms.w) atten = 0.0;
+         if (type == 4)
          {
-            const float3 toLight = lp - in.wp;
-            const float dist = length(toLight);
-            lightDir = toLight / max(dist, 1e-4);
-            atten = lightFalloff(dist, L.terms.z);
-            if (L.terms.w > 0.0 && dist > L.terms.w) atten = 0.0;
-            if (type == 4)
-            {
-               const float cosCur = dot(-lightDir, L.aim.xyz);
-               const float cosOuter = cos(L.spot.x * 0.017453292);
-               const float smoothW = (1.0 - cosOuter) * L.spot.y;
-               float sa = cosCur > cosOuter ? cosCur : 0.0;
-               if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
-               atten *= sa;
-            }
-            if (type == 5) atten *= max(dot(-lightDir, L.aim.xyz), 0.0);
+            const float cosCur = dot(-lightDir, L.aim.xyz);
+            const float cosOuter = cos(L.spot.x * 0.017453292);
+            const float smoothW = (1.0 - cosOuter) * L.spot.y;
+            float sa = cosCur > cosOuter ? cosCur : 0.0;
+            if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
+            atten *= sa;
          }
-         else lightDir = normalize(L.vec.xyz);
-         const float3 halfway = normalize(lightDir + viewDir);
-         float nDotL;
-         if (type == 2) { const float wrap = 0.35; nDotL = max((dot(n, lightDir) + wrap) / (1.0 + wrap), 0.0); }
-         else nDotL = max(dot(n, lightDir), 0.0);
-         if (nDotL <= 0.0) continue;
-         const float nDotH = max(dot(n, halfway), 0.0);
-         const float d = distGGX(nDotH, rough);
-         const float g = geomSchlick(nDotV, rough) * geomSchlick(nDotL, rough);
-         const float3 fr = fresnel(max(dot(halfway, viewDir), 0.0), f0);
-         const float3 spec = (d * g * fr) / max(4.0 * nDotV * nDotL, 1e-7);
-         const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
-         const float3 radiance = radiance0 * atten;
-         floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x * sw;
-         float shadow = (f.shP.x > 0.5 && i == int(f.shP.y)) ? shadowFactor(f, sm, in.wp, n, lightDir) : 1.0;
+      }
+      else lightDir = normalize(L.vec.xyz);
+      const float3 halfway = normalize(lightDir + viewDir);
+      float nDotL;
+      if (type == 2) { const float wrap = 0.35; nDotL = max((dot(n, lightDir) + wrap) / (1.0 + wrap), 0.0); }
+      else nDotL = max(dot(n, lightDir), 0.0);
+      if (type == 5) nDotL = max(nDotL, 1e-3); // the centre may face away while part of the rectangle is seen
+      if (nDotL <= 0.0) continue;
+      const float nDotH = max(dot(n, halfway), 0.0);
+      const float d = distGGX(nDotH, rough);
+      const float g = geomSchlick(nDotV, rough) * geomSchlick(nDotL, rough);
+      const float3 fr = fresnel(max(dot(halfway, viewDir), 0.0), f0);
+      const float3 spec = (d * g * fr) / max(4.0 * nDotV * nDotL, 1e-7);
+      const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
+      const float3 radiance = radiance0 * atten;
+      floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x;
+      float shadow = 1.0;
+      if (type == 5) shadow = areaE / max(atten * nDotL, 1e-6); // radiance * nDotL * shadow == radiance0 * E
+      else
+      {
+         if (f.shP.x > 0.5 && i == int(f.shP.y)) shadow = shadowFactor(f, sm, in.wp, n, lightDir);
          if ((int(f.shQ.z + 0.5) & 1) != 0)
          {
-            const float tmax = (type == 1 || type == 4 || type == 5) ? max(length(lp - in.wp) - 0.01, 0.0) : 1e4;
+            const float tmax = (type == 1 || type == 4) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
             if (occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, tmax)) shadow = 1.0 - f.shP.w;
          }
-         col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow * sw;
       }
+      col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow;
    }
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
    const float3 reflectDir = reflect(-viewDir, n);
@@ -311,15 +323,16 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       {
          const float3 dir = cosineDir(n, rnd(seed), rnd(seed));
          float3 hp, hn, alb;
-         float3 L1 = shadeHit(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, dir, 1.0, true, hp, hn, alb, false);
-         if (any(alb > 0.0))
+         float3 L1 = shadeHit(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, dir, 1.0, true, hp, hn, alb, false, int(rnd(seed) * f.params.w));
+         if (any(alb > 0.0) && ((uint(f.gi.z) >> 2) & 1u) == 0u)
          {
-            // Second bounce from the hit; later bounces as the geometric tail of that hit's albedo.
+            // Second bounce from the hit, every other GI frame at twice the weight (unbiased, half the rays; the
+            // history blends it); later bounces as the geometric tail of that hit's albedo.
             float3 hp2, hn2, alb2;
             const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
-            const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2);
+            const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, true, int(rnd(seed) * f.params.w));
             const float a = clamp(dot(alb2, float3(0.3333)), 0.0, 0.8);
-            L1 += alb * L2 / (1.0 - a);
+            L1 += alb * L2 * 2.0 / (1.0 - a);
          }
          acc += L1;
       }
