@@ -82,6 +82,7 @@ namespace engine
       bool rtShadows = false; // ray-traced hard shadows for every light (point and spot too); replaces the shadow map
       bool gi = false;            // one-bounce diffuse GI: cosine-sampled rays, 3x3 + temporal accumulation (needs the TLAS)
       int giRays = 1;
+      int giDenoise = 4;          // a-trous passes over the GI (steps 1, 2, 4, 8); 0 = the 3x3 gather alone
       float giStrength = 1.0f;
       float giBlend = 0.15f;      // temporal blend toward the new frame when the camera is still
       unsigned frameIndex = 0;
