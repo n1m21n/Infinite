@@ -282,6 +282,19 @@ Sun-cast shadow map fitted to the scene sphere (2048, 3x3 PCF, strength 0.8), sa
 
 Soft (PCSS / area) shadows and point-light shadows are not ported; point lights stay unshadowed here as in GL. Test note: Render 3D needs a second draw after its first cook before shadows exist (bounds come from the uploaded meshes); the harness nudges exposure to force it.
 
+## R2 step 1: ray-traced shadows (2026-11-10)
+
+Metal RT on M2: per-mesh BLAS, per-frame instance TLAS, `intersector<triangle_data, instancing>` in the fragment shader (TLAS passed through an argument buffer). Every light casts a hard ray shadow; the shadow-map path stays for the sun.
+
+| Scene (8 lights, 1080p, full-res rays) | Metal ms | GL ms | MAE vs GL shadow map |
+|---|---|---|---|
+| Raster + shadow map | 4.14 | 1.46 | 0.0009 |
+| Raster + RT shadows, all 8 lights | 7.70 | 4.20 (GL no point shadows) | 0.0070 |
+
+- RT adds about 3.5 ms at full 1080p, well inside the 12 ms R2 budget (rays at 540p would be about a quarter of that).
+- Diff vs GL is the point/spot-light shadows GL cannot draw, plus hard edges against PCF; no acne or leaking visible.
+- Open: soft RT shadows (jittered/denoised), RT reflections, quality vs path-traced reference.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

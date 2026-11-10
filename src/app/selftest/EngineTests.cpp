@@ -158,6 +158,7 @@ bool RunEngineTest()
    frame.envIntensity = r.envIntensity;
    std::memcpy(frame.clearSrgb, r.bgColor, 12);
    frame.shadow.enabled = r.shadowsEnabled;
+   frame.rtShadows = getenv("INFINITE_ENGINETEST_RT") != nullptr;
    frame.shadow.size = 2048; frame.shadow.bias = r.shadowBias; frame.shadow.strength = r.shadowStrength; frame.shadow.softness = r.shadowSoftness;
 
    auto raster = dev->CreateRasterRenderer();

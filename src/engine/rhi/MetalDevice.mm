@@ -30,7 +30,9 @@ fragment float4 tri_fs(VOut in [[stage_in]], constant float3& c [[buffer(0)]]) {
 
    NSString* const kRasterShader = @R"(
 #include <metal_stdlib>
+#include <metal_raytracing>
 using namespace metal;
+using namespace metal::raytracing;
 struct LightU { float4 vec; float4 aim; float4 color; float4 terms; float4 spot; }; // terms: diffuse, specular, falloff, cutoff
 struct FrameU
 {
@@ -87,11 +89,21 @@ float shadowFactor(constant FrameU& f, depth2d<float> sm, float3 wp, float3 n, f
          lit += sm.sample_compare(cs, uv + float2(float(x), float(y)) * f.shQ.x * f.shQ.y, z - bias);
    return mix(1.0, lit / 9.0, f.shP.w);
 }
+struct RTArgs { instance_acceleration_structure tlas; };
+bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tmax)
+{
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   it.accept_any_intersection(true);
+   ray r(o, d, 0.0, tmax);
+   intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
+   return h.type == intersection_type::triangle;
+}
 float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
 
 fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
-                     depth2d<float> sm [[texture(0)]])
+                     depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]])
 {
    const float3 n = normalize(in.n);
    const float3 base = m.base.xyz;
@@ -142,7 +154,12 @@ fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], con
       const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
       const float3 radiance = radiance0 * atten;
       floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x;
-      const float shadow = (f.shP.x > 0.5 && i == int(f.shP.y)) ? shadowFactor(f, sm, in.wp, n, lightDir) : 1.0;
+      float shadow = (f.shP.x > 0.5 && i == int(f.shP.y)) ? shadowFactor(f, sm, in.wp, n, lightDir) : 1.0;
+      if (f.shQ.z > 0.5)
+      {
+         const float tmax = (type == 1 || type == 4) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
+         if (occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, tmax)) shadow = 1.0 - f.shP.w;
+      }
       col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow;
    }
    col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal);
@@ -278,7 +295,9 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       MetalRaster(id<MTLDevice> dev, id<MTLCommandQueue> q) : mDev(dev), mQueue(q)
       {
          NSError* err = nil;
-         mLib = [dev newLibraryWithSource:kRasterShader options:nil error:&err];
+         MTLCompileOptions* co = [MTLCompileOptions new];
+         co.languageVersion = MTLLanguageVersion2_3;
+         mLib = [dev newLibraryWithSource:kRasterShader options:co error:&err];
          if (!mLib)
             NSLog(@"raster shader: %@", err);
       }
@@ -303,6 +322,72 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                return false;
             mMeshes.push_back(g);
          }
+         return BuildBlas();
+      }
+      bool BuildBlas()
+      {
+         mBlas = [NSMutableArray array];
+         if (mMeshes.empty())
+            return true;
+         id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+         id<MTLAccelerationStructureCommandEncoder> ae = [cb accelerationStructureCommandEncoder];
+         NSMutableArray* keep = [NSMutableArray array];
+         for (const Gpu& g : mMeshes)
+         {
+            MTLAccelerationStructureTriangleGeometryDescriptor* gd = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+            gd.vertexBuffer = g.vb; gd.vertexStride = 24;
+            gd.indexBuffer = g.ib; gd.indexType = MTLIndexTypeUInt32;
+            gd.triangleCount = g.count / 3;
+            gd.opaque = YES;
+            MTLPrimitiveAccelerationStructureDescriptor* ad = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+            ad.geometryDescriptors = @[ gd ];
+            const MTLAccelerationStructureSizes sz = [mDev accelerationStructureSizesWithDescriptor:ad];
+            id<MTLAccelerationStructure> as = [mDev newAccelerationStructureWithSize:sz.accelerationStructureSize];
+            id<MTLBuffer> scratch = [mDev newBufferWithLength:sz.buildScratchBufferSize options:MTLResourceStorageModePrivate];
+            if (!as || !scratch)
+               return false;
+            [ae buildAccelerationStructure:as descriptor:ad scratchBuffer:scratch scratchBufferOffset:0];
+            [mBlas addObject:as];
+            [keep addObject:scratch];
+         }
+         [ae endEncoding];
+         [cb commit];
+         [cb waitUntilCompleted];
+         return cb.status == MTLCommandBufferStatusCompleted;
+      }
+      // Instances change every frame; the instance structure is rebuilt in the frame's command buffer.
+      bool BuildTlas(id<MTLCommandBuffer> cb, const engine::Frame& fr)
+      {
+         const NSUInteger n = fr.instances.size();
+         if (n == 0 || mBlas.count == 0)
+            return false;
+         std::vector<MTLAccelerationStructureInstanceDescriptor> d(n);
+         for (NSUInteger i = 0; i < n; i++)
+         {
+            const engine::Instance& in = fr.instances[i];
+            MTLAccelerationStructureInstanceDescriptor& o = d[i];
+            for (int c = 0; c < 4; c++)
+               o.transformationMatrix.columns[c] = MTLPackedFloat3Make(in.model[c * 4 + 0], in.model[c * 4 + 1], in.model[c * 4 + 2]);
+            o.options = MTLAccelerationStructureInstanceOptionOpaque;
+            o.mask = 0xFF;
+            o.intersectionFunctionTableOffset = 0;
+            o.accelerationStructureIndex = (uint32_t)std::max(0, std::min(in.mesh, (int)mBlas.count - 1));
+         }
+         id<MTLBuffer> db = [mDev newBufferWithBytes:d.data() length:n * sizeof(d[0]) options:MTLResourceStorageModeShared];
+         MTLInstanceAccelerationStructureDescriptor* td = [MTLInstanceAccelerationStructureDescriptor descriptor];
+         td.instanceCount = n;
+         td.instanceDescriptorBuffer = db;
+         td.instancedAccelerationStructures = mBlas;
+         const MTLAccelerationStructureSizes sz = [mDev accelerationStructureSizesWithDescriptor:td];
+         if (!mTlas || mTlas.size < sz.accelerationStructureSize)
+            mTlas = [mDev newAccelerationStructureWithSize:sz.accelerationStructureSize];
+         if (!mTlasScratch || mTlasScratch.length < sz.buildScratchBufferSize)
+            mTlasScratch = [mDev newBufferWithLength:sz.buildScratchBufferSize options:MTLResourceStorageModePrivate];
+         if (!mTlas || !mTlasScratch)
+            return false;
+         id<MTLAccelerationStructureCommandEncoder> ae = [cb accelerationStructureCommandEncoder];
+         [ae buildAccelerationStructure:mTlas descriptor:td scratchBuffer:mTlasScratch scratchBufferOffset:0];
+         [ae endEncoding];
          return true;
       }
       bool Render(SharedImage& target, const engine::Frame& fr, double* gpuMs) override
@@ -334,8 +419,12 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          }
 
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
-         if (!ShadowPass(cb, fr, f))
+         const bool haveTlas = BuildTlas(cb, fr);
+         const bool rt = fr.rtShadows && haveTlas;
+         if (rt || !ShadowPass(cb, fr, f))
             EnsureShadowTex(4);
+         f.shQ[2] = rt ? 1.0f : 0.0f; f.shQ[3] = fr.rayBias;
+         if (rt) { f.shP[1] = 0; f.shP[0] = 0; f.shP[3] = fr.shadow.strength; }
          MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
          pass.colorAttachments[0].texture = img.Tex();
          pass.colorAttachments[0].loadAction = MTLLoadActionClear;
@@ -347,6 +436,22 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          pass.depthAttachment.clearDepth = 1.0;
          id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:pass];
          [enc setFragmentTexture:mShadowTex atIndex:0];
+         if (haveTlas)
+         {
+            if (mArgTlas != mTlas)
+            {
+               if (!mArgEnc)
+                  mArgEnc = [mFsFn newArgumentEncoderWithBufferIndex:3];
+               mArgBuf = [mDev newBufferWithLength:mArgEnc.encodedLength options:MTLResourceStorageModeShared];
+               [mArgEnc setArgumentBuffer:mArgBuf offset:0];
+               [mArgEnc setAccelerationStructure:mTlas atIndex:0];
+               mArgTlas = mTlas;
+            }
+            [enc setFragmentBuffer:mArgBuf offset:0 atIndex:3];
+            [enc useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            for (id<MTLAccelerationStructure> b in mBlas)
+               [enc useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+         }
          [enc setRenderPipelineState:mPso];
          [enc setDepthStencilState:mDs];
          [enc setCullMode:MTLCullModeBack];
@@ -489,7 +594,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             return true;
          MTLRenderPipelineDescriptor* pd = [MTLRenderPipelineDescriptor new];
          pd.vertexFunction = [mLib newFunctionWithName:@"r_vs"];
-         pd.fragmentFunction = [mLib newFunctionWithName:@"r_fs"];
+         mFsFn = [mLib newFunctionWithName:@"r_fs"];
+         pd.fragmentFunction = mFsFn;
          pd.colorAttachments[0].pixelFormat = fmt;
          pd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          NSError* err = nil;
@@ -522,6 +628,13 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       id<MTLDepthStencilState> mDs = nil;
       id<MTLTexture> mDepth = nil;
       id<MTLTexture> mShadowTex = nil;
+      NSMutableArray<id<MTLAccelerationStructure>>* mBlas = nil;
+      id<MTLAccelerationStructure> mTlas = nil;
+      id<MTLBuffer> mTlasScratch = nil;
+      id<MTLFunction> mFsFn = nil;
+      id<MTLArgumentEncoder> mArgEnc = nil;
+      id<MTLBuffer> mArgBuf = nil;
+      id<MTLAccelerationStructure> mArgTlas = nil;
       id<MTLRenderPipelineState> mShPso = nil;
       MTLPixelFormat mFmt = MTLPixelFormatInvalid;
       std::vector<Gpu> mMeshes;

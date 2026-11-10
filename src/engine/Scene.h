@@ -65,6 +65,8 @@ namespace engine
       float envIntensity = 1.0f;
       float clearSrgb[3] = { 0.04f, 0.04f, 0.06f };
       Shadow shadow;
+      bool rtShadows = false; // ray-traced hard shadows for every light (point and spot too); replaces the shadow map
+      float rayBias = 0.003f; // origin offset along the normal, scene units
    };
 
    constexpr int kMaxLights = 8;
