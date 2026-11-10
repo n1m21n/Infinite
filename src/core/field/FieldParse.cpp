@@ -462,7 +462,7 @@ namespace Field
       {
          if (tok.kind != TokenKind::Ident) return false;
          return tok.text == "graph" || tok.text == "frame" || tok.text == "element" ||
-                tok.text == "pixel" || tok.text == "sample";
+                tok.text == "pixel" || tok.text == "sample" || tok.text == "bin";
       }
 
       bool ParseLiteralNumber(ParserState& p, double& outVal, SourceSpan& outSpan)
@@ -802,7 +802,7 @@ namespace Field
          Token outputTok = p.Advance(); // consume 'output'
          if (p.AtEnd() || !IsDomainToken(p.Peek()))
          {
-            p.Fail("expected a domain name (graph, frame, element, pixel, sample) after 'output'", p.Peek().span);
+            p.Fail("expected a domain name (graph, frame, element, pixel, sample, bin) after 'output'", p.Peek().span);
             return nullptr;
          }
          Token domainTok = p.Advance();
@@ -839,7 +839,7 @@ namespace Field
          Token inputTok = p.Advance(); // consume 'input'
          if (p.AtEnd() || !IsDomainToken(p.Peek()))
          {
-            p.Fail("expected a domain name (graph, frame, element, pixel, sample) after 'input'", p.Peek().span);
+            p.Fail("expected a domain name (graph, frame, element, pixel, sample, bin) after 'input'", p.Peek().span);
             return nullptr;
          }
          Token domainTok = p.Advance();

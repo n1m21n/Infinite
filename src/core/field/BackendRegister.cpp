@@ -792,29 +792,6 @@ namespace Field
                   ctx.Fail("duplicate declaration of '" + d->name + "'", stmt->span);
                   return;
                }
-               if (ctx.spectralHost)
-               {
-                  if (d->domainName != "bin" || d->typeName != "audio")
-                  {
-                     ctx.Fail("a spectral kernel's input must be 'input bin audio " + d->name + "'", stmt->span,
-                              "its bins are read as " + d->name + ".mag, " + d->name + ".phase and " + d->name + ".freq");
-                     return;
-                  }
-                  if (!ctx.specInputName.empty())
-                  {
-                     ctx.Fail("a spectral kernel takes at most one bin input", stmt->span);
-                     return;
-                  }
-                  SampleDeclaredPin pin;
-                  pin.name = d->name;
-                  pin.typeName = d->typeName;
-                  pin.domainName = d->domainName;
-                  ctx.prog.declaredInputs.push_back(pin);
-                  ctx.prog.hasSpectralInput = true;
-                  ctx.prog.spectralInputName = d->name;
-                  ctx.specInputName = d->name;
-                  return;
-               }
                static const std::unordered_set<std::string> kValidDomains = { "graph", "frame", "element", "pixel", "sample" };
                if (kValidDomains.find(d->domainName) == kValidDomains.end())
                {
@@ -916,6 +893,29 @@ namespace Field
                if (scope.count(d->name))
                {
                   ctx.Fail("duplicate declaration of '" + d->name + "'", stmt->span);
+                  return;
+               }
+               if (ctx.spectralHost)
+               {
+                  if (d->domainName != "bin" || d->typeName != "audio")
+                  {
+                     ctx.Fail("a spectral kernel's input must be 'input bin audio " + d->name + "'", stmt->span,
+                              "its bins are read as " + d->name + ".mag, " + d->name + ".phase and " + d->name + ".freq");
+                     return;
+                  }
+                  if (!ctx.specInputName.empty())
+                  {
+                     ctx.Fail("a spectral kernel takes at most one bin input", stmt->span);
+                     return;
+                  }
+                  SampleDeclaredPin pin;
+                  pin.name = d->name;
+                  pin.typeName = d->typeName;
+                  pin.domainName = d->domainName;
+                  ctx.prog.declaredInputs.push_back(pin);
+                  ctx.prog.hasSpectralInput = true;
+                  ctx.prog.spectralInputName = d->name;
+                  ctx.specInputName = d->name;
                   return;
                }
                static const std::unordered_set<std::string> kValidDomains = { "graph", "frame", "element", "pixel", "sample" };
