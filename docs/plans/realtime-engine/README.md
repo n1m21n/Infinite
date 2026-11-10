@@ -302,6 +302,8 @@ One ray per pixel along the reflection vector for surfaces with roughness < 0.55
 - Cost: 9.09 ms total at 1080p with 8 RT-shadow lights + RT reflections (+1.4 ms over shadows alone), under the 12 ms R2 budget at full-res rays.
 - Known limits: hit shading has no vertex normals (uses the view ray), no lights or shadows at the hit, one bounce. Next: vertex fetch for hit normals and direct light at the hit, then compare against a path-traced reference (R4 dependency) for the FLIP ≤ 0.12 gate.
 
+**Step 2b (same day):** hit shading now fetches vertex normals (GPU addresses of each mesh's vertex/index buffers, read in the shader by primitive id and barycentrics) and applies Lambert from every light at the hit. Cost unchanged (9.05 ms at 1080p). The floor in the sphere is now lit instead of dark. Still no shadows at the hit; one bounce.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

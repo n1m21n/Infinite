@@ -99,27 +99,62 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
    return h.type == intersection_type::triangle;
 }
-// One-bounce reflection: closest hit -> flat shade (instance colour under ambient + env), miss -> env.
-float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant float4* inst, float3 o, float3 d, float rough)
+struct RInst { float4 bm; float4 rg; ulong vb; ulong ib; float4x4 normalM; };
+// One-bounce reflection: closest hit -> vertex normal, Lambert from every light (no shadows), ambient, env spec. Miss -> env.
+float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough)
 {
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    ray r(o, d, 0.0, 1e4);
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
    if (h.type != intersection_type::triangle) return sampleEnv(f, d, rough);
-   const float4 bm = inst[h.instance_id * 2];
-   const float3 nApprox = -d; // no vertex fetch yet: face the viewer ray
-   const float3 amb = sampleEnv(f, nApprox, 1.0) * f.ambient.xyz * 3.0;
-   const float3 diff = bm.xyz * (1.0 - bm.w) * (amb + float3(0.25));
-   const float3 spec = sampleEnv(f, d, inst[h.instance_id * 2 + 1].x) * bm.w * bm.xyz;
-   return diff + spec;
+   constant RInst& I = inst[h.instance_id];
+   const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
+   const device float* vb = reinterpret_cast<const device float*>(I.vb);
+   const uint3 ix = uint3(ib[h.primitive_id * 3], ib[h.primitive_id * 3 + 1], ib[h.primitive_id * 3 + 2]);
+   const float2 bc = h.triangle_barycentric_coord;
+   const float3 w = float3(1.0 - bc.x - bc.y, bc.x, bc.y);
+   float3 nl = float3(vb[ix.x * 6 + 3], vb[ix.x * 6 + 4], vb[ix.x * 6 + 5]) * w.x
+             + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w.y
+             + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w.z;
+   float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
+   if (dot(n, d) > 0.0) n = -n;
+   const float3 p = o + d * h.distance;
+   const float3 base = I.bm.xyz; const float metal = I.bm.w;
+   float3 diff = sampleEnv(f, n, 1.0) * f.ambient.xyz * 3.0;
+   const int count = int(f.params.w);
+   for (int i = 0; i < 8; i++)
+   {
+      if (i >= count) break;
+      constant LightU& L = f.lights[i];
+      const int type = int(L.vec.w);
+      if (type == 3) { diff += L.color.xyz * L.terms.x; continue; }
+      float3 ld; float atten = 1.0;
+      if (type == 1 || type == 4)
+      {
+         const float3 tl = L.vec.xyz - p; const float dist = length(tl);
+         ld = tl / max(dist, 1e-4);
+         atten = lightFalloff(dist, L.terms.z);
+         if (L.terms.w > 0.0 && dist > L.terms.w) atten = 0.0;
+         if (type == 4)
+         {
+            const float cosCur = dot(-ld, L.aim.xyz);
+            const float cosOuter = cos(L.spot.x * 0.017453292);
+            atten *= cosCur > cosOuter ? 1.0 : 0.0;
+         }
+      }
+      else ld = normalize(L.vec.xyz);
+      diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x;
+   }
+   const float3 spec = sampleEnv(f, reflect(d, n), I.rg.x) * metal * base;
+   return base * (1.0 - metal) * diff / 3.14159265 * 3.0 + spec;
 }
 float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
 
 fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
-                     constant float4* instInfo [[buffer(4)]])
+                     constant RInst* instInfo [[buffer(4)]])
 {
    const float3 n = normalize(in.n);
    const float3 base = m.base.xyz;
@@ -471,6 +506,11 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             }
             [enc setFragmentBuffer:mArgBuf offset:0 atIndex:3];
             [enc useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            for (const Gpu& g : mMeshes)
+            {
+               [enc useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               [enc useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            }
             for (id<MTLAccelerationStructure> b in mBlas)
                [enc useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
          }
@@ -481,14 +521,20 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          [enc setVertexBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
          {
-            std::vector<float> info(fr.instances.size() * 8 + 8, 0.0f);
+            struct RInstH { float bm[4], rg[4]; uint64_t vb, ib; float normalM[16]; };
+            std::vector<RInstH> info(fr.instances.size() + 1);
             for (size_t i = 0; i < fr.instances.size(); i++)
             {
-               float b[3]; Lin3(fr.instances[i].baseSrgb, b);
-               info[i * 8 + 0] = b[0]; info[i * 8 + 1] = b[1]; info[i * 8 + 2] = b[2];
-               info[i * 8 + 3] = fr.instances[i].metallic; info[i * 8 + 4] = fr.instances[i].roughness;
+               const engine::Instance& in = fr.instances[i];
+               RInstH& o = info[i]; o = {};
+               Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness;
+               std::memcpy(o.normalM, in.normalMatrix, 64);
+               if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
+               {
+                  o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress;
+               }
             }
-            [enc setFragmentBytes:info.data() length:info.size() * 4 atIndex:4];
+            [enc setFragmentBytes:info.data() length:info.size() * sizeof(RInstH) atIndex:4];
          }
          for (const engine::Instance& in : fr.instances)
          {
