@@ -49,7 +49,14 @@ struct FrameU
    LightU lights[8]; // vec.w = type, aim.w unused
 };
 struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; }; // base linear rgb; mr = metallic, roughness, transmission, ior
-struct VOut { float4 pos [[position]]; float3 wp; float3 n; };
+// INV_POS: the second, invariant compile used by the depth prepass and the shaded runs after it (exact same depth);
+// plain raster keeps the faster non-invariant build.
+#ifdef INV_POS
+#define VPOS [[position, invariant]]
+#else
+#define VPOS [[position]]
+#endif
+struct VOut { float4 pos VPOS; float3 wp; float3 n; };
 
 vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                  constant InstU& m [[buffer(2)]])
@@ -233,9 +240,76 @@ struct FOut { float4 c0 [[color(0)]]; float4 c1 [[color(1), function_constant(kM
 float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
 
+// ---- Half-res RT shadows (C18): vis_fs traces one shadow ray per light (aim.w = channel) at full-res pixel 2q
+// from the depth prepass; r_fs takes the 2x2 texels around it that lie on its surface (distance within 2%), and
+// traces its own ray where none does (silhouettes, thin parts) or where they disagree (shadow edges stay full-res).
+struct VisU { float4x4 invVP; float4 info; }; // info: full width, height
+struct VisOut { float4 v [[color(0)]]; float d [[color(1)]]; };
+float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
+{
+   const float z = dt.read(uint2(px));
+   const float2 ndc = float2(2.0 * (float(px.x) + 0.5) / u.info.x - 1.0, 2.0 * (float(px.y) + 0.5) / u.info.y - 1.0);
+   const float4 pw = u.invVP * float4(ndc, z * 2.0 - 1.0, 1.0);
+   return pw.xyz / pw.w;
+}
+fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
+                       constant RTArgs& rtArgs [[buffer(3)]], depth2d<float> dt [[texture(0)]])
+{
+   VisOut o; o.v = float4(1.0); o.d = -1.0;
+   const int W = int(u.info.x), H = int(u.info.y);
+   const int2 px = int2(in.pos.xy) * 2;
+   if (px.x >= W || px.y >= H) return o;
+   if (dt.read(uint2(px)) >= 1.0) return o;
+   const float3 p = visWp(u, dt, px);
+   const int2 ax = int2(min(px.x + 1, W - 1), px.y), bx = int2(max(px.x - 1, 0), px.y);
+   const int2 ay = int2(px.x, min(px.y + 1, H - 1)), by = int2(px.x, max(px.y - 1, 0));
+   const float3 pax = visWp(u, dt, ax), pbx = visWp(u, dt, bx), pay = visWp(u, dt, ay), pby = visWp(u, dt, by);
+   const float3 dx = distance(pax, p) < distance(pbx, p) ? pax - p : p - pbx;
+   const float3 dy = distance(pay, p) < distance(pby, p) ? pay - p : p - pby;
+   float3 n = cross(dx, dy);
+   n = dot(n, n) > 1e-20 ? normalize(n) : normalize(f.eye.xyz - p);
+   if (dot(n, f.eye.xyz - p) < 0.0) n = -n;
+   o.d = distance(p, f.eye.xyz);
+   const int count = int(f.params.w);
+   for (int i = 0; i < 8; i++)
+   {
+      if (i >= count) break;
+      constant LightU& L = f.lights[i];
+      if (L.aim.w < -0.5) continue;
+      const int ch = min(int(L.aim.w + 0.5), 3);
+      const int type = int(L.vec.w);
+      float3 ld; float tmax = 1e4;
+      if (type == 1 || type == 4) { const float3 tl = L.vec.xyz - p; const float dist = length(tl); ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0); }
+      else ld = normalize(L.vec.xyz);
+      if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) o.v[ch] = 0.0;
+   }
+   return o;
+}
+float upVis(texture2d<float> vt, texture2d<float> vd, float2 pos, float dist, int ch)
+{
+   const int2 p = int2(pos);
+   const int2 qb = p / 2;
+   const float2 fw = float2(p - qb * 2) * 0.5;
+   const int2 sz = int2(vt.get_width(), vt.get_height());
+   float acc = 0.0, ws = 0.0, lo = 1.0, hi = 0.0;
+   for (int j = 0; j < 2; j++)
+      for (int i = 0; i < 2; i++)
+      {
+         const float bw = (i == 1 ? fw.x : 1.0 - fw.x) * (j == 1 ? fw.y : 1.0 - fw.y);
+         if (bw <= 0.0) continue;
+         const uint2 q = uint2(min(qb + int2(i, j), sz - 1));
+         const float dq = vd.read(q).x;
+         if (dq < 0.0 || abs(dq - dist) > 0.02 * dist) continue;
+         const float v = vt.read(q)[ch];
+         acc += bw * v; ws += bw; lo = min(lo, v); hi = max(hi, v);
+      }
+   return (ws < 0.2 || hi - lo > 0.5) ? -1.0 : acc / ws; // a shadow edge between the texels: trace this pixel
+
+}
 fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
-                     constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]])
+                     constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
+                     texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]])
 {
    const float3 n = normalize(in.n);
    const float3 base = m.base.xyz;
@@ -318,8 +392,15 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          if (f.shP.x > 0.5 && i == int(f.shP.y)) shadow = shadowFactor(f, sm, in.wp, n, lightDir);
          if ((int(f.shQ.z + 0.5) & 1) != 0)
          {
-            const float tmax = (type == 1 || type == 4) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
-            if (occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, tmax)) shadow = 1.0 - f.shP.w;
+            float vis = -1.0;
+            if ((int(f.shQ.z + 0.5) & 4) != 0 && L.aim.w > -0.5)
+               vis = upVis(visT, visD, in.pos.xy, distance(in.wp, f.eye.xyz), int(L.aim.w + 0.5));
+            if (vis < 0.0)
+            {
+               const float tmax = (type == 1 || type == 4) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
+               vis = occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, tmax) ? 0.0 : 1.0;
+            }
+            shadow = mix(1.0 - f.shP.w, 1.0, vis);
          }
       }
       col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow;
@@ -1217,12 +1298,17 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          const bool envMap = EnsureEnv(fr);
          f.envm[0] = (envMap ? 1.0f : 0.0f) + (envMap && fr.envBackground ? 2.0f : 0.0f);
          f.envm[1] = fr.envRotationRad; f.envm[2] = fr.envMaxLod; f.envm[3] = fr.envBaseLod;
+         int visCh = 0;
          for (int i = 0; i < n; i++)
          {
             const engine::Light& l = fr.lights[i];
             LightU& o = f.lights[i];
             std::memcpy(o.vec, l.vec, 12); o.vec[3] = (float)(int)l.type;
             std::memcpy(o.aim, l.aim, 12);
+            // aim.w: this light's channel in the half-res shadow mask (directional, point, sun, spot; first four), else -1
+            o.aim[3] = -1.0f;
+            if (l.type == engine::LightType::Directional || l.type == engine::LightType::Point || l.type == engine::LightType::Sun || l.type == engine::LightType::Spot)
+               if (visCh < 4) o.aim[3] = (float)visCh++;
             Lin3(l.colorSrgb, o.color, l.intensity);
             o.terms[0] = l.diffuse; o.terms[1] = l.specular; o.terms[2] = l.falloff; o.terms[3] = l.cutoff;
             o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
@@ -1252,6 +1338,69 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          f.gi[0] = giOn ? 1.0f : 0.0f; f.gi[1] = fr.giStrength; f.gi[2] = (float)fr.frameIndex; f.gi[3] = (float)fr.giRays;
          f.shQ[2] = (rt ? 1.0f : 0.0f) + (rtRefl ? 2.0f : 0.0f); f.shQ[3] = fr.rayBias;
          if (rt) { f.shP[1] = 0; f.shP[0] = 0; f.shP[3] = fr.shadow.strength; }
+         // RT shadows: a depth-only prepass (the shaded pass then runs once per pixel), then the half-res shadow mask
+         // traced from that depth. INFINITE_ENGINE_HALFSHADOW=0 keeps the prepass and traces every pixel instead.
+         static const int sHalfSh = [] { const char* e = getenv("INFINITE_ENGINE_HALFSHADOW"); return e ? atoi(e) : 1; }(); // 0 prepass only, -1 neither
+         const bool prepass = rt && sHalfSh >= 0 && mDsEq && EnsureInv();
+         float invVP[16];
+         const bool mask = prepass && sHalfSh > 0 && mVisPso && Inv4(fr.viewProj, invVP);
+         if (prepass)
+         {
+            MTLRenderPassDescriptor* zp = [MTLRenderPassDescriptor renderPassDescriptor];
+            zp.depthAttachment.texture = mDepth;
+            zp.depthAttachment.loadAction = MTLLoadActionClear;
+            zp.depthAttachment.storeAction = MTLStoreActionStore;
+            zp.depthAttachment.clearDepth = 1.0;
+            id<MTLRenderCommandEncoder> ze = [cb renderCommandEncoderWithDescriptor:zp];
+            [ze setRenderPipelineState:mPrePso];
+            [ze setDepthStencilState:mDs];
+            [ze setCullMode:MTLCullModeBack];
+            [ze setFrontFacingWinding:MTLWindingClockwise];
+            [ze setVertexBytes:&f length:sizeof(f) atIndex:1];
+            [ze setVertexBuffer:mInstBuf offset:0 atIndex:10];
+            for (const auto& r : mRuns)
+            {
+               const Gpu& g = mMeshes[fr.instances[r.first].mesh];
+               [ze setVertexBuffer:g.vb offset:0 atIndex:0];
+               [ze setVertexBytes:&r.first length:4 atIndex:11];
+               [ze drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib
+                           indexBufferOffset:0 instanceCount:r.second];
+            }
+            [ze endEncoding];
+         }
+         if (mask)
+         {
+            f.shQ[2] += 4.0f;
+            if (!mArgEnc)
+               mArgEnc = [mFsFn newArgumentEncoderWithBufferIndex:3];
+            if (mArgTlas != mTlas)
+            {
+               mArgBuf = [mDev newBufferWithLength:mArgEnc.encodedLength options:MTLResourceStorageModeShared];
+               [mArgEnc setArgumentBuffer:mArgBuf offset:0];
+               [mArgEnc setAccelerationStructure:mTlas atIndex:0];
+               mArgTlas = mTlas;
+            }
+            MTLRenderPassDescriptor* vp = [MTLRenderPassDescriptor renderPassDescriptor];
+            vp.colorAttachments[0].texture = mVis;
+            vp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+            vp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            vp.colorAttachments[1].texture = mVisD;
+            vp.colorAttachments[1].loadAction = MTLLoadActionDontCare;
+            vp.colorAttachments[1].storeAction = MTLStoreActionStore;
+            id<MTLRenderCommandEncoder> ve = [cb renderCommandEncoderWithDescriptor:vp];
+            struct { float invVP[16]; float info[4]; } vu = {};
+            std::memcpy(vu.invVP, invVP, 64);
+            vu.info[0] = (float)img.Width(); vu.info[1] = (float)img.Height();
+            [ve setRenderPipelineState:mVisPso];
+            [ve setFragmentBytes:&vu length:sizeof(vu) atIndex:0];
+            [ve setFragmentBytes:&f length:sizeof(f) atIndex:1];
+            [ve setFragmentBuffer:mArgBuf offset:0 atIndex:3];
+            [ve setFragmentTexture:mDepth atIndex:0];
+            [ve useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            for (id<MTLAccelerationStructure> b in mBlas) [ve useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            [ve drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+            [ve endEncoding];
+         }
          MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
          const bool mrt = giOn || rtRefl;
          pass.colorAttachments[0].texture = mrt ? mHdr : img.Tex();
@@ -1276,7 +1425,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          }
          }
          pass.depthAttachment.texture = mDepth;
-         pass.depthAttachment.loadAction = MTLLoadActionClear;
+         pass.depthAttachment.loadAction = prepass ? MTLLoadActionLoad : MTLLoadActionClear;
          pass.depthAttachment.storeAction = MTLStoreActionDontCare;
          pass.depthAttachment.clearDepth = 1.0;
          id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:pass];
@@ -1324,6 +1473,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          id<MTLBuffer> infoBuf = InfoBuffer(info);
          [enc setFragmentBuffer:infoBuf offset:0 atIndex:4];
          [enc setFragmentTexture:mEnvBound atIndex:9];
+         [enc setFragmentTexture:mVis atIndex:7];
+         [enc setFragmentTexture:mVisD atIndex:8];
          if (fr.envBackground && (int(f.envm[0]) & 2) != 0 && mBgPsoMrt && mBgPsoDir)
          {
             struct { float invVP[16]; float p[4]; } bu = {};
@@ -1340,8 +1491,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                [enc setDepthStencilState:mDs];
             }
          }
-         [enc setRenderPipelineState:mrt ? mPsoRun : mPsoRunDir];
+         [enc setRenderPipelineState:prepass ? (mrt ? mPsoRunInv : mPsoRunDirInv) : (mrt ? mPsoRun : mPsoRunDir)];
          [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
+         if (prepass) [enc setDepthStencilState:mDsEq];
          const InstU* runU = (const InstU*)mInstBuf.contents;
          for (const auto& r : mRuns)
          {
@@ -1353,6 +1505,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                          indexBufferOffset:0 instanceCount:r.second];
          }
          [enc setRenderPipelineState:mrt ? mPso : mPsoDir];
+         [enc setDepthStencilState:mDs];
          for (size_t bi = 0; bi < fr.batches.size() && bi < mBatchGpu.size(); bi++)
          {
             const engine::InstanceBatch& b = fr.batches[bi];
@@ -1848,6 +2001,17 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             id<MTLFunction> keep = pd.vertexFunction;
             pd.vertexFunction = rr;
             mPsoRun = [mDev newRenderPipelineStateWithDescriptor:pd error:&err];
+            // Depth prepass: the same vertex function, no fragment work, so the shaded pass (and its rays) runs once per pixel.
+            {
+               mFsDirFn = fsDir;
+               MTLRenderPipelineDescriptor* vd = [MTLRenderPipelineDescriptor new];
+               vd.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
+               vd.fragmentFunction = [mLib newFunctionWithName:@"vis_fs"];
+               vd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
+               vd.colorAttachments[1].pixelFormat = MTLPixelFormatR32Float;
+               mVisPso = [mDev newRenderPipelineStateWithDescriptor:vd error:&err];
+               if (!mVisPso) NSLog(@"shadow mask pipeline: %@", err);
+            }
             pd.vertexFunction = keep;
             if (!mPsoRun || !mPsoRunDir) NSLog(@"run pipeline: %@", err);
          }
@@ -1889,7 +2053,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          dd.depthCompareFunction = MTLCompareFunctionLess;
          dd.depthWriteEnabled = YES;
          mDs = [mDev newDepthStencilStateWithDescriptor:dd];
+         dd.depthCompareFunction = MTLCompareFunctionLessEqual;
+         dd.depthWriteEnabled = NO;
+         mDsEq = [mDev newDepthStencilStateWithDescriptor:dd];
          mFmt = fmt;
+         mInvTried = false; mPrePso = nil; mPsoRunInv = nil; mPsoRunDirInv = nil; // rebuilt for the new format on first use
          {
             MTLRenderPipelineDescriptor* gd = [MTLRenderPipelineDescriptor new];
             gd.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
@@ -1922,7 +2090,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          if (mDepth && (int)mDepth.width == w && (int)mDepth.height == h)
             return true;
          MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float width:w height:h mipmapped:NO];
-         d.usage = MTLTextureUsageRenderTarget;
+         d.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead; // the shadow mask pass reads the prepass depth
          d.storageMode = MTLStorageModePrivate;
          mDepth = [mDev newTextureWithDescriptor:d];
          return mDepth != nil;
@@ -1931,7 +2099,44 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       id<MTLCommandQueue> mQueue;
       id<MTLLibrary> mLib = nil;
       id<MTLRenderPipelineState> mPso = nil;
-      id<MTLDepthStencilState> mDs = nil;
+      id<MTLDepthStencilState> mDs = nil, mDsEq = nil;
+      id<MTLRenderPipelineState> mPrePso = nil, mVisPso = nil, mPsoRunInv = nil, mPsoRunDirInv = nil;
+      id<MTLFunction> mFsDirFn = nil;
+      bool mInvTried = false;
+      // The invariant prepass + run pipelines, built the first time RT shadows are on (a second compile of the shader).
+      bool EnsureInv()
+      {
+         if (mInvTried) return mPrePso && mPsoRunInv && mPsoRunDirInv;
+         mInvTried = true;
+         NSError* err = nil;
+         MTLCompileOptions* co = [MTLCompileOptions new];
+         co.languageVersion = MTLLanguageVersion2_3;
+         co.preserveInvariance = YES;
+         co.preprocessorMacros = @{ @"INV_POS" : @1 };
+         id<MTLLibrary> lib = [mDev newLibraryWithSource:kRasterShader options:co error:&err];
+         id<MTLFunction> rr = lib ? [lib newFunctionWithName:@"rr_vs"] : nil;
+         if (!rr) { NSLog(@"invariant shader: %@", err); return false; }
+         MTLRenderPipelineDescriptor* zp = [MTLRenderPipelineDescriptor new];
+         zp.vertexFunction = rr;
+         zp.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+         mPrePso = [mDev newRenderPipelineStateWithDescriptor:zp error:&err];
+         MTLRenderPipelineDescriptor* pd = [MTLRenderPipelineDescriptor new];
+         pd.vertexFunction = rr; pd.fragmentFunction = mFsFn;
+         pd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+         pd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
+         pd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
+         pd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
+         pd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+         mPsoRunInv = [mDev newRenderPipelineStateWithDescriptor:pd error:&err];
+         MTLRenderPipelineDescriptor* dd = [MTLRenderPipelineDescriptor new];
+         dd.vertexFunction = rr; dd.fragmentFunction = mFsDirFn;
+         dd.colorAttachments[0].pixelFormat = mFmt;
+         dd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+         mPsoRunDirInv = [mDev newRenderPipelineStateWithDescriptor:dd error:&err];
+         if (!mPrePso || !mPsoRunInv || !mPsoRunDirInv) NSLog(@"invariant pipelines: %@", err);
+         return mPrePso && mPsoRunInv && mPsoRunDirInv;
+      }
+      id<MTLTexture> mVis = nil, mVisD = nil; // half-res RT shadow mask (4 lights) and its distance guide
       id<MTLTexture> mDepth = nil;
       id<MTLTexture> mShadowTex = nil;
       NSMutableArray<id<MTLAccelerationStructure>>* mBlas = nil;
@@ -2002,8 +2207,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          mNz = [mDev newTextureWithDescriptor:d];
          d.pixelFormat = MTLPixelFormatRGBA16Float; d.width = (w + 1) / 2; d.height = (h + 1) / 2;
          mTr[0] = [mDev newTextureWithDescriptor:d]; mTr[1] = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatRGBA8Unorm; mVis = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatR32Float; mVisD = [mDev newTextureWithDescriptor:d];
          mHistValid = false; mRValid = false;
-         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1];
+         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1] && mVis && mVisD;
       }
       MTLPixelFormat mFmt = MTLPixelFormatInvalid;
       std::vector<Gpu> mMeshes;

@@ -516,6 +516,28 @@ default below, animated, unpaced, ≈ 10 min):
 No thermal fall-off across the 10 minutes (frame 600: 29.5 ms, frame 18,000: 33.8 ms). B4 has no audio nodes, so the
 callbacks are light; xruns under a heavy synth patch are not measured yet.
 
+### Half-res RT shadows on B4 (2026-11-10, release, M2)
+
+Shadow rays (C18) now run in their own pass: a depth-only prepass, then one ray per light (first four direct
+lights) at every 2x2 block's top-left pixel, written to a half-res mask. The shaded pass takes the mask texels on its
+own surface and traces its own ray where none lies on it (silhouettes) or where they disagree (shadow edges), so
+edges stay full-res. The prepass and the runs after it use a second, invariant compile of the shader, so their
+depth matches exactly; plain raster keeps the faster build (invariance cost 3-4 ms on raster l).
+`INFINITE_ENGINE_HALFSHADOW=0` keeps the prepass and traces every pixel; `-1` turns off both.
+
+| Scale | Raster | RT shadows before | RT shadows now | All three before | All three now |
+|---|---|---|---|---|---|
+| s | 8.3 | 43.8 | **20.8** | 114.8 | 90.9 |
+| m | 12.0 | 61.4 | **26.7** | 132.8 | 100.1 |
+| l | 18.0 | 87.2 | **34.7** | 156.6 | 116.2 |
+
+- Picture: half-res mask vs every-pixel rays, FLIP 0.0005 (s) and 0.0010 (m), brightness 1.000.
+- Shadow cost is now +12 to +17 ms over raster and barely grows with object count (963 -> 12,291 objects), so
+  flattening copies into one ray structure would buy little; not done.
+- 4-object test scene with RT shadows: 11.2 ms -> 10.6 ms. Engine self-test 15/15.
+- What is left on "all three" is GI (+44 to +48 ms) and reflections (+17 to +21 ms), both already half-res; their
+  cost is the bounce shading per ray (each GI hit shades a light with its own shadow ray).
+
 ### Targets per GPU tier (set 2026-11-10)
 
 The engine picks features from the GPU it finds (Metal GPU family), so a faster chip gets more, not just more fps.
@@ -547,7 +569,7 @@ closes by denoising the settled frame and stopping adaptively (C14), not by fast
 | R0 | Baseline recorded | B4 rows, paced and unpaced | PASS |
 | R1 | FLIP ≤ 0.02 vs GL | MAE 0.0009 | PASS |
 | R1 | ≥ 1.5x, ≥ 8 lights | 1.6–3.0x test scene; **B4: 1.55x s, 0.87x m, 1.02x l** | **OPEN** on B4 (m, l) |
-| R2 | ≤ 20 ms (C4 kill rule) on B4 | reflections +19 to +22 ms, RT shadows +35 to +69 ms over raster | **OPEN**: re-plan rays for many objects |
+| R2 | ≤ 20 ms (C4 kill rule) on B4 | RT shadows +12 to +17 ms (half-res mask), reflections +17 to +21 ms | **PASS** at s, m; l reflections +21 |
 | R2 | ≤ 12 ms GPU | 9.1 ms shadows + reflections (full-res rays, before the half-res pass) | PASS |
 | R2 | FLIP ≤ 0.12 | 9/9 live cases ≤ 0.139 (Cornell at R3's 0.15 gate) | PASS |
 | R3 | ≥ 30 fps, 10 min | 41.7 fps over 15 s after the half-res pass and GI feedback; the 10-min soak (47 fps) predates the quality work | PASS, re-soak due |
