@@ -105,9 +105,10 @@ struct RInst { float4 bm; float4 rg; ulong vb; ulong ib; float4x4 normalM; };
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
 float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
-                bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, bool withEnv = true, int pick = -1)
+                bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, thread float3& mir, bool withEnv = true, int pick = -1,
+                bool withSpec = true)
 {
-   alb = float3(0.0);
+   alb = float3(0.0); mir = float3(0.0);
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    ray r(o, d, 0.0, 1e4);
@@ -163,26 +164,49 @@ float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, consta
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
    const float3 spec = sampleEnv(f, reflect(d, n), I.rg.x) * metal * base;
-   hp = p; hn = n; alb = base * (1.0 - metal);
+   hp = p; hn = n; alb = base * (1.0 - metal); mir = base * metal;
    // Lambert radiance: base/pi * light irradiance (r_fs's direct term), env as r_fs's ambient.
-   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + spec; // withEnv false: the caller's next bounce carries the env
+   // withEnv false: the caller's next bounce carries the env; withSpec false: the caller follows the mirror direction.
+   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + (withSpec ? spec : float3(0.0));
 }
 float3 cosineDir(float3 n, float u1, float u2);
 float rnd(thread uint& s);
 float3 ggxSampleH(float3 n, float a, float u1, float u2);
-// Reflection: the hit plus one diffuse bounce from it (walls lit only by bounce light must not mirror black).
-// Noisy per frame; res_fs accumulates reflections over time.
-float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough, thread uint& seed)
+// Screen-space radiance feedback: a hit that is on screen (same distance and facing as the guide there) reads
+// last frame's accumulated GI irradiance at that pixel. alb * it is the hit's indirect light with every bounce,
+// converging frame by frame; off-screen hits fall back to an explicit bounce.
+bool histAt(constant FrameU& f, texture2d<float> nz, texture2d<float> hist, float3 p, float3 n, thread float3& irr)
 {
-   float3 hp, hn, alb;
+   const float4 c = f.viewProj * float4(p, 1.0);
+   if (c.w <= 1e-4) return false;
+   const float2 ndc = c.xy / c.w;
+   if (abs(ndc.x) >= 1.0 || abs(ndc.y) >= 1.0) return false;
+   const float2 sz = float2(nz.get_width(), nz.get_height());
+   const uint2 q = uint2(min((ndc * 0.5 + 0.5) * sz, sz - 1.0)); // row 0 is GL's bottom, as in tr_fs
+   const float4 g = nz.read(q);
+   const float dist = length(p - f.eye.xyz);
+   if (g.w <= 0.0 || abs(g.w - dist) > 0.02 * dist + 0.01 || dot(g.xyz, n) < 0.8) return false;
+   irr = hist.read(q).rgb;
+   return true;
+}
+// Reflection: the hit plus its indirect light (walls lit only by bounce light must not mirror black).
+// Noisy per frame; res_fs accumulates reflections over time.
+float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough, thread uint& seed,
+                       texture2d<float> nz, texture2d<float> hist, bool hv)
+{
+   float3 hp, hn, alb, mir;
    const bool bounce = f.gi.x > 0.5;
-   float3 L = shadeHit(f, tlas, inst, o, d, rough, false, hp, hn, alb, !bounce);
-   if (any(alb > 0.0) && bounce)
+   float3 L = shadeHit(f, tlas, inst, o, d, rough, false, hp, hn, alb, mir, !bounce);
+   float3 irr;
+   if (any(alb > 0.0) && bounce && hv && histAt(f, nz, hist, hp, hn, irr))
+      L += alb * irr * f.gi.y;
+   else if (any(alb > 0.0) && bounce)
    {
-      float3 hp2, hn2, alb2;
+      float3 hp2, hn2, alb2, mir2;
       const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
       const int pk = int(rnd(seed) * f.params.w);
-      L += alb * shadeHit(f, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, true, pk) * f.gi.y;
+      const float3 L2 = shadeHit(f, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, pk);
+      L += alb * L2 * f.gi.y / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)); // later bounces as GI's geometric tail
    }
    return L;
 }
@@ -310,8 +334,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       o.c0 = float4(toSrgb(fin), 1.0);
       return o;
    }
-   o.c0 = float4((col + envRefl * envKeep) * f.params.x, 1.0);
-   o.c1 = float4(giOn ? (float3(1.0) - fAmb) * (1.0 - metal) * base * f.gi.y * f.params.x : float3(0.0), rough); // GI weight
+   // With GI, the rough share of the reflection sees the room, not only the env: its lobe is wide enough that the
+   // cosine-weighted GI radiance stands in for it (both carry the env on a miss, ambient * 3 == 1 in linear terms).
+   o.c0 = float4((col + (giOn ? float3(0.0) : envRefl * envKeep)) * f.params.x, 1.0);
+   o.c1 = float4(giOn ? ((float3(1.0) - fAmb) * (1.0 - metal) * base + fAmb * envKeep) * f.gi.y * f.params.x : float3(0.0), rough); // GI weight
    o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x, reflOn ? 1.0 : 0.0); // traced-reflection weight
    o.c3 = float4(n, length(in.wp - f.eye.xyz));
    return o;
@@ -319,12 +345,14 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
 
 // ---- Half-res trace (R3): each half-res texel traces at one full-res pixel 2q + off, off rotating over the 2x2
 // each frame; every lane traces (no idle quad lanes). Position from the eye ray and the guide distance.
-struct TrU { float4x4 invVP; float4 info; }; // info: offset x, y, full width, height
+struct TrU { float4x4 invVP; float4 info; float4 hist; }; // info: offset x, y, full width, height; hist.x: GI history valid
 struct TrOut { float4 g [[color(0)]]; float4 r [[color(1)]]; }; // raw GI irradiance / reflection radiance, a = valid
 fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                      constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]],
-                     texture2d<float> nz [[texture(0)]], texture2d<float> gw [[texture(1)]], texture2d<float> rw [[texture(2)]])
+                     texture2d<float> nz [[texture(0)]], texture2d<float> gw [[texture(1)]], texture2d<float> rw [[texture(2)]],
+                     texture2d<float> hist [[texture(3)]])
 {
+   const bool hv = u.hist.x > 0.5;
    TrOut o; o.g = float4(0.0); o.r = float4(0.0);
    const uint2 px = uint2(in.pos.xy) * 2u + uint2(u.info.xy);
    if (px.x >= uint(u.info.z) || px.y >= uint(u.info.w)) return o;
@@ -345,15 +373,27 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
       for (int k = 0; k < rays; k++)
       {
          const float3 dir = cosineDir(n, rnd(seed), rnd(seed));
-         float3 hp, hn, alb;
-         float3 L1 = shadeHit(f, rtArgs.tlas, instInfo, org, dir, 1.0, true, hp, hn, alb, false, int(rnd(seed) * f.params.w));
-         if (any(alb > 0.0) && ((uint(f.gi.z) >> 2) & 1u) == 0u)
+         float3 hp, hn, alb, mir;
+         float3 L1 = shadeHit(f, rtArgs.tlas, instInfo, org, dir, 1.0, true, hp, hn, alb, mir, false, int(rnd(seed) * f.params.w), false);
+         float3 irr;
+         if (any(alb > 0.0) && hv && histAt(f, nz, hist, hp, hn, irr))
+            L1 += alb * irr; // every bounce through last frame's GI at that point
+         else if (any(mir > 0.0))
+         {
+            // Metal hit: follow its mirror direction every frame (an env-only answer leaves what a mirror lights dark).
+            float3 hp2, hn2, alb2, mir2;
+            const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, reflect(dir, hn), 0.3, false, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
+            float3 irr2;
+            L1 += mir * (hv && any(alb2 > 0.0) && histAt(f, nz, hist, hp2, hn2, irr2) ? L2 + alb2 * irr2
+                                                                                  : L2 / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)));
+         }
+         else if (any(alb > 0.0) && ((uint(f.gi.z) >> 2) & 1u) == 0u)
          {
             // Second bounce every other 4-frame cycle at twice the weight (unbiased; the history blends it);
             // later bounces as the geometric tail of that hit's albedo.
-            float3 hp2, hn2, alb2;
+            float3 hp2, hn2, alb2, mir2;
             const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
-            const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, true, int(rnd(seed) * f.params.w));
+            const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
             const float a = clamp(dot(alb2, float3(0.3333)), 0.0, 0.8);
             L1 += alb * L2 * 2.0 / (1.0 - a);
          }
@@ -370,7 +410,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
          jd = reflect(d, ggxSampleH(n, rough * rough, rnd(rs), rnd(rs))); // the GGX lobe the tracer samples
          if (dot(jd, n) < 0.02) jd = normalize(jd + n * (0.02 - dot(jd, n)));
       }
-      o.r = float4(traceReflection(f, rtArgs.tlas, instInfo, org, jd, rough, rs), 1.0);
+      o.r = float4(traceReflection(f, rtArgs.tlas, instInfo, org, jd, rough, rs, nz, hist, hv), 1.0);
    }
    return o;
 }
@@ -1089,9 +1129,10 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                   tp.colorAttachments[k].storeAction = MTLStoreActionStore;
                }
                id<MTLRenderCommandEncoder> te = [cb renderCommandEncoderWithDescriptor:tp];
-               struct { float invVP[16]; float info[4]; } tu;
+               struct { float invVP[16]; float info[4]; float hist[4]; } tu = {};
                std::memcpy(tu.invVP, inv, 64);
                tu.info[0] = offX; tu.info[1] = offY; tu.info[2] = (float)img.Width(); tu.info[3] = (float)img.Height();
+               tu.hist[0] = (mHistValid && giOn) ? 1.0f : 0.0f;
                [te setRenderPipelineState:mTrPso];
                [te setFragmentBytes:&tu length:sizeof(tu) atIndex:0];
                [te setFragmentBytes:&f length:sizeof(f) atIndex:1];
@@ -1100,6 +1141,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                [te setFragmentTexture:mNz atIndex:0];
                [te setFragmentTexture:mGiT atIndex:1];
                [te setFragmentTexture:mRefl atIndex:2];
+               [te setFragmentTexture:mHist[prev] atIndex:3];
                [te useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
                for (const Gpu& g : mMeshes) { [te useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [te useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
                for (id<MTLAccelerationStructure> b in mBlas) [te useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
