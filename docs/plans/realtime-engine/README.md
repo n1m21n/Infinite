@@ -1,9 +1,9 @@
 # Real-time engine: live worlds that react to music
 
 Status (2026-11-10, end of day): **R0–R4 built headless, plus R5 step 1; Milestone 1 not closed.** The engine
-runs behind `INFINITE_LIVE_ENGINE` (no visible toggle, no Music Rig node: both wait for owner approval). Gate
-scoreboard: section 10, "Where the gates stand". Open: live Cornell quality, film export time, the real-patch
-bridge (B4), and the owner-facing node and toggle.
+runs behind `INFINITE_LIVE_ENGINE` (no visible toggle yet; it waits for owner approval). No Music Rig node
+(dropped 2026-11-10, C17). Gate scoreboard: section 10, "Where the gates stand". Open: film export time and
+quality, the real-patch bridge (B4), and the toggle.
 Started 2026-11-10; rewritten the same day around the owner's survey answers.
 Related: `docs/plans/3d-realism/research-brief.md` (commit e32f8eb9).
 
@@ -170,7 +170,7 @@ Live is judged first. Each stage hits its row before the next starts (keep-only-
 | R1 | Speed | ≥ 1.5× R0 fps; ≥ 8 lights |
 | R2 RT shadows + reflections | Cost | ≤ 12 ms GPU (540p traced → 1080p) |
 | R2 | Quality | FLIP ≤ 0.12 vs path-traced reference for shadows/reflections |
-| R3 Live GI + music rig | fps | **≥ 30 fps sustained over 10 minutes** (thermals), 1080p output |
+| R3 Live GI + music reaction | fps | **≥ 30 fps sustained over 10 minutes** (thermals), 1080p output |
 | R3 | Quality | FLIP ≤ 0.15 vs 1024-spp Cycles on 3 scenes |
 | R3 | Audio | 0 xruns in 10 min at a 128-sample buffer; rig ≤ 1 ms |
 | R3 | Hitches | 0 frames over 50 ms (shader compiles, uploads) |
@@ -190,7 +190,7 @@ Live is judged first. Each stage hits its row before the next starts (keep-only-
 ```
 ┌─ Infinite app (GL + ImGui, unchanged) ─────────────────────────────────┐
 │ nodes · Field compiler · transport (beats) · audio engine (CPU)        │
-│ music rig: beat / notes / bands → scene parameters                     │
+│ modulators: Audio Analyze · Envelope · LFO → scene parameters          │
 └──────┬─────────────────────────────────────────────────────▲──────────┘
        │ scene + frame time in beats                         │ shared texture
        ▼                                                     │ (IOSurface)
@@ -208,13 +208,13 @@ Live is judged first. Each stage hits its row before the next starts (keep-only-
 | Interop | IOSurface-backed texture read by GL (Syphon already uses IOSurface in-repo); Vulkan via `GL_EXT_memory_object` | Whole UI stays on GL |
 | Live light | Raster G-buffer, RT shadows (1 ray), RT reflections (1 ray, rough → probe fallback), ReSTIR GI, SVGF-style denoise, temporal upscale | The standard recipe for live photoreal, sized for M2 |
 | Settle | Port `Render3DPathTrace` BSDFs 1:1 onto Metal RT; same materials as live | Live and final agree |
-| Music rig | A rig node maps beat phase, note on/velocity, band energy to any scene parameter; envelopes and smoothing per target | Turns "react to music" into one node, not 30 wires |
+| Music reaction | Existing nodes: Audio Analyze (onset + 8 bands), Envelope, Smooth, LFO (beat sync), Note Expression, wired as modulators into Render 3D and the 3D nodes' parameters. No new node (C17) | They already do beat, bands, notes and smoothing |
 | Determinism | Frame = f(beat, seed) | Films sync frame-exact at any render speed |
 | World sources | One instance format: glTF/USD import, existing 3D nodes, Field + city nodes, splats later | All four answers in one scene |
 | Worlds by rules | Graph holds structure (lots → blocks → buildings); Field kernels set per-instance rules; new `instance` domain, GPU spatial grid for `.at()`, a split/emit step | Houdini's VEX + SOP split, which Infinite already mirrors |
 | Memory | App-wide GPU cap; drop order LOD → splat detail → resolution | 8 GB shared with audio and plugins |
 
-New nodes this implies (each needs approval): Music Rig, City/Lot/Facade split nodes, Splat import, Listener (R7).
+New nodes this implies (each needs approval): City/Lot/Facade split nodes, Splat import, Listener (R7).
 
 ## 9. Solution trajectories (preview)
 
@@ -258,7 +258,7 @@ medium scene and ~19 ms (≈54 fps) for the large one; shadows are ~1 ms of that
 costs nothing extra. **Open:** the Sep 2026 rows read 4.9-13.5 ms for the same scenes at commit c602a0d, about 2x
 faster. Cause unknown (machine state, ~3.5 GB swap in use, or a regression since); R1's "≥1.5×" gate is measured
 against today's rows above, and bisecting the Sep difference is a separate job. The beat-reactive scene here
-uses the transport's beat only; band/note-driven parameters need the Music Rig node (R3).
+uses the transport's beat only; band/note-driven parameters come from Audio Analyze and the modulators (C17).
 
 ### R1 step 1: Metal raster vs Render 3D (2026-11-10, `INFINITE_ENGINETEST=1`, release, M2 8 GB)
 
@@ -307,13 +307,13 @@ One ray per pixel along the reflection vector for surfaces with roughness < 0.55
 
 **Step 2b (same day):** hit shading now fetches vertex normals (GPU addresses of each mesh's vertex/index buffers, read in the shader by primitive id and barycentrics) and applies Lambert from every light at the hit. Cost unchanged (9.05 ms at 1080p). The floor in the sphere is now lit instead of dark. Still no shadows at the hit; one bounce.
 
-### R3 (2026-11-10): live GI + music rig, headless
+### R3 (2026-11-10): live GI + music reaction, headless
 
 **What exists**
 - GI: one cosine-sampled bounce ray per pixel, traced for 1 of every 2x2 pixels per frame, gathered with a 3x3 filter over the sampled neighbours and blended over time (history, faster when the camera moves). Hit shading = vertex normal, Lambert from all lights, env on miss.
 - Reflections: ray direction jittered inside the roughness lobe, hit shaded with shadows, accumulated over time in its own history. This removed the hard seams on the cube and sphere (the earlier single sharp ray plus an unshadowed bright floor hit made a visible cut where the ray left the floor).
 - Two pixel paths: direct (single target, no extra passes) when GI and RT reflections are off, HDR + resolve (tonemap after accumulation) when either is on.
-- `src/engine/MusicRig.h`: beat pulse/sine and low/mid/high bands -> instance scale/offset, light intensity, exposure, with attack/release smoothing; pure CPU, no allocation per frame. It is an engine-side type only: the Music Rig node still needs owner approval before it is exposed.
+- `src/engine/MusicRig.h`: beat pulse/sine and low/mid/high bands -> instance scale/offset, light intensity, exposure, with attack/release smoothing; pure CPU, no allocation per frame. It is test-only now (EngineTests drives the R3 soak with it); no node is built on it (C17).
 
 **Numbers (M2 8 GB, 1080p, 8 lights, test scene)**
 
@@ -473,7 +473,7 @@ other 8 cases 0.023–0.073, all within 0.002 of before.
 | R1 | FLIP ≤ 0.02 vs GL | MAE 0.0009 | PASS |
 | R1 | ≥ 1.5x, ≥ 8 lights | 1.6–3.0x (test scene); B4 not bridged | PASS (test scene) |
 | R2 | ≤ 12 ms GPU | 9.1 ms shadows + reflections (full-res rays, before the half-res pass) | PASS |
-| R2 | FLIP ≤ 0.12 | 8/9 live cases ≤ 0.064 | PASS except Cornell |
+| R2 | FLIP ≤ 0.12 | 9/9 live cases ≤ 0.139 (Cornell at R3's 0.15 gate) | PASS |
 | R3 | ≥ 30 fps, 10 min | 41.7 fps over 15 s after the half-res pass and GI feedback; the 10-min soak (47 fps) predates the quality work | PASS, re-soak due |
 | R3 | FLIP ≤ 0.15 | 9/9; Cornell 0.139 | PASS |
 | R3 | 0 xruns, rig ≤ 1 ms | 0 deadline xruns in 180 s; rig p99 0.01 ms | PASS (synthetic patch) |
@@ -504,6 +504,7 @@ other 8 cases 0.023–0.073, all within 0.002 of before.
 | C14 | Export is 14x off its gate | High | Denoise the settled frame and stop adaptively (R4 step 4); do not chase it with ray speed |
 | C15 | Settle misses Cycles on spot, materials and Cornell exactly where the GL tracer does | Medium | Fix in the shared BSDF (spot cone edge, lobe split), then A/B both tracers |
 | C16 | The live Cornell gap is noise, not bias (brightness 1.01) | Medium | **Wrong, closed (c4bc1748)**: it was GI bias (blur left FLIP unchanged). Fixed with screen-space GI feedback, mirror-following GI and room-lit rough reflections; Cornell 0.139 |
+| C17 | A Music Rig node is needed for music reaction | High | **Wrong, dropped (2026-11-10)**: Audio Analyze (onset, 8 bands), Envelope, Smooth, LFO and Note Expression already map music to any parameter. Per-copy reaction over many instances is the one gap; it belongs in Field kernels (R5 Field feed), not a new node |
 
 ## 12. Next steps
 
@@ -516,7 +517,7 @@ Built so far: section 10. Remaining work in order (each keeps its gate from sect
 | 3 | Bridge B4 into engine mode; re-run R1 speed, R3 soak (10 min) and audio xruns on a real patch | C12, R1 on B4 | no |
 | 4 | Settle: denoised low-spp frames, adaptive stop; re-time the 1-minute export | R4 film ≤ 15 min | no |
 | 5 | Shared BSDF fixes for spot and materials, A/B both tracers | R4 FLIP ≤ 0.05 | no |
-| 6 | Show the engine toggle on Render 3D and the Music Rig node | Milestone 1 demo | **yes**: new toggle and node |
+| 6 | Show the engine toggle on Render 3D; the demo patch reacts through Audio Analyze + modulators | Milestone 1 demo | **yes**: new toggle |
 | 7 | Discord demo, then the go/no-go on R5–R7 | C9 | yes |
 | — | Bisect the Sep 2026 B4 2x difference (section 10, R0) | baseline trust | no |
 | — | R5 next: per-copy colour, Field feed, batches in the RT structure; R6 Vulkan; R7 | after Milestone 1 | — |
