@@ -330,6 +330,22 @@ Soak, final build: SOAK 600s: 28443 frames, 47.4 fps avg, frame p50 20.7 p99 25.
 - Scene: a 4-object test scene, not the B4 or a real patch; no denoiser beyond 3x3 + temporal, so GI is soft and lags on fast change.
 - The engine is not wired to the live Render 3D node yet.
 
+### R4 (2026-11-10): Metal path tracer, headless
+
+`RasterRenderer::PathTrace(image, frame, spp, bounces, reset)`: one fragment pass per sample, RGBA32F ping-pong accumulation, a resolve pass (mean of hits, exposure, ACES, sRGB, coverage over the clear colour). Primary rays from the inverse view-projection with sub-pixel jitter; per bounce one uniformly picked light with a shadow ray (weighted by the light count, unbiased), GGX-sampled specular or cosine diffuse by Fresnel probability, Russian roulette from bounce 2, miss = environment, firefly clamp 30.
+
+| Test (`INFINITE_ENGINETEST_PT=64`, dev build, M2 8 GB, 1080p, 4 objects, 8 lights, 6 bounces) | Result |
+|---|---|
+| Metal PT | 18.5 ms/sample |
+| GL path tracer (Render 3D `engine = 1`, offline) | 135 ms/sample |
+| Speed-up (H5 gate >= 4x) | 7.3x, PASS |
+| MAE vs GL PT at 64 spp | 0.018 (gate 0.06), PASS |
+| Mean luminance | GL 0.366, Metal 0.351 (4% darker: no emissive/area lights, firefly clamp) |
+
+First version sampled all 8 lights every bounce: 45 ms/sample (3.1x, FAIL); one-light NEE fixed it.
+
+Not yet: hooking the tracer into Render 3D engine mode for settle/export, FLIP vs Cycles, glass/textures/HDRI.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

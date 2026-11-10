@@ -281,6 +281,62 @@ bool RunEngineTest()
       check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), full) && !full.empty(), "node engine picture with RT + GI reads", 0, 0);
       r.liveEngine = false;
    }
+   if (const char* ptEnv = getenv("INFINITE_ENGINETEST_PT"))
+   {
+      // R4: the Metal path tracer against the GL path tracer on the same scene. H5: >= 4x faster per sample.
+      const int spp = std::max(1, atoi(ptEnv));
+      const int bounces = 6;
+      std::vector<float> glPt, mtPt;
+      // Metal: warm-up, then timed converge.
+      raster->PathTrace(*img, frame, 1, bounces, true, nullptr);
+      double mtMs = 0.0;
+      const double t0 = NowMs();
+      bool ok = raster->PathTrace(*img, frame, spp, bounces, true, &mtMs);
+      const double mtWall = NowMs() - t0;
+      check(ok, "Metal path trace runs", mtMs, 0);
+      printf("  Metal PT: %d spp  GPU %.1f ms  wall %.1f ms  = %.3f ms/sample (%dx%d)\n", spp, mtMs, mtWall, mtMs / spp, W, H);
+      check(ReadRect(img->GlTexture(), W, H, mtPt), "Metal PT picture reads", 0, 0);
+      // GL: the node's own tracer, offline so every sample is traced in this cook.
+      r.engine = 1; r.ptSamples = spp; r.ptBounces = bounces;
+      Transport::Instance().SetOfflineMode(true);
+      r.exposure = 1.0f;
+      r.CookIfNeeded(++fnum);
+      const double g0 = NowMs();
+      r.exposure = 1.0001f;
+      r.CookIfNeeded(++fnum);
+      glFinish();
+      const double glWall = NowMs() - g0;
+      Transport::Instance().SetOfflineMode(false);
+      check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), glPt), "GL PT picture reads", 0, 0);
+      r.engine = 0;
+      printf("  GL PT: %d spp  wall %.1f ms  = %.3f ms/sample\n", spp, glWall, glWall / spp);
+      check((glWall / spp) / (mtMs / spp) >= 4.0, "R4/H5: Metal PT >= 4x faster per sample", (glWall / spp) / (mtMs / spp), 4.0);
+      if (glPt.size() == mtPt.size())
+      {
+         double s2 = 0.0, lm = 0.0, lg = 0.0;
+         for (size_t i = 0; i < glPt.size(); i += 4)
+            for (int c = 0; c < 3; c++) { s2 += std::fabs(glPt[i + c] - mtPt[i + c]); lm += mtPt[i + c]; lg += glPt[i + c]; }
+         const double n = (double)(glPt.size() / 4) * 3.0;
+         printf("  PT MAE %.4f   mean luminance GL %.4f  Metal %.4f\n", s2 / n, lg / n, lm / n);
+         check(s2 / n <= 0.06, "R4: Metal PT within 0.06 MAE of GL PT", s2 / n, 0.06);
+      }
+      if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
+      {
+         auto wp = [&](const std::string& path, const std::vector<float>& px)
+         {
+            FILE* f = fopen(path.c_str(), "wb");
+            if (!f) return;
+            fprintf(f, "P6\n%d %d\n255\n", W, H);
+            for (int y = H - 1; y >= 0; y--)
+               for (int x = 0; x < W; x++)
+                  for (int c = 0; c < 3; c++)
+                     fputc((int)std::lround(std::clamp(px[((size_t)y * W + x) * 4 + c], 0.0f, 1.0f) * 255.0f), f);
+            fclose(f);
+         };
+         wp(std::string(dir) + "/gl_pt.ppm", glPt);
+         wp(std::string(dir) + "/metal_pt.ppm", mtPt);
+      }
+   }
    if (const char* soakEnv = getenv("INFINITE_ENGINETEST_SOAK"))
    {
       // R3 soak: GI + RT shadows + RT reflections + music rig, unpaced, for N seconds. Reports fps and hitches.

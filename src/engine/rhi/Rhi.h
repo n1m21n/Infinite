@@ -41,6 +41,9 @@ namespace rhi
       virtual bool UploadMeshes(const std::vector<engine::MeshData>& meshes) = 0;
       // Draws one frame and blocks until the GPU is done. gpuMs, if given, gets the GPU's own time for it.
       virtual bool Render(SharedImage& target, const engine::Frame& frame, double* gpuMs) = 0;
+      // Progressive path tracer: adds `spp` samples per pixel to the running average and writes the picture.
+      // reset = true starts over (new camera/scene). Returns false when the device has no ray tracing.
+      virtual bool PathTrace(SharedImage&, const engine::Frame&, int /*spp*/, int /*bounces*/, bool /*reset*/, double* /*gpuMs*/) { return false; }
    };
 
    class Device
