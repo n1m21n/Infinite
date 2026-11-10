@@ -45,9 +45,10 @@ struct FrameU
    float4 shP;      // enabled, light index, bias (depth units), strength
    float4 shQ;      // texel, softness
    float4 gi;       // enabled, strength, frame index, rays
+   float4 envm;     // x: 1 = HDRI map, +2 = HDRI background; y rotation (rad); z max lod (GL levels); w the map's base lod
    LightU lights[8]; // vec.w = type, aim.w unused
 };
-struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; }; // base linear rgb; mr = metallic, roughness
+struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; }; // base linear rgb; mr = metallic, roughness, transmission, ior
 struct VOut { float4 pos [[position]]; float3 wp; float3 n; };
 
 vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
@@ -62,8 +63,15 @@ vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], co
    VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; return o;
 }
 
-float3 sampleEnv(constant FrameU& f, float3 dir, float rough)
+float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float rough)
 {
+   if ((int(f.envm.x) & 1) != 0)
+   {
+      // Render 3D's equirect lookup: u from atan(z, x) + rotation, v = 0 at the zenith; lod = rough * max lod.
+      constexpr sampler es(s_address::repeat, t_address::clamp_to_edge, filter::linear, mip_filter::linear);
+      const float2 uv = float2((atan2(dir.z, dir.x) + f.envm.y) / 6.28318530718 + 0.5, acos(clamp(dir.y, -1.0, 1.0)) / 3.14159265359);
+      return et.sample(es, uv, level(max(clamp(rough, 0.0, 1.0) * f.envm.z - f.envm.w, 0.0))).rgb * f.params.z;
+   }
    const float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
    const float3 lower = mix(f.ground.xyz, f.horizon.xyz, smoothstep(0.0, 0.5, t));
    const float3 env = mix(lower, f.sky.xyz, smoothstep(0.5, 1.0, t));
@@ -104,7 +112,7 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
 struct RInst { float4 bm; float4 rg; ulong vb; ulong ib; float4x4 normalM; };
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
-float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
+float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
                 bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, thread float3& mir, bool withEnv = true, int pick = -1,
                 bool withSpec = true)
 {
@@ -113,7 +121,7 @@ float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, consta
    it.assume_geometry_type(geometry_type::triangle);
    ray r(o, d, 0.0, 1e4);
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
-   if (h.type != intersection_type::triangle) return giMode ? sampleEnv(f, d, 1.0) * f.ambient.xyz * 3.0 : sampleEnv(f, d, rough);
+   if (h.type != intersection_type::triangle) return giMode ? sampleEnv(f, et, d, 1.0) * f.ambient.xyz * 3.0 : sampleEnv(f, et, d, rough);
    constant RInst& I = inst[h.instance_id];
    const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
    const device float* vb = reinterpret_cast<const device float*>(I.vb);
@@ -127,7 +135,7 @@ float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, consta
    if (dot(n, d) > 0.0) n = -n;
    const float3 p = o + d * h.distance;
    const float3 base = I.bm.xyz; const float metal = I.bm.w;
-   const float3 envIrr = sampleEnv(f, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
+   const float3 envIrr = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
    float3 diff = float3(0.0);
    const int count = int(f.params.w);
    // pick >= 0: one light chosen by the caller, weighted by the light count (unbiased, one shadow ray per bounce).
@@ -163,7 +171,7 @@ float3 shadeHit(constant FrameU& f, instance_acceleration_structure tlas, consta
       }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
-   const float3 spec = sampleEnv(f, reflect(d, n), I.rg.x) * metal * base;
+   const float3 spec = sampleEnv(f, et, reflect(d, n), I.rg.x) * metal * base;
    hp = p; hn = n; alb = base * (1.0 - metal); mir = base * metal;
    // Lambert radiance: base/pi * light irradiance (r_fs's direct term), env as r_fs's ambient.
    // withEnv false: the caller's next bounce carries the env; withSpec false: the caller follows the mirror direction.
@@ -191,12 +199,12 @@ bool histAt(constant FrameU& f, texture2d<float> nz, texture2d<float> hist, floa
 }
 // Reflection: the hit plus its indirect light (walls lit only by bounce light must not mirror black).
 // Noisy per frame; res_fs accumulates reflections over time.
-float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough, thread uint& seed,
+float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough, thread uint& seed,
                        texture2d<float> nz, texture2d<float> hist, bool hv)
 {
    float3 hp, hn, alb, mir;
    const bool bounce = f.gi.x > 0.5;
-   float3 L = shadeHit(f, tlas, inst, o, d, rough, false, hp, hn, alb, mir, !bounce);
+   float3 L = shadeHit(f, et, tlas, inst, o, d, rough, false, hp, hn, alb, mir, !bounce);
    float3 irr;
    if (any(alb > 0.0) && bounce && hv && histAt(f, nz, hist, hp, hn, irr))
       L += alb * irr * f.gi.y;
@@ -205,7 +213,7 @@ float3 traceReflection(constant FrameU& f, instance_acceleration_structure tlas,
       float3 hp2, hn2, alb2, mir2;
       const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
       const int pk = int(rnd(seed) * f.params.w);
-      const float3 L2 = shadeHit(f, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, pk);
+      const float3 L2 = shadeHit(f, et, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, pk);
       L += alb * L2 * f.gi.y / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)); // later bounces as GI's geometric tail
    }
    return L;
@@ -227,7 +235,7 @@ float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, 
 
 fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
-                     constant RInst* instInfo [[buffer(4)]])
+                     constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]])
 {
    const float3 n = normalize(in.n);
    const float3 base = m.base.xyz;
@@ -318,14 +326,59 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    }
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
    // GI and traced reflections run in tr_fs at half res; this pass writes their demodulated weights instead.
-   const float3 irradiance = sampleEnv(f, n, 1.0) * f.ambient.xyz * 3.0;
+   const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0;
    const float3 fAmb = fresnelRough(nDotV, f0, rough);
-   const float3 envRefl = sampleEnv(f, reflect(-viewDir, n), rough) * fAmb;
+   const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb;
    const bool reflOn = (int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55;
    const float envKeep = reflOn ? smoothstep(0.3, 0.55, rough) : 1.0; // the env share of the reflection; the rest is traced
    const bool giOn = f.gi.x > 0.5;
    if (!giOn) col += (float3(1.0) - fAmb) * (1.0 - metal) * base * irradiance;
    col += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
+   // Glass (transmission): refract in, find the far side of the hit object, refract out (or reflect on total internal
+   // reflection), shade what lies beyond. Tint and Fresnel as Render 3D's: beyond * mix(1, base, 0.4) * (1 - F).
+   // Needs the TLAS; without it the glass shows the environment along one refracted ray.
+   const float trans = clamp(m.mr.z, 0.0, 1.0);
+   const bool rtOn = (int(f.shQ.z + 0.5) & 3) != 0 || f.gi.x > 0.5;
+   if (trans > 0.0 && rtOn)
+   {
+      const float eta = 1.0 / max(m.mr.w, 1.0001);
+      float3 rd = refract(-viewDir, n, eta);
+      if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
+      float3 o2 = in.wp - n * f.shQ.w, d2 = rd;
+      intersector<triangle_data, instancing> gt;
+      gt.assume_geometry_type(geometry_type::triangle);
+      ray gr(o2, d2, 0.0, 1e4);
+      intersection_result<triangle_data, instancing> gh = gt.intersect(gr, rtArgs.tlas);
+      if (gh.type == intersection_type::triangle)
+      {
+         constant RInst& I = instInfo[gh.instance_id];
+         const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
+         const device float* vb = reinterpret_cast<const device float*>(I.vb);
+         const uint3 ix = uint3(ib[gh.primitive_id * 3], ib[gh.primitive_id * 3 + 1], ib[gh.primitive_id * 3 + 2]);
+         const float2 bc = gh.triangle_barycentric_coord;
+         const float3 w3 = float3(1.0 - bc.x - bc.y, bc.x, bc.y);
+         const float3 nl = float3(vb[ix.x * 6 + 3], vb[ix.x * 6 + 4], vb[ix.x * 6 + 5]) * w3.x
+                         + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w3.y
+                         + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w3.z;
+         float3 ne = normalize((I.normalM * float4(nl, 0.0)).xyz);
+         if (dot(ne, d2) < 0.0) ne = -ne; // outward, along the ray leaving the object
+         const float3 pe = o2 + d2 * gh.distance;
+         float3 od = refract(d2, -ne, 1.0 / eta);
+         if (dot(od, od) < 1e-6) od = reflect(d2, -ne);
+         o2 = pe + ne * f.shQ.w; d2 = od;
+      }
+      float3 hp, hn, alb, mir;
+      const float3 beyond = shadeHit(f, et, rtArgs.tlas, instInfo, o2, d2, 0.0, false, hp, hn, alb, mir, true, -1, true);
+      col = mix(col, beyond * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
+   }
+   else if (trans > 0.0)
+   {
+      // No rays this frame: see the environment through the glass along the refracted view, tinted the same way.
+      float3 rd = refract(-viewDir, n, 1.0 / max(m.mr.w, 1.0001));
+      if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
+      col = mix(col, sampleEnv(f, et, rd, 0.0) * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
+   }
+   const float opaque = (trans > 0.0 && rtOn) ? 1.0 - trans : 1.0; // glass takes no GI of its own
    FOut o;
    if (!kMrt)
    {
@@ -337,7 +390,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    // With GI, the rough share of the reflection sees the room, not only the env: its lobe is wide enough that the
    // cosine-weighted GI radiance stands in for it (both carry the env on a miss, ambient * 3 == 1 in linear terms).
    o.c0 = float4((col + (giOn ? float3(0.0) : envRefl * envKeep)) * f.params.x, 1.0);
-   o.c1 = float4(giOn ? ((float3(1.0) - fAmb) * (1.0 - metal) * base + fAmb * envKeep) * f.gi.y * f.params.x : float3(0.0), rough); // GI weight
+   o.c1 = float4(giOn ? ((float3(1.0) - fAmb) * (1.0 - metal) * base * opaque + fAmb * envKeep) * f.gi.y * f.params.x : float3(0.0), rough); // GI weight
    o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x, reflOn ? 1.0 : 0.0); // traced-reflection weight
    o.c3 = float4(n, length(in.wp - f.eye.xyz));
    return o;
@@ -350,7 +403,7 @@ struct TrOut { float4 g [[color(0)]]; float4 r [[color(1)]]; }; // raw GI irradi
 fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                      constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]],
                      texture2d<float> nz [[texture(0)]], texture2d<float> gw [[texture(1)]], texture2d<float> rw [[texture(2)]],
-                     texture2d<float> hist [[texture(3)]])
+                     texture2d<float> hist [[texture(3)]], texture2d<float> et [[texture(9)]])
 {
    const bool hv = u.hist.x > 0.5;
    TrOut o; o.g = float4(0.0); o.r = float4(0.0);
@@ -374,7 +427,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
       {
          const float3 dir = cosineDir(n, rnd(seed), rnd(seed));
          float3 hp, hn, alb, mir;
-         float3 L1 = shadeHit(f, rtArgs.tlas, instInfo, org, dir, 1.0, true, hp, hn, alb, mir, false, int(rnd(seed) * f.params.w), false);
+         float3 L1 = shadeHit(f, et, rtArgs.tlas, instInfo, org, dir, 1.0, true, hp, hn, alb, mir, false, int(rnd(seed) * f.params.w), false);
          float3 irr;
          if (any(alb > 0.0) && hv && histAt(f, nz, hist, hp, hn, irr))
             L1 += alb * irr; // every bounce through last frame's GI at that point
@@ -382,7 +435,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
          {
             // Metal hit: follow its mirror direction every frame (an env-only answer leaves what a mirror lights dark).
             float3 hp2, hn2, alb2, mir2;
-            const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, reflect(dir, hn), 0.3, false, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
+            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, reflect(dir, hn), 0.3, false, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
             float3 irr2;
             L1 += mir * (hv && any(alb2 > 0.0) && histAt(f, nz, hist, hp2, hn2, irr2) ? L2 + alb2 * irr2
                                                                                   : L2 / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)));
@@ -393,7 +446,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
             // later bounces as the geometric tail of that hit's albedo.
             float3 hp2, hn2, alb2, mir2;
             const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
-            const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
+            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
             const float a = clamp(dot(alb2, float3(0.3333)), 0.0, 0.8);
             L1 += alb * L2 * 2.0 / (1.0 - a);
          }
@@ -410,12 +463,12 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
          jd = reflect(d, ggxSampleH(n, rough * rough, rnd(rs), rnd(rs))); // the GGX lobe the tracer samples
          if (dot(jd, n) < 0.02) jd = normalize(jd + n * (0.02 - dot(jd, n)));
       }
-      o.r = float4(traceReflection(f, rtArgs.tlas, instInfo, org, jd, rough, rs, nz, hist, hv), 1.0);
+      o.r = float4(traceReflection(f, et, rtArgs.tlas, instInfo, org, jd, rough, rs, nz, hist, hv), 1.0);
    }
    return o;
 }
 
-struct ResU { float4 p; float4 clear; float4 q; }; // p: blend alpha, tonemap, history valid, refl blend; q: half-res offset x, y, GI on
+struct ResU { float4 p; float4 clear; float4 q; }; // p: blend alpha, tonemap, history valid, refl blend; q: half-res offset x, y, GI on, HDRI background
 struct ResOut { float4 c0 [[color(0)]]; float4 c1 [[color(1)]]; float4 c2 [[color(2)]]; };
 // Joint-bilateral upsample of the half-res trace (3x3 texels, spatial x normal x distance weights, a small floor so
 // thin features fall back to their spatial neighbours), temporal accumulation, then remodulation by the weights.
@@ -426,7 +479,11 @@ fragment ResOut res_fs(SkyOut in [[stage_in]], constant ResU& u [[buffer(0)]], t
    const uint2 px = uint2(in.pos.xy);
    const float4 c = hdr.read(px);
    ResOut o;
-   if (c.a < 0.5) { o.c0 = float4(u.clear.xyz, 1.0); o.c1 = float4(0.0); o.c2 = float4(0.0); return o; }
+   if (c.a < 0.5)
+   {
+      float3 b = c.rgb; if (int(u.p.y) == 1) b = aces(b);
+      o.c0 = u.q.w > 0.5 ? float4(toSrgb(b), 1.0) : float4(u.clear.xyz, 1.0); o.c1 = float4(0.0); o.c2 = float4(0.0); return o;
+   }
    const float4 cz = nz.read(px);
    const float4 wg = gw.read(px), wr = rw.read(px);
    const int2 off = int2(u.q.xy);
@@ -490,13 +547,17 @@ fragment float4 at_fs(SkyOut in [[stage_in]], constant AtU& u [[buffer(0)]], tex
    }
    return float4(sum / max(wsum, 1e-6), 1.0);
 }
-struct CompU { float4 p; float4 clear; }; // p.y tonemap
+struct CompU { float4 p; float4 clear; }; // p.y tonemap, p.z HDRI background
 fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]], texture2d<float> hdr [[texture(0)]], texture2d<float> gi [[texture(1)]], texture2d<float> rfl [[texture(2)]],
                         texture2d<float> gw [[texture(3)]], texture2d<float> rw [[texture(4)]])
 {
    const uint2 px = uint2(in.pos.xy);
    const float4 c = hdr.read(px);
-   if (c.a < 0.5) return float4(u.clear.xyz, 1.0);
+   if (c.a < 0.5)
+   {
+      float3 b = c.rgb; if (int(u.p.y) == 1) b = aces(b);
+      return u.p.z > 0.5 ? float4(toSrgb(b), 1.0) : float4(u.clear.xyz, 1.0);
+   }
    float3 col = c.rgb + gw.read(px).rgb * gi.read(px).rgb + rw.read(px).rgb * rfl.read(px).rgb;
    if (int(u.p.y) == 1) col = aces(col);
    return float4(toSrgb(col), 1.0);
@@ -547,7 +608,8 @@ float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float roug
    return fr * nL;
 }
 fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
-                      constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], texture2d<float> prev [[texture(0)]])
+                      constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], texture2d<float> prev [[texture(0)]],
+                      texture2d<float> et [[texture(9)]])
 {
    const uint2 px = uint2(in.pos.xy);
    uint seed = pcg(px.x + 8192u * px.y) ^ pcg(uint(u.info.z) * 2654435761u + 17u);
@@ -567,7 +629,8 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       intersection_result<triangle_data, instancing> h = it.intersect(r, rtArgs.tlas);
       if (h.type != intersection_type::triangle)
       {
-         if (b > 0) L += T * sampleEnv(f, d, 0.0); // the sky itself, as the GL tracer; the cosine is in the sampling
+         if (b > 0) L += T * sampleEnv(f, et, d, 0.0); // the sky itself, as the GL tracer; the cosine is in the sampling
+         else if ((int(f.envm.x) & 2) != 0) { L = sampleEnv(f, et, d, 0.0); cov = 1.0; } // the HDRI as the background
          break;
       }
       if (b == 0) cov = 1.0;
@@ -741,7 +804,28 @@ vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const de
    c.y = -c.y;
    VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; return o; // uniform scale: the model's 3x3 turns normals
 }
+// Runs: consecutive instances sharing a mesh and material drawn in one instanced call; per-copy data from a buffer.
+vertex VOut rr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
+                  const device InstU* ms [[buffer(10)]], constant uint& first [[buffer(11)]])
+{
+   const device InstU& m = ms[first + iid];
+   const float3 p = float3(v[vid * 6 + 0], v[vid * 6 + 1], v[vid * 6 + 2]);
+   const float3 n = float3(v[vid * 6 + 3], v[vid * 6 + 4], v[vid * 6 + 5]);
+   const float4 w = m.model * float4(p, 1.0);
+   float4 c = f.viewProj * w;
+   c.z = (c.z + c.w) * 0.5;
+   c.y = -c.y;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; return o;
+}
 struct SOut { float4 pos [[position]]; };
+vertex SOut shr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant float4x4& lvp [[buffer(1)]],
+                   const device InstU* ms [[buffer(10)]], constant uint& first [[buffer(11)]])
+{
+   const float3 p = float3(v[vid * 6 + 0], v[vid * 6 + 1], v[vid * 6 + 2]);
+   float4 c = lvp * (ms[first + iid].model * float4(p, 1.0));
+   c.z = (c.z + c.w) * 0.5;
+   SOut o; o.pos = c; return o;
+}
 vertex SOut sh_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant float4x4& lvp [[buffer(1)]], constant InstU& m [[buffer(2)]])
 {
    const float3 p = float3(v[vid * 6 + 0], v[vid * 6 + 1], v[vid * 6 + 2]);
@@ -752,6 +836,17 @@ vertex SOut sh_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], c
 
 vertex SkyOut sky_vs(uint vid [[vertex_id]]) { const float2 p[3] = { float2(-1, -1), float2(3, -1), float2(-1, 3) }; SkyOut o; o.pos = float4(p[vid], 1.0, 1.0); return o; }
 fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buffer(0)]]) { return float4(clearSrgb.xyz, 1.0); }
+// HDRI background, drawn first under the scene. MRT: linear * exposure with a = 0 (the resolve tonemaps it); direct: display.
+struct BgU { float4x4 invVP; float4 p; }; // p: width, height, MRT
+fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]], texture2d<float> et [[texture(9)]])
+{
+   const float2 ndc = float2(2.0 * in.pos.x / u.p.x - 1.0, 2.0 * in.pos.y / u.p.y - 1.0); // row 0 is GL's bottom
+   const float4 pw = u.invVP * float4(ndc, 1.0, 1.0);
+   float3 c = sampleEnv(f, et, normalize(pw.xyz / pw.w - f.eye.xyz), 0.0) * f.params.x;
+   if (u.p.z > 0.5) return float4(c, 0.0);
+   if (int(f.params.y) == 1) c = aces(c);
+   return float4(toSrgb(c), 1.0);
+}
 )";
 
    class MetalImage final : public SharedImage
@@ -837,7 +932,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
    struct LightU { float vec[4], aim[4], color[4], terms[4], spot[4]; };
    struct FrameU
    {
-      float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4];
+      float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4], envm[4];
       LightU lights[8];
    };
    struct InstU { float model[16], normalM[16], base[4], mr[4]; };
@@ -867,23 +962,16 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             NSLog(@"raster shader: %@", err);
       }
       bool Ok() const { return mLib != nil; }
+   private:
+      struct Gpu { id<MTLBuffer> vb = nil, ib = nil; NSUInteger count = 0; float lo[3], hi[3]; };
+   public:
       bool UploadMeshes(const std::vector<engine::MeshData>& meshes) override
       {
          mMeshes.clear();
          for (const engine::MeshData& m : meshes)
          {
             Gpu g;
-            g.vb = [mDev newBufferWithBytes:m.posNormal.data() length:m.posNormal.size() * 4 options:MTLResourceStorageModeShared];
-            g.ib = [mDev newBufferWithBytes:m.indices.data() length:m.indices.size() * 4 options:MTLResourceStorageModeShared];
-            g.count = (NSUInteger)m.indices.size();
-            for (int k = 0; k < 3; k++) { g.lo[k] = 1e30f; g.hi[k] = -1e30f; }
-            for (size_t i = 0; i + 5 < m.posNormal.size(); i += 6)
-               for (int k = 0; k < 3; k++)
-               {
-                  g.lo[k] = std::min(g.lo[k], m.posNormal[i + k]);
-                  g.hi[k] = std::max(g.hi[k], m.posNormal[i + k]);
-               }
-            if (!g.vb || !g.ib)
+            if (!MakeGpu(m, g))
                return false;
             mMeshes.push_back(g);
          }
@@ -897,15 +985,10 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
          id<MTLAccelerationStructureCommandEncoder> ae = [cb accelerationStructureCommandEncoder];
          NSMutableArray* keep = [NSMutableArray array];
+         mBlasDirty.assign(mMeshes.size(), 0);
          for (const Gpu& g : mMeshes)
          {
-            MTLAccelerationStructureTriangleGeometryDescriptor* gd = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
-            gd.vertexBuffer = g.vb; gd.vertexStride = 24;
-            gd.indexBuffer = g.ib; gd.indexType = MTLIndexTypeUInt32;
-            gd.triangleCount = g.count / 3;
-            gd.opaque = YES;
-            MTLPrimitiveAccelerationStructureDescriptor* ad = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
-            ad.geometryDescriptors = @[ gd ];
+            MTLPrimitiveAccelerationStructureDescriptor* ad = BlasDesc(g);
             const MTLAccelerationStructureSizes sz = [mDev accelerationStructureSizesWithDescriptor:ad];
             id<MTLAccelerationStructure> as = [mDev newAccelerationStructureWithSize:sz.accelerationStructureSize];
             id<MTLBuffer> scratch = [mDev newBufferWithLength:sz.buildScratchBufferSize options:MTLResourceStorageModePrivate];
@@ -926,6 +1009,31 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          const NSUInteger n = fr.instances.size();
          if (n == 0 || mBlas.count == 0)
             return false;
+         bool anyDirty = false;
+         for (char c : mBlasDirty) anyDirty |= c != 0;
+         if (anyDirty)
+         {
+            // Each refit gets its own slice of one scratch buffer, so refits in one encoder never share scratch.
+            std::vector<std::pair<size_t, NSUInteger>> jobs;
+            NSUInteger total = 0;
+            for (size_t i = 0; i < mBlasDirty.size() && i < mBlas.count; i++)
+               if (mBlasDirty[i])
+               {
+                  const MTLAccelerationStructureSizes sz = [mDev accelerationStructureSizesWithDescriptor:BlasDesc(mMeshes[i])];
+                  jobs.emplace_back(i, total);
+                  total += (std::max<NSUInteger>(sz.refitScratchBufferSize, 16) + 255) & ~(NSUInteger)255;
+               }
+            if (!mRefitScratch || mRefitScratch.length < total)
+               mRefitScratch = [mDev newBufferWithLength:total options:MTLResourceStorageModePrivate];
+            id<MTLAccelerationStructureCommandEncoder> re = [cb accelerationStructureCommandEncoder];
+            for (const auto& j : jobs)
+            {
+               [re refitAccelerationStructure:mBlas[j.first] descriptor:BlasDesc(mMeshes[j.first]) destination:nil
+                                scratchBuffer:mRefitScratch scratchBufferOffset:j.second];
+               mBlasDirty[j.first] = 0;
+            }
+            [re endEncoding];
+         }
          std::vector<MTLAccelerationStructureInstanceDescriptor> d(n);
          for (NSUInteger i = 0; i < n; i++)
          {
@@ -955,6 +1063,146 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          [ae endEncoding];
          return true;
       }
+      // The HDRI as a mipmapped half-float texture, re-uploaded only when its revision changes; a 1x1 stand-in
+      // otherwise so the shaders always have a texture bound at 9.
+      bool EnsureEnv(const engine::Frame& fr)
+      {
+         const bool want = fr.envPixels != nullptr && fr.envW > 0 && fr.envH > 0;
+         if (want && (!mEnvTex || mEnvRev != fr.envRev || (int)mEnvTex.width != fr.envW || (int)mEnvTex.height != fr.envH))
+         {
+            MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                                         width:fr.envW height:fr.envH mipmapped:YES];
+            d.usage = MTLTextureUsageShaderRead;
+            d.storageMode = MTLStorageModeShared;
+            mEnvTex = [mDev newTextureWithDescriptor:d];
+            if (!mEnvTex)
+               return false;
+            std::vector<__fp16> h((size_t)fr.envW * fr.envH * 4);
+            for (size_t i = 0, n = (size_t)fr.envW * fr.envH; i < n; i++)
+            {
+               for (int k = 0; k < 3; k++)
+               {
+                  const float v = fr.envPixels[i * 3 + k];
+                  h[i * 4 + k] = (__fp16)(std::isfinite(v) ? std::min(std::max(v, 0.0f), 65504.0f) : 0.0f);
+               }
+               h[i * 4 + 3] = (__fp16)1.0f;
+            }
+            [mEnvTex replaceRegion:MTLRegionMake2D(0, 0, fr.envW, fr.envH) mipmapLevel:0 withBytes:h.data() bytesPerRow:(NSUInteger)fr.envW * 8];
+            id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+            id<MTLBlitCommandEncoder> be = [cb blitCommandEncoder];
+            [be generateMipmapsForTexture:mEnvTex];
+            [be endEncoding];
+            [cb commit];
+            [cb waitUntilCompleted];
+            mEnvRev = fr.envRev;
+         }
+         if (!want && !mEnvDummy)
+         {
+            MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float width:1 height:1 mipmapped:NO];
+            d.usage = MTLTextureUsageShaderRead;
+            d.storageMode = MTLStorageModeShared;
+            mEnvDummy = [mDev newTextureWithDescriptor:d];
+            const __fp16 z[4] = { 0, 0, 0, 1 };
+            [mEnvDummy replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:z bytesPerRow:8];
+         }
+         mEnvBound = want ? mEnvTex : mEnvDummy;
+         return want && mEnvTex != nil;
+      }
+      // Per-instance hit data for the ray passes. A buffer, not inline bytes: inline is capped at 4 KB (~36 objects).
+      template <typename T> id<MTLBuffer> InfoBuffer(const std::vector<T>& v)
+      {
+         const NSUInteger len = std::max<NSUInteger>(v.size() * sizeof(T), 16);
+         if (!mInfoBuf || mInfoBuf.length < len)
+            mInfoBuf = [mDev newBufferWithLength:len * 2 options:MTLResourceStorageModeShared];
+         if (mInfoBuf && !v.empty())
+            std::memcpy(mInfoBuf.contents, v.data(), v.size() * sizeof(T));
+         return mInfoBuf;
+      }
+   public:
+      bool UpdateMesh(int index, const engine::MeshData& m) override
+      {
+         if (index < 0 || index >= (int)mMeshes.size() || index >= (int)mBlas.count)
+            return false;
+         Gpu& cur = mMeshes[(size_t)index];
+         if (cur.count == m.indices.size() && cur.vb.length == std::max<size_t>(m.posNormal.size() * 4, 4) &&
+             std::memcmp(cur.ib.contents, m.indices.data(), m.indices.size() * 4) == 0)
+         {
+            // Same topology: write the vertices in place (the last frame has completed) and refit next frame.
+            std::memcpy(cur.vb.contents, m.posNormal.data(), m.posNormal.size() * 4);
+            for (int k = 0; k < 3; k++) { cur.lo[k] = 1e30f; cur.hi[k] = -1e30f; }
+            for (size_t i = 0; i + 5 < m.posNormal.size(); i += 6)
+               for (int k = 0; k < 3; k++)
+               {
+                  cur.lo[k] = std::min(cur.lo[k], m.posNormal[i + k]);
+                  cur.hi[k] = std::max(cur.hi[k], m.posNormal[i + k]);
+               }
+            if (mBlasDirty.size() != mMeshes.size())
+               mBlasDirty.assign(mMeshes.size(), 0);
+            mBlasDirty[(size_t)index] = 1;
+            return true;
+         }
+         Gpu g;
+         if (!MakeGpu(m, g))
+            return false;
+         id<MTLAccelerationStructure> as = BuildOneBlas(g);
+         if (!as)
+            return false;
+         mMeshes[index] = g;
+         [mBlas replaceObjectAtIndex:(NSUInteger)index withObject:as];
+         if ((size_t)index < mBlasDirty.size())
+            mBlasDirty[(size_t)index] = 0;
+         return true;
+      }
+   private:
+      bool MakeGpu(const engine::MeshData& m, Gpu& g)
+      {
+         g.vb = [mDev newBufferWithBytes:m.posNormal.data() length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
+         g.ib = [mDev newBufferWithBytes:m.indices.data() length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
+         g.count = (NSUInteger)m.indices.size();
+         for (int k = 0; k < 3; k++) { g.lo[k] = 1e30f; g.hi[k] = -1e30f; }
+         for (size_t i = 0; i + 5 < m.posNormal.size(); i += 6)
+            for (int k = 0; k < 3; k++)
+            {
+               g.lo[k] = std::min(g.lo[k], m.posNormal[i + k]);
+               g.hi[k] = std::max(g.hi[k], m.posNormal[i + k]);
+            }
+         return g.vb && g.ib;
+      }
+      // Refit-capable, so a mesh whose vertices move but whose topology holds (an animated ocean) is refitted in
+      // the frame's own command buffer instead of rebuilt and waited on.
+      static MTLPrimitiveAccelerationStructureDescriptor* BlasDesc(const Gpu& g)
+      {
+         MTLAccelerationStructureTriangleGeometryDescriptor* gd = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+         gd.vertexBuffer = g.vb; gd.vertexStride = 24;
+         gd.indexBuffer = g.ib; gd.indexType = MTLIndexTypeUInt32;
+         gd.triangleCount = g.count / 3;
+         gd.opaque = YES;
+         MTLPrimitiveAccelerationStructureDescriptor* ad = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+         ad.geometryDescriptors = @[ gd ];
+         ad.usage = MTLAccelerationStructureUsageRefit;
+         return ad;
+      }
+      id<MTLAccelerationStructure> BuildOneBlas(const Gpu& g)
+      {
+         MTLPrimitiveAccelerationStructureDescriptor* ad = BlasDesc(g);
+         const MTLAccelerationStructureSizes sz = [mDev accelerationStructureSizesWithDescriptor:ad];
+         id<MTLAccelerationStructure> as = [mDev newAccelerationStructureWithSize:sz.accelerationStructureSize];
+         id<MTLBuffer> scratch = [mDev newBufferWithLength:std::max<NSUInteger>(sz.buildScratchBufferSize, 16) options:MTLResourceStorageModePrivate];
+         if (!as || !scratch)
+            return nil;
+         id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+         id<MTLAccelerationStructureCommandEncoder> ae = [cb accelerationStructureCommandEncoder];
+         [ae buildAccelerationStructure:as descriptor:ad scratchBuffer:scratch scratchBufferOffset:0];
+         [ae endEncoding];
+         [cb commit];
+         [cb waitUntilCompleted];
+         return as;
+      }
+      id<MTLTexture> mEnvTex = nil, mEnvDummy = nil, mEnvBound = nil;
+      unsigned long long mEnvRev = ~0ull;
+      id<MTLBuffer> mInfoBuf = nil;
+      id<MTLRenderPipelineState> mBgPsoMrt = nil, mBgPsoDir = nil;
+      id<MTLDepthStencilState> mDsBg = nil;
       void FillFrame(FrameU& f, const engine::Frame& fr)
       {
          std::memcpy(f.viewProj, fr.viewProj, 64);
@@ -966,6 +1214,9 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          Lin3(fr.envGroundSrgb, f.ground);
          const int n = (int)std::min<size_t>(fr.lights.size(), engine::kMaxLights);
          f.params[0] = fr.exposure; f.params[1] = (float)fr.tonemap; f.params[2] = fr.envIntensity; f.params[3] = (float)n;
+         const bool envMap = EnsureEnv(fr);
+         f.envm[0] = (envMap ? 1.0f : 0.0f) + (envMap && fr.envBackground ? 2.0f : 0.0f);
+         f.envm[1] = fr.envRotationRad; f.envm[2] = fr.envMaxLod; f.envm[3] = fr.envBaseLod;
          for (int i = 0; i < n; i++)
          {
             const engine::Light& l = fr.lights[i];
@@ -987,9 +1238,11 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
 
          FrameU f = {};
          FillFrame(f, fr);
+         BuildRuns(fr);
 
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
-         const bool haveTlas = BuildTlas(cb, fr);
+         // Pure raster needs no ray structure; skipping it keeps a large instanced scene's raster cost raster-only.
+         const bool haveTlas = (fr.rtShadows || fr.rtReflections || fr.gi) && BuildTlas(cb, fr);
          CullBatches(cb, fr, img.Width());
          const bool rt = fr.rtShadows && haveTlas;
          const bool rtRefl = fr.rtReflections && haveTlas;
@@ -1068,22 +1321,38 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress;
             }
          }
-         [enc setFragmentBytes:info.data() length:info.size() * sizeof(RInstH) atIndex:4];
-         for (const engine::Instance& in : fr.instances)
+         id<MTLBuffer> infoBuf = InfoBuffer(info);
+         [enc setFragmentBuffer:infoBuf offset:0 atIndex:4];
+         [enc setFragmentTexture:mEnvBound atIndex:9];
+         if (fr.envBackground && (int(f.envm[0]) & 2) != 0 && mBgPsoMrt && mBgPsoDir)
          {
-            if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
-               continue;
-            InstU u = {};
-            std::memcpy(u.model, in.model, 64);
-            std::memcpy(u.normalM, in.normalMatrix, 64);
-            Lin3(in.baseSrgb, u.base);
-            u.mr[0] = in.metallic; u.mr[1] = in.roughness;
-            [enc setVertexBytes:&u length:sizeof(u) atIndex:2];
-            [enc setFragmentBytes:&u length:sizeof(u) atIndex:2];
-            const Gpu& g = mMeshes[in.mesh];
-            [enc setVertexBuffer:g.vb offset:0 atIndex:0];
-            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib indexBufferOffset:0];
+            struct { float invVP[16]; float p[4]; } bu = {};
+            if (Inv4(fr.viewProj, bu.invVP))
+            {
+               bu.p[0] = (float)img.Width(); bu.p[1] = (float)img.Height(); bu.p[2] = mrt ? 1.0f : 0.0f;
+               [enc setRenderPipelineState:mrt ? mBgPsoMrt : mBgPsoDir];
+               [enc setDepthStencilState:mDsBg];
+               [enc setCullMode:MTLCullModeNone];   // the full-screen triangle winds as a back face here
+               [enc setFragmentBytes:&bu length:sizeof(bu) atIndex:0];
+               [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+               [enc setCullMode:MTLCullModeBack];
+               [enc setRenderPipelineState:mrt ? mPso : mPsoDir];
+               [enc setDepthStencilState:mDs];
+            }
          }
+         [enc setRenderPipelineState:mrt ? mPsoRun : mPsoRunDir];
+         [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
+         const InstU* runU = (const InstU*)mInstBuf.contents;
+         for (const auto& r : mRuns)
+         {
+            const Gpu& g = mMeshes[fr.instances[r.first].mesh];
+            [enc setFragmentBytes:&runU[r.first] length:sizeof(InstU) atIndex:2];   // the run's material
+            [enc setVertexBuffer:g.vb offset:0 atIndex:0];
+            [enc setVertexBytes:&r.first length:4 atIndex:11];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib
+                         indexBufferOffset:0 instanceCount:r.second];
+         }
+         [enc setRenderPipelineState:mrt ? mPso : mPsoDir];
          for (size_t bi = 0; bi < fr.batches.size() && bi < mBatchGpu.size(); bi++)
          {
             const engine::InstanceBatch& b = fr.batches[bi];
@@ -1137,7 +1406,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                [te setFragmentBytes:&tu length:sizeof(tu) atIndex:0];
                [te setFragmentBytes:&f length:sizeof(f) atIndex:1];
                [te setFragmentBuffer:mArgBuf offset:0 atIndex:3];
-               [te setFragmentBytes:info.data() length:info.size() * sizeof(RInstH) atIndex:4];
+               [te setFragmentBuffer:infoBuf offset:0 atIndex:4];
+               [te setFragmentTexture:mEnvBound atIndex:9];
                [te setFragmentTexture:mNz atIndex:0];
                [te setFragmentTexture:mGiT atIndex:1];
                [te setFragmentTexture:mRefl atIndex:2];
@@ -1159,7 +1429,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             rp.colorAttachments[2].loadAction = MTLLoadActionDontCare;
             rp.colorAttachments[2].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> re = [cb renderCommandEncoderWithDescriptor:rp];
-            float ru[12] = { moved ? 0.6f : fr.giBlend, (float)fr.tonemap, mHistValid ? 1.0f : 0.0f, moved ? 0.7f : 0.12f, 0, 0, 0, 0, offX, offY, giOn ? 1.0f : 0.0f, 0 };
+            float ru[12] = { moved ? 0.6f : fr.giBlend, (float)fr.tonemap, mHistValid ? 1.0f : 0.0f, moved ? 0.7f : 0.12f, 0, 0, 0, 0, offX, offY, giOn ? 1.0f : 0.0f,
+                             (int(f.envm[0]) & 2) != 0 ? 1.0f : 0.0f };
             Lin3(fr.clearSrgb, ru + 4); // clear colour is stored sRGB-encoded in the target, so undo Lin3
             for (int i = 0; i < 3; i++) ru[4 + i] = fr.clearSrgb[i];
             ru[7] = mRValid ? 1.0f : 0.0f;
@@ -1207,7 +1478,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                cp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
                cp.colorAttachments[0].storeAction = MTLStoreActionStore;
                id<MTLRenderCommandEncoder> ce = [cb renderCommandEncoderWithDescriptor:cp];
-               float cu[8] = { 0, (float)fr.tonemap, 0, 0, fr.clearSrgb[0], fr.clearSrgb[1], fr.clearSrgb[2], 0 };
+               float cu[8] = { 0, (float)fr.tonemap, (int(f.envm[0]) & 2) != 0 ? 1.0f : 0.0f, 0, fr.clearSrgb[0], fr.clearSrgb[1], fr.clearSrgb[2], 0 };
                [ce setRenderPipelineState:mCompPso];
                [ce setFragmentBytes:cu length:sizeof(cu) atIndex:0];
                [ce setFragmentTexture:mHdr atIndex:0];
@@ -1286,6 +1557,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size()) { o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; }
          }
+         id<MTLBuffer> infoBuf = InfoBuffer(info);
          for (int s = 0; s < std::max(1, spp); s++)
          {
             const int cur = 1 - mPtCur;
@@ -1301,7 +1573,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             [e setFragmentBytes:&pu length:sizeof(pu) atIndex:0];
             [e setFragmentBytes:&f length:sizeof(f) atIndex:1];
             [e setFragmentBuffer:mArgBuf offset:0 atIndex:3];
-            [e setFragmentBytes:info.data() length:info.size() * sizeof(RInstH) atIndex:4];
+            [e setFragmentBuffer:infoBuf offset:0 atIndex:4];
+            [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
             [e useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (const Gpu& g : mMeshes) { [e useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
@@ -1411,9 +1684,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       id<MTLRenderPipelineState> mPtPso = nil, mPtResPso = nil;
       id<MTLTexture> mPtAcc[2] = { nil, nil };
       int mPtCur = 0, mPtN = 0, mPtFrame = 0; MTLPixelFormat mPtFmt = MTLPixelFormatInvalid;
-   public:
    private:
-      struct Gpu { id<MTLBuffer> vb = nil, ib = nil; NSUInteger count = 0; float lo[3], hi[3]; };
 
       static void Norm(float* v) { const float l = std::sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]); if (l > 1e-5f) { v[0] /= l; v[1] /= l; v[2] /= l; } }
       bool EnsureShadowTex(int size)
@@ -1505,16 +1776,15 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          [enc setDepthStencilState:mDs];
          [enc setCullMode:MTLCullModeNone];
          [enc setVertexBytes:VP length:64 atIndex:1];
-         for (const engine::Instance& in : fr.instances)
+         [enc setRenderPipelineState:mShPsoRun];
+         [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
+         for (const auto& r : mRuns)
          {
-            if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
-               continue;
-            InstU u2 = {};
-            std::memcpy(u2.model, in.model, 64);
-            [enc setVertexBytes:&u2 length:sizeof(u2) atIndex:2];
-            const Gpu& g = mMeshes[in.mesh];
+            const Gpu& g = mMeshes[fr.instances[r.first].mesh];
             [enc setVertexBuffer:g.vb offset:0 atIndex:0];
-            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib indexBufferOffset:0];
+            [enc setVertexBytes:&r.first length:4 atIndex:11];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib
+                         indexBufferOffset:0 instanceCount:r.second];
          }
          [enc endEncoding];
          return true;
@@ -1571,6 +1841,17 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          dd2.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          mPsoDir = [mDev newRenderPipelineStateWithDescriptor:dd2 error:&err];
          {
+            id<MTLFunction> rr = [mLib newFunctionWithName:@"rr_vs"];
+            dd2.vertexFunction = rr;
+            mPsoRunDir = [mDev newRenderPipelineStateWithDescriptor:dd2 error:&err];
+            dd2.vertexFunction = pd.vertexFunction;
+            id<MTLFunction> keep = pd.vertexFunction;
+            pd.vertexFunction = rr;
+            mPsoRun = [mDev newRenderPipelineStateWithDescriptor:pd error:&err];
+            pd.vertexFunction = keep;
+            if (!mPsoRun || !mPsoRunDir) NSLog(@"run pipeline: %@", err);
+         }
+         {
             MTLRenderPipelineDescriptor* bd = [MTLRenderPipelineDescriptor new];
             bd.vertexFunction = [mLib newFunctionWithName:@"ri_vs"];
             bd.fragmentFunction = fsDir;
@@ -1609,11 +1890,32 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          dd.depthWriteEnabled = YES;
          mDs = [mDev newDepthStencilStateWithDescriptor:dd];
          mFmt = fmt;
+         {
+            MTLRenderPipelineDescriptor* gd = [MTLRenderPipelineDescriptor new];
+            gd.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
+            gd.fragmentFunction = [mLib newFunctionWithName:@"bg_fs"];
+            gd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+            gd.colorAttachments[0].pixelFormat = fmt;
+            mBgPsoDir = [mDev newRenderPipelineStateWithDescriptor:gd error:&err];
+            gd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+            gd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
+            gd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
+            gd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
+            for (int k = 1; k < 4; k++) gd.colorAttachments[k].writeMask = MTLColorWriteMaskNone;
+            mBgPsoMrt = [mDev newRenderPipelineStateWithDescriptor:gd error:&err];
+            if (!mBgPsoDir || !mBgPsoMrt) NSLog(@"background pipeline: %@", err);
+            MTLDepthStencilDescriptor* bd = [MTLDepthStencilDescriptor new];
+            bd.depthCompareFunction = MTLCompareFunctionAlways;
+            bd.depthWriteEnabled = NO;
+            mDsBg = [mDev newDepthStencilStateWithDescriptor:bd];
+         }
          MTLRenderPipelineDescriptor* sd = [MTLRenderPipelineDescriptor new];
          sd.vertexFunction = [mLib newFunctionWithName:@"sh_vs"];
          sd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          mShPso = [mDev newRenderPipelineStateWithDescriptor:sd error:&err];
-         return mPso != nil && mPsoDir != nil && mDs != nil && mShPso != nil && mResPso != nil;
+         sd.vertexFunction = [mLib newFunctionWithName:@"shr_vs"];
+         mShPsoRun = [mDev newRenderPipelineStateWithDescriptor:sd error:&err];
+         return mPso != nil && mPsoDir != nil && mDs != nil && mShPso != nil && mResPso != nil && mPsoRun != nil && mPsoRunDir != nil && mShPsoRun != nil;
       }
       bool Depth(int w, int h)
       {
@@ -1634,12 +1936,49 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       id<MTLTexture> mShadowTex = nil;
       NSMutableArray<id<MTLAccelerationStructure>>* mBlas = nil;
       id<MTLAccelerationStructure> mTlas = nil;
-      id<MTLBuffer> mTlasScratch = nil;
+      id<MTLBuffer> mTlasScratch = nil, mRefitScratch = nil;
+      std::vector<char> mBlasDirty;   // vertices moved in place; refit before the next instance build
       id<MTLFunction> mFsFn = nil;
       id<MTLArgumentEncoder> mArgEnc = nil;
       id<MTLBuffer> mArgBuf = nil;
       id<MTLAccelerationStructure> mArgTlas = nil;
-      id<MTLRenderPipelineState> mShPso = nil;
+      id<MTLRenderPipelineState> mShPso = nil, mShPsoRun = nil, mPsoRun = nil, mPsoRunDir = nil;
+      id<MTLBuffer> mInstBuf = nil;
+      std::vector<std::pair<uint32_t, uint32_t>> mRuns;   // (first, count) into mInstBuf: same mesh, same material
+
+      // Every instance's InstU into one buffer, cut into runs of one mesh and one material (instanced copies come in
+      // as consecutive instances), so 20,000 copies are a handful of draws instead of 20,000.
+      void BuildRuns(const engine::Frame& fr)
+      {
+         mRuns.clear();
+         const size_t n = fr.instances.size();
+         const NSUInteger len = std::max<NSUInteger>(n * sizeof(InstU), 16);
+         if (!mInstBuf || mInstBuf.length < len)
+            mInstBuf = [mDev newBufferWithLength:len * 2 options:MTLResourceStorageModeShared];
+         InstU* dst = (InstU*)mInstBuf.contents;
+         for (size_t i = 0; i < n; i++)
+         {
+            const engine::Instance& in = fr.instances[i];
+            InstU& u = dst[i]; u = {};
+            std::memcpy(u.model, in.model, 64);
+            std::memcpy(u.normalM, in.normalMatrix, 64);
+            Lin3(in.baseSrgb, u.base);
+            u.mr[0] = in.metallic; u.mr[1] = in.roughness; u.mr[2] = in.transmission; u.mr[3] = in.ior;
+            if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
+               continue;
+            if (!mRuns.empty())
+            {
+               auto& r = mRuns.back();
+               const engine::Instance& a = fr.instances[r.first];
+               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(dst[r.first].base, u.base, 32) == 0)
+               {
+                  r.second++;
+                  continue;
+               }
+            }
+            mRuns.emplace_back((uint32_t)i, 1u);
+         }
+      }
       id<MTLRenderPipelineState> mResPso = nil, mPsoDir = nil, mPsoBatch = nil, mPsoBatchMrt = nil, mPsoPt = nil, mPsoPtMrt = nil;
       id<MTLComputePipelineState> mCullPso = nil, mArgsPso = nil;
       struct BatchGpu { id<MTLBuffer> models = nil, visMesh = nil, visPt = nil, cnt = nil, argsMesh = nil, argsPt = nil; NSUInteger cap = 0; };

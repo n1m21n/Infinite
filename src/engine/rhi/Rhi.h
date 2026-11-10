@@ -39,6 +39,8 @@ namespace rhi
       virtual ~RasterRenderer() = default;
       // Static meshes, referenced by Instance::mesh. Replaces any earlier set.
       virtual bool UploadMeshes(const std::vector<engine::MeshData>& meshes) = 0;
+      // Replaces one mesh uploaded earlier (an animated source), rebuilding only its acceleration structure.
+      virtual bool UpdateMesh(int /*index*/, const engine::MeshData& /*mesh*/) { return false; }
       // Draws one frame and blocks until the GPU is done. gpuMs, if given, gets the GPU's own time for it.
       virtual bool Render(SharedImage& target, const engine::Frame& frame, double* gpuMs) = 0;
       // Progressive path tracer: adds `spp` samples per pixel to the running average and writes the picture.

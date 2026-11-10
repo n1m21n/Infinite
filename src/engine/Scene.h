@@ -22,6 +22,8 @@ namespace engine
       float baseSrgb[3] = { 0.8f, 0.8f, 0.8f };
       float metallic = 0.0f;
       float roughness = 0.5f;
+      float transmission = 0.0f; // glass: live = two refractions through the hit object, then the scene beyond
+      float ior = 1.5f;
    };
 
    // Many copies of one mesh drawn with one instanced call (R5). Raster only: batches are not in the ray-traced
@@ -78,6 +80,14 @@ namespace engine
             envGroundSrgb[3] = { 0.2f, 0.2f, 0.22f };
       float envIntensity = 1.0f;
       float clearSrgb[3] = { 0.04f, 0.04f, 0.06f };
+      // Equirectangular HDRI (Render 3D's Environment input): linear RGB floats, row 0 = the top. Replaces the gradient
+      // sky everywhere the env is read; envRev changes when the pixels do. envBaseLod: the GL mip the pixels came from,
+      // so roughness picks the same mip as Render 3D (lod = rough * envMaxLod, in GL's levels).
+      const float* envPixels = nullptr;
+      int envW = 0, envH = 0;
+      unsigned long long envRev = 0;
+      float envRotationRad = 0.0f, envMaxLod = 0.0f, envBaseLod = 0.0f;
+      bool envBackground = false; // draw the HDRI behind the scene instead of clearSrgb
       Shadow shadow;
       bool rtShadows = false; // ray-traced hard shadows for every light (point and spot too); replaces the shadow map
       bool gi = false;            // one-bounce diffuse GI: cosine-sampled rays, 3x3 + temporal accumulation (needs the TLAS)

@@ -465,18 +465,95 @@ and rebuilds the position from the guide distance, which is now stored as RGBA32
 distance, normal and depth, accumulates over time, then remodulates. Live A/B after it: Cornell 0.200, the
 other 8 cases 0.023–0.073, all within 0.002 of before.
 
+### B4 on the engine: the real-patch test (2026-11-10, release build, M2)
+
+B4 is the R0 baseline patch: an animated ocean, 1,000 / 5,000 / 20,000 instanced copies on a sphere shell (s / m / l),
+8 / 24 / 64 gold tori, a glass sphere, three lights, an HDRI and Render 3D at 1080p. Before this step the engine drew
+none of what makes it a real patch. Bridged now:
+
+| Gap | Fix |
+|---|---|
+| Instanced copies drawn as one object | One engine instance per copy (group matrix x copy, selection honoured); copies sharing a mesh and material draw as one instanced call in the main and shadow passes |
+| Per-object data inline, 4 KB cap (~36 objects) | A buffer; 20,000 objects tested |
+| HDRI ignored | The Environment node's map read back once per change; lighting, reflections, background, rotation, intensity and the extracted sun as GL does them |
+| Glass drawn opaque | Refract in, find the far side through the TLAS, refract out, shade beyond; with rays off, the HDRI along the refracted view |
+| Animated mesh re-uploaded and its BLAS rebuilt, waited on, every frame (14.7 ms at s) | Vertices written in place, BLAS refitted inside the frame's command buffer (2.1 ms); no ray structure built when no ray feature is on |
+
+Speed, `INFINITE_BENCH_B4SCALE`, animated, unpaced, p50 / p95 ms (GL matches the R0 rows: 12.4 / 14.6 / 18.7):
+
+| Scale | GL | Engine raster | + RT shadows | + RT reflections | + GI | All three |
+|---|---|---|---|---|---|---|
+| s (963 objects) | 13.0 / 16.2 | **8.4 / 10.1** | 43.8 / 49.6 | 27.6 / 33.3 | 53.4 / 61.5 | 114.8 / 129.1 |
+| m (4,099) | 14.5 / 16.6 | 16.6 / 17.3 | 61.4 / 68.7 | 33.3 / 39.4 | 58.7 / 67.0 | 132.8 / 146.1 |
+| l (12,291) | 18.7 / 23.0 | 18.4 / 27.3 | 87.2 / 93.3 | 40.1 / 44.5 | 66.3 / 72.2 | 156.6 / 177.9 |
+
+Picture, static s, FLIP vs GL: engine raster **0.028** (brightness 0.996), engine with RT + GI 0.075 (0.968; the
+difference is the bounce light and traced shadows GL does not have).
+
+What it says:
+
+- Raster is 1.55x GL at s and level at m and l. At m and l the frame is CPU-bound on node work shared by both paths
+  (about 28 ms of node bodies at l), and the engine still waits for its GPU work before GL reads the picture; GL
+  overlaps the two. Pipelining one frame (render N, show N-1) is the next speed step.
+- Ray features cost 2.5-14x more on a real patch than on the 4-object test scene. The M2 traverses the two-level
+  structure in software, and that cost grows with the object count: RT shadows (every light, every pixel, full res)
+  are the worst at +35 to +69 ms. The C4 kill rule (R2 > 20 ms) trips on B4.
+- The 4-object numbers (R1 1.6-3.0x, 42 fps with everything on) do not hold on a real patch. C12 was right.
+
+Debug-build numbers are not comparable: the dev build is Debug and doubled every CPU-side cost (raster l 71.5 ms).
+
+R3 soak on B4 (`INFINITE_BENCH_B4FRAMES=18000 INFINITE_BENCH_B4AUDIO=128`, scale m, raster + RT reflections, the M2
+default below, animated, unpaced, ≈ 10 min):
+
+| | Result | Gate |
+|---|---|---|
+| Frame ms p50 / p95 / p99 / max | 32.4 / 37.0 / 40.6 / 252 | 33.3 (30 fps) |
+| fps | 30.8 at p50, 27 at p95 | ≥ 30 sustained: **borderline, OPEN** |
+| Audio xruns, 128-frame buffer, transport playing | **0** deadline, 0 os, 0 callback gaps | 0: **PASS** |
+| Frames over 50 ms | p99 40.6 ms; a few spikes up to 252 ms | 0: **OPEN** |
+| Without audio | 32.6 / 38.0 / 43.7 / 217 | same picture |
+
+No thermal fall-off across the 10 minutes (frame 600: 29.5 ms, frame 18,000: 33.8 ms). B4 has no audio nodes, so the
+callbacks are light; xruns under a heavy synth patch are not measured yet.
+
+### Targets per GPU tier (set 2026-11-10)
+
+The engine picks features from the GPU it finds (Metal GPU family), so a faster chip gets more, not just more fps.
+Only the M2 row is measured; the others are targets until someone runs B4 on that chip.
+
+| Tier | Chip | Live default on B4 m (30 fps = 33 ms) | Status |
+|---|---|---|---|
+| Base, no RT hardware | M1, M2 | Raster + RT reflections; shadow maps; GI only on small scenes | Measured: 30.8 fps p50, 0 xruns over 10 min |
+| Base, RT hardware | M3, M4 (family Apple9+) | Raster + RT shadows + reflections + GI | Unmeasured; expect rays 2-4x cheaper |
+| Pro / Max | M3-M4 Pro/Max | All three at 60 fps, full-res rays | Unmeasured |
+
+### Final-render target (per frame)
+
+Render time is counted per frame. A 1-minute 1080p film at 24 fps is 1,440 frames.
+
+| | Per frame | 1-minute film | Quality |
+|---|---|---|---|
+| Today, M2, 256 spp | 8.6 s | ≈ 3.4 h | FLIP ≤ 0.05 vs Cycles on 6/9 cases |
+| Preview export (R4 gate) | ≤ 0.63 s | ≤ 15 min | the live picture, settled a few samples |
+| Final export (new target) | ≤ 2.5 s | ≤ 1 h | FLIP ≤ 0.05 vs 1024-spp Cycles on 9/9, denoised |
+
+Two gates because one number cannot be both: preview is "watch it now", final is "the film I post". The final gate
+closes by denoising the settled frame and stopping adaptively (C14), not by faster rays.
+
 ### Where the gates stand (2026-11-10)
 
 | Stage | Gate | Result | |
 |---|---|---|---|
 | R0 | Baseline recorded | B4 rows, paced and unpaced | PASS |
 | R1 | FLIP ≤ 0.02 vs GL | MAE 0.0009 | PASS |
-| R1 | ≥ 1.5x, ≥ 8 lights | 1.6–3.0x (test scene); B4 not bridged | PASS (test scene) |
+| R1 | ≥ 1.5x, ≥ 8 lights | 1.6–3.0x test scene; **B4: 1.55x s, 0.87x m, 1.02x l** | **OPEN** on B4 (m, l) |
+| R2 | ≤ 20 ms (C4 kill rule) on B4 | reflections +19 to +22 ms, RT shadows +35 to +69 ms over raster | **OPEN**: re-plan rays for many objects |
 | R2 | ≤ 12 ms GPU | 9.1 ms shadows + reflections (full-res rays, before the half-res pass) | PASS |
 | R2 | FLIP ≤ 0.12 | 9/9 live cases ≤ 0.139 (Cornell at R3's 0.15 gate) | PASS |
 | R3 | ≥ 30 fps, 10 min | 41.7 fps over 15 s after the half-res pass and GI feedback; the 10-min soak (47 fps) predates the quality work | PASS, re-soak due |
 | R3 | FLIP ≤ 0.15 | 9/9; Cornell 0.139 | PASS |
-| R3 | 0 xruns, rig ≤ 1 ms | 0 deadline xruns in 180 s; rig p99 0.01 ms | PASS (synthetic patch) |
+| R3 | 0 xruns, rig ≤ 1 ms | 0 deadline xruns in 180 s; rig p99 0.01 ms. **B4: 0 xruns in 10 min** at 128 frames | PASS |
+| R3 | ≥ 30 fps, 10 min on B4 | raster + reflections at m: 30.8 fps p50, 27 p95; all features 7.5 fps | **OPEN** on B4 |
 | R3 | Hitches | 0 frames over 50 ms in the soak | PASS |
 | R4 | ≥ 4x per sample | 7.2x | PASS |
 | R4 | FLIP ≤ 0.05 after ≤ 10 s | 6/9 at 256 spp (4.9 s at 1080p) | **OPEN** (tracer vs Cycles) |
@@ -499,7 +576,8 @@ other 8 cases 0.023–0.073, all within 0.002 of before.
 | C9 | Market unproven | High | Post the R3 demo on Discord before R5 |
 | C10 | Opportunity cost (v0.4.4 perf, VST/AU, agent-collab) | Medium | Gets a scheduled slot, not a side thread |
 | C11 | Field instance domain touches the language | Low | New domain under the same rules, like pixel and sample |
-| C12 | Every number is from a 4-object test scene or a Blender case, not a real patch | High | Bridge B4 (the real-patch scene) into engine mode and re-run R1–R3 on it before calling Milestone 1 |
+| C12 | Every number is from a 4-object test scene or a Blender case, not a real patch | High | **Confirmed (B4 bridged)**: raster holds (FLIP 0.028, 0.87-1.55x GL); ray features cost 2.5-14x more on 1k-12k objects. Milestone 1 is not met on a real patch |
+| C18 | Ray cost grows with object count on M2 (software two-level traversal) | High | Shadow rays at half res like GI; RT shadows for the key light only, the others shadow-mapped; flatten small instanced copies into one ray structure; measure on an M3 (hardware RT) before promising tiers |
 | C13 | Live headroom is gone: 31 fps with full-res rays on 4 objects | High | **Done (aa088784)**: GI and reflections traced at 540p in their own pass, upsampled with the guides; 42.4 fps, quality unchanged. Area-light shadow rays are still full-res |
 | C14 | Export is 14x off its gate | High | Denoise the settled frame and stop adaptively (R4 step 4); do not chase it with ray speed |
 | C15 | Settle misses Cycles on spot, materials and Cornell exactly where the GL tracer does | Medium | Fix in the shared BSDF (spot cone edge, lobe split), then A/B both tracers |
@@ -514,7 +592,8 @@ Built so far: section 10. Remaining work in order (each keeps its gate from sect
 |---|---|---|---|
 | ~~1~~ | ~~Half-res GI and reflections in their own pass~~ (done, aa088784: 31.0 → 42.4 fps) | C13 | — |
 | ~~2~~ | ~~Live Cornell to the R3 gate~~ (done, c4bc1748: 0.200 → 0.139; GI bias, not area-light noise) | R3 FLIP | — |
-| 3 | Bridge B4 into engine mode; re-run R1 speed, R3 soak (10 min) and audio xruns on a real patch | C12, R1 on B4 | no |
+| ~~3~~ | ~~Bridge B4 into engine mode; re-run R1, R3 soak, xruns on a real patch~~ (done: section 10, "B4 on the engine") | C12 | — |
+| 3a | Rays for many objects (C18): half-res shadow rays, key-light RT shadows, flattened instance copies; then pipeline one frame | R1, R2 on B4 | no |
 | 4 | Settle: denoised low-spp frames, adaptive stop; re-time the 1-minute export | R4 film ≤ 15 min | no |
 | 5 | Shared BSDF fixes for spot and materials, A/B both tracers | R4 FLIP ≤ 0.05 | no |
 | 6 | Show the engine toggle on Render 3D; the demo patch reacts through Audio Analyze + modulators | Milestone 1 demo | **yes**: new toggle |

@@ -212,20 +212,50 @@ void DrawBenchHarness(FrameCtx& fc)
       // RSS memory, and output_hash quality guard.
       if (isBenchB2 || isBenchB4)
       {
+         // INFINITE_BENCH_B4FRAMES=N: a longer B4 sample window (the R3 soak on the real patch); xruns are counted
+         // over the window and printed beside the report.
+         static const int sB4End = [] { const char* e = getenv("INFINITE_BENCH_B4FRAMES"); const int n = e ? atoi(e) : 0; return n > 0 ? 32 + n : 152; }();
+         const int benchEnd = isBenchB4 ? sB4End : 152;
+         static AudioEngine::XrunCounts sB4Xr0;
          if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
+         // INFINITE_BENCH_B4AUDIO=<buffer frames>: run the audio engine with the transport playing beside the render.
+         if (isBenchB4 && frameId == 3)
+            if (const char* ab = getenv("INFINITE_BENCH_B4AUDIO"))
+            {
+               std::string err;
+               AudioEngine::Instance().SetRequestedDevice(0);
+               AudioEngine::Instance().SetRequestedBufferFrames(atoi(ab));
+               if (StartAudioEngine(err)) Transport::Instance().SetPlaying(true);
+               else fprintf(stderr, "B4: audio did not start: %s\n", err.c_str());
+            }
          if (frameId == 32)
-            sBenchB2FboAtF32 = GLUtil::FboAllocationCount();
-         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
-            sBenchB2FrameMs.Push(gLastFrameMs);
-         if (frameId == 152)
          {
+            sBenchB2FboAtF32 = GLUtil::FboAllocationCount();
+            sB4Xr0 = AudioEngine::Instance().Xruns();
+         }
+         if (frameId >= 32 && frameId < benchEnd && gLastFrameMs > 0.0)
+            sBenchB2FrameMs.Push(gLastFrameMs);
+         if (isBenchB4 && benchEnd > 152 && frameId > 32 && frameId % 600 == 0)
+         {
+            printf("B4SOAK frame %d last %.1f ms\n", frameId, gLastFrameMs);
+            fflush(stdout);
+         }
+         if (frameId == benchEnd)
+         {
+            if (isBenchB4)
+            {
+               const AudioEngine::XrunCounts x = AudioEngine::Instance().Xruns();
+               printf("B4XRUNS sr %.0f deadline %llu os %llu gaps %llu\n", AudioEngine::Instance().SampleRate(),
+                      (unsigned long long)(x.deadline - sB4Xr0.deadline), (unsigned long long)(x.os - sB4Xr0.os),
+                      (unsigned long long)(x.gaps - sB4Xr0.gaps));
+            }
             Bench::BenchReport report;
             report.bench = isBenchB4 ? "B4_complex_3d" : "B2_heavy_visuals";
             // Render targets (re)allocated inside the sample window; a
             // steady-state chain should allocate none.
             report.fboAllocsSteady = (long long)(GLUtil::FboAllocationCount() - sBenchB2FboAtF32);
             report.variant = sBenchB2Variant;
-            report.frames = 152;
+            report.frames = benchEnd;
             report.nodes = (int)gNodes.size();
             report.frameMs = sBenchB2FrameMs;
             report.stagesCpuMs = {

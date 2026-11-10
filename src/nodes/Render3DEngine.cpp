@@ -1,8 +1,11 @@
 // Render 3D through the Metal engine (src/engine): the same scene the GL raster draws, lit with ray-traced
-// shadows and reflections and live GI. Opt-in per node (liveEngine); anything the engine cannot draw yet
-// (HDRI maps, textures, glass, instancing, non-ACES tonemaps) falls back to the GL render by returning false
-// only when the engine itself is unavailable - the unsupported features are simply not drawn.
+// shadows and reflections and live GI. Opt-in per node (liveEngine). Instanced copies, glass and the
+// Environment node's HDRI are carried; textures, per-copy colours and non-ACES tonemaps are not drawn yet.
+// Returns false (GL draws instead) only when the engine itself is unavailable.
 #include "Geometry3DNodes.h"
+#include "ColorSpace.h"
+#include "EnvironmentNode.h"
+#include "GeometryOpNodes.h"
 #include "SceneNodes.h"
 #include "Transport.h"
 
@@ -10,6 +13,9 @@
 #include "engine/Scene.h"
 #include "engine/rhi/Rhi.h"
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <cstring>
 #include <memory>
@@ -26,6 +32,10 @@ struct Render3DNode::EngineState
    bool failed = false;
    unsigned long long sceneHash = 0;
    int settled = 0;   // path-traced samples since the scene last changed
+   std::vector<float> envPixels;   // the HDRI read back from GL, one mip at most 2048 wide
+   int envW = 0, envH = 0, envLod = 0;
+   unsigned int envTex = 0;
+   unsigned long long envRev = ~0ull, envSerial = 0;
 };
 
 void Render3DNode::ReleaseEngine()
@@ -84,43 +94,81 @@ bool Render3DNode::CookEngine(int frameId)
       }
    }
 
+   const auto tpA = std::chrono::steady_clock::now();
    CollectDraw();
    for (IGeometrySource* src : mDraw)
       if (auto* node = dynamic_cast<INode*>(src))
          node->CookIfNeeded(frameId);
 
-   // Meshes: re-upload everything when any source's geometry changed.
+   // Meshes: a changed source re-uploads only its own mesh (and BLAS); a changed set of sources, all of them.
    std::vector<std::pair<const void*, unsigned long long>> sig;
    for (IGeometrySource* src : mDraw)
       sig.emplace_back((const void*)src, src->MeshRevision());
+   static const bool sProf = std::getenv("INFINITE_ENGINE_PROF") != nullptr;
+   const auto tp0 = std::chrono::steady_clock::now();
+   int changedMeshes = 0;
+   size_t changedTris = 0;
    if (sig != E.meshSig)
    {
-      std::vector<engine::MeshData> meshes;
-      for (IGeometrySource* src : mDraw)
-         meshes.push_back(ToMeshData(src->GetMesh()));
-      if (!E.raster->UploadMeshes(meshes))
-         return false;
+      for (size_t i = 0; i < sig.size() && i < E.meshSig.size(); i++)
+         if (sProf && sig[i] != E.meshSig[i]) { changedMeshes++; changedTris += mDraw[i]->GetMesh().indices.size() / 3; }
+      bool partial = sig.size() == E.meshSig.size() && !sig.empty();
+      for (size_t i = 0; partial && i < sig.size(); i++)
+         partial = sig[i].first == E.meshSig[i].first;
+      for (size_t i = 0; partial && i < sig.size(); i++)
+         if (sig[i].second != E.meshSig[i].second)
+            partial = E.raster->UpdateMesh((int)i, ToMeshData(mDraw[i]->GetMesh()));
+      if (!partial)
+      {
+         std::vector<engine::MeshData> meshes;
+         for (IGeometrySource* src : mDraw)
+            meshes.push_back(ToMeshData(src->GetMesh()));
+         if (!E.raster->UploadMeshes(meshes))
+            return false;
+      }
       E.meshSig = sig;
    }
 
+   const auto tp1 = std::chrono::steady_clock::now();
    engine::Frame fr;
-   for (size_t i = 0; i < mDraw.size(); i++)
+   auto place = [&](engine::Instance& in, const Mat4& m)
    {
-      IGeometrySource* src = mDraw[i];
-      engine::Instance in;
-      in.mesh = (int)i;
-      const Mat4 m = src->GetModelMatrix();
       std::memcpy(in.model, m.m, 64);
       float n3[9];
       m.NormalMatrix(n3);
       for (int c = 0; c < 3; c++)
          for (int r = 0; r < 3; r++)
             in.normalMatrix[c * 4 + r] = n3[c * 3 + r];
+   };
+   for (size_t i = 0; i < mDraw.size(); i++)
+   {
+      IGeometrySource* src = mDraw[i];
+      engine::Instance in;
+      in.mesh = (int)i;
       const Material mat = src->GetMaterial();
       for (int k = 0; k < 3; k++)
          in.baseSrgb[k] = mat.color[k];
       in.metallic = mat.metallic;
       in.roughness = mat.roughness;
+      in.transmission = mat.transmission;
+      in.ior = mat.ior;
+      // Instanced sources: one engine instance per copy, placed as the GL draw places it (group matrix * copy).
+      if (InstanceOnPointsNode* instancer = FindInstancer(src))
+      {
+         const std::vector<Mat4>& xforms = ResolveInstanceTransforms(src, instancer);
+         const std::vector<unsigned char>* sel = ResolveInstanceSelection(src);
+         const bool useSel = sel != nullptr && sel->size() == xforms.size();
+         const Mat4 group = src->GetInstanceGroupMatrix();
+         for (size_t k = 0; k < xforms.size(); k++)
+         {
+            if (useSel && (*sel)[k] == 0)
+               continue;
+            place(in, Mat4::Multiply(group, xforms[k]));
+            fr.instances.push_back(in);
+         }
+         continue;
+      }
+      place(in, src->GetModelMatrix());
       fr.instances.push_back(in);
    }
 
@@ -215,6 +263,62 @@ bool Render3DNode::CookEngine(int frameId)
    std::memcpy(fr.envGroundSrgb, envGround, 12);
    fr.envIntensity = envIntensity;
    std::memcpy(fr.clearSrgb, bgColor, 12);
+
+   // The Environment node's HDRI, read back once per change from the GL texture Render 3D samples. A mip at most
+   // 2048 wide is enough for lighting and a blurred background; envBaseLod keeps roughness on GL's mip scale.
+   if (auto* env = dynamic_cast<EnvironmentNode*>(envInput.IsConnected() ? envInput.Resolved() : nullptr))
+   {
+      env->CookIfNeeded(frameId);
+      const unsigned int tex = env->GetEnvironmentTexture();
+      if (tex != 0 && (tex != E.envTex || env->TextureRevision() != E.envRev))
+      {
+         glBindTexture(GL_TEXTURE_2D, tex);
+         int tw = 0, th = 0, lod = 0;
+         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &tw);
+         while ((tw >> lod) > 2048 && lod < (int)env->MaxLod())
+            lod++;
+         glGetTexLevelParameteriv(GL_TEXTURE_2D, lod, GL_TEXTURE_WIDTH, &tw);
+         glGetTexLevelParameteriv(GL_TEXTURE_2D, lod, GL_TEXTURE_HEIGHT, &th);
+         if (tw > 0 && th > 0)
+         {
+            E.envPixels.assign((size_t)tw * th * 3, 0.0f);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glGetTexImage(GL_TEXTURE_2D, lod, GL_RGB, GL_FLOAT, E.envPixels.data());
+            glPixelStorei(GL_PACK_ALIGNMENT, 4);
+            E.envW = tw; E.envH = th; E.envLod = lod;
+            E.envSerial++;
+         }
+         glBindTexture(GL_TEXTURE_2D, 0);
+         E.envTex = tex;
+         E.envRev = env->TextureRevision();
+      }
+      if (tex != 0 && !E.envPixels.empty())
+      {
+         // Rows as GL holds them: GL's v and Metal's v both start at row 0, so the same lookup reads the same texel.
+         fr.envPixels = E.envPixels.data();
+         fr.envW = E.envW; fr.envH = E.envH;
+         fr.envRev = E.envSerial;
+         fr.envRotationRad = env->rotation * (float)M_PI / 180.0f;
+         fr.envMaxLod = env->MaxLod();
+         fr.envBaseLod = (float)E.envLod;
+         fr.envIntensity = envIntensity * env->intensity;
+         fr.envBackground = envAsBackground;
+         float sunDir[3], sunLight[3];
+         if ((int)fr.lights.size() < engine::kMaxLights && env->Sun(sunDir, sunLight))
+         {
+            // The extracted sun, as GL adds it: rotated with the map, colour normalised, power = peak * intensity.
+            const float c = std::cos(fr.envRotationRad), sn = std::sin(fr.envRotationRad);
+            engine::Light l;
+            l.type = engine::LightType::Directional;
+            l.vec[0] = sunDir[0] * c + sunDir[2] * sn; l.vec[1] = sunDir[1]; l.vec[2] = -sunDir[0] * sn + sunDir[2] * c;
+            const float peak = std::max({ sunLight[0], sunLight[1], sunLight[2], 1e-6f });
+            for (int k = 0; k < 3; k++)
+               l.colorSrgb[k] = ColorSpace::LinearToSrgb(sunLight[k] / peak);
+            l.intensity = peak * env->intensity;
+            fr.lights.push_back(l);
+         }
+      }
+   }
    fr.exposure = exposure;
    fr.tonemap = tonemap == 0 ? 0 : 1;   // none or ACES; the other curves are not in the engine yet
    fr.rim = rimIntensity;
@@ -233,7 +337,8 @@ bool Render3DNode::CookEngine(int frameId)
       for (size_t i = 0; i < n; i++) { hsh ^= b[i]; hsh *= 1099511628211ull; }
    };
    mix(fr.viewProj, 64); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
-   for (const engine::Instance& in : fr.instances) { mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 8); }
+   mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
+   for (const engine::Instance& in : fr.instances) { mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 16); }
    for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); }
    const bool changed = hsh != E.sceneHash;
    E.sceneHash = hsh;
@@ -271,11 +376,20 @@ bool Render3DNode::CookEngine(int frameId)
          if (traced) E.settled += step;
       }
    }
+   const auto tp2 = std::chrono::steady_clock::now();
    if (!traced)
    {
       E.settled = 0;
       if (!E.raster->Render(*E.img, fr, nullptr))
          return false;
+   }
+   if (sProf && (E.frame % 30) == 0)
+   {
+      const auto tp3 = std::chrono::steady_clock::now();
+      auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+      std::fprintf(stderr, "ENGINE_PROF meshes=%.2f (changed %d, %zu tris) build=%.2f render=%.2f inst=%zu env=%dx%d lod=%.0f bg=%d conn=%d\n",
+                   ms(tp0, tp1), changedMeshes, changedTris, ms(tp1, tp2), ms(tp2, tp3), fr.instances.size(), fr.envW, fr.envH,
+                   fr.envBaseLod, (int)fr.envBackground, (int)envInput.IsConnected());
    }
 
    // GL reads the engine's picture from a rectangle texture; the node's output is an ordinary 2D texture.
@@ -289,6 +403,12 @@ bool Render3DNode::CookEngine(int frameId)
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    mRevision = NextTextureRevision();
    mHasSceneBuilt = false;
+   if (sProf && (E.frame % 30) == 0)
+   {
+      const auto tpZ = std::chrono::steady_clock::now();
+      std::fprintf(stderr, "ENGINE_PROF2 sources=%.2f total=%.2f\n", std::chrono::duration<double, std::milli>(tp0 - tpA).count(),
+                   std::chrono::duration<double, std::milli>(tpZ - tpA).count());
+   }
    return true;
 }
 #else
