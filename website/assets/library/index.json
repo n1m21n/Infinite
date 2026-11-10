@@ -8194,6 +8194,216 @@
       "file": "assets/library/pixel/vector-wireframe-geodesic-radar-horizon.field",
       "preview": "assets/library/previews/vector-wireframe-geodesic-radar-horizon.jpg",
       "bytes": 2356
+    },
+    {
+      "id": "technical-blueprint-isometric-gear-schematic",
+      "name": "Technical Blueprint Isometric Gear Schematic",
+      "kind": "Generator",
+      "tags": [
+        "technical",
+        "blueprint",
+        "schematic",
+        "gear",
+        "isometric",
+        "drawing"
+      ],
+      "description": "Procedural mathematical drafting drawing rendering interlocking epicyclic gear trains, concentric pitch circles, involute gear teeth profiles, and dimensional tolerances on a Prussian blue drafting plane.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/technical-blueprint-isometric-gear-schematic.js",
+      "preview": "assets/library/previews/technical-blueprint-isometric-gear-schematic.jpg",
+      "bytes": 6647
+    },
+    {
+      "id": "technical-blueprint-aerospace-telemetry-grid",
+      "name": "Technical Blueprint Aerospace Telemetry Grid",
+      "kind": "Generator",
+      "tags": [
+        "technical",
+        "blueprint",
+        "telemetry",
+        "radar",
+        "orbital",
+        "drawing"
+      ],
+      "description": "Mathematical architectural schematic drawing depicting multi-axis polar coordinate radar grids, orbital trajectory ellipses, telemetry vernier scales, and precision graticule crosshairs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/technical-blueprint-aerospace-telemetry-grid.js",
+      "preview": "assets/library/previews/technical-blueprint-aerospace-telemetry-grid.jpg",
+      "bytes": 5073
+    },
+    {
+      "id": "pixel-art-8bit-voxel-monolith-citadel-3d",
+      "name": "Pixel Art 8-Bit Voxel Monolith Citadel 3D",
+      "kind": "Generator",
+      "tags": [
+        "pixelart",
+        "voxel",
+        "citadel",
+        "8bit",
+        "retro",
+        "3d"
+      ],
+      "description": "Three-dimensional procedural voxel citadel featuring stepped modular pixel pylons, cantilevered arcade cuboids, and relief battlements rendered in classic four-shade dot-matrix phosphor green.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/pixel-art-8bit-voxel-monolith-citadel-3d.js",
+      "preview": "assets/library/previews/pixel-art-8bit-voxel-monolith-citadel-3d.jpg",
+      "bytes": 3659
+    },
+    {
+      "id": "pixel-art-8bit-isometric-arcade-ziggurat-3d",
+      "name": "Pixel Art 8-Bit Isometric Arcade Ziggurat 3D",
+      "kind": "Generator",
+      "tags": [
+        "pixelart",
+        "ziggurat",
+        "isometric",
+        "8bit",
+        "arcade",
+        "3d"
+      ],
+      "description": "Three-dimensional stepped isometric arcade ziggurat with cascading voxel terraces, ceremonial portal archways, and floating modular pixel satellites in classic four-tone dot-matrix palette.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/pixel-art-8bit-isometric-arcade-ziggurat-3d.js",
+      "preview": "assets/library/previews/pixel-art-8bit-isometric-arcade-ziggurat-3d.jpg",
+      "bytes": 3176
+    },
+    {
+      "id": "uk-garage-warped-sub-bass-synth",
+      "name": "UK Garage Warped Sub Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "ukgarage",
+        "subbass",
+        "warped",
+        "speedgarage",
+        "bass",
+        "synth"
+      ],
+      "description": "Dual-oscillator speed garage warped sub synthesizer combining heavy sine fundamental with detuned modulated saw glide, saturation drive, and envelope-swept low-pass filter.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/uk-garage-warped-sub-bass-synth.inf",
+      "preview": "assets/library/previews/uk-garage-warped-sub-bass-synth.jpg",
+      "bytes": 2054
+    },
+    {
+      "id": "uk-garage-2step-organ-stab-lead-synth",
+      "name": "UK Garage 2-Step Organ Stab Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "ukgarage",
+        "organ",
+        "2step",
+        "stab",
+        "lead",
+        "synth"
+      ],
+      "description": "Punchy percussive digital organ and chord stab synthesizer with multi-harmonic drawbar overtone partials, click attack transient, and warm analog chorus diffusion.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/uk-garage-2step-organ-stab-lead-synth.inf",
+      "preview": "assets/library/previews/uk-garage-2step-organ-stab-lead-synth.jpg",
+      "bytes": 2339
+    },
+    {
+      "id": "detroit-techno-motor-city-tape-delay-fx",
+      "name": "Detroit Techno Motor City Tape Delay FX",
+      "kind": "Generator",
+      "tags": [
+        "detroit",
+        "techno",
+        "delay",
+        "tape",
+        "echo",
+        "effect"
+      ],
+      "description": "Analog tape echo processor featuring tempo-sync feedback diffusion, head flutter modulation, non-linear tape saturation warmth, and high-frequency damping roll-off.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/detroit-techno-motor-city-tape-delay-fx.inf",
+      "preview": "assets/library/previews/detroit-techno-motor-city-tape-delay-fx.jpg",
+      "bytes": 2090
+    },
+    {
+      "id": "detroit-techno-warehouse-chorus-diffusion-fx",
+      "name": "Detroit Techno Warehouse Chorus Diffusion FX",
+      "kind": "Generator",
+      "tags": [
+        "detroit",
+        "techno",
+        "chorus",
+        "diffusion",
+        "spatial",
+        "effect"
+      ],
+      "description": "Multi-voice analog bucket-brigade chorus and spatial diffusion effect providing wide stereo chorus modulation, lush harmonic depth, and subtle early-reflection warmth.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/detroit-techno-warehouse-chorus-diffusion-fx.inf",
+      "preview": "assets/library/previews/detroit-techno-warehouse-chorus-diffusion-fx.jpg",
+      "bytes": 2244
+    },
+    {
+      "id": "riso-manga-zine-halftone-dot-matrix",
+      "name": "Riso Manga Zine Halftone Dot Matrix",
+      "kind": "Generator",
+      "tags": [
+        "risograph",
+        "manga",
+        "halftone",
+        "screentone",
+        "zine",
+        "shader"
+      ],
+      "description": "Audio-reactive risograph print shader rendering rotating screen halftone dot lattices, spot color ink overlapping, and bass-driven dot radius pulsation in fluorescent pink, cyan, and yellow inks.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/riso-manga-zine-halftone-dot-matrix.field",
+      "preview": "assets/library/previews/riso-manga-zine-halftone-dot-matrix.jpg",
+      "bytes": 2232
+    },
+    {
+      "id": "riso-manga-zine-chromatic-ink-misregistration",
+      "name": "Riso Manga Zine Chromatic Ink Misregistration",
+      "kind": "Generator",
+      "tags": [
+        "risograph",
+        "manga",
+        "speedlines",
+        "misregistration",
+        "print",
+        "shader"
+      ],
+      "description": "Audio-reactive risograph manga shader featuring high-frequency ink plate misregistration, dynamic radial action speedlines, and tactile paper grain texture under spot-color inks.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/riso-manga-zine-chromatic-ink-misregistration.field",
+      "preview": "assets/library/previews/riso-manga-zine-chromatic-ink-misregistration.jpg",
+      "bytes": 1880
     }
   ]
 }

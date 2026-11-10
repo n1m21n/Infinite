@@ -1,0 +1,68 @@
+infinite-patch 1
+# UK Garage Warped Sub Bass Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 38
+  i note1 38
+  i note2 45
+  i note3 43
+  i note4 38
+  i note5 45
+  i note6 41
+  i note7 43
+  i note8 33
+  i note9 33
+  i note10 40
+  i note11 38
+  i note12 31
+  i note13 35
+  i note14 40
+  i note15 41
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 0.52 [0.1, 1.0]\nparam float resonance = 0.30 [0.1, 0.88]\nparam float subLevel = 0.75 [0.0, 1.0]\nparam float sawWarp = 0.42 [0.0, 1.0]\nparam float drive = 0.35 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * 0.55), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.95, env - env * decayRate)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\nsubSine = sin(p1 * 6.2831853)\n\np2 = (p2 + dp * (1.004 + sawWarp * 0.008)) % 1.0\nsaw = p2 * 2.0 - 1.0\n\nsig = subSine * subLevel * 0.95 + saw * (1.0 - subLevel * 0.5) * 0.65\n\nfNorm = clamp(cutoff * 0.14 + env * 0.20, 0.015, 0.42)\nkRes = clamp(resonance * 1.45, 0.1, 1.75)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * (0.22 + drive * 0.28)))) * env\nout = sat * 0.68\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.18 0.22 0.32
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text UK Garage Warped Sub Bass Synth. Dual-oscillator speed garage warped sub synthesizer combining heavy sine fundamental with detuned modulated saw glide, saturation drive, and envelope-swept low-pass filter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

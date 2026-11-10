@@ -2433,6 +2433,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "uk-garage-warped-sub-bass-synth",
+      "name": "UK Garage Warped Sub Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Dual-oscillator speed garage warped sub synthesizer combining heavy sine fundamental with detuned modulated saw glide, saturation drive, and envelope-swept low-pass filter.",
+      "price": 0,
+      "preview": "assets/templates/uk-garage-warped-sub-bass-synth.webp",
+      "file": "assets/templates/uk-garage-warped-sub-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "uk-garage-2step-organ-stab-lead-synth",
+      "name": "UK Garage 2-Step Organ Stab Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Punchy percussive digital organ and chord stab synthesizer with multi-harmonic drawbar overtone partials, click attack transient, and warm analog chorus diffusion.",
+      "price": 0,
+      "preview": "assets/templates/uk-garage-2step-organ-stab-lead-synth.webp",
+      "file": "assets/templates/uk-garage-2step-organ-stab-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "detroit-techno-motor-city-tape-delay-fx",
+      "name": "Detroit Techno Motor City Tape Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Analog tape echo processor featuring tempo-sync feedback diffusion, head flutter modulation, non-linear tape saturation warmth, and high-frequency damping roll-off.",
+      "price": 0,
+      "preview": "assets/templates/detroit-techno-motor-city-tape-delay-fx.webp",
+      "file": "assets/templates/detroit-techno-motor-city-tape-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "detroit-techno-warehouse-chorus-diffusion-fx",
+      "name": "Detroit Techno Warehouse Chorus Diffusion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-voice analog bucket-brigade chorus and spatial diffusion effect providing wide stereo chorus modulation, lush harmonic depth, and subtle early-reflection warmth.",
+      "price": 0,
+      "preview": "assets/templates/detroit-techno-warehouse-chorus-diffusion-fx.webp",
+      "file": "assets/templates/detroit-techno-warehouse-chorus-diffusion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

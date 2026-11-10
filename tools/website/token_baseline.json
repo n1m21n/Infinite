@@ -520,6 +520,14 @@
   "embeds/vector-wireframe-geodesic-radar-horizon.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/riso-manga-zine-halftone-dot-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/riso-manga-zine-chromatic-ink-misregistration.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

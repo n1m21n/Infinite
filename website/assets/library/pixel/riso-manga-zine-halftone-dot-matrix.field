@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Riso Manga Zine Halftone Dot Matrix",
+    "author": "Infinite",
+    "description": "Audio-reactive risograph print shader rendering rotating screen halftone dot lattices, spot color ink overlapping, and bass-driven dot radius pulsation in fluorescent pink, cyan, and yellow inks.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float dotScale = 36.0 [12.0, 72.0]\nparam float inkDensity = 0.82 [0.2, 1.4]\nparam float contrast = 1.18 [0.8, 1.6]\nparam float paperWarmth = 0.88 [0.5, 1.0]\nparam float bloom = 0.45 [0.0, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * 0.35\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nrot1 = theta + 0.26 + time * 0.05\npPink = vec2(cos(rot1) * r, sin(rot1) * r) * dotScale\n\nrot2 = theta + 1.31 + time * 0.07\npCyan = vec2(cos(rot2) * r, sin(rot2) * r) * dotScale\n\nrot3 = theta + 0.78 + time * 0.04\npYellow = vec2(cos(rot3) * r, sin(rot3) * r) * dotScale\n\ngridPink = fract(pPink) - 0.5\ngridCyan = fract(pCyan) - 0.5\ngridYellow = fract(pYellow) - 0.5\n\ndistPink = length(gridPink)\ndistCyan = length(gridCyan)\ndistYellow = length(gridYellow)\n\ntargetPink = 0.36 + sin(r * 4.0 - time * 2.0) * 0.14\ntargetCyan = 0.34 + cos(r * 5.0 + time * 1.6) * 0.12\ntargetYellow = 0.32 + sin(theta * 3.0 + time) * 0.10\n\ndotPink = smoothstep(targetPink, targetPink - 0.08, distPink) * inkDensity\ndotCyan = smoothstep(targetCyan, targetCyan - 0.08, distCyan) * inkDensity\ndotYellow = smoothstep(targetYellow, targetYellow - 0.08, distYellow) * inkDensity\n\npaper = vec3(0.98 * paperWarmth, 0.96 * paperWarmth, 0.91 * paperWarmth)\n\npinkInk = vec3(1.0, 0.0, 0.47)\ncyanInk = vec3(0.0, 0.84, 1.0)\nyellowInk = vec3(1.0, 0.92, 0.0)\n\ncol = paper * (1.0 - dotPink * (1.0 - pinkInk)) * (1.0 - dotCyan * (1.0 - cyanInk)) * (1.0 - dotYellow * (1.0 - yellowInk))\n\nvignette = smoothstep(1.7, 0.6, r)\ncol = col * vignette * contrast\nout = vec4(col, 1.0)\n",
+    "params": {
+      "dotScale": 36.0,
+      "inkDensity": 0.82,
+      "contrast": 1.18,
+      "paperWarmth": 0.88,
+      "bloom": 0.45
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

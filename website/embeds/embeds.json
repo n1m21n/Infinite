@@ -515,6 +515,16 @@
       "slug": "vector-wireframe-geodesic-radar-horizon",
       "title": "Vector Wireframe Geodesic Radar Horizon",
       "description": "Audio-reactive vector wireframe radar visualizer featuring a spinning geodesic radar dome atop an infinite perspective vector terrain. Bass drives grid undulation, mids rotate geodesic radar azimuth, and highs emit phosphor sweep flares."
+    },
+    {
+      "slug": "riso-manga-zine-halftone-dot-matrix",
+      "title": "Riso Manga Zine Halftone Dot Matrix",
+      "description": "Interactive audio-reactive risograph print shader rendering screen halftone dot matrices in fluorescent spot inks. Bass pulses halftone dot scale and ink spread, mids rotate print angle separation, and highs modulate fluorescent ink misregistration."
+    },
+    {
+      "slug": "riso-manga-zine-chromatic-ink-misregistration",
+      "title": "Riso Manga Zine Chromatic Ink Misregistration",
+      "description": "Audio-reactive risograph manga shader featuring speedline dynamics and spot-color ink misregistration. Bass commands ink saturation depth, mids pulse dynamic speedline convergence, and highs trigger physical riso print plate misregistration."
     }
   ]
 }

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Detroit Techno Warehouse Chorus Diffusion FX",
+    "author": "Infinite",
+    "description": "Multi-voice analog bucket-brigade chorus and spatial diffusion effect providing wide stereo chorus modulation, lush harmonic depth, and subtle early-reflection warmth.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.42 [0.05, 1.0]\nparam float depth = 0.52 [0.0, 1.0]\nparam float tone = 0.48 [0.1, 1.0]\nparam float warmth = 0.42 [0.0, 1.0]\nparam float mix = 0.52 [0.0, 1.0]\nstate float c1 = 0\nstate float c2 = 0\nstate float c3 = 0\nstate float lp = 0\nstate float lfo1 = 0\nstate float lfo2 = 0\n\nlfo1 = (lfo1 + rate * 0.0022) % 1.0\nlfo2 = (lfo2 + rate * 0.0031 + 0.25) % 1.0\nmod1 = sin(lfo1 * 6.2831853) * depth * 0.035\nmod2 = cos(lfo2 * 6.2831853) * depth * 0.028\n\nfTone = clamp(0.04 + tone * 0.36, 0.015, 0.44)\ninSat = in / (1.0 + abs(in * (0.16 + warmth * 0.20)))\nlp = lp + fTone * (inSat - lp)\n\nkRate1 = clamp(0.12 + mod1, 0.03, 0.35)\nkRate2 = clamp(0.10 + mod2, 0.02, 0.32)\nc1 = c1 + kRate1 * (lp - c1)\nc2 = c2 + kRate2 * (c1 - c2)\nc3 = c3 + kRate1 * 0.8 * (c2 - c3)\n\nchorusSig = (c1 * 0.45 + c2 * 0.42 - c3 * 0.32) * 1.35\nsat = chorusSig / (1.0 + abs(chorusSig * 0.22))\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.12\n",
+    "params": {
+      "rate": 0.42,
+      "depth": 0.52,
+      "tone": 0.48,
+      "warmth": 0.42,
+      "mix": 0.52
+    }
+  }
+}
