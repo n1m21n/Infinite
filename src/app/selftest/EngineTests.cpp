@@ -279,6 +279,15 @@ bool RunEngineTest()
       r.CookIfNeeded(++fnum);
       std::vector<float> full;
       check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), full) && !full.empty(), "node engine picture with RT + GI reads", 0, 0);
+      // Settle: the same still scene, cooked repeatedly, switches to the path tracer and refines.
+      r.liveEngineFeatures = 15; r.ptSamples = 32; r.ptBounces = 6;
+      for (int i = 0; i < 12; i++) r.CookIfNeeded(++fnum);
+      std::vector<float> settled;
+      check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), settled) && settled.size() == gl.size(), "node engine settles to a path-traced still", 0, 0);
+      double ssum = 0.0, lum = 0.0;
+      for (size_t i = 0; i < settled.size(); i++) { ssum += std::fabs(settled[i] - gl[i]); lum += settled[i]; }
+      printf("  settled vs raster MAE %.4f, mean %.4f\n", ssum / (double)settled.size(), lum / (double)settled.size());
+      check(ssum / (double)settled.size() < 0.08, "settled picture stays close to the raster", ssum / (double)settled.size(), 0.08);
       r.liveEngine = false;
    }
    if (const char* ptEnv = getenv("INFINITE_ENGINETEST_PT"))

@@ -715,7 +715,7 @@ public:
    // Draw through the Metal engine (ray-traced shadows/reflections, live GI) instead of the GL raster.
    // Off by default; macOS only. Falls back to the GL render when the engine cannot run.
    bool liveEngine = false;
-   int liveEngineFeatures = 7;   // bit 0 RT shadows, 1 RT reflections, 2 GI
+   int liveEngineFeatures = 15;   // bit 0 RT shadows, 1 RT reflections, 2 GI, 3 settle (path trace once still)
    float ambientColor[3] = { 0.28f, 0.32f, 0.42f };
    float rimIntensity = 0.35f;
 

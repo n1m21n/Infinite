@@ -346,6 +346,10 @@ First version sampled all 8 lights every bounce: 45 ms/sample (3.1x, FAIL); one-
 
 Not yet: hooking the tracer into Render 3D engine mode for settle/export, FLIP vs Cycles, glass/textures/HDRI.
 
+### R4 step 2: settle in Render 3D engine mode (2026-11-10)
+
+`liveEngineFeatures` bit 3 (default on): when the scene hash (camera, instances, lights, exposure, ambient) is unchanged from the previous cook, the node switches from the raster to the path tracer, adds 4 samples per cook up to `ptSamples`, then holds the converged image; any change returns to the live raster and restarts. Test: still scene, 12 cooks at 32 spp, settled picture vs the raster MAE 0.019 (gate 0.08), PASS. Still opt-in through `INFINITE_LIVE_ENGINE` (no visible toggle until approved).
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

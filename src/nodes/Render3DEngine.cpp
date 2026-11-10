@@ -23,6 +23,8 @@ struct Render3DNode::EngineState
    unsigned frame = 0;
    unsigned int readFbo = 0;
    bool failed = false;
+   unsigned long long sceneHash = 0;
+   int settled = 0;   // path-traced samples since the scene last changed
 };
 
 void Render3DNode::ReleaseEngine()
@@ -221,8 +223,37 @@ bool Render3DNode::CookEngine(int frameId)
    fr.gi = (liveEngineFeatures & 4) != 0;
    fr.frameIndex = ++E.frame;
 
-   if (!E.raster->Render(*E.img, fr, nullptr))
-      return false;
+   // Settle: once nothing has changed since the last frame, refine with the path tracer up to ptSamples.
+   unsigned long long hsh = 1469598103934665603ull;
+   auto mix = [&](const void* d, size_t n)
+   {
+      const unsigned char* b = (const unsigned char*)d;
+      for (size_t i = 0; i < n; i++) { hsh ^= b[i]; hsh *= 1099511628211ull; }
+   };
+   mix(fr.viewProj, 64); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
+   for (const engine::Instance& in : fr.instances) { mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 8); }
+   for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); }
+   const bool changed = hsh != E.sceneHash;
+   E.sceneHash = hsh;
+   bool traced = false;
+   if ((liveEngineFeatures & 8) != 0 && !changed)
+   {
+      const int target = std::clamp(ptSamples, 1, 4096);
+      if (E.settled >= target)
+         traced = true;   // converged: the picture in the image is final
+      else
+      {
+         const int step = std::min(4, target - E.settled);
+         traced = E.raster->PathTrace(*E.img, fr, step, std::clamp(ptBounces, 1, 16), E.settled == 0, nullptr);
+         if (traced) E.settled += step;
+      }
+   }
+   if (!traced)
+   {
+      E.settled = 0;
+      if (!E.raster->Render(*E.img, fr, nullptr))
+         return false;
+   }
 
    // GL reads the engine's picture from a rectangle texture; the node's output is an ordinary 2D texture.
    if (E.readFbo == 0)
