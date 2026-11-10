@@ -864,6 +864,7 @@ namespace
                c.setup(a.node.get());
             a.node->CookIfNeeded(a.frame++);
             // ApplyNoteInbox, the engine's own rewire path (it keeps the slot's open-note list).
+            cons.audio->EnsureNoteDrain();
             cons.audio->ApplyNoteInbox(0, a.out, a.out->RegisterConsumer());
             StartTransport(120.0);
             const double bypassAt = 0.55; // 9001, 9003, 9004 are held
@@ -894,17 +895,17 @@ namespace
                   a.pos += a.block;
                }
                cons.Step(false);
+               cons.audio->FinishNoteDrain();
                cons.pos = a.pos;
             }
             StopTransport();
             const PairReport p = Pairs(cons.got);
             printf("NOTEAUDIT BYPASS %-17s %-6s %d voices open at the cut | at the consumer: on %3d off %3d stuck %d orphan-off %d\n",
                    c.name, mode == 0 ? "bypass" : "delete", voicesOnAtCut, p.ons, p.offs, p.stuck, p.orphanOff);
-            // Delete is reported only: a deleted producer cannot send note-offs, so every node leaves its
-            // consumer's open voices open (the consumer drops to its free-running state, nothing sounds).
-            if (mode == 0 && (p.stuck || p.orphanOff))
+            // Bypass and delete alike: the consumer's open notes are closed (see NoteHeld).
+            if (p.stuck || p.orphanOff)
             {
-               flags.Flag("BYPASS", c.name, "bypass mid-note: stuck + orphan-off", p.stuck + p.orphanOff);
+               flags.Flag("BYPASS", c.name, mode == 0 ? "bypass mid-note: stuck + orphan-off" : "delete mid-note: stuck + orphan-off", p.stuck + p.orphanOff);
                ok = false;
             }
          }

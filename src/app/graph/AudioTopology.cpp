@@ -774,6 +774,8 @@ namespace app
                      }
                   }
                }
+               if (inbox == nullptr)
+                  consumer->EnsureNoteDrain(); // a source that went away may still owe note-offs
                noteWires.push_back(NoteWire{ consumer, slot, inbox, cursor });
             }
          }
