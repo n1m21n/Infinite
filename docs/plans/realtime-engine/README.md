@@ -270,6 +270,18 @@ Same scene through both: floor, cube, metal sphere, torus; 8 lights (sun, points
 
 Gates passed for this scope. Not yet covered: shadows, textures, clearcoat/sheen/SSS, HDR/bloom, area lights, the real-patch bridge (the B4 scene). The GL number is a light scene, not the B4 R0 baseline (14.7 ms); compare on B4 once the bridge exists.
 
+### R1 step 2: shadows (2026-11-10, same scene, `INFINITE_ENGINETEST_SHADOWS=1`)
+
+Sun-cast shadow map fitted to the scene sphere (2048, 3x3 PCF, strength 0.8), same bias maths as Render 3D, drawn by a depth-only Metal pass in the same command buffer.
+
+| | Render 3D (GL) | Engine (Metal) |
+|---|---|---|
+| ms/frame | 4.14 | 1.46 |
+| speedup | | **2.83x** |
+| error vs GL | | MAE 0.0009, p99 0.0039, 0 pixels > 0.04 |
+
+Soft (PCSS / area) shadows and point-light shadows are not ported; point lights stay unshadowed here as in GL. Test note: Render 3D needs a second draw after its first cook before shadows exist (bounds come from the uploaded meshes); the harness nudges exposure to force it.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

@@ -126,7 +126,7 @@ bool RunEngineTest()
    Render3DNode r;
    for (int i = 0; i < 4; i++)
       r.geometry[i] = nodes[i];
-   r.width = (float)W; r.height = (float)H; r.samples = 0; r.hdr = false; r.tonemap = 1; r.shadowsEnabled = false;
+   r.width = (float)W; r.height = (float)H; r.samples = 0; r.hdr = false; r.tonemap = 1; r.shadowsEnabled = getenv("INFINITE_ENGINETEST_SHADOWS") != nullptr;
    r.rig = &rig;
 
    std::vector<engine::MeshData> meshes;
@@ -157,6 +157,8 @@ bool RunEngineTest()
    std::memcpy(frame.envGroundSrgb, r.envGround, 12);
    frame.envIntensity = r.envIntensity;
    std::memcpy(frame.clearSrgb, r.bgColor, 12);
+   frame.shadow.enabled = r.shadowsEnabled;
+   frame.shadow.size = 2048; frame.shadow.bias = r.shadowBias; frame.shadow.strength = r.shadowStrength; frame.shadow.softness = r.shadowSoftness;
 
    auto raster = dev->CreateRasterRenderer();
    check(raster != nullptr, "Metal raster renderer builds", 0, 0);
@@ -172,8 +174,14 @@ bool RunEngineTest()
    int fnum = 9000;
    unsigned int scratch = 0;
    std::vector<float> gl, mt;
-   for (int i = 0; i < 2; i++)
-      r.CookIfNeeded(++fnum);
+   if (getenv("INFINITE_ENGINETEST_PASS")) r.renderPass = atoi(getenv("INFINITE_ENGINETEST_PASS"));
+   // First cook uploads the meshes (no shadow bounds yet); nudge exposure so the next one draws again.
+   r.CookIfNeeded(++fnum);
+   r.exposure = 1.001f;
+   r.CookIfNeeded(++fnum);
+   r.exposure = 1.0f;
+   r.CookIfNeeded(++fnum);
+   printf("  GL shadow size %d, shadows enabled %d\n", r.ActiveShadowSize(), (int)r.shadowsEnabled);
    check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), gl), "GL picture", (double)r.GetOutputWidth(), (double)r.GetOutputHeight());
    double gpuMs = 0.0;
    check(raster->Render(*img, frame, &gpuMs), "Metal picture", gpuMs, 0);

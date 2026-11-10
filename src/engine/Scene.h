@@ -39,6 +39,17 @@ namespace engine
       float cutoff = 0.0f;  // 0 = none
    };
 
+   // One shadow-casting light (the first), a depth map fitted to the scene bounds. Spot and directional/sun only.
+   struct Shadow
+   {
+      bool enabled = false;
+      int size = 2048;
+      float bias = 0.0025f;     // distance in the scene, as Render 3D's shadowBias
+      float strength = 0.8f;
+      float softness = 1.0f;    // PCF kernel in texels (<= 2 supported)
+      float clipNear = 0.05f;
+   };
+
    struct Frame
    {
       std::vector<Instance> instances;
@@ -53,6 +64,7 @@ namespace engine
             envGroundSrgb[3] = { 0.2f, 0.2f, 0.22f };
       float envIntensity = 1.0f;
       float clearSrgb[3] = { 0.04f, 0.04f, 0.06f };
+      Shadow shadow;
    };
 
    constexpr int kMaxLights = 8;

@@ -39,6 +39,9 @@ struct FrameU
    float4 ambient;  // xyz linear
    float4 sky, horizon, ground; // xyz linear
    float4 params;   // exposure, tonemap, envIntensity, lightCount
+   float4x4 lightVP;
+   float4 shP;      // enabled, light index, bias (depth units), strength
+   float4 shQ;      // texel, softness
    LightU lights[8]; // vec.w = type, aim.w unused
 };
 struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; }; // base linear rgb; mr = metallic, roughness
@@ -68,10 +71,27 @@ float geomSchlick(float nDotV, float rough) { const float r = rough + 1.0, k = (
 float3 fresnel(float cosT, float3 f0) { return f0 + (1.0 - f0) * pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0); }
 float3 fresnelRough(float cosT, float3 f0, float rough) { const float3 ceil = max(float3(1.0 - rough), f0); return f0 + (ceil - f0) * pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0); }
 float lightFalloff(float dist, float k) { if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k); return min(1.0 / max(dist * dist * -k, 1e-4), 20.0); }
+float shadowFactor(constant FrameU& f, depth2d<float> sm, float3 wp, float3 n, float3 ld)
+{
+   const float4 lp = f.lightVP * float4(wp, 1.0);
+   const float3 pr = lp.xyz / max(lp.w, 1e-6);
+   const float2 uv = float2(pr.x * 0.5 + 0.5, 0.5 - pr.y * 0.5);
+   const float z = pr.z * 0.5 + 0.5;
+   if (z > 1.0 || uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 1.0;
+   const float cosL = clamp(dot(n, ld), 0.05, 1.0);
+   const float bias = f.shP.z * (1.0 + min(sqrt(1.0 - cosL * cosL) / cosL, 10.0));
+   constexpr sampler cs(coord::normalized, filter::linear, address::clamp_to_edge, compare_func::less_equal);
+   float lit = 0.0;
+   for (int x = -1; x <= 1; x++)
+      for (int y = -1; y <= 1; y++)
+         lit += sm.sample_compare(cs, uv + float2(float(x), float(y)) * f.shQ.x * f.shQ.y, z - bias);
+   return mix(1.0, lit / 9.0, f.shP.w);
+}
 float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
 
-fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]])
+fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
+                     depth2d<float> sm [[texture(0)]])
 {
    const float3 n = normalize(in.n);
    const float3 base = m.base.xyz;
@@ -122,7 +142,8 @@ fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], con
       const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
       const float3 radiance = radiance0 * atten;
       floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x;
-      col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL;
+      const float shadow = (f.shP.x > 0.5 && i == int(f.shP.y)) ? shadowFactor(f, sm, in.wp, n, lightDir) : 1.0;
+      col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow;
    }
    col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal);
    const float3 reflectDir = reflect(-viewDir, n);
@@ -135,6 +156,15 @@ fragment float4 r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], con
    col *= f.params.x;
    if (int(f.params.y) == 1) col = aces(col);
    return float4(toSrgb(col), 1.0);
+}
+
+struct SOut { float4 pos [[position]]; };
+vertex SOut sh_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant float4x4& lvp [[buffer(1)]], constant InstU& m [[buffer(2)]])
+{
+   const float3 p = float3(v[vid * 6 + 0], v[vid * 6 + 1], v[vid * 6 + 2]);
+   float4 c = lvp * (m.model * float4(p, 1.0));
+   c.z = (c.z + c.w) * 0.5;
+   SOut o; o.pos = c; return o;
 }
 
 struct SkyOut { float4 pos [[position]]; };
@@ -225,7 +255,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
    struct LightU { float vec[4], aim[4], color[4], terms[4], spot[4]; };
    struct FrameU
    {
-      float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4];
+      float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4];
       LightU lights[8];
    };
    struct InstU { float model[16], normalM[16], base[4], mr[4]; };
@@ -262,6 +292,13 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             g.vb = [mDev newBufferWithBytes:m.posNormal.data() length:m.posNormal.size() * 4 options:MTLResourceStorageModeShared];
             g.ib = [mDev newBufferWithBytes:m.indices.data() length:m.indices.size() * 4 options:MTLResourceStorageModeShared];
             g.count = (NSUInteger)m.indices.size();
+            for (int k = 0; k < 3; k++) { g.lo[k] = 1e30f; g.hi[k] = -1e30f; }
+            for (size_t i = 0; i + 5 < m.posNormal.size(); i += 6)
+               for (int k = 0; k < 3; k++)
+               {
+                  g.lo[k] = std::min(g.lo[k], m.posNormal[i + k]);
+                  g.hi[k] = std::max(g.hi[k], m.posNormal[i + k]);
+               }
             if (!g.vb || !g.ib)
                return false;
             mMeshes.push_back(g);
@@ -296,6 +333,9 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra;
          }
 
+         id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+         if (!ShadowPass(cb, fr, f))
+            EnsureShadowTex(4);
          MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
          pass.colorAttachments[0].texture = img.Tex();
          pass.colorAttachments[0].loadAction = MTLLoadActionClear;
@@ -305,8 +345,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          pass.depthAttachment.loadAction = MTLLoadActionClear;
          pass.depthAttachment.storeAction = MTLStoreActionDontCare;
          pass.depthAttachment.clearDepth = 1.0;
-         id<MTLCommandBuffer> cb = [mQueue commandBuffer];
          id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:pass];
+         [enc setFragmentTexture:mShadowTex atIndex:0];
          [enc setRenderPipelineState:mPso];
          [enc setDepthStencilState:mDs];
          [enc setCullMode:MTLCullModeBack];
@@ -337,7 +377,112 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       }
 
    private:
-      struct Gpu { id<MTLBuffer> vb = nil, ib = nil; NSUInteger count = 0; };
+      struct Gpu { id<MTLBuffer> vb = nil, ib = nil; NSUInteger count = 0; float lo[3], hi[3]; };
+
+      static void Norm(float* v) { const float l = std::sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]); if (l > 1e-5f) { v[0] /= l; v[1] /= l; v[2] /= l; } }
+      bool EnsureShadowTex(int size)
+      {
+         if (mShadowTex && (int)mShadowTex.width == size)
+            return true;
+         MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float width:size height:size mipmapped:NO];
+         d.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+         d.storageMode = MTLStorageModePrivate;
+         mShadowTex = [mDev newTextureWithDescriptor:d];
+         return mShadowTex != nil;
+      }
+      // Fits an orthographic depth map to the scene's bounding sphere, as Render 3D does, and draws it.
+      bool ShadowPass(id<MTLCommandBuffer> cb, const engine::Frame& fr, FrameU& f)
+      {
+         const engine::Shadow& sh = fr.shadow;
+         if (!sh.enabled || fr.lights.empty() || fr.lights[0].type == engine::LightType::Point ||
+             fr.lights[0].type == engine::LightType::Ambient || !EnsureShadowTex(sh.size))
+            return false;
+         float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+         bool any = false;
+         for (const engine::Instance& in : fr.instances)
+         {
+            if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
+               continue;
+            const Gpu& g = mMeshes[in.mesh];
+            for (int c = 0; c < 8; c++)
+            {
+               const float p[3] = { (c & 1) ? g.hi[0] : g.lo[0], (c & 2) ? g.hi[1] : g.lo[1], (c & 4) ? g.hi[2] : g.lo[2] };
+               for (int k = 0; k < 3; k++)
+               {
+                  const float w = in.model[k] * p[0] + in.model[4 + k] * p[1] + in.model[8 + k] * p[2] + in.model[12 + k];
+                  lo[k] = std::min(lo[k], w);
+                  hi[k] = std::max(hi[k], w);
+               }
+            }
+            any = true;
+         }
+         if (!any)
+            return false;
+         const engine::Light& L = fr.lights[0];
+         const float centre[3] = { (lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f, (lo[2] + hi[2]) * 0.5f };
+         const float radius = std::max(0.01f, 0.5f * std::sqrt((hi[0]-lo[0])*(hi[0]-lo[0]) + (hi[1]-lo[1])*(hi[1]-lo[1]) + (hi[2]-lo[2])*(hi[2]-lo[2])));
+         float dir[3] = { L.vec[0], L.vec[1], L.vec[2] };
+         const float dl = std::sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
+         if (dl > 1e-5f) Norm(dir); else { dir[0] = 0; dir[1] = 1; dir[2] = 0; }
+         const float eye[3] = { centre[0] + dir[0] * radius * 2.5f, centre[1] + dir[1] * radius * 2.5f, centre[2] + dir[2] * radius * 2.5f };
+         // LookAt, GL conventions
+         const float upv[3] = { 0, std::fabs(dir[1]) > 0.99f ? 0.0f : 1.0f, std::fabs(dir[1]) > 0.99f ? 1.0f : 0.0f };
+         float fw[3] = { centre[0] - eye[0], centre[1] - eye[1], centre[2] - eye[2] };
+         Norm(fw);
+         float sd[3] = { fw[1]*upv[2] - fw[2]*upv[1], fw[2]*upv[0] - fw[0]*upv[2], fw[0]*upv[1] - fw[1]*upv[0] };
+         Norm(sd);
+         const float u[3] = { sd[1]*fw[2] - sd[2]*fw[1], sd[2]*fw[0] - sd[0]*fw[2], sd[0]*fw[1] - sd[1]*fw[0] };
+         float V[16] = { sd[0], u[0], -fw[0], 0, sd[1], u[1], -fw[1], 0, sd[2], u[2], -fw[2], 0,
+                         -(sd[0]*eye[0] + sd[1]*eye[1] + sd[2]*eye[2]), -(u[0]*eye[0] + u[1]*eye[1] + u[2]*eye[2]),
+                         (fw[0]*eye[0] + fw[1]*eye[1] + fw[2]*eye[2]), 1 };
+         float clipNear = sh.clipNear;
+         if (L.type == engine::LightType::Spot)
+         {
+            const float d[3] = { L.vec[0] - centre[0], L.vec[1] - centre[1], L.vec[2] - centre[2] };
+            clipNear += radius * 2.5f - std::sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
+         }
+         clipNear = std::min(std::max(clipNear, 0.05f), radius * 4.0f);
+         const float farZ = radius * 5.0f, hh = radius * 1.2f;
+         float P[16] = {};
+         P[0] = 1.0f / hh; P[5] = 1.0f / hh; P[10] = -2.0f / (farZ - clipNear); P[14] = -(farZ + clipNear) / (farZ - clipNear); P[15] = 1;
+         float VP[16];
+         for (int c = 0; c < 4; c++)
+            for (int r = 0; r < 4; r++)
+            {
+               float a = 0;
+               for (int k = 0; k < 4; k++) a += P[k * 4 + r] * V[c * 4 + k];
+               VP[c * 4 + r] = a;
+            }
+         const float texelWorld = 2.4f * radius / (float)sh.size;
+         const float biasDepth = (sh.bias + 2.5f * texelWorld * std::max(1.0f, std::min(sh.softness, 2.0f))) / (farZ - clipNear);
+         std::memcpy(f.lightVP, VP, 64);
+         f.shP[0] = 1; f.shP[1] = 0; f.shP[2] = biasDepth; f.shP[3] = sh.strength;
+         f.shQ[0] = 1.0f / (float)sh.size; f.shQ[1] = sh.softness;
+
+         MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
+         pass.depthAttachment.texture = mShadowTex;
+         pass.depthAttachment.loadAction = MTLLoadActionClear;
+         pass.depthAttachment.storeAction = MTLStoreActionStore;
+         pass.depthAttachment.clearDepth = 1.0;
+         id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:pass];
+         [enc setRenderPipelineState:mShPso];
+         [enc setDepthStencilState:mDs];
+         [enc setCullMode:MTLCullModeNone];
+         [enc setVertexBytes:VP length:64 atIndex:1];
+         for (const engine::Instance& in : fr.instances)
+         {
+            if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
+               continue;
+            InstU u2 = {};
+            std::memcpy(u2.model, in.model, 64);
+            [enc setVertexBytes:&u2 length:sizeof(u2) atIndex:2];
+            const Gpu& g = mMeshes[in.mesh];
+            [enc setVertexBuffer:g.vb offset:0 atIndex:0];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib indexBufferOffset:0];
+         }
+         [enc endEncoding];
+         return true;
+      }
       bool Pipeline(MTLPixelFormat fmt)
       {
          if (mPso && mFmt == fmt)
@@ -354,7 +499,11 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          dd.depthWriteEnabled = YES;
          mDs = [mDev newDepthStencilStateWithDescriptor:dd];
          mFmt = fmt;
-         return mPso != nil && mDs != nil;
+         MTLRenderPipelineDescriptor* sd = [MTLRenderPipelineDescriptor new];
+         sd.vertexFunction = [mLib newFunctionWithName:@"sh_vs"];
+         sd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+         mShPso = [mDev newRenderPipelineStateWithDescriptor:sd error:&err];
+         return mPso != nil && mDs != nil && mShPso != nil;
       }
       bool Depth(int w, int h)
       {
@@ -372,6 +521,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       id<MTLRenderPipelineState> mPso = nil;
       id<MTLDepthStencilState> mDs = nil;
       id<MTLTexture> mDepth = nil;
+      id<MTLTexture> mShadowTex = nil;
+      id<MTLRenderPipelineState> mShPso = nil;
       MTLPixelFormat mFmt = MTLPixelFormatInvalid;
       std::vector<Gpu> mMeshes;
    };
