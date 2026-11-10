@@ -597,6 +597,7 @@ set(COMMON_SOURCES
     src/app/selftest/GenSampleTests.cpp
     src/app/selftest/FieldTests1.cpp
     src/app/selftest/FieldTests2.cpp
+    src/app/selftest/SpectralFieldTests.cpp
     src/app/selftest/Headless.cpp
     src/app/selftest/I18nTests.cpp
     src/app/selftest/MiscTests.cpp

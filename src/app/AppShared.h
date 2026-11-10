@@ -6440,6 +6440,7 @@ int RunFieldStateTest();
 int RunFieldTransferTest();
 
 int RunFieldSampleTest();
+int RunSpectralFieldTest();
 
 int RunFieldPinDeclTest();
 

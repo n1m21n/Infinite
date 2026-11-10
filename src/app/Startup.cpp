@@ -751,6 +751,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_FIELDSAMPLETEST") != nullptr)
       return RunFieldSampleTest();
 
+   if (getenv("INFINITE_SPECTRALFIELDTEST") != nullptr)
+      return RunSpectralFieldTest();
+
    if (getenv("INFINITE_FIELDNOTESTEST") != nullptr)
       return RunFieldNotesTest();
 
