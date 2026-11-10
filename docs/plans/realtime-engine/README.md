@@ -227,6 +227,24 @@ New nodes this implies (each needs approval): Music Rig, City/Lot/Facade split n
 
 Filled after each stage, linked back to sections 6 and 7.
 
+### R0 live baseline (B4, recorded 2026-11-10, commit 5e77cd9b, release build, M2 8 GB)
+
+Rows: `bench/baselines/realtime-r0-m2-8gb.jsonl`. 1080p, 3 lights, HDRI, ACES, animated.
+
+| Variant | Tris | p50 ms | p95 ms | RSS MB |
+|---|---|---|---|---|
+| scale s, shadow 2048 | 144k | 12.4 | 15.9 | 208 |
+| scale m, shadow 2048 | 540k | 14.6 | 16.5 | 399 |
+| scale l, shadow 2048 | 1.57M | 18.7 | 23.2 | 428 |
+| m, shadow off / 1024 / 4096 | 540k | 13.6 / 14.3 / 14.7 | 16.3 / 16.5 / 16.7 | 396-399 |
+| l, still (cached) | 1.57M | 1.55 | 7.3 | 405 |
+| l, animated, passes=1 | 1.57M | 28.7 | 32.5 | 271 |
+
+Caveats: machine had ~3.5 GB swap in use and Safari/IDE were quit just before; the Sep rows read 4.9-13.5 ms
+for the same scales, so these p50s sit near one 60 Hz interval and may be vsync-paced, and the two runs are not
+directly comparable. Shadows cost about 1 ms of 14.6. **Still missing for R1's gate:** a free-running (unpaced)
+run and the music-reactive reference scene.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |
