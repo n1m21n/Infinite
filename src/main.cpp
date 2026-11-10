@@ -7,6 +7,7 @@
 #include "core/InfiniteCli.h"
 #include "plugin/engine/HostAudio.h"
 
+#include <cstdio>
 #include <cstring>
 
 namespace app
@@ -36,6 +37,13 @@ int main(int argc, char** argv)
    // The Terminal's `infinite` command: answers before any window or GPU work.
    if (argc >= 2 && std::strcmp(argv[1], "--cli") == 0)
       return InfiniteCli::Run(argc - 2, argv + 2);
+   // Line-buffered stdout: a self-test that leaves the app open (INFINITE_NOTEFANOUTTEST, ...)
+   // and is stopped by a timeout used to lose its whole report in the pipe buffer.
+#if defined(_WIN32)
+   setvbuf(stdout, nullptr, _IONBF, 0); // the MSVC CRT treats _IOLBF as full buffering
+#else
+   setvbuf(stdout, nullptr, _IOLBF, 0);
+#endif
    FrameCtx fc;
    {
       const int rc = InitApp(fc, argc, argv);

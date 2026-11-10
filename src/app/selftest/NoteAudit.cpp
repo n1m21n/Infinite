@@ -711,6 +711,92 @@ namespace
       }
    }
 
+   // ---- TEMPO ------------------------------------------------------------
+   // A tempo change mid-step (120 -> 90 and 120 -> 170 at beat 2.6, between the
+   // 2.5 and 2.75 steps): every onset stays on the 1/16 beat grid of the
+   // transport's own beat clock, and every step plays exactly once - none
+   // skipped, none doubled - across the change.
+   void AuditTempo(Flags& flags, bool& ok)
+   {
+      const double rate = 0.25;
+      for (const GridSrc& g : GridSrcs())
+      {
+         int bad = 0;
+         std::string why;
+         for (double to : { 90.0, 170.0 })
+         {
+            Rig rig;
+            if (!rig.Init(g.create(rate, 0.0f, 1), 512))
+               continue;
+            rig.node->CookIfNeeded(rig.frame++);
+            StartTransport(120.0);
+            if (g.needsInput)
+               Push(rig.in[0], 60, 0.8f, true, 777);
+            struct Blk
+            {
+               long long start;
+               double b0, b1;
+            };
+            std::vector<Blk> blks;
+            bool changed = false;
+            while (Transport::Instance().Beats() < 6.0)
+            {
+               if (!changed && Transport::Instance().Beats() >= 2.6)
+               {
+                  Transport::Instance().SetTempo((float)to);
+                  changed = true;
+               }
+               const long long start = rig.pos;
+               rig.Step();
+               blks.push_back({ start, Transport::Instance().BlockStartBeats(), Transport::Instance().Beats() });
+            }
+            const float tempoNow = Transport::Instance().Tempo();
+            StopTransport();
+            const double endBeat = blks.back().b1;
+            std::map<long long, int> hits; // grid index -> onsets
+            double worst = 0.0;
+            long long lastSample = -1;
+            for (const Evt& e : rig.got)
+            {
+               if (!e.e.isNoteOn || e.e.bendUpdate || e.sample == lastSample)
+                  continue;
+               lastSample = e.sample;
+               const Blk* b = nullptr;
+               for (const Blk& k : blks)
+                  if (e.sample >= k.start && e.sample < k.start + rig.block)
+                     b = &k;
+               if (b == nullptr)
+                  continue;
+               const double beat = b->b0 + (b->b1 - b->b0) * (double)(e.sample - b->start) / rig.block;
+               const long long idx = std::llround(beat / rate);
+               worst = std::max(worst, std::fabs(beat - idx * rate));
+               hits[idx]++;
+            }
+            const long long last = (long long)std::floor((endBeat - 0.05) / rate);
+            int missing = 0, doubled = 0;
+            for (long long i = 0; i <= last; i++)
+            {
+               const int n = hits.count(i) ? hits[i] : 0;
+               missing += (n == 0);
+               doubled += (n > 1);
+            }
+            const double worstSamples = worst * kRate * 60.0 / to;
+            printf("NOTEAUDIT TEMPO %-18s 120->%3.0f (ran at %.0f)  steps %lld  missing %d  doubled %d  worst off-grid %.1f samples\n",
+                   g.name, to, tempoNow, last + 1, missing, doubled, worstSamples);
+            if (missing || doubled || worstSamples > 2.0 || std::fabs(tempoNow - to) > 0.5)
+            {
+               bad++;
+               why += " ->" + std::to_string((int)to);
+            }
+         }
+         if (bad)
+         {
+            flags.Flag("TEMPO", g.name, "step skipped, doubled or off grid across a tempo change", bad);
+            ok = false;
+         }
+      }
+   }
+
    // ---- JITTER -----------------------------------------------------------
    // Pass-through nodes keep an event's frame offset: note-on sample out must be
    // note-on sample in at every block size the app runs (24/60/144 fps at 48 kHz
@@ -960,6 +1046,8 @@ bool RunNoteAudit()
       AuditLoop(flags, ok);
    if (want("FIRST"))
       AuditFirst(flags, ok);
+   if (want("TEMPO"))
+      AuditTempo(flags, ok);
    if (want("JITTER"))
       AuditJitter(flags);
    if (want("BYPASS"))
