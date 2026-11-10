@@ -274,15 +274,22 @@
     window.addEventListener('resize', fit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
-    if (reduced) { show('you', '#B53700'); return; }
-    let i = 0;
+    // Keep the hero heading stable on initial load for LCP; animate once on user interaction or scroll
+    show('you', '#B53700');
+    let i = 0, started = false;
     const next = () => {
       const [w, col] = WORDS[i];
       show(w, col);
       i++;
-      if (i < WORDS.length) setTimeout(next, i === 1 ? 1300 : 1050);
+      if (i < WORDS.length) setTimeout(next, 1200);
     };
-    setTimeout(next, 700);
+    const startCycle = () => {
+      if (started || reduced) return;
+      started = true;
+      setTimeout(next, 1000);
+    };
+    word.addEventListener('pointerenter', startCycle);
+    window.addEventListener('scroll', startCycle, { once: true, passive: true });
   }
 
   /* ------------------------------------------------------------ HUD */
@@ -800,7 +807,16 @@
 
     function goTo(idx) {
       current = (idx + total) % total;
-      slides.forEach((s, i) => s.classList.toggle('active', i === current));
+      slides.forEach((s, i) => {
+        const on = i === current;
+        s.classList.toggle('active', on);
+        if (on) {
+          const im = s.querySelector('img');
+          if (im && !im.getAttribute('src') && im.dataset.src) {
+            im.src = im.dataset.src;
+          }
+        }
+      });
       tabs.forEach((t, i) => {
         const on = i === current;
         t.classList.toggle('is-active', on);
