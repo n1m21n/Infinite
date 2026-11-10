@@ -743,6 +743,7 @@ set(COMMON_SOURCES
     src/audio/dsp/StereoKernel.cpp
     src/audio/dsp/PitchShiftKernel.cpp
     src/audio/dsp/SpectralPitchShifter.cpp
+    src/audio/dsp/SpectralFieldEngine.cpp
     src/audio/dsp/ChorusKernel.cpp
     src/audio/dsp/FlangerKernel.cpp
     src/audio/dsp/PhaserKernel.cpp
@@ -825,6 +826,7 @@ set(COMMON_SOURCES
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp
     src/nodes/FieldSampleNode.cpp
+    src/nodes/SpectralFieldNode.cpp
     src/nodes/FieldSynthNode.cpp
     src/nodes/FieldNotesNode.cpp
     src/nodes/FieldPixelNode.cpp

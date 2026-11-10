@@ -168,10 +168,10 @@ void SpectralFieldEngine::Analyse(const float* fifo, float* mag, float* phase, f
 
 void SpectralFieldEngine::SyncState(Channel& c, const Field::SampleProgram* prog)
 {
-   if (c.stateValid && prog == c.lastProg)
+   if (c.stateValid && prog == c.lastProg && !c.swapPending)
       return;
    const int cells = (int)prog->state.size();
-   const bool canTransplant = c.stateValid && c.lastProg != nullptr;
+   const bool canTransplant = c.stateValid;
    for (int k = 0; k < mBins; k++)
    {
       const float* src = c.statePrev + (size_t)k * kStride;
@@ -186,6 +186,7 @@ void SpectralFieldEngine::SyncState(Channel& c, const Field::SampleProgram* prog
    std::swap(c.statePrev, c.stateNext);
    c.lastProg = prog;
    c.stateValid = true;
+   c.swapPending = false;
 }
 
 void SpectralFieldEngine::Frame(Channel& c, int ch, const Field::SampleProgram* prog, const float* params)

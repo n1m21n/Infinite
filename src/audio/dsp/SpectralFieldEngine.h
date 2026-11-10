@@ -47,6 +47,9 @@ public:
    void Reset();
    // log2 of the FFT size, kMinLog2..kMaxLog2. A change resets. Audio thread safe.
    void SetSizeLog2(int log2Size);
+   // A new program became active (audio thread). Forces the state banks to
+   // re-map on the next frame even if the allocator reused an address.
+   void ProgramSwapped() { for (Channel& c : mCh) c.swapPending = true; }
    int Size() const { return mSize; }
    int Latency() const { return mSize; }
 
@@ -76,6 +79,7 @@ private:
       float* stateNext = nullptr;
       const Field::SampleProgram* lastProg = nullptr;
       bool stateValid = false;
+      bool swapPending = false;
       bool firstFrame = true;
       int fifoCount = 0;
       int olaRead = 0;

@@ -196,6 +196,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/FieldGraphNode.h"
 #include "nodes/FieldPixelNode.h"
 #include "nodes/FieldSampleNode.h"
+#include "nodes/SpectralFieldNode.h"
 #include "nodes/FieldSynthNode.h"
 #include "nodes/FieldNotesNode.h"
 #include "nodes/SceneNodes.h"

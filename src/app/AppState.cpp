@@ -980,6 +980,9 @@ bool gHeadlessNeedProbe = false;
 
    bool gFieldSampleEditorOpen = false;
 
+   SpectralFieldNode* gSpectralFieldEditor = nullptr;
+   bool gSpectralFieldEditorOpen = false;
+
    FieldSynthNode* gFieldSynthEditor = nullptr;
    FieldNotesNode* gFieldNotesEditor = nullptr;
    bool gFieldNotesEditorOpen = false;
