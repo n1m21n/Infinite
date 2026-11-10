@@ -54,7 +54,7 @@ for i, l in enumerate(sc_json["lights"]):
         lo.location = v.normalized() * 10; aim(lo, (0, 0, 0))
     elif l["type"] == 1:
         ld = bpy.data.lights.new("l%d" % i, 'POINT'); ld.energy = l["intensity"] * 16 * math.pi
-        ld.shadow_soft_size = 0.05
+        ld.shadow_soft_size = 0.0  # a true point, as the engine's; a radius would poke out of a lamp globe
         lo = bpy.data.objects.new("l%d" % i, ld); sc.collection.objects.link(lo); lo.location = v
     else:
         if l["intensity"] > 0:

@@ -684,7 +684,9 @@ fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]],
 }
 
 // ---- path tracer: progressive, one sample per pass, accumulated in RGBA32F (rgb = radiance sum, a = coverage sum)
-struct PtU { float4x4 invVP; float4 info; }; // x prior samples, y max bounces, z frame, w width
+struct PtU { float4x4 invVP; float4 info; float4 em; }; // info: x prior samples, y max bounces, z frame, w width; em: x emitter triangles, y chance to sample one
+// One emissive triangle in world space. p0.w: cumulative selection chance (by power); e1.w: selection chance / area.
+struct EmTri { float4 p0; float4 e1; float4 e2; float4 em; };
 float3 ggxSampleH(float3 n, float a, float u1, float u2)
 {
    const float cosT = sqrt((1.0 - u1) / (1.0 + (a * a - 1.0) * u1));
@@ -728,8 +730,8 @@ float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float roug
    return fr * nL;
 }
 fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
-                      constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], texture2d<float> prev [[texture(0)]],
-                      texture2d<float> et [[texture(9)]])
+                      constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
+                      texture2d<float> prev [[texture(0)]], texture2d<float> et [[texture(9)]])
 {
    const uint2 px = uint2(in.pos.xy);
    uint seed = pcg(px.x + 8192u * px.y) ^ pcg(uint(u.info.z) * 2654435761u + 17u);
@@ -741,6 +743,8 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
    float3 L = float3(0.0), T = float3(1.0);
    float cov = 0.0;
    const int maxB = int(u.info.y);
+   const int nEm = int(u.em.x); const float pEm = u.em.y;
+   float lastPdfB = 0.0; // pdf of the bounce that led here (MIS against emitter sampling)
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    for (int b = 0; b < maxB; b++)
@@ -767,20 +771,51 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       if (dot(n, d) > 0.0) n = -n;
       const float3 p = o + d * h.distance;
       const float3 base = I.bm.xyz; const float metal = clamp(I.bm.w, 0.0, 1.0); const float rough = clamp(I.rg.x, 0.045, 1.0);
-      L += T * I.em.xyz;
+      if (any(I.em.xyz > 0.0))
+      {
+         // Emission seen along the path. After a bounce, emitter sampling below could have found it too: power-heuristic MIS.
+         float wE = 1.0;
+         if (b > 0 && nEm > 0 && I.em.w >= 0.0)
+         {
+            const EmTri t = ems[int(I.em.w) + int(h.primitive_id)];
+            const float3 gn = cross(t.e1.xyz, t.e2.xyz);
+            const float cosL = abs(dot(gn, d)) / max(length(gn), 1e-12);
+            const float pL = pEm * t.e1.w * h.distance * h.distance / max(cosL, 1e-6);
+            wE = lastPdfB * lastPdfB / max(lastPdfB * lastPdfB + pL * pL, 1e-20);
+         }
+         L += T * I.em.xyz * wE;
+      }
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
       const float3 f0 = mix(float3(0.04), base, metal);
       // direct light, the same model as the raster
       const int count = int(f.params.w);
-      // next-event estimation: one light per bounce, picked uniformly, weighted by the count (unbiased)
-      const int pick = min(int(rnd(seed) * float(max(count, 1))), max(count - 1, 0));
-      for (int i = pick; i < pick + 1 && count > 0; i++)
+      // next-event estimation: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
+      // weighted by the count and the chance of taking this branch (unbiased). Both branches only set up the sample;
+      // one shadow ray and one BSDF evaluation below serve either (keeps the kernel small).
+      float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
+      if (nEm > 0 && rnd(seed) < pEm)
       {
-         constant LightU& Lt = f.lights[i];
+         const float r = rnd(seed);
+         int lo = 0, hi = nEm - 1;
+         while (lo < hi) { const int mid = (lo + hi) / 2; if (ems[mid].p0.w < r) lo = mid + 1; else hi = mid; }
+         const EmTri t = ems[lo];
+         const float su = sqrt(rnd(seed)), u2 = rnd(seed);
+         const float3 tl = t.p0.xyz + t.e1.xyz * (su * (1.0 - u2)) + t.e2.xyz * (su * u2) - p;
+         const float dist = length(tl); ld = tl / max(dist, 1e-6);
+         const float3 gn = cross(t.e1.xyz, t.e2.xyz);
+         const float cosL = abs(dot(gn, ld)) / max(length(gn), 1e-12);
+         if (cosL > 1e-4 && t.e1.w > 0.0)
+         {
+            pL = pEm * t.e1.w * dist * dist / cosL; // solid-angle pdf of this sample
+            Le = t.em.xyz; tmax = max(dist * (1.0 - 1e-3) - f.shQ.w, 0.0);
+         }
+      }
+      else if (count > 0)
+      {
+         constant LightU& Lt = f.lights[min(int(rnd(seed) * float(count)), count - 1)];
          const int type = int(Lt.vec.w);
-         if (type == 3) continue; // ambient arrives through the bounces
-         const float lw = float(count);
-         float3 ld; float atten = 1.0; float tmax = 1e4;
+         float atten = type == 3 ? 0.0 : 1.0; // ambient arrives through the bounces
+         tmax = 1e4;
          if (type == 1 || type == 4 || type == 5)
          {
             float3 lp = Lt.vec.xyz;
@@ -794,7 +829,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             }
             const float3 tl = lp - p; const float dist = length(tl);
             ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
-            atten = lightFalloff(dist, Lt.terms.z);
+            atten *= lightFalloff(dist, Lt.terms.z);
             if (Lt.terms.w > 0.0 && dist > Lt.terms.w) atten = 0.0;
             if (type == 4)
             {
@@ -807,10 +842,17 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
          }
          else ld = normalize(Lt.vec.xyz);
-         if (dot(n, ld) <= 1e-5 || atten <= 0.0) continue;
-         if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) continue;
-         float pdfL = 0.0;
-         L += T * ptEval(n, V, ld, base, metal, rough, f0, Lt.terms.xy, pdfL) * Lt.color.xyz * atten * lw;
+         Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
+         lterms = Lt.terms.xy;
+      }
+      if (dot(n, ld) > 1e-5 && any(Le > 0.0))
+      {
+         // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
+         // emitters are surfaces, fully blocked.
+         if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         float pB = 0.0;
+         const float3 fe = ptEval(n, V, ld, base, metal, rough, f0, lterms, pB);
+         L += T * fe * Le * (pL > 0.0 ? pL / max(pL * pL + pB * pB, 1e-20) : 1.0); // emitters: power-heuristic MIS
       }
       // next direction: one lobe picked by Render 3D's lobe weights, weighted by the full BSDF over the mixture pdf
       const float2 lp = ptProbs(f0, metal, nDotV);
@@ -822,6 +864,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       const float3 fB = ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
       if (pdfB <= 1e-6) break;
       T *= fB / pdfB;
+      lastPdfB = pdfB;
       if (b >= 2)
       {
          const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
@@ -1321,7 +1364,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       id<MTLTexture> mEnvTex = nil, mEnvDummy = nil, mEnvBound = nil;
       unsigned long long mEnvRev = ~0ull;
-      id<MTLBuffer> mInfoBuf = nil;
+      id<MTLBuffer> mInfoBuf = nil, mEmBuf = nil;
       id<MTLRenderPipelineState> mBgPsoMrt = nil, mBgPsoDir = nil;
       id<MTLDepthStencilState> mDsBg = nil;
       void FillFrame(FrameU& f, const engine::Frame& fr)
@@ -1725,6 +1768,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          FrameU f = {};
          FillFrame(f, fr);
          f.shQ[3] = fr.rayBias;
+         f.shP[3] = fr.shadow.strength; // the live picture's shadow strength, so settling keeps the same shadows
          float inv[16];
          if (!Inv4(fr.viewProj, inv))
             return false;
@@ -1750,6 +1794,63 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size()) { o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; }
          }
+         // Emissive triangles in world space for next-event estimation, chosen by power (luminance * area). The
+         // instance's em[3] points at its first triangle; primitive_id indexes from there. Capped so a huge glowing
+         // mesh does not stall the frame (past the cap it is still found by bounces).
+         struct EmTriH { float p0[4], e1[4], e2[4], em[4]; };
+         std::vector<EmTriH> ems;
+         double emTotal = 0.0;
+         for (size_t i = 0; i < fr.instances.size(); i++)
+         {
+            const engine::Instance& in = fr.instances[i];
+            info[i].em[3] = -1.0f;
+            const float lum = 0.2126f * in.emission[0] + 0.7152f * in.emission[1] + 0.0722f * in.emission[2];
+            if (lum <= 0.0f || in.mesh < 0 || in.mesh >= (int)mMeshes.size())
+               continue;
+            const Gpu& g = mMeshes[in.mesh];
+            const size_t tris = g.count / 3;
+            if (tris == 0 || ems.size() + tris > 65536)
+               continue;
+            info[i].em[3] = (float)ems.size();
+            const float* vb = (const float*)g.vb.contents;
+            const uint32_t* ib = (const uint32_t*)g.ib.contents;
+            const float* m = in.model;
+            auto world = [&](uint32_t v, float* o) {
+               const float* a = vb + (size_t)v * 6;
+               for (int k = 0; k < 3; k++) o[k] = m[k] * a[0] + m[4 + k] * a[1] + m[8 + k] * a[2] + m[12 + k];
+            };
+            for (size_t t = 0; t < tris; t++)
+            {
+               EmTriH e = {};
+               float a[3], b[3], c[3];
+               world(ib[t * 3], a); world(ib[t * 3 + 1], b); world(ib[t * 3 + 2], c);
+               for (int k = 0; k < 3; k++) { e.p0[k] = a[k]; e.e1[k] = b[k] - a[k]; e.e2[k] = c[k] - a[k]; e.em[k] = in.emission[k]; }
+               const float cx = e.e1[1] * e.e2[2] - e.e1[2] * e.e2[1], cy = e.e1[2] * e.e2[0] - e.e1[0] * e.e2[2], cz = e.e1[0] * e.e2[1] - e.e1[1] * e.e2[0];
+               const float area = 0.5f * std::sqrt(cx * cx + cy * cy + cz * cz);
+               e.e2[3] = area;
+               emTotal += (double)area * lum;
+               e.p0[3] = (float)emTotal; // cumulative, normalised below
+               ems.push_back(e);
+            }
+         }
+         if (emTotal > 0.0)
+            for (size_t k = 0; k < ems.size(); k++)
+            {
+               const double prevC = k == 0 ? 0.0 : ems[k - 1].p0[3] * emTotal; // ems[k-1] already normalised
+               const double pw = (double)ems[k].p0[3] - prevC;
+               ems[k].p0[3] = (float)(ems[k].p0[3] / emTotal);
+               ems[k].e1[3] = ems[k].e2[3] > 0.0f ? (float)(pw / emTotal / ems[k].e2[3]) : 0.0f;
+            }
+         else
+            ems.clear();
+         if (!ems.empty()) ems.back().p0[3] = 1.0f;
+         int analytic = 0;
+         for (const engine::Light& l : fr.lights) analytic += l.type != engine::LightType::Ambient ? 1 : 0;
+         const float pEm = ems.empty() ? 0.0f : (analytic > 0 ? 0.5f : 1.0f);
+         const NSUInteger emLen = std::max<NSUInteger>(ems.size() * sizeof(EmTriH), 64);
+         if (!mEmBuf || mEmBuf.length < emLen)
+            mEmBuf = [mDev newBufferWithLength:emLen * 2 options:MTLResourceStorageModeShared];
+         if (!ems.empty()) std::memcpy(mEmBuf.contents, ems.data(), ems.size() * sizeof(EmTriH));
          id<MTLBuffer> infoBuf = InfoBuffer(info);
          for (int s = 0; s < std::max(1, spp); s++)
          {
@@ -1760,13 +1861,15 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             rp.colorAttachments[0].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
             [e setRenderPipelineState:mPtPso];
-            struct { float invVP[16]; float info[4]; } pu;
+            struct { float invVP[16]; float info[4]; float em[4]; } pu;
             std::memcpy(pu.invVP, inv, 64);
             pu.info[0] = (float)mPtN; pu.info[1] = (float)std::max(1, bounces); pu.info[2] = (float)(mPtFrame++); pu.info[3] = (float)img.Width();
+            pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = 0.0f; pu.em[3] = 0.0f;
             [e setFragmentBytes:&pu length:sizeof(pu) atIndex:0];
             [e setFragmentBytes:&f length:sizeof(f) atIndex:1];
             [e setFragmentBuffer:mArgBuf offset:0 atIndex:3];
             [e setFragmentBuffer:infoBuf offset:0 atIndex:4];
+            [e setFragmentBuffer:mEmBuf offset:0 atIndex:5];
             [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
             [e useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];

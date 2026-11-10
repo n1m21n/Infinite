@@ -657,7 +657,7 @@ Static frame, FLIP vs Cycles (lower is closer):
 | | GL | engine before | raster (16) | all (7) | all + settle (15) |
 |---|---|---|---|---|---|
 | sunset | 0.103 | 0.310 | 0.119 | 0.093 | 0.077 |
-| moon | 0.097 | 0.193 | 0.108 | 0.090 | 0.076 |
+| moon | 0.101 | 0.193 | 0.108 | 0.089 | 0.067 |
 
 Fixed by it:
 - The engine forced ACES for every tonemap but none; AgX, Reinhard and Neutral now run in Metal (`toneMap`), so the
@@ -665,10 +665,18 @@ Fixed by it:
 - Emission was not carried to the engine; emissive surfaces now glow in raster, reflections, GI hits and the path
   tracer (lantern 0.89–1.04 of Cycles, was 0.32–0.66).
 - Back faces of open surfaces now shade with the normal on the visible side.
+- Settle now samples emissive meshes as lights (triangles picked by power, power-heuristic MIS with BSDF hits), so a
+  point light enclosed in its lamp globe still lights the deck through the globe: settled moon deck 0.31 -> 1.0x of
+  Cycles, hull 0.86 -> 0.95. One shadow ray and one BSDF evaluation serve either light kind; settle frame p95
+  266 -> 403 ms (sunset), 370 -> 447 ms (moon); live modes untouched.
+- Settle ignored the shadow strength the live picture uses (Render 3D default 0.8), so shadows darkened on settle;
+  analytic-light shadows in the path tracer now keep it. The A/B sets strength 1 (Cycles' shadows are full).
+- The moon reference's point light had a 0.05 radius, wider than the 0.045 globe, leaking light onto the deck; it is
+  now a true point like the engine's (moon table row above uses the re-render).
 
 Still open (region brightness vs Cycles, mode 7 unless noted):
-- Settle has no light sampling for emissive meshes: a point light enclosed in its lamp globe is blocked (correct) and
-  the globe is only found by chance, so the settled deck under the lantern is 0.31 of Cycles (raster modes 0.98).
+- Live modes over-light dark areas through the approximate ambient fill (mode 7 hull 2.06x, deck 1.55x; mode 17
+  deck 2.33x): a neutral excess on dark pixels, not a colour shift.
 - Sails 0.85 (sunset) / 1.08 (moon); sun lights keep GL's 0.35 wrap, which Cycles has not.
 - Sun glitter path: the sun is a delta light, so the column is sparkly and wide where Cycles' 1.6° disc gives a
   clean narrow column; near water 0.99 / 1.10.

@@ -537,6 +537,8 @@ void BuildBenchBoatScene(bool moon, bool isAnim, int& outRender3DIdx, int& outOu
    render->tonemap = 3; // AgX: holds the sun and the lantern without clipping to flat white
    render->exposure = moon ? 2.2f : 0.8f;
    render->bloom = abMode ? 0.0f : (moon ? 0.25f : 0.35f);
+   if (abMode)
+      render->shadowStrength = 1.0f; // Cycles' shadows are full
    render->shadowsEnabled = true;
    render->shadowQuality = 1;
    outRender3DIdx = renderIdx;
