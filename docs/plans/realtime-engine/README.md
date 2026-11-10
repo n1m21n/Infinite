@@ -643,3 +643,33 @@ Still frames with settle on: p50 ~50, p95 260–375 (settle's refinement frames;
 Picture verdict: reads as a real sunset / moonlit sea (ray-traced boat reflection, glitter path, contact with
 the water). Open gaps it exposes: GI fireflies (white speckle on sails and hull), no back-lit sail translucency,
 sky texels visible on the sun/moon disc at this zoom, raster 5 ms over GL on a 100k-vertex moving ocean.
+
+### Blender Cycles A/B (2026-11-10)
+
+`INFINITE_BENCH_BOATAB=1` keeps only lights Cycles has (no ambient fill, lantern on hard falloff, no bloom);
+`INFINITE_BENCH_BOATDUMP=<dir>` writes the posed meshes (Blender axes), lights, camera and materials;
+`tools/blender-ab/boat_scene.py` rebuilds that frame in Cycles (128 spp, denoised, Metal GPU, ~40 s) and also writes
+linear EXR. The reference is that EXR through the engine's own AgX and exposure, so FLIP scores lighting, not the
+display transform (Blender's AgX alone differs by FLIP 0.17–0.19 and reads ~10 % darker).
+
+Static frame, FLIP vs Cycles (lower is closer):
+
+| | GL | engine before | raster (16) | all (7) | all + settle (15) |
+|---|---|---|---|---|---|
+| sunset | 0.103 | 0.310 | 0.119 | 0.093 | 0.077 |
+| moon | 0.097 | 0.193 | 0.108 | 0.090 | 0.076 |
+
+Fixed by it:
+- The engine forced ACES for every tonemap but none; AgX, Reinhard and Neutral now run in Metal (`toneMap`), so the
+  sky matches Cycles at 1.00 (it was 0.85–1.14 off).
+- Emission was not carried to the engine; emissive surfaces now glow in raster, reflections, GI hits and the path
+  tracer (lantern 0.89–1.04 of Cycles, was 0.32–0.66).
+- Back faces of open surfaces now shade with the normal on the visible side.
+
+Still open (region brightness vs Cycles, mode 7 unless noted):
+- Settle has no light sampling for emissive meshes: a point light enclosed in its lamp globe is blocked (correct) and
+  the globe is only found by chance, so the settled deck under the lantern is 0.31 of Cycles (raster modes 0.98).
+- Sails 0.85 (sunset) / 1.08 (moon); sun lights keep GL's 0.35 wrap, which Cycles has not.
+- Sun glitter path: the sun is a delta light, so the column is sparkly and wide where Cycles' 1.6° disc gives a
+  clean narrow column; near water 0.99 / 1.10.
+- Raster-only (16) boat and its reflection 1.8–4.4x: shadow maps and no GI over-light the shaded side, as GL does.

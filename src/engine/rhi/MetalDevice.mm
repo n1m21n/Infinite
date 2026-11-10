@@ -48,7 +48,7 @@ struct FrameU
    float4 envm;     // x: 1 = HDRI map, +2 = HDRI background; y rotation (rad); z max lod (GL levels); w the map's base lod
    LightU lights[8]; // vec.w = type, aim.w unused
 };
-struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; }; // base linear rgb; mr = metallic, roughness, transmission, ior
+struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; float4 em; }; // base linear rgb; mr = metallic, roughness, transmission, ior; em = linear emission * strength
 // INV_POS: the second, invariant compile used by the depth prepass and the shaded runs after it (exact same depth);
 // plain raster keeps the faster non-invariant build.
 #ifdef INV_POS
@@ -116,7 +116,7 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
    return h.type == intersection_type::triangle;
 }
-struct RInst { float4 bm; float4 rg; ulong vb; ulong ib; float4x4 normalM; };
+struct RInst { float4 bm; float4 rg; float4 em; ulong vb; ulong ib; float4x4 normalM; }; // em: linear emission * strength
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
 float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
@@ -182,7 +182,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
    hp = p; hn = n; alb = base * (1.0 - metal); mir = base * metal;
    // Lambert radiance: base/pi * light irradiance (r_fs's direct term), env as r_fs's ambient.
    // withEnv false: the caller's next bounce carries the env; withSpec false: the caller follows the mirror direction.
-   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + (withSpec ? spec : float3(0.0));
+   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + (withSpec ? spec : float3(0.0)) + I.em.xyz;
 }
 float3 cosineDir(float3 n, float u1, float u2);
 float rnd(thread uint& s);
@@ -238,6 +238,39 @@ constant bool kMrt [[function_constant(0)]];
 struct FOut { float4 c0 [[color(0)]]; float4 c1 [[color(1), function_constant(kMrt)]]; float4 c2 [[color(2), function_constant(kMrt)]];
              float4 c3 [[color(3), function_constant(kMrt)]]; }; // c3: normal, distance to the eye (denoiser guides)
 float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+// Render 3D's tonemaps (Render3DTonemap.h), same order as the node: 1 ACES, 2 Reinhard, 3 AgX, 4 Neutral.
+float3 agxTone(float3 c)
+{
+   const float3x3 inset = float3x3(float3(0.842479062253094, 0.0423282422610123, 0.0423756549057051),
+                                   float3(0.0784335999999992, 0.878468636469772, 0.0784336),
+                                   float3(0.0792237451477643, 0.0791661274605434, 0.879142973793104));
+   const float3x3 outset = float3x3(float3(1.19687900512017, -0.0528968517574562, -0.0529716355144438),
+                                    float3(-0.0980208811401368, 1.15190312990417, -0.0980434501171241),
+                                    float3(-0.0990297440797205, -0.0989611768448433, 1.15107367264116));
+   float3 x = clamp((log2(max(inset * c, float3(1e-10))) + 12.47393) / 16.5, 0.0, 1.0);
+   const float3 x2 = x * x, x4 = x2 * x2;
+   x = 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232;
+   x = max(outset * x, float3(0.0));
+   return select(pow((x + 0.055) / 1.055, float3(2.4)), x / 12.92, x < float3(0.04045));
+}
+float3 neutralTone(float3 c)
+{
+   const float x = min(c.r, min(c.g, c.b));
+   c -= (x < 0.08) ? x - 6.25 * x * x : 0.04;
+   const float peak = max(c.r, max(c.g, c.b));
+   if (peak < 0.76) return c;
+   const float np = 1.0 - 0.0576 / (peak - 0.52);
+   c *= np / peak;
+   return mix(c, float3(np), 1.0 - 1.0 / (0.15 * (peak - np) + 1.0));
+}
+float3 toneMap(float3 c, int t)
+{
+   if (t == 1) return aces(c);
+   if (t == 2) return c / (c + 1.0);
+   if (t == 3) return agxTone(c);
+   if (t == 4) return neutralTone(c);
+   return c;
+}
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
 
 // ---- Half-res RT shadows (C18): vis_fs traces one shadow ray per light (aim.w = channel) at full-res pixel 2q
@@ -311,11 +344,16 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
                      constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
                      texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]])
 {
-   const float3 n = normalize(in.n);
+   float3 n = normalize(in.n);
    const float3 base = m.base.xyz;
    const float metal = clamp(m.mr.x, 0.0, 1.0);
    const float rough = clamp(m.mr.y, 0.045, 1.0);
    const float3 viewDir = normalize(f.eye.xyz - in.wp);
+   // Two-sided: the back of an open surface (a sail, a leaf) shades with the normal on the side we see, as Cycles
+   // does; else it takes the far side's light and its shadow rays start on that side. The geometric normal decides,
+   // so smooth normals that tip away at a silhouette are left alone.
+   float3 gN = cross(dfdx(in.wp), dfdy(in.wp));
+   if (dot(gN, gN) > 1e-20) { gN = normalize(gN); if (dot(gN, viewDir) < 0.0) gN = -gN; if (dot(n, gN) < 0.0) n = -n; }
    const float nDotV = max(dot(n, viewDir), 1e-4);
    const float3 f0 = mix(float3(0.04), base, metal); // ior 1.5, specular 1
    float3 col = float3(0.0);
@@ -459,12 +497,13 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
       col = mix(col, sampleEnv(f, et, rd, 0.0) * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
    }
+   col += m.em.xyz;
    const float opaque = (trans > 0.0 && rtOn) ? 1.0 - trans : 1.0; // glass takes no GI of its own
    FOut o;
    if (!kMrt)
    {
       float3 fin = (col + envRefl) * f.params.x;
-      if (int(f.params.y) == 1) fin = aces(fin);
+      fin = toneMap(fin, int(f.params.y));
       o.c0 = float4(toSrgb(fin), 1.0);
       return o;
    }
@@ -562,7 +601,7 @@ fragment ResOut res_fs(SkyOut in [[stage_in]], constant ResU& u [[buffer(0)]], t
    ResOut o;
    if (c.a < 0.5)
    {
-      float3 b = c.rgb; if (int(u.p.y) == 1) b = aces(b);
+      float3 b = c.rgb; b = toneMap(b, int(u.p.y));
       o.c0 = u.q.w > 0.5 ? float4(toSrgb(b), 1.0) : float4(u.clear.xyz, 1.0); o.c1 = float4(0.0); o.c2 = float4(0.0); return o;
    }
    const float4 cz = nz.read(px);
@@ -595,7 +634,7 @@ fragment ResOut res_fs(SkyOut in [[stage_in]], constant ResU& u [[buffer(0)]], t
    const bool rv = u.clear.w > 0.5;
    const float3 racc = wr.a < 0.5 ? float3(0.0) : (haveR ? (rv ? mix(rh, r, u.p.w) : r) : (rv ? rh : float3(0.0)));
    float3 col = c.rgb + wg.rgb * acc + wr.rgb * racc;
-   if (int(u.p.y) == 1) col = aces(col);
+   col = toneMap(col, int(u.p.y));
    o.c0 = float4(toSrgb(col), 1.0);
    o.c1 = float4(acc, 1.0);
    o.c2 = float4(racc, 1.0);
@@ -636,11 +675,11 @@ fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]],
    const float4 c = hdr.read(px);
    if (c.a < 0.5)
    {
-      float3 b = c.rgb; if (int(u.p.y) == 1) b = aces(b);
+      float3 b = c.rgb; b = toneMap(b, int(u.p.y));
       return u.p.z > 0.5 ? float4(toSrgb(b), 1.0) : float4(u.clear.xyz, 1.0);
    }
    float3 col = c.rgb + gw.read(px).rgb * gi.read(px).rgb + rw.read(px).rgb * rfl.read(px).rgb;
-   if (int(u.p.y) == 1) col = aces(col);
+   col = toneMap(col, int(u.p.y));
    return float4(toSrgb(col), 1.0);
 }
 
@@ -728,6 +767,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       if (dot(n, d) > 0.0) n = -n;
       const float3 p = o + d * h.distance;
       const float3 base = I.bm.xyz; const float metal = clamp(I.bm.w, 0.0, 1.0); const float rough = clamp(I.rg.x, 0.045, 1.0);
+      L += T * I.em.xyz;
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
       const float3 f0 = mix(float3(0.04), base, metal);
       // direct light, the same model as the raster
@@ -800,7 +840,7 @@ fragment float4 ptres_fs(SkyOut in [[stage_in]], constant PtResU& u [[buffer(0)]
    const float4 a = acc.read(uint2(in.pos.xy));
    const float cov = a.a / u.p.x;
    float3 col = a.rgb / max(a.a, 1e-4) * u.p.z; // mean radiance of the samples that hit
-   if (int(u.p.y) == 1) col = aces(col);
+   col = toneMap(col, int(u.p.y));
    return float4(mix(u.clear.xyz, toSrgb(col), cov), 1.0);
 }
 
@@ -846,8 +886,8 @@ fragment float4 rp_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], co
       ld = (type == 1 || type == 4 || type == 5) ? normalize(L.vec.xyz - in.wp) : normalize(L.vec.xyz);
       lc = L.color.xyz * L.terms.x;
    }
-   float3 c = m.base.xyz * (f.ambient.xyz * 1.4 + lc * max(dot(n, ld), 0.0)) * f.params.x;
-   if (int(f.params.y) == 1) c = aces(c);
+   float3 c = (m.base.xyz * (f.ambient.xyz * 1.4 + lc * max(dot(n, ld), 0.0)) + m.em.xyz) * f.params.x;
+   c = toneMap(c, int(f.params.y));
    return float4(toSrgb(c), 1.0);
 }
 vertex VOutP rp_vs(uint iid [[instance_id]], constant FrameU& f [[buffer(1)]], const device float4x4* models [[buffer(5)]], const device uint* vis [[buffer(6)]],
@@ -925,7 +965,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    const float4 pw = u.invVP * float4(ndc, 1.0, 1.0);
    float3 c = sampleEnv(f, et, normalize(pw.xyz / pw.w - f.eye.xyz), 0.0) * f.params.x;
    if (u.p.z > 0.5) return float4(c, 0.0);
-   if (int(f.params.y) == 1) c = aces(c);
+   c = toneMap(c, int(f.params.y));
    return float4(toSrgb(c), 1.0);
 }
 )";
@@ -1016,7 +1056,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4], envm[4];
       LightU lights[8];
    };
-   struct InstU { float model[16], normalM[16], base[4], mr[4]; };
+   struct InstU { float model[16], normalM[16], base[4], mr[4], em[4]; };
 
    float ToLin(float c)
    {
@@ -1457,13 +1497,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setFrontFacingWinding:MTLWindingClockwise]; // GL counter-clockwise, mirrored by the y flip
          [enc setVertexBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
-         struct RInstH { float bm[4], rg[4]; uint64_t vb, ib; float normalM[16]; };
+         struct RInstH { float bm[4], rg[4], em[4]; uint64_t vb, ib; float normalM[16]; };
          std::vector<RInstH> info(fr.instances.size() + 1);
          for (size_t i = 0; i < fr.instances.size(); i++)
          {
             const engine::Instance& in = fr.instances[i];
             RInstH& o = info[i]; o = {};
-            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness;
+            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; std::memcpy(o.em, in.emission, 12);
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
@@ -1700,13 +1740,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [mArgEnc setAccelerationStructure:mTlas atIndex:0];
             mArgTlas = mTlas;
          }
-         struct RInstH { float bm[4], rg[4]; uint64_t vb, ib; float normalM[16]; };
+         struct RInstH { float bm[4], rg[4], em[4]; uint64_t vb, ib; float normalM[16]; };
          std::vector<RInstH> info(fr.instances.size() + 1);
          for (size_t i = 0; i < fr.instances.size(); i++)
          {
             const engine::Instance& in = fr.instances[i];
             RInstH& o = info[i]; o = {};
-            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness;
+            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; std::memcpy(o.em, in.emission, 12);
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size()) { o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; }
          }
@@ -2169,13 +2209,14 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             std::memcpy(u.normalM, in.normalMatrix, 64);
             Lin3(in.baseSrgb, u.base);
             u.mr[0] = in.metallic; u.mr[1] = in.roughness; u.mr[2] = in.transmission; u.mr[3] = in.ior;
+            std::memcpy(u.em, in.emission, 12);
             if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
                continue;
             if (!mRuns.empty())
             {
                auto& r = mRuns.back();
                const engine::Instance& a = fr.instances[r.first];
-               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(dst[r.first].base, u.base, 32) == 0)
+               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(dst[r.first].base, u.base, 48) == 0)
                {
                   r.second++;
                   continue;

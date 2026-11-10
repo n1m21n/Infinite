@@ -6559,6 +6559,7 @@ void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& outRender3
                               bool useEmbossForGlitch = false);
 
 void BenchBoatTick();
+void BenchBoatDump(const std::string& dir);
 void BuildBenchB4Scene(const std::string& scaleStr, const std::string& shadowStr, bool isAnim, int& outRender3DIdx, int& outOutputIdx, int& outCamIdx, int& outLfoIdx);
 
 void BuildBenchB6Scene(int n, bool collapsed, float& outMaxX, float& outMaxY, int& outDragNodeIdx);

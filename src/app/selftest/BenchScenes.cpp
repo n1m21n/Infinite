@@ -289,6 +289,8 @@ struct BoatState
    int oceanIdx = -1;
    std::vector<int> parts;
    int lanternLightIdx = -1;
+   int fillIdx = -1, keyIdx = -1, camIdx = -1, renderIdx = -1;
+   std::string envPath;
    float y = 0, pitch = 0, roll = 0;
    bool primed = false;
 };
@@ -443,6 +445,7 @@ void BuildBenchBoatScene(bool moon, bool isAnim, int& outRender3DIdx, int& outOu
    ocean->specular = 0.5f;
    sBoat = BoatState();
    sBoat.oceanIdx = oceanIdx;
+   sBoat.envPath = envPath;
 
    struct Part { const char* file; float r, g, b, metal, rough, clear, emit; };
    const Part parts[] = {
@@ -497,8 +500,11 @@ void BuildBenchBoatScene(bool moon, bool isAnim, int& outRender3DIdx, int& outOu
    lightIdx[1] = SpawnNode("Light", "3D", 520.0f, 520.0f)->index;
    auto* fill = static_cast<LightNode*>(nodeAt(lightIdx[1]));
    fill->type = 3; // ambient: the sky's own wash
-   if (!moon) { fill->color[0] = 0.45f; fill->color[1] = 0.45f; fill->color[2] = 0.65f; fill->intensity = 0.20f; }
+   const bool abMode = getenv("INFINITE_BENCH_BOATAB") != nullptr; // Blender A/B: only lights Cycles has
+   if (abMode) fill->intensity = 0.0f;
+   else if (!moon) { fill->color[0] = 0.45f; fill->color[1] = 0.45f; fill->color[2] = 0.65f; fill->intensity = 0.20f; }
    else { fill->color[0] = 0.25f; fill->color[1] = 0.35f; fill->color[2] = 0.6f; fill->intensity = 0.06f; }
+   sBoat.fillIdx = lightIdx[1];
    if (moon)
    {
       // The stern lantern's own light: a warm point riding with the boat.
@@ -507,7 +513,8 @@ void BuildBenchBoatScene(bool moon, bool isAnim, int& outRender3DIdx, int& outOu
       lan->type = 1;
       lan->color[0] = 1.0f; lan->color[1] = 0.58f; lan->color[2] = 0.25f;
       lan->intensity = 1.6f;
-      lan->falloff = 2.0f;
+      lan->falloff = abMode ? 1.0f : 2.0f;
+      if (abMode) lan->softFalloff = false;
       lan->castShadow = true;
       sBoat.lanternLightIdx = lightIdx[2];
    }
@@ -529,10 +536,11 @@ void BuildBenchBoatScene(bool moon, bool isAnim, int& outRender3DIdx, int& outOu
    render->samples = 2;
    render->tonemap = 3; // AgX: holds the sun and the lantern without clipping to flat white
    render->exposure = moon ? 2.2f : 0.8f;
-   render->bloom = moon ? 0.25f : 0.35f;
+   render->bloom = abMode ? 0.0f : (moon ? 0.25f : 0.35f);
    render->shadowsEnabled = true;
    render->shadowQuality = 1;
    outRender3DIdx = renderIdx;
+   sBoat.keyIdx = lightIdx[0]; sBoat.camIdx = camIdx; sBoat.renderIdx = renderIdx;
 
    const int outIdx = SpawnNode("Output", "Utility", 1040.0f, 0.0f)->index;
    if (ImageCable* in = CableFor(*FindNodeByIndex(outIdx), 0))
@@ -604,6 +612,78 @@ void BenchBoatTick()
          l->elevation = std::asin(wy / r) * 180.0f / 3.14159265f;
          l->azimuth = std::atan2(wz, wx) * 180.0f / 3.14159265f;
       }
+}
+
+
+// Writes the frame as it stands for the Blender A/B (tools/blender-ab/boat_scene.py): the ocean and every boat part
+// with their transforms baked in, in Blender's Z-up axes (x, -z, y), and scene.json with the camera, lights,
+// materials (colours as the nodes hold them, sRGB) and the render's exposure.
+void BenchBoatDump(const std::string& dir)
+{
+   if (sBoat.oceanIdx < 0)
+      return;
+   auto node = [](int idx) { GraphNode* g = FindNodeByIndex(idx); return g ? g->node.get() : nullptr; };
+   auto writeObj = [&](const std::string& name, const Mesh& mesh, const Mat4& m)
+   {
+      FILE* f = fopen((dir + "/" + name + ".obj").c_str(), "w");
+      if (!f) return;
+      for (const Vertex& v : mesh.vertices)
+      {
+         const float x = m.m[0] * v.px + m.m[4] * v.py + m.m[8] * v.pz + m.m[12];
+         const float y = m.m[1] * v.px + m.m[5] * v.py + m.m[9] * v.pz + m.m[13];
+         const float z = m.m[2] * v.px + m.m[6] * v.py + m.m[10] * v.pz + m.m[14];
+         fprintf(f, "v %.5f %.5f %.5f\n", x, -z, y);
+      }
+      for (size_t i = 0; i + 2 < mesh.indices.size(); i += 3)
+         fprintf(f, "f %u %u %u\n", mesh.indices[i] + 1, mesh.indices[i + 1] + 1, mesh.indices[i + 2] + 1);
+      fclose(f);
+   };
+   auto matJson = [](const Material& mt) {
+      char b[512];
+      snprintf(b, sizeof(b), "{\"color\":[%g,%g,%g],\"metallic\":%g,\"roughness\":%g,\"ior\":%g,\"specular\":%g,\"clearcoat\":%g,"
+               "\"clearcoat_roughness\":%g,\"emission_color\":[%g,%g,%g],\"emission\":%g}",
+               mt.color[0], mt.color[1], mt.color[2], mt.metallic, mt.roughness, mt.ior, mt.specular, mt.clearcoat,
+               mt.clearcoatRoughness, mt.emissionColor[0], mt.emissionColor[1], mt.emissionColor[2], mt.emission);
+      return std::string(b);
+   };
+   auto* ocean = static_cast<OceanNode*>(node(sBoat.oceanIdx));
+   writeObj("ocean", ocean->GetMesh(), ocean->GetModelMatrix());
+   std::string json = "{\"objects\":[{\"name\":\"ocean\",\"material\":" + matJson(ocean->GetMaterial()) + "}";
+   static const char* kParts[] = { "hull", "deck", "cabin", "windows", "trim", "sail", "lantern" };
+   for (size_t i = 0; i < sBoat.parts.size() && i < 7; i++)
+   {
+      auto* mdl = static_cast<ModelSourceNode*>(node(sBoat.parts[i]));
+      writeObj(kParts[i], mdl->GetMesh(), mdl->GetModelMatrix());
+      json += std::string(",{\"name\":\"") + kParts[i] + "\",\"material\":" + matJson(mdl->GetMaterial()) + "}";
+   }
+   json += "],";
+   auto* cam = static_cast<CameraNode*>(node(sBoat.camIdx));
+   float eye[3];
+   cam->ComputeEye(eye);
+   char b[1024];
+   snprintf(b, sizeof(b), "\"camera\":{\"eye\":[%g,%g,%g],\"target\":[%g,%g,%g],\"fov\":%g},", eye[0], -eye[2], eye[1],
+            cam->targetX, -cam->targetZ, cam->targetY, cam->fov);
+   json += b;
+   json += "\"lights\":[";
+   bool first = true;
+   for (int idx : { sBoat.keyIdx, sBoat.fillIdx, sBoat.lanternLightIdx })
+   {
+      if (idx < 0) continue;
+      auto* l = static_cast<LightNode*>(node(idx));
+      float v[3];
+      l->ComputeVector(v);
+      snprintf(b, sizeof(b), "%s{\"type\":%d,\"vec\":[%g,%g,%g],\"color\":[%g,%g,%g],\"intensity\":%g,\"falloff\":%g,\"soft\":%d}",
+               first ? "" : ",", l->type, v[0], -v[2], v[1], l->color[0], l->color[1], l->color[2], l->intensity, l->falloff,
+               l->softFalloff ? 1 : 0);
+      json += b;
+      first = false;
+   }
+   auto* r = static_cast<Render3DNode*>(node(sBoat.renderIdx));
+   snprintf(b, sizeof(b), "],\"exposure\":%g,\"tonemap\":%d,\"bloom\":%g,\"env\":\"%s\",\"size\":[%d,%d]}", r->exposure, r->tonemap,
+            r->bloom, sBoat.envPath.c_str(), (int)r->width, (int)r->height);
+   json += b;
+   if (FILE* f = fopen((dir + "/scene.json").c_str(), "w")) { fputs(json.c_str(), f); fclose(f); }
+   printf("BOATDUMP %s\n", dir.c_str());
 }
 
 void BuildBenchB4Scene(const std::string& scaleStr, const std::string& shadowStr, bool isAnim, int& outRender3DIdx, int& outOutputIdx, int& outCamIdx, int& outLfoIdx)

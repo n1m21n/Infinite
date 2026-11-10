@@ -1,6 +1,6 @@
 // Render 3D through the Metal engine (src/engine): the same scene the GL raster draws, lit with ray-traced
-// shadows and reflections and live GI. Opt-in per node (liveEngine). Instanced copies, glass and the
-// Environment node's HDRI are carried; textures, per-copy colours and non-ACES tonemaps are not drawn yet.
+// shadows and reflections and live GI. Opt-in per node (liveEngine). Instanced copies, glass, emission and the
+// Environment node's HDRI are carried; textures and per-copy colours are not drawn yet.
 // Returns false (GL draws instead) only when the engine itself is unavailable.
 #include "Geometry3DNodes.h"
 #include "ColorSpace.h"
@@ -152,6 +152,8 @@ bool Render3DNode::CookEngine(int frameId)
       in.roughness = mat.roughness;
       in.transmission = mat.transmission;
       in.ior = mat.ior;
+      for (int k = 0; k < 3; k++)
+         in.emission[k] = ColorSpace::SrgbToLinear(mat.emissionColor[k]) * mat.emission; // GL: toLinear(colour) * strength
       // Instanced sources: one engine instance per copy, placed as the GL draw places it (group matrix * copy).
       if (InstanceOnPointsNode* instancer = FindInstancer(src))
       {
@@ -320,7 +322,7 @@ bool Render3DNode::CookEngine(int frameId)
       }
    }
    fr.exposure = exposure;
-   fr.tonemap = tonemap == 0 ? 0 : 1;   // none or ACES; the other curves are not in the engine yet
+   fr.tonemap = tonemap;                // 0 none, 1 ACES, 2 Reinhard, 3 AgX, 4 Neutral (MetalDevice toneMap)
    fr.rim = rimIntensity;
    fr.shadow.enabled = shadowsEnabled;
    fr.shadow.bias = shadowBias; fr.shadow.strength = shadowStrength; fr.shadow.softness = shadowSoftness;

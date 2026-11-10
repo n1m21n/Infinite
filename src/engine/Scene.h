@@ -24,6 +24,7 @@ namespace engine
       float roughness = 0.5f;
       float transmission = 0.0f; // glass: live = two refractions through the hit object, then the scene beyond
       float ior = 1.5f;
+      float emission[3] = { 0.0f, 0.0f, 0.0f }; // linear light leaving the surface (colour * strength)
    };
 
    // Many copies of one mesh drawn with one instanced call (R5). Raster only: batches are not in the ray-traced
@@ -74,7 +75,7 @@ namespace engine
       float eye[3] = { 0, 0, 5 };
       float exposure = 1.0f;
       float rim = 0.35f;
-      int tonemap = 1; // 0 none, 1 ACES
+      int tonemap = 1; // 0 none, 1 ACES, 2 Reinhard, 3 AgX, 4 Neutral
       float ambientSrgb[3] = { 0.28f, 0.32f, 0.42f };
       float envSkySrgb[3] = { 0.35f, 0.5f, 0.75f }, envHorizonSrgb[3] = { 0.7f, 0.75f, 0.8f },
             envGroundSrgb[3] = { 0.2f, 0.2f, 0.22f };

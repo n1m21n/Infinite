@@ -222,6 +222,9 @@ void DrawBenchHarness(FrameCtx& fc)
          if (isBenchB4)
             BenchBoatTick();
          // INFINITE_BENCH_BOATSAVE=<path.inf>: save the built scene (with its sky and boat files) as a patch.
+         if (isBenchB4 && frameId == 6)
+            if (const char* dd = getenv("INFINITE_BENCH_BOATDUMP"))
+               BenchBoatDump(dd);
          if (isBenchB4 && frameId == 5)
             if (const char* sp = getenv("INFINITE_BENCH_BOATSAVE"))
             {
