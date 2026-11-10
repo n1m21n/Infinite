@@ -1282,6 +1282,14 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
+   if (getenv("INFINITE_RHITEST") != nullptr)
+   {
+      const bool ok = RunRhiTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_3DBENCH") != nullptr)
    {
       const bool ok = RunThreeDBench();

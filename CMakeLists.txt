@@ -609,6 +609,7 @@ set(COMMON_SOURCES
     src/app/selftest/SculptTests.cpp
     src/app/selftest/ModelAbTests.cpp
     src/app/selftest/ThreeDBench.cpp
+    src/app/selftest/RhiTests.cpp
     src/app/selftest/FlowTests.cpp
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp
@@ -957,6 +958,7 @@ file(GLOB INFINITE_STARTER_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/
 file(GLOB INFINITE_NOTO_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Noto/*-Subset.otf")
 
 set(APPLE_SOURCES
+    src/engine/rhi/MetalDevice.mm
     src/platform/Platform.mm
     src/platform/MidiOutMac.mm
     src/platform/HeadTracker.mm
@@ -1245,6 +1247,8 @@ target_compile_definitions(Infinite PRIVATE $<$<CONFIG:Debug>:IMGUI_ENABLE_TEST_
 
 if(APPLE)
     target_sources(Infinite PRIVATE ${APPLE_SOURCES})
+else()
+    target_sources(Infinite PRIVATE src/engine/rhi/RhiStub.cpp)
 endif()
 
 if(WIN32)
@@ -1754,6 +1758,7 @@ endif()
 
 if(APPLE)
     target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
+    set_source_files_properties(src/engine/rhi/MetalDevice.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
@@ -1860,6 +1865,7 @@ if(APPLE)
         "-framework CoreAudio"
         "-framework AudioToolbox"
         "-framework IOSurface"
+        "-framework Metal"
         # Plugin hosting: AUAudioUnit's -requestViewControllerWithCompletionHandler:
         # lives in CoreAudioKit (AUViewController.h), as does the
         # AUGenericViewController fallback for plugins with no editor of their

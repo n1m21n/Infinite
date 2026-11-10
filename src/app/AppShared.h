@@ -6046,6 +6046,7 @@ bool RunBakeTest();
 bool RunSculptTest();
 bool RunModelAbTest();
 bool RunThreeDBench();
+bool RunRhiTest();
 bool RunThreeDFlowTest();
 bool RunBvhTest();
 bool RunPathTraceTest();
