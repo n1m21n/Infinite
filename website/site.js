@@ -207,9 +207,10 @@
 
     path.style.strokeDasharray = len;
     path.style.strokeDashoffset = len;
-    path.getBoundingClientRect();
-    path.style.transition = 'stroke-dashoffset 1.3s cubic-bezier(0.65, 0, 0.35, 1) 0.15s';
-    path.style.strokeDashoffset = '0';
+    requestAnimationFrame(() => {
+      path.style.transition = 'stroke-dashoffset 1.3s cubic-bezier(0.65, 0, 0.35, 1) 0.15s';
+      path.style.strokeDashoffset = '0';
+    });
 
     if (!ball) return;
     const hero = $('.hero');
@@ -250,16 +251,24 @@
     const show = (w, col) => {
       word.textContent = w;
       word.style.setProperty('--hand', col);
+      if (reduced) {
+        if (line) {
+          line.style.setProperty('--hand', col);
+          line.style.width = (word.offsetWidth + 10) + 'px';
+          line.classList.add('draw');
+        }
+        return;
+      }
+      word.classList.remove('writing');
       if (line) {
         line.style.setProperty('--hand', col);
-        line.style.width = (word.offsetWidth + 10) + 'px';
+        line.classList.remove('draw');
       }
-      if (reduced) { if (line) line.classList.add('draw'); return; }
-      word.classList.remove('writing');
-      if (line) line.classList.remove('draw');
-      void word.offsetWidth;
-      word.classList.add('writing');
-      if (line) line.classList.add('draw');
+      requestAnimationFrame(() => {
+        if (line) line.style.width = (word.offsetWidth + 10) + 'px';
+        word.classList.add('writing');
+        if (line) line.classList.add('draw');
+      });
     };
     const fit = () => { if (line) line.style.width = (word.offsetWidth + 10) + 'px'; };
     window.addEventListener('resize', fit);
@@ -871,22 +880,7 @@
       }
     });
 
-    /* autoplay: advances every 2s while visible and not hovered */
-    const win = $('#hero-showcase');
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (win && !reduce) {
-      let timer = null, seen = false, hover = false;
-      const tick = () => {
-        const lbOpen = lightbox && lightbox.classList.contains('active');
-        if (seen && !hover && !lbOpen && !document.hidden) goTo(current + 1);
-      };
-      timer = setInterval(tick, 2000);
-      win.addEventListener('mouseenter', () => { hover = true; });
-      win.addEventListener('mouseleave', () => { hover = false; });
-      if ('IntersectionObserver' in window) {
-        new IntersectionObserver((en) => { seen = en[0].isIntersecting; }, { threshold: 0.5 }).observe(win);
-      } else seen = true;
-    }
+    /* Showcase controls: users navigate slides via tabs, click, and arrow buttons without jarring autoplay */
   }
 
   /* ------------------------------------------------------------ boot */

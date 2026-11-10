@@ -366,10 +366,10 @@
           <div class="showcase-stage" id="showcase-stage" title="Click to view next screenshot">
             <div class="showcase-slides" id="showcase-slides">
               <div class="showcase-slide active" data-title="untitled.infinite" data-src="assets/product_canvas.webp">
-                <img class="product-shot is-wide" fetchpriority="high" decoding="async" src="assets/product_canvas_1400.webp" srcset="assets/product_canvas_1400.webp 1400w, assets/product_canvas.webp 2628w" sizes="(max-width: 1240px) 100vw, 1200px" alt="The Infinite canvas: visual nodes on the left, synths, sequencers and a mixer on the right, live previews in the side panel" width="2628" height="1464">
+                <img class="product-shot is-wide" fetchpriority="high" decoding="async" src="assets/product_canvas_640.webp" srcset="assets/product_canvas_640.webp 640w, assets/product_canvas_960.webp 960w, assets/product_canvas_1400.webp 1400w, assets/product_canvas.webp 2628w" sizes="(max-width: 640px) 100vw, (max-width: 1240px) 100vw, 1200px" alt="The Infinite canvas: visual nodes on the left, synths, sequencers and a mixer on the right, live previews in the side panel" width="2628" height="1464">
               </div>
               <div class="showcase-slide" data-title="untitled.infinite &middot; Canvas &amp; Previews" data-src="assets/showcase/canvas-previews.webp">
-                <img class="product-shot" fetchpriority="high" decoding="async" src="assets/showcase/canvas-previews.webp" alt="Infinite Canvas: node graph on left, synthesizers and mixer on right, live previews in side panel" width="1800" height="1125">
+                <img class="product-shot" loading="lazy" decoding="async" src="assets/showcase/canvas-previews.webp" alt="Infinite Canvas: node graph on left, synthesizers and mixer on right, live previews in side panel" width="1800" height="1125">
               </div>
               <div class="showcase-slide" data-title="untitled.infinite &middot; Node Graph" data-src="assets/showcase/node-graph.webp">
                 <img class="product-shot" loading="lazy" decoding="async" src="assets/showcase/node-graph.webp" alt="Infinite Node Graph: full modular audio-visual network with patch cables" width="1800" height="1125">
@@ -912,7 +912,7 @@
         document.head.appendChild(s);
       }
       if (!('IntersectionObserver' in window)) { window.addEventListener('load', load); return; }
-      var io = new IntersectionObserver(function (e) { if (e.some(function (x) { return x.isIntersecting; })) { io.disconnect(); load(); } }, { rootMargin: '400px' });
+      var io = new IntersectionObserver(function (e) { if (e.some(function (x) { return x.isIntersecting; })) { io.disconnect(); load(); } }, { rootMargin: '0px' });
       els.forEach(function (el) { io.observe(el); });
     })();
   </script>
