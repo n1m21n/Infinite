@@ -745,6 +745,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
    const int maxB = int(u.info.y);
    const int nEm = int(u.em.x); const float pEm = u.em.y;
    float lastPdfB = 0.0; // pdf of the bounce that led here (MIS against emitter sampling)
+   float3 skyK = float3(1.0); // sky scale for the bounce that led here: Render 3D's ambient on the diffuse lobe, 1 on the glossy one (as the raster)
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    for (int b = 0; b < maxB; b++)
@@ -753,7 +754,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       intersection_result<triangle_data, instancing> h = it.intersect(r, rtArgs.tlas);
       if (h.type != intersection_type::triangle)
       {
-         if (b > 0) L += T * sampleEnv(f, et, d, 0.0); // the sky itself, as the GL tracer; the cosine is in the sampling
+         if (b > 0) L += T * sampleEnv(f, et, d, 0.0) * skyK; // the sky itself; the cosine is in the sampling
          else if ((int(f.envm.x) & 2) != 0) { L = sampleEnv(f, et, d, 0.0); cov = 1.0; } // the HDRI as the background
          break;
       }
@@ -787,6 +788,9 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       }
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
       const float3 f0 = mix(float3(0.04), base, metal);
+      if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
+      for (int i = 0; i < int(f.params.w) && i < 8; i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
+         if (int(f.lights[i].vec.w) == 3) L += T * base * (1.0 - metal) * f.lights[i].color.xyz * f.lights[i].terms.x;
       // direct light, the same model as the raster
       const int count = int(f.params.w);
       // next-event estimation: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
@@ -858,8 +862,8 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       const float2 lp = ptProbs(f0, metal, nDotV);
       const float a = max(0.002, rough * rough);
       float3 nd;
-      if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); }
-      else { nd = cosineDir(n, rnd(seed), rnd(seed)); }
+      if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); skyK = float3(1.0); }
+      else { nd = cosineDir(n, rnd(seed), rnd(seed)); skyK = f.ambient.xyz * 3.0; }
       float pdfB = 0.0;
       const float3 fB = ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
       if (pdfB <= 1e-6) break;

@@ -656,8 +656,8 @@ Static frame, FLIP vs Cycles (lower is closer):
 
 | | GL | engine before | raster (16) | all (7) | all + settle (15) |
 |---|---|---|---|---|---|
-| sunset | 0.103 | 0.310 | 0.119 | 0.093 | 0.077 |
-| moon | 0.101 | 0.193 | 0.108 | 0.089 | 0.067 |
+| sunset | 0.103 | 0.310 | 0.122 | 0.084 | 0.077 |
+| moon | 0.101 | 0.193 | 0.099 | 0.066 | 0.067 |
 
 Fixed by it:
 - The engine forced ACES for every tonemap but none; AgX, Reinhard and Neutral now run in Metal (`toneMap`), so the
@@ -671,12 +671,18 @@ Fixed by it:
   266 -> 403 ms (sunset), 370 -> 447 ms (moon); live modes untouched.
 - Settle ignored the shadow strength the live picture uses (Render 3D default 0.8), so shadows darkened on settle;
   analytic-light shadows in the path tracer now keep it. The A/B sets strength 1 (Cycles' shadows are full).
+- Live over-lit dark areas (mode 7 hull 2.06x). The cause was Render 3D's rim (0.35 by default), a stylised edge
+  glow Cycles has no twin for; the A/B now sets it 0, and with it the live hull is 0.90-1.03x of Cycles.
+- Settling changed the picture: the tracer had no rim, no ambient lights and took the sky at full strength where the
+  raster scales its diffuse sky light by the ambient colour x 3. The tracer now adds the rim on the first hit, the
+  ambient lights' flat fill on every hit, and scales the sky by ambient x 3 after a diffuse bounce (1 after a glossy
+  one, as the raster's reflections). Default look, live vs settled: FLIP 0.052 (moon) / 0.063 (sunset), regions
+  0.89-0.97x. The A/B sets ambient to linear 1/3 so the sky is at full strength, as Cycles' world.
 - The moon reference's point light had a 0.05 radius, wider than the 0.045 globe, leaking light onto the deck; it is
   now a true point like the engine's (moon table row above uses the re-render).
 
 Still open (region brightness vs Cycles, mode 7 unless noted):
-- Live modes over-light dark areas through the approximate ambient fill (mode 7 hull 2.06x, deck 1.55x; mode 17
-  deck 2.33x): a neutral excess on dark pixels, not a colour shift.
+- No-GI modes (16, 17) over-light the shaded side: the env ambient has no occlusion there (hull 1.9-5.9x).
 - Sails 0.85 (sunset) / 1.08 (moon); sun lights keep GL's 0.35 wrap, which Cycles has not.
 - Sun glitter path: the sun is a delta light, so the column is sparkly and wide where Cycles' 1.6° disc gives a
   clean narrow column; near water 0.99 / 1.10.

@@ -538,7 +538,11 @@ void BuildBenchBoatScene(bool moon, bool isAnim, int& outRender3DIdx, int& outOu
    render->exposure = moon ? 2.2f : 0.8f;
    render->bloom = abMode ? 0.0f : (moon ? 0.25f : 0.35f);
    if (abMode)
+   {
       render->shadowStrength = 1.0f; // Cycles' shadows are full
+      render->rimIntensity = 0.0f;   // a stylised edge glow with no Cycles twin
+      for (float& c : render->ambientColor) c = 0.6136f; // linear 1/3: sky light at full strength (ambient * 3 == 1), as Cycles' world
+   }
    render->shadowsEnabled = true;
    render->shadowQuality = 1;
    outRender3DIdx = renderIdx;
