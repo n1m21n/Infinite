@@ -399,6 +399,9 @@ chunks when `Transport` is offline and bit 3 is on.
 | Reflections: GGX-sampled lobe; one diffuse bounce at the hit | A mirror showed a black ceiling (lit by bounce only); the lobe was far too wide |
 | Bounce hits sample one light, weighted by the count | 8 shadow rays per hit halved the frame rate (18.8 fps) |
 | Fake floor bounce only when GI is off | It double-counted with real GI |
+| GI and reflection hits on screen read last frame's GI there (screen-space feedback); off-screen hits keep the bounce + tail (c4bc1748) | The albedo tail assumes a closed room: floor GI 22% bright in the open box |
+| GI rays follow metal hits along the mirror direction | The floor under the mirror sphere got half its light (0.18 vs 0.36 linear) |
+| With GI on, the rough share of the reflection (roughness ≥ 0.55) uses the GI radiance, not the env alone | Walls seen at grazing angles reflected a black env; the red wall lacked 37% of its green bounce |
 
 FLIP vs 1024-spp Cycles (lower is better; brightness ratio in brackets where it matters):
 
@@ -408,14 +411,19 @@ FLIP vs 1024-spp Cycles (lower is better; brightness ratio in brackets where it 
 | light_point | 0.065 | 0.037 | 0.037 | 0.038 |
 | light_spot | 0.151 | 0.053 | 0.057 | 0.064 |
 | light_area | 0.084 | 0.026 | 0.026 | 0.028 |
-| world_grey | 0.085 | 0.036 | 0.036 | 0.060 |
-| materials | 0.109 | 0.067 | 0.068 | 0.073 |
+| world_grey | 0.085 | 0.036 | 0.036 | 0.055 |
+| materials | 0.109 | 0.067 | 0.068 | 0.068 |
 | furnace_metal | 0.018 | 0.047 | 0.047 | 0.023 |
-| furnace_dielectric | 0.018 | 0.026 | 0.026 | 0.028 |
-| cornell | 0.547 | 0.096 | 0.098 (1.005) | **0.201** (1.014) |
+| furnace_dielectric | 0.018 | 0.026 | 0.026 | 0.024 |
+| cornell | 0.547 | 0.096 | 0.098 (1.005) | **0.139** (1.026) |
 
-- Live meets the R3 gate (≤ 0.15) on 8 of 9 cases. Cornell is lit almost entirely by bounce light; it went
-  0.324 → 0.201 today. Its remaining error is grain in the contact shadows and the mirror sphere's noisy reflection.
+Live column after c4bc1748 (light_sun 0.043, light_point 0.035, light_spot 0.064, light_area 0.027 likewise).
+
+- Live meets the R3 gate (≤ 0.15) on all 9 cases. Cornell is lit almost entirely by bounce light; it went
+  0.324 → 0.201 → 0.139. The 0.201 error was bias, not noise: blurring both pictures left FLIP unchanged.
+  Splitting live into direct and GI against a 1-bounce settle showed direct within 1%, so all of it was GI:
+  the closed-room tail, black mirror hits and black rough reflections (rows above). What is left: contact
+  shadows a little light, speckle in the mirror's dark areas.
 - Settle meets the R4 gate (≤ 0.05) on 6 of 9. Spot, materials and Cornell miss by the same margin as the GL
   tracer, so the gap is the tracer against Cycles (spot cone edge, material lobes, 256 spp noise), not the port.
 - Engine test after the port: Metal PT 19.0 ms per sample vs GL 136 ms (7.2x, gate 4x); MAE vs GL PT 0.010.
@@ -466,8 +474,8 @@ other 8 cases 0.023–0.073, all within 0.002 of before.
 | R1 | ≥ 1.5x, ≥ 8 lights | 1.6–3.0x (test scene); B4 not bridged | PASS (test scene) |
 | R2 | ≤ 12 ms GPU | 9.1 ms shadows + reflections (full-res rays, before the half-res pass) | PASS |
 | R2 | FLIP ≤ 0.12 | 8/9 live cases ≤ 0.064 | PASS except Cornell |
-| R3 | ≥ 30 fps, 10 min | 42.4 fps over 15 s after the half-res pass; the 10-min soak (47 fps) predates the quality work | PASS, re-soak due |
-| R3 | FLIP ≤ 0.15 | 8/9; Cornell 0.201 | **OPEN** |
+| R3 | ≥ 30 fps, 10 min | 41.7 fps over 15 s after the half-res pass and GI feedback; the 10-min soak (47 fps) predates the quality work | PASS, re-soak due |
+| R3 | FLIP ≤ 0.15 | 9/9; Cornell 0.139 | PASS |
 | R3 | 0 xruns, rig ≤ 1 ms | 0 deadline xruns in 180 s; rig p99 0.01 ms | PASS (synthetic patch) |
 | R3 | Hitches | 0 frames over 50 ms in the soak | PASS |
 | R4 | ≥ 4x per sample | 7.2x | PASS |
@@ -495,7 +503,7 @@ other 8 cases 0.023–0.073, all within 0.002 of before.
 | C13 | Live headroom is gone: 31 fps with full-res rays on 4 objects | High | **Done (aa088784)**: GI and reflections traced at 540p in their own pass, upsampled with the guides; 42.4 fps, quality unchanged. Area-light shadow rays are still full-res |
 | C14 | Export is 14x off its gate | High | Denoise the settled frame and stop adaptively (R4 step 4); do not chase it with ray speed |
 | C15 | Settle misses Cycles on spot, materials and Cornell exactly where the GL tracer does | Medium | Fix in the shared BSDF (spot cone edge, lobe split), then A/B both tracers |
-| C16 | The live Cornell gap is noise, not bias (brightness 1.01) | Medium | Accumulate the direct area-light term like GI, or denoise it with the same a-trous guides |
+| C16 | The live Cornell gap is noise, not bias (brightness 1.01) | Medium | **Wrong, closed (c4bc1748)**: it was GI bias (blur left FLIP unchanged). Fixed with screen-space GI feedback, mirror-following GI and room-lit rough reflections; Cornell 0.139 |
 
 ## 12. Next steps
 
@@ -504,7 +512,7 @@ Built so far: section 10. Remaining work in order (each keeps its gate from sect
 | # | Step | Gate it closes | Needs owner |
 |---|---|---|---|
 | ~~1~~ | ~~Half-res GI and reflections in their own pass~~ (done, aa088784: 31.0 → 42.4 fps) | C13 | — |
-| 2 | Denoise the direct area-light term; re-run live Cornell | R3 FLIP ≤ 0.15 on Cornell | no |
+| ~~2~~ | ~~Live Cornell to the R3 gate~~ (done, c4bc1748: 0.200 → 0.139; GI bias, not area-light noise) | R3 FLIP | — |
 | 3 | Bridge B4 into engine mode; re-run R1 speed, R3 soak (10 min) and audio xruns on a real patch | C12, R1 on B4 | no |
 | 4 | Settle: denoised low-spp frames, adaptive stop; re-time the 1-minute export | R4 film ≤ 15 min | no |
 | 5 | Shared BSDF fixes for spot and materials, A/B both tracers | R4 FLIP ≤ 0.05 | no |
