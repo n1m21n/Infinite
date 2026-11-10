@@ -712,6 +712,10 @@ public:
    float lightElevation = 51.5662f;
    float lightColor[3] = { 1.0f, 0.98f, 0.94f };
    float lightIntensity = 1.2f;
+   // Draw through the Metal engine (ray-traced shadows/reflections, live GI) instead of the GL raster.
+   // Off by default; macOS only. Falls back to the GL render when the engine cannot run.
+   bool liveEngine = false;
+   int liveEngineFeatures = 7;   // bit 0 RT shadows, 1 RT reflections, 2 GI
    float ambientColor[3] = { 0.28f, 0.32f, 0.42f };
    float rimIntensity = 0.35f;
 
@@ -1138,6 +1142,11 @@ private:
    // The camera and lights come from the last raster cook (mLastCamera, mPtLights), which drew the
    // same scene; an offline render runs one raster cook first for that.
    bool CookPathTrace(int frameId);
+   // Metal engine path (Apple only; see Render3DEngine.cpp). True when it drew this frame.
+   bool CookEngine(int frameId);
+   void ReleaseEngine();
+   struct EngineState;
+   EngineState* mEng = nullptr;
    void ReleasePathTrace();
    static bool PtSameGeometry(const SceneSignature& a, const SceneSignature& b);
    static bool PtSameView(const SceneSignature& a, const SceneSignature& b);

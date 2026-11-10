@@ -1619,6 +1619,7 @@ Render3DNode::~Render3DNode()
    ReleaseHdr();
    ReleasePano();
    ReleasePathTrace();
+   ReleaseEngine();
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
@@ -2076,6 +2077,9 @@ void Render3DNode::CookIfNeeded(int frameId)
    }
    else if (mPathTrace != nullptr)
       ReleasePathTrace();
+   static const bool sEngineEnv = std::getenv("INFINITE_LIVE_ENGINE") != nullptr; // owner opt-in until the face toggle is approved
+   if ((liveEngine || sEngineEnv) && renderPass == 0 && mFaceOverride < 0 && !SolidActive() && CookEngine(frameId))
+      return;
    // Supersampling only ever adds passes on an offline render; a live cook is
    // always the single pass so the real-time cost never changes.
    if (supersample > 1 && !mInAccumulate && renderPass == 0 && Transport::Instance().IsOfflineMode() && Accumulate(frameId))

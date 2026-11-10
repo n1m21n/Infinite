@@ -261,6 +261,26 @@ bool RunEngineTest()
    check(nLights >= 8, "8 lights drawn", (double)nLights, 8);
    check(mGl / mMt >= 1.5, "at least 1.5x faster than Render 3D (R1 gate)", mGl / mMt, 1.5);
    check(glGetError() == GL_NO_ERROR, "no GL error", 0, 0);
+   {
+      // The bridge: the same Render 3D node, drawn through the engine, must match its own GL picture.
+      r.exposure = 1.0f;
+      r.liveEngineFeatures = 0;
+      r.liveEngine = true;
+      r.CookIfNeeded(++fnum);
+      std::vector<float> viaNode;
+      check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), viaNode), "node engine picture reads", 0, 0);
+      double sum = 0.0;
+      const size_t n = std::min(gl.size(), viaNode.size());
+      for (size_t i = 0; i < n; i++)
+         sum += std::fabs(gl[i] - viaNode[i]);
+      const double mae = n ? sum / (double)n : 1.0;
+      check(mae <= 0.02, "Render 3D engine mode matches its GL render (MAE)", mae, 0.02);
+      r.liveEngineFeatures = 7;
+      r.CookIfNeeded(++fnum);
+      std::vector<float> full;
+      check(GLUtil::ReadTexturePixels(scratch, r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight(), full) && !full.empty(), "node engine picture with RT + GI reads", 0, 0);
+      r.liveEngine = false;
+   }
    if (const char* soakEnv = getenv("INFINITE_ENGINETEST_SOAK"))
    {
       // R3 soak: GI + RT shadows + RT reflections + music rig, unpaced, for N seconds. Reports fps and hitches.

@@ -806,6 +806,7 @@ set(COMMON_SOURCES
     src/nodes/MidiOutNode.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/Render3DPost.cpp
+    src/nodes/Render3DEngine.cpp
     src/nodes/Render3DHdr.cpp
     src/nodes/Render3DPano.cpp
     src/nodes/Render3DPathTrace.cpp
