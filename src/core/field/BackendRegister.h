@@ -19,4 +19,12 @@ namespace Field
                               SampleProgram& outProgram,
                               FieldError& outError,
                               bool notesHost = false);
+
+   // Spectral Field host: the same register machine, run once per STFT bin.
+   // Reads mag/phase/freq/bin/bins/binhz/hop/sr, writes mag/phase/freq; see
+   // SampleProgram's spectral fields and docs/plans/spectral-field/README.md.
+   bool CompileSpectralProgram(const std::string& code,
+                                const SampleProgram* previous,
+                                SampleProgram& outProgram,
+                                FieldError& outError);
 }

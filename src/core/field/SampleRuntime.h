@@ -58,6 +58,62 @@ namespace Field
       int dropped = 0;
    };
 
+   // Spectral Field host: one analysis frame, shared by every bin's run.
+   // Arrays hold `bins` entries. b* are the 'input bin audio B' frame (all
+   // zero when unconnected or undeclared). statePrevBank is the previous
+   // frame's state for every bin, `stateStride` floats per bin, for
+   // state.at(k); the running bin's own cells come through stateCur.
+   struct SpectralBinInput
+   {
+      const float* mag = nullptr;
+      const float* phase = nullptr;
+      const float* freq = nullptr;
+      const float* bmag = nullptr;
+      const float* bphase = nullptr;
+      const float* bfreq = nullptr;
+      const float* statePrevBank = nullptr;
+      int stateStride = 0;
+      int bins = 0;
+      float binhz = 0.0f;
+      float hop = 0.0f;
+   };
+
+   // X.at(k) for the spectral host: linear interpolation between bins
+   // (nearest for phase, which does not interpolate), 0 outside [0, bins-1].
+   inline float SpectralBinAt(const SpectralBinInput& sp, int array, float k)
+   {
+      if (!(k >= 0.0f) || k > (float)(sp.bins - 1))
+         return 0.0f;
+      const float* src = nullptr;
+      int stride = 1;
+      int offset = 0;
+      bool nearest = false;
+      switch (array)
+      {
+         case kBinArrayMag: src = sp.mag; break;
+         case kBinArrayPhase: src = sp.phase; nearest = true; break;
+         case kBinArrayFreq: src = sp.freq; break;
+         case kBinArrayBMag: src = sp.bmag; break;
+         case kBinArrayBPhase: src = sp.bphase; nearest = true; break;
+         case kBinArrayBFreq: src = sp.bfreq; break;
+         default:
+            src = sp.statePrevBank;
+            stride = sp.stateStride;
+            offset = array - kBinArrayState;
+            break;
+      }
+      if (src == nullptr)
+         return 0.0f;
+      if (nearest)
+         return src[(int)(k + 0.5f) * stride + offset];
+      int i0 = (int)k;
+      float frac = k - (float)i0;
+      int i1 = (i0 + 1 < sp.bins) ? i0 + 1 : i0;
+      float a = src[i0 * stride + offset];
+      float b = src[i1 * stride + offset];
+      return a + (b - a) * frac;
+   }
+
    struct SampleRuntimeInput
    {
       float in = 0.0f;
@@ -92,6 +148,9 @@ namespace Field
       float* delayBuf = nullptr;        // Step 19: storage for delay ring buffers
       int* delayCursors = nullptr;      // Step 19: per-delay-line write cursors
       float* tableBuf = nullptr;        // Step 24: storage for state tables
+      // Spectral Field host: frame arrays, and this run's bin index.
+      const SpectralBinInput* spec = nullptr;
+      int bin = 0;
    };
 
    // `regs` must have at least prog.numRegs entries (kSampleMaxRegs is
@@ -248,6 +307,13 @@ namespace Field
             case SampleOp::Clamp: regs[ins.dst] = fminf(fmaxf(regs[ins.a], regs[ins.b]), regs[ins.c]); break;
             case SampleOp::PhaseShape:
                regs[ins.dst] = PhaseShape::Apply((PhaseShape::Kind)(int)ins.imm, regs[ins.a], regs[ins.b]);
+               break;
+            case SampleOp::LoadBin: regs[ins.dst] = (float)in.bin; break;
+            case SampleOp::LoadBins: regs[ins.dst] = in.spec ? (float)in.spec->bins : 0.0f; break;
+            case SampleOp::LoadBinHz: regs[ins.dst] = in.spec ? in.spec->binhz : 0.0f; break;
+            case SampleOp::LoadHop: regs[ins.dst] = in.spec ? in.spec->hop : 0.0f; break;
+            case SampleOp::BinAt:
+               regs[ins.dst] = in.spec ? SpectralBinAt(*in.spec, ins.a, regs[ins.b]) : 0.0f;
                break;
             default:
                assert(false && "SampleRuntime: unhandled opcode");
