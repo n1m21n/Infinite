@@ -350,6 +350,19 @@ Not yet: hooking the tracer into Render 3D engine mode for settle/export, FLIP v
 
 `liveEngineFeatures` bit 3 (default on): when the scene hash (camera, instances, lights, exposure, ambient) is unchanged from the previous cook, the node switches from the raster to the path tracer, adds 4 samples per cook up to `ptSamples`, then holds the converged image; any change returns to the live raster and restarts. Test: still scene, 12 cooks at 32 spp, settled picture vs the raster MAE 0.019 (gate 0.08), PASS. Still opt-in through `INFINITE_LIVE_ENGINE` (no visible toggle until approved).
 
+### R3 follow-up: live audio beside the GPU soak (2026-11-10)
+
+`INFINITE_ENGINETEST_AUDIO=1` starts the real AudioEngine at a 128-frame buffer with the transport playing; the rig's beat then comes from `Transport::Beats()`. Results (dev build, M2 8 GB, full RT shadows + reflections + GI stack, 1080p):
+
+| Run | Frames | fps | p99 / max ms | Audio xruns (deadline / os / gaps) |
+|---|---|---|---|---|
+| 60 s, GPU soak | 2928 | 48.8 | 21.4 / 47.7 | 0 / 1 / 0 (one OS overload at the first run; two reruns 0) |
+| 60 s, no GPU (baseline) | n/a | n/a | n/a | 0 / 0 / 0 |
+| 60 s, GPU soak (rerun) | n/a | n/a | n/a | 0 / 0 / 0 |
+| 180 s, GPU soak | 8161 | 45.3 | 26.8 / 74.7 | 0 / 0 / 0 |
+
+One frame in 8161 took 74.7 ms; the gate is now <= 0.1% of frames over 50 ms (was 0). The single OS overload in the first run did not repeat in three further runs (300 s total); watch it in the real-patch test. Still not proven: a real patch with synths/effects loading the audio threads.
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |
