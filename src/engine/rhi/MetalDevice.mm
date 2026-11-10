@@ -293,41 +293,64 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow;
    }
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
-   const float3 reflectDir = reflect(-viewDir, n);
+   // GI and traced reflections run in tr_fs at half res; this pass writes their demodulated weights instead.
    const float3 irradiance = sampleEnv(f, n, 1.0) * f.ambient.xyz * 3.0;
-   float3 reflection = sampleEnv(f, reflectDir, rough);
-   float reflTraced = 0.0;
-   if ((int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55)
-   {
-      uint rs = pcg(uint(in.pos.x) * 1973u + 9277u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 26699u + 7u);
-      float3 jd = reflectDir;
-      if (rough > 0.04)
-      {
-         jd = reflect(-viewDir, ggxSampleH(n, rough * rough, rnd(rs), rnd(rs))); // the GGX lobe the tracer samples
-         if (dot(jd, n) < 0.02) jd = normalize(jd + n * (0.02 - dot(jd, n)));
-      }
-      const float3 rc = traceReflection(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, jd, rough, rs);
-      reflection = mix(rc, reflection, smoothstep(0.3, 0.55, rough));
-      reflTraced = 1.0;
-   }
    const float3 fAmb = fresnelRough(nDotV, f0, rough);
-   float3 giOut = float3(0.0);
-   const bool giOn = f.gi.x > 0.5 && (int(f.shQ.z + 0.5) >= 0);
-   const bool giSample = giOn && ((uint(in.pos.x) & 1u) + 2u * (uint(in.pos.y) & 1u)) == (uint(f.gi.z) & 3u); // 1 of every 2x2 per frame
-   if (giSample)
+   const float3 envRefl = sampleEnv(f, reflect(-viewDir, n), rough) * fAmb;
+   const bool reflOn = (int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55;
+   const float envKeep = reflOn ? smoothstep(0.3, 0.55, rough) : 1.0; // the env share of the reflection; the rest is traced
+   const bool giOn = f.gi.x > 0.5;
+   if (!giOn) col += (float3(1.0) - fAmb) * (1.0 - metal) * base * irradiance;
+   col += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
+   FOut o;
+   if (!kMrt)
    {
-      uint seed = pcg(uint(in.pos.x) + 8192u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 9781u + 1u);
+      float3 fin = (col + envRefl) * f.params.x;
+      if (int(f.params.y) == 1) fin = aces(fin);
+      o.c0 = float4(toSrgb(fin), 1.0);
+      return o;
+   }
+   o.c0 = float4((col + envRefl * envKeep) * f.params.x, 1.0);
+   o.c1 = float4(giOn ? (float3(1.0) - fAmb) * (1.0 - metal) * base * f.gi.y * f.params.x : float3(0.0), rough); // GI weight
+   o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x, reflOn ? 1.0 : 0.0); // traced-reflection weight
+   o.c3 = float4(n, length(in.wp - f.eye.xyz));
+   return o;
+}
+
+// ---- Half-res trace (R3): each half-res texel traces at one full-res pixel 2q + off, off rotating over the 2x2
+// each frame; every lane traces (no idle quad lanes). Position from the eye ray and the guide distance.
+struct TrU { float4x4 invVP; float4 info; }; // info: offset x, y, full width, height
+struct TrOut { float4 g [[color(0)]]; float4 r [[color(1)]]; }; // raw GI irradiance / reflection radiance, a = valid
+fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
+                     constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]],
+                     texture2d<float> nz [[texture(0)]], texture2d<float> gw [[texture(1)]], texture2d<float> rw [[texture(2)]])
+{
+   TrOut o; o.g = float4(0.0); o.r = float4(0.0);
+   const uint2 px = uint2(in.pos.xy) * 2u + uint2(u.info.xy);
+   if (px.x >= uint(u.info.z) || px.y >= uint(u.info.w)) return o;
+   const float4 c = nz.read(px);
+   if (c.w <= 0.0) return o;
+   const float3 n = normalize(c.xyz);
+   const float2 ndc = float2(2.0 * (float(px.x) + 0.5) / u.info.z - 1.0, 2.0 * (float(px.y) + 0.5) / u.info.w - 1.0);
+   const float4 pw = u.invVP * float4(ndc, 1.0, 1.0);
+   const float3 d = normalize(pw.xyz / pw.w - f.eye.xyz);
+   const float3 org = f.eye.xyz + d * c.w + n * f.shQ.w;
+   const float4 g = gw.read(px);
+   const float rough = g.w;
+   if (any(g.rgb > 0.0))
+   {
+      uint seed = pcg(px.x + 8192u * px.y) ^ pcg(uint(f.gi.z) * 9781u + 1u);
       const int rays = max(int(f.gi.w), 1);
       float3 acc = float3(0.0);
       for (int k = 0; k < rays; k++)
       {
          const float3 dir = cosineDir(n, rnd(seed), rnd(seed));
          float3 hp, hn, alb;
-         float3 L1 = shadeHit(f, rtArgs.tlas, instInfo, in.wp + n * f.shQ.w, dir, 1.0, true, hp, hn, alb, false, int(rnd(seed) * f.params.w));
+         float3 L1 = shadeHit(f, rtArgs.tlas, instInfo, org, dir, 1.0, true, hp, hn, alb, false, int(rnd(seed) * f.params.w));
          if (any(alb > 0.0) && ((uint(f.gi.z) >> 2) & 1u) == 0u)
          {
-            // Second bounce from the hit, every other GI frame at twice the weight (unbiased, half the rays; the
-            // history blends it); later bounces as the geometric tail of that hit's albedo.
+            // Second bounce every other 4-frame cycle at twice the weight (unbiased; the history blends it);
+            // later bounces as the geometric tail of that hit's albedo.
             float3 hp2, hn2, alb2;
             const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
             const float3 L2 = shadeHit(f, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, true, int(rnd(seed) * f.params.w));
@@ -336,49 +359,64 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          }
          acc += L1;
       }
-      giOut = (float3(1.0) - fAmb) * (1.0 - metal) * base * acc / float(rays) * f.gi.y;
+      o.g = float4(acc / float(rays), 1.0);
    }
-   else if (!giOn) col += (float3(1.0) - fAmb) * (1.0 - metal) * base * irradiance;
-   const float3 reflOut = reflection * fAmb;
-   col += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
-   FOut o;
-   if (!kMrt)
+   if (rw.read(px).w > 0.5)
    {
-      float3 fin = (col + reflOut) * f.params.x;
-      if (int(f.params.y) == 1) fin = aces(fin);
-      o.c0 = float4(toSrgb(fin), 1.0);
-      return o;
+      uint rs = pcg(px.x * 1973u + 9277u * px.y) ^ pcg(uint(f.gi.z) * 26699u + 7u);
+      float3 jd = reflect(d, n);
+      if (rough > 0.04)
+      {
+         jd = reflect(d, ggxSampleH(n, rough * rough, rnd(rs), rnd(rs))); // the GGX lobe the tracer samples
+         if (dot(jd, n) < 0.02) jd = normalize(jd + n * (0.02 - dot(jd, n)));
+      }
+      o.r = float4(traceReflection(f, rtArgs.tlas, instInfo, org, jd, rough, rs), 1.0);
    }
-   o.c2 = float4(reflOut * f.params.x, reflTraced);
-   o.c3 = float4(n, length(in.wp - f.eye.xyz));
-   o.c0 = float4(col * f.params.x, 1.0); o.c1 = float4(giOut * f.params.x, giSample ? 1.0 : 0.0);
    return o;
 }
 
-struct ResU { float4 p; float4 clear; }; // p: blend alpha, tonemap, history valid
+struct ResU { float4 p; float4 clear; float4 q; }; // p: blend alpha, tonemap, history valid, refl blend; q: half-res offset x, y, GI on
 struct ResOut { float4 c0 [[color(0)]]; float4 c1 [[color(1)]]; float4 c2 [[color(2)]]; };
-fragment ResOut res_fs(SkyOut in [[stage_in]], constant ResU& u [[buffer(0)]], texture2d<float> hdr [[texture(0)]], texture2d<float> giT [[texture(1)]], texture2d<float> hist [[texture(2)]], texture2d<float> rfl [[texture(3)]], texture2d<float> rhist [[texture(4)]])
+// Joint-bilateral upsample of the half-res trace (3x3 texels, spatial x normal x distance weights, a small floor so
+// thin features fall back to their spatial neighbours), temporal accumulation, then remodulation by the weights.
+fragment ResOut res_fs(SkyOut in [[stage_in]], constant ResU& u [[buffer(0)]], texture2d<float> hdr [[texture(0)]], texture2d<float> gw [[texture(1)]],
+                       texture2d<float> hist [[texture(2)]], texture2d<float> rw [[texture(3)]], texture2d<float> rhist [[texture(4)]],
+                       texture2d<float> trG [[texture(5)]], texture2d<float> trR [[texture(6)]], texture2d<float> nz [[texture(7)]])
 {
    const uint2 px = uint2(in.pos.xy);
    const float4 c = hdr.read(px);
    ResOut o;
    if (c.a < 0.5) { o.c0 = float4(u.clear.xyz, 1.0); o.c1 = float4(0.0); o.c2 = float4(0.0); return o; }
-   float3 g = float3(0.0); float wsum = 0.0;
+   const float4 cz = nz.read(px);
+   const float4 wg = gw.read(px), wr = rw.read(px);
+   const int2 off = int2(u.q.xy);
+   const int2 q0 = (int2(px) - off + 2) / 2 - 1;
+   const int W = int(hdr.get_width()), H = int(hdr.get_height()), HW = int(trG.get_width()), HH = int(trG.get_height());
+   float3 g = float3(0.0), r = float3(0.0); float gs = 0.0, rsum = 0.0;
    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++)
    {
-      const int2 q = int2(px) + int2(x, y);
-      if (q.x < 0 || q.y < 0 || q.x >= int(hdr.get_width()) || q.y >= int(hdr.get_height())) continue;
-      if (hdr.read(uint2(q)).a < 0.5) continue;
-      const float4 gs = giT.read(uint2(q)); if (gs.a < 0.5) continue;
-      g += gs.rgb; wsum += 1.0;
+      const int2 q = q0 + int2(x, y);
+      if (q.x < 0 || q.y < 0 || q.x >= HW || q.y >= HH) continue;
+      const int2 s = q * 2 + off;
+      if (s.x >= W || s.y >= H) continue;
+      const float4 cs = nz.read(uint2(s));
+      if (cs.w <= 0.0) continue;
+      const float2 dd = float2(s - int2(px));
+      const float wn = pow(max(dot(cz.xyz, cs.xyz), 0.0), 32.0);
+      const float wz = exp(-abs(cs.w - cz.w) / (0.02 * cz.w + 1e-3));
+      const float w = exp(-dot(dd, dd) * 0.35) * (wn * wz + 1e-3);
+      const float4 tg = trG.read(uint2(q)); if (tg.a > 0.5) { g += tg.rgb * w; gs += w; }
+      const float4 tr = trR.read(uint2(q)); if (tr.a > 0.5) { r += tr.rgb * w; rsum += w; }
    }
-   g /= max(wsum, 1.0);
+   const bool haveG = gs > 0.0, haveR = rsum > 0.0;
+   g /= max(gs, 1e-8); r /= max(rsum, 1e-8);
    const float3 h = hist.read(px).rgb;
-   const float3 acc = wsum > 0.5 ? (u.p.z > 0.5 ? mix(h, g, u.p.x) : g) : float3(0.0); // no sampled neighbour (GI off) -> no GI, never stale history
-   const float4 rc = rfl.read(px);
+   const bool hv = u.p.z > 0.5;
+   const float3 acc = u.q.z < 0.5 ? float3(0.0) : (haveG ? (hv ? mix(h, g, u.p.x) : g) : (hv ? h : float3(0.0))); // GI off -> no GI, never stale history
    const float3 rh = rhist.read(px).rgb;
-   const float3 racc = (rc.a > 0.5 && u.clear.w > 0.5) ? mix(rh, rc.rgb, u.p.w) : rc.rgb;
-   float3 col = c.rgb + acc + racc;
+   const bool rv = u.clear.w > 0.5;
+   const float3 racc = wr.a < 0.5 ? float3(0.0) : (haveR ? (rv ? mix(rh, r, u.p.w) : r) : (rv ? rh : float3(0.0)));
+   float3 col = c.rgb + wg.rgb * acc + wr.rgb * racc;
    if (int(u.p.y) == 1) col = aces(col);
    o.c0 = float4(toSrgb(col), 1.0);
    o.c1 = float4(acc, 1.0);
@@ -413,12 +451,13 @@ fragment float4 at_fs(SkyOut in [[stage_in]], constant AtU& u [[buffer(0)]], tex
    return float4(sum / max(wsum, 1e-6), 1.0);
 }
 struct CompU { float4 p; float4 clear; }; // p.y tonemap
-fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]], texture2d<float> hdr [[texture(0)]], texture2d<float> gi [[texture(1)]], texture2d<float> rfl [[texture(2)]])
+fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]], texture2d<float> hdr [[texture(0)]], texture2d<float> gi [[texture(1)]], texture2d<float> rfl [[texture(2)]],
+                        texture2d<float> gw [[texture(3)]], texture2d<float> rw [[texture(4)]])
 {
    const uint2 px = uint2(in.pos.xy);
    const float4 c = hdr.read(px);
    if (c.a < 0.5) return float4(u.clear.xyz, 1.0);
-   float3 col = c.rgb + gi.read(px).rgb + rfl.read(px).rgb;
+   float3 col = c.rgb + gw.read(px).rgb * gi.read(px).rgb + rw.read(px).rgb * rfl.read(px).rgb;
    if (int(u.p.y) == 1) col = aces(col);
    return float4(toSrgb(col), 1.0);
 }
@@ -976,22 +1015,20 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          [enc setFrontFacingWinding:MTLWindingClockwise]; // GL counter-clockwise, mirrored by the y flip
          [enc setVertexBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
+         struct RInstH { float bm[4], rg[4]; uint64_t vb, ib; float normalM[16]; };
+         std::vector<RInstH> info(fr.instances.size() + 1);
+         for (size_t i = 0; i < fr.instances.size(); i++)
          {
-            struct RInstH { float bm[4], rg[4]; uint64_t vb, ib; float normalM[16]; };
-            std::vector<RInstH> info(fr.instances.size() + 1);
-            for (size_t i = 0; i < fr.instances.size(); i++)
+            const engine::Instance& in = fr.instances[i];
+            RInstH& o = info[i]; o = {};
+            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness;
+            std::memcpy(o.normalM, in.normalMatrix, 64);
+            if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
-               const engine::Instance& in = fr.instances[i];
-               RInstH& o = info[i]; o = {};
-               Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness;
-               std::memcpy(o.normalM, in.normalMatrix, 64);
-               if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
-               {
-                  o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress;
-               }
+               o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress;
             }
-            [enc setFragmentBytes:info.data() length:info.size() * sizeof(RInstH) atIndex:4];
          }
+         [enc setFragmentBytes:info.data() length:info.size() * sizeof(RInstH) atIndex:4];
          for (const engine::Instance& in : fr.instances)
          {
             if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
@@ -1039,6 +1076,36 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             const bool moved = std::memcmp(mLastVP, fr.viewProj, 64) != 0;
             std::memcpy(mLastVP, fr.viewProj, 64);
             const int prev = mHistCur, cur = 1 - mHistCur;
+            const float offX = (float)(fr.frameIndex & 1u), offY = (float)((fr.frameIndex >> 1) & 1u);
+            float inv[16];
+            if (mTrPso && Inv4(fr.viewProj, inv))
+            {
+               // half-res trace: GI + reflection rays, one full-res pixel of every 2x2 per frame
+               MTLRenderPassDescriptor* tp = [MTLRenderPassDescriptor renderPassDescriptor];
+               for (int k = 0; k < 2; k++)
+               {
+                  tp.colorAttachments[k].texture = mTr[k];
+                  tp.colorAttachments[k].loadAction = MTLLoadActionDontCare;
+                  tp.colorAttachments[k].storeAction = MTLStoreActionStore;
+               }
+               id<MTLRenderCommandEncoder> te = [cb renderCommandEncoderWithDescriptor:tp];
+               struct { float invVP[16]; float info[4]; } tu;
+               std::memcpy(tu.invVP, inv, 64);
+               tu.info[0] = offX; tu.info[1] = offY; tu.info[2] = (float)img.Width(); tu.info[3] = (float)img.Height();
+               [te setRenderPipelineState:mTrPso];
+               [te setFragmentBytes:&tu length:sizeof(tu) atIndex:0];
+               [te setFragmentBytes:&f length:sizeof(f) atIndex:1];
+               [te setFragmentBuffer:mArgBuf offset:0 atIndex:3];
+               [te setFragmentBytes:info.data() length:info.size() * sizeof(RInstH) atIndex:4];
+               [te setFragmentTexture:mNz atIndex:0];
+               [te setFragmentTexture:mGiT atIndex:1];
+               [te setFragmentTexture:mRefl atIndex:2];
+               [te useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               for (const Gpu& g : mMeshes) { [te useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [te useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
+               for (id<MTLAccelerationStructure> b in mBlas) [te useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               [te drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+               [te endEncoding];
+            }
             MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
             rp.colorAttachments[0].texture = img.Tex();
             rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
@@ -1050,7 +1117,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             rp.colorAttachments[2].loadAction = MTLLoadActionDontCare;
             rp.colorAttachments[2].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> re = [cb renderCommandEncoderWithDescriptor:rp];
-            float ru[8] = { moved ? 0.6f : fr.giBlend, (float)fr.tonemap, mHistValid ? 1.0f : 0.0f, moved ? 0.7f : 0.12f, 0, 0, 0, 0 };
+            float ru[12] = { moved ? 0.6f : fr.giBlend, (float)fr.tonemap, mHistValid ? 1.0f : 0.0f, moved ? 0.7f : 0.12f, 0, 0, 0, 0, offX, offY, giOn ? 1.0f : 0.0f, 0 };
             Lin3(fr.clearSrgb, ru + 4); // clear colour is stored sRGB-encoded in the target, so undo Lin3
             for (int i = 0; i < 3; i++) ru[4 + i] = fr.clearSrgb[i];
             ru[7] = mRValid ? 1.0f : 0.0f;
@@ -1061,6 +1128,9 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             [re setFragmentTexture:mHist[prev] atIndex:2];
             [re setFragmentTexture:mRefl atIndex:3];
             [re setFragmentTexture:mRHist[prev] atIndex:4];
+            [re setFragmentTexture:mTr[0] atIndex:5];
+            [re setFragmentTexture:mTr[1] atIndex:6];
+            [re setFragmentTexture:mNz atIndex:7];
             [re drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [re endEncoding];
             if (giOn && fr.giDenoise > 0 && mAtPso && mCompPso)
@@ -1101,6 +1171,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                [ce setFragmentTexture:mHdr atIndex:0];
                [ce setFragmentTexture:src atIndex:1];
                [ce setFragmentTexture:mRHist[cur] atIndex:2];
+               [ce setFragmentTexture:mGiT atIndex:3];
+               [ce setFragmentTexture:mRefl atIndex:4];
                [ce drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
                [ce endEncoding];
             }
@@ -1423,7 +1495,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          pd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
          pd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
          pd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
-         pd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA16Float;
+         pd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
          pd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          NSError* err = nil;
          mPso = [mDev newRenderPipelineStateWithDescriptor:pd error:&err];
@@ -1444,6 +1516,11 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             ad.colorAttachments[0].pixelFormat = fmt;
             mCompPso = [mDev newRenderPipelineStateWithDescriptor:ad error:&err];
             if (!mAtPso || !mCompPso) NSLog(@"denoise pipeline: %@", err);
+            ad.fragmentFunction = [mLib newFunctionWithName:@"tr_fs"];
+            ad.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+            ad.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
+            mTrPso = [mDev newRenderPipelineStateWithDescriptor:ad error:&err];
+            if (!mTrPso) NSLog(@"trace pipeline: %@", err);
          }
          MTLRenderPipelineDescriptor* dd2 = [MTLRenderPipelineDescriptor new];
          dd2.vertexFunction = pd.vertexFunction;
@@ -1469,7 +1546,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
                pp.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
                pp.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
                pp.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
-               pp.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA16Float;
+               pp.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
                mPsoPtMrt = [mDev newRenderPipelineStateWithDescriptor:pp error:&err];
                mCullPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"cull_k"] error:&err];
                mArgsPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"args_k"] error:&err];
@@ -1479,7 +1556,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             bd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
             bd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
             bd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
-            bd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA16Float;
+            bd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
             mPsoBatchMrt = [mDev newRenderPipelineStateWithDescriptor:bd error:&err];
             if (!mPsoBatch || !mPsoBatchMrt) NSLog(@"batch pipeline: %@", err);
          }
@@ -1526,7 +1603,8 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       struct BatchGpu { id<MTLBuffer> models = nil, visMesh = nil, visPt = nil, cnt = nil, argsMesh = nil, argsPt = nil; NSUInteger cap = 0; };
       std::vector<BatchGpu> mBatchGpu;
       id<MTLTexture> mHdr = nil, mGiT = nil, mRefl = nil, mHist[2] = { nil, nil }, mRHist[2] = { nil, nil }, mNz = nil, mAt[2] = { nil, nil };
-      id<MTLRenderPipelineState> mAtPso = nil, mCompPso = nil;
+      id<MTLRenderPipelineState> mAtPso = nil, mCompPso = nil, mTrPso = nil;
+      id<MTLTexture> mTr[2] = { nil, nil }; // half-res trace: GI irradiance, reflection radiance
       int mHistCur = 0; bool mHistValid = false, mRValid = false; float mLastVP[16] = {};
       bool Targets(int w, int h)
       {
@@ -1538,9 +1616,13 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          mHdr = [mDev newTextureWithDescriptor:d]; mGiT = [mDev newTextureWithDescriptor:d];
          mHist[0] = [mDev newTextureWithDescriptor:d]; mHist[1] = [mDev newTextureWithDescriptor:d];
          mRefl = [mDev newTextureWithDescriptor:d]; mRHist[0] = [mDev newTextureWithDescriptor:d]; mRHist[1] = [mDev newTextureWithDescriptor:d];
-         mNz = [mDev newTextureWithDescriptor:d]; mAt[0] = [mDev newTextureWithDescriptor:d]; mAt[1] = [mDev newTextureWithDescriptor:d];
+         mAt[0] = [mDev newTextureWithDescriptor:d]; mAt[1] = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatRGBA32Float; // guides at full float: tr_fs rebuilds the position from the distance
+         mNz = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatRGBA16Float; d.width = (w + 1) / 2; d.height = (h + 1) / 2;
+         mTr[0] = [mDev newTextureWithDescriptor:d]; mTr[1] = [mDev newTextureWithDescriptor:d];
          mHistValid = false; mRValid = false;
-         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1];
+         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1];
       }
       MTLPixelFormat mFmt = MTLPixelFormatInvalid;
       std::vector<Gpu> mMeshes;
