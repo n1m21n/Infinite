@@ -1,6 +1,9 @@
 # Real-time engine: live worlds that react to music
 
-Status: **sections 1–7 for owner sign-off.** Sections 8–12 are a preview; nothing is built.
+Status (2026-11-10, end of day): **R0–R4 built headless, plus R5 step 1; Milestone 1 not closed.** The engine
+runs behind `INFINITE_LIVE_ENGINE` (no visible toggle, no Music Rig node: both wait for owner approval). Gate
+scoreboard: section 10, "Where the gates stand". Open: live Cornell quality, film export time, the real-patch
+bridge (B4), and the owner-facing node and toggle.
 Started 2026-11-10; rewritten the same day around the owner's survey answers.
 Related: `docs/plans/3d-realism/research-brief.md` (commit e32f8eb9).
 
@@ -282,7 +285,7 @@ Sun-cast shadow map fitted to the scene sphere (2048, 3x3 PCF, strength 0.8), sa
 
 Soft (PCSS / area) shadows and point-light shadows are not ported; point lights stay unshadowed here as in GL. Test note: Render 3D needs a second draw after its first cook before shadows exist (bounds come from the uploaded meshes); the harness nudges exposure to force it.
 
-## R2 step 1: ray-traced shadows (2026-11-10)
+### R2 step 1: ray-traced shadows (2026-11-10)
 
 Metal RT on M2: per-mesh BLAS, per-frame instance TLAS, `intersector<triangle_data, instancing>` in the fragment shader (TLAS passed through an argument buffer). Every light casts a hard ray shadow; the shadow-map path stays for the sun.
 
@@ -295,7 +298,7 @@ Metal RT on M2: per-mesh BLAS, per-frame instance TLAS, `intersector<triangle_da
 - Diff vs GL is the point/spot-light shadows GL cannot draw, plus hard edges against PCF; no acne or leaking visible.
 - Open: soft RT shadows (jittered/denoised), RT reflections, quality vs path-traced reference.
 
-## R2 step 2: ray-traced reflections (2026-11-10)
+### R2 step 2: ray-traced reflections (2026-11-10)
 
 One ray per pixel along the reflection vector for surfaces with roughness < 0.55 (blended to the env probe between 0.3 and 0.55). Hit = flat shade of the instance colour under ambient and env; miss = env. The gold sphere now shows the floor and the cube.
 
@@ -304,7 +307,7 @@ One ray per pixel along the reflection vector for surfaces with roughness < 0.55
 
 **Step 2b (same day):** hit shading now fetches vertex normals (GPU addresses of each mesh's vertex/index buffers, read in the shader by primitive id and barycentrics) and applies Lambert from every light at the hit. Cost unchanged (9.05 ms at 1080p). The floor in the sphere is now lit instead of dark. Still no shadows at the hit; one bounce.
 
-## R3 (2026-11-10): live GI + music rig, headless
+### R3 (2026-11-10): live GI + music rig, headless
 
 **What exists**
 - GI: one cosine-sampled bounce ray per pixel, traced for 1 of every 2x2 pixels per frame, gathered with a 3x3 filter over the sampled neighbours and blended over time (history, faster when the camera moves). Hit shading = vertex normal, Lambert from all lights, env on miss.
@@ -377,7 +380,96 @@ Without the point LOD the same 1M-cube cloud took 167 ms: it was fragment-bound 
 
 Release re-run of R1/R4 at the same build: raster 2.09 ms vs GL 3.66 ms (1.75x, gate 1.5), Metal PT 18.5 ms/sample vs GL 135 ms (7.3x).
 
-## 11. Critique (first pass)
+### R4 step 3: settle vs Cycles (2026-11-10, `tools/blender-ab/harness.py --engine settle`)
+
+The Metal tracer first read about 8% dark against Cycles and did not converge (1024 spp scored the same as 256).
+There were two causes. Area lights had been clamped to spots. The tracer also used the raster's Schlick
+geometry term and an ambient on misses. The fix was to port the GL tracer's BSDF (height-correlated Smith,
+Fresnel at the half vector, lobe probabilities) and add true area lights (`LightType::Area`, a uniform point on
+the rectangle). Offline export now always settles: `Render 3D` path-traces `ptSamples` per frame in 16-spp
+chunks when `Transport` is offline and bit 3 is on.
+
+### R3 step 2: live quality vs Cycles (2026-11-10, `--engine live`, `INFINITE_LIVE_ENGINE=7`)
+
+| Change | Why |
+|---|---|
+| A-trous GI denoise: 4 passes (steps 1, 2, 4, 8), normal and distance edge stops; the first pass feeds the history | GI was a 3x3 gather and temporal blend only |
+| Area lights live: 8 stratified points per pixel, rotated per frame, in a compact visibility loop | Hard contact shadows from a centre point |
+| GI hits: base/pi light term (was 3x), RT-shadowed, second bounce every other frame plus an albedo tail; env counted once | Cornell 14% bright with fake energy, then 21% dark with one bounce |
+| Reflections: GGX-sampled lobe; one diffuse bounce at the hit | A mirror showed a black ceiling (lit by bounce only); the lobe was far too wide |
+| Bounce hits sample one light, weighted by the count | 8 shadow rays per hit halved the frame rate (18.8 fps) |
+| Fake floor bounce only when GI is off | It double-counted with real GI |
+
+FLIP vs 1024-spp Cycles (lower is better; brightness ratio in brackets where it matters):
+
+| Case | Raster | GL tracer | Metal settle (256 spp) | Metal live |
+|---|---|---|---|---|
+| light_sun | 0.059 | 0.041 | 0.042 | 0.044 |
+| light_point | 0.065 | 0.037 | 0.037 | 0.038 |
+| light_spot | 0.151 | 0.053 | 0.057 | 0.064 |
+| light_area | 0.084 | 0.026 | 0.026 | 0.028 |
+| world_grey | 0.085 | 0.036 | 0.036 | 0.060 |
+| materials | 0.109 | 0.067 | 0.068 | 0.073 |
+| furnace_metal | 0.018 | 0.047 | 0.047 | 0.023 |
+| furnace_dielectric | 0.018 | 0.026 | 0.026 | 0.028 |
+| cornell | 0.547 | 0.096 | 0.098 (1.005) | **0.201** (1.014) |
+
+- Live meets the R3 gate (≤ 0.15) on 8 of 9 cases. Cornell is lit almost entirely by bounce light; it went
+  0.324 → 0.201 today. Its remaining error is grain in the contact shadows and the mirror sphere's noisy reflection.
+- Settle meets the R4 gate (≤ 0.05) on 6 of 9. Spot, materials and Cornell miss by the same margin as the GL
+  tracer, so the gap is the tracer against Cycles (spot cone edge, material lobes, 256 spp noise), not the port.
+- Engine test after the port: Metal PT 19.0 ms per sample vs GL 136 ms (7.2x, gate 4x); MAE vs GL PT 0.010.
+
+### R4 step 4: film export time (2026-11-10, dev build, M2 8 GB)
+
+`Infinite --render <cornell settle patch> --node 18 --duration 1 --fps 24 --size 1920x1080`,
+`INFINITE_LIVE_ENGINE=15`, 256 spp, 8 bounces: **24 frames in 206 s = 8.6 s per frame.**
+
+| | Value |
+|---|---|
+| 1-minute film, 1080p, 24 fps | 1440 frames × 8.6 s ≈ **3.4 h** |
+| Baseline (section 6) | ≈ 17.6 h |
+| Gate | ≤ 15 min (0.63 s per frame, ≈ 32 spp at today's speed) |
+| Result | 5.1x better than baseline, **13.7x short of the gate** |
+
+The gap closes only by needing fewer samples: run the GI denoiser on the settled picture (low spp + a-trous
+on noisy radiance with albedo demodulation), reuse samples across frames when the camera is still, and stop
+adaptively once a frame's error is low. Faster rays alone cannot close 14x on an M2.
+
+### R3 step 3: frame budget after the quality work (2026-11-10, `INFINITE_ENGINETEST_SOAK=15`)
+
+| Build | fps | p50 / p99 ms |
+|---|---|---|
+| Before today's quality work (ad852432) | 48.7 | 20.2 / 24.4 |
+| Every hit shades all 8 lights with shadows | 18.8 | 53.0 / 58.2 |
+| One light per bounce hit | 29.3 | 34.0 / 37.7 |
+| + compact area loop, second GI bounce every other frame (b86d240e) | **31.0** | 32.2 / 37.2 |
+
+Cost split (the 34 ms state, each item removed on its own): second GI bounce about 4 ms, GI hit shadows about
+2.5 ms, area-light loop shape about 1.4 ms (even with no area lights), denoiser about 1 ms, reflection bounce
+about 0. The gate passes with almost no headroom on a 4-object scene, and every ray is still traced at full
+1080p. The plan's 540p tracing (H2) is not built yet.
+
+### Where the gates stand (2026-11-10)
+
+| Stage | Gate | Result | |
+|---|---|---|---|
+| R0 | Baseline recorded | B4 rows, paced and unpaced | PASS |
+| R1 | FLIP ≤ 0.02 vs GL | MAE 0.0009 | PASS |
+| R1 | ≥ 1.5x, ≥ 8 lights | 1.6–3.0x (test scene); B4 not bridged | PASS (test scene) |
+| R2 | ≤ 12 ms GPU | 9.1 ms shadows + reflections, full-res rays | PASS |
+| R2 | FLIP ≤ 0.12 | 8/9 live cases ≤ 0.064 | PASS except Cornell |
+| R3 | ≥ 30 fps, 10 min | 31.0 fps over 15 s after today's work; the 10-min soak (47 fps) predates it | PASS, re-soak due |
+| R3 | FLIP ≤ 0.15 | 8/9; Cornell 0.201 | **OPEN** |
+| R3 | 0 xruns, rig ≤ 1 ms | 0 deadline xruns in 180 s; rig p99 0.01 ms | PASS (synthetic patch) |
+| R3 | Hitches | 0 frames over 50 ms in the soak | PASS |
+| R4 | ≥ 4x per sample | 7.2x | PASS |
+| R4 | FLIP ≤ 0.05 after ≤ 10 s | 6/9 at 256 spp (4.9 s at 1080p) | **OPEN** (tracer vs Cycles) |
+| R4 | 1-min film ≤ 15 min | ≈ 3.4 h | **OPEN** |
+| R5 | 1M instances ≥ 30 fps, ≤ 1.5 GB, ≤ 100 ms | 58 fps, 452 MB, 14.6 ms | PASS (raster only) |
+| R6, R7 | — | not started | — |
+
+## 11. Critique (updated 2026-11-10 after R0–R4)
 
 | # | Weak point | Severity | Response |
 |---|---|---|---|
@@ -392,10 +484,24 @@ Release re-run of R1/R4 at the same build: raster 2.09 ms vs GL 3.66 ms (1.75x, 
 | C9 | Market unproven | High | Post the R3 demo on Discord before R5 |
 | C10 | Opportunity cost (v0.4.4 perf, VST/AU, agent-collab) | Medium | Gets a scheduled slot, not a side thread |
 | C11 | Field instance domain touches the language | Low | New domain under the same rules, like pixel and sample |
+| C12 | Every number is from a 4-object test scene or a Blender case, not a real patch | High | Bridge B4 (the real-patch scene) into engine mode and re-run R1–R3 on it before calling Milestone 1 |
+| C13 | Live headroom is gone: 31 fps with full-res rays on 4 objects | High | Trace GI and reflections at 540p and upsample with the denoiser guides (H2's plan); move GI into its own pass so the raster shader is small again |
+| C14 | Export is 14x off its gate | High | Denoise the settled frame and stop adaptively (R4 step 4); do not chase it with ray speed |
+| C15 | Settle misses Cycles on spot, materials and Cornell exactly where the GL tracer does | Medium | Fix in the shared BSDF (spot cone edge, lobe split), then A/B both tracers |
+| C16 | The live Cornell gap is noise, not bias (brightness 1.01) | Medium | Accumulate the direct area-light term like GI, or denoise it with the same a-trous guides |
 
 ## 12. Next steps
 
-1. Owner signs off sections 1–7.
-2. R0: re-record B4 with GPU-inclusive timing + per-pass deltas, add the music-reactive reference scene, freeze the baseline.
-3. R1 on its own branch: RHI skeleton, Metal backend, IOSurface interop, Render 3D raster through Metal. Kill rule C4.
-4. R2 → R3 → Milestone 1 review with the Discord demo.
+Built so far: section 10. Remaining work in order (each keeps its gate from section 7):
+
+| # | Step | Gate it closes | Needs owner |
+|---|---|---|---|
+| 1 | Half-res GI and reflections in their own pass, upsampled with the normal/distance guides | Live headroom (C13), R3 fps on bigger scenes | no |
+| 2 | Denoise the direct area-light term; re-run live Cornell | R3 FLIP ≤ 0.15 on Cornell | no |
+| 3 | Bridge B4 into engine mode; re-run R1 speed, R3 soak (10 min) and audio xruns on a real patch | C12, R1 on B4 | no |
+| 4 | Settle: denoised low-spp frames, adaptive stop; re-time the 1-minute export | R4 film ≤ 15 min | no |
+| 5 | Shared BSDF fixes for spot and materials, A/B both tracers | R4 FLIP ≤ 0.05 | no |
+| 6 | Show the engine toggle on Render 3D and the Music Rig node | Milestone 1 demo | **yes**: new toggle and node |
+| 7 | Discord demo, then the go/no-go on R5–R7 | C9 | yes |
+| — | Bisect the Sep 2026 B4 2x difference (section 10, R0) | baseline trust | no |
+| — | R5 next: per-copy colour, Field feed, batches in the RT structure; R6 Vulkan; R7 | after Milestone 1 | — |
