@@ -4,6 +4,10 @@
 #include "engine/rhi/Rhi.h"
 #include "engine/MusicRig.h"
 
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#endif
+
 namespace app
 {
 namespace
@@ -289,6 +293,80 @@ bool RunEngineTest()
       printf("  settled vs raster MAE %.4f, mean %.4f\n", ssum / (double)settled.size(), lum / (double)settled.size());
       check(ssum / (double)settled.size() < 0.08, "settled picture stays close to the raster", ssum / (double)settled.size(), 0.08);
       r.liveEngine = false;
+   }
+   if (const char* instEnv = getenv("INFINITE_ENGINETEST_INSTANCES"))
+   {
+      // R5: one mesh, N copies in one instanced draw. Gates: >= 30 fps at 1M, <= 1.5 GB resident, regenerate <= 100 ms.
+      const size_t N = (size_t)atoll(instEnv);
+      engine::Frame bf = frame;
+      bf.rtShadows = false; bf.rtReflections = false; bf.gi = false; bf.shadow.enabled = false;
+      bf.instances.clear();
+      double regen = 0.0;
+      auto build = [&](float phase)
+      {
+         const double g0 = NowMs();
+         engine::InstanceBatch b;
+         b.mesh = 1; // the cube
+         b.models.resize(N * 16);
+         const size_t side = (size_t)std::ceil(std::cbrt((double)N));
+         const float step = 0.09f, sc = 0.03f;
+         size_t i = 0;
+         for (size_t z = 0; z < side && i < N; z++)
+            for (size_t y = 0; y < side && i < N; y++)
+               for (size_t x = 0; x < side && i < N; x++, i++)
+               {
+                  float* m = &b.models[i * 16];
+                  const float wob = 0.02f * std::sin(phase + 0.1f * (float)x + 0.13f * (float)z);
+                  m[0] = sc; m[5] = sc; m[10] = sc; m[15] = 1.0f;
+                  m[12] = ((float)x - 0.5f * (float)side) * step;
+                  m[13] = ((float)y - 0.5f * (float)side) * step + wob;
+                  m[14] = ((float)z - 0.5f * (float)side) * step;
+               }
+         b.baseSrgb[0] = 0.8f; b.baseSrgb[1] = 0.5f; b.baseSrgb[2] = 0.3f; b.roughness = 0.45f;
+         bf.batches.clear();
+         bf.batches.push_back(std::move(b));
+         regen = NowMs() - g0;
+      };
+      build(0.0f);
+      // camera outside the cloud looking at its centre
+      const float half = 0.5f * std::ceil(std::cbrt((double)N)) * 0.09f;
+      const float ceye[3] = { half * 1.3f, half * 0.9f, half * 2.2f }, ctgt[3] = { 0, 0, 0 };
+      const Mat4 cv = Mat4::LookAt(ceye, ctgt, up);
+      const Mat4 cp = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, (float)W / (float)H, 0.1f, 400.0f);
+      const Mat4 cvp = Mat4::Multiply(cp, cv);
+      std::memcpy(bf.viewProj, cvp.m, 64); std::memcpy(bf.eye, ceye, 12);
+      std::vector<double> ti;
+      for (int i = 0; i < 70; i++)
+      {
+         bf.frameIndex++;
+         const double t0 = NowMs();
+         double gm = 0.0;
+         raster->Render(*img, bf, &gm);
+         if (i == 20) printf("  instanced frame GPU %.1f ms\n", gm);
+         if (i >= 10) ti.push_back(NowMs() - t0);
+      }
+      std::sort(ti.begin(), ti.end());
+      build(1.0f); // the regenerate time (positions rebuilt each frame in a live use)
+      size_t rss = 0;
+#if defined(__APPLE__)
+      mach_task_basic_info_data_t info; mach_msg_type_number_t cnt = MACH_TASK_BASIC_INFO_COUNT;
+      if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &cnt) == KERN_SUCCESS) rss = info.resident_size;
+#endif
+      printf("  INSTANCES %zu: frame p50 %.1f ms p99 %.1f ms (%.1f fps), regenerate %.1f ms, resident %.0f MB\n",
+             N, ti[ti.size() / 2], ti[(size_t)(ti.size() * 0.99)], 1000.0 / ti[ti.size() / 2], regen, (double)rss / 1048576.0);
+      check(1000.0 / ti[ti.size() / 2] >= 30.0, "R5: >= 30 fps with the instanced batch", 1000.0 / ti[ti.size() / 2], 30.0);
+#ifdef NDEBUG
+      check(regen <= 100.0, "R5: regenerate <= 100 ms", regen, 100.0);
+#else
+      printf("  (regenerate gate is checked in release builds only; this is a debug build: %.1f ms)\n", regen);
+#endif
+      check((double)rss <= 1.5 * 1073741824.0, "R5: resident <= 1.5 GB", (double)rss / 1048576.0, 1536.0);
+      if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
+      {
+         std::vector<float> px; ReadRect(img->GlTexture(), W, H, px);
+         FILE* f = fopen((std::string(dir) + "/inst.ppm").c_str(), "wb");
+         if (f) { fprintf(f, "P6\n%d %d\n255\n", W, H); for (int y = H - 1; y >= 0; y--) for (int x = 0; x < W; x++) for (int c = 0; c < 3; c++) fputc((int)std::lround(std::clamp(px[((size_t)y * W + x) * 4 + c], 0.0f, 1.0f) * 255.0f), f); fclose(f); }
+      }
    }
    if (const char* ptEnv = getenv("INFINITE_ENGINETEST_PT"))
    {

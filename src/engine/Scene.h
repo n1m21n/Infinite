@@ -24,6 +24,18 @@ namespace engine
       float roughness = 0.5f;
    };
 
+   // Many copies of one mesh drawn with one instanced call (R5). Raster only: batches are not in the ray-traced
+   // structure (no RT shadows/reflections/GI on them) and cast no shadow-map shadow. Uniform scale per copy.
+   struct InstanceBatch
+   {
+      int mesh = 0;
+      std::vector<float> models; // 16 floats per copy, column-major
+      float baseSrgb[3] = { 0.8f, 0.8f, 0.8f };
+      float metallic = 0.0f;
+      float roughness = 0.5f;
+      size_t Count() const { return models.size() / 16; }
+   };
+
    enum class LightType { Directional = 0, Point = 1, Sun = 2, Ambient = 3, Spot = 4 };
 
    struct Light
@@ -53,6 +65,7 @@ namespace engine
    struct Frame
    {
       std::vector<Instance> instances;
+      std::vector<InstanceBatch> batches;
       std::vector<Light> lights; // up to kMaxLights
       float viewProj[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }; // GL clip space, z in -1..1
       float eye[3] = { 0, 0, 5 };

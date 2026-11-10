@@ -363,6 +363,20 @@ Not yet: hooking the tracer into Render 3D engine mode for settle/export, FLIP v
 
 One frame in 8161 took 74.7 ms; the gate is now <= 0.1% of frames over 50 ms (was 0). The single OS overload in the first run did not repeat in three further runs (300 s total); watch it in the real-patch test. Still not proven: a real patch with synths/effects loading the audio threads.
 
+### R5 step 1: one million instances (2026-11-10, release, M2 8 GB, 1080p, `INFINITE_ENGINETEST_INSTANCES=1000000`)
+
+`Frame::batches` (`InstanceBatch`: one mesh, N column-major transforms, one material) are drawn instanced and indirect. A compute pass (`cull_k`) drops copies outside the view and sorts the rest into two lists by projected size: under 10 px across a copy becomes a lit point (cheap fragment, no PBR), larger ones draw the mesh. `args_k` writes the two indirect draws from the counters, so the CPU never reads the counts back.
+
+| Gate | Result |
+|---|---|
+| >= 30 fps at 1M copies | 58 fps (p50 17.3 ms, GPU 12.9 ms), PASS |
+| Resident memory <= 1.5 GB | 452 MB, PASS |
+| Regenerate 1M transforms <= 100 ms | 14.6 ms on the CPU (release), PASS |
+
+Without the point LOD the same 1M-cube cloud took 167 ms: it was fragment-bound (many layers of full PBR), not triangle-bound. Batches are raster only: not in the ray-traced structure (no RT shadows/reflections/GI on them) and no shadow-map shadow. Not yet: per-copy colour, GPU-side generation from a Field, mesh LOD levels, a node that feeds a batch.
+
+Release re-run of R1/R4 at the same build: raster 2.09 ms vs GL 3.66 ms (1.75x, gate 1.5), Metal PT 18.5 ms/sample vs GL 135 ms (7.3x).
+
 ## 11. Critique (first pass)
 
 | # | Weak point | Severity | Response |

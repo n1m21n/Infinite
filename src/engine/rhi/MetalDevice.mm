@@ -447,6 +447,87 @@ fragment float4 ptres_fs(SkyOut in [[stage_in]], constant PtResU& u [[buffer(0)]
    return float4(mix(u.clear.xyz, toSrgb(col), cov), 1.0);
 }
 
+
+// R5 culling + LOD: one thread per copy. Outside the view: dropped. Under ptPx pixels across: a point. Otherwise: the mesh.
+struct CullU { float4x4 viewProj; float4 info; }; // x count, y mesh radius, z width px, w point threshold px
+kernel void cull_k(uint i [[thread_position_in_grid]], constant CullU& u [[buffer(0)]], const device float4x4* models [[buffer(1)]],
+                   device uint* visMesh [[buffer(2)]], device uint* visPt [[buffer(3)]], device atomic_uint* cnt [[buffer(4)]])
+{
+   if (i >= uint(u.info.x)) return;
+   const float4x4 m = models[i];
+   const float3 c = m[3].xyz;
+   const float scale = max(length(m[0].xyz), max(length(m[1].xyz), length(m[2].xyz)));
+   const float r = u.info.y * scale;
+   const float4 cl = u.viewProj * float4(c, 1.0);
+   const float rx = r * length(float3(u.viewProj[0][0], u.viewProj[1][0], u.viewProj[2][0]));
+   const float ry = r * length(float3(u.viewProj[0][1], u.viewProj[1][1], u.viewProj[2][1]));
+   const float rw = r * length(float3(u.viewProj[0][3], u.viewProj[1][3], u.viewProj[2][3]));
+   if (cl.w + rw < 0.0) return;
+   if (abs(cl.x) - rx > cl.w + rw || abs(cl.y) - ry > cl.w + rw || cl.z - r * 0.0 > cl.w * 1.0 + rw * 2.0) return;
+   const float px = rx / max(cl.w, 1e-4) * u.info.z;
+   if (cl.w > 0.0 && px < u.info.w) visPt[atomic_fetch_add_explicit(&cnt[1], 1u, memory_order_relaxed)] = i;
+   else visMesh[atomic_fetch_add_explicit(&cnt[0], 1u, memory_order_relaxed)] = i;
+}
+// Builds the two indirect draws from the counters, then clears them for the next frame.
+kernel void args_k(device atomic_uint* cnt [[buffer(0)]], device uint* argsMesh [[buffer(1)]], device uint* argsPt [[buffer(2)]], constant uint& indexCount [[buffer(3)]])
+{
+   const uint m = atomic_load_explicit(&cnt[0], memory_order_relaxed), p = atomic_load_explicit(&cnt[1], memory_order_relaxed);
+   argsMesh[0] = indexCount; argsMesh[1] = m; argsMesh[2] = 0; argsMesh[3] = 0; argsMesh[4] = 0;
+   argsPt[0] = 1; argsPt[1] = p; argsPt[2] = 0; argsPt[3] = 0;
+   atomic_store_explicit(&cnt[0], 0u, memory_order_relaxed); atomic_store_explicit(&cnt[1], 0u, memory_order_relaxed);
+}
+struct VOutP { float4 pos [[position]]; float3 wp; float3 n; float ps [[point_size]]; };
+// Points are sub-detail copies: lit by the first light and the ambient only, no PBR, no shadows.
+fragment float4 rp_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]])
+{
+   const float3 n = normalize(in.n);
+   float3 ld = float3(0.0, 1.0, 0.0), lc = float3(0.0);
+   if (int(f.params.w) > 0)
+   {
+      const LightU L = f.lights[0];
+      const int type = int(L.vec.w);
+      ld = (type == 1 || type == 4) ? normalize(L.vec.xyz - in.wp) : normalize(L.vec.xyz);
+      lc = L.color.xyz * L.terms.x;
+   }
+   float3 c = m.base.xyz * (f.ambient.xyz * 1.4 + lc * max(dot(n, ld), 0.0)) * f.params.x;
+   if (int(f.params.y) == 1) c = aces(c);
+   return float4(toSrgb(c), 1.0);
+}
+vertex VOutP rp_vs(uint iid [[instance_id]], constant FrameU& f [[buffer(1)]], const device float4x4* models [[buffer(5)]], const device uint* vis [[buffer(6)]],
+                   constant float& pxK [[buffer(7)]])
+{
+   const float4x4 m = models[vis[iid]];
+   const float4 w = float4(m[3].xyz, 1.0);
+   float4 c = f.viewProj * w;
+   c.z = (c.z + c.w) * 0.5;
+   c.y = -c.y;
+   VOutP o; o.pos = c; o.wp = w.xyz; o.n = normalize(f.eye.xyz - w.xyz);
+   o.ps = clamp(length(m[0].xyz) * pxK / max(c.w, 1e-4), 1.5, 16.0); return o;
+}
+vertex VOut ri_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
+                  const device float4x4* models [[buffer(5)]], const device uint* vis [[buffer(6)]])
+{
+   const float3 p = float3(v[vid * 6 + 0], v[vid * 6 + 1], v[vid * 6 + 2]);
+   const float3 n = float3(v[vid * 6 + 3], v[vid * 6 + 4], v[vid * 6 + 5]);
+   const float4x4 m = models[vis[iid]];
+   const float4 w = m * float4(p, 1.0);
+   float4 c = f.viewProj * w;
+   c.z = (c.z + c.w) * 0.5;
+   c.y = -c.y;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; return o;
+}
+vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
+                  const device float4x4* models [[buffer(5)]])
+{
+   const float3 p = float3(v[vid * 6 + 0], v[vid * 6 + 1], v[vid * 6 + 2]);
+   const float3 n = float3(v[vid * 6 + 3], v[vid * 6 + 4], v[vid * 6 + 5]);
+   const float4x4 m = models[iid];
+   const float4 w = m * float4(p, 1.0);
+   float4 c = f.viewProj * w;
+   c.z = (c.z + c.w) * 0.5;
+   c.y = -c.y;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; return o; // uniform scale: the model's 3x3 turns normals
+}
 struct SOut { float4 pos [[position]]; };
 vertex SOut sh_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant float4x4& lvp [[buffer(1)]], constant InstU& m [[buffer(2)]])
 {
@@ -696,6 +777,7 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
 
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
          const bool haveTlas = BuildTlas(cb, fr);
+         CullBatches(cb, fr, img.Width());
          const bool rt = fr.rtShadows && haveTlas;
          const bool rtRefl = fr.rtReflections && haveTlas;
          if (rt || !ShadowPass(cb, fr, f))
@@ -783,6 +865,31 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
             const Gpu& g = mMeshes[in.mesh];
             [enc setVertexBuffer:g.vb offset:0 atIndex:0];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib indexBufferOffset:0];
+         }
+         for (size_t bi = 0; bi < fr.batches.size() && bi < mBatchGpu.size(); bi++)
+         {
+            const engine::InstanceBatch& b = fr.batches[bi];
+            BatchGpu& bg = mBatchGpu[bi];
+            if (b.mesh < 0 || b.mesh >= (int)mMeshes.size() || b.Count() == 0 || !bg.models)
+               continue;
+            InstU u = {};
+            Lin3(b.baseSrgb, u.base);
+            u.mr[0] = b.metallic; u.mr[1] = b.roughness;
+            [enc setFragmentBytes:&u length:sizeof(u) atIndex:2];
+            [enc setVertexBuffer:bg.models offset:0 atIndex:5];
+            const Gpu& g = mMeshes[b.mesh];
+            [enc setRenderPipelineState:mrt ? mPsoBatchMrt : mPsoBatch];
+            [enc setVertexBuffer:g.vb offset:0 atIndex:0];
+            [enc setVertexBuffer:bg.visMesh offset:0 atIndex:6];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexType:MTLIndexTypeUInt32 indexBuffer:g.ib indexBufferOffset:0 indirectBuffer:bg.argsMesh indirectBufferOffset:0];
+            [enc setRenderPipelineState:mrt ? mPsoPtMrt : mPsoPt];
+            [enc setVertexBuffer:bg.visPt offset:0 atIndex:6];
+            {
+               const float rd = std::sqrt(std::max(g.lo[0]*g.lo[0], g.hi[0]*g.hi[0]) + std::max(g.lo[1]*g.lo[1], g.hi[1]*g.hi[1]) + std::max(g.lo[2]*g.lo[2], g.hi[2]*g.hi[2]));
+               const float k = rd * std::sqrt(fr.viewProj[0]*fr.viewProj[0] + fr.viewProj[4]*fr.viewProj[4] + fr.viewProj[8]*fr.viewProj[8]) * (float)img.Width();
+               [enc setVertexBytes:&k length:4 atIndex:7];
+            }
+            [enc drawPrimitives:MTLPrimitiveTypePoint indirectBuffer:bg.argsPt indirectBufferOffset:0];
          }
          [enc endEncoding];
          if (!mrt) { mHistValid = false; mRValid = false; }
@@ -925,6 +1032,55 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       }
 
    private:
+      void CullBatches(id<MTLCommandBuffer> cb, const engine::Frame& fr, int widthPx)
+      {
+         if (fr.batches.empty() || !mCullPso)
+            return;
+         mBatchGpu.resize(fr.batches.size());
+         id<MTLComputeCommandEncoder> ce = [cb computeCommandEncoder];
+         for (size_t bi = 0; bi < fr.batches.size(); bi++)
+         {
+            const engine::InstanceBatch& b = fr.batches[bi];
+            BatchGpu& bg = mBatchGpu[bi];
+            if (b.mesh < 0 || b.mesh >= (int)mMeshes.size() || b.Count() == 0)
+               continue;
+            const NSUInteger n = b.Count();
+            if (!bg.models || bg.cap < n)
+            {
+               bg.models = [mDev newBufferWithLength:n * 64 options:MTLResourceStorageModeShared];
+               bg.visMesh = [mDev newBufferWithLength:n * 4 options:MTLResourceStorageModePrivate];
+               bg.visPt = [mDev newBufferWithLength:n * 4 options:MTLResourceStorageModePrivate];
+               bg.cnt = [mDev newBufferWithLength:8 options:MTLResourceStorageModeShared];
+               std::memset(bg.cnt.contents, 0, 8);
+               bg.argsMesh = [mDev newBufferWithLength:20 options:MTLResourceStorageModePrivate];
+               bg.argsPt = [mDev newBufferWithLength:16 options:MTLResourceStorageModePrivate];
+               bg.cap = n;
+            }
+            std::memcpy(bg.models.contents, b.models.data(), n * 64);
+            const Gpu& g = mMeshes[b.mesh];
+            const float rad = std::sqrt(std::max({ g.lo[0]*g.lo[0], g.hi[0]*g.hi[0] }) + std::max({ g.lo[1]*g.lo[1], g.hi[1]*g.hi[1] }) + std::max({ g.lo[2]*g.lo[2], g.hi[2]*g.hi[2] }));
+            struct { float vp[16]; float info[4]; } cu;
+            std::memcpy(cu.vp, fr.viewProj, 64);
+            cu.info[0] = (float)n; cu.info[1] = rad; cu.info[2] = (float)widthPx; cu.info[3] = 10.0f;
+            [ce setComputePipelineState:mCullPso];
+            [ce setBytes:&cu length:sizeof(cu) atIndex:0];
+            [ce setBuffer:bg.models offset:0 atIndex:1];
+            [ce setBuffer:bg.visMesh offset:0 atIndex:2];
+            [ce setBuffer:bg.visPt offset:0 atIndex:3];
+            [ce setBuffer:bg.cnt offset:0 atIndex:4];
+            [ce dispatchThreads:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(256, 1, 1)];
+            [ce memoryBarrierWithScope:MTLBarrierScopeBuffers];
+            [ce setComputePipelineState:mArgsPso];
+            [ce setBuffer:bg.cnt offset:0 atIndex:0];
+            [ce setBuffer:bg.argsMesh offset:0 atIndex:1];
+            [ce setBuffer:bg.argsPt offset:0 atIndex:2];
+            const uint32_t ic = (uint32_t)g.count;
+            [ce setBytes:&ic length:4 atIndex:3];
+            [ce dispatchThreads:MTLSizeMake(1, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+            [ce memoryBarrierWithScope:MTLBarrierScopeBuffers];
+         }
+         [ce endEncoding];
+      }
       bool PtPipeline(MTLPixelFormat fmt)
       {
          if (mPtPso && mPtResPso && mPtFmt == fmt)
@@ -1101,6 +1257,36 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
          dd2.colorAttachments[0].pixelFormat = fmt;
          dd2.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          mPsoDir = [mDev newRenderPipelineStateWithDescriptor:dd2 error:&err];
+         {
+            MTLRenderPipelineDescriptor* bd = [MTLRenderPipelineDescriptor new];
+            bd.vertexFunction = [mLib newFunctionWithName:@"ri_vs"];
+            bd.fragmentFunction = fsDir;
+            bd.colorAttachments[0].pixelFormat = fmt;
+            bd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+            mPsoBatch = [mDev newRenderPipelineStateWithDescriptor:bd error:&err];
+            {
+               MTLRenderPipelineDescriptor* pp = [MTLRenderPipelineDescriptor new];
+               pp.vertexFunction = [mLib newFunctionWithName:@"rp_vs"];
+               pp.fragmentFunction = [mLib newFunctionWithName:@"rp_fs"];
+               pp.colorAttachments[0].pixelFormat = fmt;
+               pp.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+               mPsoPt = [mDev newRenderPipelineStateWithDescriptor:pp error:&err];
+               pp.fragmentFunction = mFsFn;
+               pp.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+               pp.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
+               pp.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
+               mPsoPtMrt = [mDev newRenderPipelineStateWithDescriptor:pp error:&err];
+               mCullPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"cull_k"] error:&err];
+               mArgsPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"args_k"] error:&err];
+               if (!mPsoPt || !mPsoPtMrt || !mCullPso || !mArgsPso) NSLog(@"point/cull pipeline: %@", err);
+            }
+            bd.fragmentFunction = mFsFn;
+            bd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+            bd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
+            bd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
+            mPsoBatchMrt = [mDev newRenderPipelineStateWithDescriptor:bd error:&err];
+            if (!mPsoBatch || !mPsoBatchMrt) NSLog(@"batch pipeline: %@", err);
+         }
          if (!mPsoDir) NSLog(@"direct pipeline: %@", err);
          if (!mResPso) NSLog(@"resolve pipeline: %@", err);
          MTLDepthStencilDescriptor* dd = [MTLDepthStencilDescriptor new];
@@ -1139,7 +1325,10 @@ fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buff
       id<MTLBuffer> mArgBuf = nil;
       id<MTLAccelerationStructure> mArgTlas = nil;
       id<MTLRenderPipelineState> mShPso = nil;
-      id<MTLRenderPipelineState> mResPso = nil, mPsoDir = nil;
+      id<MTLRenderPipelineState> mResPso = nil, mPsoDir = nil, mPsoBatch = nil, mPsoBatchMrt = nil, mPsoPt = nil, mPsoPtMrt = nil;
+      id<MTLComputePipelineState> mCullPso = nil, mArgsPso = nil;
+      struct BatchGpu { id<MTLBuffer> models = nil, visMesh = nil, visPt = nil, cnt = nil, argsMesh = nil, argsPt = nil; NSUInteger cap = 0; };
+      std::vector<BatchGpu> mBatchGpu;
       id<MTLTexture> mHdr = nil, mGiT = nil, mRefl = nil, mHist[2] = { nil, nil }, mRHist[2] = { nil, nil };
       int mHistCur = 0; bool mHistValid = false, mRValid = false; float mLastVP[16] = {};
       bool Targets(int w, int h)
