@@ -26,8 +26,25 @@ NEXT
    - Keep a winner as its own commit.
    - For a loser: toggle off, delete its header and toggle file, and log the numbers.
    - Then settle lobe probabilities (PLAN 1.6).
-2. Then 1.9 -> F (2.1-2.3, new branch) -> 2.4-2.9 -> Phase 3 fix/enh rows not needing 3.2 -> 4.4, 4.5 -> 5.4, 5.5.
-3. Open note: castShadow may be ignored by the Metal paths. Check it and fix it if real.
+2. Then every remaining PLAN row, in this order:
+   | step | what | do |
+   |---|---|---|
+   | 1.6 | BSDF A/Bs: ggx, falloff cap, Fresnel, settle lobe probabilities | build (above) |
+   | 1.9 | Vulkan backend on the same RHI | build; Linux via OrbStack (init external/vst3sdk first), within 0.01 of Metal |
+   | 2.1, 2.2, 2.3 | filtered normals + spec AA, POM, lights beyond 8 | build, new branch feature/engine-f-* |
+   | 2.4 to 2.9 | HDRI importance, strand shadows, live SSS colour, settle motion blur, Metal thin film, weak live cases | build |
+   | 3.1 | Field MSL backend | build |
+   | 3.3 | Field noise/pattern library | build only the parts that don't need the 3.2 material domain |
+   | 3.4, 3.7 | lowering to a Field material, recipes | blocked on 3.2 (owner): log as "waiting on 3.2" |
+   | 4.4, 4.5 | settle caustics, micro-displacement | build |
+   | 5.4, 5.5 | skin, vegetation/cities by rules | build; if either needs a new node or mode, design only |
+   | 5.1, 5.6 | weathering presets, photo cases (content) | blocked on 3.6 layers (owner): log as "waiting on 3.6" |
+   | owner rows 1.7, 1.8, 3.2, 3.5, 3.6, 3.8, 3.9, 4.1 to 4.3, 5.2, 5.3, 5.7 | designs already in designs/ | do not build; list them in the final table |
+   | 0.x, 1.1 to 1.5 | done | list them in the final table |
+3. Still-open items to retry once:
+   - 1.4 R1 gap (Metal raster 0.87x/1.02x GL on B4 m/l; needs CPU-side raster work).
+   - 1.5 adaptive stop, plus the 9/9 <= 0.05 gap (tracer bias on materials and cornell).
+   - castShadow may be ignored by the Metal paths. Check it and fix it if real.
 
 TOOLS
 - Sweep: sweep.py [--engine raster|live|settle] [--tag pre|post] [--spp N] run|diff|same [cases].
