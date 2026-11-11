@@ -2360,7 +2360,6 @@ void Render3DNode::SyncFieldPrograms()
 
 void Render3DNode::CookOnce(int frameId)
 {
-   SyncFieldPrograms();
    if (!EnsureShader())
       return;
 
@@ -2392,6 +2391,11 @@ void Render3DNode::CookOnce(int frameId)
       if (auto* node = dynamic_cast<INode*>(mDraw[i]))
          node->CookIfNeeded(frameId);
    }
+   // After the geometry cooks: a Material's Field Pixel registers its program in that cook, so a one-frame render
+   // (row 1.4) has the program in the shader on frame 1.
+   SyncFieldPrograms();
+   if (!EnsureShader())
+      return;
 
    // An Environment node patched into the env slot. envInput is an ordinary
    // image cable, but the environment sample needs more than a texture handle

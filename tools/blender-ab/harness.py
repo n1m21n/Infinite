@@ -289,8 +289,14 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
               "  f radialRoughness %g" % h.get("radial", 0.3), "  f hairShift %g" % h.get("shift", 2.0)] if h else []
         if h:   # the Material's roughness and IOR are the fibre's (the skin shares them)
             m = dict(m, roughness=h["roughness"], ior=h.get("ior", 1.55))
-        mat = node("3D", "Material", material_lines(m) + dl + hl + (["  i wrapMode repeat"] if m.get("maps") else []))
+        knobs = dict(m, base_color=[0.5, 0.5, 0.5], metallic=0.0, roughness=0.5) if m.get("field") else m
+        mat = node("3D", "Material", material_lines(knobs) + dl + hl + (["  i wrapMode repeat"] if m.get("maps") else []))
         wires.append("geo %d 0 %d" % (mat, model))
+        if m.get("field"):   # a Field material program writes the case's values over the decoy knobs (linear, as the case)
+            code = "base = vec3(%r, %r, %r)\\nmetallic = %r\\nroughness = %r" % (
+                *[float(c) for c in m.get("base_color", (0.8, 0.8, 0.8))], float(m.get("metallic", 0.0)), float(m.get("roughness", 0.5)))
+            fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % code])
+            wires.append("cable %d field %d" % (mat, fp))
         for slot, tex_name in m.get("maps", {}).items():
             tex = node("Source", "Image Source", ["  s path %s" % make_texture(case, tex_name)])
             wires.append("cable %d %s %d" % (mat, slot, tex))

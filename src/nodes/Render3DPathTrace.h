@@ -53,6 +53,7 @@ public:
       float objHi[3] = { 1.0f, 1.0f, 1.0f };
       float normalStrength = 1.0f;
       int normalBump = 0;             // 1: the normal map is a grayscale height
+      int fieldProgram = 0;           // Field material program (MaterialRegistry id) run after the maps, 0 none
 
       static PtMaterial FromLinear(float r, float g, float b, float rough = 0.5f, float metal = 0.0f,
                                    float emR = 0.0f, float emG = 0.0f, float emB = 0.0f);
@@ -100,6 +101,7 @@ public:
    void SetWorldColorLinear(float r, float g, float b);
    void SetExposure(float exp) { exposure = exp; }
    void SetTonemap(int mode) { tonemap = mode; }
+   void SetFieldTime(float seconds) { mFldTime = seconds; } // t for Field material programs
 
    void SetCameraLookAt(const float eye[3], const float target[3], const float up[3],
                         float fovDegrees, float aspect);
@@ -171,6 +173,7 @@ private:
    };
 
    bool EnsureShaders();
+   unsigned int CompileTrace(); // the trace shader with mFldGlsl spliced in (falls back to none)
    bool EnsureTargets(int w, int h);
    void UploadBufferTex(BufferTex& bt, const std::vector<float>& data, const char* label);
    void DestroyBufferTex(BufferTex& bt);
@@ -199,6 +202,9 @@ private:
    int mHeight = 0;
 
    unsigned int mProgTrace = 0;
+   std::string mFldGlsl;               // Field material library spliced into the trace shader, empty for none
+   unsigned long long mFldKey = 0;     // its program set; the trace shader relinks when it changes
+   float mFldTime = 0.0f;
    unsigned int mProgDisplay = 0;
    bool mShadersTried = false;
    bool mSceneUploaded = false;

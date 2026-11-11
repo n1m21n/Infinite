@@ -1,4 +1,5 @@
 #include "Render3DPathTrace.h"
+#include "field/MaterialRegistry.h"
 
 #include <algorithm>
 #include <chrono>
@@ -42,6 +43,12 @@ namespace
       "uniform samplerBuffer uMaterials;\n"
       "uniform samplerBuffer uBlasUvs;\n"
       "uniform sampler2D uAtlas;\n"
+      // Field material programs (row 1.4): UploadScene splices their library here (MaterialRegistry.h).
+      "//@FLD_MAT_LIB@\n"
+      "#ifndef FLD_MAT_ANY\n"
+      "#define FLD_MAT_ANY 0\n"
+      "#endif\n"
+      "uniform float uFldTime;\n"
       "\n"
       "uniform int uSampleIndex;\n"
       "uniform int uMaxBounces;\n"
@@ -813,6 +820,49 @@ namespace
       "            }\n"
       "         }\n"
       "      }\n"
+      // Field material program (row 1.4), as Render 3D's raster: after the maps, it replaces what it writes, at the
+      // hit's local position, shading normal and mesh uv. Its tangent normal goes through the triangle's uv frame;
+      // its height needs screen derivatives, so the tracer leaves it out.
+      "#if FLD_MAT_ANY\n"
+      "      float fldId = texelFetch(uMaterials, mb + 9).w;\n"
+      "      if (fldId > 0.5) {\n"
+      "         vec4 ft0 = texelFetch(uBlasTris, hit.triSlot * 3 + 0);\n"
+      "         vec4 fuA = texelFetch(uBlasUvs, hit.triSlot * 2 + 0);\n"
+      "         vec4 fuB = texelFetch(uBlasUvs, hit.triSlot * 2 + 1);\n"
+      "         float fw = 1.0 - hit.u - hit.v;\n"
+      "         vec3 fP = ft0.xyz + hit.u * t1.xyz + hit.v * t2.xyz;\n"
+      "         vec2 fUV = fw * fuA.xy + hit.u * fuA.zw + hit.v * fuB.xy;\n"
+      "         float transIn = s.metal < 1.0 ? s.trans / (1.0 - s.metal) : clamp(mt2.z, 0.0, 1.0);\n"
+      "         FldMat o;\n"
+      "         o.base = s.base; o.roughness = s.rough; o.metallic = s.metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
+      "         o.emission = emission; o.opacity = alpha; o.mask = 1.0;\n"
+      "         fldMatDispatch(int(fldId + 0.5), o, fP, N, fUV, uFldTime);\n"
+      "         s.base = max(o.base, vec3(0.0));\n"
+      "         s.rough = clamp(o.roughness, 0.045, 1.0);\n"
+      "         s.metal = clamp(o.metallic, 0.0, 1.0);\n"
+      "         s.trans = transIn * (1.0 - s.metal);\n"
+      "         s.f0 = mix(vec3(clamp(iorF0 * iorF0 * 2.0 * mt2.y, 0.0, 1.0)), s.base, s.metal);\n"
+      "         emission = max(o.emission, vec3(0.0));\n"
+      "         alpha = o.mask < 0.5 ? 0.0 : o.opacity;\n"
+      "         if (o.normal.x != 0.0 || o.normal.y != 0.0) {\n"
+      "            vec2 d1 = fuA.zw - fuA.xy, d2 = fuB.xy - fuA.xy;\n"
+      "            float det = d1.x * d2.y - d1.y * d2.x;\n"
+      "            if (abs(det) > 1e-12) {\n"
+      "               vec3 lt = (t1.xyz * d2.y - t2.xyz * d1.y) / det;\n"
+      "               vec3 lb = (t2.xyz * d1.x - t1.xyz * d2.x) / det;\n"
+      "               vec3 T = m0.xyz * lt.x + m1.xyz * lt.y + m2.xyz * lt.z;\n"
+      "               vec3 B = m0.xyz * lb.x + m1.xyz * lb.y + m2.xyz * lb.z;\n"
+      "               T = T - N * dot(N, T);\n"
+      "               if (dot(T, T) > 1e-12) {\n"
+      "                  T = normalize(T);\n"
+      "                  vec3 Bo = cross(N, T) * (dot(cross(N, T), B) < 0.0 ? -1.0 : 1.0);\n"
+      "                  vec3 Nm = normalize(T * o.normal.x + Bo * o.normal.y + N * o.normal.z);\n"
+      "                  if (dot(Nm, -rayDir) > 1e-4) N = Nm;\n"
+      "               }\n"
+      "            }\n"
+      "         }\n"
+      "      }\n"
+      "#endif\n"
       // See-through as raster blends: pass on with chance 1 - alpha (always under the cutoff),
       // without spending a bounce, up to 16 layers.
       "      float cut = texelFetch(uMaterials, mb + 7).w;\n"
@@ -1080,6 +1130,7 @@ Render3DPathTrace::PtMaterial Render3DPathTrace::PtMaterial::FromMaterial(const 
    m.metallic = std::clamp(mat.metallic, 0.0f, 1.0f);
    m.roughness = std::clamp(mat.roughness, 0.045f, 1.0f);
    m.ior = std::max(1.0001f, mat.ior);
+   m.fieldProgram = mat.fieldProgram;
    m.specular = std::max(0.0f, mat.specular);
    m.transmission = std::clamp(mat.transmission, 0.0f, 1.0f);
    m.transmissionRoughness = std::clamp(mat.transmissionRoughness, 0.0f, 1.0f);
@@ -1246,12 +1297,28 @@ void Render3DPathTrace::Release()
    mSampleIndex = 0;
 }
 
+unsigned int Render3DPathTrace::CompileTrace()
+{
+   if (mFldGlsl.empty())
+      return CompileProgram330(kTraceFrag330);
+   std::string src = kTraceFrag330;
+   const size_t at = src.find("//@FLD_MAT_LIB@");
+   if (at != std::string::npos) src.insert(at, mFldGlsl);
+   unsigned int prog = CompileProgram330(src.c_str());
+   if (prog == 0) // a library that does not build here: trace with the knobs rather than not at all
+   {
+      mFldGlsl.clear();
+      prog = CompileProgram330(kTraceFrag330);
+   }
+   return prog;
+}
+
 bool Render3DPathTrace::EnsureShaders()
 {
    if (mShadersTried)
       return mProgTrace != 0 && mProgDisplay != 0;
    mShadersTried = true;
-   mProgTrace = CompileProgram330(kTraceFrag330);
+   mProgTrace = CompileTrace();
    mProgDisplay = CompileProgram330(kDisplayFrag330);
    return mProgTrace != 0 && mProgDisplay != 0;
 }
@@ -1496,7 +1563,7 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
                             m.mapScale[0], m.mapScale[1], m.mapScale[2], anyMap,
                             m.mapRotate[0], m.mapRotate[1], m.mapRotate[2], m.alphaCutoff,
                             m.mapTranslate[0], m.mapTranslate[1], m.mapTranslate[2], (float)m.textureAlpha,
-                            m.objLo[0], m.objLo[1], m.objLo[2], 0.0f,
+                            m.objLo[0], m.objLo[1], m.objLo[2], (float)m.fieldProgram,
                             m.objHi[0], m.objHi[1], m.objHi[2], 0.0f };
       float* dst = &matTexels[i * kMatFloats];
       std::memcpy(dst, t, sizeof(t));
@@ -1509,6 +1576,23 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
    UploadBufferTex(mBlasTrisBuf, allBlasTris, "PtBlasTris");
    UploadBufferTex(mBlasNormalsBuf, allBlasNormals, "PtBlasNormals");
    UploadBufferTex(mMaterialsBuf, matTexels, "PtMaterials");
+   {
+      std::vector<int> ids;
+      for (const PtMaterial& m : materials)
+         if (m.fieldProgram != 0) ids.push_back(m.fieldProgram);
+      unsigned long long key = 0;
+      std::string lib = Field::BuildMaterialLibrary(ids, Field::MaterialLang::Glsl, key);
+      if (key != mFldKey)
+      {
+         mFldKey = key;
+         mFldGlsl = std::move(lib);
+         if (mShadersTried)
+         {
+            if (mProgTrace != 0) glDeleteProgram(mProgTrace);
+            mProgTrace = CompileTrace();
+         }
+      }
+   }
    if (allBlasUvs.empty())
       allBlasUvs.assign(8, 0.0f);
    UploadBufferTex(mBlasUvsBuf, allBlasUvs, "PtBlasUvs");
@@ -1697,6 +1781,7 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
          glUniform1i(glGetUniformLocation(mProgTrace, "uAtlas"), 9);
 
          glUniform1i(glGetUniformLocation(mProgTrace, "uSampleIndex"), curSample);
+         glUniform1f(glGetUniformLocation(mProgTrace, "uFldTime"), mFldTime);
          glUniform1i(glGetUniformLocation(mProgTrace, "uMaxBounces"), maxBounces);
          glUniform1i(glGetUniformLocation(mProgTrace, "uHasTlas"), mSceneUploaded ? 1 : 0);
          glUniform2f(glGetUniformLocation(mProgTrace, "uResolution"), (float)width, (float)height);

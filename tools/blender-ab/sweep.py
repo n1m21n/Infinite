@@ -4,6 +4,7 @@
   sweep.py [--engine raster|live|settle] [--tag NAME] [--spp N] [--ab ggx,..] [--touch G1,G2] [--skip G] [--budget MIN] run [cases]
   sweep.py [--engine E] [--base pre] [--tag post] diff
   sweep.py [--engine E] [--spp N] same            (tier 0: pixel identity, base vs tag images)
+  sweep.py [--engine E] [--spp N] --tag T pair A B   (FLIP between two cases' Infinite pictures of one run)
   sweep.py pick GROUP...                          (which cases a change can touch)
   sweep.py times                                  (seconds per case per engine, from past runs)
 
@@ -162,6 +163,22 @@ def same(a):
     return 1 if changed else 0
 
 
+def pair(a):
+    """FLIP between the Infinite pictures of two cases from one result set: a feature built two ways
+    (row 1.4: Field material vs knobs) must give the same picture."""
+    import numpy as np
+    from PIL import Image
+    import flip_evaluator as flip
+    if len(a.cases) != 2:
+        sys.exit("pair needs two cases")
+    img = os.path.join(os.path.abspath(a.out), "img", Key(a, a.tag))
+    x, y = [np.asarray(Image.open(os.path.join(img, c + ".png")).convert("RGB"), dtype=np.float32) / 255.0 for c in a.cases]
+    _, mean, _ = flip.evaluate(x, y, "LDR")
+    d = np.abs(x - y).max()
+    print("%s vs %s on %s: FLIP %.4f, max diff %d/255" % (a.cases[0], a.cases[1], Key(a, a.tag), mean, round(d * 255)))
+    return 0
+
+
 def diff(a):
     out = os.path.abspath(a.out)
     pre = load(os.path.join(out, Key(a, a.base) + ".json"))
@@ -189,7 +206,7 @@ def diff(a):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["run", "diff", "same", "pick", "times"])
+    ap.add_argument("mode", choices=["run", "diff", "same", "pair", "pick", "times"])
     ap.add_argument("cases", nargs="*")
     ap.add_argument("--engine", default="raster", choices=["raster", "pt", "live", "settle"])
     ap.add_argument("--tag", default="post", help="name of this result set (pre, post, or a variant name)")
@@ -216,7 +233,7 @@ def main():
             print("%s: %d cases, %.0f s total; slowest: %s" % (e, len(rows), sum(rows.values()), ", ".join(
                 "%s %.0f" % (c, s) for c, s in sorted(rows.items(), key=lambda x: -x[1])[:5])))
         return 0
-    return {"run": run, "diff": diff, "same": same}[a.mode](a)
+    return {"run": run, "diff": diff, "same": same, "pair": pair}[a.mode](a)
 
 
 if __name__ == "__main__":

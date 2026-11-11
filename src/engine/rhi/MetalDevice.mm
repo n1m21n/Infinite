@@ -238,7 +238,28 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
    if (dot(n, d) > 0.0) n = -n;
    const float3 p = o + d * h.distance;
    const bool hairH = I.mat.hairRadialNeg < 0.0 && float(h.primitive_id) >= I.mat.hairFrom;
-   const float3 base = hairH ? hairAlbedo(float3(I.mat.hairSigma), -I.mat.hairRadialNeg) : float3(I.mat.base); const float metal = hairH ? 0.0 : I.mat.metallic;
+   float3 base = hairH ? hairAlbedo(float3(I.mat.hairSigma), -I.mat.hairRadialNeg) : float3(I.mat.base); float metal = hairH ? 0.0 : I.mat.metallic;
+   float hitRough = I.mat.roughness; float3 hitEm = float3(I.mat.emission);
+#if FLD_MAT_ANY
+   // Field material program (row 1.4): reflection and GI rays see what the camera sees. Base, metallic, roughness and
+   // emission at the hit's local position and mesh uv; its normal, height and cut stay with the camera hit.
+   if (abs(I.mat.program) > 0.5 && !hairH)
+   {
+      float2 uv = float2(0.0);
+      if (I.uvb != 0)
+      {
+         const device float* uvp = reinterpret_cast<const device float*>(I.uvb);
+         uv = float2(uvp[ix.x * 2], uvp[ix.x * 2 + 1]) * w.x + float2(uvp[ix.y * 2], uvp[ix.y * 2 + 1]) * w.y + float2(uvp[ix.z * 2], uvp[ix.z * 2 + 1]) * w.z;
+      }
+      const float3 lp = float3(vb[ix.x * 6], vb[ix.x * 6 + 1], vb[ix.x * 6 + 2]) * w.x + float3(vb[ix.y * 6], vb[ix.y * 6 + 1], vb[ix.y * 6 + 2]) * w.y
+                      + float3(vb[ix.z * 6], vb[ix.z * 6 + 1], vb[ix.z * 6 + 2]) * w.z;
+      FldMat fo;
+      fo.base = base; fo.roughness = hitRough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
+      fo.emission = hitEm; fo.opacity = 1.0; fo.mask = 1.0;
+      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x);
+      base = max(fo.base, float3(0.0)); metal = clamp(fo.metallic, 0.0, 1.0); hitRough = clamp(fo.roughness, 0.045, 1.0); hitEm = fo.emission;
+   }
+#endif
    float3 envIrr = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
    if (envU.x >= 0.0 && withEnv)
    {
@@ -282,11 +303,11 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
-   const float3 spec = sampleEnv(f, et, reflect(d, n), I.mat.roughness) * metal * base;
+   const float3 spec = sampleEnv(f, et, reflect(d, n), hitRough) * metal * base;
    hp = p; hn = n; alb = base * (1.0 - metal); mir = base * metal;
    // Lambert radiance: base/pi * light irradiance (r_fs's direct term), env as r_fs's ambient.
    // withEnv false: the caller's next bounce carries the env; withSpec false: the caller follows the mirror direction.
-   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + (withSpec ? spec : float3(0.0)) + float3(I.mat.emission);
+   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + (withSpec ? spec : float3(0.0)) + hitEm;
 }
 float3 cosineDir(float3 n, float u1, float u2);
 float rnd(thread uint& s);
@@ -2046,6 +2067,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    {
       Lin3x(in.baseSrgb, m.base); m.metallic = in.metallic; m.roughness = in.roughness; m.ior = in.ior;
       std::memcpy(m.emission, in.emission, 12);
+      m.program = (float)(in.fieldSeeThrough ? -in.fieldProgram : in.fieldProgram); // the rays run it too (row 1.4)
    }
    // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
    void FillMat(const engine::Instance& in, R3dMatH& m)
@@ -2073,7 +2095,6 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       m.hairFrom = (float)in.hairFrom; m.hairRadialNeg = -std::max(in.hairRadial, 0.0f); m.hairShift = in.hairShift;
       m.subsurface = in.subsurface; m.translucency = in.translucency;
       m.iridescence = in.iridescence; m.iridIor = in.iridescenceIor; m.iridThickness = in.iridescenceThickness;
-      m.program = (float)(in.fieldSeeThrough ? -in.fieldProgram : in.fieldProgram); // negative: it may cut or see through
    }
    // A run the depth prepass leaves out: it cuts pixels away, so its depth is known only once it is shaded.
    bool SeeThrough(const InstU& u) { return u.mat.clear > 0.0f || u.mat.mapOpacity > 0.5f || u.mat.alphaCutoff > 0.0f || u.mat.program < -0.5f; }
@@ -2715,6 +2736,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             {
                [enc useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
                [enc useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               if (g.uvb) [enc useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             }
             for (id<MTLAccelerationStructure> b in mBlas)
                [enc useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
@@ -2736,7 +2758,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                for (int k = 0; k < 3; k++) o.mat.base[k] *= mMapMean[in.mapAlbedo][k];
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
-               o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress;
+               o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; o.uvb = mMeshes[in.mesh].uvb.gpuAddress;
             }
          }
          id<MTLBuffer> infoBuf = InfoBuffer(info);
@@ -2849,7 +2871,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                [te setFragmentTexture:mRefl atIndex:2];
                [te setFragmentTexture:mHist[prev] atIndex:3];
                [te useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
-               for (const Gpu& g : mMeshes) { [te useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [te useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
+               for (const Gpu& g : mMeshes) { [te useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [te useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.uvb) [te useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
                for (id<MTLAccelerationStructure> b in mBlas) [te useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
                [te drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
                [te endEncoding];

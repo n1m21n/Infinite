@@ -16,12 +16,15 @@ def _lit(light, world=None, view="Standard"):
             "objects": [GREY_FLOOR, _ball(base_color=[0.8, 0.8, 0.8], roughness=0.4)]}
 
 
-def _material_rows():
+def _material_rows(field=False):
+    """field=True: each ball's values come from a Field material program (OPUS_PLAN row 1.4); the harness sets
+    the Material knobs to a decoy, so the picture matches `materials` only if the program overrides them."""
     objs = [GREY_FLOOR]
+    f = {"field": True} if field else {}
     for i, rough in enumerate([0.05, 0.25, 0.5, 0.75, 1.0]):
         x = (i - 2) * 0.9
-        objs.append(_ball(x, -0.5, 0.35, base_color=[0.8, 0.1, 0.08], roughness=rough))
-        objs.append(_ball(x, 0.5, 0.35, base_color=[1.0, 0.77, 0.34], metallic=1.0, roughness=rough))
+        objs.append(_ball(x, -0.5, 0.35, base_color=[0.8, 0.1, 0.08], roughness=rough, **f))
+        objs.append(_ball(x, 0.5, 0.35, base_color=[1.0, 0.77, 0.34], metallic=1.0, roughness=rough, **f))
     return {"camera": {"fov": 40, "azimuth": 90, "elevation": 30, "distance": 6.0, "target": [0, 0, 0.3]},
             "lights": [{"type": "sun", "power": 3, "azimuth": 60, "elevation": 50}],
             "world": {"color": [0.3, 0.3, 0.3]}, "objects": objs}
@@ -151,6 +154,9 @@ CASES = {
                                _ball(0.6, 0, 0.45, base_color=[0.95, 0.95, 0.95], metallic=1, roughness=0.2)]},
     # Principled: dielectric row and metal row, roughness rising left to right.
     "materials": _material_rows(),
+    # The same scene, every ball's base / metallic / roughness written by a Field material program over decoy knobs.
+    # Gate (row 1.4): FLIP vs `materials` on the same engine under 0.01 (`sweep.py pair materials mat_field_knobs`).
+    "mat_field_knobs": _material_rows(field=True),
     # The same sun scene through AgX on both sides.
     "view_agx": _lit({"type": "sun", "power": 6, "azimuth": 30, "elevation": 45}, view="AgX"),
     # White furnace energy conservation: 5 roughness steps on metal and dielectric in a (1,1,1) world.

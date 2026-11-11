@@ -174,6 +174,7 @@ void Render3DNode::UploadPtScene(Render3DPathTrace& pt)
          instances.push_back(inst);
       }
    }
+   pt.SetFieldTime((float)Transport::Instance().Seconds());
    pt.UploadScene(meshes, instances, materials);
 }
 

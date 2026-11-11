@@ -9,6 +9,7 @@
 #include "core/field/MslBackend.h"
 #include "core/field/MaterialRegistry.h"
 #include "nodes/FieldPixelNode.h"
+#include "nodes/Render3DPathTrace.h"
 
 #if defined(__APPLE__)
 #include <mach/mach.h>
@@ -475,6 +476,51 @@ bool RunEngineTest()
       for (int k = 0; k < 3; k++) { r2.exposure = 1.01f + 0.001f * (float)k; r2.CookIfNeeded(++fnum); }
       const bool rok = aok && GLUtil::ReadTexturePixels(scratch, r2.GetOutputTexture(), r2.GetOutputWidth(), r2.GetOutputHeight(), rb);
       check(rok && redWhereChanged(ra, rb, ch) && ch > (size_t)W * H / 100, "1.3 R: program turns the sphere red", (double)ch, 0);
+
+      // 1.4: a one-frame R render (fresh Render 3D, Field Pixel never applied) has the program on its first cook
+      FieldPixelNode fp4;
+      fp4.code = "base = vec3(1.0, 0.0, 0.0)\nmetallic = 0.0\nroughness = 0.75";
+      fp4.domain = 1;
+      MaterialNode mat4;
+      mat4.input = &sphereG;
+      mat4.FieldInput().Connect(&fp4);
+      Render3DNode r4;
+      r4.geometry[0] = &floorG; r4.geometry[1] = &cubeG; r4.geometry[2] = &mat4; r4.geometry[3] = &torusG;
+      r4.width = (float)W; r4.height = (float)H; r4.samples = 0; r4.hdr = false; r4.tonemap = 1; r4.shadowsEnabled = r.shadowsEnabled;
+      r4.rig = &rig;
+      r4.exposure = 1.0f;
+      r4.CookIfNeeded(++fnum);
+      std::vector<float> r4px;
+      const bool r4ok = GLUtil::ReadTexturePixels(scratch, r4.GetOutputTexture(), r4.GetOutputWidth(), r4.GetOutputHeight(), r4px);
+      check(r4ok && fp4.MaterialProgramId() != 0 && redWhereChanged(ra, r4px, ch) && ch > (size_t)W * H / 100,
+            "1.4 R: program is in the first frame", (double)ch, 0);
+
+      // 1.4: the GL path tracer (Render 3D's GI probes and its pt engine) runs the program at its hits
+      {
+         Render3DPathTrace gpt;
+         Bvh::Instance gi;
+         gi.blasIndex = 0; gi.materialId = 0; gi.transform = Mat4::Identity();
+         auto grey = Render3DPathTrace::PtMaterial::FromLinear(0.8f, 0.8f, 0.8f, 0.75f, 0.0f);
+         auto prog = grey;
+         prog.fieldProgram = id;
+         const float eye[3] = { 0.0f, 0.0f, 4.0f }, at[3] = { 0.0f, 0.0f, 0.0f }, up[3] = { 0.0f, 1.0f, 0.0f };
+         auto shot = [&](const Render3DPathTrace::PtMaterial& m, std::vector<unsigned char>& px) -> bool
+         {
+            int w = 0, h = 0;
+            if (!gpt.UploadScene({ sphereG.GetMesh() }, { gi }, { m })) return false;
+            gpt.SetCameraLookAt(eye, at, up, 30.0f, 1.0f);
+            gpt.SetLights({});
+            gpt.SetWorldColorLinear(1.0f, 1.0f, 1.0f);
+            gpt.SetTonemap(0);
+            gpt.SetExposure(1.0f);
+            return gpt.RenderToSpp(64, 64, 4) && gpt.ReadDisplayRGBA8(px, w, h) && w == 64 && h == 64;
+         };
+         std::vector<unsigned char> pg, pr;
+         const bool gok = shot(grey, pg) && shot(prog, pr);
+         const size_t c = (32 * 64 + 32) * 4;
+         const int dr = gok ? (int)pr[c] - (int)pr[c + 1] : 0, dg = gok ? (int)pg[c] - (int)pg[c + 1] : 99;
+         check(gok && dr > 60 && std::abs(dg) < 10, "1.4 GL tracer: program turns the sphere red", (double)dr, 60.0);
+      }
    }
 
    // dump for eyes
