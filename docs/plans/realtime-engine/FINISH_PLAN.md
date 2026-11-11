@@ -1,5 +1,8 @@
 # Finish plan: every open row, cheapest route first (2026-11-11)
 
+**Order superseded 2026-11-11 by `OPUS_PLAN.md`** (foundation first: material programs, shading nodes, layers,
+Vulkan). The code briefs in section 6 here stay valid and are referenced from there.
+
 Companion to `PLAN.md` (the rows), `AUTORUN.md` (the log) and `REALISM.md` (why). This file says **how** to close
 each open row: the method, the paper, the A/B switch, the cases, and the cost on the 8 GB M2.
 

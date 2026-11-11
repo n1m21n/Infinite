@@ -63,3 +63,4 @@ D (1.1–1.3) -> E (1.4–1.7) -> 1.6 BSDF A/Bs (ggx, falloff cap, Fresnel: `--a
 | remaining rows | plan | method, paper, switch, cases and cost per row in `FINISH_PLAN.md` | — |
 | 1.7 preview export | waiting for owner | adds an export choice; measured 8 warm-ups = 0.62 s/frame, FLIP 0.041 vs 96 | `designs/1.7-preview-export.md` |
 | owner rows 1.8, 3.2, 3.5, 3.6, 3.8, 3.9, 4.1–4.3, 5.2, 5.3, 5.7 | designs written, waiting for owner | `designs/` | |
+| plan rewrite 2026-11-11 | done | order changed from picture polish to structure: Field Pixel IR as the material language on all engines, shading nodes, script nodes, layers/relief/wear, camera, assets, live parity, Vulkan, real scenes. One row = one session, each with read-first, done-command, gate | `OPUS_PLAN.md`, start file `NEXT_SESSION_PROMPT.md` |
