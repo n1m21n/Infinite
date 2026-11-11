@@ -4,6 +4,7 @@
 #include "nodes/Render3DSheen.h"
 #include "nodes/Render3DTonemap.h"
 #include "nodes/Render3DMaterial.h"
+#include "nodes/Render3DDenoise.h"
 
 #include <algorithm>
 #include <cmath>
@@ -423,7 +424,7 @@ float coatSpec(float nDotH, float nDotV, float nDotL, float vDotH, float r)
    return distGGX(nDotH, r) * geomSchlick(nDotV, r) * geomSchlick(nDotL, r) * (0.04 + 0.96 * pow(1.0 - vDotH, 5.0)) / max(4.0 * nDotV * nDotL, 1e-7);
 }
 // Sheen: Cycles' microfiber lobe (Render3DSheen.h, shared with GL).
-)" R3D_SHEEN_MSL R"(
+)" R3D_SHEEN_MSL R3D_DENOISE_MSL R"(
 float maxc(float3 c) { return max(c.x, max(c.y, c.z)); }
 // Hair: the settle sampler for Render3DHair.h's Chiang fibre BSDF (spliced in at the top).
 // Draws wi for hairBsdf at h: a lobe by its share of Ap, its tilted longitudinal lobe, then its azimuthal logistic.
@@ -1202,9 +1203,13 @@ float3 ptEvalT(float3 n, float3 V, float3 L, float3 base, float metal, float rou
    pdf = p.y * (-nL) / 3.14159265;
    return (float3(1.0) - Fv) * (1.0 - metal) * base * (w.x / 3.14159265) * (-nL);
 }
-fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
+// Three running sums (the denoiser's inputs, Render3DDenoise.h): radiance + hits, first-hit albedo + luminance^2,
+// first-hit normal + distance.
+struct PtOut { float4 acc [[color(0)]]; float4 aux [[color(1)]]; float4 gd [[color(2)]]; };
+fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
-                      texture2d<float> prev [[texture(0)]], texture2d<float> et [[texture(9)]],
+                      texture2d<float> prev [[texture(0)]], texture2d<float> prevAux [[texture(1)]], texture2d<float> prevGd [[texture(2)]],
+                      texture2d<float> et [[texture(9)]],
                       array<texture2d<float>, 16> maps [[texture(10)]])
 {
    const uint2 px = uint2(in.pos.xy);
@@ -1234,6 +1239,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
    }
    float3 L = float3(0.0), T = float3(1.0);
    float cov = 0.0;
+   float3 alb0 = float3(0.0), n0 = float3(0.0); float dist0 = 0.0; // first hit, for the denoiser's guides
    const int maxB = int(u.info.y);
    const int nEm = int(u.em.x); const float pEm = u.em.y;
    float lastPdfB = 0.0; // pdf of the bounce that led here (MIS against emitter sampling)
@@ -1332,6 +1338,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             }
          }
       }
+      if (b == 0) { alb0 = base; n0 = n; dist0 = h.distance; }
       if (any(float3(I.mat.emission) > 0.0))
       {
          // Emission seen along the path. After a bounce, emitter sampling below could have found it too: power-heuristic MIS.
@@ -1548,15 +1555,25 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       o = p + (dot(ns, nd) < 0.0 ? -ns : ns) * f.shQ.w; d = nd;
    }
    L = min(L, float3(30.0)); // firefly guard
-   const float4 pv = u.info.x > 0.5 ? prev.read(px) : float4(0.0);
-   return pv + float4(L, cov);
+   const bool add = u.info.x > 0.5;
+   const float lum = dot(L, float3(0.2126, 0.7152, 0.0722));
+   PtOut out;
+   out.acc = (add ? prev.read(px) : float4(0.0)) + float4(L, cov);
+   out.aux = (add ? prevAux.read(px) : float4(0.0)) + float4(alb0 * cov, cov > 0.0 ? lum * lum : 0.0);
+   out.gd = (add ? prevGd.read(px) : float4(0.0)) + float4(n0 * cov, dist0 * cov);
+   return out;
 }
 struct PtResU { float4 p; float4 clear; }; // p: sample count, tonemap, exposure
-fragment float4 ptres_fs(SkyOut in [[stage_in]], constant PtResU& u [[buffer(0)]], texture2d<float> acc [[texture(0)]])
+fragment float4 ptres_fs(SkyOut in [[stage_in]], constant PtResU& u [[buffer(0)]], texture2d<float> acc [[texture(0)]],
+                         texture2d<float> aux [[texture(1)]], texture2d<float> dn [[texture(2)]], texture2d<float> gd [[texture(3)]])
 {
-   const float4 a = acc.read(uint2(in.pos.xy));
+   const uint2 px = uint2(in.pos.xy);
+   const float4 a = acc.read(px);
    const float cov = a.a / u.p.x;
-   float3 col = a.rgb / max(a.a, 1e-4) * u.p.z; // mean radiance of the samples that hit
+   float3 col = a.rgb / max(a.a, 1e-4); // mean radiance of the samples that hit
+   if (u.p.w > 0.5 && gd.read(px).w > 0.0) // denoised lighting times the first-hit albedo (dn_prep_k's split)
+      col = dn.read(px).rgb * max(aux.read(px).rgb / max(a.a, 1.0), float3(0.001));
+   col *= u.p.z;
    col = toneMap(col, int(u.p.y));
    return float4(mix(u.clear.xyz, toSrgb(col), cov), 1.0);
 }
@@ -2721,9 +2738,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          {
             const int cur = 1 - mPtCur;
             MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
-            rp.colorAttachments[0].texture = mPtAcc[cur];
-            rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
-            rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            id<MTLTexture> outs[3] = { mPtAcc[cur], mPtAux[cur], mPtGd[cur] };
+            for (int k = 0; k < 3; k++)
+            {
+               rp.colorAttachments[k].texture = outs[k];
+               rp.colorAttachments[k].loadAction = MTLLoadActionDontCare;
+               rp.colorAttachments[k].storeAction = MTLStoreActionStore;
+            }
             id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
             [e setRenderPipelineState:mPtPso];
             struct { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4]; } pu;
@@ -2740,6 +2761,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e setFragmentBuffer:mEmBuf offset:0 atIndex:5];
             [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
+            [e setFragmentTexture:mPtAux[mPtCur] atIndex:1];
+            [e setFragmentTexture:mPtGd[mPtCur] atIndex:2];
             BindMaps(e);
             [e useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (const Gpu& g : mMeshes) { [e useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.uvb) [e useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
@@ -2748,15 +2771,19 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e endEncoding];
             mPtCur = cur; mPtN++;
          }
+         id<MTLTexture> dn = mDenoise ? Denoise(cb, img.Width(), img.Height()) : nil;
          MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
          rp.colorAttachments[0].texture = img.Tex();
          rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
          rp.colorAttachments[0].storeAction = MTLStoreActionStore;
          id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
-         float ru[8] = { (float)mPtN, (float)fr.tonemap, fr.exposure, 0, fr.clearSrgb[0], fr.clearSrgb[1], fr.clearSrgb[2], 0 };
+         float ru[8] = { (float)mPtN, (float)fr.tonemap, fr.exposure, dn ? 1.0f : 0.0f, fr.clearSrgb[0], fr.clearSrgb[1], fr.clearSrgb[2], 0 };
          [e setRenderPipelineState:mPtResPso];
          [e setFragmentBytes:ru length:sizeof(ru) atIndex:0];
          [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
+         [e setFragmentTexture:mPtAux[mPtCur] atIndex:1];
+         [e setFragmentTexture:dn ? dn : mPtAcc[mPtCur] atIndex:2];
+         [e setFragmentTexture:dn ? mDnG : mPtGd[mPtCur] atIndex:3];
          [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
          [e endEncoding];
          [cb commit];
@@ -2824,6 +2851,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          a.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
          a.fragmentFunction = [mLib newFunctionWithName:@"pt_fs"];
          a.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA32Float;
+         a.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA32Float;
+         a.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA32Float;
          mPtPso = [mDev newRenderPipelineStateWithDescriptor:a error:&err];
          if (!mPtPso) EngineFail(@"pt pipeline", err);
          MTLRenderPipelineDescriptor* b = [MTLRenderPipelineDescriptor new];
@@ -2832,8 +2861,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          b.colorAttachments[0].pixelFormat = fmt;
          mPtResPso = [mDev newRenderPipelineStateWithDescriptor:b error:&err];
          if (!mPtResPso) EngineFail(@"pt resolve pipeline", err);
+         mDnPrepPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"dn_prep_k"] error:&err];
+         mDnAtrousPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"dn_atrous_k"] error:&err];
+         if (!mDnPrepPso || !mDnAtrousPso) EngineFail(@"settle denoiser pipeline", err);
          mPtFmt = fmt;
-         return mPtPso && mPtResPso;
+         return mPtPso && mPtResPso && mDnPrepPso && mDnAtrousPso;
       }
       bool PtTargets(int w, int h)
       {
@@ -2842,12 +2874,57 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float width:w height:h mipmapped:NO];
          d.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
          d.storageMode = MTLStorageModePrivate;
-         mPtAcc[0] = [mDev newTextureWithDescriptor:d]; mPtAcc[1] = [mDev newTextureWithDescriptor:d];
+         for (int k = 0; k < 2; k++)
+         {
+            mPtAcc[k] = [mDev newTextureWithDescriptor:d]; mPtAux[k] = [mDev newTextureWithDescriptor:d]; mPtGd[k] = [mDev newTextureWithDescriptor:d];
+         }
+         mDnC[0] = mDnC[1] = mDnG = mDnA = nil; // made on the first denoised resolve at this size
          mPtN = 0;
-         return mPtAcc[0] && mPtAcc[1];
+         return mPtAcc[0] && mPtAcc[1] && mPtAux[0] && mPtAux[1] && mPtGd[0] && mPtGd[1];
+      }
+      bool DnTargets(int w, int h)
+      {
+         if (mDnG) return true;
+         MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float width:w height:h mipmapped:NO];
+         d.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+         d.storageMode = MTLStorageModePrivate;
+         mDnC[0] = [mDev newTextureWithDescriptor:d]; mDnC[1] = [mDev newTextureWithDescriptor:d]; mDnA = [mDev newTextureWithDescriptor:d];
+         mDnG = [mDev newTextureWithDescriptor:d];
+         return mDnC[0] && mDnC[1] && mDnA && mDnG;
+      }
+      // Settle denoiser (PLAN 1.5): demodulate, five a-trous steps over the lighting; returns the filtered texture.
+      id<MTLTexture> Denoise(id<MTLCommandBuffer> cb, int w, int h)
+      {
+         if (!DnTargets(w, h)) return nil;
+         id<MTLComputeCommandEncoder> ce = [cb computeCommandEncoder];
+         const MTLSize tg = MTLSizeMake(16, 16, 1), grid = MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
+         struct { int step; float n; float sigL; float pad; } du = { 1, 0.0f, mDnSigL, 0.0f };
+         [ce setComputePipelineState:mDnPrepPso];
+         [ce setTexture:mPtAcc[mPtCur] atIndex:0]; [ce setTexture:mPtAux[mPtCur] atIndex:1]; [ce setTexture:mPtGd[mPtCur] atIndex:2];
+         [ce setTexture:mDnC[0] atIndex:3]; [ce setTexture:mDnG atIndex:4]; [ce setTexture:mDnA atIndex:5];
+         [ce setBytes:&du length:sizeof(du) atIndex:0];
+         [ce dispatchThreads:grid threadsPerThreadgroup:tg];
+         [ce setComputePipelineState:mDnAtrousPso];
+         int c = 0;
+         for (int i = 0; i < mDnSteps; i++)
+         {
+            du.step = 1 << i;
+            [ce setTexture:mDnC[c] atIndex:0]; [ce setTexture:mDnG atIndex:1]; [ce setTexture:mDnC[1 - c] atIndex:2]; [ce setTexture:mDnA atIndex:3];
+            [ce setBytes:&du length:sizeof(du) atIndex:0];
+            [ce dispatchThreads:grid threadsPerThreadgroup:tg];
+            c = 1 - c;
+         }
+         [ce endEncoding];
+         return mDnC[c];
       }
       id<MTLRenderPipelineState> mPtPso = nil, mPtResPso = nil;
-      id<MTLTexture> mPtAcc[2] = { nil, nil };
+      id<MTLComputePipelineState> mDnPrepPso = nil, mDnAtrousPso = nil;
+      id<MTLTexture> mPtAcc[2] = { nil, nil }, mPtAux[2] = { nil, nil }, mPtGd[2] = { nil, nil };
+      id<MTLTexture> mDnC[2] = { nil, nil }, mDnG = nil, mDnA = nil;
+      // On by default; INFINITE_ENGINE_DENOISE=0 turns it off, _DNSTEPS (5) and _DNSIGL (4) are A/B knobs.
+      const bool mDenoise = [] { const char* e = getenv("INFINITE_ENGINE_DENOISE"); return !e || atoi(e) > 0; }();
+      const int mDnSteps = [] { const char* e = getenv("INFINITE_ENGINE_DNSTEPS"); return e ? atoi(e) : 5; }();
+      const float mDnSigL = [] { const char* e = getenv("INFINITE_ENGINE_DNSIGL"); return e ? (float)atof(e) : 4.0f; }();
       int mPtCur = 0, mPtN = 0, mPtFrame = 0; MTLPixelFormat mPtFmt = MTLPixelFormatInvalid;
    private:
 
