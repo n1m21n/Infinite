@@ -156,14 +156,14 @@ float3 cosineDir(float3 n, float u1, float u2);
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
 float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
                 bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, thread float3& mir, bool withEnv = true, int pick = -1,
-                bool withSpec = true, float2 envU = float2(-1.0))
+                bool withSpec = true, float2 envU = float2(-1.0), float3 missDir = float3(0.0))
 {
    alb = float3(0.0); mir = float3(0.0);
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    ray r(o, d, 0.0, 1e4);
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
-   if (h.type != intersection_type::triangle) return giMode ? sampleEnv(f, et, d, 1.0) * f.ambient.xyz * 3.0 : sampleEnv(f, et, d, rough);
+   if (h.type != intersection_type::triangle) return giMode ? sampleEnv(f, et, d, 1.0) * f.ambient.xyz * 3.0 : sampleEnv(f, et, any(missDir != 0.0) ? missDir : d, rough);
    constant RInst& I = inst[h.instance_id];
    const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
    const device float* vb = reinterpret_cast<const device float*>(I.vb);
@@ -248,12 +248,14 @@ bool histAt(constant FrameU& f, texture2d<float> nz, texture2d<float> hist, floa
 }
 // Reflection: the hit plus its indirect light (walls lit only by bounce light must not mirror black).
 // Noisy per frame; res_fs accumulates reflections over time.
+// A ray that leaves the scene reads the sky prefiltered over the lobe along the mirror direction (its expected value),
+// not along its own jittered direction: one sample of a sun disc in the sky made a speckled blob on the glitter path.
 float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough, thread uint& seed,
-                       texture2d<float> nz, texture2d<float> hist, bool hv)
+                       texture2d<float> nz, texture2d<float> hist, bool hv, float3 dMirror = float3(0.0))
 {
    float3 hp, hn, alb, mir;
    const bool bounce = f.gi.x > 0.5;
-   float3 L = shadeHit(f, et, tlas, inst, o, d, rough, false, hp, hn, alb, mir, !bounce);
+   float3 L = shadeHit(f, et, tlas, inst, o, d, rough, false, hp, hn, alb, mir, !bounce, -1, true, float2(-1.0), dMirror);
    float3 irr;
    if (any(alb > 0.0) && bounce && hv && histAt(f, nz, hist, hp, hn, irr))
       L += alb * irr * f.gi.y;
@@ -831,7 +833,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
          jd = reflect(d, ggxSampleH(n, rough * rough, rnd(rs), rnd(rs))); // the GGX lobe the tracer samples
          if (dot(jd, n) < 0.02) jd = normalize(jd + n * (0.02 - dot(jd, n)));
       }
-      o.r = float4(traceReflection(f, et, rtArgs.tlas, instInfo, org, jd, rough, rs, nz, hist, hv), 1.0);
+      o.r = float4(traceReflection(f, et, rtArgs.tlas, instInfo, org, jd, rough, rs, nz, hist, hv, reflect(d, n)), 1.0);
    }
    return o;
 }
@@ -1022,6 +1024,50 @@ float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float roug
    const float2 p = ptProbs(f0, metal, nV);
    pdf = p.x * D * nH / max(4.0 * vH, 1e-6) + p.y * nL / 3.14159265;
    return fr * nL;
+}
+// Settle's shadow ray: it passes cut-outs and see-through surfaces as the camera ray does (opacity and the opacity
+// map against the cutoff, or by chance below 1), so a leaf's holes let light through as in Cycles.
+bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, array<texture2d<float>, 16> maps,
+                   float3 o, float3 d, float tmax, float eps, thread uint& seed)
+{
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   for (int k = 0; k < 16; k++)
+   {
+      ray r(o, d, 0.0, tmax);
+      intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
+      if (h.type != intersection_type::triangle) return false;
+      constant RInst& I = inst[h.instance_id];
+      float alpha = 1.0 - I.mp0.w;
+      if (I.tx2.w > 0.5)
+      {
+         const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
+         const device float* vb = reinterpret_cast<const device float*>(I.vb);
+         const uint3 ix = uint3(ib[h.primitive_id * 3], ib[h.primitive_id * 3 + 1], ib[h.primitive_id * 3 + 2]);
+         const float2 bc = h.triangle_barycentric_coord;
+         const float3 w3 = float3(1.0 - bc.x - bc.y, bc.x, bc.y);
+         float2 uv = float2(0.0);
+         if (I.uvb != 0)
+         {
+            const device float* uvp = reinterpret_cast<const device float*>(I.uvb);
+            uv = float2(uvp[ix.x * 2], uvp[ix.x * 2 + 1]) * w3.x + float2(uvp[ix.y * 2], uvp[ix.y * 2 + 1]) * w3.y
+               + float2(uvp[ix.z * 2], uvp[ix.z * 2 + 1]) * w3.z;
+         }
+         const float3 lp = float3(vb[ix.x * 6], vb[ix.x * 6 + 1], vb[ix.x * 6 + 2]) * w3.x
+                         + float3(vb[ix.y * 6], vb[ix.y * 6 + 1], vb[ix.y * 6 + 2]) * w3.y
+                         + float3(vb[ix.z * 6], vb[ix.z * 6 + 1], vb[ix.z * 6 + 2]) * w3.z;
+         const float3 nl = float3(vb[ix.x * 6 + 3], vb[ix.x * 6 + 4], vb[ix.x * 6 + 5]) * w3.x
+                         + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w3.y
+                         + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w3.z;
+         const float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
+         const MapX mx = mapX(I.mp0, I.msc, I.mro, I.mtr, I.olo, I.ohi, int(I.sh.w + 0.5) & 3);
+         alpha *= mapSample(maps[int(I.tx2.w) - 1], mx, mapBase(mx, uv, lp), n, float3(0.0), float3(0.0), 0.0).r;
+      }
+      if (!(alpha < 1.0 && alpha < (I.mp0.z > 0.0 ? I.mp0.z : rnd(seed)))) return true;
+      o += d * (h.distance + eps); tmax -= h.distance + eps;
+      if (tmax <= 0.0) return false;
+   }
+   return true;
 }
 fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
@@ -1236,7 +1282,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
-         if (occluded(rtArgs.tlas, p + ns * f.shQ.w, ld, tmax)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (occludedAlpha(rtArgs.tlas, inst, maps, p + ns * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          float pB = 0.0;
          float3 fe = ptEval(n, V, ld, base, metal, rough, f0, lterms, pB);
          if (shW > 0.0 || ccW > 0.0)
@@ -1255,20 +1301,45 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       // next direction: one lobe picked by Render 3D's lobe weights, weighted by the full BSDF over the mixture pdf
       const float2 lp = ptProbs(f0, metal, nDotV);
       const float a = max(0.002, rough * rough);
+      // The clearcoat is a layer on top: it takes the bounce with its Fresnel share (pC), the base the rest; the
+      // base's (1 - pC) attenuation and that choice cancel, so the base branch weighs as before.
+      const float ccR = clamp(I.mro.w, 0.02, 1.0);
+      const float pC = ccW > 0.0 ? clamp(ccW * (0.04 + 0.96 * pow(1.0 - nDotV, 5.0)), 0.0, 0.95) : 0.0;
+      const bool coatB = pC > 0.0 && rnd(seed) < pC;
       float3 nd;
-      if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); skyK = float3(1.0); }
+      if (coatB) { nd = reflect(d, ggxSampleH(n, ccR * ccR, rnd(seed), rnd(seed))); skyK = float3(1.0); }
+      else if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); skyK = float3(1.0); }
       else { nd = cosineDir(n, rnd(seed), rnd(seed)); skyK = f.ambient.xyz * 3.0; }
       float pdfB = 0.0;
       float3 fB = ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
-      if (pdfB <= 1e-6 || dot(ns, nd) <= 0.0) break; // a mapped normal can send the bounce under the surface
-      if (shW > 0.0) // the bounce sees the sheen too (the cosine half of the mixture covers its wide lobe)
+      float pdfC = 0.0;
+      const float cnL = dot(n, nd);
+      if (pC > 0.0 && cnL > 0.0)
       {
-         const float nL = max(dot(n, nd), 0.0);
-         fB = fB * shV
-            + I.shc.xyz * sheenLtc(nL, nDotV, dot(nd, V), I.sh.y) * shW * nL;
+         const float3 hc = normalize(V + nd);
+         const float cnH = max(dot(n, hc), 0.0), cvH = max(dot(V, hc), 1e-4);
+         pdfC = distGGX(cnH, ccR) * cnH / (4.0 * cvH);
       }
-      T *= fB / pdfB;
-      lastPdfB = pdfB;
+      if (coatB)
+      {
+         if (pdfC <= 1e-6 || dot(ns, nd) <= 0.0) break;
+         const float3 hc = normalize(V + nd);
+         const float cw = ccW * coatSpec(max(dot(n, hc), 0.0), nDotV, max(cnL, 1e-4), max(dot(V, hc), 1e-4), ccR) * cnL / (pC * pdfC);
+         T *= min(cw, 4.0);
+         lastPdfB = pC * pdfC + (1.0 - pC) * pdfB;
+      }
+      else
+      {
+         if (pdfB <= 1e-6 || dot(ns, nd) <= 0.0) break; // a mapped normal can send the bounce under the surface
+         if (shW > 0.0) // the bounce sees the sheen too (the cosine half of the mixture covers its wide lobe)
+         {
+            const float nL = max(dot(n, nd), 0.0);
+            fB = fB * shV
+               + I.shc.xyz * sheenLtc(nL, nDotV, dot(nd, V), I.sh.y) * shW * nL;
+         }
+         T *= fB / pdfB;
+         lastPdfB = pC * pdfC + (1.0 - pC) * pdfB;
+      }
       if (b >= 2)
       {
          const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);

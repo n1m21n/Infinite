@@ -30,6 +30,7 @@ truth.png + inf.png ──> FLIP, brightness ratio, luma error ──> results.j
 | `harness.py` | runs the cases, translates the scene into a patch, scores the pictures, writes the board, gates against the baseline |
 | `cases.py` | the scenes |
 | `blender_scene.py` | the Blender side: builds the scene, renders with Cycles, writes each object as a glb |
+| `boat_ab.py` | the B4 boat-on-ocean scene (sunset / moon) vs Cycles: frame FLIP plus the glitter band (IoU, band FLIP, brightness) |
 | `baseline.json` | the FLIP score each case must hold (within 0.01) |
 | `ab.py`, `blender_side.py`, `metrics.py` | the older AO bake A/B, run by `--ao` |
 

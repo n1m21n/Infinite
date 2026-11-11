@@ -579,7 +579,7 @@ closes by denoising the settled frame and stopping adaptively (C14), not by fast
 | R3 | Hitches | 0 frames over 50 ms in the soak | PASS |
 | R4 | ≥ 4x per sample | 7.2x | PASS |
 | R4 | FLIP ≤ 0.05 after ≤ 10 s | 6/9 at 256 spp (4.9 s at 1080p) | **OPEN** (tracer vs Cycles) |
-| R4 | 1-min film ≤ 15 min | ≈ 3.4 h | **OPEN** |
+| R4 | 1-min film ≤ 15 min | settle 40 s/frame at 128 spp (≈ 16 h); live 4.4 s/frame (≈ 1.75 h, was 8.2 s) | **OPEN** |
 | R5 | 1M instances ≥ 30 fps, ≤ 1.5 GB, ≤ 100 ms | 58 fps, 452 MB, 14.6 ms | PASS (raster only) |
 | R6, R7 | — | not started | — |
 
@@ -693,8 +693,10 @@ Fixed by it:
 
 Still open (region brightness vs Cycles, mode 7 unless noted):
 - No-GI modes (16, 17) over-light the shaded side: the env ambient has no occlusion there (hull 1.9-5.9x).
-- Live glitter path: a round blob at the horizon where Cycles draws a narrow streak; the shape is the live specular
-  lobe at grazing angles (Schlick geometry, one sample of the sky's sun texels), not the sun's size.
+- ~~Live glitter path: a round blob at the horizon~~ fixed 2026-11-11: a reflection ray that leaves the scene reads
+  the prefiltered sky along the mirror direction (the lobe's expected value) instead of along its own jittered
+  direction, which sampled the sun disc once per pixel. Sunset 0.0673 -> 0.0621 (sea band 0.130 -> 0.118), moon
+  0.0504 -> 0.0477 (`tools/blender-ab/boat_ab.py`).
 - `materials` (live 0.078, was 0.068 before 222751ff): most likely the two-sided normal flip on closed spheres;
   unconfirmed.
 - Raster-only (16) boat and its reflection 1.8–4.4x: shadow maps and no GI over-light the shaded side, as GL does.

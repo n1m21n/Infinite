@@ -8,6 +8,13 @@
 | A2 | settle `bed` under the grazing sun | brightness 0.70 | 1.013, FLIP 0.091 | within 5 % | done |
 | A3 | raster over-lighting (no GI) | interior 6.6× bright, FLIP 0.79 | interior 1.03×, FLIP 0.103; bed 0.161, bed_close 0.173 | interior FLIP < 0.2 | done; raster sweep inside baseline slack |
 | A4 | raster fur two-sided, shadow blotches | `bed_fur_close` 0.402 (1.26× bright) | 0.339 (1.005×); `bed_fur` 0.183 → 0.172; `hair_long` 0.168 → 0.126 | well under 0.40 | done |
+| B5 | live glitter blob, fireflies, soft sun, displacement | boat sunset 0.0673, moon 0.0504 | sunset 0.0621, moon 0.0477; other live cases unchanged | glint shape as Cycles | done; fireflies not reproduced; true displacement already via the Displacement node |
+| B6 | settle coat on bounces, alpha in shadow rays | `mat_coat` 0.0473, `mat_alpha` 0.0828 | 0.042, 0.072 | better FLIP | done |
+| B7 | export time (1-min 1080p film) | live boat 8.2 s/frame, settle 40 s/frame | live 4.4 s/frame, FLIP unchanged (motion cases within 0.0005) | ≤ 15 min (0.63 s/frame) | live warm-up fixed; gate open: per-render cost (≈ 160 ms live, ≈ 0.3 s/sample settle) is C11's engine work |
+
+B7: live export rendered 48 warm-up frames for every film frame. Now the first exported frame warms 48 and later
+ones top up 24, carrying the GI/reflection history over (it follows motion, as in playback). 8 and 16 were measured
+too: flicker on `motion_still` rose to 0.403 / 0.325 (from 0.291); 24 holds 0.311 and FLIP equal to before.
 
 A1/A2 cause: sheen. Cycles 4+ sheen is a microfiber LTC lobe; ours was Charlie + Neubelt, up to 13× too bright
 at mid roughness and the wrong shape (too little at grazing light). Now `Render3DSheen.h` holds Cycles' measured

@@ -33,6 +33,7 @@ struct Render3DNode::EngineState
    bool failed = false;
    unsigned long long sceneHash = 0;
    int settled = 0;   // path-traced samples since the scene last changed
+   bool exportWarm = false; // the live history is already converged by an earlier exported frame
    std::vector<float> envPixels;   // the HDRI read back from GL, one mip at most 2048 wide
    int envW = 0, envH = 0, envLod = 0;
    unsigned int envTex = 0;
@@ -485,6 +486,7 @@ bool Render3DNode::CookEngine(int frameId)
    E.sceneHash = hsh;
    bool traced = false;
    const bool offline = Transport::Instance().IsOfflineMode();
+   if (!offline) E.exportWarm = false;
    if (offline && (liveEngineFeatures & 8) != 0)
    {
       // Export / --frame: every frame is the settled picture, traced in full before it is handed on.
@@ -497,7 +499,10 @@ bool Render3DNode::CookEngine(int frameId)
    else if (offline)
    {
       // Live look on export: let the temporal GI / reflection history converge as it would on a held frame.
-      const int warm = (fr.gi || fr.rtReflections) && mJitterIndex <= 0 ? 48 : 0; // later supersample passes reuse the history
+      // The first exported frame converges from nothing; later ones carry the history over (it follows motion, as
+      // in playback), so a short top-up does. Later supersample passes reuse it too.
+      const int warm = (fr.gi || fr.rtReflections) && mJitterIndex <= 0 ? (E.exportWarm ? 24 : 48) : 0;
+      E.exportWarm = true;
       for (int i = 0; i < warm; i++)
       {
          if (!E.raster->Render(*E.img, fr, nullptr))
