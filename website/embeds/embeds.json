@@ -535,6 +535,16 @@
       "slug": "minimal-signal-raster-oscillogram-sweep",
       "title": "Minimal Signal Raster Oscillogram Sweep",
       "description": "Precision audio-reactive oscilloscope raster grid rendering multi-channel sine-sweep waveforms and Alva Noto pulse-code impulses. Bass drives beam deflection amplitude, mids modulate raster lines, and highs trigger transient beam bursts."
+    },
+    {
+      "slug": "glitch-datamosh-chroma-displacement-scan",
+      "title": "Glitch Datamosh Chroma Displacement Scan",
+      "description": "Audio-reactive datamosh visualizer with macroblock slicing and chromatic RGB channel splitting. Bass triggers horizontal buffer displacement, mids warp color channels, and highs ignite digital scanlines."
+    },
+    {
+      "slug": "glitch-datamosh-macroblock-slice-corruption",
+      "title": "Glitch Datamosh Macroblock Slice Corruption",
+      "description": "Audio-reactive video compression corruption visualizer. Bass fractures the spatial macroblock grid, mids shift temporal motion vector shears, and highs trigger digital noise bursts."
     }
   ]
 }

@@ -281,6 +281,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Psytrance Acid Squelch Lead Synth](https://infinitedevices.org/library/psytrance-acid-squelch-lead-synth.html): Psychedelic FM acid lead synthesizer featuring dual cascaded oscillators, extreme resonance squelch filter sweeps, tempo-synced LFO filter modulation, and warm diode clipping. (file: https://infinitedevices.org/assets/templates/psytrance-acid-squelch-lead-synth.inf)
 - [Electro Robotic Vocoder Comb FX](https://infinitedevices.org/library/electro-robotic-vocoder-comb-fx.html): Resonant robotic comb filter and formant vocoder effect featuring pitch-tracked harmonic comb peaks, metallic sideband modulation, non-linear feedback drive, and crisp transient shaping. (file: https://infinitedevices.org/assets/templates/electro-robotic-vocoder-comb-fx.inf)
 - [Electro Cybernetic BBD Flanger Delay FX](https://infinitedevices.org/library/electro-cybernetic-bbd-flanger-delay-fx.html): Vintage bucket-brigade style short-time flanger and cross-feedback delay processor with triangular LFO sweep modulation, inverted feedback notches, and warm analog diode saturation. (file: https://infinitedevices.org/assets/templates/electro-cybernetic-bbd-flanger-delay-fx.inf)
+- [Jungle Sub Bass Pressure Synth](https://infinitedevices.org/library/jungle-sub-bass-pressure-synth.html): Heavyweight jungle 808 sub-bass synthesizer engineered for low-end sound system pressure with pitch-glide envelope dive, harmonic saturation drive, and resonant low-pass control. (file: https://infinitedevices.org/assets/templates/jungle-sub-bass-pressure-synth.inf)
+- [Jungle Atmospheric Pad Drone Synth](https://infinitedevices.org/library/jungle-atmospheric-pad-drone-synth.html): Haunting 90s intelligent jungle atmospheric synthesizer with detuned dual pulse-saw oscillators, slow sweeping resonant bandpass filter, and tape-saturated drone warmth. (file: https://infinitedevices.org/assets/templates/jungle-atmospheric-pad-drone-synth.inf)
+- [Deep House Warm Analog Chorus FX](https://infinitedevices.org/library/deep-house-warm-analog-chorus-fx.html): Lush multi-stage analog bucket-brigade chorus and spatial widening effect engineered for deep house electric pianos, synths, and basslines with warm vintage saturation. (file: https://infinitedevices.org/assets/templates/deep-house-warm-analog-chorus-fx.inf)
+- [Deep House Dusty Tape Space Delay FX](https://infinitedevices.org/library/deep-house-dusty-tape-space-delay-fx.html): Vintage tape echo and dub delay processor featuring wow-and-flutter tape modulation, warm asymmetrical feedback saturation, and high-frequency damping. (file: https://infinitedevices.org/assets/templates/deep-house-dusty-tape-space-delay-fx.inf)
 
 ## Library: Community
 
@@ -641,7 +645,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 107 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 109 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -658,4 +662,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 92 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 94 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

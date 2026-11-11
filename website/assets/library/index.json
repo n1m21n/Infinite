@@ -8618,6 +8618,219 @@
       "file": "assets/library/pixel/minimal-signal-raster-oscillogram-sweep.field",
       "preview": "assets/library/previews/minimal-signal-raster-oscillogram-sweep.jpg",
       "bytes": 2386
+    },
+    {
+      "id": "ditherpunk-atkinson-cluster-matrix",
+      "name": "Ditherpunk Atkinson Cluster Matrix",
+      "kind": "Generator",
+      "tags": [
+        "dither",
+        "ditherpunk",
+        "1-bit",
+        "atkinson",
+        "matrix",
+        "procedural"
+      ],
+      "description": "Algorithmic 1-bit drafting system rendering concentric circular threshold fields with pseudo-random error diffusion, high-density stipple clusters, and technical coordinate markers.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/ditherpunk-atkinson-cluster-matrix.js",
+      "preview": "assets/library/previews/ditherpunk-atkinson-cluster-matrix.jpg",
+      "bytes": 2341
+    },
+    {
+      "id": "ditherpunk-bayer-crosshatch-monolith",
+      "name": "Ditherpunk Bayer Crosshatch Monolith",
+      "kind": "Generator",
+      "tags": [
+        "dither",
+        "ditherpunk",
+        "1-bit",
+        "bayer",
+        "crosshatch",
+        "monolith"
+      ],
+      "description": "Procedural 1-bit structural composition simulating ordered Bayer matrix crosshatching, isometric geometric stepped monoliths, and dense ordered dither field gradients.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/ditherpunk-bayer-crosshatch-monolith.js",
+      "preview": "assets/library/previews/ditherpunk-bayer-crosshatch-monolith.jpg",
+      "bytes": 3124
+    },
+    {
+      "id": "y2k-acid-hyper-starburst-polyhedron-3d",
+      "name": "Y2K Acid Hyper Starburst Polyhedron 3D",
+      "kind": "Generator",
+      "tags": [
+        "y2k",
+        "acid",
+        "3d",
+        "rave",
+        "starburst",
+        "cyber",
+        "chrome"
+      ],
+      "description": "Monumental Y2K cyber-rave 3D composition featuring spiked metallic starburst clusters, iridescent rotating orbital rings, and hyper-stylized rave geometric facets.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/y2k-acid-hyper-starburst-polyhedron-3d.js",
+      "preview": "assets/library/previews/y2k-acid-hyper-starburst-polyhedron-3d.jpg",
+      "bytes": 1893
+    },
+    {
+      "id": "y2k-acid-chrome-metaball-lattice-3d",
+      "name": "Y2K Acid Chrome Metaball Lattice 3D",
+      "kind": "Generator",
+      "tags": [
+        "y2k",
+        "acid",
+        "3d",
+        "chrome",
+        "metaball",
+        "rave",
+        "helical"
+      ],
+      "description": "Procedural 3D liquid mercury structure simulating floating cybernetic chrome spheres, interlocking helical satellite antennas, and reflective metallic rave plinths.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/y2k-acid-chrome-metaball-lattice-3d.js",
+      "preview": "assets/library/previews/y2k-acid-chrome-metaball-lattice-3d.jpg",
+      "bytes": 2020
+    },
+    {
+      "id": "jungle-sub-bass-pressure-synth",
+      "name": "Jungle Sub Bass Pressure Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "jungle",
+        "audio",
+        "dsp",
+        "sub",
+        "bass"
+      ],
+      "description": "Heavyweight jungle 808 sub-bass synthesizer engineered for low-end sound system pressure with pitch-glide envelope dive, harmonic saturation drive, and resonant low-pass control.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/jungle-sub-bass-pressure-synth.inf",
+      "preview": "assets/library/previews/jungle-sub-bass-pressure-synth.jpg",
+      "bytes": 2182
+    },
+    {
+      "id": "jungle-atmospheric-pad-drone-synth",
+      "name": "Jungle Atmospheric Pad Drone Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "jungle",
+        "audio",
+        "dsp",
+        "sub",
+        "bass"
+      ],
+      "description": "Haunting 90s intelligent jungle atmospheric synthesizer with detuned dual pulse-saw oscillators, slow sweeping resonant bandpass filter, and tape-saturated drone warmth.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 6,
+      "file": "assets/templates/jungle-atmospheric-pad-drone-synth.inf",
+      "preview": "assets/library/previews/jungle-atmospheric-pad-drone-synth.jpg",
+      "bytes": 2234
+    },
+    {
+      "id": "deep-house-warm-analog-chorus-fx",
+      "name": "Deep House Warm Analog Chorus FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "deep-house",
+        "audio",
+        "dsp",
+        "chorus",
+        "delay"
+      ],
+      "description": "Lush multi-stage analog bucket-brigade chorus and spatial widening effect engineered for deep house electric pianos, synths, and basslines with warm vintage saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/deep-house-warm-analog-chorus-fx.inf",
+      "preview": "assets/library/previews/deep-house-warm-analog-chorus-fx.jpg",
+      "bytes": 2173
+    },
+    {
+      "id": "deep-house-dusty-tape-space-delay-fx",
+      "name": "Deep House Dusty Tape Space Delay FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "deep-house",
+        "audio",
+        "dsp",
+        "chorus",
+        "delay"
+      ],
+      "description": "Vintage tape echo and dub delay processor featuring wow-and-flutter tape modulation, warm asymmetrical feedback saturation, and high-frequency damping.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/deep-house-dusty-tape-space-delay-fx.inf",
+      "preview": "assets/library/previews/deep-house-dusty-tape-space-delay-fx.jpg",
+      "bytes": 2014
+    },
+    {
+      "id": "glitch-datamosh-chroma-displacement-scan",
+      "name": "Glitch Datamosh Chroma Displacement Scan",
+      "kind": "Generator",
+      "tags": [
+        "glitch",
+        "datamosh",
+        "shader",
+        "webgl",
+        "chromatic",
+        "macroblock",
+        "audio-reactive"
+      ],
+      "description": "Audio-reactive datamosh shader simulating compression artifact macroblocks, chromatic RGB channel splitting, horizontal sync tearing, and phosphorescent glitch scanlines.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/glitch-datamosh-chroma-displacement-scan.field",
+      "preview": "assets/library/previews/glitch-datamosh-chroma-displacement-scan.jpg",
+      "bytes": 1771
+    },
+    {
+      "id": "glitch-datamosh-macroblock-slice-corruption",
+      "name": "Glitch Datamosh Macroblock Slice Corruption",
+      "kind": "Generator",
+      "tags": [
+        "glitch",
+        "datamosh",
+        "macroblock",
+        "compression",
+        "buffer-tear",
+        "audioreactive"
+      ],
+      "description": "Dynamic video buffer corruption visualizer featuring quantized MPEG macroblock compression tears, temporal motion vector shearing, and stark signal distortion.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/glitch-datamosh-macroblock-slice-corruption.field",
+      "preview": "assets/library/previews/glitch-datamosh-macroblock-slice-corruption.jpg",
+      "bytes": 1750
     }
   ]
 }

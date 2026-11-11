@@ -536,6 +536,14 @@
   "embeds/minimal-signal-raster-oscillogram-sweep.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/glitch-datamosh-chroma-displacement-scan.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/glitch-datamosh-macroblock-slice-corruption.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

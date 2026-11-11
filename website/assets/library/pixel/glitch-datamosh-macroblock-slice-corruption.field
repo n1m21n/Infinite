@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glitch Datamosh Macroblock Slice Corruption",
+    "author": "Infinite",
+    "description": "Dynamic video buffer corruption visualizer featuring quantized MPEG macroblock compression tears, temporal motion vector shearing, and stark signal distortion.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.35 [0.05, 1.0];\nparam float blockScale = 24.0 [8.0, 48.0];\nparam float sliceShear = 0.85 [0.1, 2.0];\nparam float noiseIntensity = 0.65 [0.1, 1.0];\nparam float contrast = 1.2 [0.8, 1.8];\n\np = uv;\ntime = t * speed;\n\nblockY = floor(p.y * blockScale);\nblockX = floor(p.x * blockScale);\ncellHash = fract(sin(blockX * 37.1 + blockY * 71.7 + time * 2.3) * 43758.5453);\nisGlitch = step(0.72, cellHash);\n\nshear = (cellHash - 0.5) * sliceShear * isGlitch;\npx = fract(p.x + shear);\npy = p.y;\n\ngrain = fract(sin(px * 1234.5 + py * 6789.1 + time * 10.0) * 98765.43);\nbaseR = 0.5 + 0.5 * sin(px * 18.0 + time * 3.2);\nbaseG = 0.5 + 0.5 * sin(py * 20.0 - time * 2.8 + 1.5);\nbaseB = 0.5 + 0.5 * cos((px + py) * 16.0 + time * 4.0 + 3.0);\n\ncol = vec3(baseR, baseG, baseB);\ncDark = vec3(0.04, 0.04, 0.07);\ncol = mix(cDark, col, 0.8);\n\nblockBorder = step(0.9, fract(p.x * blockScale)) + step(0.9, fract(p.y * blockScale));\ncol = mix(col, vec3(0.95, 0.95, 0.98), blockBorder * 0.25 * isGlitch);\ncol = col + vec3(grain * noiseIntensity * isGlitch * 0.4);\n\nout = clamp(col * contrast, 0.0, 1.0);\n",
+    "params": {
+      "speed": 0.35,
+      "blockScale": 24.0,
+      "sliceShear": 0.85,
+      "noiseIntensity": 0.65,
+      "contrast": 1.2
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

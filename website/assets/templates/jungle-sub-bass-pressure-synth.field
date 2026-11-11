@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Jungle Sub Bass Pressure Synth",
+    "author": "Infinite",
+    "description": "Heavyweight jungle 808 sub-bass synthesizer engineered for low-end sound system pressure with pitch-glide envelope dive, harmonic saturation drive, and resonant low-pass control.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 450.0 [60.0, 3000.0];\nparam float envMod = 0.65 [0.0, 1.0];\nparam float decay = 0.32 [0.05, 0.8];\nparam float drive = 2.4 [1.0, 6.0];\nparam float sub = 0.5 [0.0, 1.0];\nstate float phase = 0;\nstate float env = 0;\nstate float pitchEnv = 0;\nstate float lastGate = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntrig = if(gate > 0.5 && lastGate <= 0.5, 1.0, 0.0);\nlastGate = gate;\n\npitchEnv = if(trig > 0.5, 1.0, pitchEnv - pitchEnv * clamp(35.0 / sr, 0.0001, 0.05));\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.05);\nenv = if(trig > 0.5, 1.0, env - env * decayRate);\n\neffFreq = clamp(freq * (1.0 + pitchEnv * 1.8), 20.0, 1500.0);\nphase = (phase + effFreq / sr) % 1.0;\n\nsinWave = sin(6.2831853 * phase);\nsubWave = sin(3.14159265 * phase) * sub;\nraw = sinWave + subWave * 0.5;\n\nu = raw * drive;\nsat = u / (1.0 + abs(u) * 0.4);\n\nfCut = clamp((cutoff + env * envMod * 1200.0) / sr * 3.14, 0.01, 0.45);\nlp1 = lp1 + fCut * (sat - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nout = lp2 * (0.35 + env * 0.65) * 0.22;\n",
+    "params": {
+      "cutoff": 450.0,
+      "envMod": 0.65,
+      "decay": 0.32,
+      "drive": 2.4,
+      "sub": 0.5
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

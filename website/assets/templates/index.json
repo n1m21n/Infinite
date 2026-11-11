@@ -2565,6 +2565,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "jungle-sub-bass-pressure-synth",
+      "name": "Jungle Sub Bass Pressure Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Heavyweight jungle 808 sub-bass synthesizer engineered for low-end sound system pressure with pitch-glide envelope dive, harmonic saturation drive, and resonant low-pass control.",
+      "price": 0,
+      "preview": "assets/templates/jungle-sub-bass-pressure-synth.webp",
+      "file": "assets/templates/jungle-sub-bass-pressure-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "jungle-atmospheric-pad-drone-synth",
+      "name": "Jungle Atmospheric Pad Drone Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Haunting 90s intelligent jungle atmospheric synthesizer with detuned dual pulse-saw oscillators, slow sweeping resonant bandpass filter, and tape-saturated drone warmth.",
+      "price": 0,
+      "preview": "assets/templates/jungle-atmospheric-pad-drone-synth.webp",
+      "file": "assets/templates/jungle-atmospheric-pad-drone-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "deep-house-warm-analog-chorus-fx",
+      "name": "Deep House Warm Analog Chorus FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Lush multi-stage analog bucket-brigade chorus and spatial widening effect engineered for deep house electric pianos, synths, and basslines with warm vintage saturation.",
+      "price": 0,
+      "preview": "assets/templates/deep-house-warm-analog-chorus-fx.webp",
+      "file": "assets/templates/deep-house-warm-analog-chorus-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "deep-house-dusty-tape-space-delay-fx",
+      "name": "Deep House Dusty Tape Space Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage tape echo and dub delay processor featuring wow-and-flutter tape modulation, warm asymmetrical feedback saturation, and high-frequency damping.",
+      "price": 0,
+      "preview": "assets/templates/deep-house-dusty-tape-space-delay-fx.webp",
+      "file": "assets/templates/deep-house-dusty-tape-space-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }
