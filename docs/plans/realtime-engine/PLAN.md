@@ -35,6 +35,7 @@ reach every stage of a patch:
 | Formula, Shadertoy | GLSL | per pixel | pasted or hand-written image shaders |
 | Sketch | JavaScript (p5-style, quickjs) | per frame | 2D drawing: decals, labels, stitch patterns, masks |
 | Sketch 3D | JavaScript | per frame | geometry by rules: buildings, props, scatter layouts |
+| three.js (not in Infinite) | JavaScript | — | Sketch 3D is the JS geometry route today; a three.js-style scene/material API on top of Sketch 3D (familiar calls → Infinite geometry + Material nodes) is a new mode: **owner**, design in `designs/3.9-threejs-style-api.md` |
 
 Why this beats a node pile, in numbers that matter on an 8 GB M2:
 
@@ -199,6 +200,10 @@ for as soon as Block E lands.
 ## 5. Testing procedure (every step)
 
 ```
+ tier: pick before building (load on the 8 GB M2; all runs at background priority, taskpolicy -b)
+   T0 refactor that must move no pixel: run --spp 16 pre/post, `sweep.py same` (any pixel change fails)
+   T1 real change: run --spp 64 on only the cases the change can touch, `diff`
+   T2 block close: the full sweep below on every case
  0. the step's gate case exists in tools/blender-ab/cases.py (add it first, with its Cycles truth)
  1. pre:  sweep all 43+ cases on the engines the step touches (raster, live, settle) → pre_<engine>.txt
  2. change, one build (scripts/ibuild.py), one at a time
