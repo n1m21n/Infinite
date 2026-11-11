@@ -1,6 +1,8 @@
 // Metal backend of the engine RHI. See Rhi.h.
 #include "engine/rhi/Rhi.h"
 #include "nodes/Render3DHair.h"
+#include "nodes/Render3DSheen.h"
+#include "nodes/Render3DTonemap.h"
 
 #include <algorithm>
 #include <cmath>
@@ -38,6 +40,7 @@ using namespace metal::raytracing;
 // Hair: Render3DHair.h's Chiang fibre BSDF (shared with GL).
 typedef float3 vec3;
 typedef float4 vec4;
+typedef float3x3 mat3;
 #define HAIR_ATAN2(y, x) atan2(y, x)
 #define HAIR_OUT thread float&
 )" R3D_HAIR_SRC R"(
@@ -289,40 +292,8 @@ float3 cosineDir(float3 n, float u1, float u2)
 constant bool kMrt [[function_constant(0)]];
 struct FOut { float4 c0 [[color(0)]]; float4 c1 [[color(1), function_constant(kMrt)]]; float4 c2 [[color(2), function_constant(kMrt)]];
              float4 c3 [[color(3), function_constant(kMrt)]]; }; // c3: normal, distance to the eye (denoiser guides)
-float3 aces(float3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
-// Render 3D's tonemaps (Render3DTonemap.h), same order as the node: 1 ACES, 2 Reinhard, 3 AgX, 4 Neutral.
-float3 agxTone(float3 c)
-{
-   const float3x3 inset = float3x3(float3(0.842479062253094, 0.0423282422610123, 0.0423756549057051),
-                                   float3(0.0784335999999992, 0.878468636469772, 0.0784336),
-                                   float3(0.0792237451477643, 0.0791661274605434, 0.879142973793104));
-   const float3x3 outset = float3x3(float3(1.19687900512017, -0.0528968517574562, -0.0529716355144438),
-                                    float3(-0.0980208811401368, 1.15190312990417, -0.0980434501171241),
-                                    float3(-0.0990297440797205, -0.0989611768448433, 1.15107367264116));
-   float3 x = clamp((log2(max(inset * c, float3(1e-10))) + 12.47393) / 16.5, 0.0, 1.0);
-   x = clamp(((((((((-246.535442) * x + 984.731367) * x - 1568.41656) * x + 1268.06241) * x - 553.234808) * x + 130.459845) * x - 14.9498445) * x + 0.887512984) * x - 0.00843336545, 0.0, 1.0); // fit to Blender's AgX (Render3DTonemap.h)
-   x = max(outset * x, float3(0.0));
-   return pow(x, float3(2.4));
-}
-float3 neutralTone(float3 c)
-{
-   const float x = min(c.r, min(c.g, c.b));
-   c -= (x < 0.08) ? x - 6.25 * x * x : 0.04;
-   const float peak = max(c.r, max(c.g, c.b));
-   if (peak < 0.76) return c;
-   const float np = 1.0 - 0.0576 / (peak - 0.52);
-   c *= np / peak;
-   return mix(c, float3(np), 1.0 - 1.0 / (0.15 * (peak - np) + 1.0));
-}
-float3 toneMap(float3 c, int t)
-{
-   if (t == 1) return aces(c);
-   if (t == 2) return c / (c + 1.0);
-   if (t == 3) return agxTone(c);
-   if (t == 4) return neutralTone(c);
-   return c;
-}
-float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
+// Tonemaps and sRGB (Render3DTonemap.h, shared with GL), same order as the node: 1 ACES, 2 Reinhard, 3 AgX, 4 Neutral.
+)" R3D_TONEMAP_SRC R3D_SRGB_SRC R"(
 // Material maps as Render 3D's GL path samples them: trilinear, anisotropy 8, the Material's wrap (0 clamp, 1 repeat, 2 mirror).
 constexpr sampler kMapC(filter::linear, mip_filter::linear, address::clamp_to_edge, max_anisotropy(8));
 constexpr sampler kMapR(filter::linear, mip_filter::linear, address::repeat, max_anisotropy(8));
@@ -429,29 +400,8 @@ float coatSpec(float nDotH, float nDotV, float nDotL, float vDotH, float r)
 {
    return distGGX(nDotH, r) * geomSchlick(nDotV, r) * geomSchlick(nDotL, r) * (0.04 + 0.96 * pow(1.0 - vDotH, 5.0)) / max(4.0 * nDotV * nDotL, 1e-7);
 }
-// Sheen: Cycles' microfiber lobe, an LTC fitted to Blender measurements; see Render3DSheen.h for the tables.
-// Rows roughness 0.1..1.0 step 0.15, columns cos(view) 0..1 in 11 steps.
-constant float kSheenE[84] = { 0.1027, 0.0530, 0.0033, 0.0003, 0.0001, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.5498, 0.3736, 0.1973, 0.0804, 0.0304, 0.0117, 0.0049, 0.0023, 0.0012, 0.0007, 0.0004, 0.0003, 0.6310, 0.5032, 0.3755, 0.2530, 0.1616, 0.0997, 0.0601, 0.0357, 0.0214, 0.0129, 0.0078, 0.0052, 0.6578, 0.5674, 0.4771, 0.3802, 0.2955, 0.2242, 0.1681, 0.1236, 0.0898, 0.0648, 0.0459, 0.0330, 0.6782, 0.6124, 0.5467, 0.4733, 0.4033, 0.3394, 0.2834, 0.2353, 0.1939, 0.1593, 0.1296, 0.1068, 0.7049, 0.6549, 0.6049, 0.5473, 0.4907, 0.4377, 0.3893, 0.3464, 0.3080, 0.2738, 0.2433, 0.2191, 0.7385, 0.6970, 0.6555, 0.6077, 0.5618, 0.5185, 0.4800, 0.4453, 0.4144, 0.3874, 0.3636, 0.3441 };
-constant float kSheenA[84] = { 0.05, 0.05, 0.05, 0.0748, 0.0996, 0.1492, 0.1739, 0.1987, 0.22, 0.24, 0.26, 0.28, 0.1243, 0.1491, 0.1739, 0.1987, 0.2235, 0.2235, 0.2483, 0.2731, 0.2979, 0.2979, 0.3475, 0.3971, 0.2483, 0.2731, 0.2979, 0.3227, 0.3475, 0.3723, 0.3971, 0.3971, 0.4218, 0.4466, 0.4714, 0.4962, 0.3722, 0.397, 0.4218, 0.4466, 0.4962, 0.521, 0.521, 0.5458, 0.5458, 0.5706, 0.5954, 0.5954, 0.521, 0.5458, 0.5706, 0.5954, 0.6202, 0.645, 0.6697, 0.6697, 0.6945, 0.6945, 0.7193, 0.7193, 0.6697, 0.6945, 0.7193, 0.7441, 0.7689, 0.7689, 0.7689, 0.7937, 0.7937, 0.7937, 0.8185, 0.8185, 0.7689, 0.7937, 0.8185, 0.8433, 0.8433, 0.8681, 0.8681, 0.8681, 0.8681, 0.8681, 0.8681, 0.8681 };
-constant float kSheenB[84] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.05, -0.05, -0.05, -0.025, -0.025, -0.025, -0.025, -0.05, -0.05, -0.05, -0.05, -0.025, -0.1, -0.1, -0.075, -0.05, -0.05, -0.05, -0.025, -0.025, -0.025, -0.05, -0.05, -0.025, -0.15, -0.15, -0.125, -0.1, -0.075, -0.075, -0.05, -0.05, -0.05, -0.05, -0.025, -0.025, -0.15, -0.15, -0.125, -0.1, -0.1, -0.075, -0.075, -0.075, -0.05, -0.05, -0.025, -0.025, -0.075, -0.075, -0.075, -0.075, -0.075, -0.05, -0.05, -0.05, -0.05, -0.025, -0.025, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-float sheenLut(constant float* t, float mu, float r)
-{
-   const float x = clamp(mu, 0.0, 1.0) * 11.0, y = clamp((r - 0.1) / 0.15, 0.0, 6.0);
-   const int x0 = min(int(x), 10), y0 = min(int(y), 5);
-   const float fx = x - float(x0), fy = y - float(y0);
-   const float a = mix(t[y0 * 12 + x0], t[y0 * 12 + x0 + 1], fx);
-   const float b = mix(t[(y0 + 1) * 12 + x0], t[(y0 + 1) * 12 + x0 + 1], fx);
-   return mix(a, b, fy);
-}
-float sheenE(float mu, float r) { return sheenLut(kSheenE, mu, r); }
-float sheenLtc(float nL, float nV, float lv, float r)
-{
-   const float a = sheenLut(kSheenA, nV, r), b = sheenLut(kSheenB, nV, r);
-   const float st = sqrt(max(1.0 - nL * nL, 0.0));
-   const float x = clamp((lv - nL * nV) / max(sqrt(max(1.0 - nV * nV, 0.0)), 1e-4), -st, st);
-   const float wx = a * x + b * nL, q = wx * wx + a * a * max(st * st - x * x, 0.0) + nL * nL;
-   return sheenE(nV, r) * a * a / (3.14159265 * max(q * q, 1e-8));
-}
+// Sheen: Cycles' microfiber lobe (Render3DSheen.h, shared with GL).
+)" R3D_SHEEN_MSL R"(
 float maxc(float3 c) { return max(c.x, max(c.y, c.z)); }
 // Hair: the settle sampler for Render3DHair.h's Chiang fibre BSDF (spliced in at the top).
 // Draws wi for hairBsdf at h: a lobe by its share of Ap, its tilted longitudinal lobe, then its azimuthal logistic.

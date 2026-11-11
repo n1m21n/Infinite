@@ -25,8 +25,7 @@ namespace
       "#version 150\n"
       "in vec2 vUv;\n"
       "out vec4 fragColor;\n"
-      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
-      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
+      R3D_SRGB_SRC
       "float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n";
 
    // 13 taps around vUv, `t` = one source texel. Shared by the prefilter
@@ -100,16 +99,9 @@ namespace
       "uniform float uBloomAmount;\n"
       "uniform int uTonemap;\n"
       "uniform int uKeepBg;\n"
-      "vec3 acesFilm(vec3 x) {\n"
-      "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
-      "}\n"
-      R3D_TONEMAP_GLSL
+      R3D_TONEMAP_SRC
       "vec3 tone(vec3 c) {\n"
-      "   if (uTonemap == 1) return acesFilm(c);\n"
-      "   if (uTonemap == 2) return c / (c + vec3(1.0));\n"
-      "   if (uTonemap == 3) return agxTone(c);\n"
-      "   if (uTonemap == 4) return neutralTone(c);\n"
-      "   return c;\n"
+      "   return toneMap(c, uTonemap);\n"
       "}\n"
       "void main() {\n"
       "   vec4 c = texture(uColor, vUv);\n"

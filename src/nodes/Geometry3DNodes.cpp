@@ -261,12 +261,8 @@ namespace
       "uniform float uExposure;\n"
       "uniform int uTonemap;\n"
       "uniform float uBgOpacity;\n"
-      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
-      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
-      "vec3 acesFilm(vec3 x) {\n"
-      "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
-      "}\n"
-      R3D_TONEMAP_GLSL
+      R3D_SRGB_SRC
+      R3D_TONEMAP_SRC
       "vec2 dirToEquirect(vec3 d, float rot) {\n"
       "   float phi = atan(d.z, d.x) + rot;\n"
       "   float theta = acos(clamp(d.y, -1.0, 1.0));\n"
@@ -307,10 +303,7 @@ namespace
       "      col = mix(lower, toLinear(uEnvSky), smoothstep(0.5, 1.0, t)) * uEnvIntensity;\n"
       "   }\n"
       "   col *= uExposure;\n"
-      "   if (uTonemap == 1) col = acesFilm(col);\n"
-      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
-      "   else if (uTonemap == 3) col = agxTone(col);\n"
-      "   else if (uTonemap == 4) col = neutralTone(col);\n"
+      "   col = toneMap(col, uTonemap);\n"
       "   fragColor = vec4(toSrgb(col), uBgOpacity);\n"
       "}\n";
 
@@ -643,20 +636,12 @@ namespace
       "   return mix(1.0, lit / 16.0, uShadowStrength);\n"
       "}\n"
       "\n"
-      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
-      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
+      R3D_SRGB_SRC
       "\n"
-      "vec3 acesFilm(vec3 x) {\n"
-      "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
-      "}\n"
-      R3D_TONEMAP_GLSL
+      R3D_TONEMAP_SRC
       "\n"
       "vec3 toneDisplay(vec3 c) {\n"
-      "   if (uTonemap == 1) return acesFilm(c);\n"
-      "   if (uTonemap == 2) return c / (c + vec3(1.0));\n"
-      "   if (uTonemap == 3) return agxTone(c);\n"
-      "   if (uTonemap == 4) return neutralTone(c);\n"
-      "   return c;\n"
+      "   return toneMap(c, uTonemap);\n"
       "}\n"
       "\n"
       "float ditherOffset() {\n"
