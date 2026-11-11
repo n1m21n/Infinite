@@ -32,6 +32,15 @@ inline std::vector<std::string> R3dAbMacros()
    return out;
 }
 
+// A switch read from C++ (a change that is not in a shader): name in capitals, e.g. R3dAbOn("MAPMIPS").
+inline bool R3dAbOn(const char* name)
+{
+   for (const std::string& m : R3dAbMacros())
+      if (m == std::string("R3D_AB_") + name)
+         return true;
+   return false;
+}
+
 // GLSL source with the active switches defined right after its #version line.
 inline std::string R3dAbGlsl(const char* src)
 {

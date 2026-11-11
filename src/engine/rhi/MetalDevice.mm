@@ -2,6 +2,7 @@
 #include "engine/rhi/Rhi.h"
 #include "nodes/Render3DHair.h"
 #include "nodes/Render3DSheen.h"
+#include "nodes/Render3DThinFilm.h"
 #include "nodes/Render3DTonemap.h"
 #include "nodes/Render3DMaterial.h"
 #include "nodes/Render3DDenoise.h"
@@ -135,7 +136,12 @@ float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float roug
 }
 float distGGX(float nDotH, float rough) { const float a = rough * rough, a2 = a * a; const float d = nDotH * nDotH * (a2 - 1.0) + 1.0; return a2 / max(3.14159265 * d * d, 1e-7); }
 float geomSchlick(float nDotV, float rough) { const float r = rough + 1.0, k = (r * r) / 8.0; return nDotV / (nDotV * (1.0 - k) + k); }
-)" R3D_BSDF_SRC R3D_FRESNEL_SRC R"(
+)" R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R"(
+// Thin film over the specular lobes (Render3DThinFilm.h, shared with GL): a gain on the lobe, at the view angle.
+float3 iridGain(float w, float ior, float thick, float nV, float3 f0)
+{
+   return w > 0.0 ? thinFilmGain(nV, ior, thick, f0, w) : float3(1.0);
+}
 #ifdef R3D_AB_GGX
 #define R3D_G2(nv, nl, r) ggxG2(nv, nl, r)
 #else
@@ -620,6 +626,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    const float shV = 1.0 - shMax * shEv;          // the base layer's share under the sheen
    const float3 shAmb = float3(m.mat.sheenColor) * (shW * shEv); // the sheen's own share of ambient light
    const float3 f0 = mix(float3(0.04 + m.mat.f0Extra), base, metal); // GL's dielectric F0 from ior and specular
+   const float3 iridK = iridGain(m.mat.iridescence, m.mat.iridIor, m.mat.iridThickness, nDotV, f0);
    // Clearcoat (GL's): a layer on top; what it reflects at this angle never reaches the base below.
    const float ccR = clamp(m.mat.coatRoughness, 0.02, 1.0);
    const float ccFv = 0.04 + 0.96 * pow(1.0 - nDotV, 5.0);
@@ -716,7 +723,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          const float gs = R3D_G2(nDotV, max(nls, 1e-4), rough);
          spec = ds * gs * fresnel(max(dot(hs, viewDir), 0.0), f0) / max(4.0 * nDotV, 1e-7) * (nls / max(nDotL, 1e-4)); // * nDotL below
       }
-      spec *= ggxMs(f0, rough, nDotV);
+      spec *= ggxMs(f0, rough, nDotV) * iridK;
       const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
       const float3 radiance = radiance0 * atten;
       floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x;
@@ -763,7 +770,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
    // GI and traced reflections run in tr_fs at half res; this pass writes their demodulated weights instead.
    const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0;
-   const float3 fAmb = fresnelRough(nDotV, f0, rough);
+   const float3 fAmb = fresnelRough(nDotV, f0, rough) * iridK;
    const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb * (aoV * ccAt * shV);
    const bool reflOn = (int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55;
    const float envKeep = reflOn ? smoothstep(0.3, 0.55, rough) : 1.0; // the env share of the reflection; the rest is traced
@@ -1062,6 +1069,19 @@ float3 ggxSampleH(float3 n, float a, float u1, float u2)
 // The path tracer's BSDF, ported from Render 3D's GL tracer (evalOpaqueTerms, lobeProbs) so the two agree:
 // height-correlated Smith visibility, Fresnel at the half vector, diffuse takes what the specular leaves.
 float ptS5(float c) { const float m = clamp(1.0 - c, 0.0, 1.0), m2 = m * m; return m2 * m2 * m; }
+#ifdef R3D_AB_PTFRESNEL
+float3 ptF(float c, float3 f0) { return fresnelExact(c, f0); }
+#else
+float3 ptF(float c, float3 f0) { return f0 + (float3(1.0) - f0) * ptS5(c); }
+#endif
+// Multiple-scattering gain for the tracer's own lobe (Kulla and Conty 2017, Turquin 2019): E is that lobe's
+// directional albedo at F = 1, baked by quadrature into a 16x16 table (x = nV, y = roughness) at start-up.
+constexpr sampler kELut(filter::linear, address::clamp_to_edge);
+float3 ptMs(float3 f0, float rough, float nV, texture2d<float> eLut)
+{
+   const float E = clamp(eLut.sample(kELut, float2(nV, rough), level(0.0)).r, 0.05, 1.0);
+   return float3(1.0) + f0 * (1.0 / E - 1.0);
+}
 float ptVis(float nV, float nL, float a)
 {
    const float a2 = a * a;
@@ -1088,7 +1108,7 @@ float ptFd(float c, float eta)
 }
 float ptG1(float x, float a) { return 2.0 * x / (x + sqrt(a * a + (1.0 - a * a) * x * x)); }
 // f(V, L) * cos(L), and the pdf of drawing L by ptProbs. w: a light's diffuse and specular terms.
-float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, thread float& pdf)
+float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, float3 ms, thread float& pdf)
 {
    const float nL = dot(n, L);
    if (nL <= 1e-6) { pdf = 0.0; return float3(0.0); }
@@ -1097,8 +1117,8 @@ float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float roug
    const float nH = max(dot(n, H), 0.0), vH = max(dot(V, H), 1e-4);
    const float a = max(0.002, rough * rough);
    const float D = ptD(nH, a);
-   const float3 F = f0 + (float3(1.0) - f0) * ptS5(vH);
-   const float3 fr = D * ptVis(nV, nL, a) * F * w.y + (float3(1.0) - F) * (1.0 - metal) * base * (w.x / 3.14159265);
+   const float3 F = ptF(vH, f0);
+   const float3 fr = D * ptVis(nV, nL, a) * F * ms * w.y + (float3(1.0) - F) * (1.0 - metal) * base * (w.x / 3.14159265);
    const float2 p = ptProbs(f0, metal, nV);
    pdf = p.x * D * nH / max(4.0 * vH, 1e-6) + p.y * nL / 3.14159265;
    return fr * nL;
@@ -1218,17 +1238,17 @@ void ptPickLight(constant FrameU& f, const device EmTri* ems, int nEm, float pEm
    }
 }
 // Translucency's lobes: the specular on the lit side, the diffuse share passed through to the far side (cosine there).
-float3 ptEvalT(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, thread float& pdf)
+float3 ptEvalT(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, float3 ms, thread float& pdf)
 {
    const float nL = dot(n, L), nV = max(dot(n, V), 1e-4);
    const float2 p = ptProbs(f0, metal, nV);
    if (nL > 1e-6)
    {
-      const float3 fs = ptEval(n, V, L, base, metal, rough, f0, float2(0.0, w.y), pdf);
+      const float3 fs = ptEval(n, V, L, base, metal, rough, f0, float2(0.0, w.y), ms, pdf);
       pdf -= p.y * nL / 3.14159265; // the diffuse half of the mixture lives on the far side here
       return fs;
    }
-   const float3 Fv = f0 + (float3(1.0) - f0) * ptS5(nV);
+   const float3 Fv = ptF(nV, f0);
    pdf = p.y * (-nL) / 3.14159265;
    return (float3(1.0) - Fv) * (1.0 - metal) * base * (w.x / 3.14159265) * (-nL);
 }
@@ -1238,7 +1258,7 @@ struct PtOut { float4 acc [[color(0)]]; float4 aux [[color(1)]]; float4 gd [[col
 fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
                       texture2d<float> prev [[texture(0)]], texture2d<float> prevAux [[texture(1)]], texture2d<float> prevGd [[texture(2)]],
-                      texture2d<float> et [[texture(9)]],
+                      texture2d<float> eLut [[texture(8)]], texture2d<float> et [[texture(9)]],
                       array<texture2d<float>, 16> maps [[texture(10)]])
 {
    const uint2 px = uint2(in.pos.xy);
@@ -1385,6 +1405,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
       const float shMax = shW * maxc(float3(I.mat.sheenColor)), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(nDotV, I.mat.sheenRoughness) : 1.0;
       const float3 f0 = mix(float3(0.04 + I.mat.f0Extra), base, metal);
+      const float3 msK = ptMs(f0, rough, nDotV, eLut) * iridGain(I.mat.iridescence, I.mat.iridIor, I.mat.iridThickness, nDotV, f0);
       // Subsurface and translucency (C9) take the diffuse share by chance: mode 1 walks the volume, mode 2 passes the
       // diffuse to the far side; otherwise the plain diffuse.
       int dm = 0;
@@ -1439,8 +1460,8 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          float pB = 0.0;
          float3 fe = hairM ? hairBsdf(V, ld, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pB) * lterms.x
-                  : dm == 2 ? ptEvalT(n, V, ld, base, metal, rough, f0, lterms, pB)
-                           : ptEval(n, V, ld, base, metal, rough, f0, dm == 1 ? float2(0.0, lterms.y) : lterms, pB);
+                  : dm == 2 ? ptEvalT(n, V, ld, base, metal, rough, f0, lterms, msK, pB)
+                           : ptEval(n, V, ld, base, metal, rough, f0, dm == 1 ? float2(0.0, lterms.y) : lterms, msK, pB);
          if (shW > 0.0 || ccW > 0.0)
          {
             // Sheen and clearcoat on the light sample (the raster's lobes); bounces see the base BSDF.
@@ -1479,7 +1500,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             // The specular lobe on its own (the walk takes the diffuse share).
             const float3 nd = reflect(d, ggxSampleH(n, max(0.002, rough * rough), rnd(seed), rnd(seed)));
             float pd = 0.0;
-            const float3 fs = ptEval(n, V, nd, base, metal, rough, f0, float2(0.0, 1.0), pd);
+            const float3 fs = ptEval(n, V, nd, base, metal, rough, f0, float2(0.0, 1.0), msK, pd);
             const float ps = pd - lq.y * max(dot(n, nd), 0.0) / 3.14159265;
             if (ps <= 1e-6 || dot(ns, nd) <= 0.0) break;
             T *= fs / ps; lastPdfB = pd; skyK = float3(1.0);
@@ -1491,7 +1512,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             // drawn per step, weighted by the mixture of the three pdfs), isotropic scattering at a single-scatter albedo
             // inverted from the base colour (so the walk's total albedo is close to it), out where a flight meets a
             // surface. There the light leaves as a white Lambert surface (the colour is in the throughput).
-            const float3 Fv = f0 + (float3(1.0) - f0) * ptS5(nDotV);
+            const float3 Fv = ptF(nDotV, f0);
             float3 Tw = (float3(1.0) - Fv) * (1.0 - metal) / max(lq.y, 1e-3);
             const float3 sg = 1.0 / max(float3(I.mat.sssRadius) * SSS_D, float3(1e-4));
             const float3 A = clamp(base, 0.0, 0.999);
@@ -1571,7 +1592,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       else if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); skyK = float3(1.0); }
       else { nd = cosineDir(dm == 2 ? -n : n, rnd(seed), rnd(seed)); skyK = f.ambient.xyz * 3.0; }
       float pdfB = 0.0;
-      float3 fB = dm == 2 ? ptEvalT(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB) : ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
+      float3 fB = dm == 2 ? ptEvalT(n, V, nd, base, metal, rough, f0, float2(1.0), msK, pdfB) : ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), msK, pdfB);
       float pdfC = 0.0;
       const float cnL = dot(n, nd);
       if (pC > 0.0 && cnL > 0.0)
@@ -1861,7 +1882,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    // The material record (Render3DMaterial.h) as the shader's InstU / RInst carry it.
    struct InstU { float model[16], normalM[16]; R3dMatH mat; };
    struct RInstH { uint64_t vb, ib, uvb, pad0; float normalM[16]; R3dMatH mat; };
-   static_assert(sizeof(InstU) == 384 && sizeof(RInstH) == 352, "InstU / RInst layout as the shader's");
+   static_assert(sizeof(InstU) == 400 && sizeof(RInstH) == 368, "InstU / RInst layout as the shader's");
    void Lin3x(const float* c, float* o) { for (int i = 0; i < 3; i++) o[i] = ToLin(c[i]); }
    // The surface the GI and reflection rays see: base, metal, roughness, ior, emission (no maps, sheen or hair).
    void FillMatRays(const engine::Instance& in, R3dMatH& m)
@@ -1894,6 +1915,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       m.breakup = in.breakup; m.detailScale = in.detailScale; m.detailStrength = in.detailStrength;
       m.hairFrom = (float)in.hairFrom; m.hairRadialNeg = -std::max(in.hairRadial, 0.0f); m.hairShift = in.hairShift;
       m.subsurface = in.subsurface; m.translucency = in.translucency;
+      m.iridescence = in.iridescence; m.iridIor = in.iridescenceIor; m.iridThickness = in.iridescenceThickness;
    }
    // A run the depth prepass leaves out: it cuts pixels away, so its depth is known only once it is shaded.
    bool SeeThrough(const InstU& u) { return u.mat.clear > 0.0f || u.mat.mapOpacity > 0.5f || u.mat.alphaCutoff > 0.0f; }
@@ -2015,6 +2037,42 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       // The HDRI as a mipmapped half-float texture, re-uploaded only when its revision changes; a 1x1 stand-in
       // otherwise so the shaders always have a texture bound at 9.
+      // E(mu, r): directional albedo of the settle tracer's specular lobe (GGX, height-correlated Smith) at F = 1,
+      // by quadrature over half vectors drawn from the NDF. 16x16, x = nV, y = roughness; ptMs reads it.
+      id<MTLTexture> ELut()
+      {
+         if (mELut)
+            return mELut;
+         const int kN = 16;
+         std::vector<uint16_t> e((size_t)kN * kN);
+         for (int y = 0; y < kN; y++)
+            for (int x = 0; x < kN; x++)
+            {
+               const float mu = (x + 0.5f) / kN, r = (y + 0.5f) / kN;
+               const float a = std::max(0.002f, r * r), a2 = a * a;
+               const int n1 = 64, n2 = 128;
+               double sum = 0.0;
+               for (int i = 0; i < n1; i++)
+                  for (int j = 0; j < n2; j++)
+                  {
+                     const float u1 = (i + 0.5f) / n1, ph = 6.2831853f * (j + 0.5f) / n2;
+                     const float ct = std::sqrt((1.0f - u1) / (1.0f + (a2 - 1.0f) * u1)), st = std::sqrt(std::max(0.0f, 1.0f - ct * ct));
+                     const float vh = std::sqrt(std::max(0.0f, 1.0f - mu * mu)) * st * std::cos(ph) + mu * ct;
+                     const float nl = 2.0f * vh * ct - mu;
+                     if (vh <= 0.0f || nl <= 0.0f)
+                        continue;
+                     const float gV = nl * std::sqrt(a2 + (1.0f - a2) * mu * mu), gL = mu * std::sqrt(a2 + (1.0f - a2) * nl * nl);
+                     sum += (0.5f / (gV + gL)) * nl * 4.0f * vh / std::max(ct, 1e-6f); // Vis * nL / pdf, pdf = D nH / (4 vH)
+                  }
+               e[(size_t)y * kN + x] = (uint16_t)std::lround(std::min(1.0, std::max(0.0, sum / (n1 * n2))) * 65535.0);
+            }
+         MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatR16Unorm width:kN height:kN mipmapped:NO];
+         d.usage = MTLTextureUsageShaderRead;
+         mELut = [mDev newTextureWithDescriptor:d];
+         [mELut replaceRegion:MTLRegionMake2D(0, 0, kN, kN) mipmapLevel:0 withBytes:e.data() bytesPerRow:kN * sizeof(uint16_t)];
+         return mELut;
+      }
+      id<MTLTexture> mELut = nil;
       bool EnsureEnv(const engine::Frame& fr)
       {
          const bool want = fr.envPixels != nullptr && fr.envW > 0 && fr.envH > 0;
@@ -2814,6 +2872,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e setFragmentBuffer:mArgBuf offset:0 atIndex:3];
             [e setFragmentBuffer:infoBuf offset:0 atIndex:4];
             [e setFragmentBuffer:mEmBuf offset:0 atIndex:5];
+            [e setFragmentTexture:ELut() atIndex:8];
             [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
             [e setFragmentTexture:mPtAux[mPtCur] atIndex:1];

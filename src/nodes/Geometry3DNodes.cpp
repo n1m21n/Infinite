@@ -1,6 +1,7 @@
 #include "Geometry3DNodes.h"
 #include "Render3DTonemap.h"
 #include "Render3DSheen.h"
+#include "Render3DThinFilm.h"
 #include "Render3DBsdf.h"
 #include "Render3DFresnel.h"
 #include "Render3DAb.h"
@@ -753,14 +754,7 @@ namespace
       "#define HAIR_ATAN2(y, x) atan(y, x)\n"
       "#define HAIR_OUT out float\n"
       R3D_HAIR_SRC
-      "vec3 evalIridescence(float nDotV, float iridIor, float thickness) {\n"
-      "   float sinTheta2 = max(1.0 - nDotV * nDotV, 0.0);\n"
-      "   float cosThetaPrime = sqrt(max(iridIor * iridIor - sinTheta2, 0.0));\n"
-      "   float delta = 2.0 * 3.14159265 * thickness * cosThetaPrime;\n"
-      "   vec3 lambda = vec3(650.0, 530.0, 470.0);\n"
-      "   vec3 phi = delta / lambda;\n"
-      "   return 0.5 + 0.5 * cos(phi);\n"
-      "}\n"
+      R3D_THINFILM_SRC
       "float geometrySchlickGGX(float nDotV, float rough) {\n"
       "   float r = rough + 1.0;\n"
       "   float k = (r * r) / 8.0;\n"
@@ -820,13 +814,17 @@ namespace
       "   vec3 sampled;\n"
       "   vec2 dx = dFdx(uv), dy = dFdy(uv);\n"
       "   if (uNormalBump == 1) {\n"
-      "      vec2 px = 1.0 / vec2(textureSize(uNormalMap, 0));\n"
+      // The four taps sit one texel apart at the mip the sampler reads (0 without mips), so a far bump keeps its
+      // true mean slope instead of flattening.
+      "      vec2 tsz = vec2(textureSize(uNormalMap, 0));\n"
+      "      float mipS = sqrt(max(max(dot(dx * tsz, dx * tsz), dot(dy * tsz, dy * tsz)), 1.0));\n"
+      "      vec2 px = mipS / vec2(textureSize(uNormalMap, 0));\n"
       "      const vec3 lum = vec3(0.2126, 0.7152, 0.0722);\n"
       "      float hl = dot((tile ? tapRepeat(uNormalMap, uv - vec2(px.x, 0.0), dx, dy) : tapMap(uNormalMap, uv - vec2(px.x, 0.0))).rgb, lum);\n"
       "      float hr = dot((tile ? tapRepeat(uNormalMap, uv + vec2(px.x, 0.0), dx, dy) : tapMap(uNormalMap, uv + vec2(px.x, 0.0))).rgb, lum);\n"
       "      float hd = dot((tile ? tapRepeat(uNormalMap, uv - vec2(0.0, px.y), dx, dy) : tapMap(uNormalMap, uv - vec2(0.0, px.y))).rgb, lum);\n"
       "      float hu = dot((tile ? tapRepeat(uNormalMap, uv + vec2(0.0, px.y), dx, dy) : tapMap(uNormalMap, uv + vec2(0.0, px.y))).rgb, lum);\n"
-      "      sampled = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));\n"
+      "      sampled = normalize(vec3((hl - hr) * 2.0 / mipS, (hd - hu) * 2.0 / mipS, 1.0));\n"
       "   } else {\n"
       "      sampled = (tile ? tapRepeat(uNormalMap, uv, dx, dy) : tapMap(uNormalMap, uv)).rgb * 2.0 - 1.0;\n"
       "   }\n"
@@ -1199,8 +1197,7 @@ namespace
       "      float g = R3D_G2(nDotV, nDotL, rough);\n"
       "      vec3 f = fresnelSchlick(max(dot(halfway, viewDir), 0.0), f0);\n"
       "      if (uIridescence > 0.0) {\n"
-      "         vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
-      "         f = mix(f, f * irid * 2.0, uIridescence);\n"
+      "         f *= thinFilmGain(nDotV, uIridescenceIor, uIridescenceThickness, f0, uIridescence);\n"
       "      }\n"
       "      vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 1e-7);\n"
       "      specular *= ggxMs(f0, rough, nDotV);\n"
@@ -1252,8 +1249,7 @@ namespace
       "   }\n"
       "   vec3 fAmbient = fresnelSchlickRoughness(nDotV, f0, rough);\n"
       "   if (uIridescence > 0.0) {\n"
-      "      vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
-      "      fAmbient = mix(fAmbient, fAmbient * irid * 2.0, uIridescence);\n"
+      "      fAmbient *= thinFilmGain(nDotV, uIridescenceIor, uIridescenceThickness, f0, uIridescence);\n"
       "   }\n"
       "   col += ((vec3(1.0) - fAmbient) * (1.0 - metal) * base * shBase + uSheenColor * (sh * shEv)) * irradiance * ao * ccAtten;\n"
       "   col += reflection * fAmbient * ao * ccAtten * shBase;\n"
@@ -3443,6 +3439,13 @@ void Render3DNode::CookOnce(int frameId)
             glBindTexture(GL_TEXTURE_2D, tex != 0 ? tex : WhiteTexture());
             if (tex != 0)
             {
+               // Mips + trilinear, as the albedo: a far map averages instead of aliasing. One level sharper than
+               // the footprint, since the reference keeps fine map detail the exact level would blur (measured).
+               PrepareSurfaceTexture(wrapMode);
+               glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -1.0f);
+            }
+            else if (tex != 0)
+            {
                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapMode);
                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapMode);
             }
@@ -3730,7 +3733,6 @@ void Render3DNode::CookOnce(int frameId)
       // Put the secondary maps' wrap mode back to the FBO default they were
       // created with - same reasoning as RestoreSurfaceTexture below: these
       // textures are owned by other nodes and must not be left mutated.
-      if (wrapMode != GL_CLAMP_TO_EDGE)
       {
          static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10, 13, 14 };
          for (int map = kMapRoughness; map < kMapCount; map++)
@@ -3740,6 +3742,8 @@ void Render3DNode::CookOnce(int frameId)
                continue;
             glActiveTexture(GL_TEXTURE0 + kMapUnit[map]);
             glBindTexture(GL_TEXTURE_2D, tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
          }

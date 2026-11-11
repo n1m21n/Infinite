@@ -24,7 +24,8 @@
    F1(coat) F1(coatRoughness) F1(f0Extra) \
    F3(boxLo) F3(boxHi) F1(breakup) F1(detailScale) F1(detailStrength) \
    F1(hairFrom) F1(hairRadialNeg) F1(hairShift) F3(hairSigma) \
-   F3(sssRadius) F1(subsurface) F1(translucency)
+   F3(sssRadius) F1(subsurface) F1(translucency) \
+   F1(iridescence) F1(iridIor) F1(iridThickness) F1(pad0)
 
 #define R3D_MAT_MSL_F3(n) "packed_float3 " #n "; "
 #define R3D_MAT_MSL_F1(n) "float " #n "; "
@@ -33,4 +34,4 @@
 #define R3D_MAT_C_F3(n) float n[3];
 #define R3D_MAT_C_F1(n) float n;
 struct R3dMatH { R3D_MAT_FIELDS(R3D_MAT_C_F3, R3D_MAT_C_F1) };
-static_assert(sizeof(R3dMatH) == 256, "MatRec: 64 floats (keep a multiple of 16 bytes)");
+static_assert(sizeof(R3dMatH) == 272, "MatRec: 68 floats (keep a multiple of 16 bytes)");

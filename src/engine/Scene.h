@@ -57,6 +57,7 @@ namespace engine
       // passed to the back side).
       float subsurface = 0.0f, sssRadius[3] = { 0.0f, 0.0f, 0.0f };
       float translucency = 0.0f;
+      float iridescence = 0.0f, iridescenceIor = 1.3f, iridescenceThickness = 400.0f; // thin film (Render3DThinFilm.h)
       bool castShadow = true; // false: drawn and seen by bounces, but shadow rays and the shadow map pass it by
    };
 

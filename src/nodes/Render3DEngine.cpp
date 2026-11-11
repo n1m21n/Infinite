@@ -242,6 +242,7 @@ bool Render3DNode::CookEngine(int frameId)
       for (int k = 0; k < 3; k++)
          in.sssRadius[k] = std::max(mat.subsurfaceColor[k], 0.0f) * 0.2f * std::max(mat.subsurfaceRadius, 0.0f);
       in.translucency = std::clamp(mat.translucency, 0.0f, 1.0f);
+      in.iridescence = mat.iridescence; in.iridescenceIor = mat.iridescenceIor; in.iridescenceThickness = mat.iridescenceThickness;
       if (mat.hair)
       {
          float lc[3], lt[3];
@@ -503,7 +504,7 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.mapAlbedo, 16); mix(&in.wrap, 4); mix(&in.normalStrength, 4); mix(&in.normalBump, 4);
       mix(&in.sheen, 4); mix(in.sheenColor, 12); mix(&in.sheenRoughness, 4);
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
-      mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20);
+      mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);
       { const int cs = in.castShadow ? 1 : 0; mix(&cs, 4); }
    }
    for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);
