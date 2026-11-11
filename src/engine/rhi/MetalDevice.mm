@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #import <Metal/Metal.h>
 #import <IOSurface/IOSurface.h>
@@ -48,7 +49,11 @@ struct FrameU
    float4 envm;     // x: 1 = HDRI map, +2 = HDRI background; y rotation (rad); z max lod (GL levels); w the map's base lod
    LightU lights[8]; // vec.w = type, aim.w unused
 };
-struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; float4 em; }; // base linear rgb; mr = metallic, roughness, transmission, ior; em = linear emission * strength
+struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; float4 em; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; }; // base linear rgb; mr = metallic, roughness, transmission, ior; em = linear emission * strength;
+// tx = map index + 1 (albedo, roughness, metallic, normal; 0 = none); sh = sheen, sheen roughness, normal strength, wrap + 4 * bump; shc = sheen colour
+// tx2 = ao, emission, sheen, opacity maps; tx3 = clearcoat, transmission maps; mp0 = mapping space, triplanar, alpha cutoff,
+// 1 - opacity; msc/mro/mtr = mapping scale / rotation / offset, w = clearcoat, coat roughness, dielectric F0 - 0.04;
+// olo/ohi = the mesh box, w = breakup, detail scale; dt.x = detail strength. Zero everywhere = the plain material.
 // INV_POS: the second, invariant compile used by the depth prepass and the shaded runs after it (exact same depth);
 // plain raster keeps the faster non-invariant build.
 #ifdef INV_POS
@@ -56,7 +61,7 @@ struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; float4 
 #else
 #define VPOS [[position]]
 #endif
-struct VOut { float4 pos VPOS; float3 wp; float3 n; };
+struct VOut { float4 pos VPOS; float3 wp; float3 n; float2 uv; float3 lp; };
 
 vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                  constant InstU& m [[buffer(2)]])
@@ -67,7 +72,7 @@ vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], co
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5; // GL clip depth -1..1 to Metal 0..1
    c.y = -c.y;              // the shared image is read by GL, whose row 0 is the bottom
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; return o;
 }
 
 float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float rough)
@@ -116,12 +121,42 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
    return h.type == intersection_type::triangle;
 }
-struct RInst { float4 bm; float4 rg; float4 em; ulong vb; ulong ib; float4x4 normalM; }; // em: linear emission * strength
+// A sun's shadow as its disc (angleDeg across, as settle's cone and Cycles' sun angle): four probe rays first; only
+// where they disagree (the penumbra) twelve more on a golden-angle spiral, turned and jittered per
+// pixel by a hash so the thin sampling reads as fine grain, not bands. 0 = fully blocked, 1 = open.
+uint pcg(uint v);
+float rnd(thread uint& s);
+float sunVis(instance_acceleration_structure tlas, float3 o, float3 ld, float angleDeg, float2 pix)
+{
+   if (angleDeg <= 0.0) return occluded(tlas, o, ld, 1e4) ? 0.0 : 1.0;
+   const float tr = tan(angleDeg * 0.5 * 0.017453292);
+   const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
+   const float3 ay = cross(ld, ax);
+   uint s = pcg(uint(pix.x) * 7919u + 104729u * uint(pix.y) + 31u);
+   const float rot = 6.2831853 * rnd(s);
+   // Four probes in a cross at 0.9 of the disc: one pair always spans the edge whichever way it runs, so the
+   // penumbra never snaps to 0/1 (two opposite probes agree whenever they lie along the edge -> dither).
+   float v = 0.0;
+   for (int i = 0; i < 4; i++)
+   {
+      const float an = rot + float(i) * 1.5707963;
+      v += occluded(tlas, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * (0.9 * tr)), 1e4) ? 0.0 : 1.0;
+   }
+   if (v == 0.0 || v == 4.0) return v * 0.25;
+   for (int i = 0; i < 12; i++)
+   {
+      const float an = rot + 0.7853982 + float(i) * 2.399963, r = sqrt((float(i) + rnd(s)) / 12.0) * tr;
+      v += occluded(tlas, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4) ? 0.0 : 1.0;
+   }
+   return v / 16.0;
+}
+struct RInst { float4 bm; float4 rg; float4 em; ulong vb; ulong ib; float4x4 normalM; ulong uvb; ulong pad0; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; }; // em: linear emission * strength; uvb/tx/sh: the maps, as InstU
+float3 cosineDir(float3 n, float u1, float u2);
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
 float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
                 bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, thread float3& mir, bool withEnv = true, int pick = -1,
-                bool withSpec = true)
+                bool withSpec = true, float2 envU = float2(-1.0))
 {
    alb = float3(0.0); mir = float3(0.0);
    intersector<triangle_data, instancing> it;
@@ -142,7 +177,14 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
    if (dot(n, d) > 0.0) n = -n;
    const float3 p = o + d * h.distance;
    const float3 base = I.bm.xyz; const float metal = I.bm.w;
-   const float3 envIrr = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
+   float3 envIrr = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
+   if (envU.x >= 0.0 && withEnv)
+   {
+      // A bounce's sky light, occluded: one cosine ray, the env along it when it escapes. The unoccluded form above lit
+      // every off-screen wall of a room with the whole sky (interior case 7x Cycles' brightness).
+      const float3 sd = cosineDir(n, envU.x, envU.y);
+      envIrr = occluded(tlas, p + n * f.shQ.w, sd, 1e4) ? float3(0.0) : sampleEnv(f, et, sd, 1.0) * f.ambient.xyz * 3.0;
+   }
    float3 diff = float3(0.0);
    const int count = int(f.params.w);
    // pick >= 0: one light chosen by the caller, weighted by the light count (unbiased, one shadow ray per bounce).
@@ -220,7 +262,7 @@ float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceler
       float3 hp2, hn2, alb2, mir2;
       const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
       const int pk = int(rnd(seed) * f.params.w);
-      const float3 L2 = shadeHit(f, et, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, pk);
+      const float3 L2 = shadeHit(f, et, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, pk, true, float2(rnd(seed), rnd(seed)));
       L += alb * L2 * f.gi.y / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)); // later bounces as GI's geometric tail
    }
    return L;
@@ -248,10 +290,9 @@ float3 agxTone(float3 c)
                                     float3(-0.0980208811401368, 1.15190312990417, -0.0980434501171241),
                                     float3(-0.0990297440797205, -0.0989611768448433, 1.15107367264116));
    float3 x = clamp((log2(max(inset * c, float3(1e-10))) + 12.47393) / 16.5, 0.0, 1.0);
-   const float3 x2 = x * x, x4 = x2 * x2;
-   x = 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232;
+   x = clamp(((((((((-246.535442) * x + 984.731367) * x - 1568.41656) * x + 1268.06241) * x - 553.234808) * x + 130.459845) * x - 14.9498445) * x + 0.887512984) * x - 0.00843336545, 0.0, 1.0); // fit to Blender's AgX (Render3DTonemap.h)
    x = max(outset * x, float3(0.0));
-   return select(pow((x + 0.055) / 1.055, float3(2.4)), x / 12.92, x < float3(0.04045));
+   return pow(x, float3(2.4));
 }
 float3 neutralTone(float3 c)
 {
@@ -272,6 +313,136 @@ float3 toneMap(float3 c, int t)
    return c;
 }
 float3 toSrgb(float3 c) { c = max(c, float3(0.0)); return select(1.055 * pow(c, float3(1.0 / 2.4)) - 0.055, c * 12.92, c < float3(0.0031308)); }
+// Material maps as Render 3D's GL path samples them: trilinear, anisotropy 8, the Material's wrap (0 clamp, 1 repeat, 2 mirror).
+constexpr sampler kMapC(filter::linear, mip_filter::linear, address::clamp_to_edge, max_anisotropy(8));
+constexpr sampler kMapR(filter::linear, mip_filter::linear, address::repeat, max_anisotropy(8));
+constexpr sampler kMapM(filter::linear, mip_filter::linear, address::mirrored_repeat, max_anisotropy(8));
+float4 mapS(texture2d<float> t, int wrap, float2 uv) { return wrap == 1 ? t.sample(kMapR, uv) : wrap == 2 ? t.sample(kMapM, uv) : t.sample(kMapC, uv); }
+float4 mapL(texture2d<float> t, int wrap, float2 uv, float lod) { return wrap == 1 ? t.sample(kMapR, uv, level(lod)) : wrap == 2 ? t.sample(kMapM, uv, level(lod)) : t.sample(kMapC, uv, level(lod)); }
+float3 mapLin(float3 c) { return select(pow((c + 0.055) / 1.055, float3(2.4)), c / 12.92, c < float3(0.04045)); }
+// Mapping (the Mapping node, as GL's computeMapUv / sampleMap): uv, generated (the mesh box) or object coordinates,
+// scaled, rotated and offset; outside uv, the dominant axis picks the plane or triplanar blends all three.
+struct MapX { int space; float tri; float3 sc, ro, tr, lo, hi; float brk; int wrap; };
+MapX mapX(float4 mp0, float4 msc, float4 mro, float4 mtr, float4 olo, float4 ohi, int wrap)
+{
+   MapX x; x.space = int(mp0.x + 0.5); x.tri = mp0.y; x.sc = msc.xyz; x.ro = mro.xyz; x.tr = mtr.xyz; x.lo = olo.xyz; x.hi = ohi.xyz;
+   x.brk = olo.w; x.wrap = wrap; return x;
+}
+float3 mapRot(float3 p, float3 r)
+{
+   const float cx = cos(r.x), sx = sin(r.x), cy = cos(r.y), sy = sin(r.y), cz = cos(r.z), sz = sin(r.z);
+   p = float3(p.x, cx * p.y - sx * p.z, sx * p.y + cx * p.z);
+   p = float3(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);
+   return float3(cz * p.x - sz * p.y, sz * p.x + cz * p.y, p.z);
+}
+float3 mapBase(MapX x, float2 uv, float3 lp)
+{
+   const float3 b = x.space == 1 ? (lp - x.lo) / max(x.hi - x.lo, float3(1e-5)) : x.space == 2 ? lp : float3(uv, 0.0);
+   return mapRot(b * x.sc, x.ro) + x.tr;
+}
+// Linear in b, so it also projects the screen derivatives of the base.
+float2 mapUv(MapX x, float3 b, float3 n)
+{
+   if (x.space == 0) return b.xy;
+   const float3 an = abs(n);
+   if (an.x >= an.y && an.x >= an.z) return b.yz;
+   if (an.y >= an.x && an.y >= an.z) return b.xz;
+   return b.xy;
+}
+float4 tapG(texture2d<float> t, int wrap, float2 uv, float2 gx, float2 gy, float lod)
+{
+   if (lod >= 0.0) return mapL(t, wrap, uv, lod);
+   const gradient2d g(gx, gy);
+   return wrap == 1 ? t.sample(kMapR, uv, g) : wrap == 2 ? t.sample(kMapM, uv, g) : t.sample(kMapC, uv, g);
+}
+float brkHash(float2 p) { return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
+float brkNoise(float2 p)
+{
+   const float2 i = floor(p); float2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+   return mix(mix(brkHash(i), brkHash(i + float2(1.0, 0.0)), f.x), mix(brkHash(i + float2(0.0, 1.0)), brkHash(i + float2(1.0, 1.0)), f.x), f.y);
+}
+// Breakup (texture-repetition hiding after Quilez): a slow noise picks one of 8 offsets of the tile per area, and two
+// neighbouring picks blend where the noise crosses between them, so no two tiles repeat side by side.
+float4 mapTap(texture2d<float> t, MapX x, float2 uv, float2 gx, float2 gy, float lod)
+{
+   if (x.brk <= 0.001) return tapG(t, x.wrap, uv, gx, gy, lod);
+   const float k = brkNoise(uv * 0.6) * 8.0;
+   const float i = floor(k), fk = k - i;
+   const float2 oa = sin(float2(3.0, 7.0) * i), ob = sin(float2(3.0, 7.0) * (i + 1.0));
+   // A broken-up map tiles by nature: the offsets read past 0..1, so it always repeats.
+   const float4 ca = tapG(t, 1, uv + oa, gx, gy, lod), cb = tapG(t, 1, uv + ob, gx, gy, lod);
+   const float4 u = mix(ca, cb, smoothstep(0.2, 0.8, fk - 0.1 * dot(ca.rgb - cb.rgb, float3(1.0))));
+   return x.brk >= 0.999 ? u : mix(tapG(t, 1, uv, gx, gy, lod), u, x.brk);
+}
+float2 prj(float3 v, int a) { return a == 0 ? v.yz : a == 1 ? v.xz : v.xy; }
+// lod < 0: the raster's screen gradients (bx, by: derivatives of the base); else an explicit level (the tracer).
+float4 mapSample(texture2d<float> t, MapX x, float3 b, float3 n, float3 bx, float3 by, float lod)
+{
+   if (x.space == 0 || x.tri <= 0.001) return mapTap(t, x, mapUv(x, b, n), mapUv(x, bx, n), mapUv(x, by, n), lod);
+   const float sharp = 1.0 + (1.0 - x.tri) * 7.0;
+   float3 w = pow(max(abs(n), float3(1e-4)), float3(sharp));
+   w /= (w.x + w.y + w.z);
+   float4 c = float4(0.0);
+   for (int a = 0; a < 3; a++) c += mapTap(t, x, prj(b, a), prj(bx, a), prj(by, a), lod) * w[a];
+   return c;
+}
+// The tangent-space sample (GL's applyNormalMap): a normal map, or with bump a grey height map's central differences.
+float3 mapTangent(texture2d<float> t, MapX x, bool bump, float strength, float2 uv, float2 gx, float2 gy, float lod)
+{
+   float3 s;
+   if (bump)
+   {
+      const float2 px = exp2(max(lod, 0.0)) / float2(t.get_width(), t.get_height());
+      const float3 lum = float3(0.2126, 0.7152, 0.0722);
+      const float hl = dot(mapTap(t, x, uv - float2(px.x, 0.0), gx, gy, lod).rgb, lum), hr = dot(mapTap(t, x, uv + float2(px.x, 0.0), gx, gy, lod).rgb, lum);
+      const float hd = dot(mapTap(t, x, uv - float2(0.0, px.y), gx, gy, lod).rgb, lum), hu = dot(mapTap(t, x, uv + float2(0.0, px.y), gx, gy, lod).rgb, lum);
+      s = normalize(float3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));
+   }
+   else s = mapTap(t, x, uv, gx, gy, lod).rgb * 2.0 - 1.0;
+   s.xy *= strength;
+   s.z = max(s.z, 1e-3); // a texel with z <= 0 would flip the surface
+   return s;
+}
+// The normal map and its detail read (the same map at uv * detail scale), whiteout-blended.
+float3 mapNormalTS(texture2d<float> t, MapX x, bool bump, float strength, float2 uv, float2 gx, float2 gy, float lod, float dScale, float dStrength)
+{
+   float3 s = mapTangent(t, x, bump, strength, uv, gx, gy, lod);
+   if (dScale > 0.0)
+   {
+      MapX xd = x; xd.wrap = 1; // the detail always tiles
+      const float3 d = mapTangent(t, xd, bump, dStrength, uv * dScale, gx * dScale, gy * dScale, lod);
+      s = normalize(float3(s.xy + d.xy, s.z * d.z));
+   }
+   return s;
+}
+float coatSpec(float nDotH, float nDotV, float nDotL, float vDotH, float r)
+{
+   return distGGX(nDotH, r) * geomSchlick(nDotV, r) * geomSchlick(nDotL, r) * (0.04 + 0.96 * pow(1.0 - vDotH, 5.0)) / max(4.0 * nDotV * nDotL, 1e-7);
+}
+// Sheen: Cycles' microfiber lobe, an LTC fitted to Blender measurements; see Render3DSheen.h for the tables.
+// Rows roughness 0.1..1.0 step 0.15, columns cos(view) 0..1 in 11 steps.
+constant float kSheenE[84] = { 0.1027, 0.0530, 0.0033, 0.0003, 0.0001, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.5498, 0.3736, 0.1973, 0.0804, 0.0304, 0.0117, 0.0049, 0.0023, 0.0012, 0.0007, 0.0004, 0.0003, 0.6310, 0.5032, 0.3755, 0.2530, 0.1616, 0.0997, 0.0601, 0.0357, 0.0214, 0.0129, 0.0078, 0.0052, 0.6578, 0.5674, 0.4771, 0.3802, 0.2955, 0.2242, 0.1681, 0.1236, 0.0898, 0.0648, 0.0459, 0.0330, 0.6782, 0.6124, 0.5467, 0.4733, 0.4033, 0.3394, 0.2834, 0.2353, 0.1939, 0.1593, 0.1296, 0.1068, 0.7049, 0.6549, 0.6049, 0.5473, 0.4907, 0.4377, 0.3893, 0.3464, 0.3080, 0.2738, 0.2433, 0.2191, 0.7385, 0.6970, 0.6555, 0.6077, 0.5618, 0.5185, 0.4800, 0.4453, 0.4144, 0.3874, 0.3636, 0.3441 };
+constant float kSheenA[84] = { 0.05, 0.05, 0.05, 0.0748, 0.0996, 0.1492, 0.1739, 0.1987, 0.22, 0.24, 0.26, 0.28, 0.1243, 0.1491, 0.1739, 0.1987, 0.2235, 0.2235, 0.2483, 0.2731, 0.2979, 0.2979, 0.3475, 0.3971, 0.2483, 0.2731, 0.2979, 0.3227, 0.3475, 0.3723, 0.3971, 0.3971, 0.4218, 0.4466, 0.4714, 0.4962, 0.3722, 0.397, 0.4218, 0.4466, 0.4962, 0.521, 0.521, 0.5458, 0.5458, 0.5706, 0.5954, 0.5954, 0.521, 0.5458, 0.5706, 0.5954, 0.6202, 0.645, 0.6697, 0.6697, 0.6945, 0.6945, 0.7193, 0.7193, 0.6697, 0.6945, 0.7193, 0.7441, 0.7689, 0.7689, 0.7689, 0.7937, 0.7937, 0.7937, 0.8185, 0.8185, 0.7689, 0.7937, 0.8185, 0.8433, 0.8433, 0.8681, 0.8681, 0.8681, 0.8681, 0.8681, 0.8681, 0.8681 };
+constant float kSheenB[84] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.05, -0.05, -0.05, -0.025, -0.025, -0.025, -0.025, -0.05, -0.05, -0.05, -0.05, -0.025, -0.1, -0.1, -0.075, -0.05, -0.05, -0.05, -0.025, -0.025, -0.025, -0.05, -0.05, -0.025, -0.15, -0.15, -0.125, -0.1, -0.075, -0.075, -0.05, -0.05, -0.05, -0.05, -0.025, -0.025, -0.15, -0.15, -0.125, -0.1, -0.1, -0.075, -0.075, -0.075, -0.05, -0.05, -0.025, -0.025, -0.075, -0.075, -0.075, -0.075, -0.075, -0.05, -0.05, -0.05, -0.05, -0.025, -0.025, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+float sheenLut(constant float* t, float mu, float r)
+{
+   const float x = clamp(mu, 0.0, 1.0) * 11.0, y = clamp((r - 0.1) / 0.15, 0.0, 6.0);
+   const int x0 = min(int(x), 10), y0 = min(int(y), 5);
+   const float fx = x - float(x0), fy = y - float(y0);
+   const float a = mix(t[y0 * 12 + x0], t[y0 * 12 + x0 + 1], fx);
+   const float b = mix(t[(y0 + 1) * 12 + x0], t[(y0 + 1) * 12 + x0 + 1], fx);
+   return mix(a, b, fy);
+}
+float sheenE(float mu, float r) { return sheenLut(kSheenE, mu, r); }
+float sheenLtc(float nL, float nV, float lv, float r)
+{
+   const float a = sheenLut(kSheenA, nV, r), b = sheenLut(kSheenB, nV, r);
+   const float st = sqrt(max(1.0 - nL * nL, 0.0));
+   const float x = clamp((lv - nL * nV) / max(sqrt(max(1.0 - nV * nV, 0.0)), 1e-4), -st, st);
+   const float wx = a * x + b * nL, q = wx * wx + a * a * max(st * st - x * x, 0.0) + nL * nL;
+   return sheenE(nV, r) * a * a / (3.14159265 * max(q * q, 1e-8));
+}
+float maxc(float3 c) { return max(c.x, max(c.y, c.z)); }
 
 // ---- Half-res RT shadows (C18): vis_fs traces one shadow ray per light (aim.w = channel) at full-res pixel 2q
 // from the depth prepass; r_fs takes the 2x2 texels around it that lie on its surface (distance within 2%), and
@@ -314,7 +485,8 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       float3 ld; float tmax = 1e4;
       if (type == 1 || type == 4) { const float3 tl = L.vec.xyz - p; const float dist = length(tl); ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0); }
       else ld = normalize(L.vec.xyz);
-      if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) o.v[ch] = 0.0;
+      if (type == 1 || type == 4) { if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) o.v[ch] = 0.0; }
+      else o.v[ch] = sunVis(rtArgs.tlas, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px));
    }
    return o;
 }
@@ -342,20 +514,71 @@ float upVis(texture2d<float> vt, texture2d<float> vd, float2 pos, float dist, in
 fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
                      constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
-                     texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]])
+                     texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]],
+                     array<texture2d<float>, 16> maps [[texture(10)]])
 {
    float3 n = normalize(in.n);
-   const float3 base = m.base.xyz;
-   const float metal = clamp(m.mr.x, 0.0, 1.0);
-   const float rough = clamp(m.mr.y, 0.045, 1.0);
+   float3 base = m.base.xyz;
+   float metalIn = m.mr.x, roughIn = m.mr.y;
+   const int wrapM = int(m.sh.w + 0.5) & 3;
+   // Every derivative first, in uniform control flow, before any map read or cutout.
+   const MapX mx = mapX(m.mp0, m.msc, m.mro, m.mtr, m.olo, m.ohi, wrapM);
+   const float3 mb = mapBase(mx, in.uv, in.lp);
+   const float3 mbx = dfdx(mb), mby = dfdy(mb);
+   const float3 dp1 = dfdx(in.wp), dp2 = dfdy(in.wp);
+   const float3 dnx = dfdx(in.n), dny = dfdy(in.n);
+   const float3 nP = n; // the projection's normal (triplanar weights, dominant plane)
+#define MAPR(slot) mapSample(maps[int(slot) - 1], mx, mb, nP, mbx, mby, -1.0)
+   if (m.tx.x > 0.5) base *= mapLin(MAPR(m.tx.x).rgb);
+   if (m.tx.y > 0.5) roughIn *= MAPR(m.tx.y).r;
+   if (m.tx.z > 0.5) metalIn *= MAPR(m.tx.z).r;
+   const float aoV = m.tx2.x > 0.5 ? MAPR(m.tx2.x).r : 1.0;
+   const float3 emMap = m.tx2.y > 0.5 ? mapLin(MAPR(m.tx2.y).rgb) : float3(1.0);
+   const float shW = m.sh.x * (m.tx2.z > 0.5 ? MAPR(m.tx2.z).r : 1.0);
+   const float shMax = shW * maxc(m.shc.xyz);
+   float alpha = 1.0 - m.mp0.w;
+   if (m.tx2.w > 0.5) alpha *= MAPR(m.tx2.w).r;
+   const float ccW = m.msc.w * (m.tx3.x > 0.5 ? MAPR(m.tx3.x).r : 1.0);
+   const float transMap = m.tx3.y > 0.5 ? MAPR(m.tx3.y).r : 1.0;
+#undef MAPR
+   if (alpha < 1.0)
+   {
+      // A cutoff cuts below it; without one, opacity is a coverage the frames average (a per-pixel threshold).
+      uint as = pcg(uint(in.pos.x) * 7919u + 104729u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 977u + 5u);
+      if (alpha < (m.mp0.z > 0.0 ? m.mp0.z : rnd(as))) discard_fragment();
+   }
+   const float metal = clamp(metalIn, 0.0, 1.0);
+   // Specular anti-aliasing (Kaplanyan / Tokuyoshi): where the normal turns faster than a pixel (waves at the horizon),
+   // the lobe widens by that variance, so a glitter path reads as one column instead of flickering sparkles.
+   const float nVar = min(2.0 * 0.25 * (dot(dnx, dnx) + dot(dny, dny)), 0.18);
+   const float rough = sqrt(clamp(sqrt(clamp(roughIn * roughIn * roughIn * roughIn + nVar, 0.0, 1.0)), 0.045 * 0.045, 1.0));
    const float3 viewDir = normalize(f.eye.xyz - in.wp);
    // Two-sided: the back of an open surface (a sail, a leaf) shades with the normal on the side we see, as Cycles
    // does; else it takes the far side's light and its shadow rays start on that side. The geometric normal decides,
    // so smooth normals that tip away at a silhouette are left alone.
-   float3 gN = cross(dfdx(in.wp), dfdy(in.wp));
+   float3 gN = cross(dp1, dp2);
    if (dot(gN, gN) > 1e-20) { gN = normalize(gN); if (dot(gN, viewDir) < 0.0) gN = -gN; if (dot(n, gN) < 0.0) n = -n; }
+   if (m.tx.w > 0.5)
+   {
+      // GL's cotangent frame from screen derivatives of position and the mapped uv (Schuler), then the tangent-space sample.
+      const float2 muv = mapUv(mx, mb, nP), duv1 = mapUv(mx, mbx, nP), duv2 = mapUv(mx, mby, nP);
+      const float3 dp2perp = cross(dp2, n), dp1perp = cross(n, dp1);
+      float3 t = dp2perp * duv1.x + dp1perp * duv2.x, bt = dp2perp * duv1.y + dp1perp * duv2.y;
+      if (max(dot(t, t), dot(bt, bt)) > 1e-12) { t = normalize(t); bt = normalize(bt); }
+      else { t = abs(n.z) < 0.999 ? normalize(cross(n, float3(0.0, 0.0, 1.0))) : normalize(cross(n, float3(1.0, 0.0, 0.0))); bt = normalize(cross(n, t)); }
+      const float3 s = mapNormalTS(maps[int(m.tx.w) - 1], mx, (int(m.sh.w + 0.5) & 4) != 0, m.sh.z, muv, duv1, duv2, -1.0, m.ohi.w, m.dt.x);
+      n = normalize(t * s.x + bt * s.y + n * s.z);
+   }
    const float nDotV = max(dot(n, viewDir), 1e-4);
-   const float3 f0 = mix(float3(0.04), base, metal); // ior 1.5, specular 1
+   const float shEv = shMax > 0.0 ? sheenE(nDotV, m.sh.y) : 0.0;
+   const float shV = 1.0 - shMax * shEv;          // the base layer's share under the sheen
+   const float3 shAmb = m.shc.xyz * (shW * shEv); // the sheen's own share of ambient light
+   const float3 f0 = mix(float3(0.04 + m.mtr.w), base, metal); // GL's dielectric F0 from ior and specular
+   // Clearcoat (GL's): a layer on top; what it reflects at this angle never reaches the base below.
+   const float ccR = clamp(m.mro.w, 0.02, 1.0);
+   const float ccFv = 0.04 + 0.96 * pow(1.0 - nDotV, 5.0);
+   const float ccAt = 1.0 - ccW * ccFv;
+   float3 coatCol = float3(0.0);
    float3 col = float3(0.0);
    float3 floorBounce = float3(0.0);
    const int count = int(f.params.w);
@@ -411,15 +634,29 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       else lightDir = normalize(L.vec.xyz);
       const float3 halfway = normalize(lightDir + viewDir);
       float nDotL;
-      if (type == 2) { const float wrap = 0.35; nDotL = max((dot(n, lightDir) + wrap) / (1.0 + wrap), 0.0); }
-      else nDotL = max(dot(n, lightDir), 0.0);
+      nDotL = max(dot(n, lightDir), 0.0); // no GL sun wrap: the tracer and Cycles have none, so live and settled agree
       if (type == 5) nDotL = max(nDotL, 1e-3); // the centre may face away while part of the rectangle is seen
       if (nDotL <= 0.0) continue;
       const float nDotH = max(dot(n, halfway), 0.0);
       const float d = distGGX(nDotH, rough);
       const float g = geomSchlick(nDotV, rough) * geomSchlick(nDotL, rough);
       const float3 fr = fresnel(max(dot(halfway, viewDir), 0.0), f0);
-      const float3 spec = (d * g * fr) / max(4.0 * nDotV * nDotL, 1e-7);
+      float3 spec = (d * g * fr) / max(4.0 * nDotV * nDotL, 1e-7);
+      if ((type == 0 || type == 2) && L.spot.x > 0.0)
+      {
+         // A sun disc, not a point: the highlight takes the disc direction nearest the mirror ray, on a lobe widened
+         // by the disc and renormalised (representative point, Karis 2013), so a glitter path is as wide as Cycles'.
+         const float sr = tan(L.spot.x * 0.5 * 0.017453292);
+         const float3 R = reflect(-viewDir, n);
+         const float3 ctr = dot(lightDir, R) * R - lightDir;
+         const float3 sd = normalize(lightDir + ctr * clamp(sr / max(length(ctr), 1e-6), 0.0, 1.0));
+         const float a = rough * rough, a2 = clamp(a + 0.5 * sr, 0.0, 1.0);
+         const float nls = max(dot(n, sd), 0.0);
+         const float3 hs = normalize(sd + viewDir);
+         const float ds = distGGX(max(dot(n, hs), 0.0), sqrt(a2)) * (a / a2) * (a / a2);
+         const float gs = geomSchlick(nDotV, rough) * geomSchlick(max(nls, 1e-4), rough);
+         spec = ds * gs * fresnel(max(dot(hs, viewDir), 0.0), f0) / max(4.0 * nDotV, 1e-7) * (nls / max(nDotL, 1e-4)); // * nDotL below
+      }
       const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
       const float3 radiance = radiance0 * atten;
       floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x;
@@ -435,28 +672,38 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
                vis = upVis(visT, visD, in.pos.xy, distance(in.wp, f.eye.xyz), int(L.aim.w + 0.5));
             if (vis < 0.0)
             {
-               const float tmax = (type == 1 || type == 4) ? max(length(L.vec.xyz - in.wp) - 0.01, 0.0) : 1e4;
-               vis = occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, tmax) ? 0.0 : 1.0;
+               if (type == 1 || type == 4)
+                  vis = occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0)) ? 0.0 : 1.0;
+               else
+                  vis = sunVis(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy);
             }
             shadow = mix(1.0 - f.shP.w, 1.0, vis);
          }
       }
-      col += (kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * radiance * nDotL * shadow;
+      float3 shS = float3(0.0);
+      float shK = 1.0;
+      if (shW > 0.0) // sheen: Cycles' microfiber lobe, over a base scaled by its albedo
+      {
+         shS = m.shc.xyz * sheenLtc(nDotL, nDotV, dot(lightDir, viewDir), m.sh.y) * shW;
+         shK = shV; // Cycles scales the base by the sheen albedo at the view angle only
+      }
+      col += ((kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * shK + shS * L.terms.y) * radiance * nDotL * shadow;
+      if (ccW > 0.0) coatCol += ccW * coatSpec(nDotH, nDotV, nDotL, max(dot(halfway, viewDir), 0.0), ccR) * L.terms.y * radiance * nDotL * shadow;
    }
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
    // GI and traced reflections run in tr_fs at half res; this pass writes their demodulated weights instead.
    const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0;
    const float3 fAmb = fresnelRough(nDotV, f0, rough);
-   const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb;
+   const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb * (aoV * ccAt * shV);
    const bool reflOn = (int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55;
    const float envKeep = reflOn ? smoothstep(0.3, 0.55, rough) : 1.0; // the env share of the reflection; the rest is traced
    const bool giOn = f.gi.x > 0.5;
-   if (!giOn) col += (float3(1.0) - fAmb) * (1.0 - metal) * base * irradiance;
+   if (!giOn) col += ((float3(1.0) - fAmb) * (1.0 - metal) * base * shV + shAmb) * irradiance * aoV;
    col += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
    // Glass (transmission): refract in, find the far side of the hit object, refract out (or reflect on total internal
    // reflection), shade what lies beyond. Tint and Fresnel as Render 3D's: beyond * mix(1, base, 0.4) * (1 - F).
    // Needs the TLAS; without it the glass shows the environment along one refracted ray.
-   const float trans = clamp(m.mr.z, 0.0, 1.0);
+   const float trans = clamp(m.mr.z * transMap, 0.0, 1.0);
    const bool rtOn = (int(f.shQ.z + 0.5) & 3) != 0 || f.gi.x > 0.5;
    if (trans > 0.0 && rtOn)
    {
@@ -497,7 +744,8 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
       col = mix(col, sampleEnv(f, et, rd, 0.0) * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
    }
-   col += m.em.xyz;
+   col = col * ccAt + coatCol + (ccW > 0.0 ? sampleEnv(f, et, reflect(-viewDir, n), ccR) * (ccW * ccFv) : float3(0.0));
+   col += m.em.xyz * emMap;
    const float opaque = (trans > 0.0 && rtOn) ? 1.0 - trans : 1.0; // glass takes no GI of its own
    FOut o;
    if (!kMrt)
@@ -510,8 +758,8 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    // With GI, the rough share of the reflection sees the room, not only the env: its lobe is wide enough that the
    // cosine-weighted GI radiance stands in for it (both carry the env on a miss, ambient * 3 == 1 in linear terms).
    o.c0 = float4((col + (giOn ? float3(0.0) : envRefl * envKeep)) * f.params.x, 1.0);
-   o.c1 = float4(giOn ? ((float3(1.0) - fAmb) * (1.0 - metal) * base * opaque + fAmb * envKeep) * f.gi.y * f.params.x : float3(0.0), rough); // GI weight
-   o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x, reflOn ? 1.0 : 0.0); // traced-reflection weight
+   o.c1 = float4(giOn ? (((float3(1.0) - fAmb) * (1.0 - metal) * base * opaque + fAmb * envKeep) * shV + shAmb * opaque) * f.gi.y * f.params.x * (aoV * ccAt) : float3(0.0), rough); // GI weight
+   o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x * (aoV * ccAt * shV), reflOn ? 1.0 : 0.0); // traced-reflection weight
    o.c3 = float4(n, length(in.wp - f.eye.xyz));
    return o;
 }
@@ -555,7 +803,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
          {
             // Metal hit: follow its mirror direction every frame (an env-only answer leaves what a mirror lights dark).
             float3 hp2, hn2, alb2, mir2;
-            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, reflect(dir, hn), 0.3, false, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
+            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, reflect(dir, hn), 0.3, false, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w), true, float2(rnd(seed), rnd(seed)));
             float3 irr2;
             L1 += mir * (hv && any(alb2 > 0.0) && histAt(f, nz, hist, hp2, hn2, irr2) ? L2 + alb2 * irr2
                                                                                   : L2 / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)));
@@ -566,7 +814,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
             // later bounces as the geometric tail of that hit's albedo.
             float3 hp2, hn2, alb2, mir2;
             const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
-            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w));
+            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w), true, float2(rnd(seed), rnd(seed)));
             const float a = clamp(dot(alb2, float3(0.3333)), 0.0, 0.8);
             L1 += alb * L2 * 2.0 / (1.0 - a);
          }
@@ -667,6 +915,51 @@ fragment float4 at_fs(SkyOut in [[stage_in]], constant AtU& u [[buffer(0)]], tex
    }
    return float4(sum / max(wsum, 1e-6), 1.0);
 }
+// Live depth of field: Render 3D's post blur (Render3DPost.cpp) on the finished picture. The circle of confusion is
+// aperture px x |d - focus| / d from the depth buffer; taps on a golden-angle spiral turned per pixel, each weighted by
+// whether its own circle reaches back here, so a sharp subject does not bleed onto a blurred background.
+struct DofU { float4x4 invVP; float4 info; float4 lens; float4 eye; }; // info: width, height, aperture px, max coc; lens: focus, blades, turn, ratio
+float dofCoc(constant DofU& u, depth2d<float> dt, int2 p)
+{
+   p = clamp(p, int2(0), int2(u.info.xy) - 1);
+   const float z = dt.read(uint2(p));
+   float dist = 1.0e4;
+   if (z < 0.999999)
+   {
+      const float2 ndc = float2(2.0 * (float(p.x) + 0.5) / u.info.x - 1.0, 2.0 * (float(p.y) + 0.5) / u.info.y - 1.0);
+      const float4 pw = u.invVP * float4(ndc, z * 2.0 - 1.0, 1.0);
+      dist = length(pw.xyz / pw.w - u.eye.xyz);
+   }
+   return clamp(u.info.z * abs(dist - u.lens.x) / max(dist, 1.0e-3), 0.0, u.info.w);
+}
+fragment float4 dof_fs(SkyOut in [[stage_in]], constant DofU& u [[buffer(0)]], texture2d<float> col [[texture(0)]], depth2d<float> dt [[texture(1)]])
+{
+   const int2 px = int2(in.pos.xy);
+   const float4 c0 = col.read(uint2(px));
+   const float coc0 = dofCoc(u, dt, px);
+   if (coc0 < 0.5) return c0;
+   float4 sum = c0; float wsum = 1.0;
+   const int taps = int(clamp(12.0 + coc0 * 2.0, 24.0, 48.0));
+   const float rot = 6.2831853 * fract(52.9829189 * fract(dot(in.pos.xy, float2(0.06711056, 0.00583715))));
+   for (int i = 0; i < taps; i++)
+   {
+      const float a = rot + float(i) * 2.399963;
+      float r = sqrt((float(i) + 0.5) / float(taps)) * coc0;
+      if (u.lens.y >= 3.0)
+      {
+         const float seg = 6.2831853 / u.lens.y;
+         r *= cos(0.5 * seg) / cos(fmod(fmod(a - u.lens.z, seg) + seg, seg) - 0.5 * seg);
+      }
+      float2 off = float2(cos(a), sin(a)) * r;
+      off *= u.lens.w >= 1.0 ? float2(1.0 / u.lens.w, 1.0) : float2(1.0, u.lens.w);
+      r = length(off);
+      const int2 q = clamp(px + int2(round(off)), int2(0), int2(u.info.xy) - 1);
+      const float w = clamp(dofCoc(u, dt, q) - r + 1.0, 0.0, 1.0);
+      if (w <= 0.0) continue;
+      sum += col.read(uint2(q)) * w; wsum += w;
+   }
+   return sum / wsum;
+}
 struct CompU { float4 p; float4 clear; }; // p.y tonemap, p.z HDRI background
 fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]], texture2d<float> hdr [[texture(0)]], texture2d<float> gi [[texture(1)]], texture2d<float> rfl [[texture(2)]],
                         texture2d<float> gw [[texture(3)]], texture2d<float> rw [[texture(4)]])
@@ -684,7 +977,8 @@ fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]],
 }
 
 // ---- path tracer: progressive, one sample per pass, accumulated in RGBA32F (rgb = radiance sum, a = coverage sum)
-struct PtU { float4x4 invVP; float4 info; float4 em; }; // info: x prior samples, y max bounces, z frame, w width; em: x emitter triangles, y chance to sample one
+struct PtU { float4x4 invVP; float4 info; float4 em; float4 lens; float4 lr; float4 lu; float4 lf; }; // info: x prior samples, y max bounces, z frame, w width; em: x emitter triangles, y chance to sample one
+// lens: thin-lens radius, focus distance, blades (below 3 round), blade turn; lr/lu/lf: camera right (w = bokeh ratio), up, forward
 // One emissive triangle in world space. p0.w: cumulative selection chance (by power); e1.w: selection chance / area.
 struct EmTri { float4 p0; float4 e1; float4 e2; float4 em; };
 float3 ggxSampleH(float3 n, float a, float u1, float u2)
@@ -731,7 +1025,8 @@ float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float roug
 }
 fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
-                      texture2d<float> prev [[texture(0)]], texture2d<float> et [[texture(9)]])
+                      texture2d<float> prev [[texture(0)]], texture2d<float> et [[texture(9)]],
+                      array<texture2d<float>, 16> maps [[texture(10)]])
 {
    const uint2 px = uint2(in.pos.xy);
    uint seed = pcg(px.x + 8192u * px.y) ^ pcg(uint(u.info.z) * 2654435761u + 17u);
@@ -740,6 +1035,24 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
    float4 pw = u.invVP * float4(ndc, 1.0, 1.0);
    float3 o = f.eye.xyz;
    float3 d = normalize(pw.xyz / pw.w - o);
+   if (u.lens.x > 0.0)
+   {
+      // Depth of field: a point on the aperture (round, or a polygon of lens.z blades turned by lens.w, stretched by
+      // the ratio as Render 3D's bokeh); the ray still meets the focus plane, so it stays sharp there.
+      const float3 fp = o + d * (u.lens.y / max(dot(d, u.lf.xyz), 1e-4));
+      const float2 lu = float2(rnd(seed), rnd(seed));
+      float2 off;
+      if (u.lens.z >= 3.0)
+      {
+         const float seg = 6.2831853 / u.lens.z, a0 = u.lens.w + floor(rnd(seed) * u.lens.z) * seg;
+         off = sqrt(lu.x) * mix(float2(cos(a0), sin(a0)), float2(cos(a0 + seg), sin(a0 + seg)), lu.y);
+      }
+      else
+         off = sqrt(lu.x) * float2(cos(6.2831853 * lu.y), sin(6.2831853 * lu.y));
+      off *= u.lr.w >= 1.0 ? float2(1.0 / u.lr.w, 1.0) : float2(1.0, u.lr.w);
+      o += (off.x * u.lr.xyz + off.y * u.lu.xyz) * u.lens.x;
+      d = normalize(fp - o);
+   }
    float3 L = float3(0.0), T = float3(1.0);
    float cov = 0.0;
    const int maxB = int(u.info.y);
@@ -748,6 +1061,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
    float3 skyK = float3(1.0); // sky scale for the bounce that led here: Render 3D's ambient on the diffuse lobe, 1 on the glossy one (as the raster)
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
+   int skips = 0; // see-through hits passed this sample
    for (int b = 0; b < maxB; b++)
    {
       ray r(o, d, 0.0, 1e4);
@@ -769,9 +1083,66 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
                       + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w3.y
                       + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w3.z;
       float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
-      if (dot(n, d) > 0.0) n = -n;
+      const bool backHit = dot(n, d) > 0.0;
+      if (backHit) n = -n;
       const float3 p = o + d * h.distance;
-      const float3 base = I.bm.xyz; const float metal = clamp(I.bm.w, 0.0, 1.0); const float rough = clamp(I.rg.x, 0.045, 1.0);
+      float3 base = I.bm.xyz; float metal = clamp(I.bm.w, 0.0, 1.0); float rough = clamp(I.rg.x, 0.045, 1.0);
+      const float3 ns = n; // the surface's own side: ray origins and the light / bounce gates use it, not the mapped normal
+      float3 emMap = float3(1.0); float shW = I.sh.x, ccW = I.msc.w;
+      if (any(I.tx > 0.5) || any(I.tx2 > 0.5) || any(I.tx3 > 0.5))
+      {
+         // Maps at the hit, through the mapping: full detail on the camera hit (the jittered samples filter it), a
+         // blurred level after a bounce. Normal maps take the triangle's uv tangent frame.
+         float2 t0 = float2(0.0), t1 = float2(0.0), t2 = float2(0.0);
+         if (I.uvb != 0)
+         {
+            const device float* uvp = reinterpret_cast<const device float*>(I.uvb);
+            t0 = float2(uvp[ix.x * 2], uvp[ix.x * 2 + 1]); t1 = float2(uvp[ix.y * 2], uvp[ix.y * 2 + 1]); t2 = float2(uvp[ix.z * 2], uvp[ix.z * 2 + 1]);
+         }
+         const float2 uv = t0 * w3.x + t1 * w3.y + t2 * w3.z;
+         const float3 p0 = float3(vb[ix.x * 6], vb[ix.x * 6 + 1], vb[ix.x * 6 + 2]);
+         const float3 q1 = float3(vb[ix.y * 6], vb[ix.y * 6 + 1], vb[ix.y * 6 + 2]), q2 = float3(vb[ix.z * 6], vb[ix.z * 6 + 1], vb[ix.z * 6 + 2]);
+         const float3 lp = p0 * w3.x + q1 * w3.y + q2 * w3.z;
+         const float lod = b == 0 ? 0.0 : 3.0;
+         const int wrapM = int(I.sh.w + 0.5) & 3;
+         const MapX mx = mapX(I.mp0, I.msc, I.mro, I.mtr, I.olo, I.ohi, wrapM);
+         const float3 mb = mapBase(mx, uv, lp);
+#define MAPT(slot) mapSample(maps[int(slot) - 1], mx, mb, n, float3(0.0), float3(0.0), lod)
+         if (I.tx.x > 0.5) base *= mapLin(MAPT(I.tx.x).rgb);
+         if (I.tx.y > 0.5) rough = clamp(I.rg.x * MAPT(I.tx.y).r, 0.045, 1.0);
+         if (I.tx.z > 0.5) metal = clamp(I.bm.w * MAPT(I.tx.z).r, 0.0, 1.0);
+         if (I.tx2.y > 0.5) emMap = mapLin(MAPT(I.tx2.y).rgb);
+         if (I.tx2.z > 0.5) shW *= MAPT(I.tx2.z).r;
+         if (I.tx3.x > 0.5) ccW *= MAPT(I.tx3.x).r;
+         float alpha = 1.0 - I.mp0.w;
+         if (I.tx2.w > 0.5) alpha *= MAPT(I.tx2.w).r;
+#undef MAPT
+         if (alpha < 1.0 && skips < 16 && alpha < (I.mp0.z > 0.0 ? I.mp0.z : rnd(seed)))
+         {
+            // Cut out or not covered: the ray goes on through, the same bounce.
+            skips++; if (b == 0) cov = 0.0;
+            o = p + d * f.shQ.w; b--; continue;
+         }
+         if (I.tx.w > 0.5)
+         {
+            const float3 e1 = q1 - p0, e2 = q2 - p0;
+            const float2 mu0 = mapUv(mx, mapBase(mx, t0, p0), n), mu1 = mapUv(mx, mapBase(mx, t1, q1), n), mu2 = mapUv(mx, mapBase(mx, t2, q2), n);
+            const float2 d1 = mu1 - mu0, d2 = mu2 - mu0;
+            const float det = d1.x * d2.y - d2.x * d1.y;
+            if (abs(det) > 1e-12)
+            {
+               float3 tg = normalize((I.normalM * float4((e1 * d2.y - e2 * d1.y) / det, 0.0)).xyz);
+               const float3 bg = (I.normalM * float4((e2 * d1.x - e1 * d2.x) / det, 0.0)).xyz;
+               tg = normalize(tg - n * dot(n, tg));
+               float3 bt = cross(n, tg);
+               if (dot(bt, bg) < 0.0) bt = -bt;
+               if (backHit) { tg = -tg; bt = -bt; } // the flipped side mirrors the frame, as the raster's cotangent frame does
+               const float3 s = mapNormalTS(maps[int(I.tx.w) - 1], mx, (int(I.sh.w + 0.5) & 4) != 0, I.sh.z, mapUv(mx, mb, n),
+                                            float2(0.0), float2(0.0), lod, I.ohi.w, I.dt.x);
+               n = normalize(tg * s.x + bt * s.y + n * s.z);
+            }
+         }
+      }
       if (any(I.em.xyz > 0.0))
       {
          // Emission seen along the path. After a bounce, emitter sampling below could have found it too: power-heuristic MIS.
@@ -784,10 +1155,11 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             const float pL = pEm * t.e1.w * h.distance * h.distance / max(cosL, 1e-6);
             wE = lastPdfB * lastPdfB / max(lastPdfB * lastPdfB + pL * pL, 1e-20);
          }
-         L += T * I.em.xyz * wE;
+         L += T * I.em.xyz * emMap * wE;
       }
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
-      const float3 f0 = mix(float3(0.04), base, metal);
+      const float shMax = shW * maxc(I.shc.xyz), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(nDotV, I.sh.y) : 1.0;
+      const float3 f0 = mix(float3(0.04 + I.mtr.w), base, metal);
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
       for (int i = 0; i < int(f.params.w) && i < 8; i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
          if (int(f.lights[i].vec.w) == 3) L += T * base * (1.0 - metal) * f.lights[i].color.xyz * f.lights[i].terms.x;
@@ -845,17 +1217,39 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             }
             if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
          }
-         else ld = normalize(Lt.vec.xyz);
+         else
+         {
+            ld = normalize(Lt.vec.xyz);
+            if ((type == 0 || type == 2) && Lt.spot.x > 0.0)
+            {
+               // A sun disc: a uniform direction in its cone (radiance spread so the irradiance stays the light's own).
+               const float cm = cos(Lt.spot.x * 0.5 * 0.017453292);
+               const float ct = 1.0 - rnd(seed) * (1.0 - cm), st = sqrt(max(1.0 - ct * ct, 0.0)), ph = 6.28318530718 * rnd(seed);
+               const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
+               ld = normalize(ld * ct + (ax * cos(ph) + cross(ld, ax) * sin(ph)) * st);
+            }
+         }
          Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
          lterms = Lt.terms.xy;
       }
-      if (dot(n, ld) > 1e-5 && any(Le > 0.0))
+      if (dot(n, ld) > 1e-5 && dot(ns, ld) > 0.0 && any(Le > 0.0))
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
-         if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (occluded(rtArgs.tlas, p + ns * f.shQ.w, ld, tmax)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          float pB = 0.0;
-         const float3 fe = ptEval(n, V, ld, base, metal, rough, f0, lterms, pB);
+         float3 fe = ptEval(n, V, ld, base, metal, rough, f0, lterms, pB);
+         if (shW > 0.0 || ccW > 0.0)
+         {
+            // Sheen and clearcoat on the light sample (the raster's lobes); bounces see the base BSDF.
+            const float nL = max(dot(n, ld), 0.0), nH = max(dot(n, normalize(V + ld)), 0.0), vH = max(dot(V, normalize(V + ld)), 0.0);
+            const float cF = 0.04 + 0.96 * pow(1.0 - nDotV, 5.0);
+            fe *= 1.0 - ccW * cF;
+            if (shW > 0.0)
+               fe = fe * shV
+                  + I.shc.xyz * sheenLtc(nL, nDotV, dot(ld, V), I.sh.y) * shW * nL * lterms.y;
+            if (ccW > 0.0) fe += ccW * coatSpec(nH, nDotV, max(nL, 1e-4), vH, clamp(I.mro.w, 0.02, 1.0)) * nL * lterms.y;
+         }
          L += T * fe * Le * (pL > 0.0 ? pL / max(pL * pL + pB * pB, 1e-20) : 1.0); // emitters: power-heuristic MIS
       }
       // next direction: one lobe picked by Render 3D's lobe weights, weighted by the full BSDF over the mixture pdf
@@ -865,8 +1259,14 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); skyK = float3(1.0); }
       else { nd = cosineDir(n, rnd(seed), rnd(seed)); skyK = f.ambient.xyz * 3.0; }
       float pdfB = 0.0;
-      const float3 fB = ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
-      if (pdfB <= 1e-6) break;
+      float3 fB = ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
+      if (pdfB <= 1e-6 || dot(ns, nd) <= 0.0) break; // a mapped normal can send the bounce under the surface
+      if (shW > 0.0) // the bounce sees the sheen too (the cosine half of the mixture covers its wide lobe)
+      {
+         const float nL = max(dot(n, nd), 0.0);
+         fB = fB * shV
+            + I.shc.xyz * sheenLtc(nL, nDotV, dot(nd, V), I.sh.y) * shW * nL;
+      }
       T *= fB / pdfB;
       lastPdfB = pdfB;
       if (b >= 2)
@@ -875,7 +1275,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
          if (rnd(seed) > q) break;
          T /= q;
       }
-      o = p + n * f.shQ.w; d = nd;
+      o = p + ns * f.shQ.w; d = nd;
    }
    L = min(L, float3(30.0)); // firefly guard
    const float4 pv = u.info.x > 0.5 ? prev.read(px) : float4(0.0);
@@ -958,7 +1358,7 @@ vertex VOut ri_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; return o;
 }
 vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                   const device float4x4* models [[buffer(5)]])
@@ -970,11 +1370,11 @@ vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const de
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; return o; // uniform scale: the model's 3x3 turns normals
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; return o; // uniform scale: the model's 3x3 turns normals
 }
 // Runs: consecutive instances sharing a mesh and material drawn in one instanced call; per-copy data from a buffer.
 vertex VOut rr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
-                  const device InstU* ms [[buffer(10)]], constant uint& first [[buffer(11)]])
+                  const device InstU* ms [[buffer(10)]], constant uint& first [[buffer(11)]], const device float* uvs [[buffer(12)]])
 {
    const device InstU& m = ms[first + iid];
    const float3 p = float3(v[vid * 6 + 0], v[vid * 6 + 1], v[vid * 6 + 2]);
@@ -983,7 +1383,7 @@ vertex VOut rr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(uvs[vid * 2], uvs[vid * 2 + 1]); o.lp = p; return o;
 }
 struct SOut { float4 pos [[position]]; };
 vertex SOut shr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant float4x4& lvp [[buffer(1)]],
@@ -1103,7 +1503,35 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4], envm[4];
       LightU lights[8];
    };
-   struct InstU { float model[16], normalM[16], base[4], mr[4], em[4]; };
+   // The rest of the material (InstU / RInst tx2 .. dt in the shader).
+   struct MapExtH { float tx2[4], tx3[4], mp0[4], msc[4], mro[4], mtr[4], olo[4], ohi[4], dt[4]; };
+   struct InstU { float model[16], normalM[16], base[4], mr[4], em[4], tx[4], sh[4], shc[4]; MapExtH x; };
+   struct RInstH { float bm[4], rg[4], em[4]; uint64_t vb, ib; float normalM[16]; uint64_t uvb, pad0; float tx[4], sh[4], shc[4]; MapExtH x; };
+   static_assert(sizeof(InstU) == 368 && sizeof(RInstH) == 336, "InstU / RInst layout as the shader's");
+   // Encoded so all zeros is the plain material (batches leave it empty): opacity as 1 - opacity, F0 less 0.04.
+   void MapExt(const engine::Instance& in, MapExtH& x)
+   {
+      x.tx2[0] = (float)(in.mapAo + 1); x.tx2[1] = (float)(in.mapEmission + 1); x.tx2[2] = (float)(in.mapSheen + 1); x.tx2[3] = (float)(in.mapOpacity + 1);
+      x.tx3[0] = (float)(in.mapClearcoat + 1); x.tx3[1] = (float)(in.mapTransmission + 1);
+      x.mp0[0] = (float)in.mapSpace; x.mp0[1] = in.triplanar; x.mp0[2] = in.alphaCutoff; x.mp0[3] = 1.0f - std::min(std::max(in.opacity, 0.0f), 1.0f);
+      const float r = (in.ior - 1.0f) / (in.ior + 1.0f);
+      const float f0 = std::min(std::max(r * r * 2.0f * in.specular, 0.0f), 1.0f);
+      for (int k = 0; k < 3; k++)
+      {
+         x.msc[k] = in.mapScale[k]; x.mro[k] = in.mapRotate[k]; x.mtr[k] = in.mapTranslate[k];
+         x.olo[k] = in.objLo[k]; x.ohi[k] = in.objHi[k];
+      }
+      x.msc[3] = in.clearcoat; x.mro[3] = in.clearcoatRoughness; x.mtr[3] = f0 - 0.04f;
+      x.olo[3] = in.breakup; x.ohi[3] = in.detailScale; x.dt[0] = in.detailStrength;
+   }
+   // A run the depth prepass leaves out: it cuts pixels away, so its depth is known only once it is shaded.
+   bool SeeThrough(const InstU& u) { return u.x.mp0[3] > 0.0f || u.x.tx2[3] > 0.5f || u.x.mp0[2] > 0.0f; }
+   // The maps of an instance as InstU / RInst carry them (index + 1, 0 = none).
+   void MapFields(const engine::Instance& in, float tx[4], float sh[4])
+   {
+      tx[0] = (float)(in.mapAlbedo + 1); tx[1] = (float)(in.mapRoughness + 1); tx[2] = (float)(in.mapMetallic + 1); tx[3] = (float)(in.mapNormal + 1);
+      sh[0] = in.sheen; sh[1] = in.sheenRoughness; sh[2] = in.normalStrength; sh[3] = (float)((in.wrap & 3) + (in.normalBump ? 4 : 0));
+   }
 
    float ToLin(float c)
    {
@@ -1131,7 +1559,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       bool Ok() const { return mLib != nil; }
    private:
-      struct Gpu { id<MTLBuffer> vb = nil, ib = nil; NSUInteger count = 0; float lo[3], hi[3]; };
+      struct Gpu { id<MTLBuffer> vb = nil, ib = nil, uvb = nil; NSUInteger count = 0; float lo[3], hi[3]; };
    public:
       bool UploadMeshes(const std::vector<engine::MeshData>& meshes) override
       {
@@ -1297,6 +1725,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          {
             // Same topology: write the vertices in place (the last frame has completed) and refit next frame.
             std::memcpy(cur.vb.contents, m.posNormal.data(), m.posNormal.size() * 4);
+            cur.uvb = UvBuffer(m);
             for (int k = 0; k < 3; k++) { cur.lo[k] = 1e30f; cur.hi[k] = -1e30f; }
             for (size_t i = 0; i + 5 < m.posNormal.size(); i += 6)
                for (int k = 0; k < 3; k++)
@@ -1322,10 +1751,85 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          return true;
       }
    private:
+      // Two floats per vertex (zeros when the mesh has none), read by rr_vs and the path tracer.
+      id<MTLBuffer> UvBuffer(const engine::MeshData& m)
+      {
+         const size_t nv = m.posNormal.size() / 6;
+         const size_t len = std::max<size_t>(nv * 8, 8);
+         if (m.uv.size() == nv * 2 && nv > 0)
+            return [mDev newBufferWithBytes:m.uv.data() length:len options:MTLResourceStorageModeShared];
+         id<MTLBuffer> b = [mDev newBufferWithLength:len options:MTLResourceStorageModeShared];
+         std::memset(b.contents, 0, len);
+         return b;
+      }
+      // Material maps: RGBA8 with a full mip chain, cached by TextureData::key; the frame's 16 slots (texture 10..25),
+      // unused ones a 1x1 white. mMapMean: each slot's mean linear colour, for the ray passes' hit albedo.
+      struct MapTex { unsigned long long key = 0; id<MTLTexture> tex = nil; float mean[3] = { 1, 1, 1 }; bool used = false; };
+      std::vector<MapTex> mMapCache;
+      id<MTLTexture> mMapSlot[engine::kMaxTextures] = {};
+      float mMapMean[engine::kMaxTextures][3] = {};
+      id<MTLTexture> mWhite = nil;
+      void PrepareMaps(id<MTLCommandBuffer> cb, const engine::Frame& fr)
+      {
+         if (!mWhite)
+         {
+            MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:1 height:1 mipmapped:NO];
+            mWhite = [mDev newTextureWithDescriptor:d];
+            const uint8_t w[4] = { 255, 255, 255, 255 };
+            [mWhite replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:w bytesPerRow:4];
+         }
+         for (auto& c : mMapCache) c.used = false;
+         id<MTLBlitCommandEncoder> blit = nil;
+         for (int i = 0; i < engine::kMaxTextures; i++)
+         {
+            mMapSlot[i] = mWhite;
+            mMapMean[i][0] = mMapMean[i][1] = mMapMean[i][2] = 1.0f;
+            if (i >= (int)fr.textures.size())
+               continue;
+            const engine::TextureData& t = fr.textures[(size_t)i];
+            if (!t.rgba || t.w <= 0 || t.h <= 0)
+               continue;
+            MapTex* c = nullptr;
+            for (auto& e : mMapCache)
+               if (e.key == t.key) { c = &e; break; }
+            if (!c)
+            {
+               MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:(NSUInteger)t.w height:(NSUInteger)t.h mipmapped:YES];
+               d.usage = MTLTextureUsageShaderRead;
+               id<MTLTexture> tex = [mDev newTextureWithDescriptor:d];
+               if (!tex)
+                  continue;
+               [tex replaceRegion:MTLRegionMake2D(0, 0, (NSUInteger)t.w, (NSUInteger)t.h) mipmapLevel:0 withBytes:t.rgba bytesPerRow:(NSUInteger)t.w * 4];
+               if (!blit) blit = [cb blitCommandEncoder];
+               [blit generateMipmapsForTexture:tex];
+               MapTex e;
+               e.key = t.key; e.tex = tex;
+               double acc[3] = { 0, 0, 0 }; size_t n = 0;
+               const size_t step = std::max<size_t>(1, ((size_t)t.w * t.h) / 65536);
+               for (size_t k = 0; k < (size_t)t.w * t.h; k += step, n++)
+                  for (int ch = 0; ch < 3; ch++)
+                     acc[ch] += ToLin(t.rgba[k * 4 + ch] / 255.0f);
+               for (int ch = 0; ch < 3; ch++)
+                  e.mean[ch] = n ? (float)(acc[ch] / n) : 1.0f;
+               mMapCache.push_back(e);
+               c = &mMapCache.back();
+            }
+            c->used = true;
+            mMapSlot[i] = c->tex;
+            std::memcpy(mMapMean[i], c->mean, 12);
+         }
+         if (blit) [blit endEncoding];
+         mMapCache.erase(std::remove_if(mMapCache.begin(), mMapCache.end(), [](const MapTex& e) { return !e.used; }), mMapCache.end());
+      }
+      void BindMaps(id<MTLRenderCommandEncoder> e)
+      {
+         [e setFragmentTextures:mMapSlot withRange:NSMakeRange(10, engine::kMaxTextures)];
+      }
       bool MakeGpu(const engine::MeshData& m, Gpu& g)
       {
          g.vb = [mDev newBufferWithBytes:m.posNormal.data() length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
          g.ib = [mDev newBufferWithBytes:m.indices.data() length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
+         g.uvb = UvBuffer(m);
          g.count = (NSUInteger)m.indices.size();
          for (int k = 0; k < 3; k++) { g.lo[k] = 1e30f; g.hi[k] = -1e30f; }
          for (size_t i = 0; i + 5 < m.posNormal.size(); i += 6)
@@ -1399,6 +1903,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             Lin3(l.colorSrgb, o.color, l.intensity);
             o.terms[0] = l.diffuse; o.terms[1] = l.specular; o.terms[2] = l.falloff; o.terms[3] = l.cutoff;
             o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
+            if (l.type == engine::LightType::Directional || l.type == engine::LightType::Sun) o.spot[0] = l.sunAngleDeg; // the disc, for these
          }
 
       }
@@ -1414,6 +1919,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          BuildRuns(fr);
 
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+         PrepareMaps(cb, fr);
          // Pure raster needs no ray structure; skipping it keeps a large instanced scene's raster cost raster-only.
          const bool haveTlas = (fr.rtShadows || fr.rtReflections || fr.gi) && BuildTlas(cb, fr);
          CullBatches(cb, fr, img.Width());
@@ -1445,10 +1951,14 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [ze setFrontFacingWinding:MTLWindingClockwise];
             [ze setVertexBytes:&f length:sizeof(f) atIndex:1];
             [ze setVertexBuffer:mInstBuf offset:0 atIndex:10];
+            const InstU* preU = (const InstU*)mInstBuf.contents;
             for (const auto& r : mRuns)
             {
+               if (SeeThrough(preU[r.first]))
+                  continue;
                const Gpu& g = mMeshes[fr.instances[r.first].mesh];
                [ze setVertexBuffer:g.vb offset:0 atIndex:0];
+               [ze setVertexBuffer:g.uvb offset:0 atIndex:12];
                [ze setVertexBytes:&r.first length:4 atIndex:11];
                [ze drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib
                            indexBufferOffset:0 instanceCount:r.second];
@@ -1513,7 +2023,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          }
          pass.depthAttachment.texture = mDepth;
          pass.depthAttachment.loadAction = prepass ? MTLLoadActionLoad : MTLLoadActionClear;
-         pass.depthAttachment.storeAction = MTLStoreActionDontCare;
+         pass.depthAttachment.storeAction = fr.dofAperture > 0.0f ? MTLStoreActionStore : MTLStoreActionDontCare; // the DOF pass reads it
          pass.depthAttachment.clearDepth = 1.0;
          id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:pass];
          [enc setFragmentTexture:mShadowTex atIndex:0];
@@ -1544,7 +2054,6 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setFrontFacingWinding:MTLWindingClockwise]; // GL counter-clockwise, mirrored by the y flip
          [enc setVertexBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
-         struct RInstH { float bm[4], rg[4], em[4]; uint64_t vb, ib; float normalM[16]; };
          std::vector<RInstH> info(fr.instances.size() + 1);
          for (size_t i = 0; i < fr.instances.size(); i++)
          {
@@ -1552,6 +2061,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             RInstH& o = info[i]; o = {};
             Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; std::memcpy(o.em, in.emission, 12);
             std::memcpy(o.normalM, in.normalMatrix, 64);
+            if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
+               for (int k = 0; k < 3; k++) o.bm[k] *= mMapMean[in.mapAlbedo][k];
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
                o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress;
@@ -1560,6 +2071,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          id<MTLBuffer> infoBuf = InfoBuffer(info);
          [enc setFragmentBuffer:infoBuf offset:0 atIndex:4];
          [enc setFragmentTexture:mEnvBound atIndex:9];
+         BindMaps(enc);
          [enc setFragmentTexture:mVis atIndex:7];
          [enc setFragmentTexture:mVisD atIndex:8];
          if (fr.envBackground && (int(f.envm[0]) & 2) != 0 && mBgPsoMrt && mBgPsoDir)
@@ -1582,14 +2094,27 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
          if (prepass) [enc setDepthStencilState:mDsEq];
          const InstU* runU = (const InstU*)mInstBuf.contents;
-         for (const auto& r : mRuns)
+         auto drawRun = [&](const std::pair<uint32_t, uint32_t>& r)
          {
             const Gpu& g = mMeshes[fr.instances[r.first].mesh];
             [enc setFragmentBytes:&runU[r.first] length:sizeof(InstU) atIndex:2];   // the run's material
             [enc setVertexBuffer:g.vb offset:0 atIndex:0];
+            [enc setVertexBuffer:g.uvb offset:0 atIndex:12];
             [enc setVertexBytes:&r.first length:4 atIndex:11];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:g.count indexType:MTLIndexTypeUInt32 indexBuffer:g.ib
                          indexBufferOffset:0 instanceCount:r.second];
+         };
+         for (const auto& r : mRuns)
+            if (!prepass || !SeeThrough(runU[r.first]))
+               drawRun(r);
+         if (prepass)
+         {
+            // See-through runs were left out of the prepass: drawn after it with the plain depth test.
+            [enc setRenderPipelineState:mrt ? mPsoRun : mPsoRunDir];
+            [enc setDepthStencilState:mDs];
+            for (const auto& r : mRuns)
+               if (SeeThrough(runU[r.first]))
+                  drawRun(r);
          }
          [enc setRenderPipelineState:mrt ? mPso : mPsoDir];
          [enc setDepthStencilState:mDs];
@@ -1731,6 +2256,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
             mHistCur = cur; mHistValid = giOn; mRValid = true;
          }
+         DepthOfField(cb, img, fr, fmt);
          [cb commit];
          [cb waitUntilCompleted];
          if (gpuMs)
@@ -1738,6 +2264,52 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          return cb.status == MTLCommandBufferStatusCompleted;
       }
 
+      // Live depth of field on the finished picture (dof_fs): copy it, then blur the copy back into it by depth.
+      void DepthOfField(id<MTLCommandBuffer> cb, MetalImage& img, const engine::Frame& fr, MTLPixelFormat fmt)
+      {
+         float inv[16];
+         if (fr.dofAperture <= 0.0f || !Inv4(fr.viewProj, inv))
+            return;
+         if (!mDofPso || mDofFmt != fmt)
+         {
+            MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
+            d.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
+            d.fragmentFunction = [mLib newFunctionWithName:@"dof_fs"];
+            d.colorAttachments[0].pixelFormat = fmt;
+            NSError* err = nil;
+            mDofPso = [mDev newRenderPipelineStateWithDescriptor:d error:&err];
+            mDofFmt = fmt;
+            if (!mDofPso) { NSLog(@"dof pipeline: %@", err); return; }
+         }
+         const int w = img.Width(), h = img.Height();
+         if (!mDofSrc || (int)mDofSrc.width != w || (int)mDofSrc.height != h || mDofSrc.pixelFormat != fmt)
+         {
+            MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:fmt width:w height:h mipmapped:NO];
+            d.usage = MTLTextureUsageShaderRead; d.storageMode = MTLStorageModePrivate;
+            mDofSrc = [mDev newTextureWithDescriptor:d];
+            if (!mDofSrc) return;
+         }
+         id<MTLBlitCommandEncoder> be = [cb blitCommandEncoder];
+         [be copyFromTexture:img.Tex() toTexture:mDofSrc];
+         [be endEncoding];
+         MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+         rp.colorAttachments[0].texture = img.Tex();
+         rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+         id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
+         struct { float invVP[16]; float info[4]; float lens[4]; float eye[4]; } u;
+         std::memcpy(u.invVP, inv, 64);
+         u.info[0] = (float)w; u.info[1] = (float)h; u.info[2] = fr.dofAperture * 12.0f * (float)h / 1080.0f; // 24 px is the circle's diameter
+         u.info[3] = std::max(2.0f, 0.03f * (float)h);
+         u.lens[0] = fr.focusDist; u.lens[1] = fr.bokeh[0]; u.lens[2] = fr.bokeh[1]; u.lens[3] = fr.bokeh[2];
+         u.eye[0] = fr.eye[0]; u.eye[1] = fr.eye[1]; u.eye[2] = fr.eye[2]; u.eye[3] = 0.0f;
+         [e setRenderPipelineState:mDofPso];
+         [e setFragmentBytes:&u length:sizeof(u) atIndex:0];
+         [e setFragmentTexture:mDofSrc atIndex:0];
+         [e setFragmentTexture:mDepth atIndex:1];
+         [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+         [e endEncoding];
+      }
       static bool Inv4(const float* m, float* o)
       {
          double a[16], inv[16];
@@ -1778,6 +2350,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             return false;
          if (reset) mPtN = 0;
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+         PrepareMaps(cb, fr);
          if (!BuildTlas(cb, fr))
             return false;
          if (mArgTlas != mTlas)
@@ -1788,7 +2361,6 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [mArgEnc setAccelerationStructure:mTlas atIndex:0];
             mArgTlas = mTlas;
          }
-         struct RInstH { float bm[4], rg[4], em[4]; uint64_t vb, ib; float normalM[16]; };
          std::vector<RInstH> info(fr.instances.size() + 1);
          for (size_t i = 0; i < fr.instances.size(); i++)
          {
@@ -1796,7 +2368,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             RInstH& o = info[i]; o = {};
             Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; std::memcpy(o.em, in.emission, 12);
             std::memcpy(o.normalM, in.normalMatrix, 64);
-            if (in.mesh >= 0 && in.mesh < (int)mMeshes.size()) { o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; }
+            MapFields(in, o.tx, o.sh);
+            std::memcpy(o.shc, in.sheenColor, 12);
+            MapExt(in, o.x);
+            if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
+            {
+               o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; o.uvb = mMeshes[in.mesh].uvb.gpuAddress;
+            }
          }
          // Emissive triangles in world space for next-event estimation, chosen by power (luminance * area). The
          // instance's em[3] points at its first triangle; primitive_id indexes from there. Capped so a huge glowing
@@ -1865,7 +2443,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             rp.colorAttachments[0].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
             [e setRenderPipelineState:mPtPso];
-            struct { float invVP[16]; float info[4]; float em[4]; } pu;
+            struct { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4]; } pu;
+            pu.lens[0] = fr.lensRadius; pu.lens[1] = fr.focusDist; pu.lens[2] = fr.bokeh[0]; pu.lens[3] = fr.bokeh[1];
+            for (int k = 0; k < 3; k++) { pu.lr[k] = fr.camRight[k]; pu.lu[k] = fr.camUp[k]; pu.lf[k] = fr.camFwd[k]; }
+            pu.lr[3] = fr.bokeh[2]; pu.lu[3] = pu.lf[3] = 0.0f;
             std::memcpy(pu.invVP, inv, 64);
             pu.info[0] = (float)mPtN; pu.info[1] = (float)std::max(1, bounces); pu.info[2] = (float)(mPtFrame++); pu.info[3] = (float)img.Width();
             pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = 0.0f; pu.em[3] = 0.0f;
@@ -1876,8 +2457,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e setFragmentBuffer:mEmBuf offset:0 atIndex:5];
             [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
+            BindMaps(e);
             [e useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
-            for (const Gpu& g : mMeshes) { [e useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
+            for (const Gpu& g : mMeshes) { [e useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.uvb) [e useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
             for (id<MTLAccelerationStructure> b in mBlas) [e useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [e endEncoding];
@@ -2285,6 +2867,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       id<MTLTexture> mVis = nil, mVisD = nil; // half-res RT shadow mask (4 lights) and its distance guide
       id<MTLTexture> mDepth = nil;
+      id<MTLRenderPipelineState> mDofPso = nil;
+      MTLPixelFormat mDofFmt = MTLPixelFormatInvalid;
+      id<MTLTexture> mDofSrc = nil;
       id<MTLTexture> mShadowTex = nil;
       NSMutableArray<id<MTLAccelerationStructure>>* mBlas = nil;
       id<MTLAccelerationStructure> mTlas = nil;
@@ -2317,13 +2902,16 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             Lin3(in.baseSrgb, u.base);
             u.mr[0] = in.metallic; u.mr[1] = in.roughness; u.mr[2] = in.transmission; u.mr[3] = in.ior;
             std::memcpy(u.em, in.emission, 12);
+            MapFields(in, u.tx, u.sh);
+            std::memcpy(u.shc, in.sheenColor, 12);
+            MapExt(in, u.x);
             if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
                continue;
             if (!mRuns.empty())
             {
                auto& r = mRuns.back();
                const engine::Instance& a = fr.instances[r.first];
-               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(dst[r.first].base, u.base, 48) == 0)
+               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(dst[r.first].base, u.base, sizeof(InstU) - offsetof(InstU, base)) == 0)
                {
                   r.second++;
                   continue;

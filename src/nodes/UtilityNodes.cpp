@@ -87,6 +87,8 @@ Material MaterialNode::GetMaterial() const
    m.textureAlpha = textureAlpha;
    m.opacityMapped = mMaps[kMapOpacity].Resolved() != nullptr;
    m.normalStrength = normalStrength;
+   m.detailScale = detailScale;
+   m.detailStrength = detailStrength;
    m.normalBump = normalBump ? 1 : 0;
    return m;
 }
@@ -162,6 +164,7 @@ MappingTransform MappingNode::GetMappingTransform() const
    t.rotate[0] = rotateX * d2r; t.rotate[1] = rotateY * d2r; t.rotate[2] = rotateZ * d2r;
    t.scale[0] = scaleX; t.scale[1] = scaleY; t.scale[2] = scaleZ;
    t.triplanarBlend = triplanarBlend;
+   t.breakup = breakup;
    return t;
 }
 

@@ -8,6 +8,7 @@
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
 #include "Transport.h"
+#include "UtilityNodes.h"
 
 #include "gl3.h"
 #include "engine/Scene.h"
@@ -36,6 +37,10 @@ struct Render3DNode::EngineState
    int envW = 0, envH = 0, envLod = 0;
    unsigned int envTex = 0;
    unsigned long long envRev = ~0ull, envSerial = 0;
+   // Material maps read back from GL, by (texture, the source's texture revision); dropped when a frame stops using them.
+   struct Map { unsigned int tex = 0; unsigned long long rev = 0, key = 0; int w = 0, h = 0; std::vector<uint8_t> px; bool used = false; };
+   std::vector<Map> maps;
+   unsigned long long mapSerial = 0;
 };
 
 void Render3DNode::ReleaseEngine()
@@ -58,7 +63,58 @@ namespace
       for (const Vertex& v : m.vertices)
          d.posNormal.insert(d.posNormal.end(), { v.px, v.py, v.pz, v.nx, v.ny, v.nz });
       d.indices.assign(m.indices.begin(), m.indices.end());
+      d.uv.reserve(m.vertices.size() * 2);
+      for (const Vertex& v : m.vertices)
+         d.uv.insert(d.uv.end(), { v.u, v.v });
       return d;
+   }
+}
+
+namespace
+{
+   // A material map for the engine: the GL texture's level 0 read back once per (texture, revision), at most
+   // engine::kMaxTextures distinct maps a frame (past that the material draws plain, as before maps were carried).
+   template <class State> // Render3DNode::EngineState (private, so deduced, not named)
+   int MapIndex(State& E, engine::Frame& fr, unsigned int tex, unsigned long long rev)
+   {
+      if (tex == 0)
+         return -1;
+      decltype(E.maps.data()) m = nullptr;
+      for (auto& c : E.maps)
+         if (c.tex == tex) { m = &c; break; }
+      if (m == nullptr)
+      {
+         E.maps.emplace_back();
+         m = &E.maps.back();
+         m->tex = tex;
+         m->key = 0;
+      }
+      if (m->key == 0 || m->rev != rev)
+      {
+         glBindTexture(GL_TEXTURE_2D, tex);
+         int tw = 0, th = 0;
+         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &tw);
+         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &th);
+         if (tw <= 0 || th <= 0)
+            return -1;
+         m->px.assign((size_t)tw * th * 4, 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, m->px.data());
+         glPixelStorei(GL_PACK_ALIGNMENT, 4);
+         glBindTexture(GL_TEXTURE_2D, 0);
+         m->w = tw; m->h = th; m->rev = rev;
+         m->key = ++E.mapSerial;
+      }
+      m->used = true;
+      for (size_t i = 0; i < fr.textures.size(); i++)
+         if (fr.textures[i].key == m->key)
+            return (int)i;
+      if ((int)fr.textures.size() >= engine::kMaxTextures)
+         return -1;
+      engine::TextureData t;
+      t.rgba = m->px.data(); t.w = m->w; t.h = m->h; t.key = m->key;
+      fr.textures.push_back(t);
+      return (int)fr.textures.size() - 1;
    }
 }
 
@@ -154,6 +210,50 @@ bool Render3DNode::CookEngine(int frameId)
       in.ior = mat.ior;
       for (int k = 0; k < 3; k++)
          in.emission[k] = ColorSpace::SrgbToLinear(mat.emissionColor[k]) * mat.emission; // GL: toLinear(colour) * strength
+      in.normalStrength = mat.normalStrength;
+      in.normalBump = mat.normalBump;
+      in.sheen = mat.sheen;
+      std::memcpy(in.sheenColor, mat.sheenColor, 12);
+      in.sheenRoughness = mat.sheenRoughness;
+      if (auto* mn = dynamic_cast<MaterialNode*>(src))
+         in.wrap = mn->wrapMode;
+      {
+         const int kinds[10] = { kMapAlbedo, kMapRoughness, kMapMetallic, kMapNormal, kMapAmbientOcclusion,
+                                 kMapEmission, kMapSheen, kMapOpacity, kMapClearcoat, kMapTransmission };
+         int* slots[10] = { &in.mapAlbedo, &in.mapRoughness, &in.mapMetallic, &in.mapNormal, &in.mapAo,
+                            &in.mapEmission, &in.mapSheen, &in.mapOpacity, &in.mapClearcoat, &in.mapTransmission };
+         for (int k = 0; k < 10; k++)
+            *slots[k] = MapIndex(E, fr, src->GetMaterialTexture(kinds[k]), src->SurfaceTextureRevision());
+      }
+      in.clearcoat = mat.clearcoat;
+      in.clearcoatRoughness = mat.clearcoatRoughness;
+      in.specular = mat.specular;
+      in.opacity = mat.opacity;
+      in.alphaCutoff = mat.alphaCutoff;
+      in.detailScale = mat.detailScale;
+      in.detailStrength = mat.detailStrength;
+      {
+         const MappingTransform mt = src->GetMappingTransform();
+         in.mapSpace = mt.space;
+         std::memcpy(in.mapScale, mt.scale, 12);
+         std::memcpy(in.mapRotate, mt.rotate, 12);
+         std::memcpy(in.mapTranslate, mt.translate, 12);
+         in.triplanar = mt.triplanarBlend;
+         in.breakup = mt.breakup;
+         if (mt.space == kMapSpaceGenerated) // generated coordinates span the mesh's own box
+         {
+            const Mesh& mesh = src->GetMesh();
+            if (!mesh.vertices.empty())
+            {
+               for (int a = 0; a < 3; a++) { in.objLo[a] = 1e30f; in.objHi[a] = -1e30f; }
+               for (const Vertex& v : mesh.vertices)
+               {
+                  const float q[3] = { v.px, v.py, v.pz };
+                  for (int a = 0; a < 3; a++) { in.objLo[a] = std::min(in.objLo[a], q[a]); in.objHi[a] = std::max(in.objHi[a], q[a]); }
+               }
+            }
+         }
+      }
       // Instanced sources: one engine instance per copy, placed as the GL draw places it (group matrix * copy).
       if (InstanceOnPointsNode* instancer = FindInstancer(src))
       {
@@ -208,9 +308,34 @@ bool Render3DNode::CookEngine(int frameId)
    mLastCamera.view = view; mLastCamera.proj = proj;
    mLastCamera.eye[0] = eye[0]; mLastCamera.eye[1] = eye[1]; mLastCamera.eye[2] = eye[2];
    mLastCamera.valid = true;
+   if (mJitterIndex >= 0)
+   {
+      // Supersample pass: the same Halton(2,3) sub-pixel offset as the raster's (CookOnce).
+      auto halton = [](int i, int base) { float f = 1.0f, r = 0.0f; while (i > 0) { f /= (float)base; r += f * (float)(i % base); i /= base; } return r; };
+      const float jx = (halton(mJitterIndex + 1, 2) - 0.5f) * 2.0f / (float)w;
+      const float jy = (halton(mJitterIndex + 1, 3) - 0.5f) * 2.0f / (float)h;
+      if (proj.m[11] != 0.0f) { proj.m[8] += jx; proj.m[9] += jy; }
+      else { proj.m[12] += jx; proj.m[13] += jy; }
+   }
    const Mat4 vp = Mat4::Multiply(proj, view);
    std::memcpy(fr.viewProj, vp.m, 64);
    std::memcpy(fr.eye, eye, 12);
+   {
+      // Depth of field as Render 3D's path tracer lens (Render3DPathTraceCook): a circle dofAperture x 24 px across
+      // (diameter) in a 1080 frame at |d - focus| / d, so the aperture's diameter is that share of the focus plane's
+      // height and its radius half of it.
+      const float r3[3] = { view.m[0], view.m[4], view.m[8] }, u3[3] = { view.m[1], view.m[5], view.m[9] },
+                  f3[3] = { -view.m[2], -view.m[6], -view.m[10] };
+      std::memcpy(fr.camRight, r3, 12); std::memcpy(fr.camUp, u3, 12); std::memcpy(fr.camFwd, f3, 12);
+      const bool ortho = proj.m[11] == 0.0f;
+      const float invFy = 1.0f / std::max(1e-6f, std::fabs(proj.m[5]));
+      fr.lensRadius = ortho || dofAperture <= 0.0f ? 0.0f : dofAperture * (24.0f / 1080.0f) * focusDistance * invFy;
+      fr.focusDist = std::max(1e-3f, focusDistance);
+      fr.dofAperture = ortho ? 0.0f : std::max(0.0f, dofAperture);
+      fr.bokeh[0] = dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f;
+      fr.bokeh[1] = dofRotation * 3.14159265f / 180.0f;
+      fr.bokeh[2] = std::clamp(dofRatio, 0.01f, 2.0f);
+   }
 
    // Lights: rig, then light nodes, then the built-in one.
    auto addLight = [&](const RigLight& l)
@@ -223,6 +348,8 @@ bool Render3DNode::CookEngine(int frameId)
       e.intensity = l.intensity; e.falloff = l.falloff; e.spotAngleDeg = l.spotAngle; e.spotPenumbra = l.spotPenumbra;
       e.diffuse = l.diffuse; e.specular = l.specular; e.cutoff = l.cutoff;
       e.areaW = std::max(0.001f, l.areaW); e.areaH = std::max(0.001f, l.areaH);
+      // A sun's disc from the light's shadow softness, as GL sizes its shadow (0.526 degrees, the real sun, at 1).
+      if (e.type == engine::LightType::Directional || e.type == engine::LightType::Sun) e.sunAngleDeg = 0.526f * std::max(0.0f, l.shadowSoft);
       fr.lights.push_back(e);
    };
    if (rig != nullptr && rig->hasLights)
@@ -317,10 +444,15 @@ bool Render3DNode::CookEngine(int frameId)
             for (int k = 0; k < 3; k++)
                l.colorSrgb[k] = ColorSpace::LinearToSrgb(sunLight[k] / peak);
             l.intensity = peak * env->intensity;
+            l.sunAngleDeg = std::max(0.0f, env->sunAngle);
             fr.lights.push_back(l);
          }
       }
    }
+   // Maps no instance used this frame are let go (their pixels can be large).
+   E.maps.erase(std::remove_if(E.maps.begin(), E.maps.end(), [](const auto& m) { return !m.used; }), E.maps.end());
+   for (auto& m : E.maps)
+      m.used = false;
    fr.exposure = exposure;
    fr.tonemap = tonemap;                // 0 none, 1 ACES, 2 Reinhard, 3 AgX, 4 Neutral (MetalDevice toneMap)
    fr.rim = rimIntensity;
@@ -338,9 +470,16 @@ bool Render3DNode::CookEngine(int frameId)
       const unsigned char* b = (const unsigned char*)d;
       for (size_t i = 0; i < n; i++) { hsh ^= b[i]; hsh *= 1099511628211ull; }
    };
-   mix(fr.viewProj, 64); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
+   mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
    mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
-   for (const engine::Instance& in : fr.instances) { mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 16); }
+   for (const engine::Instance& in : fr.instances)
+   {
+      mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 16);
+      mix(&in.mapAlbedo, 16); mix(&in.wrap, 4); mix(&in.normalStrength, 4); mix(&in.normalBump, 4);
+      mix(&in.sheen, 4); mix(in.sheenColor, 12); mix(&in.sheenRoughness, 4);
+      mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
+   }
+   for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);
    for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); }
    const bool changed = hsh != E.sceneHash;
    E.sceneHash = hsh;
@@ -358,7 +497,7 @@ bool Render3DNode::CookEngine(int frameId)
    else if (offline)
    {
       // Live look on export: let the temporal GI / reflection history converge as it would on a held frame.
-      const int warm = (fr.gi || fr.rtReflections) ? 48 : 0;
+      const int warm = (fr.gi || fr.rtReflections) && mJitterIndex <= 0 ? 48 : 0; // later supersample passes reuse the history
       for (int i = 0; i < warm; i++)
       {
          if (!E.raster->Render(*E.img, fr, nullptr))

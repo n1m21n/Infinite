@@ -1,5 +1,6 @@
 #include "Geometry3DNodes.h"
 #include "Render3DTonemap.h"
+#include "Render3DSheen.h"
 #include "ColorSpace.h"
 
 #include "gl3.h"
@@ -513,6 +514,12 @@ namespace
       "uniform int uLightCount;\n"
       "uniform int uLightMask;\n"
       "uniform vec3 uAmbient;\n"
+      "uniform sampler3D uProbeTex;\n"
+      "uniform sampler3D uProbeDepth;\n"
+      "uniform int uHasProbes;\n"
+      "uniform vec3 uProbeLo;\n"
+      "uniform vec3 uProbeStep;\n"
+      "uniform ivec3 uProbeDims;\n"
       "uniform float uRim;\n"
       "uniform vec3 uCamPos;\n"
       "uniform sampler2D uTexture;\n"
@@ -529,6 +536,8 @@ namespace
       "uniform int uHasRoughnessMap;\n"
       "uniform int uHasMetallicMap;\n"
       "uniform int uHasNormalMap;\n"
+      "uniform int uRibbonPrim;\n"
+      "uniform int uFurMesh;\n"
       "uniform int uHasAoMap;\n"
       "uniform int uHasEmissionMap;\n"
       "uniform int uHasClearcoatMap;\n"
@@ -546,6 +555,9 @@ namespace
       "uniform vec3 uMapRotate;\n"
       "uniform vec3 uMapScale;\n"
       "uniform float uTriplanarBlend;\n"
+      "uniform float uBreakup;\n"
+      "uniform float uDetailScale;\n"
+      "uniform float uDetailStrength;\n"
       "uniform vec3 uObjLo;\n"
       "uniform vec3 uObjHi;\n"
       "uniform float uExposure;\n"
@@ -662,6 +674,69 @@ namespace
       "   return mix(env, toLinear(uEnvHorizon), rough * rough) * uEnvIntensity;\n"
       "}\n"
       "\n"
+      // Diffuse light from the probe grid. Each probe holds six axis faces (slabs along z) mixed by n
+      // squared, and per face the mean distance to what it saw and its square. The eight probes around
+      // a point weigh by trilinear share, by facing the point's side, and by whether they could see it
+      // (a Chebyshev test on that distance), so light behind a wall stays out. Past the grid's edge
+      // it fades to the world over one cell.
+      "vec4 probeFace(ivec3 c, int f) {\n"
+      "   return texelFetch(uProbeTex, ivec3(c.xy, f * uProbeDims.z + c.z), 0);\n"
+      "}\n"
+      "vec2 probeDepth(ivec3 c, int f) {\n"
+      "   return texelFetch(uProbeDepth, ivec3(c.xy, f * uProbeDims.z + c.z), 0).xy;\n"
+      "}\n"
+      "vec3 probeIrr(vec3 p, vec3 n, vec3 r, out vec3 irrR) {\n"
+      "   vec3 envIrr = sampleEnv(n, 1.0);\n"
+      "   irrR = sampleEnv(r, 1.0);\n"
+      "   if (uHasProbes == 0) return envIrr;\n"
+      "   vec3 envR = irrR;\n"
+      "   float minStep = min(uProbeStep.x, min(uProbeStep.y, uProbeStep.z));\n"
+      "   vec3 q = p + n * 0.25 * minStep;\n"
+      "   vec3 g = (q - uProbeLo) / uProbeStep;\n"
+      "   vec3 dmax = vec3(uProbeDims - 1);\n"
+      "   float fade = clamp(1.0 - length(max(-g, vec3(0.0)) + max(g - dmax, vec3(0.0))), 0.0, 1.0);\n"
+      "   if (fade <= 0.0) return envIrr;\n"
+      "   vec3 r2 = r * r;\n"
+      "   ivec3 fr3 = ivec3(r.x >= 0.0 ? 0 : 1, r.y >= 0.0 ? 2 : 3, r.z >= 0.0 ? 4 : 5);\n"
+      "   vec3 sumR = vec3(0.0);\n"
+      "   g = clamp(g, vec3(0.0), dmax);\n"
+      "   ivec3 b = min(ivec3(floor(g)), uProbeDims - 2);\n"
+      "   vec3 fr = g - vec3(b);\n"
+      "   vec3 n2 = n * n;\n"
+      "   ivec3 fn = ivec3(n.x >= 0.0 ? 0 : 1, n.y >= 0.0 ? 2 : 3, n.z >= 0.0 ? 4 : 5);\n"
+      "   vec3 sum = vec3(0.0);\n"
+      "   float wsum = 0.0;\n"
+      "   for (int i = 0; i < 8; i++) {\n"
+      "      ivec3 o = ivec3(i & 1, (i >> 1) & 1, (i >> 2) & 1);\n"
+      "      ivec3 c = b + o;\n"
+      "      vec3 tri = mix(1.0 - fr, fr, vec3(o));\n"
+      "      float w = tri.x * tri.y * tri.z;\n"
+      "      vec3 pp = uProbeLo + vec3(c) * uProbeStep;\n"
+      "      vec3 d = q - pp;\n"
+      "      float dist = max(length(d), 1e-4);\n"
+      "      vec3 dir = d / dist;\n"
+      "      float face = (dot(-dir, n) + 1.0) * 0.5;\n"
+      "      w *= face * face + 0.05;\n"
+      "      vec3 dd = dir * dir;\n"
+      "      ivec3 fd = ivec3(dir.x >= 0.0 ? 0 : 1, dir.y >= 0.0 ? 2 : 3, dir.z >= 0.0 ? 4 : 5);\n"
+      "      vec2 m = probeDepth(c, fd.x) * dd.x + probeDepth(c, fd.y) * dd.y + probeDepth(c, fd.z) * dd.z;\n"
+      "      if (dist > m.x) {\n"
+      "         float var = max(m.y - m.x * m.x, 0.01 * minStep * minStep);\n"
+      "         float dx = dist - m.x;\n"
+      "         float ch = var / (var + dx * dx);\n"
+      "         w *= ch * ch * ch;\n"
+      "      }\n"
+      "      vec4 fx = probeFace(c, fn.x), fy = probeFace(c, fn.y), fz = probeFace(c, fn.z);\n"
+      "      w *= fx.a;\n"
+      "      sum += (fx.rgb * n2.x + fy.rgb * n2.y + fz.rgb * n2.z) * w;\n"
+      "      wsum += w;\n"
+      "      sumR += (probeFace(c, fr3.x).rgb * r2.x + probeFace(c, fr3.y).rgb * r2.y + probeFace(c, fr3.z).rgb * r2.z) * w;\n"
+      "   }\n"
+      "   if (wsum < 1e-5) return envIrr;\n"
+      "   irrR = mix(envR, sumR / wsum, fade);\n"
+      "   return mix(envIrr, sum / wsum, fade);\n"
+      "}\n"
+      "\n"
       "float distributionGGX(float nDotH, float rough) {\n"
       "   float a = rough * rough;\n"
       "   float a2 = a * a;\n"
@@ -678,12 +753,7 @@ namespace
       "   float d = (xDotH * xDotH) / (ax * ax) + (yDotH * yDotH) / (ay * ay) + nDotH * nDotH;\n"
       "   return 1.0 / max(3.14159265 * ax * ay * d * d, 1e-7);\n"
       "}\n"
-      "float distributionCharlie(float nDotH, float rough) {\n"
-      "   float invR = 1.0 / max(rough, 0.01);\n"
-      "   float cos2h = nDotH * nDotH;\n"
-      "   float sin2h = max(1.0 - cos2h, 0.0078125);\n"
-      "   return (2.0 + invR) * pow(sin2h, invR * 0.5) / 6.2831853;\n"
-      "}\n"
+      R3D_SHEEN_GLSL
       "vec3 evalIridescence(float nDotV, float iridIor, float thickness) {\n"
       "   float sinTheta2 = max(1.0 - nDotV * nDotV, 0.0);\n"
       "   float cosThetaPrime = sqrt(max(iridIor * iridIor - sinTheta2, 0.0));\n"
@@ -718,28 +788,56 @@ namespace
       "      bitangent = normalize(cross(normal, tangent));\n"
       "   }\n"
       "}\n"
+      // A repeating read at an explicit LOD from the unwrapped uv's derivatives, so fract() leaves no mip seam.
+      "vec4 tapRepeat(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {\n"
+      "   vec2 size = vec2(textureSize(tex, 0));\n"
+      "   float rho = max(length(dx * size), length(dy * size));\n"
+      "   return textureLod(tex, fract(uv), max(log2(max(rho, 1e-6)), 0.0));\n"
+      "}\n"
+      "float brkHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
+      "float brkNoise(vec2 p) {\n"
+      "   vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
+      "   return mix(mix(brkHash(i), brkHash(i + vec2(1.0, 0.0)), f.x), mix(brkHash(i + vec2(0.0, 1.0)), brkHash(i + vec2(1.0, 1.0)), f.x), f.y);\n"
+      "}\n"
+      // Breakup (repetition hiding after Quilez): a slow noise picks one of 8 tile offsets per area and blends neighbours.
+      "vec4 tapMap(sampler2D tex, vec2 uv) {\n"
+      "   if (uBreakup <= 0.001) return texture(tex, uv);\n"
+      "   vec2 dx = dFdx(uv), dy = dFdy(uv);\n"
+      "   float k = brkNoise(uv * 0.6) * 8.0;\n"
+      "   float i = floor(k), fk = k - i;\n"
+      "   vec4 ca = tapRepeat(tex, uv + sin(vec2(3.0, 7.0) * i), dx, dy);\n"
+      "   vec4 cb = tapRepeat(tex, uv + sin(vec2(3.0, 7.0) * (i + 1.0)), dx, dy);\n"
+      "   vec4 u = mix(ca, cb, smoothstep(0.2, 0.8, fk - 0.1 * dot(ca.rgb - cb.rgb, vec3(1.0))));\n"
+      "   return uBreakup >= 0.999 ? u : mix(tapRepeat(tex, uv, dx, dy), u, uBreakup);\n"
+      "}\n"
+      "vec3 tangentSample(vec2 uv, float strength, bool tile) {\n"
+      "   vec3 sampled;\n"
+      "   vec2 dx = dFdx(uv), dy = dFdy(uv);\n"
+      "   if (uNormalBump == 1) {\n"
+      "      vec2 px = 1.0 / vec2(textureSize(uNormalMap, 0));\n"
+      "      const vec3 lum = vec3(0.2126, 0.7152, 0.0722);\n"
+      "      float hl = dot((tile ? tapRepeat(uNormalMap, uv - vec2(px.x, 0.0), dx, dy) : tapMap(uNormalMap, uv - vec2(px.x, 0.0))).rgb, lum);\n"
+      "      float hr = dot((tile ? tapRepeat(uNormalMap, uv + vec2(px.x, 0.0), dx, dy) : tapMap(uNormalMap, uv + vec2(px.x, 0.0))).rgb, lum);\n"
+      "      float hd = dot((tile ? tapRepeat(uNormalMap, uv - vec2(0.0, px.y), dx, dy) : tapMap(uNormalMap, uv - vec2(0.0, px.y))).rgb, lum);\n"
+      "      float hu = dot((tile ? tapRepeat(uNormalMap, uv + vec2(0.0, px.y), dx, dy) : tapMap(uNormalMap, uv + vec2(0.0, px.y))).rgb, lum);\n"
+      "      sampled = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));\n"
+      "   } else {\n"
+      "      sampled = (tile ? tapRepeat(uNormalMap, uv, dx, dy) : tapMap(uNormalMap, uv)).rgb * 2.0 - 1.0;\n"
+      "   }\n"
+      "   sampled.xy *= strength;\n"
+      "   sampled.z = max(sampled.z, 1e-3);\n"
+      "   return sampled;\n"
+      "}\n"
       "vec3 applyNormalMap(vec3 normal, vec2 uv) {\n"
       "   vec3 tangent, bitangent;\n"
       "   getCotangentFrame(normal, vWorldPos, uv, tangent, bitangent);\n"
       "   mat3 tbn = mat3(tangent, bitangent, normal);\n"
-      "   vec3 sampled;\n"
-      "   if (uNormalBump == 1) {\n"
-      // Grayscale height: slope from central differences, +Z up. Height
-      // falls toward +U/+V -> normal tilts toward +U/+V.
-      "      vec2 px = 1.0 / vec2(textureSize(uNormalMap, 0));\n"
-      "      const vec3 lum = vec3(0.2126, 0.7152, 0.0722);\n"
-      "      float hl = dot(texture(uNormalMap, uv - vec2(px.x, 0.0)).rgb, lum);\n"
-      "      float hr = dot(texture(uNormalMap, uv + vec2(px.x, 0.0)).rgb, lum);\n"
-      "      float hd = dot(texture(uNormalMap, uv - vec2(0.0, px.y)).rgb, lum);\n"
-      "      float hu = dot(texture(uNormalMap, uv + vec2(0.0, px.y)).rgb, lum);\n"
-      "      sampled = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));\n"
-      "   } else {\n"
-      "      sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;\n"
+      "   vec3 sampled = tangentSample(uv, uNormalStrength, false);\n"
+      // Detail: the same map again at uv * detail scale, always tiling, whiteout-blended on top.
+      "   if (uDetailScale > 0.0) {\n"
+      "      vec3 d = tangentSample(uv * uDetailScale, uDetailStrength, true);\n"
+      "      sampled = normalize(vec3(sampled.xy + d.xy, sampled.z * d.z));\n"
       "   }\n"
-      "   sampled.xy *= uNormalStrength;\n"
-      // A texel with z <= 0 (any image that is not a normal map) would flip the surface, so
-      // strength 0 must land exactly on the plain normal.
-      "   sampled.z = max(sampled.z, 1e-3);\n"
       "   return normalize(tbn * sampled);\n"
       "}\n"
       "\n"
@@ -791,7 +889,7 @@ namespace
       "}\n"
       "\n"
       "vec4 sampleMap(sampler2D tex, vec3 n, vec2 uv) {\n"
-      "   if (uMapSpace == 0 || uTriplanarBlend <= 0.001) return uIsSprite == 1 ? sampleSprite(tex, uv) : texture(tex, uv);\n"
+      "   if (uMapSpace == 0 || uTriplanarBlend <= 0.001) return uIsSprite == 1 ? sampleSprite(tex, uv) : tapMap(tex, uv);\n"
       "   vec3 base;\n"
       "   if (uMapSpace == 1) {\n"
       "      vec3 sz = max(uObjHi - uObjLo, vec3(1e-5));\n"
@@ -804,7 +902,7 @@ namespace
       "   float sharpness = 1.0 + (1.0 - uTriplanarBlend) * 7.0;\n"
       "   vec3 w = pow(max(an, vec3(1e-4)), vec3(sharpness));\n"
       "   w /= (w.x + w.y + w.z);\n"
-      "   return texture(tex, base.yz) * w.x + texture(tex, base.xz) * w.y + texture(tex, base.xy) * w.z;\n"
+      "   return tapMap(tex, base.yz) * w.x + tapMap(tex, base.xz) * w.y + tapMap(tex, base.xy) * w.z;\n"
       "}\n"
       "\n"
       // Solid mode (Blender's Solid viewport shading, made here, not ported). Studio: a fixed
@@ -947,7 +1045,8 @@ namespace
       "   float metal = uMetallic;\n"
       "   if (uHasMetallicMap == 1) metal *= sampleMap(uMetallicMap, n, mapUv).r;\n"
       "   metal = clamp(metal, 0.0, 1.0);\n"
-      "   if (uHasNormalMap == 1) n = applyNormalMap(n, mapUv);\n"
+      // A fur mesh skips the normal map: on ribbons it means nothing, and on the skin under the coat it lights bumps the coat hides.
+      "   if (uHasNormalMap == 1 && uFurMesh == 0) n = applyNormalMap(n, mapUv);\n"
       "   float ao = (uHasAoMap == 1) ? sampleMap(uAoMap, n, mapUv).r : 1.0;\n"
       "   float cc = uClearcoat;\n"
       "   if (uHasClearcoatMap == 1) cc *= sampleMap(uClearcoatMap, n, mapUv).r;\n"
@@ -959,6 +1058,9 @@ namespace
       "   if (uHasEmissionMap == 1) emiss *= toLinear(sampleMap(uEmissionMap, n, mapUv).rgb);\n"
       "\n"
       "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
+      "   float shMax = sh * max(uSheenColor.r, max(uSheenColor.g, uSheenColor.b));\n"
+      "   float shEv = shMax > 0.0 ? sheenE(nDotV, uSheenRoughness) : 0.0;\n"
+      "   float shBase = 1.0 - shMax * shEv;\n"
       "   float iorF0 = pow((uIor - 1.0) / (uIor + 1.0), 2.0);\n"
       "   vec3 dielectricF0 = vec3(clamp(iorF0 * 2.0 * uSpecular, 0.0, 1.0));\n"
       "   vec3 f0 = mix(dielectricF0, base, metal);\n"
@@ -1079,11 +1181,10 @@ namespace
       "      }\n"
       "\n"
       "      vec3 sheenSpec = vec3(0.0);\n"
+      "      float shK = 1.0;\n"
       "      if (sh > 0.0) {\n"
-      "         float shD = distributionCharlie(nDotH, uSheenRoughness);\n"
-      // Charlie D with the Neubelt visibility term; without it the lobe was about 4x too bright.
-      "         float shV = 1.0 / max(4.0 * (nDotL + nDotV - nDotL * nDotV), 1e-4);\n"
-      "         sheenSpec = uSheenColor * shD * shV * sh;\n"
+      "         shK = shBase;\n"  // Cycles scales the base by the sheen albedo at the view angle only
+      "         sheenSpec = uSheenColor * sh * sheenLtc(nDotL, nDotV, dot(lightDir, viewDir), uSheenRoughness);\n"
       "      }\n"
       "\n"
       "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * ccAtten;\n"
@@ -1092,22 +1193,35 @@ namespace
       // Floor bounce, no scene lookup: the light that reaches a floor under the point, at grey 0.5, lights
       // the normals that face down in proportion to how far down they face.
       "      floorBounce += radiance * max(lightDir.y, 0.0) * uLightTerms[i].x;\n"
-      "      col += (kD * base / 3.14159265 * uLightTerms[i].x + (specular * ccAtten + vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow;\n"
+      "      col += ((kD * base / 3.14159265 * uLightTerms[i].x + specular * ccAtten * uLightTerms[i].y) * shK + (vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow * (gl_PrimitiveID >= uRibbonPrim ? 0.4 : 1.0);\n"
       "      if (trans > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow * uLightTerms[i].z;\n"
       "   }\n"
       "\n"
-      "   col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal) * ccAtten * ao;\n"
+      "   if (uHasProbes == 0) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal) * ccAtten * ao;\n"
       "   vec3 reflectDir = reflect(-viewDir, n);\n"
-      "   vec3 irradiance = sampleEnv(n, 1.0) * toLinear(uAmbient) * 3.0;\n"
+      "   vec3 probeR;\n"
+      "   vec3 irradiance = probeIrr(vWorldPos, n, reflectDir, probeR) * toLinear(uAmbient) * 3.0;\n"
+      // Raster has no strand self-shadowing: a strand's light, averaged root (buried) to tip (open), is ~0.4 of an open
+      // surface's, and what reaches it inside the coat has bounced off other strands (tinted by their colour).
+      "   if (gl_PrimitiveID >= uRibbonPrim) irradiance *= 0.4 * base;\n"
       "   vec3 reflection = sampleEnv(reflectDir, rough);\n"
+      // Reflections start from the probes' light along the mirror direction; the world's sharp detail
+      // over its blur is added in the share of the world the probes see that way.
+      "   float specVis = 1.0;\n"
+      "   vec3 envBlurR = sampleEnv(reflectDir, 1.0);\n"
+      "   if (uHasProbes == 1) {\n"
+      "      const vec3 lw = vec3(0.2126, 0.7152, 0.0722);\n"
+      "      specVis = clamp(dot(probeR, lw) / max(dot(envBlurR, lw), 1e-4), 0.0, 1.0);\n"
+      "      reflection = max(probeR + (reflection - envBlurR) * specVis, vec3(0.0));\n"
+      "   }\n"
       "   vec3 fAmbient = fresnelSchlickRoughness(nDotV, f0, rough);\n"
       "   if (uIridescence > 0.0) {\n"
       "      vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
       "      fAmbient = mix(fAmbient, fAmbient * irid * 2.0, uIridescence);\n"
       "   }\n"
-      "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao * ccAtten;\n"
-      "   col += reflection * fAmbient * ao * ccAtten;\n"
-      "   if (cc != 0.0) col += sampleEnv(reflectDir, ccRough) * (cc * ccFv) * ao;\n"
+      "   col += ((vec3(1.0) - fAmbient) * (1.0 - metal) * base * shBase + uSheenColor * (sh * shEv)) * irradiance * ao * ccAtten;\n"
+      "   col += reflection * fAmbient * ao * ccAtten * shBase;\n"
+      "   if (cc != 0.0) col += (uHasProbes == 1 ? max(probeR + (sampleEnv(reflectDir, ccRough) - envBlurR) * specVis, vec3(0.0)) : sampleEnv(reflectDir, ccRough)) * (cc * ccFv) * ao;\n"
       "   glassSpec += reflection * fAmbient * ao;\n"
       "\n"
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
@@ -1619,6 +1733,7 @@ Render3DNode::~Render3DNode()
    ReleaseHdr();
    ReleasePano();
    ReleasePathTrace();
+   ReleaseProbes();
    ReleaseEngine();
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
@@ -2082,8 +2197,21 @@ void Render3DNode::CookIfNeeded(int frameId)
    static const bool sEngineEnv = sEngineEnvValue != nullptr;
    if (sEngineEnv && std::atoi(sEngineEnvValue) > 1)
       liveEngineFeatures = std::atoi(sEngineEnvValue) & 15;
-   if ((liveEngine || sEngineEnv) && renderPass == 0 && mFaceOverride < 0 && !SolidActive() && CookEngine(frameId))
-      return;
+   if ((liveEngine || sEngineEnv) && renderPass == 0 && mFaceOverride < 0 && !SolidActive())
+   {
+      // Live on export: Supersample averages jittered live frames, as the raster export does (Settle traces its own
+      // sub-pixel samples). Pixel-thin geometry such as fur strands needs it.
+      if (supersample > 1 && !mInAccumulate && (liveEngineFeatures & 8) == 0 && Transport::Instance().IsOfflineMode())
+      {
+         mAccumEngine = true;
+         const bool ok = Accumulate(frameId);
+         mAccumEngine = false;
+         if (ok)
+            return;
+      }
+      if (CookEngine(frameId))
+         return;
+   }
    // Supersampling only ever adds passes on an offline render; a live cook is
    // always the single pass so the real-time cost never changes.
    if (supersample > 1 && !mInAccumulate && renderPass == 0 && Transport::Instance().IsOfflineMode() && Accumulate(frameId))
@@ -2381,6 +2509,10 @@ void Render3DNode::CookOnce(int frameId)
    if (!mVelocityPass && mFaceOverride < 0)
       StashPathTraceLights(lightCount, lightTypes, lightDirs, lightAims, lightCols, lightPower, lightSpotAngle,
                            lightSpotPenumbra, lightArea, lightTerms, lightCutoff);
+   // Probes light raster's own frames; the tracers find their own bounce light.
+   static const bool sEngineEnvSet = std::getenv("INFINITE_LIVE_ENGINE") != nullptr;
+   if (!mVelocityPass && mFaceOverride < 0 && !PathTraceActive() && !liveEngine && !sEngineEnvSet && !SolidActive())
+      UpdateProbes(sceneSig);
 
    // --- shadow pass ---------------------------------------------------
    // Depth from the light's point of view, rendered before the main pass and
@@ -2501,11 +2633,17 @@ void Render3DNode::CookOnce(int frameId)
             glUniform1i(glGetUniformLocation(mShadowProgram, "uGpuPoints"), (instanced && gpuInstances) ? 1 : 0);
             if (instanced && gpuInstances != nullptr)
                BindGpuInstances(mShadowProgram, *gpuInstances, *instancer, source->GetInstanceGroupMatrix());
+            // Fur's strands stay out: a shadow map can't resolve them, and they would blot the coat.
+            const Mesh& shadowMesh = source->GetMesh();
+            const GLsizei castCount = shadowMesh.twoSided ? (GLsizei)std::min<unsigned>(mGpu[i].indexCount, shadowMesh.ribbonStart)
+                                                          : (GLsizei)mGpu[i].indexCount;
+            if (castCount == 0)
+               continue;
             if (instanced)
-               glDrawElementsInstanced(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT,
+               glDrawElementsInstanced(GL_TRIANGLES, castCount, GL_UNSIGNED_INT,
                                        nullptr, (GLsizei)instanceCount);
             else
-               glDrawElements(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT, nullptr);
+               glDrawElements(GL_TRIANGLES, castCount, GL_UNSIGNED_INT, nullptr);
          }
 
          glBindVertexArray(0);
@@ -2658,6 +2796,23 @@ void Render3DNode::CookOnce(int frameId)
                                     ambientColor[1] + (rig != nullptr ? rig->ambient[1] : 0.0f),
                                     ambientColor[2] + (rig != nullptr ? rig->ambient[2] : 0.0f) };
       glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, rigAmbient);
+      {
+         const bool probes = mProbeValid && mProbeTex != 0;
+         glActiveTexture(GL_TEXTURE16);
+         glBindTexture(GL_TEXTURE_3D, probes ? mProbeTex : 0);
+         glBindSampler(16, 0);
+         glActiveTexture(GL_TEXTURE0);
+         glUniform1i(glGetUniformLocation(mProgram, "uProbeTex"), 16);
+         glActiveTexture(GL_TEXTURE17);
+         glBindTexture(GL_TEXTURE_3D, probes ? mProbeDepthTex : 0);
+         glBindSampler(17, 0);
+         glActiveTexture(GL_TEXTURE0);
+         glUniform1i(glGetUniformLocation(mProgram, "uProbeDepth"), 17);
+         glUniform1i(glGetUniformLocation(mProgram, "uHasProbes"), probes ? 1 : 0);
+         glUniform3fv(glGetUniformLocation(mProgram, "uProbeLo"), 1, mProbeLo);
+         glUniform3fv(glGetUniformLocation(mProgram, "uProbeStep"), 1, mProbeStep);
+         glUniform3iv(glGetUniformLocation(mProgram, "uProbeDims"), 1, mProbeDims);
+      }
       glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
       glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
       glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
@@ -3231,6 +3386,8 @@ void Render3DNode::CookOnce(int frameId)
          const Material mat = source->GetMaterial();
          glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"), mat.normalStrength);
          glUniform1i(glGetUniformLocation(mProgram, "uNormalBump"), mat.normalBump);
+         glUniform1f(glGetUniformLocation(mProgram, "uDetailScale"), mat.detailScale);
+         glUniform1f(glGetUniformLocation(mProgram, "uDetailStrength"), mat.detailStrength);
       }
 
       {
@@ -3240,6 +3397,7 @@ void Render3DNode::CookOnce(int frameId)
          glUniform3fv(glGetUniformLocation(mProgram, "uMapRotate"), 1, mapping.rotate);
          glUniform3fv(glGetUniformLocation(mProgram, "uMapScale"), 1, mapping.scale);
          glUniform1f(glGetUniformLocation(mProgram, "uTriplanarBlend"), mapping.triplanarBlend);
+         glUniform1f(glGetUniformLocation(mProgram, "uBreakup"), mapping.breakup);
          // Object-space bounds computed at upload time, so Generated coordinates
          // normalise into this mesh's own box rather than a hardcoded -1..1.
          static const float kFallbackLo[3] = { -1.0f, -1.0f, -1.0f };
@@ -3457,8 +3615,15 @@ void Render3DNode::CookOnce(int frameId)
          extentMin = std::min(extentMin, gpu.hi[k] - gpu.lo[k]);
          extentMax = std::max(extentMax, gpu.hi[k] - gpu.lo[k]);
       }
-      const bool twoSided = backfaceCull && gpu.hasBounds && extentMax > 0.0f && extentMin <= extentMax * 1e-4f;
+      const bool twoSided = backfaceCull && ((gpu.hasBounds && extentMax > 0.0f && extentMin <= extentMax * 1e-4f) ||
+                                             source->GetMesh().twoSided);
       glUniform1i(glGetUniformLocation(mProgram, "uTwoSided"), twoSided ? 1 : 0);
+      {
+         const Mesh& ribbonMesh = source->GetMesh();
+         glUniform1i(glGetUniformLocation(mProgram, "uRibbonPrim"),
+                     ribbonMesh.twoSided ? (int)(ribbonMesh.ribbonStart / 3) : 0x7fffffff);
+         glUniform1i(glGetUniformLocation(mProgram, "uFurMesh"), ribbonMesh.twoSided ? 1 : 0);
+      }
       if (twoSided)
          glDisable(GL_CULL_FACE);
 

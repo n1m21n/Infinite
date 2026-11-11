@@ -12,3 +12,15 @@ jpg textures into one glb (1k textures). Total about 2.5 MB, so they live in git
 
 The Fox is read from `INFINITE_3DBENCH_FOX` when that variable names an existing file (the same
 variable the 3D bench uses), otherwise from `assets/Fox.glb`.
+
+## Bed close-up (case `bed`)
+
+`fetch_bed.py` downloads two Poly Haven fabric scans (2k jpg: albedo, normal GL, roughness, height) into
+`assets/bed/` (git-ignored, about 22 MB); `bed_build.py` then builds the meshes there headless
+(`Blender -b --factory-startup -P bed_build.py`, about 40 s): a cloth-simulated sheet, a plush toy, a
+mattress and a lamp, one glb each.
+
+| Files | What | Source | Licence |
+|---|---|---|---|
+| `bed/sheet_*.jpg` | cotton jersey knit, tinted cool grey on the sheet | https://polyhaven.com/a/cotton_jersey | CC0 |
+| `bed/plush_*.jpg` | curly teddy fleece, on the plush toy | https://polyhaven.com/a/curly_teddy_natural | CC0 |

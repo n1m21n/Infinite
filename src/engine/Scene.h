@@ -12,6 +12,7 @@ namespace engine
    {
       std::vector<float> posNormal; // x y z nx ny nz per vertex
       std::vector<uint32_t> indices;
+      std::vector<float> uv;        // u v per vertex (GL convention, v = 0 is the image's first row); empty = none
    };
 
    struct Instance
@@ -25,7 +26,38 @@ namespace engine
       float transmission = 0.0f; // glass: live = two refractions through the hit object, then the scene beyond
       float ior = 1.5f;
       float emission[3] = { 0.0f, 0.0f, 0.0f }; // linear light leaving the surface (colour * strength)
+      // Material maps, as Render 3D's GL path reads them: indices into Frame::textures, -1 = none. Albedo is sRGB and
+      // multiplies the base colour; roughness and metallic multiply by the red channel; normal is a tangent-space map
+      // (or a grey height map with normalBump) through the screen-space cotangent frame. Sheen is the Charlie lobe.
+      int mapAlbedo = -1, mapRoughness = -1, mapMetallic = -1, mapNormal = -1;
+      int wrap = 0;              // 0 clamp, 1 repeat, 2 mirror (Material's wrapMode)
+      float normalStrength = 1.0f;
+      int normalBump = 0;
+      float sheen = 0.0f, sheenColor[3] = { 1.0f, 1.0f, 1.0f }, sheenRoughness = 0.5f; // sheenColor as GL uses it (raw)
+      // The rest of the Material's maps (red channel multiplies the value; emission is sRGB and multiplies the colour),
+      // as GL reads them. Detail: the normal map read again at uv * detailScale (0 = off), blended over the first.
+      int mapAo = -1, mapEmission = -1, mapSheen = -1, mapOpacity = -1, mapClearcoat = -1, mapTransmission = -1;
+      float clearcoat = 0.0f, clearcoatRoughness = 0.03f;
+      float specular = 0.5f;               // dielectric F0 = ((ior - 1) / (ior + 1))^2 * 2 * specular, as GL
+      float opacity = 1.0f, alphaCutoff = 0.0f; // cutoff > 0: cut below it; else opacity is a stochastic coverage
+      float detailScale = 0.0f, detailStrength = 1.0f;
+      // Mapping (the Mapping node): the coordinate space (0 uv, 1 generated, 2 object), its transform, triplanar blend
+      // and the mesh's own box for generated; breakup > 0 hides tiling (two offset reads blended by a noise).
+      int mapSpace = 0;
+      float mapScale[3] = { 1.0f, 1.0f, 1.0f }, mapRotate[3] = { 0.0f, 0.0f, 0.0f }, mapTranslate[3] = { 0.0f, 0.0f, 0.0f };
+      float triplanar = 0.0f, breakup = 0.0f;
+      float objLo[3] = { 0.0f, 0.0f, 0.0f }, objHi[3] = { 1.0f, 1.0f, 1.0f };
    };
+
+   // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the
+   // GPU copy between frames by key.
+   struct TextureData
+   {
+      const uint8_t* rgba = nullptr;
+      int w = 0, h = 0;
+      unsigned long long key = 0;
+   };
+   constexpr int kMaxTextures = 16;
 
    // Many copies of one mesh drawn with one instanced call (R5). Raster only: batches are not in the ray-traced
    // structure (no RT shadows/reflections/GI on them) and cast no shadow-map shadow. Uniform scale per copy.
@@ -53,6 +85,7 @@ namespace engine
       float diffuse = 1.0f, specular = 1.0f;
       float falloff = 1.0f; // k of 1 / (1 + d^2 k); negative = inverse square
       float cutoff = 0.0f;  // 0 = none
+      float sunAngleDeg = 0.0f; // directional / sun: degrees across its disc (0 = a point); softens its highlight and settled shadow
    };
 
    // One shadow-casting light (the first), a depth map fitted to the scene bounds. Spot and directional/sun only.
@@ -69,6 +102,7 @@ namespace engine
    struct Frame
    {
       std::vector<Instance> instances;
+      std::vector<TextureData> textures; // up to kMaxTextures; maps past that fall back to the plain material
       std::vector<InstanceBatch> batches;
       std::vector<Light> lights; // up to kMaxLights
       float viewProj[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }; // GL clip space, z in -1..1
@@ -99,6 +133,12 @@ namespace engine
       unsigned frameIndex = 0;
       bool rtReflections = false; // one ray along the reflection vector for glossy surfaces (hit = flat shade, miss = env)
       float rayBias = 0.003f; // origin offset along the normal, scene units
+      // Depth of field (settle's path tracer): a thin lens of this radius focused at focusDist along camFwd; bokeh =
+      // blades (below 3 round), their turn in radians, tall/wide ratio, as Render 3D's lens. 0 radius = pinhole.
+      float lensRadius = 0.0f, focusDist = 4.0f;
+      float dofAperture = 0.0f; // live: Render 3D's depth blur, a circle of dofAperture x 24 px across 1080 rows at |d - focus| / d
+      float bokeh[3] = { 0.0f, 0.0f, 1.0f };
+      float camRight[3] = { 1, 0, 0 }, camUp[3] = { 0, 1, 0 }, camFwd[3] = { 0, 0, -1 };
    };
 
    constexpr int kMaxLights = 8;

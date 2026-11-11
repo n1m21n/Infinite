@@ -1,0 +1,1150 @@
+infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
+blendfix 1
+rev 2
+node 1 3D Ocean
+  uid 1
+  pos 0 0
+  flags 1 0 1 0
+  i resolution 300
+  f size 40
+  f amplitude 0.0700000003
+  f wavelength 5
+  f steepness 0.550000012
+  f direction 25
+  f choppiness 0.800000012
+  i octaves 6
+  f speed 0.5
+  f horizon 60
+  f posX 0
+  f posY 0
+  f posZ 0
+  f scale 1
+  c color 0.00600000005 0.0199999996 0.0320000015
+  f metallic 0
+  f roughness 0.0250000004
+  f opacity 1
+  i shading 0
+  c emissionColor 0.200000003 0.5 0.699999988
+  f emission 0
+  f ior 1.33000004
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 2 3D Group 3D
+  uid 2
+  pos 260 260
+  flags 1 0 1 0
+end
+node 3 3D Model 3D
+  uid 3
+  pos 0 260
+  flags 1 0 1 0
+  s path boat-sunset media/hull.obj
+  i part 0
+  b normalize 0
+  b recenter 0
+  f posX 0
+  f posY -0.040733818
+  f posZ 0
+  f rotX -0.0157253221
+  f rotY 0.349999994
+  f rotZ 0.0151667465
+  f scale 1
+  f spin 0
+  f pointSize 0.00499999989
+  i clip 0
+  f clipSpeed 1
+  f clipPhase 0
+  i clipSync 0
+  f clipBeats 4
+  f morph0 0
+  f morph1 0
+  f morph2 0
+  f morph3 0
+  f morph4 0
+  f morph5 0
+  f morph6 0
+  f morph7 0
+  i pose0 -1
+  f pose0X 0
+  f pose0Y 0
+  f pose0Z 0
+  i pose1 -1
+  f pose1X 0
+  f pose1Y 0
+  f pose1Z 0
+  i pose2 -1
+  f pose2X 0
+  f pose2Y 0
+  f pose2Z 0
+  i pose3 -1
+  f pose3X 0
+  f pose3Y 0
+  f pose3Z 0
+  i pose4 -1
+  f pose4X 0
+  f pose4Y 0
+  f pose4Z 0
+  i pose5 -1
+  f pose5X 0
+  f pose5Y 0
+  f pose5Z 0
+  i pose6 -1
+  f pose6X 0
+  f pose6Y 0
+  f pose6Z 0
+  i pose7 -1
+  f pose7X 0
+  f pose7Y 0
+  f pose7Z 0
+  i pose8 -1
+  f pose8X 0
+  f pose8Y 0
+  f pose8Z 0
+  i pose9 -1
+  f pose9X 0
+  f pose9Y 0
+  f pose9Z 0
+  i pose10 -1
+  f pose10X 0
+  f pose10Y 0
+  f pose10Z 0
+  i pose11 -1
+  f pose11X 0
+  f pose11Y 0
+  f pose11Z 0
+  i pose12 -1
+  f pose12X 0
+  f pose12Y 0
+  f pose12Z 0
+  i pose13 -1
+  f pose13X 0
+  f pose13Y 0
+  f pose13Z 0
+  i pose14 -1
+  f pose14X 0
+  f pose14Y 0
+  f pose14Z 0
+  i pose15 -1
+  f pose15X 0
+  f pose15Y 0
+  f pose15Z 0
+  b ikOn 0
+  i ikJoint -1
+  i ikChain 2
+  f ikWeight 1
+  f ikX 0
+  f ikY 0
+  f ikZ 0
+  b ikPoleOn 0
+  f ikPoleX 0
+  f ikPoleY 0
+  f ikPoleZ 1
+  c color 0.0350000001 0.0700000003 0.129999995
+  f metallic 0
+  f roughness 0.319999993
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.550000012 0.219999999
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0.600000024
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 4 3D Model 3D
+  uid 4
+  pos 0 380
+  flags 1 0 1 0
+  s path boat-sunset media/deck.obj
+  i part 0
+  b normalize 0
+  b recenter 0
+  f posX 0
+  f posY -0.040733818
+  f posZ 0
+  f rotX -0.0157253221
+  f rotY 0.349999994
+  f rotZ 0.0151667465
+  f scale 1
+  f spin 0
+  f pointSize 0.00499999989
+  i clip 0
+  f clipSpeed 1
+  f clipPhase 0
+  i clipSync 0
+  f clipBeats 4
+  f morph0 0
+  f morph1 0
+  f morph2 0
+  f morph3 0
+  f morph4 0
+  f morph5 0
+  f morph6 0
+  f morph7 0
+  i pose0 -1
+  f pose0X 0
+  f pose0Y 0
+  f pose0Z 0
+  i pose1 -1
+  f pose1X 0
+  f pose1Y 0
+  f pose1Z 0
+  i pose2 -1
+  f pose2X 0
+  f pose2Y 0
+  f pose2Z 0
+  i pose3 -1
+  f pose3X 0
+  f pose3Y 0
+  f pose3Z 0
+  i pose4 -1
+  f pose4X 0
+  f pose4Y 0
+  f pose4Z 0
+  i pose5 -1
+  f pose5X 0
+  f pose5Y 0
+  f pose5Z 0
+  i pose6 -1
+  f pose6X 0
+  f pose6Y 0
+  f pose6Z 0
+  i pose7 -1
+  f pose7X 0
+  f pose7Y 0
+  f pose7Z 0
+  i pose8 -1
+  f pose8X 0
+  f pose8Y 0
+  f pose8Z 0
+  i pose9 -1
+  f pose9X 0
+  f pose9Y 0
+  f pose9Z 0
+  i pose10 -1
+  f pose10X 0
+  f pose10Y 0
+  f pose10Z 0
+  i pose11 -1
+  f pose11X 0
+  f pose11Y 0
+  f pose11Z 0
+  i pose12 -1
+  f pose12X 0
+  f pose12Y 0
+  f pose12Z 0
+  i pose13 -1
+  f pose13X 0
+  f pose13Y 0
+  f pose13Z 0
+  i pose14 -1
+  f pose14X 0
+  f pose14Y 0
+  f pose14Z 0
+  i pose15 -1
+  f pose15X 0
+  f pose15Y 0
+  f pose15Z 0
+  b ikOn 0
+  i ikJoint -1
+  i ikChain 2
+  f ikWeight 1
+  f ikX 0
+  f ikY 0
+  f ikZ 0
+  b ikPoleOn 0
+  f ikPoleX 0
+  f ikPoleY 0
+  f ikPoleZ 1
+  c color 0.400000006 0.25 0.119999997
+  f metallic 0
+  f roughness 0.600000024
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.550000012 0.219999999
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 5 3D Model 3D
+  uid 5
+  pos 0 500
+  flags 1 0 1 0
+  s path boat-sunset media/cabin.obj
+  i part 0
+  b normalize 0
+  b recenter 0
+  f posX 0
+  f posY -0.040733818
+  f posZ 0
+  f rotX -0.0157253221
+  f rotY 0.349999994
+  f rotZ 0.0151667465
+  f scale 1
+  f spin 0
+  f pointSize 0.00499999989
+  i clip 0
+  f clipSpeed 1
+  f clipPhase 0
+  i clipSync 0
+  f clipBeats 4
+  f morph0 0
+  f morph1 0
+  f morph2 0
+  f morph3 0
+  f morph4 0
+  f morph5 0
+  f morph6 0
+  f morph7 0
+  i pose0 -1
+  f pose0X 0
+  f pose0Y 0
+  f pose0Z 0
+  i pose1 -1
+  f pose1X 0
+  f pose1Y 0
+  f pose1Z 0
+  i pose2 -1
+  f pose2X 0
+  f pose2Y 0
+  f pose2Z 0
+  i pose3 -1
+  f pose3X 0
+  f pose3Y 0
+  f pose3Z 0
+  i pose4 -1
+  f pose4X 0
+  f pose4Y 0
+  f pose4Z 0
+  i pose5 -1
+  f pose5X 0
+  f pose5Y 0
+  f pose5Z 0
+  i pose6 -1
+  f pose6X 0
+  f pose6Y 0
+  f pose6Z 0
+  i pose7 -1
+  f pose7X 0
+  f pose7Y 0
+  f pose7Z 0
+  i pose8 -1
+  f pose8X 0
+  f pose8Y 0
+  f pose8Z 0
+  i pose9 -1
+  f pose9X 0
+  f pose9Y 0
+  f pose9Z 0
+  i pose10 -1
+  f pose10X 0
+  f pose10Y 0
+  f pose10Z 0
+  i pose11 -1
+  f pose11X 0
+  f pose11Y 0
+  f pose11Z 0
+  i pose12 -1
+  f pose12X 0
+  f pose12Y 0
+  f pose12Z 0
+  i pose13 -1
+  f pose13X 0
+  f pose13Y 0
+  f pose13Z 0
+  i pose14 -1
+  f pose14X 0
+  f pose14Y 0
+  f pose14Z 0
+  i pose15 -1
+  f pose15X 0
+  f pose15Y 0
+  f pose15Z 0
+  b ikOn 0
+  i ikJoint -1
+  i ikChain 2
+  f ikWeight 1
+  f ikX 0
+  f ikY 0
+  f ikZ 0
+  b ikPoleOn 0
+  f ikPoleX 0
+  f ikPoleY 0
+  f ikPoleZ 1
+  c color 0.800000012 0.769999981 0.699999988
+  f metallic 0
+  f roughness 0.5
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.550000012 0.219999999
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0.200000003
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 6 3D Model 3D
+  uid 6
+  pos 0 620
+  flags 1 0 1 0
+  s path boat-sunset media/windows.obj
+  i part 0
+  b normalize 0
+  b recenter 0
+  f posX 0
+  f posY -0.040733818
+  f posZ 0
+  f rotX -0.0157253221
+  f rotY 0.349999994
+  f rotZ 0.0151667465
+  f scale 1
+  f spin 0
+  f pointSize 0.00499999989
+  i clip 0
+  f clipSpeed 1
+  f clipPhase 0
+  i clipSync 0
+  f clipBeats 4
+  f morph0 0
+  f morph1 0
+  f morph2 0
+  f morph3 0
+  f morph4 0
+  f morph5 0
+  f morph6 0
+  f morph7 0
+  i pose0 -1
+  f pose0X 0
+  f pose0Y 0
+  f pose0Z 0
+  i pose1 -1
+  f pose1X 0
+  f pose1Y 0
+  f pose1Z 0
+  i pose2 -1
+  f pose2X 0
+  f pose2Y 0
+  f pose2Z 0
+  i pose3 -1
+  f pose3X 0
+  f pose3Y 0
+  f pose3Z 0
+  i pose4 -1
+  f pose4X 0
+  f pose4Y 0
+  f pose4Z 0
+  i pose5 -1
+  f pose5X 0
+  f pose5Y 0
+  f pose5Z 0
+  i pose6 -1
+  f pose6X 0
+  f pose6Y 0
+  f pose6Z 0
+  i pose7 -1
+  f pose7X 0
+  f pose7Y 0
+  f pose7Z 0
+  i pose8 -1
+  f pose8X 0
+  f pose8Y 0
+  f pose8Z 0
+  i pose9 -1
+  f pose9X 0
+  f pose9Y 0
+  f pose9Z 0
+  i pose10 -1
+  f pose10X 0
+  f pose10Y 0
+  f pose10Z 0
+  i pose11 -1
+  f pose11X 0
+  f pose11Y 0
+  f pose11Z 0
+  i pose12 -1
+  f pose12X 0
+  f pose12Y 0
+  f pose12Z 0
+  i pose13 -1
+  f pose13X 0
+  f pose13Y 0
+  f pose13Z 0
+  i pose14 -1
+  f pose14X 0
+  f pose14Y 0
+  f pose14Z 0
+  i pose15 -1
+  f pose15X 0
+  f pose15Y 0
+  f pose15Z 0
+  b ikOn 0
+  i ikJoint -1
+  i ikChain 2
+  f ikWeight 1
+  f ikX 0
+  f ikY 0
+  f ikZ 0
+  b ikPoleOn 0
+  f ikPoleX 0
+  f ikPoleY 0
+  f ikPoleZ 1
+  c color 0.0149999997 0.0179999992 0.0250000004
+  f metallic 0
+  f roughness 0.0500000007
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.550000012 0.219999999
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 7 3D Model 3D
+  uid 7
+  pos 0 740
+  flags 1 0 1 0
+  s path boat-sunset media/trim.obj
+  i part 0
+  b normalize 0
+  b recenter 0
+  f posX 0
+  f posY -0.040733818
+  f posZ 0
+  f rotX -0.0157253221
+  f rotY 0.349999994
+  f rotZ 0.0151667465
+  f scale 1
+  f spin 0
+  f pointSize 0.00499999989
+  i clip 0
+  f clipSpeed 1
+  f clipPhase 0
+  i clipSync 0
+  f clipBeats 4
+  f morph0 0
+  f morph1 0
+  f morph2 0
+  f morph3 0
+  f morph4 0
+  f morph5 0
+  f morph6 0
+  f morph7 0
+  i pose0 -1
+  f pose0X 0
+  f pose0Y 0
+  f pose0Z 0
+  i pose1 -1
+  f pose1X 0
+  f pose1Y 0
+  f pose1Z 0
+  i pose2 -1
+  f pose2X 0
+  f pose2Y 0
+  f pose2Z 0
+  i pose3 -1
+  f pose3X 0
+  f pose3Y 0
+  f pose3Z 0
+  i pose4 -1
+  f pose4X 0
+  f pose4Y 0
+  f pose4Z 0
+  i pose5 -1
+  f pose5X 0
+  f pose5Y 0
+  f pose5Z 0
+  i pose6 -1
+  f pose6X 0
+  f pose6Y 0
+  f pose6Z 0
+  i pose7 -1
+  f pose7X 0
+  f pose7Y 0
+  f pose7Z 0
+  i pose8 -1
+  f pose8X 0
+  f pose8Y 0
+  f pose8Z 0
+  i pose9 -1
+  f pose9X 0
+  f pose9Y 0
+  f pose9Z 0
+  i pose10 -1
+  f pose10X 0
+  f pose10Y 0
+  f pose10Z 0
+  i pose11 -1
+  f pose11X 0
+  f pose11Y 0
+  f pose11Z 0
+  i pose12 -1
+  f pose12X 0
+  f pose12Y 0
+  f pose12Z 0
+  i pose13 -1
+  f pose13X 0
+  f pose13Y 0
+  f pose13Z 0
+  i pose14 -1
+  f pose14X 0
+  f pose14Y 0
+  f pose14Z 0
+  i pose15 -1
+  f pose15X 0
+  f pose15Y 0
+  f pose15Z 0
+  b ikOn 0
+  i ikJoint -1
+  i ikChain 2
+  f ikWeight 1
+  f ikX 0
+  f ikY 0
+  f ikZ 0
+  b ikPoleOn 0
+  f ikPoleX 0
+  f ikPoleY 0
+  f ikPoleZ 1
+  c color 0.360000014 0.200000003 0.0799999982
+  f metallic 0
+  f roughness 0.349999994
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.550000012 0.219999999
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0.400000006
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 8 3D Model 3D
+  uid 8
+  pos 0 860
+  flags 1 0 1 0
+  s path boat-sunset media/sail.obj
+  i part 0
+  b normalize 0
+  b recenter 0
+  f posX 0
+  f posY -0.040733818
+  f posZ 0
+  f rotX -0.0157253221
+  f rotY 0.349999994
+  f rotZ 0.0151667465
+  f scale 1
+  f spin 0
+  f pointSize 0.00499999989
+  i clip 0
+  f clipSpeed 1
+  f clipPhase 0
+  i clipSync 0
+  f clipBeats 4
+  f morph0 0
+  f morph1 0
+  f morph2 0
+  f morph3 0
+  f morph4 0
+  f morph5 0
+  f morph6 0
+  f morph7 0
+  i pose0 -1
+  f pose0X 0
+  f pose0Y 0
+  f pose0Z 0
+  i pose1 -1
+  f pose1X 0
+  f pose1Y 0
+  f pose1Z 0
+  i pose2 -1
+  f pose2X 0
+  f pose2Y 0
+  f pose2Z 0
+  i pose3 -1
+  f pose3X 0
+  f pose3Y 0
+  f pose3Z 0
+  i pose4 -1
+  f pose4X 0
+  f pose4Y 0
+  f pose4Z 0
+  i pose5 -1
+  f pose5X 0
+  f pose5Y 0
+  f pose5Z 0
+  i pose6 -1
+  f pose6X 0
+  f pose6Y 0
+  f pose6Z 0
+  i pose7 -1
+  f pose7X 0
+  f pose7Y 0
+  f pose7Z 0
+  i pose8 -1
+  f pose8X 0
+  f pose8Y 0
+  f pose8Z 0
+  i pose9 -1
+  f pose9X 0
+  f pose9Y 0
+  f pose9Z 0
+  i pose10 -1
+  f pose10X 0
+  f pose10Y 0
+  f pose10Z 0
+  i pose11 -1
+  f pose11X 0
+  f pose11Y 0
+  f pose11Z 0
+  i pose12 -1
+  f pose12X 0
+  f pose12Y 0
+  f pose12Z 0
+  i pose13 -1
+  f pose13X 0
+  f pose13Y 0
+  f pose13Z 0
+  i pose14 -1
+  f pose14X 0
+  f pose14Y 0
+  f pose14Z 0
+  i pose15 -1
+  f pose15X 0
+  f pose15Y 0
+  f pose15Z 0
+  b ikOn 0
+  i ikJoint -1
+  i ikChain 2
+  f ikWeight 1
+  f ikX 0
+  f ikY 0
+  f ikZ 0
+  b ikPoleOn 0
+  f ikPoleX 0
+  f ikPoleY 0
+  f ikPoleZ 1
+  c color 0.860000014 0.819999993 0.720000029
+  f metallic 0
+  f roughness 0.850000024
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.550000012 0.219999999
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 9 3D Model 3D
+  uid 9
+  pos 0 980
+  flags 1 0 1 0
+  s path boat-sunset media/lantern.obj
+  i part 0
+  b normalize 0
+  b recenter 0
+  f posX 0
+  f posY -0.040733818
+  f posZ 0
+  f rotX -0.0157253221
+  f rotY 0.349999994
+  f rotZ 0.0151667465
+  f scale 1
+  f spin 0
+  f pointSize 0.00499999989
+  i clip 0
+  f clipSpeed 1
+  f clipPhase 0
+  i clipSync 0
+  f clipBeats 4
+  f morph0 0
+  f morph1 0
+  f morph2 0
+  f morph3 0
+  f morph4 0
+  f morph5 0
+  f morph6 0
+  f morph7 0
+  i pose0 -1
+  f pose0X 0
+  f pose0Y 0
+  f pose0Z 0
+  i pose1 -1
+  f pose1X 0
+  f pose1Y 0
+  f pose1Z 0
+  i pose2 -1
+  f pose2X 0
+  f pose2Y 0
+  f pose2Z 0
+  i pose3 -1
+  f pose3X 0
+  f pose3Y 0
+  f pose3Z 0
+  i pose4 -1
+  f pose4X 0
+  f pose4Y 0
+  f pose4Z 0
+  i pose5 -1
+  f pose5X 0
+  f pose5Y 0
+  f pose5Z 0
+  i pose6 -1
+  f pose6X 0
+  f pose6Y 0
+  f pose6Z 0
+  i pose7 -1
+  f pose7X 0
+  f pose7Y 0
+  f pose7Z 0
+  i pose8 -1
+  f pose8X 0
+  f pose8Y 0
+  f pose8Z 0
+  i pose9 -1
+  f pose9X 0
+  f pose9Y 0
+  f pose9Z 0
+  i pose10 -1
+  f pose10X 0
+  f pose10Y 0
+  f pose10Z 0
+  i pose11 -1
+  f pose11X 0
+  f pose11Y 0
+  f pose11Z 0
+  i pose12 -1
+  f pose12X 0
+  f pose12Y 0
+  f pose12Z 0
+  i pose13 -1
+  f pose13X 0
+  f pose13Y 0
+  f pose13Z 0
+  i pose14 -1
+  f pose14X 0
+  f pose14Y 0
+  f pose14Z 0
+  i pose15 -1
+  f pose15X 0
+  f pose15Y 0
+  f pose15Z 0
+  b ikOn 0
+  i ikJoint -1
+  i ikChain 2
+  f ikWeight 1
+  f ikX 0
+  f ikY 0
+  f ikZ 0
+  b ikPoleOn 0
+  f ikPoleX 0
+  f ikPoleY 0
+  f ikPoleZ 1
+  c color 1 0.620000005 0.280000001
+  f metallic 0
+  f roughness 0.300000012
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.550000012 0.219999999
+  f emission 1.5
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 10 3D Camera
+  uid 10
+  pos 520 0
+  flags 1 0 1 0
+  i projection 0
+  f fov 38
+  f shiftX 0
+  f shiftY 0
+  f sensorWidth 36
+  f sensorHeight 24
+  i sensorFit 0
+  f displaySize 1
+  b showLimits 0
+  b showName 0
+  b showSensor 0
+  b showMist 0
+  f orthoHeight 1.5
+  f distance 8.5
+  f azimuth 204
+  f elevation 5
+  f targetX 0
+  f targetY 1.5
+  f targetZ 0
+  f roll 0
+  f near 0.0500000007
+  f far 2000
+  f orbitPerBeat 0
+end
+node 11 3D Light
+  uid 11
+  pos 520 260
+  flags 1 0 1 0
+  i type 2
+  f azimuth 0
+  f elevation 3.5
+  f distance 4
+  c color 1 0.550000012 0.280000001
+  f intensity 3.20000005
+  f falloff 1
+  f spotAngle 45
+  f spotPenumbra 0.200000003
+  f orbitPerBeat 0
+  f areaWidth 1
+  f areaHeight 1
+  b normalize 1
+  f diffuse 1
+  f specular 1
+  f transmission 1
+  b softFalloff 1
+  b castShadow 1
+  f shadowRadius 0.100000001
+  f shadowFilter 1
+  i shadowRes 0
+  f shadowClip 0.0500000007
+  b useTemperature 0
+  f temperature 6500
+  f exposure 0
+  b useCutoff 0
+  f cutoffDistance 40
+  b showCone 0
+end
+node 12 3D Light
+  uid 12
+  pos 520 520
+  flags 1 0 1 0
+  i type 3
+  f azimuth 51.5662003
+  f elevation 51.5662003
+  f distance 4
+  c color 0.449999988 0.449999988 0.649999976
+  f intensity 0.200000003
+  f falloff 1
+  f spotAngle 45
+  f spotPenumbra 0.200000003
+  f orbitPerBeat 0
+  f areaWidth 1
+  f areaHeight 1
+  b normalize 1
+  f diffuse 1
+  f specular 1
+  f transmission 1
+  b softFalloff 1
+  b castShadow 1
+  f shadowRadius 0.25
+  f shadowFilter 1
+  i shadowRes 0
+  f shadowClip 0.0500000007
+  b useTemperature 0
+  f temperature 6500
+  f exposure 0
+  b useCutoff 0
+  f cutoffDistance 40
+  b showCone 0
+end
+node 13 3D HDRI
+  uid 13
+  pos 520 1040
+  flags 1 0 1 0
+  s path boat-sunset media/infinite_bench_boat_sunset.hdr
+  f intensity 1
+  f rotation 0
+  f sunThreshold 0
+  f sunAngle 0.526000023
+  b sunShadow 1
+  i sunShadowRes 0
+  f sunShadowFilter 1
+end
+node 14 3D Render 3D
+  uid 14
+  pos 780 0
+  flags 1 0 1 0
+  i engine 0
+  i ptSamples 128
+  i ptBounces 6
+  f ao 0
+  f aoRadius 0.5
+  f dofAperture 0
+  f focusDistance 4
+  i dofBlades 0
+  f dofRotation 0
+  f dofRatio 1
+  b floatOutput 0
+  i supersample 1
+  f width 1920
+  f height 1080
+  i renderPass 0
+  f mistStart 5
+  f mistDepth 25
+  i mistFalloff 0
+  f mistIntensity 0
+  f mistHeight 0
+  f passThreshold 0.5
+  b cavity 0
+  i cavityType 0
+  i viewShading 0
+  i solidLighting 0
+  i solidColor 0
+  c solidSingle 0.800000012 0.800000012 0.800000012
+  i matcap 0
+  b solidSpecular 1
+  b studioWorld 0
+  f studioRotation 0
+  f cavityRidge 1
+  f cavityValley 1
+  f curvatureRidge 1
+  f curvatureValley 1
+  f cavityDistance 0.200000003
+  b motionBlur 0
+  f motionShutter 0.5
+  i motionPosition 1
+  f motionMax 32
+  i projection 0
+  f fov 45
+  f orthoHeight 1.5
+  f domeAngle 180
+  f domeTilt 0
+  i fisheyeLens 0
+  f camDistance 3
+  f latMin -90
+  f latMax 90
+  f lonMin -180
+  f lonMax 180
+  f camAzimuth 34.3774986
+  f camElevation 22.9183006
+  f targetX 0
+  f targetY 0
+  f targetZ 0
+  f near 0.0500000007
+  f far 100
+  f lightAzimuth 51.5662003
+  f lightElevation 51.5662003
+  c lightColor 1 0.980000019 0.939999998
+  f lightIntensity 1.20000005
+  c ambient 0.280000001 0.319999993 0.419999987
+  f rim 0.349999994
+  c envSky 0.419999987 0.529999971 0.75
+  c envHorizon 0.550000012 0.560000002 0.600000024
+  c envGround 0.159999996 0.140000001 0.129999995
+  f envIntensity 1
+  b envAsBackground 1
+  c bg 0.0399999991 0.0399999991 0.0599999987
+  f bgOpacity 1
+  b depthTest 1
+  b cull 1
+  i spriteShape 0
+  i spriteSizeMode 0
+  i samples 2
+  i tonemap 3
+  f exposure 0.800000012
+  b hdr 1
+  f bloom 0.349999994
+  f bloomThreshold 1
+  f bloomRadius 0.5
+  b shadows 1
+  i shadowQuality 1
+  f shadowBias 0.00249999994
+  f shadowSoftness 1
+  f shadowStrength 0.800000012
+end
+node 15 Utility Output
+  uid 15
+  pos 1040 0
+  flags 1 0 1 0
+  i recordFps 30
+  b includeAudio 0
+  i imageFormat 0
+  i videoFormat 0
+  s exportImagePath /Users/namansoni/Desktop/infinite_output.png
+  s recordVideoPath /Users/namansoni/Desktop/infinite_output.mp4
+  i offlineFps 30
+  i offlineDurationSeconds 10
+  i offlinePrerollFrames 0
+end
+cable 14 8 13 0
+cable 15 0 14 0
+geo 2 0 3 0
+geo 2 1 4 0
+geo 2 2 5 0
+geo 2 3 6 0
+geo 2 4 7 0
+geo 2 5 8 0
+geo 2 6 9 0
+geo 14 4 10 0
+geo 14 5 11 0
+geo 14 6 12 0
+geo 14 0 1 0
+geo 14 1 2 0
+glob rand rand(0, 1, 2)
+glob sh sh(0, 1, 4)
+glob fast_lfo sin(t * 8) * 0.5 + 0.5
+glob rand_glide lerp(sh(1, 0, 2), sh(1, 0, 2), smoothstep(0, 1, mod(t * 2, 1)))
+glob bounce abs(sin(t * 3))
+glob slow_drift sin(t * 0.2) * 0.5 + 0.5
+glob chaos abs(mod(sin(t * 1.7) * 43.12 + cos(t * 2.3) * 17.54, 1.0))
+transport 120 4 4 0 0
+stream 0 0 1 0 0 1 0 Video 1
+streamid 0 1
+stream 0 0 1 0 0 1 0 Video 2
+streamid 1 2
+stream 0 0 1 0 0 1 0 Video 3
+streamid 2 3
+stream 0 0 1 0 0 1 0 Video 4
+streamid 3 4
+stream 1 0 1 0 0 1 0 Audio 1
+streamid 4 5
+stream 1 0 1 0 0 1 0 Audio 2
+streamid 5 6
+stream 1 0 1 0 0 1 0 Audio 3
+streamid 6 7
+stream 1 0 1 0 0 1 0 Audio 4
+streamid 7 8
+arrange 9 0 4 0 1 0 0 0 0 0 1920 1080 60 48000 0 0 0 0 -1 -1 

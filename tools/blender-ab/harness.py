@@ -79,7 +79,61 @@ def material_lines(m, sheen=True):
         ] + (["  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5)] if sheen else []) + [
         "  f specular 0.5",
         "  c emissionColor %g %g %g" % tuple(srgb(m.get("emission", (0, 0, 0)))),
-        "  f emission %g" % m.get("emission_strength", 0.0)]
+        "  f emission %g" % m.get("emission_strength", 0.0)] + [
+        # Coverage-case lobes, written only when set so older cases keep their exact patch.
+        line for key, line in (
+            ("alpha", "  f opacity %g" % m.get("alpha", 1.0)),
+            ("alpha_cutoff", "  f alphaCutoff %g" % m.get("alpha_cutoff", 0.0)),
+            ("subsurface", "  f subsurface %g" % m.get("subsurface", 0.0)),
+            ("subsurface_color", "  c subsurfaceColor %g %g %g" % tuple(m.get("subsurface_color", (1.0, 0.2, 0.1)))),
+            ("subsurface_radius", "  f subsurfaceRadius %g" % m.get("subsurface_radius", 0.5)),
+            ("anisotropy", "  f anisotropy %g" % m.get("anisotropy", 0.0)),
+            ("anisotropy_rotation", "  f anisotropyRotation %g" % m.get("anisotropy_rotation", 0.0)),
+            ("iridescence", "  f iridescence %g" % m.get("iridescence", 0.0)),
+            ("iridescence_thickness", "  f iridescenceThickness %g" % m.get("iridescence_thickness", 400.0)),
+            ("iridescence_ior", "  f iridescenceIor %g" % m.get("iridescence_ior", 1.33))) if key in m]
+
+
+def make_texture(case_dir, name, size=512):
+    """The coverage cases' image maps, drawn the same every run: <case>/<name>.png, read by both apps."""
+    path = os.path.join(case_dir, name + ".png")
+    if os.path.exists(path):
+        return path
+    v, u = np.mgrid[0:size, 0:size].astype(np.float32) / size
+    if name.startswith("checker"):
+        nx, ny = (16, 8) if name == "checker_fine" else (8, 8)
+        on = ((np.floor(u * nx) + np.floor(v * ny)) % 2) > 0
+        img = np.where(on[..., None], [230, 230, 230], [200, 40, 30]).astype(np.uint8)
+    elif name == "rough_bands":       # grey roughness, 6 bands along v: 0.1 and 0.9
+        g = np.where((np.floor(v * 6) % 2) > 0, 230, 25).astype(np.uint8)
+        img = np.stack([g, g, g], -1)
+    elif name == "bumps":             # OpenGL tangent-space normals of a height field of round bumps
+        h = (np.sin(u * 2 * np.pi * 12) * np.sin(v * 2 * np.pi * 6)) * 0.5
+        dx, dy = np.gradient(h, 1.0 / size)
+        n = np.stack([-dx * 0.02, dy * 0.02, np.ones_like(h)], -1)   # image rows run down, +v up: flip y
+        n /= np.linalg.norm(n, axis=-1, keepdims=True)
+        img = ((n * 0.5 + 0.5) * 255).astype(np.uint8)
+    elif name == "blotches":          # a seamless tile of soft colour blotches: integer frequencies, fixed phases
+        rng = np.random.default_rng(3)
+        f = np.zeros((size, size, 3), np.float32)
+        for _ in range(14):
+            kx, ky = rng.integers(1, 5, 2); ph = rng.uniform(0, 2 * np.pi, 3)
+            f += np.sin(2 * np.pi * (kx * u + ky * v)[..., None] + ph) * rng.uniform(0.3, 1.0)
+        f = (f - f.min()) / (f.max() - f.min())
+        img = np.array([40, 90, 60]) + f * np.array([200, 150, 120])
+        for _ in range(6):                # a few dark spots, so a repeating tile is easy to see
+            cx, cy, r = rng.uniform(0, 1), rng.uniform(0, 1), rng.uniform(0.04, 0.09)
+            dx = (u - cx + 0.5) % 1 - 0.5; dy = (v - cy + 0.5) % 1 - 0.5
+            img = np.where((np.hypot(dx, dy) < r)[..., None], [30, 20, 25], img)
+        img = img.clip(0, 255).astype(np.uint8)
+    elif name == "holes":             # opacity: a solid sheet with a grid of round holes
+        d = np.hypot((u * 4) % 1 - 0.5, (v * 4) % 1 - 0.5)
+        g = np.where(d < 0.3, 0, 255).astype(np.uint8)
+        img = np.stack([g, g, g], -1)
+    else:
+        sys.exit("unknown texture " + name)
+    Image.fromarray(img).save(path)
+    return path
 
 
 def dof_aperture(cam, aspect):
@@ -105,11 +159,11 @@ def gltf_material(path):
                "roughnessFactor": 1.0 if "specularGlossinessTexture" in sg else 1.0 - sg.get("glossinessFactor", 1.0)}
         if "diffuseTexture" in sg: pbr["baseColorTexture"] = sg["diffuseTexture"]
     base = pbr.get("baseColorFactor", [1, 1, 1, 1])
-    lines = ["  c color %g %g %g" % tuple(base[:3]), "  f opacity %g" % base[3],
+    lines = ["  c color %g %g %g" % tuple(srgb(base[:3])), "  f opacity %g" % base[3],   # linear factor -> sRGB control
              "  f metallic %g" % pbr.get("metallicFactor", 1.0), "  f roughness %g" % pbr.get("roughnessFactor", 1.0)]
     em = mat.get("emissiveFactor", [0, 0, 0])
     if any(em):
-        lines += ["  c emissionColor %g %g %g" % tuple(em), "  f emission 1"]
+        lines += ["  c emissionColor %g %g %g" % tuple(srgb(em)), "  f emission 1"]
     maps = {}
     if "baseColorTexture" in pbr: maps["albedo"] = "albedo"
     if "metallicRoughnessTexture" in pbr: maps["roughness"] = "roughness"; maps["metallic"] = "metallic"
@@ -125,9 +179,17 @@ def gltf_material(path):
             f0 *= sum(lin(sum(p) / 765.0) for p in px) / len(px)
             maps["roughness"] = "roughness"
         lines.append("  f specular %g" % min(1.0, f0 / 0.08))
-    if "normalTexture" in mat: maps["normal"] = "normal"
+    sh = mat.get("extensions", {}).get("KHR_materials_sheen")
+    if sh:   # sheen colour carries the weight in glTF (Blender's importer reads it the same way)
+        sc = sh.get("sheenColorFactor", [0, 0, 0])
+        lines += ["  f sheen %g" % max(sc), "  c sheenColor %g %g %g" % tuple(c / max(max(sc), 1e-6) for c in sc),
+                  "  f sheenRoughness %g" % sh.get("sheenRoughnessFactor", 0.0)]
+    if "normalTexture" in mat:
+        maps["normal"] = "normal"
+        lines.append("  f normalStrength %g" % mat["normalTexture"].get("scale", 1.0))
     if "occlusionTexture" in mat: maps["ao"] = "ao"
     if "emissiveTexture" in mat: maps["emission"] = "emission"
+    if maps: lines.append("  i wrapMode 1")   # glTF's default sampler wrap is REPEAT (SpawnGltfParts sets the same)
     return lines, maps
 
 
@@ -135,7 +197,8 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
     """The scene as an Infinite patch: Model 3D + Material per object (the glbs Blender wrote),
     Group 3D when there are more than four, Camera, Lights, Render 3D."""
     lines, n = ["infinite-patch 1"], [0]
-    wires = []
+    wires, exprs = [], []
+    motion = scene.get("motion", {})
 
     def node(cat, typ, params):
         n[0] += 1
@@ -143,6 +206,21 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
         lines.extend(params)
         lines.append("end")
         return n[0]
+
+    def fur_node(f, src):
+        """Geometry Op Fur after src (blender_scene.add_fur rebuilds it), with an arc Curve as its guide when asked."""
+        fur = node("3D", "Fur", ["  i op 22", "  f furDensity %g" % f["density"], "  i furMaxStrands %d" % f.get("max", 400000),
+                                 "  f furLength %g" % f["length"], "  f furJitter %g" % f.get("jitter", 0.3),
+                                 "  f furWidth %g" % f["width"], "  i furSegments %d" % f.get("segments", 3),
+                                 "  f furGravity %g" % f.get("gravity", 0.0), "  f furClump 0", "  f furCurl 0",
+                                 "  f seed %g" % f.get("seed", 0)])
+        wires.append("geo %d 0 %d" % (fur, src))
+        g = f.get("guide")
+        if g:   # the arc preset through linear interpolation: exactly the polyline add_fur builds
+            cur = node("3D", "Curve", ["  i kind 3", "  i preset 0", "  i pointCount %d" % g["points"],
+                                       "  f spread %g" % g["spread"], "  f height %g" % g["height"]])
+            wires.append("geo %d 1 %d" % (fur, cur))
+        return fur
 
     geos = []
     for i, o in enumerate(scene["objects"]):
@@ -156,7 +234,11 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
                 lines_ += ["  i clip %d" % o["clip"], "  f clipSpeed 0", "  f clipPhase %g" % (frame or {}).get("phase", 0.0)]
             path = asset_file(o)
             mlines, maps = gltf_material(path)
+            if o.get("detail"):   # Material detail normal on top of the model's own normal map
+                mlines += ["  f detailScale %g" % o["detail"][0], "  f detailStrength %g" % o["detail"][1]]
             model = node("3D", "Model 3D", lines_)
+            if o.get("fur"):
+                model = fur_node(o["fur"], model)
             mat = node("3D", "Material", mlines)
             wires.append("geo %d 0 %d" % (mat, model))
             for slot in maps:
@@ -176,8 +258,28 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             wires.append("geo %d shape %d" % (inst, model))
             geos.append(inst)
             continue
-        mat = node("3D", "Material", material_lines(m))
+        if str(i) in motion.get("velocity", {}):
+            vx, vy, vz = motion["velocity"][str(i)]   # Blender's Z-up m/s -> Infinite (x, z, -y), through a Transform
+            xf = node("3D", "Transform", [])
+            wires.append("geo %d 0 %d" % (xf, model))
+            exprs += ["expr %d offsetX %g*t" % (xf, vx), "expr %d offsetY %g*t" % (xf, vz), "expr %d offsetZ %g*t" % (xf, -vy)]
+            model = xf
+        if o.get("fur"):
+            model = fur_node(o["fur"], model)
+        if any(k in m for k in ("uv_scale", "breakup", "mapping")):
+            # Texture coordinates through a Mapping node: UV or generated, a scale, triplanar blend, breakup.
+            sc = m.get("uv_scale", 1.0)
+            mp = node("3D", "Mapping", ["  i space %d" % (1 if m.get("mapping") == "generated" else 0),
+                                        "  f scaleX %g" % sc, "  f scaleY %g" % sc, "  f scaleZ %g" % sc,
+                                        "  f triplanarBlend %g" % m.get("triplanar", 0.0), "  f breakup %g" % m.get("breakup", 0.0)])
+            wires.append("geo %d 0 %d" % (mp, model))
+            model = mp
+        dl = ["  f detailScale %g" % m["detail"][0], "  f detailStrength %g" % m["detail"][1]] if "detail" in m else []
+        mat = node("3D", "Material", material_lines(m) + dl + (["  i wrapMode repeat"] if m.get("maps") else []))
         wires.append("geo %d 0 %d" % (mat, model))
+        for slot, tex_name in m.get("maps", {}).items():
+            tex = node("Source", "Image Source", ["  s path %s" % make_texture(case, tex_name)])
+            wires.append("cable %d %s %d" % (mat, slot, tex))
         geos.append(mat)
     if len(geos) > 4:  # Render 3D takes four; group the rest eight at a time
         grouped = []
@@ -195,6 +297,8 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
     camera = node("3D", "Camera", ["  f fov %g" % cam["fov"], "  f distance %g" % cam["distance"],
                                    "  f azimuth %g" % cam["azimuth"], "  f elevation %g" % cam["elevation"],
                                    "  f targetX %g" % tx, "  f targetY %g" % tz, "  f targetZ %g" % -ty])
+    if motion.get("camera_azimuth_rate"):
+        exprs.append("expr %d azimuth %g+%g*t" % (camera, cam["azimuth"], motion["camera_azimuth_rate"]))
     lights = [node("3D", "Light", light_lines(l)) for l in scene.get("lights", [])]
     if len(lights) > 3:
         # Render 3D has three light pins (light_1..3); a fourth light would have to be the HDRI's sun.
@@ -206,8 +310,10 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
     sky = srgb([c / peak for c in col]) if peak > 1 else srgb(col)
     width, height = scene.get("size", (512, 512))
     extra = []
+    if motion.get("blur"):
+        extra += ["  b motionBlur 1", "  f motionShutter %g" % motion["blur"], "  i motionPosition 1"]
     if cam.get("fstop"):
-        extra = ["  f dofAperture %g" % dof_aperture(cam, width / height),
+        extra += ["  f dofAperture %g" % dof_aperture(cam, width / height),
                  "  f focusDistance %g" % cam.get("focus", cam["distance"])]
     hdri = None
     if w.get("hdri"):
@@ -218,8 +324,8 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
                                    "  f sunThreshold %g" % w.get("sun_threshold", 0.0)])
     render = node("3D", "Render 3D", extra + [
         "  f width %d" % width, "  f height %d" % height,
-        "  i tonemap %s" % ("AgX" if scene.get("view") == "AgX" else "None"), "  f exposure 1",
-        "  b shadows 1", "  i shadowQuality 1", "  f shadowStrength 1", "  i supersample 2", "  f ao 0",
+        "  i tonemap %s" % {"AgX": "AgX", "Khronos PBR Neutral": "Neutral"}.get(scene.get("view"), "None"), "  f exposure 1",
+        "  b shadows 1", "  i shadowQuality 1", "  f shadowStrength 1", "  i supersample %d" % scene.get("supersample", 2), "  f ao 0",
         # Uniform world: sky, horizon and ground the same colour. Diffuse from the world is
         # env * toLinear(ambient) * 3, so ambient is the sRGB code of 1/3 to make it env alone.
         "  c envSky %g %g %g" % tuple(sky), "  c envHorizon %g %g %g" % tuple(sky),
@@ -237,7 +343,7 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
     if hdri:
         wires.append("cable %d env %d" % (render, hdri))
     wires.append("cable %d 0 %d" % (out, render))
-    return "\n".join(lines + wires) + "\n"
+    return "\n".join(lines + wires + exprs) + "\n"
 
 
 def run(cmd, timeout=1800):
@@ -299,6 +405,56 @@ def score(case_dir, name="", scene=None, sfx=""):
     if scene and name.startswith("furnace"):
         out["furnace"] = furnace_metric(scene, lt, li)
     return out
+
+
+def noise_ratio(case_dir, sfx=""):
+    """High-frequency energy of Infinite's picture over Cycles' (denoised): 1 = as clean, above 1 = grain or fireflies."""
+    from PIL import ImageFilter
+    def hf(p):
+        im = Image.open(p).convert("L")
+        a = np.asarray(im, np.float32); b = np.asarray(im.filter(ImageFilter.GaussianBlur(1.5)), np.float32)
+        return float(np.abs(a - b).mean())
+    return round(hf(os.path.join(case_dir, "inf%s.png" % sfx)) / max(hf(os.path.join(case_dir, "truth.png")), 1e-3), 3)
+
+
+def run_motion(scene, name, d, sfx, engine, a):
+    """A motion case: Infinite renders the shot as a frame sequence; each check time is scored against Cycles'
+    frame there, and a still shot also gets flicker = mean change between its last 10 frames (0-255 steps)."""
+    import flip_evaluator as flip
+    mo = scene["motion"]; fps = mo.get("fps", 30)
+    w, hgt = scene.get("size", (512, 512))
+    patch = os.path.join(d, "inf%s.inf" % sfx)
+    open(patch, "w").write(to_patch(scene, d, None, engine, a.pt_samples, a.pt_bounces))
+    fd = os.path.join(d, "seq%s" % sfx)
+    if os.path.isdir(fd):
+        for f in os.listdir(fd): os.remove(os.path.join(fd, f))
+    last = int(round(max(mo["checks"]) * fps))
+    stdout, log = run([INFINITE, "--frames-dir", patch, fd, "--duration", "%g" % ((last + 1) / fps), "--fps", str(fps),
+                       "--size", "%dx%d" % (w, hgt)], 1200)
+    tail = stdout.strip().splitlines()[-1] if stdout.strip() else ""
+    status = json.loads(tail) if tail.startswith("{") else {}
+    if not status.get("ok"):
+        sys.exit("infinite failed on %s:\n%s" % (name, log[-3000:]))
+    seq = sorted(f for f in os.listdir(fd) if f.endswith(".png"))
+    checks = []
+    for k, tc in enumerate(mo["checks"]):
+        fi = int(round(tc * fps))
+        truth, inf = load(os.path.join(d, "truth_%d.png" % k)), load(os.path.join(fd, seq[min(fi, len(seq) - 1)]))
+        err, mean, _ = flip.evaluate(truth, inf, "LDR", applyMagma=True)
+        Image.fromarray((np.clip(err, 0, 1) * 255).astype(np.uint8)).save(os.path.join(d, "flip%s_%d.png" % (sfx, k)))
+        Image.fromarray((inf * 255).astype(np.uint8)).save(os.path.join(d, "inf%s_%d.png" % (sfx, k)))
+        checks.append({"t": tc, "flip": round(float(mean), 4),
+                       "brightness_ratio": round(float(luma(inf).mean() / max(luma(truth).mean(), 1e-6)), 3)})
+    r = {"flip": round(float(np.mean([c["flip"] for c in checks])), 4),
+         "brightness_ratio": round(float(np.mean([c["brightness_ratio"] for c in checks])), 3), "checks": checks,
+         "frames": len(seq), "ms_per_frame": round(status.get("elapsed_ms", 0) / max(len(seq), 1), 1)}
+    if mo.get("flicker"):
+        fr = [np.asarray(Image.open(os.path.join(fd, f)).convert("L"), np.float32) for f in seq[-10:]]
+        r["flicker"] = round(float(np.mean([np.abs(fr[i] - fr[i - 1]).mean() for i in range(1, len(fr))])), 3)
+    import shutil
+    shutil.copy(os.path.join(d, "truth_%d.png" % (len(checks) - 1)), os.path.join(d, "truth.png"))
+    shutil.copy(os.path.join(d, "inf%s_%d.png" % (sfx, len(checks) - 1)), os.path.join(d, "inf%s.png" % sfx))
+    return r
 
 
 REGION_COLORS = [(0, 0, 0), (110, 110, 120), (230, 140, 40), (70, 200, 255), (255, 50, 70), (210, 70, 210),
@@ -440,10 +596,17 @@ def main():
             scene["regions"] = REGIONS
         text = json.dumps(scene, sort_keys=True, indent=1)
         # The truth is reused while the scene, Blender's script and the asset files are unchanged.
-        h = hashlib.sha1((text + open(os.path.join(HERE, "blender_scene.py")).read()).encode()).hexdigest()
+        # Infinite-only keys (supersample) leave Blender's truth alone.
+        btext = json.dumps({k: v for k, v in scene.items() if k != "supersample"}, sort_keys=True, indent=1)
+        h = hashlib.sha1((btext + open(os.path.join(HERE, "blender_scene.py")).read()).encode()).hexdigest()
         hp = os.path.join(d, "scene.hash")
         frames = scene.get("frames")
         tags = ["_%d" % k for k in range(len(frames))] if frames else [""]
+        if scene.get("motion"):
+            tags = ["_%d" % k for k in range(len(scene["motion"]["checks"]))]
+        for o in scene["objects"]:
+            for tex_name in o.get("material", {}).get("maps", {}).values():
+                make_texture(d, tex_name)
         if not (os.path.exists(hp) and open(hp).read() == h and all(os.path.exists(os.path.join(d, "truth%s.png" % t)) for t in tags)):
             open(os.path.join(d, "scene.json"), "w").write(text)
             _, log = run([BLENDER, "-b", "--factory-startup", "--python", os.path.join(HERE, "blender_scene.py"), "--", d])
@@ -452,6 +615,13 @@ def main():
             open(hp, "w").write(h)
         w, hgt = scene.get("size", (512, 512))
         results = []
+        if scene.get("motion"):
+            r = {"case": name, **run_motion(scene, name, d, sfx, a.engine, a)}
+            r["baseline"] = base.get(name + sfx)
+            r["pass"] = r["baseline"] is None or r["flip"] <= r["baseline"] + FLIP_SLACK
+            rows.append(r)
+            print("ABRESULT " + json.dumps(r), flush=True)
+            continue
         for k, tag in enumerate(tags):
             patch = os.path.join(d, "inf%s%s.inf" % (sfx, tag))
             open(patch, "w").write(to_patch(scene, d, frames[k] if frames else None, a.engine, a.pt_samples, a.pt_bounces))
@@ -460,6 +630,7 @@ def main():
             status = json.loads(last) if last.startswith("{") else {}
             if not status.get("ok"):
                 sys.exit("infinite failed on %s%s:\n%s" % (name, tag, log[-3000:]))
+            elapsed = status.get("elapsed_ms")
             os.replace(os.path.join(d, "f", "frame_00000.png"), os.path.join(d, "inf%s%s.png" % (sfx, tag)))
             if frames:
                 results.append(score_hero(d, k, sfx))
@@ -471,7 +642,7 @@ def main():
             r["boards"] = hero_board(os.path.abspath(a.out), d, results, sfx)
             r["hero_baseline"] = hero_baseline(results)
         else:
-            r = {"case": name, **score(d, name, scene, sfx)}
+            r = {"case": name, **score(d, name, scene, sfx), "noise": noise_ratio(d, sfx), "elapsed_ms": elapsed}
             if sfx and os.path.exists(os.path.join(d, "inf.png")):
                 r["raster_flip"] = score(d)["flip"]
             r["baseline"] = base.get(name + sfx)

@@ -8,6 +8,7 @@
 
 #include "BenchReport.h"
 #include "ColorSpace.h"
+#include "Render3DSheen.h"
 #include "Render3DTonemap.h"
 #include "gl3.h"
 
@@ -79,6 +80,11 @@ namespace
       "uniform float uLensRadius;\n"
       "uniform float uFocusDist;\n"
       "uniform vec3 uBokeh;\n"
+      // Probe mode (raster's probe grid): x = probe, y = direction; the ray starts at the probe.
+      "uniform int uProbeMode;\n"
+      "uniform vec3 uProbeLo;\n"
+      "uniform vec3 uProbeStep;\n"
+      "uniform ivec3 uProbeDims;\n"
       "\n"
       "const float PI = 3.14159265358979323846;\n"
       "\n"
@@ -446,6 +452,7 @@ namespace
       "   float trans; float tRough; float ior;\n"
       "};\n"
       "\n"
+      R3D_SHEEN_GLSL
       "float schlick5(float c) {\n"
       "   float m = clamp(1.0 - c, 0.0, 1.0);\n"
       "   float m2 = m * m;\n"
@@ -506,8 +513,8 @@ namespace
       "   vec3 F = s.f0 + (vec3(1.0) - s.f0) * schlick5(vDotH);\n"
       "   float ccAtten = 1.0 - s.cc * (0.04 + 0.96 * schlick5(nDotV));\n"
       // The sheen layer sits over the base and takes its directional albedo out of it, as Cycles'
-      // layering does: the Charlie lobe's albedo at roughness 0.5 is 0.08 head on up to 0.6 at grazing.
-      "   if (s.sh > 0.0) ccAtten *= 1.0 - clamp(s.sh * max(s.shCol.r, max(s.shCol.g, s.shCol.b)) * (0.083 + 0.55 * pow(1.0 - nDotV, 1.5)), 0.0, 1.0);\n"
+      // layering does (Render3DSheen.h: Cycles' measured sheen albedo).
+      "   if (s.sh > 0.0) ccAtten *= 1.0 - clamp(s.sh * max(s.shCol.r, max(s.shCol.g, s.shCol.b)) * sheenE(nDotV, s.shRough), 0.0, 1.0);\n"
       "   vec3 f = (D * ggxVis(nDotV, nDotL, alpha) * F * w.y + (vec3(1.0) - F) * (1.0 - s.metal) * s.base * (1.0 / PI) * w.x) * ccAtten;\n"
       "\n"
       "   float ccAlpha = max(0.002, s.ccRough * s.ccRough);\n"
@@ -516,13 +523,8 @@ namespace
       "      Dc = ggxD(nDotH, ccAlpha);\n"
       "      f += vec3(Dc * ggxVis(nDotV, nDotL, ccAlpha) * (0.04 + 0.96 * schlick5(vDotH)) * s.cc * w.y);\n"
       "   }\n"
-      "   // Sheen: Charlie distribution with the Neubelt visibility, as Render 3D draws it.\n"
-      "   if (s.sh > 0.0) {\n"
-      "      float invR = 1.0 / max(s.shRough, 0.01);\n"
-      "      float sin2h = max(1.0 - nDotH * nDotH, 0.0078125);\n"
-      "      float Dsh = (2.0 + invR) * pow(sin2h, invR * 0.5) / (2.0 * PI);\n"
-      "      f += s.shCol * (Dsh / max(4.0 * (nDotL + nDotV - nDotL * nDotV), 1e-4) * s.sh * w.y);\n"
-      "   }\n"
+      "   // Sheen: Cycles' microfiber lobe (Render3DSheen.h).\n"
+      "   if (s.sh > 0.0) f += s.shCol * (s.sh * w.y * sheenLtc(nDotL, nDotV, dot(L, V), s.shRough));\n"
       "\n"
       "   vec3 p = lobeProbs(s, nDotV);\n"
       "   float toL = nDotH / max(4.0 * vDotH, 1e-6);\n"
@@ -621,6 +623,20 @@ namespace
       "      rayDir = normalize(focusPt - rayOrigin);\n"
       "   }\n"
       "   float coverage = 1.0;\n"
+      "   float probeBack = 0.0;\n"
+      "   float probeT = 1000.0;\n"
+      "   if (uProbeMode == 1) {\n"
+      "      int pi = int(pix.x), di = int(pix.y);\n"
+      "      ivec3 c = ivec3(pi % uProbeDims.x, (pi / uProbeDims.x) % uProbeDims.y, pi / (uProbeDims.x * uProbeDims.y));\n"
+      "      rayOrigin = uProbeLo + vec3(c) * uProbeStep;\n"
+      // A golden spiral over the sphere, each direction jittered inside its own cell (the CPU
+      // folds the result with the cell centres).
+      "      float nd = uResolution.y;\n"
+      "      float zc = 1.0 - 2.0 * (float(di) + 0.5) / nd;\n"
+      "      float z = clamp(zc + (rand(rng) - 0.5) * 2.0 / nd, -1.0, 1.0);\n"
+      "      float ph = 2.39996323 * (float(di) + 0.5) + (rand(rng) - 0.5) * sqrt(12.566 / nd) / max(sqrt(max(1.0 - zc * zc, 0.0)), 0.1);\n"
+      "      rayDir = vec3(sqrt(max(1.0 - z * z, 0.0)) * vec2(cos(ph), sin(ph)), z);\n"
+      "   }\n"
       "\n"
       "   vec3 radiance = vec3(0.0);\n"
       "   vec3 throughput = vec3(1.0);\n"
@@ -659,7 +675,7 @@ namespace
       "      }\n"
       "\n"
       "      if (hit.triSlot < 0) {\n"
-      "         if (bounce == 0 && uEnvAsBg == 0) { coverage = 0.0; break; }\n"
+      "         if (bounce == 0 && uEnvAsBg == 0 && uProbeMode == 0) { coverage = 0.0; break; }\n"
       "         vec3 envContrib = throughput * envRadiance(rayDir);\n"
       "         radiance += (bounce > 0) ? min(envContrib, vec3(10.0)) : envContrib;\n"
       "         break;\n"
@@ -681,6 +697,7 @@ namespace
       "      vec3 Ng = normalize(m0.xyz * localNg.x + m1.xyz * localNg.y + m2.xyz * localNg.z);\n"
       "      vec3 N = normalize(m0.xyz * localN.x + m1.xyz * localN.y + m2.xyz * localN.z);\n"
       "      bool entering = dot(Ng, -rayDir) >= 0.0;\n"
+      "      if (bounce == 0) { probeT = min(hit.t, 1000.0); if (!entering) probeBack = 1.0; }\n"
       "      if (!entering) {\n"
       "         Ng = -Ng;\n"
       "         N = -N;\n"
@@ -949,6 +966,8 @@ namespace
       "      radiance = vec3(0.0);\n"
       "\n"
       // Alpha keeps the share of samples that hit something (or the world shown as background).
+      // Probe alpha packs the first hit: 1e5 when it is a back face, plus its distance (1000 = the world).
+      "   if (uProbeMode == 1) coverage = probeBack * 1e5 + probeT;\n"
       "   if (uSampleIndex <= 0) {\n"
       "      fragColor = vec4(radiance, coverage);\n"
       "   } else {\n"
@@ -1700,6 +1719,10 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
          glUniform1f(glGetUniformLocation(mProgTrace, "uLensRadius"), mLensRadius);
          glUniform1f(glGetUniformLocation(mProgTrace, "uFocusDist"), mFocusDist);
          glUniform3fv(glGetUniformLocation(mProgTrace, "uBokeh"), 1, mBokeh);
+         glUniform1i(glGetUniformLocation(mProgTrace, "uProbeMode"), mProbeMode ? 1 : 0);
+         glUniform3fv(glGetUniformLocation(mProgTrace, "uProbeLo"), 1, mProbeLo);
+         glUniform3fv(glGetUniformLocation(mProgTrace, "uProbeStep"), 1, mProbeStep);
+         glUniform3iv(glGetUniformLocation(mProgTrace, "uProbeDims"), 1, mProbeDims);
          glUniform3fv(glGetUniformLocation(mProgTrace, "uWorldColor"), 1, mWorldColor);
          glActiveTexture(GL_TEXTURE7);
          glBindTexture(GL_TEXTURE_2D, mEnvTex);
@@ -1851,6 +1874,31 @@ bool Render3DPathTrace::ReadDisplayRGBA8(std::vector<unsigned char>& outRgba, in
                   &raw[(size_t)(mHeight - 1 - y) * rowBytes],
                   rowBytes);
    }
+   return true;
+}
+
+bool Render3DPathTrace::TraceProbes(const float lo[3], const float step[3], const int dims[3], int dirs, int spp,
+                                    std::vector<float>& out)
+{
+   const int count = dims[0] * dims[1] * dims[2];
+   if (count <= 0 || dirs <= 0 || !mSceneUploaded)
+      return false;
+   mProbeMode = true;
+   std::memcpy(mProbeLo, lo, sizeof(mProbeLo));
+   std::memcpy(mProbeStep, step, sizeof(mProbeStep));
+   std::memcpy(mProbeDims, dims, sizeof(mProbeDims));
+   ResetAccumulation();
+   const bool ok = StepSamples(count, dirs, std::max(1, spp), false);
+   mProbeMode = false;
+   if (!ok)
+      return false;
+   out.assign((size_t)count * (size_t)dirs * 4u, 0.0f);
+   GLint prevFbo = 0;
+   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+   glBindFramebuffer(GL_FRAMEBUFFER, mAccum[mAccumReadIdx].fbo);
+   glPixelStorei(GL_PACK_ALIGNMENT, 1);
+   glReadPixels(0, 0, count, dirs, GL_RGBA, GL_FLOAT, out.data());
+   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
    return true;
 }
 

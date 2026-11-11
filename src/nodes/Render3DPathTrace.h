@@ -137,6 +137,11 @@ public:
    // Renders from 0 up to `totalSpp` samples and resolves the final image.
    bool RenderToSpp(int width, int height, int totalSpp);
 
+   // Raster's probe grid: traces `spp` samples of `dirs` directions from each probe of a dims grid starting at lo,
+   // spaced by step, and reads back one RGBA32F texel per probe (x) and direction (y, bottom row first): the
+   // radiance arriving from that direction, alpha 1 where the first hit was a back face (the probe is inside).
+   bool TraceProbes(const float lo[3], const float step[3], const int dims[3], int dirs, int spp, std::vector<float>& out);
+
    // Reads the resolved sRGB display image back as top-to-bottom RGBA8 pixels.
    bool ReadDisplayRGBA8(std::vector<unsigned char>& outRgba, int& outW, int& outH) const;
 
@@ -208,6 +213,10 @@ private:
    float mLensRadius = 0.0f;
    float mFocusDist = 4.0f;
    float mBokeh[3] = { 0.0f, 0.0f, 1.0f };
+   bool mProbeMode = false;
+   float mProbeLo[3] = {};
+   float mProbeStep[3] = {};
+   int mProbeDims[3] = { 1, 1, 1 };
    float mWorldColor[3] = { 0.0f, 0.0f, 0.0f };
    unsigned int mEnvTex = 0;
    bool mEnvGradient = false;

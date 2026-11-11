@@ -360,6 +360,8 @@ public:
    float anisotropyRotation = 0.0f;
    float dispersion = 0.0f;
    float alphaCutoff = 0.0f;
+   float detailScale = 0.0f;
+   float detailStrength = 1.0f;
    bool textureAlpha = false;
    // Normal slot holds a height map (grayscale), not a tangent-space normal.
    bool normalBump = false;
@@ -394,6 +396,7 @@ public:
       v.Bool("textureAlpha", textureAlpha);
       v.Bool("normalBump", normalBump);
       v.Float("normalStrength", normalStrength);
+      v.Float("detailScale", detailScale); v.Float("detailStrength", detailStrength);
    }
 private:
    ImageCable mMaps[kMapCount];
@@ -501,6 +504,7 @@ public:
    float rotateX = 0.0f, rotateY = 0.0f, rotateZ = 0.0f;
    float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
    float triplanarBlend = 0.0f;
+   float breakup = 0.0f;
 
    static const std::vector<std::string>& SpaceNames();
 
@@ -511,6 +515,7 @@ public:
       v.Float("rotateX", rotateX); v.Float("rotateY", rotateY); v.Float("rotateZ", rotateZ);
       v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
       v.Float("triplanarBlend", triplanarBlend);
+      v.Float("breakup", breakup);
    }
 
 private:

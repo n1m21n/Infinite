@@ -64,6 +64,8 @@ public:
       kBevel, kInset,
       // Writes real UVs from a projection (MeshOps::UVProject).
       kUVProject,
+      // Strands rooted on the faces (MeshOps::Fur, docs/plans/fur); slot 1 takes an optional guide curve.
+      kFur,
       kOpCount
    };
 
@@ -183,8 +185,10 @@ public:
    const std::vector<Mat4>* InstanceTransformOverride() const override;
 
    IGeometrySource* input = nullptr;
-   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
-   const char* InputLabel(int) const override { return "geo"; }
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : slot == 1 ? &guide : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 1 ? "guide" : "geo"; }
+   // Fur only: a curve every strand takes the shape of. Shown as a pin only while op == kFur.
+   IGeometrySource* guide = nullptr;
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
    size_t SelectedCount() const { return mCache.SelectedCount(); }
 
@@ -256,6 +260,14 @@ public:
    // Decimate
    float decimateRatio = 0.5f;
    bool lockBorder = true;
+   // Fur (MeshOps::FurParams)
+   float furDensity = 40.0f;
+   int furMaxStrands = 150000;
+   float furLength = 0.012f, furJitter = 0.3f, furWidth = 0.0006f;
+   int furSegments = 3;
+   float furGravity = 0.2f, furClump = 0.3f, furCurl = 0.0f;
+   float furComb[3] = { 0.0f, 0.0f, 0.0f };
+   int furNormals = 0;
    // Screw
    int screwSteps = 32;
    float turns = 1.0f;
@@ -330,6 +342,12 @@ public:
       v.Float("insetDepth", insetDepth);
       v.Int("uvMode", uvMode); v.Float("uvAngle", uvAngle);
       v.Float("uvMargin", uvMargin); v.Float("uvScale", uvScale);
+      v.Float("furDensity", furDensity); v.Int("furMaxStrands", furMaxStrands);
+      v.Float("furLength", furLength); v.Float("furJitter", furJitter); v.Float("furWidth", furWidth);
+      v.Int("furSegments", furSegments); v.Float("furGravity", furGravity);
+      v.Float("furClump", furClump); v.Float("furCurl", furCurl);
+      v.Float("furCombX", furComb[0]); v.Float("furCombY", furComb[1]); v.Float("furCombZ", furComb[2]);
+      v.Int("furNormals", furNormals);
       v.Float("turns", turns); v.Float("rise", rise); v.Float("radiusOffset", radiusOffset);
       v.Int("selectMode", selectMode); v.Float("selectA", selectA);
       v.Float("selectB", selectB); v.Float("selectC", selectC);
@@ -349,6 +367,7 @@ public:
    }
 
 private:
+   MeshOps::FurParams FurParams() const;
    std::string mCookWarning;
    struct Signature
    {
@@ -371,6 +390,9 @@ private:
       float bevelWidth = 0, bevelAngle = 0, insetWidth = 0, insetDepth = 0;
       int uvMode = 0;
       float uvAngle = 0, uvMargin = 0, uvScale = 0;
+      MeshOps::FurParams fur;
+      const void* guide = nullptr;
+      unsigned long long guideStamp = 0;
       int bevelSegments = 0;
       int selectMode = -1;
       float selectA = 0, selectB = 0, selectC = 0, selectSeed = 0, normalAmount = 0;
@@ -406,6 +428,13 @@ private:
                 insetDepth == o.insetDepth &&
                 uvMode == o.uvMode && uvAngle == o.uvAngle &&
                 uvMargin == o.uvMargin && uvScale == o.uvScale &&
+                fur.density == o.fur.density && fur.maxStrands == o.fur.maxStrands &&
+                fur.length == o.fur.length && fur.lengthJitter == o.fur.lengthJitter &&
+                fur.width == o.fur.width && fur.segments == o.fur.segments &&
+                fur.gravity == o.fur.gravity && fur.clump == o.fur.clump && fur.curl == o.fur.curl &&
+                fur.comb[0] == o.fur.comb[0] && fur.comb[1] == o.fur.comb[1] && fur.comb[2] == o.fur.comb[2] &&
+                fur.seed == o.fur.seed && fur.normals == o.fur.normals &&
+                guide == o.guide && guideStamp == o.guideStamp &&
                 selectMode == o.selectMode && selectA == o.selectA &&
                 selectB == o.selectB && selectC == o.selectC &&
                 selectSeed == o.selectSeed && normalAmount == o.normalAmount &&

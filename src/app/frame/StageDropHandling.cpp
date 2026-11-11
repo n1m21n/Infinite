@@ -1,5 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "core/Notices.h"
+#include "ColorSpace.h"
+#include <algorithm>
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -38,7 +40,9 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
       if (pkg != nullptr)
       {
          auto* mat = static_cast<MaterialNode*>(FindNodeByIndex(materialIndex)->node.get());
-         std::copy(pkg->baseColor, pkg->baseColor + 3, mat->color);
+         // glTF factors are linear; the Material's colour controls hold sRGB.
+         for (int k = 0; k < 3; k++)
+            mat->color[k] = ColorSpace::LinearToSrgb(pkg->baseColor[k]);
          mat->opacity = pkg->baseColor[3];
          mat->metallic = pkg->metallicFactor;
          mat->roughness = pkg->roughnessFactor;
@@ -46,7 +50,8 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
          const float* e = pkg->emissiveFactor;
          if (e[0] > 0.0f || e[1] > 0.0f || e[2] > 0.0f)
          {
-            std::copy(e, e + 3, mat->emissionColor);
+            for (int k = 0; k < 3; k++)
+               mat->emissionColor[k] = ColorSpace::LinearToSrgb(std::min(e[k], 1.0f));
             mat->emission = 1.0f;
          }
 
@@ -78,6 +83,10 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
             }
             texY += 160.0f;
          }
+         // glTF samples maps with REPEAT unless a sampler says otherwise; the Material's default is clamp, which
+         // smears the edge texels across any uv outside 0..1 (tiled cloth, scaled uvs).
+         if (texY > y)
+            mat->wrapMode = 1;
          rowH = std::max(rowH, texY - y);
       }
       FindNodeByIndex(materialIndex)->showParams = parts == 1;

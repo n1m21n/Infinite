@@ -410,7 +410,7 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
       glUniform1f(glGetUniformLocation(mProgPost, "uAoRange"), radius * 0.3f);
       glUniform1i(glGetUniformLocation(mProgPost, "uDofOn"), dofOn ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgPost, "uFocus"), focusDistance);
-      glUniform1f(glGetUniformLocation(mProgPost, "uAperturePx"), dofAperture * 24.0f * hScale);
+      glUniform1f(glGetUniformLocation(mProgPost, "uAperturePx"), dofAperture * 12.0f * hScale); // 24 px is the diameter
       glUniform1f(glGetUniformLocation(mProgPost, "uMaxCoc"), std::max(2.0f, 0.03f * (float)h));
       glUniform3f(glGetUniformLocation(mProgPost, "uBokeh"), dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f,
                   dofRotation * 3.14159265f / 180.0f, std::clamp(dofRatio, 0.01f, 2.0f));
@@ -497,7 +497,8 @@ bool Render3DNode::Accumulate(int frameId)
    for (int i = 0; i < n; i++)
    {
       mJitterIndex = i;
-      CookOnce(frameId);
+      if (!mAccumEngine || !CookEngine(frameId))
+         CookOnce(frameId);
       if (mColorTex == 0 || mWidth != w || mHeight != h)
          break; // the single pass failed; leave whatever it left
       glDisable(GL_DEPTH_TEST);

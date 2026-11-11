@@ -186,3 +186,91 @@ Each drag is one stroke on the Infinite side too: its dabs land on the surface a
 (`SculptNode::BeginStroke`), as Blender's do, so a ridge rises out of the brush and levels off.
 Infinite's brush strengths are fitted to the drags (what a user does). A case fails when its error
 rises more than 10% over `baseline_sculpt.json`.
+
+## Coverage and realism gaps (2026-11-10)
+
+FLIP against Cycles, per engine (lower is better):
+
+| Group | raster | live | settle |
+|---|---|---|---|
+| 31 coverage cases | 0.02–0.83 | ≤ 0.18 | ≤ 0.19 |
+| tex_maps (after the texture port) | 0.10 | 0.49 → 0.08 | 0.48 → 0.06 |
+| interior (after the sky-leak fix) | 0.83 | 0.80 → 0.16 | 0.19 |
+| bed close-up | – | 0.35 → 0.23 | 0.31 |
+
+The texture port gives Metal live and settle albedo, roughness, metallic and normal maps, plus sheen. glTF maps now
+use REPEAT wrap, both in the app (SpawnGltfParts) and here.
+
+Open gaps:
+- Settle bed: the grazing 16° sun leaves the sheet darker than Cycles (brightness 0.70). This happens with no
+  maps too, so the texture port is not the cause.
+- Live has no depth of field, and its window patch is hard-edged.
+- Still missing for close-up fabric: plush fuzz shells, true displacement in live/settle, sheen and coat on settle's
+  bounces, alpha in shadow rays, and the new maps on the GL path tracer.
+
+## Shading gaps filled (2026-11-10)
+
+Metal live and settle now read every Material slot that GL reads, through the Mapping node:
+
+| Feature | Where | Check |
+|---|---|---|
+| AO, emission, sheen, opacity, clearcoat, transmission maps | Metal live + settle | mat_alpha, mat_coat |
+| Clearcoat lobe, specular level (F0) | Metal live + settle | mat_coat |
+| Mapping (UV / generated / object, scale, rotate, offset, triplanar) | Metal live + settle | tex_tile, tex_detail (cube) |
+| Detail normal: `detailScale`, `detailStrength` on Material | GL + Metal | tex_detail |
+| Breakup (tile-repetition hiding) on Mapping | GL + Metal | tex_breakup, `tile_repeat.py` |
+
+The detail normal reads the normal slot again at uv × `detailScale`, tilt × `detailStrength`, and whiteout-blends it on
+top. No extra texture unit is needed, because all 16 of GL's units are in use. Breakup picks one of 8 tile offsets per
+area from a slow noise and blends neighbours (after Quilez). Cycles has no twin for it, so `tex_breakup` is judged by
+`tile_repeat.py` (the autocorrelation peak of the tile's dark spots), not by FLIP. Breakup lowers the repeat score from 0.34
+to 0.21 in live and raster, and to 0.23 in settle.
+
+FLIP against Cycles: tex_tile 0.06 live / 0.03 settle; tex_detail 0.25 live / 0.10 settle. Live's extra error is its
+reflection glow on a glossy normal-mapped floor, which is there with detail off too. None of the 31 coverage cases got
+worse.
+
+## Bed realism (2026-11-10)
+
+The `bed` case (the owner's photo: slept-in jersey sheet, fleece plush, low warm sun) was 1.2–1.3× too bright in both
+engines, and settle's sunlit sheet was too dark before that. Three fixes:
+
+| Cause | Fix | Where |
+|---|---|---|
+| A dropped glTF's linear `baseColorFactor` was copied into the sRGB colour control (too dark) | linear → sRGB on drop, emission too | StageDropHandling.cpp, `gltf_material` |
+| Sheen added energy on top of an unscaled base | KHR_materials_sheen albedo scaling: base × (1 − max(sheenColor)·sheen·E(μ, r)), E as a 7×12 table | GL forward, Metal live + settle (incl. bounces) |
+| AgX lifted darks up to 1.5× vs Blender: the old minimal 6th-order fit, decoded as piecewise sRGB | our own 8th-order fit to Blender 5.2's AgX measured on a 512-step grey ramp, decoded with the 2.4 power its Rec.1886 step uses; within 1.6/255 on grey | Render3DTonemap.h, MetalDevice.mm |
+
+`bed`: FLIP 0.245 → 0.144 settle, 0.237 → 0.150 live; brightness 1.32 → 1.10 settle, 1.26 → 1.07 live (regions
+0.98–1.08). What is left is mostly depth of field (Cycles' f/2.8; live has none) and live's hard sun-shadow edge.
+
+Model objects take `"detail": [scale, strength]`: Infinite gets Material `detailScale`/`detailStrength`, Blender gets
+the same whiteout blend spliced before the imported material's Normal Map node (`detail_normal`). The bed sheet uses
+`[8, 0.6]`. `bed_close` is a 0.45 m look at the sunlit folds: the weave reads in all three with the same pattern and
+brightness (crop mean 142 Cycles, 144 settle/live); Infinite's weave is a little crisper (high-pass σ 4.8 vs 3.4).
+
+Coverage sweep (31 cases, live + settle) against the pre-fix baseline: no case got worse, none fail. Moved by AgX:
+view_agx FLIP 0.071 → 0.031 live / 0.075 → 0.028 settle; glTF heroes (colour fix) hero 0.136 → 0.092 / 0.137 → 0.064,
+deer 0.106 → 0.061 / 0.113 → 0.055; world_hdri settle 0.106 → 0.065. tex_maps (0.49 → 0.08) and interior (live
+brightness 6.9 → 1.0) also dropped, but their baseline predates part of the shading-gaps work, so not all of that is this block.
+
+## Depth of field and soft sun (2026-11-10)
+
+| Cause | Fix | Where |
+|---|---|---|
+| `dofAperture` × 24 px / 1080 rows is the circle of confusion's diameter, but every path used it as a radius (2× too much blur) | halved: thin-lens radius and post blur radius | Render3DEngine.cpp, Render3DPathTraceCook.cpp, Render3DPost.cpp |
+| settle (Metal) had no depth of field | thin lens in `pt_fs`: disc or bladed polygon on the camera's right/up, focused on the plane at `focusDist` along its forward | MetalDevice.mm (`PtU.lens/lr/lu/lf`) |
+| live had no depth of field | `dof_fs` gather after the frame: per-pixel CoC from depth, 24–48 taps, a tap counts only where its own CoC reaches the pixel (no sharp-over-blur halos) | MetalDevice.mm (`DepthOfField`) |
+| live's sun shadow was hard, settle's soft (sun angle 0.526° × shadow soft) | `sunVis`: 4 probe rays in a cross at 0.9 of the disc; where they disagree, 12 more on a hashed golden spiral (16 total) | MetalDevice.mm |
+
+Four probes, not two: two opposite probes agree whenever they lie along the shadow edge, which snaps the penumbra to
+0/1 dither. With a cross, one pair always spans the edge.
+
+FLIP: dof 0.076 → 0.075 live, 0.058 → 0.057 settle; bed 0.150 → 0.139 live, 0.144 → 0.142 settle; bed_close
+0.190 → 0.154 live. Raster's dof stays at 0.18 from a framing offset (its camera sits lower than Cycles'), which comes
+before this block and isn't blur.
+
+Coverage sweep (31 cases, live + settle) against the post-bed-realism run: no case moved by more than 0.004 FLIP,
+none fail.
+
+What is left on the plush is fur itself: see docs/plans/fur.

@@ -19,7 +19,7 @@ namespace
       // still named here so a saved index still has a label, just not spawned
       // or offered in the operation dropdown (GeometryOpNode::IsSpawnable).
       "Select", "Delete Selected", "Transform Selected", "Extrude Selected",
-      "Delete", "Decimate", "Bevel", "Inset", "UV Project"
+      "Delete", "Decimate", "Bevel", "Inset", "UV Project", "Fur"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const std::vector<std::string> kWrapModeNames = { "Cylindrical", "Spherical", "Nearest Surface" };
@@ -207,6 +207,12 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.bevelWidth = bevelWidth; s.bevelSegments = bevelSegments; s.bevelAngle = bevelAngle;
    s.insetWidth = insetWidth; s.insetDepth = insetDepth;
    s.uvMode = uvMode; s.uvAngle = uvAngle; s.uvMargin = uvMargin; s.uvScale = uvScale;
+   if (op == kFur)
+   {
+      s.fur = FurParams();
+      s.guide = guide;
+      s.guideStamp = guide ? guide->CurveStamp() : 0;
+   }
    s.upstream = input;
    // The upstream's own revision stamp, not its triangle count: Select and
    // other mask-only operators leave the vertex/index count unchanged, so a
@@ -215,6 +221,17 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    if (InstanceOnPointsNode* instancer = FindInstancer(input))
       s.upstreamInstanceRevision = instancer->InstanceRevision();
    return s;
+}
+
+MeshOps::FurParams GeometryOpNode::FurParams() const
+{
+   MeshOps::FurParams p;
+   p.density = furDensity; p.maxStrands = furMaxStrands;
+   p.length = furLength; p.lengthJitter = furJitter; p.width = furWidth;
+   p.segments = furSegments; p.gravity = furGravity; p.clump = furClump; p.curl = furCurl;
+   for (int i = 0; i < 3; i++) p.comb[i] = furComb[i];
+   p.seed = (int)seed; p.normals = furNormals;
+   return p;
 }
 
 const Mesh& GeometryOpNode::GetMesh()
@@ -383,6 +400,13 @@ const Mesh& GeometryOpNode::GetMesh()
          mCache = MeshOps::UVProject(src, uvMode, uvAngle, uvMargin, uvScale, &mUVFrom);
          mUVInputIndices = src.indices;
          mUVInputVerts = src.vertices.size();
+         break;
+      }
+      case kFur:
+      {
+         // With selectionOnly, strands grow only on the selected faces.
+         const Polyline* g = guide ? guide->GetCurve() : nullptr;
+         mCache = MeshOps::Fur(selectionOnly ? src : MeshOps::ClearSelection(src), FurParams(), g);
          break;
       }
       case kScrew:

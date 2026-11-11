@@ -49,7 +49,7 @@ for i, l in enumerate(sc_json["lights"]):
     v = Vector(l["vec"]); col = lin(l["color"])
     if l["type"] in (0, 2):
         ld = bpy.data.lights.new("l%d" % i, 'SUN'); ld.energy = l["intensity"]
-        ld.angle = math.radians(1.6)
+        ld.angle = math.radians(l.get("angle", 0.526))  # the engine's disc: 0.526 deg x the light's shadow softness
         lo = bpy.data.objects.new("l%d" % i, ld); sc.collection.objects.link(lo)
         lo.location = v.normalized() * 10; aim(lo, (0, 0, 0))
     elif l["type"] == 1:

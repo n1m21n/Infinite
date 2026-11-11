@@ -824,6 +824,10 @@ namespace app
       ImGui::BeginDisabled(!n->MapInput(kMapNormal).IsConnected());
       ModCheckbox("bump (height map)##matNormalBump", &n->normalBump);
       ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f, "%.3f", colW);
+      ModSlider("detail scale", &n->detailScale, 0.0f, 32.0f, "%.2f", colW);
+      ImGui::BeginDisabled(n->detailScale <= 0.0f);
+      ModSlider("detail strength", &n->detailStrength, 0.0f, 4.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       ImGui::EndDisabled();
 
       NodeSeparator("surface", colW);
@@ -938,6 +942,7 @@ namespace app
       DropdownButton("space", MappingNode::SpaceNames(), n->space, [n](int i) { n->space = i; });
       if (n->space != kMapSpaceUv)
          ModSlider("blend softness", &n->triplanarBlend, 0.0f, 1.0f);
+      ModSlider("breakup", &n->breakup, 0.0f, 1.0f);
 
       NodeSeparator("translate");
       ModSlider("x", &n->translateX, -4.0f, 4.0f);
@@ -1488,6 +1493,7 @@ namespace app
    {
       switch (op)
       {
+         case GeometryOpNode::kFur:
          case GeometryOpNode::kTransform:
          case GeometryOpNode::kSolidify:
          case GeometryOpNode::kExtrude:
@@ -1727,6 +1733,25 @@ namespace app
                ModSlider("margin", &n->uvMargin, 0.0f, 0.2f, "%.3f");
             }
             ModSlider("scale", &n->uvScale, 0.1f, 10.0f);
+            break;
+         }
+         case GeometryOpNode::kFur:
+         {
+            static const std::vector<std::string> kFurNormals = { "Ribbon", "Tangent" };
+            ModSlider("density", &n->furDensity, 1.0f, 400.0f, "%.0f / cm2");
+            ModSliderInt("max strands", &n->furMaxStrands, 1000, 400000);
+            ModSlider("length", &n->furLength, 0.0f, 0.5f, "%.4f");
+            ModSlider("length jitter", &n->furJitter, 0.0f, 1.0f);
+            ModSlider("width", &n->furWidth, 0.00005f, 0.005f, "%.5f");
+            ModSliderInt("segments", &n->furSegments, 1, 32);
+            ModSlider("gravity", &n->furGravity, 0.0f, 1.0f);
+            ModSlider("clump", &n->furClump, 0.0f, 1.0f);
+            ModSlider("curl", &n->furCurl, 0.0f, 1.0f);
+            ModSlider("comb x", &n->furComb[0], -2.0f, 2.0f);
+            ModSlider("comb y", &n->furComb[1], -2.0f, 2.0f);
+            ModSlider("comb z", &n->furComb[2], -2.0f, 2.0f);
+            DropdownButton("normals", kFurNormals, n->furNormals, [n](int i) { PushUndoCheckpoint(); n->furNormals = i; }, kParamWidth, true, true);
+            ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
             break;
          }
          case GeometryOpNode::kDecimate:

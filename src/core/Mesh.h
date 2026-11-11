@@ -28,6 +28,11 @@ struct Mesh
    // act on it two nodes later, without rewiring anything.
    std::vector<unsigned char> faceMask;
 
+   // Fur's ribbons: indices from ribbonStart on are faces seen from both sides. Raster draws the mesh
+   // unculled, lit from the side seen, and only the faces before them cast into its shadow map.
+   bool twoSided = false;
+   unsigned int ribbonStart = 0;
+
    // Optional grouping of faces into atomic selection units, one entry per
    // triangle, matched by value (not index - just an opaque tag). Empty means
    // every face is its own unit. Mesh to Points sets this so a point's two
@@ -411,6 +416,26 @@ namespace MeshOps
    enum UVProjectMode { kUVSmart = 0, kUVCube, kUVCylinder, kUVSphere };
    Mesh UVProject(const Mesh& in, int mode, float angleDeg, float margin, float scale,
                   std::vector<unsigned>* from = nullptr);
+
+   // Fur and hair (src/core/MeshFur.cpp, docs/plans/fur): the input mesh plus strands rooted on its (selected)
+   // faces, each a thin ribbon of `segments` quads tapering to 0.2x width at the tip, twisted at random about its
+   // own axis. Strands come in clumps of eight; `clump` pulls each clump's tips together. With a guide curve every
+   // strand takes the guide's shape (relative to its first point, turned onto the root's combed normal, scaled to
+   // the strand's length). normals: 0 = Ribbon (the surface normal with the along-strand part removed, which is how
+   // fur is lit), 1 = Tangent (the strand direction, read by the Hair material model as the fibre axis).
+   struct FurParams
+   {
+      float density = 40.0f;      // strands per cm^2
+      int maxStrands = 150000;
+      float length = 0.012f, lengthJitter = 0.3f;
+      float width = 0.0006f;
+      int segments = 3;
+      float gravity = 0.2f, clump = 0.3f, curl = 0.0f;
+      float comb[3] = { 0.0f, 0.0f, 0.0f };
+      int seed = 0;
+      int normals = 0;
+   };
+   Mesh Fur(const Mesh& in, const FurParams& p, const Polyline* guide = nullptr);
 
    // --- curves ---
    // Samples a polyline by arc length rather than by index, so a point moving

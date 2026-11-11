@@ -440,8 +440,8 @@ namespace app
          return 1 + kMapCount; // geometry, then one pin per material channel
       if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
          return Render3DNode::kEnvSlot + 1; // geo, camera, lights, env
-      if (dynamic_cast<GeometryOpNode*>(gn.node.get()) != nullptr)
-         return 1;
+      if (auto* op = dynamic_cast<GeometryOpNode*>(gn.node.get()))
+         return op->op == GeometryOpNode::kFur ? 2 : 1; // Fur: geo, then an optional guide curve
       if (dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr)
          return 2; // geometry, then the displacement texture
       if (dynamic_cast<AudioDisplacementNode*>(gn.node.get()) != nullptr)

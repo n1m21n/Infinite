@@ -678,9 +678,9 @@ void BenchBoatDump(const std::string& dir)
       auto* l = static_cast<LightNode*>(node(idx));
       float v[3];
       l->ComputeVector(v);
-      snprintf(b, sizeof(b), "%s{\"type\":%d,\"vec\":[%g,%g,%g],\"color\":[%g,%g,%g],\"intensity\":%g,\"falloff\":%g,\"soft\":%d}",
+      snprintf(b, sizeof(b), "%s{\"type\":%d,\"vec\":[%g,%g,%g],\"color\":[%g,%g,%g],\"intensity\":%g,\"falloff\":%g,\"soft\":%d,\"angle\":%g}",
                first ? "" : ",", l->type, v[0], -v[2], v[1], l->color[0], l->color[1], l->color[2], l->intensity, l->falloff,
-               l->softFalloff ? 1 : 0);
+               l->softFalloff ? 1 : 0, 0.526f * std::max(0.0f, l->shadowRadius) / 0.25f * std::max(0.0f, l->shadowFilter));
       json += b;
       first = false;
    }

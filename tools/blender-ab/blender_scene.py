@@ -48,6 +48,139 @@ def aim(ob, at):
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 
+def detail_normal(nt, ds, dk):
+    """Render 3D's detail normal on an imported glTF material: the normal map re-read at uv * ds, its tilt times dk,
+    whiteout-blended (x, y add; z multiplies) in tangent space before the Normal Map node."""
+    nm = next((n for n in nt.nodes if n.type == 'NORMAL_MAP'), None)
+    if nm is None or not nm.inputs["Color"].is_linked:
+        return
+    src = nm.inputs["Color"].links[0].from_node
+    if src.type != 'TEX_IMAGE':
+        return
+    vec = src.inputs["Vector"].links[0].from_socket if src.inputs["Vector"].is_linked else None
+    if vec is None:
+        uvn = nt.nodes.new("ShaderNodeUVMap"); vec = uvn.outputs["UV"]
+    mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (ds, ds, ds)
+    nt.links.new(vec, mp.inputs["Vector"])
+    t2 = nt.nodes.new("ShaderNodeTexImage"); t2.image = src.image; t2.extension = 'REPEAT'
+    t2.interpolation = src.interpolation
+    nt.links.new(mp.outputs["Vector"], t2.inputs["Vector"])
+    def tang(c):
+        t = nt.nodes.new("ShaderNodeVectorMath"); t.operation = 'MULTIPLY_ADD'
+        t.inputs[1].default_value = (2, 2, 2); t.inputs[2].default_value = (-1, -1, -1)
+        nt.links.new(c, t.inputs[0])
+        sx = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(t.outputs[0], sx.inputs[0]); return sx
+    a, b = tang(src.outputs["Color"]), tang(t2.outputs["Color"])
+    cx = nt.nodes.new("ShaderNodeCombineXYZ")
+    for ax, key in ((0, "X"), (1, "Y")):
+        bm = nt.nodes.new("ShaderNodeMath"); bm.operation = 'MULTIPLY_ADD'; bm.inputs[1].default_value = dk
+        nt.links.new(b.outputs[key], bm.inputs[0]); nt.links.new(a.outputs[key], bm.inputs[2])
+        nt.links.new(bm.outputs[0], cx.inputs[ax])
+    zm = nt.nodes.new("ShaderNodeMath"); zm.operation = 'MULTIPLY'
+    nt.links.new(a.outputs["Z"], zm.inputs[0]); nt.links.new(b.outputs["Z"], zm.inputs[1]); nt.links.new(zm.outputs[0], cx.inputs[2])
+    nz = nt.nodes.new("ShaderNodeVectorMath"); nz.operation = 'NORMALIZE'; nt.links.new(cx.outputs[0], nz.inputs[0])
+    enc = nt.nodes.new("ShaderNodeVectorMath"); enc.operation = 'MULTIPLY_ADD'
+    enc.inputs[1].default_value = (0.5, 0.5, 0.5); enc.inputs[2].default_value = (0.5, 0.5, 0.5)
+    nt.links.new(nz.outputs[0], enc.inputs[0]); nt.links.new(enc.outputs[0], nm.inputs["Color"])
+
+
+def add_fur(x, f):
+    """Geometry Op Fur rebuilt as Geometry Nodes on an imported mesh: roots spread at random over the faces at the same
+    density, straight strands along the surface normal of length L (1 - jitter * rand), drooped by gravity * L * t^2,
+    radius width/2 tapering to 0.2x, in a copy of the mesh's material that reads the root's UVs."""
+    # Infinite bakes the glTF node transform into the vertices before Fur runs; do the same so strands match.
+    x.data.transform(x.matrix_basis)
+    x.matrix_basis.identity()
+    ng = bpy.data.node_groups.new("fur", 'GeometryNodeTree')
+    ng.interface.new_socket("Geometry", in_out='INPUT', socket_type='NodeSocketGeometry')
+    ng.interface.new_socket("Geometry", in_out='OUTPUT', socket_type='NodeSocketGeometry')
+    N = ng.nodes.new
+    L = lambda a, b: ng.links.new(a, b)
+    gi, go = N("NodeGroupInput"), N("NodeGroupOutput")
+    dist = N("GeometryNodeDistributePointsOnFaces"); dist.distribute_method = 'RANDOM'
+    dist.inputs["Density"].default_value = f["density"] * 1e4
+    dist.inputs["Seed"].default_value = int(f.get("seed", 0))
+    # Cycles skips curves that a mesh object's modifier outputs, so the strands live on their own hair object
+    # that reads the mesh through Object Info.
+    oi = N("GeometryNodeObjectInfo"); oi.transform_space = 'ORIGINAL'; oi.inputs["Object"].default_value = x
+    L(oi.outputs["Geometry"], dist.inputs["Mesh"])
+    rs = N("GeometryNodeResampleCurve"); rs.inputs["Count"].default_value = f.get("segments", 3) + 1
+    g = f.get("guide")
+    if g:
+        # Infinite's Curve arc preset (linear): x = (t - 0.5) 2 spread, y = sin(pi t) height in its Y-up space, here
+        # (x, 0, y). Fur keeps the guide's shape per unit length, turned by the shortest rotation that takes its first
+        # segment onto the root normal: so here the shape is normalised and pre-turned by the inverse of Z -> first
+        # segment (R0), and each instance gets R0 aligned (Z onto the normal, shortest arc).
+        from mathutils import Vector
+        n = g["points"]
+        pts = [Vector(((k / (n - 1) - 0.5) * 2 * g["spread"], 0.0, math.sin(math.pi * k / (n - 1)) * g["height"]))
+               for k in range(n)]
+        arc = sum((pts[k + 1] - pts[k]).length for k in range(n - 1))
+        pts = [(p - pts[0]) / arc for p in pts]
+        r0 = Vector((0, 0, 1)).rotation_difference((pts[1] - pts[0]).normalized())
+        cd = bpy.data.curves.new(x.name + "_guide", 'CURVE'); cd.dimensions = '3D'
+        sp = cd.splines.new('POLY'); sp.points.add(n - 1)
+        inv = r0.inverted()
+        for k, p in enumerate(pts):
+            q = inv @ p
+            sp.points[k].co = (q.x, q.y, q.z, 1.0)
+        gob = bpy.data.objects.new(x.name + "_guide", cd)   # not linked to the scene: read through Object Info only
+        gi2 = N("GeometryNodeObjectInfo"); gi2.transform_space = 'ORIGINAL'; gi2.inputs["Object"].default_value = gob
+        L(gi2.outputs["Geometry"], rs.inputs["Curve"])
+        al = N("FunctionNodeAlignRotationToVector"); al.axis = 'Z'; al.pivot_axis = 'AUTO'
+        al.inputs["Rotation"].default_value = r0.to_euler()
+        L(dist.outputs["Normal"], al.inputs["Vector"])
+        rot_out = al.outputs["Rotation"]
+    else:
+        line = N("GeometryNodeCurvePrimitiveLine")
+        line.inputs["Start"].default_value = (0, 0, 0); line.inputs["End"].default_value = (0, 0, 1)
+        L(line.outputs[0], rs.inputs["Curve"])
+        rot_out = dist.outputs["Rotation"]
+    rnd = N("FunctionNodeRandomValue"); rnd.data_type = 'FLOAT'
+    lo = next(i for i in rnd.inputs if i.name == "Min" and i.type == 'VALUE')
+    hi = next(i for i in rnd.inputs if i.name == "Max" and i.type == 'VALUE')
+    lo.default_value = f["length"] * (1 - f.get("jitter", 0.3)); hi.default_value = f["length"]
+    inst = N("GeometryNodeInstanceOnPoints")
+    L(dist.outputs["Points"], inst.inputs["Points"]); L(rs.outputs[0], inst.inputs["Instance"])
+    L(rot_out, inst.inputs["Rotation"])
+    L(next(o for o in rnd.outputs if o.type == 'VALUE'), inst.inputs["Scale"])
+    real = N("GeometryNodeRealizeInstances"); L(inst.outputs[0], real.inputs[0])
+    sp, sl = N("GeometryNodeSplineParameter"), N("GeometryNodeSplineLength")
+    t2 = N("ShaderNodeMath"); t2.operation = 'MULTIPLY'; L(sp.outputs["Factor"], t2.inputs[0]); L(sp.outputs["Factor"], t2.inputs[1])
+    gl = N("ShaderNodeMath"); gl.operation = 'MULTIPLY'; L(t2.outputs[0], gl.inputs[0]); L(sl.outputs["Length"], gl.inputs[1])
+    dz = N("ShaderNodeMath"); dz.operation = 'MULTIPLY'; L(gl.outputs[0], dz.inputs[0]); dz.inputs[1].default_value = -f.get("gravity", 0.0)
+    cx = N("ShaderNodeCombineXYZ"); L(dz.outputs[0], cx.inputs["Z"])
+    setp = N("GeometryNodeSetPosition"); L(real.outputs[0], setp.inputs["Geometry"]); L(cx.outputs[0], setp.inputs["Offset"])
+    rad = N("ShaderNodeMapRange"); L(sp.outputs["Factor"], rad.inputs["Value"])
+    rad.inputs["To Min"].default_value = f["width"] * 0.5; rad.inputs["To Max"].default_value = f["width"] * 0.1
+    setr = N("GeometryNodeSetCurveRadius"); L(setp.outputs[0], setr.inputs["Curve"]); L(rad.outputs["Result"], setr.inputs["Radius"])
+    src = x.material_slots[0].material if x.material_slots and x.material_slots[0].material else None
+    setm = N("GeometryNodeSetMaterial"); L(setr.outputs[0], setm.inputs["Geometry"])
+    if src:
+        hm = src.copy(); hm.name = src.name + "_fur"
+        nt = hm.node_tree
+        uvname = x.data.uv_layers.active.name if x.data.uv_layers else "UVMap"
+        at = nt.nodes.new("ShaderNodeAttribute"); at.attribute_name = uvname
+        for lk in list(nt.links):
+            if lk.from_node.type == 'UVMAP':
+                nt.links.new(at.outputs["Vector"], lk.to_socket)
+        for nd in nt.nodes:
+            if nd.type == 'TEX_IMAGE' and not nd.inputs["Vector"].is_linked:
+                nt.links.new(at.outputs["Vector"], nd.inputs["Vector"])
+        bs = next((nd for nd in nt.nodes if nd.type == 'BSDF_PRINCIPLED'), None)
+        if bs and bs.inputs["Normal"].is_linked:   # a surface normal map has no meaning across a strand
+            nt.links.remove(bs.inputs["Normal"].links[0])
+        setm.inputs["Material"].default_value = hm
+    L(setm.outputs[0], go.inputs[0])
+    hc = bpy.data.objects.new(x.name + "_fur", bpy.data.hair_curves.new(x.name + "_fur"))
+    for c in x.users_collection:
+        c.objects.link(hc)
+    hc.parent = x.parent; hc.matrix_parent_inverse = x.matrix_parent_inverse.copy(); hc.pass_index = x.pass_index
+    if src:
+        hc.data.materials.append(hm)
+    mod = hc.modifiers.new("fur", 'NODES'); mod.node_group = ng
+
+
 def import_model(o, i):
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=asset_path(o))
@@ -61,6 +194,15 @@ def import_model(o, i):
         x.pass_index = region_index(o)
         if x.parent is None:
             x.parent = root
+    if o.get("detail"):
+        for x in new:
+            for ms in getattr(x, "material_slots", []):
+                if ms.material and ms.material.use_nodes:
+                    detail_normal(ms.material.node_tree, *o["detail"])
+    if o.get("fur"):
+        for x in new:
+            if x.type == 'MESH':
+                add_fur(x, o["fur"])
     if o.get("clip"):
         name = glb_json(asset_path(o))["animations"][o["clip"] - 1]["name"]
         arm = next(x for x in new if x.type == 'ARMATURE')
@@ -75,6 +217,81 @@ def import_model(o, i):
 
 
 posed = []   # (armature, action, object) set to each frame's phase before it renders
+MOTION = scene.get("motion", {})
+moving = []  # (object, velocity m/s) keyed linearly over the motion's frames
+
+
+def add_maps(mat, p, maps, m):
+    """Image maps from the case folder (harness.make_texture): albedo and opacity multiply their factor,
+    roughness multiplies the roughness, normal is a tangent-space OpenGL map; an alpha cutoff thresholds alpha."""
+    nt = mat.node_tree
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    gen = m.get("mapping") == "generated"
+    uv = tc.outputs["Generated" if gen else "UV"]
+    def scaled(vec, k):
+        mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (k, k, k)
+        nt.links.new(vec, mp.inputs["Vector"]); return mp.outputs["Vector"]
+    if m.get("uv_scale", 1.0) != 1.0:
+        uv = scaled(uv, m["uv_scale"])
+    def img(name, data, vec=None):
+        t = nt.nodes.new("ShaderNodeTexImage")
+        t.image = bpy.data.images.load(os.path.join(case, name + ".png"))
+        if data:
+            t.image.colorspace_settings.is_data = True
+        if gen and m.get("triplanar", 0.0) > 0:
+            t.projection = 'BOX'; t.projection_blend = m["triplanar"]
+        if m.get("uv_scale") or gen or vec is not None:
+            t.extension = 'REPEAT'
+        nt.links.new(vec if vec is not None else uv, t.inputs["Vector"])
+        return t
+    def times(sock, out, factor):
+        mul = nt.nodes.new("ShaderNodeMix"); mul.data_type = 'RGBA'; mul.blend_type = 'MULTIPLY'
+        mul.inputs["Factor"].default_value = 1.0
+        mul.inputs[6].default_value = (*factor, 1) if len(factor) == 3 else factor
+        nt.links.new(out, mul.inputs[7]); nt.links.new(mul.outputs[2], sock)
+    if "albedo" in maps:
+        times(p.inputs["Base Color"], img(maps["albedo"], False).outputs["Color"], m.get("base_color", (1, 1, 1)))
+    if "roughness" in maps:
+        mm = nt.nodes.new("ShaderNodeMath"); mm.operation = 'MULTIPLY'; mm.inputs[1].default_value = m.get("roughness", 1.0)
+        nt.links.new(img(maps["roughness"], True).outputs["Color"], mm.inputs[0]); nt.links.new(mm.outputs[0], p.inputs["Roughness"])
+    if "normal" in maps:
+        nm = nt.nodes.new("ShaderNodeNormalMap")
+        col = img(maps["normal"], True).outputs["Color"]
+        if "detail" in m:
+            # Render 3D's detail normal: the same map at uv * scale, tilt * strength, whiteout-blended in tangent space.
+            ds, dk = m["detail"]
+            def tang(c, k):
+                t = nt.nodes.new("ShaderNodeVectorMath"); t.operation = 'MULTIPLY_ADD'
+                t.inputs[1].default_value = (2, 2, 2); t.inputs[2].default_value = (-1, -1, -1)
+                nt.links.new(c, t.inputs[0])
+                sx = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(t.outputs[0], sx.inputs[0])
+                return sx, k
+            a, _ = tang(col, 1.0)
+            b, _ = tang(img(maps["normal"], True, scaled(uv, ds)).outputs["Color"], dk)
+            cx = nt.nodes.new("ShaderNodeCombineXYZ")
+            for ax, key in ((0, "X"), (1, "Y")):
+                bm = nt.nodes.new("ShaderNodeMath"); bm.operation = 'MULTIPLY_ADD'; bm.inputs[1].default_value = dk
+                nt.links.new(b.outputs[key], bm.inputs[0]); nt.links.new(a.outputs[key], bm.inputs[2])
+                nt.links.new(bm.outputs[0], cx.inputs[ax])
+            zm = nt.nodes.new("ShaderNodeMath"); zm.operation = 'MULTIPLY'
+            nt.links.new(a.outputs["Z"], zm.inputs[0]); nt.links.new(b.outputs["Z"], zm.inputs[1]); nt.links.new(zm.outputs[0], cx.inputs[2])
+            nz = nt.nodes.new("ShaderNodeVectorMath"); nz.operation = 'NORMALIZE'; nt.links.new(cx.outputs[0], nz.inputs[0])
+            enc = nt.nodes.new("ShaderNodeVectorMath"); enc.operation = 'MULTIPLY_ADD'
+            enc.inputs[1].default_value = (0.5, 0.5, 0.5); enc.inputs[2].default_value = (0.5, 0.5, 0.5)
+            nt.links.new(nz.outputs[0], enc.inputs[0]); col = enc.outputs[0]
+        nt.links.new(col, nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], p.inputs["Normal"])
+    if "opacity" in maps or m.get("alpha_cutoff", 0.0) > 0:
+        a = img(maps["opacity"], True).outputs["Color"] if "opacity" in maps else None
+        mm = nt.nodes.new("ShaderNodeMath"); mm.operation = 'MULTIPLY'; mm.inputs[1].default_value = m.get("alpha", 1.0)
+        if a is not None:
+            nt.links.new(a, mm.inputs[0])
+        else:
+            mm.inputs[0].default_value = 1.0
+        out = mm.outputs[0]
+        if m.get("alpha_cutoff", 0.0) > 0:
+            gt = nt.nodes.new("ShaderNodeMath"); gt.operation = 'GREATER_THAN'; gt.inputs[1].default_value = m["alpha_cutoff"]
+            nt.links.new(out, gt.inputs[0]); out = gt.outputs[0]
+        nt.links.new(out, p.inputs["Alpha"])
 
 for i, o in enumerate(scene["objects"]):
     shape = o["shape"]
@@ -113,8 +330,20 @@ for i, o in enumerate(scene["objects"]):
     p.inputs["Coat Weight"].default_value = m.get("coat", 0.0)
     p.inputs["Coat Roughness"].default_value = m.get("coat_roughness", 0.03)
     p.inputs["Sheen Weight"].default_value = m.get("sheen", 0.0)
+    p.inputs["Sheen Roughness"].default_value = m.get("sheen_roughness", 0.5)
     p.inputs["Emission Color"].default_value = (*m.get("emission", (0, 0, 0)), 1)
     p.inputs["Emission Strength"].default_value = m.get("emission_strength", 0.0)
+    p.inputs["Alpha"].default_value = m.get("alpha", 1.0)
+    # Coverage-case lobes. Render 3D's subsurface colour is Cycles' per-channel radius; its 0..1 radius maps to 0.2 m.
+    p.inputs["Subsurface Weight"].default_value = m.get("subsurface", 0.0)
+    p.inputs["Subsurface Radius"].default_value = m.get("subsurface_color", (1.0, 0.2, 0.1))
+    p.inputs["Subsurface Scale"].default_value = 0.2 * m.get("subsurface_radius", 0.5)
+    p.inputs["Anisotropic"].default_value = m.get("anisotropy", 0.0)
+    p.inputs["Anisotropic Rotation"].default_value = m.get("anisotropy_rotation", 0.0)
+    if m.get("iridescence", 0.0) > 0:
+        p.inputs["Thin Film Thickness"].default_value = m["iridescence"] * m.get("iridescence_thickness", 400.0)
+        p.inputs["Thin Film IOR"].default_value = m.get("iridescence_ior", 1.33)
+    add_maps(mat, p, m.get("maps", {}), m)
     ob.data.materials.append(mat)
     ob.pass_index = region_index(o)
 
@@ -122,7 +351,12 @@ for i, o in enumerate(scene["objects"]):
         x.select_set(x == ob)
     bpy.context.view_layer.objects.active = ob
     bpy.ops.export_scene.gltf(filepath=os.path.join(case, "obj_%d.glb" % i), export_format='GLB',
-                              use_selection=True, export_materials='NONE', export_animations=False)
+                              use_selection=True, export_materials='NONE', export_animations=False,
+                              export_tangents=bool(m.get("maps")))
+    if o.get("fur"):
+        add_fur(ob, o["fur"])
+    if str(i) in MOTION.get("velocity", {}):
+        moving.append((ob, MOTION["velocity"][str(i)]))
 
     if o.get("instances"):
         # Many copies of this shape. The shape stays at the origin (Infinite stamps it on the points);
@@ -197,6 +431,13 @@ if w.get("hdri"):
     wt.links.new(tex.outputs["Color"], bg.inputs["Color"])
 
 sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'
+try:  # Metal when there is one: the truth is the same picture, several times sooner
+    prefs = bpy.context.preferences.addons["cycles"].preferences
+    prefs.compute_device_type = 'METAL'; prefs.get_devices()
+    for d in prefs.devices: d.use = True
+    if any(d.type == 'METAL' for d in prefs.devices): sc.cycles.device = 'GPU'
+except Exception as e:
+    print("SCENE: GPU off,", e)
 sc.cycles.samples = scene.get("samples", 256)
 sc.cycles.use_denoising = True
 sc.view_settings.view_transform = scene.get("view", "Standard")
@@ -238,6 +479,33 @@ def render_mask(path):
     (sc.cycles.samples, sc.cycles.use_denoising, sc.cycles.filter_width, sc.view_settings.view_transform,
      sc.render.image_settings.color_mode, sc.render.image_settings.color_depth, camd.dof.use_dof) = keep
 
+
+if MOTION:
+    # Frame f is time f / fps, as Infinite's --frames-dir; the camera orbits and objects move linearly.
+    fps = MOTION.get("fps", 30); sc.render.fps = fps
+    last = int(round(max(MOTION["checks"]) * fps)) + 1
+    rate = MOTION.get("camera_azimuth_rate", 0.0)
+    for f in range(0, last + 1):
+        tt = f / fps
+        if rate:
+            co.location = spherical(cam["azimuth"] + rate * tt, cam["elevation"], cam["distance"], target); aim(co, target)
+            co.keyframe_insert("location", frame=f); co.keyframe_insert("rotation_euler", frame=f)
+        for ob, v in moving:
+            ob.location = Vector(v) * tt; ob.keyframe_insert("location", frame=f)
+    for x in [co] + [ob for ob, _ in moving]:
+        if x.animation_data and x.animation_data.action:
+            for fc in getattr(x.animation_data.action, "fcurves", []):
+                for kp in fc.keyframe_points: kp.interpolation = 'LINEAR'
+    if MOTION.get("blur"):
+        sc.render.use_motion_blur = True; sc.render.motion_blur_shutter = MOTION["blur"]
+        for host in (sc.render, sc.cycles):
+            if hasattr(host, "motion_blur_position"): host.motion_blur_position = 'CENTER'
+    for k, tc in enumerate(MOTION["checks"]):
+        sc.frame_set(int(round(tc * fps)))
+        sc.render.filepath = os.path.join(case, "truth_%d.png" % k)
+        bpy.ops.render.render(write_still=True)
+    print("SCENEDONE", len(scene["objects"]))
+    sys.exit(0)
 
 for k, fr in enumerate(FRAMES or [None]):
     tag = "" if FRAMES is None else "_%d" % k

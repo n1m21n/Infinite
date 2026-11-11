@@ -656,8 +656,10 @@ Static frame, FLIP vs Cycles (lower is closer):
 
 | | GL | engine before | raster (16) | all (7) | all + settle (15) |
 |---|---|---|---|---|---|
-| sunset | 0.103 | 0.310 | 0.122 | 0.084 | 0.077 |
-| moon | 0.101 | 0.193 | 0.099 | 0.066 | 0.067 |
+| sunset | 0.106 | 0.310 | 0.117 | 0.082 | 0.077 |
+| moon | 0.087 | 0.193 | 0.092 | 0.065 | 0.068 |
+
+(Rows re-scored 2026-11-10 evening against references re-rendered with the engine's sun disc.)
 
 Fixed by it:
 - The engine forced ACES for every tonemap but none; AgX, Reinhard and Neutral now run in Metal (`toneMap`), so the
@@ -678,12 +680,21 @@ Fixed by it:
   ambient lights' flat fill on every hit, and scales the sky by ambient x 3 after a diffuse bounce (1 after a glossy
   one, as the raster's reflections). Default look, live vs settled: FLIP 0.052 (moon) / 0.063 (sunset), regions
   0.89-0.97x. The A/B sets ambient to linear 1/3 so the sky is at full strength, as Cycles' world.
+- Sun lights are discs: 0.526° x the light's shadow softness (the real sun at 1, as GL sizes its shadow; the HDRI's
+  extracted sun takes its own `sunAngle`). Live, the highlight spreads over the disc (representative point, lobe
+  widened and renormalised); settled, the tracer samples the cone. Live shadows stay hard: one ray per pixel and no
+  temporal filter would turn a soft edge into noise. The Cycles A/B takes the same angle from the dump.
+- GL's 0.35 sun wrap is gone from the engine: the tracer and Cycles have none, so live and settled now agree on
+  sun-lit edges (sails 0.98 / 0.91 live).
+- Specular anti-aliasing: the live lobe widens by the screen-space normal variance (Kaplanyan / Tokuyoshi), so wave
+  normals finer than a pixel stop flickering; sunset live 0.085 -> 0.082, `materials` +0.002.
 - The moon reference's point light had a 0.05 radius, wider than the 0.045 globe, leaking light onto the deck; it is
   now a true point like the engine's (moon table row above uses the re-render).
 
 Still open (region brightness vs Cycles, mode 7 unless noted):
 - No-GI modes (16, 17) over-light the shaded side: the env ambient has no occlusion there (hull 1.9-5.9x).
-- Sails 0.85 (sunset) / 1.08 (moon); sun lights keep GL's 0.35 wrap, which Cycles has not.
-- Sun glitter path: the sun is a delta light, so the column is sparkly and wide where Cycles' 1.6° disc gives a
-  clean narrow column; near water 0.99 / 1.10.
+- Live glitter path: a round blob at the horizon where Cycles draws a narrow streak; the shape is the live specular
+  lobe at grazing angles (Schlick geometry, one sample of the sky's sun texels), not the sun's size.
+- `materials` (live 0.078, was 0.068 before 222751ff): most likely the two-sided normal flip on closed spheres;
+  unconfirmed.
 - Raster-only (16) boat and its reflection 1.8–4.4x: shadow maps and no GI over-light the shaded side, as GL does.

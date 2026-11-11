@@ -87,6 +87,11 @@ struct Material
    // slot joins Render 3D's sorted translucent pass.
    bool textureAlpha = false;
    unsigned char padB[3] = { 0, 0, 0 };
+
+   // Detail normal: the normal slot read a second time at uv * detailScale (0 = off), its tilt scaled by
+   // detailStrength and blended on top - weave or pores over the large folds, from one map.
+   float detailScale = 0.0f;
+   float detailStrength = 1.0f;
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
@@ -134,6 +139,7 @@ struct MappingTransform
    float rotate[3] = { 0.0f, 0.0f, 0.0f }; // radians
    float scale[3] = { 1.0f, 1.0f, 1.0f };
    float triplanarBlend = 0.0f; // 0 = sharp pick, >0 = smooth blended triplanar
+   float breakup = 0.0f; // 0..1: hides tile repetition by shifting the tile per area (repeats the map)
 };
 
 // D1 (geometry-domains audit, Phase 4): cook-time error channel. A consumer
@@ -1091,6 +1097,7 @@ private:
    GLUtil::Fbo mAccum[2];
    unsigned int mProgAccum = 0, mProgAccumDone = 0;
    int mJitterIndex = -1; // >= 0 while an offline pass is being accumulated
+   bool mAccumEngine = false; // Accumulate's passes are live engine frames
    bool mInAccumulate = false;
    bool EnsurePostShaders();
    void RunPost(const Mat4& proj, bool ortho, int w, int h);
@@ -1160,6 +1167,21 @@ private:
    bool mPtHasLastSig = false;
    bool mPtSceneBuilt = false;
    bool mPtStill = false;
+   // Raster GI probes (Render3DPathTraceCook.cpp): a grid over the scene, traced by a second path
+   // tracer and kept as one ambient cube per probe in mProbeTex (six face slabs along z, alpha =
+   // validity) with each face's mean hit distance and its square in mProbeDepthTex. Rebuilt when
+   // geometry, lights or world change.
+   void UploadPtScene(class Render3DPathTrace& pt);
+   void SetPtWorld(class Render3DPathTrace& pt);
+   void UpdateProbes(const SceneSignature& sig);
+   void ReleaseProbes();
+   class Render3DPathTrace* mProbeTrace = nullptr;
+   std::vector<float> mProbeKey;
+   SceneSignature mProbeBuiltSig, mProbeLastSig;
+   bool mProbeSceneBuilt = false, mProbeValid = false, mProbeHasLastSig = false;
+   unsigned int mProbeTex = 0, mProbeDepthTex = 0;   // depth: per face mean first-hit distance and its square
+   float mProbeLo[3] = { 0, 0, 0 }, mProbeStep[3] = { 1, 1, 1 };
+   int mProbeDims[3] = { 0, 0, 0 };
    // Multisampled draw target, blitted into the above. Unused when samples == 0.
    unsigned int mMsFbo = 0;
    unsigned int mMsColor = 0;

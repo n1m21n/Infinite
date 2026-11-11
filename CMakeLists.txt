@@ -645,6 +645,7 @@ set(COMMON_SOURCES
     src/core/Sculpt.cpp
     src/core/EditMesh.cpp
     src/core/MeshDecimate.cpp
+    src/core/MeshFur.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
