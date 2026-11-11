@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Psytrance Rolling Saw Bass Synth",
+    "author": "Infinite",
+    "description": "High-octane Goa and full-on psytrance bassline synthesizer featuring sharp transient click shaping, exponential envelope decay, resonant 24dB ladder filter cutoff, and sub-octave saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 1450.0 [80.0, 8000.0];\nparam float res = 0.65 [0.0, 0.95];\nparam float envMod = 0.72 [0.0, 1.0];\nparam float decay = 0.14 [0.03, 0.5];\nparam float drive = 2.1 [1.0, 5.0];\nparam float sub = 0.38 [0.0, 1.0];\nparam float click = 0.45 [0.0, 1.0];\nstate float phase = 0;\nstate float subPhase = 0;\nstate float env = 0;\nstate float clickEnv = 0;\nstate float lastGate = 0;\nstate float s1 = 0;\nstate float s2 = 0;\nstate float s3 = 0;\nstate float s4 = 0;\n\ntrig = if(gate > 0.5 && lastGate <= 0.5, 1.0, 0.0);\nlastGate = gate;\n\nclickEnv = if(trig > 0.5, 1.0, clickEnv - clickEnv * 0.12);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.05);\nenv = if(trig > 0.5, 1.0, env - env * decayRate);\n\npStep = clamp(freq, 20.0, 2000.0) / sr;\nphase = (phase + pStep) % 1.0;\nsubPhase = (subPhase + pStep * 0.5) % 1.0;\n\nsaw = 2.0 * phase - 1.0;\nsubOsc = sin(6.2831853 * subPhase) * sub;\nraw = saw + subOsc + clickEnv * click * 0.75;\n\nfCut = clamp((cutoff + env * envMod * 5200.0) / sr * 2.2, 0.005, 0.45);\nfb = (s4 * res * 3.6) / (1.0 + abs(s4) * 0.85);\nu = (raw * drive) - fb;\nsat = u / (1.0 + abs(u) * 0.4);\n\ns1 = s1 + fCut * (sat - s1);\ns2 = s2 + fCut * (s1 - s2);\ns3 = s3 + fCut * (s2 - s3);\ns4 = s4 + fCut * (s3 - s4);\n\nout = s4 * (0.35 + env * 0.65) * 0.38;\n",
+    "params": {
+      "cutoff": 1450.0,
+      "res": 0.65,
+      "envMod": 0.72,
+      "decay": 0.14,
+      "drive": 2.1,
+      "sub": 0.38,
+      "click": 0.45
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

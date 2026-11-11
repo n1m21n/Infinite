@@ -277,6 +277,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [UK Garage 2-Step Organ Stab Lead Synth](https://infinitedevices.org/library/uk-garage-2step-organ-stab-lead-synth.html): Punchy percussive digital organ and chord stab synthesizer with multi-harmonic drawbar overtone partials, click attack transient, and warm analog chorus diffusion. (file: https://infinitedevices.org/assets/templates/uk-garage-2step-organ-stab-lead-synth.inf)
 - [Detroit Techno Motor City Tape Delay FX](https://infinitedevices.org/library/detroit-techno-motor-city-tape-delay-fx.html): Analog tape echo processor featuring tempo-sync feedback diffusion, head flutter modulation, non-linear tape saturation warmth, and high-frequency damping roll-off. (file: https://infinitedevices.org/assets/templates/detroit-techno-motor-city-tape-delay-fx.inf)
 - [Detroit Techno Warehouse Chorus Diffusion FX](https://infinitedevices.org/library/detroit-techno-warehouse-chorus-diffusion-fx.html): Multi-voice analog bucket-brigade chorus and spatial diffusion effect providing wide stereo chorus modulation, lush harmonic depth, and subtle early-reflection warmth. (file: https://infinitedevices.org/assets/templates/detroit-techno-warehouse-chorus-diffusion-fx.inf)
+- [Psytrance Rolling Saw Bass Synth](https://infinitedevices.org/library/psytrance-rolling-saw-bass-synth.html): High-octane Goa and full-on psytrance bassline synthesizer featuring sharp transient click shaping, exponential envelope decay, resonant 24dB ladder filter cutoff, and sub-octave saturation. (file: https://infinitedevices.org/assets/templates/psytrance-rolling-saw-bass-synth.inf)
+- [Psytrance Acid Squelch Lead Synth](https://infinitedevices.org/library/psytrance-acid-squelch-lead-synth.html): Psychedelic FM acid lead synthesizer featuring dual cascaded oscillators, extreme resonance squelch filter sweeps, tempo-synced LFO filter modulation, and warm diode clipping. (file: https://infinitedevices.org/assets/templates/psytrance-acid-squelch-lead-synth.inf)
+- [Electro Robotic Vocoder Comb FX](https://infinitedevices.org/library/electro-robotic-vocoder-comb-fx.html): Resonant robotic comb filter and formant vocoder effect featuring pitch-tracked harmonic comb peaks, metallic sideband modulation, non-linear feedback drive, and crisp transient shaping. (file: https://infinitedevices.org/assets/templates/electro-robotic-vocoder-comb-fx.inf)
+- [Electro Cybernetic BBD Flanger Delay FX](https://infinitedevices.org/library/electro-cybernetic-bbd-flanger-delay-fx.html): Vintage bucket-brigade style short-time flanger and cross-feedback delay processor with triangular LFO sweep modulation, inverted feedback notches, and warm analog diode saturation. (file: https://infinitedevices.org/assets/templates/electro-cybernetic-bbd-flanger-delay-fx.inf)
 
 ## Library: Community
 
@@ -637,7 +641,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 105 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 107 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -654,4 +658,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 90 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 92 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

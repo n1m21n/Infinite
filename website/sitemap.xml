@@ -150,6 +150,8 @@
   <url><loc>https://infinitedevices.org/embeds/vector-wireframe-geodesic-radar-horizon.html</loc><lastmod>2026-11-11</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/riso-manga-zine-halftone-dot-matrix.html</loc><lastmod>2026-11-11</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/riso-manga-zine-chromatic-ink-misregistration.html</loc><lastmod>2026-11-11</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/minimal-signal-datamatics-barcode-matrix.html</loc><lastmod>2026-11-11</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/minimal-signal-raster-oscillogram-sweep.html</loc><lastmod>2026-11-11</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-11</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-11</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-11</lastmod><priority>0.7</priority></url>
@@ -319,6 +321,10 @@
   <url><loc>https://infinitedevices.org/library/uk-garage-2step-organ-stab-lead-synth.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/detroit-techno-motor-city-tape-delay-fx.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/detroit-techno-warehouse-chorus-diffusion-fx.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-rolling-saw-bass-synth.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-acid-squelch-lead-synth.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-robotic-vocoder-comb-fx.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-cybernetic-bbd-flanger-delay-fx.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
@@ -853,6 +859,16 @@
   <url><loc>https://infinitedevices.org/library/detroit-techno-warehouse-chorus-diffusion-fx.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-zine-halftone-dot-matrix.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-zine-chromatic-ink-misregistration.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/data-landscape-pulsar-elevation-profile.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/data-landscape-bathymetric-isoline-survey.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/demoscene-plasma-rotozoom-helix-twister-3d.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/demoscene-plasma-amiga-copper-polyhedron-3d.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-rolling-saw-bass-synth.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-acid-squelch-lead-synth.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-robotic-vocoder-comb-fx.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-cybernetic-bbd-flanger-delay-fx.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/minimal-signal-datamatics-barcode-matrix.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/minimal-signal-raster-oscillogram-sweep.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-11</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-11</lastmod><priority>0.5</priority></url>

@@ -525,6 +525,16 @@
       "slug": "riso-manga-zine-chromatic-ink-misregistration",
       "title": "Riso Manga Zine Chromatic Ink Misregistration",
       "description": "Audio-reactive risograph manga shader featuring speedline dynamics and spot-color ink misregistration. Bass commands ink saturation depth, mids pulse dynamic speedline convergence, and highs trigger physical riso print plate misregistration."
+    },
+    {
+      "slug": "minimal-signal-datamatics-barcode-matrix",
+      "title": "Minimal Signal Datamatics Barcode Matrix",
+      "description": "Audio-reactive binary data matrix and barcode visualizer inspired by Ryoji Ikeda. Bass pulses the high-density bitstream, mids shift vertical scanlines, and highs ignite vermilion signal impulses."
+    },
+    {
+      "slug": "minimal-signal-raster-oscillogram-sweep",
+      "title": "Minimal Signal Raster Oscillogram Sweep",
+      "description": "Precision audio-reactive oscilloscope raster grid rendering multi-channel sine-sweep waveforms and Alva Noto pulse-code impulses. Bass drives beam deflection amplitude, mids modulate raster lines, and highs trigger transient beam bursts."
     }
   ]
 }

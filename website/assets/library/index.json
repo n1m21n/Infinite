@@ -8404,6 +8404,220 @@
       "file": "assets/library/pixel/riso-manga-zine-chromatic-ink-misregistration.field",
       "preview": "assets/library/previews/riso-manga-zine-chromatic-ink-misregistration.jpg",
       "bytes": 1880
+    },
+    {
+      "id": "data-landscape-pulsar-elevation-profile",
+      "name": "Data Landscape Pulsar Elevation Profile",
+      "kind": "Generator",
+      "tags": [
+        "data",
+        "landscape",
+        "pulsar",
+        "topographic",
+        "radio-astronomy",
+        "elevation"
+      ],
+      "description": "Procedural mathematical drafting rendering successive radio-astronomy pulsar transit traces with Gaussian signal peaks, hidden-line occlusion, and phosphorescent cyan ridge lines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/data-landscape-pulsar-elevation-profile.js",
+      "preview": "assets/library/previews/data-landscape-pulsar-elevation-profile.jpg",
+      "bytes": 3861
+    },
+    {
+      "id": "data-landscape-bathymetric-isoline-survey",
+      "name": "Data Landscape Bathymetric Isoline Survey",
+      "kind": "Generator",
+      "tags": [
+        "data",
+        "landscape",
+        "bathymetric",
+        "isoline",
+        "contour",
+        "cartography"
+      ],
+      "description": "Procedural topographic contour cartography visualizing multi-tiered bathymetric elevation isolines, submarine trench abyssal gradients, and nautical depth coordinate soundings.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/data-landscape-bathymetric-isoline-survey.js",
+      "preview": "assets/library/previews/data-landscape-bathymetric-isoline-survey.jpg",
+      "bytes": 3254
+    },
+    {
+      "id": "demoscene-plasma-rotozoom-helix-twister-3d",
+      "name": "Demoscene Plasma Rotozoom Helix Twister 3D",
+      "kind": "Generator",
+      "tags": [
+        "demoscene",
+        "plasma",
+        "3d",
+        "twister",
+        "helix",
+        "amiga",
+        "rotozoom"
+      ],
+      "description": "Classic 1990s demoscene 3D twister column rendering interweaving helical copper ribbons with sine-modulated cross-sections and dual-tone electric cyan and plasma orange illumination.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/demoscene-plasma-rotozoom-helix-twister-3d.js",
+      "preview": "assets/library/previews/demoscene-plasma-rotozoom-helix-twister-3d.jpg",
+      "bytes": 2459
+    },
+    {
+      "id": "demoscene-plasma-amiga-copper-polyhedron-3d",
+      "name": "Demoscene Plasma Amiga Copper Polyhedron 3D",
+      "kind": "Generator",
+      "tags": [
+        "demoscene",
+        "amiga",
+        "3d",
+        "polyhedron",
+        "copper",
+        "plasma",
+        "geometry"
+      ],
+      "description": "Faceted 3D stellated icosahedron rotating along dual axes with copper-bar plasma gradient vertex highlights and retro Amiga vector wireframe struts.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/demoscene-plasma-amiga-copper-polyhedron-3d.js",
+      "preview": "assets/library/previews/demoscene-plasma-amiga-copper-polyhedron-3d.jpg",
+      "bytes": 2700
+    },
+    {
+      "id": "psytrance-rolling-saw-bass-synth",
+      "name": "Psytrance Rolling Saw Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "psytrance",
+        "audio",
+        "dsp",
+        "lead",
+        "bass"
+      ],
+      "description": "High-octane Goa and full-on psytrance bassline synthesizer featuring sharp transient click shaping, exponential envelope decay, resonant 24dB ladder filter cutoff, and sub-octave saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 7,
+      "file": "assets/templates/psytrance-rolling-saw-bass-synth.inf",
+      "preview": "assets/library/previews/psytrance-rolling-saw-bass-synth.jpg",
+      "bytes": 2444
+    },
+    {
+      "id": "psytrance-acid-squelch-lead-synth",
+      "name": "Psytrance Acid Squelch Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "psytrance",
+        "audio",
+        "dsp",
+        "lead",
+        "bass"
+      ],
+      "description": "Psychedelic FM acid lead synthesizer featuring dual cascaded oscillators, extreme resonance squelch filter sweeps, tempo-synced LFO filter modulation, and warm diode clipping.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 6,
+      "file": "assets/templates/psytrance-acid-squelch-lead-synth.inf",
+      "preview": "assets/library/previews/psytrance-acid-squelch-lead-synth.jpg",
+      "bytes": 2293
+    },
+    {
+      "id": "electro-robotic-vocoder-comb-fx",
+      "name": "Electro Robotic Vocoder Comb FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "electro",
+        "audio",
+        "dsp",
+        "filter",
+        "flanger"
+      ],
+      "description": "Resonant robotic comb filter and formant vocoder effect featuring pitch-tracked harmonic comb peaks, metallic sideband modulation, non-linear feedback drive, and crisp transient shaping.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/electro-robotic-vocoder-comb-fx.inf",
+      "preview": "assets/library/previews/electro-robotic-vocoder-comb-fx.jpg",
+      "bytes": 1984
+    },
+    {
+      "id": "electro-cybernetic-bbd-flanger-delay-fx",
+      "name": "Electro Cybernetic BBD Flanger Delay FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "electro",
+        "audio",
+        "dsp",
+        "filter",
+        "flanger"
+      ],
+      "description": "Vintage bucket-brigade style short-time flanger and cross-feedback delay processor with triangular LFO sweep modulation, inverted feedback notches, and warm analog diode saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/electro-cybernetic-bbd-flanger-delay-fx.inf",
+      "preview": "assets/library/previews/electro-cybernetic-bbd-flanger-delay-fx.jpg",
+      "bytes": 2138
+    },
+    {
+      "id": "minimal-signal-datamatics-barcode-matrix",
+      "name": "Minimal Signal Datamatics Barcode Matrix",
+      "kind": "Generator",
+      "tags": [
+        "minimal",
+        "signal",
+        "datamatics",
+        "binary",
+        "matrix",
+        "barcode",
+        "ryoji-ikeda"
+      ],
+      "description": "High-contrast binary data matrix and barcode visualizer inspired by Ryoji Ikeda, with audio-reactive vertical scanlines, horizontal bitstreams, and stark signal orange impulses.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/minimal-signal-datamatics-barcode-matrix.field",
+      "preview": "assets/library/previews/minimal-signal-datamatics-barcode-matrix.jpg",
+      "bytes": 1750
+    },
+    {
+      "id": "minimal-signal-raster-oscillogram-sweep",
+      "name": "Minimal Signal Raster Oscillogram Sweep",
+      "kind": "Generator",
+      "tags": [
+        "minimal",
+        "signal",
+        "oscilloscope",
+        "raster",
+        "graticule",
+        "waveform",
+        "alva-noto"
+      ],
+      "description": "Precision audio-reactive oscilloscope raster grid rendering multi-channel sine-sweep waveforms, graticule coordinate graduations, and Alva Noto-style pulse-code impulses.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/minimal-signal-raster-oscillogram-sweep.field",
+      "preview": "assets/library/previews/minimal-signal-raster-oscillogram-sweep.jpg",
+      "bytes": 2386
     }
   ]
 }

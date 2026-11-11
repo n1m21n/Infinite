@@ -1,0 +1,68 @@
+infinite-patch 1
+# Psytrance Rolling Saw Bass Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 38
+  i note1 38
+  i note2 38
+  i note3 38
+  i note4 38
+  i note5 38
+  i note6 38
+  i note7 50
+  i note8 38
+  i note9 38
+  i note10 38
+  i note11 38
+  i note12 38
+  i note13 38
+  i note14 41
+  i note15 50
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 1450.0 [80.0, 8000.0];\nparam float res = 0.65 [0.0, 0.95];\nparam float envMod = 0.72 [0.0, 1.0];\nparam float decay = 0.14 [0.03, 0.5];\nparam float drive = 2.1 [1.0, 5.0];\nparam float sub = 0.38 [0.0, 1.0];\nparam float click = 0.45 [0.0, 1.0];\nstate float phase = 0;\nstate float subPhase = 0;\nstate float env = 0;\nstate float clickEnv = 0;\nstate float lastGate = 0;\nstate float s1 = 0;\nstate float s2 = 0;\nstate float s3 = 0;\nstate float s4 = 0;\n\ntrig = if(gate > 0.5 && lastGate <= 0.5, 1.0, 0.0);\nlastGate = gate;\n\nclickEnv = if(trig > 0.5, 1.0, clickEnv - clickEnv * 0.12);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.05);\nenv = if(trig > 0.5, 1.0, env - env * decayRate);\n\npStep = clamp(freq, 20.0, 2000.0) / sr;\nphase = (phase + pStep) % 1.0;\nsubPhase = (subPhase + pStep * 0.5) % 1.0;\n\nsaw = 2.0 * phase - 1.0;\nsubOsc = sin(6.2831853 * subPhase) * sub;\nraw = saw + subOsc + clickEnv * click * 0.75;\n\nfCut = clamp((cutoff + env * envMod * 5200.0) / sr * 2.2, 0.005, 0.45);\nfb = (s4 * res * 3.6) / (1.0 + abs(s4) * 0.85);\nu = (raw * drive) - fb;\nsat = u / (1.0 + abs(u) * 0.4);\n\ns1 = s1 + fCut * (sat - s1);\ns2 = s2 + fCut * (s1 - s2);\ns3 = s3 + fCut * (s2 - s3);\ns4 = s4 + fCut * (s3 - s4);\n\nout = s4 * (0.35 + env * 0.65) * 0.38;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.18 0.22 0.32
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Psytrance Rolling Saw Bass Synth. High-octane Goa and full-on psytrance bassline synthesizer featuring sharp transient click shaping, exponential envelope decay, resonant 24dB ladder filter cutoff, and sub-octave saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

@@ -528,6 +528,14 @@
   "embeds/riso-manga-zine-chromatic-ink-misregistration.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/minimal-signal-datamatics-barcode-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/minimal-signal-raster-oscillogram-sweep.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

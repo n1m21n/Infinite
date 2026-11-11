@@ -2499,6 +2499,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "psytrance-rolling-saw-bass-synth",
+      "name": "Psytrance Rolling Saw Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "High-octane Goa and full-on psytrance bassline synthesizer featuring sharp transient click shaping, exponential envelope decay, resonant 24dB ladder filter cutoff, and sub-octave saturation.",
+      "price": 0,
+      "preview": "assets/templates/psytrance-rolling-saw-bass-synth.webp",
+      "file": "assets/templates/psytrance-rolling-saw-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "psytrance-acid-squelch-lead-synth",
+      "name": "Psytrance Acid Squelch Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Psychedelic FM acid lead synthesizer featuring dual cascaded oscillators, extreme resonance squelch filter sweeps, tempo-synced LFO filter modulation, and warm diode clipping.",
+      "price": 0,
+      "preview": "assets/templates/psytrance-acid-squelch-lead-synth.webp",
+      "file": "assets/templates/psytrance-acid-squelch-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "electro-robotic-vocoder-comb-fx",
+      "name": "Electro Robotic Vocoder Comb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Resonant robotic comb filter and formant vocoder effect featuring pitch-tracked harmonic comb peaks, metallic sideband modulation, non-linear feedback drive, and crisp transient shaping.",
+      "price": 0,
+      "preview": "assets/templates/electro-robotic-vocoder-comb-fx.webp",
+      "file": "assets/templates/electro-robotic-vocoder-comb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "electro-cybernetic-bbd-flanger-delay-fx",
+      "name": "Electro Cybernetic BBD Flanger Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage bucket-brigade style short-time flanger and cross-feedback delay processor with triangular LFO sweep modulation, inverted feedback notches, and warm analog diode saturation.",
+      "price": 0,
+      "preview": "assets/templates/electro-cybernetic-bbd-flanger-delay-fx.webp",
+      "file": "assets/templates/electro-cybernetic-bbd-flanger-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }
