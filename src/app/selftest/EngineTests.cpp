@@ -496,6 +496,11 @@ bool RunEngineTest()
    for (int i = 0; i < 4; i++)
       r.geometry[i] = nullptr;
    r.rig = nullptr;
+   // Every pipeline the frames above built (raster, GI, path tracer, denoise) compiled: a broken shared header
+   // fails here instead of quietly drawing the raster picture (DESIGN.md L2).
+   if (!rhi::LastError().empty())
+      printf("  engine error: %s\n", rhi::LastError().c_str());
+   check(rhi::LastError().empty(), "no shader or pipeline failed to build", 0, 0);
 #else
    check(dev == nullptr, "no engine backend on this platform", 0, 0);
 #endif

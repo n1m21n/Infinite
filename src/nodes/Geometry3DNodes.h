@@ -1161,6 +1161,12 @@ private:
    bool CookPathTrace(int frameId);
    // Metal engine path (Apple only; see Render3DEngine.cpp). True when it drew this frame.
    bool CookEngine(int frameId);
+public:
+   // Why the Metal engine path is not drawing (a shader or pipeline that failed to build), empty when it is fine
+   // or not in use. Shown on the node: a failed pipeline is an error, not a quiet fallback to raster.
+   const std::string& EngineError() const { return mEngineError; }
+private:
+   std::string mEngineError;
    void ReleaseEngine();
    struct EngineState;
    EngineState* mEng = nullptr;

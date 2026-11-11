@@ -4,4 +4,5 @@
 namespace rhi
 {
 std::unique_ptr<Device> CreateDevice() { return nullptr; }
+const std::string& LastError() { static const std::string kNone; return kNone; }
 }

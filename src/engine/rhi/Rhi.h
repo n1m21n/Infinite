@@ -59,4 +59,8 @@ namespace rhi
 
    // The backend for this platform, or null when there is none yet. Must be called with the app's GL context current.
    std::unique_ptr<Device> CreateDevice();
+
+   // The first shader or pipeline that failed to build ("pt pipeline: <compiler line>"), empty while none has.
+   // A failed pipeline is an error, not a quiet fallback (DESIGN.md L2): Render 3D shows it on the node.
+   const std::string& LastError();
 }

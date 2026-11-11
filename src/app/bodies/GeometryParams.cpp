@@ -2392,6 +2392,12 @@ namespace app
             ImGui::Dummy(ImVec2(fixedW - textSize.x, textSize.y));
          }
       }
+      if (!n->EngineError().empty())
+      {
+         PushTextWrapWidth(kPreviewSize);
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->EngineError().c_str());
+         PopTextWrapWidth();
+      }
 
       gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;

@@ -125,6 +125,8 @@ bool Render3DNode::CookEngine(int frameId)
    if (mEng == nullptr)
       mEng = new EngineState();
    EngineState& E = *mEng;
+   // Whatever path this cook takes, the node shows the first shader or pipeline that failed (DESIGN.md L2).
+   struct ErrorOut { std::string& s; ~ErrorOut() { s = rhi::LastError(); } } errorOut{ mEngineError };
    if (E.failed)
       return false;
    if (!E.dev)

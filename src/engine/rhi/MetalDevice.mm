@@ -17,6 +17,30 @@
 
 namespace rhi
 {
+   namespace
+   {
+      std::string gLastError;
+      // Logs a failed shader or pipeline and keeps the first one for the node: what failed plus the compiler's
+      // first error line (the full text goes to the log).
+      void EngineFail(NSString* what, NSError* err)
+      {
+         NSLog(@"%@: %@", what, err);
+         if (!gLastError.empty())
+            return;
+         std::string msg = err ? std::string([[err localizedDescription] UTF8String] ?: "") : std::string("not built");
+         const size_t e = msg.find("error:");
+         if (e != std::string::npos)
+         {
+            const size_t ls = msg.rfind('\n', e);
+            msg = msg.substr(ls == std::string::npos ? 0 : ls + 1);
+         }
+         msg = msg.substr(0, msg.find('\n'));
+         if (msg.size() > 160)
+            msg = msg.substr(0, 157) + "...";
+         gLastError = std::string([what UTF8String]) + ": " + msg;
+      }
+   }
+   const std::string& LastError() { return gLastError; }
 namespace
 {
    NSString* const kTestShader = @R"(
@@ -1568,7 +1592,9 @@ kernel void args_k(device atomic_uint* cnt [[buffer(0)]], device uint* argsMesh 
    argsPt[0] = 1; argsPt[1] = p; argsPt[2] = 0; argsPt[3] = 0;
    atomic_store_explicit(&cnt[0], 0u, memory_order_relaxed); atomic_store_explicit(&cnt[1], 0u, memory_order_relaxed);
 }
-struct VOutP { float4 pos [[position]]; float3 wp; float3 n; float ps [[point_size]]; };
+// Same varyings as VOut (uv, lp zero) so rp_fs and the MRT fragment link with it; Metal refuses a fragment input the
+// vertex stage does not write.
+struct VOutP { float4 pos [[position]]; float3 wp; float3 n; float2 uv; float3 lp; float ps [[point_size]]; };
 // Points are sub-detail copies: lit by the first light and the ambient only, no PBR, no shadows.
 fragment float4 rp_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]])
 {
@@ -1593,7 +1619,7 @@ vertex VOutP rp_vs(uint iid [[instance_id]], constant FrameU& f [[buffer(1)]], c
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOutP o; o.pos = c; o.wp = w.xyz; o.n = normalize(f.eye.xyz - w.xyz);
+   VOutP o; o.pos = c; o.wp = w.xyz; o.n = normalize(f.eye.xyz - w.xyz); o.uv = float2(0.0); o.lp = float3(0.0);
    o.ps = clamp(length(m[0].xyz) * pxK / max(c.w, 1e-4), 1.5, 16.0); return o;
 }
 vertex VOut ri_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
@@ -1810,7 +1836,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          co.languageVersion = MTLLanguageVersion2_3;
          mLib = [dev newLibraryWithSource:kRasterShader options:co error:&err];
          if (!mLib)
-            NSLog(@"raster shader: %@", err);
+            EngineFail(@"raster shader", err);
       }
       bool Ok() const { return mLib != nil; }
    private:
@@ -2534,7 +2560,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             NSError* err = nil;
             mDofPso = [mDev newRenderPipelineStateWithDescriptor:d error:&err];
             mDofFmt = fmt;
-            if (!mDofPso) { NSLog(@"dof pipeline: %@", err); return; }
+            if (!mDofPso) { EngineFail(@"dof pipeline", err); return; }
          }
          const int w = img.Width(), h = img.Height();
          if (!mDofSrc || (int)mDofSrc.width != w || (int)mDofSrc.height != h || mDofSrc.pixelFormat != fmt)
@@ -2797,13 +2823,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          a.fragmentFunction = [mLib newFunctionWithName:@"pt_fs"];
          a.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA32Float;
          mPtPso = [mDev newRenderPipelineStateWithDescriptor:a error:&err];
-         if (!mPtPso) NSLog(@"pt pipeline: %@", err);
+         if (!mPtPso) EngineFail(@"pt pipeline", err);
          MTLRenderPipelineDescriptor* b = [MTLRenderPipelineDescriptor new];
          b.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
          b.fragmentFunction = [mLib newFunctionWithName:@"ptres_fs"];
          b.colorAttachments[0].pixelFormat = fmt;
          mPtResPso = [mDev newRenderPipelineStateWithDescriptor:b error:&err];
-         if (!mPtResPso) NSLog(@"pt resolve pipeline: %@", err);
+         if (!mPtResPso) EngineFail(@"pt resolve pipeline", err);
          mPtFmt = fmt;
          return mPtPso && mPtResPso;
       }
@@ -2939,7 +2965,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [cvD setConstantValue:&no type:MTLDataTypeBool atIndex:0];
          mFsFn = [mLib newFunctionWithName:@"r_fs" constantValues:cvM error:&fe];
          id<MTLFunction> fsDir = [mLib newFunctionWithName:@"r_fs" constantValues:cvD error:&fe];
-         if (!mFsFn || !fsDir) NSLog(@"r_fs specialisation: %@", fe);
+         if (!mFsFn || !fsDir) EngineFail(@"r_fs specialisation", fe);
          pd.fragmentFunction = mFsFn;
          pd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
          pd.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
@@ -2964,12 +2990,12 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             ad.fragmentFunction = [mLib newFunctionWithName:@"comp_fs"];
             ad.colorAttachments[0].pixelFormat = fmt;
             mCompPso = [mDev newRenderPipelineStateWithDescriptor:ad error:&err];
-            if (!mAtPso || !mCompPso) NSLog(@"denoise pipeline: %@", err);
+            if (!mAtPso || !mCompPso) EngineFail(@"denoise pipeline", err);
             ad.fragmentFunction = [mLib newFunctionWithName:@"tr_fs"];
             ad.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
             ad.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA16Float;
             mTrPso = [mDev newRenderPipelineStateWithDescriptor:ad error:&err];
-            if (!mTrPso) NSLog(@"trace pipeline: %@", err);
+            if (!mTrPso) EngineFail(@"trace pipeline", err);
          }
          MTLRenderPipelineDescriptor* dd2 = [MTLRenderPipelineDescriptor new];
          dd2.vertexFunction = pd.vertexFunction;
@@ -2994,10 +3020,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                vd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
                vd.colorAttachments[1].pixelFormat = MTLPixelFormatR32Float;
                mVisPso = [mDev newRenderPipelineStateWithDescriptor:vd error:&err];
-               if (!mVisPso) NSLog(@"shadow mask pipeline: %@", err);
+               if (!mVisPso) EngineFail(@"shadow mask pipeline", err);
             }
             pd.vertexFunction = keep;
-            if (!mPsoRun || !mPsoRunDir) NSLog(@"run pipeline: %@", err);
+            if (!mPsoRun || !mPsoRunDir) EngineFail(@"run pipeline", err);
          }
          {
             MTLRenderPipelineDescriptor* bd = [MTLRenderPipelineDescriptor new];
@@ -3021,7 +3047,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                mPsoPtMrt = [mDev newRenderPipelineStateWithDescriptor:pp error:&err];
                mCullPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"cull_k"] error:&err];
                mArgsPso = [mDev newComputePipelineStateWithFunction:[mLib newFunctionWithName:@"args_k"] error:&err];
-               if (!mPsoPt || !mPsoPtMrt || !mCullPso || !mArgsPso) NSLog(@"point/cull pipeline: %@", err);
+               if (!mPsoPt || !mPsoPtMrt || !mCullPso || !mArgsPso) EngineFail(@"point/cull pipeline", err);
             }
             bd.fragmentFunction = mFsFn;
             bd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
@@ -3029,10 +3055,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             bd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
             bd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
             mPsoBatchMrt = [mDev newRenderPipelineStateWithDescriptor:bd error:&err];
-            if (!mPsoBatch || !mPsoBatchMrt) NSLog(@"batch pipeline: %@", err);
+            if (!mPsoBatch || !mPsoBatchMrt) EngineFail(@"batch pipeline", err);
          }
-         if (!mPsoDir) NSLog(@"direct pipeline: %@", err);
-         if (!mResPso) NSLog(@"resolve pipeline: %@", err);
+         if (!mPsoDir) EngineFail(@"direct pipeline", err);
+         if (!mResPso) EngineFail(@"resolve pipeline", err);
          MTLDepthStencilDescriptor* dd = [MTLDepthStencilDescriptor new];
          dd.depthCompareFunction = MTLCompareFunctionLess;
          dd.depthWriteEnabled = YES;
@@ -3055,7 +3081,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             gd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
             for (int k = 1; k < 4; k++) gd.colorAttachments[k].writeMask = MTLColorWriteMaskNone;
             mBgPsoMrt = [mDev newRenderPipelineStateWithDescriptor:gd error:&err];
-            if (!mBgPsoDir || !mBgPsoMrt) NSLog(@"background pipeline: %@", err);
+            if (!mBgPsoDir || !mBgPsoMrt) EngineFail(@"background pipeline", err);
             MTLDepthStencilDescriptor* bd = [MTLDepthStencilDescriptor new];
             bd.depthCompareFunction = MTLCompareFunctionAlways;
             bd.depthWriteEnabled = NO;
@@ -3099,7 +3125,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          co.preprocessorMacros = @{ @"INV_POS" : @1 };
          id<MTLLibrary> lib = [mDev newLibraryWithSource:kRasterShader options:co error:&err];
          id<MTLFunction> rr = lib ? [lib newFunctionWithName:@"rr_vs"] : nil;
-         if (!rr) { NSLog(@"invariant shader: %@", err); return false; }
+         if (!rr) { EngineFail(@"invariant shader", err); return false; }
          MTLRenderPipelineDescriptor* zp = [MTLRenderPipelineDescriptor new];
          zp.vertexFunction = rr;
          zp.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
@@ -3117,7 +3143,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          dd.colorAttachments[0].pixelFormat = mFmt;
          dd.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
          mPsoRunDirInv = [mDev newRenderPipelineStateWithDescriptor:dd error:&err];
-         if (!mPrePso || !mPsoRunInv || !mPsoRunDirInv) NSLog(@"invariant pipelines: %@", err);
+         if (!mPrePso || !mPsoRunInv || !mPsoRunDirInv) EngineFail(@"invariant pipelines", err);
          return mPrePso && mPsoRunInv && mPsoRunDirInv;
       }
       id<MTLTexture> mVis = nil, mVisD = nil; // half-res RT shadow mask (4 lights) and its distance guide
