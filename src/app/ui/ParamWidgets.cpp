@@ -59,11 +59,18 @@ namespace app
       sLastFrame = frame;
       if ((ImGui::GetTime() - sRestSince) * 1000.0 < tok::motion_tooltip_delay)
          return;
-      // Inside a node the editor's canvas transform is live and would offset the tooltip from the cursor.
-      if (gInsideNodeCanvas)
-         ed::Suspend();
       va_list args;
       va_start(args, fmt);
+      // Inside a node the editor's canvas transform is live, and suspending it mid-node corrupts the node's draw
+      // state (the rows above the tooltip vanish). Park the text; StageKeyboard draws it after the node loop.
+      if (gInsideNodeCanvas)
+      {
+         char buf[512];
+         vsnprintf(buf, sizeof(buf), fmt, args);
+         gNodeHelpTip = buf;
+         va_end(args);
+         return;
+      }
       if (ImGui::BeginTooltip())
       {
          ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);   // one max width: about 24 em
@@ -72,8 +79,6 @@ namespace app
          ImGui::EndTooltip();
       }
       va_end(args);
-      if (gInsideNodeCanvas)
-         ed::Resume();
    }
 
 

@@ -2353,6 +2353,7 @@ bool ViewportToggle(bool shown);
 
 extern bool gGlobalScaleTooltipHovered;
 extern std::string gNodeHoverTip;
+extern std::string gNodeHelpTip;   // HelpTip text raised inside a node body, drawn after the node loop
 
 extern bool gGlobalScaleTooltipEnabled;
 
