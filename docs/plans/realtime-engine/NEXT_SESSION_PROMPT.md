@@ -31,8 +31,8 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | 0.2 `envis` measure | done (default on; world_hdri_sun 0.458 -> 0.077) | see log |
 | 0.3 adaptive stop default | done: default 0.05 (0.08 and 0.06 failed the image gate) | see log |
 | 0.4 dark far maps | closed with a known gap (owner): grazing glint moved to row 5.7 | 0496f599 |
-| 0.5 freeze + `f0` baseline | open | — |
-| 1.1 to 1.5 material programs | open | — |
+| 0.5 freeze + `f0` baseline | done: `f0` stored, R and T, 46 cases | see log |
+| 1.1 to 1.5 material programs | **next: 1.1** (MSL emitter, 2 sessions) | — |
 | 2.1 to 2.8 shading nodes | open | — |
 | 3.1 to 3.5 script nodes | open | — |
 | 4.1 to 4.5 layers, relief, wear | open | — |
@@ -63,8 +63,8 @@ Options go before the subcommand. In zsh pass case lists as arrays. Hair cases t
 
 | Engine | Tag | Notes |
 |---|---|---|
-| raster | `c1` | 44 cases, current code |
-| settle 16 spp | `c1` | 44 cases, current code |
+| raster | `f0` | 46 cases, frozen L1 to L3 (row 0.5); `c1` is older |
+| settle 16 spp | `f0` | 46 cases, frozen L1 to L3 (row 0.5); `c1` is older |
 | settle 256 spp | `full` | 8 cases: cornell interior materials world_hdri mat_glass light_area bed deer |
 | live | `base2` / `c1` | only 5 cases are current; a full live baseline is row 8.2 |
 
