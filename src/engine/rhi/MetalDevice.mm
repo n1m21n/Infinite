@@ -2067,7 +2067,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    // The material record (Render3DMaterial.h) as the shader's InstU / RInst carry it.
    struct InstU { float model[16], normalM[16]; R3dMatH mat; };
    struct RInstH { uint64_t vb, ib, uvb, pad0; float normalM[16]; R3dMatH mat; };
-   static_assert(sizeof(InstU) == 400 && sizeof(RInstH) == 368, "InstU / RInst layout as the shader's");
+   static_assert(sizeof(InstU) == 416 && sizeof(RInstH) == 384, "InstU / RInst layout as the shader's");
    void Lin3x(const float* c, float* o) { for (int i = 0; i < 3; i++) o[i] = ToLin(c[i]); }
    // The surface the GI and reflection rays see: base, metal, roughness, ior, emission (no maps, sheen or hair).
    void FillMatRays(const engine::Instance& in, R3dMatH& m)
