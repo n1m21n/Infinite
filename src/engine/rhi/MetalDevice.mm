@@ -5,6 +5,9 @@
 #include "nodes/Render3DTonemap.h"
 #include "nodes/Render3DMaterial.h"
 #include "nodes/Render3DDenoise.h"
+#include "nodes/Render3DBsdf.h"
+#include "nodes/Render3DFresnel.h"
+#include "nodes/Render3DAb.h"
 
 #include <algorithm>
 #include <cmath>
@@ -22,6 +25,14 @@ namespace rhi
    namespace
    {
       std::string gLastError;
+      // Compile macros plus the active A/B switches (Render3DAb.h).
+      NSDictionary* AbMacros(NSDictionary* base)
+      {
+         NSMutableDictionary* d = [NSMutableDictionary dictionaryWithDictionary:base ?: @{}];
+         for (const std::string& m : R3dAbMacros())
+            d[[NSString stringWithUTF8String:m.c_str()]] = @1;
+         return d;
+      }
       // Logs a failed shader or pipeline and keeps the first one for the node: what failed plus the compiler's
       // first error line (the full text goes to the log).
       void EngineFail(NSString* what, NSError* err)
@@ -124,7 +135,13 @@ float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float roug
 }
 float distGGX(float nDotH, float rough) { const float a = rough * rough, a2 = a * a; const float d = nDotH * nDotH * (a2 - 1.0) + 1.0; return a2 / max(3.14159265 * d * d, 1e-7); }
 float geomSchlick(float nDotV, float rough) { const float r = rough + 1.0, k = (r * r) / 8.0; return nDotV / (nDotV * (1.0 - k) + k); }
-float3 fresnel(float cosT, float3 f0) { return f0 + (1.0 - f0) * pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0); }
+)" R3D_BSDF_SRC R3D_FRESNEL_SRC R"(
+#ifdef R3D_AB_GGX
+#define R3D_G2(nv, nl, r) ggxG2(nv, nl, r)
+#else
+#define R3D_G2(nv, nl, r) (geomSchlick(nv, r) * geomSchlick(nl, r))
+#endif
+float3 fresnel(float cosT, float3 f0) { return fresnelExact(cosT, f0); }
 float3 fresnelRough(float cosT, float3 f0, float rough) { const float3 ceil = max(float3(1.0 - rough), f0); return f0 + (ceil - f0) * pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0); }
 float lightFalloff(float dist, float k) { if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k); return min(1.0 / max(dist * dist * -k, 1e-4), 20.0); }
 float shadowFactor(constant FrameU& f, depth2d<float> sm, float3 wp, float3 n, float3 ld)
@@ -151,7 +168,7 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
    it.assume_geometry_type(geometry_type::triangle);
    it.accept_any_intersection(true);
    ray r(o, d, 0.0, tmax);
-   intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
+   intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1); // bit 0: shadow casters
    return h.type == intersection_type::triangle;
 }
 // A sun's shadow as its disc (angleDeg across, as settle's cone and Cycles' sun angle): four probe rays first; only
@@ -250,7 +267,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       if (atten > 0.0)
       {
          const float tm = (type == 1 || type == 4 || type == 5) ? max(length(L.vec.xyz - p) - 0.01, 0.0) : 1e4;
-         if (occluded(tlas, p + n * f.shQ.w, ld, tm)) atten *= (1.0 - f.shP.w);
+         if (L.color.w < 0.5 && occluded(tlas, p + n * f.shQ.w, ld, tm)) atten *= (1.0 - f.shP.w);
       }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
@@ -421,7 +438,7 @@ float3 mapNormalTS(texture2d<float> t, MapX x, bool bump, float strength, float2
 }
 float coatSpec(float nDotH, float nDotV, float nDotL, float vDotH, float r)
 {
-   return distGGX(nDotH, r) * geomSchlick(nDotV, r) * geomSchlick(nDotL, r) * (0.04 + 0.96 * pow(1.0 - vDotH, 5.0)) / max(4.0 * nDotV * nDotL, 1e-7);
+   return distGGX(nDotH, r) * R3D_G2(nDotV, nDotL, r) * (0.04 + 0.96 * pow(1.0 - vDotH, 5.0)) / max(4.0 * nDotV * nDotL, 1e-7);
 }
 // Sheen: Cycles' microfiber lobe (Render3DSheen.h, shared with GL).
 )" R3D_SHEEN_MSL R3D_DENOISE_MSL R"(
@@ -496,7 +513,7 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
    {
       if (i >= count) break;
       constant LightU& L = f.lights[i];
-      if (L.aim.w < -0.5) continue;
+      if (L.aim.w < -0.5 || L.color.w > 0.5) continue;
       const int ch = min(int(L.aim.w + 0.5), 3);
       const int type = int(L.vec.w);
       float3 ld; float tmax = 1e4;
@@ -647,7 +664,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             const float dist = length(tl); const float3 ld = tl / max(dist, 1e-4);
             float e = lightFalloff(dist, L.terms.z) * max(dot(-ld, L.aim.xyz), 0.0) * (hairM ? 1.0 : max(dot(n, ld), 0.0));
             if (L.terms.w > 0.0 && dist > L.terms.w) e = 0.0;
-            if (e > 0.0 && rtSh && occluded(rtArgs.tlas, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
+            if (e > 0.0 && rtSh && L.color.w < 0.5 && occluded(rtArgs.tlas, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
             areaE += e * 0.125;
          }
          if (areaE <= 0.0) continue;
@@ -681,7 +698,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float3 nS = dot(n, lightDir) < 0.0 ? -n : n; // shadow rays leave on the light's side
       const float nDotH = max(dot(n, halfway), 0.0);
       const float d = distGGX(nDotH, rough);
-      const float g = geomSchlick(nDotV, rough) * geomSchlick(nDotL, rough);
+      const float g = R3D_G2(nDotV, nDotL, rough);
       const float3 fr = fresnel(max(dot(halfway, viewDir), 0.0), f0);
       float3 spec = (d * g * fr) / max(4.0 * nDotV * nDotL, 1e-7);
       if ((type == 0 || type == 2) && L.spot.x > 0.0)
@@ -696,9 +713,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          const float nls = max(dot(n, sd), 0.0);
          const float3 hs = normalize(sd + viewDir);
          const float ds = distGGX(max(dot(n, hs), 0.0), sqrt(a2)) * (a / a2) * (a / a2);
-         const float gs = geomSchlick(nDotV, rough) * geomSchlick(max(nls, 1e-4), rough);
+         const float gs = R3D_G2(nDotV, max(nls, 1e-4), rough);
          spec = ds * gs * fresnel(max(dot(hs, viewDir), 0.0), f0) / max(4.0 * nDotV, 1e-7) * (nls / max(nDotL, 1e-4)); // * nDotL below
       }
+      spec *= ggxMs(f0, rough, nDotV);
       const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
       const float3 radiance = radiance0 * atten;
       floorBounce += radiance * max(lightDir.y, 0.0) * L.terms.x;
@@ -707,7 +725,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       else
       {
          if (f.shP.x > 0.5 && i == int(f.shP.y)) shadow = shadowFactor(f, sm, in.wp, nS, lightDir);
-         if ((int(f.shQ.z + 0.5) & 1) != 0)
+         if ((int(f.shQ.z + 0.5) & 1) != 0 && L.color.w < 0.5)
          {
             float vis = -1.0;
             if ((int(f.shQ.z + 0.5) & 4) != 0 && L.aim.w > -0.5)
@@ -1059,6 +1077,16 @@ float2 ptProbs(float3 f0, float metal, float nV)
    spec = max(spec, 0.05 * (spec + diff));
    return float2(spec, diff) / max(spec + diff, 1e-6);
 }
+// Glass: the exact unpolarised dielectric Fresnel (eta = n_i / n_t, 1 past the critical angle) and Smith G1 for GGX.
+float ptFd(float c, float eta)
+{
+   const float s2 = eta * eta * (1.0 - c * c);
+   if (s2 >= 1.0) return 1.0;
+   const float ct = sqrt(1.0 - s2);
+   const float rs = (eta * c - ct) / (eta * c + ct), rp = (c - eta * ct) / (c + eta * ct);
+   return 0.5 * (rs * rs + rp * rp);
+}
+float ptG1(float x, float a) { return 2.0 * x / (x + sqrt(a * a + (1.0 - a * a) * x * x)); }
 // f(V, L) * cos(L), and the pdf of drawing L by ptProbs. w: a light's diffuse and specular terms.
 float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, thread float& pdf)
 {
@@ -1085,7 +1113,7 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
    for (int k = 0; k < 16; k++)
    {
       ray r(o, d, 0.0, tmax);
-      intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
+      intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1); // bit 0: shadow casters
       if (h.type != intersection_type::triangle) return false;
       constant RInst& I = inst[h.instance_id];
       float alpha = 1.0 - I.mat.clear;
@@ -1186,6 +1214,7 @@ void ptPickLight(constant FrameU& f, const device EmTri* ems, int nEm, float pEm
       }
       Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
       lterms = Lt.terms.xy;
+      if (Lt.color.w > 0.5) pL = -2.0; // a light set to cast no shadow
    }
 }
 // Translucency's lobes: the specular on the lit side, the diffuse share passed through to the far side (cosine there).
@@ -1365,6 +1394,31 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          const float um = rnd(seed);
          dm = um < tlW ? 2 : (um < tlW + ssW && max(float3(I.mat.sssRadius).x, max(float3(I.mat.sssRadius).y, float3(I.mat.sssRadius).z)) > 1e-4 ? 1 : 0);
       }
+      const float glW = hairM ? 0.0 : clamp(I.mat.transmission, 0.0, 1.0) * (1.0 - metal);
+      if (glW > 0.0 && rnd(seed) < glW)
+      {
+         // Glass by its share, as the GL tracer: a GGX microfacet, then reflect or refract by the exact Fresnel; the
+         // weight is Walter et al. 2007's for a microfacet drawn from D * nDotH. Transmission takes the base colour.
+         const float ta = max(0.002, rough * rough);
+         const float3 Hm = ggxSampleH(n, ta, rnd(seed), rnd(seed));
+         const float cosI = dot(V, Hm);
+         if (cosI <= 1e-5) break;
+         const float ior = max(I.mat.ior, 1.0001), eta = backHit ? ior : 1.0 / ior;
+         float3 nd; bool thru = false;
+         if (rnd(seed) < ptFd(cosI, eta)) { nd = reflect(d, Hm); if (dot(ns, nd) <= 0.0) break; }
+         else { nd = refract(d, Hm, eta); if (dot(nd, nd) < 1e-6 || dot(ns, nd) >= 0.0) break; T *= base; thru = true; }
+         const float gV = max(abs(dot(n, V)), 1e-4), gL = max(abs(dot(n, nd)), 1e-4), gH = max(dot(n, Hm), 1e-4);
+         T *= min(cosI * ptG1(gV, ta) * ptG1(gL, ta) / (gV * gH), 4.0);
+         lastPdfB = 1e8; skyK = float3(1.0); // a sharp lobe: an emitter it finds counts in full
+         if (b >= 2)
+         {
+            const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
+            if (rnd(seed) > q) break;
+            T /= q;
+         }
+         o = p + (thru ? -ns : ns) * f.shQ.w; d = normalize(nd);
+         continue;
+      }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
       for (int i = 0; i < int(f.params.w) && i < 8; i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
          if (int(f.lights[i].vec.w) == 3) L += T * base * (1.0 - metal) * f.lights[i].color.xyz * f.lights[i].terms.x;
@@ -1382,7 +1436,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
-         if (occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          float pB = 0.0;
          float3 fe = hairM ? hairBsdf(V, ld, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pB) * lterms.x
                   : dm == 2 ? ptEvalT(n, V, ld, base, metal, rough, f0, lterms, pB)
@@ -1489,7 +1543,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             const float ec = dot(no, eld);
             if (ec > 1e-5 && any(eLe > 0.0))
             {
-               if (occludedAlpha(rtArgs.tlas, inst, maps, q + no * f.shQ.w, eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (epL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, q + no * f.shQ.w, eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                const float epB = ec / 3.14159265;
                L += T * (epB * elt.x) * eLe * (epL > 0.0 ? epL / max(epL * epL + epB * epB, 1e-20) : 1.0);
             }
@@ -1852,6 +1906,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          NSError* err = nil;
          MTLCompileOptions* co = [MTLCompileOptions new];
          co.languageVersion = MTLLanguageVersion2_3;
+         co.preprocessorMacros = AbMacros(nil);
          mLib = [dev newLibraryWithSource:kRasterShader options:co error:&err];
          if (!mLib)
             EngineFail(@"raster shader", err);
@@ -1937,7 +1992,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             for (int c = 0; c < 4; c++)
                o.transformationMatrix.columns[c] = MTLPackedFloat3Make(in.model[c * 4 + 0], in.model[c * 4 + 1], in.model[c * 4 + 2]);
             o.options = MTLAccelerationStructureInstanceOptionOpaque;
-            o.mask = 0xFF;
+            o.mask = in.castShadow ? 0xFF : 0xFE; // bit 0 is what shadow rays test
             o.intersectionFunctionTableOffset = 0;
             o.accelerationStructureIndex = (uint32_t)std::max(0, std::min(in.mesh, (int)mBlas.count - 1));
          }
@@ -2200,6 +2255,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             if (l.type == engine::LightType::Directional || l.type == engine::LightType::Point || l.type == engine::LightType::Sun || l.type == engine::LightType::Spot)
                if (visCh < 4) o.aim[3] = (float)visCh++;
             Lin3(l.colorSrgb, o.color, l.intensity);
+            o.color[3] = l.castShadow ? 0.0f : 1.0f; // 1: this light is never blocked
             o.terms[0] = l.diffuse; o.terms[1] = l.specular; o.terms[2] = l.falloff; o.terms[3] = l.cutoff;
             o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
             if (l.type == engine::LightType::Directional || l.type == engine::LightType::Sun) o.spot[0] = l.sunAngleDeg; // the disc, for these
@@ -2669,7 +2725,6 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             const engine::Instance& in = fr.instances[i];
             RInstH& o = info[i]; o = {};
             FillMat(in, o.mat);
-            o.mat.transmission = 0.0f; // settle has no transmission lobe yet; kept off so this record change moves no pixel
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
@@ -2943,7 +2998,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       bool ShadowPass(id<MTLCommandBuffer> cb, const engine::Frame& fr, FrameU& f)
       {
          const engine::Shadow& sh = fr.shadow;
-         if (!sh.enabled || fr.lights.empty() || fr.lights[0].type == engine::LightType::Point || fr.lights[0].type == engine::LightType::Area ||
+         if (!sh.enabled || fr.lights.empty() || !fr.lights[0].castShadow || fr.lights[0].type == engine::LightType::Point || fr.lights[0].type == engine::LightType::Area ||
              fr.lights[0].type == engine::LightType::Ambient || !EnsureShadowTex(sh.size))
             return false;
          float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
@@ -3022,6 +3077,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
          for (const auto& r : mRuns)
          {
+            if (!fr.instances[r.first].castShadow)
+               continue;
             const Gpu& g = mMeshes[fr.instances[r.first].mesh];
             [enc setVertexBuffer:g.vb offset:0 atIndex:0];
             [enc setVertexBytes:&r.first length:4 atIndex:11];
@@ -3201,7 +3258,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          MTLCompileOptions* co = [MTLCompileOptions new];
          co.languageVersion = MTLLanguageVersion2_3;
          co.preserveInvariance = YES;
-         co.preprocessorMacros = @{ @"INV_POS" : @1 };
+         co.preprocessorMacros = AbMacros(@{ @"INV_POS" : @1 });
          id<MTLLibrary> lib = [mDev newLibraryWithSource:kRasterShader options:co error:&err];
          id<MTLFunction> rr = lib ? [lib newFunctionWithName:@"rr_vs"] : nil;
          if (!rr) { EngineFail(@"invariant shader", err); return false; }
@@ -3267,7 +3324,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             {
                auto& r = mRuns.back();
                const engine::Instance& a = fr.instances[r.first];
-               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(&dst[r.first].mat, &u.mat, sizeof(R3dMatH)) == 0)
+               if (r.first + r.second == i && a.mesh == in.mesh && a.castShadow == in.castShadow && std::memcmp(&dst[r.first].mat, &u.mat, sizeof(R3dMatH)) == 0)
                {
                   r.second++;
                   continue;

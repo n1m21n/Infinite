@@ -57,6 +57,7 @@ namespace engine
       // passed to the back side).
       float subsurface = 0.0f, sssRadius[3] = { 0.0f, 0.0f, 0.0f };
       float translucency = 0.0f;
+      bool castShadow = true; // false: drawn and seen by bounces, but shadow rays and the shadow map pass it by
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the
@@ -95,6 +96,7 @@ namespace engine
       float diffuse = 1.0f, specular = 1.0f;
       float falloff = 1.0f; // k of 1 / (1 + d^2 k); negative = inverse square
       float cutoff = 0.0f;  // 0 = none
+      bool castShadow = true; // false: this light is never blocked
       float sunAngleDeg = 0.0f; // directional / sun: degrees across its disc (0 = a point); softens its highlight and settled shadow
    };
 

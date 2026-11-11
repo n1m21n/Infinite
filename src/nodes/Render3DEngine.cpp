@@ -206,6 +206,7 @@ bool Render3DNode::CookEngine(int frameId)
       IGeometrySource* src = mDraw[i];
       engine::Instance in;
       in.mesh = (int)i;
+      in.castShadow = src->CastsShadow();
       const Material mat = src->GetMaterial();
       for (int k = 0; k < 3; k++)
          in.baseSrgb[k] = mat.color[k];
@@ -370,6 +371,7 @@ bool Render3DNode::CookEngine(int frameId)
       std::memcpy(e.vec, l.vec, 12); std::memcpy(e.aim, l.aim, 12); std::memcpy(e.colorSrgb, l.color, 12);
       e.intensity = l.intensity; e.falloff = l.falloff; e.spotAngleDeg = l.spotAngle; e.spotPenumbra = l.spotPenumbra;
       e.diffuse = l.diffuse; e.specular = l.specular; e.cutoff = l.cutoff;
+      e.castShadow = l.castShadow;
       e.areaW = std::max(0.001f, l.areaW); e.areaH = std::max(0.001f, l.areaH);
       // A sun's disc from the light's shadow softness, as GL sizes its shadow (0.526 degrees, the real sun, at 1).
       if (e.type == engine::LightType::Directional || e.type == engine::LightType::Sun) e.sunAngleDeg = 0.526f * std::max(0.0f, l.shadowSoft);
@@ -502,9 +504,10 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.sheen, 4); mix(in.sheenColor, 12); mix(&in.sheenRoughness, 4);
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
       mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20);
+      { const int cs = in.castShadow ? 1 : 0; mix(&cs, 4); }
    }
    for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);
-   for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); }
+   for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); const int cs = l.castShadow ? 1 : 0; mix(&cs, 4); }
    const bool changed = hsh != E.sceneHash;
    E.sceneHash = hsh;
    bool traced = false;

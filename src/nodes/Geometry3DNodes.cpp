@@ -1,6 +1,9 @@
 #include "Geometry3DNodes.h"
 #include "Render3DTonemap.h"
 #include "Render3DSheen.h"
+#include "Render3DBsdf.h"
+#include "Render3DFresnel.h"
+#include "Render3DAb.h"
 #include "Render3DHair.h"
 #include "ColorSpace.h"
 
@@ -763,8 +766,15 @@ namespace
       "   float k = (r * r) / 8.0;\n"
       "   return nDotV / (nDotV * (1.0 - k) + k);\n"
       "}\n"
+      R3D_BSDF_SRC
+      R3D_FRESNEL_SRC
+      "#ifdef R3D_AB_GGX\n"
+      "#define R3D_G2(nv, nl, r) ggxG2(nv, nl, r)\n"
+      "#else\n"
+      "#define R3D_G2(nv, nl, r) (geometrySchlickGGX(nv, r) * geometrySchlickGGX(nl, r))\n"
+      "#endif\n"
       "vec3 fresnelSchlick(float cosTheta, vec3 f0) {\n"
-      "   return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);\n"
+      "   return fresnelExact(cosTheta, f0);\n"
       "}\n"
       "void getCotangentFrame(vec3 normal, vec3 pos, vec2 uv, out vec3 tangent, out vec3 bitangent) {\n"
       "   vec3 dp1 = dFdx(pos);\n"
@@ -1186,13 +1196,14 @@ namespace
       "      } else {\n"
       "         d = distributionGGX(nDotH, rough);\n"
       "      }\n"
-      "      float g = geometrySchlickGGX(nDotV, rough) * geometrySchlickGGX(nDotL, rough);\n"
+      "      float g = R3D_G2(nDotV, nDotL, rough);\n"
       "      vec3 f = fresnelSchlick(max(dot(halfway, viewDir), 0.0), f0);\n"
       "      if (uIridescence > 0.0) {\n"
       "         vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
       "         f = mix(f, f * irid * 2.0, uIridescence);\n"
       "      }\n"
       "      vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 1e-7);\n"
+      "      specular *= ggxMs(f0, rough, nDotV);\n"
       "\n"
       // Every term is finite (ccRough >= 0.02), so with no clearcoat the lobe
       // is exactly 0 and skipping it changes no pixel - it is a GGX, two
@@ -1200,7 +1211,7 @@ namespace
       "      float clearcoatSpec = 0.0;\n"
       "      if (cc != 0.0) {\n"
       "         float ccD = distributionGGX(nDotH, ccRough);\n"
-      "         float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
+      "         float ccG = R3D_G2(nDotV, nDotL, ccRough);\n"
       "         float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
       "         clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * cc;\n"
       "      }\n"
@@ -1908,9 +1919,10 @@ bool Render3DNode::EnsureShader()
    };
 
    const unsigned int vert = compile(GL_VERTEX_SHADER, kVertSrc);
-   const unsigned int frag = compile(GL_FRAGMENT_SHADER, kFragSrc);
+   const std::string fragSrc = R3dAbGlsl(kFragSrc); // with the active A/B switches (Render3DAb.h)
+   const unsigned int frag = compile(GL_FRAGMENT_SHADER, fragSrc.c_str());
    // The same source with INF_NO_DISCARD defined after the #version line.
-   std::string opaqueSrc = kFragSrc;
+   std::string opaqueSrc = fragSrc;
    opaqueSrc.insert(opaqueSrc.find('\n') + 1, "#define INF_NO_DISCARD\n");
    const unsigned int opaqueFrag = compile(GL_FRAGMENT_SHADER, opaqueSrc.c_str());
    if (vert != 0 && frag != 0)
