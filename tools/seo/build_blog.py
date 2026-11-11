@@ -374,15 +374,52 @@ def build_feed(posts):
     import datetime
     def rfc(d):
         return format_datetime(datetime.datetime.fromisoformat(d).replace(hour=9, tzinfo=datetime.timezone.utc))
-    items = "".join(f"""  <item><title>{e(p['title'])}</title><link>{p['url']}</link><guid isPermaLink="true">{p['url']}</guid>
-    <pubDate>{rfc(p['date'])}</pubDate><category>{e(p['category'])}</category><description>{e(p['description'])}</description></item>
-""" for p in posts)
+
+    feed_items = []
+    for p in posts:
+        body_html, _ = render_md(p["body"])
+        body_html = re.sub(r'src="(?:\.\./)*assets/', f'src="{BASE}assets/', body_html)
+        body_html = re.sub(r'href="\.\./(?!blog/)', f'href="{BASE}', body_html)
+        body_html = re.sub(r'href="([a-zA-Z0-9_-]+\.html)"', f'href="{BASE}blog/\\1"', body_html)
+
+        img = p.get("image", "")
+        hero_html = ""
+        if img:
+            hero_src = img if img.startswith("http") else (BASE + img.lstrip("/"))
+            hero_html = f'<p><img src="{hero_src}" alt="{e(p.get("image_alt", p["title"]))}" /></p>\n'
+
+        footer_html = (
+            f'\n<hr />\n<p><em>Originally published at <a href="{p["url"]}">{p["url"]}</a>. '
+            f'Infinite is a free, open-source DAW for visuals, music and code: '
+            f'<a href="https://infinitedevices.org">infinitedevices.org</a>.</em></p>'
+        )
+        content_html = (hero_html + body_html + footer_html).replace("]]>", "]]]]><![CDATA[>")
+
+        feed_items.append(f"""  <item>
+    <title>{e(p['title'])}</title>
+    <link>{p['url']}</link>
+    <guid isPermaLink="true">{p['url']}</guid>
+    <pubDate>{rfc(p['date'])}</pubDate>
+    <dc:creator>Naman Soni</dc:creator>
+    <category>{e(p['category'])}</category>
+    <description>{e(p['description'])}</description>
+    <content:encoded><![CDATA[{content_html}]]></content:encoded>
+  </item>""")
+
+    items = "\n".join(feed_items)
     last = rfc(posts[0]["date"]) if posts else ""
     open(os.path.join(BLOG, "feed.xml"), "w", encoding="utf-8").write(f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
-  <title>Infinite blog</title><link>{BASE}blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>{last}</lastBuildDate><atom:link href="{BASE}blog/feed.xml" rel="self" type="application/rss+xml"/>
-{items}</channel></rss>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+  <title>Infinite blog</title>
+  <link>{BASE}blog/</link>
+  <description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
+  <language>en-gb</language>
+  <lastBuildDate>{last}</lastBuildDate>
+  <atom:link href="{BASE}blog/feed.xml" rel="self" type="application/rss+xml"/>
+{items}
+</channel>
+</rss>
 """)
 
 
