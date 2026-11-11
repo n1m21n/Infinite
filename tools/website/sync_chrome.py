@@ -59,7 +59,7 @@ FOOTER_COLS = [
     ]),
     ("Learn", [
         ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("blog/", "Blog"),
-        ("plugin.html", "Plugin"), ("buy.html", "Buy the plugin"),
+        ("buy.html", "Buy the plugin"),
     ]),
     ("Docs", [   # PDFs in website/assets
         ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference"),
