@@ -3,6 +3,7 @@
 #include "nodes/Render3DHair.h"
 #include "nodes/Render3DSheen.h"
 #include "nodes/Render3DTonemap.h"
+#include "nodes/Render3DMaterial.h"
 
 #include <algorithm>
 #include <cmath>
@@ -83,11 +84,8 @@ struct FrameU
    float4 envm;     // x: 1 = HDRI map, +2 = HDRI background; y rotation (rad); z max lod (GL levels); w the map's base lod
    LightU lights[8]; // vec.w = type, aim.w unused
 };
-struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; float4 em; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; float4 ss; float4 tl; }; // base linear rgb; mr = metallic, roughness, transmission, ior; em = linear emission * strength;
-// tx = map index + 1 (albedo, roughness, metallic, normal; 0 = none); sh = sheen, sheen roughness, normal strength, wrap + 4 * bump; shc = sheen colour
-// tx2 = ao, emission, sheen, opacity maps; tx3 = clearcoat, transmission maps; mp0 = mapping space, triplanar, alpha cutoff,
-// 1 - opacity; msc/mro/mtr = mapping scale / rotation / offset, w = clearcoat, coat roughness, dielectric F0 - 0.04;
-// olo/ohi = the mesh box, w = breakup, detail scale; dt.x = detail strength. Zero everywhere = the plain material.
+)" R3D_MAT_MSL R"(
+struct InstU { float4x4 model; float4x4 normalM; MatRec mat; }; // the material: Render3DMaterial.h (all zeros = plain)
 // INV_POS: the second, invariant compile used by the depth prepass and the shaded runs after it (exact same depth);
 // plain raster keeps the faster non-invariant build.
 #ifdef INV_POS
@@ -184,7 +182,7 @@ float sunVis(instance_acceleration_structure tlas, float3 o, float3 ld, float an
    }
    return v / 16.0;
 }
-struct RInst { float4 bm; float4 rg; float4 em; ulong vb; ulong ib; float4x4 normalM; ulong uvb; ulong pad0; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; float4 ss; float4 tl; }; // em: linear emission * strength; uvb/tx/sh: the maps, as InstU
+struct RInst { ulong vb; ulong ib; ulong uvb; ulong pad0; float4x4 normalM; MatRec mat; }; // the rays' view: mesh buffers + the same record (base times the albedo map's mean on GI rays)
 float3 cosineDir(float3 n, float u1, float u2);
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
@@ -210,8 +208,8 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
    float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
    if (dot(n, d) > 0.0) n = -n;
    const float3 p = o + d * h.distance;
-   const bool hairH = I.tx3.z < 0.0 && float(h.primitive_id) >= I.shc.w;
-   const float3 base = hairH ? hairAlbedo(I.dt.yzw, -I.tx3.z) : I.bm.xyz; const float metal = hairH ? 0.0 : I.bm.w;
+   const bool hairH = I.mat.hairRadialNeg < 0.0 && float(h.primitive_id) >= I.mat.hairFrom;
+   const float3 base = hairH ? hairAlbedo(float3(I.mat.hairSigma), -I.mat.hairRadialNeg) : float3(I.mat.base); const float metal = hairH ? 0.0 : I.mat.metallic;
    float3 envIrr = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
    if (envU.x >= 0.0 && withEnv)
    {
@@ -255,11 +253,11 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
-   const float3 spec = sampleEnv(f, et, reflect(d, n), I.rg.x) * metal * base;
+   const float3 spec = sampleEnv(f, et, reflect(d, n), I.mat.roughness) * metal * base;
    hp = p; hn = n; alb = base * (1.0 - metal); mir = base * metal;
    // Lambert radiance: base/pi * light irradiance (r_fs's direct term), env as r_fs's ambient.
    // withEnv false: the caller's next bounce carries the env; withSpec false: the caller follows the mirror direction.
-   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + (withSpec ? spec : float3(0.0)) + I.em.xyz;
+   return alb * ((withEnv ? envIrr : float3(0.0)) + diff / 3.14159265) + (withSpec ? spec : float3(0.0)) + float3(I.mat.emission);
 }
 float3 cosineDir(float3 n, float u1, float u2);
 float rnd(thread uint& s);
@@ -328,10 +326,10 @@ float3 mapLin(float3 c) { return select(pow((c + 0.055) / 1.055, float3(2.4)), c
 // Mapping (the Mapping node, as GL's computeMapUv / sampleMap): uv, generated (the mesh box) or object coordinates,
 // scaled, rotated and offset; outside uv, the dominant axis picks the plane or triplanar blends all three.
 struct MapX { int space; float tri; float3 sc, ro, tr, lo, hi; float brk; int wrap; };
-MapX mapX(float4 mp0, float4 msc, float4 mro, float4 mtr, float4 olo, float4 ohi, int wrap)
+MapX mapX(MatRec m)
 {
-   MapX x; x.space = int(mp0.x + 0.5); x.tri = mp0.y; x.sc = msc.xyz; x.ro = mro.xyz; x.tr = mtr.xyz; x.lo = olo.xyz; x.hi = ohi.xyz;
-   x.brk = olo.w; x.wrap = wrap; return x;
+   MapX x; x.space = int(m.mapSpace + 0.5); x.tri = m.triplanar; x.sc = float3(m.mapScale); x.ro = float3(m.mapRotate); x.tr = float3(m.mapTranslate);
+   x.lo = float3(m.boxLo); x.hi = float3(m.boxHi); x.brk = m.breakup; x.wrap = int(m.wrapBump + 0.5) & 3; return x;
 }
 float3 mapRot(float3 p, float3 r)
 {
@@ -542,37 +540,37 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
                      array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]])
 {
    float3 n = normalize(in.n);
-   float3 base = m.base.xyz;
-   float metalIn = m.mr.x, roughIn = m.mr.y;
+   float3 base = float3(m.mat.base);
+   float metalIn = m.mat.metallic, roughIn = m.mat.roughness;
    // Hair: from triangle shc.w on (a Fur mesh's strands; the skin keeps the material). The vertex normal is the strand.
-   const bool hairM = m.tx3.z < 0.0 && float(prim) >= m.shc.w;
-   if (hairM) { base = hairAlbedo(m.dt.yzw, -m.tx3.z); metalIn = 0.0; }
-   const int wrapM = int(m.sh.w + 0.5) & 3;
+   const bool hairM = m.mat.hairRadialNeg < 0.0 && float(prim) >= m.mat.hairFrom;
+   if (hairM) { base = hairAlbedo(float3(m.mat.hairSigma), -m.mat.hairRadialNeg); metalIn = 0.0; }
+   const int wrapM = int(m.mat.wrapBump + 0.5) & 3;
    // Every derivative first, in uniform control flow, before any map read or cutout.
-   const MapX mx = mapX(m.mp0, m.msc, m.mro, m.mtr, m.olo, m.ohi, wrapM);
+   const MapX mx = mapX(m.mat);
    const float3 mb = mapBase(mx, in.uv, in.lp);
    const float3 mbx = dfdx(mb), mby = dfdy(mb);
    const float3 dp1 = dfdx(in.wp), dp2 = dfdy(in.wp);
    const float3 dnx = dfdx(in.n), dny = dfdy(in.n);
    const float3 nP = n; // the projection's normal (triplanar weights, dominant plane)
 #define MAPR(slot) mapSample(maps[int(slot) - 1], mx, mb, nP, mbx, mby, -1.0)
-   if (m.tx.x > 0.5) base *= mapLin(MAPR(m.tx.x).rgb);
-   if (m.tx.y > 0.5) roughIn *= MAPR(m.tx.y).r;
-   if (m.tx.z > 0.5) metalIn *= MAPR(m.tx.z).r;
-   const float aoV = m.tx2.x > 0.5 ? MAPR(m.tx2.x).r : 1.0;
-   const float3 emMap = m.tx2.y > 0.5 ? mapLin(MAPR(m.tx2.y).rgb) : float3(1.0);
-   const float shW = m.sh.x * (m.tx2.z > 0.5 ? MAPR(m.tx2.z).r : 1.0);
-   const float shMax = shW * maxc(m.shc.xyz);
-   float alpha = 1.0 - m.mp0.w;
-   if (m.tx2.w > 0.5) alpha *= MAPR(m.tx2.w).r;
-   const float ccW = m.msc.w * (m.tx3.x > 0.5 ? MAPR(m.tx3.x).r : 1.0);
-   const float transMap = m.tx3.y > 0.5 ? MAPR(m.tx3.y).r : 1.0;
+   if (m.mat.mapAlbedo > 0.5) base *= mapLin(MAPR(m.mat.mapAlbedo).rgb);
+   if (m.mat.mapRoughness > 0.5) roughIn *= MAPR(m.mat.mapRoughness).r;
+   if (m.mat.mapMetallic > 0.5) metalIn *= MAPR(m.mat.mapMetallic).r;
+   const float aoV = m.mat.mapAo > 0.5 ? MAPR(m.mat.mapAo).r : 1.0;
+   const float3 emMap = m.mat.mapEmission > 0.5 ? mapLin(MAPR(m.mat.mapEmission).rgb) : float3(1.0);
+   const float shW = m.mat.sheen * (m.mat.mapSheen > 0.5 ? MAPR(m.mat.mapSheen).r : 1.0);
+   const float shMax = shW * maxc(float3(m.mat.sheenColor));
+   float alpha = 1.0 - m.mat.clear;
+   if (m.mat.mapOpacity > 0.5) alpha *= MAPR(m.mat.mapOpacity).r;
+   const float ccW = m.mat.coat * (m.mat.mapCoat > 0.5 ? MAPR(m.mat.mapCoat).r : 1.0);
+   const float transMap = m.mat.mapTransmission > 0.5 ? MAPR(m.mat.mapTransmission).r : 1.0;
 #undef MAPR
    if (alpha < 1.0)
    {
       // A cutoff cuts below it; without one, opacity is a coverage the frames average (a per-pixel threshold).
       uint as = pcg(uint(in.pos.x) * 7919u + 104729u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 977u + 5u);
-      if (alpha < (m.mp0.z > 0.0 ? m.mp0.z : rnd(as))) discard_fragment();
+      if (alpha < (m.mat.alphaCutoff > 0.0 ? m.mat.alphaCutoff : rnd(as))) discard_fragment();
    }
    const float metal = clamp(metalIn, 0.0, 1.0);
    // Specular anti-aliasing (Kaplanyan / Tokuyoshi): where the normal turns faster than a pixel (waves at the horizon),
@@ -588,7 +586,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    // The ribbon's face toward us carries what is not along the strand.
    const float3 hT = normalize(in.n);
    if (hairM && dot(gN, gN) > 0.5) n = gN;
-   if (m.tx.w > 0.5 && !hairM)
+   if (m.mat.mapNormal > 0.5 && !hairM)
    {
       // GL's cotangent frame from screen derivatives of position and the mapped uv (Schuler), then the tangent-space sample.
       const float2 muv = mapUv(mx, mb, nP), duv1 = mapUv(mx, mbx, nP), duv2 = mapUv(mx, mby, nP);
@@ -596,16 +594,16 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       float3 t = dp2perp * duv1.x + dp1perp * duv2.x, bt = dp2perp * duv1.y + dp1perp * duv2.y;
       if (max(dot(t, t), dot(bt, bt)) > 1e-12) { t = normalize(t); bt = normalize(bt); }
       else { t = abs(n.z) < 0.999 ? normalize(cross(n, float3(0.0, 0.0, 1.0))) : normalize(cross(n, float3(1.0, 0.0, 0.0))); bt = normalize(cross(n, t)); }
-      const float3 s = mapNormalTS(maps[int(m.tx.w) - 1], mx, (int(m.sh.w + 0.5) & 4) != 0, m.sh.z, muv, duv1, duv2, -1.0, m.ohi.w, m.dt.x);
+      const float3 s = mapNormalTS(maps[int(m.mat.mapNormal) - 1], mx, (int(m.mat.wrapBump + 0.5) & 4) != 0, m.mat.normalStrength, muv, duv1, duv2, -1.0, m.mat.detailScale, m.mat.detailStrength);
       n = normalize(t * s.x + bt * s.y + n * s.z);
    }
    const float nDotV = max(dot(n, viewDir), 1e-4);
-   const float shEv = shMax > 0.0 ? sheenE(nDotV, m.sh.y) : 0.0;
+   const float shEv = shMax > 0.0 ? sheenE(nDotV, m.mat.sheenRoughness) : 0.0;
    const float shV = 1.0 - shMax * shEv;          // the base layer's share under the sheen
-   const float3 shAmb = m.shc.xyz * (shW * shEv); // the sheen's own share of ambient light
-   const float3 f0 = mix(float3(0.04 + m.mtr.w), base, metal); // GL's dielectric F0 from ior and specular
+   const float3 shAmb = float3(m.mat.sheenColor) * (shW * shEv); // the sheen's own share of ambient light
+   const float3 f0 = mix(float3(0.04 + m.mat.f0Extra), base, metal); // GL's dielectric F0 from ior and specular
    // Clearcoat (GL's): a layer on top; what it reflects at this angle never reaches the base below.
-   const float ccR = clamp(m.mro.w, 0.02, 1.0);
+   const float ccR = clamp(m.mat.coatRoughness, 0.02, 1.0);
    const float ccFv = 0.04 + 0.96 * pow(1.0 - nDotV, 5.0);
    const float ccAt = 1.0 - ccW * ccFv;
    float3 coatCol = float3(0.0);
@@ -613,12 +611,12 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    float3 floorBounce = float3(0.0);
    // Subsurface (C9), as GL: per channel the light bleeds past the terminator by scatter radius against curvature,
    // w = K r kappa, diffuse (N.L + w) / (1 + w)^2; translucency passes a share of the diffuse to the far side.
-   const float sssW = hairM ? 0.0 : clamp(m.ss.w, 0.0, 1.0), tlW = hairM ? 0.0 : clamp(m.tl.x, 0.0, 1.0);
+   const float sssW = hairM ? 0.0 : clamp(m.mat.subsurface, 0.0, 1.0), tlW = hairM ? 0.0 : clamp(m.mat.translucency, 0.0, 1.0);
    float3 ssW = float3(0.0);
    if (sssW > 0.0)
    {
       const float kap = sqrt((dot(dnx, dnx) + dot(dny, dny)) / max(dot(dp1, dp1) + dot(dp2, dp2), 1e-12));
-      ssW = clamp(SSS_K * m.ss.xyz * kap, 0.0, 1.0);
+      ssW = clamp(SSS_K * float3(m.mat.sssRadius) * kap, 0.0, 1.0);
    }
    const float frontD = (1.0 - sssW) * (1.0 - tlW);
    const int count = int(f.params.w);
@@ -725,14 +723,14 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       }
       if (hairM)
       {
-         col += hairAvg(viewDir, lightDir, hT, m.dt.yzw, clamp(roughIn, 0.02, 1.0), -m.tx3.z, m.tx3.w, m.mr.w) * radiance * shadow * L.terms.x;
+         col += hairAvg(viewDir, lightDir, hT, float3(m.mat.hairSigma), clamp(roughIn, 0.02, 1.0), -m.mat.hairRadialNeg, m.mat.hairShift, m.mat.ior) * radiance * shadow * L.terms.x;
          continue;
       }
       float3 shS = float3(0.0);
       float shK = 1.0;
       if (shW > 0.0) // sheen: Cycles' microfiber lobe, over a base scaled by its albedo
       {
-         shS = m.shc.xyz * sheenLtc(nDotL, nDotV, dot(lightDir, viewDir), m.sh.y) * shW;
+         shS = float3(m.mat.sheenColor) * sheenLtc(nDotL, nDotV, dot(lightDir, viewDir), m.mat.sheenRoughness) * shW;
          shK = shV; // Cycles scales the base by the sheen albedo at the view angle only
       }
       // Diffuse: the Lambert share, the subsurface wrap (unshadowed past the terminator, where a shadow ray from the
@@ -756,11 +754,11 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    // Glass (transmission): refract in, find the far side of the hit object, refract out (or reflect on total internal
    // reflection), shade what lies beyond. Tint and Fresnel as Render 3D's: beyond * mix(1, base, 0.4) * (1 - F).
    // Needs the TLAS; without it the glass shows the environment along one refracted ray.
-   const float trans = clamp(m.mr.z * transMap, 0.0, 1.0);
+   const float trans = clamp(m.mat.transmission * transMap, 0.0, 1.0);
    const bool rtOn = (int(f.shQ.z + 0.5) & 3) != 0 || f.gi.x > 0.5;
    if (trans > 0.0 && rtOn)
    {
-      const float eta = 1.0 / max(m.mr.w, 1.0001);
+      const float eta = 1.0 / max(m.mat.ior, 1.0001);
       float3 rd = refract(-viewDir, n, eta);
       if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
       float3 o2 = in.wp - n * f.shQ.w, d2 = rd;
@@ -793,12 +791,12 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    else if (trans > 0.0)
    {
       // No rays this frame: see the environment through the glass along the refracted view, tinted the same way.
-      float3 rd = refract(-viewDir, n, 1.0 / max(m.mr.w, 1.0001));
+      float3 rd = refract(-viewDir, n, 1.0 / max(m.mat.ior, 1.0001));
       if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
       col = mix(col, sampleEnv(f, et, rd, 0.0) * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
    }
    col = col * ccAt + coatCol + (ccW > 0.0 ? sampleEnv(f, et, reflect(-viewDir, n), ccR) * (ccW * ccFv) : float3(0.0));
-   col += m.em.xyz * emMap;
+   col += float3(m.mat.emission) * emMap;
    const float opaque = (trans > 0.0 && rtOn) ? 1.0 - trans : 1.0; // glass takes no GI of its own
    FOut o;
    if (!kMrt)
@@ -1089,8 +1087,8 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
       intersection_result<triangle_data, instancing> h = it.intersect(r, tlas);
       if (h.type != intersection_type::triangle) return false;
       constant RInst& I = inst[h.instance_id];
-      float alpha = 1.0 - I.mp0.w;
-      if (I.tx2.w > 0.5)
+      float alpha = 1.0 - I.mat.clear;
+      if (I.mat.mapOpacity > 0.5)
       {
          const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
          const device float* vb = reinterpret_cast<const device float*>(I.vb);
@@ -1111,10 +1109,10 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
                          + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w3.y
                          + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w3.z;
          const float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
-         const MapX mx = mapX(I.mp0, I.msc, I.mro, I.mtr, I.olo, I.ohi, int(I.sh.w + 0.5) & 3);
-         alpha *= mapSample(maps[int(I.tx2.w) - 1], mx, mapBase(mx, uv, lp), n, float3(0.0), float3(0.0), 0.0).r;
+         const MapX mx = mapX(I.mat);
+         alpha *= mapSample(maps[int(I.mat.mapOpacity) - 1], mx, mapBase(mx, uv, lp), n, float3(0.0), float3(0.0), 0.0).r;
       }
-      if (!(alpha < 1.0 && alpha < (I.mp0.z > 0.0 ? I.mp0.z : rnd(seed)))) return true;
+      if (!(alpha < 1.0 && alpha < (I.mat.alphaCutoff > 0.0 ? I.mat.alphaCutoff : rnd(seed)))) return true;
       o += d * (h.distance + eps); tmax -= h.distance + eps;
       if (tmax <= 0.0) return false;
    }
@@ -1267,7 +1265,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       const float3 hT = n; // hair: the strand axis
       const bool backHit = dot(n, d) > 0.0;
       if (backHit) n = -n;
-      const bool hairM = I.tx3.z < 0.0 && float(h.primitive_id) >= I.shc.w;
+      const bool hairM = I.mat.hairRadialNeg < 0.0 && float(h.primitive_id) >= I.mat.hairFrom;
       if (hairM)
       {
          // The ribbon's face toward the ray (the vertex normal is along the strand).
@@ -1277,10 +1275,10 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
          if (dot(gn, gn) > 1e-30) { gn = normalize(gn); n = dot(gn, d) > 0.0 ? -gn : gn; }
       }
       const float3 p = o + d * h.distance;
-      float3 base = hairM ? hairAlbedo(I.dt.yzw, -I.tx3.z) : I.bm.xyz; float metal = hairM ? 0.0 : clamp(I.bm.w, 0.0, 1.0); float rough = clamp(I.rg.x, 0.045, 1.0);
+      float3 base = hairM ? hairAlbedo(float3(I.mat.hairSigma), -I.mat.hairRadialNeg) : float3(I.mat.base); float metal = hairM ? 0.0 : clamp(I.mat.metallic, 0.0, 1.0); float rough = clamp(I.mat.roughness, 0.045, 1.0);
       const float3 ns = n; // the surface's own side: ray origins and the light / bounce gates use it, not the mapped normal
-      float3 emMap = float3(1.0); float shW = hairM ? 0.0 : I.sh.x, ccW = hairM ? 0.0 : I.msc.w;
-      if (any(I.tx > 0.5) || any(I.tx2 > 0.5) || any(I.tx3 > 0.5))
+      float3 emMap = float3(1.0); float shW = hairM ? 0.0 : I.mat.sheen, ccW = hairM ? 0.0 : I.mat.coat;
+      if (I.mat.mapAlbedo > 0.5 || I.mat.mapRoughness > 0.5 || I.mat.mapMetallic > 0.5 || I.mat.mapNormal > 0.5 || I.mat.mapAo > 0.5 || I.mat.mapEmission > 0.5 || I.mat.mapSheen > 0.5 || I.mat.mapOpacity > 0.5 || I.mat.mapCoat > 0.5 || I.mat.mapTransmission > 0.5 || I.mat.hairShift > 0.5)
       {
          // Maps at the hit, through the mapping: full detail on the camera hit (the jittered samples filter it), a
          // blurred level after a bounce. Normal maps take the triangle's uv tangent frame.
@@ -1295,26 +1293,26 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
          const float3 q1 = float3(vb[ix.y * 6], vb[ix.y * 6 + 1], vb[ix.y * 6 + 2]), q2 = float3(vb[ix.z * 6], vb[ix.z * 6 + 1], vb[ix.z * 6 + 2]);
          const float3 lp = p0 * w3.x + q1 * w3.y + q2 * w3.z;
          const float lod = b == 0 ? 0.0 : 3.0;
-         const int wrapM = int(I.sh.w + 0.5) & 3;
-         const MapX mx = mapX(I.mp0, I.msc, I.mro, I.mtr, I.olo, I.ohi, wrapM);
+         const int wrapM = int(I.mat.wrapBump + 0.5) & 3;
+         const MapX mx = mapX(I.mat);
          const float3 mb = mapBase(mx, uv, lp);
 #define MAPT(slot) mapSample(maps[int(slot) - 1], mx, mb, n, float3(0.0), float3(0.0), lod)
-         if (I.tx.x > 0.5) base *= mapLin(MAPT(I.tx.x).rgb);
-         if (I.tx.y > 0.5) rough = clamp(I.rg.x * MAPT(I.tx.y).r, 0.045, 1.0);
-         if (I.tx.z > 0.5) metal = clamp(I.bm.w * MAPT(I.tx.z).r, 0.0, 1.0);
-         if (I.tx2.y > 0.5) emMap = mapLin(MAPT(I.tx2.y).rgb);
-         if (I.tx2.z > 0.5) shW *= MAPT(I.tx2.z).r;
-         if (I.tx3.x > 0.5) ccW *= MAPT(I.tx3.x).r;
-         float alpha = 1.0 - I.mp0.w;
-         if (I.tx2.w > 0.5) alpha *= MAPT(I.tx2.w).r;
+         if (I.mat.mapAlbedo > 0.5) base *= mapLin(MAPT(I.mat.mapAlbedo).rgb);
+         if (I.mat.mapRoughness > 0.5) rough = clamp(I.mat.roughness * MAPT(I.mat.mapRoughness).r, 0.045, 1.0);
+         if (I.mat.mapMetallic > 0.5) metal = clamp(I.mat.metallic * MAPT(I.mat.mapMetallic).r, 0.0, 1.0);
+         if (I.mat.mapEmission > 0.5) emMap = mapLin(MAPT(I.mat.mapEmission).rgb);
+         if (I.mat.mapSheen > 0.5) shW *= MAPT(I.mat.mapSheen).r;
+         if (I.mat.mapCoat > 0.5) ccW *= MAPT(I.mat.mapCoat).r;
+         float alpha = 1.0 - I.mat.clear;
+         if (I.mat.mapOpacity > 0.5) alpha *= MAPT(I.mat.mapOpacity).r;
 #undef MAPT
-         if (alpha < 1.0 && skips < 16 && alpha < (I.mp0.z > 0.0 ? I.mp0.z : rnd(seed)))
+         if (alpha < 1.0 && skips < 16 && alpha < (I.mat.alphaCutoff > 0.0 ? I.mat.alphaCutoff : rnd(seed)))
          {
             // Cut out or not covered: the ray goes on through, the same bounce.
             skips++; if (b == 0) cov = 0.0;
             o = p + d * f.shQ.w; b--; continue;
          }
-         if (I.tx.w > 0.5 && !hairM)
+         if (I.mat.mapNormal > 0.5 && !hairM)
          {
             const float3 e1 = q1 - p0, e2 = q2 - p0;
             const float2 mu0 = mapUv(mx, mapBase(mx, t0, p0), n), mu1 = mapUv(mx, mapBase(mx, t1, q1), n), mu2 = mapUv(mx, mapBase(mx, t2, q2), n);
@@ -1328,37 +1326,37 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
                float3 bt = cross(n, tg);
                if (dot(bt, bg) < 0.0) bt = -bt;
                if (backHit) { tg = -tg; bt = -bt; } // the flipped side mirrors the frame, as the raster's cotangent frame does
-               const float3 s = mapNormalTS(maps[int(I.tx.w) - 1], mx, (int(I.sh.w + 0.5) & 4) != 0, I.sh.z, mapUv(mx, mb, n),
-                                            float2(0.0), float2(0.0), lod, I.ohi.w, I.dt.x);
+               const float3 s = mapNormalTS(maps[int(I.mat.mapNormal) - 1], mx, (int(I.mat.wrapBump + 0.5) & 4) != 0, I.mat.normalStrength, mapUv(mx, mb, n),
+                                            float2(0.0), float2(0.0), lod, I.mat.detailScale, I.mat.detailStrength);
                n = normalize(tg * s.x + bt * s.y + n * s.z);
             }
          }
       }
-      if (any(I.em.xyz > 0.0))
+      if (any(float3(I.mat.emission) > 0.0))
       {
          // Emission seen along the path. After a bounce, emitter sampling below could have found it too: power-heuristic MIS.
          float wE = 1.0;
-         if (b > 0 && nEm > 0 && I.em.w >= 0.0)
+         if (b > 0 && nEm > 0 && I.mat.emTri >= 0.0)
          {
-            const EmTri t = ems[int(I.em.w) + int(h.primitive_id)];
+            const EmTri t = ems[int(I.mat.emTri) + int(h.primitive_id)];
             const float3 gn = cross(t.e1.xyz, t.e2.xyz);
             const float cosL = abs(dot(gn, d)) / max(length(gn), 1e-12);
             const float pL = pEm * t.e1.w * h.distance * h.distance / max(cosL, 1e-6);
             wE = lastPdfB * lastPdfB / max(lastPdfB * lastPdfB + pL * pL, 1e-20);
          }
-         L += T * I.em.xyz * emMap * wE;
+         L += T * float3(I.mat.emission) * emMap * wE;
       }
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
-      const float shMax = shW * maxc(I.shc.xyz), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(nDotV, I.sh.y) : 1.0;
-      const float3 f0 = mix(float3(0.04 + I.mtr.w), base, metal);
+      const float shMax = shW * maxc(float3(I.mat.sheenColor)), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(nDotV, I.mat.sheenRoughness) : 1.0;
+      const float3 f0 = mix(float3(0.04 + I.mat.f0Extra), base, metal);
       // Subsurface and translucency (C9) take the diffuse share by chance: mode 1 walks the volume, mode 2 passes the
       // diffuse to the far side; otherwise the plain diffuse.
       int dm = 0;
-      if (!hairM && metal < 1.0 && (I.ss.w > 0.0 || I.tl.x > 0.0))
+      if (!hairM && metal < 1.0 && (I.mat.subsurface > 0.0 || I.mat.translucency > 0.0))
       {
-         const float tlW = clamp(I.tl.x, 0.0, 1.0), ssW = clamp(I.ss.w, 0.0, 1.0) * (1.0 - tlW);
+         const float tlW = clamp(I.mat.translucency, 0.0, 1.0), ssW = clamp(I.mat.subsurface, 0.0, 1.0) * (1.0 - tlW);
          const float um = rnd(seed);
-         dm = um < tlW ? 2 : (um < tlW + ssW && max(I.ss.x, max(I.ss.y, I.ss.z)) > 1e-4 ? 1 : 0);
+         dm = um < tlW ? 2 : (um < tlW + ssW && max(float3(I.mat.sssRadius).x, max(float3(I.mat.sssRadius).y, float3(I.mat.sssRadius).z)) > 1e-4 ? 1 : 0);
       }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
       for (int i = 0; i < int(f.params.w) && i < 8; i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
@@ -1372,14 +1370,14 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       ptPickLight(f, ems, nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms);
       // Hair: one place across the fibre per hit (the paper's integral over h), the same for the light and the bounce.
       const float hH = hairM ? rnd(seed) * 2.0 - 1.0 : 0.0;
-      const float hBm = clamp(I.rg.x, 0.02, 1.0), hBn = -I.tx3.z;
+      const float hBm = clamp(I.mat.roughness, 0.02, 1.0), hBn = -I.mat.hairRadialNeg;
       if ((hairM || (dot(n, ld) > 1e-5 && dot(ns, ld) > 0.0) || (dm == 2 && dot(n, ld) < -1e-5 && dot(ns, ld) < 0.0)) && any(Le > 0.0))
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
          if (occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          float pB = 0.0;
-         float3 fe = hairM ? hairBsdf(V, ld, hT, I.dt.yzw, hBm, hBn, I.tx3.w, I.rg.y, hH, pB) * lterms.x
+         float3 fe = hairM ? hairBsdf(V, ld, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pB) * lterms.x
                   : dm == 2 ? ptEvalT(n, V, ld, base, metal, rough, f0, lterms, pB)
                            : ptEval(n, V, ld, base, metal, rough, f0, dm == 1 ? float2(0.0, lterms.y) : lterms, pB);
          if (shW > 0.0 || ccW > 0.0)
@@ -1390,16 +1388,16 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             fe *= 1.0 - ccW * cF;
             if (shW > 0.0)
                fe = fe * shV
-                  + I.shc.xyz * sheenLtc(nL, nDotV, dot(ld, V), I.sh.y) * shW * nL * lterms.y;
-            if (ccW > 0.0) fe += ccW * coatSpec(nH, nDotV, max(nL, 1e-4), vH, clamp(I.mro.w, 0.02, 1.0)) * nL * lterms.y;
+                  + float3(I.mat.sheenColor) * sheenLtc(nL, nDotV, dot(ld, V), I.mat.sheenRoughness) * shW * nL * lterms.y;
+            if (ccW > 0.0) fe += ccW * coatSpec(nH, nDotV, max(nL, 1e-4), vH, clamp(I.mat.coatRoughness, 0.02, 1.0)) * nL * lterms.y;
          }
          L += T * fe * Le * (pL > 0.0 ? pL / max(pL * pL + pB * pB, 1e-20) : 1.0); // emitters: power-heuristic MIS
       }
       if (hairM)
       {
-         const float3 nd = hairSample(V, hT, I.dt.yzw, hBm, hBn, I.tx3.w, I.rg.y, hH, float4(rnd(seed), rnd(seed), rnd(seed), rnd(seed)));
+         const float3 nd = hairSample(V, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, float4(rnd(seed), rnd(seed), rnd(seed), rnd(seed)));
          float pdH = 0.0;
-         const float3 fH = hairBsdf(V, nd, hT, I.dt.yzw, hBm, hBn, I.tx3.w, I.rg.y, hH, pdH);
+         const float3 fH = hairBsdf(V, nd, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pdH);
          if (pdH <= 1e-6) break;
          T *= min(fH / pdH, float3(4.0));
          lastPdfB = pdH; skyK = float3(1.0);
@@ -1434,7 +1432,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             // surface. There the light leaves as a white Lambert surface (the colour is in the throughput).
             const float3 Fv = f0 + (float3(1.0) - f0) * ptS5(nDotV);
             float3 Tw = (float3(1.0) - Fv) * (1.0 - metal) / max(lq.y, 1e-3);
-            const float3 sg = 1.0 / max(I.ss.xyz * SSS_D, float3(1e-4));
+            const float3 sg = 1.0 / max(float3(I.mat.sssRadius) * SSS_D, float3(1e-4));
             const float3 A = clamp(base, 0.0, 0.999);
             const float3 qa = 4.09712 + 4.20863 * A - sqrt(9.59217 + 41.6808 * A + 17.7126 * A * A);
             const float3 alb = 1.0 - qa * qa;
@@ -1504,7 +1502,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       const float a = max(0.002, rough * rough);
       // The clearcoat is a layer on top: it takes the bounce with its Fresnel share (pC), the base the rest; the
       // base's (1 - pC) attenuation and that choice cancel, so the base branch weighs as before.
-      const float ccR = clamp(I.mro.w, 0.02, 1.0);
+      const float ccR = clamp(I.mat.coatRoughness, 0.02, 1.0);
       const float pC = ccW > 0.0 ? clamp(ccW * (0.04 + 0.96 * pow(1.0 - nDotV, 5.0)), 0.0, 0.95) : 0.0;
       const bool coatB = pC > 0.0 && rnd(seed) < pC;
       float3 nd;
@@ -1536,7 +1534,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
          {
             const float nL = max(dot(n, nd), 0.0);
             fB = fB * shV
-               + I.shc.xyz * sheenLtc(nL, nDotV, dot(nd, V), I.sh.y) * shW * nL;
+               + float3(I.mat.sheenColor) * sheenLtc(nL, nDotV, dot(nd, V), I.mat.sheenRoughness) * shW * nL;
          }
          T *= fB / pdfB;
          lastPdfB = pC * pdfC + (1.0 - pC) * pdfB;
@@ -1607,7 +1605,7 @@ fragment float4 rp_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], co
       ld = (type == 1 || type == 4 || type == 5) ? normalize(L.vec.xyz - in.wp) : normalize(L.vec.xyz);
       lc = L.color.xyz * L.terms.x;
    }
-   float3 c = (m.base.xyz * (f.ambient.xyz * 1.4 + lc * max(dot(n, ld), 0.0)) + m.em.xyz) * f.params.x;
+   float3 c = (float3(m.mat.base) * (f.ambient.xyz * 1.4 + lc * max(dot(n, ld), 0.0)) + float3(m.mat.emission)) * f.params.x;
    c = toneMap(c, int(f.params.y));
    return float4(toSrgb(c), 1.0);
 }
@@ -1777,43 +1775,6 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4], envm[4];
       LightU lights[8];
    };
-  // The rest of the material (InstU / RInst tx2 .. dt in the shader).
-   struct MapExtH { float tx2[4], tx3[4], mp0[4], msc[4], mro[4], mtr[4], olo[4], ohi[4], dt[4], ss[4], tl[4]; };
-   struct InstU { float model[16], normalM[16], base[4], mr[4], em[4], tx[4], sh[4], shc[4]; MapExtH x; };
-   struct RInstH { float bm[4], rg[4], em[4]; uint64_t vb, ib; float normalM[16]; uint64_t uvb, pad0; float tx[4], sh[4], shc[4]; MapExtH x; };
-   static_assert(sizeof(InstU) == 400 && sizeof(RInstH) == 368, "InstU / RInst layout as the shader's");
-   // Encoded so all zeros is the plain material (batches leave it empty): opacity as 1 - opacity, F0 less 0.04.
-   void MapExt(const engine::Instance& in, MapExtH& x)
-   {
-      x.tx2[0] = (float)(in.mapAo + 1); x.tx2[1] = (float)(in.mapEmission + 1); x.tx2[2] = (float)(in.mapSheen + 1); x.tx2[3] = (float)(in.mapOpacity + 1);
-      x.tx3[0] = (float)(in.mapClearcoat + 1); x.tx3[1] = (float)(in.mapTransmission + 1);
-      x.mp0[0] = (float)in.mapSpace; x.mp0[1] = in.triplanar; x.mp0[2] = in.alphaCutoff; x.mp0[3] = 1.0f - std::min(std::max(in.opacity, 0.0f), 1.0f);
-      const float r = (in.ior - 1.0f) / (in.ior + 1.0f);
-      const float f0 = std::min(std::max(r * r * 2.0f * in.specular, 0.0f), 1.0f);
-      for (int k = 0; k < 3; k++)
-      {
-         x.msc[k] = in.mapScale[k]; x.mro[k] = in.mapRotate[k]; x.mtr[k] = in.mapTranslate[k];
-         x.olo[k] = in.objLo[k]; x.ohi[k] = in.objHi[k];
-      }
-      x.msc[3] = in.clearcoat; x.mro[3] = in.clearcoatRoughness; x.mtr[3] = f0 - 0.04f;
-      x.olo[3] = in.breakup; x.ohi[3] = in.detailScale; x.dt[0] = in.detailStrength;
-      // Hair: tx3.z = -radial roughness (negative so the any(tx3 > 0.5) map test stays off), tx3.w = cuticle tilt,
-      // dt.yzw = absorption.
-      x.tx3[2] = -std::max(in.hairRadial, 0.0f); x.tx3[3] = in.hairShift;
-      for (int k = 0; k < 3; k++) x.dt[k + 1] = in.hairSigma[k];
-      // Subsurface: ss.xyz = mean free path per channel (scene units), ss.w = weight; tl.x = translucency.
-      for (int k = 0; k < 3; k++) x.ss[k] = in.sssRadius[k];
-      x.ss[3] = in.subsurface; x.tl[0] = in.translucency;
-   }
-   // A run the depth prepass leaves out: it cuts pixels away, so its depth is known only once it is shaded.
-   bool SeeThrough(const InstU& u) { return u.x.mp0[3] > 0.0f || u.x.tx2[3] > 0.5f || u.x.mp0[2] > 0.0f; }
-   // The maps of an instance as InstU / RInst carry them (index + 1, 0 = none).
-   void MapFields(const engine::Instance& in, float tx[4], float sh[4])
-   {
-      tx[0] = (float)(in.mapAlbedo + 1); tx[1] = (float)(in.mapRoughness + 1); tx[2] = (float)(in.mapMetallic + 1); tx[3] = (float)(in.mapNormal + 1);
-      sh[0] = in.sheen; sh[1] = in.sheenRoughness; sh[2] = in.normalStrength; sh[3] = (float)((in.wrap & 3) + (in.normalBump ? 4 : 0));
-   }
-
    float ToLin(float c)
    {
       c = c < 0.0f ? 0.0f : c;
@@ -1825,6 +1786,46 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          o[i] = ToLin(c[i]) * scale;
       o[3] = 0;
    }
+
+   // The material record (Render3DMaterial.h) as the shader's InstU / RInst carry it.
+   struct InstU { float model[16], normalM[16]; R3dMatH mat; };
+   struct RInstH { uint64_t vb, ib, uvb, pad0; float normalM[16]; R3dMatH mat; };
+   static_assert(sizeof(InstU) == 384 && sizeof(RInstH) == 352, "InstU / RInst layout as the shader's");
+   void Lin3x(const float* c, float* o) { for (int i = 0; i < 3; i++) o[i] = ToLin(c[i]); }
+   // The surface the GI and reflection rays see: base, metal, roughness, ior, emission (no maps, sheen or hair).
+   void FillMatRays(const engine::Instance& in, R3dMatH& m)
+   {
+      Lin3x(in.baseSrgb, m.base); m.metallic = in.metallic; m.roughness = in.roughness; m.ior = in.ior;
+      std::memcpy(m.emission, in.emission, 12);
+   }
+   // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
+   void FillMat(const engine::Instance& in, R3dMatH& m)
+   {
+      FillMatRays(in, m);
+      m.transmission = in.transmission;
+      m.mapAlbedo = (float)(in.mapAlbedo + 1); m.mapRoughness = (float)(in.mapRoughness + 1);
+      m.mapMetallic = (float)(in.mapMetallic + 1); m.mapNormal = (float)(in.mapNormal + 1);
+      m.mapAo = (float)(in.mapAo + 1); m.mapEmission = (float)(in.mapEmission + 1); m.mapSheen = (float)(in.mapSheen + 1);
+      m.mapOpacity = (float)(in.mapOpacity + 1); m.mapCoat = (float)(in.mapClearcoat + 1); m.mapTransmission = (float)(in.mapTransmission + 1);
+      m.sheen = in.sheen; m.sheenRoughness = in.sheenRoughness; std::memcpy(m.sheenColor, in.sheenColor, 12);
+      m.normalStrength = in.normalStrength; m.wrapBump = (float)((in.wrap & 3) + (in.normalBump ? 4 : 0));
+      m.mapSpace = (float)in.mapSpace; m.triplanar = in.triplanar; m.alphaCutoff = in.alphaCutoff;
+      m.clear = 1.0f - std::min(std::max(in.opacity, 0.0f), 1.0f);
+      const float r = (in.ior - 1.0f) / (in.ior + 1.0f);
+      const float f0 = std::min(std::max(r * r * 2.0f * in.specular, 0.0f), 1.0f);
+      for (int k = 0; k < 3; k++)
+      {
+         m.mapScale[k] = in.mapScale[k]; m.mapRotate[k] = in.mapRotate[k]; m.mapTranslate[k] = in.mapTranslate[k];
+         m.boxLo[k] = in.objLo[k]; m.boxHi[k] = in.objHi[k];
+         m.hairSigma[k] = in.hairSigma[k]; m.sssRadius[k] = in.sssRadius[k];
+      }
+      m.coat = in.clearcoat; m.coatRoughness = in.clearcoatRoughness; m.f0Extra = f0 - 0.04f;
+      m.breakup = in.breakup; m.detailScale = in.detailScale; m.detailStrength = in.detailStrength;
+      m.hairFrom = (float)in.hairFrom; m.hairRadialNeg = -std::max(in.hairRadial, 0.0f); m.hairShift = in.hairShift;
+      m.subsurface = in.subsurface; m.translucency = in.translucency;
+   }
+   // A run the depth prepass leaves out: it cuts pixels away, so its depth is known only once it is shaded.
+   bool SeeThrough(const InstU& u) { return u.mat.clear > 0.0f || u.mat.mapOpacity > 0.5f || u.mat.alphaCutoff > 0.0f; }
 
    class MetalRaster final : public RasterRenderer
    {
@@ -2340,10 +2341,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          {
             const engine::Instance& in = fr.instances[i];
             RInstH& o = info[i]; o = {};
-            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; o.rg[1] = in.ior; std::memcpy(o.em, in.emission, 12);
+            FillMatRays(in, o.mat);
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
-               for (int k = 0; k < 3; k++) o.bm[k] *= mMapMean[in.mapAlbedo][k];
+               for (int k = 0; k < 3; k++) o.mat.base[k] *= mMapMean[in.mapAlbedo][k];
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
                o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress;
@@ -2406,8 +2407,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             if (b.mesh < 0 || b.mesh >= (int)mMeshes.size() || b.Count() == 0 || !bg.models)
                continue;
             InstU u = {};
-            Lin3(b.baseSrgb, u.base);
-            u.mr[0] = b.metallic; u.mr[1] = b.roughness;
+            Lin3x(b.baseSrgb, u.mat.base);
+            u.mat.metallic = b.metallic; u.mat.roughness = b.roughness;
             [enc setFragmentBytes:&u length:sizeof(u) atIndex:2];
             [enc setVertexBuffer:bg.models offset:0 atIndex:5];
             const Gpu& g = mMeshes[b.mesh];
@@ -2647,11 +2648,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          {
             const engine::Instance& in = fr.instances[i];
             RInstH& o = info[i]; o = {};
-            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; o.rg[1] = in.ior; std::memcpy(o.em, in.emission, 12);
+            FillMat(in, o.mat);
+            o.mat.transmission = 0.0f; // settle has no transmission lobe yet; kept off so this record change moves no pixel
             std::memcpy(o.normalM, in.normalMatrix, 64);
-            MapFields(in, o.tx, o.sh);
-            std::memcpy(o.shc, in.sheenColor, 12); o.shc[3] = (float)in.hairFrom;
-            MapExt(in, o.x);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
                o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; o.uvb = mMeshes[in.mesh].uvb.gpuAddress;
@@ -2666,7 +2665,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          for (size_t i = 0; i < fr.instances.size(); i++)
          {
             const engine::Instance& in = fr.instances[i];
-            info[i].em[3] = -1.0f;
+            info[i].mat.emTri = -1.0f;
             const float lum = 0.2126f * in.emission[0] + 0.7152f * in.emission[1] + 0.0722f * in.emission[2];
             if (lum <= 0.0f || in.mesh < 0 || in.mesh >= (int)mMeshes.size())
                continue;
@@ -2674,7 +2673,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             const size_t tris = g.count / 3;
             if (tris == 0 || ems.size() + tris > 65536)
                continue;
-            info[i].em[3] = (float)ems.size();
+            info[i].mat.emTri = (float)ems.size();
             const float* vb = (const float*)g.vb.contents;
             const uint32_t* ib = (const uint32_t*)g.ib.contents;
             const float* m = in.model;
@@ -3180,19 +3179,14 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             InstU& u = dst[i]; u = {};
             std::memcpy(u.model, in.model, 64);
             std::memcpy(u.normalM, in.normalMatrix, 64);
-            Lin3(in.baseSrgb, u.base);
-            u.mr[0] = in.metallic; u.mr[1] = in.roughness; u.mr[2] = in.transmission; u.mr[3] = in.ior;
-            std::memcpy(u.em, in.emission, 12);
-            MapFields(in, u.tx, u.sh);
-            std::memcpy(u.shc, in.sheenColor, 12); u.shc[3] = (float)in.hairFrom;
-            MapExt(in, u.x);
+            FillMat(in, u.mat);
             if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
                continue;
             if (!mRuns.empty())
             {
                auto& r = mRuns.back();
                const engine::Instance& a = fr.instances[r.first];
-               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(dst[r.first].base, u.base, sizeof(InstU) - offsetof(InstU, base)) == 0)
+               if (r.first + r.second == i && a.mesh == in.mesh && std::memcmp(&dst[r.first].mat, &u.mat, sizeof(R3dMatH)) == 0)
                {
                   r.second++;
                   continue;
