@@ -58,6 +58,16 @@ namespace rhi
       virtual std::string Name() const = 0;
       virtual std::unique_ptr<SharedImage> CreateSharedImage(int width, int height, Format format) = 0;
       virtual std::unique_ptr<RasterRenderer> CreateRasterRenderer() = 0;
+      // Field Pixel on Metal, a test aid for now (OPUS_PLAN row 1.1): compiles `msl` (an EmitMsl result, fast math
+      // on, as GL) and, when w > 0, draws fld_fs over a w x h RGBA32F target. `slots` are the float4 uniform slots, the
+      // source is a 1x1 black texture and the state bank is cleared to bankInit. px gets w*h*4 floats, row 0 first
+      // (uv.y near 0, the same memory order as a GL readback). err gets the compiler's message on failure.
+      virtual bool RunFieldPixel(const std::string& /*msl*/, int /*w*/, int /*h*/, const std::vector<float>& /*slots*/,
+                                 const float* /*bankInit*/, std::vector<float>& /*px*/, std::string& err)
+      {
+         err = "no Field Pixel backend";
+         return false;
+      }
    };
 
    // The backend for this platform, or null when there is none yet. Must be called with the app's GL context current.

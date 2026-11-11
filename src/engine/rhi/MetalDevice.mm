@@ -3598,6 +3598,77 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          return r->Ok() ? std::unique_ptr<RasterRenderer>(std::move(r)) : nullptr;
       }
 
+      bool RunFieldPixel(const std::string& msl, int w, int h, const std::vector<float>& slots, const float* bankInit,
+                         std::vector<float>& px, std::string& err) override
+      {
+         @autoreleasepool
+         {
+            MTLCompileOptions* co = [MTLCompileOptions new];
+            co.fastMathEnabled = YES; // as GL on macOS: precise sin turns the fract(sin(x) * 43758) hashes into other noise
+            NSError* e = nil;
+            id<MTLLibrary> lib = [mDev newLibraryWithSource:[NSString stringWithUTF8String:msl.c_str()] options:co error:&e];
+            if (!lib)
+            {
+               err = e ? [[e localizedDescription] UTF8String] : "Metal compile failed";
+               return false;
+            }
+            if (w <= 0 || h <= 0)
+               return true;
+            MTLRenderPipelineDescriptor* pd = [MTLRenderPipelineDescriptor new];
+            pd.vertexFunction = [lib newFunctionWithName:@"fld_vs"];
+            pd.fragmentFunction = [lib newFunctionWithName:@"fld_fs"];
+            pd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA32Float;
+            id<MTLRenderPipelineState> pso = [mDev newRenderPipelineStateWithDescriptor:pd error:&e];
+            if (!pso)
+            {
+               err = e ? [[e localizedDescription] UTF8String] : "Metal pipeline failed";
+               return false;
+            }
+            MTLTextureDescriptor* td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
+                                                                                          width:w height:h mipmapped:NO];
+            td.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+            td.storageMode = MTLStorageModeShared;
+            id<MTLTexture> out = [mDev newTextureWithDescriptor:td];
+            id<MTLTexture> bank = [mDev newTextureWithDescriptor:td];
+            std::vector<float> fill((size_t)w * h * 4);
+            for (size_t i = 0; i < fill.size(); i++)
+               fill[i] = bankInit ? bankInit[i & 3] : 0.0f;
+            [bank replaceRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0 withBytes:fill.data() bytesPerRow:(NSUInteger)w * 16];
+            MTLTextureDescriptor* sd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                          width:1 height:1 mipmapped:NO];
+            id<MTLTexture> black = [mDev newTextureWithDescriptor:sd];
+            const uint8_t zero[4] = { 0, 0, 0, 0 };
+            [black replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:zero bytesPerRow:4];
+
+            MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            rp.colorAttachments[0].texture = out;
+            rp.colorAttachments[0].loadAction = MTLLoadActionClear;
+            rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            rp.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
+            id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+            id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rp];
+            [enc setRenderPipelineState:pso];
+            std::vector<float> u = slots;
+            if (u.empty())
+               u.assign(4, 0.0f);
+            [enc setFragmentBytes:u.data() length:u.size() * sizeof(float) atIndex:0];
+            [enc setFragmentTexture:black atIndex:0];
+            [enc setFragmentTexture:bank atIndex:1];
+            [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+            [enc endEncoding];
+            [cb commit];
+            [cb waitUntilCompleted];
+            if (cb.status != MTLCommandBufferStatusCompleted)
+            {
+               err = "Metal command buffer failed";
+               return false;
+            }
+            px.resize((size_t)w * h * 4);
+            [out getBytes:px.data() bytesPerRow:(NSUInteger)w * 16 fromRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0];
+            return true;
+         }
+      }
+
    private:
       id<MTLDevice> mDev = nil;
       id<MTLCommandQueue> mQueue = nil;

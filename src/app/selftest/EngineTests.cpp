@@ -3,6 +3,10 @@
 #include "app/AppShared.h"
 #include "engine/rhi/Rhi.h"
 #include "engine/MusicRig.h"
+#include "core/field/FieldLex.h"
+#include "core/field/FieldParse.h"
+#include "core/field/GlslBackend.h"
+#include "core/field/MslBackend.h"
 
 #if defined(__APPLE__)
 #include <mach/mach.h>
@@ -53,6 +57,184 @@ namespace
       return ok;
    }
 
+
+   // ---- Field Pixel through both emitters (OPUS_PLAN row 1.1) ----
+   bool LowerPreset(const char* code, Field::PixelIRProgram& ir, std::string& err)
+   {
+      std::vector<Field::Token> tokens;
+      Field::FieldError fe;
+      Field::AstNodePtr ast;
+      if (!Field::Lex(code, tokens, fe) || !Field::ParseProgram(tokens, ast, fe) || !Field::LowerPixelProgramToIR(ast, ir, fe))
+      {
+         err = "line " + std::to_string(fe.span.line) + ": " + fe.message;
+         return false;
+      }
+      return true;
+   }
+
+   // The fixed test inputs both sides get: 256x256, t 1.37, dt 1/60, frame 42, age 0, unconnected source,
+   // display pass, state bank at its initial values, hoisted value i = 0.25 + 0.125 i, params at their defaults.
+   constexpr float kFpT = 1.37f, kFpDt = 1.0f / 60.0f, kFpFrame = 42.0f;
+   float HoistValue(int i) { return 0.25f + 0.125f * (float)i; }
+
+   void BankInit(const Field::PixelIRProgram& ir, float init[4])
+   {
+      for (int i = 0; i < 4; i++)
+         init[i] = 0.0f;
+      for (size_t i = 0; i < ir.declaredStates.size() && i < 4; i++)
+         if (!ir.declaredStates[i].initialValues.empty())
+            init[i] = ir.declaredStates[i].initialValues[0];
+   }
+
+   bool GlFieldPixel(const Field::PixelIRProgram& ir, int n, std::vector<float>& px, std::string& err)
+   {
+      Field::GlslEmitResult ge = Field::EmitGlsl(ir);
+      if (!ge.error.empty()) { err = ge.error; return false; }
+      unsigned int prog = GLUtil::CompileProgram(ge.source.c_str(), &err);
+      if (prog == 0) return false;
+      GLUtil::Fbo out, bank;
+      GLUtil::EnsureFbo(out, n, n, GL_RGBA32F, "FieldMslTest");
+      GLUtil::EnsureFbo(bank, n, n, GL_RGBA32F, "FieldMslTest");
+      float init[4];
+      BankInit(ir, init);
+      GLint oldFbo = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, bank.fbo);
+      glClearColor(init[0], init[1], init[2], init[3]);
+      glClear(GL_COLOR_BUFFER_BIT);
+      GLuint black = 0;
+      glGenTextures(1, &black);
+      glBindTexture(GL_TEXTURE_2D, black);
+      const unsigned char zero[4] = { 0, 0, 0, 0 };
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, zero);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      GLUtil::RunShaderPass(out, prog, [&]()
+      {
+         auto loc = [&](const char* nm) { return glGetUniformLocation(prog, nm); };
+         glUniform2f(loc("fld_res"), (float)n, (float)n);
+         glUniform1f(loc("fld_t"), kFpT);
+         glUniform1f(loc("fld_dt"), kFpDt);
+         glUniform1i(loc("fld_frame"), (int)kFpFrame);
+         glUniform1f(loc("fld_age"), 0.0f);
+         glUniform1f(loc("fld_srcAlpha"), 0.0f);
+         glUniform1i(loc("fld_outMode"), 1);
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, bank.tex);
+         glUniform1i(loc("fld_s_bank0"), 0);
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, black);
+         glUniform1i(loc("fld_srcTex"), 1);
+         glActiveTexture(GL_TEXTURE0);
+         for (const auto& u : ge.uniforms)
+         {
+            const GLint l = loc(u.name.c_str());
+            const float v = u.hoistedIndex >= 0 ? HoistValue(u.hoistedIndex) : (float)ir.declaredParams[u.paramIndex].defaultValue;
+            if (u.type.lanes == 2) glUniform2f(l, v, v);
+            else if (u.type.lanes == 3) glUniform3f(l, v, v, v);
+            else if (u.type.lanes == 4) glUniform4f(l, v, v, v, v);
+            else if (u.type.kind == Field::DataType::Int) glUniform1i(l, (int)v);
+            else glUniform1f(l, v);
+         }
+      });
+      px.resize((size_t)n * n * 4);
+      glBindFramebuffer(GL_FRAMEBUFFER, out.fbo);
+      glReadPixels(0, 0, n, n, GL_RGBA, GL_FLOAT, px.data());
+      glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)oldFbo);
+      glDeleteTextures(1, &black);
+      glDeleteProgram(prog);
+      GLUtil::DestroyFbo(out);
+      GLUtil::DestroyFbo(bank);
+      return true;
+   }
+
+   bool MetalFieldPixel(rhi::Device& dev, const Field::PixelIRProgram& ir, int n, std::vector<float>& px, std::string& err)
+   {
+      Field::MslEmitResult me = Field::EmitMsl(ir);
+      if (!me.error.empty()) { err = me.error; return false; }
+      std::vector<float> slots((size_t)me.uniformSlotCount * 4, 0.0f);
+      const float fixed[8] = { (float)n, (float)n, kFpT, kFpDt, kFpFrame, 0.0f, 0.0f, 1.0f };
+      std::copy(fixed, fixed + 8, slots.begin());
+      for (const auto& u : me.uniforms)
+      {
+         const float v = u.hoistedIndex >= 0 ? HoistValue(u.hoistedIndex) : (float)ir.declaredParams[u.paramIndex].defaultValue;
+         for (int k = 0; k < 4; k++)
+            slots[(size_t)u.location * 4 + k] = v;
+      }
+      float init[4];
+      BankInit(ir, init);
+      if (!dev.RunFieldPixel(me.source, n, n, slots, init, px, err))
+      {
+         static int dumped = 0;
+         if (dumped++ == 0)
+            printf("%s\n", me.source.c_str());
+         return false;
+      }
+      return true;
+   }
+
+   void FieldMslRows(rhi::Device& dev, const std::function<void(bool, const char*, double, double)>& check)
+   {
+      const auto& presets = FieldPixelNode::Presets();
+      int compiled = 0;
+      for (const auto& p : presets)
+      {
+         Field::PixelIRProgram ir;
+         std::string err;
+         bool ok = LowerPreset(p.code, ir, err);
+         if (ok)
+         {
+            Field::MslEmitResult me = Field::EmitMsl(ir);
+            ok = me.error.empty();
+            err = me.error;
+            std::vector<float> none;
+            if (ok)
+               ok = dev.RunFieldPixel(me.source, 0, 0, {}, nullptr, none, err);
+         }
+         if (ok)
+            compiled++;
+         else
+            printf("  field msl: %s: %s\n", p.name, err.c_str());
+      }
+      check(compiled == (int)presets.size(), "1.1: every Field Pixel preset compiles with the Metal compiler",
+            (double)compiled, (double)presets.size());
+
+      const char* picks[8] = { "Default (UV Gradient)", "Noise Texture", "Organic Blobs / Metaballs", "Chladni Nodal Pattern",
+                               "Quasicrystal Kaleidoscope", "Voronoi Cells", "Nebula / Galaxy", "Reaction Diffusion (Gray-Scott)" };
+      const int n = 256;
+      double worstAll = 0.0;
+      int rendered = 0;
+      for (const char* name : picks)
+      {
+         const FieldPixelNode::Preset* pre = nullptr;
+         for (const auto& p : presets)
+            if (std::strcmp(p.name, name) == 0)
+               pre = &p;
+         Field::PixelIRProgram ir;
+         std::string err;
+         std::vector<float> a, b;
+         if (!pre || !LowerPreset(pre->code, ir, err) || !GlFieldPixel(ir, n, a, err) || !MetalFieldPixel(dev, ir, n, b, err))
+         {
+            printf("  field msl: %s: not rendered (%s)\n", name, pre ? err.c_str() : "no such preset");
+            worstAll = 1.0;
+            continue;
+         }
+         double worst = 0.0;
+         for (size_t i = 0; i < a.size(); i++)
+         {
+            const bool na = std::isnan(a[i]), nb = std::isnan(b[i]);
+            const double d = (na || nb) ? (na == nb ? 0.0 : 1.0)
+                                        : std::fabs((double)std::clamp(a[i], 0.0f, 1.0f) - (double)std::clamp(b[i], 0.0f, 1.0f));
+            worst = std::max(worst, d);
+         }
+         printf("  field msl: %-34s max diff %.6f (%.2f/255)\n", name, worst, worst * 255.0);
+         worstAll = std::max(worstAll, worst);
+         rendered++;
+      }
+      check(rendered == 8 && worstAll <= 1.0 / 255.0, "1.1: 8 presets, GLSL vs MSL at 256x256, max diff <= 1/255",
+            worstAll * 255.0, 1.0);
+   }
+
    double NowMs()
    {
       return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -76,6 +258,7 @@ bool RunEngineTest()
       printf("  [FAIL] no Metal device\nENGINETEST FAIL\n");
       return false;
    }
+   FieldMslRows(*dev, check);
    const int W = 1920, H = 1080;
    const int nLights = getenv("INFINITE_ENGINETEST_LIGHTS") ? atoi(getenv("INFINITE_ENGINETEST_LIGHTS")) : 8;
 
