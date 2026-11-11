@@ -1,4 +1,5 @@
 #include "MslBackend.h"
+#include "FieldNoise.h"
 #include "../../audio/PhaseShape.h"
 #include <cctype>
 #include <iomanip>
@@ -304,6 +305,8 @@ namespace Field
 
                if (name == "vec2" || name == "vec3" || name == "vec4")
                   ctx.Line("   " + ty + " " + r + " = " + ty + "(" + joined(false) + ");");
+               else if (IsNoiseBuiltin(name))
+                  ctx.Line("   " + ty + " " + r + " = fld_" + name + "(" + joined(false) + ");");
                else if (name == "mod" || name == "fmod")
                   ctx.Line("   " + ty + " " + r + " = fld_mod(" + bc(0) + ", " + bc(1) + ");");
                else if (name == "pow")
@@ -521,7 +524,7 @@ namespace Field
 
       std::ostringstream o;
       o << "#include <metal_stdlib>\nusing namespace metal;\n\n"
-        << kMslHelperPrelude << ToMslTypes(PhaseShape::kGlslPrelude) << "\n"
+        << kMslHelperPrelude << ToMslTypes(PhaseShape::kGlslPrelude) << NoiseMsl() << "\n"
         << "constexpr sampler fld_smp(filter::linear, address::clamp_to_edge);\n\n"
         << "struct FldVOut { float4 position [[position]]; };\n"
         << "vertex FldVOut fld_vs(uint vid [[vertex_id]])\n{\n"
@@ -583,6 +586,7 @@ namespace Field
    {
       std::string s = kMslHelperPrelude;
       s += ToMslTypes(PhaseShape::kGlslPrelude);
+      s += NoiseMsl();
       s += "\nstruct FldMat { float3 base; float roughness; float metallic; float3 normal; float height; float3 emission; "
            "float opacity; float mask; };\n";
       return s;

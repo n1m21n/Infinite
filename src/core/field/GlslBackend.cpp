@@ -1,5 +1,6 @@
 #include "GlslBackend.h"
 #include "GlslHelpers.h"
+#include "FieldNoise.h"
 #include "../../audio/PhaseShape.h"
 #include <iomanip>
 #include <sstream>
@@ -359,6 +360,13 @@ namespace Field
                   }
                   ctx.EmitLine("   " + typeStr + " " + resTemp + " = " + name + "(" + argStr + ");");
                }
+               else if (IsNoiseBuiltin(name))
+               {
+                  std::string argStr;
+                  for (size_t i = 0; i < args.size(); i++)
+                     argStr += (i ? ", " : "") + args[i];
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_" + name + "(" + argStr + ");");
+               }
                else if (name == "mod" || name == "fmod")
                {
                   ctx.EmitLine("   " + typeStr + " " + resTemp + " = fld_mod(" + bc(0) + ", " + bc(1) + ");");
@@ -597,6 +605,7 @@ namespace Field
       // 5. Helper prelude
       ctx.EmitLine(kFieldHelperPrelude);
       ctx.EmitLine(PhaseShape::kGlslPrelude);
+      ctx.EmitLine(NoiseGlsl());
 
       // 6. Hoisted uniforms from prologue
       if (!program.prologue.empty())
@@ -794,6 +803,7 @@ namespace Field
    {
       std::string s = kFieldHelperPrelude;
       s += PhaseShape::kGlslPrelude;
+      s += NoiseGlsl();
       s += "\nstruct FldMat { vec3 base; float roughness; float metallic; vec3 normal; float height; vec3 emission; "
            "float opacity; float mask; };\n";
       return s;

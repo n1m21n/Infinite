@@ -1,5 +1,6 @@
 #include "ElementBackend.h"
 #include "FieldRandom.h"
+#include "FieldNoise.h"
 #include "FieldState.h"
 #include "ReduceOps.h"
 #include "../../audio/PhaseShape.h"
@@ -968,6 +969,19 @@ namespace Field
             return (a < inst.argLanes.size() && inst.argLanes[a] == 1) ? r.v[0] : r.v[l];
          };
          auto scalar = [&](size_t a) -> double { return regs[inst.argRegs[a]].v[0]; };
+
+         if (IsNoiseBuiltin(fn)) // row 2.1
+         {
+            double flat[8] = { 0 }, res[3] = { 0, 0, 0 };
+            int n = 0;
+            for (size_t a = 0; a < nArgs; ++a)
+               for (int l = 0; l < std::max(inst.argLanes[a], 1) && n < 8; ++l)
+                  flat[n++] = regs[inst.argRegs[a]].v[l];
+            EvalNoiseBuiltin(fn, flat, n, res);
+            for (int l = 0; l < dst.lanes && l < 3; ++l)
+               dst.v[l] = res[l];
+            return;
+         }
 
          if (fn == "rand" || fn == "noise" || fn == "sh")
          {

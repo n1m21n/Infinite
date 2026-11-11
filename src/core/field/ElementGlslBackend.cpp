@@ -1,5 +1,6 @@
 #include "ElementGlslBackend.h"
 #include "FieldRandom.h"
+#include "FieldNoise.h"
 #include "../../audio/PhaseShape.h"
 
 #include <algorithm>
@@ -326,6 +327,14 @@ namespace Field
                return Fail(fn + " with too few arguments");
             };
             auto lane = [&](size_t k) { return Fit(args[k], lanes); };
+
+            if (int nl = 1; IsNoiseBuiltin(fn, nullptr, &nl))
+            {
+               std::string a;
+               for (size_t k = 0; k < args.size(); k++)
+                  a += (k ? ", " : "") + args[k].expr;
+               return Temp("fld_" + fn + "(" + a + ")", nl);
+            }
 
             if (fn == "vec2" || fn == "vec3" || fn == "vec4")
             {
@@ -718,7 +727,7 @@ namespace Field
       res.writesSize = !e.sizeVar.empty() && program.writeMask.WroteAttrib(ElementStore::kPointSizeAttrib);
 
       std::ostringstream src;
-      src << kScalarHelpers << VecOverloads() << kRandHelpers << PhaseShape::kGlslPrelude;
+      src << kScalarHelpers << VecOverloads() << kRandHelpers << PhaseShape::kGlslPrelude << NoiseGlsl();
       src << "uniform float fld_baseSize;\n";
       for (const auto& u : res.uniforms)
          src << "uniform " << TypeName(u.lanes) << " " << u.glslName << ";\n";

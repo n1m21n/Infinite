@@ -1,4 +1,5 @@
 #include "FieldIR.h"
+#include "FieldNoise.h"
 #include "FieldSwizzle.h"
 #include "FieldCycles.h"
 #include "ExprGlobals.h"
@@ -104,6 +105,9 @@ namespace Field
          {
             return checkExact(3);
          }
+         int noiseArity = 0;
+         if (IsNoiseBuiltin(name, &noiseArity))
+            return checkExact(noiseArity);
          if (name == "rand" || name == "noise" || name == "sh")
          {
             if (argCount > 4)
@@ -1122,6 +1126,23 @@ namespace Field
                      error.message = rankErr;
                      return nullptr;
                   }
+               }
+               else if (int noiseLanes = 1; IsNoiseBuiltin(call->callee, nullptr, &noiseLanes))
+               {
+                  // row 2.1: p is a vec3, every other argument a scalar
+                  for (size_t k = 0; k < argIRs.size(); k++)
+                  {
+                     const int want = k == 0 ? 3 : 1;
+                     if (argIRs[k]->type.lanes != want)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = call->span;
+                        error.message = k == 0 ? call->callee + "() needs a vec3 point first, e.g. " + call->callee + "(vec3(uv * 8.0, 0.0)" + (argIRs.size() > 1 ? ", ...)" : ")")
+                                               : call->callee + "() argument " + std::to_string(k + 1) + " must be a scalar";
+                        return nullptr;
+                     }
+                  }
+                  fnResultType = noiseLanes == 3 ? FieldType(DataType::Vec3, 3) : FieldType(DataType::Float, 1);
                }
                else if (call->callee == "rand" || call->callee == "noise" || call->callee == "sh")
                {

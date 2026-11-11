@@ -1,4 +1,5 @@
 #include "FieldGraphKernel.h"
+#include "FieldNoise.h"
 #include "../../audio/PhaseShape.h"
 
 #include <algorithm>
@@ -253,6 +254,22 @@ namespace Field
          bool EvalCall(const IRNodePtr& node, LocalValue& out)
          {
             const std::string& fn = node->callee;
+
+            if (int nl = 1; IsNoiseBuiltin(fn, nullptr, &nl)) // row 2.1
+            {
+               double flat[8] = { 0 }, res[3] = { 0, 0, 0 };
+               int n = 0;
+               for (const auto& c : node->children)
+               {
+                  LocalValue v;
+                  if (!Eval(c, v)) return false;
+                  for (int i = 0; i < std::max(v.laneCount, 1) && n < 8; ++i) flat[n++] = v.lanes[i];
+               }
+               if (!EvalNoiseBuiltin(fn, flat, n, res)) return Fail(node->span, fn + "() needs a vec3 point first");
+               out.laneCount = nl;
+               for (int i = 0; i < nl; ++i) out.lanes[i] = res[i];
+               return true;
+            }
 
             if (fn == "vec2" || fn == "vec3" || fn == "vec4")
             {

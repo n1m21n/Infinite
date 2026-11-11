@@ -1,5 +1,6 @@
 #include "FieldVM.h"
 #include "FieldRandom.h"
+#include "FieldNoise.h"
 #include "../../audio/PhaseShape.h"
 
 #include <algorithm>
@@ -416,6 +417,22 @@ namespace Field
 
             case Opcode::OpCallBuiltin:
             {
+               if (IsNoiseBuiltin(inst.stringData)) // row 2.1: a vec3 point plus scalars in, 1 or 3 lanes out
+               {
+                  double flat[8] = { 0 }, res[3] = { 0, 0, 0 };
+                  int n = 0;
+                  for (size_t a = 0; a < inst.argRegs.size(); ++a)
+                     for (int l = 0; l < std::max(inst.argLanes[a], 1) && n < 8; ++l)
+                        flat[n++] = regs[inst.argRegs[a]].v[l];
+                  if (!EvalNoiseBuiltin(inst.stringData, flat, n, res))
+                  {
+                     outError = inst.stringData + "() needs a vec3 point first";
+                     return false;
+                  }
+                  for (int l = 0; l < lanes && l < 3; ++l)
+                     regs[inst.dst].v[l] = res[l];
+                  break;
+               }
                for (int l = 0; l < lanes; ++l)
                {
                   double argBuf[8];

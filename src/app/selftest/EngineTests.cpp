@@ -8,6 +8,7 @@
 #include "core/field/GlslBackend.h"
 #include "core/field/MslBackend.h"
 #include "core/field/MaterialRegistry.h"
+#include "core/Expression.h"
 #include "nodes/FieldPixelNode.h"
 #include "nodes/Render3DPathTrace.h"
 
@@ -238,6 +239,116 @@ namespace
             worstAll * 255.0, 1.0);
    }
 
+   // Row 2.1: mean, variance and power-spectrum slope of one channel image (n x n). The slope is the least-squares
+   // fit of log power against log frequency, k = 1..n/2, of the row DFTs averaged over all rows.
+   struct NoiseStats { double mean = 0, var = 0, slope = 0; };
+   NoiseStats StatsOf(const std::vector<double>& img, int n)
+   {
+      NoiseStats s;
+      for (double v : img) s.mean += v;
+      s.mean /= (double)img.size();
+      for (double v : img) s.var += (v - s.mean) * (v - s.mean);
+      s.var /= (double)img.size();
+      std::vector<double> pw((size_t)n / 2 + 1, 0.0);
+      for (int y = 0; y < n; y++)
+         for (int k = 1; k <= n / 2; k++)
+         {
+            double re = 0, im = 0;
+            for (int x = 0; x < n; x++)
+            {
+               const double a = -2.0 * M_PI * k * x / n, v = img[(size_t)y * n + x] - s.mean;
+               re += v * std::cos(a);
+               im += v * std::sin(a);
+            }
+            pw[k] += re * re + im * im;
+         }
+      double sx = 0, sy = 0, sxx = 0, sxy = 0;
+      int m = 0;
+      for (int k = 1; k <= n / 2; k++)
+      {
+         const double lx = std::log((double)k), ly = std::log(pw[k] / n + 1e-12);
+         sx += lx; sy += ly; sxx += lx * lx; sxy += lx * ly; m++;
+      }
+      s.slope = (m * sxy - sx * sy) / (m * sxx - sx * sx);
+      return s;
+   }
+
+   // Within 2 %: relative to the reference, with a floor so values near 0 (a white spectrum's slope, a centred mean)
+   // are judged on an absolute scale instead of blowing up.
+   bool Within2(double ref, double v, double floor) { return std::fabs(v - ref) <= 0.02 * std::max(std::fabs(ref), floor); }
+
+   void NoiseRows(rhi::Device& dev, const std::function<void(bool, const char*, double, double)>& check)
+   {
+      struct Case { const char* name; const char* expr; };
+      // expr is over u, v (pixel centre uv); the kernel and the CPU VM evaluate the same text.
+      const Case cases[] = {
+         { "noise3", "noise3(vec3(u * 16.0, v * 16.0, 0.37)) * 0.5 + 0.5" },
+         { "noise4", "noise4(vec3(u * 16.0, v * 16.0, 0.37), 1.7) * 0.5 + 0.5" },
+         { "fbm", "fbm(vec3(u * 8.0, v * 8.0, 0.37), 5.0, 2.0, 0.5) * 0.5 + 0.5" },
+         { "voronoi3 F1", "voronoi3(vec3(u * 12.0, v * 12.0, 0.37)).x * 0.5" },
+         { "voronoi3 F2", "voronoi3(vec3(u * 12.0, v * 12.0, 0.37)).y * 0.5" },
+         { "voronoi3 id", "voronoi3(vec3(u * 12.0, v * 12.0, 0.37)).z" },
+         { "wave", "wave(vec3(u * 6.3, v * 6.3, 0.0))" },
+         { "brick", "brick(vec3(u * 7.3, v * 7.3, 0.0), 0.1)" },
+         { "checker", "checker(vec3(u * 9.3, v * 9.3, 0.0))" },
+         { "gradient", "gradient(vec3(u * 1.4 - 0.2, v, 0.0))" },
+         { "white", "white(vec3(u * 32.0, v * 32.0, 0.0))" },
+      };
+      const int n = 128;
+      int passed = 0, total = 0;
+      double worstStat = 0.0;
+      for (const Case& c : cases)
+      {
+         total++;
+         std::string code = "float u = uv.x;\nfloat v = uv.y;\ncol = vec3(" + std::string(c.expr) + ");";
+         Field::PixelIRProgram ir;
+         std::string err;
+         std::vector<float> gl, mt;
+         if (!LowerPreset(code.c_str(), ir, err) || !GlFieldPixel(ir, n, gl, err) || !MetalFieldPixel(dev, ir, n, mt, err))
+         {
+            printf("  noise %-12s GPU failed: %s\n", c.name, err.c_str());
+            continue;
+         }
+         std::vector<double> cpu((size_t)n * n), g((size_t)n * n), m((size_t)n * n);
+         bool vmOk = true;
+         std::map<std::string, float> sib;
+         for (int y = 0; y < n && vmOk; y++)
+            for (int x = 0; x < n; x++)
+            {
+               sib["u"] = (float)((x + 0.5) / n);
+               sib["v"] = (float)((y + 0.5) / n);
+               float out = 0.0f;
+               if (!Expression::Evaluate(c.expr, 0.0, &sib, nullptr, out, err))
+               {
+                  printf("  noise %-12s VM failed: %s\n", c.name, err.c_str());
+                  vmOk = false;
+                  break;
+               }
+               const size_t i = (size_t)y * n + x;
+               cpu[i] = out;
+               g[i] = gl[i * 4];
+               m[i] = mt[i * 4];
+            }
+         if (!vmOk)
+            continue;
+         const NoiseStats a = StatsOf(cpu, n), b = StatsOf(g, n), d = StatsOf(m, n);
+         double px = 0.0;
+         for (size_t i = 0; i < cpu.size(); i++)
+            px = std::max({ px, std::fabs(cpu[i] - g[i]), std::fabs(cpu[i] - m[i]) });
+         const bool ok = Within2(a.mean, b.mean, 0.05) && Within2(a.mean, d.mean, 0.05) && Within2(a.var, b.var, 0.01) &&
+                         Within2(a.var, d.var, 0.01) && Within2(a.slope, b.slope, 1.0) && Within2(a.slope, d.slope, 1.0);
+         auto rel = [](double r, double v, double f) { return std::fabs(v - r) / std::max(std::fabs(r), f); };
+         worstStat = std::max({ worstStat, rel(a.mean, b.mean, 0.05), rel(a.mean, d.mean, 0.05), rel(a.var, b.var, 0.01),
+                                rel(a.var, d.var, 0.01), rel(a.slope, b.slope, 1.0), rel(a.slope, d.slope, 1.0) });
+         printf("  noise %-12s VM mean %.4f var %.4f slope %+.3f | GLSL %.4f %.4f %+.3f | MSL %.4f %.4f %+.3f | max px %.5f %s\n",
+                c.name, a.mean, a.var, a.slope, b.mean, b.var, b.slope, d.mean, d.var, d.slope, px, ok ? "" : "<-- off");
+         if (ok)
+            passed++;
+      }
+      check(passed == total, "2.1: 9 noise built-ins (11 channels), mean/variance/spectrum slope VM vs GLSL vs MSL within 2 %",
+            worstStat * 100.0, 2.0);
+   }
+
    double NowMs()
    {
       return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -262,6 +373,7 @@ bool RunEngineTest()
       return false;
    }
    FieldMslRows(*dev, check);
+   NoiseRows(*dev, check);
    const int W = 1920, H = 1080;
    const int nLights = getenv("INFINITE_ENGINETEST_LIGHTS") ? atoi(getenv("INFINITE_ENGINETEST_LIGHTS")) : 8;
 
