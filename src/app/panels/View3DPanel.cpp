@@ -6936,6 +6936,7 @@ namespace
       mat->subsurface = was.subsurface;
       std::copy(was.subsurfaceColor, was.subsurfaceColor + 3, mat->subsurfaceColor);
       mat->subsurfaceRadius = was.subsurfaceRadius;
+      mat->translucency = was.translucency;
       item.uid = made->uid;
       scene->Commit();
    }

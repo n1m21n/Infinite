@@ -87,6 +87,7 @@ def material_lines(m, sheen=True):
             ("subsurface", "  f subsurface %g" % m.get("subsurface", 0.0)),
             ("subsurface_color", "  c subsurfaceColor %g %g %g" % tuple(m.get("subsurface_color", (1.0, 0.2, 0.1)))),
             ("subsurface_radius", "  f subsurfaceRadius %g" % m.get("subsurface_radius", 0.5)),
+            ("translucency", "  f translucency %g" % m.get("translucency", 0.0)),
             ("anisotropy", "  f anisotropy %g" % m.get("anisotropy", 0.0)),
             ("anisotropy_rotation", "  f anisotropyRotation %g" % m.get("anisotropy_rotation", 0.0)),
             ("iridescence", "  f iridescence %g" % m.get("iridescence", 0.0)),
@@ -209,11 +210,11 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
 
     def fur_node(f, src):
         """Geometry Op Fur after src (blender_scene.add_fur rebuilds it), with an arc Curve as its guide when asked."""
-        fur = node("3D", "Fur", ["  i op 22", "  f furDensity %g" % f["density"], "  i furMaxStrands %d" % f.get("max", 400000),
+        fur = node("3D", "Fur", ["  f furDensity %g" % f["density"], "  i furMaxStrands %d" % f.get("max", 400000),
                                  "  f furLength %g" % f["length"], "  f furJitter %g" % f.get("jitter", 0.3),
                                  "  f furWidth %g" % f["width"], "  i furSegments %d" % f.get("segments", 3),
                                  "  f furGravity %g" % f.get("gravity", 0.0), "  f furClump 0", "  f furCurl 0",
-                                 "  f seed %g" % f.get("seed", 0)])
+                                 "  f seed %g" % f.get("seed", 0)] + (["  i furNormals 1"] if f.get("hair") else []))
         wires.append("geo %d 0 %d" % (fur, src))
         g = f.get("guide")
         if g:   # the arc preset through linear interpolation: exactly the polyline add_fur builds
@@ -275,7 +276,12 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             wires.append("geo %d 0 %d" % (mp, model))
             model = mp
         dl = ["  f detailScale %g" % m["detail"][0], "  f detailStrength %g" % m["detail"][1]] if "detail" in m else []
-        mat = node("3D", "Material", material_lines(m) + dl + (["  i wrapMode repeat"] if m.get("maps") else []))
+        h = (o.get("fur") or {}).get("hair")
+        hl = ["  i model 1", "  i hairColour 0", "  f melanin %g" % h["melanin"], "  f melaninRedness %g" % h.get("redness", 1.0),
+              "  f radialRoughness %g" % h.get("radial", 0.3), "  f hairShift %g" % h.get("shift", 2.0)] if h else []
+        if h:   # the Material's roughness and IOR are the fibre's (the skin shares them)
+            m = dict(m, roughness=h["roughness"], ior=h.get("ior", 1.55))
+        mat = node("3D", "Material", material_lines(m) + dl + hl + (["  i wrapMode repeat"] if m.get("maps") else []))
         wires.append("geo %d 0 %d" % (mat, model))
         for slot, tex_name in m.get("maps", {}).items():
             tex = node("Source", "Image Source", ["  s path %s" % make_texture(case, tex_name)])
@@ -630,6 +636,8 @@ def main():
             status = json.loads(last) if last.startswith("{") else {}
             if not status.get("ok"):
                 sys.exit("infinite failed on %s%s:\n%s" % (name, tag, log[-3000:]))
+            if "MTLLibraryErrorDomain" in log or "shader compile" in log.lower():   # a broken shader falls back quietly
+                sys.exit("shader error on %s%s:\n%s" % (name, tag, log[-3000:]))
             elapsed = status.get("elapsed_ms")
             os.replace(os.path.join(d, "f", "frame_00000.png"), os.path.join(d, "inf%s%s.png" % (sfx, tag)))
             if frames:

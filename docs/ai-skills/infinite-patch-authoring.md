@@ -133,7 +133,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-352 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+353 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -142,12 +142,12 @@ first, then the type name), then `--describe "<type>"` for parameters.
 |---|---|---|---|---|
 | `3D View` | none | out:image | 62 | bypass |
 | `Armature` | in:geometry, path:geometry | out:geometry | 86 |  |
-| `Array` | geo:geometry | out:geometry | 76 | bypass |
+| `Array` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 51 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
 | `Audio Ribbon` | input:audio | out:geometry | 23 | bypass |
 | `Bake` | geo:geometry | out:image | 4 | bypass |
-| `Bevel` | geo:geometry | out:geometry | 76 | bypass |
+| `Bevel` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Camera` | none | out:camera | 23 | bypass |
 | `Capsule` | texture:image | out:geometry | 51 | bypass |
 | `Cloth` | geo:geometry, collider:geometry | out:geometry | 41 |  |
@@ -156,10 +156,10 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Curve` | none | out:geometry | 32 | bypass |
 | `Curve Ops` | curve:geometry | out:geometry | 9 | bypass |
 | `Cylinder` | texture:image | out:geometry | 51 | bypass |
-| `Decimate` | geo:geometry | out:geometry | 76 | bypass |
+| `Decimate` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Delaunay Mesh` | points:geometry | out:geometry | 4 | bypass |
-| `Delete` | geo:geometry | out:geometry | 76 | bypass |
-| `Delete Selected` | geo:geometry | out:geometry | 76 | bypass |
+| `Delete` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
+| `Delete Selected` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Depth Projection` | depth:image, color:image | out:geometry | 35 |  |
 | `Difference` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Disc` | texture:image | out:geometry | 51 | bypass |
@@ -168,12 +168,13 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Distribute Points on Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Dodecahedron` | texture:image | out:geometry | 51 | bypass |
 | `Edit Mesh` | geo:geometry | out:geometry | 1 | bypass |
-| `Explode` | geo:geometry | out:geometry | 76 | bypass |
-| `Extrude` | geo:geometry | out:geometry | 76 | bypass |
-| `Extrude Selected` | geo:geometry | out:geometry | 76 | bypass |
+| `Explode` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
+| `Extrude` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
+| `Extrude Selected` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Feedback 3D` | seed:geometry, loop:geometry | out:geometry | 0 |  |
 | `Field Modifier` | geo:geometry | out:geometry | 11 | bypass |
 | `Field Primitive` | none | out:geometry | 13 | bypass |
+| `Fur` | geo:geometry, guide:geometry | out:geometry | 89 |  |
 | `Gear 3D` | texture:image | out:geometry | 51 | bypass |
 | `Geometry` | texture:image | out:geometry | 51 | bypass |
 | `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
@@ -181,26 +182,26 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Helix` | texture:image | out:geometry | 51 | bypass |
 | `Icosphere` | texture:image | out:geometry | 51 | bypass |
 | `Image to Points` | input:image | out:geometry | 10 | bypass |
-| `Inset` | geo:geometry | out:geometry | 76 | bypass |
+| `Inset` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Instance on Points` | points:geometry, shape:geometry, cloud:geometry | out:geometry | 25 |  |
 | `Intersect` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Join Geometry` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Klein Bottle` | texture:image | out:geometry | 51 | bypass |
 | `L-System` | none | out:geometry | 21 | bypass |
 | `Light` | none | out:light | 28 | bypass |
-| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
-| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image | out:geometry | 30 |  |
+| `Mapping` | geo:geometry | out:geometry | 12 | bypass |
+| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image | out:geometry | 40 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Points` | geo:geometry | out:geometry | 22 | bypass |
 | `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
-| `Mirror` | geo:geometry | out:geometry | 76 | bypass |
+| `Mirror` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
 | `Model 3D` | texture:image | out:geometry | 117 | bypass |
-| `Normals` | geo:geometry | out:geometry | 76 | bypass |
+| `Normals` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Null 3D` | geo:geometry | out:geometry | 0 | bypass |
-| `Ocean` | texture:image | out:geometry | 29 | bypass |
+| `Ocean` | texture:image | out:geometry | 30 | bypass |
 | `Octahedron` | texture:image | out:geometry | 51 | bypass |
 | `Particle System` | emit:geometry | out:geometry | 30 | bypass |
 | `Plane` | texture:image | out:geometry | 51 | bypass |
@@ -214,16 +215,16 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
 | `Rounded Cube` | texture:image | out:geometry | 51 | bypass |
-| `Screw` | geo:geometry | out:geometry | 76 | bypass |
+| `Screw` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Sculpt` | geo:geometry, brush:image | out:geometry | 3 |  |
-| `Select` | geo:geometry | out:geometry | 76 | bypass |
+| `Select` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
 | `Sketch 3D` | none | out:geometry | 4 | bypass |
-| `Smooth` | geo:geometry | out:geometry | 76 | bypass |
-| `Solidify` | geo:geometry | out:geometry | 76 | bypass |
+| `Smooth` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
+| `Solidify` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Sphere` | texture:image | out:geometry | 51 | bypass |
 | `Star 3D` | texture:image | out:geometry | 51 | bypass |
-| `Subdivide` | geo:geometry | out:geometry | 76 | bypass |
+| `Subdivide` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Supershape` | texture:image | out:geometry | 51 | bypass |
 | `Sweep` | profile:geometry, path:geometry | out:geometry | 6 |  |
 | `Switcher 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 5 |  |
@@ -231,15 +232,15 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Text 3D` | texture:image | out:geometry | 29 | bypass |
 | `Torus` | texture:image | out:geometry | 51 | bypass |
 | `Torus Knot` | texture:image | out:geometry | 51 | bypass |
-| `Transform` | geo:geometry | out:geometry | 76 | bypass |
-| `Transform Selected` | geo:geometry | out:geometry | 76 | bypass |
-| `Triangulate` | geo:geometry | out:geometry | 76 | bypass |
+| `Transform` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
+| `Transform Selected` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
+| `Triangulate` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Tube` | texture:image | out:geometry | 51 | bypass |
-| `Twist` | geo:geometry | out:geometry | 76 | bypass |
-| `UV Project` | geo:geometry | out:geometry | 76 | bypass |
+| `Twist` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
+| `UV Project` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Union` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Voronoi Cells` | points:geometry | out:geometry | 4 | bypass |
-| `Wireframe` | geo:geometry | out:geometry | 76 | bypass |
+| `Wireframe` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Wrap` | source:geometry, target:geometry | out:geometry | 26 |  |
 
 ### AudioEffects
@@ -360,15 +361,15 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `Macro Bipolar Knob` | none | out:modulator | 2 | bypass |
-| `Macro Knob` | none | out:modulator | 2 | bypass |
-| `Macro NumBox` | none | out:modulator | 5 | bypass |
-| `Macro Radio Selector` | none | out:modulator | 3 | bypass |
-| `Macro Slider` | none | out:modulator | 2 | bypass |
-| `Macro Step Gate` | none | out:modulator | 3 | bypass |
-| `Macro Toggle` | none | out:modulator | 2 | bypass |
-| `Macro Trigger` | none | out:modulator | 2 | bypass |
-| `Macro XY` | none | x:modulator, y:modulator | 5 | bypass |
+| `Macro Bipolar Knob` | none | out:modulator | 3 | bypass |
+| `Macro Knob` | none | out:modulator | 3 | bypass |
+| `Macro NumBox` | none | out:modulator | 6 | bypass |
+| `Macro Radio Selector` | none | out:modulator | 4 | bypass |
+| `Macro Slider` | none | out:modulator | 3 | bypass |
+| `Macro Step Gate` | none | out:modulator | 4 | bypass |
+| `Macro Toggle` | none | out:modulator | 3 | bypass |
+| `Macro Trigger` | none | out:modulator | 3 | bypass |
+| `Macro XY` | none | x:modulator, y:modulator | 7 | bypass |
 
 ### Modulators
 
@@ -390,7 +391,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `LFO` | trig:modulator | out:modulator | 11 | bypass |
 | `MIDI CC` | none | out:modulator | 7 | hardware: refused headless, bypass |
 | `MIDI Trigger` | none | out:modulator | 6 | hardware: refused headless, bypass |
-| `MSEG` | trig:modulator | out:modulator | 8 | bypass |
+| `MSEG` | trig:modulator | out:modulator | 19 | bypass |
 | `Math` | input:modulator, input_2:modulator | out:modulator | 6 |  |
 | `Mod Curve` | in:modulator | out:modulator | 3 | bypass |
 | `Mod Depth` | in:modulator | out:modulator | 2 | bypass |
@@ -524,7 +525,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `Audio In` | none | out:audio | 4 | hardware: refused headless, bypass |
+| `Audio In` | none | out:audio | 5 | hardware: refused headless, bypass |
 | `Audio Meter` | audio:audio | out:audio | 0 | bypass |
 | `Audio Out` | audio:audio | out:image | 3 | bypass |
 | `Blend Audio` | a:audio, b:audio | out:audio | 1 |  |

@@ -350,6 +350,7 @@ public:
    float subsurface = 0.0f;
    float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
    float subsurfaceRadius = 0.5f;
+   float translucency = 0.0f;
    float sheen = 0.0f;
    float sheenColor[3] = { 1.0f, 1.0f, 1.0f };
    float sheenRoughness = 0.5f;
@@ -362,6 +363,13 @@ public:
    float alphaCutoff = 0.0f;
    float detailScale = 0.0f;
    float detailStrength = 1.0f;
+   // Model: 0 Principled, 1 Hair (Chiang fibre BSDF; hairColour 0 Melanin, 1 the base colour).
+   int model = 0;
+   int hairColour = 0;
+   float melanin = 0.8f, melaninRedness = 1.0f;
+   float hairTint[3] = { 1.0f, 1.0f, 1.0f };
+   float radialRoughness = 0.3f;
+   float hairShift = 2.0f;
    bool textureAlpha = false;
    // Normal slot holds a height map (grayscale), not a tangent-space normal.
    bool normalBump = false;
@@ -387,6 +395,7 @@ public:
       v.Float("clearcoat", clearcoat); v.Float("clearcoatRoughness", clearcoatRoughness);
       v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
       v.Float("subsurfaceRadius", subsurfaceRadius);
+      v.Float("translucency", translucency);
       v.Float("sheen", sheen); v.Color("sheenColor", sheenColor);
       v.Float("sheenRoughness", sheenRoughness);
       v.Float("iridescence", iridescence); v.Float("iridescenceIor", iridescenceIor);
@@ -397,6 +406,9 @@ public:
       v.Bool("normalBump", normalBump);
       v.Float("normalStrength", normalStrength);
       v.Float("detailScale", detailScale); v.Float("detailStrength", detailStrength);
+      v.Int("model", model); v.Int("hairColour", hairColour);
+      v.Float("melanin", melanin); v.Float("melaninRedness", melaninRedness);
+      v.Color("hairTint", hairTint); v.Float("radialRoughness", radialRoughness); v.Float("hairShift", hairShift);
    }
 private:
    ImageCable mMaps[kMapCount];

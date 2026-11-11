@@ -1,5 +1,6 @@
 // Metal backend of the engine RHI. See Rhi.h.
 #include "engine/rhi/Rhi.h"
+#include "nodes/Render3DHair.h"
 
 #include <algorithm>
 #include <cmath>
@@ -34,6 +35,12 @@ fragment float4 tri_fs(VOut in [[stage_in]], constant float3& c [[buffer(0)]]) {
 #include <metal_raytracing>
 using namespace metal;
 using namespace metal::raytracing;
+// Hair: Render3DHair.h's Chiang fibre BSDF (shared with GL).
+typedef float3 vec3;
+typedef float4 vec4;
+#define HAIR_ATAN2(y, x) atan2(y, x)
+#define HAIR_OUT thread float&
+)" R3D_HAIR_SRC R"(
 struct LightU { float4 vec; float4 aim; float4 color; float4 terms; float4 spot; }; // terms: diffuse, specular, falloff, cutoff; spot: angle, penumbra, area w, h
 struct FrameU
 {
@@ -49,7 +56,7 @@ struct FrameU
    float4 envm;     // x: 1 = HDRI map, +2 = HDRI background; y rotation (rad); z max lod (GL levels); w the map's base lod
    LightU lights[8]; // vec.w = type, aim.w unused
 };
-struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; float4 em; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; }; // base linear rgb; mr = metallic, roughness, transmission, ior; em = linear emission * strength;
+struct InstU { float4x4 model; float4x4 normalM; float4 base; float4 mr; float4 em; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; float4 ss; float4 tl; }; // base linear rgb; mr = metallic, roughness, transmission, ior; em = linear emission * strength;
 // tx = map index + 1 (albedo, roughness, metallic, normal; 0 = none); sh = sheen, sheen roughness, normal strength, wrap + 4 * bump; shc = sheen colour
 // tx2 = ao, emission, sheen, opacity maps; tx3 = clearcoat, transmission maps; mp0 = mapping space, triplanar, alpha cutoff,
 // 1 - opacity; msc/mro/mtr = mapping scale / rotation / offset, w = clearcoat, coat roughness, dielectric F0 - 0.04;
@@ -150,7 +157,7 @@ float sunVis(instance_acceleration_structure tlas, float3 o, float3 ld, float an
    }
    return v / 16.0;
 }
-struct RInst { float4 bm; float4 rg; float4 em; ulong vb; ulong ib; float4x4 normalM; ulong uvb; ulong pad0; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; }; // em: linear emission * strength; uvb/tx/sh: the maps, as InstU
+struct RInst { float4 bm; float4 rg; float4 em; ulong vb; ulong ib; float4x4 normalM; ulong uvb; ulong pad0; float4 tx; float4 sh; float4 shc; float4 tx2; float4 tx3; float4 mp0; float4 msc; float4 mro; float4 mtr; float4 olo; float4 ohi; float4 dt; float4 ss; float4 tl; }; // em: linear emission * strength; uvb/tx/sh: the maps, as InstU
 float3 cosineDir(float3 n, float u1, float u2);
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
@@ -176,7 +183,8 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
    float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
    if (dot(n, d) > 0.0) n = -n;
    const float3 p = o + d * h.distance;
-   const float3 base = I.bm.xyz; const float metal = I.bm.w;
+   const bool hairH = I.tx3.z < 0.0 && float(h.primitive_id) >= I.shc.w;
+   const float3 base = hairH ? hairAlbedo(I.dt.yzw, -I.tx3.z) : I.bm.xyz; const float metal = hairH ? 0.0 : I.bm.w;
    float3 envIrr = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0; // same ambient convention as r_fs
    if (envU.x >= 0.0 && withEnv)
    {
@@ -445,6 +453,40 @@ float sheenLtc(float nL, float nV, float lv, float r)
    return sheenE(nV, r) * a * a / (3.14159265 * max(q * q, 1e-8));
 }
 float maxc(float3 c) { return max(c.x, max(c.y, c.z)); }
+// Hair: the settle sampler for Render3DHair.h's Chiang fibre BSDF (spliced in at the top).
+// Draws wi for hairBsdf at h: a lobe by its share of Ap, its tilted longitudinal lobe, then its azimuthal logistic.
+float3 hairSample(float3 wo, float3 T, float3 sa, float bm, float bn, float alpha, float eta, float h, float4 u)
+{
+   const float sto = clamp(dot(wo, T), -1.0, 1.0), cto = sqrt(max(1.0 - sto * sto, 0.0));
+   const float3 X = hairX(wo, T, sto), Y = cross(T, X);
+   const float stt = sto / eta, ctt = sqrt(max(1.0 - stt * stt, 1e-4));
+   const float etap = sqrt(max(eta * eta - sto * sto, 0.0)) / max(cto, 1e-4);
+   const float sgt = clamp(h / etap, -1.0, 1.0), cgt = sqrt(max(1.0 - sgt * sgt, 0.0));
+   const float go = asin(clamp(h, -1.0, 1.0)), gt = asin(sgt);
+   const float3 tr = exp(-sa * (2.0 * cgt / ctt));
+   const float fr = hairFresnel(cto * sqrt(max(1.0 - h * h, 0.0)), eta);
+   const float3 a0 = float3(fr), a1 = (1.0 - fr) * (1.0 - fr) * tr, a2 = a1 * tr * fr;
+   const float3 a3 = a2 * tr * fr / max(float3(1.0) - tr * fr, float3(1e-4));
+   const float3 lw = float3(0.2126, 0.7152, 0.0722);
+   float4 ap = float4(dot(a0, lw), dot(a1, lw), dot(a2, lw), dot(a3, lw)); ap /= max(ap.x + ap.y + ap.z + ap.w, 1e-6);
+   const int p = u.x < ap.x ? 0 : u.x < ap.x + ap.y ? 1 : u.x < ap.x + ap.y + ap.z ? 2 : 3;
+   const float v0 = hairV0(bm), s = hairS(bn);
+   float v = p == 0 ? v0 : p == 1 ? 0.25 * v0 : 4.0 * v0;
+   const float ta = p == 0 ? -2.0 * alpha : p == 1 ? alpha : p == 2 ? 4.0 * alpha : 0.0;
+   const float stp = sto * cos(ta) + cto * sin(ta), ctp = abs(cto * cos(ta) - sto * sin(ta));
+   const float u1 = max(u.y, 1e-5);
+   const float ct = 1.0 + v * log(u1 + (1.0 - u1) * exp(-2.0 / v)), st = sqrt(max(1.0 - ct * ct, 0.0));
+   const float sti = clamp(-ct * stp + st * cos(6.2831853 * u.z) * ctp, -1.0, 1.0), cti = sqrt(max(1.0 - sti * sti, 0.0));
+   float phi;
+   if (p < 3)
+   {
+      const float lo = hairCdf(-3.14159265, s), k = hairCdf(3.14159265, s) - lo;
+      const float x = -s * log(1.0 / max(u.w * k + lo, 1e-7) - 1.0);
+      phi = hairPhi(float(p), go, gt) + clamp(x, -3.14159265, 3.14159265);
+   }
+   else phi = 6.2831853 * u.w;
+   return normalize(T * sti + (X * cos(phi) + Y * sin(phi)) * cti);
+}
 
 // ---- Half-res RT shadows (C18): vis_fs traces one shadow ray per light (aim.w = channel) at full-res pixel 2q
 // from the depth prepass; r_fs takes the 2x2 texels around it that lie on its surface (distance within 2%), and
@@ -513,15 +555,24 @@ float upVis(texture2d<float> vt, texture2d<float> vd, float2 pos, float dist, in
    return (ws < 0.2 || hi - lo > 0.5) ? -1.0 : acc / ws; // a shadow edge between the texels: trace this pixel
 
 }
+#ifndef SSS_K
+#define SSS_K 4.0
+#endif
+#ifndef SSS_D
+#define SSS_D 1.0
+#endif
 fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant InstU& m [[buffer(2)]],
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
                      constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
                      texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]],
-                     array<texture2d<float>, 16> maps [[texture(10)]])
+                     array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]])
 {
    float3 n = normalize(in.n);
    float3 base = m.base.xyz;
    float metalIn = m.mr.x, roughIn = m.mr.y;
+   // Hair: from triangle shc.w on (a Fur mesh's strands; the skin keeps the material). The vertex normal is the strand.
+   const bool hairM = m.tx3.z < 0.0 && float(prim) >= m.shc.w;
+   if (hairM) { base = hairAlbedo(m.dt.yzw, -m.tx3.z); metalIn = 0.0; }
    const int wrapM = int(m.sh.w + 0.5) & 3;
    // Every derivative first, in uniform control flow, before any map read or cutout.
    const MapX mx = mapX(m.mp0, m.msc, m.mro, m.mtr, m.olo, m.ohi, wrapM);
@@ -560,7 +611,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    // so smooth normals that tip away at a silhouette are left alone.
    float3 gN = cross(dp1, dp2);
    if (dot(gN, gN) > 1e-20) { gN = normalize(gN); if (dot(gN, viewDir) < 0.0) gN = -gN; if (dot(n, gN) < 0.0) n = -n; }
-   if (m.tx.w > 0.5)
+   // The ribbon's face toward us carries what is not along the strand.
+   const float3 hT = normalize(in.n);
+   if (hairM && dot(gN, gN) > 0.5) n = gN;
+   if (m.tx.w > 0.5 && !hairM)
    {
       // GL's cotangent frame from screen derivatives of position and the mapped uv (Schuler), then the tangent-space sample.
       const float2 muv = mapUv(mx, mb, nP), duv1 = mapUv(mx, mbx, nP), duv2 = mapUv(mx, mby, nP);
@@ -583,6 +637,16 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    float3 coatCol = float3(0.0);
    float3 col = float3(0.0);
    float3 floorBounce = float3(0.0);
+   // Subsurface (C9), as GL: per channel the light bleeds past the terminator by scatter radius against curvature,
+   // w = K r kappa, diffuse (N.L + w) / (1 + w)^2; translucency passes a share of the diffuse to the far side.
+   const float sssW = hairM ? 0.0 : clamp(m.ss.w, 0.0, 1.0), tlW = hairM ? 0.0 : clamp(m.tl.x, 0.0, 1.0);
+   float3 ssW = float3(0.0);
+   if (sssW > 0.0)
+   {
+      const float kap = sqrt((dot(dnx, dnx) + dot(dny, dny)) / max(dot(dp1, dp1) + dot(dp2, dp2), 1e-12));
+      ssW = clamp(SSS_K * m.ss.xyz * kap, 0.0, 1.0);
+   }
+   const float frontD = (1.0 - sssW) * (1.0 - tlW);
    const int count = int(f.params.w);
    for (int i = 0; i < 8; i++)
    {
@@ -608,9 +672,9 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             const float jx = (float(si & 3) + rnd(ars)) * 0.25, jy = (float(si >> 2) + rnd(ars)) * 0.5;
             const float3 tl = L.vec.xyz + aR * ((jx - 0.5) * L.spot.z) + aU * ((jy - 0.5) * L.spot.w) - in.wp;
             const float dist = length(tl); const float3 ld = tl / max(dist, 1e-4);
-            float e = lightFalloff(dist, L.terms.z) * max(dot(-ld, L.aim.xyz), 0.0) * max(dot(n, ld), 0.0);
+            float e = lightFalloff(dist, L.terms.z) * max(dot(-ld, L.aim.xyz), 0.0) * (hairM ? 1.0 : max(dot(n, ld), 0.0));
             if (L.terms.w > 0.0 && dist > L.terms.w) e = 0.0;
-            if (e > 0.0 && rtSh && occluded(rtArgs.tlas, in.wp + n * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
+            if (e > 0.0 && rtSh && occluded(rtArgs.tlas, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
             areaE += e * 0.125;
          }
          if (areaE <= 0.0) continue;
@@ -638,7 +702,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       float nDotL;
       nDotL = max(dot(n, lightDir), 0.0); // no GL sun wrap: the tracer and Cycles have none, so live and settled agree
       if (type == 5) nDotL = max(nDotL, 1e-3); // the centre may face away while part of the rectangle is seen
-      if (nDotL <= 0.0) continue;
+      if (hairM) nDotL = 1.0; // a fibre takes light from every side; the BSDF holds the cosine
+      const float nlS = dot(n, lightDir);
+      if (nDotL <= 0.0 && !((sssW > 0.0 && any(nlS + ssW > 0.0)) || (tlW > 0.0 && type != 5))) continue;
+      const float3 nS = dot(n, lightDir) < 0.0 ? -n : n; // shadow rays leave on the light's side
       const float nDotH = max(dot(n, halfway), 0.0);
       const float d = distGGX(nDotH, rough);
       const float g = geomSchlick(nDotV, rough) * geomSchlick(nDotL, rough);
@@ -666,7 +733,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       if (type == 5) shadow = areaE / max(atten * nDotL, 1e-6); // radiance * nDotL * shadow == radiance0 * E
       else
       {
-         if (f.shP.x > 0.5 && i == int(f.shP.y)) shadow = shadowFactor(f, sm, in.wp, n, lightDir);
+         if (f.shP.x > 0.5 && i == int(f.shP.y)) shadow = shadowFactor(f, sm, in.wp, nS, lightDir);
          if ((int(f.shQ.z + 0.5) & 1) != 0)
          {
             float vis = -1.0;
@@ -675,12 +742,17 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             if (vis < 0.0)
             {
                if (type == 1 || type == 4)
-                  vis = occluded(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0)) ? 0.0 : 1.0;
+                  vis = occluded(rtArgs.tlas, in.wp + nS * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0)) ? 0.0 : 1.0;
                else
-                  vis = sunVis(rtArgs.tlas, in.wp + n * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy);
+                  vis = sunVis(rtArgs.tlas, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy);
             }
             shadow = mix(1.0 - f.shP.w, 1.0, vis);
          }
+      }
+      if (hairM)
+      {
+         col += hairAvg(viewDir, lightDir, hT, m.dt.yzw, clamp(roughIn, 0.02, 1.0), -m.tx3.z, m.tx3.w, m.mr.w) * radiance * shadow * L.terms.x;
+         continue;
       }
       float3 shS = float3(0.0);
       float shK = 1.0;
@@ -689,7 +761,12 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          shS = m.shc.xyz * sheenLtc(nDotL, nDotV, dot(lightDir, viewDir), m.sh.y) * shW;
          shK = shV; // Cycles scales the base by the sheen albedo at the view angle only
       }
-      col += ((kD * base / 3.14159265 * L.terms.x + spec * L.terms.y) * shK + shS * L.terms.y) * radiance * nDotL * shadow;
+      // Diffuse: the Lambert share, the subsurface wrap (unshadowed past the terminator, where a shadow ray from the
+      // surface meets the object itself) and the back side's share (its shadow ray leaves from behind).
+      float3 dif = float3(frontD * nDotL * shadow);
+      if (sssW > 0.0) dif += (1.0 - tlW) * sssW * max(nlS + ssW, 0.0) / ((1.0 + ssW) * (1.0 + ssW)) * (nlS > 0.0 ? shadow : 1.0);
+      if (tlW > 0.0) dif += tlW * max(-nlS, 0.0) * shadow;
+      col += ((kD * base / 3.14159265 * dif * L.terms.x + spec * nDotL * shadow * L.terms.y) * shK + shS * nDotL * shadow * L.terms.y) * radiance;
       if (ccW > 0.0) coatCol += ccW * coatSpec(nDotH, nDotV, nDotL, max(dot(halfway, viewDir), 0.0), ccR) * L.terms.y * radiance * nDotL * shadow;
    }
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
@@ -1069,6 +1146,90 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
    }
    return true;
 }
+// Settle's next-event pick: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
+// weighted by the count and the chance of taking this branch. pL > 0: an emitter, its solid-angle pdf.
+void ptPickLight(constant FrameU& f, const device EmTri* ems, int nEm, float pEm, int count, float3 p, thread uint& seed,
+                 thread float3& ld, thread float3& Le, thread float& tmax, thread float& pL, thread float2& lterms)
+{
+   if (nEm > 0 && rnd(seed) < pEm)
+   {
+      const float r = rnd(seed);
+      int lo = 0, hi = nEm - 1;
+      while (lo < hi) { const int mid = (lo + hi) / 2; if (ems[mid].p0.w < r) lo = mid + 1; else hi = mid; }
+      const EmTri t = ems[lo];
+      const float su = sqrt(rnd(seed)), u2 = rnd(seed);
+      const float3 tl = t.p0.xyz + t.e1.xyz * (su * (1.0 - u2)) + t.e2.xyz * (su * u2) - p;
+      const float dist = length(tl); ld = tl / max(dist, 1e-6);
+      const float3 gn = cross(t.e1.xyz, t.e2.xyz);
+      const float cosL = abs(dot(gn, ld)) / max(length(gn), 1e-12);
+      if (cosL > 1e-4 && t.e1.w > 0.0)
+      {
+         pL = pEm * t.e1.w * dist * dist / cosL; // solid-angle pdf of this sample
+         Le = t.em.xyz; tmax = max(dist * (1.0 - 1e-3) - f.shQ.w, 0.0);
+      }
+   }
+   else if (count > 0)
+   {
+      constant LightU& Lt = f.lights[min(int(rnd(seed) * float(count)), count - 1)];
+      const int type = int(Lt.vec.w);
+      float atten = type == 3 ? 0.0 : 1.0; // ambient arrives through the bounces
+      tmax = 1e4;
+      if (type == 1 || type == 4 || type == 5)
+      {
+         float3 lp = Lt.vec.xyz;
+         if (type == 5)
+         {
+            // Area: a uniform point on the rectangle (Render 3D's basis), cosine at the light below.
+            float3 rgt = cross(float3(0.0, 1.0, 0.0), Lt.aim.xyz);
+            rgt = dot(rgt, rgt) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(rgt);
+            const float3 upv = cross(Lt.aim.xyz, rgt);
+            lp += rgt * ((rnd(seed) - 0.5) * Lt.spot.z) + upv * ((rnd(seed) - 0.5) * Lt.spot.w);
+         }
+         const float3 tl = lp - p; const float dist = length(tl);
+         ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
+         atten *= lightFalloff(dist, Lt.terms.z);
+         if (Lt.terms.w > 0.0 && dist > Lt.terms.w) atten = 0.0;
+         if (type == 4)
+         {
+            const float cosCur = dot(-ld, Lt.aim.xyz), cosOuter = cos(Lt.spot.x * 0.017453292);
+            const float smoothW = (1.0 - cosOuter) * Lt.spot.y;
+            float sa = cosCur > cosOuter ? cosCur : 0.0;
+            if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
+            atten *= sa;
+         }
+         if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
+      }
+      else
+      {
+         ld = normalize(Lt.vec.xyz);
+         if ((type == 0 || type == 2) && Lt.spot.x > 0.0)
+         {
+            // A sun disc: a uniform direction in its cone (radiance spread so the irradiance stays the light's own).
+            const float cm = cos(Lt.spot.x * 0.5 * 0.017453292);
+            const float ct = 1.0 - rnd(seed) * (1.0 - cm), st = sqrt(max(1.0 - ct * ct, 0.0)), ph = 6.28318530718 * rnd(seed);
+            const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
+            ld = normalize(ld * ct + (ax * cos(ph) + cross(ld, ax) * sin(ph)) * st);
+         }
+      }
+      Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
+      lterms = Lt.terms.xy;
+   }
+}
+// Translucency's lobes: the specular on the lit side, the diffuse share passed through to the far side (cosine there).
+float3 ptEvalT(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, thread float& pdf)
+{
+   const float nL = dot(n, L), nV = max(dot(n, V), 1e-4);
+   const float2 p = ptProbs(f0, metal, nV);
+   if (nL > 1e-6)
+   {
+      const float3 fs = ptEval(n, V, L, base, metal, rough, f0, float2(0.0, w.y), pdf);
+      pdf -= p.y * nL / 3.14159265; // the diffuse half of the mixture lives on the far side here
+      return fs;
+   }
+   const float3 Fv = f0 + (float3(1.0) - f0) * ptS5(nV);
+   pdf = p.y * (-nL) / 3.14159265;
+   return (float3(1.0) - Fv) * (1.0 - metal) * base * (w.x / 3.14159265) * (-nL);
+}
 fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
                       texture2d<float> prev [[texture(0)]], texture2d<float> et [[texture(9)]],
@@ -1129,12 +1290,22 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
                       + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w3.y
                       + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w3.z;
       float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
+      const float3 hT = n; // hair: the strand axis
       const bool backHit = dot(n, d) > 0.0;
       if (backHit) n = -n;
+      const bool hairM = I.tx3.z < 0.0 && float(h.primitive_id) >= I.shc.w;
+      if (hairM)
+      {
+         // The ribbon's face toward the ray (the vertex normal is along the strand).
+         const float3 p0 = float3(vb[ix.x * 6], vb[ix.x * 6 + 1], vb[ix.x * 6 + 2]);
+         const float3 q1 = float3(vb[ix.y * 6], vb[ix.y * 6 + 1], vb[ix.y * 6 + 2]), q2 = float3(vb[ix.z * 6], vb[ix.z * 6 + 1], vb[ix.z * 6 + 2]);
+         float3 gn = (I.normalM * float4(cross(q1 - p0, q2 - p0), 0.0)).xyz;
+         if (dot(gn, gn) > 1e-30) { gn = normalize(gn); n = dot(gn, d) > 0.0 ? -gn : gn; }
+      }
       const float3 p = o + d * h.distance;
-      float3 base = I.bm.xyz; float metal = clamp(I.bm.w, 0.0, 1.0); float rough = clamp(I.rg.x, 0.045, 1.0);
+      float3 base = hairM ? hairAlbedo(I.dt.yzw, -I.tx3.z) : I.bm.xyz; float metal = hairM ? 0.0 : clamp(I.bm.w, 0.0, 1.0); float rough = clamp(I.rg.x, 0.045, 1.0);
       const float3 ns = n; // the surface's own side: ray origins and the light / bounce gates use it, not the mapped normal
-      float3 emMap = float3(1.0); float shW = I.sh.x, ccW = I.msc.w;
+      float3 emMap = float3(1.0); float shW = hairM ? 0.0 : I.sh.x, ccW = hairM ? 0.0 : I.msc.w;
       if (any(I.tx > 0.5) || any(I.tx2 > 0.5) || any(I.tx3 > 0.5))
       {
          // Maps at the hit, through the mapping: full detail on the camera hit (the jittered samples filter it), a
@@ -1169,7 +1340,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
             skips++; if (b == 0) cov = 0.0;
             o = p + d * f.shQ.w; b--; continue;
          }
-         if (I.tx.w > 0.5)
+         if (I.tx.w > 0.5 && !hairM)
          {
             const float3 e1 = q1 - p0, e2 = q2 - p0;
             const float2 mu0 = mapUv(mx, mapBase(mx, t0, p0), n), mu1 = mapUv(mx, mapBase(mx, t1, q1), n), mu2 = mapUv(mx, mapBase(mx, t2, q2), n);
@@ -1206,6 +1377,15 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
       const float shMax = shW * maxc(I.shc.xyz), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(nDotV, I.sh.y) : 1.0;
       const float3 f0 = mix(float3(0.04 + I.mtr.w), base, metal);
+      // Subsurface and translucency (C9) take the diffuse share by chance: mode 1 walks the volume, mode 2 passes the
+      // diffuse to the far side; otherwise the plain diffuse.
+      int dm = 0;
+      if (!hairM && metal < 1.0 && (I.ss.w > 0.0 || I.tl.x > 0.0))
+      {
+         const float tlW = clamp(I.tl.x, 0.0, 1.0), ssW = clamp(I.ss.w, 0.0, 1.0) * (1.0 - tlW);
+         const float um = rnd(seed);
+         dm = um < tlW ? 2 : (um < tlW + ssW && max(I.ss.x, max(I.ss.y, I.ss.z)) > 1e-4 ? 1 : 0);
+      }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
       for (int i = 0; i < int(f.params.w) && i < 8; i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
          if (int(f.lights[i].vec.w) == 3) L += T * base * (1.0 - metal) * f.lights[i].color.xyz * f.lights[i].terms.x;
@@ -1215,76 +1395,19 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       // weighted by the count and the chance of taking this branch (unbiased). Both branches only set up the sample;
       // one shadow ray and one BSDF evaluation below serve either (keeps the kernel small).
       float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-      if (nEm > 0 && rnd(seed) < pEm)
-      {
-         const float r = rnd(seed);
-         int lo = 0, hi = nEm - 1;
-         while (lo < hi) { const int mid = (lo + hi) / 2; if (ems[mid].p0.w < r) lo = mid + 1; else hi = mid; }
-         const EmTri t = ems[lo];
-         const float su = sqrt(rnd(seed)), u2 = rnd(seed);
-         const float3 tl = t.p0.xyz + t.e1.xyz * (su * (1.0 - u2)) + t.e2.xyz * (su * u2) - p;
-         const float dist = length(tl); ld = tl / max(dist, 1e-6);
-         const float3 gn = cross(t.e1.xyz, t.e2.xyz);
-         const float cosL = abs(dot(gn, ld)) / max(length(gn), 1e-12);
-         if (cosL > 1e-4 && t.e1.w > 0.0)
-         {
-            pL = pEm * t.e1.w * dist * dist / cosL; // solid-angle pdf of this sample
-            Le = t.em.xyz; tmax = max(dist * (1.0 - 1e-3) - f.shQ.w, 0.0);
-         }
-      }
-      else if (count > 0)
-      {
-         constant LightU& Lt = f.lights[min(int(rnd(seed) * float(count)), count - 1)];
-         const int type = int(Lt.vec.w);
-         float atten = type == 3 ? 0.0 : 1.0; // ambient arrives through the bounces
-         tmax = 1e4;
-         if (type == 1 || type == 4 || type == 5)
-         {
-            float3 lp = Lt.vec.xyz;
-            if (type == 5)
-            {
-               // Area: a uniform point on the rectangle (Render 3D's basis), cosine at the light below.
-               float3 rgt = cross(float3(0.0, 1.0, 0.0), Lt.aim.xyz);
-               rgt = dot(rgt, rgt) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(rgt);
-               const float3 upv = cross(Lt.aim.xyz, rgt);
-               lp += rgt * ((rnd(seed) - 0.5) * Lt.spot.z) + upv * ((rnd(seed) - 0.5) * Lt.spot.w);
-            }
-            const float3 tl = lp - p; const float dist = length(tl);
-            ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
-            atten *= lightFalloff(dist, Lt.terms.z);
-            if (Lt.terms.w > 0.0 && dist > Lt.terms.w) atten = 0.0;
-            if (type == 4)
-            {
-               const float cosCur = dot(-ld, Lt.aim.xyz), cosOuter = cos(Lt.spot.x * 0.017453292);
-               const float smoothW = (1.0 - cosOuter) * Lt.spot.y;
-               float sa = cosCur > cosOuter ? cosCur : 0.0;
-               if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
-               atten *= sa;
-            }
-            if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
-         }
-         else
-         {
-            ld = normalize(Lt.vec.xyz);
-            if ((type == 0 || type == 2) && Lt.spot.x > 0.0)
-            {
-               // A sun disc: a uniform direction in its cone (radiance spread so the irradiance stays the light's own).
-               const float cm = cos(Lt.spot.x * 0.5 * 0.017453292);
-               const float ct = 1.0 - rnd(seed) * (1.0 - cm), st = sqrt(max(1.0 - ct * ct, 0.0)), ph = 6.28318530718 * rnd(seed);
-               const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
-               ld = normalize(ld * ct + (ax * cos(ph) + cross(ld, ax) * sin(ph)) * st);
-            }
-         }
-         Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
-         lterms = Lt.terms.xy;
-      }
-      if (dot(n, ld) > 1e-5 && dot(ns, ld) > 0.0 && any(Le > 0.0))
+      ptPickLight(f, ems, nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms);
+      // Hair: one place across the fibre per hit (the paper's integral over h), the same for the light and the bounce.
+      const float hH = hairM ? rnd(seed) * 2.0 - 1.0 : 0.0;
+      const float hBm = clamp(I.rg.x, 0.02, 1.0), hBn = -I.tx3.z;
+      if ((hairM || (dot(n, ld) > 1e-5 && dot(ns, ld) > 0.0) || (dm == 2 && dot(n, ld) < -1e-5 && dot(ns, ld) < 0.0)) && any(Le > 0.0))
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
-         if (occludedAlpha(rtArgs.tlas, inst, maps, p + ns * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          float pB = 0.0;
-         float3 fe = ptEval(n, V, ld, base, metal, rough, f0, lterms, pB);
+         float3 fe = hairM ? hairBsdf(V, ld, hT, I.dt.yzw, hBm, hBn, I.tx3.w, I.rg.y, hH, pB) * lterms.x
+                  : dm == 2 ? ptEvalT(n, V, ld, base, metal, rough, f0, lterms, pB)
+                           : ptEval(n, V, ld, base, metal, rough, f0, dm == 1 ? float2(0.0, lterms.y) : lterms, pB);
          if (shW > 0.0 || ccW > 0.0)
          {
             // Sheen and clearcoat on the light sample (the raster's lobes); bounces see the base BSDF.
@@ -1298,6 +1421,110 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
          }
          L += T * fe * Le * (pL > 0.0 ? pL / max(pL * pL + pB * pB, 1e-20) : 1.0); // emitters: power-heuristic MIS
       }
+      if (hairM)
+      {
+         const float3 nd = hairSample(V, hT, I.dt.yzw, hBm, hBn, I.tx3.w, I.rg.y, hH, float4(rnd(seed), rnd(seed), rnd(seed), rnd(seed)));
+         float pdH = 0.0;
+         const float3 fH = hairBsdf(V, nd, hT, I.dt.yzw, hBm, hBn, I.tx3.w, I.rg.y, hH, pdH);
+         if (pdH <= 1e-6) break;
+         T *= min(fH / pdH, float3(4.0));
+         lastPdfB = pdH; skyK = float3(1.0);
+         if (b >= 2)
+         {
+            const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
+            if (rnd(seed) > q) break;
+            T /= q;
+         }
+         o = p + (dot(ns, nd) < 0.0 ? -ns : ns) * f.shQ.w; d = nd;
+         continue;
+      }
+      if (dm == 1)
+      {
+         const float2 lq = ptProbs(f0, metal, nDotV);
+         if (rnd(seed) < lq.x)
+         {
+            // The specular lobe on its own (the walk takes the diffuse share).
+            const float3 nd = reflect(d, ggxSampleH(n, max(0.002, rough * rough), rnd(seed), rnd(seed)));
+            float pd = 0.0;
+            const float3 fs = ptEval(n, V, nd, base, metal, rough, f0, float2(0.0, 1.0), pd);
+            const float ps = pd - lq.y * max(dot(n, nd), 0.0) / 3.14159265;
+            if (ps <= 1e-6 || dot(ns, nd) <= 0.0) break;
+            T *= fs / ps; lastPdfB = pd; skyK = float3(1.0);
+            o = p + ns * f.shQ.w; d = nd;
+         }
+         else
+         {
+            // Random walk: in through a cosine below the surface, free flights of mean free path ss.xyz (one channel
+            // drawn per step, weighted by the mixture of the three pdfs), isotropic scattering at a single-scatter albedo
+            // inverted from the base colour (so the walk's total albedo is close to it), out where a flight meets a
+            // surface. There the light leaves as a white Lambert surface (the colour is in the throughput).
+            const float3 Fv = f0 + (float3(1.0) - f0) * ptS5(nDotV);
+            float3 Tw = (float3(1.0) - Fv) * (1.0 - metal) / max(lq.y, 1e-3);
+            const float3 sg = 1.0 / max(I.ss.xyz * SSS_D, float3(1e-4));
+            const float3 A = clamp(base, 0.0, 0.999);
+            const float3 qa = 4.09712 + 4.20863 * A - sqrt(9.59217 + 41.6808 * A + 17.7126 * A * A);
+            const float3 alb = 1.0 - qa * qa;
+            float3 wp = p - ns * f.shQ.w, wd = cosineDir(-ns, rnd(seed), rnd(seed));
+            bool out = false; float3 q = p, no = ns;
+            for (int s = 0; s < 256 && !out; s++)
+            {
+               // The channel is drawn in proportion to the walk's throughput so far, so a channel that has kept its
+               // weight (the long red path in skin) is not starved by draws from the short ones.
+               const float3 cw = max(Tw, float3(1e-6)) / max(Tw.x + Tw.y + Tw.z, 3e-6);
+               const float u0 = rnd(seed);
+               const float sc = u0 < cw.x ? sg.x : (u0 < cw.x + cw.y ? sg.y : sg.z);
+               const float tt = -log(max(1.0 - rnd(seed), 1e-7)) / sc;
+               ray wr(wp, wd, 0.0, tt);
+               intersection_result<triangle_data, instancing> wh = it.intersect(wr, rtArgs.tlas);
+               if (wh.type == intersection_type::triangle)
+               {
+                  const float3 tr = exp(-sg * wh.distance);
+                  Tw *= tr / max(dot(cw, tr), 1e-20);
+                  q = wp + wd * wh.distance;
+                  constant RInst& J = inst[wh.instance_id];
+                  const device uint* jb = reinterpret_cast<const device uint*>(J.ib);
+                  const device float* jv = reinterpret_cast<const device float*>(J.vb);
+                  const uint3 jx = uint3(jb[wh.primitive_id * 3], jb[wh.primitive_id * 3 + 1], jb[wh.primitive_id * 3 + 2]);
+                  const float2 jc = wh.triangle_barycentric_coord;
+                  const float3 jw = float3(1.0 - jc.x - jc.y, jc.x, jc.y);
+                  const float3 jn = float3(jv[jx.x * 6 + 3], jv[jx.x * 6 + 4], jv[jx.x * 6 + 5]) * jw.x
+                                  + float3(jv[jx.y * 6 + 3], jv[jx.y * 6 + 4], jv[jx.y * 6 + 5]) * jw.y
+                                  + float3(jv[jx.z * 6 + 3], jv[jx.z * 6 + 4], jv[jx.z * 6 + 5]) * jw.z;
+                  const float3 gn = normalize((J.normalM * float4(jn, 0.0)).xyz);
+                  no = dot(gn, wd) > 0.0 ? gn : -gn;
+                  out = true;
+               }
+               else
+               {
+                  const float3 tr = exp(-sg * tt);
+                  Tw *= alb * sg * tr / max(dot(cw, sg * tr), 1e-20);
+                  wp += wd * tt;
+                  const float cz = 1.0 - 2.0 * rnd(seed), ph = 6.28318530718 * rnd(seed), sz = sqrt(max(1.0 - cz * cz, 0.0));
+                  wd = float3(sz * cos(ph), sz * sin(ph), cz);
+               }
+            }
+            if (!out) break;
+            T *= min(Tw, float3(8.0));
+            float3 eld = float3(0.0, 1.0, 0.0), eLe = float3(0.0); float etm = 0.0, epL = -1.0; float2 elt = float2(1.0);
+            ptPickLight(f, ems, nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt);
+            const float ec = dot(no, eld);
+            if (ec > 1e-5 && any(eLe > 0.0))
+            {
+               if (occludedAlpha(rtArgs.tlas, inst, maps, q + no * f.shQ.w, eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               const float epB = ec / 3.14159265;
+               L += T * (epB * elt.x) * eLe * (epL > 0.0 ? epL / max(epL * epL + epB * epB, 1e-20) : 1.0);
+            }
+            d = cosineDir(no, rnd(seed), rnd(seed)); o = q + no * f.shQ.w;
+            lastPdfB = max(dot(no, d), 1e-4) / 3.14159265; skyK = f.ambient.xyz * 3.0;
+         }
+         if (b >= 2)
+         {
+            const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
+            if (rnd(seed) > q) break;
+            T /= q;
+         }
+         continue;
+      }
       // next direction: one lobe picked by Render 3D's lobe weights, weighted by the full BSDF over the mixture pdf
       const float2 lp = ptProbs(f0, metal, nDotV);
       const float a = max(0.002, rough * rough);
@@ -1309,9 +1536,9 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       float3 nd;
       if (coatB) { nd = reflect(d, ggxSampleH(n, ccR * ccR, rnd(seed), rnd(seed))); skyK = float3(1.0); }
       else if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); skyK = float3(1.0); }
-      else { nd = cosineDir(n, rnd(seed), rnd(seed)); skyK = f.ambient.xyz * 3.0; }
+      else { nd = cosineDir(dm == 2 ? -n : n, rnd(seed), rnd(seed)); skyK = f.ambient.xyz * 3.0; }
       float pdfB = 0.0;
-      float3 fB = ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
+      float3 fB = dm == 2 ? ptEvalT(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB) : ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), pdfB);
       float pdfC = 0.0;
       const float cnL = dot(n, nd);
       if (pC > 0.0 && cnL > 0.0)
@@ -1330,7 +1557,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
       }
       else
       {
-         if (pdfB <= 1e-6 || dot(ns, nd) <= 0.0) break; // a mapped normal can send the bounce under the surface
+         if (pdfB <= 1e-6 || (dot(ns, nd) <= 0.0) != (dm == 2 && dot(n, nd) < 0.0)) break; // a mapped normal can send the bounce under the surface
          if (shW > 0.0) // the bounce sees the sheen too (the cosine half of the mixture covers its wide lobe)
          {
             const float nL = max(dot(n, nd), 0.0);
@@ -1346,7 +1573,7 @@ fragment float4 pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], 
          if (rnd(seed) > q) break;
          T /= q;
       }
-      o = p + ns * f.shQ.w; d = nd;
+      o = p + (dot(ns, nd) < 0.0 ? -ns : ns) * f.shQ.w; d = nd;
    }
    L = min(L, float3(30.0)); // firefly guard
    const float4 pv = u.info.x > 0.5 ? prev.read(px) : float4(0.0);
@@ -1574,11 +1801,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4], envm[4];
       LightU lights[8];
    };
-   // The rest of the material (InstU / RInst tx2 .. dt in the shader).
-   struct MapExtH { float tx2[4], tx3[4], mp0[4], msc[4], mro[4], mtr[4], olo[4], ohi[4], dt[4]; };
+  // The rest of the material (InstU / RInst tx2 .. dt in the shader).
+   struct MapExtH { float tx2[4], tx3[4], mp0[4], msc[4], mro[4], mtr[4], olo[4], ohi[4], dt[4], ss[4], tl[4]; };
    struct InstU { float model[16], normalM[16], base[4], mr[4], em[4], tx[4], sh[4], shc[4]; MapExtH x; };
    struct RInstH { float bm[4], rg[4], em[4]; uint64_t vb, ib; float normalM[16]; uint64_t uvb, pad0; float tx[4], sh[4], shc[4]; MapExtH x; };
-   static_assert(sizeof(InstU) == 368 && sizeof(RInstH) == 336, "InstU / RInst layout as the shader's");
+   static_assert(sizeof(InstU) == 400 && sizeof(RInstH) == 368, "InstU / RInst layout as the shader's");
    // Encoded so all zeros is the plain material (batches leave it empty): opacity as 1 - opacity, F0 less 0.04.
    void MapExt(const engine::Instance& in, MapExtH& x)
    {
@@ -1594,6 +1821,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       x.msc[3] = in.clearcoat; x.mro[3] = in.clearcoatRoughness; x.mtr[3] = f0 - 0.04f;
       x.olo[3] = in.breakup; x.ohi[3] = in.detailScale; x.dt[0] = in.detailStrength;
+      // Hair: tx3.z = -radial roughness (negative so the any(tx3 > 0.5) map test stays off), tx3.w = cuticle tilt,
+      // dt.yzw = absorption.
+      x.tx3[2] = -std::max(in.hairRadial, 0.0f); x.tx3[3] = in.hairShift;
+      for (int k = 0; k < 3; k++) x.dt[k + 1] = in.hairSigma[k];
+      // Subsurface: ss.xyz = mean free path per channel (scene units), ss.w = weight; tl.x = translucency.
+      for (int k = 0; k < 3; k++) x.ss[k] = in.sssRadius[k];
+      x.ss[3] = in.subsurface; x.tl[0] = in.translucency;
    }
    // A run the depth prepass leaves out: it cuts pixels away, so its depth is known only once it is shaded.
    bool SeeThrough(const InstU& u) { return u.x.mp0[3] > 0.0f || u.x.tx2[3] > 0.5f || u.x.mp0[2] > 0.0f; }
@@ -2130,7 +2364,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          {
             const engine::Instance& in = fr.instances[i];
             RInstH& o = info[i]; o = {};
-            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; std::memcpy(o.em, in.emission, 12);
+            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; o.rg[1] = in.ior; std::memcpy(o.em, in.emission, 12);
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
                for (int k = 0; k < 3; k++) o.bm[k] *= mMapMean[in.mapAlbedo][k];
@@ -2437,10 +2671,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          {
             const engine::Instance& in = fr.instances[i];
             RInstH& o = info[i]; o = {};
-            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; std::memcpy(o.em, in.emission, 12);
+            Lin3(in.baseSrgb, o.bm); o.bm[3] = in.metallic; o.rg[0] = in.roughness; o.rg[1] = in.ior; std::memcpy(o.em, in.emission, 12);
             std::memcpy(o.normalM, in.normalMatrix, 64);
             MapFields(in, o.tx, o.sh);
-            std::memcpy(o.shc, in.sheenColor, 12);
+            std::memcpy(o.shc, in.sheenColor, 12); o.shc[3] = (float)in.hairFrom;
             MapExt(in, o.x);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
@@ -2974,7 +3208,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             u.mr[0] = in.metallic; u.mr[1] = in.roughness; u.mr[2] = in.transmission; u.mr[3] = in.ior;
             std::memcpy(u.em, in.emission, 12);
             MapFields(in, u.tx, u.sh);
-            std::memcpy(u.shc, in.sheenColor, 12);
+            std::memcpy(u.shc, in.sheenColor, 12); u.shc[3] = (float)in.hairFrom;
             MapExt(in, u.x);
             if (in.mesh < 0 || in.mesh >= (int)mMeshes.size())
                continue;

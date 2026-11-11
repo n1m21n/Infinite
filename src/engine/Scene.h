@@ -47,6 +47,16 @@ namespace engine
       float mapScale[3] = { 1.0f, 1.0f, 1.0f }, mapRotate[3] = { 0.0f, 0.0f, 0.0f }, mapTranslate[3] = { 0.0f, 0.0f, 0.0f };
       float triplanar = 0.0f, breakup = 0.0f;
       float objLo[3] = { 0.0f, 0.0f, 0.0f }, objHi[3] = { 1.0f, 1.0f, 1.0f };
+      // Hair (Render3DHair.h): hairRadial > 0 shades the Chiang fibre BSDF along the vertex normal (the strand axis),
+      // with absorption hairSigma, cuticle tilt hairShift (radians), from triangle hairFrom on (a Fur mesh's strands; the
+      // skin below keeps the Principled material).
+      float hairSigma[3] = { 0.0f, 0.0f, 0.0f };
+      float hairRadial = 0.0f, hairShift = 0.0f;
+      int hairFrom = 0;
+      // Subsurface (weight, per-channel mean free path in scene units) and thin translucency (share of diffuse
+      // passed to the back side).
+      float subsurface = 0.0f, sssRadius[3] = { 0.0f, 0.0f, 0.0f };
+      float translucency = 0.0f;
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the

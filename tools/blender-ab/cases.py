@@ -292,6 +292,12 @@ CASES.update({
     "mat_subsurface": _row([{"base_color": [0.9, 0.7, 0.6], "roughness": 0.5, "subsurface": 1.0, "subsurface_radius": r}
                             for r in (0.0, 0.25, 0.5, 1.0)],
                            lights=[{"type": "sun", "power": 3, "azimuth": 250, "elevation": 30}]),
+    # Thin translucency: four leaves seen from below against a sun above them, none to full.
+    "mat_translucent": {"size": SMALL, "camera": {"fov": 40, "azimuth": 90, "elevation": -25, "distance": 5.0, "target": [0, 0, 1.0]},
+                        "lights": [{"type": "sun", "power": 3, "azimuth": 60, "elevation": 60}], "world": {"color": [0.3, 0.3, 0.3]},
+                        "objects": [{"shape": "plane", "scale": 0.4, "location": [(k - 1.5) * 0.9, 0, 1.0],
+                                     "material": {"base_color": [0.5, 0.8, 0.3], "roughness": 0.6, "translucency": t}}
+                                    for k, t in enumerate((0.0, 0.33, 0.66, 1.0))]},
     "mat_anisotropy": _row([{"base_color": [0.95, 0.93, 0.88], "metallic": 1.0, "roughness": 0.4, "anisotropy": a} for a in (0.0, 0.33, 0.66, 1.0)],
                            world={"hdri": "kloofendal_43d_clear_puresky_1k.hdr", "strength": 1.0, "sun_threshold": 10.0}, lights=[]),
     "mat_thinfilm": _row([{"base_color": [0.05, 0.05, 0.05], "roughness": 0.15, "iridescence": 1.0, "iridescence_thickness": t}
@@ -396,3 +402,9 @@ CASES["hair_long"] = {
                  "fur": {"density": 20, "length": 0.15, "jitter": 0.2, "width": 0.0003, "segments": 16, "gravity": 0.3,
                          "guide": {"points": 9, "spread": 0.5, "height": 1.0}}}],
 }
+# Block 3 gate: the same hair with Material model Hair (Chiang, melanin) against Cycles' Principled Hair.
+for _mel in (0.2, 0.5, 0.8):
+    _o = dict(CASES["hair_long"]["objects"][1])
+    _o["material"] = dict(_o["material"], roughness=0.3)   # skin and fibre share one Material roughness
+    _o["fur"] = dict(_o["fur"], hair={"melanin": _mel, "redness": 1.0, "roughness": 0.3, "radial": 0.3, "shift": 2.0, "ior": 1.55})
+    CASES["hair_melanin_%g" % _mel] = dict(CASES["hair_long"], objects=[GREY_FLOOR, _o])

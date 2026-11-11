@@ -898,8 +898,31 @@ namespace app
       ColorSwatch("sss colour", n->subsurfaceColor, n);
       ModSlider("sss radius", &n->subsurfaceRadius, 0.0f, 1.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      ModSlider("translucency", &n->translucency, 0.0f, 1.0f, "%.3f", colW);
       ImGui::EndDisabled();
       ImGui::EndDisabled();
+
+      // Hair (Chiang fibre BSDF): last, so the rows above keep their keys. Roughness and ior are the fibre's.
+      static const std::vector<std::string> kModels = { "Principled", "Hair" }, kHairColour = { "Melanin", "Colour" };
+      NodeSeparator("hair", colW);
+      DropdownButton("model", kModels, n->model, [n](int i) { n->model = i; }, colW);
+      ImGui::BeginDisabled(n->model != 1 && !gParamRegisterOnly);
+      DropdownButton("hair colour", kHairColour, n->hairColour, [n](int i) { n->hairColour = i; }, colW);
+      ImGui::BeginDisabled(n->hairColour != 0 && !gParamRegisterOnly);
+      ModSlider("melanin", &n->melanin, 0.0f, 1.0f, "%.3f", colW);
+      ModSlider("redness", &n->melaninRedness, 0.0f, 1.0f, "%.3f", colW);
+      ColorSwatch("hair tint", n->hairTint, n);
+      ImGui::EndDisabled();
+      ModSlider("radial rough", &n->radialRoughness, 0.02f, 1.0f, "%.3f", colW);
+      ModSlider("cuticle shift", &n->hairShift, -10.0f, 10.0f, "%.1f deg", colW);
+      ImGui::EndDisabled();
+      if (n->model == 1 && !gParamRegisterOnly)
+      {
+         // The fibre axis comes from Fur's Tangent normals; any other mesh has its surface normal there.
+         auto* fur = dynamic_cast<GeometryOpNode*>(n->input);
+         if (!(fur && fur->op == GeometryOpNode::kFur && fur->furNormals == 1))
+            ImGui::TextDisabled("needs Fur, Tangent normals");
+      }
 
       ImGui::EndGroup();
 

@@ -1,6 +1,7 @@
 #include "Geometry3DNodes.h"
 #include "Render3DTonemap.h"
 #include "Render3DSheen.h"
+#include "Render3DHair.h"
 #include "ColorSpace.h"
 
 #include "gl3.h"
@@ -480,6 +481,9 @@ namespace
       "uniform float uSubsurface;\n"
       "uniform vec3 uSubsurfaceColor;\n"
       "uniform float uSubsurfaceRadius;\n"
+      "uniform vec3 uSssRadius;\n"
+      "uniform float uTranslucency;\n"
+      "uniform float uSssK;\n"
       "uniform float uSheen;\n"
       "uniform vec3 uSheenColor;\n"
       "uniform float uSheenRoughness;\n"
@@ -537,6 +541,10 @@ namespace
       "uniform int uHasMetallicMap;\n"
       "uniform int uHasNormalMap;\n"
       "uniform int uRibbonPrim;\n"
+      "uniform int uHair;\n"            // Hair model: the Chiang fibre BSDF along vNormal (Render3DHair.h)
+      "uniform vec3 uHairSigma;\n"
+      "uniform float uHairRadial;\n"
+      "uniform float uHairShift;\n"
       "uniform int uFurMesh;\n"
       "uniform int uHasAoMap;\n"
       "uniform int uHasEmissionMap;\n"
@@ -754,6 +762,9 @@ namespace
       "   return 1.0 / max(3.14159265 * ax * ay * d * d, 1e-7);\n"
       "}\n"
       R3D_SHEEN_GLSL
+      "#define HAIR_ATAN2(y, x) atan(y, x)\n"
+      "#define HAIR_OUT out float\n"
+      R3D_HAIR_SRC
       "vec3 evalIridescence(float nDotV, float iridIor, float thickness) {\n"
       "   float sinTheta2 = max(1.0 - nDotV * nDotV, 0.0);\n"
       "   float cosThetaPrime = sqrt(max(iridIor * iridIor - sinTheta2, 0.0));\n"
@@ -1045,8 +1056,14 @@ namespace
       "   float metal = uMetallic;\n"
       "   if (uHasMetallicMap == 1) metal *= sampleMap(uMetallicMap, n, mapUv).r;\n"
       "   metal = clamp(metal, 0.0, 1.0);\n"
+      // Hair shades a Fur mesh's strands only (the skin keeps the material); the strand reads as its albedo under diffuse light.
+      "   bool hairHere = uHair == 1 && (uFurMesh == 0 || gl_PrimitiveID >= uRibbonPrim);\n"
+      "   if (hairHere) { base = hairAlbedo(uHairSigma, uHairRadial) * vInstanceColor * vVertexColor; metal = 0.0; }\n"
       // A fur mesh skips the normal map: on ribbons it means nothing, and on the skin under the coat it lights bumps the coat hides.
-      "   if (uHasNormalMap == 1 && uFurMesh == 0) n = applyNormalMap(n, mapUv);\n"
+      "   if (uHasNormalMap == 1 && uFurMesh == 0 && !hairHere) n = applyNormalMap(n, mapUv);\n"
+      // Hair: the vertex normal is the strand (Fur's Tangent normals); the ribbon's face toward us carries the rest.
+      "   vec3 hT = normalize(vNormal);\n"
+      "   if (hairHere) { vec3 gN = cross(dFdx(vWorldPos), dFdy(vWorldPos)); if (dot(gN, gN) > 1e-20) { gN = normalize(gN); n = dot(gN, viewDir) < 0.0 ? -gN : gN; } }\n"
       "   float ao = (uHasAoMap == 1) ? sampleMap(uAoMap, n, mapUv).r : 1.0;\n"
       "   float cc = uClearcoat;\n"
       "   if (uHasClearcoatMap == 1) cc *= sampleMap(uClearcoatMap, n, mapUv).r;\n"
@@ -1082,6 +1099,16 @@ namespace
       "   }\n"
       "\n"
       "   vec3 floorBounce = vec3(0.0);\n"
+      // Subsurface (C9): light bleeds past the terminator by how far it scatters against how sharply the surface
+      // curves there, per channel: w = K * radius * curvature, diffuse (N.L + w) / (1 + w)^2 (energy conserving).
+      "   vec3 ssW = vec3(0.0);\n"
+      "   if (uSubsurface > 0.0) {\n"
+      "      vec3 sdn1 = dFdx(n), sdn2 = dFdy(n), sdp1 = dFdx(vWorldPos), sdp2 = dFdy(vWorldPos);\n"
+      "      float kap = sqrt((dot(sdn1, sdn1) + dot(sdn2, sdn2)) / max(dot(sdp1, sdp1) + dot(sdp2, sdp2), 1e-12));\n"
+      "      ssW = clamp(uSssK * uSssRadius * kap, 0.0, 1.0);\n"
+      "   }\n"
+      "   float frontD = (1.0 - uSubsurface) * (1.0 - uTranslucency);\n"
+      "   vec3 kD0 = (vec3(1.0) - f0) * (1.0 - metal) * ccAtten;\n"
       "   for (int i = 0; i < 8; i++) {\n"
       "      if (i >= uLightCount) break;\n"
       "      if ((uLightMask & (1 << i)) == 0) continue;\n"
@@ -1148,10 +1175,23 @@ namespace
       "      } else {\n"
       "         nDotL = max(dot(n, shadeDir), 0.0);\n"
       "      }\n"
-      "      float sssWrap = uSubsurfaceRadius * 0.5;\n"   // was saturated by half the slider
-      "      float sssNdotL = clamp((dot(n, lightDir) + sssWrap) / (1.0 + sssWrap), 0.0, 1.0);\n"
-      "      vec3 sssRadiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
-      "      col += base * uSubsurfaceColor * sssNdotL * uSubsurface * sssRadiance * uLightTerms[i].x;\n"
+      "      if (hairHere) {\n"
+      "         vec3 hRad = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
+      "         float hSh = (i == uShadowLight) ? shadowFactor(dot(n, shadeDir) < 0.0 ? -n : n, shadeDir) : 1.0;\n"
+      "         floorBounce += hRad * max(lightDir.y, 0.0) * uLightTerms[i].x;\n"
+      "         col += hairAvg(viewDir, shadeDir, hT, uHairSigma, clamp(uRoughness, 0.02, 1.0), uHairRadial, uHairShift, uIor) * hRad * hSh * uLightTerms[i].x * (uFurMesh == 1 ? 0.4 : 1.0);\n"
+      "         continue;\n"
+      "      }\n"
+      // The subsurface and translucent shares of the diffuse; the plain Lambert share is frontD below. The wrap band
+      // past the terminator is unshadowed (the shadow map has no thickness); the back side reads it from behind.
+      "      float nlS = dot(n, shadeDir);\n"
+      "      if (uSubsurface > 0.0 || uTranslucency > 0.0) {\n"
+      "         vec3 rX = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
+      "         float sF = (i == uShadowLight && nlS > 0.0) ? shadowFactor(n, shadeDir) : 1.0;\n"
+      "         vec3 dX = (1.0 - uTranslucency) * uSubsurface * max(vec3(nlS) + ssW, 0.0) / ((1.0 + ssW) * (1.0 + ssW)) * sF;\n"
+      "         if (uTranslucency > 0.0 && nlS < 0.0) dX += uTranslucency * (-nlS) * ((i == uShadowLight) ? shadowFactor(-n, shadeDir) : 1.0);\n"
+      "         col += kD0 * base / 3.14159265 * dX * rX * uLightTerms[i].x * (gl_PrimitiveID >= uRibbonPrim ? 0.4 : 1.0);\n"
+      "      }\n"
       "      if (nDotL <= 0.0) continue;\n"
       "      float nDotH = max(dot(n, halfway), 0.0);\n"
       "\n"
@@ -1193,7 +1233,7 @@ namespace
       // Floor bounce, no scene lookup: the light that reaches a floor under the point, at grey 0.5, lights
       // the normals that face down in proportion to how far down they face.
       "      floorBounce += radiance * max(lightDir.y, 0.0) * uLightTerms[i].x;\n"
-      "      col += ((kD * base / 3.14159265 * uLightTerms[i].x + specular * ccAtten * uLightTerms[i].y) * shK + (vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow * (gl_PrimitiveID >= uRibbonPrim ? 0.4 : 1.0);\n"
+      "      col += ((kD * base / 3.14159265 * frontD * uLightTerms[i].x + specular * ccAtten * uLightTerms[i].y) * shK + (vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow * (gl_PrimitiveID >= uRibbonPrim ? 0.4 : 1.0);\n"
       "      if (trans > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow * uLightTerms[i].z;\n"
       "   }\n"
       "\n"
@@ -1263,6 +1303,36 @@ namespace
 
 const std::vector<std::string>& GeometryNode::ShapeNames() { return kShapeNames; }
 const std::vector<std::string>& GeometryNode::ShadingNames() { return kShadingNames; }
+
+// The Hair model's uniforms (the shader shades a Fur mesh's strands with it, the skin with the rest of the material).
+// Subsurface radius per channel in scene units (Blender's Subsurface Radius times Scale, as blender_scene.py maps it).
+static void SetSssUniforms(GLuint prog, const Material& m)
+{
+   float r[3];
+   for (int k = 0; k < 3; k++)
+      r[k] = std::max(m.subsurfaceColor[k], 0.0f) * 0.2f * std::max(m.subsurfaceRadius, 0.0f);
+   glUniform3fv(glGetUniformLocation(prog, "uSssRadius"), 1, r);
+   glUniform1f(glGetUniformLocation(prog, "uTranslucency"), std::clamp(m.translucency, 0.0f, 1.0f));
+   glUniform1f(glGetUniformLocation(prog, "uSssK"), 4.0f); // curvature wrap gain, fitted on mat_subsurface (as live SSS_K)
+}
+
+static void SetHairUniforms(GLuint prog, const Material& m)
+{
+   glUniform1i(glGetUniformLocation(prog, "uHair"), m.hair ? 1 : 0);
+   if (!m.hair)
+      return;
+   float lc[3], lt[3], sa[3];
+   for (int k = 0; k < 3; k++)
+   {
+      lc[k] = ColorSpace::SrgbToLinear(m.color[k]);
+      lt[k] = ColorSpace::SrgbToLinear(m.hairTint[k]);
+   }
+   const float bn = std::clamp(m.radialRoughness, 0.02f, 1.0f);
+   r3dhair::Sigma(m.hair, m.melanin, m.melaninRedness, lc, lt, bn, sa);
+   glUniform3fv(glGetUniformLocation(prog, "uHairSigma"), 1, sa);
+   glUniform1f(glGetUniformLocation(prog, "uHairRadial"), bn);
+   glUniform1f(glGetUniformLocation(prog, "uHairShift"), m.hairShift * 0.017453293f);
+}
 
 GeometryNode::~GeometryNode()
 {
@@ -3189,9 +3259,11 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
       glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+      SetSssUniforms(mProgram, material);
       glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
       glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      SetHairUniforms(mProgram, material);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescenceThickness"), material.iridescenceThickness);
@@ -3593,9 +3665,11 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
       glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+      SetSssUniforms(mProgram, material);
       glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
       glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      SetHairUniforms(mProgram, material);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescenceThickness"), material.iridescenceThickness);

@@ -639,7 +639,8 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
       material.subsurfaceColor[0] != mLastMaterial.subsurfaceColor[0] ||
       material.subsurfaceColor[1] != mLastMaterial.subsurfaceColor[1] ||
       material.subsurfaceColor[2] != mLastMaterial.subsurfaceColor[2] ||
-      material.subsurfaceRadius != mLastMaterial.subsurfaceRadius;
+      material.subsurfaceRadius != mLastMaterial.subsurfaceRadius ||
+      material.translucency != mLastMaterial.translucency;
    const bool cameraChanged = cam.azimuth != mLastAzimuth || cam.elevation != mLastElevation ||
                               mDistance != mLastDistance;
    const bool instancingChanged = instanced != mInstanceAttribsOn ||

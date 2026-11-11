@@ -217,7 +217,7 @@ Try: import a character model and spin it live using a rotation modulated by an 
 Chain: Model 3D -> Material -> Render 3D
 
 ### Material
-3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, iridescence, and can take up to eight image inputs to paint any of those channels from a texture.
+3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, subsurface, translucency (light through to the far side), iridescence, and can take up to eight image inputs to paint any of those channels from a texture.
 Try: feed a Noise texture into the roughness map input to give a single flat color a hand-worn, uneven sheen.
 Chain: Cube -> Material -> Render 3D
 
@@ -1408,6 +1408,11 @@ Chain: Cube -> Armature -> Render 3D
 Try: project a Cylinder map onto a vase so the pattern wraps around it.
 Chain: Sphere -> UV Project -> Render 3D
 
+### Fur
+3D · GEOMETRY OUT. Grows strands on the faces as thin ribbons: fur, fleece, grass or hair. A curve in `guide` gives every strand its shape, for styled long hair. Comb leans the roots, Gravity droops them, Clump pulls tips together, Curl twists them. Normals Tangent feeds a Material set to model Hair.
+Try: grow 4 cm fur on a sphere, then wire an arc Curve into guide for long combed hair.
+Chain: Sphere -> Fur -> Material (model Hair) -> Render 3D
+
 ### Bevel
 3D · GEOMETRY OUT. Rounds or chamfers every sharp edge above the sharp angle. Width is the bevel size; one segment gives a flat chamfer and more give a smooth round.
 Try: bevel a box so its edges catch highlights.
@@ -2478,6 +2483,7 @@ R"AGENTDOC(Three ways, from simplest to most flexible.
 | Bake | `i mode` AO, Curvature, Position, Normal, Thickness, Sculpt | Outputs an image, so wire it to an Output or to a Material slot. Sculpt mode needs a sculpted input |
 | Armature | `i bones`, `f curl`, `f waveAmount` | Pose and IK controls are `pose0..`; an optional `path` geometry input bends the chain along a curve |
 | UV Project | `i uvMode` Smart, Cube, Cylinder, Sphere | Same engine as Transform's UV Project operation |
+| Fur | `f furDensity` (per cm²), `f furLength` (m), `f furWidth`, `i furSegments`, `f furGravity`, `f furClump`, `f furCurl`, `i furNormals` Ribbon, Tangent | Optional `guide` geometry input (a Curve) styles every strand; `i furMaxStrands` caps the count. A Material with `i model 1` (Hair: `f melanin`, `f melaninRedness`, `f radialRoughness`, `f hairShift`) wants Tangent normals |
 | Model 3D | `s path file.glb`, `i clip`, `pose0..` | Skinned glTF clips, morphs and poses animate with the clock |
 | Cloth, Rigid Bodies | `geo` input, Cloth also `collider` | Cloth `colliderFriction`, `colliderDistance`; Rigid Bodies `collider` Box, Sphere, Convex hull. Both simulate from time 0, so ask `--frame` for a later second to see motion |
 | Render 3D | `i engine` Raster or Path trace | `ptSamples`, `ptBounces` for the path tracer; `renderPass` and cavity, AO, depth of field controls for passes |

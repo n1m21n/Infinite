@@ -1,55 +1,143 @@
 {
- "cornell": 0.5472,
+ "bed": 0.1612,
+ "bed_close": 0.1734,
+ "bed_close_live": 0.1266,
+ "bed_close_settle": 0.099,
+ "bed_fur": 0.172,
+ "bed_fur_close": 0.3393,
+ "bed_fur_close_live": 0.2271,
+ "bed_fur_close_settle": 0.23,
+ "bed_fur_live": 0.1325,
+ "bed_fur_settle": 0.111,
+ "bed_live": 0.11,
+ "bed_settle": 0.091,
+ "cornell": 0.3155,
+ "cornell_live": 0.1598,
  "cornell_pt": 0.1103,
- "deer": 0.1203,
+ "cornell_settle": 0.098,
+ "deer": 0.0937,
+ "deer_live": 0.0607,
  "deer_pt": 0.0897,
- "furnace_dielectric": 0.0176,
- "furnace_metal": 0.0182,
+ "deer_settle": 0.055,
+ "dof": 0.113,
+ "dof_live": 0.1042,
+ "dof_settle": 0.057,
+ "emission_light": 0.3098,
+ "emission_light_live": 0.1639,
+ "emission_light_settle": 0.087,
+ "furnace_dielectric": 0.018,
+ "furnace_dielectric_live": 0.0239,
+ "furnace_dielectric_settle": 0.026,
+ "furnace_metal": 0.0227,
+ "furnace_metal_live": 0.0227,
+ "furnace_metal_settle": 0.046,
+ "geom_monkey": 0.1193,
+ "geom_monkey_live": 0.0708,
+ "geom_monkey_settle": 0.058,
+ "hair_long": 0.1262,
+ "hair_long_live": 0.0915,
+ "hair_long_settle": 0.073,
+ "hair_melanin_0.2": 0.1411,
+ "hair_melanin_0.2_live": 0.118,
+ "hair_melanin_0.2_settle": 0.071,
+ "hair_melanin_0.5": 0.1366,
+ "hair_melanin_0.5_live": 0.085,
+ "hair_melanin_0.5_settle": 0.065,
+ "hair_melanin_0.8": 0.1351,
+ "hair_melanin_0.8_live": 0.0719,
+ "hair_melanin_0.8_settle": 0.066,
  "hero": {
   "all": [
-   0.1705,
-   0.1708,
-   0.1705
+   0.1044,
+   0.1047,
+   0.1045
   ],
   "coat": [
-   0.382,
-   0.3821,
-   0.3821
+   0.2501,
+   0.2498,
+   0.2499
   ],
   "emissive": [
-   0.0965,
-   0.0965,
-   0.0965
+   0.0392,
+   0.0391,
+   0.0391
   ],
   "fox": [
-   0.4119,
-   0.393,
-   0.3887
+   0.2749,
+   0.3104,
+   0.2965
   ],
   "glass": [
-   0.3888,
-   0.3895,
-   0.3889
+   0.3289,
+   0.3293,
+   0.3288
   ],
   "instances": [
-   0.3891,
-   0.389,
-   0.389
+   0.3233,
+   0.3233,
+   0.3233
   ],
   "models": [
-   0.4586,
-   0.4582,
-   0.4585
+   0.317,
+   0.3171,
+   0.3153
   ],
   "room": [
-   0.1767,
-   0.177,
-   0.1767
+   0.1024,
+   0.1026,
+   0.1024
   ],
   "velvet": [
-   0.3138,
-   0.3138,
-   0.3138
+   0.1819,
+   0.1819,
+   0.182
+  ]
+ },
+ "hero_live": {
+  "all": [
+   0.0905,
+   0.0908,
+   0.0909
+  ],
+  "coat": [
+   0.2916,
+   0.2916,
+   0.2916
+  ],
+  "emissive": [
+   0.0365,
+   0.0365,
+   0.0365
+  ],
+  "fox": [
+   0.2833,
+   0.322,
+   0.3242
+  ],
+  "glass": [
+   0.2127,
+   0.2127,
+   0.2127
+  ],
+  "instances": [
+   0.3193,
+   0.3194,
+   0.3194
+  ],
+  "models": [
+   0.2672,
+   0.2665,
+   0.2671
+  ],
+  "room": [
+   0.0873,
+   0.0874,
+   0.0875
+  ],
+  "velvet": [
+   0.2381,
+   0.2382,
+   0.2382
   ]
  },
  "hero_pt": {
@@ -99,18 +187,91 @@
    0.2661
   ]
  },
- "light_area": 0.0835,
+ "interior": 0.1033,
+ "interior_live": 0.0959,
+ "interior_settle": 0.074,
+ "light_area": 0.0891,
+ "light_area_live": 0.0283,
  "light_area_pt": 0.0259,
- "light_point": 0.0646,
+ "light_area_settle": 0.026,
+ "light_point": 0.06,
+ "light_point_live": 0.0377,
  "light_point_pt": 0.0367,
- "light_spot": 0.1506,
+ "light_point_settle": 0.037,
+ "light_spot": 0.0818,
+ "light_spot_live": 0.068,
  "light_spot_pt": 0.0529,
- "light_sun": 0.059,
+ "light_spot_settle": 0.057,
+ "light_sun": 0.0581,
+ "light_sun_live": 0.0454,
  "light_sun_pt": 0.0411,
- "lineup": 0.0737,
- "materials": 0.109,
+ "light_sun_settle": 0.042,
+ "lights_multi": 0.1353,
+ "lights_multi_live": 0.0511,
+ "lights_multi_settle": 0.053,
+ "lineup": 0.061,
+ "lineup_live": 0.0507,
+ "lineup_settle": 0.056,
+ "mat_alpha": 0.0952,
+ "mat_alpha_live": 0.1002,
+ "mat_alpha_settle": 0.072,
+ "mat_anisotropy": 0.1258,
+ "mat_anisotropy_live": 0.1254,
+ "mat_anisotropy_settle": 0.092,
+ "mat_coat": 0.0544,
+ "mat_coat_live": 0.0444,
+ "mat_coat_settle": 0.042,
+ "mat_glass": 0.1124,
+ "mat_glass_live": 0.1056,
+ "mat_glass_settle": 0.1,
+ "mat_sheen": 0.1326,
+ "mat_sheen_live": 0.1746,
+ "mat_sheen_settle": 0.062,
+ "mat_subsurface": 0.1344,
+ "mat_subsurface_live": 0.165,
+ "mat_subsurface_settle": 0.074,
+ "mat_thinfilm": 0.1024,
+ "mat_thinfilm_live": 0.0997,
+ "mat_thinfilm_settle": 0.083,
+ "mat_translucent": 0.0238,
+ "mat_translucent_live": 0.0879,
+ "mat_translucent_settle": 0.028,
+ "materials": 0.0893,
+ "materials_live": 0.0728,
  "materials_pt": 0.067,
- "view_agx": 0.0671,
- "world_grey": 0.0851,
- "world_grey_pt": 0.0355
+ "materials_settle": 0.068,
+ "motion_blur": 0.0687,
+ "motion_blur_live": 0.0597,
+ "motion_blur_settle": 0.067,
+ "motion_orbit": 0.0629,
+ "motion_orbit_live": 0.0529,
+ "motion_orbit_settle": 0.053,
+ "motion_still": 0.061,
+ "motion_still_live": 0.0515,
+ "motion_still_settle": 0.057,
+ "tex_breakup": 0.5655,
+ "tex_breakup_live": 0.5664,
+ "tex_breakup_settle": 0.566,
+ "tex_detail": 0.1502,
+ "tex_detail_live": 0.2629,
+ "tex_detail_settle": 0.098,
+ "tex_maps": 0.0818,
+ "tex_maps_live": 0.0852,
+ "tex_maps_settle": 0.062,
+ "tex_tile": 0.0553,
+ "tex_tile_live": 0.0653,
+ "tex_tile_settle": 0.028,
+ "view_agx": 0.0416,
+ "view_agx_live": 0.0336,
+ "view_agx_settle": 0.028,
+ "view_neutral": 0.0656,
+ "view_neutral_live": 0.051,
+ "view_neutral_settle": 0.047,
+ "world_grey": 0.058,
+ "world_grey_live": 0.05,
+ "world_grey_pt": 0.0355,
+ "world_grey_settle": 0.036,
+ "world_hdri": 0.0887,
+ "world_hdri_live": 0.0837,
+ "world_hdri_settle": 0.065
 }

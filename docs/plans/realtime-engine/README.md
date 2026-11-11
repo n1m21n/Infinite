@@ -1,5 +1,7 @@
 # Real-time engine: live worlds that react to music
 
+**The one ordered plan across all these files: `PLAN.md`.**
+
 Status (2026-11-10, end of day): **R0–R4 built headless, plus R5 step 1; Milestone 1 not closed.** The engine
 runs behind `INFINITE_LIVE_ENGINE` (no visible toggle yet; it waits for owner approval). No Music Rig node
 (dropped 2026-11-10, C17). Gate scoreboard: section 10, "Where the gates stand". Open: film export time and

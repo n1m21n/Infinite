@@ -10,6 +10,10 @@
 | A4 | raster fur two-sided, shadow blotches | `bed_fur_close` 0.402 (1.26× bright) | 0.339 (1.005×); `bed_fur` 0.183 → 0.172; `hair_long` 0.168 → 0.126 | well under 0.40 | done |
 | B5 | live glitter blob, fireflies, soft sun, displacement | boat sunset 0.0673, moon 0.0504 | sunset 0.0621, moon 0.0477; other live cases unchanged | glint shape as Cycles | done; fireflies not reproduced; true displacement already via the Displacement node |
 | B6 | settle coat on bounces, alpha in shadow rays | `mat_coat` 0.0473, `mat_alpha` 0.0828 | 0.042, 0.072 | better FLIP | done |
+| C8 | hair BSDF in every engine | `hair_melanin` live (multi-scatter off) 0.152 / 0.107 / 0.078 | live 0.118 / 0.085 / 0.072 (melanin 0.2 / 0.5 / 0.8), multi-scatter gain 4 | better FLIP, no case worse | done |
+| C9 | SSS + translucency | `mat_subsurface` live 0.1716, settle 0.0856, raster 0.141 | live 0.165, settle 0.074, raster 0.134; new `mat_translucent` live 0.088, settle 0.028, raster 0.024 | better FLIP, no case worse | done; settle walk picks a channel by throughput (green tint and speckle gone) |
+| C10 | paperwork: baselines, A/B README, tracker | live/settle had no baselines | every case on raster, live, settle in baseline.json; sweep.py | — | done |
+| C11 | engine design doc | — | `docs/plans/realtime-engine/DESIGN.md`, `REALISM.md`, `PLAN.md` | owner reads | done |
 | B7 | export time (1-min 1080p film) | live boat 8.2 s/frame, settle 40 s/frame | live 4.4 s/frame, FLIP unchanged (motion cases within 0.0005) | ≤ 15 min (0.63 s/frame) | live warm-up fixed; gate open: per-render cost (≈ 160 ms live, ≈ 0.3 s/sample settle) is C11's engine work |
 
 B7: live export rendered 48 warm-up frames for every film frame. Now the first exported frame warms 48 and later

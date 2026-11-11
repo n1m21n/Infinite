@@ -170,6 +170,23 @@ def add_fur(x, f):
         bs = next((nd for nd in nt.nodes if nd.type == 'BSDF_PRINCIPLED'), None)
         if bs and bs.inputs["Normal"].is_linked:   # a surface normal map has no meaning across a strand
             nt.links.remove(bs.inputs["Normal"].links[0])
+        h = f.get("hair")
+        if h:   # Material model Hair: the strands take Principled Hair (Chiang, melanin); the skin keeps its own
+            for nd in list(nt.nodes):
+                nt.nodes.remove(nd)
+            ph = nt.nodes.new("ShaderNodeBsdfHairPrincipled"); ph.model = 'CHIANG'; ph.parametrization = 'MELANIN'
+            ph.inputs["Melanin"].default_value = h["melanin"]
+            ph.inputs["Melanin Redness"].default_value = h.get("redness", 1.0)
+            ph.inputs["Tint"].default_value = (1, 1, 1, 1)
+            ph.inputs["Roughness"].default_value = h["roughness"]
+            ph.inputs["Radial Roughness"].default_value = h.get("radial", 0.3)
+            ph.inputs["Coat"].default_value = 0.0
+            ph.inputs["IOR"].default_value = h.get("ior", 1.55)
+            ph.inputs["Offset"].default_value = math.radians(h.get("shift", 2.0))
+            for k in ("Random Color", "Random Roughness"):
+                ph.inputs[k].default_value = 0.0
+            out = nt.nodes.new("ShaderNodeOutputMaterial")
+            nt.links.new(ph.outputs[0], out.inputs["Surface"])
         setm.inputs["Material"].default_value = hm
     L(setm.outputs[0], go.inputs[0])
     hc = bpy.data.objects.new(x.name + "_fur", bpy.data.hair_curves.new(x.name + "_fur"))
@@ -344,6 +361,16 @@ for i, o in enumerate(scene["objects"]):
         p.inputs["Thin Film Thickness"].default_value = m["iridescence"] * m.get("iridescence_thickness", 400.0)
         p.inputs["Thin Film IOR"].default_value = m.get("iridescence_ior", 1.33)
     add_maps(mat, p, m.get("maps", {}), m)
+    tl = m.get("translucency", 0.0)
+    if tl > 0:  # Render 3D's translucency: that share of the diffuse leaves the far side (Translucent BSDF)
+        nt = mat.node_tree
+        bc = m.get("base_color", (0.8, 0.8, 0.8))
+        p.inputs["Base Color"].default_value = (*[c * (1.0 - tl) for c in bc], 1)
+        tr = nt.nodes.new("ShaderNodeBsdfTranslucent"); tr.inputs["Color"].default_value = (*[c * tl for c in bc], 1)
+        ad = nt.nodes.new("ShaderNodeAddShader")
+        mo = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+        nt.links.new(p.outputs[0], ad.inputs[0]); nt.links.new(tr.outputs[0], ad.inputs[1])
+        nt.links.new(ad.outputs[0], mo.inputs["Surface"])
     ob.data.materials.append(mat)
     ob.pass_index = region_index(o)
 

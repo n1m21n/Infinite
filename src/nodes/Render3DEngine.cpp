@@ -6,6 +6,7 @@
 #include "ColorSpace.h"
 #include "EnvironmentNode.h"
 #include "GeometryOpNodes.h"
+#include "Render3DHair.h"
 #include "SceneNodes.h"
 #include "Transport.h"
 #include "UtilityNodes.h"
@@ -233,6 +234,24 @@ bool Render3DNode::CookEngine(int frameId)
       in.alphaCutoff = mat.alphaCutoff;
       in.detailScale = mat.detailScale;
       in.detailStrength = mat.detailStrength;
+      in.subsurface = std::clamp(mat.subsurface, 0.0f, 1.0f);
+      for (int k = 0; k < 3; k++)
+         in.sssRadius[k] = std::max(mat.subsurfaceColor[k], 0.0f) * 0.2f * std::max(mat.subsurfaceRadius, 0.0f);
+      in.translucency = std::clamp(mat.translucency, 0.0f, 1.0f);
+      if (mat.hair)
+      {
+         float lc[3], lt[3];
+         for (int k = 0; k < 3; k++)
+         {
+            lc[k] = ColorSpace::SrgbToLinear(mat.color[k]);
+            lt[k] = ColorSpace::SrgbToLinear(mat.hairTint[k]);
+         }
+         in.hairRadial = std::clamp(mat.radialRoughness, 0.02f, 1.0f);
+         r3dhair::Sigma(mat.hair, mat.melanin, mat.melaninRedness, lc, lt, in.hairRadial, in.hairSigma);
+         in.hairShift = mat.hairShift * 0.017453293f;
+         const Mesh& hm = src->GetMesh();
+         in.hairFrom = hm.twoSided ? (int)(hm.ribbonStart / 3) : 0;
+      }
       {
          const MappingTransform mt = src->GetMappingTransform();
          in.mapSpace = mt.space;
@@ -479,6 +498,7 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.mapAlbedo, 16); mix(&in.wrap, 4); mix(&in.normalStrength, 4); mix(&in.normalBump, 4);
       mix(&in.sheen, 4); mix(in.sheenColor, 12); mix(&in.sheenRoughness, 4);
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
+      mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20);
    }
    for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);
    for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); }

@@ -49,11 +49,13 @@ struct Material
    // paint / lacquer.
    float clearcoat = 0.0f;
    float clearcoatRoughness = 0.03f;
-   // Fake subsurface scattering via wrap lighting (N.L extended past the
-   // terminator, tinted by subsurfaceColor) - not true multi-scatter.
+   // Subsurface scattering: subsurfaceColor is the per-channel scatter radius (Blender's Subsurface Radius),
+   // subsurfaceRadius scales it (1 = 0.2 m). Settle walks the volume; live and raster soften the terminator by it.
    float subsurface = 0.0f;
    float subsurfaceColor[3] = { 1.0f, 0.2f, 0.1f };
    float subsurfaceRadius = 0.5f;
+   // Thin translucency: the share of diffuse light that passes through to the far side (sails, leaves, paper).
+   float translucency = 0.0f;
 
    // Sheen / cloth / velvet microfacet backscattering lobe (Charlie distribution)
    float sheen = 0.0f;
@@ -92,6 +94,14 @@ struct Material
    // detailStrength and blended on top - weave or pores over the large folds, from one map.
    float detailScale = 0.0f;
    float detailStrength = 1.0f;
+
+   // Hair model (Render3DHair.h, Chiang): 0 off, 1 Melanin, 2 Colour (the base colour is the hair's). Roughness is
+   // the longitudinal roughness and ior the fibre's; the strand axis comes from Fur's Tangent normals.
+   int hair = 0;
+   float melanin = 0.8f, melaninRedness = 1.0f;
+   float hairTint[3] = { 1.0f, 1.0f, 1.0f };
+   float radialRoughness = 0.3f;
+   float hairShift = 2.0f; // cuticle tilt, degrees
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own

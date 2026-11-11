@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "Transport.h"
 
@@ -72,6 +73,7 @@ Material MaterialNode::GetMaterial() const
    m.subsurfaceColor[1] = subsurfaceColor[1];
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
+   m.translucency = translucency;
    m.sheen = sheen;
    m.sheenColor[0] = sheenColor[0];
    m.sheenColor[1] = sheenColor[1];
@@ -90,6 +92,12 @@ Material MaterialNode::GetMaterial() const
    m.detailScale = detailScale;
    m.detailStrength = detailStrength;
    m.normalBump = normalBump ? 1 : 0;
+   m.hair = model == 1 ? 1 + std::clamp(hairColour, 0, 1) : 0;
+   m.melanin = melanin;
+   m.melaninRedness = melaninRedness;
+   std::memcpy(m.hairTint, hairTint, sizeof(hairTint));
+   m.radialRoughness = radialRoughness;
+   m.hairShift = hairShift;
    return m;
 }
 

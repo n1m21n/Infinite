@@ -44,6 +44,9 @@ truth.png + inf.png ──> FLIP, brightness ratio, luma error ──> results.j
 | `lights[]` | `type` (sun, point, spot, area), `power` (W, or W/m² for sun), `azimuth`, `elevation`, `distance`, `color`, `radius`, `spot_angle` (half angle), `blend`, `size` |
 | `world` | `color` (linear), `strength` |
 | `view`, `size`, `samples` | Standard or AgX, picture size, Cycles samples (denoised) |
+| `objects[].fur` | Geometry Op Fur on that object: `density` (strands/cm²), `length`, `jitter`, `width`, `segments`, `gravity`, `max`, `seed`; `guide` {`points`, `spread`, `height`} adds an arc Curve to the guide input; `hair` {`melanin`, `redness`, `roughness`, `radial`, `shift` (degrees), `ior`} turns the strands' Material to model Hair (Cycles: Principled Hair, Chiang, melanin) and Fur's normals to Tangent |
+| `objects[].detail` | `[scale, strength]`: Material `detailScale`/`detailStrength`; Blender gets the same whiteout normal blend |
+| `objects[].region` | a name; the case then also reports FLIP and brightness per region (see the hero case) |
 
 Azimuth runs from +X toward -Y and elevation up from the ground, as in Infinite's
 Camera and Light nodes. Blender's Z-up (x, y, z) is Infinite's (x, z, -y).
@@ -275,3 +278,21 @@ Coverage sweep (31 cases, live + settle) against the post-bed-realism run: no ca
 none fail.
 
 What is left on the plush is fur itself: see docs/plans/fur.
+
+## Fur, hair, SSS and translucency (2026-11-11, Block C)
+
+FLIP per engine after Block C (raster / live / settle). Lower is better; gates raster ≤ 0.20, live ≤ 0.15,
+settle ≤ 0.05.
+
+| case | raster | live | settle | note |
+|---|---|---|---|---|
+| `bed_fur` | 0.172 | 0.133 | 0.111 | fur ribbons over the plush |
+| `bed_fur_close` | 0.339 | 0.227 | 0.230 | open: strand self-shadowing (PLAN 2.5) |
+| `hair_long` | 0.126 | 0.091 | 0.073 | guide-combed strands, Hair model |
+| `hair_melanin_0.2 / 0.5 / 0.8` | 0.141 / 0.137 / 0.135 | 0.118 / 0.085 / 0.072 | 0.071 / 0.065 / 0.066 | Chiang fibre BSDF; multi-scatter gain 4 (`HAIR_MS`) |
+| `mat_subsurface` | 0.134 | 0.165 | 0.074 | settle random walk picks a channel by throughput; raster/live wrap widened by curvature × radius (gain 4) |
+| `mat_translucent` | 0.024 | 0.088 | 0.028 | thin translucency, all engines |
+
+No case got worse by more than 0.005 on any engine (full 43-case sweep, raster, live and settle). Every case on
+every engine is now in `baseline.json` (`case`, `case_live`, `case_settle`), so the harness exit code guards all
+three paths. Before/after sweeps: `sweep.py` (PLAN.md §5).
