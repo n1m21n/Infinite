@@ -29,8 +29,8 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 |---|---|---|
 | 0.1 build WIP + self-test | done (no code change; envis compiles) | see log |
 | 0.2 `envis` measure | done (default on; world_hdri_sun 0.458 -> 0.077) | see log |
-| 0.3 adaptive stop default | **next** (0.08 measured good on 8 cases) | — |
-| 0.4 dark far maps | open | — |
+| 0.3 adaptive stop default | done: default 0.05 (0.08 and 0.06 failed the image gate) | see log |
+| 0.4 dark far maps | **next** | — |
 | 0.5 freeze + `f0` baseline | open | — |
 | 1.1 to 1.5 material programs | open | — |
 | 2.1 to 2.8 shading nodes | open | — |

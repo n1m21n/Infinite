@@ -519,8 +519,10 @@ bool Render3DNode::CookEngine(int frameId)
       // Export / --frame: every frame is the settled picture, traced in full before it is handed on.
       const int target = std::clamp(ptSamples, 1, 4096), bounces = std::clamp(ptBounces, 1, 16);
       // Adaptive stop: a frame whose 95th-percentile relative error is already under the limit takes no more
-      // samples (the denoiser's own variance says so). INFINITE_ENGINE_STOP sets the limit; 0 traces them all.
-      static const float sStop = [] { const char* e = std::getenv("INFINITE_ENGINE_STOP"); return e ? (float)std::atof(e) : 0.0f; }();
+      // samples (the denoiser's own variance says so). Default 0.05: the largest limit whose picture stays under
+      // 0.01 FLIP of the full count on the 8 reference cases (0.06 and 0.08 do not). INFINITE_ENGINE_STOP overrides;
+      // 0 traces them all.
+      static const float sStop = [] { const char* e = std::getenv("INFINITE_ENGINE_STOP"); return e ? (float)std::atof(e) : 0.05f; }();
       traced = true;
       int done = 0;
       while (done < target && traced)
