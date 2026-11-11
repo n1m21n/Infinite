@@ -521,6 +521,72 @@ bool RunEngineTest()
          const int dr = gok ? (int)pr[c] - (int)pr[c + 1] : 0, dg = gok ? (int)pg[c] - (int)pg[c + 1] : 99;
          check(gok && dr > 60 && std::abs(dg) < 10, "1.4 GL tracer: program turns the sphere red", (double)dr, 60.0);
       }
+
+      // 1.5: a program the backend cannot compile shows its error on the node and its material draws the knobs; the
+      // others keep running. One edit of one program costs one library build.
+      {
+         const char* kBad = "base = vec3(1.0, 0.0, 0.0)\nmetallic = 0.0\nroughness = 0.9";
+         const int bad = Field::RegisterMaterialProgram(kBad, {}, ferr);
+         Field::BreakMaterialProgramForTest(bad);
+         engine::Frame fb = frame, fref = frame;
+         fb.instances[1].fieldProgram = id;  // cube: a good program
+         fb.instances[2].fieldProgram = bad; // sphere: the broken one
+         fb.fieldMsl = Field::BuildMaterialLibrary({ id, bad }, Field::MaterialLang::Msl, fb.fieldMslKey);
+         fref.instances[1].fieldProgram = id;
+         fref.fieldMsl = Field::BuildMaterialLibrary({ id }, Field::MaterialLang::Msl, fref.fieldMslKey);
+         std::vector<float> pb, pref;
+         const int b0 = raster->FieldLibraryBuilds();
+         const bool okb = raster->Render(*img, fb, nullptr) && ReadRect(img->GlTexture(), W, H, pb);
+         const bool okr = raster->Render(*img, fref, nullptr) && ReadRect(img->GlTexture(), W, H, pref);
+         double worst = (okb && okr && pb.size() == pref.size()) ? 0.0 : 1.0;
+         for (size_t i = 0; worst < 1.0 && i < pb.size(); i++) worst = std::max(worst, (double)std::fabs(pb[i] - pref[i]));
+         const std::string berr = Field::MaterialProgramError(bad);
+         printf("    bad program error: %s\n", berr.c_str());
+         check(!berr.empty(), "1.5 L: bad program -> error text non-empty", (double)berr.size(), 0);
+         check(worst <= 1.0 / 255.0, "1.5 L: bad program draws the knob picture, the good one still runs", worst * 255.0, 1.0);
+         check(raster->FieldLibraryBuilds() - b0 == 1, "1.5 L: failure costs one library build, the next frame none",
+               raster->FieldLibraryBuilds() - b0, 1);
+         // the node shows it and hands the material no program
+         FieldPixelNode fpb;
+         fpb.code = kBad;
+         fpb.domain = 1;
+         fpb.Apply();
+         check(!fpb.CodeError().empty() && fpb.MaterialProgramId() == 0, "1.5: Field Pixel shows the backend error, no program",
+               (double)fpb.CodeError().size(), 0);
+         // edit of one program: the cube's program changes, one library build; the same frame again, none
+         const int edited = Field::RegisterMaterialProgram("base = vec3(0.0, 1.0, 0.0)\nmetallic = 0.0\nroughness = 1.0", {}, ferr);
+         engine::Frame fe = fref;
+         fe.instances[1].fieldProgram = edited;
+         fe.fieldMsl = Field::BuildMaterialLibrary({ edited }, Field::MaterialLang::Msl, fe.fieldMslKey);
+         const int b1 = raster->FieldLibraryBuilds();
+         const bool oke = raster->Render(*img, fe, nullptr) && raster->Render(*img, fe, nullptr);
+         check(oke && raster->FieldLibraryBuilds() - b1 == 1, "1.5 L: edit of one program recompiles 1 library",
+               raster->FieldLibraryBuilds() - b1, 1);
+
+         // R (GL): a fresh broken program on the sphere draws the knob picture (ra) and gets its error
+         FieldPixelNode fpg;
+         fpg.code = "base = vec3(1.0, 0.0, 0.0)\nmetallic = 0.0\nroughness = 0.8";
+         fpg.domain = 1;
+         fpg.Apply();
+         const int gbad = fpg.MaterialProgramId();
+         Field::BreakMaterialProgramForTest(gbad);
+         MaterialNode mat5;
+         mat5.input = &sphereG;
+         mat5.FieldInput().Connect(&fpg);
+         Render3DNode r5;
+         r5.geometry[0] = &floorG; r5.geometry[1] = &cubeG; r5.geometry[2] = &mat5; r5.geometry[3] = &torusG;
+         r5.width = (float)W; r5.height = (float)H; r5.samples = 0; r5.hdr = false; r5.tonemap = 1; r5.shadowsEnabled = r.shadowsEnabled;
+         r5.rig = &rig;
+         for (int k = 0; k < 3; k++) { r5.exposure = 1.0f + 0.001f * (float)k; r5.CookIfNeeded(++fnum); }
+         std::vector<float> r5px;
+         const bool r5ok = gbad != 0 && GLUtil::ReadTexturePixels(scratch, r5.GetOutputTexture(), r5.GetOutputWidth(), r5.GetOutputHeight(), r5px);
+         double rworst = (r5ok && r5px.size() == ra.size()) ? 0.0 : 1.0;
+         for (size_t i = 0; rworst < 1.0 && i < r5px.size(); i++) rworst = std::max(rworst, (double)std::fabs(r5px[i] - ra[i]));
+         printf("    R bad program error: %s\n", Field::MaterialProgramError(gbad).c_str());
+         check(!Field::MaterialProgramError(gbad).empty() && !fpg.CodeError().empty(), "1.5 R: bad program -> error text non-empty",
+               (double)Field::MaterialProgramError(gbad).size(), 0);
+         check(rworst <= 1.0 / 255.0, "1.5 R: bad program draws the knob picture", rworst * 255.0, 1.0);
+      }
    }
 
    // dump for eyes

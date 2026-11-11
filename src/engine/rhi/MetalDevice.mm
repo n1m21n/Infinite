@@ -9,6 +9,7 @@
 #include "nodes/Render3DBsdf.h"
 #include "nodes/Render3DFresnel.h"
 #include "nodes/Render3DAb.h"
+#include "field/MaterialRegistry.h"
 
 #include <algorithm>
 #include <cmath>
@@ -36,11 +37,9 @@ namespace rhi
       }
       // Logs a failed shader or pipeline and keeps the first one for the node: what failed plus the compiler's
       // first error line (the full text goes to the log).
-      void EngineFail(NSString* what, NSError* err)
+      // The compiler's first error line, at most 160 chars.
+      std::string FirstError(NSError* err)
       {
-         NSLog(@"%@: %@", what, err);
-         if (!gLastError.empty())
-            return;
          std::string msg = err ? std::string([[err localizedDescription] UTF8String] ?: "") : std::string("not built");
          const size_t e = msg.find("error:");
          if (e != std::string::npos)
@@ -51,7 +50,14 @@ namespace rhi
          msg = msg.substr(0, msg.find('\n'));
          if (msg.size() > 160)
             msg = msg.substr(0, 157) + "...";
-         gLastError = std::string([what UTF8String]) + ": " + msg;
+         return msg;
+      }
+      void EngineFail(NSString* what, NSError* err)
+      {
+         NSLog(@"%@: %@", what, err);
+         if (!gLastError.empty())
+            return;
+         gLastError = std::string([what UTF8String]) + ": " + FirstError(err);
       }
    }
    const std::string& LastError() { return gLastError; }
@@ -2116,19 +2122,24 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    private:
       // Field material programs (row 1.3): their library spliced in at the marker; a new set recompiles the shader and
       // drops every pipeline, which the next Pipeline / PtPipeline / DepthOfField / EnsureInv rebuild from it. A
-      // library that fails to compile leaves the plain shader: the programs are skipped and the knobs draw.
+      // library that fails to compile (row 1.5): each program is compiled alone, the ones that fail are marked in the
+      // registry (their error shows on the Field Pixel node, their materials draw the knobs) and the rest is built
+      // once. mFieldKey becomes the key of what was built, which is the key the engine sends next frame.
       NSString* mSrc = nil;
       unsigned long long mFieldKey = 0;
       NSString* Src() const { return mSrc ? mSrc : kRasterShader; }
+      static NSString* WithLib(const std::string& msl)
+      {
+         if (msl.empty()) return kRasterShader;
+         return [kRasterShader stringByReplacingOccurrencesOfString:@"//@FLD_MAT_LIB@"
+                                                         withString:[NSString stringWithUTF8String:msl.c_str()]];
+      }
       void FieldLib(const engine::Frame& fr)
       {
          if (fr.fieldMslKey == mFieldKey)
             return;
          mFieldKey = fr.fieldMslKey;
-         NSString* src = kRasterShader;
-         if (!fr.fieldMsl.empty())
-            src = [kRasterShader stringByReplacingOccurrencesOfString:@"//@FLD_MAT_LIB@"
-                                                           withString:[NSString stringWithUTF8String:fr.fieldMsl.c_str()]];
+         NSString* src = WithLib(fr.fieldMsl);
          NSError* err = nil;
          MTLCompileOptions* co = [MTLCompileOptions new];
          co.languageVersion = MTLLanguageVersion2_3;
@@ -2136,10 +2147,21 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          id<MTLLibrary> lib = [mDev newLibraryWithSource:src options:co error:&err];
          if (!lib)
          {
-            EngineFail(@"field material library", err);
-            if (mSrc == nil) return; // already the plain shader
-            src = kRasterShader;
+            // a user's program, not an engine failure: logged, its error goes to its node (registry), and
+            // rhi::LastError stays free for the engine's own shaders
+            NSLog(@"field material library: %@", err);
+            std::vector<int> ids;
+            for (const engine::Instance& in : fr.instances)
+               if (in.fieldProgram != 0) ids.push_back(in.fieldProgram);
+            Field::IsolateFailingPrograms(ids, Field::MaterialLang::Msl, [&](const std::string& one) -> std::string {
+               NSError* e1 = nil;
+               return [mDev newLibraryWithSource:WithLib(one) options:co error:&e1] ? std::string() : "MSL: " + FirstError(e1);
+            });
+            const std::string rest = Field::BuildMaterialLibrary(ids, Field::MaterialLang::Msl, mFieldKey);
+            if (rest.empty() && mSrc == nil) return; // already the plain shader
+            src = WithLib(rest);
             lib = [mDev newLibraryWithSource:src options:co error:&err];
+            if (!lib && !rest.empty()) { src = kRasterShader; lib = [mDev newLibraryWithSource:src options:co error:&err]; }
             if (!lib) return;
          }
          mLib = lib;

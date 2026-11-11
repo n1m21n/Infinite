@@ -87,7 +87,7 @@ namespace Field
    bool MaterialProgramSeeThrough(int id)
    {
       const MaterialProgramEntry* e = FindMaterialProgram(id);
-      if (!e) return false;
+      if (!e || !MaterialProgramError(id).empty()) return false;
       const uint32_t cut = (1u << MaterialOutputBit("opacity")) | (1u << MaterialOutputBit("mask"));
       return (e->written & cut) != 0;
    }
@@ -96,7 +96,7 @@ namespace Field
    {
       std::vector<int> ids;
       for (int id : idsIn)
-         if (FindMaterialProgram(id)) ids.push_back(id);
+         if (FindMaterialProgram(id) && MaterialProgramError(id).empty()) ids.push_back(id);
       std::sort(ids.begin(), ids.end());
       ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
       key = ids.empty() ? 0 : Fnv(ids.data(), ids.size() * sizeof(int), lang == MaterialLang::Glsl ? 7ull : 11ull);
@@ -116,5 +116,40 @@ namespace Field
       }
       s += "}\n";
       return s;
+   }
+
+   std::string MaterialProgramError(int id)
+   {
+      std::lock_guard<std::mutex> lk(gMu);
+      return (id >= 1 && id <= (int)gEntries.size()) ? gEntries[id - 1].error : std::string();
+   }
+
+   int IsolateFailingPrograms(const std::vector<int>& ids, MaterialLang lang,
+                              const std::function<std::string(const std::string&)>& compile)
+   {
+      std::vector<int> u(ids);
+      std::sort(u.begin(), u.end());
+      u.erase(std::unique(u.begin(), u.end()), u.end());
+      int marked = 0;
+      for (int id : u)
+      {
+         unsigned long long key = 0;
+         const std::string lib = BuildMaterialLibrary({ id }, lang, key);
+         if (lib.empty()) continue; // unknown or already failed
+         std::string e = compile(lib);
+         if (e.empty()) continue;
+         std::lock_guard<std::mutex> lk(gMu);
+         if (gEntries[id - 1].error.empty()) gEntries[id - 1].error = std::move(e);
+         marked++;
+      }
+      return marked;
+   }
+
+   void BreakMaterialProgramForTest(int id)
+   {
+      std::lock_guard<std::mutex> lk(gMu);
+      if (id < 1 || id > (int)gEntries.size()) return;
+      gEntries[id - 1].glsl += "\nthis does not compile;\n";
+      gEntries[id - 1].msl += "\nthis does not compile;\n";
    }
 }

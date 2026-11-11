@@ -1068,6 +1068,18 @@ const std::vector<std::string>& FieldPixelNode::DomainNames()
 
 // Params are baked into the program as constants, so a new value set is a new program id (and one shader rebuild in
 // each renderer that draws it). Same values, same id: the registry dedupes on source + values.
+std::string FieldPixelNode::LastError() const
+{
+   if (!mLastError.empty() || domain != 1 || mMatId == 0)
+      return mLastError;
+   return Field::MaterialProgramError(mMatId);
+}
+
+int FieldPixelNode::MaterialProgramId() const
+{
+   return (domain == 1 && Field::MaterialProgramError(mMatId).empty()) ? mMatId : 0;
+}
+
 void FieldPixelNode::RefreshMaterialProgram()
 {
    std::vector<float> values;

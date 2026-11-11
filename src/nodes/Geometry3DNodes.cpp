@@ -2334,6 +2334,33 @@ Mat4 Render3DNode::MotionDelta(const void* source, const Mat4& model)
 
 // Row 1.3: the Field material programs the drawn sources use. A new set relinks the forward programs with their
 // library; a library that fails to compile relinks without it (the knobs draw).
+namespace
+{
+   // "" when the fragment shader compiles with this material library spliced in, else "GLSL: " + its first error line.
+   std::string FragmentErrorWith(const char* frag, const std::string& lib)
+   {
+      std::string src = R3dAbGlsl(frag);
+      const size_t at = src.find("//@FLD_MAT_LIB@");
+      if (at != std::string::npos) src.insert(at, lib);
+      const char* p = src.c_str();
+      const unsigned int sh = glCreateShader(GL_FRAGMENT_SHADER);
+      glShaderSource(sh, 1, &p, nullptr);
+      glCompileShader(sh);
+      GLint ok = 0;
+      glGetShaderiv(sh, GL_COMPILE_STATUS, &ok);
+      std::string e;
+      if (!ok)
+      {
+         char log[1024] = { 0 };
+         glGetShaderInfoLog(sh, sizeof(log), nullptr, log);
+         e = log;
+         e = "GLSL: " + e.substr(0, std::min(e.find('\n'), (size_t)160));
+      }
+      glDeleteShader(sh);
+      return e;
+   }
+}
+
 void Render3DNode::SyncFieldPrograms()
 {
    std::vector<int> ids;
@@ -2352,9 +2379,20 @@ void Render3DNode::SyncFieldPrograms()
    mShaderTried = false;
    if (!EnsureShader() && !mFldGlsl.empty())
    {
-      mFldGlsl.clear();
+      // row 1.5: mark the programs that fail alone (their materials draw the knobs), build the rest
+      Field::IsolateFailingPrograms(ids, Field::MaterialLang::Glsl,
+                                    [](const std::string& one) { return FragmentErrorWith(kFragSrc, one); });
+      mFldGlsl = Field::BuildMaterialLibrary(ids, Field::MaterialLang::Glsl, mFldKey);
+      if (mProgramFull != 0) glDeleteProgram(mProgramFull);
+      if (mProgramOpaque != 0) glDeleteProgram(mProgramOpaque);
+      mProgramFull = mProgramOpaque = mProgram = 0;
       mShaderTried = false;
-      EnsureShader();
+      if (!EnsureShader() && !mFldGlsl.empty())
+      {
+         mFldGlsl.clear();
+         mShaderTried = false;
+         EnsureShader();
+      }
    }
 }
 

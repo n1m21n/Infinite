@@ -162,9 +162,10 @@ public:
 
    // Compilation & UI
    bool Apply();
-   const std::string& LastError() const { return mLastError; }
-   NodeIssue Issue() const override { return NodeIssues::FieldCompile(mLastError); }
-   std::string CodeError() const override { return mLastError; }
+   // The source error, else (Material domain, row 1.5) the error a backend gave the registered program.
+   std::string LastError() const;
+   NodeIssue Issue() const override { return NodeIssues::FieldCompile(LastError()); }
+   std::string CodeError() const override { return LastError(); }
    const std::string& Notice() const { return mNotice; }
    unsigned int Program() const { return mProgram; }
    const Field::GlslEmitResult& EmitResult() const { return mEmitResult; }
@@ -201,8 +202,9 @@ public:
    // Material node's `field` pin; it draws nothing and registers one Field::MaterialProgram per param set.
    int domain = 0;
    static const std::vector<std::string>& DomainNames();
-   // The registered program for the current code and param values, 0 when not in Material domain or on error.
-   int MaterialProgramId() const { return domain == 1 ? mMatId : 0; }
+   // The registered program for the current code and param values, 0 when not in Material domain or on error
+   // (a backend that could not compile it included: the material then draws its knobs).
+   int MaterialProgramId() const;
 
 private:
    void RefreshMaterialProgram();

@@ -204,6 +204,7 @@ private:
    unsigned int mProgTrace = 0;
    std::string mFldGlsl;               // Field material library spliced into the trace shader, empty for none
    unsigned long long mFldKey = 0;     // its program set; the trace shader relinks when it changes
+   std::vector<int> mFldIds;           // the ids drawn, for finding the one that fails (row 1.5)
    float mFldTime = 0.0f;
    unsigned int mProgDisplay = 0;
    bool mShadersTried = false;

@@ -1305,6 +1305,22 @@ unsigned int Render3DPathTrace::CompileTrace()
    const size_t at = src.find("//@FLD_MAT_LIB@");
    if (at != std::string::npos) src.insert(at, mFldGlsl);
    unsigned int prog = CompileProgram330(src.c_str());
+   if (prog == 0 && !mFldIds.empty()) // row 1.5: mark the programs that fail alone, trace the rest
+   {
+      Field::IsolateFailingPrograms(mFldIds, Field::MaterialLang::Glsl, [](const std::string& one) -> std::string {
+         std::string s1 = kTraceFrag330;
+         const size_t a1 = s1.find("//@FLD_MAT_LIB@");
+         if (a1 != std::string::npos) s1.insert(a1, one);
+         const unsigned int p1 = CompileProgram330(s1.c_str());
+         if (p1 != 0) { glDeleteProgram(p1); return std::string(); }
+         return "GLSL: does not compile in the GL path tracer";
+      });
+      mFldGlsl = Field::BuildMaterialLibrary(mFldIds, Field::MaterialLang::Glsl, mFldKey);
+      src = kTraceFrag330;
+      const size_t a2 = src.find("//@FLD_MAT_LIB@");
+      if (a2 != std::string::npos) src.insert(a2, mFldGlsl);
+      prog = mFldGlsl.empty() ? 0u : CompileProgram330(src.c_str());
+   }
    if (prog == 0) // a library that does not build here: trace with the knobs rather than not at all
    {
       mFldGlsl.clear();
@@ -1585,6 +1601,7 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
       if (key != mFldKey)
       {
          mFldKey = key;
+         mFldIds = ids;
          mFldGlsl = std::move(lib);
          if (mShadersTried)
          {
