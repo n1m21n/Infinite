@@ -199,19 +199,33 @@ for as soon as Block E lands.
 
 ## 5. Testing procedure (every step)
 
+Rule of load on the 8 GB M2: **one build tests many variants; a sweep runs only the cases a change can touch,
+fastest first, inside a time budget; results merge, so nothing is rendered twice.**
+
+| tier | when | command (options go before the subcommand) | cost |
+|---|---|---|---|
+| T0 | refactor that must move no pixel | `sweep.py --spp 16 --tag post run`, then `same` | ~4 min / engine |
+| T1 | real change | `sweep.py --tag X --ab X --touch G1,G2 run`, then `--base post --tag X diff` | 1 to 4 min |
+| T2 | block close | `sweep.py --tag post --all run` on raster, live, settle `--spp 16` | ~20 min, capped |
+
+| piece | what it does |
+|---|---|
+| `INFINITE_R3D_AB=a,b` | shader switches: a candidate sits under `#ifdef R3D_AB_<NAME>` in GL forward, GL tracer and Metal (`src/nodes/Render3DAb.h`). One build, every variant. Winner: remove the `#ifdef`, keep its branch |
+| `--ab a,b` | renders the sweep with those switches on |
+| `--touch G` | picks cases by what their scene uses (`sweep.py pick G` lists them): direct, falloff, sun, spec, gloss, metal, coat, sheen, glass, sss, aniso, thinfilm, emission, maps, hair, hdri, motion, dof |
+| `--budget MIN` | default 20; fastest cases first (from `times.json`), stops at the budget and keeps what finished |
+| merge | `run` adds to `<tag>_<engine>.json`; `diff` / `same` compare only the cases of the latest run |
+| `times` | per-case seconds of past runs, to size a job before starting it |
+
 ```
- tier: pick before building (load on the 8 GB M2; all runs at background priority, taskpolicy -b)
-   T0 refactor that must move no pixel: run --spp 16 pre/post, `sweep.py same` (any pixel change fails)
-   T1 real change: run --spp 64 on only the cases the change can touch, `diff`
-   T2 block close: the full sweep below on every case
  0. the step's gate case exists in tools/blender-ab/cases.py (add it first, with its Cycles truth)
- 1. pre:  sweep all 43+ cases on the engines the step touches (raster, live, settle) → pre_<engine>.txt
- 2. change, one build (scripts/ibuild.py), one at a time
- 3. post: same sweep → post_<engine>.txt
- 4. compare: gate case better; no case worse by > 0.005 FLIP; brightness within 5 %
+ 1. candidate goes in behind a switch; one build (scripts/ibuild.py), self-test
+ 2. T0 with no switch: 0 changed (the switch plumbing moved nothing)
+ 3. T1 per switch on the engines it touches; keep = gate case better, no case worse by > 0.005 FLIP
+ 4. winners become the default in one more build; T1 again on the union of touched cases
  5. perf: live fps soak and settle s/frame where the step touches speed (README §10 routes)
- 6. app: FURTEST + the hygiene driver for touched areas; pre-push hook on commit
- 7. keep only if 4–6 pass; update baseline.json for every engine; tracker row; commit
+ 6. app: self-test + the hygiene driver for touched areas
+ 7. tracker row with the numbers; commit; rotate post -> pre
 ```
 
 | Layer | Tool | Gate |
