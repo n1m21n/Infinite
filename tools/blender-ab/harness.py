@@ -298,7 +298,12 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % code])
             wires.append("cable %d field %d" % (mat, fp))
         sh = m.get("shade")
-        if sh:   # Shade Coord (Object) -> Mapping rotate X +90 (Infinite's Y-up to the case's Z-up) -> Mapping -> Checker
+        if sh and sh.get("tex") == "image":   # row 2.4: Shade Coord (UV) -> Shade Image <- Image Source
+            src = node("Source", "Image Source", ["  s path %s" % make_texture(case, sh.get("image", "blotches"))])
+            co = node("3D", "Shade Coord", ["  i output 0"])
+            ck = node("3D", "Shade Image", ["  i projection 0", "  i space 0"])
+            wires += ["cable %d vector %d" % (ck, co), "cable %d image %d" % (ck, src), "cable %d field %d" % (mat, ck)]
+        elif sh:   # Shade Coord (Object) -> Mapping rotate X +90 (Infinite's Y-up to the case's Z-up) -> Mapping -> Checker
             sc = sh.get("scale", 1.0)
             sc = sc if isinstance(sc, list) else [sc, sc, sc]
             co = node("3D", "Shade Coord", ["  i output 1"])
@@ -651,6 +656,8 @@ def main():
         for o in scene["objects"]:
             for tex_name in o.get("material", {}).get("maps", {}).values():
                 make_texture(d, tex_name)
+            if o.get("material", {}).get("shade", {}).get("tex") == "image":
+                make_texture(d, o["material"]["shade"].get("image", "blotches"))
         if not (os.path.exists(hp) and open(hp).read() == h and all(os.path.exists(os.path.join(d, "truth%s.png" % t)) for t in tags)):
             open(os.path.join(d, "scene.json"), "w").write(text)
             _, log = run([BLENDER, "-b", "--factory-startup", "--python", os.path.join(HERE, "blender_scene.py"), "--", d])

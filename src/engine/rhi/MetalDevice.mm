@@ -221,7 +221,7 @@ struct RInst { ulong vb; ulong ib; ulong uvb; ulong pad0; float4x4 normalM; MatR
 float3 cosineDir(float3 n, float u1, float u2);
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
-float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough,
+float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, array<texture2d<float>, 16> maps, float3 o, float3 d, float rough,
                 bool giMode, thread float3& hp, thread float3& hn, thread float3& alb, thread float3& mir, bool withEnv = true, int pick = -1,
                 bool withSpec = true, float2 envU = float2(-1.0), float3 missDir = float3(0.0))
 {
@@ -262,7 +262,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       FldMat fo;
       fo.base = base; fo.roughness = hitRough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
       fo.emission = hitEm; fo.opacity = 1.0; fo.mask = 1.0;
-      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d);
+      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
       base = max(fo.base, float3(0.0)); metal = clamp(fo.metallic, 0.0, 1.0); hitRough = clamp(fo.roughness, 0.045, 1.0); hitEm = fo.emission;
    }
 #endif
@@ -339,12 +339,12 @@ bool histAt(constant FrameU& f, texture2d<float> nz, texture2d<float> hist, floa
 // Noisy per frame; res_fs accumulates reflections over time.
 // A ray that leaves the scene reads the sky prefiltered over the lobe along the mirror direction (its expected value),
 // not along its own jittered direction: one sample of a sun disc in the sky made a speckled blob on the glitter path.
-float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 d, float rough, thread uint& seed,
+float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceleration_structure tlas, constant RInst* inst, array<texture2d<float>, 16> maps, float3 o, float3 d, float rough, thread uint& seed,
                        texture2d<float> nz, texture2d<float> hist, bool hv, float3 dMirror = float3(0.0))
 {
    float3 hp, hn, alb, mir;
    const bool bounce = f.gi.x > 0.5;
-   float3 L = shadeHit(f, et, tlas, inst, o, d, rough, false, hp, hn, alb, mir, !bounce, -1, true, float2(-1.0), dMirror);
+   float3 L = shadeHit(f, et, tlas, inst, maps, o, d, rough, false, hp, hn, alb, mir, !bounce, -1, true, float2(-1.0), dMirror);
    float3 irr;
    if (any(alb > 0.0) && bounce && hv && histAt(f, nz, hist, hp, hn, irr))
       L += alb * irr * f.gi.y;
@@ -353,7 +353,7 @@ float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceler
       float3 hp2, hn2, alb2, mir2;
       const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
       const int pk = int(rnd(seed) * f.params.w);
-      const float3 L2 = shadeHit(f, et, tlas, inst, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, pk, true, float2(rnd(seed), rnd(seed)));
+      const float3 L2 = shadeHit(f, et, tlas, inst, maps, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, pk, true, float2(rnd(seed), rnd(seed)));
       L += alb * L2 * f.gi.y / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)); // later bounces as GI's geometric tail
    }
    return L;
@@ -634,7 +634,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float3 em0 = float3(m.mat.emission) * emMap;
       o.base = base; o.roughness = roughIn; o.metallic = metalIn; o.normal = float3(0.0, 0.0, 1.0); o.height = 0.0;
       o.emission = em0; o.opacity = alpha; o.mask = 1.0;
-      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp));
+      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
       fldDh = float2(dfdx(o.height), dfdy(o.height));
       base = o.base; roughIn = o.roughness; metalIn = o.metallic; fldEmD = o.emission - em0; alpha = o.opacity;
       fldNrm = o.normal;
@@ -878,7 +878,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          o2 = pe + ne * f.shQ.w; d2 = od;
       }
       float3 hp, hn, alb, mir;
-      const float3 beyond = shadeHit(f, et, rtArgs.tlas, instInfo, o2, d2, 0.0, false, hp, hn, alb, mir, true, -1, true);
+      const float3 beyond = shadeHit(f, et, rtArgs.tlas, instInfo, maps, o2, d2, 0.0, false, hp, hn, alb, mir, true, -1, true);
       col = mix(col, beyond * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
    }
    else if (trans > 0.0)
@@ -918,7 +918,8 @@ struct TrOut { float4 g [[color(0)]]; float4 r [[color(1)]]; }; // raw GI irradi
 fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                      constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]],
                      texture2d<float> nz [[texture(0)]], texture2d<float> gw [[texture(1)]], texture2d<float> rw [[texture(2)]],
-                     texture2d<float> hist [[texture(3)]], texture2d<float> et [[texture(9)]])
+                     texture2d<float> hist [[texture(3)]], texture2d<float> et [[texture(9)]],
+                     array<texture2d<float>, 16> maps [[texture(10)]])
 {
    const bool hv = u.hist.x > 0.5;
    TrOut o; o.g = float4(0.0); o.r = float4(0.0);
@@ -942,7 +943,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
       {
          const float3 dir = cosineDir(n, rnd(seed), rnd(seed));
          float3 hp, hn, alb, mir;
-         float3 L1 = shadeHit(f, et, rtArgs.tlas, instInfo, org, dir, 1.0, true, hp, hn, alb, mir, false, int(rnd(seed) * f.params.w), false);
+         float3 L1 = shadeHit(f, et, rtArgs.tlas, instInfo, maps, org, dir, 1.0, true, hp, hn, alb, mir, false, int(rnd(seed) * f.params.w), false);
          float3 irr;
          if (any(alb > 0.0) && hv && histAt(f, nz, hist, hp, hn, irr))
             L1 += alb * irr; // every bounce through last frame's GI at that point
@@ -950,7 +951,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
          {
             // Metal hit: follow its mirror direction every frame (an env-only answer leaves what a mirror lights dark).
             float3 hp2, hn2, alb2, mir2;
-            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, reflect(dir, hn), 0.3, false, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w), true, float2(rnd(seed), rnd(seed)));
+            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, maps, hp + hn * f.shQ.w, reflect(dir, hn), 0.3, false, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w), true, float2(rnd(seed), rnd(seed)));
             float3 irr2;
             L1 += mir * (hv && any(alb2 > 0.0) && histAt(f, nz, hist, hp2, hn2, irr2) ? L2 + alb2 * irr2
                                                                                   : L2 / (1.0 - clamp(dot(alb2, float3(0.3333)), 0.0, 0.8)));
@@ -961,7 +962,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
             // later bounces as the geometric tail of that hit's albedo.
             float3 hp2, hn2, alb2, mir2;
             const float3 d2 = cosineDir(hn, rnd(seed), rnd(seed));
-            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w), true, float2(rnd(seed), rnd(seed)));
+            const float3 L2 = shadeHit(f, et, rtArgs.tlas, instInfo, maps, hp + hn * f.shQ.w, d2, 1.0, true, hp2, hn2, alb2, mir2, true, int(rnd(seed) * f.params.w), true, float2(rnd(seed), rnd(seed)));
             const float a = clamp(dot(alb2, float3(0.3333)), 0.0, 0.8);
             L1 += alb * L2 * 2.0 / (1.0 - a);
          }
@@ -978,7 +979,7 @@ fragment TrOut tr_fs(SkyOut in [[stage_in]], constant TrU& u [[buffer(0)]], cons
          jd = reflect(d, ggxSampleH(n, rough * rough, rnd(rs), rnd(rs))); // the GGX lobe the tracer samples
          if (dot(jd, n) < 0.02) jd = normalize(jd + n * (0.02 - dot(jd, n)));
       }
-      o.r = float4(traceReflection(f, et, rtArgs.tlas, instInfo, org, jd, rough, rs, nz, hist, hv, reflect(d, n)), 1.0);
+      o.r = float4(traceReflection(f, et, rtArgs.tlas, instInfo, maps, org, jd, rough, rs, nz, hist, hv, reflect(d, n)), 1.0);
    }
    return o;
 }
@@ -1481,7 +1482,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             FldMat fo;
             fo.base = base; fo.roughness = rough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
             fo.emission = float3(I.mat.emission) * emMap; fo.opacity = alpha; fo.mask = 1.0;
-            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d);
+            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), lod);
             base = fo.base; rough = clamp(fo.roughness, 0.045, 1.0); metal = clamp(fo.metallic, 0.0, 1.0);
             fldEm = fo.emission; fldEmSet = true; alpha = fo.mask < 0.5 ? 0.0 : fo.opacity; fldNrm = fo.normal;
          }
@@ -2074,6 +2075,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       Lin3x(in.baseSrgb, m.base); m.metallic = in.metallic; m.roughness = in.roughness; m.ior = in.ior;
       std::memcpy(m.emission, in.emission, 12);
       m.program = (float)(in.fieldSeeThrough ? -in.fieldProgram : in.fieldProgram); // the rays run it too (row 1.4)
+      m.fimg0 = (float)(in.fieldImage[0] + 1); m.fimg1 = (float)(in.fieldImage[1] + 1);
+      m.fimg2 = (float)(in.fieldImage[2] + 1); m.fimg3 = (float)(in.fieldImage[3] + 1);
    }
    // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
    void FillMat(const engine::Instance& in, R3dMatH& m)
@@ -2883,6 +2886,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                tu.info[0] = offX; tu.info[1] = offY; tu.info[2] = (float)img.Width(); tu.info[3] = (float)img.Height();
                tu.hist[0] = (mHistValid && giOn) ? 1.0f : 0.0f;
                [te setRenderPipelineState:mTrPso];
+               [te setFragmentTextures:mMapSlot withRange:NSMakeRange(10, engine::kMaxTextures)]; // row 2.4: field images at a traced hit
                [te setFragmentBytes:&tu length:sizeof(tu) atIndex:0];
                [te setFragmentBytes:&f length:sizeof(f) atIndex:1];
                [te setFragmentBuffer:mArgBuf offset:0 atIndex:3];

@@ -64,6 +64,7 @@ namespace app
       REGISTER_NODE(ShadeVoronoiNode, Shade Voronoi, "3D");
       REGISTER_NODE(ShadeGradientNode, Shade Gradient, "3D");
       REGISTER_NODE(ShadeBrickNode, Shade Brick, "3D");
+      REGISTER_NODE(ShadeImageNode, Shade Image, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
       REGISTER_NODE(RigidBodyNode, Rigid Bodies, "3D");

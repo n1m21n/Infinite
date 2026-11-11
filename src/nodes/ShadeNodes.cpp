@@ -252,7 +252,56 @@ std::string ShadeBrickNode::Emit(ShadeBuild& b) const
    return b.NewVar(this, "mix(" + cm + ", " + brick + ", step(" + F(std::max(mortar, 0.0f)) + ", " + edge + "))");
 }
 
-std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err)
+const std::vector<std::string>& ShadeImageNode::ProjectionNames()
+{
+   static const std::vector<std::string> k = { "Flat", "Box" };
+   return k;
+}
+
+const std::vector<std::string>& ShadeImageNode::SpaceNames()
+{
+   static const std::vector<std::string> k = { "Colour", "Data" };
+   return k;
+}
+
+std::string ShadeImageNode::Emit(ShadeBuild& b) const
+{
+   // unwired vector: UV for a flat picture (as Blender's Image Texture), Generated for a box
+   const std::string in = b.Input(mVector, projection == kBox ? b.Generated() : "vec3(UV.x, UV.y, 0.0)");
+   if (mImage.Resolved() == nullptr || dynamic_cast<const ShadeNode*>(mImage.Resolved()) != nullptr)
+      return b.NewVar(this, "vec3(0.0, 0.0, 0.0)"); // no picture: black
+   int slot = -1;
+   for (size_t i = 0; i < b.images.size(); i++)
+      if (b.images[i]->ShadeImageTexture() == ShadeImageTexture()) slot = (int)i; // one picture, one slot
+   if (slot < 0)
+   {
+      if (b.images.size() >= 4)
+      {
+         b.error = "a material reads at most four Shade Image pictures";
+         return b.NewVar(this, "vec3(0.0, 0.0, 0.0)");
+      }
+      slot = (int)b.images.size();
+      b.images.push_back(this);
+   }
+   const std::string fn = std::string(space == kData ? "img" : "imgc") + "(" + F((float)slot) + ", ";
+   if (projection != kBox)
+   {
+      const std::string c = b.NewVar(this, fn + "vec2(" + in + ".x, " + in + ".y))");
+      return b.NewVar(this, "vec3(" + c + ".x, " + c + ".y, " + c + ".z)");
+   }
+   // triplanar: one read along each axis, weighted by how far the normal faces it; blend 0 is a hard box, 1 soft
+   const std::string p = b.NewVar(this, in);
+   const float sharp = 1.0f + (1.0f - std::clamp(blend, 0.0f, 1.0f)) * 15.0f;
+   const std::string w = b.NewVar(this, "pow(max(abs(N), vec3(0.0001, 0.0001, 0.0001)), vec3(" + F(sharp) + ", " + F(sharp) + ", " + F(sharp) + "))");
+   const std::string cx = b.NewVar(this, fn + "vec2(" + p + ".z, " + p + ".y))");
+   const std::string cy = b.NewVar(this, fn + "vec2(" + p + ".x, " + p + ".z))");
+   const std::string cz = b.NewVar(this, fn + "vec2(" + p + ".x, " + p + ".y))");
+   const std::string s = b.NewVar(this, "(" + cx + " * " + w + ".x + " + cy + " * " + w + ".y + " + cz + " * " + w + ".z) / (" + w + ".x + " + w + ".y + " + w + ".z)");
+   return b.NewVar(this, "vec3(" + s + ".x, " + s + ".y, " + s + ".z)");
+}
+
+std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err,
+                                std::vector<const ShadeNode*>* images)
 {
    ShadeBuild b;
    for (int i = 0; i < 3; i++) { b.lo[i] = lo[i]; b.hi[i] = hi[i]; }
@@ -263,6 +312,7 @@ std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const f
       err = b.error;
       return std::string();
    }
+   if (images) *images = b.images;
    // A coordinate on its own shows as a colour, as Blender shows a vector wired into Base Color.
    return b.body + "base = " + v + "\n";
 }

@@ -238,6 +238,8 @@ bool Render3DNode::CookEngine(int frameId)
       in.opacity = mat.opacity;
       in.alphaCutoff = mat.alphaCutoff;
       in.fieldProgram = mat.fieldProgram;
+      for (int k = 0; k < 4; k++)
+         in.fieldImage[k] = MapIndex(E, fr, mat.fieldImage[k], mat.fieldImageRev[k]);
       in.fieldSeeThrough = mat.fieldProgram != 0 && Field::MaterialProgramSeeThrough(mat.fieldProgram);
       in.detailScale = mat.detailScale;
       in.detailStrength = mat.detailStrength;
@@ -519,7 +521,7 @@ bool Render3DNode::CookEngine(int frameId)
    for (const engine::Instance& in : fr.instances)
    {
       mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 16);
-      mix(&in.mapAlbedo, 16); mix(&in.wrap, 4); mix(&in.normalStrength, 4); mix(&in.normalBump, 4);
+      mix(&in.mapAlbedo, 16); mix(&in.fieldImage, 16); mix(&in.wrap, 4); mix(&in.normalStrength, 4); mix(&in.normalBump, 4);
       mix(&in.sheen, 4); mix(in.sheenColor, 12); mix(&in.sheenRoughness, 4);
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
       mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);

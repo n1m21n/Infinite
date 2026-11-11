@@ -64,6 +64,7 @@ namespace engine
       // the maps are read and replaces the outputs it writes. seeThrough: it writes opacity or mask.
       int fieldProgram = 0;
       bool fieldSeeThrough = false;
+      int fieldImage[4] = { -1, -1, -1, -1 }; // row 2.4: what img(slot, uv) reads, indices into Frame::textures
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the

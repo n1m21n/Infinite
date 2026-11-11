@@ -557,6 +557,17 @@ namespace
       "uniform int uHasSheenMap;\n"
       "uniform int uHasOpacityMap;\n"
       "uniform int uHasTransmissionMap;\n"
+      // Row 2.4 field images: all 16 texture units are taken, so img(slot, uv) borrows the four map units a material
+      // wires least; the draw binds the picture there and switches that map off.
+      "#if FLD_MAT_ANY\n"
+      "vec4 fldImg(int slot, vec2 uv)\n"
+      "{\n"
+      "   if (slot == 0) return texture(uClearcoatMap, uv);\n"
+      "   if (slot == 1) return texture(uSheenMap, uv);\n"
+      "   if (slot == 2) return texture(uTransmissionMap, uv);\n"
+      "   return texture(uAoMap, uv);\n"
+      "}\n"
+      "#endif\n"
       "uniform float uNormalStrength;\n"
       "uniform int uNormalBump;\n"
       // Mapping: which coordinate space the material maps sample (UV /
@@ -3563,6 +3574,16 @@ void Render3DNode::CookOnce(int frameId)
             }
             glUniform1i(glGetUniformLocation(mProgram, kMapUniform[map]), unit);
             glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), tex != 0 ? 1 : 0);
+         }
+         // Row 2.4: a field image takes its borrowed unit (clearcoat, sheen, transmission, AO maps give way).
+         static const int kFldImgMap[4] = { kMapClearcoat, kMapSheen, kMapTransmission, kMapAmbientOcclusion };
+         for (int k = 0; k < 4; k++)
+         {
+            if (material.fieldImage[k] == 0) continue;
+            glActiveTexture(GL_TEXTURE0 + kMapUnit[kFldImgMap[k]]);
+            glBindTexture(GL_TEXTURE_2D, material.fieldImage[k]);
+            PrepareSurfaceTexture(GL_REPEAT);
+            glUniform1i(glGetUniformLocation(mProgram, kHasUniform[kFldImgMap[k]]), 0);
          }
          glActiveTexture(GL_TEXTURE0);
       }

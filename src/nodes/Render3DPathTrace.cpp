@@ -48,6 +48,9 @@ namespace
       "#ifndef FLD_MAT_ANY\n"
       "#define FLD_MAT_ANY 0\n"
       "#endif\n"
+      "#if FLD_MAT_ANY\n"
+      "vec4 fldImg(int slot, vec2 uv) { return vec4(0.5, 0.5, 0.5, 1.0); }\n" // this tracer's atlas holds no field images
+      "#endif\n"
       "uniform float uFldTime;\n"
       "\n"
       "uniform int uSampleIndex;\n"

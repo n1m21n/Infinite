@@ -430,7 +430,9 @@ def _shade_textures():
                         {"shape": "sphere", "scale": 0.5, "location": [1.2, 0.0, 0.5],
                          "material": mat(tex="gradient", kind="radial")},
                         {"shape": "cube", "scale": 0.3, "location": [0.0, -1.2, 0.3],
-                         "material": mat(tex="gradient", kind="quadratic_sphere", scale=2)}]}
+                         "material": mat(tex="gradient", kind="quadratic_sphere", scale=2)},
+                        {"shape": "sphere", "scale": 0.5, "location": [1.2, -1.2, 0.5],
+                         "material": mat(tex="image", image="blotches")}]}
 
 
 CASES["shade_mapping"] = _shade_mapping()

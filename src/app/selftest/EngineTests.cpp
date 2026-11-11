@@ -816,6 +816,78 @@ bool RunEngineTest()
       check(composed == total, "2.4: every Noise / Voronoi / Gradient / Brick mode composes a program", (double)composed, (double)total);
       check(compiled == total, "2.4 L: every mode compiles", (double)compiled, (double)total);
       check(patterned == total, "2.4 L: every mode draws a pattern on the sphere", (double)patterned, (double)total);
+
+      // Shade Image: a two-colour picture through img(slot, uv), flat and as a box (triplanar), colour and data.
+      struct FakeImage : INode
+      {
+         unsigned int GetOutputTexture() override { return 7; }
+         int GetOutputWidth() const override { return 64; }
+         int GetOutputHeight() const override { return 64; }
+         void CookIfNeeded(int) override {}
+      } fakeImage;
+      std::vector<unsigned char> stripes(64 * 64 * 4, 255);
+      for (int y = 0; y < 64; y++)
+         for (int x = 0; x < 64; x++)
+         {
+            unsigned char* p = &stripes[((size_t)y * 64 + x) * 4];
+            const bool on = ((x / 8) + (y / 8)) % 2 == 0;
+            p[0] = on ? 230 : 20; p[1] = on ? 60 : 90; p[2] = on ? 30 : 220;
+         }
+      ShadeImageNode image;
+      image.ShadeInput(0)->Connect(&coord);
+      image.ShadeInput(1)->Connect(&fakeImage);
+      int imgTotal = 0, imgOk = 0;
+      double meanColour = 0.0, meanData = 0.0;
+      for (int proj = 0; proj < 2; proj++)
+         for (int space = 0; space < 2; space++)
+         {
+            imgTotal++;
+            image.projection = proj; image.space = space;
+            std::string err;
+            std::vector<const ShadeNode*> images;
+            const std::string src = ComposeShadeProgram(&image, lo, hi, err, &images);
+            const int id = src.empty() ? 0 : Field::RegisterMaterialProgram(src, {}, err);
+            if (id <= 0 || images.size() != 1)
+            {
+               printf("    2.4 image %d/%d: %s (%zu images)\n%s", proj, space, err.c_str(), images.size(), src.c_str());
+               continue;
+            }
+            engine::Frame fs = frame;
+            engine::TextureData td;
+            td.rgba = stripes.data(); td.w = 64; td.h = 64; td.key = 0x24a0001ull;
+            fs.textures.push_back(td);
+            fs.instances[2].fieldProgram = id;
+            fs.instances[2].fieldImage[0] = (int)fs.textures.size() - 1;
+            fs.fieldMsl = Field::BuildMaterialLibrary({ id }, Field::MaterialLang::Msl, fs.fieldMslKey);
+            std::vector<float> sp;
+            const bool ok = raster->Render(*img, fs, nullptr) && raster->Render(*img, fs, nullptr) && ReadRect(img->GlTexture(), W, H, sp);
+            const std::string perr = Field::MaterialProgramError(id);
+            if (!perr.empty())
+            {
+               printf("    2.4 image %d/%d: %s\n%s", proj, space, perr.c_str(), src.c_str());
+               continue;
+            }
+            double sum = 0.0, sum2 = 0.0;
+            size_t n = 0;
+            for (size_t i = 0; ok && i + 3 < sp.size() && i + 3 < mt.size(); i += 4)
+            {
+               const float d = std::max({ std::fabs(sp[i] - mt[i]), std::fabs(sp[i + 1] - mt[i + 1]), std::fabs(sp[i + 2] - mt[i + 2]) });
+               if (d < 0.02f) continue;
+               const double l = (sp[i] + sp[i + 1] + sp[i + 2]) / 3.0;
+               sum += l; sum2 += l * l; n++;
+            }
+            const double mean = n ? sum / (double)n : 0.0, var = n ? sum2 / (double)n - mean * mean : 0.0;
+            if (proj == 0) (space == 0 ? meanColour : meanData) = mean;
+            if (n > (size_t)W * H / 400 && var > 1e-4) imgOk++;
+            else printf("    2.4 image %d/%d: flat (%zu px, variance %.6f)\n", proj, space, n, var);
+         }
+      check(imgOk == imgTotal, "2.4 L: Shade Image draws its picture, flat and box, colour and data", (double)imgOk, (double)imgTotal);
+      check(meanData > meanColour + 0.01, "2.4 L: Data reads raw values, Colour decodes sRGB (darker)", meanData - meanColour, 0.01);
+      {
+         std::string err;
+         const int bad = Field::RegisterMaterialProgram("c = img(0.0, P)\nbase = vec3(c.x, c.y, c.z)\n", {}, err);
+         check(bad == 0 && !err.empty(), "2.4: img() refuses a uv that is not a vec2", (double)bad, 0.0);
+      }
    }
 
    // dump for eyes

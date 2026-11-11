@@ -33,6 +33,7 @@ namespace Field
 
    namespace
    {
+      thread_local bool tMaterialLowering = false; // row 2.4: img() types only inside a Material program
       bool IsLiteralConstant(const AstNodePtr& node, std::string& outNonConst)
       {
          if (!node) return true;
@@ -108,6 +109,8 @@ namespace Field
          int noiseArity = 0;
          if (IsNoiseBuiltin(name, &noiseArity))
             return checkExact(noiseArity);
+         if (IsImageBuiltin(name))
+            return checkExact(2);
          if (name == "rand" || name == "noise" || name == "sh")
          {
             if (argCount > 4)
@@ -1143,6 +1146,19 @@ namespace Field
                      }
                   }
                   fnResultType = noiseLanes == 3 ? FieldType(DataType::Vec3, 3) : FieldType(DataType::Float, 1);
+               }
+               else if (IsImageBuiltin(call->callee))
+               {
+                  // row 2.4: a slot (0 to 3) and a vec2 uv in, rgba out
+                  if (!tMaterialLowering || argIRs[0]->type.lanes != 1 || argIRs[1]->type.lanes != 2)
+                  {
+                     error.severity = Severity::Error;
+                     error.span = call->span;
+                     error.message = !tMaterialLowering ? call->callee + "() is only available in the Material domain"
+                                                        : call->callee + "() takes an image slot (0 to 3) and a vec2, e.g. " + call->callee + "(0, UV)";
+                     return nullptr;
+                  }
+                  fnResultType = FieldType(DataType::Vec4, 4);
                }
                else if (call->callee == "rand" || call->callee == "noise" || call->callee == "sh")
                {
@@ -3329,6 +3345,7 @@ namespace Field
       outProgram = PixelIRProgram{};
       outProgram.kind = kind;
       const bool material = (kind == PixelProgramKind::Material);
+      struct ImgScope { bool was; ImgScope(bool on) : was(tMaterialLowering) { tMaterialLowering = on; } ~ImgScope() { tMaterialLowering = was; } } imgScope(material);
 
       if (!ast)
       {

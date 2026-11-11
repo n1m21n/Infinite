@@ -360,6 +360,8 @@ namespace Field
                   }
                   ctx.EmitLine("   " + typeStr + " " + resTemp + " = " + name + "(" + argStr + ");");
                }
+               else if (IsImageBuiltin(name))
+                  ctx.EmitLine("   " + typeStr + " " + resTemp + " = " + (name == "imgc" ? "fldImgC" : "fldImg") + "(int(" + args[0] + " + 0.5), " + args[1] + ");");
                else if (IsNoiseBuiltin(name))
                {
                   std::string argStr;
@@ -804,6 +806,11 @@ namespace Field
       std::string s = kFieldHelperPrelude;
       s += PhaseShape::kGlslPrelude;
       s += NoiseGlsl();
+      // Row 2.4 field images: the host shader defines fldImg (it owns the samplers).
+      s += "\nvec4 fldImg(int slot, vec2 uv);\n"
+           "vec4 fldImgC(int slot, vec2 uv)\n{\n"
+           "   vec4 c = fldImg(slot, uv);\n"
+           "   return vec4(mix(pow((c.rgb + 0.055) / 1.055, vec3(2.4)), c.rgb / 12.92, vec3(lessThan(c.rgb, vec3(0.04045)))), c.a);\n}\n";
       s += "\nstruct FldMat { vec3 base; float roughness; float metallic; vec3 normal; float height; vec3 emission; "
            "float opacity; float mask; };\n";
       return s;

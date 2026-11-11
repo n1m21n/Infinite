@@ -12,6 +12,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 class ShadeNode;
 
@@ -25,6 +26,7 @@ struct ShadeBuild
    int depth = 0;
    int counter = 0;
    std::string error;
+   std::vector<const ShadeNode*> images; // row 2.4: Shade Image nodes in slot order (img(slot, uv)), at most 4
 
    // The local holding `c`'s upstream Shade node, emitting it first; `fallback` when nothing (or not a Shade node)
    // is wired.
@@ -39,7 +41,15 @@ public:
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
-   void CookIfNeeded(int) override {}
+   // A shade node draws nothing itself; cooking it cooks what is wired in (a Shade Image's picture, further up).
+   void CookIfNeeded(int frameId) override
+   {
+      if (mShadeCookFrame == frameId) return;
+      mShadeCookFrame = frameId;
+      for (int i = 0; i < ShadeInputCount(); i++)
+         if (ImageCable* c = ShadeInput(i))
+            if (c->IsConnected()) c->Pull(frameId);
+   }
    // Emits this node into b and returns the local that holds its value. Called once per node per pass.
    virtual std::string Emit(ShadeBuild& b) const = 0;
    // Is this node's value a colour (Material writes it to `base`) rather than a coordinate.
@@ -47,6 +57,12 @@ public:
    // Image-cable inputs, in pin order (Wiring counts and resolves them through here).
    virtual int ShadeInputCount() const { return 0; }
    virtual ImageCable* ShadeInput(int) { return nullptr; }
+   // Shade Image only: the picture it reads and that picture's revision (0: nothing wired).
+   virtual unsigned int ShadeImageTexture() const { return 0; }
+   virtual unsigned long long ShadeImageRevision() const { return 0; }
+
+private:
+   int mShadeCookFrame = -1;
 };
 
 // Shade Coord: one texture coordinate (Blender's Texture Coordinate outputs, as one dropdown).
@@ -232,6 +248,40 @@ private:
    ImageCable mVector;
 };
 
+// Shade Image (row 2.4): any image cable as a texture, filtered with mips. Flat reads it at vector.xy (unwired: UV);
+// Box projects it along the three axes and blends by the normal (triplanar). Colour decodes sRGB, Data reads raw.
+// A material program reads at most four pictures.
+class ShadeImageNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeImageNode(); }
+   enum Projection { kFlat = 0, kBox };
+   enum Space { kColour = 0, kData };
+   static const std::vector<std::string>& ProjectionNames();
+   static const std::vector<std::string>& SpaceNames();
+   int projection = kFlat;
+   int space = kColour;
+   float blend = 0.2f;
+   bool IsColour() const override { return true; }
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 2; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : i == 1 ? &mImage : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : slot == 1 ? "image" : nullptr; }
+   unsigned int ShadeImageTexture() const override { return mImage.Texture(); }
+   unsigned long long ShadeImageRevision() const override { return mImage.Revision(); }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("projection", projection);
+      v.Int("space", space);
+      v.Float("blend", blend);
+   }
+
+private:
+   ImageCable mVector;
+   ImageCable mImage;
+};
+
 // The Material-domain program for a chain ending at `out` (empty with `err` set on failure). lo/hi: the object-space
-// bounds Generated normalises by.
-std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err);
+// bounds Generated normalises by. images: the Shade Image nodes the program reads, in slot order.
+std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err,
+                                std::vector<const ShadeNode*>* images = nullptr);

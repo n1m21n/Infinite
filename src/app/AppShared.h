@@ -4163,6 +4163,7 @@ void DrawShadeNoiseParams(ShadeNoiseNode* n);
 void DrawShadeVoronoiParams(ShadeVoronoiNode* n);
 void DrawShadeGradientParams(ShadeGradientNode* n);
 void DrawShadeBrickParams(ShadeBrickNode* n);
+void DrawShadeImageParams(ShadeImageNode* n);
 
 void DrawMeshResynthParams(MeshResynthNode* n);
 

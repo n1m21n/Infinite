@@ -118,7 +118,13 @@ Material MaterialNode::GetMaterial() const
          }
       }
       std::string err;
-      const std::string src = ComposeShadeProgram(sh, mShadeLo, mShadeHi, err);
+      std::vector<const ShadeNode*> images;
+      const std::string src = ComposeShadeProgram(sh, mShadeLo, mShadeHi, err, &images);
+      for (size_t k = 0; k < images.size() && k < 4; k++)
+      {
+         m.fieldImage[k] = images[k]->ShadeImageTexture();
+         m.fieldImageRev[k] = (unsigned int)images[k]->ShadeImageRevision();
+      }
       if (src != mShadeSource)
       {
          mShadeSource = src;

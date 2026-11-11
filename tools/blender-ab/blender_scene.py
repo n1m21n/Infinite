@@ -362,7 +362,15 @@ for i, o in enumerate(scene["objects"]):
         p.inputs["Thin Film IOR"].default_value = m.get("iridescence_ior", 1.33)
     add_maps(mat, p, m.get("maps", {}), m)
     sh = m.get("shade")
-    if sh:   # row 2.3: Texture Coordinate (Object) -> Mapping (Point) -> Checker (scale 1) -> Base Color
+    if sh and sh.get("tex") == "image":   # row 2.4: Texture Coordinate (UV) -> Image Texture -> Base Color
+        nt = mat.node_tree
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        it = nt.nodes.new("ShaderNodeTexImage")
+        it.image = bpy.data.images.load(os.path.join(case, sh.get("image", "blotches") + ".png"))
+        it.extension = 'REPEAT'
+        nt.links.new(tc.outputs["UV"], it.inputs["Vector"])
+        nt.links.new(it.outputs["Color"], p.inputs["Base Color"])
+    elif sh:   # row 2.3: Texture Coordinate (Object) -> Mapping (Point) -> Checker (scale 1) -> Base Color
         nt = mat.node_tree
         tc = nt.nodes.new("ShaderNodeTexCoord")
         mp = nt.nodes.new("ShaderNodeMapping"); mp.vector_type = 'POINT'

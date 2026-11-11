@@ -305,6 +305,8 @@ namespace Field
 
                if (name == "vec2" || name == "vec3" || name == "vec4")
                   ctx.Line("   " + ty + " " + r + " = " + ty + "(" + joined(false) + ");");
+               else if (IsImageBuiltin(name))
+                  ctx.Line("   " + ty + " " + r + " = fld_" + name + "(fm, fi, flod, " + args[0] + ", " + args[1] + ");");
                else if (IsNoiseBuiltin(name))
                   ctx.Line("   " + ty + " " + r + " = fld_" + name + "(" + joined(false) + ");");
                else if (name == "mod" || name == "fmod")
@@ -587,6 +589,17 @@ namespace Field
       std::string s = kMslHelperPrelude;
       s += ToMslTypes(PhaseShape::kGlslPrelude);
       s += NoiseMsl();
+      // Row 2.4 field images: fm is the host's map array, fi the four slots as index + 1 (0 none), flod the mip level
+      // (below 0: the raster's own screen derivatives).
+      s += "\nconstexpr sampler kFldImgS(filter::linear, mip_filter::linear, address::repeat, max_anisotropy(8));\n"
+           "static float4 fld_img(array<texture2d<float>, 16> fm, float4 fi, float flod, float slot, float2 uv)\n{\n"
+           "   const int t = int(fi[clamp(int(slot + 0.5), 0, 3)] + 0.5) - 1;\n"
+           "   if (t < 0 || t > 15) return float4(1.0);\n"
+           "   if (flod < 0.0) return fm[t].sample(kFldImgS, uv);\n"
+           "   return fm[t].sample(kFldImgS, uv, level(flod));\n}\n"
+           "static float4 fld_imgc(array<texture2d<float>, 16> fm, float4 fi, float flod, float slot, float2 uv)\n{\n"
+           "   const float4 c = fld_img(fm, fi, flod, slot, uv);\n"
+           "   return float4(select(pow((c.rgb + 0.055) / 1.055, float3(2.4)), c.rgb / 12.92, c.rgb < float3(0.04045)), c.a);\n}\n";
       s += "\nstruct FldMat { float3 base; float roughness; float metallic; float3 normal; float height; float3 emission; "
            "float opacity; float mask; };\n";
       return s;
@@ -606,7 +619,8 @@ namespace Field
       for (const auto& s : program.pixelBody)
          if (s->rvalueExpr && HasReduce(s->rvalueExpr)) { r.error = "reduce is not available in the Material domain"; return r; }
       Ctx ctx;
-      ctx.Line("static void " + fnName + "(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t, float3 W, float3 V)");
+      ctx.Line("static void " + fnName + "(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t, float3 W, float3 V, "
+               "array<texture2d<float>, 16> fm, float4 fi, float flod)");
       ctx.Line("{");
       ctx.Line("   float fld_dt = 0.0; int fld_frame = 0; (void)fld_dt; (void)fld_frame; (void)fld_t;");
       for (int i = 0; i < kMaterialInputCount; i++)

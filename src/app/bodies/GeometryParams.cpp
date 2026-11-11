@@ -1066,6 +1066,15 @@ namespace app
    }
 
 
+   void DrawShadeImageParams(ShadeImageNode* n)
+   {
+      DropdownButton("projection", ShadeImageNode::ProjectionNames(), n->projection, [n](int i) { PushUndoCheckpoint(); n->projection = i; });
+      DropdownButton("space", ShadeImageNode::SpaceNames(), n->space, [n](int i) { PushUndoCheckpoint(); n->space = i; });
+      if (n->projection == ShadeImageNode::kBox)
+         ModSlider("blend", &n->blend, 0.0f, 1.0f);
+   }
+
+
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());

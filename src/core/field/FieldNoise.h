@@ -24,6 +24,9 @@ namespace Field
 {
    // True for the nine names above. arity: argument count; resultLanes: 1, or 3 for voronoi3.
    bool IsNoiseBuiltin(const std::string& name, int* arity = nullptr, int* resultLanes = nullptr);
+   // Row 2.4: img(slot, uv) reads one of a material's four field images (raw values), imgc() the same decoded from
+   // sRGB. Material domain only: the host shader owns the textures.
+   inline bool IsImageBuiltin(const std::string& name) { return name == "img" || name == "imgc"; }
    // flat: p.x, p.y, p.z, then the scalar arguments. Writes resultLanes values to out; false for an unknown name.
    bool EvalNoiseBuiltin(const std::string& name, const double* flat, int count, double out[3]);
    // GLSL 150 helpers fld_noise3 ... fld_white (MSL gets them through NoiseMsl()).

@@ -106,6 +106,9 @@ struct Material
    // Field material program (core/field/MaterialRegistry.h) from Material's `field` input: runs after the maps and
    // replaces the outputs it writes. 0 = none.
    int fieldProgram = 0;
+   // Row 2.4: the pictures that program reads with img(slot, uv) (GL textures, 0 none) and their revisions.
+   unsigned int fieldImage[4] = { 0, 0, 0, 0 };
+   unsigned int fieldImageRev[4] = { 0, 0, 0, 0 };
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
