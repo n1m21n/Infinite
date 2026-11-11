@@ -283,6 +283,29 @@ namespace Field
       bool isTimeDependent = false;
    };
 
+   // OPUS_PLAN row 1.2: a Field Pixel program runs either over an image (col, alpha, uv, ...) or over a surface hit
+   // (the Material domain: read-only inputs, writable outputs, all bare names). An output the program never writes
+   // keeps the Material node's knob; PixelIRProgram::materialWritten has one bit per kMaterialOutputs entry.
+   enum class PixelProgramKind
+   {
+      Image,
+      Material
+   };
+
+   struct MaterialChannel
+   {
+      const char* name;
+      DataType type;
+      int lanes;
+   };
+   // P object-space position, N shading normal, UV first set, curvature and cavity 0 until row 4.4, t seconds.
+   extern const MaterialChannel kMaterialInputs[];
+   extern const int kMaterialInputCount;
+   // base, roughness, metallic, normal (tangent space), height, emission, opacity, mask - bit i = kMaterialOutputs[i].
+   extern const MaterialChannel kMaterialOutputs[];
+   extern const int kMaterialOutputCount;
+   int MaterialOutputBit(const std::string& name); // -1 when name is not an output
+
    struct PixelIRProgram
    {
       std::vector<IRStmtPtr> prologue;    // Hoisted frame/graph statements
@@ -292,6 +315,8 @@ namespace Field
       std::vector<DeclaredOutput> declaredOutputs;
       std::vector<DeclaredInput> declaredInputs;
       bool isTimeDependent = false;
+      PixelProgramKind kind = PixelProgramKind::Image;
+      uint32_t materialWritten = 0; // Material kind: outputs written anywhere in the program
    };
 
    Domain JoinDomains(Domain a, Domain b, bool& outCompatible);
@@ -303,7 +328,8 @@ namespace Field
    bool LowerElementProgramToIR(const AstNodePtr& ast, ElementIRProgram& outProgram, FieldError& outError);
 
    // Lowers a Pixel program AST to typed Pixel IR with domain inference and hoisting
-   bool LowerPixelProgramToIR(const AstNodePtr& ast, PixelIRProgram& outProgram, FieldError& outError);
+   bool LowerPixelProgramToIR(const AstNodePtr& ast, PixelIRProgram& outProgram, FieldError& outError,
+                              PixelProgramKind kind = PixelProgramKind::Image);
 
    // Lowers a Graph program AST to typed Graph IR: domain inference, then a
    // rate-zero enforcement walk (Phase 2, step 10 doc §5.2) rejecting any

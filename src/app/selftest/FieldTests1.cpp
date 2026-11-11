@@ -567,7 +567,75 @@ int RunFieldTest()
    }
    printf("SECTION F (Non-finite result): %s\n", secFOk ? "OK" : "FAIL");
 
-   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk && secFOk;
+   // SECTION G (OPUS_PLAN row 1.2): the Material domain of Field Pixel. Inputs P N UV curvature cavity t are
+   // read-only; outputs base roughness metallic normal height emission opacity mask are written by bare name; an
+   // output the program never writes keeps the Material knob (materialWritten has no bit for it). Writing a name
+   // that is not an output - a typo - is an error on that line.
+   bool secGOk = true;
+   {
+      struct MatCase
+      {
+         const char* code;
+         bool ok;
+         int errLine;          // checked when !ok
+         const char* errHas;   // substring of the error when !ok
+         const char* written;  // space-separated outputs expected written when ok
+      };
+      const MatCase cases[] = {
+         { "base = vec3(0.8, 0.2, 0.1)\nroughness = 0.3 + 0.2 * N.y\nmetallic = 1.0", true, 0, "",
+           "base roughness metallic" },
+         { "base = vec3(1.0)\nrougness = 0.5", false, 2, "rougness", "" },
+         { "base = 0.5", true, 0, "", "base" },
+         { "k = UV.x * 2.0\nbase = vec3(k)", true, 0, "", "base" },
+         { "base = P * 0.5 + N * curvature + vec3(cavity, t, UV.y)\nheight = cavity", true, 0, "", "base height" },
+         { "if (UV.x > 0.5) {\n emission = vec3(1.0)\n}\nopacity = 1.0\nmask = 0.0\nnormal = vec3(0.0, 0.0, 1.0)",
+           true, 0, "", "emission opacity mask normal" },
+         { "base = vec3(1.0)\nP = vec3(0.0)", false, 2, "read-only", "" },
+         { "roughness = vec3(1.0)", false, 1, "cannot assign", "" },
+         { "base = vec3(1.0)\nvec3(0.5)", false, 2, "material output", "" },
+      };
+      for (const MatCase& c : cases)
+      {
+         std::vector<Field::Token> toks;
+         Field::FieldError err;
+         Field::AstNodePtr ast;
+         Field::PixelIRProgram prog;
+         const bool ok = Field::Lex(c.code, toks, err) && Field::ParseProgram(toks, ast, err) &&
+                         Field::LowerPixelProgramToIR(ast, prog, err, Field::PixelProgramKind::Material);
+         bool pass = (ok == c.ok);
+         if (pass && !ok)
+            pass = err.span.line == c.errLine && err.message.find(c.errHas) != std::string::npos;
+         if (pass && ok)
+         {
+            uint32_t want = 0;
+            std::istringstream ws(c.written);
+            for (std::string w; ws >> w;)
+               want |= 1u << Field::MaterialOutputBit(w);
+            pass = prog.kind == Field::PixelProgramKind::Material && prog.materialWritten == want;
+         }
+         if (!pass)
+         {
+            printf("SECTION G (Material domain): FAIL - '%s' ok=%d line=%d err='%s' written=0x%x\n", c.code, (int)ok,
+                   err.span.line, err.message.c_str(), prog.materialWritten);
+            secGOk = false;
+         }
+      }
+      // The Image domain is unchanged: material names stay free locals there.
+      std::vector<Field::Token> toks;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      Field::PixelIRProgram prog;
+      if (!(Field::Lex("base = uv.x\ncol = vec3(base)", toks, err) && Field::ParseProgram(toks, ast, err) &&
+            Field::LowerPixelProgramToIR(ast, prog, err)) ||
+          prog.kind != Field::PixelProgramKind::Image)
+      {
+         printf("SECTION G (Material domain): FAIL - image program broke: %s\n", err.message.c_str());
+         secGOk = false;
+      }
+   }
+   printf("SECTION G (Material domain): %s\n", secGOk ? "OK" : "FAIL");
+
+   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk && secFOk && secGOk;
    printf("INFINITE_FIELDTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }
