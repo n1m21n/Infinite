@@ -13,7 +13,7 @@ first after any context reset, then continue from the first open row.
 - **owner** rows and anything that adds a node, mode, panel or UI: write the one-page design in
   `docs/plans/realtime-engine/designs/<step>.md`, mark the row "waiting for owner", move on. Do not build it.
 - Budget: a step that fails its gate after three measured attempts is logged with its numbers and skipped.
-- Clean room (papers only), GPU only, keep disk low (remove merged worktrees and old sweep images).
+- Sources: papers plus Blender source as a reference since 2026-11-12 (OPUS_PLAN rule 12: Apache 2.0 Cycles formulas may be ported with a notice; GPL code is read for the idea only), GPU only, keep disk low (remove merged worktrees and old sweep images).
 - Test tiers (light load on the 8 GB Mac; all runs at background priority via `taskpolicy -b`):
 
   | tier | when | how |

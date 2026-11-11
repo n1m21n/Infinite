@@ -193,7 +193,7 @@ for as soon as Block E lands.
 | Item | Why |
 |---|---|
 | CPU render paths | 3D and video run on the GPU; the CPU belongs to audio |
-| Blender source, GPL code | clean room: papers and public descriptions only |
+| Blender source, GPL code | superseded 2026-11-12 by OPUS_PLAN rule 12: reference reading allowed; Apache 2.0 Cycles formulas may be ported with a notice; GPL code never copied |
 | Light Path tricks, Shader to RGB, Ray Portal, Raycast node | no case needs them (REALISM §9) |
 | Per-hit JavaScript | JS is CPU; Sketch nodes feed images and geometry |
 

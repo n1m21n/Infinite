@@ -19,7 +19,7 @@ Paste this as the first message:
 | 2 | No row is done without its done-command output in `AUTORUN.md`. |
 | 3 | One build at a time, `python3 scripts/ibuild.py build --mode release`; never during a sweep; nothing over 20 minutes. |
 | 4 | No Co-Authored-By or "Generated with" lines. Never push. Never merge to main. |
-| 5 | Papers only. Blender renders truths as a black box; its source is never read. |
+| 5 | Papers, own derivations and Blender's source as a reference (owner, 2026-11-12). Cycles files under Apache 2.0: formulas may be ported, with a line in `THIRD_PARTY_NOTICES.md`. GPL Blender code: read for the idea only, never copied or translated. Blender renders the A/B truths and the gate decides. See OPUS_PLAN rule 12. |
 
 All 16 rules: `OPUS_PLAN.md` section 2.
 
