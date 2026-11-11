@@ -43,7 +43,7 @@ Read these at the start of every session. They are not optional.
 | 11 | Self-test: `INFINITE_ENGINETEST=1 script -q /dev/null timeout 300 build/Infinite.app/Contents/MacOS/Infinite`. The only known fail is the R1 row "at least 1.5x faster than Render 3D". |
 | 12 | Clean room: papers and your own derivations only. Never read or copy Cycles, Blender or any GPL source. Blender is used only as a black box to render truths. |
 | 13 | 3D stays on the GPU. No downloads, no agent fan-out, no extra sessions, no UI scripting of the app, no release. |
-| 14 | Anything in section 3 marked "not approved" is built on the branch but not wired into the node menu until the owner says yes. Nothing else needs a question. |
+| 14 | Section 3 lists what the owner approved. Anything marked "not approved" there, and any node, mode, panel or input not named in this file, is not built: write a design and mark it "waiting for owner". Nothing else needs a question. |
 | 15 | Delete with variables only as `"${S:?}"/x`. Never `pgrep -f` a pattern that the waiting command itself contains. |
 | 16 | End of session: update the state table in `NEXT_SESSION_PROMPT.md` (row, state, commit), commit, stop. Reports use tables and bullets, plain ASCII diagrams, no Mermaid. |
 
@@ -60,7 +60,7 @@ Session ritual:
 
 | Item | Where | State |
 |---|---|---|
-| Shading node list (section 5) | block 2 | **approved in principle 2026-11-11** ("equivalent of shading nodes"); exact list shown to owner before menu wiring |
+| Shading node list (section 5) | block 2 | **approved 2026-11-11**: build and wire into the node menu. A node not in section 5 still needs a yes |
 | Material inputs `Layer`, `Mask`; Field Pixel `Domain: Image / Material` | rows 1.2, 4.1 | same |
 | `direction` knob on sheen | row 5.1 | same |
 | Engine dropdown on Render 3D (old 1.8) | row 8.1 | decided: build it; it is the only way a user reaches the engine |
