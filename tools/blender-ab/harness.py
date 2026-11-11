@@ -127,6 +127,14 @@ def make_texture(case_dir, name, size=512):
             dx = (u - cx + 0.5) % 1 - 0.5; dy = (v - cy + 0.5) % 1 - 0.5
             img = np.where((np.hypot(dx, dy) < r)[..., None], [30, 20, 25], img)
         img = img.clip(0, 255).astype(np.uint8)
+    elif name == "weave":             # a fine plain weave: crossed threads, each a half-round ridge (OpenGL normals)
+        tu, tv = (u * 16) % 1, (v * 16) % 1
+        over = ((np.floor(u * 16) + np.floor(v * 16)) % 2) > 0
+        h = np.where(over, np.sin(np.pi * tu), np.sin(np.pi * tv)) * 0.5
+        dx, dy = np.gradient(h, 1.0 / size)
+        n = np.stack([-dx * 0.04, dy * 0.04, np.ones_like(h)], -1)
+        n /= np.linalg.norm(n, axis=-1, keepdims=True)
+        img = ((n * 0.5 + 0.5) * 255).astype(np.uint8)
     elif name == "holes":             # opacity: a solid sheet with a grid of round holes
         d = np.hypot((u * 4) % 1 - 0.5, (v * 4) % 1 - 0.5)
         g = np.where(d < 0.3, 0, 255).astype(np.uint8)

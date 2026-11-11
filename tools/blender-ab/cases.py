@@ -315,6 +315,12 @@ CASES.update({
     "tex_tile": _shading(maps={"albedo": "blotches"}, uv_scale=6.0),
     "tex_breakup": _shading(maps={"albedo": "blotches"}, uv_scale=6.0, breakup=1.0),
     "tex_detail": _detail(),
+    # Filtered normals (2.1): a fine weave normal map tiled x40 on a glossy plane seen from 8 m at a low angle, so many
+    # texels fall under one pixel and the highlight must widen instead of sparkling or vanishing.
+    "tex_fabric_far": {"size": SMALL, "camera": {"fov": 40, "azimuth": 90, "elevation": 12, "distance": 8.0, "target": [0, 0, 0.0]},
+                       "lights": [{"type": "sun", "power": 3, "azimuth": 270, "elevation": 14}], "world": {"color": [0.3, 0.3, 0.3]},
+                       "objects": [{"shape": "plane", "scale": 6, "material": {"base_color": [0.25, 0.3, 0.5], "roughness": 0.25,
+                                                                                "maps": {"normal": "weave"}, "uv_scale": 40.0}}]},
     # Emissive meshes as the only light.
     "emission_light": _emission_room(),
     # Three coloured point lights: coloured, overlapping shadows.

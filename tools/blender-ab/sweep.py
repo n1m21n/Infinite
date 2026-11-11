@@ -33,6 +33,9 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 SLACK = 0.005
+# Cases whose FLIP is not a gate: tex_breakup has no Cycles counterpart (its truth is the plain tile), so it is
+# judged by tile_repeat.py; diff prints it but never counts it worse or better.
+NO_GATE = {"tex_breakup"}
 
 # What a change can touch -> regex on the case's scene JSON. `pick` lists the cases.
 GROUPS = {
@@ -173,6 +176,10 @@ def diff(a):
             continue
         d = n["flip"] - o["flip"]
         total += d
+        if case in NO_GATE:
+            print("%-28s %7.3f %7.3f  %+.3f  b %5.3f (not gated)" % (case, o["flip"], n["flip"], d, n["brightness"]))
+            total -= d
+            continue
         tag = "WORSE" if d > SLACK else ("better" if d < -SLACK else "")
         worse += tag == "WORSE"; better += tag == "better"
         print("%-28s %7.3f %7.3f  %+.3f  b %5.3f %s" % (case, o["flip"], n["flip"], d, n["brightness"], tag))
