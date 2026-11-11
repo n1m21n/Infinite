@@ -35,6 +35,7 @@ struct Render3DNode::EngineState
    unsigned long long sceneHash = 0;
    int settled = 0;   // path-traced samples since the scene last changed
    bool exportWarm = false; // the live history is already converged by an earlier exported frame
+   double profWarmGpu = 0.0; // INFINITE_ENGINE_PROF: GPU ms of this frame's warm-up renders
    std::vector<float> envPixels;   // the HDRI read back from GL, one mip at most 2048 wide
    int envW = 0, envH = 0, envLod = 0;
    unsigned int envTex = 0;
@@ -527,9 +528,12 @@ bool Render3DNode::CookEngine(int frameId)
       E.exportWarm = true;
       for (int i = 0; i < warm; i++)
       {
-         if (!E.raster->Render(*E.img, fr, nullptr))
+         double g = 0.0;
+         if (!E.raster->Render(*E.img, fr, sProf ? &g : nullptr))
             return false;
+         E.profWarmGpu += g;
          fr.frameIndex = ++E.frame;
+         fr.reuseShadowMask = true; // one camera, scene and light set: the warm-ups and the final render share one mask
       }
    }
    else if ((liveEngineFeatures & 8) != 0 && !changed)
@@ -551,13 +555,16 @@ bool Render3DNode::CookEngine(int frameId)
       if (!E.raster->Render(*E.img, fr, nullptr))
          return false;
    }
-   if (sProf && (E.frame % 30) == 0)
+   // Export steps the counter by the warm-up count, so print every exported frame there.
+   const bool profNow = sProf && ((E.frame % 30) == 0 || offline);
+   if (profNow)
    {
       const auto tp3 = std::chrono::steady_clock::now();
       auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
-      std::fprintf(stderr, "ENGINE_PROF meshes=%.2f (changed %d, %zu tris) build=%.2f render=%.2f inst=%zu env=%dx%d lod=%.0f bg=%d conn=%d\n",
-                   ms(tp0, tp1), changedMeshes, changedTris, ms(tp1, tp2), ms(tp2, tp3), fr.instances.size(), fr.envW, fr.envH,
+      std::fprintf(stderr, "ENGINE_PROF warmGpu=%.1f meshes=%.2f (changed %d, %zu tris) build=%.2f render=%.2f inst=%zu env=%dx%d lod=%.0f bg=%d conn=%d\n",
+                   E.profWarmGpu, ms(tp0, tp1), changedMeshes, changedTris, ms(tp1, tp2), ms(tp2, tp3), fr.instances.size(), fr.envW, fr.envH,
                    fr.envBaseLod, (int)fr.envBackground, (int)envInput.IsConnected());
+      E.profWarmGpu = 0.0;
    }
 
    // GL reads the engine's picture from a rectangle texture; the node's output is an ordinary 2D texture.
@@ -571,7 +578,7 @@ bool Render3DNode::CookEngine(int frameId)
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    mRevision = NextTextureRevision();
    mHasSceneBuilt = false;
-   if (sProf && (E.frame % 30) == 0)
+   if (profNow)
    {
       const auto tpZ = std::chrono::steady_clock::now();
       std::fprintf(stderr, "ENGINE_PROF2 sources=%.2f total=%.2f\n", std::chrono::duration<double, std::milli>(tp0 - tpA).count(),

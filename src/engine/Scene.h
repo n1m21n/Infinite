@@ -141,6 +141,7 @@ namespace engine
       float giStrength = 1.0f;
       float giBlend = 0.15f;      // temporal blend toward the new frame when the camera is still
       unsigned frameIndex = 0;
+      bool reuseShadowMask = false; // same camera, scene and lights as the last Render: keep its half-res RT shadow mask
       bool rtReflections = false; // one ray along the reflection vector for glossy surfaces (hit = flat shade, miss = env)
       float rayBias = 0.003f; // origin offset along the normal, scene units
       // Depth of field (settle's path tracer): a thin lens of this radius focused at focusDist along camFwd; bokeh =

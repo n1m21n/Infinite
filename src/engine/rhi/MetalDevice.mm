@@ -2247,9 +2247,12 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
             [ze endEncoding];
          }
-         if (mask)
+         // The same frame again (export warm-ups): the mask pass would trace the same rays to the same answer.
+         const bool maskReuse = mask && fr.reuseShadowMask && mVisValid && mVisW == img.Width() && mVisH == img.Height();
+         if (mask) f.shQ[2] += 4.0f;
+         mVisValid = mask; mVisW = img.Width(); mVisH = img.Height();
+         if (mask && !maskReuse)
          {
-            f.shQ[2] += 4.0f;
             if (!mArgEnc)
                mArgEnc = [mFsFn newArgumentEncoderWithBufferIndex:3];
             if (mArgTlas != mTlas)
@@ -3145,6 +3148,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          if (!mPrePso || !mPsoRunInv || !mPsoRunDirInv) EngineFail(@"invariant pipelines", err);
          return mPrePso && mPsoRunInv && mPsoRunDirInv;
       }
+      bool mVisValid = false; int mVisW = 0, mVisH = 0; // mVis holds the last Render's mask at this size
       id<MTLTexture> mVis = nil, mVisD = nil; // half-res RT shadow mask (4 lights) and its distance guide
       id<MTLTexture> mDepth = nil;
       id<MTLRenderPipelineState> mDofPso = nil;
