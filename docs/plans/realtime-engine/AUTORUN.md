@@ -1,0 +1,40 @@
+# Autorun: finish PLAN.md unattended (owner away, 2026-11-11)
+
+Owner: "assign yourself a goal and finish every block and every step." This file is the goal and the log; read it
+first after any context reset, then continue from the first open row.
+
+## Rules (unchanged by being unattended)
+
+- One build at a time (`scripts/ibuild.py build --mode release`), one sweep at a time; always leave a background
+  job running so the session is woken when it ends.
+- A/B every change against the previous step's sweep (`sweep.py run --tag post`, `diff`); keep only if no case is
+  > 0.005 FLIP worse and the step's gate moves the right way. Rotate post -> pre after each kept step.
+- Commit per step on the block's branch, no attribution lines, never push, never merge to main.
+- **owner** rows and anything that adds a node, mode, panel or UI: write the one-page design in
+  `docs/plans/realtime-engine/designs/<step>.md`, mark the row "waiting for owner", move on. Do not build it.
+- Budget: a step that fails its gate after three measured attempts is logged with its numbers and skipped.
+- Clean room (papers only), GPU only, keep disk low (remove merged worktrees and old sweep images).
+- Test tiers (light load on the 8 GB Mac; all runs at background priority via `taskpolicy -b`):
+
+  | tier | when | how |
+  |---|---|---|
+  | 0 | refactor meant to move no pixel | `sweep.py run --spp 16` pre/post, `sweep.py same`: any pixel change fails |
+  | 1 | real change | `run --spp 64 <cases it can touch>` pre/post, `diff` |
+  | 2 | block close | full `run` on all 43, `diff` |
+
+  The Air (SSH, resolve with `dns-sd` first) is the reserve if a tier-2 sweep must run while building here.
+
+## Order
+
+D (1.1–1.3) -> E (1.4–1.7) -> 1.6 BSDF A/Bs (ggx, falloff cap, Fresnel: toggles in
+`tools/blender-ab/toggles/`) -> 1.9 -> F (2.1–2.3) -> 2.4–2.9 -> Phase 3 fix/enh rows that do not need
+3.2 -> 4.4, 4.5 -> 5.4, 5.5. Owner rows get designs along the way.
+
+## Log
+
+| step | state | numbers | commit |
+|---|---|---|---|
+| 1.1a sheen + tonemap one source | done | raster/live/settle 0 worse of 43 | 33eddee2 |
+| 1.2 engine error on the node | built, sweep running | self-test caught the point-LOD pipeline (VOutP lacked uv/lp since R5); fixed | |
+| 1.3 material record | built, sweep running | raster: every case identical | |
+| owner rows 1.8, 3.2, 3.5, 3.6, 3.8, 4.1–4.3, 5.2, 5.3, 5.7 | designs written, waiting for owner | `designs/` | |
