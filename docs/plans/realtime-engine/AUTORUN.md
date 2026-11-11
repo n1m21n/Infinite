@@ -35,6 +35,6 @@ D (1.1–1.3) -> E (1.4–1.7) -> 1.6 BSDF A/Bs (ggx, falloff cap, Fresnel: togg
 | step | state | numbers | commit |
 |---|---|---|---|
 | 1.1a sheen + tonemap one source | done | raster/live/settle 0 worse of 43 | 33eddee2 |
-| 1.2 engine error on the node | built, sweep running | self-test caught the point-LOD pipeline (VOutP lacked uv/lp since R5); fixed | |
-| 1.3 material record | built, sweep running | raster: every case identical | |
+| 1.2 engine error on the node | done | self-test caught the point-LOD pipeline (VOutP lacked uv/lp since R5); fixed. raster/live 0 worse of 43 | e6b2e971 |
+| 1.3 material record | done | raster identical; live 0 worse of 43; settle 20 touched cases identical to 1.1a (full 43 stopped: over the 20 min cap) | 64bccfea |
 | owner rows 1.8, 3.2, 3.5, 3.6, 3.8, 3.9, 4.1–4.3, 5.2, 5.3, 5.7 | designs written, waiting for owner | `designs/` | |
