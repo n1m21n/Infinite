@@ -140,6 +140,118 @@ std::string ShadeCheckerNode::Emit(ShadeBuild& b) const
    return b.NewVar(this, "mix(" + c2 + ", " + c1 + ", checker(" + in + " * " + F(scale) + "))");
 }
 
+const std::vector<std::string>& ShadeNoiseNode::OutputNames()
+{
+   static const std::vector<std::string> k = { "Value", "Colour" };
+   return k;
+}
+
+std::string ShadeNoiseNode::Emit(ShadeBuild& b) const
+{
+   const std::string in = b.Input(mVector, b.Generated());
+   std::string p = b.NewVar(this, in + " * " + F(scale));
+   if (std::fabs(distortion) > 1e-6f)
+      p = b.NewVar(this, p + " + vec3(noise3(" + p + " + vec3(13.5, 7.25, 3.75)), noise3(" + p +
+                            " + vec3(-5.5, 21.75, 9.25)), noise3(" + p + " + vec3(31.25, -11.5, 17.75))) * " + F(distortion));
+   const std::string tail = ", " + F(std::floor(std::max(detail, 0.0f)) + 1.0f) + ", 2.0, " + F(std::min(std::max(roughness, 0.0f), 1.0f)) + ")";
+   auto value = [&](const std::string& at) { return "clamp(0.5 + 0.5 * fbm(" + at + tail + ", 0.0, 1.0)"; };
+   if (output == kColour)
+      return b.NewVar(this, "vec3(" + value(p) + ", " + value(p + " + vec3(47.5, 19.25, -23.75)") + ", " +
+                               value(p + " + vec3(-37.25, 53.5, 11.75)") + ")");
+   const std::string v = b.NewVar(this, value(p));
+   return b.NewVar(this, "vec3(" + v + ", " + v + ", " + v + ")");
+}
+
+const std::vector<std::string>& ShadeVoronoiNode::OutputNames()
+{
+   static const std::vector<std::string> k = { "Distance", "Second", "Edge", "Cell", "Colour" };
+   return k;
+}
+
+std::string ShadeVoronoiNode::Emit(ShadeBuild& b) const
+{
+   const std::string in = b.Input(mVector, b.Generated());
+   const std::string c = b.NewVar(this, "voronoi3(" + in + " * " + F(scale) + ")");
+   std::string v;
+   switch (output)
+   {
+   case kSecond: v = c + ".y"; break;
+   case kEdge: v = c + ".y - " + c + ".x"; break;
+   case kCell: v = c + ".z"; break;
+   case kColour:
+      return b.NewVar(this, "vec3(" + c + ".z, fract(" + c + ".z * 7.31 + 0.37), fract(" + c + ".z * 13.73 + 0.71))");
+   default: v = c + ".x"; break;
+   }
+   const std::string g = b.NewVar(this, "clamp(" + v + ", 0.0, 1.0)");
+   return b.NewVar(this, "vec3(" + g + ", " + g + ", " + g + ")");
+}
+
+const std::vector<std::string>& ShadeGradientNode::KindNames()
+{
+   static const std::vector<std::string> k = { "Linear", "Quadratic", "Easing", "Diagonal", "Spherical",
+                                               "Quadratic Sphere", "Radial", "Wave", "Magic" };
+   return k;
+}
+
+std::string ShadeGradientNode::Emit(ShadeBuild& b) const
+{
+   const std::string in = b.Input(mVector, b.Generated());
+   const std::string p = b.NewVar(this, in + " * " + F(scale));
+   std::string v;
+   switch (kind)
+   {
+   case kQuadratic:
+   {
+      const std::string r = b.NewVar(this, "clamp(" + p + ".x, 0.0, 1.0)");
+      v = r + " * " + r;
+      break;
+   }
+   case kEasing:
+   {
+      const std::string r = b.NewVar(this, "clamp(" + p + ".x, 0.0, 1.0)");
+      v = r + " * " + r + " * (3.0 - 2.0 * " + r + ")";
+      break;
+   }
+   case kDiagonal: v = "clamp((" + p + ".x + " + p + ".y) * 0.5, 0.0, 1.0)"; break;
+   case kSpherical: v = "max(1.0 - length(" + p + "), 0.0)"; break;
+   case kQuadraticSphere:
+   {
+      const std::string r = b.NewVar(this, "max(1.0 - length(" + p + "), 0.0)");
+      v = r + " * " + r;
+      break;
+   }
+   case kRadial: v = "atan2(" + p + ".y, " + p + ".x) * 0.15915494 + 0.5"; break;
+   case kWave: v = "wave(" + p + ")"; break;
+   case kMagic:
+      v = "clamp(0.5 + 0.25 * (sin(" + p + ".x * 6.2831853 + cos(" + p + ".y * 6.2831853)) + cos(" + p +
+          ".y * 6.2831853 - sin(" + p + ".z * 6.2831853 + " + p + ".x * 3.1415927))), 0.0, 1.0)";
+      break;
+   default: v = "clamp(" + p + ".x, 0.0, 1.0)"; break;
+   }
+   const std::string g = b.NewVar(this, v);
+   return b.NewVar(this, "vec3(" + g + ", " + g + ", " + g + ")");
+}
+
+std::string ShadeBrickNode::Emit(ShadeBuild& b) const
+{
+   const std::string in = b.Input(mVector, b.Generated());
+   const float w = std::max(width, 1e-3f), h = std::max(height, 1e-3f);
+   const std::string c1 = V3(SrgbToLinear(color1[0]), SrgbToLinear(color1[1]), SrgbToLinear(color1[2]));
+   const std::string c2 = V3(SrgbToLinear(color2[0]), SrgbToLinear(color2[1]), SrgbToLinear(color2[2]));
+   const std::string cm = V3(SrgbToLinear(mortarColor[0]), SrgbToLinear(mortarColor[1]), SrgbToLinear(mortarColor[2]));
+   const std::string p = b.NewVar(this, in + " * " + F(scale));
+   const std::string row = b.NewVar(this, "floor(" + p + ".y * " + F(1.0f / h) + ")");
+   // every second row shifts by offset bricks; the row at 0 is a shifted one (measured on Cycles' brick texture)
+   const std::string x = b.NewVar(this, p + ".x + " + F(w * offset) + " * mod(" + row + " + 1.0, 2.0)");
+   const std::string col = b.NewVar(this, "floor(" + x + " * " + F(1.0f / w) + ")");
+   const std::string fx = b.NewVar(this, x + " - " + col + " * " + F(w));
+   const std::string fy = b.NewVar(this, p + ".y - " + row + " * " + F(h));
+   const std::string edge = b.NewVar(this, "min(min(" + fx + ", " + F(w) + " - " + fx + "), min(" + fy + ", " + F(h) + " - " + fy + "))");
+   const std::string brick = b.NewVar(this, "mix(" + c1 + ", " + c2 + ", white(vec3(" + col + ", " + row + ", 0.0)) * " +
+                                               F(std::min(std::max(tint, 0.0f), 1.0f)) + ")");
+   return b.NewVar(this, "mix(" + cm + ", " + brick + ", step(" + F(std::max(mortar, 0.0f)) + ", " + edge + "))");
+}
+
 std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err)
 {
    ShadeBuild b;

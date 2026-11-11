@@ -748,6 +748,76 @@ bool RunEngineTest()
       check(sok && red > need && blue > need, "2.3 L: sphere shows both checker colours", (double)red, (double)blue);
    }
 
+   // ---- 2.4: every mode of Shade Noise, Voronoi, Gradient and Brick composes, compiles on L and draws a pattern
+   // (the sphere's changed pixels are not one flat value).
+   {
+      ShadeCoordNode coord;
+      coord.output = ShadeCoordNode::kObject;
+      ShadeNoiseNode noise;
+      noise.distortion = 0.5f;
+      noise.ShadeInput(0)->Connect(&coord);
+      ShadeVoronoiNode voronoi;
+      voronoi.ShadeInput(0)->Connect(&coord);
+      ShadeGradientNode gradient;
+      gradient.scale = 2.0f;
+      gradient.ShadeInput(0)->Connect(&coord);
+      ShadeBrickNode brick;
+      brick.mortarColor[0] = brick.mortarColor[1] = brick.mortarColor[2] = 1.0f;
+      brick.ShadeInput(0)->Connect(&coord);
+      struct Mode { const ShadeNode* node; int* knob; int count; const char* name; };
+      int one = 0;
+      const Mode modes[] = {
+         { &noise, &noise.output, (int)ShadeNoiseNode::OutputNames().size(), "noise" },
+         { &voronoi, &voronoi.output, (int)ShadeVoronoiNode::OutputNames().size(), "voronoi" },
+         { &gradient, &gradient.kind, (int)ShadeGradientNode::KindNames().size(), "gradient" },
+         { &brick, &one, 1, "brick" },
+      };
+      const float lo[3] = { -1.0f, -1.0f, -1.0f }, hi[3] = { 1.0f, 1.0f, 1.0f };
+      int total = 0, composed = 0, compiled = 0, patterned = 0;
+      for (const Mode& m : modes)
+         for (int k = 0; k < m.count; k++)
+         {
+            total++;
+            *m.knob = k;
+            std::string err;
+            const std::string src = ComposeShadeProgram(m.node, lo, hi, err);
+            const int id = src.empty() ? 0 : Field::RegisterMaterialProgram(src, {}, err);
+            if (id <= 0)
+            {
+               printf("    2.4 %s mode %d: %s\n%s", m.name, k, err.c_str(), src.c_str());
+               continue;
+            }
+            composed++;
+            engine::Frame fs = frame;
+            fs.instances[2].fieldProgram = id;
+            fs.fieldMsl = Field::BuildMaterialLibrary({ id }, Field::MaterialLang::Msl, fs.fieldMslKey);
+            std::vector<float> sp;
+            const bool ok = raster->Render(*img, fs, nullptr) && raster->Render(*img, fs, nullptr) && ReadRect(img->GlTexture(), W, H, sp);
+            const std::string perr = Field::MaterialProgramError(id);
+            if (!perr.empty())
+            {
+               printf("    2.4 %s mode %d: %s\n%s", m.name, k, perr.c_str(), src.c_str());
+               continue;
+            }
+            compiled++;
+            double sum = 0.0, sum2 = 0.0;
+            size_t n = 0;
+            for (size_t i = 0; ok && i + 3 < sp.size() && i + 3 < mt.size(); i += 4)
+            {
+               const float d = std::max({ std::fabs(sp[i] - mt[i]), std::fabs(sp[i + 1] - mt[i + 1]), std::fabs(sp[i + 2] - mt[i + 2]) });
+               if (d < 0.02f) continue;
+               const double l = (sp[i] + sp[i + 1] + sp[i + 2]) / 3.0;
+               sum += l; sum2 += l * l; n++;
+            }
+            const double var = n ? sum2 / (double)n - (sum / (double)n) * (sum / (double)n) : 0.0;
+            if (n > (size_t)W * H / 400 && var > 1e-4) patterned++;
+            else printf("    2.4 %s mode %d: flat (%zu px, variance %.6f)\n", m.name, k, n, var);
+         }
+      check(composed == total, "2.4: every Noise / Voronoi / Gradient / Brick mode composes a program", (double)composed, (double)total);
+      check(compiled == total, "2.4 L: every mode compiles", (double)compiled, (double)total);
+      check(patterned == total, "2.4 L: every mode draws a pattern on the sphere", (double)patterned, (double)total);
+   }
+
    // dump for eyes
    if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
    {

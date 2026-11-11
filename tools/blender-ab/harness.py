@@ -306,8 +306,19 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             mp = node("3D", "Shade Mapping", ["  i kind 0"] + ["  f %s%s %g" % (k, a, v) for k, vals in
                       (("translate", sh.get("translate", (0, 0, 0))), ("rotate", sh.get("rotate", (0, 0, 0))), ("scale", sc))
                       for a, v in zip("XYZ", vals)])
-            ck = node("3D", "Shade Checker", ["  c color1 %g %g %g" % tuple(srgb(sh["color1"])),
-                                              "  c color2 %g %g %g" % tuple(srgb(sh["color2"])), "  f scale 1"])
+            tex = sh.get("tex", "checker")
+            col = lambda k, d: "  c %s %g %g %g" % ((k,) + tuple(srgb(sh.get(k, d))))
+            if tex == "brick":      # Cycles' brick defaults; one colour for both bricks (its per-brick pick is random)
+                ck = node("3D", "Shade Brick", [col("color1", (0.8, 0.8, 0.8)), col("color2", (0.8, 0.8, 0.8)),
+                                                col("mortarColor", (0, 0, 0)), "  f scale 1",
+                                                "  f width %g" % sh.get("width", 0.5), "  f height %g" % sh.get("height", 0.25),
+                                                "  f offset %g" % sh.get("offset", 0.5), "  f mortar %g" % sh.get("mortar", 0.02),
+                                                "  f tint 0"])
+            elif tex == "gradient":
+                kinds = ["linear", "quadratic", "easing", "diagonal", "spherical", "quadratic_sphere", "radial"]
+                ck = node("3D", "Shade Gradient", ["  i kind %d" % kinds.index(sh.get("kind", "linear")), "  f scale 1"])
+            else:
+                ck = node("3D", "Shade Checker", [col("color1", (0.8, 0.8, 0.8)), col("color2", (0.2, 0.2, 0.2)), "  f scale 1"])
             wires += ["cable %d vector %d" % (up, co), "cable %d vector %d" % (mp, up), "cable %d vector %d" % (ck, mp),
                       "cable %d field %d" % (mat, ck)]
         for slot, tex_name in m.get("maps", {}).items():

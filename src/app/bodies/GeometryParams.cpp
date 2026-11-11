@@ -1028,6 +1028,44 @@ namespace app
    }
 
 
+   void DrawShadeNoiseParams(ShadeNoiseNode* n)
+   {
+      DropdownButton("output", ShadeNoiseNode::OutputNames(), n->output, [n](int i) { PushUndoCheckpoint(); n->output = i; });
+      ModSlider("scale", &n->scale, 0.1f, 32.0f);
+      ModSlider("detail", &n->detail, 0.0f, 8.0f, "%.0f", kParamWidth, false, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.0f, 1.0f);
+      ModSlider("distortion", &n->distortion, 0.0f, 4.0f);
+   }
+
+
+   void DrawShadeVoronoiParams(ShadeVoronoiNode* n)
+   {
+      DropdownButton("output", ShadeVoronoiNode::OutputNames(), n->output, [n](int i) { PushUndoCheckpoint(); n->output = i; });
+      ModSlider("scale", &n->scale, 0.1f, 32.0f);
+   }
+
+
+   void DrawShadeGradientParams(ShadeGradientNode* n)
+   {
+      DropdownButton("type", ShadeGradientNode::KindNames(), n->kind, [n](int i) { PushUndoCheckpoint(); n->kind = i; });
+      ModSlider("scale", &n->scale, 0.1f, 32.0f);
+   }
+
+
+   void DrawShadeBrickParams(ShadeBrickNode* n)
+   {
+      ColorSwatch("colour 1", n->color1, n);
+      ColorSwatch("colour 2", n->color2, n);
+      ColorSwatch("mortar", n->mortarColor, n);
+      ModSlider("scale", &n->scale, 0.1f, 32.0f);
+      ModSlider("width", &n->width, 0.05f, 2.0f);
+      ModSlider("height", &n->height, 0.05f, 2.0f);
+      ModSlider("offset", &n->offset, 0.0f, 1.0f);
+      ModSlider("mortar size", &n->mortar, 0.0f, 0.125f, "%.3f");
+      ModSlider("tint", &n->tint, 0.0f, 1.0f);
+   }
+
+
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());

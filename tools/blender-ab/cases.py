@@ -409,7 +409,32 @@ def _shade_mapping():
                         {"shape": "cube", "scale": 0.4, "location": [0.7, 0.0, 0.4], "material": mat}]}
 
 
+
+
+def _shade_textures():
+    # Row 2.4: one texture source per object, each on Object coordinates through a Mapping. Brick and gradient live in
+    # the coordinate's x and y (the floor plane in the case's Z-up frame), so the camera looks down. Noise and voronoi
+    # are not pixel-comparable to Cycles and are gated in ENGINETEST instead.
+    def mat(**sh):
+        return {"base_color": [0.8, 0.8, 0.8], "roughness": 0.5, "shade": sh}
+    return {"camera": {"fov": 40, "azimuth": 70, "elevation": 55, "distance": 5.0, "target": [0, 0, 0.3]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 30, "elevation": 60}],
+            "world": {"color": [0.3, 0.3, 0.3]},
+            "objects": [{"shape": "plane", "scale": 3,
+                         "material": mat(tex="brick", translate=[0.1, 0.07, 0.25], rotate=[0, 0, 20], scale=1.5,
+                                         color1=[0.7, 0.3, 0.2], mortarColor=[0.8, 0.8, 0.8])},
+                        {"shape": "sphere", "scale": 0.5, "location": [-1.2, 0.0, 0.5],
+                         "material": mat(tex="checker", translate=[0.1, 0.2, 0.25], scale=4)},
+                        {"shape": "sphere", "scale": 0.5, "location": [0.0, 0.0, 0.5],
+                         "material": mat(tex="gradient", kind="linear", translate=[0.5, 0.5, 0.5])},
+                        {"shape": "sphere", "scale": 0.5, "location": [1.2, 0.0, 0.5],
+                         "material": mat(tex="gradient", kind="radial")},
+                        {"shape": "cube", "scale": 0.3, "location": [0.0, -1.2, 0.3],
+                         "material": mat(tex="gradient", kind="quadratic_sphere", scale=2)}]}
+
+
 CASES["shade_mapping"] = _shade_mapping()
+CASES["shade_textures"] = _shade_textures()
 CASES["bed"] = _bed()
 # A close look at the sunlit folds right of the plush, where the weave has to read.
 CASES["bed_close"] = dict(_bed(), camera={"fov": 30, "azimuth": 100, "elevation": 30, "distance": 0.45,

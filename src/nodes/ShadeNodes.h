@@ -113,6 +113,125 @@ private:
    ImageCable mVector;
 };
 
+// Shade Noise (row 2.4): fbm of the 2.1 gradient noise. detail = extra octaves, roughness = gain per octave,
+// distortion = how far a second noise pushes the coordinate. Value: grey 0..1; Colour: three decorrelated values.
+class ShadeNoiseNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeNoiseNode(); }
+   enum Output { kValue = 0, kColour };
+   static const std::vector<std::string>& OutputNames();
+   int output = kValue;
+   float scale = 5.0f;
+   float detail = 2.0f;
+   float roughness = 0.5f;
+   float distortion = 0.0f;
+   bool IsColour() const override { return true; }
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 1; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("output", output);
+      v.Float("scale", scale);
+      v.Float("detail", detail);
+      v.Float("roughness", roughness);
+      v.Float("distortion", distortion);
+   }
+
+private:
+   ImageCable mVector;
+};
+
+// Shade Voronoi (row 2.4): the 2.1 cell noise. Distance (F1), Second (F2), Edge (F2 - F1), Cell (grey per cell),
+// Colour (a colour per cell).
+class ShadeVoronoiNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeVoronoiNode(); }
+   enum Output { kDistance = 0, kSecond, kEdge, kCell, kColour };
+   static const std::vector<std::string>& OutputNames();
+   int output = kDistance;
+   float scale = 5.0f;
+   bool IsColour() const override { return true; }
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 1; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("output", output);
+      v.Float("scale", scale);
+   }
+
+private:
+   ImageCable mVector;
+};
+
+// Shade Gradient (row 2.4): a grey ramp of the coordinate. Linear to Radial are Blender's Gradient Texture types;
+// Wave (bands along x) and Magic (interfering sines) stand in for its Wave and Magic textures.
+class ShadeGradientNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeGradientNode(); }
+   enum Kind { kLinear = 0, kQuadratic, kEasing, kDiagonal, kSpherical, kQuadraticSphere, kRadial, kWave, kMagic };
+   static const std::vector<std::string>& KindNames();
+   int kind = kLinear;
+   float scale = 1.0f;
+   bool IsColour() const override { return true; }
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 1; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("kind", kind);
+      v.Float("scale", scale);
+   }
+
+private:
+   ImageCable mVector;
+};
+
+// Shade Brick (row 2.4): bricks in the xy of vector * scale. width / height: one brick; offset: how far every
+// second row shifts, in bricks; mortar: the gap from each brick edge; tint: how far each brick moves from colour 1
+// to colour 2 by a per-brick random.
+class ShadeBrickNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeBrickNode(); }
+   float color1[3] = { 0.8f, 0.8f, 0.8f };
+   float color2[3] = { 0.2f, 0.2f, 0.2f };
+   float mortarColor[3] = { 0.0f, 0.0f, 0.0f };
+   float scale = 5.0f;
+   float width = 0.5f;
+   float height = 0.25f;
+   float offset = 0.5f;
+   float mortar = 0.02f;
+   float tint = 1.0f;
+   bool IsColour() const override { return true; }
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 1; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Color("color1", color1);
+      v.Color("color2", color2);
+      v.Color("mortarColor", mortarColor);
+      v.Float("scale", scale);
+      v.Float("width", width);
+      v.Float("height", height);
+      v.Float("offset", offset);
+      v.Float("mortar", mortar);
+      v.Float("tint", tint);
+   }
+
+private:
+   ImageCable mVector;
+};
+
 // The Material-domain program for a chain ending at `out` (empty with `err` set on failure). lo/hi: the object-space
 // bounds Generated normalises by.
 std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err);

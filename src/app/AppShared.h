@@ -4159,6 +4159,10 @@ void DrawMappingParams(MappingNode* n);
 void DrawShadeCoordParams(ShadeCoordNode* n);
 void DrawShadeMappingParams(ShadeMappingNode* n);
 void DrawShadeCheckerParams(ShadeCheckerNode* n);
+void DrawShadeNoiseParams(ShadeNoiseNode* n);
+void DrawShadeVoronoiParams(ShadeVoronoiNode* n);
+void DrawShadeGradientParams(ShadeGradientNode* n);
+void DrawShadeBrickParams(ShadeBrickNode* n);
 
 void DrawMeshResynthParams(MeshResynthNode* n);
 

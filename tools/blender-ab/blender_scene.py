@@ -370,10 +370,26 @@ for i, o in enumerate(scene["objects"]):
         mp.inputs["Location"].default_value = sh.get("translate", (0, 0, 0))
         mp.inputs["Rotation"].default_value = [math.radians(a) for a in sh.get("rotate", (0, 0, 0))]
         mp.inputs["Scale"].default_value = s3 if isinstance(s3, list) else (s3, s3, s3)
-        ck = nt.nodes.new("ShaderNodeTexChecker")
-        ck.inputs["Color1"].default_value = (*sh["color1"], 1)
-        ck.inputs["Color2"].default_value = (*sh["color2"], 1)
-        ck.inputs["Scale"].default_value = 1.0
+        tex = sh.get("tex", "checker")
+        if tex == "brick":      # row 2.4: both brick colours the same, since the pick per brick is random
+            ck = nt.nodes.new("ShaderNodeTexBrick")
+            ck.inputs["Color1"].default_value = (*sh.get("color1", (0.8, 0.8, 0.8)), 1)
+            ck.inputs["Color2"].default_value = (*sh.get("color1", (0.8, 0.8, 0.8)), 1)
+            ck.inputs["Mortar"].default_value = (*sh.get("mortarColor", (0, 0, 0)), 1)
+            ck.inputs["Scale"].default_value = 1.0
+            ck.inputs["Mortar Size"].default_value = sh.get("mortar", 0.02)
+            ck.inputs["Mortar Smooth"].default_value = 0.0
+            ck.inputs["Brick Width"].default_value = sh.get("width", 0.5)
+            ck.inputs["Row Height"].default_value = sh.get("height", 0.25)
+            ck.offset = sh.get("offset", 0.5); ck.offset_frequency = 2; ck.squash = 1.0
+        elif tex == "gradient":
+            ck = nt.nodes.new("ShaderNodeTexGradient")
+            ck.gradient_type = sh.get("kind", "linear").upper()
+        else:
+            ck = nt.nodes.new("ShaderNodeTexChecker")
+            ck.inputs["Color1"].default_value = (*sh.get("color1", (0.8, 0.8, 0.8)), 1)
+            ck.inputs["Color2"].default_value = (*sh.get("color2", (0.2, 0.2, 0.2)), 1)
+            ck.inputs["Scale"].default_value = 1.0
         nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
         nt.links.new(mp.outputs["Vector"], ck.inputs["Vector"])
         nt.links.new(ck.outputs["Color"], p.inputs["Base Color"])
