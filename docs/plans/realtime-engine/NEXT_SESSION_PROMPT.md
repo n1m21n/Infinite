@@ -27,8 +27,8 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 
 | Row | State | Commit |
 |---|---|---|
-| 0.1 build WIP + self-test | **next** | — |
-| 0.2 `envis` measure | open | — |
+| 0.1 build WIP + self-test | done (no code change; envis compiles) | see log |
+| 0.2 `envis` measure | **next** | — |
 | 0.3 adaptive stop default | open (0.08 measured good on 8 cases) | — |
 | 0.4 dark far maps | open | — |
 | 0.5 freeze + `f0` baseline | open | — |
