@@ -107,12 +107,12 @@ namespace Field
       s += "\n";
       for (int id : ids)
          s += (g ? FindMaterialProgram(id)->glsl : FindMaterialProgram(id)->msl) + "\n";
-      s += g ? "void fldMatDispatch(int id, inout FldMat o, vec3 P, vec3 N, vec2 UV, float t)\n{\n"
-             : "static void fldMatDispatch(int id, thread FldMat& o, float3 P, float3 N, float2 UV, float t)\n{\n";
+      s += g ? "void fldMatDispatch(int id, inout FldMat o, vec3 P, vec3 N, vec2 UV, float t, vec3 W, vec3 V)\n{\n"
+             : "static void fldMatDispatch(int id, thread FldMat& o, float3 P, float3 N, float2 UV, float t, float3 W, float3 V)\n{\n";
       for (int id : ids)
       {
          const std::string n = std::to_string(id);
-         s += "   if (id == " + n + ") fldmat_" + n + "(o, P, N, UV, t);\n";
+         s += "   if (id == " + n + ") fldmat_" + n + "(o, P, N, UV, t, W, V);\n";
       }
       s += "}\n";
       return s;

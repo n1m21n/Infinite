@@ -701,6 +701,53 @@ bool RunEngineTest()
       }
    }
 
+   // ---- 2.3 (ShadeRows): Shade Coord (Object) -> Shade Mapping (rotate Z 30, scale 3) -> Shade Checker -> Material
+   // `field` composes one Material program; on L the sphere shows both checker colours.
+   {
+      ShadeCoordNode coord;
+      coord.output = ShadeCoordNode::kObject;
+      ShadeMappingNode mapping;
+      mapping.rotate[2] = 30.0f;
+      mapping.scale[0] = mapping.scale[1] = mapping.scale[2] = 3.0f;
+      mapping.ShadeInput(0)->Connect(&coord);
+      ShadeCheckerNode checker;
+      checker.color1[0] = 1.0f; checker.color1[1] = 0.0f; checker.color1[2] = 0.0f;
+      checker.color2[0] = 0.0f; checker.color2[1] = 0.0f; checker.color2[2] = 1.0f;
+      checker.scale = 1.0f;
+      checker.ShadeInput(0)->Connect(&mapping);
+      MaterialNode smat;
+      smat.input = &sphereG;
+      smat.FieldInput().Connect(&checker);
+      const int sid = smat.GetMaterial().fieldProgram;
+      const float lo[3] = { 0.0f, 0.0f, 0.0f }, hi[3] = { 1.0f, 1.0f, 1.0f };
+      std::string serr;
+      printf("    shade program:\n%s", ComposeShadeProgram(&checker, lo, hi, serr).c_str());
+      check(sid > 0 && serr.empty(), "2.3: Shade chain on Material field registers a program", (double)sid, 0);
+      check(smat.GetMaterial().fieldProgram == sid, "2.3: same chain, same id", (double)smat.GetMaterial().fieldProgram, (double)sid);
+      mapping.rotate[2] = 45.0f;
+      const int sid2 = smat.GetMaterial().fieldProgram;
+      check(sid2 > 0 && sid2 != sid, "2.3: a knob change gives a new program", (double)sid2, (double)sid);
+      mapping.rotate[2] = 30.0f;
+      engine::Frame fs = frame;
+      fs.instances[2].fieldProgram = sid;
+      fs.fieldMsl = Field::BuildMaterialLibrary({ sid }, Field::MaterialLang::Msl, fs.fieldMslKey);
+      std::vector<float> sp;
+      const bool sok = sid > 0 && raster->Render(*img, fs, nullptr) && raster->Render(*img, fs, nullptr) && ReadRect(img->GlTexture(), W, H, sp);
+      size_t red = 0, blue = 0;
+      for (size_t i = 0; sok && i + 3 < sp.size() && i + 3 < mt.size(); i += 4)
+      {
+         const float d = std::max({ std::fabs(sp[i] - mt[i]), std::fabs(sp[i + 1] - mt[i + 1]), std::fabs(sp[i + 2] - mt[i + 2]) });
+         if (d < 0.05f) continue;
+         if (sp[i] > sp[i + 2] + 0.1f) red++;
+         else if (sp[i + 2] > sp[i] + 0.1f) blue++;
+      }
+      const std::string perr = sid > 0 ? Field::MaterialProgramError(sid) : std::string("no program");
+      if (!perr.empty()) printf("    shade program error: %s\n", perr.c_str());
+      check(perr.empty(), "2.3 L: shade program compiles", (double)perr.size(), 0);
+      const size_t need = (size_t)W * H / 400;
+      check(sok && red > need && blue > need, "2.3 L: sphere shows both checker colours", (double)red, (double)blue);
+   }
+
    // dump for eyes
    if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
    {

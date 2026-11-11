@@ -836,6 +836,7 @@ set(COMMON_SOURCES
     src/nodes/FieldSynthNode.cpp
     src/nodes/FieldNotesNode.cpp
     src/nodes/FieldPixelNode.cpp
+    src/nodes/ShadeNodes.cpp
     src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
     src/nodes/ProximityLinesNode.cpp

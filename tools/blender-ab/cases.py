@@ -393,6 +393,23 @@ def _bed():
             "world": {"color": [0.06, 0.075, 0.1]}, "objects": objs}
 
 
+def _shade_mapping():
+    # Row 2.3: a 3D checker through Object coordinates and a Mapping (Point: translate, rotate Z 30, scale 3) on a
+    # plane, a sphere and a cube. Cycles: Texture Coordinate Object -> Mapping -> Checker (scale 1) -> Base Color.
+    # Infinite: Shade Coord -> Shade Mapping -> Shade Checker -> Material field. The translate keeps every flat face
+    # off a checker boundary (the plane sits at 0.25, not 0).
+    sh = {"translate": [0.1, 0.2, 0.25], "rotate": [0, 0, 30], "scale": 3,
+          "color1": [0.8, 0.8, 0.8], "color2": [0.2, 0.2, 0.2]}
+    mat = {"base_color": [0.8, 0.8, 0.8], "roughness": 0.5, "shade": sh}
+    return {"camera": {"fov": 40, "azimuth": 60, "elevation": 30, "distance": 5.0, "target": [0, 0, 0.3]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 30, "elevation": 50}],
+            "world": {"color": [0.3, 0.3, 0.3]},
+            "objects": [{"shape": "plane", "scale": 3, "material": mat},
+                        {"shape": "sphere", "scale": 0.5, "location": [-0.7, 0.0, 0.5], "material": mat},
+                        {"shape": "cube", "scale": 0.4, "location": [0.7, 0.0, 0.4], "material": mat}]}
+
+
+CASES["shade_mapping"] = _shade_mapping()
 CASES["bed"] = _bed()
 # A close look at the sunlit folds right of the plush, where the weave has to read.
 CASES["bed_close"] = dict(_bed(), camera={"fov": 30, "azimuth": 100, "elevation": 30, "distance": 0.45,

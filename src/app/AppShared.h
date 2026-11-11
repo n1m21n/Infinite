@@ -4156,6 +4156,9 @@ void DrawParticleSystemParams(ParticleSystemNode* n);
 void DrawMaterialParams(MaterialNode* n);
 
 void DrawMappingParams(MappingNode* n);
+void DrawShadeCoordParams(ShadeCoordNode* n);
+void DrawShadeMappingParams(ShadeMappingNode* n);
+void DrawShadeCheckerParams(ShadeCheckerNode* n);
 
 void DrawMeshResynthParams(MeshResynthNode* n);
 

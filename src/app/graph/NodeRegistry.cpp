@@ -57,6 +57,9 @@ namespace app
       REGISTER_NODE(AudioDisplacementNode, Audio Displacement, "3D");
       REGISTER_NODE(AudioRibbonNode, Audio Ribbon, "3D");
       REGISTER_NODE(MappingNode, Mapping, "3D");
+      REGISTER_NODE(ShadeCoordNode, Shade Coord, "3D");
+      REGISTER_NODE(ShadeMappingNode, Shade Mapping, "3D");
+      REGISTER_NODE(ShadeCheckerNode, Shade Checker, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
       REGISTER_NODE(RigidBodyNode, Rigid Bodies, "3D");

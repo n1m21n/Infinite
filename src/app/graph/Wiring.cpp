@@ -386,6 +386,8 @@ namespace app
          return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
+      if (auto* sh = dynamic_cast<ShadeNode*>(gn.node.get()))
+         return sh->ShadeInputCount();
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
          // Dynamic pins, Phase 2b (build step 13, §5.7): no native input pin
          // (device-catalog simplification) - one slot per currently-declared
@@ -602,6 +604,8 @@ namespace app
          return slot == 0 ? &ht->Input() : nullptr;
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
+      if (auto* sh = dynamic_cast<ShadeNode*>(gn.node.get()))
+         return sh->ShadeInput(slot);
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
          // Dynamic pins, Phase 2b (build step 13, §5.7): no native input pin
          // (device-catalog simplification) - slot 0..N-1 route to the

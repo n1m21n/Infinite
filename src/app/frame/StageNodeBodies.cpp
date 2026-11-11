@@ -977,6 +977,12 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawMaterialParams(n);
             else if (auto* n = dynamic_cast<MappingNode*>(gn.node.get()))
                DrawMappingParams(n);
+            else if (auto* n = dynamic_cast<ShadeCoordNode*>(gn.node.get()))
+               DrawShadeCoordParams(n);
+            else if (auto* n = dynamic_cast<ShadeMappingNode*>(gn.node.get()))
+               DrawShadeMappingParams(n);
+            else if (auto* n = dynamic_cast<ShadeCheckerNode*>(gn.node.get()))
+               DrawShadeCheckerParams(n);
             else if (auto* n = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                DrawParticleSystemParams(n);
             else if (auto* n = dynamic_cast<ClothNode*>(gn.node.get()))

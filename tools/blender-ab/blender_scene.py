@@ -361,6 +361,22 @@ for i, o in enumerate(scene["objects"]):
         p.inputs["Thin Film Thickness"].default_value = m["iridescence"] * m.get("iridescence_thickness", 400.0)
         p.inputs["Thin Film IOR"].default_value = m.get("iridescence_ior", 1.33)
     add_maps(mat, p, m.get("maps", {}), m)
+    sh = m.get("shade")
+    if sh:   # row 2.3: Texture Coordinate (Object) -> Mapping (Point) -> Checker (scale 1) -> Base Color
+        nt = mat.node_tree
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        mp = nt.nodes.new("ShaderNodeMapping"); mp.vector_type = 'POINT'
+        s3 = sh.get("scale", 1.0)
+        mp.inputs["Location"].default_value = sh.get("translate", (0, 0, 0))
+        mp.inputs["Rotation"].default_value = [math.radians(a) for a in sh.get("rotate", (0, 0, 0))]
+        mp.inputs["Scale"].default_value = s3 if isinstance(s3, list) else (s3, s3, s3)
+        ck = nt.nodes.new("ShaderNodeTexChecker")
+        ck.inputs["Color1"].default_value = (*sh["color1"], 1)
+        ck.inputs["Color2"].default_value = (*sh["color2"], 1)
+        ck.inputs["Scale"].default_value = 1.0
+        nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+        nt.links.new(mp.outputs["Vector"], ck.inputs["Vector"])
+        nt.links.new(ck.outputs["Color"], p.inputs["Base Color"])
     tl = m.get("translucency", 0.0)
     if tl > 0:  # Render 3D's translucency: that share of the diffuse leaves the far side (Translucent BSDF)
         nt = mat.node_tree

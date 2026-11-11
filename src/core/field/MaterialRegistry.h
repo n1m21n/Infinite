@@ -6,7 +6,7 @@
 //
 // A host shader gets one library string per language for the set of ids it draws (BuildMaterialLibrary): it defines
 // FLD_MAT_ANY 1, the FldMat struct, one function per id and
-//   fldMatDispatch(int id, inout FldMat o, P, N, UV, t)
+//   fldMatDispatch(int id, inout FldMat o, P, N, UV, t, W, V)
 // The library is empty for an empty set, so a scene without programs compiles exactly the shader it had before.
 
 #include <cstdint>

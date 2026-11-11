@@ -1,5 +1,6 @@
 #include "UtilityNodes.h"
 #include "FieldPixelNode.h"
+#include "ShadeNodes.h"
 #include "field/MaterialRegistry.h"
 
 #include <algorithm>
@@ -95,6 +96,37 @@ Material MaterialNode::GetMaterial() const
       m.fieldProgram = fp->MaterialProgramId();
       if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
          m.opacityMapped = true;
+   }
+   else if (auto* sh = dynamic_cast<ShadeNode*>(mField.Resolved()))
+   {
+      // Generated normalises by the object-space bounds of the mesh this material wraps.
+      const unsigned long long rev = input ? input->MeshRevision() : 0;
+      if (input && rev != mShadeBoundsRev)
+      {
+         mShadeBoundsRev = rev;
+         const Mesh& mesh = input->GetMesh();
+         if (!mesh.vertices.empty())
+         {
+            const Vertex& v0 = mesh.vertices[0];
+            mShadeLo[0] = mShadeHi[0] = v0.px; mShadeLo[1] = mShadeHi[1] = v0.py; mShadeLo[2] = mShadeHi[2] = v0.pz;
+            for (const Vertex& v : mesh.vertices)
+            {
+               mShadeLo[0] = std::min(mShadeLo[0], v.px); mShadeHi[0] = std::max(mShadeHi[0], v.px);
+               mShadeLo[1] = std::min(mShadeLo[1], v.py); mShadeHi[1] = std::max(mShadeHi[1], v.py);
+               mShadeLo[2] = std::min(mShadeLo[2], v.pz); mShadeHi[2] = std::max(mShadeHi[2], v.pz);
+            }
+         }
+      }
+      std::string err;
+      const std::string src = ComposeShadeProgram(sh, mShadeLo, mShadeHi, err);
+      if (src != mShadeSource)
+      {
+         mShadeSource = src;
+         mShadeProgram = src.empty() ? 0 : Field::RegisterMaterialProgram(src, {}, err);
+         if (!err.empty())
+            fprintf(stderr, "[Material] shading chain: %s\n", err.c_str());
+      }
+      m.fieldProgram = mShadeProgram;
    }
    m.normalStrength = normalStrength;
    m.detailScale = detailScale;

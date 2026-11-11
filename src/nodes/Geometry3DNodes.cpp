@@ -1082,7 +1082,7 @@ namespace
       "      FldMat o;\n"
       "      o.base = base; o.roughness = rough; o.metallic = metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
       "      o.emission = emiss; o.opacity = alpha; o.mask = 1.0;\n"
-      "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime);\n"
+      "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime, vWorldPos, normalize(uCamPos - vWorldPos));\n"
       "      vec3 dp1 = dFdx(vWorldPos), dp2 = dFdy(vWorldPos);\n"
       "      vec2 duv1 = dFdx(vUv), duv2 = dFdy(vUv);\n"
       "      float dhx = dFdx(o.height), dhy = dFdy(o.height);\n"

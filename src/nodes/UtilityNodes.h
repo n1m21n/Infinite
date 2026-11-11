@@ -419,6 +419,12 @@ private:
    ImageCable mField;
    Mesh mEmpty;
    int mLastCookFrame = -1;
+   // Row 2.3: the program composed from a Shade chain on `field`, re-registered only when its text changes.
+   mutable std::string mShadeSource;
+   mutable int mShadeProgram = 0;
+   mutable unsigned long long mShadeBoundsRev = ~0ull;
+   mutable float mShadeLo[3] = { 0.0f, 0.0f, 0.0f };
+   mutable float mShadeHi[3] = { 1.0f, 1.0f, 1.0f };
    mutable unsigned long long mMaterialRevision = 0;
    mutable size_t mLastMaterialHash = 0;
    mutable unsigned long long mMappingRevision = 0;

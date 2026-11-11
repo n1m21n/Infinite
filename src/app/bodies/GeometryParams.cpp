@@ -993,6 +993,41 @@ namespace app
    }
 
 
+   void DrawShadeCoordParams(ShadeCoordNode* n)
+   {
+      DropdownButton("output", ShadeCoordNode::OutputNames(), n->output, [n](int i) { PushUndoCheckpoint(); n->output = i; });
+   }
+
+
+   void DrawShadeMappingParams(ShadeMappingNode* n)
+   {
+      DropdownButton("type", ShadeMappingNode::KindNames(), n->kind, [n](int i) { PushUndoCheckpoint(); n->kind = i; });
+
+      NodeSeparator("translate");
+      ModSlider("x", &n->translate[0], -4.0f, 4.0f);
+      ModSlider("y", &n->translate[1], -4.0f, 4.0f);
+      ModSlider("z", &n->translate[2], -4.0f, 4.0f);
+
+      NodeSeparator("rotate");
+      ModSlider("x", &n->rotate[0], -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("y", &n->rotate[1], -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("z", &n->rotate[2], -180.0f, 180.0f, "%.1f\xC2\xB0");
+
+      NodeSeparator("scale");
+      ModSlider("x", &n->scale[0], 0.05f, 8.0f);
+      ModSlider("y", &n->scale[1], 0.05f, 8.0f);
+      ModSlider("z", &n->scale[2], 0.05f, 8.0f);
+   }
+
+
+   void DrawShadeCheckerParams(ShadeCheckerNode* n)
+   {
+      ColorSwatch("colour 1", n->color1, n);
+      ColorSwatch("colour 2", n->color2, n);
+      ModSlider("scale", &n->scale, 0.1f, 32.0f);
+   }
+
+
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());

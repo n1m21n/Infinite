@@ -262,7 +262,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       FldMat fo;
       fo.base = base; fo.roughness = hitRough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
       fo.emission = hitEm; fo.opacity = 1.0; fo.mask = 1.0;
-      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x);
+      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d);
       base = max(fo.base, float3(0.0)); metal = clamp(fo.metallic, 0.0, 1.0); hitRough = clamp(fo.roughness, 0.045, 1.0); hitEm = fo.emission;
    }
 #endif
@@ -634,7 +634,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float3 em0 = float3(m.mat.emission) * emMap;
       o.base = base; o.roughness = roughIn; o.metallic = metalIn; o.normal = float3(0.0, 0.0, 1.0); o.height = 0.0;
       o.emission = em0; o.opacity = alpha; o.mask = 1.0;
-      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x);
+      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp));
       fldDh = float2(dfdx(o.height), dfdy(o.height));
       base = o.base; roughIn = o.roughness; metalIn = o.metallic; fldEmD = o.emission - em0; alpha = o.opacity;
       fldNrm = o.normal;
@@ -1481,7 +1481,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             FldMat fo;
             fo.base = base; fo.roughness = rough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
             fo.emission = float3(I.mat.emission) * emMap; fo.opacity = alpha; fo.mask = 1.0;
-            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x);
+            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d);
             base = fo.base; rough = clamp(fo.roughness, 0.045, 1.0); metal = clamp(fo.metallic, 0.0, 1.0);
             fldEm = fo.emission; fldEmSet = true; alpha = fo.mask < 0.5 ? 0.0 : fo.opacity; fldNrm = fo.normal;
          }

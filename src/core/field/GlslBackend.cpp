@@ -815,7 +815,7 @@ namespace Field
       MaterialFnResult r;
       if (MaterialFnRefusal(program, r.error)) return r;
       EmitterContext ctx;
-      ctx.EmitLine("void " + fnName + "(inout FldMat o, vec3 P, vec3 N, vec2 UV, float fld_t)");
+      ctx.EmitLine("void " + fnName + "(inout FldMat o, vec3 P, vec3 N, vec2 UV, float fld_t, vec3 W, vec3 V)");
       ctx.EmitLine("{");
       ctx.EmitLine("   float fld_dt = 0.0; int fld_frame = 0;");
       for (int i = 0; i < kMaterialInputCount; i++)

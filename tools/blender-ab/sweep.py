@@ -47,7 +47,7 @@ GROUPS = {
     "gloss": r'"roughness": 0\.(0|1|2|3)',               # sharp highlights: GGX / Fresnel shape
     "metal": r'"metallic"', "coat": r'"coat"', "sheen": r'"sheen"', "glass": r'"transmission"',
     "sss": r'"subsurface"', "aniso": r'"anisotropy"', "thinfilm": r'"iridescence"', "emission": r'"emission',
-    "maps": r'"maps"', "hair": r'"(hair|fur)', "hdri": r'"hdri"', "motion": r'"motion"', "dof": r'"(fstop|aperture|dof)',
+    "maps": r'"maps"', "shade": r'"shade"', "hair": r'"(hair|fur)', "hdri": r'"hdri"', "motion": r'"motion"', "dof": r'"(fstop|aperture|dof)',
 }
 
 

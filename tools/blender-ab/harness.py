@@ -297,6 +297,19 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
                 *[float(c) for c in m.get("base_color", (0.8, 0.8, 0.8))], float(m.get("metallic", 0.0)), float(m.get("roughness", 0.5)))
             fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % code])
             wires.append("cable %d field %d" % (mat, fp))
+        sh = m.get("shade")
+        if sh:   # Shade Coord (Object) -> Mapping rotate X +90 (Infinite's Y-up to the case's Z-up) -> Mapping -> Checker
+            sc = sh.get("scale", 1.0)
+            sc = sc if isinstance(sc, list) else [sc, sc, sc]
+            co = node("3D", "Shade Coord", ["  i output 1"])
+            up = node("3D", "Shade Mapping", ["  i kind 0", "  f rotateX 90"])
+            mp = node("3D", "Shade Mapping", ["  i kind 0"] + ["  f %s%s %g" % (k, a, v) for k, vals in
+                      (("translate", sh.get("translate", (0, 0, 0))), ("rotate", sh.get("rotate", (0, 0, 0))), ("scale", sc))
+                      for a, v in zip("XYZ", vals)])
+            ck = node("3D", "Shade Checker", ["  c color1 %g %g %g" % tuple(srgb(sh["color1"])),
+                                              "  c color2 %g %g %g" % tuple(srgb(sh["color2"])), "  f scale 1"])
+            wires += ["cable %d vector %d" % (up, co), "cable %d vector %d" % (mp, up), "cable %d vector %d" % (ck, mp),
+                      "cable %d field %d" % (mat, ck)]
         for slot, tex_name in m.get("maps", {}).items():
             tex = node("Source", "Image Source", ["  s path %s" % make_texture(case, tex_name)])
             wires.append("cable %d %s %d" % (mat, slot, tex))

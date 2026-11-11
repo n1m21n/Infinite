@@ -606,7 +606,7 @@ namespace Field
       for (const auto& s : program.pixelBody)
          if (s->rvalueExpr && HasReduce(s->rvalueExpr)) { r.error = "reduce is not available in the Material domain"; return r; }
       Ctx ctx;
-      ctx.Line("static void " + fnName + "(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t)");
+      ctx.Line("static void " + fnName + "(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t, float3 W, float3 V)");
       ctx.Line("{");
       ctx.Line("   float fld_dt = 0.0; int fld_frame = 0; (void)fld_dt; (void)fld_frame; (void)fld_t;");
       for (int i = 0; i < kMaterialInputCount; i++)
