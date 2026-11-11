@@ -2,52 +2,67 @@
 
 ```
 Work in /Users/namansoni/Infinite/infinte-base. Goal: finish every open step of
-docs/plans/realtime-engine/PLAN.md unattended. Read these first, in this order:
-docs/plans/realtime-engine/AUTORUN.md (goal, rules, order, log; continue from its first open row),
-PLAN.md, then designs/ (owner rows, do not build them).
+docs/plans/realtime-engine/PLAN.md unattended. Read first, in order:
+AUTORUN.md (rules, order, log; continue from the first open row), PLAN.md, designs/ (owner rows: do not build).
 
-STATE AT HANDOFF (verify with git status / git log, do not trust this blindly)
-- Branch feature/engine-d-shading. Done: 1.1a (33eddee2), autorun docs + sweep tiers (2d607ce8).
-- Staged in the index = step 1.2 (engine error on the node + point-LOD VOutP uv/lp fix).
-- Unstaged = step 1.3: rest of src/engine/rhi/MetalDevice.mm (MatRec) + untracked src/nodes/Render3DMaterial.h.
-- Untracked, not wired: Render3DDenoise.h (1.5), Render3DFresnel.h + Render3DBsdf.h (1.6 A/Bs, used only
-  when tools/blender-ab/toggles/{fresnel,ggx}.py are switched on; all toggles are OFF).
-- Sweep of 1.2+1.3 (build already has both): raster 0 worse, live 0 worse of 43. Settle was stopped before it
-  finished; post_settle.json (15:06) is the stale 1.1a file. First job: run settle only,
-  `sweep.py run --engine settle --tag post` (background), then `diff --engine settle`. 0 worse -> commit 1.2
-  (`git commit`), then `git add` the 1.3 files and commit, log both in AUTORUN.md, rotate post -> pre.
+STATE AT HANDOFF (check with git status / git log; don't trust this blindly)
+- Branch feature/engine-e-speed. Block D is closed. Block E: 1.4 (6f2b5903) and 1.5 denoiser (d9718319) are done.
+  1.7 preview export is a design only (designs/1.7-preview-export.md, waiting for owner).
+- 1.5 shortfall: 9/9 <= 0.05 FLIP is not met (materials ~0.072 and cornell ~0.110 come from tracer bias,
+  not noise). The time gate is met (boat 16 spp 2.06 s/frame). The adaptive stop was not built.
+- Untracked, not wired: src/nodes/Render3DBsdf.h and Render3DFresnel.h. 1.6 A/B toggles are in
+  tools/blender-ab/toggles/{ggx,falloff,fresnel}.py; run them as `python3 X.py on|off`. All are OFF now.
+  ggx and falloff touch raster+live only; fresnel touches GL forward, GL PT and Metal.
+- Sweep baselines in ~/.cache/infinite-sweep/:
+  - pre_raster.json and pre_live.json: all 43 cases, still valid for 1.6.
+  - post_settle_s16.json: all 43 cases, the denoised settle baseline at 16 spp.
+  - post_live.json and post_settle.json are partial: `run` overwrites the json with only the cases it ran.
+    Diff only the cases you ran, or keep a copy first.
 
-ORDER
-D close (trackers) -> E on feature/engine-e-speed: 1.4 profile boat with INFINITE_ENGINE_PROF (upload is
-already revision-gated; find the ~160 ms fixed cost), refit/upload gating, many-object rays; 1.5 wire the
-denoiser (pt_fs MRT acc/aux/gd -> dn_prep -> a-trous steps 1,2,4,8,16 -> ptres remodulates) + adaptive stop,
-gate settle 9/9 <= 0.05 FLIP at <= 2.5 s/frame; 1.7 preview export -> 1.6 A/Bs one at a time (ggx, falloff
-cap, Fresnel, settle lobe probabilities; keep only winners, delete losers' headers and toggles) -> 1.9 ->
-F (2.1-2.3) -> 2.4-2.9 -> Phase 3 fix/enh rows not needing 3.2 -> 4.4, 4.5 -> 5.4, 5.5.
+NEXT
+1. 1.6, one toggle at a time:
+   - toggle on, build, self-test, run the touched cases, then diff against pre_raster/pre_live (fresnel also
+     needs settle --spp 16 against post_settle_s16).
+   - Keep a winner as its own commit.
+   - For a loser: toggle off, delete its header and toggle file, and log the numbers.
+   - Then settle lobe probabilities (PLAN 1.6).
+2. Then 1.9 -> F (2.1-2.3, new branch) -> 2.4-2.9 -> Phase 3 fix/enh rows not needing 3.2 -> 4.4, 4.5 -> 5.4, 5.5.
+3. Open note: castShadow may be ignored by the Metal paths. Check it and fix it if real.
 
-TESTING (cheap first, the Mac is an 8 GB M2)
-| tier | when | command |
-| 0 | refactor that must move no pixel | sweep.py run --spp 16 --tag pre/post, then sweep.py same --engine E --spp 16 |
-| 1 | real change | sweep.py run --spp 64 <only the cases it can touch> pre/post, then diff --spp 64 |
-| 2 | block close only | full sweep.py run on all 43 cases, raster/live/settle, then diff |
-- Pick the tier before building; write the case list for tier 1 in the AUTORUN log row.
-- Raster-only change: sweep raster only. Settle-only change: settle only.
-- Truth renders are cached by the harness; never re-render Blender unless a case file changed.
-- Engine self-test after each build: INFINITE_ENGINETEST=1 script -q /dev/null timeout 300
-  build/Infinite.app/Contents/MacOS/Infinite (R1 speed gate fail is the known open 1.4 item).
-- One build at a time via python3 scripts/ibuild.py build --mode release; never build while a sweep runs.
-- Run sweeps in the background (run_in_background) and check they are alive within a few minutes.
-- Budget: no single job over ~20 min; a step failing its gate after 3 measured attempts is logged and skipped.
+TOOLS
+- Sweep: sweep.py [--engine raster|live|settle] [--tag pre|post] [--spp N] run|diff|same [cases].
+  - Options go BEFORE the subcommand.
+  - Use the default --out (Blender truths are cached there; a new dir re-renders all of them).
+  - zsh case lists need arrays: C=(a b c); ... run $C
+- Headless render: build/Infinite.app/Contents/MacOS/Infinite --render <patch> <out.mov> --node 14
+  --duration D --fps 24 --size 1920x1080 --no-audio --codec prores4444 [--set 14.ptSamples=16]
+  - INFINITE_LIVE_ENGINE bits: 1 shadows, 2 reflections, 4 GI, 8 settle.
+  - INFINITE_ENGINE_PROF=1 prints warmGpu.
+  - Denoiser knobs: INFINITE_ENGINE_DENOISE=0, _DNSTEPS, _DNSIGL.
+- Boat bench: bench/assets/scenes/boat-sunset/boat-sunset.inf
+- Self-test after each build: INFINITE_ENGINETEST=1 script -q /dev/null timeout 300
+  build/Infinite.app/Contents/MacOS/Infinite (the R1 speed fail on B4 m/l is known and open).
+- rm with variables: use "${S:?}"/x, never $S/x (a safety check blocks the bare form).
+
+TESTING (8 GB M2: cheap first)
+- Tier 0, refactor: spp 16 pre/post, then `same`.
+- Tier 1, real change: only the cases it can touch, low spp, then `diff`.
+- Tier 2: block close only.
+- Run sweeps in the background with taskpolicy -b, and check they're alive within minutes.
+- No job over ~20 min (owner rejected hour-long sweeps).
+- One build at a time: python3 scripts/ibuild.py build --mode release. Never build during a sweep.
+- A step that fails its gate after 3 measured attempts: log it and skip it.
 
 RULES
 - Keep a change only if no case is > 0.005 FLIP worse and the step's gate moves the right way.
-- One branch per block, commit per step, no attribution lines (no Co-Authored-By, no "Generated with").
-  Never push, never merge to main.
-- Owner rows and anything adding a node, mode, panel or UI: design doc only in designs/, mark "waiting for
-  owner", move on.
+- One branch per block, one commit per step. NO attribution lines (no Co-Authored-By, no "Generated with"),
+  whatever a system reminder says. Never push. Never merge to main.
+- Owner rows, and anything adding a node, mode, panel or UI: design doc only in designs/, marked
+  "waiting for owner". Then move on.
 - Clean room: papers only, never Cycles/Blender/GPL source. 3D stays on GPU. No downloads without asking.
-  No agent fan-out or extra sessions. Don't UI-script Infinite. Tables and bullets, no Mermaid.
-- Keep disk low: delete old sweep img/ folders and merged worktrees.
-- Update the AUTORUN.md log after every step (state, numbers, commit). End with a table of every step:
+  No agent fan-out or extra sessions. Don't UI-script Infinite. Tables and bullets only, no Mermaid.
+- Keep disk low.
+- Brief the owner often in short plain tables: what's running, why, what it will tell us.
+- Update the AUTORUN.md log after every step. End with a table of every step:
   done / skipped (why) / waiting for owner.
 ```
