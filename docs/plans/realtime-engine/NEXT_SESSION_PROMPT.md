@@ -28,8 +28,8 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | Row | State | Commit |
 |---|---|---|
 | 0.1 build WIP + self-test | done (no code change; envis compiles) | see log |
-| 0.2 `envis` measure | **next** | — |
-| 0.3 adaptive stop default | open (0.08 measured good on 8 cases) | — |
+| 0.2 `envis` measure | done (default on; world_hdri_sun 0.458 -> 0.077) | see log |
+| 0.3 adaptive stop default | **next** (0.08 measured good on 8 cases) | — |
 | 0.4 dark far maps | open | — |
 | 0.5 freeze + `f0` baseline | open | — |
 | 1.1 to 1.5 material programs | open | — |

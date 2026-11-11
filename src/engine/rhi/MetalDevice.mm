@@ -1510,7 +1510,6 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          }
          L += T * fe * Le * (pL > 0.0 ? pL / max(pL * pL + pB * pB, 1e-20) : 1.0); // emitters: power-heuristic MIS
       }
-#ifdef R3D_AB_ENVIS
       // The HDRI as a light: one direction drawn in proportion to the sky's light, weighted against the bounce
       // (power heuristic), so a small bright sun is found at every hit instead of by a lucky bounce. The sample
       // carries what the bounce would: sheen, the coat's share, and the lobe's sky scale (skyK).
@@ -1541,7 +1540,6 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                L += T * fe * sampleEnv(f, et, ed, 0.0) * (pE / max(pE * pE + pBm * pBm, 1e-20));
          }
       }
-#endif
       if (hairM)
       {
          const float3 nd = hairSample(V, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, float4(rnd(seed), rnd(seed), rnd(seed), rnd(seed)));
