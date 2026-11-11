@@ -333,6 +333,13 @@ CASES.update({
                         {"base_color": [1.0, 0.77, 0.34], "metallic": 1.0, "roughness": 0.25},
                         {"base_color": [0.95, 0.95, 0.95], "metallic": 1.0, "roughness": 0.02}],
                        world={"hdri": "kloofendal_43d_clear_puresky_1k.hdr", "strength": 1.0, "sun_threshold": 10.0}, lights=[], view="AgX"),
+    # The same, with the sun left in the sky map (no sun extraction): a tiny, very bright patch the path tracer
+    # must find by sampling the map as a light. Row 2.4's case.
+    "world_hdri_sun": _row([{"base_color": [0.8, 0.8, 0.8], "roughness": 0.6},
+                            {"base_color": [0.8, 0.1, 0.08], "roughness": 0.2},
+                            {"base_color": [1.0, 0.77, 0.34], "metallic": 1.0, "roughness": 0.25},
+                            {"base_color": [0.95, 0.95, 0.95], "metallic": 1.0, "roughness": 0.02}],
+                           world={"hdri": "kloofendal_43d_clear_puresky_1k.hdr", "strength": 1.0, "sun_threshold": 0.0}, lights=[], view="AgX"),
     # Interior lit by sun through a window: GI, and the noise it leaves.
     "interior": _interior(),
     # Depth of field: f/1.4 on the middle ball, the rest blur by distance.

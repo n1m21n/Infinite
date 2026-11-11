@@ -46,6 +46,9 @@ namespace rhi
       // Progressive path tracer: adds `spp` samples per pixel to the running average and writes the picture.
       // reset = true starts over (new camera/scene). Returns false when the device has no ray tracing.
       virtual bool PathTrace(SharedImage&, const engine::Frame&, int /*spp*/, int /*bounces*/, bool /*reset*/, double* /*gpuMs*/) { return false; }
+      // After PathTrace: the 95th-percentile relative error of the accumulated mean over the picture (0.02 = 2 %),
+      // or -1 when it was not measured. The export stops sampling a frame once this is small.
+      virtual float PathTraceNoise() const { return -1.0f; }
    };
 
    class Device

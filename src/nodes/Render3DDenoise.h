@@ -9,12 +9,15 @@
 // dn_prep_k turns them into demodulated radiance (radiance / albedo) + its variance of the mean, and the guide
 // (normal, distance); dn_atrous_k runs once per step 1, 2, 4, 8, 16; ptres_fs then multiplies the albedo back.
 // Demodulating keeps texture detail out of the blur: only lighting is filtered.
+// dn_prep_k also bins every pixel's relative error of the mean (sqrt(variance) / luminance, 0.0025 per bin, 64
+// bins) for the export's adaptive stop: the CPU reads 64 counts, never the image.
 #define R3D_DENOISE_MSL \
    "struct DnU { int step; float n; float sigL; float pad; };\n" \
    "kernel void dn_prep_k(uint2 p [[thread_position_in_grid]], texture2d<float, access::read> acc [[texture(0)]],\n" \
    "      texture2d<float, access::read> aux [[texture(1)]], texture2d<float, access::read> gd [[texture(2)]],\n" \
    "      texture2d<float, access::write> col [[texture(3)]], texture2d<float, access::write> gOut [[texture(4)]],\n" \
-   "      texture2d<float, access::write> aOut [[texture(5)]], constant DnU& u [[buffer(0)]]) {\n" \
+   "      texture2d<float, access::write> aOut [[texture(5)]], constant DnU& u [[buffer(0)]],\n" \
+   "      device atomic_uint* hist [[buffer(1)]]) {\n" \
    "   if (p.x >= acc.get_width() || p.y >= acc.get_height()) return;\n" \
    "   const float4 a = acc.read(p), x = aux.read(p), g = gd.read(p);\n" \
    "   const float hits = max(a.a, 1.0);\n" \
@@ -23,6 +26,8 @@
    "   const float l = dot(a.rgb / hits, float3(0.2126, 0.7152, 0.0722));\n" \
    "   const float var = max(x.a / hits - l * l, 0.0) / hits;\n" \
    "   const float la = dot(alb, float3(0.2126, 0.7152, 0.0722));\n" \
+   "   const float rel = g.w > 0.0 ? sqrt(var) / max(l, 0.05) : 0.0;\n" \
+   "   atomic_fetch_add_explicit(&hist[min(int(rel * 400.0), 63)], 1u, memory_order_relaxed);\n" \
    "   col.write(float4(dm, var / max(la * la, 1e-4)), p);\n" \
    "   aOut.write(float4(alb, 0.0), p);\n" \
    "   const float nl = length(g.xyz);\n" \

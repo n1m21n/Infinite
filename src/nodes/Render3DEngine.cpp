@@ -518,9 +518,21 @@ bool Render3DNode::CookEngine(int frameId)
    {
       // Export / --frame: every frame is the settled picture, traced in full before it is handed on.
       const int target = std::clamp(ptSamples, 1, 4096), bounces = std::clamp(ptBounces, 1, 16);
+      // Adaptive stop: a frame whose 95th-percentile relative error is already under the limit takes no more
+      // samples (the denoiser's own variance says so). INFINITE_ENGINE_STOP sets the limit; 0 traces them all.
+      static const float sStop = [] { const char* e = std::getenv("INFINITE_ENGINE_STOP"); return e ? (float)std::atof(e) : 0.0f; }();
       traced = true;
-      for (int done = 0; done < target && traced; done += 16)
-         traced = E.raster->PathTrace(*E.img, fr, std::min(16, target - done), bounces, done == 0, nullptr);
+      int done = 0;
+      while (done < target && traced)
+      {
+         const int n = std::min(16, target - done);
+         traced = E.raster->PathTrace(*E.img, fr, n, bounces, done == 0, nullptr);
+         done += n;
+         const float noise = E.raster->PathTraceNoise();
+         if (sProf) std::fprintf(stderr, "ENGINE_PROF settle spp=%d noise95=%.4f\n", done, noise);
+         if (sStop > 0.0f && noise >= 0.0f && noise < sStop)
+            break;
+      }
       E.settled = traced ? target : 0;
    }
    else if (offline)
