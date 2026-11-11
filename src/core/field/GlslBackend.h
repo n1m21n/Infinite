@@ -47,4 +47,19 @@ namespace Field
    };
 
    GlslEmitResult EmitGlsl(const PixelIRProgram& program);
+
+   // OPUS_PLAN row 1.3: a Material-domain program as one function a host shader calls per hit,
+   //   void <fn>(inout FldMat o, vec3 P, vec3 N, vec2 UV, float fld_t)
+   // o arrives holding the material's knob values (an unwritten output keeps them) and leaves with the program's.
+   // Params are baked in as constants (paramValues in declaration order; missing ones take their default), so a
+   // knob change is a new function. State, image inputs and reduce are refused: a surface hit has no neighbours.
+   struct MaterialFnResult
+   {
+      std::string source;
+      std::string error;
+   };
+   // Helpers + struct FldMat, once per host shader before every material function.
+   std::string GlslMaterialPrelude();
+   MaterialFnResult EmitGlslMaterialFn(const PixelIRProgram& program, const std::string& fnName,
+                                       const std::vector<float>& paramValues);
 }

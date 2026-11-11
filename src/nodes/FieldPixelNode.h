@@ -148,6 +148,7 @@ public:
       v.Float("height", height);
       v.Bool("animate", animate);
       v.Bool("exposeAuxTexture", exposeAuxTexture);
+      v.Int("domain", domain);
       mParamTable.VisitParams(v);
       // Dynamic pins, Phase 2b (build step 13, §5.1 step 8) - see
       // FieldElementNode::VisitParams's identical block for the rationale.
@@ -196,9 +197,20 @@ public:
    float height = 1024.0f;
    bool animate = true;
    int presetIndex = 0;
+   // OPUS_PLAN row 1.3. 0 Image: the kernel draws a picture. 1 Material: the kernel is a surface program for a
+   // Material node's `field` pin; it draws nothing and registers one Field::MaterialProgram per param set.
+   int domain = 0;
+   static const std::vector<std::string>& DomainNames();
+   // The registered program for the current code and param values, 0 when not in Material domain or on error.
+   int MaterialProgramId() const { return domain == 1 ? mMatId : 0; }
 
 private:
+   void RefreshMaterialProgram();
    unsigned int mProgram = 0;
+   int mMatId = 0;
+   bool mMatTried = false;
+   bool mMatApplied = false;          // the Material-domain IR in mIR is current for `code`
+   std::vector<float> mMatValues;      // param values mMatId was built with, in mIR.declaredParams order
    std::string mLastError;
    std::string mNotice;
    int mLastCookFrame = -1;

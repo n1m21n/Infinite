@@ -713,6 +713,12 @@ namespace app
          }
       }
 
+      DropdownButton("domain", FieldPixelNode::DomainNames(), n->domain, [n](int i)
+      {
+         if (i == n->domain) return;
+         n->domain = i;
+         n->Apply();
+      });
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModCheckbox("animate", &n->animate);

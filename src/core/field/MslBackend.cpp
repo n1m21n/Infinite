@@ -578,4 +578,60 @@ namespace Field
       result.usesOffsetReads = ctx.offsetReadCount > ctx.imageReadCount;
       return result;
    }
+
+   std::string MslMaterialPrelude()
+   {
+      std::string s = kMslHelperPrelude;
+      s += ToMslTypes(PhaseShape::kGlslPrelude);
+      s += "\nstruct FldMat { float3 base; float roughness; float metallic; float3 normal; float height; float3 emission; "
+           "float opacity; float mask; };\n";
+      return s;
+   }
+
+   MaterialFnResult EmitMslMaterialFn(const PixelIRProgram& program, const std::string& fnName,
+                                      const std::vector<float>& paramValues)
+   {
+      MaterialFnResult r;
+      if (program.kind != PixelProgramKind::Material)
+         r.error = "not a Material-domain program";
+      else if (!program.declaredStates.empty())
+         r.error = "state is not available in the Material domain (a surface hit has no previous frame)";
+      else if (!program.declaredInputs.empty())
+         r.error = "input pins are not available in the Material domain";
+      if (!r.error.empty()) return r;
+      for (const auto& s : program.pixelBody)
+         if (s->rvalueExpr && HasReduce(s->rvalueExpr)) { r.error = "reduce is not available in the Material domain"; return r; }
+      Ctx ctx;
+      ctx.Line("static void " + fnName + "(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t)");
+      ctx.Line("{");
+      ctx.Line("   float fld_dt = 0.0; int fld_frame = 0; (void)fld_dt; (void)fld_frame; (void)fld_t;");
+      for (int i = 0; i < kMaterialInputCount; i++)
+      {
+         const MaterialChannel& c = kMaterialInputs[i];
+         const std::string v = (c.lanes == 1) ? "0.0" : c.name;
+         ctx.Line("   " + MslType(FieldType(c.type, c.lanes)) + " fld_v_" + c.name + " = " + v + "; (void)fld_v_" + c.name + ";");
+         ctx.declaredLocals.insert(c.name);
+      }
+      for (int i = 0; i < kMaterialOutputCount; i++)
+      {
+         const MaterialChannel& c = kMaterialOutputs[i];
+         ctx.Line("   " + MslType(FieldType(c.type, c.lanes)) + " fld_v_" + c.name + " = o." + c.name + ";");
+         ctx.declaredLocals.insert(c.name);
+      }
+      for (size_t i = 0; i < program.declaredParams.size(); i++)
+      {
+         const auto& p = program.declaredParams[i];
+         const float v = i < paramValues.size() ? paramValues[i] : (float)p.defaultValue;
+         ctx.Line("   float fld_p_" + p.name + " = " + FormatFloat(v) + ";");
+         ctx.paramNames.insert(p.name);
+      }
+      for (const auto& s : program.prologue) EmitStmt(s, ctx);
+      for (const auto& s : program.pixelBody) EmitStmt(s, ctx);
+      if (!ctx.error.empty()) { r.error = ctx.error; return r; }
+      for (int i = 0; i < kMaterialOutputCount; i++)
+         ctx.Line(std::string("   o.") + kMaterialOutputs[i].name + " = fld_v_" + kMaterialOutputs[i].name + ";");
+      ctx.Line("}");
+      r.source = ctx.out.str();
+      return r;
+   }
 }

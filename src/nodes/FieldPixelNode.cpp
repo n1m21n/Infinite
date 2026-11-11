@@ -1,4 +1,5 @@
 #include "FieldPixelNode.h"
+#include "field/MaterialRegistry.h"
 #include "field/FieldLex.h"
 #include "field/FieldParse.h"
 #include "Transport.h"
@@ -1059,6 +1060,36 @@ unsigned int FieldPixelNode::GetOutputTexture(int index)
 int FieldPixelNode::GetOutputWidth() const { return mOut.w; }
 int FieldPixelNode::GetOutputHeight() const { return mOut.h; }
 
+const std::vector<std::string>& FieldPixelNode::DomainNames()
+{
+   static const std::vector<std::string> kNames = { "Image", "Material" };
+   return kNames;
+}
+
+// Params are baked into the program as constants, so a new value set is a new program id (and one shader rebuild in
+// each renderer that draws it). Same values, same id: the registry dedupes on source + values.
+void FieldPixelNode::RefreshMaterialProgram()
+{
+   std::vector<float> values;
+   values.reserve(mIR.declaredParams.size());
+   for (const auto& p : mIR.declaredParams)
+   {
+      const Field::ParamEntry* e = mParamTable.Find(p.name);
+      values.push_back(e ? e->value : (float)p.defaultValue);
+   }
+   if (mMatTried && values == mMatValues)
+      return;
+   mMatTried = true;
+   std::string err;
+   const int id = Field::RegisterMaterialProgram(code, values, err);
+   mMatValues = values;
+   mMatId = id;
+   if (id == 0)
+      mLastError = err;
+   else
+      mLastError.clear();
+}
+
 bool FieldPixelNode::Apply()
 {
    pinRefusal.clear();
@@ -1080,11 +1111,36 @@ bool FieldPixelNode::Apply()
 
    Field::PixelIRProgram ir;
    Field::FieldError irErr;
-   if (!Field::LowerPixelProgramToIR(ast, ir, irErr))
+   const Field::PixelProgramKind kind = domain == 1 ? Field::PixelProgramKind::Material : Field::PixelProgramKind::Image;
+   if (!Field::LowerPixelProgramToIR(ast, ir, irErr, kind))
    {
       mLastError = "line " + std::to_string(irErr.span.line) + ", col " + std::to_string(irErr.span.col) + ": " + irErr.message;
+      mMatId = 0;
+      mMatApplied = false;
       return false;
    }
+
+   // Material domain (row 1.3): no picture of its own. The program is compiled into the Render 3D shaders through
+   // Field::RegisterMaterialProgram; the GL image program is dropped so nothing renders here.
+   if (domain == 1)
+   {
+      if (mProgram != 0)
+      {
+         glDeleteProgram(mProgram);
+         mProgram = 0;
+      }
+      mIR = std::move(ir);
+      mEmitResult = Field::GlslEmitResult();
+      mParamTable.Reconcile(mIR.declaredParams, mNodeIndex, mNotice);
+      mMatApplied = true;
+      mMatId = 0;
+      mMatTried = false;
+      mLastError.clear();
+      RefreshMaterialProgram();
+      return mMatId != 0;
+   }
+   mMatApplied = false;
+   mMatId = 0;
 
    // Emit and compile against LOCALS. Keeping the last working program means
    // keeping the IR and uniform table that describe it too: if mIR were swapped
@@ -1185,6 +1241,20 @@ void FieldPixelNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
+   if (domain == 1)
+   {
+      if (!mMatApplied && mLastError.empty())
+         Apply();
+      else if (mMatApplied)
+         RefreshMaterialProgram();
+      return;
+   }
+   if (mMatApplied) // switched back to Image without an Apply
+   {
+      mMatApplied = false;
+      mMatId = 0;
+      Apply();
+   }
    if (mProgram == 0 && mLastError.empty())
       Apply();
    if (mProgram == 0)

@@ -7,6 +7,8 @@
 #include "core/field/FieldParse.h"
 #include "core/field/GlslBackend.h"
 #include "core/field/MslBackend.h"
+#include "core/field/MaterialRegistry.h"
+#include "nodes/FieldPixelNode.h"
 
 #if defined(__APPLE__)
 #include <mach/mach.h>
@@ -404,6 +406,76 @@ bool RunEngineTest()
    printf("  MAE %.5f  p99 %.5f  max %.4f  >0.04: %.3f%% of pixels\n", mae, p99, worst, 100.0 * (double)big / (double)errs.size());
    check(lit > (size_t)W * H / 20, "scene is on screen", (double)lit, 0);
    check(mae <= 0.02, "mean error vs GL <= 0.02 (R1 gate)", mae, 0.02);
+
+   // ---- 1.3: material programs run after the maps in R (GL), L (Metal raster) and T (Metal tracer)
+   {
+      const char* kRed = "base = vec3(1.0, 0.0, 0.0)\nmetallic = 0.0\nroughness = 1.0";
+      // changed pixels between a and b, and whether b reads red there
+      auto redWhereChanged = [](const std::vector<float>& a, const std::vector<float>& b, size_t& changed) -> bool
+      {
+         changed = 0;
+         double sr = 0, sg = 0, sb = 0;
+         for (size_t i = 0; i + 3 < a.size() && i + 3 < b.size(); i += 4)
+         {
+            const float d = std::max({ std::fabs(a[i] - b[i]), std::fabs(a[i + 1] - b[i + 1]), std::fabs(a[i + 2] - b[i + 2]) });
+            if (d < 0.1f) continue;
+            changed++;
+            sr += b[i]; sg += b[i + 1]; sb += b[i + 2];
+         }
+         if (changed == 0) return false;
+         sr /= (double)changed; sg /= (double)changed; sb /= (double)changed;
+         printf("    changed %zu px, mean rgb %.3f %.3f %.3f\n", changed, sr, sg, sb);
+         return sr > sg + 0.1 && sr > sb + 0.1;
+      };
+      std::string ferr;
+      const int id = Field::RegisterMaterialProgram(kRed, {}, ferr);
+      check(id > 0, "1.3: material program registers", (double)id, 0);
+      check(Field::RegisterMaterialProgram(kRed, {}, ferr) == id, "1.3: same source, same id", 0, 0);
+
+      // L: the sphere (instance 2) gets the program
+      engine::Frame f2 = frame;
+      f2.instances[2].fieldProgram = id;
+      f2.fieldMsl = Field::BuildMaterialLibrary({ id }, Field::MaterialLang::Msl, f2.fieldMslKey);
+      const int builds0 = raster->FieldLibraryBuilds();
+      std::vector<float> lp;
+      const bool lok = raster->Render(*img, f2, nullptr) && raster->Render(*img, f2, nullptr) && ReadRect(img->GlTexture(), W, H, lp);
+      size_t ch = 0;
+      check(lok && redWhereChanged(mt, lp, ch) && ch > (size_t)W * H / 100, "1.3 L: program turns the sphere red", (double)ch, 0);
+      check(raster->FieldLibraryBuilds() - builds0 == 1, "1.3 L: one library build for one program set", raster->FieldLibraryBuilds() - builds0, 1);
+      // and back: no program is the picture it was
+      std::vector<float> back;
+      bool bok = raster->Render(*img, frame, nullptr) && ReadRect(img->GlTexture(), W, H, back) && back.size() == mt.size();
+      double bworst = 0.0;
+      for (size_t i = 0; bok && i < back.size(); i++) bworst = std::max(bworst, (double)std::fabs(back[i] - mt[i]));
+      check(bok && bworst <= 1.0 / 255.0, "1.3 L: program removed, picture unchanged", bworst * 255.0, 1.0);
+
+      // T: the tracer reads the same program
+      std::vector<float> t0, t1;
+      const bool tok = raster->PathTrace(*img, frame, 4, 3, true, nullptr) && ReadRect(img->GlTexture(), W, H, t0) &&
+                       raster->PathTrace(*img, f2, 4, 3, true, nullptr) && ReadRect(img->GlTexture(), W, H, t1);
+      check(tok && redWhereChanged(t0, t1, ch) && ch > (size_t)W * H / 100, "1.3 T: program turns the sphere red", (double)ch, 0);
+
+      // R: Field Pixel (Material domain) -> Material `field` pin -> Render 3D (GL)
+      FieldPixelNode fp;
+      fp.code = kRed;
+      fp.domain = 1;
+      const bool applied = fp.Apply();
+      check(applied && fp.MaterialProgramId() == id, "1.3: Field Pixel in Material domain registers its program", fp.MaterialProgramId(), id);
+      MaterialNode mat;
+      mat.input = &sphereG;
+      Render3DNode r2;
+      r2.geometry[0] = &floorG; r2.geometry[1] = &cubeG; r2.geometry[2] = &mat; r2.geometry[3] = &torusG;
+      r2.width = (float)W; r2.height = (float)H; r2.samples = 0; r2.hdr = false; r2.tonemap = 1; r2.shadowsEnabled = r.shadowsEnabled;
+      r2.rig = &rig;
+      std::vector<float> ra, rb;
+      for (int k = 0; k < 3; k++) { r2.exposure = 1.0f + 0.001f * (float)k; r2.CookIfNeeded(++fnum); }
+      const bool aok = GLUtil::ReadTexturePixels(scratch, r2.GetOutputTexture(), r2.GetOutputWidth(), r2.GetOutputHeight(), ra);
+      mat.FieldInput().Connect(&fp);
+      check(mat.GetMaterial().fieldProgram == id, "1.3: Material node carries the program id", mat.GetMaterial().fieldProgram, id);
+      for (int k = 0; k < 3; k++) { r2.exposure = 1.01f + 0.001f * (float)k; r2.CookIfNeeded(++fnum); }
+      const bool rok = aok && GLUtil::ReadTexturePixels(scratch, r2.GetOutputTexture(), r2.GetOutputWidth(), r2.GetOutputHeight(), rb);
+      check(rok && redWhereChanged(ra, rb, ch) && ch > (size_t)W * H / 100, "1.3 R: program turns the sphere red", (double)ch, 0);
+   }
 
    // dump for eyes
    if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))

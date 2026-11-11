@@ -49,6 +49,8 @@ namespace rhi
       // After PathTrace: the 95th-percentile relative error of the accumulated mean over the picture (0.02 = 2 %),
       // or -1 when it was not measured. The export stops sampling a frame once this is small.
       virtual float PathTraceNoise() const { return -1.0f; }
+      // Times the shader was rebuilt for a new set of Field material programs (Frame::fieldMslKey).
+      virtual int FieldLibraryBuilds() const { return 0; }
    };
 
    class Device

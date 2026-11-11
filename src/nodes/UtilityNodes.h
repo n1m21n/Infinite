@@ -314,9 +314,13 @@ public:
    {
       static const char* kNames[] = { "geo", "albedo", "roughness", "metallic",
                                       "normal", "ao", "emission", "clearcoat", "sheen",
-                                      "opacity", "transmission" };
-      return (slot >= 0 && slot < (1 + kMapCount)) ? kNames[slot] : nullptr;
+                                      "opacity", "transmission", "field" };
+      return (slot >= 0 && slot < (2 + kMapCount)) ? kNames[slot] : nullptr;
    }
+   // OPUS_PLAN row 1.3: the last pin takes a Field Pixel in Material domain; its program runs in the Render 3D
+   // shaders after the maps are read.
+   ImageCable& FieldInput() { return mField; }
+   static constexpr int kFieldSlot = 1 + kMapCount;
    size_t TriangleCount() const;
 
    float normalStrength = 1.0f;
@@ -412,6 +416,7 @@ public:
    }
 private:
    ImageCable mMaps[kMapCount];
+   ImageCable mField;
    Mesh mEmpty;
    int mLastCookFrame = -1;
    mutable unsigned long long mMaterialRevision = 0;

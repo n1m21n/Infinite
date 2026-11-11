@@ -102,6 +102,10 @@ struct Material
    float hairTint[3] = { 1.0f, 1.0f, 1.0f };
    float radialRoughness = 0.3f;
    float hairShift = 2.0f; // cuticle tilt, degrees
+
+   // Field material program (core/field/MaterialRegistry.h) from Material's `field` input: runs after the maps and
+   // replaces the outputs it writes. 0 = none.
+   int fieldProgram = 0;
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
@@ -1224,6 +1228,10 @@ private:
    // mesh draws with no alpha cutoff; 0 if it failed to link.
    unsigned int mProgramOpaque = 0;
    bool mShaderTried = false;
+   // Row 1.3: the Field material library spliced into the forward shader, and its program set's key.
+   std::string mFldGlsl;
+   unsigned long long mFldKey = 0;
+   void SyncFieldPrograms();
    unsigned int mEnvBgProgram = 0;
    bool mEnvBgShaderTried = false;
    // Empty VAO for the background's vertexless "big triangle" - core profile

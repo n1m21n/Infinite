@@ -774,4 +774,68 @@ namespace Field
       result.lineToIrNode = ctx.lineToIrNode;
       return result;
    }
+
+   namespace
+   {
+      // Shared by both material emitters' refusal checks.
+      bool MaterialFnRefusal(const PixelIRProgram& program, std::string& err)
+      {
+         if (program.kind != PixelProgramKind::Material)
+            err = "not a Material-domain program";
+         else if (!program.declaredStates.empty())
+            err = "state is not available in the Material domain (a surface hit has no previous frame)";
+         else if (!program.declaredInputs.empty())
+            err = "input pins are not available in the Material domain";
+         return !err.empty();
+      }
+   }
+
+   std::string GlslMaterialPrelude()
+   {
+      std::string s = kFieldHelperPrelude;
+      s += PhaseShape::kGlslPrelude;
+      s += "\nstruct FldMat { vec3 base; float roughness; float metallic; vec3 normal; float height; vec3 emission; "
+           "float opacity; float mask; };\n";
+      return s;
+   }
+
+   MaterialFnResult EmitGlslMaterialFn(const PixelIRProgram& program, const std::string& fnName,
+                                       const std::vector<float>& paramValues)
+   {
+      MaterialFnResult r;
+      if (MaterialFnRefusal(program, r.error)) return r;
+      EmitterContext ctx;
+      ctx.EmitLine("void " + fnName + "(inout FldMat o, vec3 P, vec3 N, vec2 UV, float fld_t)");
+      ctx.EmitLine("{");
+      ctx.EmitLine("   float fld_dt = 0.0; int fld_frame = 0;");
+      for (int i = 0; i < kMaterialInputCount; i++)
+      {
+         const MaterialChannel& c = kMaterialInputs[i];
+         const std::string v = (c.lanes == 1) ? "0.0" : c.name; // curvature and cavity: 0 until row 4.4
+         ctx.EmitLine("   " + GlslTypeString(FieldType(c.type, c.lanes)) + " fld_v_" + c.name + " = " + v + ";");
+         ctx.declaredLocals.insert(c.name);
+      }
+      for (int i = 0; i < kMaterialOutputCount; i++)
+      {
+         const MaterialChannel& c = kMaterialOutputs[i];
+         ctx.EmitLine("   " + GlslTypeString(FieldType(c.type, c.lanes)) + " fld_v_" + c.name + " = o." + c.name + ";");
+         ctx.declaredLocals.insert(c.name);
+      }
+      for (size_t i = 0; i < program.declaredParams.size(); i++)
+      {
+         const auto& p = program.declaredParams[i];
+         const float v = i < paramValues.size() ? paramValues[i] : (float)p.defaultValue;
+         ctx.EmitLine("   float fld_p_" + p.name + " = " + FormatFloat(v) + ";");
+         ctx.paramNames.insert(p.name);
+      }
+      // Frame-rate statements stay in the function: a host shader has no CPU prologue to hoist them into.
+      for (const auto& s : program.prologue) EmitStmt(s, ctx);
+      for (const auto& s : program.pixelBody) EmitStmt(s, ctx);
+      if (!ctx.error.empty()) { r.error = ctx.error; return r; }
+      for (int i = 0; i < kMaterialOutputCount; i++)
+         ctx.EmitLine(std::string("   o.") + kMaterialOutputs[i].name + " = fld_v_" + kMaterialOutputs[i].name + ";");
+      ctx.EmitLine("}");
+      r.source = ctx.out.str();
+      return r;
+   }
 }

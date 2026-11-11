@@ -681,6 +681,7 @@ set(COMMON_SOURCES
     src/core/field/PinTable.cpp
     src/core/field/GlslBackend.cpp
     src/core/field/MslBackend.cpp
+    src/core/field/MaterialRegistry.cpp
     src/core/field/PixelState.cpp
     src/core/field/Transfer.cpp
     src/core/field/ReduceOps.cpp

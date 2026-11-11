@@ -25,7 +25,7 @@
    F3(boxLo) F3(boxHi) F1(breakup) F1(detailScale) F1(detailStrength) \
    F1(hairFrom) F1(hairRadialNeg) F1(hairShift) F3(hairSigma) \
    F3(sssRadius) F1(subsurface) F1(translucency) \
-   F1(iridescence) F1(iridIor) F1(iridThickness) F1(pad0)
+   F1(iridescence) F1(iridIor) F1(iridThickness) F1(program)
 
 #define R3D_MAT_MSL_F3(n) "packed_float3 " #n "; "
 #define R3D_MAT_MSL_F1(n) "float " #n "; "

@@ -9,6 +9,7 @@
 #include "Render3DHair.h"
 #include "SceneNodes.h"
 #include "Transport.h"
+#include "field/MaterialRegistry.h"
 #include "UtilityNodes.h"
 
 #include "gl3.h"
@@ -236,6 +237,8 @@ bool Render3DNode::CookEngine(int frameId)
       in.specular = mat.specular;
       in.opacity = mat.opacity;
       in.alphaCutoff = mat.alphaCutoff;
+      in.fieldProgram = mat.fieldProgram;
+      in.fieldSeeThrough = mat.fieldProgram != 0 && Field::MaterialProgramSeeThrough(mat.fieldProgram);
       in.detailScale = mat.detailScale;
       in.detailStrength = mat.detailStrength;
       in.subsurface = std::clamp(mat.subsurface, 0.0f, 1.0f);
@@ -297,6 +300,21 @@ bool Render3DNode::CookEngine(int frameId)
       }
       place(in, src->GetModelMatrix());
       fr.instances.push_back(in);
+   }
+
+   // Material programs (row 1.3): one library for the set of ids drawn; the backend relinks when the key changes.
+   bool fieldUsesTime = false;
+   {
+      std::vector<int> ids;
+      for (const engine::Instance& in : fr.instances)
+         if (in.fieldProgram != 0)
+         {
+            ids.push_back(in.fieldProgram);
+            if (const Field::MaterialProgramEntry* e = Field::FindMaterialProgram(in.fieldProgram))
+               fieldUsesTime = fieldUsesTime || e->usesTime;
+         }
+      fr.fieldMsl = Field::BuildMaterialLibrary(ids, Field::MaterialLang::Msl, fr.fieldMslKey);
+      fr.fieldTime = (float)Transport::Instance().Seconds();
    }
 
    // Camera, same precedence as the GL cook.
@@ -506,7 +524,9 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
       mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);
       { const int cs = in.castShadow ? 1 : 0; mix(&cs, 4); }
+      mix(&in.fieldProgram, 4);
    }
+   if (fieldUsesTime) mix(&fr.fieldTime, 4); // a program that reads t never settles
    for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);
    for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); const int cs = l.castShadow ? 1 : 0; mix(&cs, 4); }
    const bool changed = hsh != E.sceneHash;

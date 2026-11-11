@@ -1,4 +1,6 @@
 #include "UtilityNodes.h"
+#include "FieldPixelNode.h"
+#include "field/MaterialRegistry.h"
 
 #include <algorithm>
 #include <cmath>
@@ -88,6 +90,12 @@ Material MaterialNode::GetMaterial() const
    m.alphaCutoff = alphaCutoff;
    m.textureAlpha = textureAlpha;
    m.opacityMapped = mMaps[kMapOpacity].Resolved() != nullptr;
+   if (auto* fp = dynamic_cast<FieldPixelNode*>(mField.Resolved()))
+   {
+      m.fieldProgram = fp->MaterialProgramId();
+      if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
+         m.opacityMapped = true;
+   }
    m.normalStrength = normalStrength;
    m.detailScale = detailScale;
    m.detailStrength = detailStrength;
@@ -140,6 +148,8 @@ void MaterialNode::CookIfNeeded(int frameId)
    for (int map = 0; map < kMapCount; map++)
       if (mMaps[map].IsConnected())
          mMaps[map].Pull(frameId);
+   if (mField.IsConnected())
+      mField.Pull(frameId);
 }
 
 // ==================================================================== Mapping

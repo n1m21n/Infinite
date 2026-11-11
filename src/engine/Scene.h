@@ -4,6 +4,7 @@
 // default materials: meshes, instances with a base-colour/metal/rough material, up to 8 lights, a gradient sky.
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace engine
@@ -59,6 +60,10 @@ namespace engine
       float translucency = 0.0f;
       float iridescence = 0.0f, iridescenceIor = 1.3f, iridescenceThickness = 400.0f; // thin film (Render3DThinFilm.h)
       bool castShadow = true; // false: drawn and seen by bounces, but shadow rays and the shadow map pass it by
+      // Field material program (core/field/MaterialRegistry.h): the id the shader switches on, 0 = none. It runs after
+      // the maps are read and replaces the outputs it writes. seeThrough: it writes opacity or mask.
+      int fieldProgram = 0;
+      bool fieldSeeThrough = false;
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the
@@ -153,6 +158,11 @@ namespace engine
       float dofAperture = 0.0f; // live: Render 3D's depth blur, a circle of dofAperture x 24 px across 1080 rows at |d - focus| / d
       float bokeh[3] = { 0.0f, 0.0f, 1.0f };
       float camRight[3] = { 1, 0, 0 }, camUp[3] = { 0, 1, 0 }, camFwd[3] = { 0, 0, -1 };
+      // The MSL library for the instances' Field material programs (MaterialRegistry BuildMaterialLibrary), empty when
+      // none; the backend rebuilds its pipelines when fieldMslKey changes. fieldTime is the programs' t.
+      std::string fieldMsl;
+      unsigned long long fieldMslKey = 0;
+      float fieldTime = 0.0f;
    };
 
    constexpr int kMaxLights = 8;

@@ -1,4 +1,5 @@
 // Field self-tests, part 1 (moved verbatim from main.cpp).
+#include "core/field/MaterialRegistry.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -635,7 +636,44 @@ int RunFieldTest()
    }
    printf("SECTION G (Material domain): %s\n", secGOk ? "OK" : "FAIL");
 
-   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk && secFOk && secGOk;
+   // SECTION H (row 1.3): material programs register once per (source, params) and build one library per id set.
+   bool secHOk = true;
+   {
+      auto fail = [&](const char* what) { printf("SECTION H (material programs): FAIL - %s\n", what); secHOk = false; };
+      std::string err;
+      const char* src = "param float k = 0.5 [0.0, 1.0];\nbase = vec3(k, 0.2, 0.1)\nroughness = UV.x";
+      const int a = Field::RegisterMaterialProgram(src, {}, err);
+      if (a <= 0) fail(("register: " + err).c_str());
+      if (Field::RegisterMaterialProgram(src, {}, err) != a) fail("same source gave a new id");
+      const int b = Field::RegisterMaterialProgram(src, { 0.75f }, err);
+      if (b <= 0 || b == a) fail("new param value did not give a new id");
+      const Field::MaterialProgramEntry* eb = Field::FindMaterialProgram(b);
+      if (!eb || eb->glsl.find("0.75") == std::string::npos || eb->msl.find("0.75") == std::string::npos)
+         fail("param value not baked into both languages");
+      if (Field::RegisterMaterialProgram("base = vec3(1.0)\nrougness = 0.5", {}, err) != 0 || err.find("line 2") == std::string::npos)
+         fail("bad source not refused with a line number");
+      if (Field::MaterialProgramSeeThrough(a)) fail("opaque program reads as see-through");
+      const int c = Field::RegisterMaterialProgram("mask = step(0.5, UV.x)", {}, err);
+      if (c <= 0 || !Field::MaterialProgramSeeThrough(c)) fail("mask program not see-through");
+      const int d = Field::RegisterMaterialProgram("emission = vec3(sin(t))", {}, err);
+      if (d <= 0 || !Field::FindMaterialProgram(d)->usesTime || Field::FindMaterialProgram(a)->usesTime)
+         fail("usesTime wrong");
+      unsigned long long k0 = 1, k1 = 0, k2 = 0;
+      if (!Field::BuildMaterialLibrary({}, Field::MaterialLang::Glsl, k0).empty() || k0 != 0) fail("empty set not empty");
+      const std::string g = Field::BuildMaterialLibrary({ b, a, a, 99999 }, Field::MaterialLang::Glsl, k1);
+      const std::string m = Field::BuildMaterialLibrary({ a, b }, Field::MaterialLang::Msl, k2);
+      unsigned long long k3 = 0;
+      Field::BuildMaterialLibrary({ a, b }, Field::MaterialLang::Glsl, k3);
+      if (k1 == 0 || k1 != k3) fail("library key not order-free");
+      if (g.find("#define FLD_MAT_ANY 1") == std::string::npos || g.find("fldMatDispatch") == std::string::npos ||
+          g.find("fldmat_" + std::to_string(a) + "(") == std::string::npos || g.find("fldmat_99999") != std::string::npos)
+         fail("GLSL library content");
+      if (m.find("thread FldMat&") == std::string::npos || m.find("fldmat_" + std::to_string(b) + "(") == std::string::npos)
+         fail("MSL library content");
+   }
+   printf("SECTION H (material programs): %s\n", secHOk ? "OK" : "FAIL");
+
+   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk && secFOk && secGOk && secHOk;
    printf("INFINITE_FIELDTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }

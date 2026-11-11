@@ -17,6 +17,7 @@
 #include <string>
 
 #include "Transport.h"
+#include "field/MaterialRegistry.h"
 #include "BenchReport.h"
 #include "SceneNodes.h"
 #include "GeometryOpNodes.h"
@@ -431,6 +432,13 @@ namespace
       "#else\n"
       "#define KILL_FRAGMENT discard\n"
       "#endif\n"
+      // Field material programs (row 1.3): EnsureShader splices their library here (MaterialRegistry.h).
+      "//@FLD_MAT_LIB@\n"
+      "#ifndef FLD_MAT_ANY\n"
+      "#define FLD_MAT_ANY 0\n"
+      "#endif\n"
+      "uniform float uFldProgram;\n" // the draw's program id, 0 = none
+      "uniform float uFldTime;\n"
       "in vec3 vWorldPos;\n"
       "in vec3 vLocalPos;\n"
       "in vec3 vNormal;\n"
@@ -1066,6 +1074,34 @@ namespace
       "   if (uHasTransmissionMap == 1) trans *= sampleMap(uTransmissionMap, n, mapUv).r;\n"
       "   vec3 emiss = toLinear(uEmissionColor) * uEmission;\n"
       "   if (uHasEmissionMap == 1) emiss *= toLinear(sampleMap(uEmissionMap, n, mapUv).rgb);\n"
+      // Field material program (row 1.3): after the maps; it replaces what it writes. Its tangent-space normal goes
+      // through the cotangent frame of the mesh uv, its height is a bump by the surface gradient
+      // (n' = |det| n - sign(det) (dh/dx r1 + dh/dy r2)); derivatives come before the cut.
+      "#if FLD_MAT_ANY\n"
+      "   if (uFldProgram > 0.5) {\n"
+      "      FldMat o;\n"
+      "      o.base = base; o.roughness = rough; o.metallic = metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
+      "      o.emission = emiss; o.opacity = alpha; o.mask = 1.0;\n"
+      "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime);\n"
+      "      vec3 dp1 = dFdx(vWorldPos), dp2 = dFdy(vWorldPos);\n"
+      "      vec2 duv1 = dFdx(vUv), duv2 = dFdy(vUv);\n"
+      "      float dhx = dFdx(o.height), dhy = dFdy(o.height);\n"
+      "      base = o.base; rough = clamp(o.roughness, 0.045, 1.0); metal = clamp(o.metallic, 0.0, 1.0);\n"
+      "      emiss = o.emission; alpha = o.opacity;\n"
+      "      if (o.mask < 0.5 || (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff)) KILL_FRAGMENT;\n"
+      "      if (!hairHere) {\n"
+      "         vec3 dp2perp = cross(dp2, n), dp1perp = cross(n, dp1);\n"
+      "         vec3 t = dp2perp * duv1.x + dp1perp * duv2.x, bt = dp2perp * duv1.y + dp1perp * duv2.y;\n"
+      "         if (max(dot(t, t), dot(bt, bt)) > 1e-12) { t = normalize(t); bt = normalize(bt); }\n"
+      "         else { t = abs(n.z) < 0.999 ? normalize(cross(n, vec3(0.0, 0.0, 1.0))) : normalize(cross(n, vec3(1.0, 0.0, 0.0))); bt = normalize(cross(n, t)); }\n"
+      "         n = normalize(t * o.normal.x + bt * o.normal.y + n * o.normal.z);\n"
+      "         vec3 r1 = cross(dp2, n), r2 = cross(n, dp1);\n"
+      "         float det = dot(dp1, r1);\n"
+      "         vec3 nb = abs(det) * n - sign(det) * (dhx * r1 + dhy * r2);\n"
+      "         if (dot(nb, nb) > 1e-30) n = normalize(nb);\n"
+      "      }\n"
+      "   }\n"
+      "#endif\n"
       "\n"
       "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
       "   float shMax = sh * max(uSheenColor.r, max(uSheenColor.g, uSheenColor.b));\n"
@@ -1915,7 +1951,12 @@ bool Render3DNode::EnsureShader()
    };
 
    const unsigned int vert = compile(GL_VERTEX_SHADER, kVertSrc);
-   const std::string fragSrc = R3dAbGlsl(kFragSrc); // with the active A/B switches (Render3DAb.h)
+   std::string fragSrc = R3dAbGlsl(kFragSrc); // with the active A/B switches (Render3DAb.h)
+   if (!mFldGlsl.empty())
+   {
+      const size_t at = fragSrc.find("//@FLD_MAT_LIB@");
+      if (at != std::string::npos) fragSrc.insert(at, mFldGlsl);
+   }
    const unsigned int frag = compile(GL_FRAGMENT_SHADER, fragSrc.c_str());
    // The same source with INF_NO_DISCARD defined after the #version line.
    std::string opaqueSrc = fragSrc;
@@ -2291,8 +2332,35 @@ Mat4 Render3DNode::MotionDelta(const void* source, const Mat4& model)
    return found != mPrevModel.end() ? Mat4::Multiply(found->second, Mat4::Inverse(model)) : Mat4::Identity();
 }
 
+// Row 1.3: the Field material programs the drawn sources use. A new set relinks the forward programs with their
+// library; a library that fails to compile relinks without it (the knobs draw).
+void Render3DNode::SyncFieldPrograms()
+{
+   std::vector<int> ids;
+   for (IGeometrySource* s : FlattenedGeometry())
+      if (s != nullptr)
+         if (const int id = s->GetMaterial().fieldProgram) ids.push_back(id);
+   unsigned long long key = 0;
+   std::string lib = Field::BuildMaterialLibrary(ids, Field::MaterialLang::Glsl, key);
+   if (key == mFldKey)
+      return;
+   mFldKey = key;
+   mFldGlsl = std::move(lib);
+   if (mProgramFull != 0) glDeleteProgram(mProgramFull);
+   if (mProgramOpaque != 0) glDeleteProgram(mProgramOpaque);
+   mProgramFull = mProgramOpaque = mProgram = 0;
+   mShaderTried = false;
+   if (!EnsureShader() && !mFldGlsl.empty())
+   {
+      mFldGlsl.clear();
+      mShaderTried = false;
+      EnsureShader();
+   }
+}
+
 void Render3DNode::CookOnce(int frameId)
 {
+   SyncFieldPrograms();
    if (!EnsureShader())
       return;
 
@@ -2855,6 +2923,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform4fv(glGetUniformLocation(mProgram, "uLightTerms"), kMaxLights, lightTerms);
       glUniform1fv(glGetUniformLocation(mProgram, "uLightCutoff"), kMaxLights, lightCutoff);
       glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
+      glUniform1f(glGetUniformLocation(mProgram, "uFldTime"), (float)Transport::Instance().Seconds());
       const float rigAmbient[3] = { ambientColor[0] + (rig != nullptr ? rig->ambient[0] : 0.0f),
                                     ambientColor[1] + (rig != nullptr ? rig->ambient[1] : 0.0f),
                                     ambientColor[2] + (rig != nullptr ? rig->ambient[2] : 0.0f) };
@@ -3239,6 +3308,7 @@ void Render3DNode::CookOnce(int frameId)
          glUniform1f(glGetUniformLocation(mProgram, "uPointSizeScale"), gpuSizeScale);
       }
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
+      glUniform1f(glGetUniformLocation(mProgram, "uFldProgram"), (float)material.fieldProgram);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
       glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
       glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);
@@ -3652,6 +3722,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
+      glUniform1f(glGetUniformLocation(mProgram, "uFldProgram"), (float)material.fieldProgram);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
       glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
       glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);

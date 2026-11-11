@@ -32,7 +32,7 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | 0.3 adaptive stop default | done: default 0.05 (0.08 and 0.06 failed the image gate) | see log |
 | 0.4 dark far maps | closed with a known gap (owner): grazing glint moved to row 5.7 | 0496f599 |
 | 0.5 freeze + `f0` baseline | done: `f0` stored, R and T, 46 cases | see log |
-| 1.1 to 1.5 material programs | 1.1 done (MSL emitter; 40/40 presets compile on Metal, 8 match GL to 0.02/255, fast math as GL); 1.2 done (Material domain in the IR, written-output mask, misspelt-output error with its line); **next: 1.3** | — |
+| 1.1 to 1.5 material programs | 1.1 done (MSL emitter; 40/40 presets compile on Metal, 8 match GL to 0.02/255, fast math as GL); 1.2 done (Material domain in the IR, written-output mask, misspelt-output error with its line); 1.3 done (program hook in R, L, T; Field Pixel Domain, Material `field` pin; identity gate settle 0/45, raster 4/45 all run-to-run noise); **next: 1.4** | — |
 | 2.1 to 2.8 shading nodes | open | — |
 | 3.1 to 3.5 script nodes | open | — |
 | 4.1 to 4.5 layers, relief, wear | open | — |

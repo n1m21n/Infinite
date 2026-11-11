@@ -36,4 +36,9 @@ namespace Field
    };
 
    MslEmitResult EmitMsl(const PixelIRProgram& program);
+
+   // Row 1.3, the MSL twin of EmitGlslMaterialFn: void <fn>(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t)
+   std::string MslMaterialPrelude();
+   MaterialFnResult EmitMslMaterialFn(const PixelIRProgram& program, const std::string& fnName,
+                                      const std::vector<float>& paramValues);
 }

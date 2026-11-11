@@ -96,8 +96,13 @@ struct FrameU
    float4 gi;       // enabled, strength, frame index, rays
    float4 envm;     // x: 1 = HDRI map, +2 = HDRI background; y rotation (rad); z max lod (GL levels); w the map's base lod
    LightU lights[8]; // vec.w = type, aim.w unused
+   float4 fld;      // x: the Field material programs' t
 };
 )" R3D_MAT_MSL R"(
+//@FLD_MAT_LIB@
+#ifndef FLD_MAT_ANY
+#define FLD_MAT_ANY 0
+#endif
 struct InstU { float4x4 model; float4x4 normalM; MatRec mat; }; // the material: Render3DMaterial.h (all zeros = plain)
 // INV_POS: the second, invariant compile used by the depth prepass and the shaded runs after it (exact same depth);
 // plain raster keeps the faster non-invariant build.
@@ -590,6 +595,25 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    const float ccW = m.mat.coat * (m.mat.mapCoat > 0.5 ? MAPR(m.mat.mapCoat).r : 1.0);
    const float transMap = m.mat.mapTransmission > 0.5 ? MAPR(m.mat.mapTransmission).r : 1.0;
 #undef MAPR
+#if FLD_MAT_ANY
+   // Field material program (row 1.3): after the maps, before the cut; it replaces what it writes. Its normal and
+   // height bend n after the normal map; height derivatives are taken here, before any discard.
+   float3 fldEmD = float3(0.0), fldNrm = float3(0.0, 0.0, 1.0);
+   float2 fldDh = float2(0.0);
+   const float2 fldDuv1 = dfdx(in.uv), fldDuv2 = dfdy(in.uv);
+   if (abs(m.mat.program) > 0.5)
+   {
+      FldMat o;
+      const float3 em0 = float3(m.mat.emission) * emMap;
+      o.base = base; o.roughness = roughIn; o.metallic = metalIn; o.normal = float3(0.0, 0.0, 1.0); o.height = 0.0;
+      o.emission = em0; o.opacity = alpha; o.mask = 1.0;
+      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x);
+      fldDh = float2(dfdx(o.height), dfdy(o.height));
+      base = o.base; roughIn = o.roughness; metalIn = o.metallic; fldEmD = o.emission - em0; alpha = o.opacity;
+      fldNrm = o.normal;
+      if (o.mask < 0.5) discard_fragment();
+   }
+#endif
    if (alpha < 1.0)
    {
       // A cutoff cuts below it; without one, opacity is a coverage the frames average (a per-pixel threshold).
@@ -621,6 +645,22 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float3 s = mapNormalTS(maps[int(m.mat.mapNormal) - 1], mx, (int(m.mat.wrapBump + 0.5) & 4) != 0, m.mat.normalStrength, muv, duv1, duv2, -1.0, m.mat.detailScale, m.mat.detailStrength);
       n = normalize(t * s.x + bt * s.y + n * s.z);
    }
+#if FLD_MAT_ANY
+   if (abs(m.mat.program) > 0.5 && !hairM)
+   {
+      // The program's tangent-space normal through the cotangent frame of the mesh uv, then its height as a bump
+      // (surface gradient: n' = |det| n - sign(det) (dh/dx r1 + dh/dy r2)).
+      const float3 dp2perp = cross(dp2, n), dp1perp = cross(n, dp1);
+      float3 t = dp2perp * fldDuv1.x + dp1perp * fldDuv2.x, bt = dp2perp * fldDuv1.y + dp1perp * fldDuv2.y;
+      if (max(dot(t, t), dot(bt, bt)) > 1e-12) { t = normalize(t); bt = normalize(bt); }
+      else { t = abs(n.z) < 0.999 ? normalize(cross(n, float3(0.0, 0.0, 1.0))) : normalize(cross(n, float3(1.0, 0.0, 0.0))); bt = normalize(cross(n, t)); }
+      n = normalize(t * fldNrm.x + bt * fldNrm.y + n * fldNrm.z);
+      const float3 r1 = cross(dp2, n), r2 = cross(n, dp1);
+      const float det = dot(dp1, r1);
+      const float3 nb = abs(det) * n - sign(det) * (fldDh.x * r1 + fldDh.y * r2);
+      if (dot(nb, nb) > 1e-30) n = normalize(nb);
+   }
+#endif
    const float nDotV = max(dot(n, viewDir), 1e-4);
    const float shEv = shMax > 0.0 ? sheenE(nDotV, m.mat.sheenRoughness) : 0.0;
    const float shV = 1.0 - shMax * shEv;          // the base layer's share under the sheen
@@ -823,6 +863,9 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    }
    col = col * ccAt + coatCol + (ccW > 0.0 ? sampleEnv(f, et, reflect(-viewDir, n), ccR) * (ccW * ccFv) : float3(0.0));
    col += float3(m.mat.emission) * emMap;
+#if FLD_MAT_ANY
+   col += fldEmD;
+#endif
    const float opaque = (trans > 0.0 && rtOn) ? 1.0 - trans : 1.0; // glass takes no GI of its own
    FOut o;
    if (!kMrt)
@@ -1368,7 +1411,13 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       float3 base = hairM ? hairAlbedo(float3(I.mat.hairSigma), -I.mat.hairRadialNeg) : float3(I.mat.base); float metal = hairM ? 0.0 : clamp(I.mat.metallic, 0.0, 1.0); float rough = clamp(I.mat.roughness, 0.045, 1.0);
       const float3 ns = n; // the surface's own side: ray origins and the light / bounce gates use it, not the mapped normal
       float3 emMap = float3(1.0); float shW = hairM ? 0.0 : I.mat.sheen, ccW = hairM ? 0.0 : I.mat.coat;
-      if (I.mat.mapAlbedo > 0.5 || I.mat.mapRoughness > 0.5 || I.mat.mapMetallic > 0.5 || I.mat.mapNormal > 0.5 || I.mat.mapAo > 0.5 || I.mat.mapEmission > 0.5 || I.mat.mapSheen > 0.5 || I.mat.mapOpacity > 0.5 || I.mat.mapCoat > 0.5 || I.mat.mapTransmission > 0.5 || I.mat.hairShift > 0.5)
+#if FLD_MAT_ANY
+      float3 fldEm = float3(0.0); bool fldEmSet = false;
+      const bool fldOn = abs(I.mat.program) > 0.5;
+#else
+      const bool fldOn = false;
+#endif
+      if (I.mat.mapAlbedo > 0.5 || I.mat.mapRoughness > 0.5 || I.mat.mapMetallic > 0.5 || I.mat.mapNormal > 0.5 || I.mat.mapAo > 0.5 || I.mat.mapEmission > 0.5 || I.mat.mapSheen > 0.5 || I.mat.mapOpacity > 0.5 || I.mat.mapCoat > 0.5 || I.mat.mapTransmission > 0.5 || I.mat.hairShift > 0.5 || fldOn)
       {
          // Maps at the hit, through the mapping: full detail on the camera hit (the jittered samples filter it), a
          // blurred level after a bounce. Normal maps take the triangle's uv tangent frame.
@@ -1396,6 +1445,20 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          float alpha = 1.0 - I.mat.clear;
          if (I.mat.mapOpacity > 0.5) alpha *= MAPT(I.mat.mapOpacity).r;
 #undef MAPT
+#if FLD_MAT_ANY
+         // Field material program (row 1.3): after the maps, before the cut; it replaces what it writes. Height is not
+         // traced (no screen derivatives at a ray hit); the normal goes through the triangle's uv frame below.
+         float3 fldNrm = float3(0.0, 0.0, 1.0);
+         if (fldOn)
+         {
+            FldMat fo;
+            fo.base = base; fo.roughness = rough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
+            fo.emission = float3(I.mat.emission) * emMap; fo.opacity = alpha; fo.mask = 1.0;
+            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x);
+            base = fo.base; rough = clamp(fo.roughness, 0.045, 1.0); metal = clamp(fo.metallic, 0.0, 1.0);
+            fldEm = fo.emission; fldEmSet = true; alpha = fo.mask < 0.5 ? 0.0 : fo.opacity; fldNrm = fo.normal;
+         }
+#endif
          if (alpha < 1.0 && skips < 16 && alpha < (I.mat.alphaCutoff > 0.0 ? I.mat.alphaCutoff : rnd(seed)))
          {
             // Cut out or not covered: the ray goes on through, the same bounce.
@@ -1421,9 +1484,33 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                n = normalize(tg * s.x + bt * s.y + n * s.z);
             }
          }
+#if FLD_MAT_ANY
+         if (fldOn && !hairM && any(fldNrm != float3(0.0, 0.0, 1.0)))
+         {
+            // The program's tangent-space normal in the triangle's mesh-uv frame (as the normal map's, unmapped uv).
+            const float3 e1 = q1 - p0, e2 = q2 - p0;
+            const float2 d1 = t1 - t0, d2 = t2 - t0;
+            const float det = d1.x * d2.y - d2.x * d1.y;
+            if (abs(det) > 1e-12)
+            {
+               float3 tg = normalize((I.normalM * float4((e1 * d2.y - e2 * d1.y) / det, 0.0)).xyz);
+               const float3 bg = (I.normalM * float4((e2 * d1.x - e1 * d2.x) / det, 0.0)).xyz;
+               tg = normalize(tg - n * dot(n, tg));
+               float3 bt = cross(n, tg);
+               if (dot(bt, bg) < 0.0) bt = -bt;
+               if (backHit) { tg = -tg; bt = -bt; }
+               n = normalize(tg * fldNrm.x + bt * fldNrm.y + n * fldNrm.z);
+            }
+         }
+#endif
       }
       if (b == 0) { alb0 = base; n0 = n; dist0 = h.distance; }
+#if FLD_MAT_ANY
+      if (!fldEmSet) fldEm = float3(I.mat.emission) * emMap;
+      if (any(fldEm > 0.0))
+#else
       if (any(float3(I.mat.emission) > 0.0))
+#endif
       {
          // Emission seen along the path. After a bounce, emitter sampling below could have found it too: power-heuristic MIS.
          float wE = 1.0;
@@ -1435,7 +1522,11 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             const float pL = pEm * t.e1.w * h.distance * h.distance / max(cosL, 1e-6);
             wE = lastPdfB * lastPdfB / max(lastPdfB * lastPdfB + pL * pL, 1e-20);
          }
+#if FLD_MAT_ANY
+         L += T * fldEm * wE;
+#else
          L += T * float3(I.mat.emission) * emMap * wE;
+#endif
       }
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
       const float shMax = shW * maxc(float3(I.mat.sheenColor)), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(nDotV, I.mat.sheenRoughness) : 1.0;
@@ -1931,6 +2022,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    {
       float viewProj[16], eye[4], ambient[4], sky[4], horizon[4], ground[4], params[4], lightVP[16], shP[4], shQ[4], gi[4], envm[4];
       LightU lights[8];
+      float fld[4];
    };
    float ToLin(float c)
    {
@@ -1981,9 +2073,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       m.hairFrom = (float)in.hairFrom; m.hairRadialNeg = -std::max(in.hairRadial, 0.0f); m.hairShift = in.hairShift;
       m.subsurface = in.subsurface; m.translucency = in.translucency;
       m.iridescence = in.iridescence; m.iridIor = in.iridescenceIor; m.iridThickness = in.iridescenceThickness;
+      m.program = (float)(in.fieldSeeThrough ? -in.fieldProgram : in.fieldProgram); // negative: it may cut or see through
    }
    // A run the depth prepass leaves out: it cuts pixels away, so its depth is known only once it is shaded.
-   bool SeeThrough(const InstU& u) { return u.mat.clear > 0.0f || u.mat.mapOpacity > 0.5f || u.mat.alphaCutoff > 0.0f; }
+   bool SeeThrough(const InstU& u) { return u.mat.clear > 0.0f || u.mat.mapOpacity > 0.5f || u.mat.alphaCutoff > 0.0f || u.mat.program < -0.5f; }
 
    class MetalRaster final : public RasterRenderer
    {
@@ -1999,6 +2092,46 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             EngineFail(@"raster shader", err);
       }
       bool Ok() const { return mLib != nil; }
+   private:
+      // Field material programs (row 1.3): their library spliced in at the marker; a new set recompiles the shader and
+      // drops every pipeline, which the next Pipeline / PtPipeline / DepthOfField / EnsureInv rebuild from it. A
+      // library that fails to compile leaves the plain shader: the programs are skipped and the knobs draw.
+      NSString* mSrc = nil;
+      unsigned long long mFieldKey = 0;
+      NSString* Src() const { return mSrc ? mSrc : kRasterShader; }
+      void FieldLib(const engine::Frame& fr)
+      {
+         if (fr.fieldMslKey == mFieldKey)
+            return;
+         mFieldKey = fr.fieldMslKey;
+         NSString* src = kRasterShader;
+         if (!fr.fieldMsl.empty())
+            src = [kRasterShader stringByReplacingOccurrencesOfString:@"//@FLD_MAT_LIB@"
+                                                           withString:[NSString stringWithUTF8String:fr.fieldMsl.c_str()]];
+         NSError* err = nil;
+         MTLCompileOptions* co = [MTLCompileOptions new];
+         co.languageVersion = MTLLanguageVersion2_3;
+         co.preprocessorMacros = AbMacros(nil);
+         id<MTLLibrary> lib = [mDev newLibraryWithSource:src options:co error:&err];
+         if (!lib)
+         {
+            EngineFail(@"field material library", err);
+            if (mSrc == nil) return; // already the plain shader
+            src = kRasterShader;
+            lib = [mDev newLibraryWithSource:src options:co error:&err];
+            if (!lib) return;
+         }
+         mLib = lib;
+         mSrc = src;
+         mFieldLibBuilds++;
+         mPso = nil; mFmt = MTLPixelFormatInvalid;
+         mPtPso = nil; mPtResPso = nil; mPtFmt = MTLPixelFormatInvalid;
+         mDofPso = nil;
+         mInvTried = false; mPrePso = nil; mPsoRunInv = nil; mPsoRunDirInv = nil;
+      }
+      int mFieldLibBuilds = 0;
+   public:
+      int FieldLibraryBuilds() const override { return mFieldLibBuilds; }
    private:
       struct Gpu { id<MTLBuffer> vb = nil, ib = nil, uvb = nil; NSUInteger count = 0; float lo[3], hi[3]; };
    public:
@@ -2409,6 +2542,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       id<MTLDepthStencilState> mDsBg = nil;
       void FillFrame(FrameU& f, const engine::Frame& fr)
       {
+         f.fld[0] = fr.fieldTime;
          std::memcpy(f.viewProj, fr.viewProj, 64);
          std::memcpy(f.eye, fr.eye, 12);
          f.eye[3] = fr.rim;
@@ -2444,6 +2578,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       {
          MetalImage& img = static_cast<MetalImage&>(target);
          const MTLPixelFormat fmt = img.Half() ? MTLPixelFormatRGBA16Float : MTLPixelFormatBGRA8Unorm;
+         FieldLib(fr);
          if (!Pipeline(fmt) || !Depth(img.Width(), img.Height()) || !Targets(img.Width(), img.Height()))
             return false;
 
@@ -2875,6 +3010,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       {
          MetalImage& img = static_cast<MetalImage&>(target);
          const MTLPixelFormat fmt = img.Half() ? MTLPixelFormatRGBA16Float : MTLPixelFormatBGRA8Unorm;
+         FieldLib(fr);
          if (!Pipeline(fmt) || !PtPipeline(fmt) || !PtTargets(img.Width(), img.Height()))
             return false;
          FrameU f = {};
@@ -3458,7 +3594,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          co.languageVersion = MTLLanguageVersion2_3;
          co.preserveInvariance = YES;
          co.preprocessorMacros = AbMacros(@{ @"INV_POS" : @1 });
-         id<MTLLibrary> lib = [mDev newLibraryWithSource:kRasterShader options:co error:&err];
+         id<MTLLibrary> lib = [mDev newLibraryWithSource:Src() options:co error:&err];
          id<MTLFunction> rr = lib ? [lib newFunctionWithName:@"rr_vs"] : nil;
          if (!rr) { EngineFail(@"invariant shader", err); return false; }
          MTLRenderPipelineDescriptor* zp = [MTLRenderPipelineDescriptor new];

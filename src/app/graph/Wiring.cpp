@@ -437,7 +437,7 @@ namespace app
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
-         return 1 + kMapCount; // geometry, then one pin per material channel
+         return 2 + kMapCount; // geometry, one pin per material channel, then field
       if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
          return Render3DNode::kEnvSlot + 1; // geo, camera, lights, env
       if (auto* op = dynamic_cast<GeometryOpNode*>(gn.node.get()))
@@ -620,7 +620,10 @@ namespace app
       // Slot 0 is a geometry pin, wired by pointer, not an image cable; the
       // rest are the material channels in MaterialMap order.
       if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
+         {
+         if (slot == MaterialNode::kFieldSlot) return &mat->FieldInput();
          return (slot >= 1 && slot <= kMapCount) ? &mat->MapInput(slot - 1) : nullptr;
+      }
       // Slot 0 is the geometry pin, wired by pointer in ConnectGeometrySlot;
       // slot 1 is the height/vector displacement texture.
       if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
