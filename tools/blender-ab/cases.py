@@ -321,6 +321,10 @@ CASES.update({
                        "lights": [{"type": "sun", "power": 3, "azimuth": 270, "elevation": 14}], "world": {"color": [0.3, 0.3, 0.3]},
                        "objects": [{"shape": "plane", "scale": 6, "material": {"base_color": [0.25, 0.3, 0.5], "roughness": 0.25,
                                                                                 "maps": {"normal": "weave"}, "uv_scale": 40.0}}]},
+    # Row 0.4 elimination: tex_fabric_far without its normal map (is the darkness the map, or the lobe?).
+    "tex_fabric_far_flat": {"size": SMALL, "camera": {"fov": 40, "azimuth": 90, "elevation": 12, "distance": 8.0, "target": [0, 0, 0.0]},
+                            "lights": [{"type": "sun", "power": 3, "azimuth": 270, "elevation": 14}], "world": {"color": [0.3, 0.3, 0.3]},
+                            "objects": [{"shape": "plane", "scale": 6, "material": {"base_color": [0.25, 0.3, 0.5], "roughness": 0.25}}]},
     # Emissive meshes as the only light.
     "emission_light": _emission_room(),
     # Three coloured point lights: coloured, overlapping shadows.
