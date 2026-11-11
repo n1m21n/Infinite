@@ -85,7 +85,7 @@ then the same with `diff`. Options go before the subcommand.
 | 0.4 | Dark far maps: mapped surfaces lose 30 to 40 % brightness at distance (`tex_fabric_far` brightness 0.69 R, 0.60 L, settle is right) | the map read in each engine; grep `mapAlbedo` | Find by elimination, one map at a time in the case (albedo, normal, roughness, AO, sheen): which removal restores brightness to 0.95 to 1.05. Likely causes in order: albedo mips averaged in sRGB not linear; normal mips shortened and used unnormalised in diffuse; AO map mip bias. Gate: brightness 0.95 to 1.05 on R and L, 0 worse | 0.1 | 1 |
 | 0.5 | Write "L1 to L3 frozen" in AUTORUN with the baseline numbers; re-run raster and settle s16 full as tag `f0` | — | `f0` stored for 44 cases on R and T | 0.2 to 0.4 | with 0.4 |
 
-After 0.5 these stay closed: multiscatter, Fresnel variants, `ggx` switch, Toksvig, spec AA, denoiser tuning.
+After 0.5 these stay closed: multiscatter, Fresnel variants, `ggx` switch (reopened only by row 5.7), Toksvig, spec AA, denoiser tuning.
 
 ### Block 1: material programs (the spine)
 
@@ -142,6 +142,7 @@ All of these emit Field source into the material program of row 1.2. Node list i
 | 5.4 | Sun shaft on R and L: froxel fog (160x90x64), sun visibility from the shadow map, temporal reprojection (Wronski 2014) | 5.3 | `vol_shaft` on L: FLIP under 0.15, under 1.5 ms GPU | 5.3 | 2 |
 | 5.5 | Physical sky: Preetham or Hosek-Wilkie analytic sky + sun disc, from the published papers and coefficient tables typed from the paper, not from any code base | same design | case `sky_noon`, `sky_dusk` vs Blender sky texture: brightness ratio 0.9 to 1.1, FLIP under 0.10 | 0.5 | 1 |
 | 5.6 | More than 8 lights (old 2.3) | FINISH_PLAN 6.10 | case `lights_64`: R and L within 0.02 FLIP of T; frame time under 1.3x the 8-light frame | 0.5 | 2 |
+| 5.7 | Grazing glint (found in 0.4, owner 2026-11-11: freeze with the gap, fix here). Raster and live draw the sun glint at grazing view too narrow and too dim; a normal map widens it in Cycles and settle but not on R and L. Three steps in order: (1) the brightness excess of deer, geom_monkey, cornell that blocked `ggx`; (2) `ggx` (height-correlated G2) on R and L, which alone fixes the flat raster plane; (3) live's second loss: probe the sun-disc representative point (`a2 = a + 0.5 sr`), `sunVis` grazing self-shadow and `ggxMs`, one switch each. This row reopens `ggx`, closed after 0.5 for this row only | AUTORUN row 0.4; the live sun term in `MetalDevice.mm` (grep `representative point`) | `tex_fabric_far_flat` and `tex_fabric_far`: brightness 0.95 to 1.05 on R and L; 0 worse vs `f0` on R and `f8` on L. Three failed attempts per step: log, skip that step | 0.5, 8.2 | 2 |
 
 ### Block 6: camera (L8)
 

@@ -30,13 +30,13 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | 0.1 build WIP + self-test | done (no code change; envis compiles) | see log |
 | 0.2 `envis` measure | done (default on; world_hdri_sun 0.458 -> 0.077) | see log |
 | 0.3 adaptive stop default | done: default 0.05 (0.08 and 0.06 failed the image gate) | see log |
-| 0.4 dark far maps | **blocked**: not a map read; grazing glint (G2 on raster, + an unprobed live sun term). Waits for owner: freeze with gap, or reopen `ggx` | see log |
+| 0.4 dark far maps | closed with a known gap (owner): grazing glint moved to row 5.7 | 0496f599 |
 | 0.5 freeze + `f0` baseline | open | — |
 | 1.1 to 1.5 material programs | open | — |
 | 2.1 to 2.8 shading nodes | open | — |
 | 3.1 to 3.5 script nodes | open | — |
 | 4.1 to 4.5 layers, relief, wear | open | — |
-| 5.1 to 5.6 fibre, volumes, sky, lights | open | — |
+| 5.1 to 5.7 fibre, volumes, sky, lights, grazing glint | open | — |
 | 6.1 to 6.3 camera | open | — |
 | 7.1 to 7.3 assets, scale | open | — |
 | 8.1 to 8.6 live | open | — |
