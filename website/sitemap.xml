@@ -154,6 +154,8 @@
   <url><loc>https://infinitedevices.org/embeds/minimal-signal-raster-oscillogram-sweep.html</loc><lastmod>2026-11-12</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/glitch-datamosh-chroma-displacement-scan.html</loc><lastmod>2026-11-12</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/glitch-datamosh-macroblock-slice-corruption.html</loc><lastmod>2026-11-12</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cymatics-sine-chladni-plate-resonance.html</loc><lastmod>2026-11-12</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cymatics-sine-harmonic-modal-interference.html</loc><lastmod>2026-11-12</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-12</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-12</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-12</lastmod><priority>0.7</priority></url>
@@ -331,6 +333,10 @@
   <url><loc>https://infinitedevices.org/library/jungle-atmospheric-pad-drone-synth.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/deep-house-warm-analog-chorus-fx.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/deep-house-dusty-tape-space-delay-fx.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neurofunk-modulated-reese-bass-synth.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neurofunk-cybernetic-growl-lead-synth.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/french-filter-house-pumping-disco-sweep-fx.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/french-filter-house-creamy-phaser-drive-fx.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
@@ -885,6 +891,16 @@
   <url><loc>https://infinitedevices.org/library/deep-house-dusty-tape-space-delay-fx.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-chroma-displacement-scan.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-macroblock-slice-corruption.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/swiss-typographic-modular-grid-harmony.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/swiss-typographic-geometric-tension-matrix.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/holographic-iridescent-prismatic-polytope-3d.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/holographic-iridescent-faceted-torus-lattice-3d.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neurofunk-modulated-reese-bass-synth.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neurofunk-cybernetic-growl-lead-synth.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/french-filter-house-pumping-disco-sweep-fx.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/french-filter-house-creamy-phaser-drive-fx.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-plate-resonance.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-modal-interference.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-12</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-12</lastmod><priority>0.5</priority></url>

@@ -545,6 +545,16 @@
       "slug": "glitch-datamosh-macroblock-slice-corruption",
       "title": "Glitch Datamosh Macroblock Slice Corruption",
       "description": "Audio-reactive video compression corruption visualizer. Bass fractures the spatial macroblock grid, mids shift temporal motion vector shears, and highs trigger digital noise bursts."
+    },
+    {
+      "slug": "cymatics-sine-chladni-plate-resonance",
+      "title": "Cymatics Sine Chladni Plate Resonance",
+      "description": "Audio-reactive Chladni plate cymatics visualizer. Bass shifts modal standing-wave frequencies, mids warp geometric nodal lines, and highs vibrate granular sand dispersion."
+    },
+    {
+      "slug": "cymatics-sine-harmonic-modal-interference",
+      "title": "Cymatics Sine Harmonic Modal Interference",
+      "description": "Audio-reactive circular modal cymatics visualizer. Bass drives radial Bessel diaphragm oscillation, mids modulate harmonic interference sectors, and highs disperse resonant nodal ripples."
     }
   ]
 }

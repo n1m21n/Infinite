@@ -8831,6 +8831,224 @@
       "file": "assets/library/pixel/glitch-datamosh-macroblock-slice-corruption.field",
       "preview": "assets/library/previews/glitch-datamosh-macroblock-slice-corruption.jpg",
       "bytes": 1750
+    },
+    {
+      "id": "swiss-typographic-modular-grid-harmony",
+      "name": "Swiss Typographic Modular Grid Harmony",
+      "kind": "Generator",
+      "tags": [
+        "swiss",
+        "typographic",
+        "grid",
+        "constructivist",
+        "minimal",
+        "procedural"
+      ],
+      "description": "Asymmetric constructivist layout constructed on a 12-column modular typographic grid with mathematical proportion divisions, vermilion geometric accents, and high-contrast typographic hierarchy.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/swiss-typographic-modular-grid-harmony.js",
+      "preview": "assets/library/previews/swiss-typographic-modular-grid-harmony.jpg",
+      "bytes": 3187
+    },
+    {
+      "id": "swiss-typographic-geometric-tension-matrix",
+      "name": "Swiss Typographic Geometric Tension Matrix",
+      "kind": "Generator",
+      "tags": [
+        "swiss",
+        "typographic",
+        "muller-brockmann",
+        "tension",
+        "matrix",
+        "geometric"
+      ],
+      "description": "Dynamic Josef M\u00fcller-Brockmann inspired composition exploring radial and orthogonal typographic grid tension with vermilion arc sectors, stepped rules, and modernist structural cadence.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/swiss-typographic-geometric-tension-matrix.js",
+      "preview": "assets/library/previews/swiss-typographic-geometric-tension-matrix.jpg",
+      "bytes": 2425
+    },
+    {
+      "id": "holographic-iridescent-prismatic-polytope-3d",
+      "name": "Holographic Iridescent Prismatic Polytope 3D",
+      "kind": "Generator",
+      "tags": [
+        "holographic",
+        "iridescent",
+        "3d",
+        "prismatic",
+        "polytope",
+        "crystal",
+        "geometry"
+      ],
+      "description": "Faceted holographic crystal polytope with rotating iridescent orbital planes, dispersion refraction facets, and lustrous pastel rainbow metallic sheen.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/holographic-iridescent-prismatic-polytope-3d.js",
+      "preview": "assets/library/previews/holographic-iridescent-prismatic-polytope-3d.jpg",
+      "bytes": 1876
+    },
+    {
+      "id": "holographic-iridescent-faceted-torus-lattice-3d",
+      "name": "Holographic Iridescent Faceted Torus Lattice 3D",
+      "kind": "Generator",
+      "tags": [
+        "holographic",
+        "iridescent",
+        "3d",
+        "torus",
+        "lattice",
+        "ribbon",
+        "prismatic"
+      ],
+      "description": "Procedural 3D iridescent ribbon structure featuring interlocking crystalline torus rings, floating prismatic pearl satellite beads, and soft chromatic refraction planes.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/holographic-iridescent-faceted-torus-lattice-3d.js",
+      "preview": "assets/library/previews/holographic-iridescent-faceted-torus-lattice-3d.jpg",
+      "bytes": 1903
+    },
+    {
+      "id": "neurofunk-modulated-reese-bass-synth",
+      "name": "Neurofunk Modulated Reese Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "neurofunk",
+        "audio",
+        "dsp",
+        "reese",
+        "bass"
+      ],
+      "description": "Menacing neurofunk reese bass synthesizer featuring dual detuned phase-beating sawtooth oscillators, a sweeping modulated notch-lowpass filter, and multi-stage diode overdrive.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/neurofunk-modulated-reese-bass-synth.inf",
+      "preview": "assets/library/previews/neurofunk-modulated-reese-bass-synth.jpg",
+      "bytes": 2142
+    },
+    {
+      "id": "neurofunk-cybernetic-growl-lead-synth",
+      "name": "Neurofunk Cybernetic Growl Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "neurofunk",
+        "audio",
+        "dsp",
+        "reese",
+        "bass"
+      ],
+      "description": "Aggressive cybernetic growl synthesizer engineered for techstep and neurofunk leads with formant-shifted resonant filtering, wavefolded harmonic drive, and snappy envelope modulation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/neurofunk-cybernetic-growl-lead-synth.inf",
+      "preview": "assets/library/previews/neurofunk-cybernetic-growl-lead-synth.jpg",
+      "bytes": 2064
+    },
+    {
+      "id": "french-filter-house-pumping-disco-sweep-fx",
+      "name": "French Filter House Pumping Disco Sweep FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "french-filter-house",
+        "audio",
+        "dsp",
+        "disco",
+        "filter",
+        "phaser"
+      ],
+      "description": "Classic French touch resonant disco lowpass sweep filter featuring rhythmic envelope ducking, warm transistor drive, and sweeping resonant cutoff modulation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 6,
+      "file": "assets/templates/french-filter-house-pumping-disco-sweep-fx.inf",
+      "preview": "assets/library/previews/french-filter-house-pumping-disco-sweep-fx.jpg",
+      "bytes": 2011
+    },
+    {
+      "id": "french-filter-house-creamy-phaser-drive-fx",
+      "name": "French Filter House Creamy Phaser Drive FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "french-filter-house",
+        "audio",
+        "dsp",
+        "disco",
+        "filter",
+        "phaser"
+      ],
+      "description": "Silky multi-stage vintage analog phaser and warm console saturation effect designed for French house rhodes stabs, guitars, and filtered disco master buses.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/french-filter-house-creamy-phaser-drive-fx.inf",
+      "preview": "assets/library/previews/french-filter-house-creamy-phaser-drive-fx.jpg",
+      "bytes": 2051
+    },
+    {
+      "id": "cymatics-sine-chladni-plate-resonance",
+      "name": "Cymatics Sine Chladni Plate Resonance",
+      "kind": "Generator",
+      "tags": [
+        "cymatics",
+        "chladni",
+        "nodal",
+        "resonance",
+        "sine",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Mathematical simulation of 2D Chladni plate acoustic resonance where sand particles settle along nodal lines determined by harmonic vibrational modal frequencies.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cymatics-sine-chladni-plate-resonance.field",
+      "preview": "assets/library/previews/cymatics-sine-chladni-plate-resonance.jpg",
+      "bytes": 1558
+    },
+    {
+      "id": "cymatics-sine-harmonic-modal-interference",
+      "name": "Cymatics Sine Harmonic Modal Interference",
+      "kind": "Generator",
+      "tags": [
+        "cymatics",
+        "bessel",
+        "harmonic",
+        "modal",
+        "interference",
+        "audio-reactive",
+        "shader",
+        "webgl"
+      ],
+      "description": "Radial Bessel modal acoustic interference pattern simulating circular diaphragm cymatic vibration, concentric standing waves, and luminescent nodal particle clustering.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cymatics-sine-harmonic-modal-interference.field",
+      "preview": "assets/library/previews/cymatics-sine-harmonic-modal-interference.jpg",
+      "bytes": 1574
     }
   ]
 }

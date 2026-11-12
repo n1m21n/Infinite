@@ -285,6 +285,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Jungle Atmospheric Pad Drone Synth](https://infinitedevices.org/library/jungle-atmospheric-pad-drone-synth.html): Haunting 90s intelligent jungle atmospheric synthesizer with detuned dual pulse-saw oscillators, slow sweeping resonant bandpass filter, and tape-saturated drone warmth. (file: https://infinitedevices.org/assets/templates/jungle-atmospheric-pad-drone-synth.inf)
 - [Deep House Warm Analog Chorus FX](https://infinitedevices.org/library/deep-house-warm-analog-chorus-fx.html): Lush multi-stage analog bucket-brigade chorus and spatial widening effect engineered for deep house electric pianos, synths, and basslines with warm vintage saturation. (file: https://infinitedevices.org/assets/templates/deep-house-warm-analog-chorus-fx.inf)
 - [Deep House Dusty Tape Space Delay FX](https://infinitedevices.org/library/deep-house-dusty-tape-space-delay-fx.html): Vintage tape echo and dub delay processor featuring wow-and-flutter tape modulation, warm asymmetrical feedback saturation, and high-frequency damping. (file: https://infinitedevices.org/assets/templates/deep-house-dusty-tape-space-delay-fx.inf)
+- [Neurofunk Modulated Reese Bass Synth](https://infinitedevices.org/library/neurofunk-modulated-reese-bass-synth.html): Menacing neurofunk reese bass synthesizer featuring dual detuned phase-beating sawtooth oscillators, a sweeping modulated notch-lowpass filter, and multi-stage diode overdrive. (file: https://infinitedevices.org/assets/templates/neurofunk-modulated-reese-bass-synth.inf)
+- [Neurofunk Cybernetic Growl Lead Synth](https://infinitedevices.org/library/neurofunk-cybernetic-growl-lead-synth.html): Aggressive cybernetic growl synthesizer engineered for techstep and neurofunk leads with formant-shifted resonant filtering, wavefolded harmonic drive, and snappy envelope modulation. (file: https://infinitedevices.org/assets/templates/neurofunk-cybernetic-growl-lead-synth.inf)
+- [French Filter House Pumping Disco Sweep FX](https://infinitedevices.org/library/french-filter-house-pumping-disco-sweep-fx.html): Classic French touch resonant disco lowpass sweep filter featuring rhythmic envelope ducking, warm transistor drive, and sweeping resonant cutoff modulation. (file: https://infinitedevices.org/assets/templates/french-filter-house-pumping-disco-sweep-fx.inf)
+- [French Filter House Creamy Phaser Drive FX](https://infinitedevices.org/library/french-filter-house-creamy-phaser-drive-fx.html): Silky multi-stage vintage analog phaser and warm console saturation effect designed for French house rhodes stabs, guitars, and filtered disco master buses. (file: https://infinitedevices.org/assets/templates/french-filter-house-creamy-phaser-drive-fx.inf)
 
 ## Library: Community
 
@@ -645,7 +649,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 109 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 111 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -662,4 +666,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 94 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 96 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

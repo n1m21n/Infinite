@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "French Filter House Pumping Disco Sweep FX",
+    "author": "Infinite",
+    "description": "Classic French touch resonant disco lowpass sweep filter featuring rhythmic envelope ducking, warm transistor drive, and sweeping resonant cutoff modulation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float cutoff = 2200.0 [200.0, 6000.0];\nparam float resonance = 0.65 [0.0, 0.92];\nparam float pumpRate = 0.50 [0.1, 2.0];\nparam float pumpDepth = 0.65 [0.0, 1.0];\nparam float drive = 1.6 [1.0, 4.0];\nparam float mix = 0.70 [0.0, 1.0];\nstate float lfo = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\nlfo = (lfo + pumpRate * 0.002) % 1.0;\npump = (0.5 - 0.5 * cos(6.2831853 * lfo)) * pumpDepth;\n\nu = in * drive;\nsat = u / (1.0 + abs(u) * 0.25);\n\neffCut = clamp(cutoff * (1.0 - pump * 0.75), 150.0, 8000.0);\nfCut = clamp(effCut / sr * 3.14, 0.01, 0.45);\n\nfb = lp2 * resonance * 1.4;\nlp1 = lp1 + fCut * ((sat - fb) - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nprocessed = in * (1.0 - mix) + lp2 * mix * 1.15;\nout = processed * 0.90;\n",
+    "params": {
+      "cutoff": 2200.0,
+      "resonance": 0.65,
+      "pumpRate": 0.5,
+      "pumpDepth": 0.65,
+      "drive": 1.6,
+      "mix": 0.7
+    }
+  }
+}

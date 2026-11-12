@@ -2631,6 +2631,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "neurofunk-modulated-reese-bass-synth",
+      "name": "Neurofunk Modulated Reese Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Menacing neurofunk reese bass synthesizer featuring dual detuned phase-beating sawtooth oscillators, a sweeping modulated notch-lowpass filter, and multi-stage diode overdrive.",
+      "price": 0,
+      "preview": "assets/templates/neurofunk-modulated-reese-bass-synth.webp",
+      "file": "assets/templates/neurofunk-modulated-reese-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "neurofunk-cybernetic-growl-lead-synth",
+      "name": "Neurofunk Cybernetic Growl Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Aggressive cybernetic growl synthesizer engineered for techstep and neurofunk leads with formant-shifted resonant filtering, wavefolded harmonic drive, and snappy envelope modulation.",
+      "price": 0,
+      "preview": "assets/templates/neurofunk-cybernetic-growl-lead-synth.webp",
+      "file": "assets/templates/neurofunk-cybernetic-growl-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "french-filter-house-pumping-disco-sweep-fx",
+      "name": "French Filter House Pumping Disco Sweep FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Classic French touch resonant disco lowpass sweep filter featuring rhythmic envelope ducking, warm transistor drive, and sweeping resonant cutoff modulation.",
+      "price": 0,
+      "preview": "assets/templates/french-filter-house-pumping-disco-sweep-fx.webp",
+      "file": "assets/templates/french-filter-house-pumping-disco-sweep-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "french-filter-house-creamy-phaser-drive-fx",
+      "name": "French Filter House Creamy Phaser Drive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Silky multi-stage vintage analog phaser and warm console saturation effect designed for French house rhodes stabs, guitars, and filtered disco master buses.",
+      "price": 0,
+      "preview": "assets/templates/french-filter-house-creamy-phaser-drive-fx.webp",
+      "file": "assets/templates/french-filter-house-creamy-phaser-drive-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

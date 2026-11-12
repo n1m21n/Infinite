@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Neurofunk Cybernetic Growl Lead Synth",
+    "author": "Infinite",
+    "description": "Aggressive cybernetic growl synthesizer engineered for techstep and neurofunk leads with formant-shifted resonant filtering, wavefolded harmonic drive, and snappy envelope modulation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float formant = 1200.0 [200.0, 4000.0];\nparam float drive = 2.2 [1.0, 5.0];\nparam float decay = 0.35 [0.1, 0.9];\nparam float detune = 0.015 [0.002, 0.05];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float env = 0;\nstate float bp1 = 0;\nstate float bp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.05);\nenv = if(target > env, env + (target - env) * 0.12, env - env * decayRate);\n\nstep1 = clamp(freq * (1.0 - detune), 20.0, 3000.0) / sr;\nstep2 = clamp(freq * (1.0 + detune), 20.0, 3000.0) / sr;\np1 = (p1 + step1) % 1.0;\np2 = (p2 + step2) % 1.0;\n\nsaw1 = 2.0 * p1 - 1.0;\nsaw2 = 2.0 * p2 - 1.0;\nraw = (saw1 + saw2) * 0.5;\n\nu = raw * drive;\nsat = u / (1.0 + abs(u) * 0.35);\n\nfCut = clamp((formant + env * 1400.0) / sr * 3.14, 0.01, 0.45);\nbp1 = bp1 + fCut * (sat - bp1);\nbp2 = bp2 + fCut * (bp1 - bp2);\n\nout = bp2 * (0.35 + env * 0.65) * 0.28;\n",
+    "params": {
+      "formant": 1200.0,
+      "drive": 2.2,
+      "decay": 0.35,
+      "detune": 0.015
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
