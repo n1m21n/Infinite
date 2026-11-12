@@ -35,7 +35,8 @@ namespace app
       DrawCheckerboardBackdrop(dl, origin, size);
 
       // fork: skip the offscreen render when the thumbnail is clipped away; scale by Preview quality.
-      const bool visibleNow = ForkLegacyMode() || ImGui::IsRectVisible(origin, ImVec2(origin.x + size, origin.y + size));
+      static const bool sNoMini = std::getenv("INFINITE_FPS_NOMINI") != nullptr; // bisect aid
+      const bool visibleNow = !sNoMini && (ForkLegacyMode() || ImGui::IsRectVisible(origin, ImVec2(origin.x + size, origin.y + size)));
       const int renderSide = std::max(16, (int)(size * PreviewQualityScale()));
       const unsigned int tex = visibleNow
          ? viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(gn.node.get())), cam, renderSide, renderSide)
