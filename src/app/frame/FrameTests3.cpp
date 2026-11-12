@@ -1,4 +1,5 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
+#include "app/panels/FieldPatcherPanel.h"
 #include "app/AppShared.h"
 #include "app/panels/CurveEditorPanel.h"
 
@@ -3301,5 +3302,38 @@ void FrameTest_CURVEMOTIONTEST(int frameId, GLFWwindow* window)
       glfwSetWindowShouldClose(window, GLFW_TRUE);
    }
    ed::SetCurrentEditor(prevEditor);
+}
+
+// Field Patcher (internal/plans/field-patcher/README.md §8, §10 M5/M6): the panel draws open on a Field node page,
+// maximised and on an empty strip without trouble, and its gestures (box edit, move, broken program, export,
+// Value mode, save and load) land on real nodes.
+void FrameTest_FIELDPATCHERTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_FIELDPATCHERTEST") == nullptr)
+      return;
+   static int sFails = 0;
+   if (frameId == 4)
+   {
+      NewPatch();
+      gFieldPatcherDock = 0;
+      gFieldPatcherOpen = true;
+   }
+   if (frameId == 8)
+      sFails += FieldPatcherSelfCheck();
+   if (frameId == 12)
+      gFieldPatcherMaximised = true;
+   if (frameId == 16)
+   {
+      gFieldPatcherMaximised = false;
+      gFieldPatcherDock = 3;
+   }
+   if (frameId == 20)
+   {
+      const bool drew = gFieldPatcherOpen;
+      printf("FIELDPATCHER the panel drew 16 frames docked, maximised and on top  %s\n", drew ? "OK" : "FAIL");
+      sFails += drew ? 0 : 1;
+      printf("FIELDPATCHER %s\n", sFails == 0 ? "PASS" : "FAIL");
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+   }
 }
 }

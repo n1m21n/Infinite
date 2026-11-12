@@ -1,6 +1,7 @@
 // Field node parameter bodies and scopes (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/AudioViz.h"
 
 namespace app
@@ -263,6 +264,8 @@ namespace app
             gFieldElementEditor = n;
             gFieldElementEditorOpen = true;
          }
+         if (ActionButton::Draw(T("Boxes"), ImVec2(kPreviewSize, 0)) && gCurrentNodeIndex >= 0 && gCurrentNodeIndex < (int)gNodes.size())
+            FieldPatcherOpenNode(gNodes[gCurrentNodeIndex].uid);
 
          if (!n->LastError().empty())
          {
@@ -338,6 +341,8 @@ namespace app
             gFieldPrimitiveEditor = n;
             gFieldPrimitiveEditorOpen = true;
          }
+         if (ActionButton::Draw(T("Boxes"), ImVec2(kPreviewSize, 0)) && gCurrentNodeIndex >= 0 && gCurrentNodeIndex < (int)gNodes.size())
+            FieldPatcherOpenNode(gNodes[gCurrentNodeIndex].uid);
 
          if (!n->LastError().empty())
          {
@@ -368,14 +373,26 @@ namespace app
          }
       }
 
+      {
+         bool value = n->valueMode;
+         if (ModCheckbox("value", &value) && value != n->valueMode)
+         {
+            n->valueMode = value;
+            if (value)
+               n->publishScalarOutput = true;
+         }
+      }
       static const std::vector<std::string> kTopologies = {
          "Points", "Plane (Grid)", "Sphere", "Cylinder", "Torus", "Disc"
       };
-      DropdownButton("topology", kTopologies, n->topology, [n](int i) { n->topology = i; });
+      if (!n->valueMode || gParamRegisterOnly)
+      {
+         DropdownButton("topology", kTopologies, n->topology, [n](int i) { n->topology = i; });
+         ModSliderInt("count", &n->count, 1, 100000);
+         ModSliderInt("max elements", &n->maxElements, 100, 200000);
+      }
 
-      ModSliderInt("count", &n->count, 1, 100000);
-      ModSliderInt("max elements", &n->maxElements, 100, 200000);
-
+      if (!n->valueMode || gParamRegisterOnly)
       {
          bool publish = n->publishScalarOutput;
          if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
@@ -555,6 +572,8 @@ namespace app
             gFieldNotesEditor = n;
             gFieldNotesEditorOpen = true;
          }
+         if (ActionButton::Draw(T("Boxes"), ImVec2(kPreviewSize, 0)) && gCurrentNodeIndex >= 0 && gCurrentNodeIndex < (int)gNodes.size())
+            FieldPatcherOpenNode(gNodes[gCurrentNodeIndex].uid);
 
          if (!n->LastError().empty())
          {

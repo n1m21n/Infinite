@@ -17,6 +17,7 @@
 #include "field/ElementBackend.h"
 
 #include "field_patcher_presets.h"
+#include "field/FieldPatcherStarters.h"
 
 #include <cstdio>
 #include <cstring>
@@ -574,6 +575,14 @@ int main(int argc, char** argv)
    }
 
    RegistryBoxes();
+   for (const Field::PatcherStarter& st : Field::kPatcherStarters)
+   {
+      RoundTrip r = Run(st.domain, st.code);
+      if (!r.ok)
+         Fail(std::string("starter ") + st.name, r.why, r.printed);
+      else if (r.codeBoxes != 0)
+         Fail(std::string("starter ") + st.name, "opens with a code box", r.printed);
+   }
    HandBuiltGraphs();
    InsertLineKeepsPositions();
 

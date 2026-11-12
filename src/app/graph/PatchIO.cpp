@@ -1,4 +1,5 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
+#include "app/panels/FieldPatcherPanel.h"
 #include <algorithm>
 #include "app/AppShared.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -407,6 +408,27 @@ namespace app
             gCurveEditorWidth = std::max(360.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelCurveEditorDock")
             gCurveEditorDock = atoi(val.c_str()) == 3 ? 3 : 0; // bottom or top only
+         else if (key == "panelFieldPatcherOpen")
+            gFieldPatcherOpen = (val != "0");
+         else if (key == "panelFieldPatcherH")
+            gFieldPatcherHeight = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelFieldPatcherDock")
+            gFieldPatcherDock = atoi(val.c_str()) == 3 ? 3 : 0;
+         else if (key == "panelFieldPatcherPages")
+         {
+            std::string text;
+            for (size_t i = 0; i < val.size(); i++)
+            {
+               if (val[i] == '\\' && i + 1 < val.size())
+               {
+                  const char c = val[++i];
+                  text += c == 'n' ? '\n' : c;
+               }
+               else
+                  text += val[i];
+            }
+            FieldPatcherLoadState(text);
+         }
          else if (key == "panelTerminalOpen")
          {
             // Inside a DAW there is no shell: keep it closed, and write the app's value back untouched.
@@ -481,6 +503,24 @@ namespace app
       file << "panelCurveEditorH=" << gCurveEditorHeight << "\n";
       file << "panelCurveEditorW=" << gCurveEditorWidth << "\n";
       file << "panelCurveEditorDock=" << gCurveEditorDock << "\n";
+      file << "panelFieldPatcherOpen=" << (gFieldPatcherOpen ? 1 : 0) << "\n";
+      file << "panelFieldPatcherH=" << gFieldPatcherHeight << "\n";
+      file << "panelFieldPatcherDock=" << gFieldPatcherDock << "\n";
+      {
+         // Scratch pages and pins, one line: \ and newlines escaped.
+         std::string pages;
+         for (char c : FieldPatcherSaveState())
+         {
+            if (c == '\\')
+               pages += "\\\\";
+            else if (c == '\n')
+               pages += "\\n";
+            else
+               pages += c;
+         }
+         if (!pages.empty())
+            file << "panelFieldPatcherPages=" << pages << "\n";
+      }
       file << "panelTerminalOpen=" << ((Platform::PluginModeActive() ? gTerminalOpenInApp : gTerminalOpen) ? 1 : 0) << "\n";
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";
