@@ -95,6 +95,7 @@ Material MaterialNode::GetMaterial() const
    if (auto* fp = dynamic_cast<FieldPixelNode*>(mField.Resolved()))
    {
       m.fieldProgram = fp->MaterialProgramId();
+      fp->MaterialParams(m.fieldParams);
       if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
          m.opacityMapped = true;
    }

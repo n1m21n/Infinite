@@ -601,7 +601,7 @@ namespace Field
            "   const float4 c = fld_img(fm, fi, flod, slot, uv);\n"
            "   return float4(select(pow((c.rgb + 0.055) / 1.055, float3(2.4)), c.rgb / 12.92, c.rgb < float3(0.04045)), c.a);\n}\n";
       s += "\nstruct FldMat { float3 base; float roughness; float metallic; float3 normal; float height; float3 emission; "
-           "float opacity; float mask; };\n";
+           "float opacity; float mask; float4 prm0; float4 prm1; float4 prm2; float4 prm3; };\n";
       return s;
    }
 
@@ -642,7 +642,11 @@ namespace Field
       {
          const auto& p = program.declaredParams[i];
          const float v = i < paramValues.size() ? paramValues[i] : (float)p.defaultValue;
-         ctx.Line("   float fld_p_" + p.name + " = " + FormatFloat(v) + ";");
+         // Row 3.4: live knobs come from the host's record (o.prm*), the rest are baked (GlslBackend.cpp, same rule).
+         if (i < (size_t)kMaterialLiveParams)
+            ctx.Line("   float fld_p_" + p.name + " = o.prm" + std::to_string(i / 4) + "." + "xyzw"[i % 4] + ";");
+         else
+            ctx.Line("   float fld_p_" + p.name + " = " + FormatFloat(v) + ";");
          ctx.paramNames.insert(p.name);
       }
       for (const auto& s : program.prologue) EmitStmt(s, ctx);

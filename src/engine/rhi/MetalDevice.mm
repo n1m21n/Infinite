@@ -262,6 +262,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       FldMat fo;
       fo.base = base; fo.roughness = hitRough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
       fo.emission = hitEm; fo.opacity = 1.0; fo.mask = 1.0;
+      fo.prm0 = float4(I.mat.p0, I.mat.p1, I.mat.p2, I.mat.p3); fo.prm1 = float4(I.mat.p4, I.mat.p5, I.mat.p6, I.mat.p7); fo.prm2 = float4(I.mat.p8, I.mat.p9, I.mat.p10, I.mat.p11); fo.prm3 = float4(I.mat.p12, I.mat.p13, I.mat.p14, I.mat.p15);
       fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, float4(0.0), maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
       base = max(fo.base, float3(0.0)); metal = clamp(fo.metallic, 0.0, 1.0); hitRough = clamp(fo.roughness, 0.045, 1.0); hitEm = fo.emission;
    }
@@ -634,6 +635,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float3 em0 = float3(m.mat.emission) * emMap;
       o.base = base; o.roughness = roughIn; o.metallic = metalIn; o.normal = float3(0.0, 0.0, 1.0); o.height = 0.0;
       o.emission = em0; o.opacity = alpha; o.mask = 1.0;
+      o.prm0 = float4(m.mat.p0, m.mat.p1, m.mat.p2, m.mat.p3); o.prm1 = float4(m.mat.p4, m.mat.p5, m.mat.p6, m.mat.p7); o.prm2 = float4(m.mat.p8, m.mat.p9, m.mat.p10, m.mat.p11); o.prm3 = float4(m.mat.p12, m.mat.p13, m.mat.p14, m.mat.p15);
       fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), float4(dot(in.n, f.eye.xyz - in.wp) < 0.0 ? 1.0 : 0.0, 0.0, 0.0, 0.0), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
       fldDh = float2(dfdx(o.height), dfdy(o.height));
       base = o.base; roughIn = o.roughness; metalIn = o.metallic; fldEmD = o.emission - em0; alpha = o.opacity;
@@ -1483,6 +1485,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             FldMat fo;
             fo.base = base; fo.roughness = rough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
             fo.emission = float3(I.mat.emission) * emMap; fo.opacity = alpha; fo.mask = 1.0;
+            fo.prm0 = float4(I.mat.p0, I.mat.p1, I.mat.p2, I.mat.p3); fo.prm1 = float4(I.mat.p4, I.mat.p5, I.mat.p6, I.mat.p7); fo.prm2 = float4(I.mat.p8, I.mat.p9, I.mat.p10, I.mat.p11); fo.prm3 = float4(I.mat.p12, I.mat.p13, I.mat.p14, I.mat.p15);
             const float4 fldG = float4(backHit ? 1.0 : 0.0, 0.0, 0.0, 0.0);
             const float4 fldI = float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3);
             fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, fldG, maps, fldI, lod);
@@ -2092,7 +2095,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    // The material record (Render3DMaterial.h) as the shader's InstU / RInst carry it.
    struct InstU { float model[16], normalM[16]; R3dMatH mat; };
    struct RInstH { uint64_t vb, ib, uvb, pad0; float normalM[16]; R3dMatH mat; };
-   static_assert(sizeof(InstU) == 416 && sizeof(RInstH) == 384, "InstU / RInst layout as the shader's");
+   static_assert(sizeof(InstU) == 480 && sizeof(RInstH) == 448, "InstU / RInst layout as the shader's");
    void Lin3x(const float* c, float* o) { for (int i = 0; i < 3; i++) o[i] = ToLin(c[i]); }
    // The surface the GI and reflection rays see: base, metal, roughness, ior, emission (no maps, sheen or hair).
    void FillMatRays(const engine::Instance& in, R3dMatH& m)
@@ -2102,6 +2105,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       m.program = (float)(in.fieldSeeThrough ? -in.fieldProgram : in.fieldProgram); // the rays run it too (row 1.4)
       m.fimg0 = (float)(in.fieldImage[0] + 1); m.fimg1 = (float)(in.fieldImage[1] + 1);
       m.fimg2 = (float)(in.fieldImage[2] + 1); m.fimg3 = (float)(in.fieldImage[3] + 1);
+      std::memcpy(&m.p0, in.fieldParams, sizeof(in.fieldParams)); // row 3.4: knobs live, no relink
    }
    // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
    void FillMat(const engine::Instance& in, R3dMatH& m)

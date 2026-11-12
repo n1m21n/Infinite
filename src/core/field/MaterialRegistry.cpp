@@ -36,7 +36,9 @@ namespace Field
    {
       err.clear();
       unsigned long long h = Fnv(source.data(), source.size());
-      if (!paramValues.empty()) h = Fnv(paramValues.data(), paramValues.size() * sizeof(float), h);
+      // Live knobs (the first kMaterialLiveParams) are data, so only the baked ones are part of the program.
+      if (paramValues.size() > (size_t)kMaterialLiveParams)
+         h = Fnv(paramValues.data() + kMaterialLiveParams, (paramValues.size() - kMaterialLiveParams) * sizeof(float), h);
       {
          std::lock_guard<std::mutex> lk(gMu);
          for (const MaterialProgramEntry& e : gEntries)

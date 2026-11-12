@@ -65,6 +65,7 @@ namespace engine
       int fieldProgram = 0;
       bool fieldSeeThrough = false;
       int fieldImage[4] = { -1, -1, -1, -1 }; // row 2.4: what img(slot, uv) reads, indices into Frame::textures
+      float fieldParams[16] = {};               // row 3.4: the program's live knobs (FldMat.prm0..3)
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the

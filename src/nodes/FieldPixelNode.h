@@ -205,6 +205,9 @@ public:
    // The registered program for the current code and param values, 0 when not in Material domain or on error
    // (a backend that could not compile it included: the material then draws its knobs).
    int MaterialProgramId() const;
+   // Row 3.4: the program's live knob values (the first Field::kMaterialLiveParams params, declaration order, the rest
+   // 0), read from the param table now, so a modulated knob reaches the shader as data the same frame.
+   void MaterialParams(float out[16]) const;
 
 private:
    void RefreshMaterialProgram();

@@ -715,7 +715,7 @@ namespace
       "      if (dot(N, -rayDir) <= 1e-4)\n"
       "         N = Ng;\n"
       "\n"
-      "      int mb = hit.matId * 20;\n"
+      "      int mb = hit.matId * 24;\n"
       "      vec4 mt0 = texelFetch(uMaterials, mb + 0);\n"
       "      vec4 mt1 = texelFetch(uMaterials, mb + 1);\n"
       "      vec4 mt2 = texelFetch(uMaterials, mb + 2);\n"
@@ -839,6 +839,8 @@ namespace
       "         FldMat o;\n"
       "         o.base = s.base; o.roughness = s.rough; o.metallic = s.metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
       "         o.emission = emission; o.opacity = alpha; o.mask = 1.0;\n"
+      "         o.prm0 = texelFetch(uMaterials, mb + 20); o.prm1 = texelFetch(uMaterials, mb + 21);\n"
+      "         o.prm2 = texelFetch(uMaterials, mb + 22); o.prm3 = texelFetch(uMaterials, mb + 23);\n"
       "         fldMatDispatch(int(fldId + 0.5), o, fP, N, fUV, uFldTime, hitPos, -rayDir, vec4(0.0));\n"
       "         s.base = max(o.base, vec3(0.0));\n"
       "         s.rough = clamp(o.roughness, 0.045, 1.0);\n"
@@ -1134,6 +1136,7 @@ Render3DPathTrace::PtMaterial Render3DPathTrace::PtMaterial::FromMaterial(const 
    m.roughness = std::clamp(mat.roughness, 0.045f, 1.0f);
    m.ior = std::max(1.0001f, mat.ior);
    m.fieldProgram = mat.fieldProgram;
+   std::memcpy(m.fieldParams, mat.fieldParams, sizeof(m.fieldParams));
    m.specular = std::max(0.0f, mat.specular);
    m.transmission = std::clamp(mat.transmission, 0.0f, 1.0f);
    m.transmissionRoughness = std::clamp(mat.transmissionRoughness, 0.0f, 1.0f);
@@ -1565,7 +1568,7 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
       mats.push_back(PtMaterial());
    std::vector<float> rects;
    BuildAtlas(mats, rects);
-   constexpr size_t kMatFloats = 20 * 4;
+   constexpr size_t kMatFloats = 24 * 4;   // texels 20..23: the field program's live knobs (row 3.4)
    std::vector<float> matTexels(mats.size() * kMatFloats, 0.0f);
    for (size_t i = 0; i < mats.size(); i++)
    {
@@ -1587,6 +1590,7 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
       float* dst = &matTexels[i * kMatFloats];
       std::memcpy(dst, t, sizeof(t));
       std::memcpy(dst + 44, &rects[i * PtMaterial::kMapSlots * 4], PtMaterial::kMapSlots * 4 * sizeof(float));
+      std::memcpy(dst + 80, m.fieldParams, sizeof(m.fieldParams));
    }
 
    UploadBufferTex(mTlasNodesBuf, tlas.nodeTexels, "PtTlasNodes");

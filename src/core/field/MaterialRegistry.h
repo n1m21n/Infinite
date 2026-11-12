@@ -1,7 +1,8 @@
 #pragma once
 
 // Material programs (OPUS_PLAN rows 1.2 to 1.5): a Field Pixel kernel in the Material domain, compiled once per
-// (source, param values) into one GLSL and one MSL function. The id is process-wide and stable for the run, and it is
+// source (row 3.4: knob values are live data, FldMat.prm0..3, except knobs past kMaterialLiveParams, which are baked)
+// into one GLSL and one MSL function. The id is process-wide and stable for the run, and it is
 // the number the shaders switch on (MatRec.program on Metal, uFldProgram on GL), so no remapping happens per frame.
 //
 // A host shader gets one library string per language for the set of ids it draws (BuildMaterialLibrary): it defines
@@ -27,7 +28,7 @@ namespace Field
    };
 
    // Lex, parse, lower (Material kind) and emit both languages. Returns the id (> 0), or 0 with err set (line-numbered
-   // for a source error). The same source and param values give the same id.
+   // for a source error). The same source gives the same id whatever its first 16 param values.
    int RegisterMaterialProgram(const std::string& source, const std::vector<float>& paramValues, std::string& err);
    const MaterialProgramEntry* FindMaterialProgram(int id);
    // True when the program writes opacity or mask: the surface can be cut or see-through.

@@ -3,6 +3,7 @@
 #include "field/FieldLex.h"
 #include "field/FieldParse.h"
 #include "Transport.h"
+#include <algorithm>
 #include "gl3.h"
 #include <cmath>
 
@@ -1066,13 +1067,25 @@ const std::vector<std::string>& FieldPixelNode::DomainNames()
    return kNames;
 }
 
-// Params are baked into the program as constants, so a new value set is a new program id (and one shader rebuild in
-// each renderer that draws it). Same values, same id: the registry dedupes on source + values.
+// Row 3.4: the first 16 params are live (MaterialParams, carried per material to the shader), so moving them keeps
+// the id and the shaders; params past 16 are baked, and a new value there is a new id.
 std::string FieldPixelNode::LastError() const
 {
    if (!mLastError.empty() || domain != 1 || mMatId == 0)
       return mLastError;
    return Field::MaterialProgramError(mMatId);
+}
+
+void FieldPixelNode::MaterialParams(float out[16]) const
+{
+   for (int i = 0; i < 16; i++) out[i] = 0.0f;
+   const size_t n = std::min(mIR.declaredParams.size(), (size_t)Field::kMaterialLiveParams);
+   for (size_t i = 0; i < n; i++)
+   {
+      const auto& p = mIR.declaredParams[i];
+      const Field::ParamEntry* e = mParamTable.Find(p.name);
+      out[i] = e ? e->value : (float)p.defaultValue;
+   }
 }
 
 int FieldPixelNode::MaterialProgramId() const

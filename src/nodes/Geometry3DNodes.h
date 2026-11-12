@@ -109,6 +109,8 @@ struct Material
    // Row 2.4: the pictures that program reads with img(slot, uv) (GL textures, 0 none) and their revisions.
    unsigned int fieldImage[4] = { 0, 0, 0, 0 };
    unsigned int fieldImageRev[4] = { 0, 0, 0, 0 };
+   // Row 3.4: that program's live knob values (FldMat.prm0..3); a change here is data, the program stays.
+   float fieldParams[16] = {};
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own

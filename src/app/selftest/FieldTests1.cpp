@@ -646,10 +646,11 @@ int RunFieldTest()
       if (a <= 0) fail(("register: " + err).c_str());
       if (Field::RegisterMaterialProgram(src, {}, err) != a) fail("same source gave a new id");
       const int b = Field::RegisterMaterialProgram(src, { 0.75f }, err);
-      if (b <= 0 || b == a) fail("new param value did not give a new id");
+      // Row 3.4: the first 16 knobs are live (o.prmN), so a new value is the same program, no relink.
+      if (b != a) fail("new knob value gave a new program id");
       const Field::MaterialProgramEntry* eb = Field::FindMaterialProgram(b);
-      if (!eb || eb->glsl.find("0.75") == std::string::npos || eb->msl.find("0.75") == std::string::npos)
-         fail("param value not baked into both languages");
+      if (!eb || eb->glsl.find("o.prm0.x") == std::string::npos || eb->msl.find("o.prm0.x") == std::string::npos)
+         fail("knob not read live in both languages");
       if (Field::RegisterMaterialProgram("base = vec3(1.0)\nrougness = 0.5", {}, err) != 0 || err.find("line 2") == std::string::npos)
          fail("bad source not refused with a line number");
       if (Field::MaterialProgramSeeThrough(a)) fail("opaque program reads as see-through");

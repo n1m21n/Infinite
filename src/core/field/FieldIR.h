@@ -306,6 +306,9 @@ namespace Field
    extern const MaterialChannel kMaterialOutputs[];
    extern const int kMaterialOutputCount;
    int MaterialOutputBit(const std::string& name); // -1 when name is not an output
+   // Row 3.4: a material program's first 16 knobs are live: read from FldMat.prm0..prm3, which every host fills from
+   // the material's record each draw, so a knob move is data, not a recompile. Knobs past 16 are baked.
+   constexpr int kMaterialLiveParams = 16;
 
    struct PixelIRProgram
    {

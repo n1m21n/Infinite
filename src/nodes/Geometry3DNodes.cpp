@@ -438,6 +438,7 @@ namespace
       "#define FLD_MAT_ANY 0\n"
       "#endif\n"
       "uniform float uFldProgram;\n" // the draw's program id, 0 = none
+      "uniform vec4 uFldPrm[4];\n"   // row 3.4: its live knobs
       "uniform float uFldTime;\n"
       "in vec3 vWorldPos;\n"
       "in vec3 vLocalPos;\n"
@@ -1093,6 +1094,7 @@ namespace
       "      FldMat o;\n"
       "      o.base = base; o.roughness = rough; o.metallic = metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
       "      o.emission = emiss; o.opacity = alpha; o.mask = 1.0;\n"
+      "      o.prm0 = uFldPrm[0]; o.prm1 = uFldPrm[1]; o.prm2 = uFldPrm[2]; o.prm3 = uFldPrm[3];\n"
       "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime, vWorldPos, normalize(uCamPos - vWorldPos), vec4(gl_FrontFacing ? 0.0 : 1.0, 0.0, 0.0, 0.0));\n"
       "      vec3 dp1 = dFdx(vWorldPos), dp2 = dFdy(vWorldPos);\n"
       "      vec2 duv1 = dFdx(vUv), duv2 = dFdy(vUv);\n"
@@ -3362,6 +3364,7 @@ void Render3DNode::CookOnce(int frameId)
       }
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uFldProgram"), (float)material.fieldProgram);
+      glUniform4fv(glGetUniformLocation(mProgram, "uFldPrm"), 4, material.fieldParams);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
       glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
       glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);
@@ -3786,6 +3789,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uFldProgram"), (float)material.fieldProgram);
+      glUniform4fv(glGetUniformLocation(mProgram, "uFldPrm"), 4, material.fieldParams);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
       glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
       glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);

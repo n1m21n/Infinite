@@ -241,6 +241,7 @@ bool Render3DNode::CookEngine(int frameId)
       for (int k = 0; k < 4; k++)
          in.fieldImage[k] = MapIndex(E, fr, mat.fieldImage[k], mat.fieldImageRev[k]);
       in.fieldSeeThrough = mat.fieldProgram != 0 && Field::MaterialProgramSeeThrough(mat.fieldProgram);
+      std::memcpy(in.fieldParams, mat.fieldParams, sizeof(in.fieldParams));
       in.detailScale = mat.detailScale;
       in.detailStrength = mat.detailStrength;
       in.subsurface = std::clamp(mat.subsurface, 0.0f, 1.0f);
@@ -526,7 +527,7 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
       mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);
       { const int cs = in.castShadow ? 1 : 0; mix(&cs, 4); }
-      mix(&in.fieldProgram, 4);
+      mix(&in.fieldProgram, 4); mix(in.fieldParams, 64);
    }
    if (fieldUsesTime) mix(&fr.fieldTime, 4); // a program that reads t never settles
    for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);

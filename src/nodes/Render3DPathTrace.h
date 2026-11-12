@@ -54,6 +54,7 @@ public:
       float normalStrength = 1.0f;
       int normalBump = 0;             // 1: the normal map is a grayscale height
       int fieldProgram = 0;           // Field material program (MaterialRegistry id) run after the maps, 0 none
+      float fieldParams[16] = {};     // its live knobs (row 3.4), texels 20..23 of the material record
 
       static PtMaterial FromLinear(float r, float g, float b, float rough = 0.5f, float metal = 0.0f,
                                    float emR = 0.0f, float emG = 0.0f, float emB = 0.0f);

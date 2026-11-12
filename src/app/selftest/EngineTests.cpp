@@ -1505,6 +1505,50 @@ bool RunEngineTest()
       check(okf && okb && changed > (size_t)W * H / 400, "2.6 L: the bump changes the sphere's shading", (double)changed, (double)((size_t)W * H / 400));
    }
 
+   // ---- 3.4: a material-program knob is live data. 100 moves of k keep one program id and one library key (no
+   // pipeline rebuild), the Material carries the value, and the picture on L follows it.
+   {
+      FieldPixelNode kfp;
+      kfp.code = "param float k = 0.5 [0.0, 1.0];\nbase = vec3(k)\nroughness = 0.6";
+      kfp.domain = 1;
+      const bool kap = kfp.Apply();
+      MaterialNode kmat;
+      kmat.input = &sphereG;
+      kmat.FieldInput().Connect(&kfp);
+      const int kid = kmat.GetMaterial().fieldProgram;
+      unsigned long long key0 = 0;
+      Field::BuildMaterialLibrary({ kid }, Field::MaterialLang::Msl, key0);
+      int rebuilds = 0, follow = 0;
+      for (int i = 0; i < 100; i++)
+      {
+         const float v = (float)i / 99.0f;
+         if (Field::ParamEntry* e = kfp.GetParamTable().Find("k")) e->value = v;
+         kfp.CookIfNeeded(910000 + i);
+         const Material& km = kmat.GetMaterial();
+         unsigned long long key = 0;
+         Field::BuildMaterialLibrary({ km.fieldProgram }, Field::MaterialLang::Msl, key);
+         if (km.fieldProgram != kid || key != key0) rebuilds++;
+         if (std::fabs(km.fieldParams[0] - v) < 1e-6f) follow++;
+      }
+      check(kap && kid > 0 && rebuilds == 0 && follow == 100, "3.4: 100 knob moves, 0 program rebuilds, value carried 100 / 100",
+            (double)rebuilds, (double)follow);
+      std::vector<float> plo, phi;
+      engine::Frame fl = frame, fh = frame;
+      for (engine::Frame* fr : { &fl, &fh })
+      {
+         fr->instances[2].fieldProgram = kid;
+         fr->fieldMsl = Field::BuildMaterialLibrary({ kid }, Field::MaterialLang::Msl, fr->fieldMslKey);
+      }
+      fl.instances[2].fieldParams[0] = 0.2f; fh.instances[2].fieldParams[0] = 0.8f;
+      const bool okl = kid > 0 && raster->Render(*img, fl, nullptr) && raster->Render(*img, fl, nullptr) && ReadRect(img->GlTexture(), W, H, plo);
+      const bool okh = kid > 0 && raster->Render(*img, fh, nullptr) && raster->Render(*img, fh, nullptr) && ReadRect(img->GlTexture(), W, H, phi);
+      size_t brighter = 0;
+      for (size_t i = 0; okl && okh && i + 3 < plo.size() && i + 3 < phi.size(); i += 4)
+         if (phi[i] - plo[i] > 0.05f) brighter++;
+      check(okl && okh && fl.fieldMslKey == fh.fieldMslKey && brighter > (size_t)W * H / 100,
+            "3.4 L: k 0.2 -> 0.8 brightens the sphere with the same library", (double)brighter, (double)((size_t)W * H / 100));
+   }
+
    // dump for eyes
    if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
    {

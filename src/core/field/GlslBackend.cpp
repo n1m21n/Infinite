@@ -812,7 +812,7 @@ namespace Field
            "   vec4 c = fldImg(slot, uv);\n"
            "   return vec4(mix(pow((c.rgb + 0.055) / 1.055, vec3(2.4)), c.rgb / 12.92, vec3(lessThan(c.rgb, vec3(0.04045)))), c.a);\n}\n";
       s += "\nstruct FldMat { vec3 base; float roughness; float metallic; vec3 normal; float height; vec3 emission; "
-           "float opacity; float mask; };\n";
+           "float opacity; float mask; vec4 prm0; vec4 prm1; vec4 prm2; vec4 prm3; };\n";
       return s;
    }
 
@@ -844,7 +844,12 @@ namespace Field
       {
          const auto& p = program.declaredParams[i];
          const float v = i < paramValues.size() ? paramValues[i] : (float)p.defaultValue;
-         ctx.EmitLine("   float fld_p_" + p.name + " = " + FormatFloat(v) + ";");
+         // Row 3.4: the first kMaterialLiveParams knobs are read from the record the host fills per material, so a
+         // knob move changes data, not the program; the rest are baked.
+         if (i < (size_t)kMaterialLiveParams)
+            ctx.EmitLine("   float fld_p_" + p.name + " = o.prm" + std::to_string(i / 4) + "." + "xyzw"[i % 4] + ";");
+         else
+            ctx.EmitLine("   float fld_p_" + p.name + " = " + FormatFloat(v) + ";");
          ctx.paramNames.insert(p.name);
       }
       // Frame-rate statements stay in the function: a host shader has no CPU prologue to hoist them into.
