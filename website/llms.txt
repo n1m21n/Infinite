@@ -289,6 +289,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Neurofunk Cybernetic Growl Lead Synth](https://infinitedevices.org/library/neurofunk-cybernetic-growl-lead-synth.html): Aggressive cybernetic growl synthesizer engineered for techstep and neurofunk leads with formant-shifted resonant filtering, wavefolded harmonic drive, and snappy envelope modulation. (file: https://infinitedevices.org/assets/templates/neurofunk-cybernetic-growl-lead-synth.inf)
 - [French Filter House Pumping Disco Sweep FX](https://infinitedevices.org/library/french-filter-house-pumping-disco-sweep-fx.html): Classic French touch resonant disco lowpass sweep filter featuring rhythmic envelope ducking, warm transistor drive, and sweeping resonant cutoff modulation. (file: https://infinitedevices.org/assets/templates/french-filter-house-pumping-disco-sweep-fx.inf)
 - [French Filter House Creamy Phaser Drive FX](https://infinitedevices.org/library/french-filter-house-creamy-phaser-drive-fx.html): Silky multi-stage vintage analog phaser and warm console saturation effect designed for French house rhodes stabs, guitars, and filtered disco master buses. (file: https://infinitedevices.org/assets/templates/french-filter-house-creamy-phaser-drive-fx.inf)
+- [IDM Crystalline Granular Bell Synth](https://infinitedevices.org/library/idm-crystalline-granular-bell-synth.html): Micro-tuned crystalline FM bell synthesizer featuring non-harmonic golden-ratio modulator ratios, shimmering high-frequency dispersion, and exponential decay envelopes. (file: https://infinitedevices.org/assets/templates/idm-crystalline-granular-bell-synth.inf)
+- [IDM Algorithmic Drift Reese Synth](https://infinitedevices.org/library/idm-algorithmic-drift-reese-synth.html): Complex drifting IDM bass synthesizer featuring phase-jittered dual detuned saw/pulse oscillators, tape-flutter pitch modulation, and soft asymmetric saturation. (file: https://infinitedevices.org/assets/templates/idm-algorithmic-drift-reese-synth.inf)
+- [Breakbeat Transient Saturation Drive FX](https://infinitedevices.org/library/breakbeat-transient-saturation-drive-fx.html): Dynamic breakbeat drum bus saturator featuring punchy transient envelope detection, analog diode clipping, and low-end warmth emphasis. (file: https://infinitedevices.org/assets/templates/breakbeat-transient-saturation-drive-fx.inf)
+- [Breakbeat Syncopated Tape Echo FX](https://infinitedevices.org/library/breakbeat-syncopated-tape-echo-fx.html): Tempo-synced syncopated ping-pong tape echo featuring dotted-eighth delay taps, tape flutter modulation, and high-frequency saturation in the feedback loop. (file: https://infinitedevices.org/assets/templates/breakbeat-syncopated-tape-echo-fx.inf)
 
 ## Library: Community
 
@@ -649,7 +653,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 111 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 113 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -666,4 +670,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 96 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 98 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

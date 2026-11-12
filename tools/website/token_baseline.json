@@ -552,6 +552,14 @@
   "embeds/cymatics-sine-harmonic-modal-interference.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/analog-crt-aperture-grille-phosphor-bloom.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/analog-crt-electron-beam-raster-deflection.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

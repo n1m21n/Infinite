@@ -2697,6 +2697,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "idm-crystalline-granular-bell-synth",
+      "name": "IDM Crystalline Granular Bell Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Micro-tuned crystalline FM bell synthesizer featuring non-harmonic golden-ratio modulator ratios, shimmering high-frequency dispersion, and exponential decay envelopes.",
+      "price": 0,
+      "preview": "assets/templates/idm-crystalline-granular-bell-synth.webp",
+      "file": "assets/templates/idm-crystalline-granular-bell-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "idm-algorithmic-drift-reese-synth",
+      "name": "IDM Algorithmic Drift Reese Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Complex drifting IDM bass synthesizer featuring phase-jittered dual detuned saw/pulse oscillators, tape-flutter pitch modulation, and soft asymmetric saturation.",
+      "price": 0,
+      "preview": "assets/templates/idm-algorithmic-drift-reese-synth.webp",
+      "file": "assets/templates/idm-algorithmic-drift-reese-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "breakbeat-transient-saturation-drive-fx",
+      "name": "Breakbeat Transient Saturation Drive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dynamic breakbeat drum bus saturator featuring punchy transient envelope detection, analog diode clipping, and low-end warmth emphasis.",
+      "price": 0,
+      "preview": "assets/templates/breakbeat-transient-saturation-drive-fx.webp",
+      "file": "assets/templates/breakbeat-transient-saturation-drive-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "breakbeat-syncopated-tape-echo-fx",
+      "name": "Breakbeat Syncopated Tape Echo FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Tempo-synced syncopated ping-pong tape echo featuring dotted-eighth delay taps, tape flutter modulation, and high-frequency saturation in the feedback loop.",
+      "price": 0,
+      "preview": "assets/templates/breakbeat-syncopated-tape-echo-fx.webp",
+      "file": "assets/templates/breakbeat-syncopated-tape-echo-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Breakbeat Transient Saturation Drive FX",
+    "author": "Infinite",
+    "description": "Dynamic breakbeat drum bus saturator featuring punchy transient envelope detection, analog diode clipping, and low-end warmth emphasis.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float drive = 2.4 [1.0, 6.0];\nparam float punch = 0.65 [0.0, 1.0];\nparam float warmth = 0.55 [0.0, 1.0];\nparam float mix = 0.75 [0.0, 1.0];\nstate float env = 0;\nstate float lp = 0;\n\nsigIn = in;\ninAbs = abs(sigIn);\nenv = if(inAbs > env, env + (inAbs - env) * 0.25, env - env * 0.005);\n\ngain = 1.0 + env * punch * 2.0;\nboosted = sigIn * gain * drive;\n\nsat = boosted / (1.0 + abs(boosted) * 0.35);\n\nfWarm = clamp(1800.0 / sr * 3.14, 0.01, 0.45);\nlp = lp + fWarm * (sat - lp);\nshaped = sat * (1.0 - warmth * 0.4) + lp * (warmth * 0.4);\n\nprocessed = sigIn * (1.0 - mix) + shaped * mix * 0.85;\nout = processed * 0.88;\n",
+    "params": {
+      "drive": 2.4,
+      "punch": 0.65,
+      "warmth": 0.55,
+      "mix": 0.75
+    }
+  }
+}

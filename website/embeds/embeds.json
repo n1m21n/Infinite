@@ -555,6 +555,16 @@
       "slug": "cymatics-sine-harmonic-modal-interference",
       "title": "Cymatics Sine Harmonic Modal Interference",
       "description": "Audio-reactive circular modal cymatics visualizer. Bass drives radial Bessel diaphragm oscillation, mids modulate harmonic interference sectors, and highs disperse resonant nodal ripples."
+    },
+    {
+      "slug": "analog-crt-aperture-grille-phosphor-bloom",
+      "title": "Analog CRT Aperture Grille Phosphor Bloom",
+      "description": "Audio-reactive Trinitron CRT visualizer. Bass modulates magnetic deflection and spherical tube barrel distortion, mids ignite RGB phosphor triad bloom, and highs vibrate raster scanline luminescence."
+    },
+    {
+      "slug": "analog-crt-electron-beam-raster-deflection",
+      "title": "Analog CRT Electron Beam Raster Deflection",
+      "description": "Audio-reactive CRT electron beam oscilloscope. Bass drives magnetic deflection coil amplitude, mids shape Lissajous beam trajectories, and highs energize phosphor trace bloom."
     }
   ]
 }

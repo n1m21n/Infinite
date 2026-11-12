@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "IDM Crystalline Granular Bell Synth",
+    "author": "Infinite",
+    "description": "Micro-tuned crystalline FM bell synthesizer featuring non-harmonic golden-ratio modulator ratios, shimmering high-frequency dispersion, and exponential decay envelopes.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fmRatio = 2.618 [1.0, 6.0];\nparam float fmDepth = 1.6 [0.0, 4.0];\nparam float brightness = 2800.0 [400.0, 8000.0];\nparam float shimmer = 0.40 [0.0, 1.0];\nparam float decay = 0.45 [0.1, 1.2];\nstate float pCarrier = 0;\nstate float pMod = 0;\nstate float pShimmer = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.05);\nenv = if(target > env, env + (target - env) * 0.15, env - env * decayRate);\n\nfCarrier = clamp(freq, 20.0, 4000.0);\nfMod = fCarrier * fmRatio;\nfShimmer = fCarrier * 4.0;\n\nstepCarrier = fCarrier / sr;\nstepMod = fMod / sr;\nstepShimmer = fShimmer / sr;\n\npCarrier = (pCarrier + stepCarrier) % 1.0;\npMod = (pMod + stepMod) % 1.0;\npShimmer = (pShimmer + stepShimmer) % 1.0;\n\nmodSig = sin(6.2831853 * pMod) * fmDepth * env;\ncarrierSig = sin(6.2831853 * (pCarrier + modSig));\nshimSig = sin(6.2831853 * pShimmer) * shimmer * env;\n\nraw = carrierSig * 0.75 + shimSig * 0.25;\n\nfCut = clamp(brightness / sr * 3.14, 0.01, 0.45);\nlp = lp + fCut * (raw - lp);\n\nout = lp * env * 0.32;\n",
+    "params": {
+      "fmRatio": 2.618,
+      "fmDepth": 1.6,
+      "brightness": 2800.0,
+      "shimmer": 0.4,
+      "decay": 0.45
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

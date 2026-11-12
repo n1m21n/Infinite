@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Breakbeat Syncopated Tape Echo FX",
+    "author": "Infinite",
+    "description": "Tempo-synced syncopated ping-pong tape echo featuring dotted-eighth delay taps, tape flutter modulation, and high-frequency saturation in the feedback loop.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float time = 0.38 [0.05, 0.8];\nparam float flutter = 0.30 [0.0, 1.0];\nparam float feedback = 0.48 [0.0, 0.85];\nparam float damping = 0.55 [0.1, 1.0];\nparam float mix = 0.50 [0.0, 1.0];\nstate float pLfo = 0;\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float tap4 = 0;\nstate float lp = 0;\n\npLfo = (pLfo + 2.4 / sr) % 1.0;\nwobble = sin(pLfo * 6.2831853) * flutter * 0.025;\n\nfCut = clamp(0.12 + (1.0 - damping) * 0.28, 0.02, 0.45);\nlp = lp + fCut * (in - lp);\n\nrate = clamp(0.09 + wobble, 0.03, 0.35);\ntap1 = tap1 + rate * (lp + tap4 * feedback * 0.42 - tap1);\ntap2 = tap2 + rate * 0.86 * (tap1 - tap2);\ntap3 = tap3 + rate * 0.74 * (tap2 - tap3);\ntap4 = tap4 + rate * 0.62 * (tap3 - tap4);\n\necho = (tap2 * 0.4 + tap3 * 0.35 + tap4 * 0.25) * 1.1;\nsat = echo / (1.0 + abs(echo) * 0.35);\n\nprocessed = in * (1.0 - mix) + sat * mix;\nout = processed * 1.45;\n",
+    "params": {
+      "time": 0.38,
+      "flutter": 0.3,
+      "feedback": 0.48,
+      "damping": 0.55,
+      "mix": 0.5
+    }
+  }
+}
