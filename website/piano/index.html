@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=36336012">
-  <link rel="stylesheet" href="./piano.css?v=3">
+  <link rel="stylesheet" href="./piano.css?v=4">
   <script type="importmap">
     { "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.min.js",
@@ -36,7 +36,7 @@
     } }
   </script>
 </head>
-<body class="is-intro">
+<body>
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
   <!-- icons: Infinite Glyphs, 20 grid, 1.5 stroke (art/icons/src) -->
@@ -147,15 +147,6 @@
     </details>
   </section>
 
-  <div class="intro" id="intro">
-    <p class="folio">Infinite · Nocturne</p>
-    <h1>Nocturne</h1>
-    <p class="lead">An endless piano piece in a landscape you can walk through.</p>
-    <button type="button" class="btn-primary" id="btn-enter"><svg><use href="#i-play"/></svg><span>Play</span></button>
-    <button type="button" class="btn-quiet" id="btn-look">Look around</button>
-    <p class="load" id="load" role="status">Loading 0%</p>
-  </div>
-
   <p class="toast glass" id="toast" role="status" hidden></p>
 
   <dialog class="patch" id="patch">
@@ -170,6 +161,6 @@
 
   <script src="./ambient-engine.js?v=2"></script>
   <script src="./piano-engine.js?v=2"></script>
-  <script type="module" src="./app.js?v=3"></script>
+  <script type="module" src="./app.js?v=4"></script>
 </body>
 </html>

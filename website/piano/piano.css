@@ -203,21 +203,6 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bo
 .mix-grid { display: grid; gap: 0 var(--space-4); grid-template-columns: 1fr 1fr; }
 .mix-grid .row { grid-template-columns: 56px 1fr; }
 
-/* ---------- intro ---------- */
-
-.intro {
-  position: fixed; inset: 0; z-index: var(--z-modal);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4);
-  padding: var(--web-margin); text-align: center;
-  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--ground) 55%, transparent), color-mix(in srgb, var(--ground) 88%, transparent));
-  transition: opacity var(--dur-page) var(--ease-out), visibility 0s linear var(--dur-page);
-}
-body:not(.is-intro) .intro { opacity: 0; visibility: hidden; pointer-events: none; }
-.intro h1 { margin: 0; font: var(--type-display); letter-spacing: var(--track-display); }
-.intro .lead { margin: 0 0 var(--space-4); max-width: 22em; font: var(--type-lead); letter-spacing: var(--track-lead); color: var(--ink-2); }
-.load { margin: var(--space-3) 0 0; color: var(--ink-3); transition: opacity var(--dur-medium) var(--ease-out); }
-.load.is-done { opacity: 0; }
-
 .btn-primary, .btn-secondary, .btn-quiet {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
   border-radius: var(--radius-control); font-weight: 600;
@@ -230,8 +215,6 @@ body:not(.is-intro) .intro { opacity: 0; visibility: hidden; pointer-events: non
 .btn-secondary:hover { background: color-mix(in srgb, var(--ink) 20%, transparent); }
 .btn-quiet { height: var(--web-hit); padding: 0 var(--space-4); color: var(--ink-2); font-weight: 500; }
 .btn-quiet:hover { color: var(--ink); }
-
-.is-intro .top-actions, .is-intro .dock, .is-intro .ribbon, .is-intro .readout { opacity: 0; pointer-events: none; }
 
 /* ---------- toast ---------- */
 

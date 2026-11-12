@@ -42,14 +42,11 @@ let levels = { ...SCENES.midnight_grove };
 
 try {
   world = new NocturneWorld($('world'), {
-    onProgress: (p) => { $('load').textContent = `Loading ${Math.round(p * 100)}%`; },
-    onReady: () => { $('load').classList.add('is-done'); }
   });
   world.onInteract(() => { if (started) call(piano, 'triggerManualNote', 62 + [0, 3, 7, 10, 12][Math.floor(Math.random() * 5)], 0.5, 2.2); });
   window.nocturne = world;
 } catch (err) {
   console.warn('Nocturne: 3D view unavailable', err);
-  $('load').textContent = 'Sound only on this device';
 }
 
 /* ---------- toast ---------- */
@@ -104,16 +101,25 @@ function pause() {
 
 $('btn-play').addEventListener('click', () => (playing ? pause() : play()));
 
-/* ---------- intro ---------- */
+/* ---------- first touch ---------- */
 
-function enter(withSound) {
-  body.classList.remove('is-intro');
-  if (withSound) play();
+// Browsers only allow sound after a gesture, so the first click, tap or key
+// starts the music. Dragging to look around does not.
+(function () {
   const touch = window.matchMedia('(hover: none)').matches;
-  setTimeout(() => toast(touch ? 'Drag to look · tap to walk' : 'Drag to look · click to walk', 4200), 900);
-}
-$('btn-enter').addEventListener('click', () => enter(true));
-$('btn-look').addEventListener('click', () => enter(false));
+  setTimeout(() => toast(touch ? 'Drag to look · tap to walk' : 'Drag to look · click to walk', 4200), 1200);
+  let down = null;
+  window.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; }, true);
+  window.addEventListener('pointerup', (e) => {
+    if (playing || !down) return;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6;
+    down = null;
+    if (!moved && !e.target.closest('button, .pop, dialog, input, select, summary')) play();
+  }, true);
+  window.addEventListener('keydown', (e) => {
+    if (!playing && !e.metaKey && !e.ctrlKey && e.code !== 'Escape' && e.code !== 'Tab') play();
+  }, { once: true });
+})();
 
 /* ---------- key ribbon ---------- */
 
@@ -335,7 +341,6 @@ window.addEventListener('keydown', (e) => {
   const tag = e.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || e.metaKey || e.ctrlKey || patch.open) return;
   if (e.code === 'Escape') { closePops(); setZen(false); }
-  if (body.classList.contains('is-intro')) return;
   if (e.code === 'Space' && tag !== 'BUTTON') { e.preventDefault(); playing ? pause() : play(); }
   if (e.code === 'KeyH') setZen(!body.classList.contains('is-zen'));
 });
