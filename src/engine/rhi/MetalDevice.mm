@@ -154,11 +154,8 @@ float3 iridGain(float w, float ior, float thick, float nV, float3 f0)
 {
    return w > 0.0 ? thinFilmGain(nV, ior, thick, f0, w) : float3(1.0);
 }
-#ifdef R3D_AB_GGX
+// Height-correlated Smith G2 (row 5.7): Schlick's separable form lost the grazing sun on far flat ground.
 #define R3D_G2(nv, nl, r) ggxG2(nv, nl, r)
-#else
-#define R3D_G2(nv, nl, r) (geomSchlick(nv, r) * geomSchlick(nl, r))
-#endif
 float3 fresnel(float cosT, float3 f0) { return fresnelExact(cosT, f0); }
 float3 fresnelRough(float cosT, float3 f0, float rough) { const float3 ceil = max(float3(1.0 - rough), f0); return f0 + (ceil - f0) * pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0); }
 float lightFalloff(float dist, float k) { if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k); return min(1.0 / max(dist * dist * -k, 1e-4), 20.0); }
@@ -938,21 +935,6 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float g = R3D_G2(nDotV, nDotL, rough);
       const float3 fr = fresnel(max(dot(halfway, viewDir), 0.0), f0);
       float3 spec = (d * g * fr) / max(4.0 * nDotV * nDotL, 1e-7);
-      if ((type == 0 || type == 2) && L.spot.x > 0.0)
-      {
-         // A sun disc, not a point: the highlight takes the disc direction nearest the mirror ray, on a lobe widened
-         // by the disc and renormalised (representative point, Karis 2013), so a glitter path is as wide as Cycles'.
-         const float sr = tan(L.spot.x * 0.5 * 0.017453292);
-         const float3 R = reflect(-viewDir, n);
-         const float3 ctr = dot(lightDir, R) * R - lightDir;
-         const float3 sd = normalize(lightDir + ctr * clamp(sr / max(length(ctr), 1e-6), 0.0, 1.0));
-         const float a = rough * rough, a2 = clamp(a + 0.5 * sr, 0.0, 1.0);
-         const float nls = max(dot(n, sd), 0.0);
-         const float3 hs = normalize(sd + viewDir);
-         const float ds = distGGX(max(dot(n, hs), 0.0), sqrt(a2)) * (a / a2) * (a / a2);
-         const float gs = R3D_G2(nDotV, max(nls, 1e-4), rough);
-         spec = ds * gs * fresnel(max(dot(hs, viewDir), 0.0), f0) / max(4.0 * nDotV, 1e-7) * (nls / max(nDotL, 1e-4)); // * nDotL below
-      }
       spec *= ggxMs(f0, rough, nDotV) * iridK;
       const float3 kD = (float3(1.0) - fr) * (1.0 - metal);
       const float3 radiance = radiance0 * atten;

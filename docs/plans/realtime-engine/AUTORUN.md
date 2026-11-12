@@ -62,3 +62,4 @@ commit. No pasted logs, no file-by-file retelling: the commit holds that. When a
 | 8.2 mat_translucent |  0.088  | settle 0.028 , gap +0.060  |
 | 8.2 dof |  0.106  | settle 0.059 , gap +0.047  |
 | 8.2 cornell |  0.157  | settle 0.110 , gap +0.046  |
+| 5.7 | partly met. L: height-correlated G2 default, sun representative point removed: fabric_far_flat 0.205->0.036 (br 0.99), fabric_far 0.327->0.255 (br 0.76, gate 0.95 not met), sheen 0.172->0.039, subsurface 0.161->0.051; 59 cases, worst +0.004 (dof) vs f8; new live base g57n. R: ggx stays a switch (step 1 failed: deer/monkey/cornell +0.006..0.014). Toksvig, sun wrap, rep a+sr/3, ggxMs, sunVis probed: no gain | see git log |
