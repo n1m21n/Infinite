@@ -40,6 +40,7 @@ namespace app
          { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" }, { "daw-plugin", 9, nullptr }, { "daw-sync", 9, nullptr },
          { "field", 4, nullptr }, { "globals", 5, nullptr }, { "extensions", 6, nullptr }, { "plugins", 7, nullptr },
          { "agents", 8, nullptr }, { "terminal", 8, nullptr },
+         { "custom-agent", 8, "Custom agent (OpenAI-compatible)" }, { "connect-agent", 8, "Connect Infinite to an outside agent" },  // fork
       };
    }
 

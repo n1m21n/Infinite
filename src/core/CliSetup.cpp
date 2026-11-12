@@ -113,6 +113,9 @@ namespace CliSetup
            ".codex/skills",
            "ChatGPT asks you to sign in with ChatGPT or an API key the first time it starts. Infinite never sees or stores the login." },
          // Antigravity has no `mcp add` command: the helper edits its JSON config (mcp_json.js, written next to the setup script).
+         // fork: the built-in agent (chat/HttpAgent.h): no CLI, nothing to install; setup commands stay empty.
+         { "custom", "Custom", "", "", "", "", "", "", "", "", "",
+           "Runs on your own OpenAI-compatible endpoint (Ollama, DeepSeek, OpenRouter...). The API key is kept in the system keychain." },
          { "antigravity", "Gemini", "agy",
            "fetch https://antigravity.google/cli/install.sh | bash",
            "irm https://antigravity.google/cli/install.ps1 | iex",
@@ -825,6 +828,10 @@ if ($Failed -gt 0) { exit 1 }
       c.folderAccess = j.value("folderAccess", false);
       c.introduced = j.value("introduced", false);
       c.tried = j.value("tried", false);
+      c.customBaseUrl = j.value("customBaseUrl", std::string());
+      c.customPreset = j.value("customPreset", std::string());
+      if (const std::string k = j.value("customKeyEnv", std::string()); !k.empty())
+         c.customKeyEnv = k;
       for (const char* key : { "folders", "commands" })
          if (j.contains(key) && j[key].is_array())
             for (const auto& v : j[key])
@@ -857,6 +864,7 @@ if ($Failed -gt 0) { exit 1 }
          usage[id] = { { "turns", u.turns }, { "input", u.input }, { "cached", u.cached }, { "output", u.output }, { "cost", u.cost } };
       std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face },
                                                                 { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced }, { "tried", c.tried },
+                                                                { "customBaseUrl", c.customBaseUrl }, { "customKeyEnv", c.customKeyEnv }, { "customPreset", c.customPreset },
                                                                 { "models", c.models }, { "folders", c.folders }, { "commands", c.commands },
                                                                 { "usage", usage } }.dump(2) << "\n";
    }
@@ -1066,6 +1074,14 @@ if ($Failed -gt 0) { exit 1 }
       in.binDir = os == Os::kWindows ? std::string(local != nullptr ? local : "") + "/Infinite/bin" : in.home + "/.local/bin";
       in.agent = &agent;
       Readiness r;
+      if (std::string(agent.id) == "custom")  // fork: built in, nothing to install; ready when the form is filled
+      {
+         r.installed = r.connected = true;
+         const Config& c = Prefs();
+         const auto m = c.models.find("custom");
+         r.signedIn = c.customBaseUrl.rfind("http", 0) == 0 && m != c.models.end() && !m->second.empty();
+         return r;
+      }
       r.installed = AgentInstalled(os, agent, in.home, in.pathEnv);
       const HealthReport h = CheckHealth(in);
       r.connected = r.installed && h.step[0] == Health::kOk && h.step[2] == Health::kOk && h.step[4] == Health::kOk;
@@ -1082,6 +1098,8 @@ if ($Failed -gt 0) { exit 1 }
          r.signedIn = ReadAll(in.home + "/.claude.json").find("\"oauthAccount\"") != std::string::npos || env("ANTHROPIC_API_KEY");
       else if (id == "codex")
          r.signedIn = IsFile(in.home + "/.codex/auth.json") || env("OPENAI_API_KEY");
+      else if (id == "custom")  // fork: configured; the key variable itself is checked by the status run
+         r.signedIn = Prefs().customBaseUrl.size() > 0 && Prefs().models.count("custom") && !Prefs().models["custom"].empty();
       else if (id == "antigravity")
          r.signedIn = IsFile(in.home + "/.gemini/jetski-standalone-oauth-token") || env("GEMINI_API_KEY") || (os == Os::kMac && AntigravityInKeychain(in.home));
       return r;

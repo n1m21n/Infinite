@@ -23,6 +23,8 @@
 #include "audio/AudioEngine.h"
 #include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
+#include "core/chat/Providers.h"  // fork
+#include "core/chat/HttpAgent.h"  // fork
 #include "core/chat/Onboarding.h"
 #include "core/chat/ChatDiff.h"
 #include "core/chat/ChatFiles.h"
@@ -411,14 +413,10 @@ namespace app
 
       bool KindOf(const std::string& id, chat::AgentKind& kind)
       {
-         if (id == "claude")
-            kind = chat::AgentKind::Claude;
-         else if (id == "codex")
-            kind = chat::AgentKind::Codex;
-         else if (id == "antigravity")
-            kind = chat::AgentKind::Antigravity;
-         else
+         const chat::ProviderDef* p = chat::FindProvider(id);  // fork: the provider table
+         if (p == nullptr)
             return false;
+         kind = p->kind;
          return true;
       }
 
@@ -442,7 +440,7 @@ namespace app
       // shows who wrote it at a glance when several agents answer in one chat.
       ImU32 AgentTint(const std::string& id)
       {
-         static const std::map<std::string, const char*> kFamily = { { "claude", "AudioEffects" }, { "codex", "3D" }, { "antigravity", "Notes" } };
+         static const std::map<std::string, const char*> kFamily = { { "claude", "AudioEffects" }, { "codex", "3D" }, { "antigravity", "Notes" }, { "custom", "Effects" } };  // fork: custom
          const auto it = kFamily.find(id);
          return CategoryU32(it != kFamily.end() ? it->second : "Utility");
       }
@@ -603,6 +601,12 @@ namespace app
             s.ready = CliSetup::AgentReadiness(a);
             const bool probeChanged = s.ready.signedIn != s.probe;
             s.probe = s.ready.signedIn;
+            if (k == chat::AgentKind::Custom)  // fork: ready is just "the form is filled"; nothing to verify
+            {
+               s.auth = chat::Auth::Unknown;
+               s.verifyAt = now;
+               continue;
+            }
             if (s.auth != chat::Auth::Unknown)
                s.ready.signedIn = s.auth == chat::Auth::In;
             if (s.ready.signedIn && s.login == nullptr)
@@ -882,6 +886,12 @@ namespace app
          const AgentState& s = it->second;
          chat::AgentKind kind = chat::AgentKind::Claude;
          KindOf(id, kind);
+         if (kind == chat::AgentKind::Custom)  // fork: built in, no install and no sign-in
+         {
+            v.ready = s.ready.signedIn;
+            v.status = v.ready ? T("Ready") : T("Fill in the form below");
+            return v;
+         }
          const bool canSignOut = !chat::SignOutArgs(kind, OnMac()).empty();
          const bool stale = s.authBroken || (s.auth == chat::Auth::Out && s.probe && !s.signedOutHere) || (s.everIn && !s.ready.signedIn);
          if (s.setup != nullptr)
@@ -1253,7 +1263,7 @@ namespace app
          r.retried = retried;
          KindOf(agent, r.kind);
          chat::Session& s = sThread.sessions[agent];
-         if (s.id.empty() && r.kind == chat::AgentKind::Claude)
+         if (s.id.empty() && (r.kind == chat::AgentKind::Claude || r.kind == chat::AgentKind::Custom))
             s.id = NewId();
          chat::AgentRun::Options o;
          o.kind = r.kind;
@@ -1266,6 +1276,26 @@ namespace app
             to.folderAccess = prefs.folderAccess;
             to.folders = prefs.folders;
             to.commands = prefs.commands;
+            to.customBaseUrl = prefs.customBaseUrl;  // fork
+            to.customKeyEnv = prefs.customKeyEnv;
+         }
+         if (r.kind == chat::AgentKind::Custom)  // fork: the built-in agent runs in-process, no child
+         {
+            const std::string why = chat::CustomProblem(to.customBaseUrl, to.model, to.customKeyEnv);
+            if (!why.empty())
+            {
+               Push(Make(Entry::Kind::Error, why, agent));
+               return;
+            }
+            chat::HttpAgentConfig hc;
+            hc.baseUrl = to.customBaseUrl;
+            hc.model = to.model;
+            hc.keyEnv = to.customKeyEnv;
+            const std::string text = s.live ? prompt : chat::Briefing() + prompt;
+            const std::string sid = s.id;
+            const bool live = s.live;
+            o.work = [hc, text, sid, live](const std::function<void(const chat::AgentEvent&)>& emit, const std::function<bool()>& stopped)
+            { chat::RunHttpTurn(hc, sid, live, text, emit, stopped); };
          }
          o.argv = chat::AgentArgs(r.kind, s.live ? prompt : chat::Briefing() + prompt, s.id, s.live, dirs, to);
          TerminalCommandEnv(o.env, o.cwd);
@@ -4618,6 +4648,20 @@ namespace app
          std::vector<chat::Model>& list = sModels[agent];
          if (!KindOf(agent, kind))
             return list;
+         if (kind == chat::AgentKind::Custom)  // fork: the Model ID field, then the preset's hints
+         {
+            list.clear();
+            const auto& prefs = CliSetup::Prefs();
+            const auto m = prefs.models.find("custom");
+            if (m != prefs.models.end() && !m->second.empty())
+               list.push_back({ m->second, m->second, "" });
+            for (const chat::CustomPreset& p : chat::CustomPresets())
+               if (prefs.customPreset == p.id)
+                  for (const char* h : p.models)
+                     if (m == prefs.models.end() || m->second != h)
+                        list.push_back({ h, h, "" });
+            return list;
+         }
          if (list.empty())
             list = chat::FixedModels(kind);
          // One fetch at a time, only for an installed agent, and an empty answer (signed out, offline) waits a

@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "core/McpHttp.h"
 #include "plugin/engine/HostAudio.h"
 #include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
@@ -1703,6 +1704,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
          controlPort = atoi(portEnv);
       RemoteControl::Start(controlPort);
+      McpHttp::StartFromSettings();  // fork: the in-app MCP over HTTP, off unless Settings turned it on
 
       // The OSC control API (core/OscControl.h): loopback UDP, port 9100,
       // INFINITE_OSC_PORT to move it, 0 to turn it off.

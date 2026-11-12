@@ -43,4 +43,9 @@ namespace RemoteControl
    // Runs `handler` for every request received since the last call, in
    // receipt order, on the calling (main) thread. Must be called every frame.
    void DrainPending(const Handler& handler);
+
+   // fork: run one request from any thread (the in-app MCP over HTTP, core/McpHttp.cpp) through the same queue
+   // and handler as a socket client. Waits for the main thread up to `timeoutMs`. False, error set, on failure.
+   bool Call(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError,
+             int timeoutMs = 30000);
 }

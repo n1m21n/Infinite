@@ -12,6 +12,8 @@ namespace chat
    {
       switch (kind)
       {
+         case AgentKind::Custom:  // fork: no login; the key is entered in Settings
+            return { "/bin/sh", "-c", "echo 'Open Settings > Agents & Terminal > Custom agent and enter the Base URL and Model ID.'; exit 1" };
          case AgentKind::Codex:
             return { "codex", "login" };
          case AgentKind::Antigravity:
@@ -26,6 +28,8 @@ namespace chat
    {
       switch (kind)
       {
+         case AgentKind::Custom:  // fork: nothing to ask; the chat treats a filled form as ready
+            return { "/bin/sh", "-c", "echo 'logged in'" };
          case AgentKind::Codex:
             return { "codex", "login", "status" };
          case AgentKind::Antigravity:
@@ -45,6 +49,8 @@ namespace chat
    {
       switch (kind)
       {
+         case AgentKind::Custom:  // fork: nothing stored, nothing to sign out of
+            return {};
          case AgentKind::Codex:
             return { "codex", "logout" };
          case AgentKind::Antigravity:
@@ -259,7 +265,7 @@ namespace chat
             return Auth::Out;
          return exitOk ? Auth::Unknown : Auth::Out;
       }
-      if (kind == AgentKind::Codex)
+      if (kind == AgentKind::Codex || kind == AgentKind::Custom)
       {
          if (l.find("not logged in") != std::string::npos)
             return Auth::Out;
