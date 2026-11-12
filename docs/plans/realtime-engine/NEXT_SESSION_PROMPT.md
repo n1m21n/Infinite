@@ -18,7 +18,7 @@ Paste this as the first message:
 | # | Rule |
 |---|---|
 | 1 | As many rows per session as can be finished, one commit per row, in order (owner, 2026-11-12). Each row still meets its own done command before the next starts. |
-| 2 | No row is done without its done-command output in `AUTORUN.md`. Rows in the same area may share one build and one self-test (batch); per row sweep only its own cases plus the three smoke cases, full sweep at the end of each block. Small deviations: settle, log, go on. Sonnet agents for narrow no-build edits only. |
+| 2 | Lighter routine (owner, 2026-11-12: "relax the routines and sweeps and do the actual work"). Per row: build + self-test only if engine code changed; sweep only the cases the row touches (plus the 3 smoke cases only when shared shading code changed), one engine unless the row is engine-specific. No full sweep per block: one full sweep at the end of the plan. `AUTORUN.md` entry: one line, under 300 characters (result + deviations). Proof-only rows become a quick check inside the next feature row. A cached case costs about 3 s: the Blender truth is keyed on `TRUTH_VERSION` in `blender_scene.py`, bump it only when an old case's picture changes. |
 | 3 | One build at a time, `python3 scripts/ibuild.py build --mode release`; never during a sweep; nothing over 20 minutes. |
 | 4 | No Co-Authored-By or "Generated with" lines. Never push. Never merge to main. |
 | 5 | Papers, own derivations and Blender's source as a reference (owner, 2026-11-12). Cycles files under Apache 2.0: formulas may be ported, with a line in `THIRD_PARTY_NOTICES.md`. GPL Blender code: read for the idea only, never copied or translated. Blender renders the A/B truths and the gate decides. See OPUS_PLAN rule 12. |
@@ -35,8 +35,8 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | 0.4 dark far maps | closed with a known gap (owner): grazing glint moved to row 5.7 | 0496f599 |
 | 0.5 freeze + `f0` baseline | done: `f0` stored, R and T, 46 cases | see log |
 | 1.1 to 1.5 material programs | done (details in `AUTORUN_ARCHIVE.md`) | — |
-| 2.1 to 2.8 shading nodes | 2.1 to 2.6 done (`Shade Attribute` not built: no vertex colour on Mesh); 2.7 is a no-build row; **next: 2.8** (details in `AUTORUN.md`) | — |
-| 3.1 to 3.5 script nodes | open | — |
+| 2.1 to 2.8 shading nodes | done (`Shade Attribute` not built: no vertex colour on Mesh) | see log |
+| 3.1 to 3.5 script nodes | 3.1 done; **next: 3.2** | see log |
 | 4.1 to 4.5 layers, relief, wear | open | — |
 | 5.1 to 5.7 fibre, volumes, sky, lights, grazing glint | open | — |
 | 6.1 to 6.3 camera | open | — |

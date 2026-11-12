@@ -9,6 +9,10 @@
 # glb), an HDRI world, per-region object indices, and a mask_<k>.png per frame (1 spp, no filter,
 # no depth of field: the value in each pixel is the object index, 0 = sky).
 import bpy, sys, os, json, math, struct
+
+# The truth cache (harness.py) keys on this number, not on this file's text: bump it only when a change alters the
+# picture of a case that already exists. Adding a new feature for a new case needs no bump, so the old truths stay.
+TRUTH_VERSION = 1
 from mathutils import Vector, Matrix
 
 case = sys.argv[sys.argv.index("--") + 1]

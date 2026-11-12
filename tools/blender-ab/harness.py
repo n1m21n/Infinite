@@ -67,6 +67,82 @@ def asset_file(o):
     return env if env and os.path.exists(env) else os.path.join(ASSETS, o["asset"])
 
 
+def _truth_version():
+    # blender_scene.py's TRUTH_VERSION line: a cached truth stays valid across edits that leave old cases alone.
+    for line in open(os.path.join(HERE, "blender_scene.py")):
+        if line.startswith("TRUTH_VERSION"):
+            return "truth-v" + line.split("=", 1)[1].strip()
+    return open(os.path.join(HERE, "blender_scene.py")).read()
+
+
+BLENDER_TRUTH_VERSION = _truth_version()
+
+
+def field_texture_code(sh):
+    """Row 3.1: a shade_textures texture (checker, brick or gradient on Object coordinates through a Point mapping)
+    as hand-written Material-domain Field code: the maths the Shade nodes compose, with their float32 literals.
+    Locals avoid Field Pixel's built-in names (col, alpha, xy, uv, res, aspect)."""
+    import numpy as np
+    f32 = np.float32
+
+    def F(v):   # ShadeNodes.cpp F(): %.8f, trailing zeros trimmed, near zero snapped
+        v = float(f32(v))
+        if abs(v) < 1e-6 or not np.isfinite(v):
+            v = 0.0
+        t = "%.8f" % v
+        while len(t) > 2 and t[-1] == "0" and t[-2] != ".":
+            t = t[:-1]
+        return "0.0" if t == "-0.0" else t
+
+    def lin(c):   # the node decodes the sRGB value the harness writes with %g
+        out = []
+        for v in srgb(c):
+            v = f32(float("%g" % v))
+            out.append(v / f32(12.92) if v <= f32(0.04045) else f32(np.power((v + f32(0.055)) / f32(1.055), f32(2.4))))
+        return "vec3(%s, %s, %s)" % tuple(F(v) for v in out)
+
+    k = f32(3.14159265358979) / f32(180.0)
+    deg = [f32(v) for v in sh.get("rotate", (0, 0, 0))]
+    cx, sx = np.cos(deg[0] * k), np.sin(deg[0] * k)
+    cy, sy = np.cos(deg[1] * k), np.sin(deg[1] * k)
+    cz, sz = np.cos(deg[2] * k), np.sin(deg[2] * k)
+    r = [[cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx],
+         [sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx],
+         [-sy, cy * sx, cy * cx]]
+    sc = sh.get("scale", 1.0)
+    sc = sc if isinstance(sc, list) else [sc, sc, sc]
+    t = sh.get("translate", (0, 0, 0))
+    rows = ["dot(vec3(%s, %s, %s), o) + %s" % (F(r[i][0] * f32(sc[0])), F(r[i][1] * f32(sc[1])), F(r[i][2] * f32(sc[2])), F(t[i]))
+            for i in range(3)]
+    code = ["o = vec3(dot(vec3(1.0, 0.0, 0.0), P) + 0.0, dot(vec3(0.0, 0.0, -1.0), P) + 0.0, dot(vec3(0.0, 1.0, 0.0), P) + 0.0)",   # Y up -> Z up, as Mapping rotate X 90 writes it
+            "q = vec3(%s)" % ", ".join(rows)]         # Point mapping: T + R (S o)
+    tex = sh.get("tex", "checker")
+    if tex == "checker":
+        code.append("base = mix(%s, %s, checker(q * 1.0))" % (lin(sh.get("color2", (0.2, 0.2, 0.2))), lin(sh.get("color1", (0.8, 0.8, 0.8)))))
+    elif tex == "brick":
+        w, h = max(sh.get("width", 0.5), 1e-3), max(sh.get("height", 0.25), 1e-3)
+        off, mo = sh.get("offset", 0.5), sh.get("mortar", 0.02)
+        code += ["p = q * 1.0",
+                 "brow = floor(p.y * %s)" % F(f32(1.0) / f32(h)),
+                 "bx = p.x + %s * mod(brow + 1.0, 2.0)" % F(f32(w) * f32(off)),   # the row at 0 is a shifted one
+                 "bcol = floor(bx * %s)" % F(f32(1.0) / f32(w)),
+                 "bfx = bx - bcol * %s" % F(w),
+                 "bfy = p.y - brow * %s" % F(h),
+                 "bedge = min(min(bfx, %s - bfx), min(bfy, %s - bfy))" % (F(w), F(h)),
+                 "base = mix(%s, %s, step(%s, bedge))" % (lin(sh.get("mortarColor", (0, 0, 0))), lin(sh.get("color1", (0.8, 0.8, 0.8))), F(max(mo, 0.0)))]
+    else:
+        kind = sh.get("kind", "linear")
+        code.append("p = q * 1.0")
+        if kind == "radial":
+            code.append("g = atan2(p.y, p.x) * 0.15915494 + 0.5")
+        elif kind == "quadratic_sphere":
+            code += ["r = max(1.0 - length(p), 0.0)", "g = r * r"]
+        else:
+            code.append("g = clamp(p.x, 0.0, 1.0)")
+        code.append("base = vec3(g, g, g)")
+    return "\n".join(code)
+
+
 def material_lines(m, sheen=True):
     trans = m.get("transmission", 0.0)
     trough = m.get("transmission_roughness", m.get("roughness", 0.0) if trans > 0 else 0.0)
@@ -303,6 +379,9 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             co = node("3D", "Shade Coord", ["  i output 0"])
             ck = node("3D", "Shade Image", ["  i projection 0", "  i space 0"])
             wires += ["cable %d vector %d" % (ck, co), "cable %d image %d" % (ck, src), "cable %d field %d" % (mat, ck)]
+        elif sh and sh.get("code"):   # row 3.1: the same texture written by hand as a Material-domain Field Pixel
+            fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % field_texture_code(sh).replace("\n", "\\n")])
+            wires.append("cable %d field %d" % (mat, fp))
         elif sh:   # Shade Coord (Object) -> Mapping rotate X +90 (Infinite's Y-up to the case's Z-up) -> Mapping -> Checker
             sc = sh.get("scale", 1.0)
             sc = sc if isinstance(sc, list) else [sc, sc, sc]
@@ -661,7 +740,7 @@ def main():
         # The truth is reused while the scene, Blender's script and the asset files are unchanged.
         # Infinite-only keys (supersample) leave Blender's truth alone.
         btext = json.dumps({k: v for k, v in scene.items() if k != "supersample"}, sort_keys=True, indent=1)
-        h = hashlib.sha1((btext + open(os.path.join(HERE, "blender_scene.py")).read()).encode()).hexdigest()
+        h = hashlib.sha1((btext + BLENDER_TRUTH_VERSION).encode()).hexdigest()
         hp = os.path.join(d, "scene.hash")
         frames = scene.get("frames")
         tags = ["_%d" % k for k in range(len(frames))] if frames else [""]

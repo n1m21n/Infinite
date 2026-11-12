@@ -451,6 +451,20 @@ def _shade_bump():
 CASES["shade_bump"] = _shade_bump()
 CASES["shade_mapping"] = _shade_mapping()
 CASES["shade_textures"] = _shade_textures()
+
+def _mat_field_code():
+    # Row 3.1: shade_textures with the brick, checker and gradient textures written by hand as Field code on a
+    # Material-domain Field Pixel instead of Shade nodes. Gate: `sweep.py pair shade_textures mat_field_code` FLIP 0.
+    # The image sphere stays a Shade Image chain: a Field Pixel has no picture input in the Material domain.
+    c = _shade_textures()
+    for o in c["objects"]:
+        sh = o["material"]["shade"]
+        if sh.get("tex") != "image":
+            sh["code"] = True
+    return c
+
+
+CASES["mat_field_code"] = _mat_field_code()
 CASES["bed"] = _bed()
 # A close look at the sunlit folds right of the plush, where the weave has to read.
 CASES["bed_close"] = dict(_bed(), camera={"fov": 30, "azimuth": 100, "elevation": 30, "distance": 0.45,
