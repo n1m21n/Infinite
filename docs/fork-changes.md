@@ -16,6 +16,14 @@
 | `frame/StageKeyboard.cpp` (~1015) | одна подсказка за кадр: scale-toggle → `gNodeHoverTip` → `gNodeHelpTip` (else-if) | два tooltip-окна в кадре перекрывали друг друга | my/quick-fixes |
 | `frame/StagePopupsB.cpp` (меню "search") | при протягивании кабеля несовместимые ноды рисуются с alpha 0.3 (подменю категорий и текстовый поиск; в поиске совместимые первыми), остаются кликабельными; для кабеля от модулятора не применяется; множество совместимых имён — `unordered_set` (файловый static, пересобирается при смене drag-а); `AppShared.h` не тронут | этап 2 ux-roadmap | my/quick-fixes |
 | `src/app/graph/PortProbeCache.{h,cpp}` (новые), `CMakeLists.txt` (+1 строка), `graph/Wiring.cpp:RecommendedNodeTypesForOutput`, `frame/StageLinks.cpp:RecommendedNodeTypesForPin`, `frame/StagePopupsB.cpp` (прогрев) | кэш портов по имени типа ноды: подсказки на drop кабеля считаются из кэша (маска принимаемых видов источника + виды выходов), без `MakeNode` на каждый drop; прогрев 3 мс/кадр, типы из расширений достраиваются при первом использовании; для param-пина проба только у модуляторов | drop кабеля стоил ~960 мс (Debug) | my/quick-fixes |
+| src/app/Startup.cpp | `// fork:` экспорт NvOptimusEnablement/AmdPowerXpress (_WIN32) | дискретная GPU на ноутбуках | my/fps |
+| src/core/GraphNode.h | `showMiniViewport` по умолчанию false | мини-вьюпорты дорогие | my/fps |
+| src/core/NodeViewport.{h,cpp} | троттлинг 20 Гц, `LastColorTexture()` | FPS | my/fps |
+| src/app/panels/ViewportPanel.cpp | пропуск невидимых, Preview quality | FPS | my/fps |
+| src/nodes/{AnalyzeNodes,PaletteNode,PredictiveColoringNode}.{h,cpp} | `PboReadback` вместо glReadPixels | убрать sync-стоп | my/fps |
+| src/app/panels/SettingsWindow.cpp, src/app/graph/PatchIO.cpp | настройка Preview quality + предупреждение GPU | диагностика | my/fps |
+| src/app/frame/StageMenuBar.cpp, StagePresent.cpp | тултип GPU; `INFINITE_FPS_LOG` | диагностика | my/fps |
+| новые: src/core/{PboReadback,PreviewQuality,GpuDiag}.h | наш код | | my/fps |
 
 ## Правила
 - Наш код — в **собственных файлах** (новые .cpp/.h), а не внутри файлов апстрима.
