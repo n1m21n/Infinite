@@ -25,6 +25,11 @@ if [ -n "${SANITIZE:-}" ]; then
   CMAKE_FLAGS+=(-DINFINITE_SANITIZE="$SANITIZE" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
 fi
 
+# VULKAN=1 builds the engine's Vulkan backend (INFINITE_RHI=vulkan; lavapipe in this container).
+if [ -n "${VULKAN:-}" ]; then
+  CMAKE_FLAGS+=(-DINFINITE_VULKAN=ON)
+fi
+
 if command -v ccache >/dev/null 2>&1; then
   CMAKE_FLAGS+=(
     -DCMAKE_C_COMPILER_LAUNCHER=ccache
@@ -36,4 +41,5 @@ echo "==> Configuring with ${CC} / ${CXX} in ${BUILD_DIR}..."
 cmake "${CMAKE_FLAGS[@]}"
 
 echo "==> Building Infinite..."
-ninja -C "$BUILD_DIR"
+# TARGET builds one target (default: all). JOBS caps the compile jobs (an 8 GB host cannot take ninja's default).
+ninja -C "$BUILD_DIR" ${JOBS:+-j "$JOBS"} ${TARGET:-}

@@ -43,6 +43,10 @@ apt-get install -y --no-install-recommends \
   imagemagick \
   xdotool \
   ca-certificates \
-  fonts-dejavu-core
+  fonts-dejavu-core \
+  libvulkan-dev \
+  mesa-vulkan-drivers \
+  glslang-tools \
+  vulkan-tools
 
 rm -rf /var/lib/apt/lists/*

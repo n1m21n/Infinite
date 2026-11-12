@@ -1087,6 +1087,7 @@ endif()
 add_executable(field-preset-check
     tools/field_preset_check.cpp
     src/core/field/FieldLex.cpp
+    src/core/field/FieldNoise.cpp
     src/core/field/FieldParse.cpp
     src/core/field/FieldIR.cpp
     src/core/field/FieldSwizzle.cpp
@@ -1269,7 +1270,7 @@ endif()
 option(INFINITE_VULKAN "Build the Vulkan engine backend (INFINITE_RHI=vulkan)" OFF)
 if(INFINITE_VULKAN)
     set(INFINITE_VK_ROOT "$ENV{HOME}/Infinite/vk/src" CACHE PATH "Vulkan headers, MoltenVK and glslang")
-    find_program(INFINITE_GLSLANG glslang HINTS "${INFINITE_VK_ROOT}/glslang/16.6.0/bin" REQUIRED)
+    find_program(INFINITE_GLSLANG NAMES glslang glslangValidator HINTS "${INFINITE_VK_ROOT}/glslang/16.6.0/bin" REQUIRED)
     add_executable(VkShaderGen src/engine/rhi/vk/VkShaderGen.cpp)
     target_include_directories(VkShaderGen PRIVATE src)
     target_compile_features(VkShaderGen PRIVATE cxx_std_17)

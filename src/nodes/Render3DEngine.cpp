@@ -73,7 +73,7 @@ void Render3DNode::ReleaseEngine()
    mEng = nullptr;
 }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(INFINITE_VULKAN) // the engine: Metal on macOS, Vulkan where it is built in (row 9.5)
 namespace
 {
    engine::MeshData ToMeshData(const Mesh& m)

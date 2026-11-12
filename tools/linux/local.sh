@@ -10,6 +10,13 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
+# Passed into the container when set on the host (VULKAN=1 JOBS=3 tools/linux/local.sh build).
+PASS_ENV=(-e VULKAN -e JOBS -e TARGET -e BUILD_DIR -e SANITIZE -e INFINITE_RHI)
+# AB_DIR mounts the Mac sweep's case directory at the same path, read-only (tools/linux/vk-cases.sh).
+if [ -n "${AB_DIR:-}" ]; then
+  PASS_ENV+=(-e AB_DIR -e CASE_TIMEOUT -v "$AB_DIR":"$AB_DIR":ro)
+fi
+
 cmd="${1:-shell}"
 shift || true
 
@@ -24,15 +31,15 @@ build_image_if_needed
 
 case "$cmd" in
   build)
-    docker run --rm -v "$REPO_ROOT":/src -v infinite-ccache:/root/.ccache -w /src "$IMAGE_NAME" tools/linux/build.sh "$@"
+    docker run --rm "${PASS_ENV[@]}" -v "$REPO_ROOT":/src -v infinite-ccache:/root/.ccache -w /src "$IMAGE_NAME" tools/linux/build.sh "$@"
     ;;
   test)
-    docker run --rm -v "$REPO_ROOT":/src -v infinite-ccache:/root/.ccache -w /src "$IMAGE_NAME" tools/linux/xvfb-harness.sh "$@"
+    docker run --rm "${PASS_ENV[@]}" -v "$REPO_ROOT":/src -v infinite-ccache:/root/.ccache -w /src "$IMAGE_NAME" tools/linux/xvfb-harness.sh "$@"
     ;;
   shell)
     docker run --rm -it -v "$REPO_ROOT":/src -v infinite-ccache:/root/.ccache -w /src "$IMAGE_NAME" bash
     ;;
   *)
-    docker run --rm -v "$REPO_ROOT":/src -v infinite-ccache:/root/.ccache -w /src "$IMAGE_NAME" "$cmd" "$@"
+    docker run --rm "${PASS_ENV[@]}" -v "$REPO_ROOT":/src -v infinite-ccache:/root/.ccache -w /src "$IMAGE_NAME" "$cmd" "$@"
     ;;
 esac

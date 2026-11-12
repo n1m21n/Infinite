@@ -42,6 +42,8 @@
 #include <OpenGL/CGLIOSurface.h>
 #include <OpenGL/gl3.h>
 #include <OpenGL/gl3ext.h>
+#else
+#include "gl3.h"
 #endif
 
 namespace rhi
@@ -370,6 +372,15 @@ namespace
             return;
 #ifdef __APPLE__
          NSDictionaryLess();
+#else
+         // No shared surface here: a plain GL rectangle texture that Publish() uploads the readback into.
+         glGenTextures(1, &mGl);
+         glBindTexture(GL_TEXTURE_RECTANGLE, mGl);
+         if (mHalf)
+            glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+         else
+            glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+         glBindTexture(GL_TEXTURE_RECTANGLE, 0);
 #endif
          mOk = true;
       }
@@ -381,6 +392,8 @@ namespace
 #ifdef __APPLE__
          if (mGl) glDeleteTextures(1, &mGl);
          if (mSurface) CFRelease(mSurface);
+#else
+         if (mGl) glDeleteTextures(1, &mGl);
 #endif
       }
       bool Ok() const { return mOk && mGl != 0; }
@@ -413,6 +426,17 @@ namespace
          for (int y = 0; y < mH; y++)
             std::memcpy(dst + (size_t)y * stride, (const uint8_t*)mRead.map + (size_t)y * row, row);
          IOSurfaceUnlock(mSurface, 0, nullptr);
+#else
+         if (!mGl)
+            return;
+         glBindTexture(GL_TEXTURE_RECTANGLE, mGl);
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+         if (mHalf)
+            glTexSubImage2D(GL_TEXTURE_RECTANGLE, 0, 0, 0, mW, mH, GL_RGBA, GL_HALF_FLOAT, mRead.map);
+         else
+            glTexSubImage2D(GL_TEXTURE_RECTANGLE, 0, 0, 0, mW, mH, GL_BGRA, GL_UNSIGNED_BYTE, mRead.map);
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+         glBindTexture(GL_TEXTURE_RECTANGLE, 0);
 #endif
       }
       bool DrawTestTriangle(const float clear[4], const float tri[3]) override
