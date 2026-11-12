@@ -51,3 +51,14 @@ commit. No pasted logs, no file-by-file retelling: the commit holds that. When a
 | 7.2 | partly met. carpet_pile 200 k, 384 px: rays see scatters as world-space cluster BLASes, TLAS cached; L 690->590 ms (16-side cone, over 4 M-tri cap), 352 ms (6-side), build 140->21 ms; T 64 spp 8.6 s, 611 MB; objRand to Shade Geometry (GL raster still 0); 30 fps not met | see git log |
 | 7.3 | design only: designs/7.3-passes.md (depth, normal, albedo, mask, id as Render 3D outputs behind one Passes toggle; Metal reuses its denoiser guides). Waiting for owner | see git log |
 | 8.1 | Engine dropdown: Raster, Path trace, Live, Live + settle (stored 0..3; old 0/1 unchanged; Live entries only where Metal is built). Headless: engine 2 runs live, 3 settles to 48 spp, 0 stays GL. Deviation: GL Path trace kept as its own entry | see git log |
+| 8.2 | f8 live baseline: 60 cases (hair skipped) in 670 s; 40 shared with settle f0, 8 more than 0.05 behind settle (worst 10 below, case: live / settle). 20 live-only cases have no settle f0 | see git log |
+| 8.2 world_hdri_sun |  0.311  | settle 0.077 , gap +0.235  |
+| 8.2 tex_fabric_far |  0.327  | settle 0.118 , gap +0.209  |
+| 8.2 tex_detail |  0.263  | settle 0.102 , gap +0.160  |
+| 8.2 tex_fabric_far_flat |  0.205  | settle 0.056 , gap +0.150  |
+| 8.2 mat_sheen |  0.172  | settle 0.063 , gap +0.109  |
+| 8.2 mat_subsurface |  0.161  | settle 0.075 , gap +0.085  |
+| 8.2 emission_light |  0.164  | settle 0.085 , gap +0.079  |
+| 8.2 mat_translucent |  0.088  | settle 0.028 , gap +0.060  |
+| 8.2 dof |  0.106  | settle 0.059 , gap +0.047  |
+| 8.2 cornell |  0.157  | settle 0.110 , gap +0.046  |

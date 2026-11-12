@@ -36,7 +36,7 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | 0.5 freeze + `f0` baseline | done: `f0` stored, R and T, 46 cases | see log |
 | 1.1 to 1.5 material programs | done (details in `AUTORUN_ARCHIVE.md`) | — |
 | 2.1 to 2.8 shading nodes | done (`Shade Attribute` not built: no vertex colour on Mesh) | see log |
-| 3.1 to 3.5 script nodes | 3.1 to 3.5, 4.1 to 4.5, 5.1 to 5.6, 6.1 to 6.3, 7.1 done, 7.2 partly met (30 fps not met), 7.3 waiting for owner (design), 8.1 done (5.7 after 8.2); **next: 8.2** | see log |
+| 3.1 to 3.5 script nodes | 3.1 to 3.5, 4.1 to 4.5, 5.1 to 5.6, 6.1 to 6.3, 7.1 done, 7.2 partly met (30 fps not met), 7.3 waiting for owner (design), 8.1, 8.2 done (`f8` live baseline); **next: 5.7**, then 8.3 | see log |
 | 4.1 to 4.5 layers, relief, wear | open | — |
 | 5.1 to 5.7 fibre, volumes, sky, lights, grazing glint | open | — |
 | 6.1 to 6.3 camera | open | — |
@@ -68,7 +68,7 @@ Options go before the subcommand. In zsh pass case lists as arrays. Hair cases t
 | raster | `f0` | 46 cases, frozen L1 to L3 (row 0.5); `c1` is older |
 | settle 16 spp | `f0` | 46 cases, frozen L1 to L3 (row 0.5); `c1` is older |
 | settle 256 spp | `full` | 8 cases: cornell interior materials world_hdri mat_glass light_area bed deer |
-| live | `base2` / `c1` | only 5 cases are current; a full live baseline is row 8.2 |
+| live | `f8` | 60 cases (hair skipped), row 8.2 |
 
 Row 0.5 creates `f0` (raster, settle); row 8.2 creates `f8` (live). From then on those are the bases.
 
