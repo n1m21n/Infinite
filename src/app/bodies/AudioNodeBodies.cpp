@@ -1,6 +1,7 @@
 // Plugin, audio-out, analog and audio-node dispatch bodies (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 
 namespace app
 {
@@ -319,7 +320,7 @@ namespace app
          }
       }
       if (!recording && !audioOn && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         ImGui::SetTooltip("press Start Audio in the toolbar first");
+         NodeTip("press Start Audio in the toolbar first");
       ImGui::EndDisabled();
       ImGui::SameLine();
 
