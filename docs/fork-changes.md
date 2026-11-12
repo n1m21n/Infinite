@@ -7,6 +7,11 @@
 | `tools/design/build_tokens.py`, `Tokens.gen.h` | цветовые роли `inline` + дефолты + реестр `kColorTokens`; генерация `docs/theme-tokens.md` | переопределение токенов (4б) | my/themes |
 | `src/app/Startup.cpp`, `frame/StageFramePump.cpp`, `panels/SettingsWindow.cpp`, `CMakeLists.txt` | крючки `// fork:` (Init до LoadPreference, Tick перед NewFrame, кнопки/кружки в Appearance, +ThemeFiles.cpp) | JSON-темы | my/themes |
 | новое: `src/app/ui/ThemeFiles.{h,cpp}`, `docs/themes.md`, `docs/theme-tokens.md` | загрузчик/горячая перезагрузка/экспорт | JSON-темы | my/themes |
+| `src/core/OscMessage.{h,cpp}` | `DecodePacket` (bundle, рекурсивно), `MatchAddress` (`*`,`?`), теги `T/F/d/h` в `DecodeMany`; `Decode` теперь через `DecodeMany` | Bitwig/DrivenByMoss шлёт bundle'ами | my/osc |
+| `src/nodes/OscNodes.{h,cpp}` | OSC Receive переведён на общий приёмник порта; параметр `argIndex`, wildcard, OSC learn, `BindError()` | несколько нод на порт, learn, индикация ошибки | my/osc |
+| `src/nodes/OscPortHub.{h,cpp}` (новые) + `CMakeLists.txt` (+1 строка) | один сокет/поток на порт, буфер 64 КБ, раздача по подписчикам | | my/osc |
+| `src/app/bodies/ParamBodies1.cpp` | `DrawOscReceiveParams`: arg index, кнопка OSC Learn, строка ошибки, диапазон low/high 0..127 | UI | my/osc |
+| `src/app/selftest/MiscTests.cpp` | в `RunOscControlTest` добавлены проверки OSC Receive (bundle, общий порт, wildcard, learn, bind-ошибка) + includes | self-test | my/osc |
 
 ## Правила
 - Наш код — в **собственных файлах** (новые .cpp/.h), а не внутри файлов апстрима.

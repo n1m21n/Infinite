@@ -24,84 +24,57 @@ OscReceiveNode::~OscReceiveNode()
 
 void OscReceiveNode::StopListener()
 {
-   if (mSocket < 0)
-      return;
-   mStop = true;
-   // Unblocks the thread's recvfrom() the same way closing a socket already
-   // does elsewhere in this codebase (RemoteControl's accept loop) - there is
-   // no portable "cancel this blocking syscall" short of shutting the fd down.
-   shutdown(mSocket, SHUT_RDWR);
-   NetCompat::NetClose(mSocket);
-   mSocket = -1;
-   if (mThread.joinable())
-      mThread.join();
-   mStop = false;
+   if (mBoundPort >= 0)
+      OscPortHub::Unsubscribe(mBoundPort, this);
    mBoundPort = -1;
 }
 
 void OscReceiveNode::RestartListenerIfNeeded()
 {
-   if (port == mBoundPort)
-      return;
    StopListener();
-
-   int fd = socket(AF_INET, SOCK_DGRAM, 0);
-   if (fd < 0)
-      return;
-
-   sockaddr_in addr{};
-   addr.sin_family = AF_INET;
-   addr.sin_port = htons(static_cast<uint16_t>(port));
-   addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // loopback only, same policy as RemoteControl
-
-   if (bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
+   std::string err = OscPortHub::Subscribe(port, this);
    {
-      NetCompat::NetClose(fd);
+      std::lock_guard<std::mutex> lock(mFilterMutex);
+      mBindError = err;
+   }
+   if (err.empty())
+      mBoundPort = port;
+   mRetryCountdown = 120;
+}
+
+void OscReceiveNode::OnOscMessage(const OscMessage::Message& msg)
+{
+   std::string filter;
+   int idx;
+   {
+      std::lock_guard<std::mutex> lock(mFilterMutex);
+      filter = mAddressFilter;
+      idx = mArgIndexShared;
+   }
+   const bool learning = mLearning.load();
+   if (!learning && !OscMessage::MatchAddress(filter, msg.address))
+      return;
+   if (idx < 0 || static_cast<size_t>(idx) >= msg.args.size())
+      return;
+   const OscMessage::Arg& arg = msg.args[static_cast<size_t>(idx)];
+   if (arg.type == OscMessage::ArgType::String)
+      return; // no numeric value to report
+   const float value = arg.type == OscMessage::ArgType::Float ? arg.f : static_cast<float>(arg.i);
+   if (learning)
+   {
+      std::lock_guard<std::mutex> lock(mFilterMutex);
+      mLearnedAddress = msg.address;
+      mLearning = false;
       return;
    }
-
-   mSocket = fd;
-   mBoundPort = port;
-
-   mThread = std::thread([this, fd]() {
-      uint8_t buffer[1024];
-      for (;;)
-      {
-         NetSsize n = NetCompat::NetRecv(fd, buffer, sizeof(buffer), 0);
-         if (mStop.load())
-            break;
-         if (n <= 0)
-            continue;
-
-         std::string addr;
-         OscMessage::Arg arg;
-         if (!OscMessage::Decode(buffer, static_cast<size_t>(n), addr, arg))
-            continue;
-
-         std::string filter;
-         {
-            std::lock_guard<std::mutex> lock(mFilterMutex);
-            filter = mAddressFilter;
-         }
-         if (addr != filter)
-            continue;
-
-         float value = 0.0f;
-         switch (arg.type)
-         {
-            case OscMessage::ArgType::Float:  value = arg.f; break;
-            case OscMessage::ArgType::Int:    value = static_cast<float>(arg.i); break;
-            case OscMessage::ArgType::String: continue; // no numeric value to report
-         }
-         mLastValue.store(value);
-      }
-   });
+   mLastValue.store(value);
 }
 
 void OscReceiveNode::VisitParams(ParamVisitor& v)
 {
    v.Int("port", port);
    v.Text("address", address);
+   v.Int("argIndex", argIndex);
    v.Float("low", low);
    v.Float("high", high);
 }
@@ -109,21 +82,31 @@ void OscReceiveNode::VisitParams(ParamVisitor& v)
 float OscReceiveNode::Value01()
 {
    // Live param edits (DrawOscReceiveParams) write straight into port/address
-   // via ModSliderInt/InputText - there is no VisitParams pass in that path
-   // (VisitParams only runs for save/load/undo/copy-paste; see ParamVisitor's
-   // header comment) - so both a port and an address change have to be
-   // noticed here instead. Value01() is exactly the one thing guaranteed to
-   // run every frame this node is on canvas, since the editor draws every
-   // modulator's value meter unconditionally (see the DrawModulatorMeter
-   // call site).
-   if (address != mLastAddress)
+   // (there is no VisitParams pass in that path), so changes are noticed here:
+   // Value01() runs every frame this node is on canvas.
    {
-      mLastAddress = address;
       std::lock_guard<std::mutex> lock(mFilterMutex);
-      mAddressFilter = address;
+      if (!mLearnedAddress.empty())
+      {
+         address = mLearnedAddress;
+         mLearnedAddress.clear();
+      }
+      if (address != mLastAddress)
+      {
+         mLastAddress = address;
+         mAddressFilter = address;
+      }
+      mArgIndexShared = argIndex;
    }
    if (port != mBoundPort)
-      RestartListenerIfNeeded();
+   {
+      // Retry a busy port about every 2 s so it recovers once freed.
+      if (mBoundPort >= 0 || mRetryCountdown-- <= 0 || mLastBoundTry != port)
+      {
+         mLastBoundTry = port;
+         RestartListenerIfNeeded();
+      }
+   }
 
    const float raw = mLastValue.load();
    const float span = high - low;

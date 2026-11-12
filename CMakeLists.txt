@@ -784,6 +784,7 @@ set(COMMON_SOURCES
     src/nodes/PredictiveModulatorNode.cpp
     src/audio/NoteModel.cpp
     src/nodes/OscNodes.cpp
+    src/nodes/OscPortHub.cpp
     src/nodes/NoiseNode.cpp
     src/nodes/SketchNode.cpp
     src/nodes/Sketch3DNode.cpp

@@ -281,8 +281,23 @@ namespace app
       ModSliderInt("port", &n->port, 1, 65535);
       ImGui::SetNextItemWidth(kParamWidth);
       FieldWell::InputText("address", &n->address);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      ModSliderInt("arg index", &n->argIndex, 0, 15);
+      if (n->IsLearning())
+      {
+         if (ActionButton::Draw("Listening... send a value", ImVec2(kPreviewSize, 0), ActionButton::Kind::Learn))
+            n->CancelLearn();
+      }
+      else if (ActionButton::Draw("OSC Learn", ImVec2(kPreviewSize, 0)))
+         n->StartLearn();
+      const std::string bindErr = n->BindError();
+      if (!bindErr.empty())
+      {
+         PushTextWrapWidth(kPreviewSize);
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "Cannot listen: %s", bindErr.c_str());
+         PopTextWrapWidth();
+      }
+      ModSlider("low", &n->low, 0.0f, 127.0f);
+      ModSlider("high", &n->high, 0.0f, 127.0f);
    }
 
 
