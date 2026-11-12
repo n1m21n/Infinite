@@ -2563,9 +2563,9 @@ ImageCable* CableFor(GraphNode& gn, int slot);
 
 
    // Upper bound on how many geometry-input slots any single node exposes via
-   // GeometryInputSlot() - the widest today is Group3DNode at 8. Generic loops over
+   // GeometryInputSlot() - Material's layer pin sits at slot 13 (row 4.1). Generic loops over
    // "every geometry slot this node might have" stop here rather than walking off into unrelated pins.
-   inline const int kMaxGeometrySlots = 8;
+   inline const int kMaxGeometrySlots = 16;
 
 
 

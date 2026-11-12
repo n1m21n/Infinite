@@ -307,7 +307,10 @@ public:
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    IGeometrySource* input = nullptr;
-   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      return slot == 0 ? &input : slot == kLayerSlot ? &layer : nullptr;
+   }
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
    // Slot 0 is geometry; slots 1..5 are the material channels, in MaterialMap
    // order, so the existing 2D generators can author a whole surface.
@@ -316,8 +319,8 @@ public:
    {
       static const char* kNames[] = { "geo", "albedo", "roughness", "metallic",
                                       "normal", "ao", "emission", "clearcoat", "sheen",
-                                      "opacity", "transmission", "field" };
-      return (slot >= 0 && slot < (2 + kMapCount)) ? kNames[slot] : nullptr;
+                                      "opacity", "transmission", "field", "layer", "mask" };
+      return (slot >= 0 && slot < (4 + kMapCount)) ? kNames[slot] : nullptr;
    }
    // OPUS_PLAN row 1.3: the last pin takes a Field Pixel in Material domain; its program runs in the Render 3D
    // shaders after the maps are read.
@@ -326,6 +329,13 @@ public:
    // and opacity pins, as the outputs one composed program writes. False when there is none.
    bool ShadeOutputs(std::vector<ShadeOutput>& outs) const;
    static constexpr int kFieldSlot = 1 + kMapCount;
+   // Row 4.1: `layer` takes a second Material, laid over this one where `mask` is 1 (a picture's red, a Shade chain's
+   // x, 1 when unwired) times layerMix. Base, roughness, metallic, normal, emission, opacity and height blend before
+   // lighting, in one composed program; a layer may carry its own layer, 4 materials deep.
+   static constexpr int kLayerSlot = kFieldSlot + 1, kMaskSlot = kFieldSlot + 2;
+   IGeometrySource* layer = nullptr;
+   ImageCable& LayerMaskInput() { return mLayerMask; }
+   float layerMix = 1.0f;
    size_t TriangleCount() const;
 
    float normalStrength = 1.0f;
@@ -415,6 +425,7 @@ public:
       v.Bool("normalBump", normalBump);
       v.Float("normalStrength", normalStrength);
       v.Float("detailScale", detailScale); v.Float("detailStrength", detailStrength);
+      v.Float("layerMix", layerMix);
       v.Int("model", model); v.Int("hairColour", hairColour);
       v.Float("melanin", melanin); v.Float("melaninRedness", melaninRedness);
       v.Color("hairTint", hairTint); v.Float("radialRoughness", radialRoughness); v.Float("hairShift", hairShift);
@@ -422,11 +433,18 @@ public:
 private:
    ImageCable mMaps[kMapCount];
    ImageCable mField;
+   ImageCable mLayerMask;
    Mesh mEmpty;
+   struct LayerBuild;
+   struct LayerSurf;
+   LayerSurf EmitLayer(const MaterialNode& L, const std::string& p, int depth, LayerBuild& lb) const;
+   std::string EmitLayerMask(const MaterialNode& L, const std::string& p, LayerBuild& lb) const;
+   bool ComposeLayered(Material& m) const;
    int mLastCookFrame = -1;
    // Row 2.3: the program composed from a Shade chain on `field`, re-registered only when its text changes.
    mutable std::string mShadeSource;
    mutable int mShadeProgram = 0;
+   mutable std::vector<float> mShadeValues;
    mutable unsigned long long mShadeBoundsRev = ~0ull;
    mutable float mShadeLo[3] = { 0.0f, 0.0f, 0.0f };
    mutable float mShadeHi[3] = { 1.0f, 1.0f, 1.0f };

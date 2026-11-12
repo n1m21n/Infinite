@@ -219,6 +219,19 @@ def make_texture(case_dir, name, size=512):
         n = np.stack([-dx * 0.04, dy * 0.04, np.ones_like(h)], -1)
         n /= np.linalg.norm(n, axis=-1, keepdims=True)
         img = ((n * 0.5 + 0.5) * 255).astype(np.uint8)
+    elif name.startswith("mask_"):    # row 4.1: soft grey masks; mask_noise is smooth blobs, mask_half splits u
+        if name == "mask_half":
+            g = np.where(u > 0.5, 255, 0)
+        else:
+            rng = np.random.default_rng({"mask_noise": 5, "mask_dirt": 7, "mask_dust": 11}.get(name, 5))
+            f = np.zeros((size, size), np.float32)
+            for _ in range(10):
+                kx, ky = rng.integers(1, 6, 2); ph = rng.uniform(0, 2 * np.pi)
+                f += np.sin(2 * np.pi * (kx * u + ky * v) + ph) * rng.uniform(0.3, 1.0)
+            f = (f - f.min()) / (f.max() - f.min())
+            g = np.clip((f - 0.4) * 4.0, 0, 1) * 255
+        g = g.astype(np.uint8)
+        img = np.stack([g, g, g], -1)
     elif name == "holes":             # opacity: a solid sheet with a grid of round holes
         d = np.hypot((u * 4) % 1 - 0.5, (v * 4) % 1 - 0.5)
         g = np.where(d < 0.3, 0, 255).astype(np.uint8)
@@ -435,6 +448,14 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             else:
                 tex = node("Source", "Image Source", ["  s path %s" % make_texture(case, tex_name)])
             wires.append("cable %d %s %d" % (mat, slot, tex))
+        top, ly = mat, m.get("layer")
+        while ly:   # row 4.1: a second Material on the layer pin, laid over where its mask image's red is 1
+            lm = node("3D", "Material", material_lines(ly))
+            wires.append("geo %d 12 %d" % (top, lm))
+            if ly.get("mask"):
+                mk = node("Source", "Image Source", ["  s path %s" % make_texture(case, ly["mask"])])
+                wires.append("cable %d 13 %d" % (top, mk))
+            top, ly = lm, ly.get("layer")
         geos.append(mat)
     if len(geos) > 4:  # Render 3D takes four; group the rest eight at a time
         grouped = []
@@ -762,6 +783,10 @@ def main():
         for o in scene["objects"]:
             for tex_name in o.get("material", {}).get("maps", {}).values():
                 make_texture(d, tex_name)
+            ly = o.get("material", {}).get("layer")
+            while ly:
+                if ly.get("mask"): make_texture(d, ly["mask"])
+                ly = ly.get("layer")
             if o.get("material", {}).get("shade", {}).get("tex") == "image":
                 make_texture(d, o["material"]["shade"].get("image", "blotches"))
         if not (os.path.exists(hp) and open(hp).read() == h and all(os.path.exists(os.path.join(d, "truth%s.png" % t)) for t in tags)):

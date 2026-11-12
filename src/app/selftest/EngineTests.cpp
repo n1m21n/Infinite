@@ -1549,6 +1549,75 @@ bool RunEngineTest()
             "3.4 L: k 0.2 -> 0.8 brightens the sphere with the same library", (double)brighter, (double)((size_t)W * H / 100));
    }
 
+   // ---- 4.1: Material layers. Red gloss paint laid over grey rough metal: one program, the layer's knobs live (100
+   // moves of layerMix, 0 rebuilds), mix 1 reads as the paint and mix 0 as the metal on L; a Shade mask splits the
+   // sphere; a 4-deep chain compiles.
+   {
+      struct MaskProbe : ShadeNode
+      {
+         std::string e;
+         explicit MaskProbe(const char* s) : e(s) {}
+         std::string Emit(ShadeBuild& b) const override { return b.NewVar(this, e); }
+      };
+      MaterialNode metal, paint, dirt, dust;
+      metal.input = &sphereG;
+      metal.color[0] = metal.color[1] = metal.color[2] = 0.5f; metal.metallic = 1.0f; metal.roughness = 0.7f;
+      paint.color[0] = 0.8f; paint.color[1] = 0.08f; paint.color[2] = 0.08f; paint.metallic = 0.0f; paint.roughness = 0.2f;
+      metal.layer = &paint;
+      const Material lm = metal.GetMaterial();
+      const int lid = lm.fieldProgram;
+      const std::string lerr = lid > 0 ? Field::MaterialProgramError(lid) : std::string("no program");
+      if (!lerr.empty()) printf("    layer program error: %s\n", lerr.c_str());
+      int lre = 0;
+      for (int i = 0; i < 100; i++)
+      {
+         metal.layerMix = (float)i / 99.0f;
+         paint.roughness = 0.2f + 0.001f * (float)i;
+         if (metal.GetMaterial().fieldProgram != lid) lre++;
+      }
+      check(lid > 0 && lerr.empty() && lre == 0, "4.1: a layer is one program; 100 knob moves, 0 rebuilds", (double)lre, 0);
+      auto shot = [&](const Material& mm, std::vector<float>& px)
+      {
+         engine::Frame fr = frame;
+         fr.instances[2].fieldProgram = mm.fieldProgram;
+         std::memcpy(fr.instances[2].fieldParams, mm.fieldParams, sizeof(mm.fieldParams));
+         fr.fieldMsl = Field::BuildMaterialLibrary({ mm.fieldProgram }, Field::MaterialLang::Msl, fr.fieldMslKey);
+         return mm.fieldProgram > 0 && raster->Render(*img, fr, nullptr) && raster->Render(*img, fr, nullptr) && ReadRect(img->GlTexture(), W, H, px);
+      };
+      auto red = [&](const std::vector<float>& px, size_t& n)
+      {
+         n = 0;
+         for (size_t i = 0; i + 3 < px.size(); i += 4)
+            if (px[i] > px[i + 1] + 0.15f) n++;
+      };
+      // Counted against mix 0: the rest of the scene has red of its own.
+      std::vector<float> p1, p0, ph;
+      metal.layerMix = 1.0f;
+      const bool o1 = shot(metal.GetMaterial(), p1);
+      metal.layerMix = 0.0f;
+      const bool o0 = shot(metal.GetMaterial(), p0);
+      size_t r1 = 0, r0 = 0, rh = 0;
+      red(p1, r1); red(p0, r0);
+      const double paintPx = (double)r1 - (double)r0;
+      check(o1 && o0 && paintPx > (double)W * H / 200, "4.1 L: mix 1 paints the sphere red, mix 0 leaves the metal",
+            paintPx, (double)W * H / 200);
+      MaskProbe half("vec3(step(0.0, P.x))");   // the test sphere has no UVs: split it in object space
+      metal.layerMix = 1.0f;
+      metal.LayerMaskInput().Connect(&half);
+      const Material hm = metal.GetMaterial();
+      const bool oh = shot(hm, ph);
+      red(ph, rh);
+      const double halfPx = (double)rh - (double)r0;
+      check(oh && halfPx > paintPx / 5 && halfPx < paintPx * 4 / 5, "4.1 L: a Shade mask paints part of the sphere", halfPx, paintPx);
+      paint.layer = &dirt; dirt.layer = &dust;
+      dirt.color[0] = 0.3f; dust.roughness = 0.9f; dust.layerMix = 0.5f;
+      const int deep = metal.GetMaterial().fieldProgram;
+      const std::string derr = deep > 0 ? Field::MaterialProgramError(deep) : std::string("no program");
+      if (!derr.empty()) printf("    4-deep program error: %s\n", derr.c_str());
+      check(deep > 0 && derr.empty(), "4.1: a 4-deep layer chain compiles", (double)deep, 0);
+      metal.LayerMaskInput().Disconnect();
+   }
+
    // dump for eyes
    if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
    {

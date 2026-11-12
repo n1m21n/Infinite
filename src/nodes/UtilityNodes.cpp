@@ -2,9 +2,11 @@
 #include "FieldPixelNode.h"
 #include "ShadeNodes.h"
 #include "field/MaterialRegistry.h"
+#include "field/FieldIR.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 #include "Transport.h"
@@ -99,44 +101,9 @@ Material MaterialNode::GetMaterial() const
       if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
          m.opacityMapped = true;
    }
-   else if (ShadeOutputs(outs))
+   else if (dynamic_cast<const MaterialNode*>(layer) != nullptr || ShadeOutputs(outs))
    {
-      // Generated normalises by the object-space bounds of the mesh this material wraps.
-      const unsigned long long rev = input ? input->MeshRevision() : 0;
-      if (input && rev != mShadeBoundsRev)
-      {
-         mShadeBoundsRev = rev;
-         const Mesh& mesh = input->GetMesh();
-         if (!mesh.vertices.empty())
-         {
-            const Vertex& v0 = mesh.vertices[0];
-            mShadeLo[0] = mShadeHi[0] = v0.px; mShadeLo[1] = mShadeHi[1] = v0.py; mShadeLo[2] = mShadeHi[2] = v0.pz;
-            for (const Vertex& v : mesh.vertices)
-            {
-               mShadeLo[0] = std::min(mShadeLo[0], v.px); mShadeHi[0] = std::max(mShadeHi[0], v.px);
-               mShadeLo[1] = std::min(mShadeLo[1], v.py); mShadeHi[1] = std::max(mShadeHi[1], v.py);
-               mShadeLo[2] = std::min(mShadeLo[2], v.pz); mShadeHi[2] = std::max(mShadeHi[2], v.pz);
-            }
-         }
-      }
-      std::string err;
-      std::vector<const ShadeNode*> images;
-      const std::string src = ComposeShadeProgram(outs, mShadeLo, mShadeHi, err, &images);
-      for (size_t k = 0; k < images.size() && k < 4; k++)
-      {
-         m.fieldImage[k] = images[k]->ShadeImageTexture();
-         m.fieldImageRev[k] = (unsigned int)images[k]->ShadeImageRevision();
-      }
-      if (src != mShadeSource)
-      {
-         mShadeSource = src;
-         mShadeProgram = src.empty() ? 0 : Field::RegisterMaterialProgram(src, {}, err);
-         if (!err.empty())
-            fprintf(stderr, "[Material] shading chain: %s\n", err.c_str());
-      }
-      m.fieldProgram = mShadeProgram;
-      if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
-         m.opacityMapped = true;
+      ComposeLayered(m);
    }
    m.normalStrength = normalStrength;
    m.detailScale = detailScale;
@@ -149,6 +116,258 @@ Material MaterialNode::GetMaterial() const
    m.radialRoughness = radialRoughness;
    m.hairShift = hairShift;
    return m;
+}
+
+// ---- Row 4.1: layers. One Material-domain program: this material's own Shade outputs, then each layer's surface
+// (its knobs as live params, its pictures as img() slots, its Shade chains inline) blended in by its mask.
+namespace
+{
+   std::string Num(float v)
+   {
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%.7g", (double)v);
+      std::string r = buf;
+      if (r.find_first_of(".eEn") == std::string::npos) r += ".0";
+      return r;
+   }
+   float Lin(float c)
+   {
+      c = std::max(c, 0.0f);
+      return c < 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+   }
+}
+
+struct MaterialNode::LayerSurf
+{
+   std::string base, rough, metal, em, nrm, op, h; // nrm, op, h empty: the plain default
+};
+
+struct MaterialNode::LayerBuild
+{
+   ShadeBuild b;
+   std::string decl;
+   std::vector<float> values;
+   std::vector<std::pair<unsigned int, unsigned long long>> raw; // pictures after the Shade Image ones
+   int n = 0;
+   std::string Var(const std::string& prefix, const std::string& expr)
+   {
+      const std::string name = prefix + "_" + std::to_string(n++);
+      b.body += name + " = " + expr + "\n";
+      return name;
+   }
+   std::string Param(const std::string& name, float v, float lo, float hi)
+   {
+      v = std::clamp(v, lo, hi);
+      // The default is the range's low end, never v: the source stays the same text as the knob moves (live, row 3.4).
+      decl += "param float " + name + " = " + Num(lo) + " [" + Num(lo) + ", " + Num(hi) + "];\n";
+      values.push_back(v);
+      return name;
+   }
+   std::string Raw(const ImageCable& c)
+   {
+      const unsigned int t = c.Texture();
+      size_t k = 0;
+      while (k < raw.size() && raw[k].first != t) k++;
+      if (k == raw.size()) raw.push_back({ t, c.Revision() });
+      return "@R" + std::to_string(k) + "@";
+   }
+   // The heights the Shade Bumps emitted since `from` add up to, removed from the shared list.
+   std::string TakeHeights(size_t from)
+   {
+      std::string sum;
+      for (size_t i = from; i < b.heights.size(); i++) sum += (sum.empty() ? "" : " + ") + b.heights[i];
+      b.heights.resize(std::min(from, b.heights.size()));
+      return sum;
+   }
+};
+
+std::string MaterialNode::EmitLayerMask(const MaterialNode& L, const std::string& p, LayerBuild& lb) const
+{
+   std::string m = "1.0";
+   if (dynamic_cast<const ShadeNode*>(L.mLayerMask.Resolved()))
+      m = lb.b.Input(L.mLayerMask, "vec3(1.0)") + ".x";
+   else if (L.mLayerMask.Resolved() != nullptr)
+      m = lb.Var(p + "mk", "img(" + lb.Raw(L.mLayerMask) + ", UV)") + ".x";
+   const std::string mix = lb.Param(p + "mix", L.layerMix, 0.0f, 1.0f);
+   return lb.Var(p + "m", "clamp(" + m + " * " + mix + ", 0.0, 1.0)");
+}
+
+MaterialNode::LayerSurf MaterialNode::EmitLayer(const MaterialNode& L, const std::string& p, int depth, LayerBuild& lb) const
+{
+   LayerSurf s;
+   const size_t h0 = lb.b.heights.size();
+   auto shade = [&](const ImageCable& c) { return dynamic_cast<const ShadeNode*>(c.Resolved()) != nullptr; };
+   auto pic = [&](const ImageCable& c) { return c.Resolved() != nullptr && !shade(c); };
+   s.base = lb.Var(p + "b", "vec3(" + lb.Param(p + "cr", Lin(L.color[0]), 0, 1) + ", " + lb.Param(p + "cg", Lin(L.color[1]), 0, 1) +
+                                 ", " + lb.Param(p + "cb", Lin(L.color[2]), 0, 1) + ")");
+   s.rough = lb.Param(p + "ro", L.roughness, 0, 1);
+   s.metal = lb.Param(p + "me", L.metallic, 0, 1);
+   s.em = lb.Var(p + "e", "vec3(" + lb.Param(p + "er", Lin(L.emissionColor[0]) * L.emission, 0, 1000) + ", " +
+                             lb.Param(p + "eg", Lin(L.emissionColor[1]) * L.emission, 0, 1000) + ", " +
+                             lb.Param(p + "eb", Lin(L.emissionColor[2]) * L.emission, 0, 1000) + ")");
+   if (L.opacity < 1.0f) s.op = lb.Param(p + "op", L.opacity, 0, 1);
+   const ImageCable& albedo = L.mMaps[kMapAlbedo];
+   if (shade(L.mField)) s.base = lb.b.Input(L.mField, s.base);
+   else if (shade(albedo)) s.base = lb.b.Input(albedo, s.base);
+   else if (pic(albedo))
+   {
+      const std::string c = lb.Var(p + "ca", "imgc(" + lb.Raw(albedo) + ", UV)");
+      s.base = lb.Var(p + "b", s.base + " * vec3(" + c + ".x, " + c + ".y, " + c + ".z)");
+   }
+   auto scalar = [&](int map, std::string& v, const std::string& own)
+   {
+      const ImageCable& c = L.mMaps[map];
+      if (shade(c)) v = lb.b.Input(c, "vec3(0.0)") + ".x";
+      else if (pic(c)) v = lb.Var(p + "s", own + " * img(" + lb.Raw(c) + ", UV).x");
+   };
+   scalar(kMapRoughness, s.rough, s.rough);
+   scalar(kMapMetallic, s.metal, s.metal);
+   scalar(kMapOpacity, s.op, s.op.empty() ? std::string("1.0") : s.op);
+   const ImageCable& em = L.mMaps[kMapEmission];
+   if (shade(em)) s.em = lb.b.Input(em, s.em);
+   else if (pic(em))
+   {
+      const std::string c = lb.Var(p + "ce", "imgc(" + lb.Raw(em) + ", UV)");
+      s.em = lb.Var(p + "e", s.em + " * vec3(" + c + ".x, " + c + ".y, " + c + ".z)");
+   }
+   const ImageCable& nm = L.mMaps[kMapNormal];
+   if (shade(nm)) s.nrm = lb.b.Input(nm, "vec3(0.0, 0.0, 1.0)");
+   else if (pic(nm) && !L.normalBump)
+   {
+      const std::string c = lb.Var(p + "cn", "img(" + lb.Raw(nm) + ", UV)"), k = lb.Param(p + "ns", L.normalStrength, 0, 8);
+      s.nrm = lb.Var(p + "n", "normalize(vec3((" + c + ".x * 2.0 - 1.0) * " + k + ", (" + c + ".y * 2.0 - 1.0) * " + k + ", " +
+                                 c + ".z * 2.0 - 1.0))");
+   }
+   const std::string hs = lb.TakeHeights(h0);
+   if (!hs.empty()) s.h = lb.Var(p + "h", hs);
+   const auto* LL = dynamic_cast<const MaterialNode*>(L.layer);
+   if (LL && LL != &L && LL != this && depth < 3)
+   {
+      const LayerSurf u = EmitLayer(*LL, p + "l", depth + 1, lb);
+      const std::string m = EmitLayerMask(L, p, lb);
+      s = [&]
+      {
+         LayerSurf r;
+         auto mix3 = [&](const std::string& a, const std::string& b) { return "mix(" + a + ", " + b + ", vec3(" + m + "))"; };
+         auto mix1 = [&](const std::string& a, const std::string& b) { return "mix(" + a + ", " + b + ", " + m + ")"; };
+         r.base = lb.Var(p + "b", mix3(s.base, u.base));
+         r.rough = lb.Var(p + "r", mix1(s.rough, u.rough));
+         r.metal = lb.Var(p + "t", mix1(s.metal, u.metal));
+         r.em = lb.Var(p + "e", mix3(s.em, u.em));
+         if (!s.nrm.empty() || !u.nrm.empty())
+            r.nrm = lb.Var(p + "n", "normalize(" + mix3(s.nrm.empty() ? "vec3(0.0, 0.0, 1.0)" : s.nrm, u.nrm.empty() ? "vec3(0.0, 0.0, 1.0)" : u.nrm) + ")");
+         if (!s.op.empty() || !u.op.empty())
+            r.op = lb.Var(p + "o", mix1(s.op.empty() ? "1.0" : s.op, u.op.empty() ? "1.0" : u.op));
+         if (!s.h.empty() || !u.h.empty())
+            r.h = lb.Var(p + "h", mix1(s.h.empty() ? "0.0" : s.h, u.h.empty() ? "0.0" : u.h));
+         return r;
+      }();
+   }
+   return s;
+}
+
+bool MaterialNode::ComposeLayered(Material& m) const
+{
+   // Generated normalises by the object-space bounds of the mesh this material wraps.
+   const unsigned long long rev = input ? input->MeshRevision() : 0;
+   if (input && rev != mShadeBoundsRev)
+   {
+      mShadeBoundsRev = rev;
+      const Mesh& mesh = input->GetMesh();
+      if (!mesh.vertices.empty())
+      {
+         const Vertex& v0 = mesh.vertices[0];
+         mShadeLo[0] = mShadeHi[0] = v0.px; mShadeLo[1] = mShadeHi[1] = v0.py; mShadeLo[2] = mShadeHi[2] = v0.pz;
+         for (const Vertex& v : mesh.vertices)
+         {
+            mShadeLo[0] = std::min(mShadeLo[0], v.px); mShadeHi[0] = std::max(mShadeHi[0], v.px);
+            mShadeLo[1] = std::min(mShadeLo[1], v.py); mShadeHi[1] = std::max(mShadeHi[1], v.py);
+            mShadeLo[2] = std::min(mShadeLo[2], v.pz); mShadeHi[2] = std::max(mShadeHi[2], v.pz);
+         }
+      }
+   }
+   std::string err, src;
+   std::vector<std::pair<unsigned int, unsigned long long>> pics;
+   std::vector<float> values;
+   const auto* L = dynamic_cast<const MaterialNode*>(layer);
+   if (L == this) L = nullptr;
+   std::vector<ShadeOutput> outs;
+   ShadeOutputs(outs);
+   if (!L)
+   {
+      std::vector<const ShadeNode*> images;
+      src = ComposeShadeProgram(outs, mShadeLo, mShadeHi, err, &images);
+      for (const ShadeNode* n : images) pics.push_back({ n->ShadeImageTexture(), n->ShadeImageRevision() });
+   }
+   else
+   {
+      LayerBuild lb;
+      for (int i = 0; i < 3; i++) { lb.b.lo[i] = mShadeLo[i]; lb.b.hi[i] = mShadeHi[i]; }
+      lb.b.depth = 1;
+      // This material's own Shade outputs first, exactly as ComposeShadeProgram writes them.
+      for (const ShadeOutput& o : outs)
+      {
+         if (!o.node) continue;
+         auto it = lb.b.vars.find(o.node);
+         std::string v = it != lb.b.vars.end() ? it->second : o.node->Emit(lb.b);
+         lb.b.vars[o.node] = v;
+         const std::string ch = o.channel;
+         const bool sc = ch == "roughness" || ch == "metallic" || ch == "opacity";
+         lb.b.body += ch + " = " + v + (sc ? ".x" : "") + "\n";
+      }
+      const std::string ownH = lb.TakeHeights(0);
+      const LayerSurf u = EmitLayer(*L, "ly1", 1, lb);
+      const std::string mk = EmitLayerMask(*this, "ly0", lb);
+      std::string& out = lb.b.body;
+      out += "base = mix(base, " + u.base + ", vec3(" + mk + "))\n";
+      out += "roughness = mix(roughness, " + u.rough + ", " + mk + ")\n";
+      out += "metallic = mix(metallic, " + u.metal + ", " + mk + ")\n";
+      out += "emission = mix(emission, " + u.em + ", vec3(" + mk + "))\n";
+      if (!u.nrm.empty()) out += "normal = normalize(mix(normal, " + u.nrm + ", vec3(" + mk + ")))\n";
+      if (!u.op.empty() || mMaps[kMapOpacity].Resolved() || opacity < 1.0f)
+         out += "opacity = mix(opacity, " + (u.op.empty() ? std::string("1.0") : u.op) + ", " + mk + ")\n";
+      if (!u.h.empty() || !ownH.empty())
+         out += "height = mix(" + (ownH.empty() ? std::string("0.0") : ownH) + ", " + (u.h.empty() ? std::string("0.0") : u.h) + ", " + mk + ")\n";
+      err = lb.b.error;
+      const size_t nShade = lb.b.images.size();
+      if (err.empty() && nShade + lb.raw.size() > 4) err = "a material and its layers read at most four pictures";
+      if (err.empty())
+      {
+         src = lb.decl + out;
+         for (size_t k = 0; k < lb.raw.size(); k++)
+         {
+            const std::string tok = "@R" + std::to_string(k) + "@", slot = Num((float)(nShade + k));
+            for (size_t at = src.find(tok); at != std::string::npos; at = src.find(tok, at)) src.replace(at, tok.size(), slot);
+         }
+         for (const ShadeNode* n : lb.b.images) pics.push_back({ n->ShadeImageTexture(), n->ShadeImageRevision() });
+         for (const auto& r : lb.raw) pics.push_back(r);
+         values = lb.values;
+      }
+   }
+   for (size_t k = 0; k < pics.size() && k < 4; k++)
+   {
+      m.fieldImage[k] = pics[k].first;
+      m.fieldImageRev[k] = (unsigned int)pics[k].second;
+   }
+   // Knobs past the 16 live ones are baked, so a change there is a new program (row 3.4).
+   const bool tailMoved = values.size() > (size_t)Field::kMaterialLiveParams &&
+                          (mShadeValues.size() != values.size() ||
+                           !std::equal(values.begin() + Field::kMaterialLiveParams, values.end(), mShadeValues.begin() + Field::kMaterialLiveParams));
+   if (src != mShadeSource || tailMoved)
+   {
+      mShadeSource = src;
+      std::string rerr;
+      mShadeProgram = src.empty() ? 0 : Field::RegisterMaterialProgram(src, values, rerr);
+      if (!rerr.empty()) err = rerr;
+   }
+   mShadeValues = values;
+   if (!err.empty())
+      fprintf(stderr, "[Material] shading chain: %s\n", err.c_str());
+   for (size_t i = 0; i < values.size() && i < (size_t)Field::kMaterialLiveParams; i++) m.fieldParams[i] = values[i];
+   m.fieldProgram = mShadeProgram;
+   if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
+      m.opacityMapped = true;
+   return m.fieldProgram != 0;
 }
 
 unsigned long long MaterialNode::MaterialRevision() const
@@ -207,6 +426,10 @@ void MaterialNode::CookIfNeeded(int frameId)
          mMaps[map].Pull(frameId);
    if (mField.IsConnected())
       mField.Pull(frameId);
+   if (mLayerMask.IsConnected())
+      mLayerMask.Pull(frameId);
+   if (auto* l = dynamic_cast<INode*>(layer); l && l != this)
+      l->CookIfNeeded(frameId);
 }
 
 // ==================================================================== Mapping

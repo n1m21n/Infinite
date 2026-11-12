@@ -516,3 +516,13 @@ for _mel in (0.2, 0.5, 0.8):
     _o["material"] = dict(_o["material"], roughness=0.3)   # skin and fibre share one Material roughness
     _o["fur"] = dict(_o["fur"], hair={"melanin": _mel, "redness": 1.0, "roughness": 0.3, "radial": 0.3, "shift": 2.0, "ior": 1.55})
     CASES["hair_melanin_%g" % _mel] = dict(CASES["hair_long"], objects=[GREY_FLOOR, _o])
+
+
+# Row 4.1: layered materials. A gloss red paint over rough metal through a soft noise mask, and a 4-deep stack
+# (metal, paint, dirt, dust) where each layer's own mask sits inside its parent's. Blender: Mix Shaders on the masks.
+_METAL = {"base_color": [0.7, 0.7, 0.72], "metallic": 1.0, "roughness": 0.55}
+_PAINT = {"base_color": [0.6, 0.05, 0.04], "roughness": 0.15, "mask": "mask_noise"}
+CASES["layer_two"] = _row([_METAL, dict(_METAL, layer=_PAINT), _PAINT])
+CASES["layer_four"] = _row([dict(_METAL, layer=dict(_PAINT, layer={
+    "base_color": [0.18, 0.12, 0.06], "roughness": 0.9, "mask": "mask_dirt",
+    "layer": {"base_color": [0.75, 0.72, 0.65], "roughness": 0.8, "mask": "mask_dust"}}))])

@@ -365,6 +365,38 @@ for i, o in enumerate(scene["objects"]):
         p.inputs["Thin Film Thickness"].default_value = m["iridescence"] * m.get("iridescence_thickness", 400.0)
         p.inputs["Thin Film IOR"].default_value = m.get("iridescence_ior", 1.33)
     add_maps(mat, p, m.get("maps", {}), m)
+    if m.get("layer"):   # row 4.1: mix(base, mix(layer, its layer, its mask), mask) through Mix Shaders on UV masks
+        nt = mat.node_tree
+        def principled(lm):
+            q = nt.nodes.new("ShaderNodeBsdfPrincipled")
+            q.inputs["Base Color"].default_value = (*lm.get("base_color", (0.8, 0.8, 0.8)), 1)
+            q.inputs["Metallic"].default_value = lm.get("metallic", 0.0)
+            q.inputs["Roughness"].default_value = lm.get("roughness", 0.5)
+            q.inputs["Emission Color"].default_value = (*lm.get("emission", (0, 0, 0)), 1)
+            q.inputs["Emission Strength"].default_value = lm.get("emission_strength", 0.0)
+            return q.outputs["BSDF"]
+        def over(under, lm):
+            top = principled(lm)
+            if lm.get("layer"):
+                top = over(top, lm["layer"])
+            mx = nt.nodes.new("ShaderNodeMixShader")
+            mx.inputs["Fac"].default_value = lm.get("mix", 1.0)
+            if lm.get("mask"):
+                tc = nt.nodes.new("ShaderNodeTexCoord")
+                t = nt.nodes.new("ShaderNodeTexImage")
+                t.image = bpy.data.images.load(os.path.join(case, lm["mask"] + ".png"))
+                t.image.colorspace_settings.is_data = True
+                nt.links.new(tc.outputs["UV"], t.inputs["Vector"])
+                fac = t.outputs["Color"]
+                if lm.get("mix", 1.0) != 1.0:
+                    k = nt.nodes.new("ShaderNodeMath"); k.operation = 'MULTIPLY'
+                    k.inputs[1].default_value = lm["mix"]
+                    nt.links.new(t.outputs["Color"], k.inputs[0]); fac = k.outputs[0]
+                nt.links.new(fac, mx.inputs["Fac"])
+            nt.links.new(under, mx.inputs[1]); nt.links.new(top, mx.inputs[2])
+            return mx.outputs["Shader"]
+        out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+        nt.links.new(over(p.outputs["BSDF"], m["layer"]), out.inputs["Surface"])
     sh = m.get("shade")
     if sh and sh.get("tex") == "image":   # row 2.4: Texture Coordinate (UV) -> Image Texture -> Base Color
         nt = mat.node_tree

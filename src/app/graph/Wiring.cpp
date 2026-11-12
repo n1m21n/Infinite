@@ -439,7 +439,7 @@ namespace app
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
-         return 2 + kMapCount; // geometry, one pin per material channel, then field
+         return 4 + kMapCount; // geometry, one pin per material channel, field, then layer and its mask
       if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr)
          return Render3DNode::kEnvSlot + 1; // geo, camera, lights, env
       if (auto* op = dynamic_cast<GeometryOpNode*>(gn.node.get()))
@@ -626,6 +626,7 @@ namespace app
       if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
          {
          if (slot == MaterialNode::kFieldSlot) return &mat->FieldInput();
+         if (slot == MaterialNode::kMaskSlot) return &mat->LayerMaskInput();
          return (slot >= 1 && slot <= kMapCount) ? &mat->MapInput(slot - 1) : nullptr;
       }
       // Slot 0 is the geometry pin, wired by pointer in ConnectGeometrySlot;
@@ -846,6 +847,8 @@ namespace app
          else
             return false;
       }
+      else if (dstMaterial != nullptr && slot == MaterialNode::kLayerSlot)
+         return dynamic_cast<MaterialNode*>(srcGeometry) != nullptr; // row 4.1: a Material only (one on itself is ignored)
       else if (dstNode->node->GeometryInputSlot(slot) != nullptr)
          return srcGeometry != nullptr && srcCamera == nullptr && srcLight == nullptr;
       else if (dstMaterial != nullptr)
