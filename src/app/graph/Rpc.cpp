@@ -1,5 +1,8 @@
 // RPC command handler (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/Notices.h"
+#include <filesystem>
+#include <fstream>
 #include "imgui_internal.h"
 
 namespace app
@@ -477,7 +480,7 @@ namespace app
       else if (method == "set_param")
       {
          const int index = params.value("index", -1);
-         const std::string name = params.value("name", std::string());
+         std::string name = params.value("name", std::string());
          GraphNode* gn = FindNodeByIndex(index);
          if (gn == nullptr)
          {
@@ -493,7 +496,7 @@ namespace app
          for (const auto& kv : raw)
          {
             const size_t sp = kv.first.find(' ');
-            if (sp != std::string::npos && kv.first.substr(sp + 1) == name)
+            if (sp != std::string::npos && (kv.first.substr(sp + 1) == name || kv.first == name))  // fork: "uRotation" or "f uRotation"
             {
                matchedKey = kv.first;
                break;
@@ -501,9 +504,13 @@ namespace app
          }
          if (matchedKey.empty())
          {
-            outError = "unknown param '" + name + "' on this node";
+            std::string keys;
+            for (const auto& kv : raw)
+               keys += (keys.empty() ? "" : ", ") + kv.first;
+            outError = "unknown param '" + name + "' on this node. Its keys: " + keys + ". Example: {\"index\":" + std::to_string(index) + ",\"name\":\"<key>\",\"value\":0.5}";
             return false;
          }
+         name = matchedKey.substr(matchedKey.find(' ') + 1);
          std::string valueStr;
          if (params.contains("value"))
          {
@@ -862,7 +869,7 @@ namespace app
          const PatchSchema::TypeSchema* ts = SchemaFor(type);
          if (ts == nullptr)
          {
-            outError = "unknown node type '" + type + "'";
+            outError = "unknown node type '" + type + "'. Call describe with no type to list the valid names (exact spelling, e.g. as list_node_types prints them).";
             return false;
          }
          json pj = json::array(), in = json::array(), out = json::array();
@@ -951,13 +958,69 @@ namespace app
       }
       else if (method == "save_patch")
       {
-         const std::string path = params.value("path", std::string());
-         if (!SavePatchTo(path))
+         // fork: an agent's save never pops the modal error and never guesses: no path = the open patch's own file;
+         // missing folders are created; the answer says where it went or exactly why not.
+         std::string path;
+         if (const json pv = params.value("path", json()); pv.is_string())
+            path = pv.get<std::string>();
+         else if (!pv.is_null())
          {
-            outError = gPatchStatus;
+            outError = "path must be a string. Example: {\"path\":\"/Users/me/song.inf\"}";
             return false;
          }
-         outResult = json::object();
+         if (path.empty())
+            path = gPatchPath;
+         if (path.empty())
+         {
+            outError = "The patch has no file yet and no path was given. Ask the user where to save it, then call save_patch with an absolute path.";
+            return false;
+         }
+         namespace fs = std::filesystem;
+         std::error_code ec;
+         const fs::path target = AppPaths::FsPath(path);
+         if (!target.is_absolute())
+         {
+            outError = "'" + path + "' is not an absolute path. Use a full path such as /Users/me/song.inf (or C:\\Users\\me\\song.inf).";
+            return false;
+         }
+         if (fs::is_directory(target, ec))
+         {
+            outError = "'" + path + "' is a folder; give a file name ending in .inf";
+            return false;
+         }
+         const fs::path folder = target.parent_path();
+         bool created = false;
+         if (!folder.empty() && !fs::exists(folder, ec))
+         {
+            created = fs::create_directories(folder, ec);
+            if (ec || !fs::is_directory(folder, ec))
+            {
+               outError = "Could not create the folder '" + folder.string() + "': " + (ec ? ec.message() : std::string("unknown error")) +
+                          ". Check the path is valid and writable, or ask the user for another place.";
+               Notices::Post(Notices::Level::Warning, "patch.save.agent", "An agent could not save the patch", outError);
+               return false;
+            }
+         }
+         {
+            // Writable? Tested with a scratch file so a refusal comes back here instead of as a modal on screen.
+            const fs::path probe = folder / ".infinite-write-test";
+            std::ofstream t(probe);
+            const bool writable = t.good();
+            t.close();
+            fs::remove(probe, ec);
+            if (!writable)
+            {
+               outError = "No permission to write in '" + folder.string() + "'. Ask the user for a folder they can write to.";
+               Notices::Post(Notices::Level::Warning, "patch.save.agent", "An agent could not save the patch", outError);
+               return false;
+            }
+         }
+         if (!SavePatchTo(path))
+         {
+            outError = gPatchStatus + " (path: " + path + ")";
+            return false;
+         }
+         outResult = { { "saved", fs::absolute(target, ec).string() }, { "createdFolders", created } };
          return true;
       }
       else if (method == "load_patch")

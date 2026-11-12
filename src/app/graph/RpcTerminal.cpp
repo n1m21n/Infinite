@@ -141,13 +141,38 @@ namespace app
       }
       if (method == "set_expr" || method == "bind_mod" || method == "unbind_mod")
       {
-         GraphNode* gn = FindNodeByIndex(params.value(method == "bind_mod" ? "dst" : "index", -1));
+         // fork: also accept the shapes an agent naturally writes: dst / src as {index, output, param|key}.
+         const json& dstField = method == "bind_mod" ? params.value("dst", json()) : params.value("index", json());
+         int dstIndex = dstField.is_number_integer() ? dstField.get<int>() : -1;
+         std::string key;
+         if (const json k = params.value("key", json()); k.is_string())
+            key = k.get<std::string>();
+         if (dstField.is_object())
+         {
+            dstIndex = dstField.value("index", -1);
+            for (const char* name : { "key", "param", "name" })
+               if (dstField.contains(name) && dstField[name].is_string() && key.empty())
+                  key = dstField[name].get<std::string>();
+         }
+         GraphNode* gn = FindNodeByIndex(dstIndex);
          if (gn == nullptr)
          {
-            outError = "unknown node index";
+            outError = "unknown node index (dst/index must be an integer node index from get_graph)";
             return true;
          }
-         const int param = ParamIndexOfKey(*gn, params.value("key", std::string()), outError);
+         // A bare name ("uRotation") works as well as the typed key ("f uRotation").
+         std::string tryKey = key;
+         int param = ParamIndexOfKey(*gn, tryKey, outError);
+         for (const char* prefix : { "f ", "i ", "b ", "c ", "s " })
+            if (param < 0 && key.find(' ') == std::string::npos && !key.empty())
+            {
+               std::string e2;
+               const int p2 = ParamIndexOfKey(*gn, std::string(prefix) + key, e2);
+               if (p2 >= 0)
+                  param = p2;
+            }
+         if (param >= 0)
+            outError.clear();
          if (param < 0)
             return true;
          if (method == "set_expr")
@@ -180,8 +205,12 @@ namespace app
          }
          else
          {
-            GraphNode* src = FindNodeByIndex(params.value("src", -1));
-            const int output = params.value("output", 0);
+            const json srcField = params.value("src", json());
+            const int srcIndex = srcField.is_number_integer() ? srcField.get<int>() : srcField.is_object() ? srcField.value("index", -1) : -1;
+            GraphNode* src = FindNodeByIndex(srcIndex);
+            int output = params.value("output", json()).is_number_integer() ? params.value("output", 0) : 0;
+            if (srcField.is_object() && srcField.value("output", json()).is_number_integer())
+               output = srcField.value("output", 0);
             if (src == nullptr || output < 0 || output >= GraphNode::kStride - GraphNode::kOutputBase)
             {
                outError = "unknown modulator node or output";

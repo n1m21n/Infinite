@@ -38,7 +38,7 @@ Or run the CLI directly (same app binary): `{EXE} --cli context` with env `INFIN
 
 ## 2. Check the connection
 
-1. `initialize`, then `tools/list`: you must see `infinite_context`, `infinite_cli`, `infinite_rpc`, `infinite_rpc_methods`.
+1. `initialize`, then `tools/list`: you must see `infinite_context`, `infinite_cli`, `infinite_rpc`, `infinite_rpc_methods`, `infinite_rpc_help`.
 2. Call `infinite_context` with `{}`. A text answer describing the open patch means it works.
 3. HTTP 401 = wrong or missing token. Connection refused = Infinite is closed, or the server is switched off (Settings → Agents & Terminal → Connect Infinite to an outside agent). Tell the user; do not retry in a loop.
 
@@ -48,8 +48,21 @@ Or run the CLI directly (same app binary): `{EXE} --cli context` with env `INFIN
 |---|---|---|
 | `infinite_context` | none | State of the open patch: nodes, cables, what is selected, hints. Call first and after each change. |
 | `infinite_cli` | `args`: array of strings, e.g. `["add","Oscillator"]` | Runs one `infinite` command. The commands are the whole editing language: `add <type> [x y]`, `remove <node>`, `connect <src[:out]> <dst[:slot]>`, `disconnect`, `set <node.param> <value>`, `undo`, `docs [topic]`, `find <words>`, `guide`. Run `["help"]` for the full list. |
-| `infinite_rpc` | `method`: string, `params`: object | Low-level JSON-RPC of the app (same as the control socket). Use only when `infinite_cli` has no command. |
-| `infinite_rpc_methods` | none | The method names `infinite_rpc` accepts. |
+| `infinite_rpc` | `method`: string, `params`: object | Low-level JSON-RPC of the app (same as the control socket). Wrong or missing fields return `isError` with the method's example, never a crash. |
+| `infinite_rpc_methods` | none | **Every method with its parameters and a working example.** Read it before the first `infinite_rpc` call. |
+| `infinite_rpc_help` | `method`: string | The same for one method. |
+
+## 3b. RPC cheat sheet (details: `infinite_rpc_methods`)
+
+- Node indexes are integers from `get_graph` (`nodes[].index`). Never pass objects where an index is expected (`"dst":5`, not `"dst":{"index":5}`; the nested form is tolerated for `bind_mod` only).
+- Control keys have a type-letter prefix: `f uRotation` (float), `i`, `b`, `c`, `s`. `get_params` / `describe` print them. `set_param` accepts the key with or without the letter (`uRotation`); `bind_mod`/`set_expr` too.
+- Type names for `create_node`/`describe` are exact (`describe` with no `type` lists them).
+- Set a value: `infinite_rpc {"method":"set_param","params":{"index":5,"name":"uRotation","value":0.5}}`.
+- Set an expression: same call with a string value that starts with `=`: `"value":"=sin(t)*0.3"`, or `set_expr` with `text`.
+- Modulate a control from another node: `bind_mod {"dst":5,"key":"f uRotation","src":4,"output":0,"lo":0,"hi":1}`; remove with `unbind_mod {"index":5,"key":"f uRotation"}`.
+- Cables: `connect {"srcIndex":4,"srcOutput":0,"dstIndex":5,"dstSlot":0}`; `disconnect {"linkId":N}` (ids in `get_graph`).
+- Save the patch: `save_patch {"path":"/abs/path/name.inf"}`. With no `path` it writes to the open patch's own file; if the patch has no file yet it returns an error. In that case do not invent a path: ask the user where to save. The path must be absolute; missing folders are created; the answer is `{"saved":"<real absolute path>"}` or an error that names the reason (no folder rights, not absolute, is a folder). Open with `load_patch {"path":...}`.
+- Undo your own change: `undo`.
 
 ## 4. Recommended workflow
 
@@ -64,4 +77,4 @@ Or run the CLI directly (same app binary): `{EXE} --cli context` with env `INFIN
 - Loopback only. Do not try to reach it from another machine.
 - The token is a secret of the user's. Do not write it to files, logs, commits or messages other than their own client config.
 - A "show lock" in the app blocks edits that move the graph; the error says so. Ask the user to unlock it.
-- Not verified: Windows behaviour of `infinite_cli`.
+- `infinite_context` works without the CLI (it reads the app's RPC in-process), so it also works on Windows. Not verified: `infinite_cli` on Windows.

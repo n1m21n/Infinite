@@ -12,6 +12,7 @@
 #include "core/chat/HttpAgent.h"
 #include "core/chat/Providers.h"
 #include "core/McpHttp.h"
+#include "core/RemoteControl.h"
 #include "platform/AgentNet.h"
 #include "core/chat/ReplyLinks.h"
 #include "core/chat/ChatGuide.h"
@@ -270,7 +271,7 @@ namespace app
                check(sc.text == "Hello" && sc.calls.size() == 1 && sc.calls[0].id == "c1" && sc.calls[0].name == "infinite_cli" && sc.calls[0].args == "{\"args\":[\"undo\"]}" &&
                         sc.finish == "tool_calls" && sc.usage.input == 60 && sc.usage.cached == 40 && sc.usage.output == 7 && sc.done,
                      "custom: SSE chunks give text, a tool call assembled from pieces, usage");
-               check(chat::OpenAiTools().size() == 4 && chat::OpenAiTools()[0]["type"] == "function" && chat::DescribeCall("infinite_cli", nlohmann::json::parse("{\"args\":[\"add\",\"Osc\"]}")) == "infinite add Osc",
+               check(chat::OpenAiTools().size() == 5 && chat::OpenAiTools()[0]["type"] == "function" && chat::DescribeCall("infinite_cli", nlohmann::json::parse("{\"args\":[\"add\",\"Osc\"]}")) == "infinite add Osc",
                      "custom: Infinite's tools are offered in OpenAI form");
             }
          }
@@ -296,6 +297,81 @@ namespace app
                const chat::ConnectionResult cr = chat::TestConnection(hc);
                check(cr.ok, "mock llm: test connection says connected");
                AgentNet::SecretDelete(chat::kKeyService, chat::kKeyAccount);
+            }
+            {  // fork: no RPC method may take the app down. Each method gets {}, wrong types and absent indices through
+               // the same guard the control socket and the HTTP MCP use.
+               static const char* const kKeys[] = { "index", "type", "typeName", "name", "value", "key", "src", "dst", "output", "text", "calls", "nodes",
+                                                    "action", "srcIndex", "dstIndex", "srcOutput", "dstSlot", "linkId", "what", "x", "y", "bypassed",
+                                                    "lo", "hi", "id", "category", "full", "all", "advanced", "bpm", "seconds" };
+               // Writes files, replaces the patch or changes app settings: only called with values that are not strings.
+               static const char* const kGuarded[] = { "save_patch", "load_patch", "new_patch", "settings", "load_patch_text", "batch", "edit", "transport", "view" };
+               const std::vector<nlohmann::json> garbage = { nullptr, true, -1, 987654, 1.5, nlohmann::json::array({ 1, "a" }), nlohmann::json::object({ { "index", 4 }, { "output", 11 } }) };
+               int bad = 0, calls = 0;
+               std::string firstBad;
+               for (const std::string& method : McpHttp::RpcMethodNames())
+               {
+                  if (method == "undo" || method == "redo" || method == "new_patch")
+                     continue;  // take no parameters and would change the state later checks rely on
+                  const bool guarded = std::find(std::begin(kGuarded), std::end(kGuarded), method) != std::end(kGuarded);
+                  std::vector<nlohmann::json> payloads = { nlohmann::json::object() };
+                  for (const nlohmann::json& g : garbage)
+                  {
+                     nlohmann::json p = nlohmann::json::object();
+                     for (const char* k : kKeys)
+                        p[k] = g;
+                     payloads.push_back(p);
+                  }
+                  if (!guarded)
+                  {
+                     nlohmann::json p = nlohmann::json::object();
+                     for (const char* k : kKeys)
+                        p[k] = "zzz-not-a-thing";
+                     payloads.push_back(p);
+                  }
+                  for (const nlohmann::json& payload : payloads)
+                  {
+                     if (guarded && method != "view" && method != "transport" && method != "edit" && method != "batch" && !payload.empty() && payload.begin().value().is_string())
+                        continue;
+                     nlohmann::json out;
+                     std::string err;
+                     calls++;
+                     bool ok = false;
+                     try
+                     {
+                        ok = RemoteControl::SafeDispatch(app::HandleRpcCommand, method, payload, out, err);
+                     }
+                     catch (...)
+                     {
+                        bad++;
+                        if (firstBad.empty())
+                           firstBad = method + " threw";
+                     }
+                     if (!ok && err.empty())
+                     {
+                        bad++;
+                        if (firstBad.empty())
+                           firstBad = method + " failed without a message";
+                     }
+                  }
+               }
+               check(bad == 0 && calls > 100, ("rpc fuzz: every method survives odd input with a message (" + std::to_string(calls) + " calls) " + firstBad).c_str());
+               nlohmann::json out;
+               std::string err;
+               const bool ok = RemoteControl::SafeDispatch(app::HandleRpcCommand, "bind_mod",
+                                                           nlohmann::json::parse(R"({"src":{"index":4,"output":11},"dst":{"index":5,"param":"uRotation"}})"), out, err);
+               check(!ok && !err.empty() && err.find("unknown node index") != std::string::npos, "rpc: bind_mod with nested src/dst on a missing node is an error, not a crash");
+               {  // save_patch: errors name the reason and nothing is written
+                  nlohmann::json o2;
+                  std::string e2;
+                  const bool rel = RemoteControl::SafeDispatch(app::HandleRpcCommand, "save_patch", nlohmann::json::parse(R"({"path":"relative/x.inf"})"), o2, e2);
+                  check(!rel && e2.find("absolute") != std::string::npos, "save_patch: a relative path is refused with the reason");
+                  const bool num = RemoteControl::SafeDispatch(app::HandleRpcCommand, "save_patch", nlohmann::json::parse(R"({"path":12})"), o2, e2);
+                  check(!num && e2.find("string") != std::string::npos, "save_patch: a non-string path is refused with an example");
+               }
+               nlohmann::json ex;
+               check(!RemoteControl::SafeDispatch([](const std::string&, const nlohmann::json&, nlohmann::json&, std::string&) -> bool { throw std::runtime_error("boom"); },
+                                                  "connect", nlohmann::json::object(), ex, err) && err.find("Example:") != std::string::npos,
+                     "rpc: a throwing handler becomes an error that quotes an example");
             }
             {  // fork: the in-app MCP over HTTP answers the protocol without a socket
                const std::string init = McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\"}}");

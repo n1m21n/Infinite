@@ -46,6 +46,11 @@ namespace RemoteControl
 
    // fork: run one request from any thread (the in-app MCP over HTTP, core/McpHttp.cpp) through the same queue
    // and handler as a socket client. Waits for the main thread up to `timeoutMs`. False, error set, on failure.
+   // Runs `handler` so that nothing it throws (a field of the wrong JSON type is the usual cause) reaches the main
+   // loop: the call fails with a message that names the method and quotes a working example.
+   bool SafeDispatch(const Handler& handler, const std::string& method, const nlohmann::json& params, nlohmann::json& outResult,
+                     std::string& outError);
+
    bool Call(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError,
              int timeoutMs = 30000);
 }

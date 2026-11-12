@@ -1,5 +1,7 @@
 #include "RemoteControl.h"
 
+#include "McpHttp.h"
+
 #include "platform/NetCompat.h"
 
 #include <chrono>
@@ -234,6 +236,36 @@ namespace RemoteControl
       return gToken;
    }
 
+   bool SafeDispatch(const Handler& handler, const std::string& method, const nlohmann::json& params, nlohmann::json& outResult,
+                     std::string& outError)
+   {
+      auto fail = [&](const std::string& why)
+      {
+         const std::string ex = McpHttp::RpcExample(method);
+         outError = "bad parameters for '" + method + "': " + why + (ex.empty() ? std::string() : ". Example: " + ex) +
+                    ". Call infinite_rpc_methods for every method's parameters.";
+         return false;
+      };
+      if (!params.is_object())
+         return fail("params must be a JSON object");
+      try
+      {
+         return handler(method, params, outResult, outError);
+      }
+      catch (const nlohmann::json::exception& e)
+      {
+         return fail(std::string("a field has the wrong type or is missing (") + e.what() + ")");
+      }
+      catch (const std::exception& e)
+      {
+         return fail(e.what());
+      }
+      catch (...)
+      {
+         return fail("unexpected failure");
+      }
+   }
+
    void DrainPending(const Handler& handler)
    {
       std::deque<PendingCommand*> batch;
@@ -255,7 +287,7 @@ namespace RemoteControl
          {
             std::string error;
             json out;
-            if (handler(cmd->method, cmd->params, out, error))
+            if (SafeDispatch(handler, cmd->method, cmd->params, out, error))
             {
                cmd->response.set_value(out);
             }

@@ -6,6 +6,7 @@
 #include "json.hpp"
 
 #include <string>
+#include <vector>
 
 namespace McpHttp
 {
@@ -35,4 +36,8 @@ namespace McpHttp
    nlohmann::json ToolsJson();
    nlohmann::json CallToolJson(const std::string& name, const nlohmann::json& args);
    nlohmann::json TextResultJson(const std::string& text, bool error);
+   // Parameters and a working example of each infinite_rpc method ("" when unknown); the RPC error text quotes it.
+   std::string RpcExample(const std::string& method);
+   nlohmann::json RpcHelp(const std::string& method);   // one method, or all when empty
+   std::vector<std::string> RpcMethodNames();
 }
