@@ -803,7 +803,7 @@ cable out_screen 0 color_grade 0</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>Build procedural 3D trees and fractals using L-system branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_l_system_procedural_3d_branching_fractals.png" alt="L-system procedural 3D branching diagram showing rewrite grammar, turtle orientation vectors, tree hierarchy, and node graph" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_l-system-procedural-3d-branching-fractals.png" alt="L-system procedural 3D branching diagram showing rewrite grammar, turtle orientation vectors, tree hierarchy, and node graph" /></p>
 <p>An l-system procedural 3d branching architecture brings the algorithmic elegance of formal rewriting grammars into real-time computer graphics and modular audiovisual performance. In traditional generative design, procedural geometry often relies on explicit loops, mathematical trigonometric functions, or Perlin noise fields. While noise produces organic displacement and sine waves yield predictable oscillation, neither method captures the developmental morphology of living organisms: structured self-similarity, hierarchical vascular branching, and recursive form unfolding across space and time.</p>
 <p>In modular workstations like <a href="https://infinitedevices.org/">Infinite</a>, the Lindenmayer system bridges formal language theory, three-dimensional geometry, and live sound design. By evaluating production rules inside a native <code>L-System</code> node, creative coders can grow intricate botanical canopies, generate procedural coral and crystal formations, and modulate geometric growth parameters live using incoming audio frequencies.</p>
 <p>Here is how Lindenmayer grammars operate, how three-dimensional turtle geometry navigates space, how branch strands are swept into watertight polygonal tubes, and how to patch audio-reactive procedural trees on a unified canvas.</p>
@@ -1607,7 +1607,7 @@ col = mix(base_col, pulse_col, tunnel * ridges + core * energy);</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_hardware_midi.png" alt="generative midi note nodes and algorithmic sequencers in Infinite DAW" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_every-note-node-in-infinite-generative-sequencing-guide.png" alt="generative midi note nodes and algorithmic sequencers in Infinite DAW" /></p>
 <p>In traditional music production environments, MIDI is treated as a static piano roll. Notes are clicked onto a grid, quantised rigidly, and routed through a single linear track directly into a virtual instrument.</p>
 <p>Infinite re-imagines MIDI and musical timing as an open, modular stream of discrete note events. Notes are not passive rows in an arrangement; they are first-class signals that flow through cables, branch across splitters, undergo algorithmic transformations, and drive both sound engines and 3D visual geometry in real time.</p>
 <p>Infinite provides twenty-four dedicated note processing nodes, spanning hardware input bridges, rhythmic arpeggiators, Markov-chain phrase predictors, physics-based trigger simulations, scale quantizers, and programmable algorithmic note generators.</p>
@@ -1864,7 +1864,7 @@ emit_note(note_out, 90, 120) // pitch, velocity, duration_ms</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>The complete guide to all 20 synthesizer nodes in Infinite: subtractive, wavetable, FM, physical modeling, granular, spectral resynthesis, and DSP kernels.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_sound_design_synth.png" alt="modular synthesizer nodes and sound design instruments in Infinite DAW" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_every-synthesizer-node-in-infinite-sound-design-guide.png" alt="modular synthesizer nodes and sound design instruments in Infinite DAW" /></p>
 <p>Most digital audio workstations isolate sound generation inside third-party plugins. You purchase an instrument, load a floating window, navigate vendor-specific preset systems, and route stereo audio into a rigid mixer channel.</p>
 <p>Infinite approaches synthesis from a different foundation. Every synthesizer lives directly on the open canvas as a modular node. Notes, audio streams, modulation voltages, and visual textures share the same graph and memory space. A single LFO can sweep a wavetable position while warping a 3D geometry mesh, and a reaction-diffusion simulation can directly generate polyphonic audio timbre.</p>
 <p>Infinite features twenty native synthesizer engines, spanning virtual analog, morphing wavetables, 4-operator frequency modulation, Karplus-Strong waveguides, granular cloud generators, extreme spectral time-stretchers, and per-sample programmable JIT kernels.</p>
@@ -2081,7 +2081,7 @@ out = tanh(raw * 1.5) * gate</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to build a real-time raymarcher in GLSL: sphere tracing algorithm, primitive distance functions, smooth blending, normals, and audio-reactive scenes.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_raymarching_signed_distance_fields_in_real_time_glsl.png" alt="Raymarching signed distance fields diagram showing sphere tracing steps, primitive distance functions, polynomial smooth min blending, and lighting normals" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_raymarching-signed-distance-fields-in-real-time-glsl.png" alt="Raymarching signed distance fields diagram showing sphere tracing steps, primitive distance functions, polynomial smooth min blending, and lighting normals" /></p>
 <p>Building a system for raymarching signed distance fields in real-time GLSL provides a powerful alternative to traditional polygonal rasterisation. While standard 3D rendering pipelines rely on vertex buffers, index arrays, and triangle meshes, raymarching computes three-dimensional surfaces procedurally inside a fragment shader. Every geometric volume, smooth Boolean blend, and fractal surface is evaluated mathematically for every individual pixel on the screen.</p>
 <p>In modern audiovisual software such as <a href="https://infinitedevices.org/">Infinite</a>, raymarching allows visual artists and audio producers to bridge the gap between mathematical graphics and low-latency audio synthesis. Because signed distance fields are defined purely through mathematical equations, parameters such as scale, repetition, twisting, and morphing can be cabled directly to live audio frequency bands, envelope followers, and LFO modulators without regenerating vertex buffers or stalling the graphics pipeline.</p>
 <p>Here is an architectural walkthrough of how sphere tracing works, how to construct signed distance functions (SDFs) for common 3D primitives, how to blend geometry organically with polynomial smooth minimums, and how to wire a complete audio-reactive raymarching pipeline inside Infinite.</p>
@@ -2281,7 +2281,7 @@ param float u_smooth = 0.3 [0.05, 1.0]</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to implement real-time Eulerian fluid simulation in GLSL: velocity advection, multigrid pressure solves, vorticity confinement, and audio reactivity.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_real_time_fluid_simulation_in_glsl.png" alt="Real-time fluid simulation in GLSL diagram showing velocity advection, pressure Poisson solve, vorticity confinement, and audio-reactive dye mixing" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_real-time-fluid-simulation-in-glsl.png" alt="Real-time fluid simulation in GLSL diagram showing velocity advection, pressure Poisson solve, vorticity confinement, and audio-reactive dye mixing" /></p>
 <p>Implementing real-time fluid simulation in GLSL provides creative coders and visual artists with an organic medium for live performance, interactive installations, and audiovisual synthesis. Unlike particle-based systems or static procedural distortions, a Navier-Stokes fluid solver models the conservation of mass and momentum across a continuous vector field. When applied to visual media, live video feeds and generative graphics become dynamic dyes that swirl, fold, and disperse according to physical laws.</p>
 <p>In real-time audiovisual software such as <a href="https://infinitedevices.org/">Infinite</a>, fluid dynamics can be driven directly by incoming sound and camera motion. Because audio frequency bands and optical flow vectors can be mapped to velocity injection points, the fluid reacts with zero perceptible delay to live musical performance.</p>
 <p>This guide walks through the complete mathematical and architectural implementation of an Eulerian fluid solver on the GPU: the staggered Marker-and-Cell (MAC) grid layout, unconditionally stable semi-Lagrangian advection, geometric multigrid Poisson solvers for incompressibility, vorticity confinement for preserving turbulence, and live audio-reactive modulation.</p>
@@ -2462,7 +2462,7 @@ float faceU(sampler2D vt, sampler2D obs, ivec2 p, ivec2 sz) {
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to build a reaction-diffusion simulation in real-time GLSL shaders and nodes, creating generative Turing patterns with audio-reactive parameter modulation.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_reaction_diffusion_simulation_in_real_time_glsl.png" alt="Reaction-diffusion simulation diagram showing chemical morphogenesis equations, 9-point Laplacian convolution stencil, and node graph" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_reaction-diffusion-simulation-in-real-time-glsl.png" alt="Reaction-diffusion simulation diagram showing chemical morphogenesis equations, 9-point Laplacian convolution stencil, and node graph" /></p>
 <p>A reaction-diffusion simulation in real-time GLSL brings the organic complexity of natural morphogenesis directly into creative coding and live visual performance. From the spots on a leopard and the stripes on a zebrafish to coral formations and cellular colonies, biological patterns are rarely drawn with static geometry. Instead, they grow out of non-linear chemical interactions where substances spread, react, and compete across space.</p>
 <p>In audiovisual environments like <a href="https://infinitedevices.org/">Infinite</a>, reaction-diffusion simulations can run entirely on the GPU, updating at high frame rates while reacting to incoming sound. By coupling partial differential equations to real-time audio analysis, artists can guide chemical morphogenesis with musical rhythm, using bass frequencies to seed new matter and high frequencies to trigger cell division.</p>
 <p>Here is how the underlying chemistry works, how to discretise the equations for GLSL execution, and how to patch an audio-reactive reaction-diffusion pipeline using both native nodes and custom Field kernels.</p>
@@ -2676,7 +2676,7 @@ col = bg + warm_ring + shimmer;</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to build a Lorenz attractor interactive simulation in real time using differential equations, interactive Sketch code, and audio modulation.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_lorenz_attractor_interactive_simulation.png" alt="Lorenz attractor interactive simulation diagram displaying differential equations, phase space trajectories, and modular node wiring" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_lorenz-attractor-interactive-simulation.png" alt="Lorenz attractor interactive simulation diagram displaying differential equations, phase space trajectories, and modular node wiring" /></p>
 <p>A Lorenz attractor interactive simulation brings the non-linear elegance of deterministic chaos into modern creative coding and live audiovisual performance. In traditional generative art, procedural movement often relies on periodic functions like sine waves or pseudorandom noise fields. While periodic functions offer predictable repetition and noise fields produce uncorrelated drifting, neither captures the natural tension of complex physical systems: structured form that evolves continuously without ever repeating.</p>
 <p>In modular workstations like <a href="https://infinitedevices.org/">Infinite</a>, the Lorenz attractor bridges mathematics, real-time computer graphics, and modular sound design. By evaluating its three coupled differential equations inside a programmable canvas, artists can project intricate three-dimensional phase space paths, modulate attractor dynamics live with audio frequencies, and sonify chaotic coordinates into synthesiser parameters.</p>
 <p>Here is how the underlying non-linear mathematics work, how to implement the simulation inside a <code>Sketch</code> node, and how to patch chaotic variables across visual and audio nodes on a single canvas.</p>
@@ -2852,7 +2852,7 @@ function draw(t) {
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to generate Euclidean rhythm sequencer algorithms using Bjorklund integer distribution, modular arithmetic, and audio-reactive triggers in Infinite.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_euclidean_rhythm_sequencer.png" alt="Euclidean rhythm sequencer algorithm diagram showing geometric hit distributions and modular node patching" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_euclidean-rhythm-sequencer-algorithm.png" alt="Euclidean rhythm sequencer algorithm diagram showing geometric hit distributions and modular node patching" /></p>
 <p>A Euclidean rhythm sequencer algorithm distributes a fixed number of active musical pulses as evenly as possible across a discrete timeline of metric steps. First identified in computer science by E. Bjorklund in 2003 for timing neutron accelerators at Los Alamos, and brought into music theory by Godfried Toussaint in 2005, Euclidean rhythms revealed a startling truth: the mathematical distribution of pulses on a circle generates the foundational rhythmic structures of traditional music worldwide.</p>
 <p>In modern modular synthesis and creative coding environments like <a href="https://infinitedevices.org/">Infinite</a>, Euclidean sequencers provide an elegant alternative to static step grids. Because the pattern emerges directly from two integer parameters, pulse count and step length, composers can morph complex groove structures live without editing step arrays by hand.</p>
 <p>Here is how the mathematics work, how to implement the algorithm in a single line of procedural code, and how to patch Euclidean triggers into synthesizers and 3D geometry simultaneously.</p>
@@ -2922,7 +2922,7 @@ if (tick(1/16) &gt; 0.5) {
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to embed responsive, microphone-reactive 3D WebGL visualisers into portfolios, documentation, and blogs using self-contained HTML iframes.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_webgl_audio_visualizer_embed.png" alt="interactive webgl audio reactive visual running inside an iframe embed" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_interactive-audio-reactive-webgl-embeds-for-websites.png" alt="interactive webgl audio reactive visual running inside an iframe embed" /></p>
 <p>Adding an interactive audio visualizer embed to a technical portfolio, documentation page, or creative release announcement often sounds simpler than it turns out to be. In practice, embedding real-time generative computer graphics on the web usually means pulling in large third-party runtime bundles, wrangling WebAudio permission policies, managing asset loading cascades, and debugging WebGL canvas resize glitches across mobile viewports.</p>
 <p>Infinite approaches web graphics from a different perspective. Because Infinite compiles procedural fragment shaders, JavaScript sketches, and per-sample audio DSP nodes into self-contained formats, its web export pipeline generates standalone HTML widgets that require zero external dependencies, zero CDN requests, and zero script frameworks.</p>
 <p>Here is how these embeds are structured, how the microphone reactivity works, and how you can place one on any page with a standard iframe.</p>
@@ -3022,7 +3022,7 @@ document.getElementById("btn-audio").addEventListener("click", async () =&gt; {
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>explore infinite original nodes: convert images to sound with wave terrain, ring 3d geometry with shape resonator, and simulate chladni cymatics.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_original_audiovisual_nodes.png" alt="chladni cymatics and wave terrain standing wave resonance pattern in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_original-audiovisual-nodes-wave-terrain-shape-resonator-cymatics.png" alt="chladni cymatics and wave terrain standing wave resonance pattern in infinite" /></p>
 <p>most creative software falls into one of two camps: digital audio workstations that treat visuals as an afterthought, or visual patchers (like touchdesigner or blender) that treat audio as a simple control voltage or fft spectrum.</p>
 <p>infinite was designed from day one on a unified execution graph. sound, 2d textures, and 3d geometry live in the same memory space, enabling node architectures that simply do not exist in conventional daws.</p>
 <p>here is an in-depth breakdown of seven standout original nodes in infinite that bridge sound, mathematics, and geometry.</p>
@@ -3086,7 +3086,7 @@ document.getElementById("btn-audio").addEventListener("click", async () =&gt; {
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Connect AI coding agents to Infinite via MCP and Python SDK for headless audio synthesis, 3D meshes, and video rendering.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_ai_agent_mcp.png" alt="headless mcp audio-visual synthesis matrix in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_ai-agent-mcp-audio-visual-engine-guide.png" alt="headless mcp audio-visual synthesis matrix in infinite" /></p>
 <p>AI coding assistants (Claude Desktop, Cursor, Antigravity, Devin) are exceptionally good at writing code, but historically poor at producing interactive music and real-time 3D visuals. Desktop DAWs and visual engines require manual mouse interactions, proprietary project files, and heavy graphical interfaces that agents cannot operate.</p>
 <p>Infinite bridges this gap by exposing its entire C++20 engine through the <strong>Model Context Protocol (MCP)</strong> and a dedicated <strong>Python SDK</strong>.</p>
 <h2 id="the-architecture-how-ai-agents-interact-with-infinite">The architecture: how AI agents interact with Infinite</h2>
@@ -3167,7 +3167,7 @@ function draw(t) {
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Infinite headless engine lets AI agents write text patches, inspect signals, and render music, pictures and 3D from the command line.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/og-image.jpg" alt="Infinite, a free open-source DAW for sound, pictures and 3D" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_ai-agents-make-music-art-3d-headless.png" alt="Infinite, a free open-source DAW for sound, pictures and 3D" /></p>
 <p>An AI agent that can run shell commands can make music, pictures and 3D with Infinite, because the engine runs headless. The executable inside the app is also a command-line tool. It reads a plain-text patch and writes stills, video and audio, with no window and no mouse. A patch is text, so an agent such as Claude can write it, check it, listen to it and fix it in a loop.</p>
 <p>This post shows that loop, then three small patches: a sound, a picture and a 3D scene. It builds on the <a href="https://infinitedevices.org/blog/render-video-and-audio-from-a-text-file.html">headless render walkthrough</a> and the <a href="https://infinitedevices.org/assets/Infinite_Headless_User_Guide.pdf">Headless User Guide</a>.</p>
 <h2 id="why-a-text-patch-suits-an-agent">Why a text patch suits an agent</h2>
@@ -3262,7 +3262,7 @@ Infinite --render scene.inf scene.mp4 --duration 6 --fps 30</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>why infinite&#x27;s audio engine is written in modern c++ without a framework, and what that changes for real-time safety.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/nodegraph.webp" alt="infinite modular audio graph canvas and node dsp architecture" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_dsp-without-juce.png" alt="infinite modular audio graph canvas and node dsp architecture" /></p>
 <p>juce is the de facto standard for audio software development, but it brings substantial architectural gravity: a massive monolithic codebase, custom string classes, complex licensing, and heavy abstractions.</p>
 <p>when building <a href="https://infinitedevices.org" rel="noopener">infinite</a>, an open-source modular workstation, we chose to write the entire pull-based audio engine in modern standard c++ (c++20) from scratch.</p>
 <p>here is what we learned and how the architecture is designed.</p>
@@ -3297,7 +3297,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>Guide to modular sound design in Infinite DAW: subtractive sub bass, Karplus-Strong plucks, and ambient pads with Field kernels.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_sound_design_synth.png" alt="3d audio spectrum and modular sound design synthesis in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_electronic-music-sound-design-sub-bass-pluck-pad.png" alt="3d audio spectrum and modular sound design synthesis in infinite" /></p>
 <p>Most modern digital audio workstations treat sound design as an external plugin problem. You buy a third-party VST, open a floating GUI, turn virtual skeuomorphic knobs, and send audio back into a linear timeline. If you want a dedicated sound design DAW, Infinite takes a fundamentally different path: sound design and synthesis live directly on the same canvas as your sequencers, modulation matrix, and visual engine.</p>
 <p>With Field language nodes, every oscillator, envelope, filter, and wavefolder can be written as clean, per-sample DSP code running at 48 kHz with zero allocation overhead. You can also <a href="https://infinitedevices.org/blog/modulate-vst3-plugins-with-visuals-and-lfos.html">modulate VST3 plugins with LFOs and visuals</a> whenever you wish to incorporate external instruments.</p>
 <p>Here is how to construct three foundational electronic music sounds from first principles in Infinite.</p>
@@ -3360,7 +3360,7 @@ out = new_sample</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Connect hardware synthesizers, MIDI controllers, and DMX lighting to Infinite with low latency routing and parameter modulation.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_hardware_midi.png" alt="hardware midi routing and modulation matrix in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_hardware-midi-and-controller-mapping-in-infinite.png" alt="hardware midi routing and modulation matrix in infinite" /></p>
 <p>performing electronic music live with hardware should feel direct and immediate. yet most traditional setups require juggling multiple applications: one daw for sequencing, another utility for midi cc routing, a visual package like touchdesigner for projections, and external software for dmx stage lighting.</p>
 <p>infinite unifies this entire live performance rig into a single real-time engine. with sub-millisecond midi scheduling and direct parameter binding, any hardware knob, fader, or pad can modulate synths, audio filters, 3d geometry, and stage lights simultaneously.</p>
 <h2 id="1-low-latency-midi-device-discovery">1. low-latency midi device discovery</h2>
@@ -3391,7 +3391,7 @@ out = new_sample</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>how sketch nodes let you draw with javascript in infinite and expose real modulation pins to synths and audio signals.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/sketch_showcase_preview.png" alt="javascript sketch node showcase with clifford attractor and parameters in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_javascript-sketches.png" alt="javascript sketch node showcase with clifford attractor and parameters in infinite" /></p>
 <p>creative coders generally face a difficult compromise:</p>
 <ul><li><strong>in the browser</strong> (p5.js, three.js, canvas2d): rapid iteration, clean drawing apis, but limited audio precision, browser sandbox limits, and no native vst3 or au plugin support.</li><li><strong>in native c++</strong> (openframeworks, cinder): high performance, but long compilation cycles that break creative flow on every small aesthetic tweak.</li></ul>
 <p>with <a href="https://infinitedevices.org" rel="noopener">infinite</a>, we bridged these worlds by embedding a high-performance javascript runtime directly into a native c++ modular daw.</p>
@@ -3444,7 +3444,7 @@ function draw(t) {
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Breakdown of Infinite register machine for Field Synth and Effect nodes, compiling per-sample audio DSP kernels at 48kHz.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_audio_dsp_kernel.png" alt="real-time 48khz audio dsp register waveform visualization in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_per-sample-dsp-audio-kernels-in-field-language.png" alt="real-time 48khz audio dsp register waveform visualization in infinite" /></p>
 <p>Most modern digital audio workstations treat audio synthesis as a black box: you write a C++ plugin, compile a VST3 or AU bundle with JUCE or Dplug, restart your host, and attach a debugger.</p>
 <p>In Infinite, you can write audio DSP at the sample level directly inside the canvas using <strong>Field language</strong>. Your code runs on the audio thread once per sample (48,000 times per second), compiled to a register machine that executes with zero memory allocations.</p>
 <h2 id="how-the-sample-register-machine-works">How the sample register machine works</h2>
@@ -3510,7 +3510,7 @@ out = (phase * 2.0 - 1.0) * 0.3 * gate
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>Build procedural 3D meshes in Infinite DAW, deform topology with Field modifier kernels, and drive real-time geometric mutations.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_procedural_3d_geometry.png" alt="procedural 3d deformed geometry mesh rendered with infinite engine" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_procedural-3d-geometry-nodes-and-audio-deformation.png" alt="procedural 3d deformed geometry mesh rendered with infinite engine" /></p>
 <p>in traditional 3d software, generating complex procedural geometry requires heavy dcc suites like blender or houdini. when you want to connect that geometry to low-latency audio analysis, midi clocks, or live synthesis, you are forced into fragile websocket bridges or osc pipelines.</p>
 <p>infinite brings 3d geometry generation, vertex shading, and per-sample audio dsp onto the same unified execution graph. you can generate procedural vertex topologies, deform them with fast simd-vectorized field modifier kernels, and render them in real time at 60+ fps.</p>
 <h2 id="1-generating-base-procedural-meshes">1. generating base procedural meshes</h2>
@@ -3552,7 +3552,7 @@ infinite export-video --graph project.json --audio track.wav --out visual.mp4 --
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to convert any Shadertoy fragment shader into a native real-time node in Infinite, hook it up to audio analysis FFT bands, and export high-resolution video.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_shadertoy_glsl.png" alt="audio reactive glsl shader visual running in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_shadertoy-to-infinite-audio-reactive-glsl.png" alt="audio reactive glsl shader visual running in infinite" /></p>
 <p>Shadertoy is the world's greatest sketchbook for pixel shaders. But getting a Shadertoy shader to respond dynamically to your music, sync with MIDI, or render out to high-resolution MP4 video often involves clumsy workarounds, browser recording extensions, or complex OSC bridges.</p>
 <p>In Infinite, shaders are native first-class nodes that sit directly alongside polyphonic synthesizers, audio effects, and sequencers on one infinite canvas.</p>
 <h2 id="the-coordinate-space-mapping">The coordinate space mapping</h2>
@@ -3607,7 +3607,7 @@ col = (wire + center) * (0.7 + 0.5 * bass);</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Field is the language built into Infinite. One kernel can become a shader, a geometry deformer or an audio effect, depending on the node it lives in.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/field_pixel_editor.webp" alt="The Field Pixel code editor open inside Infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_field-language-write-what-a-node-does.png" alt="The Field Pixel code editor open inside Infinite" /></p>
 <p>Most nodes do one fixed thing. A Blur node blurs and a Delay node delays. Creative work often needs something in between, so Infinite includes <strong>Field</strong>, a kernel language for shaders, geometry and audio: a small language for writing what a node does.</p>
 <h2 id="one-idea-a-kernel-run-once-per-element">One idea: a kernel run once per element</h2>
 <p>A Field node runs your kernel once for every element of its domain, forever. The domain is chosen by the node, not by you:</p>
@@ -3638,7 +3638,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>An honest look at where Infinite fits next to TouchDesigner for audio-reactive visuals and VJ work, and where TouchDesigner is still the better choice.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_touchdesigner_alternative.png" alt="real-time audio reactive holographic orb visualizer in infinite" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_free-touchdesigner-alternative-for-audio-reactive-visuals.png" alt="real-time audio reactive holographic orb visualizer in infinite" /></p>
 <p>If you make audio-reactive visuals, you have probably met TouchDesigner. It is powerful, mature and has a large community. It is also a visual tool first: sound comes in through operators, and a full music setup usually means a second program next to it.</p>
 <p>Infinite starts from the other side. It is a DAW and a visual tool on one canvas, free and open source. This page is a practical comparison, including the places where TouchDesigner is the better pick.</p>
 <h2 id="what-infinite-does-well-for-this-job">What Infinite does well for this job</h2>
@@ -3662,7 +3662,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Infinite benchmarks on a base MacBook Air M2 against Blender, Vital, Serum 2 and popular DAWs, with the results published, including where Infinite is slower.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/og-image.jpg" alt="Infinite v0.6 benchmark report summary" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_infinite-v0-6-benchmarks.png" alt="Infinite v0.6 benchmark report summary" /></p>
 <p>These are the Infinite v0.6 benchmarks: Infinite measured against the tools you already use, on one ordinary laptop, with the same tests for everyone. We publish the numbers that are good for us and the ones that are not. The full report is on the <a href="https://infinitedevices.org/benchmarks.html">benchmarks page</a>, with a PDF and the raw data as JSON.</p>
 <h2 id="how-we-tested">How we tested</h2>
 <p>Everything ran on a base MacBook Air with an Apple M2 and 8 GB of memory, on macOS, between 12 and 17 October 2026. That is the cheapest model on purpose: if it is fast there, it is fast on yours. Nothing was measured on Windows or Linux.</p>
@@ -3687,7 +3687,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>A beginner walkthrough from a free template to a shape that moves with your music, using the Audio Analyze node and a single cable.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/howto_daw.webp" alt="Infinite open on a patch that makes music and pictures together" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_make-your-first-audio-reactive-visual.png" alt="Infinite open on a patch that makes music and pictures together" /></p>
 <p>This is the shortest path from nothing to a picture that follows your music. You need Infinite and about ten minutes. No plugins or extra software.</p>
 <h2 id="1-start-from-a-template">1. Start from a template</h2>
 <p>Open the <a href="https://infinitedevices.org/library.html">Library</a> and download <strong>Moves with the music</strong>. It is a small patch where a shape grows with the sound. Open the file from <strong>File, Open</strong> in Infinite and press play.</p>
@@ -3717,7 +3717,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>How to modulate VST3 parameters in Infinite DAW using modular LFOs, audio envelopes, webcam feeds and real-time visual movement.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/product_canvas_1400.webp" alt="A plugin host node inside the Infinite canvas" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_modulate-vst3-plugins-with-visuals-and-lfos.png" alt="A plugin host node inside the Infinite canvas" /></p>
 <p>Most digital audio workstations treat third-party plugins as static black boxes. You insert a synthesiser or effect into an audio track, open its bespoke window, and rely solely on the modulators the plugin developer chose to include. If your favourite compressor lacks sidechain filtering, or your preferred synthesiser lacks an extra complex LFO, you are normally out of options.</p>
 <p>Infinite takes a modular approach where every hosted plugin becomes an open node on a shared canvas. When you host a plugin, you can modulate VST3 parameters directly with virtual patch cables, routing numbers from procedural LFOs, envelope followers, sound generators, and interactive graphics straight into plugin knobs.</p>
 <h2 id="what-plugins-can-be-hosted">What plugins can be hosted</h2>
@@ -3751,7 +3751,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>creative</category>
     <description>Hand Track, Face Track and Pose Track turn a camera or picture into modulators, so a pinch, a smile or a raised arm can drive any parameter in your patch.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/og-image.jpg" alt="Infinite showing a live hand landmark overlay beside a node graph" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_motion-tracking-hand-face-pose-modulators.png" alt="Infinite showing a live hand landmark overlay beside a node graph" /></p>
 <p>Free motion tracking software is built into Infinite as an optional pack: it turns a camera image into numbers you can wire to anything: a shader's size, a filter cutoff, a synth note. There are three tracking nodes, Hand Track, Face Track and Pose Track, and each one outputs modulators the same way an LFO does. This post explains what they give you, how to set them up, and where they work well.</p>
 <h2 id="what-you-need">What you need</h2>
 <ul><li>Infinite 0.5.0 or later.</li><li>The free Tracking pack (26 MB). Open Settings, then Extensions, and press Install next to Tracking. It installs while the app runs, with no restart. If you are offline, download the pack for your platform from the <a href="https://infinitedevices.org/library.html#extensions">Extensions page</a> and use Install from file.</li><li>A video source: a camera, a video file or a still image.</li></ul>
@@ -3787,7 +3787,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/nodegraph.webp" alt="A node graph in Infinite with audio and image nodes connected by cables" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_one-graph-for-sound-and-pictures.png" alt="A node graph in Infinite with audio and image nodes connected by cables" /></p>
 <p>Video tools and audio tools usually live in separate programs. You wire them together with OSC, MIDI clock or a texture-sharing protocol, and you accept a little latency and jitter on the way. Infinite takes a different route: audio and visuals are two parts of one engine that share a transport.</p>
 <h2 id="two-graphs-one-clock">Two graphs, one clock</h2>
 <p>The engine has two sides, and each one follows the rules of its own medium.</p>
@@ -3813,7 +3813,7 @@ out = z</code></pre>
     <dc:creator>Naman Soni</dc:creator>
     <category>product</category>
     <description>Infinite&#x27;s headless mode turns a plain-text patch into stills, video and a loudness report from the command line. Here is the five-minute workflow.</description>
-    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/product_canvas_1400.webp" alt="The Infinite node canvas with audio and visual nodes wired together" /></p>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_render-video-and-audio-from-a-text-file.png" alt="The Infinite node canvas with audio and visual nodes wired together" /></p>
 <p>A headless DAW is one that renders with no window open. Most DAWs and visual tools only run with a window and a mouse. Infinite's engine does not need either. The executable inside the app is also a command-line tool, so a patch can be validated, drawn and rendered from a terminal, a script or a CI job.</p>
 <p>This post walks through the loop from the <a href="https://infinitedevices.org/assets/Infinite_Headless_User_Guide.pdf">Headless User Guide</a>: describe, write, validate, explain, look and listen, render.</p>
 <h2 id="what-you-need">What you need</h2>

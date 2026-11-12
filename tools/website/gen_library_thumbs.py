@@ -1,160 +1,356 @@
 #!/usr/bin/env python3
-"""Library thumbnails: knobs and cables, generated, one SVG per preset.
+"""Library thumbnails: brand-book v2.1 Midnight-mode cards & normalized artwork renders.
 
-Why   : a preset's own render is a different style every time. These are one system: a handful of knobs laid out at
-        random, joined by cables, in the colour of the preset's category. Quiet, on-brand, about 3 KB each, sharp at any size.
-What  : reads the five library indexes (library, templates, community, skills, extensions) and writes website/assets/library/thumbs/<id>.svg (720 x 450, the card ratio).
-Rules : the knob count is the preset's own param count, or its node count for patches and templates (3 to 8, so a bigger preset looks busier); the layout, the knob
-        positions and the cables come from a hash of the preset id, so a preset always gets the same picture and re-running
-        changes nothing. Cables chain the knobs nearest-first and add one or two cross links, each a sagging bezier with a plug
-        at both ends. Colours: brand only: the category's brand colour (ember, mint, pink or signal) for cables and value arcs, ink for pointers, ground #151930 to deep #0D1020 with the brand dot grid. Knobs and cables are shaded as 3D (bezel, domed cap, tube highlights, blurred shadows).
-Run   : python3 tools/website/gen_library_thumbs.py          (write)
-        python3 tools/website/gen_library_thumbs.py --check  (exit 1 if a file would change)
-Art   : any preset with a preview image (Pixel, Sketch, Sketch 3D, synths, effects ...) shows its own render instead: the
-        preview jpg is cropped to the card ratio and written as thumbs/<id>.webp (about 20 KB). Everything else gets the knobs and cables.
-Used  : website/library.js shows thumbs/<id>.svg on every deck card; the preset page keeps its real render.
+What:
+  Reads the five library indexes (library, templates, community, skills, extensions) and writes
+  website/assets/library/thumbs/<id>.webp (720 x 450, 16:10 card ratio).
+Rules:
+  - Visual presets (Pixel, Sketch, Sketch 3D, Community, and rich-visual Templates) keep their
+    real artwork render, cropped/resized cleanly to 720 x 450 WebP.
+  - Audio, Synth, FX, Template (node/blank), AI Skill, and Extension presets are rendered at 2x
+    (1440 x 900 -> 720 x 450 LANCZOS) using Midnight mode tokens (#151930 ground, #0D1020 deep,
+    #20263F surface-1, #EEF1FA Moon ink, #A7B1FF Signal, one #FF6B35 Ember focal element),
+    zero outlines, Geist & Geist Mono typography, and a deterministic preset-specific visual
+    (synth waveform + knobs, FX frequency response, or actual node-chain graph).
+Run:
+  python3 tools/website/gen_library_thumbs.py
+  python3 tools/website/gen_library_thumbs.py --check
 """
-import hashlib, json, math, os, sys
+from __future__ import annotations
+import hashlib
+import io
+import json
+import math
+import os
+import sys
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website")
-SOURCES = [os.path.join(ROOT, "assets", d, "index.json") for d in ("library", "templates", "community", "skills", "extensions")]   # every card in the library deck
-OUT = os.path.join(ROOT, "assets", "library", "thumbs")
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+WEB = os.path.join(ROOT, "website")
+SOURCES = [os.path.join(WEB, "assets", d, "index.json") for d in ("library", "templates", "community", "skills", "extensions")]
+OUT = os.path.join(WEB, "assets", "library", "thumbs")
+FONTS = os.path.join(ROOT, "art", "brand", "fonts")
+
 W, H = 720, 450
-COLOUR = {"Pixel": "#FF9878", "Audio FX": "#8FE3D0", "Audio Effects": "#8FE3D0", "Synths": "#8795F4", "Notes": "#F6B4C8", "Sketch": "#A7B1FF", "Sketch 3D": "#8795F4", "Templates": "#FF9878", "Community": "#8FE3D0", "AI Skills": "#F6B4C8", "Extensions": "#A7B1FF"}   # brand: ember-300, iridescence mint and pink, signal
+S = 2  # 2x supersampling
+SW, SH = W * S, H * S
+
+# Brand Book v2.1 Midnight tokens
+GROUND = (21, 25, 48)       # #151930
+DEEP = (13, 16, 32)         # #0D1020
+SURFACE1 = (32, 38, 63)     # #20263F
+SURFACE2 = (42, 48, 82)     # #2A3052
+LINE = (52, 59, 94)         # #343B5E
+MOON = (238, 241, 250)      # #EEF1FA
+INK2 = (163, 170, 203)      # #A3AACB
+INK3 = (136, 144, 177)      # #8890B1
+SIGNAL = (167, 177, 255)    # #A7B1FF
+EMBER = (255, 107, 53)      # #FF6B35
+
+ART_CATS = {"Pixel", "Sketch", "Sketch 3D", "Community"}
 
 
-BG = "plain"   # "plain": one flat brand colour (surface #20263F), no gradient. "textured": the same colour with the brand dot grid. Change this one word and rerun.
+def load_font(name: str, size: int) -> ImageFont.FreeTypeFont:
+    p = os.path.join(FONTS, name)
+    if os.path.exists(p):
+        return ImageFont.truetype(p, size)
+    return ImageFont.load_default()
 
 
-ART = {"Pixel", "Sketch", "Sketch 3D"}   # categories whose own render is the thumbnail
-
-
-def art_webp(item):
-    """The preset's own preview, cropped to 720 x 450 and compressed. Returns bytes, or None if it has no preview file."""
-    from PIL import Image
-    import io
-    src = os.path.join(ROOT, item.get("preview", ""))
-    if not item.get("preview") or not os.path.exists(src): return None
-    im = Image.open(src).convert("RGB"); w, h = im.size; th = int(w * H / W)
-    top = (h - th) // 2 if th < h else 0
-    im = im.crop((0, top, w, top + min(th, h))).resize((W, H), Image.LANCZOS)
-    b = io.BytesIO(); im.save(b, "WEBP", quality=80, method=6)
-    return b.getvalue()
+F_TITLE = load_font("Geist-ExtraBold.ttf", 52)
+F_TITLE_SM = load_font("Geist-ExtraBold.ttf", 42)
+F_KICKER = load_font("GeistMono-Medium.ttf", 22)
+F_META = load_font("GeistMono-Medium.ttf", 22)
+F_NODE = load_font("Geist-SemiBold.ttf", 22)
+F_MONO_SM = load_font("GeistMono-Medium.ttf", 18)
 
 
 class Rng:
-    """Small deterministic generator seeded by the preset id (no global state, same on every machine)."""
-    def __init__(self, key):
+    """Deterministic PRNG seeded by preset id."""
+    def __init__(self, key: str):
         self.s = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") or 1
-    def next(self):
-        self.s ^= (self.s << 13) & 0xFFFFFFFFFFFFFFFF; self.s ^= self.s >> 7; self.s ^= (self.s << 17) & 0xFFFFFFFFFFFFFFFF
+
+    def next(self) -> float:
+        self.s ^= (self.s << 13) & 0xFFFFFFFFFFFFFFFF
+        self.s ^= self.s >> 7
+        self.s ^= (self.s << 17) & 0xFFFFFFFFFFFFFFFF
         return (self.s & 0xFFFFFF) / 0x1000000
-    def range(self, a, b): return a + (b - a) * self.next()
+
+    def range(self, a: float, b: float) -> float:
+        return a + (b - a) * self.next()
 
 
-def place(rng, n):
-    """n knobs at random, kept apart (dart throwing with a shrinking gap) and away from the edge."""
-    gap = 150
-    while True:
-        pts = []
-        for _ in range(4000):
-            r = rng.range(26, 40) if rng.next() < 0.7 else rng.range(44, 56)
-            x, y = rng.range(70, W - 70), rng.range(66, H - 66)
-            if all(math.hypot(x - px, y - py) > gap * 0.5 + (r + pr) * 0.6 for px, py, pr in pts):
-                pts.append((x, y, r))
-            if len(pts) == n: return pts
-        gap *= 0.85
+def is_rich_visual_template(item: dict) -> bool:
+    """For Templates, keep real rendered visuals and replace blank circles or audio/bare nodegraphs."""
+    nodes = item.get("nodes") or []
+    if isinstance(nodes, list) and "Audio Out" in nodes and not any(
+        k in " ".join(nodes) for k in ("Shader", "Field Pixel", "Render 3D", "Sketch")
+    ):
+        return False
+    src = os.path.join(WEB, item.get("preview", ""))
+    if not item.get("preview") or not os.path.exists(src):
+        return False
+    with Image.open(src) as im:
+        arr = np.asarray(im.convert("RGB"))
+    black_frac = float(np.mean(arr.max(axis=2) < 10))
+    mid_dist = np.abs(arr.astype(int) - np.array(GROUND)).sum(axis=2)
+    mid_frac = float(np.mean(mid_dist < 25))
+    return black_frac <= 0.70 and mid_frac <= 0.55
 
 
-def cable(a, b, rng, col, w):
-    """A 3D tube: a soft shadow, a dark rim, the body, then a thin highlight along the top. A metal jack at each end."""
-    (x1, y1, _), (x2, y2, _) = a, b
-    d = math.hypot(x2 - x1, y2 - y1)
-    sag = min(90, d * 0.35) * (1 if rng.next() < 0.75 else -0.5)
-    mx, my = (x1 + x2) / 2, (y1 + y2) / 2 + sag
-    c1x, c1y = x1 + (mx - x1) * 0.9, y1 + (my - y1) * 0.9 + sag * 0.15
-    c2x, c2y = x2 + (mx - x2) * 0.9, y2 + (my - y2) * 0.9 + sag * 0.15
-    path = "M%.1f %.1fC%.1f %.1f %.1f %.1f %.1f %.1f" % (x1, y1, c1x, c1y, c2x, c2y, x2, y2)
-    st = lambda wd, c, extra="": '<path d="%s" fill="none" stroke="%s" stroke-width="%.1f" stroke-linecap="round" %s/>' % (path, c, wd, extra)
-    jacks = "".join('<circle cx="%.1f" cy="%.1f" r="9" fill="url(#jack)"/><circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/><circle cx="%.1f" cy="%.1f" r="4.5" fill="none" stroke="#04050E" stroke-opacity=".5"/>' % (x, y, x, y, col, x, y) for x, y in ((x1, y1), (x2, y2)))
-    return (st(w + 6, "#04050E", 'stroke-opacity=".4" filter="url(#blur)" transform="translate(0 9)"') + st(w + 3, "#0D1020") + st(w, col) +
-            st(w * 0.35, "#FFFFFF", 'stroke-opacity=".5" transform="translate(0 -%.1f)"' % (w * 0.22)) + jacks)
+def art_webp(item: dict) -> bytes | None:
+    """Crop/resize a real visual preview to 720 x 450 WebP."""
+    src = os.path.join(WEB, item.get("preview", ""))
+    if not item.get("preview") or not os.path.exists(src):
+        return None
+    with Image.open(src) as im:
+        im = im.convert("RGB")
+        w, h = im.size
+        target_ratio = W / H
+        cur_ratio = w / h
+        if cur_ratio > target_ratio:
+            nw = int(h * target_ratio)
+            left = (w - nw) // 2
+            im = im.crop((left, 0, left + nw, h))
+        elif cur_ratio < target_ratio:
+            nh = int(w / target_ratio)
+            top = (h - nh) // 2
+            im = im.crop((0, top, w, top + nh))
+        im = im.resize((W, H), Image.LANCZOS)
+        b = io.BytesIO()
+        im.save(b, "WEBP", quality=85, method=6)
+        return b.getvalue()
 
 
-def knob(i, k, rng, col):
-    """A 3D knob: a blurred drop shadow, a bevelled bezel, a domed cap lit from the top left, a value arc and a glowing pointer."""
-    x, y, r = k
-    val = rng.range(0.15, 0.95)
-    a0, sweep = math.radians(135), math.radians(270)
-    def pt(t, rr): return x + rr * math.cos(a0 + sweep * t), y + rr * math.sin(a0 + sweep * t)
-    ring = r + 11
-    s, e0, e1 = pt(0, ring), pt(1, ring), pt(val, ring)
-    track = "M%.1f %.1fA%.1f %.1f 0 1 1 %.1f %.1f" % (s[0], s[1], ring, ring, e0[0], e0[1])
-    arc = "M%.1f %.1fA%.1f %.1f 0 %d 1 %.1f %.1f" % (s[0], s[1], ring, ring, 1 if val > 0.5 else 0, e1[0], e1[1])
-    p0, p1 = pt(val, r * 0.3), pt(val, r * 0.82)
-    return ('<g><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#04050E" fill-opacity=".6" filter="url(#blur)"/>'
-            '<path d="%s" fill="none" stroke="#04050E" stroke-opacity=".55" stroke-width="6" stroke-linecap="round"/>'
-            '<path d="%s" fill="none" stroke="%s" stroke-width="4" stroke-linecap="round" filter="url(#glow)"/>'
-            '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="url(#bezel)"/>'
-            '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="url(#cap)"/>'
-            '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="none" stroke="#FFFFFF" stroke-opacity=".22" stroke-width="1.2"/>'
-            '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="4" stroke-linecap="round"/></g>') % (
-        x + 3, y + r * 0.85, r * 1.05, r * 0.5, track, arc, col, x, y, r, x, y, r * 0.8, x - r * 0.1, y - r * 0.12, r * 0.62, p0[0], p0[1], p1[0], p1[1], "#EEF1FA")
+def wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_w: int, max_lines: int = 3) -> list[str]:
+    words = text.split()
+    lines: list[str] = []
+    cur = ""
+    for w in words:
+        cand = f"{cur} {w}".strip()
+        if draw.textlength(cand, font=font) <= max_w:
+            cur = cand
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+            if len(lines) == max_lines - 1:
+                break
+    if cur and len(lines) < max_lines:
+        # Append remaining words if any were skipped
+        idx = sum(len(l.split()) for l in lines)
+        rem = " ".join(words[idx:])
+        while draw.textlength(rem, font=font) > max_w and len(rem) > 4:
+            rem = rem[:-2].rstrip() + "…"
+        lines.append(rem)
+    return lines
 
 
-def thumb(item):
+def draw_bezier(draw: ImageDraw.ImageDraw, p0, p1, p2, p3, fill, width: int) -> None:
+    pts = []
+    steps = 32
+    for i in range(steps + 1):
+        t = i / steps
+        mt = 1 - t
+        x = mt**3 * p0[0] + 3 * mt**2 * t * p1[0] + 3 * mt * t**2 * p2[0] + t**3 * p3[0]
+        y = mt**3 * p0[1] + 3 * mt**2 * t * p1[1] + 3 * mt * t**2 * p2[1] + t**3 * p3[1]
+        pts.append((x, y))
+    draw.line(pts, fill=fill, width=width, joint="curve")
+
+
+def draw_knob(draw: ImageDraw.ImageDraw, cx: int, cy: int, r: int, val: float, ember: bool) -> None:
+    # Track arc (270 deg from 135 deg)
+    bbox = [cx - r - 14, cy - r - 14, cx + r + 14, cy + r + 14]
+    draw.arc(bbox, start=135, end=405, fill=SURFACE2, width=8)
+    end_ang = 135 + int(270 * val)
+    draw.arc(bbox, start=135, end=end_ang, fill=EMBER if ember else SIGNAL, width=8)
+    # Knob body (no outline)
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=SURFACE1)
+    draw.ellipse([cx - int(r * 0.78), cy - int(r * 0.78), cx + int(r * 0.78), cy + int(r * 0.78)], fill=SURFACE2)
+    # Pointer
+    rad = math.radians(end_ang)
+    px0, py0 = cx + math.cos(rad) * (r * 0.25), cy + math.sin(rad) * (r * 0.25)
+    px1, py1 = cx + math.cos(rad) * (r * 0.72), cy + math.sin(rad) * (r * 0.72)
+    draw.line([(px0, py0), (px1, py1)], fill=MOON, width=5)
+
+
+def render_brand_card(item: dict) -> bytes:
     rng = Rng(item["id"])
-    col = COLOUR.get(item.get("category"), "#A7B1FF")
-    raw = item.get("params", item.get("nodes", 4))
-    raw = len(raw) if isinstance(raw, (list, dict)) else raw
-    n = max(3, min(8, int(raw or 4)))
-    ks = place(rng, n)
-    order, left = [ks[0]], ks[1:]                      # chain nearest-first so the cables read as one patch
-    while left:
-        last = order[-1]; nx = min(left, key=lambda k: math.hypot(k[0] - last[0], k[1] - last[1])); left.remove(nx); order.append(nx)
-    links = list(zip(order, order[1:]))
-    for _ in range(1 + (n > 5)):
-        a, b = rng.next(), rng.next(); ia, ib = int(a * n), int(b * n)
-        if abs(ia - ib) > 1: links.append((order[ia], order[ib]))
-    gx, gy = rng.range(0.2, 0.8) * W, rng.range(0.15, 0.6) * H
-    parts = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d">' % (W, H, W, H),
-             '<defs><radialGradient id="bg" cx="%.0f" cy="%.0f" r="480" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="%s" stop-opacity=".16"/><stop offset="1" stop-color="%s" stop-opacity="0"/></radialGradient>' % (gx, gy, col, col),
-             '<radialGradient id="vig" cx=".5" cy=".42" r=".8"><stop offset="0" stop-color="#20263F"/><stop offset="1" stop-color="#0D1020"/></radialGradient>',
-             '<pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#2A3052"/></pattern>',
-             '<radialGradient id="cap" cx=".34" cy=".26" r=".95"><stop offset="0" stop-color="#6A73A6"/><stop offset=".45" stop-color="#394070"/><stop offset="1" stop-color="#1C2140"/></radialGradient>',
-             '<linearGradient id="bezel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5A6396"/><stop offset=".5" stop-color="#262C52"/><stop offset="1" stop-color="#0D1020"/></linearGradient>',
-             '<radialGradient id="jack" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#D5DAF0"/><stop offset=".6" stop-color="#6F77A3"/><stop offset="1" stop-color="#2A3052"/></radialGradient>',
-             '<filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>',
-             '<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>',
-             '<rect width="%d" height="%d" fill="#20263F"/>' % (W, H)] + (['<rect width="%d" height="%d" fill="url(#dots)" opacity=".7"/>' % (W, H)] if BG == "textured" else [])
-    parts += [cable(a, b, rng, col, 7) for a, b in links]
-    parts += [knob(i, k, rng, col) for i, k in enumerate(ks)]
-    parts.append("</svg>")
-    return "".join(parts) + "\n"
+    cat = item.get("category", "Library")
+    cat_norm = "Audio Effects" if cat.lower() == "audio effects" else cat
+
+    im = Image.new("RGB", (SW, SH), GROUND)
+    draw = ImageDraw.Draw(im)
+
+    # Programmed dot field (~5% Signal over Midnight ground)
+    dot_col = (30, 35, 62)
+    for gx in range(32, SW - 20, 48):
+        for gy in range(32, SH - 20, 48):
+            draw.ellipse([gx - 2, gy - 2, gx + 2, gy + 2], fill=dot_col)
+
+    # Right stage well (no outline, rounded 40px at 2x = 20px at 1x)
+    sx1, sy1, sx2, sy2 = 660, 118, SW - 64, SH - 138
+    draw.rounded_rectangle([sx1, sy1, sx2, sy2], radius=40, fill=DEEP)
+
+    # Subtle graticule inside stage
+    grat_col = (26, 30, 52)
+    for gx in range(sx1 + 64, sx2, 64):
+        draw.line([(gx, sy1 + 16), (gx, sy2 - 16)], fill=grat_col, width=2)
+    for gy in range(sy1 + 64, sy2, 64):
+        draw.line([(sx1 + 16, gy), (sx2 - 16, gy)], fill=grat_col, width=2)
+
+    # Left column: category badge, title, metadata (safe from top chips and bottom title bar)
+    lx = 68
+    badge_txt = cat_norm.upper()
+    bw = int(draw.textlength(badge_txt, font=F_KICKER)) + 36
+    draw.rounded_rectangle([lx, 172, lx + bw, 214], radius=21, fill=SURFACE1)
+    draw.text((lx + 18, 180), badge_txt, font=F_KICKER, fill=SIGNAL)
+
+    name = item.get("name", item["id"])
+    font_t = F_TITLE if len(name) <= 24 else F_TITLE_SM
+    lines = wrap_text(draw, name, font_t, max_w=550, max_lines=3)
+    ty = 248
+    line_h = 60 if font_t == F_TITLE else 50
+    for ln in lines:
+        draw.text((lx, ty), ln, font=font_t, fill=MOON)
+        ty += line_h
+
+    # Metadata line
+    tags = item.get("tags") or []
+    nodes = item.get("nodes") or []
+    params = item.get("params")
+    if isinstance(nodes, list) and nodes:
+        meta = f"{len(nodes)} nodes · " + " · ".join(nodes[:2])
+    elif params:
+        meta = f"{params} params" + (f" · {' · '.join(tags[:2])}" if tags else "")
+    elif tags:
+        meta = " · ".join(tags[:3])
+    else:
+        meta = item.get("kind", "Patch")
+    while draw.textlength(meta, font=F_META) > 550 and len(meta) > 6:
+        meta = meta[:-2].rstrip() + "…"
+    draw.text((lx, ty + 18), meta, font=F_META, fill=INK2)
+
+    # Pre-blended header tint colours over SURFACE1
+    hdr_signal = (51, 58, 90)
+    hdr_ember = (63, 48, 61)
+
+    # Right stage bespoke visual by category
+    if cat_norm == "Templates" and isinstance(nodes, list) and len(nodes) >= 2:
+        show_nodes = nodes[:3]
+        ny0 = sy1 + 54
+        nh = 104
+        gap = 54
+        prev_out = None
+        for idx, nname in enumerate(show_nodes):
+            nx1 = sx1 + 60 + idx * 70
+            nx2 = min(sx2 - 44, nx1 + 380)
+            ny = ny0 + idx * (nh + gap)
+            if ny + nh > sy2 - 30:
+                break
+            draw.rounded_rectangle([nx1, ny, nx2, ny + nh], radius=24, fill=SURFACE1)
+            is_last = idx == len(show_nodes) - 1
+            hdr_col = hdr_ember if is_last else hdr_signal
+            draw.rounded_rectangle([nx1, ny, nx2, ny + 44], radius=24, fill=hdr_col)
+            draw.rectangle([nx1, ny + 22, nx2, ny + 44], fill=hdr_col)
+            nlabel = nname if len(nname) <= 22 else nname[:20] + "…"
+            draw.text((nx1 + 22, ny + 10), nlabel, font=F_NODE, fill=MOON)
+            draw.text((nx1 + 22, ny + 60), f"NODE 0{idx + 1}", font=F_MONO_SM, fill=INK3)
+            if prev_out is not None:
+                p0 = prev_out
+                p3 = (nx1, ny + 68)
+                dx = max(60, abs(p3[0] - p0[0]) * 0.5)
+                c_col = EMBER if is_last else SIGNAL
+                draw_bezier(draw, p0, (p0[0] + dx, p0[1]), (p3[0] - dx, p3[1]), p3, fill=c_col, width=6)
+                draw.ellipse([p0[0] - 8, p0[1] - 8, p0[0] + 8, p0[1] + 8], fill=c_col)
+                draw.ellipse([p3[0] - 8, p3[1] - 8, p3[0] + 8, p3[1] + 8], fill=c_col)
+            prev_out = (nx2, ny + 68)
+
+    elif cat_norm == "Synths":
+        wave_y = sy1 + 190
+        pts = []
+        f1 = rng.range(2.0, 5.0)
+        f2 = rng.range(5.0, 11.0)
+        mod = rng.range(0.4, 1.4)
+        for x in range(sx1 + 48, sx2 - 48, 3):
+            t = (x - (sx1 + 48)) / max(1, (sx2 - sx1 - 96))
+            env = math.sin(t * math.pi)
+            y = wave_y - env * 115 * math.sin(t * math.pi * f1 + mod * math.sin(t * math.pi * f2))
+            pts.append((x, y))
+        draw.line(pts, fill=SIGNAL, width=6, joint="curve")
+
+        ky = sy2 - 120
+        for i in range(3):
+            kx = sx1 + 135 + i * 215
+            draw_knob(draw, kx, ky, 46, rng.range(0.2, 0.9), ember=(i == 1))
+
+    elif cat_norm == "Audio Effects":
+        base_y = sy1 + 310
+        peak_pos = rng.range(0.28, 0.72)
+        q = rng.range(16.0, 34.0)
+        pts = []
+        for x in range(sx1 + 48, sx2 - 48, 3):
+            t = (x - (sx1 + 48)) / max(1, (sx2 - sx1 - 96))
+            lp = 1.0 / (1.0 + math.exp((t - peak_pos) * 9.0))
+            res = 0.55 * math.exp(-((t - peak_pos) ** 2) * q)
+            y = base_y - (lp * 130 + res * 170)
+            pts.append((x, y))
+        poly = [(sx1 + 48, base_y)] + pts + [(sx2 - 48, base_y)]
+        draw.polygon(poly, fill=(36, 40, 68))
+        draw.line(pts, fill=SIGNAL, width=6, joint="curve")
+        pk_x = int(sx1 + 48 + peak_pos * (sx2 - sx1 - 96))
+        pk_y = int(base_y - (0.5 * 130 + 0.55 * 170))
+        draw.ellipse([pk_x - 11, pk_y - 11, pk_x + 11, pk_y + 11], fill=EMBER)
+
+        ky = sy2 - 110
+        for i in range(3):
+            kx = sx1 + 135 + i * 215
+            draw_knob(draw, kx, ky, 44, rng.range(0.2, 0.9), ember=(i == 0))
+
+    else:
+        mx1, my1, mx2, my2 = sx1 + 72, sy1 + 110, sx2 - 72, sy2 - 110
+        draw.rounded_rectangle([mx1, my1, mx2, my2], radius=28, fill=SURFACE1)
+        draw.rounded_rectangle([mx1, my1, mx2, my1 + 60], radius=28, fill=hdr_signal)
+        draw.rectangle([mx1, my1 + 30, mx2, my1 + 60], fill=hdr_signal)
+        draw.text((mx1 + 28, my1 + 16), cat_norm.upper(), font=F_NODE, fill=MOON)
+        for r in range(3):
+            py = my1 + 115 + r * 68
+            is_e = (r == 1)
+            draw.ellipse([mx1 - 10, py - 10, mx1 + 10, py + 10], fill=EMBER if is_e else SIGNAL)
+            draw.rounded_rectangle([mx1 + 32, py - 14, mx2 - 48 - r * 36, py + 14], radius=14,
+                                   fill=EMBER if is_e else SURFACE2)
+
+    out = im.resize((W, H), Image.LANCZOS)
+    b = io.BytesIO()
+    out.save(b, "WEBP", quality=85, method=6)
+    return b.getvalue()
 
 
-def main():
+def main() -> int:
     items = [it for f in SOURCES if os.path.exists(f) for it in json.load(open(f, encoding="utf-8"))["items"]]
-    items = list({it["id"]: it for it in reversed(items)}.values())[::-1]   # a preset listed in two indexes (the synth templates) gets one picture
+    items = list({it["id"]: it for it in reversed(items)}.values())[::-1]
     os.makedirs(OUT, exist_ok=True)
-    check = "--check" in sys.argv; diff = []
+    check = "--check" in sys.argv
+    changed = 0
+
     for it in items:
-        if True:   # any preset that has its own render shows it; only presets without one get the knobs and cables
-            data = art_webp(it)
-            if data is not None:
-                p = os.path.join(OUT, it["id"] + ".webp")
-                if not os.path.exists(p) or open(p, "rb").read() != data:
-                    diff.append(it["id"])
-                    if not check: open(p, "wb").write(data)
-                old = os.path.join(OUT, it["id"] + ".svg")
-                if os.path.exists(old) and not check: os.remove(old)
-                continue
-        p = os.path.join(OUT, it["id"] + ".svg"); new = thumb(it)
-        if not os.path.exists(p) or open(p, encoding="utf-8").read() != new:
-            diff.append(it["id"])
-            if not check: open(p, "w", encoding="utf-8").write(new)
-    print(("differ: " if check else "written: ") + (", ".join(diff) or "none"))
-    return 1 if (check and diff) else 0
+        cat = it.get("category", "")
+        use_art = (cat in ART_CATS) or (cat == "Templates" and is_rich_visual_template(it))
+        data = art_webp(it) if use_art else None
+        if data is None:
+            data = render_brand_card(it)
+        p = os.path.join(OUT, f"{it['id']}.webp")
+        if not os.path.exists(p) or open(p, "rb").read() != data:
+            changed += 1
+            if not check:
+                open(p, "wb").write(data)
+        old_svg = os.path.join(OUT, f"{it['id']}.svg")
+        if os.path.exists(old_svg) and not check:
+            os.remove(old_svg)
+
+    print(f"{'differ' if check else 'written'}: {changed} / {len(items)} library thumbnails")
+    return 1 if (check and changed) else 0
 
 
 if __name__ == "__main__":

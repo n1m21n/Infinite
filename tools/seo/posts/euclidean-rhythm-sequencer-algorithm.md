@@ -4,7 +4,7 @@ description: How to generate Euclidean rhythm sequencer algorithms using Bjorklu
 date: 2026-10-20
 category: creative
 tags: [euclidean rhythms, sequencing, modular synthesis, algorithmic composition]
-image: assets/blog_euclidean_rhythm_sequencer.png
+image: assets/blog_euclidean-rhythm-sequencer-algorithm.png
 image_alt: Euclidean rhythm sequencer algorithm diagram showing geometric hit distributions and modular node patching
 keywords: euclidean rhythm sequencer algorithm, euclidean rhythm generator, bjorklund algorithm audio, modular beat generator
 status: published

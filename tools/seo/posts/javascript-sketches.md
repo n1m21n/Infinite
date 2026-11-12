@@ -5,7 +5,7 @@ description: how sketch nodes let you draw with javascript in infinite and expos
 date: 2026-10-19
 category: creative
 tags: [javascript, creative coding, sketch, generative art]
-image: assets/sketch_showcase_preview.png
+image: assets/blog_javascript-sketches.png
 image_alt: javascript sketch node showcase with clifford attractor and parameters in infinite
 keywords: javascript creative coding daw, p5js alternative native, audio reactive javascript canvas, modular sketch node, generative visual synthesis
 status: published
