@@ -325,6 +325,7 @@ static bool Invert4(const float* m, float* o)
    return true;
 }
 
+bool Render3DNode::LiveEngineAvailable() { return true; }
 bool Render3DNode::CookEngine(int frameId)
 {
    if (mEng == nullptr)
@@ -953,4 +954,5 @@ bool Render3DNode::CookEngine(int frameId)
 }
 #else
 bool Render3DNode::CookEngine(int) { return false; }
+bool Render3DNode::LiveEngineAvailable() { return false; }
 #endif

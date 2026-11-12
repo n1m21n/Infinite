@@ -888,6 +888,8 @@ public:
    // anything moves and refines toward `ptSamples` once the view is still; an offline render
    // traces all `ptSamples` for every frame.
    static const std::vector<std::string>& EngineNames();
+   static bool LiveEngineAvailable(); // the Metal live engine is built in (macOS today)
+   bool LiveActive() const { return liveEngine || (engine >= 2 && LiveEngineAvailable()); }
    int engine = 0;
    int ptSamples = 128;
    int ptBounces = 6;

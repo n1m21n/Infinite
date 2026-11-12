@@ -50,7 +50,10 @@ namespace
    const std::vector<std::string> kSolidColorNames = { "Material", "Attribute", "Single", "Random", "Texture", "Object" };
    const std::vector<std::string> kMatcapNames = { "Clay", "Metal", "Toon", "Gloss" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
-   const std::vector<std::string> kEngineNames = { "Raster", "Path trace" };
+   // Row 8.1: Live = the Metal live engine (RT shadows, reflections, GI); Live + settle also path traces once still.
+   // Stored as 2 and 3 so old patches keep 0 = Raster, 1 = Path trace. Without Metal only the first two show.
+   const std::vector<std::string> kEngineNames = { "Raster", "Path trace", "Live", "Live + settle" };
+   const std::vector<std::string> kEngineNamesGl = { "Raster", "Path trace" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
    const Mesh kEmptyMesh;
@@ -1620,7 +1623,7 @@ const std::vector<std::string>& Render3DNode::SolidColorNames() { return kSolidC
 const std::vector<std::string>& Render3DNode::MatcapNames() { return kMatcapNames; }
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
-const std::vector<std::string>& Render3DNode::EngineNames() { return kEngineNames; }
+const std::vector<std::string>& Render3DNode::EngineNames() { return LiveEngineAvailable() ? kEngineNames : kEngineNamesGl; }
 int Render3DNode::PathTraceSampleCount() const { return std::clamp(ptSamples, 1, 4096); }
 const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
 
@@ -2372,9 +2375,11 @@ void Render3DNode::CookIfNeeded(int frameId)
    // Owner opt-in until the face toggle is approved; a number 2..15 also sets liveEngineFeatures (1 = defaults).
    static const char* sEngineEnvValue = std::getenv("INFINITE_LIVE_ENGINE");
    static const bool sEngineEnv = sEngineEnvValue != nullptr;
+   if (engine >= 2 && !liveEngine)
+      liveEngineFeatures = engine == 3 ? 15 : 7;
    if (sEngineEnv && std::atoi(sEngineEnvValue) > 1)
       liveEngineFeatures = std::atoi(sEngineEnvValue) & 15;
-   if ((liveEngine || sEngineEnv) && renderPass == 0 && mFaceOverride < 0 && !SolidActive())
+   if ((LiveActive() || sEngineEnv) && renderPass == 0 && mFaceOverride < 0 && !SolidActive())
    {
       // Live on export: Supersample averages jittered live frames, as the raster export does (Settle traces its own
       // sub-pixel samples). Pixel-thin geometry such as fur strands needs it.
@@ -2757,7 +2762,7 @@ void Render3DNode::CookOnce(int frameId)
                            lightSpotPenumbra, lightArea, lightTerms, lightCutoff);
    // Probes light raster's own frames; the tracers find their own bounce light.
    static const bool sEngineEnvSet = std::getenv("INFINITE_LIVE_ENGINE") != nullptr;
-   if (!mVelocityPass && mFaceOverride < 0 && !PathTraceActive() && !liveEngine && !sEngineEnvSet && !SolidActive())
+   if (!mVelocityPass && mFaceOverride < 0 && !PathTraceActive() && !LiveActive() && !sEngineEnvSet && !SolidActive())
       UpdateProbes(sceneSig);
 
    // --- shadow pass ---------------------------------------------------

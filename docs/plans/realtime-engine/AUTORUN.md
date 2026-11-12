@@ -50,3 +50,4 @@ commit. No pasted logs, no file-by-file retelling: the commit holds that. When a
 | 7.1 texture transform | not read | a Mapping node between Model and Material (base colour map transform, v flip folded in) |
 | 7.2 | partly met. carpet_pile 200 k, 384 px: rays see scatters as world-space cluster BLASes, TLAS cached; L 690->590 ms (16-side cone, over 4 M-tri cap), 352 ms (6-side), build 140->21 ms; T 64 spp 8.6 s, 611 MB; objRand to Shade Geometry (GL raster still 0); 30 fps not met | see git log |
 | 7.3 | design only: designs/7.3-passes.md (depth, normal, albedo, mask, id as Render 3D outputs behind one Passes toggle; Metal reuses its denoiser guides). Waiting for owner | see git log |
+| 8.1 | Engine dropdown: Raster, Path trace, Live, Live + settle (stored 0..3; old 0/1 unchanged; Live entries only where Metal is built). Headless: engine 2 runs live, 3 settles to 48 spp, 0 stays GL. Deviation: GL Path trace kept as its own entry | see git log |

@@ -2917,7 +2917,7 @@ namespace app
       ModSliderInt("offline supersample", &n->supersample, 1, 64, colW);
       ImGui::EndDisabled();
       hideEnd();
-      ImGui::BeginDisabled(!n->liveEngine && (!n->HdrActive() || pt)); // the live engine blooms its own picture (row 6.3)
+      ImGui::BeginDisabled(!n->LiveActive() && (!n->HdrActive() || pt)); // the live engine blooms its own picture (row 6.3)
       ModSlider("bloom", &n->bloom, 0.0f, 1.0f, "%.3f", colW);
       hideBegin(2, 0, {});
       ImGui::BeginDisabled(n->bloom <= 0.0f);

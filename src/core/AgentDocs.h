@@ -2486,7 +2486,7 @@ R"AGENTDOC(Three ways, from simplest to most flexible.
 | Fur | `f furDensity` (per cm²), `f furLength` (m), `f furWidth`, `i furSegments`, `f furGravity`, `f furClump`, `f furCurl`, `i furNormals` Ribbon, Tangent | Optional `guide` geometry input (a Curve) styles every strand; `i furMaxStrands` caps the count. A Material with `i model 1` (Hair: `f melanin`, `f melaninRedness`, `f radialRoughness`, `f hairShift`) wants Tangent normals |
 | Model 3D | `s path file.glb`, `i clip`, `pose0..` | Skinned glTF clips, morphs and poses animate with the clock |
 | Cloth, Rigid Bodies | `geo` input, Cloth also `collider` | Cloth `colliderFriction`, `colliderDistance`; Rigid Bodies `collider` Box, Sphere, Convex hull. Both simulate from time 0, so ask `--frame` for a later second to see motion |
-| Render 3D | `i engine` Raster or Path trace | `ptSamples`, `ptBounces` for the path tracer; `renderPass` and cavity, AO, depth of field controls for passes |
+| Render 3D | `i engine` Raster, Path trace, Live or Live + settle (Live: macOS) | `ptSamples`, `ptBounces` for the path tracer; `renderPass` and cavity, AO, depth of field controls for passes |
 | Light, HDRI, Camera | `geo r3 5 light`, `geo r3 4 camera`, `cable r3 8 hdri` | An HDRI is an environment: it uses a `cable` line, not `geo`. Light `useTemperature`, `useCutoff`; Camera `shiftX`, `sensorFit` |
 
 Write each control with its real tag; `--describe "<type>"` shows it, and `--validate` warns `W_TYPE_MISMATCH` when you guess wrong.
