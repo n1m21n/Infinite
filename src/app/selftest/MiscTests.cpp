@@ -16,6 +16,11 @@
 #include "miniz.h"
 #include "core/MediaCollect.h"
 #include "nodes/FormulaNode.h"
+#include "nodes/OscNodes.h"
+#include "platform/NetCompat.h"
+#include <cmath>
+#include <cstring>
+#include <thread>
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
@@ -2788,6 +2793,103 @@ void RunOscControlTest()
    Check("a listener on a deleted node is told and dropped", Last(got, "/infinite/error") != nullptr);
    Undo();
    Check("delete is one undo step", FindNodeByIndex(shape) != nullptr);
+
+   // ---- OSC Receive: bundles, shared port, wildcard, arg index, learn, bind error
+   {
+      using OscMessage::EncodeMany;
+      const int kPort = 9197;
+      OscReceiveNode a, b, w, l;
+      a.port = b.port = w.port = l.port = kPort;
+      a.address = "/a"; a.low = 0.0f; a.high = 100.0f;
+      b.address = "/b"; b.low = 0.0f; b.high = 100.0f;
+      w.address = "/track/*/volume"; w.argIndex = 1; w.low = 0.0f; w.high = 127.0f;
+      l.address = "/unused"; l.low = 0.0f; l.high = 100.0f;
+      a.Value01(); b.Value01(); w.Value01(); l.Value01(); // sync filters
+      Check("two OSC Receive nodes share one port", a.BindError().empty() && b.BindError().empty());
+
+      const int fd = socket(AF_INET, SOCK_DGRAM, 0);
+      sockaddr_in to{};
+      to.sin_family = AF_INET;
+      to.sin_port = htons(static_cast<uint16_t>(kPort));
+      to.sin_addr.s_addr = inet_addr("127.0.0.1");
+      auto SendPacket = [&](const std::vector<uint8_t>& p)
+      {
+         NetCompat::NetSendTo(fd, p.data(), p.size(), 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+      };
+      auto Wait = [&](OscReceiveNode& n, float want)
+      {
+         for (int t = 0; t < 200; t++)
+         {
+            if (std::fabs(n.Value01() - want) < 1e-3f)
+               return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+         }
+         return false;
+      };
+      // single message
+      SendPacket(EncodeMany("/a", { OscMessage::IntArg(25) }));
+      Check("single OSC message reaches its node", Wait(a, 0.25f));
+      // bundle (with a nested bundle, a bool, a double and an int64)
+      auto Elem = [](std::vector<uint8_t>& out, const std::vector<uint8_t>& m)
+      {
+         const uint32_t n = static_cast<uint32_t>(m.size());
+         out.push_back(static_cast<uint8_t>(n >> 24)); out.push_back(static_cast<uint8_t>(n >> 16));
+         out.push_back(static_cast<uint8_t>(n >> 8)); out.push_back(static_cast<uint8_t>(n));
+         out.insert(out.end(), m.begin(), m.end());
+      };
+      auto Header = [](std::vector<uint8_t>& out)
+      {
+         const char h[8] = { '#', 'b', 'u', 'n', 'd', 'l', 'e', 0 };
+         out.insert(out.end(), h, h + 8);
+         for (int i = 0; i < 7; i++) out.push_back(0);
+         out.push_back(1); // timetag "immediately" - ignored
+      };
+      std::vector<uint8_t> inner;
+      Header(inner);
+      Elem(inner, EncodeMany("/b", { OscMessage::FloatArg(50.0f) }));
+      std::vector<uint8_t> bundle;
+      Header(bundle);
+      Elem(bundle, EncodeMany("/a", { OscMessage::FloatArg(75.0f) }));
+      Elem(bundle, inner);
+      // /track/3/volume with ",Td": arg 0 = true, arg 1 = double 63.5
+      std::vector<uint8_t> raw;
+      const std::string addrS = "/track/3/volume";
+      raw.insert(raw.end(), addrS.begin(), addrS.end());
+      do raw.push_back(0); while (raw.size() % 4 != 0);
+      const char tags[4] = { ',', 'T', 'd', 0 };
+      raw.insert(raw.end(), tags, tags + 4);
+      double dv = 63.5;
+      uint64_t bits;
+      std::memcpy(&bits, &dv, 8);
+      for (int sh = 56; sh >= 0; sh -= 8) raw.push_back(static_cast<uint8_t>(bits >> sh));
+      Elem(bundle, raw);
+      SendPacket(bundle);
+      Check("bundle: first message delivered", Wait(a, 0.75f));
+      Check("bundle: nested bundle delivered to the other node on the port", Wait(b, 0.5f));
+      Check("wildcard address + arg index + T/d types", Wait(w, 0.5f));
+      // learn
+      l.StartLearn();
+      SendPacket(EncodeMany("/learned/addr", { OscMessage::FloatArg(1.0f) }));
+      bool learned = false;
+      for (int t = 0; t < 200 && !learned; t++)
+      {
+         l.Value01();
+         learned = l.address == "/learned/addr";
+         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      }
+      Check("OSC learn records the next address", learned && !l.IsLearning());
+      // bind error: port held by a plain socket
+      const int blocker = socket(AF_INET, SOCK_DGRAM, 0);
+      sockaddr_in ba = to;
+      ba.sin_port = htons(9196);
+      const bool held = bind(blocker, reinterpret_cast<sockaddr*>(&ba), sizeof(ba)) == 0;
+      OscReceiveNode busy;
+      busy.port = 9196;
+      busy.Value01();
+      Check("bind failure is reported on the node", held && !busy.BindError().empty());
+      NetCompat::NetClose(blocker);
+      NetCompat::NetClose(fd);
+   }
 
    ClearOscListeners();
    if (startedHere)
