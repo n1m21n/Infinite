@@ -507,6 +507,7 @@ set(COMMON_SOURCES
     src/app/graph/ExportImage.cpp
     src/app/graph/GraphHosts.cpp
     src/app/graph/NodeRegistry.cpp
+    src/app/graph/PortProbeCache.cpp
     src/app/graph/PatchFiles.cpp
     src/app/graph/PatchShare.cpp
     src/app/graph/PatchIO.cpp
