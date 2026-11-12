@@ -641,3 +641,44 @@ def _sky(elev, az, turb):
 
 CASES["sky_noon"] = _sky(55, -70, 3.0)
 CASES["sky_dusk"] = _sky(4, -100, 4.0)
+
+
+# Row 10.2: an interior reference still. The window room of "interior" with a planked wood floor, a fabric ottoman,
+# a wooden nightstand, a glass and a metal ball, sunlight through the window and a physical sky outside it.
+def _ref_interior():
+    sc = _interior()
+    sc["size"] = [512, 384]
+    sc["objects"][0]["material"] = {"base_color": [1, 1, 1], "roughness": 0.45, "maps": {"albedo": "wood"}, "uv_scale": 2.0}
+    sc["objects"] = [o for o in sc["objects"] if o.get("shape") != "sphere" and o.get("scale") != [0.4, 0.4, 0.4]]
+    sc["objects"] += [{"shape": "model", "asset": "Ottoman_01.glb", "location": [0.2, 0.9, 0]},
+                      {"shape": "model", "asset": "ClassicNightstand_01.glb", "location": [1.4, 1.5, 0]},
+                      _ball(-0.6, -0.2, 0.22, base_color=[1, 1, 1], transmission=1.0, roughness=0.0, ior=1.5),
+                      _ball(-0.1, -0.6, 0.18, base_color=[0.95, 0.93, 0.88], metallic=1.0, roughness=0.15)]
+    sc["world"] = {"sky": {"elevation": 35, "azimuth": 180, "turbidity": 3.0}}
+    return sc
+
+
+# Row 10.3: a product still. A glass bottle with a brushed metal cap and a paper label, on a grey sweep, small warm
+# lights far behind out of focus (bokeh through a 6-blade aperture).
+def _ref_product():
+    bg = [_ball(-6.0 - 0.7 * (k % 2), x, z, base_color=[0, 0, 0], emission=[1.0, 0.8, 0.55], emission_strength=40.0)
+          for k, (x, z) in enumerate((x, z) for x in (-1.8, -0.6, 0.6, 1.8) for z in (0.4, 1.4))]
+    for b in bg:
+        b["scale"] = 0.06
+    objs = [GREY_FLOOR,
+            {"shape": "sphere", "scale": [0.16, 0.16, 0.34], "location": [0, 0, 0.34],
+             "material": {"base_color": [0.55, 0.8, 0.6], "transmission": 1.0, "roughness": 0.02, "ior": 1.5}},
+            {"shape": "cube", "scale": [0.07, 0.07, 0.05], "location": [0, 0, 0.71],
+             "material": {"base_color": [0.9, 0.9, 0.88], "metallic": 1.0, "roughness": 0.3, "anisotropy": 0.8}},
+            {"shape": "cube", "scale": [0.004, 0.11, 0.09], "location": [0.162, 0, 0.32],
+             "material": {"base_color": [1, 1, 1], "roughness": 0.55, "maps": {"albedo": "label"}, "coat": 0.3}}] + bg
+    return {"size": [384, 512],
+            "camera": {"fov": 28, "azimuth": 10, "elevation": 8, "distance": 1.6, "target": [0, 0, 0.36],
+                       "fstop": 1.4, "focus": 1.6, "blades": 6, "blade_rotation": 15},
+            "lights": [{"type": "area", "power": 60, "azimuth": 50, "elevation": 35, "distance": 2.0, "size": [1, 1]},
+                       {"type": "sun", "power": 1.0, "azimuth": -60, "elevation": 40}],
+            "world": {"color": [0.05, 0.05, 0.06]}, "objects": objs}
+
+
+CASES["ref_interior"] = _ref_interior()
+CASES["ref_product"] = _ref_product()

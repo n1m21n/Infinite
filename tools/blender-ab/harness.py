@@ -223,6 +223,18 @@ def make_texture(case_dir, name, size=512):
             dx = (u - cx + 0.5) % 1 - 0.5; dy = (v - cy + 0.5) % 1 - 0.5
             img = np.where((np.hypot(dx, dy) < r)[..., None], [30, 20, 25], img)
         img = img.clip(0, 255).astype(np.uint8)
+    elif name == "wood":              # row 10.2: planks along u (8 a tile), each its own tone, a fine wavy grain
+        rng = np.random.default_rng(7)
+        k = np.floor(v * 8).astype(int) % 8
+        tone = rng.uniform(0.75, 1.15, 8)[k]
+        grain = 0.5 + 0.5 * np.sin(2 * np.pi * (v * 96 + 0.6 * np.sin(2 * np.pi * (u * 3 + k * 0.37))))
+        seam = np.where(((v * 8) % 1) < 0.03, 0.45, 1.0)
+        img = (np.array([150, 95, 55]) * (tone * (0.82 + 0.18 * grain) * seam)[..., None]).clip(0, 255).astype(np.uint8)
+    elif name == "label":             # row 10.3: a paper label, a cream ground with two dark bands and a red one
+        g = np.full((size, size, 3), [235, 225, 200], np.float32)
+        g[(v > 0.30) & (v < 0.36)] = [40, 35, 30]; g[(v > 0.64) & (v < 0.70)] = [40, 35, 30]
+        g[(v > 0.44) & (v < 0.56)] = [170, 30, 25]
+        img = g.astype(np.uint8)
     elif name == "holes":             # row 4.2: a 6 x 6 grid of round holes in a flat top, grey height (1 top, 0 floor)
         r = np.hypot((u * 6) % 1 - 0.5, (v * 6) % 1 - 0.5)
         g = (np.clip((r - 0.27) / 0.03, 0, 1) * 255).astype(np.uint8)
