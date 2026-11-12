@@ -73,6 +73,17 @@ namespace Field
             if (!(std::isalnum((unsigned char)nx) || nx == '_')) uses++;
          }
          e.usesTime = uses > 1;
+         // every function declares fld_v_curvature / fld_v_cavity from G; a second whole-word use is a read
+         auto reads = [&](const std::string& name) {
+            int n = 0;
+            for (size_t at = g.source.find(name); at != std::string::npos; at = g.source.find(name, at + name.size()))
+            {
+               const char nx = at + name.size() < g.source.size() ? g.source[at + name.size()] : ' ';
+               if (!(std::isalnum((unsigned char)nx) || nx == '_')) n++;
+            }
+            return n > 1;
+         };
+         e.usesWear = reads("fld_v_curvature") || reads("fld_v_cavity");
       }
       e.glsl = std::move(g.source);
       e.msl = std::move(m.source);

@@ -364,6 +364,26 @@ for i, o in enumerate(scene["objects"]):
     p.inputs["Emission Color"].default_value = (*m.get("emission", (0, 0, 0)), 1)
     p.inputs["Emission Strength"].default_value = m.get("emission_strength", 0.0)
     p.inputs["Alpha"].default_value = m.get("alpha", 1.0)
+    if m.get("wear"):   # row 4.4 truth: pointiness (curvature) or local AO at 5 % of the bounding radius, as emission
+        nt = mat.node_tree
+        out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+        em = nt.nodes.new("ShaderNodeEmission")
+        nt.links.new(em.outputs[0], out.inputs["Surface"])
+        if m["wear"] == "curvature":
+            ge = nt.nodes.new("ShaderNodeNewGeometry")
+            mr = nt.nodes.new("ShaderNodeMapRange")
+            mr.inputs[1].default_value, mr.inputs[2].default_value = 0.4, 0.6
+            nt.links.new(ge.outputs["Pointiness"], mr.inputs[0])
+            nt.links.new(mr.outputs[0], em.inputs["Color"])
+        else:
+            vs = [v.co for v in ob.data.vertices]
+            lo = [min(v[k] for v in vs) for k in range(3)]; hi = [max(v[k] for v in vs) for k in range(3)]
+            mid = [(lo[k] + hi[k]) / 2 for k in range(3)]
+            rad = max(sum((v[k] - mid[k]) ** 2 for k in range(3)) for v in vs) ** 0.5
+            ao = nt.nodes.new("ShaderNodeAmbientOcclusion")
+            ao.samples = 16; ao.only_local = True
+            ao.inputs["Distance"].default_value = 0.05 * rad
+            nt.links.new(ao.outputs["AO"], em.inputs["Color"])
     # Coverage-case lobes. Render 3D's subsurface colour is Cycles' per-channel radius; its 0..1 radius maps to 0.2 m.
     p.inputs["Subsurface Weight"].default_value = m.get("subsurface", 0.0)
     p.inputs["Subsurface Radius"].default_value = m.get("subsurface_color", (1.0, 0.2, 0.1))

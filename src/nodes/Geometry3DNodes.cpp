@@ -18,6 +18,7 @@
 
 #include "Transport.h"
 #include "field/MaterialRegistry.h"
+#include "MeshWear.h"
 #include "BenchReport.h"
 #include "SceneNodes.h"
 #include "GeometryOpNodes.h"
@@ -320,6 +321,7 @@ namespace
       "in mat4 aInstance;\n"      // per-instance transform, divisor 1
       "in vec3 aInstanceColor;\n" // per-instance tint, divisor 1
       "in vec3 aVertexColor;\n"   // per-vertex tint, from Mesh::vertexColor
+      "in vec2 aWear;\n"          // row 4.4: curvature, cavity per vertex (attrib off = 0)
       "uniform mat4 uModel;\n"
       "uniform int uInstanced;\n"
       "uniform int uInstanceColored;\n"
@@ -359,6 +361,7 @@ namespace
       "out vec2 vUv;\n"
       "out vec3 vInstanceColor;\n"
       "out vec3 vVertexColor;\n"
+      "out vec2 vWear;\n"
       // Motion blur's velocity cook: where this point was last frame, through last
       // frame's camera. uMotionDelta takes this frame's world to last frame's.
       "uniform int uVelocity;\n"
@@ -408,6 +411,7 @@ namespace
       "   vLocalPos = aPos;\n"
       "   vNormal = worldNormal;\n"
       "   vUv = aUv;\n"
+      "   vWear = aWear;\n"
       // White when there is no per-instance colour, so the fragment shader can
       // multiply unconditionally rather than branching on it.
       "   vInstanceColor = (uInstanceColored == 1) ? instanceColor : vec3(1.0);\n"
@@ -446,6 +450,7 @@ namespace
       "in vec2 vUv;\n"
       "in vec3 vInstanceColor;\n"
       "in vec3 vVertexColor;\n"
+      "in vec2 vWear;\n"
       "in vec4 vLightSpacePos;\n"
       "in vec4 vCurClip;\n"
       "in vec4 vPrevClip;\n"
@@ -1141,7 +1146,7 @@ namespace
       "      o.base = base; o.roughness = rough; o.metallic = metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
       "      o.emission = emiss; o.opacity = alpha; o.mask = 1.0;\n"
       "      o.prm0 = uFldPrm[0]; o.prm1 = uFldPrm[1]; o.prm2 = uFldPrm[2]; o.prm3 = uFldPrm[3];\n"
-      "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime, vWorldPos, normalize(uCamPos - vWorldPos), vec4(gl_FrontFacing ? 0.0 : 1.0, 0.0, 0.0, 0.0));\n"
+      "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime, vWorldPos, normalize(uCamPos - vWorldPos), vec4(gl_FrontFacing ? 0.0 : 1.0, 0.0, vWear.x, vWear.y));\n"
       "      vec3 dp1 = dFdx(vWorldPos), dp2 = dFdy(vWorldPos);\n"
       "      vec2 duv1 = dFdx(vUv), duv2 = dFdy(vUv);\n"
       "      float dhx = dFdx(o.height), dhy = dFdy(o.height);\n"
@@ -1910,6 +1915,7 @@ void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
    if (gpu.instanceVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.instanceVbo); glDeleteBuffers(1, &gpu.instanceVbo); gpu.instanceVbo = 0; }
    if (gpu.instanceColorVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.instanceColorVbo); glDeleteBuffers(1, &gpu.instanceColorVbo); gpu.instanceColorVbo = 0; }
    if (gpu.vertexColorVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.vertexColorVbo); glDeleteBuffers(1, &gpu.vertexColorVbo); gpu.vertexColorVbo = 0; }
+   if (gpu.wearVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.wearVbo); glDeleteBuffers(1, &gpu.wearVbo); gpu.wearVbo = 0; }
    if (gpu.vao != 0) { glDeleteVertexArrays(1, &gpu.vao); gpu.vao = 0; }
    gpu = GpuMesh();
 }
@@ -1993,6 +1999,7 @@ bool Render3DNode::EnsureShader()
       glBindAttribLocation(program, 3, "aInstance"); // occupies locations 3..6
       glBindAttribLocation(program, 7, "aInstanceColor");
       glBindAttribLocation(program, 8, "aVertexColor");
+      glBindAttribLocation(program, 9, "aWear");
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
@@ -3512,7 +3519,9 @@ void Render3DNode::CookOnce(int frameId)
       }
 
       const unsigned long long revision = source->MeshRevision();
-      if (gpu.meshRevision != revision)
+      const Field::MaterialProgramEntry* wearProg = Field::FindMaterialProgram(source->GetMaterial().fieldProgram);
+      const bool wantWear = wearProg != nullptr && wearProg->usesWear && !mesh.vertices.empty();
+      if (gpu.meshRevision != revision || gpu.hasWear != wantWear)
       {
          glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
          glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex),
@@ -3550,6 +3559,24 @@ void Render3DNode::CookOnce(int frameId)
          else
          {
             glDisableVertexAttribArray(8);
+         }
+         // Location 9: curvature and cavity (row 4.4), baked only for a material program that reads them.
+         gpu.hasWear = wantWear;
+         if (wantWear)
+         {
+            const std::vector<float> wear = MeshWear::Bake(&mesh.vertices[0].px, sizeof(Vertex) / sizeof(float), mesh.vertices.size(),
+                                                           mesh.indices.data(), mesh.indices.size());
+            if (gpu.wearVbo == 0)
+               glGenBuffers(1, &gpu.wearVbo);
+            glBindBuffer(GL_ARRAY_BUFFER, gpu.wearVbo);
+            glBufferData(GL_ARRAY_BUFFER, wear.size() * sizeof(float), wear.data(), GL_STATIC_DRAW);
+            Bench::GpuMem::RecordBuffer(gpu.wearVbo, Bench::GpuMemCategory::MeshBuffers, wear.size() * sizeof(float), "Render3D_Wear");
+            glEnableVertexAttribArray(9);
+            glVertexAttribPointer(9, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+         }
+         else
+         {
+            glDisableVertexAttribArray(9);
          }
 
          // Bounds computed here rather than per frame: this is the one place

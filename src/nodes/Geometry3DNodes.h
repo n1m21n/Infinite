@@ -934,7 +934,7 @@ private:
    // changes source simply invalidates and re-uploads.
    struct GpuMesh
    {
-      unsigned int vao = 0, vbo = 0, ibo = 0, instanceVbo = 0, instanceColorVbo = 0, vertexColorVbo = 0;
+      unsigned int vao = 0, vbo = 0, ibo = 0, instanceVbo = 0, instanceColorVbo = 0, vertexColorVbo = 0, wearVbo = 0;
       // Object-space bounds, computed once per upload. The shadow volume has to
       // be fitted to the scene every frame, and walking every vertex of a
       // hundred-thousand-triangle mesh to do that would cost more than the
@@ -954,6 +954,7 @@ private:
       bool instanceAttribsOn = false;
       bool instanceColored = false;
       bool hasVertexColor = false;
+      bool hasWear = false; // row 4.4: location 9 carries curvature, cavity
       // The GetInstanceGroupMatrix() baked into the uploaded instance buffer
       // last time it was rebuilt, so a Transform node's own params changing -
       // which doesn't bump the instancer's own InstanceRevision() - still

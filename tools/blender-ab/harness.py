@@ -394,6 +394,12 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
         knobs = dict(m, base_color=[0.5, 0.5, 0.5], metallic=0.0, roughness=0.5) if m.get("field") else m
         mat = node("3D", "Material", material_lines(knobs) + dl + hl + (["  i wrapMode repeat"] if m.get("maps") else []))
         wires.append("geo %d 0 %d" % (mat, model))
+        if m.get("wear"):   # row 4.4: curvature or cavity as emission on a black surface (truth: pointiness, AO)
+            w = m["wear"]
+            code = ("base = vec3(0.0)\\nroughness = 1.0\\nemission = vec3(clamp(0.5 + curvature * %r, 0.0, 1.0))" % float(m.get("gain", 0.1))
+                    if w == "curvature" else "base = vec3(0.0)\\nroughness = 1.0\\nemission = vec3(1.0 - cavity)")
+            fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % code])
+            wires.append("cable %d field %d" % (mat, fp))
         if m.get("field"):   # a Field material program writes the case's values over the decoy knobs (linear, as the case)
             code = "base = vec3(%r, %r, %r)\\nmetallic = %r\\nroughness = %r" % (
                 *[float(c) for c in m.get("base_color", (0.8, 0.8, 0.8))], float(m.get("metallic", 0.0)), float(m.get("roughness", 0.5)))

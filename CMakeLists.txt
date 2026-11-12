@@ -634,6 +634,7 @@ set(COMMON_SOURCES
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
+    src/core/MeshWear.cpp
     src/core/Bvh.cpp
     src/core/GpuPoints.cpp
     src/core/PlyPoints.cpp

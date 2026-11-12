@@ -8,6 +8,9 @@
 #include "core/field/GlslBackend.h"
 #include "core/field/MslBackend.h"
 #include "core/field/MaterialRegistry.h"
+#include "core/MeshWear.h"
+#include "core/Mesh.h"
+#include <chrono>
 #include "core/Expression.h"
 #include <functional>
 #include "nodes/FieldPixelNode.h"
@@ -1616,6 +1619,34 @@ bool RunEngineTest()
       if (!derr.empty()) printf("    4-deep program error: %s\n", derr.c_str());
       check(deep > 0 && derr.empty(), "4.1: a 4-deep layer chain compiles", (double)deep, 0);
       metal.LayerMaskInput().Disconnect();
+   }
+
+   // ---- 4.4: curvature and cavity per vertex. A ~100 k vertex sphere reads curvature 1 (radius-normalised) and
+   // cavity 0, baked under 200 ms; only a program that reads them asks for the bake.
+   {
+      Mesh sp = Primitives::Sphere(224, 448);
+      for (Vertex& v : sp.vertices) { v.px *= 3.0f; v.py *= 3.0f; v.pz *= 3.0f; } // any size reads the same
+      const auto t0 = std::chrono::steady_clock::now();
+      const std::vector<float> wr = MeshWear::Bake(&sp.vertices[0].px, sizeof(Vertex) / sizeof(float), sp.vertices.size(), sp.indices.data(), sp.indices.size());
+      const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+      std::vector<float> cs;
+      double cavSum = 0.0;
+      for (size_t i = 0; i < sp.vertices.size() && wr.size() == sp.vertices.size() * 2; i++)
+      {
+         if (std::fabs(sp.vertices[i].ny) < 0.95f) cs.push_back(wr[i * 2]); // poles of a uv sphere are fans
+         cavSum += wr[i * 2 + 1];
+      }
+      std::sort(cs.begin(), cs.end());
+      const double med = cs.empty() ? 0.0 : cs[cs.size() / 2], cav = cavSum / std::max<size_t>(sp.vertices.size(), 1);
+      printf("    4.4 sphere %zu vertices: bake %.0f ms, curvature median %.3f, cavity mean %.4f\n", sp.vertices.size(), ms, med, cav);
+      check(std::fabs(med - 1.0) < 0.03 && cav < 0.01, "4.4: sphere curvature 1, cavity 0", med, 1.0);
+      check(sp.vertices.size() >= 100000 && ms < 200.0, "4.4: wear bake of 100 k vertices under 200 ms", ms, 200.0);
+      std::string e1, e2;
+      const int pw = Field::RegisterMaterialProgram("emission = vec3(curvature + cavity)", {}, e1);
+      const int pn = Field::RegisterMaterialProgram("base = vec3(0.25, 0.5, 0.75)", {}, e2);
+      const Field::MaterialProgramEntry* ew = Field::FindMaterialProgram(pw);
+      const Field::MaterialProgramEntry* en = Field::FindMaterialProgram(pn);
+      check(ew && en && ew->usesWear && !en->usesWear, "4.4: only a program reading curvature or cavity asks for the bake", ew && ew->usesWear, 1);
    }
 
    // dump for eyes

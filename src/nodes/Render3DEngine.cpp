@@ -10,6 +10,7 @@
 #include "SceneNodes.h"
 #include "Transport.h"
 #include "field/MaterialRegistry.h"
+#include "MeshWear.h"
 #include "UtilityNodes.h"
 
 #include "gl3.h"
@@ -151,6 +152,12 @@ namespace
       const MappingTransform mt = src->GetMappingTransform();
       return mt.space == kMapSpaceUv && mt.breakup <= 0.001f && mt.rotate[0] == 0.0f && mt.rotate[1] == 0.0f && mt.rotate[2] == 0.0f;
    }
+   // Row 4.4: curvature and cavity are baked for a mesh whose material program reads them.
+   bool WantsWear(IGeometrySource* src)
+   {
+      const Field::MaterialProgramEntry* e = Field::FindMaterialProgram(src->GetMaterial().fieldProgram);
+      return e != nullptr && e->usesWear;
+   }
    size_t TriangleCap()
    {
       unsigned long long mem = 8ull << 30;
@@ -208,6 +215,8 @@ namespace
       };
       const size_t per = (size_t)(n + 1) * (n + 2) / 2;
       d.tracePosNormal.reserve(nt * per * 6); d.traceUv.reserve(nt * per * 2); d.traceIndices.reserve(nt * (size_t)n * n * 3);
+      const bool wear = d.wear.size() == nv * 2;
+      if (wear) d.traceWear.reserve(nt * per * 2);
       for (size_t t = 0; t < nt; t++)
       {
          const uint32_t vi[3] = { d.indices[t * 3], d.indices[t * 3 + 1], d.indices[t * 3 + 2] };
@@ -219,7 +228,7 @@ namespace
             {
                const int w[3] = { n - a - b, a, b };
                // On an edge the two ends are taken in vertex-index order, so both triangles get the same bits.
-               float att[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+               float att[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
                for (int kk = 0; kk < 3; kk++)
                {
                   const int k = ks[kk];
@@ -227,6 +236,7 @@ namespace
                   const float f = (float)w[k] / (float)n;
                   for (int c = 0; c < 6; c++) att[c] += d.posNormal[vi[k] * 6 + c] * f;
                   for (int c = 0; c < 2; c++) att[6 + c] += d.uv[vi[k] * 2 + c] * f;
+                  if (wear) for (int c = 0; c < 2; c++) att[8 + c] += d.wear[vi[k] * 2 + c] * f;
                }
                float nl = std::sqrt(att[3] * att[3] + att[4] * att[4] + att[5] * att[5]);
                if (nl > 1e-12f) { att[3] /= nl; att[4] /= nl; att[5] /= nl; }
@@ -234,6 +244,7 @@ namespace
                for (int c = 0; c < 3; c++) att[c] += att[3 + c] * off;
                d.tracePosNormal.insert(d.tracePosNormal.end(), att, att + 6);
                d.traceUv.insert(d.traceUv.end(), att + 6, att + 8);
+               if (wear) d.traceWear.insert(d.traceWear.end(), att + 8, att + 10);
             }
          auto id = [&](int a, int b) { return base + (uint32_t)(a * (n + 1) - a * (a - 1) / 2 + b); }; // row a holds n + 1 - a
          for (int a = 0; a < n; a++)
@@ -262,9 +273,12 @@ namespace
       for (size_t v = 0; v < tv; v++)
       {
          const float* a = &d.tracePosNormal[v * 6];
-         unsigned long long h = 1469598103934665603ull;
-         for (int c = 0; c < 3; c++) h = (h ^ (unsigned long long)(long long)std::llround(a[c] * q)) * 1099511628211ull;
-         for (int c = 3; c < 6; c++) h = (h ^ (unsigned long long)(long long)std::llround(a[c] * 64.0f)) * 1099511628211ull;
+         auto mix = [](unsigned long long x) { // splitmix64: small integer keys fold together under xor-multiply
+            x += 0x9E3779B97F4A7C15ull; x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull; x = (x ^ (x >> 27)) * 0x94D049BB133111EBull; return x ^ (x >> 31);
+         };
+         unsigned long long h = 0;
+         for (int c = 0; c < 3; c++) h = mix(h ^ mix((unsigned long long)(long long)std::llround(a[c] * q)));
+         for (int c = 3; c < 6; c++) h = mix(h ^ mix((unsigned long long)(long long)std::llround(a[c] * 64.0f)));
          auto it = weld.emplace(h, v).first;
          rep[v] = it->second;
          if (it->second != v)
@@ -337,11 +351,15 @@ bool Render3DNode::CookEngine(int frameId)
          rev ^= k | 1ull;
          displaced++;
       }
+      if (WantsWear(src))
+         rev = (rev ^ 0x5745415257454152ull) * 1099511628211ull; // the bake joins the mesh's key
       sig.emplace_back((const void*)src, rev);
    }
    const size_t triCap = TriangleCap() / (size_t)std::max(displaced, 1);
    auto meshFor = [&](IGeometrySource* src) {
       engine::MeshData d = ToMeshData(src->GetMesh());
+      if (WantsWear(src))
+         d.wear = MeshWear::Bake(d.posNormal.data(), 6, d.posNormal.size() / 6, d.indices.data(), d.indices.size());
       if (WantsDisplace(src))
          if (auto* m = CacheMap(E, src->GetMaterialTexture(kMapNormal), src->SurfaceTextureRevision()))
          {

@@ -277,6 +277,16 @@ def _monkey():
                         {"shape": "cube", "scale": 0.3, "location": [0.8, 0.3, 0.3], "material": {"base_color": [0.3, 0.5, 0.8], "roughness": 0.5}}]}
 
 
+def _wear_masks():
+    # Row 4.4: curvature (left) and cavity (right) of the monkey head shown as emission; truth is Cycles' pointiness
+    # and local AO at 5 % of the radius. Gate: pixel correlation over each head above 0.8 (wear_corr.py).
+    blk = {"base_color": [0, 0, 0], "roughness": 1.0}
+    return {"size": SMALL, "camera": {"fov": 35, "azimuth": 90, "elevation": 10, "distance": 4.2, "target": [0, 0, 0.6]},
+            "lights": [], "world": {"color": [0, 0, 0]},
+            "objects": [{"shape": "monkey", "scale": 0.6, "location": [0.65, 0, 0.6], "material": dict(blk, wear="curvature", gain=0.04)},
+                        {"shape": "monkey", "scale": 0.6, "location": [-0.65, 0, 0.6], "material": dict(blk, wear="cavity")}]}
+
+
 def _motion(kind):
     sc = _lineup()
     sc["size"] = SMALL
@@ -367,6 +377,7 @@ CASES.update({
     "view_neutral": _lit({"type": "sun", "power": 6, "azimuth": 30, "elevation": 45}, view="Khronos PBR Neutral"),
     # A smooth subdivided head and a hard cube: smooth normals, self-shadow, crevices.
     "geom_monkey": _monkey(),
+    "wear_masks": _wear_masks(),
     # Motion: a camera orbit, a fast object with motion blur, and a still shot scored for flicker.
     "motion_orbit": _motion("orbit"),
     "motion_blur": _motion("blur"),
