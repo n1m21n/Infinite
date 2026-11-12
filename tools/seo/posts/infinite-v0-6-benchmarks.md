@@ -5,7 +5,7 @@ description: Infinite benchmarks on a base MacBook Air M2 against Blender, Vital
 date: 2026-10-17
 category: product
 tags: [benchmarks, performance, open source, audio]
-image: assets/og-image.jpg
+image: assets/blog_infinite-v0-6-benchmarks.png
 image_alt: Infinite v0.6 benchmark report summary
 keywords: infinite benchmarks, daw performance comparison, vital vs serum cpu, blender video export speed
 status: published

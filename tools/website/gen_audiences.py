@@ -374,7 +374,7 @@ def lib_thumb(name):
     """The library's own thumbnail for a preset id or an old picture path (assets/.../<id>.ext): the render for art presets, knobs and cables for the rest. None if there is none."""
     i = os.path.splitext(os.path.basename(name))[0]
     for ext in ("webp", "svg"):
-        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=7" % (i, ext)
+        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=6" % (i, ext)
     return None
 
 
@@ -508,7 +508,7 @@ def artists_main(a, rel, hero="blob"):
              '<a class="ax-blobgo" href="samples/">Open the generator</a></div>\n      </section>\n') if hero == "cables" else ""
     items = [(src, w, h, al) for src, w, h, al in a["reel"]["items"]]   # the result pictures, not the patch-graph thumbnails
     # museum shots show small in the strip: serve a 400px webp, and leave alt empty because the caption beside it says the same thing
-    figs = "".join(f'<a class="mi-card" href="{reel_href(a, src)}"><img src="{src.replace("assets/museum/", "assets/museum/thumb/").replace(".jpg", ".webp") if "assets/museum/" in src else src}" alt="{"" if "assets/museum/" in src else e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="mi-t">{e(al.replace(", library", ""))}<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M11 6l4 4-4 4"/></svg></span></a>' for src, w, h, al in items)
+    figs = "".join(f'<a class="mi-card" href="{reel_href(a, src)}"><img src="{src.replace("assets/museum/", "assets/museum/thumb/").replace(".jpg", ".webp") if "assets/museum/" in src else (lib_thumb(src) if src.startswith(("assets/library/", "assets/community/")) and lib_thumb(src) else src)}" alt="{"" if "assets/museum/" in src else e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="mi-t">{e(al.replace(", library", ""))}<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M11 6l4 4-4 4"/></svg></span></a>' for src, w, h, al in items)
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
     others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     lab = lab_html(a)
