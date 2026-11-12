@@ -8,6 +8,7 @@
 #include "nodes/Render3DDenoise.h"
 #include "nodes/Render3DBsdf.h"
 #include "nodes/Render3DFresnel.h"
+#include "nodes/Render3DShared.h"
 #include "nodes/Render3DAb.h"
 #include "field/MaterialRegistry.h"
 #include "engine/LightClusters.h"
@@ -147,9 +148,7 @@ float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float roug
    const float3 env = mix(lower, f.sky.xyz, smoothstep(0.5, 1.0, t));
    return mix(env, f.horizon.xyz, rough * rough) * f.params.z;
 }
-float distGGX(float nDotH, float rough) { const float a = rough * rough, a2 = a * a; const float d = nDotH * nDotH * (a2 - 1.0) + 1.0; return a2 / max(3.14159265 * d * d, 1e-7); }
-float geomSchlick(float nDotV, float rough) { const float r = rough + 1.0, k = (r * r) / 8.0; return nDotV / (nDotV * (1.0 - k) + k); }
-)" R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R"(
+)" R3D_SHARED_SRC R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R"(
 // Thin film over the specular lobes (Render3DThinFilm.h, shared with GL): a gain on the lobe, at the view angle.
 float3 iridGain(float w, float ior, float thick, float nV, float3 f0)
 {
@@ -158,8 +157,6 @@ float3 iridGain(float w, float ior, float thick, float nV, float3 f0)
 // Height-correlated Smith G2 (row 5.7): Schlick's separable form lost the grazing sun on far flat ground.
 #define R3D_G2(nv, nl, r) ggxG2(nv, nl, r)
 float3 fresnel(float cosT, float3 f0) { return fresnelExact(cosT, f0); }
-float3 fresnelRough(float cosT, float3 f0, float rough) { const float3 ceil = max(float3(1.0 - rough), f0); return f0 + (ceil - f0) * pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0); }
-float lightFalloff(float dist, float k) { if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k); return min(1.0 / max(dist * dist * -k, 1e-4), 20.0); }
 float shadowFactor(constant FrameU& f, depth2d<float> sm, float3 wp, float3 n, float3 ld)
 {
    const float4 lp = f.lightVP * float4(wp, 1.0);
@@ -401,15 +398,7 @@ float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceler
    }
    return L;
 }
-uint pcg(uint v) { v = v * 747796405u + 2891336453u; uint w = ((v >> ((v >> 28u) + 4u)) ^ v) * 277803737u; return (w >> 22u) ^ w; }
 float rnd(thread uint& s) { s = pcg(s); return float(s) * (1.0 / 4294967296.0); }
-float3 cosineDir(float3 n, float u1, float u2)
-{
-   const float r = sqrt(u1), phi = 6.2831853 * u2;
-   const float3 up = abs(n.y) < 0.99 ? float3(0, 1, 0) : float3(1, 0, 0);
-   const float3 t = normalize(cross(up, n)); const float3 b = cross(n, t);
-   return normalize(t * (r * cos(phi)) + b * (r * sin(phi)) + n * sqrt(max(1.0 - u1, 0.0)));
-}
 constant bool kMrt [[function_constant(0)]];
 // Row 8.3: false compiles r_fs without its ray paths (no TLAS this frame), a leaner shader for pure raster.
 constant bool kRayC [[function_constant(1)]];
@@ -554,7 +543,6 @@ float coatSpec(float nDotH, float nDotV, float nDotL, float vDotH, float r)
 }
 // Sheen: Cycles' microfiber lobe (Render3DSheen.h, shared with GL).
 )" R3D_SHEEN_MSL R3D_DENOISE_MSL R"(
-float maxc(float3 c) { return max(c.x, max(c.y, c.z)); }
 // Hair: the settle sampler for Render3DHair.h's Chiang fibre BSDF (spliced in at the top).
 // Draws wi for hairBsdf at h: a lobe by its share of Ap, its tilted longitudinal lobe, then its azimuthal logistic.
 float3 hairSample(float3 wo, float3 T, float3 sa, float bm, float bn, float alpha, float eta, float h, float4 u)
@@ -602,7 +590,6 @@ float2 boxSpan(float3 lo, float3 hi, float3 o, float3 d, float tmax)
    const float3 l = min(a, c), h = max(a, c);
    return float2(max(max(l.x, l.y), max(l.z, 0.0)), min(min(h.x, h.y), min(h.z, tmax)));
 }
-float hgPhase(float c, float g) { const float k = max(1.0 + g * g - 2.0 * g * c, 1e-6); return (1.0 - g * g) / (12.566370614 * k * sqrt(k)); }
 struct VisU { float4x4 invVP; float4 info; float4 fog; float4 fogC; float4 fogLo; float4 fogHi; }; // info: full width, height; fog as PtU's
 struct VisOut { float4 v [[color(0)]]; float d [[color(1)]]; float4 fg [[color(2)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view
 float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
@@ -1296,17 +1283,8 @@ struct PtU { float4x4 invVP; float4 info; float4 em; float4 lens; float4 lr; flo
 // fog (row 5.3): x extinction per unit (0 off), y HG g; fogC the scattered share; fogLo/fogHi the medium's box
 // One emissive triangle in world space. p0.w: cumulative selection chance (by power); e1.w: selection chance / area.
 struct EmTri { float4 p0; float4 e1; float4 e2; float4 em; };
-float3 ggxSampleH(float3 n, float a, float u1, float u2)
-{
-   const float cosT = sqrt((1.0 - u1) / (1.0 + (a * a - 1.0) * u1));
-   const float sinT = sqrt(max(1.0 - cosT * cosT, 0.0)), phi = 6.2831853 * u2;
-   const float3 up = abs(n.y) < 0.99 ? float3(0, 1, 0) : float3(1, 0, 0);
-   const float3 t = normalize(cross(up, n)); const float3 b = cross(n, t);
-   return normalize(t * (sinT * cos(phi)) + b * (sinT * sin(phi)) + n * cosT);
-}
 // The path tracer's BSDF, ported from Render 3D's GL tracer (evalOpaqueTerms, lobeProbs) so the two agree:
 // height-correlated Smith visibility, Fresnel at the half vector, diffuse takes what the specular leaves.
-float ptS5(float c) { const float m = clamp(1.0 - c, 0.0, 1.0), m2 = m * m; return m2 * m2 * m; }
 #ifdef R3D_AB_PTFRESNEL
 float3 ptF(float c, float3 f0) { return fresnelExact(c, f0); }
 #else
@@ -1320,13 +1298,6 @@ float3 ptMs(float3 f0, float rough, float nV, texture2d<float> eLut)
    const float E = clamp(eLut.sample(kELut, float2(nV, rough), level(0.0)).r, 0.05, 1.0);
    return float3(1.0) + f0 * (1.0 / E - 1.0);
 }
-float ptVis(float nV, float nL, float a)
-{
-   const float a2 = a * a;
-   const float gV = nL * sqrt(a2 + (1.0 - a2) * nV * nV), gL = nV * sqrt(a2 + (1.0 - a2) * nL * nL);
-   return 0.5 / max(gV + gL, 1e-7);
-}
-float ptD(float nH, float a) { const float a2 = a * a, d = nH * nH * (a2 - 1.0) + 1.0; return a2 / max(3.14159265 * d * d, 1e-7); }
 float2 ptProbs(float3 f0, float metal, float nV)
 {
    const float f0s = max(f0.x, max(f0.y, f0.z)), fV = f0s + (1.0 - f0s) * ptS5(nV);
@@ -1336,15 +1307,6 @@ float2 ptProbs(float3 f0, float metal, float nV)
    return float2(spec, diff) / max(spec + diff, 1e-6);
 }
 // Glass: the exact unpolarised dielectric Fresnel (eta = n_i / n_t, 1 past the critical angle) and Smith G1 for GGX.
-float ptFd(float c, float eta)
-{
-   const float s2 = eta * eta * (1.0 - c * c);
-   if (s2 >= 1.0) return 1.0;
-   const float ct = sqrt(1.0 - s2);
-   const float rs = (eta * c - ct) / (eta * c + ct), rp = (c - eta * ct) / (c + eta * ct);
-   return 0.5 * (rs * rs + rp * rp);
-}
-float ptG1(float x, float a) { return 2.0 * x / (x + sqrt(a * a + (1.0 - a * a) * x * x)); }
 // f(V, L) * cos(L), and the pdf of drawing L by ptProbs. w: a light's diffuse and specular terms.
 float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float rough, float3 f0, float2 w, float3 ms, thread float& pdf)
 {
