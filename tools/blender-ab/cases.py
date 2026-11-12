@@ -327,6 +327,13 @@ CASES.update({
                        "lights": [{"type": "sun", "power": 3, "azimuth": 270, "elevation": 14}], "world": {"color": [0.3, 0.3, 0.3]},
                        "objects": [{"shape": "plane", "scale": 6, "material": {"base_color": [0.25, 0.3, 0.5], "roughness": 0.25,
                                                                                 "maps": {"normal": "weave"}, "uv_scale": 40.0}}]},
+    # Row 4.2: parallax occlusion. A 1.2 m plate with a 6 x 6 grid of 5 cm deep round holes as a bump map (strength
+    # 5.33 = 0.05 m / 1.2 m x 512 px / 4), seen at 35 degrees under a raking sun; Cycles renders the real relief.
+    "tex_perforated": {"size": SMALL, "camera": {"fov": 40, "azimuth": 90, "elevation": 35, "distance": 2.2, "target": [0, 0, 0.0]},
+                       "lights": [{"type": "sun", "power": 3, "azimuth": 200, "elevation": 30}], "world": {"color": [0.3, 0.3, 0.3]},
+                       "objects": [{"shape": "plane", "scale": 0.6, "material": {"base_color": [0.7, 0.62, 0.5], "roughness": 0.5,
+                                                                                  "maps": {"normal": "holes"}, "bump": 5.33,
+                                                                                  "displace": 0.05}}]},
     # Row 0.4 elimination: tex_fabric_far without its normal map (is the darkness the map, or the lobe?).
     "tex_fabric_far_flat": {"size": SMALL, "camera": {"fov": 40, "azimuth": 90, "elevation": 12, "distance": 8.0, "target": [0, 0, 0.0]},
                             "lights": [{"type": "sun", "power": 3, "azimuth": 270, "elevation": 14}], "world": {"color": [0.3, 0.3, 0.3]},

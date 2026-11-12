@@ -173,7 +173,8 @@ def material_lines(m, sheen=True):
             ("anisotropy_rotation", "  f anisotropyRotation %g" % m.get("anisotropy_rotation", 0.0)),
             ("iridescence", "  f iridescence %g" % m.get("iridescence", 0.0)),
             ("iridescence_thickness", "  f iridescenceThickness %g" % m.get("iridescence_thickness", 400.0)),
-            ("iridescence_ior", "  f iridescenceIor %g" % m.get("iridescence_ior", 1.33))) if key in m]
+            ("iridescence_ior", "  f iridescenceIor %g" % m.get("iridescence_ior", 1.33)),
+            ("bump", "  b normalBump 1"), ("bump", "  f normalStrength %g" % m.get("bump", 1.0))) if key in m]
 
 
 def make_texture(case_dir, name, size=512):
@@ -211,6 +212,10 @@ def make_texture(case_dir, name, size=512):
             dx = (u - cx + 0.5) % 1 - 0.5; dy = (v - cy + 0.5) % 1 - 0.5
             img = np.where((np.hypot(dx, dy) < r)[..., None], [30, 20, 25], img)
         img = img.clip(0, 255).astype(np.uint8)
+    elif name == "holes":             # row 4.2: a 6 x 6 grid of round holes in a flat top, grey height (1 top, 0 floor)
+        r = np.hypot((u * 6) % 1 - 0.5, (v * 6) % 1 - 0.5)
+        g = (np.clip((r - 0.27) / 0.03, 0, 1) * 255).astype(np.uint8)
+        img = np.stack([g, g, g], -1)
     elif name == "weave":             # a fine plain weave: crossed threads, each a half-round ridge (OpenGL normals)
         tu, tv = (u * 16) % 1, (v * 16) % 1
         over = ((np.floor(u * 16) + np.floor(v * 16)) % 2) > 0

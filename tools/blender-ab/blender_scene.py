@@ -275,7 +275,7 @@ def add_maps(mat, p, maps, m):
     if "roughness" in maps:
         mm = nt.nodes.new("ShaderNodeMath"); mm.operation = 'MULTIPLY'; mm.inputs[1].default_value = m.get("roughness", 1.0)
         nt.links.new(img(maps["roughness"], True).outputs["Color"], mm.inputs[0]); nt.links.new(mm.outputs[0], p.inputs["Roughness"])
-    if "normal" in maps:
+    if "normal" in maps and "displace" not in m:   # row 4.2: a displaced case's truth is the real relief, not the bump
         nm = nt.nodes.new("ShaderNodeNormalMap")
         col = img(maps["normal"], True).outputs["Color"]
         if "detail" in m:
@@ -339,6 +339,15 @@ for i, o in enumerate(scene["objects"]):
     bpy.context.view_layer.update()
     ob.data.transform(ob.matrix_world)
     ob.matrix_world = Matrix.Identity(4)
+    dz = o.get("material", {}).get("displace")
+    if dz:   # row 4.2: the bump map's grey as real geometry, 1 = the surface, 0 = dz below it
+        sub = ob.modifiers.new("sub", 'SUBSURF'); sub.subdivision_type = 'SIMPLE'; sub.levels = sub.render_levels = 9
+        tx = bpy.data.textures.new("disp%d" % i, 'IMAGE')
+        tx.image = bpy.data.images.load(os.path.join(case, o["material"]["maps"]["normal"] + ".png"))
+        tx.image.colorspace_settings.is_data = True
+        tx.extension = 'EXTEND'; tx.use_interpolation = True
+        dm = ob.modifiers.new("disp", 'DISPLACE'); dm.texture = tx; dm.texture_coords = 'UV'
+        dm.strength = dz; dm.mid_level = 1.0
 
     m = o.get("material", {})
     mat = bpy.data.materials.new("m%d" % i); mat.use_nodes = True

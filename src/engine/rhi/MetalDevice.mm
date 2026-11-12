@@ -475,6 +475,34 @@ float3 mapNormalTS(texture2d<float> t, MapX x, bool bump, float strength, float2
    }
    return s;
 }
+// Row 4.2: parallax occlusion on a bump (grey height) map. Height 1 is the surface, 0 the deepest; a full step is
+// 4 x strength texels deep, the same relief the bump normal reads, so the two agree. The gradients are the
+// unshifted uv's, so mips do not jump at the steps.
+float pomH(texture2d<float> t, MapX x, float2 uv, float2 gx, float2 gy)
+{
+   return dot(mapTap(t, x, uv, gx, gy, -1.0).rgb, float3(0.2126, 0.7152, 0.0722));
+}
+float2 pomMarch(texture2d<float> t, MapX x, float2 uv, float2 gx, float2 gy, float3 vTS, float scale, thread float& hOut)
+{
+   const float ns = mix(32.0, 8.0, abs(vTS.z)), dl = 1.0 / ns; // more steps at grazing
+   const float2 dUv = -vTS.xy / max(vTS.z, 0.1) * scale / ns;
+   float layer = 1.0, hc = pomH(t, x, uv, gx, gy), hp = hc;
+   float2 c = uv, cp = uv;
+   for (int i = 0; i < 32 && hc < layer; i++) { cp = c; hp = hc; c += dUv; layer -= dl; hc = pomH(t, x, c, gx, gy); }
+   const float a = hc - layer, b = hp - (layer + dl); // secant between the last two layers
+   const float w = a - b > 1e-6 ? a / (a - b) : 0.0;
+   hOut = layer + w * dl;
+   return mix(c, cp, w);
+}
+// Light blocked by the relief between the hit and the top: 8 steps toward the light.
+float pomShadow(texture2d<float> t, MapX x, float2 c, float h, float2 gx, float2 gy, float3 lTS, float scale)
+{
+   if (lTS.z <= 0.0 || h >= 0.999) return 1.0;
+   const float2 dUv = lTS.xy / max(lTS.z, 0.1) * scale * (1.0 - h) / 8.0;
+   float m = 0.0;
+   for (int i = 1; i <= 8; i++) m = max(m, pomH(t, x, c + dUv * float(i), gx, gy) - (h + (1.0 - h) * float(i) / 8.0));
+   return 1.0 - smoothstep(0.0, 0.05, m);
+}
 float coatSpec(float nDotH, float nDotV, float nDotL, float vDotH, float r)
 {
    return distGGX(nDotH, r) * R3D_G2(nDotV, nDotL, r) * (0.04 + 0.96 * pow(1.0 - vDotH, 5.0)) / max(4.0 * nDotV * nDotL, 1e-7);
@@ -605,11 +633,33 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    const int wrapM = int(m.mat.wrapBump + 0.5) & 3;
    // Every derivative first, in uniform control flow, before any map read or cutout.
    const MapX mx = mapX(m.mat);
-   const float3 mb = mapBase(mx, in.uv, in.lp);
+   float3 mb = mapBase(mx, in.uv, in.lp);
    const float3 mbx = dfdx(mb), mby = dfdy(mb);
    const float3 dp1 = dfdx(in.wp), dp2 = dfdy(in.wp);
    const float3 dnx = dfdx(in.n), dny = dfdy(in.n);
    const float3 nP = n; // the projection's normal (triplanar weights, dominant plane)
+   // Row 4.2: a bump map on uv marches the view ray through its relief; every map then reads at the hit.
+   float pomHt = 1.0, pomScale = 0.0;
+   float3 pomT = float3(0.0), pomB = float3(0.0);
+#ifndef R3D_AB_NOPOM
+   if (m.mat.mapNormal > 0.5 && (int(m.mat.wrapBump + 0.5) & 4) != 0 && mx.space == 0 && mx.brk <= 0.001 && !hairM)
+   {
+      texture2d<float> ht = maps[int(m.mat.mapNormal) - 1];
+      const float2 tsz = float2(ht.get_width(), ht.get_height());
+      const float rho = max(length(mbx.xy * tsz), length(mby.xy * tsz));
+      pomScale = 4.0 * m.mat.normalStrength / tsz.x * (1.0 - smoothstep(4.0, 8.0, rho)); // far: the bump normal carries it
+      const float3 dp2perp = cross(dp2, n), dp1perp = cross(n, dp1);
+      float3 t = dp2perp * mbx.x + dp1perp * mby.x, bt = dp2perp * mbx.y + dp1perp * mby.y;
+      const float3 V = normalize(f.eye.xyz - in.wp);
+      if (pomScale > 1e-6 && max(dot(t, t), dot(bt, bt)) > 1e-12 && dot(V, n) > 0.0)
+      {
+         t = normalize(t); bt = normalize(bt);
+         mb.xy = pomMarch(ht, mx, mb.xy, mbx.xy, mby.xy, float3(dot(V, t), dot(V, bt), dot(V, n)), pomScale, pomHt);
+         pomT = t; pomB = bt;
+      }
+      else pomScale = 0.0;
+   }
+#endif
 #define MAPR(slot) mapSample(maps[int(slot) - 1], mx, mb, nP, mbx, mby, -1.0)
    if (m.mat.mapAlbedo > 0.5) base *= mapLin(MAPR(m.mat.mapAlbedo).rgb);
    if (m.mat.mapRoughness > 0.5) roughIn *= MAPR(m.mat.mapRoughness).r;
@@ -816,6 +866,9 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             shadow = mix(1.0 - f.shP.w, 1.0, vis);
          }
       }
+      if (pomScale > 0.0)
+         shadow *= pomShadow(maps[int(m.mat.mapNormal) - 1], mx, mb.xy, pomHt, mbx.xy, mby.xy,
+                             float3(dot(lightDir, pomT), dot(lightDir, pomB), dot(lightDir, normalize(in.n))), pomScale);
       if (hairM)
       {
          col += hairAvg(viewDir, lightDir, hT, float3(m.mat.hairSigma), clamp(roughIn, 0.02, 1.0), -m.mat.hairRadialNeg, m.mat.hairShift, m.mat.ior) * radiance * shadow * L.terms.x;
