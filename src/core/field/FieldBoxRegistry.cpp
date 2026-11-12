@@ -129,7 +129,6 @@ namespace Field
          s.push_back({ "cos", BoxFamily::Waves, "cosine", "cos", { "cosine", "cos" }, { In("x") }, { Out("out") }, HostAll, false });
          s.push_back({ "tan", BoxFamily::Waves, "tan", "tan", { "tan" }, { In("x") }, { Out("out") }, HostAll, false });
          s.push_back({ "atan2", BoxFamily::Waves, "angle", "atan2", { "angle", "atan2" }, { In("y"), In("x") }, { Out("out") }, HostGeometry | HostPixel, false });
-         s.push_back({ "phase", BoxFamily::Waves, "phase", "phase", { "phase", "phasor" }, { In("freq", ValueKind::Number, 1.0) }, { Out("out") }, HostGeometry | HostPixel, true });
 
          // 5. Logic
          s.push_back({ "lt", BoxFamily::Logic, "<", "<", { "<", "lt", "less" }, { In("a"), In("b") }, { Out("out", ValueKind::Bool) }, HostAll, false });
@@ -149,17 +148,12 @@ namespace Field
 
          // 6. Time & memory
          s.push_back({ "tick", BoxFamily::TimeMemory, "every", "tick", { "every", "tick" }, { In("div", ValueKind::Number, 0.25) }, { Out("pulse", ValueKind::Pulse) }, HostNotes, false });
-         s.push_back({ "edge", BoxFamily::TimeMemory, "on rise", "edge", { "on rise", "edge" }, { In("x", ValueKind::Bool) }, { Out("pulse", ValueKind::Pulse) }, HostAll, true });
-         s.push_back({ "latch", BoxFamily::TimeMemory, "hold", "latch", { "hold", "latch", "s&h" }, { In("val"), In("trig", ValueKind::Pulse) }, { Out("out") }, HostAll, true });
-         s.push_back({ "toggle", BoxFamily::TimeMemory, "switch", "toggle", { "switch", "toggle" }, { In("trig", ValueKind::Pulse) }, { Out("out", ValueKind::Bool) }, HostAll, true });
-         s.push_back({ "counter", BoxFamily::TimeMemory, "count", "counter", { "count", "counter" }, { In("trig", ValueKind::Pulse), In("steps", ValueKind::Number, 8.0) }, { Out("step") }, HostAll, true });
          s.push_back({ "previous", BoxFamily::TimeMemory, "previous", "state", { "previous", "state" }, { In("next"), In("init") }, { Out("cur") }, HostAll, false });
-         s.push_back({ "smooth", BoxFamily::TimeMemory, "glide", "smooth", { "glide", "smooth", "slew" }, { In("target"), In("rate", ValueKind::Number, 0.1) }, { Out("out") }, HostAll, true });
 
          // 7. Random
          s.push_back({ "rand", BoxFamily::Random, "random", "rand", { "random", "rand" }, {}, { Out("out") }, HostAll, false });
          s.push_back({ "noise", BoxFamily::Random, "smooth random", "noise", { "smooth random", "noise" }, { In("x", ValueKind::Any) }, { Out("out") }, HostGeometry | HostPixel, false });
-         s.push_back({ "sh", BoxFamily::Random, "stepped random", "sh", { "stepped random", "sh" }, { In("x") }, { Out("out") }, HostAll, true });
+         s.push_back({ "sh", BoxFamily::Random, "stepped random", "sh", { "stepped random", "sh" }, { In("x") }, { Out("out") }, HostAll, false });
 
          // 8. Geometry
          s.push_back({ "vec3", BoxFamily::Geometry, "point", "vec3", { "point", "vec3" }, { In("x"), In("y"), In("z") }, { Out("vec", ValueKind::Vec3) }, HostGeometry | HostPixel, false });
@@ -180,15 +174,10 @@ namespace Field
          s.push_back({ "deg", BoxFamily::Music, "scale note", "deg", { "scale note", "deg" }, { In("degree") }, { Out("note", ValueKind::Note) }, HostNotes, false });
          s.push_back({ "note_to_hz", BoxFamily::Music, "note\xE2\x86\x92Hz", "noteToHz", { "note->Hz", "mtof" }, { In("note", ValueKind::Note) }, { Out("hz") }, HostNotes | HostAudio, true });
          s.push_back({ "hz_to_note", BoxFamily::Music, "Hz\xE2\x86\x92note", "hzToNote", { "Hz->note", "ftom" }, { In("hz") }, { Out("note", ValueKind::Note) }, HostNotes | HostAudio, true });
-         s.push_back({ "transpose", BoxFamily::Music, "transpose", "transpose", { "transpose" }, { In("note", ValueKind::Note), In("semi") }, { Out("note", ValueKind::Note) }, HostNotes, true });
          s.push_back({ "octave", BoxFamily::Music, "octave", "octave", { "octave" }, { In("note", ValueKind::Note), In("oct") }, { Out("note", ValueKind::Note) }, HostNotes, true });
-         s.push_back({ "snap_scale", BoxFamily::Music, "snap to scale", "snap", { "snap to scale", "snap" }, { In("x") }, { Out("note", ValueKind::Note) }, HostNotes, true });
-         s.push_back({ "chord", BoxFamily::Music, "chord", "chord", { "chord" }, { In("root", ValueKind::Note) }, { Out("n1", ValueKind::Note), Out("n2", ValueKind::Note), Out("n3", ValueKind::Note) }, HostNotes, true });
          s.push_back({ "euclid", BoxFamily::Music, "spread hits", "euclid", { "spread hits", "euclid" }, { In("step"), In("hits", ValueKind::Number, 5.0), In("steps", ValueKind::Number, 16.0) }, { Out("hit", ValueKind::Bool) }, HostNotes, true });
 
          // 10. Inlets / outlets
-         s.push_back({ "notes_in", BoxFamily::InletsOutlets, "notes in", "noteNum", { "notes in" }, {}, { Out("note", ValueKind::Note), Out("vel"), Out("on", ValueKind::Pulse) }, HostNotes, false });
-         s.push_back({ "geometry_in", BoxFamily::InletsOutlets, "geometry in", "P", { "geometry in" }, {}, { Out("P", ValueKind::Vec3), Out("N", ValueKind::Vec3), Out("Cd", ValueKind::Vec3) }, HostElement, false });
          s.push_back({ "play_note", BoxFamily::InletsOutlets, "play note", "note", { "play note", "note" }, { In("when", ValueKind::Pulse, 1.0), In("note", ValueKind::Note, 60.0), In("vel", ValueKind::Number, 0.8), In("len", ValueKind::Number, 0.25) }, {}, HostNotes, false });
          s.push_back({ "position_out", BoxFamily::InletsOutlets, "position", "P", { "position out", "P" }, { In("x"), In("y"), In("z"), In("xyz", ValueKind::Vec3) }, {}, HostGeometry, false });
          s.push_back({ "normal_out", BoxFamily::InletsOutlets, "normal", "N", { "normal out", "N" }, { In("xyz", ValueKind::Vec3) }, {}, HostGeometry, false });

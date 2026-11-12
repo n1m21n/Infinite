@@ -22,6 +22,7 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -307,6 +308,207 @@ namespace
          Fail(name, "printed text differs; expected:\n" + code, body);
    }
 
+   // ---- graphs built in code (no source text) -----------------------------------------------
+
+   struct Maker
+   {
+      BoxGraph& g;
+      int next = 1;
+      int Add(const std::string& specId)
+      {
+         BoxNode b;
+         b.id = next++;
+         b.specId = specId;
+         if (const BoxSpec* spec = FindBoxSpec(specId))
+         {
+            b.label = spec->label;
+            for (const PinSpec& p : spec->inlets) b.inlets.push_back({ p.name, p.kind, p.defaultValue });
+            for (const PinSpec& p : spec->outlets) b.outlets.push_back({ p.name, p.kind, p.defaultValue });
+         }
+         g.boxes.push_back(b);
+         return b.id;
+      }
+      BoxNode& Box(int id) { return *g.FindBox(id); }
+      void Wire(int src, int srcPin, int dst, int dstPin)
+      {
+         BoxWire w;
+         w.id = static_cast<int>(g.wires.size()) + 1;
+         w.srcBoxId = src; w.srcPinIdx = srcPin; w.dstBoxId = dst; w.dstPinIdx = dstPin;
+         g.wires.push_back(w);
+      }
+   };
+
+   std::string DomainFor(uint32_t hostMask)
+   {
+      if (hostMask & HostElement) return "element";
+      if (hostMask & HostPixel) return "pixel";
+      if (hostMask & HostNotes) return "notes";
+      if (hostMask & HostAudio) return "sample";
+      return "graph";
+   }
+
+   // Every registry box, built by hand with default inputs: prints Field that compiles and
+   // reopens as the same box.
+   void RegistryBoxes()
+   {
+      for (const BoxSpec& spec : AllBoxSpecs())
+      {
+         BoxGraph g;
+         Maker m{ g };
+         const std::string& id = spec.id;
+         std::string domain = DomainFor(spec.hostMask);
+         if (id == "pulse_out" || id == "play_note") domain = "notes";
+         if (id == "code")
+         {
+            int c = m.Add("code");
+            m.Box(c).rawCode = "if (P.x > 0) {\n   P.y = 1\n} else {\n   P.y = 0\n}";
+         }
+         else if (id == "play_note")
+         {
+            int n = m.Add(id);
+            m.Wire(m.Add("tick"), 0, n, 0);
+         }
+         else if (spec.outlets.empty())
+         {
+            int sink = m.Add(id);
+            if (id == "position_out") m.Wire(m.Add("normal"), 0, sink, 3);
+            else if (id == "normal_out" || id == "color_out") m.Wire(m.Add("position"), 0, sink, 0);
+            else if (id == "pulse_out") m.Wire(m.Add("tick"), 0, sink, 0);
+            else if (id == "value_out") m.Wire(m.Add("number"), 0, sink, 0);
+         }
+         else
+         {
+            int b = m.Add(id);
+            BoxNode& box = m.Box(b);
+            if (id == "knob" || id == "previous" || id == "attrib") box.varName = "k";
+            if (id == "swizzle") { box.swizzleField = "x"; m.Wire(m.Add("position"), 0, b, 0); }
+            if (id == "neighbour") box.varName = "P";
+            if (id == "reduce")
+            {
+               box.swizzleField = "max";
+               int sw = m.Add("swizzle");
+               m.Box(sw).swizzleField = "x";
+               m.Wire(m.Add("position"), 0, sw, 0);
+               m.Wire(sw, 0, b, 0);
+            }
+            // Bool inlets need a comparison, not a number.
+            const int pins = static_cast<int>(spec.inlets.size());
+            for (int pin = 0; pin < pins; ++pin)
+            {
+               if (spec.inlets[pin].kind == ValueKind::Bool)
+               {
+                  int lt = m.Add("lt");
+                  m.Wire(m.Add("time"), 0, lt, 0);
+                  m.Wire(lt, 0, b, pin);
+               }
+            }
+            const bool vec = spec.outlets[0].kind == ValueKind::Vec3;
+            int sink = m.Add(vec ? "color_out" : (spec.outlets[0].kind == ValueKind::Pulse ? "pulse_out" : "value_out"));
+            m.Wire(b, 0, sink, 0);
+         }
+         AutoLayoutBoxGraph(g);
+         const std::string printed = PrintBoxGraphToCode(g, false);
+         std::string why;
+         if (!SameProgram(domain, printed, printed, why))
+         {
+            Fail("box " + id, "does not compile in " + domain + ": " + why, printed);
+            continue;
+         }
+         BoxGraph back;
+         FieldError err;
+         if (!ParseCodeToBoxGraph(printed, HostAll, back, err)) { Fail("box " + id, "re-parse: " + err.message, printed); continue; }
+         bool found = false;
+         for (const BoxNode& b : back.boxes)
+            found = found || b.specId == id;
+         if (!found)
+            Fail("box " + id, "does not reopen as itself", printed);
+      }
+   }
+
+   int Count(const std::string& s, const std::string& what)
+   {
+      int n = 0;
+      for (size_t at = s.find(what); at != std::string::npos; at = s.find(what, at + 1))
+         ++n;
+      return n;
+   }
+
+   // A graph built by hand (no source behind it) prints Field that compiles; an output
+   // read twice gets a name; a random value read by a repeated slot is never duplicated.
+   void HandBuiltGraphs()
+   {
+      {
+         BoxGraph g;
+         Maker m{ g };
+         int k = m.Add("knob");
+         m.Box(k).varName = "amp";
+         m.Box(k).numberValue = 0.5;
+         int sn = m.Add("sin");
+         m.Wire(m.Add("time"), 0, sn, 0);
+         int mul = m.Add("mul");
+         m.Wire(sn, 0, mul, 0);
+         m.Wire(k, 0, mul, 1);
+         int out = m.Add("position_out");
+         m.Wire(mul, 0, out, 0);
+         m.Wire(mul, 0, out, 1);
+         AutoLayoutBoxGraph(g);
+         const std::string printed = PrintBoxGraphToCode(g, false);
+         std::string why;
+         if (!SameProgram("element", printed, printed, why))
+            Fail("hand-built graph", "does not compile: " + why, printed);
+         else if (Count(printed, "sin(") != 1)
+            Fail("hand-built graph", "an output read twice was not named", printed);
+      }
+      {
+         BoxGraph g;
+         Maker m{ g };
+         int w = m.Add("wrap");
+         m.Wire(m.Add("rand"), 0, w, 1);
+         int out = m.Add("position_out");
+         m.Wire(w, 0, out, 1);
+         AutoLayoutBoxGraph(g);
+         const std::string printed = PrintBoxGraphToCode(g, false);
+         std::string why;
+         if (!SameProgram("element", printed, printed, why))
+            Fail("hand-built rand", "does not compile: " + why, printed);
+         else if (Count(printed, "rand(") != 1)
+            Fail("hand-built rand", "rand() was duplicated by the wrap expansion", printed);
+      }
+   }
+
+   // Inserting a line keeps every other box where the owner put it.
+   void InsertLineKeepsPositions()
+   {
+      const std::string code = "param float amp = 0.5 [0, 1]\nP.y += sin(P.x * 3) * amp\nCd = vec3(P.y)\n";
+      BoxGraph g;
+      FieldError err;
+      if (!ParseCodeToBoxGraph(code, HostElement, g, err)) { Fail("insert line", "parse: " + err.message); return; }
+      std::map<std::string, std::pair<int, int>> before;
+      int n = 0;
+      for (BoxNode& b : g.boxes)
+      {
+         b.x = 1000.0f + 37.0f * n;
+         b.y = 500.0f + 11.0f * n++;
+         if (!b.key.empty()) before[b.key] = { static_cast<int>(b.x), static_cast<int>(b.y) };
+      }
+      std::string printed = PrintBoxGraphToCode(g, true);
+      size_t at = printed.find("P.y +=");
+      if (at == std::string::npos) { Fail("insert line", "no P.y line", printed); return; }
+      printed.insert(at, "P.z = t * 0.25\n");
+      BoxGraph back;
+      if (!ParseCodeToBoxGraph(printed, HostElement, back, err)) { Fail("insert line", "re-parse: " + err.message, printed); return; }
+      int moved = 0, kept = 0;
+      for (const BoxNode& b : back.boxes)
+      {
+         auto it = before.find(b.key);
+         if (it == before.end()) continue;
+         if (static_cast<int>(b.x) == it->second.first && static_cast<int>(b.y) == it->second.second) ++kept;
+         else ++moved;
+      }
+      if (moved != 0 || kept != static_cast<int>(before.size()))
+         Fail("insert line", std::to_string(moved) + " box(es) moved, " + std::to_string(kept) + " kept of " + std::to_string(before.size()), printed);
+   }
+
    void Presets(const char* filter, int& m4Pass, int& m4Total, int& m3Pass, int& m3Total)
    {
       for (const auto& p : FieldPatcherPresets::kAll)
@@ -371,6 +573,10 @@ int main(int argc, char** argv)
       }
    }
 
+   RegistryBoxes();
+   HandBuiltGraphs();
+   InsertLineKeepsPositions();
+
    // ---- hand-written round trips ----
    Case("Notes Harmoniser", "notes",
         "if (noteOn > 0.5) {\n   note(noteNum, noteVel, 0)\n   note(noteNum + 7, noteVel * 0.7, 0)\n}\n");
@@ -410,6 +616,10 @@ int main(int argc, char** argv)
          "# top\n# inline\nparam float amp = 0.5 [0, 1]\n# kept\nstate float s = 0\n# before y\nP.y += amp\n# end\n");
    Exact("bug 8 comment in code box", "sample", "state float tbl[4] = 0 # table\nout = tbl[0]\n",
          "state float tbl[4] = 0 # table\nout = tbl[0]\n", -1);
+
+   Exact("sugar rescale", "element", "P.y = 1 + (P.x - 0) / (2 - 0) * (3 - 1)\n", "P.y = 1 + (P.x - 0) / (2 - 0) * (3 - 1)\n");
+   Exact("sugar wrap", "element", "P.y = -1 + fract((P.x - -1) / (1 - -1)) * (1 - -1)\n",
+         "P.y = -1 + fract((P.x - -1) / (1 - -1)) * (1 - -1)\n");
 
    // ---- every shipped preset ----
    int m4Pass = 0, m4Total = 0, m3Pass = 0, m3Total = 0;

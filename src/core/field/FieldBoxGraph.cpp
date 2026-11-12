@@ -540,6 +540,199 @@ namespace Field
          return a + "\n" + b;
       }
 
+      // ---- sugar ---------------------------------------------------------------------
+      // A sugar box has no Field word of its own: it prints as an expansion and an
+      // expression of exactly that shape reopens as the box. `$k` is inlet k.
+      struct SugarTemplate
+      {
+         std::string id;
+         std::string text;
+         AstNodePtr ast;          // parsed text, `$k` read as identifier `__sk`
+         int prec = 0;            // binding strength of the whole expansion
+         std::vector<int> uses;   // how often each inlet appears
+         std::vector<int> ctx;    // parent precedence at each `$k`, in text order
+      };
+
+      void CollectSlotContexts(const AstNodePtr& node, int parentPrec, std::vector<int>& ctx)
+      {
+         if (!node)
+            return;
+         switch (node->kind)
+         {
+            case AstKind::Ident:
+               if (static_cast<const AstIdent*>(node.get())->name.rfind("__s", 0) == 0)
+                  ctx.push_back(parentPrec);
+               return;
+            case AstKind::Binary:
+            {
+               auto* bin = static_cast<const AstBinary*>(node.get());
+               int p = BinaryPrec(bin->op);
+               bool rightAssoc = bin->op == "^";
+               CollectSlotContexts(bin->lhs, rightAssoc ? p : p - 1, ctx);
+               CollectSlotContexts(bin->rhs, rightAssoc ? p - 1 : p, ctx);
+               return;
+            }
+            case AstKind::Unary:
+               CollectSlotContexts(static_cast<const AstUnary*>(node.get())->operand, kPrecPostfix, ctx);
+               return;
+            case AstKind::Access:
+               CollectSlotContexts(static_cast<const AstAccess*>(node.get())->base, kPrecPow, ctx);
+               return;
+            case AstKind::Call:
+               for (const AstNodePtr& a : static_cast<const AstCall*>(node.get())->args)
+                  CollectSlotContexts(a, 0, ctx);
+               return;
+            default:
+               ForEachChild(node, [&](const AstNodePtr& c) { CollectSlotContexts(c, 0, ctx); });
+               return;
+         }
+      }
+
+      const std::vector<SugarTemplate>& SugarTemplates()
+      {
+         static const std::vector<SugarTemplate> kTemplates = [] {
+            static const std::pair<const char*, const char*> kText[] = {
+               { "rescale", "$3 + ($0 - $1) / ($2 - $1) * ($4 - $3)" },
+               { "wrap", "$1 + fract(($0 - $1) / ($2 - $1)) * ($2 - $1)" },
+               { "rotate", "vec3($0.x * cos($1) - $0.y * sin($1), $0.x * sin($1) + $0.y * cos($1), $0.z)" },
+               { "circle", "vec3(cos($0) * $1, sin($0) * $1, 0)" },
+               { "spiral", "vec3(cos($0 * $1 * 6.28318531) * $2 * $0, sin($0 * $1 * 6.28318531) * $2 * $0, 0)" },
+               { "note_to_hz", "440 * 2 ^ (($0 - 69) / 12)" },
+               { "hz_to_note", "69 + 12 * log($0 / 440) / log(2)" },
+               { "octave", "$0 + 12 * $1" },
+               { "euclid", "$0 * $1 % $2 < $1" },
+            };
+            std::vector<SugarTemplate> out;
+            for (const auto& [id, text] : kText)
+            {
+               SugarTemplate t;
+               t.id = id;
+               t.text = text;
+               std::string src = "__r = ";
+               for (const char* c = text; *c; ++c)
+               {
+                  if (*c == '$')
+                     src += "__s";
+                  else
+                     src += *c;
+               }
+               std::vector<Token> toks;
+               FieldError err;
+               AstNodePtr prog;
+               if (!Lex(src, toks, err) || !ParseProgram(toks, prog, err) || !prog)
+                  continue;
+               auto* p = static_cast<const AstProgram*>(prog.get());
+               if (p->statements.empty() || p->statements[0]->kind != AstKind::Assign)
+                  continue;
+               t.ast = static_cast<const AstAssign*>(p->statements[0].get())->rvalue;
+               t.prec = NodePrec(t.ast);
+               CollectSlotContexts(t.ast, 0, t.ctx);
+               for (const char* c = text; *c; ++c)
+               {
+                  if (*c == '$')
+                  {
+                     int k = c[1] - '0';
+                     if (k >= static_cast<int>(t.uses.size()))
+                        t.uses.resize(k + 1, 0);
+                     t.uses[k]++;
+                  }
+               }
+               out.push_back(std::move(t));
+            }
+            return out;
+         }();
+         return kTemplates;
+      }
+
+      const SugarTemplate* FindSugarTemplate(const std::string& id)
+      {
+         for (const SugarTemplate& t : SugarTemplates())
+         {
+            if (t.id == id)
+               return &t;
+         }
+         return nullptr;
+      }
+
+      bool HasImpureCall(const AstNodePtr& node)
+      {
+         if (!node)
+            return false;
+         if (node->kind == AstKind::Call && static_cast<const AstCall*>(node.get())->callee == "rand")
+            return true;
+         bool impure = false;
+         ForEachChild(node, [&](const AstNodePtr& c) { impure = impure || HasImpureCall(c); });
+         return impure;
+      }
+
+      bool MatchTemplate(const std::string& src, const AstNodePtr& tpl, const AstNodePtr& node, std::vector<AstNodePtr>& binds)
+      {
+         if (!tpl || !node)
+            return tpl == node;
+         if (tpl->kind == AstKind::Ident)
+         {
+            const std::string& name = static_cast<const AstIdent*>(tpl.get())->name;
+            if (name.rfind("__s", 0) == 0)
+            {
+               size_t k = static_cast<size_t>(name[3] - '0');
+               if (k >= binds.size())
+                  binds.resize(k + 1);
+               if (!binds[k])
+               {
+                  binds[k] = node;
+                  return true;
+               }
+               return Canon(src, binds[k]) == Canon(src, node) && !HasImpureCall(node);
+            }
+         }
+         if (tpl->kind != node->kind)
+            return false;
+         switch (tpl->kind)
+         {
+            case AstKind::Literal:
+            {
+               auto* a = static_cast<const AstLiteral*>(tpl.get());
+               auto* b = static_cast<const AstLiteral*>(node.get());
+               return !b->isString && !b->isBool && a->numberValue == b->numberValue;
+            }
+            case AstKind::Ident:
+               return static_cast<const AstIdent*>(tpl.get())->name == static_cast<const AstIdent*>(node.get())->name;
+            case AstKind::Access:
+            {
+               auto* a = static_cast<const AstAccess*>(tpl.get());
+               auto* b = static_cast<const AstAccess*>(node.get());
+               return a->field == b->field && MatchTemplate(src, a->base, b->base, binds);
+            }
+            case AstKind::Unary:
+            {
+               auto* a = static_cast<const AstUnary*>(tpl.get());
+               auto* b = static_cast<const AstUnary*>(node.get());
+               return a->op == b->op && MatchTemplate(src, a->operand, b->operand, binds);
+            }
+            case AstKind::Binary:
+            {
+               auto* a = static_cast<const AstBinary*>(tpl.get());
+               auto* b = static_cast<const AstBinary*>(node.get());
+               return a->op == b->op && MatchTemplate(src, a->lhs, b->lhs, binds) && MatchTemplate(src, a->rhs, b->rhs, binds);
+            }
+            case AstKind::Call:
+            {
+               auto* a = static_cast<const AstCall*>(tpl.get());
+               auto* b = static_cast<const AstCall*>(node.get());
+               if (a->callee != b->callee || a->args.size() != b->args.size())
+                  return false;
+               for (size_t i = 0; i < a->args.size(); ++i)
+               {
+                  if (!MatchTemplate(src, a->args[i], b->args[i], binds))
+                     return false;
+               }
+               return true;
+            }
+            default:
+               return false;
+         }
+      }
+
       struct GraphBuilder
       {
          BoxGraph& graph;
@@ -691,6 +884,26 @@ namespace Field
                b.literalText = "0";
                SetHashKey(b, node);
                return { b.id, 0, ValueKind::Number };
+            }
+
+            if (node->kind == AstKind::Binary || node->kind == AstKind::Call)
+            {
+               for (const SugarTemplate& tpl : SugarTemplates())
+               {
+                  std::vector<AstNodePtr> binds;
+                  if (!MatchTemplate(src, tpl.ast, node, binds) || binds.size() != tpl.uses.size())
+                     continue;
+                  std::vector<OutRef> refs;
+                  for (const AstNodePtr& bnd : binds)
+                     refs.push_back(LowerExpr(bnd));
+                  BoxNode& bx = AddBox(tpl.id);
+                  SetHashKey(bx, node);
+                  int id = bx.id;
+                  ValueKind outKind = bx.outlets.empty() ? ValueKind::Number : bx.outlets[0].kind;
+                  for (size_t k = 0; k < refs.size(); ++k)
+                     Connect(refs[k].boxId, refs[k].pinIdx, id, static_cast<int>(k), refs[k].kind);
+                  return { id, 0, outKind };
+               }
             }
 
             switch (node->kind)
@@ -1340,6 +1553,11 @@ namespace Field
                   const BoxNode* dst = Box(w->dstBoxId);
                   if (!dst)
                      continue;
+                  if (const SugarTemplate* tpl = FindSugarTemplate(dst->specId))
+                  {
+                     if (w->dstPinIdx < static_cast<int>(tpl->uses.size()) && tpl->uses[w->dstPinIdx] > 1 && IsImpure(boxId))
+                        ++extra;
+                  }
                   if (dst->specId == "swizzle" && dst->wireName.empty())
                      extra += std::max(1, Readers(dst->id));
                   else if (dst->specId == "play_note" && w->dstPinIdx == 0 && groupOf.count(dst->id) == 0)
@@ -1356,6 +1574,27 @@ namespace Field
             int n = static_cast<int>(keys.size()) + extra;
             readerMemo[boxId] = n;
             return n;
+         }
+
+         // A box whose inlined value changes per read (rand), so it must not be duplicated.
+         bool IsImpure(int boxId, int depth = 0)
+         {
+            const BoxNode* b = Box(boxId);
+            if (!b || depth > 64)
+               return false;
+            if (b->specId == "rand" || (b->specId == "code" && b->rawCode.find("rand(") != std::string::npos))
+               return true;
+            if (!b->wireName.empty() || IsDeclSpecId(b->specId) || b->specId == "assign_var")
+               return false;
+            for (int pin = 0; pin < static_cast<int>(b->inlets.size()); ++pin)
+            {
+               if (const BoxWire* w = WireTo(boxId, pin))
+               {
+                  if (IsImpure(w->srcBoxId, depth + 1))
+                     return true;
+               }
+            }
+            return false;
          }
 
          bool IsTemp(const BoxNode& b)
@@ -1501,13 +1740,30 @@ namespace Field
                int p = BinaryPrec(op);
                return Wrap("!(" + Inlet(b, 0, p - 1) + " " + op + " " + Inlet(b, 1, p) + ")", kPrecUnary, parentPrec);
             }
-            if (id == "rescale")
+            if (const SugarTemplate* tpl = FindSugarTemplate(id))
             {
-               // outMin + (x - inMin) / (inMax - inMin) * (outMax - outMin)
-               std::string s = Inlet(b, 3, kPrecAdd - 1) + " + (" + Inlet(b, 0, kPrecAdd - 1) + " - " + Inlet(b, 1, kPrecAdd) +
-                               ") / (" + Inlet(b, 2, kPrecAdd - 1) + " - " + Inlet(b, 1, kPrecAdd) + ") * (" +
-                               Inlet(b, 4, kPrecAdd - 1) + " - " + Inlet(b, 3, kPrecAdd) + ")";
-               return Wrap(s, kPrecAdd, parentPrec);
+               std::string out;
+               size_t slot = 0;
+               for (size_t c = 0; c < tpl->text.size(); ++c)
+               {
+                  if (tpl->text[c] != '$')
+                  {
+                     out += tpl->text[c];
+                     continue;
+                  }
+                  int k = tpl->text[c + 1] - '0';
+                  ++c;
+                  const int ctxPrec = slot < tpl->ctx.size() ? tpl->ctx[slot] : kPrecPostfix;
+                  ++slot;
+                  std::string arg = Inlet(b, k, ctxPrec);
+                  if (!WireTo(b.id, k) && k < static_cast<int>(b.inlets.size()) && b.inlets[k].kind == ValueKind::Vec3)
+                     arg = "vec3(" + Inlet(b, k, 0) + ")";
+                  const bool dotAfter = c + 1 < tpl->text.size() && tpl->text[c + 1] == '.';
+                  if (dotAfter && !arg.empty() && (std::isdigit(static_cast<unsigned char>(arg[0])) || arg[0] == '.'))
+                     arg = "(" + arg + ")";
+                  out += arg;
+               }
+               return Wrap(out, tpl->prec, parentPrec);
             }
 
             std::string op = OperatorOf(b, spec);

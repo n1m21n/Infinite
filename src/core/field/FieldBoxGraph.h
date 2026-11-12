@@ -82,7 +82,7 @@ namespace Field
 
    struct BoxGraph
    {
-      uint32_t hostMask = HostAll;
+      uint32_t hostMask = HostAll; // Kept for Block B: the palette filters boxes by the host node
       BoxViewState view;
       std::vector<BoxNode> boxes;
       std::vector<BoxWire> wires;
