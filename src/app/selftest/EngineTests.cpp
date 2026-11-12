@@ -1697,7 +1697,7 @@ bool RunEngineTest()
 
    // ---- timing: end to end per frame (CPU encode + GPU + wait), exposure nudged so nothing is cached
    const int N = 120;
-   std::vector<double> tgl, tmt;
+   std::vector<double> tgl, tmt, tmg;
    for (int i = 0; i < N + 10; i++)
    {
       r.exposure = 1.0f + 0.0001f * (float)i;
@@ -1711,12 +1711,13 @@ bool RunEngineTest()
       frame.exposure = 1.0f + 0.0001f * (float)i;
       frame.frameIndex++;
       const double t0 = NowMs();
-      raster->Render(*img, frame, nullptr);
-      if (i >= 10) tmt.push_back(NowMs() - t0);
+      double g = 0.0;
+      raster->Render(*img, frame, &g);
+      if (i >= 10) { tmt.push_back(NowMs() - t0); tmg.push_back(g); }
    }
    auto med = [](std::vector<double> v) { std::sort(v.begin(), v.end()); return v[v.size() / 2]; };
    const double mGl = med(tgl), mMt = med(tmt);
-   printf("  GL %.2f ms   Metal %.2f ms   speedup %.2fx   (%d lights, %dx%d)\n", mGl, mMt, mGl / mMt, nLights, W, H);
+   printf("  GL %.2f ms   Metal %.2f ms (GPU %.2f)   speedup %.2fx   (%d lights, %dx%d)\n", mGl, mMt, med(tmg), mGl / mMt, nLights, W, H);
    check(nLights >= 8, "8 lights drawn", (double)nLights, 8);
    check(mGl / mMt >= 1.5, "at least 1.5x faster than Render 3D (R1 gate)", mGl / mMt, 1.5);
    check(glGetError() == GL_NO_ERROR, "no GL error", 0, 0);

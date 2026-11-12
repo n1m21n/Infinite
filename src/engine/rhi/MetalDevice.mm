@@ -410,6 +410,9 @@ float3 cosineDir(float3 n, float u1, float u2)
    return normalize(t * (r * cos(phi)) + b * (r * sin(phi)) + n * sqrt(max(1.0 - u1, 0.0)));
 }
 constant bool kMrt [[function_constant(0)]];
+// Row 8.3: false compiles r_fs without its ray paths (no TLAS this frame), a leaner shader for pure raster.
+constant bool kRayC [[function_constant(1)]];
+constant bool kRay = is_function_constant_defined(kRayC) ? kRayC : true;
 struct FOut { float4 c0 [[color(0)]]; float4 c1 [[color(1), function_constant(kMrt)]]; float4 c2 [[color(2), function_constant(kMrt)]];
              float4 c3 [[color(3), function_constant(kMrt)]]; }; // c3: normal, distance to the eye (denoiser guides)
 // Tonemaps and sRGB (Render3DTonemap.h, shared with GL), same order as the node: 1 ACES, 2 Reinhard, 3 AgX, 4 Neutral.
@@ -888,7 +891,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          aR = dot(aR, aR) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(aR);
          const float3 aU = cross(L.aim.xyz, aR);
          uint ars = pcg(uint(in.pos.x) * 7919u + 104729u * uint(in.pos.y)) ^ pcg(uint(f.gi.z) * 31337u + uint(i));
-         const bool rtSh = (int(f.shQ.z + 0.5) & 1) != 0;
+         const bool rtSh = kRay && (int(f.shQ.z + 0.5) & 1) != 0;
          areaE = 0.0;
          for (int si = 0; si < 8; si++)
          {
@@ -944,7 +947,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       else
       {
          if (f.shP.x > 0.5 && i == int(f.shP.y)) shadow = shadowFactor(f, sm, in.wp, nS, lightDir);
-         if ((int(f.shQ.z + 0.5) & 1) != 0 && L.color.w < 0.5)
+         if (kRay && (int(f.shQ.z + 0.5) & 1) != 0 && L.color.w < 0.5)
          {
             float vis = -1.0;
             if ((int(f.shQ.z + 0.5) & 4) != 0 && L.aim.w > -0.5 && !strandPx) // a strand traces its own (row 5.2)
@@ -998,7 +1001,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    // reflection), shade what lies beyond. Tint and Fresnel as Render 3D's: beyond * mix(1, base, 0.4) * (1 - F).
    // Needs the TLAS; without it the glass shows the environment along one refracted ray.
    const float trans = clamp(m.mat.transmission * transMap, 0.0, 1.0);
-   const bool rtOn = (int(f.shQ.z + 0.5) & 3) != 0 || f.gi.x > 0.5;
+   const bool rtOn = kRay && ((int(f.shQ.z + 0.5) & 3) != 0 || f.gi.x > 0.5);
    if (trans > 0.0 && rtOn)
    {
       const float eta = 1.0 / max(m.mat.ior, 1.0001);
@@ -3417,7 +3420,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                [enc setDepthStencilState:mDs];
             }
          }
-         [enc setRenderPipelineState:prepass ? (mrt ? mPsoRunInv : mPsoRunDirInv) : (mrt ? mPsoRun : mPsoRunDir)];
+         [enc setRenderPipelineState:prepass ? (mrt ? mPsoRunInv : mPsoRunDirInv) : (mrt ? mPsoRun : (!haveTlas && mPsoRunDirLite ? mPsoRunDirLite : mPsoRunDir))];
          [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
          if (prepass) [enc setDepthStencilState:mDsEq];
          const InstU* runU = (const InstU*)mInstBuf.contents;
@@ -4231,6 +4234,15 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
             pd.vertexFunction = keep;
             if (!mPsoRun || !mPsoRunDir) EngineFail(@"run pipeline", err);
+            {
+               MTLFunctionConstantValues* cvL = [MTLFunctionConstantValues new];
+               [cvL setConstantValue:&no type:MTLDataTypeBool atIndex:0];
+               [cvL setConstantValue:&no type:MTLDataTypeBool atIndex:1];
+               id<MTLFunction> fsLite = [mLib newFunctionWithName:@"r_fs" constantValues:cvL error:&fe];
+               dd2.vertexFunction = rr; dd2.fragmentFunction = fsLite;
+               mPsoRunDirLite = fsLite ? [mDev newRenderPipelineStateWithDescriptor:dd2 error:&err] : nil;
+               dd2.vertexFunction = pd.vertexFunction; dd2.fragmentFunction = fsDir;
+            }
          }
          {
             MTLRenderPipelineDescriptor* bd = [MTLRenderPipelineDescriptor new];
@@ -4389,7 +4401,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       id<MTLArgumentEncoder> mArgEnc = nil;
       id<MTLBuffer> mArgBuf = nil;
       id<MTLAccelerationStructure> mArgTlas = nil;
-      id<MTLRenderPipelineState> mShPso = nil, mShPsoRun = nil, mPsoRun = nil, mPsoRunDir = nil;
+      id<MTLRenderPipelineState> mShPso = nil, mShPsoRun = nil, mPsoRun = nil, mPsoRunDir = nil, mPsoRunDirLite = nil;
       id<MTLBuffer> mInstBuf = nil;
       std::vector<std::pair<uint32_t, uint32_t>> mRuns;   // (first, count) into mInstBuf: same mesh, same material
 
