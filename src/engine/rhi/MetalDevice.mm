@@ -713,9 +713,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
                      constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
                      texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]], texture2d<float> visF [[texture(6)]],
                      array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]],
-                     constant LightU* LL [[buffer(6)]], constant uint* CL [[buffer(7)]])
+                     constant LightU* LL [[buffer(6)]], constant uint* CL [[buffer(7)]], bool frontF [[front_facing]])
 {
    float3 n = normalize(in.n);
+   if (!frontF) n = -n; // a flat mesh's back side (drawn without culling), as GL's uTwoSided
    float3 base = float3(m.mat.base);
    float metalIn = m.mat.metallic, roughIn = m.mat.roughness;
    // Hair: from triangle shc.w on (a Fur mesh's strands; the skin keeps the material). The vertex normal is the strand.
@@ -2536,6 +2537,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       struct Gpu
       {
          id<MTLBuffer> vb = nil, ib = nil, uvb = nil; NSUInteger count = 0; float lo[3], hi[3];
+         // A flat mesh (a plane, a card) is seen from both sides, as GL's uTwoSided draws it and Cycles shades it.
+         bool Flat() const { const float e[3] = { hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2] }; const float mx = std::max({ e[0], e[1], e[2] }); return mx > 0.0f && std::min({ e[0], e[1], e[2] }) <= mx * 1e-4f; }
          id<MTLBuffer> tvb = nil, tib = nil, tuvb = nil; NSUInteger tcount = 0;
          id<MTLBuffer> wb = nil, twb = nil; // row 4.4: curvature, cavity per vertex (zeros when not baked)
          id<MTLBuffer> RW() const { return tvb ? twb : wb; }
@@ -3326,6 +3329,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                if (SeeThrough(preU[r.first]))
                   continue;
                const Gpu& g = mMeshes[fr.instances[r.first].mesh];
+               [ze setCullMode:g.Flat() ? MTLCullModeNone : MTLCullModeBack];
                [ze setVertexBuffer:g.vb offset:0 atIndex:0];
                [ze setVertexBuffer:g.uvb offset:0 atIndex:12];
                [ze setVertexBuffer:g.wb offset:0 atIndex:13];
@@ -3475,6 +3479,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          auto drawRun = [&](const std::pair<uint32_t, uint32_t>& r)
          {
             const Gpu& g = mMeshes[fr.instances[r.first].mesh];
+            [enc setCullMode:g.Flat() ? MTLCullModeNone : MTLCullModeBack];
             [enc setFragmentBytes:&runU[r.first] length:sizeof(InstU) atIndex:2];   // the run's material
             [enc setVertexBuffer:g.vb offset:0 atIndex:0];
             [enc setVertexBuffer:g.uvb offset:0 atIndex:12];
@@ -3497,6 +3502,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          }
          [enc setRenderPipelineState:mrt ? mPso : mPsoDir];
          [enc setDepthStencilState:mDs];
+         [enc setCullMode:MTLCullModeBack];
          for (size_t bi = 0; bi < fr.batches.size() && bi < mBatchGpu.size(); bi++)
          {
             const engine::InstanceBatch& b = fr.batches[bi];
