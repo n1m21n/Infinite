@@ -2,7 +2,7 @@
 # Синхронизация форка с апстримом. Коды: 0 ок, 1 грязная копия, 2 конфликт, 3 красные тесты.
 set -u
 cd "$(git rev-parse --show-toplevel)"
-if [ -n "$(git status --porcelain --untracked-files=no | grep -v '^ m external/')" ]; then
+if [ -n "$(git status --porcelain --untracked-files=no | grep -v '^ . external/')" ]; then
   echo "Есть незакоммиченные изменения — закоммить или убери." >&2; exit 1
 fi
 git fetch upstream || exit 1
