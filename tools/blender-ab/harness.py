@@ -67,6 +67,11 @@ def asset_file(o):
     return env if env and os.path.exists(env) else os.path.join(ASSETS, o["asset"])
 
 
+# Row 3.2: map names Infinite draws with a Sketch node; make_texture draws the same picture as a PNG for Blender.
+SKETCH_MAPS = {"sketch_stripes": "function draw(t) {\n  background(25 / 255);\n  noStroke();\n  fill(230 / 255);\n"
+                                 "  for (let k = 1; k < 8; k += 2) rect(0, k * 64, width, 64);\n}"}
+
+
 def _truth_version():
     # blender_scene.py's TRUTH_VERSION line: a cached truth stays valid across edits that leave old cases alone.
     for line in open(os.path.join(HERE, "blender_scene.py")):
@@ -181,6 +186,9 @@ def make_texture(case_dir, name, size=512):
         nx, ny = (16, 8) if name == "checker_fine" else (8, 8)
         on = ((np.floor(u * nx) + np.floor(v * ny)) % 2) > 0
         img = np.where(on[..., None], [230, 230, 230], [200, 40, 30]).astype(np.uint8)
+    elif name in ("stripes", "sketch_stripes"):   # row 3.2: 8 bands of 64 px down the image, 25 and 230 (a Sketch draws the same)
+        g = np.where((np.floor(v * 8) % 2) > 0, 230, 25).astype(np.uint8)
+        img = np.stack([g, g, g], -1)
     elif name == "rough_bands":       # grey roughness, 6 bands along v: 0.1 and 0.9
         g = np.where((np.floor(v * 6) % 2) > 0, 230, 25).astype(np.uint8)
         img = np.stack([g, g, g], -1)
@@ -420,7 +428,12 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             wires += ["cable %d vector %d" % (up, co), "cable %d vector %d" % (mp, up), "cable %d vector %d" % (ck, mp),
                       "cable %d field %d" % (mat, ck)]
         for slot, tex_name in m.get("maps", {}).items():
-            tex = node("Source", "Image Source", ["  s path %s" % make_texture(case, tex_name)])
+            make_texture(case, tex_name)   # Blender reads the PNG either way
+            if tex_name in SKETCH_MAPS:    # row 3.2: Infinite draws the map with a JS Sketch instead of loading it
+                tex = node("Source", "Sketch", ["  s code %s" % SKETCH_MAPS[tex_name].replace("\n", "\\n"),
+                                                "  f width 512", "  f height 512", "  b animate 1"])
+            else:
+                tex = node("Source", "Image Source", ["  s path %s" % make_texture(case, tex_name)])
             wires.append("cable %d %s %d" % (mat, slot, tex))
         geos.append(mat)
     if len(geos) > 4:  # Render 3D takes four; group the rest eight at a time

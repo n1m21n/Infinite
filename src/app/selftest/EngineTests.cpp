@@ -11,6 +11,8 @@
 #include "core/Expression.h"
 #include <functional>
 #include "nodes/FieldPixelNode.h"
+#include "nodes/SketchNode.h"
+#include "Transport.h"
 #include "nodes/Render3DPathTrace.h"
 
 #if defined(__APPLE__)
@@ -1428,6 +1430,34 @@ bool RunEngineTest()
          check(ok == total, "2.6 R/L: Shade Geometry, 8 outputs", (double)ok, (double)total);
          printf("    2.6 worst error so far %.3f x tolerance, %d node programs off in all\n", worst, bad);
       }
+   }
+
+   // ---- 3.2: a Sketch as a material map. An animated sketch whose picture does not change uploads once and keeps
+   // its revision (the engines read a map back only on a new revision); one that moves uploads every frame.
+   {
+      SketchNode sk;
+      sk.width = 64.0f; sk.height = 64.0f; sk.animate = true;
+      sk.code = "function draw(t) {\n  background(25 / 255);\n  noStroke();\n  fill(230 / 255);\n"
+                "  for (let k = 1; k < 8; k += 2) rect(0, k * 8, width, 8);\n}\n";
+      const double t0 = Transport::Instance().Seconds();
+      unsigned long long rev0 = 0;
+      for (int i = 0; i < 100; i++)
+      {
+         Transport::Instance().Seek(t0 + i / 60.0);
+         sk.CookIfNeeded(900000 + i);
+         if (i == 0) rev0 = sk.TextureRevision();
+      }
+      check(sk.LastError().empty() && sk.GetOutputTexture() != 0 && sk.Uploads() == 1 && sk.TextureRevision() == rev0,
+            "3.2: an unchanged animated sketch uploads once in 100 frames", (double)sk.Uploads(), 1);
+      sk.code = "function draw(t) {\n  background(25 / 255);\n  fill(230 / 255);\n  rect(t * 60 % 64, 0, 8, 64);\n}\n";
+      const int before = sk.Uploads();
+      for (int i = 0; i < 10; i++)
+      {
+         Transport::Instance().Seek(t0 + 2.0 + i / 60.0);
+         sk.CookIfNeeded(900200 + i);
+      }
+      check(sk.Uploads() - before == 10, "3.2: a moving sketch uploads every frame (10 / 10)", (double)(sk.Uploads() - before), 10);
+      Transport::Instance().Seek(t0);
    }
 
    // ---- 2.6: Shade Bump into Material's normal pin writes `height`; the sphere's shading changes on L, and the

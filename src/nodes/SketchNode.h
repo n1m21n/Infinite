@@ -44,6 +44,8 @@ public:
    const std::string& Notice() const { return mNotice; }
    Field::ParamTable& GetParamTable() { return mParamTable; }
    const Field::ParamTable& GetParamTable() const { return mParamTable; }
+   // Texture uploads so far: one per changed picture, none for a frame that drew the same pixels (row 3.2).
+   int Uploads() const { return mUploads; }
    void SetNodeIndex(int idx) { mNodeIndex = idx; }
    int NodeIndex() const { return mNodeIndex; }
 
@@ -76,6 +78,8 @@ private:
    int mLastCookFrame = -1;
    int mNodeIndex = -1;
 
+   std::vector<unsigned char> mUploadedPixels;   // the picture in mTex, top row first
+   int mUploads = 0;
    unsigned int mTex = 0;
    int mW = 4, mH = 4;          // size of the uploaded texture
    int mUploadedW = 0, mUploadedH = 0;

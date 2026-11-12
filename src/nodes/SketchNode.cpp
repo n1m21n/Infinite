@@ -154,6 +154,12 @@ void SketchNode::CookIfNeeded(int frameId)
    }
    mLastError.clear();
 
+   // An animated sketch whose picture did not change (draw() ignores t, or a static mask on a material pin) costs no
+   // upload and keeps its revision, so the Render 3D engines do not read the map back again (row 3.2).
+   if (mUploadedW == w && mUploadedH == h && mPixels == mUploadedPixels) return;
+   mUploadedPixels = mPixels;
+   mUploads++;
+
    // plutovg writes the top row first; GL row 0 is the bottom (same as TextNode).
    const int stride = w * 4;
    mFlipped.resize(mPixels.size());

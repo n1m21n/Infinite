@@ -465,6 +465,19 @@ def _mat_field_code():
 
 
 CASES["mat_field_code"] = _mat_field_code()
+
+
+def _mat_sketch_mask(name):
+    # Row 3.2: a JS-drawn stripe mask on the roughness pin of a metal ball (sketch_stripes), and the same mask as a
+    # PNG (stripes). Gate: `sweep.py pair mat_sketch_mask_png mat_sketch_mask` FLIP under 0.005.
+    return {"size": SMALL, "camera": {"fov": 35, "azimuth": 90, "elevation": 20, "distance": 4.0, "target": [0, 0, 0.45]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 40, "elevation": 35}], "world": {"color": [0.3, 0.3, 0.3]},
+            "objects": [{"shape": "plane", "scale": 3, "material": {"base_color": [0.5, 0.5, 0.5], "roughness": 0.6}},
+                        _ball(0.0, 0, 0.45, base_color=[0.9, 0.9, 0.9], metallic=1.0, roughness=1.0, maps={"roughness": name})]}
+
+
+CASES["mat_sketch_mask"] = _mat_sketch_mask("sketch_stripes")
+CASES["mat_sketch_mask_png"] = _mat_sketch_mask("stripes")
 CASES["bed"] = _bed()
 # A close look at the sunlit folds right of the plush, where the weave has to read.
 CASES["bed_close"] = dict(_bed(), camera={"fov": 30, "azimuth": 100, "elevation": 30, "distance": 0.45,
