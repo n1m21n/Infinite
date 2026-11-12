@@ -82,7 +82,7 @@ class Rng:
 
 
 def is_rich_visual_template(item: dict) -> bool:
-    """For Templates, keep real rendered visuals and replace blank circles or audio/bare nodegraphs."""
+    """For Templates, keep real rendered visuals and replace blank circles or bare Midnight nodegraphs."""
     nodes = item.get("nodes") or []
     if isinstance(nodes, list) and "Audio Out" in nodes and not any(
         k in " ".join(nodes) for k in ("Shader", "Field Pixel", "Render 3D", "Sketch")
@@ -92,11 +92,14 @@ def is_rich_visual_template(item: dict) -> bool:
     if not item.get("preview") or not os.path.exists(src):
         return False
     with Image.open(src) as im:
-        arr = np.asarray(im.convert("RGB"))
+        arr = np.asarray(im.convert("RGB")).astype(int)
     black_frac = float(np.mean(arr.max(axis=2) < 10))
-    mid_dist = np.abs(arr.astype(int) - np.array(GROUND)).sum(axis=2)
-    mid_frac = float(np.mean(mid_dist < 25))
-    return black_frac <= 0.70 and mid_frac <= 0.55
+    # Detect Midnight-ground nodegraph diagrams (#0D1020, #151930, #20263F)
+    d_ground = np.abs(arr - np.array(GROUND)).sum(axis=2) < 28
+    d_deep = np.abs(arr - np.array(DEEP)).sum(axis=2) < 28
+    d_surf = np.abs(arr - np.array(SURFACE1)).sum(axis=2) < 28
+    nodegraph_frac = float(np.mean(d_ground | d_deep | d_surf))
+    return black_frac <= 0.70 and nodegraph_frac <= 0.55
 
 
 def art_webp(item: dict) -> bytes | None:
