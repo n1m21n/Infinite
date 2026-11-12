@@ -10,6 +10,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdlib>
 #include <cctype>
 #include <fstream>
 #include <mutex>
@@ -41,11 +42,49 @@ namespace McpHttp
          return d == 0;
       }
 
-      const char* kRpcMethods[] = { "attention", "auto_wire_inputs", "batch", "bind_mod", "code_errors", "connect", "create_node", "delete_node",
-                                    "describe", "disconnect", "edit", "expand_node", "explain", "get_graph", "get_node_position", "get_params",
-                                    "list_node_types", "list_nodes", "load_patch", "load_patch_text", "new_patch", "redo", "save_patch", "select",
-                                    "selection", "set_bypass", "set_expr", "set_node_position", "set_param", "settings", "status", "transport",
-                                    "undo", "unbind_mod", "validate_patch_text", "view" };
+      // Every method infinite_rpc accepts: its parameters and a call that works. Keep in step with
+      // src/app/graph/Rpc*.cpp (the parameter names are the ones those handlers read).
+      struct RpcDoc { const char* method; const char* params; const char* example; };
+      const RpcDoc kRpcDocs[] = {
+         { "status", "none", "{}" },
+         { "get_graph", "none. Returns nodes (index, type, params) and links (id, src, dst)", "{}" },
+         { "list_nodes", "none", "{}" },
+         { "list_node_types", "none. Valid type names by category", "{}" },
+         { "describe", "type?: node type name EXACTLY as list_node_types prints it (e.g. \"Bloom\"); omit to list all types. Returns control keys with a type letter prefix (f/i/b/c/s), e.g. \"f uRotation\"", "{\"type\":\"Kaleidoscope\"}" },
+         { "get_params", "index: int node index; full?: bool. Keys carry the type letter prefix: \"f uRotation\"", "{\"index\":5}" },
+         { "create_node", "typeName: string; category?: string; x?: number; y?: number. Returns {index}", "{\"typeName\":\"Oscillator\",\"x\":100,\"y\":100}" },
+         { "delete_node", "index: int", "{\"index\":5}" },
+         { "connect", "srcIndex: int; srcOutput?: int (default 0); dstIndex: int; dstSlot?: int (default 0). Returns the link id", "{\"srcIndex\":4,\"srcOutput\":0,\"dstIndex\":5,\"dstSlot\":0}" },
+         { "disconnect", "linkId: int (from get_graph)", "{\"linkId\":3}" },
+         { "set_param", "index: int; name: string, with or without the type letter (\"uRotation\" or \"f uRotation\"); value: number | string | bool. A string starting with = is an expression, e.g. \"=sin(t)\"", "{\"index\":5,\"name\":\"uRotation\",\"value\":0.5}" },
+         { "set_expr", "index: int; key: string (\"f uRotation\"); text: expression, with or without the leading =; \"\" clears it", "{\"index\":5,\"key\":\"f uRotation\",\"text\":\"sin(t)*0.3\"}" },
+         { "bind_mod", "dst: int node index to modulate; key: string (\"f uRotation\"); src: int modulator node index; output?: int (default 0); lo?, hi?: number range. Flat integers: dst/src are NOT objects", "{\"dst\":5,\"key\":\"f uRotation\",\"src\":4,\"output\":0,\"lo\":0,\"hi\":1}" },
+         { "unbind_mod", "index: int node index; key: string (\"f uRotation\")", "{\"index\":5,\"key\":\"f uRotation\"}" },
+         { "set_bypass", "index: int; bypassed?: bool (default true)", "{\"index\":3,\"bypassed\":true}" },
+         { "set_node_position", "index: int; x: number; y: number", "{\"index\":3,\"x\":200,\"y\":120}" },
+         { "get_node_position", "index: int", "{\"index\":3}" },
+         { "auto_wire_inputs", "index: int node whose inputs get wired from nodes selected before it", "{\"index\":3}" },
+         { "expand_node", "index: int; advanced?: bool", "{\"index\":3}" },
+         { "select", "nodes?: int[] ; all?: bool", "{\"nodes\":[3,4]}" },
+         { "selection", "none", "{}" },
+         { "attention", "none. What the user is looking at / touched", "{}" },
+         { "edit", "action: string; nodes?: int[] (copy, paste, duplicate, group... see `infinite help`)", "{\"action\":\"duplicate\",\"nodes\":[3]}" },
+         { "explain", "all?: bool", "{}" },
+         { "code_errors", "none. Compile errors of code nodes", "{}" },
+         { "batch", "calls: [{method, params}] run in order; stops at the first error", "{\"calls\":[{\"method\":\"create_node\",\"params\":{\"typeName\":\"Oscillator\"}}]}" },
+         { "undo", "none", "{}" },
+         { "redo", "none", "{}" },
+         { "new_patch", "none. Clears the patch (undoable)", "{}" },
+         { "save_patch", "path?: absolute file path ending .inf. Omit to write the open patch's own file (error if it has none: then ask the user, never invent a path). Missing folders are created. Returns {saved: real path} or an error with the reason", "{\"path\":\"/Users/me/song.inf\"}" },
+         { "load_patch", "path: string path of a .inf file", "{\"path\":\"/Users/me/song.inf\"}" },
+         { "load_patch_text", "text: string, the patch file contents", "{\"text\":\"...\"}" },
+         { "validate_patch_text", "text: string; strict?: bool", "{\"text\":\"...\"}" },
+         { "transport", "action: \"play\"|\"pause\"|\"stop\"|\"seek\"|\"bpm\"; bpm?: number; seconds?: number", "{\"action\":\"bpm\",\"bpm\":128}" },
+         { "settings", "action?/name?/value?: read or change an app setting; see `infinite settings`", "{\"name\":\"bpm\"}" },
+         { "view", "action: string; on?/show?/volume?/accent?: see `infinite help`", "{\"action\":\"fit\"}" },
+      };
+
+      json Tools();
 
       json Tools()
       {
@@ -64,7 +103,9 @@ namespace McpHttp
               { "inputSchema", { { "type", "object" },
                                  { "properties", { { "method", { { "type", "string" } } }, { "params", { { "type", "object" } } } } },
                                  { "required", json::array({ "method" }) } } } },
-            { { "name", "infinite_rpc_methods" }, { "description", "Method names infinite_rpc accepts." }, { "inputSchema", none } },
+            { { "name", "infinite_rpc_methods" }, { "description", "Every method infinite_rpc accepts, with its parameters and a working example. Read this before calling infinite_rpc." }, { "inputSchema", none } },
+            { { "name", "infinite_rpc_help" }, { "description", "Parameters and example of one infinite_rpc method." },
+              { "inputSchema", { { "type", "object" }, { "properties", { { "method", { { "type", "string" } } } } }, { "required", json::array({ "method" }) } } } },
          });
       }
 
@@ -76,13 +117,57 @@ namespace McpHttp
          return o + "'";
       }
 
+      // The state of the open patch from the app's own RPC, no child process (the only way `infinite_context`
+      // works where the CLI cannot be started, and a fallback elsewhere).
+      std::string ContextViaRpc()
+      {
+         json out = json::object();
+         std::string err;
+         for (const char* m : { "status", "get_graph", "attention", "selection", "code_errors" })
+         {
+            json r;
+            if (RemoteControl::Call(m, json::object(), r, err))
+               out[m] = r;
+            else
+               out[m] = { { "error", err } };
+         }
+         out["next"] = "Edit with infinite_rpc (see infinite_rpc_methods for parameters) or infinite_cli; call this again to verify.";
+         return out.dump();
+      }
+
+#ifdef _WIN32
+      // NOT VERIFIED on Windows: `<this binary> --cli ...` through _popen, the control port and token passed in the
+      // environment of this process (which the child inherits).
+      std::string WinQuote(const std::string& a)
+      {
+         std::string o = "\"";
+         for (char c : a)
+            o += c == '"' ? std::string("\\\"") : std::string(1, c);
+         return o + "\"";
+      }
+#endif
+
       // Runs `<this binary> --cli args...` with the control port and token in its environment.
       bool RunCli(const std::vector<std::string>& args, std::string& out)
       {
 #ifdef _WIN32
-         (void)args;
-         out = "infinite_cli is not available on Windows yet (not verified); use infinite_rpc.";
-         return false;
+         _putenv_s("INFINITE_CONTROL_PORT", std::to_string(RemoteControl::Port()).c_str());
+         _putenv_s("INFINITE_CONTROL_TOKEN", RemoteControl::Token().c_str());
+         std::string cmd = "\"" + WinQuote(CliSetup::RealExecutable()) + " --cli";
+         for (const std::string& a : args)
+            cmd += " " + WinQuote(a);
+         cmd += " 2>&1\"";
+         FILE* p = _popen(cmd.c_str(), "r");
+         if (p == nullptr)
+         {
+            out = "could not start the infinite command";
+            return false;
+         }
+         char buf[4096];
+         size_t n;
+         while ((n = fread(buf, 1, sizeof buf, p)) > 0 && out.size() < (1u << 20))
+            out.append(buf, n);
+         return _pclose(p) == 0;
 #else
          std::string cmd = "INFINITE_CONTROL_PORT=" + std::to_string(RemoteControl::Port()) + " INFINITE_CONTROL_TOKEN=" + RemoteControl::Token() +
                            " " + ShellQuote(CliSetup::RealExecutable()) + " --cli";
@@ -99,8 +184,7 @@ namespace McpHttp
          size_t n;
          while ((n = fread(buf, 1, sizeof buf, p)) > 0 && out.size() < (1u << 20))
             out.append(buf, n);
-         const int rc = pclose(p);
-         return rc == 0;
+         return pclose(p) == 0;
 #endif
       }
 
@@ -122,29 +206,43 @@ namespace McpHttp
             else
                return TextResult("infinite_cli needs args: an array of strings", true);
             std::string out;
+            if (name == "infinite_context")
+            {
+#ifdef _WIN32
+               return TextResult(ContextViaRpc(), false);  // no child process on Windows
+#else
+               const bool ok = RunCli(a, out);
+               if (!ok || out.empty())
+                  return TextResult(ContextViaRpc(), false);
+               return TextResult(out, false);
+#endif
+            }
             const bool ok = RunCli(a, out);
             return TextResult(out.empty() ? (ok ? "ok" : "failed") : out, !ok);
          }
          if (name == "infinite_rpc_methods")
          {
-            json m = json::array();
-            for (const char* x : kRpcMethods)
-               m.push_back(x);
-            return TextResult(m.dump(), false);
+            return TextResult(RpcHelp("").dump(), false);
+         }
+         if (name == "infinite_rpc_help")
+         {
+            const std::string mname = args.is_object() && args.contains("method") && args["method"].is_string() ? args["method"].get<std::string>() : std::string();
+            const json h = RpcHelp(mname);
+            return TextResult(h.dump(), h.is_null());
          }
          if (name == "infinite_rpc")
          {
             if (!args.is_object() || !args.value("method", std::string()).size())
                return TextResult("infinite_rpc needs a method", true);
-            bool known = false;
-            for (const char* x : kRpcMethods)
-               known = known || args["method"] == x;
-            if (!known)
-               return TextResult("unknown or not allowed method; see infinite_rpc_methods", true);
+            const std::string mname = args["method"].is_string() ? args["method"].get<std::string>() : std::string();
+            if (RpcExample(mname).empty())
+               return TextResult("unknown or not allowed method '" + mname + "'. Call infinite_rpc_methods for the list with parameters.", true);
+            if (args.contains("params") && !args["params"].is_object())
+               return TextResult("params must be an object. Example for " + mname + ": " + RpcExample(mname), true);
             json result;
             std::string err;
-            if (!RemoteControl::Call(args["method"], args.value("params", json::object()), result, err))
-               return TextResult(err, true);
+            if (!RemoteControl::Call(mname, args.value("params", json::object()), result, err))
+               return TextResult(err + (err.find("Example:") == std::string::npos ? " Example: " + RpcExample(mname) : std::string()), true);
             return TextResult(result.dump(), false);
          }
          return TextResult("unknown tool " + name, true);
@@ -324,6 +422,38 @@ namespace McpHttp
             std::thread(Serve, c, generation).detach();
          }
       }
+   }
+
+   std::string RpcExample(const std::string& method)
+   {
+      for (const RpcDoc& d : kRpcDocs)
+         if (method == d.method)
+            return d.example;
+      return {};
+   }
+
+   std::vector<std::string> RpcMethodNames()
+   {
+      std::vector<std::string> out;
+      for (const RpcDoc& d : kRpcDocs)
+         out.push_back(d.method);
+      return out;
+   }
+
+   nlohmann::json RpcHelp(const std::string& method)
+   {
+      auto one = [](const RpcDoc& d) { return json{ { "method", d.method }, { "params", d.params }, { "example", json::parse(d.example, nullptr, false) } }; };
+      if (method.empty())
+      {
+         json all = json::array();
+         for (const RpcDoc& d : kRpcDocs)
+            all.push_back(one(d));
+         return all;
+      }
+      for (const RpcDoc& d : kRpcDocs)
+         if (method == d.method)
+            return one(d);
+      return json();
    }
 
    nlohmann::json ToolsJson() { return Tools(); }
