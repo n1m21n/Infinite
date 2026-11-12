@@ -573,7 +573,7 @@ namespace
       const std::string sub = BoxSubtitle(b, spec);
       if (!sub.empty())
       {
-         ImGui::SameLine();
+         FormParts::Inline();
          ImGui::TextDisabled("%s", sub.c_str());
       }
 
@@ -638,7 +638,7 @@ namespace
             ImGui::Dummy(ImVec2(60.0f, ImGui::GetTextLineHeight()));
          if (r < (int)b.outlets.size())
          {
-            ImGui::SameLine(0.0f, 24.0f);
+            FormParts::Inline(0.0f, 24.0f);
             ed::BeginPin(OutPinId(b.id, r), ed::PinKind::Output);
             ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(KindCol(b.outlets[r].kind)), "%s ●", b.outlets[r].name.c_str());
@@ -863,7 +863,7 @@ namespace
       ImGui::BeginChild("##fpInspector", size, false, ImGuiWindowFlags_NoScrollbar);
       if (ChipButton::Draw(T("Code"), s.inspectorTab == 0))
          s.inspectorTab = 0;
-      ImGui::SameLine(0.0f, tok::space_1);
+      FormParts::Inline(0.0f, tok::space_1);
       if (ChipButton::Draw(T("Box"), s.inspectorTab == 1))
          s.inspectorTab = 1;
       const std::string src = SourceOf(p, h);
@@ -1063,7 +1063,7 @@ namespace
                std::swap(s.pages[i], s.pages[i + 1]), s.front = i + 1;
             MenuParts::EndPopup();
          }
-         ImGui::SameLine(0.0f, tok::space_1);
+         FormParts::Inline(0.0f, tok::space_1);
          ImGui::PopID();
       }
       if (ChipButton::Draw("+##fpAdd", false))
@@ -1080,7 +1080,7 @@ namespace
                FieldPatcherOpenStarter(k);
          MenuParts::EndPopup();
       }
-      ImGui::SameLine(0.0f, tok::space_1);
+      FormParts::Inline(0.0f, tok::space_1);
       if (ChipButton::Draw(gFieldPatcherMaximised ? "⤡##fpMax" : "⤢##fpMax", gFieldPatcherMaximised))
          gFieldPatcherMaximised = !gFieldPatcherMaximised;
       if (ImGui::IsItemHovered())
@@ -1111,21 +1111,21 @@ namespace
       else
       {
          ImGui::TextDisabled("%s", T(h.nodeName));
-         ImGui::SameLine(0.0f, tok::space_3);
+         FormParts::Inline(0.0f, tok::space_3);
          if (h.error.empty())
             ImGui::TextUnformatted("✓");
          else
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s %s",
                                T("last good ·"), h.error.c_str());
       }
-      ImGui::SameLine(0.0f, tok::space_3);
+      FormParts::Inline(0.0f, tok::space_3);
       if (codeBoxes > 0)
          ImGui::TextDisabled("%d %s · %d %s", boxes, T("boxes"), codeBoxes, T("code"));
       else
          ImGui::TextDisabled("%d %s", boxes, T("boxes"));
       if (!p.parseError.empty())
       {
-         ImGui::SameLine(0.0f, tok::space_3);
+         FormParts::Inline(0.0f, tok::space_3);
          ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s", p.parseError.c_str());
       }
    }
@@ -1140,7 +1140,7 @@ namespace
          AddScratch("", "");
       for (int k = 0; k < Field::kPatcherStarterCount; k++)
       {
-         ImGui::SameLine(0.0f, tok::space_2);
+         FormParts::Inline(0.0f, tok::space_2);
          ImGui::PushID(k);
          if (ActionButton::Draw(T(Field::kPatcherStarters[k].name), ImVec2(150, 0)))
             FieldPatcherOpenStarter(k);
