@@ -9274,6 +9274,228 @@
       "file": "assets/library/pixel/analog-crt-electron-beam-raster-deflection.field",
       "preview": "assets/library/previews/analog-crt-electron-beam-raster-deflection.jpg",
       "bytes": 2728
+    },
+    {
+      "id": "lilliputian-surreal-colossal-orb-procession",
+      "name": "Lilliputian Surreal Colossal Orb Procession",
+      "kind": "Generator",
+      "tags": [
+        "lilliputian",
+        "surreal",
+        "scale",
+        "miniature",
+        "procession",
+        "architectural",
+        "procedural"
+      ],
+      "description": "Miniature vermilion figures crossing a suspended causeway beneath a titanic alabaster sphere in a vaulted slate chamber.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/lilliputian-surreal-colossal-orb-procession.js",
+      "preview": "assets/library/previews/lilliputian-surreal-colossal-orb-procession.jpg",
+      "bytes": 2632
+    },
+    {
+      "id": "lilliputian-surreal-titanic-staircase-pilgrims",
+      "name": "Lilliputian Surreal Titanic Staircase Pilgrims",
+      "kind": "Generator",
+      "tags": [
+        "lilliputian",
+        "surreal",
+        "staircase",
+        "monolith",
+        "scale",
+        "miniature",
+        "procedural"
+      ],
+      "description": "Monumental stepped alabaster monoliths and sweeping arches traversed by miniature terracotta figures in quiet scale contrast.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/lilliputian-surreal-titanic-staircase-pilgrims.js",
+      "preview": "assets/library/previews/lilliputian-surreal-titanic-staircase-pilgrims.jpg",
+      "bytes": 1952
+    },
+    {
+      "id": "cymatics-sine-chladni-nodal-shell-3d",
+      "name": "Cymatics Sine Chladni Nodal Shell 3D",
+      "kind": "Generator",
+      "tags": [
+        "cymatics",
+        "chladni",
+        "3d",
+        "standing-wave",
+        "nodal",
+        "cyan",
+        "procedural"
+      ],
+      "description": "3D standing-wave Chladni plate lattice where crisp white and cyan-ice nodal pillars trace resonant harmonic modes.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/cymatics-sine-chladni-nodal-shell-3d.js",
+      "preview": "assets/library/previews/cymatics-sine-chladni-nodal-shell-3d.jpg",
+      "bytes": 1420
+    },
+    {
+      "id": "cymatics-sine-harmonic-toroid-resonator-3d",
+      "name": "Cymatics Sine Harmonic Toroid Resonator 3D",
+      "kind": "Generator",
+      "tags": [
+        "cymatics",
+        "toroid",
+        "harmonic",
+        "3d",
+        "resonance",
+        "cyan",
+        "procedural"
+      ],
+      "description": "Nested cymatic torus rings and radial harmonic spokes oscillating around a central acoustic focal core.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/cymatics-sine-harmonic-toroid-resonator-3d.js",
+      "preview": "assets/library/previews/cymatics-sine-harmonic-toroid-resonator-3d.jpg",
+      "bytes": 1235
+    },
+    {
+      "id": "downtempo-warm-sub-tape-bass-synth",
+      "name": "Downtempo Warm Sub Tape Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "downtempo",
+        "audio",
+        "dsp",
+        "bass",
+        "rhodes",
+        "pad"
+      ],
+      "description": "Trip-hop sub-weighted analog bass synthesizer with tape saturation, subtle pitch drift, and resonant lowpass envelope.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/downtempo-warm-sub-tape-bass-synth.inf",
+      "preview": "assets/library/previews/downtempo-warm-sub-tape-bass-synth.jpg",
+      "bytes": 2192
+    },
+    {
+      "id": "downtempo-dusty-rhodes-bell-pad-synth",
+      "name": "Downtempo Dusty Rhodes Bell Pad Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "downtempo",
+        "audio",
+        "dsp",
+        "bass",
+        "rhodes",
+        "pad"
+      ],
+      "description": "Warm dusty electric-tine and bell pad synthesizer with soft FM overtone bloom, gentle chorus detune, and mellow decay.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/downtempo-dusty-rhodes-bell-pad-synth.inf",
+      "preview": "assets/library/previews/downtempo-dusty-rhodes-bell-pad-synth.jpg",
+      "bytes": 2117
+    },
+    {
+      "id": "minimal-techno-dub-chord-echo-fx",
+      "name": "Minimal Techno Dub Chord Echo FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "minimal-techno",
+        "audio",
+        "dsp",
+        "delay",
+        "dub",
+        "shaper"
+      ],
+      "description": "Basic Channel-inspired damped stereo dub delay network with dark feedback filtering and subtle tape pitch drift.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 4,
+      "file": "assets/templates/minimal-techno-dub-chord-echo-fx.inf",
+      "preview": "assets/library/previews/minimal-techno-dub-chord-echo-fx.jpg",
+      "bytes": 2049
+    },
+    {
+      "id": "minimal-techno-sub-harmonic-shaper-fx",
+      "name": "Minimal Techno Sub Harmonic Shaper FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "minimal-techno",
+        "audio",
+        "dsp",
+        "delay",
+        "dub",
+        "shaper"
+      ],
+      "description": "Plastikman-inspired resonant lowpass sculpt and asymmetric soft-clipper for tight minimal techno basslines and percussive clicks.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 4,
+      "file": "assets/templates/minimal-techno-sub-harmonic-shaper-fx.inf",
+      "preview": "assets/library/previews/minimal-techno-sub-harmonic-shaper-fx.jpg",
+      "bytes": 1737
+    },
+    {
+      "id": "suprematist-blocks-kinetic-red-wedge",
+      "name": "Suprematist Blocks Kinetic Red Wedge",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "constructivist",
+        "lissitzky",
+        "malevich",
+        "geometric",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Constructivist composition of a vermilion wedge piercing a charcoal disc and diagonal beams on warm ivory paper.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/suprematist-blocks-kinetic-red-wedge.field",
+      "preview": "assets/library/previews/suprematist-blocks-kinetic-red-wedge.jpg",
+      "bytes": 2257
+    },
+    {
+      "id": "suprematist-blocks-malevich-floating-plane",
+      "name": "Suprematist Blocks Malevich Floating Plane",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "malevich",
+        "geometric",
+        "minimal",
+        "constructivist",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Balanced asymmetric field of a rotated black quadrilateral and vermilion satellite bars suspended over warm paper ivory.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/suprematist-blocks-malevich-floating-plane.field",
+      "preview": "assets/library/previews/suprematist-blocks-malevich-floating-plane.jpg",
+      "bytes": 2106
     }
   ]
 }

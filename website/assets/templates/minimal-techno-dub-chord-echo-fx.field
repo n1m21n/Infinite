@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Minimal Techno Dub Chord Echo FX",
+    "author": "Infinite",
+    "description": "Basic Channel-inspired damped stereo dub delay network with dark feedback filtering and subtle tape pitch drift.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float feedback = 0.62 [0.0, 0.88];\nparam float damping = 0.55 [0.1, 0.95];\nparam float drift = 0.25 [0.0, 1.0];\nparam float mix = 0.52 [0.0, 1.0];\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float tap4 = 0;\nstate float lp = 0;\nstate float lfo = 0;\n\nlfo = (lfo + 1.1 / sr) % 1.0;\nmodRate = sin(6.2831853 * lfo) * drift * 0.015;\n\nfCut = clamp(0.08 + (1.0 - damping) * 0.26, 0.02, 0.40);\nlp = lp + fCut * (in - lp);\n\nr = clamp(0.075 + modRate, 0.02, 0.30);\ntap1 = tap1 + r * (lp + tap4 * feedback * 0.45 - tap1);\ntap2 = tap2 + r * 0.84 * (tap1 - tap2);\ntap3 = tap3 + r * 0.72 * (tap2 - tap3);\ntap4 = tap4 + r * 0.61 * (tap3 - tap4);\n\necho = (tap2 * 0.42 + tap3 * 0.34 + tap4 * 0.24) * 1.15;\nsat = echo / (1.0 + abs(echo) * 0.28);\n\nprocessed = in * (1.0 - mix) + sat * mix;\nout = processed * 1.45;\n",
+    "params": {
+      "feedback": 0.62,
+      "damping": 0.55,
+      "drift": 0.25,
+      "mix": 0.52
+    }
+  }
+}

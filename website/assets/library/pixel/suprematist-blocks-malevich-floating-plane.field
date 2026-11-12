@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Suprematist Blocks Malevich Floating Plane",
+    "author": "Infinite",
+    "description": "Balanced asymmetric field of a rotated black quadrilateral and vermilion satellite bars suspended over warm paper ivory.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float planeSize = 0.42 [0.2, 0.65];\nparam float tilt = 0.32 [-0.8, 0.8];\nparam float barSpread = 0.52 [0.2, 0.8];\nparam float paperGrain = 0.04 [0.0, 0.12];\nparam float contrast = 1.05 [0.8, 1.4];\n\np = (uv - 0.5) * 2.0;\n\ncPaper = vec3(0.957, 0.937, 0.902);\ncInk = vec3(0.067, 0.067, 0.067);\ncRed = vec3(0.851, 0.137, 0.122);\n\ngrain = (fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * paperGrain;\nbg = cPaper + grain;\n\n# Central tilted black quadrilateral\na = tilt + sin(t * 0.25) * 0.04;\nca = cos(a);\nsa = sin(a);\nq = vec2(p.x * ca + p.y * sa, -p.x * sa + p.y * ca);\ndQuad = max(abs(q.x), abs(q.y)) - planeSize;\nmQuad = 1.0 - smoothstep(-0.008, 0.008, dQuad);\n\n# Vermilion floating bar above-left\nb1 = vec2(p.x + barSpread * 0.72, p.y - barSpread * 0.85);\nr1 = vec2(b1.x * ca + b1.y * sa, -b1.x * sa + b1.y * ca);\nmBar1 = (1.0 - smoothstep(-0.008, 0.008, max(abs(r1.x) - 0.28, abs(r1.y) - 0.055)));\n\n# Charcoal thin cross-bar below-right\nb2 = vec2(p.x - barSpread * 0.68, p.y + barSpread * 0.75);\nr2 = vec2(b2.x * ca + b2.y * sa, -b2.x * sa + b2.y * ca);\nmBar2 = (1.0 - smoothstep(-0.008, 0.008, max(abs(r2.x) - 0.36, abs(r2.y) - 0.032)));\n\n# Small vermilion circle orbit\ndOrb = length(p - vec2(0.56, 0.22 + 0.06 * cos(t * 0.4))) - 0.09;\nmOrb = 1.0 - smoothstep(-0.008, 0.008, dOrb);\n\nresCol = mix(bg, cInk, mQuad);\nresCol = mix(resCol, cInk, mBar2);\nresCol = mix(resCol, cRed, mBar1);\nresCol = mix(resCol, cRed, mOrb);\n\ncol = clamp(resCol * contrast, 0.0, 1.0);\n",
+    "params": {
+      "planeSize": 0.42,
+      "tilt": 0.32,
+      "barSpread": 0.52,
+      "paperGrain": 0.04,
+      "contrast": 1.05
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

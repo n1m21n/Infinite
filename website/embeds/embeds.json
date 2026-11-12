@@ -565,6 +565,16 @@
       "slug": "analog-crt-electron-beam-raster-deflection",
       "title": "Analog CRT Electron Beam Raster Deflection",
       "description": "Audio-reactive CRT electron beam oscilloscope. Bass drives magnetic deflection coil amplitude, mids shape Lissajous beam trajectories, and highs energize phosphor trace bloom."
+    },
+    {
+      "slug": "suprematist-blocks-kinetic-red-wedge",
+      "title": "Suprematist Blocks Kinetic Red Wedge",
+      "description": "Audio-reactive Suprematist composition inspired by El Lissitzky. Bass drives the vermilion wedge thrust, mids rotate the constructivist beams, and highs pulse the geometric accents."
+    },
+    {
+      "slug": "suprematist-blocks-malevich-floating-plane",
+      "title": "Suprematist Blocks Malevich Floating Plane",
+      "description": "Audio-reactive Malevich-inspired Suprematist planes. Bass pulses the central black quadrilateral, mids drift the vermilion satellite bars, and highs sharpen the edge tension."
     }
   ]
 }

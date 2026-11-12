@@ -2763,6 +2763,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "downtempo-warm-sub-tape-bass-synth",
+      "name": "Downtempo Warm Sub Tape Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Trip-hop sub-weighted analog bass synthesizer with tape saturation, subtle pitch drift, and resonant lowpass envelope.",
+      "price": 0,
+      "preview": "assets/templates/downtempo-warm-sub-tape-bass-synth.webp",
+      "file": "assets/templates/downtempo-warm-sub-tape-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "downtempo-dusty-rhodes-bell-pad-synth",
+      "name": "Downtempo Dusty Rhodes Bell Pad Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Warm dusty electric-tine and bell pad synthesizer with soft FM overtone bloom, gentle chorus detune, and mellow decay.",
+      "price": 0,
+      "preview": "assets/templates/downtempo-dusty-rhodes-bell-pad-synth.webp",
+      "file": "assets/templates/downtempo-dusty-rhodes-bell-pad-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "minimal-techno-dub-chord-echo-fx",
+      "name": "Minimal Techno Dub Chord Echo FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Basic Channel-inspired damped stereo dub delay network with dark feedback filtering and subtle tape pitch drift.",
+      "price": 0,
+      "preview": "assets/templates/minimal-techno-dub-chord-echo-fx.webp",
+      "file": "assets/templates/minimal-techno-dub-chord-echo-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "minimal-techno-sub-harmonic-shaper-fx",
+      "name": "Minimal Techno Sub Harmonic Shaper FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Plastikman-inspired resonant lowpass sculpt and asymmetric soft-clipper for tight minimal techno basslines and percussive clicks.",
+      "price": 0,
+      "preview": "assets/templates/minimal-techno-sub-harmonic-shaper-fx.webp",
+      "file": "assets/templates/minimal-techno-sub-harmonic-shaper-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }
