@@ -1827,6 +1827,69 @@ bool RunEngineTest()
       check(ms64 / std::max(ms8, 1e-3) < 1.3, "lights_64 L frame under 1.3x the 8-light frame", ms64 / std::max(ms8, 1e-3), 1.3);
       q.liveEngine = false;
    }
+   if (const char* glb = getenv("INFINITE_ENGINETEST_GLTF"))
+   {
+      // Row 7.1: a glTF on disk through the drop's own ApplyGltfMaterial, drawn on R, L and T at 256 px. PPMs go to
+      // INFINITE_ENGINETEST_OUT; the KHR factors the file has must reach the Material.
+      const char* outDir = getenv("INFINITE_ENGINETEST_OUT");
+      const int S = 256;
+      std::string err;
+      const GltfImport::GltfDecodePackage* file = GltfImport::DecodeCached(glb, err);
+      check(file != nullptr, "glTF decodes", 0, 0);
+      if (file != nullptr)
+      {
+         const GltfImport::GltfDecodePackage& pk = *file->Part(0);
+         printf("  gltf part 0 '%s': clearcoat %.3f/%.3f sheen %.3f emissive x%.2f ior %.2f transmission %.2f irid %.2f aniso %.2f uvT %d\n",
+                pk.materialName.c_str(), pk.clearcoat, pk.clearcoatRoughness, pk.sheen, pk.emissiveStrength, pk.ior,
+                pk.transmission, pk.iridescence, pk.anisotropy, (int)pk.hasUvTransform);
+         ModelSourceNode model;
+         model.Load(glb);
+         MaterialNode mat;
+         mat.input = &model;
+         ApplyGltfMaterial(&mat, pk);
+         check(std::fabs(mat.clearcoat - pk.clearcoat) < 1e-6f && std::fabs(mat.sheen - pk.sheen) < 1e-6f &&
+               std::fabs(mat.ior - pk.ior) < 1e-6f, "glTF KHR factors reach the Material", mat.clearcoat, pk.clearcoat);
+         Render3DNode::Rig rg = rig;
+         const float e2[3] = { 0.0f, 0.7f, 2.6f }, t2[3] = { 0.0f, 0.0f, 0.0f };
+         rg.view = Mat4::LookAt(e2, t2, up); rg.eye[0] = e2[0]; rg.eye[1] = e2[1]; rg.eye[2] = e2[2];
+         rg.proj = Mat4::Perspective(40.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 100.0f);
+         rg.lights.resize(2);
+         Render3DNode q;
+         q.geometry[0] = &mat;
+         q.width = (float)S; q.height = (float)S; q.samples = 0; q.hdr = false; q.tonemap = 1; q.rig = &rg;
+         std::vector<float> pR, pL, pT;
+         auto grab = [&](std::vector<float>& px) { return GLUtil::ReadTexturePixels(scratch, q.GetOutputTexture(), q.GetOutputWidth(), q.GetOutputHeight(), px); };
+         auto ppm = [&](const char* name, const std::vector<float>& px)
+         {
+            if (!outDir) return;
+            FILE* fp = fopen((std::string(outDir) + "/" + name).c_str(), "wb");
+            if (!fp) return;
+            fprintf(fp, "P6\n%d %d\n255\n", S, S);
+            for (int y = S - 1; y >= 0; y--)
+               for (int x = 0; x < S; x++)
+                  for (int c = 0; c < 3; c++)
+                     fputc((int)std::lround(std::clamp(px[((size_t)y * S + x) * 4 + c], 0.0f, 1.0f) * 255.0f), fp);
+            fclose(fp);
+         };
+         auto mae = [](const std::vector<float>& a, const std::vector<float>& b)
+         {
+            double d = 0.0;
+            for (size_t i = 0; i < a.size() && i < b.size(); i++) d += std::fabs(a[i] - b[i]);
+            return a.empty() ? 1.0 : d / (double)a.size();
+         };
+         q.CookIfNeeded(++fnum);
+         check(grab(pR), "glTF R picture", 0, 0); ppm("gR.ppm", pR);
+         q.liveEngine = true; q.liveEngineFeatures = 7;
+         for (int i = 0; i < 3; i++) q.CookIfNeeded(++fnum);
+         check(grab(pL), "glTF L picture", 0, 0); ppm("gL.ppm", pL);
+         q.liveEngineFeatures = 15; q.ptSamples = 256; q.ptBounces = 4;
+         for (int i = 0; i < 40; i++) q.CookIfNeeded(++fnum);
+         check(grab(pT), "glTF T picture", 0, 0); ppm("gT.ppm", pT);
+         q.liveEngine = false;
+         printf("  glTF MAE L-R %.4f T-R %.4f\n", mae(pL, pR), mae(pT, pR));
+         check(mae(pL, pR) < 0.08 && mae(pT, pR) < 0.08, "glTF on L and T stays close to R", std::max(mae(pL, pR), mae(pT, pR)), 0.08);
+      }
+   }
    if (const char* instEnv = getenv("INFINITE_ENGINETEST_INSTANCES"))
    {
       // R5: one mesh, N copies in one instanced draw. Gates: >= 30 fps at 1M, <= 1.5 GB resident, regenerate <= 100 ms.

@@ -39,3 +39,12 @@ commit. No pasted logs, no file-by-file retelling: the commit holds that. When a
 | 6.1 | Settle motion blur: per-source motion from the last transport step (model x whole-mesh Transform ops), shutter time per 2-spp chunk. motion_blur T FLIP 0.058 -> 0.050, motion_orbit 0.045 (gate 0.05); sheet sheets/6.1-motion_blur.jpg | see git log |
 | 6.2 | Settle lens: blades already there; new cat-eye, radial distortion, lateral CA (one channel per sample) in pt_fs; direct emitter hits skip the firefly clamp; ptres blends coverage in linear. dof_bokeh T FLIP 0.057 (gate 0.06), dof 0.056; sheet sheets/6.2-dof_bokeh.jpg | see git log |
 | 6.3 | Bloom on L and T: Metal chain on the finished picture (expand x/(1-x), 13-tap down, tent up, composite); bloom 0 pixel-identical (emission_light same); sheet sheets/6.3-bloom.jpg | see git log |
+| 7.1 | glTF KHR materials read and applied by the drop (shared ApplyGltfMaterial). brand_ball clearcoat L-R MAE 0.008, T-R 0.010; plush sheen 0.002 / 0.003; sheet sheets/7.1-gltf.jpg. Table below: extension, before, after | see git log |
+| 7.1 clearcoat | not read | factor, roughness, map to clearcoat slot |
+| 7.1 sheen | not read | colour max as weight, colour, roughness, colour map to sheen slot |
+| 7.1 transmission, ior | not read | factor, map to transmission slot; ior |
+| 7.1 specular | spec-gloss only | KHR factor x colour mean as Material specular (same F0) |
+| 7.1 emissive_strength | not read (emission 1) | emission = strength |
+| 7.1 iridescence, anisotropy, dispersion, diffuse_transmission | not read | factors, rotation in turns, 20/Abbe to 1/Abbe, translucency |
+| 7.1 volume | not read | thickness, attenuation in the record only: no Beer absorption in the engines |
+| 7.1 texture transform | not read | a Mapping node between Model and Material (base colour map transform, v flip folded in) |

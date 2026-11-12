@@ -685,6 +685,76 @@ namespace GltfImport
             DecodeCgltfImage(mat.occlusion_texture.texture->image, dir, "occlusion", pkg.occlusion, err);
          if (mat.emissive_texture.texture != nullptr)
             DecodeCgltfImage(mat.emissive_texture.texture->image, dir, "emissive", pkg.emissive, err);
+         if (mat.has_emissive_strength)
+            pkg.emissiveStrength = mat.emissive_strength.emissive_strength;
+         if (mat.has_ior)
+            pkg.ior = mat.ior.ior;
+         if (mat.has_transmission)
+         {
+            pkg.transmission = mat.transmission.transmission_factor;
+            if (mat.transmission.transmission_texture.texture != nullptr)
+               DecodeCgltfImage(mat.transmission.transmission_texture.texture->image, dir, "transmission", pkg.transmissionMap, err);
+         }
+         if (mat.has_clearcoat)
+         {
+            pkg.clearcoat = mat.clearcoat.clearcoat_factor;
+            pkg.clearcoatRoughness = mat.clearcoat.clearcoat_roughness_factor;
+            if (mat.clearcoat.clearcoat_texture.texture != nullptr)
+               DecodeCgltfImage(mat.clearcoat.clearcoat_texture.texture->image, dir, "clearcoat", pkg.clearcoatMap, err);
+         }
+         if (mat.has_specular)
+         {
+            // F0 = ((ior-1)/(ior+1))^2 x factor x colour; Material's F0 is that same r^2 x 2 x specular.
+            const float* c = mat.specular.specular_color_factor;
+            pkg.specular = 0.5f * mat.specular.specular_factor * (c[0] + c[1] + c[2]) / 3.0f;
+         }
+         if (mat.has_sheen)
+         {
+            const float* c = mat.sheen.sheen_color_factor;
+            const float w = std::max({ c[0], c[1], c[2] });
+            pkg.sheen = w;
+            for (int k = 0; k < 3; k++) pkg.sheenColor[k] = w > 0.0f ? c[k] / w : 1.0f;
+            pkg.sheenRoughness = mat.sheen.sheen_roughness_factor;
+            if (mat.sheen.sheen_color_texture.texture != nullptr)
+            {
+               DecodeCgltfImage(mat.sheen.sheen_color_texture.texture->image, dir, "sheen", pkg.sheenMap, err);
+               if (w <= 0.0f) pkg.sheen = 1.0f;
+            }
+         }
+         if (mat.has_iridescence)
+         {
+            pkg.iridescence = mat.iridescence.iridescence_factor;
+            pkg.iridescenceIor = mat.iridescence.iridescence_ior;
+            pkg.iridescenceThickness = mat.iridescence.iridescence_thickness_max;
+         }
+         if (mat.has_anisotropy)
+         {
+            pkg.anisotropy = mat.anisotropy.anisotropy_strength;
+            pkg.anisotropyRotation = mat.anisotropy.anisotropy_rotation;
+         }
+         if (mat.has_dispersion)
+            pkg.dispersion = mat.dispersion.dispersion;
+         if (mat.has_diffuse_transmission)
+            pkg.translucency = mat.diffuse_transmission.diffuse_transmission_factor;
+         if (mat.has_volume)
+         {
+            pkg.thickness = mat.volume.thickness_factor;
+            std::copy(mat.volume.attenuation_color, mat.volume.attenuation_color + 3, pkg.attenuationColor);
+            pkg.attenuationDistance = mat.volume.attenuation_distance;
+         }
+         // One Mapping per material: the base colour map's transform, else the first map with one.
+         const cgltf_texture_view* views[] = { &mat.pbr_metallic_roughness.base_color_texture, &mat.pbr_specular_glossiness.diffuse_texture,
+                                               &mat.normal_texture, &mat.pbr_metallic_roughness.metallic_roughness_texture,
+                                               &mat.occlusion_texture, &mat.emissive_texture };
+         for (const cgltf_texture_view* v : views)
+            if (v->texture != nullptr && v->has_transform)
+            {
+               pkg.hasUvTransform = true;
+               std::copy(v->transform.offset, v->transform.offset + 2, pkg.uvOffset);
+               std::copy(v->transform.scale, v->transform.scale + 2, pkg.uvScale);
+               pkg.uvRotation = v->transform.rotation;
+               break;
+            }
       }
       built.erase(std::remove_if(built.begin(), built.end(), [](const GltfDecodePackage& p) { return p.vertices.empty(); }), built.end());
       if (built.empty())
@@ -713,7 +783,8 @@ namespace GltfImport
             for (const auto& ch : c.channels)
                bytes += (ch.times.size() + ch.values.size()) * sizeof(float);
          for (const GltfDecodedImage* img : { &part.albedo, &part.roughness, &part.metallic, &part.normalMap,
-                                              &part.occlusion, &part.emissive })
+                                              &part.occlusion, &part.emissive, &part.clearcoatMap,
+                                              &part.sheenMap, &part.transmissionMap })
             bytes += img->pixels.size();
       }
 

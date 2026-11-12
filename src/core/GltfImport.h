@@ -16,8 +16,9 @@
 // one part per material (part 0 is the package itself, the rest are in
 // `parts`). TEXCOORD_0 only. The skin, its animation clips and a lone
 // primitive's morph targets are read (Skinning.h poses them); no Draco/meshopt
-// compression, no KHR_materials_* extensions beyond the base PBR
-// metallic-roughness set, no cameras/lights.
+// compression, no cameras/lights. Row 7.1: KHR_materials_* clearcoat, transmission, ior, specular, sheen,
+// emissive_strength, iridescence, anisotropy, dispersion, diffuse_transmission and volume, plus
+// KHR_texture_transform (the base colour map's, else the first map that has one), are read into the part.
 namespace GltfImport
 {
    struct GltfDecodedImage
@@ -73,6 +74,9 @@ namespace GltfImport
       GltfDecodedImage normalMap;
       GltfDecodedImage occlusion;
       GltfDecodedImage emissive;
+      GltfDecodedImage clearcoatMap;    // KHR_materials_clearcoat texture (R)
+      GltfDecodedImage sheenMap;        // KHR_materials_sheen colour texture
+      GltfDecodedImage transmissionMap; // KHR_materials_transmission texture (R)
 
       // Rig: four joints and weights per vertex, parallel to `vertices`;
       // empty when the file has no skin.
@@ -92,6 +96,17 @@ namespace GltfImport
       float roughnessFactor = 1.0f;
       float specular = 0.5f;   // Material's specular (0.5 = F0 0.04); spec-gloss files set it from their specular colour
       float emissiveFactor[3] = { 0, 0, 0 };
+      float emissiveStrength = 1.0f;
+      float ior = 1.5f;
+      float transmission = 0.0f, clearcoat = 0.0f, clearcoatRoughness = 0.0f;
+      float sheen = 0.0f, sheenColor[3] = { 1, 1, 1 }, sheenRoughness = 0.0f;
+      float iridescence = 0.0f, iridescenceIor = 1.3f, iridescenceThickness = 400.0f;
+      float anisotropy = 0.0f, anisotropyRotation = 0.0f; // rotation in radians, as the file has it
+      float dispersion = 0.0f;                            // the file's 20 / Abbe
+      float translucency = 0.0f;                          // KHR_materials_diffuse_transmission
+      float thickness = 0.0f, attenuationColor[3] = { 1, 1, 1 }, attenuationDistance = 0.0f; // volume, 0 = none
+      bool hasUvTransform = false;
+      float uvOffset[2] = { 0, 0 }, uvRotation = 0.0f, uvScale[2] = { 1, 1 };
 
       bool hadMultipleUVSets = false;
 

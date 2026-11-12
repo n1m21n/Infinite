@@ -2,10 +2,59 @@
 #include "core/Notices.h"
 #include "ColorSpace.h"
 #include <algorithm>
+#include <cmath>
 #include "app/frame/FrameCtx.h"
 
 namespace app
 {
+// Row 7.1: a glTF part's factors onto a Material (the drop and the engine test share it).
+void ApplyGltfMaterial(MaterialNode* mat, const GltfImport::GltfDecodePackage& pkg)
+{
+   // glTF factors are linear; the Material's colour controls hold sRGB.
+   for (int k = 0; k < 3; k++)
+      mat->color[k] = ColorSpace::LinearToSrgb(pkg.baseColor[k]);
+   mat->opacity = pkg.baseColor[3];
+   mat->metallic = pkg.metallicFactor;
+   mat->roughness = pkg.roughnessFactor;
+   mat->specular = pkg.specular;
+   const float* e = pkg.emissiveFactor;
+   if (e[0] > 0.0f || e[1] > 0.0f || e[2] > 0.0f)
+   {
+      for (int k = 0; k < 3; k++)
+         mat->emissionColor[k] = ColorSpace::LinearToSrgb(std::min(e[k], 1.0f));
+      mat->emission = pkg.emissiveStrength;
+   }
+   // Row 7.1: the KHR_materials_* factors Material has a control for (volume has none: Beer absorption is
+   // not in the engines, so thickness and attenuation stay in the record only).
+   mat->ior = pkg.ior;
+   mat->transmission = pkg.transmission;
+   mat->clearcoat = pkg.clearcoat;
+   mat->clearcoatRoughness = pkg.clearcoatRoughness;
+   mat->sheen = pkg.sheen;
+   for (int k = 0; k < 3; k++)
+      mat->sheenColor[k] = ColorSpace::LinearToSrgb(pkg.sheenColor[k]);
+   mat->sheenRoughness = pkg.sheenRoughness;
+   mat->iridescence = pkg.iridescence;
+   mat->iridescenceIor = pkg.iridescenceIor;
+   mat->iridescenceThickness = pkg.iridescenceThickness;
+   mat->anisotropy = pkg.anisotropy;
+   const float turns = pkg.anisotropyRotation / 6.2831853f;
+   mat->anisotropyRotation = turns - std::floor(turns);
+   mat->dispersion = std::min(pkg.dispersion / 20.0f, 1.0f); // file 20/Abbe -> Material 1/Abbe
+   mat->translucency = pkg.translucency;
+}
+
+void ApplyGltfUvTransform(MappingNode* mp, const GltfImport::GltfDecodePackage& tp)
+{
+   // KHR_texture_transform on glTF uv (v down) is uv' = offset + R(rot) S uv; on the flipped v the loader
+   // stores it is Mapping's R(rot) S uv + t with t = (sin r sy + ox, 1 - cos r sy - oy).
+   const float r = tp.uvRotation, sx = tp.uvScale[0], sy = tp.uvScale[1];
+   mp->scaleX = sx; mp->scaleY = sy;
+   mp->rotateZ = r * 57.2957795f;
+   mp->translateX = std::sin(r) * sy + tp.uvOffset[0];
+   mp->translateY = 1.0f - std::cos(r) * sy - tp.uvOffset[1];
+}
+
 // A glTF dropped anywhere: per material, a Model 3D showing that part, a
 // Material with the file's factors and one Image Source per map, wired. The
 // nodes stack in rows from (x, y). Returns each part's Material index. The
@@ -32,7 +81,21 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
       if (modelIndex == -1 || materialIndex == -1)
          break;
       std::string wireErr;
-      ConnectNodes(modelIndex, 0, materialIndex, 0, wireErr);
+      const GltfImport::GltfDecodePackage* tp = file != nullptr ? file->Part(n) : nullptr;
+      int mappingIndex = -1;
+      if (tp != nullptr && tp->hasUvTransform)
+         if (GraphNode* gn = SpawnNode("Mapping", "3D", x + 130.0f, y + 120.0f))
+         {
+            mappingIndex = gn->index;
+            ApplyGltfUvTransform(static_cast<MappingNode*>(gn->node.get()), *tp);
+         }
+      if (mappingIndex != -1)
+      {
+         ConnectNodes(modelIndex, 0, mappingIndex, 0, wireErr);
+         ConnectNodes(mappingIndex, 0, materialIndex, 0, wireErr);
+      }
+      else
+         ConnectNodes(modelIndex, 0, materialIndex, 0, wireErr);
       FindNodeByIndex(modelIndex)->showParams = parts == 1;
 
       float rowH = 200.0f;
@@ -40,20 +103,7 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
       if (pkg != nullptr)
       {
          auto* mat = static_cast<MaterialNode*>(FindNodeByIndex(materialIndex)->node.get());
-         // glTF factors are linear; the Material's colour controls hold sRGB.
-         for (int k = 0; k < 3; k++)
-            mat->color[k] = ColorSpace::LinearToSrgb(pkg->baseColor[k]);
-         mat->opacity = pkg->baseColor[3];
-         mat->metallic = pkg->metallicFactor;
-         mat->roughness = pkg->roughnessFactor;
-         mat->specular = pkg->specular;
-         const float* e = pkg->emissiveFactor;
-         if (e[0] > 0.0f || e[1] > 0.0f || e[2] > 0.0f)
-         {
-            for (int k = 0; k < 3; k++)
-               mat->emissionColor[k] = ColorSpace::LinearToSrgb(std::min(e[k], 1.0f));
-            mat->emission = 1.0f;
-         }
+         ApplyGltfMaterial(mat, *pkg);
 
          struct MapSlot
          {
@@ -68,6 +118,9 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
             { &pkg->normalMap, kMapNormal, "normal" },
             { &pkg->occlusion, kMapAmbientOcclusion, "ao" },
             { &pkg->emissive, kMapEmission, "emission" },
+            { &pkg->clearcoatMap, kMapClearcoat, "clearcoat" },
+            { &pkg->sheenMap, kMapSheen, "sheen" },
+            { &pkg->transmissionMap, kMapTransmission, "transmission" },
          };
          float texY = y;
          for (const MapSlot& m : maps)
