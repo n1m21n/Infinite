@@ -42,3 +42,17 @@
 - В файлах апстрима — только короткие «крючки» (вызов/include) с комментарием `// fork:`.
 - `AppShared.h` без крайней необходимости не трогаем (горячий файл, конфликты почти гарантированы).
 - Каждая правка файла апстрима заносится в таблицу выше — по ней разрешаются конфликты при синхронизации.
+
+## Infinite TU: отдельная программа рядом с официальным Infinite (2026-11-12)
+
+Все имена собраны в `src/core/ForkIdentity.h` (`// fork:` в местах использования). Что разделено:
+- exe: `InfiniteTU.exe` + `InfiniteTU.com` (CMake `OUTPUT_NAME`), ProductName/InternalName/OriginalFilename в `.rc.in`, заголовок окна «Infinite TU».
+- Данные/настройки/кэши/логи: `%APPDATA%\InfiniteTU` (macOS `~/Library/Application Support/InfiniteTU`, Linux `~/.config/InfiniteTU`), лицензионная папка тоже (`License.cpp`), `SettingsDirForVST3` (`PluginVST3.mm`).
+- Mutex одного экземпляра: `Local\InfiniteTU.SingleInstance`; AppUserModelID `InfiniteTU.Synthesizer`.
+- Порты: control 7777→7877, OSC 9100→9200, MCP 7790→7890 (`InfiniteCli` по умолчанию 7877).
+- Credential Manager/Keychain service: `InfiniteTU`.
+- Установщик `.iss`: новый AppId (GUID), `{localappdata}\Programs\InfiniteTU`, ярлыки «Infinite TU», `InfiniteTU-Setup-*.exe`; компонент VST3 удалён (иначе затёр бы плагины официальной версии в общей папке VST3).
+- macOS: bundle id `com.deriio.infinitetu`, bundle name «Infinite TU».
+- Проверка обновлений отключена (`UpdateCheck::Start`), иначе предложила бы заменить форк официальной сборкой.
+- CI (`build.yml`, Windows): пути `Infinite.exe/.com` → `InfiniteTU.*`; SignPath и так условный по секрету.
+- Не менялось (не проверено, что конфликтует): ассоциацию `.infinite` программа сама не регистрирует (только по кнопке в настройках, ключи `Infinite.Patch`); скрипты настройки агента (`%LOCALAPPDATA%\Infinite\node|bin`, путь `C:\Program Files\Infinite\Infinite.exe` в `CliSetup.cpp`) — общие с официальной, пока форк их не использует; MIDI/NDI-имена «Infinite».

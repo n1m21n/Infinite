@@ -22,7 +22,7 @@ namespace chat
       int maxSteps = 12;     // model calls per turn
    };
 
-   constexpr const char* kKeyService = "Infinite";
+   constexpr const char* kKeyService = "InfiniteTU"  /* fork: */;
    constexpr const char* kKeyAccount = "custom-agent";
    // The key and where it came from ("Keychain", "$NAME", or "" = none: fine for Ollama).
    // `askShell` = also try the login shell (slow, worker threads only; never from the UI thread).

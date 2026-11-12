@@ -65,7 +65,7 @@ namespace
    constexpr int kExitFail = 1;
    constexpr int kExitUsage = 2;
    constexpr int kExitNoApp = 7;
-   constexpr int kDefaultPort = 7777;
+   constexpr int kDefaultPort = 7877;  // fork: official 7777
 
    struct Failure
    {

@@ -1247,6 +1247,8 @@ add_executable(Infinite ${COMMON_SOURCES})
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
 # User-Agent header, etc.).
 target_compile_definitions(Infinite PRIVATE INFINITE_VERSION_STRING="${INFINITE_VERSION}")
+# fork: the executable is InfiniteTU(.exe) so it installs beside the official Infinite.
+set_target_properties(Infinite PROPERTIES OUTPUT_NAME InfiniteTU)
 # Plugin licence (src/core/License.h): the engine reads only the key's id, for the refund check.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/worker/license/PUBLIC_KEY.txt" INFINITE_LICENSE_PUBKEY_HEX)
 string(STRIP "${INFINITE_LICENSE_PUBKEY_HEX}" INFINITE_LICENSE_PUBKEY_HEX)
@@ -1438,7 +1440,7 @@ if(WIN32)
     add_executable(infinite-cli src/cli_main_win.cpp)
     target_compile_definitions(infinite-cli PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
     set_target_properties(infinite-cli PROPERTIES
-        OUTPUT_NAME Infinite
+        OUTPUT_NAME InfiniteTU  # fork:
         SUFFIX ".com"
         PDB_NAME infinite-cli)
     add_dependencies(Infinite infinite-cli)
@@ -1882,8 +1884,8 @@ if(APPLE)
 
     set_target_properties(Infinite PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "Infinite"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "com.namansoni.infinite"
+        MACOSX_BUNDLE_BUNDLE_NAME "Infinite TU"  # fork:
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.deriio.infinitetu"  # fork:
         MACOSX_BUNDLE_BUNDLE_VERSION "${INFINITE_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${INFINITE_VERSION}"
         MACOSX_BUNDLE_ICON_FILE "Infinite"

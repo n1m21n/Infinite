@@ -19,6 +19,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include "core/ForkIdentity.h"
 
 #if defined(_WIN32)
    #ifndef NOMINMAX
@@ -47,7 +48,7 @@ namespace SingleInstance
 #if defined(_WIN32)
       // One named mutex per user session; Windows releases it when we exit.
       static HANDLE sMutex = nullptr;
-      sMutex = CreateMutexW(nullptr, FALSE, L"Local\\Infinite.SingleInstance");
+      sMutex = CreateMutexW(nullptr, FALSE, ForkIdentity::kMutexName  /* fork: */);
       if (sMutex == nullptr)
          return true;
       return GetLastError() != ERROR_ALREADY_EXISTS;

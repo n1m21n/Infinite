@@ -214,7 +214,7 @@ jobs:
         if: matrix.arch == 'x64'
         shell: bash
         timeout-minutes: 10
-        run: ./.github/scripts/headless-tests.sh build/Release/Infinite.exe
+        run: ./.github/scripts/headless-tests.sh build/Release/InfiniteTU.exe
 
       # R489: Infinite.exe is GUI-subsystem, so a shell does not wait for it and
       # never sees its exit code. Infinite.com is the console-subsystem launcher
@@ -226,7 +226,7 @@ jobs:
         if: matrix.arch == 'x64'
         shell: pwsh
         run: |
-          $com = (Resolve-Path "build/Release/Infinite.com").Path
+          $com = (Resolve-Path "build/Release/InfiniteTU.com").Path
           $tmp = $env:RUNNER_TEMP
           $fail = $false
           function Check($name, $ok) {
@@ -243,7 +243,7 @@ jobs:
           Set-Content -Path "$tmp\shim.cmd" -Encoding ascii -Value @(
             "@echo off",
             "cd /d build\Release",
-            "Infinite --frame $tmp\p.inf abc $tmp\x.png > $tmp\cmd.json",
+            "InfiniteTU --frame $tmp\p.inf abc $tmp\x.png > $tmp\cmd.json",
             "echo %errorlevel% > $tmp\cmd.code")  # the space matters: "2>" would be a stderr redirect
           cmd /c "$tmp\shim.cmd"
           Check "cmd: bare 'Infinite' resolves to Infinite.com and waits (exit 2)" ((Get-Content "$tmp/cmd.code").Trim() -eq "2")
@@ -259,7 +259,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 2
         shell: bash
-        run: scripts/headless_smoke.sh build/Release/Infinite.com
+        run: scripts/headless_smoke.sh build/Release/InfiniteTU.com
 
       # Informational for the same reason: the hosted Windows runner has no
       # GPU, so a window-creation failure is expected and is not a defect.
@@ -268,7 +268,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 2
         shell: bash
-        run: python3 tools/render-check.py --binary build/Release/Infinite.exe
+        run: python3 tools/render-check.py --binary build/Release/InfiniteTU.exe
 
       # The exe is handed to people as a single portable file, so it must not
       # import the Visual C++ redistributable's CRT - a /MD build dies at
@@ -280,7 +280,7 @@ jobs:
       - name: Assert no Visual C++ redistributable dependency
         shell: pwsh
         run: |
-          $exes = @("build/Release/Infinite.exe", "build/Release/Infinite.com", "build/Release/infinite-vst3-scanner.exe")
+          $exes = @("build/Release/InfiniteTU.exe", "build/Release/InfiniteTU.com", "build/Release/infinite-vst3-scanner.exe")
           foreach ($exe in $exes) {
             $bytes = [System.IO.File]::ReadAllBytes($exe)
             $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
@@ -308,7 +308,7 @@ jobs:
           done
           curl -fsSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip
           mkdir -p pluginval && unzip -o -q pluginval.zip -d pluginval
-          PLUGINVAL="$PWD/pluginval/pluginval.exe" INFINITE_PLUGIN_ENGINE="$PWD/build/Release/Infinite.exe" \
+          PLUGINVAL="$PWD/pluginval/pluginval.exe" INFINITE_PLUGIN_ENGINE="$PWD/build/Release/InfiniteTU.exe" \
             LOGDIR="$PWD/plugin-logs" tools/plugin/validate.sh --build build-plugin --strictness 10 --licensed
 
       - name: Upload plugin logs
@@ -325,9 +325,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist/Infinite/assets/models
-          cp build/Release/Infinite.exe dist/Infinite/
+          cp build/Release/InfiniteTU.exe dist/Infinite/
           cp build/Release/infinite-vst3-scanner.exe dist/Infinite/
-          cp build/Release/Infinite.com dist/Infinite/
+          cp build/Release/InfiniteTU.com dist/Infinite/
           # onnxruntime.dll + DirectML.dll (Platform::SubjectMask's backend)
           # and the bundled u2netp model - CMakeLists.txt's POST_BUILD step
           # already staged these next to the exe in the build tree.

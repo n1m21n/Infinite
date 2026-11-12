@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "core/McpHttp.h"
+#include "core/ForkIdentity.h"
 #include "plugin/engine/HostAudio.h"
 #include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
@@ -1186,7 +1187,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    mainWindowHints.scaleToMonitor = gHeadlessTestWindow ? GLFW_FALSE : GLFW_TRUE;
    if (LauncherCard::Enabled())
       glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-   window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
+   window = glfwCreateWindow(1600, 1000, "Infinite TU"  /* fork: */, nullptr, nullptr);
    if (!window)
    {
       if (pluginNoGraphics("no OpenGL 3.3 window"))
@@ -1711,7 +1712,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // screenshot run (INFINITE_SHOT_REQUEST), which is driven over this port.
    if (!IsHeadlessProcess() || getenv("INFINITE_SHOT_REQUEST") != nullptr)
    {
-      int controlPort = 7777;
+      int controlPort = ForkIdentity::kControlPort;  // fork:
       if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
          controlPort = atoi(portEnv);
       RemoteControl::Start(controlPort);
@@ -1719,7 +1720,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
       // The OSC control API (core/OscControl.h): loopback UDP, port 9100,
       // INFINITE_OSC_PORT to move it, 0 to turn it off.
-      int oscPort = 9100;
+      int oscPort = ForkIdentity::kOscPort;  // fork:
       if (const char* oscEnv = getenv("INFINITE_OSC_PORT"))
          oscPort = atoi(oscEnv);
       if (oscPort > 0)

@@ -1,4 +1,5 @@
 #include "McpHttp.h"
+#include "core/ForkIdentity.h"
 
 #include "McpAgentDoc.h"
 #include "RemoteControl.h"
@@ -368,11 +369,11 @@ namespace McpHttp
       if (j.is_object())
       {
          s.enabled = j.value("enabled", false);
-         s.port = j.value("port", 7790);
+         s.port = j.value("port", ForkIdentity::kMcpPort);
          s.token = j.value("token", std::string());
       }
       if (s.port < 1024 || s.port > 65535)
-         s.port = 7790;
+         s.port = ForkIdentity::kMcpPort;
       if (s.token.size() < 16)
          s.token = NewToken();
       return s;

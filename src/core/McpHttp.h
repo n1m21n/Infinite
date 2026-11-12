@@ -12,7 +12,7 @@ namespace McpHttp
    struct Settings
    {
       bool enabled = false;
-      int port = 7790;
+      int port = 7890;  // fork: official 7790
       std::string token;   // 32 hex chars, made on first use; shown to the user, kept in <AppSupport>/mcp-http.json
    };
    Settings Load();                       // creates the token when missing (does not write)
