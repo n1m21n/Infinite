@@ -167,7 +167,8 @@ def material_lines(m, sheen=True):
         "  f ior %g" % m.get("ior", 1.5), "  f transmission %g" % trans,
         "  f transmissionRoughness %g" % trough,
         "  f clearcoat %g" % m.get("coat", 0.0), "  f clearcoatRoughness %g" % m.get("coat_roughness", 0.03),
-        ] + (["  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5)] if sheen else []) + [
+        ] + (["  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5),
+                         "  f sheenDirection %g" % m.get("sheen_direction", 0.0)] if sheen else []) + [
         "  f specular 0.5",
         "  c emissionColor %g %g %g" % tuple(srgb(m.get("emission", (0, 0, 0)))),
         "  f emission %g" % m.get("emission_strength", 0.0)] + [

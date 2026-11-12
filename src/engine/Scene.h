@@ -42,7 +42,7 @@ namespace engine
       int wrap = 0;              // 0 clamp, 1 repeat, 2 mirror (Material's wrapMode)
       float normalStrength = 1.0f;
       int normalBump = 0;
-      float sheen = 0.0f, sheenColor[3] = { 1.0f, 1.0f, 1.0f }, sheenRoughness = 0.5f; // sheenColor as GL uses it (raw)
+      float sheen = 0.0f, sheenColor[3] = { 1.0f, 1.0f, 1.0f }, sheenRoughness = 0.5f, sheenDir = 0.0f; // sheenColor as GL uses it (raw)
       // The rest of the Material's maps (red channel multiplies the value; emission is sRGB and multiplies the colour),
       // as GL reads them. Detail: the normal map read again at uv * detailScale (0 = off), blended over the first.
       int mapAo = -1, mapEmission = -1, mapSheen = -1, mapOpacity = -1, mapClearcoat = -1, mapTransmission = -1;

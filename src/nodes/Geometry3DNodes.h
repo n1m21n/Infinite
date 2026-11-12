@@ -61,6 +61,9 @@ struct Material
    float sheen = 0.0f;
    float sheenColor[3] = { 1.0f, 1.0f, 1.0f };
    float sheenRoughness = 0.5f;
+   // Row 5.1: the nap's lean along the uv tangent, -1..1 (0 = isotropic): brushed one way catches the light, the other way
+   // goes dark, as velvet and suede do.
+   float sheenDirection = 0.0f;
 
    // Optical thin-film interference / iridescence (soap bubble / oil slick / pearl)
    float iridescence = 0.0f;
@@ -510,6 +513,7 @@ public:
    float sheen = 0.0f;
    float sheenColor[3] = { 1.0f, 1.0f, 1.0f };
    float sheenRoughness = 0.5f;
+   float sheenDirection = 0.0f;
    float iridescence = 0.0f;
    float iridescenceIor = 1.33f;
    float iridescenceThickness = 400.0f;
@@ -547,7 +551,7 @@ public:
       v.Float("subsurface", subsurface); v.Color("subsurfaceColor", subsurfaceColor);
       v.Float("subsurfaceRadius", subsurfaceRadius);
       v.Float("sheen", sheen); v.Color("sheenColor", sheenColor);
-      v.Float("sheenRoughness", sheenRoughness);
+      v.Float("sheenRoughness", sheenRoughness); v.Float("sheenDirection", sheenDirection);
       v.Float("iridescence", iridescence); v.Float("iridescenceIor", iridescenceIor);
       v.Float("iridescenceThickness", iridescenceThickness);
       v.Float("anisotropy", anisotropy); v.Float("anisotropyRotation", anisotropyRotation);

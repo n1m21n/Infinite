@@ -84,6 +84,7 @@ Material MaterialNode::GetMaterial() const
    m.sheenColor[1] = sheenColor[1];
    m.sheenColor[2] = sheenColor[2];
    m.sheenRoughness = sheenRoughness;
+   m.sheenDirection = sheenDirection;
    m.iridescence = iridescence;
    m.iridescenceIor = iridescenceIor;
    m.iridescenceThickness = iridescenceThickness;

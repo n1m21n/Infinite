@@ -642,6 +642,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    float3 mb = mapBase(mx, in.uv, in.lp);
    const float3 mbx = dfdx(mb), mby = dfdy(mb);
    const float3 dp1 = dfdx(in.wp), dp2 = dfdy(in.wp);
+   const float2 shDu1 = dfdx(in.uv), shDu2 = dfdy(in.uv);
    const float3 dnx = dfdx(in.n), dny = dfdy(in.n);
    const float3 nP = n; // the projection's normal (triplanar weights, dominant plane)
    // Row 4.2: a bump map on uv marches the view ray through its relief; every map then reads at the hit.
@@ -747,7 +748,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    }
 #endif
    const float nDotV = max(dot(n, viewDir), 1e-4);
-   const float shEv = shMax > 0.0 ? sheenE(nDotV, m.mat.sheenRoughness) : 0.0;
+   float3 shN = n; // row 5.1: the sheen lobe leans along the mesh-uv tangent (screen-derivative frame, as the normal map's)
+   if (m.mat.sheenDir != 0.0) shN = sheenTilt(n, cross(dp2, n) * shDu1.x + cross(n, dp1) * shDu2.x, m.mat.sheenDir);
+   const float shNV = max(dot(shN, viewDir), 1e-4);
+   const float shEv = shMax > 0.0 ? sheenE(shNV, m.mat.sheenRoughness) : 0.0;
    const float shV = 1.0 - shMax * shEv;          // the base layer's share under the sheen
    const float3 shAmb = float3(m.mat.sheenColor) * (shW * shEv); // the sheen's own share of ambient light
    const float3 f0 = mix(float3(0.04 + m.mat.f0Extra), base, metal); // GL's dielectric F0 from ior and specular
@@ -884,7 +888,8 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       float shK = 1.0;
       if (shW > 0.0) // sheen: Cycles' microfiber lobe, over a base scaled by its albedo
       {
-         shS = float3(m.mat.sheenColor) * sheenLtc(nDotL, nDotV, dot(lightDir, viewDir), m.mat.sheenRoughness) * shW;
+         const float shL = m.mat.sheenDir != 0.0 ? max(dot(shN, lightDir), 0.0) : nDotL;
+         shS = float3(m.mat.sheenColor) * sheenLtc(shL, shNV, dot(lightDir, viewDir), m.mat.sheenRoughness) * shW * (m.mat.sheenDir != 0.0 ? shL / max(nDotL, 1e-4) : 1.0);
          shK = shV; // Cycles scales the base by the sheen albedo at the view angle only
       }
       // Diffuse: the Lambert share, the subsurface wrap (unshadowed past the terminator, where a shadow ray from the
@@ -1651,7 +1656,19 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
 #endif
       }
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
-      const float shMax = shW * maxc(float3(I.mat.sheenColor)), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(nDotV, I.mat.sheenRoughness) : 1.0;
+      float3 shN = n; // row 5.1: the sheen lobe leans along the triangle's mesh-uv tangent
+      if (shW > 0.0 && I.mat.sheenDir != 0.0 && I.uvb != 0)
+      {
+         const device float* uvs = reinterpret_cast<const device float*>(I.uvb);
+         const float2 u0 = float2(uvs[ix.x * 2], uvs[ix.x * 2 + 1]);
+         const float2 d1 = float2(uvs[ix.y * 2], uvs[ix.y * 2 + 1]) - u0, d2 = float2(uvs[ix.z * 2], uvs[ix.z * 2 + 1]) - u0;
+         const float3 a0 = float3(vb[ix.x * 6], vb[ix.x * 6 + 1], vb[ix.x * 6 + 2]);
+         const float3 e1 = float3(vb[ix.y * 6], vb[ix.y * 6 + 1], vb[ix.y * 6 + 2]) - a0, e2 = float3(vb[ix.z * 6], vb[ix.z * 6 + 1], vb[ix.z * 6 + 2]) - a0;
+         const float det = d1.x * d2.y - d2.x * d1.y;
+         if (abs(det) > 1e-12) shN = sheenTilt(n, (I.normalM * float4((e1 * d2.y - e2 * d1.y) / det, 0.0)).xyz, I.mat.sheenDir);
+      }
+      const float shNV = max(dot(shN, V), 1e-4);
+      const float shMax = shW * maxc(float3(I.mat.sheenColor)), shV = shMax > 0.0 ? 1.0 - shMax * sheenE(shNV, I.mat.sheenRoughness) : 1.0;
       const float3 f0 = mix(float3(0.04 + I.mat.f0Extra), base, metal);
       const float3 msK = ptMs(f0, rough, nDotV, eLut) * iridGain(I.mat.iridescence, I.mat.iridIor, I.mat.iridThickness, nDotV, f0);
       // Subsurface and translucency (C9) take the diffuse share by chance: mode 1 walks the volume, mode 2 passes the
@@ -1718,7 +1735,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             fe *= 1.0 - ccW * cF;
             if (shW > 0.0)
                fe = fe * shV
-                  + float3(I.mat.sheenColor) * sheenLtc(nL, nDotV, dot(ld, V), I.mat.sheenRoughness) * shW * nL * lterms.y;
+                  + float3(I.mat.sheenColor) * (I.mat.sheenDir != 0.0 ? sheenLtc(max(dot(shN, ld), 0.0), shNV, dot(ld, V), I.mat.sheenRoughness) * max(dot(shN, ld), 0.0) : sheenLtc(nL, nDotV, dot(ld, V), I.mat.sheenRoughness) * nL) * shW * lterms.y;
             if (ccW > 0.0) fe += ccW * coatSpec(nH, nDotV, max(nL, 1e-4), vH, clamp(I.mat.coatRoughness, 0.02, 1.0)) * nL * lterms.y;
          }
          L += T * fe * Le * (pL > 0.0 ? pL / max(pL * pL + pB * pB, 1e-20) : 1.0); // emitters: power-heuristic MIS
@@ -1738,7 +1755,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             float pB = 0.0;
             float3 fe = dm == 2 ? ptEvalT(n, V, ed, base, metal, rough, f0, float2(1.0), msK, pB) : ptEval(n, V, ed, base, metal, rough, f0, float2(1.0), msK, pB);
             const float nLe = max(eL, 0.0);
-            if (shW > 0.0) fe = fe * shV + float3(I.mat.sheenColor) * sheenLtc(nLe, nDotV, dot(ed, V), I.mat.sheenRoughness) * shW * nLe;
+            if (shW > 0.0) fe = fe * shV + float3(I.mat.sheenColor) * (I.mat.sheenDir != 0.0 ? sheenLtc(max(dot(shN, ed), 0.0), shNV, dot(ed, V), I.mat.sheenRoughness) * max(dot(shN, ed), 0.0) : sheenLtc(nLe, nDotV, dot(ed, V), I.mat.sheenRoughness) * nLe) * shW;
             fe *= mix(float3(1.0), f.ambient.xyz * 3.0, clamp((1.0 - ptProbs(f0, metal, nDotV).x) * abs(eL) / 3.14159265 / max(pB, 1e-6), 0.0, 1.0));
             float pBm = pB;
             if (ccW > 0.0)
@@ -1894,7 +1911,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          {
             const float nL = max(dot(n, nd), 0.0);
             fB = fB * shV
-               + float3(I.mat.sheenColor) * sheenLtc(nL, nDotV, dot(nd, V), I.mat.sheenRoughness) * shW * nL;
+               + float3(I.mat.sheenColor) * (I.mat.sheenDir != 0.0 ? sheenLtc(max(dot(shN, nd), 0.0), shNV, dot(nd, V), I.mat.sheenRoughness) * max(dot(shN, nd), 0.0) : sheenLtc(nL, nDotV, dot(nd, V), I.mat.sheenRoughness) * nL) * shW;
          }
          T *= fB / pdfB;
          lastPdfB = pC * pdfC + (1.0 - pC) * pdfB;
@@ -2162,7 +2179,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    // The material record (Render3DMaterial.h) as the shader's InstU / RInst carry it.
    struct InstU { float model[16], normalM[16]; R3dMatH mat; };
    struct RInstH { uint64_t vb, ib, uvb, wr; float normalM[16]; R3dMatH mat; };
-   static_assert(sizeof(InstU) == 480 && sizeof(RInstH) == 448, "InstU / RInst layout as the shader's");
+   static_assert(sizeof(InstU) == 496 && sizeof(RInstH) == 464, "InstU / RInst layout as the shader's");
    void Lin3x(const float* c, float* o) { for (int i = 0; i < 3; i++) o[i] = ToLin(c[i]); }
    // The surface the GI and reflection rays see: base, metal, roughness, ior, emission (no maps, sheen or hair).
    void FillMatRays(const engine::Instance& in, R3dMatH& m)
@@ -2183,7 +2200,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       m.mapMetallic = (float)(in.mapMetallic + 1); m.mapNormal = (float)(in.mapNormal + 1);
       m.mapAo = (float)(in.mapAo + 1); m.mapEmission = (float)(in.mapEmission + 1); m.mapSheen = (float)(in.mapSheen + 1);
       m.mapOpacity = (float)(in.mapOpacity + 1); m.mapCoat = (float)(in.mapClearcoat + 1); m.mapTransmission = (float)(in.mapTransmission + 1);
-      m.sheen = in.sheen; m.sheenRoughness = in.sheenRoughness; std::memcpy(m.sheenColor, in.sheenColor, 12);
+      m.sheen = in.sheen; m.sheenRoughness = in.sheenRoughness; m.sheenDir = in.sheenDir; std::memcpy(m.sheenColor, in.sheenColor, 12);
       m.normalStrength = in.normalStrength; m.wrapBump = (float)((in.wrap & 3) + (in.normalBump ? 4 : 0));
       m.mapSpace = (float)in.mapSpace; m.triplanar = in.triplanar; m.alphaCutoff = in.alphaCutoff;
       m.clear = 1.0f - std::min(std::max(in.opacity, 0.0f), 1.0f);

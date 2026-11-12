@@ -308,6 +308,16 @@ def _sketch3d_two_tone():
                                      "material": {"split": [[0.6, 0.08, 0.05], [0.05, 0.2, 0.5], 1.0]}}]}
 
 
+def _suede_dir():
+    # Row 5.1: two suede planes, nap leaning +u (+X) and -u, backlit by a low sun from +X with the camera at -X: the nap
+    # leaning toward the light catches more sheen. Gate: the planes' brightness ratio vs Cycles' within 20 %.
+    m = {"base_color": [0.03, 0.015, 0.02], "roughness": 0.9, "sheen": 1.0, "sheen_roughness": 0.3}
+    return {"size": SMALL, "camera": {"fov": 40, "azimuth": 180, "elevation": 30, "distance": 5.5, "target": [0, 0, 0]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 0, "elevation": 15}], "world": {"color": [0.15, 0.15, 0.15]},
+            "objects": [{"shape": "plane", "scale": [1.4, 0.9, 1], "location": [0, y, 0], "material": dict(m, sheen_direction=d)}
+                        for y, d in ((-0.95, 1.0), (0.95, -1.0))]}
+
+
 RECIPES = ("Leather", "Suede", "Rubber", "Knit Fabric", "Carpet", "Brushed Metal", "Concrete", "Painted Wood")
 
 
@@ -414,6 +424,7 @@ CASES.update({
     "wear_masks": _wear_masks(),
     "wear_groove": _wear_groove(),
     "sketch3d_two_tone": _sketch3d_two_tone(),
+    "suede_dir": _suede_dir(),
     "recipes_near": _recipes(3.6),
     "recipes_far": _recipes(16.0),
     # Motion: a camera orbit, a fast object with motion blur, and a still shot scored for flicker.

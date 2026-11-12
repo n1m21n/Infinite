@@ -498,6 +498,7 @@ namespace
       "uniform float uSheen;\n"
       "uniform vec3 uSheenColor;\n"
       "uniform float uSheenRoughness;\n"
+      "uniform float uSheenDir;\n"   // row 5.1
       "uniform float uIridescence;\n"
       "uniform float uIridescenceIor;\n"
       "uniform float uIridescenceThickness;\n"
@@ -1168,8 +1169,11 @@ namespace
       "#endif\n"
       "\n"
       "   float nDotV = max(dot(n, viewDir), 1e-4);\n"
+      "   vec3 shN = n;\n"   // row 5.1: the sheen lobe leans along the uv tangent
+      "   if (uSheenDir != 0.0) { vec3 shT, shB; getCotangentFrame(n, vWorldPos, vUv, shT, shB); shN = sheenTilt(n, shT, uSheenDir); }\n"
+      "   float shNV = max(dot(shN, viewDir), 1e-4);\n"
       "   float shMax = sh * max(uSheenColor.r, max(uSheenColor.g, uSheenColor.b));\n"
-      "   float shEv = shMax > 0.0 ? sheenE(nDotV, uSheenRoughness) : 0.0;\n"
+      "   float shEv = shMax > 0.0 ? sheenE(shNV, uSheenRoughness) : 0.0;\n"
       "   float shBase = 1.0 - shMax * shEv;\n"
       "   float iorF0 = pow((uIor - 1.0) / (uIor + 1.0), 2.0);\n"
       "   vec3 dielectricF0 = vec3(clamp(iorF0 * 2.0 * uSpecular, 0.0, 1.0));\n"
@@ -1317,7 +1321,8 @@ namespace
       "      float shK = 1.0;\n"
       "      if (sh > 0.0) {\n"
       "         shK = shBase;\n"  // Cycles scales the base by the sheen albedo at the view angle only
-      "         sheenSpec = uSheenColor * sh * sheenLtc(nDotL, nDotV, dot(lightDir, viewDir), uSheenRoughness);\n"
+      "         float shL = uSheenDir != 0.0 ? max(dot(shN, lightDir), 0.0) : nDotL;\n"
+      "         sheenSpec = uSheenColor * sh * sheenLtc(shL, shNV, dot(lightDir, viewDir), uSheenRoughness) * (uSheenDir != 0.0 ? shL / max(nDotL, 1e-4) : 1.0);\n"
       "      }\n"
       "\n"
       "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * ccAtten;\n"
@@ -1562,6 +1567,7 @@ Material GeometryNode::GetMaterial() const
    m.sheenColor[1] = sheenColor[1];
    m.sheenColor[2] = sheenColor[2];
    m.sheenRoughness = sheenRoughness;
+   m.sheenDirection = sheenDirection;
    m.iridescence = iridescence;
    m.iridescenceIor = iridescenceIor;
    m.iridescenceThickness = iridescenceThickness;
@@ -3436,6 +3442,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
       glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uSheenDir"), material.sheenDirection);
       SetHairUniforms(mProgram, material);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);
@@ -3881,6 +3888,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
       glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
       glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      glUniform1f(glGetUniformLocation(mProgram, "uSheenDir"), material.sheenDirection);
       SetHairUniforms(mProgram, material);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
       glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);

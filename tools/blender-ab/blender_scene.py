@@ -418,6 +418,19 @@ for i, o in enumerate(scene["objects"]):
     p.inputs["Coat Roughness"].default_value = m.get("coat_roughness", 0.03)
     p.inputs["Sheen Weight"].default_value = m.get("sheen", 0.0)
     p.inputs["Sheen Roughness"].default_value = m.get("sheen_roughness", 0.5)
+    if m.get("sheen_direction"):   # row 5.1 truth: a separate Sheen BSDF whose normal leans toward the uv tangent (+X on a
+        # Blender plane), added over the Principled with its own sheen off; the base dims by Infinite's 1 - sheen E, kept dark
+        nt = mat.node_tree; dd = m["sheen_direction"]
+        p.inputs["Sheen Weight"].default_value = 0.0
+        sh = nt.nodes.new("ShaderNodeBsdfSheen"); sh.distribution = 'MICROFIBER'
+        sh.inputs["Color"].default_value = (m.get("sheen", 0.0),) * 3 + (1.0,)
+        sh.inputs["Roughness"].default_value = m.get("sheen_roughness", 0.5)
+        k = (1 + dd * dd) ** -0.5
+        cx = nt.nodes.new("ShaderNodeCombineXYZ")   # an unlinked Normal socket's value is ignored, so feed it
+        cx.inputs[0].default_value, cx.inputs[1].default_value, cx.inputs[2].default_value = dd * k, 0.0, k
+        nt.links.new(cx.outputs[0], sh.inputs["Normal"])
+        ad = nt.nodes.new("ShaderNodeAddShader"); mo = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+        nt.links.new(p.outputs[0], ad.inputs[0]); nt.links.new(sh.outputs[0], ad.inputs[1]); nt.links.new(ad.outputs[0], mo.inputs[0])
     p.inputs["Emission Color"].default_value = (*m.get("emission", (0, 0, 0)), 1)
     p.inputs["Emission Strength"].default_value = m.get("emission_strength", 0.0)
     p.inputs["Alpha"].default_value = m.get("alpha", 1.0)

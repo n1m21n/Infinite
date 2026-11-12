@@ -871,6 +871,7 @@ namespace app
       ImGui::BeginDisabled(!(n->sheen > 0.0f || n->MapInput(kMapSheen).IsConnected()));
       ColorSwatch("sheen tint", n->sheenColor, n);
       ModSlider("sheen roughness", &n->sheenRoughness, 0.01f, 1.0f, "%.3f", colW);
+      ModSlider("sheen direction", &n->sheenDirection, -1.0f, 1.0f, "%.2f", colW);
       ImGui::EndDisabled();
 
       NodeSeparator("optics", colW);

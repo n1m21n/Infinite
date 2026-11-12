@@ -373,6 +373,7 @@ public:
    float sheen = 0.0f;
    float sheenColor[3] = { 1.0f, 1.0f, 1.0f };
    float sheenRoughness = 0.5f;
+   float sheenDirection = 0.0f; // row 5.1: nap lean along the uv tangent, -1..1
    float iridescence = 0.0f;
    float iridescenceIor = 1.33f;
    float iridescenceThickness = 400.0f;
@@ -416,7 +417,7 @@ public:
       v.Float("subsurfaceRadius", subsurfaceRadius);
       v.Float("translucency", translucency);
       v.Float("sheen", sheen); v.Color("sheenColor", sheenColor);
-      v.Float("sheenRoughness", sheenRoughness);
+      v.Float("sheenRoughness", sheenRoughness); v.Float("sheenDirection", sheenDirection);
       v.Float("iridescence", iridescence); v.Float("iridescenceIor", iridescenceIor);
       v.Float("iridescenceThickness", iridescenceThickness);
       v.Float("anisotropy", anisotropy); v.Float("anisotropyRotation", anisotropyRotation);
