@@ -33,7 +33,7 @@ button, select, input { font: inherit; letter-spacing: inherit; color: inherit; 
 button { border: 0; background: none; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
-.mono, .folio, .readout, output, .pop-title, .load, .patch-meta, .patch h2 {
+.mono, .folio, .readout, output, .pop-title, .load, .loader-step, .loader-meta, .patch-meta, .patch h2 {
   font: var(--type-micro-mono); letter-spacing: var(--track-micro-mono);
 }
 .folio, .pop-title, .patch h2 { letter-spacing: var(--track-folio-mono-caps); text-transform: uppercase; color: var(--ink-2); margin: 0; }
@@ -244,6 +244,45 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bo
   font: var(--type-micro-mono); white-space: pre-wrap; word-break: break-word;
 }
 .patch .btn-secondary { align-self: flex-start; }
+
+/* ---------- loading screen ---------- */
+
+.loader {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 62%, color-mix(in srgb, var(--signal) 14%, transparent), transparent 70%),
+    linear-gradient(var(--deep), var(--ground));
+  transition: opacity 900ms var(--ease-out), visibility 0s linear 900ms;
+}
+.loader.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+.loader-inner { display: grid; justify-items: center; gap: var(--space-4); padding: var(--space-5); text-align: center; }
+.loader-inner img { opacity: 0.9; }
+.loader-title { margin: 0; font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); }
+.loader-keys { display: flex; align-items: flex-end; gap: 5px; height: 56px; margin: var(--space-3) 0 var(--space-2); }
+.loader-keys span {
+  width: 6px; height: 10px; border-radius: 2px;
+  background: var(--ink-3); opacity: 0.3;
+  transition: height 520ms var(--spring-soft, var(--ease-out)), opacity 320ms var(--ease-out), background 320ms var(--ease-out);
+}
+.loader-keys span.on { height: var(--h, 28px); opacity: 1; background: var(--signal); }
+.loader-keys span.lead { animation: loader-breathe 1.1s ease-in-out infinite alternate; }
+@keyframes loader-breathe { to { opacity: 0.45; } }
+.loader-step { margin: 0; color: var(--ink-2); min-height: 1.5em; }
+.loader-meta { margin: 0; color: var(--ink-3); }
+
+/* ---------- underwater wash ---------- */
+
+.tint {
+  position: fixed; inset: 0; z-index: 5; pointer-events: none;
+  --uw: 0; opacity: var(--uw);
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(2, 24, 40, 0.55) 100%),
+    rgba(18, 90, 120, 0.16);
+}
+.row-volume { margin-top: var(--space-3); }
+.row-volume input { width: 100%; }
+#btn-dive[hidden] { display: none; }
 
 /* ---------- hidden controls ---------- */
 

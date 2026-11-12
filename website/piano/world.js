@@ -23,7 +23,15 @@ const EYE = 1.65;           // eye height, metres
 const LAKE = { x: 0, z: -48 };
 const HOME = { x: 0, z: 12 };
 const WALK_LIMIT = 120;
+const MIN_H = -4;           // the lake floor is walkable: wade, swim, dive
+const WADE_MAX = 0.9;       // click-to-walk reaches the shallows only
 const LAYER_DETAIL = 1;     // small things the lake does not need to mirror
+
+// what the lake looks like from below, per sky
+const UNDERWATER = {
+  midnight: { fog: 0x0a3046, density: 0.07, ceiling: 0x14506b },
+  sunset: { fog: 0x1f6070, density: 0.052, ceiling: 0x3f93a3 }
+};
 
 const MODES = {
   midnight: {
@@ -106,6 +114,13 @@ export class NocturneWorld {
     this.base = { x: HOME.x, z: HOME.z };   // where the idle drift circles
     this.ray = new THREE.Raycaster();
     this.glideT = 0;
+    this.diveWant = false;   // wants to be under the surface
+    this.dive = 0;           // 0 at the surface .. 1 fully down
+    this.uw = 0;             // smoothed underwater look
+    this.under = false;
+    this.immersion = { depth: 0, swim: 0, under: false, uw: 0, dive: false, moving: false, run: false };
+    this._fog = new THREE.Color();
+    this._uwFog = new THREE.Color();
 
     this.uniforms = {
       uTime: { value: 0 },
@@ -236,6 +251,7 @@ export class NocturneWorld {
 
     this._buildTerrain();
     this._buildWater();
+    this._buildUnderside();
     this._buildTrees();
     this._buildScatter();
     this._buildGrass();
@@ -310,6 +326,18 @@ export class NocturneWorld {
   }
 
   /* ---------- water ---------- */
+
+  /** The surface seen from below: a bright ceiling instead of the mirror. */
+  _buildUnderside() {
+    this.ceiling = new THREE.Mesh(
+      new THREE.PlaneGeometry(3000, 3000).rotateX(Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: UNDERWATER.midnight.ceiling, transparent: true, opacity: 0.8, fog: false, depthWrite: false })
+    );
+    this.ceiling.position.y = 0.002;
+    this.ceiling.visible = false;
+    this.scene.add(this.ceiling);
+    this.uwBackground = new THREE.Color(UNDERWATER.midnight.fog);
+  }
 
   _buildWater() {
     this.water = new Water(new THREE.PlaneGeometry(3000, 3000), {
@@ -728,7 +756,7 @@ export class NocturneWorld {
     const el = (0.5 - c.sunUV[1]) * Math.PI;
     const want = Math.atan2(-1, 0.28);
     const rot = az - want;
-    this.scene.background = this.tex.sky[mode];
+    this.scene.background = this.under ? this.uwBackground : this.tex.sky[mode];
     this.scene.environment = this.env[mode];
     this.scene.backgroundRotation.set(0, rot, 0);
     this.scene.environmentRotation.set(0, rot, 0);
@@ -785,6 +813,14 @@ export class NocturneWorld {
 
   onInteract(cb) { this.interactCb = cb; }
 
+  /** Go under (true) or come up (false). Only works where the water is deep enough. */
+  setDive(on) {
+    if (on && this.immersion.swim < 0.5) return;
+    this.diveWant = on;
+    this.lastInput = performance.now();
+  }
+  toggleDive() { this.setDive(!this.diveWant); }
+
   /* ---------- input ---------- */
 
   _bind() {
@@ -829,7 +865,7 @@ export class NocturneWorld {
         const spot = this._pick(e.clientX, e.clientY);
         if (spot) {
           this.goal = spot;
-          this.marker.position.set(spot.x, this.heightAt(spot.x, spot.z) + 0.06, spot.z);
+          this.marker.position.set(spot.x, Math.max(this.heightAt(spot.x, spot.z), 0) + 0.06, spot.z);
           this.marker.material.opacity = 0.9;
           this.lastInput = performance.now();
         } else if (this.interactCb) {
@@ -850,6 +886,8 @@ export class NocturneWorld {
     window.addEventListener('keydown', (e) => {
       const tag = e.target && e.target.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey) return;
+      if (e.code === 'KeyQ') this.setDive(true);
+      if (e.code === 'KeyE') this.setDive(false);
       if (WALK[e.code]) { this.keys.add(e.code); this.goal = null; if (e.code.startsWith('Arrow')) e.preventDefault(); }
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
@@ -878,7 +916,7 @@ export class NocturneWorld {
     for (let t = 1; t < 90; t += 0.4 + t * 0.02) {
       const x = o.x + d.x * t, z = o.z + d.z * t;
       const h = this.heightAt(x, z);
-      if (o.y + d.y * t <= Math.max(h, 0)) return h > 0.32 && Math.hypot(x, z) < WALK_LIMIT ? { x, z } : null;
+      if (o.y + d.y * t <= Math.max(h, 0)) return h > -WADE_MAX && Math.hypot(x, z) < WALK_LIMIT ? { x, z } : null;
     }
     return null;
   }
@@ -893,7 +931,7 @@ export class NocturneWorld {
   _move(dx, dz) {
     const nx = this.cam.x + dx;
     const nz = this.cam.z + dz;
-    const ok = (x, z) => this.heightAt(x, z) > 0.32 && Math.hypot(x, z) < WALK_LIMIT;
+    const ok = (x, z) => this.heightAt(x, z) > MIN_H && Math.hypot(x, z) < WALK_LIMIT;
     if (ok(nx, nz)) { this.cam.x = nx; this.cam.z = nz; }
     else if (ok(nx, this.cam.z)) this.cam.x = nx;       // slide along the shore
     else if (ok(this.cam.x, nz)) this.cam.z = nz;
@@ -926,9 +964,18 @@ export class NocturneWorld {
     const t = this.clock.elapsedTime;
     const u = this.uniforms;
 
+    // water: wading slows you, deep water floats you, Q goes under
+    const h0 = this.heightAt(this.cam.x, this.cam.z);
+    const depth = Math.max(0, -h0);
+    const swimW = smooth(0.5, 1.3, depth);
+    if (swimW < 0.45) this.diveWant = false;
+    this.dive += ((this.diveWant ? 1 : 0) - this.dive) * Math.min(1, dt * 2.2);
+    const drag = 1 - 0.45 * smooth(0, 1.4, depth);
+
     // walking
     let f = 0, s = 0;
     const k = this.keys;
+    const run = k.has('ShiftLeft') || k.has('ShiftRight');
     if (k.has('KeyW') || k.has('ArrowUp')) f += 1;
     if (k.has('KeyS') || k.has('ArrowDown')) f -= 1;
     if (k.has('KeyD')) s += 1;
@@ -936,13 +983,13 @@ export class NocturneWorld {
     const turn = (k.has('ArrowRight') ? 1 : 0) - (k.has('ArrowLeft') ? 1 : 0);
     if (turn) { this.cam.yaw += turn * 1.5 * dt; this.lastInput = performance.now(); }
     if (f || s) {
-      const speed = (k.has('ShiftLeft') || k.has('ShiftRight') ? 5.5 : 2.4) * dt / Math.hypot(f, s);
+      const speed = (run ? 5.5 : 2.4) * drag * dt / Math.hypot(f, s);
       this._walk(f * speed, s * speed);
       this.lastInput = performance.now();
     }
     if (this.goal) {
       const gx = this.goal.x - this.cam.x, gz = this.goal.z - this.cam.z, gd = Math.hypot(gx, gz);
-      const step = Math.min(gd, 3.4 * dt);
+      const step = Math.min(gd, 3.4 * drag * dt);
       if (gd < 0.5 || !this._move(gx / gd * step, gz / gd * step)) this.goal = null;
       else { f = 1; this.lastInput = performance.now(); }
     }
@@ -970,11 +1017,39 @@ export class NocturneWorld {
       this.cam.pitch += (this.restPitch + Math.sin(t * 0.07) * 0.02 - this.cam.pitch) * ease * 0.6;
     }
 
-    const ground = Math.max(this.heightAt(this.cam.x, this.cam.z), 0.2) + EYE;
-    this.cam.y += (ground - this.cam.y) * (this.cam.y ? 1 - Math.exp(-dt * 8) : 1);
-    const bob = (f || s) ? Math.sin(t * 9) * 0.025 : Math.sin(t * 0.8) * 0.008;
+    const wadeY = h0 + EYE;
+    const diveY = Math.min(-0.3, Math.max(h0 + 0.55, -2.4));
+    const surfY = lerp(wadeY, 0.3, swimW);
+    const ground = lerp(surfY, diveY, this.dive * swimW);
+    this.cam.y += (ground - this.cam.y) * (this.cam.y ? 1 - Math.exp(-dt * (this.dive > 0.02 ? 3 : 8)) : 1);
+    const moving = !!(f || s);
+    const bob = (moving ? Math.sin(t * 9) * 0.025 * (1 - swimW) : Math.sin(t * 0.8) * 0.008) + Math.sin(t * 1.3) * 0.035 * swimW * (1 - this.dive);
     this.camera.position.set(this.cam.x, this.cam.y + bob, this.cam.z);
     this.camera.rotation.set(this.cam.pitch, -this.cam.yaw, 0);
+
+    // under the surface: murk, a bright ceiling, no sky
+    const under = this.camera.position.y < -0.04;
+    if (under !== this.under) {
+      this.under = under;
+      this.water.visible = !under;
+      this.ceiling.visible = under;
+      this.scene.background = under ? this.uwBackground : this.tex.sky[this.mode];
+    }
+    this.uw += ((under ? 1 : 0) - this.uw) * Math.min(1, dt * 7);
+    const mc = MODES[this.mode], uc = UNDERWATER[this.mode];
+    this._fog.set(mc.fog).lerp(this._uwFog.set(uc.fog), this.uw);
+    const fogDensity = lerp(mc.fogDensity, uc.density, this.uw);
+    this.scene.fog.color.copy(this._fog);
+    this.scene.fog.density = fogDensity;
+    this.uniforms.uFogColor.value.copy(this._fog);
+    this.uniforms.uFogDensity.value = fogDensity;
+    this.uwBackground.set(uc.fog);
+    this.ceiling.material.color.set(uc.ceiling);
+
+    const im = this.immersion;
+    im.depth = depth; im.swim = swimW; im.under = under; im.uw = this.uw;
+    im.dive = this.diveWant && swimW >= 0.45; im.moving = moving || !!this.goal; im.run = run;
+    if (this.options.onImmersion) this.options.onImmersion(im);
 
     // pulses decay like a struck string
     const p = this.pulse;
@@ -996,7 +1071,8 @@ export class NocturneWorld {
     u.uCam.value.copy(this.camera.position);
     u.uPulse.value = Math.min(1, p.treble + p.mid * 0.6);
     u.uRain.value += (this.weather.rain - u.uRain.value) * Math.min(1, dt * 0.7);
-    this.rain.visible = u.uRain.value > 0.02;
+    this.rain.visible = u.uRain.value > 0.02 && !under;
+    this.fireflies.visible = !under;
     this.fireflies.material.uniforms.uScale.value = this.renderer.domElement.height * 1.2;
 
     const wu = this.water.material.uniforms;

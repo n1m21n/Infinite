@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=36336012">
-  <link rel="stylesheet" href="./piano.css?v=4">
+  <link rel="stylesheet" href="./piano.css?v=5">
   <script type="importmap">
     { "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.min.js",
@@ -55,11 +55,30 @@
       <symbol id="i-eye-off" viewBox="0 0 20 20"><path d="M3 10C4.7 6.8 7.1 5.2 10 5.2S15.3 6.8 17 10C15.3 13.2 12.9 14.8 10 14.8S4.7 13.2 3 10Z"/><path d="M5 15 15 5"/></symbol>
       <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.5"/><path d="M10 2.75v1.25M10 16v1.25M2.75 10H4M16 10h1.25M4.7 4.7l1 1M14.3 14.3l1 1M15.3 4.7l-1 1M5.7 14.3l-1 1"/></symbol>
       <symbol id="i-moon" viewBox="0 0 20 20"><path d="M15.6 11.9A6.3 6.3 0 1 1 8.1 4.4a5 5 0 0 0 7.5 7.5Z"/></symbol>
+      <symbol id="i-dive" viewBox="0 0 20 20"><path d="M3 7.5c1.7-1.6 3.3-1.6 5 0s3.3 1.6 5 0 2.3-1.1 4-0.1"/><path d="M10 11v5M7.8 14l2.2 2.2 2.2-2.2"/></symbol>
       <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></symbol>
     </defs>
   </svg>
 
   <div id="world" class="world" aria-hidden="true"></div>
+  <div class="tint" id="tint" aria-hidden="true"></div>
+
+  <div class="loader" id="loader" role="status" aria-live="polite">
+    <div class="loader-inner">
+      <img src="../assets/favicon.svg" alt="" width="36" height="36">
+      <h1 class="loader-title">Nocturne</h1>
+      <div class="loader-keys" id="loader-keys" aria-hidden="true"></div>
+      <p class="loader-step" id="loader-step">Waking the lake</p>
+      <p class="loader-meta"><span id="loader-pct">0</span>%</p>
+    </div>
+  </div>
+  <script>
+    // if the 3D engine never arrives (offline, blocked CDN), say so instead of waiting forever
+    setTimeout(function () {
+      var l = document.getElementById('loader'), s = document.getElementById('loader-step');
+      if (l && !l.classList.contains('is-done') && s) s.textContent = 'Taking longer than usual. Check your connection.';
+    }, 20000);
+  </script>
 
   <header class="top">
     <a class="brand glass" href="../" aria-label="Infinite home">
@@ -88,6 +107,7 @@
     <button type="button" class="icon-btn" id="btn-like" aria-label="Like this phrase" data-tip="Like"><svg><use id="like-icon" href="#i-star"/></svg></button>
     <button type="button" class="icon-btn" id="btn-next" aria-label="Next phrase" data-tip="Next"><svg><use href="#i-refresh"/></svg></button>
     <span class="dock-gap" aria-hidden="true"></span>
+    <button type="button" class="icon-btn" id="btn-dive" aria-label="Dive" aria-pressed="false" data-tip="Dive (Q)" hidden><svg><use href="#i-dive"/></svg></button>
     <button type="button" class="icon-btn" id="btn-sky" aria-label="Switch to sunset" data-tip="Sunset"><svg><use id="sky-icon" href="#i-sun"/></svg></button>
   </nav>
 
@@ -99,6 +119,7 @@
       <button type="button" class="chip" role="radio" aria-checked="false" data-model="dark_grand">Dark grand</button>
       <button type="button" class="chip" role="radio" aria-checked="false" data-model="rhodes">Rhodes</button>
     </div>
+    <label class="row row-volume"><span>Volume</span><input type="range" id="s-volume" min="0" max="100" value="88" aria-label="Piano volume"><output>88</output></label>
   </section>
 
   <section class="pop" id="pop-feel" role="dialog" aria-label="Feel" hidden>
@@ -161,6 +182,6 @@
 
   <script src="./ambient-engine.js?v=2"></script>
   <script src="./piano-engine.js?v=2"></script>
-  <script type="module" src="./app.js?v=4"></script>
+  <script type="module" src="./app.js?v=5"></script>
 </body>
 </html>

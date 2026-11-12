@@ -4,6 +4,7 @@
  * and to NocturneWorld (world.js).
  */
 import { NocturneWorld } from './world.js';
+import { createWaterAudio } from './water-audio.js';
 
 const $ = (id) => document.getElementById(id);
 const body = document.body;
@@ -37,17 +38,86 @@ let world = null;
 let playing = false;
 let started = false;
 let levels = { ...SCENES.midnight_grove };
+let water = null;
+
+/* ---------- loading screen ---------- */
+
+const loader = $('loader');
+const KEYS = 30;
+const loaderKeys = $('loader-keys');
+for (let i = 0; i < KEYS; i++) {
+  const k = document.createElement('span');
+  k.style.setProperty('--h', `${20 + Math.round(30 * Math.abs(Math.sin(i * 0.9 + 0.6) * 0.6 + Math.sin(i * 0.37) * 0.4))}px`);
+  loaderKeys.append(k);
+}
+const LOAD_STEPS = [[0, 'Waking the lake'], [0.25, 'Raising the hills'], [0.5, 'Planting the grass'], [0.75, 'Hanging the stars'], [0.97, 'Tuning the piano']];
+const loadStart = performance.now();
+let shown = 0;
+function setLoad(p) {
+  shown = Math.max(shown, Math.min(1, p));
+  const lit = Math.round(shown * KEYS);
+  [...loaderKeys.children].forEach((k, i) => {
+    k.classList.toggle('on', i < lit);
+    k.classList.toggle('lead', i === lit - 1 && shown < 1);
+  });
+  $('loader-pct').textContent = Math.round(shown * 100);
+  let step = LOAD_STEPS[0][1];
+  for (const [at, text] of LOAD_STEPS) if (shown >= at) step = text;
+  $('loader-step').textContent = step;
+}
+function hideLoader() {
+  setLoad(1);
+  const wait = Math.max(0, 900 - (performance.now() - loadStart));   // never a flash
+  setTimeout(() => {
+    loader.classList.add('is-done');
+    loader.setAttribute('aria-hidden', 'true');
+    setTimeout(() => loader.remove(), 1200);
+    const touch = window.matchMedia('(hover: none)').matches;
+    setTimeout(() => toast(touch ? 'Drag to look · tap to walk · the lake is open' : 'Drag to look · click to walk · the lake is open', 4600), 600);
+  }, wait);
+}
+setLoad(0);
 
 /* ---------- world ---------- */
 
+const dive = $('btn-dive');
+let lastFrame = performance.now();
+let diveTipShown = false;
+let diveOn = false;
+
+function onImmersion(s) {
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - lastFrame) / 1000);
+  lastFrame = now;
+  $('tint').style.setProperty('--uw', s.uw.toFixed(3));
+  const canDive = s.swim > 0.5;
+  if (dive.hidden === canDive) dive.hidden = !canDive;
+  if (canDive && !diveTipShown) {
+    diveTipShown = true;
+    toast(window.matchMedia('(hover: none)').matches ? 'Deep water · tap dive to go under' : 'Deep water · Q to dive, E to surface', 3400);
+  }
+  if (s.dive !== diveOn) {
+    diveOn = s.dive;
+    dive.setAttribute('aria-pressed', String(diveOn));
+    dive.dataset.tip = diveOn ? 'Surface (E)' : 'Dive (Q)';
+    dive.setAttribute('aria-label', diveOn ? 'Surface' : 'Dive');
+  }
+  if (water && playing) water.update(s, dt);
+}
+
 try {
   world = new NocturneWorld($('world'), {
+    onProgress: setLoad,
+    onReady: hideLoader,
+    onImmersion
   });
   world.onInteract(() => { if (started) call(piano, 'triggerManualNote', 62 + [0, 3, 7, 10, 12][Math.floor(Math.random() * 5)], 0.5, 2.2); });
   window.nocturne = world;
 } catch (err) {
   console.warn('Nocturne: 3D view unavailable', err);
+  hideLoader();
 }
+dive.addEventListener('click', () => { if (world) world.toggleDive(); });
 
 /* ---------- toast ---------- */
 
@@ -84,6 +154,7 @@ async function play() {
     const ctx = call(piano, 'getAudioContext');
     if (ctx) call(ambient, 'attachAudioContext', ctx, call(piano, 'getSpaceInputNode') || null, call(piano, 'getOutputNode') || null);
     await call(ambient, 'start');
+    if (!water) water = createWaterAudio(ctx, call(piano, 'getOutputNode'), piano && piano.glueComp);
     if (!started) { started = true; pushLevels(); }
   } catch (err) {
     console.warn('Nocturne: audio could not start', err);
@@ -107,7 +178,6 @@ $('btn-play').addEventListener('click', () => (playing ? pause() : play()));
 // starts the music. Dragging to look around does not.
 (function () {
   const touch = window.matchMedia('(hover: none)').matches;
-  setTimeout(() => toast(touch ? 'Drag to look · tap to walk' : 'Drag to look · click to walk', 4200), 1200);
   let down = null;
   window.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; }, true);
   window.addEventListener('pointerup', (e) => {
@@ -254,6 +324,13 @@ function slider(input, onInput) {
   paint();
   return paint;
 }
+const savedVolume = (() => { try { const v = parseInt(localStorage.getItem('nocturne.volume'), 10); return v >= 0 && v <= 100 ? v : null; } catch (e) { return null; } })();
+if (savedVolume !== null) { $('s-volume').value = savedVolume; }
+slider($('s-volume'), (v) => {
+  call(piano, 'setMasterVolume', Math.max(0.0001, v));      // 0 would read as "unset" and fall back to the default
+  try { localStorage.setItem('nocturne.volume', String(Math.round(v * 100))); } catch (e) { /* private mode */ }
+});
+call(piano, 'setMasterVolume', Math.max(0.0001, (savedVolume !== null ? savedVolume : 88) / 100));
 slider($('s-smooth'), (v) => call(piano, 'setSmoothness', v));
 slider($('s-soothe'), (v) => call(piano, 'setSoothingness', v));
 slider($('s-space'), (v) => { call(piano, 'setSpace', v); call(ambient, 'setGlobalSpace', v); });
