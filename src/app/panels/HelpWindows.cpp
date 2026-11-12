@@ -1111,6 +1111,7 @@ namespace app
                { "Audio Displacement", I18N_KEY("Deforms 3D vertex geometries in real-time driven by live audio frequencies or RMS waveforms.") },
                { "Particle System & Cloth", I18N_KEY("Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind, an optional ground plane and an optional collider mesh.") },
                { "Material, Mapping & HDRI", I18N_KEY("Material is the shading block Render 3D reads per slot (base colour, metal/rough, emission, texture inputs). Mapping controls how a texture is projected onto the geometry. HDRI supplies the environment map for reflections and the background.") },
+               { "Shading nodes", I18N_KEY("Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight and Geometry build a surface per shading point, the way Blender's shader nodes do. Chain them into a Material's field, albedo, roughness, metallic, normal, emission or opacity pin; the Material compiles the chain into one program for every Render 3D engine.") },
                { "Field Primitive & Field Modifier", I18N_KEY("Signed-distance geometry written as Field kernels and combined/warped by modifiers, then meshed - the procedural counterpart to the fixed primitives.") },
             } },
             { "Compositing", {

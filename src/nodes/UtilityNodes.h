@@ -322,6 +322,9 @@ public:
    // OPUS_PLAN row 1.3: the last pin takes a Field Pixel in Material domain; its program runs in the Render 3D
    // shaders after the maps are read.
    ImageCable& FieldInput() { return mField; }
+   // Row 2.6: the Shade nodes wired into the field pin (base) and the albedo, roughness, metallic, normal, emission
+   // and opacity pins, as the outputs one composed program writes. False when there is none.
+   bool ShadeOutputs(std::vector<ShadeOutput>& outs) const;
    static constexpr int kFieldSlot = 1 + kMapCount;
    size_t TriangleCount() const;
 
@@ -424,9 +427,6 @@ private:
    // Row 2.3: the program composed from a Shade chain on `field`, re-registered only when its text changes.
    mutable std::string mShadeSource;
    mutable int mShadeProgram = 0;
-   // Row 2.6: the Shade nodes wired into the field pin (base) and the albedo, roughness, metallic, normal, emission
-   // and opacity pins, as the outputs one composed program writes. False when there is none.
-   bool ShadeOutputs(std::vector<ShadeOutput>& outs) const;
    mutable unsigned long long mShadeBoundsRev = ~0ull;
    mutable float mShadeLo[3] = { 0.0f, 0.0f, 0.0f };
    mutable float mShadeHi[3] = { 1.0f, 1.0f, 1.0f };
