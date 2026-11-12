@@ -8,6 +8,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "app/graph/PortProbeCache.h"
 #include "app/panels/CurveEditorPanel.h"
 
 namespace app
@@ -254,6 +255,7 @@ void DrawPopupsB(FrameCtx& fc)
                                       gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
          ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       }
+      WarmPortProbeCache(3.0);   // fork: fill the port cache a few ms per frame after startup
       if (MenuParts::BeginPopup("search"))
       {
          // fork: while a cable is being dropped, node types that cannot take it are drawn at ~30% alpha (still
