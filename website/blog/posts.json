@@ -1,5 +1,14 @@
 [
  {
+  "slug": "modal-synthesis-and-physical-modelling-of-metallic-percussion",
+  "title": "Modal synthesis and metallic percussion in real time",
+  "description": "How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.",
+  "date": "2026-11-12",
+  "updated": "2026-11-12",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/modal-synthesis-and-physical-modelling-of-metallic-percussion.html"
+ },
+ {
   "slug": "delaunay-triangulation-and-voronoi-geometry-in-real-time",
   "title": "Delaunay triangulation and Voronoi geometry in real time",
   "description": "How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson, polygon insetting, and audio-reactive 3D.",

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="midnight">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>Modal Synthesis and Metallic Percussion | Infinite</title>
+  <meta name="description" content="How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/modal-synthesis-and-physical-modelling-of-metallic-percussion.html">
+  <meta property="og:title" content="Modal Synthesis and Metallic Percussion | Infinite">
+  <meta property="og:description" content="How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/blog_modal-synthesis-and-physical-modelling-of-metallic-percussion.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/modal-synthesis-and-physical-modelling-of-metallic-percussion.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Modal Synthesis and Metallic Percussion | Infinite">
+  <meta name="twitter:description" content="How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_modal-synthesis-and-physical-modelling-of-metallic-percussion.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="../style.css?v=3ac517c3">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
+  <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "BlogPosting"], "headline": "Modal synthesis and metallic percussion in real time", "description": "How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.", "datePublished": "2026-11-12", "dateModified": "2026-11-12", "mainEntityOfPage": "https://infinitedevices.org/blog/modal-synthesis-and-physical-modelling-of-metallic-percussion.html", "url": "https://infinitedevices.org/blog/modal-synthesis-and-physical-modelling-of-metallic-percussion.html", "image": ["https://infinitedevices.org/assets/blog_modal-synthesis-and-physical-modelling-of-metallic-percussion.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "modal synthesis, physical modelling, metallic percussion, sound design, dsp", "wordCount": 2778, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Modal synthesis and metallic percussion in real time", "item": "https://infinitedevices.org/blog/modal-synthesis-and-physical-modelling-of-metallic-percussion.html"}]}</script>
+  <link rel="stylesheet" href="../system.css?v=23625436">
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
+  <link rel="stylesheet" href="../search.css?v=96e10ca3">
+</head>
+<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
+          <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="../plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a href="../plugin.html">Plugin</a>
+      <a class="btn btn-primary nav-sheet-cta" href="../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub repository" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Creative</p>
+          <h1>Modal synthesis and metallic percussion in real time</h1>
+          <p class="post-lede">How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.</p>
+          <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">12 November 2026 · 13 min read</span></span></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/blog_modal-synthesis-and-physical-modelling-of-metallic-percussion.png" alt="Technical architecture diagram of real-time modal synthesis for metallic percussion showing mallet strike exciters, inharmonic second-order resonator banks, dispersive waveguides, and material profiles" width="1200" height="675" decoding="async"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#what-modal-synthesis-solves-for-struck-metal">What modal synthesis solves for struck metal</a></li><li><a href="#the-acoustic-physics-of-vibrating-bars-plates-and-bells">The acoustic physics of vibrating bars, plates, and bells</a></li><li><a href="#mallet-excitation-and-transient-contact-mechanics">Mallet excitation and transient contact mechanics</a></li><li><a href="#second-order-inharmonic-resonator-bank-formulation">Second-order inharmonic resonator bank formulation</a></li><li><a href="#dispersive-waveguides-and-allpass-phase-delay-loops">Dispersive waveguides and allpass phase delay loops</a></li><li><a href="#material-physics-presets-and-acoustic-modal-ratios">Material physics presets and acoustic modal ratios</a></li><li><a href="#audiovisual-patching-coupling-modal-acoustics-to-3d-geometry">Audiovisual patching: coupling modal acoustics to 3D geometry</a></li><li><a href="#building-a-complete-physical-percussion-instrument-in-infinite">Building a complete physical percussion instrument in Infinite</a></li><li><a href="#real-time-execution-constraints-and-performance-bounds">Real-time execution constraints and performance bounds</a></li></ol></details>
+        <div class="prose">
+<p>Modal synthesis metallic percussion sound design simulates acoustic resonance by decomposing complex vibrating structures into independent resonant modes. Unlike acoustic strings and open cylindrical pipes, whose boundary conditions produce integer harmonic partials (such as 1f, 2f, 3f, and 4f), metallic objects like bells, struck rods, vibraphone bars, cymbals, and gongs exhibit strongly inharmonic frequency spectra.</p>
+<p>When a mallet strikes a solid bronze bell or steel plate, energy distributes across dozens of vibrational modes simultaneously. Each mode oscillates at its own characteristic frequency, dissipates energy at a material-dependent decay rate, and responds to the hardness and velocity of the exciter.</p>
+<p>In audiovisual modular environments like <a href="https://infinitedevices.org/">Infinite</a>, physical modelling provides an expressive acoustic bridge between digital signal processing and procedural graphics. Because the underlying state variables (such as mode displacement, exciter velocity, and high-frequency dissipation) are calculated in real time on the audio thread, they can be routed directly into 3D mesh deformation, particle velocities, and shaders.</p>
+<p>Here is an analysis of how real-time modal synthesis models metallic percussion, how mallet contact mechanics excite resonant structures, how second-order bandpass resonator banks are formulated, how dispersive waveguides reproduce high-frequency shimmer, and how to patch a complete metallic percussion synthesiser using native nodes.</p>
+<figure><img src="https://infinitedevices.org/assets/blog_modal-synthesis-and-physical-modelling-of-metallic-percussion.png" alt="Technical architecture diagram of real-time modal synthesis for metallic percussion showing mallet strike exciters, inharmonic second-order resonator banks, dispersive waveguides, and material profiles" width="1200" height="675" loading="lazy" decoding="async"><figcaption>Technical architecture diagram of real-time modal synthesis for metallic percussion showing mallet strike exciters, inharmonic second-order resonator banks, dispersive waveguides, and material profiles</figcaption></figure>
+<h2 id="what-modal-synthesis-solves-for-struck-metal">What modal synthesis solves for struck metal</h2>
+<p>In acoustic percussion modelling, sound designers historically relied on two conventional techniques: sample playback and frequency modulation (FM) synthesis.</p>
+<p>Sample libraries record acoustic instruments with fidelity, but they remain static snapshots. Sticking, damping, scraping, or striking an acoustic gong at varying distances from the rim requires dozens of velocity layers and round-robin samples. Even with extensive sample sets, phase cancellation and repetitive transients degrade acoustic realism during fast rolls or sustained strikes.</p>
+<p>FM synthesis excels at producing metallic sidebands by modulating a sinusoidal carrier with another operator. However, FM sideband distribution follows Bessel functions of the first kind (<code>J_n(beta)</code>), where the partials are symmetrically spaced around the carrier frequency:</p>
+<pre><code>f_sideband = f_carrier +/- n * f_modulator</code></pre>
+<p>Real solid metals do not follow linear FM sideband symmetry. Their natural resonant frequencies arise from the physical stiffness and boundary conditions of elastic solids, producing wide, asymmetrical frequency spreads that sound unnatural when forced into FM operator ratios.</p>
+<p>Modal synthesis resolves this by modelling the resonant body as a parallel bank of damped second-order resonators. Each filter represents one orthogonal physical vibrational mode. By configuring the frequency ratios, initial amplitudes, and decay times of each filter to match the analytical solutions of acoustic differential equations, modal synthesis reproduces the nuanced acoustic behaviour of struck metal with low computational overhead.</p>
+<h2 id="the-acoustic-physics-of-vibrating-bars-plates-and-bells">The acoustic physics of vibrating bars, plates, and bells</h2>
+<p>To model metallic percussion accurately, we must examine how acoustic waves propagate through different geometric structures: one-dimensional bars, two-dimensional plates, and three-dimensional bells.</p>
+<h3 id="transverse-vibrations-in-stiff-bars-euler-bernoulli-beam-theory">Transverse vibrations in stiff bars (Euler-Bernoulli beam theory)</h3>
+<p>In an ideal flexible string, tension dominates restoring forces, producing harmonic overtones. In a stiff metallic bar (such as a glockenspiel or xylophone bar), shear stiffness and bending moments govern motion. The fourth-order Euler-Bernoulli partial differential equation describes this transverse displacement <code>y(x, t)</code>:</p>
+<pre><code>rho * A * (d^2 y / dt^2) + E * I * (d^4 y / dx^4) = 0</code></pre>
+<p>Where <code>rho</code> represents material density, <code>A</code> is cross-sectional area, <code>E</code> is Young's modulus of elasticity, and <code>I</code> is the area moment of inertia.</p>
+<p>For a bar with free ends, the boundary conditions require zero bending moment and zero shear force at both boundaries. Solving this eigenvalue equation yields the modal frequencies:</p>
+<pre><code>f_n = (pi / (2 * L^2)) * sqrt((E * I) / (rho * A)) * m_n^2</code></pre>
+<p>Where the modal constants <code>m_n</code> approximately equal:</p>
+<pre><code>m_1 = 3.0112,   m_2 = 5.0000,   m_3 = 7.0000,   m_4 = 9.0000</code></pre>
+<p>Normalising by the fundamental frequency <code>f_1</code>, the modal frequency ratios for an ideal free-free metallic bar become:</p>
+<pre><code>f_1 / f_1 = 1.000
+f_2 / f_1 = (5.000 / 3.0112)^2 = 2.756
+f_3 / f_1 = (7.000 / 3.0112)^2 = 5.404
+f_4 / f_1 = (9.000 / 3.0112)^2 = 8.933
+f_5 / f_1 = (11.00 / 3.0112)^2 = 13.344</code></pre>
+<p>Notice that the second mode is nearly 2.76 times the fundamental, and the third mode is over 5.4 times the fundamental. This progressive widening of partial spacing creates the bright, bell-like timbre of struck steel.</p>
+<h3 id="two-dimensional-circular-plates-and-chladni-figures">Two-dimensional circular plates and Chladni figures</h3>
+<p>When energy disperses across a circular bronze plate, cymbal, or gong, waves propagate radially and azimuthally. Ernst Chladni demonstrated that sand scattered on vibrating plates gathers along stationary nodal lines and nodal circles.</p>
+<p>The governing equation for a vibrating thin plate of thickness <code>h</code> is Poisson's plate equation:</p>
+<pre><code>D * nabla^4 w + rho * h * (d^2 w / dt^2) = 0</code></pre>
+<p>Where <code>D = (E * h^3) / (12 * (1 - nu^2))</code> is the flexural rigidity and <code>nu</code> is Poisson's ratio. In polar coordinates, the spatial mode shapes are given by combinations of ordinary and modified Bessel functions:</p>
+<pre><code>w_mn(r, theta) = [A * J_m(k * r) + B * I_m(k * r)] * cos(m * theta)</code></pre>
+<p>The modal frequencies correspond to the roots of the transcendental boundary equation. For a circular plate clamped at the centre and free at the edge (typical of a suspended cymbal or small gong), the resulting modal ratios deviate sharply from integer multiples:</p>
+<pre><code>f_01 / f_01 = 1.000   (fundamental mode)
+f_11 / f_01 = 1.482   (one nodal diameter)
+f_21 / f_01 = 2.045   (two nodal diameters)
+f_02 / f_01 = 2.684   (one nodal circle)
+f_31 / f_01 = 3.420   (three nodal diameters)
+f_12 / f_01 = 4.250   (one diameter, one circle)</code></pre>
+<p>These clustered, closely spaced inharmonic ratios produce the dense shimmering wash and acoustic turbulence characteristic of cymbals and tam-tams.</p>
+<h3 id="the-acoustic-hierarchy-of-tuned-church-bells">The acoustic hierarchy of tuned church bells</h3>
+<p>Tuned bells (such as carillons and orchestral chimes) represent a specialised branch of acoustics. Bell founders shape the bronze casting profile so that five key partials align into a musically consonant structure:</p>
+<ol><li><strong>Hum tone</strong> (<code>0.5 * f_0</code>): One octave below the strike note.</li><li><strong>Prime</strong> (<code>1.0 * f_0</code>): The nominal pitch of the bell.</li><li><strong>Tierce</strong> (<code>1.189 * f_0</code>): A minor third above the prime, giving European bells their melancholic quality.</li><li><strong>Quint</strong> (<code>1.5 * f_0</code>): A perfect fifth above the prime.</li><li><strong>Nominal</strong> (<code>2.0 * f_0</code>): One octave above the prime, which governs the perceived strike pitch.</li></ol>
+<p>Higher modes (supernominal at 2.74x, octave nominal at 4.0x) decay rapidly, while the lower hum tone and prime ring for seconds.</p>
+<h2 id="mallet-excitation-and-transient-contact-mechanics">Mallet excitation and transient contact mechanics</h2>
+<p>The sound of struck metal depends heavily on the exciter. Striking a bell with a hard brass rod produces a sharp transient rich in high frequencies. Striking the same bell with a soft felt mallet yields a rounded, deep resonance with minimal high-frequency content.</p>
+<h3 id="raised-cosine-contact-model">Raised-cosine contact model</h3>
+<p>In physical acoustics, mallet impact can be approximated as an elastic sphere contacting a surface. According to Hertzian contact mechanics, the contact duration <code>tau</code> varies inversely with strike velocity <code>v_0</code>:</p>
+<pre><code>tau proportional to v_0^(-1/5)</code></pre>
+<p>For real-time synthesiser architectures, a raised-cosine impulse function simulates the mallet contact force <code>p(t)</code> over contact duration <code>T_c</code>:</p>
+<pre><code>p(t) = 0.5 * [1 - cos((2 * pi * t) / T_c)]    for 0 &lt;= t &lt;= T_c
+p(t) = 0                                       for t &gt; T_c</code></pre>
+<p>The Fourier transform of this raised-cosine pulse exhibits spectral nulls at multiples of <code>1 / T_c</code>:</p>
+<pre><code>P(f) = (sin(pi * f * T_c) / (pi * f * T_c)) * (1 / (1 - (f * T_c)^2))</code></pre>
+<p>When the mallet is hard, <code>T_c</code> is short (around 0.5 to 1.5 milliseconds), pushing the spectral cutoff well into the ultrasonic range and exciting every high mode. When the mallet is soft, <code>T_c</code> lengthens to 8 to 20 milliseconds, filtering out high frequencies before they reach the resonator bank.</p>
+<p>In Infinite's <code>Metallic</code> node, the <code>transient</code> parameter controls both the mallet strike hardness and the injection of a micro-burst of band-limited noise into the resonators, simulating the physical scrape and impact of the mallet head.</p>
+<h2 id="second-order-inharmonic-resonator-bank-formulation">Second-order inharmonic resonator bank formulation</h2>
+<p>To compute modal resonance efficiently on digital hardware, each mode is implemented as a two-pole digital bandpass filter.</p>
+<h3 id="continuous-to-discrete-transformation">Continuous to discrete transformation</h3>
+<p>The continuous-time transfer function of a single damped mechanical oscillator is:</p>
+<pre><code>H(s) = (omega_0 / Q) * s / (s^2 + (omega_0 / Q) * s + omega_0^2)</code></pre>
+<p>Applying the impulse invariant transform or matched z-transform yields the canonical second-order infinite impulse response (IIR) filter:</p>
+<pre><code>y[n] = 2 * r * cos(theta) * y[n-1] - r^2 * y[n-2] + b_0 * (x[n] - r * cos(theta) * x[n-1])</code></pre>
+<p>Where:</p>
+<ul><li><code>omega_0 = 2 * pi * f_mode / f_s</code> is the normalised angular frequency at sample rate <code>f_s</code>.</li><li><code>r = exp(-pi * B / f_s)</code> represents the pole radius, where <code>B</code> is the -3 dB resonance bandwidth in Hertz.</li><li><code>theta = omega_0 * sqrt(1 - 1 / (4 * Q^2))</code> is the pole angle.</li><li><code>b_0 = (1 - r^2) * sin(theta)</code> normalises the peak gain to unity at the resonant frequency.</li></ul>
+<h3 id="mode-decoupling-and-parallel-execution">Mode decoupling and parallel execution</h3>
+<p>In real-time processing, evaluating 12 independent second-order filters in parallel offers numerical stability. Unlike cascade filters, where small coefficient roundoff errors can propagate and cause instability, parallel resonators run independently:</p>
+<pre><code>y_total[n] = sum_{m=0}^{M-1} g_m * y_m[n]</code></pre>
+<p>Where <code>g_m</code> is the excitation gain for mode <code>m</code>.</p>
+<h3 id="frequency-dependent-damping">Frequency-dependent damping</h3>
+<p>In solid metals, high-frequency modes dissipate energy faster than low-frequency modes due to internal thermoelastic friction and acoustic radiation into the surrounding air. The decay time <code>tau_m</code> of each mode scales with frequency:</p>
+<pre><code>tau_m = tau_base * (f_0 / f_m)^alpha</code></pre>
+<p>Where <code>alpha</code> represents the material loss coefficient (typically 0.2 to 0.8 for metals, 1.2 to 1.8 for wood or ceramic). By applying this frequency-dependent damping curve across the resonator bank, high partials ring out quickly while the fundamental and lower modes sustain for several seconds.</p>
+<h2 id="dispersive-waveguides-and-allpass-phase-delay-loops">Dispersive waveguides and allpass phase delay loops</h2>
+<p>While a 12-mode resonator bank accurately captures the discrete lower and middle partials of metallic bodies, dense high-frequency energy (above 6 kHz) requires hundreds of closely packed modes. Evaluating hundreds of discrete filters per voice strains CPU budgets.</p>
+<p>To solve this, modal synthesis can be paired with an extended Karplus-Strong waveguide featuring allpass dispersion filters.</p>
+<p>An ideal delay line recirculates audio with uniform delay across all frequencies. In a stiff metallic medium, however, wave propagation velocity increases with frequency:</p>
+<pre><code>v_phase(f) = sqrt(2 * pi * f) * ((E * I) / (rho * A))^(1/4)</code></pre>
+<p>Higher frequencies travel faster than lower frequencies. To model this dispersion in discrete time, a cascade of first-order allpass filters is inserted into the feedback loop:</p>
+<pre><code>A(z) = (a + z^-1) / (1 + a * z^-1)</code></pre>
+<p>The group delay <code>tau_g(omega)</code> of this allpass filter varies with frequency:</p>
+<pre><code>tau_g(omega) = - d(phi) / d(omega) = (1 - a^2) / (1 + 2 * a * cos(omega) + a^2)</code></pre>
+<p>When <code>a &amp;gt; 0</code>, high frequencies experience shorter phase delay through the loop than low frequencies. As the strike transient recirculates through the waveguide, the impulse stretches out into a dispersed chirp, creating the characteristic metallic ringing tail found in metal rods and sheet springs.</p>
+<h2 id="material-physics-presets-and-acoustic-modal-ratios">Material physics presets and acoustic modal ratios</h2>
+<p>Infinite's <code>Metallic</code> node packages these mathematical foundations into eight material presets, each defining distinct mode ratios, decay times, and dispersion strengths.</p>
+<h3 id="preset-comparison">Preset comparison</h3>
+<ol><li><strong>Steel (<code>kSteel</code>)</strong>: Modeled on Euler-Bernoulli clamped bar ratios (1.00, 2.76, 5.40, 8.93, 13.34, 18.64...). Stiffness is set to 0.25, producing clear, bright overtones with moderate dispersion and clean harmonic decay.</li><li><strong>Bell Bronze (<code>kBell</code>)</strong>: Incorporates tuned church bell ratios (hum 0.50x, prime 1.00x, minor third tierce 1.189x, quint 1.50x, nominal 2.00x, supernominal 2.74x). Delivers a long 3.5-second sustain with minor-third beating.</li><li><strong>Gong / Plate (<code>kGong</code>)</strong>: Based on two-dimensional Chladni circular plate modes (1.00, 1.48, 2.05, 2.68, 3.42, 4.25...). Features high dispersion (0.70) and nonlinear detuning (0.012) to simulate modal collisions and wash.</li><li><strong>Cast Iron (<code>kIron</code>)</strong>: Features heavy high-frequency loss (0.85) and short 1.2-second decay. Models heavy machinery, anvils, and thick industrial plates.</li><li><strong>Titanium (<code>kTitanium</code>)</strong>: High stiffness (0.60) and minimal high-frequency damping (0.18). Produces an ultra-bright, piercing resonance with a 2.8-second decay.</li><li><strong>Glass / Crystal (<code>kGlass</code>)</strong>: Extremely low high-frequency loss (0.12) with pure, crystalline modal ratios. Simulates struck wine glasses and crystal singing bowls.</li><li><strong>Ceramic (<code>kCeramic</code>)</strong>: Rapid high-frequency decay (1.10) with dry, hollow wooden-metallic overtones resembling marimba bars or porcelain tiles.</li><li><strong>Vibraphone Bar (<code>kVibraphone</code>)</strong>: Tuned bar with an undercut arch profile, aligning the second mode to the fourth harmonic (4.00x) rather than the standard 2.76x of uniform bars.</li></ol>
+<h2 id="audiovisual-patching-coupling-modal-acoustics-to-3d-geometry">Audiovisual patching: coupling modal acoustics to 3D geometry</h2>
+<p>Because Infinite executes both audio DSP and 3D graphics inside a unified graph, physical modal parameters can modulate procedural geometry in real time.</p>
+<pre><code>[Note Sequencer] ---&gt; (notes) ---&gt; [Metallic] ---&gt; (audio) ---&gt; [Gain] ---&gt; [Audio Output]
+                                       |
+                                       +---&gt; [Audio Analyze]
+                                                    |
+                                          (rms / peak / pitch)
+                                                    |
+                                                    v
+[Mesh (Plate)] ---&gt; [Audio Displacement] &lt;----------+
+                           |
+                           v
+                      [Render 3D]</code></pre>
+<h3 id="visualising-chladni-nodal-figures-in-3d">Visualising Chladni nodal figures in 3D</h3>
+<p>To visualise the acoustic modes directly on a procedural surface:</p>
+<ol><li>Spawn a <code>Metallic</code> node and select the <code>Bell Bronze</code> or <code>Gong / Plate</code> material preset.</li><li>Connect a <code>Note Sequencer</code> node to the <code>notes</code> input slot of <code>Metallic</code> to drive rhythmic strikes with varying velocity.</li><li>Route the audio output of <code>Metallic</code> into an <code>Audio Analyze</code> node.</li><li>Spawn a <code>Geometry</code> node set to a high-resolution subdivided cylinder or plane (representing the physical plate).</li><li>Cable the geometry into an <code>Audio Displacement</code> node.</li><li>Patch the <code>spectralRms</code> or mode outputs from <code>Audio Analyze</code> into the displacement amplitude and frequency slots.</li><li>As the <code>Metallic</code> node sounds, the surface vertices deform along the theoretical Bessel nodal rings. High-velocity strikes create dramatic surface ripples, which smoothly settle into stationary nodal rings as the modes decay.</li></ol>
+<p>You can explore functional examples of physical modelling and geometry patching in the <a href="https://infinitedevices.org/library.html">Infinite patch library</a>.</p>
+<h2 id="building-a-complete-physical-percussion-instrument-in-infinite">Building a complete physical percussion instrument in Infinite</h2>
+<p>Here is the step-by-step procedure to construct a complete, playable metallic percussion instrument from scratch:</p>
+<h3 id="1-exciter-and-sequencing-setup">1. Exciter and sequencing setup</h3>
+<p>Create a <code>Note Sequencer</code> node. Set <code>division</code> to <code>1/16 sync</code> and dial <code>length</code> to 16 steps. Program an uneven rhythmic pattern with varied velocity steps.</p>
+<p>Add a <code>Random</code> modulator node. Set its distribution to Gaussian, rate to <code>1/8 bar</code>, and smoothing to 45 ms. Route this random value into the <code>transient</code> parameter of <code>Metallic</code>. Each strike now hits with a slightly different mallet snap and contact duration, avoiding repetitive transients.</p>
+<h3 id="2-tuning-and-material-selection">2. Tuning and material selection</h3>
+<p>Open the <code>Metallic</code> node. Select <code>Bell Bronze</code> for deep metallic resonance, or <code>Steel</code> for bright melodic percussion. Set <code>frequency</code> to 220 Hz (A3).</p>
+<p>If controlling via an external keyboard or MIDI controller, patch a <code>MIDI Notes</code> node into the <code>notes</code> slot. <code>Metallic</code> supports up to 8 polyphonic voices, tracking pitch across standard MIDI note numbers while maintaining inharmonic modal ratios.</p>
+<h3 id="3-spatialisation-and-dynamics">3. Spatialisation and dynamics</h3>
+<p>Route <code>Metallic</code>'s stereo output into a <code>Gain</code> node. Attenuate the master gain by -3.5 dB to prevent clipping during dense polyphonic strikes.</p>
+<p>Add an <code>Audio Filter</code> node configured as a subtle high-shelf cut around 12 kHz to emulate room acoustic absorption, or apply subtle saturation using <code>Gain</code>'s soft drive.</p>
+<h3 id="4-interactive-scope-monitoring">4. Interactive scope monitoring</h3>
+<p><code>Metallic</code> features an integrated real-time oscilloscope in its node body. By observing the trace during a strike, you can visually monitor how the initial mallet transient gives way to sinusoidal modal decay. The node publishes decimated peak waveforms directly to the UI thread via <code>ReadScope</code>, ensuring visual feedback without audio dropouts.</p>
+<h2 id="real-time-execution-constraints-and-performance-bounds">Real-time execution constraints and performance bounds</h2>
+<p>Physical modelling synthesis requires strict computational discipline to ensure glitch-free audio execution.</p>
+<p>In Infinite's audio engine:</p>
+<ul><li>The 12-mode resonator bank runs inside the audio callback at 44.1 kHz or 48 kHz.</li><li>Filter calculations use SIMD vectorisation where available, updating 12 poles and zeros in parallel chunks.</li><li>Parameter updates (such as <code>decay</code>, <code>stiffness</code>, and <code>frequency</code>) are delivered from the UI thread to the audio thread via atomic mailboxes (<code>ParamMailbox</code>), avoiding thread locks or memory allocation.</li><li>Voice allocation is handled dynamically: idle voices whose energy drops below -96 dB are put to sleep, keeping CPU utilisation under 2.5% on modern processors.</li></ul>
+<p>By combining the mathematical precision of acoustic wave equations with real-time modulation, modal synthesis transforms metallic percussion from static sampled hits into responsive, living acoustic instruments.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="physical-modelling-string-synthesis-in-real-time.html"><span class="mono">Creative</span><b>Physical modelling string synthesis in real time</b></a><a class="rel-card" href="wave-terrain-synthesis-in-real-time.html"><span class="mono">Creative</span><b>Wave terrain synthesis: audio from 3D surfaces</b></a><a class="rel-card" href="drum-and-bass-reese-bass-sound-design.html"><span class="mono">Creative</span><b>Drum and bass Reese bass sound design in modular synthesisers</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../artists.html">Artists</a>
+          <a href="../musicians.html">Musicians</a>
+          <a href="../vjs.html">VJs</a>
+          <a href="../creative-coders.html">Creative coders</a>
+          <a href="../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../library.html">Library</a>
+          <a href="../samples/">Sample generator</a>
+          <a href="../artworks.html">Art gallery</a>
+          <a href="../nodes/">Nodes</a>
+          <a href="../embeds/">Embeds</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../index.html#learn">Get started</a>
+          <a href="../philosophy.html">Philosophy</a>
+          <a href="../chat.html">Agents &amp; terminal</a>
+          <a href="../blog/">Blog</a>
+          <a href="../buy.html">Buy the plugin</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../benchmarks.html">Benchmarks</a>
+          <a href="../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting). <a href="../terms.html">Terms</a> · <a href="../refund.html">Refunds</a> · <a href="../privacy.html">Privacy</a></p>
+    </div>
+  </footer>
+  <script src="../site.js?v=21" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
+    <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="../plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="../chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+  <script src="../search.js?v=d89de447" defer></script>
+  <script src="../share.js?v=ad5e5392" defer></script>
+  <script src="../bird.js?v=a4ec7f42" defer></script>
+</body>
+</html>
