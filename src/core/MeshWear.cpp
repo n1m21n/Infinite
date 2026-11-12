@@ -125,4 +125,18 @@ namespace MeshWear
       }
       return out;
    }
+
+   std::vector<float> Stream(const float* pos, size_t stride, size_t nv, const unsigned int* idx, size_t ni, bool bake,
+                             const std::vector<float>& mask)
+   {
+      const std::vector<float> w = bake ? Bake(pos, stride, nv, idx, ni) : std::vector<float>();
+      const bool hasW = w.size() == nv * 2, hasM = mask.size() == nv;
+      std::vector<float> out(nv * 3, 0.0f);
+      for (size_t i = 0; i < nv; i++)
+      {
+         if (hasW) { out[i * 3] = w[i * 2]; out[i * 3 + 1] = w[i * 2 + 1]; }
+         if (hasM) out[i * 3 + 2] = mask[i];
+      }
+      return out;
+   }
 }

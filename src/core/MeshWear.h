@@ -15,4 +15,8 @@ namespace MeshWear
 {
    // pos: 3 floats a vertex, `stride` floats apart. Returns 2 floats a vertex (curvature, cavity), empty for no faces.
    std::vector<float> Bake(const float* pos, size_t stride, size_t vertexCount, const unsigned int* idx, size_t indexCount);
+   // Row 3.3: the stream the GPU reads, 3 floats a vertex (curvature, cavity, attr). The bake runs only when `bake`;
+   // attr is `mask[i]` when mask holds one float a vertex, else 0.
+   std::vector<float> Stream(const float* pos, size_t stride, size_t vertexCount, const unsigned int* idx, size_t indexCount,
+                             bool bake, const std::vector<float>& mask);
 }

@@ -1649,6 +1649,18 @@ bool RunEngineTest()
       check(ew && en && ew->usesWear && !en->usesWear, "4.4: only a program reading curvature or cavity asks for the bake", ew && ew->usesWear, 1);
    }
 
+   // ---- 3.3: attr reaches the stream: a program reading it asks for it (not the bake), and Stream carries the mask
+   {
+      std::string e1;
+      const int pa = Field::RegisterMaterialProgram("base = vec3(attr)", {}, e1);
+      const Field::MaterialProgramEntry* ea = Field::FindMaterialProgram(pa);
+      const float tri[9] = { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+      const unsigned int ix[3] = { 0, 1, 2 };
+      const std::vector<float> st = MeshWear::Stream(tri, 3, 3, ix, 3, false, { 0.0f, 1.0f, 0.5f });
+      check(ea && ea->usesAttr && !ea->usesWear && st.size() == 9 && st[5] == 1.0f && st[8] == 0.5f,
+            "3.3: attr program asks for the stream, mask rides in it", ea && ea->usesAttr, 1);
+   }
+
    // ---- 3.5 / 4.5: every Material recipe lowers and registers; the wear ones ask for the bake
    {
       int ok = 0, wear = 0;

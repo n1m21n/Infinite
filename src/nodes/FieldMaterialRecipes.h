@@ -1,6 +1,6 @@
 // Material-domain Field Pixel recipes (rows 3.5 and 4.5). Included by FieldPixelNode::MaterialPresets() with
 // FLD_RECIPE(name, code) defined; tools/blender-ab/harness.py reads this file to put a recipe in a case.
-// Each recipe stays under 40 lines. Inputs: P N UV W V curvature cavity backfacing objrand.
+// Each recipe stays under 40 lines. Inputs: P N UV W V curvature cavity backfacing objrand attr (Sketch 3D mask()).
 // Outputs: base roughness metallic normal height emission opacity mask (height is a bump in metres; mask under 0.5
 // cuts the surface away).
 // No include guard: the file is meant to be expanded once per FLD_RECIPE definition.

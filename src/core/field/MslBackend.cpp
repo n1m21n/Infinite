@@ -619,7 +619,7 @@ namespace Field
       for (const auto& s : program.pixelBody)
          if (s->rvalueExpr && HasReduce(s->rvalueExpr)) { r.error = "reduce is not available in the Material domain"; return r; }
       Ctx ctx;
-      ctx.Line("static void " + fnName + "(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t, float3 W, float3 V, float4 G, "
+      ctx.Line("static void " + fnName + "(thread FldMat& o, float3 P, float3 N, float2 UV, float fld_t, float3 W, float3 V, float4 G, float4 A, "
                "array<texture2d<float>, 16> fm, float4 fi, float flod)");
       ctx.Line("{");
       ctx.Line("   float fld_dt = 0.0; int fld_frame = 0; (void)fld_dt; (void)fld_frame; (void)fld_t;");
@@ -627,7 +627,7 @@ namespace Field
       {
          const MaterialChannel& c = kMaterialInputs[i];
          const char* gl = std::string(c.name) == "backfacing" ? "G.x" : std::string(c.name) == "objrand" ? "G.y"
-                          : std::string(c.name) == "curvature" ? "G.z" : "G.w";
+                          : std::string(c.name) == "curvature" ? "G.z" : std::string(c.name) == "attr" ? "A.x" : "G.w";
          const std::string v = (c.lanes == 1) ? gl : c.name; // G = (backfacing, objrand, curvature, cavity)
          ctx.Line("   " + MslType(FieldType(c.type, c.lanes)) + " fld_v_" + c.name + " = " + v + "; (void)fld_v_" + c.name + ";");
          ctx.declaredLocals.insert(c.name);

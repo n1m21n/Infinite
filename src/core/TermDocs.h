@@ -95,6 +95,9 @@ geometry, so it needs a Render 3D to become a picture.
 ## Custom mesh
     beginShape(mode)  vertex(x, y, z, u, v)  endShape()
 
+## Material attribute
+    mask(v)   tags the vertices that follow; a material Field program reads it as `attr`
+
 ## Numbers
     random(lo, hi)  noise(x, y, z)  param(name, default, lo, hi)
 

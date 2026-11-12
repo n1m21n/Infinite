@@ -822,14 +822,14 @@ namespace Field
       MaterialFnResult r;
       if (MaterialFnRefusal(program, r.error)) return r;
       EmitterContext ctx;
-      ctx.EmitLine("void " + fnName + "(inout FldMat o, vec3 P, vec3 N, vec2 UV, float fld_t, vec3 W, vec3 V, vec4 G)");
+      ctx.EmitLine("void " + fnName + "(inout FldMat o, vec3 P, vec3 N, vec2 UV, float fld_t, vec3 W, vec3 V, vec4 G, vec4 A)");
       ctx.EmitLine("{");
       ctx.EmitLine("   float fld_dt = 0.0; int fld_frame = 0;");
       for (int i = 0; i < kMaterialInputCount; i++)
       {
          const MaterialChannel& c = kMaterialInputs[i];
          const char* gl = std::string(c.name) == "backfacing" ? "G.x" : std::string(c.name) == "objrand" ? "G.y"
-                          : std::string(c.name) == "curvature" ? "G.z" : "G.w";
+                          : std::string(c.name) == "curvature" ? "G.z" : std::string(c.name) == "attr" ? "A.x" : "G.w";
          const std::string v = (c.lanes == 1) ? gl : c.name; // G = (backfacing, objrand, curvature, cavity)
          ctx.EmitLine("   " + GlslTypeString(FieldType(c.type, c.lanes)) + " fld_v_" + c.name + " = " + v + ";");
          ctx.declaredLocals.insert(c.name);

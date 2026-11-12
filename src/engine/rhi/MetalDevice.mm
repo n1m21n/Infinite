@@ -117,7 +117,7 @@ struct InstU { float4x4 model; float4x4 normalM; MatRec mat; }; // the material:
 #else
 #define VPOS [[position]]
 #endif
-struct VOut { float4 pos VPOS; float3 wp; float3 n; float2 uv; float3 lp; float2 cw; }; // cw: curvature, cavity (row 4.4)
+struct VOut { float4 pos VPOS; float3 wp; float3 n; float2 uv; float3 lp; float3 cw; }; // cw: curvature, cavity (row 4.4), attr (row 3.3)
 
 vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                  constant InstU& m [[buffer(2)]])
@@ -128,7 +128,7 @@ vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], co
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5; // GL clip depth -1..1 to Metal 0..1
    c.y = -c.y;              // the shared image is read by GL, whose row 0 is the bottom
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float2(0.0); return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); return o;
 }
 
 float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float rough)
@@ -263,13 +263,13 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       fo.base = base; fo.roughness = hitRough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
       fo.emission = hitEm; fo.opacity = 1.0; fo.mask = 1.0;
       fo.prm0 = float4(I.mat.p0, I.mat.p1, I.mat.p2, I.mat.p3); fo.prm1 = float4(I.mat.p4, I.mat.p5, I.mat.p6, I.mat.p7); fo.prm2 = float4(I.mat.p8, I.mat.p9, I.mat.p10, I.mat.p11); fo.prm3 = float4(I.mat.p12, I.mat.p13, I.mat.p14, I.mat.p15);
-      float2 fw = float2(0.0);
+      float3 fw = float3(0.0);
       if (I.wr != 0)
       {
          const device float* wp2 = reinterpret_cast<const device float*>(I.wr);
-         fw = float2(wp2[ix.x * 2], wp2[ix.x * 2 + 1]) * w.x + float2(wp2[ix.y * 2], wp2[ix.y * 2 + 1]) * w.y + float2(wp2[ix.z * 2], wp2[ix.z * 2 + 1]) * w.z;
+         fw = float3(wp2[ix.x * 3], wp2[ix.x * 3 + 1], wp2[ix.x * 3 + 2]) * w.x + float3(wp2[ix.y * 3], wp2[ix.y * 3 + 1], wp2[ix.y * 3 + 2]) * w.y + float3(wp2[ix.z * 3], wp2[ix.z * 3 + 1], wp2[ix.z * 3 + 2]) * w.z;
       }
-      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, float4(0.0, 0.0, fw.x, fw.y), maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
+      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, float4(0.0, 0.0, fw.x, fw.y), float4(fw.z, 0.0, 0.0, 0.0), maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
       base = max(fo.base, float3(0.0)); metal = clamp(fo.metallic, 0.0, 1.0); hitRough = clamp(fo.roughness, 0.045, 1.0); hitEm = fo.emission;
    }
 #endif
@@ -692,7 +692,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       o.base = base; o.roughness = roughIn; o.metallic = metalIn; o.normal = float3(0.0, 0.0, 1.0); o.height = 0.0;
       o.emission = em0; o.opacity = alpha; o.mask = 1.0;
       o.prm0 = float4(m.mat.p0, m.mat.p1, m.mat.p2, m.mat.p3); o.prm1 = float4(m.mat.p4, m.mat.p5, m.mat.p6, m.mat.p7); o.prm2 = float4(m.mat.p8, m.mat.p9, m.mat.p10, m.mat.p11); o.prm3 = float4(m.mat.p12, m.mat.p13, m.mat.p14, m.mat.p15);
-      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), float4(dot(in.n, f.eye.xyz - in.wp) < 0.0 ? 1.0 : 0.0, 0.0, in.cw.x, in.cw.y), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
+      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), float4(dot(in.n, f.eye.xyz - in.wp) < 0.0 ? 1.0 : 0.0, 0.0, in.cw.x, in.cw.y), float4(in.cw.z, 0.0, 0.0, 0.0), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
       fldDh = float2(dfdx(o.height), dfdy(o.height));
       base = o.base; roughIn = o.roughness; metalIn = o.metallic; fldEmD = o.emission - em0; alpha = o.opacity;
       fldNrm = o.normal;
@@ -1545,15 +1545,16 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             fo.base = base; fo.roughness = rough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
             fo.emission = float3(I.mat.emission) * emMap; fo.opacity = alpha; fo.mask = 1.0;
             fo.prm0 = float4(I.mat.p0, I.mat.p1, I.mat.p2, I.mat.p3); fo.prm1 = float4(I.mat.p4, I.mat.p5, I.mat.p6, I.mat.p7); fo.prm2 = float4(I.mat.p8, I.mat.p9, I.mat.p10, I.mat.p11); fo.prm3 = float4(I.mat.p12, I.mat.p13, I.mat.p14, I.mat.p15);
-            float2 fldW = float2(0.0);
+            float3 fldW = float3(0.0);
             if (I.wr != 0)
             {
                const device float* wp2 = reinterpret_cast<const device float*>(I.wr);
-               fldW = float2(wp2[ix.x * 2], wp2[ix.x * 2 + 1]) * w3.x + float2(wp2[ix.y * 2], wp2[ix.y * 2 + 1]) * w3.y + float2(wp2[ix.z * 2], wp2[ix.z * 2 + 1]) * w3.z;
+               fldW = float3(wp2[ix.x * 3], wp2[ix.x * 3 + 1], wp2[ix.x * 3 + 2]) * w3.x + float3(wp2[ix.y * 3], wp2[ix.y * 3 + 1], wp2[ix.y * 3 + 2]) * w3.y + float3(wp2[ix.z * 3], wp2[ix.z * 3 + 1], wp2[ix.z * 3 + 2]) * w3.z;
             }
             const float4 fldG = float4(backHit ? 1.0 : 0.0, 0.0, fldW.x, fldW.y);
+            const float4 fldA = float4(fldW.z, 0.0, 0.0, 0.0);
             const float4 fldI = float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3);
-            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, fldG, maps, fldI, lod);
+            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, fldG, fldA, maps, fldI, lod);
             if (b == 0 && !hairM && fldMatHasHeight(int(abs(I.mat.program) + 0.5)))
             {
                // Row 2.6 bump: no screen derivatives at a ray hit, so the height is read twice more, a step along
@@ -1563,8 +1564,8 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                const float stp = max(h.distance, 1e-3) * 1e-3;
                const float k1 = stp / max(length(we1), 1e-12), k2 = stp / max(length(we2), 1e-12);
                FldMat fa = fo, fb = fo;
-               fldMatDispatch(int(abs(I.mat.program) + 0.5), fa, lp + le1 * k1, n, uv + (t1 - t0) * k1, f.fld.x, p + we1 * k1, -d, fldG, maps, fldI, lod);
-               fldMatDispatch(int(abs(I.mat.program) + 0.5), fb, lp + le2 * k2, n, uv + (t2 - t0) * k2, f.fld.x, p + we2 * k2, -d, fldG, maps, fldI, lod);
+               fldMatDispatch(int(abs(I.mat.program) + 0.5), fa, lp + le1 * k1, n, uv + (t1 - t0) * k1, f.fld.x, p + we1 * k1, -d, fldG, fldA, maps, fldI, lod);
+               fldMatDispatch(int(abs(I.mat.program) + 0.5), fb, lp + le2 * k2, n, uv + (t2 - t0) * k2, f.fld.x, p + we2 * k2, -d, fldG, fldA, maps, fldI, lod);
                fldDh = float2(fa.height - fo.height, fb.height - fo.height);
                fldE1 = we1 * k1; fldE2 = we2 * k2;
             }
@@ -1999,7 +2000,7 @@ vertex VOut ri_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float2(0.0); return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); return o;
 }
 vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                   const device float4x4* models [[buffer(5)]])
@@ -2011,7 +2012,7 @@ vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const de
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float2(0.0); return o; // uniform scale: the model's 3x3 turns normals
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); return o; // uniform scale: the model's 3x3 turns normals
 }
 // Runs: consecutive instances sharing a mesh and material drawn in one instanced call; per-copy data from a buffer.
 vertex VOut rr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
@@ -2025,7 +2026,7 @@ vertex VOut rr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(uvs[vid * 2], uvs[vid * 2 + 1]); o.lp = p; o.cw = float2(wr[vid * 2], wr[vid * 2 + 1]); return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(uvs[vid * 2], uvs[vid * 2 + 1]); o.lp = p; o.cw = float3(wr[vid * 3], wr[vid * 3 + 1], wr[vid * 3 + 2]); return o;
 }
 struct SOut { float4 pos [[position]]; };
 vertex SOut shr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant float4x4& lvp [[buffer(1)]],
@@ -2569,12 +2570,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          return true;
       }
    private:
-      // Two floats per vertex (zeros when the mesh has none), read by rr_vs and the path tracer.
-      // Two floats per vertex (curvature, cavity; zeros when not baked), read by rr_vs and the ray hits.
+      // Three floats per vertex (curvature, cavity, attr; zeros when the mesh has none), read by rr_vs and the ray hits.
       id<MTLBuffer> WearBuffer(const std::vector<float>& w, size_t nv)
       {
-         const size_t len = std::max<size_t>(nv * 8, 8);
-         if (w.size() == nv * 2 && nv > 0)
+         const size_t len = std::max<size_t>(nv * 12, 12);
+         if (w.size() == nv * 3 && nv > 0)
             return [mDev newBufferWithBytes:w.data() length:len options:MTLResourceStorageModeShared];
          id<MTLBuffer> b = [mDev newBufferWithLength:len options:MTLResourceStorageModeShared];
          std::memset(b.contents, 0, len);

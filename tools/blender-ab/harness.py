@@ -367,8 +367,11 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
                 wires.append("cable %d %s %d" % (mat, slot, tex))
             geos.append(mat)
             continue
-        model = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "obj_%d.glb" % i),
-                                        "  b normalize 0", "  b recenter 0"])
+        if o.get("sketch"):   # row 3.3: the mesh from a Sketch 3D script (Infinite's Y-up world), not the Blender glb
+            model = node("3D", "Sketch 3D", ["  s code %s" % o["sketch"].replace("\n", "\\n")])
+        else:
+            model = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "obj_%d.glb" % i),
+                                            "  b normalize 0", "  b recenter 0"])
         if o.get("instances"):
             # The shape at the origin, stamped on the vertices of the points mesh (one instance per vertex).
             pts = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "pts_%d.glb" % i),
@@ -408,6 +411,11 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             w = m["wear"]
             code = ("base = vec3(0.0)\\nroughness = 1.0\\nemission = vec3(clamp(0.5 + curvature * %r, 0.0, 1.0))" % float(m.get("gain", 0.1))
                     if w == "curvature" else "base = vec3(0.0)\\nroughness = 1.0\\nemission = vec3(1.0 - cavity)")
+            fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % code])
+            wires.append("cable %d field %d" % (mat, fp))
+        if m.get("split"):   # row 3.3: two tones by the mesh's mask() attribute (attr)
+            c0, c1, _ = m["split"]
+            code = "base = mix(vec3(%r, %r, %r), vec3(%r, %r, %r), step(0.5, attr))\\nroughness = 0.5" % (*map(float, c0), *map(float, c1))
             fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % code])
             wires.append("cable %d field %d" % (mat, fp))
         if m.get("recipe"):   # rows 3.5 / 4.5: a Material recipe from FieldMaterialRecipes.h, its default params

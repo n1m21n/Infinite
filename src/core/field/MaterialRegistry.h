@@ -25,6 +25,7 @@ namespace Field
       uint32_t written = 0;  // MaterialOutputBit mask of the outputs the program writes
       bool usesTime = false; // reads t: the picture changes every frame
       bool usesWear = false; // reads curvature or cavity (row 4.4): the renderer bakes them per vertex
+      bool usesAttr = false; // reads attr (row 3.3): the renderer carries the mesh's per-vertex mask
       std::string error;     // set when a backend could not compile it (read with MaterialProgramError)
    };
 

@@ -321,7 +321,7 @@ namespace
       "in mat4 aInstance;\n"      // per-instance transform, divisor 1
       "in vec3 aInstanceColor;\n" // per-instance tint, divisor 1
       "in vec3 aVertexColor;\n"   // per-vertex tint, from Mesh::vertexColor
-      "in vec2 aWear;\n"          // row 4.4: curvature, cavity per vertex (attrib off = 0)
+      "in vec3 aWear;\n"          // rows 4.4 / 3.3: curvature, cavity, attr per vertex (attrib off = 0)
       "uniform mat4 uModel;\n"
       "uniform int uInstanced;\n"
       "uniform int uInstanceColored;\n"
@@ -361,7 +361,7 @@ namespace
       "out vec2 vUv;\n"
       "out vec3 vInstanceColor;\n"
       "out vec3 vVertexColor;\n"
-      "out vec2 vWear;\n"
+      "out vec3 vWear;\n"
       // Motion blur's velocity cook: where this point was last frame, through last
       // frame's camera. uMotionDelta takes this frame's world to last frame's.
       "uniform int uVelocity;\n"
@@ -450,7 +450,7 @@ namespace
       "in vec2 vUv;\n"
       "in vec3 vInstanceColor;\n"
       "in vec3 vVertexColor;\n"
-      "in vec2 vWear;\n"
+      "in vec3 vWear;\n"
       "in vec4 vLightSpacePos;\n"
       "in vec4 vCurClip;\n"
       "in vec4 vPrevClip;\n"
@@ -1146,7 +1146,7 @@ namespace
       "      o.base = base; o.roughness = rough; o.metallic = metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
       "      o.emission = emiss; o.opacity = alpha; o.mask = 1.0;\n"
       "      o.prm0 = uFldPrm[0]; o.prm1 = uFldPrm[1]; o.prm2 = uFldPrm[2]; o.prm3 = uFldPrm[3];\n"
-      "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime, vWorldPos, normalize(uCamPos - vWorldPos), vec4(gl_FrontFacing ? 0.0 : 1.0, 0.0, vWear.x, vWear.y));\n"
+      "      fldMatDispatch(int(uFldProgram + 0.5), o, vLocalPos, n, vUv, uFldTime, vWorldPos, normalize(uCamPos - vWorldPos), vec4(gl_FrontFacing ? 0.0 : 1.0, 0.0, vWear.x, vWear.y), vec4(vWear.z, 0.0, 0.0, 0.0));\n"
       "      vec3 dp1 = dFdx(vWorldPos), dp2 = dFdy(vWorldPos);\n"
       "      vec2 duv1 = dFdx(vUv), duv2 = dFdy(vUv);\n"
       "      float dhx = dFdx(o.height), dhy = dFdy(o.height);\n"
@@ -3520,7 +3520,7 @@ void Render3DNode::CookOnce(int frameId)
 
       const unsigned long long revision = source->MeshRevision();
       const Field::MaterialProgramEntry* wearProg = Field::FindMaterialProgram(source->GetMaterial().fieldProgram);
-      const bool wantWear = wearProg != nullptr && wearProg->usesWear && !mesh.vertices.empty();
+      const bool wantWear = wearProg != nullptr && (wearProg->usesWear || wearProg->usesAttr) && !mesh.vertices.empty();
       if (gpu.meshRevision != revision || gpu.hasWear != wantWear)
       {
          glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
@@ -3560,19 +3560,19 @@ void Render3DNode::CookOnce(int frameId)
          {
             glDisableVertexAttribArray(8);
          }
-         // Location 9: curvature and cavity (row 4.4), baked only for a material program that reads them.
+         // Location 9: curvature, cavity (row 4.4) and attr (row 3.3), only for a material program that reads them.
          gpu.hasWear = wantWear;
          if (wantWear)
          {
-            const std::vector<float> wear = MeshWear::Bake(&mesh.vertices[0].px, sizeof(Vertex) / sizeof(float), mesh.vertices.size(),
-                                                           mesh.indices.data(), mesh.indices.size());
+            const std::vector<float> wear = MeshWear::Stream(&mesh.vertices[0].px, sizeof(Vertex) / sizeof(float), mesh.vertices.size(),
+                                                             mesh.indices.data(), mesh.indices.size(), wearProg->usesWear, mesh.vertexMask);
             if (gpu.wearVbo == 0)
                glGenBuffers(1, &gpu.wearVbo);
             glBindBuffer(GL_ARRAY_BUFFER, gpu.wearVbo);
             glBufferData(GL_ARRAY_BUFFER, wear.size() * sizeof(float), wear.data(), GL_STATIC_DRAW);
             Bench::GpuMem::RecordBuffer(gpu.wearVbo, Bench::GpuMemCategory::MeshBuffers, wear.size() * sizeof(float), "Render3D_Wear");
             glEnableVertexAttribArray(9);
-            glVertexAttribPointer(9, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+            glVertexAttribPointer(9, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
          }
          else
          {

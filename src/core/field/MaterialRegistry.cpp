@@ -73,7 +73,7 @@ namespace Field
             if (!(std::isalnum((unsigned char)nx) || nx == '_')) uses++;
          }
          e.usesTime = uses > 1;
-         // every function declares fld_v_curvature / fld_v_cavity from G; a second whole-word use is a read
+         // every function declares fld_v_curvature / fld_v_cavity / fld_v_attr from G and A; a second whole-word use is a read
          auto reads = [&](const std::string& name) {
             int n = 0;
             for (size_t at = g.source.find(name); at != std::string::npos; at = g.source.find(name, at + name.size()))
@@ -84,6 +84,7 @@ namespace Field
             return n > 1;
          };
          e.usesWear = reads("fld_v_curvature") || reads("fld_v_cavity");
+         e.usesAttr = reads("fld_v_attr");
       }
       e.glsl = std::move(g.source);
       e.msl = std::move(m.source);
@@ -120,13 +121,13 @@ namespace Field
       s += "\n";
       for (int id : ids)
          s += (g ? FindMaterialProgram(id)->glsl : FindMaterialProgram(id)->msl) + "\n";
-      s += g ? "void fldMatDispatch(int id, inout FldMat o, vec3 P, vec3 N, vec2 UV, float t, vec3 W, vec3 V, vec4 G)\n{\n"
-             : "static void fldMatDispatch(int id, thread FldMat& o, float3 P, float3 N, float2 UV, float t, float3 W, float3 V, float4 G, "
+      s += g ? "void fldMatDispatch(int id, inout FldMat o, vec3 P, vec3 N, vec2 UV, float t, vec3 W, vec3 V, vec4 G, vec4 A)\n{\n"
+             : "static void fldMatDispatch(int id, thread FldMat& o, float3 P, float3 N, float2 UV, float t, float3 W, float3 V, float4 G, float4 A, "
                "array<texture2d<float>, 16> fm, float4 fi, float flod)\n{\n";
       for (int id : ids)
       {
          const std::string n = std::to_string(id);
-         s += "   if (id == " + n + ") fldmat_" + n + (g ? "(o, P, N, UV, t, W, V, G);\n" : "(o, P, N, UV, t, W, V, G, fm, fi, flod);\n");
+         s += "   if (id == " + n + ") fldmat_" + n + (g ? "(o, P, N, UV, t, W, V, G, A);\n" : "(o, P, N, UV, t, W, V, G, A, fm, fi, flod);\n");
       }
       s += "}\n";
       // Row 2.6: which programs write height (the tracer takes two more taps for those, to bump the normal).

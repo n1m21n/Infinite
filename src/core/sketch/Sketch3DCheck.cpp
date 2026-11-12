@@ -81,6 +81,8 @@ int main()
    Check(!m.HasVertexColor(), "no fill() -> no vertex colour");
    Build("function draw(t){ fill(1,0,0); box(1); }", m, err);
    Check(m.HasVertexColor() && m.vertexColor[0] == 1.f && m.vertexColor[1] == 0.f, "fill() colours vertices");
+   Build("function draw(t){ box(1); mask(1); box(1); }", m, err);
+   Check(m.vertexMask.size() == m.vertices.size() && m.vertexMask.front() == 0.f && m.vertexMask.back() == 1.f, "mask() tags vertices");
 
    // Custom shape.
    Build("function draw(t){ beginShape(TRIANGLES); vertex(0,0,0); vertex(1,0,0); vertex(0,1,0); endShape(); }", m, err);

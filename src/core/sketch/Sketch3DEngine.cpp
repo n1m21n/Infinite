@@ -83,6 +83,8 @@ struct Program
    std::vector<Mat4> stack;
    float fill[3] = {1, 1, 1};
    bool usedFill = false;
+   float mask = 0;          // row 3.3: mask(v), read by material programs as `attr`
+   bool usedMask = false;
    Rng rng;
    int shapeKind = -1;             // -1 = not inside beginShape
    std::vector<V3> shape;
@@ -125,6 +127,7 @@ struct Program
       mesh.vertexColor.push_back(fill[0]);
       mesh.vertexColor.push_back(fill[1]);
       mesh.vertexColor.push_back(fill[2]);
+      mesh.vertexMask.push_back(mask);
       return (unsigned int)mesh.vertices.size() - 1;
    }
    bool Mirrored() const
@@ -241,6 +244,14 @@ FN(js_fill)
    else return JS_ThrowTypeError(c, "fill(gray) or fill(r, g, b), 0..1");
    for (int i = 0; i < 3; ++i) p->fill[i] = SrgbToLinear(std::min(1.f, std::max(0.f, v[i])));
    p->usedFill = true;
+   return JS_UNDEFINED;
+}
+FN(js_mask)
+{
+   Program* p = P(c);
+   NEEDN(1); GETF(0, v);
+   p->mask = v;
+   p->usedMask = true;
    return JS_UNDEFINED;
 }
 FN(js_hsl)
@@ -566,6 +577,7 @@ bool Sketch3DEngine::Compile(const std::string& code, SketchError& err)
 
    JSValue g = JS_GetGlobalObject(c);
    Reg(c, g, "fill", js_fill, 1);
+   Reg(c, g, "mask", js_mask, 1);
    Reg(c, g, "hsl", js_hsl, 3);
    Reg(c, g, "push", js_push, 0);
    Reg(c, g, "pop", js_pop, 0);
@@ -642,6 +654,8 @@ bool Sketch3DEngine::Run(const Frame& f, Mesh& out, SketchError& err)
    p->shapeKind = -1;
    p->fill[0] = p->fill[1] = p->fill[2] = 1;
    p->usedFill = false;
+   p->mask = 0;
+   p->usedMask = false;
    p->tooBig = false;
    p->rng.s = (f.seed * 2654435761u) ^ ((uint32_t)f.frame * 40503u + 1u);
    if (!p->rng.s) p->rng.s = 1;
@@ -677,6 +691,7 @@ bool Sketch3DEngine::Run(const Frame& f, Mesh& out, SketchError& err)
    if (!ok) return false;
 
    if (!p->usedFill) p->mesh.vertexColor.clear();
+   if (!p->usedMask) p->mesh.vertexMask.clear();
    out = std::move(p->mesh);
    p->mesh = Mesh();
    return true;

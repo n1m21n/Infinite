@@ -19,8 +19,8 @@ namespace engine
       std::vector<float> tracePosNormal;
       std::vector<uint32_t> traceIndices;
       std::vector<float> traceUv;
-      // Row 4.4: curvature, cavity per vertex (MeshWear.h), baked only when a material program reads them; empty =
-      // none (both read 0). traceWear: the same over the trace mesh, when there is one.
+      // Rows 4.4 / 3.3: curvature, cavity, attr per vertex (MeshWear::Stream), present only when a material program
+      // reads one of them; empty = none (all read 0). traceWear: the same over the trace mesh, when there is one.
       std::vector<float> wear, traceWear;
    };
 

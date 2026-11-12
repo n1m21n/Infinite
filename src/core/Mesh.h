@@ -48,6 +48,9 @@ struct Mesh
    // per-instance colour for upload - same shape means the same upload path
    // works.
    std::vector<float> vertexColor;
+   // Row 3.3: one float per vertex, parallel to `vertices` (Sketch 3D mask()); material programs read it as `attr`.
+   // Empty (or size-mismatched) means none: attr reads 0.
+   std::vector<float> vertexMask;
 
    bool Empty() const { return vertices.empty() || indices.empty(); }
    // Unlike Empty(), true for a vertices-only mesh with no faces (Points to

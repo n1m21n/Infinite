@@ -3270,6 +3270,7 @@ namespace Field
       { "W", DataType::Vec3, 3 },         { "V", DataType::Vec3, 3 },       // row 2.3: world position, unit vector to the eye
       { "curvature", DataType::Float, 1 }, { "cavity", DataType::Float, 1 },
       { "backfacing", DataType::Float, 1 }, { "objrand", DataType::Float, 1 }, // row 2.6: 1 on the back side; per-object random (0 until row 7.2)
+      { "attr", DataType::Float, 1 },       // row 3.3: the mesh's per-vertex mask (Sketch 3D mask()), 0 when it has none
    };
    const int kMaterialInputCount = (int)(sizeof(kMaterialInputs) / sizeof(kMaterialInputs[0]));
    const MaterialChannel kMaterialOutputs[] = {

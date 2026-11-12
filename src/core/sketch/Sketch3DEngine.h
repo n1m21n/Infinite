@@ -34,7 +34,7 @@ public:
       const std::map<std::string, float>* params = nullptr;
    };
    // Runs draw(t) and replaces `out` with the mesh it built. Vertex colour is filled
-   // (linear RGB) only if the script called fill() this frame. On a runtime error
+   // (linear RGB) only if the script called fill() this frame, the vertex mask only if it called mask(). On a runtime error
    // `out` is left untouched and false returned.
    bool Run(const Frame& f, Mesh& out, SketchError& err);
 

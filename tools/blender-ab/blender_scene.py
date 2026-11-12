@@ -441,6 +441,16 @@ for i, o in enumerate(scene["objects"]):
             ao.samples = 16; ao.only_local = True
             ao.inputs["Distance"].default_value = 0.05 * rad
             nt.links.new(ao.outputs["AO"], em.inputs["Color"])
+    if m.get("split"):   # row 3.3 truth: the Sketch 3D mask() split as a world-height step (Blender Z-up)
+        c0, c1, z = m["split"]
+        nt = mat.node_tree
+        geo = nt.nodes.new("ShaderNodeNewGeometry"); sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        gt = nt.nodes.new("ShaderNodeMath"); gt.operation = 'GREATER_THAN'; gt.inputs[1].default_value = z
+        mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = 'RGBA'
+        mix.inputs[6].default_value = (*c0, 1.0); mix.inputs[7].default_value = (*c1, 1.0)
+        nt.links.new(geo.outputs["Position"], sep.inputs[0]); nt.links.new(sep.outputs["Z"], gt.inputs[0])
+        nt.links.new(gt.outputs[0], mix.inputs[0]); nt.links.new(mix.outputs[2], p.inputs["Base Color"])
+        p.inputs["Roughness"].default_value = 0.5
     if m.get("recipe"):   # rows 3.5 / 4.5 truth: the recipe rebuilt from Cycles' own masks (pointiness, local AO, normal)
         add_recipe(mat, p, ob, m["recipe"])
     # Coverage-case lobes. Render 3D's subsurface colour is Cycles' per-channel radius; its 0..1 radius maps to 0.2 m.

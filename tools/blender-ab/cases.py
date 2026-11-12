@@ -297,6 +297,17 @@ def _wear_groove():
                         for x, r in ((1.2, "Edge Wear"), (0.0, "Dirt"), (-1.2, "Dust"))]}
 
 
+def _sketch3d_two_tone():
+    # Row 3.3: a Sketch 3D cube whose top half is tagged mask(1); a material Field program reads it as attr and paints
+    # the two halves. Truth splits Cycles' cube at the same height.
+    js = ("function draw(t) {\n  push(); translate(0, 0.5, 0); box(2, 1, 2); pop();\n"
+          "  mask(1);\n  push(); translate(0, 1.5, 0); box(2, 1, 2); pop();\n}")
+    return {"size": SMALL, "camera": {"fov": 40, "azimuth": 60, "elevation": 25, "distance": 7, "target": [0, 0, 1]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 70, "elevation": 45}], "world": {"color": [0.35, 0.35, 0.35]},
+            "objects": [GREY_FLOOR, {"shape": "cube", "location": [0, 0, 1], "sketch": js,
+                                     "material": {"split": [[0.6, 0.08, 0.05], [0.05, 0.2, 0.5], 1.0]}}]}
+
+
 RECIPES = ("Leather", "Suede", "Rubber", "Knit Fabric", "Carpet", "Brushed Metal", "Concrete", "Painted Wood")
 
 
@@ -402,6 +413,7 @@ CASES.update({
     "geom_monkey": _monkey(),
     "wear_masks": _wear_masks(),
     "wear_groove": _wear_groove(),
+    "sketch3d_two_tone": _sketch3d_two_tone(),
     "recipes_near": _recipes(3.6),
     "recipes_far": _recipes(16.0),
     # Motion: a camera orbit, a fast object with motion blur, and a still shot scored for flicker.
