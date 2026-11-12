@@ -2,6 +2,7 @@
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/frame/FrameCtx.h"
+#include "app/ui/ThemeFiles.h" // fork
 #include "plugin/engine/PluginView.h"
 
 namespace app
@@ -636,6 +637,8 @@ void DrawFramePump(FrameCtx& fc)
          if (gKbOwnTab || gTerminalFocus || (!navOn && !nio.WantTextInput))
             ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       }
+      if (ThemeFiles::Tick()) // fork: hot-reload of themes/*.json
+         ApplyTheme();
       ImGui::NewFrame();
       // The shell's keys are text to every canvas and panel shortcut. Set here: EndFrame overwrites WantTextInputNextFrame.
       if (gTerminalFocus)

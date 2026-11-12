@@ -616,6 +616,7 @@ set(COMMON_SOURCES
     src/app/ui/ModWidgets.cpp
     src/app/ui/ParamWidgets.cpp
     src/app/ui/Theme.cpp
+    src/app/ui/ThemeFiles.cpp # fork: JSON themes
     src/app/ui/design/UiAnim.cpp
     src/app/ui/design/UiType.cpp
     src/app/ui/design/UiInteract.cpp

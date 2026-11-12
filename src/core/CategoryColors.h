@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,25 @@ namespace CategoryColors
    int CurrentPreset();
    void SetPreset(int index); // clamps out-of-range, persists immediately
    void SetPresetTransient(int index); // same, but never written to the user's theme file (tests, gallery)
+
+   // fork: user themes (<SettingsDir>/themes/*.json, see app/ui/ThemeFiles.cpp, docs/themes.md). They are appended
+   // after the built-in presets, so indices of the built-ins never move.
+   struct UserPreset
+   {
+      std::string name, file, base;
+      UiTheme ui;
+      std::map<std::string, Color> categories; // complete (already merged with the base preset)
+      std::map<int, Color> cables;             // CableType -> colour; may be partial
+   };
+   int BuiltinPresetCount();
+   bool IsUserPreset(int index);
+   const std::string& PresetFile(int index);
+   const std::string& PresetBase(int index);
+   int FindPreset(const std::string& name); // -1 when unknown
+   std::map<std::string, Color> PresetCategoryColors(int index);
+   std::map<int, Color> PresetCableColors(int index);
+   // Replaces every user theme; the active theme is kept by name (falls back to preset 0).
+   void SetUserPresets(const std::vector<UserPreset>& themes);
 
    // All 10 node module categories
    const std::vector<std::string>& CategoryNames();

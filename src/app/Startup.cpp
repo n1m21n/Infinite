@@ -11,6 +11,7 @@
 #include "app/frame/FrameCtx.h"
 #include "platform/HeadTracker.h"
 #include "platform/AppPaths.h"
+#include "app/ui/ThemeFiles.h" // fork
 #include "core/DawPluginInstall.h"
 
 namespace app
@@ -1436,6 +1437,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Loaded here (rather than down with the other Load*Settings() calls)
    // because the font/DPI block right below needs gUiScale before it bakes
    // the font atlas - loading it after the atlas already exists is too late.
+   ThemeFiles::Init(); // fork: user themes (themes/*.json) must exist before the saved theme name is resolved
    CategoryColors::LoadPreference();
 
    // Interface language: an explicit choice wins, otherwise the first OS preference that is one of
