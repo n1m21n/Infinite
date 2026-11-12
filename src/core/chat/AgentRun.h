@@ -4,6 +4,7 @@
 // and the main thread takes the events each frame. Never blocks the caller.
 #include "AgentStream.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -28,6 +29,9 @@ namespace chat
          std::vector<std::string> argv;  // AgentArgs()
          std::string cwd;
          std::vector<std::pair<std::string, std::string>> env;
+         // fork: an in-process turn instead of a child process (the built-in HTTP agent). Gets an emitter and a
+         // "stopped?" test; when it returns the run is over.
+         std::function<void(const std::function<void(const AgentEvent&)>&, const std::function<bool()>&)> work;
          bool raw = false;  // not a stream-json turn (a sign-in, a setup): End carries the exit status, Log() the text
       };
       static std::shared_ptr<AgentRun> Start(const Options& options);

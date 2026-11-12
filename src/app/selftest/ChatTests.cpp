@@ -9,6 +9,10 @@
 #include "core/chat/ChatFiles.h"
 #include "core/chat/ChatThread.h"
 #include "core/chat/PatchGrammar.h"
+#include "core/chat/HttpAgent.h"
+#include "core/chat/Providers.h"
+#include "core/McpHttp.h"
+#include "platform/AgentNet.h"
 #include "core/chat/ReplyLinks.h"
 #include "core/chat/ChatGuide.h"
 #include "core/chat/NodeFinder.h"
@@ -244,6 +248,68 @@ namespace app
                   std::find(next.begin(), next.end(), "--resume") != next.end() && next.back() == "hello",
                "claude: first turn names the session, later turns resume it");
          check(chat::TerminalResumeLine(chat::AgentKind::Claude, "abc") == "claude --resume abc", "terminal face resumes the same session");
+         {  // fork: provider table and the custom (OpenAI-compatible) agent
+            check(chat::FindProvider("codex") != nullptr && chat::FindProvider("codex")->kind == chat::AgentKind::Codex && chat::FindProvider("nope") == nullptr &&
+                     chat::FindProvider(chat::AgentKind::Custom) != nullptr && std::string(chat::FindProvider(chat::AgentKind::Custom)->id) == "custom",
+                  "providers: the table finds agents by id and kind");
+            check(chat::AgentArgs(chat::AgentKind::Custom, "hi", "s", false).empty(), "custom: the built-in agent has no argv (no child process)");
+            check(chat::CustomProblem("", "m", "K").size() > 0 && chat::CustomProblem("http://x", "", "K").size() > 0 && chat::CustomProblem("http://x", "m", "a b;").size() > 0 &&
+                     chat::CustomProblem("http://x", "m", "CUSTOM_LLM_API_KEY").empty() && chat::CustomProblem("http://x", "m", "").empty(),
+                  "custom: an incomplete form or a bad variable name blocks the turn");
+            check(chat::ChatUrl("https://openrouter.ai/api/v1/") == "https://openrouter.ai/api/v1/chat/completions" && chat::MaskKey("sk-abcdefghijkl") == "sk-…ijkl" && chat::MaskKey("abc") == "…",
+                  "custom: the chat URL is the base + /chat/completions; keys are masked");
+            {
+               chat::SseChat sc;
+               const std::string stream =
+                  "data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\r\n\r\n: keep-alive\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n"
+                  "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"infinite_cli\",\"arguments\":\"{\\\"args\\\":\"}}]}}]}\n"
+                  "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"[\\\"undo\\\"]}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n"
+                  "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":7,\"prompt_tokens_details\":{\"cached_tokens\":40}}}\ndata: [DONE]\n";
+               for (size_t i = 0; i < stream.size(); i += 7)  // arbitrary chunking
+                  sc.Feed(stream.data() + i, std::min<size_t>(7, stream.size() - i));
+               check(sc.text == "Hello" && sc.calls.size() == 1 && sc.calls[0].id == "c1" && sc.calls[0].name == "infinite_cli" && sc.calls[0].args == "{\"args\":[\"undo\"]}" &&
+                        sc.finish == "tool_calls" && sc.usage.input == 60 && sc.usage.cached == 40 && sc.usage.output == 7 && sc.done,
+                     "custom: SSE chunks give text, a tool call assembled from pieces, usage");
+               check(chat::OpenAiTools().size() == 4 && chat::OpenAiTools()[0]["type"] == "function" && chat::DescribeCall("infinite_cli", nlohmann::json::parse("{\"args\":[\"add\",\"Osc\"]}")) == "infinite add Osc",
+                     "custom: Infinite's tools are offered in OpenAI form");
+            }
+         }
+         {
+            if (const char* mock = std::getenv("INFINITE_MOCK_LLM_PORT"))  // fork: only with tools/mock_openai_server.py running
+            {
+               chat::HttpAgentConfig hc;
+               hc.baseUrl = std::string("http://127.0.0.1:") + mock + "/v1";
+               hc.model = "mock";
+               hc.tools = false;
+               const auto turn = [&](const chat::HttpAgentConfig& c, std::vector<chat::AgentEvent>& ev)
+               { chat::RunHttpTurn(c, "sess-1", false, "hello", [&](const chat::AgentEvent& e) { ev.push_back(e); }, [] { return false; }); };
+               std::vector<chat::AgentEvent> ev;
+               turn(hc, ev);  // the mock wants "Bearer test-key": no key is set here, so it refuses with 401
+               check(!ev.empty() && ev.back().kind == chat::AgentEvent::Kind::End && ev.back().error && ev.back().text.find("401") != std::string::npos, "mock llm: a refused key ends the turn with the status");
+               AgentNet::SecretSet(chat::kKeyService, chat::kKeyAccount, "test-key");
+               ev.clear();
+               turn(hc, ev);
+               bool streamed = false;
+               for (const auto& e : ev)
+                  streamed = streamed || (e.kind == chat::AgentEvent::Kind::Text && e.text.find("Hello from the mock") != std::string::npos);
+               check(streamed && !ev.back().error && ev.back().usage.output == 5, "mock llm: the keychain key is sent, the stream becomes the answer, usage is read");
+               const chat::ConnectionResult cr = chat::TestConnection(hc);
+               check(cr.ok, "mock llm: test connection says connected");
+               AgentNet::SecretDelete(chat::kKeyService, chat::kKeyAccount);
+            }
+            {  // fork: the in-app MCP over HTTP answers the protocol without a socket
+               const std::string init = McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\"}}");
+               const std::string list = McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
+               check(init.find("2025-03-26") != std::string::npos && list.find("infinite_cli") != std::string::npos && list.find("infinite_rpc_methods") != std::string::npos,
+                     "mcp http: initialize echoes the version, tools/list names the tools");
+               check(McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}").empty() && McpHttp::Handle("nope").find("-32700") != std::string::npos &&
+                        McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"x\"}").find("-32601") != std::string::npos,
+                     "mcp http: notifications get no reply; bad JSON and unknown methods are errors");
+               check(McpHttp::NewToken().size() == 32 && McpHttp::AgentInstructions({ true, 7790, "tok123" }, "/x/Infinite").find("Bearer tok123") != std::string::npos,
+                     "mcp http: instructions carry the real token");
+            }
+
+         }
 
          // A turn through the login shell: a stand-in agent prints stream-json, the runner hands it over.
          auto runTurn = [](const std::vector<std::string>& argv, std::vector<chat::AgentEvent>& out)

@@ -550,6 +550,11 @@ set(COMMON_SOURCES
     src/app/panels/ChatPanel.cpp
     src/core/CliSetup.cpp
     src/core/chat/AgentStream.cpp
+    src/core/chat/Providers.cpp
+    src/core/chat/HttpAgent.cpp
+    src/core/McpHttp.cpp
+    src/app/panels/CustomAgentForm.cpp
+    src/app/panels/ConnectAgentForm.cpp
     src/core/chat/ChatCatalog.cpp
     src/core/chat/PatchGrammar.cpp
     src/core/chat/ReplyLinks.cpp
@@ -961,6 +966,7 @@ file(GLOB INFINITE_NOTO_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ext
 
 set(APPLE_SOURCES
     src/platform/Platform.mm
+    src/platform/AgentNetMac.mm
     src/platform/MidiOutMac.mm
     src/platform/HeadTracker.mm
     src/audio/AudioFileWriter.mm
@@ -999,6 +1005,7 @@ set(WIN32_SOURCES
     # activeCodePage UTF-8: narrow paths, getenv and argv become UTF-8 (W1).
     src/platform/win/Infinite.manifest
     src/platform/win/PlatformWin.cpp
+    src/platform/AgentNetWin.cpp
     src/platform/HeadTrackerStub.cpp
     src/platform/win/TextWin.cpp
     src/platform/win/CrashHandlerWin.cpp
@@ -1032,6 +1039,7 @@ set(WIN32_SOURCES
 
 set(LINUX_SOURCES
     src/platform/linux/PlatformLinux.cpp
+    src/platform/AgentNetStub.cpp
     src/platform/HeadTrackerStub.cpp
     src/platform/linux/TextLinux.cpp
     src/platform/linux/CrashHandlerLinux.cpp
@@ -1757,7 +1765,7 @@ endif()
 
 if(APPLE)
     target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
-    set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
+    set_source_files_properties(src/platform/Platform.mm src/platform/AgentNetMac.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
@@ -1843,6 +1851,7 @@ if(APPLE)
 
     target_link_libraries(Infinite PRIVATE
         "-framework OpenGL"
+        "-framework Security"  # fork: Keychain for the built-in agent
         "-framework Cocoa"
         "-framework IOKit"
         "-framework CoreVideo"
