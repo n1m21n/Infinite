@@ -238,3 +238,16 @@ configure time; it is not part of this repository.
 Copyright (c) Apple Inc. Licensed under the Apache License, Version 2.0
 (https://www.apache.org/licenses/LICENSE-2.0). The shipped AU bundle carries
 the licence text in its Resources folder (added with the AU build, plan step 1.6).
+
+MoltenVK and the Vulkan headers (optional Vulkan engine backend)
+----------------------------------------------------------------
+
+Used only when Infinite is built with `-DINFINITE_VULKAN=ON` (off by default and in
+every release): `src/engine/rhi/VulkanDevice.cpp` links MoltenVK 1.4.2 statically on
+macOS and compiles against the Khronos Vulkan headers 1.4.363; its shaders are
+compiled to SPIR-V with glslang at build time (a build tool, not shipped). None of
+these are part of this repository.
+
+MoltenVK: Copyright (c) The Brenwill Workshop Ltd. Vulkan headers: Copyright (c)
+The Khronos Group Inc. Both licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0).

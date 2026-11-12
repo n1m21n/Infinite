@@ -1263,6 +1263,52 @@ endif()
 if(WIN32)
     target_sources(Infinite PRIVATE ${WIN32_SOURCES})
 endif()
+# Real-time engine on Vulkan (OPUS_PLAN rows 9.2 to 9.5). Off by default: the shipped macOS engine is Metal. On, it
+# links MoltenVK statically (macOS) or the system loader (Linux), and INFINITE_RHI=vulkan picks it at run time.
+# SPIR-V comes from VkShaderGen (src/engine/rhi/vk) through glslang at build time.
+option(INFINITE_VULKAN "Build the Vulkan engine backend (INFINITE_RHI=vulkan)" OFF)
+if(INFINITE_VULKAN)
+    set(INFINITE_VK_ROOT "$ENV{HOME}/Infinite/vk/src" CACHE PATH "Vulkan headers, MoltenVK and glslang")
+    find_program(INFINITE_GLSLANG glslang HINTS "${INFINITE_VK_ROOT}/glslang/16.6.0/bin" REQUIRED)
+    add_executable(VkShaderGen src/engine/rhi/vk/VkShaderGen.cpp)
+    target_include_directories(VkShaderGen PRIVATE src)
+    target_compile_features(VkShaderGen PRIVATE cxx_std_17)
+    set(_vkgen "${CMAKE_CURRENT_BINARY_DIR}/vkshaders")
+    set(_vkheaders)
+    foreach(_s raster.vert raster.frag shadow.vert bg.vert bg.frag tri.vert tri.frag)
+        string(REPLACE "." "_" _id "${_s}")
+        # kVk + CamelCase name, e.g. raster_frag -> kVkRasterFrag
+        string(REPLACE "_" ";" _parts "${_id}")
+        set(_name "kVk")
+        foreach(_p ${_parts})
+            string(SUBSTRING "${_p}" 0 1 _f)
+            string(TOUPPER "${_f}" _f)
+            string(SUBSTRING "${_p}" 1 -1 _r)
+            string(APPEND _name "${_f}${_r}")
+        endforeach()
+        add_custom_command(OUTPUT "${_vkgen}/${_id}.h"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${_vkgen}"
+            COMMAND VkShaderGen "${_vkgen}"
+            COMMAND "${INFINITE_GLSLANG}" -V --target-env vulkan1.3 --vn ${_name} -o "${_vkgen}/${_id}.h" "${_vkgen}/${_s}"
+            DEPENDS VkShaderGen
+            COMMENT "SPIR-V ${_s}")
+        list(APPEND _vkheaders "${_vkgen}/${_id}.h")
+    endforeach()
+    add_custom_target(InfiniteVkShaders DEPENDS ${_vkheaders})
+    add_dependencies(Infinite InfiniteVkShaders)
+    target_sources(Infinite PRIVATE src/engine/rhi/VulkanDevice.cpp)
+    target_include_directories(Infinite PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+    target_compile_definitions(Infinite PRIVATE INFINITE_VULKAN=1)
+    if(APPLE)
+        target_include_directories(Infinite PRIVATE "${INFINITE_VK_ROOT}/vulkan-headers/1.4.363.0/include" "${INFINITE_VK_ROOT}/molten-vk/1.4.2/include")
+        target_link_libraries(Infinite PRIVATE "${INFINITE_VK_ROOT}/molten-vk/1.4.2/lib/libMoltenVK.a"
+            "-framework Metal" "-framework IOSurface" "-framework QuartzCore" "-framework Foundation" "-framework CoreGraphics" "-framework IOKit" "-framework AppKit")
+    else()
+        find_package(Vulkan REQUIRED)
+        target_link_libraries(Infinite PRIVATE Vulkan::Vulkan)
+    endif()
+endif()
+
 
 # ---- ASIO (Windows) ---------------------------------------------------------
 # Steinberg's ASIO SDK is fetched at configure time and is never committed to

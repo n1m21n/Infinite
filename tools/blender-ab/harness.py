@@ -818,6 +818,8 @@ def main():
     if a.engine in ("live", "settle"):
         # Render 3D's liveEngineFeatures: 7 = RT shadows + reflections + GI, 15 = also settle (path trace).
         os.environ["INFINITE_LIVE_ENGINE"] = "7" if a.engine == "live" else "15"
+        # Row 9.3: INFINITE_SWEEP_FEATURES overrides the bits, e.g. 16 = the live engine with no rays (the Vulkan raster gate).
+        os.environ["INFINITE_LIVE_ENGINE"] = os.environ.get("INFINITE_SWEEP_FEATURES", os.environ["INFINITE_LIVE_ENGINE"])
     base = json.load(open(BASELINE)) if os.path.exists(BASELINE) else {}
     rows = []
     os.environ.setdefault("DEER_GLB", os.path.expanduser("~/Downloads/Assets/deer.glb"))
