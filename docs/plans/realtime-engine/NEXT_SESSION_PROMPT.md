@@ -16,7 +16,7 @@ Paste this as the first message:
 | # | Rule |
 |---|---|
 | 1 | As many rows per session as can be finished, one commit per row, in order (owner, 2026-11-12). Each row still meets its own done command before the next starts. |
-| 2 | No row is done without its done-command output in `AUTORUN.md`. |
+| 2 | No row is done without its done-command output in `AUTORUN.md`. Rows in the same area may share one build and one self-test (batch); per row sweep only its own cases plus the three smoke cases, full sweep at the end of each block. Small deviations: settle, log, go on. Sonnet agents for narrow no-build edits only. |
 | 3 | One build at a time, `python3 scripts/ibuild.py build --mode release`; never during a sweep; nothing over 20 minutes. |
 | 4 | No Co-Authored-By or "Generated with" lines. Never push. Never merge to main. |
 | 5 | Papers, own derivations and Blender's source as a reference (owner, 2026-11-12). Cycles files under Apache 2.0: formulas may be ported, with a line in `THIRD_PARTY_NOTICES.md`. GPL Blender code: read for the idea only, never copied or translated. Blender renders the A/B truths and the gate decides. See OPUS_PLAN rule 12. |
