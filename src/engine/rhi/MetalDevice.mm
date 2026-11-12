@@ -193,9 +193,12 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
 // pixel by a hash so the thin sampling reads as fine grain, not bands. 0 = fully blocked, 1 = open.
 uint pcg(uint v);
 float rnd(thread uint& s);
-float sunVis(instance_acceleration_structure tlas, float3 o, float3 ld, float angleDeg, float2 pix)
+struct RInst;
+float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax);
+// thru (row 5.2): the receiver is a strand, so other strands pass light (see shadowT); inst may be null when false.
+float sunVis(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 ld, float angleDeg, float2 pix)
 {
-   if (angleDeg <= 0.0) return occluded(tlas, o, ld, 1e4) ? 0.0 : 1.0;
+   if (angleDeg <= 0.0) return shadowT(tlas, inst, thru, o, ld, 1e4);
    const float tr = tan(angleDeg * 0.5 * 0.017453292);
    const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
    const float3 ay = cross(ld, ax);
@@ -207,17 +210,51 @@ float sunVis(instance_acceleration_structure tlas, float3 o, float3 ld, float an
    for (int i = 0; i < 4; i++)
    {
       const float an = rot + float(i) * 1.5707963;
-      v += occluded(tlas, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * (0.9 * tr)), 1e4) ? 0.0 : 1.0;
+      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * (0.9 * tr)), 1e4);
    }
    if (v == 0.0 || v == 4.0) return v * 0.25;
    for (int i = 0; i < 12; i++)
    {
       const float an = rot + 0.7853982 + float(i) * 2.399963, r = sqrt((float(i) + rnd(s)) / 12.0) * tr;
-      v += occluded(tlas, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4) ? 0.0 : 1.0;
+      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4);
    }
    return v / 16.0;
 }
 struct RInst { ulong vb; ulong ib; ulong uvb; ulong wr; float4x4 normalM; MatRec mat; }; // the rays' view: mesh buffers + the same record (base times the albedo map's mean on GI rays)
+// Row 5.2: a shadow ray's visibility. Light reaching a strand passes the other strands by exp(-0.7) each, re-traced
+// from every strand hit up to 4 (FINISH_PLAN 6.12; the forward scatter of Zinke's dual scattering, which Cycles gets
+// from many bounces through bright fibres); a strand still blocks fully what lies under it (skin, floor), as in Cycles.
+float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax)
+{
+   if (!occluded(tlas, o, d, tmax)) return 1.0;
+   if (!thru) return 0.0;
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   float T = 1.0, t0 = 0.0;
+   for (int k = 0; k < 4; k++)
+   {
+      ray r(o, d, t0, tmax);
+      intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1);
+      if (h.type != intersection_type::triangle) return T;
+      constant RInst& I = inst[h.instance_id];
+      if (I.mat.strandFrom < 0.5 || float(h.primitive_id) < I.mat.strandFrom - 1.0) return 0.0;
+      T *= 0.49658530; // exp(-0.7)
+      t0 = h.distance + 1e-4;
+   }
+   return T;
+}
+// A strand's sun: one ray per pixel in the disc (hashed per pixel and frame), through shadowT; the 16-ray penumbra
+// search times a 4-hit re-trace over every hair pixel is what the live frame cannot afford (FINISH_PLAN 6.12).
+float sunVisStrand(instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 ld, float angleDeg, float2 pix, float frame)
+{
+   if (angleDeg <= 0.0) return shadowT(tlas, inst, true, o, ld, 1e4);
+   const float tr = tan(angleDeg * 0.5 * 0.017453292);
+   const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
+   const float3 ay = cross(ld, ax);
+   uint sd = pcg(uint(pix.x) * 7919u + 104729u * uint(pix.y) + 31u * uint(frame));
+   const float an = 6.2831853 * rnd(sd), r = sqrt(rnd(sd)) * tr;
+   return shadowT(tlas, inst, true, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4);
+}
 float3 cosineDir(float3 n, float u1, float u2);
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
 // hp/hn/alb return the hit (alb = diffuse albedo, 0 on a miss) so GI can take one more bounce from it.
@@ -593,7 +630,7 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       if (type == 1 || type == 4) { const float3 tl = L.vec.xyz - p; const float dist = length(tl); ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0); }
       else ld = normalize(L.vec.xyz);
       if (type == 1 || type == 4) { if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) o.v[ch] = 0.0; }
-      else o.v[ch] = sunVis(rtArgs.tlas, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px));
+      else o.v[ch] = sunVis(rtArgs.tlas, nullptr, false, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px));
    }
    return o;
 }
@@ -635,6 +672,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    float metalIn = m.mat.metallic, roughIn = m.mat.roughness;
    // Hair: from triangle shc.w on (a Fur mesh's strands; the skin keeps the material). The vertex normal is the strand.
    const bool hairM = m.mat.hairRadialNeg < 0.0 && float(prim) >= m.mat.hairFrom;
+   const bool strandPx = m.mat.strandFrom > 0.5 && float(prim) >= m.mat.strandFrom - 1.0; // row 5.2
    if (hairM) { base = hairAlbedo(float3(m.mat.hairSigma), -m.mat.hairRadialNeg); metalIn = 0.0; }
    const int wrapM = int(m.mat.wrapBump + 0.5) & 3;
    // Every derivative first, in uniform control flow, before any map read or cutout.
@@ -864,14 +902,15 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          if ((int(f.shQ.z + 0.5) & 1) != 0 && L.color.w < 0.5)
          {
             float vis = -1.0;
-            if ((int(f.shQ.z + 0.5) & 4) != 0 && L.aim.w > -0.5)
+            if ((int(f.shQ.z + 0.5) & 4) != 0 && L.aim.w > -0.5 && !strandPx) // a strand traces its own (row 5.2)
                vis = upVis(visT, visD, in.pos.xy, distance(in.wp, f.eye.xyz), int(L.aim.w + 0.5));
             if (vis < 0.0)
             {
                if (type == 1 || type == 4)
-                  vis = occluded(rtArgs.tlas, in.wp + nS * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0)) ? 0.0 : 1.0;
+                  vis = shadowT(rtArgs.tlas, instInfo, strandPx, in.wp + nS * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0));
                else
-                  vis = sunVis(rtArgs.tlas, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy);
+                  vis = strandPx ? sunVisStrand(rtArgs.tlas, instInfo, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy, f.gi.z)
+                                 : sunVis(rtArgs.tlas, instInfo, false, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy);
             }
             shadow = mix(1.0 - f.shP.w, 1.0, vis);
          }
@@ -2190,6 +2229,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       m.fimg0 = (float)(in.fieldImage[0] + 1); m.fimg1 = (float)(in.fieldImage[1] + 1);
       m.fimg2 = (float)(in.fieldImage[2] + 1); m.fimg3 = (float)(in.fieldImage[3] + 1);
       std::memcpy(&m.p0, in.fieldParams, sizeof(in.fieldParams)); // row 3.4: knobs live, no relink
+      m.strandFrom = (float)(in.strandFrom + 1); // row 5.2: the shadow rays tell strands from solids
    }
    // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
    void FillMat(const engine::Instance& in, R3dMatH& m)

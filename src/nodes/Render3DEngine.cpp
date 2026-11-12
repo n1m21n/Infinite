@@ -41,6 +41,7 @@ struct Render3DNode::EngineState
    unsigned long long sceneHash = 0;
    int settled = 0;   // path-traced samples since the scene last changed
    bool exportWarm = false; // the live history is already converged by an earlier exported frame
+   double offlineAt = -1.0; // the transport time of the last offline cook (a repeat cook at it reuses the picture)
    double profWarmGpu = 0.0; // INFINITE_ENGINE_PROF: GPU ms of this frame's warm-up renders
    std::vector<float> envPixels;   // the HDRI read back from GL, one mip at most 2048 wide
    int envW = 0, envH = 0, envLod = 0;
@@ -375,7 +376,8 @@ bool Render3DNode::CookEngine(int frameId)
    const auto tp0 = std::chrono::steady_clock::now();
    int changedMeshes = 0;
    size_t changedTris = 0;
-   if (sig != E.meshSig)
+   const bool meshesChanged = sig != E.meshSig;
+   if (meshesChanged)
    {
       for (size_t i = 0; i < sig.size() && i < E.meshSig.size(); i++)
          if (sProf && sig[i] != E.meshSig[i]) { changedMeshes++; changedTris += mDraw[i]->GetMesh().indices.size() / 3; }
@@ -455,6 +457,7 @@ bool Render3DNode::CookEngine(int frameId)
          in.sssRadius[k] = std::max(mat.subsurfaceColor[k], 0.0f) * 0.2f * std::max(mat.subsurfaceRadius, 0.0f);
       in.translucency = std::clamp(mat.translucency, 0.0f, 1.0f);
       in.iridescence = mat.iridescence; in.iridescenceIor = mat.iridescenceIor; in.iridescenceThickness = mat.iridescenceThickness;
+      { const Mesh& sm = src->GetMesh(); in.strandFrom = sm.twoSided ? (int)(sm.ribbonStart / 3) : -1; }
       if (mat.hair)
       {
          float lc[3], lt[3];
@@ -731,7 +734,7 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.mapAlbedo, 16); mix(&in.fieldImage, 16); mix(&in.wrap, 4); mix(&in.normalStrength, 4); mix(&in.normalBump, 4);
       mix(&in.sheen, 4); mix(in.sheenColor, 12); mix(&in.sheenRoughness, 4); mix(&in.sheenDir, 4);
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
-      mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);
+      mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.strandFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);
       { const int cs = in.castShadow ? 1 : 0; mix(&cs, 4); }
       mix(&in.fieldProgram, 4); mix(in.fieldParams, 64);
    }
@@ -743,7 +746,14 @@ bool Render3DNode::CookEngine(int frameId)
    bool traced = false;
    const bool offline = Transport::Instance().IsOfflineMode();
    if (!offline) E.exportWarm = false;
-   if (offline && (liveEngineFeatures & 8) != 0)
+   // --frame cooks the graph a few times at one moment before it exports (probe and warm ticks). A repeat cook of an
+   // unchanged scene at the same time keeps the converged picture instead of warming or tracing it again.
+   const double offlineNow = offline ? Transport::Instance().Seconds() : -1.0;
+   const bool offlineRepeat = offline && !changed && !meshesChanged && offlineNow == E.offlineAt;
+   E.offlineAt = offlineNow;
+   if (offline && (liveEngineFeatures & 8) != 0 && offlineRepeat && E.settled > 0)
+      traced = true;
+   else if (offline && (liveEngineFeatures & 8) != 0)
    {
       // Export / --frame: every frame is the settled picture, traced in full before it is handed on.
       const int target = std::clamp(ptSamples, 1, 4096), bounces = std::clamp(ptBounces, 1, 16);
@@ -771,7 +781,7 @@ bool Render3DNode::CookEngine(int frameId)
       // Live look on export: let the temporal GI / reflection history converge as it would on a held frame.
       // The first exported frame converges from nothing; later ones carry the history over (it follows motion, as
       // in playback), so a short top-up does. Later supersample passes reuse it too.
-      const int warm = (fr.gi || fr.rtReflections) && mJitterIndex <= 0 ? (E.exportWarm ? 24 : 48) : 0;
+      const int warm = (fr.gi || fr.rtReflections) && mJitterIndex <= 0 && !(offlineRepeat && E.exportWarm) ? (E.exportWarm ? 24 : 48) : 0;
       E.exportWarm = true;
       for (int i = 0; i < warm; i++)
       {

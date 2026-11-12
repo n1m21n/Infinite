@@ -36,7 +36,7 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | 0.5 freeze + `f0` baseline | done: `f0` stored, R and T, 46 cases | see log |
 | 1.1 to 1.5 material programs | done (details in `AUTORUN_ARCHIVE.md`) | — |
 | 2.1 to 2.8 shading nodes | done (`Shade Attribute` not built: no vertex colour on Mesh) | see log |
-| 3.1 to 3.5 script nodes | 3.1 to 3.5, 4.1 to 4.5, 5.1 done; **next: 5.2** | see log |
+| 3.1 to 3.5 script nodes | 3.1 to 3.5, 4.1 to 4.5, 5.1, 5.2 done; **next: 5.3** | see log |
 | 4.1 to 4.5 layers, relief, wear | open | — |
 | 5.1 to 5.7 fibre, volumes, sky, lights, grazing glint | open | — |
 | 6.1 to 6.3 camera | open | — |

@@ -62,6 +62,7 @@ namespace engine
       float hairSigma[3] = { 0.0f, 0.0f, 0.0f };
       float hairRadial = 0.0f, hairShift = 0.0f;
       int hairFrom = 0;
+      int strandFrom = -1; // row 5.2: a two-sided ribbon mesh's first strand triangle (Fur), -1 none
       // Subsurface (weight, per-channel mean free path in scene units) and thin translucency (share of diffuse
       // passed to the back side).
       float subsurface = 0.0f, sssRadius[3] = { 0.0f, 0.0f, 0.0f };
