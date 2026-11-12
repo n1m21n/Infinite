@@ -6,6 +6,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiType.h"
+#include "core/PreviewQuality.h" // fork
 
 namespace app
 {
@@ -33,8 +34,12 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       DrawCheckerboardBackdrop(dl, origin, size);
 
-      const unsigned int tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(gn.node.get())),
-                                               cam, (int)size, (int)size);
+      // fork: skip the offscreen render when the thumbnail is clipped away; scale by Preview quality.
+      const bool visibleNow = ForkLegacyMode() || ImGui::IsRectVisible(origin, ImVec2(origin.x + size, origin.y + size));
+      const int renderSide = std::max(16, (int)(size * PreviewQualityScale()));
+      const unsigned int tex = visibleNow
+         ? viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(gn.node.get())), cam, renderSide, renderSide)
+         : viewport.LastColorTexture();
       if (tex != 0)
       {
          dl->AddImage((ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),

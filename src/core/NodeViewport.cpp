@@ -2,7 +2,9 @@
 
 #include "gl3.h"
 #include "BenchReport.h"
+#include "PreviewQuality.h" // fork
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 
@@ -655,6 +657,15 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
                             textureChanged || w != mWidth || h != mHeight;
    if (!needsRedraw)
       return mColorTex;
+   // fork: animated inputs (LFO-driven meshes, animated textures) invalidate the cache every
+   // frame; cap such redraws at ~20 Hz. Size changes and forced redraws are never delayed.
+   {
+      const double nowT = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+      if (!ForkLegacyMode() && !forceRedraw && mHasRendered && w == mWidth && h == mHeight && mLastRenderTime >= 0.0 &&
+          nowT >= mLastRenderTime && nowT - mLastRenderTime < 0.05)
+         return mColorTex;
+      mLastRenderTime = nowT;
+   }
 
    // Compiled once for the process and shared read-only by every viewport -
    // not per instance, so N nodes with viewports open cost one compile total.

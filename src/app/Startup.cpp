@@ -13,6 +13,15 @@
 #include "platform/AppPaths.h"
 #include "core/DawPluginInstall.h"
 
+// fork: ask NVIDIA Optimus / AMD PowerXpress laptops for the discrete GPU (not verified on Windows).
+#if defined(_WIN32)
+extern "C"
+{
+   __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+   __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
+
 namespace app
 {
    DawPlugin::Env DawPluginEnv();   // DawPluginSection.cpp

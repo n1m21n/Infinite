@@ -10,6 +10,8 @@
 #include "core/gl3.h"
 #include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/FormParts.h"
+#include "core/PreviewQuality.h" // fork
+#include "core/GpuDiag.h" // fork
 #include "app/ui/design/components/LibraryParts.h"
 
 namespace app
@@ -914,6 +916,22 @@ namespace app
             {
                const char* renderer = (const char*)glGetString(GL_RENDERER);
                ImGui::TextDisabled("%s: %s", T("Graphics"), renderer ? renderer : T("unknown"));
+               if (const char* warn = GpuDiagWarning(renderer)) // fork
+                  ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "%s", warn);
+               { // fork: preview quality
+                  const char* qLabels[] = { "1", "1/2", "1/4" };
+                  if (FormParts::BeginCombo(L("Preview quality"), qLabels[std::clamp(gPreviewQuality, 0, 2)]))
+                  {
+                     for (int i = 0; i < 3; i++)
+                        if (MenuParts::Choice(qLabels[i], gPreviewQuality == i))
+                        {
+                           gPreviewQuality = i;
+                           SaveGeneralSettings();
+                        }
+                     FormParts::EndCombo();
+                  }
+                  ImGui::TextDisabled("%s", T("Resolution of node mini-viewports. Lower is faster on weak GPUs."));
+               }
                if (Platform::GpuPreferenceSupported())
                {
                   const char* gpuLabels[] = { T("System default"), T("Power saving (integrated GPU)"), T("High performance (discrete GPU)") };
