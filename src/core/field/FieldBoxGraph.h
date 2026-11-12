@@ -35,13 +35,16 @@ namespace Field
       std::string varType;      // e.g. "float", "vec3", "image", "audio"
       std::string domainName;   // e.g. "frame", "element", "pixel", "sample"
       double numberValue = 0.0; // Literal or param default
-      std::string literalText;  // Preserved numeric text when parsed from source
+      std::string literalText;  // Literal text exactly as written in the source
       double minVal = 0.0;
       double maxVal = 1.0;
       std::string assignOp = "="; // "=", "+=", "-=", "*=", "/="
       std::string swizzleField;   // e.g. "x", "y", "rgb" or reduce op ("max", "mean")
       std::string boundary;       // e.g. "wrap", "border" for state
-      std::string rawCode;        // For "code" boxes
+      std::string rawCode;        // For "code" boxes: the source text, comments included
+      int rawPrec = 0;            // Binding strength of rawCode (0 = unknown, always parenthesised)
+      std::string callName;       // Set when the source wrote a call (e.g. "pow"); empty for operator form
+      std::string comment;        // Whole-line comments printed above this box's statement
       int stmtOrder = -1;         // Top-level statement order (-1 for pure sub-expressions)
       int whenGroupId = -1;       // Group id if inside an `if (cond) { ... }` block
    };
@@ -66,6 +69,7 @@ namespace Field
       int condBoxId = 0;
       int condPinIdx = 0;
       int stmtOrder = -1;
+      std::string comment;
    };
 
    struct BoxViewState
@@ -83,6 +87,7 @@ namespace Field
       std::vector<BoxNode> boxes;
       std::vector<BoxWire> wires;
       std::vector<BoxGroup> groups;
+      std::string trailingComment; // Comments after the last statement
 
       const BoxNode* FindBox(int id) const;
       BoxNode* FindBox(int id);
@@ -111,17 +116,20 @@ namespace Field
       std::vector<BoxHeaderGroup> groups;
    };
 
-   // Parses `// @boxes v1 view x,y,z | key x,y | group "name" k1 k2`.
+   // Parses `# @boxes v1 view x,y,z | key x,y | group "name" k1 k2` (the older `//` form is accepted).
    // Never fails; malformed or missing headers yield empty/partial BoxHeaderData.
    void ParseBoxesHeader(const std::string& code, BoxHeaderData& outHeader);
 
-   // Formats the `// @boxes v1 ...` header line for the graph.
+   // Formats the `# @boxes v1 ...` header line for the graph.
    std::string FormatBoxesHeader(const BoxGraph& graph);
 
    // Parses Field source into a BoxGraph. Returns false on lex/parse error.
    bool ParseCodeToBoxGraph(const std::string& code, uint32_t hostMask, BoxGraph& outGraph, FieldError& outError);
 
-   // Prints a BoxGraph back to Field source code.
+   // Prints a BoxGraph back to Field source code, from the wires: statements in
+   // dependency order (ties keep source order), an output read more than once is
+   // named, everything else is inlined. Comments are kept: a code box keeps its
+   // raw text; comments around other statements print as whole lines above them.
    std::string PrintBoxGraphToCode(const BoxGraph& graph, bool includeHeader = true);
 
    // Assigns clean left-to-right column positions to boxes without explicit positions.

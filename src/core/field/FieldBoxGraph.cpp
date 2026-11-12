@@ -5,11 +5,31 @@
 
 #include <algorithm>
 #include <cctype>
+#include <climits>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <functional>
+#include <map>
+#include <set>
 #include <sstream>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+
+// How code becomes boxes and back (plan §8.2.1).
+//
+//   code --Lex/Parse--> AST --GraphBuilder--> BoxGraph --Printer--> code
+//
+// * Every expression the registry knows becomes a box; anything else becomes a
+//   code box holding the exact source text (comments included).
+// * A call keeps exactly the arguments the source wrote, and a call stays a call:
+//   `pow(a, b)` never comes back as `a ^ b`. Sugar boxes never capture a call.
+// * Comments: a code box keeps its own. Whole-line comments before a statement
+//   ride on that statement's box (or when-group) and print above it; a comment
+//   at the end of a box statement's line moves to the line above it. Comments
+//   after the last statement are kept on the graph.
+// * The printer works from the wires, so a graph built by hand prints too.
 
 namespace Field
 {
@@ -56,6 +76,20 @@ namespace Field
 
    namespace
    {
+      // Binding strength, low to high, matching FieldParse.cpp.
+      enum Prec
+      {
+         kPrecOr = 1,
+         kPrecAnd = 2,
+         kPrecCompare = 3,
+         kPrecAdd = 4,
+         kPrecMul = 5,
+         kPrecPow = 6,
+         kPrecUnary = 7,
+         kPrecPostfix = 8, // x.y, X.at(i), reduce.op(...): never the operand of a unary
+         kPrecAtom = 10
+      };
+
       std::string Trim(const std::string& s)
       {
          size_t a = 0;
@@ -67,231 +101,326 @@ namespace Field
          return s.substr(a, b - a);
       }
 
+      // Shortest text that reads back as exactly the same double.
       std::string FormatDouble(double v)
       {
-         if (std::isnan(v) || std::isinf(v))
-            return "0";
-         if (v == 0.0)
+         if (std::isnan(v) || std::isinf(v) || v == 0.0)
             return "0";
          char buf[64];
-         std::snprintf(buf, sizeof(buf), "%.15g", v);
-         return std::string(buf);
-      }
-
-      std::string EscapeString(const std::string& s)
-      {
-         std::string out = "\"";
-         for (char c : s)
+         for (int digits = 15; digits <= 17; ++digits)
          {
-            if (c == '"' || c == '\\')
-               out.push_back('\\');
-            out.push_back(c);
+            std::snprintf(buf, sizeof(buf), "%.*g", digits, v);
+            if (std::strtod(buf, nullptr) == v)
+               break;
          }
-         out.push_back('"');
-         return out;
+         return std::string(buf);
       }
 
       int BinaryPrec(const std::string& op)
       {
-         if (op == "||") return 1;
-         if (op == "&&") return 2;
-         if (op == "==" || op == "!=") return 3;
-         if (op == "<" || op == "<=" || op == ">" || op == ">=") return 4;
-         if (op == "+" || op == "-") return 5;
-         if (op == "*" || op == "/" || op == "%") return 6;
-         if (op == "^") return 7;
+         if (op == "||") return kPrecOr;
+         if (op == "&&") return kPrecAnd;
+         if (op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">=") return kPrecCompare;
+         if (op == "+" || op == "-") return kPrecAdd;
+         if (op == "*" || op == "/" || op == "%") return kPrecMul;
+         if (op == "^") return kPrecPow;
          return 0;
       }
 
-      std::string AstExprToCode(const AstNodePtr& node, int parentPrec = 0);
-
-      std::string AstStmtToCode(const AstNodePtr& node, const std::string& indent = "")
+      std::string Wrap(const std::string& s, int myPrec, int parentPrec)
       {
-         if (!node)
-            return "";
-         switch (node->kind)
+         return myPrec <= parentPrec ? "(" + s + ")" : s;
+      }
+
+      // FNV-1a: the same key on every OS and compiler (std::hash is not).
+      std::string StableHash(const std::string& s)
+      {
+         uint32_t h = 2166136261u;
+         for (unsigned char c : s)
          {
-            case AstKind::DeclParam:
+            h ^= c;
+            h *= 16777619u;
+         }
+         char buf[16];
+         std::snprintf(buf, sizeof(buf), "%08x", h);
+         return std::string(buf);
+      }
+
+      bool IsOpenBracket(char c) { return c == '(' || c == '[' || c == '{'; }
+      bool IsCloseBracket(char c) { return c == ')' || c == ']' || c == '}'; }
+
+      // Index of the bracket that closes src[open], skipping strings and comments.
+      size_t MatchClose(const std::string& src, size_t open)
+      {
+         int depth = 0;
+         for (size_t p = open; p < src.size(); ++p)
+         {
+            char c = src[p];
+            if (c == '"')
             {
-               auto* p = static_cast<const AstDeclParam*>(node.get());
-               std::string s = indent + "param " + p->typeName + " " + p->name + " = ";
-               s += p->initExpr ? AstExprToCode(p->initExpr) : FormatDouble(p->defaultValue);
-               s += " [" + FormatDouble(p->minVal) + ", " + FormatDouble(p->maxVal) + "]";
-               return s;
-            }
-            case AstKind::DeclState:
-            {
-               auto* st = static_cast<const AstDeclState*>(node.get());
-               std::string s = indent + "state " + st->typeName + " " + st->name;
-               if (st->tableSize > 0)
-                  s += "[" + std::to_string(st->tableSize) + "]";
-               s += " = " + (st->initExpr ? AstExprToCode(st->initExpr) : "0");
-               if (!st->boundary.empty())
-                  s += " [" + st->boundary + "]";
-               return s;
-            }
-            case AstKind::DeclAttrib:
-            {
-               auto* a = static_cast<const AstDeclAttrib*>(node.get());
-               std::string s = indent + "attrib " + a->typeName + " " + a->name;
-               if (a->initExpr)
-                  s += " = " + AstExprToCode(a->initExpr);
-               return s;
-            }
-            case AstKind::DeclOutput:
-            {
-               auto* o = static_cast<const AstDeclOutput*>(node.get());
-               return indent + "output " + o->domainName + " " + o->typeName + " " + o->name + " = " + AstExprToCode(o->initExpr);
-            }
-            case AstKind::DeclInput:
-            {
-               auto* in = static_cast<const AstDeclInput*>(node.get());
-               return indent + "input " + in->domainName + " " + in->typeName + " " + in->name;
-            }
-            case AstKind::Assign:
-            {
-               auto* a = static_cast<const AstAssign*>(node.get());
-               return indent + AstExprToCode(a->lvalue) + " " + a->op + " " + AstExprToCode(a->rvalue);
-            }
-            case AstKind::If:
-            {
-               auto* iff = static_cast<const AstIf*>(node.get());
-               std::string s = indent + "if (" + AstExprToCode(iff->cond) + ") {\n";
-               if (iff->thenBlock && iff->thenBlock->kind == AstKind::Block)
+               for (++p; p < src.size() && src[p] != '"'; ++p)
                {
-                  auto* blk = static_cast<const AstBlock*>(iff->thenBlock.get());
-                  for (const auto& sub : blk->statements)
-                     s += AstStmtToCode(sub, indent + "   ") + "\n";
+                  if (src[p] == '\\')
+                     ++p;
                }
-               else if (iff->thenBlock)
+               continue;
+            }
+            if (c == '#')
+            {
+               while (p < src.size() && src[p] != '\n')
+                  ++p;
+               continue;
+            }
+            if (IsOpenBracket(c))
+               ++depth;
+            else if (IsCloseBracket(c) && --depth == 0)
+               return p;
+         }
+         return std::string::npos;
+      }
+
+      // Grows [lo, hi) until its brackets balance: `a + b) * c` gains its `(`,
+      // `if (x) { y = 1` gains its `}`.
+      void BalanceRange(const std::string& src, size_t& lo, size_t& hi)
+      {
+         for (int guard = 0; guard < 256; ++guard)
+         {
+            int depth = 0;
+            int minDepth = 0;
+            for (size_t p = lo; p < hi; ++p)
+            {
+               char c = src[p];
+               if (c == '"')
                {
-                  s += AstStmtToCode(iff->thenBlock, indent + "   ") + "\n";
-               }
-               s += indent + "}";
-               if (iff->elseBlock)
-               {
-                  s += " else {\n";
-                  if (iff->elseBlock->kind == AstKind::Block)
+                  for (++p; p < hi && src[p] != '"'; ++p)
                   {
-                     auto* blk = static_cast<const AstBlock*>(iff->elseBlock.get());
-                     for (const auto& sub : blk->statements)
-                        s += AstStmtToCode(sub, indent + "   ") + "\n";
+                     if (src[p] == '\\')
+                        ++p;
                   }
-                  else
+                  continue;
+               }
+               if (c == '#')
+               {
+                  while (p < hi && src[p] != '\n')
+                     ++p;
+                  continue;
+               }
+               if (IsOpenBracket(c))
+                  ++depth;
+               else if (IsCloseBracket(c))
+                  minDepth = std::min(minDepth, --depth);
+            }
+            if (minDepth < 0)
+            {
+               int need = -minDepth;
+               int inner = 0;
+               size_t p = lo;
+               while (p > 0 && need > 0)
+               {
+                  char c = src[--p];
+                  if (IsCloseBracket(c))
+                     ++inner;
+                  else if (IsOpenBracket(c))
                   {
-                     s += AstStmtToCode(iff->elseBlock, indent + "   ") + "\n";
+                     if (inner > 0)
+                        --inner;
+                     else
+                        --need;
                   }
-                  s += indent + "}";
                }
-               return s;
+               if (need > 0)
+                  return;
+               lo = p;
+               continue;
             }
-            case AstKind::For:
+            if (depth > 0)
             {
-               auto* f = static_cast<const AstFor*>(node.get());
-               std::string s = indent + "for (" + AstStmtToCode(f->init, "") + "; "
-                             + AstExprToCode(f->cond) + "; "
-                             + AstStmtToCode(f->step, "") + ") {\n";
-               if (f->body && f->body->kind == AstKind::Block)
+               // Close the innermost open bracket left inside the range.
+               std::vector<size_t> opens;
+               for (size_t p = lo; p < hi; ++p)
                {
-                  auto* blk = static_cast<const AstBlock*>(f->body.get());
-                  for (const auto& sub : blk->statements)
-                     s += AstStmtToCode(sub, indent + "   ") + "\n";
+                  char c = src[p];
+                  if (c == '"')
+                  {
+                     for (++p; p < hi && src[p] != '"'; ++p)
+                     {
+                        if (src[p] == '\\')
+                           ++p;
+                     }
+                     continue;
+                  }
+                  if (c == '#')
+                  {
+                     while (p < hi && src[p] != '\n')
+                        ++p;
+                     continue;
+                  }
+                  if (IsOpenBracket(c))
+                     opens.push_back(p);
+                  else if (IsCloseBracket(c) && !opens.empty())
+                     opens.pop_back();
                }
-               s += indent + "}";
-               return s;
+               if (opens.empty())
+                  return;
+               size_t close = MatchClose(src, opens.front());
+               if (close == std::string::npos)
+                  return;
+               hi = close + 1;
+               continue;
             }
-            case AstKind::Map:
-            {
-               auto* m = static_cast<const AstMap*>(node.get());
-               std::string s = indent + "map (" + AstExprToCode(m->countExpr) + ") {\n";
-               if (m->body && m->body->kind == AstKind::Block)
-               {
-                  auto* blk = static_cast<const AstBlock*>(m->body.get());
-                  for (const auto& sub : blk->statements)
-                     s += AstStmtToCode(sub, indent + "   ") + "\n";
-               }
-               s += indent + "}";
-               return s;
-            }
-            case AstKind::Block:
-            {
-               auto* blk = static_cast<const AstBlock*>(node.get());
-               std::string s;
-               for (size_t i = 0; i < blk->statements.size(); ++i)
-               {
-                  if (i > 0)
-                     s += "\n";
-                  s += AstStmtToCode(blk->statements[i], indent);
-               }
-               return s;
-            }
-            default:
-               return indent + AstExprToCode(node);
+            return;
          }
       }
 
-      std::string AstExprToCode(const AstNodePtr& node, int parentPrec)
+      void ForEachChild(const AstNodePtr& node, const std::function<void(const AstNodePtr&)>& fn)
       {
          if (!node)
-            return "0";
+            return;
+         switch (node->kind)
+         {
+            case AstKind::Access: fn(static_cast<const AstAccess*>(node.get())->base); break;
+            case AstKind::Index:
+               fn(static_cast<const AstIndex*>(node.get())->base);
+               fn(static_cast<const AstIndex*>(node.get())->index);
+               break;
+            case AstKind::Unary: fn(static_cast<const AstUnary*>(node.get())->operand); break;
+            case AstKind::Binary:
+               fn(static_cast<const AstBinary*>(node.get())->lhs);
+               fn(static_cast<const AstBinary*>(node.get())->rhs);
+               break;
+            case AstKind::Call:
+               for (const auto& a : static_cast<const AstCall*>(node.get())->args)
+                  fn(a);
+               break;
+            case AstKind::Assign:
+               fn(static_cast<const AstAssign*>(node.get())->lvalue);
+               fn(static_cast<const AstAssign*>(node.get())->rvalue);
+               break;
+            case AstKind::Block:
+               for (const auto& s : static_cast<const AstBlock*>(node.get())->statements)
+                  fn(s);
+               break;
+            case AstKind::Program:
+               for (const auto& s : static_cast<const AstProgram*>(node.get())->statements)
+                  fn(s);
+               break;
+            case AstKind::If:
+               fn(static_cast<const AstIf*>(node.get())->cond);
+               fn(static_cast<const AstIf*>(node.get())->thenBlock);
+               fn(static_cast<const AstIf*>(node.get())->elseBlock);
+               break;
+            case AstKind::For:
+               fn(static_cast<const AstFor*>(node.get())->init);
+               fn(static_cast<const AstFor*>(node.get())->cond);
+               fn(static_cast<const AstFor*>(node.get())->step);
+               fn(static_cast<const AstFor*>(node.get())->body);
+               break;
+            case AstKind::Map:
+               fn(static_cast<const AstMap*>(node.get())->countExpr);
+               fn(static_cast<const AstMap*>(node.get())->body);
+               break;
+            case AstKind::DeclParam: fn(static_cast<const AstDeclParam*>(node.get())->initExpr); break;
+            case AstKind::DeclState: fn(static_cast<const AstDeclState*>(node.get())->initExpr); break;
+            case AstKind::DeclAttrib: fn(static_cast<const AstDeclAttrib*>(node.get())->initExpr); break;
+            case AstKind::DeclOutput: fn(static_cast<const AstDeclOutput*>(node.get())->initExpr); break;
+            default: break;
+         }
+      }
+
+      // Source range of a node and everything under it. The parser gives most
+      // nodes only their first token, so the range is the union of the subtree's
+      // tokens, each call stretched to its `)`, then balanced.
+      void CollectExtent(const std::string& src, const AstNodePtr& node, size_t& lo, size_t& hi)
+      {
+         if (!node)
+            return;
+         const SourceSpan& sp = node->span;
+         if (sp.length > 0 && sp.offset + sp.length <= src.size())
+         {
+            lo = std::min(lo, sp.offset);
+            hi = std::max(hi, sp.offset + sp.length);
+            if (node->kind == AstKind::Call)
+            {
+               size_t p = sp.offset + sp.length;
+               while (p < src.size() && (src[p] == ' ' || src[p] == '\t'))
+                  ++p;
+               if (p < src.size() && src[p] == '(')
+               {
+                  size_t close = MatchClose(src, p);
+                  if (close != std::string::npos)
+                     hi = std::max(hi, close + 1);
+               }
+            }
+         }
+         ForEachChild(node, [&](const AstNodePtr& c) { CollectExtent(src, c, lo, hi); });
+      }
+
+      bool NodeExtent(const std::string& src, const AstNodePtr& node, size_t& lo, size_t& hi)
+      {
+         lo = std::string::npos;
+         hi = 0;
+         CollectExtent(src, node, lo, hi);
+         if (lo == std::string::npos || hi <= lo)
+            return false;
+         BalanceRange(src, lo, hi);
+         return true;
+      }
+
+      // Layout-free text of a subtree (no spaces, no parentheses, no comments), so
+      // a key survives the printer re-spacing a line.
+      std::string Canon(const std::string& src, const AstNodePtr& node)
+      {
+         if (!node)
+            return "_";
+         std::string s;
          switch (node->kind)
          {
             case AstKind::Literal:
             {
                auto* lit = static_cast<const AstLiteral*>(node.get());
-               if (lit->isString)
-                  return EscapeString(lit->stringValue);
-               if (lit->isBool)
-                  return lit->boolValue ? "true" : "false";
-               return FormatDouble(lit->numberValue);
+               const SourceSpan& sp = node->span;
+               if (sp.length > 0 && sp.offset + sp.length <= src.size())
+                  return "L" + src.substr(sp.offset, sp.length);
+               return "L" + (lit->isBool ? std::string(lit->boolValue ? "true" : "false") : FormatDouble(lit->numberValue));
             }
+            case AstKind::Ident: return "I" + static_cast<const AstIdent*>(node.get())->name;
+            case AstKind::Access: s = "." + static_cast<const AstAccess*>(node.get())->field; break;
+            case AstKind::Unary: s = "U" + static_cast<const AstUnary*>(node.get())->op; break;
+            case AstKind::Binary: s = "B" + static_cast<const AstBinary*>(node.get())->op; break;
+            case AstKind::Call: s = "C" + static_cast<const AstCall*>(node.get())->callee; break;
+            case AstKind::Assign: s = "A" + static_cast<const AstAssign*>(node.get())->op; break;
+            case AstKind::DeclParam: s = "Dp" + static_cast<const AstDeclParam*>(node.get())->name; break;
+            case AstKind::DeclState: s = "Ds" + static_cast<const AstDeclState*>(node.get())->name; break;
+            case AstKind::DeclAttrib: s = "Da" + static_cast<const AstDeclAttrib*>(node.get())->name; break;
+            case AstKind::DeclOutput: s = "Do" + static_cast<const AstDeclOutput*>(node.get())->name; break;
+            case AstKind::DeclInput: return "Di" + static_cast<const AstDeclInput*>(node.get())->name;
+            default: s = "K" + std::to_string(static_cast<int>(node->kind)); break;
+         }
+         s += "(";
+         ForEachChild(node, [&](const AstNodePtr& c) { s += Canon(src, c) + ","; });
+         return s + ")";
+      }
+
+      int NodePrec(const AstNodePtr& node)
+      {
+         if (!node)
+            return 0;
+         switch (node->kind)
+         {
+            case AstKind::Literal:
             case AstKind::Ident:
-               return static_cast<const AstIdent*>(node.get())->name;
-            case AstKind::Access:
-            {
-               auto* acc = static_cast<const AstAccess*>(node.get());
-               return AstExprToCode(acc->base, 10) + "." + acc->field;
-            }
-            case AstKind::Index:
-            {
-               auto* idx = static_cast<const AstIndex*>(node.get());
-               return AstExprToCode(idx->base, 10) + "[" + AstExprToCode(idx->index, 0) + "]";
-            }
-            case AstKind::Unary:
-            {
-               auto* un = static_cast<const AstUnary*>(node.get());
-               std::string inner = AstExprToCode(un->operand, 8);
-               std::string s = un->op + inner;
-               if (parentPrec > 8)
-                  return "(" + s + ")";
-               return s;
-            }
-            case AstKind::Binary:
-            {
-               auto* bin = static_cast<const AstBinary*>(node.get());
-               int prec = BinaryPrec(bin->op);
-               std::string lhs = AstExprToCode(bin->lhs, prec);
-               std::string rhs = AstExprToCode(bin->rhs, prec + 1);
-               std::string s = lhs + " " + bin->op + " " + rhs;
-               if (prec <= parentPrec)
-                  return "(" + s + ")";
-               return s;
-            }
+               return kPrecAtom;
             case AstKind::Call:
-            {
-               auto* call = static_cast<const AstCall*>(node.get());
-               std::string s = call->callee + "(";
-               for (size_t i = 0; i < call->args.size(); ++i)
-               {
-                  if (i > 0)
-                     s += ", ";
-                  s += AstExprToCode(call->args[i], 0);
-               }
-               s += ")";
-               return s;
-            }
+               return static_cast<const AstCall*>(node.get())->callee.find('.') != std::string::npos ? kPrecPostfix : kPrecAtom;
+            case AstKind::Access:
+            case AstKind::Index:
+               return kPrecPostfix;
+            case AstKind::Unary:
+               return kPrecUnary;
+            case AstKind::Binary:
+               return BinaryPrec(static_cast<const AstBinary*>(node.get())->op);
             default:
-               return "0";
+               return 0;
          }
       }
 
@@ -312,158 +441,81 @@ namespace Field
          return false;
       }
 
-      // Collects variables whose bare name is passed to reduce.*(var) or are state/table/reassigned.
       struct PreScanInfo
       {
          std::unordered_set<std::string> stateNames;
-         std::unordered_set<std::string> paramNames;
-         std::unordered_set<std::string> attribNames;
-         std::unordered_set<std::string> inputNames;
-         std::unordered_set<std::string> reduceArgNames;
          std::unordered_map<std::string, int> assignCounts;
       };
 
-      void PreScanExpr(const AstNodePtr& node, PreScanInfo& info)
+      void PreScan(const AstNodePtr& node, PreScanInfo& info)
       {
          if (!node)
             return;
-         switch (node->kind)
+         if (node->kind == AstKind::DeclState)
+            info.stateNames.insert(static_cast<const AstDeclState*>(node.get())->name);
+         if (node->kind == AstKind::Assign)
          {
-            case AstKind::Unary:
-               PreScanExpr(static_cast<const AstUnary*>(node.get())->operand, info);
-               break;
-            case AstKind::Binary:
-               PreScanExpr(static_cast<const AstBinary*>(node.get())->lhs, info);
-               PreScanExpr(static_cast<const AstBinary*>(node.get())->rhs, info);
-               break;
-            case AstKind::Access:
-               PreScanExpr(static_cast<const AstAccess*>(node.get())->base, info);
-               break;
-            case AstKind::Index:
-               PreScanExpr(static_cast<const AstIndex*>(node.get())->base, info);
-               PreScanExpr(static_cast<const AstIndex*>(node.get())->index, info);
-               break;
-            case AstKind::Call:
-            {
-               auto* c = static_cast<const AstCall*>(node.get());
-               if (c->callee.rfind("reduce.", 0) == 0 && !c->args.empty() && c->args[0]->kind == AstKind::Ident)
-                  info.reduceArgNames.insert(static_cast<const AstIdent*>(c->args[0].get())->name);
-               for (const auto& a : c->args)
-                  PreScanExpr(a, info);
-               break;
-            }
-            default:
-               break;
+            auto* a = static_cast<const AstAssign*>(node.get());
+            if (a->lvalue && a->lvalue->kind == AstKind::Ident)
+               info.assignCounts[static_cast<const AstIdent*>(a->lvalue.get())->name]++;
+            else if (a->lvalue && a->lvalue->kind == AstKind::Access &&
+                     static_cast<const AstAccess*>(a->lvalue.get())->base->kind == AstKind::Ident)
+               info.assignCounts[static_cast<const AstIdent*>(static_cast<const AstAccess*>(a->lvalue.get())->base.get())->name]++;
          }
+         ForEachChild(node, [&](const AstNodePtr& c) { PreScan(c, info); });
       }
 
-      void PreScanStmt(const AstNodePtr& node, PreScanInfo& info)
-      {
-         if (!node)
-            return;
-         switch (node->kind)
-         {
-            case AstKind::Program:
-               for (const auto& s : static_cast<const AstProgram*>(node.get())->statements)
-                  PreScanStmt(s, info);
-               break;
-            case AstKind::Block:
-               for (const auto& s : static_cast<const AstBlock*>(node.get())->statements)
-                  PreScanStmt(s, info);
-               break;
-            case AstKind::DeclState:
-               info.stateNames.insert(static_cast<const AstDeclState*>(node.get())->name);
-               break;
-            case AstKind::DeclParam:
-               info.paramNames.insert(static_cast<const AstDeclParam*>(node.get())->name);
-               break;
-            case AstKind::DeclAttrib:
-               info.attribNames.insert(static_cast<const AstDeclAttrib*>(node.get())->name);
-               break;
-            case AstKind::DeclInput:
-               info.inputNames.insert(static_cast<const AstDeclInput*>(node.get())->name);
-               break;
-            case AstKind::DeclOutput:
-               PreScanExpr(static_cast<const AstDeclOutput*>(node.get())->initExpr, info);
-               break;
-            case AstKind::Assign:
-            {
-               auto* a = static_cast<const AstAssign*>(node.get());
-               if (a->lvalue && a->lvalue->kind == AstKind::Ident)
-                  info.assignCounts[static_cast<const AstIdent*>(a->lvalue.get())->name]++;
-               else if (a->lvalue && a->lvalue->kind == AstKind::Access &&
-                        static_cast<const AstAccess*>(a->lvalue.get())->base->kind == AstKind::Ident)
-                  info.assignCounts[static_cast<const AstIdent*>(static_cast<const AstAccess*>(a->lvalue.get())->base.get())->name]++;
-               PreScanExpr(a->rvalue, info);
-               break;
-            }
-            case AstKind::If:
-            {
-               auto* iff = static_cast<const AstIf*>(node.get());
-               PreScanExpr(iff->cond, info);
-               PreScanStmt(iff->thenBlock, info);
-               PreScanStmt(iff->elseBlock, info);
-               break;
-            }
-            case AstKind::For:
-            {
-               auto* f = static_cast<const AstFor*>(node.get());
-               PreScanStmt(f->init, info);
-               PreScanExpr(f->cond, info);
-               PreScanStmt(f->step, info);
-               PreScanStmt(f->body, info);
-               break;
-            }
-            case AstKind::Map:
-            {
-               auto* m = static_cast<const AstMap*>(node.get());
-               PreScanExpr(m->countExpr, info);
-               PreScanStmt(m->body, info);
-               break;
-            }
-            default:
-               PreScanExpr(node, info);
-               break;
-         }
-      }
-
-      // Checks if an expression contains constructs that cannot be represented as pure boxes
-      // (state offset read `A(uv+d)`, table indexing `tbl[i]`, string literals, delay()).
+      // Expressions that cannot be boxes: state offset reads `A(uv + d)`, table
+      // indexing `tbl[i]`, strings, and calls with side effects or special forms.
       bool ExprNeedsCodeBox(const AstNodePtr& node, const PreScanInfo& info)
       {
          if (!node)
             return false;
-         switch (node->kind)
+         if (node->kind == AstKind::Literal)
+            return static_cast<const AstLiteral*>(node.get())->isString;
+         if (node->kind == AstKind::Index)
+            return true;
+         if (node->kind == AstKind::Call)
          {
-            case AstKind::Literal:
-               return static_cast<const AstLiteral*>(node.get())->isString;
-            case AstKind::Index:
+            auto* c = static_cast<const AstCall*>(node.get());
+            if (info.stateNames.count(c->callee) > 0)
                return true;
-            case AstKind::Unary:
-               return ExprNeedsCodeBox(static_cast<const AstUnary*>(node.get())->operand, info);
-            case AstKind::Binary:
-               return ExprNeedsCodeBox(static_cast<const AstBinary*>(node.get())->lhs, info)
-                   || ExprNeedsCodeBox(static_cast<const AstBinary*>(node.get())->rhs, info);
-            case AstKind::Access:
-               return ExprNeedsCodeBox(static_cast<const AstAccess*>(node.get())->base, info);
-            case AstKind::Call:
-            {
-               auto* c = static_cast<const AstCall*>(node.get());
-               if (info.stateNames.count(c->callee) > 0)
-                  return true; // Pixel state offset read A(uv + d)
-               if (c->callee == "delay" || c->callee == "phase" || c->callee == "vec4" ||
-                   c->callee == "emit" || c->callee == "connect" || c->callee == "set" || c->callee == "place")
-                  return true;
-               for (const auto& a : c->args)
-               {
-                  if (ExprNeedsCodeBox(a, info))
-                     return true;
-               }
-               return false;
-            }
-            default:
-               return false;
+            if (c->callee == "delay" || c->callee == "phase" || c->callee == "vec4" ||
+                c->callee == "emit" || c->callee == "connect" || c->callee == "set" || c->callee == "place")
+               return true;
          }
+         bool needs = false;
+         ForEachChild(node, [&](const AstNodePtr& c) { needs = needs || ExprNeedsCodeBox(c, info); });
+         return needs;
+      }
+
+      // Registry boxes a Field call may open as. Sugar never does (it has no Field
+      // word of its own), nor do boxes that are not functions.
+      const BoxSpec* SpecForCall(const std::string& callee)
+      {
+         const BoxSpec* spec = FindBoxSpec(callee);
+         if (!spec || spec->isSugar || spec->outlets.empty())
+            return nullptr;
+         if (spec->family == BoxFamily::Sources || spec->family == BoxFamily::InletsOutlets)
+            return nullptr;
+         if (spec->id == "previous" || spec->id == "swizzle" || spec->id == "neighbour" || spec->id == "reduce")
+            return nullptr;
+         if (spec->fieldWord != callee && callee != "mod" && callee != "pow")
+            return nullptr;
+         return spec;
+      }
+
+      bool IsSourceSpecId(const std::string& id)
+      {
+         if (id == "ident" || id == "notes_in" || id == "geometry_in")
+            return true;
+         const BoxSpec* spec = FindBoxSpec(id);
+         return spec && spec->family == BoxFamily::Sources && spec->inlets.empty() && id != "number" && id != "knob";
+      }
+
+      bool IsDeclSpecId(const std::string& id)
+      {
+         return id == "knob" || id == "previous" || id == "attrib" || id == "input_pin";
       }
 
       struct OutRef
@@ -473,22 +525,82 @@ namespace Field
          ValueKind kind = ValueKind::Number;
       };
 
+      struct CommentTok
+      {
+         size_t offset = 0;
+         std::string text;
+      };
+
+      std::string JoinComments(const std::string& a, const std::string& b)
+      {
+         if (a.empty())
+            return b;
+         if (b.empty())
+            return a;
+         return a + "\n" + b;
+      }
+
       struct GraphBuilder
       {
          BoxGraph& graph;
          const PreScanInfo& info;
+         const std::string& src;
+         std::vector<CommentTok> comments;
+         size_t commentIdx = 0;
          int nextBoxId = 1;
          int nextWireId = 1;
          int nextGroupId = 1;
          int nextStmtOrder = 0;
          std::unordered_map<std::string, OutRef> env;
          std::unordered_map<std::string, OutRef> builtinSources;
+         std::unordered_map<std::string, int> keyCount;
+         std::string stmtCanon; // layout-free text of the statement being lowered (for keys)
+         size_t stmtLo = 0;
+         size_t stmtHi = 0;
+         std::string pendingComment;
+
+         GraphBuilder(BoxGraph& g, const PreScanInfo& i, const std::string& s) : graph(g), info(i), src(s) {}
+
+         std::string Slice(const AstNodePtr& node) const
+         {
+            size_t lo = 0, hi = 0;
+            if (!NodeExtent(src, node, lo, hi))
+               return "";
+            return src.substr(lo, hi - lo);
+         }
+
+         // Comments not yet claimed that start before `offset`.
+         std::string TakeCommentsBefore(size_t offset)
+         {
+            std::string out;
+            while (commentIdx < comments.size() && comments[commentIdx].offset < offset)
+               out = JoinComments(out, comments[commentIdx++].text);
+            return out;
+         }
+
+         size_t LineEnd(size_t p) const
+         {
+            while (p < src.size() && src[p] != '\n')
+               ++p;
+            return p;
+         }
+
+         // Unique, edit-stable key: same base text -> same key, repeats get ~2, ~3.
+         void SetKey(BoxNode& b, const std::string& base)
+         {
+            int n = ++keyCount[base];
+            b.key = n == 1 ? base : base + "~" + std::to_string(n);
+         }
+
+         void SetHashKey(BoxNode& b, const AstNodePtr& node)
+         {
+            SetKey(b, "h" + StableHash(stmtCanon + "\x1f" + Canon(src, node) + "\x1f" + b.specId));
+         }
 
          BoxNode& AddBox(const std::string& specId, const std::string& customLabel = "")
          {
             BoxNode node;
             node.id = nextBoxId++;
-            node.key = "b" + std::to_string(node.id);
             node.specId = specId;
             if (const BoxSpec* spec = FindBoxSpec(specId))
             {
@@ -506,6 +618,15 @@ namespace Field
             return graph.boxes.back();
          }
 
+         // Sizes a call box's inlets to the number of arguments the source wrote.
+         static void SizeInlets(BoxNode& b, size_t count)
+         {
+            if (b.inlets.size() > count)
+               b.inlets.resize(count);
+            while (b.inlets.size() < count)
+               b.inlets.push_back({ "arg" + std::to_string(b.inlets.size() + 1), ValueKind::Number, 0.0 });
+         }
+
          void Connect(int srcBoxId, int srcPinIdx, int dstBoxId, int dstPinIdx, ValueKind kind)
          {
             BoxWire w;
@@ -516,6 +637,15 @@ namespace Field
             w.dstPinIdx = dstPinIdx;
             w.kind = kind;
             graph.wires.push_back(std::move(w));
+         }
+
+         void ConnectArgs(int boxId, const std::vector<AstNodePtr>& args, int firstPin)
+         {
+            for (size_t i = 0; i < args.size(); ++i)
+            {
+               OutRef r = LowerExpr(args[i]);
+               Connect(r.boxId, r.pinIdx, boxId, firstPin + static_cast<int>(i), r.kind);
+            }
          }
 
          OutRef GetOrCreateBuiltinSource(const std::string& name)
@@ -533,23 +663,24 @@ namespace Field
             };
 
             auto spIt = kBuiltinSpec.find(name);
-            if (spIt != kBuiltinSpec.end())
-            {
-               BoxNode& b = AddBox(spIt->second);
-               b.key = "src_" + name;
-               b.varName = name;
-               OutRef ref{ b.id, 0, b.outlets.empty() ? ValueKind::Number : b.outlets[0].kind };
-               builtinSources[name] = ref;
-               return ref;
-            }
-
-            BoxNode& b = AddBox("ident", name);
-            b.key = "src_" + name;
+            BoxNode& b = spIt != kBuiltinSpec.end() ? AddBox(spIt->second) : AddBox("ident", name);
+            SetKey(b, "src_" + name);
             b.varName = name;
-            b.outlets.push_back({ name, ValueKind::Number, 0.0 });
-            OutRef ref{ b.id, 0, ValueKind::Number };
+            if (b.outlets.empty())
+               b.outlets.push_back({ name, ValueKind::Number, 0.0 });
+            OutRef ref{ b.id, 0, b.outlets[0].kind };
             builtinSources[name] = ref;
             return ref;
+         }
+
+         OutRef MakeCodeExpr(const AstNodePtr& node, const std::string& label = "")
+         {
+            BoxNode& bx = AddBox("code", label);
+            bx.rawCode = Slice(node);
+            bx.rawPrec = NodePrec(node);
+            bx.outlets.push_back({ "out", ValueKind::Number, 0.0 });
+            SetKey(bx, "c" + StableHash(stmtCanon + "\x1f" + bx.rawCode));
+            return { bx.id, 0, ValueKind::Number };
          }
 
          OutRef LowerExpr(const AstNodePtr& node)
@@ -557,8 +688,8 @@ namespace Field
             if (!node)
             {
                BoxNode& b = AddBox("number", "0");
-               b.numberValue = 0.0;
                b.literalText = "0";
+               SetHashKey(b, node);
                return { b.id, 0, ValueKind::Number };
             }
 
@@ -567,10 +698,15 @@ namespace Field
                case AstKind::Literal:
                {
                   auto* lit = static_cast<const AstLiteral*>(node.get());
-                  std::string txt = lit->isBool ? (lit->boolValue ? "1" : "0") : FormatDouble(lit->numberValue);
+                  if (lit->isString)
+                     return MakeCodeExpr(node);
+                  std::string txt = Slice(node);
+                  if (txt.empty())
+                     txt = lit->isBool ? (lit->boolValue ? "true" : "false") : FormatDouble(lit->numberValue);
                   BoxNode& b = AddBox("number", txt);
-                  b.numberValue = lit->numberValue;
+                  b.numberValue = lit->isBool ? (lit->boolValue ? 1.0 : 0.0) : lit->numberValue;
                   b.literalText = txt;
+                  SetHashKey(b, node);
                   return { b.id, 0, lit->isBool ? ValueKind::Bool : ValueKind::Number };
                }
 
@@ -589,23 +725,26 @@ namespace Field
                   OutRef baseRef = LowerExpr(acc->base);
                   BoxNode& sw = AddBox("swizzle", "." + acc->field);
                   sw.swizzleField = acc->field;
-                  // Single dynamic outlet for the requested swizzle if not just x/y/z
-                  if (acc->field != "x" && acc->field != "y" && acc->field != "z")
+                  SetHashKey(sw, node);
+                  int swId = sw.id;
+                  int outIdx = 0;
+                  ValueKind k = ValueKind::Number;
+                  if (acc->field == "x" || acc->field == "y" || acc->field == "z")
+                     outIdx = acc->field == "x" ? 0 : (acc->field == "y" ? 1 : 2);
+                  else
                   {
                      sw.outlets.clear();
-                     sw.outlets.push_back({ acc->field, acc->field.size() > 1 ? ValueKind::Vec3 : ValueKind::Number, 0.0 });
-                     Connect(baseRef.boxId, baseRef.pinIdx, sw.id, 0, baseRef.kind);
-                     return { sw.id, 0, sw.outlets[0].kind };
+                     k = acc->field.size() > 1 ? ValueKind::Vec3 : ValueKind::Number;
+                     sw.outlets.push_back({ acc->field, k, 0.0 });
                   }
-                  int outIdx = (acc->field == "x") ? 0 : (acc->field == "y" ? 1 : 2);
-                  Connect(baseRef.boxId, baseRef.pinIdx, sw.id, 0, baseRef.kind);
-                  return { sw.id, outIdx, ValueKind::Number };
+                  Connect(baseRef.boxId, baseRef.pinIdx, swId, 0, baseRef.kind);
+                  return { swId, outIdx, k };
                }
 
                case AstKind::Unary:
                {
                   auto* un = static_cast<const AstUnary*>(node.get());
-                  // Sugar recognition: !(a && b) -> nand, !(a || b) -> nor
+                  // !(a && b) -> not both, !(a || b) -> neither
                   if (un->op == "!" && un->operand && un->operand->kind == AstKind::Binary)
                   {
                      auto* inner = static_cast<const AstBinary*>(un->operand.get());
@@ -614,16 +753,19 @@ namespace Field
                         OutRef a = LowerExpr(inner->lhs);
                         OutRef b = LowerExpr(inner->rhs);
                         BoxNode& bx = AddBox(inner->op == "&&" ? "nand" : "nor");
-                        Connect(a.boxId, a.pinIdx, bx.id, 0, ValueKind::Bool);
-                        Connect(b.boxId, b.pinIdx, bx.id, 1, ValueKind::Bool);
-                        return { bx.id, 0, ValueKind::Bool };
+                        SetHashKey(bx, node);
+                        int id = bx.id;
+                        Connect(a.boxId, a.pinIdx, id, 0, ValueKind::Bool);
+                        Connect(b.boxId, b.pinIdx, id, 1, ValueKind::Bool);
+                        return { id, 0, ValueKind::Bool };
                      }
                   }
                   OutRef opRef = LowerExpr(un->operand);
-                  std::string specId = (un->op == "!") ? "not" : "neg";
-                  BoxNode& bx = AddBox(specId);
-                  Connect(opRef.boxId, opRef.pinIdx, bx.id, 0, opRef.kind);
-                  return { bx.id, 0, (un->op == "!") ? ValueKind::Bool : opRef.kind };
+                  BoxNode& bx = AddBox(un->op == "!" ? "not" : "neg");
+                  SetHashKey(bx, node);
+                  int id = bx.id;
+                  Connect(opRef.boxId, opRef.pinIdx, id, 0, opRef.kind);
+                  return { id, 0, (un->op == "!") ? ValueKind::Bool : opRef.kind };
                }
 
                case AstKind::Binary:
@@ -646,124 +788,187 @@ namespace Field
                   else if (bin->op == ">=") { specId = "ge"; outKind = ValueKind::Bool; }
                   else if (bin->op == "==")
                   {
-                     bool boolSugar = IsBoolLikeExpr(bin->lhs) && IsBoolLikeExpr(bin->rhs);
-                     specId = boolSugar ? "xnor" : "eq";
+                     specId = (IsBoolLikeExpr(bin->lhs) && IsBoolLikeExpr(bin->rhs)) ? "xnor" : "eq";
                      outKind = ValueKind::Bool;
                   }
                   else if (bin->op == "!=")
                   {
-                     bool boolSugar = IsBoolLikeExpr(bin->lhs) || IsBoolLikeExpr(bin->rhs);
-                     specId = boolSugar ? "xor" : "ne";
+                     specId = (IsBoolLikeExpr(bin->lhs) || IsBoolLikeExpr(bin->rhs)) ? "xor" : "ne";
                      outKind = ValueKind::Bool;
                   }
                   else if (bin->op == "&&") { specId = "and"; outKind = ValueKind::Bool; }
                   else if (bin->op == "||") { specId = "or"; outKind = ValueKind::Bool; }
+                  else
+                     return MakeCodeExpr(node);
 
                   BoxNode& bx = AddBox(specId);
-                  Connect(lhs.boxId, lhs.pinIdx, bx.id, 0, lhs.kind);
-                  Connect(rhs.boxId, rhs.pinIdx, bx.id, 1, rhs.kind);
-                  return { bx.id, 0, outKind };
+                  SetHashKey(bx, node);
+                  int id = bx.id;
+                  Connect(lhs.boxId, lhs.pinIdx, id, 0, lhs.kind);
+                  Connect(rhs.boxId, rhs.pinIdx, id, 1, rhs.kind);
+                  return { id, 0, outKind };
                }
 
                case AstKind::Call:
                {
                   auto* call = static_cast<const AstCall*>(node.get());
+                  const std::string& callee = call->callee;
+                  size_t dot = callee.find('.');
 
                   // Neighbour read: X.at(idx)
-                  if (call->callee.size() > 3 && call->callee.compare(call->callee.size() - 3, 3, ".at") == 0)
+                  if (dot != std::string::npos && callee.compare(dot, std::string::npos, ".at") == 0 && dot > 0)
                   {
-                     std::string baseName = call->callee.substr(0, call->callee.size() - 3);
-                     BoxNode& bx = AddBox("neighbour", baseName + ".at");
-                     bx.varName = baseName;
-                     if (!call->args.empty())
-                     {
-                        OutRef idxRef = LowerExpr(call->args[0]);
-                        Connect(idxRef.boxId, idxRef.pinIdx, bx.id, 0, idxRef.kind);
-                     }
-                     return { bx.id, 0, ValueKind::Vec3 };
+                     BoxNode& bx = AddBox("neighbour", callee);
+                     bx.varName = callee.substr(0, dot);
+                     SetHashKey(bx, node);
+                     SizeInlets(bx, call->args.size());
+                     int id = bx.id;
+                     ConnectArgs(id, call->args, 0);
+                     return { id, 0, ValueKind::Vec3 };
                   }
 
-                  // Reduce: reduce.max(x), reduce.mean(x), etc.
-                  if (call->callee.rfind("reduce.", 0) == 0)
+                  // reduce.max(x), reduce.rms(in, lo, hi), ...
+                  if (callee.rfind("reduce.", 0) == 0 && callee.size() > 7 && callee.find('.', 7) == std::string::npos)
                   {
-                     std::string op = call->callee.substr(7);
-                     BoxNode& bx = AddBox("reduce", call->callee);
-                     bx.swizzleField = op;
-                     if (!call->args.empty())
-                     {
-                        OutRef argRef = LowerExpr(call->args[0]);
-                        Connect(argRef.boxId, argRef.pinIdx, bx.id, 0, argRef.kind);
-                     }
-                     return { bx.id, 0, ValueKind::Number };
+                     BoxNode& bx = AddBox("reduce", callee);
+                     bx.swizzleField = callee.substr(7);
+                     SetHashKey(bx, node);
+                     SizeInlets(bx, call->args.size());
+                     int id = bx.id;
+                     ConnectArgs(id, call->args, 0);
+                     return { id, 0, ValueKind::Number };
                   }
 
-                  // Special 0-arg or variable-arg functions
-                  std::string specId = call->callee;
-                  if (const BoxSpec* spec = FindBoxSpec(specId))
+                  if (const BoxSpec* spec = SpecForCall(callee))
                   {
-                     int bxId = 0;
-                     size_t nInlets = 0;
-                     ValueKind outKind = ValueKind::Number;
-                     {
-                        BoxNode& bx = AddBox(specId);
-                        bxId = bx.id;
-                        nInlets = bx.inlets.size();
-                        outKind = bx.outlets.empty() ? ValueKind::Number : bx.outlets[0].kind;
-                     }
-                     size_t nArgs = std::min(call->args.size(), nInlets);
-                     for (size_t i = 0; i < nArgs; ++i)
-                     {
-                        OutRef argRef = LowerExpr(call->args[i]);
-                        Connect(argRef.boxId, argRef.pinIdx, bxId, static_cast<int>(i), argRef.kind);
-                     }
-                     // Handle extra args on rand(lo, hi, rate, seed) if any
-                     for (size_t i = nArgs; i < call->args.size(); ++i)
-                     {
-                        if (BoxNode* bx = graph.FindBox(bxId))
-                           bx->inlets.push_back({ "arg" + std::to_string(i), ValueKind::Number, 0.0 });
-                        OutRef argRef = LowerExpr(call->args[i]);
-                        Connect(argRef.boxId, argRef.pinIdx, bxId, static_cast<int>(i), argRef.kind);
-                     }
-                     return { bxId, 0, outKind };
+                     BoxNode& bx = AddBox(spec->id);
+                     bx.callName = callee;
+                     SetHashKey(bx, node);
+                     SizeInlets(bx, call->args.size());
+                     int id = bx.id;
+                     ValueKind outKind = bx.outlets[0].kind;
+                     ConnectArgs(id, call->args, 0);
+                     return { id, 0, outKind };
                   }
 
-                  // Fallback generic call box
-                  BoxNode& bx = AddBox("code", call->callee);
-                  bx.rawCode = AstExprToCode(node);
-                  bx.outlets.push_back({ "out", ValueKind::Number, 0.0 });
-                  return { bx.id, 0, ValueKind::Number };
+                  return MakeCodeExpr(node, callee);
                }
 
                default:
-               {
-                  BoxNode& bx = AddBox("code");
-                  bx.rawCode = AstExprToCode(node);
-                  bx.outlets.push_back({ "out", ValueKind::Number, 0.0 });
-                  return { bx.id, 0, ValueKind::Number };
-               }
+                  return MakeCodeExpr(node);
             }
          }
 
-         void AddCodeBoxStmt(const AstNodePtr& stmt, int whenGroupId)
+         // The statement becomes one code box holding its source text, plus a
+         // comment at the end of its last line.
+         void AddCodeBoxStmt(int whenGroupId)
          {
+            size_t hi = stmtHi;
+            size_t p = hi;
+            while (p < src.size() && (src[p] == ' ' || src[p] == '\t' || src[p] == ';'))
+               ++p;
+            if (p < src.size() && src[p] == '#')
+               hi = LineEnd(p);
             BoxNode& bx = AddBox("code");
-            bx.rawCode = AstStmtToCode(stmt);
+            bx.rawCode = src.substr(stmtLo, hi - stmtLo);
+            while (!bx.rawCode.empty() && std::isspace(static_cast<unsigned char>(bx.rawCode.back())))
+               bx.rawCode.pop_back();
             bx.stmtOrder = nextStmtOrder++;
             bx.whenGroupId = whenGroupId;
+            SetKey(bx, "c" + StableHash(bx.rawCode));
+            TakeCommentsBefore(hi); // already inside rawCode
          }
 
+         int MakePlayNote(const AstCall* call, int whenGroupId)
+         {
+            BoxNode& pn = AddBox("play_note");
+            pn.stmtOrder = nextStmtOrder++;
+            pn.whenGroupId = whenGroupId;
+            SizeInlets(pn, call->args.size() + 1);
+            SetHashKey(pn, nullptr);
+            int id = pn.id;
+            ConnectArgs(id, call->args, 1);
+            return id;
+         }
+
+         // Lowers one statement, keeping the comments that lead it (and the one
+         // at the end of its line) on the box or group it becomes.
          void LowerStmt(const AstNodePtr& stmt, int whenGroupId = -1)
          {
             if (!stmt)
                return;
+            size_t lo = 0, hi = 0;
+            bool hasRange = NodeExtent(src, stmt, lo, hi);
+            const std::string savedCanon = stmtCanon;
+            const size_t savedLo = stmtLo, savedHi = stmtHi;
+            stmtCanon = Canon(src, stmt);
+            stmtLo = lo;
+            stmtHi = hi;
+
+            std::string lead = JoinComments(pendingComment, hasRange ? TakeCommentsBefore(lo) : std::string());
+            pendingComment.clear();
+            const int orderBefore = nextStmtOrder;
+            const size_t boxesBefore = graph.boxes.size();
+            const size_t groupsBefore = graph.groups.size();
+
+            // A comment inside a statement cannot ride on a box: keep it as code.
+            bool commentInside = false;
+            for (size_t c = commentIdx; hasRange && c < comments.size() && comments[c].offset < hi; ++c)
+               commentInside = commentInside || comments[c].offset > lo;
+            if (commentInside)
+               AddCodeBoxStmt(whenGroupId);
+            else
+               LowerStmtBody(stmt, whenGroupId, hasRange);
+
+            if (hasRange)
+               lead = JoinComments(lead, TakeCommentsBefore(LineEnd(hi)));
+            if (!lead.empty())
+            {
+               bool attached = false;
+               for (size_t gi = groupsBefore; gi < graph.groups.size() && !attached; ++gi)
+               {
+                  if (graph.groups[gi].stmtOrder == orderBefore)
+                  {
+                     graph.groups[gi].comment = JoinComments(lead, graph.groups[gi].comment);
+                     attached = true;
+                  }
+               }
+               for (size_t bi = boxesBefore; bi < graph.boxes.size() && !attached; ++bi)
+               {
+                  if (graph.boxes[bi].stmtOrder == orderBefore)
+                  {
+                     graph.boxes[bi].comment = JoinComments(lead, graph.boxes[bi].comment);
+                     attached = true;
+                  }
+               }
+               if (!attached)
+                  pendingComment = lead;
+            }
+            stmtCanon = savedCanon;
+            stmtLo = savedLo;
+            stmtHi = savedHi;
+         }
+
+         void LowerStmtBody(const AstNodePtr& stmt, int whenGroupId, bool hasRange)
+         {
+            if (!hasRange)
+               return; // nothing in the source to keep
 
             switch (stmt->kind)
             {
                case AstKind::DeclParam:
                {
                   auto* p = static_cast<const AstDeclParam*>(stmt.get());
+                  const AstNode* init = p->initExpr.get();
+                  if (init && init->kind == AstKind::Unary)
+                     init = static_cast<const AstUnary*>(init)->operand.get();
+                  if (init && (init->kind != AstKind::Literal || static_cast<const AstLiteral*>(init)->isString))
+                  {
+                     AddCodeBoxStmt(whenGroupId);
+                     break;
+                  }
                   BoxNode& bx = AddBox("knob", p->name);
-                  bx.key = "k_" + p->name;
+                  SetKey(bx, "k_" + p->name);
                   bx.varName = p->name;
                   bx.varType = p->typeName;
                   bx.numberValue = p->defaultValue;
@@ -778,24 +983,21 @@ namespace Field
                case AstKind::DeclState:
                {
                   auto* st = static_cast<const AstDeclState*>(stmt.get());
-                  if (st->tableSize > 0)
+                  if (st->tableSize > 0 || ExprNeedsCodeBox(st->initExpr, info))
                   {
-                     AddCodeBoxStmt(stmt, whenGroupId);
+                     AddCodeBoxStmt(whenGroupId);
                      break;
                   }
-                  int bxId = 0;
                   ValueKind k = (st->typeName == "vec3") ? ValueKind::Vec3 : ValueKind::Number;
-                  {
-                     BoxNode& bx = AddBox("previous", st->name);
-                     bxId = bx.id;
-                     bx.key = "s_" + st->name;
-                     bx.varName = st->name;
-                     bx.varType = st->typeName;
-                     bx.boundary = st->boundary;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
-                     bx.outlets[0].kind = k;
-                  }
+                  BoxNode& bx = AddBox("previous", st->name);
+                  int bxId = bx.id;
+                  SetKey(bx, "s_" + st->name);
+                  bx.varName = st->name;
+                  bx.varType = st->typeName;
+                  bx.boundary = st->boundary;
+                  bx.stmtOrder = nextStmtOrder++;
+                  bx.whenGroupId = whenGroupId;
+                  bx.outlets[0].kind = k;
                   if (st->initExpr)
                   {
                      OutRef initRef = LowerExpr(st->initExpr);
@@ -808,16 +1010,18 @@ namespace Field
                case AstKind::DeclAttrib:
                {
                   auto* a = static_cast<const AstDeclAttrib*>(stmt.get());
-                  int bxId = 0;
+                  if (ExprNeedsCodeBox(a->initExpr, info))
                   {
-                     BoxNode& bx = AddBox("attrib", a->name);
-                     bxId = bx.id;
-                     bx.key = "a_" + a->name;
-                     bx.varName = a->name;
-                     bx.varType = a->typeName;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
+                     AddCodeBoxStmt(whenGroupId);
+                     break;
                   }
+                  BoxNode& bx = AddBox("attrib", a->name);
+                  int bxId = bx.id;
+                  SetKey(bx, "a_" + a->name);
+                  bx.varName = a->name;
+                  bx.varType = a->typeName;
+                  bx.stmtOrder = nextStmtOrder++;
+                  bx.whenGroupId = whenGroupId;
                   if (a->initExpr)
                   {
                      OutRef initRef = LowerExpr(a->initExpr);
@@ -830,23 +1034,20 @@ namespace Field
                case AstKind::DeclOutput:
                {
                   auto* o = static_cast<const AstDeclOutput*>(stmt.get());
-                  if (ExprNeedsCodeBox(o->initExpr, info))
+                  if (!o->initExpr || ExprNeedsCodeBox(o->initExpr, info))
                   {
-                     AddCodeBoxStmt(stmt, whenGroupId);
+                     AddCodeBoxStmt(whenGroupId);
                      break;
                   }
-                  int bxId = 0;
-                  {
-                     BoxNode& bx = AddBox("output_pin", o->name);
-                     bxId = bx.id;
-                     bx.key = "out_" + o->name;
-                     bx.varName = o->name;
-                     bx.varType = o->typeName;
-                     bx.domainName = o->domainName;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
-                     bx.inlets.push_back({ o->name, ValueKind::Number, 0.0 });
-                  }
+                  BoxNode& bx = AddBox("output_pin", o->name);
+                  int bxId = bx.id;
+                  SetKey(bx, "out_" + o->name);
+                  bx.varName = o->name;
+                  bx.varType = o->typeName;
+                  bx.domainName = o->domainName;
+                  bx.stmtOrder = nextStmtOrder++;
+                  bx.whenGroupId = whenGroupId;
+                  bx.inlets.push_back({ o->name, ValueKind::Number, 0.0 });
                   OutRef valRef = LowerExpr(o->initExpr);
                   Connect(valRef.boxId, valRef.pinIdx, bxId, 0, valRef.kind);
                   break;
@@ -856,7 +1057,7 @@ namespace Field
                {
                   auto* in = static_cast<const AstDeclInput*>(stmt.get());
                   BoxNode& bx = AddBox("input_pin", in->name);
-                  bx.key = "in_" + in->name;
+                  SetKey(bx, "in_" + in->name);
                   bx.varName = in->name;
                   bx.varType = in->typeName;
                   bx.domainName = in->domainName;
@@ -868,279 +1069,821 @@ namespace Field
                }
 
                case AstKind::Assign:
-               {
-                  auto* a = static_cast<const AstAssign*>(stmt.get());
-                  if (ExprNeedsCodeBox(a->rvalue, info) ||
-                      (a->lvalue && a->lvalue->kind == AstKind::Index))
-                  {
-                     AddCodeBoxStmt(stmt, whenGroupId);
-                     break;
-                  }
-
-                  std::string targetBase;
-                  std::string targetField;
-                  if (a->lvalue && a->lvalue->kind == AstKind::Ident)
-                  {
-                     targetBase = static_cast<const AstIdent*>(a->lvalue.get())->name;
-                  }
-                  else if (a->lvalue && a->lvalue->kind == AstKind::Access)
-                  {
-                     auto* acc = static_cast<const AstAccess*>(a->lvalue.get());
-                     if (acc->base && acc->base->kind == AstKind::Ident)
-                     {
-                        targetBase = static_cast<const AstIdent*>(acc->base.get())->name;
-                        targetField = acc->field;
-                     }
-                  }
-
-                  if (targetBase.empty())
-                  {
-                     AddCodeBoxStmt(stmt, whenGroupId);
-                     break;
-                  }
-
-                  OutRef rhsRef = LowerExpr(a->rvalue);
-
-                  // Built-in outlets: P, N, Cd, publish
-                  if (targetBase == "P")
-                  {
-                     BoxNode& bx = AddBox("position_out");
-                     bx.varName = "P";
-                     bx.assignOp = a->op;
-                     bx.swizzleField = targetField;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
-                     int pinIdx = 3; // xyz
-                     if (targetField == "x") pinIdx = 0;
-                     else if (targetField == "y") pinIdx = 1;
-                     else if (targetField == "z") pinIdx = 2;
-                     else if (!targetField.empty())
-                     {
-                        // Multi-char swizzle like P.xz: use code box for safety
-                        graph.boxes.pop_back();
-                        AddCodeBoxStmt(stmt, whenGroupId);
-                        break;
-                     }
-                     Connect(rhsRef.boxId, rhsRef.pinIdx, bx.id, pinIdx, rhsRef.kind);
-                     break;
-                  }
-                  if (targetBase == "N" && targetField.empty() && a->op == "=")
-                  {
-                     BoxNode& bx = AddBox("normal_out");
-                     bx.varName = "N";
-                     bx.assignOp = a->op;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
-                     Connect(rhsRef.boxId, rhsRef.pinIdx, bx.id, 0, rhsRef.kind);
-                     break;
-                  }
-                  if (targetBase == "Cd" && targetField.empty() && a->op == "=")
-                  {
-                     BoxNode& bx = AddBox("color_out");
-                     bx.varName = "Cd";
-                     bx.assignOp = a->op;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
-                     Connect(rhsRef.boxId, rhsRef.pinIdx, bx.id, 0, rhsRef.kind);
-                     break;
-                  }
-                  if (targetBase == "publish" && targetField.empty() && a->op == "=")
-                  {
-                     BoxNode& bx = AddBox(rhsRef.kind == ValueKind::Pulse ? "pulse_out" : "value_out");
-                     bx.varName = "publish";
-                     bx.assignOp = a->op;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
-                     Connect(rhsRef.boxId, rhsRef.pinIdx, bx.id, 0, rhsRef.kind);
-                     break;
-                  }
-
-                  // State write or compound assignment or reassigned variable -> explicit assign box
-                  bool isState = info.stateNames.count(targetBase) > 0;
-                  bool isReassigned = false;
-                  auto cntIt = info.assignCounts.find(targetBase);
-                  if (cntIt != info.assignCounts.end() && cntIt->second > 1)
-                     isReassigned = true;
-
-                  if (isState || !targetField.empty() || a->op != "=" || isReassigned || whenGroupId >= 0)
-                  {
-                     BoxNode& bx = AddBox("assign_var", targetBase + (targetField.empty() ? "" : "." + targetField) + " " + a->op);
-                     bx.varName = targetBase;
-                     bx.swizzleField = targetField;
-                     bx.assignOp = a->op;
-                     bx.stmtOrder = nextStmtOrder++;
-                     bx.whenGroupId = whenGroupId;
-                     bx.inlets.push_back({ "val", rhsRef.kind, 0.0 });
-                     bx.outlets.push_back({ targetBase, rhsRef.kind, 0.0 });
-                     Connect(rhsRef.boxId, rhsRef.pinIdx, bx.id, 0, rhsRef.kind);
-                     if (!isState && targetField.empty() && a->op == "=")
-                        env[targetBase] = { bx.id, 0, rhsRef.kind };
-                     break;
-                  }
-
-                  // Single-assignment pure/named wire: attach wireName to the producer box
-                  if (BoxNode* prod = graph.FindBox(rhsRef.boxId))
-                  {
-                     if (prod->wireName.empty() && prod->stmtOrder < 0)
-                     {
-                        prod->wireName = targetBase;
-                        prod->stmtOrder = nextStmtOrder++;
-                        env[targetBase] = rhsRef;
-                        break;
-                     }
-                  }
-
-                  // If producer already has a wireName or is a source/param/state, create an alias assign_var
-                  BoxNode& bx = AddBox("assign_var", targetBase + " =");
-                  bx.varName = targetBase;
-                  bx.assignOp = "=";
-                  bx.stmtOrder = nextStmtOrder++;
-                  bx.whenGroupId = whenGroupId;
-                  bx.inlets.push_back({ "val", rhsRef.kind, 0.0 });
-                  bx.outlets.push_back({ targetBase, rhsRef.kind, 0.0 });
-                  Connect(rhsRef.boxId, rhsRef.pinIdx, bx.id, 0, rhsRef.kind);
-                  env[targetBase] = { bx.id, 0, rhsRef.kind };
+                  LowerAssign(static_cast<const AstAssign*>(stmt.get()), whenGroupId);
                   break;
-               }
 
                case AstKind::If:
-               {
-                  auto* iff = static_cast<const AstIf*>(stmt.get());
-                  if (iff->elseBlock || ExprNeedsCodeBox(iff->cond, info))
-                  {
-                     AddCodeBoxStmt(stmt, whenGroupId);
-                     break;
-                  }
-
-                  std::vector<AstNodePtr> thenStmts;
-                  if (iff->thenBlock && iff->thenBlock->kind == AstKind::Block)
-                     thenStmts = static_cast<const AstBlock*>(iff->thenBlock.get())->statements;
-                  else if (iff->thenBlock)
-                     thenStmts.push_back(iff->thenBlock);
-
-                  // Check if nested if/for/map exists inside thenStmts
-                  bool hasNestedControl = false;
-                  for (const auto& s : thenStmts)
-                  {
-                     if (s && (s->kind == AstKind::If || s->kind == AstKind::For || s->kind == AstKind::Map))
-                     {
-                        hasNestedControl = true;
-                        break;
-                     }
-                  }
-                  if (hasNestedControl || whenGroupId >= 0)
-                  {
-                     AddCodeBoxStmt(stmt, whenGroupId);
-                     break;
-                  }
-
-                  OutRef condRef = LowerExpr(iff->cond);
-
-                  // Check if thenStmts is ONLY note(...) calls
-                  bool onlyNotes = !thenStmts.empty();
-                  for (const auto& s : thenStmts)
-                  {
-                     if (!s || s->kind != AstKind::Call || static_cast<const AstCall*>(s.get())->callee != "note")
-                     {
-                        onlyNotes = false;
-                        break;
-                     }
-                  }
-
-                  if (onlyNotes)
-                  {
-                     for (const auto& s : thenStmts)
-                     {
-                        auto* call = static_cast<const AstCall*>(s.get());
-                        int pnId = 0;
-                        {
-                           BoxNode& pn = AddBox("play_note");
-                           pnId = pn.id;
-                           pn.stmtOrder = nextStmtOrder++;
-                        }
-                        Connect(condRef.boxId, condRef.pinIdx, pnId, 0, ValueKind::Pulse);
-                        for (size_t i = 0; i < std::min<size_t>(call->args.size(), 3); ++i)
-                        {
-                           OutRef aRef = LowerExpr(call->args[i]);
-                           Connect(aRef.boxId, aRef.pinIdx, pnId, static_cast<int>(i + 1), aRef.kind);
-                        }
-                     }
-                     break;
-                  }
-
-                  // Mixed statements -> when_group
-                  BoxGroup grp;
-                  grp.id = nextGroupId++;
-                  grp.name = "when";
-                  grp.isWhenGroup = true;
-                  grp.condBoxId = condRef.boxId;
-                  grp.condPinIdx = condRef.pinIdx;
-                  grp.stmtOrder = nextStmtOrder++;
-                  graph.groups.push_back(grp);
-                  size_t grpIdx = graph.groups.size() - 1;
-                  int gid = grp.id;
-
-                  size_t boxStart = graph.boxes.size();
-                  for (const auto& s : thenStmts)
-                  {
-                     if (s && s->kind == AstKind::Call && static_cast<const AstCall*>(s.get())->callee == "note")
-                     {
-                        auto* call = static_cast<const AstCall*>(s.get());
-                        int pnId = 0;
-                        {
-                           BoxNode& pn = AddBox("play_note");
-                           pnId = pn.id;
-                           pn.stmtOrder = nextStmtOrder++;
-                           pn.whenGroupId = gid;
-                        }
-                        for (size_t i = 0; i < std::min<size_t>(call->args.size(), 3); ++i)
-                        {
-                           OutRef aRef = LowerExpr(call->args[i]);
-                           Connect(aRef.boxId, aRef.pinIdx, pnId, static_cast<int>(i + 1), aRef.kind);
-                        }
-                     }
-                     else
-                     {
-                        LowerStmt(s, gid);
-                     }
-                  }
-                  for (size_t bi = boxStart; bi < graph.boxes.size(); ++bi)
-                  {
-                     if (graph.boxes[bi].whenGroupId == gid)
-                        graph.groups[grpIdx].boxIds.push_back(graph.boxes[bi].id);
-                  }
+                  LowerIf(static_cast<const AstIf*>(stmt.get()), whenGroupId);
                   break;
-               }
 
                case AstKind::Call:
                {
                   auto* call = static_cast<const AstCall*>(stmt.get());
                   if (call->callee == "note" && !ExprNeedsCodeBox(stmt, info))
                   {
-                     int pnId = 0;
-                     {
-                        BoxNode& pn = AddBox("play_note");
-                        pnId = pn.id;
-                        pn.stmtOrder = nextStmtOrder++;
-                        pn.whenGroupId = whenGroupId;
-                     }
-                     for (size_t i = 0; i < std::min<size_t>(call->args.size(), 3); ++i)
-                     {
-                        OutRef aRef = LowerExpr(call->args[i]);
-                        Connect(aRef.boxId, aRef.pinIdx, pnId, static_cast<int>(i + 1), aRef.kind);
-                     }
+                     MakePlayNote(call, whenGroupId);
                      break;
                   }
-                  AddCodeBoxStmt(stmt, whenGroupId);
+                  AddCodeBoxStmt(whenGroupId);
                   break;
                }
 
                default:
-                  AddCodeBoxStmt(stmt, whenGroupId);
+                  AddCodeBoxStmt(whenGroupId);
                   break;
             }
          }
+
+         void LowerAssign(const AstAssign* a, int whenGroupId)
+         {
+            if (ExprNeedsCodeBox(a->rvalue, info) || !a->lvalue || a->lvalue->kind == AstKind::Index)
+            {
+               AddCodeBoxStmt(whenGroupId);
+               return;
+            }
+
+            std::string targetBase;
+            std::string targetField;
+            if (a->lvalue->kind == AstKind::Ident)
+               targetBase = static_cast<const AstIdent*>(a->lvalue.get())->name;
+            else if (a->lvalue->kind == AstKind::Access)
+            {
+               auto* acc = static_cast<const AstAccess*>(a->lvalue.get());
+               if (acc->base && acc->base->kind == AstKind::Ident)
+               {
+                  targetBase = static_cast<const AstIdent*>(acc->base.get())->name;
+                  targetField = acc->field;
+               }
+            }
+            const bool multiSwizzleP = targetBase == "P" && !targetField.empty() &&
+                                       targetField != "x" && targetField != "y" && targetField != "z";
+            if (targetBase.empty() || multiSwizzleP)
+            {
+               AddCodeBoxStmt(whenGroupId);
+               return;
+            }
+
+            OutRef rhsRef = LowerExpr(a->rvalue);
+
+            auto sink = [&](const std::string& specId, const std::string& varName, int pin) {
+               BoxNode& bx = AddBox(specId);
+               bx.varName = varName;
+               bx.assignOp = a->op;
+               bx.swizzleField = targetField;
+               bx.stmtOrder = nextStmtOrder++;
+               bx.whenGroupId = whenGroupId;
+               SetKey(bx, varName + (targetField.empty() ? "" : "." + targetField) + "_out");
+               Connect(rhsRef.boxId, rhsRef.pinIdx, bx.id, pin, rhsRef.kind);
+            };
+
+            if (targetBase == "P")
+            {
+               int pin = targetField == "x" ? 0 : (targetField == "y" ? 1 : (targetField == "z" ? 2 : 3));
+               sink("position_out", "P", pin);
+               return;
+            }
+            if (targetField.empty() && a->op == "=")
+            {
+               if (targetBase == "N") { sink("normal_out", "N", 0); return; }
+               if (targetBase == "Cd") { sink("color_out", "Cd", 0); return; }
+               if (targetBase == "publish") { sink(rhsRef.kind == ValueKind::Pulse ? "pulse_out" : "value_out", "publish", 0); return; }
+            }
+
+            const bool isState = info.stateNames.count(targetBase) > 0;
+            auto cntIt = info.assignCounts.find(targetBase);
+            const bool isReassigned = cntIt != info.assignCounts.end() && cntIt->second > 1;
+            const bool explicitAssign = isState || !targetField.empty() || a->op != "=" || isReassigned || whenGroupId >= 0;
+
+            // A single `name = expr` names the box that computes expr, unless that
+            // box is a source, a declaration or already named (`x = t`, `y = x`):
+            // those get an assign box, so a shared source is never renamed.
+            if (!explicitAssign)
+            {
+               BoxNode* prod = graph.FindBox(rhsRef.boxId);
+               if (prod && prod->wireName.empty() && prod->stmtOrder < 0 &&
+                   !IsSourceSpecId(prod->specId) && !IsDeclSpecId(prod->specId) && prod->specId != "assign_var" &&
+                   (prod->outlets.size() <= 1 || prod->specId == "swizzle"))
+               {
+                  prod->wireName = targetBase;
+                  prod->stmtOrder = nextStmtOrder++;
+                  SetKey(*prod, "w_" + targetBase);
+                  env[targetBase] = rhsRef;
+                  return;
+               }
+            }
+
+            BoxNode& bx = AddBox("assign_var", targetBase + (targetField.empty() ? "" : "." + targetField) + " " + a->op);
+            bx.varName = targetBase;
+            bx.swizzleField = targetField;
+            bx.assignOp = a->op;
+            bx.stmtOrder = nextStmtOrder++;
+            bx.whenGroupId = whenGroupId;
+            bx.inlets.push_back({ "val", rhsRef.kind, 0.0 });
+            bx.outlets.push_back({ targetBase, rhsRef.kind, 0.0 });
+            SetKey(bx, "v_" + targetBase + (targetField.empty() ? "" : "." + targetField));
+            int id = bx.id;
+            Connect(rhsRef.boxId, rhsRef.pinIdx, id, 0, rhsRef.kind);
+            if (!isState && targetField.empty() && a->op == "=")
+               env[targetBase] = { id, 0, rhsRef.kind };
+         }
+
+         void LowerIf(const AstIf* iff, int whenGroupId)
+         {
+            if (iff->elseBlock || whenGroupId >= 0 || ExprNeedsCodeBox(iff->cond, info))
+            {
+               AddCodeBoxStmt(whenGroupId);
+               return;
+            }
+
+            std::vector<AstNodePtr> thenStmts;
+            if (iff->thenBlock && iff->thenBlock->kind == AstKind::Block)
+               thenStmts = static_cast<const AstBlock*>(iff->thenBlock.get())->statements;
+            else if (iff->thenBlock)
+               thenStmts.push_back(iff->thenBlock);
+
+            bool onlyNotes = !thenStmts.empty();
+            for (const auto& s : thenStmts)
+            {
+               if (!s)
+                  continue;
+               if (s->kind == AstKind::If || s->kind == AstKind::For || s->kind == AstKind::Map)
+               {
+                  AddCodeBoxStmt(whenGroupId);
+                  return;
+               }
+               if (s->kind != AstKind::Call || static_cast<const AstCall*>(s.get())->callee != "note" ||
+                   ExprNeedsCodeBox(s, info))
+                  onlyNotes = false;
+            }
+
+            OutRef condRef = LowerExpr(iff->cond);
+
+            if (onlyNotes)
+            {
+               for (const auto& s : thenStmts)
+               {
+                  int pnId = MakePlayNote(static_cast<const AstCall*>(s.get()), -1);
+                  Connect(condRef.boxId, condRef.pinIdx, pnId, 0, ValueKind::Pulse);
+               }
+               return;
+            }
+
+            BoxGroup grp;
+            grp.id = nextGroupId++;
+            grp.name = "when";
+            grp.isWhenGroup = true;
+            grp.condBoxId = condRef.boxId;
+            grp.condPinIdx = condRef.pinIdx;
+            grp.stmtOrder = nextStmtOrder++;
+            graph.groups.push_back(grp);
+            const size_t grpIdx = graph.groups.size() - 1;
+            const int gid = grp.id;
+
+            const size_t boxStart = graph.boxes.size();
+            for (const auto& s : thenStmts)
+               LowerStmt(s, gid);
+            for (size_t bi = boxStart; bi < graph.boxes.size(); ++bi)
+            {
+               if (graph.boxes[bi].whenGroupId == gid)
+                  graph.groups[grpIdx].boxIds.push_back(graph.boxes[bi].id);
+            }
+         }
       };
+   }
+
+   namespace
+   {
+      // Prints a graph from its wires. A statement box (declaration, sink,
+      // assignment, named box, code statement, note) is one line; everything it
+      // reads is inlined, except a box read more than once, which is named first.
+      struct Printer
+      {
+         const BoxGraph& graph;
+         std::unordered_map<int, const BoxNode*> byId;
+         std::map<std::pair<int, int>, const BoxWire*> wireTo;
+         std::unordered_map<int, std::vector<const BoxWire*>> wiresFrom;
+         std::unordered_map<int, int> groupOf; // box id -> when-group id
+         std::unordered_map<int, int> readerMemo;
+         std::unordered_map<int, std::string> tempNames;
+         std::unordered_set<std::string> usedNames;
+         int tempCounter = 0;
+
+         explicit Printer(const BoxGraph& g) : graph(g)
+         {
+            for (const BoxNode& b : graph.boxes)
+            {
+               byId[b.id] = &b;
+               for (const std::string* n : { &b.wireName, &b.varName })
+               {
+                  if (!n->empty())
+                     usedNames.insert(*n);
+               }
+               if (b.whenGroupId >= 0)
+                  groupOf[b.id] = b.whenGroupId;
+            }
+            for (const BoxWire& w : graph.wires)
+            {
+               wireTo[{ w.dstBoxId, w.dstPinIdx }] = &w;
+               wiresFrom[w.srcBoxId].push_back(&w);
+            }
+            for (const BoxGroup& grp : graph.groups)
+            {
+               if (!grp.isWhenGroup)
+                  continue;
+               for (int id : grp.boxIds)
+                  groupOf[id] = grp.id;
+            }
+         }
+
+         const BoxNode* Box(int id) const
+         {
+            auto it = byId.find(id);
+            return it == byId.end() ? nullptr : it->second;
+         }
+
+         const BoxWire* WireTo(int boxId, int pin) const
+         {
+            auto it = wireTo.find({ boxId, pin });
+            return it == wireTo.end() ? nullptr : it->second;
+         }
+
+         static bool IsSink(const std::string& id)
+         {
+            return id == "position_out" || id == "normal_out" || id == "color_out" ||
+                   id == "value_out" || id == "pulse_out" || id == "output_pin";
+         }
+
+         bool IsCodeStmt(const BoxNode& b) const { return b.specId == "code" && b.outlets.empty(); }
+
+         // Boxes that are printed as their own statement.
+         bool IsStatementBox(const BoxNode& b) const
+         {
+            return IsDeclSpecId(b.specId) || IsSink(b.specId) || b.specId == "assign_var" ||
+                   b.specId == "play_note" || IsCodeStmt(b) || !b.wireName.empty();
+         }
+
+         // Distinct reads of a box's outputs. Reads through an unnamed swizzle
+         // count as reads of the box; notes sharing one trigger count once.
+         int Readers(int boxId)
+         {
+            auto memo = readerMemo.find(boxId);
+            if (memo != readerMemo.end())
+               return memo->second;
+            readerMemo[boxId] = 0; // cycle guard
+            std::set<std::pair<int, int>> keys;
+            int extra = 0;
+            auto it = wiresFrom.find(boxId);
+            if (it != wiresFrom.end())
+            {
+               for (const BoxWire* w : it->second)
+               {
+                  const BoxNode* dst = Box(w->dstBoxId);
+                  if (!dst)
+                     continue;
+                  if (dst->specId == "swizzle" && dst->wireName.empty())
+                     extra += std::max(1, Readers(dst->id));
+                  else if (dst->specId == "play_note" && w->dstPinIdx == 0 && groupOf.count(dst->id) == 0)
+                     keys.insert({ -1, w->srcPinIdx });
+                  else
+                     keys.insert({ w->dstBoxId, w->dstPinIdx });
+               }
+            }
+            for (const BoxGroup& grp : graph.groups)
+            {
+               if (grp.isWhenGroup && grp.condBoxId == boxId)
+                  keys.insert({ -2 - grp.id, 0 });
+            }
+            int n = static_cast<int>(keys.size()) + extra;
+            readerMemo[boxId] = n;
+            return n;
+         }
+
+         bool IsTemp(const BoxNode& b)
+         {
+            if (IsStatementBox(b) || b.specId == "number" || b.specId == "swizzle" || IsSourceSpecId(b.specId))
+               return false;
+            if (b.outlets.size() != 1)
+               return false;
+            return Readers(b.id) > 1;
+         }
+
+         const std::string& TempName(int boxId)
+         {
+            auto it = tempNames.find(boxId);
+            if (it != tempNames.end())
+               return it->second;
+            std::string name;
+            do
+               name = "v" + std::to_string(++tempCounter);
+            while (usedNames.count(name) > 0);
+            usedNames.insert(name);
+            return tempNames[boxId] = name;
+         }
+
+         // The name a box's output is read by, or "" when it is inlined.
+         std::string NameOf(const BoxNode& b)
+         {
+            if (!b.wireName.empty())
+               return b.wireName;
+            if (IsDeclSpecId(b.specId) || b.specId == "assign_var")
+               return b.varName;
+            if (IsTemp(b))
+               return TempName(b.id);
+            return "";
+         }
+
+         static std::string Number(double v, int parentPrec)
+         {
+            std::string s = FormatDouble(v);
+            return (v < 0.0 && parentPrec > 0) ? "(" + s + ")" : s;
+         }
+
+         std::string Inlet(const BoxNode& b, int pin, int parentPrec)
+         {
+            if (const BoxWire* w = WireTo(b.id, pin))
+               return Ref(w->srcBoxId, w->srcPinIdx, parentPrec);
+            double def = pin >= 0 && pin < static_cast<int>(b.inlets.size()) ? b.inlets[pin].defaultValue : 0.0;
+            return Number(def, parentPrec);
+         }
+
+         std::string Args(const BoxNode& b, int first = 0)
+         {
+            std::string s;
+            for (int i = first; i < static_cast<int>(b.inlets.size()); ++i)
+            {
+               if (i > first)
+                  s += ", ";
+               s += Inlet(b, i, 0);
+            }
+            return s;
+         }
+
+         std::string Ref(int boxId, int pin, int parentPrec)
+         {
+            const BoxNode* b = Box(boxId);
+            if (!b)
+               return "0";
+            std::string name = NameOf(*b);
+            if (!name.empty())
+               return name;
+            return Body(*b, pin, parentPrec);
+         }
+
+         static std::string OperatorOf(const BoxNode& b, const BoxSpec* spec)
+         {
+            if (!b.callName.empty())
+               return "";
+            if (b.specId == "pow") return "^";
+            if (b.specId == "mod") return "%";
+            if (b.specId == "xor") return "!=";
+            if (b.specId == "xnor") return "==";
+            if (spec && b.inlets.size() == 2 && BinaryPrec(spec->fieldWord) > 0)
+               return spec->fieldWord;
+            return "";
+         }
+
+         std::string Binary(const BoxNode& b, const std::string& op, int parentPrec)
+         {
+            int p = BinaryPrec(op);
+            bool rightAssoc = op == "^";
+            std::string s = Inlet(b, 0, rightAssoc ? p : p - 1) + " " + op + " " + Inlet(b, 1, rightAssoc ? p - 1 : p);
+            return Wrap(s, p, parentPrec);
+         }
+
+         // The expression a box computes (ignoring any name it has).
+         std::string Body(const BoxNode& b, int pin, int parentPrec)
+         {
+            const std::string& id = b.specId;
+            const BoxSpec* spec = FindBoxSpec(id);
+
+            if (id == "number")
+            {
+               if (!b.literalText.empty())
+                  return (b.literalText[0] == '-' && parentPrec > 0) ? "(" + b.literalText + ")" : b.literalText;
+               return Number(b.numberValue, parentPrec);
+            }
+            if (id == "code")
+               return b.rawPrec > parentPrec ? b.rawCode : "(" + b.rawCode + ")";
+            if (id == "ident")
+               return b.varName.empty() ? b.label : b.varName;
+            if (id == "notes_in")
+            {
+               static const char* kNames[] = { "noteNum", "noteVel", "noteOn" };
+               return kNames[std::clamp(pin, 0, 2)];
+            }
+            if (id == "geometry_in")
+            {
+               static const char* kNames[] = { "P", "N", "Cd" };
+               return kNames[std::clamp(pin, 0, 2)];
+            }
+            if (IsSourceSpecId(id) && spec)
+               return b.varName.empty() ? spec->fieldWord : b.varName;
+            if (IsDeclSpecId(id) || id == "assign_var")
+               return b.varName;
+
+            if (id == "swizzle")
+            {
+               std::string field = b.swizzleField;
+               if (field.empty() && pin >= 0 && pin < static_cast<int>(b.outlets.size()))
+                  field = b.outlets[pin].name;
+               return Wrap(Inlet(b, 0, kPrecPow) + "." + field, kPrecPostfix, parentPrec);
+            }
+            if (id == "neighbour")
+               return Wrap(b.varName + ".at(" + Args(b) + ")", kPrecPostfix, parentPrec);
+            if (id == "reduce")
+               return Wrap("reduce." + b.swizzleField + "(" + Args(b) + ")", kPrecPostfix, parentPrec);
+
+            if (id == "neg" || id == "not")
+               return Wrap(std::string(id == "neg" ? "-" : "!") + Inlet(b, 0, kPrecPostfix), kPrecUnary, parentPrec);
+            if (id == "nand" || id == "nor")
+            {
+               std::string op = id == "nand" ? "&&" : "||";
+               int p = BinaryPrec(op);
+               return Wrap("!(" + Inlet(b, 0, p - 1) + " " + op + " " + Inlet(b, 1, p) + ")", kPrecUnary, parentPrec);
+            }
+            if (id == "rescale")
+            {
+               // outMin + (x - inMin) / (inMax - inMin) * (outMax - outMin)
+               std::string s = Inlet(b, 3, kPrecAdd - 1) + " + (" + Inlet(b, 0, kPrecAdd - 1) + " - " + Inlet(b, 1, kPrecAdd) +
+                               ") / (" + Inlet(b, 2, kPrecAdd - 1) + " - " + Inlet(b, 1, kPrecAdd) + ") * (" +
+                               Inlet(b, 4, kPrecAdd - 1) + " - " + Inlet(b, 3, kPrecAdd) + ")";
+               return Wrap(s, kPrecAdd, parentPrec);
+            }
+
+            std::string op = OperatorOf(b, spec);
+            if (!op.empty())
+               return Binary(b, op, parentPrec);
+
+            std::string fn = !b.callName.empty() ? b.callName : (spec ? spec->fieldWord : id);
+            return fn + "(" + Args(b) + ")";
+         }
+
+         static std::string Indent(const std::string& text, const std::string& indent)
+         {
+            std::string out;
+            std::istringstream iss(text);
+            std::string line;
+            while (std::getline(iss, line))
+               out += indent + line + "\n";
+            return out;
+         }
+
+         // One statement box as a line (no trailing newline).
+         std::string Statement(const BoxNode& b)
+         {
+            const std::string type = b.varType.empty() ? "float" : b.varType;
+            const std::string& id = b.specId;
+            if (id == "code")
+               return b.wireName.empty() ? b.rawCode : b.wireName + " = " + b.rawCode;
+            if (id == "knob")
+               return "param " + type + " " + b.varName + " = " + FormatDouble(b.numberValue) +
+                      " [" + FormatDouble(b.minVal) + ", " + FormatDouble(b.maxVal) + "]";
+            if (id == "previous")
+            {
+               std::string s = "state " + type + " " + b.varName + " = " + Inlet(b, 1, 0);
+               if (!b.boundary.empty())
+                  s += " [" + b.boundary + "]";
+               return s;
+            }
+            if (id == "attrib")
+            {
+               std::string s = "attrib " + type + " " + b.varName;
+               if (WireTo(b.id, 0))
+                  s += " = " + Inlet(b, 0, 0);
+               return s;
+            }
+            if (id == "input_pin" || id == "output_pin")
+            {
+               std::string s = id == "input_pin" ? "input" : "output";
+               if (!b.domainName.empty())
+                  s += " " + b.domainName;
+               s += " " + type + " " + b.varName;
+               if (id == "output_pin")
+                  s += " = " + Inlet(b, 0, 0);
+               return s;
+            }
+            if (id == "position_out")
+            {
+               int pin = b.swizzleField == "x" ? 0 : (b.swizzleField == "y" ? 1 : (b.swizzleField == "z" ? 2 : 3));
+               if (b.swizzleField.empty() && !WireTo(b.id, 3))
+               {
+                  // A hand-built box wired per axis.
+                  std::string s;
+                  for (int i = 0; i < 3; ++i)
+                  {
+                     if (WireTo(b.id, i))
+                        s += std::string(s.empty() ? "" : "\n") + "P." + "xyz"[i] + " = " + Inlet(b, i, 0);
+                  }
+                  return s;
+               }
+               return (b.swizzleField.empty() ? "P" : "P." + b.swizzleField) + " " + b.assignOp + " " + Inlet(b, pin, 0);
+            }
+            if (id == "normal_out" || id == "color_out")
+            {
+               std::string def = id == "normal_out" ? "vec3(0, 1, 0)" : "vec3(1, 1, 1)";
+               return std::string(id == "normal_out" ? "N" : "Cd") + " = " + (WireTo(b.id, 0) ? Inlet(b, 0, 0) : def);
+            }
+            if (id == "value_out" || id == "pulse_out")
+               return "publish = " + Inlet(b, 0, 0);
+            if (id == "assign_var")
+               return b.varName + (b.swizzleField.empty() ? "" : "." + b.swizzleField) + " " + b.assignOp + " " + Inlet(b, 0, 0);
+            if (id == "play_note")
+               return "note(" + Args(b, 1) + ")";
+            if (!b.wireName.empty())
+               return b.wireName + " = " + Body(b, 0, 0);
+            return "";
+         }
+
+         struct Unit
+         {
+            enum Kind { BoxStmt, Temp, StateWrite, Group, Notes } kind = BoxStmt;
+            int id = 0;            // box id, or group id
+            std::vector<int> notes; // Notes: play_note box ids
+            int order = INT_MAX;
+            float x = 0.0f;
+            int tie = 0;
+         };
+
+         std::string Print()
+         {
+            std::vector<Unit> units;
+            std::unordered_map<int, int> unitOfBox;
+            std::map<std::pair<int, int>, int> notesUnitBySource;
+
+            auto addUnit = [&](Unit u, const BoxNode* b) {
+               if (b)
+               {
+                  u.order = b->stmtOrder >= 0 ? b->stmtOrder : (u.kind == Unit::StateWrite ? INT_MAX : -1);
+                  u.x = b->x;
+                  u.tie = b->id;
+               }
+               units.push_back(u);
+               return static_cast<int>(units.size()) - 1;
+            };
+
+            for (const BoxNode& b : graph.boxes)
+            {
+               if (groupOf.count(b.id) > 0)
+                  continue;
+               if (b.specId == "play_note")
+               {
+                  const BoxWire* w = WireTo(b.id, 0);
+                  if (w)
+                  {
+                     auto key = std::make_pair(w->srcBoxId, w->srcPinIdx);
+                     auto it = notesUnitBySource.find(key);
+                     if (it != notesUnitBySource.end())
+                     {
+                        units[it->second].notes.push_back(b.id);
+                        unitOfBox[b.id] = it->second;
+                        continue;
+                     }
+                     Unit u;
+                     u.kind = Unit::Notes;
+                     u.notes.push_back(b.id);
+                     int ui = addUnit(u, &b);
+                     notesUnitBySource[key] = ui;
+                     unitOfBox[b.id] = ui;
+                     continue;
+                  }
+               }
+               if (IsStatementBox(b))
+               {
+                  Unit u;
+                  u.id = b.id;
+                  unitOfBox[b.id] = addUnit(u, &b);
+               }
+               else if (IsTemp(b))
+               {
+                  Unit u;
+                  u.kind = Unit::Temp;
+                  u.id = b.id;
+                  unitOfBox[b.id] = addUnit(u, &b);
+               }
+            }
+            std::vector<int> stateWriteUnits;
+            for (const BoxNode& b : graph.boxes)
+            {
+               if (b.specId == "previous" && WireTo(b.id, 0))
+               {
+                  Unit u;
+                  u.kind = Unit::StateWrite;
+                  u.id = b.id;
+                  stateWriteUnits.push_back(addUnit(u, &b));
+               }
+            }
+            for (const BoxGroup& grp : graph.groups)
+            {
+               if (!grp.isWhenGroup)
+                  continue;
+               Unit u;
+               u.kind = Unit::Group;
+               u.id = grp.id;
+               u.order = grp.stmtOrder >= 0 ? grp.stmtOrder : -1;
+               u.tie = INT_MAX / 2 + grp.id;
+               float minX = 1e30f;
+               for (const BoxNode& b : graph.boxes)
+               {
+                  auto g = groupOf.find(b.id);
+                  if (g != groupOf.end() && g->second == grp.id)
+                  {
+                     minX = std::min(minX, b.x);
+                     if (grp.stmtOrder < 0 && b.stmtOrder >= 0)
+                        u.order = u.order < 0 ? b.stmtOrder : std::min(u.order, b.stmtOrder);
+                  }
+               }
+               u.x = minX < 1e29f ? minX : 0.0f;
+               int ui = static_cast<int>(units.size());
+               units.push_back(u);
+               for (const BoxNode& b : graph.boxes)
+               {
+                  auto g = groupOf.find(b.id);
+                  if (g != groupOf.end() && g->second == grp.id)
+                     unitOfBox[b.id] = ui;
+               }
+            }
+
+            // Dependencies: walk each unit's inlined inputs until a named box.
+            std::vector<std::set<int>> deps(units.size());
+            for (size_t ui = 0; ui < units.size(); ++ui)
+            {
+               std::unordered_set<int> seen;
+               std::function<void(int, int)> walkInlets;
+               std::function<void(int)> walkSource = [&](int srcId) {
+                  auto u = unitOfBox.find(srcId);
+                  if (u != unitOfBox.end() && u->second != static_cast<int>(ui))
+                  {
+                     deps[ui].insert(u->second);
+                     return;
+                  }
+                  if (u != unitOfBox.end())
+                     return; // own box
+                  walkInlets(srcId, -1);
+               };
+               walkInlets = [&](int boxId, int onlyPin) {
+                  if (!seen.insert(boxId * 64 + (onlyPin + 1)).second)
+                     return;
+                  const BoxNode* b = Box(boxId);
+                  if (!b)
+                     return;
+                  for (int pin = 0; pin < static_cast<int>(b->inlets.size()); ++pin)
+                  {
+                     if (onlyPin >= 0 && pin != onlyPin)
+                        continue;
+                     if (b->specId == "previous" && onlyPin < 0 && pin == 0)
+                        continue; // the next value is written later, not read now
+                     if (const BoxWire* w = WireTo(boxId, pin))
+                        walkSource(w->srcBoxId);
+                  }
+               };
+               const Unit& u = units[ui];
+               switch (u.kind)
+               {
+                  case Unit::BoxStmt:
+                  case Unit::Temp: walkInlets(u.id, -1); break;
+                  case Unit::StateWrite:
+                     walkInlets(u.id, 0);
+                     deps[ui].insert(unitOfBox[u.id]);
+                     break;
+                  case Unit::Notes:
+                     for (int nid : u.notes)
+                        walkInlets(nid, -1);
+                     break;
+                  case Unit::Group:
+                  {
+                     for (const BoxGroup& grp : graph.groups)
+                     {
+                        if (grp.id == u.id)
+                           walkSource(grp.condBoxId);
+                     }
+                     for (const BoxNode& b : graph.boxes)
+                     {
+                        auto g = groupOf.find(b.id);
+                        if (g != groupOf.end() && g->second == u.id)
+                           walkInlets(b.id, -1);
+                     }
+                     break;
+                  }
+               }
+               deps[ui].erase(static_cast<int>(ui));
+            }
+
+            // Kahn, ties in source order then left to right.
+            auto before = [&](int a, int b) {
+               const Unit& ua = units[a];
+               const Unit& ub = units[b];
+               return std::tie(ua.order, ua.x, ua.tie) < std::tie(ub.order, ub.x, ub.tie);
+            };
+            std::vector<bool> done(units.size(), false);
+            std::vector<int> sequence;
+            for (size_t n = 0; n < units.size(); ++n)
+            {
+               int pick = -1;
+               for (size_t ui = 0; ui < units.size(); ++ui)
+               {
+                  if (done[ui])
+                     continue;
+                  bool ready = true;
+                  for (int d : deps[ui])
+                     ready = ready && done[d];
+                  if (ready && (pick < 0 || before(static_cast<int>(ui), pick)))
+                     pick = static_cast<int>(ui);
+               }
+               if (pick < 0) // a cycle: take the earliest remaining
+               {
+                  for (size_t ui = 0; ui < units.size(); ++ui)
+                  {
+                     if (!done[ui] && (pick < 0 || before(static_cast<int>(ui), pick)))
+                        pick = static_cast<int>(ui);
+                  }
+               }
+               done[pick] = true;
+               sequence.push_back(pick);
+            }
+
+            std::string out;
+            for (int ui : sequence)
+            {
+               const Unit& u = units[ui];
+               switch (u.kind)
+               {
+                  case Unit::BoxStmt:
+                  {
+                     const BoxNode& b = *Box(u.id);
+                     out += Indent(b.comment, "");
+                     std::string s = Statement(b);
+                     if (!s.empty())
+                        out += s + "\n";
+                     break;
+                  }
+                  case Unit::Temp:
+                  {
+                     const BoxNode& b = *Box(u.id);
+                     out += Indent(b.comment, "");
+                     out += TempName(b.id) + " = " + Body(b, 0, 0) + "\n";
+                     break;
+                  }
+                  case Unit::StateWrite:
+                  {
+                     const BoxNode& b = *Box(u.id);
+                     out += b.varName + " = " + Inlet(b, 0, 0) + "\n";
+                     break;
+                  }
+                  case Unit::Notes:
+                  {
+                     const BoxNode& first = *Box(u.notes.front());
+                     for (int nid : u.notes)
+                        out += Indent(Box(nid)->comment, "");
+                     out += "if (" + Inlet(first, 0, 0) + ") {\n";
+                     for (int nid : u.notes)
+                        out += "   " + Statement(*Box(nid)) + "\n";
+                     out += "}\n";
+                     break;
+                  }
+                  case Unit::Group:
+                  {
+                     const BoxGroup* grp = nullptr;
+                     for (const BoxGroup& g : graph.groups)
+                     {
+                        if (g.id == u.id)
+                           grp = &g;
+                     }
+                     out += Indent(grp->comment, "");
+                     out += "if (" + Ref(grp->condBoxId, grp->condPinIdx, 0) + ") {\n";
+                     std::vector<const BoxNode*> members;
+                     for (const BoxNode& b : graph.boxes)
+                     {
+                        auto g = groupOf.find(b.id);
+                        if (g != groupOf.end() && g->second == grp->id && IsStatementBox(b))
+                           members.push_back(&b);
+                     }
+                     std::sort(members.begin(), members.end(), [](const BoxNode* a, const BoxNode* b) {
+                        return std::tie(a->stmtOrder, a->x, a->id) < std::tie(b->stmtOrder, b->x, b->id);
+                     });
+                     for (const BoxNode* m : members)
+                     {
+                        out += Indent(m->comment, "   ");
+                        std::string s = Statement(*m);
+                        if (!s.empty())
+                           out += Indent(s, "   ");
+                     }
+                     out += "}\n";
+                     break;
+                  }
+               }
+            }
+            if (!graph.trailingComment.empty())
+               out += Indent(graph.trailingComment, "");
+            return out;
+         }
+      };
+   }
+
+   std::string PrintBoxGraphToCode(const BoxGraph& graph, bool includeHeader)
+   {
+      Printer printer(graph);
+      std::string body = printer.Print();
+      return includeHeader ? FormatBoxesHeader(graph) + "\n" + body : body;
    }
 
    void ParseBoxesHeader(const std::string& code, BoxHeaderData& outHeader)
@@ -1242,8 +1985,27 @@ namespace Field
 
    bool ParseCodeToBoxGraph(const std::string& code, uint32_t hostMask, BoxGraph& outGraph, FieldError& outError)
    {
+      // `//` is not a Field comment: blank an old-style header line (same length,
+      // so every offset still points at the same text).
+      std::string src = code;
+      {
+         size_t lineStart = 0;
+         while (lineStart < src.size())
+         {
+            size_t lineEnd = src.find('\n', lineStart);
+            if (lineEnd == std::string::npos)
+               lineEnd = src.size();
+            size_t p = lineStart;
+            while (p < lineEnd && (src[p] == ' ' || src[p] == '\t'))
+               ++p;
+            if (src.compare(p, 9, "// @boxes") == 0)
+               std::fill(src.begin() + static_cast<std::ptrdiff_t>(p), src.begin() + static_cast<std::ptrdiff_t>(lineEnd), ' ');
+            lineStart = lineEnd + 1;
+         }
+      }
+
       std::vector<Token> tokens;
-      if (!Lex(code, tokens, outError))
+      if (!Lex(src, tokens, outError))
          return false;
 
       AstNodePtr ast;
@@ -1259,15 +2021,21 @@ namespace Field
          outGraph.view = header.view;
 
       PreScanInfo preScan;
-      PreScanStmt(ast, preScan);
+      PreScan(ast, preScan);
 
-      GraphBuilder builder{ outGraph, preScan };
+      GraphBuilder builder{ outGraph, preScan, src };
+      for (const Token& t : tokens)
+      {
+         if (t.kind == TokenKind::Comment && t.text.rfind("# @boxes", 0) != 0)
+            builder.comments.push_back({ t.span.offset, t.text });
+      }
       if (ast && ast->kind == AstKind::Program)
       {
          const auto* prog = static_cast<const AstProgram*>(ast.get());
          for (const AstNodePtr& stmt : prog->statements)
             builder.LowerStmt(stmt);
       }
+      outGraph.trailingComment = JoinComments(builder.pendingComment, builder.TakeCommentsBefore(std::string::npos));
 
       // Apply header positions if present
       std::unordered_map<std::string, BoxHeaderEntry> posByKey;
@@ -1344,323 +2112,5 @@ namespace Field
          b.x = 40.0f + static_cast<float>(col) * 210.0f;
          b.y = 40.0f + static_cast<float>(row) * 96.0f;
       }
-   }
-
-   namespace
-   {
-      struct ExprPrinter
-      {
-         const BoxGraph& graph;
-         std::unordered_map<int, int> readerCount;
-         std::unordered_map<int, std::string> boundVar;
-         std::unordered_set<int> emittedStmts;
-         int tempCounter = 1;
-
-         ExprPrinter(const BoxGraph& g) : graph(g)
-         {
-            for (const BoxWire& w : graph.wires)
-               readerCount[w.srcBoxId]++;
-            for (const BoxNode& b : graph.boxes)
-            {
-               if (!b.wireName.empty())
-                  boundVar[b.id] = b.wireName;
-               else if (b.specId == "knob" || b.specId == "previous" || b.specId == "attrib" ||
-                        b.specId == "input_pin" || b.specId == "assign_var")
-                  boundVar[b.id] = b.varName;
-               else if (b.specId == "ident")
-                  boundVar[b.id] = b.varName;
-            }
-         }
-
-         std::string PrintInlet(int dstBoxId, int dstPinIdx, const std::string& fallback = "0", int parentPrec = 0)
-         {
-            const BoxWire* w = graph.FindWireTo(dstBoxId, dstPinIdx);
-            if (!w)
-               return fallback;
-            return PrintBoxExpr(w->srcBoxId, w->srcPinIdx, parentPrec);
-         }
-
-         std::string PrintBoxExpr(int boxId, int pinIdx, int parentPrec = 0)
-         {
-            const BoxNode* b = graph.FindBox(boxId);
-            if (!b)
-               return "0";
-
-            // Builtin sources
-            if (b->specId == "time") return "t";
-            if (b->specId == "dt") return "dt";
-            if (b->specId == "age") return "age";
-            if (b->specId == "beat") return "beat";
-            if (b->specId == "index") return "i";
-            if (b->specId == "count") return "count";
-            if (b->specId == "position") return "P";
-            if (b->specId == "normal") return "N";
-            if (b->specId == "color_in") return "Cd";
-            if (b->specId == "uv") return "uv";
-            if (b->specId == "audio_in") return "in";
-            if (b->specId == "sr") return "sr";
-            if (b->specId == "freq") return "freq";
-            if (b->specId == "gate") return "gate";
-            if (b->specId == "noteOn") return "noteOn";
-            if (b->specId == "noteNum") return "noteNum";
-            if (b->specId == "noteVel") return "noteVel";
-            if (b->specId == "ident") return b->varName;
-
-            if (b->specId == "knob" || b->specId == "previous" || b->specId == "attrib" ||
-                b->specId == "input_pin" || b->specId == "assign_var")
-               return b->varName;
-
-            if (!b->wireName.empty() && emittedStmts.count(b->id) > 0)
-               return b->wireName;
-
-            auto bvIt = boundVar.find(b->id);
-            if (bvIt != boundVar.end() && emittedStmts.count(b->id) > 0)
-               return bvIt->second;
-
-            return PrintRawBoxExpr(*b, pinIdx, parentPrec);
-         }
-
-         std::string PrintRawBoxExpr(const BoxNode& b, int pinIdx, int parentPrec = 0)
-         {
-            if (b.specId == "number")
-               return b.literalText.empty() ? FormatDouble(b.numberValue) : b.literalText;
-
-            if (b.specId == "code")
-               return b.rawCode.empty() ? "0" : b.rawCode;
-
-            if (b.specId == "swizzle")
-            {
-               std::string field = b.swizzleField;
-               if (field.empty())
-                  field = (pinIdx == 0) ? "x" : (pinIdx == 1 ? "y" : "z");
-               return PrintInlet(b.id, 0, "P", 10) + "." + field;
-            }
-
-            if (b.specId == "neighbour")
-               return b.varName + ".at(" + PrintInlet(b.id, 0, "i", 0) + ")";
-
-            if (b.specId == "reduce")
-               return "reduce." + (b.swizzleField.empty() ? "max" : b.swizzleField) + "(" + PrintInlet(b.id, 0, "0", 0) + ")";
-
-            if (b.specId == "neg" || b.specId == "not")
-            {
-               std::string op = (b.specId == "not") ? "!" : "-";
-               std::string s = op + PrintInlet(b.id, 0, "0", 8);
-               return parentPrec > 8 ? "(" + s + ")" : s;
-            }
-
-            if (b.specId == "nand" || b.specId == "nor")
-            {
-               std::string op = (b.specId == "nand") ? "&&" : "||";
-               std::string s = "!(" + PrintInlet(b.id, 0, "0", 2) + " " + op + " " + PrintInlet(b.id, 1, "0", 2) + ")";
-               return parentPrec > 8 ? "(" + s + ")" : s;
-            }
-
-            static const std::unordered_map<std::string, std::string> kBinOps = {
-               { "add", "+" }, { "sub", "-" }, { "mul", "*" }, { "div", "/" },
-               { "mod", "%" }, { "pow", "^" }, { "lt", "<" }, { "le", "<=" },
-               { "gt", ">" }, { "ge", ">=" }, { "eq", "==" }, { "ne", "!=" },
-               { "xor", "!=" }, { "xnor", "==" }, { "and", "&&" }, { "or", "||" }
-            };
-            auto binIt = kBinOps.find(b.specId);
-            if (binIt != kBinOps.end())
-            {
-               const std::string& op = binIt->second;
-               int prec = BinaryPrec(op);
-               std::string lhs = PrintInlet(b.id, 0, "0", prec);
-               std::string rhs = PrintInlet(b.id, 1, "0", prec + 1);
-               std::string s = lhs + " " + op + " " + rhs;
-               return prec <= parentPrec ? "(" + s + ")" : s;
-            }
-
-            // Sugar functions
-            if (b.specId == "rescale")
-            {
-               std::string x = PrintInlet(b.id, 0, "0", 5);
-               std::string inMin = PrintInlet(b.id, 1, "0", 5);
-               std::string inMax = PrintInlet(b.id, 2, "1", 5);
-               std::string outMin = PrintInlet(b.id, 3, "0", 5);
-               std::string outMax = PrintInlet(b.id, 4, "1", 5);
-               return "mix(" + outMin + ", " + outMax + ", (" + x + " - " + inMin + ") / max(" + inMax + " - " + inMin + ", 0.0001))";
-            }
-
-            // Standard function call
-            const BoxSpec* spec = FindBoxSpec(b.specId);
-            std::string fn = spec ? spec->fieldWord : b.specId;
-            std::string s = fn + "(";
-            for (size_t i = 0; i < b.inlets.size(); ++i)
-            {
-               if (i > 0)
-                  s += ", ";
-               s += PrintInlet(b.id, static_cast<int>(i), FormatDouble(b.inlets[i].defaultValue), 0);
-            }
-            s += ")";
-            return s;
-         }
-
-         std::string PrintStmt(const BoxNode& b, const std::string& indent = "")
-         {
-            if (b.specId == "code")
-               return indent + b.rawCode;
-
-            if (b.specId == "knob")
-               return indent + "param " + (b.varType.empty() ? "float" : b.varType) + " " + b.varName +
-                      " = " + FormatDouble(b.numberValue) + " [" + FormatDouble(b.minVal) + ", " + FormatDouble(b.maxVal) + "]";
-
-            if (b.specId == "previous")
-            {
-               std::string s = indent + "state " + (b.varType.empty() ? "float" : b.varType) + " " + b.varName +
-                               " = " + PrintInlet(b.id, 1, "0", 0);
-               if (!b.boundary.empty())
-                  s += " [" + b.boundary + "]";
-               return s;
-            }
-
-            if (b.specId == "attrib")
-            {
-               std::string s = indent + "attrib " + (b.varType.empty() ? "float" : b.varType) + " " + b.varName;
-               if (graph.FindWireTo(b.id, 0))
-                  s += " = " + PrintInlet(b.id, 0, "0", 0);
-               return s;
-            }
-
-            if (b.specId == "output_pin")
-               return indent + "output " + b.domainName + " " + b.varType + " " + b.varName + " = " + PrintInlet(b.id, 0, "0", 0);
-
-            if (b.specId == "input_pin")
-               return indent + "input " + b.domainName + " " + b.varType + " " + b.varName;
-
-            if (b.specId == "position_out")
-            {
-               std::string lhs = b.swizzleField.empty() ? "P" : ("P." + b.swizzleField);
-               int pinIdx = (b.swizzleField == "x") ? 0 : (b.swizzleField == "y" ? 1 : (b.swizzleField == "z" ? 2 : 3));
-               return indent + lhs + " " + b.assignOp + " " + PrintInlet(b.id, pinIdx, "0", 0);
-            }
-
-            if (b.specId == "normal_out")
-               return indent + "N " + b.assignOp + " " + PrintInlet(b.id, 0, "vec3(0, 1, 0)", 0);
-
-            if (b.specId == "color_out")
-               return indent + "Cd " + b.assignOp + " " + PrintInlet(b.id, 0, "vec3(1, 1, 1)", 0);
-
-            if (b.specId == "value_out" || b.specId == "pulse_out")
-               return indent + "publish " + b.assignOp + " " + PrintInlet(b.id, 0, "0", 0);
-
-            if (b.specId == "assign_var")
-            {
-               std::string lhs = b.varName + (b.swizzleField.empty() ? "" : ("." + b.swizzleField));
-               emittedStmts.insert(b.id);
-               return indent + lhs + " " + b.assignOp + " " + PrintInlet(b.id, 0, "0", 0);
-            }
-
-            if (b.specId == "play_note")
-            {
-               std::string noteCall = "note(" + PrintInlet(b.id, 1, "60", 0) + ", " +
-                                      PrintInlet(b.id, 2, "0.8", 0) + ", " +
-                                      PrintInlet(b.id, 3, "0.25", 0) + ")";
-               if (b.whenGroupId < 0 && graph.FindWireTo(b.id, 0))
-                  return indent + "if (" + PrintInlet(b.id, 0, "1", 0) + ") {\n" + indent + "   " + noteCall + "\n" + indent + "}";
-               return indent + noteCall;
-            }
-
-            if (!b.wireName.empty())
-            {
-               std::string rhs = PrintRawBoxExpr(b, 0, 0);
-               emittedStmts.insert(b.id);
-               return indent + b.wireName + " = " + rhs;
-            }
-
-            return "";
-         }
-      };
-   }
-
-   std::string PrintBoxGraphToCode(const BoxGraph& graph, bool includeHeader)
-   {
-      ExprPrinter printer(graph);
-      std::ostringstream out;
-      if (includeHeader)
-         out << FormatBoxesHeader(graph) << "\n";
-
-      // Collect ordered top-level items: either standalone statements (whenGroupId < 0) or when-groups
-      struct TopItem
-      {
-         int order = 0;
-         bool isGroup = false;
-         int idx = 0;
-      };
-      std::vector<TopItem> items;
-      for (size_t i = 0; i < graph.boxes.size(); ++i)
-      {
-         const BoxNode& b = graph.boxes[i];
-         if (b.stmtOrder >= 0 && b.whenGroupId < 0)
-            items.push_back({ b.stmtOrder, false, static_cast<int>(i) });
-      }
-      for (size_t i = 0; i < graph.groups.size(); ++i)
-      {
-         const BoxGroup& g = graph.groups[i];
-         if (g.isWhenGroup && g.stmtOrder >= 0)
-            items.push_back({ g.stmtOrder, true, static_cast<int>(i) });
-      }
-      std::sort(items.begin(), items.end(), [](const TopItem& a, const TopItem& b) {
-         return a.order < b.order;
-      });
-
-      for (size_t k = 0; k < items.size(); ++k)
-      {
-         const TopItem& item = items[k];
-         if (!item.isGroup)
-         {
-            const BoxNode& b = graph.boxes[item.idx];
-            if (b.specId == "play_note")
-            {
-               if (const BoxWire* w0 = graph.FindWireTo(b.id, 0))
-               {
-                  out << "if (" << printer.PrintBoxExpr(w0->srcBoxId, w0->srcPinIdx, 0) << ") {\n";
-                  while (k < items.size() && !items[k].isGroup)
-                  {
-                     const BoxNode& nb = graph.boxes[items[k].idx];
-                     const BoxWire* nw = (nb.specId == "play_note") ? graph.FindWireTo(nb.id, 0) : nullptr;
-                     if (!nw || nw->srcBoxId != w0->srcBoxId || nw->srcPinIdx != w0->srcPinIdx)
-                        break;
-                     out << "   note(" << printer.PrintInlet(nb.id, 1, "60", 0) << ", "
-                         << printer.PrintInlet(nb.id, 2, "0.8", 0) << ", "
-                         << printer.PrintInlet(nb.id, 3, "0.25", 0) << ")\n";
-                     ++k;
-                  }
-                  --k;
-                  out << "}\n";
-                  continue;
-               }
-            }
-            std::string line = printer.PrintStmt(b);
-            if (!line.empty())
-               out << line << "\n";
-         }
-         else
-         {
-            const BoxGroup& g = graph.groups[item.idx];
-            std::string condStr = printer.PrintBoxExpr(g.condBoxId, g.condPinIdx, 0);
-            out << "if (" << condStr << ") {\n";
-            std::vector<const BoxNode*> groupBoxes;
-            for (int bid : g.boxIds)
-            {
-               if (const BoxNode* gb = graph.FindBox(bid))
-                  groupBoxes.push_back(gb);
-            }
-            std::sort(groupBoxes.begin(), groupBoxes.end(), [](const BoxNode* a, const BoxNode* b) {
-               return a->stmtOrder < b->stmtOrder;
-            });
-            for (const BoxNode* gb : groupBoxes)
-            {
-               std::string line = printer.PrintStmt(*gb, "   ");
-               if (!line.empty())
-                  out << line << "\n";
-            }
-            out << "}\n";
-         }
-      }
-
-      return out.str();
    }
 }

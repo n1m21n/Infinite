@@ -283,6 +283,30 @@ namespace
          Fail(name, "expected " + std::to_string(expectCodeBoxes) + " code boxes, got " + std::to_string(r.codeBoxes), r.printed);
    }
 
+   // A case whose printed body (no header) must be exactly `expected`.
+   void Exact(const std::string& name, const std::string& domain, const std::string& code, const std::string& expected,
+              int expectCodeBoxes = 0)
+   {
+      Case(name, domain, code, expectCodeBoxes);
+      FieldError err;
+      BoxGraph g;
+      if (!ParseCodeToBoxGraph(code, HostAll, g, err)) return;
+      const std::string body = PrintBoxGraphToCode(g, false);
+      if (body != expected)
+         Fail(name, "printed text differs; expected:\n" + expected, body);
+   }
+
+   // Parse and print only (for text Field itself would not compile): must come back exactly.
+   void TextOnly(const std::string& name, const std::string& code)
+   {
+      FieldError err;
+      BoxGraph g;
+      if (!ParseCodeToBoxGraph(code, HostAll, g, err)) { Fail(name, "parse: " + err.message); return; }
+      const std::string body = PrintBoxGraphToCode(g, false);
+      if (body != code)
+         Fail(name, "printed text differs; expected:\n" + code, body);
+   }
+
    void Presets(const char* filter, int& m4Pass, int& m4Total, int& m3Pass, int& m3Total)
    {
       for (const auto& p : FieldPatcherPresets::kAll)
@@ -365,6 +389,27 @@ int main(int argc, char** argv)
         "lp = lp + f * (sat - lp)\nout = lp\n", -1);
    Case("Graph Pipeline", "graph",
         "lfo = emit(\"LFO\", 0)\nosc = emit(\"Wavetable\", 1)\nconnect(lfo, 0, osc, 0)\nplace(lfo, -260, 0)\nplace(osc, 80, 0)\n", -1);
+
+   // ---- block-a-fix-brief Step 2 rows: exact text back ----
+   Exact("bug 1 neighbour read", "element", "a = P.at(i - 1)\nP.y += a.y\n", "a = P.at(i - 1)\nP.y += a.y\n");
+   Exact("bug 2 vec3 one arg", "element", "L = 0.5\nCd = vec3(L)\n", "L = 0.5\nCd = vec3(L)\n");
+   // Field's note() takes exactly 3 arguments, so these two only check the text.
+   TextOnly("bug 2 note with 2 args", "if (tick(1 / 4) > 0.5) {\n   note(16, 60)\n}\n");
+   TextOnly("bug 6 note with 4 args", "if (tick(1 / 4) > 0.5) {\n   note(60, 0.8, 0.25, 2)\n}\n");
+   TextOnly("bug 2 clamp with 1 arg", "P.y = clamp(P.x)\n");
+   Exact("bug 3 reduce args", "sample", "output frame float bass = reduce.rms(in, 20.0, 160.0)\nout = in\n",
+         "output frame float bass = reduce.rms(in, 20.0, 160.0)\nout = in\n", -1);
+   Exact("bug 4 alias of a source", "element", "x = t\nP.y += x\n", "x = t\nP.y += x\n");
+   Exact("bug 5 call stays call", "element", "a = pow(P.x, 2)\nb = mod(P.y, 2)\nP.z = a + b\n",
+         "a = pow(P.x, 2)\nb = mod(P.y, 2)\nP.z = a + b\n");
+   Exact("bug 5 operator stays operator", "element", "P.y = P.x ^ 2 + P.x % 2\n", "P.y = P.x ^ 2 + P.x % 2\n");
+   Exact("bug 7 named code box", "element", "grid = fmod(P.x, 1.0)\nP.y = grid + grid\n",
+         "grid = fmod(P.x, 1.0)\nP.y = grid + grid\n", 1);
+   Exact("bug 8 comments", "element",
+         "# top\nparam float amp = 0.5 [0, 1] # inline\nstate float s = 0 # kept\n# before y\nP.y += amp\n# end\n",
+         "# top\n# inline\nparam float amp = 0.5 [0, 1]\n# kept\nstate float s = 0\n# before y\nP.y += amp\n# end\n");
+   Exact("bug 8 comment in code box", "sample", "state float tbl[4] = 0 # table\nout = tbl[0]\n",
+         "state float tbl[4] = 0 # table\nout = tbl[0]\n", -1);
 
    // ---- every shipped preset ----
    int m4Pass = 0, m4Total = 0, m3Pass = 0, m3Total = 0;
