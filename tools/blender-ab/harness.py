@@ -823,6 +823,7 @@ def main():
     base = json.load(open(BASELINE)) if os.path.exists(BASELINE) else {}
     rows = []
     os.environ.setdefault("DEER_GLB", os.path.expanduser("~/Downloads/Assets/deer.glb"))
+    os.environ.setdefault("SHOE_GLB", os.path.expanduser("~/Infinite/shoe-dl/MaterialsVariantsShoe.glb"))
     for name in names:
         scene = dict(CASES[name]); d = os.path.join(os.path.abspath(a.out), name)
         if any(o["shape"] == "model" and not os.path.exists(asset_file(o)) for o in scene["objects"]):

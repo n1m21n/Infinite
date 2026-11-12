@@ -680,5 +680,29 @@ def _ref_product():
             "world": {"color": [0.05, 0.05, 0.06]}, "objects": objs}
 
 
+# Row 10.1: the shoe photo (REALISM section 2). A scanned sneaker (Khronos MaterialsVariantsShoe, CC-BY 4.0, not in
+# git: SHOE_GLB or ~/Infinite/shoe-dl/) on a carpet-coloured sheen floor in a small dusty box; one sun shaft through a
+# slot in the +x wall falls across it. The shoe keeps its own glTF maps (albedo, normal, metal-rough, occlusion).
+def _ref_shoe():
+    wall = {"base_color": [0.7, 0.68, 0.64], "roughness": 0.9}
+    carpet = {"base_color": [0.35, 0.3, 0.25], "roughness": 0.9, "sheen": 0.6, "sheen_roughness": 0.4}
+    objs = [
+        {"shape": "cube", "scale": [0.5, 0.5, 0.01], "location": [0.0, 0.0, -0.01], "material": carpet},
+        {"shape": "cube", "scale": [0.5, 0.5, 0.01], "location": [0.0, 0.0, 0.81], "material": wall},
+        {"shape": "cube", "scale": [0.5, 0.01, 0.4], "location": [0.0, 0.51, 0.4], "material": wall},
+        {"shape": "cube", "scale": [0.01, 0.5, 0.4], "location": [-0.51, 0.0, 0.4], "material": wall},
+        {"shape": "cube", "scale": [0.01, 0.52, 0.1], "location": [0.51, 0.0, 0.1], "material": wall},    # below the slot
+        {"shape": "cube", "scale": [0.01, 0.52, 0.15], "location": [0.51, 0.0, 0.65], "material": wall},  # above it
+        {"shape": "model", "asset": "MaterialsVariantsShoe.glb", "env": "SHOE_GLB", "location": [0.0, 0.0, 0.0]},
+    ]
+    return {"size": [512, 384],
+            "camera": {"fov": 35, "azimuth": 78, "elevation": 14, "distance": 0.62, "target": [0, 0, 0.06]},
+            "lights": [{"type": "sun", "power": 6, "azimuth": 0, "elevation": 35, "angle": 0.5}],
+            "world": {"color": [0.03, 0.03, 0.035]},
+            "fog": {"density": 0.6, "color": [0.9, 0.88, 0.85], "g": 0.3, "box": [[-0.5, -0.5, 0.0], [0.5, 0.5, 0.8]]},
+            "objects": objs}
+
+
 CASES["ref_interior"] = _ref_interior()
+CASES["ref_shoe"] = _ref_shoe()
 CASES["ref_product"] = _ref_product()
