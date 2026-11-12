@@ -372,7 +372,7 @@ def lib_thumb(name):
     """The library's own thumbnail for a preset id or an old picture path (assets/.../<id>.ext): the render for art presets, knobs and cables for the rest. None if there is none."""
     i = os.path.splitext(os.path.basename(name))[0]
     for ext in ("webp", "svg"):
-        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=4" % (i, ext)
+        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=5" % (i, ext)
     return None
 
 
@@ -597,15 +597,15 @@ def page(a):
                  "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": title, "description": cdesc} for i, (title, cdesc) in enumerate(a.get("cards", []))]}
     lds = [ld, item_list]
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=4" defer></script>\n  <script src="artists.js?v=11" defer></script>')
+        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=5" defer></script>\n  <script src="artists.js?v=11" defer></script>')
     if a["slug"] == "creative-coders":
-        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=4" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="ccode.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=5" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="ccode.js?v=5" defer></script>')
     if a["slug"] == "vjs":
-        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=4" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="vjs.js?v=5" defer></script>')
+        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=5" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="vjs.js?v=5" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=4" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script type="module" src="musicians.js?v=4"></script>\n  <script src="mxrack.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], lds, artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">\n  <link rel="stylesheet" href="nodedeck.css?v=' + chrome._hash("nodedeck.css") + '">', extra_js='\n  <script src="deck.js?v=5" defer></script>\n  <script src="nodedeck.js?v=5" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script type="module" src="musicians.js?v=5"></script>\n  <script src="mxrack.js?v=3" defer></script>')
     if a["slug"] == "developers":
-        return shell(rel, a["title"], a["desc"], lds, dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], lds, dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=5" defer></script>')
     return shell(rel, a["title"], a["desc"], lds, main_html(a, rel))
 
 
