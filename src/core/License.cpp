@@ -223,7 +223,7 @@ namespace License
          return env;
 #if defined(_WIN32)
       if (std::string appdata; AppPaths::GetEnvUtf8("APPDATA", appdata) && !appdata.empty())
-         return (AppPaths::FsPath(appdata) / ForkIdentity::kDataDirName).u8string()  // fork:;
+         return (AppPaths::FsPath(appdata) / ForkIdentity::kDataDirName).u8string();  // fork:
       return std::string();
 #else
       // The account's real home, not $HOME: a sandboxed host points $HOME into its container.
