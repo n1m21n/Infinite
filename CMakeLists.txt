@@ -566,6 +566,7 @@ set(COMMON_SOURCES
     src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
+    src/app/panels/InspectorPanel.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp
     src/app/panels/ViewportPanel.cpp

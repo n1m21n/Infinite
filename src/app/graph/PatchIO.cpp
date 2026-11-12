@@ -1,4 +1,5 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include <algorithm>
 #include "app/AppShared.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -369,6 +370,8 @@ namespace app
             gViewportPanelWidth = std::max(kViewportPanelMinWidth, std::strtof(val.c_str(), nullptr));
          else if (key == "panelViewportH")
             gViewportPanelHeight = std::max(kViewportPanelMinHeight, std::strtof(val.c_str(), nullptr));
+         else if (InspectorLoadSetting(key, val)) // fork: inspector
+            ;
          else if (key == "panelMatrixOpen")
             gModMatrixOpen = (val != "0");
          else if (key == "panelMatrixDock")
@@ -458,6 +461,7 @@ namespace app
       file << "panelViewportDock=" << gViewportPanelDock << "\n";
       file << "panelViewportW=" << gViewportPanelWidth << "\n";
       file << "panelViewportH=" << gViewportPanelHeight << "\n";
+      InspectorSaveSettings(file); // fork: inspector
       file << "panelMatrixOpen=" << (gModMatrixOpen ? 1 : 0) << "\n";
       file << "panelMatrixDock=" << gModMatrixDock << "\n";
       file << "panelMatrixW=" << gModMatrixWidth << "\n";
@@ -503,6 +507,7 @@ namespace app
                     gSampleStudioDock, gPianoRollDock, gTerminalDock,
                     gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
                     gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight, gTerminalHeight, gTerminalWidth);
+      std::snprintf(buf + strlen(buf), sizeof buf - strlen(buf), "|%llu", (unsigned long long)InspectorLayoutHash()); // fork
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

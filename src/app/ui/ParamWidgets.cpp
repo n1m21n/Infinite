@@ -1,4 +1,5 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector pin wrappers
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/CheckBox.h"
@@ -718,8 +719,8 @@ namespace app
       const int pinId = h.nodeIndex * GraphNode::kStride + GraphNode::kParamBase + h.paramIndex;
       gDrawnParamPins.insert(pinId);
 
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      insp::BeginPin(pinId, ed::PinKind::Input);
+      insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       const ImVec2 p = controlHeight > 0.0f
@@ -732,7 +733,7 @@ namespace app
       const bool isLight = IsThemeLight();
       PinDot::Param(dl, c, h.modulated ? PinDot::State::Modulated : PinDot::State::Idle, isLight);
       ExpandPinHit(c, p.x + box);
-      ed::EndPin();
+      insp::EndPin();
 
       GraphNode* curGn = FindNodeByIndex(h.nodeIndex);
       // rowMin starts after the pin box + its SameLine gap, not at the pin

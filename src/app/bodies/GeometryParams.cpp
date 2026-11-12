@@ -1,4 +1,5 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector pin wrappers
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -290,18 +291,18 @@ namespace app
             // to an absolute position and never advances it, so each
             // successive pin's group-derived bounds would balloon to include
             // every prior cell too - only the last-drawn pin would end up
-            // hit-testable across the whole grid. ed::PinRect() sets the
+            // hit-testable across the whole grid. insp::PinRect() sets the
             // pin's bounds explicitly, sidestepping that group-bounds path.
             ImGui::PushID(outputIndex);
             const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kOutputBase + outputIndex;
-            ed::BeginPin(pinId, ed::PinKind::Output);
-            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            insp::BeginPin(pinId, ed::PinKind::Output);
+            insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
             const ImVec2 pinCenter(cellMax.x - 9.0f, cellMax.y - 9.0f);
             const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
-            ed::PinRect(pinMin, pinMax);
+            insp::PinRect(pinMin, pinMax);
             PinDot::Cable(dl, pinCenter, /*prediction=*/false, isLight, /*small=*/true);
-            ed::EndPin();
+            insp::EndPin();
             ImGui::PopID();
          }
       }

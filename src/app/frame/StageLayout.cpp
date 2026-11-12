@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/ui/design/components/FormParts.h"
@@ -341,6 +342,11 @@ void DrawLayout(FrameCtx& fc)
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
          ImGui::SameLine(0.0f, 0.0f);
       }
+      if (gInspectorOpen && gInspectorDock == 2) // fork: inspector, left dock
+      {
+         DrawInspectorDocked("##inspector_left", ImVec2(gInspectorWidth, graphHeight));
+         ImGui::SameLine(0.0f, 0.0f);
+      }
       if (matrixLeft)
       {
          DrawModMatrixDocked("##modmatrix_left", ImVec2(gModMatrixWidth, graphHeight));
@@ -401,6 +407,7 @@ void DrawLayout(FrameCtx& fc)
       if (gNodePanelOpen) rightReserved += kNodePanelWidth;
       if (viewportRight) rightReserved += gViewportPanelWidth;
       if (matrixRight) rightReserved += gModMatrixWidth;
+      if (gInspectorOpen && gInspectorDock == 1) rightReserved += gInspectorWidth; // fork: inspector
       if (perfRight) rightReserved += gPerfPanelWidth;
       if (arrangeRight) rightReserved += gArrangePanelWidth;
       if (TerminalDocked() && gTerminalDock == 1) rightReserved += gTerminalWidth;

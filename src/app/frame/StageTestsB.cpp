@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/InspectorPanel.h" // fork: inspector self-test
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
@@ -306,6 +307,7 @@ int DrawTestsB(FrameCtx& fc)
       }
 #endif
 
+      InspectorSelfTestFrame(window, frameId); // fork: INFINITE_INSPECTORTEST
       if (getenv("INFINITE_MODMATRIXTEST") != nullptr)
       {
          static int sidesParam = -1;

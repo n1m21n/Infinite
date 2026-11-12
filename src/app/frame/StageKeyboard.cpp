@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/graph/NodeClipboard.h"
@@ -182,6 +183,10 @@ void DrawKeyboard(FrameCtx& fc)
       // Shift+U: the docked edit history
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_U, false))
          gHistoryOpen = !gHistoryOpen;
+
+      // fork: Shift+I: the Inspector
+      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_I, false))
+         gInspectorOpen = !gInspectorOpen;
 
       // Shift+W: the docked Sample studio (plain W pans the canvas)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_W, false))
