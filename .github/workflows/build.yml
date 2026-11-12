@@ -216,6 +216,13 @@ jobs:
         timeout-minutes: 10
         run: ./.github/scripts/headless-tests.sh build/Release/Infinite.exe
 
+      # Field Patcher round trip over every shipped Field preset (internal plan, Block A M7).
+      - name: Field patcher check
+        if: matrix.arch == 'x64'
+        shell: bash
+        timeout-minutes: 5
+        run: ./build/Release/field-patcher-check.exe
+
       # R489: Infinite.exe is GUI-subsystem, so a shell does not wait for it and
       # never sees its exit code. Infinite.com is the console-subsystem launcher
       # (src/cli_main_win.cpp). These cases end in argument parsing, before any
