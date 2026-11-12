@@ -48,7 +48,7 @@ INK3 = (136, 144, 177)      # #8890B1
 SIGNAL = (167, 177, 255)    # #A7B1FF
 EMBER = (255, 107, 53)      # #FF6B35
 
-ART_CATS = {"Pixel", "Sketch", "Sketch 3D", "Community"}
+ART_CATS = {"Pixel", "Sketch", "Sketch 3D"}
 
 
 def load_font(name: str, size: int) -> ImageFont.FreeTypeFont:
@@ -339,7 +339,7 @@ def main() -> int:
 
     for it in items:
         cat = it.get("category", "")
-        use_art = (cat in ART_CATS) or (cat == "Templates" and is_rich_visual_template(it))
+        use_art = (cat in ART_CATS) or (cat in ("Templates", "Community") and is_rich_visual_template(it))
         data = art_webp(it) if use_art else None
         if data is None:
             data = render_brand_card(it)
