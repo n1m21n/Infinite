@@ -14,6 +14,11 @@ namespace engine
       std::vector<float> posNormal; // x y z nx ny nz per vertex
       std::vector<uint32_t> indices;
       std::vector<float> uv;        // u v per vertex (GL convention, v = 0 is the image's first row); empty = none
+      // Row 4.3: the rays' mesh when it differs from the drawn one (a bump map tessellated and displaced into real
+      // relief). Empty = the rays see the drawn mesh. Same layout as above; the BLAS and every ray-hit read use it.
+      std::vector<float> tracePosNormal;
+      std::vector<uint32_t> traceIndices;
+      std::vector<float> traceUv;
    };
 
    struct Instance

@@ -22,7 +22,11 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <unordered_map>
 #include <utility>
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
 
 struct Render3DNode::EngineState
 {
@@ -79,10 +83,8 @@ namespace
    // A material map for the engine: the GL texture's level 0 read back once per (texture, revision), at most
    // engine::kMaxTextures distinct maps a frame (past that the material draws plain, as before maps were carried).
    template <class State> // Render3DNode::EngineState (private, so deduced, not named)
-   int MapIndex(State& E, engine::Frame& fr, unsigned int tex, unsigned long long rev)
+   auto CacheMap(State& E, unsigned int tex, unsigned long long rev) -> decltype(E.maps.data())
    {
-      if (tex == 0)
-         return -1;
       decltype(E.maps.data()) m = nullptr;
       for (auto& c : E.maps)
          if (c.tex == tex) { m = &c; break; }
@@ -100,7 +102,7 @@ namespace
          glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &tw);
          glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &th);
          if (tw <= 0 || th <= 0)
-            return -1;
+            return nullptr;
          m->px.assign((size_t)tw * th * 4, 0);
          glPixelStorei(GL_PACK_ALIGNMENT, 1);
          glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, m->px.data());
@@ -110,6 +112,16 @@ namespace
          m->key = ++E.mapSerial;
       }
       m->used = true;
+      return m;
+   }
+   template <class State>
+   int MapIndex(State& E, engine::Frame& fr, unsigned int tex, unsigned long long rev)
+   {
+      if (tex == 0)
+         return -1;
+      auto* m = CacheMap(E, tex, rev);
+      if (m == nullptr)
+         return -1;
       for (size_t i = 0; i < fr.textures.size(); i++)
          if (fr.textures[i].key == m->key)
             return (int)i;
@@ -119,6 +131,152 @@ namespace
       t.rgba = m->px.data(); t.w = m->w; t.h = m->h; t.key = m->key;
       fr.textures.push_back(t);
       return (int)fr.textures.size() - 1;
+   }
+}
+
+namespace
+{
+   // Row 4.3: a bump (grey height) map as real relief for the rays. The map's grey is read where Render 3D's raster
+   // reads it (uv * mapping scale + translate), 1 = the surface, 0 = 4 x strength texels below it: the same depth
+   // parallax occlusion (row 4.2) marches, so the raster and the rays agree. Each triangle is cut into n x n by
+   // barycentric steps, n from the longest edge in texels, all triangles of a mesh alike so no edge cracks; capped
+   // by the machine's memory (2 KB of RAM a triangle: 8 GB -> 4 M). Raster keeps the base mesh.
+   bool WantsDisplace(IGeometrySource* src)
+   {
+      const Material mat = src->GetMaterial();
+      if (!mat.normalBump || mat.hair || src->GetMaterialTexture(kMapNormal) == 0 || mat.normalStrength <= 0.0f)
+         return false;
+      if (mat.emission > 0.0f) // emissive triangles are sampled by primitive id from the drawn mesh
+         return false;
+      const MappingTransform mt = src->GetMappingTransform();
+      return mt.space == kMapSpaceUv && mt.breakup <= 0.001f && mt.rotate[0] == 0.0f && mt.rotate[1] == 0.0f && mt.rotate[2] == 0.0f;
+   }
+   size_t TriangleCap()
+   {
+      unsigned long long mem = 8ull << 30;
+#if defined(__APPLE__)
+      size_t len = sizeof(mem);
+      sysctlbyname("hw.memsize", &mem, &len, nullptr, 0);
+#endif
+      return (size_t)(mem / 2048);
+   }
+   template <class MapT>
+   void Displace(engine::MeshData& d, const MapT& map, const Material& mat, const MappingTransform& mt, int wrap, size_t cap)
+   {
+      const size_t nv = d.posNormal.size() / 6, nt = d.indices.size() / 3;
+      if (nt == 0 || d.uv.size() != nv * 2 || map.w <= 0 || map.h <= 0)
+         return;
+      const float su = mt.scale[0], sv = mt.scale[1];
+      // World length per uv unit over the whole mesh (object space), so the depth is in the mesh's own units.
+      double aw = 0.0, au = 0.0; float maxTx = 0.0f;
+      for (size_t t = 0; t < nt; t++)
+      {
+         const uint32_t i[3] = { d.indices[t * 3], d.indices[t * 3 + 1], d.indices[t * 3 + 2] };
+         const float* p[3] = { &d.posNormal[i[0] * 6], &d.posNormal[i[1] * 6], &d.posNormal[i[2] * 6] };
+         const float* u[3] = { &d.uv[i[0] * 2], &d.uv[i[1] * 2], &d.uv[i[2] * 2] };
+         const float e1[3] = { p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2] }, e2[3] = { p[2][0] - p[0][0], p[2][1] - p[0][1], p[2][2] - p[0][2] };
+         const float cx = e1[1] * e2[2] - e1[2] * e2[1], cy = e1[2] * e2[0] - e1[0] * e2[2], cz = e1[0] * e2[1] - e1[1] * e2[0];
+         aw += 0.5 * std::sqrt(cx * cx + cy * cy + cz * cz);
+         au += 0.5 * std::fabs((u[1][0] - u[0][0]) * (u[2][1] - u[0][1]) - (u[2][0] - u[0][0]) * (u[1][1] - u[0][1]));
+         for (int k = 0; k < 3; k++)
+         {
+            const float* a = u[k]; const float* b = u[(k + 1) % 3];
+            maxTx = std::max(maxTx, std::max(std::fabs(b[0] - a[0]) * su * map.w, std::fabs(b[1] - a[1]) * sv * map.h));
+         }
+      }
+      if (au <= 1e-12 || aw <= 1e-12)
+         return;
+      const float depth = 4.0f * mat.normalStrength / (float)map.w / std::max(su, 1e-6f) * (float)std::sqrt(aw / au);
+      int n = (int)std::ceil(maxTx);
+      n = std::min(n, (int)std::sqrt((double)cap / (double)nt));
+      if (n < 1)
+         return;
+      auto texel = [&](int x, int y) {
+         auto fix = [&](int c, int sz) {
+            if (wrap == 1) return ((c % sz) + sz) % sz;
+            if (wrap == 2) { const int p = ((c % (2 * sz)) + 2 * sz) % (2 * sz); return p < sz ? p : 2 * sz - 1 - p; }
+            return std::clamp(c, 0, sz - 1);
+         };
+         const uint8_t* q = &map.px[((size_t)fix(y, map.h) * map.w + fix(x, map.w)) * 4];
+         return (0.2126f * q[0] + 0.7152f * q[1] + 0.0722f * q[2]) / 255.0f;
+      };
+      auto height = [&](float u, float v) { // bilinear at texel centres, as the GPU reads level 0
+         const float x = (u * su + mt.translate[0]) * map.w - 0.5f, y = (v * sv + mt.translate[1]) * map.h - 0.5f;
+         const int x0 = (int)std::floor(x), y0 = (int)std::floor(y);
+         const float fx = x - x0, fy = y - y0;
+         return (texel(x0, y0) * (1 - fx) + texel(x0 + 1, y0) * fx) * (1 - fy) + (texel(x0, y0 + 1) * (1 - fx) + texel(x0 + 1, y0 + 1) * fx) * fy;
+      };
+      const size_t per = (size_t)(n + 1) * (n + 2) / 2;
+      d.tracePosNormal.reserve(nt * per * 6); d.traceUv.reserve(nt * per * 2); d.traceIndices.reserve(nt * (size_t)n * n * 3);
+      for (size_t t = 0; t < nt; t++)
+      {
+         const uint32_t vi[3] = { d.indices[t * 3], d.indices[t * 3 + 1], d.indices[t * 3 + 2] };
+         const uint32_t base = (uint32_t)(d.tracePosNormal.size() / 6);
+         int ks[3] = { 0, 1, 2 };
+         std::sort(ks, ks + 3, [&](int x, int y) { return vi[x] < vi[y]; });
+         for (int a = 0; a <= n; a++)
+            for (int b = 0; b <= n - a; b++)
+            {
+               const int w[3] = { n - a - b, a, b };
+               // On an edge the two ends are taken in vertex-index order, so both triangles get the same bits.
+               float att[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+               for (int kk = 0; kk < 3; kk++)
+               {
+                  const int k = ks[kk];
+                  if (w[k] == 0) continue;
+                  const float f = (float)w[k] / (float)n;
+                  for (int c = 0; c < 6; c++) att[c] += d.posNormal[vi[k] * 6 + c] * f;
+                  for (int c = 0; c < 2; c++) att[6 + c] += d.uv[vi[k] * 2 + c] * f;
+               }
+               float nl = std::sqrt(att[3] * att[3] + att[4] * att[4] + att[5] * att[5]);
+               if (nl > 1e-12f) { att[3] /= nl; att[4] /= nl; att[5] /= nl; }
+               const float off = (height(att[6], att[7]) - 1.0f) * depth;
+               for (int c = 0; c < 3; c++) att[c] += att[3 + c] * off;
+               d.tracePosNormal.insert(d.tracePosNormal.end(), att, att + 6);
+               d.traceUv.insert(d.traceUv.end(), att + 6, att + 8);
+            }
+         auto id = [&](int a, int b) { return base + (uint32_t)(a * (n + 1) - a * (a - 1) / 2 + b); }; // row a holds n + 1 - a
+         for (int a = 0; a < n; a++)
+            for (int b = 0; b < n - a; b++)
+            {
+               d.traceIndices.insert(d.traceIndices.end(), { id(a, b), id(a + 1, b), id(a, b + 1) });
+               if (b + 1 < n - a)
+                  d.traceIndices.insert(d.traceIndices.end(), { id(a + 1, b), id(a + 1, b + 1), id(a, b + 1) });
+            }
+      }
+      // Normals of the relief: area-weighted faces, welded by position and the base normal (hard edges stay hard).
+      const size_t tv = d.tracePosNormal.size() / 6;
+      std::vector<float> acc(tv * 3, 0.0f);
+      for (size_t t = 0; t + 2 < d.traceIndices.size(); t += 3)
+      {
+         const float* p0 = &d.tracePosNormal[d.traceIndices[t] * 6]; const float* p1 = &d.tracePosNormal[d.traceIndices[t + 1] * 6]; const float* p2 = &d.tracePosNormal[d.traceIndices[t + 2] * 6];
+         const float e1[3] = { p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2] }, e2[3] = { p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2] };
+         const float c[3] = { e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0] };
+         for (int k = 0; k < 3; k++)
+            for (int j = 0; j < 3; j++) acc[d.traceIndices[t + k] * 3 + j] += c[j];
+      }
+      const float q = 1.0f / std::max(depth * 1e-3f, 1e-7f);
+      std::unordered_map<unsigned long long, size_t> weld;
+      weld.reserve(tv);
+      std::vector<size_t> rep(tv);
+      for (size_t v = 0; v < tv; v++)
+      {
+         const float* a = &d.tracePosNormal[v * 6];
+         unsigned long long h = 1469598103934665603ull;
+         for (int c = 0; c < 3; c++) h = (h ^ (unsigned long long)(long long)std::llround(a[c] * q)) * 1099511628211ull;
+         for (int c = 3; c < 6; c++) h = (h ^ (unsigned long long)(long long)std::llround(a[c] * 64.0f)) * 1099511628211ull;
+         auto it = weld.emplace(h, v).first;
+         rep[v] = it->second;
+         if (it->second != v)
+            for (int j = 0; j < 3; j++) acc[it->second * 3 + j] += acc[v * 3 + j];
+      }
+      for (size_t v = 0; v < tv; v++)
+      {
+         const float* c = &acc[rep[v] * 3];
+         const float l = std::sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
+         if (l > 1e-20f)
+            for (int j = 0; j < 3; j++) d.tracePosNormal[v * 6 + 3 + j] = c[j] / l;
+      }
    }
 }
 
@@ -164,8 +322,35 @@ bool Render3DNode::CookEngine(int frameId)
 
    // Meshes: a changed source re-uploads only its own mesh (and BLAS); a changed set of sources, all of them.
    std::vector<std::pair<const void*, unsigned long long>> sig;
+   int displaced = 0;
    for (IGeometrySource* src : mDraw)
-      sig.emplace_back((const void*)src, src->MeshRevision());
+   {
+      unsigned long long rev = src->MeshRevision();
+      if (WantsDisplace(src))
+      {
+         // The relief follows the map, its strength and its mapping, so they are part of the mesh's key.
+         const Material mat = src->GetMaterial();
+         const MappingTransform mt = src->GetMappingTransform();
+         unsigned long long k = (unsigned long long)src->GetMaterialTexture(kMapNormal) * 0x9E3779B97F4A7C15ull ^ src->SurfaceTextureRevision();
+         const float f[5] = { mat.normalStrength, mt.scale[0], mt.scale[1], mt.translate[0], mt.translate[1] };
+         for (float x : f) { unsigned u; std::memcpy(&u, &x, 4); k = (k ^ u) * 1099511628211ull; }
+         rev ^= k | 1ull;
+         displaced++;
+      }
+      sig.emplace_back((const void*)src, rev);
+   }
+   const size_t triCap = TriangleCap() / (size_t)std::max(displaced, 1);
+   auto meshFor = [&](IGeometrySource* src) {
+      engine::MeshData d = ToMeshData(src->GetMesh());
+      if (WantsDisplace(src))
+         if (auto* m = CacheMap(E, src->GetMaterialTexture(kMapNormal), src->SurfaceTextureRevision()))
+         {
+            int wrap = 0;
+            if (auto* mn = dynamic_cast<MaterialNode*>(src)) wrap = mn->wrapMode;
+            Displace(d, *m, src->GetMaterial(), src->GetMappingTransform(), wrap, triCap);
+         }
+      return d;
+   };
    static const bool sProf = std::getenv("INFINITE_ENGINE_PROF") != nullptr;
    const auto tp0 = std::chrono::steady_clock::now();
    int changedMeshes = 0;
@@ -179,12 +364,12 @@ bool Render3DNode::CookEngine(int frameId)
          partial = sig[i].first == E.meshSig[i].first;
       for (size_t i = 0; partial && i < sig.size(); i++)
          if (sig[i].second != E.meshSig[i].second)
-            partial = E.raster->UpdateMesh((int)i, ToMeshData(mDraw[i]->GetMesh()));
+            partial = E.raster->UpdateMesh((int)i, meshFor(mDraw[i]));
       if (!partial)
       {
          std::vector<engine::MeshData> meshes;
          for (IGeometrySource* src : mDraw)
-            meshes.push_back(ToMeshData(src->GetMesh()));
+            meshes.push_back(meshFor(src));
          if (!E.raster->UploadMeshes(meshes))
             return false;
       }

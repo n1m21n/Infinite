@@ -2261,7 +2261,16 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    public:
       int FieldLibraryBuilds() const override { return mFieldLibBuilds; }
    private:
-      struct Gpu { id<MTLBuffer> vb = nil, ib = nil, uvb = nil; NSUInteger count = 0; float lo[3], hi[3]; };
+      // tvb/tib/tuvb/tcount: the rays' mesh (row 4.3, a displaced copy), nil when the rays see the drawn one.
+      struct Gpu
+      {
+         id<MTLBuffer> vb = nil, ib = nil, uvb = nil; NSUInteger count = 0; float lo[3], hi[3];
+         id<MTLBuffer> tvb = nil, tib = nil, tuvb = nil; NSUInteger tcount = 0;
+         id<MTLBuffer> RV() const { return tvb ? tvb : vb; }
+         id<MTLBuffer> RI() const { return tvb ? tib : ib; }
+         id<MTLBuffer> RU() const { return tvb ? tuvb : uvb; }
+         NSUInteger RC() const { return tvb ? tcount : count; }
+      };
    public:
       bool UploadMeshes(const std::vector<engine::MeshData>& meshes) override
       {
@@ -2513,7 +2522,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          if (index < 0 || index >= (int)mMeshes.size() || index >= (int)mBlas.count)
             return false;
          Gpu& cur = mMeshes[(size_t)index];
-         if (cur.count == m.indices.size() && cur.vb.length == std::max<size_t>(m.posNormal.size() * 4, 4) &&
+         if (!cur.tvb && m.tracePosNormal.empty() && cur.count == m.indices.size() && cur.vb.length == std::max<size_t>(m.posNormal.size() * 4, 4) &&
              std::memcmp(cur.ib.contents, m.indices.data(), m.indices.size() * 4) == 0)
          {
             // Same topology: write the vertices in place (the last frame has completed) and refit next frame.
@@ -2624,6 +2633,15 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          g.ib = [mDev newBufferWithBytes:m.indices.data() length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
          g.uvb = UvBuffer(m);
          g.count = (NSUInteger)m.indices.size();
+         if (!m.tracePosNormal.empty() && !m.traceIndices.empty())
+         {
+            engine::MeshData t;
+            t.posNormal = m.tracePosNormal; t.uv = m.traceUv;
+            g.tvb = [mDev newBufferWithBytes:m.tracePosNormal.data() length:m.tracePosNormal.size() * 4 options:MTLResourceStorageModeShared];
+            g.tib = [mDev newBufferWithBytes:m.traceIndices.data() length:m.traceIndices.size() * 4 options:MTLResourceStorageModeShared];
+            g.tuvb = UvBuffer(t);
+            g.tcount = (NSUInteger)m.traceIndices.size();
+         }
          for (int k = 0; k < 3; k++) { g.lo[k] = 1e30f; g.hi[k] = -1e30f; }
          for (size_t i = 0; i + 5 < m.posNormal.size(); i += 6)
             for (int k = 0; k < 3; k++)
@@ -2638,9 +2656,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       static MTLPrimitiveAccelerationStructureDescriptor* BlasDesc(const Gpu& g)
       {
          MTLAccelerationStructureTriangleGeometryDescriptor* gd = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
-         gd.vertexBuffer = g.vb; gd.vertexStride = 24;
-         gd.indexBuffer = g.ib; gd.indexType = MTLIndexTypeUInt32;
-         gd.triangleCount = g.count / 3;
+         gd.vertexBuffer = g.RV(); gd.vertexStride = 24;
+         gd.indexBuffer = g.RI(); gd.indexType = MTLIndexTypeUInt32;
+         gd.triangleCount = g.RC() / 3;
          gd.opaque = YES;
          MTLPrimitiveAccelerationStructureDescriptor* ad = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
          ad.geometryDescriptors = @[ gd ];
@@ -2841,9 +2859,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [enc useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (const Gpu& g : mMeshes)
             {
-               [enc useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
-               [enc useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
-               if (g.uvb) [enc useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               [enc useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               [enc useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               if (g.RU()) [enc useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             }
             for (id<MTLAccelerationStructure> b in mBlas)
                [enc useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
@@ -2865,7 +2883,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                for (int k = 0; k < 3; k++) o.mat.base[k] *= mMapMean[in.mapAlbedo][k];
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
-               o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; o.uvb = mMeshes[in.mesh].uvb.gpuAddress;
+               const Gpu& g = mMeshes[in.mesh];
+               o.vb = g.RV().gpuAddress; o.ib = g.RI().gpuAddress; o.uvb = g.RU().gpuAddress;
+               if (g.tvb) o.mat.mapNormal = 0.0f; // row 4.3: the relief is geometry now; its bump would count twice
             }
          }
          id<MTLBuffer> infoBuf = InfoBuffer(info);
@@ -2979,7 +2999,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                [te setFragmentTexture:mRefl atIndex:2];
                [te setFragmentTexture:mHist[prev] atIndex:3];
                [te useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
-               for (const Gpu& g : mMeshes) { [te useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [te useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.uvb) [te useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
+               for (const Gpu& g : mMeshes) { [te useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [te useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RU()) [te useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
                for (id<MTLAccelerationStructure> b in mBlas) [te useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
                [te drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
                [te endEncoding];
@@ -3172,7 +3192,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             std::memcpy(o.normalM, in.normalMatrix, 64);
             if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
             {
-               o.vb = mMeshes[in.mesh].vb.gpuAddress; o.ib = mMeshes[in.mesh].ib.gpuAddress; o.uvb = mMeshes[in.mesh].uvb.gpuAddress;
+               const Gpu& g = mMeshes[in.mesh];
+               o.vb = g.RV().gpuAddress; o.ib = g.RI().gpuAddress; o.uvb = g.RU().gpuAddress;
+               if (g.tvb) o.mat.mapNormal = 0.0f; // row 4.3: the relief is geometry now; its bump would count twice
             }
          }
          // Emissive triangles in world space for next-event estimation, chosen by power (luminance * area). The
@@ -3267,7 +3289,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e setFragmentTexture:envLight ? mEnvCdf : mEnvBound atIndex:3];
             BindMaps(e);
             [e useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
-            for (const Gpu& g : mMeshes) { [e useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.uvb) [e useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
+            for (const Gpu& g : mMeshes) { [e useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RU()) [e useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
             for (id<MTLAccelerationStructure> b in mBlas) [e useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [e endEncoding];
