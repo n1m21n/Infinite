@@ -319,7 +319,7 @@ html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-m
 .ax-blobgo:hover { background: rgb(255 255 255 / 0.22); }
 
 /* Made in Infinite: one grid of equal cards, picture on top, name under it */
-.mi-grid, .sw-grid { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mi-grid, .sw-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .mi-card, .sw-card { display: flex; flex-direction: column; border-radius: var(--web-card-radius, 20px); overflow: hidden; text-decoration: none; color: var(--midnight-50, #eef0fa); background: var(--midnight-900, #151933); transition: transform var(--dur-medium, .25s) var(--ease-out, ease), box-shadow var(--dur-medium, .25s) var(--ease-out, ease); }
 .mi-card:hover, .sw-card:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgb(0 0 0 / 0.28); }
 .mi-card:focus-visible, .sw-card:focus-visible { outline: 3px solid var(--signal, #e8745a); outline-offset: 3px; }
@@ -329,7 +329,7 @@ html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-m
 .mi-card:hover .mi-t svg { transform: translateX(3px); opacity: 1; }
 
 /* Start with: wide thumbnail, play icon and name */
-.sw-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.sw-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sw-card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: var(--midnight-950, #0d1020); }
 .sw-t { display: flex; align-items: center; gap: 10px; padding: 12px 16px 14px; font: 600 var(--size-body, 1rem)/1.2 'Geist', system-ui, sans-serif; }
 .sw-t .ic, .sw-t svg { width: 18px; height: 18px; flex: none; color: var(--signal, #e8745a); }

@@ -382,7 +382,7 @@ def start_html(start):
     """Start-with patches as a bento of their preview pictures; the first is the big tile (refs: units. and UNLOCKED bentos)."""
     import re as _re
     tiles = []
-    for i, (sl, t) in enumerate(start):
+    for i, (sl, t) in enumerate(start[:2]):
         m = _re.search(r'og:image" content="https://infinitedevices\.org/([^"]+)"', open(os.path.join(W, "library", sl + ".html")).read())
         src = lib_thumb(sl) or (m.group(1) if m and os.path.exists(os.path.join(W, m.group(1))) else "")
         img = f'<img src="{src}" alt="" width="720" height="450" loading="lazy" decoding="async">' if src else ""
@@ -506,7 +506,7 @@ def artists_main(a, rel, hero="blob"):
     watch = ('      <section class="aud-section reveal">\n        <h2 class="ax-h">Sample generator</h2>\n'
              '        <div class="ax-blobframe"><iframe src="samples/?embed=1" title="Sample generator: a glowing blob that plays the loop it makes" loading="lazy"></iframe>'
              '<a class="ax-blobgo" href="samples/">Open the generator</a></div>\n        <script>addEventListener("message",function(e){var d=e.data;if(d&&d.smpEmbedH){var f=document.querySelector(".ax-blobframe");if(f&&e.source===f.querySelector("iframe").contentWindow)f.style.height=Math.max(300,d.smpEmbedH)+"px"}})</script>\n      </section>\n') if hero == "cables" else ""
-    items = [(src, w, h, al) for src, w, h, al in a["reel"]["items"]]   # the result pictures, not the patch-graph thumbnails
+    items = [(src, w, h, al) for src, w, h, al in a["reel"]["items"]][:2]   # the result pictures, not the patch-graph thumbnails
     # museum shots show small in the strip: serve a 400px webp, and leave alt empty because the caption beside it says the same thing
     figs = "".join(f'<a class="mi-card" href="{reel_href(a, src)}"><img src="{src.replace("assets/museum/", "assets/museum/thumb/").replace(".jpg", ".webp") if "assets/museum/" in src else (lib_thumb(src) if src.startswith(("assets/library/", "assets/community/")) and lib_thumb(src) else src)}" alt="{"" if "assets/museum/" in src else e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="mi-t">{e(al.replace(", library", ""))}<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M11 6l4 4-4 4"/></svg></span></a>' for src, w, h, al in items)
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
