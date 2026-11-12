@@ -593,3 +593,25 @@ CASES["layer_two"] = _row([_METAL, dict(_METAL, layer=_PAINT), _PAINT])
 CASES["layer_four"] = _row([dict(_METAL, layer=dict(_PAINT, layer={
     "base_color": [0.18, 0.12, 0.06], "roughness": 0.9, "mask": "mask_dirt",
     "layer": {"base_color": [0.75, 0.72, 0.65], "roughness": 0.8, "mask": "mask_dust"}}))])
+
+
+# Row 5.3: a sun shaft. A closed room (open toward the camera) with a horizontal slot in the +X wall; the sun comes in
+# through it, and dusty air fills the room (one homogeneous medium, Cycles Volume Scatter + Absorption as the truth).
+def _vol_shaft():
+    white = {"base_color": [0.7, 0.7, 0.7], "roughness": 0.9}
+    objs = [
+        {"shape": "cube", "scale": [1.0, 1.0, 0.02], "location": [0.0, 0.0, -0.02], "material": white},
+        {"shape": "cube", "scale": [1.0, 1.0, 0.02], "location": [0.0, 0.0, 2.02], "material": white},
+        {"shape": "cube", "scale": [1.0, 0.02, 1.0], "location": [0.0, 1.02, 1.0], "material": white},
+        {"shape": "cube", "scale": [0.02, 1.0, 1.0], "location": [-1.02, 0.0, 1.0], "material": white},
+        {"shape": "cube", "scale": [0.02, 1.04, 0.6], "location": [1.02, 0.0, 0.6], "material": white},    # below the slot
+        {"shape": "cube", "scale": [0.02, 1.04, 0.2], "location": [1.02, 0.0, 1.82], "material": white},   # above it
+    ]
+    return {"camera": {"fov": 40, "azimuth": 90, "elevation": 0, "distance": 3.8, "target": [0, 0, 1.0]},
+            "lights": [{"type": "sun", "power": 6, "azimuth": 0, "elevation": 35}],
+            "world": {"color": [0.02, 0.02, 0.02]}, "size": (256, 256),
+            "fog": {"density": 0.35, "color": [0.9, 0.9, 0.9], "g": 0.3, "box": [[-1.0, -1.0, 0.0], [1.0, 1.0, 2.0]]},
+            "objects": objs}
+
+
+CASES["vol_shaft"] = _vol_shaft()

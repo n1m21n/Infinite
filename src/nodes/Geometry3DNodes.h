@@ -824,6 +824,13 @@ public:
    // The aperture's shape: 0 blades is round, 3 or more a polygon turned by `dofRotation` degrees;
    // `dofRatio` stretches it tall (above 1) or wide (below 1), as an anamorphic lens does.
    int dofBlades = 0;
+   // Fog (row 5.3): one homogeneous medium filling the box fogMin..fogMax (world units), traced by the settle path
+   // tracer. fogDensity is extinction per unit, fogColor the share scattered (the rest absorbed), fogAnisotropy
+   // the Henyey-Greenstein g (0 even, toward 1 forward). 0 density is off.
+   float fogDensity = 0.0f;
+   float fogColor[3] = { 0.9f, 0.9f, 0.9f };
+   float fogAnisotropy = 0.0f;
+   float fogMin[3] = { -1000.0f, -1000.0f, -1000.0f }, fogMax[3] = { 1000.0f, 1000.0f, 1000.0f };
    float dofRotation = 0.0f;
    float dofRatio = 1.0f;
    // Keep the output texture as 16-bit float instead of 8-bit, so a 16-bit PNG
@@ -890,6 +897,9 @@ public:
       v.Float("ao", aoStrength); v.Float("aoRadius", aoRadius);
       v.Float("dofAperture", dofAperture); v.Float("focusDistance", focusDistance);
       v.Int("dofBlades", dofBlades); v.Float("dofRotation", dofRotation); v.Float("dofRatio", dofRatio);
+      v.Float("fogDensity", fogDensity); v.Color("fogColor", fogColor); v.Float("fogAnisotropy", fogAnisotropy);
+      v.Float("fogMinX", fogMin[0]); v.Float("fogMinY", fogMin[1]); v.Float("fogMinZ", fogMin[2]);
+      v.Float("fogMaxX", fogMax[0]); v.Float("fogMaxY", fogMax[1]); v.Float("fogMaxZ", fogMax[2]);
       v.Bool("floatOutput", floatOutput); v.Int("supersample", supersample);
       v.Float("width", width); v.Float("height", height);
       v.Int("renderPass", renderPass);

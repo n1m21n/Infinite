@@ -2892,6 +2892,14 @@ namespace app
       ModSlider("curvature valley", &n->curvatureValley, 0.0f, 2.0f, "%.2f", colW);
       ImGui::EndDisabled();
       hideEnd();
+      ModSlider("fog", &n->fogDensity, 0.0f, 4.0f, "%.3f", colW);
+      if (n->fogDensity > 0.0f)
+      {
+         ColorSwatch("fog colour", n->fogColor, n);
+         ModSlider("fog anisotropy", &n->fogAnisotropy, -0.95f, 0.95f, "%.2f", colW);
+         ImGui::SetNextItemWidth(colW); ImGui::DragFloat3("fog min", n->fogMin, 0.05f, -1000.0f, 1000.0f, "%.2f");
+         ImGui::SetNextItemWidth(colW); ImGui::DragFloat3("fog max", n->fogMax, 0.05f, -1000.0f, 1000.0f, "%.2f");
+      }
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
       ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);
       ImGui::EndDisabled();

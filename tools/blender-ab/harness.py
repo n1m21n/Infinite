@@ -531,6 +531,14 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
                                    "  f intensity %g" % w.get("strength", 1.0),
                                    "  f rotation %g" % w.get("rotation", 0.0),
                                    "  f sunThreshold %g" % w.get("sun_threshold", 0.0)])
+    fog = scene.get("fog")
+    if fog:
+        # Row 5.3: Blender's box (Z up) in Infinite's Y-up world: (x, y, z) -> (x, z, -y).
+        (x0, y0, z0), (x1, y1, z1) = fog["box"]
+        extra += ["  f fogDensity %g" % fog["density"], "  c fogColor %g %g %g" % tuple(srgb(fog["color"])),
+                  "  f fogAnisotropy %g" % fog.get("g", 0.0),
+                  "  f fogMinX %g" % x0, "  f fogMinY %g" % z0, "  f fogMinZ %g" % -y1,
+                  "  f fogMaxX %g" % x1, "  f fogMaxY %g" % z1, "  f fogMaxZ %g" % -y0]
     render = node("3D", "Render 3D", extra + [
         "  f width %d" % width, "  f height %d" % height,
         "  i tonemap %s" % {"AgX": "AgX", "Khronos PBR Neutral": "Neutral"}.get(scene.get("view"), "None"), "  f exposure 1",

@@ -643,6 +643,29 @@ for i, l in enumerate(scene.get("lights", [])):
     lo.location = spherical(l["azimuth"], l["elevation"], l.get("distance", 10))
     aim(lo, (0, 0, 0))
 
+fog = scene.get("fog")
+if fog:
+    # Row 5.3 truth: a homogeneous medium in a box, extinction = density, scattered share = colour, HG g:
+    # Volume Scatter (colour x density) plus Volume Absorption ((1 - colour) x density).
+    (x0, y0, z0), (x1, y1, z1) = fog["box"]
+    bpy.ops.mesh.primitive_cube_add(size=2, location=((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
+    fo = bpy.context.active_object; fo.scale = ((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2)
+    fm = bpy.data.materials.new("fog"); fm.use_nodes = True; fnt = fm.node_tree
+    for nd in list(fnt.nodes):
+        if nd.type != "OUTPUT_MATERIAL": fnt.nodes.remove(nd)
+    fout = next(nd for nd in fnt.nodes if nd.type == "OUTPUT_MATERIAL")
+    vs = fnt.nodes.new("ShaderNodeVolumeScatter"); va = fnt.nodes.new("ShaderNodeVolumeAbsorption")
+    vs.inputs["Color"].default_value = (*fog["color"], 1); vs.inputs["Density"].default_value = fog["density"]
+    vs.inputs["Anisotropy"].default_value = fog.get("g", 0.0)
+    va.inputs["Color"].default_value = (*fog["color"], 1); va.inputs["Density"].default_value = fog["density"]
+    add = fnt.nodes.new("ShaderNodeAddShader")
+    fnt.links.new(vs.outputs[0], add.inputs[0]); fnt.links.new(va.outputs[0], add.inputs[1])
+    fnt.links.new(add.outputs[0], fout.inputs["Volume"])
+    try: fm.cycles.homogeneous_volume = True
+    except Exception: pass
+    fo.data.materials.append(fm)
+    sc.cycles.volume_bounces = 8
+
 w = scene.get("world", {})
 sc.world = bpy.data.worlds.new("w"); sc.world.use_nodes = True
 wt = sc.world.node_tree

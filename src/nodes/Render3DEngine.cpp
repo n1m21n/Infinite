@@ -587,6 +587,8 @@ bool Render3DNode::CookEngine(int frameId)
       fr.lensRadius = ortho || dofAperture <= 0.0f ? 0.0f : dofAperture * (24.0f / 1080.0f) * focusDistance * invFy;
       fr.focusDist = std::max(1e-3f, focusDistance);
       fr.dofAperture = ortho ? 0.0f : std::max(0.0f, dofAperture);
+      fr.fogDensity = std::max(0.0f, fogDensity); fr.fogAnisotropy = std::clamp(fogAnisotropy, -0.95f, 0.95f);
+      for (int k = 0; k < 3; k++) { fr.fogColor[k] = ColorSpace::SrgbToLinear(std::clamp(fogColor[k], 0.0f, 1.0f)); fr.fogMin[k] = fogMin[k]; fr.fogMax[k] = fogMax[k]; }
       fr.bokeh[0] = dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f;
       fr.bokeh[1] = dofRotation * 3.14159265f / 180.0f;
       fr.bokeh[2] = std::clamp(dofRatio, 0.01f, 2.0f);
@@ -728,6 +730,7 @@ bool Render3DNode::CookEngine(int frameId)
    };
    mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
    mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
+   mix(&fr.fogDensity, 8); mix(fr.fogColor, 36);
    for (const engine::Instance& in : fr.instances)
    {
       mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 16);

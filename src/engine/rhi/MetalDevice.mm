@@ -1230,8 +1230,9 @@ fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]],
 }
 
 // ---- path tracer: progressive, one sample per pass, accumulated in RGBA32F (rgb = radiance sum, a = coverage sum)
-struct PtU { float4x4 invVP; float4 info; float4 em; float4 lens; float4 lr; float4 lu; float4 lf; }; // info: x prior samples, y max bounces, z frame, w width; em: x emitter triangles, y chance to sample one
+struct PtU { float4x4 invVP; float4 info; float4 em; float4 lens; float4 lr; float4 lu; float4 lf; float4 fog; float4 fogC; float4 fogLo; float4 fogHi; }; // info: x prior samples, y max bounces, z frame, w width; em: x emitter triangles, y chance to sample one
 // lens: thin-lens radius, focus distance, blades (below 3 round), blade turn; lr/lu/lf: camera right (w = bokeh ratio), up, forward
+// fog (row 5.3): x extinction per unit (0 off), y HG g; fogC the scattered share; fogLo/fogHi the medium's box
 // One emissive triangle in world space. p0.w: cumulative selection chance (by power); e1.w: selection chance / area.
 struct EmTri { float4 p0; float4 e1; float4 e2; float4 em; };
 float3 ggxSampleH(float3 n, float a, float u1, float u2)
@@ -1461,6 +1462,31 @@ float envPdf(constant FrameU& f, texture2d<float> cdf, float3 dir)
    const int x = min(int(uv.x * float(NX)), NX - 1), y = min(int(uv.y * float(NY)), NY - 1);
    return cdf.read(uint2(x, NY + 1 + y)).r / (19.7392088 * max(sqrt(max(1.0 - dir.y * dir.y, 0.0)), 1e-4));
 }
+// Row 5.3: one homogeneous medium in a box. fogSpan is the part of o + d t, t in [0, tmax], inside it.
+float2 fogSpan(constant PtU& u, float3 o, float3 d, float tmax)
+{
+   const float3 inv = 1.0 / select(d, float3(1e-12), abs(d) < 1e-12);
+   const float3 a = (u.fogLo.xyz - o) * inv, c = (u.fogHi.xyz - o) * inv;
+   const float3 lo = min(a, c), hi = max(a, c);
+   return float2(max(max(lo.x, lo.y), max(lo.z, 0.0)), min(min(hi.x, hi.y), min(hi.z, tmax)));
+}
+float fogTr(constant PtU& u, float3 o, float3 d, float tmax)
+{
+   if (u.fog.x <= 0.0) return 1.0;
+   const float2 s = fogSpan(u, o, d, tmax);
+   return exp(-u.fog.x * max(s.y - s.x, 0.0));
+}
+// Henyey-Greenstein: c is the cosine between the light's travel before and after the scatter.
+float hgPhase(float c, float g) { const float k = max(1.0 + g * g - 2.0 * g * c, 1e-6); return (1.0 - g * g) / (12.566370614 * k * sqrt(k)); }
+float3 hgSample(float3 w, float g, float u1, float u2)
+{
+   float c = 1.0 - 2.0 * u1;
+   if (abs(g) > 1e-3) { const float q = (1.0 - g * g) / (1.0 - g + 2.0 * g * u1); c = (1.0 + g * g - q * q) / (2.0 * g); }
+   c = clamp(c, -1.0, 1.0);
+   const float st = sqrt(max(0.0, 1.0 - c * c)), ph = 6.28318530718 * u2;
+   const float3 t = normalize(cross(w, abs(w.y) < 0.99 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0)));
+   return normalize(t * (st * cos(ph)) + cross(w, t) * (st * sin(ph)) + w * c);
+}
 fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
                       texture2d<float> prev [[texture(0)]], texture2d<float> prevAux [[texture(1)]], texture2d<float> prevGd [[texture(2)]],
@@ -1508,6 +1534,37 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
    {
       ray r(o, d, 0.0, 1e4);
       intersection_result<triangle_data, instancing> h = it.intersect(r, rtArgs.tlas);
+      if (u.fog.x > 0.0)
+      {
+         // Row 5.3: free flight through the medium (one extinction for all channels, so the weight is the albedo).
+         // A scatter takes one light sample with the phase function, then the path goes on along a phase sample.
+         const float2 sp = fogSpan(u, o, d, h.type == intersection_type::triangle ? h.distance : 1e4);
+         const float s = sp.x - log(max(1.0 - rnd(seed), 1e-12)) / u.fog.x;
+         if (sp.y > sp.x && s < sp.y)
+         {
+            const float3 pm = o + d * s;
+            if (b == 0) { cov = 1.0; alb0 = u.fogC.xyz; n0 = -d; dist0 = s; }
+            T *= u.fogC.xyz;
+            float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
+            ptPickLight(f, ems, nEm, pEm, int(f.params.w), pm, seed, ld, Le, tmax, pL, lterms);
+            if (any(Le > 0.0))
+            {
+               if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               const float ph = hgPhase(dot(ld, d), u.fog.y);
+               L += T * ph * Le * lterms.x * fogTr(u, pm, ld, tmax) * (pL > 0.0 ? pL / max(pL * pL + ph * ph, 1e-20) : 1.0);
+            }
+            const float3 nd = hgSample(d, u.fog.y, rnd(seed), rnd(seed));
+            lastPdfB = hgPhase(dot(nd, d), u.fog.y); envMis = 0.0; skyK = float3(1.0);
+            o = pm; d = nd;
+            if (b >= 2)
+            {
+               const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
+               if (rnd(seed) > q) break;
+               T /= q;
+            }
+            continue;
+         }
+      }
       if (h.type != intersection_type::triangle)
       {
          float wS = 1.0;
@@ -1762,6 +1819,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
          if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         Le *= fogTr(u, p, ld, tmax);
          float pB = 0.0;
          float3 fe = hairM ? hairBsdf(V, ld, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pB) * lterms.x
                   : dm == 2 ? ptEvalT(n, V, ld, base, metal, rough, f0, lterms, msK, pB)
@@ -1806,7 +1864,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                pBm = cP * (eL > 0.0 ? distGGX(cnH, cR) * cnH / (4.0 * cvH) : 0.0) + (1.0 - cP) * pB;
             }
             if (any(fe > 0.0) && !occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ed) < 0.0 ? -ns : ns) * f.shQ.w, ed, 1e4, f.shQ.w, seed))
-               L += T * fe * sampleEnv(f, et, ed, 0.0) * (pE / max(pE * pE + pBm * pBm, 1e-20));
+               L += T * fe * sampleEnv(f, et, ed, 0.0) * fogTr(u, p, ed, 1e4) * (pE / max(pE * pE + pBm * pBm, 1e-20));
          }
       }
       if (hairM)
@@ -3356,7 +3414,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
             id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
             [e setRenderPipelineState:mPtPso];
-            struct { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4]; } pu;
+            struct { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4], fog[4], fogC[4], fogLo[4], fogHi[4]; } pu;
+            pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy; pu.fog[2] = pu.fog[3] = 0.0f;
+            for (int k = 0; k < 3; k++) { pu.fogC[k] = fr.fogColor[k]; pu.fogLo[k] = fr.fogMin[k]; pu.fogHi[k] = fr.fogMax[k]; }
+            pu.fogC[3] = pu.fogLo[3] = pu.fogHi[3] = 0.0f;
             pu.lens[0] = fr.lensRadius; pu.lens[1] = fr.focusDist; pu.lens[2] = fr.bokeh[0]; pu.lens[3] = fr.bokeh[1];
             for (int k = 0; k < 3; k++) { pu.lr[k] = fr.camRight[k]; pu.lu[k] = fr.camUp[k]; pu.lf[k] = fr.camFwd[k]; }
             pu.lr[3] = fr.bokeh[2]; pu.lu[3] = pu.lf[3] = 0.0f;
