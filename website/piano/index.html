@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="midnight">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#151930">
+  <title>Nocturne: endless piano in a living landscape | Infinite</title>
+  <meta name="description" content="Nocturne is an endless generative piano piece set in a lakeside landscape you can walk through. Made with Infinite, the free open-source audiovisual workstation.">
+  <link rel="canonical" href="https://infinitedevices.org/piano/">
+  <meta property="og:title" content="Nocturne: endless piano in a living landscape">
+  <meta property="og:description" content="An endless generative piano piece set in a lakeside landscape you can walk through. Made with Infinite.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og/nocturne.jpg">
+  <meta property="og:url" content="https://infinitedevices.org/piano/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/og/nocturne.jpg">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="./piano.css?v=3">
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.min.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body class="is-intro">
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <!-- icons: Infinite Glyphs, 20 grid, 1.5 stroke (art/icons/src) -->
+  <svg class="sprite" aria-hidden="true">
+    <defs>
+      <symbol id="i-play" viewBox="0 0 20 20"><path fill="currentColor" d="M7 4.8 15 10 7 15.2Z"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 20 20"><rect fill="currentColor" x="5.5" y="4.5" width="3" height="11" rx="1.2"/><rect fill="currentColor" x="11.5" y="4.5" width="3" height="11" rx="1.2"/></symbol>
+      <symbol id="i-piano" viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="11" rx="1.5"/><path d="M7.7 11v4.5M12.3 11v4.5"/><rect x="6.2" y="4.5" width="3" height="6.5" fill="currentColor"/><rect x="10.8" y="4.5" width="3" height="6.5" fill="currentColor"/></symbol>
+      <symbol id="i-mixer" viewBox="0 0 20 20"><path d="M5 3v4M5 11v6M10 3v8M10 15v2M15 3v1M15 8v9"/><circle cx="5" cy="9" r="1.9" fill="currentColor" stroke="none"/><circle cx="10" cy="13" r="1.9" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.9" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-waveform" viewBox="0 0 20 20"><path d="M3.5 9v2M6.5 6.5v7M10 3.5v13M13.5 6.5v7M16.5 8v4"/></symbol>
+      <symbol id="i-star" viewBox="0 0 20 20"><path d="M10 3.6l1.9 4.1 4.4.5-3.3 3 .9 4.4L10 13.3l-3.9 2.3.9-4.4-3.3-3 4.4-.5Z"/></symbol>
+      <symbol id="i-star-fill" viewBox="0 0 20 20"><path fill="currentColor" d="M10 3.6l1.9 4.1 4.4.5-3.3 3 .9 4.4L10 13.3l-3.9 2.3.9-4.4-3.3-3 4.4-.5Z"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 20 20"><path d="M15.8 9.5A6 6 0 0 0 5 6.6M4.2 10.5A6 6 0 0 0 15 13.4"/><path d="M5 3.5v3.4h3.4M15 16.5v-3.4h-3.4"/></symbol>
+      <symbol id="i-code" viewBox="0 0 20 20"><path d="M7 6.5L3.5 10 7 13.5M13 6.5l3.5 3.5-3.5 3.5M11 5.5l-2 9"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 20 20"><path d="M3 10C4.7 6.8 7.1 5.2 10 5.2S15.3 6.8 17 10C15.3 13.2 12.9 14.8 10 14.8S4.7 13.2 3 10Z"/><circle cx="10" cy="10" r="2.2" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 20 20"><path d="M3 10C4.7 6.8 7.1 5.2 10 5.2S15.3 6.8 17 10C15.3 13.2 12.9 14.8 10 14.8S4.7 13.2 3 10Z"/><path d="M5 15 15 5"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.5"/><path d="M10 2.75v1.25M10 16v1.25M2.75 10H4M16 10h1.25M4.7 4.7l1 1M14.3 14.3l1 1M15.3 4.7l-1 1M5.7 14.3l-1 1"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 20 20"><path d="M15.6 11.9A6.3 6.3 0 1 1 8.1 4.4a5 5 0 0 0 7.5 7.5Z"/></symbol>
+      <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></symbol>
+    </defs>
+  </svg>
+
+  <div id="world" class="world" aria-hidden="true"></div>
+
+  <header class="top">
+    <a class="brand glass" href="../" aria-label="Infinite home">
+      <img src="../assets/favicon.svg" alt="" width="24" height="24">
+      <span class="brand-name">Infinite</span>
+      <span class="folio">Nocturne</span>
+    </a>
+    <p class="readout glass" id="readout">
+      <span id="hud-key">D dorian</span><span id="hud-chord">Dm9</span><span id="hud-bpm">60 BPM</span>
+    </p>
+    <div class="top-actions glass">
+      <button type="button" class="icon-btn" id="btn-patch" aria-label="Show patch" data-tip="Patch"><svg><use href="#i-code"/></svg></button>
+      <button type="button" class="icon-btn" id="btn-hide" aria-label="Hide controls" aria-pressed="false" data-tip="Hide"><svg><use href="#i-eye"/></svg></button>
+    </div>
+  </header>
+
+  <canvas id="ribbon" class="ribbon" height="28" aria-label="Piano keys. Click a key to play it."></canvas>
+
+  <nav class="dock glass" aria-label="Nocturne controls">
+    <button type="button" class="icon-btn is-primary" id="btn-play" aria-label="Play" data-tip="Play"><svg><use id="play-icon" href="#i-play"/></svg></button>
+    <span class="dock-gap" aria-hidden="true"></span>
+    <button type="button" class="icon-btn" data-pop="pop-voice" aria-expanded="false" aria-controls="pop-voice" aria-label="Voice" data-tip="Voice"><svg><use href="#i-piano"/></svg></button>
+    <button type="button" class="icon-btn" data-pop="pop-feel" aria-expanded="false" aria-controls="pop-feel" aria-label="Feel" data-tip="Feel"><svg><use href="#i-mixer"/></svg></button>
+    <button type="button" class="icon-btn" data-pop="pop-ambience" aria-expanded="false" aria-controls="pop-ambience" aria-label="Ambience" data-tip="Ambience"><svg><use href="#i-waveform"/></svg></button>
+    <span class="dock-gap" aria-hidden="true"></span>
+    <button type="button" class="icon-btn" id="btn-like" aria-label="Like this phrase" data-tip="Like"><svg><use id="like-icon" href="#i-star"/></svg></button>
+    <button type="button" class="icon-btn" id="btn-next" aria-label="Next phrase" data-tip="Next"><svg><use href="#i-refresh"/></svg></button>
+    <span class="dock-gap" aria-hidden="true"></span>
+    <button type="button" class="icon-btn" id="btn-sky" aria-label="Switch to sunset" data-tip="Sunset"><svg><use id="sky-icon" href="#i-sun"/></svg></button>
+  </nav>
+
+  <section class="pop" id="pop-voice" role="dialog" aria-label="Voice" hidden>
+    <h2 class="pop-title">Voice</h2>
+    <div class="chips" role="radiogroup" aria-label="Piano voice">
+      <button type="button" class="chip" role="radio" aria-checked="true" data-model="felt">Felt</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-model="grand">Grand</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-model="dark_grand">Dark grand</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-model="rhodes">Rhodes</button>
+    </div>
+  </section>
+
+  <section class="pop" id="pop-feel" role="dialog" aria-label="Feel" hidden>
+    <h2 class="pop-title">Feel</h2>
+    <label class="row"><span>Smooth</span><input type="range" id="s-smooth" min="0" max="100" value="80"><output>80</output></label>
+    <label class="row"><span>Soothe</span><input type="range" id="s-soothe" min="0" max="100" value="84"><output>84</output></label>
+    <label class="row"><span>Space</span><input type="range" id="s-space" min="0" max="100" value="76"><output>76</output></label>
+    <label class="row"><span>Range</span><input type="range" id="s-range" min="15" max="100" value="90"><output>90</output></label>
+    <div class="row row-selects">
+      <label><span class="sr">Key</span>
+        <select id="sel-key">
+          <option value="-1">Auto key</option><option value="0">C</option><option value="2" selected>D</option>
+          <option value="3">E♭</option><option value="4">E</option><option value="5">F</option><option value="6">F♯</option>
+          <option value="7">G</option><option value="9">A</option><option value="10">B♭</option>
+        </select>
+      </label>
+      <label><span class="sr">Scale</span>
+        <select id="sel-scale">
+          <option value="auto">Auto scale</option><option value="dorian" selected>Dorian</option><option value="minor">Aeolian</option>
+          <option value="major">Major</option><option value="lydian">Lydian</option><option value="harmonic minor">Harmonic minor</option>
+          <option value="maj_pent">Pentatonic</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="pop" id="pop-ambience" role="dialog" aria-label="Ambience" hidden>
+    <h2 class="pop-title">Ambience</h2>
+    <div class="chips" role="radiogroup" aria-label="Scene">
+      <button type="button" class="chip" role="radio" aria-checked="true" data-scene="midnight_grove">Grove</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-scene="rainy_vinyl">Rain</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-scene="pebble_cove">Cove</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-scene="cozy_cafe">Café</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-scene="deep_zen">Zen</button>
+      <button type="button" class="chip" role="radio" aria-checked="false" data-scene="clear">Off</button>
+    </div>
+    <details class="mix">
+      <summary>Mix</summary>
+      <div class="mix-grid" id="mix-grid"></div>
+      <div class="chips chips-small" role="radiogroup" aria-label="Noise colour">
+        <button type="button" class="chip" role="radio" aria-checked="true" data-noise="pink">Pink</button>
+        <button type="button" class="chip" role="radio" aria-checked="false" data-noise="brown">Brown</button>
+        <button type="button" class="chip" role="radio" aria-checked="false" data-noise="velvet">Velvet</button>
+        <button type="button" class="chip" role="radio" aria-checked="false" data-noise="white">White</button>
+      </div>
+    </details>
+  </section>
+
+  <div class="intro" id="intro">
+    <p class="folio">Infinite · Nocturne</p>
+    <h1>Nocturne</h1>
+    <p class="lead">An endless piano piece in a landscape you can walk through.</p>
+    <button type="button" class="btn-primary" id="btn-enter"><svg><use href="#i-play"/></svg><span>Play</span></button>
+    <button type="button" class="btn-quiet" id="btn-look">Look around</button>
+    <p class="load" id="load" role="status">Loading 0%</p>
+  </div>
+
+  <p class="toast glass" id="toast" role="status" hidden></p>
+
+  <dialog class="patch" id="patch">
+    <header>
+      <h2>Patch</h2>
+      <button type="button" class="icon-btn" id="btn-patch-close" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <p class="patch-meta" id="patch-meta">PianoNode</p>
+    <pre id="patch-code" tabindex="0">Press play to grow a patch.</pre>
+    <button type="button" class="btn-secondary" id="btn-download">Download .inf</button>
+  </dialog>
+
+  <script src="./ambient-engine.js?v=2"></script>
+  <script src="./piano-engine.js?v=2"></script>
+  <script type="module" src="./app.js?v=3"></script>
+</body>
+</html>
