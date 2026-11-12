@@ -6441,6 +6441,8 @@ int RunFieldPinDeclTest();
 
 int RunFieldNotesTest();
 
+int RunFieldPatcherTest();
+
 void RunRecSyncTest();
 
 void RunAudioRingTest();

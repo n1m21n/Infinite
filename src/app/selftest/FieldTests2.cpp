@@ -2,6 +2,9 @@
 #include "app/AppShared.h"
 #include "audio/PhaseShape.h"
 #include "core/field/SampleRuntime.h"
+#include "core/field/FieldBoxGraph.h"
+#include "core/field/FieldBoxRegistry.h"
+#include "core/field/GlslBackend.h"
 
 namespace app
 {
@@ -3636,5 +3639,262 @@ int RunFieldNotesTest()
    printf("INFINITE_FIELDNOTESTEST: %s\n", allOk ? "OK" : "FAIL");
    fflush(stdout);
    return allOk ? 0 : 1;
+}
+
+// ============================================================ INFINITE_FIELDPATCHERTEST
+namespace
+{
+   bool PatcherIRNodeEqual(const Field::IRNodePtr& a, const Field::IRNodePtr& b)
+   {
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      if (a->kind != b->kind || a->type != b->type || a->domain != b->domain ||
+          a->transferKind != b->transferKind || a->divisor != b->divisor ||
+          a->isOffsetRead != b->isOffsetRead || a->isNeighbourRead != b->isNeighbourRead ||
+          a->isHandle != b->isHandle || a->reduceNeedsPostLoop != b->reduceNeedsPostLoop ||
+          a->numberValue != b->numberValue || a->varName != b->varName ||
+          a->op != b->op || a->callee != b->callee || a->field != b->field ||
+          a->children.size() != b->children.size())
+         return false;
+      for (int i = 0; i < 4; ++i)
+      {
+         if (a->vecValues[i] != b->vecValues[i] || a->swizzleIndices[i] != b->swizzleIndices[i])
+            return false;
+      }
+      for (size_t i = 0; i < a->children.size(); ++i)
+      {
+         if (!PatcherIRNodeEqual(a->children[i], b->children[i]))
+            return false;
+      }
+      return true;
+   }
+
+   bool PatcherIRStmtEqual(const Field::IRStmtPtr& a, const Field::IRStmtPtr& b)
+   {
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      if (a->kind != b->kind || a->domain != b->domain ||
+          a->assignTarget != b->assignTarget || a->assignField != b->assignField ||
+          a->assignOp != b->assignOp || a->swizzleCount != b->swizzleCount ||
+          a->attribName != b->attribName || a->attribType != b->attribType ||
+          a->stateName != b->stateName || a->stateTypeName != b->stateTypeName ||
+          a->stateType != b->stateType || a->stateLanes != b->stateLanes ||
+          a->pinName != b->pinName || a->pinTypeName != b->pinTypeName ||
+          a->pinIsStructural != b->pinIsStructural || a->pinType != b->pinType ||
+          a->pinLanes != b->pinLanes || a->pinDomain != b->pinDomain ||
+          a->constantTripCount != b->constantTripCount ||
+          a->emitTargetName != b->emitTargetName || a->emitTypeName != b->emitTypeName ||
+          a->setParamName != b->setParamName)
+         return false;
+      if (!PatcherIRNodeEqual(a->lvalueExpr, b->lvalueExpr) ||
+          !PatcherIRNodeEqual(a->rvalueExpr, b->rvalueExpr) ||
+          !PatcherIRNodeEqual(a->attribInitExpr, b->attribInitExpr) ||
+          !PatcherIRNodeEqual(a->pinInitExpr, b->pinInitExpr) ||
+          !PatcherIRNodeEqual(a->ifCond, b->ifCond) ||
+          !PatcherIRNodeEqual(a->forCond, b->forCond) ||
+          !PatcherIRNodeEqual(a->expr, b->expr) ||
+          !PatcherIRNodeEqual(a->connectSrc, b->connectSrc) ||
+          !PatcherIRNodeEqual(a->connectSrcSlot, b->connectSrcSlot) ||
+          !PatcherIRNodeEqual(a->connectDst, b->connectDst) ||
+          !PatcherIRNodeEqual(a->connectDstSlot, b->connectDstSlot) ||
+          !PatcherIRNodeEqual(a->setTarget, b->setTarget) ||
+          !PatcherIRNodeEqual(a->setValue, b->setValue) ||
+          !PatcherIRNodeEqual(a->placeTarget, b->placeTarget) ||
+          !PatcherIRNodeEqual(a->placeX, b->placeX) ||
+          !PatcherIRNodeEqual(a->placeY, b->placeY))
+         return false;
+      if (a->thenStmts.size() != b->thenStmts.size() ||
+          a->elseStmts.size() != b->elseStmts.size() ||
+          a->forBody.size() != b->forBody.size() ||
+          a->emitKeyArgs.size() != b->emitKeyArgs.size())
+         return false;
+      for (size_t i = 0; i < a->thenStmts.size(); ++i)
+         if (!PatcherIRStmtEqual(a->thenStmts[i], b->thenStmts[i])) return false;
+      for (size_t i = 0; i < a->elseStmts.size(); ++i)
+         if (!PatcherIRStmtEqual(a->elseStmts[i], b->elseStmts[i])) return false;
+      for (size_t i = 0; i < a->forBody.size(); ++i)
+         if (!PatcherIRStmtEqual(a->forBody[i], b->forBody[i])) return false;
+      for (size_t i = 0; i < a->emitKeyArgs.size(); ++i)
+         if (!PatcherIRNodeEqual(a->emitKeyArgs[i], b->emitKeyArgs[i])) return false;
+      return true;
+   }
+
+   bool PatcherSampleEqual(const Field::SampleProgram& a, const Field::SampleProgram& b)
+   {
+      if (a.code.size() != b.code.size() || a.params.size() != b.params.size() ||
+          a.state.size() != b.state.size())
+         return false;
+      for (size_t i = 0; i < a.code.size(); ++i)
+      {
+         const auto& ia = a.code[i];
+         const auto& ib = b.code[i];
+         if (ia.op != ib.op || ia.dst != ib.dst || ia.a != ib.a ||
+             ia.b != ib.b || ia.c != ib.c || ia.imm != ib.imm)
+            return false;
+      }
+      return true;
+   }
+}
+
+int RunFieldPatcherTest()
+{
+   printf("[FIELDPATCHERTEST] Running round-trip test over all kPresets...\n");
+   int totalPresets = 0;
+   int totalIrOk = 0;
+   int m3Total = 0;
+   int m3ZeroCode = 0;
+
+   auto checkPreset = [&](const char* hostName, const char* presetName, const std::string& code,
+                          uint32_t hostMask, const std::string& domain, bool countForM3) {
+      ++totalPresets;
+      if (countForM3)
+         ++m3Total;
+
+      Field::FieldError err;
+      Field::BoxGraph graph;
+      if (!Field::ParseCodeToBoxGraph(code, hostMask, graph, err))
+      {
+         printf("FAIL [%s / %s]: ParseCodeToBoxGraph: %s\n", hostName, presetName, err.message.c_str());
+         return;
+      }
+
+      int codeBoxes = graph.CountCodeBoxes();
+      if (countForM3)
+      {
+         if (codeBoxes == 0)
+            ++m3ZeroCode;
+         else
+            printf("INFO M3 [%s / %s]: %d code box(es)\n", hostName, presetName, codeBoxes);
+      }
+
+      std::string rtCode = Field::PrintBoxGraphToCode(graph, true);
+
+      if (domain == "notes" || domain == "sample")
+      {
+         bool notesHost = (domain == "notes");
+         Field::SampleProgram p1, p2;
+         if (!Field::CompileSampleProgram(code, nullptr, p1, err, notesHost))
+         {
+            printf("FAIL [%s / %s]: orig compile: %s\n", hostName, presetName, err.message.c_str());
+            return;
+         }
+         if (!Field::CompileSampleProgram(rtCode, nullptr, p2, err, notesHost))
+         {
+            printf("FAIL [%s / %s]: rt compile: %s\n", hostName, presetName, err.message.c_str());
+            return;
+         }
+         if (!PatcherSampleEqual(p1, p2))
+         {
+            printf("FAIL [%s / %s]: SampleProgram mismatch\n", hostName, presetName);
+            return;
+         }
+         ++totalIrOk;
+         return;
+      }
+
+      auto parseAst = [&](const std::string& src, Field::AstNodePtr& outAst) -> bool {
+         std::vector<Field::Token> toks;
+         if (!Field::Lex(src, toks, err)) return false;
+         return Field::ParseProgram(toks, outAst, err);
+      };
+      Field::AstNodePtr a1, a2;
+      if (!parseAst(code, a1) || !parseAst(rtCode, a2))
+      {
+         printf("FAIL [%s / %s]: parse failed: %s\n", hostName, presetName, err.message.c_str());
+         return;
+      }
+
+      if (domain == "element")
+      {
+         Field::ElementIRProgram ir1, ir2;
+         if (!Field::LowerElementProgramToIR(a1, ir1, err) ||
+             !Field::LowerElementProgramToIR(a2, ir2, err))
+         {
+            printf("FAIL [%s / %s]: LowerElementProgramToIR: %s\n", hostName, presetName, err.message.c_str());
+            return;
+         }
+         bool ok = (ir1.prologue.size() == ir2.prologue.size() &&
+                    ir1.elementLoop.size() == ir2.elementLoop.size() &&
+                    ir1.postLoop.size() == ir2.postLoop.size());
+         for (size_t i = 0; ok && i < ir1.prologue.size(); ++i)
+            ok = PatcherIRStmtEqual(ir1.prologue[i], ir2.prologue[i]);
+         for (size_t i = 0; ok && i < ir1.elementLoop.size(); ++i)
+            ok = PatcherIRStmtEqual(ir1.elementLoop[i], ir2.elementLoop[i]);
+         for (size_t i = 0; ok && i < ir1.postLoop.size(); ++i)
+            ok = PatcherIRStmtEqual(ir1.postLoop[i], ir2.postLoop[i]);
+         if (!ok)
+         {
+            printf("FAIL [%s / %s]: ElementIR mismatch\n", hostName, presetName);
+            return;
+         }
+         ++totalIrOk;
+         return;
+      }
+
+      if (domain == "pixel")
+      {
+         Field::PixelIRProgram ir1, ir2;
+         if (!Field::LowerPixelProgramToIR(a1, ir1, err) ||
+             !Field::LowerPixelProgramToIR(a2, ir2, err))
+         {
+            printf("FAIL [%s / %s]: LowerPixelProgramToIR: %s\n", hostName, presetName, err.message.c_str());
+            return;
+         }
+         Field::GlslEmitResult g1 = Field::EmitGlsl(ir1);
+         Field::GlslEmitResult g2 = Field::EmitGlsl(ir2);
+         if (g1.source != g2.source)
+         {
+            printf("FAIL [%s / %s]: GLSL mismatch\n", hostName, presetName);
+            return;
+         }
+         ++totalIrOk;
+         return;
+      }
+
+      if (domain == "graph")
+      {
+         Field::GraphIRProgram ir1, ir2;
+         if (!Field::LowerGraphProgramToIR(a1, ir1, err) ||
+             !Field::LowerGraphProgramToIR(a2, ir2, err))
+         {
+            printf("FAIL [%s / %s]: LowerGraphProgramToIR: %s\n", hostName, presetName, err.message.c_str());
+            return;
+         }
+         bool ok = (ir1.statements.size() == ir2.statements.size());
+         for (size_t i = 0; ok && i < ir1.statements.size(); ++i)
+            ok = PatcherIRStmtEqual(ir1.statements[i], ir2.statements[i]);
+         if (!ok)
+         {
+            printf("FAIL [%s / %s]: GraphIR mismatch\n", hostName, presetName);
+            return;
+         }
+         ++totalIrOk;
+         return;
+      }
+   };
+
+   for (const auto& p : FieldNotesNode::Presets())
+      checkPreset("Notes", p.name, p.code, Field::HostNotes, "notes", true);
+   for (const auto& p : FieldPrimitiveNode::Presets())
+      checkPreset("Primitive", p.name, p.code, Field::HostPrimitive, "element", true);
+   for (const auto& p : FieldElementNode::Presets())
+      checkPreset("Element", p.name, p.code, Field::HostElement, "element", true);
+   for (const auto& p : FieldPixelNode::Presets())
+      checkPreset("Pixel", p.name, p.code, Field::HostPixel, "pixel", false);
+   for (const auto& p : FieldSampleNode::Presets())
+      checkPreset("Sample", p.name, p.code, Field::HostSample, "sample", false);
+   for (const auto& p : FieldSynthNode::Presets())
+      checkPreset("Synth", p.name, p.code, Field::HostSynth, "sample", false);
+   for (const auto& p : FieldGraphNode::Presets())
+      checkPreset("Graph", p.name, p.code, Field::HostGraph, "graph", false);
+
+   double m3Pct = (m3Total > 0) ? (100.0 * m3ZeroCode / m3Total) : 0.0;
+   double m4Pct = (totalPresets > 0) ? (100.0 * totalIrOk / totalPresets) : 0.0;
+   printf("[FIELDPATCHERTEST] M3 (Notes+Primitive+Element 0-code-box): %d / %d (%.1f%%)\n", m3ZeroCode, m3Total, m3Pct);
+   printf("[FIELDPATCHERTEST] M4 (All presets IR unchanged): %d / %d (%.1f%%)\n", totalIrOk, totalPresets, m4Pct);
+   bool pass = (m3Pct >= 70.0) && (totalIrOk == totalPresets);
+   printf("INFINITE_FIELDPATCHERTEST: %s\n", pass ? "OK" : "FAIL");
+   fflush(stdout);
+   return pass ? 0 : 1;
 }
 }

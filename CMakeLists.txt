@@ -683,6 +683,8 @@ set(COMMON_SOURCES
     src/core/field/FieldGraphKernel.cpp
     src/core/field/FieldGraphReconciler.cpp
     src/core/field/FieldGraphOwnership.cpp
+    src/core/field/FieldBoxRegistry.cpp
+    src/core/field/FieldBoxGraph.cpp
     src/core/ExprGlobals.cpp
     src/core/FactoryPresets.cpp
     src/platform/PluginCrashGuard.cpp
@@ -1090,6 +1092,27 @@ add_executable(field-preset-check
     src/core/field/FieldState.cpp
 )
 target_include_directories(field-preset-check PRIVATE src src/core)
+
+# Headless checks for Field Patcher Block A (internal/plans/field-patcher/README.md §12).
+add_executable(field-patcher-check
+    tools/field_patcher_check.cpp
+    src/core/field/FieldBoxRegistry.cpp
+    src/core/field/FieldBoxGraph.cpp
+    src/core/field/FieldLex.cpp
+    src/core/field/FieldParse.cpp
+    src/core/field/FieldIR.cpp
+    src/core/field/FieldSwizzle.cpp
+    src/core/field/FieldCycles.cpp
+    src/core/field/GlslBackend.cpp
+    src/core/field/Transfer.cpp
+    src/core/field/ReduceOps.cpp
+    src/core/field/BackendRegister.cpp
+    src/core/field/ElementBackend.cpp
+    src/core/field/ElementStore.cpp
+    src/core/field/FieldRandom.cpp
+    src/core/field/FieldState.cpp
+)
+target_include_directories(field-patcher-check PRIVATE src src/core)
 
 # Headless checks for the Sketch engine (docs/plans/sketch/README.md exit criteria
 # that need no window): compile, params, determinism, abort, memory, errors.
