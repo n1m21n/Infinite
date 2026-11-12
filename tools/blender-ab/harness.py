@@ -524,6 +524,8 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
     if cam.get("fstop"):
         extra += ["  f dofAperture %g" % dof_aperture(cam, width / height),
                  "  f focusDistance %g" % cam.get("focus", cam["distance"])]
+        if cam.get("blades"):
+            extra += ["  i dofBlades %d" % cam["blades"], "  f dofRotation %g" % cam.get("blade_rotation", 0.0)]
     hdri = None
     if w.get("sky"):
         k = w["sky"]  # row 5.5: the HDRI node's physical sky, azimuth in Infinite's Y-up frame (Blender +Y = -Z)

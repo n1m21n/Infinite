@@ -187,6 +187,18 @@ def _row(mats, cam=None, lights=None, world=None, extra=(), **kw):
     return sc
 
 
+def _dof_bokeh():
+    """A small ball in focus 1.6 m away and a grid of small bright emitters about 10 m behind, out of focus at f/1."""
+    em = [_ball(x, 8.0 + 0.8 * (k % 2), z, base_color=[0, 0, 0], emission=[1.0, 0.85, 0.6], emission_strength=60.0)
+          for k, (x, z) in enumerate((x, z) for x in (-2.4, -1.2, 0.0, 1.2, 2.4) for z in (0.3, 1.6, 2.9))]
+    for b in em:
+        b["scale"] = 0.05
+    return {"size": SMALL, "camera": {"fov": 30, "azimuth": 90, "elevation": 3, "distance": 1.6, "target": [0, 0, 0.2],
+                                      "fstop": 1.0, "focus": 1.6, "blades": 6, "blade_rotation": 15},
+            "lights": [{"type": "sun", "power": 0.5, "azimuth": 60, "elevation": 45}], "world": {"color": [0.01, 0.01, 0.012]},
+            "objects": [GREY_FLOOR, _ball(0.0, 0.0, 0.15, base_color=[0.7, 0.3, 0.2], roughness=0.4)] + em}
+
+
 def _stripes():
     """A wall of coloured bars behind the row, so refraction, blur and see-through have something to bend."""
     cols = [[0.8, 0.1, 0.08], [0.9, 0.8, 0.1], [0.1, 0.6, 0.15], [0.1, 0.25, 0.8], [0.9, 0.9, 0.9], [0.05, 0.05, 0.05]]
@@ -417,6 +429,8 @@ CASES.update({
     "dof": _row([{"base_color": c, "roughness": 0.4} for c in ([0.8, 0.1, 0.08], [0.9, 0.8, 0.1], [0.1, 0.6, 0.15], [0.1, 0.25, 0.8], [0.9, 0.9, 0.9])],
                 cam={"fov": 30, "azimuth": 60, "elevation": 15, "distance": 5.0, "target": [0, 0, 0.35], "fstop": 1.4, "focus": 5.0},
                 extra=_stripes()),
+    # Row 6.2: out-of-focus point highlights through a 6-blade aperture turned 15 degrees (bokeh polygons).
+    "dof_bokeh": _dof_bokeh(),
     # The Neutral view (Khronos PBR Neutral) on the sun scene.
     "view_neutral": _lit({"type": "sun", "power": 6, "azimuth": 30, "elevation": 45}, view="Khronos PBR Neutral"),
     # A smooth subdivided head and a hard cube: smooth normals, self-shadow, crevices.

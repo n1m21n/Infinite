@@ -2903,13 +2903,16 @@ namespace app
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
       ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);
       ImGui::EndDisabled();
-      hideBegin(5, 0, {});   // focus distance, aperture x3, offline supersample
+      hideBegin(8, 0, {});   // focus distance, aperture x3, cat eye, distortion, CA, offline supersample
       ImGui::BeginDisabled(n->dofAperture <= 0.0f || n->PanoActive());
       ModSlider("focus distance", &n->focusDistance, 0.3f, 30.0f, "%.3f", colW);
       ModSliderInt("aperture blades", &n->dofBlades, 0, 16, colW);
       ModSlider("aperture rotation", &n->dofRotation, -180.0f, 180.0f, "%.0f\xC2\xB0", colW);
       ModSlider("aperture ratio", &n->dofRatio, 0.01f, 2.0f, "%.2f", colW);
+      ModSlider("cat eye", &n->dofCatEye, 0.0f, 1.0f, "%.2f", colW);
       ImGui::EndDisabled();
+      ModSlider("lens distortion", &n->lensDistortion, -0.5f, 0.5f, "%.3f", colW);
+      ModSlider("chromatic aberration", &n->lensCA, 0.0f, 0.05f, "%.4f", colW);
       ImGui::BeginDisabled(pt);   // path trace takes its samples from the path trace section
       ModSliderInt("offline supersample", &n->supersample, 1, 64, colW);
       ImGui::EndDisabled();

@@ -174,6 +174,9 @@ namespace engine
       float fogColor[3] = { 0.9f, 0.9f, 0.9f }, fogMin[3] = { -1000, -1000, -1000 }, fogMax[3] = { 1000, 1000, 1000 };
       float dofAperture = 0.0f; // live: Render 3D's depth blur, a circle of dofAperture x 24 px across 1080 rows at |d - focus| / d
       float bokeh[3] = { 0.0f, 0.0f, 1.0f };
+      // Row 6.2, settle only: cat-eye 0..1 (aperture clipped toward the edges), radial distortion k (r^2, + pincushion, - barrel; on the
+      // image, + pushes out), lateral chromatic aberration (red and blue scaled by -/+ this).
+      float lensCatEye = 0.0f, lensDistortion = 0.0f, lensCA = 0.0f;
       float camRight[3] = { 1, 0, 0 }, camUp[3] = { 0, 1, 0 }, camFwd[3] = { 0, 0, -1 };
       // The MSL library for the instances' Field material programs (MaterialRegistry BuildMaterialLibrary), empty when
       // none; the backend rebuilds its pipelines when fieldMslKey changes. fieldTime is the programs' t.

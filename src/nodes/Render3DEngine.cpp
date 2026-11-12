@@ -670,6 +670,9 @@ bool Render3DNode::CookEngine(int frameId)
       fr.bokeh[0] = dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f;
       fr.bokeh[1] = dofRotation * 3.14159265f / 180.0f;
       fr.bokeh[2] = std::clamp(dofRatio, 0.01f, 2.0f);
+      fr.lensCatEye = fr.lensRadius > 0.0f ? std::clamp(dofCatEye, 0.0f, 1.0f) : 0.0f;
+      fr.lensDistortion = ortho ? 0.0f : std::clamp(lensDistortion, -0.5f, 0.5f);
+      fr.lensCA = ortho ? 0.0f : std::clamp(lensCA, 0.0f, 0.05f);
    }
 
    // Lights: rig, then light nodes, then the built-in one.
@@ -806,7 +809,7 @@ bool Render3DNode::CookEngine(int frameId)
       const unsigned char* b = (const unsigned char*)d;
       for (size_t i = 0; i < n; i++) { hsh ^= b[i]; hsh *= 1099511628211ull; }
    };
-   mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
+   mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.lensCatEye, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
    mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
    mix(&fr.fogDensity, 8); mix(fr.fogColor, 36);
    for (const engine::Instance& in : fr.instances)

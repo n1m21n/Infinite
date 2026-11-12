@@ -833,6 +833,9 @@ public:
    float fogMin[3] = { -1000.0f, -1000.0f, -1000.0f }, fogMax[3] = { 1000.0f, 1000.0f, 1000.0f };
    float dofRotation = 0.0f;
    float dofRatio = 1.0f;
+   // Settle's lens (row 6.2): cat-eye bokeh toward the edges (0..1), radial distortion (+ pincushion, - barrel)
+   // and lateral chromatic aberration. All 0 = an ideal lens.
+   float dofCatEye = 0.0f, lensDistortion = 0.0f, lensCA = 0.0f;
    // Keep the output texture as 16-bit float instead of 8-bit, so a 16-bit PNG
    // or EXR carries real precision and, with tonemap off, light above 1.0.
    bool floatOutput = false;
@@ -897,6 +900,7 @@ public:
       v.Float("ao", aoStrength); v.Float("aoRadius", aoRadius);
       v.Float("dofAperture", dofAperture); v.Float("focusDistance", focusDistance);
       v.Int("dofBlades", dofBlades); v.Float("dofRotation", dofRotation); v.Float("dofRatio", dofRatio);
+      v.Float("dofCatEye", dofCatEye); v.Float("lensDistortion", lensDistortion); v.Float("lensCA", lensCA);
       v.Float("fogDensity", fogDensity); v.Color("fogColor", fogColor); v.Float("fogAnisotropy", fogAnisotropy);
       v.Float("fogMinX", fogMin[0]); v.Float("fogMinY", fogMin[1]); v.Float("fogMinZ", fogMin[2]);
       v.Float("fogMaxX", fogMax[0]); v.Float("fogMaxY", fogMax[1]); v.Float("fogMaxZ", fogMax[2]);

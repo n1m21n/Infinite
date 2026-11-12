@@ -623,6 +623,9 @@ if cam.get("fstop"):
     camd.dof.use_dof = True
     camd.dof.focus_distance = cam.get("focus", cam["distance"])
     camd.dof.aperture_fstop = cam["fstop"]
+    if cam.get("blades"):
+        camd.dof.aperture_blades = cam["blades"]
+        camd.dof.aperture_rotation = math.radians(cam.get("blade_rotation", 0.0))
 
 for i, l in enumerate(scene.get("lights", [])):
     kind = {"point": "POINT", "spot": "SPOT", "area": "AREA", "sun": "SUN"}[l["type"]]

@@ -1567,7 +1567,18 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
    const uint2 px = uint2(in.pos.xy);
    uint seed = pcg(px.x + 8192u * px.y) ^ pcg(uint(u.info.z) * 2654435761u + 17u);
    const float H = float(prev.get_height());
-   const float2 ndc = float2(2.0 * (float(px.x) + rnd(seed)) / u.info.w - 1.0, 2.0 * (float(px.y) + rnd(seed)) / H - 1.0);
+   float2 ndc = float2(2.0 * (float(px.x) + rnd(seed)) / u.info.w - 1.0, 2.0 * (float(px.y) + rnd(seed)) / H - 1.0);
+   const float2 ndc0 = ndc;
+   // Row 6.2 lens: radial distortion k r^2 (lf.w, + pincushion, - barrel) and lateral chromatic
+   // aberration (fogC.w): each sample sees one channel through its own scale and counts 3x in that channel.
+   float3 chan = float3(1.0);
+   if (u.lf.w != 0.0) ndc *= 1.0 + u.lf.w * dot(ndc, ndc);
+   if (u.fogC.w != 0.0)
+   {
+      const int c = min(int(rnd(seed) * 3.0), 2);
+      ndc *= 1.0 + u.fogC.w * float(c - 1);
+      chan = float3(c == 0 ? 3.0 : 0.0, c == 1 ? 3.0 : 0.0, c == 2 ? 3.0 : 0.0);
+   }
    float4 pw = u.invVP * float4(ndc, 1.0, 1.0);
    float3 o = f.eye.xyz;
    float3 d = normalize(pw.xyz / pw.w - o);
@@ -1576,20 +1587,27 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       // Depth of field: a point on the aperture (round, or a polygon of lens.z blades turned by lens.w, stretched by
       // the ratio as Render 3D's bokeh); the ray still meets the focus plane, so it stays sharp there.
       const float3 fp = o + d * (u.lens.y / max(dot(d, u.lf.xyz), 1e-4));
-      const float2 lu = float2(rnd(seed), rnd(seed));
       float2 off;
-      if (u.lens.z >= 3.0)
+      // Cat-eye (lu.w): toward the frame's edge the lens barrel clips the aperture by a second disc shifted outward,
+      // so out-of-focus highlights turn to lemons; samples outside it are drawn again (up to 8 tries).
+      const float2 eye = u.lu.w * ndc0 * float2(u.info.w / H, 1.0) * 0.5;
+      for (int tr = 0; tr < 8; tr++)
       {
-         const float seg = 6.2831853 / u.lens.z, a0 = u.lens.w + floor(rnd(seed) * u.lens.z) * seg;
-         off = sqrt(lu.x) * mix(float2(cos(a0), sin(a0)), float2(cos(a0 + seg), sin(a0 + seg)), lu.y);
+         const float2 lu = float2(rnd(seed), rnd(seed));
+         if (u.lens.z >= 3.0)
+         {
+            const float seg = 6.2831853 / u.lens.z, a0 = u.lens.w + floor(rnd(seed) * u.lens.z) * seg;
+            off = sqrt(lu.x) * mix(float2(cos(a0), sin(a0)), float2(cos(a0 + seg), sin(a0 + seg)), lu.y);
+         }
+         else
+            off = sqrt(lu.x) * float2(cos(6.2831853 * lu.y), sin(6.2831853 * lu.y));
+         if (u.lu.w <= 0.0 || length_squared(off - eye) <= 1.0) break;
       }
-      else
-         off = sqrt(lu.x) * float2(cos(6.2831853 * lu.y), sin(6.2831853 * lu.y));
       off *= u.lr.w >= 1.0 ? float2(1.0 / u.lr.w, 1.0) : float2(1.0, u.lr.w);
       o += (off.x * u.lr.xyz + off.y * u.lu.xyz) * u.lens.x;
       d = normalize(fp - o);
    }
-   float3 L = float3(0.0), T = float3(1.0);
+   float3 L = float3(0.0), T = float3(1.0), L0 = float3(0.0);
    float cov = 0.0;
    float3 alb0 = float3(0.0), n0 = float3(0.0); float dist0 = 0.0; // first hit, for the denoiser's guides
    const int maxB = int(u.info.y);
@@ -1816,10 +1834,11 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             wE = lastPdfB * lastPdfB / max(lastPdfB * lastPdfB + pL * pL, 1e-20);
          }
 #if FLD_MAT_ANY
-         L += T * fldEm * wE;
+         const float3 eHit = T * fldEm * wE;
 #else
-         L += T * float3(I.mat.emission) * emMap * wE;
+         const float3 eHit = T * float3(I.mat.emission) * emMap * wE;
 #endif
+         if (b == 0) L0 += eHit; else L += eHit; // an emitter seen straight from the lens is never a firefly
       }
       const float3 V = -d; const float nDotV = max(dot(n, V), 1e-4);
       float3 shN = n; // row 5.1: the sheen lobe leans along the triangle's mesh-uv tangent
@@ -2091,7 +2110,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       }
       o = p + (dot(ns, nd) < 0.0 ? -ns : ns) * f.shQ.w; d = nd;
    }
-   L = min(L, float3(30.0)); // firefly guard
+   L = (min(L, float3(30.0)) + L0) * chan; // firefly guard; chan weights a chromatic-aberration sample's one channel
    const bool add = u.info.x > 0.5;
    const float lum = dot(L, float3(0.2126, 0.7152, 0.0722));
    PtOut out;
@@ -2111,8 +2130,11 @@ fragment float4 ptres_fs(SkyOut in [[stage_in]], constant PtResU& u [[buffer(0)]
    if (u.p.w > 0.5 && gd.read(px).w > 0.0) // denoised lighting times the first-hit albedo (dn_prep_k's split)
       col = dn.read(px).rgb * max(aux.read(px).rgb / max(a.a, 1.0), float3(0.001));
    col *= u.p.z;
-   col = toneMap(col, int(u.p.y));
-   return float4(mix(u.clear.xyz, toSrgb(col), cov), 1.0);
+   // Blend hits with the background in linear light, as a camera does (a 60x highlight on a third of the lens
+   // still reads white), keeping a pixel no sample hit exactly the clear colour and a fully hit one unchanged.
+   const float3 cl = toLinear(u.clear.xyz);
+   const float3 bg = toSrgb(toneMap(cl, int(u.p.y)));
+   return float4(max(toSrgb(toneMap(cov * col + (1.0 - cov) * cl, int(u.p.y))) - (1.0 - cov) * bg, float3(0.0)) + (1.0 - cov) * u.clear.xyz, 1.0);
 }
 
 
@@ -3519,10 +3541,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             struct { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4], fog[4], fogC[4], fogLo[4], fogHi[4]; } pu;
             pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy; pu.fog[2] = pu.fog[3] = 0.0f;
             for (int k = 0; k < 3; k++) { pu.fogC[k] = fr.fogColor[k]; pu.fogLo[k] = fr.fogMin[k]; pu.fogHi[k] = fr.fogMax[k]; }
-            pu.fogC[3] = pu.fogLo[3] = pu.fogHi[3] = 0.0f;
+            pu.fogLo[3] = pu.fogHi[3] = 0.0f;
             pu.lens[0] = fr.lensRadius; pu.lens[1] = fr.focusDist; pu.lens[2] = fr.bokeh[0]; pu.lens[3] = fr.bokeh[1];
             for (int k = 0; k < 3; k++) { pu.lr[k] = fr.camRight[k]; pu.lu[k] = fr.camUp[k]; pu.lf[k] = fr.camFwd[k]; }
-            pu.lr[3] = fr.bokeh[2]; pu.lu[3] = pu.lf[3] = 0.0f;
+            pu.lr[3] = fr.bokeh[2]; pu.lu[3] = fr.lensCatEye; pu.lf[3] = fr.lensDistortion; pu.fogC[3] = fr.lensCA;
             std::memcpy(pu.invVP, inv, 64);
             pu.info[0] = (float)mPtN; pu.info[1] = (float)std::max(1, bounces); pu.info[2] = (float)(mPtFrame++); pu.info[3] = (float)img.Width();
             const bool envLight = mEnvCdf && mEnvBound == mEnvTex; // the HDRI can be sampled as a light
