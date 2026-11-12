@@ -36,7 +36,7 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 | 0.5 freeze + `f0` baseline | done: `f0` stored, R and T, 46 cases | see log |
 | 1.1 to 1.5 material programs | done (details in `AUTORUN_ARCHIVE.md`) | — |
 | 2.1 to 2.8 shading nodes | done (`Shade Attribute` not built: no vertex colour on Mesh) | see log |
-| 3.1 to 3.5 script nodes | 3.1 to 3.5, 4.1 to 4.5, 5.1 to 5.6, 6.1 to 6.3, 7.1 done, 7.2 partly met (30 fps not met), 7.3 approved and built, 8.1, 8.2 done (`f8` live baseline), 5.7 partly met (live base now `g57n`); 7.3 done; 8.3 partly met (R1 1.17x, skipped after 3 tries); 8.4 done (MetalFX, interactive only); 8.5 met by 5.7; 8.6 partly met (live base now `f86`); 9.1 done; 9.2 done (skeleton); 9.3 done (Vulkan raster, 46/59 match Metal); 9.4-9.5 in progress; 9.6 run sheet waiting for owner; 10.1 blocked (no shoe mesh); 10.2, 10.3 sheets for owner review; 10.4 10 defects logged; **next: owner review / approvals** | see log |
+| 3.1 to 3.5 script nodes | 3.1 to 3.5, 4.1 to 4.5, 5.1 to 5.6, 6.1 to 6.3, 7.1 done, 7.2 partly met (30 fps not met), 7.3 approved and built, 8.1, 8.2 done (`f8` live baseline), 5.7 partly met (live base now `g57n`); 7.3 done; 8.3 partly met (R1 1.17x, skipped after 3 tries); 8.4 done (MetalFX, interactive only); 8.5 met by 5.7; 8.6 partly met (live base now `f86`); 9.1 done; 9.2 done (skeleton); 9.3 done (Vulkan raster, 46/59 match Metal); 9.4 WIP (code written, not built; see "Row 9.4 handoff"); 9.5 open; 9.6 run sheet waiting for owner; 10.1 open (shoe now at ~/Infinite/shoe-dl/MaterialsVariantsShoe.glb, CC-BY 4.0, needs notice); 10.2, 10.3 sheets for owner review; 10.4 10 defects logged; **next: build + gate 9.4** | see log |
 | 4.1 to 4.5 layers, relief, wear | open | — |
 | 5.1 to 5.7 fibre, volumes, sky, lights, grazing glint | open | — |
 | 6.1 to 6.3 camera | open | — |
@@ -48,6 +48,28 @@ All 16 rules: `OPUS_PLAN.md` section 2.
 Done before this plan (commits 85b3def7, 6f59e164, 4b7701fa): settle multiscatter, physical thin film on all
 engines, map mips on raster, `tex_breakup` out of the gate, adaptive stop knob (off), HDRI sampling written but
 never built. Dropped after measuring: Toksvig, curvature widening, emission proxy. Still switches: `ptfresnel`, `ggx`.
+
+## Row 9.4 handoff (2026-11-12)
+
+The Vulkan path tracer is written but has never been built. It is in the WIP commit on `feature/engine-e-speed`.
+
+| Piece | File | State |
+|---|---|---|
+| Shaders: BVH trace, pt, dnprep, dnatrous, ptres | `src/engine/rhi/vk/VkPtShaders.h` | written; all four pass glslang |
+| Generator outputs `pt.comp dnprep.comp dnatrous.comp ptres.frag` | `src/engine/rhi/vk/VkShaderGen.cpp`, `CMakeLists.txt` (~1278) | done |
+| Host: `PathTrace`, CPU SAH BVH, emitters, env CDF, ELut, set 1 (19 bindings), dispatches | `src/engine/rhi/VulkanDevice.cpp` (`VulkanRaster`) | written, not compiled |
+
+```
+pt.comp (accumulate) -> dnprep -> dnatrous x DNSTEPS (ping-pong dnC0/dnC1) -> ptres.frag (tonemap to target)
+set 0 = raster set (mSetLayout), set 1 = path-trace set; push range V|F|C 160 bytes, push all three stages
+```
+
+Next steps, in order:
+
+1. Build with `python3 scripts/ibuild.py build --mode release`. Fix compile errors. Field names guessed in the host: `Instance.emission/model/castShadow/mesh`, `MeshData.trace*`, `Frame.envW/envH/envPixels`, `InstU.mat.emTri/mapNormal`. Check them against `src/engine/Scene.h`.
+2. Run s16 settle with `INFINITE_RHI=vulkan` and with Metal on cornell, interior, materials, world_hdri, mat_glass, light_area, bed, deer. Compare with `python3 tools/blender-ab/vkcmp.py <metaltag> <vktag> 0.01`. The gate is all 8 within 0.01 FLIP. After three failed tries, log it and skip.
+3. AUTORUN line. Not ported: Field programs, motion blur, clusters, Bloom. Deviation: a CPU SAH BVH with stack traversal instead of ray query. Then update the state cell and commit with no attribution lines.
+4. Then do 9.5 (lavapipe in a container; run `git submodule update --init external/vst3sdk` first) and 10.1 (shoe sheet plus a CC-BY notice).
 
 ## Commands
 

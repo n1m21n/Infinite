@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -25,6 +26,10 @@
 
 #include "vkshaders/bg_frag.h"
 #include "vkshaders/bg_vert.h"
+#include "vkshaders/dnatrous_comp.h"
+#include "vkshaders/dnprep_comp.h"
+#include "vkshaders/pt_comp.h"
+#include "vkshaders/ptres_frag.h"
 #include "vkshaders/raster_frag.h"
 #include "vkshaders/raster_vert.h"
 #include "vkshaders/shadow_vert.h"
@@ -524,6 +529,7 @@ namespace
          if (mPool) vkDestroyDescriptorPool(C.dev, mPool, nullptr);
          if (mSetLayout) vkDestroyDescriptorSetLayout(C.dev, mSetLayout, nullptr);
          if (mQuery) vkDestroyQueryPool(C.dev, mQuery, nullptr);
+         PtFree();
       }
       bool Ok() const { return mOk; }
 
@@ -532,9 +538,14 @@ namespace
          vkDeviceWaitIdle(mC->dev);
          for (Gpu& g : mMeshes) FreeGpu(g);
          mMeshes.assign(meshes.size(), Gpu{});
+         mCpu.assign(meshes.size(), Cpu{});
+         mMeshGen++;
          for (size_t i = 0; i < meshes.size(); i++)
+         {
+            KeepCpu(meshes[i], mCpu[i]);
             if (!MakeGpu(meshes[i], mMeshes[i]))
                return false;
+         }
          return true;
       }
       bool UpdateMesh(int index, const engine::MeshData& mesh) override
@@ -543,6 +554,8 @@ namespace
             return false;
          vkDeviceWaitIdle(mC->dev);
          FreeGpu(mMeshes[(size_t)index]);
+         KeepCpu(mesh, mCpu[(size_t)index]);
+         mMeshGen++;
          return MakeGpu(mesh, mMeshes[(size_t)index]);
       }
 
@@ -644,6 +657,160 @@ namespace
          return true;
       }
 
+      // Row 9.4: MetalRaster::PathTrace on compute. MoltenVK has no ray query, so rays walk a BVH built here on the
+      // CPU (binned SAH over world-space triangles, rebuilt when meshes, transforms or shadow flags change); pt.comp
+      // adds one sample per dispatch to the running sums, dnprep / dnatrous denoise them, ptres.frag resolves.
+      // Not ported (as the raster): Field material programs, motion blur, instance clusters / batches, bloom.
+      bool PathTrace(SharedImage& target, const engine::Frame& fr, int spp, int bounces, bool reset, double* gpuMs) override
+      {
+         if (!mOk)
+            return false;
+         const Ctx& C = *mC;
+         VulkanImage& img = static_cast<VulkanImage&>(target);
+         const int fi = img.Bpp() == 8 ? 1 : 0;
+         const int W = img.Width(), H = img.Height();
+         if (!PtPipelines(fi, img.Fmt()) || !PtTargets(W, H) || !EnsureDummyShadow())
+            return false;
+         FrameU f = {};
+         FillFrameRecord(f, fr, EnsureEnv(fr), mLightAll);
+         f.shQ[3] = fr.rayBias;
+         f.shP[3] = fr.shadow.strength; // the live picture's shadow strength, so settling keeps the same shadows
+         std::memcpy(mFrameBuf.map, &f, sizeof(f));
+         float inv[16];
+         if (!Inv4(fr.viewProj, inv))
+            return false;
+         if (reset) mPtN = 0;
+         const size_t ni = std::max<size_t>(fr.instances.size(), 1);
+         if (mInstBuf.size < ni * sizeof(InstU))
+         {
+            vkDeviceWaitIdle(C.dev);
+            FreeBuf(C, mInstBuf);
+            if (!MakeBuf(C, ni * sizeof(InstU) * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mInstBuf))
+               return false;
+         }
+         InstU* recs = (InstU*)mInstBuf.map;
+         BuildRunRecords(fr, (int)mMeshes.size(), recs, mRuns);
+         for (size_t i = 0; i < fr.instances.size(); i++)
+         {
+            recs[i].mat.emTri = -1.0f;
+            const int m = fr.instances[i].mesh;
+            if (m >= 0 && m < (int)mCpu.size() && mCpu[(size_t)m].trace) recs[i].mat.mapNormal = 0.0f; // relief is geometry now
+         }
+         PrepareMaps(fr);
+         WriteSet(mSet[0], mShadowDum);
+         if (!PtGeometry(fr))
+            return false;
+         const float pEm = PtEmitters(fr, recs);
+         if (mEnvBound == &mEnv && mCdfRev != mEnvRev)
+            BuildEnvCdf(fr);
+         const bool envLight = mEnvBound == &mEnv && mCdf.img && mCdfRev == mEnvRev; // the HDRI can be sampled as a light
+         if (!mELut.img && !MakeELut())
+            return false;
+         if (!PtBuf(mLightB, mLightAll.data(), mLightAll.size() * sizeof(LightU)))
+            return false;
+
+         struct PtUH { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4], fog[4], fogC[4], fogLo[4], fogHi[4]; } pu = {};
+         pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy;
+         for (int k = 0; k < 3; k++) { pu.fogC[k] = fr.fogColor[k]; pu.fogLo[k] = fr.fogMin[k]; pu.fogHi[k] = fr.fogMax[k]; }
+         pu.lens[0] = fr.lensRadius; pu.lens[1] = fr.focusDist; pu.lens[2] = fr.bokeh[0]; pu.lens[3] = fr.bokeh[1];
+         for (int k = 0; k < 3; k++) { pu.lr[k] = fr.camRight[k]; pu.lu[k] = fr.camUp[k]; pu.lf[k] = fr.camFwd[k]; }
+         pu.lr[3] = fr.bokeh[2]; pu.lu[3] = fr.lensCatEye; pu.lf[3] = fr.lensDistortion; pu.fogC[3] = fr.lensCA;
+         std::memcpy(pu.invVP, inv, 64);
+         pu.info[1] = (float)std::max(1, bounces); pu.info[3] = (float)W;
+         pu.em[0] = (float)mEmCount; pu.em[1] = pEm; pu.em[2] = envLight ? 1.0f : 0.0f;
+         if (!PtBuf(mPtUB, &pu, sizeof(pu)))
+            return false;
+         std::memset(mHistB.map, 0, 64 * sizeof(uint32_t));
+         PtWriteSet(envLight);
+
+         VkCommandBuffer cb = C.Begin();
+         if (mQuery) { vkCmdResetQueryPool(cb, mQuery, 0, 2); vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, mQuery, 0); }
+         const VkShaderStageFlags pcs = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+         const VkDescriptorSet sets[2] = { mSet[0], mPtSet };
+         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, mPtLayout, 0, 2, sets, 0, nullptr);
+         const auto barrier = [&](VkPipelineStageFlags dst) {
+            VkMemoryBarrier mb = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+            mb.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT; mb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, dst, 0, 1, &mb, 0, nullptr, 0, nullptr);
+         };
+         const uint32_t gx = (uint32_t)(W + 7) / 8, gy = (uint32_t)(H + 7) / 8;
+         FramePush pc = {};
+         vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, mPtPso);
+         for (int s = 0; s < std::max(1, spp); s++)
+         {
+            pc.bg[0] = (float)mPtN; pc.bg[1] = (float)(mPtFrame++);
+            vkCmdPushConstants(cb, mPtLayout, pcs, 0, sizeof(pc), &pc);
+            vkCmdDispatch(cb, gx, gy, 1);
+            barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            mPtN++;
+         }
+         int dnIdx = -1;
+         if (mDenoise)
+         {
+            vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, mDnPrepPso);
+            vkCmdDispatch(cb, gx, gy, 1);
+            barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, mDnAtrousPso);
+            int c = 0;
+            for (int i = 0; i < mDnSteps; i++)
+            {
+               pc = {};
+               pc.bg[0] = (float)(1 << i); pc.bg[1] = mDnSigL; pc.bg[2] = (float)c;
+               vkCmdPushConstants(cb, mPtLayout, pcs, 0, sizeof(pc), &pc);
+               vkCmdDispatch(cb, gx, gy, 1);
+               barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+               c = 1 - c;
+            }
+            dnIdx = c;
+         }
+         barrier(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+         Img& tgt = img.Target();
+         ToLayout(cb, tgt, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+         VkRenderingAttachmentInfo ca = { VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
+         ca.imageView = tgt.view; ca.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+         ca.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; ca.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+         VkRenderingInfo ri = { VK_STRUCTURE_TYPE_RENDERING_INFO };
+         ri.renderArea = { { 0, 0 }, { (uint32_t)W, (uint32_t)H } }; ri.layerCount = 1;
+         ri.colorAttachmentCount = 1; ri.pColorAttachments = &ca;
+         vkCmdBeginRendering(cb, &ri);
+         Viewport(cb, W, H);
+         vkCmdSetCullMode(cb, VK_CULL_MODE_NONE);
+         vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mPtResPso[fi]);
+         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mPtLayout, 0, 2, sets, 0, nullptr);
+         pc = {};
+         pc.bg[0] = (float)mPtN; pc.bg[1] = (float)fr.tonemap; pc.bg[2] = fr.exposure; pc.bg[3] = dnIdx >= 0 ? 1.0f : 0.0f;
+         pc.clr[0] = fr.clearSrgb[0]; pc.clr[1] = fr.clearSrgb[1]; pc.clr[2] = fr.clearSrgb[2]; pc.clr[3] = (float)std::max(dnIdx, 0);
+         vkCmdPushConstants(cb, mPtLayout, pcs, 0, sizeof(pc), &pc);
+         vkCmdDraw(cb, 3, 1, 0, 0);
+         vkCmdEndRendering(cb);
+         img.RecordReadback(cb);
+         if (mQuery) vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, mQuery, 1);
+         if (!C.Submit(cb))
+            return false;
+         img.Publish();
+         if (gpuMs)
+         {
+            *gpuMs = 0.0;
+            uint64_t ts[2] = {};
+            if (mQuery && vkGetQueryPoolResults(C.dev, mQuery, 0, 2, sizeof(ts), ts, 8, VK_QUERY_RESULT_64_BIT) == VK_SUCCESS)
+               *gpuMs = (double)(ts[1] - ts[0]) * C.props.limits.timestampPeriod * 1e-6;
+         }
+         mPtNoise = -1.0f;
+         if (dnIdx >= 0)
+         {
+            const uint32_t* h = (const uint32_t*)mHistB.map;
+            uint64_t total = 0, run = 0;
+            for (int i = 0; i < 64; i++) total += h[i];
+            for (int i = 0; i < 64 && total > 0; i++)
+            {
+               run += h[i];
+               if (run * 100 >= total * 95) { mPtNoise = (float)(i + 1) / 400.0f; break; }
+            }
+         }
+         return true;
+      }
+      float PathTraceNoise() const override { return mPtNoise; }
+
    private:
       struct Gpu
       {
@@ -678,7 +845,8 @@ namespace
       {
          const Ctx& C = *mC;
          VkDescriptorSetLayoutBinding b[8] = {};
-         const VkShaderStageFlags vf = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+         // Compute too: the path tracer (row 9.4) binds this set beside its own.
+         const VkShaderStageFlags vf = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
          b[0] = { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, vf, nullptr };
          b[1] = { 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, vf, nullptr };
          b[2] = { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, vf, nullptr };
@@ -702,7 +870,7 @@ namespace
          ai.descriptorPool = mPool; ai.descriptorSetCount = 2; ai.pSetLayouts = two;
          if (vkAllocateDescriptorSets(C.dev, &ai, mSet) != VK_SUCCESS)
             return false;
-         VkPushConstantRange pr = { vf, 0, sizeof(FramePush) };
+         VkPushConstantRange pr = { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(FramePush) };
          VkPipelineLayoutCreateInfo pl = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
          pl.setLayoutCount = 1; pl.pSetLayouts = &mSetLayout; pl.pushConstantRangeCount = 1; pl.pPushConstantRanges = &pr;
          if (vkCreatePipelineLayout(C.dev, &pl, nullptr, &mLayout) != VK_SUCCESS)
@@ -938,6 +1106,485 @@ namespace
          vkUpdateDescriptorSets(C.dev, 8, w, 0, nullptr);
       }
 
+      // ---- path tracer (row 9.4)
+      // The rays' copy of a mesh: the trace mesh when the source gave one (row 4.3), else the drawn one.
+      struct Cpu
+      {
+         std::vector<float> pn, uv;
+         std::vector<uint32_t> ix;
+         bool trace = false;
+      };
+      static void KeepCpu(const engine::MeshData& m, Cpu& c)
+      {
+         c.trace = !m.tracePosNormal.empty() && !m.traceIndices.empty();
+         c.pn = c.trace ? m.tracePosNormal : m.posNormal;
+         c.ix = c.trace ? m.traceIndices : m.indices;
+         const std::vector<float>& uv = c.trace ? m.traceUv : m.uv;
+         c.uv = uv.size() == c.pn.size() / 6 * 2 ? uv : std::vector<float>();
+      }
+      // Grows a host-visible storage buffer as needed and copies bytes in (the GPU is idle between frames).
+      bool PtBuf(Buf& b, const void* data, size_t bytes)
+      {
+         if (b.size < std::max<size_t>(bytes, 16))
+         {
+            vkDeviceWaitIdle(mC->dev);
+            FreeBuf(*mC, b);
+            if (!MakeBuf(*mC, std::max<size_t>(bytes, 16) * 3 / 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, b))
+               return false;
+         }
+         if (data && bytes) std::memcpy(b.map, data, bytes);
+         return true;
+      }
+      static void Xf(const float* m, const float* a, float* o)
+      {
+         for (int k = 0; k < 3; k++) o[k] = m[k] * a[0] + m[4 + k] * a[1] + m[8 + k] * a[2] + m[12 + k];
+      }
+      static float AsF(uint32_t u) { float f; std::memcpy(&f, &u, 4); return f; }
+      // Mesh streams (object space, all meshes end to end) and the BVH over every instance's world-space triangles,
+      // rebuilt only when what they depend on changes.
+      bool PtGeometry(const engine::Frame& fr)
+      {
+         uint64_t key = 1469598103934665603ull;
+         const auto mix = [&](const void* p, size_t n) {
+            const uint8_t* b = (const uint8_t*)p;
+            for (size_t i = 0; i < n; i++) { key ^= b[i]; key *= 1099511628211ull; }
+         };
+         mix(&mMeshGen, sizeof(mMeshGen));
+         for (const engine::Instance& in : fr.instances)
+         {
+            mix(&in.mesh, sizeof(in.mesh)); mix(in.model, 64);
+            const uint8_t cs = in.castShadow ? 1 : 0; mix(&cs, 1);
+         }
+         if (key == mBvhKey && mNodeB.buf)
+            return true;
+         // Mesh streams: vertex v of mesh m is global vertex vOff[m] + v; indices are stored already offset.
+         std::vector<size_t> vOff(mCpu.size()), iOff(mCpu.size());
+         std::vector<float> vb, ub;
+         std::vector<uint32_t> ib;
+         for (size_t m = 0; m < mCpu.size(); m++)
+         {
+            const Cpu& c = mCpu[m];
+            const size_t nv = c.pn.size() / 6;
+            vOff[m] = vb.size() / 6; iOff[m] = ib.size();
+            vb.insert(vb.end(), c.pn.begin(), c.pn.begin() + (ptrdiff_t)(nv * 6));
+            if (c.uv.empty()) ub.insert(ub.end(), nv * 2, 0.0f);
+            else ub.insert(ub.end(), c.uv.begin(), c.uv.end());
+            for (size_t t = 0; t + 2 < c.ix.size(); t += 3)
+               for (int k = 0; k < 3; k++)
+                  ib.push_back(c.ix[t + k] < nv ? (uint32_t)(vOff[m] + c.ix[t + k]) : (uint32_t)vOff[m]);
+         }
+         std::vector<uint32_t> base(fr.instances.size() * 4 + 4, 0u);
+         // World-space triangles with their instance, primitive and shadow flag.
+         struct Ref { float lo[3], hi[3], c[3]; };
+         std::vector<float> tv; // 9 floats per triangle: v0, e1, e2
+         std::vector<uint32_t> tinfo; // inst, prim, flags
+         std::vector<Ref> refs;
+         for (size_t i = 0; i < fr.instances.size(); i++)
+         {
+            const engine::Instance& in = fr.instances[i];
+            if (in.mesh < 0 || in.mesh >= (int)mCpu.size())
+               continue;
+            const Cpu& c = mCpu[(size_t)in.mesh];
+            base[i * 4] = (uint32_t)iOff[(size_t)in.mesh]; base[i * 4 + 1] = c.uv.empty() ? 0u : 1u;
+            const size_t nv = c.pn.size() / 6;
+            for (size_t t = 0; t + 2 < c.ix.size(); t += 3)
+            {
+               float p[3][3];
+               for (int k = 0; k < 3; k++) Xf(in.model, &c.pn[std::min<size_t>(c.ix[t + k], nv ? nv - 1 : 0) * 6], p[k]);
+               Ref r;
+               for (int a = 0; a < 3; a++)
+               {
+                  r.lo[a] = std::min({ p[0][a], p[1][a], p[2][a] }); r.hi[a] = std::max({ p[0][a], p[1][a], p[2][a] });
+                  r.c[a] = (r.lo[a] + r.hi[a]) * 0.5f;
+               }
+               refs.push_back(r);
+               for (int a = 0; a < 3; a++) tv.push_back(p[0][a]);
+               for (int a = 0; a < 3; a++) tv.push_back(p[1][a] - p[0][a]);
+               for (int a = 0; a < 3; a++) tv.push_back(p[2][a] - p[0][a]);
+               tinfo.push_back((uint32_t)i); tinfo.push_back((uint32_t)(t / 3)); tinfo.push_back(in.castShadow ? 1u : 0u);
+            }
+         }
+         // Binned SAH (16 bins per axis), leaves of up to 4 triangles; children of a node are adjacent.
+         struct Node { float lo[3], hi[3]; uint32_t a = 0, n = 0; };
+         std::vector<Node> nodes(1);
+         std::vector<uint32_t> order(refs.size());
+         for (size_t k = 0; k < order.size(); k++) order[k] = (uint32_t)k;
+         const auto area = [](const float* lo, const float* hi) {
+            const float e[3] = { std::max(hi[0] - lo[0], 0.0f), std::max(hi[1] - lo[1], 0.0f), std::max(hi[2] - lo[2], 0.0f) };
+            return e[0] * e[1] + e[1] * e[2] + e[2] * e[0];
+         };
+         struct Job { uint32_t node, b, e; };
+         std::vector<Job> jobs = { { 0u, 0u, (uint32_t)order.size() } };
+         while (!jobs.empty())
+         {
+            const Job j = jobs.back(); jobs.pop_back();
+            Node nd;
+            float clo[3] = { 1e30f, 1e30f, 1e30f }, chi[3] = { -1e30f, -1e30f, -1e30f };
+            for (int a = 0; a < 3; a++) { nd.lo[a] = 1e30f; nd.hi[a] = -1e30f; }
+            for (uint32_t k = j.b; k < j.e; k++)
+            {
+               const Ref& r = refs[order[k]];
+               for (int a = 0; a < 3; a++)
+               {
+                  nd.lo[a] = std::min(nd.lo[a], r.lo[a]); nd.hi[a] = std::max(nd.hi[a], r.hi[a]);
+                  clo[a] = std::min(clo[a], r.c[a]); chi[a] = std::max(chi[a], r.c[a]);
+               }
+            }
+            const uint32_t n = j.e - j.b;
+            int bestA = -1, bestS = 0;
+            float bestC = 1e38f;
+            if (n > 4)
+               for (int a = 0; a < 3; a++)
+               {
+                  const float ext = chi[a] - clo[a];
+                  if (!(ext > 1e-12f))
+                     continue;
+                  struct Bin { float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f }; uint32_t n = 0; } bins[16];
+                  for (uint32_t k = j.b; k < j.e; k++)
+                  {
+                     const Ref& r = refs[order[k]];
+                     Bin& bn = bins[std::min(15, (int)((r.c[a] - clo[a]) / ext * 16.0f))];
+                     bn.n++;
+                     for (int q = 0; q < 3; q++) { bn.lo[q] = std::min(bn.lo[q], r.lo[q]); bn.hi[q] = std::max(bn.hi[q], r.hi[q]); }
+                  }
+                  float rA[16]; uint32_t rN[16];
+                  Bin acc;
+                  for (int s = 15; s > 0; s--)
+                  {
+                     acc.n += bins[s].n;
+                     for (int q = 0; q < 3; q++) { acc.lo[q] = std::min(acc.lo[q], bins[s].lo[q]); acc.hi[q] = std::max(acc.hi[q], bins[s].hi[q]); }
+                     rA[s] = area(acc.lo, acc.hi); rN[s] = acc.n;
+                  }
+                  Bin l;
+                  for (int s = 1; s < 16; s++)
+                  {
+                     l.n += bins[s - 1].n;
+                     for (int q = 0; q < 3; q++) { l.lo[q] = std::min(l.lo[q], bins[s - 1].lo[q]); l.hi[q] = std::max(l.hi[q], bins[s - 1].hi[q]); }
+                     if (l.n == 0 || rN[s] == 0)
+                        continue;
+                     const float cst = area(l.lo, l.hi) * (float)l.n + rA[s] * (float)rN[s];
+                     if (cst < bestC) { bestC = cst; bestA = a; bestS = s; }
+                  }
+               }
+            uint32_t mid = j.b;
+            if (bestA >= 0)
+            {
+               const float ext = chi[bestA] - clo[bestA];
+               mid = (uint32_t)(std::partition(order.begin() + j.b, order.begin() + j.e, [&](uint32_t k) {
+                                   return std::min(15, (int)((refs[k].c[bestA] - clo[bestA]) / ext * 16.0f)) < bestS;
+                                }) - order.begin());
+            }
+            else if (n > 4)
+               mid = j.b + n / 2; // every centroid in one place: split the list in half
+            if (n <= 4 || mid == j.b || mid == j.e)
+            {
+               nd.a = j.b; nd.n = std::max(n, 1u) == n ? n : 0u;
+               if (n == 0) { for (int a = 0; a < 3; a++) { nd.lo[a] = 1e30f; nd.hi[a] = -1e30f; } }
+               nodes[j.node] = nd;
+               continue;
+            }
+            nd.a = (uint32_t)nodes.size(); nd.n = 0;
+            nodes[j.node] = nd;
+            nodes.resize(nodes.size() + 2);
+            jobs.push_back({ nd.a, j.b, mid });
+            jobs.push_back({ nd.a + 1, mid, j.e });
+         }
+         std::vector<float> nb(nodes.size() * 8);
+         for (size_t k = 0; k < nodes.size(); k++)
+         {
+            const Node& nd = nodes[k];
+            float* o = &nb[k * 8];
+            for (int a = 0; a < 3; a++) { o[a] = nd.lo[a]; o[4 + a] = nd.hi[a]; }
+            o[3] = AsF(nd.a); o[7] = AsF(nd.n);
+         }
+         std::vector<float> tb(std::max<size_t>(order.size(), 1) * 12, 0.0f);
+         for (size_t k = 0; k < order.size(); k++)
+         {
+            const uint32_t t = order[k];
+            float* o = &tb[k * 12];
+            for (int a = 0; a < 3; a++) { o[a] = tv[t * 9 + a]; o[4 + a] = tv[t * 9 + 3 + a]; o[8 + a] = tv[t * 9 + 6 + a]; }
+            o[3] = AsF(tinfo[t * 3]); o[7] = AsF(tinfo[t * 3 + 1]); o[11] = AsF(tinfo[t * 3 + 2]);
+         }
+         if (!PtBuf(mVtxB, vb.data(), vb.size() * 4) || !PtBuf(mIdxB, ib.data(), ib.size() * 4) || !PtBuf(mUvB, ub.data(), ub.size() * 4) ||
+             !PtBuf(mBaseB, base.data(), base.size() * 4) || !PtBuf(mTriB, tb.data(), tb.size() * 4) || !PtBuf(mNodeB, nb.data(), nb.size() * 4))
+            return false;
+         mBvhKey = key;
+         return true;
+      }
+      // Emissive triangles in world space for next-event estimation, chosen by power (luminance * area), as
+      // MetalRaster::PathTrace. Returns the chance a light sample picks one.
+      float PtEmitters(const engine::Frame& fr, InstU* recs)
+      {
+         struct EmTriH { float p0[4], e1[4], e2[4], em[4]; };
+         std::vector<EmTriH> ems;
+         double emTotal = 0.0;
+         for (size_t i = 0; i < fr.instances.size(); i++)
+         {
+            const engine::Instance& in = fr.instances[i];
+            const float lum = 0.2126f * in.emission[0] + 0.7152f * in.emission[1] + 0.0722f * in.emission[2];
+            if (lum <= 0.0f || in.mesh < 0 || in.mesh >= (int)mCpu.size())
+               continue;
+            const Cpu& c = mCpu[(size_t)in.mesh];
+            const size_t tris = c.ix.size() / 3, nv = c.pn.size() / 6;
+            if (tris == 0 || nv == 0 || ems.size() + tris > 65536)
+               continue;
+            recs[i].mat.emTri = (float)ems.size();
+            for (size_t t = 0; t < tris; t++)
+            {
+               EmTriH e = {};
+               float a[3], b[3], d[3];
+               Xf(in.model, &c.pn[std::min<size_t>(c.ix[t * 3], nv - 1) * 6], a);
+               Xf(in.model, &c.pn[std::min<size_t>(c.ix[t * 3 + 1], nv - 1) * 6], b);
+               Xf(in.model, &c.pn[std::min<size_t>(c.ix[t * 3 + 2], nv - 1) * 6], d);
+               for (int k = 0; k < 3; k++) { e.p0[k] = a[k]; e.e1[k] = b[k] - a[k]; e.e2[k] = d[k] - a[k]; e.em[k] = in.emission[k]; }
+               const float cx = e.e1[1] * e.e2[2] - e.e1[2] * e.e2[1], cy = e.e1[2] * e.e2[0] - e.e1[0] * e.e2[2], cz = e.e1[0] * e.e2[1] - e.e1[1] * e.e2[0];
+               const float ar = 0.5f * std::sqrt(cx * cx + cy * cy + cz * cz);
+               e.e2[3] = ar;
+               emTotal += (double)ar * lum;
+               e.p0[3] = (float)emTotal;
+               ems.push_back(e);
+            }
+         }
+         if (emTotal > 0.0)
+            for (size_t k = 0; k < ems.size(); k++)
+            {
+               const double prevC = k == 0 ? 0.0 : ems[k - 1].p0[3] * emTotal;
+               const double pw = (double)ems[k].p0[3] - prevC;
+               ems[k].p0[3] = (float)(ems[k].p0[3] / emTotal);
+               ems[k].e1[3] = ems[k].e2[3] > 0.0f ? (float)(pw / emTotal / ems[k].e2[3]) : 0.0f;
+            }
+         else
+         {
+            ems.clear();
+            for (size_t i = 0; i < fr.instances.size(); i++) recs[i].mat.emTri = -1.0f;
+         }
+         if (!ems.empty()) ems.back().p0[3] = 1.0f;
+         mEmCount = (int)ems.size();
+         PtBuf(mEmB, ems.data(), ems.size() * sizeof(EmTriH));
+         int analytic = 0;
+         for (const engine::Light& l : fr.lights) analytic += l.type != engine::LightType::Ambient ? 1 : 0;
+         return ems.empty() ? 0.0f : (analytic > 0 ? 0.5f : 1.0f);
+      }
+      // E(mu, r) of the tracer's specular lobe (MetalRaster::ELut, the same quadrature), R32F 16x16.
+      bool MakeELut()
+      {
+         const int kN = 16;
+         std::vector<float> e((size_t)kN * kN);
+         for (int y = 0; y < kN; y++)
+            for (int x = 0; x < kN; x++)
+            {
+               const float mu = (x + 0.5f) / kN, r = (y + 0.5f) / kN;
+               const float a = std::max(0.002f, r * r), a2 = a * a;
+               const int n1 = 64, n2 = 128;
+               double sum = 0.0;
+               for (int i = 0; i < n1; i++)
+                  for (int j = 0; j < n2; j++)
+                  {
+                     const float u1 = (i + 0.5f) / n1, ph = 6.2831853f * (j + 0.5f) / n2;
+                     const float ct = std::sqrt((1.0f - u1) / (1.0f + (a2 - 1.0f) * u1)), st = std::sqrt(std::max(0.0f, 1.0f - ct * ct));
+                     const float vh = std::sqrt(std::max(0.0f, 1.0f - mu * mu)) * st * std::cos(ph) + mu * ct;
+                     const float nl = 2.0f * vh * ct - mu;
+                     if (vh <= 0.0f || nl <= 0.0f)
+                        continue;
+                     const float gV = nl * std::sqrt(a2 + (1.0f - a2) * mu * mu), gL = mu * std::sqrt(a2 + (1.0f - a2) * nl * nl);
+                     sum += (0.5f / (gV + gL)) * nl * 4.0f * vh / std::max(ct, 1e-6f);
+                  }
+               // Metal stores R16Unorm; the same rounding keeps the two tracers' tables equal.
+               e[(size_t)y * kN + x] = (float)std::lround(std::min(1.0, std::max(0.0, sum / (n1 * n2))) * 65535.0) / 65535.0f;
+            }
+         return MakeImg(*mC, kN, kN, VK_FORMAT_R32_SFLOAT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, mELut) &&
+                UploadMipped(*mC, mELut, e.data(), e.size() * 4);
+      }
+      // The HDRI's sampling table (MetalRaster::BuildEnvCdf): 256 x 128 cells of luminance * sin(theta).
+      void BuildEnvCdf(const engine::Frame& fr)
+      {
+         mCdfRev = mEnvRev;
+         const int NX = 256, NY = 128;
+         std::vector<double> w((size_t)NX * NY, 0.0);
+         double total = 0.0;
+         for (int cy = 0; cy < NY; cy++)
+         {
+            const int y0 = cy * fr.envH / NY, y1 = std::max(y0 + 1, (cy + 1) * fr.envH / NY);
+            const double st = std::sin(((double)cy + 0.5) / NY * 3.14159265358979);
+            for (int cx = 0; cx < NX; cx++)
+            {
+               const int x0 = cx * fr.envW / NX, x1 = std::max(x0 + 1, (cx + 1) * fr.envW / NX);
+               double sum = 0.0;
+               for (int y = y0; y < y1 && y < fr.envH; y++)
+                  for (int x = x0; x < x1 && x < fr.envW; x++)
+                  {
+                     const float* px = fr.envPixels + ((size_t)y * fr.envW + x) * 3;
+                     const float l = 0.2126f * px[0] + 0.7152f * px[1] + 0.0722f * px[2];
+                     sum += std::isfinite(l) ? std::min(std::max(l, 0.0f), 65504.0f) : 0.0f;
+                  }
+               w[(size_t)cy * NX + cx] = sum / ((double)(y1 - y0) * (x1 - x0)) * st;
+               total += w[(size_t)cy * NX + cx];
+            }
+         }
+         vkDeviceWaitIdle(mC->dev);
+         FreeImg(*mC, mCdf);
+         if (!(total > 0.0))
+            return;
+         const double floorW = total / ((double)NX * NY) * 1e-3;
+         total += floorW * NX * NY;
+         std::vector<float> t((size_t)NX * (2 * NY + 1), 0.0f);
+         double rows = 0.0;
+         for (int cy = 0; cy < NY; cy++)
+         {
+            double row = 0.0;
+            for (int cx = 0; cx < NX; cx++) row += w[(size_t)cy * NX + cx] + floorW;
+            double run = 0.0;
+            for (int cx = 0; cx < NX; cx++)
+            {
+               const double c = w[(size_t)cy * NX + cx] + floorW;
+               run += c;
+               t[(size_t)cy * NX + cx] = cx == NX - 1 ? 1.0f : (float)(run / row);
+               t[(size_t)(NY + 1 + cy) * NX + cx] = (float)(c / total * NX * NY);
+            }
+            rows += row;
+            t[(size_t)NY * NX + cy] = cy == NY - 1 ? 1.0f : (float)(rows / total);
+         }
+         if (!MakeImg(*mC, NX, 2 * NY + 1, VK_FORMAT_R32_SFLOAT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, mCdf) ||
+             !UploadMipped(*mC, mCdf, t.data(), t.size() * 4))
+            FreeImg(*mC, mCdf);
+      }
+      // The running sums and the denoiser's images, RGBA32F storage, kept in GENERAL. A new size starts over.
+      bool PtTargets(int w, int h)
+      {
+         if (mPtImg[0].img && mPtImg[0].w == w && mPtImg[0].h == h)
+            return true;
+         vkDeviceWaitIdle(mC->dev);
+         for (Img& m : mPtImg) FreeImg(*mC, m);
+         for (Img& m : mPtImg)
+            if (!MakeImg(*mC, w, h, VK_FORMAT_R32G32B32A32_SFLOAT, 1, VK_IMAGE_USAGE_STORAGE_BIT, m))
+               return false;
+         VkCommandBuffer cb = mC->Begin();
+         for (Img& m : mPtImg) ToLayout(cb, m, VK_IMAGE_LAYOUT_GENERAL);
+         mPtN = 0;
+         return mC->Submit(cb);
+      }
+      VkPipeline Compute(VkShaderModule m)
+      {
+         VkComputePipelineCreateInfo ci = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+         ci.stage = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_COMPUTE_BIT, m, "main", nullptr };
+         ci.layout = mPtLayout;
+         VkPipeline p = VK_NULL_HANDLE;
+         vkCreateComputePipelines(mC->dev, VK_NULL_HANDLE, 1, &ci, nullptr, &p);
+         return p;
+      }
+      bool PtPipelines(int fi, VkFormat fmt)
+      {
+         if (mPtPso && mDnPrepPso && mDnAtrousPso && mPtResPso[fi])
+            return true;
+         const Ctx& C = *mC;
+         if (!mPtSetLayout)
+         {
+            const VkShaderStageFlags cf = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            VkDescriptorSetLayoutBinding b[19] = {};
+            for (uint32_t i = 0; i < 19; i++)
+            {
+               b[i].binding = i; b[i].descriptorCount = 1; b[i].stageFlags = cf;
+               b[i].descriptorType = i <= 8 || i == 18 ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+                                     : i <= 10       ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+                                                     : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            }
+            VkDescriptorSetLayoutCreateInfo li = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+            li.bindingCount = 19; li.pBindings = b;
+            if (vkCreateDescriptorSetLayout(C.dev, &li, nullptr, &mPtSetLayout) != VK_SUCCESS)
+               return false;
+            const VkDescriptorPoolSize ps[3] = { { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 }, { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2 },
+                                                 { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 7 } };
+            VkDescriptorPoolCreateInfo pi = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+            pi.maxSets = 1; pi.poolSizeCount = 3; pi.pPoolSizes = ps;
+            if (vkCreateDescriptorPool(C.dev, &pi, nullptr, &mPtPool) != VK_SUCCESS)
+               return false;
+            VkDescriptorSetAllocateInfo ai = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+            ai.descriptorPool = mPtPool; ai.descriptorSetCount = 1; ai.pSetLayouts = &mPtSetLayout;
+            if (vkAllocateDescriptorSets(C.dev, &ai, &mPtSet) != VK_SUCCESS)
+               return false;
+            const VkDescriptorSetLayout two[2] = { mSetLayout, mPtSetLayout };
+            VkPushConstantRange pr = { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(FramePush) };
+            VkPipelineLayoutCreateInfo pl = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+            pl.setLayoutCount = 2; pl.pSetLayouts = two; pl.pushConstantRangeCount = 1; pl.pPushConstantRanges = &pr;
+            if (vkCreatePipelineLayout(C.dev, &pl, nullptr, &mPtLayout) != VK_SUCCESS)
+               return false;
+            if (!MakeBuf(C, 64 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mHistB))
+               return false;
+            const float zero = 0.0f;
+            if (!MakeImg(C, 1, 1, VK_FORMAT_R32_SFLOAT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, mCdfDummy) ||
+                !UploadMipped(C, mCdfDummy, &zero, 4))
+               return false;
+         }
+         if (!mPtPso) { VkShaderModule m = Module(C, kVkPtComp, sizeof(kVkPtComp)); mPtPso = Compute(m); vkDestroyShaderModule(C.dev, m, nullptr); }
+         if (!mDnPrepPso) { VkShaderModule m = Module(C, kVkDnprepComp, sizeof(kVkDnprepComp)); mDnPrepPso = Compute(m); vkDestroyShaderModule(C.dev, m, nullptr); }
+         if (!mDnAtrousPso) { VkShaderModule m = Module(C, kVkDnatrousComp, sizeof(kVkDnatrousComp)); mDnAtrousPso = Compute(m); vkDestroyShaderModule(C.dev, m, nullptr); }
+         if (!mPtResPso[fi])
+         {
+            VkShaderModule bv = Module(C, kVkBgVert, sizeof(kVkBgVert)), rf = Module(C, kVkPtresFrag, sizeof(kVkPtresFrag));
+            PsoDesc d;
+            d.vs = bv; d.fs = rf; d.layout = mPtLayout; d.color = fmt; d.depthTest = false; d.depthWrite = false;
+            mPtResPso[fi] = MakePso(C, d);
+            vkDestroyShaderModule(C.dev, bv, nullptr); vkDestroyShaderModule(C.dev, rf, nullptr);
+         }
+         if (!mPtPso || !mDnPrepPso || !mDnAtrousPso || !mPtResPso[fi])
+         {
+            VulkanFail(std::string("vulkan path tracer pipeline: not built") + (mPtPso ? "" : " (pt)") + (mDnPrepPso ? "" : " (dnprep)") +
+                       (mDnAtrousPso ? "" : " (dnatrous)") + (mPtResPso[fi] ? "" : " (ptres)"));
+            return false;
+         }
+         return true;
+      }
+      void PtWriteSet(bool envLight)
+      {
+         const Buf* bufs[9] = { &mPtUB, &mLightB, &mEmB, &mBaseB, &mTriB, &mNodeB, &mVtxB, &mIdxB, &mUvB };
+         VkDescriptorBufferInfo bi[10];
+         for (int i = 0; i < 9; i++) bi[i] = { bufs[i]->buf, 0, VK_WHOLE_SIZE };
+         bi[9] = { mHistB.buf, 0, VK_WHOLE_SIZE };
+         VkDescriptorImageInfo si[2] = { { VK_NULL_HANDLE, (envLight ? mCdf : mCdfDummy).view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                                         { VK_NULL_HANDLE, mELut.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL } };
+         VkDescriptorImageInfo ii[7];
+         for (int i = 0; i < 7; i++) ii[i] = { VK_NULL_HANDLE, mPtImg[i].view, VK_IMAGE_LAYOUT_GENERAL };
+         VkWriteDescriptorSet w[19] = {};
+         for (uint32_t i = 0; i < 19; i++)
+         {
+            w[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET; w[i].dstSet = mPtSet; w[i].dstBinding = i; w[i].descriptorCount = 1;
+            if (i <= 8) { w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; w[i].pBufferInfo = &bi[i]; }
+            else if (i == 18) { w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; w[i].pBufferInfo = &bi[9]; }
+            else if (i <= 10) { w[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; w[i].pImageInfo = &si[i - 9]; }
+            else { w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; w[i].pImageInfo = &ii[i - 11]; }
+         }
+         vkUpdateDescriptorSets(mC->dev, 19, w, 0, nullptr);
+      }
+      void PtFree()
+      {
+         const Ctx& C = *mC;
+         for (Buf* b : { &mPtUB, &mLightB, &mEmB, &mBaseB, &mTriB, &mNodeB, &mVtxB, &mIdxB, &mUvB, &mHistB }) FreeBuf(C, *b);
+         for (Img& m : mPtImg) FreeImg(C, m);
+         FreeImg(C, mCdf); FreeImg(C, mCdfDummy); FreeImg(C, mELut);
+         for (VkPipeline p : { mPtPso, mDnPrepPso, mDnAtrousPso, mPtResPso[0], mPtResPso[1] })
+            if (p) vkDestroyPipeline(C.dev, p, nullptr);
+         if (mPtLayout) vkDestroyPipelineLayout(C.dev, mPtLayout, nullptr);
+         if (mPtPool) vkDestroyDescriptorPool(C.dev, mPtPool, nullptr);
+         if (mPtSetLayout) vkDestroyDescriptorSetLayout(C.dev, mPtSetLayout, nullptr);
+      }
+      std::vector<Cpu> mCpu;
+      uint64_t mMeshGen = 0, mBvhKey = 0;
+      VkDescriptorSetLayout mPtSetLayout = VK_NULL_HANDLE;
+      VkDescriptorPool mPtPool = VK_NULL_HANDLE;
+      VkDescriptorSet mPtSet = VK_NULL_HANDLE;
+      VkPipelineLayout mPtLayout = VK_NULL_HANDLE;
+      VkPipeline mPtPso = VK_NULL_HANDLE, mDnPrepPso = VK_NULL_HANDLE, mDnAtrousPso = VK_NULL_HANDLE, mPtResPso[2] = {};
+      Buf mPtUB, mLightB, mEmB, mBaseB, mTriB, mNodeB, mVtxB, mIdxB, mUvB, mHistB;
+      Img mPtImg[7]; // acc, aux, gd, dnC0, dnC1, dnG, dnA (set 1, bindings 11..17)
+      Img mCdf, mCdfDummy, mELut;
+      unsigned long long mCdfRev = ~0ull - 1;
+      int mEmCount = 0, mPtN = 0, mPtFrame = 0;
+      float mPtNoise = -1.0f;
+      // On by default; INFINITE_ENGINE_DENOISE=0 turns it off, _DNSTEPS (5) and _DNSIGL (4) are A/B knobs (as Metal).
+      const bool mDenoise = [] { const char* e = getenv("INFINITE_ENGINE_DENOISE"); return !e || atoi(e) > 0; }();
+      const int mDnSteps = [] { const char* e = getenv("INFINITE_ENGINE_DNSTEPS"); return e ? atoi(e) : 5; }();
+      const float mDnSigL = [] { const char* e = getenv("INFINITE_ENGINE_DNSIGL"); return e ? (float)atof(e) : 4.0f; }();
+
       std::shared_ptr<Ctx> mC;
       bool mOk = false;
       std::vector<Gpu> mMeshes;
@@ -1064,6 +1711,7 @@ namespace
       w2.pNext = &w12;
       w2.features.samplerAnisotropy = f2.features.samplerAnisotropy;
       w2.features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+      w2.features.fragmentStoresAndAtomics = f2.features.fragmentStoresAndAtomics; // ptres.frag declares the PT images
       const float prio = 1.0f;
       VkDeviceQueueCreateInfo qi = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
       qi.queueFamilyIndex = c->qfam; qi.queueCount = 1; qi.pQueuePriorities = &prio;

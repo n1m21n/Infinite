@@ -1275,7 +1275,7 @@ if(INFINITE_VULKAN)
     target_compile_features(VkShaderGen PRIVATE cxx_std_17)
     set(_vkgen "${CMAKE_CURRENT_BINARY_DIR}/vkshaders")
     set(_vkheaders)
-    foreach(_s raster.vert raster.frag shadow.vert bg.vert bg.frag tri.vert tri.frag)
+    foreach(_s raster.vert raster.frag shadow.vert bg.vert bg.frag tri.vert tri.frag pt.comp dnprep.comp dnatrous.comp ptres.frag)
         string(REPLACE "." "_" _id "${_s}")
         # kVk + CamelCase name, e.g. raster_frag -> kVkRasterFrag
         string(REPLACE "_" ";" _parts "${_id}")

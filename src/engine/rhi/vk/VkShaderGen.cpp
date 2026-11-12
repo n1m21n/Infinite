@@ -13,6 +13,7 @@
 #include "nodes/Render3DSheen.h"
 #include "nodes/Render3DThinFilm.h"
 #include "nodes/Render3DTonemap.h"
+#include "engine/rhi/vk/VkPtShaders.h"
 
 #define R3D_MAT_GLSL_F3(n) "vec3 " #n "; "
 #define R3D_MAT_GLSL_F1(n) "float " #n "; "
@@ -487,5 +488,9 @@ int main(int argc, char** argv)
    const bool ok = Put(d, "raster.vert", kHead + kRasterVert) && Put(d, "shadow.vert", kHead + kShadowVert) &&
                    Put(d, "bg.vert", kHead + kSkyVert) && Put(d, "raster.frag", frag + kRasterFrag) &&
                    Put(d, "bg.frag", frag + kBgFrag) && Put(d, "tri.vert", kTriVert) && Put(d, "tri.frag", kTriFrag);
-   return ok ? 0 : 1;
+   // Row 9.4: the path tracer (compute, with the fragment library for the maps and the environment).
+   const std::string comp = kHead + kFragLib + vkpt::kBind;
+   const bool okPt = Put(d, "pt.comp", comp + vkpt::kTrace + vkpt::kPtMain) && Put(d, "dnprep.comp", comp + vkpt::kDnPrep) &&
+                     Put(d, "dnatrous.comp", comp + vkpt::kDnAtrous) && Put(d, "ptres.frag", frag + vkpt::kBind + vkpt::kPtRes);
+   return ok && okPt ? 0 : 1;
 }
