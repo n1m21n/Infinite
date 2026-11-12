@@ -993,6 +993,22 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawShadeBrickParams(n);
             else if (auto* n = dynamic_cast<ShadeImageNode*>(gn.node.get()))
                DrawShadeImageParams(n);
+            else if (auto* n = dynamic_cast<ShadeMathNode*>(gn.node.get()))
+               DrawShadeMathParams(n);
+            else if (auto* n = dynamic_cast<ShadeVectorMathNode*>(gn.node.get()))
+               DrawShadeVectorMathParams(n);
+            else if (auto* n = dynamic_cast<ShadeMixNode*>(gn.node.get()))
+               DrawShadeMixParams(n);
+            else if (auto* n = dynamic_cast<ShadeRampNode*>(gn.node.get()))
+               DrawShadeRampParams(n);
+            else if (auto* n = dynamic_cast<ShadeMapRangeNode*>(gn.node.get()))
+               DrawShadeMapRangeParams(n);
+            else if (auto* n = dynamic_cast<ShadeSeparateNode*>(gn.node.get()))
+               DrawShadeSeparateParams(n);
+            else if (auto* n = dynamic_cast<ShadeCombineNode*>(gn.node.get()))
+               DrawShadeCombineParams(n);
+            else if (auto* n = dynamic_cast<ShadeCurvesNode*>(gn.node.get()))
+               DrawShadeCurvesParams(n);
             else if (auto* n = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                DrawParticleSystemParams(n);
             else if (auto* n = dynamic_cast<ClothNode*>(gn.node.get()))

@@ -1075,6 +1075,125 @@ namespace app
    }
 
 
+   void DrawShadeMathParams(ShadeMathNode* n)
+   {
+      DropdownButton("op", ShadeMathNode::OpNames(), n->op, [n](int i) { PushUndoCheckpoint(); n->op = i; });
+      const int k = ShadeMathNode::Operands(n->op);
+      static const char* kNames[3] = { "a", "b", "c" };
+      for (int i = 0; i < k; i++)
+         ModSlider(kNames[i], &n->value[i], -10.0f, 10.0f);
+      ModCheckbox("clamp", &n->clampResult);
+   }
+
+
+   void DrawShadeVectorMathParams(ShadeVectorMathNode* n)
+   {
+      DropdownButton("op", ShadeVectorMathNode::OpNames(), n->op, [n](int i) { PushUndoCheckpoint(); n->op = i; });
+      const int k = ShadeVectorMathNode::Operands(n->op);
+      float* vecs[3] = { n->a, n->b, n->c };
+      static const char* kLabels[3][3] = { { "a x", "a y", "a z" }, { "b x", "b y", "b z" }, { "c x", "c y", "c z" } };
+      static const char* kParams[3][3] = { { "aX", "aY", "aZ" }, { "bX", "bY", "bZ" }, { "cX", "cY", "cZ" } };
+      for (int v = 0; v < k; v++)
+         for (int c = 0; c < 3; c++)
+            ModSlider(kLabels[v][c], &vecs[v][c], -10.0f, 10.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, kParams[v][c]);
+      if (ShadeVectorMathNode::UsesScale(n->op))
+         ModSlider("scale", &n->scale, -10.0f, 10.0f);
+   }
+
+
+   void DrawShadeMixParams(ShadeMixNode* n)
+   {
+      DropdownButton("type", ShadeMixNode::DataTypeNames(), n->dataType, [n](int i) { PushUndoCheckpoint(); n->dataType = i; });
+      if (n->dataType == ShadeMixNode::kColour)
+         DropdownButton("mode", ShadeMixNode::ModeNames(), n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+      ModSlider("factor", &n->factor, 0.0f, 1.0f);
+      if (n->dataType == ShadeMixNode::kFloat)
+      {
+         ModSlider("a", &n->a[0], -10.0f, 10.0f);
+         ModSlider("b", &n->b[0], -10.0f, 10.0f);
+      }
+      else if (n->dataType == ShadeMixNode::kVector)
+      {
+         static const char* kA[3] = { "a x", "a y", "a z" };
+         static const char* kB[3] = { "b x", "b y", "b z" };
+         for (int c = 0; c < 3; c++) ModSlider(kA[c], &n->a[c], -10.0f, 10.0f);
+         for (int c = 0; c < 3; c++) ModSlider(kB[c], &n->b[c], -10.0f, 10.0f);
+      }
+      else
+      {
+         ColorSwatch("a", n->a, n);
+         ColorSwatch("b", n->b, n);
+      }
+      ModCheckbox("clamp factor", &n->clampFactor);
+      ModCheckbox("clamp result", &n->clampResult);
+   }
+
+
+   void DrawShadeRampParams(ShadeRampNode* n)
+   {
+      DropdownButton("interpolation", ShadeRampNode::InterpNames(), n->interp, [n](int i) { PushUndoCheckpoint(); n->interp = i; });
+      ModSlider("factor", &n->factor, 0.0f, 1.0f);
+      ModSliderInt("stops", &n->count, 2, ShadeRampNode::kMaxStops);
+      static const char* kPos[ShadeRampNode::kMaxStops] = { "pos0", "pos1", "pos2", "pos3", "pos4", "pos5", "pos6", "pos7" };
+      for (int i = 0; i < n->count && i < ShadeRampNode::kMaxStops; i++)
+      {
+         ImGui::PushID(i);
+         ModSlider("position", &n->pos[i], 0.0f, 1.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, kPos[i]);
+         ColorSwatch("colour", n->color[i], n);
+         ImGui::PopID();
+      }
+   }
+
+
+   void DrawShadeMapRangeParams(ShadeMapRangeNode* n)
+   {
+      DropdownButton("interpolation", ShadeMapRangeNode::InterpNames(), n->interp, [n](int i) { PushUndoCheckpoint(); n->interp = i; });
+      ModSlider("value", &n->value, -10.0f, 10.0f);
+      ModSlider("from min", &n->fromMin, -10.0f, 10.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, "fromMin");
+      ModSlider("from max", &n->fromMax, -10.0f, 10.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, "fromMax");
+      ModSlider("to min", &n->toMin, -10.0f, 10.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, "toMin");
+      ModSlider("to max", &n->toMax, -10.0f, 10.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, "toMax");
+      if (n->interp == ShadeMapRangeNode::kStepped)
+         ModSlider("steps", &n->steps, 1.0f, 32.0f, "%.0f", kParamWidth, false, 1.0f);
+      if (n->interp == ShadeMapRangeNode::kLinear || n->interp == ShadeMapRangeNode::kStepped)
+         ModCheckbox("clamp", &n->clampResult);
+   }
+
+
+   void DrawShadeSeparateParams(ShadeSeparateNode* n)
+   {
+      DropdownButton("mode", ShadeSeparateNode::ModeNames(), n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; n->channel = 0; });
+      DropdownButton("channel", ShadeSeparateNode::ChannelNames(n->mode), n->channel, [n](int i) { PushUndoCheckpoint(); n->channel = i; });
+   }
+
+
+   void DrawShadeCombineParams(ShadeCombineNode* n)
+   {
+      DropdownButton("mode", ShadeSeparateNode::ModeNames(), n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+      static const char* kXyz[3] = { "x", "y", "z" };
+      static const char* kHsv[3] = { "hue", "saturation", "value" };
+      const char* const* lab = n->mode == 1 ? kHsv : kXyz;
+      for (int i = 0; i < 3; i++)
+         ModSlider(lab[i], &n->value[i], 0.0f, 1.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, kXyz[i]);
+   }
+
+
+   void DrawShadeCurvesParams(ShadeCurvesNode* n)
+   {
+      ModSlider("factor", &n->factor, 0.0f, 1.0f);
+      ModSliderInt("points", &n->count, 2, ShadeCurvesNode::kMaxPoints);
+      static const char* kX[ShadeCurvesNode::kMaxPoints] = { "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7" };
+      static const char* kY[ShadeCurvesNode::kMaxPoints] = { "y0", "y1", "y2", "y3", "y4", "y5", "y6", "y7" };
+      for (int i = 0; i < n->count && i < ShadeCurvesNode::kMaxPoints; i++)
+      {
+         ImGui::PushID(i);
+         ModSlider("x", &n->px[i], 0.0f, 1.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, kX[i]);
+         ModSlider("y", &n->py[i], 0.0f, 1.0f, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, -1, kY[i]);
+         ImGui::PopID();
+      }
+   }
+
+
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());

@@ -9,6 +9,7 @@
 #include "core/field/MslBackend.h"
 #include "core/field/MaterialRegistry.h"
 #include "core/Expression.h"
+#include <functional>
 #include "nodes/FieldPixelNode.h"
 #include "nodes/Render3DPathTrace.h"
 
@@ -888,6 +889,451 @@ bool RunEngineTest()
          const int bad = Field::RegisterMaterialProgram("c = img(0.0, P)\nbase = vec3(c.x, c.y, c.z)\n", {}, err);
          check(bad == 0 && !err.empty(), "2.4: img() refuses a uv that is not a vec2", (double)bad, 0.0);
       }
+   }
+
+   // ---- 2.5: value nodes against hand formulas. Each node is fed probe values that vary over a 5x5 picture
+   // (25 inputs), its program runs through both emitters, and every pixel is compared with the formula in C++.
+   {
+      struct Probe : ShadeNode
+      {
+         std::string e;
+         explicit Probe(const char* s) : e(s) {}
+         std::string Emit(ShadeBuild& b) const override { return b.NewVar(this, e); }
+      };
+      struct V { double x, y, z; };
+      const int n = 5;
+      auto U = [&](int x) { return (x + 0.5) / n; };
+      int bad = 0;
+      double worst = 0.0;
+      // runs `node`, compares with ref(x, y) on GLSL and MSL; values travel as v / 20 + 0.5
+      auto run = [&](const char* name, const ShadeNode& node, const std::function<V(int, int)>& ref) {
+         ShadeBuild sb;
+         const std::string v = node.Emit(sb);
+         const std::string code = sb.body + "col = " + v + " * 0.05 + vec3(0.5)\n";
+         Field::PixelIRProgram ir;
+         std::string err;
+         std::vector<float> g, m;
+         if (!LowerPreset(code.c_str(), ir, err) || !GlFieldPixel(ir, n, g, err) || (dev && !MetalFieldPixel(*dev, ir, n, m, err)))
+         {
+            printf("    2.5 %s: %s\n%s", name, err.c_str(), code.c_str());
+            bad++;
+            return false;
+         }
+         double e = 0.0;
+         for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+               const V r = ref(x, y);
+               const double want[3] = { r.x, r.y, r.z };
+               for (int c = 0; c < 3; c++)
+               {
+                  const double w = std::clamp(want[c], -9.5, 9.5);
+                  const size_t i = ((size_t)y * n + x) * 4 + c;
+                  const double tol = 2e-3 + 1e-3 * std::fabs(w);
+                  e = std::max(e, std::fabs(std::clamp((g[i] - 0.5) * 20.0, -9.5, 9.5) - w) / tol);
+                  if (!m.empty()) e = std::max(e, std::fabs(std::clamp((m[i] - 0.5) * 20.0, -9.5, 9.5) - w) / tol);
+               }
+            }
+         worst = std::max(worst, e);
+         if (!(e <= 1.0))
+         {
+            printf("    2.5 %s: off by %.2f x tolerance\n", name, e);
+            bad++;
+            return false;
+         }
+         return true;
+      };
+      auto A = [&](int x) { return -2.0 + 4.5 * U(x); };
+      auto B = [&](int y) { return -1.5 + 4.0 * U(y); };
+      const double C = 0.3;
+      auto fr = [](double x) { return x - std::floor(x); };
+
+      // Shade Math
+      {
+         Probe pa("vec3(-2.0 + 4.5 * uv.x)"), pb("vec3(-1.5 + 4.0 * uv.y)"), pc("vec3(0.3)");
+         using M = ShadeMathNode;
+         const std::function<double(double, double, double)> f[M::kOpCount] = {
+            [](double a, double b, double) { return a + b; },
+            [](double a, double b, double) { return a - b; },
+            [](double a, double b, double) { return a * b; },
+            [](double a, double b, double) { return b != 0.0 ? a / b : 0.0; },
+            [](double a, double b, double c) { return a * b + c; },
+            [](double a, double b, double) { return a >= 0.0 ? std::pow(a, b) : (b == std::floor(b) ? std::pow(a, b) : 0.0); },
+            [](double a, double b, double) { return a > 0.0 && b > 0.0 ? std::log(a) / std::log(b) : 0.0; },
+            [](double a, double, double) { return a > 0.0 ? std::sqrt(a) : 0.0; },
+            [](double a, double, double) { return a > 0.0 ? 1.0 / std::sqrt(a) : 0.0; },
+            [](double a, double, double) { return std::fabs(a); },
+            [](double a, double, double) { return std::exp(a); },
+            [](double a, double b, double) { return std::min(a, b); },
+            [](double a, double b, double) { return std::max(a, b); },
+            [](double a, double b, double) { return a < b ? 1.0 : 0.0; },
+            [](double a, double b, double) { return a > b ? 1.0 : 0.0; },
+            [](double a, double, double) { return a > 0.0 ? 1.0 : a < 0.0 ? -1.0 : 0.0; },
+            [](double a, double b, double c) { return std::fabs(a - b) <= std::max(c, 1e-5) ? 1.0 : 0.0; },
+            [](double a, double b, double c) { const double h = std::max(c - std::fabs(a - b), 0.0) / c; return std::min(a, b) - h * h * h * c / 6.0; },
+            [](double a, double b, double c) { const double h = std::max(c - std::fabs(a - b), 0.0) / c; return std::max(a, b) + h * h * h * c / 6.0; },
+            [](double a, double, double) { return std::floor(a + 0.5); },
+            [](double a, double, double) { return std::floor(a); },
+            [](double a, double, double) { return std::ceil(a); },
+            [](double a, double, double) { return std::trunc(a); },
+            [](double a, double, double) { return a - std::floor(a); },
+            [](double a, double b, double) { return std::fmod(a, b); },
+            [](double a, double b, double) { return a - std::floor(a / b) * b; },
+            [](double a, double b, double c) { return a - (b - c) * std::floor((a - c) / (b - c)); },
+            [](double a, double b, double) { return std::floor(a / b) * b; },
+            [](double a, double b, double) { const double q = (a - b) / (b * 2.0); return std::fabs((q - std::floor(q)) * b * 2.0 - b); },
+            [](double a, double, double) { return std::sin(a); },
+            [](double a, double, double) { return std::cos(a); },
+            [](double a, double, double) { return std::tan(a); },
+            [](double a, double, double) { return std::asin(std::clamp(a, -1.0, 1.0)); },
+            [](double a, double, double) { return std::acos(std::clamp(a, -1.0, 1.0)); },
+            [](double a, double, double) { return std::atan(a); },
+            [](double a, double b, double) { return std::atan2(a, b); },
+            [](double a, double, double) { return std::sinh(a); },
+            [](double a, double, double) { return std::cosh(a); },
+            [](double a, double, double) { return std::tanh(a); },
+            [](double a, double, double) { return a * 3.14159265358979 / 180.0; },
+            [](double a, double, double) { return a * 180.0 / 3.14159265358979; },
+         };
+         int ok = 0;
+         for (int op = 0; op < M::kOpCount; op++)
+         {
+            M node;
+            node.op = op;
+            node.ShadeInput(0)->Connect(&pa);
+            node.ShadeInput(1)->Connect(&pb);
+            node.ShadeInput(2)->Connect(&pc);
+            if (run(("Math " + M::OpNames()[op]).c_str(), node, [&](int x, int y) { const double r = f[op](A(x), B(y), C); return V{ r, r, r }; }))
+               ok++;
+         }
+         M cl; // clamp, and unwired pins reading the node's own numbers
+         cl.op = M::kMultiply; cl.value[0] = 3.0f; cl.value[1] = 0.25f; cl.clampResult = true;
+         if (run("Math own values", cl, [](int, int) { return V{ 0.75, 0.75, 0.75 }; })) ok++;
+         cl.value[1] = 0.5f;
+         if (run("Math clamp", cl, [](int, int) { return V{ 1.0, 1.0, 1.0 }; })) ok++;
+         check(ok == M::kOpCount + 2, "2.5 R/L: Shade Math, 41 ops x 25 inputs match the hand formula", (double)ok, (double)M::kOpCount + 2);
+      }
+
+      // Shade Vector Math
+      {
+         Probe pa("vec3(-2.0 + 4.5 * uv.x, -1.5 + 4.0 * uv.y, 0.4)"), pb("vec3(-1.5 + 4.0 * uv.y, 0.75, -2.0 + 4.5 * uv.x)"), pc("vec3(0.3, -0.55, 0.15)");
+         using M = ShadeVectorMathNode;
+         auto per = [](V a, V b, V c, const std::function<double(double, double, double)>& f) { return V{ f(a.x, b.x, c.x), f(a.y, b.y, c.y), f(a.z, b.z, c.z) }; };
+         auto dot = [](V a, V b) { return a.x * b.x + a.y * b.y + a.z * b.z; };
+         auto mul = [](V a, double s) { return V{ a.x * s, a.y * s, a.z * s }; };
+         auto sub = [](V a, V b) { return V{ a.x - b.x, a.y - b.y, a.z - b.z }; };
+         auto unit = [&](V a) { const double l = std::sqrt(dot(a, a)); return l > 0.0 ? mul(a, 1.0 / l) : V{ 0, 0, 0 }; };
+         auto grey = [](double v) { return V{ v, v, v }; };
+         const double eta = 0.8;
+         const std::function<V(V, V, V)> f[M::kOpCount] = {
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return x + y; }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return x - y; }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return x * y; }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return y != 0.0 ? x / y : 0.0; }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double z) { return x * y + z; }); },
+            [&](V a, V b, V) { return V{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; },
+            [&](V a, V b, V) { return mul(b, dot(a, b) / dot(b, b)); },
+            [&](V a, V b, V) { const V nn = unit(b); return sub(a, mul(nn, 2.0 * dot(a, nn))); },
+            [&](V a, V b, V) {
+               const V nn = unit(b);
+               const double d = dot(nn, a), k = 1.0 - eta * eta * (1.0 - d * d);
+               return k < 0.0 ? V{ 0, 0, 0 } : sub(mul(a, eta), mul(nn, eta * d + std::sqrt(k)));
+            },
+            [&](V a, V b, V c) { return dot(c, b) < 0.0 ? a : mul(a, -1.0); },
+            [&](V a, V b, V) { return grey(dot(a, b)); },
+            [&](V a, V b, V) { const V d = sub(a, b); return grey(std::sqrt(dot(d, d))); },
+            [&](V a, V, V) { return grey(std::sqrt(dot(a, a))); },
+            [&](V a, V, V) { return mul(a, eta); },
+            [&](V a, V, V) { return unit(a); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double, double) { return std::fabs(x); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return std::min(x, y); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return std::max(x, y); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double, double) { return std::floor(x); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double, double) { return std::ceil(x); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double, double) { return x - std::floor(x); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return std::fmod(x, y); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double z) { return x - (y - z) * std::floor((x - z) / (y - z)); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double y, double) { return std::floor(x / y) * y; }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double, double) { return std::sin(x); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double, double) { return std::cos(x); }); },
+            [&](V a, V b, V c) { return per(a, b, c, [](double x, double, double) { return std::tan(x); }); },
+         };
+         int ok = 0;
+         for (int op = 0; op < M::kOpCount; op++)
+         {
+            M node;
+            node.op = op;
+            node.scale = (float)eta;
+            node.ShadeInput(0)->Connect(&pa);
+            node.ShadeInput(1)->Connect(&pb);
+            node.ShadeInput(2)->Connect(&pc);
+            if (run(("Vector Math " + M::OpNames()[op]).c_str(), node, [&](int x, int y) {
+                   return f[op](V{ A(x), B(y), 0.4 }, V{ B(y), 0.75, A(x) }, V{ 0.3, -0.55, 0.15 });
+                }))
+               ok++;
+         }
+         check(ok == M::kOpCount, "2.5 R/L: Shade Vector Math, 27 ops x 25 inputs match the hand formula", (double)ok, (double)M::kOpCount);
+      }
+
+      // Shade Mix: float, vector, and the 30 colour modes against core/BlendModes.cpp's formulas
+      {
+         Probe pa("vec3(0.03 + 0.9 * uv.x, 0.07 + 0.8 * uv.y, 0.35)"), pb("vec3(0.07 + 0.8 * uv.y, 0.6, 0.03 + 0.9 * uv.x)");
+         auto ch = [](V a, V b, const std::function<double(double, double)>& f) { return V{ f(a.x, b.x), f(a.y, b.y), f(a.z, b.z) }; };
+         auto lum = [](V c) { return 0.3 * c.x + 0.59 * c.y + 0.11 * c.z; };
+         auto mn = [](V c) { return std::min({ c.x, c.y, c.z }); };
+         auto mx = [](V c) { return std::max({ c.x, c.y, c.z }); };
+         auto sat01 = [](double v) { return std::clamp(v, 0.0, 1.0); };
+         auto setSat = [&](V c, double s) {
+            const double lo = mn(c), hi = mx(c);
+            return hi > lo ? V{ (c.x - lo) * s / (hi - lo), (c.y - lo) * s / (hi - lo), (c.z - lo) * s / (hi - lo) } : V{ 0, 0, 0 };
+         };
+         auto setLum = [&](V c, double l) {
+            const double d = l - lum(c);
+            c = V{ c.x + d, c.y + d, c.z + d };
+            const double L = lum(c), lo = mn(c), hi = mx(c);
+            auto sc = [&](V q, double k) { return V{ L + (q.x - L) * k, L + (q.y - L) * k, L + (q.z - L) * k }; };
+            if (lo < 0.0) c = sc(c, L / (L - lo + 1e-6));
+            if (hi > 1.0) c = sc(c, (1.0 - L) / (hi - L + 1e-6));
+            return c;
+         };
+         auto hard = [](double a, double b, bool top) { return top ? 1.0 - 2.0 * (1.0 - a) * (1.0 - b) : 2.0 * a * b; };
+         auto blend = [&](int mode, V a, V b) -> V {
+            switch (mode)
+            {
+            case 0: return b;
+            case 1: return ch(a, b, [](double x, double y) { return std::min(x, y); });
+            case 2: return ch(a, b, [](double x, double y) { return x * y; });
+            case 3: return ch(a, b, [](double x, double y) { return 1.0 - std::min((1.0 - x) / std::max(y, 1e-4), 1.0); });
+            case 4: return ch(a, b, [&](double x, double y) { return sat01(x + y - 1.0); });
+            case 5: return lum(a) <= lum(b) ? a : b;
+            case 6: return ch(a, b, [](double x, double y) { return std::max(x, y); });
+            case 7: return ch(a, b, [](double x, double y) { return 1.0 - (1.0 - x) * (1.0 - y); });
+            case 8: return ch(a, b, [](double x, double y) { return std::min(x / std::max(1.0 - y, 1e-4), 1.0); });
+            case 9: return ch(a, b, [&](double x, double y) { return sat01(x + y); });
+            case 10: return lum(a) >= lum(b) ? a : b;
+            case 11: return ch(a, b, [&](double x, double y) { return hard(x, y, x >= 0.5); });
+            case 12: return ch(a, b, [](double x, double y) {
+               const double d = x >= 0.25 ? std::sqrt(x) : ((16.0 * x - 12.0) * x + 4.0) * x;
+               return y >= 0.5 ? x + (2.0 * y - 1.0) * (d - x) : x - (1.0 - 2.0 * y) * x * (1.0 - x);
+            });
+            case 13: return ch(a, b, [&](double x, double y) { return hard(x, y, y >= 0.5); });
+            case 14: return ch(a, b, [](double x, double y) {
+               return y >= 0.5 ? std::min(x / std::max(2.0 * (1.0 - y), 1e-4), 1.0) : 1.0 - std::min((1.0 - x) / std::max(2.0 * y, 1e-4), 1.0);
+            });
+            case 15: return ch(a, b, [&](double x, double y) { return sat01(x + 2.0 * y - 1.0); });
+            case 16: return ch(a, b, [](double x, double y) { return y >= 0.5 ? std::max(x, 2.0 * y - 1.0) : std::min(x, 2.0 * y); });
+            case 17: return ch(a, b, [&](double x, double y) { return sat01(x + 2.0 * y - 1.0) >= 0.5 ? 1.0 : 0.0; });
+            case 18: return ch(a, b, [](double x, double y) { return std::fabs(x - y); });
+            case 19: return ch(a, b, [](double x, double y) { return x + y - 2.0 * x * y; });
+            case 20: return ch(a, b, [&](double x, double y) { return sat01(x - y); });
+            case 21: return ch(a, b, [](double x, double y) { return std::min(x / std::max(y, 1e-4), 1.0); });
+            case 22: return setLum(setSat(b, mx(a) - mn(a)), lum(a));
+            case 23: return setLum(setSat(a, mx(b) - mn(b)), lum(a));
+            case 24: return setLum(b, lum(a));
+            case 25: return setLum(a, lum(b));
+            case 26: return ch(a, b, [](double x, double y) { return (x + y) * 0.5; });
+            case 27: return ch(a, b, [](double x, double y) { return 1.0 - std::fabs(1.0 - x - y); });
+            case 28: return ch(a, b, [](double x, double y) { return std::min(x * x / std::max(1.0 - y, 1e-4), 1.0); });
+            default: return ch(a, b, [](double x, double y) { return std::min(y * y / std::max(1.0 - x, 1e-4), 1.0); });
+            }
+         };
+         auto pA = [&](int x, int y) { return V{ 0.03 + 0.9 * U(x), 0.07 + 0.8 * U(y), 0.35 }; };
+         auto pB = [&](int x, int y) { return V{ 0.07 + 0.8 * U(y), 0.6, 0.03 + 0.9 * U(x) }; };
+         const double fac = 0.7;
+         auto lerp = [&](V a, V b) { return V{ a.x + (b.x - a.x) * fac, a.y + (b.y - a.y) * fac, a.z + (b.z - a.z) * fac }; };
+         int ok = 0, total = 0;
+         for (int mode = 0; mode < (int)ShadeMixNode::ModeNames().size(); mode++)
+         {
+            ShadeMixNode node;
+            node.mode = mode;
+            node.factor = (float)fac;
+            node.ShadeInput(1)->Connect(&pa);
+            node.ShadeInput(2)->Connect(&pb);
+            total++;
+            if (run(("Mix " + ShadeMixNode::ModeNames()[mode]).c_str(), node, [&](int x, int y) { return lerp(pA(x, y), blend(mode, pA(x, y), pB(x, y))); }))
+               ok++;
+         }
+         ShadeMixNode vec;
+         vec.dataType = ShadeMixNode::kVector;
+         vec.factor = (float)fac;
+         vec.ShadeInput(1)->Connect(&pa);
+         vec.ShadeInput(2)->Connect(&pb);
+         total++;
+         if (run("Mix vector", vec, [&](int x, int y) { return lerp(pA(x, y), pB(x, y)); })) ok++;
+         ShadeMixNode fl; // float reads x; the factor pin is clamped to 0..1 (probe a runs 0.03 to 0.84, times 2)
+         Probe pf("vec3(2.0 * (0.03 + 0.9 * uv.x))");
+         fl.dataType = ShadeMixNode::kFloat;
+         fl.ShadeInput(0)->Connect(&pf);
+         fl.ShadeInput(1)->Connect(&pa);
+         fl.ShadeInput(2)->Connect(&pb);
+         total++;
+         if (run("Mix float", fl, [&](int x, int y) {
+                const double f = std::clamp(2.0 * (0.03 + 0.9 * U(x)), 0.0, 1.0), a = pA(x, y).x, b = pB(x, y).x, r = a + (b - a) * f;
+                return V{ r, r, r };
+             }))
+            ok++;
+         check(ok == total, "2.5 R/L: Shade Mix, float, vector and 30 colour modes match BlendModes", (double)ok, (double)total);
+      }
+
+      // Shade Ramp: 4 known stops, 25 factors from -0.076 to 1.076
+      {
+         Probe pt("vec3(-0.1 + 1.2 * (uv.x + floor(uv.y * 5.0)) / 5.0)");
+         auto T = [&](int x, int y) { return -0.1 + 1.2 * (U(x) + y) / 5.0; };
+         const double p[4] = { 0.1, 0.4, 0.6, 0.9 };
+         const V col[4] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, { 1, 1, 1 } };
+         auto mixv = [](V a, V b, double w) { return V{ a.x + (b.x - a.x) * w, a.y + (b.y - a.y) * w, a.z + (b.z - a.z) * w }; };
+         auto ref = [&](int interp, double t) -> V {
+            if (interp == ShadeRampNode::kBSpline)
+            {
+               t = std::clamp(t, p[0], p[3]);
+               int i = t >= p[2] ? 2 : t >= p[1] ? 1 : 0;
+               const double s = (t - p[i]) / (p[i + 1] - p[i]);
+               const double w[4] = { (1 - s) * (1 - s) * (1 - s) / 6.0, (3 * s * s * s - 6 * s * s + 4) / 6.0, (-3 * s * s * s + 3 * s * s + 3 * s + 1) / 6.0, s * s * s / 6.0 };
+               V r{ 0, 0, 0 };
+               for (int k = 0; k < 4; k++)
+               {
+                  const V c = col[std::clamp(i - 1 + k, 0, 3)];
+                  r = V{ r.x + c.x * w[k], r.y + c.y * w[k], r.z + c.z * w[k] };
+               }
+               return r;
+            }
+            if (t <= p[0]) return col[0];
+            if (t >= p[3]) return col[3];
+            const int i = t >= p[2] ? 2 : t >= p[1] ? 1 : 0;
+            double w = (t - p[i]) / (p[i + 1] - p[i]);
+            if (interp == ShadeRampNode::kConstant) return col[i];
+            if (interp == ShadeRampNode::kEase) w = w * w * (3.0 - 2.0 * w);
+            return mixv(col[i], col[i + 1], w);
+         };
+         int ok = 0;
+         for (int interp = 0; interp < 4; interp++)
+         {
+            ShadeRampNode node;
+            node.interp = interp;
+            node.count = 4;
+            // stored out of order: the node sorts by position
+            const int slot[4] = { 2, 0, 3, 1 };
+            for (int i = 0; i < 4; i++)
+            {
+               node.pos[slot[i]] = (float)p[i];
+               node.color[slot[i]][0] = (float)col[i].x; node.color[slot[i]][1] = (float)col[i].y; node.color[slot[i]][2] = (float)col[i].z;
+            }
+            node.ShadeInput(0)->Connect(&pt);
+            if (run(("Ramp " + ShadeRampNode::InterpNames()[interp]).c_str(), node, [&](int x, int y) { return ref(interp, T(x, y)); })) ok++;
+         }
+         check(ok == 4, "2.5 R/L: Shade Ramp, 4 known stops, linear / ease / constant / b-spline", (double)ok, 4.0);
+      }
+
+      // Shade Map Range, Separate / Combine, Curves
+      {
+         Probe pa("vec3(-2.0 + 4.5 * uv.x)");
+         int ok = 0, total = 0;
+         const double f0 = -1.0, f1 = 1.5, t0 = 2.0, t1 = -1.0, steps = 4.0;
+         auto range = [&](int interp, bool clampIt, double v) {
+            double f = (v - f0) / (f1 - f0), r;
+            if (interp == ShadeMapRangeNode::kStepped) f = std::floor(f * (steps + 1.0)) / steps;
+            if (interp >= ShadeMapRangeNode::kSmoothstep)
+            {
+               f = std::clamp(f, 0.0, 1.0);
+               f = interp == ShadeMapRangeNode::kSmoothstep ? f * f * (3.0 - 2.0 * f) : f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+               return t0 + f * (t1 - t0);
+            }
+            r = t0 + f * (t1 - t0);
+            return clampIt ? std::clamp(r, std::min(t0, t1), std::max(t0, t1)) : r;
+         };
+         for (int k = 0; k < 5; k++)
+         {
+            const int interp = k < 4 ? k : 0;
+            const bool cl = k < 4;
+            ShadeMapRangeNode node;
+            node.interp = interp;
+            node.fromMin = (float)f0; node.fromMax = (float)f1; node.toMin = (float)t0; node.toMax = (float)t1; node.steps = (float)steps;
+            node.clampResult = cl;
+            node.ShadeInput(0)->Connect(&pa);
+            total++;
+            if (run(("Map Range " + ShadeMapRangeNode::InterpNames()[interp] + (cl ? "" : " unclamped")).c_str(), node,
+                    [&](int x, int) { const double r = range(interp, cl, A(x)); return V{ r, r, r }; }))
+               ok++;
+         }
+         check(ok == total, "2.5 R/L: Shade Map Range, 4 interpolations and unclamped", (double)ok, (double)total);
+
+         Probe pcol("vec3(0.03 + 0.9 * uv.x, 0.07 + 0.8 * uv.y, 0.35)");
+         auto colAt = [&](int x, int y) { return V{ 0.03 + 0.9 * U(x), 0.07 + 0.8 * U(y), 0.35 }; };
+         auto hsv = [](V c) {
+            const double hi = std::max({ c.x, c.y, c.z }), lo = std::min({ c.x, c.y, c.z }), d = hi - lo;
+            double h = d == 0.0 ? 0.0 : (c.x == hi ? (c.y - c.z) / d : c.y == hi ? 2.0 + (c.z - c.x) / d : 4.0 + (c.x - c.y) / d) / 6.0;
+            if (h < 0.0) h += 1.0;
+            return V{ h, hi > 0.0 ? d / hi : 0.0, hi };
+         };
+         auto rgb = [&](V q) {
+            auto chn = [&](double k) { return q.z * (1.0 + q.y * (std::clamp(std::fabs(std::fmod(q.x * 6.0 + k, 6.0) - 3.0) - 1.0, 0.0, 1.0) - 1.0)); };
+            return V{ chn(0.0), chn(4.0), chn(2.0) };
+         };
+         ok = total = 0;
+         ShadeSeparateNode sep[6];
+         for (int k = 0; k < 6; k++)
+         {
+            sep[k].mode = k / 3;
+            sep[k].channel = k % 3;
+            sep[k].ShadeInput(0)->Connect(&pcol);
+            total++;
+            if (run(k < 3 ? "Separate RGB" : "Separate HSV", sep[k], [&](int x, int y) {
+                   const V c = k < 3 ? colAt(x, y) : hsv(colAt(x, y));
+                   const double r = k % 3 == 0 ? c.x : k % 3 == 1 ? c.y : c.z;
+                   return V{ r, r, r };
+                }))
+               ok++;
+         }
+         ShadeCombineNode comb; // x, y, z straight
+         for (int k = 0; k < 3; k++) comb.ShadeInput(k)->Connect(&sep[k]);
+         total++;
+         if (run("Combine RGB", comb, [&](int x, int y) { return colAt(x, y); })) ok++;
+         ShadeCombineNode back; // separate to HSV and back gives the colour again
+         back.mode = 1;
+         for (int k = 0; k < 3; k++) back.ShadeInput(k)->Connect(&sep[3 + k]);
+         total++;
+         if (run("Combine HSV round trip", back, [&](int x, int y) { return colAt(x, y); })) ok++;
+         ShadeCombineNode hc; // hue from the picture, own saturation and value
+         hc.mode = 1;
+         hc.value[1] = 0.6f; hc.value[2] = 0.8f;
+         hc.ShadeInput(0)->Connect(&sep[0]);
+         total++;
+         if (run("Combine HSV", hc, [&](int x, int y) { return rgb(V{ colAt(x, y).x, 0.6, 0.8 }); })) ok++;
+         check(ok == total, "2.5 R/L: Shade Separate / Combine, RGB and HSV, round trip", (double)ok, (double)total);
+
+         Probe pt("vec3(-0.1 + 1.2 * (uv.x + floor(uv.y * 5.0)) / 5.0)");
+         auto T = [&](int x, int y) { return -0.1 + 1.2 * (U(x) + y) / 5.0; };
+         const double cx[4] = { 0.0, 0.3, 0.7, 1.0 }, cy[4] = { 0.0, 0.5, 0.6, 1.0 };
+         auto curve = [&](double t) {
+            double m[4];
+            for (int i = 0; i < 4; i++)
+            {
+               const int lo = std::max(i - 1, 0), hi = std::min(i + 1, 3);
+               m[i] = (cy[hi] - cy[lo]) / (cx[hi] - cx[lo]);
+            }
+            if (t < cx[0]) return cy[0] + m[0] * (t - cx[0]);
+            if (t > cx[3]) return cy[3] + m[3] * (t - cx[3]);
+            const int i = t >= cx[2] ? 2 : t >= cx[1] ? 1 : 0;
+            const double h = cx[i + 1] - cx[i], s = (t - cx[i]) / h, s2 = s * s, s3 = s2 * s;
+            return cy[i] * (2 * s3 - 3 * s2 + 1) + h * m[i] * (s3 - 2 * s2 + s) + cy[i + 1] * (3 * s2 - 2 * s3) + h * m[i + 1] * (s3 - s2);
+         };
+         ok = total = 0;
+         ShadeCurvesNode cv;
+         cv.count = 4;
+         for (int i = 0; i < 4; i++) { cv.px[i] = (float)cx[i]; cv.py[i] = (float)cy[i]; }
+         cv.ShadeInput(0)->Connect(&pt);
+         total++;
+         if (run("Curves 4 points", cv, [&](int x, int y) { const double r = curve(T(x, y)); return V{ r, r, r }; })) ok++;
+         cv.factor = 0.25f;
+         total++;
+         if (run("Curves factor", cv, [&](int x, int y) { const double t = T(x, y), r = t + (curve(t) - t) * 0.25; return V{ r, r, r }; })) ok++;
+         ShadeCurvesNode id; // the default curve changes nothing, also outside 0..1
+         id.ShadeInput(0)->Connect(&pa);
+         total++;
+         if (run("Curves identity", id, [&](int x, int) { return V{ A(x), A(x), A(x) }; })) ok++;
+         check(ok == total, "2.5 R/L: Shade Curves, 4 points, factor, identity default", (double)ok, (double)total);
+      }
+      printf("    2.5 worst error %.3f x tolerance (tolerance 0.002 + 0.1%%), %d node programs off\n", worst, bad);
    }
 
    // dump for eyes
