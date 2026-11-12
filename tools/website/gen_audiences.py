@@ -43,7 +43,7 @@ AUDIENCES = [
              "note": "The same idea as the Halftone and Ordered Dither presets in the library."},
      "reel": {"title": "Made in Infinite", "sub": "Pieces from the art gallery and starting points from the library.", "href": "artworks.html",
               "items": [("assets/museum/06.jpg", 720, 960, "Neon mushroom"), ("assets/library/previews/iridescent-orb.jpg", 900, 600, "Iridescent orb, library"), ("assets/museum/10.jpg", 720, 960, "Rainbow spiral"),
-                        ("assets/library/previews/liquid-glass.jpg", 900, 600, "Liquid glass, library"), ("assets/museum/08.jpg", 720, 960, "Halftone face"), ("assets/library/previews/ordered-dither.jpg", 900, 600, "Ordered dither, library"), ("assets/museum/02.jpg", 720, 960, "Mirrored portrait")]},
+                        ("assets/library/previews/liquid-glass.jpg", 900, 600, "Liquid glass, library"), ("assets/museum/08.jpg", 720, 960, "Halftone face"), ("assets/library/previews/ordered-dither.jpg", 900, 600, "Ordered dither, library")]},
      "start": [("first-image", "First image"), ("layered-blends", "Layered blends"), ("glitch-feedback", "Glitch feedback"), ("iridescent-orb", "Iridescent orb"), ("trail-glitch", "Trail glitch")],
      "extra": ("artworks.html", "See the art gallery")},
     {"slug": "musicians", "name": "musicians", "hand": "play",
@@ -364,15 +364,17 @@ def others_html(rel):
 
 
 def reel_href(a, src):
-    """Where a reel tile goes: a library thumbnail opens that patch's page; art from the gallery opens the gallery."""
-    return "library/%s.html" % os.path.splitext(os.path.basename(src.split("?")[0]))[0] if src.startswith("assets/library/thumbs/") else a["reel"]["href"]
+    """Where a reel tile goes: a library picture opens that patch's page; art from the gallery opens the gallery."""
+    b = os.path.splitext(os.path.basename(src.split("?")[0]))[0]
+    if src.startswith(("assets/library/", "assets/community/")) and os.path.exists(os.path.join(W, "library", b + ".html")): return "library/%s.html" % b
+    return a["reel"]["href"]
 
 
 def lib_thumb(name):
     """The library's own thumbnail for a preset id or an old picture path (assets/.../<id>.ext): the render for art presets, knobs and cables for the rest. None if there is none."""
     i = os.path.splitext(os.path.basename(name))[0]
     for ext in ("webp", "svg"):
-        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=5" % (i, ext)
+        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=6" % (i, ext)
     return None
 
 
@@ -384,8 +386,8 @@ def start_html(start):
         m = _re.search(r'og:image" content="https://infinitedevices\.org/([^"]+)"', open(os.path.join(W, "library", sl + ".html")).read())
         src = lib_thumb(sl) or (m.group(1) if m and os.path.exists(os.path.join(W, m.group(1))) else "")
         img = f'<img src="{src}" alt="" width="720" height="450" loading="lazy" decoding="async">' if src else ""
-        tiles.append(f'<a class="ax-bento-t{" big" if i == 0 else ""}" href="library/{sl}.html">{img}<span class="ax-bento-l">{e(t)}</span></a>')
-    return f'<div class="ax-bento">{"".join(tiles)}</div>'
+        tiles.append(f'<a class="sw-card" href="library/{sl}.html">{img}<span class="sw-t">{icon("play")}{e(t)}</span></a>')
+    return f'<div class="sw-grid">{"".join(tiles)}</div>'
 
 
 def dv_number(html):
@@ -468,6 +470,20 @@ def node_deck(a):
             f'<button type="button" class="nd-btn" data-nd="1" aria-label="Next node"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5"/></svg></button></div></div>')
 
 
+SCREENS = {   # real app panels per audience; files in website/assets/showcase. Lives here, not in the generated pages, so a regen cannot drop it.
+    "artists": [("3d-view.webp?v=2", "Infinite 3D View with procedural geometry and particles", "3D View: procedural geometry and particles, rendered live.")],
+    "musicians": [("sample-studio.webp?v=2", "Sample Studio, slicing and pitch analysis of a waveform", "Sample Studio: slice, stretch and analyse any sound."),
+                  ("piano-roll.webp", "Piano Roll with polyphonic MIDI notes and velocity lane", "Piano Roll: polyphonic MIDI with velocity editing.")],
+    "vjs": [("session-clips.webp?v=2", "Infinite scene and clip launcher matrix", "Scene mode: launch scenes from the clip matrix, on the bar.")],
+    "creative-coders": [("terminal.webp?v=2", "Infinite built-in terminal panel", "Terminal: run and script Infinite from the command line.")],
+}
+def screens_html(slug):
+    shots = SCREENS.get(slug)
+    if not shots: return ""
+    figs = "".join(f'<figure class="aud-shot"><img src="assets/showcase/{src}" alt="{e(al)}" width="1800" height="1125" loading="lazy" decoding="async"><figcaption>{e(cap)}</figcaption></figure>' for src, al, cap in shots)
+    return f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Screens</h2>\n        <div class="aud-shots">{figs}</div>\n      </section>\n'
+
+
 def artists_main(a, rel, hero="blob"):
     """Immersive artists page: a live iridescent blob you steer, three glass bubbles that morph it, a swipe strip of nodes, knobs, a reel."""
     L = a["lab"]
@@ -484,10 +500,12 @@ def artists_main(a, rel, hero="blob"):
         bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
         tag, caps, ghost = "Images that move.", "Layers|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(t)}: {e(c)}. {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
-    watch = f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Watch</h2>\n        {film_poster(*MUSIC_FILM)}\n      </section>\n' if hero == "cables" else ""
-    items = [((lib_thumb(src), 720, 450, al) if "assets/museum" not in src and lib_thumb(src) else (src, w, h, al)) for src, w, h, al in a["reel"]["items"]]
+    watch = ('      <section class="aud-section reveal">\n        <h2 class="ax-h">Sample generator</h2>\n'
+             '        <div class="ax-blobframe"><iframe src="samples/?embed=1" title="Sample generator: a glowing blob that plays the loop it makes" loading="lazy"></iframe>'
+             '<a class="ax-blobgo" href="samples/">Open the generator</a></div>\n      </section>\n') if hero == "cables" else ""
+    items = [(src, w, h, al) for src, w, h, al in a["reel"]["items"]]   # the result pictures, not the patch-graph thumbnails
     # museum shots show small in the strip: serve a 400px webp, and leave alt empty because the caption beside it says the same thing
-    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{reel_href(a, src)}"><img src="{src.replace("assets/museum/", "assets/museum/thumb/").replace(".jpg", ".webp") if "assets/museum/" in src else src}" alt="{"" if "assets/museum/" in src else e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in items)
+    figs = "".join(f'<a class="mi-card" href="{reel_href(a, src)}"><img src="{src.replace("assets/museum/", "assets/museum/thumb/").replace(".jpg", ".webp") if "assets/museum/" in src else src}" alt="{"" if "assets/museum/" in src else e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="mi-t">{e(al.replace(", library", ""))}<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M11 6l4 4-4 4"/></svg></span></a>' for src, w, h, al in items)
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
     others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     lab = lab_html(a)
@@ -521,7 +539,7 @@ def artists_main(a, rel, hero="blob"):
       </div>
     </section>
     <div class="container">
-      <section class="aud-section reveal">
+{screens_html(a["slug"])}      <section class="aud-section reveal">
         <h2 class="ax-h">Nodes</h2>
         {node_deck(a)}
       </section>
@@ -531,7 +549,7 @@ def artists_main(a, rel, hero="blob"):
       </section>
 {watch}      <section class="aud-section reveal">
         <h2 class="ax-h">Made in Infinite</h2>
-        <div class="ax-strip"><div class="ax-reel">{figs}</div></div>
+        <div class="mi-grid">{figs}</div>
       </section>
       <section class="aud-section reveal">
         <h2 class="ax-h">Start with</h2>

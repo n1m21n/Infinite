@@ -305,3 +305,33 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 .ax-ttl { left: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 3px 8px; font-size: var(--size-micro-mono, .75rem); font-weight: 500; }
 html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-mono, .75rem); font-weight: 500; }
 .ax-bento-l { left: 10px; right: 10px; bottom: 8px; font-size: var(--size-micro-mono, .75rem); font-weight: 500; line-height: 1.2; }
+
+/* Screens: real app panels per audience (moved here from audience.css so the one stylesheet the generator hashes carries it) */
+.aud-shots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.aud-shot { margin: 0; border-radius: var(--web-card-radius, 20px); overflow: hidden; background: var(--midnight-950, #0d1020); }
+.aud-shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; }
+.aud-shot figcaption { padding: 12px 16px 14px; color: var(--midnight-50, #eef0fa); font-size: 0.9rem; opacity: 0.85; }
+
+/* Sample generator preview: the live glowing blob, framed like a media card */
+.ax-blobframe { position: relative; border-radius: var(--web-card-radius, 20px); overflow: hidden; background: var(--midnight-950, #0d1020); height: clamp(340px, 52vw, 520px); }
+.ax-blobframe iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+.ax-blobgo { position: absolute; right: 14px; top: 14px; padding: 8px 14px; border-radius: 999px; background: rgb(255 255 255 / 0.12); color: var(--midnight-50, #eef0fa); font: 500 0.8rem/1 'Geist', system-ui, sans-serif; text-decoration: none; backdrop-filter: blur(8px); }
+.ax-blobgo:hover { background: rgb(255 255 255 / 0.22); }
+
+/* Made in Infinite: one grid of equal cards, picture on top, name under it */
+.mi-grid, .sw-grid { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mi-card, .sw-card { display: flex; flex-direction: column; border-radius: var(--web-card-radius, 20px); overflow: hidden; text-decoration: none; color: var(--midnight-50, #eef0fa); background: var(--midnight-900, #151933); transition: transform var(--dur-medium, .25s) var(--ease-out, ease), box-shadow var(--dur-medium, .25s) var(--ease-out, ease); }
+.mi-card:hover, .sw-card:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgb(0 0 0 / 0.28); }
+.mi-card:focus-visible, .sw-card:focus-visible { outline: 3px solid var(--signal, #e8745a); outline-offset: 3px; }
+.mi-card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: var(--midnight-950, #0d1020); }
+.mi-t { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px 16px; font: 600 var(--size-body, 1rem)/1.2 'Geist', system-ui, sans-serif; }
+.mi-t svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .55; transition: transform .2s, opacity .2s; }
+.mi-card:hover .mi-t svg { transform: translateX(3px); opacity: 1; }
+
+/* Start with: wide thumbnail, play icon and name */
+.sw-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.sw-card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: var(--midnight-950, #0d1020); }
+.sw-t { display: flex; align-items: center; gap: 10px; padding: 12px 16px 14px; font: 600 var(--size-body, 1rem)/1.2 'Geist', system-ui, sans-serif; }
+.sw-t .ic, .sw-t svg { width: 18px; height: 18px; flex: none; color: var(--signal, #e8745a); }
+@media (max-width: 900px) { .mi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .mi-t { padding: 12px 14px 14px; } }
+@media (prefers-reduced-motion: reduce) { .mi-card, .sw-card, .mi-t svg { transition: none; } .mi-card:hover, .sw-card:hover { transform: none; } }
