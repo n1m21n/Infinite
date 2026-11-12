@@ -1,7 +1,7 @@
 """Owner-review sheet: one row per case, columns truth (Cycles), R (GL raster), L (Metal live), T (settle),
 from the last sweep's images in ~/.cache/infinite-sweep/ab/<case>/.
 
-    python3 case_sheet.py out.jpg wear_groove [more cases]
+    python3 case_sheet.py out.jpg wear_groove [more cases]     (--no-truth drops the Cycles column)
 """
 import os, sys
 from PIL import Image, ImageDraw
@@ -11,6 +11,10 @@ COLS = (("Cycles", "truth.png"), ("R raster", "inf.png"), ("L live", "inf_live.p
 
 
 def main(out, cases):
+    global COLS
+    if "--no-truth" in cases:
+        cases = [c for c in cases if c != "--no-truth"]
+        COLS = COLS[1:]
     tiles = [[Image.open(os.path.join(AB, c, f)).convert("RGB") if os.path.exists(os.path.join(AB, c, f)) else None
               for _, f in COLS] for c in cases]
     w, h = next(t for row in tiles for t in row if t).size

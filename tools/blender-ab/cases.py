@@ -297,6 +297,19 @@ def _wear_groove():
                         for x, r in ((1.2, "Edge Wear"), (0.0, "Dirt"), (-1.2, "Dust"))]}
 
 
+RECIPES = ("Leather", "Suede", "Rubber", "Knit Fabric", "Carpet", "Brushed Metal", "Concrete", "Painted Wood")
+
+
+def _recipes(distance):
+    # Row 3.5: the 8 surface recipes on balls, front row Leather..Carpet... left to right, near (fills the frame) and far
+    # (each ball ~ 30 px, where the fine grain must settle to its average, not shimmer). Owner review on a sheet, no gate.
+    balls = [dict(_ball((i % 4 - 1.5) * 0.75, (0.4 if i < 4 else -0.4), 0.3), material={"recipe": r})
+             for i, r in enumerate(RECIPES)]
+    return {"size": [768, 384], "camera": {"fov": 30, "azimuth": 90, "elevation": 30, "distance": distance, "target": [0, 0, 0.3]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 60, "elevation": 45}], "world": {"color": [0.35, 0.35, 0.35]},
+            "objects": [GREY_FLOOR] + balls}
+
+
 def _motion(kind):
     sc = _lineup()
     sc["size"] = SMALL
@@ -389,6 +402,8 @@ CASES.update({
     "geom_monkey": _monkey(),
     "wear_masks": _wear_masks(),
     "wear_groove": _wear_groove(),
+    "recipes_near": _recipes(3.6),
+    "recipes_far": _recipes(16.0),
     # Motion: a camera orbit, a fast object with motion blur, and a still shot scored for flicker.
     "motion_orbit": _motion("orbit"),
     "motion_blur": _motion("blur"),

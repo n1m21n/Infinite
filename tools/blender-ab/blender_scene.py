@@ -240,6 +240,8 @@ def import_model(o, i):
 def add_recipe(mat, p, ob, name):
     """The FieldMaterialRecipes.h recipe `name` as Cycles nodes. curvature = (pointiness - 0.5) * 125 (the row 4.4
     calibration), cavity = 1 - local AO at 5 % of the radius, N.y = world Z, fbm = Noise Texture (its own pattern)."""
+    if name not in ("Edge Wear", "Dirt", "Dust"):   # row 3.5 surfaces have no Cycles rebuild: owner review only
+        return
     import re
     hdr = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "nodes", "FieldMaterialRecipes.h")).read()
     code = dict(re.findall(r'FLD_RECIPE\("([^"]+)", R"FLD\((.*?)\)FLD"\)', hdr, re.S))[name]
