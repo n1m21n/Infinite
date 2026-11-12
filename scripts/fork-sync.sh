@@ -2,7 +2,7 @@
 # Синхронизация форка с апстримом. Коды: 0 ок, 1 грязная копия, 2 конфликт, 3 красные тесты.
 set -u
 cd "$(git rev-parse --show-toplevel)"
-if [ -n "$(git status --porcelain --untracked-files=no | grep -v '^ . external/')" ]; then
+if [ -n "$(git status --porcelain --untracked-files=no --ignore-submodules=dirty)" ]; then
   echo "Есть незакоммиченные изменения — закоммить или убери." >&2; exit 1
 fi
 git fetch upstream || exit 1
@@ -15,7 +15,8 @@ if ! git merge --no-edit main; then
   git diff --name-only --diff-filter=U >&2
   exit 2
 fi
-git submodule update --init --recursive
+git submodule update --init external/vst3sdk
+git -C external/vst3sdk submodule update --init base cmake pluginterfaces public.sdk
 scripts/ibuild.py build --mode dev || fail=1
 if [ -z "${fail:-}" ]; then
   INFINITE_BIN=build-dev/Infinite.app/Contents/MacOS/Infinite \
