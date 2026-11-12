@@ -707,14 +707,14 @@ def _ref_shoe():
 # a rim from behind and a low fill, shallow depth of field. Rendered large and converged; the question is only whether
 # the settle picture stands next to Cycles.
 def _hero_shoe():
-    sweep = {"base_color": [0.42, 0.42, 0.44], "roughness": 0.55}
-    return {"size": [640, 480],
+    sweep = {"base_color": [0.36, 0.36, 0.38], "roughness": 0.62}
+    return {"size": [1280, 960],
             "camera": {"fov": 32, "azimuth": 62, "elevation": 12, "distance": 0.66, "target": [0, 0, 0.055],
                        "fstop": 5.6, "focus": 0.66, "blades": 7},
-            "lights": [{"type": "area", "power": 14, "azimuth": 110, "elevation": 55, "distance": 0.9, "size": [0.7, 0.7]},
-                       {"type": "area", "power": 9, "azimuth": 250, "elevation": 25, "distance": 0.9, "size": [0.25, 0.6]},
-                       {"type": "area", "power": 3, "azimuth": 10, "elevation": 20, "distance": 1.0, "size": [0.6, 0.6]}],
-            "world": {"color": [0.06, 0.06, 0.065]},
+            "lights": [{"type": "area", "power": 11, "azimuth": 110, "elevation": 55, "distance": 1.05, "size": [0.75, 0.75]},
+                       {"type": "area", "power": 6.5, "azimuth": 250, "elevation": 32, "distance": 1.0, "size": [0.25, 0.6]},
+                       {"type": "area", "power": 2.5, "azimuth": 10, "elevation": 22, "distance": 1.05, "size": [0.6, 0.6]}],
+            "world": {"color": [0.05, 0.05, 0.055]},
             "objects": [{"shape": "plane", "scale": 4, "material": sweep},
                         {"shape": "model", "asset": "MaterialsVariantsShoe.glb", "env": "SHOE_GLB", "location": [0.0, 0.0, 0.0]}]}
 
