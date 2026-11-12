@@ -177,6 +177,9 @@ namespace engine
       // Row 6.2, settle only: cat-eye 0..1 (aperture clipped toward the edges), radial distortion k (r^2, + pincushion, - barrel; on the
       // image, + pushes out), lateral chromatic aberration (red and blue scaled by -/+ this).
       float lensCatEye = 0.0f, lensDistortion = 0.0f, lensCA = 0.0f;
+      // Row 6.3 bloom on the finished picture (live and settle), as Render 3D's: amount 0..1 (0 off), radiance
+      // threshold, radius 0..1.
+      float bloom = 0.0f, bloomThreshold = 1.0f, bloomRadius = 0.5f;
       float camRight[3] = { 1, 0, 0 }, camUp[3] = { 0, 1, 0 }, camFwd[3] = { 0, 0, -1 };
       // The MSL library for the instances' Field material programs (MaterialRegistry BuildMaterialLibrary), empty when
       // none; the backend rebuilds its pipelines when fieldMslKey changes. fieldTime is the programs' t.

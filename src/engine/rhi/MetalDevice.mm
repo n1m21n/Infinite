@@ -2253,6 +2253,58 @@ vertex SOut sh_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], c
 
 vertex SkyOut sky_vs(uint vid [[vertex_id]]) { const float2 p[3] = { float2(-1, -1), float2(3, -1), float2(-1, 3) }; SkyOut o; o.pos = float4(p[vid], 1.0, 1.0); return o; }
 fragment float4 sky_fs(SkyOut in [[stage_in]], constant float4& clearSrgb [[buffer(0)]]) { return float4(clearSrgb.xyz, 1.0); }
+// ---- Row 6.3 bloom on the finished picture (L and T): display values are expanded back toward radiance (x / (1 - x),
+// the inverse of x / (1 + x)), thresholded, run down a 13-tap chain and up a tent chain, added, and compressed back.
+struct BlU { float4 p; }; // x, y: 1 / source size; z threshold (radiance); w radius mix (up) or amount (composite)
+constexpr sampler blS(filter::linear, address::clamp_to_edge);
+float3 blExpand(float3 c) { const float3 l = toLinear(c); return l / max(1.0 - l, float3(1.0 / 64.0)); }
+float3 blDown13(texture2d<float> t, float2 uv, float2 tx)
+{
+   const float3 a = t.sample(blS, uv + tx * float2(-2, -2)).rgb, b = t.sample(blS, uv + tx * float2(0, -2)).rgb, c = t.sample(blS, uv + tx * float2(2, -2)).rgb;
+   const float3 d = t.sample(blS, uv + tx * float2(-2, 0)).rgb, e = t.sample(blS, uv).rgb, f = t.sample(blS, uv + tx * float2(2, 0)).rgb;
+   const float3 g = t.sample(blS, uv + tx * float2(-2, 2)).rgb, h = t.sample(blS, uv + tx * float2(0, 2)).rgb, i = t.sample(blS, uv + tx * float2(2, 2)).rgb;
+   const float3 j = t.sample(blS, uv + tx * float2(-1, -1)).rgb, k = t.sample(blS, uv + tx * float2(1, -1)).rgb;
+   const float3 l = t.sample(blS, uv + tx * float2(-1, 1)).rgb, m = t.sample(blS, uv + tx * float2(1, 1)).rgb;
+   return e * 0.125 + (a + c + g + i) * 0.03125 + (b + d + f + h) * 0.0625 + (j + k + l + m) * 0.125;
+}
+fragment float4 bl_pre_fs(SkyOut in [[stage_in]], constant BlU& u [[buffer(0)]], texture2d<float> src [[texture(0)]],
+                          texture2d<float> dst [[texture(1)]])
+{
+   const float2 uv = in.pos.xy / float2(dst.get_width(), dst.get_height());
+   float3 c = float3(0.0);
+   const float2 o[4] = { float2(-1, -1), float2(1, -1), float2(-1, 1), float2(1, 1) };
+   for (int k = 0; k < 4; k++) // 4 bilinear taps over the 4x4 block, each expanded (and Karis-weighted against fireflies)
+   {
+      const float3 e = blExpand(src.sample(blS, uv + o[k] * u.p.xy).rgb);
+      c += e / (1.0 + dot(e, float3(0.2126, 0.7152, 0.0722)) * 0.25);
+   }
+   c *= 0.25;
+   const float lum = dot(c, float3(0.2126, 0.7152, 0.0722));
+   return float4(c * (max(lum - u.p.z, 0.0) / max(lum, 1e-4)), 1.0);
+}
+fragment float4 bl_down_fs(SkyOut in [[stage_in]], constant BlU& u [[buffer(0)]], texture2d<float> src [[texture(0)]],
+                           texture2d<float> dst [[texture(1)]])
+{
+   return float4(blDown13(src, in.pos.xy / float2(dst.get_width(), dst.get_height()), u.p.xy), 1.0);
+}
+fragment float4 bl_up_fs(SkyOut in [[stage_in]], constant BlU& u [[buffer(0)]], texture2d<float> below [[texture(0)]],
+                         texture2d<float> cur [[texture(1)]])
+{
+   const float2 uv = in.pos.xy / float2(cur.get_width(), cur.get_height()), tx = u.p.xy;
+   float3 t = below.sample(blS, uv).rgb * 4.0;
+   t += (below.sample(blS, uv + float2(tx.x, 0)).rgb + below.sample(blS, uv - float2(tx.x, 0)).rgb +
+         below.sample(blS, uv + float2(0, tx.y)).rgb + below.sample(blS, uv - float2(0, tx.y)).rgb) * 2.0;
+   t += below.sample(blS, uv + tx).rgb + below.sample(blS, uv - tx).rgb + below.sample(blS, uv + float2(tx.x, -tx.y)).rgb +
+        below.sample(blS, uv + float2(-tx.x, tx.y)).rgb;
+   return float4(mix(cur.read(uint2(in.pos.xy)).rgb, t / 16.0, u.p.w), 1.0);
+}
+fragment float4 bl_comp_fs(SkyOut in [[stage_in]], constant BlU& u [[buffer(0)]], texture2d<float> pic [[texture(0)]],
+                           texture2d<float> bl [[texture(1)]])
+{
+   const uint2 px = uint2(in.pos.xy);
+   const float3 e = blExpand(pic.read(px).rgb) + u.p.w * bl.sample(blS, in.pos.xy * u.p.xy).rgb;
+   return float4(toSrgb(e / (1.0 + e)), 1.0);
+}
 // HDRI background, drawn first under the scene. MRT: linear * exposure with a = 0 (the resolve tonemaps it); direct: display.
 struct BgU { float4x4 invVP; float4 p; float4 clr; }; // p: width, height, MRT, 1 = plain clear colour under fog (row 5.4); clr linear
 fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]], texture2d<float> et [[texture(9)]],
@@ -3348,6 +3400,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             mHistCur = cur; mHistValid = giOn; mRValid = true;
          }
          DepthOfField(cb, img, fr, fmt);
+         Bloom(cb, img, fr, fmt);
          [cb commit];
          [cb waitUntilCompleted];
          if (gpuMs)
@@ -3401,6 +3454,81 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
          [e endEncoding];
       }
+      // Row 6.3: bloom on the finished picture (bl_*_fs). Skipped at 0, so the picture is then untouched.
+      void Bloom(id<MTLCommandBuffer> cb, MetalImage& img, const engine::Frame& fr, MTLPixelFormat fmt)
+      {
+         if (fr.bloom <= 0.0f) return;
+         const int w = img.Width(), h = img.Height();
+         auto pso = [&](__strong id<MTLRenderPipelineState>& p, NSString* fn, MTLPixelFormat pf) {
+            if (p && p.label && [p.label isEqualToString:[NSString stringWithFormat:@"%@%d", fn, (int)pf]]) return true;
+            MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
+            d.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
+            d.fragmentFunction = [mLib newFunctionWithName:fn];
+            d.colorAttachments[0].pixelFormat = pf;
+            d.label = [NSString stringWithFormat:@"%@%d", fn, (int)pf];
+            NSError* err = nil;
+            p = [mDev newRenderPipelineStateWithDescriptor:d error:&err];
+            if (!p) EngineFail(@"bloom pipeline", err);
+            return p != nil;
+         };
+         if (!pso(mBlPre, @"bl_pre_fs", MTLPixelFormatRGBA16Float) || !pso(mBlDown, @"bl_down_fs", MTLPixelFormatRGBA16Float) ||
+             !pso(mBlUp, @"bl_up_fs", MTLPixelFormatRGBA16Float) || !pso(mBlComp, @"bl_comp_fs", fmt))
+            return;
+         auto tex = [&](__strong id<MTLTexture>& t, int tw, int th, MTLPixelFormat pf, MTLTextureUsage use) {
+            if (t && (int)t.width == tw && (int)t.height == th && t.pixelFormat == pf) return true;
+            MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:pf width:tw height:th mipmapped:NO];
+            d.usage = use; d.storageMode = MTLStorageModePrivate;
+            t = [mDev newTextureWithDescriptor:d];
+            return t != nil;
+         };
+         const MTLTextureUsage rt = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+         int levels = 0, lw = w, lh = h;
+         while (levels < kBlLevels && std::min(lw, lh) >= 16)
+         {
+            lw = std::max(1, lw / 2); lh = std::max(1, lh / 2);
+            if (!tex(mBlDn[levels], lw, lh, MTLPixelFormatRGBA16Float, rt) || !tex(mBlUpT[levels], lw, lh, MTLPixelFormatRGBA16Float, rt)) return;
+            levels++;
+         }
+         if (levels == 0 || !tex(mBlSrc, w, h, fmt, MTLTextureUsageShaderRead)) return;
+         id<MTLBlitCommandEncoder> be = [cb blitCommandEncoder];
+         [be copyFromTexture:img.Tex() toTexture:mBlSrc];
+         [be endEncoding];
+         auto pass = [&](id<MTLTexture> dst, id<MTLRenderPipelineState> p, id<MTLTexture> t0, id<MTLTexture> t1, const float* up) {
+            MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            rp.colorAttachments[0].texture = dst;
+            rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+            rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
+            [e setRenderPipelineState:p];
+            [e setFragmentBytes:up length:16 atIndex:0];
+            [e setFragmentTexture:t0 atIndex:0];
+            [e setFragmentTexture:t1 atIndex:1];
+            [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+            [e endEncoding];
+         };
+         const float thr = std::clamp(fr.bloomThreshold, 0.5f, 8.0f);
+         float u[4] = { 1.0f / (float)w, 1.0f / (float)h, thr, 0.0f };
+         pass(mBlDn[0], mBlPre, mBlSrc, mBlDn[0], u);
+         for (int i = 1; i < levels; i++)
+         {
+            const float ud[4] = { 1.0f / (float)mBlDn[i - 1].width, 1.0f / (float)mBlDn[i - 1].height, 0.0f, 0.0f };
+            pass(mBlDn[i], mBlDown, mBlDn[i - 1], mBlDn[i], ud);
+         }
+         // Radius 0 keeps the finest level (a tight glow), 1 lets the widest through (Render 3D's GL bloom).
+         const float mixAmt = 0.15f + 0.8f * std::clamp(fr.bloomRadius, 0.0f, 1.0f);
+         id<MTLTexture> below = mBlDn[levels - 1];
+         for (int i = levels - 2; i >= 0; i--)
+         {
+            const float uu[4] = { 1.0f / (float)below.width, 1.0f / (float)below.height, 0.0f, mixAmt };
+            pass(mBlUpT[i], mBlUp, below, mBlDn[i], uu);
+            below = mBlUpT[i];
+         }
+         const float uc[4] = { 1.0f / (float)w, 1.0f / (float)h, 0.0f, std::clamp(fr.bloom, 0.0f, 1.0f) };
+         pass(img.Tex(), mBlComp, mBlSrc, below, uc);
+      }
+      static constexpr int kBlLevels = 6;
+      id<MTLRenderPipelineState> mBlPre = nil, mBlDown = nil, mBlUp = nil, mBlComp = nil;
+      id<MTLTexture> mBlDn[kBlLevels] = {}, mBlUpT[kBlLevels] = {}, mBlSrc = nil;
       static bool Inv4(const float* m, float* o)
       {
          double a[16], inv[16];
@@ -3584,6 +3712,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [e setFragmentTexture:dn ? mDnG : mPtGd[mPtCur] atIndex:3];
          [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
          [e endEncoding];
+         Bloom(cb, img, fr, img.Tex().pixelFormat);
          [cb commit];
          [cb waitUntilCompleted];
          if (gpuMs) *gpuMs = (cb.GPUEndTime - cb.GPUStartTime) * 1000.0;
