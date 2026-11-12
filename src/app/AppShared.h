@@ -4172,6 +4172,11 @@ void DrawShadeMapRangeParams(ShadeMapRangeNode* n);
 void DrawShadeSeparateParams(ShadeSeparateNode* n);
 void DrawShadeCombineParams(ShadeCombineNode* n);
 void DrawShadeCurvesParams(ShadeCurvesNode* n);
+void DrawShadeBumpParams(ShadeBumpNode* n);
+void DrawShadeNormalMapParams(ShadeNormalMapNode* n);
+void DrawShadeFresnelParams(ShadeFresnelNode* n);
+void DrawShadeLayerWeightParams(ShadeLayerWeightNode* n);
+void DrawShadeGeometryParams(ShadeGeometryNode* n);
 
 void DrawMeshResynthParams(MeshResynthNode* n);
 

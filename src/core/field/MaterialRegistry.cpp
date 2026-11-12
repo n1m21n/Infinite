@@ -107,15 +107,21 @@ namespace Field
       s += "\n";
       for (int id : ids)
          s += (g ? FindMaterialProgram(id)->glsl : FindMaterialProgram(id)->msl) + "\n";
-      s += g ? "void fldMatDispatch(int id, inout FldMat o, vec3 P, vec3 N, vec2 UV, float t, vec3 W, vec3 V)\n{\n"
-             : "static void fldMatDispatch(int id, thread FldMat& o, float3 P, float3 N, float2 UV, float t, float3 W, float3 V, "
+      s += g ? "void fldMatDispatch(int id, inout FldMat o, vec3 P, vec3 N, vec2 UV, float t, vec3 W, vec3 V, vec4 G)\n{\n"
+             : "static void fldMatDispatch(int id, thread FldMat& o, float3 P, float3 N, float2 UV, float t, float3 W, float3 V, float4 G, "
                "array<texture2d<float>, 16> fm, float4 fi, float flod)\n{\n";
       for (int id : ids)
       {
          const std::string n = std::to_string(id);
-         s += "   if (id == " + n + ") fldmat_" + n + (g ? "(o, P, N, UV, t, W, V);\n" : "(o, P, N, UV, t, W, V, fm, fi, flod);\n");
+         s += "   if (id == " + n + ") fldmat_" + n + (g ? "(o, P, N, UV, t, W, V, G);\n" : "(o, P, N, UV, t, W, V, G, fm, fi, flod);\n");
       }
       s += "}\n";
+      // Row 2.6: which programs write height (the tracer takes two more taps for those, to bump the normal).
+      s += g ? "bool fldMatHasHeight(int id)\n{\n" : "static bool fldMatHasHeight(int id)\n{\n";
+      for (int id : ids)
+         if (FindMaterialProgram(id)->written & (1u << MaterialOutputBit("height")))
+            s += "   if (id == " + std::to_string(id) + ") return true;\n";
+      s += "   return false;\n}\n";
       return s;
    }
 

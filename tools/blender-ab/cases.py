@@ -435,6 +435,20 @@ def _shade_textures():
                          "material": mat(tex="image", image="blotches")}]}
 
 
+def _shade_bump():
+    # Row 2.6: a height bends the normal. Height = sin(10 x) sin(10 y) on Object coordinates (noise is not
+    # pixel-comparable to Cycles), strength 1, distance 0.05, on a plane under a raking sun.
+    # Cycles: Texture Coordinate Object -> Mapping -> Separate XYZ -> Math Sine x2 -> Math Multiply -> Bump -> Normal.
+    # Infinite: Shade Coord -> Shade Mapping -> Shade Separate x2 -> Shade Math x3 -> Shade Bump -> Material normal.
+    mat = {"base_color": [0.8, 0.8, 0.8], "roughness": 0.5,
+           "shade": {"tex": "bump", "scale": 10, "distance": 0.05, "strength": 1.0}}
+    return {"camera": {"fov": 40, "azimuth": 60, "elevation": 40, "distance": 4.0, "target": [0, 0, 0]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 20, "elevation": 20}],
+            "world": {"color": [0.3, 0.3, 0.3]},
+            "objects": [{"shape": "plane", "scale": 1, "material": mat}]}
+
+
+CASES["shade_bump"] = _shade_bump()
 CASES["shade_mapping"] = _shade_mapping()
 CASES["shade_textures"] = _shade_textures()
 CASES["bed"] = _bed()

@@ -379,7 +379,21 @@ for i, o in enumerate(scene["objects"]):
         mp.inputs["Rotation"].default_value = [math.radians(a) for a in sh.get("rotate", (0, 0, 0))]
         mp.inputs["Scale"].default_value = s3 if isinstance(s3, list) else (s3, s3, s3)
         tex = sh.get("tex", "checker")
-        if tex == "brick":      # row 2.4: both brick colours the same, since the pick per brick is random
+        if tex == "bump":       # row 2.6: sin(x) sin(y) -> Bump -> Normal
+            sp = nt.nodes.new("ShaderNodeSeparateXYZ")
+            ma = nt.nodes.new("ShaderNodeMath"); ma.operation = 'SINE'
+            mb = nt.nodes.new("ShaderNodeMath"); mb.operation = 'SINE'
+            mm = nt.nodes.new("ShaderNodeMath"); mm.operation = 'MULTIPLY'
+            bp = nt.nodes.new("ShaderNodeBump")
+            bp.inputs["Strength"].default_value = sh.get("strength", 1.0)
+            bp.inputs["Distance"].default_value = sh.get("distance", 0.1)
+            nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+            nt.links.new(mp.outputs["Vector"], sp.inputs[0])
+            nt.links.new(sp.outputs["X"], ma.inputs[0]); nt.links.new(sp.outputs["Y"], mb.inputs[0])
+            nt.links.new(ma.outputs[0], mm.inputs[0]); nt.links.new(mb.outputs[0], mm.inputs[1])
+            nt.links.new(mm.outputs[0], bp.inputs["Height"])
+            nt.links.new(bp.outputs["Normal"], p.inputs["Normal"])
+        elif tex == "brick":      # row 2.4: both brick colours the same, since the pick per brick is random
             ck = nt.nodes.new("ShaderNodeTexBrick")
             ck.inputs["Color1"].default_value = (*sh.get("color1", (0.8, 0.8, 0.8)), 1)
             ck.inputs["Color2"].default_value = (*sh.get("color1", (0.8, 0.8, 0.8)), 1)
@@ -398,9 +412,10 @@ for i, o in enumerate(scene["objects"]):
             ck.inputs["Color1"].default_value = (*sh.get("color1", (0.8, 0.8, 0.8)), 1)
             ck.inputs["Color2"].default_value = (*sh.get("color2", (0.2, 0.2, 0.2)), 1)
             ck.inputs["Scale"].default_value = 1.0
-        nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
-        nt.links.new(mp.outputs["Vector"], ck.inputs["Vector"])
-        nt.links.new(ck.outputs["Color"], p.inputs["Base Color"])
+        if tex != "bump":
+            nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+            nt.links.new(mp.outputs["Vector"], ck.inputs["Vector"])
+            nt.links.new(ck.outputs["Color"], p.inputs["Base Color"])
     tl = m.get("translucency", 0.0)
     if tl > 0:  # Render 3D's translucency: that share of the diffuse leaves the far side (Translucent BSDF)
         nt = mat.node_tree

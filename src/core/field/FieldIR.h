@@ -298,7 +298,8 @@ namespace Field
       DataType type;
       int lanes;
    };
-   // P object-space position, N shading normal, UV first set, curvature and cavity 0 until row 4.4, t seconds.
+   // P object-space position, N shading normal, UV first set, curvature and cavity 0 until row 4.4, t seconds,
+   // backfacing 1 on the back side, objrand per-object random (0 until row 7.2). The four scalars ride in G.
    extern const MaterialChannel kMaterialInputs[];
    extern const int kMaterialInputCount;
    // base, roughness, metallic, normal (tangent space), height, emission, opacity, mask - bit i = kMaterialOutputs[i].

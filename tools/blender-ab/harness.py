@@ -312,6 +312,20 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
                       (("translate", sh.get("translate", (0, 0, 0))), ("rotate", sh.get("rotate", (0, 0, 0))), ("scale", sc))
                       for a, v in zip("XYZ", vals)])
             tex = sh.get("tex", "checker")
+            if tex == "bump":   # row 2.6: sin(x) sin(y) -> Shade Bump -> Material normal pin
+                sx = node("3D", "Shade Separate", ["  i mode 0", "  i channel 0"])
+                sy = node("3D", "Shade Separate", ["  i mode 0", "  i channel 1"])
+                mx = node("3D", "Shade Math", ["  i op 29"])
+                my = node("3D", "Shade Math", ["  i op 29"])
+                mm = node("3D", "Shade Math", ["  i op 2"])
+                bp = node("3D", "Shade Bump", ["  f strength %g" % sh.get("strength", 1.0), "  f distance %g" % sh.get("distance", 0.1)])
+                wires += ["cable %d vector %d" % (up, co), "cable %d vector %d" % (mp, up),
+                          "cable %d vector %d" % (sx, mp), "cable %d vector %d" % (sy, mp),
+                          "cable %d a %d" % (mx, sx), "cable %d a %d" % (my, sy),
+                          "cable %d a %d" % (mm, mx), "cable %d b %d" % (mm, my),
+                          "cable %d height %d" % (bp, mm), "cable %d normal %d" % (mat, bp)]
+                geos.append(mat)
+                continue
             col = lambda k, d: "  c %s %g %g %g" % ((k,) + tuple(srgb(sh.get(k, d))))
             if tex == "brick":      # Cycles' brick defaults; one colour for both bricks (its per-brick pick is random)
                 ck = node("3D", "Shade Brick", [col("color1", (0.8, 0.8, 0.8)), col("color2", (0.8, 0.8, 0.8)),

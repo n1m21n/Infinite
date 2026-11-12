@@ -27,6 +27,7 @@ struct ShadeBuild
    int counter = 0;
    std::string error;
    std::vector<const ShadeNode*> images; // row 2.4: Shade Image nodes in slot order (img(slot, uv)), at most 4
+   std::vector<std::string> heights;     // row 2.6: what each Shade Bump adds to the `height` output
 
    // The local holding `c`'s upstream Shade node, emitting it first; `fallback` when nothing (or not a Shade node)
    // is wired.
@@ -512,7 +513,115 @@ private:
    ImageCable mIn;
 };
 
+// Shade Bump: a height bends the normal. The height goes to the Material domain's `height` output (strength x distance,
+// in scene units); the renderer takes its gradient (screen derivatives in the raster and live engines, two more taps
+// in the tracer). Its value is the tangent-space normal wired into `normal` (flat when nothing is), so it plugs into
+// Material's normal pin.
+class ShadeBumpNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeBumpNode(); }
+   float strength = 1.0f;
+   float distance = 0.1f;
+   bool invert = false;
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 2; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mHeight : i == 1 ? &mNormal : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "height" : slot == 1 ? "normal" : nullptr; }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("strength", strength);
+      v.Float("distance", distance);
+      v.Bool("invert", invert);
+   }
+
+private:
+   ImageCable mHeight, mNormal;
+};
+
+// Shade Normal Map: a tangent-space normal map colour (wire a Shade Image set to Data) as a tangent-space normal for
+// Material's normal pin. Strength leans it from flat (0) to the map (1) and past it.
+class ShadeNormalMapNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeNormalMapNode(); }
+   float strength = 1.0f;
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 1; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mColour : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "colour" : nullptr; }
+   void VisitParams(ParamVisitor& v) override { v.Float("strength", strength); }
+
+private:
+   ImageCable mColour;
+};
+
+// Shade Fresnel: how much a dielectric of this IOR reflects at the view angle (0 facing, 1 grazing).
+class ShadeFresnelNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeFresnelNode(); }
+   float ior = 1.45f;
+   bool IsColour() const override { return true; }
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 1; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mIor : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "ior" : nullptr; }
+   void VisitParams(ParamVisitor& v) override { v.Float("ior", ior); }
+
+private:
+   ImageCable mIor;
+};
+
+// Shade Layer Weight: a blend weight by view angle, as a Fresnel curve or a plain facing falloff.
+class ShadeLayerWeightNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeLayerWeightNode(); }
+   enum Output { kFresnel = 0, kFacing };
+   static const std::vector<std::string>& OutputNames();
+   int output = kFresnel;
+   float blend = 0.5f;
+   bool IsColour() const override { return true; }
+   std::string Emit(ShadeBuild& b) const override;
+   int ShadeInputCount() const override { return 1; }
+   ImageCable* ShadeInput(int i) override { return i == 0 ? &mBlend : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "blend" : nullptr; }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("output", output);
+      v.Float("blend", blend);
+   }
+
+private:
+   ImageCable mBlend;
+};
+
+// Shade Geometry: what the surface point knows about itself. Curvature and cavity are 0 until row 4.4, the per-object
+// random is 0 until row 7.2.
+class ShadeGeometryNode : public ShadeNode
+{
+public:
+   static INode* Create() { return new ShadeGeometryNode(); }
+   enum Output { kPosition = 0, kNormal, kTangent, kIncoming, kBackfacing, kCurvature, kCavity, kRandom };
+   static const std::vector<std::string>& OutputNames();
+   int output = kPosition;
+   std::string Emit(ShadeBuild& b) const override;
+   void VisitParams(ParamVisitor& v) override { v.Int("output", output); }
+};
+
+// One Material output and the Shade node that drives it. Channels: base, roughness, metallic, normal, emission, opacity.
+struct ShadeOutput
+{
+   const char* channel;
+   const ShadeNode* node;
+};
+
 // The Material-domain program for a chain ending at `out` (empty with `err` set on failure). lo/hi: the object-space
 // bounds Generated normalises by. images: the Shade Image nodes the program reads, in slot order.
 std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err,
                                 std::vector<const ShadeNode*>* images = nullptr);
+// The same for several outputs at once (row 2.6): one program writes every channel given; Shade Bump nodes on the
+// way add up into `height`.
+std::string ComposeShadeProgram(const std::vector<ShadeOutput>& outs, const float lo[3], const float hi[3],
+                                std::string& err, std::vector<const ShadeNode*>* images = nullptr);

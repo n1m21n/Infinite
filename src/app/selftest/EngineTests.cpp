@@ -906,10 +906,10 @@ bool RunEngineTest()
       int bad = 0;
       double worst = 0.0;
       // runs `node`, compares with ref(x, y) on GLSL and MSL; values travel as v / 20 + 0.5
-      auto run = [&](const char* name, const ShadeNode& node, const std::function<V(int, int)>& ref) {
+      auto run = [&](const char* name, const ShadeNode& node, const std::function<V(int, int)>& ref, const std::string& pre = std::string()) {
          ShadeBuild sb;
          const std::string v = node.Emit(sb);
-         const std::string code = sb.body + "col = " + v + " * 0.05 + vec3(0.5)\n";
+         const std::string code = pre + sb.body + "col = " + v + " * 0.05 + vec3(0.5)\n";
          Field::PixelIRProgram ir;
          std::string err;
          std::vector<float> g, m;
@@ -1334,6 +1334,145 @@ bool RunEngineTest()
          check(ok == total, "2.5 R/L: Shade Curves, 4 points, factor, identity default", (double)ok, (double)total);
       }
       printf("    2.5 worst error %.3f x tolerance (tolerance 0.002 + 0.1%%), %d node programs off\n", worst, bad);
+
+      // ---- 2.6: surface helpers against hand formulas. The Material inputs they read (N, V, P, W, backfacing,
+      // curvature, cavity, objrand) are plain locals here, varying over the picture.
+      {
+         const std::string pre =
+            "N = normalize(vec3(uv.x * 1.6 - 0.8, uv.y * 1.2 - 0.6, 0.5))\n"
+            "V = normalize(vec3(0.2, 0.1 + uv.x * 0.0, 1.0))\n"
+            "P = vec3(uv.x, 0.3, uv.y)\n"
+            "W = vec3(uv.x * 2.0, uv.y, 0.2)\n"
+            "backfacing = step(0.55, uv.y)\n"
+            "curvature = uv.x * 0.3\n"
+            "cavity = uv.y * 0.6\n"
+            "objrand = uv.x * uv.y\n";
+         struct D3 { double x, y, z; };
+         auto nrm = [](D3 a) { const double l = std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z); return D3{ a.x / l, a.y / l, a.z / l }; };
+         auto crs = [](D3 a, D3 b) { return D3{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; };
+         auto Nn = [&](int x, int y) { return nrm({ U(x) * 1.6 - 0.8, U(y) * 1.2 - 0.6, 0.5 }); };
+         const D3 Vv = nrm({ 0.2, 0.1, 1.0 });
+         auto cosNV = [&](int x, int y) { const D3 a = Nn(x, y); return std::fabs(a.x * Vv.x + a.y * Vv.y + a.z * Vv.z); };
+         auto back = [&](int y) { return U(y) >= 0.55; };
+         auto fresnel = [](double c, double eta) {
+            const double g2 = eta * eta - 1.0 + c * c;
+            if (g2 <= 0.0) return 1.0;
+            const double g = std::sqrt(g2), a = (g - c) / (g + c), b = (c * (g + c) - 1.0) / (c * (g - c) + 1.0);
+            return 0.5 * a * a * (1.0 + b * b);
+         };
+         auto S = [](double r) { return V{ r, r, r }; };
+         int ok = 0, total = 0;
+         ShadeFresnelNode fn; // IOR 1.45
+         total++;
+         if (run("Fresnel 1.45", fn, [&](int x, int y) { return S(fresnel(cosNV(x, y), back(y) ? 1.0 / 1.45 : 1.45)); }, pre)) ok++;
+         Probe pi("vec3(1.0 + 1.5 * uv.x)");
+         ShadeFresnelNode fw;
+         fw.ShadeInput(0)->Connect(&pi);
+         total++;
+         if (run("Fresnel wired", fw, [&](int x, int y) { const double i = 1.0 + 1.5 * U(x); return S(fresnel(cosNV(x, y), back(y) ? 1.0 / i : i)); }, pre)) ok++;
+         ShadeLayerWeightNode lw;
+         lw.blend = 0.3f;
+         total++;
+         if (run("Layer Weight fresnel", lw, [&](int x, int y) { return S(fresnel(cosNV(x, y), back(y) ? 0.7 : 1.0 / 0.7)); }, pre)) ok++;
+         lw.output = ShadeLayerWeightNode::kFacing;
+         for (float bl : { 0.0f, 0.3f, 0.5f, 0.8f, 1.0f })
+         {
+            lw.blend = bl;
+            total++;
+            if (run("Layer Weight facing", lw, [&](int x, int y) {
+                   const double k = std::clamp((double)bl, 0.0, 0.99999), e = k < 0.5 ? 2.0 * k : 0.5 / (1.0 - k);
+                   return S(1.0 - std::pow(std::max(cosNV(x, y), 1e-6), e));
+                }, pre)) ok++;
+         }
+         check(ok == total, "2.6 R/L: Shade Fresnel and Layer Weight match the hand formula", (double)ok, (double)total);
+
+         ok = total = 0;
+         Probe pcol("vec3(uv.x, uv.y, 0.9)");
+         ShadeNormalMapNode nm;
+         nm.strength = 0.7f;
+         nm.ShadeInput(0)->Connect(&pcol);
+         total++;
+         if (run("Normal Map", nm, [&](int x, int y) {
+                const D3 t{ U(x) * 2.0 - 1.0, U(y) * 2.0 - 1.0, 0.8 }, r = nrm({ t.x * 0.7, t.y * 0.7, 1.0 + (t.z - 1.0) * 0.7 });
+                return V{ r.x, r.y, r.z };
+             }, pre)) ok++;
+         ShadeNormalMapNode nflat; // nothing wired: the flat normal
+         total++;
+         if (run("Normal Map unwired", nflat, [&](int, int) { return V{ 0.0, 0.0, 1.0 }; }, pre)) ok++;
+         check(ok == total, "2.6 R/L: Shade Normal Map, strength 0.7 and unwired", (double)ok, (double)total);
+
+         ok = total = 0;
+         using G = ShadeGeometryNode;
+         const std::function<V(int, int)> gref[] = {
+            [&](int x, int y) { return V{ U(x) * 2.0, U(y), 0.2 }; },
+            [&](int x, int y) { const D3 a = Nn(x, y); return V{ a.x, a.y, a.z }; },
+            [&](int x, int y) {
+               const D3 a = Nn(x, y), d{ U(x) - 0.5, -0.2, U(y) - 0.5 }, r{ d.z, 0.0, -d.x };
+               D3 c = crs(r, a); c.x += 1e-7;
+               const D3 t = crs(a, nrm(c));
+               return V{ t.x, t.y, t.z };
+            },
+            [&](int, int) { return V{ Vv.x, Vv.y, Vv.z }; },
+            [&](int, int y) { return S(back(y) ? 1.0 : 0.0); },
+            [&](int x, int) { return S(U(x) * 0.3); },
+            [&](int, int y) { return S(U(y) * 0.6); },
+            [&](int x, int y) { return S(U(x) * U(y)); },
+         };
+         for (int o = 0; o < 8; o++)
+         {
+            G gnode;
+            gnode.output = o;
+            total++;
+            if (run(G::OutputNames()[o].c_str(), gnode, gref[o], pre)) ok++;
+         }
+         check(ok == total, "2.6 R/L: Shade Geometry, 8 outputs", (double)ok, (double)total);
+         printf("    2.6 worst error so far %.3f x tolerance, %d node programs off in all\n", worst, bad);
+      }
+   }
+
+   // ---- 2.6: Shade Bump into Material's normal pin writes `height`; the sphere's shading changes on L, and the
+   // base still comes from the chain on the field pin.
+   {
+      struct Probe : ShadeNode
+      {
+         std::string e;
+         explicit Probe(const char* s) : e(s) {}
+         std::string Emit(ShadeBuild& b) const override { return b.NewVar(this, e); }
+      };
+      Probe ph("vec3(sin(P.x * 40.0) * sin(P.y * 40.0))"), pbase("vec3(0.8, 0.8, 0.8)");
+      ShadeBumpNode bump;
+      bump.strength = 0.5f; bump.distance = 0.2f; bump.invert = true;
+      bump.ShadeInput(0)->Connect(&ph);
+      MaterialNode bmat;
+      bmat.input = &sphereG;
+      bmat.FieldInput().Connect(&pbase);
+      const int flat = bmat.GetMaterial().fieldProgram;
+      bmat.MapInput(kMapNormal).Connect(&bump);
+      const float lo[3] = { 0.0f, 0.0f, 0.0f }, hi[3] = { 1.0f, 1.0f, 1.0f };
+      std::string berr;
+      const std::string bsrc = ComposeShadeProgram(std::vector<ShadeOutput>{ { "base", &pbase }, { "normal", &bump } }, lo, hi, berr);
+      printf("    bump program:\n%s", bsrc.c_str());
+      check(bsrc.find("height = sh") != std::string::npos && bsrc.find(".x * (-0.1)") != std::string::npos && bsrc.find("base = sh") != std::string::npos,
+            "2.6: Bump on the normal pin writes height = h x strength x distance, inverted", (double)bsrc.size(), 0);
+      const int bid = bmat.GetMaterial().fieldProgram;
+      const Field::MaterialProgramEntry* be = bid > 0 ? Field::FindMaterialProgram(bid) : nullptr;
+      check(bid > 0 && bid != flat && be && (be->written & (1u << Field::MaterialOutputBit("height"))) != 0,
+            "2.6: the Material registers a program that writes height", (double)bid, (double)flat);
+      std::vector<float> pf, pb2;
+      engine::Frame ff = frame, fb = frame;
+      ff.instances[2].fieldProgram = flat;
+      ff.fieldMsl = Field::BuildMaterialLibrary({ flat }, Field::MaterialLang::Msl, ff.fieldMslKey);
+      fb.instances[2].fieldProgram = bid;
+      fb.fieldMsl = Field::BuildMaterialLibrary({ bid }, Field::MaterialLang::Msl, fb.fieldMslKey);
+      const bool okf = flat > 0 && raster->Render(*img, ff, nullptr) && raster->Render(*img, ff, nullptr) && ReadRect(img->GlTexture(), W, H, pf);
+      const bool okb = bid > 0 && raster->Render(*img, fb, nullptr) && raster->Render(*img, fb, nullptr) && ReadRect(img->GlTexture(), W, H, pb2);
+      const std::string perr = bid > 0 ? Field::MaterialProgramError(bid) : std::string("no program");
+      if (!perr.empty()) printf("    bump program error: %s\n", perr.c_str());
+      check(perr.empty(), "2.6 L: bump program compiles", (double)perr.size(), 0);
+      size_t changed = 0;
+      for (size_t i = 0; okf && okb && i + 3 < pf.size() && i + 3 < pb2.size(); i += 4)
+         if (std::fabs(pf[i] - pb2[i]) > 0.03f) changed++;
+      check(okf && okb && changed > (size_t)W * H / 400, "2.6 L: the bump changes the sphere's shading", (double)changed, (double)((size_t)W * H / 400));
    }
 
    // dump for eyes

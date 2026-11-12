@@ -1009,6 +1009,16 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawShadeCombineParams(n);
             else if (auto* n = dynamic_cast<ShadeCurvesNode*>(gn.node.get()))
                DrawShadeCurvesParams(n);
+            else if (auto* n = dynamic_cast<ShadeBumpNode*>(gn.node.get()))
+               DrawShadeBumpParams(n);
+            else if (auto* n = dynamic_cast<ShadeNormalMapNode*>(gn.node.get()))
+               DrawShadeNormalMapParams(n);
+            else if (auto* n = dynamic_cast<ShadeFresnelNode*>(gn.node.get()))
+               DrawShadeFresnelParams(n);
+            else if (auto* n = dynamic_cast<ShadeLayerWeightNode*>(gn.node.get()))
+               DrawShadeLayerWeightParams(n);
+            else if (auto* n = dynamic_cast<ShadeGeometryNode*>(gn.node.get()))
+               DrawShadeGeometryParams(n);
             else if (auto* n = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
                DrawParticleSystemParams(n);
             else if (auto* n = dynamic_cast<ClothNode*>(gn.node.get()))

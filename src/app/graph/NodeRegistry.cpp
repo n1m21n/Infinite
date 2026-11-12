@@ -73,6 +73,11 @@ namespace app
       REGISTER_NODE(ShadeSeparateNode, Shade Separate, "3D");
       REGISTER_NODE(ShadeCombineNode, Shade Combine, "3D");
       REGISTER_NODE(ShadeCurvesNode, Shade Curves, "3D");
+      REGISTER_NODE(ShadeBumpNode, Shade Bump, "3D");
+      REGISTER_NODE(ShadeNormalMapNode, Shade Normal Map, "3D");
+      REGISTER_NODE(ShadeFresnelNode, Shade Fresnel, "3D");
+      REGISTER_NODE(ShadeLayerWeightNode, Shade Layer Weight, "3D");
+      REGISTER_NODE(ShadeGeometryNode, Shade Geometry, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
       REGISTER_NODE(ClothNode, Cloth, "3D");
       REGISTER_NODE(RigidBodyNode, Rigid Bodies, "3D");

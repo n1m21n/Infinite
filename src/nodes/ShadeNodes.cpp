@@ -823,19 +823,137 @@ std::string ShadeCurvesNode::Emit(ShadeBuild& sb) const
    return sb.NewVar(this, "mix(" + in + ", " + curved + ", " + FP(std::clamp(factor, 0.0f, 1.0f)) + ")");
 }
 
-std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err,
-                                std::vector<const ShadeNode*>* images)
+std::string ShadeBumpNode::Emit(ShadeBuild& b) const
+{
+   const std::string h = b.Input(mHeight, "");
+   if (!h.empty()) b.heights.push_back(h + ".x * " + FP(strength * distance * (invert ? -1.0f : 1.0f)));
+   return Vector(b, mNormal, "vec3(0.0, 0.0, 1.0)");
+}
+
+std::string ShadeNormalMapNode::Emit(ShadeBuild& b) const
+{
+   // Blender's strength: the normal leans from flat towards the map, N + (map - N) * strength, then unit length.
+   const std::string c = Vector(b, mColour, "vec3(0.5, 0.5, 1.0)");
+   const std::string t = Local(b, c + " * 2.0 - vec3(1.0)");
+   const std::string s = FP(strength);
+   return b.NewVar(this, "normalize(vec3(" + t + ".x * " + s + ", " + t + ".y * " + s + ", 1.0 + (" + t + ".z - 1.0) * " + s + "))");
+}
+
+namespace
+{
+   // Unpolarised Fresnel reflectance of a dielectric at cos(angle) c for relative index eta (the textbook form):
+   // g = sqrt(eta^2 - 1 + c^2), F = 1/2 ((g - c) / (g + c))^2 (1 + ((c (g + c) - 1) / (c (g - c) + 1))^2); 1 past the
+   // critical angle. Returns a scalar local.
+   std::string Fresnel(ShadeBuild& b, const std::string& eta)
+   {
+      const std::string c = Local(b, "abs(dot(N, V))");
+      const std::string e = Local(b, eta);
+      const std::string g2 = Local(b, e + " * " + e + " - 1.0 + " + c + " * " + c);
+      const std::string g = Local(b, "sqrt(max(" + g2 + ", 0.0))");
+      const std::string A = Local(b, "(" + g + " - " + c + ") / (" + g + " + " + c + ")");
+      const std::string B = Local(b, "(" + c + " * (" + g + " + " + c + ") - 1.0) / (" + c + " * (" + g + " - " + c + ") + 1.0)");
+      return Local(b, "if(" + g2 + " > 0.0, 0.5 * " + A + " * " + A + " * (1.0 + " + B + " * " + B + "), 1.0)");
+   }
+}
+
+std::string ShadeFresnelNode::Emit(ShadeBuild& b) const
+{
+   const std::string i = "max(" + Scalar(b, mIor, ior) + ", 0.00001)";
+   const std::string f = Fresnel(b, "if(backfacing > 0.5, 1.0 / " + i + ", " + i + ")");
+   return b.NewVar(this, "vec3(" + f + ")");
+}
+
+const std::vector<std::string>& ShadeLayerWeightNode::OutputNames()
+{
+   static const std::vector<std::string> k = { "Fresnel", "Facing" };
+   return k;
+}
+
+std::string ShadeLayerWeightNode::Emit(ShadeBuild& b) const
+{
+   const std::string bl = Scalar(b, mBlend, blend);
+   if (output == kFacing)
+   {
+      // An unwired blend is folded here (a constant scalar local would be hoisted out of a Pixel program).
+      std::string e;
+      if (dynamic_cast<const ShadeNode*>(mBlend.Resolved()))
+      {
+         const std::string k = Local(b, "clamp(" + bl + ", 0.0, 0.99999)");
+         e = Local(b, "if(" + k + " < 0.5, 2.0 * " + k + ", 0.5 / (1.0 - " + k + "))");
+      }
+      else
+      {
+         const float k = std::clamp(blend, 0.0f, 0.99999f);
+         e = FP(k < 0.5f ? 2.0f * k : 0.5f / (1.0f - k));
+      }
+      return b.NewVar(this, "vec3(1.0 - pow(max(abs(dot(N, V)), 0.000001), " + e + "))");
+   }
+   const std::string i = "max(1.0 - " + bl + ", 0.00001)";
+   const std::string f = Fresnel(b, "if(backfacing > 0.5, " + i + ", 1.0 / " + i + ")");
+   return b.NewVar(this, "vec3(" + f + ")");
+}
+
+const std::vector<std::string>& ShadeGeometryNode::OutputNames()
+{
+   static const std::vector<std::string> k = { "Position", "Normal", "Tangent", "Incoming", "Backfacing",
+                                               "Curvature", "Cavity", "Random" };
+   return k;
+}
+
+std::string ShadeGeometryNode::Emit(ShadeBuild& b) const
+{
+   switch (output)
+   {
+   case kNormal: return b.NewVar(this, "N");
+   case kTangent:
+   {
+      // Blender's default tangent: around the up axis (Y here) through the middle of the bounds, laid into the surface.
+      const std::string d = Local(b, b.Generated() + " - vec3(0.5)");
+      const std::string r = Local(b, "vec3(" + d + ".z, 0.0, 0.0 - " + d + ".x)");
+      return b.NewVar(this, "cross(N, normalize(cross(" + r + ", N) + vec3(0.0000001, 0.0, 0.0)))");
+   }
+   case kIncoming: return b.NewVar(this, "V");
+   case kBackfacing: return b.NewVar(this, "vec3(backfacing)");
+   case kCurvature: return b.NewVar(this, "vec3(curvature)");
+   case kCavity: return b.NewVar(this, "vec3(cavity)");
+   case kRandom: return b.NewVar(this, "vec3(objrand)");
+   default: return b.NewVar(this, "W");
+   }
+}
+
+std::string ComposeShadeProgram(const std::vector<ShadeOutput>& outs, const float lo[3], const float hi[3],
+                                std::string& err, std::vector<const ShadeNode*>* images)
 {
    ShadeBuild b;
    for (int i = 0; i < 3; i++) { b.lo[i] = lo[i]; b.hi[i] = hi[i]; }
    b.depth = 1;
-   const std::string v = out->Emit(b);
+   std::string tail;
+   for (const ShadeOutput& o : outs)
+   {
+      if (!o.node) continue;
+      std::string v;
+      auto it = b.vars.find(o.node);
+      if (it != b.vars.end()) v = it->second;
+      else { v = o.node->Emit(b); b.vars[o.node] = v; }
+      const std::string ch = o.channel;
+      // A coordinate on its own shows as a colour, as Blender shows a vector wired into Base Color.
+      const bool scalar = ch == "roughness" || ch == "metallic" || ch == "opacity";
+      tail += ch + " = " + v + (scalar ? ".x" : "") + "\n";
+   }
    if (!b.error.empty())
    {
       err = b.error;
       return std::string();
    }
    if (images) *images = b.images;
-   // A coordinate on its own shows as a colour, as Blender shows a vector wired into Base Color.
-   return b.body + "base = " + v + "\n";
+   std::string hsum;
+   for (const std::string& t : b.heights) hsum += (hsum.empty() ? "" : " + ") + t;
+   if (!hsum.empty()) tail += "height = " + hsum + "\n";
+   return tail.empty() ? std::string() : b.body + tail;
+}
+
+std::string ComposeShadeProgram(const ShadeNode* out, const float lo[3], const float hi[3], std::string& err,
+                                std::vector<const ShadeNode*>* images)
+{
+   return ComposeShadeProgram(std::vector<ShadeOutput>{ { "base", out } }, lo, hi, err, images);
 }

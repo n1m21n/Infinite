@@ -262,7 +262,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       FldMat fo;
       fo.base = base; fo.roughness = hitRough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
       fo.emission = hitEm; fo.opacity = 1.0; fo.mask = 1.0;
-      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
+      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, float4(0.0), maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
       base = max(fo.base, float3(0.0)); metal = clamp(fo.metallic, 0.0, 1.0); hitRough = clamp(fo.roughness, 0.045, 1.0); hitEm = fo.emission;
    }
 #endif
@@ -634,7 +634,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const float3 em0 = float3(m.mat.emission) * emMap;
       o.base = base; o.roughness = roughIn; o.metallic = metalIn; o.normal = float3(0.0, 0.0, 1.0); o.height = 0.0;
       o.emission = em0; o.opacity = alpha; o.mask = 1.0;
-      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
+      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), float4(dot(in.n, f.eye.xyz - in.wp) < 0.0 ? 1.0 : 0.0, 0.0, 0.0, 0.0), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
       fldDh = float2(dfdx(o.height), dfdy(o.height));
       base = o.base; roughIn = o.roughness; metalIn = o.metallic; fldEmD = o.emission - em0; alpha = o.opacity;
       fldNrm = o.normal;
@@ -1477,12 +1477,29 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          // Field material program (row 1.3): after the maps, before the cut; it replaces what it writes. Height is not
          // traced (no screen derivatives at a ray hit); the normal goes through the triangle's uv frame below.
          float3 fldNrm = float3(0.0, 0.0, 1.0);
+         float2 fldDh = float2(0.0); float3 fldE1 = float3(0.0), fldE2 = float3(0.0);
          if (fldOn)
          {
             FldMat fo;
             fo.base = base; fo.roughness = rough; fo.metallic = metal; fo.normal = float3(0.0, 0.0, 1.0); fo.height = 0.0;
             fo.emission = float3(I.mat.emission) * emMap; fo.opacity = alpha; fo.mask = 1.0;
-            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), lod);
+            const float4 fldG = float4(backHit ? 1.0 : 0.0, 0.0, 0.0, 0.0);
+            const float4 fldI = float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3);
+            fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, fldG, maps, fldI, lod);
+            if (b == 0 && !hairM && fldMatHasHeight(int(abs(I.mat.program) + 0.5)))
+            {
+               // Row 2.6 bump: no screen derivatives at a ray hit, so the height is read twice more, a step along
+               // each triangle edge (about a pixel wide at this distance); the two differences are the gradient.
+               const float3 le1 = q1 - p0, le2 = q2 - p0;
+               const float3 we1 = (I.normalM * float4(le1, 0.0)).xyz, we2 = (I.normalM * float4(le2, 0.0)).xyz;
+               const float stp = max(h.distance, 1e-3) * 1e-3;
+               const float k1 = stp / max(length(we1), 1e-12), k2 = stp / max(length(we2), 1e-12);
+               FldMat fa = fo, fb = fo;
+               fldMatDispatch(int(abs(I.mat.program) + 0.5), fa, lp + le1 * k1, n, uv + (t1 - t0) * k1, f.fld.x, p + we1 * k1, -d, fldG, maps, fldI, lod);
+               fldMatDispatch(int(abs(I.mat.program) + 0.5), fb, lp + le2 * k2, n, uv + (t2 - t0) * k2, f.fld.x, p + we2 * k2, -d, fldG, maps, fldI, lod);
+               fldDh = float2(fa.height - fo.height, fb.height - fo.height);
+               fldE1 = we1 * k1; fldE2 = we2 * k2;
+            }
             base = fo.base; rough = clamp(fo.roughness, 0.045, 1.0); metal = clamp(fo.metallic, 0.0, 1.0);
             fldEm = fo.emission; fldEmSet = true; alpha = fo.mask < 0.5 ? 0.0 : fo.opacity; fldNrm = fo.normal;
          }
@@ -1529,6 +1546,14 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                if (backHit) { tg = -tg; bt = -bt; }
                n = normalize(tg * fldNrm.x + bt * fldNrm.y + n * fldNrm.z);
             }
+         }
+         if (any(fldDh != float2(0.0)))
+         {
+            // The same surface gradient as the raster: n' = |det| n - sign(det) (dh1 r1 + dh2 r2).
+            const float3 r1 = cross(fldE2, n), r2 = cross(n, fldE1);
+            const float det = dot(fldE1, r1);
+            const float3 nb = abs(det) * n - sign(det) * (fldDh.x * r1 + fldDh.y * r2);
+            if (dot(nb, nb) > 1e-30) n = normalize(nb);
          }
 #endif
       }

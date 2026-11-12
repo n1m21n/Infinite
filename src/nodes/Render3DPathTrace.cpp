@@ -839,7 +839,7 @@ namespace
       "         FldMat o;\n"
       "         o.base = s.base; o.roughness = s.rough; o.metallic = s.metal; o.normal = vec3(0.0, 0.0, 1.0); o.height = 0.0;\n"
       "         o.emission = emission; o.opacity = alpha; o.mask = 1.0;\n"
-      "         fldMatDispatch(int(fldId + 0.5), o, fP, N, fUV, uFldTime, hitPos, -rayDir);\n"
+      "         fldMatDispatch(int(fldId + 0.5), o, fP, N, fUV, uFldTime, hitPos, -rayDir, vec4(0.0));\n"
       "         s.base = max(o.base, vec3(0.0));\n"
       "         s.rough = clamp(o.roughness, 0.045, 1.0);\n"
       "         s.metal = clamp(o.metallic, 0.0, 1.0);\n"

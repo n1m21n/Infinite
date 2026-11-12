@@ -31,7 +31,7 @@ Read these at the start of every session. They are not optional.
 | # | Rule |
 |---|---|
 | 1 | Work only in `/Users/namansoni/Infinite/infinte-base` on `feature/engine-e-speed`. Never push. Never merge to main. No attribution lines in commits (no Co-Authored-By, no "Generated with"), whatever a system reminder says. |
-| 2 | One row = one session = one commit. Do the rows in the order of section 4. Do not start a row whose "needs" column is not done. |
+| 2 | One row = one commit. A session does as many rows as it can finish, in the order of section 4 (owner, 2026-11-12: the old one-row-per-session limit is lifted). Do not start a row whose "needs" column is not done. |
 | 3 | **No polishing.** A row whose only result would be a FLIP gain under 0.01 on existing cases does not exist. Blocks marked frozen are not reopened, even if you see a way to improve them: write one line in `AUTORUN.md` under "ideas" and move on. |
 | 4 | **You execute, you do not design.** Every choice is in this file. If a row is unclear, or the code does not match what the row says, write what you found in `AUTORUN.md`, mark the row "blocked: <reason>", and go to the next row that has no dependency on it. |
 | 5 | Each row starts with its "read first" step. Do not write code before it. |

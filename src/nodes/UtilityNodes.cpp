@@ -91,13 +91,14 @@ Material MaterialNode::GetMaterial() const
    m.alphaCutoff = alphaCutoff;
    m.textureAlpha = textureAlpha;
    m.opacityMapped = mMaps[kMapOpacity].Resolved() != nullptr;
+   std::vector<ShadeOutput> outs;
    if (auto* fp = dynamic_cast<FieldPixelNode*>(mField.Resolved()))
    {
       m.fieldProgram = fp->MaterialProgramId();
       if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
          m.opacityMapped = true;
    }
-   else if (auto* sh = dynamic_cast<ShadeNode*>(mField.Resolved()))
+   else if (ShadeOutputs(outs))
    {
       // Generated normalises by the object-space bounds of the mesh this material wraps.
       const unsigned long long rev = input ? input->MeshRevision() : 0;
@@ -119,7 +120,7 @@ Material MaterialNode::GetMaterial() const
       }
       std::string err;
       std::vector<const ShadeNode*> images;
-      const std::string src = ComposeShadeProgram(sh, mShadeLo, mShadeHi, err, &images);
+      const std::string src = ComposeShadeProgram(outs, mShadeLo, mShadeHi, err, &images);
       for (size_t k = 0; k < images.size() && k < 4; k++)
       {
          m.fieldImage[k] = images[k]->ShadeImageTexture();
@@ -133,6 +134,8 @@ Material MaterialNode::GetMaterial() const
             fprintf(stderr, "[Material] shading chain: %s\n", err.c_str());
       }
       m.fieldProgram = mShadeProgram;
+      if (m.fieldProgram != 0 && Field::MaterialProgramSeeThrough(m.fieldProgram))
+         m.opacityMapped = true;
    }
    m.normalStrength = normalStrength;
    m.detailScale = detailScale;
@@ -155,6 +158,21 @@ unsigned long long MaterialNode::MaterialRevision() const
 unsigned int MaterialNode::GetSurfaceTexture()
 {
    return GetMaterialTexture(kMapAlbedo);
+}
+
+bool MaterialNode::ShadeOutputs(std::vector<ShadeOutput>& outs) const
+{
+   outs.clear();
+   const ShadeNode* base = dynamic_cast<const ShadeNode*>(mField.Resolved());
+   if (!base) base = dynamic_cast<const ShadeNode*>(mMaps[kMapAlbedo].Resolved());
+   if (base) outs.push_back({ "base", base });
+   static const struct { int map; const char* channel; } kPins[] = {
+      { kMapRoughness, "roughness" }, { kMapMetallic, "metallic" }, { kMapNormal, "normal" },
+      { kMapEmission, "emission" },   { kMapOpacity, "opacity" },
+   };
+   for (const auto& p : kPins)
+      if (auto* n = dynamic_cast<const ShadeNode*>(mMaps[p.map].Resolved())) outs.push_back({ p.channel, n });
+   return !outs.empty();
 }
 
 unsigned int MaterialNode::GetMaterialTexture(int map)

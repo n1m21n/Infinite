@@ -1194,6 +1194,39 @@ namespace app
    }
 
 
+   void DrawShadeBumpParams(ShadeBumpNode* n)
+   {
+      ModSlider("strength", &n->strength, 0.0f, 1.0f);
+      ModSlider("distance", &n->distance, 0.0f, 1.0f);
+      ModCheckbox("invert", &n->invert);
+   }
+
+
+   void DrawShadeNormalMapParams(ShadeNormalMapNode* n)
+   {
+      ModSlider("strength", &n->strength, 0.0f, 2.0f);
+   }
+
+
+   void DrawShadeFresnelParams(ShadeFresnelNode* n)
+   {
+      ModSlider("ior", &n->ior, 1.0f, 3.0f);
+   }
+
+
+   void DrawShadeLayerWeightParams(ShadeLayerWeightNode* n)
+   {
+      DropdownButton("output", ShadeLayerWeightNode::OutputNames(), n->output, [n](int i) { PushUndoCheckpoint(); n->output = i; });
+      ModSlider("blend", &n->blend, 0.0f, 1.0f);
+   }
+
+
+   void DrawShadeGeometryParams(ShadeGeometryNode* n)
+   {
+      DropdownButton("output", ShadeGeometryNode::OutputNames(), n->output, [n](int i) { PushUndoCheckpoint(); n->output = i; });
+   }
+
+
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());

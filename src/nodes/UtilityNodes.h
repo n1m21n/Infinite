@@ -7,6 +7,8 @@
 #include "GeometryOpNodes.h"
 #include "Mesh.h"
 
+struct ShadeOutput;
+
 // --- Comment --------------------------------------------------------------
 // A free-floating annotation. Not part of the signal graph at all - no
 // inputs, no outputs, CookIfNeeded does nothing - so it can be dropped
@@ -422,6 +424,9 @@ private:
    // Row 2.3: the program composed from a Shade chain on `field`, re-registered only when its text changes.
    mutable std::string mShadeSource;
    mutable int mShadeProgram = 0;
+   // Row 2.6: the Shade nodes wired into the field pin (base) and the albedo, roughness, metallic, normal, emission
+   // and opacity pins, as the outputs one composed program writes. False when there is none.
+   bool ShadeOutputs(std::vector<ShadeOutput>& outs) const;
    mutable unsigned long long mShadeBoundsRev = ~0ull;
    mutable float mShadeLo[3] = { 0.0f, 0.0f, 0.0f };
    mutable float mShadeHi[3] = { 1.0f, 1.0f, 1.0f };

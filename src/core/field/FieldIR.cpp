@@ -3269,6 +3269,7 @@ namespace Field
       { "P", DataType::Vec3, 3 },         { "N", DataType::Vec3, 3 },       { "UV", DataType::Vec2, 2 },
       { "W", DataType::Vec3, 3 },         { "V", DataType::Vec3, 3 },       // row 2.3: world position, unit vector to the eye
       { "curvature", DataType::Float, 1 }, { "cavity", DataType::Float, 1 },
+      { "backfacing", DataType::Float, 1 }, { "objrand", DataType::Float, 1 }, // row 2.6: 1 on the back side; per-object random (0 until row 7.2)
    };
    const int kMaterialInputCount = (int)(sizeof(kMaterialInputs) / sizeof(kMaterialInputs[0]));
    const MaterialChannel kMaterialOutputs[] = {
