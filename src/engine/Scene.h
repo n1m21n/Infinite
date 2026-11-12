@@ -29,6 +29,9 @@ namespace engine
       int mesh = 0;
       float model[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };       // column-major, GL conventions
       float normalMatrix[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }; // inverse transpose of model
+      // Row 6.1: settle's motion blur. moving: model at shutter open (shut0) and close (shut1), from the frame before.
+      bool moving = false;
+      float shut0[16] = {}, shut1[16] = {};
       float baseSrgb[3] = { 0.8f, 0.8f, 0.8f };
       float metallic = 0.0f;
       float roughness = 0.5f;

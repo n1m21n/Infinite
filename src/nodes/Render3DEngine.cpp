@@ -43,6 +43,9 @@ struct Render3DNode::EngineState
    bool exportWarm = false; // the live history is already converged by an earlier exported frame
    double offlineAt = -1.0; // the transport time of the last offline cook (a repeat cook at it reuses the picture)
    double profWarmGpu = 0.0; // INFINITE_ENGINE_PROF: GPU ms of this frame's warm-up renders
+   // Row 6.1: each plain source's model on the last cooked frame, for settle's motion blur (as the GL path's mPrevModel).
+   std::unordered_map<const void*, Mat4> prevModel, curModel;
+   double motionAt = -1.0; // the transport time of curModel; a cook at a new time moves it to prevModel
    std::vector<float> envPixels;   // the HDRI read back from GL, one mip at most 2048 wide
    int envW = 0, envH = 0, envLod = 0;
    unsigned int envTex = 0;
@@ -296,6 +299,32 @@ namespace
    }
 }
 
+// General 4x4 inverse (cofactors); false when singular.
+static bool Invert4(const float* m, float* o)
+{
+   float inv[16];
+   inv[0] = m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10];
+   inv[4] = -m[4]*m[10]*m[15] + m[4]*m[11]*m[14] + m[8]*m[6]*m[15] - m[8]*m[7]*m[14] - m[12]*m[6]*m[11] + m[12]*m[7]*m[10];
+   inv[8] = m[4]*m[9]*m[15] - m[4]*m[11]*m[13] - m[8]*m[5]*m[15] + m[8]*m[7]*m[13] + m[12]*m[5]*m[11] - m[12]*m[7]*m[9];
+   inv[12] = -m[4]*m[9]*m[14] + m[4]*m[10]*m[13] + m[8]*m[5]*m[14] - m[8]*m[6]*m[13] - m[12]*m[5]*m[10] + m[12]*m[6]*m[9];
+   inv[1] = -m[1]*m[10]*m[15] + m[1]*m[11]*m[14] + m[9]*m[2]*m[15] - m[9]*m[3]*m[14] - m[13]*m[2]*m[11] + m[13]*m[3]*m[10];
+   inv[5] = m[0]*m[10]*m[15] - m[0]*m[11]*m[14] - m[8]*m[2]*m[15] + m[8]*m[3]*m[14] + m[12]*m[2]*m[11] - m[12]*m[3]*m[10];
+   inv[9] = -m[0]*m[9]*m[15] + m[0]*m[11]*m[13] + m[8]*m[1]*m[15] - m[8]*m[3]*m[13] - m[12]*m[1]*m[11] + m[12]*m[3]*m[9];
+   inv[13] = m[0]*m[9]*m[14] - m[0]*m[10]*m[13] - m[8]*m[1]*m[14] + m[8]*m[2]*m[13] + m[12]*m[1]*m[10] - m[12]*m[2]*m[9];
+   inv[2] = m[1]*m[6]*m[15] - m[1]*m[7]*m[14] - m[5]*m[2]*m[15] + m[5]*m[3]*m[14] + m[13]*m[2]*m[7] - m[13]*m[3]*m[6];
+   inv[6] = -m[0]*m[6]*m[15] + m[0]*m[7]*m[14] + m[4]*m[2]*m[15] - m[4]*m[3]*m[14] - m[12]*m[2]*m[7] + m[12]*m[3]*m[6];
+   inv[10] = m[0]*m[5]*m[15] - m[0]*m[7]*m[13] - m[4]*m[1]*m[15] + m[4]*m[3]*m[13] + m[12]*m[1]*m[7] - m[12]*m[3]*m[5];
+   inv[14] = -m[0]*m[5]*m[14] + m[0]*m[6]*m[13] + m[4]*m[1]*m[14] - m[4]*m[2]*m[13] - m[12]*m[1]*m[6] + m[12]*m[2]*m[5];
+   inv[3] = -m[1]*m[6]*m[11] + m[1]*m[7]*m[10] + m[5]*m[2]*m[11] - m[5]*m[3]*m[10] - m[9]*m[2]*m[7] + m[9]*m[3]*m[6];
+   inv[7] = m[0]*m[6]*m[11] - m[0]*m[7]*m[10] - m[4]*m[2]*m[11] + m[4]*m[3]*m[10] + m[8]*m[2]*m[7] - m[8]*m[3]*m[6];
+   inv[11] = -m[0]*m[5]*m[11] + m[0]*m[7]*m[9] + m[4]*m[1]*m[11] - m[4]*m[3]*m[9] - m[8]*m[1]*m[7] + m[8]*m[3]*m[5];
+   inv[15] = m[0]*m[5]*m[10] - m[0]*m[6]*m[9] - m[4]*m[1]*m[10] + m[4]*m[2]*m[9] + m[8]*m[1]*m[6] - m[8]*m[2]*m[5];
+   const float det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12];
+   if (std::fabs(det) < 1e-12f) return false;
+   for (int i = 0; i < 16; i++) o[i] = inv[i] / det;
+   return true;
+}
+
 bool Render3DNode::CookEngine(int frameId)
 {
    if (mEng == nullptr)
@@ -400,6 +429,24 @@ bool Render3DNode::CookEngine(int frameId)
 
    const auto tp1 = std::chrono::steady_clock::now();
    engine::Frame fr;
+   // Motion blur: the last earlier moment cooked gives each source's motion per frame (one step of the transport, as
+   // export and playback step it; several cooks at one moment share it); after a jump back or a long gap there is none.
+   const bool motion = MotionActive();
+   if (motion)
+   {
+      const double now = Transport::Instance().Seconds();
+      if (now != E.motionAt)
+      {
+         const bool step = E.motionAt >= 0.0 && now > E.motionAt && now - E.motionAt < 0.25 && !E.curModel.empty();
+         E.prevModel.swap(E.curModel);
+         if (!step) E.prevModel.clear();
+         E.curModel.clear();
+         E.motionAt = now;
+      }
+   }
+   const bool hasPrev = motion && !E.prevModel.empty();
+   const float shutS = std::clamp(motionShutter, 0.0f, 2.0f);
+   const float shutOpen = motionPosition == 0 ? 0.0f : motionPosition == 2 ? -shutS : -0.5f * shutS;
    auto place = [&](engine::Instance& in, const Mat4& m)
    {
       std::memcpy(in.model, m.m, 64);
@@ -510,7 +557,38 @@ bool Render3DNode::CookEngine(int frameId)
          }
          continue;
       }
-      place(in, src->GetModelMatrix());
+      const Mat4 model = src->GetModelMatrix();
+      place(in, model);
+      if (motion)
+      {
+         // A Transform op bakes its move into the mesh, so the motion is the model matrix times every whole-mesh
+         // Transform up the chain (E); the mesh drawn already carries this frame's Transforms (B), so the shutter
+         // places it at E(time) * B^-1.
+         Mat4 bake = Mat4::Identity();
+         for (IGeometrySource* g = src; g; g = g->PassthroughSource())
+            if (auto* op = dynamic_cast<GeometryOpNode*>(g))
+               if (op->op == GeometryOpNode::kTransform && !op->bypassed && !op->selectionOnly && !FindInstancer(op->input))
+                  bake = Mat4::Multiply(bake, op->TransformMatrix());
+         const Mat4 eff = Mat4::Multiply(model, bake);
+         E.curModel[src] = eff;
+         auto pv = E.prevModel.find(src);
+         float inv[16];
+         if (hasPrev && pv != E.prevModel.end() && std::memcmp(pv->second.m, eff.m, 64) != 0 && Invert4(bake.m, inv))
+         {
+            // linear in the matrix, per frame: open/close = E + (E - prev) * time (frames)
+            in.moving = true;
+            Mat4 a, b, binv;
+            std::memcpy(binv.m, inv, 64);
+            for (int k = 0; k < 16; k++)
+            {
+               const float d = eff.m[k] - pv->second.m[k];
+               a.m[k] = eff.m[k] + d * shutOpen;
+               b.m[k] = eff.m[k] + d * (shutOpen + shutS);
+            }
+            std::memcpy(in.shut0, Mat4::Multiply(a, binv).m, 64);
+            std::memcpy(in.shut1, Mat4::Multiply(b, binv).m, 64);
+         }
+      }
       fr.instances.push_back(in);
    }
 
@@ -767,14 +845,31 @@ bool Render3DNode::CookEngine(int frameId)
       static const float sStop = [] { const char* e = std::getenv("INFINITE_ENGINE_STOP"); return e ? (float)std::atof(e) : 0.05f; }();
       traced = true;
       int done = 0;
+      // Row 6.1, motion blur: the shutter is cut into time slices, two samples each, at radical-inverse times (any
+      // prefix spans the shutter); each slice places the moving instances at its time, and the TLAS follows.
+      bool anyMoving = false;
+      for (const engine::Instance& in : fr.instances) anyMoving = anyMoving || in.moving;
+      unsigned slice = 0;
       while (done < target && traced)
       {
-         const int n = std::min(16, target - done);
+         const int n = std::min(anyMoving ? 2 : 16, target - done);
+         if (anyMoving)
+         {
+            unsigned b = ++slice; float tau = 0.0f, w = 0.5f;
+            for (; b; b >>= 1, w *= 0.5f) if (b & 1) tau += w;
+            for (engine::Instance& in : fr.instances)
+               if (in.moving)
+               {
+                  Mat4 m;
+                  for (int k = 0; k < 16; k++) m.m[k] = in.shut0[k] + (in.shut1[k] - in.shut0[k]) * tau;
+                  place(in, m);
+               }
+         }
          traced = E.raster->PathTrace(*E.img, fr, n, bounces, done == 0, nullptr);
          done += n;
          const float noise = E.raster->PathTraceNoise();
          if (sProf) std::fprintf(stderr, "ENGINE_PROF settle spp=%d noise95=%.4f\n", done, noise);
-         if (sStop > 0.0f && noise >= 0.0f && noise < sStop)
+         if (!anyMoving && sStop > 0.0f && noise >= 0.0f && noise < sStop)
             break;
       }
       E.settled = traced ? target : 0;
