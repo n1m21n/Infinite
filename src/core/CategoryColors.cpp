@@ -29,6 +29,11 @@ struct Preset
    std::string name;
    Table categories; // one entry per NodeFactory category
    UiTheme ui;        // the rest of the app's chrome
+   // fork: user themes (themes/*.json) fill these; built-in presets leave them empty.
+   std::map<int, Color> cables; // per-CableType defaults of this theme (absent = built-in default)
+   bool user = false;
+   std::string file; // path of the JSON file
+   std::string base; // name of the built-in preset it inherits from
 };
 
 // Every preset covers all 10 category keys, in the order RegisterNodes()
@@ -388,24 +393,29 @@ Color WithContrast(const Color& fg, const Color& bgA, const Color& bgB, float mi
 // under WCAG AA. Chrome text has to stay readable, so both text tones are lifted to 4.5:1 against
 // the window, the panel and a text field's well at load. The well is tinted toward the text, so it
 // moves when the text does: a few passes settle it.
-const std::vector<Preset>& Presets()
+void LiftContrast(UiTheme& ui)
 {
-   static const std::vector<Preset> presets = [] {
+   ui.text = WithContrast(ui.text, ui.windowBg, ui.panelBg, kMinTextContrast);
+   for (int pass = 0; pass < 4 && ContrastRatio(ui.text, FieldWellBg(ui)) < kMinTextContrast; ++pass)
+      ui.text = WithContrast(ui.text, FieldWellBg(ui), ui.panelBg, kMinTextContrast + 0.02f);
+   ui.textDim = WithContrast(ui.textDim, ui.windowBg, ui.panelBg, kMinTextContrast);
+   ui.textDim = WithContrast(ui.textDim, FieldWellBg(ui), ui.panelBg, kMinTextContrast);
+}
+
+constexpr size_t kMaxUserThemes = 200;
+
+std::vector<Preset>& PresetsMutable()
+{
+   static std::vector<Preset> presets = [] {
       std::vector<Preset> p = RawPresets();
       for (Preset& preset : p)
-      {
-         UiTheme& ui = preset.ui;
-         ui.text = WithContrast(ui.text, ui.windowBg, ui.panelBg, kMinTextContrast);
-         for (int pass = 0; pass < 4 && ContrastRatio(ui.text, FieldWellBg(ui)) < kMinTextContrast; ++pass)
-            ui.text = WithContrast(ui.text, FieldWellBg(ui), ui.panelBg, kMinTextContrast + 0.02f);
-         ui.textDim = WithContrast(ui.textDim, ui.windowBg, ui.panelBg, kMinTextContrast);
-         ui.textDim = WithContrast(ui.textDim, FieldWellBg(ui), ui.panelBg, kMinTextContrast);
-      }
+         LiftContrast(preset.ui);
       // The brand themes lead the list, together, Ember first: preset 0 is the default for a
       // fresh install (a saved choice is stored by name, so it is unaffected by the order).
       static const char* const kLead[] = { "Infinite Ember", "Infinite Midnight", "Infinite Deep",
                                            "Infinite Mist", "Infinite Paper", "Infinite" };
       std::vector<Preset> ordered;
+      ordered.reserve(p.size() + kMaxUserThemes); // user themes are appended later; refs into the list stay valid
       for (const char* name : kLead)
          for (const Preset& preset : p)
             if (preset.name == name)
@@ -417,6 +427,15 @@ const std::vector<Preset>& Presets()
    }();
    return presets;
 }
+
+const std::vector<Preset>& Presets() { return PresetsMutable(); }
+
+size_t BuiltinCount()
+{
+   static const size_t n = PresetsMutable().size(); // first call happens before any user theme is added
+   return n;
+}
+int gPresetVersion = 0;
 
 int gCurrent = 0;
 
@@ -582,9 +601,14 @@ void LoadAppearanceOverrides()
 const std::vector<std::string>& PresetNames()
 {
    static std::vector<std::string> names;
-   if (names.empty())
+   static int version = -1;
+   if (version != gPresetVersion || names.empty())
+   {
+      names.clear();
       for (const Preset& p : Presets())
          names.push_back(p.name);
+      version = gPresetVersion;
+   }
    return names;
 }
 
@@ -710,6 +734,13 @@ const std::vector<std::string>& CableTypeNames()
 
 Color DefaultCableColor(CableType type, bool light)
 {
+   if (!Presets().empty())
+   {
+      const auto& cm = Presets()[gCurrent].cables; // fork: a user theme may define its cable colours
+      auto ci = cm.find((int)type);
+      if (ci != cm.end())
+         return ci->second;
+   }
    switch (type)
    {
       case CableType::Stream:
@@ -1025,6 +1056,77 @@ int SemanticRank(const std::string& category)
       if (kOrder[i] == category)
          return (int)i;
    return (int)kOrder.size();
+}
+
+int BuiltinPresetCount() { return (int)BuiltinCount(); }
+
+bool IsUserPreset(int index)
+{
+   const auto& p = Presets();
+   return index >= 0 && index < (int)p.size() && p[(size_t)index].user;
+}
+
+const std::string& PresetFile(int index)
+{
+   static const std::string kEmpty;
+   const auto& p = Presets();
+   return index >= 0 && index < (int)p.size() ? p[(size_t)index].file : kEmpty;
+}
+
+const std::string& PresetBase(int index)
+{
+   static const std::string kEmpty;
+   const auto& p = Presets();
+   return index >= 0 && index < (int)p.size() ? p[(size_t)index].base : kEmpty;
+}
+
+int FindPreset(const std::string& name)
+{
+   const auto& p = Presets();
+   for (size_t i = 0; i < p.size(); i++)
+      if (p[i].name == name)
+         return (int)i;
+   return -1;
+}
+
+std::map<std::string, Color> PresetCategoryColors(int index)
+{
+   const auto& p = Presets();
+   return index >= 0 && index < (int)p.size() ? p[(size_t)index].categories : std::map<std::string, Color>();
+}
+
+std::map<int, Color> PresetCableColors(int index)
+{
+   const auto& p = Presets();
+   return index >= 0 && index < (int)p.size() ? p[(size_t)index].cables : std::map<int, Color>();
+}
+
+void SetUserPresets(const std::vector<UserPreset>& themes)
+{
+   auto& all = PresetsMutable();
+   const size_t builtin = BuiltinCount();
+   const std::string keep = gCurrent < (int)all.size() ? all[(size_t)gCurrent].name : std::string();
+   all.resize(builtin);
+   for (const UserPreset& u : themes)
+   {
+      if (all.size() >= builtin + kMaxUserThemes)
+         break;
+      Preset p;
+      p.name = u.name;
+      p.categories = u.categories;
+      p.ui = u.ui;
+      LiftContrast(p.ui);
+      p.cables = u.cables;
+      p.user = true;
+      p.file = u.file;
+      p.base = u.base;
+      all.push_back(std::move(p));
+   }
+   gPresetVersion++;
+   gCurrent = 0;
+   for (size_t i = 0; i < all.size(); i++)
+      if (all[i].name == keep)
+         gCurrent = (int)i;
 }
 
 void LoadPreference()

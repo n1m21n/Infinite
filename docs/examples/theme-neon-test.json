@@ -1,0 +1,8 @@
+{
+  "name": "Neon Test",
+  "base": "Infinite Ember",
+  "colors": { "windowBg": "#10002B", "panelBg": "#240046", "text": "#F8F0FF",
+              "textDim": "#C8A8FF", "border": "#FF00AA", "accent": "#00FFB3" },
+  "categories": { "Source": "#FF006E", "Effects": "#FFBE0B" },
+  "tokens": { "scope.bg": "#00AA55" }
+}

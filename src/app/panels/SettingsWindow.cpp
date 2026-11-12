@@ -6,6 +6,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/ThemeFiles.h" // fork
 #include "core/Transport.h"
 #include "core/gl3.h"
 #include "app/ui/design/components/CodeBlock.h"
@@ -254,6 +255,61 @@ namespace app
             {
                CategoryColors::ResetAllAppearanceBoth();
                ApplyTheme();
+            }
+            ImGui::Spacing();
+
+            // fork: JSON themes (docs/themes.md)
+            {
+               ImGui::SetCursorPosX(FormParts::kLabelW);
+               if (FormParts::Button(L("Create from current")))
+               {
+                  ThemeFiles::CreateFromCurrent(nullptr);
+                  ApplyTheme();
+               }
+               ImGui::SameLine();
+               if (FormParts::Button(L("Open themes folder")))
+                  Platform::RevealInFileManager(ThemeFiles::ThemesDir());
+               ImGui::SameLine();
+               if (FormParts::Button(L("Reload")))
+               {
+                  ThemeFiles::Reload();
+                  ApplyTheme();
+               }
+               for (const std::string& m : ThemeFiles::Messages())
+               {
+                  ImGui::SetCursorPosX(FormParts::kLabelW);
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.55f, 0.35f, 1.0f));
+                  ImGui::TextWrapped("%s", m.c_str());
+                  ImGui::PopStyleColor();
+               }
+               ImGui::SetCursorPosX(FormParts::kLabelW);
+               if (!CategoryColors::IsUserPreset(currentPreset))
+                  ImGui::TextDisabled("%s", T("Built-in theme. Create from current to edit colours in a file."));
+               else
+               {
+                  static const struct { const char* key; const char* label; } kBase[6] = {
+                     { "windowBg", "Window" }, { "panelBg", "Panel" }, { "text", "Text" },
+                     { "textDim", "Dim text" }, { "border", "Border" }, { "accent", "Accent" } };
+                  const CategoryColors::UiTheme& ut = CategoryColors::CurrentUiTheme();
+                  const CategoryColors::Color* cs[6] = { &ut.windowBg, &ut.panelBg, &ut.text, &ut.textDim, &ut.border, &ut.accent };
+                  for (int k = 0; k < 6; k++)
+                  {
+                     float c[3] = { cs[k]->r, cs[k]->g, cs[k]->b };
+                     char id[32];
+                     snprintf(id, sizeof(id), "##basecol_%d", k);
+                     if (k > 0)
+                        ImGui::SameLine(0.0f, 6.0f);
+                     else
+                        ImGui::SetCursorPosX(FormParts::kLabelW);
+                     if (FormParts::ColorDot(id, c))
+                     {
+                        ThemeFiles::SaveBaseColor(kBase[k].key, c[0], c[1], c[2]);
+                        ApplyTheme();
+                     }
+                     if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("%s", kBase[k].label);
+                  }
+               }
             }
             ImGui::Spacing();
 
