@@ -18,14 +18,14 @@
   <link rel="canonical" href="https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html">
   <meta property="og:title" content="One graph for sound and pictures: how Infinite syncs them">
   <meta property="og:description" content="Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.">
-  <meta property="og:image" content="https://infinitedevices.org/assets/blog_one-graph-for-sound-and-pictures.png">
+  <meta property="og:image" content="https://infinitedevices.org/assets/nodegraph.webp">
   <meta property="og:url" content="https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="One graph for sound and pictures: how Infinite syncs them">
   <meta name="twitter:description" content="Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.">
-  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_one-graph-for-sound-and-pictures.png">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/nodegraph.webp">
   <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -45,7 +45,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "BlogPosting"], "headline": "One graph for sound and pictures: how Infinite keeps them in step", "description": "Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.", "datePublished": "2026-10-17", "dateModified": "2026-10-17", "mainEntityOfPage": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html", "url": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html", "image": ["https://infinitedevices.org/assets/blog_one-graph-for-sound-and-pictures.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "architecture, audio, opengl, modulation", "wordCount": 357, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "BlogPosting"], "headline": "One graph for sound and pictures: how Infinite keeps them in step", "description": "Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.", "datePublished": "2026-10-17", "dateModified": "2026-10-17", "mainEntityOfPage": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html", "url": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html", "image": ["https://infinitedevices.org/assets/nodegraph.webp"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "architecture, audio, opengl, modulation", "wordCount": 357, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "One graph for sound and pictures: how Infinite keeps them in step", "item": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html"}]}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
@@ -136,7 +136,7 @@
           <p class="post-lede">Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.</p>
           <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">17 October 2026 · 2 min read</span></span></p>
         </header>
-        <figure class="post-hero"><img src="../assets/blog_one-graph-for-sound-and-pictures.png" alt="A node graph in Infinite with audio and image nodes connected by cables" width="1200" height="675" decoding="async"></figure>
+        <figure class="post-hero"><img src="../assets/nodegraph.webp" alt="A node graph in Infinite with audio and image nodes connected by cables" width="1200" height="675" decoding="async"></figure>
         <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#two-graphs-one-clock">Two graphs, one clock</a></li><li><a href="#modulation-crosses-the-boundary">Modulation crosses the boundary</a></li><li><a href="#why-one-canvas-helps">Why one canvas helps</a></li><li><a href="#try-it">Try it</a></li></ol></details>
         <div class="prose">
 <p>Video tools and audio tools usually live in separate programs. You wire them together with OSC, MIDI clock or a texture-sharing protocol, and you accept a little latency and jitter on the way. Infinite takes a different route: audio and visuals are two parts of one engine that share a transport.</p>

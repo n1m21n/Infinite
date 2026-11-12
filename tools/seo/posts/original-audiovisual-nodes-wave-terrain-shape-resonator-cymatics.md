@@ -5,7 +5,7 @@ description: explore infinite original nodes: convert images to sound with wave 
 date: 2026-10-19
 category: creative
 tags: [wave terrain, shape resonator, cymatics, sound design, creative coding]
-image: assets/blog_original-audiovisual-nodes-wave-terrain-shape-resonator-cymatics.png
+image: assets/blog_original_audiovisual_nodes.png
 image_alt: chladni cymatics and wave terrain standing wave resonance pattern in infinite
 keywords: wave terrain synthesis, shape resonator, 3d mesh to audio, audio displacement, cymatics simulation, desmos synth, equation oscillator
 weight: 100

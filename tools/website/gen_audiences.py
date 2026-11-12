@@ -374,7 +374,7 @@ def lib_thumb(name):
     """The library's own thumbnail for a preset id or an old picture path (assets/.../<id>.ext): the render for art presets, knobs and cables for the rest. None if there is none."""
     i = os.path.splitext(os.path.basename(name))[0]
     for ext in ("webp", "svg"):
-        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=6" % (i, ext)
+        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=7" % (i, ext)
     return None
 
 
@@ -500,6 +500,9 @@ def artists_main(a, rel, hero="blob"):
         bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
         tag, caps, ghost = "Images that move.", "Layers|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(t)}: {e(c)}. {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
+    piano = ('      <section class="aud-section reveal">\n        <h2 class="ax-h">Play a piano</h2>\n'
+             '        <a class="mi-card pn-card" href="piano/"><img src="assets/og/nocturne.jpg" alt="" width="1200" height="630" loading="lazy" decoding="async">'
+             f'<span class="mi-t">Nocturne{icon("play")}</span></a>\n      </section>\n') if hero == "cables" else ""
     watch = ('      <section class="aud-section reveal">\n        <h2 class="ax-h">Sample generator</h2>\n'
              '        <div class="ax-blobframe"><iframe src="samples/?embed=1" title="Sample generator: a glowing blob that plays the loop it makes" loading="lazy"></iframe>'
              '<a class="ax-blobgo" href="samples/">Open the generator</a></div>\n      </section>\n') if hero == "cables" else ""
@@ -555,7 +558,7 @@ def artists_main(a, rel, hero="blob"):
         <h2 class="ax-h">Start with</h2>
         {start_html(a["start"])}
       </section>
-      <section class="aud-section reveal">
+{piano}      <section class="aud-section reveal">
         <h2 class="ax-h">For everyone else</h2>
         <div class="ax-keys">{others_html(rel)}</div>
       </section>

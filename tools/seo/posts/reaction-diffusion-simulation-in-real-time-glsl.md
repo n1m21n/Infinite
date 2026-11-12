@@ -5,7 +5,7 @@ description: How to build a reaction-diffusion simulation in real-time GLSL shad
 date: 2026-10-22
 category: creative
 tags: [reaction diffusion, glsl shaders, creative coding, generative art, turing patterns]
-image: assets/blog_reaction-diffusion-simulation-in-real-time-glsl.png
+image: assets/blog_reaction_diffusion_simulation_in_real_time_glsl.png
 image_alt: Reaction-diffusion simulation diagram showing chemical morphogenesis equations, 9-point Laplacian convolution stencil, and node graph
 keywords: reaction-diffusion simulation in real-time glsl, gray-scott algorithm, turing patterns shader, audio-reactive glsl, reaction diffusion node
 status: published

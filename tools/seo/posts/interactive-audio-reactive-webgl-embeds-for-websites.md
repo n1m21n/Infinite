@@ -5,7 +5,7 @@ description: How to embed responsive, microphone-reactive 3D WebGL visualisers i
 date: 2026-10-20
 category: creative
 tags: [webgl, embeds, visualisers, audio reactive, creative coding]
-image: assets/blog_interactive-audio-reactive-webgl-embeds-for-websites.png
+image: assets/blog_webgl_audio_visualizer_embed.png
 image_alt: interactive webgl audio reactive visual running inside an iframe embed
 keywords: interactive audio visualizer embed, audio reactive webgl embed, iframe music visualizer, embed audio visualizer
 status: published

@@ -335,3 +335,7 @@ html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-m
 .sw-t .ic, .sw-t svg { width: 18px; height: 18px; flex: none; color: var(--signal, #e8745a); }
 @media (max-width: 900px) { .mi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .mi-t { padding: 12px 14px 14px; } }
 @media (prefers-reduced-motion: reduce) { .mi-card, .sw-card, .mi-t svg { transition: none; } .mi-card:hover, .sw-card:hover { transform: none; } }
+
+/* Piano card: one wide card, picture on top */
+.pn-card img { display: block; width: 100%; height: auto; aspect-ratio: 21 / 9; object-fit: cover; background: var(--midnight-950, #0d1020); }
+.pn-card .mi-t .ic { width: 18px; height: 18px; color: var(--signal, #e8745a); }

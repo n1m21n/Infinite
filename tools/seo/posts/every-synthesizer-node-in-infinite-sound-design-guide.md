@@ -5,7 +5,7 @@ description: The complete guide to all 20 synthesizer nodes in Infinite: subtrac
 date: 2026-10-24
 category: creative
 tags: [synthesizers, sound design, modular synth, dsp, wavetable, physical modeling]
-image: assets/blog_every-synthesizer-node-in-infinite-sound-design-guide.png
+image: assets/blog_sound_design_synth.png
 image_alt: modular synthesizer nodes and sound design instruments in Infinite DAW
 keywords: infinite synth nodes, wavetable synthesizer, modular dsp synthesizer, physical modeling synth, granular synthesis daw
 status: published

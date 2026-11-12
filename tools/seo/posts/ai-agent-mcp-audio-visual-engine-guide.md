@@ -4,7 +4,7 @@ description: Connect AI coding agents to Infinite via MCP and Python SDK for hea
 date: 2026-10-19
 category: product
 tags: [ai agents, mcp, python sdk, automation, headless engine]
-image: assets/blog_ai-agent-mcp-audio-visual-engine-guide.png
+image: assets/blog_ai_agent_mcp.png
 image_alt: headless mcp audio-visual synthesis matrix in infinite
 keywords: model context protocol audio, mcp server python, claude desktop mcp audio, cursor ai music generator, headless daw
 status: published

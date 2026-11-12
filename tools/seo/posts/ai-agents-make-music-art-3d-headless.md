@@ -5,7 +5,7 @@ description: Infinite headless engine lets AI agents write text patches, inspect
 date: 2026-10-19
 category: product
 tags: [headless, ai agents, music, 3d]
-image: assets/blog_ai-agents-make-music-art-3d-headless.png
+image: assets/og-image.jpg
 image_alt: Infinite, a free open-source DAW for sound, pictures and 3D
 keywords: ai agent make music, claude generate music and art, headless daw ai, ai 3d generation from text
 status: published

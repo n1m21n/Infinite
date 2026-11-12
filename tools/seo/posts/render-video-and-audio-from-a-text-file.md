@@ -4,7 +4,7 @@ description: Infinite's headless mode turns a plain-text patch into stills, vide
 date: 2026-10-17
 category: product
 tags: [headless, cli, rendering, automation]
-image: assets/blog_render-video-and-audio-from-a-text-file.png
+image: assets/product_canvas_1400.webp
 image_alt: The Infinite node canvas with audio and visual nodes wired together
 keywords: headless daw, render audio from command line, scripted video rendering, ci audio testing
 status: published

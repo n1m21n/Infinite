@@ -4,7 +4,7 @@ description: A beginner walkthrough from a free template to a shape that moves w
 date: 2026-10-17
 category: creative
 tags: [tutorial, audio reactive, beginners, templates]
-image: assets/blog_make-your-first-audio-reactive-visual.png
+image: assets/howto_daw.webp
 image_alt: Infinite open on a patch that makes music and pictures together
 keywords: how to make audio reactive visuals, audio visualizer tutorial, music visualiser free, node based visuals beginner
 status: published

@@ -4,7 +4,7 @@ description: Hand Track, Face Track and Pose Track turn a camera or picture into
 date: 2026-10-17
 category: creative
 tags: [motion tracking, hand tracking, face tracking, interactive art]
-image: assets/blog_motion-tracking-hand-face-pose-modulators.png
+image: assets/og-image.jpg
 image_alt: Infinite showing a live hand landmark overlay beside a node graph
 keywords: motion tracking software free, hand tracking visuals, webcam body tracking music, interactive visuals open source
 status: published

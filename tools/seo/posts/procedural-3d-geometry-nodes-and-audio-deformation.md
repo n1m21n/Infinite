@@ -4,7 +4,7 @@ description: Build procedural 3D meshes in Infinite DAW, deform topology with Fi
 date: 2026-10-19
 category: creative
 tags: [3d graphics, procedural geometry, geometry nodes, creative coding, shaders]
-image: assets/blog_procedural-3d-geometry-nodes-and-audio-deformation.png
+image: assets/blog_procedural_3d_geometry.png
 image_alt: procedural 3d deformed geometry mesh rendered with infinite engine
 keywords: procedural 3d geometry, audio reactive mesh, geometry nodes alternative, real-time 3d daw, field modifier kernel
 status: published

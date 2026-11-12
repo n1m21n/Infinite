@@ -4,7 +4,7 @@ description: why infinite's audio engine is written in modern c++ without a fram
 date: 2026-10-19
 category: product
 tags: [c++, dsp, audio, architecture]
-image: assets/blog_dsp-without-juce.png
+image: assets/nodegraph.webp
 image_alt: infinite modular audio graph canvas and node dsp architecture
 keywords: c++ audio dsp without juce, real-time audio thread allocations, spsc lock-free audio queue, vst3 hosting architecture, field dsp language
 status: published

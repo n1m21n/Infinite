@@ -5,7 +5,7 @@ description: Build procedural 3D trees and fractals using L-system branching, 3D
 date: 2026-11-04
 category: creative
 tags: [l-system, procedural 3d, generative art, creative coding, fractals]
-image: assets/blog_l-system-procedural-3d-branching-fractals.png
+image: assets/blog_l_system_procedural_3d_branching_fractals.png
 image_alt: L-system procedural 3D branching diagram showing rewrite grammar, turtle orientation vectors, tree hierarchy, and node graph
 keywords: l-system procedural 3d branching, procedural plant generation, l-system 3d turtle geometry, generative fractals, procedural tree algorithms
 status: published

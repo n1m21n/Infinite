@@ -5,7 +5,7 @@ description: Explore all 24 note nodes in Infinite: algorithmic arpeggiators, sc
 date: 2026-10-24
 category: creative
 tags: [midi nodes, generative music, sequencing, algorithmic composition, arpeggiator]
-image: assets/blog_every-note-node-in-infinite-generative-sequencing-guide.png
+image: assets/blog_hardware_midi.png
 image_alt: generative midi note nodes and algorithmic sequencers in Infinite DAW
 keywords: generative midi nodes, algorithmic sequencer, arpeggiator node, midi scale quantizer, modular chord generator
 status: published

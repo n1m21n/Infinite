@@ -5,7 +5,7 @@ description: How to build a Lorenz attractor interactive simulation in real time
 date: 2026-10-21
 category: creative
 tags: [lorenz attractor, creative coding, chaos theory, generative art, simulation]
-image: assets/blog_lorenz-attractor-interactive-simulation.png
+image: assets/blog_lorenz_attractor_interactive_simulation.png
 image_alt: Lorenz attractor interactive simulation diagram displaying differential equations, phase space trajectories, and modular node wiring
 keywords: lorenz attractor interactive simulation, lorenz attractor visualizer, strange attractor simulation, creative coding chaos, real time lorenz attractor
 status: published

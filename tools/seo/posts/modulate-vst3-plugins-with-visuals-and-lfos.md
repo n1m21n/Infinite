@@ -4,7 +4,7 @@ description: How to modulate VST3 parameters in Infinite DAW using modular LFOs,
 date: 2026-10-17
 category: creative
 tags: [vst3, au, modulation, plugins, sound design]
-image: assets/blog_modulate-vst3-plugins-with-visuals-and-lfos.png
+image: assets/product_canvas_1400.webp
 image_alt: A plugin host node inside the Infinite canvas
 keywords: modulate vst3 parameters, modular daw plugin hosting, lfo for any plugin, free modular vst host
 status: published

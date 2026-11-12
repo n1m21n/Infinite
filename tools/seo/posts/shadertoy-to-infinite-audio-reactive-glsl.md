@@ -5,7 +5,7 @@ description: How to convert any Shadertoy fragment shader into a native real-tim
 date: 2026-10-19
 category: creative
 tags: [shadertoy, glsl, audio reactive, shaders, creative coding]
-image: assets/blog_shadertoy-to-infinite-audio-reactive-glsl.png
+image: assets/blog_shadertoy_glsl.png
 image_alt: audio reactive glsl shader visual running in infinite
 keywords: shadertoy audio reactive, shadertoy export mp4, glsl visualizer, touchdesigner alternative, audio reactive shader
 status: published
