@@ -983,16 +983,36 @@ const std::vector<std::string>& FieldPixelNode::PresetNames()
    {
       for (const auto& p : Presets())
          kNames.push_back(p.name);
+      for (const auto& p : MaterialPresets())
+         kNames.push_back(std::string("Material: ") + p.name);
    }
    return kNames;
+}
+
+const std::vector<FieldPixelNode::Preset>& FieldPixelNode::MaterialPresets()
+{
+   static const std::vector<Preset> kRecipes = {
+#define FLD_RECIPE(name, code) { name, code },
+#include "FieldMaterialRecipes.h"
+#undef FLD_RECIPE
+   };
+   return kRecipes;
 }
 
 void FieldPixelNode::LoadPreset(int index)
 {
    const auto& p = Presets();
+   const auto& m = MaterialPresets();
    if (index >= 0 && index < (int)p.size())
    {
       code = p[index].code;
+      domain = 0;
+      Apply();
+   }
+   else if (index >= (int)p.size() && index < (int)(p.size() + m.size()))
+   {
+      code = m[index - p.size()].code;
+      domain = 1;
       Apply();
    }
 }

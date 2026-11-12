@@ -184,8 +184,9 @@ public:
       const char* name;
       const char* code;
    };
-   static const std::vector<Preset>& Presets();
-   static const std::vector<std::string>& PresetNames();
+   static const std::vector<Preset>& Presets();           // Image domain
+   static const std::vector<Preset>& MaterialPresets();   // Material domain recipes (rows 3.5, 4.5), FieldMaterialRecipes.h
+   static const std::vector<std::string>& PresetNames();  // Presets() then MaterialPresets(); LoadPreset sets the domain
    void LoadPreset(int index);
 
    // Field build step 17 (.infdev device files) - see FieldElementNode's

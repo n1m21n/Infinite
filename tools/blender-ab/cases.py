@@ -287,6 +287,16 @@ def _wear_masks():
                         {"shape": "monkey", "scale": 0.6, "location": [-0.65, 0, 0.6], "material": dict(blk, wear="cavity")}]}
 
 
+def _wear_groove():
+    # Row 4.5: the three wear recipes on the monkey (grooves round the eyes and ears, sharp brow and ear rims), left to
+    # right edge wear, dirt, dust. Truth rebuilds each recipe from Cycles' pointiness, local AO and normal; its noise is
+    # Blender's own, so the gate is the owner's eye on the sheet, not a number.
+    return {"size": SMALL, "camera": {"fov": 34, "azimuth": 90, "elevation": 25, "distance": 6.4, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 70, "elevation": 45}], "world": {"color": [0.35, 0.35, 0.35]},
+            "objects": [{"shape": "monkey", "scale": 0.42, "location": [x, 0, 0.6], "material": {"recipe": r}}
+                        for x, r in ((1.2, "Edge Wear"), (0.0, "Dirt"), (-1.2, "Dust"))]}
+
+
 def _motion(kind):
     sc = _lineup()
     sc["size"] = SMALL
@@ -378,6 +388,7 @@ CASES.update({
     # A smooth subdivided head and a hard cube: smooth normals, self-shadow, crevices.
     "geom_monkey": _monkey(),
     "wear_masks": _wear_masks(),
+    "wear_groove": _wear_groove(),
     # Motion: a camera orbit, a fast object with motion blur, and a still shot scored for flicker.
     "motion_orbit": _motion("orbit"),
     "motion_blur": _motion("blur"),

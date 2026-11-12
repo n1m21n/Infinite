@@ -237,6 +237,61 @@ def import_model(o, i):
         posed.append((arm, act, o))
 
 
+def add_recipe(mat, p, ob, name):
+    """The FieldMaterialRecipes.h recipe `name` as Cycles nodes. curvature = (pointiness - 0.5) * 125 (the row 4.4
+    calibration), cavity = 1 - local AO at 5 % of the radius, N.y = world Z, fbm = Noise Texture (its own pattern)."""
+    import re
+    hdr = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "nodes", "FieldMaterialRecipes.h")).read()
+    code = dict(re.findall(r'FLD_RECIPE\("([^"]+)", R"FLD\((.*?)\)FLD"\)', hdr, re.S))[name]
+    k = {a: float(b) for a, b in re.findall(r"param float (\w+) = ([-\d.]+)", code)}   # the recipe's defaults
+    nt = mat.node_tree
+    def math(op, a, b=None, clamp=False):
+        n = nt.nodes.new("ShaderNodeMath"); n.operation = op; n.use_clamp = clamp
+        for i, v in enumerate((a, b)):
+            if v is None: continue
+            if isinstance(v, (int, float)): n.inputs[i].default_value = v
+            else: nt.links.new(v, n.inputs[i])
+        return n.outputs[0]
+    def noise(scale, octaves):
+        tc = nt.nodes.new("ShaderNodeTexCoord"); nz = nt.nodes.new("ShaderNodeTexNoise")
+        nz.inputs["Scale"].default_value = scale; nz.inputs["Detail"].default_value = octaves - 1
+        nz.inputs["Roughness"].default_value = 0.5
+        nt.links.new(tc.outputs["Object"], nz.inputs["Vector"]); return nz.outputs["Fac"]
+    def mixc(a, b, f, sock):
+        mx = nt.nodes.new("ShaderNodeMix"); mx.data_type = 'RGBA'
+        mx.inputs[6].default_value = (*a, 1); mx.inputs[7].default_value = (*b, 1)
+        nt.links.new(f, mx.inputs["Factor"]); nt.links.new(mx.outputs[2], sock)
+    def mixf(a, b, f, sock):
+        nt.links.new(math('ADD', a, math('MULTIPLY', f, b - a)), sock)
+    ge = nt.nodes.new("ShaderNodeNewGeometry")
+    if name == "Edge Wear":
+        curv = math('MULTIPLY', math('SUBTRACT', ge.outputs["Pointiness"], 0.5), 125.0)
+        n = math('SUBTRACT', noise(k["scale"], 4), 0.5)
+        e = math('ADD', math('DIVIDE', math('SUBTRACT', curv, k["threshold"]), k["width"]), math('MULTIPLY', n, 2 * k["breakup"]))
+        mr = nt.nodes.new("ShaderNodeMapRange"); mr.interpolation_type = 'SMOOTHSTEP'
+        mr.inputs[1].default_value, mr.inputs[2].default_value = 0.35, 0.65
+        nt.links.new(e, mr.inputs[0]); w = mr.outputs[0]
+        mixc((0.50, 0.07, 0.05), (0.80, 0.78, 0.74), w, p.inputs["Base Color"])
+        nt.links.new(w, p.inputs["Metallic"]); mixf(0.55, 0.25, w, p.inputs["Roughness"])
+        return
+    nn = noise(k["scale"], 5 if name == "Dirt" else 4)
+    if name == "Dirt":
+        vs = [v.co for v in ob.data.vertices]
+        lo = [min(v[k] for v in vs) for k in range(3)]; hi = [max(v[k] for v in vs) for k in range(3)]
+        mid = [(lo[k] + hi[k]) / 2 for k in range(3)]
+        rad = max(sum((v[k] - mid[k]) ** 2 for k in range(3)) for v in vs) ** 0.5
+        ao = nt.nodes.new("ShaderNodeAmbientOcclusion"); ao.samples = 16; ao.only_local = True
+        ao.inputs["Distance"].default_value = 0.05 * rad
+        cav = math('SUBTRACT', 1.0, ao.outputs["AO"])
+        d = math('MULTIPLY', math('MULTIPLY', math('MULTIPLY', cav, k["spread"]), math('ADD', nn, 0.3), clamp=True), k["amount"])
+        mixc((0.70, 0.69, 0.66), (0.10, 0.08, 0.05), d, p.inputs["Base Color"]); mixf(0.4, 0.9, d, p.inputs["Roughness"])
+    elif name == "Dust":
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(ge.outputs["Normal"], sep.inputs[0])
+        up = math('MAXIMUM', sep.outputs["Z"], 0.0)
+        d = math('MULTIPLY', math('MULTIPLY', math('POWER', up, k["sharpness"]), math('ADD', nn, 0.5), clamp=True), k["amount"])
+        mixc((0.04, 0.10, 0.30), (0.60, 0.57, 0.52), d, p.inputs["Base Color"]); mixf(0.3, 1.0, d, p.inputs["Roughness"])
+
+
 posed = []   # (armature, action, object) set to each frame's phase before it renders
 MOTION = scene.get("motion", {})
 moving = []  # (object, velocity m/s) keyed linearly over the motion's frames
@@ -384,6 +439,8 @@ for i, o in enumerate(scene["objects"]):
             ao.samples = 16; ao.only_local = True
             ao.inputs["Distance"].default_value = 0.05 * rad
             nt.links.new(ao.outputs["AO"], em.inputs["Color"])
+    if m.get("recipe"):   # rows 3.5 / 4.5 truth: the recipe rebuilt from Cycles' own masks (pointiness, local AO, normal)
+        add_recipe(mat, p, ob, m["recipe"])
     # Coverage-case lobes. Render 3D's subsurface colour is Cycles' per-channel radius; its 0..1 radius maps to 0.2 m.
     p.inputs["Subsurface Weight"].default_value = m.get("subsurface", 0.0)
     p.inputs["Subsurface Radius"].default_value = m.get("subsurface_color", (1.0, 0.2, 0.1))

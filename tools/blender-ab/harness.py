@@ -83,6 +83,16 @@ def _truth_version():
 BLENDER_TRUTH_VERSION = _truth_version()
 
 
+def recipe_code(name):
+    """A recipe's code from src/nodes/FieldMaterialRecipes.h: FLD_RECIPE("name", R"FLD(code)FLD")."""
+    import re
+    src = open(os.path.join(REPO, "src", "nodes", "FieldMaterialRecipes.h")).read()
+    for n, code in re.findall(r'FLD_RECIPE\("([^"]+)", R"FLD\((.*?)\)FLD"\)', src, re.S):
+        if n == name:
+            return code
+    raise KeyError("no recipe %r in FieldMaterialRecipes.h" % name)
+
+
 def field_texture_code(sh):
     """Row 3.1: a shade_textures texture (checker, brick or gradient on Object coordinates through a Point mapping)
     as hand-written Material-domain Field code: the maths the Shade nodes compose, with their float32 literals.
@@ -399,6 +409,9 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             code = ("base = vec3(0.0)\\nroughness = 1.0\\nemission = vec3(clamp(0.5 + curvature * %r, 0.0, 1.0))" % float(m.get("gain", 0.1))
                     if w == "curvature" else "base = vec3(0.0)\\nroughness = 1.0\\nemission = vec3(1.0 - cavity)")
             fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % code])
+            wires.append("cable %d field %d" % (mat, fp))
+        if m.get("recipe"):   # rows 3.5 / 4.5: a Material recipe from FieldMaterialRecipes.h, its default params
+            fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % recipe_code(m["recipe"]).replace("\n", "\\n")])
             wires.append("cable %d field %d" % (mat, fp))
         if m.get("field"):   # a Field material program writes the case's values over the decoy knobs (linear, as the case)
             code = "base = vec3(%r, %r, %r)\\nmetallic = %r\\nroughness = %r" % (

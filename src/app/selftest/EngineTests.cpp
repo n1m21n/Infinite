@@ -1649,6 +1649,22 @@ bool RunEngineTest()
       check(ew && en && ew->usesWear && !en->usesWear, "4.4: only a program reading curvature or cavity asks for the bake", ew && ew->usesWear, 1);
    }
 
+   // ---- 3.5 / 4.5: every Material recipe lowers and registers; the wear ones ask for the bake
+   {
+      int ok = 0, wear = 0;
+      for (const auto& r : FieldPixelNode::MaterialPresets())
+      {
+         std::string err;
+         const int id = Field::RegisterMaterialProgram(r.code, {}, err);
+         const Field::MaterialProgramEntry* e = id ? Field::FindMaterialProgram(id) : nullptr;
+         if (e && err.empty()) ok++;
+         else printf("    recipe %s: %s\n", r.name, err.c_str());
+         if (e && e->usesWear) wear++;
+      }
+      const int n = (int)FieldPixelNode::MaterialPresets().size();
+      check(ok == n && wear >= 2, "3.5/4.5: every Material recipe compiles", ok, n);
+   }
+
    // dump for eyes
    if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
    {
