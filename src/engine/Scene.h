@@ -179,5 +179,5 @@ namespace engine
       float fieldTime = 0.0f;
    };
 
-   constexpr int kMaxLights = 8;
+   constexpr int kMaxLights = 64;
 }

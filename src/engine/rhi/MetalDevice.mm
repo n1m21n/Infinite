@@ -10,6 +10,7 @@
 #include "nodes/Render3DFresnel.h"
 #include "nodes/Render3DAb.h"
 #include "field/MaterialRegistry.h"
+#include "engine/LightClusters.h"
 
 #include <algorithm>
 #include <cmath>
@@ -710,7 +711,8 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
                      constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
                      texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]], texture2d<float> visF [[texture(6)]],
-                     array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]])
+                     array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]],
+                     constant LightU* LL [[buffer(6)]], constant uint* CL [[buffer(7)]])
 {
    float3 n = normalize(in.n);
    float3 base = float3(m.mat.base);
@@ -857,10 +859,25 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    }
    const float frontD = (1.0 - sssW) * (1.0 - tlW);
    const int count = int(f.params.w);
-   for (int i = 0; i < 8; i++)
+   // Row 5.6: past 8 lights, this pixel's froxel lists the lights that reach it (LightClusters.h); else the first 8.
+   const bool clu = f.fld.y > 8.5;
+   uint cBase = 0u; int iters = count;
+   if (clu)
    {
-      if (i >= count) break;
-      constant LightU& L = f.lights[i];
+      const float4 cp = f.viewProj * float4(in.wp, 1.0);
+      const uint gx = CL[0], gy = CL[1], gz = CL[2];
+      const uint cx = uint(clamp((cp.x / cp.w * 0.5 + 0.5) * float(gx), 0.0, float(gx - 1)));
+      const uint cy = uint(clamp((cp.y / cp.w * 0.5 + 0.5) * float(gy), 0.0, float(gy - 1)));
+      const float zk = log(max(cp.w, as_type<float>(CL[4])) / as_type<float>(CL[4])) / as_type<float>(CL[5]);
+      const uint cz = uint(clamp(floor(zk * float(gz)), 0.0, float(gz - 1)));
+      const uint cell = CL[12u + (cz * gy + cy) * gx + cx];
+      iters = int(cell & 255u); cBase = 12u + CL[3] + (cell >> 8);
+   }
+   for (int k = 0; k < 64; k++)
+   {
+      if (k >= iters) break;
+      const int i = clu ? int(CL[cBase + uint(k)]) : k;
+      constant LightU& L = clu ? LL[i] : f.lights[i];
       const int type = int(L.vec.w);
       const float3 radiance0 = L.color.xyz; // linear * intensity
       if (type == 3) { col += base * (1.0 - metal) * radiance0 * L.terms.x; continue; }
@@ -905,6 +922,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
+         if (atten <= 0.0 && type != 5) continue; // out of reach (cutoff, cone): every term below is scaled by it
       }
       else lightDir = normalize(L.vec.xyz);
       const float3 halfway = normalize(lightDir + viewDir);
@@ -1402,7 +1420,7 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
 }
 // Settle's next-event pick: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
 // weighted by the count and the chance of taking this branch. pL > 0: an emitter, its solid-angle pdf.
-void ptPickLight(constant FrameU& f, const device EmTri* ems, int nEm, float pEm, int count, float3 p, thread uint& seed,
+void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* ems, int nEm, float pEm, int count, float3 p, thread uint& seed,
                  thread float3& ld, thread float3& Le, thread float& tmax, thread float& pL, thread float2& lterms)
 {
    if (nEm > 0 && rnd(seed) < pEm)
@@ -1424,7 +1442,7 @@ void ptPickLight(constant FrameU& f, const device EmTri* ems, int nEm, float pEm
    }
    else if (count > 0)
    {
-      constant LightU& Lt = f.lights[min(int(rnd(seed) * float(count)), count - 1)];
+      constant LightU& Lt = LL[min(int(rnd(seed) * float(count)), count - 1)]; // row 5.6: all N lights
       const int type = int(Lt.vec.w);
       float atten = type == 3 ? 0.0 : 1.0; // ambient arrives through the bounces
       tmax = 1e4;
@@ -1540,6 +1558,7 @@ float3 hgSample(float3 w, float g, float u1, float u2)
 }
 fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
+                      constant LightU* LL [[buffer(6)]],
                       texture2d<float> prev [[texture(0)]], texture2d<float> prevAux [[texture(1)]], texture2d<float> prevGd [[texture(2)]],
                       texture2d<float> ecdf [[texture(3)]],
                       texture2d<float> eLut [[texture(8)]], texture2d<float> et [[texture(9)]],
@@ -1597,7 +1616,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             if (b == 0) { cov = 1.0; alb0 = u.fogC.xyz; n0 = -d; dist0 = s; }
             T *= u.fogC.xyz;
             float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-            ptPickLight(f, ems, nEm, pEm, int(f.params.w), pm, seed, ld, Le, tmax, pL, lterms);
+            ptPickLight(f, LL, ems, nEm, pEm, int(f.fld.y + 0.5), pm, seed, ld, Le, tmax, pL, lterms);
             if (any(Le > 0.0))
             {
                if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
@@ -1853,15 +1872,15 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          continue;
       }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
-      for (int i = 0; i < int(f.params.w) && i < 8; i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
-         if (int(f.lights[i].vec.w) == 3) L += T * base * (1.0 - metal) * f.lights[i].color.xyz * f.lights[i].terms.x;
+      for (int i = 0; i < int(f.fld.y + 0.5); i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
+         if (int(LL[i].vec.w) == 3) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
       // direct light, the same model as the raster
-      const int count = int(f.params.w);
+      const int count = int(f.fld.y + 0.5);
       // next-event estimation: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
       // weighted by the count and the chance of taking this branch (unbiased). Both branches only set up the sample;
       // one shadow ray and one BSDF evaluation below serve either (keeps the kernel small).
       float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-      ptPickLight(f, ems, nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms);
+      ptPickLight(f, LL, ems, nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms);
       // Hair: one place across the fibre per hit (the paper's integral over h), the same for the light and the bounce.
       const float hH = hairM ? rnd(seed) * 2.0 - 1.0 : 0.0;
       const float hBm = clamp(I.mat.roughness, 0.02, 1.0), hBn = -I.mat.hairRadialNeg;
@@ -2003,7 +2022,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             if (!out) break;
             T *= min(Tw, float3(8.0));
             float3 eld = float3(0.0, 1.0, 0.0), eLe = float3(0.0); float etm = 0.0, epL = -1.0; float2 elt = float2(1.0);
-            ptPickLight(f, ems, nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt);
+            ptPickLight(f, LL, ems, nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt);
             const float ec = dot(no, eld);
             if (ec > 1e-5 && any(eLe > 0.0))
             {
@@ -2902,7 +2921,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          Lin3(fr.envHorizonSrgb, f.horizon);
          Lin3(fr.envGroundSrgb, f.ground);
          const int n = (int)std::min<size_t>(fr.lights.size(), engine::kMaxLights);
-         f.params[0] = fr.exposure; f.params[1] = (float)fr.tonemap; f.params[2] = fr.envIntensity; f.params[3] = (float)n;
+         // Row 5.6: params.w keeps the first 8 (every per-pixel loop that walks f.lights); fld.y is all of them, in the
+         // light buffer (mLightAll) the live froxel loop and settle's pick read.
+         f.params[0] = fr.exposure; f.params[1] = (float)fr.tonemap; f.params[2] = fr.envIntensity; f.params[3] = (float)std::min(n, 8);
+         f.fld[1] = (float)n;
+         mLightAll.assign((size_t)std::max(n, 1), LightU{});
          const bool envMap = EnsureEnv(fr);
          f.envm[0] = (envMap ? 1.0f : 0.0f) + (envMap && fr.envBackground ? 2.0f : 0.0f);
          f.envm[1] = fr.envRotationRad; f.envm[2] = fr.envMaxLod; f.envm[3] = fr.envBaseLod;
@@ -2910,21 +2933,28 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          for (int i = 0; i < n; i++)
          {
             const engine::Light& l = fr.lights[i];
-            LightU& o = f.lights[i];
+            LightU& o = mLightAll[(size_t)i];
             std::memcpy(o.vec, l.vec, 12); o.vec[3] = (float)(int)l.type;
             std::memcpy(o.aim, l.aim, 12);
             // aim.w: this light's channel in the half-res shadow mask (directional, point, sun, spot; first four), else -1
             o.aim[3] = -1.0f;
             if (l.type == engine::LightType::Directional || l.type == engine::LightType::Point || l.type == engine::LightType::Sun || l.type == engine::LightType::Spot)
-               if (visCh < 4) o.aim[3] = (float)visCh++;
+               if (visCh < 4 && i < 8) o.aim[3] = (float)visCh++;
             Lin3(l.colorSrgb, o.color, l.intensity);
             o.color[3] = l.castShadow ? 0.0f : 1.0f; // 1: this light is never blocked
             o.terms[0] = l.diffuse; o.terms[1] = l.specular; o.terms[2] = l.falloff; o.terms[3] = l.cutoff;
             o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
             if (l.type == engine::LightType::Directional || l.type == engine::LightType::Sun) o.spot[0] = l.sunAngleDeg; // the disc, for these
+            if (i < 8) f.lights[i] = o;
          }
-
+         mLightBuf = [mDev newBufferWithBytes:mLightAll.data() length:mLightAll.size() * sizeof(LightU) options:MTLResourceStorageModeShared];
+         mClusters.assign(16, 0u);
+         if (n > 8) engine::BuildLightClusters(fr, n, mClusters);
+         mClusterBuf = [mDev newBufferWithBytes:mClusters.data() length:mClusters.size() * sizeof(uint32_t) options:MTLResourceStorageModeShared];
       }
+      std::vector<LightU> mLightAll;
+      std::vector<uint32_t> mClusters;
+      id<MTLBuffer> mLightBuf = nil, mClusterBuf = nil;
       bool Render(SharedImage& target, const engine::Frame& fr, double* gpuMs) override
       {
          MetalImage& img = static_cast<MetalImage&>(target);
@@ -3084,6 +3114,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setFrontFacingWinding:MTLWindingClockwise]; // GL counter-clockwise, mirrored by the y flip
          [enc setVertexBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
+         [enc setFragmentBuffer:mLightBuf offset:0 atIndex:6];
+         [enc setFragmentBuffer:mClusterBuf offset:0 atIndex:7];
          std::vector<RInstH> info(fr.instances.size() + 1);
          for (size_t i = 0; i < fr.instances.size(); i++)
          {
@@ -3500,6 +3532,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e setFragmentBuffer:mArgBuf offset:0 atIndex:3];
             [e setFragmentBuffer:infoBuf offset:0 atIndex:4];
             [e setFragmentBuffer:mEmBuf offset:0 atIndex:5];
+            [e setFragmentBuffer:mLightBuf offset:0 atIndex:6];
             [e setFragmentTexture:ELut() atIndex:8];
             [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];

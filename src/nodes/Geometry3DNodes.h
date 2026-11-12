@@ -589,7 +589,7 @@ public:
    // Most sources one Render 3D draws once Group 3D containers are expanded.
    static const int kMaxDraw = 256;
    // Lights the shader can take. The pins stop at kLightSlots; a Rig may use all of these.
-   static const int kMaxLights = 8;
+   static const int kMaxLights = 64;
 
    static INode* Create() { return new Render3DNode(); }
    static const std::vector<std::string>& ProjectionNames();

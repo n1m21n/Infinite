@@ -1172,7 +1172,7 @@ void Scene3DNode::Sync(int frameId)
       if (auto it2 = mPictureSources.find(it.id); it2 != mPictureSources.end())
          it2->second->Update(node, it.pictureLit);
       unsigned int mask = ~0u;
-      for (size_t i = 0; i < lightOrder.size(); i++)
+      for (size_t i = 0; i < lightOrder.size() && i < 32; i++) // per-item unlit lists cover the first 32 lights
          if (std::find(it.unlit.begin(), it.unlit.end(), lightOrder[i]) != it.unlit.end())
             mask &= ~(1u << i);
       std::unique_ptr<Placed>& placed = mPlaced[it.id];

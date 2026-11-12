@@ -10,6 +10,8 @@
 #include "BenchReport.h"
 #include "ColorSpace.h"
 #include "Render3DSheen.h"
+
+static const int kPtMaxLights = 8; // the GL path tracer keeps its 8-light shader (row 5.6 lifts raster, live, settle)
 #include "Render3DTonemap.h"
 #include "gl3.h"
 
@@ -1629,8 +1631,8 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
 void Render3DPathTrace::SetLights(const std::vector<PtLight>& lights)
 {
    mLights = lights;
-   if ((int)mLights.size() > Render3DNode::kMaxLights)
-      mLights.resize((size_t)Render3DNode::kMaxLights);
+   if ((int)mLights.size() > kPtMaxLights)
+      mLights.resize((size_t)kPtMaxLights);
    ResetAccumulation();
 }
 
@@ -1742,14 +1744,14 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
    if (!EnsureShaders() || !EnsureTargets(width, height))
       return false;
 
-   const int lightCount = std::min((int)mLights.size(), (int)Render3DNode::kMaxLights);
-   int lTypes[Render3DNode::kMaxLights] = {};
-   float lPos[Render3DNode::kMaxLights * 3] = {};
-   float lAim[Render3DNode::kMaxLights * 3] = {};
-   float lCol[Render3DNode::kMaxLights * 3] = {};
-   float lArea[Render3DNode::kMaxLights * 2] = {};
-   float lSpot[Render3DNode::kMaxLights * 3] = {};
-   float lTerms[Render3DNode::kMaxLights * 3] = {};
+   const int lightCount = std::min((int)mLights.size(), (int)kPtMaxLights);
+   int lTypes[kPtMaxLights] = {};
+   float lPos[kPtMaxLights * 3] = {};
+   float lAim[kPtMaxLights * 3] = {};
+   float lCol[kPtMaxLights * 3] = {};
+   float lArea[kPtMaxLights * 2] = {};
+   float lSpot[kPtMaxLights * 3] = {};
+   float lTerms[kPtMaxLights * 3] = {};
    for (int i = 0; i < lightCount; i++)
    {
       const PtLight& l = mLights[(size_t)i];

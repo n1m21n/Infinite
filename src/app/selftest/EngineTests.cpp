@@ -1749,6 +1749,84 @@ bool RunEngineTest()
       check(ssum / (double)settled.size() < 0.08, "settled picture stays close to the raster", ssum / (double)settled.size(), 0.08);
       r.liveEngine = false;
    }
+   if (const char* l64 = getenv("INFINITE_ENGINETEST_LIGHTS64"))
+   {
+      // Row 5.6, case lights_64: the same objects under 64 small point lights (an 8 x 8 grid, each with a cutoff),
+      // drawn on R (GL), L (live) and T (settle). The PPMs go to the named folder; FLIP is measured outside
+      // (tools/blender-ab/lights64.py). Timing: L's frame with 64 lights against the same scene with 8.
+      const int S = 256;
+      Render3DNode::Rig rig64 = rig;
+      rig64.proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 100.0f);
+      rig64.lights.clear();
+      for (int i = 0; i < 64; i++)
+      {
+         Render3DNode::RigLight l;
+         l.type = 1;
+         l.vec[0] = -3.5f + (float)(i % 8); l.vec[1] = -0.6f + 0.25f * (float)((i / 3) % 3); l.vec[2] = -3.5f + (float)(i / 8);
+         const float h = 6.2831853f * (float)i / 64.0f;
+         l.color[0] = 0.55f + 0.45f * std::cos(h); l.color[1] = 0.55f + 0.45f * std::cos(h - 2.094f); l.color[2] = 0.55f + 0.45f * std::cos(h + 2.094f);
+         l.intensity = 0.6f; l.falloff = -1.0f; l.cutoff = 1.6f; l.castShadow = false;
+         rig64.lights.push_back(l);
+      }
+      // The 8-light frame: 8 of them along the diagonal, no cutoff, so every pixel shades all 8 (the old path's work);
+      // the 64-light frame shades the ~8 within each pixel's reach, so the two frames do the same lighting per pixel.
+      Render3DNode::Rig rig8 = rig64;
+      rig8.lights.clear();
+      for (int i = 0; i < 8; i++) { rig8.lights.push_back(rig64.lights[(size_t)(i * 9)]); rig8.lights.back().cutoff = 0.0f; }
+      Render3DNode q;
+      for (int i = 0; i < 4; i++) q.geometry[i] = nodes[i];
+      q.width = (float)S; q.height = (float)S; q.samples = 0; q.hdr = false; q.tonemap = 1;
+      q.rig = &rig64;
+      std::vector<float> pR, pL, pT;
+      auto grab = [&](std::vector<float>& px) { return GLUtil::ReadTexturePixels(scratch, q.GetOutputTexture(), q.GetOutputWidth(), q.GetOutputHeight(), px); };
+      auto ppm = [&](const char* name, const std::vector<float>& px)
+      {
+         FILE* fp = fopen((std::string(l64) + "/" + name).c_str(), "wb");
+         if (!fp) return;
+         fprintf(fp, "P6\n%d %d\n255\n", S, S);
+         for (int y = S - 1; y >= 0; y--)
+            for (int x = 0; x < S; x++)
+               for (int c = 0; c < 3; c++)
+                  fputc((int)std::lround(std::clamp(px[((size_t)y * S + x) * 4 + c], 0.0f, 1.0f) * 255.0f), fp);
+         fclose(fp);
+      };
+      auto timeL = [&](int frames)
+      {
+         std::vector<double> t;
+         for (int i = 0; i < frames + 5; i++)
+         {
+            q.exposure = 1.0f + 0.0001f * (float)(i % 2);
+            const double t0 = NowMs();
+            q.CookIfNeeded(++fnum);
+            glFinish();
+            if (i >= 5) t.push_back(NowMs() - t0);
+         }
+         std::sort(t.begin(), t.end());
+         return t[t.size() / 2];
+      };
+      // One set per rig: R, then L (timed), then T, written as R64/L64/T64 and R8/L8/T8.
+      auto shoot = [&](Render3DNode::Rig* rg, const char* tag)
+      {
+         q.rig = rg; q.liveEngine = false;
+         q.exposure = 1.001f; q.CookIfNeeded(++fnum); q.exposure = 1.0f; q.CookIfNeeded(++fnum);
+         check(grab(pR), "lights_64 R picture", 0, 0); ppm((std::string("R") + tag + ".ppm").c_str(), pR);
+         q.liveEngine = true; q.liveEngineFeatures = 7;
+         const double ms = timeL(40);
+         q.exposure = 1.0f; q.CookIfNeeded(++fnum);
+         check(grab(pL), "lights_64 L picture", 0, 0); ppm((std::string("L") + tag + ".ppm").c_str(), pL);
+         q.liveEngineFeatures = 15; q.ptSamples = 512; q.ptBounces = 4;
+         for (int i = 0; i < 60; i++) q.CookIfNeeded(++fnum);
+         check(grab(pT), "lights_64 T picture", 0, 0); ppm((std::string("T") + tag + ".ppm").c_str(), pT);
+         q.liveEngine = false;
+         return ms;
+      };
+      q.CookIfNeeded(++fnum);
+      const double ms64 = shoot(&rig64, "64");
+      const double ms8 = shoot(&rig8, "8");
+      printf("  lights_64 L frame %.2f ms, 8 lights %.2f ms, ratio %.2f (%dx%d)\n", ms64, ms8, ms64 / std::max(ms8, 1e-3), S, S);
+      check(ms64 / std::max(ms8, 1e-3) < 1.3, "lights_64 L frame under 1.3x the 8-light frame", ms64 / std::max(ms8, 1e-3), 1.3);
+      q.liveEngine = false;
+   }
    if (const char* instEnv = getenv("INFINITE_ENGINETEST_INSTANCES"))
    {
       // R5: one mesh, N copies in one instanced draw. Gates: >= 30 fps at 1M, <= 1.5 GB resident, regenerate <= 100 ms.
