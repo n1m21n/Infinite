@@ -49,6 +49,9 @@ namespace rhi
       // After PathTrace: the 95th-percentile relative error of the accumulated mean over the picture (0.02 = 2 %),
       // or -1 when it was not measured. The export stops sampling a frame once this is small.
       virtual float PathTraceNoise() const { return -1.0f; }
+      // Row 8.4: temporal upscale of the last Render (into `low`, drawn with Frame::keepDepth and a sub-pixel jitter
+      // of jx, jy pixels) to `out`. reset = new camera or scene. False when the device has no temporal scaler.
+      virtual bool Upscale(SharedImage& /*low*/, SharedImage& /*out*/, float /*jx*/, float /*jy*/, bool /*reset*/) { return false; }
       // Times the shader was rebuilt for a new set of Field material programs (Frame::fieldMslKey).
       virtual int FieldLibraryBuilds() const { return 0; }
    };

@@ -18,6 +18,7 @@
 #include <cstring>
 #import <Metal/Metal.h>
 #import <IOSurface/IOSurface.h>
+#import <MetalFX/MetalFX.h>
 #include <OpenGL/CGLIOSurface.h>
 #include <OpenGL/CGLCurrent.h>
 #include <OpenGL/gl3.h>
@@ -2333,7 +2334,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          MTLTextureDescriptor* d =
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:(half ? MTLPixelFormatRGBA16Float : MTLPixelFormatBGRA8Unorm)
                                                                width:w height:h mipmapped:NO];
-         d.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+         d.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite; // ShaderWrite: the upscaler's output
          d.storageMode = MTLStorageModeShared;
          mTex = [dev newTextureWithDescriptor:d iosurface:mSurface plane:0];
          CGLContextObj ctx = CGLGetCurrentContext();
@@ -3227,6 +3228,53 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       std::vector<LightU> mLightAll;
       std::vector<uint32_t> mClusters;
       id<MTLBuffer> mLightBuf = nil, mClusterBuf = nil;
+      bool Upscale(SharedImage& lowImg, SharedImage& outImg, float jx, float jy, bool reset) override
+      {
+         if (@available(macOS 13.0, *))
+         {
+            MetalImage& lo = static_cast<MetalImage&>(lowImg);
+            MetalImage& out = static_cast<MetalImage&>(outImg);
+            if (!mDepth || mDepth.width != (NSUInteger)lo.Width() || mDepth.height != (NSUInteger)lo.Height())
+               return false;
+            const MTLPixelFormat cf = lo.Tex().pixelFormat, of = out.Tex().pixelFormat;
+            id<MTLFXTemporalScaler> fx = (id<MTLFXTemporalScaler>)mFx;
+            if (!fx || mFxW != lo.Width() || mFxH != lo.Height() || mFxOW != out.Width() || mFxOH != out.Height() || mFxFmt != cf)
+            {
+               mFx = nil;
+               if (![MTLFXTemporalScalerDescriptor supportsDevice:mDev])
+                  return false;
+               MTLFXTemporalScalerDescriptor* d = [MTLFXTemporalScalerDescriptor new];
+               d.colorTextureFormat = cf; d.depthTextureFormat = mDepth.pixelFormat; d.motionTextureFormat = MTLPixelFormatRG16Float;
+               d.outputTextureFormat = of;
+               d.inputWidth = lo.Width(); d.inputHeight = lo.Height(); d.outputWidth = out.Width(); d.outputHeight = out.Height();
+               fx = [d newTemporalScalerWithDevice:mDev]; mFx = fx;
+               MTLTextureDescriptor* md = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRG16Float width:lo.Width() height:lo.Height() mipmapped:NO];
+               md.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget; md.storageMode = MTLStorageModePrivate;
+               mFxMotion = [mDev newTextureWithDescriptor:md];
+               if (!fx || !mFxMotion) { mFx = nil; return false; }
+               mFxW = lo.Width(); mFxH = lo.Height(); mFxOW = out.Width(); mFxOH = out.Height(); mFxFmt = cf;
+               reset = true;
+               // The camera holds still between upscaled frames (a move resets the history), so motion stays zero.
+               MTLRenderPassDescriptor* z = [MTLRenderPassDescriptor renderPassDescriptor];
+               z.colorAttachments[0].texture = mFxMotion; z.colorAttachments[0].loadAction = MTLLoadActionClear;
+               z.colorAttachments[0].storeAction = MTLStoreActionStore; z.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
+               id<MTLCommandBuffer> zc = [mQueue commandBuffer];
+               [[zc renderCommandEncoderWithDescriptor:z] endEncoding];
+               [zc commit];
+            }
+            fx.colorTexture = lo.Tex(); fx.depthTexture = mDepth; fx.motionTexture = mFxMotion; fx.outputTexture = out.Tex();
+            fx.inputContentWidth = lo.Width(); fx.inputContentHeight = lo.Height();
+            fx.jitterOffsetX = jx; fx.jitterOffsetY = jy; fx.reset = reset; fx.depthReversed = NO;
+            fx.motionVectorScaleX = 1.0f; fx.motionVectorScaleY = 1.0f;
+            id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+            [fx encodeToCommandBuffer:cb];
+            [cb commit];
+            [cb waitUntilCompleted];
+            return cb.status == MTLCommandBufferStatusCompleted;
+         }
+         return false;
+      }
+
       bool Render(SharedImage& target, const engine::Frame& fr, double* gpuMs) override
       {
          MetalImage& img = static_cast<MetalImage&>(target);
@@ -3354,7 +3402,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          }
          pass.depthAttachment.texture = mDepth;
          pass.depthAttachment.loadAction = prepass ? MTLLoadActionLoad : MTLLoadActionClear;
-         pass.depthAttachment.storeAction = fr.dofAperture > 0.0f ? MTLStoreActionStore : MTLStoreActionDontCare; // the DOF pass reads it
+         pass.depthAttachment.storeAction = (fr.dofAperture > 0.0f || fr.keepDepth) ? MTLStoreActionStore : MTLStoreActionDontCare; // the DOF pass reads it
          pass.depthAttachment.clearDepth = 1.0;
          id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:pass];
          [enc setFragmentTexture:mShadowTex atIndex:0];
@@ -4379,6 +4427,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          return mFogNone;
       }
       id<MTLTexture> mDepth = nil;
+      id mFx = nil;                     // row 8.4: id<MTLFXTemporalScaler> (macOS 13+)
+      id<MTLTexture> mFxMotion = nil;
+      int mFxW = 0, mFxH = 0, mFxOW = 0, mFxOH = 0;
+      MTLPixelFormat mFxFmt = MTLPixelFormatInvalid;
       id<MTLRenderPipelineState> mDofPso = nil;
       MTLPixelFormat mDofFmt = MTLPixelFormatInvalid;
       id<MTLTexture> mDofSrc = nil;

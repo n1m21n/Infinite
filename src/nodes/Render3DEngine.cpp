@@ -34,6 +34,8 @@ struct Render3DNode::EngineState
    std::unique_ptr<rhi::Device> dev;
    std::unique_ptr<rhi::RasterRenderer> raster;
    std::unique_ptr<rhi::SharedImage> img;
+   std::unique_ptr<rhi::SharedImage> imgLo; // row 8.4: the live picture at the upscale percentage
+   bool upReset = true;                     // the upscaler's history starts over on the next frame
    std::vector<std::pair<const void*, unsigned long long>> meshSig;
    unsigned frame = 0;
    unsigned int readFbo = 0;
@@ -349,6 +351,18 @@ bool Render3DNode::CookEngine(int frameId)
    const int h = GLUtil::TargetSide(height, 16);
    if (!EnsureResources(w, h, 1))
       return false;
+   // Row 8.4: interactive live frames render at 67 % and MetalFX's temporal scaler brings them to w x h (boat: 83 -> 53
+   // ms a frame; 8 cases within 0.005 FLIP of native). Export stays native. INFINITE_ENGINE_UPSCALE=<percent> sets
+   // both (0 = off).
+   static const int sUpEnv = [] { const char* e = std::getenv("INFINITE_ENGINE_UPSCALE"); return e ? std::atoi(e) : -1; }();
+   const int sUp = sUpEnv >= 0 ? sUpEnv : (Transport::Instance().IsOfflineMode() ? 0 : 67);
+   const bool up = sUp > 0 && sUp < 100;
+   const int lw = up ? std::max(16, w * sUp / 100) : w, lh = up ? std::max(16, h * sUp / 100) : h;
+   if (up && (!E.imgLo || E.imgLo->Width() != lw || E.imgLo->Height() != lh))
+   {
+      E.imgLo = E.dev->CreateSharedImage(lw, lh, rhi::Format::RGBA8);
+      E.upReset = true;
+   }
    if (!E.img || E.img->Width() != w || E.img->Height() != h)
    {
       E.img = E.dev->CreateSharedImage(w, h, rhi::Format::RGBA8);
@@ -835,6 +849,31 @@ bool Render3DNode::CookEngine(int frameId)
    for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); const int cs = l.castShadow ? 1 : 0; mix(&cs, 4); }
    const bool changed = hsh != E.sceneHash;
    E.sceneHash = hsh;
+   if (changed || meshesChanged) E.upReset = true;
+   // One live frame: native, or (row 8.4) at lw x lh with a Halton sub-pixel jitter, then upscaled into E.img.
+   float vpBase[16];
+   std::memcpy(vpBase, fr.viewProj, 64);
+   auto liveRender = [&](double* g) -> bool
+   {
+      if (!up || !E.imgLo)
+         return E.raster->Render(*E.img, fr, g);
+      auto halton = [](unsigned i, unsigned base) { float f = 1.0f, r = 0.0f; while (i > 0) { f /= (float)base; r += f * (float)(i % base); i /= base; } return r; };
+      const unsigned ji = (E.frame % 32u) + 1u;
+      const float jx = halton(ji, 2) - 0.5f, jy = halton(ji, 3) - 0.5f; // pixels of the low-res picture
+      const float dx = jx * 2.0f / (float)lw, dy = jy * 2.0f / (float)lh;
+      for (int c = 0; c < 4; c++) { fr.viewProj[c * 4 + 0] = vpBase[c * 4 + 0] + dx * vpBase[c * 4 + 3]; fr.viewProj[c * 4 + 1] = vpBase[c * 4 + 1] + dy * vpBase[c * 4 + 3]; }
+      fr.keepDepth = true;
+      const bool ok = E.raster->Render(*E.imgLo, fr, g);
+      std::memcpy(fr.viewProj, vpBase, 64);
+      fr.keepDepth = false;
+      if (ok && E.raster->Upscale(*E.imgLo, *E.img, jx, jy, E.upReset))
+      {
+         E.upReset = false;
+         return true;
+      }
+      E.upReset = true;
+      return E.raster->Render(*E.img, fr, g); // no scaler on this device: native
+   };
    bool traced = false;
    const bool offline = Transport::Instance().IsOfflineMode();
    if (!offline) E.exportWarm = false;
@@ -890,12 +929,13 @@ bool Render3DNode::CookEngine(int frameId)
       // Live look on export: let the temporal GI / reflection history converge as it would on a held frame.
       // The first exported frame converges from nothing; later ones carry the history over (it follows motion, as
       // in playback), so a short top-up does. Later supersample passes reuse it too.
-      const int warm = (fr.gi || fr.rtReflections) && mJitterIndex <= 0 && !(offlineRepeat && E.exportWarm) ? (E.exportWarm ? 24 : 48) : 0;
+      int warm = (fr.gi || fr.rtReflections) && mJitterIndex <= 0 && !(offlineRepeat && E.exportWarm) ? (E.exportWarm ? 24 : 48) : 0;
+      if (up && !offlineRepeat) warm = std::max(warm, E.exportWarm ? 4 : 8); // the upscaler's history fills over jittered frames
       E.exportWarm = true;
       for (int i = 0; i < warm; i++)
       {
          double g = 0.0;
-         if (!E.raster->Render(*E.img, fr, sProf ? &g : nullptr))
+         if (!liveRender(sProf ? &g : nullptr))
             return false;
          E.profWarmGpu += g;
          fr.frameIndex = ++E.frame;
@@ -915,10 +955,11 @@ bool Render3DNode::CookEngine(int frameId)
       }
    }
    const auto tp2 = std::chrono::steady_clock::now();
+   if (traced) E.upReset = true; // the path tracer wrote E.img itself
    if (!traced)
    {
       E.settled = 0;
-      if (!E.raster->Render(*E.img, fr, nullptr))
+      if (!liveRender(nullptr))
          return false;
    }
    // Export steps the counter by the warm-up count, so print every exported frame there.

@@ -1875,6 +1875,7 @@ if(APPLE)
         "-framework AudioToolbox"
         "-framework IOSurface"
         "-framework Metal"
+        "-weak_framework MetalFX"   # row 8.4: temporal upscale, macOS 13+
         # Plugin hosting: AUAudioUnit's -requestViewControllerWithCompletionHandler:
         # lives in CoreAudioKit (AUViewController.h), as does the
         # AUGenericViewController fallback for plugins with no editor of their

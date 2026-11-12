@@ -167,6 +167,7 @@ namespace engine
       float giStrength = 1.0f;
       float giBlend = 0.15f;      // temporal blend toward the new frame when the camera is still
       unsigned frameIndex = 0;
+      bool keepDepth = false;       // row 8.4: keep the depth target after Render (the upscaler reads it)
       bool reuseShadowMask = false; // same camera, scene and lights as the last Render: keep its half-res RT shadow mask
       bool rtReflections = false; // one ray along the reflection vector for glossy surfaces (hit = flat shade, miss = env)
       float rayBias = 0.003f; // origin offset along the normal, scene units
