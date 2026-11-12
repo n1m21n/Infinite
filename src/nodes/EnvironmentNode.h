@@ -67,6 +67,12 @@ public:
    float intensity = 1.0f;
    float rotation = 0.0f; // degrees, about the world Y axis
 
+   // Row 5.5: source 1 = a physical sky made here instead of a file: Preetham, Shirley and Smits 1999 (the Perez
+   // distribution and the turbidity fits for Y, x, y typed from the paper). The sun sits at elevation / azimuth
+   // (degrees; azimuth 0 = +X, 90 = +Z) before `rotation`. The sky only: a sun light is its own Light node.
+   int source = 0;
+   float skyElevation = 45.0f, skyAzimuth = 0.0f, turbidity = 3.0f;
+
    // Sun extraction: the image's light above `sunThreshold` is taken out of the sky and handed to
    // Render 3D as one sun light, so a bright HDRI sun casts a real shadow. 0 = off, so a scene
    // made before this lights the same; Blender's own default is 10.
@@ -84,6 +90,8 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("path", mLoadedPath);
+      v.Int("source", source);
+      v.Float("skyElevation", skyElevation); v.Float("skyAzimuth", skyAzimuth); v.Float("turbidity", turbidity);
       v.Float("intensity", intensity);
       v.Float("rotation", rotation);
       v.Float("sunThreshold", sunThreshold); v.Float("sunAngle", sunAngle);
@@ -93,6 +101,8 @@ public:
 
 private:
    void EnsurePlaceholder();
+   void MakeSky();
+   float mSkyMade[3] = { -1e9f, 0, 0 }; // elevation, azimuth, turbidity of the sky in the texture
    void Upload(const float* pixels, int w, int h);
 
    unsigned int mTex = 0;

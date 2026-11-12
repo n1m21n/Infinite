@@ -298,6 +298,53 @@ unsigned int EnvironmentNode::GetOutputTexture()
    return mTex;
 }
 
+// Row 5.5: Preetham, Shirley, Smits, "A Practical Analytic Model for Daylight" (SIGGRAPH 1999). Sky luminance Y and
+// chromaticity x, y each follow Perez: F(theta, gamma) = (1 + A e^(B / cos theta)) (1 + C e^(D gamma) + E cos^2 gamma),
+// theta the view's zenith angle, gamma its angle to the sun, scaled so the zenith equals the paper's zenith fits.
+// Below the horizon theta is held at the horizon while gamma still follows the view. Y in kcd/m2 * 0.06 (the scale Blender's Preetham sky shows).
+void EnvironmentNode::MakeSky()
+{
+   const double kPi = 3.14159265358979, T = std::max(1.0f, turbidity);
+   const double el = std::clamp((double)skyElevation, 0.0, 90.0) * kPi / 180.0, az = skyAzimuth * kPi / 180.0;
+   const double ts = kPi / 2 - el;                      // the sun's zenith angle
+   const double sd[3] = { std::cos(el) * std::cos(az), std::sin(el), std::cos(el) * std::sin(az) };
+   const double cY[5] = { 0.1787 * T - 1.4630, -0.3554 * T + 0.4275, -0.0227 * T + 5.3251, 0.1206 * T - 2.5771, -0.0670 * T + 0.3703 };
+   const double cx[5] = { -0.0193 * T - 0.2592, -0.0665 * T + 0.0008, -0.0004 * T + 0.2125, -0.0641 * T - 0.8989, -0.0033 * T + 0.0452 };
+   const double cy[5] = { -0.0167 * T - 0.2608, -0.0950 * T + 0.0092, -0.0079 * T + 0.2102, -0.0441 * T - 1.6537, -0.0109 * T + 0.0529 };
+   auto perez = [](const double* c, double th, double g)
+   { return (1.0 + c[0] * std::exp(c[1] / std::cos(th))) * (1.0 + c[2] * std::exp(c[3] * g) + c[4] * std::cos(g) * std::cos(g)); };
+   const double chi = (4.0 / 9.0 - T / 120.0) * (kPi - 2.0 * ts);
+   const double Yz = ((4.0453 * T - 4.9710) * std::tan(chi) - 0.2155 * T + 2.4192) * 0.06;
+   const double t2 = ts * ts, t3 = t2 * ts, T2 = T * T;
+   const double xz = (0.00166 * t3 - 0.00375 * t2 + 0.00209 * ts) * T2 + (-0.02903 * t3 + 0.06377 * t2 - 0.03202 * ts + 0.00394) * T +
+                     (0.11693 * t3 - 0.21196 * t2 + 0.06052 * ts + 0.25886);
+   const double yz = (0.00275 * t3 - 0.00610 * t2 + 0.00317 * ts) * T2 + (-0.04214 * t3 + 0.08970 * t2 - 0.04153 * ts + 0.00516) * T +
+                     (0.15346 * t3 - 0.26756 * t2 + 0.06670 * ts + 0.26688);
+   const double nY = Yz / perez(cY, 0.0, ts), nx = xz / perez(cx, 0.0, ts), ny = yz / perez(cy, 0.0, ts);
+   const int w = 512, h = 256;
+   std::vector<float> px((size_t)w * h * 3);
+   for (int r = 0; r < h; r++)
+   {
+      const double th = kPi * (r + 0.5) / h;             // row 0 the zenith, as dirToEquirect
+      const double thc = std::min(th, kPi / 2 - 0.001);
+      for (int c = 0; c < w; c++)
+      {
+         const double ph = 2.0 * kPi * ((c + 0.5) / w - 0.5);
+         const double d[3] = { std::sin(th) * std::cos(ph), std::cos(th), std::sin(th) * std::sin(ph) }; // gamma from the true view
+         const double g = std::acos(std::clamp(d[0] * sd[0] + d[1] * sd[1] + d[2] * sd[2], -1.0, 1.0));
+         const double Y = nY * perez(cY, thc, g), x = nx * perez(cx, thc, g), y = std::max(ny * perez(cy, thc, g), 1e-6);
+         const double X = x * Y / y, Z = (1.0 - x - y) * Y / y;
+         float* o = &px[((size_t)r * w + c) * 3];
+         o[0] = (float)std::max(0.0, 3.2406 * X - 1.5372 * Y - 0.4986 * Z); // XYZ to linear Rec.709
+         o[1] = (float)std::max(0.0, -0.9689 * X + 1.8758 * Y + 0.0415 * Z);
+         o[2] = (float)std::max(0.0, 0.0557 * X - 0.2040 * Y + 1.0570 * Z);
+      }
+   }
+   Upload(px.data(), w, h);
+   mHasImage = true;
+   mSkyMade[0] = skyElevation; mSkyMade[1] = skyAzimuth; mSkyMade[2] = turbidity;
+}
+
 bool EnvironmentNode::Sun(float dir[3], float light[3]) const
 {
    if (!mHasImage || !mHasSun || sunThreshold <= 0.0f)
@@ -317,6 +364,17 @@ unsigned int EnvironmentNode::GetEnvironmentTexture()
 
 void EnvironmentNode::CookIfNeeded(int /*frameId*/)
 {
+   if (source == 1)
+   {
+      if (!mHasImage || skyElevation != mSkyMade[0] || skyAzimuth != mSkyMade[1] || turbidity != mSkyMade[2] || sunThreshold != mUploadedThreshold)
+         MakeSky();
+      return;
+   }
+   if (mSkyMade[0] > -1e8f) // back from the sky to the file (or to nothing)
+   {
+      mSkyMade[0] = -1e9f; mHasImage = false;
+      ReloadFromPath();
+   }
    if (!mHasImage)
       EnsurePlaceholder();
    else if (sunThreshold != mUploadedThreshold)

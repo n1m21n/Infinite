@@ -615,3 +615,15 @@ def _vol_shaft():
 
 
 CASES["vol_shaft"] = _vol_shaft()
+
+
+# Row 5.5: the physical sky alone (Preetham) against Blender's Preetham sky texture. Sky azimuth 0 = +X, -90 = +Y
+# (in front of an azimuth-90 camera); the camera looks a little up so the horizon sits low in the frame.
+def _sky(elev, az, turb):
+    return {"camera": {"fov": 75, "azimuth": 90, "elevation": -12, "distance": 1.0, "target": [0, 0, 1.0]},
+            "lights": [], "world": {"sky": {"elevation": elev, "azimuth": az, "turbidity": turb}},
+            "size": (256, 256), "objects": []}
+
+
+CASES["sky_noon"] = _sky(55, -70, 3.0)
+CASES["sky_dusk"] = _sky(4, -100, 4.0)

@@ -304,6 +304,17 @@ namespace app
 
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
+      static const std::vector<std::string> kSources = { "Image", "Physical sky" };
+      DropdownButton("source", kSources, n->source, [n](int i) { n->source = i; }, kParamWidth);
+      if (n->source == 1)
+      {
+         ModSlider("sun elevation", &n->skyElevation, 0.0f, 90.0f, "%.1f\xC2\xB0");
+         ModSlider("sun azimuth", &n->skyAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
+         ModSlider("turbidity", &n->turbidity, 1.7f, 10.0f);
+         ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
+         ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
+         return;
+      }
       if (ActionButton::Draw("Choose HDRI...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 

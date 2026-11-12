@@ -672,6 +672,12 @@ wt = sc.world.node_tree
 bg = next(n for n in wt.nodes if n.type == "BACKGROUND")
 bg.inputs["Color"].default_value = (*w.get("color", (0, 0, 0)), 1)
 bg.inputs["Strength"].default_value = w.get("strength", 1.0)
+if w.get("sky"):
+    # Row 5.5: Blender's Preetham sky; sun_direction is Z up, from the case's elevation / azimuth (0 = +X, -90 = +Y).
+    k = w["sky"]; e, a = math.radians(k["elevation"]), math.radians(k["azimuth"])
+    st = wt.nodes.new("ShaderNodeTexSky"); st.sky_type = 'PREETHAM'; st.turbidity = k.get("turbidity", 3.0)
+    st.sun_direction = (math.cos(e) * math.cos(a), -math.cos(e) * math.sin(a), math.sin(e))
+    wt.links.new(st.outputs["Color"], bg.inputs["Color"])
 if w.get("hdri"):
     # Equirect HDRI; its sun lights the scene here, and Infinite's Environment lifts it out as a light.
     tex = wt.nodes.new("ShaderNodeTexEnvironment")

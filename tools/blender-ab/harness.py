@@ -525,6 +525,10 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
         extra += ["  f dofAperture %g" % dof_aperture(cam, width / height),
                  "  f focusDistance %g" % cam.get("focus", cam["distance"])]
     hdri = None
+    if w.get("sky"):
+        k = w["sky"]  # row 5.5: the HDRI node's physical sky, azimuth in Infinite's Y-up frame (Blender +Y = -Z)
+        hdri = node("3D", "HDRI", ["  i source 1", "  f skyElevation %g" % k["elevation"], "  f skyAzimuth %g" % k["azimuth"],
+                                   "  f turbidity %g" % k.get("turbidity", 3.0), "  f intensity %g" % w.get("strength", 1.0)])
     if w.get("hdri"):
         # The HDRI lights, reflects and fills the background; its sun above the threshold becomes a light.
         hdri = node("3D", "HDRI", ["  s path %s" % os.path.join(ASSETS, w["hdri"]),
