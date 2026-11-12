@@ -474,6 +474,8 @@ namespace
       "uniform float uMistIntensity;\n"
       "uniform float uMistHeight;\n"
       "uniform int uObjectIndex;\n"
+      "uniform int uPassMask;\n"
+      "uniform int uDrawSlot;\n"
       "uniform int uSolid;\n"
       "uniform int uSolidLighting;\n"
       "uniform int uSolidColor;\n"
@@ -1040,7 +1042,12 @@ namespace
       "   if (uTwoSided == 1 && !gl_FrontFacing) n = -n;\n"
       // Data passes leave out what is more see-through than the threshold, the way a
       // depth or index pass cannot hold half a value.
-      "   if (uRenderPass >= 1 && uRenderPass <= 9 && alpha < uPassThreshold) KILL_FRAGMENT;\n"
+      "   if (((uRenderPass >= 1 && uRenderPass <= 9) || uRenderPass >= 11) && alpha < uPassThreshold) KILL_FRAGMENT;\n"
+      // Row 7.3 mask: white on the objects whose index is uPassMask.
+      "   int passId = uObjectIndex > 0 ? uObjectIndex : uDrawSlot;\n"
+      "   if (uRenderPass == 12) { fragColor = vec4(vec3(passId == uPassMask ? 1.0 : 0.0), alpha); return; }\n"
+      // Row 7.3 id: one flat colour per object (its pass index, else its geometry slot), golden-ratio hues.
+      "   if (uRenderPass == 13) { float hh = fract(float(passId) * 0.618034); fragColor = vec4(clamp(abs(fract(hh + vec3(0.0, 2.0, 1.0) / 3.0) * 6.0 - 3.0) - 1.0, 0.0, 1.0) * (0.55 + 0.45 * fract(float(passId) * 0.381966)), alpha); return; }\n"
       "   if (uRenderPass == 1) {\n"
       "      float d = clamp((length(vWorldPos - uCamPos) - uNear) / max(0.001, uFar - uNear), 0.0, 1.0);\n"
       "      fragColor = vec4(vec3(d), alpha);\n"
@@ -1116,6 +1123,8 @@ namespace
       "   vec3 base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
       "   if (uHasTexture == 1) base *= toLinear(sampleMap(uTexture, n, mapUv).rgb);\n"
       "   if (uShading == 3) { fragColor = vec4(toSrgb(base), alpha); return; }\n"
+      // Row 7.3 albedo: the first-hit base colour with its maps, linear.
+      "   if (uRenderPass == 11) { fragColor = vec4(base, alpha); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
       "   float rough = uRoughness;\n"
@@ -1908,6 +1917,8 @@ Render3DNode::~Render3DNode()
    ReleaseProbes();
    ReleaseEngine();
    ReleaseShadowTargets();
+   for (GLUtil::Fbo& f : mPassFbo)
+      GLUtil::DestroyFbo(f);
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
    if (mProgramFull != 0) glDeleteProgram(mProgramFull);
@@ -2055,7 +2066,7 @@ bool Render3DNode::EnsureShader()
 bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
 {
    // HDR needs the float target to hold light above 1.0 until the tonemap at the end.
-   const bool wantFloat = floatOutput || HdrActive();
+   const bool wantFloat = floatOutput || HdrActive() || mPassKeepFloat;
    if (mFbo != 0 && mWidth == w && mHeight == h && mActiveSamples == sampleCount && mFloatTarget == wantFloat)
       return true;
 
@@ -2342,6 +2353,8 @@ void Render3DNode::CookIfNeeded(int frameId)
       CookPano(frameId);
       return;
    }
+   if (passes && renderPass == 0)
+      CookPasses(frameId);
    if (mCubeColor != 0 || mPano.tex != 0)   // projection went back to Perspective: give the cube memory back
       ReleasePanoTargets();
    mPanoValid = false;
@@ -2399,6 +2412,50 @@ void Render3DNode::CookIfNeeded(int frameId)
    if (supersample > 1 && !mInAccumulate && renderPass == 0 && Transport::Instance().IsOfflineMode() && Accumulate(frameId))
       return;
    CookOnce(frameId);
+}
+
+const char* Render3DNode::OutputLabel(int index) const
+{
+   static const char* kNames[] = { "image", "depth", "normal", "albedo", "mask", "id" };
+   return (passes && index >= 0 && index < 6) ? kNames[index] : "out";
+}
+
+unsigned int Render3DNode::GetOutputTexture(int index)
+{
+   if (index == 0) return GetOutputTexture();
+   return (passes && index >= 1 && index <= 5 && mPassValid) ? mPassFbo[index - 1].tex : 0;
+}
+
+// Row 7.3: the pass outputs, each drawn by the raster data pass of that name into the shared target, then copied
+// out, before the image (any engine) is drawn. Redrawn only when the scene changed, or on every export frame.
+void Render3DNode::CookPasses(int frameId)
+{
+   const SceneSignature sig = BuildSceneSignature();
+   if (mPassValid && sig == mPassSig && !Transport::Instance().IsOfflineMode())
+      return;
+   static const int kPass[5] = { 1, 3, 11, 12, 13 }; // depth, normal, albedo, mask, id
+   const int keepSamples = samples;
+   if (LiveActive()) samples = 0; // the live image draws single-sample: the shared target keeps its shape
+   mPassKeepFloat = floatOutput || HdrActive();
+   const int w = GLUtil::TargetSide(width, 16), h = GLUtil::TargetSide(height, 16);
+   mPassValid = true;
+   for (int k = 0; k < 5; k++)
+   {
+      renderPass = kPass[k];
+      mHasSceneBuilt = false;
+      CookOnce(frameId);
+      if (mFbo == 0 || !GLUtil::EnsureFbo(mPassFbo[k], w, h, GL_RGBA16F, "Render3D_Pass")) { mPassValid = false; continue; }
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, mFbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mPassFbo[k].fbo);
+      glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   }
+   renderPass = 0;
+   samples = keepSamples;
+   mPassKeepFloat = false;
+   mHasSceneBuilt = false; // the image draws over the shared target next
+   mPassSig = sig;
 }
 
 // This frame's world to last frame's for one source; still when it was not drawn last frame.
@@ -2939,7 +2996,7 @@ void Render3DNode::CookOnce(int frameId)
       glClearColor(1.0f, 1.0f, 1.0f, bgOpacity);
    else if (renderPass == 3)
       glClearColor(0.5f, 0.5f, 0.5f, bgOpacity);
-   else if (renderPass == 6 || renderPass == 7 || renderPass == 10)
+   else if (renderPass == 6 || renderPass == 7 || renderPass == 10 || renderPass >= 11)
       glClearColor(0.0f, 0.0f, 0.0f, bgOpacity);
    else
       glClearColor(bgColor[0], bgColor[1], bgColor[2], bgOpacity);
@@ -3070,6 +3127,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
       glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
       glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
+      glUniform1i(glGetUniformLocation(mProgram, "uPassMask"), passMask);
       glUniform1i(glGetUniformLocation(mProgram, "uVelocity"), mVelocityPass ? 1 : 0);
       if (mVelocityPass)
       {
@@ -3406,6 +3464,7 @@ void Render3DNode::CookOnce(int frameId)
          glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(cloud, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), cloud->PassIndex());
+      glUniform1i(glGetUniformLocation(mProgram, "uDrawSlot"), i + 1);
       { float oc[3]; cloud->ObjectColor(oc); glUniform3fv(glGetUniformLocation(mProgram, "uObjectColor"), 1, oc); }
       glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
@@ -3870,6 +3929,7 @@ void Render3DNode::CookOnce(int frameId)
          glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(source, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), source->PassIndex());
+      glUniform1i(glGetUniformLocation(mProgram, "uDrawSlot"), i + 1);
       { float oc[3]; source->ObjectColor(oc); glUniform3fv(glGetUniformLocation(mProgram, "uObjectColor"), 1, oc); }
       glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);

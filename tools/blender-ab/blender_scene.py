@@ -768,6 +768,46 @@ if MOTION:
     print("SCENEDONE", len(scene["objects"]))
     sys.exit(0)
 
+if os.environ.get("AB_PASSES"):
+    # Row 7.3 check (tools/blender-ab/passes_check.py): world normal, diffuse colour and world position as float
+    # arrays, <case>/pass_<Name>.npy, rows top to bottom. 4 samples, no denoise, no depth of field.
+    import numpy as np
+    vl = sc.view_layers[0]
+    vl.use_pass_normal = vl.use_pass_diffuse_color = vl.use_pass_position = True
+    sc.cycles.samples, sc.cycles.use_denoising = 4, False
+    sc.view_settings.view_transform = 'Raw'
+    camd.dof.use_dof = False
+    # Diffuse Color is the base colour scaled by the specular layer (and 0 on metal); the albedo pass is the plain
+    # base colour, so for this render no surface has a specular layer or metal.
+    for mat in bpy.data.materials:
+        for nd in (mat.node_tree.nodes if mat.node_tree else []):
+            if nd.type == 'BSDF_PRINCIPLED':
+                for k in ("Specular IOR Level", "Metallic", "Coat Weight", "Sheen Weight"):
+                    if k in nd.inputs and not nd.inputs[k].is_linked:
+                        nd.inputs[k].default_value = 0.0
+    sc.render.image_settings.file_format = 'OPEN_EXR'
+    sc.render.image_settings.color_mode, sc.render.image_settings.color_depth = 'RGB', '32'
+    for name in ("Normal", "DiffCol", "Position"):
+        tree = bpy.data.node_groups.new("pass_" + name, 'CompositorNodeTree')
+        rl = tree.nodes.new('CompositorNodeRLayers')
+        out = tree.nodes.new('NodeGroupOutput')
+        tree.interface.new_socket("Image", in_out='OUTPUT', socket_type='NodeSocketColor')
+        names = {"DiffCol": ("DiffCol", "Diffuse Color")}.get(name, (name,))
+        sock = next((rl.outputs[n] for n in names if n in rl.outputs), None)
+        if sock is None:
+            print("PASSES outputs:", [o.name for o in rl.outputs]); sys.exit(1)
+        tree.links.new(sock, out.inputs[0])
+        sc.compositing_node_group = tree
+        path = os.path.join(case, "pass_%s.exr" % name)
+        sc.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+        img = bpy.data.images.load(path)
+        w, h = img.size
+        np.save(path[:-4] + ".npy", np.array(img.pixels[:], dtype=np.float32).reshape(h, w, 4)[::-1, :, :3])
+    np.save(os.path.join(case, "pass_cam.npy"), np.array(co.location[:], dtype=np.float32))
+    print("PASSESDONE")
+    sys.exit(0)
+
 for k, fr in enumerate(FRAMES or [None]):
     tag = "" if FRAMES is None else "_%d" % k
     if fr is not None:

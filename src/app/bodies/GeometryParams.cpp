@@ -2692,6 +2692,12 @@ namespace app
       ImGui::EndDisabled();
       DropdownButton("pass", Render3DNode::RenderPassNames(), n->renderPass,
                      [n](int i) { n->renderPass = i; }, colW);
+      // Row 7.3: depth, normal, albedo, mask and id as extra outputs beside the image.
+      ImGui::BeginDisabled(n->renderPass != 0 || n->PanoActive());
+      ModCheckbox("passes", &n->passes);
+      ImGui::EndDisabled();
+      if (n->passes && n->renderPass == 0)
+         ModSliderInt("mask index", &n->passMask, 0, 255);
       if (n->renderPass >= 1 && n->renderPass <= 9)
          ModSlider("pass alpha threshold", &n->passThreshold, 0.0f, 1.0f, "%.2f", colW);
       if (n->renderPass == 5)

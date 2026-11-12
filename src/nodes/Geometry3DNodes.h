@@ -610,6 +610,13 @@ public:
    // Data passes (depth, normals, position, mist, index, emission, shadow, AO)
    // leave out surfaces whose alpha is under this.
    float passThreshold = 0.5f;
+   // Row 7.3: with `passes` on, depth, normal, albedo, mask and id are extra image outputs next to the image,
+   // drawn by the data passes above. `passMask` is the object index the mask is white on.
+   bool passes = false;
+   int passMask = 1;
+   int OutputCount() const override { return passes ? 6 : 1; }
+   const char* OutputLabel(int index) const override;
+   unsigned int GetOutputTexture(int index) override;
 
    ~Render3DNode() override;
 
@@ -912,6 +919,7 @@ public:
       v.Float("mistStart", mistStart); v.Float("mistDepth", mistDepth); v.Int("mistFalloff", mistFalloff);
       v.Float("mistIntensity", mistIntensity); v.Float("mistHeight", mistHeight);
       v.Float("passThreshold", passThreshold);
+      v.Bool("passes", passes); v.Int("passMask", passMask);
       v.Bool("cavity", cavity); v.Int("cavityType", cavityType);
       v.Int("viewShading", viewShading); v.Int("solidLighting", solidLighting); v.Int("solidColor", solidColor);
       v.Color("solidSingle", solidSingle); v.Int("matcap", matcap); v.Bool("solidSpecular", solidSpecular);
@@ -1285,5 +1293,10 @@ private:
    size_t mLastUploads = 0;
    bool mHasSceneBuilt = false;
    SceneSignature mSceneBuilt;
+   // Row 7.3: the pass outputs (depth, normal, albedo, mask, id) and the scene they were drawn for.
+   GLUtil::Fbo mPassFbo[5];
+   bool mPassValid = false, mPassKeepFloat = false;
+   SceneSignature mPassSig;
+   void CookPasses(int frameId);
    unsigned long long mRevision = 0;
 };
