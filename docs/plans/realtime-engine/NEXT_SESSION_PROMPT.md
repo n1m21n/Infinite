@@ -71,3 +71,14 @@ Options go before the subcommand. In zsh pass case lists as arrays. Hair cases t
 | live | `base2` / `c1` | only 5 cases are current; a full live baseline is row 8.2 |
 
 Row 0.5 creates `f0` (raster, settle); row 8.2 creates `f8` (live). From then on those are the bases.
+
+## Handover 2026-11-12 (row 7.2 in progress, WIP commit)
+
+| item | state |
+|---|---|
+| case | `tools/blender-ab/scale/carpet_pile.py out.inf [N] [size]`: Plane -> Distribute Points on Faces (density N on the unit plane, cap 200 k, pointSize 2) -> Instance on Points cloud slot (`geo 3 2 8`), cone shape |
+| fixed | Instance on Points cloud path now applies the cloud's model matrix and the same random scale/rotation/align/offset as the mesh path (`PointPose`, GeometryOpNodes.cpp); cloud model is in the dirty check |
+| not fixed | GPU-cloud path (GpuPointsGL vertex shader) still ignores the cloud model matrix |
+| measured, L 384 px | 200 k copies at pointSize 0.05 (tiny): 5.3 s, 688 MB; at pointSize 2: 45 s, 706 MB. Gate (L 30 fps at 1080p, T under memory cap) is far off |
+| next | profile where 45 s goes (likely one engine::Instance per copy + per-frame TLAS rebuild + per-copy BLAS work at large size); then compact per-copy records (matrix + prototype index), TLAS copies pointing at the prototype RInst via user id, cache the TLAS when nothing changed, per-instance random to Shade Geometry. Then self-test, AUTORUN 7.2 line, real "Engine 7.2" commit, then 7.3 design-only |
+| rules | swap was 3.4 GB of 4 GB; 384 px tests, one render at a time, cap 3 min |

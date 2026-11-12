@@ -1413,20 +1413,74 @@ void InstanceOnPointsNode::BuildCloudTransforms() const
    const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
    if (cloud == nullptr)
       return;
+   // A scatter's cloud is in its surface's local space (Distribute Points on
+   // Faces reports the plane's model matrix), so it is placed like the mesh
+   // path places sampled points: through the source's model matrix.
+   const Mat4 cm = cloudSource->GetModelMatrix();
+   const bool ident = (cm == Mat4::Identity());
+   float nm[9];
+   cm.NormalMatrix(nm);
    mTransforms.reserve(cloud->size());
    mColors.reserve(cloud->size() * 3);
+   int i = 0;
    for (const Particle& p : *cloud)
    {
       if (!p.alive)
          continue;
-      const float s = instanceScale * p.scale;
-      Mat4 m = Mat4::Scale(s, s, s);
-      m = Mat4::Multiply(Mat4::Translation(p.px, p.py, p.pz), m);
+      float wp[3] = { p.px, p.py, p.pz };
+      float wn[3] = { p.nx, p.ny, p.nz };
+      if (!ident)
+      {
+         wp[0] = cm.m[0]*p.px + cm.m[4]*p.py + cm.m[8]*p.pz + cm.m[12];
+         wp[1] = cm.m[1]*p.px + cm.m[5]*p.py + cm.m[9]*p.pz + cm.m[13];
+         wp[2] = cm.m[2]*p.px + cm.m[6]*p.py + cm.m[10]*p.pz + cm.m[14];
+         wn[0] = nm[0]*p.nx + nm[3]*p.ny + nm[6]*p.nz;
+         wn[1] = nm[1]*p.nx + nm[4]*p.ny + nm[7]*p.nz;
+         wn[2] = nm[2]*p.nx + nm[5]*p.ny + nm[8]*p.nz;
+      }
+      const float s = instanceScale * p.scale * (1.0f + (Rand01(seed, i * 3) - 0.5f) * 2.0f * scaleRandom);
+      const Mat4 m = Mat4::Multiply(PointPose(wp, wn, i), Mat4::Scale(s, s, s));
       mTransforms.push_back(Mat4::Multiply(m, mBuiltShapeModel));
       mColors.push_back(p.r);
       mColors.push_back(p.g);
       mColors.push_back(p.b);
+      i++;
    }
+}
+
+Mat4 InstanceOnPointsNode::PointPose(const float pt[3], const float nIn[3], int i) const
+{
+   Mat4 m = Mat4::Identity();
+   if (rotationRandom > 0.0f)
+   {
+      const float r1 = Rand01(seed, i * 3 + 1);
+      const float r2 = Rand01(seed, i * 3 + 2);
+      m = Mat4::Multiply(Mat4::RotationY(r1 * 6.28318530f * rotationRandom), m);
+      m = Mat4::Multiply(Mat4::RotationX(r2 * 6.28318530f * rotationRandom), m);
+   }
+   float n[3] = { nIn[0], nIn[1], nIn[2] };
+   const float len = std::sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+   if (len > 1e-6f) { n[0] /= len; n[1] /= len; n[2] /= len; }
+   if (alignToNormal && len > 1e-6f)
+   {
+      // Build a basis whose Y axis is the point normal, so instances stand
+      // up off the surface instead of all facing the same way.
+      float up[3] = { 0, 1, 0 };
+      if (std::fabs(n[1]) > 0.99f) { up[0] = 1; up[1] = 0; }
+      float t[3] = { up[1]*n[2] - up[2]*n[1], up[2]*n[0] - up[0]*n[2], up[0]*n[1] - up[1]*n[0] };
+      const float tl = std::sqrt(t[0]*t[0] + t[1]*t[1] + t[2]*t[2]);
+      if (tl > 1e-6f) { t[0] /= tl; t[1] /= tl; t[2] /= tl; }
+      // t x n, so the basis (t, n, b) is right-handed; n x t would mirror every instance and turn its winding inside out.
+      const float b[3] = { t[1]*n[2] - t[2]*n[1], t[2]*n[0] - t[0]*n[2], t[0]*n[1] - t[1]*n[0] };
+      Mat4 basis;
+      basis.m[0] = t[0]; basis.m[1] = t[1]; basis.m[2] = t[2];
+      basis.m[4] = n[0]; basis.m[5] = n[1]; basis.m[6] = n[2];
+      basis.m[8] = b[0]; basis.m[9] = b[1]; basis.m[10] = b[2];
+      m = Mat4::Multiply(basis, m);
+   }
+   return Mat4::Multiply(Mat4::Translation(pt[0] + n[0] * normalOffset,
+                                           pt[1] + n[1] * normalOffset,
+                                           pt[2] + n[2] * normalOffset), m);
 }
 
 Material InstanceOnPointsNode::GetMaterial() const
@@ -1528,43 +1582,10 @@ void InstanceOnPointsNode::Rebuild()
    {
       const MeshPoint& p = points[i];
       const float r0 = Rand01(seed, (int)i * 3 + 0);
-      const float r1 = Rand01(seed, (int)i * 3 + 1);
-      const float r2 = Rand01(seed, (int)i * 3 + 2);
-
       mScaleJitter.push_back(1.0f + (r0 - 0.5f) * 2.0f * scaleRandom);
-      Mat4 m = Mat4::Identity();
-
-      if (rotationRandom > 0.0f)
-      {
-         m = Mat4::Multiply(Mat4::RotationY(r1 * 6.28318530f * rotationRandom), m);
-         m = Mat4::Multiply(Mat4::RotationX(r2 * 6.28318530f * rotationRandom), m);
-      }
-
-      if (alignToNormal)
-      {
-         // Build a basis whose Y axis is the point normal, so instances stand
-         // up off the surface instead of all facing the same way.
-         float n[3] = { p.nx, p.ny, p.nz };
-         const float len = std::sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
-         if (len > 1e-6f) { n[0] /= len; n[1] /= len; n[2] /= len; }
-         float up[3] = { 0, 1, 0 };
-         if (std::fabs(n[1]) > 0.99f) { up[0] = 1; up[1] = 0; }
-         float t[3] = { up[1]*n[2] - up[2]*n[1], up[2]*n[0] - up[0]*n[2], up[0]*n[1] - up[1]*n[0] };
-         const float tl = std::sqrt(t[0]*t[0] + t[1]*t[1] + t[2]*t[2]);
-         if (tl > 1e-6f) { t[0] /= tl; t[1] /= tl; t[2] /= tl; }
-         // t x n, so the basis (t, n, b) is right-handed; n x t would mirror every instance and turn its winding inside out.
-         const float b[3] = { t[1]*n[2] - t[2]*n[1], t[2]*n[0] - t[0]*n[2], t[0]*n[1] - t[1]*n[0] };
-
-         Mat4 basis;
-         basis.m[0] = t[0]; basis.m[1] = t[1]; basis.m[2] = t[2];
-         basis.m[4] = n[0]; basis.m[5] = n[1]; basis.m[6] = n[2];
-         basis.m[8] = b[0]; basis.m[9] = b[1]; basis.m[10] = b[2];
-         m = Mat4::Multiply(basis, m);
-      }
-
-      m = Mat4::Multiply(Mat4::Translation(p.px + p.nx * normalOffset,
-                                           p.py + p.ny * normalOffset,
-                                           p.pz + p.nz * normalOffset), m);
+      const float pt[3] = { p.px, p.py, p.pz };
+      const float nn[3] = { p.nx, p.ny, p.nz };
+      const Mat4 m = PointPose(pt, nn, (int)i);
       mPoses.push_back(m);
       mColors.push_back(p.r);
       mColors.push_back(p.g);
@@ -1612,6 +1633,7 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    // matrices baked into Rebuild() have to be compared directly to catch that.
    const Mat4 pointModel = pointSource ? pointSource->GetModelMatrix() : Mat4::Identity();
    const Mat4 shapeModel = instanceShape ? instanceShape->GetModelMatrix() : Mat4::Identity();
+   const Mat4 cloudModel = cloudSource ? cloudSource->GetModelMatrix() : Mat4::Identity();
    // Whether the cloud is on the GPU can change with no revision (its first
    // cook, INFINITE_GPU_POINTS), and decides which list Rebuild() keeps.
    const bool gpuCloud = cloudSource != nullptr && GpuPointsGL::Enabled() && cloudSource->GetGpuPoints() != nullptr;
@@ -1620,7 +1642,7 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
       mBuiltCloud != (const void*)cloudSource || mBuiltCloudRevision != cloudRevision ||
       mBuiltPointRevision != pointRevision || mBuiltShapeRevision != shapeRevision ||
       !(mBuiltPointModel == pointModel) || !(mBuiltShapeModel == shapeModel) ||
-      mBuiltMode != pointMode || mBuiltMax != maxPoints ||
+      !(mBuiltCloudModel == cloudModel) || mBuiltMode != pointMode || mBuiltMax != maxPoints ||
       mBuiltScaleRand != scaleRandom ||
       mBuiltRotRand != rotationRandom || mBuiltSeed != seed ||
       mBuiltOffset != normalOffset || mBuiltAlign != alignToNormal;
@@ -1643,6 +1665,7 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    mBuiltShapeRevision = shapeRevision;
    mBuiltPointModel = pointModel;
    mBuiltShapeModel = shapeModel;
+   mBuiltCloudModel = cloudModel;
    mBuiltMode = pointMode;
    mBuiltMax = maxPoints;
    mBuiltScale = instanceScale;

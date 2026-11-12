@@ -943,6 +943,9 @@ private:
    // cloud is on the GPU (mCloudStale) until a CPU consumer asks.
    void BuildCloudTransforms() const;
    void EnsureCloudTransforms() const { if (mCloudStale) BuildCloudTransforms(); }
+   // One copy's pose (no scale) at a world-space point and normal: random
+   // rotation, normal alignment, normal offset. Shared by mesh and cloud paths.
+   Mat4 PointPose(const float p[3], const float n[3], int i) const;
 
    mutable std::vector<Mat4> mTransforms;
    mutable std::vector<float> mColors; // rgb triples, or empty for a uniform material
@@ -967,6 +970,7 @@ private:
    // caught here rather than falling through the revision checks above.
    Mat4 mBuiltPointModel;
    Mat4 mBuiltShapeModel;
+   Mat4 mBuiltCloudModel;
    int mBuiltMode = -1, mBuiltMax = -1;
    float mBuiltScale = -1, mBuiltScaleRand = -1, mBuiltRotRand = -1, mBuiltSeed = -1, mBuiltOffset = -1;
    bool mBuiltAlign = false;
