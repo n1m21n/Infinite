@@ -1206,7 +1206,9 @@ public:
 private:
    std::string mEngineError;
    void ReleaseEngine();
-   struct EngineState;
+public:
+   struct EngineState; // public so Render3DEngine.cpp's file-local helpers can take it
+private:
    EngineState* mEng = nullptr;
    void ReleasePathTrace();
    static bool PtSameGeometry(const SceneSignature& a, const SceneSignature& b);

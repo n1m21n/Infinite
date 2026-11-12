@@ -56,6 +56,11 @@ struct Render3DNode::EngineState
    struct Map { unsigned int tex = 0; unsigned long long rev = 0, key = 0; int w = 0, h = 0; std::vector<uint8_t> px; bool used = false; };
    std::vector<Map> maps;
    unsigned long long mapSerial = 0;
+   // Row 8.6: the map with its sun taken out, for pure live frames (LiveSun).
+   std::vector<float> envLive;
+   unsigned long long envLiveSerial = ~0ull;
+   bool envLiveSun = false;
+   float envLiveDir[3] = {}, envLiveLight[3] = {};
 };
 
 void Render3DNode::ReleaseEngine()
@@ -328,6 +333,49 @@ static bool Invert4(const float* m, float* o)
 }
 
 bool Render3DNode::LiveEngineAvailable() { return true; }
+namespace
+{
+// Row 8.6: EnvironmentNode's sun extraction (threshold 10) on the live engine's own copy of the map, once per map.
+bool LiveSun(Render3DNode::EngineState& E, float dir[3], float light[3])
+{
+   if (E.envLiveSerial != E.envSerial)
+   {
+      E.envLiveSerial = E.envSerial;
+      E.envLive = E.envPixels;
+      E.envLiveSun = false;
+      const int w = E.envW, h = E.envH;
+      const float kT = 10.0f;
+      const double kPi = 3.14159265358979;
+      double L[3] = { 0, 0, 0 }, D[3] = { 0, 0, 0 };
+      for (int r = 0; r < h; r++)
+      {
+         const double theta = kPi * (r + 0.5) / h, omega = (2.0 * kPi / w) * (kPi / h) * std::sin(theta);
+         for (int x = 0; x < w; x++)
+         {
+            float* p = &E.envLive[((size_t)r * w + x) * 3];
+            const float lum = 0.2126f * p[0] + 0.7152f * p[1] + 0.0722f * p[2];
+            if (lum <= kT)
+               continue;
+            const float keep = kT / lum;
+            const double phi = 2.0 * kPi * ((x + 0.5) / w - 0.5), wt = (lum - kT) * omega;
+            for (int k = 0; k < 3; k++) { L[k] += p[k] * (1.0f - keep) * omega; p[k] *= keep; }
+            D[0] += std::sin(theta) * std::cos(phi) * wt; D[1] += std::cos(theta) * wt; D[2] += std::sin(theta) * std::sin(phi) * wt;
+         }
+      }
+      const double len = std::sqrt(D[0] * D[0] + D[1] * D[1] + D[2] * D[2]);
+      if (len > 0.0 && L[0] + L[1] + L[2] > 0.0)
+      {
+         E.envLiveSun = true;
+         for (int k = 0; k < 3; k++) { E.envLiveDir[k] = (float)(D[k] / len); E.envLiveLight[k] = (float)L[k]; }
+      }
+   }
+   if (!E.envLiveSun)
+      return false;
+   for (int k = 0; k < 3; k++) { dir[k] = E.envLiveDir[k]; light[k] = E.envLiveLight[k]; }
+   return true;
+}
+}
+
 bool Render3DNode::CookEngine(int frameId)
 {
    if (mEng == nullptr)
@@ -794,6 +842,24 @@ bool Render3DNode::CookEngine(int frameId)
          if ((int)fr.lights.size() < engine::kMaxLights && env->Sun(sunDir, sunLight))
          {
             // The extracted sun, as GL adds it: rotated with the map, colour normalised, power = peak * intensity.
+            const float c = std::cos(fr.envRotationRad), sn = std::sin(fr.envRotationRad);
+            engine::Light l;
+            l.type = engine::LightType::Directional;
+            l.vec[0] = sunDir[0] * c + sunDir[2] * sn; l.vec[1] = sunDir[1]; l.vec[2] = -sunDir[0] * sn + sunDir[2] * c;
+            const float peak = std::max({ sunLight[0], sunLight[1], sunLight[2], 1e-6f });
+            for (int k = 0; k < 3; k++)
+               l.colorSrgb[k] = ColorSpace::LinearToSrgb(sunLight[k] / peak);
+            l.intensity = peak * env->intensity;
+            l.sunAngleDeg = std::max(0.0f, env->sunAngle);
+            fr.lights.push_back(l);
+         }
+         else if ((liveEngineFeatures & 8) == 0 && (int)fr.lights.size() < engine::kMaxLights && !E.envPixels.empty() && LiveSun(E, sunDir, sunLight))
+         {
+            // Row 8.6: the sun left in the map (threshold 0) is a patch the live engine's prefiltered lighting blurs
+            // away and its shadows never see; pure live takes it out of its own copy of the map, as a threshold of
+            // 10 would, and adds it as the sun. Settle keeps the whole map and samples it.
+            fr.envPixels = E.envLive.data();
+            fr.envRev = E.envSerial | (1ull << 62);
             const float c = std::cos(fr.envRotationRad), sn = std::sin(fr.envRotationRad);
             engine::Light l;
             l.type = engine::LightType::Directional;
