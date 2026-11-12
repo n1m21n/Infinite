@@ -78,6 +78,10 @@ namespace engine
       bool fieldSeeThrough = false;
       int fieldImage[4] = { -1, -1, -1, -1 }; // row 2.4: what img(slot, uv) reads, indices into Frame::textures
       float fieldParams[16] = {};               // row 3.4: the program's live knobs (FldMat.prm0..3)
+      // Row 7.2: copies of one scatter (Instance on Points) share copyGroup (>= 0) and sit consecutively; every field
+      // but model, normalMatrix and objRand is the same across them. objRand: Shade Geometry's per-object random, 0..1.
+      int copyGroup = -1;
+      float objRand = 0.0f;
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the
@@ -189,4 +193,14 @@ namespace engine
    };
 
    constexpr int kMaxLights = 64;
+
+   // Row 7.2: Shade Geometry's random for copy k of a scatter, 0..1 (a single object reads 0). The same PCG hash
+   // runs in GL raster's vertex shader on gl_InstanceID (Geometry3DNodes.cpp), so the engines agree.
+   inline float CopyRandom(uint32_t k)
+   {
+      uint32_t h = k * 747796405u + 2891336453u;
+      h = ((h >> ((h >> 28u) + 4u)) ^ h) * 277803737u;
+      h = (h >> 22u) ^ h;
+      return (float)(h >> 8) * (1.0f / 16777216.0f);
+   }
 }

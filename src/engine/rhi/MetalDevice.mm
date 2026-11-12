@@ -118,7 +118,7 @@ struct InstU { float4x4 model; float4x4 normalM; MatRec mat; }; // the material:
 #else
 #define VPOS [[position]]
 #endif
-struct VOut { float4 pos VPOS; float3 wp; float3 n; float2 uv; float3 lp; float3 cw; }; // cw: curvature, cavity (row 4.4), attr (row 3.3)
+struct VOut { float4 pos VPOS; float3 wp; float3 n; float2 uv; float3 lp; float3 cw; float orand [[flat]]; }; // cw: curvature, cavity (row 4.4), attr (row 3.3); orand: the copy's random (row 7.2)
 
 vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                  constant InstU& m [[buffer(2)]])
@@ -129,7 +129,7 @@ vertex VOut r_vs(uint vid [[vertex_id]], const device float* v [[buffer(0)]], co
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5; // GL clip depth -1..1 to Metal 0..1
    c.y = -c.y;              // the shared image is read by GL, whose row 0 is the bottom
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); o.orand = m.mat.objRand; return o;
 }
 
 float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float rough)
@@ -307,7 +307,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
          const device float* wp2 = reinterpret_cast<const device float*>(I.wr);
          fw = float3(wp2[ix.x * 3], wp2[ix.x * 3 + 1], wp2[ix.x * 3 + 2]) * w.x + float3(wp2[ix.y * 3], wp2[ix.y * 3 + 1], wp2[ix.y * 3 + 2]) * w.y + float3(wp2[ix.z * 3], wp2[ix.z * 3 + 1], wp2[ix.z * 3 + 2]) * w.z;
       }
-      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, float4(0.0, 0.0, fw.x, fw.y), float4(fw.z, 0.0, 0.0, 0.0), maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
+      fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, float4(0.0, I.mat.objRand, fw.x, fw.y), float4(fw.z, 0.0, 0.0, 0.0), maps, float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3), 2.0);
       base = max(fo.base, float3(0.0)); metal = clamp(fo.metallic, 0.0, 1.0); hitRough = clamp(fo.roughness, 0.045, 1.0); hitEm = fo.emission;
    }
 #endif
@@ -778,7 +778,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       o.base = base; o.roughness = roughIn; o.metallic = metalIn; o.normal = float3(0.0, 0.0, 1.0); o.height = 0.0;
       o.emission = em0; o.opacity = alpha; o.mask = 1.0;
       o.prm0 = float4(m.mat.p0, m.mat.p1, m.mat.p2, m.mat.p3); o.prm1 = float4(m.mat.p4, m.mat.p5, m.mat.p6, m.mat.p7); o.prm2 = float4(m.mat.p8, m.mat.p9, m.mat.p10, m.mat.p11); o.prm3 = float4(m.mat.p12, m.mat.p13, m.mat.p14, m.mat.p15);
-      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), float4(dot(in.n, f.eye.xyz - in.wp) < 0.0 ? 1.0 : 0.0, 0.0, in.cw.x, in.cw.y), float4(in.cw.z, 0.0, 0.0, 0.0), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
+      fldMatDispatch(int(abs(m.mat.program) + 0.5), o, in.lp, normalize(in.n), in.uv, f.fld.x, in.wp, normalize(f.eye.xyz - in.wp), float4(dot(in.n, f.eye.xyz - in.wp) < 0.0 ? 1.0 : 0.0, in.orand, in.cw.x, in.cw.y), float4(in.cw.z, 0.0, 0.0, 0.0), maps, float4(m.mat.fimg0, m.mat.fimg1, m.mat.fimg2, m.mat.fimg3), -1.0);
       fldDh = float2(dfdx(o.height), dfdy(o.height));
       base = o.base; roughIn = o.roughness; metalIn = o.metallic; fldEmD = o.emission - em0; alpha = o.opacity;
       fldNrm = o.normal;
@@ -1740,7 +1740,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                const device float* wp2 = reinterpret_cast<const device float*>(I.wr);
                fldW = float3(wp2[ix.x * 3], wp2[ix.x * 3 + 1], wp2[ix.x * 3 + 2]) * w3.x + float3(wp2[ix.y * 3], wp2[ix.y * 3 + 1], wp2[ix.y * 3 + 2]) * w3.y + float3(wp2[ix.z * 3], wp2[ix.z * 3 + 1], wp2[ix.z * 3 + 2]) * w3.z;
             }
-            const float4 fldG = float4(backHit ? 1.0 : 0.0, 0.0, fldW.x, fldW.y);
+            const float4 fldG = float4(backHit ? 1.0 : 0.0, I.mat.objRand, fldW.x, fldW.y);
             const float4 fldA = float4(fldW.z, 0.0, 0.0, 0.0);
             const float4 fldI = float4(I.mat.fimg0, I.mat.fimg1, I.mat.fimg2, I.mat.fimg3);
             fldMatDispatch(int(abs(I.mat.program) + 0.5), fo, lp, n, uv, f.fld.x, p, -d, fldG, fldA, maps, fldI, lod);
@@ -2206,7 +2206,7 @@ vertex VOut ri_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); o.orand = 0.0; return o;
 }
 vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                   const device float4x4* models [[buffer(5)]])
@@ -2218,7 +2218,7 @@ vertex VOut ri_vs_old(uint vid [[vertex_id]], uint iid [[instance_id]], const de
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); return o; // uniform scale: the model's 3x3 turns normals
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m * float4(n, 0.0)).xyz; o.uv = float2(0.0); o.lp = p; o.cw = float3(0.0); o.orand = 0.0; return o; // uniform scale: the model's 3x3 turns normals
 }
 // Runs: consecutive instances sharing a mesh and material drawn in one instanced call; per-copy data from a buffer.
 vertex VOut rr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant FrameU& f [[buffer(1)]],
@@ -2232,7 +2232,7 @@ vertex VOut rr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device
    float4 c = f.viewProj * w;
    c.z = (c.z + c.w) * 0.5;
    c.y = -c.y;
-   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(uvs[vid * 2], uvs[vid * 2 + 1]); o.lp = p; o.cw = float3(wr[vid * 3], wr[vid * 3 + 1], wr[vid * 3 + 2]); return o;
+   VOut o; o.pos = c; o.wp = w.xyz; o.n = (m.normalM * float4(n, 0.0)).xyz; o.uv = float2(uvs[vid * 2], uvs[vid * 2 + 1]); o.lp = p; o.cw = float3(wr[vid * 3], wr[vid * 3 + 1], wr[vid * 3 + 2]); o.orand = m.mat.objRand; return o;
 }
 struct SOut { float4 pos [[position]]; };
 vertex SOut shr_vs(uint vid [[vertex_id]], uint iid [[instance_id]], const device float* v [[buffer(0)]], constant float4x4& lvp [[buffer(1)]],
@@ -2443,6 +2443,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       m.fimg2 = (float)(in.fieldImage[2] + 1); m.fimg3 = (float)(in.fieldImage[3] + 1);
       std::memcpy(&m.p0, in.fieldParams, sizeof(in.fieldParams)); // row 3.4: knobs live, no relink
       m.strandFrom = (float)(in.strandFrom + 1); // row 5.2: the shadow rays tell strands from solids
+      m.objRand = in.objRand;                    // row 7.2: Shade Geometry's random
    }
    // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
    void FillMat(const engine::Instance& in, R3dMatH& m)
@@ -2560,6 +2561,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
    public:
       bool UploadMeshes(const std::vector<engine::MeshData>& meshes) override
       {
+         mMeshGen++;
          mMeshes.clear();
          for (const engine::MeshData& m : meshes)
          {
@@ -2596,7 +2598,106 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [cb waitUntilCompleted];
          return cb.status == MTLCommandBufferStatusCompleted;
       }
-      // Instances change every frame; the instance structure is rebuilt in the frame's command buffer.
+      static void HMix(uint64_t& h, const void* p, size_t n)
+      {
+         const unsigned char* b = (const unsigned char*)p;
+         size_t i = 0;
+         for (; i + 8 <= n; i += 8) { uint64_t w; std::memcpy(&w, b + i, 8); h = (h ^ w) * 1099511628211ull; h ^= h >> 29; }
+         for (; i < n; i++) h = (h ^ b[i]) * 1099511628211ull;
+      }
+      bool RayClusterable(const engine::Instance& in) const
+      {
+         if (in.copyGroup < 0 || in.moving || in.fieldProgram != 0 || in.hairRadial > 0.0f || in.strandFrom >= 0 || in.transmission > 0.0f ||
+             in.opacity < 1.0f || in.alphaCutoff > 0.0f || in.mapSpace != 0 || in.triplanar > 0.0f || in.mapOpacity >= 0 ||
+             in.emission[0] + in.emission[1] + in.emission[2] > 0.0f)
+            return false;
+         return in.mesh >= 0 && in.mesh < (int)mMeshes.size() && !mMeshes[in.mesh].tvb && mMeshes[in.mesh].count >= 3;
+      }
+      // Realise each run's copies in world space, Morton-ordered, chunked to about 16 k triangles, one BLAS each.
+      bool BuildClusters(const engine::Frame& fr, const std::vector<std::pair<size_t, size_t>>& runs)
+      {
+         mClGpu.clear(); mClProto.clear();
+         mClBlas = [NSMutableArray array];
+         if (runs.empty())
+            return true;
+         id<MTLCommandBuffer> cb = [mQueue commandBuffer];
+         NSMutableArray* keep = [NSMutableArray array];
+         for (const auto& run : runs)
+         {
+            const engine::Instance& p0 = fr.instances[run.first];
+            const Gpu& src = mMeshes[p0.mesh];
+            const size_t T = src.count / 3, V = src.vb.length / 24;
+            const float* svb = (const float*)src.vb.contents; const uint32_t* sib = (const uint32_t*)src.ib.contents;
+            const float* suv = (const float*)src.uvb.contents; const float* swr = src.wb ? (const float*)src.wb.contents : nullptr;
+            float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+            for (size_t i = run.first; i < run.first + run.second; i++)
+               for (int k = 0; k < 3; k++) { lo[k] = std::min(lo[k], fr.instances[i].model[12 + k]); hi[k] = std::max(hi[k], fr.instances[i].model[12 + k]); }
+            std::vector<std::pair<uint32_t, uint32_t>> order(run.second);
+            for (size_t i = 0; i < run.second; i++)
+            {
+               uint32_t code = 0;
+               for (int k = 0; k < 3; k++)
+               {
+                  uint32_t q = (uint32_t)std::min(1023.0f, std::max(0.0f, (fr.instances[run.first + i].model[12 + k] - lo[k]) / std::max(hi[k] - lo[k], 1e-9f) * 1023.0f));
+                  for (int b = 0; b < 10; b++) code |= ((q >> b) & 1u) << (b * 3 + k);
+               }
+               order[i] = { code, (uint32_t)(run.first + i) };
+            }
+            std::sort(order.begin(), order.end());
+            const size_t per = std::max<size_t>(1, 16384 / std::max<size_t>(T, 1));
+            for (size_t c0 = 0; c0 < order.size(); c0 += per)
+            {
+               const size_t cc = std::min(per, order.size() - c0);
+               Gpu g;
+               g.vb = [mDev newBufferWithLength:V * cc * 24 options:MTLResourceStorageModeShared];
+               g.ib = [mDev newBufferWithLength:T * 3 * cc * 4 options:MTLResourceStorageModeShared];
+               g.uvb = [mDev newBufferWithLength:std::max<size_t>(V * cc * 8, 8) options:MTLResourceStorageModeShared];
+               g.wb = [mDev newBufferWithLength:std::max<size_t>(V * cc * 12, 12) options:MTLResourceStorageModeShared];
+               if (!g.vb || !g.ib || !g.uvb || !g.wb)
+                  return false;
+               float* vb = (float*)g.vb.contents; uint32_t* ib = (uint32_t*)g.ib.contents;
+               float* uv = (float*)g.uvb.contents; float* wr = (float*)g.wb.contents;
+               for (size_t j = 0; j < cc; j++)
+               {
+                  const engine::Instance& in = fr.instances[order[c0 + j].second];
+                  const float* m = in.model; const float* nm = in.normalMatrix;
+                  for (size_t v = 0; v < V; v++)
+                  {
+                     const float* a = svb + v * 6; float* o = vb + (j * V + v) * 6;
+                     for (int k = 0; k < 3; k++)
+                     {
+                        o[k] = m[k] * a[0] + m[4 + k] * a[1] + m[8 + k] * a[2] + m[12 + k];
+                        o[3 + k] = nm[k] * a[3] + nm[4 + k] * a[4] + nm[8 + k] * a[5];
+                     }
+                  }
+                  std::memcpy(uv + j * V * 2, suv, V * 8);
+                  if (swr) std::memcpy(wr + j * V * 3, swr, V * 12); else std::memset(wr + j * V * 3, 0, V * 12);
+                  for (size_t t = 0; t < T * 3; t++) ib[j * T * 3 + t] = sib[t] + (uint32_t)(j * V);
+               }
+               g.count = T * 3 * cc;
+               for (int k = 0; k < 3; k++) { g.lo[k] = lo[k]; g.hi[k] = hi[k]; }
+               MTLPrimitiveAccelerationStructureDescriptor* ad = BlasDesc(g);
+               ad.usage = MTLAccelerationStructureUsageNone;
+               const MTLAccelerationStructureSizes sz = [mDev accelerationStructureSizesWithDescriptor:ad];
+               id<MTLAccelerationStructure> as = [mDev newAccelerationStructureWithSize:sz.accelerationStructureSize];
+               id<MTLBuffer> scratch = [mDev newBufferWithLength:std::max<NSUInteger>(sz.buildScratchBufferSize, 16) options:MTLResourceStorageModePrivate];
+               if (!as || !scratch)
+                  return false;
+               id<MTLAccelerationStructureCommandEncoder> ae = [cb accelerationStructureCommandEncoder];
+               [ae buildAccelerationStructure:as descriptor:ad scratchBuffer:scratch scratchBufferOffset:0];
+               [ae endEncoding];
+               [keep addObject:scratch];
+               [mClBlas addObject:as];
+               mClGpu.push_back(g);
+               mClProto.push_back((int)run.first);
+            }
+         }
+         [cb commit];
+         [cb waitUntilCompleted];
+         return cb.status == MTLCommandBufferStatusCompleted;
+      }
+      // Instances change every frame; the instance structure is rebuilt in the frame's command buffer, only when
+      // its key (models, meshes, shadow flags, clusters) changed or a BLAS was refitted.
       bool BuildTlas(id<MTLCommandBuffer> cb, const engine::Frame& fr)
       {
          const NSUInteger n = fr.instances.size();
@@ -2627,23 +2728,90 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
             [re endEncoding];
          }
-         std::vector<MTLAccelerationStructureInstanceDescriptor> d(n);
-         for (NSUInteger i = 0; i < n; i++)
+         // Plan: runs of consecutive copies of one scatter that the rays may see merged.
+         static const long long kClusterTris = [] { const char* e = std::getenv("INFINITE_ENGINE_CLUSTER_TRIS"); return e ? std::atoll(e) : 4000000LL; }();
+         std::vector<std::pair<size_t, size_t>> runs;
+         long long tris = 0;
+         for (size_t i = 0; i < n && kClusterTris > 0;)
          {
-            const engine::Instance& in = fr.instances[i];
-            MTLAccelerationStructureInstanceDescriptor& o = d[i];
-            for (int c = 0; c < 4; c++)
-               o.transformationMatrix.columns[c] = MTLPackedFloat3Make(in.model[c * 4 + 0], in.model[c * 4 + 1], in.model[c * 4 + 2]);
-            o.options = MTLAccelerationStructureInstanceOptionOpaque;
-            o.mask = in.castShadow ? 0xFF : 0xFE; // bit 0 is what shadow rays test
-            o.intersectionFunctionTableOffset = 0;
-            o.accelerationStructureIndex = (uint32_t)std::max(0, std::min(in.mesh, (int)mBlas.count - 1));
+            const engine::Instance& a = fr.instances[i];
+            size_t j = i + 1;
+            if (RayClusterable(a))
+               while (j < n && fr.instances[j].copyGroup == a.copyGroup && fr.instances[j].mesh == a.mesh && fr.instances[j].castShadow == a.castShadow &&
+                      RayClusterable(fr.instances[j]) && std::memcmp(fr.instances[j].baseSrgb, a.baseSrgb, sizeof(a.baseSrgb)) == 0 &&
+                      fr.instances[j].metallic == a.metallic && fr.instances[j].roughness == a.roughness)
+                  j++;
+            const long long t = (long long)(mMeshes[std::max(0, std::min(a.mesh, (int)mMeshes.size() - 1))].count / 3) * (long long)(j - i);
+            if (RayClusterable(a) && j - i >= 512 && tris + t <= kClusterTris)
+            {
+               runs.emplace_back(i, j - i);
+               tris += t;
+            }
+            i = j;
          }
-         id<MTLBuffer> db = [mDev newBufferWithBytes:d.data() length:n * sizeof(d[0]) options:MTLResourceStorageModeShared];
+         uint64_t ck = 1469598103934665603ull;
+         HMix(ck, &mMeshGen, 8);
+         for (const auto& r : runs)
+         {
+            HMix(ck, &r, sizeof(r));
+            HMix(ck, &fr.instances[r.first].mesh, 4);
+            for (size_t i = r.first; i < r.first + r.second; i++) HMix(ck, fr.instances[i].model, 64);
+         }
+         if (runs.empty()) ck = 0;
+         if (ck != mClKey)
+         {
+            if (!BuildClusters(fr, runs))
+            {
+               mClGpu.clear(); mClProto.clear(); mClBlas = [NSMutableArray array]; runs.clear(); ck = 0;
+            }
+            mClKey = ck;
+         }
+         uint64_t tk = ck ^ 0x9e3779b97f4a7c15ull;
+         HMix(tk, &mMeshGen, 8);
+         HMix(tk, &n, sizeof(n));
+         mTlasSrc.clear();
+         size_t ri = 0;
+         for (size_t i = 0; i < n;)
+         {
+            if (ri < runs.size() && runs[ri].first == i) { i += runs[ri].second; ri++; continue; }
+            const engine::Instance& in = fr.instances[i];
+            HMix(tk, in.model, 48); HMix(tk, &in.mesh, 4); HMix(tk, &in.castShadow, 1);
+            mTlasSrc.push_back((int)i);
+            i++;
+         }
+         for (size_t c = 0; c < mClGpu.size(); c++) mTlasSrc.push_back(-(int)c - 1);
+         if (mTlasValid && mTlas && !anyDirty && tk == mTlasKey)
+            return true;
+         const NSUInteger ne = mTlasSrc.size();
+         std::vector<MTLAccelerationStructureInstanceDescriptor> d(ne);
+         for (NSUInteger e = 0; e < ne; e++)
+         {
+            MTLAccelerationStructureInstanceDescriptor& o = d[e];
+            o.options = MTLAccelerationStructureInstanceOptionOpaque;
+            o.intersectionFunctionTableOffset = 0;
+            if (mTlasSrc[e] >= 0)
+            {
+               const engine::Instance& in = fr.instances[(size_t)mTlasSrc[e]];
+               for (int c = 0; c < 4; c++)
+                  o.transformationMatrix.columns[c] = MTLPackedFloat3Make(in.model[c * 4 + 0], in.model[c * 4 + 1], in.model[c * 4 + 2]);
+               o.mask = in.castShadow ? 0xFF : 0xFE; // bit 0 is what shadow rays test
+               o.accelerationStructureIndex = (uint32_t)std::max(0, std::min(in.mesh, (int)mBlas.count - 1));
+            }
+            else
+            {
+               const int c = -mTlasSrc[e] - 1;
+               for (int k = 0; k < 4; k++)
+                  o.transformationMatrix.columns[k] = MTLPackedFloat3Make(k == 0 ? 1.0f : 0.0f, k == 1 ? 1.0f : 0.0f, k == 2 ? 1.0f : 0.0f);
+               o.mask = fr.instances[(size_t)mClProto[c]].castShadow ? 0xFF : 0xFE;
+               o.accelerationStructureIndex = (uint32_t)(mBlas.count + c);
+            }
+         }
+         NSArray* all = mClBlas.count ? [mBlas arrayByAddingObjectsFromArray:mClBlas] : mBlas;
+         id<MTLBuffer> db = [mDev newBufferWithBytes:d.data() length:ne * sizeof(d[0]) options:MTLResourceStorageModeShared];
          MTLInstanceAccelerationStructureDescriptor* td = [MTLInstanceAccelerationStructureDescriptor descriptor];
-         td.instanceCount = n;
+         td.instanceCount = ne;
          td.instanceDescriptorBuffer = db;
-         td.instancedAccelerationStructures = mBlas;
+         td.instancedAccelerationStructures = all;
          const MTLAccelerationStructureSizes sz = [mDev accelerationStructureSizesWithDescriptor:td];
          if (!mTlas || mTlas.size < sz.accelerationStructureSize)
             mTlas = [mDev newAccelerationStructureWithSize:sz.accelerationStructureSize];
@@ -2654,7 +2822,51 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          id<MTLAccelerationStructureCommandEncoder> ae = [cb accelerationStructureCommandEncoder];
          [ae buildAccelerationStructure:mTlas descriptor:td scratchBuffer:mTlasScratch scratchBufferOffset:0];
          [ae endEncoding];
+         mTlasKey = tk; mTlasValid = true;
+         if (std::getenv("INFINITE_ENGINE_PROF") && ck != 0)
+            std::fprintf(stderr, "ENGINE_PROF tlas entries=%lu clusters=%lu clusterTris=%lld\n", (unsigned long)ne, (unsigned long)mClGpu.size(), tris);
          return true;
+      }
+      // Residency for the ray passes: the cluster buffers and structures besides the meshes'.
+      void UseClusters(id<MTLRenderCommandEncoder> e)
+      {
+         for (const Gpu& g : mClGpu)
+         {
+            [e useResource:g.vb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            [e useResource:g.ib usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            [e useResource:g.uvb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            [e useResource:g.wb usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+         }
+         for (id<MTLAccelerationStructure> b in mClBlas) [e useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+      }
+      // The rays' per-entry records: an instance's own, or a cluster's (its first copy's material, world-space buffers).
+      template <typename FillFn>
+      std::vector<RInstH> RayInfo(const engine::Frame& fr, bool useSrc, FillFn fill)
+      {
+         const size_t ne = useSrc ? mTlasSrc.size() : fr.instances.size();
+         std::vector<RInstH> info(ne + 1);
+         for (size_t e = 0; e < ne; e++)
+         {
+            const int s = useSrc ? mTlasSrc[e] : (int)e;
+            const engine::Instance& in = fr.instances[(size_t)(s >= 0 ? s : mClProto[(size_t)(-s - 1)])];
+            RInstH& o = info[e]; o = {};
+            fill(in, o.mat);
+            if (s < 0)
+            {
+               const Gpu& g = mClGpu[(size_t)(-s - 1)];
+               for (int k = 0; k < 4; k++) o.normalM[k * 5] = 1.0f;
+               o.vb = g.vb.gpuAddress; o.ib = g.ib.gpuAddress; o.uvb = g.uvb.gpuAddress; o.wr = g.wb.gpuAddress;
+               continue;
+            }
+            std::memcpy(o.normalM, in.normalMatrix, 64);
+            if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
+            {
+               const Gpu& g = mMeshes[in.mesh];
+               o.vb = g.RV().gpuAddress; o.ib = g.RI().gpuAddress; o.uvb = g.RU().gpuAddress; o.wr = g.RW() ? g.RW().gpuAddress : 0;
+               if (g.tvb) o.mat.mapNormal = 0.0f; // row 4.3: the relief is geometry now; its bump would count twice
+            }
+         }
+         return info;
       }
       // The HDRI as a mipmapped half-float texture, re-uploaded only when its revision changes; a 1x1 stand-in
       // otherwise so the shaders always have a texture bound at 9.
@@ -2807,6 +3019,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       {
          if (index < 0 || index >= (int)mMeshes.size() || index >= (int)mBlas.count)
             return false;
+         mMeshGen++;
          Gpu& cur = mMeshes[(size_t)index];
          if (!cur.tvb && m.tracePosNormal.empty() && cur.count == m.indices.size() && cur.vb.length == std::max<size_t>(m.posNormal.size() * 4, 4) &&
              std::memcmp(cur.ib.contents, m.indices.data(), m.indices.size() * 4) == 0)
@@ -3127,6 +3340,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [ve setFragmentTexture:mDepth atIndex:0];
             [ve useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (id<MTLAccelerationStructure> b in mBlas) [ve useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            UseClusters(ve);
             [ve drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [ve endEncoding];
          }
@@ -3181,6 +3395,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
             for (id<MTLAccelerationStructure> b in mBlas)
                [enc useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            UseClusters(enc);
          }
          [enc setRenderPipelineState:mrt ? mPso : mPsoDir];
          [enc setDepthStencilState:mDs];
@@ -3190,22 +3405,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBuffer:mLightBuf offset:0 atIndex:6];
          [enc setFragmentBuffer:mClusterBuf offset:0 atIndex:7];
-         std::vector<RInstH> info(fr.instances.size() + 1);
-         for (size_t i = 0; i < fr.instances.size(); i++)
-         {
-            const engine::Instance& in = fr.instances[i];
-            RInstH& o = info[i]; o = {};
-            FillMatRays(in, o.mat);
-            std::memcpy(o.normalM, in.normalMatrix, 64);
+         std::vector<RInstH> info = RayInfo(fr, haveTlas, [&](const engine::Instance& in, R3dMatH& m) {
+            FillMatRays(in, m);
             if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
-               for (int k = 0; k < 3; k++) o.mat.base[k] *= mMapMean[in.mapAlbedo][k];
-            if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
-            {
-               const Gpu& g = mMeshes[in.mesh];
-               o.vb = g.RV().gpuAddress; o.ib = g.RI().gpuAddress; o.uvb = g.RU().gpuAddress; o.wr = g.RW() ? g.RW().gpuAddress : 0;
-               if (g.tvb) o.mat.mapNormal = 0.0f; // row 4.3: the relief is geometry now; its bump would count twice
-            }
-         }
+               for (int k = 0; k < 3; k++) m.base[k] *= mMapMean[in.mapAlbedo][k];
+         });
          id<MTLBuffer> infoBuf = InfoBuffer(info);
          [enc setFragmentBuffer:infoBuf offset:0 atIndex:4];
          [enc setFragmentTexture:mEnvBound atIndex:9];
@@ -3323,6 +3527,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                [te useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
                for (const Gpu& g : mMeshes) { [te useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [te useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RU()) [te useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RW()) [te useResource:g.RW() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
                for (id<MTLAccelerationStructure> b in mBlas) [te useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               UseClusters(te);
                [te drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
                [te endEncoding];
             }
@@ -3581,20 +3786,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [mArgEnc setAccelerationStructure:mTlas atIndex:0];
             mArgTlas = mTlas;
          }
-         std::vector<RInstH> info(fr.instances.size() + 1);
-         for (size_t i = 0; i < fr.instances.size(); i++)
-         {
-            const engine::Instance& in = fr.instances[i];
-            RInstH& o = info[i]; o = {};
-            FillMat(in, o.mat);
-            std::memcpy(o.normalM, in.normalMatrix, 64);
-            if (in.mesh >= 0 && in.mesh < (int)mMeshes.size())
-            {
-               const Gpu& g = mMeshes[in.mesh];
-               o.vb = g.RV().gpuAddress; o.ib = g.RI().gpuAddress; o.uvb = g.RU().gpuAddress; o.wr = g.RW() ? g.RW().gpuAddress : 0;
-               if (g.tvb) o.mat.mapNormal = 0.0f; // row 4.3: the relief is geometry now; its bump would count twice
-            }
-         }
+         std::vector<RInstH> info = RayInfo(fr, true, [&](const engine::Instance& in, R3dMatH& m) { FillMat(in, m); });
+         std::vector<int> entOf(fr.instances.size(), -1);
+         for (size_t e = 0; e < mTlasSrc.size(); e++)
+            if (mTlasSrc[e] >= 0) entOf[(size_t)mTlasSrc[e]] = (int)e;
+         for (RInstH& o : info) o.mat.emTri = -1.0f;
          // Emissive triangles in world space for next-event estimation, chosen by power (luminance * area). The
          // instance's em[3] points at its first triangle; primitive_id indexes from there. Capped so a huge glowing
          // mesh does not stall the frame (past the cap it is still found by bounces).
@@ -3604,7 +3800,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          for (size_t i = 0; i < fr.instances.size(); i++)
          {
             const engine::Instance& in = fr.instances[i];
-            info[i].mat.emTri = -1.0f;
+            if (entOf[i] < 0)
+               continue; // clustered copies carry no emission
             const float lum = 0.2126f * in.emission[0] + 0.7152f * in.emission[1] + 0.0722f * in.emission[2];
             if (lum <= 0.0f || in.mesh < 0 || in.mesh >= (int)mMeshes.size())
                continue;
@@ -3612,7 +3809,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             const size_t tris = g.count / 3;
             if (tris == 0 || ems.size() + tris > 65536)
                continue;
-            info[i].mat.emTri = (float)ems.size();
+            info[(size_t)entOf[i]].mat.emTri = (float)ems.size();
             const float* vb = (const float*)g.vb.contents;
             const uint32_t* ib = (const uint32_t*)g.ib.contents;
             const float* m = in.model;
@@ -3693,6 +3890,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (const Gpu& g : mMeshes) { [e useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RU()) [e useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RW()) [e useResource:g.RW() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
             for (id<MTLAccelerationStructure> b in mBlas) [e useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+            UseClusters(e);
             [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [e endEncoding];
             mPtCur = cur; mPtN++;
@@ -4195,6 +4393,16 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       id<MTLAccelerationStructure> mTlas = nil;
       id<MTLBuffer> mTlasScratch = nil, mRefitScratch = nil;
       std::vector<char> mBlasDirty;   // vertices moved in place; refit before the next instance build
+      // Row 7.2: ray clusters. A big scatter (>= 512 copies of one mesh, plain opaque material) is realised in world
+      // space in chunks of about 16 k triangles, one BLAS each, for the rays only (raster still draws it instanced):
+      // 200 k overlapping instance boxes made every shadow ray walk dozens of instances. mTlasSrc: per TLAS entry,
+      // the instance index, or -(cluster + 1). The TLAS is rebuilt only when its key changes.
+      std::vector<int> mTlasSrc, mClProto;
+      std::vector<Gpu> mClGpu;
+      NSMutableArray<id<MTLAccelerationStructure>>* mClBlas = nil;
+      uint64_t mClKey = 0, mTlasKey = 0;
+      uint64_t mMeshGen = 1;
+      bool mTlasValid = false;
       id<MTLFunction> mFsFn = nil;
       id<MTLArgumentEncoder> mArgEnc = nil;
       id<MTLBuffer> mArgBuf = nil;
@@ -4226,7 +4434,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             {
                auto& r = mRuns.back();
                const engine::Instance& a = fr.instances[r.first];
-               if (r.first + r.second == i && a.mesh == in.mesh && a.castShadow == in.castShadow && std::memcmp(&dst[r.first].mat, &u.mat, sizeof(R3dMatH)) == 0)
+               R3dMatH hm = dst[r.first].mat; hm.objRand = u.mat.objRand; // copies differ only in their random (VOut.orand carries it)
+               if (r.first + r.second == i && a.mesh == in.mesh && a.castShadow == in.castShadow && std::memcmp(&hm, &u.mat, sizeof(R3dMatH)) == 0)
                {
                   r.second++;
                   continue;

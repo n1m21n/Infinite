@@ -548,11 +548,14 @@ bool Render3DNode::CookEngine(int frameId)
          const std::vector<unsigned char>* sel = ResolveInstanceSelection(src);
          const bool useSel = sel != nullptr && sel->size() == xforms.size();
          const Mat4 group = src->GetInstanceGroupMatrix();
+         in.copyGroup = (int)i; // row 7.2: the backend merges a large run of copies for the rays
+         fr.instances.reserve(fr.instances.size() + xforms.size());
          for (size_t k = 0; k < xforms.size(); k++)
          {
             if (useSel && (*sel)[k] == 0)
                continue;
             place(in, Mat4::Multiply(group, xforms[k]));
+            in.objRand = engine::CopyRandom((uint32_t)k);
             fr.instances.push_back(in);
          }
          continue;
@@ -813,8 +816,11 @@ bool Render3DNode::CookEngine(int frameId)
    mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.lensCatEye, 12); mix(&fr.bloom, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
    mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
    mix(&fr.fogDensity, 8); mix(fr.fogColor, 36);
-   for (const engine::Instance& in : fr.instances)
+   for (size_t ii = 0; ii < fr.instances.size(); ii++)
    {
+      const engine::Instance& in = fr.instances[ii];
+      // row 7.2: a scatter's later copies differ from its first only in placement
+      if (ii > 0 && in.copyGroup >= 0 && fr.instances[ii - 1].copyGroup == in.copyGroup) { mix(in.model, 64); continue; }
       mix(in.model, 64); mix(in.baseSrgb, 12); mix(&in.metallic, 16);
       mix(&in.mapAlbedo, 16); mix(&in.fieldImage, 16); mix(&in.wrap, 4); mix(&in.normalStrength, 4); mix(&in.normalBump, 4);
       mix(&in.sheen, 4); mix(in.sheenColor, 12); mix(&in.sheenRoughness, 4); mix(&in.sheenDir, 4);
