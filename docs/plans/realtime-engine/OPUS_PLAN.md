@@ -66,7 +66,7 @@ Session ritual:
 | Engine dropdown on Render 3D (old 1.8) | row 8.1 | decided: build it; it is the only way a user reaches the engine |
 | Downloads: Vulkan SDK, MoltenVK, glslang | block 9 | **not approved**: block 9 stops at row 9.2 until yes |
 | Downloads: reference assets for block 10 | block 10 | **not approved**: use `ModelSource` files already on disk, or build in Sketch 3D |
-| Render passes as new outputs | row 7.3 | **not approved**: design only |
+| Render passes as new outputs | row 7.3 | **approved 2026-11-12**: build `designs/7.3-passes.md` as written |
 
 ## 4. Rows
 
