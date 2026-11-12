@@ -1297,6 +1297,8 @@ if(INFINITE_VULKAN)
     add_custom_target(InfiniteVkShaders DEPENDS ${_vkheaders})
     add_dependencies(Infinite InfiniteVkShaders)
     target_sources(Infinite PRIVATE src/engine/rhi/VulkanDevice.cpp)
+    # The SPIR-V headers are generated: without this a shader edit regenerates them but leaves the old object file.
+    set_source_files_properties(src/engine/rhi/VulkanDevice.cpp PROPERTIES OBJECT_DEPENDS "${_vkheaders}")
     target_include_directories(Infinite PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
     target_compile_definitions(Infinite PRIVATE INFINITE_VULKAN=1)
     if(APPLE)

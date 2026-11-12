@@ -24,8 +24,11 @@ layout(scalar, set = 1, binding = 0) readonly buffer PtB { PtU pu; };
 layout(scalar, set = 1, binding = 1) readonly buffer LightB { LightU LL[]; };
 layout(scalar, set = 1, binding = 2) readonly buffer EmB { EmTri ems[]; };
 layout(scalar, set = 1, binding = 3) readonly buffer BaseB { uvec4 ibase[]; };
-layout(scalar, set = 1, binding = 4) readonly buffer TriB { vec4 btri[]; };
-layout(scalar, set = 1, binding = 5) readonly buffer NodeB { vec4 bnode[]; };
+// The integer fields are uint, not bits inside a float: small integers are denormal floats and a GPU may flush them to 0.
+struct BTri { vec3 a; uint inst; vec3 e1; uint prim; vec3 e2; uint flags; };
+struct BNode { vec3 lo; uint first; vec3 hi; uint cnt; };
+layout(scalar, set = 1, binding = 4) readonly buffer TriB { BTri btri[]; };
+layout(scalar, set = 1, binding = 5) readonly buffer NodeB { BNode bnode[]; };
 layout(scalar, set = 1, binding = 6) readonly buffer VtxB { float vbuf[]; };
 layout(scalar, set = 1, binding = 7) readonly buffer IdxB { uint ibuf[]; };
 layout(scalar, set = 1, binding = 8) readonly buffer UvB { float ubuf[]; };
@@ -60,39 +63,38 @@ bool trace(vec3 o, vec3 d, float tmax, bool casters, out Hit hit)
    bool found = false;
    vec3 sg = mix(vec3(1.0), vec3(-1.0), lessThan(d, vec3(0.0)));
    vec3 inv = sg / max(abs(d), vec3(1e-12));
-   vec2 r0 = slab(bnode[0].xyz, bnode[1].xyz, o, inv, tmax);
+   vec2 r0 = slab(bnode[0].lo, bnode[0].hi, o, inv, tmax);
    if (r0.x > r0.y) return false;
    uint stack[64]; int sp = 0;
    uint node = 0u;
-   for (;;)
+   for (int step = 0; step < 16384; step++) // bounded: a bad node can never hang the GPU
    {
-      vec4 lo = bnode[node * 2u], hi = bnode[node * 2u + 1u];
-      uint first = floatBitsToUint(lo.w), cnt = floatBitsToUint(hi.w);
+      uint first = bnode[node].first, cnt = bnode[node].cnt;
       if (cnt > 0u)
       {
          for (uint k = first; k < first + cnt; k++)
          {
-            vec4 a = btri[k * 3u], e1 = btri[k * 3u + 1u], e2 = btri[k * 3u + 2u];
-            if (casters && (floatBitsToUint(e2.w) & 1u) == 0u) continue;
-            vec3 p = cross(d, e2.xyz);
-            float det = dot(e1.xyz, p);
+            if (casters && (btri[k].flags & 1u) == 0u) continue;
+            vec3 a = btri[k].a, e1 = btri[k].e1, e2 = btri[k].e2;
+            vec3 p = cross(d, e2);
+            float det = dot(e1, p);
             if (abs(det) < 1e-24) continue;
             float id = 1.0 / det;
-            vec3 s = o - a.xyz;
+            vec3 s = o - a;
             float bu = dot(s, p) * id;
             if (bu < 0.0 || bu > 1.0) continue;
-            vec3 q = cross(s, e1.xyz);
+            vec3 q = cross(s, e1);
             float bv = dot(d, q) * id;
             if (bv < 0.0 || bu + bv > 1.0) continue;
-            float t = dot(e2.xyz, q) * id;
-            if (t > 0.0 && t < hit.t) { hit.t = t; hit.inst = floatBitsToUint(a.w); hit.prim = floatBitsToUint(e1.w); hit.bc = vec2(bu, bv); found = true; }
+            float t = dot(e2, q) * id;
+            if (t > 0.0 && t < hit.t) { hit.t = t; hit.inst = btri[k].inst; hit.prim = btri[k].prim; hit.bc = vec2(bu, bv); found = true; }
          }
       }
       else
       {
          uint l = first, r = first + 1u;
-         vec2 tl = slab(bnode[l * 2u].xyz, bnode[l * 2u + 1u].xyz, o, inv, hit.t);
-         vec2 tr = slab(bnode[r * 2u].xyz, bnode[r * 2u + 1u].xyz, o, inv, hit.t);
+         vec2 tl = slab(bnode[l].lo, bnode[l].hi, o, inv, hit.t);
+         vec2 tr = slab(bnode[r].lo, bnode[r].hi, o, inv, hit.t);
          bool hl = tl.x <= tl.y, hr = tr.x <= tr.y;
          if (hl && hr)
          {
