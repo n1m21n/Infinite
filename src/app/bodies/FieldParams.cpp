@@ -606,6 +606,17 @@ namespace app
             n->scale = scale;
       }
 
+      {
+         bool publish = n->publishScalarOutput;
+         if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
+         {
+            if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
+               ImGui::SetTooltip("%s", T("refused: publish output is still wired"));
+            else
+               n->publishScalarOutput = publish;
+         }
+      }
+
       DrawFieldParamSliders(n);
    }
 

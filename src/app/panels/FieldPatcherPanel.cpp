@@ -93,6 +93,7 @@ namespace
          h.nodeName = "Field Notes";
          h.error = n->LastError();
          h.params = &n->GetParamTable();
+         h.publish = n->publishScalarOutput ? n->ModulatorOutput(1) : nullptr;
       }
       else if (auto* n = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
       {
@@ -1002,6 +1003,8 @@ namespace
       else if (auto* n = dynamic_cast<FieldNotesNode*>(gn->node.get()))
       {
          n->code = p.scratchCode;
+         for (const Field::BoxNode& b : p.graph.boxes)
+            n->publishScalarOutput = n->publishScalarOutput || b.specId == "value_out" || b.specId == "pulse_out";
          n->Apply();
       }
       p.uid = gn->uid;

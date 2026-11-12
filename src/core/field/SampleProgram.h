@@ -161,6 +161,7 @@ namespace Field
       int numRegs = 0;
 
       int outReg = -1; // final register bound to 'out'; duplicated to both channels (mono kernel, v1)
+      int publishReg = -1; // Field Notes only: the register bound to `publish` at the end, read as a modulator
 
       std::vector<SampleStateInit> state; // one entry per declared state cell
       std::vector<SampleParamSlot> params; // one entry per declared param

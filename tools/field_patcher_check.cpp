@@ -558,6 +558,18 @@ int main(int argc, char** argv)
          Fail("header", "broken header should leave the view invalid");
    }
 
+   // ---- Field Notes publish (§13 #4): `publish` is bound to a register only on a Notes host ----
+   {
+      Field::SampleProgram p;
+      FieldError err;
+      const std::string src = "state float step = 0\nif (tick(1 / 8) > 0.5) {\n   step = step + 1\n}\npublish = step % 4 / 4\n";
+      if (!CompileSampleProgram(src, nullptr, p, err, true) || p.publishReg < 0)
+         Fail("notes publish", "a Notes program that sets publish has no publish register: " + err.message);
+      Field::SampleProgram q;
+      if (CompileSampleProgram("step = 1\n", nullptr, q, err, true) && q.publishReg >= 0)
+         Fail("notes publish", "a Notes program without publish got a publish register");
+   }
+
    // ---- sugar ----
    {
       BoxGraph g;

@@ -78,6 +78,7 @@ public:
    MeterRing& RollRing() { return mRoll; }
    uint64_t EmittedTotal() const { return mEmittedTotal.load(std::memory_order_relaxed); }
    uint64_t DroppedTotal() const { return mDroppedTotal.load(std::memory_order_relaxed); }
+   float PublishLatest() const { return mPublish.load(std::memory_order_relaxed); }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
@@ -274,6 +275,11 @@ private:
       float regs[Field::kSampleMaxRegs];
       RunSampleProgram(*mActive, rin, regs);
       std::memcpy(mStateCur, mStateNext, sizeof(mStateCur));
+      if (mActive->publishReg >= 0)
+      {
+         const float pv = regs[mActive->publishReg];
+         mPublish.store(std::isfinite(pv) ? pv : 0.0f, std::memory_order_relaxed);
+      }
 
       for (int k = 0; k < mSink.count; k++)
          HandleEmit(mSink.items[k], frame, inEv);
@@ -479,6 +485,7 @@ private:
    bool mPrevBeatValid = false;
 
    std::atomic<bool> mFlushFollowers { false };
+   std::atomic<float> mPublish { 0.0f }; // latest `publish`, for the main thread
    std::atomic<int> mRoot { 0 };
    std::atomic<int> mScale { 0 };
    std::atomic<uint64_t> mEmittedTotal { 0 };
@@ -773,6 +780,7 @@ void FieldNotesNode::LoadPreset(int index)
 FieldNotesNode::FieldNotesNode()
    : mAudioNode(std::make_unique<AudioFieldNotesNode>())
 {
+   mPublishOutput.owner = this;
    code = Presets()[presetIndex].code;
    Apply();
 }
@@ -854,6 +862,7 @@ void FieldNotesNode::VisitParams(ParamVisitor& v)
    v.Text("code", code);
    v.Int("root", root);
    v.Int("scale", scale);
+   v.Bool("publishScalarOutput", publishScalarOutput);
    // Loaded unchecked: keep the key inside the tables, as the Note nodes do.
    root = ((root % 12) + 12) % 12;
    if (scale < 0 || scale >= MusicTime::kNumScaleTypes)
@@ -892,4 +901,9 @@ void FieldNotesNode::LoadDeviceFile(const Field::DeviceFile& device)
       if (p != nullptr)
          p->value = kv.second;
    }
+}
+
+float FieldNotesNode::PublishLatest() const
+{
+   return mAudioNode != nullptr ? mAudioNode->PublishLatest() : 0.0f;
 }
