@@ -6,6 +6,8 @@
 #include "core/TileStore.h"
 #include "gl3.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -347,6 +349,41 @@ void RunView2DTest()
       Cook(&masked);
       Check("T3: the mask saves", masked.FindLayer(b)->HasPixelMask() && Pixel(&masked, 200, 180)[2] < 0.05f);
       printf("  T3 tiles in store after test: %zu keys\n", keys.size());
+   }
+
+   // ---- M4: a brush stroke at 1080p stays inside one frame ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 1920;
+      pic.Doc().h = 1080;
+      pic.Commit();
+      const int id = pic.AddPaintLayer();
+      BrushEngine::Brush br = BrushEngine::Presets()[1].brush;
+      br.size = 80.0f;
+      Cook(&pic);
+      using Clock = std::chrono::steady_clock;
+      std::vector<double> ms;
+      pic.BeginPaint(id, 0, br, 100.0f, 540.0f, 1.0f);
+      for (int f = 0; f < 120; f++)
+      {
+         const auto t0 = Clock::now();
+         // Each frame the pen moves ~14 px, as a fast hand does at 60 fps.
+         const float x = 100.0f + f * 14.0f, y = 540.0f + 300.0f * std::sin(f * 0.08f);
+         pic.PaintTo(x, y, 0.5f + 0.5f * std::sin(f * 0.2f));
+         Cook(&pic);
+         glFinish();
+         ms.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
+      }
+      const auto e0 = Clock::now();
+      pic.EndPaint();
+      glFinish();
+      const double endMs = std::chrono::duration<double, std::milli>(Clock::now() - e0).count();
+      std::vector<double> sorted = ms;
+      std::sort(sorted.begin(), sorted.end());
+      const double median = sorted[sorted.size() / 2], p95 = sorted[sorted.size() * 95 / 100];
+      printf("  M4 1080p stroke: median %.2f ms, p95 %.2f ms, end %.2f ms\n", median, p95, endMs);
+      Check("M4: a 1080p brush frame is under 16.7 ms", p95 < 16.7);
    }
 
    NewPatch();

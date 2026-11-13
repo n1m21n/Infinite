@@ -4,7 +4,10 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <condition_variable>
+#include <deque>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -15,14 +18,95 @@ namespace TileStore
 {
    namespace
    {
-      std::mutex sLock;
-      std::unordered_map<std::string, std::vector<uint8_t>>& Map()
+      // A tile is kept raw until a worker has compressed it, so a stroke's end
+      // never waits on PNG encoding; anything that needs the PNG (saving) gets
+      // it encoded on the spot when the worker hasn't reached it yet.
+      struct Entry
       {
-         static std::unordered_map<std::string, std::vector<uint8_t>> m;
+         std::vector<uint8_t> raw;   // straight RGBA8 until encoded
+         int w = 0, h = 0;
+         std::vector<uint8_t> png;
+      };
+      std::mutex sLock;
+      std::unordered_map<std::string, Entry>& Map()
+      {
+         static std::unordered_map<std::string, Entry> m;
          return m;
       }
 
       bool IsHex(char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }
+
+      std::vector<uint8_t> EncodePng(const std::vector<uint8_t>& rgba, int w, int h)
+      {
+         std::vector<uint8_t> png;
+         stbi_write_png_to_func(
+            [](void* ctx, void* data, int size)
+            {
+               auto* out = static_cast<std::vector<uint8_t>*>(ctx);
+               out->insert(out->end(), (uint8_t*)data, (uint8_t*)data + size);
+            },
+            &png, w, h, 4, rgba.data(), w * 4);
+         return png;
+      }
+
+      // Encodes `key` if it is still raw. Called with sLock held; drops it while encoding.
+      void EncodeLocked(std::unique_lock<std::mutex>& g, const std::string& key)
+      {
+         auto it = Map().find(key);
+         if (it == Map().end() || !it->second.png.empty() || it->second.raw.empty())
+            return;
+         const std::vector<uint8_t> raw = it->second.raw;
+         const int w = it->second.w, h = it->second.h;
+         g.unlock();
+         std::vector<uint8_t> png = EncodePng(raw, w, h);
+         g.lock();
+         it = Map().find(key);
+         if (it != Map().end() && it->second.png.empty())
+         {
+            it->second.png = std::move(png);
+            it->second.raw.clear();
+            it->second.raw.shrink_to_fit();
+         }
+      }
+
+      struct Worker
+      {
+         std::thread thread;
+         std::condition_variable cv;
+         std::deque<std::string> queue;
+         bool stop = false;
+         ~Worker()
+         {
+            {
+               std::lock_guard<std::mutex> g(sLock);
+               stop = true;
+            }
+            cv.notify_all();
+            if (thread.joinable())
+               thread.join();
+         }
+         void Run()
+         {
+            std::unique_lock<std::mutex> g(sLock);
+            for (;;)
+            {
+               cv.wait(g, [&] { return stop || !queue.empty(); });
+               if (stop)
+                  return;
+               const std::string key = std::move(queue.front());
+               queue.pop_front();
+               EncodeLocked(g, key);
+            }
+         }
+      };
+      // Made after Map() so it is torn down first.
+      Worker& TheWorker()
+      {
+         static Worker w;
+         static std::once_flag started;
+         std::call_once(started, [] { w.thread = std::thread([] { w.Run(); }); });
+         return w;
+      }
    }
 
    bool IsKey(const char* s, size_t n)
@@ -54,25 +138,32 @@ namespace TileStore
          mix((uint8_t)(w >> (k * 8)));
          mix((uint8_t)(h >> (k * 8)));
       }
-      for (size_t i = 0; i < n; i++)
+      // Eight bytes per step: tiles are 256 KB and this runs on stroke end.
+      size_t i = 0;
+      for (; i + 8 <= n; i += 8)
+      {
+         unsigned long long v;
+         std::memcpy(&v, rgba + i, 8);
+         hsh = (hsh ^ v) * 1099511628211ull;
+         hsh ^= hsh >> 29;
+      }
+      for (; i < n; i++)
          mix(rgba[i]);
       char key[24];
       std::snprintf(key, sizeof(key), "t%016llx", hsh);
+      Map();
+      Worker& worker = TheWorker();
       {
          std::lock_guard<std::mutex> g(sLock);
          if (Map().count(key) != 0)
             return key;
+         Entry& e = Map()[key];
+         e.raw.assign(rgba, rgba + n);
+         e.w = w;
+         e.h = h;
+         worker.queue.push_back(key);
       }
-      std::vector<uint8_t> png;
-      stbi_write_png_to_func(
-         [](void* ctx, void* data, int size)
-         {
-            auto* out = static_cast<std::vector<uint8_t>*>(ctx);
-            out->insert(out->end(), (uint8_t*)data, (uint8_t*)data + size);
-         },
-         &png, w, h, 4, rgba, w * 4);
-      std::lock_guard<std::mutex> g(sLock);
-      Map()[key] = std::move(png);
+      worker.cv.notify_one();
       return key;
    }
 
@@ -81,11 +172,24 @@ namespace TileStore
       if (!IsKey(key.data(), key.size()) || png.empty())
          return;
       std::lock_guard<std::mutex> g(sLock);
-      Map()[key] = std::move(png);
+      Entry& e = Map()[key];
+      e.png = std::move(png);
+      e.raw.clear();
    }
 
    bool Get(const std::string& key, std::vector<uint8_t>& rgba, int& w, int& h)
    {
+      {
+         std::lock_guard<std::mutex> g(sLock);
+         auto it = Map().find(key);
+         if (it != Map().end() && !it->second.raw.empty())
+         {
+            rgba = it->second.raw;
+            w = it->second.w;
+            h = it->second.h;
+            return true;
+         }
+      }
       std::vector<uint8_t> png = Encoded(key);
       if (png.empty())
          return false;
@@ -100,9 +204,10 @@ namespace TileStore
 
    std::vector<uint8_t> Encoded(const std::string& key)
    {
-      std::lock_guard<std::mutex> g(sLock);
+      std::unique_lock<std::mutex> g(sLock);
+      EncodeLocked(g, key);
       auto it = Map().find(key);
-      return it != Map().end() ? it->second : std::vector<uint8_t>();
+      return it != Map().end() ? it->second.png : std::vector<uint8_t>();
    }
 
    bool Has(const std::string& key)
