@@ -564,7 +564,36 @@ namespace
       FieldLabel(label);
       ImGui::SetNextItemWidth(sFieldW);
       FieldWell::PushStyle();
-      const bool changed = ImGui::DragFloat(FormParts::Id(label).c_str(), v, speed, lo, hi, fmt);
+      const std::string wid = FormParts::Id(label);
+      const ImGuiID gid = ImGui::GetID(wid.c_str());
+      // Hover the box and just type a digit: the number field opens with that first character in it.
+      {
+         static ImGuiID sTypeId = 0;
+         static ImWchar sTypeCh = 0;
+         const ImVec2 mn = ImGui::GetCursorScreenPos(), mx(mn.x + ImGui::CalcItemWidth(), mn.y + ImGui::GetFrameHeight());
+         const bool editing = ImGui::TempInputIsActive(gid);
+         if (editing && sTypeId == gid && sTypeCh != 0)
+         {
+            ImGui::GetIO().AddInputCharacter(sTypeCh);
+            sTypeId = 0;
+            sTypeCh = 0;
+         }
+         else if (!editing && ImGui::GetCurrentContext()->ActiveId == 0 && ImGui::IsMouseHoveringRect(mn, mx) &&
+                  ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+         {
+            for (const ImWchar c : ImGui::GetIO().InputQueueCharacters)
+               if ((c >= '0' && c <= '9') || c == '-' || c == '.')
+               {
+                  sTypeId = gid;
+                  sTypeCh = c;
+                  ImGuiContext& g = *ImGui::GetCurrentContext();
+                  g.NavNextActivateId = gid;
+                  g.NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+                  break;
+               }
+         }
+      }
+      const bool changed = ImGui::DragFloat(wid.c_str(), v, speed, lo, hi, fmt);
       FieldWell::PopStyle();
       UndoOnActivate();
       if (changed)
@@ -2895,6 +2924,15 @@ namespace
       ImGui::EndChild();
    }
 
+   // Text centred on the 28 px tile row, so labels share the chips' centre line.
+   void RowLabel(const char* text)
+   {
+      const float y = ImGui::GetCursorPosY();
+      ImGui::SetCursorPosY(y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f);
+      ImGui::TextDisabled("%s", text);
+      ImGui::SetCursorPosY(y);
+   }
+
    void DrawHeader(Scene2DNode* doc)
    {
       const float availW = ImGui::GetContentRegionAvail().x;
@@ -2914,13 +2952,15 @@ namespace
       if (sTool == kMove)
       {
          bool autoSel = sAutoSelect;
-         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (tok::tile - CheckBox::kSize) * 0.5f);
+         // Checkbox and label sit on the chips' centre line; the cursor then returns to the row's top edge.
+         const ImVec2 row0 = ImGui::GetCursorScreenPos();
+         ImGui::SetCursorScreenPos(ImVec2(row0.x, row0.y + (tok::tile - CheckBox::kSize) * 0.5f));
          if (CheckBox::Box("##v2dauto", &autoSel))
             sAutoSelect = autoSel;
-         FormParts::Inline(0.0f, tok::space_1);
-         ImGui::AlignTextToFramePadding();
+         const float labelX = ImGui::GetItemRectMax().x + tok::space_1;
+         ImGui::SetCursorScreenPos(ImVec2(labelX, row0.y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f));
          ImGui::TextDisabled("%s", T("Auto-select"));
-         gap();
+         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_3, row0.y));
          static const char* kAlign[6] = { "##al0", "##al1", "##al2", "##al3", "##al4", "##al5" };
          static const char* kAlignTip[6] = { "Align left edges", "Align horizontal centres", "Align right edges",
                                              "Align top edges", "Align vertical centres", "Align bottom edges" };
@@ -3048,9 +3088,11 @@ namespace
    {
       const Scene2DNode::Document& d = doc->Doc();
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
+      float row0Y = 0.0f;
       const ImVec2 mid((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
       if (ZoomChip("##v2dzout", false, T("Zoom out (Ctrl+-)")))
          ZoomAt(doc, 0.8f, mid);
+      row0Y = ImGui::GetItemRectMin().y;   // every later item and the text share this chip's top edge
       next();
       float pct = sZoom * 100.0f;
       ImGui::SetNextItemWidth(58.0f);
@@ -3081,7 +3123,7 @@ namespace
          std::snprintf(buf, sizeof(buf), "%d x %d   %.0f, %.0f   %.2f ms", d.w, d.h, sMouseDoc.x, sMouseDoc.y, doc->CookMs());
       else
          std::snprintf(buf, sizeof(buf), "%d x %d   %.2f ms", d.w, d.h, doc->CookMs());
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f);
+      ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, row0Y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f));
       ImGui::TextDisabled("%s", buf);
    }
 
