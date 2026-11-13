@@ -122,5 +122,16 @@
  "marquee": 59768,
  "wand": 59769,
  "shape": 59770,
- "type": 59771
+ "type": 59771,
+ "quick-mask": 59772,
+ "sel-add": 59773,
+ "sel-exclude": 59774,
+ "sel-intersect": 59775,
+ "sel-new": 59776,
+ "sel-subtract": 59777,
+ "stroke-style": 59778,
+ "text-center": 59779,
+ "text-left": 59780,
+ "text-right": 59781,
+ "zoom-out": 59782
 }

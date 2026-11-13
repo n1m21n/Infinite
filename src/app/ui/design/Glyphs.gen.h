@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE97B;
+   inline constexpr unsigned kLast = 0xE986;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -128,4 +128,15 @@ namespace IconsInfinite
    inline constexpr const char* Wand = "\xee\xa5\xb9"; // U+E979 wand
    inline constexpr const char* Shape = "\xee\xa5\xba"; // U+E97A shape
    inline constexpr const char* Type = "\xee\xa5\xbb"; // U+E97B type
+   inline constexpr const char* QuickMask = "\xee\xa5\xbc"; // U+E97C quick-mask
+   inline constexpr const char* SelAdd = "\xee\xa5\xbd"; // U+E97D sel-add
+   inline constexpr const char* SelExclude = "\xee\xa5\xbe"; // U+E97E sel-exclude
+   inline constexpr const char* SelIntersect = "\xee\xa5\xbf"; // U+E97F sel-intersect
+   inline constexpr const char* SelNew = "\xee\xa6\x80"; // U+E980 sel-new
+   inline constexpr const char* SelSubtract = "\xee\xa6\x81"; // U+E981 sel-subtract
+   inline constexpr const char* StrokeStyle = "\xee\xa6\x82"; // U+E982 stroke-style
+   inline constexpr const char* TextCenter = "\xee\xa6\x83"; // U+E983 text-center
+   inline constexpr const char* TextLeft = "\xee\xa6\x84"; // U+E984 text-left
+   inline constexpr const char* TextRight = "\xee\xa6\x85"; // U+E985 text-right
+   inline constexpr const char* ZoomOut = "\xee\xa6\x86"; // U+E986 zoom-out
 }
