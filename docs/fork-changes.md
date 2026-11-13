@@ -49,6 +49,8 @@
 | `src/app/graph/RpcTerminal.cpp` | `transport`: действие `loop` (`enabled`, `start`, `end` в битах) через `ArrangeSetLoop`; в ответ добавлены `loopEnabled/loopStart/loopEnd` | API-7: диапазон лупа программно | tu/api-roundtrip |
 | `src/app/graph/NodeRegistry.cpp` | `ArrangeSetLoop`: при `enabled` диапазон короче `kPPQ/16` поднимается до неё | луп не «включён», но нулевой (Transport такой отбрасывал — кнопка выглядела мёртвой) | tu/api-roundtrip |
 | `src/app/selftest/MiscTests.cpp` | в `RunRpcBatchTest` проверки round-trip категории, `deferredKeys`, действий `transport loop` | регрессии по трём карточкам | tu/api-roundtrip |
+| `src/platform/AppPaths.h` | `sPortableDataDir()` / `FileExists()` / `DirName()` / `ResolvePortableDataDir(exePath)`; `AppSupportDir()` в начале отдаёт портативную папку, если она задана | портативная копия держит всё состояние рядом с собой | tu/api-roundtrip |
+| `src/app/Startup.cpp` | одна строка в начале `InitApp`: `AppPaths::ResolvePortableDataDir(Platform::ExecutablePath())` | решить до первого чтения настроек/автосохранения/лога | tu/api-roundtrip |
 
 Наши новые файлы (конфликтов с апстримом нет): `src/core/chat/{Providers,HttpAgent}.*`, `src/core/{McpHttp.*,McpAgentDoc.h}`, `src/platform/AgentNet*.{h,mm,cpp}`, `src/app/panels/{CustomAgentForm,ConnectAgentForm}.cpp`, `tools/{mcp_http_probe,mock_openai_server,gen_agent_doc}.py`, `docs/{custom-agent,connect-agent}.md`.
 
