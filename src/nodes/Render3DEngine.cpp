@@ -730,6 +730,9 @@ bool Render3DNode::CookEngine(int frameId)
       const float invFy = 1.0f / std::max(1e-6f, std::fabs(proj.m[5]));
       fr.lensRadius = ortho || dofAperture <= 0.0f ? 0.0f : dofAperture * (24.0f / 1080.0f) * focusDistance * invFy;
       fr.focusDist = std::max(1e-3f, focusDistance);
+      // A new ray starts this far off the surface. Scaled to the focus distance (under a pixel's footprint there), so
+      // a glass wall or a water drop a few millimetres thick is not stepped over; never more than the old fixed 3 mm.
+      fr.rayBias = std::clamp(fr.focusDist * 1e-4f, 1e-5f, 0.003f);
       fr.dofAperture = ortho ? 0.0f : std::max(0.0f, dofAperture);
       fr.fogDensity = std::max(0.0f, fogDensity); fr.fogAnisotropy = std::clamp(fogAnisotropy, -0.95f, 0.95f);
       for (int k = 0; k < 3; k++) { fr.fogColor[k] = ColorSpace::SrgbToLinear(std::clamp(fogColor[k], 0.0f, 1.0f)); fr.fogMin[k] = fogMin[k]; fr.fogMax[k] = fogMax[k]; }
