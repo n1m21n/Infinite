@@ -1,4 +1,5 @@
 // Settings window (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include <algorithm>
 #include "app/graph/LearningLog.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -523,6 +524,7 @@ namespace app
             FormParts::SliderFloat(L("Zoom sensitivity"), &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
+            InspectorSettingsRow(); // fork: params in the inspector / in the node
 
             ImGui::Spacing();
             FormParts::Section(T("Minimap"));

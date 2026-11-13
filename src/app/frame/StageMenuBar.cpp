@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include "core/GpuDiag.h" // fork
 #include "app/panels/CurveEditorPanel.h"
 #include "app/ui/design/components/StatusDot.h"
@@ -57,6 +58,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railCurveEditor", top + 9.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
                        T("Curve editor - draw and shape MSEG curves (Shift+E)")))
       gCurveEditorOpen = !gCurveEditorOpen;
+   if (PanelRail::Item("##railInspector", top + 10.0f * step, IconsInfinite::Edit, nullptr, gInspectorOpen, // fork
+                       T("Inspector - parameters of the selected node (Shift+I)")))
+      gInspectorOpen = !gInspectorOpen;
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
@@ -339,6 +343,7 @@ void DrawMenuBar(FrameCtx& fc)
                   // dark-contrast-budget style meant for controls inside a node.
                   // The two styles side by side in one menu (one purple/clean,
                   // one flat blue) is what read as inconsistent.
+                  MenuParts::Check(L("Show inspector"), &gInspectorOpen); // fork: inspector
                   MenuParts::Check(L("Show modulation matrix"), &gModMatrixOpen);
                   if (gModMatrixOpen)
                   {
@@ -1104,6 +1109,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::tile * 0.5f));
             drawAudio();
          }
+         DrawTopBarParamsTools(centreY); // fork: params show/hide + inspector tiles
 
          // Width of the centred group, measured for next frame's placement.
          sCentreW = ImGui::GetItemRectMax().x - centreStartScreenX;

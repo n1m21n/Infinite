@@ -314,6 +314,8 @@ public:
 
    // Parameters registered during the current frame's node drawing.
    void ClearFrameParams() { mFrameParams.clear(); }
+   // fork: the inspector redraws a node the canvas already registered; drop its duplicate registrations.
+   void TruncateFrameParams(size_t n) { if (n < mFrameParams.size()) mFrameParams.resize(n); }
    // Set by the app: reports whether the control being registered right now is greyed or hidden.
    using StateProbe = void (*)(bool& disabled, bool& hidden);
    void SetStateProbe(StateProbe probe) { mStateProbe = probe; }
