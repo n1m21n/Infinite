@@ -3,11 +3,14 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "INode.h"
 #include "GLUtil.h"
+#include "BrushEngine.h"
 
 // The 2D View's document: node outputs, fills and groups stacked into one
 // picture at the document's size. A node layer only references its node (by
@@ -20,7 +23,7 @@ public:
    static INode* Create() { return new Scene2DNode(); }
    ~Scene2DNode() override;
 
-   enum class Kind { Node = 0, Fill = 1, Group = 2 };
+   enum class Kind { Node = 0, Fill = 1, Group = 2, Paint = 3 };
    enum Fit { kFitNone = 0, kFitFit, kFitFill, kFitStretch };
    static const std::vector<std::string>& FitNames();
    static constexpr int kPassThrough = -1;   // a group's blend: its children blend straight into what is below
@@ -63,6 +66,15 @@ public:
       float colorA[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
       float colorB[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float fillAngle = 90.0f;      // linear: degrees, 90 = top to bottom
+      // Paint layers: the surface's size and its tiles (TileStore keys, row
+      // major from the bottom row, kTile px square).
+      int pw = 0, ph = 0;
+      std::vector<std::string> tiles;
+      // Pixel mask (any layer but a group): grey, white shows. Sized to the layer's box.
+      bool pmaskOn = true;
+      int mw = 0, mh = 0;
+      std::vector<std::string> mtiles;
+      bool HasPixelMask() const { return mw > 0 && mh > 0; }
    };
 
    struct Document
@@ -135,6 +147,47 @@ public:
    const std::string& DocText() const { return mText; }
    void SetDocText(const std::string& text) { mText = text; }
 
+   // ---- paint (Block B) ------------------------------------------------
+   // A new empty paint layer at the document's size, above `above`.
+   int AddPaintLayer(int above = 0);
+   // Adds a white (all shown) pixel mask; false when the layer cannot have one.
+   bool AddPixelMask(int id);
+   // The selection made into the layer's pixel mask (all shown without one).
+   bool MaskFromSelection(int id);
+   void RemovePixelMask(int id);
+   // Painting on a layer (target 0) or its pixel mask (1) or the quick mask (2).
+   // Points are document pixels. EndPaint stores the touched tiles and commits.
+   bool BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure);
+   void PaintTo(float x, float y, float pressure);
+   void EndPaint();
+   bool Painting() const { return mStroke.Active(); }
+   int PaintingLayer() const { return mPaintId; }
+   // Bucket fill at a document point, within `tolerance` (0..255) of the
+   // clicked colour; contiguous or everywhere; sampled from the layer or the picture.
+   bool Bucket(int id, float x, float y, const float rgb[3], float opacity, int tolerance, bool contiguous, bool sampleAll);
+   // Gradient from a to b (document px), colour A to B; radial when `radial`.
+   bool Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], bool radial);
+   // The picture's colour (display values) at a document point.
+   bool Pick(float x, float y, float rgb[3]);
+   // The paint surface's texture and size, 0 when not a paint layer (Convert to Draw node).
+   bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
+
+   // Selection: one per document, document-sized, not saved.
+   enum SelOp { kSelNew = 0, kSelAdd, kSelSub, kSelIntersect };
+   void SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse);
+   void SelectPolygon(const std::vector<float>& xy, int op, float feather);
+   void SelectWand(float x, float y, int tolerance, bool contiguous, int op, bool sampleAll, int layerId);
+   void SelectAll();
+   void Deselect();
+   void InvertSelection();
+   bool HasSelection() const { return mSelAny; }
+   bool SelectionBounds(float lo[2], float hi[2]) const;
+   float SelectionAt(int x, int y) const;   // 0..1, document px
+   // Marching ants for the selection (or the red quick-mask tint), a document-sized overlay; 0 = none.
+   unsigned SelectionOverlay(float time, bool quickMask);
+   unsigned SelectionTexture();             // the selection as a grey texture, 0 = none
+   bool quickMask = false;                  // Q: the selection shows red and the brush paints it
+
    bool panelOnly = false;           // lives in the 2D View panel until Convert to node
    int soloLayer = 0;                // panel only, not saved: Alt-click eye
 
@@ -184,9 +237,34 @@ private:
       int maskChannel = 0;
       bool maskInvert = false;
       float maskDensity = 1.0f;
+      unsigned int pmask = 0;       // pixel mask, sampled with the layer
       const Layer* fill = nullptr;
    };
    void Pass(int depth, const PassArgs& a);
+
+   // Paint surfaces, live on the GPU, filled from the tiles the text names.
+   struct Surface
+   {
+      GLUtil::Fbo fbo;
+      std::vector<std::string> loaded;   // keys the texture holds now
+   };
+   Surface* SyncSurface(std::map<int, Surface>& in, int id, int w, int h, const std::vector<std::string>& keys);
+   void SyncSurfaces();
+   void StoreTiles(Surface& s, std::vector<std::string>& keys, const int dirty[4]);
+   bool DocToSurface(const Layer& l, int target, float x, float y, float& sx, float& sy, float& scale);
+   bool EnsurePaintShaders();
+   void UploadSelection();
+   void ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned coverage, const float colA[4], const float colB[4],
+                  int kind, const float p0[2], const float p1[2], float opacity);
+   std::map<int, Surface> mSurfaces, mMasks;
+   BrushEngine::Stroke mStroke;
+   int mPaintId = 0, mPaintTarget = 0;
+   std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
+   bool mSelAny = false, mSelDirty = false;
+   GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch;
+   unsigned mFillProgram = 0, mAntsProgram = 0, mResampleProgram = 0;
+   bool mPaintTried = false;
+   unsigned long long mPaintEdits = 0;   // bumps when a surface changes outside a stroke
 
    std::vector<Layer> mLayers;
    Document mDoc;
