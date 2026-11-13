@@ -4,7 +4,7 @@ description: Breakdown of Infinite register machine for Field Synth and Effect n
 date: 2026-10-19
 category: product
 tags: [dsp, c++, field language, synthesis, audio engineering]
-image: assets/blog_audio_dsp_kernel.png
+image: assets/blog_per-sample-dsp-audio-kernels-in-field-language.png
 image_alt: real-time 48khz audio dsp register waveform visualization in infinite
 keywords: audio dsp c++, per-sample dsp kernel, audio register machine, moog ladder filter formula, modular synth coding
 status: published

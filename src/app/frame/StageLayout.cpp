@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/FormParts.h"
 
 namespace app
@@ -134,7 +135,8 @@ void DrawLayout(FrameCtx& fc)
          gSessionClaimedKeys = inSession;
          gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
                            (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
-                           (gCurveEditorOpen && gCurveEditorClaimedKeys);
+                           (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
+                           (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
          gPerfMatrixClaimedKeys = inPerf;
          gPerfMatrixFocused = inPerf && gPerfEditMode;
@@ -147,7 +149,8 @@ void DrawLayout(FrameCtx& fc)
             gSessionClaimedKeys = false;
          gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
                         (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
-                           (gCurveEditorOpen && gCurveEditorClaimedKeys);
+                           (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
+                           (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
          if (!gPerfPanelOpen)
          {
@@ -297,6 +300,19 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gCurveEditorHeight;
          topBottomRows++;
       }
+      if (gFieldPatcherDock != 3)
+         gFieldPatcherDock = 0; // bottom or top only
+      if (gFieldPatcherOpen)
+      {
+         const float room = std::max(220.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f);
+         gFieldPatcherHeight = std::clamp(gFieldPatcherHeight, 220.0f, room);
+         gFieldPatcherShownHeight = gFieldPatcherMaximised ? std::max(220.0f, ImGui::GetContentRegionAvail().y - topBottom - 24.0f)
+                                                           : gFieldPatcherHeight;
+         topBottom += gFieldPatcherShownHeight;
+         topBottomRows++;
+      }
+      else
+         gFieldPatcherMaximised = false;
       if (TerminalDocked() && (gTerminalDock == 0 || gTerminalDock == 3))
       {
          gTerminalHeight = std::clamp(gTerminalHeight, 160.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
@@ -334,6 +350,8 @@ void DrawLayout(FrameCtx& fc)
          DrawView3DDocked("##view3d_top", ImVec2(0, gView3DHeight));
       if (gCurveEditorOpen && gCurveEditorDock == 3)
          DrawCurveEditorDocked("##curveeditor_top", ImVec2(0, gCurveEditorHeight));
+      if (gFieldPatcherOpen && gFieldPatcherDock == 3)
+         DrawFieldPatcherDocked("##fieldpatcher_top", ImVec2(0, gFieldPatcherShownHeight));
       if (TerminalDocked() && gTerminalDock == 3)
          DrawTerminalDocked("##terminal_top", ImVec2(0, gTerminalHeight));
       if (viewportLeft)
@@ -449,6 +467,7 @@ void DrawLayout(FrameCtx& fc)
       GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GesturePlaybackClock());
       gGlobalScaleTooltipHovered = false;
       gNodeHoverTip.clear();
+      gNodeHelpTip.clear();
 
       if (!gPendingSelect.empty())
       {

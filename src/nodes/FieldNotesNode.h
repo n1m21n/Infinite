@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/INode.h"
+#include "core/Modulation.h"
 #include "core/NoteCable.h"
 #include "field/FieldDevice.h"
 #include "field/ParamTable.h"
@@ -33,7 +34,14 @@ public:
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
-   const char* OutputLabel(int /*index*/) const override { return "notes"; }
+   // Output 1 is the publish modulator (Field Patcher §13 #4), behind the same toggle the other Field nodes have.
+   int OutputCount() const override { return publishScalarOutput ? 2 : 1; }
+   const char* OutputLabel(int index) const override { return (publishScalarOutput && index == 1) ? "publish" : "notes"; }
+   IModulator* ModulatorOutput(int index) override
+   {
+      return (publishScalarOutput && index == 1) ? static_cast<IModulator*>(&mPublishOutput) : nullptr;
+   }
+   float PublishLatest() const; // the audio thread's latest `publish`
    INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
@@ -81,8 +89,16 @@ public:
    int scale = 0;       // MusicTime::ScaleType, feeds deg()
 
    NoteCable noteInput;
+   bool publishScalarOutput = false;
+
+   struct PublishOutput : public IModulator
+   {
+      FieldNotesNode* owner = nullptr;
+      float Value01() override { return owner != nullptr ? owner->PublishLatest() : 0.0f; }
+   };
 
 private:
+   PublishOutput mPublishOutput;
    std::unique_ptr<AudioFieldNotesNode> mAudioNode;
    Field::ParamTable mParamTable;
    std::vector<Field::SampleParamSlot> mCompiledParams;

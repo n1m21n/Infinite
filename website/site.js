@@ -207,9 +207,10 @@
 
     path.style.strokeDasharray = len;
     path.style.strokeDashoffset = len;
-    path.getBoundingClientRect();
-    path.style.transition = 'stroke-dashoffset 1.3s cubic-bezier(0.65, 0, 0.35, 1) 0.15s';
-    path.style.strokeDashoffset = '0';
+    requestAnimationFrame(() => {
+      path.style.transition = 'stroke-dashoffset 1.3s cubic-bezier(0.65, 0, 0.35, 1) 0.15s';
+      path.style.strokeDashoffset = '0';
+    });
 
     if (!ball) return;
     const hero = $('.hero');
@@ -250,30 +251,45 @@
     const show = (w, col) => {
       word.textContent = w;
       word.style.setProperty('--hand', col);
+      if (reduced) {
+        if (line) {
+          line.style.setProperty('--hand', col);
+          line.style.width = (word.offsetWidth + 10) + 'px';
+          line.classList.add('draw');
+        }
+        return;
+      }
+      word.classList.remove('writing');
       if (line) {
         line.style.setProperty('--hand', col);
-        line.style.width = (word.offsetWidth + 10) + 'px';
+        line.classList.remove('draw');
       }
-      if (reduced) { if (line) line.classList.add('draw'); return; }
-      word.classList.remove('writing');
-      if (line) line.classList.remove('draw');
-      void word.offsetWidth;
-      word.classList.add('writing');
-      if (line) line.classList.add('draw');
+      requestAnimationFrame(() => {
+        if (line) line.style.width = (word.offsetWidth + 10) + 'px';
+        word.classList.add('writing');
+        if (line) line.classList.add('draw');
+      });
     };
     const fit = () => { if (line) line.style.width = (word.offsetWidth + 10) + 'px'; };
     window.addEventListener('resize', fit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
-    if (reduced) { show('you', '#B53700'); return; }
-    let i = 0;
+    // Keep the hero heading stable on initial load for LCP; animate once on user interaction or scroll
+    show('you', '#B53700');
+    let i = 0, started = false;
     const next = () => {
       const [w, col] = WORDS[i];
       show(w, col);
       i++;
-      if (i < WORDS.length) setTimeout(next, i === 1 ? 1300 : 1050);
+      if (i < WORDS.length) setTimeout(next, 1200);
     };
-    setTimeout(next, 700);
+    const startCycle = () => {
+      if (started || reduced) return;
+      started = true;
+      setTimeout(next, 1000);
+    };
+    word.addEventListener('pointerenter', startCycle);
+    window.addEventListener('scroll', startCycle, { once: true, passive: true });
   }
 
   /* ------------------------------------------------------------ HUD */
@@ -791,7 +807,16 @@
 
     function goTo(idx) {
       current = (idx + total) % total;
-      slides.forEach((s, i) => s.classList.toggle('active', i === current));
+      slides.forEach((s, i) => {
+        const on = i === current;
+        s.classList.toggle('active', on);
+        if (on) {
+          const im = s.querySelector('img');
+          if (im && !im.getAttribute('src') && im.dataset.src) {
+            im.src = im.dataset.src;
+          }
+        }
+      });
       tabs.forEach((t, i) => {
         const on = i === current;
         t.classList.toggle('is-active', on);
@@ -871,22 +896,7 @@
       }
     });
 
-    /* autoplay: advances every 2s while visible and not hovered */
-    const win = $('#hero-showcase');
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (win && !reduce) {
-      let timer = null, seen = false, hover = false;
-      const tick = () => {
-        const lbOpen = lightbox && lightbox.classList.contains('active');
-        if (seen && !hover && !lbOpen && !document.hidden) goTo(current + 1);
-      };
-      timer = setInterval(tick, 2000);
-      win.addEventListener('mouseenter', () => { hover = true; });
-      win.addEventListener('mouseleave', () => { hover = false; });
-      if ('IntersectionObserver' in window) {
-        new IntersectionObserver((en) => { seen = en[0].isIntersecting; }, { threshold: 0.5 }).observe(win);
-      } else seen = true;
-    }
+    /* Showcase controls: users navigate slides via tabs, click, and arrow buttons without jarring autoplay */
   }
 
   /* ------------------------------------------------------------ boot */

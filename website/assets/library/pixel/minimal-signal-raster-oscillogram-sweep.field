@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Minimal Signal Raster Oscillogram Sweep",
+    "author": "Infinite",
+    "description": "Precision audio-reactive oscilloscope raster grid rendering multi-channel sine-sweep waveforms, graticule coordinate graduations, and Alva Noto-style pulse-code impulses.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float sweepSpeed = 0.40 [0.05, 1.2];\nparam float beamGlow = 0.85 [0.3, 1.5];\nparam float graticuleOpacity = 0.35 [0.1, 0.8];\nparam float harmonicFrequency = 5.0 [2.0, 12.0];\nparam float contrast = 1.20 [0.8, 1.6];\n\np = uv;\ntime = t * sweepSpeed;\n\n# CRT Oscilloscope 10x10 Graticule Grid\ngx = smoothstep(0.06, 0.01, abs(fract(p.x * 10.0) - 0.5));\ngy = smoothstep(0.06, 0.01, abs(fract(p.y * 10.0) - 0.5));\ngrid = max(gx, gy) * graticuleOpacity;\n\n# Center Axis Calibration Ticks\ncenterAxisX = smoothstep(0.008, 0.002, abs(p.y - 0.5));\ncenterAxisY = smoothstep(0.008, 0.002, abs(p.x - 0.5));\nsubTicks = (step(0.85, fract(p.x * 50.0)) * centerAxisX) + (step(0.85, fract(p.y * 50.0)) * centerAxisY);\n\n# Primary White Oscilloscope Beam Trace\nwave1 = sin(p.x * 14.0 + time * 3.5) * 0.16 + sin(p.x * 38.0 - time * 2.0) * 0.04;\nbeam1 = smoothstep(0.018, 0.002, abs(p.y - (0.52 + wave1))) * beamGlow;\n\n# Secondary Vermilion Pulse Waveform\nwave2 = cos(p.x * harmonicFrequency * 3.0 - time * 4.2) * 0.12;\npulseGate = step(0.3, fract(p.x * 8.0 - time * 1.5));\nbeam2 = smoothstep(0.014, 0.002, abs(p.y - (0.46 + wave2))) * pulseGate * 1.1;\n\n# Bottom Telemetry Spectrum Bars\nbarIndex = floor(p.x * 16.0);\nbarHeight = 0.04 + 0.12 * abs(sin(barIndex * 1.7 + time * 2.5));\nbarMask = step(p.y, barHeight) * step(0.04, p.y) * step(0.18, fract(p.x * 16.0));\n\ncBg = vec3(0.063, 0.063, 0.063);\ncWhite = vec3(0.95, 0.95, 0.95);\ncRed = vec3(1.0, 0.20, 0.0);\ncGrid = vec3(0.30, 0.32, 0.36);\n\ncol = cBg;\ncol = mix(col, cGrid, grid);\ncol = mix(col, cWhite * 0.65, subTicks * 0.6);\ncol = mix(col, cWhite, barMask * 0.75);\ncol = mix(col, cRed, beam2);\ncol = mix(col, cWhite, beam1);\n\nout = clamp(col * contrast, 0.0, 1.0);\n",
+    "params": {
+      "sweepSpeed": 0.4,
+      "beamGlow": 0.85,
+      "graticuleOpacity": 0.35,
+      "harmonicFrequency": 5.0,
+      "contrast": 1.2
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

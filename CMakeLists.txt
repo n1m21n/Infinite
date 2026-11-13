@@ -542,6 +542,7 @@ set(COMMON_SOURCES
     src/app/panels/HistoryPanel.cpp
     src/app/panels/PianoRollPanel.cpp
     src/app/panels/CurveEditorPanel.cpp
+    src/app/panels/FieldPatcherPanel.cpp
     src/app/panels/View3DPanel.cpp
     src/app/panels/TerminalPanel.cpp
     src/app/panels/CliSetupSection.cpp
@@ -691,6 +692,8 @@ set(COMMON_SOURCES
     src/core/field/FieldGraphKernel.cpp
     src/core/field/FieldGraphReconciler.cpp
     src/core/field/FieldGraphOwnership.cpp
+    src/core/field/FieldBoxRegistry.cpp
+    src/core/field/FieldBoxGraph.cpp
     src/core/ExprGlobals.cpp
     src/core/FactoryPresets.cpp
     src/platform/PluginCrashGuard.cpp
@@ -1102,6 +1105,50 @@ add_executable(field-preset-check
     src/core/field/FieldState.cpp
 )
 target_include_directories(field-preset-check PRIVATE src src/core)
+
+# Headless checks for Field Patcher Block A (internal/plans/field-patcher/README.md §12).
+# The check round-trips every shipped preset, so it needs the kPresets tables without the app:
+# tools/field_patcher_presets.py copies them out of the node sources into a header. Skipped
+# (with a notice) where no Python 3 is installed.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+add_executable(field-patcher-check
+    tools/field_patcher_check.cpp
+    src/core/field/FieldBoxRegistry.cpp
+    src/core/field/FieldBoxGraph.cpp
+    src/core/field/FieldLex.cpp
+    src/core/field/FieldParse.cpp
+    src/core/field/FieldIR.cpp
+    src/core/field/FieldSwizzle.cpp
+    src/core/field/FieldCycles.cpp
+    src/core/field/GlslBackend.cpp
+    src/core/field/Transfer.cpp
+    src/core/field/ReduceOps.cpp
+    src/core/field/BackendRegister.cpp
+    src/core/field/ElementBackend.cpp
+    src/core/field/ElementStore.cpp
+    src/core/field/FieldRandom.cpp
+    src/core/field/FieldState.cpp
+)
+target_include_directories(field-patcher-check PRIVATE src src/core ${CMAKE_BINARY_DIR}/generated)
+set(FIELD_PATCHER_PRESET_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/nodes/FieldNotesNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/nodes/FieldPrimitiveNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/nodes/FieldElementNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/nodes/FieldPixelNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/nodes/FieldSampleNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/nodes/FieldSynthNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/nodes/FieldGraphNode.cpp)
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/generated/field_patcher_presets.h
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/field_patcher_presets.py
+            ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/generated/field_patcher_presets.h
+    DEPENDS ${CMAKE_SOURCE_DIR}/tools/field_patcher_presets.py ${FIELD_PATCHER_PRESET_SOURCES}
+    COMMENT "Extracting Field presets for field-patcher-check")
+target_sources(field-patcher-check PRIVATE ${CMAKE_BINARY_DIR}/generated/field_patcher_presets.h)
+else()
+    message(STATUS "Python 3 not found: field-patcher-check is not built")
+endif()
 
 # Headless checks for the Sketch engine (docs/plans/sketch/README.md exit criteria
 # that need no window): compile, params, determinism, abort, memory, errors.

@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "app/graph/NodeClipboard.h"
 
 namespace app
@@ -204,8 +205,13 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_E, false))
          gCurveEditorOpen = !gCurveEditorOpen;
 
+      // Shift+F: the docked Field Patcher (the 3D View keeps Shift+F for sculpt strength while it has the pointer)
+      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_F, false))
+         gFieldPatcherOpen = !gFieldPatcherOpen;
+
       // Shift+3: the 3D View (inside the Curve Editor, Shift+1..5 pick handle types)
-      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_3, false))
+      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) ||
+                        (gFieldPatcherOpen && gFieldPatcherClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_3, false))
          gView3DOpen = !gView3DOpen;
 
       // Shift+Y: fit view to content, replacing the old menu-only entry
@@ -364,7 +370,8 @@ void DrawKeyboard(FrameCtx& fc)
          gSessionClaimedKeys = false;
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
                         (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
-                        (gCurveEditorOpen && gCurveEditorClaimedKeys);
+                        (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
+                        (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
       bool doDelete = gRequestDelete ||
          (!typing && !gPerfMatrixFocused && !gArrangeFocused && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
@@ -1028,6 +1035,13 @@ void DrawKeyboard(FrameCtx& fc)
       // Deferred from the node draw loop (cook warning, live schema issue).
       if (!gNodeHoverTip.empty())
          ImGui::SetTooltip("%s", gNodeHoverTip.c_str());
+      else if (!gNodeHelpTip.empty() && ImGui::BeginTooltip())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);   // same max width as HelpTip
+         ImGui::TextUnformatted(gNodeHelpTip.c_str());
+         ImGui::PopTextWrapPos();
+         ImGui::EndTooltip();
+      }
 
       // Right-click (two-finger click on a Mac trackpad) opens the same
       // type-to-filter picker as double-click, so the keyboard works either way.

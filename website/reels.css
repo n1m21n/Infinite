@@ -130,7 +130,7 @@ body.reels-page {
   position: absolute;
   left: 16px;
   right: 76px;
-  bottom: 24px;
+  bottom: 80px;            /* clears the visual's own mic button and badge in the corners */
   z-index: 5;
   pointer-events: none;
 }
@@ -172,7 +172,7 @@ body.reels-page {
   cursor: pointer;
 }
 
-.rail-btn .ic {
+.rail-btn svg {
   box-sizing: content-box;
   width: 20px;
   height: 20px;
@@ -185,11 +185,11 @@ body.reels-page {
   transition: transform var(--dur-small, 0.2s) var(--ease-out, ease-out), background-color var(--dur-small, 0.2s) var(--ease-out, ease-out);
 }
 
-.rail-btn:active .ic {
+.rail-btn:active svg {
   transform: scale(0.92);
 }
 
-.rail-btn.is-done .ic {
+.rail-btn.is-done svg {
   background: var(--ember, var(--ember-400));
   color: var(--midnight-900);
 }
@@ -198,7 +198,7 @@ body.reels-page {
   outline: 0;
 }
 
-.rail-btn:focus-visible .ic {
+.rail-btn:focus-visible svg {
   box-shadow: 0 0 0 2px var(--signal, var(--signal-300));
 }
 
@@ -243,7 +243,7 @@ body.reels-page {
     left: calc(100% + 18px);
     bottom: 24px;
   }
-  .rail-btn:hover .ic {
+  .rail-btn:hover svg {
     transform: translateY(-2px);
     background: rgba(42, 48, 82, 0.9);
   }

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Electro Robotic Vocoder Comb FX",
+    "author": "Infinite",
+    "description": "Resonant robotic comb filter and formant vocoder effect featuring pitch-tracked harmonic comb peaks, metallic sideband modulation, non-linear feedback drive, and crisp transient shaping.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float pitch = 0.42 [0.1, 0.95];\nparam float feedback = 0.62 [0.0, 0.92];\nparam float formant = 0.55 [0.0, 1.0];\nparam float drive = 0.35 [0.0, 1.0];\nparam float mix = 0.50 [0.0, 1.0];\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float d4 = 0;\nstate float fb = 0;\n\nkRate = clamp(0.04 + pitch * 0.28, 0.02, 0.45);\nd1 = d1 + kRate * ((in + fb * feedback) - d1);\nd2 = d2 + kRate * 0.92 * (d1 - d2);\nd3 = d3 + kRate * 0.85 * (d2 - d3);\nd4 = d4 + kRate * 0.78 * (d3 - d4);\n\ncomb = (d1 - d2 * 0.70 + d3 * 0.50 - d4 * 0.30) * (1.0 + formant * 0.50);\nfb = comb / (1.0 + abs(comb * (0.20 + drive * 0.40)));\n\nprocessed = in * (1.0 - mix) + fb * mix * 1.35;\nout = processed * 0.95;\n",
+    "params": {
+      "pitch": 0.42,
+      "feedback": 0.62,
+      "formant": 0.55,
+      "drive": 0.35,
+      "mix": 0.5
+    }
+  }
+}

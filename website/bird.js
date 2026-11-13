@@ -246,5 +246,10 @@
     };
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(start); else start();
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initBird); else initBird();
+  const scheduleInit = () => {
+    if ('requestIdleCallback' in window) requestIdleCallback(initBird, { timeout: 3000 });
+    else setTimeout(initBird, 2000);
+  };
+  if (document.readyState === 'loading') window.addEventListener('load', scheduleInit);
+  else scheduleInit();
 })();

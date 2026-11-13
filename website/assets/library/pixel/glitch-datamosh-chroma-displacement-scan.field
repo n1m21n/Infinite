@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glitch Datamosh Chroma Displacement Scan",
+    "author": "Infinite",
+    "description": "Audio-reactive datamosh shader simulating compression artifact macroblocks, chromatic RGB channel splitting, horizontal sync tearing, and phosphorescent glitch scanlines.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.4 [0.05, 1.0];\nparam float blockSize = 18.0 [6.0, 40.0];\nparam float tearIntensity = 0.75 [0.1, 1.5];\nparam float chromaSplit = 0.035 [0.005, 0.08];\nparam float contrast = 1.25 [0.8, 1.8];\n\np = uv;\ntime = t * speed;\n\ngridY = floor(p.y * blockSize);\nsliceHash = fract(sin(gridY * 127.1 + time * 3.7) * 43758.5453);\nisTear = step(0.68, sliceHash);\ntearOffset = (sliceHash - 0.5) * tearIntensity * isTear;\n\npx = fract(p.x + tearOffset);\npy = p.y;\n\nuvR = vec2(fract(px + chromaSplit * isTear), py);\nuvG = vec2(px, py);\nuvB = vec2(fract(px - chromaSplit * isTear), py);\n\nvalR = 0.5 + 0.5 * sin(uvR.x * 14.0 + time * 4.0 + sin(uvR.y * 22.0));\nvalG = 0.5 + 0.5 * sin(uvG.x * 14.0 + time * 4.0 + sin(uvG.y * 22.0) + 1.2);\nvalB = 0.5 + 0.5 * cos(uvB.x * 14.0 + time * 4.0 + sin(uvB.y * 22.0) + 2.4);\n\nscanline = step(0.5, fract(p.y * 120.0)) * 0.15;\nblockEdge = step(0.92, fract(p.y * blockSize)) * 0.35;\n\ncol = vec3(valR, valG, valB);\ncDark = vec3(0.05, 0.04, 0.09);\ncol = mix(cDark, col, 0.85);\ncol = col + vec3(scanline) + vec3(blockEdge * isTear);\n\nout = clamp(col * contrast, 0.0, 1.0);\n",
+    "params": {
+      "speed": 0.4,
+      "blockSize": 18.0,
+      "tearIntensity": 0.75,
+      "chromaSplit": 0.035,
+      "contrast": 1.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

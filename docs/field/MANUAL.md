@@ -420,3 +420,69 @@ if (tick(1/8) > 0.5) {
 - Vector literals are no longer mistaken for scalars by the constant folder.
 
 Presets added since v1 include Gray-Scott reaction-diffusion and a flow and advection pair (Pixel), Verlet Rope and Buckling Ribbon (Element), and the pixel illusion, nature and Field Effect and Synth libraries.
+
+## 14. Patching Field
+
+The Field Patcher shows a Field program as boxes and wires. The code stays the program: every box you add, wire you
+draw or number you drag is written back into the node's code, compiled, and kept as one undo step. Open the code and
+the boxes side by side and either one can be edited.
+
+```
+ Canvas: [Field Notes 1]  [Field Primitive 2]
+              |                 |
+              v   select one    v
+ +-- Field Patcher -----------------------------------------------+
+ | ♪ Field Notes 1 | ✦ Field Primitive 2 | ◌ Scratch 1 | + | ⤢     |
+ | rail | box canvas                          | Code | Box         |
+ |  ●   |  [time]--->[*]--->[floor]--->[...]  | step = floor(t*4)  |
+ |  ●   |                                     | ...                |
+ | Field Primitive  ✓   9 boxes                                    |
+ +----------------------------------------------------------------+
+```
+
+### 14.1 Opening it
+
+| From | What happens |
+|---|---|
+| View > Field Patcher, the panel rail, or Shift+F | the panel docks at the bottom (or top) |
+| **Boxes** on a Field Notes, Field Primitive or Field Modifier body | the panel opens on that node's page |
+| selecting one of those nodes on the canvas | its page comes to the front, unless the front page is pinned |
+| File > Template library > Field patches | a scratch page with that starter |
+
+### 14.2 Pages
+
+One page per node. Right-click a page to pin it (it then stays in front whatever you select), close it, move it, or
+delete the node. A **scratch page** (+) belongs to no node yet. When it has an outlet, the footer offers **⤓** to place
+it as a node:
+
+| The page has | It becomes |
+|---|---|
+| a play note box | Field Notes (with the publish output on if it also has a value or pulse outlet) |
+| a position, normal or colour outlet | Field Primitive |
+| only value or pulse outlets | Field Primitive in Value mode |
+
+Scratch pages are saved with the patch.
+
+### 14.3 Boxes
+
+The rail holds the ten families: sources, arithmetic, range, waves, logic, time and memory, random, geometry, music,
+inlets and outlets. Right-click the canvas, or drag a wire into empty space, to search every box by its name or Field
+word. Boxes the page's node cannot run are greyed out. Wire colours follow the kind: number, on/off, pulse, note,
+point, per-point. Pulse wires animate.
+
+Anything the boxes cannot show stays a **code** box with its text intact, so no program is ever lost by opening it.
+
+### 14.4 Value mode and publish
+
+**value** on Field Primitive turns it into a value source: no mesh, and its publish output carries the program's
+`publish`. Field Notes has the same **publish scalar output** toggle as the other Field nodes, so a melody page can
+also send a value or a pulse to any knob.
+
+```
+publish = 0 + (sin(t * 2) - -1) / (1 - -1) * (1 - 0) // Breathing light: 0..1, wire it to any knob
+```
+
+### 14.5 When a program breaks
+
+A broken program never silences the node: it keeps playing its last good program and the footer shows the error.
+Fix it in the boxes or the code and it takes over again.

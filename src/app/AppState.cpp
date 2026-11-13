@@ -1279,6 +1279,10 @@ bool gHeadlessNeedProbe = false;
    // inside ed::Begin/End lands offset by the canvas zoom and pan).
    std::string gNodeHoverTip;
 
+   // HelpTip text raised from inside a node body. ed::Suspend() mid-node corrupts the node's draw state (rows
+   // vanish under the tooltip), so the text is parked here and drawn in the post-loop suspended block.
+   std::string gNodeHelpTip;
+
    bool gGlobalScaleTooltipEnabled = false;
 
 

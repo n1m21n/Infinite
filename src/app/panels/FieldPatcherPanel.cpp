@@ -1,0 +1,1427 @@
+// Field Patcher panel (internal/plans/field-patcher/README.md §8). Docks bottom or top like the Curve Editor; one
+// page per Field Notes / Field Primitive / Field Modifier node, following the canvas selection, plus scratch pages
+// with no node yet. The node's `code` is the model: every gesture prints the box graph back to Field (with the
+// `# @boxes v1` header that keeps positions), sets the node's code, compiles it and is one patch undo step. A
+// failed compile leaves the node on its last good program; the footer names the error.
+#include "app/panels/FieldPatcherPanel.h"
+
+#include "app/AppShared.h"
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/components/IconTile.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PanelFrame.h"
+#include "core/Modulation.h"
+#include "core/field/FieldBoxGraph.h"
+#include "core/field/FieldLex.h"
+#include "core/field/FieldParse.h"
+#include "core/field/FieldPatcherStarters.h"
+#include "nodes/FieldElementNode.h"
+#include "nodes/FieldNotesNode.h"
+#include "nodes/FieldPrimitiveNode.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+namespace app
+{
+bool gFieldPatcherOpen = false;
+int gFieldPatcherDock = 0;
+float gFieldPatcherHeight = 380.0f;
+bool gFieldPatcherClaimedKeys = false;
+bool gFieldPatcherMaximised = false;
+float gFieldPatcherShownHeight = 380.0f;
+
+namespace
+{
+   constexpr float kMinHeight = 220.0f;
+   constexpr float kInspectorW = 268.0f;
+   constexpr int kPinStride = 128; // pin ids: box * stride + 1 + inlet, outlets from +64
+
+   // ---- hosts: the three Field nodes a page can show
+
+   struct Host
+   {
+      GraphNode* gn = nullptr;
+      std::string* code = nullptr;
+      uint32_t mask = 0;
+      const char* nodeName = "";
+      std::string error;
+      Field::ParamTable* params = nullptr;
+      IModulator* publish = nullptr;
+      bool Apply()
+      {
+         if (gn == nullptr)
+            return false;
+         if (auto* n = dynamic_cast<FieldNotesNode*>(gn->node.get()))
+            return n->Apply();
+         if (auto* n = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
+            return n->Apply();
+         if (auto* n = dynamic_cast<FieldElementNode*>(gn->node.get()))
+            return n->Apply();
+         return false;
+      }
+   };
+
+   bool IsFieldHost(const GraphNode& gn)
+   {
+      INode* n = gn.node.get();
+      return dynamic_cast<FieldNotesNode*>(n) != nullptr || dynamic_cast<FieldPrimitiveNode*>(n) != nullptr ||
+             dynamic_cast<FieldElementNode*>(n) != nullptr;
+   }
+
+   Host HostOf(GraphNode* gn)
+   {
+      Host h;
+      h.gn = gn;
+      if (gn == nullptr)
+         return h;
+      if (auto* n = dynamic_cast<FieldNotesNode*>(gn->node.get()))
+      {
+         h.code = &n->code;
+         h.mask = Field::HostNotes;
+         h.nodeName = "Field Notes";
+         h.error = n->LastError();
+         h.params = &n->GetParamTable();
+         h.publish = n->publishScalarOutput ? n->ModulatorOutput(1) : nullptr;
+      }
+      else if (auto* n = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
+      {
+         h.code = &n->code;
+         h.mask = Field::HostPrimitive;
+         h.nodeName = n->valueMode ? "Field Primitive · Value" : "Field Primitive";
+         h.error = n->LastError();
+         h.params = &n->GetParamTable();
+         h.publish = n->publishScalarOutput ? n->ModulatorOutput(1) : nullptr;
+      }
+      else if (auto* n = dynamic_cast<FieldElementNode*>(gn->node.get()))
+      {
+         h.code = &n->code;
+         h.mask = Field::HostElement;
+         h.nodeName = "Field Modifier";
+         h.error = n->LastError();
+         h.params = &n->GetParamTable();
+         h.publish = n->publishScalarOutput ? n->ModulatorOutput(1) : nullptr;
+      }
+      return h;
+   }
+
+   // ---- pages
+
+   struct Page
+   {
+      uint64_t uid = 0;          // the Field node; 0 = scratch page
+      int scratchId = 0;         // scratch pages only
+      std::string scratchCode;   // scratch pages only: the source the page holds
+      std::string scratchName;
+      bool pinned = false;
+      ed::EditorContext* ctx = nullptr;
+      Field::BoxGraph graph;
+      std::string parsedFrom;    // the source text the graph was built from
+      std::string parseError;
+      bool placeAll = true;      // push every box position into the editor next frame
+      bool navigate = true;
+   };
+
+   struct State
+   {
+      std::vector<std::unique_ptr<Page>> pages;
+      int front = -1;
+      uint64_t lastSelected = 0;
+      std::set<uint64_t> closed;  // node pages hidden from the strip (the nodes stay)
+      int nextScratch = 1;
+      int inspectorTab = 0;       // 0 Code, 1 Box
+      std::string codeBuf;
+      std::string codeBufFor;     // the source codeBuf was filled from
+      bool codeEditing = false;
+      int pendingFromPin = 0;     // a wire dropped in empty space: the pin it came from
+      ImVec2 pendingAt {};
+      char search[64] = {};
+      int railFamily = -1;
+      bool kindHint = false;
+   };
+
+   State& S()
+   {
+      static State s;
+      return s;
+   }
+
+   Page* Front()
+   {
+      State& s = S();
+      return (s.front >= 0 && s.front < (int)s.pages.size()) ? s.pages[s.front].get() : nullptr;
+   }
+
+   void DropContext(Page& p)
+   {
+      if (p.ctx == nullptr)
+         return;
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::EditorContext* dying = p.ctx;
+      p.ctx = nullptr;
+      ed::DestroyEditor(dying);
+      ed::SetCurrentEditor(prev == dying ? nullptr : prev);
+   }
+
+   int FindPage(uint64_t uid)
+   {
+      const State& s = S();
+      for (int i = 0; i < (int)s.pages.size(); i++)
+         if (s.pages[i]->uid == uid && uid != 0)
+            return i;
+      return -1;
+   }
+
+   void ShowNodePage(uint64_t uid)
+   {
+      State& s = S();
+      s.closed.erase(uid);
+      int i = FindPage(uid);
+      if (i < 0)
+      {
+         auto p = std::make_unique<Page>();
+         p->uid = uid;
+         s.pages.push_back(std::move(p));
+         i = (int)s.pages.size() - 1;
+      }
+      s.front = i;
+   }
+
+   void ClosePage(int i)
+   {
+      State& s = S();
+      if (i < 0 || i >= (int)s.pages.size())
+         return;
+      Page& p = *s.pages[i];
+      if (p.uid != 0)
+         s.closed.insert(p.uid);
+      DropContext(p);
+      s.pages.erase(s.pages.begin() + i);
+      if (s.front >= (int)s.pages.size())
+         s.front = (int)s.pages.size() - 1;
+   }
+
+   Page& AddScratch(const std::string& name, const std::string& code)
+   {
+      State& s = S();
+      auto p = std::make_unique<Page>();
+      p->scratchId = s.nextScratch++;
+      p->scratchName = name.empty() ? std::string(T("Scratch")) + " " + std::to_string(p->scratchId) : name;
+      p->scratchCode = code;
+      s.pages.push_back(std::move(p));
+      s.front = (int)s.pages.size() - 1;
+      return *s.pages.back();
+   }
+
+   // Drop pages whose node is gone; add nothing (pages appear by selection, ⧉ or +).
+   void PrunePages()
+   {
+      State& s = S();
+      for (int i = (int)s.pages.size() - 1; i >= 0; i--)
+      {
+         Page& p = *s.pages[i];
+         if (p.uid == 0)
+            continue;
+         GraphNode* gn = FindNodeByUid(p.uid);
+         if (gn == nullptr || !IsFieldHost(*gn))
+         {
+            const uint64_t uid = p.uid;
+            ClosePage(i);
+            s.closed.erase(uid);
+         }
+      }
+   }
+
+   void FollowCanvasSelection()
+   {
+      State& s = S();
+      Page* f = Front();
+      if (f != nullptr && f->pinned)
+         return;
+      uint64_t uid = 0;
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      for (GraphNode& gn : gNodes)
+         if (IsFieldHost(gn) && ed::IsNodeSelected(gn.NodeId()))
+         {
+            uid = gn.uid;
+            break;
+         }
+      ed::SetCurrentEditor(prev);
+      if (uid == s.lastSelected)
+         return;
+      s.lastSelected = uid;
+      if (uid != 0)
+         ShowNodePage(uid);
+   }
+
+   // ---- the page's source text
+
+   // A scratch page runs where its program can: a note() call makes it a Field Notes page, anything else a
+   // Field Primitive one (where the value outlets and the geometry outlets both live).
+   uint32_t ScratchMask(const std::string& src)
+   {
+      return src.find("note(") != std::string::npos ? Field::HostNotes : Field::HostPrimitive;
+   }
+
+   std::string SourceOf(Page& p, Host& h)
+   {
+      if (p.uid == 0)
+         return p.scratchCode;
+      return h.code != nullptr ? *h.code : std::string();
+   }
+
+   uint32_t MaskOf(Page& p, Host& h) { return p.uid == 0 ? ScratchMask(p.scratchCode) : h.mask; }
+
+   void Reparse(Page& p, const std::string& src, uint32_t mask)
+   {
+      Field::FieldError err;
+      Field::BoxGraph g;
+      if (Field::ParseCodeToBoxGraph(src, mask, g, err))
+      {
+         p.graph = std::move(g);
+         p.parseError.clear();
+      }
+      else
+      {
+         p.graph = Field::BoxGraph{};
+         p.parseError = err.message;
+      }
+      p.parsedFrom = src;
+      p.placeAll = true;
+   }
+
+   // Positions survive a commit: the reparsed graph's boxes take the old positions of the boxes they came from,
+   // matched by kind in order (the printer keeps that order), so the header written next keeps the layout.
+   void CarryPositions(const Field::BoxGraph& from, Field::BoxGraph& to)
+   {
+      std::map<std::string, std::vector<const Field::BoxNode*>> byKind;
+      for (const Field::BoxNode& b : from.boxes)
+         byKind[b.specId].push_back(&b);
+      std::map<std::string, size_t> used;
+      for (Field::BoxNode& b : to.boxes)
+      {
+         auto it = byKind.find(b.specId);
+         size_t& k = used[b.specId];
+         if (it == byKind.end() || k >= it->second.size())
+            continue;
+         const Field::BoxNode* o = it->second[k++];
+         b.x = o->x;
+         b.y = o->y;
+         b.hasExplicitPos = true;
+      }
+      to.view = from.view;
+   }
+
+   std::string CompileCheck(const std::string& src)
+   {
+      std::vector<Field::Token> toks;
+      Field::FieldError err;
+      Field::AstNodePtr ast;
+      if (!Field::Lex(src, toks, err) || !Field::ParseProgram(toks, ast, err))
+         return err.message;
+      return std::string();
+   }
+
+   // One gesture: print the graph, keep positions, write the source, compile. One undo step.
+   void Commit(Page& p, Host& h, const char* what)
+   {
+      const std::string body = Field::PrintBoxGraphToCode(p.graph, false);
+      Field::BoxGraph re;
+      Field::FieldError err;
+      std::string src = body;
+      if (Field::ParseCodeToBoxGraph(body, MaskOf(p, h), re, err))
+      {
+         CarryPositions(p.graph, re);
+         src = Field::FormatBoxesHeader(re) + "\n" + body;
+      }
+      if (p.uid == 0)
+         p.scratchCode = src;
+      else if (h.code != nullptr)
+      {
+         PushUndoCheckpoint(what);
+         *h.code = src;
+         h.Apply();
+      }
+      Reparse(p, src, MaskOf(p, h));
+   }
+
+   void SetSource(Page& p, Host& h, const std::string& src)
+   {
+      if (p.uid == 0)
+         p.scratchCode = src;
+      else if (h.code != nullptr)
+      {
+         PushUndoCheckpoint("Edit Field");
+         *h.code = src;
+         h.Apply();
+      }
+      Reparse(p, src, MaskOf(p, h));
+   }
+
+   // ---- boxes
+
+   int NextBoxId(const Field::BoxGraph& g)
+   {
+      int id = 0;
+      for (const Field::BoxNode& b : g.boxes)
+         id = std::max(id, b.id);
+      return id + 1;
+   }
+
+   std::string FreshName(const Field::BoxGraph& g, const char* stem)
+   {
+      for (int i = 1;; i++)
+      {
+         std::string n = std::string(stem) + std::to_string(i);
+         bool taken = false;
+         for (const Field::BoxNode& b : g.boxes)
+            taken = taken || b.varName == n || b.wireName == n;
+         if (!taken)
+            return n;
+      }
+   }
+
+   Field::BoxNode& AddBox(Page& p, const Field::BoxSpec& spec, ImVec2 at)
+   {
+      Field::BoxNode b;
+      b.id = NextBoxId(p.graph);
+      b.specId = spec.id;
+      b.label = spec.label;
+      for (const Field::PinSpec& pin : spec.inlets)
+         b.inlets.push_back({ pin.name, pin.kind, pin.defaultValue });
+      for (const Field::PinSpec& pin : spec.outlets)
+         b.outlets.push_back({ pin.name, pin.kind, pin.defaultValue });
+      b.x = at.x;
+      b.y = at.y;
+      b.hasExplicitPos = true;
+      if (spec.id == "number")
+      {
+         b.numberValue = 1.0;
+         b.literalText = "1";
+      }
+      else if (spec.id == "knob")
+      {
+         b.varName = FreshName(p.graph, "k");
+         b.varType = "float";
+         b.numberValue = 0.5;
+         b.minVal = 0.0;
+         b.maxVal = 1.0;
+      }
+      else if (spec.id == "previous")
+      {
+         b.varName = FreshName(p.graph, "s");
+         b.varType = "float";
+      }
+      else if (spec.id == "swizzle")
+         b.swizzleField = "x";
+      else if (spec.id == "reduce")
+         b.swizzleField = "max";
+      else if (spec.id == "neighbour")
+         b.varName = "P";
+      else if (spec.id == "code")
+         b.rawCode = "# Field";
+      p.graph.boxes.push_back(b);
+      return p.graph.boxes.back();
+   }
+
+   void RemoveBox(Page& p, int id)
+   {
+      auto& w = p.graph.wires;
+      w.erase(std::remove_if(w.begin(), w.end(), [id](const Field::BoxWire& x) { return x.srcBoxId == id || x.dstBoxId == id; }), w.end());
+      auto& b = p.graph.boxes;
+      b.erase(std::remove_if(b.begin(), b.end(), [id](const Field::BoxNode& x) { return x.id == id; }), b.end());
+      for (Field::BoxGroup& g : p.graph.groups)
+         g.boxIds.erase(std::remove(g.boxIds.begin(), g.boxIds.end(), id), g.boxIds.end());
+   }
+
+   void Connect(Page& p, int src, int srcPin, int dst, int dstPin)
+   {
+      auto& w = p.graph.wires;
+      w.erase(std::remove_if(w.begin(), w.end(), [&](const Field::BoxWire& x) { return x.dstBoxId == dst && x.dstPinIdx == dstPin; }), w.end());
+      Field::BoxWire nw;
+      int id = 0;
+      for (const Field::BoxWire& x : w)
+         id = std::max(id, x.id);
+      nw.id = id + 1;
+      nw.srcBoxId = src;
+      nw.srcPinIdx = srcPin;
+      nw.dstBoxId = dst;
+      nw.dstPinIdx = dstPin;
+      if (const Field::BoxNode* b = p.graph.FindBox(src))
+         if (srcPin >= 0 && srcPin < (int)b->outlets.size())
+            nw.kind = b->outlets[srcPin].kind;
+      w.push_back(nw);
+   }
+
+   int InPinId(int box, int pin) { return box * kPinStride + 1 + pin; }
+   int OutPinId(int box, int pin) { return box * kPinStride + 64 + pin; }
+   void DecodePin(int id, int& box, int& pin, bool& out)
+   {
+      box = id / kPinStride;
+      const int r = id % kPinStride;
+      out = r >= 64;
+      pin = out ? r - 64 : r - 1;
+   }
+
+   ImU32 KindCol(Field::ValueKind k, float a = 1.0f)
+   {
+      switch (k)
+      {
+      case Field::ValueKind::Bool: return ImGui::GetColorU32(ImGuiCol_CheckMark, a);
+      case Field::ValueKind::Pulse: return ImGui::GetColorU32(ImGuiCol_PlotHistogram, a);
+      case Field::ValueKind::Note: return ImGui::GetColorU32(ImGuiCol_PlotLines, a);
+      case Field::ValueKind::Vec3:
+      case Field::ValueKind::Vec2: return ImGui::GetColorU32(ImGuiCol_ButtonActive, a);
+      case Field::ValueKind::PerPoint: return ImGui::GetColorU32(ImGuiCol_PlotLinesHovered, a);
+      default: return ImGui::GetColorU32(ImGuiCol_Text, 0.55f * a);
+      }
+   }
+
+   const char* BoxTitle(const Field::BoxNode& b)
+   {
+      if (b.specId == "code")
+         return T("code");
+      if (b.specId == "assign_var")
+         return b.varName.c_str();
+      if (!b.label.empty())
+         return T(b.label.c_str());
+      return b.specId.c_str();
+   }
+
+   std::string BoxSubtitle(const Field::BoxNode& b, const Field::BoxSpec* spec)
+   {
+      if (!b.wireName.empty())
+         return b.wireName;
+      if ((b.specId == "knob" || b.specId == "previous" || b.specId == "attrib") && !b.varName.empty())
+         return b.varName;
+      if (b.specId == "swizzle" || b.specId == "reduce")
+         return "." + b.swizzleField;
+      if (spec != nullptr && spec->fieldWord != spec->label)
+         return spec->fieldWord;
+      return std::string();
+   }
+
+   // ---- the pick menu (§8.6): a search field and the boxes this page's host can run
+
+   bool PickMenu(Page& p, Host& h, ImVec2 at, int fromPin, int family)
+   {
+      State& s = S();
+      bool added = false;
+      ImGui::SetNextItemWidth(220.0f);
+      if (ImGui::IsWindowAppearing())
+         ImGui::SetKeyboardFocusHere();
+      FieldWell::InputTextWithHint("##fpSearch", T("Box name or Field word"), s.search, sizeof(s.search));
+      const uint32_t mask = MaskOf(p, h);
+      std::vector<const Field::BoxSpec*> list = Field::FindBoxSpecsByQuery(s.search, 0);
+      int shown = 0;
+      for (const Field::BoxSpec* spec : list)
+      {
+         if (family >= 0 && (int)spec->family != family)
+            continue;
+         if (spec->id == "assign_var" || spec->id == "ident")
+            continue;
+         const bool runs = (spec->hostMask & mask) != 0;
+         std::string row = std::string(T(spec->label.c_str()));
+         if (spec->fieldWord != spec->label)
+            row += "   " + spec->fieldWord;
+         row += "##" + spec->id;
+         if (MenuParts::Item(row.c_str(), nullptr, false, runs))
+         {
+            Field::BoxNode& b = AddBox(p, *spec, at);
+            const int newId = b.id;
+            if (fromPin != 0)
+            {
+               int box, pin;
+               bool out;
+               DecodePin(fromPin, box, pin, out);
+               if (out && !spec->inlets.empty())
+                  Connect(p, box, pin, newId, 0);
+               else if (!out && !spec->outlets.empty())
+                  Connect(p, newId, 0, box, pin);
+            }
+            Commit(p, h, "Add Box");
+            added = true;
+            s.search[0] = 0;
+            ImGui::CloseCurrentPopup();
+         }
+         if (++shown > 40)
+            break;
+      }
+      return added;
+   }
+
+   // ---- one box
+
+   void DrawBox(Page& p, Host& h, Field::BoxNode& b, bool& changed)
+   {
+      const Field::BoxSpec* spec = Field::FindBoxSpec(b.specId);
+      ed::BeginNode(b.id);
+      ImGui::PushID(b.id);
+      ImGui::TextUnformatted(BoxTitle(b));
+      const std::string sub = BoxSubtitle(b, spec);
+      if (!sub.empty())
+      {
+         FormParts::Inline();
+         ImGui::TextDisabled("%s", sub.c_str());
+      }
+
+      // Bodies: a number scrubs, a knob shows its live value, a code box shows its text.
+      if (b.specId == "number")
+      {
+         float v = (float)b.numberValue;
+         ImGui::SetNextItemWidth(84.0f);
+         if (ImGui::DragFloat("##num", &v, 0.01f, 0.0f, 0.0f, "%.3g"))
+         {
+            b.numberValue = v;
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%g", v);
+            b.literalText = buf;
+         }
+         if (ImGui::IsItemDeactivatedAfterEdit())
+            changed = true;
+      }
+      else if (b.specId == "knob")
+      {
+         Field::ParamEntry* e = h.params != nullptr ? h.params->Find(b.varName) : nullptr;
+         float v = e != nullptr ? e->value : (float)b.numberValue;
+         ImGui::SetNextItemWidth(110.0f);
+         if (ImGui::SliderFloat("##knob", &v, (float)b.minVal, (float)b.maxVal, "%.3g"))
+         {
+            if (e != nullptr)
+               e->value = v; // live: the param moves without a recompile
+            else
+               b.numberValue = v;
+         }
+         if (ImGui::IsItemActivated() && p.uid != 0)
+            PushUndoCheckpoint("Edit Knob");
+         if (ImGui::IsItemDeactivatedAfterEdit() && e == nullptr)
+            changed = true;
+      }
+      else if (b.specId == "code")
+      {
+         std::string text = b.rawCode;
+         if (text.size() > 160)
+            text = text.substr(0, 160) + " …";
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
+         ImGui::TextDisabled("%s", text.c_str());
+         ImGui::PopTextWrapPos();
+      }
+      else if ((b.specId == "value_out" || b.specId == "pulse_out") && h.publish != nullptr)
+      {
+         ImGui::TextDisabled("%.3f", h.publish->Value01());
+      }
+
+      // Pins: inlets left, outlets right, coloured by kind.
+      const int rows = std::max((int)b.inlets.size(), (int)b.outlets.size());
+      for (int r = 0; r < rows; r++)
+      {
+         if (r < (int)b.inlets.size())
+         {
+            ed::BeginPin(InPinId(b.id, r), ed::PinKind::Input);
+            ed::PinPivotAlignment(ImVec2(0.0f, 0.5f));
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(KindCol(b.inlets[r].kind)), "● %s", b.inlets[r].name.c_str());
+            ed::EndPin();
+         }
+         else
+            ImGui::Dummy(ImVec2(60.0f, ImGui::GetTextLineHeight()));
+         if (r < (int)b.outlets.size())
+         {
+            FormParts::Inline(0.0f, 24.0f);
+            ed::BeginPin(OutPinId(b.id, r), ed::PinKind::Output);
+            ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(KindCol(b.outlets[r].kind)), "%s ●", b.outlets[r].name.c_str());
+            ed::EndPin();
+         }
+      }
+      ImGui::PopID();
+      ed::EndNode();
+   }
+
+   // ---- the box canvas
+
+   void DrawCanvas(Page& p, Host& h, ImVec2 size)
+   {
+      State& s = S();
+      if (p.ctx == nullptr)
+      {
+         ed::Config cfg;
+         cfg.SettingsFile = nullptr; // positions live in the source header, not a json file
+         cfg.EnableSmoothZoom = true;
+         p.ctx = ed::CreateEditor(&cfg);
+         p.placeAll = true;
+      }
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::Style mainStyle;
+      ed::SetCurrentEditor(gEditor);
+      mainStyle = ed::GetStyle();
+      ed::SetCurrentEditor(p.ctx);
+      ed::GetStyle() = mainStyle; // the same look as the main canvas
+
+      ed::Begin("##fpCanvas", size);
+      bool changed = false;
+      if (p.placeAll)
+      {
+         for (const Field::BoxNode& b : p.graph.boxes)
+            ed::SetNodePosition(b.id, ImVec2(b.x, b.y));
+      }
+      for (Field::BoxNode& b : p.graph.boxes)
+         DrawBox(p, h, b, changed);
+      for (const Field::BoxWire& w : p.graph.wires)
+      {
+         const ImU32 col = KindCol(w.kind, 0.9f);
+         ed::Link(w.id, OutPinId(w.srcBoxId, w.srcPinIdx), InPinId(w.dstBoxId, w.dstPinIdx), ImGui::ColorConvertU32ToFloat4(col), 2.0f);
+         if (w.kind == Field::ValueKind::Pulse)
+            ed::Flow(w.id);
+      }
+      if (p.placeAll)
+      {
+         p.placeAll = false;
+         if (p.navigate)
+         {
+            ed::NavigateToContent(0.0f);
+            p.navigate = false;
+         }
+      }
+
+      // New wires: output to input. A wire dropped on nothing opens the pick menu with that pin.
+      if (ed::BeginCreate())
+      {
+         ed::PinId a, c;
+         if (ed::QueryNewLink(&a, &c))
+         {
+            int ab, ap, cb, cp;
+            bool ao, co;
+            DecodePin((int)a.Get(), ab, ap, ao);
+            DecodePin((int)c.Get(), cb, cp, co);
+            if (ao == co || ab == cb)
+               ed::RejectNewItem();
+            else if (ed::AcceptNewItem())
+            {
+               if (ao)
+                  Connect(p, ab, ap, cb, cp);
+               else
+                  Connect(p, cb, cp, ab, ap);
+               changed = true;
+            }
+         }
+         ed::PinId from;
+         if (ed::QueryNewNode(&from) && ed::AcceptNewItem())
+         {
+            s.pendingFromPin = (int)from.Get();
+            s.pendingAt = ed::ScreenToCanvas(ImGui::GetMousePos());
+            ed::Suspend();
+            ImGui::OpenPopup("##fpPick");
+            ed::Resume();
+         }
+      }
+      ed::EndCreate();
+
+      if (ed::BeginDelete())
+      {
+         ed::LinkId l;
+         while (ed::QueryDeletedLink(&l))
+            if (ed::AcceptDeletedItem())
+            {
+               auto& w = p.graph.wires;
+               w.erase(std::remove_if(w.begin(), w.end(), [&](const Field::BoxWire& x) { return x.id == (int)l.Get(); }), w.end());
+               changed = true;
+            }
+         ed::NodeId n;
+         while (ed::QueryDeletedNode(&n))
+            if (ed::AcceptDeletedItem())
+            {
+               RemoveBox(p, (int)n.Get());
+               changed = true;
+            }
+      }
+      ed::EndDelete();
+
+      // Moves: a drag that ends with a box somewhere new is one header-only change.
+      if (!changed && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+      {
+         for (Field::BoxNode& b : p.graph.boxes)
+         {
+            const ImVec2 at = ed::GetNodePosition(b.id);
+            if (std::fabs(at.x - b.x) > 0.5f || std::fabs(at.y - b.y) > 0.5f)
+            {
+               b.x = at.x;
+               b.y = at.y;
+               b.hasExplicitPos = true;
+               changed = true;
+            }
+         }
+      }
+
+      ed::Suspend();
+      if (ed::ShowBackgroundContextMenu())
+      {
+         s.pendingFromPin = 0;
+         s.pendingAt = ed::ScreenToCanvas(ImGui::GetMousePos());
+         ImGui::OpenPopup("##fpPick");
+      }
+      if (MenuParts::BeginPopup("##fpPick"))
+      {
+         if (PickMenu(p, h, s.pendingAt, s.pendingFromPin, -1))
+            changed = false; // PickMenu committed
+         MenuParts::EndPopup();
+      }
+      ed::Resume();
+
+      // The box under selection, for the inspector.
+      ed::End();
+      if (changed)
+      {
+         for (Field::BoxNode& b : p.graph.boxes)
+         {
+            const ImVec2 at = ed::GetNodePosition(b.id);
+            if (at.x < 1e8f)
+            {
+               b.x = at.x;
+               b.y = at.y;
+               b.hasExplicitPos = true;
+            }
+         }
+         Commit(p, h, "Edit Boxes");
+      }
+      ed::SetCurrentEditor(prev);
+   }
+
+   int SelectedBox(Page& p)
+   {
+      if (p.ctx == nullptr)
+         return 0;
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(p.ctx);
+      ed::NodeId ids[2];
+      const int n = ed::GetSelectedNodes(ids, 2);
+      ed::SetCurrentEditor(prev);
+      return n == 1 ? (int)ids[0].Get() : 0;
+   }
+
+   // ---- the family rail (§8.4)
+
+   const char* FamilyGlyph(int f)
+   {
+      static const char* kGlyphs[] = { IconsInfinite::FamilySource, IconsInfinite::Plus, IconsInfinite::Range, IconsInfinite::Waveform,
+                                       IconsInfinite::Bolt, IconsInfinite::Metronome, IconsInfinite::Spark, IconsInfinite::Cube,
+                                       IconsInfinite::Piano, IconsInfinite::GridDots };
+      return kGlyphs[std::clamp(f, 0, 9)];
+   }
+
+   void DrawRail(Page& p, Host& h, float height)
+   {
+      State& s = S();
+      ImGui::BeginChild("##fpRail", ImVec2(tok::tile, height), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+      for (int f = 0; f < (int)Field::BoxFamily::Count; f++)
+      {
+         ImGui::PushID(f);
+         if (IconTile::Draw("##fam", FamilyGlyph(f), FamilyGlyph(f), s.railFamily == f, tok::tile, tok::tile))
+         {
+            s.railFamily = f;
+            s.search[0] = 0;
+            ImGui::OpenPopup("##fpFamily");
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T(Field::BoxFamilyName((Field::BoxFamily)f)));
+         if (MenuParts::BeginPopup("##fpFamily"))
+         {
+            ImVec2 at(0, 0);
+            if (p.ctx != nullptr)
+            {
+               ed::EditorContext* prev = ed::GetCurrentEditor();
+               ed::SetCurrentEditor(p.ctx);
+               at = ed::ScreenToCanvas(ImVec2(ImGui::GetMainViewport()->GetCenter()));
+               ed::SetCurrentEditor(prev);
+            }
+            PickMenu(p, h, at, 0, f);
+            MenuParts::EndPopup();
+         }
+         else if (s.railFamily == f)
+            s.railFamily = -1;
+         ImGui::PopID();
+      }
+      ImGui::EndChild();
+   }
+
+   // ---- inspector: Code and Box
+
+   void DrawInspector(Page& p, Host& h, ImVec2 size)
+   {
+      State& s = S();
+      ImGui::BeginChild("##fpInspector", size, false, ImGuiWindowFlags_NoScrollbar);
+      if (ChipButton::Draw(T("Code"), s.inspectorTab == 0))
+         s.inspectorTab = 0;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (ChipButton::Draw(T("Box"), s.inspectorTab == 1))
+         s.inspectorTab = 1;
+      const std::string src = SourceOf(p, h);
+      if (s.inspectorTab == 0)
+      {
+         if (!s.codeEditing && s.codeBufFor != src)
+         {
+            s.codeBuf = src;
+            s.codeBufFor = src;
+         }
+         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(60.0f, avail.y)));
+         s.codeEditing = ImGui::IsItemActive();
+         if (ImGui::IsItemDeactivatedAfterEdit() && s.codeBuf != src)
+         {
+            SetSource(p, h, s.codeBuf);
+            s.codeBufFor = s.codeBuf;
+         }
+      }
+      else
+      {
+         const int id = SelectedBox(p);
+         Field::BoxNode* b = id != 0 ? p.graph.FindBox(id) : nullptr;
+         if (b == nullptr)
+            EmptyState::DrawInWindow(T("No box selected"), T("Click a box"));
+         else
+         {
+            const Field::BoxSpec* spec = Field::FindBoxSpec(b->specId);
+            FormParts::Section(BoxTitle(*b));
+            if (spec != nullptr)
+            {
+               ImGui::TextDisabled("%s", spec->fieldWord.c_str());
+               if (!spec->aliases.empty())
+               {
+                  std::string a;
+                  for (const std::string& x : spec->aliases)
+                     a += (a.empty() ? "" : ", ") + x;
+                  ImGui::TextDisabled("%s", a.c_str());
+               }
+            }
+            if (b->specId == "code")
+            {
+               const ImVec2 avail = ImGui::GetContentRegionAvail();
+               FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(60.0f, avail.y)));
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  Commit(p, h, "Edit Code Box");
+            }
+            else if (b->specId == "knob")
+            {
+               bool edited = false;
+               FieldWell::InputText(T("name"), &b->varName);
+               edited |= ImGui::IsItemDeactivatedAfterEdit();
+               float lo = (float)b->minVal, hi = (float)b->maxVal, d = (float)b->numberValue;
+               ImGui::DragFloat(T("default"), &d, 0.01f);
+               edited |= ImGui::IsItemDeactivatedAfterEdit();
+               ImGui::DragFloat(T("min"), &lo, 0.01f);
+               edited |= ImGui::IsItemDeactivatedAfterEdit();
+               ImGui::DragFloat(T("max"), &hi, 0.01f);
+               edited |= ImGui::IsItemDeactivatedAfterEdit();
+               b->numberValue = d;
+               b->minVal = lo;
+               b->maxVal = std::max(lo, hi);
+               if (edited)
+                  Commit(p, h, "Edit Knob");
+            }
+            else if (b->specId == "swizzle" || b->specId == "reduce")
+            {
+               FieldWell::InputText(T("field"), &b->swizzleField);
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  Commit(p, h, "Edit Box");
+            }
+            else if (b->specId == "number")
+            {
+               float v = (float)b->numberValue;
+               ImGui::DragFloat(T("value"), &v, 0.01f);
+               if (ImGui::IsItemEdited())
+               {
+                  b->numberValue = v;
+                  char buf[32];
+                  std::snprintf(buf, sizeof(buf), "%g", v);
+                  b->literalText = buf;
+               }
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  Commit(p, h, "Edit Number");
+            }
+         }
+      }
+      ImGui::EndChild();
+   }
+
+   // ---- scratch export (§8.10)
+
+   struct ExportTarget
+   {
+      const char* typeName = nullptr;
+      const char* category = nullptr;
+      const char* label = nullptr;
+      bool valueMode = false;
+   };
+
+   ExportTarget TargetOf(const Field::BoxGraph& g)
+   {
+      bool notes = false, geo = false, value = false;
+      for (const Field::BoxNode& b : g.boxes)
+      {
+         notes = notes || b.specId == "play_note";
+         geo = geo || b.specId == "position_out" || b.specId == "normal_out" || b.specId == "color_out";
+         value = value || b.specId == "value_out" || b.specId == "pulse_out";
+      }
+      if (notes)
+         return { "Field Notes", "Notes", "Field Notes", false };
+      if (geo)
+         return { "Field Primitive", "3D", "Field Primitive", false };
+      if (value)
+         return { "Field Primitive", "3D", "Field Primitive · Value", true };
+      return {};
+   }
+
+   void Export(Page& p)
+   {
+      const ExportTarget t = TargetOf(p.graph);
+      if (t.typeName == nullptr)
+         return;
+      PushUndoCheckpoint("Export Field Page");
+      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas);
+      GraphNode* gn = SpawnNode(t.typeName, t.category, at.x, at.y);
+      if (gn == nullptr)
+         return;
+      if (auto* n = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
+      {
+         n->code = p.scratchCode;
+         n->valueMode = t.valueMode;
+         if (t.valueMode)
+            n->publishScalarOutput = true;
+         n->Apply();
+      }
+      else if (auto* n = dynamic_cast<FieldNotesNode*>(gn->node.get()))
+      {
+         n->code = p.scratchCode;
+         for (const Field::BoxNode& b : p.graph.boxes)
+            n->publishScalarOutput = n->publishScalarOutput || b.specId == "value_out" || b.specId == "pulse_out";
+         n->Apply();
+      }
+      p.uid = gn->uid;
+      p.scratchCode.clear();
+      p.parsedFrom.clear();
+   }
+
+   // ---- header strip and footer
+
+   std::string PageTitle(Page& p)
+   {
+      if (p.uid == 0)
+         return std::string("◌ ") + p.scratchName;
+      GraphNode* gn = FindNodeByUid(p.uid);
+      Host h = HostOf(gn);
+      const char* glyph = h.mask == Field::HostNotes ? "♪ " : "✦ ";
+      if (auto* n = gn != nullptr ? dynamic_cast<FieldPrimitiveNode*>(gn->node.get()) : nullptr)
+         if (n->valueMode)
+            glyph = "─ ";
+      std::string name = gn != nullptr ? gn->typeName : std::string("?");
+      return glyph + std::string(T(name.c_str())) + " " + std::to_string(gn != nullptr ? gn->index : 0);
+   }
+
+   void DrawStrip()
+   {
+      State& s = S();
+      for (int i = 0; i < (int)s.pages.size(); i++)
+      {
+         Page& p = *s.pages[i];
+         ImGui::PushID(i);
+         const std::string title = PageTitle(p) + (p.pinned ? " •" : "");
+         if (ChipButton::Draw(title.c_str(), i == s.front))
+            s.front = i;
+         if (MenuParts::BeginContextItem("##fpPageMenu"))
+         {
+            if (MenuParts::Item(p.pinned ? T("Unpin") : T("Pin")))
+               p.pinned = !p.pinned;
+            if (MenuParts::Item(T("Close page")))
+            {
+               MenuParts::EndPopup();
+               ImGui::PopID();
+               ClosePage(i);
+               return;
+            }
+            if (p.uid != 0 && MenuParts::Item(T("Delete node")))
+            {
+               if (GraphNode* gn = FindNodeByUid(p.uid))
+               {
+                  PushUndoCheckpoint("Delete Field Node");
+                  RemoveNodeByIndex(gn->index);
+               }
+            }
+            if (i > 0 && MenuParts::Item(T("Move left")))
+               std::swap(s.pages[i], s.pages[i - 1]), s.front = i - 1;
+            if (i + 1 < (int)s.pages.size() && MenuParts::Item(T("Move right")))
+               std::swap(s.pages[i], s.pages[i + 1]), s.front = i + 1;
+            MenuParts::EndPopup();
+         }
+         FormParts::Inline(0.0f, tok::space_1);
+         ImGui::PopID();
+      }
+      if (ChipButton::Draw("+##fpAdd", false))
+         ImGui::OpenPopup("##fpNew");
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("New scratch page"));
+      if (MenuParts::BeginPopup("##fpNew"))
+      {
+         if (MenuParts::Item(T("Empty page")))
+            AddScratch("", "");
+         MenuParts::Separator();
+         for (int k = 0; k < Field::kPatcherStarterCount; k++)
+            if (MenuParts::Item(T(Field::kPatcherStarters[k].name)))
+               FieldPatcherOpenStarter(k);
+         MenuParts::EndPopup();
+      }
+      FormParts::Inline(0.0f, tok::space_1);
+      if (ChipButton::Draw(gFieldPatcherMaximised ? "⤡##fpMax" : "⤢##fpMax", gFieldPatcherMaximised))
+         gFieldPatcherMaximised = !gFieldPatcherMaximised;
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Maximise (Esc returns)"));
+   }
+
+   void DrawFooter(Page& p, Host& h)
+   {
+      const int boxes = (int)p.graph.boxes.size();
+      const int codeBoxes = p.graph.CountCodeBoxes();
+      if (p.uid == 0)
+      {
+         const ExportTarget t = TargetOf(p.graph);
+         const std::string err = CompileCheck(p.scratchCode);
+         if (!err.empty())
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s", err.c_str());
+         else if (t.typeName != nullptr)
+         {
+            const std::string chip = std::string("⤓ ") + T(t.label) + "##fpExport";
+            if (ChipButton::Draw(chip.c_str(), true))
+               Export(p);
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Place this page as a node"));
+         }
+         else
+            ImGui::TextDisabled("%s", T("Add an outlet to make a node"));
+      }
+      else
+      {
+         ImGui::TextDisabled("%s", T(h.nodeName));
+         FormParts::Inline(0.0f, tok::space_3);
+         if (h.error.empty())
+            ImGui::TextUnformatted("✓");
+         else
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s %s",
+                               T("last good ·"), h.error.c_str());
+      }
+      FormParts::Inline(0.0f, tok::space_3);
+      if (codeBoxes > 0)
+         ImGui::TextDisabled("%d %s · %d %s", boxes, T("boxes"), codeBoxes, T("code"));
+      else
+         ImGui::TextDisabled("%d %s", boxes, T("boxes"));
+      if (!p.parseError.empty())
+      {
+         FormParts::Inline(0.0f, tok::space_3);
+         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s", p.parseError.c_str());
+      }
+   }
+
+   void DrawEmpty()
+   {
+      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 mn = ImGui::GetCursorScreenPos();
+      EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y * 0.5f), T("New patch"), T("Select a Field node, or start from one of these"));
+      ImGui::SetCursorScreenPos(ImVec2(mn.x + avail.x * 0.5f - 290.0f, mn.y + avail.y * 0.5f));
+      if (ActionButton::Draw(T("Empty page"), ImVec2(130, 0)))
+         AddScratch("", "");
+      for (int k = 0; k < Field::kPatcherStarterCount; k++)
+      {
+         FormParts::Inline(0.0f, tok::space_2);
+         ImGui::PushID(k);
+         if (ActionButton::Draw(T(Field::kPatcherStarters[k].name), ImVec2(150, 0)))
+            FieldPatcherOpenStarter(k);
+         ImGui::PopID();
+      }
+   }
+
+   void DrawPanel()
+   {
+      gFieldPatcherClaimedKeys = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::GetIO().WantTextInput;
+      if (gFieldPatcherMaximised && gFieldPatcherClaimedKeys && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         gFieldPatcherMaximised = false;
+      PrunePages();
+      FollowCanvasSelection();
+      DrawStrip();
+      Page* p = Front();
+      if (p == nullptr)
+      {
+         DrawEmpty();
+         return;
+      }
+      Host h = HostOf(p->uid != 0 ? FindNodeByUid(p->uid) : nullptr);
+      const std::string src = SourceOf(*p, h);
+      if (src != p->parsedFrom)
+         Reparse(*p, src, MaskOf(*p, h));
+
+      const float footerH = ImGui::GetFrameHeightWithSpacing();
+      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const float bodyH = std::max(1.0f, avail.y - footerH);
+      const float gap = tok::space_2;
+      DrawRail(*p, h, bodyH);
+      FormParts::Inline(0.0f, gap);
+      const float inspW = std::min(kInspectorW, avail.x * 0.35f);
+      const float canvasW = std::max(80.0f, avail.x - tok::tile - inspW - 2.0f * gap);
+      ImGui::BeginChild("##fpCanvasWrap", ImVec2(canvasW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+      DrawCanvas(*p, h, ImVec2(canvasW, bodyH));
+      ImGui::EndChild();
+      FormParts::Inline(0.0f, gap);
+      DrawInspector(*p, h, ImVec2(inspW, bodyH));
+      DrawFooter(*p, h);
+   }
+}
+
+void FieldPatcherOpenNode(uint64_t uid)
+{
+   gFieldPatcherOpen = true;
+   ShowNodePage(uid);
+   if (Page* p = Front())
+      p->pinned = false;
+}
+
+void FieldPatcherOpenStarter(int index)
+{
+   if (index < 0 || index >= Field::kPatcherStarterCount)
+      return;
+   gFieldPatcherOpen = true;
+   const Field::PatcherStarter& st = Field::kPatcherStarters[index];
+   AddScratch(T(st.name), st.code);
+}
+
+// Saved with the patch: one line per scratch page (name, then the source with \n and \\ escaped), and pins.
+std::string FieldPatcherSaveState()
+{
+   auto esc = [](const std::string& x) {
+      std::string o;
+      for (char c : x)
+      {
+         if (c == '\\')
+            o += "\\\\";
+         else if (c == '\n')
+            o += "\\n";
+         else if (c == '\t')
+            o += "\\t";
+         else
+            o += c;
+      }
+      return o;
+   };
+   std::string out;
+   for (const auto& p : S().pages)
+   {
+      if (p->uid == 0)
+         out += "s\t" + esc(p->scratchName) + "\t" + esc(p->scratchCode) + "\n";
+      else if (p->pinned)
+         out += "p\t" + std::to_string(p->uid) + "\n";
+   }
+   return out;
+}
+
+void FieldPatcherLoadState(const std::string& text)
+{
+   State& s = S();
+   for (auto& p : s.pages)
+      DropContext(*p);
+   s.pages.clear();
+   s.front = -1;
+   s.closed.clear();
+   auto unesc = [](const std::string& x) {
+      std::string o;
+      for (size_t i = 0; i < x.size(); i++)
+      {
+         if (x[i] == '\\' && i + 1 < x.size())
+         {
+            const char c = x[++i];
+            o += c == 'n' ? '\n' : (c == 't' ? '\t' : c);
+         }
+         else
+            o += x[i];
+      }
+      return o;
+   };
+   size_t at = 0;
+   while (at < text.size())
+   {
+      size_t nl = text.find('\n', at);
+      if (nl == std::string::npos)
+         nl = text.size();
+      const std::string line = text.substr(at, nl - at);
+      at = nl + 1;
+      if (line.size() > 2 && line[0] == 's' && line[1] == '\t')
+      {
+         const size_t tab = line.find('\t', 2);
+         if (tab == std::string::npos)
+            continue;
+         AddScratch(unesc(line.substr(2, tab - 2)), unesc(line.substr(tab + 1)));
+      }
+      else if (line.size() > 2 && line[0] == 'p' && line[1] == '\t')
+      {
+         const uint64_t uid = std::strtoull(line.c_str() + 2, nullptr, 10);
+         ShowNodePage(uid);
+         if (Page* p = Front())
+            p->pinned = true;
+      }
+   }
+}
+
+void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
+{
+   const float kGrip = PanelFrame::kGap;
+   const int dock = gFieldPatcherDock;
+   const bool gripFirst = dock == 0;
+   ImGui::BeginChild(id, size, false);
+   gFieldPatcherClaimedKeys = false;
+   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   auto grip = [&]() {
+      ImGui::InvisibleButton("##fpgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
+      DrawPanelSeam(false, gripFirst);
+      if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+      if (ImGui::IsItemActive())
+      {
+         const float d = ImGui::GetIO().MouseDelta.y;
+         gFieldPatcherHeight += dock == 0 ? -d : d;
+         gFieldPatcherHeight = std::max(kMinHeight, gFieldPatcherHeight);
+      }
+   };
+   if (gripFirst && !gFieldPatcherMaximised)
+      grip();
+   const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+   const float gripH = gFieldPatcherMaximised ? 0.0f : kGrip + gap.y;
+   const ImVec2 cardSize(std::max(1.0f, inner.x), std::max(1.0f, inner.y - gripH));
+   PanelFrame::Insets in;
+   if (dock == 0)
+      in.t = 0.0f;
+   else
+      in.b = 0.0f;
+   PanelFrame::BeginCard("##fpcontent", cardSize, in, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+   DrawPanel();
+   PanelFrame::EndCard();
+   if (!gripFirst && !gFieldPatcherMaximised)
+      grip();
+   const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
+   ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
+   ImGui::EndChild();
+   ImGui::GetStyle().ItemSpacing = savedSpacing;
+}
+}
+
+// Self-test (INFINITE_FIELDPATCHERTEST, FrameTests3.cpp): the gestures the panel makes, run on real nodes.
+namespace app
+{
+int FieldPatcherSelfCheck()
+{
+   int fails = 0;
+   auto expect = [&](const char* what, bool pass) {
+      printf("FIELDPATCHER %s  %s\n", what, pass ? "OK" : "FAIL");
+      fails += pass ? 0 : 1;
+   };
+   State& s = S();
+
+   // 1. A node page: edit a number box, move a box; both reach the node's code, compile, and keep positions.
+   GraphNode* prim = SpawnNode("Field Primitive", "3D", 0.0f, 0.0f);
+   expect("spawned a Field Primitive", prim != nullptr);
+   if (prim != nullptr)
+   {
+      auto* n = dynamic_cast<FieldPrimitiveNode*>(prim->node.get());
+      n->code = Field::kPatcherStarters[2].code; // Spiral
+      n->Apply();
+      FieldPatcherOpenNode(prim->uid);
+      Page* p = Front();
+      Host h = HostOf(prim);
+      Reparse(*p, *h.code, h.mask);
+      expect("the page opens box-only", !p->graph.boxes.empty() && p->graph.CountCodeBoxes() == 0);
+      Field::BoxNode* num = nullptr;
+      for (Field::BoxNode& b : p->graph.boxes)
+         if (b.specId == "number" && b.literalText == "2.39996")
+            num = &b;
+      expect("the golden-angle number is a box", num != nullptr);
+      if (num != nullptr)
+      {
+         num->numberValue = 1.5;
+         num->literalText = "1.5";
+         num->x = 432.0f;
+         num->y = 96.0f;
+         num->hasExplicitPos = true;
+         Commit(*p, h, "Edit Number");
+         expect("the edit reached the code", n->code.find("1.5") != std::string::npos);
+         expect("the code keeps the boxes header", n->code.rfind("# @boxes v1", 0) == 0);
+         expect("it compiles", n->LastError().empty());
+         bool kept = false;
+         for (const Field::BoxNode& b : p->graph.boxes)
+            kept = kept || (b.specId == "number" && b.literalText == "1.5" && std::fabs(b.x - 432.0f) < 0.5f && std::fabs(b.y - 96.0f) < 0.5f);
+         expect("the moved box keeps its place after the round trip", kept);
+      }
+      // A broken gesture: the error shows and the code text keeps what was typed.
+      const std::string good = n->code;
+      SetSource(*p, h, good + "\nP = vec3(\n");
+      h = HostOf(prim);
+      expect("a broken program reports an error", !h.error.empty());
+      SetSource(*p, h, good);
+      expect("restoring it compiles again", n->LastError().empty());
+   }
+
+   // 2. Scratch pages export to the node their outlets need.
+   const int before = (int)gNodes.size();
+   FieldPatcherOpenStarter(1); // Melody from counting
+   Page* mel = Front();
+   Reparse(*mel, mel->scratchCode, ScratchMask(mel->scratchCode));
+   expect("the melody starter targets Field Notes", TargetOf(mel->graph).typeName != nullptr &&
+                                                     std::string(TargetOf(mel->graph).typeName) == "Field Notes");
+   Export(*mel);
+   GraphNode* notes = mel->uid != 0 ? FindNodeByUid(mel->uid) : nullptr;
+   expect("export placed a Field Notes node", notes != nullptr && (int)gNodes.size() == before + 1 &&
+                                               dynamic_cast<FieldNotesNode*>(notes->node.get()) != nullptr);
+   if (notes != nullptr)
+      expect("the exported melody compiles", dynamic_cast<FieldNotesNode*>(notes->node.get())->LastError().empty());
+
+   FieldPatcherOpenStarter(3); // Breathing light
+   Page* light = Front();
+   Reparse(*light, light->scratchCode, ScratchMask(light->scratchCode));
+   Export(*light);
+   GraphNode* val = light->uid != 0 ? FindNodeByUid(light->uid) : nullptr;
+   auto* vp = val != nullptr ? dynamic_cast<FieldPrimitiveNode*>(val->node.get()) : nullptr;
+   expect("a value-only page exports a Field Primitive in Value mode", vp != nullptr && vp->valueMode && vp->publishScalarOutput);
+   if (vp != nullptr)
+   {
+      expect("Value mode has no mesh", vp->GetMesh().vertices.empty());
+      expect("Value mode publishes", vp->ModulatorOutput(1) != nullptr);
+      expect("the light compiles", vp->LastError().empty());
+   }
+
+   // 3. Scratch pages and pins survive save and load.
+   AddScratch("Keep me", "x = 1\n");
+   const int pagesBefore = (int)s.pages.size();
+   const std::string saved = FieldPatcherSaveState();
+   FieldPatcherLoadState(saved);
+   bool found = false;
+   for (const auto& p : s.pages)
+      found = found || (p->uid == 0 && p->scratchName == "Keep me" && p->scratchCode == "x = 1\n");
+   expect("a scratch page survives save and load", found);
+   expect("pages come back in number", (int)s.pages.size() <= pagesBefore && !s.pages.empty());
+
+   // 4. Every starter compiles box-only through the page path.
+   for (int k = 0; k < Field::kPatcherStarterCount; k++)
+   {
+      Field::BoxGraph g;
+      Field::FieldError err;
+      const uint32_t mask = std::string(Field::kPatcherStarters[k].domain) == "notes" ? Field::HostNotes : Field::HostPrimitive;
+      const bool ok = Field::ParseCodeToBoxGraph(Field::kPatcherStarters[k].code, mask, g, err) && g.CountCodeBoxes() == 0;
+      expect(Field::kPatcherStarters[k].name, ok);
+   }
+   return fails;
+}
+}

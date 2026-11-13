@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cymatics Sine Chladni Plate Resonance",
+    "author": "Infinite",
+    "description": "Mathematical simulation of 2D Chladni plate acoustic resonance where sand particles settle along nodal lines determined by harmonic vibrational modal frequencies.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float modeM = 5.0 [1.0, 12.0];\nparam float modeN = 3.0 [1.0, 12.0];\nparam float lineSharpness = 16.0 [6.0, 36.0];\nparam float speed = 0.35 [0.05, 1.0];\nparam float contrast = 1.25 [0.8, 1.8];\n\np = (uv - 0.5) * 2.0;\ntime = t * speed;\n\nm = modeM + sin(time * 0.4) * 0.5;\nn = modeN + cos(time * 0.3) * 0.5;\n\npi = 3.14159265;\nterm1 = sin(n * pi * p.x) * sin(m * pi * p.y);\nterm2 = sin(m * pi * p.x) * sin(n * pi * p.y);\nw = term1 - term2;\n\nnodalDist = abs(w);\nsandLine = 1.0 - clamp(nodalDist * lineSharpness, 0.0, 1.0);\nsandGlow = 1.0 - clamp(nodalDist * (lineSharpness * 0.35), 0.0, 1.0);\n\ncDark = vec3(0.03, 0.035, 0.07);\ncCyan = vec3(0.490, 0.976, 1.0);\ncWhite = vec3(0.96, 0.98, 1.0);\n\ncol = mix(cDark, cCyan, sandGlow * 0.85);\ncol = mix(col, cWhite, sandLine * 0.95);\n\nplateDist = length(p);\nplateEdge = 1.0 - smoothstep(0.92, 0.98, plateDist);\ncol = col * plateEdge;\n\nout = clamp(col * contrast, 0.0, 1.0);\n",
+    "params": {
+      "modeM": 5.0,
+      "modeN": 3.0,
+      "lineSharpness": 16.0,
+      "speed": 0.35,
+      "contrast": 1.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/panels/CurveEditorPanel.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
@@ -56,6 +57,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railCurveEditor", top + 9.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
                        T("Curve editor - draw and shape MSEG curves (Shift+E)")))
       gCurveEditorOpen = !gCurveEditorOpen;
+   if (PanelRail::Item("##railFieldPatcher", top + 10.0f * step, IconsInfinite::Code, nullptr, gFieldPatcherOpen,
+                       T("Field patcher - Field as boxes (Shift+F)")))
+      gFieldPatcherOpen = !gFieldPatcherOpen;
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
@@ -501,6 +505,28 @@ void DrawMenuBar(FrameCtx& fc)
                      FieldWell::PopStyle();
                      ImGui::SetNextItemWidth(150);
                      FieldWell::Slider(L("Height"), &gCurveEditorHeight, 220.0f, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               }
+               if (MenuParts::SubMenu(L("Field Patcher")))
+               {
+                  MenuParts::Check(L("Show Field Patcher"), &gFieldPatcherOpen);
+                  if (gFieldPatcherOpen)
+                  {
+                     static const char* kPatcherDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+                     static const int kPatcherDockCodes[] = { 0, 3 };
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     if (MenuParts::BeginCombo("##patcherdock", T(kPatcherDocks[gFieldPatcherDock == 3 ? 1 : 0])))
+                     {
+                        for (int i = 0; i < 2; ++i)
+                           if (MenuParts::Choice(L(kPatcherDocks[i]), kPatcherDockCodes[i] == gFieldPatcherDock))
+                              gFieldPatcherDock = kPatcherDockCodes[i];
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::Slider(L("Height"), &gFieldPatcherHeight, 220.0f, 800.0f, "%.0f px");
                   }
                   ImGui::EndMenu();
                }

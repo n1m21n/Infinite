@@ -505,6 +505,76 @@
       "slug": "bauhaus-geometry-kinetic-quadrant-tessellation",
       "title": "Bauhaus Geometry Kinetic Quadrant Tessellation",
       "description": "Audio-reactive Bauhaus geometric tessellation visualizer featuring rhythmic primary color concentric arcs, kinetic quadrant dividers, and constructivist diagonal bars. Bass modulates the central geometric core and quadrant expansion, mids drive concentric circular arc rotation, and highs activate crisp constructivist cross-hatch stippling."
+    },
+    {
+      "slug": "vector-wireframe-phosphor-tesseract-hypercube",
+      "title": "Vector Wireframe Phosphor Tesseract Hypercube",
+      "description": "Audio-reactive 1980s vector CRT visualizer rendering a rotating 4D tesseract wireframe with luminous phosphor glow. Bass pulses the outer hypercube scale and beam intensity, mids rotate inner 4D perspective axes, and highs trigger intense vector CRT electron bloom."
+    },
+    {
+      "slug": "vector-wireframe-geodesic-radar-horizon",
+      "title": "Vector Wireframe Geodesic Radar Horizon",
+      "description": "Audio-reactive vector wireframe radar visualizer featuring a spinning geodesic radar dome atop an infinite perspective vector terrain. Bass drives grid undulation, mids rotate geodesic radar azimuth, and highs emit phosphor sweep flares."
+    },
+    {
+      "slug": "riso-manga-zine-halftone-dot-matrix",
+      "title": "Riso Manga Zine Halftone Dot Matrix",
+      "description": "Interactive audio-reactive risograph print shader rendering screen halftone dot matrices in fluorescent spot inks. Bass pulses halftone dot scale and ink spread, mids rotate print angle separation, and highs modulate fluorescent ink misregistration."
+    },
+    {
+      "slug": "riso-manga-zine-chromatic-ink-misregistration",
+      "title": "Riso Manga Zine Chromatic Ink Misregistration",
+      "description": "Audio-reactive risograph manga shader featuring speedline dynamics and spot-color ink misregistration. Bass commands ink saturation depth, mids pulse dynamic speedline convergence, and highs trigger physical riso print plate misregistration."
+    },
+    {
+      "slug": "minimal-signal-datamatics-barcode-matrix",
+      "title": "Minimal Signal Datamatics Barcode Matrix",
+      "description": "Audio-reactive binary data matrix and barcode visualizer inspired by Ryoji Ikeda. Bass pulses the high-density bitstream, mids shift vertical scanlines, and highs ignite vermilion signal impulses."
+    },
+    {
+      "slug": "minimal-signal-raster-oscillogram-sweep",
+      "title": "Minimal Signal Raster Oscillogram Sweep",
+      "description": "Precision audio-reactive oscilloscope raster grid rendering multi-channel sine-sweep waveforms and Alva Noto pulse-code impulses. Bass drives beam deflection amplitude, mids modulate raster lines, and highs trigger transient beam bursts."
+    },
+    {
+      "slug": "glitch-datamosh-chroma-displacement-scan",
+      "title": "Glitch Datamosh Chroma Displacement Scan",
+      "description": "Audio-reactive datamosh visualizer with macroblock slicing and chromatic RGB channel splitting. Bass triggers horizontal buffer displacement, mids warp color channels, and highs ignite digital scanlines."
+    },
+    {
+      "slug": "glitch-datamosh-macroblock-slice-corruption",
+      "title": "Glitch Datamosh Macroblock Slice Corruption",
+      "description": "Audio-reactive video compression corruption visualizer. Bass fractures the spatial macroblock grid, mids shift temporal motion vector shears, and highs trigger digital noise bursts."
+    },
+    {
+      "slug": "cymatics-sine-chladni-plate-resonance",
+      "title": "Cymatics Sine Chladni Plate Resonance",
+      "description": "Audio-reactive Chladni plate cymatics visualizer. Bass shifts modal standing-wave frequencies, mids warp geometric nodal lines, and highs vibrate granular sand dispersion."
+    },
+    {
+      "slug": "cymatics-sine-harmonic-modal-interference",
+      "title": "Cymatics Sine Harmonic Modal Interference",
+      "description": "Audio-reactive circular modal cymatics visualizer. Bass drives radial Bessel diaphragm oscillation, mids modulate harmonic interference sectors, and highs disperse resonant nodal ripples."
+    },
+    {
+      "slug": "analog-crt-aperture-grille-phosphor-bloom",
+      "title": "Analog CRT Aperture Grille Phosphor Bloom",
+      "description": "Audio-reactive Trinitron CRT visualizer. Bass modulates magnetic deflection and spherical tube barrel distortion, mids ignite RGB phosphor triad bloom, and highs vibrate raster scanline luminescence."
+    },
+    {
+      "slug": "analog-crt-electron-beam-raster-deflection",
+      "title": "Analog CRT Electron Beam Raster Deflection",
+      "description": "Audio-reactive CRT electron beam oscilloscope. Bass drives magnetic deflection coil amplitude, mids shape Lissajous beam trajectories, and highs energize phosphor trace bloom."
+    },
+    {
+      "slug": "suprematist-blocks-kinetic-red-wedge",
+      "title": "Suprematist Blocks Kinetic Red Wedge",
+      "description": "Audio-reactive Suprematist composition inspired by El Lissitzky. Bass drives the vermilion wedge thrust, mids rotate the constructivist beams, and highs pulse the geometric accents."
+    },
+    {
+      "slug": "suprematist-blocks-malevich-floating-plane",
+      "title": "Suprematist Blocks Malevich Floating Plane",
+      "description": "Audio-reactive Malevich-inspired Suprematist planes. Bass pulses the central black quadrilateral, mids drift the vermilion satellite bars, and highs sharpen the edge tension."
     }
   ]
 }

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vector Wireframe Geodesic Radar Horizon",
+    "author": "Infinite",
+    "description": "Audio-reactive vector wireframe radar shader featuring a rotating geodesic radar dome over an infinite perspective grid with beam sweep echoes and reactive frequency pulses.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.26 [0.05, 1.0]\nparam float radarDensity = 16.0 [8.0, 32.0]\nparam float beamIntensity = 0.75 [0.2, 1.0]\nparam float domeScale = 0.65 [0.3, 1.2]\nparam float contrast = 1.15 [0.8, 1.6]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nrings = sin(r * radarDensity * 1.5 - time * 1.2)\nringLines = smoothstep(0.12, 0.02, abs(rings)) * step(r, domeScale)\n\nspokes = sin(theta * 12.0 + time * 0.5)\nspokeLines = smoothstep(0.10, 0.01, abs(spokes)) * step(r, domeScale)\n\nsweepAngle = mod(theta - time * 2.5 + 3.14159, 6.28318)\nsweepBeam = smoothstep(0.45, 0.0, sweepAngle) * step(r, domeScale * 1.08)\n\nboundRing = smoothstep(domeScale * 1.02, domeScale * 0.99, r) * (1.0 - smoothstep(domeScale * 0.99, domeScale * 0.96, r))\n\ngridY = (p.y + 0.50) / (abs(p.y + 0.90) + 0.1)\ngridX = p.x / (abs(p.y + 0.90) + 0.1)\nperspLines = smoothstep(0.08, 0.01, abs(fract(gridX * 4.0) - 0.5)) + smoothstep(0.08, 0.01, abs(fract(gridY * 4.0 - time * 1.4) - 0.5))\nperspMask = step(p.y, -0.20) * perspLines * clamp(1.0 - abs(p.y + 0.20) * 1.2, 0.0, 1.0)\n\ncBg = vec3(0.04, 0.06, 0.08)\ncGreen = vec3(0.0, 1.0, 0.42)\ncCyan = vec3(0.0, 0.90, 1.0)\ncWhite = vec3(0.95, 1.0, 0.95)\n\nglowDome = smoothstep(domeScale * 1.05, domeScale * 0.2, r) * 0.42\ncrtBevel = smoothstep(1.15, 0.95, max(abs(p.x), abs(p.y)))\n\ncol = cBg * crtBevel\ncol = mix(col, cCyan * 0.7, perspMask * 0.85)\ncol = mix(col, cGreen * 0.55, glowDome)\ncol = mix(col, cGreen, (ringLines * 0.6 + spokeLines * 0.5) * beamIntensity * 1.4)\ncol = mix(col, cCyan, boundRing * 1.5)\ncol = mix(col, cWhite, sweepBeam * beamIntensity * 1.3)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.26,
+      "radarDensity": 16.0,
+      "beamIntensity": 0.75,
+      "domeScale": 0.65,
+      "contrast": 1.15
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

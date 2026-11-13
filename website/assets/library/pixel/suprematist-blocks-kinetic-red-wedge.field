@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Suprematist Blocks Kinetic Red Wedge",
+    "author": "Infinite",
+    "description": "Constructivist composition of a vermilion wedge piercing a charcoal disc and diagonal beams on warm ivory paper.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float wedgeThrust = 0.18 [-0.2, 0.5];\nparam float beamAngle = 0.58 [0.1, 1.4];\nparam float discRadius = 0.32 [0.15, 0.5];\nparam float paperGrain = 0.04 [0.0, 0.12];\nparam float contrast = 1.05 [0.8, 1.4];\n\np = (uv - 0.5) * 2.0;\n\n# Warm paper ivory (#f4efe6), charcoal ink (#111111), constructivist vermilion (#d9231f)\ncPaper = vec3(0.957, 0.937, 0.902);\ncInk = vec3(0.067, 0.067, 0.067);\ncRed = vec3(0.851, 0.137, 0.122);\n\n# Subtle paper grain\ngrain = (fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * paperGrain;\nbg = cPaper + grain;\n\n# Charcoal disc slightly right of center\ndDisc = length(p - vec2(0.18, -0.05)) - discRadius;\nmDisc = 1.0 - smoothstep(-0.008, 0.008, dDisc);\n\n# Kinetic red wedge piercing from upper-left\nang = beamAngle + sin(t * 0.35) * 0.05;\nca = cos(ang);\nsa = sin(ang);\nq = vec2(p.x * ca + p.y * sa, -p.x * sa + p.y * ca);\nshiftX = q.x - wedgeThrust + 0.15 * sin(t * 0.5);\nhalfW = clamp(0.28 - shiftX * 0.38, 0.0, 0.45);\ninWedgeX = step(-0.75, shiftX) * step(shiftX, 0.55);\nmWedge = inWedgeX * (1.0 - smoothstep(halfW - 0.008, halfW + 0.008, abs(q.y)));\n\n# Diagonal charcoal structural bar\nq2 = vec2(p.x * cos(-0.42) + p.y * sin(-0.42), -p.x * sin(-0.42) + p.y * cos(-0.42));\nmBar = (1.0 - smoothstep(0.045, 0.053, abs(q2.y + 0.36))) * (1.0 - smoothstep(0.65, 0.66, abs(q2.x)));\n\n# Small floating vermilion square accent\ndSq = max(abs(p.x - 0.52), abs(p.y - 0.46)) - 0.09;\nmSq = 1.0 - smoothstep(-0.008, 0.008, dSq);\n\nresCol = mix(bg, cInk, mDisc);\nresCol = mix(resCol, cInk, mBar);\nresCol = mix(resCol, cRed, mWedge);\nresCol = mix(resCol, cRed, mSq);\n\ncol = clamp(resCol * contrast, 0.0, 1.0);\n",
+    "params": {
+      "wedgeThrust": 0.18,
+      "beamAngle": 0.58,
+      "discRadius": 0.32,
+      "paperGrain": 0.04,
+      "contrast": 1.05
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

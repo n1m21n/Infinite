@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Riso Manga Zine Chromatic Ink Misregistration",
+    "author": "Infinite",
+    "description": "Audio-reactive risograph manga shader featuring high-frequency ink plate misregistration, dynamic radial action speedlines, and tactile paper grain texture under spot-color inks.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.38 [0.1, 1.0]\nparam float lineDensity = 52.0 [20.0, 96.0]\nparam float misreg = 0.42 [0.1, 1.0]\nparam float contrast = 1.20 [0.8, 1.6]\nparam float paperWarmth = 0.88 [0.5, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nspokePink = abs(sin(theta * lineDensity * 0.5 + time * 1.5 + 0.1))\nspokeCyan = abs(sin(theta * lineDensity * 0.5 - time * 1.2 - 0.1))\nspokeYellow = abs(sin(theta * lineDensity * 0.5 + time * 0.8 + 0.2))\n\nburst = smoothstep(0.18, 0.95, r)\n\nlinePink = smoothstep(0.45, 0.82, spokePink) * burst * 0.88\nlineCyan = smoothstep(0.42, 0.80, spokeCyan) * burst * 0.85\nlineYellow = smoothstep(0.40, 0.78, spokeYellow) * burst * 0.82\n\npaper = vec3(0.97 * paperWarmth, 0.95 * paperWarmth, 0.90 * paperWarmth)\n\npinkInk = vec3(1.0, 0.05, 0.45)\ncyanInk = vec3(0.0, 0.82, 0.98)\nyellowInk = vec3(1.0, 0.90, 0.02)\n\ncol = paper * (1.0 - linePink * (1.0 - pinkInk)) * (1.0 - lineCyan * (1.0 - cyanInk)) * (1.0 - lineYellow * (1.0 - yellowInk))\n\ncenterDot = smoothstep(0.18, 0.15, r) * 0.85\ncol = mix(col, vec3(0.08, 0.08, 0.10), centerDot)\n\nvignette = smoothstep(1.7, 0.65, r)\nout = vec4(col * vignette * contrast, 1.0)\n",
+    "params": {
+      "speed": 0.38,
+      "lineDensity": 52.0,
+      "misreg": 0.42,
+      "contrast": 1.2,
+      "paperWarmth": 0.88
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

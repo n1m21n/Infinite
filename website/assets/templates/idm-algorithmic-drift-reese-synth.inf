@@ -1,0 +1,68 @@
+infinite-patch 1
+# IDM Algorithmic Drift Reese Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 36
+  i note1 36
+  i note2 39
+  i note3 43
+  i note4 36
+  i note5 39
+  i note6 48
+  i note7 43
+  i note8 36
+  i note9 36
+  i note10 39
+  i note11 41
+  i note12 36
+  i note13 48
+  i note14 43
+  i note15 36
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 950.0 [100.0, 3500.0];\nparam float detune = 0.025 [0.005, 0.08];\nparam float flutter = 0.35 [0.0, 1.0];\nparam float drive = 2.0 [1.0, 5.0];\nparam float decay = 0.40 [0.1, 1.0];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.05);\nenv = if(target > env, env + (target - env) * 0.12, env - env * decayRate);\n\nlfo = (lfo + 3.2 / sr) % 1.0;\ndrift = sin(6.2831853 * lfo) * flutter * 0.008;\n\nbaseF = clamp(freq, 20.0, 1200.0);\nstep1 = (baseF * (1.0 - detune + drift)) / sr;\nstep2 = (baseF * (1.0 + detune - drift)) / sr;\n\np1 = (p1 + step1) % 1.0;\np2 = (p2 + step2) % 1.0;\n\nsaw1 = 2.0 * p1 - 1.0;\nsaw2 = 2.0 * p2 - 1.0;\nsubWave = sin(6.2831853 * p1) * 0.35;\n\nraw = (saw1 + saw2) * 0.40 + subWave * 0.30;\nu = raw * drive;\nsat = u / (1.0 + abs(u) * 0.35);\n\nfCut = clamp((cutoff + env * 1200.0) / sr * 3.14, 0.01, 0.45);\nlp1 = lp1 + fCut * (sat - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nout = lp2 * (0.35 + env * 0.65) * 0.20;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.18 0.22 0.32
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text IDM Algorithmic Drift Reese Synth. Complex drifting IDM bass synthesizer featuring phase-jittered dual detuned saw/pulse oscillators, tape-flutter pitch modulation, and soft asymmetric saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

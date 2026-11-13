@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Electro Cybernetic BBD Flanger Delay FX",
+    "author": "Infinite",
+    "description": "Vintage bucket-brigade style short-time flanger and cross-feedback delay processor with triangular LFO sweep modulation, inverted feedback notches, and warm analog diode saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.32 [0.05, 1.0];\nparam float depth = 0.45 [0.05, 0.9];\nparam float feedback = 0.52 [0.0, 0.88];\nparam float damping = 0.40 [0.05, 0.9];\nparam float mix = 0.48 [0.0, 1.0];\nstate float lfoPhase = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float lp = 0;\nstate float fb = 0;\n\nlfoPhase = (lfoPhase + rate * 0.0016) % 1.0;\ntri = 2.0 * abs(2.0 * lfoPhase - 1.0) - 1.0;\nflangeMod = tri * depth * 0.035;\n\nkRate = clamp(0.10 + flangeMod, 0.03, 0.35);\nd1 = d1 + kRate * ((in + fb * feedback) - d1);\nd2 = d2 + kRate * 0.88 * (d1 - d2);\nd3 = d3 + kRate * 0.76 * (d2 - d3);\n\nfDamp = clamp(0.12 + (1.0 - damping) * 0.28, 0.04, 0.45);\nlp = lp + fDamp * (d3 - lp);\nfb = lp / (1.0 + abs(lp * 0.22));\n\nflanged = (in - d2 * 0.95) * 1.15;\nprocessed = in * (1.0 - mix) + flanged * mix;\nout = processed * 1.05;\n",
+    "params": {
+      "rate": 0.32,
+      "depth": 0.45,
+      "feedback": 0.52,
+      "damping": 0.4,
+      "mix": 0.48
+    }
+  }
+}

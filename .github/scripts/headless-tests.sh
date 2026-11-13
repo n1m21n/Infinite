@@ -198,6 +198,30 @@ if [ "$UNAME_S" = "Linux" ]; then
    fi
 fi
 
+# --- field-patcher-check ---------------------------------------------------
+# Standalone tool built beside the app (CMakeLists.txt): every shipped Field
+# preset round-trips code -> boxes -> code with an unchanged compiled program.
+# Beside the binary on Windows and Linux, three levels up from the macOS
+# bundle executable.
+BIN_DIR="$(cd "$(dirname "$BIN")" && pwd)"
+FPC=""
+for cand in "$BIN_DIR/field-patcher-check" "$BIN_DIR/field-patcher-check.exe" \
+            "$BIN_DIR/../../../field-patcher-check"; do
+   if [ -x "$cand" ]; then FPC="$cand"; break; fi
+done
+echo "== field-patcher-check"
+if [ -z "$FPC" ]; then
+   echo "   FAIL (field-patcher-check not built next to $BIN)"
+   status=1
+elif out="$("$FPC" 2>&1)"; then
+   printf '%s\n' "$out" | grep -E '^M[34] ' | sed 's/^/   /'
+   echo "   pass"
+else
+   printf '%s\n' "$out" | tail -40
+   echo "   FAIL"
+   status=1
+fi
+
 echo
 if [ "$status" -eq 0 ]; then
    echo "All headless self-tests passed."

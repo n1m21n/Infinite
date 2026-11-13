@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Deep House Warm Analog Chorus FX",
+    "author": "Infinite",
+    "description": "Lush multi-stage analog bucket-brigade chorus and spatial widening effect engineered for deep house electric pianos, synths, and basslines with warm vintage saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.35 [0.05, 1.0];\nparam float depth = 0.55 [0.05, 0.95];\nparam float feedback = 0.38 [0.0, 0.85];\nparam float warmth = 0.65 [0.1, 1.0];\nparam float mix = 0.50 [0.0, 1.0];\nstate float lfo1 = 0;\nstate float lfo2 = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float lp = 0;\nstate float fb = 0;\n\nlfo1 = (lfo1 + rate * 0.0018) % 1.0;\nlfo2 = (lfo2 + rate * 0.0023 + 0.25) % 1.0;\nsin1 = sin(6.2831853 * lfo1) * depth * 0.032;\nsin2 = cos(6.2831853 * lfo2) * depth * 0.028;\n\nkRate1 = clamp(0.08 + sin1, 0.02, 0.35);\nkRate2 = clamp(0.09 + sin2, 0.02, 0.35);\n\nd1 = d1 + kRate1 * ((in + fb * feedback) - d1);\nd2 = d2 + kRate2 * (d1 - d2);\n\nfWarm = clamp(0.15 + (1.0 - warmth) * 0.25, 0.05, 0.45);\nlp = lp + fWarm * (d2 - lp);\n\nsat = lp / (1.0 + abs(lp * 0.25));\nfb = sat;\n\nchorus = (d1 * 0.6 + d2 * 0.4) * 1.15;\nprocessed = in * (1.0 - mix) + chorus * mix;\nout = processed * 0.92;\n",
+    "params": {
+      "rate": 0.35,
+      "depth": 0.55,
+      "feedback": 0.38,
+      "warmth": 0.65,
+      "mix": 0.5
+    }
+  }
+}

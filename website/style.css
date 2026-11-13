@@ -990,7 +990,7 @@ p.mono { font-size: 0.84375rem; }
 .dock-thumb { position: absolute; left: 0; top: 0; width: var(--w, 0); height: var(--h, 0); transform: translate(var(--x, 0), var(--y, 0)); border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--ink) 14%, transparent); box-shadow: var(--dock-hi); opacity: 0; transition: transform var(--dur-medium, 333ms) var(--ease-out), width var(--dur-medium, 333ms) var(--ease-out), height var(--dur-medium, 333ms) var(--ease-out), opacity var(--dur-small) var(--ease-out); }
 .dock.ready .dock-thumb { opacity: 1; }
-.dock:not(.ready) .dock-thumb { transition: none; }
+.dock:not(.ready) .dock-thumb, .dock:not(.ready) .dock-stop { transition: none; }
 .dock-dl { display: none !important; }
 .dock-stop { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 14px; border-radius: var(--r-pill);
   font: 500 0.8438rem/1 "Geist", system-ui, sans-serif; color: var(--ink2); text-decoration: none; cursor: pointer; background: none; transition: color var(--dur-small) var(--ease-out); }

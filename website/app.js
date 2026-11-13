@@ -96,23 +96,25 @@ function animateCosmos() {
   cosmicTime++;
   cosmicCtx.clearRect(0, 0, cWidth, cHeight);
 
-  cosmicNebulae.forEach(n => {
-    n.x += n.vx;
-    n.y += n.vy;
-    if (n.x < -n.radius) n.x = cWidth + n.radius;
-    if (n.x > cWidth + n.radius) n.x = -n.radius;
-    if (n.y < -n.radius) n.y = cHeight + n.radius;
-    if (n.y > cHeight + n.radius) n.y = -n.radius;
+  if (cWidth > 768) {
+    cosmicNebulae.forEach(n => {
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < -n.radius) n.x = cWidth + n.radius;
+      if (n.x > cWidth + n.radius) n.x = -n.radius;
+      if (n.y < -n.radius) n.y = cHeight + n.radius;
+      if (n.y > cHeight + n.radius) n.y = -n.radius;
 
-    const grad = cosmicCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius);
-    grad.addColorStop(0, n.color);
-    grad.addColorStop(1, 'transparent');
+      const grad = cosmicCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius);
+      grad.addColorStop(0, n.color);
+      grad.addColorStop(1, 'transparent');
 
-    cosmicCtx.fillStyle = grad;
-    cosmicCtx.beginPath();
-    cosmicCtx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-    cosmicCtx.fill();
-  });
+      cosmicCtx.fillStyle = grad;
+      cosmicCtx.beginPath();
+      cosmicCtx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      cosmicCtx.fill();
+    });
+  }
 
   cosmicStars.forEach(s => {
     s.x += s.vx;
@@ -1009,7 +1011,7 @@ function initParticlesAnimation() {
       initThreeJSCube(fresh);
     };
     document.head.appendChild(s);
-  }, { rootMargin: '600px 0px' });
+  }, { rootMargin: '0px' });
   io.observe(canvas);
 }
 

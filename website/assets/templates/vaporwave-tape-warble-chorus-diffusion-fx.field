@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vaporwave Tape Warble Chorus Diffusion FX",
+    "author": "Infinite",
+    "description": "Dreamy vintage cassette tape chorus and spatial diffusion effect with pitch flutter, multi-tap bucket brigade modulation, warm low-end saturation, and airy stereo widening.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.38 [0.05, 1.0]\nparam float depth = 0.55 [0.0, 1.0]\nparam float tone = 0.48 [0.1, 1.0]\nparam float warmth = 0.50 [0.0, 1.0]\nparam float mix = 0.55 [0.0, 1.0]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float lp = 0\nstate float lfo = 0\n\nlfo = (lfo + rate * 0.002) % 1.0\nwMod = sin(lfo * 6.28318) * depth * 0.04\n\nfTone = clamp(0.04 + tone * 0.35, 0.015, 0.44)\ninSat = in / (1.0 + abs(in * (0.20 + warmth * 0.25)))\nlp = lp + fTone * (inSat - lp)\n\nkRate = clamp(0.12 + wMod, 0.02, 0.35)\nd1 = d1 + kRate * (lp - d1)\nd2 = d2 + kRate * 0.85 * (d1 - d2)\nd3 = d3 + kRate * 0.72 * (d2 - d3)\n\nchorusSig = (d1 * 0.45 + d2 * 0.40 - d3 * 0.35) * 1.35\nsat = chorusSig / (1.0 + abs(chorusSig * 0.25))\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.15\n",
+    "params": {
+      "rate": 0.38,
+      "depth": 0.55,
+      "tone": 0.48,
+      "warmth": 0.5,
+      "mix": 0.55
+    }
+  }
+}

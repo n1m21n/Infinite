@@ -22,6 +22,7 @@ def min_css(s):
 
 LINK = re.compile(r'<link rel="stylesheet" href="((?:\.\./)*)([A-Za-z0-9_.-]+\.css)(?:\?v=[0-9a-f]+)?">\s*')
 FONT = re.compile(r'<link href="(https://fonts\.googleapis\.com/css2[^"]+)" rel="stylesheet">')
+THEME_SCRIPT = re.compile(r'<script src="((?:\.\./)*)theme\.js(?:\?v=[0-9a-zA-Z]+)?"></script>')
 
 def bundle_page(html, out):
     head_end = html.find("</head>")
@@ -43,10 +44,15 @@ def bundle_page(html, out):
 def main():
     if OUT.exists(): shutil.rmtree(OUT)
     shutil.copytree(SRC, OUT, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
+    theme_js = (SRC / "theme.js").read_text() if (SRC / "theme.js").exists() else ""
+    theme_min = re.sub(r"/\*.*?\*/", "", theme_js, flags=re.S)
+    theme_min = re.sub(r"\s+", " ", theme_min).strip()
     pages = 0
     for f in OUT.rglob("*.html"):
         h = f.read_text(errors="ignore"); n = bundle_page(h, OUT)
         n = FONT.sub(lambda m: f'<link rel="preload" as="style" href="{m.group(1)}" onload="this.onload=null;this.rel=\'stylesheet\'"><noscript><link href="{m.group(1)}" rel="stylesheet"></noscript>', n)
+        if theme_min:
+            n = THEME_SCRIPT.sub(f'<script>{theme_min}</script>', n)
         if n != h: f.write_text(n); pages += 1
     used = set()
     for f in OUT.rglob("bundle-*.css"): used.add(f.name)

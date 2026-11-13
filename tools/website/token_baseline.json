@@ -512,6 +512,62 @@
   "embeds/bauhaus-geometry-kinetic-quadrant-tessellation.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/vector-wireframe-phosphor-tesseract-hypercube.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/vector-wireframe-geodesic-radar-horizon.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/riso-manga-zine-halftone-dot-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/riso-manga-zine-chromatic-ink-misregistration.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/minimal-signal-datamatics-barcode-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/minimal-signal-raster-oscillogram-sweep.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/glitch-datamosh-chroma-displacement-scan.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/glitch-datamosh-macroblock-slice-corruption.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-chladni-plate-resonance.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-harmonic-modal-interference.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/analog-crt-aperture-grille-phosphor-bloom.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/analog-crt-electron-beam-raster-deflection.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/suprematist-blocks-kinetic-red-wedge.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/suprematist-blocks-malevich-floating-plane.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

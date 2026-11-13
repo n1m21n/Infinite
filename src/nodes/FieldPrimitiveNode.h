@@ -79,6 +79,8 @@ public:
    }
 
    bool publishScalarOutput = false;
+   // Value mode (Field Patcher §13 #3): the node is a value source only. No mesh; `publish` is its output.
+   bool valueMode = false;
    std::string pinRefusal;
 
    const Field::PinTable& OutputPinTable() const { return mOutputPins; }
@@ -91,6 +93,9 @@ public:
       v.Int("maxElements", maxElements);
       v.Int("topology", topology);
       v.Bool("publishScalarOutput", publishScalarOutput);
+      v.Bool("valueMode", valueMode);
+      if (valueMode)
+         publishScalarOutput = true;
       mParamTable.VisitParams(v);
       mState.VisitParams(v);
 
@@ -103,8 +108,8 @@ public:
    }
 
    // IGeometrySource overrides (pure generator - identity transforms, no passthrough)
-   const Mesh& GetMesh() override { return bypassed ? EmptyMesh() : mOutMesh; }
-   unsigned long long MeshRevision() override { return bypassed ? 0 : mMeshRevision; }
+   const Mesh& GetMesh() override { return (bypassed || valueMode) ? EmptyMesh() : mOutMesh; }
+   unsigned long long MeshRevision() override { return (bypassed || valueMode) ? 0 : mMeshRevision; }
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override { return Material(); }
    unsigned int GetSurfaceTexture() override { return 0; }

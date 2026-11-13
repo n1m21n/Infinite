@@ -3,6 +3,8 @@
 // where to put it and the original can't be overwritten. The picker is File > Template library: a window like Settings,
 // one card per template under its group heading (thumbnail, title, one line).
 #include "app/AppShared.h"
+#include "app/panels/FieldPatcherPanel.h"
+#include "core/field/FieldPatcherStarters.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/SectionCard.h"
@@ -171,6 +173,29 @@ void DrawTemplatesWindow(bool* open)
             picked = &entries[i];
       }
       const int rows = (col + perRow - 1) / perRow;
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + (float)rows * (cardH + gap) - gap));
+      ImGui::Dummy(ImVec2(0.0f, 0.0f));
+   }
+   // Field Patcher starters: a scratch page in the current patch, not a new patch.
+   {
+      SectionCard::Begin(T("Field patches"));
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float cardH = CardHeight(kCardW);
+      int k = 0;
+      for (; k < Field::kPatcherStarterCount; k++)
+      {
+         const Field::PatcherStarter& st = Field::kPatcherStarters[k];
+         const Entry e { std::string("fieldstarter-") + std::to_string(k), "", T(st.name),
+                         T(std::string(st.domain) == "notes" ? "Boxes that play notes" : "Boxes in the Field Patcher") };
+         ImGui::SetCursorScreenPos(ImVec2(origin.x + (float)(k % perRow) * (kCardW + gap),
+                                          origin.y + (float)(k / perRow) * (cardH + gap)));
+         if (Card(e, kCardW))
+         {
+            FieldPatcherOpenStarter(k);
+            *open = false;
+         }
+      }
+      const int rows = (k + perRow - 1) / perRow;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + (float)rows * (cardH + gap) - gap));
       ImGui::Dummy(ImVec2(0.0f, 0.0f));
    }

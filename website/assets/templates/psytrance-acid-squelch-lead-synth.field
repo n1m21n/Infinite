@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Psytrance Acid Squelch Lead Synth",
+    "author": "Infinite",
+    "description": "Psychedelic FM acid lead synthesizer featuring dual cascaded oscillators, extreme resonance squelch filter sweeps, tempo-synced LFO filter modulation, and warm diode clipping.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 2400.0 [100.0, 10000.0];\nparam float res = 0.82 [0.0, 0.98];\nparam float envMod = 0.75 [0.0, 1.0];\nparam float decay = 0.25 [0.05, 0.8];\nparam float drive = 2.2 [1.0, 6.0];\nparam float lfoRate = 4.0 [0.5, 12.0];\nstate float phase = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float s1 = 0;\nstate float s2 = 0;\nstate float s3 = 0;\nstate float s4 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.02);\nenv = if(target > env, env + (target - env) * 0.12, env - env * decayRate);\n\nlfo = (lfo + lfoRate / sr) % 1.0;\nlfoSin = sin(6.2831853 * lfo);\n\npStep = clamp(freq, 20.0, 4000.0) / sr;\nphase = (phase + pStep) % 1.0;\nsaw = 2.0 * phase - 1.0;\nsq = if(phase > 0.5, 0.8, -0.8);\nraw = saw * 0.7 + sq * 0.3;\n\nfCut = clamp((cutoff + env * envMod * 6000.0 + lfoSin * 800.0) / sr * 2.2, 0.005, 0.45);\nfeedback = (s4 * res * 3.8) / (1.0 + abs(s4) * 0.9);\nu = (raw * drive) - feedback;\nsat = u / (1.0 + abs(u) * 0.35);\n\ns1 = s1 + fCut * (sat - s1);\ns2 = s2 + fCut * (s1 - s2);\ns3 = s3 + fCut * (s2 - s3);\ns4 = s4 + fCut * (s3 - s4);\n\nout = s4 * (0.30 + env * 0.70) * 0.38;\n",
+    "params": {
+      "cutoff": 2400.0,
+      "res": 0.82,
+      "envMod": 0.75,
+      "decay": 0.25,
+      "drive": 2.2,
+      "lfoRate": 4.0
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

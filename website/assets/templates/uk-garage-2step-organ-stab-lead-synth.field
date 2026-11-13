@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "UK Garage 2-Step Organ Stab Lead Synth",
+    "author": "Infinite",
+    "description": "Punchy percussive digital organ and chord stab synthesizer with multi-harmonic drawbar overtone partials, click attack transient, and warm analog chorus diffusion.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.65 [0.1, 1.0]\nparam float resonance = 0.28 [0.1, 0.88]\nparam float percussion = 0.60 [0.0, 1.0]\nparam float drawbar = 0.70 [0.0, 1.0]\nparam float drive = 0.30 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float clickEnv = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * 0.38), 0.0001, 0.05)\nclickDecay = clamp(1.0 / (sr * 0.025), 0.001, 0.2)\nenv = if(target > env, env + (target - env) * 0.98, env - env * decayRate)\nclickEnv = if(target > clickEnv, target, clickEnv - clickEnv * clickDecay)\n\ndp = freq / sr\np1 = (p1 + dp) % 1.0\np2 = (p2 + dp * 2.0) % 1.0\np3 = (p3 + dp * 3.0) % 1.0\n\nh1 = sin(p1 * 6.2831853)\nh2 = sin(p2 * 6.2831853)\nh3 = sin(p3 * 6.2831853)\n\norgan = (h1 * 0.65 + h2 * drawbar * 0.45 + h3 * drawbar * 0.30)\nclick = sin(p1 * 12.56637) * clickEnv * percussion * 0.45\nsig = organ + click\n\nfNorm = clamp(cutoff * 0.22 + env * 0.16, 0.02, 0.45)\nkRes = clamp(resonance * 1.35, 0.1, 1.65)\n\ns1 = s1 + fNorm * (sig - s2 * kRes - s1)\ns2 = s2 + fNorm * (s1 - s2)\n\nsat = (s2 / (1.0 + abs(s2 * (0.20 + drive * 0.25)))) * env\nout = sat * 0.62\n",
+    "params": {
+      "cutoff": 0.65,
+      "resonance": 0.28,
+      "percussion": 0.6,
+      "drawbar": 0.7,
+      "drive": 0.3
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

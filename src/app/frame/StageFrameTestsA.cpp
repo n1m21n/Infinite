@@ -2497,6 +2497,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // Curve Editor motion grade: + Position on a selected Transform makes three bound X Y Z pages.
       FrameTest_CURVEMOTIONTEST(frameId, window);
 
+      // Field Patcher: box edits reach the node, scratch pages export, Value mode, pages survive save.
+      FrameTest_FIELDPATCHERTEST(frameId, window);
+
       // Keyed mod/expr on a Star: lands on the named control, survives a shape change.
       FrameTest_KEYEDSTARTEST(frameId, window);
 

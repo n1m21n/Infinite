@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "French Filter House Creamy Phaser Drive FX",
+    "author": "Infinite",
+    "description": "Silky multi-stage vintage analog phaser and warm console saturation effect designed for French house rhodes stabs, guitars, and filtered disco master buses.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.40 [0.05, 1.5];\nparam float depth = 0.60 [0.1, 0.95];\nparam float feedback = 0.45 [0.0, 0.85];\nparam float warmth = 0.70 [0.1, 1.0];\nparam float mix = 0.55 [0.0, 1.0];\nstate float lfo = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float ap3 = 0;\nstate float ap4 = 0;\nstate float fb = 0;\n\nlfo = (lfo + rate * 0.0015) % 1.0;\nmod = (0.5 + 0.5 * sin(6.2831853 * lfo)) * depth;\n\nkRate = clamp(0.08 + mod * 0.18, 0.02, 0.35);\n\nx = in + fb * feedback * 0.6;\nap1 = ap1 + kRate * (x - ap1);\nap2 = ap2 + kRate * (ap1 - ap2);\nap3 = ap3 + kRate * (ap2 - ap3);\nap4 = ap4 + kRate * (ap3 - ap4);\n\nphaseSig = ap4;\nu = phaseSig * (1.0 + warmth * 0.5);\nfb = u / (1.0 + abs(u) * 0.3);\n\nprocessed = in * (1.0 - mix) + fb * mix * 1.1;\nout = processed * 0.90;\n",
+    "params": {
+      "rate": 0.4,
+      "depth": 0.6,
+      "feedback": 0.45,
+      "warmth": 0.7,
+      "mix": 0.55
+    }
+  }
+}

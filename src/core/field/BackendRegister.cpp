@@ -1190,6 +1190,14 @@ namespace Field
       }
 
       outProgram.outReg = (int)scope["out"];
+      // Field Notes publishes a value the way the other Field nodes do (Field Patcher §13 #4): whatever `publish`
+      // holds after the sample's run. Other sample hosts keep their own outputs.
+      if (notesHost)
+      {
+         auto pub = scope.find("publish");
+         if (pub != scope.end())
+            outProgram.publishReg = (int)pub->second;
+      }
 
       // Emit the final state write-back, once per declared cell, using
       // whatever register that cell's name is bound to at the very end of

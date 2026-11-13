@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Deep House Dusty Tape Space Delay FX",
+    "author": "Infinite",
+    "description": "Vintage tape echo and dub delay processor featuring wow-and-flutter tape modulation, warm asymmetrical feedback saturation, and high-frequency damping.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float time = 0.38 [0.05, 0.9];\nparam float feedback = 0.55 [0.0, 0.88];\nparam float flutter = 0.35 [0.0, 1.0];\nparam float tone = 0.65 [0.1, 1.0];\nparam float mix = 0.45 [0.0, 1.0];\nstate float lfo = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float lp = 0;\nstate float fb = 0;\n\nlfo = (lfo + 0.0008) % 1.0;\nwMod = sin(6.2831853 * lfo) * flutter * 0.015;\n\nkRate = clamp(0.06 + (1.0 - time) * 0.22 + wMod, 0.02, 0.35);\nd1 = d1 + kRate * ((in + fb * feedback) - d1);\nd2 = d2 + kRate * 0.9 * (d1 - d2);\nd3 = d3 + kRate * 0.8 * (d2 - d3);\n\nfDamp = clamp(0.12 + tone * 0.28, 0.04, 0.45);\nlp = lp + fDamp * (d3 - lp);\n\nfb = lp / (1.0 + abs(lp * 0.28));\nprocessed = in * (1.0 - mix) + fb * mix * 1.1;\nout = processed * 0.95;\n",
+    "params": {
+      "time": 0.38,
+      "feedback": 0.55,
+      "flutter": 0.35,
+      "tone": 0.65,
+      "mix": 0.45
+    }
+  }
+}

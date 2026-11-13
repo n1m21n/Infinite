@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cymatics Sine Harmonic Modal Interference",
+    "author": "Infinite",
+    "description": "Radial Bessel modal acoustic interference pattern simulating circular diaphragm cymatic vibration, concentric standing waves, and luminescent nodal particle clustering.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float rings = 7.0 [2.0, 16.0];\nparam float sectors = 8.0 [2.0, 16.0];\nparam float radialSharpness = 14.0 [5.0, 30.0];\nparam float speed = 0.30 [0.05, 1.0];\nparam float contrast = 1.25 [0.8, 1.8];\n\np = (uv - 0.5) * 2.0;\ntime = t * speed;\n\nr = length(p);\ntheta = atan2(p.y, p.x);\n\nrMod = sin(time * 0.35) * 0.4;\neffRings = rings + rMod;\n\npi = 3.14159265;\nradialWave = cos(effRings * pi * r);\nangularWave = cos(sectors * theta + time * 0.2);\nmodalPattern = radialWave * angularWave;\n\nnodal = abs(modalPattern);\nline1 = 1.0 - clamp(nodal * radialSharpness, 0.0, 1.0);\nglow = 1.0 - clamp(nodal * (radialSharpness * 0.3), 0.0, 1.0);\n\ncDark = vec3(0.025, 0.03, 0.065);\ncCyan = vec3(0.45, 0.95, 1.0);\ncWhite = vec3(0.95, 0.98, 1.0);\n\ncol = mix(cDark, cCyan, glow * 0.82);\ncol = mix(col, cWhite, line1 * 0.95);\n\nplateEdge = 1.0 - smoothstep(0.92, 0.98, r);\ncol = col * plateEdge;\n\nout = clamp(col * contrast, 0.0, 1.0);\n",
+    "params": {
+      "rings": 7.0,
+      "sectors": 8.0,
+      "radialSharpness": 14.0,
+      "speed": 0.3,
+      "contrast": 1.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

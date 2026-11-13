@@ -1,0 +1,77 @@
+infinite-patch 1
+# Electro Cybernetic BBD Flanger Delay FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3200.0
+  f resonance 0.28
+  f decay 0.30
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rate = 0.32 [0.05, 1.0];\nparam float depth = 0.45 [0.05, 0.9];\nparam float feedback = 0.52 [0.0, 0.88];\nparam float damping = 0.40 [0.05, 0.9];\nparam float mix = 0.48 [0.0, 1.0];\nstate float lfoPhase = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float lp = 0;\nstate float fb = 0;\n\nlfoPhase = (lfoPhase + rate * 0.0016) % 1.0;\ntri = 2.0 * abs(2.0 * lfoPhase - 1.0) - 1.0;\nflangeMod = tri * depth * 0.035;\n\nkRate = clamp(0.10 + flangeMod, 0.03, 0.35);\nd1 = d1 + kRate * ((in + fb * feedback) - d1);\nd2 = d2 + kRate * 0.88 * (d1 - d2);\nd3 = d3 + kRate * 0.76 * (d2 - d3);\n\nfDamp = clamp(0.12 + (1.0 - damping) * 0.28, 0.04, 0.45);\nlp = lp + fDamp * (d3 - lp);\nfb = lp / (1.0 + abs(lp * 0.22));\n\nflanged = (in - d2 * 0.95) * 1.15;\nprocessed = in * (1.0 - mix) + flanged * mix;\nout = processed * 1.05;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.15 0.20 0.30
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Electro Cybernetic BBD Flanger Delay FX. Vintage bucket-brigade style short-time flanger and cross-feedback delay processor with triangular LFO sweep modulation, inverted feedback notches, and warm analog diode saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

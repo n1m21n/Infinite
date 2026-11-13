@@ -5,7 +5,7 @@ description: How to implement real-time Eulerian fluid simulation in GLSL: veloc
 date: 2026-10-23
 category: creative
 tags: [fluid simulation, glsl shaders, navier-stokes, creative coding, real-time graphics]
-image: assets/blog_real_time_fluid_simulation_in_glsl.png
+image: assets/blog_real-time-fluid-simulation-in-glsl.png
 image_alt: Real-time fluid simulation in GLSL diagram showing velocity advection, pressure Poisson solve, vorticity confinement, and audio-reactive dye mixing
 keywords: real-time fluid simulation in glsl, navier-stokes glsl, stable fluids stam, audio-reactive fluid dynamics, optical flow shader
 status: published

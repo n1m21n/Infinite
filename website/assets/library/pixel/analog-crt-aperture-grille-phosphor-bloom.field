@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Analog CRT Aperture Grille Phosphor Bloom",
+    "author": "Infinite",
+    "description": "Cathode-ray tube Trinitron simulation rendering RGB vertical phosphor aperture grille stripes, spherical tube curvature, magnetic beam bloom, and audio-reactive scanline luminescence.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float curvature = 0.12 [0.0, 0.3];\nparam float scanlines = 220.0 [80.0, 360.0];\nparam float phosphorDensity = 240.0 [80.0, 480.0];\nparam float bloom = 1.6 [0.5, 3.0];\nparam float contrast = 1.2 [0.8, 1.8];\n\np = (uv - 0.5) * 2.0;\nr2 = p.x * p.x + p.y * p.y;\ndistortedP = p * (1.0 + r2 * curvature);\n\nbezelFade = 1.0 - smoothstep(0.92, 0.98, max(abs(distortedP.x), abs(distortedP.y)));\n\ntime = t * 0.4;\n\n# Dual-channel Lissajous beam trajectories\nbeam1Dist = abs(distortedP.y - sin(distortedP.x * 4.0 * 3.14159 + time * 0.8) * 0.35);\nbeam2Dist = abs(distortedP.y - cos(distortedP.x * 2.0 * 3.14159 - time * 0.5) * 0.45);\n\ng1 = 1.0 / (1.0 + beam1Dist * 22.0);\nc1 = 1.0 / (1.0 + beam1Dist * 90.0);\n\ng2 = 1.0 / (1.0 + beam2Dist * 22.0);\nc2 = 1.0 / (1.0 + beam2Dist * 90.0);\n\n# Oscilloscope graticule grid lines (calibrated graticule)\ngratX = abs(sin(distortedP.x * 10.0 * 3.14159));\ngratY = abs(sin(distortedP.y * 10.0 * 3.14159));\ngridLine = (1.0 - smoothstep(0.92, 0.98, gratX)) + (1.0 - smoothstep(0.92, 0.98, gratY));\ngraticule = clamp(gridLine * 0.22, 0.0, 0.4);\n\n# Trinitron vertical RGB aperture grille stripes\nstripePhase = distortedP.x * phosphorDensity * 3.14159;\nrStripe = 0.5 + 0.5 * sin(stripePhase);\ngStripe = 0.5 + 0.5 * sin(stripePhase + 2.094);\nbStripe = 0.5 + 0.5 * sin(stripePhase + 4.188);\nphosphor = vec3(rStripe, gStripe, bStripe) * 0.65 + 0.35;\n\n# Horizontal raster scanline modulation\nscanlineMod = 0.80 + 0.20 * sin(distortedP.y * scanlines * 3.14159);\n\n# Phosphor palette (P31 classic CRT green/amber & cyan beam trails)\ncPhosphor1 = vec3(0.20, 0.96, 0.58);\ncPhosphor2 = vec3(0.35, 0.75, 1.0);\ncCore = vec3(0.92, 1.0, 0.94);\ncDark = vec3(0.04, 0.065, 0.05);\n\nbeamCol1 = mix(cDark, cPhosphor1, g1 * bloom) + cCore * c1 * 0.8;\nbeamCol2 = mix(vec3(0.0), cPhosphor2, g2 * bloom * 0.8) + cCore * c2 * 0.7;\ncombinedBeam = beamCol1 + beamCol2 + vec3(0.12, 0.28, 0.20) * graticule;\n\nfinalCol = combinedBeam * phosphor * scanlineMod * bezelFade;\n\ncol = clamp(finalCol * contrast, 0.0, 1.0);\n",
+    "params": {
+      "curvature": 0.12,
+      "scanlines": 220.0,
+      "phosphorDensity": 240.0,
+      "bloom": 1.6,
+      "contrast": 1.2
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -6,6 +6,7 @@
 #include <functional>
 #include "app/AppShared.h"
 #include "app/panels/CurveEditorPanel.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "imgui.h"
 #include "app/graph/LearningLog.h"
 
@@ -39,6 +40,7 @@ namespace app
             { "view3d", &gView3DOpen, &gView3DDock, false },
             { "terminal", &gTerminalOpen, &gTerminalDock, true },
             { "curveeditor", &gCurveEditorOpen, &gCurveEditorDock, false },
+            { "fieldpatcher", &gFieldPatcherOpen, &gFieldPatcherDock, false },
             { "showset", &gShowSetOpen, nullptr, false },
             { "history", &gHistoryOpen, nullptr, false },
             { "settings", &gSettingsOpen, nullptr, false },

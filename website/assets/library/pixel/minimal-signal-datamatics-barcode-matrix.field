@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Minimal Signal Datamatics Barcode Matrix",
+    "author": "Infinite",
+    "description": "High-contrast binary data matrix and barcode visualizer inspired by Ryoji Ikeda, with audio-reactive vertical scanlines, horizontal bitstreams, and stark signal orange impulses.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.35 [0.05, 1.0];\nparam float dataDensity = 16.0 [6.0, 32.0];\nparam float barcodeScale = 1.2 [0.5, 2.5];\nparam float strobeIntensity = 0.8 [0.2, 1.0];\nparam float contrast = 1.25 [0.8, 1.8];\n\np = uv;\ntime = t * speed;\n\nlane = floor(p.y * 14.0);\nlaneSpeed = sin(lane * 2.3) * 1.2;\n\nxCoord = p.x * (dataDensity * barcodeScale) + time * laneSpeed;\nbit = step(0.48, fract(sin(floor(xCoord) * 43758.5453 + lane * 13.37)));\n\ncenterMask = step(0.36, p.y) * step(p.y, 0.64);\nfineBit = step(0.5, fract(p.x * 64.0 + time * 2.0));\ndenseData = mix(bit, fineBit, centerMask * 0.75);\n\nisPulse = step(0.92, fract(sin(lane * 71.1 + floor(xCoord * 0.25)) * 12345.67));\n\ngraticuleY = step(0.94, fract(p.y * 14.0));\ngraticuleX = step(0.96, fract(p.x * 28.0));\ngrid = max(graticuleY, graticuleX) * 0.35;\n\ncBg = vec3(0.063, 0.063, 0.063);\ncWhite = vec3(0.94, 0.94, 0.94);\ncRed = vec3(1.0, 0.20, 0.0);\n\ncol = cBg;\ncol = mix(col, cWhite, denseData * 0.88);\ncol = mix(col, cWhite, grid);\ncol = mix(col, cRed, isPulse * strobeIntensity);\n\nout = clamp(col * contrast, 0.0, 1.0);\n",
+    "params": {
+      "speed": 0.35,
+      "dataDensity": 16.0,
+      "barcodeScale": 1.2,
+      "strobeIntensity": 0.8,
+      "contrast": 1.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

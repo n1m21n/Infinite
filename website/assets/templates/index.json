@@ -2367,6 +2367,468 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "drone-kosmische-berlin-school-analog-drift-synth",
+      "name": "Drone Kosmische Berlin School Analog Drift Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Deep cosmic synthesizer modeled after vintage German Berlin School modular systems, featuring three detuned drifting analog saw/triangle oscillators, resonant ladder low-pass filtering, and slow breathing harmonic envelope.",
+      "price": 0,
+      "preview": "assets/templates/drone-kosmische-berlin-school-analog-drift-synth.webp",
+      "file": "assets/templates/drone-kosmische-berlin-school-analog-drift-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "drone-kosmische-sub-harmonic-meditation-generator-synth",
+      "name": "Drone Kosmische Sub-Harmonic Meditation Generator Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Sub-harmonic meditation drone synthesizer with rich fifth and sub-octave oscillator beating, warm saturation, and gentle analog filter frequency modulation.",
+      "price": 0,
+      "preview": "assets/templates/drone-kosmische-sub-harmonic-meditation-generator-synth.webp",
+      "file": "assets/templates/drone-kosmische-sub-harmonic-meditation-generator-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "vaporwave-tape-warble-chorus-diffusion-fx",
+      "name": "Vaporwave Tape Warble Chorus Diffusion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dreamy vintage cassette tape chorus and spatial diffusion effect with pitch flutter, multi-tap bucket brigade modulation, warm low-end saturation, and airy stereo widening.",
+      "price": 0,
+      "preview": "assets/templates/vaporwave-tape-warble-chorus-diffusion-fx.webp",
+      "file": "assets/templates/vaporwave-tape-warble-chorus-diffusion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "vaporwave-hypnagogic-slowdown-reverb-fx",
+      "name": "Vaporwave Hypnagogic Slowdown Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Hypnagogic ambient space reverb and pitch-stretched delay processor featuring modulated allpass diffusion combs, warm analog tape roll-off, and decaying nostalgic reflections.",
+      "price": 0,
+      "preview": "assets/templates/vaporwave-hypnagogic-slowdown-reverb-fx.webp",
+      "file": "assets/templates/vaporwave-hypnagogic-slowdown-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "uk-garage-warped-sub-bass-synth",
+      "name": "UK Garage Warped Sub Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Dual-oscillator speed garage warped sub synthesizer combining heavy sine fundamental with detuned modulated saw glide, saturation drive, and envelope-swept low-pass filter.",
+      "price": 0,
+      "preview": "assets/templates/uk-garage-warped-sub-bass-synth.webp",
+      "file": "assets/templates/uk-garage-warped-sub-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "uk-garage-2step-organ-stab-lead-synth",
+      "name": "UK Garage 2-Step Organ Stab Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Punchy percussive digital organ and chord stab synthesizer with multi-harmonic drawbar overtone partials, click attack transient, and warm analog chorus diffusion.",
+      "price": 0,
+      "preview": "assets/templates/uk-garage-2step-organ-stab-lead-synth.webp",
+      "file": "assets/templates/uk-garage-2step-organ-stab-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "detroit-techno-motor-city-tape-delay-fx",
+      "name": "Detroit Techno Motor City Tape Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Analog tape echo processor featuring tempo-sync feedback diffusion, head flutter modulation, non-linear tape saturation warmth, and high-frequency damping roll-off.",
+      "price": 0,
+      "preview": "assets/templates/detroit-techno-motor-city-tape-delay-fx.webp",
+      "file": "assets/templates/detroit-techno-motor-city-tape-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "detroit-techno-warehouse-chorus-diffusion-fx",
+      "name": "Detroit Techno Warehouse Chorus Diffusion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-voice analog bucket-brigade chorus and spatial diffusion effect providing wide stereo chorus modulation, lush harmonic depth, and subtle early-reflection warmth.",
+      "price": 0,
+      "preview": "assets/templates/detroit-techno-warehouse-chorus-diffusion-fx.webp",
+      "file": "assets/templates/detroit-techno-warehouse-chorus-diffusion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "psytrance-rolling-saw-bass-synth",
+      "name": "Psytrance Rolling Saw Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "High-octane Goa and full-on psytrance bassline synthesizer featuring sharp transient click shaping, exponential envelope decay, resonant 24dB ladder filter cutoff, and sub-octave saturation.",
+      "price": 0,
+      "preview": "assets/templates/psytrance-rolling-saw-bass-synth.webp",
+      "file": "assets/templates/psytrance-rolling-saw-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "psytrance-acid-squelch-lead-synth",
+      "name": "Psytrance Acid Squelch Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Psychedelic FM acid lead synthesizer featuring dual cascaded oscillators, extreme resonance squelch filter sweeps, tempo-synced LFO filter modulation, and warm diode clipping.",
+      "price": 0,
+      "preview": "assets/templates/psytrance-acid-squelch-lead-synth.webp",
+      "file": "assets/templates/psytrance-acid-squelch-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "electro-robotic-vocoder-comb-fx",
+      "name": "Electro Robotic Vocoder Comb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Resonant robotic comb filter and formant vocoder effect featuring pitch-tracked harmonic comb peaks, metallic sideband modulation, non-linear feedback drive, and crisp transient shaping.",
+      "price": 0,
+      "preview": "assets/templates/electro-robotic-vocoder-comb-fx.webp",
+      "file": "assets/templates/electro-robotic-vocoder-comb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "electro-cybernetic-bbd-flanger-delay-fx",
+      "name": "Electro Cybernetic BBD Flanger Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage bucket-brigade style short-time flanger and cross-feedback delay processor with triangular LFO sweep modulation, inverted feedback notches, and warm analog diode saturation.",
+      "price": 0,
+      "preview": "assets/templates/electro-cybernetic-bbd-flanger-delay-fx.webp",
+      "file": "assets/templates/electro-cybernetic-bbd-flanger-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "jungle-sub-bass-pressure-synth",
+      "name": "Jungle Sub Bass Pressure Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Heavyweight jungle 808 sub-bass synthesizer engineered for low-end sound system pressure with pitch-glide envelope dive, harmonic saturation drive, and resonant low-pass control.",
+      "price": 0,
+      "preview": "assets/templates/jungle-sub-bass-pressure-synth.webp",
+      "file": "assets/templates/jungle-sub-bass-pressure-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "jungle-atmospheric-pad-drone-synth",
+      "name": "Jungle Atmospheric Pad Drone Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Haunting 90s intelligent jungle atmospheric synthesizer with detuned dual pulse-saw oscillators, slow sweeping resonant bandpass filter, and tape-saturated drone warmth.",
+      "price": 0,
+      "preview": "assets/templates/jungle-atmospheric-pad-drone-synth.webp",
+      "file": "assets/templates/jungle-atmospheric-pad-drone-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "deep-house-warm-analog-chorus-fx",
+      "name": "Deep House Warm Analog Chorus FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Lush multi-stage analog bucket-brigade chorus and spatial widening effect engineered for deep house electric pianos, synths, and basslines with warm vintage saturation.",
+      "price": 0,
+      "preview": "assets/templates/deep-house-warm-analog-chorus-fx.webp",
+      "file": "assets/templates/deep-house-warm-analog-chorus-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "deep-house-dusty-tape-space-delay-fx",
+      "name": "Deep House Dusty Tape Space Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage tape echo and dub delay processor featuring wow-and-flutter tape modulation, warm asymmetrical feedback saturation, and high-frequency damping.",
+      "price": 0,
+      "preview": "assets/templates/deep-house-dusty-tape-space-delay-fx.webp",
+      "file": "assets/templates/deep-house-dusty-tape-space-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "neurofunk-modulated-reese-bass-synth",
+      "name": "Neurofunk Modulated Reese Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Menacing neurofunk reese bass synthesizer featuring dual detuned phase-beating sawtooth oscillators, a sweeping modulated notch-lowpass filter, and multi-stage diode overdrive.",
+      "price": 0,
+      "preview": "assets/templates/neurofunk-modulated-reese-bass-synth.webp",
+      "file": "assets/templates/neurofunk-modulated-reese-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "neurofunk-cybernetic-growl-lead-synth",
+      "name": "Neurofunk Cybernetic Growl Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Aggressive cybernetic growl synthesizer engineered for techstep and neurofunk leads with formant-shifted resonant filtering, wavefolded harmonic drive, and snappy envelope modulation.",
+      "price": 0,
+      "preview": "assets/templates/neurofunk-cybernetic-growl-lead-synth.webp",
+      "file": "assets/templates/neurofunk-cybernetic-growl-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "french-filter-house-pumping-disco-sweep-fx",
+      "name": "French Filter House Pumping Disco Sweep FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Classic French touch resonant disco lowpass sweep filter featuring rhythmic envelope ducking, warm transistor drive, and sweeping resonant cutoff modulation.",
+      "price": 0,
+      "preview": "assets/templates/french-filter-house-pumping-disco-sweep-fx.webp",
+      "file": "assets/templates/french-filter-house-pumping-disco-sweep-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "french-filter-house-creamy-phaser-drive-fx",
+      "name": "French Filter House Creamy Phaser Drive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Silky multi-stage vintage analog phaser and warm console saturation effect designed for French house rhodes stabs, guitars, and filtered disco master buses.",
+      "price": 0,
+      "preview": "assets/templates/french-filter-house-creamy-phaser-drive-fx.webp",
+      "file": "assets/templates/french-filter-house-creamy-phaser-drive-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "idm-crystalline-granular-bell-synth",
+      "name": "IDM Crystalline Granular Bell Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Micro-tuned crystalline FM bell synthesizer featuring non-harmonic golden-ratio modulator ratios, shimmering high-frequency dispersion, and exponential decay envelopes.",
+      "price": 0,
+      "preview": "assets/templates/idm-crystalline-granular-bell-synth.webp",
+      "file": "assets/templates/idm-crystalline-granular-bell-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "idm-algorithmic-drift-reese-synth",
+      "name": "IDM Algorithmic Drift Reese Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Complex drifting IDM bass synthesizer featuring phase-jittered dual detuned saw/pulse oscillators, tape-flutter pitch modulation, and soft asymmetric saturation.",
+      "price": 0,
+      "preview": "assets/templates/idm-algorithmic-drift-reese-synth.webp",
+      "file": "assets/templates/idm-algorithmic-drift-reese-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "breakbeat-transient-saturation-drive-fx",
+      "name": "Breakbeat Transient Saturation Drive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dynamic breakbeat drum bus saturator featuring punchy transient envelope detection, analog diode clipping, and low-end warmth emphasis.",
+      "price": 0,
+      "preview": "assets/templates/breakbeat-transient-saturation-drive-fx.webp",
+      "file": "assets/templates/breakbeat-transient-saturation-drive-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "breakbeat-syncopated-tape-echo-fx",
+      "name": "Breakbeat Syncopated Tape Echo FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Tempo-synced syncopated ping-pong tape echo featuring dotted-eighth delay taps, tape flutter modulation, and high-frequency saturation in the feedback loop.",
+      "price": 0,
+      "preview": "assets/templates/breakbeat-syncopated-tape-echo-fx.webp",
+      "file": "assets/templates/breakbeat-syncopated-tape-echo-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "downtempo-warm-sub-tape-bass-synth",
+      "name": "Downtempo Warm Sub Tape Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Trip-hop sub-weighted analog bass synthesizer with tape saturation, subtle pitch drift, and resonant lowpass envelope.",
+      "price": 0,
+      "preview": "assets/templates/downtempo-warm-sub-tape-bass-synth.webp",
+      "file": "assets/templates/downtempo-warm-sub-tape-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "downtempo-dusty-rhodes-bell-pad-synth",
+      "name": "Downtempo Dusty Rhodes Bell Pad Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Warm dusty electric-tine and bell pad synthesizer with soft FM overtone bloom, gentle chorus detune, and mellow decay.",
+      "price": 0,
+      "preview": "assets/templates/downtempo-dusty-rhodes-bell-pad-synth.webp",
+      "file": "assets/templates/downtempo-dusty-rhodes-bell-pad-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "minimal-techno-dub-chord-echo-fx",
+      "name": "Minimal Techno Dub Chord Echo FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Basic Channel-inspired damped stereo dub delay network with dark feedback filtering and subtle tape pitch drift.",
+      "price": 0,
+      "preview": "assets/templates/minimal-techno-dub-chord-echo-fx.webp",
+      "file": "assets/templates/minimal-techno-dub-chord-echo-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "minimal-techno-sub-harmonic-shaper-fx",
+      "name": "Minimal Techno Sub Harmonic Shaper FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Plastikman-inspired resonant lowpass sculpt and asymmetric soft-clipper for tight minimal techno basslines and percussive clicks.",
+      "price": 0,
+      "preview": "assets/templates/minimal-techno-sub-harmonic-shaper-fx.webp",
+      "file": "assets/templates/minimal-techno-sub-harmonic-shaper-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }
