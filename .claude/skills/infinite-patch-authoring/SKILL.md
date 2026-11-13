@@ -27,7 +27,9 @@ the result back as JSON. Never guess a node's name, keys, slots or ranges: ask t
    default; a node needs only the keys you set.
 3. **Lay out and annotate** - a node with no `pos` spawns at 0,0, so a hand-written patch opens as one
    stacked pile. Always finish with `python3 tools/patch-layout.py patch.inf`: Picture / Sound /
-   Modulation bands, left to right by wiring depth, sized per node type. Always add `Comment` nodes
+   Modulation bands, left to right by wiring depth, sized per node type. The layout is always landscape
+   (each band about 16:9, tall columns wrap); never write `pos` lines yourself and never leave a patch as one
+   tall vertical column. Always add `Comment` nodes
    (`node N Compositing Comment`, `s text ...`, `f width`, `f height`): one header per band
    (`# band Picture` on the line before the node) and one beside every node a user would want explained
    (`# near <id>`); the tool places them. Check with `python3 tools/patch-layout-preview.py patch.inf box.png`
