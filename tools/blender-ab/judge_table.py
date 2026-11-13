@@ -219,8 +219,8 @@ def judge_table(stage="flaws", size=(640, 480), samples=256):
     # 50 mm on a 36 x 24 frame: 27 degrees vertical. The harness measures f-stop on a 36 mm vertical span (a 75 mm
     # lens at this angle), so f/4.2 there is the 17.9 mm aperture of a real 50 mm at f/2.8. Seated eye: 0.42 m above
     # the table top. Focus on the mug's near rim.
-    cam = {"fov": 27.0, "azimuth": 94, "elevation": 29, "distance": 0.80, "target": [-0.055, -0.01, 0.035],
-           "fstop": 4.2, "focus": 0.775, "blades": 7}
+    cam = {"fov": 27.0, "azimuth": 94, "elevation": 29, "distance": 0.88, "target": [-0.07, -0.01, 0.045],
+           "fstop": 4.2, "focus": 0.87, "blades": 7}
     return {"size": list(size), "samples": samples, "view": "AgX", "camera": cam,
             # C1: one large area light as the window (left, behind the camera line), the physical sky, the card above.
             "lights": [{"type": "area", "power": 20, "azimuth": 205, "elevation": 34, "distance": 1.25, "size": [0.9, 1.1],
