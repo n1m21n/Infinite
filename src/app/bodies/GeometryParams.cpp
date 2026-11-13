@@ -1586,6 +1586,16 @@ namespace app
       ModSlider("depth", &n->depth, 0.0f, 1.5f);
       ModSlider("bevel", &n->bevel, 0.0f, 0.45f);
       ModSlider("tracking", &n->letterSpacing, -0.1f, 0.5f);
+
+      NodeSeparator("transform");
+      ModSlider("pos X", &n->posX, -10.0f, 10.0f);
+      ModSlider("pos Y", &n->posY, -10.0f, 10.0f);
+      ModSlider("pos Z", &n->posZ, -10.0f, 10.0f);
+      ModSlider("rot X", &n->rotX, -3.14159f, 3.14159f);
+      ModSlider("rot Y", &n->rotY, -3.14159f, 3.14159f);
+      ModSlider("rot Z", &n->rotZ, -3.14159f, 3.14159f);
+      ModSlider("scale", &n->uniformScale, 0.05f, 10.0f);
+      ModSlider("spin", &n->spinY, -2.0f, 2.0f);
    }
 
 
