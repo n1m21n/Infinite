@@ -17,6 +17,9 @@
 #include "core/BlendModes.h"
 #include "core/BrushEngine.h"
 #include "nodes/DrawNode.h"
+#include "nodes/Geometry3DNodes.h"
+#include "nodes/Scene3DNode.h"
+#include "nodes/SceneNodes.h"
 #include "nodes/ImageSourceNode.h"
 #include "nodes/OutputNode.h"
 #include "nodes/Scene2DNode.h"
@@ -4086,14 +4089,21 @@ bool View2DImportSvg(const std::string& path)
    return true;
 }
 
-// Anything with a 2D picture except a 3D node or a document. Uses the
-// viewport panel's pixel gate, not the output size: a node that has not
-// cooked yet reports 0x0.
+// Anything with a picture except a document; bare geometry comes in as a solo
+// render. Uses the viewport panel's pixel gate, not the output size: a node
+// that has not cooked yet reports 0x0.
 bool View2DCanAdd(const GraphNode& gn)
 {
    INode* n = gn.node.get();
-   return n != nullptr && dynamic_cast<Scene2DNode*>(n) == nullptr && dynamic_cast<IGeometrySource*>(n) == nullptr &&
-          CanShowInViewportPanel(gn);
+   return n != nullptr && dynamic_cast<Scene2DNode*>(n) == nullptr &&
+          (dynamic_cast<IGeometrySource*>(n) != nullptr || CanShowInViewportPanel(gn));
+}
+
+// 3D nodes land as 3D cards.
+static bool Is3DNode(INode* n)
+{
+   return dynamic_cast<IGeometrySource*>(n) != nullptr || dynamic_cast<Render3DNode*>(n) != nullptr ||
+          dynamic_cast<Scene3DNode*>(n) != nullptr;
 }
 
 void View2DAddNode(GraphNode& gn)
@@ -4107,6 +4117,10 @@ void View2DAddNode(GraphNode& gn)
    gView2DOpen = true;
    Layer* a = Active(doc);
    Layer& l = doc->AddLayer(Kind::Node, uid, a != nullptr && a->kind != Kind::Group ? a->id : 0);
+   GraphNode* added = FindNodeByUid(uid);
+   l.is3d = added != nullptr && Is3DNode(added->node.get());
+   if (l.is3d)
+      doc->Commit();
    SelectOnly(l.id);
 }
 

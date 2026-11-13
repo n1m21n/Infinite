@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -55,6 +56,22 @@ public:
    static const std::vector<std::string>& FitNames();
    static constexpr int kPassThrough = -1;   // a group's blend: its children blend straight into what is below
    enum Lock : unsigned { kLockAlpha = 1, kLockPixels = 2, kLockPosition = 4, kLockAll = 8 };
+
+   // Layer fx (Photoshop order): drop shadow and outer glow under the pixels,
+   // colour overlay and inner shadow on them, stroke on top.
+   enum FxType { kFxShadow = 0, kFxInner, kFxGlow, kFxStroke, kFxOverlay, kFxCount };
+   struct Fx
+   {
+      bool on = false;
+      float c[4] = { 0.0f, 0.0f, 0.0f, 0.75f };   // colour and its opacity (display values)
+      float angle = 120.0f;   // shadows: light from this angle, degrees (Photoshop: 90 = from the top)
+      float dist = 10.0f;     // shadows: offset, px
+      float size = 10.0f;     // blur (shadows, glow) or width (stroke), px
+      float spread = 0.0f;    // shadows and glow: 0..1, how hard the edge is
+      int pos = 0;            // stroke: 0 outside, 1 inside, 2 centre
+   };
+   static Fx FxDefault(int type);
+   static const char* FxName(int type);
 
    struct Layer
    {
@@ -113,6 +130,32 @@ public:
       int align = 0;                // left, centre, right, justified
       float textC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float boxW = 0.0f;
+      // 3D (After Effects model): the layer is a card the comp camera sees.
+      // angle is the Z rotation; x, y place the anchor as in 2D, z pushes it away.
+      bool is3d = false;
+      float z = 0.0f, az = 0.0f;              // depth and anchor depth, px
+      float rx = 0.0f, ry = 0.0f;             // X and Y rotation, degrees
+      float orient[3] = { 0.0f, 0.0f, 0.0f }; // orientation X Y Z, degrees, under the rotations
+      bool collapse = false;                  // a pass-through group: its 3D layers sort with the outside
+      // Distort: each corner (top left, top right, bottom right, bottom left) moved by dx, dy px.
+      bool warpOn = false;
+      float warp[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+      Fx fx[kFxCount] = { FxDefault(0), FxDefault(1), FxDefault(2), FxDefault(3), FxDefault(4) };
+      // Blend if (grey): this layer's and the underlying picture's black lo/hi and white lo/hi, 0..1.
+      float bifT[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+      float bifU[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+      bool AnyFx() const
+      {
+         for (const Fx& f : fx)
+            if (f.on)
+               return true;
+         return false;
+      }
+      bool HasBlendIf() const
+      {
+         return bifT[0] > 0.0f || bifT[1] > 0.0f || bifT[2] < 1.0f || bifT[3] < 1.0f || bifU[0] > 0.0f || bifU[1] > 0.0f ||
+                bifU[2] < 1.0f || bifU[3] < 1.0f;
+      }
    };
 
    struct Document
@@ -127,6 +170,9 @@ public:
       std::vector<float> guidesX, guidesY;   // document pixels
       float fps = 60.0f, seconds = 10.0f;    // Render Animation
       bool linear = true, headroom = true;   // composite in linear light, light above 1.0 survives
+      uint64_t camUid = 0;                   // a Camera node for 3D layers; 0 = the default 50 mm camera
+      int symmetry = 0;                      // painting: 0 off, 1 left-right, 2 top-bottom, 3 both, 4 radial
+      int symN = 6;                          // radial copies
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
@@ -167,6 +213,20 @@ public:
    bool LayerBox(const Layer& l, float& w, float& h);
    // Box-pixel -> document-pixel affine, row-major 2x3: x' = m0 x + m1 y + m2, y' = m3 x + m4 y + m5.
    void LayerMatrix(const Layer& l, float m[6]);
+   // Box-pixel -> document-pixel homography, row-major 3x3 (3D cards and distort
+   // make it projective). False when the card is edge-on or behind the camera.
+   bool LayerHomography(const Layer& l, float h[9]);
+   // The comp camera: zoom (px), position, and its right/down/forward rows.
+   struct CompCam
+   {
+      float zoom = 1.0f;
+      float pos[3] = { 0, 0, 0 };
+      float rot[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+      float az = 0.0f, el = 0.0f;   // the orbit, degrees (geometry cards turn with it)
+   };
+   CompCam Camera();
+   // A 3D layer's depth from the camera at its box centre (sort key, far first).
+   float CardDepth(const Layer& l);
    // The four corners in document pixels (top left, top right, bottom right, bottom left), after the crop.
    bool Corners(const Layer& l, float out[8]);
    // The document box a layer covers; a group: the union of its children.
@@ -211,6 +271,11 @@ public:
    bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
    // The paint surface's live texture (thumbnails), 0 when none.
    unsigned PaintTexture(int id);
+
+   // Symmetry copies of a document point (the point itself first).
+   std::vector<std::pair<float, float>> SymmetryPoints(float x, float y);
+   // The document's mirrors as doc-pixel affines (x' = m0 x + m1 y + m2, y' = m3 x + m4 y + m5), identity excluded.
+   std::vector<std::array<float, 6>> DocMirrors() const;
 
    // ---- vector and text (Block C) ---------------------------------------
    int AddVectorLayer(int above = 0);
@@ -278,6 +343,13 @@ private:
    void Clear(Pair& p, const float rgba[4]);
    // Composites `l` (any kind) onto `dst`; depth = dst's pool level; clipMode keeps dst's alpha.
    void DrawLayer(const Layer& l, int depth, int frameId, float opacityMul, bool clipMode);
+   // A layer with fx: drawn alone, the fx built round it, then blended as one.
+   void DrawFx(const Layer& l, int depth, int frameId, float opacityMul, bool clipMode);
+   bool EnsureFxShaders();
+   // 3D runs: the pair at `depth` gets a depth buffer; layers then hide behind nearer ones.
+   bool BeginDepth(int depth);
+   void EndDepth(int depth);
+   std::vector<const Layer*> ListOf(int parent);   // collapsed groups open in place
    void DrawList(int parent, int depth, int frameId, float opacityMul);
    // One pass: tex (or a fill) placed by `inv` (document px -> box uv), blended onto PairAt(depth).
    struct PassArgs
@@ -285,7 +357,7 @@ private:
       unsigned int tex = 0;
       int texW = 0, texH = 0;
       int kind = 0;                 // 0 texture, 1 solid, 2 linear, 3 radial
-      float inv[6] = { 1, 0, 0, 0, 1, 0 };   // document px -> box px
+      float inv[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };   // document px -> box px (homogeneous)
       float box[2] = { 1, 1 };
       float crop[4] = { 0, 0, 1, 1 };        // visible part of the box, as uv (left, top, right, bottom)
       int blend = 0;
@@ -300,6 +372,8 @@ private:
       unsigned int pmask = 0;       // pixel mask, sampled with the layer
       unsigned int vmask = 0;       // vector mask, alpha
       const Layer* fill = nullptr;
+      const Layer* bif = nullptr;   // blend if
+      bool card = false;            // a 3D card: tested against and written to the run's depth
    };
    void Pass(int depth, const PassArgs& a);
 
@@ -313,6 +387,7 @@ private:
    void SyncSurfaces();
    void StoreTiles(Surface& s, std::vector<std::string>& keys, const int dirty[4]);
    bool DocToSurface(const Layer& l, int target, float x, float y, float& sx, float& sy, float& scale);
+   std::vector<std::array<float, 6>> SurfaceMirrors(const Layer& l, int target);
    bool EnsurePaintShaders();
    void UploadSelection();
    void ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned coverage, const float colA[4], const float colB[4],
@@ -345,7 +420,22 @@ private:
    std::string mText;
    std::string mParsedText;
 
-   std::deque<Pair> mPool;            // deque: a deeper level never moves the ones in use
+   std::deque<Pair> mPool;   // deque: a deeper level never moves the ones in use
+   // Depth buffers per pool level (attachment 1 of both FBOs), and the level a 3D run is on.
+   struct DepthBufs
+   {
+      unsigned tex[2] = { 0, 0 };
+      int w = 0, h = 0;
+   };
+   std::map<int, DepthBufs> mDepth;
+   int mDepthLevel = -1;
+   // Layer fx scratch: blurred alpha (two ping-pong), the finished layer.
+   GLUtil::Fbo mFxBlur[2], mFxOut;
+   unsigned mBlurProgram = 0, mFxProgram = 0;
+   bool mFxTried = false;
+   // Bare geometry cards: a solo render per layer.
+   std::map<int, std::shared_ptr<class NodeViewport>> mGeo;   // shared: the type stays incomplete here
+   unsigned GeometryTexture(const Layer& l, int& w, int& h);
    GLUtil::Fbo mOut;
    unsigned int mPassProgram = 0, mFinishProgram = 0;
    bool mShaderTried = false;

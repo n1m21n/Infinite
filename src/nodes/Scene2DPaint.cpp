@@ -107,18 +107,6 @@ namespace
       glBindTexture(GL_TEXTURE_2D, 0);
    }
 
-   void InvertM(const float m[6], float out[6])
-   {
-      const float det = m[0] * m[4] - m[1] * m[3];
-      const float id = std::fabs(det) > 1e-12f ? 1.0f / det : 0.0f;
-      out[0] = m[4] * id;
-      out[1] = -m[1] * id;
-      out[3] = -m[3] * id;
-      out[4] = m[0] * id;
-      out[2] = -(out[0] * m[2] + out[1] * m[5]);
-      out[5] = -(out[3] * m[2] + out[4] * m[5]);
-   }
-
    // Box blur, three times: close to a gaussian of the same radius.
    void Feather(std::vector<uint8_t>& a, int w, int h, float radius)
    {
@@ -353,13 +341,14 @@ bool Scene2DNode::DocToSurface(const Layer& l, int target, float x, float y, flo
    const float sw = (float)(target == 0 ? l.pw : l.mw), sh = (float)(target == 0 ? l.ph : l.mh);
    if (sw <= 0 || sh <= 0)
       return false;
-   float m[6], inv[6];
-   LayerMatrix(l, m);
-   InvertM(m, inv);
-   const float bx = inv[0] * x + inv[1] * y + inv[2], by = inv[3] * x + inv[4] * y + inv[5];
+   // Through the card's homography; the brush scale is the local one (a 3D card shrinks with distance).
+   float bx = 0, by = 0, ux = 0, uy = 0, vx = 0, vy = 0;
+   DocToBox(l, x, y, bx, by);
+   DocToBox(l, x + 1.0f, y, ux, uy);
+   DocToBox(l, x, y + 1.0f, vx, vy);
    sx = bx * sw / bw;
    sy = sh - by * sh / bh;
-   scale = std::sqrt(std::fabs(inv[0] * inv[4] - inv[1] * inv[3])) * sw / bw;
+   scale = std::sqrt(std::fabs((ux - bx) * (vy - by) - (uy - by) * (vx - bx))) * sw / bw;
    return true;
 }
 
@@ -495,6 +484,7 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    }
    mPaintId = id;
    mPaintTarget = target;
+   mStroke.SetMirrors(SurfaceMirrors(target == 2 ? Layer() : *l, target));
    mStroke.Begin(*surf, brush, sx, sy, pressure, sel);
    return mStroke.Active();
 }

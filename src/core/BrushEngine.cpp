@@ -247,6 +247,13 @@ namespace BrushEngine
          y += (Rand(mRng) - 0.5f) * mBrush.jitter * mBrush.size;
       }
       const float p = pressure < 0.0f ? 1.0f : std::clamp(pressure, 0.0f, 1.0f);
+      Queue(x, y, p, seed);
+      for (const auto& m : mMirrors)
+         Queue(m[0] * x + m[1] * y + m[2], m[3] * x + m[4] * y + m[5], p, seed);
+   }
+
+   void Stroke::Queue(float x, float y, float p, float seed)
+   {
       mQueue.push_back({ x, y, p, seed });
       const float r = 0.5f * mBrush.size + 2.0f;
       if (!mAny)

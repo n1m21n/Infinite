@@ -380,26 +380,25 @@ int Scene2DNode::AddTextLayer(const std::string& text, float x, float y, float b
 
 void Scene2DNode::DocToBox(const Layer& l, float x, float y, float& bx, float& by)
 {
-   float m[6], inv[6];
-   LayerMatrix(l, m);
-   const float det = m[0] * m[4] - m[1] * m[3];
-   const float id = std::fabs(det) > 1e-12f ? 1.0f / det : 0.0f;
-   inv[0] = m[4] * id;
-   inv[1] = -m[1] * id;
-   inv[3] = -m[3] * id;
-   inv[4] = m[0] * id;
-   inv[2] = -(inv[0] * m[2] + inv[1] * m[5]);
-   inv[5] = -(inv[3] * m[2] + inv[4] * m[5]);
-   bx = inv[0] * x + inv[1] * y + inv[2];
-   by = inv[3] * x + inv[4] * y + inv[5];
+   float h[9];
+   LayerHomography(l, h);
+   // Inverse by the adjugate (w's scale cancels).
+   const float a[9] = { h[4] * h[8] - h[5] * h[7], h[2] * h[7] - h[1] * h[8], h[1] * h[5] - h[2] * h[4],
+                        h[5] * h[6] - h[3] * h[8], h[0] * h[8] - h[2] * h[6], h[2] * h[3] - h[0] * h[5],
+                        h[3] * h[7] - h[4] * h[6], h[1] * h[6] - h[0] * h[7], h[0] * h[4] - h[1] * h[3] };
+   const float qx = a[0] * x + a[1] * y + a[2], qy = a[3] * x + a[4] * y + a[5], qw = a[6] * x + a[7] * y + a[8];
+   const float w = std::fabs(qw) > 1e-20f ? qw : 1e-20f;
+   bx = qx / w;
+   by = qy / w;
 }
 
 void Scene2DNode::BoxToDoc(const Layer& l, float bx, float by, float& x, float& y)
 {
-   float m[6];
-   LayerMatrix(l, m);
-   x = m[0] * bx + m[1] * by + m[2];
-   y = m[3] * bx + m[4] * by + m[5];
+   float h[9];
+   LayerHomography(l, h);
+   const float w = std::max(1e-6f, h[6] * bx + h[7] * by + h[8]);
+   x = (h[0] * bx + h[1] * by + h[2]) / w;
+   y = (h[3] * bx + h[4] * by + h[5]) / w;
 }
 
 void Scene2DNode::Outline(const Shape& s, std::vector<std::vector<float>>& out)

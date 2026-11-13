@@ -2,7 +2,9 @@
 // text, the composite it draws, and the plan's two Block A tasks (T1 poster, T2
 // overlay) built from node and fill layers only. Plan: internal/plans/2d-view.
 #include "app/AppShared.h"
+#include "nodes/Geometry3DNodes.h"
 #include "nodes/Scene2DNode.h"
+#include "nodes/SceneNodes.h"
 #include "core/TileStore.h"
 #include "gl3.h"
 
@@ -470,6 +472,296 @@ void RunView2DTest()
       copy.Commit();
       Cook(&copy);
       Check("T-C: an edit after reopen redraws", Pixel(&copy, 70, 90)[1] < 0.05f && Pixel(&copy, 125, 90)[1] > 0.95f);
+   }
+
+   // ---- T-D: 3D cards, camera, fx, blend if, distort, symmetry ----
+   {
+      using Shape = Scene2DNode::Shape;
+      auto NewPic = [](Scene2DNode& pic, int w, int h)
+      {
+         pic.Layers();
+         pic.Doc().w = w;
+         pic.Doc().h = h;
+         pic.Commit();
+      };
+      // A vector layer of w x h px filled with one colour, centred on (x, y).
+      auto Card = [](Scene2DNode& pic, float x, float y, float w, float h, float r, float g, float b)
+      {
+         const int id = pic.AddVectorLayer();
+         Layer* l = pic.FindLayer(id);
+         l->pw = (int)w;
+         l->ph = (int)h;
+         l->x = x;
+         l->y = y;
+         Shape sh;
+         sh.type = Shape::kRect;
+         sh.x0 = 0; sh.y0 = 0; sh.x1 = w; sh.y1 = h;
+         sh.fillC[0] = r; sh.fillC[1] = g; sh.fillC[2] = b; sh.fillC[3] = 1.0f;
+         l->shapes = { sh };
+         pic.Commit();
+         return id;
+      };
+      auto Near = [](float a, float b, float tol) { return std::fabs(a - b) <= tol; };
+
+      // T4: a Render 3D output tilted 30 degrees in depth behind a 2D title, no other node.
+      {
+         GraphNode* cubeGn = SpawnNode("Cube", "3D", 0.0f, 600.0f);
+         GraphNode* renderGn = SpawnNode("Render 3D", "3D", 300.0f, 600.0f);
+         const uint64_t renderUid = renderGn != nullptr ? renderGn->uid : 0;
+         if (cubeGn != nullptr && renderGn != nullptr)
+            if (auto* r3 = dynamic_cast<Render3DNode*>(renderGn->node.get()))
+               r3->geometry[0] = dynamic_cast<IGeometrySource*>(cubeGn->node.get());
+         Scene2DNode pic;
+         NewPic(pic, 640, 360);
+         Layer& card = pic.AddLayer(Kind::Node, renderUid);
+         card.is3d = true;
+         card.fit = Scene2DNode::kFitFit;
+         card.sx = card.sy = 0.6f;
+         card.ry = 30.0f;
+         card.z = 150.0f;
+         const int cardId = card.id;
+         const int title = pic.AddTextLayer("TITLE", 250.0f, 150.0f, 0.0f);
+         pic.FindLayer(title)->fontSize = 48.0f;
+         pic.FindLayer(title)->textC[1] = 1.0f;   // pure green, nothing a render makes
+         pic.Commit();
+         Cook(&pic);
+         float c[8] = { 0 };
+         const bool front = pic.Corners(*pic.FindLayer(cardId), c);
+         const float left = c[7] - c[1], right = c[5] - c[3];
+         printf("  T4 card corners: left edge %.1f px, right edge %.1f px\n", left, right);
+         Check("T4: the tilted card is a trapezoid", front && left > 10.0f && right > 10.0f && std::fabs(left - right) > 8.0f);
+         Check("T4: pushed back, it is smaller than flat", std::max(left, right) < 360.0f * 0.6f);
+         int ink = 0, drawn = 0;
+         for (int y = 150; y < 210; y += 2)
+            for (int x = 250; x < 400; x += 2)
+            {
+               const std::vector<float> px = Pixel(&pic, x, y);
+               ink += px[1] > 0.9f && px[0] < 0.1f && px[2] < 0.1f ? 1 : 0;
+            }
+         for (int y = 40; y < 320; y += 8)
+            for (int x = 120; x < 520; x += 8)
+               drawn += Pixel(&pic, x, y)[0] < 0.95f ? 1 : 0;
+         Check("T4: the Render 3D card draws", drawn > 20);
+         Check("T4: the 2D title draws over the card", ink > 20);
+         Check("T4: no node was added for it", pic.Layers().size() == 2);
+      }
+
+      // The default camera keeps Z = 0 exactly 2D.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         const int a = Card(pic, 200, 150, 120, 80, 1, 0, 0);
+         float flat[8], d3[8];
+         pic.Corners(*pic.FindLayer(a), flat);
+         pic.FindLayer(a)->is3d = true;
+         pic.FindLayer(a)->angle = 0.0f;
+         pic.Commit();
+         pic.Corners(*pic.FindLayer(a), d3);
+         bool same = true;
+         for (int i = 0; i < 8; i++)
+            same = same && Near(flat[i], d3[i], 0.05f);
+         Check("T-D: a 3D layer at Z 0 sits where its 2D self did", same);
+         // A Camera node at its defaults with a 50 mm lens, no orbit: the same view.
+         GraphNode* camGn = SpawnNode("Camera", "3D", 600.0f, 600.0f);
+         if (auto* cam = camGn != nullptr ? dynamic_cast<CameraNode*>(camGn->node.get()) : nullptr)
+         {
+            cam->azimuth = 0.0f;
+            cam->elevation = 0.0f;
+            cam->SetFocalLength(50.0f, 400.0f / 300.0f);
+            pic.Doc().camUid = camGn->uid;
+            pic.Commit();
+            float withCam[8];
+            pic.Corners(*pic.FindLayer(a), withCam);
+            bool camSame = true;
+            for (int i = 0; i < 8; i++)
+               camSame = camSame && Near(withCam[i], d3[i], 0.5f);
+            Check("T-D: a 50 mm Camera node matches the default view", camSame);
+            cam->azimuth = 25.0f;
+            float turned[8];
+            pic.Corners(*pic.FindLayer(a), turned);
+            Check("T-D: orbiting the Camera node moves the card", !Near(turned[0], d3[0], 2.0f));
+         }
+         else
+            Check("T-D: a Camera node spawns", false);
+      }
+
+      // Intersections: two cards crossing in depth; each shows where it is nearer, whatever the order.
+      {
+         auto Draw = [&](bool swap, float out[2][3])
+         {
+            Scene2DNode pic;
+            NewPic(pic, 400, 300);
+            const int first = Card(pic, 200, 150, 240, 120, swap ? 0.0f : 1.0f, 0, swap ? 1.0f : 0.0f);
+            const int second = Card(pic, 200, 150, 240, 120, swap ? 1.0f : 0.0f, 0, swap ? 0.0f : 1.0f);
+            const int a = swap ? second : first, b = swap ? first : second;   // a red, b blue
+            pic.FindLayer(a)->is3d = pic.FindLayer(b)->is3d = true;
+            pic.FindLayer(a)->ry = 40.0f;
+            pic.FindLayer(b)->ry = -40.0f;
+            pic.Commit();
+            Cook(&pic);
+            for (int k = 0; k < 2; k++)
+            {
+               const std::vector<float> px = Pixel(&pic, k == 0 ? 140 : 260, 150);
+               for (int i = 0; i < 3; i++)
+                  out[k][i] = px[i];
+            }
+         };
+         float p0[2][3], p1[2][3];
+         Draw(false, p0);
+         Draw(true, p1);
+         const bool lr = (p0[0][0] > 0.5f && p0[1][2] > 0.5f) || (p0[0][2] > 0.5f && p0[1][0] > 0.5f);
+         Check("T-D: crossing cards each show where they are nearer", lr);
+         bool same = true;
+         for (int k = 0; k < 2; k++)
+            for (int i = 0; i < 3; i++)
+               same = same && Near(p0[k][i], p1[k][i], 0.02f);
+         Check("T-D: the crossing does not depend on layer order", same);
+      }
+
+      // Layer fx: drop shadow, stroke, colour overlay.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         const int a = Card(pic, 200, 150, 100, 100, 1, 0, 0);
+         Layer* l = pic.FindLayer(a);
+         l->fx[Scene2DNode::kFxShadow].on = true;
+         l->fx[Scene2DNode::kFxShadow].angle = 90.0f;   // light from the top, the shadow falls down
+         l->fx[Scene2DNode::kFxShadow].dist = 20.0f;
+         l->fx[Scene2DNode::kFxShadow].size = 0.0f;
+         l->fx[Scene2DNode::kFxShadow].c[3] = 1.0f;
+         l->fx[Scene2DNode::kFxStroke].on = true;
+         l->fx[Scene2DNode::kFxStroke].size = 6.0f;
+         l->fx[Scene2DNode::kFxStroke].c[1] = 1.0f;   // green, outside
+         pic.Commit();
+         Cook(&pic);
+         Check("T-D: the drop shadow falls below", Pixel(&pic, 200, 212)[0] < 0.1f && Pixel(&pic, 200, 88)[0] > 0.9f);
+         Check("T-D: the stroke rings the outside", Pixel(&pic, 253, 150)[1] > 0.5f && Pixel(&pic, 200, 150)[0] > 0.9f);
+         l = pic.FindLayer(a);
+         l->fx[Scene2DNode::kFxOverlay].on = true;
+         l->fx[Scene2DNode::kFxOverlay].c[0] = 0.0f;
+         l->fx[Scene2DNode::kFxOverlay].c[2] = 1.0f;
+         pic.Commit();
+         Cook(&pic);
+         Check("T-D: the colour overlay recolours the pixels", Pixel(&pic, 200, 150)[2] > 0.9f && Pixel(&pic, 200, 150)[0] < 0.1f);
+      }
+
+      // Blend if: a red layer shows only over the light half of what is below.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         Card(pic, 100, 150, 200, 300, 0, 0, 0);
+         const int top = Card(pic, 200, 150, 400, 300, 1, 0, 0);
+         pic.FindLayer(top)->bifU[0] = pic.FindLayer(top)->bifU[1] = 0.5f;
+         pic.Commit();
+         Cook(&pic);
+         Check("T-D: blend if hides the layer over dark", Pixel(&pic, 100, 150)[0] < 0.05f && Pixel(&pic, 300, 150)[0] > 0.95f
+                                                           && Pixel(&pic, 300, 150)[1] < 0.05f);
+      }
+
+      // Distort: the top-right corner pulled out; the picture follows.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         const int a = Card(pic, 200, 150, 200, 100, 1, 0, 0);
+         Layer* l = pic.FindLayer(a);
+         l->warpOn = true;
+         l->warp[2] = 80.0f;
+         l->warp[3] = -40.0f;
+         pic.Commit();
+         Cook(&pic);
+         float c[8];
+         pic.Corners(*pic.FindLayer(a), c);
+         Check("T-D: distort moves the corner", Near(c[2], 380.0f, 0.5f) && Near(c[3], 60.0f, 0.5f) && Near(c[0], 100.0f, 0.5f));
+         Check("T-D: the pixels follow the corner", Pixel(&pic, 340, 90)[1] < 0.05f && Pixel(&pic, 120, 190)[1] < 0.05f
+                                                       && Pixel(&pic, 120, 60)[1] > 0.95f);
+      }
+
+      // Symmetry: a stroke on the left lands on the right too.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         const int id = pic.AddPaintLayer();
+         pic.Doc().symmetry = 1;
+         pic.Commit();
+         BrushEngine::Brush br = BrushEngine::Presets()[1].brush;
+         br.size = 16.0f;
+         br.color[0] = br.color[1] = br.color[2] = 0.0f;
+         pic.BeginPaint(id, 0, br, 60.0f, 100.0f, 1.0f);
+         pic.PaintTo(60.0f, 200.0f, 1.0f);
+         pic.EndPaint();
+         Cook(&pic);
+         Check("T-D: symmetry mirrors the stroke", Pixel(&pic, 60, 150)[1] < 0.2f && Pixel(&pic, 340, 150)[1] < 0.2f
+                                                      && Pixel(&pic, 200, 150)[1] > 0.9f);
+         pic.Doc().symmetry = 4;
+         pic.Doc().symN = 4;
+         const auto pts = pic.SymmetryPoints(300.0f, 150.0f);
+         Check("T-D: radial symmetry makes N copies", pts.size() == 4 && Near(pts[2].first, 100.0f, 0.01f) && Near(pts[2].second, 150.0f, 0.01f));
+      }
+
+      // Save: every new line round-trips.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         const int a = Card(pic, 200, 150, 100, 100, 1, 0, 0);
+         Layer* l = pic.FindLayer(a);
+         l->is3d = true; l->z = 12.5f; l->az = 3; l->rx = 10; l->ry = -20; l->orient[2] = 45; l->collapse = true;
+         l->warpOn = true; l->warp[5] = 7;
+         l->fx[Scene2DNode::kFxGlow].on = true; l->fx[Scene2DNode::kFxGlow].size = 22;
+         l->bifT[1] = 0.25f; l->bifU[2] = 0.75f;
+         pic.Doc().camUid = 77; pic.Doc().symmetry = 4; pic.Doc().symN = 8;
+         pic.Commit();
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         const Layer& c = copy.Layers()[0];
+         Check("T-D: 3D, distort, fx, blend if, camera and symmetry save",
+               c.is3d && c.z == 12.5f && c.az == 3 && c.rx == 10 && c.ry == -20 && c.orient[2] == 45 && c.collapse && c.warpOn
+                  && c.warp[5] == 7 && c.fx[Scene2DNode::kFxGlow].on && c.fx[Scene2DNode::kFxGlow].size == 22
+                  && !c.fx[Scene2DNode::kFxShadow].on && c.bifT[1] == 0.25f && c.bifU[2] == 0.75f && copy.Doc().camUid == 77
+                  && copy.Doc().symmetry == 4 && copy.Doc().symN == 8);
+      }
+
+      // M3: 20 layers at 1080p (10 node, 6 paint, 4 vector/text) composite in under 4 ms.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 1920, 1080);
+         for (int i = 0; i < 10; i++)
+         {
+            Layer& l = pic.AddLayer(Kind::Node, FindNodeByIndex(i % 2 == 0 ? shape : text)->uid);
+            l.opacity = 0.8f;
+            l.blend = i % 3;
+         }
+         for (int i = 0; i < 6; i++)
+         {
+            const int id = pic.AddPaintLayer();
+            BrushEngine::Brush br = BrushEngine::Presets()[1].brush;
+            br.size = 60.0f;
+            pic.BeginPaint(id, 0, br, 100.0f + i * 200.0f, 200.0f, 1.0f);
+            pic.PaintTo(300.0f + i * 200.0f, 800.0f, 1.0f);
+            pic.EndPaint();
+         }
+         Card(pic, 500, 500, 600, 400, 0.2f, 0.4f, 0.8f);
+         Card(pic, 1400, 500, 600, 400, 0.8f, 0.4f, 0.2f);
+         pic.AddTextLayer("INFINITE", 200.0f, 900.0f, 0.0f);
+         pic.AddTextLayer("a 2D view", 1200.0f, 900.0f, 0.0f);
+         Cook(&pic);
+         glFinish();
+         std::vector<double> ms;
+         using Clock = std::chrono::steady_clock;
+         for (int f = 0; f < 40; f++)
+         {
+            pic.Layers()[0].opacity = 0.8f + 0.001f * (f % 2);
+            pic.Commit();
+            glFinish();
+            const auto t0 = Clock::now();
+            Cook(&pic);
+            glFinish();
+            ms.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
+         }
+         std::sort(ms.begin(), ms.end());
+         const double median = ms[ms.size() / 2];
+         printf("  M3 20 layers at 1080p: median %.2f ms (cook + finish, %d layers)\n", median, (int)pic.Layers().size());
+         Check("M3: 20 layers at 1080p composite in under 4 ms", pic.Layers().size() == 20 && median < 4.0);
+      }
    }
 
    // ---- M4: a brush stroke at 1080p stays inside one frame ----
