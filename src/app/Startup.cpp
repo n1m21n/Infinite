@@ -11,6 +11,7 @@
 #include "app/frame/FrameCtx.h"
 #include "platform/HeadTracker.h"
 #include "platform/AppPaths.h"
+#include "core/sketch/SketchEngine.h"
 #include "core/DawPluginInstall.h"
 
 namespace app
@@ -68,6 +69,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    const float bakedPx = 0.0f; // 0 = style.FontSizeBase
    const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
    SketchNode::SetFontPath(bundledInter);   // text() in Sketch
+   SketchEngine::FontFileFor = [](const std::string& family) { return Platform::FontFileForFamily(family); };   // textFont()
    std::string chosenFontPath;
    {
       const std::string wanted = CategoryColors::GetUiFont();

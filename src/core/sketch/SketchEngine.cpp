@@ -29,6 +29,8 @@ struct DrawState
    float stroke[4] = {0, 0, 0, 1};
    float weight = 1;
    float textSize = 24;
+   plutovg_font_face_t* face = nullptr;   // textFont(); nullptr = the default
+   int align = 0;                         // textAlign(): LEFT 0, CENTER 1, RIGHT 2
 };
 
 // Small xorshift so random() is reproducible per (node seed, frame).
@@ -79,6 +81,7 @@ struct Program
    plutovg_canvas_t* cv = nullptr;
    plutovg_font_face_t* font = nullptr;
    std::vector<plutovg_font_face_t*> fallbacks;   // tried in order for codepoints `font` lacks
+   std::map<std::string, plutovg_font_face_t*>* fontCache = nullptr;   // textFont faces, owned by the engine
    DrawState st;
    std::vector<DrawState> stack;
    Rng rng;
@@ -114,6 +117,7 @@ struct SketchEngine::Impl
    std::string fontPath;
    plutovg_font_face_t* font = nullptr;
    std::vector<plutovg_font_face_t*> fallbacks;
+   std::map<std::string, plutovg_font_face_t*> fontCache;   // nullptr: tried, not found
    std::string svgText;
    std::unique_ptr<lunasvg::Document> svg;
    bool svgDirty = false;      // a script mutated `svg`: re-parse before the next run
@@ -122,6 +126,8 @@ struct SketchEngine::Impl
       delete prog;
       if (font) plutovg_font_face_destroy(font);
       for (auto* f : fallbacks) plutovg_font_face_destroy(f);
+      for (auto& kv : fontCache)
+         if (kv.second) plutovg_font_face_destroy(kv.second);
    }
 };
 
@@ -223,6 +229,37 @@ FN(js_noFill) { P(c)->st.fillOn = false; return JS_UNDEFINED; }
 FN(js_noStroke) { P(c)->st.strokeOn = false; return JS_UNDEFINED; }
 FN(js_strokeWeight) { NEEDN(1); GETF(0, w); P(c)->st.weight = std::max(0.f, w); return JS_UNDEFINED; }
 FN(js_textSize) { NEEDN(1); GETF(0, s); P(c)->st.textSize = std::max(1.f, s); return JS_UNDEFINED; }
+FN(js_textAlign)
+{
+   NEEDN(1);
+   int32_t a = 0;
+   if (JS_ToInt32(c, &a, argv[0])) return JS_EXCEPTION;
+   P(c)->st.align = std::clamp((int)a, 0, 2);
+   return JS_UNDEFINED;
+}
+// textFont(name): an installed family by name; textFont() or an unknown name: the default face.
+FN(js_textFont)
+{
+   Program* p = P(c);
+   p->st.face = nullptr;
+   if (argc < 1 || JS_IsUndefined(argv[0])) return JS_UNDEFINED;
+   const char* s = JS_ToCString(c, argv[0]);
+   if (!s) return JS_EXCEPTION;
+   const std::string name = s;
+   JS_FreeCString(c, s);
+   if (name.empty() || p->fontCache == nullptr) return JS_UNDEFINED;
+   auto it = p->fontCache->find(name);
+   if (it == p->fontCache->end())
+   {
+      plutovg_font_face_t* face = nullptr;
+      const std::string path = SketchEngine::FontFileFor ? SketchEngine::FontFileFor(name) : std::string();
+      if (!path.empty())
+         face = plutovg_font_face_load_from_file(path.c_str(), 0);
+      it = p->fontCache->emplace(name, face).first;
+   }
+   p->st.face = it->second;
+   return JS_UNDEFINED;
+}
 FN(js_push) { Program* p = P(c); p->stack.push_back(p->st); plutovg_canvas_save(p->cv); return JS_UNDEFINED; }
 FN(js_pop)
 {
@@ -371,7 +408,7 @@ float TextRun(Program* p, const char* s, float x, float y, bool draw)
    while (plutovg_text_iterator_has_next(&it))
    {
       const plutovg_codepoint_t cp = plutovg_text_iterator_next(&it);
-      plutovg_font_face_t* face = p->font;
+      plutovg_font_face_t* face = p->st.face ? p->st.face : p->font;
       if (!plutovg_font_face_has_glyph(face, cp))
          for (auto* f : p->fallbacks)
             if (plutovg_font_face_has_glyph(f, cp)) { face = f; break; }
@@ -394,6 +431,8 @@ FN(js_text)
    if (ok && p->font && p->st.fillOn)
    {
       plutovg_canvas_set_rgba(p->cv, p->st.fill[0], p->st.fill[1], p->st.fill[2], p->st.fill[3]);
+      if (p->st.align != 0)
+         x -= TextRun(p, s, 0, 0, false) * (p->st.align == 1 ? 0.5f : 1.0f);
       TextRun(p, s, x, y, true);
    }
    JS_FreeCString(c, s);
@@ -562,6 +601,8 @@ void Reg(JSContext* c, JSValue g, const char* name, JSCFunction* f, int len)
 
 const char* kPrelude = R"JS(
 const PI = Math.PI, TAU = Math.PI * 2, HALF_PI = Math.PI / 2, CLOSE = 1;
+globalThis.LEFT = 0; globalThis.CENTER = 1; globalThis.RIGHT = 2;   // plain properties: a sketch may still declare its own
+globalThis.fract = (v) => v - Math.floor(v);
 const sin = Math.sin, cos = Math.cos, tan = Math.tan, atan2 = Math.atan2, atan = Math.atan,
       asin = Math.asin, acos = Math.acos, sqrt = Math.sqrt, abs = Math.abs, floor = Math.floor,
       ceil = Math.ceil, round = Math.round, pow = Math.pow, exp = Math.exp, log = Math.log,
@@ -606,6 +647,8 @@ const std::vector<SketchParamDecl>& SketchEngine::Params() const
    static const std::vector<SketchParamDecl> none;
    return mImpl->prog ? mImpl->prog->params : none;
 }
+
+std::function<std::string(const std::string&)> SketchEngine::FontFileFor;
 
 void SketchEngine::SetFontFile(const std::string& path)
 {
@@ -712,6 +755,8 @@ bool SketchEngine::Compile(const std::string& code, SketchError& err)
    Reg(c, g, "noStroke", js_noStroke, 0);
    Reg(c, g, "strokeWeight", js_strokeWeight, 1);
    Reg(c, g, "textSize", js_textSize, 1);
+   Reg(c, g, "textAlign", js_textAlign, 1);
+   Reg(c, g, "textFont", js_textFont, 1);
    Reg(c, g, "push", js_push, 0);
    Reg(c, g, "pop", js_pop, 0);
    Reg(c, g, "translate", js_translate, 2);
@@ -817,6 +862,7 @@ bool SketchEngine::Run(const Frame& f, std::vector<uint8_t>& rgba, SketchError& 
    p->inShape = false;
    p->font = mImpl->font;
    p->fallbacks = mImpl->fallbacks;
+   p->fontCache = &mImpl->fontCache;
    if (mImpl->svg && mImpl->svgDirty)   // undo last frame's svgSet so frames never depend on history
       if (auto fresh = lunasvg::Document::loadFromData(StripExternalRefs(mImpl->svgText))) mImpl->svg = std::move(fresh);
    mImpl->svgDirty = false;

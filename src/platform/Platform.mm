@@ -1619,6 +1619,35 @@ namespace Platform
       }
    }
 
+   std::string FontFileForFamily(const std::string& family)
+   {
+      std::string out;
+      @autoreleasepool
+      {
+         NSString* name = [NSString stringWithUTF8String:family.c_str()];
+         if (name == nil)
+            return out;
+         NSDictionary* attrs = @{ (__bridge NSString*)kCTFontFamilyNameAttribute : name };
+         CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes((__bridge CFDictionaryRef)attrs);
+         if (desc == nullptr)
+            return out;
+         CTFontDescriptorRef match = CTFontDescriptorCreateMatchingFontDescriptor(desc, nullptr);
+         CFRelease(desc);
+         if (match == nullptr)
+            return out;
+         CFURLRef url = (CFURLRef)CTFontDescriptorCopyAttribute(match, kCTFontURLAttribute);
+         CFRelease(match);
+         if (url != nullptr)
+         {
+            NSString* path = [(__bridge NSURL*)url path];
+            if (path != nil)
+               out = [path UTF8String];
+            CFRelease(url);
+         }
+      }
+      return out;
+   }
+
    const std::vector<std::string>& AvailableFontFamilies()
    {
       // Enumerated once and cached: the query walks every installed font and is

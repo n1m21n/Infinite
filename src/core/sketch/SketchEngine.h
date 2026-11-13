@@ -3,6 +3,7 @@
 // Design and decisions: docs/plans/sketch/README.md.
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -36,6 +37,8 @@ public:
 
    // Optional font used by text(); a TTF/OTF path. Call before Run.
    void SetFontFile(const std::string& path);
+   // Set once by the app: an installed family's font file ("" = unknown), for textFont(name).
+   static std::function<std::string(const std::string&)> FontFileFor;
 
    // Optional SVG document the script can animate and draw: svgSet(selector, attr,
    // value), svgText(selector, str), svgBox(selector), svgDraw(x, y, w, h) and the

@@ -617,6 +617,38 @@ namespace Platform
       return RunOpenDialog(wtitle.c_str(), {}, true, initialDir, err);
    }
 
+   std::string FontFileForFamily(const std::string& family)
+   {
+      // Installed fonts live in the registry by display name ("Arial (TrueType)" -> arial.ttf).
+      std::string out;
+      HKEY key = nullptr;
+      if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts", 0, KEY_READ, &key) != ERROR_SUCCESS)
+         return out;
+      const std::wstring want = WinCommon::Utf8ToWide(family);
+      wchar_t name[512];
+      wchar_t data[MAX_PATH];
+      for (DWORD i = 0;; i++)
+      {
+         DWORD nameLen = 512, dataLen = sizeof(data), type = 0;
+         if (RegEnumValueW(key, i, name, &nameLen, nullptr, &type, (LPBYTE)data, &dataLen) != ERROR_SUCCESS)
+            break;
+         const std::wstring n(name, nameLen);
+         if (type != REG_SZ || n.compare(0, want.size(), want) != 0 || (n.size() > want.size() && n[want.size()] != L' '))
+            continue;
+         std::wstring file(data);
+         if (file.find(L'\\') == std::wstring::npos)
+         {
+            wchar_t dir[MAX_PATH];
+            GetWindowsDirectoryW(dir, MAX_PATH);
+            file = std::wstring(dir) + L"\\Fonts\\" + file;
+         }
+         out = WinCommon::WideToUtf8(file);
+         break;
+      }
+      RegCloseKey(key);
+      return out;
+   }
+
    const std::vector<std::string>& AvailableFontFamilies()
    {
       static std::vector<std::string> sFonts;

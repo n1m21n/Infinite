@@ -266,6 +266,29 @@ namespace
 
 namespace Platform
 {
+   std::string FontFileForFamily(const std::string& family)
+   {
+      std::string out;
+      std::lock_guard<std::mutex> lock(gFtMutex);
+      FcConfig* config = SharedFcConfig();
+      if (config == nullptr)
+         return out;
+      FcPattern* pat = FcPatternCreate();
+      FcPatternAddString(pat, FC_FAMILY, (const FcChar8*)family.c_str());
+      FcConfigSubstitute(config, pat, FcMatchPattern);
+      FcDefaultSubstitute(pat);
+      FcResult res = FcResultNoMatch;
+      if (FcPattern* m = FcFontMatch(config, pat, &res))
+      {
+         FcChar8* file = nullptr;
+         if (FcPatternGetString(m, FC_FILE, 0, &file) == FcResultMatch && file)
+            out = (const char*)file;
+         FcPatternDestroy(m);
+      }
+      FcPatternDestroy(pat);
+      return out;
+   }
+
    const std::vector<std::string>& AvailableFontFamilies()
    {
       static std::vector<std::string> sFamilies;

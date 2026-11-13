@@ -229,6 +229,8 @@ namespace Platform
 
    // Installed font families, sorted, for the Text nodes' font pickers.
    const std::vector<std::string>& AvailableFontFamilies();
+   // The font file an installed family resolves to ("" when unknown).
+   std::string FontFileForFamily(const std::string& family);
 
    bool GetTextOutlines(const std::string& text, const std::string& fontName,
                         float letterSpacing, std::vector<TextContour>& outContours,
