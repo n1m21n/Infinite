@@ -172,9 +172,9 @@ void main() {
           analyser.fftSize = 64;
           source.connect(analyser);
           freqData = new Uint8Array(analyser.frequencyBinCount);
-          document.getElementById("btn-audio").innerText = "Microphone on";
+          document.getElementById("btn-audio").classList.add("on");document.getElementById("btn-audio").setAttribute("aria-label","Microphone on");
         } catch(e) {
-          document.getElementById("btn-audio").innerText = "Microphone blocked";
+          document.getElementById("btn-audio").classList.add("off");document.getElementById("btn-audio").setAttribute("aria-label","Microphone blocked");
         }
       }
     });

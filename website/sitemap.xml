@@ -161,6 +161,8 @@
   <url><loc>https://infinitedevices.org/embeds/analog-crt-electron-beam-raster-deflection.html</loc><lastmod>2026-11-13</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/suprematist-blocks-kinetic-red-wedge.html</loc><lastmod>2026-11-13</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/suprematist-blocks-malevich-floating-plane.html</loc><lastmod>2026-11-13</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/brutalist-architecture-monolith-facade.html</loc><lastmod>2026-11-13</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/brutalist-architecture-spomenik-rib-vault.html</loc><lastmod>2026-11-13</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-13</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-13</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-13</lastmod><priority>0.7</priority></url>
@@ -350,6 +352,10 @@
   <url><loc>https://infinitedevices.org/library/downtempo-dusty-rhodes-bell-pad-synth.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-techno-dub-chord-echo-fx.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-techno-sub-harmonic-shaper-fx.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vaporwave-mallsoft-rhodes-pad-synth.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vaporwave-midnight-chorus-lead-synth.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/synthwave-ensemble-chorus-wash-fx.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/synthwave-gated-analog-delay-fx.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
@@ -934,6 +940,16 @@
   <url><loc>https://infinitedevices.org/library/minimal-techno-sub-harmonic-shaper-fx.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-kinetic-red-wedge.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-malevich-floating-plane.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/indie-psychedelic-liquid-oil-prism.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/indie-psychedelic-chromatic-mycelium.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/technical-blueprint-turbine-assembly-3d.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/technical-blueprint-geodesic-observatory-3d.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vaporwave-mallsoft-rhodes-pad-synth.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vaporwave-midnight-chorus-lead-synth.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/synthwave-ensemble-chorus-wash-fx.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/synthwave-gated-analog-delay-fx.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/brutalist-architecture-monolith-facade.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/brutalist-architecture-spomenik-rib-vault.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-13</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-13</lastmod><priority>0.5</priority></url>

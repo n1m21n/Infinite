@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Brutalist Architecture Spomenik Rib Vault",
+    "author": "Infinite",
+    "description": "Monumental Spomenik concrete rib vault with radiating cantilevered fins, terraced plinths, and brutalist oculus.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float ribCount = 12.0 [6.0, 24.0];\nparam float oculusSize = 0.24 [0.10, 0.45];\nparam float ringSteps = 6.0 [3.0, 12.0];\nparam float grainAmt = 0.05 [0.0, 0.14];\nparam float contrast = 1.10 [0.8, 1.5];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\ncDark = vec3(0.133, 0.133, 0.133);\ncMid = vec3(0.478, 0.478, 0.471);\ncLight = vec3(0.851, 0.839, 0.812);\n\nr = length(p);\na = atan2(p.y, p.x);\n\n# Concrete formwork grain\ngrain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grainAmt;\n\n# Radiating Spomenik concrete ribs\nribWave = cos(a * ribCount + sin(t * 0.2) * 0.15);\nribMask = smoothstep(0.15, 0.55, ribWave);\n\n# Terraced concentric concrete plinth rings\nringIdx = floor(r * ringSteps);\nringEdge = smoothstep(0.86, 0.96, fract(r * ringSteps));\nstepShade = 0.35 + 0.65 * fract(ringIdx * 0.37);\n\n# Central brutalist oculus void\noculus = 1.0 - smoothstep(oculusSize - 0.02, oculusSize + 0.02, r);\nrim = smoothstep(oculusSize - 0.01, oculusSize + 0.03, r) * (1.0 - smoothstep(oculusSize + 0.03, oculusSize + 0.09, r));\n\n# Directional relief lighting\nsun = 0.5 + 0.5 * cos(a - 0.8 + t * 0.18);\n\nsurface = mix(cDark, cMid, stepShade);\nsurface = mix(surface, cLight, ribMask * sun * 0.82);\nsurface = mix(surface, cDark, ringEdge * 0.48);\nsurface = mix(surface, cLight, rim * 0.9);\nsurface = mix(surface, cDark * 0.6, oculus);\n\ncol = clamp((surface + grain) * contrast, 0.0, 1.0);\n",
+    "params": {
+      "ribCount": 12.0,
+      "oculusSize": 0.24,
+      "ringSteps": 6.0,
+      "grainAmt": 0.05,
+      "contrast": 1.1
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}
