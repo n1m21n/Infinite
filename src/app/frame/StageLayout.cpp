@@ -134,7 +134,7 @@ void DrawLayout(FrameCtx& fc)
          gArrangeClaimedKeys = inArrange;
          gSessionClaimedKeys = inSession;
          gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                           (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
+                           (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) || (gView2DOpen && gView2DClaimedKeys) ||
                            (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
                            (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
@@ -148,7 +148,7 @@ void DrawLayout(FrameCtx& fc)
          if (!gSessionPanelOpen)
             gSessionClaimedKeys = false;
          gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) || (gView2DOpen && gView2DClaimedKeys) ||
                            (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
                            (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
@@ -286,6 +286,11 @@ void DrawLayout(FrameCtx& fc)
          gView3DHeight = std::clamp(gView3DHeight, 300.0f, std::max(300.0f, ImGui::GetContentRegionAvail().y * 0.8f));
          topBottom += gView3DHeight;
       }
+      if (gView2DOpen)
+      {
+         gView2DHeight = std::clamp(gView2DHeight, 300.0f, std::max(300.0f, ImGui::GetContentRegionAvail().y * 0.8f));
+         topBottom += gView2DHeight;
+      }
       if (gPianoRollOpen)
       {
          gPianoRollHeight = std::clamp(gPianoRollHeight, 240.0f, std::max(240.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
@@ -348,6 +353,8 @@ void DrawLayout(FrameCtx& fc)
          DrawPianoRollDocked("##pianoroll_top", ImVec2(0, gPianoRollHeight));
       if (gView3DOpen && gView3DDock == 3)
          DrawView3DDocked("##view3d_top", ImVec2(0, gView3DHeight));
+      if (gView2DOpen && gView2DDock == 3)
+         DrawView2DDocked("##view2d_top", ImVec2(0, gView2DHeight));
       if (gCurveEditorOpen && gCurveEditorDock == 3)
          DrawCurveEditorDocked("##curveeditor_top", ImVec2(0, gCurveEditorHeight));
       if (gFieldPatcherOpen && gFieldPatcherDock == 3)
@@ -504,6 +511,8 @@ void DrawLayout(FrameCtx& fc)
                                 gDropPos.y >= gPianoRollRectMin.y && gDropPos.y < gPianoRollRectMax.y) ||
                                (gView3DOpen && gDropPos.x >= gView3DRectMin.x && gDropPos.x < gView3DRectMax.x &&
                                 gDropPos.y >= gView3DRectMin.y && gDropPos.y < gView3DRectMax.y) ||
+                               (gView2DOpen && gDropPos.x >= gView2DRectMin.x && gDropPos.x < gView2DRectMax.x &&
+                                gDropPos.y >= gView2DRectMin.y && gDropPos.y < gView2DRectMax.y) ||
                                (gTerminalOpen && gDropPos.x >= gTerminalRectMin.x && gDropPos.x < gTerminalRectMax.x &&
                                 gDropPos.y >= gTerminalRectMin.y && gDropPos.y < gTerminalRectMax.y);
       // Files dropped on the Terminal become shell words at its prompt.

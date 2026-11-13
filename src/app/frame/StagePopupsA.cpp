@@ -77,10 +77,13 @@ void DrawPopupsA(FrameCtx& fc)
    // Run after the menu: the first add spawns the 3D View node, which can move
    // gNodes while gn is still in use.
    int view3DAddFrom = -1;
+   int view2DAddFrom = -1;
    auto view3DItems = [&](const GraphNode& gn)
    {
       if (View3DCanAdd(gn) && (MenuParts::Item(L("Add to 3D View")) || gView3DTestMenuNode >= 0))
          view3DAddFrom = gn.index;
+      if (View2DCanAdd(gn) && MenuParts::Item(L("Add to 2D View")))
+         view2DAddFrom = gn.index;
    };
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
@@ -416,6 +419,8 @@ void DrawPopupsA(FrameCtx& fc)
             OpenInPianoRoll(from, mf);
       if (GraphNode* from = FindNodeByIndex(view3DAddFrom))
          View3DAddNode(*from);
+      if (GraphNode* from = FindNodeByIndex(view2DAddFrom))
+         View2DAddNode(*from);
 
       // Node "Help" popup, opened via the context menu above. A separate
       // OpenPopup call (rather than nesting it inside "##nodecontext") because

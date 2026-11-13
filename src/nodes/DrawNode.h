@@ -6,6 +6,7 @@
 #include "INode.h"
 #include "ImageCable.h"
 #include "GLUtil.h"
+#include "BrushEngine.h"
 
 // A paintable canvas. Strokes accumulate into a persistent FBO, so painting is
 // destructive-to-the-buffer but the node itself stays a normal graph citizen -
@@ -116,6 +117,7 @@ private:
    Stamp MakeStamp(float x, float y, float seed) const;
 
    bool EnsureShaders();
+   BrushEngine::Brush EngineBrush(const Stamp& s) const;
    void FlushStamps();
 
    static std::string EncodeRecording(const std::vector<RecordedStamp>& recorded);
@@ -125,9 +127,8 @@ private:
 
    ImageCable mInput;
    GLUtil::Fbo mCanvas;     // the painted layer alone
-   GLUtil::Fbo mScratch;    // ping-pong target while stamping
    GLUtil::Fbo mComposite;  // input with the painted layer over it
-   unsigned int mStampProgram = 0;
+   BrushEngine::Stroke mStroke;   // the shared brush, one micro-stroke per run of like stamps
    unsigned int mCompositeProgram = 0;
    bool mShaderTried = false;
    bool mNeedsClear = true;

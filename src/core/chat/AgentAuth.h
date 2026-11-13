@@ -59,8 +59,10 @@ namespace chat
    void ShortenModelLabels(std::vector<Model>& models);
    // The fixed list for an agent ({} = the agent picks); Antigravity's comes from `agy models`.
    std::vector<Model> FixedModels(AgentKind kind);
-   // `agy models` output: a header line, then `<id>\t<label>`.
+   // `agy models` output: a header line, then `<id>\t<label>` or space-aligned `<id>  +<label>`.
    std::vector<Model> ParseAgyModels(const std::string& output);
+   // Resolve a user-typed model query or shorthand (e.g. "hydrogen", "argon high") to a model id.
+   std::string ResolveModel(AgentKind kind, const std::vector<Model>& models, const std::string& wanted);
    // Codex keeps the models its account may use in $CODEX_HOME/models_cache.json: the listed ones, by priority.
    std::vector<Model> ParseCodexModels(const std::string& json);
    // Where an agent keeps the model it uses when none is picked: Claude's and Antigravity's settings.json, Codex's

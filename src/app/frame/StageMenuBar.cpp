@@ -51,6 +51,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railView3D", top + 8.0f * step, IconsInfinite::View3d, nullptr, gView3DOpen,
                        T("3D View - arrange node outputs and render a camera (Shift+3)")))
       gView3DOpen = !gView3DOpen;
+   if (PanelRail::Item("##railView2D", top + 11.0f * step, IconsInfinite::Layers, nullptr, gView2DOpen,
+                       T("2D View - lay out node outputs as layers and render a picture (Shift+2)")))
+      gView2DOpen = !gView2DOpen;
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
@@ -461,6 +464,7 @@ void DrawMenuBar(FrameCtx& fc)
                };
                dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
                dockedPanelMenu(L("3D View"), L("Show 3D View"), gView3DOpen, gView3DDock, gView3DHeight, "##view3ddock");
+               dockedPanelMenu(L("2D View"), L("Show 2D View"), gView2DOpen, gView2DDock, gView2DHeight, "##view2ddock");
                dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
                if (!Platform::PluginModeActive() && MenuParts::SubMenu(L("Terminal"))) // no shell inside a DAW
                {

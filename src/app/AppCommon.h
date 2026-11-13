@@ -235,6 +235,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/Switcher3DNode.h"
 #include "nodes/Group3DNode.h"
 #include "nodes/Scene3DNode.h"
+#include "nodes/Scene2DNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/PredictionNodes.h"
 #include "nodes/PredictiveNotesNode.h"

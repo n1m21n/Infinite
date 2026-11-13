@@ -29,7 +29,7 @@ KEY_ALIASES = {
     "home": "Home", "end": "End", "pagedown": "PageDown", "pageup": "PageUp",
     "=": "Equal", "-": "Minus", ".": "Period",
     "`": "GraveAccent", "period": "Period", "comma": "Comma", "f2": "F2", "f12": "F12",
-    "[": "LeftBracket", "]": "RightBracket",
+    "[": "LeftBracket", "]": "RightBracket", ";": "Semicolon", "'": "Apostrophe",
 }
 
 def norm_key(tok):

@@ -1998,6 +1998,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunClipboardTest();
       if (getenv("INFINITE_VIEW3DTEST") != nullptr && frameId == 4)
          RunView3DTest();
+      if (getenv("INFINITE_VIEW2DTEST") != nullptr && frameId == 4)
+         RunView2DTest();
       if (getenv("INFINITE_VIEW3DNAVTEST") != nullptr)
          RunView3DNavTest(frameId);
       if (getenv("INFINITE_VIEW3DEDITTEST") != nullptr)

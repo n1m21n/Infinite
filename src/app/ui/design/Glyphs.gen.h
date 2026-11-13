@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE970;
+   inline constexpr unsigned kLast = 0xE979;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -117,4 +117,13 @@ namespace IconsInfinite
    inline constexpr const char* Curve = "\xee\xa5\xae"; // U+E96E curve
    inline constexpr const char* LineTool = "\xee\xa5\xaf"; // U+E96F line-tool
    inline constexpr const char* PenTool = "\xee\xa5\xb0"; // U+E970 pen-tool
+   inline constexpr const char* Crop = "\xee\xa5\xb1"; // U+E971 crop
+   inline constexpr const char* Fill = "\xee\xa5\xb2"; // U+E972 fill
+   inline constexpr const char* Layers = "\xee\xa5\xb3"; // U+E973 layers
+   inline constexpr const char* Mask = "\xee\xa5\xb4"; // U+E974 mask
+   inline constexpr const char* Brush = "\xee\xa5\xb5"; // U+E975 brush
+   inline constexpr const char* Eyedropper = "\xee\xa5\xb6"; // U+E976 eyedropper
+   inline constexpr const char* Lasso = "\xee\xa5\xb7"; // U+E977 lasso
+   inline constexpr const char* Marquee = "\xee\xa5\xb8"; // U+E978 marquee
+   inline constexpr const char* Wand = "\xee\xa5\xb9"; // U+E979 wand
 }

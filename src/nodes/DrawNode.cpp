@@ -14,61 +14,6 @@ namespace
       "Soft Round", "Hard Round", "Square", "Spray", "Chalk", "Ink Bleed"
    };
 
-   // One stamp per pass, blended into the canvas. Slower than instancing, but a
-   // stroke only produces a handful of stamps per frame at sane spacing.
-   const char* kStampFrag =
-      "#version 150\n"
-      "in vec2 vUv;\n"
-      "out vec4 fragColor;\n"
-      "uniform sampler2D uCanvas;\n"
-      "uniform vec2 uCenter;\n"
-      "uniform float uRadius;\n"
-      "uniform float uAspect;\n"
-      "uniform int uBrush;\n"
-      "uniform float uHardness;\n"
-      "uniform float uOpacity;\n"
-      "uniform vec3 uColor;\n"
-      "uniform int uErase;\n"
-      "uniform float uSeed;\n"
-      "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }\n"
-      "void main() {\n"
-      "   vec4 dst = texture(uCanvas, vUv);\n"
-      "   vec2 d = vUv - uCenter;\n"
-      "   d.x *= uAspect;\n"
-      "   float r = length(d) / max(uRadius, 1e-4);\n"
-      "\n"
-      "   float a = 0.0;\n"
-      "   if (uBrush == 0) {\n"                       // Soft Round
-      "      a = 1.0 - smoothstep(uHardness, 1.0, r);\n"
-      "   } else if (uBrush == 1) {\n"                // Hard Round
-      "      a = 1.0 - smoothstep(0.94, 1.0, r);\n"
-      "   } else if (uBrush == 2) {\n"                // Square
-      "      vec2 q = abs(d) / max(uRadius, 1e-4);\n"
-      "      float m = max(q.x, q.y);\n"
-      "      a = 1.0 - smoothstep(uHardness, 1.0, m);\n"
-      "   } else if (uBrush == 3) {\n"                // Spray
-      "      float n = hash(floor(vUv * 900.0));\n"
-      "      a = (1.0 - smoothstep(0.0, 1.0, r)) * step(0.55, n);\n"
-      "   } else if (uBrush == 4) {\n"                // Chalk
-      "      float n = hash(floor(vUv * 500.0)) * 0.55 + 0.45;\n"
-      "      a = (1.0 - smoothstep(uHardness * 0.6, 1.0, r)) * n;\n"
-      "   } else {\n"                                 // Ink Bleed
-      "      float n = hash(floor(vUv * 120.0)) * 0.35;\n"
-      "      a = 1.0 - smoothstep(uHardness - n, 1.0 + n, r);\n"
-      "   }\n"
-      "   a = clamp(a, 0.0, 1.0) * uOpacity;\n"
-      "   if (a <= 0.0) { fragColor = dst; return; }\n"
-      "\n"
-      "   if (uErase == 1) {\n"
-      "      fragColor = vec4(dst.rgb, dst.a * (1.0 - a));\n"
-      "      return;\n"
-      "   }\n"
-      "   // standard source-over onto a premultiplied-ish straight-alpha canvas\n"
-      "   float outA = a + dst.a * (1.0 - a);\n"
-      "   vec3 outRgb = (uColor * a + dst.rgb * dst.a * (1.0 - a)) / max(outA, 1e-4);\n"
-      "   fragColor = vec4(outRgb, outA);\n"
-      "}\n";
-
    const char* kCompositeFrag =
       "#version 150\n"
       "in vec2 vUv;\n"
@@ -94,10 +39,7 @@ const std::vector<std::string>& DrawNode::BrushNames()
 DrawNode::~DrawNode()
 {
    GLUtil::DestroyFbo(mCanvas);
-   GLUtil::DestroyFbo(mScratch);
    GLUtil::DestroyFbo(mComposite);
-   if (mStampProgram != 0)
-      glDeleteProgram(mStampProgram);
    if (mCompositeProgram != 0)
       glDeleteProgram(mCompositeProgram);
 }
@@ -105,11 +47,10 @@ DrawNode::~DrawNode()
 bool DrawNode::EnsureShaders()
 {
    if (mShaderTried)
-      return mStampProgram != 0 && mCompositeProgram != 0;
+      return mCompositeProgram != 0;
    mShaderTried = true;
-   mStampProgram = GLUtil::CompileProgram(kStampFrag);
    mCompositeProgram = GLUtil::CompileProgram(kCompositeFrag);
-   return mStampProgram != 0 && mCompositeProgram != 0;
+   return mCompositeProgram != 0;
 }
 
 DrawNode::Stamp DrawNode::MakeStamp(float x, float y, float seed) const
@@ -326,33 +267,51 @@ void DrawNode::EndStroke()
    mStrokeActive = false;
 }
 
+BrushEngine::Brush DrawNode::EngineBrush(const Stamp& s) const
+{
+   // A Draw stamp is one source-over dab, so its opacity is the engine's flow
+   // and the stroke ceiling stays at 1. Size is a fraction of the height.
+   BrushEngine::Brush b;
+   b.tip = std::clamp(s.brush, 0, 5) + BrushEngine::kSoftRound;
+   b.size = std::max(1.0f, s.size * (float)mCanvas.h);
+   b.hardness = s.hardness;
+   b.opacity = 1.0f;
+   b.flow = s.opacity;
+   b.pressureSize = false;
+   b.mode = s.erase ? BrushEngine::kErase : BrushEngine::kNormal;
+   b.color[0] = s.color[0];
+   b.color[1] = s.color[1];
+   b.color[2] = s.color[2];
+   return b;
+}
+
 void DrawNode::FlushStamps()
 {
    if (mPending.empty())
       return;
 
-   // Each stamp reads the canvas and writes the scratch, then they swap. Reading
-   // and writing the same FBO in one pass is undefined, hence the ping-pong.
-   const float aspect = (float)mCanvas.w / (float)std::max(1, mCanvas.h);
-   for (const Stamp& stamp : mPending)
+   // Stamps that share brush settings go down as one engine stroke; a change
+   // of brush, colour or eraser starts the next one.
+   const float w = (float)mCanvas.w, h = (float)mCanvas.h;
+   auto same = [](const Stamp& a, const Stamp& b)
    {
-      const unsigned int canvasTex = GLUtil::FboTexture(mCanvas);
-      GLUtil::RunShaderPass(mScratch, mStampProgram, [&]()
+      return a.brush == b.brush && a.size == b.size && a.opacity == b.opacity && a.hardness == b.hardness &&
+             a.erase == b.erase && a.color[0] == b.color[0] && a.color[1] == b.color[1] && a.color[2] == b.color[2];
+   };
+   size_t i = 0;
+   while (i < mPending.size())
+   {
+      const Stamp& first = mPending[i];
+      mStroke.Begin(mCanvas, EngineBrush(first), first.x * w, first.y * h, 1.0f);
+      size_t j = i + 1;
+      while (j < mPending.size() && same(first, mPending[j]))
       {
-         glActiveTexture(GL_TEXTURE0);
-         glBindTexture(GL_TEXTURE_2D, canvasTex);
-         glUniform1i(glGetUniformLocation(mStampProgram, "uCanvas"), 0);
-         glUniform2f(glGetUniformLocation(mStampProgram, "uCenter"), stamp.x, stamp.y);
-         glUniform1f(glGetUniformLocation(mStampProgram, "uRadius"), std::max(0.001f, stamp.size * 0.5f));
-         glUniform1f(glGetUniformLocation(mStampProgram, "uAspect"), aspect);
-         glUniform1i(glGetUniformLocation(mStampProgram, "uBrush"), stamp.brush);
-         glUniform1f(glGetUniformLocation(mStampProgram, "uHardness"), std::min(0.98f, stamp.hardness));
-         glUniform1f(glGetUniformLocation(mStampProgram, "uOpacity"), stamp.opacity);
-         glUniform3f(glGetUniformLocation(mStampProgram, "uColor"), stamp.color[0], stamp.color[1], stamp.color[2]);
-         glUniform1i(glGetUniformLocation(mStampProgram, "uErase"), stamp.erase ? 1 : 0);
-         glUniform1f(glGetUniformLocation(mStampProgram, "uSeed"), stamp.seed);
-      });
-      std::swap(mCanvas, mScratch);
+         mStroke.Dab(mPending[j].x * w, mPending[j].y * h, 1.0f, mPending[j].seed);
+         j++;
+      }
+      int dirty[4];
+      mStroke.End(mCanvas, dirty);
+      i = j;
    }
    mPending.clear();
 }
@@ -385,7 +344,6 @@ void DrawNode::CookIfNeeded(int frameId)
 
    if (!GLUtil::EnsureFbo(mCanvas, w, h))
       return;
-   GLUtil::EnsureFbo(mScratch, w, h);
    GLUtil::EnsureFbo(mComposite, w, h);
 
    auto clearCanvas = [this]()

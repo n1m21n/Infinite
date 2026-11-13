@@ -862,6 +862,24 @@ namespace app
          check(agy2[0].label == "Gemini 4 Argon" && agy2[1].label == "Gemini 3.8 Flash" && agy2[1].full == "Gemini 3.8 Flash (High)", "agy models: the effort dropped, the model name and the full name kept");
          const std::vector<chat::Model> agy3 = chat::ParseAgyModels("a\tGemini 3.8 Flash (Medium)\nb\tGemini 3.8 Flash (High)\n");
          check(agy3[0].label == "Gemini 3.8 Flash (Medium)" && agy3[1].label == "Gemini 3.8 Flash (High)", "agy models: efforts stay when they are all that tells two apart");
+         const std::vector<chat::Model> agyPty = chat::ParseAgyModels(
+            "\rFetching available models...\r\x1b[Kgemini-4-argon-medium           Gemini 4 Argon (Medium)\r\n"
+            "gemini-4-hydrogen-medium        Gemini 4 Hydrogen (Medium)\r\n"
+            "gemini-4-hydrogen-high          Gemini 4 Hydrogen (High)\r\n");
+         check(agyPty.size() == 3 && agyPty[0].id == "gemini-4-argon-medium" && agyPty[0].label == "Gemini 4 Argon (Medium)" &&
+                  agyPty[1].id == "gemini-4-hydrogen-medium" && agyPty[2].id == "gemini-4-hydrogen-high",
+               "agy models: PTY spinner and space-aligned rows are parsed");
+         check(chat::ResolveModel(chat::AgentKind::Antigravity, agyPty, "hydrogen") == "gemini-4-hydrogen-medium" &&
+                  chat::ResolveModel(chat::AgentKind::Antigravity, agyPty, "argon") == "gemini-4-argon-medium" &&
+                  chat::ResolveModel(chat::AgentKind::Antigravity, agyPty, "hydrogen high") == "gemini-4-hydrogen-high" &&
+                  chat::ResolveModel(chat::AgentKind::Antigravity, {}, "hydrogen") == "gemini-4-hydrogen-medium",
+               "agy models: /model shorthands resolve to valid model ids");
+         {
+            chat::AgentStream as(chat::AgentKind::Antigravity);
+            std::vector<chat::AgentEvent> av;
+            as.Feed("{\"event\":\"result\",\"result\":{\"status\":\"ERROR\",\"response\":\"\",\"error\":\"invalid model selection\"}}\n", av);
+            check(av.size() == 1 && av[0].error && av[0].text == "invalid model selection", "antigravity: result.error is surfaced when response is empty");
+         }
          check(chat::FixedModels(chat::AgentKind::Claude).size() == 4 && chat::FixedModels(chat::AgentKind::Claude)[0].label == "Sonnet 5.5", "claude: the menu names the model and its version");
          chat::TurnOptions to;
          to.model = "opus";

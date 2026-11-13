@@ -449,6 +449,12 @@ namespace app
             gView3DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelView3DDock")
             gView3DDock = (val == "3") ? 3 : 0;
+         else if (key == "panelView2DOpen")
+            gView2DOpen = (val != "0");
+         else if (key == "panelView2DH")
+            gView2DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelView2DDock")
+            gView2DDock = (val == "3") ? 3 : 0;
          else if (key == "panelStudioDock")
             gSampleStudioDock = (val == "3") ? 3 : 0;
       }
@@ -496,6 +502,9 @@ namespace app
       file << "panelView3DOpen=" << (gView3DOpen ? 1 : 0) << "\n";
       file << "panelView3DH=" << gView3DHeight << "\n";
       file << "panelView3DDock=" << gView3DDock << "\n";
+      file << "panelView2DOpen=" << (gView2DOpen ? 1 : 0) << "\n";
+      file << "panelView2DH=" << gView2DHeight << "\n";
+      file << "panelView2DDock=" << gView2DDock << "\n";
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
       file << "panelPianoRollH=" << gPianoRollHeight << "\n";
       file << "panelPianoRollDock=" << gPianoRollDock << "\n";

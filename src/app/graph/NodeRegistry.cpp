@@ -10,6 +10,7 @@ namespace app
          GraphNode* gn = FindNodeByUid(uid);
          return gn != nullptr ? gn->node.get() : nullptr;
       };
+      Scene2DNode::ResolveUid = Scene3DNode::ResolveUid;
 #ifndef NDEBUG
       if (getenv("INFINITE_PREDBINDTEST") != nullptr)
          REGISTER_NODE(StubPredictorNode, Stub Predictor, "Modulators");
@@ -157,6 +158,7 @@ namespace app
       REGISTER_NODE(GroupNode, Group, "Compositing");
       REGISTER_NODE(NullNode, Null, "Compositing");
       REGISTER_NODE(ViewportNode, Viewport, "Compositing");
+      REGISTER_NODE(Scene2DNode, Scene 2D, "Compositing");
       // Color, Mask and Feedback all merged into Compositing - each was a
       // small category whose nodes are, in practice, ways of combining or
       // managing image flow, same as Compositing's original members.

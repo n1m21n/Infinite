@@ -1,4 +1,6 @@
 #include "Patch.h"
+#include "Base64.h"
+#include "TileStore.h"
 #include "BlendModes.h"
 #include "core/Provenance.h"
 
@@ -576,6 +578,19 @@ static void WriteBody(std::ostream& file, const Data& data)
          if (!line.empty())
             file << "studio " << line << "\n";
          at = nl == std::string::npos ? data.studio.size() : nl + 1;
+      }
+   }
+   {
+      // Painted pixels: a param that names tiles (2D View paint layers) brings them along.
+      std::vector<std::string> keys;
+      for (const NodeRecord& node : data.nodes)
+         for (const auto& kv : node.params)
+            TileStore::CollectKeys(kv.second, keys);
+      for (const std::string& k : keys)
+      {
+         const std::vector<uint8_t> png = TileStore::Encoded(k);
+         if (!png.empty())
+            file << "blob " << k << " " << Base64::Encode(png.data(), png.size()) << "\n";
       }
    }
    for (const TrackGroupRecord& g : data.trackGroups)
@@ -1448,6 +1463,14 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                outData.scenes[idx].followBars = std::clamp(fb, 0, 64);
             }
          }
+      }
+      else if (tag == "blob")
+      {
+         std::string key, body;
+         in >> key >> body;
+         std::vector<uint8_t> png;
+         if (Base64::Decode(body, png))
+            TileStore::PutEncoded(key, std::move(png));
       }
       else if (tag == "studio")
       {

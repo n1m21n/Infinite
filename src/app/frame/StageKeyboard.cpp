@@ -214,6 +214,12 @@ void DrawKeyboard(FrameCtx& fc)
           !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_3, false))
          gView3DOpen = !gView3DOpen;
 
+      // Shift+2: the 2D View
+      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) &&
+          !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && !(gView3DOpen && gView3DClaimedKeys) &&
+          ImGui::IsKeyPressed(ImGuiKey_2, false))
+         gView2DOpen = !gView2DOpen;
+
       // Shift+Y: fit view to content, replacing the old menu-only entry
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_Y, false))
          gRequestFitView = true;
@@ -369,7 +375,7 @@ void DrawKeyboard(FrameCtx& fc)
       if (!gSessionPanelOpen)
          gSessionClaimedKeys = false;
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) || (gView2DOpen && gView2DClaimedKeys) ||
                         (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
                         (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 

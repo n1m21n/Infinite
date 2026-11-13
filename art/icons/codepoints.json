@@ -111,5 +111,14 @@
  "bend": 59757,
  "curve": 59758,
  "line-tool": 59759,
- "pen-tool": 59760
+ "pen-tool": 59760,
+ "crop": 59761,
+ "fill": 59762,
+ "layers": 59763,
+ "mask": 59764,
+ "brush": 59765,
+ "eyedropper": 59766,
+ "lasso": 59767,
+ "marquee": 59768,
+ "wand": 59769
 }
