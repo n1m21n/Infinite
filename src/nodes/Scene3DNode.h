@@ -193,6 +193,9 @@ public:
       int look = 0;                 // 0 none, 1 soft contrast, 2 medium, 3 strong, 4 faded
       bool xray = false;            // Solid: surfaces half see-through, hidden edges show (Alt+Z)
       bool wireOver = false;        // the edges drawn over shaded surfaces
+      // An environment world still lights the scene, but this colour is what is seen behind it.
+      bool backdropOn = false;
+      float backdrop[3] = { 1.0f, 1.0f, 1.0f };
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.

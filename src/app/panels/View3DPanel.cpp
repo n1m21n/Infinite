@@ -7152,6 +7152,11 @@ namespace
                sPending.what = Pending::PickHdri;
             FloatRow(T("Rotation"), &env->rotation, -180.0f, 180.0f, "%.0f");
             FloatRow(T("Strength"), &env->intensity, 0.0f, 10.0f, "%.3f");
+            Scene3DNode::Settings& set = scene->settings;
+            if (BoolRow(T("Background colour"), &set.backdropOn))
+               scene->Commit();
+            if (set.backdropOn && ColorRow(T("Colour"), set.backdrop, "3D View world"))
+               scene->Commit();
             FloatRow(T("Sun threshold"), &env->sunThreshold, 0.0f, 100.0f, "%.1f");
             if (env->sunThreshold > 0.0f)
             {

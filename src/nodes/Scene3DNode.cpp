@@ -78,6 +78,7 @@ namespace
       f(s.outlineSel);
       f(s.dither); f(s.filterSize); f(s.gamma); f(s.look);
       f(s.xray); f(s.wireOver);
+      f(s.backdropOn); f(s.backdrop[0]); f(s.backdrop[1]); f(s.backdrop[2]);
    }
 
    void Normalize(float v[3])
@@ -1292,6 +1293,14 @@ void Scene3DNode::ApplyWorld(Render3DNode& render, bool show, bool background)
       render.envHorizon[k] = colorWorld ? render.bgColor[k] : Render3DNode::kEnvHorizon[k];
       render.envGround[k] = colorWorld ? render.bgColor[k] : Render3DNode::kEnvGround[k];
    }
+   // An environment that lights but is not seen: a flat colour behind the scene instead.
+   if (env != nullptr && show && background && settings.backdropOn)
+   {
+      render.envAsBackground = false;
+      render.bgOpacity = 1.0f;
+      for (int k = 0; k < 3; k++)
+         render.bgColor[k] = settings.backdrop[k];
+   }
 }
 
 // A plain picture as the world: the render, over it, with its own alpha.
@@ -1878,7 +1887,8 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
                                look.shadowSoftness, look.shadowStrength, look.envIntensity, look.ambientColor[0],
                                look.ambientColor[1], look.ambientColor[2], worldColor[0], worldColor[1], worldColor[2],
                                worldColorOn ? 1.0f : 0.0f, worldStrength, (float)look.renderPass,
-                               settings.transparent ? 1.0f : 0.0f });
+                               settings.transparent ? 1.0f : 0.0f, settings.backdropOn ? 1.0f : 0.0f, settings.backdrop[0],
+                               settings.backdrop[1], settings.backdrop[2] });
    if (stamp != mEditorStamp)
    {
       mEditorStamp.swap(stamp);
