@@ -101,7 +101,16 @@ def release():
 def configure(mode):
     d, args, _, _ = MODES[mode]
     path = os.path.join(ROOT, d)
-    if os.path.exists(path + "/CMakeCache.txt"):
+    cache = path + "/CMakeCache.txt"
+    if os.path.exists(cache):
+        want = next((a.split("=", 1)[1] for a in args if a.startswith("-DCMAKE_BUILD_TYPE=")), None)
+        have = next((l.split("=", 1)[1].strip() for l in open(cache) if l.startswith("CMAKE_BUILD_TYPE:")), None)
+        if want is None or want == have:
+            return path
+        # A cache left as another build type (build/ once configured Debug) would ship debug-only UI as "release".
+        print(f"ibuild: {d} is configured {have}, want {want}: reconfiguring", flush=True)
+        if subprocess.run(["cmake", "-B", path, f"-DCMAKE_BUILD_TYPE={want}"]).returncode:
+            sys.exit(1)
         return path
     extra = [f"-DCMAKE_{lang}_COMPILER_LAUNCHER=ccache" for lang in ("C", "CXX", "OBJC", "OBJCXX")] if shutil.which("ccache") else []
     print(f"ibuild: configuring {d} (first build in this dir compiles everything once)", flush=True)
