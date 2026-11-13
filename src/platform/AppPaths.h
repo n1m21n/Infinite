@@ -196,11 +196,56 @@ namespace AppPaths
       return DirExists(path);
    }
 
+   // fork: the portable data folder, or "" for the normal per-user one. See AppSupportDir above.
+   inline std::string& sPortableDataDir()
+   {
+      static std::string dir;
+      return dir;
+   }
+
+   inline std::string DirName(const std::string& path)
+   {
+      const size_t slash = path.find_last_of("/\\");
+      return slash == std::string::npos ? std::string() : path.substr(0, slash);
+   }
+
+   inline bool FileExists(const std::string& path)
+   {
+      if (path.empty())
+         return false;
+      APPPATHS_STAT_T sb {};
+      return APPPATHS_STAT(path.c_str(), &sb) == 0;
+   }
+
+   // fork: called once at startup with the executable's own path (AppPaths.h cannot see
+   // Platform::ExecutablePath). If a file named "portable.txt" sits beside the executable, every
+   // setting, index and log lives in "<exe folder>/Data" instead of the per-user folder, so a
+   // portable copy is self-contained and two copies never read each other's last session.
+   // Empty exePath, or no marker, leaves the normal per-user folder in place.
+   inline void ResolvePortableDataDir(const std::string& exePath)
+   {
+      sPortableDataDir().clear();
+      const std::string folder = DirName(exePath);
+      if (folder.empty() || !FileExists(folder + "/portable.txt"))
+         return;
+      const std::string dir = folder + "/Data";
+      if (!EnsureDir(dir))
+         return; // read-only media: fall back to the per-user folder rather than lose every write
+      sPortableDataDir() = dir;
+   }
+
    // The app's per-user settings directory, created if missing. Callers that
    // need a specific behavior when creation fails should check with their own
    // filesystem call; historically these paths were used optimistically.
    inline std::string AppSupportDir()
    {
+      // fork: a portable copy keeps everything next to itself. A file named "portable.txt" beside
+      // the executable (next to Resources/ and assets/) means "Data here", so the portable build and
+      // an installed one never share settings, recents or an autosave - which is how a launch used to
+      // pick up the other copy's last project and open it with a red error. Set once at startup by
+      // AppPaths::ResolvePortableDataDir (main.cpp InitApp); empty means the normal per-user folder.
+      if (!sPortableDataDir().empty())
+         return sPortableDataDir();
 #if defined(_WIN32)
       // %APPDATA% is the roaming profile (CSIDL_APPDATA); fall back to
       // USERPROFILE\AppData\Roaming when the variable is missing, which is
