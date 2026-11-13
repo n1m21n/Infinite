@@ -137,8 +137,8 @@ def spoon():
     rim = [(R - t * 0.15, t * 0.45), (R - t * 0.85, t * 0.45)]
     bowl = place(lathe(outer + rim + inner), (0, 0, d), scale=(1.42, 1.0, 1.0))
     L = 0.125   # handle: a lathe along its own axis, flattened, wider toward the end
-    prof = [(0, 0)] + [(0.0028 + 0.0042 * (k / 14) ** 1.6, L * k / 14) for k in range(1, 14)] + [(0.0062, L * 0.985), (0.0045, L), (0, L)]
-    handle = place(lathe(_round(prof, 0.002), 32), (R * 1.42 - 0.004, 0, d - 0.0006), scale=(0.24, 1.0, 1.0), rot_y=92.6)
+    prof = [(0, 0)] + [(0.0036 + 0.0042 * (k / 14) ** 1.6, L * k / 14) for k in range(1, 14)] + [(0.0062, L * 0.985), (0.0045, L), (0, L)]
+    handle = place(lathe(_round(prof, 0.002), 32), (R * 1.42 - 0.004, 0, d - 0.0006), scale=(0.30, 1.0, 1.0), rot_y=92.4)
     return place(join(bowl, handle), (SPOON_AT[0], SPOON_AT[1], 0), rot_z=SPOON_ROT)
 
 
@@ -154,7 +154,7 @@ def cloth(nx=150, ny=120, w=0.25, h=0.19):
             edge = min(s(0, 0.035, u), s(0, 0.035, 1 - u), s(0, 0.045, v), s(0, 0.045, 1 - v))
             fold = s(0.43, 0.50, v + 0.03 * math.sin(u * 5.0))
             z = 0.0035 + 0.0045 * fold
-            z += 0.0022 * math.sin(u * 13.0 + 2.5 * v) * math.sin(v * 9.0 + 1.3) * (0.4 + 0.6 * fold)
+            z += 0.0013 * math.sin(u * 13.0 + 2.5 * v) * math.sin(v * 9.0 + 1.3) * (0.4 + 0.6 * fold)
             z += 0.0012 * math.sin(u * 31.0 - v * 17.0) * math.cos(v * 23.0 + u * 5.0)
             z += 0.0040 * math.exp(-((u - 0.62) ** 2 * 60 + (v - 0.3) ** 2 * 25))
             verts.append([(u - 0.5) * w, (v - 0.5) * h, 0.0006 + z * edge])
@@ -208,7 +208,7 @@ def materials(stage):
 def judge_table(stage="flaws", size=(640, 480), samples=256):
     m = materials(stage)
     objs = [
-        {"shape": "cube", "scale": [0.62, 0.41, 0.016], "location": [0, 0.11, -0.016], "bevel": 0.0035, "material": m["table"]},
+        {"shape": "cube", "scale": [0.62, 0.41, 0.016], "location": [0, 0.17, -0.016], "bevel": 0.0035, "material": m["table"]},
         {"shape": "cube", "scale": [2.5, 0.02, 1.4], "location": [0, 1.25, 0.2], "material": m["wall"]},
         {"shape": "plane", "scale": 3, "location": [0, 0, -0.74], "material": m["floor"]},
         # the warm bounce card: a matt board standing right of the table, facing the window
@@ -216,12 +216,14 @@ def judge_table(stage="flaws", size=(640, 480), samples=256):
         _obj(mug(), m["mug"]), _obj(glass(), m["glass"]), _obj(water(), m["water"]),
         _obj(spoon(), m["spoon"]), _obj(cloth(), m["cloth"]), _obj(droplets(), m["drops"]),
     ]
-    # 50 mm on the harness's 36 mm span, f/2.8, a seated eye about 0.42 m above the table top, focus on the mug's near rim.
-    cam = {"fov": 39.6, "azimuth": 93, "elevation": 29, "distance": 0.80, "target": [-0.01, -0.02, 0.035],
-           "fstop": 2.8, "focus": 0.775, "blades": 7}
+    # 50 mm on a 36 x 24 frame: 27 degrees vertical. The harness measures f-stop on a 36 mm vertical span (a 75 mm
+    # lens at this angle), so f/4.2 there is the 17.9 mm aperture of a real 50 mm at f/2.8. Seated eye: 0.42 m above
+    # the table top. Focus on the mug's near rim.
+    cam = {"fov": 27.0, "azimuth": 94, "elevation": 29, "distance": 0.80, "target": [-0.055, -0.01, 0.035],
+           "fstop": 4.2, "focus": 0.775, "blades": 7}
     return {"size": list(size), "samples": samples, "view": "AgX", "camera": cam,
             # C1: one large area light as the window (left, behind the camera line), the physical sky, the card above.
-            "lights": [{"type": "area", "power": 55, "azimuth": 205, "elevation": 34, "distance": 1.25, "size": [0.9, 1.1],
+            "lights": [{"type": "area", "power": 20, "azimuth": 205, "elevation": 34, "distance": 1.25, "size": [0.9, 1.1],
                         "color": [1.0, 0.97, 0.92]}],
-            "world": {"sky": {"elevation": 38, "azimuth": 200, "turbidity": 3.0}, "strength": 0.18},
+            "world": {"sky": {"elevation": 38, "azimuth": 200, "turbidity": 3.0}, "strength": 0.08},
             "objects": objs}
