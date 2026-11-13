@@ -1,7 +1,6 @@
 # Material-domain Field programs for the judge table (judge_table.py). Each starts from a recipe in
 # src/nodes/FieldMaterialRecipes.h (its outputs renamed to locals), adds the flaws, and ends in one tail that writes
 # the outputs from the locals oB oR oM oH. P is Infinite's Y-up world in metres (Blender x, z, -y), table top y = 0.
-# tail("rm") writes roughness and metallic as the base colour instead, for bake_maps.py.
 import math
 import os
 import re
@@ -22,7 +21,12 @@ def recipe(name, subs=()):
 
 
 TAIL = "base = oB;\nroughness = oR;\nmetallic = oM;\nheight = oH;"
-TAIL_RM = "base = vec3(oR, oM, 0.0);\nroughness = 1.0;\nmetallic = 0.0;\nheight = oH;"
+# Bake tails (judge_render.py bake): an unlit black surface that emits the colour, then roughness / metallic / height.
+# 0.02 is added so the object can be told from the empty frame.
+HEIGHT_K = 800.0
+TAIL_A = "base = vec3(0.0);\nroughness = 1.0 + (oR + oM + oH) * 0.0;\nemission = oB * 0.98 + 0.02;"
+TAIL_RMH = ("base = oB * 0.0;\nroughness = 1.0;\n"
+            "emission = vec3(oR, oM, clamp(oH * %r + 0.5, 0.0, 1.0)) * 0.98 + 0.02;" % HEIGHT_K)
 
 
 def table(flaws):

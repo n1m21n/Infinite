@@ -497,7 +497,23 @@ for i, o in enumerate(scene["objects"]):
         p.inputs["Thin Film Thickness"].default_value = m["iridescence"] * m.get("iridescence_thickness", 400.0)
         p.inputs["Thin Film IOR"].default_value = m.get("iridescence_ior", 1.33)
     add_maps(mat, p, m.get("maps", {}), m)
-    if m.get("layer"):   # row 4.1: mix(base, mix(layer, its layer, its mask), mask) through Mix Shaders on UV masks
+    if m.get("proj"):
+        # Judge table: a Field material baked through the camera (judge_render.py bake). Window coordinates put each
+        # shading point's own camera pixel back on it: albedo, then roughness / metallic / height in R G B (linear).
+        pr, nt = m["proj"], mat.node_tree
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        def pimg(path):
+            t = nt.nodes.new("ShaderNodeTexImage"); t.image = bpy.data.images.load(path)
+            t.image.colorspace_settings.name = 'Non-Color'; t.extension = 'EXTEND'
+            nt.links.new(tc.outputs["Window"], t.inputs["Vector"])
+            return t
+        nt.links.new(pimg(pr["albedo"]).outputs["Color"], p.inputs["Base Color"])
+        sep = nt.nodes.new("ShaderNodeSeparateColor"); nt.links.new(pimg(pr["rmh"]).outputs["Color"], sep.inputs[0])
+        nt.links.new(sep.outputs[0], p.inputs["Roughness"]); nt.links.new(sep.outputs[1], p.inputs["Metallic"])
+        if pr.get("bump"):
+            bp = nt.nodes.new("ShaderNodeBump"); bp.inputs["Distance"].default_value = 1.0 / pr["bump"]
+            nt.links.new(sep.outputs[2], bp.inputs["Height"]); nt.links.new(bp.outputs["Normal"], p.inputs["Normal"])
+    if m.get("layer") and not m.get("proj"):   # row 4.1: mix(base, mix(layer, its layer, its mask), mask) through Mix Shaders on UV masks
         nt = mat.node_tree
         def principled(lm):
             q = nt.nodes.new("ShaderNodeBsdfPrincipled")

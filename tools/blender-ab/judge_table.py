@@ -3,6 +3,7 @@
 # for the mug handle, a draped grid for the cloth. Blender Z-up metres, the table top at z = 0.
 # stage: "clay" (one grey material), "base" (clean materials), "flaws" (imperfection layers, the final scene).
 import math
+import os
 
 SEG = 96
 
@@ -206,8 +207,18 @@ def materials(stage):
     return m
 
 
-def judge_table(stage="flaws", size=(640, 480), samples=256):
+# Camera-projected maps of the Field materials (judge_render.py bake), so Cycles renders the same surfaces.
+PROJ = os.path.expanduser("~/.cache/infinite-sweep/judge/proj")
+BAKED = {"table": (0, True), "mug": (4, False), "glass": (5, False), "spoon": (7, False), "cloth": (8, True)}   # object, bump
+
+
+def judge_table(stage="flaws", size=(640, 480), samples=256, proj=True):
     m = materials(stage)
+    if proj and stage == "flaws" and all(os.path.exists(os.path.join(PROJ, k + "_rmh.png")) for k in BAKED):
+        import judge_table_fields as F
+        for k, (_, bump) in BAKED.items():
+            m[k]["proj"] = {"albedo": os.path.join(PROJ, k + "_albedo.png"), "rmh": os.path.join(PROJ, k + "_rmh.png"),
+                            "bump": F.HEIGHT_K if bump else 0}
     objs = [
         {"shape": "cube", "scale": [0.62, 0.41, 0.016], "location": [0, 0.17, -0.016], "bevel": 0.0035, "material": m["table"]},
         {"shape": "cube", "scale": [2.5, 0.02, 1.4], "location": [0, 1.25, 0.2], "material": m["wall"]},

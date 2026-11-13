@@ -23,13 +23,14 @@ import judge_table as JT
 
 CASE = os.path.expanduser("~/.cache/infinite-sweep/ab/judge_table")
 OUT = os.path.expanduser("~/.cache/infinite-sweep/judge")
+BOUNCES = int(os.environ.get("JUDGE_BOUNCES", "8"))
 ENGINES = {"raster": None, "pt": None, "live": "7", "settle": "15"}
 
 
-def infinite(scene, engine, name, spp=64, edit=None, frame_t=None):
+def infinite(scene, engine, name, spp=64, edit=None, case=None):
     """Render `scene` with one engine into OUT/<name>.png; returns seconds. edit(patch text) -> patch text."""
     os.makedirs(OUT, exist_ok=True)
-    patch = harness.to_patch(scene, CASE, engine=engine, pt_samples=spp)
+    patch = harness.to_patch(scene, case or CASE, engine=engine, pt_samples=spp, pt_bounces=BOUNCES)
     if edit:
         patch = edit(patch)
     pf = os.path.join(OUT, name + ".inf")
@@ -86,13 +87,141 @@ def zoom(a):
     print(os.path.join(OUT, "zoom_%s.jpg" % a.stage))
 
 
+def _fill(path, out, grow=24):
+    """Emission render -> linear map: decode sRGB and the 0.02 floor, drop the antialiased rim, then grow the object's
+    values `grow` px past its silhouette so edge samples never read the empty frame. Returns the object's cover."""
+    import numpy as np
+    from PIL import Image
+    c = np.asarray(Image.open(path).convert("RGB"), dtype=np.float32) / 255.0
+    lin = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    ok = lin.max(axis=2) > 0.012
+    for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0), (0, 2), (0, -2), (2, 0), (-2, 0)):
+        ok &= np.roll(lin.max(axis=2) > 0.012, (dy, dx), (0, 1))
+    cover = float(ok.mean())
+    rgb = np.clip((lin - 0.02) / 0.98, 0.0, 1.0)
+    for _ in range(grow):
+        acc, n = np.zeros_like(rgb), np.zeros(ok.shape, np.float32)
+        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            acc += np.roll(rgb * ok[..., None], (dy, dx), (0, 1))
+            n += np.roll(ok, (dy, dx), (0, 1))
+        new = (~ok) & (n > 0)
+        rgb[new] = acc[new] / n[new][:, None]
+        ok = ok | new
+    Image.fromarray(np.clip(rgb * 255.0 + 0.5, 0, 255).astype(np.uint8)).save(out)
+    return cover
+
+
+def bake(a):
+    """Each Field material alone through the final camera (no depth of field) at 3840x2880, unlit, emitting its colour,
+    then again emitting roughness / metallic / height (Render 3D's albedo pass does not carry a Field material).
+    Cycles reads the maps back by window coordinates (blender_scene.py, material key `proj`). Surfaces the camera
+    cannot see take the texel in front of them."""
+    import judge_table_fields as F
+    os.makedirs(JT.PROJ, exist_ok=True)
+    for k, (idx, _) in JT.BAKED.items():
+        sc = JT.judge_table("flaws", size=(3840, 2880), proj=False)
+        sc["camera"].pop("fstop", None)
+        sc["supersample"] = 1
+        sc.pop("view", None)
+        sc["world"], sc["lights"] = {}, []
+        o = sc["objects"][idx]
+        cd = os.path.join(OUT, "bake_" + k)
+        os.makedirs(cd, exist_ok=True)
+        link = os.path.join(cd, "obj_0.glb")
+        if os.path.lexists(link):
+            os.remove(link)
+        os.symlink(os.path.join(CASE, "obj_%d.glb" % idx), link)
+        for kind, tail in (("albedo", F.TAIL_A), ("rmh", F.TAIL_RMH)):
+            m = {"roughness": 0.5, "code": o["material"]["code"].replace(F.TAIL, tail)}
+            ly = o["material"].get("layer")
+            if ly:
+                m["layer"] = dict(ly, code=ly["code"].replace(F.TAIL, tail))
+            dt = infinite(dict(sc, objects=[dict(o, material=m)]), "raster", "bake_%s_%s" % (k, kind), case=cd)
+            cover = _fill(os.path.join(OUT, "bake_%s_%s.png" % (k, kind)), os.path.join(JT.PROJ, "%s_%s.png" % (k, kind)))
+            print("bake %-6s %-6s %.1f s, covers %.1f %% of the frame" % (k, kind, dt, cover * 100), flush=True)
+
+
+COLUMNS = [("truth", "Cycles 1024 spp"), ("pt", "GL Path trace 256 spp"), ("settle", "settle 256 spp"), ("live", "live, one frame")]
+
+
+def final(a):
+    import json
+    from PIL import Image, ImageDraw, ImageFont
+    d = os.path.join(OUT, "final")
+    os.makedirs(d, exist_ok=True)
+    w, h = a.size
+    scene = JT.judge_table("flaws", size=(w, h), samples=1024)
+    times, res = {}, {}
+    if not (a.keep_truth and os.path.exists(os.path.join(d, "truth.png"))):
+        open(os.path.join(d, "scene.json"), "w").write(json.dumps(scene, sort_keys=True, indent=1))
+        t0 = time.time()
+        _, log = harness.run([harness.BLENDER, "-b", "--factory-startup", "--python", os.path.join(HERE, "blender_scene.py"), "--", d])
+        if "SCENEDONE" not in log:
+            sys.exit("blender failed:\n" + log[-3000:])
+        times["truth"] = time.time() - t0
+        json.dump(times, open(os.path.join(d, "times.json"), "w"))
+        print("final truth  %.1f s" % times["truth"], flush=True)
+    else:
+        times = json.load(open(os.path.join(d, "times.json")))
+    for eng, spp in (("pt", 256), ("settle", 256), ("live", 1)):
+        times[eng] = infinite(scene, eng, "final_" + eng, spp, case=d)
+        os.replace(os.path.join(OUT, "final_%s.png" % eng), os.path.join(d, "inf_%s.png" % eng))
+        res[eng] = harness.score(d, "judge_table", scene, "_" + eng)
+        print("final %-6s %.1f s  FLIP %.4f  brightness %.3f" % (eng, times[eng], res[eng]["flip"], res[eng]["brightness_ratio"]), flush=True)
+    json.dump({"times": times, "scores": res, "size": [w, h]}, open(os.path.join(d, "result.json"), "w"), indent=1)
+    cw, ch, bar = 1280, 1280 * h // w, 64
+    sheet = Image.new("RGB", (cw * 4, ch + bar), (18, 18, 18))
+    dr = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 30)
+    except OSError:
+        font = ImageFont.load_default()
+    for i, (k, label) in enumerate(COLUMNS):
+        f = os.path.join(d, "truth.png" if k == "truth" else "inf_%s.png" % k)
+        sheet.paste(Image.open(f).convert("RGB").resize((cw, ch), Image.LANCZOS), (cw * i, 0))
+        note = "%s   %.0f s" % (label, times[k]) + ("   FLIP %.3f" % res[k]["flip"] if k in res else "")
+        dr.text((cw * i + 16, ch + 14), note, fill=(230, 230, 230), font=font)
+    sheets = os.path.join(harness.REPO, "docs", "plans", "realtime-engine", "sheets")
+    sheet.save(os.path.join(sheets, "judge-table.jpg"), quality=88)
+    Image.open(os.path.join(d, "inf_settle.png")).convert("RGB").save(os.path.join(sheets, "judge-table-settle.jpg"), quality=92)
+    print(os.path.join(sheets, "judge-table.jpg"))
+
+
+def orbit(a):
+    """30 live frames over a 90 degree arc around the final view (5 s at 6 samples a second), each its own one-frame
+    render: a contact sheet, the seconds per frame and the largest brightness step between neighbours."""
+    import numpy as np
+    from PIL import Image
+    w, h = a.size
+    tiles, lum, secs = [], [], []
+    for i in range(30):
+        sc = JT.judge_table("flaws", size=(w, h))
+        sc["camera"]["azimuth"] += -45.0 + 90.0 * i / 29.0
+        sc["camera"].pop("fstop", None)
+        secs.append(infinite(sc, "live", "orbit_%02d" % i, 1))
+        im = Image.open(os.path.join(OUT, "orbit_%02d.png" % i)).convert("RGB")
+        lum.append(float(np.asarray(im, dtype=np.float32).mean() / 255.0))
+        tiles.append(im.resize((480, 480 * h // w), Image.LANCZOS))
+        print("orbit %02d  %.1f s  mean %.3f" % (i, secs[-1], lum[-1]), flush=True)
+    th = tiles[0].height
+    sheet = Image.new("RGB", (480 * 6, th * 5))
+    for i, t in enumerate(tiles):
+        sheet.paste(t, (480 * (i % 6), th * (i // 6)))
+    out = os.path.join(harness.REPO, "docs", "plans", "realtime-engine", "sheets", "judge-table-orbit.jpg")
+    sheet.save(out, quality=85)
+    step = max(abs(lum[i + 1] - lum[i]) for i in range(29))
+    print("ORBIT 30 frames, %.1f s mean per frame, largest brightness step %.4f\n%s" % (sum(secs) / 30, step, out))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("cmd", choices=["zoom", "bake", "final", "orbit"])
     p.add_argument("--stage", default="flaws")
     p.add_argument("--only", nargs="*")
+    p.add_argument("--size", nargs=2, type=int, default=[1920, 1440])
+    p.add_argument("--keep-truth", action="store_true")
     a = p.parse_args()
-    {"zoom": zoom, "bake": lambda a: bake(a), "final": lambda a: final(a), "orbit": lambda a: orbit(a)}[a.cmd](a)
+    {"zoom": zoom, "bake": bake, "final": final, "orbit": orbit}[a.cmd](a)
 
 
 if __name__ == "__main__":
