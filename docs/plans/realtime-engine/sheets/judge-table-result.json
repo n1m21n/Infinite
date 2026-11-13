@@ -1,9 +1,9 @@
 {
  "times": {
-  "truth": 271.2194170951843,
-  "pt": 322.0730288028717,
-  "settle": 107.51260805130005,
-  "live": 34.028258085250854
+  "truth": 193.5258047580719,
+  "pt": 315.07180976867676,
+  "settle": 119.63148331642151,
+  "live": 38.93389916419983
  },
  "scores": {
   "pt": {
@@ -12,14 +12,14 @@
    "luma_err": 0.008
   },
   "settle": {
-   "flip": 0.0875,
-   "brightness_ratio": 1.044,
-   "luma_err": 0.0088
+   "flip": 0.08,
+   "brightness_ratio": 1.03,
+   "luma_err": 0.0079
   },
   "live": {
-   "flip": 0.0972,
-   "brightness_ratio": 1.009,
-   "luma_err": 0.0102
+   "flip": 0.097,
+   "brightness_ratio": 1.004,
+   "luma_err": 0.0106
   }
  },
  "size": [
