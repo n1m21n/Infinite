@@ -133,8 +133,9 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, AddAdjust };
       What what = None;
+      int arg = 0;   // AddAdjust: the type
    } sPending;
 
    ImU32 Hex(unsigned rgb, float a = 1.0f)
@@ -227,6 +228,8 @@ namespace
          return std::string(T("Group")) + " " + std::to_string(l.id);
       if (l.kind == Kind::Fill)
          return std::string(T("Fill")) + " " + std::to_string(l.id);
+      if (l.kind == Kind::Adjust)
+         return std::string(T(Scene2DNode::AdjName(l.adjType))) + " " + std::to_string(l.id);
       if (l.kind == Kind::Paint)
          return std::string(T("Layer")) + " " + std::to_string(l.id);
       if (l.kind == Kind::Vector)
@@ -494,6 +497,26 @@ namespace
       Layer* a = Active(doc);
       Layer& l = doc->AddLayer(Kind::Fill, 0, a != nullptr ? a->id : 0);
       SelectOnly(l.id);
+   }
+
+   void AddAdjust(Scene2DNode* doc, int type)
+   {
+      PushUndoCheckpoint("New adjustment layer");
+      Layer* a = Active(doc);
+      Layer& l = doc->AddLayer(Kind::Adjust, 0, a != nullptr ? a->id : 0);
+      l.adjType = std::clamp(type, 0, Scene2DNode::kAdjCount - 1);
+      l.adjAmt = l.adjTo = Scene2DNode::AdjDefault(l.adjType);
+      if (l.adjType == Scene2DNode::kAdjGradientMap)
+      {
+         const float a0[4] = { 0.05f, 0.1f, 0.35f, 1.0f }, b0[4] = { 1.0f, 0.85f, 0.4f, 1.0f };
+         std::copy(a0, a0 + 4, l.colorA);
+         std::copy(b0, b0 + 4, l.colorB);
+      }
+      const int id = l.id;
+      doc->Commit();
+      if (doc->HasSelection())
+         doc->MaskFromSelection(id);
+      SelectOnly(id);
    }
 
    // ---- widgets ---------------------------------------------------------
@@ -1224,7 +1247,7 @@ namespace
    void ScaleActive(Scene2DNode* doc, ImVec2 mouse)
    {
       Layer* l = Active(doc);
-      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Fill)
+      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Fill || l->kind == Kind::Adjust)
          return;
       const Layer& l0 = sOp.l0;
       float bw = 1, bh = 1, m0[6], inv[6];
@@ -1268,7 +1291,7 @@ namespace
    void RotateActive(Scene2DNode* doc, ImVec2 mouse)
    {
       Layer* l = Active(doc);
-      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Fill)
+      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Fill || l->kind == Kind::Adjust)
          return;
       const ImVec2 c = ToScreen(doc, sOp.l0.x, sOp.l0.y);
       const float a0 = std::atan2(sOp.start.y - c.y, sOp.start.x - c.x), a1 = std::atan2(mouse.y - c.y, mouse.x - c.x);
@@ -2123,7 +2146,7 @@ namespace
       sMouseIn = hovered;
       sMouseDoc = ToDoc(doc, mouse);
       Layer* active = Active(doc);
-      const bool canTransform = sTool == kMove && active != nullptr && active->kind != Kind::Group && active->kind != Kind::Fill && sSel.size() == 1 &&
+      const bool canTransform = sTool == kMove && active != nullptr && active->kind != Kind::Group && active->kind != Kind::Fill && active->kind != Kind::Adjust && sSel.size() == 1 &&
                                 Movable(*active) && doc->Shown(*active);
 
       // Outlines: each selected layer, then the active one's handles.
@@ -2138,7 +2161,7 @@ namespace
                      dl->AddRect(ToScreen(doc, lo[0], lo[1]), ToScreen(doc, hi[0], hi[1]), Hex(kOutline), 0.0f, 0, 1.0f);
                   continue;
                }
-               if (l->kind == Kind::Fill)
+               if (l->kind == Kind::Fill || l->kind == Kind::Adjust)
                   continue;
                if (l->kind == Kind::Vector)
                {
@@ -3266,6 +3289,11 @@ namespace
          glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_md, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Folder);
          return;
       }
+      if (l.kind == Kind::Adjust)
+      {
+         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_md, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::ShadeSolid);
+         return;
+      }
       if (l.kind == Kind::Fill)
       {
          const ImU32 ca = ImGui::GetColorU32(ImVec4(l.colorA[0], l.colorA[1], l.colorA[2], 1.0f));
@@ -3592,13 +3620,26 @@ namespace
       }
       ImGui::EndChild();
       // The strip under the list, as in every layers panel, centred under it.
-      const float footW = 7 * kIconW + 6 * tok::space_1;
+      const float footW = 8 * kIconW + 7 * tok::space_1;
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
       if (IconChip("##v2dnewpaint", IconsInfinite::Brush, false, T("New layer")))
          sPending.what = Pending::AddPaint;
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dnewfill", IconsInfinite::Fill, false, T("New fill layer")))
          sPending.what = Pending::AddFill;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v2dnewadj", IconsInfinite::ShadeSolid, false, T("New adjustment layer")))
+         ImGui::OpenPopup("##v2dadjpop");
+      if (MenuParts::BeginPopup("##v2dadjpop"))
+      {
+         for (int t = 0; t < Scene2DNode::kAdjCount; t++)
+            if (MenuParts::Item(T(Scene2DNode::AdjName(t)), nullptr, false, true))
+            {
+               sPending.what = Pending::AddAdjust;
+               sPending.arg = t;
+            }
+         MenuParts::EndPopup();
+      }
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dnewvec", IconsInfinite::PenTool, false, T("New vector layer")))
          sPending.what = Pending::AddVector;
@@ -3665,6 +3706,37 @@ namespace
          if (type == 1)
             SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
       }
+      if (l->kind == Kind::Adjust)
+      {
+         SectionCard::Begin(T("Adjustment"));
+         std::vector<std::string> names;
+         for (int t = 0; t < Scene2DNode::kAdjCount; t++)
+            names.push_back(T(Scene2DNode::AdjName(t)));
+         int type = l->adjType;
+         if (ComboRow(T("Type"), &type, names))
+         {
+            l->adjType = type;
+            l->adjAmt = l->adjTo = Scene2DNode::AdjDefault(type);
+         }
+         float lo = 0, hi = 1;
+         Scene2DNode::AdjRange(l->adjType, lo, hi);
+         const char* fmt = l->adjType == Scene2DNode::kAdjThreshold ? "%.2f" : "%.0f";
+         if (l->adjType != Scene2DNode::kAdjGradientMap)
+         {
+            SliderRow(T("Amount"), &l->adjAmt, lo, hi, fmt);
+            int drive = l->adjDrive;
+            if (ComboRow(T("Drive"), &drive, { T("None"), "A", "B", "C", "D" }))
+               l->adjDrive = drive;
+            if (l->adjDrive > 0)
+               SliderRow(T("To"), &l->adjTo, lo, hi, fmt);
+            BoolRow(T("Map colours"), &l->adjMap);
+         }
+         if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
+         {
+            ColorRow(T("Shadows"), l->colorA);
+            ColorRow(T("Highlights"), l->colorB);
+         }
+      }
       if (l->kind == Kind::Text)
       {
          SectionCard::Begin(T("Text"));
@@ -3689,7 +3761,7 @@ namespace
          SectionCard::Begin(T("Vector"));
          ImGui::TextDisabled("%d %s", (int)l->shapes.size(), T("items"));
       }
-      if (l->kind != Kind::Group && l->kind != Kind::Fill)
+      if (l->kind != Kind::Group && l->kind != Kind::Fill && l->kind != Kind::Adjust)
       {
          SectionCard::Begin(T("Transform"));
          DragRow("X", &l->x, 1.0f, "%.1f px");
@@ -4225,6 +4297,7 @@ namespace
          break;
       case Pending::Delete: DeleteSelected(doc); break;
       case Pending::AddFill: AddFill(doc); break;
+      case Pending::AddAdjust: AddAdjust(doc, sPending.arg); break;
       case Pending::AddPaint: AddPaint(doc); break;
       case Pending::AddMask:
          if (Layer* a = Active(doc))
@@ -4450,6 +4523,10 @@ void DrawScene2DBody(GraphNode& gn)
       sNeedFit = true;
       gView2DOpen = true;
    }
+   // Drive A..D: adjustment layers follow these, so a modulator animates what is inside a layer.
+   static const char* kLabels[Scene2DNode::kDrives] = { "Drive A", "Drive B", "Drive C", "Drive D" };
+   for (int i = 0; i < Scene2DNode::kDrives; i++)
+      ModSlider(kLabels[i], &doc->drive[i], 0.0f, 1.0f, "%.2f");
 }
 
 void DrawView2DDocked(const char* id, const ImVec2& size)

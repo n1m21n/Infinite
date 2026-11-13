@@ -75,7 +75,7 @@ namespace
       return true;
    }
 
-   bool Is3dKind(Scene2DNode::Kind k) { return k != Scene2DNode::Kind::Group && k != Scene2DNode::Kind::Fill; }
+   bool Is3dKind(Scene2DNode::Kind k) { return k != Scene2DNode::Kind::Group && k != Scene2DNode::Kind::Fill && k != Scene2DNode::Kind::Adjust; }
 
    const char* kBlurFrag = R"(#version 150
 in vec2 vUv;

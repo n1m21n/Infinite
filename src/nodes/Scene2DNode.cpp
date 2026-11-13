@@ -15,6 +15,35 @@
 
 std::function<INode*(uint64_t)> Scene2DNode::ResolveUid;
 
+const char* Scene2DNode::AdjName(int type)
+{
+   static const char* kNames[kAdjCount] = { "Pixelate", "Halftone", "Dither", "Threshold", "Gradient Map", "Posterize" };
+   return kNames[std::clamp(type, 0, kAdjCount - 1)];
+}
+
+float Scene2DNode::AdjDefault(int type)
+{
+   static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f };
+   return kDef[std::clamp(type, 0, kAdjCount - 1)];
+}
+
+void Scene2DNode::AdjRange(int type, float& lo, float& hi)
+{
+   static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f };
+   static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f };
+   const int t = std::clamp(type, 0, kAdjCount - 1);
+   lo = kLo[t];
+   hi = kHi[t];
+}
+
+float Scene2DNode::AdjAmount(const Layer& l) const
+{
+   if (l.adjDrive < 1 || l.adjDrive > kDrives)
+      return l.adjAmt;
+   const float k = std::clamp(drive[l.adjDrive - 1], 0.0f, 1.0f);
+   return l.adjAmt + (l.adjTo - l.adjAmt) * k;
+}
+
 namespace
 {
    const std::string& PassSrc()
@@ -132,6 +161,62 @@ namespace
       return src;
    }
 
+   // Adjustment layers: the picture below with one effect, in display values.
+   const std::string& AdjustSrc()
+   {
+      static const std::string src = std::string(
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uSrc;\n"
+         "uniform vec2 uDoc;\n"
+         "uniform int uType;\n"
+         "uniform float uAmt;\n"
+         "uniform int uMap;\n"
+         "uniform vec4 uColA;\n"
+         "uniform vec4 uColB;\n"
+         "uniform int uLinear;\n")
+         + GLUtil::kSrgbGlsl +
+         "vec3 Disp(vec4 c) { return uLinear == 1 ? SrgbEncode(max(c.rgb, 0.0)) : c.rgb; }\n"
+         "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+         "const int kBayer[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);\n"
+         "void main() {\n"
+         "   vec2 px = gl_FragCoord.xy;\n"
+         "   vec4 src = texture(uSrc, vUv);\n"
+         "   vec3 c = Disp(src);\n"
+         "   if (uType == 0) {\n"
+         "      float b = max(1.0, uAmt);\n"
+         "      vec2 q = (floor(px / b) + 0.5) * b;\n"
+         "      c = Disp(texture(uSrc, clamp(q / uDoc, vec2(0.0), vec2(1.0))));\n"
+         "   } else if (uType == 1) {\n"
+         "      float cell = max(2.0, uAmt);\n"
+         "      mat2 r = mat2(0.7071, 0.7071, -0.7071, 0.7071);\n"
+         "      vec2 p = r * px;\n"
+         "      vec2 ctr = (floor(p / cell) + 0.5) * cell;\n"
+         "      vec2 cpx = transpose(r) * ctr;\n"
+         "      float L = Luma(Disp(texture(uSrc, clamp(cpx / uDoc, vec2(0.0), vec2(1.0)))));\n"
+         "      float rad = sqrt(clamp(1.0 - L, 0.0, 1.0)) * cell * 0.7071;\n"
+         "      float d = length(p - ctr);\n"
+         "      c = vec3(smoothstep(rad - 0.75, rad + 0.75, d));\n"
+         "   } else if (uType == 2) {\n"
+         "      float n = max(2.0, floor(uAmt + 0.5));\n"
+         "      ivec2 ip = ivec2(mod(px, 4.0));\n"
+         "      float t = (float(kBayer[ip.y * 4 + ip.x]) + 0.5) / 16.0;\n"
+         "      c = floor(c * (n - 1.0) + t) / (n - 1.0);\n"
+         "   } else if (uType == 3) {\n"
+         "      c = vec3(step(uAmt, Luma(c)));\n"
+         "   } else if (uType == 5) {\n"
+         "      float n = max(2.0, floor(uAmt + 0.5));\n"
+         "      c = floor(c * n) / (n - 1.0);\n"
+         "      c = min(c, vec3(1.0));\n"
+         "   }\n"
+         "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(Luma(c), 0.0, 1.0));\n"
+         "   c = clamp(c, 0.0, 1.0);\n"
+         "   fragColor = vec4(uLinear == 1 ? SrgbDecode(c) : c, src.a);\n"
+         "}\n";
+      return src;
+   }
+
    float SrgbToLinear(float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); }
 
    // 3x3 inverse by the adjugate; the sign is kept so w stays positive in front of the camera.
@@ -169,6 +254,7 @@ Scene2DNode::~Scene2DNode()
       GLUtil::DestroyFbo(p.f[1]);
    }
    GLUtil::DestroyFbo(mOut);
+   GLUtil::DestroyFbo(mAdjFbo);
    for (auto& kv : mSurfaces)
       GLUtil::DestroyFbo(kv.second.fbo);
    for (auto& kv : mMasks)
@@ -180,7 +266,7 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mSelTex);
    GLUtil::DestroyFbo(mSelOverlay);
    GLUtil::DestroyFbo(mSelScratch);
-   for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram })
+   for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram })
       if (p != 0)
          glDeleteProgram(p);
    if (mPassProgram != 0)
@@ -229,6 +315,12 @@ Scene2DNode::Layer& Scene2DNode::AddLayer(Kind kind, uint64_t uid, int above)
    l.y = mDoc.h * 0.5f;
    if (kind == Kind::Group)
       l.blend = kPassThrough;
+   if (kind == Kind::Adjust)
+   {
+      const float black[4] = { 0, 0, 0, 1 }, white[4] = { 1, 1, 1, 1 };
+      std::copy(black, black + 4, l.colorA);
+      std::copy(white, white + 4, l.colorB);
+   }
    if (kind == Kind::Vector)
    {
       l.pw = mDoc.w;
@@ -545,9 +637,9 @@ bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
 
 void Scene2DNode::LayerMatrix(const Layer& l, float m[6])
 {
-   if (l.kind == Kind::Fill || l.kind == Kind::Group)
+   if (l.kind == Kind::Fill || l.kind == Kind::Group || l.kind == Kind::Adjust)
    {
-      // Fills and groups are the document itself.
+      // Fills, groups and adjustments are the document itself.
       const float id[6] = { 1, 0, 0, 0, 1, 0 };
       std::copy(id, id + 6, m);
       return;
@@ -773,7 +865,10 @@ void Scene2DNode::Serialize()
       if (l.maskUid != 0)
          o << "mask " << l.id << " " << l.maskUid << " " << +l.maskOn << " " << +l.maskInvert << " " << l.maskChannel
            << " " << l.maskDensity << "\n";
-      if (l.kind == Kind::Fill)
+      if (l.kind == Kind::Adjust)
+         o << "adj " << l.id << " " << l.adjType << " " << l.adjAmt << " " << l.adjTo << " " << l.adjDrive << " " << +l.adjMap
+           << "\n";
+      if (l.kind == Kind::Fill || l.kind == Kind::Adjust)
       {
          o << "fillc " << l.id << " " << l.fillType;
          for (float v : l.colorA) o << " " << v;
@@ -984,6 +1079,14 @@ void Scene2DNode::Parse()
             s >> l->maskUid >> on >> inv >> l->maskChannel >> l->maskDensity;
             l->maskOn = on != 0;
             l->maskInvert = inv != 0;
+         }
+         else if (key == "adj")
+         {
+            int map = 0;
+            s >> l->adjType >> l->adjAmt >> l->adjTo >> l->adjDrive >> map;
+            l->adjType = std::clamp(l->adjType, 0, kAdjCount - 1);
+            l->adjDrive = std::clamp(l->adjDrive, 0, kDrives);
+            l->adjMap = map != 0;
          }
          else if (key == "fillc")
          {
@@ -1199,6 +1302,16 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
 
 void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacityMul, bool clipMode)
 {
+   if (l.kind == Kind::Adjust && !mAdjReady)
+   {
+      // The picture below this layer, changed once; the fx path then draws it like any other layer.
+      if (!RunAdjust(l, PairAt(depth).Tex()))
+         return;
+      mAdjReady = true;
+      DrawLayer(l, depth, frameId, opacityMul, clipMode);
+      mAdjReady = false;
+      return;
+   }
    if (l.AnyFx())
    {
       DrawFx(l, depth, frameId, opacityMul, clipMode);
@@ -1258,6 +1371,13 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.texW = it->second.fbo.w;
       a.texH = it->second.fbo.h;
    }
+   else if (l.kind == Kind::Adjust)
+   {
+      a.tex = mAdjFbo.tex;
+      a.texW = mAdjFbo.w;
+      a.texH = mAdjFbo.h;
+      a.srgb = false;   // already in working space
+   }
    else if (l.kind == Kind::Vector || l.kind == Kind::Text)
    {
       Raster* r = SyncRaster(mVec, l, false);
@@ -1313,10 +1433,39 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    Pass(depth, a);
 }
 
+bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
+{
+   if (!mAdjTried)
+   {
+      mAdjTried = true;
+      mAdjProgram = GLUtil::CompileProgram(AdjustSrc().c_str());
+   }
+   if (mAdjProgram == 0 || src == 0)
+      return false;
+   if (!GLUtil::EnsureFbo(mAdjFbo, mDoc.w, mDoc.h, GLUtil::ImageWorkingFormat(), "Scene2DAdj"))
+      return false;
+   const unsigned prog = mAdjProgram;
+   GLUtil::RunShaderPass(mAdjFbo, prog, [&]()
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, src);
+      glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
+      glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
+      glUniform1i(glGetUniformLocation(prog, "uType"), l.adjType);
+      glUniform1f(glGetUniformLocation(prog, "uAmt"), AdjAmount(l));
+      glUniform1i(glGetUniformLocation(prog, "uMap"), l.adjMap ? 1 : 0);
+      glUniform4fv(glGetUniformLocation(prog, "uColA"), 1, l.colorA);
+      glUniform4fv(glGetUniformLocation(prog, "uColB"), 1, l.colorB);
+      glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
+   });
+   return true;
+}
+
 void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
 {
    const std::vector<const Layer*> kids = ListOf(parent);
-   auto card = [](const Layer& l) { return l.is3d && !l.clip && l.kind != Kind::Group && l.kind != Kind::Fill; };
+   auto card = [](const Layer& l)
+   { return l.is3d && !l.clip && l.kind != Kind::Group && l.kind != Kind::Fill && l.kind != Kind::Adjust; };
    for (size_t i = 0; i < kids.size(); i++)
    {
       const Layer& base = *kids[i];
@@ -1427,6 +1576,13 @@ void Scene2DNode::CookIfNeeded(int frameId)
             stamp = Mix(stamp, n->TextureRevision());
             stamp = Mix(stamp, (unsigned long long)n->GetOutputWidth() * 65536ull + (unsigned long long)n->GetOutputHeight());
          }
+   }
+   // Drive A..D move adjustment layers.
+   for (float v : drive)
+   {
+      unsigned bits = 0;
+      std::memcpy(&bits, &v, sizeof bits);
+      stamp = Mix(stamp, bits);
    }
    // The comp camera moves 3D cards and turns geometry.
    const CompCam cam = Camera();

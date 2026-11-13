@@ -24,8 +24,14 @@ public:
    static INode* Create() { return new Scene2DNode(); }
    ~Scene2DNode() override;
 
-   enum class Kind { Node = 0, Fill = 1, Group = 2, Paint = 3, Vector = 4, Text = 5 };
-   static constexpr int kKindCount = 6;
+   enum class Kind { Node = 0, Fill = 1, Group = 2, Paint = 3, Vector = 4, Text = 5, Adjust = 6 };
+   static constexpr int kKindCount = 7;
+   // Adjustment layers: the picture below, changed in place (masks and clip limit where).
+   enum AdjType { kAdjPixelate = 0, kAdjHalftone, kAdjDither, kAdjThreshold, kAdjGradientMap, kAdjPosterize, kAdjCount };
+   static const char* AdjName(int type);
+   static float AdjDefault(int type);
+   static void AdjRange(int type, float& lo, float& hi);
+   static constexpr int kDrives = 4;   // Drive A..D: modulatable 0..1 knobs adjustment layers follow
 
    // One vector item: a pen path, a live shape or an imported SVG. Points are
    // the layer's own box pixels, y down.
@@ -110,6 +116,12 @@ public:
       float colorA[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
       float colorB[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float fillAngle = 90.0f;      // linear: degrees, 90 = top to bottom
+      // Adjustment layers. adjDrive 1..4 moves the amount from adjAmt to adjTo with Drive A..D.
+      // adjMap: after the effect, dark to colorA, light to colorB.
+      int adjType = 0;
+      float adjAmt = 16.0f, adjTo = 16.0f;
+      int adjDrive = 0;
+      bool adjMap = false;
       // Paint layers: the surface's size and its tiles (TileStore keys, row
       // major from the bottom row, kTile px square).
       int pw = 0, ph = 0;
@@ -326,7 +338,15 @@ public:
    int GetOutputHeight() const override { return mOut.h > 0 ? mOut.h : mDoc.h; }
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
-   void VisitParams(ParamVisitor& v) override { v.Text("doc", mText); }
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Text("doc", mText);
+      static const char* kKeys[kDrives] = { "driveA", "driveB", "driveC", "driveD" };
+      for (int i = 0; i < kDrives; i++)
+         v.Float(kKeys[i], drive[i]);
+   }
+   float drive[kDrives] = { 0, 0, 0, 0 };   // node knobs, modulatable
+   float AdjAmount(const Layer& l) const;
    // No inputs: a bypassed Scene 2D is transparent (BypassSource nullptr).
 
    // Milliseconds of the last cook, for the status bar.
@@ -437,6 +457,11 @@ private:
    GLUtil::Fbo mFxBlur[2], mFxOut;
    unsigned mBlurProgram = 0, mFxProgram = 0;
    bool mFxTried = false;
+   // Adjustment layers: the picture below, changed, ready for the layer's normal pass.
+   GLUtil::Fbo mAdjFbo;
+   unsigned mAdjProgram = 0;
+   bool mAdjTried = false, mAdjReady = false;
+   bool RunAdjust(const Layer& l, unsigned src);
    // Bare geometry cards: a solo render per layer.
    std::map<int, std::shared_ptr<class NodeViewport>> mGeo;   // shared: the type stays incomplete here
    unsigned GeometryTexture(const Layer& l, int& w, int& h);
