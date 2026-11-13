@@ -1053,7 +1053,9 @@ void Scene2DNode::CookIfNeeded(int frameId)
       stamp = Mix(stamp, (unsigned char)c);
    stamp = Mix(stamp, (unsigned long long)soloLayer);
    SyncSurfaces();
-   // A stroke changes the picture before it changes the text.
+   // A stroke changes the picture before it changes the text; its queued dabs land now.
+   if (mStroke.Active())
+      mStroke.Flush();
    stamp = Mix(stamp, mStroke.Active() ? (unsigned long long)mStroke.DabCount() + 1ull : 0ull);
    stamp = Mix(stamp, mPaintEdits);
    for (const Layer& l : mLayers)

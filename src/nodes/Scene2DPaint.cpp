@@ -866,3 +866,10 @@ unsigned Scene2DNode::SelectionOverlay(float time, bool quick)
    });
    return mSelOverlay.tex;
 }
+
+unsigned Scene2DNode::PaintTexture(int id)
+{
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   return it == mSurfaces.end() ? 0u : it->second.fbo.tex;
+}

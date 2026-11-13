@@ -171,6 +171,8 @@ public:
    bool Pick(float x, float y, float rgb[3]);
    // The paint surface's texture and size, 0 when not a paint layer (Convert to Draw node).
    bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
+   // The paint surface's live texture (thumbnails), 0 when none.
+   unsigned PaintTexture(int id);
 
    // Selection: one per document, document-sized, not saved.
    enum SelOp { kSelNew = 0, kSelAdd, kSelSub, kSelIntersect };
