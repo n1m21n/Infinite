@@ -210,8 +210,8 @@ void DrawKeyboard(FrameCtx& fc)
          gFieldPatcherOpen = !gFieldPatcherOpen;
 
       // Shift+3: the 3D View (inside the Curve Editor, Shift+1..5 pick handle types)
-      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) ||
-                        (gFieldPatcherOpen && gFieldPatcherClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_3, false))
+      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) &&
+          !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_3, false))
          gView3DOpen = !gView3DOpen;
 
       // Shift+Y: fit view to content, replacing the old menu-only entry

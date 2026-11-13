@@ -58,6 +58,12 @@ public:
    // Image-cable inputs, in pin order (Wiring counts and resolves them through here).
    virtual int ShadeInputCount() const { return 0; }
    virtual ImageCable* ShadeInput(int) { return nullptr; }
+   // Bypassed with one input: that input passes straight through (two or more inputs never bypass).
+   INode* BypassSource() override
+   {
+      ImageCable* c = ShadeInputCount() == 1 ? ShadeInput(0) : nullptr;
+      return c != nullptr ? c->GetSource() : nullptr;
+   }
    // Shade Image only: the picture it reads and that picture's revision (0: nothing wired).
    virtual unsigned int ShadeImageTexture() const { return 0; }
    virtual unsigned long long ShadeImageRevision() const { return 0; }

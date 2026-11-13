@@ -191,9 +191,9 @@ uvec4 fld_pcg4d(uvec4 v)
    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
    return v;
 }
-vec3 fld_h3(vec3 c) { return vec3(fld_pcg3d(uvec3(ivec3(c))) >> 8u) * (1.0 / 16777216.0); }
+vec3 fld_hash3(vec3 c) { return vec3(fld_pcg3d(uvec3(ivec3(c))) >> 8u) * (1.0 / 16777216.0); }
 vec3 fld_fade3(vec3 f) { return f * f * f * (f * (f * 6.0 - 15.0) + 10.0); }
-float fld_gdot3(vec3 c, vec3 f) { return dot(fld_h3(c) * 2.0 - 1.0, f); }
+float fld_gdot3(vec3 c, vec3 f) { return dot(fld_hash3(c) * 2.0 - 1.0, f); }
 float fld_noise3(vec3 p)
 {
    vec3 i = floor(p); vec3 f = p - i; vec3 u = fld_fade3(f);
@@ -254,7 +254,7 @@ vec3 fld_voronoi3(vec3 p)
          for (int x = -1; x <= 1; x++)
          {
             vec3 c = i + vec3(float(x), float(y), float(z));
-            vec3 d = c + fld_h3(c) - p;
+            vec3 d = c + fld_hash3(c) - p;
             float dd = dot(d, d);
             if (dd < f1) { f2 = f1; f1 = dd; b = c; }
             else if (dd < f2) { f2 = dd; }
@@ -273,7 +273,7 @@ float fld_brick(vec3 p, float mortar)
 }
 float fld_checker(vec3 p) { float c = floor(p.x) + floor(p.y) + floor(p.z); return c - 2.0 * floor(c * 0.5); }
 float fld_gradient(vec3 p) { return clamp(p.x, 0.0, 1.0); }
-float fld_white(vec3 p) { return fld_h3(floor(p)).x; }
+float fld_white(vec3 p) { return fld_hash3(floor(p)).x; }
 )";
    }
 
