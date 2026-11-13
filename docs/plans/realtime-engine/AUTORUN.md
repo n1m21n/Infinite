@@ -82,3 +82,11 @@ commit. No pasted logs, no file-by-file retelling: the commit holds that. When a
 | 9.5 | done (raster, needs 9.3). Settle 64px light_area timed out at 900s on lavapipe; raster (LIVE_ENGINE=7) 256px 6-15s/case, 4/4 within 0.02 FLIP of Mac Vulkan (interior 0.0003, materials/cornell 0.0001, light_area 0.0000). vs Metal live 0/4 (Vulkan raster has no RT GI/shadows) | see git log |
 | hero_shoe | done (the judge, sheets/hero-shoe.jpg). Tuned studio lights + sweep (hero0 0.080 -> hero1 0.055 at 640x480 64spp), then 1280x960 256spp: FLIP 0.054 (141.6 s). Verdict: stands next to Cycles; clean knit, sole, stripes, soft shadow, minor rim/sole-edge diff | see git log |
 | end_sweep | done (64 cases, hair skipped, --budget 15 per engine, tag end). raster 256s: 0 worse/0 better (sum -0.000 vs f0); live 483s: 0 worse/0 better (sum +0.000 vs f86); settle s16 316s: 0 worse/0 better (sum -0.005 vs f0) | see git log |
+| judge_table | done, both gates fail (sheets/judge-table.jpg, 1920x1440). Cycles 1024spp 271 s; GL PT 256spp 322 s FLIP 0.079; settle 256spp 108 s FLIP 0.087 (gate 0.06), 3x faster than PT (gate 5x); live 34 s 0.097. Glass decides it. Owner's photo/render call open | see git log |
+
+judge_table defects (procedural table, tools/blender-ab/judge_table.py):
+1. Settle: the glass with water does not refract the scene behind it and its base turns milky white; Cycles and GL Path trace show it clear.
+2. Live: the glass is opaque blue with a dark top in all 30 orbit frames, the mug handle renders black, the knit shows moire.
+3. Settle: a small refractive solid resting on a surface (water droplets) renders black; the case uses coated beads instead.
+4. Render 3D's albedo pass ignores a Field material's colour (flat knob grey), so the Cycles bake goes through unlit emission renders.
+5. Sketch 3D has no lathe and shades custom shapes flat; the lathes are meshed from one profile in Python and loaded as glb.
