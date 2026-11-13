@@ -409,6 +409,65 @@ int Scene2DNode::Duplicate(int id)
    return copies.empty() ? 0 : copies[0].id;
 }
 
+std::vector<Scene2DNode::Layer> Scene2DNode::CopyLayers(const std::vector<int>& ids)
+{
+   Layers();
+   std::vector<Layer> out;
+   for (const Layer& l : mLayers)
+      for (int id : ids)
+         if (IsInside(l.id, id))
+         {
+            out.push_back(l);
+            break;
+         }
+   return out;
+}
+
+std::vector<int> Scene2DNode::PasteLayers(const std::vector<Layer>& clip, int above, float dx, float dy)
+{
+   Layers();
+   std::vector<int> tops;
+   if (clip.empty())
+      return tops;
+   std::vector<std::pair<int, int>> remap;
+   std::vector<Layer> copies;
+   for (const Layer& src : clip)
+   {
+      Layer c = src;
+      remap.push_back({ c.id, mNextId });
+      c.id = mNextId++;
+      copies.push_back(c);
+   }
+   int parentOfPaste = 0;
+   if (const Layer* a = FindConst(above))
+      parentOfPaste = a->parent;
+   for (Layer& c : copies)
+   {
+      bool inside = false;
+      for (auto& r : remap)
+         if (c.parent == r.first)
+         {
+            c.parent = r.second;
+            inside = true;
+            break;
+         }
+      if (!inside)
+      {
+         c.parent = parentOfPaste;
+         c.x += dx;
+         c.y += dy;
+         tops.push_back(c.id);
+      }
+   }
+   int at = (int)mLayers.size();
+   for (int i = 0; i < (int)mLayers.size(); i++)
+      if (mLayers[i].id == above || IsInside(mLayers[i].id, above))
+         at = i + 1;
+   mLayers.insert(mLayers.begin() + at, copies.begin(), copies.end());
+   Commit();
+   return tops;
+}
+
 INode* Scene2DNode::Source(const Layer& l) const
 {
    if (l.kind != Kind::Node || l.uid == 0 || !ResolveUid)

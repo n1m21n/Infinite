@@ -208,6 +208,10 @@ public:
    int GroupLayers(const std::vector<int>& ids);   // returns the new group's id
    void Ungroup(int group);
    int Duplicate(int id);
+   // Copy and paste: the layers (with everything inside a copied group) as a free-standing list, and back in
+   // with fresh ids above `above` (0: the top), nudged by (dx, dy). Returns the new top-level ids.
+   std::vector<Layer> CopyLayers(const std::vector<int>& ids);
+   std::vector<int> PasteLayers(const std::vector<Layer>& clip, int above, float dx, float dy);
 
    // The layer's own box before the transform (node: after Fit), in pixels.
    bool LayerBox(const Layer& l, float& w, float& h);

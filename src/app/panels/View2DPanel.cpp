@@ -126,10 +126,14 @@ namespace
 
    bool sCropOn = false;
    float sCrop[4] = { 0, 0, 0, 0 };   // x0 y0 x1 y1, document px
+   std::vector<Scene2DNode::Layer> sClip;   // Copy / Cut: the layers waiting to be pasted
+   int sPasteCount = 0;                     // each paste of the same copy steps further from the original
+   float sZoomVel = 0.0f;                   // smoothed wheel zoom: log-zoom still to apply
+   ImVec2 sZoomAt(0, 0);
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText };
       What what = None;
    } sPending;
 
@@ -507,6 +511,24 @@ namespace
       return clicked;
    }
 
+   // A magnifier with a plus or a minus, drawn here (the glyph font has only the plain magnifier).
+   bool ZoomChip(const char* id, bool plus, const char* tip)
+   {
+      const bool clicked = ActionButton::Draw(id, ImVec2(tok::tile, tok::tile));
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", tip);
+      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+      const ImVec2 c((bmin.x + bmax.x) * 0.5f - 1.0f, (bmin.y + bmax.y) * 0.5f - 1.0f);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+      dl->AddCircle(c, 6.0f, col, 20, 1.6f);
+      dl->AddLine(ImVec2(c.x + 4.4f, c.y + 4.4f), ImVec2(c.x + 9.0f, c.y + 9.0f), col, 2.0f);
+      dl->AddLine(ImVec2(c.x - 3.0f, c.y), ImVec2(c.x + 3.0f, c.y), col, 1.5f);
+      if (plus)
+         dl->AddLine(ImVec2(c.x, c.y - 3.0f), ImVec2(c.x, c.y + 3.0f), col, 1.5f);
+      return clicked;
+   }
+
    bool TextChip(const char* label, bool on, const char* tip)
    {
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
@@ -846,7 +868,13 @@ namespace
          sSel.clear();
       if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
          sPending.what = Pending::Delete;
-      if (cmd && !shift && key(ImGuiKey_J)) sPending.what = Pending::Duplicate;
+      if (cmd && !shift && (key(ImGuiKey_J) || (key(ImGuiKey_D) && !PixelTool(sTool)))) sPending.what = Pending::Duplicate;
+      if (cmd && !shift)
+      {
+         if (key(ImGuiKey_C)) sPending.what = Pending::Copy;
+         if (key(ImGuiKey_X)) sPending.what = Pending::Cut;
+         if (key(ImGuiKey_V)) sPending.what = Pending::Paste;
+      }
       if (cmd && !shift && key(ImGuiKey_G)) sPending.what = Pending::Group;
       if (cmd && shift && key(ImGuiKey_G)) sPending.what = Pending::Ungroup;
       if (cmd && alt && key(ImGuiKey_G))
@@ -1972,6 +2000,36 @@ namespace
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       ImGui::InvisibleButton("##view2dcanvas", size,
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle | ImGuiButtonFlags_MouseButtonRight);
+      if (MenuParts::BeginContextItem("##v2dcanvasmenu"))
+      {
+         const bool any = !sSel.empty();
+         if (MenuParts::Item(T("Copy"), "Ctrl+C", false, any)) sPending.what = Pending::Copy;
+         if (MenuParts::Item(T("Cut"), "Ctrl+X", false, any)) sPending.what = Pending::Cut;
+         if (MenuParts::Item(T("Paste"), "Ctrl+V", false, !sClip.empty())) sPending.what = Pending::Paste;
+         if (MenuParts::Item(T("Duplicate"), "Ctrl+J", false, any)) sPending.what = Pending::Duplicate;
+         if (MenuParts::Item(T("Delete"), "Delete", false, any)) sPending.what = Pending::Delete;
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Group"), "Ctrl+G", false, any)) sPending.what = Pending::Group;
+         if (MenuParts::Item(T("Bring to Front"), "Shift+Ctrl+]", false, any)) Restack(doc, 3);
+         if (MenuParts::Item(T("Bring Forward"), "Ctrl+]", false, any)) Restack(doc, 1);
+         if (MenuParts::Item(T("Send Backward"), "Ctrl+[", false, any)) Restack(doc, 0);
+         if (MenuParts::Item(T("Send to Back"), "Shift+Ctrl+[", false, any)) Restack(doc, 2);
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Select All"), "Ctrl+A"))
+         {
+            sSel.clear();
+            for (const Layer& l : doc->Layers())
+               if (l.parent == 0)
+                  sSel.push_back(l.id);
+         }
+         if (MenuParts::Item(T("Fit on Screen"), "Ctrl+0")) FitView(doc);
+         if (MenuParts::Item(T("Actual Pixels"), "Ctrl+1"))
+         {
+            sZoom = 1.0f;
+            sPan = ImVec2(0, 0);
+         }
+         MenuParts::EndPopup();
+      }
       const ImVec2 mp = ImGui::GetIO().MousePos;
       const bool inEditor = sTextEdit != 0 && mp.x >= sEditMn.x && mp.x <= sEditMx.x && mp.y >= sEditMn.y && mp.y <= sEditMx.y;
       const bool hovered = ImGui::IsItemHovered() && !inEditor;
@@ -2161,15 +2219,30 @@ namespace
       HandleKeys(doc, hovered);
       const bool space = hovered && ImGui::IsKeyDown(ImGuiKey_Space) && !io.WantTextInput;
       const bool panTool = sTool == kHand || space;
-      if (hovered && io.MouseWheel != 0.0f)
+      // Two fingers never pan: they zoom, softly, about the pointer (a pinch arrives as Ctrl + wheel and zooms a
+      // little faster). Panning is the Hand tool, Space-drag, middle-drag, or Shift + wheel.
+      if (hovered && (io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f))
       {
-         if (io.KeyCtrl || io.KeySuper || io.KeyAlt)
-            ZoomAt(doc, std::pow(1.15f, io.MouseWheel), mouse);
+         if (io.KeyShift)
+         {
+            sPan.x += (io.MouseWheelH + io.MouseWheel) * 12.0f;
+         }
          else
-            sPan.y += io.MouseWheel * 40.0f;
+         {
+            const bool pinch = io.KeyCtrl || io.KeySuper || io.KeyAlt;
+            sZoomVel += io.MouseWheel * (pinch ? 0.10f : 0.045f);
+            sZoomAt = mouse;
+         }
       }
-      if (hovered && io.MouseWheelH != 0.0f)
-         sPan.x += io.MouseWheelH * 40.0f;
+      if (std::fabs(sZoomVel) > 0.0005f)
+      {
+         // Ease the zoom in over a few frames so a notched mouse wheel glides instead of jumping.
+         const float step = sZoomVel * 0.35f;
+         ZoomAt(doc, std::exp(step), sZoomAt);
+         sZoomVel -= step;
+      }
+      else
+         sZoomVel = 0.0f;
 
       // Cursor hints.
       int guideAxis = 0;
@@ -2970,15 +3043,45 @@ namespace
       if (IconChip("##v2dside", IconsInfinite::Layers, sSideOpen, T("Layers and properties"))) sSideOpen = !sSideOpen;
    }
 
+   // The bottom row: zoom out / in, the zoom itself (click it to type one), Fit and 1:1, then the document facts.
    void DrawStatus(Scene2DNode* doc)
    {
       const Scene2DNode::Document& d = doc->Doc();
+      auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
+      const ImVec2 mid((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
+      if (ZoomChip("##v2dzout", false, T("Zoom out (Ctrl+-)")))
+         ZoomAt(doc, 0.8f, mid);
+      next();
+      float pct = sZoom * 100.0f;
+      ImGui::SetNextItemWidth(58.0f);
+      FieldWell::PushStyle();
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+      const bool zoomTyped = ImGui::InputFloat("##v2dzoompct", &pct, 0.0f, 0.0f, "%.0f%%", ImGuiInputTextFlags_EnterReturnsTrue);
+      ImGui::PopStyleVar();
+      if (zoomTyped)
+         ZoomAt(doc, std::clamp(pct, 1.0f, 6400.0f) / 100.0f / sZoom, mid);
+      FieldWell::PopStyle();
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Zoom - type a percentage"));
+      next();
+      if (ZoomChip("##v2dzin", true, T("Zoom in (Ctrl++)")))
+         ZoomAt(doc, 1.25f, mid);
+      next();
+      if (TextChip(L("Fit##v2dstfit"), false, T("Fit on screen (Ctrl+0)")))
+         FitView(doc);
+      next();
+      if (TextChip("1:1##v2dst11", false, T("Actual pixels (Ctrl+1)")))
+      {
+         sZoom = 1.0f;
+         sPan = ImVec2(0, 0);
+      }
+      FormParts::Inline(0.0f, tok::space_3);
       char buf[200];
       if (sMouseIn)
-         std::snprintf(buf, sizeof(buf), "%.0f%%   %d x %d   %.0f, %.0f   %.2f ms", sZoom * 100.0f, d.w, d.h, sMouseDoc.x,
-                       sMouseDoc.y, doc->CookMs());
+         std::snprintf(buf, sizeof(buf), "%d x %d   %.0f, %.0f   %.2f ms", d.w, d.h, sMouseDoc.x, sMouseDoc.y, doc->CookMs());
       else
-         std::snprintf(buf, sizeof(buf), "%.0f%%   %d x %d   %.2f ms", sZoom * 100.0f, d.w, d.h, doc->CookMs());
+         std::snprintf(buf, sizeof(buf), "%d x %d   %.2f ms", d.w, d.h, doc->CookMs());
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f);
       ImGui::TextDisabled("%s", buf);
    }
 
@@ -3177,7 +3280,11 @@ namespace
          {
             if (!Selected(id))
                SelectOnly(id);
+            if (MenuParts::Item(T("Copy"), "Ctrl+C")) sPending.what = Pending::Copy;
+            if (MenuParts::Item(T("Cut"), "Ctrl+X")) sPending.what = Pending::Cut;
+            if (MenuParts::Item(T("Paste"), "Ctrl+V", false, !sClip.empty())) sPending.what = Pending::Paste;
             if (MenuParts::Item(T("Duplicate Layer"), "Ctrl+J")) sPending.what = Pending::Duplicate;
+            MenuParts::Separator();
             if (MenuParts::Item(T("Group Layers"), "Ctrl+G")) sPending.what = Pending::Group;
             if (l->kind == Kind::Group && MenuParts::Item(T("Ungroup"), "Shift+Ctrl+G")) sPending.what = Pending::Ungroup;
             if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), "Alt+Ctrl+G"))
@@ -3911,6 +4018,26 @@ namespace
             SelectOnly(doc->Duplicate(a->id));
          }
          break;
+      case Pending::Copy:
+      case Pending::Cut:
+         if (!sSel.empty())
+         {
+            sClip = doc->CopyLayers(sSel);
+            sPasteCount = 0;
+            if (sPending.what == Pending::Cut)
+               DeleteSelected(doc);
+         }
+         break;
+      case Pending::Paste:
+         if (!sClip.empty())
+         {
+            PushUndoCheckpoint("Paste layer");
+            Layer* a = Active(doc);
+            sPasteCount++;
+            const float nudge = 16.0f * sPasteCount;
+            sSel = doc->PasteLayers(sClip, a != nullptr ? a->id : 0, nudge, nudge);
+         }
+         break;
       case Pending::Delete: DeleteSelected(doc); break;
       case Pending::AddFill: AddFill(doc); break;
       case Pending::AddPaint: AddPaint(doc); break;
@@ -4043,7 +4170,7 @@ namespace
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideW = sSideOpen ? std::min(kSideW, avail.x * 0.5f) : 0.0f;
       const float viewW = std::max(120.0f, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
-      const float statusH = ImGui::GetTextLineHeightWithSpacing();
+      const float statusH = tok::tile + ImGui::GetStyle().ItemSpacing.y;
       const float canvasH = std::max(80.0f, avail.y - statusH);
       DrawToolStrip(canvasH);
       ActionButton::RowNext();
