@@ -321,6 +321,22 @@ namespace Platform
    int GpuPreference() { return 0; }
    void SetGpuPreference(int) {}
 
+   float PenPressure(GLFWwindow*)
+   {
+      static float sPressure = -1.0f;
+      static id sMonitor = nil;
+      if (sMonitor == nil)
+      {
+         NSEventMask mask = NSEventMaskLeftMouseDown | NSEventMaskLeftMouseDragged | NSEventMaskTabletPoint;
+         sMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent*(NSEvent* e) {
+            bool tablet = e.type == NSEventTypeTabletPoint || e.subtype == NSEventSubtypeTabletPoint;
+            sPressure = tablet ? (float)e.pressure : -1.0f;
+            return e;
+         }];
+      }
+      return sPressure;
+   }
+
    void ShowFatalError(const std::string& title, const std::string& message)
    {
       fprintf(stderr, "%s: %s\n", title.c_str(), message.c_str());

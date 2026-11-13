@@ -1673,6 +1673,44 @@ namespace Platform
       }
    }
 
+   namespace
+   {
+      WNDPROC sPenPrevProc = nullptr;
+      float sPenPressure = -1.0f;
+
+      // Pen input reaches the window as WM_POINTER* before Windows turns it
+      // into mouse messages, so read the pressure here and pass everything on.
+      LRESULT CALLBACK PenProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+      {
+         if (msg == WM_POINTERDOWN || msg == WM_POINTERUPDATE)
+         {
+            const UINT32 id = GET_POINTERID_WPARAM(wp);
+            POINTER_INPUT_TYPE type = PT_POINTER;
+            if (GetPointerType(id, &type) && type == PT_PEN)
+            {
+               POINTER_PEN_INFO info = {};
+               if (GetPointerPenInfo(id, &info) && (info.penMask & PEN_MASK_PRESSURE))
+                  sPenPressure = info.pressure / 1024.0f;
+            }
+            else
+               sPenPressure = -1.0f;
+         }
+         return CallWindowProcW(sPenPrevProc, hwnd, msg, wp, lp);
+      }
+   }
+
+   float PenPressure(GLFWwindow* window)
+   {
+      static HWND sHooked = nullptr;
+      HWND hwnd = window ? glfwGetWin32Window(window) : nullptr;
+      if (hwnd && hwnd != sHooked && sHooked == nullptr)
+      {
+         sPenPrevProc = (WNDPROC)SetWindowLongPtrW(hwnd, GWLP_WNDPROC, (LONG_PTR)PenProc);
+         sHooked = hwnd;
+      }
+      return sPenPressure;
+   }
+
    bool GpuPreferenceSupported() { return true; }
 
    int GpuPreference()
