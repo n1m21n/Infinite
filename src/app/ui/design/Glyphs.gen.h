@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE979;
+   inline constexpr unsigned kLast = 0xE97B;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -126,4 +126,6 @@ namespace IconsInfinite
    inline constexpr const char* Lasso = "\xee\xa5\xb7"; // U+E977 lasso
    inline constexpr const char* Marquee = "\xee\xa5\xb8"; // U+E978 marquee
    inline constexpr const char* Wand = "\xee\xa5\xb9"; // U+E979 wand
+   inline constexpr const char* Shape = "\xee\xa5\xba"; // U+E97A shape
+   inline constexpr const char* Type = "\xee\xa5\xbb"; // U+E97B type
 }

@@ -351,6 +351,127 @@ void RunView2DTest()
       printf("  T3 tiles in store after test: %zu keys\n", keys.size());
    }
 
+   // ---- T-C: a poster with a vector logo and text, all editable after reopen ----
+   {
+      using Shape = Scene2DNode::Shape;
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 400;
+      pic.Doc().h = 300;
+      pic.Commit();
+      const int v = pic.AddVectorLayer();
+      {
+         Shape box;
+         box.type = Shape::kRect;
+         box.x0 = 20; box.y0 = 20; box.x1 = 160; box.y1 = 160;
+         box.radius = 12.0f;
+         box.fillC[0] = 1.0f;
+         Shape hole;
+         hole.type = Shape::kEllipse;
+         hole.x0 = 60; hole.y0 = 60; hole.x1 = 120; hole.y1 = 120;
+         hole.op = Shape::kSubtract;
+         Shape star;
+         star.type = Shape::kStar;
+         star.x0 = 240; star.y0 = 20; star.x1 = 380; star.y1 = 140;
+         star.fillOn = false;
+         star.strokeOn = true;
+         star.strokeC[1] = 1.0f;
+         star.width = 6.0f;
+         star.join = 1;
+         star.cap = 1;
+         star.dash = 14.0f;
+         star.gap = 8.0f;
+         Shape pen;
+         pen.type = Shape::kPath;
+         pen.pts = { 20, 280, 20, 280, 60, 240, 160, 280, 120, 240, 160, 280 };
+         pen.fillOn = false;
+         pen.strokeOn = true;
+         pen.width = 4.0f;
+         pen.align = 0;
+         pic.FindLayer(v)->shapes = { box, hole, star, pen };
+         pic.Commit();
+      }
+      const bool imported = pic.ImportSvg(v, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+                                             "<rect width=\"20\" height=\"20\" fill=\"#0000ff\"/></svg>");
+      const int pt = pic.AddTextLayer("INFINITE", 20.0f, 180.0f, 0.0f);
+      const int bx = pic.AddTextLayer("a poster set in a box that wraps", 230.0f, 170.0f, 150.0f);
+      pic.FindLayer(pt)->fontSize = 40.0f;
+      pic.FindLayer(bx)->fontSize = 22.0f;
+      pic.Commit();
+      Cook(&pic);
+      Check("T-C: SVG imports into the vector layer", imported && pic.FindLayer(v)->shapes.size() == 5
+                                                        && pic.FindLayer(v)->shapes.back().type == Shape::kSvg);
+      Check("T-C: rectangle fills, the subtracted ellipse is a hole", Pixel(&pic, 30, 30)[1] < 0.05f && Pixel(&pic, 90, 90)[1] > 0.95f
+                                                                        && Pixel(&pic, 150, 90)[1] < 0.05f);
+      Check("T-C: the imported SVG draws centred", Pixel(&pic, 200, 150)[2] > 0.95f && Pixel(&pic, 200, 150)[0] < 0.05f);
+      auto Ink = [](Scene2DNode* d, int x0, int y0, int x1, int y1, int ch)
+      {
+         int n = 0;
+         for (int y = y0; y < y1; y += 2)
+            for (int x = x0; x < x1; x += 2)
+               if (Pixel(d, x, y)[ch] < 0.5f)   // ink on the white page
+                  n++;
+         return n;
+      };
+      Check("T-C: the dashed star stroke draws", Ink(&pic, 240, 20, 380, 140, 0) > 20 && Ink(&pic, 240, 20, 380, 140, 1) == 0);
+      int tw = 0, th = 0, bw = 0, bh = 0;
+      const bool sized = pic.TextSize(*pic.FindLayer(pt), tw, th) && pic.TextSize(*pic.FindLayer(bx), bw, bh);
+      printf("  T-C text boxes: point %dx%d, box %dx%d\n", tw, th, bw, bh);
+      Check("T-C: point text sizes to its ink, box text keeps its width", sized && tw > 60 && th > 10 && bw == 150 && bh > 40);
+      Check("T-C: the text draws", Ink(&pic, 20, 180, 220, 236, 1) > 10 && Ink(&pic, 230, 170, 380, 290, 1) > 10);
+      const std::string svg = pic.ToSvg(*pic.FindLayer(v));
+      Check("T-C: the layer writes as SVG", svg.find("<svg") != std::string::npos && svg.find("mask") != std::string::npos
+                                              && svg.find("stroke-dasharray") != std::string::npos);
+      // Reopen: every item and every text field comes back and draws the same.
+      Scene2DNode copy;
+      copy.SetDocText(pic.DocText());
+      Cook(&copy);
+      const Layer* cv = copy.FindLayer(v);
+      const Layer* cb = copy.FindLayer(bx);
+      bool same = cv != nullptr && cb != nullptr && cv->shapes.size() == 5;
+      if (same)
+      {
+         const Layer* ov = pic.FindLayer(v);
+         for (size_t i = 0; i < 5; i++)
+         {
+            const Shape& a = ov->shapes[i];
+            const Shape& b = cv->shapes[i];
+            same = same && a.type == b.type && a.op == b.op && a.pts == b.pts && a.svg == b.svg && a.dash == b.dash
+                   && a.gap == b.gap && a.cap == b.cap && a.join == b.join && a.radius == b.radius && a.strokeOn == b.strokeOn;
+         }
+         same = same && cb->text == "a poster set in a box that wraps" && cb->boxW == 150.0f && cb->fontSize == 22.0f;
+      }
+      Check("T-C: reopened, shapes and text are still editable", same);
+      bool picture = true;
+      for (int y = 5; y < 300; y += 10)
+         for (int x = 5; x < 400; x += 10)
+         {
+            const std::vector<float> p0 = Pixel(&pic, x, y), p1 = Pixel(&copy, x, y);
+            for (int c = 0; c < 4; c++)
+               picture = picture && std::fabs(p0[c] - p1[c]) < 0.02f;
+         }
+      Check("T-C: reopened, the picture is the same", picture);
+      // A vector mask keeps only the left part of the logo.
+      Layer* mv = copy.FindLayer(v);
+      Shape keep;
+      keep.type = Shape::kRect;
+      keep.x0 = 0; keep.y0 = 0; keep.x1 = 50; keep.y1 = 300;
+      keep.fillC[0] = keep.fillC[1] = keep.fillC[2] = 1.0f;
+      mv->hasVMask = true;
+      mv->vmask = { keep };
+      copy.Commit();
+      Cook(&copy);
+      Check("T-C: the vector mask hides outside its shape", Pixel(&copy, 30, 30)[1] < 0.05f && Pixel(&copy, 150, 30)[1] > 0.95f);
+      // Editing after reopen redraws: the hole moves.
+      copy.FindLayer(v)->vmask.clear();
+      copy.FindLayer(v)->hasVMask = false;
+      copy.FindLayer(v)->shapes[1].x0 = 100;
+      copy.FindLayer(v)->shapes[1].x1 = 150;
+      copy.Commit();
+      Cook(&copy);
+      Check("T-C: an edit after reopen redraws", Pixel(&copy, 70, 90)[1] < 0.05f && Pixel(&copy, 125, 90)[1] > 0.95f);
+   }
+
    // ---- M4: a brush stroke at 1080p stays inside one frame ----
    {
       Scene2DNode pic;

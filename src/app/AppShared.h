@@ -5925,6 +5925,8 @@ void DrawView2DDocked(const char* id, const ImVec2& size);
 bool View2DCanAdd(const GraphNode& gn);
 void View2DAddNode(GraphNode& gn);
 OutputNode* View2DEnsureOutput();
+// Drops an SVG file onto the open 2D View as a new vector layer.
+bool View2DImportSvg(const std::string& path);
 // The Scene 2D node's canvas body: its size and Open in 2D View.
 void DrawScene2DBody(GraphNode& gn);
 GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId);

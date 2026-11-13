@@ -20,12 +20,15 @@
 #include "nodes/ImageSourceNode.h"
 #include "nodes/OutputNode.h"
 #include "nodes/Scene2DNode.h"
+#include "nodes/SketchNode.h"
+#include "nodes/TextNode.h"
 #include "platform/Platform.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -57,10 +60,10 @@ namespace
    // Overlay colours are an image editor's, not the app's: they are read against the picture.
    constexpr unsigned kPasteboard = 0x282828, kOutline = 0x2D8CFF, kSmart = 0xFF2DB4, kGuide = 0x00D2E6, kGrid = 0x808080;
 
-   enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand };
+   enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand, kPen, kNode, kShape, kText };
    int sTool = kMove;
    bool PaintTool(int t) { return t == kBrush || t == kEraser || t == kFill; }
-   bool PixelTool(int t) { return t >= kBrush; }
+   bool PixelTool(int t) { return t >= kBrush && t <= kWand; }
 
    // Paint tools. The brush and the eraser keep their own settings.
    BrushEngine::Brush sBrush, sEraser;
@@ -115,6 +118,7 @@ namespace
       float crop0[4] = { 0, 0, 0, 0 };
       int cropHandle = -1;        // 0..7 handle, 8 inside
       ImVec2 pan0;
+      bool made = false;          // the shape tool has added its item
    } sOp;
 
    bool sCropOn = false;
@@ -122,7 +126,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText };
       What what = None;
    } sPending;
 
@@ -218,6 +222,15 @@ namespace
          return std::string(T("Fill")) + " " + std::to_string(l.id);
       if (l.kind == Kind::Paint)
          return std::string(T("Layer")) + " " + std::to_string(l.id);
+      if (l.kind == Kind::Vector)
+         return std::string(T("Vector")) + " " + std::to_string(l.id);
+      if (l.kind == Kind::Text)
+      {
+         std::string first = l.text.substr(0, l.text.find('\n'));
+         if (first.size() > 28)
+            first = first.substr(0, 28) + "...";
+         return first.empty() ? std::string(T("Text")) + " " + std::to_string(l.id) : first;
+      }
       GraphNode* gn = FindNodeByUid(l.uid);
       return gn != nullptr ? gn->typeName + " " + std::to_string(gn->index) : std::string(T("source missing"));
    }
@@ -303,8 +316,22 @@ namespace
       for (int i = (int)layers.size() - 1; i >= 0; i--)
       {
          const Layer& l = layers[i];
-         if ((l.kind != Kind::Node && l.kind != Kind::Paint) || !doc->Shown(l) || (l.lock & Scene2DNode::kLockAll) != 0)
+         if ((l.kind != Kind::Node && l.kind != Kind::Paint && l.kind != Kind::Vector && l.kind != Kind::Text) || !doc->Shown(l) ||
+             (l.lock & Scene2DNode::kLockAll) != 0)
             continue;
+         if (l.kind == Kind::Vector)
+         {
+            // Only where the layer has items, not its whole document-sized box.
+            float bx = 0, by = 0;
+            doc->DocToBox(l, p.x, p.y, bx, by);
+            for (const Scene2DNode::Shape& s : l.shapes)
+            {
+               float lo[2], hi[2];
+               if (Scene2DNode::ShapeBounds(s, lo, hi) && bx >= lo[0] && bx <= hi[0] && by >= lo[1] && by <= hi[1])
+                  return l.id;
+            }
+            continue;
+         }
          float c[8];
          doc->Corners(l, c);
          if (InQuad(c, p))
@@ -750,6 +777,8 @@ namespace
 
    void HandlePixelKeys(Scene2DNode* doc, bool cmd, bool shift);
 
+   bool HandleVectorKeys(Scene2DNode* doc);
+
    void HandleKeys(Scene2DNode* doc, bool hovered)
    {
       const ImGuiIO& io = ImGui::GetIO();
@@ -773,7 +802,13 @@ namespace
          if (key(ImGuiKey_M)) sTool = kMarquee;
          if (key(ImGuiKey_L)) sTool = kLasso;
          if (key(ImGuiKey_W)) sTool = kWand;
+         if (key(ImGuiKey_P)) sTool = kPen;
+         if (key(ImGuiKey_A)) sTool = kNode;
+         if (key(ImGuiKey_U)) sTool = kShape;
+         if (key(ImGuiKey_T)) sTool = kText;
       }
+      if (HandleVectorKeys(doc))
+         return;
       HandlePixelKeys(doc, cmd, shift);
       if (key(ImGuiKey_F12))
          sPending.what = cmd ? Pending::RenderAnim : Pending::RenderImage;
@@ -1127,7 +1162,7 @@ namespace
    void ScaleActive(Scene2DNode* doc, ImVec2 mouse)
    {
       Layer* l = Active(doc);
-      if (l == nullptr || (l->kind != Kind::Node && l->kind != Kind::Paint))
+      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Fill)
          return;
       const Layer& l0 = sOp.l0;
       float bw = 1, bh = 1, m0[6], inv[6];
@@ -1171,7 +1206,7 @@ namespace
    void RotateActive(Scene2DNode* doc, ImVec2 mouse)
    {
       Layer* l = Active(doc);
-      if (l == nullptr || (l->kind != Kind::Node && l->kind != Kind::Paint))
+      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Fill)
          return;
       const ImVec2 c = ToScreen(doc, sOp.l0.x, sOp.l0.y);
       const float a0 = std::atan2(sOp.start.y - c.y, sOp.start.x - c.x), a1 = std::atan2(mouse.y - c.y, mouse.x - c.x);
@@ -1358,13 +1393,585 @@ namespace
       std::copy(c, c + 4, sCrop);
    }
 
+   // ---- vector and text tools ----------------------------------------------
+
+   using Shape = Scene2DNode::Shape;
+   Shape sStyle;                   // what the next drawn item gets
+   int sShapeKind = 0;             // 0 rectangle, 1 rounded, 2 ellipse, 3 polygon, 4 star, 5 line
+   int sVecTarget = 0;             // 0 the layer's items, 1 its vector mask
+   int sItem = -1, sItemLayer = 0; // the picked item and the layer it is in
+   int sPenItem = -1;              // the open path the pen adds to
+   int sAnchor = -1, sPart = 0;    // node tool: 0 anchor, 1 in handle, 2 out handle, 3 box corner, 4 the whole item
+   Shape sItem0;                   // the item as the drag began
+   std::string sFont;
+   float sTextSize = 0.0f, sLeading = 1.2f, sTracking = 0.0f;
+   int sTextAlign = 0;
+   float sTextC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+   int sTextEdit = 0;              // the text layer being typed into
+   bool sTextFocus = false;
+   char sTextBuf[4096] = {};
+   ImVec2 sEditMn(0, 0), sEditMx(0, 0);
+
+   bool VectorTool(int t) { return t == kPen || t == kNode || t == kShape; }
+
+   std::vector<Shape>* Items(Layer* l)
+   {
+      if (l == nullptr)
+         return nullptr;
+      if (sVecTarget == 1 && l->hasVMask)
+         return &l->vmask;
+      return l->kind == Kind::Vector ? &l->shapes : nullptr;
+   }
+
+   Shape* PickedItem(Scene2DNode* doc)
+   {
+      Layer* a = Active(doc);
+      std::vector<Shape>* items = Items(a);
+      if (items == nullptr || a->id != sItemLayer || sItem < 0 || sItem >= (int)items->size())
+         return nullptr;
+      return &(*items)[sItem];
+   }
+
+   // Where drawing goes: the active vector layer (or the mask being drawn), else a new vector layer over it.
+   Layer* DrawTarget(Scene2DNode* doc)
+   {
+      Layer* a = Active(doc);
+      if (Items(a) != nullptr)
+         return a;
+      const int id = doc->AddVectorLayer(a != nullptr && a->kind != Kind::Group ? a->id : 0);
+      SelectOnly(id);
+      sVecTarget = 0;
+      sItem = -1;
+      return doc->FindLayer(id);
+   }
+
+   ImVec2 BoxPt(Scene2DNode* doc, const Layer& l, ImVec2 p)
+   {
+      float bx = 0, by = 0;
+      doc->DocToBox(l, p.x, p.y, bx, by);
+      return ImVec2(bx, by);
+   }
+
+   ImVec2 BoxScreen(Scene2DNode* doc, const Layer& l, float bx, float by)
+   {
+      float x = 0, y = 0;
+      doc->BoxToDoc(l, bx, by, x, y);
+      return ToScreen(doc, x, y);
+   }
+
+   bool VectorBounds(const Layer& l, float lo[2], float hi[2])
+   {
+      lo[0] = lo[1] = 1e30f;
+      hi[0] = hi[1] = -1e30f;
+      for (const Shape& s : l.shapes)
+      {
+         float a[2], b[2];
+         if (!Scene2DNode::ShapeBounds(s, a, b))
+            continue;
+         lo[0] = std::min(lo[0], a[0]);
+         lo[1] = std::min(lo[1], a[1]);
+         hi[0] = std::max(hi[0], b[0]);
+         hi[1] = std::max(hi[1], b[1]);
+      }
+      return lo[0] <= hi[0];
+   }
+
+   void CopyStyle(const Shape& from, Shape& to)
+   {
+      to.fillOn = from.fillOn;
+      to.strokeOn = from.strokeOn;
+      std::copy(from.fillC, from.fillC + 4, to.fillC);
+      std::copy(from.strokeC, from.strokeC + 4, to.strokeC);
+      to.width = from.width;
+      to.cap = from.cap;
+      to.join = from.join;
+      to.align = from.align;
+      to.dash = from.dash;
+      to.gap = from.gap;
+      to.op = from.op;
+   }
+
+   // Shape tool: the item appears once the drag has moved, so a stray click leaves nothing behind.
+   void DragShape(Scene2DNode* doc, ImVec2 mouse)
+   {
+      const ImGuiIO& io = ImGui::GetIO();
+      if (!sOp.made)
+      {
+         if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < 3.0f)
+            return;
+         PushUndoCheckpoint("Draw shape");
+         Layer* l = DrawTarget(doc);
+         std::vector<Shape>* items = Items(l);
+         if (items == nullptr)
+            return;
+         static const int kTypes[6] = { Shape::kRect, Shape::kRect, Shape::kEllipse, Shape::kPolygon, Shape::kStar, Shape::kLine };
+         Shape s = sStyle;
+         s.type = kTypes[std::clamp(sShapeKind, 0, 5)];
+         s.radius = sShapeKind == 1 ? std::max(1.0f, sStyle.radius) : 0.0f;
+         s.pts.clear();
+         s.svg.clear();
+         s.closed = false;
+         items->push_back(s);
+         sItem = (int)items->size() - 1;
+         sItemLayer = l->id;
+         sOp.made = true;
+      }
+      Layer* l = Active(doc);
+      Shape* s = PickedItem(doc);
+      if (l == nullptr || s == nullptr)
+         return;
+      const ImVec2 a = BoxPt(doc, *l, sOp.docStart), b = BoxPt(doc, *l, sMouseDoc);
+      float dx = b.x - a.x, dy = b.y - a.y;
+      if (io.KeyShift)
+      {
+         if (s->type == Shape::kLine)
+         {
+            const float ang = std::round(std::atan2(dy, dx) / (kPi * 0.25f)) * (kPi * 0.25f), len = std::hypot(dx, dy);
+            dx = std::cos(ang) * len;
+            dy = std::sin(ang) * len;
+         }
+         else
+         {
+            const float m = std::max(std::fabs(dx), std::fabs(dy));
+            dx = dx < 0 ? -m : m;
+            dy = dy < 0 ? -m : m;
+         }
+      }
+      const bool centre = io.KeyAlt && s->type != Shape::kLine;
+      s->x0 = centre ? a.x - dx : a.x;
+      s->y0 = centre ? a.y - dy : a.y;
+      s->x1 = a.x + dx;
+      s->y1 = a.y + dy;
+      Touch();
+   }
+
+   void FinishPen(Scene2DNode* doc)
+   {
+      Layer* a = Active(doc);
+      std::vector<Shape>* items = Items(a);
+      if (items != nullptr && a->id == sItemLayer && sPenItem >= 0 && sPenItem < (int)items->size() && (*items)[sPenItem].Anchors() < 2)
+      {
+         items->erase(items->begin() + sPenItem);
+         sItem = -1;
+         Touch();
+      }
+      sPenItem = -1;
+   }
+
+   // Pen: a click adds a corner, a drag pulls out smooth handles, a click on the first anchor closes the path.
+   void PenClick(Scene2DNode* doc, ImVec2 mouse)
+   {
+      Layer* l = Active(doc);
+      std::vector<Shape>* items = Items(l);
+      Shape* open = nullptr;
+      if (items != nullptr && l->id == sItemLayer && sPenItem >= 0 && sPenItem < (int)items->size() &&
+          (*items)[sPenItem].type == Shape::kPath && !(*items)[sPenItem].closed)
+         open = &(*items)[sPenItem];
+      if (open == nullptr)
+      {
+         PushUndoCheckpoint("Pen path");
+         l = DrawTarget(doc);
+         items = Items(l);
+         if (items == nullptr)
+            return;
+         Shape s = sStyle;
+         s.type = Shape::kPath;
+         s.pts.clear();
+         s.svg.clear();
+         s.closed = false;
+         items->push_back(s);
+         sPenItem = sItem = (int)items->size() - 1;
+         sItemLayer = l->id;
+         open = &items->back();
+      }
+      else
+         PushUndoCheckpoint("Pen point");
+      sOp = Op();
+      sOp.kind = 13;
+      sOp.start = mouse;
+      if (open->Anchors() >= 2)
+      {
+         const ImVec2 f = BoxScreen(doc, *l, open->pts[0], open->pts[1]);
+         if (std::hypot(mouse.x - f.x, mouse.y - f.y) < 8.0f)
+         {
+            open->closed = true;
+            sAnchor = 0;
+            Touch();
+            return;
+         }
+      }
+      const ImVec2 b = BoxPt(doc, *l, sMouseDoc);
+      open->pts.insert(open->pts.end(), { b.x, b.y, b.x, b.y, b.x, b.y });
+      sAnchor = open->Anchors() - 1;
+      Touch();
+   }
+
+   void PenDrag(Scene2DNode* doc, ImVec2 mouse)
+   {
+      Layer* l = Active(doc);
+      std::vector<Shape>* items = Items(l);
+      if (items == nullptr || sPenItem < 0 || sPenItem >= (int)items->size())
+         return;
+      Shape& s = (*items)[sPenItem];
+      if (sAnchor < 0 || sAnchor >= s.Anchors() || std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < 2.0f)
+         return;
+      float* p = &s.pts[(size_t)sAnchor * 6];
+      const ImVec2 b = BoxPt(doc, *l, sMouseDoc);
+      p[4] = b.x;
+      p[5] = b.y;
+      p[2] = 2.0f * p[0] - b.x;
+      p[3] = 2.0f * p[1] - b.y;
+      Touch();
+   }
+
+   // The item under the pointer: the picked item's anchors, handles and corners first, then any item's body, top first.
+   int HitItem(Scene2DNode* doc, const Layer& l, const std::vector<Shape>& items, ImVec2 mouse, int& anchor, int& part)
+   {
+      auto near = [&](float bx, float by) {
+         const ImVec2 q = BoxScreen(doc, l, bx, by);
+         return std::hypot(mouse.x - q.x, mouse.y - q.y) < 6.0f;
+      };
+      if (l.id == sItemLayer && sItem >= 0 && sItem < (int)items.size())
+      {
+         const Shape& s = items[sItem];
+         if (s.type == Shape::kPath)
+         {
+            for (int i = 0; i < s.Anchors(); i++)
+               for (int k = 0; k < 3; k++)
+                  if (near(s.pts[(size_t)i * 6 + k * 2], s.pts[(size_t)i * 6 + k * 2 + 1]))
+                  {
+                     anchor = i;
+                     part = k;
+                     return sItem;
+                  }
+         }
+         else
+         {
+            if (near(s.x0, s.y0) || near(s.x1, s.y1))
+            {
+               anchor = near(s.x0, s.y0) ? 0 : 1;
+               part = 3;
+               return sItem;
+            }
+         }
+      }
+      const ImVec2 b = BoxPt(doc, l, ToDoc(doc, mouse));
+      const float pad = 4.0f / std::max(0.01f, sZoom);
+      for (int i = (int)items.size() - 1; i >= 0; i--)
+      {
+         float lo[2], hi[2];
+         if (Scene2DNode::ShapeBounds(items[i], lo, hi) && b.x >= lo[0] - pad && b.x <= hi[0] + pad && b.y >= lo[1] - pad && b.y <= hi[1] + pad)
+         {
+            anchor = -1;
+            part = 4;
+            return i;
+         }
+      }
+      return -1;
+   }
+
+   void NodeClick(Scene2DNode* doc, ImVec2 mouse)
+   {
+      Layer* l = Active(doc);
+      std::vector<Shape>* items = Items(l);
+      int anchor = -1, part = 0;
+      int hit = items != nullptr ? HitItem(doc, *l, *items, mouse, anchor, part) : -1;
+      if (hit < 0)
+      {
+         // Another vector layer under the pointer becomes the one edited.
+         Layer* o = doc->FindLayer(HitLayer(doc, sMouseDoc));
+         if (o != nullptr && o->kind == Kind::Vector && o != l)
+         {
+            SelectOnly(o->id);
+            sVecTarget = 0;
+            l = o;
+            items = Items(l);
+            hit = HitItem(doc, *l, *items, mouse, anchor, part);
+         }
+      }
+      if (hit < 0)
+      {
+         sItem = -1;
+         return;
+      }
+      sItem = hit;
+      sItemLayer = l->id;
+      Shape& s = (*items)[hit];
+      if (ImGui::GetIO().KeyAlt && part == 0 && s.type == Shape::kPath)
+      {
+         // Alt-click on an anchor makes it a corner.
+         PushUndoCheckpoint("Corner point");
+         float* p = &s.pts[(size_t)anchor * 6];
+         p[2] = p[4] = p[0];
+         p[3] = p[5] = p[1];
+         Touch();
+         return;
+      }
+      PushUndoCheckpoint(part == 4 ? "Move shape" : "Edit path");
+      sOp = Op();
+      sOp.kind = 14;
+      sOp.start = mouse;
+      sOp.docStart = sMouseDoc;
+      sAnchor = anchor;
+      sPart = part;
+      sItem0 = s;
+   }
+
+   void NodeDrag(Scene2DNode* doc)
+   {
+      Layer* l = Active(doc);
+      Shape* s = PickedItem(doc);
+      if (l == nullptr || s == nullptr)
+         return;
+      const ImVec2 a = BoxPt(doc, *l, sOp.docStart), b = BoxPt(doc, *l, sMouseDoc);
+      const float dx = b.x - a.x, dy = b.y - a.y;
+      *s = sItem0;
+      if (sPart == 4)
+      {
+         s->x0 += dx;
+         s->x1 += dx;
+         s->y0 += dy;
+         s->y1 += dy;
+         for (size_t i = 0; i < s->pts.size(); i++)
+            s->pts[i] += (i % 2) == 0 ? dx : dy;
+      }
+      else if (sPart == 3)
+      {
+         (sAnchor == 0 ? s->x0 : s->x1) += dx;
+         (sAnchor == 0 ? s->y0 : s->y1) += dy;
+      }
+      else if (sAnchor >= 0 && sAnchor < s->Anchors())
+      {
+         float* p = &s->pts[(size_t)sAnchor * 6];
+         if (sPart == 0)
+            for (int k = 0; k < 6; k++)
+               p[k] += (k % 2) == 0 ? dx : dy;
+         else
+         {
+            const int h = sPart == 1 ? 2 : 4, o = sPart == 1 ? 4 : 2;
+            p[h] += dx;
+            p[h + 1] += dy;
+            // The opposite handle turns with it, keeping its length; Alt breaks the pair.
+            const float ol = std::hypot(p[o] - p[0], p[o + 1] - p[1]), hl = std::hypot(p[h] - p[0], p[h + 1] - p[1]);
+            if (!ImGui::GetIO().KeyAlt && ol > 1e-3f && hl > 1e-3f)
+            {
+               p[o] = p[0] - (p[h] - p[0]) / hl * ol;
+               p[o + 1] = p[1] - (p[h + 1] - p[1]) / hl * ol;
+            }
+         }
+      }
+      Touch();
+   }
+
+   void DrawVectorOverlay(ImDrawList* dl, Scene2DNode* doc, ImVec2 mouse, bool hovered)
+   {
+      Layer* l = Active(doc);
+      std::vector<Shape>* items = Items(l);
+      if (items == nullptr)
+         return;
+      std::vector<std::vector<float>> lines;
+      const ImU32 white = IM_COL32(255, 255, 255, 255);
+      for (int i = 0; i < (int)items->size(); i++)
+      {
+         const Shape& s = (*items)[i];
+         const bool picked = i == sItem && l->id == sItemLayer;
+         Scene2DNode::Outline(s, lines);
+         for (const auto& ln : lines)
+         {
+            std::vector<ImVec2> q;
+            for (size_t k = 0; k + 1 < ln.size(); k += 2)
+               q.push_back(BoxScreen(doc, *l, ln[k], ln[k + 1]));
+            if (q.size() >= 2)
+               dl->AddPolyline(q.data(), (int)q.size(), Hex(kOutline, picked ? 1.0f : 0.45f), ImDrawFlags_None, picked ? 1.5f : 1.0f);
+         }
+         if (!picked || sTool == kShape)
+            continue;
+         auto dot = [&](float bx, float by, bool square) {
+            const ImVec2 p = BoxScreen(doc, *l, bx, by);
+            if (square)
+            {
+               dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), white);
+               dl->AddRect(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), Hex(kOutline));
+            }
+            else
+            {
+               dl->AddCircleFilled(p, 3.0f, Hex(kOutline));
+            }
+         };
+         if (s.type == Shape::kPath)
+            for (int a = 0; a < s.Anchors(); a++)
+            {
+               const float* p = &s.pts[(size_t)a * 6];
+               for (int k = 1; k < 3; k++)
+                  if (std::fabs(p[k * 2] - p[0]) + std::fabs(p[k * 2 + 1] - p[1]) > 0.01f)
+                  {
+                     dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), BoxScreen(doc, *l, p[k * 2], p[k * 2 + 1]), Hex(kOutline, 0.8f));
+                     dot(p[k * 2], p[k * 2 + 1], false);
+                  }
+               dot(p[0], p[1], true);
+            }
+         else
+         {
+            dot(s.x0, s.y0, true);
+            dot(s.x1, s.y1, true);
+         }
+      }
+      // The pen's next segment follows the pointer.
+      if (sTool == kPen && hovered && sOp.kind == 0 && l->id == sItemLayer && sPenItem >= 0 && sPenItem < (int)items->size())
+      {
+         const Shape& s = (*items)[sPenItem];
+         if (s.Anchors() > 0 && !s.closed)
+         {
+            const float* p = &s.pts[(size_t)(s.Anchors() - 1) * 6];
+            dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), mouse, Hex(kOutline, 0.7f), 1.0f);
+         }
+      }
+   }
+
+   // ---- text -------------------------------------------------------------
+
+   void EndTextEdit(Scene2DNode* doc)
+   {
+      Layer* l = doc->FindLayer(sTextEdit);
+      sTextEdit = 0;
+      if (l != nullptr && l->kind == Kind::Text && l->text.empty())
+      {
+         doc->RemoveLayer(l->id);
+         PruneSelection(doc);
+      }
+   }
+
+   void BeginTextEdit(Scene2DNode* doc, int id)
+   {
+      Layer* l = doc->FindLayer(id);
+      if (l == nullptr || l->kind != Kind::Text)
+         return;
+      if (sTextEdit != 0 && sTextEdit != id)
+         EndTextEdit(doc);
+      sTextEdit = id;
+      sTextFocus = true;
+      std::snprintf(sTextBuf, sizeof(sTextBuf), "%s", l->text.c_str());
+      SelectOnly(id);
+   }
+
+   void TextClick(Scene2DNode* doc, ImVec2 mouse)
+   {
+      if (sTextEdit != 0)
+         EndTextEdit(doc);
+      Layer* hit = doc->FindLayer(HitLayer(doc, sMouseDoc));
+      if (hit != nullptr && hit->kind == Kind::Text)
+      {
+         PushUndoCheckpoint("Edit text");
+         BeginTextEdit(doc, hit->id);
+         return;
+      }
+      sOp = Op();
+      sOp.kind = 15;
+      sOp.start = mouse;
+      sOp.docStart = sMouseDoc;
+   }
+
+   // A click places point text; a drag sets a box the text wraps in.
+   void TextRelease(Scene2DNode* doc, ImVec2 mouse)
+   {
+      PushUndoCheckpoint("New text");
+      const bool box = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) > 6.0f;
+      const float x = box ? std::min(sOp.docStart.x, sMouseDoc.x) : sOp.docStart.x;
+      const float y = box ? std::min(sOp.docStart.y, sMouseDoc.y) : sOp.docStart.y;
+      Layer* a = Active(doc);
+      const int id = doc->AddTextLayer("", x, y, box ? std::fabs(sMouseDoc.x - sOp.docStart.x) : 0.0f,
+                                       a != nullptr && a->kind != Kind::Group ? a->id : 0);
+      if (Layer* l = doc->FindLayer(id))
+      {
+         l->font = sFont;
+         if (sTextSize > 0.0f)
+            l->fontSize = sTextSize;
+         l->leading = sLeading;
+         l->tracking = sTracking;
+         l->align = sTextAlign;
+         std::copy(sTextC, sTextC + 4, l->textC);
+         doc->Commit();
+      }
+      BeginTextEdit(doc, id);
+   }
+
+   // Typing happens in a field under the text; the picture above updates as you type.
+   void DrawTextEditor(Scene2DNode* doc)
+   {
+      Layer* l = doc->FindLayer(sTextEdit);
+      if (l == nullptr || l->kind != Kind::Text)
+      {
+         sTextEdit = 0;
+         return;
+      }
+      float bw = 1, bh = 1;
+      doc->LayerBox(*l, bw, bh);
+      ImVec2 c[4] = { BoxScreen(doc, *l, 0, 0), BoxScreen(doc, *l, bw, 0), BoxScreen(doc, *l, bw, bh), BoxScreen(doc, *l, 0, bh) };
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddPolyline(c, 4, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
+      const float w = std::clamp(bw * sZoom, 220.0f, 520.0f);
+      const float h = ImGui::GetTextLineHeight() * 4.0f + 2.0f * ImGui::GetStyle().FramePadding.y;
+      ImVec2 at(std::min(c[0].x, c[3].x), std::max(c[2].y, c[3].y) + 6.0f);
+      at.x = std::clamp(at.x, sViewMn.x + 4.0f, std::max(sViewMn.x + 4.0f, sViewMx.x - w - 4.0f));
+      at.y = std::clamp(at.y, sViewMn.y + 4.0f, std::max(sViewMn.y + 4.0f, sViewMx.y - h - 4.0f));
+      const ImVec2 keep = ImGui::GetCursorScreenPos();
+      ImGui::SetCursorScreenPos(at);
+      ImGui::PushID(sTextEdit);
+      if (sTextFocus)
+      {
+         ImGui::SetKeyboardFocusHere();
+         sTextFocus = false;
+      }
+      FieldWell::PushStyle();
+      const bool changed = ImGui::InputTextMultiline("##v2dtextedit", sTextBuf, sizeof(sTextBuf), ImVec2(w, h));
+      FieldWell::PopStyle();
+      sEditMn = ImGui::GetItemRectMin();
+      sEditMx = ImGui::GetItemRectMax();
+      const bool done = ImGui::IsItemDeactivated();
+      ImGui::PopID();
+      ImGui::SetCursorScreenPos(keep);
+      if (changed)
+      {
+         l->text = sTextBuf;
+         Touch();
+      }
+      if (done)
+         EndTextEdit(doc);
+   }
+
+   // Pen: Esc/Enter finishes the path. Node: Delete removes the picked item.
+   bool HandleVectorKeys(Scene2DNode* doc)
+   {
+      auto key = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      if (sTool == kPen && sPenItem >= 0 && (key(ImGuiKey_Escape) || key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)))
+      {
+         FinishPen(doc);
+         return true;
+      }
+      if (sTool == kNode && (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace)))
+      {
+         std::vector<Shape>* items = Items(Active(doc));
+         if (PickedItem(doc) != nullptr && items != nullptr)
+         {
+            PushUndoCheckpoint("Delete shape");
+            items->erase(items->begin() + sItem);
+            sItem = -1;
+            Touch();
+            return true;
+         }
+      }
+      return false;
+   }
+
    void DrawCanvas(Scene2DNode* doc, ImVec2 size)
    {
       ImGuiIO& io = ImGui::GetIO();
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       ImGui::InvisibleButton("##view2dcanvas", size,
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle | ImGuiButtonFlags_MouseButtonRight);
-      const bool hovered = ImGui::IsItemHovered();
+      const ImVec2 mp = ImGui::GetIO().MousePos;
+      const bool inEditor = sTextEdit != 0 && mp.x >= sEditMn.x && mp.x <= sEditMx.x && mp.y >= sEditMn.y && mp.y <= sEditMx.y;
+      const bool hovered = ImGui::IsItemHovered() && !inEditor;
       const ImVec2 mx(mn.x + size.x, mn.y + size.y);
       Scene2DNode::Document& d = doc->Doc();
       const float r = d.rulers ? kRuler : 0.0f;
@@ -1424,7 +2031,7 @@ namespace
       sMouseIn = hovered;
       sMouseDoc = ToDoc(doc, mouse);
       Layer* active = Active(doc);
-      const bool canTransform = sTool == kMove && active != nullptr && (active->kind == Kind::Node || active->kind == Kind::Paint) && sSel.size() == 1 &&
+      const bool canTransform = sTool == kMove && active != nullptr && active->kind != Kind::Group && active->kind != Kind::Fill && sSel.size() == 1 &&
                                 Movable(*active) && doc->Shown(*active);
 
       // Outlines: each selected layer, then the active one's handles.
@@ -1439,8 +2046,19 @@ namespace
                      dl->AddRect(ToScreen(doc, lo[0], lo[1]), ToScreen(doc, hi[0], hi[1]), Hex(kOutline), 0.0f, 0, 1.0f);
                   continue;
                }
-               if (l->kind != Kind::Node && l->kind != Kind::Paint)
+               if (l->kind == Kind::Fill)
                   continue;
+               if (l->kind == Kind::Vector)
+               {
+                  float lo[2], hi[2];
+                  if (VectorBounds(*l, lo, hi))
+                  {
+                     ImVec2 q[4] = { BoxScreen(doc, *l, lo[0], lo[1]), BoxScreen(doc, *l, hi[0], lo[1]), BoxScreen(doc, *l, hi[0], hi[1]),
+                                     BoxScreen(doc, *l, lo[0], hi[1]) };
+                     dl->AddPolyline(q, 4, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
+                  }
+                  continue;
+               }
                float c[8];
                doc->Corners(*l, c);
                ImVec2 q[4];
@@ -1461,6 +2079,14 @@ namespace
          dl->AddCircle(an, 4.0f, Hex(kOutline), 12, 1.5f);
          dl->AddLine(ImVec2(an.x - 7, an.y), ImVec2(an.x + 7, an.y), Hex(kOutline));
          dl->AddLine(ImVec2(an.x, an.y - 7), ImVec2(an.x, an.y + 7), Hex(kOutline));
+      }
+      if (VectorTool(sTool))
+         DrawVectorOverlay(dl, doc, mouse, hovered);
+      if (sOp.kind == 15)
+      {
+         const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y);
+         if (std::hypot(mouse.x - p0.x, mouse.y - p0.y) > 6.0f)
+            dl->AddRect(ImVec2(std::min(p0.x, mouse.x), std::min(p0.y, mouse.y)), ImVec2(std::max(p0.x, mouse.x), std::max(p0.y, mouse.y)), Hex(kOutline));
       }
       if (sOp.kind == 1)
       {
@@ -1659,6 +2285,19 @@ namespace
                sOp.crop0[1] = sOp.crop0[3] = std::round(sMouseDoc.y);
             }
          }
+         else if (sTool == kShape)
+         {
+            sOp = Op();
+            sOp.kind = 12;
+            sOp.start = mouse;
+            sOp.docStart = sMouseDoc;
+         }
+         else if (sTool == kPen)
+            PenClick(doc, mouse);
+         else if (sTool == kNode)
+            NodeClick(doc, mouse);
+         else if (sTool == kText)
+            TextClick(doc, mouse);
          else if (sTool == kMove)
          {
             if (hoverHandle >= 0 && hoverHandle < 8)
@@ -1723,6 +2362,12 @@ namespace
                sOp.path.push_back(sMouseDoc.y);
             }
          }
+         else if (sOp.kind == 12)
+            DragShape(doc, mouse);
+         else if (sOp.kind == 13)
+            PenDrag(doc, mouse);
+         else if (sOp.kind == 14)
+            NodeDrag(doc);
          else if (sOp.kind == 11)
             doc->Pick(sMouseDoc.x, sMouseDoc.y, sOp.selOp == 1 ? sBg : sFg);
          else if (sOp.kind == 6)
@@ -1736,6 +2381,15 @@ namespace
          {
             if (sOp.kind == 7)
                EndStroke(doc);
+            else if (sOp.kind == 13)
+            {
+               Layer* pl = Active(doc);
+               std::vector<Shape>* items = Items(pl);
+               if (items != nullptr && sPenItem >= 0 && sPenItem < (int)items->size() && (*items)[sPenItem].closed)
+                  sPenItem = -1;
+            }
+            else if (sOp.kind == 15)
+               TextRelease(doc, mouse);
             else if (sOp.kind == 8 && std::hypot(mouse.x - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).x,
                                                  mouse.y - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).y) > 2.0f)
                GradientTo(doc, sOp.docStart, sMouseDoc);
@@ -1771,6 +2425,8 @@ namespace
          }
       }
       dl->PopClipRect();
+      if (sTextEdit != 0)
+         DrawTextEditor(doc);
    }
 
    // ---- the pixel tools' context bar ---------------------------------------
@@ -1910,6 +2566,223 @@ namespace
          doc->quickMask = !doc->quickMask;
    }
 
+   // ---- the vector and text tools' context bars ----------------------------
+
+   // Edits the picked item when there is one, and always what the next item gets.
+   void DrawVectorBar(Scene2DNode* doc)
+   {
+      auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
+      auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
+      Shape* picked = PickedItem(doc);
+      Shape& t = picked != nullptr ? *picked : sStyle;
+      bool changed = false;
+      auto undo = [&]() { if (picked != nullptr) PushUndoCheckpoint("Shape style"); };
+      if (sTool == kShape)
+      {
+         static const char* kKinds[6] = { "Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line" };
+         for (int i = 0; i < 6; i++)
+         {
+            if (i > 0)
+               next();
+            const std::string id = std::string(L(kKinds[i])) + "##v2dsk" + std::to_string(i);
+            if (TextChip(id.c_str(), sShapeKind == i, nullptr))
+               sShapeKind = i;
+         }
+         gap();
+      }
+      if (TextChip(L("Fill##v2dvfill"), t.fillOn, T("Fill on or off")))
+      {
+         undo();
+         t.fillOn = !t.fillOn;
+         changed = true;
+      }
+      next();
+      if (FormParts::ColorDot("##v2dvfillc", t.fillC, 18.0f, tok::tile))
+         changed = true;
+      next();
+      if (TextChip(L("Stroke##v2dvstroke"), t.strokeOn, T("Stroke on or off")))
+      {
+         undo();
+         t.strokeOn = !t.strokeOn;
+         changed = true;
+      }
+      next();
+      if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, 18.0f, tok::tile))
+         changed = true;
+      next();
+      ImGui::SetNextItemWidth(96.0f);
+      changed |= FieldWell::Slider("##v2dvwidth", &t.width, 0.0f, 200.0f, "%.0f px");
+      if (ImGui::IsItemActivated())
+         undo();
+      next();
+      auto pick = [&](const char* id, int* v, std::initializer_list<const char*> names, float w) {
+         std::vector<const char*> n(names);
+         ImGui::SetNextItemWidth(w);
+         if (MenuParts::BeginCombo(id, T(n[std::clamp(*v, 0, (int)n.size() - 1)])))
+         {
+            for (int i = 0; i < (int)n.size(); i++)
+               if (MenuParts::Choice(T(n[i]), i == *v) && i != *v)
+               {
+                  undo();
+                  *v = i;
+                  changed = true;
+               }
+            MenuParts::EndCombo();
+         }
+         next();
+      };
+      pick("##v2dvcap", &t.cap, { "Butt", "Round cap", "Square" }, 84.0f);
+      pick("##v2dvjoin", &t.join, { "Miter", "Round join", "Bevel" }, 84.0f);
+      pick("##v2dvalign", &t.align, { "Centre", "Inside", "Outside" }, 84.0f);
+      ImGui::SetNextItemWidth(84.0f);
+      changed |= FieldWell::Slider("##v2dvdash", &t.dash, 0.0f, 200.0f, t.dash > 0.0f ? "Dash %.0f" : "Solid");
+      if (ImGui::IsItemActivated())
+         undo();
+      if (t.dash > 0.0f)
+      {
+         next();
+         ImGui::SetNextItemWidth(76.0f);
+         changed |= FieldWell::Slider("##v2dvgap", &t.gap, 0.0f, 200.0f, "Gap %.0f");
+         if (ImGui::IsItemActivated())
+            undo();
+      }
+      gap();
+      static const char* kOps[4] = { "Add", "Subtract", "Intersect", "Exclude" };
+      static const char* kOpTips[4] = { "Over what is below", "Cuts what is below", "Keeps only the overlap", "Keeps all but the overlap" };
+      for (int i = 0; i < 4; i++)
+      {
+         if (i > 0)
+            next();
+         const std::string id = std::string(L(kOps[i])) + "##v2dvop" + std::to_string(i);
+         if (TextChip(id.c_str(), t.op == i, T(kOpTips[i])) && t.op != i)
+         {
+            undo();
+            t.op = i;
+            changed = true;
+         }
+      }
+      // The live shape's own numbers.
+      const bool rect = picked != nullptr ? picked->type == Shape::kRect : sShapeKind <= 1;
+      const bool poly = picked != nullptr ? (picked->type == Shape::kPolygon || picked->type == Shape::kStar) : (sShapeKind == 3 || sShapeKind == 4);
+      const bool star = picked != nullptr ? picked->type == Shape::kStar : sShapeKind == 4;
+      if (rect && (picked != nullptr || sTool == kShape))
+      {
+         gap();
+         ImGui::SetNextItemWidth(96.0f);
+         changed |= FieldWell::Slider("##v2dvrad", &t.radius, 0.0f, 500.0f, "Radius %.0f");
+         if (ImGui::IsItemActivated())
+            undo();
+      }
+      if (poly && (picked != nullptr || sTool == kShape))
+      {
+         gap();
+         float sides = (float)t.sides;
+         ImGui::SetNextItemWidth(84.0f);
+         if (FieldWell::Slider("##v2dvsides", &sides, 3.0f, 64.0f, star ? "Points %.0f" : "Sides %.0f"))
+         {
+            t.sides = (int)std::lround(sides);
+            changed = true;
+         }
+         if (ImGui::IsItemActivated())
+            undo();
+         if (star)
+         {
+            next();
+            ImGui::SetNextItemWidth(84.0f);
+            changed |= FieldWell::Slider("##v2dvinner", &t.inner, 0.05f, 1.0f, "Inner %.2f");
+            if (ImGui::IsItemActivated())
+               undo();
+         }
+      }
+      Layer* a = Active(doc);
+      if (a != nullptr && a->hasVMask)
+      {
+         gap();
+         if (TextChip(L("Mask##v2dvmask"), sVecTarget == 1, T("Draw into the vector mask")))
+         {
+            sVecTarget = sVecTarget == 1 ? 0 : 1;
+            sItem = -1;
+            sPenItem = -1;
+         }
+      }
+      if (changed)
+      {
+         if (picked != nullptr)
+         {
+            CopyStyle(*picked, sStyle);
+            sStyle.radius = picked->radius;
+            sStyle.sides = picked->sides;
+            sStyle.inner = picked->inner;
+         }
+         Touch();
+      }
+   }
+
+   void DrawTextBar(Scene2DNode* doc)
+   {
+      auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
+      auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
+      Layer* a = Active(doc);
+      Layer* l = a != nullptr && a->kind == Kind::Text ? a : nullptr;
+      std::string& font = l != nullptr ? l->font : sFont;
+      float autoSize = std::clamp(std::round(doc->Doc().h / 12.0f), 12.0f, 400.0f);
+      float& size = l != nullptr ? l->fontSize : (sTextSize > 0.0f ? sTextSize : (sTextSize = autoSize));
+      float& leading = l != nullptr ? l->leading : sLeading;
+      float& tracking = l != nullptr ? l->tracking : sTracking;
+      int& align = l != nullptr ? l->align : sTextAlign;
+      float* colour = l != nullptr ? l->textC : sTextC;
+      bool changed = false;
+      auto undo = [&]() { if (l != nullptr) PushUndoCheckpoint("Text style"); };
+      const auto& fonts = Platform::AvailableFontFamilies();
+      ImGui::SetNextItemWidth(160.0f);
+      const std::string shown = font.empty() ? (fonts.empty() ? std::string("Helvetica") : fonts.front()) : font;
+      if (MenuParts::BeginCombo("##v2dfont", shown.c_str()))
+      {
+         for (const std::string& f : fonts)
+            if (MenuParts::Choice(f.c_str(), f == shown) && f != shown)
+            {
+               undo();
+               font = f;
+               changed = true;
+            }
+         MenuParts::EndCombo();
+      }
+      next();
+      ImGui::SetNextItemWidth(96.0f);
+      changed |= FieldWell::Slider("##v2dfsize", &size, 4.0f, 800.0f, "%.0f px");
+      if (ImGui::IsItemActivated())
+         undo();
+      next();
+      ImGui::SetNextItemWidth(96.0f);
+      changed |= FieldWell::Slider("##v2dlead", &leading, 0.5f, 3.0f, "Leading %.2f");
+      if (ImGui::IsItemActivated())
+         undo();
+      next();
+      ImGui::SetNextItemWidth(104.0f);
+      changed |= FieldWell::Slider("##v2dtrack", &tracking, -100.0f, 400.0f, "Tracking %.0f");
+      if (ImGui::IsItemActivated())
+         undo();
+      gap();
+      static const char* kAligns[3] = { "Left", "Centre", "Right" };
+      for (int i = 0; i < 3; i++)
+      {
+         if (i > 0)
+            next();
+         const std::string id = std::string(L(kAligns[i])) + "##v2dtal" + std::to_string(i);
+         if (TextChip(id.c_str(), align == i, nullptr) && align != i)
+         {
+            undo();
+            align = i;
+            changed = true;
+         }
+      }
+      gap();
+      if (FormParts::ColorDot("##v2dtextc", colour, 18.0f, tok::tile))
+         changed = true;
+      if (changed && l != nullptr)
+         Touch();
+   }
+
    // ---- header and status ----------------------------------------------
 
    // The tools, down the left of the picture as in every image editor.
@@ -1917,8 +2790,9 @@ namespace
    {
       ImGui::BeginChild("##v2dtools", ImVec2(kIconW, h), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, tok::space_1));
-      struct { int tool; const char* id; const char* glyph; const char* tip; } kTools[11] = {
+      struct { int tool; const char* id; const char* glyph; const char* tip; } kTools[15] = {
          { kMove, "##v2dmove", IconsInfinite::ToolMove, "Move (V)" },
+         { kNode, "##v2dnode", IconsInfinite::Pointer, "Direct select (A). Alt-click an anchor makes a corner" },
          { kMarquee, "##v2dmarquee", IconsInfinite::Marquee, "Marquee (M)" },
          { kLasso, "##v2dlasso", IconsInfinite::Lasso, "Lasso (L)" },
          { kWand, "##v2dwand", IconsInfinite::Wand, "Magic wand (W)" },
@@ -1927,13 +2801,16 @@ namespace
          { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line" },
          { kEraser, "##v2derase", IconsInfinite::Erase, "Eraser (E)" },
          { kFill, "##v2dfilltool", IconsInfinite::Fill, "Fill and gradient (G)" },
+         { kPen, "##v2dpen", IconsInfinite::PenTool, "Pen (P). Drag for curves, Enter ends" },
+         { kShape, "##v2dshape", IconsInfinite::Shape, "Shape (U). Shift keeps it square, Alt from the centre" },
+         { kText, "##v2dtext", IconsInfinite::Type, "Text (T). Click for a line, drag for a box" },
          { kHand, "##v2dhand", IconsInfinite::Hand, "Hand (H, or hold Space)" },
          { kZoom, "##v2dzoom", IconsInfinite::Zoom, "Zoom (Z). Alt-click zooms out" },
       };
-      for (int i = 0; i < 11; i++)
+      for (int i = 0; i < 15; i++)
       {
-         // Gaps between the families: move, select, crop, paint, view.
-         if (i == 1 || i == 4 || i == 5 || i == 9)
+         // Gaps between the families: move, select, crop, paint, vector, view.
+         if (i == 2 || i == 5 || i == 6 || i == 10 || i == 13)
             ImGui::Dummy(ImVec2(0.0f, tok::space_1));
          if (IconChip(kTools[i].id, kTools[i].glyph, sTool == kTools[i].tool, T(kTools[i].tip)))
             sTool = kTools[i].tool;
@@ -1952,6 +2829,10 @@ namespace
          sCropOn = false;
       if (sTool != kLasso)
          sPoly.clear();
+      if (sTool != kPen && sPenItem >= 0)
+         FinishPen(doc);
+      if (sTool != kText && sTextEdit != 0)
+         EndTextEdit(doc);
       // The context bar: what the current tool can do.
       Layer* a = Active(doc);
       if (sTool == kMove)
@@ -2043,6 +2924,10 @@ namespace
       }
       else if (PixelTool(sTool))
          DrawPixelBar(doc);
+      else if (VectorTool(sTool))
+         DrawVectorBar(doc);
+      else if (sTool == kText)
+         DrawTextBar(doc);
       else
       {
          if (TextChip(L("Fit##v2dfit"), false, T("Fit on screen (Ctrl+0)")))
@@ -2123,6 +3008,18 @@ namespace
          const ImVec2 c(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), h(pw * k * 0.5f, ph * k * 0.5f);
          if (ptex != 0)
             dl->AddImage((ImTextureID)(intptr_t)ptex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
+         return;
+      }
+      if (l.kind == Kind::Vector || l.kind == Kind::Text)
+      {
+         DrawChecker(dl, p, ImVec2(p.x + sz.x, p.y + sz.y));
+         const unsigned vtex = doc->VectorTexture(l.id);
+         float vw = 1, vh = 1;
+         doc->LayerBox(l, vw, vh);
+         const float k = std::min(sz.x / std::max(1.0f, vw), sz.y / std::max(1.0f, vh));
+         const ImVec2 c(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), h(vw * k * 0.5f, vh * k * 0.5f);
+         if (vtex != 0)
+            dl->AddImage((ImTextureID)(intptr_t)vtex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
          return;
       }
       INode* src = doc->Source(l);
@@ -2291,8 +3188,12 @@ namespace
                if (!l->HasPixelMask() && MenuParts::Item(T("Add Layer Mask"), nullptr)) sPending.what = Pending::AddMask;
                if (MenuParts::Item(T("Mask from Selection"), nullptr, false, doc->HasSelection())) sPending.what = Pending::MaskFromSel;
                if (l->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"), nullptr)) sPending.what = Pending::RemoveMask;
+               if (!l->hasVMask && MenuParts::Item(T("Add Vector Mask"), nullptr)) sPending.what = Pending::AddVMask;
+               if (l->hasVMask && MenuParts::Item(T("Delete Vector Mask"), nullptr)) sPending.what = Pending::RemoveVMask;
             }
             if (l->kind == Kind::Paint && MenuParts::Item(T("Convert to Draw Node"), nullptr)) sPending.what = Pending::ToDraw;
+            if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
+            if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
             if (MenuParts::Item(T("Rename"), nullptr))
             {
                sRename = id;
@@ -2410,6 +3311,9 @@ namespace
       if (IconChip("##v2dnewfill", IconsInfinite::Fill, false, T("New fill layer")))
          sPending.what = Pending::AddFill;
       FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v2dnewvec", IconsInfinite::PenTool, false, T("New vector layer")))
+         sPending.what = Pending::AddVector;
+      FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dnewgroup", IconsInfinite::Folder, false, T("Group (Ctrl+G)")))
          sPending.what = Pending::Group;
       FormParts::Inline(0.0f, tok::space_1);
@@ -2472,7 +3376,31 @@ namespace
          if (type == 1)
             SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
       }
-      if (l->kind == Kind::Node || l->kind == Kind::Paint)
+      if (l->kind == Kind::Text)
+      {
+         SectionCard::Begin(T("Text"));
+         static char buf[4096];
+         std::snprintf(buf, sizeof(buf), "%s", l->text.c_str());
+         FieldWell::PushStyle();
+         if (ImGui::InputTextMultiline("##v2dtexttab", buf, sizeof(buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f)))
+         {
+            l->text = buf;
+            Touch();
+         }
+         FieldWell::PopStyle();
+         UndoOnActivate("Edit text");
+         SliderRow(T("Size"), &l->fontSize, 4.0f, 800.0f, "%.0f px");
+         SliderRow(T("Leading"), &l->leading, 0.5f, 3.0f, "%.2f");
+         SliderRow(T("Tracking"), &l->tracking, -100.0f, 400.0f, "%.0f");
+         ColorRow(T("Colour"), l->textC);
+         DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", 0.0f, 8192.0f);
+      }
+      if (l->kind == Kind::Vector)
+      {
+         SectionCard::Begin(T("Vector"));
+         ImGui::TextDisabled("%d %s", (int)l->shapes.size(), T("items"));
+      }
+      if (l->kind != Kind::Group && l->kind != Kind::Fill)
       {
          SectionCard::Begin(T("Transform"));
          DragRow("X", &l->x, 1.0f, "%.1f px");
@@ -2535,6 +3463,20 @@ namespace
             FormParts::Inline(0.0f, tok::space_1);
             if (TextChip(L("Delete##v2dpmdel"), false, T("Delete the layer mask")))
                sPending.what = Pending::RemoveMask;
+         }
+         if (l->hasVMask)
+         {
+            BoolRow(T("Vector mask"), &l->vmaskOn);
+            if (TextChip(L("Draw mask##v2dvm"), sVecTarget == 1, T("Pen and shapes draw the mask")))
+            {
+               sVecTarget = sVecTarget == 1 ? 0 : 1;
+               sItem = -1;
+               if (sVecTarget == 1 && !VectorTool(sTool))
+                  sTool = kPen;
+            }
+            FormParts::Inline(0.0f, tok::space_1);
+            if (TextChip(L("Delete##v2dvmdel"), false, T("Delete the vector mask")))
+               sPending.what = Pending::RemoveVMask;
          }
          NodeRow(T("Node"), &l->maskUid, true, doc);
          if (l->maskUid != 0)
@@ -2827,6 +3769,88 @@ namespace
       gPatchDirty = true;
    }
 
+   // The vector layer becomes a Sketch node drawing the same picture as SVG; the
+   // layer keeps its place and points at the node.
+   void ConvertToSketch(Scene2DNode* doc, int id)
+   {
+      Layer* l = doc->FindLayer(id);
+      if (l == nullptr)
+         return;
+      float bw = 1, bh = 1;
+      doc->LayerBox(*l, bw, bh);
+      const std::string svg = doc->ToSvg(*l);
+      PushUndoCheckpoint("Convert to Sketch node");
+      GraphNode* self = DocGraphNode();
+      const ImVec2 at = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
+      GraphNode* gn = SpawnNode("Sketch", "Source", at.x - 380.0f, at.y);
+      if (gn == nullptr)
+         return;
+      if (auto* sk = dynamic_cast<SketchNode*>(gn->node.get()))
+      {
+         sk->svg = svg;
+         sk->svgName = LayerName(*l) + ".svg";
+         sk->width = bw;
+         sk->height = bh;
+         sk->code = "// Drawn from a 2D View vector layer. Animate parts with svgSet(\"#id\", \"attr\", value).\n"
+                    "function draw(t) {\n  svgDraw(0, 0, width, height);\n}\n";
+         sk->Apply();
+      }
+      const uint64_t uid = gn->uid;
+      if ((l = doc->FindLayer(id)) != nullptr)
+      {
+         l->kind = Kind::Node;
+         l->uid = uid;
+         l->fit = Scene2DNode::kFitNone;
+         l->shapes.clear();
+         l->pw = l->ph = 0;
+         doc->Commit();
+      }
+      gPatchDirty = true;
+   }
+
+   // The text layer becomes a Text node set the same way.
+   void ConvertToTextNode(Scene2DNode* doc, int id)
+   {
+      Layer* l = doc->FindLayer(id);
+      if (l == nullptr)
+         return;
+      float bw = 1, bh = 1;
+      doc->LayerBox(*l, bw, bh);
+      PushUndoCheckpoint("Convert to Text node");
+      GraphNode* self = DocGraphNode();
+      const ImVec2 at = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
+      GraphNode* gn = SpawnNode("Text", "Source", at.x - 380.0f, at.y);
+      if (gn == nullptr)
+         return;
+      if (auto* tn = dynamic_cast<TextNode*>(gn->node.get()))
+      {
+         tn->text = l->text;
+         tn->fontName = l->font;
+         tn->fontSize = l->fontSize;
+         std::copy(l->textC, l->textC + 3, tn->color);
+         tn->tracking = l->tracking;
+         tn->align = l->align;
+         tn->lineSpacing = l->leading;
+         tn->wordWrap = l->boxW > 0.0f;
+         tn->wrapWidth = 1.0f;
+         tn->wrapHeight = 1.0f;
+         tn->fitToBox = false;
+         tn->width = bw;
+         tn->height = bh;
+      }
+      const uint64_t uid = gn->uid;
+      if ((l = doc->FindLayer(id)) != nullptr)
+      {
+         // The box keeps its size and place; the text's alpha moves to the layer.
+         l->opacity *= std::clamp(l->textC[3], 0.0f, 1.0f);
+         l->kind = Kind::Node;
+         l->uid = uid;
+         l->fit = Scene2DNode::kFitNone;
+         doc->Commit();
+      }
+      gPatchDirty = true;
+   }
+
    void RunPending(Scene2DNode* doc)
    {
       const Pending todo = sPending;
@@ -2915,6 +3939,50 @@ namespace
             if (a->kind == Kind::Paint)
                ConvertToDraw(doc, a->id);
          break;
+      case Pending::AddVector:
+      {
+         PushUndoCheckpoint("New vector layer");
+         Layer* a = Active(doc);
+         SelectOnly(doc->AddVectorLayer(a != nullptr && a->kind != Kind::Group ? a->id : 0));
+         sVecTarget = 0;
+         if (!VectorTool(sTool))
+            sTool = kPen;
+         break;
+      }
+      case Pending::AddVMask:
+         if (Layer* a = Active(doc))
+         {
+            PushUndoCheckpoint("Add vector mask");
+            a->hasVMask = true;
+            a->vmaskOn = true;
+            sVecTarget = 1;
+            sItem = -1;
+            if (!VectorTool(sTool))
+               sTool = kPen;
+            doc->Commit();
+         }
+         break;
+      case Pending::RemoveVMask:
+         if (Layer* a = Active(doc))
+         {
+            PushUndoCheckpoint("Delete vector mask");
+            a->hasVMask = false;
+            a->vmask.clear();
+            sVecTarget = 0;
+            sItem = -1;
+            doc->Commit();
+         }
+         break;
+      case Pending::ToSketch:
+         if (Layer* a = Active(doc))
+            if (a->kind == Kind::Vector)
+               ConvertToSketch(doc, a->id);
+         break;
+      case Pending::ToText:
+         if (Layer* a = Active(doc))
+            if (a->kind == Kind::Text)
+               ConvertToTextNode(doc, a->id);
+         break;
       case Pending::None: break;
       }
    }
@@ -2992,6 +4060,31 @@ namespace
 }
 
 OutputNode* View2DEnsureOutput() { return EnsureOutputImpl(); }
+
+bool View2DImportSvg(const std::string& path)
+{
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr)
+      return false;
+   std::ifstream f(path, std::ios::binary);
+   if (!f)
+      return false;
+   const std::string svg((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+   PushUndoCheckpoint("Import SVG");
+   doc->Layers();
+   Layer* a = Active(doc);
+   const int id = doc->AddVectorLayer(a != nullptr && a->kind != Kind::Group ? a->id : 0);
+   if (!doc->ImportSvg(id, svg))
+   {
+      doc->RemoveLayer(id);
+      return false;
+   }
+   if (Layer* l = doc->FindLayer(id))
+      l->name = std::filesystem::path(path).stem().string();
+   doc->Commit();
+   SelectOnly(id);
+   return true;
+}
 
 // Anything with a 2D picture except a 3D node or a document. Uses the
 // viewport panel's pixel gate, not the output size: a node that has not

@@ -120,5 +120,7 @@
  "eyedropper": 59766,
  "lasso": 59767,
  "marquee": 59768,
- "wand": 59769
+ "wand": 59769,
+ "shape": 59770,
+ "type": 59771
 }
