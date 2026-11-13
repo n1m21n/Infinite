@@ -723,3 +723,10 @@ CASES["ref_interior"] = _ref_interior()
 CASES["ref_shoe"] = _ref_shoe()
 CASES["hero_shoe"] = _hero_shoe()
 CASES["ref_product"] = _ref_product()
+
+
+# The procedural table (judge_table.py): the judge scene of the real-time engine. _clay and _base are its build stages.
+from judge_table import judge_table
+CASES["judge_table"] = judge_table("flaws")
+CASES["judge_table_base"] = judge_table("base")
+CASES["judge_table_clay"] = judge_table("clay")

@@ -434,6 +434,9 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
         if m.get("recipe"):   # rows 3.5 / 4.5: a Material recipe from FieldMaterialRecipes.h, its default params
             fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % recipe_code(m["recipe"]).replace("\n", "\\n")])
             wires.append("cable %d field %d" % (mat, fp))
+        if m.get("code"):   # judge_table: a whole Material-domain Field program given by the case
+            fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % m["code"].replace("\n", "\\n")])
+            wires.append("cable %d field %d" % (mat, fp))
         if m.get("field"):   # a Field material program writes the case's values over the decoy knobs (linear, as the case)
             code = "base = vec3(%r, %r, %r)\\nmetallic = %r\\nroughness = %r" % (
                 *[float(c) for c in m.get("base_color", (0.8, 0.8, 0.8))], float(m.get("metallic", 0.0)), float(m.get("roughness", 0.5)))
@@ -497,6 +500,12 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
         while ly:   # row 4.1: a second Material on the layer pin, laid over where its mask image's red is 1
             lm = node("3D", "Material", material_lines(ly))
             wires.append("geo %d 12 %d" % (top, lm))
+            if ly.get("code"):
+                fp = node("Source", "FieldPixel", ["  i domain 1", "  s code %s" % ly["code"].replace("\n", "\\n")])
+                wires.append("cable %d field %d" % (lm, fp))
+            if ly.get("mask_code"):   # the mask as an Image-domain Field Pixel (a picture)
+                mk = node("Source", "FieldPixel", ["  i domain 0", "  s code %s" % ly["mask_code"].replace("\n", "\\n")])
+                wires.append("cable %d 13 %d" % (top, mk))
             if ly.get("mask"):
                 mk = node("Source", "Image Source", ["  s path %s" % make_texture(case, ly["mask"])])
                 wires.append("cable %d 13 %d" % (top, mk))

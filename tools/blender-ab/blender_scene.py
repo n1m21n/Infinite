@@ -387,6 +387,19 @@ for i, o in enumerate(scene["objects"]):
         bpy.ops.mesh.primitive_monkey_add(size=2)
         bpy.ops.object.modifier_add(type='SUBSURF'); bpy.ops.object.modifier_apply(modifier="Subdivision")
         bpy.ops.object.shade_smooth()
+    elif shape == "mesh":   # judge_table: verts, faces and per-corner uvs straight from the case, smooth shaded
+        me = bpy.data.meshes.new("mesh%d" % i)
+        me.from_pydata(o["verts"], [], o["faces"])
+        if o.get("uvs"):
+            uvl = me.uv_layers.new(name="UVMap")
+            for lp, uv in zip(uvl.data, o["uvs"]):
+                lp.uv = uv
+        for poly in me.polygons:
+            poly.use_smooth = True
+        me.update()
+        mo = bpy.data.objects.new("mesh%d" % i, me)
+        sc.collection.objects.link(mo)
+        bpy.context.view_layer.objects.active = mo
     else:
         sys.exit("unknown shape " + shape)
     ob = bpy.context.active_object
@@ -396,6 +409,14 @@ for i, o in enumerate(scene["objects"]):
     bpy.context.view_layer.update()
     ob.data.transform(ob.matrix_world)
     ob.matrix_world = Matrix.Identity(4)
+    if o.get("bevel"):   # round every edge by this width (metres), flat faces kept flat by weighted normals
+        bv = ob.modifiers.new("bev", 'BEVEL'); bv.width = o["bevel"]; bv.segments = 4; bv.limit_method = 'ANGLE'
+        wn = ob.modifiers.new("wn", 'WEIGHTED_NORMAL'); wn.keep_sharp = False
+        for x in bpy.context.scene.objects:
+            x.select_set(x == ob)
+        bpy.ops.object.shade_smooth()
+        for md in list(ob.modifiers):
+            bpy.ops.object.modifier_apply(modifier=md.name)
     dz = o.get("material", {}).get("displace")
     if dz:   # row 4.2: the bump map's grey as real geometry, 1 = the surface, 0 = dz below it
         sub = ob.modifiers.new("sub", 'SUBSURF'); sub.subdivision_type = 'SIMPLE'; sub.levels = sub.render_levels = 9
