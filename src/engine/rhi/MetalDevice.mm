@@ -410,6 +410,30 @@ float3 traceReflection(constant FrameU& f, texture2d<float> et, instance_acceler
    return L;
 }
 float rnd(thread uint& s) { s = pcg(s); return float(s) * (1.0 / 4294967296.0); }
+// Settle's sample stream (SPEED_PLAN S1.0): Owen-scrambled Sobol after Burley, "Practical Hash-based Owen
+// Scrambling" (JCGT 2020), the kind Cycles uses. Each path event (the camera, then every bounce) gets its own 16
+// dimensions, read in 4D groups: the sample index is shuffled per pixel and group, each dimension scrambled on its
+// own, so pairs (0,1) and (2,3) of a group stay stratified across the pixel's samples. Past 16 in one event: PCG.
+// Direction numbers: dimension 0 the identity, 1..3 from Joe and Kuo's polynomials (s,a,m) (1,0,1) (2,1,1 3) (3,1,1 3 1).
+constant uint kSobolDir[4][32] = {
+   { 0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u, 0x08000000u, 0x04000000u, 0x02000000u, 0x01000000u, 0x00800000u, 0x00400000u, 0x00200000u, 0x00100000u, 0x00080000u, 0x00040000u, 0x00020000u, 0x00010000u, 0x00008000u, 0x00004000u, 0x00002000u, 0x00001000u, 0x00000800u, 0x00000400u, 0x00000200u, 0x00000100u, 0x00000080u, 0x00000040u, 0x00000020u, 0x00000010u, 0x00000008u, 0x00000004u, 0x00000002u, 0x00000001u },
+   { 0x80000000u, 0xc0000000u, 0xa0000000u, 0xf0000000u, 0x88000000u, 0xcc000000u, 0xaa000000u, 0xff000000u, 0x80800000u, 0xc0c00000u, 0xa0a00000u, 0xf0f00000u, 0x88880000u, 0xcccc0000u, 0xaaaa0000u, 0xffff0000u, 0x80008000u, 0xc000c000u, 0xa000a000u, 0xf000f000u, 0x88008800u, 0xcc00cc00u, 0xaa00aa00u, 0xff00ff00u, 0x80808080u, 0xc0c0c0c0u, 0xa0a0a0a0u, 0xf0f0f0f0u, 0x88888888u, 0xccccccccu, 0xaaaaaaaau, 0xffffffffu },
+   { 0x80000000u, 0xc0000000u, 0x60000000u, 0x90000000u, 0xe8000000u, 0x5c000000u, 0x8e000000u, 0xc5000000u, 0x68800000u, 0x9cc00000u, 0xee600000u, 0x55900000u, 0x80680000u, 0xc09c0000u, 0x60ee0000u, 0x90550000u, 0xe8808000u, 0x5cc0c000u, 0x8e606000u, 0xc5909000u, 0x6868e800u, 0x9c9c5c00u, 0xeeee8e00u, 0x5555c500u, 0x8000e880u, 0xc0005cc0u, 0x60008e60u, 0x9000c590u, 0xe8006868u, 0x5c009c9cu, 0x8e00eeeeu, 0xc5005555u },
+   { 0x80000000u, 0xc0000000u, 0x20000000u, 0x50000000u, 0xf8000000u, 0x74000000u, 0xa2000000u, 0x93000000u, 0xd8800000u, 0x25400000u, 0x59e00000u, 0xe6d00000u, 0x78080000u, 0xb40c0000u, 0x82020000u, 0xc3050000u, 0x208f8000u, 0x51474000u, 0xfbea2000u, 0x75d93000u, 0xa0858800u, 0x914e5400u, 0xdbe79e00u, 0x25db6d00u, 0x58800080u, 0xe54000c0u, 0x79e00020u, 0xb6d00050u, 0x800800f8u, 0xc00c0074u, 0x200200a2u, 0x50050093u } };
+struct Lds { uint i; uint px; uint ev; uint k; uint fb; }; // sample index, pixel hash, event, next dimension, fallback
+uint lkPermute(uint x, uint s) { x += s; x ^= x * 0x6c50b47cu; x ^= x * 0xb82f1e52u; x ^= x * 0xc7afe638u; x ^= x * 0x8d22f6e6u; return x; }
+uint owenScramble(uint x, uint s) { return reverse_bits(lkPermute(reverse_bits(x), s)); }
+float rnd(thread Lds& q)
+{
+   if (q.k >= 16u) return rnd(q.fb);
+   const uint dim = q.ev * 16u + q.k++;
+   const uint g = dim >> 2, c = dim & 3u;
+   const uint s = pcg(q.px ^ pcg(g * 0x9e3779b9u + 1u));
+   uint v = owenScramble(q.i, s), x = 0u;
+   for (uint b = 0u; v != 0u; b++, v >>= 1) if ((v & 1u) != 0u) x ^= kSobolDir[c][b];
+   return float(owenScramble(x, pcg(s + c + 1u)) >> 8) * (1.0 / 16777216.0);
+}
+void ldsEvent(thread Lds& q) { q.ev++; q.k = 0u; }
 constant bool kMrt [[function_constant(0)]];
 // Row 8.3: false compiles r_fs without its ray paths (no TLAS this frame), a leaner shader for pure raster.
 constant bool kRayC [[function_constant(1)]];
@@ -1289,6 +1313,20 @@ fragment float4 comp_fs(SkyOut in [[stage_in]], constant CompU& u [[buffer(0)]],
 }
 
 // ---- path tracer: progressive, one sample per pass, accumulated in RGBA32F (rgb = radiance sum, a = coverage sum)
+// Settle's ray origins: Waechter and Binder's offset (Ray Tracing Gems, ch. 6). The hit point moves a few float ulps
+// off the surface along n, so it is clear of its own triangle at any distance from the origin, yet thin layers (a
+// 0.2 mm gap between glass and water) are never stepped over, as a fixed scene-unit offset does in wide shots.
+static inline float3 offRay(float3 p, float3 n)
+{
+   const float kOrigin = 1.0 / 32.0, kFloat = 1.0 / 65536.0, kInt = 256.0;
+   const int3 of = int3(kInt * n);
+   const float3 pi = float3(as_type<float>(as_type<int>(p.x) + (p.x < 0.0 ? -of.x : of.x)),
+                            as_type<float>(as_type<int>(p.y) + (p.y < 0.0 ? -of.y : of.y)),
+                            as_type<float>(as_type<int>(p.z) + (p.z < 0.0 ? -of.z : of.z)));
+   return float3(abs(p.x) < kOrigin ? p.x + kFloat * n.x : pi.x, abs(p.y) < kOrigin ? p.y + kFloat * n.y : pi.y,
+                 abs(p.z) < kOrigin ? p.z + kFloat * n.z : pi.z);
+}
+
 struct PtU { float4x4 invVP; float4 info; float4 em; float4 lens; float4 lr; float4 lu; float4 lf; float4 fog; float4 fogC; float4 fogLo; float4 fogHi; }; // info: x prior samples, y max bounces, z frame, w width; em: x emitter triangles, y chance to sample one
 // lens: thin-lens radius, focus distance, blades (below 3 round), blade turn; lr/lu/lf: camera right (w = bokeh ratio), up, forward
 // fog (row 5.3): x extinction per unit (0 off), y HG g; fogC the scattered share; fogLo/fogHi the medium's box
@@ -1380,7 +1418,7 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
 }
 // Settle's next-event pick: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
 // weighted by the count and the chance of taking this branch. pL > 0: an emitter, its solid-angle pdf.
-void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* ems, int nEm, float pEm, int count, float3 p, thread uint& seed,
+void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* ems, int nEm, float pEm, int count, float3 p, thread Lds& seed,
                  thread float3& ld, thread float3& Le, thread float& tmax, thread float& pL, thread float2& lterms)
 {
    if (nEm > 0 && rnd(seed) < pEm)
@@ -1526,8 +1564,9 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
 {
    const uint2 px = uint2(in.pos.xy);
    uint seed = pcg(px.x + 8192u * px.y) ^ pcg(uint(u.info.z) * 2654435761u + 17u);
+   Lds qs = { uint(u.info.x), pcg(px.x + 8192u * px.y), 0u, 0u, pcg(seed ^ 0x5bd1e995u) }; // u.info.x: samples so far
    const float H = float(prev.get_height());
-   float2 ndc = float2(2.0 * (float(px.x) + rnd(seed)) / u.info.w - 1.0, 2.0 * (float(px.y) + rnd(seed)) / H - 1.0);
+   float2 ndc = float2(2.0 * (float(px.x) + rnd(qs)) / u.info.w - 1.0, 2.0 * (float(px.y) + rnd(qs)) / H - 1.0);
    const float2 ndc0 = ndc;
    // Row 6.2 lens: radial distortion k r^2 (lf.w, + pincushion, - barrel) and lateral chromatic
    // aberration (fogC.w): each sample sees one channel through its own scale and counts 3x in that channel.
@@ -1535,7 +1574,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
    if (u.lf.w != 0.0) ndc *= 1.0 + u.lf.w * dot(ndc, ndc);
    if (u.fogC.w != 0.0)
    {
-      const int c = min(int(rnd(seed) * 3.0), 2);
+      const int c = min(int(rnd(qs) * 3.0), 2);
       ndc *= 1.0 + u.fogC.w * float(c - 1);
       chan = float3(c == 0 ? 3.0 : 0.0, c == 1 ? 3.0 : 0.0, c == 2 ? 3.0 : 0.0);
    }
@@ -1553,10 +1592,10 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       const float2 eye = u.lu.w * ndc0 * float2(u.info.w / H, 1.0) * 0.5;
       for (int tr = 0; tr < 8; tr++)
       {
-         const float2 lu = float2(rnd(seed), rnd(seed));
+         const float2 lu = float2(rnd(qs), rnd(qs));
          if (u.lens.z >= 3.0)
          {
-            const float seg = 6.2831853 / u.lens.z, a0 = u.lens.w + floor(rnd(seed) * u.lens.z) * seg;
+            const float seg = 6.2831853 / u.lens.z, a0 = u.lens.w + floor(rnd(qs) * u.lens.z) * seg;
             off = sqrt(lu.x) * mix(float2(cos(a0), sin(a0)), float2(cos(a0 + seg), sin(a0 + seg)), lu.y);
          }
          else
@@ -1580,6 +1619,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
    int skips = 0; // see-through hits passed this sample
    for (int b = 0; b < maxB; b++)
    {
+      ldsEvent(qs); // every pass through the loop (a bounce, a see-through skip, a fog scatter) reads fresh dimensions
       ray r(o, d, 0.0, 1e4);
       intersection_result<triangle_data, instancing> h = it.intersect(r, rtArgs.tlas);
       if (u.fog.x > 0.0)
@@ -1587,27 +1627,27 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          // Row 5.3: free flight through the medium (one extinction for all channels, so the weight is the albedo).
          // A scatter takes one light sample with the phase function, then the path goes on along a phase sample.
          const float2 sp = fogSpan(u, o, d, h.type == intersection_type::triangle ? h.distance : 1e4);
-         const float s = sp.x - log(max(1.0 - rnd(seed), 1e-12)) / u.fog.x;
+         const float s = sp.x - log(max(1.0 - rnd(qs), 1e-12)) / u.fog.x;
          if (sp.y > sp.x && s < sp.y)
          {
             const float3 pm = o + d * s;
             if (b == 0) { cov = 1.0; alb0 = u.fogC.xyz; n0 = -d; dist0 = s; }
             T *= u.fogC.xyz;
             float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-            ptPickLight(f, LL, ems, nEm, pEm, int(f.fld.y + 0.5), pm, seed, ld, Le, tmax, pL, lterms);
+            ptPickLight(f, LL, ems, nEm, pEm, int(f.fld.y + 0.5), pm, qs, ld, Le, tmax, pL, lterms);
             if (any(Le > 0.0))
             {
                if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                const float ph = hgPhase(dot(ld, d), u.fog.y);
                L += T * ph * Le * lterms.x * fogTr(u, pm, ld, tmax) * (pL > 0.0 ? pL / max(pL * pL + ph * ph, 1e-20) : 1.0);
             }
-            const float3 nd = hgSample(d, u.fog.y, rnd(seed), rnd(seed));
+            const float3 nd = hgSample(d, u.fog.y, rnd(qs), rnd(qs));
             lastPdfB = hgPhase(dot(nd, d), u.fog.y); envMis = 0.0; skyK = float3(1.0);
             o = pm; d = nd;
             if (b >= 2)
             {
                const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
-               if (rnd(seed) > q) break;
+               if (rnd(qs) > q) break;
                T /= q;
             }
             continue;
@@ -1722,11 +1762,11 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             fldEm = fo.emission; fldEmSet = true; alpha = fo.mask < 0.5 ? 0.0 : fo.opacity; fldNrm = fo.normal;
          }
 #endif
-         if (alpha < 1.0 && skips < 16 && alpha < (I.mat.alphaCutoff > 0.0 ? I.mat.alphaCutoff : rnd(seed)))
+         if (alpha < 1.0 && skips < 16 && alpha < (I.mat.alphaCutoff > 0.0 ? I.mat.alphaCutoff : rnd(qs)))
          {
             // Cut out or not covered: the ray goes on through, the same bounce.
             skips++; if (b == 0) cov = 0.0;
-            o = p + d * f.shQ.w; b--; continue;
+            o = offRay(p, d); b--; continue;
          }
          if (I.mat.mapNormal > 0.5 && !hairM)
          {
@@ -1822,21 +1862,21 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       if (!hairM && metal < 1.0 && (I.mat.subsurface > 0.0 || I.mat.translucency > 0.0))
       {
          const float tlW = clamp(I.mat.translucency, 0.0, 1.0), ssW = clamp(I.mat.subsurface, 0.0, 1.0) * (1.0 - tlW);
-         const float um = rnd(seed);
+         const float um = rnd(qs);
          dm = um < tlW ? 2 : (um < tlW + ssW && max(float3(I.mat.sssRadius).x, max(float3(I.mat.sssRadius).y, float3(I.mat.sssRadius).z)) > 1e-4 ? 1 : 0);
       }
       const float glW = hairM ? 0.0 : clamp(I.mat.transmission, 0.0, 1.0) * (1.0 - metal);
-      if (glW > 0.0 && rnd(seed) < glW)
+      if (glW > 0.0 && rnd(qs) < glW)
       {
          // Glass by its share, as the GL tracer: a GGX microfacet, then reflect or refract by the exact Fresnel; the
          // weight is Walter et al. 2007's for a microfacet drawn from D * nDotH. Transmission takes the base colour.
          const float ta = max(0.002, rough * rough);
-         const float3 Hm = ggxSampleH(n, ta, rnd(seed), rnd(seed));
+         const float3 Hm = ggxSampleH(n, ta, rnd(qs), rnd(qs));
          const float cosI = dot(V, Hm);
          if (cosI <= 1e-5) break;
          const float ior = max(I.mat.ior, 1.0001), eta = backHit ? ior : 1.0 / ior;
          float3 nd; bool thru = false;
-         if (rnd(seed) < ptFd(cosI, eta)) { nd = reflect(d, Hm); if (dot(ns, nd) <= 0.0) break; }
+         if (rnd(qs) < ptFd(cosI, eta)) { nd = reflect(d, Hm); if (dot(ns, nd) <= 0.0) break; }
          else { nd = refract(d, Hm, eta); if (dot(nd, nd) < 1e-6 || dot(ns, nd) >= 0.0) break; T *= base; thru = true; }
          const float gV = max(abs(dot(n, V)), 1e-4), gL = max(abs(dot(n, nd)), 1e-4), gH = max(dot(n, Hm), 1e-4);
          T *= min(cosI * ptG1(gV, ta) * ptG1(gL, ta) / (gV * gH), 4.0);
@@ -1844,10 +1884,10 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          if (b >= 2)
          {
             const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
-            if (rnd(seed) > q) break;
+            if (rnd(qs) > q) break;
             T /= q;
          }
-         o = p + (thru ? -ns : ns) * f.shQ.w; d = normalize(nd);
+         o = offRay(p, thru ? -ns : ns); d = normalize(nd);
          continue;
       }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
@@ -1859,15 +1899,15 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       // weighted by the count and the chance of taking this branch (unbiased). Both branches only set up the sample;
       // one shadow ray and one BSDF evaluation below serve either (keeps the kernel small).
       float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-      ptPickLight(f, LL, ems, nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms);
+      ptPickLight(f, LL, ems, nEm, pEm, count, p, qs, ld, Le, tmax, pL, lterms);
       // Hair: one place across the fibre per hit (the paper's integral over h), the same for the light and the bounce.
-      const float hH = hairM ? rnd(seed) * 2.0 - 1.0 : 0.0;
+      const float hH = hairM ? rnd(qs) * 2.0 - 1.0 : 0.0;
       const float hBm = clamp(I.mat.roughness, 0.02, 1.0), hBn = -I.mat.hairRadialNeg;
       if ((hairM || (dot(n, ld) > 1e-5 && dot(ns, ld) > 0.0) || (dm == 2 && dot(n, ld) < -1e-5 && dot(ns, ld) < 0.0)) && any(Le > 0.0))
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
-         if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(p, dot(ns, ld) < 0.0 ? -ns : ns), ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          Le *= fogTr(u, p, ld, tmax);
          float pB = 0.0;
          float3 fe = hairM ? hairBsdf(V, ld, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pB) * lterms.x
@@ -1893,7 +1933,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       {
          envMis = 1.0;
          float pE = 0.0;
-         const float3 ed = envPick(f, ecdf, float2(rnd(seed), rnd(seed)), pE);
+         const float3 ed = envPick(f, ecdf, float2(rnd(qs), rnd(qs)), pE);
          const float eL = dot(n, ed);
          const bool under = dm == 2 && eL < 0.0;
          if (pE > 0.0 && abs(eL) > 1e-5 && (dot(ns, ed) > 0.0) != under)
@@ -1912,13 +1952,13 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                fe = fe * (1.0 - cP) + (eL > 0.0 ? float3(ccW * coatSpec(cnH, nDotV, max(eL, 1e-4), cvH, cR) * eL) : float3(0.0));
                pBm = cP * (eL > 0.0 ? distGGX(cnH, cR) * cnH / (4.0 * cvH) : 0.0) + (1.0 - cP) * pB;
             }
-            if (any(fe > 0.0) && !occludedAlpha(rtArgs.tlas, inst, maps, p + (dot(ns, ed) < 0.0 ? -ns : ns) * f.shQ.w, ed, 1e4, f.shQ.w, seed))
+            if (any(fe > 0.0) && !occludedAlpha(rtArgs.tlas, inst, maps, offRay(p, dot(ns, ed) < 0.0 ? -ns : ns), ed, 1e4, f.shQ.w, seed))
                L += T * fe * sampleEnv(f, et, ed, 0.0) * fogTr(u, p, ed, 1e4) * (pE / max(pE * pE + pBm * pBm, 1e-20));
          }
       }
       if (hairM)
       {
-         const float3 nd = hairSample(V, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, float4(rnd(seed), rnd(seed), rnd(seed), rnd(seed)));
+         const float3 nd = hairSample(V, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, float4(rnd(qs), rnd(qs), rnd(qs), rnd(qs)));
          float pdH = 0.0;
          const float3 fH = hairBsdf(V, nd, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pdH);
          if (pdH <= 1e-6) break;
@@ -1927,25 +1967,25 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          if (b >= 2)
          {
             const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
-            if (rnd(seed) > q) break;
+            if (rnd(qs) > q) break;
             T /= q;
          }
-         o = p + (dot(ns, nd) < 0.0 ? -ns : ns) * f.shQ.w; d = nd;
+         o = offRay(p, dot(ns, nd) < 0.0 ? -ns : ns); d = nd;
          continue;
       }
       if (dm == 1)
       {
          const float2 lq = ptProbs(f0, metal, nDotV);
-         if (rnd(seed) < lq.x)
+         if (rnd(qs) < lq.x)
          {
             // The specular lobe on its own (the walk takes the diffuse share).
-            const float3 nd = reflect(d, ggxSampleH(n, max(0.002, rough * rough), rnd(seed), rnd(seed)));
+            const float3 nd = reflect(d, ggxSampleH(n, max(0.002, rough * rough), rnd(qs), rnd(qs)));
             float pd = 0.0;
             const float3 fs = ptEval(n, V, nd, base, metal, rough, f0, float2(0.0, 1.0), msK, pd);
             const float ps = pd - lq.y * max(dot(n, nd), 0.0) / 3.14159265;
             if (ps <= 1e-6 || dot(ns, nd) <= 0.0) break;
             T *= fs / ps; lastPdfB = pd; skyK = float3(1.0);
-            o = p + ns * f.shQ.w; d = nd;
+            o = offRay(p, ns); d = nd;
          }
          else
          {
@@ -1959,16 +1999,16 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             const float3 A = clamp(base, 0.0, 0.999);
             const float3 qa = 4.09712 + 4.20863 * A - sqrt(9.59217 + 41.6808 * A + 17.7126 * A * A);
             const float3 alb = 1.0 - qa * qa;
-            float3 wp = p - ns * f.shQ.w, wd = cosineDir(-ns, rnd(seed), rnd(seed));
+            float3 wp = offRay(p, -ns), wd = cosineDir(-ns, rnd(qs), rnd(qs));
             bool out = false; float3 q = p, no = ns;
             for (int s = 0; s < 256 && !out; s++)
             {
                // The channel is drawn in proportion to the walk's throughput so far, so a channel that has kept its
                // weight (the long red path in skin) is not starved by draws from the short ones.
                const float3 cw = max(Tw, float3(1e-6)) / max(Tw.x + Tw.y + Tw.z, 3e-6);
-               const float u0 = rnd(seed);
+               const float u0 = rnd(qs);
                const float sc = u0 < cw.x ? sg.x : (u0 < cw.x + cw.y ? sg.y : sg.z);
-               const float tt = -log(max(1.0 - rnd(seed), 1e-7)) / sc;
+               const float tt = -log(max(1.0 - rnd(qs), 1e-7)) / sc;
                ray wr(wp, wd, 0.0, tt);
                intersection_result<triangle_data, instancing> wh = it.intersect(wr, rtArgs.tlas);
                if (wh.type == intersection_type::triangle)
@@ -1994,28 +2034,28 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                   const float3 tr = exp(-sg * tt);
                   Tw *= alb * sg * tr / max(dot(cw, sg * tr), 1e-20);
                   wp += wd * tt;
-                  const float cz = 1.0 - 2.0 * rnd(seed), ph = 6.28318530718 * rnd(seed), sz = sqrt(max(1.0 - cz * cz, 0.0));
+                  const float cz = 1.0 - 2.0 * rnd(qs), ph = 6.28318530718 * rnd(qs), sz = sqrt(max(1.0 - cz * cz, 0.0));
                   wd = float3(sz * cos(ph), sz * sin(ph), cz);
                }
             }
             if (!out) break;
             T *= min(Tw, float3(8.0));
             float3 eld = float3(0.0, 1.0, 0.0), eLe = float3(0.0); float etm = 0.0, epL = -1.0; float2 elt = float2(1.0);
-            ptPickLight(f, LL, ems, nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt);
+            ptPickLight(f, LL, ems, nEm, pEm, count, q, qs, eld, eLe, etm, epL, elt);
             const float ec = dot(no, eld);
             if (ec > 1e-5 && any(eLe > 0.0))
             {
-               if (epL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, q + no * f.shQ.w, eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (epL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(q, no), eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                const float epB = ec / 3.14159265;
                L += T * (epB * elt.x) * eLe * (epL > 0.0 ? epL / max(epL * epL + epB * epB, 1e-20) : 1.0);
             }
-            d = cosineDir(no, rnd(seed), rnd(seed)); o = q + no * f.shQ.w;
+            d = cosineDir(no, rnd(qs), rnd(qs)); o = offRay(q, no);
             lastPdfB = max(dot(no, d), 1e-4) / 3.14159265; skyK = f.ambient.xyz * 3.0;
          }
          if (b >= 2)
          {
             const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
-            if (rnd(seed) > q) break;
+            if (rnd(qs) > q) break;
             T /= q;
          }
          continue;
@@ -2027,11 +2067,11 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       // base's (1 - pC) attenuation and that choice cancel, so the base branch weighs as before.
       const float ccR = clamp(I.mat.coatRoughness, 0.02, 1.0);
       const float pC = ccW > 0.0 ? clamp(ccW * (0.04 + 0.96 * pow(1.0 - nDotV, 5.0)), 0.0, 0.95) : 0.0;
-      const bool coatB = pC > 0.0 && rnd(seed) < pC;
+      const bool coatB = pC > 0.0 && rnd(qs) < pC;
       float3 nd;
-      if (coatB) { nd = reflect(d, ggxSampleH(n, ccR * ccR, rnd(seed), rnd(seed))); skyK = float3(1.0); }
-      else if (rnd(seed) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(seed), rnd(seed))); skyK = float3(1.0); }
-      else { nd = cosineDir(dm == 2 ? -n : n, rnd(seed), rnd(seed)); skyK = f.ambient.xyz * 3.0; }
+      if (coatB) { nd = reflect(d, ggxSampleH(n, ccR * ccR, rnd(qs), rnd(qs))); skyK = float3(1.0); }
+      else if (rnd(qs) < lp.x) { nd = reflect(d, ggxSampleH(n, a, rnd(qs), rnd(qs))); skyK = float3(1.0); }
+      else { nd = cosineDir(dm == 2 ? -n : n, rnd(qs), rnd(qs)); skyK = f.ambient.xyz * 3.0; }
       float pdfB = 0.0;
       float3 fB = dm == 2 ? ptEvalT(n, V, nd, base, metal, rough, f0, float2(1.0), msK, pdfB) : ptEval(n, V, nd, base, metal, rough, f0, float2(1.0), msK, pdfB);
       float pdfC = 0.0;
@@ -2065,10 +2105,10 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       if (b >= 2)
       {
          const float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
-         if (rnd(seed) > q) break;
+         if (rnd(qs) > q) break;
          T /= q;
       }
-      o = p + (dot(ns, nd) < 0.0 ? -ns : ns) * f.shQ.w; d = nd;
+      o = offRay(p, dot(ns, nd) < 0.0 ? -ns : ns); d = nd;
    }
    L = (min(L, float3(30.0)) + L0) * chan; // firefly guard; chan weights a chromatic-aberration sample's one channel
    const bool add = u.info.x > 0.5;

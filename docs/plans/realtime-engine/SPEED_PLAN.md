@@ -41,10 +41,11 @@ No new scene. Three existing ones cover what one scene cannot, and the timing me
 
 | Step | What | Why it should pay | Keep only if |
 |---|---|---|---|
+| S1.0 | Owen-scrambled Sobol samples (Burley 2020) in place of white-noise PCG, 16 dimensions per path event; added after S0 showed settle and Cycles cost the same per sample on ref_interior (586 vs 578 ms at 1080p) while Cycles is cleaner per sample (FLIP 0.0185 vs 0.0278 at 16 spp) | evenly spread samples converge faster at the same cost; direct light from area lights and depth of field gain most | equal-picture time drops 1.3x or more on judge_table and ref_interior, picture at 1024 spp unchanged within 0.003 |
 | S1.1 | Per-pixel adaptive sampling. Today the stop is one decision for the whole frame (95th percentile of error) | most of the table frame is a flat surface that is clean at 16 to 32 spp; glass and edges need the full count | equal-picture time drops 2x or more, FLIP against full count 0.005 or less |
 | S1.2 | Denoiser guides through glass: albedo and normal of the first non-glass hit | glass regions now denoise as one white surface, so they need many samples to look clean | glass at 64 spp matches 256 spp within 0.01 |
-| S1.3 | Cheaper Field materials after the first bounce: no bump taps (three program runs a hit) on later bounces | later bounces already see the smooth normal for maps | ms per pass drops 10 % or more, picture unchanged within 0.002 |
-| S1.4 | Path length by throughput: roulette from bounce 1 on diffuse, as glass already does from bounce 2 | closed rooms spend most rays on dim deep bounces | ref_interior pass time drops 15 % or more, brightness within 1 % |
+| S1.3 | Cheaper Field materials after the first bounce: no bump taps (three program runs a hit) on later bounces. Found already in place (2026-11-13: bump taps only when b == 0); what is left is the one program run a hit | later bounces already see the smooth normal for maps | ms per pass drops 10 % or more, picture unchanged within 0.002 |
+| S1.4 | Path length by throughput: roulette from bounce 1 on diffuse. Today every branch (diffuse, glass, fog, subsurface) starts it at bounce 2, so this is one bounce earlier, a small gain | closed rooms spend most rays on dim deep bounces | ref_interior pass time drops 15 % or more, brightness within 1 % |
 | S1.5 | Preview only: settle at 67 % size through the MetalFX scaler live already uses | first clean picture sooner while working | never used on export |
 
 ### Block S2: live speed and the glass path
@@ -71,3 +72,17 @@ FLIP 0.01, the time is carried on along the last two points' log-log line and ma
 
 S0 first (it also fixes the Cycles column). Then transmission in settle (absorption, touching media, the dark
 water surface) before S1, because S1.2 changes how glass is sampled and should start from correct glass.
+
+## 6. Test queue (run when the laptop is free, in this order, from tools/blender-ab)
+
+| # | Command | Time | Answers |
+|---|---|---|---|
+| 1 | `python3 speed.py equal carpet_pile --engines settle,pt --budget 15` | ~25 min (two 1024 spp references) | the last S0 cell: settle vs GL Path trace on the ray-structure scene |
+| 2 | `judge_render.py probe --size 960 720 --tag off` with `INFINITE_BIN=~/.cache/infinite-sweep/bin/before-ulp.app/Contents/MacOS/Infinite` (kept copy, delete after), then `--tag ulp --ref off` with `INFINITE_BIN=$PWD/../../build/Infinite.app/Contents/MacOS/Infinite` | ~3 min | the offset change keeps the picture (FLIP small, glass and water same or clearer) |
+| 3 | The same pair with `--distance 3` (tags `off3`, `ulp3`) | ~4 min | the 0.2 mm glass-water gap is no longer stepped over in wide shots |
+| 4 | `judge_render.py probe --size 960 720 --lift 0.0005 --tag lift --ref ulp` | ~3 min (Blender writes the moved glbs once) | the light glass base: dark when lifted means the exact glass-table contact is the cause |
+| 5 | S1.0 Sobol: `speed.py equal judge_table ref_interior --engines settle --budget 15` (built in with the ulp offset; compare against the S0 rows 42.5 s and 45.2 s) | ~12 min | keep S1.0 only if both drop 1.3x or more |
+| 6 | `speed.py equal judge_table ref_interior --engines settle` after each later S1 step | ~5 min each | the keep-or-drop number for that step |
+
+Note for picture checks: Cycles' bounce cap of 8 (speed.py) turns half the glass black, because Cycles counts every
+glass interface as a bounce; picture truth keeps Cycles' default bounces (blender_scene.py only caps when asked).

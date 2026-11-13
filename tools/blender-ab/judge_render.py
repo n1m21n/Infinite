@@ -213,15 +213,53 @@ def orbit(a):
     print("ORBIT 30 frames, %.1f s mean per frame, largest brightness step %.4f\n%s" % (sum(secs) / 30, step, out))
 
 
+def probe(a):
+    """One settle render of judge_table with a change, for picture questions that need no sheet:
+    --lift M raises the glass and the water by M metres (is the glass base light because it touches the table?),
+    --distance M moves the camera back along its line and refocuses (does a wide shot step over thin layers?).
+    Writes OUT/probe_<tag>.png and prints FLIP against OUT/probe_<ref>.png when --ref is given."""
+    import json
+    w, h = a.size
+    sc = JT.judge_table("flaws", size=(w, h), samples=16)
+    key = "lift%g" % a.lift
+    if a.lift:
+        for i in (5, 6):   # the glass and the water (judge_table's object order)
+            sc["objects"][i]["verts"] = [[v[0], v[1], v[2] + a.lift] for v in sc["objects"][i]["verts"]]
+    if a.distance:
+        sc["camera"]["focus"] += a.distance - sc["camera"]["distance"]
+        sc["camera"]["distance"] = a.distance
+    # Moved meshes need their own glbs, which Blender writes on a quick 16 spp render of the case.
+    case = CASE if not a.lift else os.path.join(OUT, "probe_case_" + key)
+    if not os.path.exists(os.path.join(case, "obj_5.glb")):
+        os.makedirs(case, exist_ok=True)
+        open(os.path.join(case, "scene.json"), "w").write(json.dumps(sc))
+        _, log = harness.run([harness.BLENDER, "-b", "--factory-startup", "--python", os.path.join(HERE, "blender_scene.py"), "--", case])
+        if "SCENEDONE" not in log:
+            sys.exit("blender failed:\n" + log[-3000:])
+    dt = infinite(sc, "settle", "probe_" + a.tag, a.spp, case=case)
+    out = os.path.join(OUT, "probe_%s.png" % a.tag)
+    msg = "probe %s  %.1f s  %s" % (a.tag, dt, out)
+    if a.ref:
+        import flip_evaluator as F
+        _, mean, _ = F.evaluate(harness.load(os.path.join(OUT, "probe_%s.png" % a.ref)), harness.load(out), "LDR")
+        msg += "  FLIP vs %s %.4f" % (a.ref, mean)
+    print(msg, flush=True)
+
+
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("cmd", choices=["zoom", "bake", "final", "orbit"])
+    p.add_argument("cmd", choices=["zoom", "bake", "final", "orbit", "probe"])
     p.add_argument("--stage", default="flaws")
     p.add_argument("--only", nargs="*")
     p.add_argument("--size", nargs=2, type=int, default=[1920, 1440])
     p.add_argument("--keep-truth", action="store_true")
+    p.add_argument("--tag", default="now")
+    p.add_argument("--ref")
+    p.add_argument("--spp", type=int, default=256)
+    p.add_argument("--lift", type=float, default=0.0)
+    p.add_argument("--distance", type=float, default=0.0)
     a = p.parse_args()
-    {"zoom": zoom, "bake": bake, "final": final, "orbit": orbit}[a.cmd](a)
+    {"zoom": zoom, "bake": bake, "final": final, "orbit": orbit, "probe": probe}[a.cmd](a)
 
 
 if __name__ == "__main__":
