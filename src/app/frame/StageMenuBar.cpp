@@ -22,47 +22,103 @@ namespace app
 {
 // The rail of panel toggles down the right edge. Library leads on the top bar's centre line and the panels follow,
 // one tile apart; at the bottom, Settings in the corner, then Edit history, then the Terminal.
+std::string gRailOrder; // saved tile order
+
 static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
    const float step = tok::tile + tok::space_3;
    const float top = (tok::bar_h - tok::tile) * 0.5f + step; // Library starts level with the Viewport tile
-   if (PanelRail::Item("##railLibrary", top, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
-                       T("Library - search modules, samples, media and plugins")))
-      gNodePanelOpen = !gNodePanelOpen;
-   if (PanelRail::Item("##railViewport", top + step, IconsInfinite::Viewport, IconsInfinite::ViewportFill, gViewportPanelOpen,
-                       T("Viewport panel")))
-      gViewportPanelOpen = !gViewportPanelOpen;
-   if (PanelRail::Item("##railModMatrix", top + 2.0f * step, IconsInfinite::GridDots, nullptr, gModMatrixOpen,
-                       T("Modulation matrix")))
-      gModMatrixOpen = !gModMatrixOpen;
-   if (PanelRail::Item("##railPerf", top + 3.0f * step, IconsInfinite::Perform, nullptr, gPerfPanelOpen,
-                       T("Performance mode")))
-      gPerfPanelOpen = !gPerfPanelOpen;
-   if (PanelRail::Item("##railArrange", top + 4.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
-                       T("Arrangement timeline")))
-      gArrangePanelOpen = !gArrangePanelOpen;
-   if (PanelRail::Item("##railSession", top + 5.0f * step, IconsInfinite::Session, nullptr, gSessionPanelOpen,
-                       T("Session - launch clips by scene")))
-      gSessionPanelOpen = !gSessionPanelOpen;
-   if (PanelRail::Item("##railStudio", top + 6.0f * step, IconsInfinite::Waveform, nullptr, gSampleStudioOpen,
-                       T("Sample studio - generate and shape a loop (Shift+W)")))
-      gSampleStudioOpen = !gSampleStudioOpen;
-   if (PanelRail::Item("##railView3D", top + 8.0f * step, IconsInfinite::View3d, nullptr, gView3DOpen,
-                       T("3D View - arrange node outputs and render a camera (Shift+3)")))
-      gView3DOpen = !gView3DOpen;
-   if (PanelRail::Item("##railView2D", top + 11.0f * step, IconsInfinite::Layers, nullptr, gView2DOpen,
-                       T("2D View - lay out node outputs as layers and render a picture (Shift+2)")))
-      gView2DOpen = !gView2DOpen;
-   if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
-                       T("Piano roll - edit and generate notes (Shift+R)")))
-      gPianoRollOpen = !gPianoRollOpen;
-   if (PanelRail::Item("##railCurveEditor", top + 9.0f * step, IconsInfinite::Curve, nullptr, gCurveEditorOpen,
-                       T("Curve editor - draw and shape MSEG curves (Shift+E)")))
-      gCurveEditorOpen = !gCurveEditorOpen;
-   if (PanelRail::Item("##railFieldPatcher", top + 10.0f * step, IconsInfinite::Code, nullptr, gFieldPatcherOpen,
-                       T("Field patcher - Field as boxes (Shift+F)")))
-      gFieldPatcherOpen = !gFieldPatcherOpen;
+   struct Entry
+   {
+      const char* key;
+      const char* id;
+      const char* glyphOff;
+      const char* glyphOn;
+      bool* open;
+      const char* tip;
+   };
+   static const Entry kEntries[] = {
+      { "library", "##railLibrary", IconsInfinite::Library, IconsInfinite::LibraryFill, &gNodePanelOpen,
+        T("Library - search modules, samples, media and plugins") },
+      { "viewport", "##railViewport", IconsInfinite::Viewport, IconsInfinite::ViewportFill, &gViewportPanelOpen, T("Viewport panel") },
+      { "modmatrix", "##railModMatrix", IconsInfinite::GridDots, nullptr, &gModMatrixOpen, T("Modulation matrix") },
+      { "perf", "##railPerf", IconsInfinite::Perform, nullptr, &gPerfPanelOpen, T("Performance mode") },
+      { "arrange", "##railArrange", IconsInfinite::Cube, nullptr, &gArrangePanelOpen, T("Arrangement timeline") },
+      { "session", "##railSession", IconsInfinite::Session, nullptr, &gSessionPanelOpen, T("Session - launch clips by scene") },
+      { "studio", "##railStudio", IconsInfinite::Waveform, nullptr, &gSampleStudioOpen,
+        T("Sample studio - generate and shape a loop (Shift+W)") },
+      { "piano", "##railPianoRoll", IconsInfinite::Piano, nullptr, &gPianoRollOpen, T("Piano roll - edit and generate notes (Shift+R)") },
+      { "view3d", "##railView3D", IconsInfinite::View3d, nullptr, &gView3DOpen,
+        T("3D View - arrange node outputs and render a camera (Shift+3)") },
+      { "view2d", "##railView2D", IconsInfinite::Layers, nullptr, &gView2DOpen,
+        T("2D View - lay out node outputs as layers and render a picture (Shift+2)") },
+      { "curve", "##railCurveEditor", IconsInfinite::Curve, nullptr, &gCurveEditorOpen,
+        T("Curve editor - draw and shape MSEG curves (Shift+E)") },
+      { "field", "##railFieldPatcher", IconsInfinite::Code, nullptr, &gFieldPatcherOpen, T("Field patcher - Field as boxes (Shift+F)") },
+   };
+   constexpr int kN = (int)(sizeof(kEntries) / sizeof(kEntries[0]));
+   // The saved order (gRailOrder, comma-separated keys); unknown keys are skipped, new ones join in default place.
+   int order[kN];
+   {
+      int n = 0;
+      bool used[kN] = {};
+      size_t at = 0;
+      while (at <= gRailOrder.size() && n < kN)
+      {
+         size_t c = gRailOrder.find(',', at);
+         if (c == std::string::npos)
+            c = gRailOrder.size();
+         const std::string k = gRailOrder.substr(at, c - at);
+         at = c + 1;
+         for (int i = 0; i < kN; i++)
+            if (!used[i] && k == kEntries[i].key)
+            {
+               used[i] = true;
+               order[n++] = i;
+               break;
+            }
+      }
+      for (int i = 0; i < kN; i++)
+         if (!used[i])
+            order[n++] = i;
+   }
+   int moveFrom = -1, moveTo = -1;
+   for (int slot = 0; slot < kN; slot++)
+   {
+      const Entry& e = kEntries[order[slot]];
+      if (PanelRail::Item(e.id, top + slot * step, e.glyphOff, e.glyphOn, *e.open, e.tip))
+         *e.open = !*e.open;
+      // Drag a tile onto another to reorder; the order is saved with the workspace.
+      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+      {
+         ImGui::SetDragDropPayload("RAIL_TILE", &slot, sizeof(slot));
+         ImGui::EndDragDropSource();
+      }
+      if (ImGui::BeginDragDropTarget())
+      {
+         if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RAIL_TILE"))
+         {
+            moveFrom = *(const int*)pl->Data;
+            moveTo = slot;
+         }
+         ImGui::EndDragDropTarget();
+      }
+   }
+   if (moveFrom >= 0 && moveFrom != moveTo)
+   {
+      const int moved = order[moveFrom];
+      if (moveFrom < moveTo)
+         for (int i = moveFrom; i < moveTo; i++)
+            order[i] = order[i + 1];
+      else
+         for (int i = moveFrom; i > moveTo; i--)
+            order[i] = order[i - 1];
+      order[moveTo] = moved;
+      gRailOrder.clear();
+      for (int i = 0; i < kN; i++)
+         gRailOrder += std::string(i ? "," : "") + kEntries[order[i]].key;
+   }
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))

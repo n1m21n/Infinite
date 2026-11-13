@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <map>
 #include <memory>
@@ -131,6 +132,9 @@ namespace
       std::string parseError;
       bool placeAll = true;      // push every box position into the editor next frame
       bool navigate = true;
+         // the tab's name when the user renamed it (node pages: a label, the node keeps its own)
+      bool hoverItem = false;    // last frame: the pointer was over a box, pin or wire (so a left drag is not a pan)
+      bool panLeft = false;      // a left drag that began on empty canvas pans it
    };
 
    struct State
@@ -149,6 +153,14 @@ namespace
       char search[64] = {};
       int railFamily = -1;
       bool kindHint = false;
+      std::map<uint64_t, std::string> nodeNames;
+      std::vector<Field::BoxNode> clipBoxes; // copied boxes, with the wires that ran between them
+      std::vector<Field::BoxWire> clipWires;
+      int ctxBox = 0;             // the box a right-click menu is open on
+      int ctxLink = 0;
+      int renaming = -1;          // the page whose tab is being renamed
+      char renameBuf[64] = {};
+      bool renameFocus = false;
    };
 
    State& S()
@@ -465,6 +477,104 @@ namespace
       w.push_back(nw);
    }
 
+   // ---- copy, paste, duplicate, delete (the box ids the editor has selected)
+
+   std::vector<int> SelectedIds(Page& p)
+   {
+      std::vector<int> out;
+      if (p.ctx == nullptr)
+         return out;
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(p.ctx);
+      std::vector<ed::NodeId> ids((size_t)std::max(1, ed::GetSelectedObjectCount()));
+      const int n = ed::GetSelectedNodes(ids.data(), (int)ids.size());
+      for (int i = 0; i < n; i++)
+         out.push_back((int)ids[i].Get());
+      ed::SetCurrentEditor(prev);
+      return out;
+   }
+
+   void CopyBoxes(Page& p, const std::vector<int>& ids)
+   {
+      State& s = S();
+      s.clipBoxes.clear();
+      s.clipWires.clear();
+      auto has = [&](int id) { return std::find(ids.begin(), ids.end(), id) != ids.end(); };
+      for (const Field::BoxNode& b : p.graph.boxes)
+         if (has(b.id))
+            s.clipBoxes.push_back(b);
+      for (const Field::BoxWire& w : p.graph.wires)
+         if (has(w.srcBoxId) && has(w.dstBoxId))
+            s.clipWires.push_back(w);
+   }
+
+   // Pastes the clipboard so its top-left box lands on `at`. Returns the number of boxes added.
+   int PasteBoxes(Page& p, ImVec2 at)
+   {
+      State& s = S();
+      if (s.clipBoxes.empty())
+         return 0;
+      float minX = 1e9f, minY = 1e9f;
+      for (const Field::BoxNode& b : s.clipBoxes)
+      {
+         minX = std::min(minX, b.x);
+         minY = std::min(minY, b.y);
+      }
+      int maxStmt = -1;
+      for (const Field::BoxNode& b : p.graph.boxes)
+         maxStmt = std::max(maxStmt, b.stmtOrder);
+      std::map<int, int> remap;
+      int next = NextBoxId(p.graph);
+      for (const Field::BoxNode& src : s.clipBoxes)
+      {
+         Field::BoxNode b = src;
+         b.id = next++;
+         remap[src.id] = b.id;
+         b.key.clear();
+         b.wireName.clear();
+         b.whenGroupId = -1;
+         b.x = at.x + (src.x - minX);
+         b.y = at.y + (src.y - minY);
+         b.hasExplicitPos = true;
+         if (src.stmtOrder >= 0)
+            b.stmtOrder = ++maxStmt;
+         if (src.specId == "knob")
+            b.varName = FreshName(p.graph, "k");
+         else if (src.specId == "previous")
+            b.varName = FreshName(p.graph, "s");
+         else if (src.specId == "assign_var")
+            b.varName = FreshName(p.graph, "v");
+         p.graph.boxes.push_back(b);
+      }
+      int wid = 0;
+      for (const Field::BoxWire& w : p.graph.wires)
+         wid = std::max(wid, w.id);
+      for (const Field::BoxWire& w : s.clipWires)
+      {
+         Field::BoxWire nw = w;
+         nw.id = ++wid;
+         nw.srcBoxId = remap[w.srcBoxId];
+         nw.dstBoxId = remap[w.dstBoxId];
+         p.graph.wires.push_back(nw);
+      }
+      return (int)s.clipBoxes.size();
+   }
+
+   void SelectAllBoxes(Page& p)
+   {
+      if (p.ctx == nullptr)
+         return;
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(p.ctx);
+      bool first = true;
+      for (const Field::BoxNode& b : p.graph.boxes)
+      {
+         ed::SelectNode(b.id, !first);
+         first = false;
+      }
+      ed::SetCurrentEditor(prev);
+   }
+
    int InPinId(int box, int pin) { return box * kPinStride + 1 + pin; }
    int OutPinId(int box, int pin) { return box * kPinStride + 64 + pin; }
    void DecodePin(int id, int& box, int& pin, bool& out)
@@ -515,7 +625,14 @@ namespace
 
    // ---- the pick menu (§8.6): a search field and the boxes this page's host can run
 
-   bool PickMenu(Page& p, Host& h, ImVec2 at, int fromPin, int family)
+   void DockItem()
+   {
+      if (MenuParts::Item(gFieldPatcherDock == 3 ? T("Dock at bottom") : T("Dock at top")))
+         gFieldPatcherDock = gFieldPatcherDock == 3 ? 0 : 3;
+   }
+
+   // `extras`: the canvas menu also carries Paste, Select all, Fit view and the dock switch under the list.
+   bool PickMenu(Page& p, Host& h, ImVec2 at, int fromPin, int family, bool extras = false)
    {
       State& s = S();
       bool added = false;
@@ -523,9 +640,33 @@ namespace
       if (ImGui::IsWindowAppearing())
          ImGui::SetKeyboardFocusHere();
       FieldWell::InputTextWithHint("##fpSearch", T("Box name or Field word"), s.search, sizeof(s.search));
+      const bool enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
       const uint32_t mask = MaskOf(p, h);
       std::vector<const Field::BoxSpec*> list = Field::FindBoxSpecsByQuery(s.search, 0);
-      int shown = 0;
+
+      auto place = [&](const Field::BoxSpec& spec) {
+         Field::BoxNode& b = AddBox(p, spec, at);
+         const int newId = b.id;
+         if (fromPin != 0)
+         {
+            int box, pin;
+            bool out;
+            DecodePin(fromPin, box, pin, out);
+            if (out && !spec.inlets.empty())
+               Connect(p, box, pin, newId, 0);
+            else if (!out && !spec.outlets.empty())
+               Connect(p, newId, 0, box, pin);
+         }
+         Commit(p, h, "Add Box");
+         added = true;
+         s.search[0] = 0;
+         ImGui::CloseCurrentPopup();
+      };
+
+      // The list scrolls in a window of about ten rows, so the menu never runs off the screen.
+      const float rowH = ImGui::GetTextLineHeightWithSpacing() + 4.0f;
+      ImGui::BeginChild("##fpPickList", ImVec2(260.0f, rowH * 10.0f), false);
+      bool first = true;
       for (const Field::BoxSpec* spec : list)
       {
          if (family >= 0 && (int)spec->family != family)
@@ -533,31 +674,40 @@ namespace
          if (spec->id == "assign_var" || spec->id == "ident")
             continue;
          const bool runs = (spec->hostMask & mask) != 0;
+         if (enter && first && runs && !added)
+         {
+            place(*spec);
+            break;
+         }
+         first = false;
          std::string row = std::string(T(spec->label.c_str()));
          if (spec->fieldWord != spec->label)
             row += "   " + spec->fieldWord;
          row += "##" + spec->id;
          if (MenuParts::Item(row.c_str(), nullptr, false, runs))
          {
-            Field::BoxNode& b = AddBox(p, *spec, at);
-            const int newId = b.id;
-            if (fromPin != 0)
-            {
-               int box, pin;
-               bool out;
-               DecodePin(fromPin, box, pin, out);
-               if (out && !spec->inlets.empty())
-                  Connect(p, box, pin, newId, 0);
-               else if (!out && !spec->outlets.empty())
-                  Connect(p, newId, 0, box, pin);
-            }
-            Commit(p, h, "Add Box");
-            added = true;
-            s.search[0] = 0;
-            ImGui::CloseCurrentPopup();
-         }
-         if (++shown > 40)
+            place(*spec);
             break;
+         }
+      }
+      ImGui::EndChild();
+
+      if (extras && !added)
+      {
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Paste"), nullptr, false, !s.clipBoxes.empty()))
+         {
+            if (PasteBoxes(p, at) > 0)
+            {
+               Commit(p, h, "Paste Boxes");
+               added = true;
+            }
+         }
+         if (MenuParts::Item(T("Select all")))
+            SelectAllBoxes(p);
+         if (MenuParts::Item(T("Fit view")))
+            ed::NavigateToContent(0.2f);
+         DockItem();
       }
       return added;
    }
@@ -669,6 +819,17 @@ namespace
       ed::SetCurrentEditor(p.ctx);
       ed::GetStyle() = mainStyle; // the same look as the main canvas
 
+      {
+         // A left drag that begins on empty canvas pans it (the main canvas does the same); a box, pin or wire keeps
+         // its own drag, and Shift drags a selection box.
+         ed::Config& live = const_cast<ed::Config&>(ed::GetConfig(p.ctx));
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() && !p.hoverItem && !ImGui::GetIO().KeyShift &&
+             !ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeySuper)
+            p.panLeft = true;
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            p.panLeft = false;
+         live.NavigateButtonIndex = p.panLeft ? 0 : 1;
+      }
       ed::Begin("##fpCanvas", size);
       bool changed = false;
       if (p.placeAll)
@@ -764,8 +925,61 @@ namespace
          }
       }
 
+      p.hoverItem = ed::GetHoveredNode().Get() != 0 || ed::GetHoveredPin().Get() != 0 || ed::GetHoveredLink().Get() != 0;
+
+      // Keys while the pointer is over the panel and no text field has the keyboard: copy, cut, paste, duplicate,
+      // select all, delete.
+      const ImGuiIO& io = ImGui::GetIO();
+      if (!changed && gFieldPatcherClaimedKeys && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput)
+      {
+         const bool cmd = io.KeyCtrl || io.KeySuper;
+         const std::vector<int> sel = SelectedIds(p);
+         const ImVec2 mouse = ed::ScreenToCanvas(ImGui::GetMousePos());
+         if (cmd && ImGui::IsKeyPressed(ImGuiKey_C, false) && !sel.empty())
+            CopyBoxes(p, sel);
+         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_X, false) && !sel.empty())
+         {
+            CopyBoxes(p, sel);
+            for (int id : sel)
+               RemoveBox(p, id);
+            changed = true;
+         }
+         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false) && !s.clipBoxes.empty())
+            changed = PasteBoxes(p, mouse) > 0;
+         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_D, false) && !sel.empty())
+         {
+            CopyBoxes(p, sel);
+            ImVec2 tl(1e9f, 1e9f);
+            for (const Field::BoxNode& b : s.clipBoxes)
+               tl = ImVec2(std::min(tl.x, b.x), std::min(tl.y, b.y));
+            changed = PasteBoxes(p, ImVec2(tl.x + 40.0f, tl.y + 40.0f)) > 0;
+         }
+         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_A, false))
+            SelectAllBoxes(p);
+         else if ((ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false)) && !sel.empty())
+         {
+            for (int id : sel)
+               RemoveBox(p, id);
+            changed = true;
+         }
+      }
+
       ed::Suspend();
-      if (ed::ShowBackgroundContextMenu())
+      ed::NodeId ctxNode;
+      ed::LinkId ctxLink;
+      if (ed::ShowNodeContextMenu(&ctxNode))
+      {
+         s.ctxBox = (int)ctxNode.Get();
+         if (!ed::IsNodeSelected(ctxNode))
+            ed::SelectNode(ctxNode, false);
+         ImGui::OpenPopup("##fpNodeMenu");
+      }
+      else if (ed::ShowLinkContextMenu(&ctxLink))
+      {
+         s.ctxLink = (int)ctxLink.Get();
+         ImGui::OpenPopup("##fpLinkMenu");
+      }
+      else if (ed::ShowBackgroundContextMenu())
       {
          s.pendingFromPin = 0;
          s.pendingAt = ed::ScreenToCanvas(ImGui::GetMousePos());
@@ -773,8 +987,58 @@ namespace
       }
       if (MenuParts::BeginPopup("##fpPick"))
       {
-         if (PickMenu(p, h, s.pendingAt, s.pendingFromPin, -1))
+         if (PickMenu(p, h, s.pendingAt, s.pendingFromPin, -1, s.pendingFromPin == 0))
             changed = false; // PickMenu committed
+         MenuParts::EndPopup();
+      }
+      if (MenuParts::BeginPopup("##fpNodeMenu"))
+      {
+         const std::vector<int> sel = SelectedIds(p);
+         if (MenuParts::Item(T("Duplicate"), nullptr, false, !sel.empty()))
+         {
+            CopyBoxes(p, sel);
+            ImVec2 tl(1e9f, 1e9f);
+            for (const Field::BoxNode& b : s.clipBoxes)
+               tl = ImVec2(std::min(tl.x, b.x), std::min(tl.y, b.y));
+            if (PasteBoxes(p, ImVec2(tl.x + 40.0f, tl.y + 40.0f)) > 0)
+               Commit(p, h, "Duplicate Boxes"), changed = false;
+         }
+         if (MenuParts::Item(T("Copy"), nullptr, false, !sel.empty()))
+            CopyBoxes(p, sel);
+         if (MenuParts::Item(T("Cut"), nullptr, false, !sel.empty()))
+         {
+            CopyBoxes(p, sel);
+            for (int id : sel)
+               RemoveBox(p, id);
+            changed = true;
+         }
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Disconnect")))
+         {
+            for (int id : sel)
+            {
+               auto& w = p.graph.wires;
+               w.erase(std::remove_if(w.begin(), w.end(), [id](const Field::BoxWire& x) { return x.srcBoxId == id || x.dstBoxId == id; }), w.end());
+            }
+            changed = true;
+         }
+         if (MenuParts::Item(T("Delete")))
+         {
+            for (int id : sel)
+               RemoveBox(p, id);
+            changed = true;
+         }
+         MenuParts::EndPopup();
+      }
+      if (MenuParts::BeginPopup("##fpLinkMenu"))
+      {
+         if (MenuParts::Item(T("Delete wire")))
+         {
+            auto& w = p.graph.wires;
+            const int lid = s.ctxLink;
+            w.erase(std::remove_if(w.begin(), w.end(), [lid](const Field::BoxWire& x) { return x.id == lid; }), w.end());
+            changed = true;
+         }
          MenuParts::EndPopup();
       }
       ed::Resume();
@@ -1016,16 +1280,62 @@ namespace
 
    std::string PageTitle(Page& p)
    {
+      if (p.uid != 0)
+      {
+         auto it = S().nodeNames.find(p.uid);
+         if (it != S().nodeNames.end())
+            return it->second;
+      }
       if (p.uid == 0)
-         return std::string("◌ ") + p.scratchName;
+         return p.scratchName;
       GraphNode* gn = FindNodeByUid(p.uid);
-      Host h = HostOf(gn);
-      const char* glyph = h.mask == Field::HostNotes ? "♪ " : "✦ ";
-      if (auto* n = gn != nullptr ? dynamic_cast<FieldPrimitiveNode*>(gn->node.get()) : nullptr)
-         if (n->valueMode)
-            glyph = "─ ";
       std::string name = gn != nullptr ? gn->typeName : std::string("?");
-      return glyph + std::string(T(name.c_str())) + " " + std::to_string(gn != nullptr ? gn->index : 0);
+      return std::string(T(name.c_str())) + " " + std::to_string(gn != nullptr ? gn->index : 0);
+   }
+
+   void StartRename(int i)
+   {
+      State& s = S();
+      s.renaming = i;
+      s.renameFocus = true;
+      std::snprintf(s.renameBuf, sizeof(s.renameBuf), "%s", PageTitle(*s.pages[i]).c_str());
+   }
+
+   // Enter or a click away keeps the name; Esc drops it; an empty name returns the tab to its own.
+   void FinishRename(bool keep)
+   {
+      State& s = S();
+      if (keep && s.renaming >= 0 && s.renaming < (int)s.pages.size())
+      {
+         Page& p = *s.pages[s.renaming];
+         std::string n = s.renameBuf;
+         if (p.uid == 0)
+         {
+            if (!n.empty())
+               p.scratchName = n;
+         }
+         else if (n.empty())
+            s.nodeNames.erase(p.uid);
+         else
+            s.nodeNames[p.uid] = n;
+      }
+      s.renaming = -1;
+   }
+
+   // One strip-high text line: the text sits on the chips' centre line, not on their top edge.
+   void RowText(const char* fmt, ...) IM_FMTARGS(1);
+   void RowText(const char* fmt, ...)
+   {
+      char buf[512];
+      va_list args;
+      va_start(args, fmt);
+      std::vsnprintf(buf, sizeof(buf), fmt, args);
+      va_end(args);
+      const float dy = std::max(0.0f, (ChipButton::kHeight - ImGui::GetTextLineHeight()) * 0.5f);
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + dy);
+      ImGui::TextDisabled("%s", buf);
+      ImGui::SameLine(0.0f, tok::space_2);
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() - dy);
    }
 
    void DrawStrip()
@@ -1035,11 +1345,36 @@ namespace
       {
          Page& p = *s.pages[i];
          ImGui::PushID(i);
+         if (s.renaming == i)
+         {
+            ImGui::SetNextItemWidth(150.0f);
+            if (s.renameFocus)
+            {
+               ImGui::SetKeyboardFocusHere();
+               s.renameFocus = false;
+            }
+            FieldWell::PushStyle();
+            const bool enter = ImGui::InputText("##fpRename", s.renameBuf, sizeof(s.renameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
+            FieldWell::PopStyle();
+            if (enter)
+               FinishRename(true);
+            else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+               FinishRename(false);
+            else if (!ImGui::IsItemActive() && !ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+               FinishRename(true);
+            FormParts::Inline(0.0f, tok::space_1);
+            ImGui::PopID();
+            continue;
+         }
          const std::string title = PageTitle(p) + (p.pinned ? " •" : "");
          if (ChipButton::Draw(title.c_str(), i == s.front))
             s.front = i;
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            StartRename(i);
          if (MenuParts::BeginContextItem("##fpPageMenu"))
          {
+            if (MenuParts::Item(T("Rename")))
+               StartRename(i);
             if (MenuParts::Item(p.pinned ? T("Unpin") : T("Pin")))
                p.pinned = !p.pinned;
             if (MenuParts::Item(T("Close page")))
@@ -1061,6 +1396,8 @@ namespace
                std::swap(s.pages[i], s.pages[i - 1]), s.front = i - 1;
             if (i + 1 < (int)s.pages.size() && MenuParts::Item(T("Move right")))
                std::swap(s.pages[i], s.pages[i + 1]), s.front = i + 1;
+            MenuParts::Separator();
+            DockItem();
             MenuParts::EndPopup();
          }
          FormParts::Inline(0.0f, tok::space_1);
@@ -1081,71 +1418,126 @@ namespace
          MenuParts::EndPopup();
       }
       FormParts::Inline(0.0f, tok::space_1);
-      if (ChipButton::Draw(gFieldPatcherMaximised ? "⤡##fpMax" : "⤢##fpMax", gFieldPatcherMaximised))
+      if (IconTile::Draw("##fpMax", IconsInfinite::PopOut, IconsInfinite::PopOut, gFieldPatcherMaximised, ChipButton::kHeight))
          gFieldPatcherMaximised = !gFieldPatcherMaximised;
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Maximise (Esc returns)"));
+      // The free strip to the right: right-click for the dock switch.
+      FormParts::Inline(0.0f, tok::space_1);
+      const float freeW = ImGui::GetContentRegionAvail().x;
+      if (freeW > 8.0f)
+      {
+         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, ChipButton::kHeight));
+         if (MenuParts::BeginContextItem("##fpStripMenu"))
+         {
+            DockItem();
+            MenuParts::EndPopup();
+         }
+      }
    }
 
    void DrawFooter(Page& p, Host& h)
    {
       const int boxes = (int)p.graph.boxes.size();
       const int codeBoxes = p.graph.CountCodeBoxes();
+      const ImVec4 warn = ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered));
+      const float dy = std::max(0.0f, (ChipButton::kHeight - ImGui::GetTextLineHeight()) * 0.5f);
+      const float y0 = ImGui::GetCursorPosY();
+      // Every item of the row shares one centre line: chips are kHeight tall, text is nudged to match.
+      auto text = [&](const char* t, const ImVec4* col = nullptr) {
+         ImGui::SetCursorPosY(y0 + dy);
+         if (col != nullptr)
+            ImGui::TextColored(*col, "%s", t);
+         else
+            ImGui::TextDisabled("%s", t);
+         ImGui::SameLine(0.0f, tok::space_3);
+      };
+      ImGui::SetCursorPosY(y0);
       if (p.uid == 0)
       {
          const ExportTarget t = TargetOf(p.graph);
          const std::string err = CompileCheck(p.scratchCode);
          if (!err.empty())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s", err.c_str());
+            text(err.c_str(), &warn);
          else if (t.typeName != nullptr)
          {
-            const std::string chip = std::string("⤓ ") + T(t.label) + "##fpExport";
+            const std::string chip = std::string(T(t.label)) + "##fpExport";
+            ImGui::SetCursorPosY(y0);
             if (ChipButton::Draw(chip.c_str(), true))
                Export(p);
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Place this page as a node"));
+            ImGui::SameLine(0.0f, tok::space_3);
          }
          else
-            ImGui::TextDisabled("%s", T("Add an outlet to make a node"));
+            text(T("Add an outlet to make a node"));
       }
       else
       {
-         ImGui::TextDisabled("%s", T(h.nodeName));
-         FormParts::Inline(0.0f, tok::space_3);
+         text(T(h.nodeName));
          if (h.error.empty())
-            ImGui::TextUnformatted("✓");
+            text("✓");
          else
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s %s",
-                               T("last good ·"), h.error.c_str());
+         {
+            const std::string e = std::string(T("last good ·")) + " " + h.error;
+            text(e.c_str(), &warn);
+         }
       }
-      FormParts::Inline(0.0f, tok::space_3);
+      char count[96];
       if (codeBoxes > 0)
-         ImGui::TextDisabled("%d %s · %d %s", boxes, T("boxes"), codeBoxes, T("code"));
+         std::snprintf(count, sizeof(count), "%d %s · %d %s", boxes, T("boxes"), codeBoxes, T("code"));
       else
-         ImGui::TextDisabled("%d %s", boxes, T("boxes"));
+         std::snprintf(count, sizeof(count), "%d %s", boxes, T("boxes"));
+      text(count);
       if (!p.parseError.empty())
+         text(p.parseError.c_str(), &warn);
+      // The free footer: right-click for the dock switch.
+      ImGui::SetCursorPosY(y0);
+      const float freeW = ImGui::GetContentRegionAvail().x;
+      if (freeW > 8.0f)
       {
-         FormParts::Inline(0.0f, tok::space_3);
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)), "%s", p.parseError.c_str());
+         ImGui::InvisibleButton("##fpFooterFree", ImVec2(freeW, ChipButton::kHeight));
+         if (MenuParts::BeginContextItem("##fpFooterMenu"))
+         {
+            DockItem();
+            MenuParts::EndPopup();
+         }
       }
+      else
+         ImGui::NewLine();
    }
 
    void DrawEmpty()
    {
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const ImVec2 mn = ImGui::GetCursorScreenPos();
-      EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y * 0.5f), T("New patch"), T("Select a Field node, or start from one of these"));
-      ImGui::SetCursorScreenPos(ImVec2(mn.x + avail.x * 0.5f - 290.0f, mn.y + avail.y * 0.5f));
-      if (ActionButton::Draw(T("Empty page"), ImVec2(130, 0)))
-         AddScratch("", "");
-      for (int k = 0; k < Field::kPatcherStarterCount; k++)
+      EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y * 0.4f), T("New patch"), T("Select a Field node, or start from one of these"));
+      // Starters in a wrapping grid of equal buttons, centred under the message.
+      const float bw = 150.0f, gap = tok::space_2;
+      const int cols = std::max(1, (int)((avail.x + gap) / (bw + gap)));
+      const int total = Field::kPatcherStarterCount + 1;
+      const int shownCols = std::min(cols, total);
+      const float gridW = shownCols * bw + (shownCols - 1) * gap;
+      const float x0 = mn.x + std::max(0.0f, (avail.x - gridW) * 0.5f);
+      float y = mn.y + avail.y * 0.4f + tok::space_2;
+      for (int k = 0; k < total; k++)
       {
-         FormParts::Inline(0.0f, tok::space_2);
+         const int col = k % shownCols;
+         if (col == 0 && k > 0)
+            y += ImGui::GetFrameHeight() + gap;
+         ImGui::SetCursorScreenPos(ImVec2(x0 + col * (bw + gap), y));
          ImGui::PushID(k);
-         if (ActionButton::Draw(T(Field::kPatcherStarters[k].name), ImVec2(150, 0)))
-            FieldPatcherOpenStarter(k);
+         const char* name = k == 0 ? T("Empty page") : T(Field::kPatcherStarters[k - 1].name);
+         if (ActionButton::Draw(name, ImVec2(bw, 0)))
+         {
+            if (k == 0)
+               AddScratch("", "");
+            else
+               FieldPatcherOpenStarter(k - 1);
+         }
          ImGui::PopID();
       }
+      ImGui::SetCursorScreenPos(ImVec2(mn.x, y + ImGui::GetFrameHeight()));
    }
 
    void DrawPanel()
@@ -1227,6 +1619,8 @@ std::string FieldPatcherSaveState()
       else if (p->pinned)
          out += "p\t" + std::to_string(p->uid) + "\n";
    }
+   for (const auto& kv : S().nodeNames)
+      out += "r\t" + std::to_string(kv.first) + "\t" + esc(kv.second) + "\n";
    return out;
 }
 
@@ -1238,6 +1632,7 @@ void FieldPatcherLoadState(const std::string& text)
    s.pages.clear();
    s.front = -1;
    s.closed.clear();
+   s.nodeNames.clear();
    auto unesc = [](const std::string& x) {
       std::string o;
       for (size_t i = 0; i < x.size(); i++)
@@ -1266,6 +1661,12 @@ void FieldPatcherLoadState(const std::string& text)
          if (tab == std::string::npos)
             continue;
          AddScratch(unesc(line.substr(2, tab - 2)), unesc(line.substr(tab + 1)));
+      }
+      else if (line.size() > 2 && line[0] == 'r' && line[1] == '\t')
+      {
+         const size_t tab = line.find('\t', 2);
+         if (tab != std::string::npos)
+            s.nodeNames[std::strtoull(line.c_str() + 2, nullptr, 10)] = unesc(line.substr(tab + 1));
       }
       else if (line.size() > 2 && line[0] == 'p' && line[1] == '\t')
       {

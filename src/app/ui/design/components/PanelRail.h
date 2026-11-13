@@ -7,6 +7,8 @@
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/IconTile.h"
 
+namespace app { extern std::string gRailOrder; } // comma-separated tile keys, saved with the workspace
+
 namespace PanelRail
 {
    constexpr float kWidth = 44.0f; // tile 28 + space_2 either side

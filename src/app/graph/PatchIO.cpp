@@ -1,5 +1,6 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include "app/panels/FieldPatcherPanel.h"
+#include "app/ui/design/components/PanelRail.h"
 #include <algorithm>
 #include "app/AppShared.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -412,6 +413,8 @@ namespace app
             gFieldPatcherOpen = (val != "0");
          else if (key == "panelFieldPatcherH")
             gFieldPatcherHeight = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelRailOrder")
+            gRailOrder = val;
          else if (key == "panelFieldPatcherDock")
             gFieldPatcherDock = atoi(val.c_str()) == 3 ? 3 : 0;
          else if (key == "panelFieldPatcherPages")
@@ -515,6 +518,7 @@ namespace app
       file << "panelFieldPatcherOpen=" << (gFieldPatcherOpen ? 1 : 0) << "\n";
       file << "panelFieldPatcherH=" << gFieldPatcherHeight << "\n";
       file << "panelFieldPatcherDock=" << gFieldPatcherDock << "\n";
+      file << "panelRailOrder=" << gRailOrder << "\n";
       {
          // Scratch pages and pins, one line: \ and newlines escaped.
          std::string pages;

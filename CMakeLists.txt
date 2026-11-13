@@ -1138,6 +1138,7 @@ add_executable(field-patcher-check
     src/core/field/BackendRegister.cpp
     src/core/field/ElementBackend.cpp
     src/core/field/ElementStore.cpp
+    src/core/field/FieldNoise.cpp
     src/core/field/FieldRandom.cpp
     src/core/field/FieldState.cpp
 )
