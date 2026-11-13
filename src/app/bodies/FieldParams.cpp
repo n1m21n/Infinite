@@ -125,6 +125,52 @@ namespace app
    }
 
 
+   // Spectral Field preview: 64 log bands, input as a faint fill, output as
+   // the stroke. dB scale -90..0.
+   void DrawSpectralFieldSpectrum(SpectralFieldNode* n, float h, float width)
+   {
+      constexpr int kB = SpectralFieldNode::kBands;
+      float in[kB], out[kB];
+      const bool valid = n->ReadSpectrum(in, out);
+
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      AudioViz::Fill(dl, origin, br);
+      dl->PushClipRect(origin, br, true);
+      for (int i = 1; i < 4; i++)
+         dl->AddLine(ImVec2(origin.x, origin.y + h * i / 4.0f), ImVec2(br.x, origin.y + h * i / 4.0f), ScopeGridCol(), 1.0f);
+
+      if (valid)
+      {
+         auto yFor = [&](float mag) {
+            const float db = 20.0f * std::log10(std::max(mag, 1e-6f));
+            const float t = std::clamp((db + 90.0f) / 90.0f, 0.0f, 1.0f);
+            return br.y - t * h;
+         };
+         const bool isLight = IsThemeLight();
+         const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_78C8FF2E);
+         const ImU32 strokeCol = isLight ? tok::U32(tok::pal::c_1464E6FF) : tok::U32(tok::pal::c_96D6FFF5);
+         const float bw = w / (float)kB;
+         for (int i = 0; i < kB; i++)
+            dl->AddRectFilled(ImVec2(origin.x + i * bw, yFor(in[i])), ImVec2(origin.x + (i + 1) * bw, br.y), fillCol);
+         dl->PathClear();
+         for (int i = 0; i < kB; i++)
+            dl->PathLineTo(ImVec2(origin.x + (i + 0.5f) * bw, yFor(out[i])));
+         dl->PathStroke(strokeCol, 0, 1.6f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+      }
+
+      dl->PopClipRect();
+      AudioViz::Border(dl, origin, br);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+
    void DrawFieldSynthScope(FieldSynthNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -479,6 +525,44 @@ namespace app
             PopTextWrapWidth();
          }
       }
+
+      DrawFieldParamSliders(n);
+   }
+
+
+   void DrawSpectralFieldParams(SpectralFieldNode* n)
+   {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DrawFieldDeviceControls<SpectralFieldNode>(n, "bin", &SpectralFieldNode::PresetNames(),
+                                                    [](SpectralFieldNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gSpectralFieldEditor = n;
+            gSpectralFieldEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            PushTextWrapWidth(kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            PopTextWrapWidth();
+         }
+
+         if (!n->Notice().empty())
+         {
+            PushTextWrapWidth(kPreviewSize);
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            PopTextWrapWidth();
+         }
+      }
+
+      DropdownButton("size", SpectralFieldNode::SizeNames(), n->sizeIndex, [n](int i) { n->sizeIndex = i; });
+      ModSlider("mix", &n->mix, 0.0f, 1.0f, "%.2f");
 
       DrawFieldParamSliders(n);
    }

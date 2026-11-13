@@ -272,6 +272,14 @@ namespace Field
                   {
                      calleeName = std::static_pointer_cast<AstIdent>(base)->name + "." + fieldTok.text;
                   }
+                  else if (fieldTok.text == "at" && base->kind == AstKind::Access &&
+                           std::static_pointer_cast<AstAccess>(base)->base &&
+                           std::static_pointer_cast<AstAccess>(base)->base->kind == AstKind::Ident)
+                  {
+                     // Spectral Field: B.mag.at(k) keeps its full dotted name.
+                     auto acc = std::static_pointer_cast<AstAccess>(base);
+                     calleeName = std::static_pointer_cast<AstIdent>(acc->base)->name + "." + acc->field + ".at";
+                  }
                   else
                   {
                      calleeName = fieldTok.text;
@@ -454,7 +462,7 @@ namespace Field
       {
          if (tok.kind != TokenKind::Ident) return false;
          return tok.text == "graph" || tok.text == "frame" || tok.text == "element" ||
-                tok.text == "pixel" || tok.text == "sample";
+                tok.text == "pixel" || tok.text == "sample" || tok.text == "bin";
       }
 
       bool ParseLiteralNumber(ParserState& p, double& outVal, SourceSpan& outSpan)
@@ -794,7 +802,7 @@ namespace Field
          Token outputTok = p.Advance(); // consume 'output'
          if (p.AtEnd() || !IsDomainToken(p.Peek()))
          {
-            p.Fail("expected a domain name (graph, frame, element, pixel, sample) after 'output'", p.Peek().span);
+            p.Fail("expected a domain name (graph, frame, element, pixel, sample, bin) after 'output'", p.Peek().span);
             return nullptr;
          }
          Token domainTok = p.Advance();
@@ -831,7 +839,7 @@ namespace Field
          Token inputTok = p.Advance(); // consume 'input'
          if (p.AtEnd() || !IsDomainToken(p.Peek()))
          {
-            p.Fail("expected a domain name (graph, frame, element, pixel, sample) after 'input'", p.Peek().span);
+            p.Fail("expected a domain name (graph, frame, element, pixel, sample, bin) after 'input'", p.Peek().span);
             return nullptr;
          }
          Token domainTok = p.Advance();

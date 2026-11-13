@@ -88,8 +88,14 @@ namespace NoteModel
       float durMeanTicks[kDurBins] = {};
       float velMean[kVelBins] = {};
       int lowNote = 0, highNote = 127;
+      uint16_t onsetSlots = 0;   // bit s: some learned note starts on sixteenth s of its bar
       std::vector<Event> events; // the training data; main thread only (save, meter)
    };
+
+   // Where a walk (re)starts after Play, a seek or a loop lap: the first sixteenth at or after
+   // `fromBeats` on which a learned note started, so the pattern lands in phase with the bar and a
+   // note on the new position (the downbeat after Return to Start) plays. -1 when nothing was learned.
+   double AnchorBeat(const Tables& t, double fromBeats, double beatsPerBar);
 
    // Symbol mapping.
    int DurBin(int ticks);
@@ -134,14 +140,16 @@ namespace NoteModel
    {
    public:
       void Reset(const Tables* t, uint32_t seed);
-      // Next event after an onset at `prevOnsetBeats`.
-      void Next(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar, Out& o);
+      // Next event after an onset at `prevOnsetBeats`. With `atBeats` >= 0 the onset is placed
+      // there instead of sampled (AnchorBeat), and the spacing history is left as it was.
+      void Next(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar, Out& o,
+                double atBeats = -1.0);
       // Predictive Rhythm (step-11): samples rhythm/duration/velocity exactly like Next(), but
       // samples pitch from kPitchRel instead of kPitch and resolves it against `rootNote` - the
       // node's currently-selected root, which may differ from the root the pattern was learned
       // against (changing it transposes playback without relearning).
       void NextRhythm(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
-                       int rootNote, Out& o);
+                       int rootNote, Out& o, double atBeats = -1.0);
       const Tables* Bound() const { return mBound; }
 
    private:

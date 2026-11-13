@@ -7,6 +7,81 @@
 
 #include "NoteEvent.h"
 
+// The notes one consumer slot has open (note-on read, note-off not yet read),
+// owned by that consumer's AudioNode and updated by NoteEventQueue::Pop on
+// whichever queue the slot reads. When the slot's source changes (an upstream
+// node bypassed mid-note, a cable moved), AudioNode::ApplyNoteInbox turns every
+// open note into a pending note-off, and the next Pop hands those out first, so
+// nothing the old source started is left hanging. While the list has not
+// overflowed it also drops a note-off for a voice this slot never saw (the new
+// source closing a note its old source had re-voiced), so a switch leaves no
+// orphan off either. Audio-thread / owning-thread only, like Pop.
+struct NoteHeld
+{
+   static constexpr int kMax = 64;
+   struct Entry
+   {
+      const void* source;
+      int voiceId;
+      int note;
+   };
+   Entry open[kMax];
+   int numOpen = 0;
+   bool lossy = false; // a note-on did not fit: offs are no longer filtered until the list empties
+   Entry pending[kMax];
+   int numPending = 0;
+
+   // Voice ids are unique app-wide (NextVoiceId), so a nonzero id alone names
+   // the note - an off may legally carry another pitch or source pointer. An
+   // id-less producer falls back to (source, note).
+   static bool Same(const Entry& a, const NoteEvent& e)
+   {
+      if (e.voiceId != 0)
+         return a.voiceId == e.voiceId;
+      return a.voiceId == 0 && a.source == e.source && a.note == e.note;
+   }
+
+   // false = drop this event (a note-off for a voice this slot never opened).
+   bool Track(const NoteEvent& e)
+   {
+      if (e.bendUpdate)
+         return true;
+      if (e.isNoteOn)
+      {
+         if (numOpen < kMax)
+            open[numOpen++] = Entry{ e.source, e.voiceId, e.note };
+         else
+            lossy = true;
+         return true;
+      }
+      for (int i = 0; i < numOpen; i++)
+         if (Same(open[i], e))
+         {
+            open[i] = open[--numOpen];
+            if (numOpen == 0)
+               lossy = false;
+            return true;
+         }
+      return lossy || e.voiceId == 0;
+   }
+
+   // The slot now reads another source: everything open gets a note-off.
+   void SourceChanged()
+   {
+      for (int i = 0; i < numOpen && numPending < kMax; i++)
+         pending[numPending++] = open[i];
+      numOpen = 0;
+      lossy = false;
+   }
+
+   void Clear()
+   {
+      numOpen = 0;
+      numPending = 0;
+      lossy = false;
+   }
+};
+
 // Lock-free single-producer/multi-consumer ring of NoteEvent, following
 // MeterRing's index discipline (producer writes only mTail) but never
 // dropping in a way that can leave a voice stuck.
@@ -63,7 +138,21 @@ public:
    // thread mid-block. Drops every registered cursor so ids don't leak
    // across rebuild generations; call once per producer at the start of each
    // rebuild, before any RegisterConsumer() calls for that generation.
-   void ResetConsumers() { mNumCursors = 0; }
+   void ResetConsumers()
+   {
+      mNumCursors = 0;
+      for (NoteHeld*& t : mTrackers)
+         t = nullptr;
+   }
+
+   // Owning-thread-only (same rule as AdoptConsumers). The open-note list Pop
+   // keeps for `cursor`; nullptr = untracked. AdoptConsumers clears them all,
+   // so AudioNode::ApplyNoteInbox sets them again right after.
+   void SetCursorTracker(int cursor, NoteHeld* held)
+   {
+      if (cursor >= 0 && cursor < kMaxConsumers)
+         mTrackers[cursor] = held;
+   }
 
    // No-device-running use only - see ResetConsumers' comment; the real
    // topology-rebuild path goes through AdoptConsumers() instead. Registers a
@@ -76,6 +165,7 @@ public:
       if (n >= kMaxConsumers)
          return -1;
       mCursorHeads[n].store(mTail.load(std::memory_order_relaxed), std::memory_order_relaxed);
+      mTrackers[n] = nullptr;
       mNumCursors = n + 1;
       return n;
    }
@@ -96,6 +186,8 @@ public:
    {
       for (int i = 0; i < count; i++)
          mCursorHeads[i].store(heads[i], std::memory_order_relaxed);
+      for (NoteHeld*& t : mTrackers)
+         t = nullptr;
       mNumCursors = count;
    }
 
@@ -160,12 +252,25 @@ public:
 
       size_t head = mCursorHeads[cursor].load(std::memory_order_relaxed);
       const size_t tail = mTail.load(std::memory_order_acquire);
+      NoteHeld* held = mTrackers[cursor];
 
       int n = 0;
+      if (held != nullptr)
+         while (held->numPending > 0 && n < maxCount)
+         {
+            const NoteHeld::Entry& p = held->pending[--held->numPending];
+            NoteEvent off;
+            off.note = p.note;
+            off.voiceId = p.voiceId;
+            off.source = p.source;
+            out[n++] = off;
+         }
       while (head != tail && n < maxCount)
       {
-         out[n++] = mEntries[head];
+         const NoteEvent& e = mEntries[head];
          head = (head + 1) % kCapacity;
+         if (held == nullptr || held->Track(e))
+            out[n++] = e;
       }
       mCursorHeads[cursor].store(head, std::memory_order_release);
       return n;
@@ -234,6 +339,7 @@ private:
 
    NoteEvent mEntries[kCapacity];
    std::atomic<size_t> mCursorHeads[kMaxConsumers];
+   NoteHeld* mTrackers[kMaxConsumers] = {};
    int mNumCursors = 0;
    std::atomic<size_t> mTail { 0 };
    std::atomic<uint64_t> mOverflowCount { 0 };

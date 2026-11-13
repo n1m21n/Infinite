@@ -2163,12 +2163,14 @@ namespace app
       const float loopX0 = tickToX(gArrange.settings.loop.start);
       const float loopX1 = tickToX(gArrange.settings.loop.end);
       const float kBorderHitRadius = 7.0f;
+      // An edge scrolled out of the view isn't drawn, so it can't be grabbed either.
+      const auto edgeInView = [&](float x) { return x >= rulerPos.x - 0.5f && x <= rulerPos.x + rulerSize.x + 0.5f; };
       const bool mouseInRuler = mouse.x >= rulerPos.x && mouse.x < rulerPos.x + rulerSize.x &&
                                 mouse.y >= rulerPos.y && mouse.y < rulerPos.y + rulerSize.y;
       const bool loopLeftBorderHovered = gArrange.settings.loop.enabled && mouseInRuler && !markerHoveredAny &&
-                                         (std::abs(mouse.x - loopX0) <= kBorderHitRadius);
+                                         edgeInView(loopX0) && (std::abs(mouse.x - loopX0) <= kBorderHitRadius);
       const bool loopRightBorderHovered = gArrange.settings.loop.enabled && mouseInRuler && !markerHoveredAny &&
-                                          (std::abs(mouse.x - loopX1) <= kBorderHitRadius);
+                                          edgeInView(loopX1) && (std::abs(mouse.x - loopX1) <= kBorderHitRadius);
       const bool loopHeaderHovered = gArrange.settings.loop.enabled && mouseInRuler && !markerHoveredAny &&
                                      !loopLeftBorderHovered && !loopRightBorderHovered &&
                                      (mouse.x > loopX0 && mouse.x < loopX1) &&
@@ -4387,9 +4389,8 @@ namespace app
          const Arrange::LoopRange& bl = gArrange.settings.loop;
          if (bl.end > startTick && bl.start < endTick)
          {
-            const float bx0 = std::max(rulerStartX, tickToX(bl.start));
-            const float bx1 = std::min(rulerStartX + rulerWidth, tickToX(bl.end));
-            TimeRuler::LoopBand(dl, bx0, bx1, kTickStripTop, fullTimelineBottom, gArrangeShiftDraggingLoop,
+            TimeRuler::LoopBand(dl, tickToX(bl.start), tickToX(bl.end), kTickStripTop, fullTimelineBottom, rulerStartX, rulerStartX + rulerWidth,
+                                gArrangeShiftDraggingLoop,
                                 gArrangeLoopDragMode == kArrangeLoopDragStart ? 1 : gArrangeLoopDragMode == kArrangeLoopDragEnd ? 2
                                 : gArrangeLoopDragMode == kArrangeLoopDragMove ? 3 : 0);
          }
@@ -4404,12 +4405,12 @@ namespace app
          const double playBeats = std::max(0.0, tr.Beats());
          if (playBeats >= startBeat && playBeats <= endBeat)
          {
-            TimeRuler::Playhead(dl, beatToX(playBeats), kTickStripTop, lineBottom);
+            TimeRuler::Playhead(dl, beatToX(playBeats), kTickStripTop, lineBottom, rulerStartX, rulerStartX + rulerWidth);
          }
          if (gArrangeScrubbing && gArrangeScrubTick >= startTick && gArrangeScrubTick <= endTick)
          {
             const float gx = tickToX(gArrangeScrubTick);
-            TimeRuler::Playhead(dl, gx, kTickStripTop, lineBottom, true);
+            TimeRuler::Playhead(dl, gx, kTickStripTop, lineBottom, rulerStartX, rulerStartX + rulerWidth, true);
             const std::string ghostLabel = TimeRuler::BarLabel((double)gArrangeScrubTick / (double)Arrange::kPPQ, beatsPerBar) + "  |  " + ArrangeFormatTickSeconds(gArrangeScrubTick);
             const ImVec2 ts = ImGui::CalcTextSize(ghostLabel.c_str());
             float lx = gx + 6.0f;

@@ -1332,6 +1332,98 @@ static bool RunDrumSequencerFixture()
       ok &= waveOk;
    }
 
+   // Jumps on a running sequencer: the step under the new playhead plays.
+   // a) Return to Start while playing: step 1 (beat 0) sounds in the first block after the seek.
+   // b) A loop lap: the step at the loop start sounds every pass, on the wrap frame.
+   // c) Rewound while stopped, then Play: step 1 sounds on the first block.
+   // d) A forward seek fires nothing it jumped over: no burst of hits.
+   {
+      // More blocks on an already-prepared node (Render() re-prepares, which reseeds the scheduler).
+      auto more = [&](DrumSequencerNode& node, int totalFrames)
+      {
+         AudioNode* an = node.GetAudioNode();
+         std::vector<float> out;
+         for (int done = 0; done < totalFrames;)
+         {
+            const int n = std::min(blockSize, totalFrames - done);
+            Transport::Instance().AdvanceAudioClock(n);
+            std::vector<float> l(n, 0.0f), r(n, 0.0f);
+            float* chans[2] = { l.data(), r.data() };
+            AudioBuffer buf;
+            buf.channels = chans;
+            buf.numChannels = 2;
+            buf.numFrames = n;
+            an->ProcessBlock(nullptr, 0, buf);
+            out.insert(out.end(), l.begin(), l.end());
+            done += n;
+         }
+         return out;
+      };
+      auto peakIn = [](const std::vector<float>& b, int from, int to)
+      {
+         float m = 0.0f;
+         for (int i = std::max(0, from); i < std::min((int)b.size(), to); i++)
+            m = std::max(m, std::fabs(b[i]));
+         return m;
+      };
+      const int stepFrames = sampleRate / 8; // a 16th at 120 BPM
+
+      resetTransport();
+      auto a = makeNode(shortClickPath);
+      a->stepVel[0][0] = 0.8f; // 8 steps: step 1 once a bar-half (every 2 beats)
+      Render(*a, stepFrames * 3, blockSize, sampleRate);
+      transport.Rewind();
+      const auto afterRewind = more(*a, blockSize * 4);
+      const bool rewindOk = peakIn(afterRewind, 0, blockSize * 2) > 0.3f;
+      printf("DRUMSEQTEST rewind plays step 1 %s (peak=%.3f)\n", rewindOk ? "OK" : "FAIL", peakIn(afterRewind, 0, blockSize * 2));
+      ok &= rewindOk;
+
+      resetTransport();
+      transport.SetLoop(true, 0.0, 1.0); // one beat = 4 sixteenths, so every lap starts on step 1
+      auto b = makeNode(shortClickPath);
+      b->stepVel[0][0] = 0.8f;
+      const auto looped = Render(*b, stepFrames * 4 * 3 + stepFrames, blockSize, sampleRate);
+      transport.SetLoop(false, 0.0, 0.0);
+      // Each lap's hit sits exactly one loop after the first (the click has its own fixed onset latency).
+      int laps = 0;
+      const int first = FindOnset(looped, 0);
+      int at[4] = { first, -1, -1, -1 };
+      for (int lap = 1; lap <= 3 && first >= 0; lap++)
+      {
+         at[lap] = FindOnset(looped, first + lap * stepFrames * 4 - stepFrames / 2);
+         if (at[lap] >= 0 && std::abs(at[lap] - (first + lap * stepFrames * 4)) <= 2)
+            laps++;
+      }
+      printf("DRUMSEQTEST loop lap plays step 1 %s (%d/3 laps, onsets %d %d %d %d)\n", laps == 3 ? "OK" : "FAIL", laps,
+             at[0], at[1], at[2], at[3]);
+      ok &= laps == 3;
+
+      resetTransport();
+      auto c = makeNode(shortClickPath);
+      c->stepVel[0][0] = 0.8f;
+      Render(*c, stepFrames * 3, blockSize, sampleRate);
+      transport.SetPlaying(false);
+      transport.Rewind();
+      const auto stopped = more(*c, blockSize * 4);
+      transport.SetPlaying(true);
+      const auto played = more(*c, blockSize * 4);
+      const bool stoppedOk = peakIn(stopped, 0, (int)stopped.size()) < 0.05f && peakIn(played, 0, blockSize * 2) > 0.3f;
+      printf("DRUMSEQTEST rewind while stopped then play %s (stopped=%.3f played=%.3f)\n", stoppedOk ? "OK" : "FAIL",
+             peakIn(stopped, 0, (int)stopped.size()), peakIn(played, 0, blockSize * 2));
+      ok &= stoppedOk;
+
+      resetTransport();
+      auto d = makeNode(shortClickPath);
+      for (int st = 0; st < 8; st++)
+         d->stepVel[0][st] = 0.8f;
+      Render(*d, blockSize, blockSize, sampleRate);
+      transport.Seek(7.0 * 0.125 + 0.01); // past seven 16ths (0.125 s each), between steps
+      const auto jumped = more(*d, blockSize * 2);
+      const bool noBurst = peakIn(jumped, 0, (int)jumped.size()) < 0.3f;
+      printf("DRUMSEQTEST forward seek no burst %s (peak=%.3f)\n", noBurst ? "OK" : "FAIL", peakIn(jumped, 0, (int)jumped.size()));
+      ok &= noBurst;
+   }
+
    DrumSequencerNode::SetKitDir(savedKitDir);
    {
       std::error_code ec;

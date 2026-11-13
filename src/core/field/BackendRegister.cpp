@@ -37,6 +37,11 @@ namespace Field
          SampleProgram& prog;
          FieldError& err;
          bool notesHost = false; // true only when compiling for a Field Notes node
+         // Spectral Field host: the kernel runs once per STFT bin and sees
+         // mag/phase/freq instead of in/out (docs/plans/spectral-field).
+         bool spectralHost = false;
+         uint8_t binReg = 0;            // LoadBin, emitted once at entry
+         std::string specInputName;     // 'input bin audio B' name, or empty
 
          bool Failed() const { return !err.Empty(); }
 
@@ -86,6 +91,33 @@ namespace Field
          }
       };
 
+      // Names only the spectral host reserves (bin facts and the per-bin
+      // spectrum); 'freq' is already reserved in every sample host.
+      bool IsSpectralName(const std::string& name)
+      {
+         return name == "bin" || name == "bins" || name == "binhz" || name == "hop" ||
+                name == "mag" || name == "phase";
+      }
+
+      bool IsReservedFor(const Ctx& ctx, const std::string& name)
+      {
+         return IsReservedName(name) || (ctx.spectralHost && IsSpectralName(name));
+      }
+
+      // Sample-host names a spectral kernel cannot see.
+      bool IsSpectralRefused(const std::string& name)
+      {
+         return name == "in" || name == "out" || name == "n" || name == "gate" ||
+                name == "noteOn" || name == "notePitch" || name == "noteVel" ||
+                name == "noteNum" || name == "beat";
+      }
+
+      void FailSpectralRefused(Ctx& ctx, const std::string& name, const SourceSpan& span)
+      {
+         ctx.Fail("a spectral kernel has no '" + name + "'", span,
+                  "it runs once per bin and sees mag, phase and freq; write those to change the sound");
+      }
+
       using Scope = std::unordered_map<std::string, uint8_t>;
       using TableScope = std::unordered_map<std::string, int>;
 
@@ -104,6 +136,51 @@ namespace Field
       {
          const std::string& c = call.callee;
          auto arg = [&](size_t i) -> uint8_t { return CompileExpr(ctx, call.args[i], scope, tableScope); };
+
+         if (c.size() > 3 && c.compare(c.size() - 3, 3, ".at") == 0)
+         {
+            const std::string base = c.substr(0, c.size() - 3);
+            if (!ctx.spectralHost)
+            {
+               ctx.Fail("'" + c + "' needs a Spectral Field node", call.span,
+                        "X.at(k) reads another bin; the sample domain has no bins");
+               return 0;
+            }
+            if (call.args.size() != 1)
+            {
+               ctx.Fail("'.at' takes exactly 1 argument (bin index)", call.span);
+               return 0;
+            }
+            int array = -1;
+            if (base == "mag") array = kBinArrayMag;
+            else if (base == "phase") array = kBinArrayPhase;
+            else if (base == "freq") array = kBinArrayFreq;
+            else if (!ctx.specInputName.empty() && base == ctx.specInputName + ".mag") array = kBinArrayBMag;
+            else if (!ctx.specInputName.empty() && base == ctx.specInputName + ".phase") array = kBinArrayBPhase;
+            else if (!ctx.specInputName.empty() && base == ctx.specInputName + ".freq") array = kBinArrayBFreq;
+            else
+            {
+               for (int i = 0; i < (int)ctx.prog.state.size(); i++)
+                  if (ctx.prog.state[i].name == base) { array = kBinArrayState + i; break; }
+            }
+            if (array < 0)
+            {
+               ctx.Fail("'" + base + ".at' reads nothing", call.span,
+                        ".at(k) reads mag, phase, freq, a state cell or the bin input's .mag/.phase/.freq");
+               return 0;
+            }
+            uint8_t k = arg(0);
+            uint8_t dst = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::BinAt, dst, (uint8_t)array, k, 0, 0.0f, call.span);
+            return dst;
+         }
+         if (ctx.spectralHost && (c == "delay" || c == "tick" || c == "deg" || c == "note" ||
+                                  c.compare(0, 7, "reduce.") == 0))
+         {
+            ctx.Fail("'" + c + "' is not available in a spectral kernel", call.span,
+                     "a spectral kernel runs once per bin per frame; keep memory in 'state'");
+            return 0;
+         }
 
          auto unary = [&](SampleOp op) -> uint8_t
          {
@@ -284,7 +361,7 @@ namespace Field
          }
          if (c == "rand")
          {
-            if (!ctx.notesHost)
+            if (!ctx.notesHost && !ctx.spectralHost)
             {
                ctx.Fail("rand() needs a Field Notes node", call.span,
                         "the sample domain has no random source outside Field Notes");
@@ -337,6 +414,34 @@ namespace Field
             case AstKind::Ident:
             {
                auto* id = static_cast<AstIdent*>(node.get());
+               if (ctx.spectralHost)
+               {
+                  const std::string& nm = id->name;
+                  SampleOp binOp = SampleOp::Count;
+                  if (nm == "bin") binOp = SampleOp::LoadBin;
+                  else if (nm == "bins") binOp = SampleOp::LoadBins;
+                  else if (nm == "binhz") binOp = SampleOp::LoadBinHz;
+                  else if (nm == "hop") binOp = SampleOp::LoadHop;
+                  if (binOp != SampleOp::Count)
+                  {
+                     uint8_t dst = ctx.AllocReg(node->span);
+                     ctx.Emit(binOp, dst, 0, 0, 0, 0.0f, node->span);
+                     return dst;
+                  }
+                  if (IsSpectralRefused(nm))
+                  {
+                     FailSpectralRefused(ctx, nm, node->span);
+                     return 0;
+                  }
+                  if (!ctx.specInputName.empty() && nm == ctx.specInputName)
+                  {
+                     ctx.Fail("'" + nm + "' is a whole spectrum, not a value", node->span,
+                              "read " + nm + ".mag, " + nm + ".phase or " + nm + ".freq");
+                     return 0;
+                  }
+                  if (nm == "mag" || nm == "phase" || nm == "freq")
+                     return scope[nm]; // seeded at entry, rebound by assignment
+               }
                if (id->name == "in")
                {
                   uint8_t dst = ctx.AllocReg(node->span);
@@ -482,6 +587,27 @@ namespace Field
                return dst;
             }
             case AstKind::Access:
+            {
+               auto* acc = static_cast<AstAccess*>(node.get());
+               if (ctx.spectralHost && acc->base && acc->base->kind == AstKind::Ident &&
+                   !ctx.specInputName.empty() &&
+                   static_cast<AstIdent*>(acc->base.get())->name == ctx.specInputName)
+               {
+                  int array = -1;
+                  if (acc->field == "mag") array = kBinArrayBMag;
+                  else if (acc->field == "phase") array = kBinArrayBPhase;
+                  else if (acc->field == "freq") array = kBinArrayBFreq;
+                  if (array < 0)
+                  {
+                     ctx.Fail("bin input '" + ctx.specInputName + "' has no '" + acc->field + "'", node->span,
+                              "use ." "mag, .phase or .freq");
+                     return 0;
+                  }
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::BinAt, dst, (uint8_t)array, ctx.binReg, 0, 0.0f, node->span);
+                  return dst;
+               }
+            }
                ctx.Fail("vector/swizzle access is not supported in the sample domain in v1", node->span,
                         "v1 is scalar-only; split vectors into separate float state/params");
                return 0;
@@ -515,7 +641,7 @@ namespace Field
             case AstKind::DeclState:
             {
                auto* d = static_cast<AstDeclState*>(stmt.get());
-               if (IsReservedName(d->name))
+               if (IsReservedFor(ctx, d->name))
                {
                   ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n) and cannot be declared", stmt->span);
                   return;
@@ -542,6 +668,12 @@ namespace Field
                   initVal = (float)static_cast<AstLiteral*>(d->initExpr.get())->numberValue;
                }
 
+               if (d->tableSize > 0 && ctx.spectralHost)
+               {
+                  ctx.Fail("state tables are not available in a spectral kernel", stmt->span,
+                           "state is already one cell per bin; read other bins with " + d->name + ".at(k)");
+                  return;
+               }
                if (d->tableSize > 0)
                {
                   int tableIdx = (int)ctx.prog.tables.size();
@@ -580,6 +712,12 @@ namespace Field
                si.typeName = "float";
                si.initialValue = initVal;
                int stateIndex = (int)ctx.prog.state.size();
+               if (ctx.spectralHost && stateIndex >= kSpectralMaxStateCells)
+               {
+                  ctx.Fail("spectral kernel exceeds the state-cell cap (" + std::to_string(kSpectralMaxStateCells) + " per bin)",
+                           stmt->span);
+                  return;
+               }
                if (stateIndex >= kSampleMaxStateCells)
                {
                   ctx.Fail("sample-domain kernel exceeds the state-cell cap (" + std::to_string(kSampleMaxStateCells) + ")",
@@ -595,7 +733,7 @@ namespace Field
             case AstKind::DeclParam:
             {
                auto* d = static_cast<AstDeclParam*>(stmt.get());
-               if (IsReservedName(d->name))
+               if (IsReservedFor(ctx, d->name))
                {
                   ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n) and cannot be declared", stmt->span);
                   return;
@@ -638,7 +776,13 @@ namespace Field
                // FieldIR.h's DeclOutput/DeclInput lowering - same grammar
                // and per-entry shape, genuinely separate implementation.
                auto* d = static_cast<AstDeclOutput*>(stmt.get());
-               if (IsReservedName(d->name))
+               if (ctx.spectralHost)
+               {
+                  ctx.Fail("a spectral kernel has no declared outputs", stmt->span,
+                           "its output is the spectrum: write mag, phase or freq");
+                  return;
+               }
+               if (IsReservedFor(ctx, d->name))
                {
                   ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate/noteOn/notePitch/noteVel) and cannot be declared", stmt->span);
                   return;
@@ -741,7 +885,7 @@ namespace Field
             case AstKind::DeclInput:
             {
                auto* d = static_cast<AstDeclInput*>(stmt.get());
-               if (IsReservedName(d->name))
+               if (IsReservedFor(ctx, d->name))
                {
                   ctx.Fail("'" + d->name + "' is a reserved name (in/out/sr/n/freq/gate/noteOn/notePitch/noteVel) and cannot be declared", stmt->span);
                   return;
@@ -749,6 +893,29 @@ namespace Field
                if (scope.count(d->name))
                {
                   ctx.Fail("duplicate declaration of '" + d->name + "'", stmt->span);
+                  return;
+               }
+               if (ctx.spectralHost)
+               {
+                  if (d->domainName != "bin" || d->typeName != "audio")
+                  {
+                     ctx.Fail("a spectral kernel's input must be 'input bin audio " + d->name + "'", stmt->span,
+                              "its bins are read as " + d->name + ".mag, " + d->name + ".phase and " + d->name + ".freq");
+                     return;
+                  }
+                  if (!ctx.specInputName.empty())
+                  {
+                     ctx.Fail("a spectral kernel takes at most one bin input", stmt->span);
+                     return;
+                  }
+                  SampleDeclaredPin pin;
+                  pin.name = d->name;
+                  pin.typeName = d->typeName;
+                  pin.domainName = d->domainName;
+                  ctx.prog.declaredInputs.push_back(pin);
+                  ctx.prog.hasSpectralInput = true;
+                  ctx.prog.spectralInputName = d->name;
+                  ctx.specInputName = d->name;
                   return;
                }
                static const std::unordered_set<std::string> kValidDomains = { "graph", "frame", "element", "pixel", "sample" };
@@ -892,7 +1059,27 @@ namespace Field
                            "assign to an indexed element: '" + name + "[idx] = val'");
                   return;
                }
-               if (name == "in" || name == "sr" || name == "n" || name == "freq" || name == "gate" ||
+               if (ctx.spectralHost)
+               {
+                  if (IsSpectralRefused(name))
+                  {
+                     FailSpectralRefused(ctx, name, stmt->span);
+                     return;
+                  }
+                  if (name == "bin" || name == "bins" || name == "binhz" || name == "hop" || name == "sr")
+                  {
+                     ctx.Fail("cannot assign to '" + name + "' (reserved, read-only)", stmt->span);
+                     return;
+                  }
+                  if (!ctx.specInputName.empty() && name == ctx.specInputName)
+                  {
+                     ctx.Fail("cannot assign to bin input '" + name + "'", stmt->span);
+                     return;
+                  }
+                  if (name == "phase") ctx.prog.writesPhase = true;
+                  if (name == "freq") ctx.prog.writesFreq = true;
+               }
+               else if (name == "in" || name == "sr" || name == "n" || name == "freq" || name == "gate" ||
                    name == "noteOn" || name == "notePitch" || name == "noteVel" ||
                    name == "noteNum" || name == "beat")
                {
@@ -1006,7 +1193,7 @@ namespace Field
                if (initA->op != "=" || initA->lvalue->kind != AstKind::Ident ||
                    initA->rvalue->kind != AstKind::Literal) { fail(); return; }
                const std::string loopVar = static_cast<AstIdent*>(initA->lvalue.get())->name;
-               if (IsReservedName(loopVar) || scope.count(loopVar) || tableScope.count(loopVar))
+               if (IsReservedFor(ctx, loopVar) || scope.count(loopVar) || tableScope.count(loopVar))
                {
                   ctx.Fail("'" + loopVar + "' cannot be used as a for-loop variable (reserved or already declared)",
                            stmt->span);
@@ -1074,6 +1261,12 @@ namespace Field
             case AstKind::Call:
             {
                auto* call = static_cast<AstCall*>(stmt.get());
+               if (ctx.spectralHost)
+               {
+                  ctx.Fail("'" + call->callee + "' is not available in a spectral kernel", stmt->span,
+                           "a spectral kernel only assigns mag, phase, freq, state and locals");
+                  return;
+               }
                if (call->callee == "delay")
                {
                   CompileCall(ctx, *call, scope, tableScope);
@@ -1149,11 +1342,14 @@ namespace Field
       }
    }
 
-   bool CompileSampleProgram(const std::string& code,
-                              const SampleProgram* previous,
-                              SampleProgram& outProgram,
-                              FieldError& outError,
-                              bool notesHost)
+   namespace
+   {
+   bool CompileRegisterProgram(const std::string& code,
+                               const SampleProgram* previous,
+                               SampleProgram& outProgram,
+                               FieldError& outError,
+                               bool notesHost,
+                               bool spectralHost)
    {
       outProgram = SampleProgram{};
       outError.Clear();
@@ -1174,13 +1370,32 @@ namespace Field
 
       Ctx ctx { outProgram, outError };
       ctx.notesHost = notesHost;
+      ctx.spectralHost = spectralHost;
       Scope scope;
       TableScope tableScope;
 
-      // 'out' behaves like an ordinary local, seeded to silence so a kernel
-      // that never assigns it is a valid (if useless) always-silent program
-      // rather than a compile error.
-      scope["out"] = EmitImm(ctx, 0.0f, SourceSpan{});
+      if (spectralHost)
+      {
+         // mag/phase/freq behave like locals seeded with this bin's
+         // analysis values; their registers at program end are the output.
+         ctx.binReg = ctx.AllocReg(SourceSpan{});
+         ctx.Emit(SampleOp::LoadBin, ctx.binReg, 0, 0, 0, 0.0f, SourceSpan{});
+         const char* names[3] = { "mag", "phase", "freq" };
+         const uint8_t arrays[3] = { kBinArrayMag, kBinArrayPhase, kBinArrayFreq };
+         for (int i = 0; i < 3; i++)
+         {
+            uint8_t r = ctx.AllocReg(SourceSpan{});
+            ctx.Emit(SampleOp::BinAt, r, arrays[i], ctx.binReg, 0, 0.0f, SourceSpan{});
+            scope[names[i]] = r;
+         }
+      }
+      else
+      {
+         // 'out' behaves like an ordinary local, seeded to silence so a kernel
+         // that never assigns it is a valid (if useless) always-silent program
+         // rather than a compile error.
+         scope["out"] = EmitImm(ctx, 0.0f, SourceSpan{});
+      }
 
       CompileBlock(ctx, static_cast<AstProgram*>(astProgram.get())->statements, scope, tableScope);
       if (ctx.Failed())
@@ -1189,7 +1404,16 @@ namespace Field
          return false;
       }
 
-      outProgram.outReg = (int)scope["out"];
+      if (spectralHost)
+      {
+         outProgram.spectral = true;
+         outProgram.outReg = -1;
+         outProgram.magOutReg = (int)scope["mag"];
+         outProgram.phaseOutReg = (int)scope["phase"];
+         outProgram.freqOutReg = (int)scope["freq"];
+      }
+      else
+         outProgram.outReg = (int)scope["out"];
       // Field Notes publishes a value the way the other Field nodes do (Field Patcher §13 #4): whatever `publish`
       // holds after the sample's run. Other sample hosts keep their own outputs.
       if (notesHost)
@@ -1279,5 +1503,23 @@ namespace Field
 
       outProgram.valid = true;
       return true;
+   }
+   } // namespace
+
+   bool CompileSampleProgram(const std::string& code,
+                              const SampleProgram* previous,
+                              SampleProgram& outProgram,
+                              FieldError& outError,
+                              bool notesHost)
+   {
+      return CompileRegisterProgram(code, previous, outProgram, outError, notesHost, false);
+   }
+
+   bool CompileSpectralProgram(const std::string& code,
+                                const SampleProgram* previous,
+                                SampleProgram& outProgram,
+                                FieldError& outError)
+   {
+      return CompileRegisterProgram(code, previous, outProgram, outError, false, true);
    }
 }

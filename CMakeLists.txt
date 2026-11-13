@@ -601,6 +601,7 @@ set(COMMON_SOURCES
     src/app/selftest/GenSampleTests.cpp
     src/app/selftest/FieldTests1.cpp
     src/app/selftest/FieldTests2.cpp
+    src/app/selftest/SpectralFieldTests.cpp
     src/app/selftest/Headless.cpp
     src/app/selftest/I18nTests.cpp
     src/app/selftest/MiscTests.cpp
@@ -758,6 +759,7 @@ set(COMMON_SOURCES
     src/audio/dsp/StereoKernel.cpp
     src/audio/dsp/PitchShiftKernel.cpp
     src/audio/dsp/SpectralPitchShifter.cpp
+    src/audio/dsp/SpectralFieldEngine.cpp
     src/audio/dsp/ChorusKernel.cpp
     src/audio/dsp/FlangerKernel.cpp
     src/audio/dsp/PhaserKernel.cpp
@@ -845,6 +847,7 @@ set(COMMON_SOURCES
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp
     src/nodes/FieldSampleNode.cpp
+    src/nodes/SpectralFieldNode.cpp
     src/nodes/FieldSynthNode.cpp
     src/nodes/FieldNotesNode.cpp
     src/nodes/FieldPixelNode.cpp

@@ -663,6 +663,8 @@ void DrawNodeBodies(FrameCtx& fc)
          }
          else if (auto* fsnPreview = dynamic_cast<FieldSampleNode*>(gn.node.get()))
             DrawFieldSampleScope(fsnPreview, 60.0f, kPreviewSize);
+         else if (auto* sfnPreview = dynamic_cast<SpectralFieldNode*>(gn.node.get()))
+            DrawSpectralFieldSpectrum(sfnPreview, 60.0f, kPreviewSize);
          else if (auto* fspPreview = dynamic_cast<FieldSynthNode*>(gn.node.get()))
             DrawFieldSynthScope(fspPreview, 60.0f, kPreviewSize);
          else if (auto* fnnPreview = dynamic_cast<FieldNotesNode*>(gn.node.get()))
@@ -1157,6 +1159,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawSketch3DParams(n);
                else if (auto* n = dynamic_cast<FieldSampleNode*>(gn.node.get()))
                   DrawFieldSampleParams(n);
+               else if (auto* n = dynamic_cast<SpectralFieldNode*>(gn.node.get()))
+                  DrawSpectralFieldParams(n);
                else if (auto* n = dynamic_cast<FieldSynthNode*>(gn.node.get()))
                   DrawFieldSynthParams(n);
                else if (auto* n = dynamic_cast<FieldNotesNode*>(gn.node.get()))

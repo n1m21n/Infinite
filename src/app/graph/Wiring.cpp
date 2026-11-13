@@ -1909,6 +1909,8 @@ namespace app
          fp->Apply();
       if (auto* fs = dynamic_cast<FieldSampleNode*>(node))
          fs->Apply();
+      if (auto* sfn = dynamic_cast<SpectralFieldNode*>(node))
+         sfn->Apply();
       if (auto* fsn = dynamic_cast<FieldSynthNode*>(node))
          fsn->Apply();
       if (auto* fnn = dynamic_cast<FieldNotesNode*>(node))

@@ -1,5 +1,5 @@
 // TimeRuler: the one time ruler and playhead of the Timeline, the Piano Roll and the Sample Studio.
-// A beat axis, bar numbers from 0 with the beats between them as zoom allows ("0", "0.3", "1"),
+// A beat axis, bar numbers from 1 as in every DAW, with the beats between them as zoom allows ("1", "1.3", "2"),
 // the red playhead with its cap in the ruler, and the loop band. How a ruler is used is the same
 // everywhere: click or drag places the playhead, Shift+drag carves the loop, loop edges drag.
 #pragma once
@@ -36,11 +36,12 @@ namespace TimeRuler
       dl->AddLine(ImVec2(a.x0, y0 + kHeight), ImVec2(a.x1, y0 + kHeight), ImGui::GetColorU32(ImGuiCol_Text, 0.08f));
    }
 
-   // "4" on a bar, "4.3" on its third beat, "4.2.5" between beats.
+   // Bars count from 1: beat 0 is "1", "4.3" is bar 4's third beat, "4.2.5" between beats.
    inline std::string BarLabel(double beat, double beatsPerBar)
    {
-      const int bar = (int)std::floor(beat / beatsPerBar + 1e-9);
-      const double inBar = beat - bar * beatsPerBar;
+      const int bar0 = (int)std::floor(beat / beatsPerBar + 1e-9);
+      const double inBar = beat - bar0 * beatsPerBar;
+      const int bar = bar0 + 1;
       char label[24];
       if (std::fabs(inBar) < 1e-6)
          std::snprintf(label, sizeof label, "%d", bar);
@@ -105,17 +106,28 @@ namespace TimeRuler
       Ticks(dl, a, y0, 1.0 / unitsPerBeat, step, [](double) { return true; }, format);
    }
 
-   // From the ruler's top down through the panel. A ghost shows where a drag will land.
-   inline void Playhead(ImDrawList* dl, float x, float top, float bottom, bool ghost = false)
+   // From the ruler's top down through the panel, only while it is inside the view [vx0, vx1].
+   // A ghost shows where a drag will land.
+   inline void Playhead(ImDrawList* dl, float x, float top, float bottom, float vx0, float vx1, bool ghost = false)
    {
+      if (x < vx0 - 0.5f || x > vx1 + 0.5f)
+         return;
       const ImU32 col = tok::U32(ghost ? tok::pal::c_EF444478 : tok::pal::c_EF4444FF);
       dl->AddLine(ImVec2(x, top), ImVec2(x, bottom), col, ghost ? 1.5f : 1.25f);
+      dl->PushClipRect(ImVec2(vx0, top), ImVec2(vx1, bottom), true); // the cap at bar 1 stays off the keys
       dl->AddTriangleFilled(ImVec2(x - kCap, top), ImVec2(x + kCap, top), ImVec2(x, top + kCap * 1.6f), col);
+      dl->PopClipRect();
    }
 
-   // The armed loop, as brackets on the ruler and a band down the panel. `drag`: 0 none, 1 start, 2 end, 3 move.
-   inline void LoopBand(ImDrawList* dl, float bx0, float bx1, float top, float bottom, bool carving, int drag)
+   // The armed loop, as brackets on the ruler and a band down the panel, clipped to the view [vx0, vx1]
+   // so a loop that starts or ends off-screen never paints over the keys or the track headers.
+   // Pass the true loop edges, not clamped ones: an edge off-screen is not drawn at the view's border.
+   // `drag`: 0 none, 1 start, 2 end, 3 move.
+   inline void LoopBand(ImDrawList* dl, float bx0, float bx1, float top, float bottom, float vx0, float vx1, bool carving, int drag)
    {
+      if (bx1 < vx0 || bx0 > vx1 || vx1 <= vx0)
+         return;
+      dl->PushClipRect(ImVec2(vx0 - 1.5f, top), ImVec2(vx1 + 1.5f, bottom), true); // room for an edge sitting on the border
       const ImU32 border = tok::U32(tok::pal::c_FACC15B4);
       dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, bottom), tok::U32(carving ? tok::pal::c_FACC152D : tok::pal::c_FACC151E));
       dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, top + 4.0f), tok::U32(drag == 3 ? tok::pal::c_FFEB3BFF : tok::pal::c_FACC15E6), 2.0f);
@@ -128,6 +140,7 @@ namespace TimeRuler
       };
       edge(bx0, 5.0f, drag == 1);
       edge(bx1, -5.0f, drag == 2);
+      dl->PopClipRect();
    }
 
    // The Bars | Time | Samples unit toggle the three toolbars share. Returns the picked index, or -1.

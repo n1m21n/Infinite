@@ -766,6 +766,7 @@ namespace app
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
           dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr ||
           dynamic_cast<FieldSampleNode*>(node) != nullptr ||
+          dynamic_cast<SpectralFieldNode*>(node) != nullptr ||
           dynamic_cast<FieldSynthNode*>(node) != nullptr ||
           dynamic_cast<FieldNotesNode*>(node) != nullptr ||
           dynamic_cast<NoteToCVNode*>(node) != nullptr ||

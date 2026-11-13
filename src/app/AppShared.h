@@ -1513,6 +1513,9 @@ extern FieldSampleNode* gFieldSampleEditor;
 
 extern bool gFieldSampleEditorOpen;
 
+extern SpectralFieldNode* gSpectralFieldEditor;
+extern bool gSpectralFieldEditorOpen;
+
 extern FieldSynthNode* gFieldSynthEditor;
 extern FieldNotesNode* gFieldNotesEditor;
 extern bool gFieldNotesEditorOpen;
@@ -3618,6 +3621,7 @@ float AudioNodeWidth(INode* node);
 void DrawWavetableScope(WavetableNode* n, float h, float width);
 
 void DrawFieldSampleScope(FieldSampleNode* n, float h, float width);
+void DrawSpectralFieldSpectrum(SpectralFieldNode* n, float h, float width);
 
 void DrawFieldSynthScope(FieldSynthNode* n, float h, float width);
 void DrawFieldNotesRoll(FieldNotesNode* n, float h, float width);
@@ -3627,6 +3631,7 @@ void DrawFieldElementParams(FieldElementNode* n);
 void DrawFieldPrimitiveParams(FieldPrimitiveNode* n);
 
 void DrawFieldSampleParams(FieldSampleNode* n);
+void DrawSpectralFieldParams(SpectralFieldNode* n);
 
 void DrawFieldSynthParams(FieldSynthNode* n);
 void DrawFieldNotesParams(FieldNotesNode* n);
@@ -6475,6 +6480,7 @@ int RunFieldStateTest();
 int RunFieldTransferTest();
 
 int RunFieldSampleTest();
+int RunSpectralFieldTest();
 
 int RunFieldPinDeclTest();
 

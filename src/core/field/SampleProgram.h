@@ -45,6 +45,23 @@ namespace Field
    // from the audio thread.
    static constexpr int kSampleMaxDeclaredAudioInputs = 16;
 
+   // Spectral Field host (docs/plans/spectral-field/README.md 5d): state is
+   // one cell per bin, so the cap is far below kSampleMaxStateCells.
+   static constexpr int kSpectralMaxStateCells = 16;
+
+   // Array ids for SampleOp::BinAt (operand a). State cell s reads id
+   // kBinArrayState + s from the previous frame's bank.
+   enum BinArray : uint8_t
+   {
+      kBinArrayMag = 0,
+      kBinArrayPhase = 1,
+      kBinArrayFreq = 2,
+      kBinArrayBMag = 3,
+      kBinArrayBPhase = 4,
+      kBinArrayBFreq = 5,
+      kBinArrayState = 6
+   };
+
    enum class SampleOp : uint8_t
    {
       Nop = 0,
@@ -78,6 +95,12 @@ namespace Field
       Sin, Cos, Tan, Sqrt, Abs, Floor, Ceil, Exp, Log,
       Min, Max, Clamp,
       PhaseShape,  // dst = phase shape imm (PhaseShape::Kind) of phase a by amount b
+      // Spectral Field host only (SampleRuntimeInput::spec is non-null).
+      LoadBin,     // dst = this bin's index
+      LoadBins,    // dst = bin count (Size / 2 + 1)
+      LoadBinHz,   // dst = Hz per bin (sr / Size)
+      LoadHop,     // dst = hop in samples
+      BinAt,       // dst = array a at bin index reg b: linear interp (phase: nearest), 0 outside [0, bins-1]
       Count
    };
 
@@ -171,6 +194,18 @@ namespace Field
       // True when the kernel calls note(); only a Field Notes node may
       // compile such a program (BackendRegister refuses it elsewhere).
       bool hasNoteEmit = false;
+
+      // Spectral Field host: the kernel's per-bin outputs. mag/phase/freq
+      // start as the analysis values and behave like locals; these are the
+      // registers bound to them at program end.
+      bool spectral = false;
+      int magOutReg = -1;
+      int phaseOutReg = -1;
+      int freqOutReg = -1;
+      bool writesPhase = false;   // raw mode: resynthesise with the written phase
+      bool writesFreq = false;
+      bool hasSpectralInput = false; // 'input bin audio B' declared
+      std::string spectralInputName;
 
       bool hasReduceRms = false;
       float reduceLoHz = 20.0f;

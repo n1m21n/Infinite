@@ -738,7 +738,7 @@ namespace
       {
          const float lo = std::clamp(std::min(n.loopStart, n.loopEnd), 0.0f, 1.0f);
          const float hi = std::clamp(std::max(n.loopStart, n.loopEnd), 0.0f, 1.0f);
-         TimeRuler::LoopBand(dl, a.X(lo), a.X(hi), a.y0, a.y1, false, 0);
+         TimeRuler::LoopBand(dl, a.X(lo), a.X(hi), a.y0, a.y1, a.x0, a.x1, false, 0);
       }
       if (s.ghost)
          for (GraphNode* g : ModePages())
@@ -802,7 +802,7 @@ namespace
       if (s.tool == Tool::Eraser && ImGui::IsMouseHoveringRect(mn, mx))
          dl->AddCircle(m, kEraseR, selCol, 0, 1.5f);
       // Where the node is reading now, and a take in progress.
-      TimeRuler::Playhead(dl, a.X(n.Position()), a.y0, a.y1);
+      TimeRuler::Playhead(dl, a.X(n.Position()), a.y0, a.y1, a.x0, a.x1);
       DrawTake(dl, a, selCol);
       if (s.drag == Drag::Marquee)
       {
@@ -2037,7 +2037,7 @@ namespace
       for (const auto& run : r.take.runs)
          for (size_t i = 1; i < run.size(); i++)
             dl->AddLine(a.P(run[i - 1].x * scale, run[i - 1].y), a.P(run[i].x * scale, run[i].y), col, 2.0f);
-      TimeRuler::Playhead(dl, a.X(r.x * scale), a.y0, a.y1);
+      TimeRuler::Playhead(dl, a.X(r.x * scale), a.y0, a.y1, a.x0, a.x1);
    }
 
    const char* RecTip()

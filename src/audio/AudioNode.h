@@ -33,7 +33,7 @@ inline std::atomic<uint64_t> gClipSampleDriftReseeks { 0 };
 class AudioNode
 {
 public:
-   virtual ~AudioNode() {}
+   virtual ~AudioNode() { delete noteDrain.load(std::memory_order_relaxed); }
    virtual void PrepareToPlay(double sampleRate, int maxBlockSize) {}
 
    // Main thread only. Sample rate this node was last PrepareToPlay'd at, or
@@ -273,6 +273,7 @@ public:
    // unconnected pin.
    NoteEventQueue* appliedInbox[kMaxNoteSlots] = {};
    int appliedCursor[kMaxNoteSlots] = { -1, -1, -1, -1 };
+   NoteHeld noteHeld[kMaxNoteSlots];
 
    // Owning-thread-only (same rule as appliedInbox above - called only from
    // AudioEngine::ApplyNoteWiringIfNew, never from RebuildAudioTopology
@@ -285,8 +286,67 @@ public:
    {
       if (slot < 0 || slot >= kMaxNoteSlots)
          return;
+      // A different source (or none): every note the old one left open gets
+      // its note-off on this slot's next Pop - see NoteHeld.
+      if (appliedInbox[slot] != nullptr && appliedInbox[slot] != inbox)
+         noteHeld[slot].SourceChanged();
+      if (inbox != nullptr)
+         inbox->SetCursorTracker(cursor, &noteHeld[slot]);
       appliedInbox[slot] = inbox;
       appliedCursor[slot] = cursor;
+      noteDraining[slot] = false;
+      // No source left (the producer was deleted or the cable pulled) but
+      // note-offs still owed: read them from the empty drain queue for a block,
+      // then FinishNoteDrain drops the slot to nullptr, so a synth that free-runs
+      // without a note input behaves exactly as before.
+      NoteEventQueue* drain = noteDrain.load(std::memory_order_acquire);
+      if (inbox == nullptr && drain != nullptr && noteHeld[slot].numPending > 0)
+      {
+         drain->SetCursorTracker(slot, &noteHeld[slot]);
+         noteDraining[slot] = true;
+         noteDrainingAny = true;
+         SetNoteInbox(slot, drain, slot);
+         return;
+      }
       SetNoteInbox(slot, inbox, cursor);
    }
+
+   // Owning-thread-only, after this node's block: a draining slot whose
+   // note-offs have all been read goes back to no inbox.
+   void FinishNoteDrain()
+   {
+      if (!noteDrainingAny)
+         return;
+      noteDrainingAny = false;
+      for (int slot = 0; slot < kMaxNoteSlots; slot++)
+      {
+         if (!noteDraining[slot])
+            continue;
+         if (noteHeld[slot].numPending > 0)
+         {
+            noteDrainingAny = true;
+            continue;
+         }
+         noteDraining[slot] = false;
+         SetNoteInbox(slot, nullptr, -1);
+      }
+   }
+
+   // Main thread, from the topology build, before the generation that can
+   // first need it is published: the empty queue FinishNoteDrain's slots read.
+   // Set once and kept for the node's life.
+   void EnsureNoteDrain()
+   {
+      if (noteDrain.load(std::memory_order_relaxed) != nullptr)
+         return;
+      auto* q = new NoteEventQueue();
+      for (int i = 0; i < kMaxNoteSlots; i++)
+         q->RegisterConsumer();
+      noteDrain.store(q, std::memory_order_release);
+   }
+
+private:
+   std::atomic<NoteEventQueue*> noteDrain { nullptr };
+   bool noteDraining[kMaxNoteSlots] = {};
+   bool noteDrainingAny = false;
 };

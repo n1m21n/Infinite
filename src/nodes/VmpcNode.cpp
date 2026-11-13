@@ -754,6 +754,9 @@ void VmpcNode::Engine(double dt)
    Transport& tr = Transport::Instance();
    const bool trPlaying = tr.IsPlaying();
    const double beat = tr.Beats();
+   // A loop lap or a seek back jumped over the line a synced press waits for: it fires now.
+   const bool wentBack = trPlaying && mLastEngineBeat >= 0.0 && beat < mLastEngineBeat - 1e-6;
+   mLastEngineBeat = trPlaying ? beat : -1.0;
 
    for (int p = 0; p < kPads; p++)
    {
@@ -769,7 +772,7 @@ void VmpcNode::Engine(double dt)
       const bool synced = padSync[p] == kSynced;
       const double g = std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(
                                          padDiv[p], 0, (int)MusicTime::kNumRateDivisions - 1)));
-      if (r.pending && (!trPlaying || beat >= r.pendingBeat - 1e-6))
+      if (r.pending && (!trPlaying || wentBack || beat >= r.pendingBeat - 1e-6))
       {
          r.pending = false;
          Fire(p);
@@ -931,7 +934,8 @@ void VmpcNode::CookIfNeeded(int frameId)
    if (mTestDt >= 0.0)
       dt = mTestDt;
    else if (tr.IsPlaying())
-      dt = mWasPlaying ? trNow - mLastTransport : 0.0;
+      // a loop lap or a seek back moves the transport backwards: the pads keep moving on wall time
+      dt = !mWasPlaying ? 0.0 : trNow >= mLastTransport ? trNow - mLastTransport : wall - mLastWall;
    else
       dt = mLastWall > 0.0 ? wall - mLastWall : 0.0;
    dt = std::clamp(dt, 0.0, 0.25);

@@ -2363,9 +2363,14 @@ namespace
       const Tick tick = (Tick)std::max(0.0, a.XTick(m.x));
       const Arrange::LoopRange& loop = gArrange.settings.loop;
       const ImGuiIO& io = ImGui::GetIO();
-      if (loop.enabled && std::fabs(m.x - a.TickX((double)loop.start)) <= TimeRuler::kEdgeHit)
+      // An edge scrolled out of the view isn't drawn, so it can't be grabbed either.
+      const auto grabs = [&](Tick t) {
+         const float x = a.TickX((double)t);
+         return x >= a.x0 - 0.5f && x <= a.x1 + 0.5f && std::fabs(m.x - x) <= TimeRuler::kEdgeHit;
+      };
+      if (loop.enabled && grabs(loop.start))
          BeginDrag(Drag::LoopStart, page, m, tick, 0, loop.start);
-      else if (loop.enabled && std::fabs(m.x - a.TickX((double)loop.end)) <= TimeRuler::kEdgeHit)
+      else if (loop.enabled && grabs(loop.end))
          BeginDrag(Drag::LoopEnd, page, m, tick, 0, loop.end);
       else
       {
@@ -3333,13 +3338,11 @@ namespace
       dl->PopClipRect();
       const Arrange::LoopRange& loop = gArrange.settings.loop;
       if (loop.enabled && loop.end > loop.start)
-         TimeRuler::LoopBand(dl, a.TickX((double)loop.start), a.TickX((double)loop.end), a.rulerY, a.rollB, s.drag == Drag::LoopCarve,
+         TimeRuler::LoopBand(dl, a.TickX((double)loop.start), a.TickX((double)loop.end), a.rulerY, a.rollB, a.x0, a.x1, s.drag == Drag::LoopCarve,
                              s.drag == Drag::LoopStart ? 1 : s.drag == Drag::LoopEnd ? 2 : 0);
-      const float px = a.TickX((double)play);
-      if (px >= a.x0 && px <= a.x1)
-         TimeRuler::Playhead(dl, px, a.rulerY, a.rollB);
+      TimeRuler::Playhead(dl, a.TickX((double)play), a.rulerY, a.rollB, a.x0, a.x1);
       if (gArrangeScrubbing && s.drag == Drag::Scrub)
-         TimeRuler::Playhead(dl, a.TickX((double)gArrangeScrubTick), a.rulerY, a.rollB, true);
+         TimeRuler::Playhead(dl, a.TickX((double)gArrangeScrubTick), a.rulerY, a.rollB, a.x0, a.x1, true);
       if (page.clips.empty())
       {
          const char* text = T("Draw a clip, drop a .mid, or record");

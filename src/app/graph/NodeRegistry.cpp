@@ -253,6 +253,7 @@ namespace app
       REGISTER_NODE(FieldSynthNode, Field Synth, "Synths");
       REGISTER_NODE(FieldNotesNode, Field Notes, "Notes");
       REGISTER_NODE(FieldSampleNode, Field Effect, "AudioEffects");
+      REGISTER_NODE(SpectralFieldNode, Spectral Field, "AudioEffects");
       // Field Graph: registered so NodeFactory::MakeNode still resolves it
       // for loading a patch saved before this pass, but excluded from every
       // spawn-menu/search enumeration via IsUserSpawnable below - it can no

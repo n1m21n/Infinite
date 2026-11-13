@@ -576,6 +576,7 @@ void AudioEngine::PumpNoteNodesWithoutDevice()
                outputPtrs[o] = nullptr;
          }
          entry.node->ProcessBlockMulti(inputPtrs, std::min(entry.numInputs, kAudioMaxNodeInputs), outputPtrs, numOuts);
+         entry.node->FinishNoteDrain();
       }
    }
 
@@ -1280,6 +1281,7 @@ void AudioEngine::RunEntry(AudioTopologyEntry& entry, ProcessList* list, int num
    {
       entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
    }
+   entry.node->FinishNoteDrain();
    entry.node->ApplyBlockGain(outputPtrs, numOuts, numFrames, mSampleRate.load(std::memory_order_relaxed));
    if (mOfflineTaps != nullptr)
       for (OfflineTap& tap : *mOfflineTaps)

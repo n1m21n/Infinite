@@ -599,6 +599,204 @@ namespace
    }
 
 
+   // ---- FIRST ------------------------------------------------------------
+   // The step under the playhead plays after anything that moves it: each loop lap starts on step 1,
+   // Return to Start plays step 1, Play after a rewind while stopped plays step 1, and a seek to
+   // between steps plays at most the step under the playhead, then the next step on time.
+   void AuditFirst(Flags& flags, bool& ok)
+   {
+      const double bpm = 120.0, spb = kRate * 60.0 / bpm, rate = 0.25, step = rate * spb;
+      for (const GridSrc& g : GridSrcs())
+      {
+         const auto make = [&](Rig& rig) {
+            if (!rig.Init(g.create(rate, 0.0f, 1), 512))
+               return false;
+            rig.node->CookIfNeeded(rig.frame++);
+            StartTransport(bpm);
+            if (g.needsInput)
+               Push(rig.in[0], 60, 0.8f, true, 777);
+            return true;
+         };
+         const auto onsIn = [](const Rig& rig, long long a, long long b) {
+            int n = 0;
+            long long last = -1;
+            for (const Evt& e : rig.got)
+               if (e.e.isNoteOn && !e.e.bendUpdate && e.sample >= a && e.sample < b && e.sample != last)
+               {
+                  n++;
+                  last = e.sample;
+               }
+            return n;
+         };
+         const auto firstOn = [](const Rig& rig, long long from) {
+            for (const Evt& e : rig.got)
+               if (e.e.isNoteOn && !e.e.bendUpdate && e.sample >= from)
+                  return e.sample;
+            return -1LL;
+         };
+         int bad = 0;
+         std::string why;
+         const auto fail = [&](const char* what, long long v) {
+            bad++;
+            why += std::string(" ") + what + "=" + std::to_string(v);
+         };
+
+         { // loop laps: 0..2 beats
+            Rig rig;
+            if (!make(rig))
+               continue;
+            Transport::Instance().SetLoop(true, 0.0, 2.0);
+            rig.Run(3.1);
+            Transport::Instance().SetLoop(false, 0.0, 4.0);
+            StopTransport();
+            for (int lap = 0; lap < 3; lap++)
+            {
+               const long long at = (long long)std::llround(lap * 2.0 * spb);
+               if (onsIn(rig, at - 1, at + 2) != 1)
+                  fail("lap", lap);
+            }
+         }
+         { // Return to Start while playing
+            Rig rig;
+            if (!make(rig))
+               continue;
+            rig.Run(1.3);
+            Transport::Instance().Seek(0.0);
+            const long long at = rig.pos;
+            rig.Run(0.5);
+            StopTransport();
+            if (firstOn(rig, at) != at)
+               fail("rewind", firstOn(rig, at) - at);
+            if (onsIn(rig, at, at + (long long)step) != 1)
+               fail("rewind-count", onsIn(rig, at, at + (long long)step));
+         }
+         { // rewind while stopped, then Play
+            Rig rig;
+            if (!make(rig))
+               continue;
+            rig.Run(1.3);
+            Transport::Instance().SetPlaying(false);
+            rig.Run(0.3);
+            Transport::Instance().Seek(0.0);
+            rig.Run(0.1);
+            Transport::Instance().SetPlaying(true);
+            const long long at = rig.pos;
+            rig.Run(0.5);
+            StopTransport();
+            if (firstOn(rig, at) != at)
+               fail("play", firstOn(rig, at) - at);
+         }
+         { // seek forward to between steps: 0.7 s = 1.4 beats, next step at 1.5 beats
+            Rig rig;
+            if (!make(rig))
+               continue;
+            rig.Run(0.3);
+            Transport::Instance().Seek(0.7);
+            const long long at = rig.pos;
+            rig.Run(0.5);
+            StopTransport();
+            const long long next = at + (long long)std::llround(0.1 * spb);
+            // The step under the playhead may chase in at the seek (StepClock), but only that one.
+            if (onsIn(rig, at, next - 1) > 1)
+               fail("seek-burst", onsIn(rig, at, next - 1));
+            if (onsIn(rig, next - 1, next + 2) != 1)
+               fail("seek-next", firstOn(rig, next - 1) - next);
+         }
+         printf("NOTEAUDIT FIRST %-18s %s%s\n", g.name, bad ? "FAIL" : "OK", why.c_str());
+         if (bad)
+         {
+            flags.Flag("FIRST", g.name, "first step missed or doubled after a lap/seek/play", bad);
+            ok = false;
+         }
+      }
+   }
+
+   // ---- TEMPO ------------------------------------------------------------
+   // A tempo change mid-step (120 -> 90 and 120 -> 170 at beat 2.6, between the
+   // 2.5 and 2.75 steps): every onset stays on the 1/16 beat grid of the
+   // transport's own beat clock, and every step plays exactly once - none
+   // skipped, none doubled - across the change.
+   void AuditTempo(Flags& flags, bool& ok)
+   {
+      const double rate = 0.25;
+      for (const GridSrc& g : GridSrcs())
+      {
+         int bad = 0;
+         std::string why;
+         for (double to : { 90.0, 170.0 })
+         {
+            Rig rig;
+            if (!rig.Init(g.create(rate, 0.0f, 1), 512))
+               continue;
+            rig.node->CookIfNeeded(rig.frame++);
+            StartTransport(120.0);
+            if (g.needsInput)
+               Push(rig.in[0], 60, 0.8f, true, 777);
+            struct Blk
+            {
+               long long start;
+               double b0, b1;
+            };
+            std::vector<Blk> blks;
+            bool changed = false;
+            while (Transport::Instance().Beats() < 6.0)
+            {
+               if (!changed && Transport::Instance().Beats() >= 2.6)
+               {
+                  Transport::Instance().SetTempo((float)to);
+                  changed = true;
+               }
+               const long long start = rig.pos;
+               rig.Step();
+               blks.push_back({ start, Transport::Instance().BlockStartBeats(), Transport::Instance().Beats() });
+            }
+            const float tempoNow = Transport::Instance().Tempo();
+            StopTransport();
+            const double endBeat = blks.back().b1;
+            std::map<long long, int> hits; // grid index -> onsets
+            double worst = 0.0;
+            long long lastSample = -1;
+            for (const Evt& e : rig.got)
+            {
+               if (!e.e.isNoteOn || e.e.bendUpdate || e.sample == lastSample)
+                  continue;
+               lastSample = e.sample;
+               const Blk* b = nullptr;
+               for (const Blk& k : blks)
+                  if (e.sample >= k.start && e.sample < k.start + rig.block)
+                     b = &k;
+               if (b == nullptr)
+                  continue;
+               const double beat = b->b0 + (b->b1 - b->b0) * (double)(e.sample - b->start) / rig.block;
+               const long long idx = std::llround(beat / rate);
+               worst = std::max(worst, std::fabs(beat - idx * rate));
+               hits[idx]++;
+            }
+            const long long last = (long long)std::floor((endBeat - 0.05) / rate);
+            int missing = 0, doubled = 0;
+            for (long long i = 0; i <= last; i++)
+            {
+               const int n = hits.count(i) ? hits[i] : 0;
+               missing += (n == 0);
+               doubled += (n > 1);
+            }
+            const double worstSamples = worst * kRate * 60.0 / to;
+            printf("NOTEAUDIT TEMPO %-18s 120->%3.0f (ran at %.0f)  steps %lld  missing %d  doubled %d  worst off-grid %.1f samples\n",
+                   g.name, to, tempoNow, last + 1, missing, doubled, worstSamples);
+            if (missing || doubled || worstSamples > 2.0 || std::fabs(tempoNow - to) > 0.5)
+            {
+               bad++;
+               why += " ->" + std::to_string((int)to);
+            }
+         }
+         if (bad)
+         {
+            flags.Flag("TEMPO", g.name, "step skipped, doubled or off grid across a tempo change", bad);
+            ok = false;
+         }
+      }
+   }
+
    // ---- JITTER -----------------------------------------------------------
    // Pass-through nodes keep an event's frame offset: note-on sample out must be
    // note-on sample in at every block size the app runs (24/60/144 fps at 48 kHz
@@ -751,7 +949,9 @@ namespace
             if (c.setup)
                c.setup(a.node.get());
             a.node->CookIfNeeded(a.frame++);
-            cons.audio->SetNoteInbox(0, a.out, a.out->RegisterConsumer());
+            // ApplyNoteInbox, the engine's own rewire path (it keeps the slot's open-note list).
+            cons.audio->EnsureNoteDrain();
+            cons.audio->ApplyNoteInbox(0, a.out, a.out->RegisterConsumer());
             StartTransport(120.0);
             const double bypassAt = 0.55; // 9001, 9003, 9004 are held
             bool cut = false;
@@ -769,9 +969,9 @@ namespace
                         e.e.isNoteOn ? (void)(open[e.e.voiceId] = true) : (void)open.erase(e.e.voiceId);
                   voicesOnAtCut = (int)open.size();
                   if (mode == 0)
-                     cons.audio->SetNoteInbox(0, &a.in[0], a.in[0].RegisterConsumer());
+                     cons.audio->ApplyNoteInbox(0, &a.in[0], a.in[0].RegisterConsumer());
                   else
-                     cons.audio->SetNoteInbox(0, nullptr, -1);
+                     cons.audio->ApplyNoteInbox(0, nullptr, -1);
                }
                if (!cut)
                   a.Step(true);
@@ -781,19 +981,21 @@ namespace
                   a.pos += a.block;
                }
                cons.Step(false);
+               cons.audio->FinishNoteDrain();
                cons.pos = a.pos;
             }
             StopTransport();
             const PairReport p = Pairs(cons.got);
             printf("NOTEAUDIT BYPASS %-17s %-6s %d voices open at the cut | at the consumer: on %3d off %3d stuck %d orphan-off %d\n",
                    c.name, mode == 0 ? "bypass" : "delete", voicesOnAtCut, p.ons, p.offs, p.stuck, p.orphanOff);
-            // Delete is reported only: a deleted producer cannot send note-offs, so every node leaves its
-            // consumer's open voices open (the consumer drops to its free-running state, nothing sounds).
-            if (mode == 0 && (p.stuck || p.orphanOff))
-               flags.Flag("BYPASS", c.name, "bypass mid-note: stuck + orphan-off", p.stuck + p.orphanOff);
+            // Bypass and delete alike: the consumer's open notes are closed (see NoteHeld).
+            if (p.stuck || p.orphanOff)
+            {
+               flags.Flag("BYPASS", c.name, mode == 0 ? "bypass mid-note: stuck + orphan-off" : "delete mid-note: stuck + orphan-off", p.stuck + p.orphanOff);
+               ok = false;
+            }
          }
       }
-      (void)ok;
    }
 
    // ---- CPU --------------------------------------------------------------
@@ -842,6 +1044,10 @@ bool RunNoteAudit()
       AuditHuman(flags);
    if (want("LOOP"))
       AuditLoop(flags, ok);
+   if (want("FIRST"))
+      AuditFirst(flags, ok);
+   if (want("TEMPO"))
+      AuditTempo(flags, ok);
    if (want("JITTER"))
       AuditJitter(flags);
    if (want("BYPASS"))

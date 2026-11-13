@@ -58,7 +58,8 @@ public:
    // --- main-thread UI / test helpers ---
    struct Cap // one captured note event: absolute beat, the note-on's voiceId, note, velocity 0..127
    {
-      double beat;
+      double beat; // an elapsed clock that only moves forward: loop laps and seeks never reorder a take
+      double pos;  // where the transport was (the bar position the note is learned at)
       int voiceId;
       uint8_t note, vel;
       bool on;

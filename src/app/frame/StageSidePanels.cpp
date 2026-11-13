@@ -1435,6 +1435,67 @@ void DrawSidePanels(FrameCtx& fc)
          EndEditorWindow(editorVisible);
       }
 
+      if (gSpectralFieldEditorOpen && gSpectralFieldEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gSpectralFieldEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gSpectralFieldEditor = nullptr;
+            gSpectralFieldEditorOpen = false;
+         }
+      }
+
+      if (gSpectralFieldEditorOpen && gSpectralFieldEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         const bool editorVisible = BeginEditorWindow(L("Spectral field editor"), &gSpectralFieldEditorOpen);
+         if (editorVisible)
+         {
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Runs once per bin. Read: bin, bins, binhz, hop, sr. Write: mag, phase, freq. X.at(k) reads another bin."));
+            SectionCard::Begin(T("Code"));
+
+            gCurrentNodeIndex = gSpectralFieldEditor->NodeIndex();
+            DrawFieldDeviceControls<SpectralFieldNode>(gSpectralFieldEditor, "bin", &SpectralFieldNode::PresetNames(),
+                                                       [](SpectralFieldNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+            gCurrentNodeIndex = -1;
+
+            static char editBuf[8192];
+            static SpectralFieldNode* lastEdited = nullptr;
+            static std::string lastKnownCode;
+            if (lastEdited != gSpectralFieldEditor || gSpectralFieldEditor->code != lastKnownCode)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gSpectralFieldEditor->code.c_str());
+               lastEdited = gSpectralFieldEditor;
+               lastKnownCode = gSpectralFieldEditor->code;
+            }
+
+            FieldWell::InputTextMultiline("##spectralFieldCode", editBuf, sizeof(editBuf),
+                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+
+            PushPrimaryButtonStyle();
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            {
+               gSpectralFieldEditor->code = editBuf;
+               gSpectralFieldEditor->Apply();
+               lastKnownCode = gSpectralFieldEditor->code;
+            }
+            PopPrimaryButtonStyle();
+            FormParts::Inline();
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gSpectralFieldEditor->code.c_str());
+
+            if (!gSpectralFieldEditor->LastError().empty())
+               DrawFieldError(gSpectralFieldEditor->LastError(), gSpectralFieldEditor->code);
+         }
+         EndEditorWindow(editorVisible);
+      }
+
       if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
       {
          bool alive = false;
