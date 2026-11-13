@@ -943,6 +943,15 @@ bool Render3DNode::CookEngine(int frameId)
       E.upReset = true;
       return E.raster->Render(*E.img, fr, g); // no scaler on this device: native
    };
+   // SPEED_PLAN S0.1: one line per scene build (geometry cook, mesh upload and BVH, frame build), so warm timing can
+   // keep the build apart from the samples.
+   if (sProf && meshesChanged)
+   {
+      auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+      const auto tpS = std::chrono::steady_clock::now();
+      std::fprintf(stderr, "ENGINE_PROF scene sources=%.2f meshes=%.2f frame=%.2f total=%.2f\n", ms(tpA, tp0), ms(tp0, tp1),
+                   ms(tp1, tpS), ms(tpA, tpS));
+   }
    bool traced = false;
    const bool offline = Transport::Instance().IsOfflineMode();
    if (!offline) E.exportWarm = false;
@@ -984,10 +993,14 @@ bool Render3DNode::CookEngine(int frameId)
                   place(in, m);
                }
          }
-         traced = E.raster->PathTrace(*E.img, fr, n, bounces, done == 0, nullptr);
+         const auto tpP = std::chrono::steady_clock::now();
+         double passGpu = 0.0;
+         traced = E.raster->PathTrace(*E.img, fr, n, bounces, done == 0, sProf ? &passGpu : nullptr);
          done += n;
          const float noise = E.raster->PathTraceNoise();
-         if (sProf) std::fprintf(stderr, "ENGINE_PROF settle spp=%d noise95=%.4f\n", done, noise);
+         if (sProf)
+            std::fprintf(stderr, "ENGINE_PROF settle spp=%d noise95=%.4f n=%d ms=%.2f gpu=%.2f\n", done, noise, n,
+                         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tpP).count(), passGpu);
          if (!anyMoving && sStop > 0.0f && noise >= 0.0f && noise < sStop)
             break;
       }
@@ -1004,9 +1017,13 @@ bool Render3DNode::CookEngine(int frameId)
       for (int i = 0; i < warm; i++)
       {
          double g = 0.0;
+         const auto tpW = std::chrono::steady_clock::now();
          if (!liveRender(sProf ? &g : nullptr))
             return false;
          E.profWarmGpu += g;
+         if (sProf) // S0.1: each warm-up is one live frame of a held view; frames 2.. are the warm frame rate
+            std::fprintf(stderr, "ENGINE_PROF live frame=%d ms=%.2f gpu=%.2f\n", i + 1,
+                         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tpW).count(), g);
          fr.frameIndex = ++E.frame;
          fr.reuseShadowMask = true; // one camera, scene and light set: the warm-ups and the final render share one mask
       }

@@ -60,8 +60,12 @@ No new scene. Three existing ones cover what one scene cannot, and the timing me
 | Gate | Target |
 |---|---|
 | Settle vs GL Path trace, equal picture | 5x faster on all three scenes |
+| Settle vs Cycles, equal picture | faster on all three scenes (Cycles s to 0.01 / settle s to 0.01 above 1), both on the M2 GPU, Cycles adaptive off, 8 bounces each |
 | Settle export | FLIP against the full sample count 0.005 or less with every speed-up on |
 | Live | 30 fps at 1080p warm on judge_table; ref_interior and carpet_pile reported, no gate yet |
+
+Equal-picture runs use 960x540 so a 1024 spp reference stays under a few minutes. When a ladder ends above
+FLIP 0.01, the time is carried on along the last two points' log-log line and marked "~" in the table.
 
 ## 5. Order with the picture work
 

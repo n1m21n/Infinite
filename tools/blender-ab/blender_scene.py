@@ -8,7 +8,7 @@
 # and posed per frame), "instances" (one shape at many points; the points go out as a vertex-only
 # glb), an HDRI world, per-region object indices, and a mask_<k>.png per frame (1 spp, no filter,
 # no depth of field: the value in each pixel is the object index, 0 = sky).
-import bpy, sys, os, json, math, struct
+import bpy, sys, os, json, math, struct, time
 
 # The truth cache (harness.py) keys on this number, not on this file's text: bump it only when a change alters the
 # picture of a case that already exists. Adding a new feature for a new case needs no bump, so the old truths stay.
@@ -738,6 +738,16 @@ except Exception as e:
     print("SCENE: GPU off,", e)
 sc.cycles.samples = scene.get("samples", 256)
 sc.cycles.use_denoising = True
+# SPEED_PLAN S0.3: "adaptive": false traces every sample (Blender's default stops early), so Cycles is timed sample
+# for sample; each render prints CYCLESTIME, the seconds from Blender's render start to its end (no launch, no load).
+if "adaptive" in scene:
+    sc.cycles.use_adaptive_sampling = bool(scene["adaptive"])
+if "bounces" in scene:  # settle's one depth for every kind of bounce (Cycles' defaults stop diffuse and glossy at 4)
+    nb = int(scene["bounces"])
+    sc.cycles.max_bounces = sc.cycles.diffuse_bounces = sc.cycles.glossy_bounces = sc.cycles.transmission_bounces = nb
+_t_render = [0.0]
+bpy.app.handlers.render_init.append(lambda *_: _t_render.__setitem__(0, time.time()))
+bpy.app.handlers.render_complete.append(lambda *_: print("CYCLESTIME %.3f" % (time.time() - _t_render[0]), flush=True))
 sc.view_settings.view_transform = scene.get("view", "Standard")
 sc.view_settings.look = 'None'
 sc.render.resolution_x, sc.render.resolution_y = scene.get("size", (512, 512))

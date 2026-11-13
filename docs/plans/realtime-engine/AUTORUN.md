@@ -91,3 +91,22 @@ judge_table defects (procedural table, tools/blender-ab/judge_table.py):
 4. Render 3D's albedo pass ignores a Field material's colour (flat knob grey), so the Cycles bake goes through unlit emission renders.
 5. Sketch 3D has no lathe and shades custom shapes flat; the lathes are meshed from one profile in Python and loaded as glb.
 6. Cause of 1 and 3: every new ray starts a fixed 3 mm off the surface (Frame.rayBias, never set), thicker than the 1.7 mm glass wall, the 0.2 mm gap to the water and the droplets, so rays step over surfaces. Fixed: the offset is 1e-4 of the focus distance, at most 3 mm (Render3DEngine.cpp). Refractive droplets were not re-tested at full size; the case keeps coated beads. Live glass (2) is unchanged.
+
+## S0: speed ruler (SPEED_PLAN.md Block S0, 2026-11-13)
+
+Tool: `tools/blender-ab/speed.py` (warm, equal, cycles, table, rescore); results in `~/.cache/infinite-sweep/speed/results.json`.
+Warm columns at 1920x1080, one launch each. Equal columns at 960x540: seconds until FLIP against the engine's own
+1024 spp frame is 0.01 or less. "~" = carried on along the last two ladder points. Cycles: adaptive off, 8 bounces.
+
+| Scene | build ms | settle ms / 16 spp pass | Msamples/s | live ms / frame (fps) | Cycles ms / spp | settle s to 0.01 | PT s to 0.01 | PT / settle | Cycles s to 0.01 | Cycles / settle |
+|---|---|---|---|---|---|---|---|---|---|---|
+| judge_table | 107.9 | 5222 | 6.4 | 90.9 (11.0) | 328 | 42.5 | ~172 | 4.05 | ~63.7 | 1.5 |
+| ref_interior | 27.6 | 9375 | 3.5 | 39.9 (25.0) | 578 | 45.2 | ~569 | 12.6 | 40.9 | 0.9 |
+| carpet_pile | 62.9 | 26879 | 1.2 | 2538 (0.4) | - | not run | not run | - | skipped | - |
+
+Read:
+- Gate PT 5x: judge_table fails (4.05), ref_interior passes (12.6). Gate Cycles above 1: judge_table passes, ref_interior fails (0.9).
+- Cycles at 16 spp on ref_interior is already FLIP 0.0185 vs settle 0.0278: bounce light in a closed room is where settle loses (S1.4, S1.1).
+- carpet_pile: 0.4 fps live and 1.2 Msamples/s settle; a ray-structure problem, not a shading one. build ms spread 55 %, not trusted.
+- Cycles ms/spp column is from default bounces (before matching); the equal columns use 8.
+- Open: carpet_pile equal (settle ref alone ~8 min at 960x540), run when the laptop is free.
