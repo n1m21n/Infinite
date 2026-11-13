@@ -90,3 +90,4 @@ judge_table defects (procedural table, tools/blender-ab/judge_table.py):
 3. Settle: a small refractive solid resting on a surface (water droplets) renders black; the case uses coated beads instead.
 4. Render 3D's albedo pass ignores a Field material's colour (flat knob grey), so the Cycles bake goes through unlit emission renders.
 5. Sketch 3D has no lathe and shades custom shapes flat; the lathes are meshed from one profile in Python and loaded as glb.
+6. Cause of 1 and 3: every new ray starts a fixed 3 mm off the surface (Frame.rayBias, never set), thicker than the 1.7 mm glass wall, the 0.2 mm gap to the water and the droplets, so rays step over surfaces.
