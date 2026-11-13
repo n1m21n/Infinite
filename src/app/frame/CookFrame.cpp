@@ -693,7 +693,8 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
            dynamic_cast<Sketch3DNode*>(gn.node.get()) != nullptr ||
            dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr ||
            dynamic_cast<VmpcNode*>(gn.node.get()) != nullptr ||
-           (gView3DOpen && dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr)))
+           (gView3DOpen && dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr) ||
+           (gView2DOpen && dynamic_cast<Scene2DNode*>(gn.node.get()) != nullptr)))
       {
          CookProbe::Scope probe(gn.node.get());
          gn.node->CookIfNeeded(frameId);
@@ -740,6 +741,14 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
       {
          scene->Items();
          gn.hiddenFromCanvas = scene->panelOnly;
+      }
+      auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get());
+      if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
+         doc = dynamic_cast<Scene2DNode*>(out->Input().GetSource());
+      if (doc != nullptr)
+      {
+         doc->Layers();
+         gn.hiddenFromCanvas = doc->panelOnly;
       }
    }
 
