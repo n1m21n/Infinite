@@ -385,6 +385,9 @@ namespace GLUtil
       const unsigned int program = glCreateProgram();
       glBindAttribLocation(program, 0, "aPos");
       glBindAttribLocation(program, 1, "aUv");
+      // A shader with a second output (the 2D View's depth) gets attachment 1; names a shader lacks are ignored.
+      glBindFragDataLocation(program, 0, "fragColor");
+      glBindFragDataLocation(program, 1, "fragDepth");
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);

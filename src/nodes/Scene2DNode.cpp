@@ -3,12 +3,14 @@
 #include "gl3.h"
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cmath>
 #include <sstream>
 
 #include "BlendModes.h"
 #include "Geometry3DNodes.h"
 #include "Modulation.h"
+#include "NodeViewport.h"
 #include "TileStore.h"
 
 std::function<INode*(uint64_t)> Scene2DNode::ResolveUid;
@@ -28,6 +30,13 @@ namespace
             "uniform vec2 uDoc;\n"
             "uniform vec3 uInvA;\n"
             "uniform vec3 uInvB;\n"
+            "uniform vec3 uInvC;\n"
+            "out float fragDepth;\n"
+            "uniform sampler2D uDepthIn;\n"
+            "uniform int uDepthMode;\n"
+            "uniform int uBif;\n"
+            "uniform vec4 uBifT;\n"
+            "uniform vec4 uBifU;\n"
             "uniform vec2 uBox;\n"
             "uniform vec4 uCrop;\n"
             "uniform vec2 uTexSize;\n"
@@ -47,10 +56,15 @@ namespace
             "uniform vec4 uColB;\n"
             "uniform float uFillAngle;\n"
             "uniform sampler2D uPMask;\n"
-            "uniform int uHasPMask;\n")
+            "uniform int uHasPMask;\n"
+            "uniform sampler2D uVMask;\n"
+            "uniform int uHasVMask;\n")
          + GLUtil::kSrgbGlsl
          + BlendModes::kBlendGLSL
-         + "vec4 layerAt(vec2 uvb, vec2 uv) {\n"
+         + "float ramp(float lo, float hi, float v) { return hi > lo + 1e-4 ? clamp((v - lo) / (hi - lo), 0.0, 1.0) : step(lo, v); }\n"
+           "float bifW(vec4 t, float l) { return ramp(t.x, t.y, l) * (1.0 - ramp(t.z, t.w, l)); }\n"
+           "float gLum(vec3 c) { c = clamp(c, 0.0, 1.0); return Lum(uLinear == 1 ? SrgbEncode(c) : c); }\n"
+           "vec4 layerAt(vec2 uvb, vec2 uv) {\n"
            "   if (uvb.x < uCrop.x || uvb.x > uCrop.z || uvb.y < uCrop.y || uvb.y > uCrop.w) return vec4(0.0);\n"
            "   if (uKind == 1) return uColA;\n"
            "   if (uKind == 2) {\n"
@@ -68,8 +82,12 @@ namespace
            "}\n"
            "void main() {\n"
            "   vec4 acc = texture(uAcc, vUv);\n"
+           "   float dIn = uDepthMode != 0 ? texture(uDepthIn, vUv).r : 1e30;\n"
+           "   fragDepth = dIn;\n"
            "   vec2 p = vec2(vUv.x * uDoc.x, (1.0 - vUv.y) * uDoc.y);\n"
-           "   vec2 b = vec2(dot(uInvA, vec3(p, 1.0)), dot(uInvB, vec3(p, 1.0)));\n"
+           "   vec3 q = vec3(dot(uInvA, vec3(p, 1.0)), dot(uInvB, vec3(p, 1.0)), dot(uInvC, vec3(p, 1.0)));\n"
+           "   if (q.z <= 1e-12) { fragColor = acc; return; }\n"
+           "   vec2 b = q.xy / q.z;\n"
            "   vec2 uvb = b / uBox;\n"
            "   vec2 uv = vec2(uvb.x, 1.0 - uvb.y);\n"
            "   vec4 layer = layerAt(uvb, uv);\n"
@@ -81,7 +99,14 @@ namespace
            "      layer.a *= mix(1.0, clamp(v, 0.0, 1.0), uMaskDensity);\n"
            "   }\n"
            "   if (uHasPMask == 1) layer.a *= texture(uPMask, uv).r;\n"
+           "   if (uHasVMask == 1) layer.a *= texture(uVMask, uv).a;\n"
            "   float amt = uOpacity * layer.a;\n"
+           "   if (uBif == 1) amt *= bifW(uBifT, gLum(layer.rgb)) * bifW(uBifU, gLum(acc.rgb));\n"
+           "   if (uDepthMode == 1) {\n"
+           "      float d = 1.0 / q.z;\n"
+           "      if (d > dIn * 1.0005 + 0.01) { fragColor = acc; return; }\n"
+           "      if (layer.a > 0.5) fragDepth = min(dIn, d);\n"
+           "   }\n"
            "   if (uMode == " + std::to_string(BlendModes::kEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - amt)); return; }\n"
            "   if (uMode == " + std::to_string(BlendModes::kAntiEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - (1.0 - layer.a) * uOpacity)); return; }\n"
            "   vec3 blended = blendModeImage(uMode, acc.rgb, layer.rgb, 1, uHead);\n"
@@ -109,16 +134,22 @@ namespace
 
    float SrgbToLinear(float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); }
 
-   void Invert(const float m[6], float out[6])
+   // 3x3 inverse by the adjugate; the sign is kept so w stays positive in front of the camera.
+   void Invert3(const float m[9], float o[9])
    {
-      const float det = m[0] * m[4] - m[1] * m[3];
-      const float id = std::fabs(det) > 1e-12f ? 1.0f / det : 0.0f;
-      out[0] = m[4] * id;
-      out[1] = -m[1] * id;
-      out[3] = -m[3] * id;
-      out[4] = m[0] * id;
-      out[2] = -(out[0] * m[2] + out[1] * m[5]);
-      out[5] = -(out[3] * m[2] + out[4] * m[5]);
+      o[0] = m[4] * m[8] - m[5] * m[7];
+      o[1] = m[2] * m[7] - m[1] * m[8];
+      o[2] = m[1] * m[5] - m[2] * m[4];
+      o[3] = m[5] * m[6] - m[3] * m[8];
+      o[4] = m[0] * m[8] - m[2] * m[6];
+      o[5] = m[2] * m[3] - m[0] * m[5];
+      o[6] = m[3] * m[7] - m[4] * m[6];
+      o[7] = m[1] * m[6] - m[0] * m[7];
+      o[8] = m[0] * m[4] - m[1] * m[3];
+      const float det = m[0] * o[0] + m[1] * o[3] + m[2] * o[6];
+      const float id = std::fabs(det) > 1e-20f ? 1.0f / det : 0.0f;
+      for (int i = 0; i < 9; i++)
+         o[i] *= id;
    }
 
    unsigned long long Mix(unsigned long long h, unsigned long long v) { return (h ^ v) * 1099511628211ull; }
@@ -142,6 +173,10 @@ Scene2DNode::~Scene2DNode()
       GLUtil::DestroyFbo(kv.second.fbo);
    for (auto& kv : mMasks)
       GLUtil::DestroyFbo(kv.second.fbo);
+   for (auto* m : { &mVec, &mVMasks })
+      for (auto& kv : *m)
+         if (kv.second.tex != 0)
+            glDeleteTextures(1, &kv.second.tex);
    GLUtil::DestroyFbo(mSelTex);
    GLUtil::DestroyFbo(mSelOverlay);
    GLUtil::DestroyFbo(mSelScratch);
@@ -152,6 +187,16 @@ Scene2DNode::~Scene2DNode()
       glDeleteProgram(mPassProgram);
    if (mFinishProgram != 0)
       glDeleteProgram(mFinishProgram);
+   for (auto& kv : mDepth)
+      for (unsigned t : kv.second.tex)
+         if (t != 0)
+            glDeleteTextures(1, &t);
+   GLUtil::DestroyFbo(mFxBlur[0]);
+   GLUtil::DestroyFbo(mFxBlur[1]);
+   GLUtil::DestroyFbo(mFxOut);
+   for (unsigned p : { mBlurProgram, mFxProgram })
+      if (p != 0)
+         glDeleteProgram(p);
 }
 
 // ---- model --------------------------------------------------------------
@@ -184,6 +229,11 @@ Scene2DNode::Layer& Scene2DNode::AddLayer(Kind kind, uint64_t uid, int above)
    l.y = mDoc.h * 0.5f;
    if (kind == Kind::Group)
       l.blend = kPassThrough;
+   if (kind == Kind::Vector)
+   {
+      l.pw = mDoc.w;
+      l.ph = mDoc.h;
+   }
    if (kind == Kind::Paint)
    {
       l.pw = mDoc.w;
@@ -383,11 +433,19 @@ INode* Scene2DNode::MaskSource(const Layer& l) const
 bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
 {
    const float W = (float)mDoc.w, H = (float)mDoc.h;
-   if (l.kind == Kind::Paint)
+   if (l.kind == Kind::Paint || l.kind == Kind::Vector)
    {
       w = (float)std::max(1, l.pw);
       h = (float)std::max(1, l.ph);
       return true;
+   }
+   if (l.kind == Kind::Text)
+   {
+      int tw = 0, th = 0;
+      const bool ok = TextSize(l, tw, th);
+      w = (float)std::max(1, tw);
+      h = (float)std::max(1, th);
+      return ok;
    }
    if (l.kind != Kind::Node)
    {
@@ -396,8 +454,11 @@ bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
       return true;
    }
    INode* src = Source(l);
-   const float sw = src != nullptr ? (float)src->GetOutputWidth() : 0.0f;
-   const float sh = src != nullptr ? (float)src->GetOutputHeight() : 0.0f;
+   float sw = src != nullptr ? (float)src->GetOutputWidth() : 0.0f;
+   float sh = src != nullptr ? (float)src->GetOutputHeight() : 0.0f;
+   if (dynamic_cast<IGeometrySource*>(src) != nullptr)
+      sw = sh = (float)std::clamp(std::min(mDoc.w, mDoc.h), 64, 2048);   // a solo render, square
+
    if (sw <= 0.0f || sh <= 0.0f)
    {
       w = W;
@@ -425,7 +486,7 @@ bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
 
 void Scene2DNode::LayerMatrix(const Layer& l, float m[6])
 {
-   if (l.kind != Kind::Node && l.kind != Kind::Paint)
+   if (l.kind == Kind::Fill || l.kind == Kind::Group)
    {
       // Fills and groups are the document itself.
       const float id[6] = { 1, 0, 0, 0, 1, 0 };
@@ -451,8 +512,8 @@ bool Scene2DNode::Corners(const Layer& l, float out[8])
 {
    float bw = 1, bh = 1;
    LayerBox(l, bw, bh);
-   float m[6];
-   LayerMatrix(l, m);
+   float h[9];
+   const bool front = LayerHomography(l, h);
    float x0 = 0, y0 = 0, x1 = bw, y1 = bh;
    if (l.cropOn)
    {
@@ -464,10 +525,12 @@ bool Scene2DNode::Corners(const Layer& l, float out[8])
    const float pts[8] = { x0, y0, x1, y0, x1, y1, x0, y1 };
    for (int i = 0; i < 4; i++)
    {
-      out[i * 2] = m[0] * pts[i * 2] + m[1] * pts[i * 2 + 1] + m[2];
-      out[i * 2 + 1] = m[3] * pts[i * 2] + m[4] * pts[i * 2 + 1] + m[5];
+      // A corner behind the camera is held just in front of it, so handles stay finite.
+      const float w = std::max(1e-3f, h[6] * pts[i * 2] + h[7] * pts[i * 2 + 1] + h[8]);
+      out[i * 2] = (h[0] * pts[i * 2] + h[1] * pts[i * 2 + 1] + h[2]) / w;
+      out[i * 2 + 1] = (h[3] * pts[i * 2] + h[4] * pts[i * 2 + 1] + h[5]) / w;
    }
-   return true;
+   return front;
 }
 
 bool Scene2DNode::Bounds(int id, float lo[2], float hi[2])
@@ -632,6 +695,10 @@ void Scene2DNode::Serialize()
       for (float g : d.guidesY) o << " " << g;
       o << "\n";
    }
+   if (d.camUid != 0)
+      o << "cam " << d.camUid << "\n";
+   if (d.symmetry != 0 || d.symN != 6)
+      o << "sym " << d.symmetry << " " << d.symN << "\n";
    for (const Layer& l : mLayers)
    {
       o << "layer " << l.id << " " << (int)l.kind << " " << l.parent << " " << l.uid << " " << +l.visible << " "
@@ -658,6 +725,64 @@ void Scene2DNode::Serialize()
       {
          o << "paint " << l.id << " " << l.pw << " " << l.ph;
          for (const std::string& k : l.tiles) o << " " << k;
+         o << "\n";
+      }
+      auto shapeLine = [&](const char* key, const Shape& sh)
+      {
+         o << key << " " << l.id << " " << sh.type << " " << sh.x0 << " " << sh.y0 << " " << sh.x1 << " " << sh.y1 << " "
+           << sh.radius << " " << sh.sides << " " << sh.inner << " " << +sh.closed << " " << +sh.fillOn;
+         for (float v : sh.fillC) o << " " << v;
+         o << " " << +sh.strokeOn;
+         for (float v : sh.strokeC) o << " " << v;
+         o << " " << sh.width << " " << sh.cap << " " << sh.join << " " << sh.align << " " << sh.dash << " " << sh.gap << " "
+           << sh.op << " " << EscapeToken(sh.svg) << " " << sh.pts.size();
+         for (float v : sh.pts) o << " " << v;
+         o << "\n";
+      };
+      if (l.kind == Kind::Vector)
+      {
+         o << "vsize " << l.id << " " << l.pw << " " << l.ph << "\n";
+         for (const Shape& sh : l.shapes)
+            shapeLine("shape", sh);
+      }
+      if (l.hasVMask)
+      {
+         o << "vmask " << l.id << " " << +l.vmaskOn << "\n";
+         for (const Shape& sh : l.vmask)
+            shapeLine("vshape", sh);
+      }
+      if (l.kind == Kind::Text)
+      {
+         o << "text " << l.id << " " << l.fontSize << " " << l.leading << " " << l.tracking << " " << l.align;
+         for (float v : l.textC) o << " " << v;
+         o << " " << l.boxW << " " << EscapeToken(l.font) << " " << EscapeToken(l.text) << "\n";
+      }
+      if (l.is3d || l.z != 0 || l.az != 0 || l.rx != 0 || l.ry != 0 || l.orient[0] != 0 || l.orient[1] != 0 ||
+          l.orient[2] != 0 || l.collapse)
+         o << "d3 " << l.id << " " << +l.is3d << " " << l.z << " " << l.az << " " << l.rx << " " << l.ry << " "
+           << l.orient[0] << " " << l.orient[1] << " " << l.orient[2] << " " << +l.collapse << "\n";
+      if (l.warpOn || std::any_of(l.warp, l.warp + 8, [](float v) { return v != 0.0f; }))
+      {
+         o << "warp " << l.id << " " << +l.warpOn;
+         for (float v : l.warp) o << " " << v;
+         o << "\n";
+      }
+      for (int t = 0; t < kFxCount; t++)
+      {
+         const Fx& f = l.fx[t];
+         const Fx z = FxDefault(t);
+         if (f.on == z.on && std::equal(f.c, f.c + 4, z.c) && f.angle == z.angle && f.dist == z.dist && f.size == z.size &&
+             f.spread == z.spread && f.pos == z.pos)
+            continue;
+         o << "fx " << l.id << " " << t << " " << +f.on;
+         for (float v : f.c) o << " " << v;
+         o << " " << f.angle << " " << f.dist << " " << f.size << " " << f.spread << " " << f.pos << "\n";
+      }
+      if (l.HasBlendIf())
+      {
+         o << "bif " << l.id;
+         for (float v : l.bifT) o << " " << v;
+         for (float v : l.bifU) o << " " << v;
          o << "\n";
       }
       if (l.HasPixelMask())
@@ -718,12 +843,20 @@ void Scene2DNode::Parse()
          while (s >> g)
             (key == "guidesx" ? mDoc.guidesX : mDoc.guidesY).push_back(g);
       }
+      else if (key == "cam")
+         s >> mDoc.camUid;
+      else if (key == "sym")
+      {
+         s >> mDoc.symmetry >> mDoc.symN;
+         mDoc.symmetry = std::clamp(mDoc.symmetry, 0, 4);
+         mDoc.symN = std::clamp(mDoc.symN, 2, 32);
+      }
       else if (key == "layer")
       {
          Layer l;
          int kind = 0, vis = 1, clip = 0, open = 1;
          s >> l.id >> kind >> l.parent >> l.uid >> vis >> l.blend >> l.opacity >> l.fill >> l.lock >> l.label >> clip >> open;
-         l.kind = (Kind)std::clamp(kind, 0, 3);
+         l.kind = (Kind)std::clamp(kind, 0, kKindCount - 1);
          l.visible = vis != 0;
          l.clip = clip != 0;
          l.open = open != 0;
@@ -750,6 +883,36 @@ void Scene2DNode::Parse()
             s >> std::ws;
             std::getline(s, l->name);
          }
+         else if (key == "d3")
+         {
+            int on = 0, col = 0;
+            s >> on >> l->z >> l->az >> l->rx >> l->ry >> l->orient[0] >> l->orient[1] >> l->orient[2] >> col;
+            l->is3d = on != 0;
+            l->collapse = col != 0;
+         }
+         else if (key == "warp")
+         {
+            int on = 0;
+            s >> on;
+            for (float& v : l->warp) s >> v;
+            l->warpOn = on != 0;
+         }
+         else if (key == "fx")
+         {
+            int t = -1, on = 0;
+            s >> t;
+            if (t >= 0 && t < kFxCount)
+            {
+               Fx& f = l->fx[t];
+               s >> on >> f.c[0] >> f.c[1] >> f.c[2] >> f.c[3] >> f.angle >> f.dist >> f.size >> f.spread >> f.pos;
+               f.on = on != 0;
+            }
+         }
+         else if (key == "bif")
+         {
+            for (float& v : l->bifT) s >> v;
+            for (float& v : l->bifU) s >> v;
+         }
          else if (key == "crop")
          {
             int on = 0;
@@ -769,6 +932,58 @@ void Scene2DNode::Parse()
             for (float& v : l->colorA) s >> v;
             for (float& v : l->colorB) s >> v;
             s >> l->fillAngle;
+         }
+         else if (key == "vsize")
+         {
+            s >> l->pw >> l->ph;
+            l->pw = std::clamp(l->pw, 1, GLUtil::kMaxTargetSide);
+            l->ph = std::clamp(l->ph, 1, GLUtil::kMaxTargetSide);
+         }
+         else if (key == "vmask")
+         {
+            int on = 1;
+            s >> on;
+            l->hasVMask = true;
+            l->vmaskOn = on != 0;
+         }
+         else if (key == "shape" || key == "vshape")
+         {
+            Shape sh;
+            int closed = 0, fillOn = 1, strokeOn = 0;
+            size_t n = 0;
+            std::string svg;
+            s >> sh.type >> sh.x0 >> sh.y0 >> sh.x1 >> sh.y1 >> sh.radius >> sh.sides >> sh.inner >> closed >> fillOn;
+            for (float& v : sh.fillC) s >> v;
+            s >> strokeOn;
+            for (float& v : sh.strokeC) s >> v;
+            s >> sh.width >> sh.cap >> sh.join >> sh.align >> sh.dash >> sh.gap >> sh.op >> svg >> n;
+            if (!s)
+               continue;
+            sh.type = std::clamp(sh.type, 0, (int)Shape::kTypeCount - 1);
+            sh.sides = std::clamp(sh.sides, 3, 64);
+            sh.op = std::clamp(sh.op, 0, 3);
+            sh.closed = closed != 0;
+            sh.fillOn = fillOn != 0;
+            sh.strokeOn = strokeOn != 0;
+            sh.svg = UnescapeToken(svg);
+            n = std::min<size_t>(n, 6 * 100000) / 6 * 6;
+            sh.pts.reserve(n);
+            float v = 0;
+            while (sh.pts.size() < n && s >> v)
+               sh.pts.push_back(v);
+            sh.pts.resize(sh.pts.size() / 6 * 6);
+            (key == "shape" ? l->shapes : l->vmask).push_back(sh);
+         }
+         else if (key == "text")
+         {
+            std::string font, text;
+            s >> l->fontSize >> l->leading >> l->tracking >> l->align;
+            for (float& v : l->textC) s >> v;
+            s >> l->boxW >> font >> text;
+            l->font = UnescapeToken(font);
+            l->text = UnescapeToken(text);
+            l->fontSize = std::clamp(l->fontSize, 1.0f, 2000.0f);
+            l->align = std::clamp(l->align, 0, 3);
          }
          else if (key == "paint" || key == "pmask")
          {
@@ -849,6 +1064,7 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
    const unsigned int acc = p.Tex();
    const int next = 1 - p.cur;
    const unsigned int prog = mPassProgram;
+   const int depthMode = depth == mDepthLevel ? (a.card ? 1 : 2) : 0;
    GLUtil::RunShaderPass(p.f[next], prog, [&]()
    {
       glActiveTexture(GL_TEXTURE0);
@@ -864,10 +1080,31 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glBindTexture(GL_TEXTURE_2D, a.pmask);
       glUniform1i(glGetUniformLocation(prog, "uPMask"), 3);
       glUniform1i(glGetUniformLocation(prog, "uHasPMask"), a.pmask != 0 ? 1 : 0);
+      glActiveTexture(GL_TEXTURE4);
+      glBindTexture(GL_TEXTURE_2D, a.vmask);
+      glUniform1i(glGetUniformLocation(prog, "uVMask"), 4);
+      glUniform1i(glGetUniformLocation(prog, "uHasVMask"), a.vmask != 0 ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
       glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
       glUniform3f(glGetUniformLocation(prog, "uInvA"), a.inv[0], a.inv[1], a.inv[2]);
       glUniform3f(glGetUniformLocation(prog, "uInvB"), a.inv[3], a.inv[4], a.inv[5]);
+      glUniform3f(glGetUniformLocation(prog, "uInvC"), a.inv[6], a.inv[7], a.inv[8]);
+      glUniform1i(glGetUniformLocation(prog, "uDepthMode"), depthMode);
+      if (depthMode != 0)
+      {
+         glActiveTexture(GL_TEXTURE5);
+         glBindTexture(GL_TEXTURE_2D, mDepth[depth].tex[p.cur]);
+         glUniform1i(glGetUniformLocation(prog, "uDepthIn"), 5);
+         glActiveTexture(GL_TEXTURE0);
+         const GLenum bufs[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+         glDrawBuffers(2, bufs);
+      }
+      glUniform1i(glGetUniformLocation(prog, "uBif"), a.bif != nullptr ? 1 : 0);
+      if (a.bif != nullptr)
+      {
+         glUniform4fv(glGetUniformLocation(prog, "uBifT"), 1, a.bif->bifT);
+         glUniform4fv(glGetUniformLocation(prog, "uBifU"), 1, a.bif->bifU);
+      }
       glUniform2f(glGetUniformLocation(prog, "uBox"), std::max(1e-3f, a.box[0]), std::max(1e-3f, a.box[1]));
       glUniform4f(glGetUniformLocation(prog, "uCrop"), a.crop[0], a.crop[1], a.crop[2], a.crop[3]);
       glUniform2f(glGetUniformLocation(prog, "uTexSize"), (float)std::max(1, a.texW), (float)std::max(1, a.texH));
@@ -890,12 +1127,26 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
          glUniform1f(glGetUniformLocation(prog, "uFillAngle"), a.fill->fillAngle);
       }
    });
+   if (depthMode != 0)
+   {
+      GLint prev = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev);
+      glBindFramebuffer(GL_FRAMEBUFFER, p.f[next].fbo);
+      glDrawBuffer(GL_COLOR_ATTACHMENT0);
+      glBindFramebuffer(GL_FRAMEBUFFER, prev);
+   }
    p.cur = next;
 }
 
 void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacityMul, bool clipMode)
 {
+   if (l.AnyFx())
+   {
+      DrawFx(l, depth, frameId, opacityMul, clipMode);
+      return;
+   }
    PassArgs a;
+   a.bif = l.HasBlendIf() ? &l : nullptr;
    a.opacity = l.opacity * l.fill * opacityMul;
    a.blend = l.kind == Kind::Group && l.blend == kPassThrough ? 0 : std::clamp(l.blend, 0, BlendModes::kAntiEraseMode);
    a.clipMode = clipMode;
@@ -948,6 +1199,20 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.texW = it->second.fbo.w;
       a.texH = it->second.fbo.h;
    }
+   else if (l.kind == Kind::Vector || l.kind == Kind::Text)
+   {
+      Raster* r = SyncRaster(mVec, l, false);
+      if (r == nullptr)
+         return;
+      a.tex = r->tex;
+      a.texW = r->w;
+      a.texH = r->h;
+   }
+   else if (dynamic_cast<IGeometrySource*>(Source(l)) != nullptr)
+   {
+      a.tex = GeometryTexture(l, a.texW, a.texH);
+      a.srgb = true;
+   }
    else
    {
       INode* src = Source(l);
@@ -961,9 +1226,11 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    if (a.tex == 0 || a.texW <= 0 || a.texH <= 0)
       return;
    LayerBox(l, a.box[0], a.box[1]);
-   float m[6];
-   LayerMatrix(l, m);
-   Invert(m, a.inv);
+   float h[9];
+   if (!LayerHomography(l, h))
+      return;
+   Invert3(h, a.inv);
+   a.card = l.is3d && !l.warpOn;
    if (l.cropOn)
    {
       a.crop[0] = std::clamp(l.crop[0] / a.box[0], 0.0f, 1.0f);
@@ -981,15 +1248,16 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
          a.pmask = live ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
       }
    }
+   if (l.hasVMask && l.vmaskOn && !l.vmask.empty())
+      if (Raster* r = SyncRaster(mVMasks, l, true))
+         a.vmask = r->tex;
    Pass(depth, a);
 }
 
 void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
 {
-   std::vector<const Layer*> kids;
-   for (const Layer& l : mLayers)
-      if (l.parent == parent)
-         kids.push_back(&l);
+   const std::vector<const Layer*> kids = ListOf(parent);
+   auto card = [](const Layer& l) { return l.is3d && !l.clip && l.kind != Kind::Group && l.kind != Kind::Fill; };
    for (size_t i = 0; i < kids.size(); i++)
    {
       const Layer& base = *kids[i];
@@ -997,6 +1265,33 @@ void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
       size_t end = i + 1;
       while (end < kids.size() && kids[end]->clip)
          end++;
+      // Neighbouring 3D cards (none with clipped layers) draw as one run: far first, nearer ones hide them.
+      if (card(base) && end == i + 1)
+      {
+         std::vector<const Layer*> run;
+         size_t j = i;
+         while (j < kids.size() && card(*kids[j]) && !(j + 1 < kids.size() && kids[j + 1]->clip))
+         {
+            if (Shown(*kids[j]))
+               run.push_back(kids[j]);
+            j++;
+         }
+         if (run.size() >= 2)
+         {
+            std::vector<std::pair<float, const Layer*>> order;
+            for (const Layer* r : run)
+               order.push_back({ CardDepth(*r), r });
+            std::stable_sort(order.begin(), order.end(), [](const auto& x, const auto& y) { return x.first > y.first; });
+            BeginDepth(depth);
+            for (const auto& o : order)
+               DrawLayer(*o.second, depth, frameId, opacityMul, false);
+            EndDepth(depth);
+         }
+         else if (!run.empty())
+            DrawLayer(*run[0], depth, frameId, opacityMul, false);
+         i = j - 1;
+         continue;
+      }
       if (!Shown(base))
       {
          if (!base.clip)
@@ -1053,6 +1348,7 @@ void Scene2DNode::CookIfNeeded(int frameId)
       stamp = Mix(stamp, (unsigned char)c);
    stamp = Mix(stamp, (unsigned long long)soloLayer);
    SyncSurfaces();
+   SyncRasters();
    // A stroke changes the picture before it changes the text; its queued dabs land now.
    if (mStroke.Active())
       mStroke.Flush();
@@ -1067,9 +1363,24 @@ void Scene2DNode::CookIfNeeded(int frameId)
          {
             n->CookIfNeeded(frameId);
             stamp = Mix(stamp, (unsigned long long)(uintptr_t)n);
+            if (auto* geo = dynamic_cast<IGeometrySource*>(n))
+               stamp = Mix(Mix(stamp, geo->MeshRevision()), geo->MaterialRevision());
             stamp = Mix(stamp, n->TextureRevision());
             stamp = Mix(stamp, (unsigned long long)n->GetOutputWidth() * 65536ull + (unsigned long long)n->GetOutputHeight());
          }
+   }
+   // The comp camera moves 3D cards and turns geometry.
+   const CompCam cam = Camera();
+   for (float v : { cam.zoom, cam.pos[0], cam.pos[1], cam.pos[2], cam.rot[0], cam.rot[1], cam.rot[2], cam.rot[4], cam.rot[8] })
+   {
+      unsigned bits = 0;
+      std::memcpy(&bits, &v, sizeof bits);
+      stamp = Mix(stamp, bits);
+   }
+   for (auto it = mGeo.begin(); it != mGeo.end();)
+   {
+      const Layer* l = FindConst(it->first);
+      it = l == nullptr || dynamic_cast<IGeometrySource*>(Source(*l)) == nullptr ? mGeo.erase(it) : std::next(it);
    }
    if (stamp == mStamp && mOut.tex != 0 && mOut.w == mDoc.w && mOut.h == mDoc.h)
       return;

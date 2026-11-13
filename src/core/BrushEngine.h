@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <array>
 #include <vector>
 
 #include "GLUtil.h"
@@ -59,6 +60,9 @@ namespace BrushEngine
       void MoveTo(float x, float y, float pressure);
       // A dab exactly here, no spacing walk (recorded replays).
       void Dab(float x, float y, float pressure, float seed);
+      // Symmetry: every dab is also placed through each of these surface-pixel
+      // affines (x' = m0 x + m1 y + m2, y' = m3 x + m4 y + m5). Kept until set again.
+      void SetMirrors(const std::vector<std::array<float, 6>>& m) { mMirrors = m; }
       // Renders queued dabs into the coverage buffer.
       void Flush();
       // The surface with the stroke on it, for showing while the stroke lasts.
@@ -93,6 +97,8 @@ namespace BrushEngine
       float mDirty[4] = { 0, 0, 0, 0 };
       bool mAny = false;
       std::vector<Pending> mQueue;
+      std::vector<std::array<float, 6>> mMirrors;
+      void Queue(float x, float y, float p, float seed);
       GLUtil::Fbo mCoverage, mDisplay, mMerge;
       bool mDisplayStale = true;
    };

@@ -341,6 +341,9 @@ void DrawDropHandling(FrameCtx& fc)
             // spawns a Sketch that draws it (animate by id from the script).
             if (HasExtension(path, std::vector<std::string> { "svg" }))
             {
+               if (gView2DOpen && gDropPos.x >= gView2DRectMin.x && gDropPos.y >= gView2DRectMin.y && gDropPos.x < gView2DRectMax.x &&
+                   gDropPos.y < gView2DRectMax.y && View2DImportSvg(path))
+                  continue;
                ensureDroppedCheckpoint();
                if (dropTargetSketch != nullptr)
                {
