@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Synthwave Gated Analog Delay FX",
+    "author": "Infinite",
+    "description": "Retro-futuristic multi-tap analog delay with warm tape saturation and damped feedback tail.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float feedback = 0.56 [0.0, 0.85];\nparam float damping = 0.48 [0.1, 0.95];\nparam float drive = 1.4 [1.0, 3.5];\nparam float mix = 0.50 [0.0, 1.0];\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float lp = 0;\n\nfCut = clamp(0.10 + (1.0 - damping) * 0.28, 0.03, 0.42);\nlp = lp + fCut * (in - lp);\n\ntap1 = tap1 + 0.065 * (lp + tap3 * feedback * 0.55 - tap1);\ntap2 = tap2 + 0.052 * (tap1 - tap2);\ntap3 = tap3 + 0.044 * (tap2 - tap3);\n\necho = (tap1 * 0.45 + tap2 * 0.35 + tap3 * 0.25) * drive;\nsat = echo / (1.0 + abs(echo) * 0.35);\n\nprocessed = in * (1.0 - mix) + sat * mix;\nout = processed * 0.95;\n",
+    "params": {
+      "feedback": 0.56,
+      "damping": 0.48,
+      "drive": 1.4,
+      "mix": 0.5
+    }
+  }
+}

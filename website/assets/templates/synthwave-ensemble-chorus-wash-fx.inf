@@ -1,0 +1,77 @@
+infinite-patch 1
+# Synthwave Ensemble Chorus Wash FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 45
+  i note1 45
+  i note2 57
+  i note3 52
+  i note4 45
+  i note5 57
+  i note6 50
+  i note7 52
+  i note8 45
+  i note9 45
+  i note10 57
+  i note11 52
+  i note12 45
+  i note13 57
+  i note14 50
+  i note15 55
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2800.0
+  f resonance 0.25
+  f decay 0.35
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rate = 0.85 [0.1, 4.0];\nparam float depth = 0.45 [0.0, 1.0];\nparam float warmth = 0.65 [0.1, 1.0];\nparam float mix = 0.58 [0.0, 1.0];\nstate float lfo1 = 0;\nstate float lfo2 = 0;\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float lp = 0;\n\nlfo1 = (lfo1 + rate / sr) % 1.0;\nlfo2 = (lfo2 + (rate * 1.37) / sr) % 1.0;\n\nm1 = sin(6.2831853 * lfo1) * depth * 0.06;\nm2 = cos(6.2831853 * lfo2) * depth * 0.06;\n\nr1 = clamp(0.18 + m1, 0.03, 0.45);\nr2 = clamp(0.14 + m2, 0.03, 0.45);\n\ntap1 = tap1 + r1 * (in - tap1);\ntap2 = tap2 + r2 * (tap1 - tap2);\ntap3 = tap3 + 0.11 * (tap2 - tap3);\n\nfCut = clamp(0.15 + warmth * 0.30, 0.04, 0.45);\nlp = lp + fCut * ((tap1 + tap2 + tap3) * 0.42 - lp);\n\nprocessed = in * (1.0 - mix) + lp * mix;\nout = processed * 1.25;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.22 0.14 0.30
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Synthwave Ensemble Chorus Wash FX. Analog-inspired multi-voice modulated chorus wash with warm high-frequency smoothing for retro synth leads and pads.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

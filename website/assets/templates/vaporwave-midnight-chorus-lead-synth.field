@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vaporwave Midnight Chorus Lead Synth",
+    "author": "Infinite",
+    "description": "Dreamy dual-oscillator detuned saw-triangle lead with gentle vibrato, chorus drift, and silky lowpass filter.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detune = 0.014 [0.0, 0.04];\nparam float cutoff = 1450.0 [200.0, 4500.0];\nparam float vibrato = 0.25 [0.0, 1.0];\nparam float subMix = 0.38 [0.0, 0.8];\nparam float decay = 0.55 [0.15, 1.5];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float pSub = 0;\nstate float vib = 0;\nstate float env = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.04);\nenv = if(target > env, env + (target - env) * 0.1, env - env * decayRate);\n\nvib = (vib + 4.8 / sr) % 1.0;\nvMod = 1.0 + sin(6.2831853 * vib) * vibrato * 0.006;\n\nf0 = clamp(freq * vMod, 40.0, 2800.0);\np1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;\np2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;\npSub = (pSub + (f0 * 0.5) / sr) % 1.0;\n\nsaw1 = 2.0 * p1 - 1.0;\ntri2 = 1.0 - 4.0 * abs(p2 - 0.5);\nsub = sin(6.2831853 * pSub);\nraw = (saw1 * 0.45 + tri2 * 0.55) + sub * subMix;\n\nfCut = clamp((cutoff + env * 900.0) / sr * 3.14, 0.01, 0.44);\nlp1 = lp1 + fCut * (raw - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nout = lp2 * env * 0.32;\n",
+    "params": {
+      "detune": 0.014,
+      "cutoff": 1450.0,
+      "vibrato": 0.25,
+      "subMix": 0.38,
+      "decay": 0.55
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

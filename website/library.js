@@ -89,7 +89,7 @@
     var detailHref = 'library/' + esc(it.id) + '.html';
     return '<article class="lib-card deck-card" data-cat="' + esc(cat) + '" data-raw-cat="' + esc(rawCat) + '" data-name="' + esc(it.name) + '" data-file="' + esc(it.file) + '" data-has-copy="' + (hasCopy ? '1' : '0') + '" data-ext="' + (isExt ? '1' : '0') + '" style="--cat:' + (COLOUR[rawCat] || COLOUR[cat] || 'var(--accent)') + '">' +
       '<a class="lib-media-link" href="' + detailHref + '" aria-label="Open ' + esc(it.name) + '">' +
-        '<img data-src="assets/library/thumbs/' + esc(it.id) + (it.preview ? '.webp' : '.svg') + '?v=4" ' + (it.preview ? 'onerror="if(!this.__fb){this.__fb=true;this.src=\'' + esc(it.preview) + '\';}" ' : '') + 'alt="" decoding="async" width="720" height="450">' +
+        '<img data-src="assets/library/thumbs/' + esc(it.id) + (it.preview ? '.webp' : '.svg') + '?v=5" ' + (it.preview ? 'onerror="if(!this.__fb){this.__fb=true;this.src=\'' + esc(it.preview) + '\';}" ' : '') + 'alt="" decoding="async" width="720" height="450">' +
       '</a>' +
       '<span class="lib-chip lib-chip-cat" title="' + esc(rawCat) + '">' + catIcon(rawCat) + '</span>' +
       '<span class="lib-chip lib-chip-open" aria-hidden="true">' + IC_OPEN + '</span>' +
@@ -244,8 +244,8 @@
   renderDropdown();
 
   Promise.all([
-    fetch('assets/library/index.json?v=4').then(function (r) { return r.json(); }),
-    fetch('assets/templates/index.json?v=4').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
+    fetch('assets/library/index.json?v=5').then(function (r) { return r.json(); }),
+    fetch('assets/templates/index.json?v=5').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/community/index.json?v=2').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/skills/index.json?v=2').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/extensions/index.json?v=1').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),

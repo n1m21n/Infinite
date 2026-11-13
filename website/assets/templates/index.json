@@ -2829,6 +2829,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "vaporwave-mallsoft-rhodes-pad-synth",
+      "name": "Vaporwave Mallsoft Rhodes Pad Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Lush detuned electric-tine pad synthesizer with slow tape wow, soft FM bell shimmer, and warm lowpass bloom.",
+      "price": 0,
+      "preview": "assets/templates/vaporwave-mallsoft-rhodes-pad-synth.webp",
+      "file": "assets/templates/vaporwave-mallsoft-rhodes-pad-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "vaporwave-midnight-chorus-lead-synth",
+      "name": "Vaporwave Midnight Chorus Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Dreamy dual-oscillator detuned saw-triangle lead with gentle vibrato, chorus drift, and silky lowpass filter.",
+      "price": 0,
+      "preview": "assets/templates/vaporwave-midnight-chorus-lead-synth.webp",
+      "file": "assets/templates/vaporwave-midnight-chorus-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "synthwave-ensemble-chorus-wash-fx",
+      "name": "Synthwave Ensemble Chorus Wash FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Analog-inspired multi-voice modulated chorus wash with warm high-frequency smoothing for retro synth leads and pads.",
+      "price": 0,
+      "preview": "assets/templates/synthwave-ensemble-chorus-wash-fx.webp",
+      "file": "assets/templates/synthwave-ensemble-chorus-wash-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "synthwave-gated-analog-delay-fx",
+      "name": "Synthwave Gated Analog Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Retro-futuristic multi-tap analog delay with warm tape saturation and damped feedback tail.",
+      "price": 0,
+      "preview": "assets/templates/synthwave-gated-analog-delay-fx.webp",
+      "file": "assets/templates/synthwave-gated-analog-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

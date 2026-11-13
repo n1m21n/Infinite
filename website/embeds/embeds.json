@@ -575,6 +575,16 @@
       "slug": "suprematist-blocks-malevich-floating-plane",
       "title": "Suprematist Blocks Malevich Floating Plane",
       "description": "Audio-reactive Malevich-inspired Suprematist planes. Bass pulses the central black quadrilateral, mids drift the vermilion satellite bars, and highs sharpen the edge tension."
+    },
+    {
+      "slug": "brutalist-architecture-monolith-facade",
+      "title": "Brutalist Architecture Monolith Facade",
+      "description": "Audio-reactive Brutalist concrete facade inspired by Le Corbusier and Soviet modernism. Bass shifts the monumental cantilevers, mids sweep the shadow angle, and highs sharpen the concrete relief."
+    },
+    {
+      "slug": "brutalist-architecture-spomenik-rib-vault",
+      "title": "Brutalist Architecture Spomenik Rib Vault",
+      "description": "Audio-reactive Spomenik concrete monument. Bass pulses the brutalist oculus and ribs, mids rotate the directional sun relief, and highs illuminate the raw concrete edges."
     }
   ]
 }
