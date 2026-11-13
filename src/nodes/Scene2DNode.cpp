@@ -47,7 +47,9 @@ namespace
             "uniform vec4 uColB;\n"
             "uniform float uFillAngle;\n"
             "uniform sampler2D uPMask;\n"
-            "uniform int uHasPMask;\n")
+            "uniform int uHasPMask;\n"
+            "uniform sampler2D uVMask;\n"
+            "uniform int uHasVMask;\n")
          + GLUtil::kSrgbGlsl
          + BlendModes::kBlendGLSL
          + "vec4 layerAt(vec2 uvb, vec2 uv) {\n"
@@ -81,6 +83,7 @@ namespace
            "      layer.a *= mix(1.0, clamp(v, 0.0, 1.0), uMaskDensity);\n"
            "   }\n"
            "   if (uHasPMask == 1) layer.a *= texture(uPMask, uv).r;\n"
+           "   if (uHasVMask == 1) layer.a *= texture(uVMask, uv).a;\n"
            "   float amt = uOpacity * layer.a;\n"
            "   if (uMode == " + std::to_string(BlendModes::kEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - amt)); return; }\n"
            "   if (uMode == " + std::to_string(BlendModes::kAntiEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - (1.0 - layer.a) * uOpacity)); return; }\n"
@@ -142,6 +145,10 @@ Scene2DNode::~Scene2DNode()
       GLUtil::DestroyFbo(kv.second.fbo);
    for (auto& kv : mMasks)
       GLUtil::DestroyFbo(kv.second.fbo);
+   for (auto* m : { &mVec, &mVMasks })
+      for (auto& kv : *m)
+         if (kv.second.tex != 0)
+            glDeleteTextures(1, &kv.second.tex);
    GLUtil::DestroyFbo(mSelTex);
    GLUtil::DestroyFbo(mSelOverlay);
    GLUtil::DestroyFbo(mSelScratch);
@@ -184,6 +191,11 @@ Scene2DNode::Layer& Scene2DNode::AddLayer(Kind kind, uint64_t uid, int above)
    l.y = mDoc.h * 0.5f;
    if (kind == Kind::Group)
       l.blend = kPassThrough;
+   if (kind == Kind::Vector)
+   {
+      l.pw = mDoc.w;
+      l.ph = mDoc.h;
+   }
    if (kind == Kind::Paint)
    {
       l.pw = mDoc.w;
@@ -383,11 +395,19 @@ INode* Scene2DNode::MaskSource(const Layer& l) const
 bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
 {
    const float W = (float)mDoc.w, H = (float)mDoc.h;
-   if (l.kind == Kind::Paint)
+   if (l.kind == Kind::Paint || l.kind == Kind::Vector)
    {
       w = (float)std::max(1, l.pw);
       h = (float)std::max(1, l.ph);
       return true;
+   }
+   if (l.kind == Kind::Text)
+   {
+      int tw = 0, th = 0;
+      const bool ok = TextSize(l, tw, th);
+      w = (float)std::max(1, tw);
+      h = (float)std::max(1, th);
+      return ok;
    }
    if (l.kind != Kind::Node)
    {
@@ -425,7 +445,7 @@ bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
 
 void Scene2DNode::LayerMatrix(const Layer& l, float m[6])
 {
-   if (l.kind != Kind::Node && l.kind != Kind::Paint)
+   if (l.kind == Kind::Fill || l.kind == Kind::Group)
    {
       // Fills and groups are the document itself.
       const float id[6] = { 1, 0, 0, 0, 1, 0 };
@@ -660,6 +680,36 @@ void Scene2DNode::Serialize()
          for (const std::string& k : l.tiles) o << " " << k;
          o << "\n";
       }
+      auto shapeLine = [&](const char* key, const Shape& sh)
+      {
+         o << key << " " << l.id << " " << sh.type << " " << sh.x0 << " " << sh.y0 << " " << sh.x1 << " " << sh.y1 << " "
+           << sh.radius << " " << sh.sides << " " << sh.inner << " " << +sh.closed << " " << +sh.fillOn;
+         for (float v : sh.fillC) o << " " << v;
+         o << " " << +sh.strokeOn;
+         for (float v : sh.strokeC) o << " " << v;
+         o << " " << sh.width << " " << sh.cap << " " << sh.join << " " << sh.align << " " << sh.dash << " " << sh.gap << " "
+           << sh.op << " " << EscapeToken(sh.svg) << " " << sh.pts.size();
+         for (float v : sh.pts) o << " " << v;
+         o << "\n";
+      };
+      if (l.kind == Kind::Vector)
+      {
+         o << "vsize " << l.id << " " << l.pw << " " << l.ph << "\n";
+         for (const Shape& sh : l.shapes)
+            shapeLine("shape", sh);
+      }
+      if (l.hasVMask)
+      {
+         o << "vmask " << l.id << " " << +l.vmaskOn << "\n";
+         for (const Shape& sh : l.vmask)
+            shapeLine("vshape", sh);
+      }
+      if (l.kind == Kind::Text)
+      {
+         o << "text " << l.id << " " << l.fontSize << " " << l.leading << " " << l.tracking << " " << l.align;
+         for (float v : l.textC) o << " " << v;
+         o << " " << l.boxW << " " << EscapeToken(l.font) << " " << EscapeToken(l.text) << "\n";
+      }
       if (l.HasPixelMask())
       {
          o << "pmask " << l.id << " " << +l.pmaskOn << " " << l.mw << " " << l.mh;
@@ -723,7 +773,7 @@ void Scene2DNode::Parse()
          Layer l;
          int kind = 0, vis = 1, clip = 0, open = 1;
          s >> l.id >> kind >> l.parent >> l.uid >> vis >> l.blend >> l.opacity >> l.fill >> l.lock >> l.label >> clip >> open;
-         l.kind = (Kind)std::clamp(kind, 0, 3);
+         l.kind = (Kind)std::clamp(kind, 0, kKindCount - 1);
          l.visible = vis != 0;
          l.clip = clip != 0;
          l.open = open != 0;
@@ -769,6 +819,58 @@ void Scene2DNode::Parse()
             for (float& v : l->colorA) s >> v;
             for (float& v : l->colorB) s >> v;
             s >> l->fillAngle;
+         }
+         else if (key == "vsize")
+         {
+            s >> l->pw >> l->ph;
+            l->pw = std::clamp(l->pw, 1, GLUtil::kMaxTargetSide);
+            l->ph = std::clamp(l->ph, 1, GLUtil::kMaxTargetSide);
+         }
+         else if (key == "vmask")
+         {
+            int on = 1;
+            s >> on;
+            l->hasVMask = true;
+            l->vmaskOn = on != 0;
+         }
+         else if (key == "shape" || key == "vshape")
+         {
+            Shape sh;
+            int closed = 0, fillOn = 1, strokeOn = 0;
+            size_t n = 0;
+            std::string svg;
+            s >> sh.type >> sh.x0 >> sh.y0 >> sh.x1 >> sh.y1 >> sh.radius >> sh.sides >> sh.inner >> closed >> fillOn;
+            for (float& v : sh.fillC) s >> v;
+            s >> strokeOn;
+            for (float& v : sh.strokeC) s >> v;
+            s >> sh.width >> sh.cap >> sh.join >> sh.align >> sh.dash >> sh.gap >> sh.op >> svg >> n;
+            if (!s)
+               continue;
+            sh.type = std::clamp(sh.type, 0, (int)Shape::kTypeCount - 1);
+            sh.sides = std::clamp(sh.sides, 3, 64);
+            sh.op = std::clamp(sh.op, 0, 3);
+            sh.closed = closed != 0;
+            sh.fillOn = fillOn != 0;
+            sh.strokeOn = strokeOn != 0;
+            sh.svg = UnescapeToken(svg);
+            n = std::min<size_t>(n, 6 * 100000) / 6 * 6;
+            sh.pts.reserve(n);
+            float v = 0;
+            while (sh.pts.size() < n && s >> v)
+               sh.pts.push_back(v);
+            sh.pts.resize(sh.pts.size() / 6 * 6);
+            (key == "shape" ? l->shapes : l->vmask).push_back(sh);
+         }
+         else if (key == "text")
+         {
+            std::string font, text;
+            s >> l->fontSize >> l->leading >> l->tracking >> l->align;
+            for (float& v : l->textC) s >> v;
+            s >> l->boxW >> font >> text;
+            l->font = UnescapeToken(font);
+            l->text = UnescapeToken(text);
+            l->fontSize = std::clamp(l->fontSize, 1.0f, 2000.0f);
+            l->align = std::clamp(l->align, 0, 3);
          }
          else if (key == "paint" || key == "pmask")
          {
@@ -864,6 +966,10 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glBindTexture(GL_TEXTURE_2D, a.pmask);
       glUniform1i(glGetUniformLocation(prog, "uPMask"), 3);
       glUniform1i(glGetUniformLocation(prog, "uHasPMask"), a.pmask != 0 ? 1 : 0);
+      glActiveTexture(GL_TEXTURE4);
+      glBindTexture(GL_TEXTURE_2D, a.vmask);
+      glUniform1i(glGetUniformLocation(prog, "uVMask"), 4);
+      glUniform1i(glGetUniformLocation(prog, "uHasVMask"), a.vmask != 0 ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
       glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
       glUniform3f(glGetUniformLocation(prog, "uInvA"), a.inv[0], a.inv[1], a.inv[2]);
@@ -948,6 +1054,15 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.texW = it->second.fbo.w;
       a.texH = it->second.fbo.h;
    }
+   else if (l.kind == Kind::Vector || l.kind == Kind::Text)
+   {
+      Raster* r = SyncRaster(mVec, l, false);
+      if (r == nullptr)
+         return;
+      a.tex = r->tex;
+      a.texW = r->w;
+      a.texH = r->h;
+   }
    else
    {
       INode* src = Source(l);
@@ -981,6 +1096,9 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
          a.pmask = live ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
       }
    }
+   if (l.hasVMask && l.vmaskOn && !l.vmask.empty())
+      if (Raster* r = SyncRaster(mVMasks, l, true))
+         a.vmask = r->tex;
    Pass(depth, a);
 }
 
@@ -1053,6 +1171,7 @@ void Scene2DNode::CookIfNeeded(int frameId)
       stamp = Mix(stamp, (unsigned char)c);
    stamp = Mix(stamp, (unsigned long long)soloLayer);
    SyncSurfaces();
+   SyncRasters();
    // A stroke changes the picture before it changes the text; its queued dabs land now.
    if (mStroke.Active())
       mStroke.Flush();

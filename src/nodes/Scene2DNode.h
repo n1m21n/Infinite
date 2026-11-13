@@ -23,7 +23,34 @@ public:
    static INode* Create() { return new Scene2DNode(); }
    ~Scene2DNode() override;
 
-   enum class Kind { Node = 0, Fill = 1, Group = 2, Paint = 3 };
+   enum class Kind { Node = 0, Fill = 1, Group = 2, Paint = 3, Vector = 4, Text = 5 };
+   static constexpr int kKindCount = 6;
+
+   // One vector item: a pen path, a live shape or an imported SVG. Points are
+   // the layer's own box pixels, y down.
+   struct Shape
+   {
+      enum Type { kPath = 0, kRect, kEllipse, kPolygon, kStar, kLine, kSvg, kTypeCount };
+      enum Op { kAdd = 0, kSubtract, kIntersect, kXor };
+      int type = kPath;
+      float x0 = 0, y0 = 0, x1 = 0, y1 = 0;   // live shapes and SVG: the box; a line: its ends
+      float radius = 0.0f;                    // rectangle corners
+      int sides = 5;                          // polygon and star points
+      float inner = 0.5f;                     // star inner radius, fraction of the outer
+      std::vector<float> pts;                 // path: per anchor x y inX inY outX outY
+      bool closed = false;
+      bool fillOn = true;
+      float fillC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      bool strokeOn = false;
+      float strokeC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      float width = 4.0f;
+      int cap = 0, join = 0;                  // butt/round/square, miter/round/bevel
+      int align = 0;                          // centre, inside, outside
+      float dash = 0.0f, gap = 0.0f;          // 0 dash = solid
+      int op = kAdd;                          // with the items below it in the layer
+      std::string svg;                        // kSvg: the document text
+      int Anchors() const { return (int)pts.size() / 6; }
+   };
    enum Fit { kFitNone = 0, kFitFit, kFitFill, kFitStretch };
    static const std::vector<std::string>& FitNames();
    static constexpr int kPassThrough = -1;   // a group's blend: its children blend straight into what is below
@@ -75,6 +102,17 @@ public:
       int mw = 0, mh = 0;
       std::vector<std::string> mtiles;
       bool HasPixelMask() const { return mw > 0 && mh > 0; }
+      // Vector layers: items bottom to top; pw/ph hold the box size.
+      std::vector<Shape> shapes;
+      // Vector mask (any layer but a group): inside the items shows. No items shows all.
+      bool hasVMask = false, vmaskOn = true;
+      std::vector<Shape> vmask;
+      // Text layers. boxW 0 = point text (no wrap); else wraps at boxW px.
+      std::string text, font;
+      float fontSize = 96.0f, leading = 1.2f, tracking = 0.0f;
+      int align = 0;                // left, centre, right, justified
+      float textC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      float boxW = 0.0f;
    };
 
    struct Document
@@ -174,6 +212,26 @@ public:
    // The paint surface's live texture (thumbnails), 0 when none.
    unsigned PaintTexture(int id);
 
+   // ---- vector and text (Block C) ---------------------------------------
+   int AddVectorLayer(int above = 0);
+   int AddTextLayer(const std::string& text, float x, float y, float boxW, int above = 0);
+   // Document px <-> the layer's box px.
+   void DocToBox(const Layer& l, float x, float y, float& bx, float& by);
+   void BoxToDoc(const Layer& l, float bx, float by, float& x, float& y);
+   // An item's outline as polylines in box px (anchors for paths), for the editor.
+   static void Outline(const Shape& s, std::vector<std::vector<float>>& out);
+   static bool ShapeBounds(const Shape& s, float lo[2], float hi[2]);
+   // The layer's vector or text picture (and vector mask) as a texture; 0 = none.
+   unsigned VectorTexture(int id);
+   // The items as an SVG document (Convert to Sketch node, Copy SVG).
+   std::string ToSvg(const Layer& l);
+   // An SVG file's text as one item filling (or fitting) the document; false on a parse error.
+   bool ImportSvg(int id, const std::string& svgText);
+   // A text's raster size (the box a text layer has), cached.
+   bool TextSize(const Layer& l, int& w, int& h);
+   static std::string EscapeToken(const std::string& s);
+   static std::string UnescapeToken(const std::string& s);
+
    // Selection: one per document, document-sized, not saved.
    enum SelOp { kSelNew = 0, kSelAdd, kSelSub, kSelIntersect };
    void SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse);
@@ -240,6 +298,7 @@ private:
       bool maskInvert = false;
       float maskDensity = 1.0f;
       unsigned int pmask = 0;       // pixel mask, sampled with the layer
+      unsigned int vmask = 0;       // vector mask, alpha
       const Layer* fill = nullptr;
    };
    void Pass(int depth, const PassArgs& a);
@@ -259,6 +318,18 @@ private:
    void ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned coverage, const float colA[4], const float colB[4],
                   int kind, const float p0[2], const float p1[2], float opacity);
    std::map<int, Surface> mSurfaces, mMasks;
+   // CPU-rastered layers (vector, text) and vector masks, re-rastered when their key changes.
+   struct Raster
+   {
+      unsigned tex = 0;
+      int w = 0, h = 0;
+      unsigned long long key = 0;
+   };
+   Raster* SyncRaster(std::map<int, Raster>& in, const Layer& l, bool mask);
+   void SyncRasters();
+   std::map<int, Raster> mVec, mVMasks;
+   struct TextBox { unsigned long long key = 0; int w = 0, h = 0; std::vector<uint8_t> rgba; };
+   std::map<int, TextBox> mTextBoxes;
    BrushEngine::Stroke mStroke;
    int mPaintId = 0, mPaintTarget = 0;
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
