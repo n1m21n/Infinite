@@ -1502,8 +1502,8 @@ float3 ptEvalT(float3 n, float3 V, float3 L, float3 base, float metal, float rou
    return (float3(1.0) - Fv) * (1.0 - metal) * base * (w.x / 3.14159265) * (-nL);
 }
 // Three running sums (the denoiser's inputs, Render3DDenoise.h): radiance + hits, first-hit albedo + luminance^2,
-// first-hit normal + distance.
-struct PtOut { float4 acc [[color(0)]]; float4 aux [[color(1)]]; float4 gd [[color(2)]]; };
+// first-hit normal + distance; plus per-pixel adaptive state (sample count N_p, active flag, rel error).
+struct PtOut { float4 acc [[color(0)]]; float4 aux [[color(1)]]; float4 gd [[color(2)]]; float4 state [[color(3)]]; };
 // The HDRI as a light (PBRT's piecewise-constant 2D distribution; Veach 1997 for the MIS). `cdf` is built on the CPU
 // from the map's luminance times sin(theta) on an NX x NY grid: rows 0..NY-1 hold each row's cumulative chance
 // over x, row NY the cumulative chance over rows, rows NY+1.. each cell's density over the unit uv square.
@@ -1559,10 +1559,27 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
                       constant LightU* LL [[buffer(6)]],
                       texture2d<float> prev [[texture(0)]], texture2d<float> prevAux [[texture(1)]], texture2d<float> prevGd [[texture(2)]],
                       texture2d<float> ecdf [[texture(3)]],
+                      texture2d<float> prevState [[texture(4)]],
                       texture2d<float> eLut [[texture(8)]], texture2d<float> et [[texture(9)]],
                       array<texture2d<float>, 16> maps [[texture(10)]])
 {
    const uint2 px = uint2(in.pos.xy);
+   const bool add = u.info.x > 0.5;
+   // S1.1: em.w = minimum samples + per-pixel stop (floor, fract); a pixel the last pass marked converged keeps its sums
+   const float sMin = floor(u.em.w), sStop = u.em.w - sMin;
+   if (add && sStop > 0.0)
+   {
+      const float4 st = prevState.read(px);
+      if (st.y == 0.0)
+      {
+         PtOut out;
+         out.acc = prev.read(px);
+         out.aux = prevAux.read(px);
+         out.gd = prevGd.read(px);
+         out.state = st;
+         return out;
+      }
+   }
    uint seed = pcg(px.x + 8192u * px.y) ^ pcg(uint(u.info.z) * 2654435761u + 17u);
    Lds qs = { uint(u.info.x), pcg(px.x + 8192u * px.y), 0u, 0u, pcg(seed ^ 0x5bd1e995u) }; // u.info.x: samples so far
    const float H = float(prev.get_height());
@@ -2111,21 +2128,45 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       o = offRay(p, dot(ns, nd) < 0.0 ? -ns : ns); d = nd;
    }
    L = (min(L, float3(30.0)) + L0) * chan; // firefly guard; chan weights a chromatic-aberration sample's one channel
-   const bool add = u.info.x > 0.5;
    const float lum = dot(L, float3(0.2126, 0.7152, 0.0722));
+   const float4 prevSt = add ? prevState.read(px) : float4(0.0);
+   const float Np = prevSt.x + 1.0;
    PtOut out;
    out.acc = (add ? prev.read(px) : float4(0.0)) + float4(L, cov);
    out.aux = (add ? prevAux.read(px) : float4(0.0)) + float4(alb0 * cov, cov > 0.0 ? lum * lum : 0.0);
    out.gd = (add ? prevGd.read(px) : float4(0.0)) + float4(n0 * cov, dist0 * cov);
+
+   float curRel = 1.0;
+   float active = 1.0;
+   if (sStop > 0.0 && Np >= max(sMin, 16.0))
+   {
+      const float hits = max(out.acc.a, 1.0);
+      const float l = dot(out.acc.rgb / hits, float3(0.2126, 0.7152, 0.0722));
+      const float var = max(out.aux.a / hits - l * l, 0.0) / hits;
+      // an all-black hit is only trusted after 64 samples (a rare bright path may still come)
+      curRel = out.gd.w > 0.0 ? (l > 0.0 ? sqrt(var) / max(l, 0.05) : (Np >= 64.0 ? 0.0 : 1.0)) : 0.0;
+      // Stop only when the 3x3 neighbourhood agrees (its errors from the last pass): a lone pixel whose samples
+      // happened to miss a bright path reads as converged and would stop dark (Cycles filters its error map the same way).
+      float nb = curRel;
+      const int2 lim = int2(prevState.get_width(), prevState.get_height()) - 1;
+      for (int dy = -1; dy <= 1; dy++)
+         for (int dx = -1; dx <= 1; dx++)
+            nb = max(nb, prevState.read(uint2(clamp(int2(px) + int2(dx, dy), int2(0), lim))).z);
+      if (nb < sStop)
+         active = 0.0;
+   }
+   out.state = float4(Np, active, curRel, 0.0);
    return out;
 }
 struct PtResU { float4 p; float4 clear; }; // p: sample count, tonemap, exposure
 fragment float4 ptres_fs(SkyOut in [[stage_in]], constant PtResU& u [[buffer(0)]], texture2d<float> acc [[texture(0)]],
-                         texture2d<float> aux [[texture(1)]], texture2d<float> dn [[texture(2)]], texture2d<float> gd [[texture(3)]])
+                         texture2d<float> aux [[texture(1)]], texture2d<float> dn [[texture(2)]], texture2d<float> gd [[texture(3)]],
+                         texture2d<float> state [[texture(4)]])
 {
    const uint2 px = uint2(in.pos.xy);
    const float4 a = acc.read(px);
-   const float cov = a.a / u.p.x;
+   const float4 st = state.read(px);
+   const float cov = clamp(a.a / max(st.x, 1.0), 0.0, 1.0);
    float3 col = a.rgb / max(a.a, 1e-4); // mean radiance of the samples that hit
    if (u.p.w > 0.5 && gd.read(px).w > 0.0) // denoised lighting times the first-hit albedo (dn_prep_k's split)
       col = dn.read(px).rgb * max(aux.read(px).rgb / max(a.a, 1.0), float3(0.001));
@@ -3696,20 +3737,23 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          MetalImage& img = static_cast<MetalImage&>(target);
          const MTLPixelFormat fmt = img.Half() ? MTLPixelFormatRGBA16Float : MTLPixelFormatBGRA8Unorm;
          FieldLib(fr);
-         if (!Pipeline(fmt) || !PtPipeline(fmt) || !PtTargets(img.Width(), img.Height()))
-            return false;
+         static const bool sProf = getenv("INFINITE_ENGINE_PROF") != nullptr;
+         auto fail = [&](const char* why) { if (sProf) std::fprintf(stderr, "ENGINE_PROF pathtrace failed: %s\n", why); return false; };
+         if (!Pipeline(fmt)) return fail("pipeline");
+         if (!PtPipeline(fmt)) return fail("pt pipeline");
+         if (!PtTargets(img.Width(), img.Height())) return fail("pt targets");
          FrameU f = {};
          FillFrame(f, fr);
          f.shQ[3] = fr.rayBias;
          f.shP[3] = fr.shadow.strength; // the live picture's shadow strength, so settling keeps the same shadows
          float inv[16];
          if (!Inv4(fr.viewProj, inv))
-            return false;
+            return fail("camera");
          if (reset) mPtN = 0;
          id<MTLCommandBuffer> cb = [mQueue commandBuffer];
          PrepareMaps(cb, fr);
          if (!BuildTlas(cb, fr))
-            return false;
+            return fail("tlas");
          if (mArgTlas != mTlas)
          {
             if (!mArgEnc) mArgEnc = [mFsFn newArgumentEncoderWithBufferIndex:3];
@@ -3786,8 +3830,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          {
             const int cur = 1 - mPtCur;
             MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
-            id<MTLTexture> outs[3] = { mPtAcc[cur], mPtAux[cur], mPtGd[cur] };
-            for (int k = 0; k < 3; k++)
+            id<MTLTexture> outs[4] = { mPtAcc[cur], mPtAux[cur], mPtGd[cur], mPtState[cur] };
+            for (int k = 0; k < 4; k++)
             {
                rp.colorAttachments[k].texture = outs[k];
                rp.colorAttachments[k].loadAction = MTLLoadActionDontCare;
@@ -3805,7 +3849,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             std::memcpy(pu.invVP, inv, 64);
             pu.info[0] = (float)mPtN; pu.info[1] = (float)std::max(1, bounces); pu.info[2] = (float)(mPtFrame++); pu.info[3] = (float)img.Width();
             const bool envLight = mEnvCdf && mEnvBound == mEnvTex; // the HDRI can be sampled as a light
-            pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = envLight ? 1.0f : 0.0f; pu.em[3] = 0.0f;
+            pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = envLight ? 1.0f : 0.0f; pu.em[3] = fr.ptStop > 0.0f ? (float)std::max(16, fr.ptMinSamples) + std::min(fr.ptStop, 0.99f) : 0.0f;
             [e setFragmentBytes:&pu length:sizeof(pu) atIndex:0];
             [e setFragmentBytes:&f length:sizeof(f) atIndex:1];
             [e setFragmentBuffer:mArgBuf offset:0 atIndex:3];
@@ -3818,6 +3862,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e setFragmentTexture:mPtAux[mPtCur] atIndex:1];
             [e setFragmentTexture:mPtGd[mPtCur] atIndex:2];
             [e setFragmentTexture:envLight ? mEnvCdf : mEnvBound atIndex:3];
+            [e setFragmentTexture:mPtState[mPtCur] atIndex:4];
             BindMaps(e);
             [e useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (const Gpu& g : mMeshes) { [e useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [e useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RU()) [e useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RW()) [e useResource:g.RW() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
@@ -3827,7 +3872,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [e endEncoding];
             mPtCur = cur; mPtN++;
          }
-         id<MTLTexture> dn = mDenoise ? Denoise(cb, img.Width(), img.Height()) : nil;
+         id<MTLTexture> dn = Denoise(cb, img.Width(), img.Height());
          MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
          rp.colorAttachments[0].texture = img.Tex();
          rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
@@ -3840,6 +3885,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [e setFragmentTexture:mPtAux[mPtCur] atIndex:1];
          [e setFragmentTexture:dn ? dn : mPtAcc[mPtCur] atIndex:2];
          [e setFragmentTexture:dn ? mDnG : mPtGd[mPtCur] atIndex:3];
+         [e setFragmentTexture:mPtState[mPtCur] atIndex:4];
          [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
          [e endEncoding];
          Bloom(cb, img, fr, img.Tex().pixelFormat);
@@ -3847,7 +3893,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [cb waitUntilCompleted];
          if (gpuMs) *gpuMs = (cb.GPUEndTime - cb.GPUStartTime) * 1000.0;
          mPtNoise = -1.0f;
-         if (dn && mDnHist && cb.status == MTLCommandBufferStatusCompleted)
+         mPtActivePixels = -1;
+         if (mDnHist && cb.status == MTLCommandBufferStatusCompleted)
          {
             const uint32_t* h = (const uint32_t*)mDnHist.contents;
             uint64_t total = 0, run = 0;
@@ -3857,10 +3904,18 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                run += h[i];
                if (run * 100 >= total * 95) { mPtNoise = (float)(i + 1) / 400.0f; break; }
             }
+            if (fr.ptStop > 0.0f)
+            {
+               int stopBin = std::clamp((int)(fr.ptStop * 400.0f), 0, 63);
+               uint64_t active = 0;
+               for (int i = stopBin; i < 64; i++) active += h[i];
+               mPtActivePixels = (int)active;
+            }
          }
          return cb.status == MTLCommandBufferStatusCompleted;
       }
       float PathTraceNoise() const override { return mPtNoise; }
+      int PathTraceActive() const override { return mPtActivePixels; }
 
    private:
       void CullBatches(id<MTLCommandBuffer> cb, const engine::Frame& fr, int widthPx)
@@ -3923,6 +3978,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          a.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA32Float;
          a.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA32Float;
          a.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA32Float;
+         a.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA32Float;
          mPtPso = [mDev newRenderPipelineStateWithDescriptor:a error:&err];
          if (!mPtPso) EngineFail(@"pt pipeline", err);
          MTLRenderPipelineDescriptor* b = [MTLRenderPipelineDescriptor new];
@@ -3946,11 +4002,14 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          d.storageMode = MTLStorageModePrivate;
          for (int k = 0; k < 2; k++)
          {
-            mPtAcc[k] = [mDev newTextureWithDescriptor:d]; mPtAux[k] = [mDev newTextureWithDescriptor:d]; mPtGd[k] = [mDev newTextureWithDescriptor:d];
+            mPtAcc[k] = [mDev newTextureWithDescriptor:d];
+            mPtAux[k] = [mDev newTextureWithDescriptor:d];
+            mPtGd[k] = [mDev newTextureWithDescriptor:d];
+            mPtState[k] = [mDev newTextureWithDescriptor:d];
          }
          mDnC[0] = mDnC[1] = mDnG = mDnA = nil; // made on the first denoised resolve at this size
          mPtN = 0;
-         return mPtAcc[0] && mPtAcc[1] && mPtAux[0] && mPtAux[1] && mPtGd[0] && mPtGd[1];
+         return mPtAcc[0] && mPtAcc[1] && mPtAux[0] && mPtAux[1] && mPtGd[0] && mPtGd[1] && mPtState[0] && mPtState[1];
       }
       bool DnTargets(int w, int h)
       {
@@ -3977,6 +4036,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [ce setBytes:&du length:sizeof(du) atIndex:0];
          [ce setBuffer:mDnHist offset:0 atIndex:1];
          [ce dispatchThreads:grid threadsPerThreadgroup:tg];
+         if (!mDenoise)
+         {
+            [ce endEncoding];
+            return nil;
+         }
          [ce setComputePipelineState:mDnAtrousPso];
          int c = 0;
          for (int i = 0; i < mDnSteps; i++)
@@ -3993,8 +4057,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       id<MTLRenderPipelineState> mPtPso = nil, mPtResPso = nil;
       id<MTLComputePipelineState> mDnPrepPso = nil, mDnAtrousPso = nil;
       id<MTLBuffer> mDnHist = nil; // dn_prep_k's 64-bin relative-error histogram
+      int mPtActivePixels = -1;
       float mPtNoise = -1.0f;
-      id<MTLTexture> mPtAcc[2] = { nil, nil }, mPtAux[2] = { nil, nil }, mPtGd[2] = { nil, nil };
+      id<MTLTexture> mPtAcc[2] = { nil, nil }, mPtAux[2] = { nil, nil }, mPtGd[2] = { nil, nil }, mPtState[2] = { nil, nil };
       id<MTLTexture> mDnC[2] = { nil, nil }, mDnG = nil, mDnA = nil;
       // On by default; INFINITE_ENGINE_DENOISE=0 turns it off, _DNSTEPS (5) and _DNSIGL (4) are A/B knobs.
       const bool mDenoise = [] { const char* e = getenv("INFINITE_ENGINE_DENOISE"); return !e || atoi(e) > 0; }();

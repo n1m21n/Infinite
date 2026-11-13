@@ -186,6 +186,10 @@ namespace engine
       // threshold, radius 0..1.
       float bloom = 0.0f, bloomThreshold = 1.0f, bloomRadius = 0.5f;
       float camRight[3] = { 1, 0, 0 }, camUp[3] = { 0, 1, 0 }, camFwd[3] = { 0, 0, -1 };
+      // S1.1 per-pixel adaptive sampling (PathTrace): a pixel whose relative error of the mean is under ptStop after
+      // ptMinSamples (16 or more) takes no more. 0 (the default) traces every pixel; the settled export sets it.
+      float ptStop = 0.0f;
+      int ptMinSamples = 16;
       // The MSL library for the instances' Field material programs (MaterialRegistry BuildMaterialLibrary), empty when
       // none; the backend rebuilds its pipelines when fieldMslKey changes. fieldTime is the programs' t.
       std::string fieldMsl;

@@ -977,6 +977,11 @@ bool Render3DNode::CookEngine(int frameId)
       // prefix spans the shutter); each slice places the moving instances at its time, and the TLAS follows.
       bool anyMoving = false;
       for (const engine::Instance& in : fr.instances) anyMoving = anyMoving || in.moving;
+      // S1.1: per-pixel stop (INFINITE_ENGINE_PXSTOP, 0 = off) after INFINITE_ENGINE_PXMIN samples.
+      static const float sPxStop = [] { const char* e = std::getenv("INFINITE_ENGINE_PXSTOP"); return e ? (float)std::atof(e) : 0.025f; }();
+      static const int sPxMin = [] { const char* e = std::getenv("INFINITE_ENGINE_PXMIN"); return e ? std::atoi(e) : 64; }();
+      fr.ptStop = anyMoving || sStop <= 0.0f ? 0.0f : sPxStop;
+      fr.ptMinSamples = sPxMin;
       unsigned slice = 0;
       while (done < target && traced)
       {
@@ -998,10 +1003,11 @@ bool Render3DNode::CookEngine(int frameId)
          traced = E.raster->PathTrace(*E.img, fr, n, bounces, done == 0, sProf ? &passGpu : nullptr);
          done += n;
          const float noise = E.raster->PathTraceNoise();
+         const int active = E.raster->PathTraceActive();
          if (sProf)
-            std::fprintf(stderr, "ENGINE_PROF settle spp=%d noise95=%.4f n=%d ms=%.2f gpu=%.2f\n", done, noise, n,
+            std::fprintf(stderr, "ENGINE_PROF settle spp=%d noise95=%.4f active=%d n=%d ms=%.2f gpu=%.2f\n", done, noise, active, n,
                          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tpP).count(), passGpu);
-         if (!anyMoving && sStop > 0.0f && noise >= 0.0f && noise < sStop)
+         if (!anyMoving && sStop > 0.0f && ((active == 0 && done >= sPxMin) || (noise >= 0.0f && noise < sStop)))
             break;
       }
       E.settled = traced ? target : 0;
