@@ -292,6 +292,8 @@ namespace app
          gMetronomeVolume = std::clamp((float)atof(line.c_str()), 0.0f, 1.0f);
       if (std::getline(file, line) && !line.empty())
          gMetronomeAccent = (line != "0");
+      if (std::getline(file, line) && !line.empty()) // fork: preview quality
+         gPreviewQuality = std::clamp(atoi(line.c_str()), 0, 2);
    }
 
 
@@ -304,7 +306,8 @@ namespace app
       file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n"
            << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n"
            << (gCheckerboardBackdrop ? "1" : "0") << "\n"
-           << gMetronomeVolume << "\n" << (gMetronomeAccent ? "1" : "0") << "\n";
+           << gMetronomeVolume << "\n" << (gMetronomeAccent ? "1" : "0") << "\n"
+           << gPreviewQuality << "\n"; // fork
    }
 
 

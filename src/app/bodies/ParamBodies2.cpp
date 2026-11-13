@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/GlyphToggle.h"
@@ -439,7 +440,7 @@ namespace app
       PushTextWrapWidth(kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());
       if (ImGui::IsItemHovered())
-         ImGui::SetTooltip("engine: %s", Platform::MattingBackend().c_str());
+         NodeTip("engine: %s", Platform::MattingBackend().c_str());
       PopTextWrapWidth();
 
       ModSlider("feather", &n->feather, 0.0f, 4.0f);

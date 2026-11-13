@@ -53,9 +53,9 @@ BEGIN
          VALUE "CompanyName",      "Infinite"
          VALUE "FileDescription",  "Infinite - realtime modular visual and audio synthesizer"
          VALUE "FileVersion",      INFINITE_VERSION_STR
-         VALUE "InternalName",     "Infinite"
-         VALUE "OriginalFilename", "Infinite.exe"
-         VALUE "ProductName",      "Infinite"
+         VALUE "InternalName",     "InfiniteTU"
+         VALUE "OriginalFilename", "InfiniteTU.exe"
+         VALUE "ProductName",      "Infinite TU"
          VALUE "ProductVersion",   INFINITE_VERSION_STR
       END
    END

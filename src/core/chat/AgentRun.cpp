@@ -39,6 +39,19 @@ namespace chat
          events.clear();
       }
 
+      void RunWork(const Options& o)  // fork
+      {
+         o.work(
+            [this](const AgentEvent& e)
+            {
+               std::vector<AgentEvent> one{ e };
+               AppendLog(e.text + "\n");
+               Push(one);
+            },
+            [this] { return stopped.load(); });
+         finished = true;
+      }
+
       void Run(const Options& o)
       {
          term::PtySpawn spawn;
@@ -235,7 +248,10 @@ namespace chat
    {
       std::shared_ptr<AgentRun> run(new AgentRun());
       run->mImpl = std::make_shared<Impl>();
-      std::thread([impl = run->mImpl, options] { impl->Run(options); }).detach();
+      if (options.work)  // fork
+         std::thread([impl = run->mImpl, options] { impl->RunWork(options); }).detach();
+      else
+         std::thread([impl = run->mImpl, options] { impl->Run(options); }).detach();
       return run;
    }
 

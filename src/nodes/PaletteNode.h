@@ -1,4 +1,5 @@
 #pragma once
+#include "core/PboReadback.h" // fork
 
 #include <string>
 #include <vector>
@@ -146,6 +147,7 @@ private:
    unsigned int mDownsampleProgram = 0;
    bool mShaderTried = false;
    std::vector<unsigned char> mPixels;
+   PboReadback mPboRead; // fork
 
    GLUtil::Fbo mStrip;
 

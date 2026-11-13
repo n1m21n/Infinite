@@ -7,6 +7,7 @@
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 #include "imgui_internal.h"
 
 #include <cmath>
@@ -80,6 +81,23 @@ namespace app
          ImGui::EndTooltip();
       }
       va_end(args);
+   }
+
+
+   // fork: diagnostic tooltip that is safe inside a node body (see NodeTip.h). Last writer wins within a frame.
+   void NodeTip(const char* fmt, ...)
+   {
+      char buf[512];
+      va_list args;
+      va_start(args, fmt);
+      vsnprintf(buf, sizeof(buf), fmt, args);
+      va_end(args);
+      if (gInsideNodeCanvas)
+      {
+         gNodeHoverTip = buf;
+         return;
+      }
+      ImGui::SetTooltip("%s", buf);
    }
 
 
@@ -563,9 +581,9 @@ namespace app
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_ForTooltip))
       {
          if (sGateNode == nodeIndex && !sGateLabel.empty())
-            ImGui::SetTooltip("%s %s", T("Off: set by"), sGateLabel.c_str());
+            NodeTip("%s %s", T("Off: set by"), sGateLabel.c_str());
          else
-            ImGui::SetTooltip("%s", T("Off in this mode"));
+            NodeTip("%s", T("Off in this mode"));
       }
    }
 

@@ -9,6 +9,7 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "core/ForkIdentity.h"
 
 #if defined(_WIN32)
    #include <direct.h>
@@ -209,12 +210,12 @@ namespace AppPaths
          base = profile + "\\AppData\\Roaming";
       if (base.empty())
          return {};
-      std::string dir = base + "/Infinite";
+      std::string dir = base + "/" + ForkIdentity::kDataDirName;  // fork:
 #elif defined(__APPLE__)
       const std::string home = HomeDir();
       if (home.empty())
          return {};
-      std::string dir = home + "/Library/Application Support/Infinite";
+      std::string dir = home + "/Library/Application Support/" + ForkIdentity::kDataDirName;  // fork:
 #else
       // Linux / XDG Base Directory specification:
       // $XDG_CONFIG_HOME/Infinite or ~/.config/Infinite
@@ -231,7 +232,7 @@ namespace AppPaths
             return {};
          base = home + "/.config";
       }
-      std::string dir = base + "/Infinite";
+      std::string dir = base + "/" + ForkIdentity::kDataDirName;  // fork:
 #endif
       // An unusable settings directory returns empty rather than a path that
       // silently swallows every write. Every caller already handles the empty

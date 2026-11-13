@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiInteract.h"
@@ -114,7 +115,7 @@ namespace FilterBar
             dl->AddLine(ImVec2(std::round(cx - 6.0f), y), ImVec2(std::round(cx - 6.0f + len), y), col, 1.5f);
          }
          if (s.hovered)
-            ImGui::SetTooltip("%s", descending ? I18n::T("Descending") : I18n::T("Ascending"));
+            app::NodeTip("%s", descending ? I18n::T("Descending") : I18n::T("Ascending"));
          return s.clicked;
       }
    }

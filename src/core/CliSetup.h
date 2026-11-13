@@ -99,6 +99,9 @@ namespace CliSetup
       std::string face = "chat";  // what the Terminal panel opens to: "chat" or "terminal"
       std::string workspace;      // the folder agents work in; "" = the open patch's folder, else HOME
       bool folderAccess = false;  // agents may also read and edit files in the folder (else only `infinite` and attached files)
+      // fork: the custom (OpenAI-compatible) agent. Its Model ID is models["custom"]; the key is never stored,
+      // only the NAME of the environment variable that holds it.
+      std::string customBaseUrl, customKeyEnv = "CUSTOM_LLM_API_KEY", customPreset;
       std::map<std::string, std::string> models;  // per agent id; missing = the agent's own default
       std::vector<std::string> folders;   // more folders agents may read (and edit, with folderAccess)
       std::vector<std::string> commands;  // commands agents may run besides `infinite` ("ffprobe")

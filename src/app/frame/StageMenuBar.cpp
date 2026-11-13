@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/panels/InspectorPanel.h" // fork: inspector
+#include "core/GpuDiag.h" // fork
 #include "app/panels/CurveEditorPanel.h"
 #include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -1282,6 +1283,15 @@ void DrawMenuBar(FrameCtx& fc)
          {
             TopBarPlaceAt(cursorX - telemetryW);
             TabLabel("topbar.fps", readout, "99.9 fps   99.9 ms", true);
+            { // fork: GPU name + frame time (+ warning) on hover
+               if (ImGui::IsItemHovered())
+               {
+                  const char* gpu = (const char*)glGetString(GL_RENDERER);
+                  const char* warn = GpuDiagWarning(gpu);
+                  ImGui::SetTooltip("GPU: %s\n%.1f ms/frame (%.1f fps)%s%s", gpu ? gpu : "?", sSmoothedMs, fps,
+                                    warn ? "\n! " : "", warn ? warn : "");
+               }
+            }
             TopBarSameLine(telemetryGap);
             TabLabel("topbar.cpu", cpuReadout, cpuWidest, true);
 

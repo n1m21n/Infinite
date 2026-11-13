@@ -1022,8 +1022,11 @@ void DrawKeyboard(FrameCtx& fc)
       // Deferred from GlobalScaleToggle() above - see comment on
       // gGlobalScaleTooltipHovered. This is the first point after the
       // per-node draw loop where an ed::Suspend()'d tooltip is safe to draw.
+      // fork: one tooltip window per frame - scale toggle, then diagnostics, then help (a later one used to cover the earlier).
+      bool tipShown = false;
       if (gGlobalScaleTooltipHovered)
       {
+         tipShown = true;
          ImGui::BeginTooltip();
          ImGui::TextUnformatted(gGlobalScaleTooltipEnabled ? "Global Scale: ON (click to disable)"
                                                             : "Global Scale: OFF (click to enable)");
@@ -1031,7 +1034,9 @@ void DrawKeyboard(FrameCtx& fc)
       }
 
       // Deferred from the node draw loop (cook warning, live schema issue).
-      if (!gNodeHoverTip.empty())
+      if (tipShown)
+         ;
+      else if (!gNodeHoverTip.empty())
          ImGui::SetTooltip("%s", gNodeHoverTip.c_str());
       else if (!gNodeHelpTip.empty() && ImGui::BeginTooltip())
       {

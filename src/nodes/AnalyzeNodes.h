@@ -1,4 +1,5 @@
 #pragma once
+#include "core/PboReadback.h" // fork
 
 #include <algorithm>
 #include <memory>
@@ -165,6 +166,7 @@ private:
    std::string mExprError;
 
    std::vector<unsigned char> mPixels;
+   PboReadback mPboRead; // fork
    std::vector<unsigned char> mPrevPixels;
    unsigned int mSmallFbo = 0;
    unsigned int mSmallTex = 0;

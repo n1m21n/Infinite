@@ -2,6 +2,7 @@
 
 #include "platform/NetCompat.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <deque>
 #include <fstream>
@@ -267,5 +268,36 @@ namespace RemoteControl
          }
          delete cmd;
       }
+   }
+
+   bool Call(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError, int timeoutMs)
+   {
+      if (gPort == 0)
+      {
+         outError = "the control server is not running";
+         return false;
+      }
+      auto* cmd = new PendingCommand();  // freed by DrainPending, even when we stopped waiting
+      cmd->method = method;
+      cmd->params = params;
+      cmd->token = gToken;
+      std::future<json> fut = cmd->response.get_future();
+      {
+         std::lock_guard<std::mutex> lock(gQueueMutex);
+         gQueue.push_back(cmd);
+      }
+      if (fut.wait_for(std::chrono::milliseconds(timeoutMs)) != std::future_status::ready)
+      {
+         outError = "timed out waiting for the app (is its window busy or minimised?)";
+         return false;
+      }
+      json r = fut.get();
+      if (r.is_object() && r.contains("__error__"))
+      {
+         outError = r["__error__"].get<std::string>();
+         return false;
+      }
+      outResult = r;
+      return true;
    }
 }

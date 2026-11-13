@@ -1,6 +1,7 @@
 #pragma once
 #include <cstring>
 #include "imgui.h"
+#include "app/ui/NodeTip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/ui/design/TokenColors.h"
@@ -66,13 +67,7 @@ namespace NodeHeader
       if (hot)
       {
          ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-         if (ImGui::BeginTooltip())
-         {
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
-            ImGui::TextUnformatted(issue.reason.c_str());
-            ImGui::PopTextWrapPos();
-            ImGui::EndTooltip();
-         }
+         app::NodeTip("%s", issue.reason.c_str());   // fork: parked while inside a node, see NodeTip.h
       }
       return clicked && issue.fix != NodeIssue::Fix::None;
    }

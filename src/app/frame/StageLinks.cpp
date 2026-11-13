@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/graph/PortProbeCache.h"
 
 namespace app
 {
@@ -52,15 +53,35 @@ namespace
 
 std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForPin(int dragPin)
 {
+   // fork: input and colour pins are answered from the per-type port cache (PortProbeCache.cpp). A param pin also
+   // asks PredictorBindRefusal about the source instance, so only the modulator types (a few dozen) get a probe.
    std::vector<std::pair<std::string, std::string>> result;
+   GraphNode* dst = FindNodeByIndex(GraphNode::NodeIndexFromPin(dragPin));
    for (const std::string& category : NodeFactory::Instance().GetCategories())
       for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
       {
          if (!IsUserSpawnable(name))
             continue;
-         GraphNode probe;
-         probe.node.reset(NodeFactory::Instance().MakeNode(name));
-         if (probe.node && FirstOutputFitting(&probe, dragPin) >= 0)
+         bool fits = false;
+         bool needsProbe = false;
+         for (uint16_t kind : TypeOutputKinds(name))
+         {
+            if (GraphNode::IsInputPin(dragPin))
+               fits = dst != nullptr && SlotAcceptsKind(dst, GraphNode::InputSlotFromPin(dragPin), kind);
+            else if (GraphNode::IsColorPin(dragPin))
+               fits = (kind & kSrcPalette) != 0;
+            else if (GraphNode::IsParamPin(dragPin))
+               needsProbe = needsProbe || (kind & kSrcModulator) != 0;
+            if (fits)
+               break;
+         }
+         if (!fits && needsProbe)
+         {
+            GraphNode probe;
+            probe.node.reset(NodeFactory::Instance().MakeNode(name));
+            fits = probe.node && FirstOutputFitting(&probe, dragPin) >= 0;
+         }
+         if (fits)
             result.emplace_back(name, category);
       }
    return result;

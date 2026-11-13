@@ -1,5 +1,8 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
 namespace app
 {
@@ -99,6 +102,22 @@ void DrawPresent(FrameCtx& fc)
          if (sPrevTime > 0.0)
             gLastFrameMs = (now - sPrevTime) * 1000.0;
          sPrevTime = now;
+         // fork: INFINITE_FPS_LOG=1 prints mean/max frame ms every 120 frames (after 120 warm-up frames).
+         static const bool sFpsLog = std::getenv("INFINITE_FPS_LOG") != nullptr;
+         if (sFpsLog)
+         {
+            static int sN = 0, sSeen = 0; static double sSum = 0, sMax = 0;
+            if (++sSeen > 120)
+            {
+               sSum += gLastFrameMs; sMax = std::max(sMax, gLastFrameMs);
+               if (++sN == 120)
+               {
+                  std::printf("FPSLOG mean_ms=%.2f fps=%.1f max_ms=%.2f\n", sSum / sN, 1000.0 * sN / sSum, sMax);
+                  std::fflush(stdout);
+                  sN = 0; sSum = 0; sMax = 0;
+               }
+            }
+         }
       }
 
       // Dev harness: quit after N frames. The self-tests above printf their

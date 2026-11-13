@@ -5,6 +5,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 
 namespace app
 {
@@ -2426,7 +2427,7 @@ namespace app
       // The requested sample count is clamped by both the driver and a memory
       // budget, so say what actually happened when they disagree.
       if (n->ActiveSamples() != wantedAa && ImGui::IsItemHovered())
-         ImGui::SetTooltip("antialias reduced to %dx at this size", n->ActiveSamples());
+         NodeTip("antialias reduced to %dx at this size", n->ActiveSamples());
       DropdownButton("tonemap", Render3DNode::TonemapNames(), n->tonemap,
                      [n](int i) { n->tonemap = i; }, colW);
       ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);

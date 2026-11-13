@@ -441,7 +441,7 @@ void DrawNodeParamsBody(GraphNode& gn)
          ModCheckbox(L("include audio"), &n->includeAudio);
          ImGui::EndDisabled();
          if (n->IsRecording() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s", T("locked for the current take"));
+            NodeTip("%s", T("locked for the current take"));
          if (n->includeAudio && n->AudioInput().IsConnected())
          {
             INode* src = n->AudioInput().GetSource();
