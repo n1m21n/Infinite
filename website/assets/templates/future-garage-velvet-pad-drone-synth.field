@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Future Garage Velvet Pad Drone Synth",
+    "author": "Infinite",
+    "description": "Shimmering dual-oscillator velvet pad with slow LFO filter sweep and gentle harmonic overtones.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detune = 0.013 [0.0, 0.035];\nparam float cutoff = 1400.0 [250.0, 4200.0];\nparam float sweep = 0.45 [0.0, 1.0];\nparam float shimmer = 0.35 [0.0, 1.0];\nparam float decay = 0.95 [0.25, 2.5];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float pOct = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.025);\nenv = if(target > env, env + (target - env) * 0.04, env - env * decayRate);\n\nlfo = (lfo + 0.45 / sr) % 1.0;\nf0 = clamp(freq, 40.0, 2600.0);\np1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;\np2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;\npOct = (pOct + f0 * 2.002 / sr) % 1.0;\n\nsaw1 = p1 * 2.0 - 1.0;\nsaw2 = p2 * 2.0 - 1.0;\ntriOct = 1.0 - 4.0 * abs(pOct - 0.5);\nraw = (saw1 + saw2) * 0.35 + triOct * shimmer * 0.35;\n\nmodCut = cutoff * (1.0 + sin(6.2831853 * lfo) * sweep * 0.45);\nfCut = clamp(modCut / sr * 3.14, 0.01, 0.44);\nlp1 = lp1 + fCut * (raw - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nout = lp2 * env * 0.55;\n",
+    "params": {
+      "detune": 0.013,
+      "cutoff": 1400.0,
+      "sweep": 0.45,
+      "shimmer": 0.35,
+      "decay": 0.95
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

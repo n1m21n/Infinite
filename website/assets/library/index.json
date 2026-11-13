@@ -9718,6 +9718,220 @@
       "file": "assets/library/pixel/brutalist-architecture-spomenik-rib-vault.field",
       "preview": "assets/library/previews/brutalist-architecture-spomenik-rib-vault.jpg",
       "bytes": 2023
+    },
+    {
+      "id": "holographic-iridescent-foil-ribbon",
+      "name": "Holographic Iridescent Foil Ribbon",
+      "kind": "Generator",
+      "tags": [
+        "holographic",
+        "iridescent",
+        "foil",
+        "ribbon",
+        "y2k",
+        "procedural"
+      ],
+      "description": "Layered chromatic foil ribbons twisting across a deep indigo field with pastel cyan, rose, and lime interference bands.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/holographic-iridescent-foil-ribbon.js",
+      "preview": "assets/library/previews/holographic-iridescent-foil-ribbon.jpg",
+      "bytes": 2113
+    },
+    {
+      "id": "holographic-iridescent-prism-blob",
+      "name": "Holographic Iridescent Prism Blob",
+      "kind": "Generator",
+      "tags": [
+        "holographic",
+        "iridescent",
+        "prism",
+        "superellipse",
+        "y2k",
+        "procedural"
+      ],
+      "description": "Morphing superellipse foil lobes with thin-film spectral contour rings and specular white highlights.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/holographic-iridescent-prism-blob.js",
+      "preview": "assets/library/previews/holographic-iridescent-prism-blob.jpg",
+      "bytes": 1759
+    },
+    {
+      "id": "generative-plotter-molnar-lattice-3d",
+      "name": "Generative Plotter Molnar Lattice 3D",
+      "kind": "Generator",
+      "tags": [
+        "generative-plotter",
+        "plotter",
+        "molnar",
+        "3d",
+        "algorithmic",
+        "minimal"
+      ],
+      "description": "Algorithmic 3D lattice of perturbed India-ink and vermilion frames inspired by Vera Molnar's Interruptions.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/generative-plotter-molnar-lattice-3d.js",
+      "preview": "assets/library/previews/generative-plotter-molnar-lattice-3d.jpg",
+      "bytes": 1400
+    },
+    {
+      "id": "generative-plotter-torus-strata-3d",
+      "name": "Generative Plotter Torus Strata 3D",
+      "kind": "Generator",
+      "tags": [
+        "generative-plotter",
+        "plotter",
+        "strata",
+        "3d",
+        "contour",
+        "algorithmic"
+      ],
+      "description": "Stepped concentric torus and cylinder elevation strata in India ink and vermilion red evoking pen-plotter contours.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/generative-plotter-torus-strata-3d.js",
+      "preview": "assets/library/previews/generative-plotter-torus-strata-3d.jpg",
+      "bytes": 905
+    },
+    {
+      "id": "future-garage-sub-chord-organ-synth",
+      "name": "Future Garage Sub Chord Organ Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "future-garage",
+        "audio",
+        "dsp",
+        "organ",
+        "pad"
+      ],
+      "description": "Warm detuned sine-fifth sub organ with soft vinyl-like envelope and subtle pitch drift.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/future-garage-sub-chord-organ-synth.inf",
+      "preview": "assets/library/previews/future-garage-sub-chord-organ-synth.jpg",
+      "bytes": 2003
+    },
+    {
+      "id": "future-garage-velvet-pad-drone-synth",
+      "name": "Future Garage Velvet Pad Drone Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "future-garage",
+        "audio",
+        "dsp",
+        "organ",
+        "pad"
+      ],
+      "description": "Shimmering dual-oscillator velvet pad with slow LFO filter sweep and gentle harmonic overtones.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/future-garage-velvet-pad-drone-synth.inf",
+      "preview": "assets/library/previews/future-garage-velvet-pad-drone-synth.jpg",
+      "bytes": 2128
+    },
+    {
+      "id": "acid-house-303-resonant-filter-fx",
+      "name": "Acid House 303 Resonant Filter FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "acid-house",
+        "audio",
+        "dsp",
+        "filter",
+        "delay"
+      ],
+      "description": "Sweeping resonant diode-style lowpass filter with soft waveshaped drive and LFO cutoff modulation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/acid-house-303-resonant-filter-fx.inf",
+      "preview": "assets/library/previews/acid-house-303-resonant-filter-fx.jpg",
+      "bytes": 1832
+    },
+    {
+      "id": "acid-house-overdrive-tape-delay-fx",
+      "name": "Acid House Overdrive Tape Delay FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "acid-house",
+        "audio",
+        "dsp",
+        "filter",
+        "delay"
+      ],
+      "description": "Punchy saturated analog delay with warm feedback damping and rhythmic echo smear.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 4,
+      "file": "assets/templates/acid-house-overdrive-tape-delay-fx.inf",
+      "preview": "assets/library/previews/acid-house-overdrive-tape-delay-fx.jpg",
+      "bytes": 1662
+    },
+    {
+      "id": "ukiyoe-cartography-isobar-waves",
+      "name": "Ukiyo-e Cartography Isobar Waves",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "cartography",
+        "woodblock",
+        "indigo",
+        "waves",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Woodblock-inspired topographical wave contours in Prussian indigo and celadon mist over warm rice paper with a vermilion seal accent.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ukiyoe-cartography-isobar-waves.field",
+      "preview": "assets/library/previews/ukiyoe-cartography-isobar-waves.jpg",
+      "bytes": 1977
+    },
+    {
+      "id": "ukiyoe-cartography-woodblock-relief",
+      "name": "Ukiyo-e Cartography Woodblock Relief",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "cartography",
+        "woodblock",
+        "relief",
+        "archipelago",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Layered Edo-era archipelago elevation strata with woodblock grain, directional relief, and vermilion cartographic markers.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ukiyoe-cartography-woodblock-relief.field",
+      "preview": "assets/library/previews/ukiyoe-cartography-woodblock-relief.jpg",
+      "bytes": 1988
     }
   ]
 }

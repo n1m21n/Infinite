@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid House Overdrive Tape Delay FX",
+    "author": "Infinite",
+    "description": "Punchy saturated analog delay with warm feedback damping and rhythmic echo smear.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float feedback = 0.52 [0.0, 0.85];\nparam float damping = 0.45 [0.1, 0.95];\nparam float drive = 1.8 [0.5, 4.0];\nparam float mix = 0.55 [0.0, 1.0];\nstate float d1 = 0;\nstate float d2 = 0;\nstate float lp = 0;\n\nx = in * drive;\nsat = x / (1.0 + abs(x));\n\nd1 = d1 + 0.14 * (sat + d2 * feedback - d1);\nd2 = d2 + 0.09 * (d1 - d2);\n\nfCut = clamp(1.0 - damping * 0.72, 0.08, 0.85);\nlp = lp + fCut * (d2 - lp);\n\nout = clamp((in * (1.0 - mix) + lp * mix * 1.15) * 0.62, -0.92, 0.92);\n",
+    "params": {
+      "feedback": 0.52,
+      "damping": 0.45,
+      "drive": 1.8,
+      "mix": 0.55
+    }
+  }
+}

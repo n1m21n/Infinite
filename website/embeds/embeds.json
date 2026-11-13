@@ -585,6 +585,16 @@
       "slug": "brutalist-architecture-spomenik-rib-vault",
       "title": "Brutalist Architecture Spomenik Rib Vault",
       "description": "Audio-reactive Spomenik concrete monument. Bass pulses the brutalist oculus and ribs, mids rotate the directional sun relief, and highs illuminate the raw concrete edges."
+    },
+    {
+      "slug": "ukiyoe-cartography-isobar-waves",
+      "title": "Ukiyo-e Cartography Isobar Waves",
+      "description": "Audio-reactive Edo-period woodblock wave cartography. Bass ripples the isobar contours, mids drift the celadon mist, and highs sharpen the paper grain."
+    },
+    {
+      "slug": "ukiyoe-cartography-woodblock-relief",
+      "title": "Ukiyo-e Cartography Woodblock Relief",
+      "description": "Audio-reactive woodblock archipelago relief map. Bass swells the island elevation contours, mids sweep the compass meridians, and highs crisp the woodblock ink."
     }
   ]
 }
