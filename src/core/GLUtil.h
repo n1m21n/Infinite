@@ -117,6 +117,13 @@ namespace GLUtil
    // the shared fullscreen quad. Restores previously-bound FBO/viewport after.
    void RunShaderPass(const Fbo& out, unsigned int program, const std::function<void()>& setup);
 
+   // Like RunShaderPass but keeps what is in `out` (no clear), so a pass can
+   // blend onto it. `scissor` (x, y, w, h in out's pixels, bottom-left origin)
+   // limits the pass to that rectangle; nullptr draws the whole target.
+   void DrawPass(const Fbo& out, unsigned int program, const std::function<void()>& setup, const int* scissor = nullptr);
+   // Clears `out` to transparent, or to `rgba`.
+   void ClearFbo(const Fbo& out, const float* rgba = nullptr);
+
    // Draws `tex` as a fullscreen quad into whatever framebuffer is currently
    // bound (used to blit a node's output to a window). Clears the full
    // windowW x windowH area first, then draws into a letterboxed viewport

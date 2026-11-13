@@ -115,5 +115,10 @@
  "crop": 59761,
  "fill": 59762,
  "layers": 59763,
- "mask": 59764
+ "mask": 59764,
+ "brush": 59765,
+ "eyedropper": 59766,
+ "lasso": 59767,
+ "marquee": 59768,
+ "wand": 59769
 }

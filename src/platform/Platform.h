@@ -159,6 +159,11 @@ namespace Platform
    int GpuPreference();
    void SetGpuPreference(int preference);
 
+   // The pen's pressure (0..1) on the last press or drag in `window`, or -1 when
+   // the last pointer was a mouse or the OS gives no pressure (Linux). Callers
+   // treat -1 as full pressure. The hook installs itself on the first call.
+   float PenPressure(GLFWwindow* window);
+
    // Reports a fatal startup failure through every channel a user might
    // actually see: stderr (unconditionally, matches prior behavior) and,
    // on Windows only, a MessageBoxW plus AppendLogLine. macOS relies on the

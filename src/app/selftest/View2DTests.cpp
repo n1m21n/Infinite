@@ -3,8 +3,11 @@
 // overlay) built from node and fill layers only. Plan: internal/plans/2d-view.
 #include "app/AppShared.h"
 #include "nodes/Scene2DNode.h"
+#include "core/TileStore.h"
 #include "gl3.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -253,6 +256,134 @@ void RunView2DTest()
       Check("T2: the logo sits top right", p->Bounds(p->Layers().back().id, lo, hi) && std::fabs(hi[0] - (p->Doc().w - 40.0f)) < 0.5f
                                              && std::fabs(lo[1] - 40.0f) < 0.5f);
       Check("T2: it cooks at the document size", p->GetOutputWidth() == 1920 && p->GetOutputHeight() == 1080);
+   }
+
+   // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 300;
+      pic.Doc().h = 200;
+      pic.Doc().background = 1;   // black
+      pic.Commit();
+      const int a = pic.AddPaintLayer();
+      const int b = pic.AddPaintLayer();
+      Check("T3: two paint layers", pic.Layers().size() == 2 && pic.FindLayer(a)->kind == Kind::Paint
+                                      && pic.FindLayer(a)->tiles.size() == 2);
+      BrushEngine::Brush br = BrushEngine::Presets()[5].brush;   // Hard round
+      br.size = 20.0f;
+      br.color[0] = br.color[1] = br.color[2] = 1.0f;
+      const auto Line = [&](int id, float x0, float x1, float y, const BrushEngine::Brush& use)
+      {
+         pic.BeginPaint(id, 0, use, x0, y, 1.0f);
+         for (float x = x0; x <= x1; x += 7.0f)
+            pic.PaintTo(x, y, 1.0f);
+         pic.EndPaint();
+      };
+      const std::string blank = pic.DocText();
+      Line(a, 20.0f, 280.0f, 50.0f, br);   // white across the top, crossing the tile seam at 256
+      Cook(&pic);
+      Check("T3: a stroke lands", Pixel(&pic, 100, 50)[0] > 0.95f && Pixel(&pic, 270, 50)[0] > 0.95f && Pixel(&pic, 100, 150)[0] < 0.02f);
+      BrushEngine::Brush red = br;
+      red.color[1] = red.color[2] = 0.0f;
+      Line(b, 20.0f, 280.0f, 150.0f, red);
+      Cook(&pic);
+      Check("T3: the second layer paints too", Pixel(&pic, 100, 150)[0] > 0.95f && Pixel(&pic, 100, 150)[1] < 0.02f);
+      const std::string twoStrokes = pic.DocText();
+      BrushEngine::Brush er = BrushEngine::Presets()[12].brush;   // Eraser hard
+      er.size = 30.0f;
+      pic.BeginPaint(a, 0, er, 100.0f, 50.0f, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      Check("T3: the eraser clears one layer", Pixel(&pic, 100, 50)[0] < 0.05f && Pixel(&pic, 150, 50)[0] > 0.95f
+                                                  && Pixel(&pic, 100, 150)[0] > 0.95f);
+      // Save and reopen: the text names the tiles, the store holds them.
+      Scene2DNode copy;
+      copy.SetDocText(pic.DocText());
+      Cook(&copy);
+      Check("T3: reopened, the pixels are back", Pixel(&copy, 150, 50)[0] > 0.95f && Pixel(&copy, 100, 50)[0] < 0.05f
+                                                    && Pixel(&copy, 100, 150)[0] > 0.95f);
+      // A blob line in a patch decodes to the same tile.
+      std::vector<std::string> keys;
+      TileStore::CollectKeys(pic.DocText(), keys);
+      bool blobs = !keys.empty();
+      for (const std::string& k : keys)
+      {
+         std::vector<uint8_t> rgba;
+         int tw = 0, th = 0;
+         blobs = blobs && !TileStore::Encoded(k).empty() && TileStore::Get(k, rgba, tw, th) && TileStore::Put(rgba.data(), tw, th) == k;
+      }
+      Check("T3: every tile round-trips as a blob", blobs);
+      // Undo is the text from before the eraser.
+      pic.SetDocText(twoStrokes);
+      Cook(&pic);
+      Check("T3: undo brings the erased stroke back", Pixel(&pic, 100, 50)[0] > 0.95f);
+      pic.SetDocText(blank);
+      Cook(&pic);
+      Check("T3: undo to blank clears both", Pixel(&pic, 100, 50)[0] < 0.02f && Pixel(&pic, 100, 150)[0] < 0.02f);
+      // A selection keeps paint inside it.
+      pic.SelectRect(0.0f, 0.0f, 150.0f, 200.0f, Scene2DNode::kSelNew, 0.0f, false);
+      Line(a, 20.0f, 280.0f, 100.0f, br);
+      Cook(&pic);
+      Check("T3: paint stays inside the selection", Pixel(&pic, 100, 100)[0] > 0.95f && Pixel(&pic, 200, 100)[0] < 0.02f);
+      pic.InvertSelection();
+      Check("T3: invert flips the selection", pic.SelectionAt(100, 100) < 0.01f && pic.SelectionAt(200, 100) > 0.99f);
+      pic.Deselect();
+      // Bucket fills the black region of layer b's empty area, picked from the picture.
+      const float blue[3] = { 0.0f, 0.0f, 1.0f };
+      const bool filled = pic.Bucket(b, 200.0f, 180.0f, blue, 1.0f, 10, true, true);
+      Cook(&pic);
+      float got[3] = {};
+      const bool picked = pic.Pick(200.0f, 180.0f, got);
+      Check("T3: bucket fills the open area, not the stroke", filled && picked && got[2] > 0.95f && got[0] < 0.05f
+                                                                 && Pixel(&pic, 100, 100)[1] > 0.95f);
+      // A pixel mask from a selection hides the rest of the layer.
+      pic.SelectRect(0.0f, 0.0f, 300.0f, 120.0f, Scene2DNode::kSelNew, 0.0f, false);
+      pic.MaskFromSelection(b);
+      pic.Deselect();
+      Cook(&pic);
+      Check("T3: selection to mask hides outside it", pic.FindLayer(b)->HasPixelMask() && Pixel(&pic, 200, 180)[2] < 0.05f
+                                                         && Pixel(&pic, 100, 100)[0] > 0.95f);
+      Scene2DNode masked;
+      masked.SetDocText(pic.DocText());
+      Cook(&masked);
+      Check("T3: the mask saves", masked.FindLayer(b)->HasPixelMask() && Pixel(&masked, 200, 180)[2] < 0.05f);
+      printf("  T3 tiles in store after test: %zu keys\n", keys.size());
+   }
+
+   // ---- M4: a brush stroke at 1080p stays inside one frame ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 1920;
+      pic.Doc().h = 1080;
+      pic.Commit();
+      const int id = pic.AddPaintLayer();
+      BrushEngine::Brush br = BrushEngine::Presets()[1].brush;
+      br.size = 80.0f;
+      Cook(&pic);
+      using Clock = std::chrono::steady_clock;
+      std::vector<double> ms;
+      pic.BeginPaint(id, 0, br, 100.0f, 540.0f, 1.0f);
+      for (int f = 0; f < 120; f++)
+      {
+         const auto t0 = Clock::now();
+         // Each frame the pen moves ~14 px, as a fast hand does at 60 fps.
+         const float x = 100.0f + f * 14.0f, y = 540.0f + 300.0f * std::sin(f * 0.08f);
+         pic.PaintTo(x, y, 0.5f + 0.5f * std::sin(f * 0.2f));
+         Cook(&pic);
+         glFinish();
+         ms.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
+      }
+      const auto e0 = Clock::now();
+      pic.EndPaint();
+      glFinish();
+      const double endMs = std::chrono::duration<double, std::milli>(Clock::now() - e0).count();
+      std::vector<double> sorted = ms;
+      std::sort(sorted.begin(), sorted.end());
+      const double median = sorted[sorted.size() / 2], p95 = sorted[sorted.size() * 95 / 100];
+      printf("  M4 1080p stroke: median %.2f ms, p95 %.2f ms, end %.2f ms\n", median, p95, endMs);
+      Check("M4: a 1080p brush frame is under 16.7 ms", p95 < 16.7);
    }
 
    NewPatch();

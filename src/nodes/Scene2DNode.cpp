@@ -9,6 +9,7 @@
 #include "BlendModes.h"
 #include "Geometry3DNodes.h"
 #include "Modulation.h"
+#include "TileStore.h"
 
 std::function<INode*(uint64_t)> Scene2DNode::ResolveUid;
 
@@ -44,7 +45,9 @@ namespace
             "uniform float uMaskDensity;\n"
             "uniform vec4 uColA;\n"
             "uniform vec4 uColB;\n"
-            "uniform float uFillAngle;\n")
+            "uniform float uFillAngle;\n"
+            "uniform sampler2D uPMask;\n"
+            "uniform int uHasPMask;\n")
          + GLUtil::kSrgbGlsl
          + BlendModes::kBlendGLSL
          + "vec4 layerAt(vec2 uvb, vec2 uv) {\n"
@@ -77,6 +80,7 @@ namespace
            "      if (uMaskInv == 1) v = 1.0 - v;\n"
            "      layer.a *= mix(1.0, clamp(v, 0.0, 1.0), uMaskDensity);\n"
            "   }\n"
+           "   if (uHasPMask == 1) layer.a *= texture(uPMask, uv).r;\n"
            "   float amt = uOpacity * layer.a;\n"
            "   if (uMode == " + std::to_string(BlendModes::kEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - amt)); return; }\n"
            "   if (uMode == " + std::to_string(BlendModes::kAntiEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - (1.0 - layer.a) * uOpacity)); return; }\n"
@@ -134,6 +138,16 @@ Scene2DNode::~Scene2DNode()
       GLUtil::DestroyFbo(p.f[1]);
    }
    GLUtil::DestroyFbo(mOut);
+   for (auto& kv : mSurfaces)
+      GLUtil::DestroyFbo(kv.second.fbo);
+   for (auto& kv : mMasks)
+      GLUtil::DestroyFbo(kv.second.fbo);
+   GLUtil::DestroyFbo(mSelTex);
+   GLUtil::DestroyFbo(mSelOverlay);
+   GLUtil::DestroyFbo(mSelScratch);
+   for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram })
+      if (p != 0)
+         glDeleteProgram(p);
    if (mPassProgram != 0)
       glDeleteProgram(mPassProgram);
    if (mFinishProgram != 0)
@@ -170,6 +184,13 @@ Scene2DNode::Layer& Scene2DNode::AddLayer(Kind kind, uint64_t uid, int above)
    l.y = mDoc.h * 0.5f;
    if (kind == Kind::Group)
       l.blend = kPassThrough;
+   if (kind == Kind::Paint)
+   {
+      l.pw = mDoc.w;
+      l.ph = mDoc.h;
+      const int n = ((l.pw + TileStore::kTile - 1) / TileStore::kTile) * ((l.ph + TileStore::kTile - 1) / TileStore::kTile);
+      l.tiles.assign(n, "-");
+   }
    int at = (int)mLayers.size();
    if (const Layer* ref = FindConst(above))
    {
@@ -362,6 +383,12 @@ INode* Scene2DNode::MaskSource(const Layer& l) const
 bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
 {
    const float W = (float)mDoc.w, H = (float)mDoc.h;
+   if (l.kind == Kind::Paint)
+   {
+      w = (float)std::max(1, l.pw);
+      h = (float)std::max(1, l.ph);
+      return true;
+   }
    if (l.kind != Kind::Node)
    {
       w = W;
@@ -398,7 +425,7 @@ bool Scene2DNode::LayerBox(const Layer& l, float& w, float& h)
 
 void Scene2DNode::LayerMatrix(const Layer& l, float m[6])
 {
-   if (l.kind != Kind::Node)
+   if (l.kind != Kind::Node && l.kind != Kind::Paint)
    {
       // Fills and groups are the document itself.
       const float id[6] = { 1, 0, 0, 0, 1, 0 };
@@ -627,6 +654,18 @@ void Scene2DNode::Serialize()
          for (float v : l.colorB) o << " " << v;
          o << " " << l.fillAngle << "\n";
       }
+      if (l.kind == Kind::Paint)
+      {
+         o << "paint " << l.id << " " << l.pw << " " << l.ph;
+         for (const std::string& k : l.tiles) o << " " << k;
+         o << "\n";
+      }
+      if (l.HasPixelMask())
+      {
+         o << "pmask " << l.id << " " << +l.pmaskOn << " " << l.mw << " " << l.mh;
+         for (const std::string& k : l.mtiles) o << " " << k;
+         o << "\n";
+      }
    }
    mText = o.str();
    mParsedText = mText;
@@ -684,7 +723,7 @@ void Scene2DNode::Parse()
          Layer l;
          int kind = 0, vis = 1, clip = 0, open = 1;
          s >> l.id >> kind >> l.parent >> l.uid >> vis >> l.blend >> l.opacity >> l.fill >> l.lock >> l.label >> clip >> open;
-         l.kind = (Kind)std::clamp(kind, 0, 2);
+         l.kind = (Kind)std::clamp(kind, 0, 3);
          l.visible = vis != 0;
          l.clip = clip != 0;
          l.open = open != 0;
@@ -730,6 +769,35 @@ void Scene2DNode::Parse()
             for (float& v : l->colorA) s >> v;
             for (float& v : l->colorB) s >> v;
             s >> l->fillAngle;
+         }
+         else if (key == "paint" || key == "pmask")
+         {
+            const bool mask = key == "pmask";
+            int on = 1, w = 0, h = 0;
+            if (mask)
+               s >> on;
+            s >> w >> h;
+            w = std::clamp(w, 0, GLUtil::kMaxTargetSide);
+            h = std::clamp(h, 0, GLUtil::kMaxTargetSide);
+            const size_t n = (size_t)((w + TileStore::kTile - 1) / TileStore::kTile) * (size_t)((h + TileStore::kTile - 1) / TileStore::kTile);
+            std::vector<std::string> keys;
+            std::string k;
+            while (keys.size() < n && s >> k)
+               keys.push_back(TileStore::IsKey(k.data(), k.size()) ? k : "-");
+            keys.resize(n, "-");
+            if (mask)
+            {
+               l->pmaskOn = on != 0;
+               l->mw = w;
+               l->mh = h;
+               l->mtiles = keys;
+            }
+            else
+            {
+               l->pw = w;
+               l->ph = h;
+               l->tiles = keys;
+            }
          }
       }
    }
@@ -792,6 +860,10 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, a.mask);
       glUniform1i(glGetUniformLocation(prog, "uMask"), 2);
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, a.pmask);
+      glUniform1i(glGetUniformLocation(prog, "uPMask"), 3);
+      glUniform1i(glGetUniformLocation(prog, "uHasPMask"), a.pmask != 0 ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
       glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
       glUniform3f(glGetUniformLocation(prog, "uInvA"), a.inv[0], a.inv[1], a.inv[2]);
@@ -866,13 +938,26 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       Pass(depth, a);
       return;
    }
-   INode* src = Source(l);
-   if (src == nullptr)
-      return;
-   src->CookIfNeeded(frameId);
-   a.tex = src->GetOutputTexture();
-   a.texW = src->GetOutputWidth();
-   a.texH = src->GetOutputHeight();
+   if (l.kind == Kind::Paint)
+   {
+      auto it = mSurfaces.find(l.id);
+      if (it == mSurfaces.end())
+         return;
+      const bool live = mStroke.Active() && mPaintId == l.id && mPaintTarget == 0;
+      a.tex = live ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+      a.texW = it->second.fbo.w;
+      a.texH = it->second.fbo.h;
+   }
+   else
+   {
+      INode* src = Source(l);
+      if (src == nullptr)
+         return;
+      src->CookIfNeeded(frameId);
+      a.tex = src->GetOutputTexture();
+      a.texW = src->GetOutputWidth();
+      a.texH = src->GetOutputHeight();
+   }
    if (a.tex == 0 || a.texW <= 0 || a.texH <= 0)
       return;
    LayerBox(l, a.box[0], a.box[1]);
@@ -887,6 +972,15 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.crop[3] = std::clamp(1.0f - l.crop[3] / a.box[1], a.crop[1], 1.0f);
    }
    a.nearest = l.nearest;
+   if (l.HasPixelMask() && l.pmaskOn)
+   {
+      auto it = mMasks.find(l.id);
+      if (it != mMasks.end())
+      {
+         const bool live = mStroke.Active() && mPaintId == l.id && mPaintTarget == 1;
+         a.pmask = live ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+      }
+   }
    Pass(depth, a);
 }
 
@@ -958,6 +1052,12 @@ void Scene2DNode::CookIfNeeded(int frameId)
    for (char c : mText)
       stamp = Mix(stamp, (unsigned char)c);
    stamp = Mix(stamp, (unsigned long long)soloLayer);
+   SyncSurfaces();
+   // A stroke changes the picture before it changes the text; its queued dabs land now.
+   if (mStroke.Active())
+      mStroke.Flush();
+   stamp = Mix(stamp, mStroke.Active() ? (unsigned long long)mStroke.DabCount() + 1ull : 0ull);
+   stamp = Mix(stamp, mPaintEdits);
    for (const Layer& l : mLayers)
    {
       if (!Shown(l))

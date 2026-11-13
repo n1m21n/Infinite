@@ -404,6 +404,47 @@ namespace GLUtil
       return program;
    }
 
+   void DrawPass(const Fbo& out, unsigned int program, const std::function<void()>& setup, const int* scissor)
+   {
+      if (out.fbo == 0 || program == 0)
+         return;
+      GLint prevFbo = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      GLint prevViewport[4];
+      glGetIntegerv(GL_VIEWPORT, prevViewport);
+      glBindFramebuffer(GL_FRAMEBUFFER, out.fbo);
+      glViewport(0, 0, out.w, out.h);
+      if (scissor != nullptr)
+      {
+         glEnable(GL_SCISSOR_TEST);
+         glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+      }
+      glUseProgram(program);
+      if (setup)
+         setup();
+      DrawQuad();
+      glUseProgram(0);
+      if (scissor != nullptr)
+         glDisable(GL_SCISSOR_TEST);
+      glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+      glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+   }
+
+   void ClearFbo(const Fbo& out, const float* rgba)
+   {
+      if (out.fbo == 0)
+         return;
+      GLint prevFbo = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, out.fbo);
+      if (rgba != nullptr)
+         glClearColor(rgba[0], rgba[1], rgba[2], rgba[3]);
+      else
+         glClearColor(0, 0, 0, 0);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+   }
+
    void RunShaderPass(const Fbo& out, unsigned int program, const std::function<void()>& setup)
    {
       if (out.fbo == 0 || program == 0)

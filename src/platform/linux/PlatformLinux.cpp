@@ -285,6 +285,7 @@ namespace Platform
    bool GpuPreferenceSupported() { return false; }
    int GpuPreference() { return 0; }
    void SetGpuPreference(int) {}
+   float PenPressure(GLFWwindow*) { return -1.0f; }
 
    void ShowFatalError(const std::string& title, const std::string& message)
    {

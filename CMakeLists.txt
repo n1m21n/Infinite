@@ -627,6 +627,8 @@ set(COMMON_SOURCES
     src/app/ui/design/UiInteract.cpp
     src/app/ui/design/UiGallery.cpp
     src/core/GLUtil.cpp
+    src/core/BrushEngine.cpp
+    src/core/TileStore.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
     src/core/CategoryColors.cpp
@@ -836,6 +838,7 @@ set(COMMON_SOURCES
     src/nodes/GeometryOpNodes.cpp
     src/nodes/Scene3DNode.cpp
     src/nodes/Scene2DNode.cpp
+    src/nodes/Scene2DPaint.cpp
     src/nodes/GeometryFeedbackNode.cpp
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp
