@@ -808,7 +808,7 @@ namespace app
                s.signedOutHere = false;
                if (kind == chat::AgentKind::Antigravity)
                {
-                  std::vector<chat::Model> list = chat::ParseAgyModels(chat::StripAnsi(log));
+                  std::vector<chat::Model> list = chat::ParseAgyModels(log);
                   if (!list.empty())
                      sModels[id] = std::move(list);
                }
@@ -1244,6 +1244,8 @@ namespace app
          Push(std::move(e));
       }
 
+      std::vector<chat::Model>& ModelsOf(const std::string& agent);
+
       void StartRun(const std::string& agent, const std::string& prompt, const std::vector<std::string>& dirs, bool retried = false)
       {
          Run r;
@@ -1262,7 +1264,7 @@ namespace app
             const auto& prefs = CliSetup::Prefs();
             const auto m = prefs.models.find(agent);
             if (m != prefs.models.end())
-               to.model = m->second;
+               to.model = chat::ResolveModel(r.kind, ModelsOf(agent), m->second);
             to.folderAccess = prefs.folderAccess;
             to.folders = prefs.folders;
             to.commands = prefs.commands;
@@ -1335,18 +1337,20 @@ namespace app
                Push(Make(Entry::Kind::Error, T("Set up an agent first.")));
                return true;
             }
-            std::string id = arg;
-            if (arg.empty() || chat::Lower(arg) == "default")
+            const std::vector<chat::Model>& list = ModelsOf(cur);
+            const std::string id = chat::ResolveModel(kind, list, arg);
+            std::string shown = id;
+            if (id.empty())
                CliSetup::Prefs().models.erase(cur);
             else
             {
-               for (const chat::Model& m : chat::FixedModels(kind))
-                  if (chat::Lower(m.label) == chat::Lower(arg) || m.id == chat::Lower(arg))
-                     id = m.id;
                CliSetup::Prefs().models[cur] = id;
+               for (const chat::Model& m : list)
+                  if (m.id == id && !m.label.empty())
+                     shown = m.label;
             }
             SaveCliConfig();
-            say(std::string(AgentName(cur)) + T(" will use ") + (arg.empty() ? std::string(T("its default model")) : id) + ".");
+            say(std::string(AgentName(cur)) + T(" will use ") + (id.empty() ? std::string(T("its default model")) : shown) + ".");
             return true;
          }
          if (name == "undo")
@@ -1921,7 +1925,19 @@ namespace app
       // `/name` being typed as the whole first word: the completion replaces from the start.
       bool SlashTyping() { return !sInput.empty() && sInput[0] == '/' && sInput.find_first_of(" \t\n") == std::string::npos; }
 
-      size_t ReplaceFrom() { return SlashTyping() ? 0 : sParse.partialBegin; }
+      bool SlashModelTyping(std::string& arg)
+      {
+         if (sInput.empty() || sInput[0] != '/' || SlashTyping())
+            return false;
+         std::string sn;
+         return chat::ParseSlash(sInput, sn, arg) && sn == "model";
+      }
+
+      size_t ReplaceFrom()
+      {
+         std::string sa;
+         return SlashTyping() || SlashModelTyping(sa) ? 0 : sParse.partialBegin;
+      }
 
       std::vector<Cand> Candidates(const chat::Parse& p)
       {
@@ -1930,6 +1946,16 @@ namespace app
          {
             for (const chat::SlashCommand* c : chat::MatchSlash(sInput.substr(1)))
                out.push_back({ "/" + std::string(c->name) + " ", "/" + std::string(c->name), c->summary, "", 0, false });
+            return out;
+         }
+         if (std::string sa; SlashModelTyping(sa))
+         {
+            const std::string cur = DefaultAgent();
+            const std::string want = chat::Lower(sa);
+            if (!cur.empty())
+               for (const chat::Model& m : ModelsOf(cur))
+                  if (!m.id.empty() && (Score(m.id, want) >= 0 || Score(m.label, want) >= 0 || (!m.full.empty() && Score(m.full, want) >= 0)))
+                     out.push_back({ "/model " + m.id, m.label.empty() ? m.id : m.label, m.id, "", 0, false });
             return out;
          }
          std::string want = chat::Lower(p.partial);
@@ -4655,7 +4681,7 @@ namespace app
             sFetch[agent]->Poll(drop);
             if (sFetch[agent]->Done())
             {
-               list = chat::ParseAgyModels(chat::StripAnsi(sFetch[agent]->Log()));
+               list = chat::ParseAgyModels(sFetch[agent]->Log());
                sFetch[agent] = nullptr;
             }
          }

@@ -164,7 +164,12 @@ namespace chat
          {
             const json r = j.value("result", json::object());
             const bool ok = Str(r, "status") == "SUCCESS";
-            out.push_back(Event(AgentEvent::Kind::End, ok ? std::string() : Str(r, "response").empty() ? Str(r, "status") : Str(r, "response"), !ok));
+            std::string msg = Str(r, "response");
+            if (msg.empty())
+               msg = Str(r, "error");
+            if (msg.empty())
+               msg = Str(r, "status");
+            out.push_back(Event(AgentEvent::Kind::End, ok ? std::string() : msg, !ok));
          }
       }
    }

@@ -34,7 +34,7 @@ namespace chat
                return { "agy", "models" };
             return { "/bin/sh", "-c",
                      "if /usr/bin/security find-generic-password -s gemini -a antigravity >/dev/null 2>&1 || "
-                     "[ -f \"$HOME/.gemini/jetski-standalone-oauth-token\" ]; then exec agy models; fi; "
+                     "[ -f \"$HOME/.gemini/jetski-standalone-oauth-token\" ]; then agy models | cat; exit; fi; "
                      "echo 'not logged in'; exit 1" };
          default:
             return { "claude", "auth", "status" };
@@ -355,31 +355,137 @@ namespace chat
       std::vector<Model> out;
       size_t start = 0;
       bool first = true;
+      auto isIdChar = [](unsigned char c) {
+         return std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == ':' || c == '/';
+      };
       while (start < output.size())
       {
-         size_t nl = output.find('\n', start);
+         // Split on both '\n' and '\r' so PTY spinner frames never glue onto the first model row.
+         size_t nl = output.find_first_of("\r\n", start);
          if (nl == std::string::npos)
             nl = output.size();
-         const std::string line = StripAnsi(output.substr(start, nl - start));
+         std::string raw = output.substr(start, nl - start);
          start = nl + 1;
-         // Rows are `<id>\t<label>`; progress lines have no tab, and a column header names "ID".
-         const size_t tab = line.find('\t');
-         if (tab == std::string::npos || tab == 0)
+         // If an erase-to-end-of-line sequence (\x1b[K) appears mid-line, keep only what follows the last one.
+         if (const size_t el = raw.rfind("\x1b[K"); el != std::string::npos)
+            raw.erase(0, el + 3);
+         std::string line = StripAnsi(raw);
+         // If StripAnsi was already called before ParseAgyModels, spinner frames may precede the row on one line.
+         if (const size_t spin = line.rfind("Fetching available models..."); spin != std::string::npos)
+            line.erase(0, spin + std::strlen("Fetching available models..."));
+         while (!line.empty() && (line.front() == ' ' || line.front() == '\t'))
+            line.erase(0, 1);
+         while (!line.empty() && (line.back() == ' ' || line.back() == '\t'))
+            line.pop_back();
+         if (line.empty())
             continue;
-         if (first && (line.compare(0, tab, "ID") == 0 || line.compare(0, tab, "id") == 0))
+         std::string id, label;
+         if (const size_t tab = line.find('\t'); tab != std::string::npos && tab > 0)
+         {
+            id = line.substr(0, tab);
+            label = line.substr(tab + 1);
+         }
+         else if (const size_t gap = line.find("  "); gap != std::string::npos && gap > 0)
+         {
+            // PTY output pads `<id>` and `<label>` with two or more spaces instead of a tab.
+            id = line.substr(0, gap);
+            size_t ls = gap + 2;
+            while (ls < line.size() && line[ls] == ' ')
+               ls++;
+            label = line.substr(ls);
+         }
+         else
+            continue;
+         if (first && (id == "ID" || id == "id"))
          {
             first = false;
             continue;
          }
          first = false;
-         Model m;
-         m.id = line.substr(0, tab);
-         m.label = line.substr(tab + 1);
-         if (m.id.find(' ') == std::string::npos && !m.label.empty())
-            out.push_back(m);
+         if (id.empty() || !std::isalnum((unsigned char)id[0]) ||
+             !std::all_of(id.begin(), id.end(), [&](unsigned char c) { return isIdChar(c); }) || label.empty())
+            continue;
+         out.push_back({ std::move(id), std::move(label), {} });
       }
       ShortenModelLabels(out);
       return out;
+   }
+
+   std::string ResolveModel(AgentKind kind, const std::vector<Model>& models, const std::string& wanted)
+   {
+      auto trim = [](std::string s) {
+         while (!s.empty() && std::isspace((unsigned char)s.front()))
+            s.erase(0, 1);
+         while (!s.empty() && std::isspace((unsigned char)s.back()))
+            s.pop_back();
+         return s;
+      };
+      const std::string q = trim(wanted);
+      const std::string ql = Lower(q);
+      if (ql.empty() || ql == "default")
+         return {};
+      const std::vector<Model> fallback = models.empty() ? FixedModels(kind) : models;
+      for (const Model& m : fallback)
+      {
+         if (Lower(m.id) == ql || Lower(m.label) == ql || (!m.full.empty() && Lower(m.full) == ql))
+            return m.id;
+      }
+      std::vector<std::string> tokens;
+      for (size_t i = 0; i < ql.size();)
+      {
+         while (i < ql.size() && std::isspace((unsigned char)ql[i]))
+            i++;
+         size_t j = i;
+         while (j < ql.size() && !std::isspace((unsigned char)ql[j]))
+            j++;
+         if (j > i)
+            tokens.push_back(ql.substr(i, j - i));
+         i = j;
+      }
+      if (!tokens.empty())
+      {
+         std::vector<std::string> matches;
+         for (const Model& m : fallback)
+         {
+            const std::string hay = Lower(m.id + " " + m.label + " " + m.full);
+            bool all = true;
+            for (const std::string& t : tokens)
+               if (hay.find(t) == std::string::npos)
+               {
+                  all = false;
+                  break;
+               }
+            if (all)
+               matches.push_back(m.id);
+         }
+         if (!matches.empty())
+         {
+            for (const std::string& id : matches)
+               if (id.size() >= 7 && id.compare(id.size() - 7, 7, "-medium") == 0)
+                  return id;
+            return matches.front();
+         }
+      }
+      if (kind == AgentKind::Antigravity)
+      {
+         static const std::pair<const char*, const char*> kAliases[] = {
+            { "hydrogen", "gemini-4-hydrogen-medium" },
+            { "hydrogen high", "gemini-4-hydrogen-high" },
+            { "hydrogen xhigh", "gemini-4-hydrogen-xhigh" },
+            { "hydrogen low", "gemini-4-hydrogen-low" },
+            { "argon", "gemini-4-argon-medium" },
+            { "argon high", "gemini-4-argon-high" },
+            { "argon low", "gemini-4-argon-low" },
+            { "orchestrator", "gemini-pro-orchestrator-g1-pro" },
+            { "flash", "gemini-3.8-flash-medium" },
+            { "flash high", "gemini-3.8-flash-high" },
+            { "flash low", "gemini-3.8-flash-low" },
+         };
+         for (const auto& [alias, id] : kAliases)
+            if (ql == alias)
+               return id;
+      }
+      return q;
    }
 
    void ShortenModelLabels(std::vector<Model>& models)
