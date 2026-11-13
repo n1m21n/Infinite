@@ -174,7 +174,7 @@ def droplets():
     parts = []
     for x, y, r in DROPS:
         prof = [(r * math.sin(math.radians(a)), r * 0.42 * math.cos(math.radians(a))) for a in range(90, -1, -10)]
-        parts.append(place(lathe([(0, 0.0)] + prof, 24), (x, y, 0)))
+        parts.append(place(lathe([(0, 0.0)] + prof, 24), (x, y, 0.00003)))
     return join(*parts)
 
 
@@ -195,7 +195,8 @@ def materials(stage):
         "mug": {"roughness": 0.3, "coat": 1.0, "coat_roughness": 0.04 if not flaws else 0.07, "code": F.mug(flaws) + F.TAIL},
         "glass": {"base_color": [1, 1, 1], "roughness": 0.0, "transmission": 1.0, "ior": 1.5, "code": F.glass(flaws) + F.TAIL},
         "water": {"base_color": [1, 1, 1], "roughness": 0.0, "transmission": 1.0, "ior": 1.33},
-        "drops": {"base_color": [1, 1, 1], "roughness": 0.0, "transmission": 1.0, "ior": 1.33},
+        # refractive beads resting on the table render black in settle (AUTORUN defect): wet-paint beads under a clear coat
+        "drops": {"base_color": [0.045, 0.10, 0.10], "roughness": 0.03, "coat": 1.0, "coat_roughness": 0.0, "ior": 1.33},
         "spoon": {"metallic": 1.0, "roughness": 0.1, "code": F.spoon(flaws) + F.TAIL},
         "cloth": {"roughness": 0.92, "sheen": 0.6, "sheen_roughness": 0.45, "code": F.cloth(flaws) + F.TAIL},
     }

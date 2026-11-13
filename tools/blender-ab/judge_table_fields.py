@@ -26,23 +26,27 @@ TAIL_RM = "base = vec3(oR, oM, 0.0);\nroughness = 1.0;\nmetallic = 0.0;\nheight 
 
 
 def table(flaws):
-    c = recipe("Painted Wood", [("vec3(0.05, 0.17, 0.11)", "vec3(0.085, 0.19, 0.185)")])
+    # straight plank grain along x instead of the recipe's end-grain rings (they read as CG ripples on a table top)
+    c = recipe("Painted Wood", [("vec3(0.05, 0.17, 0.11)", "vec3(0.07, 0.15, 0.15)"),
+                                ("length(vec2(P.x, P.z) + vec2(0.31, 0.17)) * rings", "(P.z + 0.02 * sin(P.x * 3.0)) * rings"),
+                                ("relief = 0.5 [", "relief = 0.07 ["), ("warp = 0.4 [", "warp = 0.5 ["), ("rings = 120.0 [", "rings = 380.0 ["),
+                                ("0.12 * (1.0 - grain)", "0.035 * (1.0 - grain)")])
     if not flaws:
         return c + "oB = b0;\noR = r0;\noM = 0.0;\noH = h0;\n"
     return c + """q = vec2(P.x * 0.8 + P.z * 0.6, P.z * 0.8 - P.x * 0.6);
-s1 = smoothstep(0.50, 0.58, noise3(vec3(P.x * 6.0, 3.1, P.z * 1300.0)));
-s2 = smoothstep(0.54, 0.60, noise3(vec3(q.x * 4.0, 7.7, q.y * 1700.0)));
-scr = clamp(s1 + s2, 0.0, 1.0) * smoothstep(-0.2, 0.3, fbm(P * 5.0, 3.0, 2.0, 0.5));
+s1 = smoothstep(0.38, 0.43, noise3(vec3(P.x * 13.0, 3.1, P.z * 520.0)));
+s2 = smoothstep(0.40, 0.44, noise3(vec3(q.x * 9.0, 7.7, q.y * 640.0)));
+scr = clamp(s1 + s2, 0.0, 1.0) * smoothstep(0.0, 0.4, fbm(P * 5.0, 3.0, 2.0, 0.5));
 wn = fbm(P * 70.0, 4.0, 2.0, 0.5);
-wear = smoothstep(0.35, 0.65, (curvature - 22.0) / 30.0 + wn * 0.9);
+wear = smoothstep(0.35, 0.65, clamp((curvature - 20.0) / 40.0, 0.0, 1.0) * (0.2 + wn * 1.2 + fbm(P * 9.0, 3.0, 2.0, 0.5)));
 wood = vec3(0.40, 0.28, 0.17) * (0.75 + 0.35 * grain);
 dust = clamp((1.0 - grain) * 0.5 + scr, 0.0, 1.0) * smoothstep(0.0, 0.5, fbm(P * 9.0, 4.0, 2.0, 0.5) + 0.2) * 0.35;
-b1 = mix(b0, b0 * 1.5 + 0.04, scr * 0.7);
+b1 = mix(b0, b0 * 1.7 + 0.06, scr * 0.7);
 b1 = mix(b1, vec3(0.55, 0.52, 0.47), dust);
 oB = mix(b1, wood, wear);
 oR = mix(r0 + scr * 0.3 + dust * 0.4, 0.72, wear);
 oM = 0.0;
-oH = h0 - scr * 0.00012 - wear * 0.00018;
+oH = h0 - scr * 0.00025 - wear * 0.00018;
 """
 
 
@@ -55,7 +59,7 @@ def table_dust():
 TABLE_DUST_MASK = ("n = fbm(vec3(uv.x * 14.0, uv.y * 14.0, 0.5), 5.0, 2.0, 0.5) * 0.5 + 0.5;\n"
                    "col = vec3(smoothstep(0.5, 0.85, n) * 0.3);")
 MUG_STAIN_MASK = ("n = noise3(vec3(uv.x * 260.0, uv.y * 180.0, 1.7)) * 0.5 + 0.5;\n"
-                  "col = vec3(smoothstep(0.83, 0.88, n));")
+                  "col = vec3(smoothstep(0.69, 0.73, n));")
 
 
 def mug(flaws):
@@ -70,18 +74,18 @@ h0 = fbm(P * 90.0, 3.0, 2.0, 0.5) * 0.00002;
     return c + """ax = vec2(P.x + 0.075, P.z + 0.045);
 rad = length(ax);
 pool = fbm(vec3(P.x * 22.0, P.y * 7.0, P.z * 22.0), 4.0, 2.0, 0.5) * 0.5 + 0.5;
-b1 = b0 * mix(vec3(1.0), vec3(0.86, 0.80, 0.68), pool * 0.8);
-gate = smoothstep(0.05, 0.3, fbm(P * 45.0, 3.0, 2.0, 0.5));
-e = (curvature - 7.0) / 6.0 + fbm(P * 260.0, 4.0, 2.0, 0.5) * 1.3;
-chip = smoothstep(0.35, 0.65, e) * gate * step(0.08, P.y);
+b1 = b0 * mix(vec3(1.0), vec3(0.86, 0.80, 0.68), pool);
+gate = smoothstep(0.08, 0.26, fbm(P * 45.0, 3.0, 2.0, 0.5));
+e = smoothstep(0.09, 0.0935, P.y) + fbm(P * 260.0, 4.0, 2.0, 0.5) * 0.6;
+chip = smoothstep(0.75, 0.95, e) * gate * step(1.0, curvature);
 inside = step(rad, 0.0385) * step(0.0085, P.y);
 wob = fbm(P * 60.0, 3.0, 2.0, 0.5) * 0.0015;
-dy = (P.y - 0.056 + wob) / 0.0011;
+dy = (P.y - 0.074 + wob) / 0.0013;
 ring = exp(-dy * dy) * inside;
-film = inside * (1.0 - smoothstep(0.050, 0.057, P.y + wob)) * 0.35;
+film = inside * (1.0 - smoothstep(0.066, 0.075, P.y + wob)) * 0.4;
 tea = clamp(ring * 0.85 + film, 0.0, 1.0);
 b1 = mix(b1, vec3(0.30, 0.16, 0.06), tea);
-oB = mix(b1, vec3(0.50, 0.44, 0.36), chip);
+oB = mix(b1, vec3(0.30, 0.21, 0.15), chip);
 oR = mix(r0 + pool * 0.10 + tea * 0.25, 0.85, chip);
 oM = 0.0;
 oH = h0 + pool * 0.00006 - chip * 0.0004;
@@ -111,8 +115,8 @@ smudge = smoothstep(0.1, 0.6, fbm(vec3(P.x * 30.0, P.y * 55.0, P.z * 30.0), 4.0,
 ly = (P.y - 0.0845) / 0.0007;
 line = exp(-ly * ly);
 scale = smoothstep(0.084, 0.086, P.y) * (1.0 - smoothstep(0.088, 0.094, P.y)) * (fbm(P * 300.0, 3.0, 2.0, 0.5) * 0.5 + 0.5);
-oB = vec3(1.0) * (1.0 - 0.06 * line);
-oR = clamp((p1 + p2 + p3) * 0.30 + smudge * 0.10 + line * 0.30 + scale * 0.12, 0.0, 0.6);
+oB = vec3(1.0) * (1.0 - 0.10 * line - 0.10 * (p1 + p2 + p3) - 0.04 * smudge - 0.08 * scale);
+oR = clamp((p1 + p2 + p3) * 0.45 + smudge * 0.16 + line * 0.35 + scale * 0.2, 0.0, 0.6);
 oM = 0.0;
 oH = 0.0;
 """
@@ -124,18 +128,18 @@ def spoon(flaws):
          + "pb = vec3(sl, P.y, sx);\n"
          + re.sub(r"\bP\b", "pb", recipe("Brushed Metal", [("= 0.32 [", "= 0.26 ["), ("= 6.0 [", "= 9.0 [")]))
          + "hb = smoothstep(0.020, 0.030, sl);\n"
-           "oB = mix(vec3(0.93, 0.93, 0.92), b0, hb);\noR = mix(0.045, r0, hb);\noM = 1.0;\noH = h0 * hb;\n")
+           "oB = mix(vec3(0.93, 0.93, 0.92), b0, hb);\noR = mix(0.045, r0, hb);\noM = m0;\noH = h0 * hb;\n")
     if not flaws:
         return c
-    return c + """a1 = smoothstep(0.55, 0.62, noise3(vec3(pb.x * 2500.0, 1.3, pb.z * 60.0)));
-a2 = smoothstep(0.58, 0.64, noise3(vec3((pb.x + pb.z) * 45.0, 4.1, (pb.x - pb.z) * 2800.0)));
-a3 = smoothstep(0.60, 0.66, noise3(vec3((pb.x * 0.5 - pb.z) * 3000.0, 9.3, (pb.x + pb.z * 0.5) * 50.0)));
+    return c + """a1 = smoothstep(0.30, 0.36, noise3(vec3(pb.x * 1500.0, 1.3, pb.z * 60.0)));
+a2 = smoothstep(0.32, 0.38, noise3(vec3((pb.x + pb.z) * 45.0, 4.1, (pb.x - pb.z) * 1700.0)));
+a3 = smoothstep(0.33, 0.39, noise3(vec3((pb.x * 0.5 - pb.z) * 1800.0, 9.3, (pb.x + pb.z * 0.5) * 50.0)));
 fine = clamp(a1 + a2 + a3, 0.0, 1.0) * (1.0 - hb * 0.6);
 tn = fbm(P * 55.0, 4.0, 2.0, 0.5) * 0.5 + 0.5;
-neck = (1.0 - smoothstep(0.004, 0.012, abs(sl - 0.027))) * 0.5;
+neck = (1.0 - smoothstep(0.004, 0.014, abs(sl - 0.027))) * 0.9 + smoothstep(0.2, 0.5, tn) * 0.25;
 tar = clamp((cavity * 5.0 + neck) * (0.3 + tn), 0.0, 1.0);
 oB = mix(oB * (1.0 - 0.10 * fine), vec3(0.34, 0.25, 0.14), tar * 0.8);
-oR = oR + fine * 0.16 + tar * 0.35;
+oR = oR + fine * 0.22 + tar * 0.4;
 oH = oH - fine * 0.00003;
 """
 
@@ -147,12 +151,12 @@ def cloth(flaws):
         return c + "oB = b0;\noR = r0;\noM = 0.0;\noH = h0;\n"
     return c + """var = fbm(P * 16.0, 4.0, 2.0, 0.5);
 fz = smoothstep(1.5, 9.0, curvature);
-lint = smoothstep(0.80, 0.86, noise3(P * 1400.0)) * 0.5;
-stain = smoothstep(0.012, 0.004, length(vec2(P.x + 0.19, P.z - 0.145))) * 0.35;
-b1 = b0 * (1.0 + 0.16 * var) * mix(vec3(1.0), vec3(1.06, 0.98, 0.9), var * 0.5 + 0.5);
+lint = smoothstep(0.38, 0.44, noise3(P * 900.0)) * 0.6;
+stain = (1.0 - smoothstep(0.006, 0.016, length(vec2(P.x + 0.19, P.z - 0.145)) + var * 0.004)) * 0.45;
+b1 = b0 * (1.0 + 0.3 * var) * mix(vec3(1.0), vec3(1.06, 0.98, 0.9), var * 0.5 + 0.5);
 b1 = mix(b1, b1 * 1.35 + 0.03, clamp(fz * 0.5 + lint, 0.0, 1.0));
 oB = mix(b1, b1 * vec3(0.55, 0.42, 0.30), stain);
-oR = 0.92 + fz * 0.08;
+oR = r0 + fz * 0.08;
 oM = 0.0;
 oH = h0 + fz * noise3(P * 3000.0) * 0.0002;
 """
