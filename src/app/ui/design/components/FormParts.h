@@ -54,6 +54,8 @@ namespace FormParts
       const ImVec2 c(p.x + d * 0.5f, p.y + h * 0.5f);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), 48);   // 48 segments: the auto count facets a 9 px circle
+      // Hairline ring: a black or near-background colour still reads as a swatch.
+      dl->AddCircle(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImGuiCol_Border), 48, 1.0f);
       if (click)
          ImGui::OpenPopup(id);
       bool changed = false;

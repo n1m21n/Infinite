@@ -53,7 +53,7 @@ namespace
 
    constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = 300.0f;
-   constexpr float kIconW = 30.0f;
+   constexpr float kIconW = tok::tile;   // icon chips are square, one tile
    constexpr float kRuler = 18.0f;
    constexpr float kHandle = 7.0f;
    constexpr float kSnapPx = 6.0f;
@@ -511,22 +511,22 @@ namespace
       return clicked;
    }
 
-   // A magnifier with a plus or a minus, drawn here (the glyph font has only the plain magnifier).
    bool ZoomChip(const char* id, bool plus, const char* tip)
    {
-      const bool clicked = ActionButton::Draw(id, ImVec2(tok::tile, tok::tile));
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", tip);
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      const ImVec2 c((bmin.x + bmax.x) * 0.5f - 1.0f, (bmin.y + bmax.y) * 0.5f - 1.0f);
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-      dl->AddCircle(c, 6.0f, col, 20, 1.6f);
-      dl->AddLine(ImVec2(c.x + 4.4f, c.y + 4.4f), ImVec2(c.x + 9.0f, c.y + 9.0f), col, 2.0f);
-      dl->AddLine(ImVec2(c.x - 3.0f, c.y), ImVec2(c.x + 3.0f, c.y), col, 1.5f);
-      if (plus)
-         dl->AddLine(ImVec2(c.x, c.y - 3.0f), ImVec2(c.x, c.y + 3.0f), col, 1.5f);
-      return clicked;
+      return IconChip(id, plus ? IconsInfinite::Zoom : IconsInfinite::ZoomOut, false, tip);
+   }
+
+   // Dimmed text centred on a tile row that starts at rowTop. Drawn, not laid out as Text: ImGui shifts Text by the
+   // line's frame-padding baseline offset, which put labels ~6 pt under the chips' centre line.
+   void CentredText(float rowTop, const char* text, bool dim = true)
+   {
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const ImVec2 sz = ImGui::CalcTextSize(text);
+      const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y); // device-pixel snap, as ActionButton
+      ImGui::GetWindowDrawList()->AddText(ImVec2(p.x, std::round((rowTop + (tok::tile - sz.y) * 0.5f) * px) / px),
+                                          ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text), text);
+      ImGui::SetCursorScreenPos(ImVec2(p.x, rowTop));
+      ImGui::Dummy(ImVec2(sz.x, tok::tile));
    }
 
    bool TextChip(const char* label, bool on, const char* tip)
@@ -540,6 +540,8 @@ namespace
       return clicked;
    }
 
+   // Field widths by content class (plan §3): S numbers, M short words, L labelled sliders and names.
+   constexpr float kWellS = 56.0f, kWellM = 72.0f, kWellL = 110.0f;
    float sFieldW = 160.0f;
    constexpr float kLabelW = 84.0f;
 
@@ -2534,37 +2536,38 @@ namespace
          DrawTextEditor(doc);
    }
 
+   // Between two groups of a bar: space_2, a 1 px hairline as tall as the chips' inner area, space_2 (Photopea's divider).
+   void BarDivider()
+   {
+      const float top = ImGui::GetItemRectMin().y;
+      ImGui::SameLine(0.0f, tok::space_2);
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float x = std::round(p.x) + 0.5f;
+      ImGui::GetWindowDrawList()->AddLine(ImVec2(x, top + 6.0f), ImVec2(x, top + tok::tile - 6.0f), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
+      ImGui::SetCursorScreenPos(ImVec2(p.x, top));
+      ImGui::Dummy(ImVec2(1.0f, tok::tile));
+      ImGui::SameLine(0.0f, tok::space_2);
+   }
+
    // ---- the pixel tools' context bar ---------------------------------------
 
-   void BarSlider(const char* id, float* v, float lo, float hi, const char* fmt, float w = 104.0f)
+   void BarSlider(const char* id, float* v, float lo, float hi, const char* fmt, float w = kWellL)
    {
       ImGui::SetNextItemWidth(w);
       FieldWell::Slider(id, v, lo, hi, fmt);
       FormParts::Inline(0.0f, tok::space_1);
    }
 
-   void Swatches()
-   {
-      const float d = 18.0f;
-      FormParts::ColorDot("##v2dfg", sFg, d, tok::tile);
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Foreground. X swaps, D resets"));
-      FormParts::Inline(0.0f, tok::space_1);
-      FormParts::ColorDot("##v2dbg", sBg, d, tok::tile);
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Background"));
-   }
-
    void SelOpChips(const char* idBase)
    {
-      static const char* kOps[4] = { "New", "Add", "Subtract", "Intersect" };
-      static const char* kTips[4] = { "New selection", "Add (Shift)", "Subtract (Alt)", "Intersect (Shift+Alt)" };
+      static const char* kGlyphs[4] = { IconsInfinite::SelNew, IconsInfinite::SelAdd, IconsInfinite::SelSubtract, IconsInfinite::SelIntersect };
+      static const char* kTips[4] = { "New selection", "Add to selection (Shift)", "Subtract from selection (Alt)", "Intersect with selection (Shift+Alt)" };
       for (int i = 0; i < 4; i++)
       {
          if (i > 0)
             FormParts::Inline(0.0f, tok::space_1);
-         const std::string id = std::string(L(kOps[i])) + "##" + idBase + std::to_string(i);
-         if (TextChip(id.c_str(), sSelOp == i, T(kTips[i])))
+         const std::string id = std::string("##") + idBase + std::to_string(i);
+         if (IconChip(id.c_str(), kGlyphs[i], sSelOp == i, T(kTips[i])))
             sSelOp = i;
       }
    }
@@ -2572,7 +2575,7 @@ namespace
    void MatchChips()
    {
       float tol = (float)sTolerance;
-      BarSlider("##v2dtol", &tol, 0.0f, 255.0f, "Tolerance %.0f", 120.0f);
+      BarSlider("##v2dtol", &tol, 0.0f, 255.0f, "Tolerance %.0f", kWellL);
       sTolerance = (int)std::lround(tol);
       if (TextChip(L("Contiguous##v2dcont"), sContiguous, T("Only touching pixels")))
          sContiguous = !sContiguous;
@@ -2583,7 +2586,7 @@ namespace
 
    void DrawPixelBar(Scene2DNode* doc)
    {
-      auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
+      auto gap = []() { BarDivider(); };
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
       Layer* a = Active(doc);
       if (sTool == kBrush || sTool == kEraser)
@@ -2591,7 +2594,7 @@ namespace
          BrushEngine::Brush& b = ToolBrush();
          int& preset = sTool == kEraser ? sEraserPreset : sBrushPreset;
          const auto& presets = BrushEngine::Presets();
-         ImGui::SetNextItemWidth(130.0f);
+         ImGui::SetNextItemWidth(kWellL);
          const char* shown = preset >= 0 && preset < (int)presets.size() ? presets[preset].name : "";
          if (MenuParts::BeginCombo("##v2dpreset", T(shown)))
          {
@@ -2611,11 +2614,11 @@ namespace
             MenuParts::EndCombo();
          }
          next();
-         BarSlider("##v2dsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", 112.0f);
+         BarSlider("##v2dsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
          float hard = b.hardness * 100.0f, op = b.opacity * 100.0f, flow = b.flow * 100.0f;
-         BarSlider("##v2dhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", 120.0f);
-         BarSlider("##v2dop", &op, 1.0f, 100.0f, "Opacity %.0f%%", 112.0f);
-         BarSlider("##v2dflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", 96.0f);
+         BarSlider("##v2dhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
+         BarSlider("##v2dop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+         BarSlider("##v2dflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          b.flow = flow / 100.0f;
@@ -2656,7 +2659,7 @@ namespace
          gap();
          SelOpChips("v2dop");
          gap();
-         BarSlider("##v2dfeather", &sFeather, 0.0f, 250.0f, "Feather %.0f px", 120.0f);
+         BarSlider("##v2dfeather", &sFeather, 0.0f, 250.0f, "Feather %.0f px", kWellL);
       }
       else if (sTool == kWand)
       {
@@ -2664,11 +2667,6 @@ namespace
          gap();
          MatchChips();
       }
-      gap();
-      Swatches();
-      gap();
-      if (TextChip(L("Quick mask##v2dqm"), doc->quickMask, T("Paint the selection (Q)")))
-         doc->quickMask = !doc->quickMask;
    }
 
    // ---- the vector and text tools' context bars ----------------------------
@@ -2676,7 +2674,7 @@ namespace
    // Edits the picked item when there is one, and always what the next item gets.
    void DrawVectorBar(Scene2DNode* doc)
    {
-      auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
+      auto gap = []() { BarDivider(); };
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
       Shape* picked = PickedItem(doc);
       Shape& t = picked != nullptr ? *picked : sStyle;
@@ -2685,16 +2683,17 @@ namespace
       if (sTool == kShape)
       {
          static const char* kKinds[6] = { "Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line" };
-         for (int i = 0; i < 6; i++)
+         ImGui::SetNextItemWidth(kWellL);
+         if (MenuParts::BeginCombo("##v2dshapekind", T(kKinds[std::clamp(sShapeKind, 0, 5)])))
          {
-            if (i > 0)
-               next();
-            const std::string id = std::string(L(kKinds[i])) + "##v2dsk" + std::to_string(i);
-            if (TextChip(id.c_str(), sShapeKind == i, nullptr))
-               sShapeKind = i;
+            for (int i = 0; i < 6; i++)
+               if (MenuParts::Choice(T(kKinds[i]), sShapeKind == i))
+                  sShapeKind = i;
+            MenuParts::EndCombo();
          }
          gap();
       }
+      // Fill and stroke: the chip toggles, the dot beside it picks the colour (Photopea: "Fill [ ] Stroke [ ] 1 px").
       if (TextChip(L("Fill##v2dvfill"), t.fillOn, T("Fill on or off")))
       {
          undo();
@@ -2704,7 +2703,7 @@ namespace
       next();
       if (FormParts::ColorDot("##v2dvfillc", t.fillC, 18.0f, tok::tile))
          changed = true;
-      next();
+      gap();
       if (TextChip(L("Stroke##v2dvstroke"), t.strokeOn, T("Stroke on or off")))
       {
          undo();
@@ -2715,51 +2714,58 @@ namespace
       if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, 18.0f, tok::tile))
          changed = true;
       next();
-      ImGui::SetNextItemWidth(96.0f);
+      ImGui::SetNextItemWidth(kWellS);
       changed |= FieldWell::Slider("##v2dvwidth", &t.width, 0.0f, 200.0f, "%.0f px");
       if (ImGui::IsItemActivated())
          undo();
       next();
-      auto pick = [&](const char* id, int* v, std::initializer_list<const char*> names, float w) {
-         std::vector<const char*> n(names);
-         ImGui::SetNextItemWidth(w);
-         if (MenuParts::BeginCombo(id, T(n[std::clamp(*v, 0, (int)n.size() - 1)])))
-         {
+      // Caps, joins, alignment and dashes live in one popup, as Photoshop's stroke options do.
+      if (IconChip("##v2dvstyle", IconsInfinite::StrokeStyle, false, T("Stroke options")))
+         ImGui::OpenPopup("##v2dvstylepop");
+      if (MenuParts::BeginPopup("##v2dvstylepop"))
+      {
+         auto pick = [&](const char* title, int* v, std::initializer_list<const char*> names) {
+            std::vector<const char*> n(names);
+            ImGui::TextDisabled("%s", T(title));
             for (int i = 0; i < (int)n.size(); i++)
-               if (MenuParts::Choice(T(n[i]), i == *v) && i != *v)
+            {
+               if (i > 0)
+                  FormParts::Inline(0.0f, tok::space_1);
+               const std::string id = std::string(T(n[i])) + "##" + title + std::to_string(i);
+               if (TextChip(id.c_str(), *v == i, nullptr) && *v != i)
                {
                   undo();
                   *v = i;
                   changed = true;
                }
-            MenuParts::EndCombo();
-         }
-         next();
-      };
-      pick("##v2dvcap", &t.cap, { "Butt", "Round cap", "Square" }, 84.0f);
-      pick("##v2dvjoin", &t.join, { "Miter", "Round join", "Bevel" }, 84.0f);
-      pick("##v2dvalign", &t.align, { "Centre", "Inside", "Outside" }, 84.0f);
-      ImGui::SetNextItemWidth(84.0f);
-      changed |= FieldWell::Slider("##v2dvdash", &t.dash, 0.0f, 200.0f, t.dash > 0.0f ? "Dash %.0f" : "Solid");
-      if (ImGui::IsItemActivated())
-         undo();
-      if (t.dash > 0.0f)
-      {
-         next();
-         ImGui::SetNextItemWidth(76.0f);
+            }
+         };
+         pick("Cap", &t.cap, { "Butt", "Round", "Square" });
+         pick("Join", &t.join, { "Miter", "Round", "Bevel" });
+         pick("Align", &t.align, { "Centre", "Inside", "Outside" });
+         ImGui::TextDisabled("%s", T("Dash"));
+         ImGui::SetNextItemWidth(kWellL);
+         changed |= FieldWell::Slider("##v2dvdash", &t.dash, 0.0f, 200.0f, t.dash > 0.0f ? "Dash %.0f" : "Solid");
+         if (ImGui::IsItemActivated())
+            undo();
+         FormParts::Inline(0.0f, tok::space_1);
+         ImGui::BeginDisabled(t.dash <= 0.0f);
+         ImGui::SetNextItemWidth(kWellL);
          changed |= FieldWell::Slider("##v2dvgap", &t.gap, 0.0f, 200.0f, "Gap %.0f");
          if (ImGui::IsItemActivated())
             undo();
+         ImGui::EndDisabled();
+         MenuParts::EndPopup();
       }
       gap();
-      static const char* kOps[4] = { "Add", "Subtract", "Intersect", "Exclude" };
-      static const char* kOpTips[4] = { "Over what is below", "Cuts what is below", "Keeps only the overlap", "Keeps all but the overlap" };
+      static const char* kOpGlyphs[4] = { IconsInfinite::SelAdd, IconsInfinite::SelSubtract, IconsInfinite::SelIntersect, IconsInfinite::SelExclude };
+      static const char* kOpTips[4] = { "Combine shapes", "Subtract front shape", "Intersect shape areas", "Exclude overlapping shapes" };
       for (int i = 0; i < 4; i++)
       {
          if (i > 0)
             next();
-         const std::string id = std::string(L(kOps[i])) + "##v2dvop" + std::to_string(i);
-         if (TextChip(id.c_str(), t.op == i, T(kOpTips[i])) && t.op != i)
+         const std::string id = std::string("##v2dvop") + std::to_string(i);
+         if (IconChip(id.c_str(), kOpGlyphs[i], t.op == i, T(kOpTips[i])) && t.op != i)
          {
             undo();
             t.op = i;
@@ -2773,7 +2779,7 @@ namespace
       if (rect && (picked != nullptr || sTool == kShape))
       {
          gap();
-         ImGui::SetNextItemWidth(96.0f);
+         ImGui::SetNextItemWidth(kWellL);
          changed |= FieldWell::Slider("##v2dvrad", &t.radius, 0.0f, 500.0f, "Radius %.0f");
          if (ImGui::IsItemActivated())
             undo();
@@ -2782,7 +2788,7 @@ namespace
       {
          gap();
          float sides = (float)t.sides;
-         ImGui::SetNextItemWidth(84.0f);
+         ImGui::SetNextItemWidth(kWellL);
          if (FieldWell::Slider("##v2dvsides", &sides, 3.0f, 64.0f, star ? "Points %.0f" : "Sides %.0f"))
          {
             t.sides = (int)std::lround(sides);
@@ -2793,7 +2799,7 @@ namespace
          if (star)
          {
             next();
-            ImGui::SetNextItemWidth(84.0f);
+            ImGui::SetNextItemWidth(kWellL);
             changed |= FieldWell::Slider("##v2dvinner", &t.inner, 0.05f, 1.0f, "Inner %.2f");
             if (ImGui::IsItemActivated())
                undo();
@@ -2825,7 +2831,7 @@ namespace
 
    void DrawTextBar(Scene2DNode* doc)
    {
-      auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
+      auto gap = []() { BarDivider(); };
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
       Layer* a = Active(doc);
       Layer* l = a != nullptr && a->kind == Kind::Text ? a : nullptr;
@@ -2839,7 +2845,7 @@ namespace
       bool changed = false;
       auto undo = [&]() { if (l != nullptr) PushUndoCheckpoint("Text style"); };
       const auto& fonts = Platform::AvailableFontFamilies();
-      ImGui::SetNextItemWidth(160.0f);
+      ImGui::SetNextItemWidth(2.0f * kWellM);
       const std::string shown = font.empty() ? (fonts.empty() ? std::string("Helvetica") : fonts.front()) : font;
       if (MenuParts::BeginCombo("##v2dfont", shown.c_str()))
       {
@@ -2853,28 +2859,29 @@ namespace
          MenuParts::EndCombo();
       }
       next();
-      ImGui::SetNextItemWidth(96.0f);
+      ImGui::SetNextItemWidth(kWellM);
       changed |= FieldWell::Slider("##v2dfsize", &size, 4.0f, 800.0f, "%.0f px");
       if (ImGui::IsItemActivated())
          undo();
       next();
-      ImGui::SetNextItemWidth(96.0f);
+      ImGui::SetNextItemWidth(kWellL);
       changed |= FieldWell::Slider("##v2dlead", &leading, 0.5f, 3.0f, "Leading %.2f");
       if (ImGui::IsItemActivated())
          undo();
       next();
-      ImGui::SetNextItemWidth(104.0f);
+      ImGui::SetNextItemWidth(kWellL);
       changed |= FieldWell::Slider("##v2dtrack", &tracking, -100.0f, 400.0f, "Tracking %.0f");
       if (ImGui::IsItemActivated())
          undo();
       gap();
-      static const char* kAligns[3] = { "Left", "Centre", "Right" };
+      static const char* kAlignGlyphs[3] = { IconsInfinite::TextLeft, IconsInfinite::TextCenter, IconsInfinite::TextRight };
+      static const char* kAlignTips[3] = { "Left align text", "Centre text", "Right align text" };
       for (int i = 0; i < 3; i++)
       {
          if (i > 0)
             next();
-         const std::string id = std::string(L(kAligns[i])) + "##v2dtal" + std::to_string(i);
-         if (TextChip(id.c_str(), align == i, nullptr) && align != i)
+         const std::string id = std::string("##v2dtal") + std::to_string(i);
+         if (IconChip(id.c_str(), kAlignGlyphs[i], align == i, T(kAlignTips[i])) && align != i)
          {
             undo();
             align = i;
@@ -2890,36 +2897,117 @@ namespace
 
    // ---- header and status ----------------------------------------------
 
-   // The tools, down the left of the picture as in every image editor.
-   void DrawToolStrip(float h)
+   // The tools, down the left of the picture as in every image editor, in Photoshop's order and sections
+   // (Photopea and PhotoCraft keep the same). Under them the foreground / background chips and quick mask.
+   struct ToolDef { int tool; const char* id; const char* glyph; const char* tip; };
+   const ToolDef kTools[15] = {
+      { kMove, "##v2dmove", IconsInfinite::ToolMove, "Move (V)" },
+      { kMarquee, "##v2dmarquee", IconsInfinite::Marquee, "Marquee (M)" },
+      { kLasso, "##v2dlasso", IconsInfinite::Lasso, "Lasso (L)" },
+      { kWand, "##v2dwand", IconsInfinite::Wand, "Magic wand (W)" },
+      { kCrop, "##v2dcrop", IconsInfinite::Crop, "Crop (C). Enter applies, Esc cancels" },
+      { kPick, "##v2dpick", IconsInfinite::Eyedropper, "Eyedropper (I). Alt sets the background" },
+      { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line" },
+      { kEraser, "##v2derase", IconsInfinite::Erase, "Eraser (E)" },
+      { kFill, "##v2dfilltool", IconsInfinite::Fill, "Fill and gradient (G)" },
+      { kPen, "##v2dpen", IconsInfinite::PenTool, "Pen (P). Drag for curves, Enter ends" },
+      { kText, "##v2dtext", IconsInfinite::Type, "Text (T). Click for a line, drag for a box" },
+      { kNode, "##v2dnode", IconsInfinite::Pointer, "Direct select (A). Alt-click an anchor makes a corner" },
+      { kShape, "##v2dshape", IconsInfinite::Shape, "Shape (U). Shift keeps it square, Alt from the centre" },
+      { kHand, "##v2dhand", IconsInfinite::Hand, "Hand (H, or hold Space)" },
+      { kZoom, "##v2dzoom", IconsInfinite::Zoom, "Zoom (Z). Alt-click zooms out" },
+   };
+   bool SectionStart(int i) { return i == 1 || i == 6 || i == 9 || i == 13; }   // select | paint | vector | view
+
+   // One column when the tools fit the height, else as many as it takes (never clipped, never scrolled).
+   int StripColumns(float h)
    {
-      ImGui::BeginChild("##v2dtools", ImVec2(kIconW, h), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, tok::space_1));
-      struct { int tool; const char* id; const char* glyph; const char* tip; } kTools[15] = {
-         { kMove, "##v2dmove", IconsInfinite::ToolMove, "Move (V)" },
-         { kNode, "##v2dnode", IconsInfinite::Pointer, "Direct select (A). Alt-click an anchor makes a corner" },
-         { kMarquee, "##v2dmarquee", IconsInfinite::Marquee, "Marquee (M)" },
-         { kLasso, "##v2dlasso", IconsInfinite::Lasso, "Lasso (L)" },
-         { kWand, "##v2dwand", IconsInfinite::Wand, "Magic wand (W)" },
-         { kCrop, "##v2dcrop", IconsInfinite::Crop, "Crop (C). Enter applies, Esc cancels" },
-         { kPick, "##v2dpick", IconsInfinite::Eyedropper, "Eyedropper (I). Alt sets the background" },
-         { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line" },
-         { kEraser, "##v2derase", IconsInfinite::Erase, "Eraser (E)" },
-         { kFill, "##v2dfilltool", IconsInfinite::Fill, "Fill and gradient (G)" },
-         { kPen, "##v2dpen", IconsInfinite::PenTool, "Pen (P). Drag for curves, Enter ends" },
-         { kShape, "##v2dshape", IconsInfinite::Shape, "Shape (U). Shift keeps it square, Alt from the centre" },
-         { kText, "##v2dtext", IconsInfinite::Type, "Text (T). Click for a line, drag for a box" },
-         { kHand, "##v2dhand", IconsInfinite::Hand, "Hand (H, or hold Space)" },
-         { kZoom, "##v2dzoom", IconsInfinite::Zoom, "Zoom (Z). Alt-click zooms out" },
+      const float step = tok::tile + tok::space_1;
+      const float oneCol = 15 * step + 4 * (tok::space_1 + 1.0f) + tok::space_1 + 2 * step;   // + sections + chips row
+      if (oneCol <= h)
+         return 1;
+      for (int cols = 2; cols < 5; cols++)
+         if (((15 + cols - 1) / cols + 1) * step + tok::space_1 <= h)
+            return cols;
+      return 5;
+   }
+
+   float StripWidth(int cols) { return cols * tok::tile + (cols - 1) * tok::space_1; }
+
+   // Foreground over background in one tile, Photoshop's corner layout. Click either square for its picker;
+   // the small corner arrow swaps (X), the tiny pair resets (D).
+   void ColourChips()
+   {
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float t = tok::tile, sq = 17.0f;
+      ImGui::InvisibleButton("##v2dcolours", ImVec2(t, t));
+      const ImVec2 m = ImGui::GetIO().MousePos;
+      const bool inFg = m.x < p.x + sq + 1 && m.y < p.y + sq + 1;
+      const bool inSwap = !inFg && m.x > p.x + sq && m.y < p.y + t - sq;
+      const bool inReset = !inFg && m.x < p.x + t - sq && m.y > p.y + sq;
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T(inFg ? "Foreground" : inSwap ? "Swap colours (X)" : inReset ? "Default colours (D)" : "Background"));
+      if (ImGui::IsItemClicked())
+      {
+         if (inSwap) SwapColours();
+         else if (inReset) DefaultColours();
+         else ImGui::OpenPopup(inFg ? "##v2dfgpick" : "##v2dbgpick");
+      }
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 edge = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      auto square = [&](ImVec2 a, const float* c) {
+         dl->AddRectFilled(a, ImVec2(a.x + sq, a.y + sq), ImGui::GetColorU32(ImVec4(c[0], c[1], c[2], 1.0f)), tok::radius_cell);
+         dl->AddRect(a, ImVec2(a.x + sq, a.y + sq), edge, tok::radius_cell);
       };
+      square(ImVec2(p.x + t - sq, p.y + t - sq), sBg);
+      square(p, sFg);
+      const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text);
+      // swap: a bent arrow in the top-right corner
+      const ImVec2 s0(p.x + sq + 2.5f, p.y + 2.5f);
+      dl->AddBezierQuadratic(ImVec2(s0.x, s0.y + 0.5f), ImVec2(s0.x + 6.0f, s0.y + 0.5f), ImVec2(s0.x + 6.0f, s0.y + 6.5f), ink, 1.2f);
+      // reset: a tiny black-over-white pair in the bottom-left corner
+      const ImVec2 r0(p.x + 1.5f, p.y + sq + 3.0f);
+      dl->AddRectFilled(ImVec2(r0.x + 2.5f, r0.y + 2.5f), ImVec2(r0.x + 7.0f, r0.y + 7.0f), IM_COL32(255, 255, 255, 255));
+      dl->AddRectFilled(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), IM_COL32(0, 0, 0, 255));
+      dl->AddRect(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), edge);
+      for (int i = 0; i < 2; i++)
+         if (ImGui::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
+         {
+            ImGui::ColorPicker3("##pick", i == 0 ? sFg : sBg, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview);
+            ImGui::EndPopup();
+         }
+   }
+
+   void DrawToolStrip(float h, Scene2DNode* doc)
+   {
+      const int cols = StripColumns(h);
+      const float w = StripWidth(cols);
+      ImGui::BeginChild("##v2dtools", ImVec2(w, h), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_1, tok::space_1));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
       for (int i = 0; i < 15; i++)
       {
-         // Gaps between the families: move, select, crop, paint, vector, view.
-         if (i == 2 || i == 5 || i == 6 || i == 10 || i == 13)
-            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         if (cols == 1 && SectionStart(i))
+         {
+            // A hairline between sections, centred in its gap.
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const float y = std::round(p.y + 0.5f * (tok::space_1 + 1.0f) - tok::space_1 * 0.5f);
+            dl->AddLine(ImVec2(p.x + 4.0f, y), ImVec2(p.x + w - 4.0f, y), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
+            ImGui::Dummy(ImVec2(w, 1.0f));
+         }
+         else if (cols > 1 && i % cols != 0)
+            ImGui::SameLine(0.0f, tok::space_1);
          if (IconChip(kTools[i].id, kTools[i].glyph, sTool == kTools[i].tool, T(kTools[i].tip)))
             sTool = kTools[i].tool;
       }
+      ImGui::Dummy(ImVec2(w, 0.0f));
+      ColourChips();
+      if (cols == 1)
+         ImGui::Dummy(ImVec2(w, 0.0f));
+      else
+         ImGui::SameLine(0.0f, tok::space_1);
+      if (IconChip("##v2dqm", IconsInfinite::QuickMask, doc->quickMask, T(doc->quickMask ? "Quick mask on (Q)" : "Quick mask (Q)")))
+         doc->quickMask = !doc->quickMask;
       ImGui::PopStyleVar();
       ImGui::EndChild();
    }
@@ -2933,21 +3021,21 @@ namespace
       ImGui::SetCursorPosY(y);
    }
 
-   void DrawHeader(Scene2DNode* doc)
+   // The context bar: what the current tool can do (plan §5). Laid out on one tile row from the cursor.
+   void DrawContextBarItems(Scene2DNode* doc);
+
+   // Wells, combos and chips share one 28 pt row: frames get the tile height so their text sits on the chips' line.
+   void DrawContextBar(Scene2DNode* doc)
    {
-      const float availW = ImGui::GetContentRegionAvail().x;
-      const float startX = ImGui::GetCursorPosX();
-      auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+      DrawContextBarItems(doc);
+      ImGui::PopStyleVar();
+   }
+
+   void DrawContextBarItems(Scene2DNode* doc)
+   {
+      auto gap = []() { BarDivider(); };
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
-      if (sTool != kCrop)
-         sCropOn = false;
-      if (sTool != kLasso)
-         sPoly.clear();
-      if (sTool != kPen && sPenItem >= 0)
-         FinishPen(doc);
-      if (sTool != kText && sTextEdit != 0)
-         EndTextEdit(doc);
-      // The context bar: what the current tool can do.
       Layer* a = Active(doc);
       if (sTool == kMove)
       {
@@ -2957,10 +3045,11 @@ namespace
          ImGui::SetCursorScreenPos(ImVec2(row0.x, row0.y + (tok::tile - CheckBox::kSize) * 0.5f));
          if (CheckBox::Box("##v2dauto", &autoSel))
             sAutoSelect = autoSel;
-         const float labelX = ImGui::GetItemRectMax().x + tok::space_1;
-         ImGui::SetCursorScreenPos(ImVec2(labelX, row0.y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f));
-         ImGui::TextDisabled("%s", T("Auto-select"));
-         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_3, row0.y));
+         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_1, row0.y));
+         CentredText(row0.y, T("Auto-select"));
+         if (ImGui::IsItemClicked())
+            sAutoSelect = !sAutoSelect;
+         gap();
          static const char* kAlign[6] = { "##al0", "##al1", "##al2", "##al3", "##al4", "##al5" };
          static const char* kAlignTip[6] = { "Align left edges", "Align horizontal centres", "Align right edges",
                                              "Align top edges", "Align vertical centres", "Align bottom edges" };
@@ -2973,7 +3062,7 @@ namespace
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                HelpTip("%s", T(kAlignTip[i]));
-            // Drawn: a bar for the edge and two blocks lined up on it.
+            // Drawn: a bar for the edge and two blocks lined up on it; bar at +-5 so bar + 10 pt block is centred in the chip.
             const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
             const ImVec2 c((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2981,7 +3070,7 @@ namespace
             const int side = i % 3;
             if (i < 3)
             {
-               const float x = side == 0 ? c.x - 6 : side == 1 ? c.x : c.x + 6;
+               const float x = side == 0 ? c.x - 5 : side == 1 ? c.x : c.x + 5;
                dl->AddLine(ImVec2(x, c.y - 7), ImVec2(x, c.y + 7), col, 1.5f);
                const float w1 = 10, w2 = 6;
                const float s1 = side == 0 ? x : side == 1 ? x - w1 / 2 : x - w1, s2 = side == 0 ? x : side == 1 ? x - w2 / 2 : x - w2;
@@ -2990,7 +3079,7 @@ namespace
             }
             else
             {
-               const float y = side == 0 ? c.y - 6 : side == 1 ? c.y : c.y + 6;
+               const float y = side == 0 ? c.y - 5 : side == 1 ? c.y : c.y + 5;
                dl->AddLine(ImVec2(c.x - 7, y), ImVec2(c.x + 7, y), col, 1.5f);
                const float h1 = 10, h2 = 6;
                const float s1 = side == 0 ? y : side == 1 ? y - h1 / 2 : y - h1, s2 = side == 0 ? y : side == 1 ? y - h2 / 2 : y - h2;
@@ -3020,8 +3109,10 @@ namespace
       }
       else if (sTool == kCrop && sCropOn)
       {
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextDisabled("%d x %d", (int)std::fabs(sCrop[2] - sCrop[0]), (int)std::fabs(sCrop[3] - sCrop[1]));
+         char dims[64];
+         std::snprintf(dims, sizeof(dims), "%d x %d", (int)std::fabs(sCrop[2] - sCrop[0]), (int)std::fabs(sCrop[3] - sCrop[1]));
+         const float rowTop = ImGui::GetCursorScreenPos().y;
+         CentredText(rowTop, dims);
          gap();
          if (TextChip(L("Apply##v2dcropok"), false, T("Crop the document (Enter)")))
          {
@@ -3055,26 +3146,65 @@ namespace
             sPan = ImVec2(0, 0);
          }
       }
-      ActionButton::RowNext();
+   }
+
+   void DrawHeader(Scene2DNode* doc)
+   {
+      const float availW = ImGui::GetContentRegionAvail().x;
+      const float startX = ImGui::GetCursorPosX();
+      if (sTool != kCrop)
+         sCropOn = false;
+      if (sTool != kLasso)
+         sPoly.clear();
+      if (sTool != kPen && sPenItem >= 0)
+         FinishPen(doc);
+      if (sTool != kText && sTextEdit != 0)
+         EndTextEdit(doc);
+      // Right cluster first, so the bar knows its room: [Convert] [Render] [Layers], right-aligned on the bar's row.
       const char* renderL = L("Render##v2drender");
-      const float renderW = ImGui::CalcTextSize(renderL, ImGui::FindRenderedTextEnd(renderL)).x + 2.0f * tok::space_3;
-      float rightX = startX + availW - kIconW;
-      float x = rightX - tok::space_1 - renderW;
       const char* convertL = L("Convert##v2dconvert");
-      const float convertW = ImGui::CalcTextSize(convertL, ImGui::FindRenderedTextEnd(convertL)).x + 2.0f * tok::space_3;
-      if (doc->panelOnly)
-         x -= tok::space_1 + convertW;
-      ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), x));
+      auto chipW = [](const char* l) { return ImGui::CalcTextSize(l, ImGui::FindRenderedTextEnd(l)).x + 2.0f * tok::space_2; };
+      const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + tok::space_1 + kIconW;
+      const float rowTop = ImGui::GetCursorScreenPos().y;
+      const float barRoom = availW - rightW - tok::space_3;
+      // A bar wider than its room is clipped at a chip edge-free boundary and a "..." chip opens the whole bar.
+      static float sBarW = 0.0f;
+      const bool overflow = sBarW > barRoom;
+      const float barX = ImGui::GetCursorScreenPos().x;
+      if (overflow)
+      {
+         const float clipW = std::max(0.0f, barRoom - kIconW - tok::space_1);
+         ImGui::BeginChild("##v2dbarclip", ImVec2(clipW, tok::tile), ImGuiChildFlags_None,
+                           ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
+         DrawContextBar(doc);
+         sBarW = ImGui::GetItemRectMax().x - barX;
+         ImGui::EndChild();
+         ImGui::SameLine(0.0f, tok::space_1);
+         if (TextChip("...##v2dmore", false, T("More options")))
+            ImGui::OpenPopup("##v2dbarmore");
+         if (MenuParts::BeginPopup("##v2dbarmore"))
+         {
+            DrawContextBar(doc);
+            MenuParts::EndPopup();
+         }
+      }
+      else
+      {
+         DrawContextBar(doc);
+         sBarW = ImGui::GetItemRectMax().x - barX;
+      }
+      ImGui::SameLine();
+      ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, ImGui::GetWindowPos().x + startX + availW - rightW), rowTop));
       if (doc->panelOnly)
       {
-         if (ActionButton::Draw(convertL, ImVec2(convertW, tok::tile)))
+         if (ActionButton::Draw(convertL, ImVec2(chipW(convertL), tok::tile)))
             sPending.what = Pending::Convert;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Put this document on the canvas"));
          FormParts::Inline(0.0f, tok::space_1);
       }
       ImGui::BeginDisabled(gOfflineRender.active);
-      if (ActionButton::Draw(renderL, ImVec2(renderW, tok::tile)))
+      if (ActionButton::Draw(renderL, ImVec2(chipW(renderL), tok::tile)))
          sPending.what = Pending::RenderImage;
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -3095,7 +3225,7 @@ namespace
       row0Y = ImGui::GetItemRectMin().y;   // every later item and the text share this chip's top edge
       next();
       float pct = sZoom * 100.0f;
-      ImGui::SetNextItemWidth(58.0f);
+      ImGui::SetNextItemWidth(kWellS);
       FieldWell::PushStyle();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
       const bool zoomTyped = ImGui::InputFloat("##v2dzoompct", &pct, 0.0f, 0.0f, "%.0f%%", ImGuiInputTextFlags_EnterReturnsTrue);
@@ -3123,8 +3253,7 @@ namespace
          std::snprintf(buf, sizeof(buf), "%d x %d   %.0f, %.0f   %.2f ms", d.w, d.h, sMouseDoc.x, sMouseDoc.y, doc->CookMs());
       else
          std::snprintf(buf, sizeof(buf), "%d x %d   %.2f ms", d.w, d.h, doc->CookMs());
-      ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, row0Y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f));
-      ImGui::TextDisabled("%s", buf);
+      CentredText(row0Y, buf);
    }
 
    // ---- layers list ------------------------------------------------------
@@ -3383,7 +3512,10 @@ namespace
       {
          const bool group = a->kind == Kind::Group;
          std::vector<std::string> names = BlendNames(a->blend, group);
-         ImGui::SetNextItemWidth(w * 0.5f - tok::space_1);
+         // Blend + Opacity, then Fill + Lock: tile-high wells so they share the chips' 28 pt rows, both rows flush to w.
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+         const float half = (w - tok::space_1) * 0.5f;
+         ImGui::SetNextItemWidth(half);
          const int offset = group ? -1 : 0;
          const int shown = std::clamp(a->blend - offset, 0, (int)names.size() - 1);
          if (MenuParts::BeginCombo("##v2dblend", names[shown].c_str()))
@@ -3398,7 +3530,7 @@ namespace
             MenuParts::EndCombo();
          }
          FormParts::Inline(0.0f, tok::space_1);
-         ImGui::SetNextItemWidth(w * 0.5f - tok::space_1);
+         ImGui::SetNextItemWidth(w - half - tok::space_1);
          float pct = a->opacity * 100.0f;
          if (FieldWell::Slider("##v2dopacity", &pct, 0.0f, 100.0f, "Opacity %.0f%%"))
          {
@@ -3406,7 +3538,8 @@ namespace
             Touch();
          }
          UndoOnActivate("Opacity");
-         ImGui::SetNextItemWidth(w * 0.5f - tok::space_1);
+         const float lockW = ImGui::CalcTextSize(T("Lock")).x + 4.0f * (tok::space_1 + kIconW);
+         ImGui::SetNextItemWidth(std::max(kWellM, w - lockW - tok::space_1));
          float fillPct = a->fill * 100.0f;
          if (FieldWell::Slider("##v2dfill", &fillPct, 0.0f, 100.0f, "Fill %.0f%%"))
          {
@@ -3414,30 +3547,32 @@ namespace
             Touch();
          }
          UndoOnActivate("Fill");
-         FormParts::Inline(0.0f, tok::space_1);
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextDisabled("%s", T("Lock"));
-         struct { unsigned bit; const char* label; const char* tip; } kLocks[4] = {
-            { Scene2DNode::kLockAlpha, "A##lk0", "Lock transparent pixels" },
-            { Scene2DNode::kLockPixels, "P##lk1", "Lock image pixels" },
-            { Scene2DNode::kLockPosition, "M##lk2", "Lock position" },
-            { Scene2DNode::kLockAll, "All##lk3", "Lock all" },
+         // Lock row, Photoshop's four icons: transparent pixels, image pixels, position, all.
+         struct { unsigned bit; const char* id; const char* glyph; const char* tip; } kLocks[4] = {
+            { Scene2DNode::kLockAlpha, "##lk0", IconsInfinite::GridDots, "Lock transparent pixels" },
+            { Scene2DNode::kLockPixels, "##lk1", IconsInfinite::Brush, "Lock image pixels" },
+            { Scene2DNode::kLockPosition, "##lk2", IconsInfinite::ToolMove, "Lock position" },
+            { Scene2DNode::kLockAll, "##lk3", IconsInfinite::Lock, "Lock all" },
          };
+         FormParts::Inline(0.0f, tok::space_1);
+         const float lockTop = ImGui::GetCursorScreenPos().y;
+         CentredText(lockTop, T("Lock"));
          for (auto& lk : kLocks)
          {
             FormParts::Inline(0.0f, tok::space_1);
-            if (TextChip(lk.label, (a->lock & lk.bit) != 0, T(lk.tip)))
+            if (IconChip(lk.id, lk.glyph, (a->lock & lk.bit) != 0, T(lk.tip)))
             {
                PushUndoCheckpoint("Lock layer");
                a->lock ^= lk.bit;
                Touch();
             }
          }
+         ImGui::PopStyleVar();
       }
       ImGui::BeginChild("##v2dlayers", ImVec2(w, listH), ImGuiChildFlags_None);
       const float rowsW = ImGui::GetContentRegionAvail().x;
       if (doc->Layers().empty())
-         ImGui::TextDisabled("%s", T("Right-click a node and choose Add to 2D View"));
+         CentredText(ImGui::GetCursorScreenPos().y, T("No layers"));
       DrawLayerRows(doc, 0, 0, rowsW);
       // Dropping below the last row puts a layer at the bottom of the document.
       ImGui::Dummy(ImVec2(rowsW, std::max(8.0f, ImGui::GetContentRegionAvail().y)));
@@ -3456,7 +3591,9 @@ namespace
          ImGui::EndDragDropTarget();
       }
       ImGui::EndChild();
-      // The strip under the list, as in every layers panel.
+      // The strip under the list, as in every layers panel, centred under it.
+      const float footW = 7 * kIconW + 6 * tok::space_1;
+      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
       if (IconChip("##v2dnewpaint", IconsInfinite::Brush, false, T("New layer")))
          sPending.what = Pending::AddPaint;
       FormParts::Inline(0.0f, tok::space_1);
@@ -3491,7 +3628,7 @@ namespace
       Layer* l = Active(doc);
       if (l == nullptr)
       {
-         ImGui::TextDisabled("%s", T("No layer selected"));
+         CentredText(ImGui::GetCursorScreenPos().y, T("No layer selected"));
          return;
       }
       SectionCard::Begin(T("Layer"));
@@ -3789,7 +3926,10 @@ namespace
       GraphNode* self = DocGraphNode();
       auto nameOf = [](const GraphNode* gn) { return std::string("Document ") + std::to_string(gn->index); };
       ImGui::SetNextItemWidth(w - kIconW - tok::space_1);
-      if (MenuParts::BeginCombo("##v2ddocs", self != nullptr ? nameOf(self).c_str() : ""))
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+      const bool docsOpen = MenuParts::BeginCombo("##v2ddocs", self != nullptr ? nameOf(self).c_str() : "");
+      ImGui::PopStyleVar();
+      if (docsOpen)
       {
          for (GraphNode* gn : docs)
             if (MenuParts::Choice((nameOf(gn) + "##d" + std::to_string(gn->uid)).c_str(), gn == self))
@@ -3828,12 +3968,15 @@ namespace
       DrawLayersCard(doc, availW, std::max(90.0f, roomH * 0.42f - 70.0f));
       ImGui::Dummy(ImVec2(0, tok::space_1));
       const struct { const char* id; const char* label; } kTabs[3] = { { "##v2dt0", "Layer" }, { "##v2dt1", "Document" }, { "##v2dt2", "Output" } };
+      const float tabW = std::floor((availW - 2.0f * tok::space_1) / 3.0f);
       for (int i = 0; i < 3; i++)
       {
          if (i > 0)
             FormParts::Inline(0.0f, tok::space_1);
-         if (TextChip((std::string(T(kTabs[i].label)) + kTabs[i].id).c_str(), sTab == i, nullptr))
+         ActionButton::Scoped() = sTab == i ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+         if (ActionButton::Draw((std::string(T(kTabs[i].label)) + kTabs[i].id).c_str(), ImVec2(i == 2 ? availW - 2.0f * (tabW + tok::space_1) : tabW, tok::tile)))
             sTab = i;
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
       }
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::kPad, 0.0f));
       ImGui::BeginChild("##v2dprops", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
@@ -4214,10 +4357,11 @@ namespace
       const float viewW = std::max(120.0f, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
       const float statusH = tok::tile + ImGui::GetStyle().ItemSpacing.y;
       const float canvasH = std::max(80.0f, avail.y - statusH);
-      DrawToolStrip(canvasH);
+      const float stripW = StripWidth(StripColumns(canvasH));
+      DrawToolStrip(canvasH, doc);
       ActionButton::RowNext();
       ImGui::BeginGroup();
-      DrawCanvas(doc, ImVec2(viewW - kIconW - tok::space_1, canvasH));
+      DrawCanvas(doc, ImVec2(viewW - stripW - tok::space_1, canvasH));
       DrawStatus(doc);
       ImGui::EndGroup();
       if (sSideOpen)

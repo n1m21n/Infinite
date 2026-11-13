@@ -81,7 +81,9 @@ namespace ActionButton
       const float x0 = p.x + (w - ts.x - iconW) * 0.5f;
       if (glyph != nullptr)
          glyph::Draw(dl, ImVec2(std::round(x0 + 7.0f), std::round(p.y + h * 0.5f)), 14.0f, ink, glyph);
-      dl->AddText(ImVec2(std::round(x0 + iconW), std::round(p.y + (h - ts.y) * 0.5f)), ink, shown.c_str());
+      // Snap to device pixels, not points: 13 pt text in a 28 pt tile sits at 7.5 pt, where ImGui's own frames put it.
+      const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
+      dl->AddText(ImVec2(std::round(x0 + iconW), std::round((p.y + (h - ts.y) * 0.5f) * px) / px), ink, shown.c_str());
       return clicked;
    }
 
