@@ -407,13 +407,13 @@ namespace app
       }
       // "ui": synthetic ImGui input for scripted documentation shots (tools/manual/ui_shots_offscreen.py), so menus,
       // right-click menus and dropdowns can be opened in an off-screen run. x, y are window points.
-      // actions: move {x,y}; click {x,y,button 0|1|2, double}; down / up {x,y,button} (a drag is down, move, up); key {key: escape|enter|tab|up|down|left|right|a..z|0..9,
+      // actions: move {x,y}; click {x,y,button 0|1|2, double}; wheel {x,y,dx,dy}; text {text} (typed characters); down / up {x,y,button} (a drag is down, move, up); key {key: escape|enter|tab|up|down|left|right|a..z|0..9,
       // shift, ctrl, alt, super}. ImGui trickles the queued events, so a down and up land on separate frames.
       if (method == "ui")
       {
          ImGuiIO& io = ImGui::GetIO();
          const std::string action = params.value("action", std::string());
-         if (action == "move" || action == "click" || action == "down" || action == "up")
+         if (action == "move" || action == "click" || action == "down" || action == "up" || action == "wheel")
             io.AddMousePosEvent(params.value("x", 0.0f), params.value("y", 0.0f));
          if (action == "down" || action == "up")
             io.AddMouseButtonEvent(std::clamp(params.value("button", 0), 0, 2), action == "down");
@@ -458,6 +458,10 @@ namespace app
                if (params.value(name, false))
                   io.AddKeyEvent(m, false);
          }
+         else if (action == "wheel")
+            io.AddMouseWheelEvent(params.value("dx", 0.0f), params.value("dy", 0.0f));
+         else if (action == "text")
+            io.AddInputCharactersUTF8(params.value("text", std::string()).c_str());
          else if (action != "move" && action != "down" && action != "up")
          {
             outError = "unknown ui action '" + action + "'";
