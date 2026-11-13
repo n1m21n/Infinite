@@ -5,8 +5,53 @@
   <link>https://infinitedevices.org/blog/</link>
   <description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
   <language>en-gb</language>
-  <lastBuildDate>Thu, 12 Nov 2026 09:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Fri, 13 Nov 2026 09:00:00 +0000</lastBuildDate>
   <atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item>
+    <title>Real-time STFT phase vocoder kernels in Spectral Field</title>
+    <link>https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html</link>
+    <guid isPermaLink="true">https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html</guid>
+    <pubDate>Fri, 13 Nov 2026 09:00:00 +0000</pubDate>
+    <dc:creator>Naman Soni</dc:creator>
+    <category>product</category>
+    <description>How Infinite runs per-bin STFT phase vocoder kernels on the audio thread: zero-phase framing, identity phase locking, per-bin state, and dual-mode synthesis.</description>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_spectral-field-real-time-stft-phase-vocoder-kernels.png" alt="Technical architecture diagram of Spectral Field in Infinite showing Hann-windowed STFT analysis, per-bin register kernel execution, identity phase locking, and overlap-add synthesis" /></p>
+<p>Most audio environments split spectral processing into two rigid camps: fixed-function plugins like spectral gates and pitch shifters, or offline Python scripts that cannot run on a live audio callback. Writing a custom phase vocoder normally means managing ring buffers, FFT twiddle factors, phase unwrapping, and overlap-add normalisation in C++ before you hear a single bin.</p>
+<p>In <a href="https://infinitedevices.org/">Infinite</a>, the <strong>Spectral Field</strong> node (<code>AudioEffects / Spectral Field</code>) compiles <a href="https://infinitedevices.org/blog/per-sample-dsp-audio-kernels-in-field-language.html">Field language</a> kernels to run once per frequency bin inside a real-time Short-Time Fourier Transform (STFT) host. You write short expressions over bin magnitude, phase, and instantaneous frequency, and the engine handles framing, phase coherence, and latency-compensated dry/wet mixing on the audio thread with zero allocations.</p>
+<h2 id="streaming-stft-architecture-and-zero-phase-framing">Streaming STFT architecture and zero-phase framing</h2>
+<p><code>SpectralFieldEngine</code> processes up to two channels (<code>kMaxChannels = 2</code>) using power-of-two FFT sizes from <code>512</code> to <code>8192</code> samples (<code>2048</code> by default), selectable directly on the node card. The hop size is fixed at <code>Size / 4</code> (75% overlap) with a periodic Hann analysis and synthesis window. Because a squared Hann window at 75% overlap sums to <code>1.5</code>, the overlap-add stage divides by <code>Size * 1.5</code> for unity reconstruction.</p>
+<p>Before the forward real FFT runs, each windowed frame is circularly rotated by <code>Size / 2</code> samples (zero-phase framing). Rotating the buffer places the window peak at sample index <code>0</code>, so all bins within a sinusoid's main lobe share a single phase rather than alternating sign across adjacent bins. That property becomes critical when a kernel shifts frequencies and triggers phase locking.</p>
+<h3 id="built-in-variables-inside-a-spectral-field-kernel">Built-in variables inside a Spectral Field kernel</h3>
+<p>For each hop, the engine analyses <code>bins = Size / 2 + 1</code> frequency bins and executes the compiled <code>SampleProgram</code> register machine across <code>k = 0 .. bins - 1</code>:</p>
+<ul><li><code>mag</code>: Window-gain-compensated bin magnitude (<code>1.0</code> for a 0 dBFS sine on its peak bin, clamped at <code>+60 dB</code> on output).</li><li><code>phase</code>: Analysis phase in radians.</li><li><code>freq</code>: Instantaneous bin frequency in Hz, computed from the inter-frame phase advance (<code>Csound pvs</code> style).</li><li><code>bin</code> and <code>bins</code>: Current bin index and total bin count (<code>Size / 2 + 1</code>).</li><li><code>binhz</code>: Bin spacing in Hz (<code>sr / Size</code>).</li><li><code>sr</code>: Audio sample rate in Hz.</li><li><code>state</code>: Persistent per-bin memory banks (<code>stateA</code> and <code>stateB</code>) swapped each frame so <code>state.at(k)</code> reads the previous frame's value.</li><li><code>input bin audio B</code>: Optional second audio input (<code>B.mag</code>, <code>B.phase</code>, <code>B.freq</code>) for cross-synthesis.</li></ul>
+<h2 id="dual-synthesis-modes-vocoder-vs-raw-phase">Dual synthesis modes: vocoder vs raw phase</h2>
+<p>The engine inspects what the kernel writes at compile time to pick between two reconstruction paths, without requiring a manual mode switch:</p>
+<ol><li><strong>Vocoder mode (default)</strong>: When the kernel leaves <code>phase</code> untouched and modifies <code>mag</code> or <code>freq</code>, any bin whose output <code>freq</code> equals the analysis <code>freq</code> keeps its exact analysis phase. Magnitude-only kernels such as <code>Low-pass</code> or <code>Gate</code> therefore reconstruct with zero phase smear. Any bin whose <code>freq</code> changed advances its previous synthesis phase by <code>2 * pi * freq * hop / sr</code>.</li><li><strong>Raw phase mode</strong>: When the kernel explicitly assigns <code>phase</code>, the inverse FFT rebuilds each bin directly from <code>mag</code> and the kernel's <code>phase</code>. This allows effects like <code>Robot / whisper</code> (setting <code>phase = 0</code> for a metallic robotised buzz or <code>rand() * 2 * pi</code> for whispered noise) or <code>Cross-synth</code> (<code>phase = B.phase</code>).</li></ol>
+<h2 id="identity-phase-locking-for-pitch-and-frequency-shifts">Identity phase locking for pitch and frequency shifts</h2>
+<p>Naive phase vocoders smear transients and produce a hollow, phasiness artefact when bins are shifted in frequency, because adjacent bins belonging to the same sinusoidal peak drift out of phase. To preserve vertical phase coherence, <code>SpectralFieldEngine</code> applies identity phase locking (Laroche and Dolson, 1999) over every contiguous run of moved bins in vocoder mode.</p>
+<p>For each run of moved bins, the engine locates local magnitude peaks (<code>outMag[j] &amp;gt; outMag[j - 1]</code> and <code>outMag[j] &amp;gt;= outMag[j + 1]</code>). Between every pair of consecutive peaks, it finds the lowest magnitude valley and assigns the peak's synthesis phase to all bins in that peak's region. Because zero-phase framing already aligned the main lobe around each peak, locking the region to the peak phase keeps harmonics tight during pitch shifts and frequency warps.</p>
+<h2 id="practical-spectral-kernels-in-a-few-lines">Practical spectral kernels in a few lines</h2>
+<p>All eight factory presets in <code>SpectralFieldNode</code> demonstrate how compact per-bin expressions map to classic spectral DSP. A frequency shifter reads magnitude and frequency from a fractional bin offset using <code>.at()</code> interpolation:</p>
+<pre><code class="language-field">param float shift = 200 [-2000, 2000]
+k = bin - shift / binhz
+mag = mag.at(k)
+freq = freq.at(k) + shift</code></pre>
+<p>A spectral freeze holds the last captured magnitude and frequency per bin using two <code>state</code> cells:</p>
+<pre><code class="language-field">param float hold = 0 [0, 1]
+state float m = 0
+state float f = 0
+m = if(hold &gt; 0.5, m, mag)
+f = if(hold &gt; 0.5, f, freq)
+mag = m
+freq = f</code></pre>
+<p>Because <code>SpectralFieldNode</code> maintains a <code>ParamMailbox</code> for lock-free parameter smoothing and swaps compiled programs via <code>SampleSlotT</code>, you can edit kernel code live or modulate <code>hold</code>, <code>shift</code>, and <code>cutoff</code> from any LFO, envelope, or visual modulator in the <a href="https://infinitedevices.org/library.html">Infinite node library</a>.</p>
+<h2 id="real-time-safety-latency-and-honest-limits">Real-time safety, latency, and honest limits</h2>
+<p><code>SpectralFieldEngine::Prepare()</code> pre-allocates all FIFOs, overlap-add rings, FFT scratch buffers, and per-bin state banks for <code>kMaxSize = 8192</code> on the main thread. Switching FFT sizes via <code>SetSizeLog2()</code>, resetting transport, and running <code>Process()</code> on the audio thread never allocate or take a lock.</p>
+<p>There are clear engineering trade-offs to keep in mind. Latency is always equal to the chosen FFT <code>Size</code> (<code>512</code> to <code>8192</code> samples, or roughly <code>10.7 ms</code> to <code>170.7 ms</code> at <code>48 kHz</code>), which <code>AudioSpectralFieldNode</code> reports via <code>LatencySamples()</code> and compensates internally on its dry delay ring (<code>mDry</code>) so the <code>mix</code> knob stays phase-aligned. Processing is currently capped at stereo (<code>2</code> channels), and changing the FFT size resets the overlap-add ring and per-bin state.</p>
+<p>For developers building custom audio-visual instruments or automated headless patches, <code>Spectral Field</code> brings per-bin STFT programming into the same unified graph as 3D geometry, shaders, and modulators. Explore the full node catalogue and architecture details on the <a href="https://infinitedevices.org/developers.html">Infinite developers page</a>.</p>
+<hr />
+<p><em>Originally published at <a href="https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html">https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html</a>. Infinite is a free, open-source DAW for visuals, music and code: <a href="https://infinitedevices.org">infinitedevices.org</a>.</em></p>]]></content:encoded>
+  </item>
   <item>
     <title>Modal synthesis and metallic percussion in real time</title>
     <link>https://infinitedevices.org/blog/modal-synthesis-and-physical-modelling-of-metallic-percussion.html</link>

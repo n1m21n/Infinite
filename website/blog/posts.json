@@ -1,5 +1,14 @@
 [
  {
+  "slug": "spectral-field-real-time-stft-phase-vocoder-kernels",
+  "title": "Real-time STFT phase vocoder kernels in Spectral Field",
+  "description": "How Infinite runs per-bin STFT phase vocoder kernels on the audio thread: zero-phase framing, identity phase locking, per-bin state, and dual-mode synthesis.",
+  "date": "2026-11-13",
+  "updated": "2026-11-13",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html"
+ },
+ {
   "slug": "modal-synthesis-and-physical-modelling-of-metallic-percussion",
   "title": "Modal synthesis and metallic percussion in real time",
   "description": "How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.",
