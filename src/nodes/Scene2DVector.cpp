@@ -546,7 +546,8 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       {
          Platform::TextRasterRequest req;
          req.text = l.text;
-         req.fontName = l.font.empty() ? (Platform::AvailableFontFamilies().empty() ? std::string("Helvetica") : Platform::AvailableFontFamilies().front()) : l.font;
+         // Empty = the platform's own default sans (as the Text node), not the alphabetically first family.
+         req.fontName = l.font;
          req.fontSize = size;
          req.color[0] = l.textC[0];
          req.color[1] = l.textC[1];

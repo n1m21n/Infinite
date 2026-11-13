@@ -848,6 +848,7 @@ void DrawNodeBodies(FrameCtx& fc)
                                          (gn.IsParamDriven() || gHeadlessProbeAll || gn.index == gParamProbeNode);
          ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
          const bool savedSkipItems = paramsWindow->SkipItems;
+         const ImVec2 savedCursor = paramsWindow->DC.CursorPos;
          if (registerOnlyParams)
          {
             gParamRegisterOnly = true;
@@ -1469,6 +1470,10 @@ void DrawNodeBodies(FrameCtx& fc)
          {
             ImGui::GetWindowDrawList()->PopClipRect();
             paramsWindow->SkipItems = savedSkipItems;
+            // A skipped body still moves the cursor (SetCursorScreenPos is not an item): put it back, so EndGroup
+            // does not see a group grown by a body that drew nothing.
+            paramsWindow->DC.CursorPos = savedCursor;
+            paramsWindow->DC.IsSetPos = false;
             gParamRegisterOnly = false;
          }
 

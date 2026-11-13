@@ -767,14 +767,15 @@ namespace PatchSchema
          else if (terminals.empty())   // an audio-only patch (Audio Out / Spatial Mixer) is complete: it is measured, not rendered
             warnings.push_back(Make("W_NO_OUTPUT", "the patch has no Output node, so it cannot be rendered", 0, -1));
       }
-      // A 3D View reads its sources by uid, so its scene text is its cables.
+      // A 3D View and a Scene 2D read their sources by uid, so their scene / doc text is their cables.
       for (const Patch::NodeRecord& n : data.nodes)
       {
-         if (n.typeName != "3D View")
+         const bool view2d = n.typeName == "Scene 2D";
+         if (n.typeName != "3D View" && !view2d)
             continue;
          for (const auto& param : n.params)
          {
-            if (param.first != "s scene")
+            if (param.first != (view2d ? "s doc" : "s scene"))
                continue;
             std::string text = param.second;
             for (size_t at = text.find("\\n"); at != std::string::npos; at = text.find("\\n", at))
@@ -789,8 +790,17 @@ namespace PatchSchema
                l >> key;
                if (key == "item")
                   l >> id >> uid;
-               else if (key == "world")
+               else if (key == "world" || key == "cam")
                   l >> uid;
+               else if (view2d && key == "layer")
+               {
+                  int kind = 0, parent = 0;
+                  l >> id >> kind >> parent >> uid;
+                  if (kind != 0)
+                     uid = 0;
+               }
+               else if (view2d && key == "mask")
+                  l >> id >> uid;
                if (uid == 0)
                   continue;
                for (const Patch::NodeRecord& src : data.nodes)
