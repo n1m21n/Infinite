@@ -48,6 +48,23 @@ No new scene. Three existing ones cover what one scene cannot, and the timing me
 | S1.4 | Path length by throughput: roulette from bounce 1 on diffuse. Today every branch (diffuse, glass, fog, subsurface) starts it at bounce 2, so this is one bounce earlier, a small gain | closed rooms spend most rays on dim deep bounces | ref_interior pass time drops 15 % or more, brightness within 1 % |
 | S1.5 | Preview only: settle at 67 % size through the MetalFX scaler live already uses | first clean picture sooner while working | never used on export |
 
+**S1.1 result (2026-11-13): dropped.** Built and measured at 960x540, 256 spp, against the same build tracing every pixel
+(commit 6d638de0, reverted in 6789116c; bring it back by reverting that revert):
+
+| Variant | judge_table GPU s | FLIP vs full | ref_interior GPU s | FLIP vs full |
+|---|---|---|---|---|
+| every pixel | 27.9 | 0 | 47.8 | 0 |
+| per-pixel stop 0.05, from 16 spp | 21.0 (1.33x) | 0.0155 (picture darker) | | |
+| stop 0.05 from 128 spp | 21.7 (1.29x) | 0.0091 | | |
+| stop 0.05 from 64 spp, 3x3 neighbours must agree | 23.7 (1.18x) | 0.0068 | 43.5 (1.10x) | 0.0034 |
+| stop 0.025 from 64 spp, 3x3 neighbours | 27.2 (1.03x) | 0.0007 | | |
+
+Why it does not pay: the time goes into glass, edges and dim corners, which do not converge before the count runs out;
+the flat table is cheap per sample already. A pixel judged on its own stops early when its samples happened to miss a
+bright path, so the picture darkens (the 3x3 rule fixes most of that and takes the gain with it). It also needs two more
+full-size RGBA32F targets (66 MB at 1080p). Better routes to the same goal are S1.2 (denoise through glass) and better
+sampling of the dim corners (S1.5), not stopping the easy pixels.
+
 ### Block S2: live speed and the glass path
 
 | Step | What | Done when |
@@ -83,6 +100,10 @@ water surface) before S1, because S1.2 changes how glass is sampled and should s
 | 4 | `judge_render.py probe --size 960 720 --lift 0.0005 --tag lift --ref ulp` | ~3 min (Blender writes the moved glbs once) | the light glass base: dark when lifted means the exact glass-table contact is the cause |
 | 5 | S1.0 Sobol: `speed.py equal judge_table ref_interior --engines settle --budget 15` (built in with the ulp offset; compare against the S0 rows 42.5 s and 45.2 s) | ~12 min | keep S1.0 only if both drop 1.3x or more |
 | 6 | `speed.py equal judge_table ref_interior --engines settle` after each later S1 step | ~5 min each | the keep-or-drop number for that step |
+
+Row 5 also repairs a stale cell: the judge_table settle ladder and its 1024 spp reference in `results.json` were
+re-rendered at 15:20 on 2026-11-13 by the S1.1 build with the per-pixel stop on (the ladder flattens at FLIP 0.019 and
+reads "never"). Row 5 overwrites both; the ref_interior settle rows were not touched.
 
 Note for picture checks: Cycles' bounce cap of 8 (speed.py) turns half the glass black, because Cycles counts every
 glass interface as a bounce; picture truth keeps Cycles' default bounces (blender_scene.py only caps when asked).
