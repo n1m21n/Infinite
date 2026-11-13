@@ -82,12 +82,12 @@ commit. No pasted logs, no file-by-file retelling: the commit holds that. When a
 | 9.5 | done (raster, needs 9.3). Settle 64px light_area timed out at 900s on lavapipe; raster (LIVE_ENGINE=7) 256px 6-15s/case, 4/4 within 0.02 FLIP of Mac Vulkan (interior 0.0003, materials/cornell 0.0001, light_area 0.0000). vs Metal live 0/4 (Vulkan raster has no RT GI/shadows) | see git log |
 | hero_shoe | done (the judge, sheets/hero-shoe.jpg). Tuned studio lights + sweep (hero0 0.080 -> hero1 0.055 at 640x480 64spp), then 1280x960 256spp: FLIP 0.054 (141.6 s). Verdict: stands next to Cycles; clean knit, sole, stripes, soft shadow, minor rim/sole-edge diff | see git log |
 | end_sweep | done (64 cases, hair skipped, --budget 15 per engine, tag end). raster 256s: 0 worse/0 better (sum -0.000 vs f0); live 483s: 0 worse/0 better (sum +0.000 vs f86); settle s16 316s: 0 worse/0 better (sum -0.005 vs f0) | see git log |
-| judge_table | done, both gates fail (sheets/judge-table.jpg, 1920x1440). Cycles 1024spp 271 s; GL PT 256spp 322 s FLIP 0.079; settle 256spp 108 s FLIP 0.087 (gate 0.06), 3x faster than PT (gate 5x); live 34 s 0.097. Glass decides it. Owner's photo/render call open | see git log |
+| judge_table | done, both gates fail (sheets/judge-table.jpg, 1920x1440). Cycles 1024spp 194 s; GL PT 256spp 315 s FLIP 0.079; settle 256spp 120 s FLIP 0.080 (gate 0.06), 2.6x faster than PT (gate 5x); live 39 s 0.097. Settle glass clear after ray-offset fix. Owner's call open | see git log |
 
 judge_table defects (procedural table, tools/blender-ab/judge_table.py):
-1. Settle: the glass with water does not refract the scene behind it and its base turns milky white; Cycles and GL Path trace show it clear.
+1. Settle: the glass with water did not refract the scene behind it and its base turned milky white. Fixed (see 6): the glass is clear, FLIP 0.087 -> 0.080. Left: the water surface is dark where Cycles shows the window, the thick base is light where Cycles is black.
 2. Live: the glass is opaque blue with a dark top in all 30 orbit frames, the mug handle renders black, the knit shows moire.
 3. Settle: a small refractive solid resting on a surface (water droplets) renders black; the case uses coated beads instead.
 4. Render 3D's albedo pass ignores a Field material's colour (flat knob grey), so the Cycles bake goes through unlit emission renders.
 5. Sketch 3D has no lathe and shades custom shapes flat; the lathes are meshed from one profile in Python and loaded as glb.
-6. Cause of 1 and 3: every new ray starts a fixed 3 mm off the surface (Frame.rayBias, never set), thicker than the 1.7 mm glass wall, the 0.2 mm gap to the water and the droplets, so rays step over surfaces.
+6. Cause of 1 and 3: every new ray starts a fixed 3 mm off the surface (Frame.rayBias, never set), thicker than the 1.7 mm glass wall, the 0.2 mm gap to the water and the droplets, so rays step over surfaces. Fixed: the offset is 1e-4 of the focus distance, at most 3 mm (Render3DEngine.cpp). Refractive droplets were not re-tested at full size; the case keeps coated beads. Live glass (2) is unchanged.
