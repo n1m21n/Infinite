@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vaporwave Mallsoft Rhodes Pad Synth",
+    "author": "Infinite",
+    "description": "Lush detuned electric-tine pad synthesizer with slow tape wow, soft FM bell shimmer, and warm lowpass bloom.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float tine = 0.42 [0.0, 1.2];\nparam float detune = 0.012 [0.0, 0.035];\nparam float warmth = 1600.0 [300.0, 4200.0];\nparam float wow = 0.35 [0.0, 1.0];\nparam float decay = 0.85 [0.2, 2.0];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float pMod = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.03);\nenv = if(target > env, env + (target - env) * 0.06, env - env * decayRate);\n\nlfo = (lfo + 0.9 / sr) % 1.0;\npitchWow = 1.0 + sin(6.2831853 * lfo) * wow * 0.008;\n\nf0 = clamp(freq * pitchWow, 40.0, 2600.0);\np1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;\np2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;\npMod = (pMod + (f0 * 3.0) / sr) % 1.0;\n\nmodSig = sin(6.2831853 * pMod) * tine * env * env;\nv1 = sin(6.2831853 * p1 + modSig);\nv2 = sin(6.2831853 * p2 + modSig * 0.65);\nraw = (v1 + v2) * 0.5;\n\nfCut = clamp(warmth / sr * 3.14, 0.01, 0.44);\nlp = lp + fCut * (raw - lp);\n\nout = lp * env * 0.78;\n",
+    "params": {
+      "tine": 0.42,
+      "detune": 0.012,
+      "warmth": 1600.0,
+      "wow": 0.35,
+      "decay": 0.85
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

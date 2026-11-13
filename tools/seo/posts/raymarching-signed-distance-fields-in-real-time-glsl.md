@@ -4,7 +4,7 @@ description: How to build a real-time raymarcher in GLSL: sphere tracing algorit
 date: 2026-10-23
 category: creative
 tags: [raymarching, signed distance fields, glsl shaders, creative coding, 3d shaders]
-image: assets/blog_raymarching_signed_distance_fields_in_real_time_glsl.png
+image: assets/blog_raymarching-signed-distance-fields-in-real-time-glsl.png
 image_alt: Raymarching signed distance fields diagram showing sphere tracing steps, primitive distance functions, polynomial smooth min blending, and lighting normals
 keywords: raymarching signed distance fields in real-time glsl, sphere tracing algorithm, sdf glsl functions, audio-reactive raymarching, real-time shader coding
 status: published

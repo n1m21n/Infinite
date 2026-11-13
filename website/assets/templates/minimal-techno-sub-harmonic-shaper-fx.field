@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Minimal Techno Sub Harmonic Shaper FX",
+    "author": "Infinite",
+    "description": "Plastikman-inspired resonant lowpass sculpt and asymmetric soft-clipper for tight minimal techno basslines and percussive clicks.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float drive = 2.4 [1.0, 6.0];\nparam float cutoff = 0.42 [0.05, 0.95];\nparam float resonance = 0.45 [0.0, 0.85];\nparam float mix = 0.72 [0.0, 1.0];\nstate float lp1 = 0;\nstate float lp2 = 0;\n\nu = in * drive + 0.06;\nsat = (u / (1.0 + abs(u) * 0.55)) - 0.04;\n\nfCut = clamp(0.04 + cutoff * 0.38, 0.02, 0.44);\nfb = clamp(resonance * 1.35, 0.0, 1.15);\nlp1 = lp1 + fCut * (sat - lp2 * fb * 0.35 - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nprocessed = in * (1.0 - mix) + lp2 * mix;\nout = processed * 1.35;\n",
+    "params": {
+      "drive": 2.4,
+      "cutoff": 0.42,
+      "resonance": 0.45,
+      "mix": 0.72
+    }
+  }
+}

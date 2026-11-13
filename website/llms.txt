@@ -293,6 +293,14 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [IDM Algorithmic Drift Reese Synth](https://infinitedevices.org/library/idm-algorithmic-drift-reese-synth.html): Complex drifting IDM bass synthesizer featuring phase-jittered dual detuned saw/pulse oscillators, tape-flutter pitch modulation, and soft asymmetric saturation. (file: https://infinitedevices.org/assets/templates/idm-algorithmic-drift-reese-synth.inf)
 - [Breakbeat Transient Saturation Drive FX](https://infinitedevices.org/library/breakbeat-transient-saturation-drive-fx.html): Dynamic breakbeat drum bus saturator featuring punchy transient envelope detection, analog diode clipping, and low-end warmth emphasis. (file: https://infinitedevices.org/assets/templates/breakbeat-transient-saturation-drive-fx.inf)
 - [Breakbeat Syncopated Tape Echo FX](https://infinitedevices.org/library/breakbeat-syncopated-tape-echo-fx.html): Tempo-synced syncopated ping-pong tape echo featuring dotted-eighth delay taps, tape flutter modulation, and high-frequency saturation in the feedback loop. (file: https://infinitedevices.org/assets/templates/breakbeat-syncopated-tape-echo-fx.inf)
+- [Downtempo Warm Sub Tape Bass Synth](https://infinitedevices.org/library/downtempo-warm-sub-tape-bass-synth.html): Trip-hop sub-weighted analog bass synthesizer with tape saturation, subtle pitch drift, and resonant lowpass envelope. (file: https://infinitedevices.org/assets/templates/downtempo-warm-sub-tape-bass-synth.inf)
+- [Downtempo Dusty Rhodes Bell Pad Synth](https://infinitedevices.org/library/downtempo-dusty-rhodes-bell-pad-synth.html): Warm dusty electric-tine and bell pad synthesizer with soft FM overtone bloom, gentle chorus detune, and mellow decay. (file: https://infinitedevices.org/assets/templates/downtempo-dusty-rhodes-bell-pad-synth.inf)
+- [Minimal Techno Dub Chord Echo FX](https://infinitedevices.org/library/minimal-techno-dub-chord-echo-fx.html): Basic Channel-inspired damped stereo dub delay network with dark feedback filtering and subtle tape pitch drift. (file: https://infinitedevices.org/assets/templates/minimal-techno-dub-chord-echo-fx.inf)
+- [Minimal Techno Sub Harmonic Shaper FX](https://infinitedevices.org/library/minimal-techno-sub-harmonic-shaper-fx.html): Plastikman-inspired resonant lowpass sculpt and asymmetric soft-clipper for tight minimal techno basslines and percussive clicks. (file: https://infinitedevices.org/assets/templates/minimal-techno-sub-harmonic-shaper-fx.inf)
+- [Vaporwave Mallsoft Rhodes Pad Synth](https://infinitedevices.org/library/vaporwave-mallsoft-rhodes-pad-synth.html): Lush detuned electric-tine pad synthesizer with slow tape wow, soft FM bell shimmer, and warm lowpass bloom. (file: https://infinitedevices.org/assets/templates/vaporwave-mallsoft-rhodes-pad-synth.inf)
+- [Vaporwave Midnight Chorus Lead Synth](https://infinitedevices.org/library/vaporwave-midnight-chorus-lead-synth.html): Dreamy dual-oscillator detuned saw-triangle lead with gentle vibrato, chorus drift, and silky lowpass filter. (file: https://infinitedevices.org/assets/templates/vaporwave-midnight-chorus-lead-synth.inf)
+- [Synthwave Ensemble Chorus Wash FX](https://infinitedevices.org/library/synthwave-ensemble-chorus-wash-fx.html): Analog-inspired multi-voice modulated chorus wash with warm high-frequency smoothing for retro synth leads and pads. (file: https://infinitedevices.org/assets/templates/synthwave-ensemble-chorus-wash-fx.inf)
+- [Synthwave Gated Analog Delay FX](https://infinitedevices.org/library/synthwave-gated-analog-delay-fx.html): Retro-futuristic multi-tap analog delay with warm tape saturation and damped feedback tail. (file: https://infinitedevices.org/assets/templates/synthwave-gated-analog-delay-fx.inf)
 
 ## Library: Community
 
@@ -653,7 +661,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 113 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 117 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -670,4 +678,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 98 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 102 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

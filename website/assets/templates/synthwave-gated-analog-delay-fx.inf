@@ -1,0 +1,77 @@
+infinite-patch 1
+# Synthwave Gated Analog Delay FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 45
+  i note1 45
+  i note2 57
+  i note3 52
+  i note4 45
+  i note5 57
+  i note6 50
+  i note7 52
+  i note8 45
+  i note9 45
+  i note10 57
+  i note11 52
+  i note12 45
+  i note13 57
+  i note14 50
+  i note15 55
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2800.0
+  f resonance 0.25
+  f decay 0.35
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float feedback = 0.56 [0.0, 0.85];\nparam float damping = 0.48 [0.1, 0.95];\nparam float drive = 1.4 [1.0, 3.5];\nparam float mix = 0.50 [0.0, 1.0];\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float lp = 0;\n\nfCut = clamp(0.10 + (1.0 - damping) * 0.28, 0.03, 0.42);\nlp = lp + fCut * (in - lp);\n\ntap1 = tap1 + 0.065 * (lp + tap3 * feedback * 0.55 - tap1);\ntap2 = tap2 + 0.052 * (tap1 - tap2);\ntap3 = tap3 + 0.044 * (tap2 - tap3);\n\necho = (tap1 * 0.45 + tap2 * 0.35 + tap3 * 0.25) * drive;\nsat = echo / (1.0 + abs(echo) * 0.35);\n\nprocessed = in * (1.0 - mix) + sat * mix;\nout = processed * 0.95;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.22 0.14 0.30
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Synthwave Gated Analog Delay FX. Retro-futuristic multi-tap analog delay with warm tape saturation and damped feedback tail.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

@@ -59,7 +59,7 @@ def thumb_src(i):
     """The page picture: the library's own thumbnail (the render for art presets, knobs and cables otherwise), else the preview."""
     for ext in ("webp", "svg"):
         if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i["id"] + "." + ext)):
-            return "../assets/library/thumbs/%s.%s?v=4" % (i["id"], ext)   # ?v= : bump when gen_library_thumbs.py changes the pictures
+            return "../assets/library/thumbs/%s.%s?v=5" % (i["id"], ext)   # ?v= : bump when gen_library_thumbs.py changes the pictures
     return i["preview"]
 
 def page(i, embeds=frozenset()):
