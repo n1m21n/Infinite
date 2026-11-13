@@ -27,4 +27,9 @@ namespace app
    void FieldPatcherLoadState(const std::string& text);
 
    int FieldPatcherSelfCheck(); // INFINITE_FIELDPATCHERTEST: the panel's gestures on real nodes; returns failures
+   // Key test hooks: the front page's canvas centre, its counts, and selecting a box (kind 0) or wire (kind 1).
+   extern bool gFieldPatcherTestCmd; // key test: Cmd held (the backend re-reads real modifiers)
+   bool FieldPatcherTestCanvasCentre(ImVec2& out);
+   void FieldPatcherTestCounts(int& boxes, int& wires);
+   void FieldPatcherTestSelect(int kind, int index);
 }

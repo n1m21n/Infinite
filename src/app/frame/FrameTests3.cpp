@@ -3518,6 +3518,84 @@ void FrameTest_FIELDPATCHERTEST(int frameId, GLFWwindow* window)
       const bool drew = gFieldPatcherOpen;
       printf("FIELDPATCHER the panel drew 16 frames docked, maximised and on top  %s\n", drew ? "OK" : "FAIL");
       sFails += drew ? 0 : 1;
+      gFieldPatcherDock = 0;
+      gFieldPatcherHeight = 420.0f;
+      NewPatch(); // the preset exports above leave node pages that follow the canvas selection
+      FieldPatcherLoadState("");
+   }
+   if (frameId == 21)
+   {
+      FieldPatcherOpenStarter(2); // Spiral: boxes and wires
+   }
+   // Keys on the canvas, as on the main canvas: the pointer rests on the canvas, the keys go to the patcher.
+   ImGuiIO& kio = ImGui::GetIO();
+   static int sBoxes = 0, sWires = 0;
+   auto counts = [&]() { FieldPatcherTestCounts(sBoxes, sWires); };
+   auto keyCheck = [&](const char* what, bool pass) {
+      printf("FIELDPATCHER %s  %s\n", what, pass ? "OK" : "FAIL");
+      sFails += pass ? 0 : 1;
+   };
+   ImVec2 centre;
+   if (frameId > 22 && frameId < 120 && FieldPatcherTestCanvasCentre(centre))
+   {
+      kio.ConfigInputTrickleEventQueue = false;
+      kio.AddFocusEvent(true);
+      kio.AddMousePosEvent(centre.x, centre.y);
+      glfwSetCursorPos(window, (double)(centre.x * ImGui_ImplGlfw_GetPointScale()), (double)(centre.y * ImGui_ImplGlfw_GetPointScale()));
+   }
+   // The backend re-reads the real modifier keys on every cursor move, so a held Cmd is sent again each frame.
+   auto chord = [&](int f0, ImGuiKey key, bool cmd) {
+      if (cmd && frameId >= f0 && frameId <= f0 + 3)
+         gFieldPatcherTestCmd = frameId < f0 + 3;
+      if (frameId == f0)
+         kio.AddKeyEvent(key, true);
+      if (frameId == f0 + 1)
+         kio.AddKeyEvent(key, false);
+   };
+   int b0 = 0, w0 = 0;
+   if (frameId == 30)
+   {
+      counts();
+      FieldPatcherTestSelect(0, 0);
+   }
+   chord(32, ImGuiKey_D, true);
+   if (frameId == 38)
+   {
+      FieldPatcherTestCounts(b0, w0);
+      keyCheck("Cmd+D duplicates the selected box", b0 == sBoxes + 1);
+      counts();
+      FieldPatcherTestSelect(0, sBoxes - 1);
+   }
+   chord(40, ImGuiKey_Backspace, false);
+   if (frameId == 46)
+   {
+      FieldPatcherTestCounts(b0, w0);
+      keyCheck("Backspace deletes the selected box", b0 == sBoxes - 1);
+      counts();
+      FieldPatcherTestSelect(0, 0);
+   }
+   chord(48, ImGuiKey_C, true);
+   chord(52, ImGuiKey_V, true);
+   if (frameId == 58)
+   {
+      FieldPatcherTestCounts(b0, w0);
+      keyCheck("Cmd+C then Cmd+V pastes a copy", b0 == sBoxes + 1);
+      counts();
+      FieldPatcherTestSelect(1, 0);
+   }
+   chord(60, ImGuiKey_Delete, false);
+   if (frameId == 66)
+   {
+      FieldPatcherTestCounts(b0, w0);
+      keyCheck("Delete removes the selected wire", w0 == sWires - 1 && b0 == sBoxes);
+      counts();
+      FieldPatcherTestSelect(0, 0);
+   }
+   chord(68, ImGuiKey_X, true);
+   if (frameId == 74)
+   {
+      FieldPatcherTestCounts(b0, w0);
+      keyCheck("Cmd+X cuts the selected box", b0 == sBoxes - 1);
       printf("FIELDPATCHER %s\n", sFails == 0 ? "PASS" : "FAIL");
       glfwSetWindowShouldClose(window, GLFW_TRUE);
    }

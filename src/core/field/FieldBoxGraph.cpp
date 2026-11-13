@@ -1597,6 +1597,15 @@ namespace Field
             return false;
          }
 
+         // A box nothing reads yet (just placed, pasted or unwired) keeps its own named line, so it survives the
+         // round trip through the code instead of vanishing until it is wired.
+         bool IsDangling(const BoxNode& b)
+         {
+            if (IsStatementBox(b) || b.specId == "code" || b.specId == "ident" || b.outlets.empty())
+               return false;
+            return Readers(b.id) == 0;
+         }
+
          bool IsTemp(const BoxNode& b)
          {
             if (IsStatementBox(b) || b.specId == "number" || b.specId == "swizzle" || IsSourceSpecId(b.specId))
@@ -1909,7 +1918,7 @@ namespace Field
                   u.id = b.id;
                   unitOfBox[b.id] = addUnit(u, &b);
                }
-               else if (IsTemp(b))
+               else if (IsTemp(b) || IsDangling(b))
                {
                   Unit u;
                   u.kind = Unit::Temp;

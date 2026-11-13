@@ -135,6 +135,7 @@ namespace
          // the tab's name when the user renamed it (node pages: a label, the node keeps its own)
       bool hoverItem = false;    // last frame: the pointer was over a box, pin or wire (so a left drag is not a pan)
       bool panLeft = false;      // a left drag that began on empty canvas pans it
+      ImVec2 canvasMin {}, canvasMax {}; // last frame's canvas rectangle on screen (key test)
    };
 
    struct State
@@ -625,20 +626,31 @@ namespace
 
    // ---- the pick menu (§8.6): a search field and the boxes this page's host can run
 
+   // The same Dock Position submenu as the Curve Editor.
    void DockItem()
    {
-      if (MenuParts::Item(gFieldPatcherDock == 3 ? T("Dock at bottom") : T("Dock at top")))
-         gFieldPatcherDock = gFieldPatcherDock == 3 ? 0 : 3;
+      if (MenuParts::SubMenu(T("Dock Position")))
+      {
+         static const char* kDocks[] = { "Bottom", "Top" };
+         static const int kCodes[] = { 0, 3 };
+         for (int i = 0; i < 2; i++)
+            if (MenuParts::Item(T(kDocks[i]), nullptr, gFieldPatcherDock == kCodes[i]))
+               gFieldPatcherDock = kCodes[i];
+         ImGui::EndMenu();
+      }
    }
 
-   // `extras`: the canvas menu also carries Paste, Select all, Fit view and the dock switch under the list.
-   bool PickMenu(Page& p, Host& h, ImVec2 at, int fromPin, int family, bool extras = false)
+   // Boxes only: paste, select all and the dock live on keys and the strip.
+   bool PickMenu(Page& p, Host& h, ImVec2 at, int fromPin, int family)
    {
       State& s = S();
       bool added = false;
       ImGui::SetNextItemWidth(220.0f);
       if (ImGui::IsWindowAppearing())
+      {
+         s.search[0] = 0; // a stale query from last time would open on an empty list
          ImGui::SetKeyboardFocusHere();
+      }
       FieldWell::InputTextWithHint("##fpSearch", T("Box name or Field word"), s.search, sizeof(s.search));
       const bool enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
       const uint32_t mask = MaskOf(p, h);
@@ -692,23 +704,6 @@ namespace
       }
       ImGui::EndChild();
 
-      if (extras && !added)
-      {
-         MenuParts::Separator();
-         if (MenuParts::Item(T("Paste"), nullptr, false, !s.clipBoxes.empty()))
-         {
-            if (PasteBoxes(p, at) > 0)
-            {
-               Commit(p, h, "Paste Boxes");
-               added = true;
-            }
-         }
-         if (MenuParts::Item(T("Select all")))
-            SelectAllBoxes(p);
-         if (MenuParts::Item(T("Fit view")))
-            ed::NavigateToContent(0.2f);
-         DockItem();
-      }
       return added;
    }
 
@@ -830,6 +825,8 @@ namespace
             p.panLeft = false;
          live.NavigateButtonIndex = p.panLeft ? 0 : 1;
       }
+      p.canvasMin = ImGui::GetCursorScreenPos();
+      p.canvasMax = ImVec2(p.canvasMin.x + size.x, p.canvasMin.y + size.y);
       ed::Begin("##fpCanvas", size);
       bool changed = false;
       if (p.placeAll)
@@ -926,13 +923,15 @@ namespace
       }
 
       p.hoverItem = ed::GetHoveredNode().Get() != 0 || ed::GetHoveredPin().Get() != 0 || ed::GetHoveredLink().Get() != 0;
+      // A double-click on empty canvas opens the box search there, as on the main canvas.
+      const bool dblPick = !p.hoverItem && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 
       // Keys while the pointer is over the panel and no text field has the keyboard: copy, cut, paste, duplicate,
       // select all, delete.
       const ImGuiIO& io = ImGui::GetIO();
       if (!changed && gFieldPatcherClaimedKeys && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput)
       {
-         const bool cmd = io.KeyCtrl || io.KeySuper;
+         const bool cmd = io.KeyCtrl || io.KeySuper || gFieldPatcherTestCmd;
          const std::vector<int> sel = SelectedIds(p);
          const ImVec2 mouse = ed::ScreenToCanvas(ImGui::GetMousePos());
          if (cmd && ImGui::IsKeyPressed(ImGuiKey_C, false) && !sel.empty())
@@ -956,12 +955,27 @@ namespace
          }
          else if (cmd && ImGui::IsKeyPressed(ImGuiKey_A, false))
             SelectAllBoxes(p);
-         else if ((ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false)) && !sel.empty())
+         else if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
          {
+            // Selected wires go too, as on the main canvas.
+            std::vector<ed::LinkId> links((size_t)std::max(1, ed::GetSelectedObjectCount()));
+            const int nl = ed::GetSelectedLinks(links.data(), (int)links.size());
+            auto& w = p.graph.wires;
+            for (int i = 0; i < nl; i++)
+            {
+               const int lid = (int)links[i].Get();
+               w.erase(std::remove_if(w.begin(), w.end(), [lid](const Field::BoxWire& x) { return x.id == lid; }), w.end());
+            }
             for (int id : sel)
                RemoveBox(p, id);
-            changed = true;
+            changed = nl > 0 || !sel.empty();
+            if (changed)
+               ed::ClearSelection();
          }
+         else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+            ed::ClearSelection();
+         else if (io.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_Y, false))
+            ed::NavigateToContent(0.2f); // Shift+Y fits the view, as on the main canvas
       }
 
       ed::Suspend();
@@ -979,7 +993,7 @@ namespace
          s.ctxLink = (int)ctxLink.Get();
          ImGui::OpenPopup("##fpLinkMenu");
       }
-      else if (ed::ShowBackgroundContextMenu())
+      else if (ed::ShowBackgroundContextMenu() || dblPick)
       {
          s.pendingFromPin = 0;
          s.pendingAt = ed::ScreenToCanvas(ImGui::GetMousePos());
@@ -987,7 +1001,7 @@ namespace
       }
       if (MenuParts::BeginPopup("##fpPick"))
       {
-         if (PickMenu(p, h, s.pendingAt, s.pendingFromPin, -1, s.pendingFromPin == 0))
+         if (PickMenu(p, h, s.pendingAt, s.pendingFromPin, -1))
             changed = false; // PickMenu committed
          MenuParts::EndPopup();
       }
@@ -1106,7 +1120,8 @@ namespace
             {
                ed::EditorContext* prev = ed::GetCurrentEditor();
                ed::SetCurrentEditor(p.ctx);
-               at = ed::ScreenToCanvas(ImVec2(ImGui::GetMainViewport()->GetCenter()));
+               // The middle of this page's canvas, not of the window: a docked panel's canvas is far from it.
+               at = ed::ScreenToCanvas(ImVec2((p.canvasMin.x + p.canvasMax.x) * 0.5f, (p.canvasMin.y + p.canvasMax.y) * 0.5f));
                ed::SetCurrentEditor(prev);
             }
             PickMenu(p, h, at, 0, f);
@@ -1139,7 +1154,7 @@ namespace
             s.codeBufFor = src;
          }
          const ImVec2 avail = ImGui::GetContentRegionAvail();
-         FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(60.0f, avail.y)));
+         FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(60.0f, avail.y)), ImGuiInputTextFlags_WordWrap);
          s.codeEditing = ImGui::IsItemActive();
          if (ImGui::IsItemDeactivatedAfterEdit() && s.codeBuf != src)
          {
@@ -1171,7 +1186,7 @@ namespace
             if (b->specId == "code")
             {
                const ImVec2 avail = ImGui::GetContentRegionAvail();
-               FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(60.0f, avail.y)));
+               FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(60.0f, avail.y)), ImGuiInputTextFlags_WordWrap);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   Commit(p, h, "Edit Code Box");
             }
@@ -1272,6 +1287,8 @@ namespace
          n->Apply();
       }
       p.uid = gn->uid;
+      if (!p.scratchName.empty())
+         S().nodeNames[gn->uid] = p.scratchName; // the tab keeps "Slow LFO", not "Field Primitive 3"
       p.scratchCode.clear();
       p.parsedFrom.clear();
    }
@@ -1538,6 +1555,7 @@ namespace
          ImGui::PopID();
       }
       ImGui::SetCursorScreenPos(ImVec2(mn.x, y + ImGui::GetFrameHeight()));
+      ImGui::Dummy(ImVec2(0.0f, 0.0f));
    }
 
    void DrawPanel()
@@ -1723,6 +1741,39 @@ void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
 // Self-test (INFINITE_FIELDPATCHERTEST, FrameTests3.cpp): the gestures the panel makes, run on real nodes.
 namespace app
 {
+bool gFieldPatcherTestCmd = false;
+
+bool FieldPatcherTestCanvasCentre(ImVec2& out)
+{
+   Page* p = Front();
+   if (p == nullptr || p->canvasMax.x <= p->canvasMin.x)
+      return false;
+   out = ImVec2((p->canvasMin.x + p->canvasMax.x) * 0.5f, (p->canvasMin.y + p->canvasMax.y) * 0.5f);
+   return true;
+}
+
+void FieldPatcherTestCounts(int& boxes, int& wires)
+{
+   Page* p = Front();
+   boxes = p != nullptr ? (int)p->graph.boxes.size() : -1;
+   wires = p != nullptr ? (int)p->graph.wires.size() : -1;
+}
+
+void FieldPatcherTestSelect(int kind, int index)
+{
+   Page* p = Front();
+   if (p == nullptr || p->ctx == nullptr)
+      return;
+   ed::EditorContext* prev = ed::GetCurrentEditor();
+   ed::SetCurrentEditor(p->ctx);
+   ed::ClearSelection();
+   if (kind == 0 && index < (int)p->graph.boxes.size())
+      ed::SelectNode(p->graph.boxes[index].id, false);
+   if (kind == 1 && index < (int)p->graph.wires.size())
+      ed::SelectLink(p->graph.wires[index].id, false);
+   ed::SetCurrentEditor(prev);
+}
+
 int FieldPatcherSelfCheck()
 {
    int fails = 0;
@@ -1822,6 +1873,28 @@ int FieldPatcherSelfCheck()
       const uint32_t mask = std::string(Field::kPatcherStarters[k].domain) == "notes" ? Field::HostNotes : Field::HostPrimitive;
       const bool ok = Field::ParseCodeToBoxGraph(Field::kPatcherStarters[k].code, mask, g, err) && g.CountCodeBoxes() == 0;
       expect(Field::kPatcherStarters[k].name, ok);
+   }
+
+   // 5. Every starter, placed as a node: the right kind, it compiles, and the tab keeps the starter's name.
+   for (int k = 0; k < Field::kPatcherStarterCount; k++)
+   {
+      const Field::PatcherStarter& st = Field::kPatcherStarters[k];
+      FieldPatcherOpenStarter(k);
+      Page* pg = Front();
+      Reparse(*pg, pg->scratchCode, ScratchMask(pg->scratchCode));
+      Export(*pg);
+      GraphNode* gn = pg->uid != 0 ? FindNodeByUid(pg->uid) : nullptr;
+      std::string err = "not placed";
+      bool kind = false;
+      if (gn != nullptr)
+      {
+         if (auto* fn = dynamic_cast<FieldNotesNode*>(gn->node.get()))
+            err = fn->LastError(), kind = std::string(st.domain) == "notes";
+         else if (auto* fp = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
+            err = fp->LastError(), kind = std::string(st.domain) == "element" && fp->valueMode == st.valueMode;
+      }
+      const std::string what = std::string("placed: ") + st.name + (err.empty() ? "" : " (" + err + ")");
+      expect(what.c_str(), gn != nullptr && kind && err.empty() && PageTitle(*pg) == T(st.name));
    }
    return fails;
 }

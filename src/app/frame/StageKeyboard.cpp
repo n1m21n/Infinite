@@ -221,7 +221,7 @@ void DrawKeyboard(FrameCtx& fc)
          gView2DOpen = !gView2DOpen;
 
       // Shift+Y: fit view to content, replacing the old menu-only entry
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_Y, false))
+      if (!typing && shiftOnly && !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_Y, false))
          gRequestFitView = true;
 
       // Shift+N: the type-to-filter node picker, without having to find empty
