@@ -544,6 +544,7 @@ set(COMMON_SOURCES
     src/app/panels/CurveEditorPanel.cpp
     src/app/panels/FieldPatcherPanel.cpp
     src/app/panels/View3DPanel.cpp
+    src/app/panels/View2DPanel.cpp
     src/app/panels/TerminalPanel.cpp
     src/app/panels/CliSetupSection.cpp
     src/app/panels/DawPluginSection.cpp
@@ -576,6 +577,7 @@ set(COMMON_SOURCES
     src/app/selftest/UiAudit.cpp
     src/app/selftest/MidiOutTests.cpp
     src/app/selftest/View3DNavTests.cpp
+    src/app/selftest/View2DTests.cpp
     src/app/selftest/EditMeshRefineTests.cpp
     src/app/selftest/FurTests.cpp
     src/app/selftest/CliSetupTests.cpp
@@ -833,6 +835,7 @@ set(COMMON_SOURCES
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
     src/nodes/Scene3DNode.cpp
+    src/nodes/Scene2DNode.cpp
     src/nodes/GeometryFeedbackNode.cpp
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp

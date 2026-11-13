@@ -720,6 +720,8 @@ void DrawSidePanels(FrameCtx& fc)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
       if (gView3DOpen && gView3DDock != 3)
          DrawView3DDocked("##view3d_bottom", ImVec2(0, gView3DHeight));
+      if (gView2DOpen && gView2DDock != 3)
+         DrawView2DDocked("##view2d_bottom", ImVec2(0, gView2DHeight));
       // Curve Editor (View > Curve Editor or Shift+E) at the bottom; the other sides draw with their row.
       if (gCurveEditorOpen && gCurveEditorDock == 0)
          DrawCurveEditorDocked("##curveeditor_bottom", ImVec2(0, gCurveEditorHeight));

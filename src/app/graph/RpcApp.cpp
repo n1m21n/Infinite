@@ -38,6 +38,7 @@ namespace app
             { "samplestudio", &gSampleStudioOpen, &gSampleStudioDock, false },
             { "pianoroll", &gPianoRollOpen, &gPianoRollDock, false },
             { "view3d", &gView3DOpen, &gView3DDock, false },
+            { "view2d", &gView2DOpen, &gView2DDock, false },
             { "terminal", &gTerminalOpen, &gTerminalDock, true },
             { "curveeditor", &gCurveEditorOpen, &gCurveEditorDock, false },
             { "fieldpatcher", &gFieldPatcherOpen, &gFieldPatcherDock, false },
@@ -559,6 +560,24 @@ namespace app
                   return true;
                }
                View3DAddNode(*gn);
+            }
+         }
+         else if (action == "view2d-add")
+         {
+            for (const json& index : params.value("nodes", json::array()))
+            {
+               GraphNode* gn = index.is_number_integer() ? FindNodeByIndex(index.get<int>()) : nullptr;
+               if (gn == nullptr)
+               {
+                  outError = "unknown node index";
+                  return true;
+               }
+               if (!View2DCanAdd(*gn))
+               {
+                  outError = "node " + std::to_string(index.get<int>()) + " cannot be added to the 2D View";
+                  return true;
+               }
+               View2DAddNode(*gn);
             }
          }
          else if (action == "group")
