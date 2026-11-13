@@ -64,7 +64,11 @@ namespace app
          Patch::NodeRecord rec;
          rec.index = gn.index;
          rec.uid = gn.uid;
-         rec.category = gn.category;
+         // fork: never write a node whose category is empty - "node 14  Set Vertex Color" saves a
+         // double space the loader turns into category "Set" / type "Vertex Color" and skips. The
+         // type name is the identity that survives; resolve the category from it as every other
+         // spawn path does (Wiring.cpp SchemaProbe, ChatPanel's add).
+         rec.category = !gn.category.empty() ? gn.category : NodeFactory::Instance().CategoryOf(gn.typeName);
          rec.typeName = gn.typeName;
          // The cached live position, not the spawn position: the node has almost
          // certainly been dragged since it was created. Read from the cache

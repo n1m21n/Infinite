@@ -2549,6 +2549,68 @@ void RunRpcBatchTest()
    json lbad = { {"text", "not a patch"} };
    Check("load_patch_text refuses garbage, canvas kept", !Call("load_patch_text", lbad, r, e) && gNodes.size() == 2);
 
+   // fork: the round-trip the agent workflow depends on. create_node's category is optional in
+   // infinite_rpc_methods, and an empty one used to save "node 14  Set Vertex Color" - a double
+   // space the loader reads back as category "Set" / type "Vertex Color" and skips, so save_patch
+   // followed by load_patch_text silently emptied the graph.
+   NewPatch();
+   {
+      json made;
+      Check("create_node without a category", Call("create_node", { {"typeName", "Set Vertex Color"}, {"x", 40.0f}, {"y", 40.0f} }, made, e));
+      const int idx = made.value("index", -1);
+      const GraphNode* gn = FindNodeByIndex(idx);
+      Check("a category-less create_node still records a category", gn != nullptr && !gn->category.empty());
+
+      Patch::Data built = BuildPatchData();
+      std::string saved;
+      Patch::WriteText(built, saved);
+      const std::string head = "node " + std::to_string(idx) + " 3D Set Vertex Color";
+      Check("save_patch writes the category into the node line", saved.find(head) != std::string::npos);
+
+      json lt = { {"text", saved} };
+      Check("load_patch_text reads its own save back", Call("load_patch_text", lt, r, e) && r.value("nodes", 0) >= 1);
+
+      // A file already on disk with the empty category is named, not silently dropped.
+      std::string broken = saved;
+      const size_t at = broken.find("node " + std::to_string(idx) + " 3D ");
+      if (at != std::string::npos)
+         broken.replace(at, std::string("node " + std::to_string(idx) + " 3D ").size(),
+                        "node " + std::to_string(idx) + "  ");
+      json vb = { {"text", broken} };
+      Check("a category-less node line is reported, not dropped silently",
+            Call("validate_patch_text", vb, r, e) && r["ok"] == false && r["errors"][0]["code"] == "E_MISSING_CATEGORY");
+   }
+
+   // A mod line naming a control by key is not an error here: the window app never probes node
+   // types, so the key cannot be looked up yet. The loader defers exactly this (PendingKeyed).
+   {
+      const std::string keyed =
+         "infinite-patch 1\nnode 1 Source Shape\n  id pic\nend\nnode 2 Utility Output\n  id out\nend\n"
+         "node 3 Modulators Audio Analyze\n  id ana\nend\ncable out 0 pic\nmod pic sizeX ana 0 0 1 0.5\n";
+      json vk = { {"text", keyed} };
+      Check("validate_patch_text accepts a mod line by control name", Call("validate_patch_text", vk, r, e) && r["ok"] == true);
+      Check("the deferred key is counted", r.value("deferredKeys", 0) >= 1);
+      Check("strict does not resurrect the deferred key",
+            Call("validate_patch_text", { {"text", keyed}, {"strict", true} }, r, e) && r["ok"] == true);
+      json vkbad = { {"text", keyed + "cable 1 0 99\n"} };
+      Check("a real error is still reported beside a keyed mod", Call("validate_patch_text", vkbad, r, e) && r["ok"] == false);
+   }
+
+   // fork: the arrange loop had no RPC. Zero-length must be refused, never armed over nothing
+   // (Transport drops a zero span, so the button would read "on" while playback ignored it).
+   {
+      json tr;
+      NewPatch();
+      Check("transport loop refuses an empty range", !Call("transport", { {"action", "loop"}, {"enabled", true} }, tr, e));
+      Check("transport loop sets a range in beats",
+            Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 4}, {"end", 12} }, tr, e) &&
+               tr.value("loopEnabled", false) && std::abs(tr.value("loopStart", 0.0) - 4.0) < 1e-6 &&
+               std::abs(tr.value("loopEnd", 0.0) - 12.0) < 1e-6);
+      Check("transport loop refuses a zero span", !Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 8}, {"end", 8} }, tr, e));
+      Check("transport loop turns off", Call("transport", { {"action", "loop"}, {"enabled", false} }, tr, e) && !tr.value("loopEnabled", true));
+   }
+   NewPatch();
+
    Check("describe with a type", Call("describe", { {"type", "Shape"} }, r, e) && r["type"] == "Shape" && r["params"].is_array());
    Check("describe without a type lists them", Call("describe", json::object(), r, e) && r["types"].is_object());
    Check("describe unknown type errors", !Call("describe", { {"type", "Nope"} }, r, e));
