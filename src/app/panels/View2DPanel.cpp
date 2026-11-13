@@ -584,7 +584,7 @@ namespace
          }
          for (GraphNode& gn : gNodes)
          {
-            if (gn.node.get() == doc || !Scene2DNode::CanLayer(gn.node.get()))
+            if (gn.node.get() == doc || !View2DCanAdd(gn))
                continue;
             const std::string name = gn.typeName + " " + std::to_string(gn.index) + "##n" + std::to_string(gn.uid);
             if (MenuParts::Choice(name.c_str(), gn.uid == *uid) && gn.uid != *uid)
@@ -2333,7 +2333,15 @@ namespace
 
 OutputNode* View2DEnsureOutput() { return EnsureOutputImpl(); }
 
-bool View2DCanAdd(const GraphNode& gn) { return Scene2DNode::CanLayer(gn.node.get()); }
+// Anything with a 2D picture except a 3D node or a document. Uses the
+// viewport panel's pixel gate, not the output size: a node that has not
+// cooked yet reports 0x0.
+bool View2DCanAdd(const GraphNode& gn)
+{
+   INode* n = gn.node.get();
+   return n != nullptr && dynamic_cast<Scene2DNode*>(n) == nullptr && dynamic_cast<IGeometrySource*>(n) == nullptr &&
+          CanShowInViewportPanel(gn);
+}
 
 void View2DAddNode(GraphNode& gn)
 {

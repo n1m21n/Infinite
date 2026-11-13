@@ -140,18 +140,6 @@ Scene2DNode::~Scene2DNode()
       glDeleteProgram(mFinishProgram);
 }
 
-bool Scene2DNode::CanLayer(const INode* node)
-{
-   if (node == nullptr || dynamic_cast<const Scene2DNode*>(node) != nullptr)
-      return false;
-   auto* audio = dynamic_cast<const IAudioSource*>(node);
-   if ((audio != nullptr && audio->IsAudioOutputIndex(0)) || dynamic_cast<const INoteSource*>(node) != nullptr ||
-       dynamic_cast<const IModulator*>(node) != nullptr || dynamic_cast<const IPredictor*>(node) != nullptr ||
-       dynamic_cast<const IGeometrySource*>(node) != nullptr)
-      return false;
-   return node->GetOutputWidth() > 0 && node->GetOutputHeight() > 0;
-}
-
 // ---- model --------------------------------------------------------------
 
 const Scene2DNode::Layer* Scene2DNode::FindConst(int id) const

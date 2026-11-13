@@ -81,8 +81,6 @@ public:
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
    static std::function<INode*(uint64_t)> ResolveUid;
-   // Whether a node can be a layer (anything with a 2D picture, not this kind of node).
-   static bool CanLayer(const INode* node);
 
    // The model. Edits go through these so the saved text follows.
    std::vector<Layer>& Layers()
