@@ -98,13 +98,23 @@ def release():
     shutil.rmtree(LOCK, ignore_errors=True)
 
 
+def build_types(mode):
+    """(wanted, cached) CMAKE_BUILD_TYPE for a mode's build dir; cached is None before the first configure."""
+    d, args, _, _ = MODES[mode]
+    cache = os.path.join(ROOT, d, "CMakeCache.txt")
+    want = next((a.split("=", 1)[1] for a in args if a.startswith("-DCMAKE_BUILD_TYPE=")), None)
+    have = None
+    if os.path.exists(cache):
+        have = next((l.split("=", 1)[1].strip() for l in open(cache) if l.startswith("CMAKE_BUILD_TYPE:")), None)
+    return want, have
+
+
 def configure(mode):
     d, args, _, _ = MODES[mode]
     path = os.path.join(ROOT, d)
     cache = path + "/CMakeCache.txt"
     if os.path.exists(cache):
-        want = next((a.split("=", 1)[1] for a in args if a.startswith("-DCMAKE_BUILD_TYPE=")), None)
-        have = next((l.split("=", 1)[1].strip() for l in open(cache) if l.startswith("CMAKE_BUILD_TYPE:")), None)
+        want, have = build_types(mode)
         if want is None or want == have:
             return path
         # A cache left as another build type (build/ once configured Debug) would ship debug-only UI as "release".
@@ -179,7 +189,8 @@ def cmd_plan(a):
 
 def cmd_build(a):
     d, *_ = MODES[a.mode]
-    if not a.force:
+    want, have = build_types(a.mode)
+    if not a.force and (want is None or have is None or want == have):
         r = stale_count(os.path.join(ROOT, d), a.target)
         if r == (0, 0):
             print(f"ibuild: {d} up to date, nothing to do.")
