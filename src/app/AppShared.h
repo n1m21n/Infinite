@@ -6504,7 +6504,6 @@ int RunVST3BlocklistTest();
 #endif
 
 void RunRpcBatchTest();
-void RunBindModTest(int frameId); // fork: k17 - bind_mod needs one drawn frame before its key resolves
 void RunOscControlTest();
 void RunHistoryTest();
 void RunClipboardTest();

@@ -6,6 +6,9 @@ namespace app
 void RunView3DMenuTest(int frameId);
 void RunView3DDropTest(int frameId);
 void RunView3DNavTest(int frameId);
+// fork: k17 - declared here, not in AppShared.h: that header is included by every translation unit,
+// and one declaration there recompiles the whole app for a self-test entry point.
+void RunBindModTest(int frameId);
 void RunView3DEditTest(int frameId);
 void RunEditMeshRefineTest(int frameId);
 void RunView3DPivotTest(int frameId);
