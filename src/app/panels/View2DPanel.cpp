@@ -106,6 +106,7 @@ namespace
    int sFillKind = 1;              // gradient: 1 linear, 2 radial
    int sTolerance = 32;
    bool sContiguous = true, sAllLayers = false;
+   int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
    bool sSurfacePaint = true;      // brush / eraser / eyedropper work on a 3D object's surface
    bool sSurfaceStroke = false;    // the stroke now running paints a surface
    int sSkinSide = 2;              // 0..3: 512 .. 4096 px, for the next new skin
@@ -991,7 +992,7 @@ namespace
    {
       if (gOfflineRender.active)
          return;
-      const std::string path = Platform::SaveRenderDialog("infinite_2d.png", false);
+      const std::string path = Platform::SaveRenderDialog(sImageFormat == 1 ? "infinite_2d.jpg" : "infinite_2d.png", false);
       if (path.empty())
          return;
       if (OutputNode* out = EnsureOutputImpl())
@@ -1006,7 +1007,7 @@ namespace
    {
       if (gOfflineRender.active)
          return;
-      const std::string path = Platform::SaveRenderDialog("infinite_2d.mp4", true);
+      const std::string path = Platform::SaveRenderDialog(sVideoFormat == 1 ? "infinite_2d.mov" : "infinite_2d.mp4", true);
       if (path.empty())
          return;
       if (OutputNode* out = EnsureOutputImpl())
@@ -4637,6 +4638,29 @@ namespace
             if (c & 2)
                l->sy = bh > 0 ? hpx / bh : 1.0f;
          }
+         {
+            // Scale in percent, as Photoshop's options bar: typed, dragged, or locked to one ratio.
+            static bool sLockScale = true;
+            float pct[2] = { l->sx * 100.0f, l->sy * 100.0f };
+            float* const pp[2] = { &pct[0], &pct[1] };
+            const char* const pf[2] = { "W %.1f%%", "H %.1f%%" };
+            const int c = DragMulti(T("Scale"), pp, pf, 2, 0.5f, 0.1f, 10000.0f);
+            if (c != 0)
+            {
+               if (sLockScale)
+               {
+                  const float k = (c & 1) ? pct[0] / std::max(0.1f, l->sx * 100.0f) : pct[1] / std::max(0.1f, l->sy * 100.0f);
+                  l->sx *= k;
+                  l->sy *= k;
+               }
+               else
+               {
+                  if (c & 1) l->sx = pct[0] / 100.0f;
+                  if (c & 2) l->sy = pct[1] / 100.0f;
+               }
+            }
+            BoolRow(T("Keep proportions"), &sLockScale);
+         }
          // 3D: the layer is a card the comp camera sees; Z pushes it away, X / Y / Z rotate it.
          BoolRow(T("3D"), &l->is3d);
          if (l->is3d)
@@ -4794,6 +4818,27 @@ namespace
          sSeenH = sCanvasH = sImageH = d.h;
       }
       SectionCard::Begin(T("Canvas size"));
+      {
+         // Common sizes, as the new-document dialogs of Photoshop and Affinity offer them.
+         static const int kPresets[][2] = { { 1280, 720 }, { 1920, 1080 }, { 2560, 1440 }, { 3840, 2160 }, { 1080, 1080 },
+                                            { 1080, 1350 }, { 1080, 1920 }, { 2048, 2048 }, { 2480, 3508 }, { 3508, 2480 } };
+         static const char* const kPresetNames[] = { "HD 1280 x 720", "Full HD 1920 x 1080", "QHD 2560 x 1440", "4K 3840 x 2160",
+                                                     "Square 1080", "Portrait 1080 x 1350", "Story 1080 x 1920", "Square 2048",
+                                                     "A4 300 dpi", "A4 landscape 300 dpi" };
+         int match = -1;
+         for (int i = 0; i < 10; i++)
+            if (kPresets[i][0] == sCanvasW && kPresets[i][1] == sCanvasH)
+               match = i;
+         int pick = match + 1;
+         if (ComboRow(T("Preset"), &pick, { T("Custom"), kPresetNames[0], kPresetNames[1], kPresetNames[2], kPresetNames[3],
+                                            kPresetNames[4], kPresetNames[5], kPresetNames[6], kPresetNames[7], kPresetNames[8],
+                                            kPresetNames[9] }) &&
+             pick > 0)
+         {
+            sCanvasW = kPresets[pick - 1][0];
+            sCanvasH = kPresets[pick - 1][1];
+         }
+      }
       if (IntRow(T("Width"), &sCanvasW) && d.ratioLock)
          sCanvasH = (int)std::lround(sCanvasW * (float)d.h / (float)d.w);
       if (IntRow(T("Height"), &sCanvasH) && d.ratioLock)
@@ -4865,12 +4910,14 @@ namespace
    {
       Scene2DNode::Document& d = doc->Doc();
       SectionCard::Begin(T("Render"));
+      ComboRow(T("Image"), &sImageFormat, { "PNG", "JPEG" });
       ImGui::BeginDisabled(gOfflineRender.active);
       if (ActionButton::Draw(L("Render Image##v2dimg"), ImVec2(availW, 0)))
          sPending.what = Pending::RenderImage;
       ImGui::EndDisabled();
       ImGui::TextDisabled("%d x %d, F12", d.w, d.h);
       SectionCard::Begin(T("Animation"));
+      ComboRow(T("Video"), &sVideoFormat, { "MP4", "MOV" });
       DragRow(T("Frame rate"), &d.fps, 0.1f, "%.0f fps", 1.0f, 240.0f);
       DragRow(T("Length"), &d.seconds, 0.1f, "%.1f s", 0.1f, 3600.0f);
       ImGui::BeginDisabled(gOfflineRender.active);
