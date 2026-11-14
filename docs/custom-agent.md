@@ -68,6 +68,8 @@ Settings → Agents & Terminal → **Connect Infinite to an outside agent**:
 
 ## Не сделано / ограничения
 - Linux: встроенный агент выдаёт сообщение «not available on Linux yet».
-- Windows: `AgentNetWin.cpp` (WinHTTP, Credential Manager) и `infinite_cli` — не проверены.
+- Windows: `infinite_cli` реализован (`src/core/McpHttp.cpp`, `RunCli` через `_popen`) и `infinite_context`
+  переведён на внутрипроцессный RPC, но на живой сборке не проверены; `AgentNetWin.cpp`
+  (WinHTTP, Credential Manager) — тоже не проверены.
 - Старый SSE-транспорт MCP (HTTP+SSE 2024-11-05) не реализован — только Streamable HTTP без серверных уведомлений.
 - «Отвечает после перезапуска» без памяти диалога (см. выше).
