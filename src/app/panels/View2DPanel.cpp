@@ -4839,6 +4839,71 @@ namespace
       }
    }
 
+   // Layer effects (Photoshop's Layer Style): each one on or off, with its own settings, for the active layer.
+   void DrawEffectsTab(Scene2DNode* doc)
+   {
+      Layer* l = Active(doc);
+      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Adjust)
+      {
+         CentredText(ImGui::GetCursorScreenPos().y, l == nullptr ? T("No layer selected") : T("No effects here"));
+         return;
+      }
+      for (int t = 0; t < Scene2DNode::kFxCount; t++)
+      {
+         Scene2DNode::Fx& f = l->fx[t];
+         ImGui::PushID(t);
+         SectionCard::Begin(T(Scene2DNode::FxName(t)));
+         BoolRow(T("On"), &f.on);
+         if (f.on)
+         {
+            ColorRow(T("Colour"), f.c);
+            SliderRow(T("Opacity"), &f.c[3], 0.0f, 1.0f, "%.2f");
+            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner)
+            {
+               SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+               SliderRow(T("Distance"), &f.dist, 0.0f, 200.0f, "%.0f px");
+            }
+            if (t != Scene2DNode::kFxOverlay)
+               SliderRow(T(t == Scene2DNode::kFxStroke ? "Width" : "Size"), &f.size, 0.0f, 200.0f, "%.0f px");
+            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || t == Scene2DNode::kFxGlow)
+               SliderRow(T("Spread"), &f.spread, 0.0f, 1.0f, "%.2f");
+            if (t == Scene2DNode::kFxStroke)
+            {
+               int pos = f.pos;
+               if (ComboRow(T("Position"), &pos, { T("Outside"), T("Inside"), T("Centre") }))
+                  f.pos = pos;
+            }
+         }
+         ImGui::PopID();
+      }
+   }
+
+   // Colour: the adjustment layers as one panel, a click adds one above the active layer.
+   void DrawColourTab(Scene2DNode* doc)
+   {
+      SectionCard::Begin(T("Adjustments"));
+      for (int t = 0; t < Scene2DNode::kAdjCount; t++)
+         if (ActionButton::Draw((std::string(T(Scene2DNode::AdjName(t))) + "##v2dcadj" + std::to_string(t)).c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+         {
+            sPending.what = Pending::AddAdjust;
+            sPending.arg = t;
+         }
+      Layer* l = Active(doc);
+      if (l != nullptr && l->kind == Kind::Adjust)
+      {
+         SectionCard::Begin(T(Scene2DNode::AdjName(l->adjType)));
+         float lo = 0, hi = 1;
+         Scene2DNode::AdjRange(l->adjType, lo, hi);
+         if (l->adjType != Scene2DNode::kAdjGradientMap)
+            SliderRow(T("Amount"), &l->adjAmt, lo, hi, l->adjType == Scene2DNode::kAdjThreshold ? "%.2f" : "%.0f");
+         if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
+         {
+            ColorRow(T("Shadows"), l->colorA);
+            ColorRow(T("Highlights"), l->colorB);
+         }
+      }
+   }
+
    struct Preset
    {
       const char* name;
@@ -5046,16 +5111,18 @@ namespace
       PopDockedPanelStyle();
 
       // The tab column, as the 3D View: each group of settings one click away instead of down one long scroll.
-      const struct { const char* id; const char* icon; const char* tip; } kTabs[5] = {
+      const struct { const char* id; const char* icon; const char* tip; } kTabs[7] = {
          { "##v2dt0", IconsInfinite::Layers, "Layers" },
          { "##v2dt1", IconsInfinite::Edit, "Layer" },
          { "##v2dt2", IconsInfinite::ToolMove, "Transform" },
          { "##v2dt3", IconsInfinite::Crop, "Document" },
          { "##v2dt4", IconsInfinite::ShadeRender, "Render" },
+         { "##v2dt5", IconsInfinite::FamilyEffects, "Effects" },
+         { "##v2dt6", IconsInfinite::Curve, "Colour" },
       };
-      sTab = std::clamp(sTab, 0, 4);
+      sTab = std::clamp(sTab, 0, 6);
       ImGui::BeginGroup();
-      for (int i = 0; i < 5; i++)
+      for (int i = 0; i < 7; i++)
          if (IconChip(kTabs[i].id, kTabs[i].icon, sTab == i, T(kTabs[i].tip)))
             sTab = i;
       ImGui::EndGroup();
@@ -5085,6 +5152,8 @@ namespace
          if (sTab == 1) DrawLayerTab(doc, 0);
          else if (sTab == 2) DrawLayerTab(doc, 1);
          else if (sTab == 3) DrawDocumentTab(doc);
+         else if (sTab == 5) DrawEffectsTab(doc);
+         else if (sTab == 6) DrawColourTab(doc);
          else DrawOutputTab(doc, w);
          ImGui::PopStyleVar(2);
          SectionCard::EndWindow();
