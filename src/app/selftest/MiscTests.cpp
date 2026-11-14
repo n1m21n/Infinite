@@ -2733,6 +2733,9 @@ void RunBindModTest(int f)
    // Frame 4: build the pair and cover every refusal that needs no control table.
    if (f == 4)
    {
+      // What the previous frame's draw registered, before NewPatch wipes the graph: the graph the
+      // app starts with has hundreds of nodes, so a zero here means no body registered at all.
+      printf("  [diag] k17: frame 4, before NewPatch frameParams=%zu nodes=%zu\n", Modulation::Instance().FrameParams().size(), gNodes.size());
       NewPatch();
       // A node body is culled off-screen unless something drives it (StageNodeBodies, mustDraw),
       // and a culled node never registers its controls. The window app has a person looking at the
