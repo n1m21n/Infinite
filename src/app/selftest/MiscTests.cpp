@@ -2842,6 +2842,194 @@ void RunRpcBatchTest()
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }
 
+// ====================================================== INFINITE_RPCBATCHTEST (k17)
+//
+// fork: k17 - bind_mod through the API. A control's key resolves only once a node of that type has
+// drawn a frame (ParamIndexOfKeyOnNode: FrameParams first, gParamJoin otherwise), so a bind written in
+// the same frame as create_node legitimately answers "has no controls yet; retry on the next frame".
+// RunRpcBatchTest is a single frame, so the modulation checks live here - one frame after the create,
+// retrying until the node has drawn, which is exactly the contract the handler documents.
+namespace
+{
+   bool sBindOk = true;
+
+   void BindCheck(const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         sBindOk = false;
+   }
+}
+
+void RunBindModTest(int f)
+{
+   using json = nlohmann::json;
+   static int dst = -1;
+   static int src = -1;
+   static int param = -1;
+   static bool bound = false;
+   static bool verified = false;
+   const std::string key = "f rotation";
+   auto Call = [](const char* m, const json& p, json& r, std::string& e) { return HandleRpcCommand(m, p, r, e); };
+   json r;
+   std::string e;
+
+   // Frame 4: build the pair and cover every refusal that needs no control table.
+   if (f == 4)
+   {
+      NewPatch();
+      sBindOk = true;
+      json made;
+      e.clear();
+      BindCheck("k17: the destination exists", Call("create_node", { { "typeName", "Shape" }, { "category", "Source" } }, made, e));
+      dst = made.value("index", -1);
+      BindCheck("k17: the modulator exists", Call("create_node", { { "typeName", "LFO" }, { "category", "Modulators" } }, made, e));
+      src = made.value("index", -1);
+
+      const json garbage[] = { json::array({ 1, 2, 3 }), json("not an object"), json(nullptr), json(7) };
+      bool refusedAll = true, threw = false;
+      for (const json& g : garbage)
+      {
+         try
+         {
+            e.clear();
+            refusedAll = refusedAll && !Call("bind_mod", g, r, e) && !e.empty();
+         }
+         catch (...)
+         {
+            threw = true;
+         }
+      }
+      BindCheck("bind_mod: non-object params are refused, not thrown", refusedAll && !threw);
+
+      json deep = 5;
+      for (int i = 0; i < 500; i++)
+         deep = { { "index", deep } };
+      e.clear();
+      bool threwDeep = false, deepRefused = false;
+      try
+      {
+         deepRefused = !Call("bind_mod", { { "dst", deep }, { "key", key }, { "src", src } }, r, e) && !e.empty();
+      }
+      catch (...)
+      {
+         threwDeep = true;
+      }
+      BindCheck("bind_mod: a 500-deep {index} chain is refused politely", deepRefused && !threwDeep);
+
+      const json wild[] = { json(1e300), json(-1e300), json("999999999999999999999"), json(true), json(nullptr) };
+      bool wildRefused = true, wildThrew = false;
+      for (const json& w : wild)
+      {
+         try
+         {
+            e.clear();
+            wildRefused = wildRefused && !Call("bind_mod", { { "dst", w }, { "key", key }, { "src", src } }, r, e);
+         }
+         catch (...)
+         {
+            wildThrew = true;
+         }
+      }
+      BindCheck("bind_mod: a wild node value is an error, not a cast", wildRefused && !wildThrew);
+
+      e.clear();
+      BindCheck("bind_mod: an unknown destination is an error",
+                !Call("bind_mod", { { "dst", 99999 }, { "key", key }, { "src", src } }, r, e) && e.find("unknown node index") != std::string::npos);
+      e.clear();
+      BindCheck("bind_mod: a missing key is named, not ignored",
+                !Call("bind_mod", { { "dst", dst }, { "src", src } }, r, e) && e.find("missing control key") != std::string::npos);
+      e.clear();
+      BindCheck("bind_mod: a non-string key is reported as missing",
+                !Call("bind_mod", { { "dst", dst }, { "key", 42 }, { "src", src } }, r, e) && e.find("missing control key") != std::string::npos);
+      return;
+   }
+   if (f < 5 || dst < 0)
+      return;
+
+   // Frames 5..7: the node has drawn, so the key resolves - bind, then check everything that needs it.
+   if (!bound)
+   {
+      e.clear();
+      if (Call("bind_mod", { { "dst", dst }, { "key", key }, { "src", src } }, r, e))
+      {
+         bound = true;
+         param = r.value("param", -1);
+      }
+      else
+         printf("  [diag] k17: frame %d, Shape's controls are not registered yet (%s)\n", f, e.c_str());
+   }
+
+   if (bound && !verified)
+   {
+      verified = true;
+      BindCheck("bind_mod: the link is in the modulation map", param >= 0 && Modulation::Instance().IsModulated(dst, param));
+      BindCheck("bind_mod: the result names what was bound",
+                r.value("index", -1) == dst && r.value("src", -1) == src && r.value("key", std::string()) == key);
+
+      // API-6 itself: the destination under the name the other verbs use, and a bare key.
+      e.clear();
+      BindCheck("bind_mod: `index` names the destination too",
+                Call("bind_mod", { { "index", dst }, { "key", "rotation" }, { "src", src } }, r, e) && Modulation::Instance().IsModulated(dst, param));
+
+      // The shape an agent writes when it copies an object out of get_graph.
+      e.clear();
+      BindCheck("bind_mod: {dst:{index}} + a numeric-string src",
+                Call("bind_mod", { { "dst", { { "index", dst } } }, { "key", "rotation" }, { "src", std::to_string(src) } }, r, e));
+      BindCheck("bind_mod: still the same modulator", Modulation::Instance().ModulatorFor(dst, param).nodeIndex == src);
+
+      e.clear();
+      BindCheck("bind_mod: lo/hi land on the binding",
+                Call("bind_mod", { { "dst", dst }, { "key", key }, { "src", src }, { "lo", 0.25f }, { "hi", 0.75f } }, r, e) &&
+                   std::abs(Modulation::Instance().ModulatorFor(dst, param).lo - 0.25f) < 1e-6f &&
+                   std::abs(Modulation::Instance().ModulatorFor(dst, param).hi - 0.75f) < 1e-6f);
+
+      {
+         Patch::Data built = BuildPatchData();
+         std::string saved;
+         Patch::WriteText(built, saved);
+         BindCheck("bind_mod: the binding is saved as a mod line",
+                   saved.find("mod " + std::to_string(dst) + " " + std::to_string(param) + " ") != std::string::npos);
+      }
+
+      // Each refusal sets e; a stale one would fail the next Check (the k19 trap).
+      e.clear();
+      BindCheck("bind_mod: an unknown key names the node's controls",
+                !Call("bind_mod", { { "dst", dst }, { "key", "f nope" }, { "src", src } }, r, e) && e.find("not a modulatable control") != std::string::npos);
+      e.clear();
+      BindCheck("bind_mod: an unknown modulator is an error",
+                !Call("bind_mod", { { "dst", dst }, { "key", key }, { "src", 99999 } }, r, e) && e.find("unknown modulator node") != std::string::npos);
+      e.clear();
+      BindCheck("bind_mod: half a range is refused, not half applied",
+                !Call("bind_mod", { { "dst", dst }, { "key", key }, { "src", src }, { "lo", 0.2f } }, r, e) && e.find("lo and hi") != std::string::npos);
+      e.clear();
+      BindCheck("bind_mod: a string range is refused, not thrown",
+                !Call("bind_mod", { { "dst", dst }, { "key", key }, { "src", src }, { "lo", "0.2" }, { "hi", 1 } }, r, e) && e.find("lo and hi") != std::string::npos);
+      e.clear();
+      BindCheck("set_expr: a non-string text is refused, not thrown",
+                !Call("set_expr", { { "index", dst }, { "key", key }, { "text", 42 } }, r, e) && e.find("text must be a string") != std::string::npos);
+
+      // Unbind is the same node under the same names, and it leaves no empty undo step behind.
+      e.clear();
+      BindCheck("unbind_mod: `dst` works and reports the binding", Call("unbind_mod", { { "dst", dst }, { "key", key } }, r, e) && r.value("wasModulated", false));
+      BindCheck("unbind_mod: the link is gone", !Modulation::Instance().IsModulated(dst, param));
+      const size_t undoAfterUnbind = gUndoStack.size();
+      e.clear();
+      BindCheck("unbind_mod: `index` works too", Call("unbind_mod", { { "index", dst }, { "key", key } }, r, e) && !r.value("wasModulated", true));
+      BindCheck("unbind_mod: no empty undo step for a missing binding", gUndoStack.size() == undoAfterUnbind);
+   }
+
+   if (f >= 7)
+   {
+      if (!bound)
+         BindCheck("bind_mod: the node registered its controls within three frames", false);
+      printf("BINDMODTEST %s\n", bound && sBindOk ? "OK" : "FAIL");
+      NewPatch();
+      dst = src = param = -1;
+      bound = verified = false;
+   }
+}
+
 // ====================================================== INFINITE_OSCCONTROLTEST
 //
 // v0.6 2.31: an external script drives a patch over the OSC control API -

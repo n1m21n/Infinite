@@ -1989,6 +1989,10 @@ void DrawFrameTestsA(FrameCtx& fc)
 
       if (getenv("INFINITE_RPCBATCHTEST") != nullptr && frameId == 4)
          RunRpcBatchTest();
+      // fork: k17 - the modulation half needs the destination's control table, and a node only
+      // registers its controls on a frame that draws it, so it runs on the frames after the create.
+      if (getenv("INFINITE_RPCBATCHTEST") != nullptr && frameId >= 4 && frameId <= 7)
+         RunBindModTest(frameId);
       if (getenv("INFINITE_OSCCONTROLTEST") != nullptr && frameId == 4)
          RunOscControlTest();
       if (getenv("INFINITE_HISTORYTEST") != nullptr && frameId == 4)
