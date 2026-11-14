@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ukiyoe Cartography Archipelago Contours",
+    "author": "Infinite",
+    "description": "Topographical Edo woodblock archipelago map with animated contour ripples, rhumb lines, and a vermilion hanko seal.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float contourFreq = 18.0 [8.0, 32.0];\nparam float islandScale = 1.45 [0.8, 2.5];\nparam float rhumbCount = 8.0 [4.0, 16.0];\nparam float grainAmt = 0.04 [0.0, 0.12];\nparam float seaTint = 0.55 [0.1, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\n# Ukiyo-e cartography palette\ncPaper = vec3(0.945, 0.922, 0.855);\ncIndigo = vec3(0.114, 0.208, 0.341);\ncSea = vec3(0.659, 0.855, 0.863);\ncSeal = vec3(0.902, 0.224, 0.275);\n\n# Topographical elevation field\nq = p * islandScale;\nh1 = sin(q.x * 2.1 + sin(q.y * 1.7 + t * 0.25)) * cos(q.y * 2.0 - t * 0.15);\nh2 = 0.5 * sin(length(q - vec2(0.35, -0.25)) * 3.8 - t * 0.3);\nelev = h1 + h2;\n\n# Woodblock contour bands and fine ink lines\nband = smoothstep(-0.08, 0.08, elev);\ncontourWave = abs(fract(elev * contourFreq * 0.25) - 0.5);\ninkLine = 1.0 - smoothstep(0.03, 0.09, contourWave);\n\n# Cartographic rhumb lines from map center\nang = atan2(p.y, p.x);\nrhumb = 1.0 - smoothstep(0.015, 0.045, abs(sin(ang * rhumbCount)));\n\n# Paper fibre grain\ngrain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grainAmt;\n\nbaseCol = mix(mix(cPaper, cSea, seaTint * 0.72), cPaper, band);\nbaseCol = mix(baseCol, cIndigo, inkLine * 0.78);\nbaseCol = mix(baseCol, cIndigo, rhumb * 0.24);\n\n# Vermilion hanko seal stamp in lower-right quadrant\nsealPos = abs(p - vec2(0.56, -0.56));\ninSeal = step(max(sealPos.x, sealPos.y), 0.14);\nsealInner = step(max(sealPos.x, sealPos.y), 0.105) * step(0.025, abs(sealPos.x - 0.03));\nbaseCol = mix(baseCol, cSeal, inSeal * 0.92);\nbaseCol = mix(baseCol, cPaper, sealInner * 0.75);\n\ncol = clamp(baseCol + grain, 0.0, 1.0);\n",
+    "params": {
+      "contourFreq": 18.0,
+      "islandScale": 1.45,
+      "rhumbCount": 8.0,
+      "grainAmt": 0.04,
+      "seaTint": 0.55
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -2895,6 +2895,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "future-garage-sub-reese-bass-synth",
+      "name": "Future Garage Sub Reese Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Detuned dual-saw sub-bass synthesizer with warm lowpass filter drift and subtle saturation for UK garage basslines.",
+      "price": 0,
+      "preview": "assets/templates/future-garage-sub-reese-bass-synth.webp",
+      "file": "assets/templates/future-garage-sub-reese-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "future-garage-glass-rhodes-chord-synth",
+      "name": "Future Garage Glass Rhodes Chord Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay.",
+      "price": 0,
+      "preview": "assets/templates/future-garage-glass-rhodes-chord-synth.webp",
+      "file": "assets/templates/future-garage-glass-rhodes-chord-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "acid-house-303-resonant-squelch-fx",
+      "name": "Acid House 303 Resonant Squelch FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation.",
+      "price": 0,
+      "preview": "assets/templates/acid-house-303-resonant-squelch-fx.webp",
+      "file": "assets/templates/acid-house-303-resonant-squelch-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "acid-house-tape-dub-delay-fx",
+      "name": "Acid House Tape Dub Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive.",
+      "price": 0,
+      "preview": "assets/templates/acid-house-tape-dub-delay-fx.webp",
+      "file": "assets/templates/acid-house-tape-dub-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid House 303 Resonant Squelch FX",
+    "author": "Infinite",
+    "description": "Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float cutoff = 0.24 [0.04, 0.55];\nparam float resonance = 0.68 [0.0, 0.88];\nparam float sweepRate = 0.65 [0.1, 4.0];\nparam float drive = 1.6 [1.0, 3.5];\nparam float mix = 0.78 [0.0, 1.0];\nstate float lfo = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\nlfo = (lfo + sweepRate / sr) % 1.0;\nmodCut = clamp(cutoff + sin(6.2831853 * lfo) * 0.14, 0.03, 0.52);\n\nfb = clamp(resonance * 0.82, 0.0, 0.78);\nsig = in - lp2 * fb;\nsatIn = (sig * drive) / (1.0 + abs(sig * drive) * 0.45);\n\nlp1 = lp1 + modCut * (satIn - lp1);\nlp2 = lp2 + modCut * (lp1 - lp2);\n\nprocessed = in * (1.0 - mix) + lp2 * mix;\nout = processed * 0.92;\n",
+    "params": {
+      "cutoff": 0.24,
+      "resonance": 0.68,
+      "sweepRate": 0.65,
+      "drive": 1.6,
+      "mix": 0.78
+    }
+  }
+}

@@ -576,6 +576,14 @@
   "embeds/brutalist-architecture-spomenik-rib-vault.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/ukiyoe-cartography-archipelago-contours.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ukiyoe-cartography-compass-tide-chart.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

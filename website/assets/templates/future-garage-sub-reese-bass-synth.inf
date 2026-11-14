@@ -1,0 +1,68 @@
+infinite-patch 1
+# Future Garage Sub Reese Bass Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 44
+  i note1 44
+  i note2 47
+  i note3 51
+  i note4 44
+  i note5 47
+  i note6 54
+  i note7 51
+  i note8 44
+  i note9 44
+  i note10 47
+  i note11 49
+  i note12 44
+  i note13 56
+  i note14 51
+  i note15 44
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float detune = 0.016 [0.002, 0.045];\nparam float cutoff = 520.0 [120.0, 2200.0];\nparam float subLevel = 0.65 [0.0, 1.0];\nparam float drive = 1.35 [1.0, 3.0];\nparam float decay = 0.65 [0.15, 1.8];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float pSub = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.03);\nenv = if(target > env, env + (target - env) * 0.09, env - env * decayRate);\n\nlfo = (lfo + 0.65 / sr) % 1.0;\ndrift = 1.0 + sin(6.2831853 * lfo) * 0.18;\n\nf0 = clamp(freq, 30.0, 1600.0);\np1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;\np2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;\npSub = (pSub + (f0 * 0.5) / sr) % 1.0;\n\nsaw1 = 2.0 * p1 - 1.0;\nsaw2 = 2.0 * p2 - 1.0;\nsub = sin(6.2831853 * pSub);\nraw = (saw1 + saw2) * 0.36 + sub * subLevel;\n\nfCut = clamp((cutoff * drift + env * 340.0) / sr * 3.14, 0.008, 0.42);\nlp1 = lp1 + fCut * (raw - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nsat = (lp2 * drive) / (1.0 + abs(lp2 * drive) * 0.4);\nout = sat * env * 0.45;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.16 0.24 0.34
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Future Garage Sub Reese Bass Synth. Detuned dual-saw sub-bass synthesizer with warm lowpass filter drift and subtle saturation for UK garage basslines.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

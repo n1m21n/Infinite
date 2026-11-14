@@ -9718,6 +9718,228 @@
       "file": "assets/library/pixel/brutalist-architecture-spomenik-rib-vault.field",
       "preview": "assets/library/previews/brutalist-architecture-spomenik-rib-vault.jpg",
       "bytes": 2023
+    },
+    {
+      "id": "vector-wireframe-trench-horizon",
+      "name": "Vector Wireframe Trench Horizon",
+      "kind": "Generator",
+      "tags": [
+        "vector-wireframe",
+        "vectrex",
+        "crt",
+        "wireframe",
+        "perspective",
+        "retro",
+        "procedural"
+      ],
+      "description": "Perspective CRT vector trench corridor with receding horizon grid, targeting reticle, and phosphor scanlines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/vector-wireframe-trench-horizon.js",
+      "preview": "assets/library/previews/vector-wireframe-trench-horizon.jpg",
+      "bytes": 2688
+    },
+    {
+      "id": "vector-wireframe-icosahedron-radar",
+      "name": "Vector Wireframe Icosahedron Radar",
+      "kind": "Generator",
+      "tags": [
+        "vector-wireframe",
+        "icosahedron",
+        "radar",
+        "crt",
+        "vectrex",
+        "geometry",
+        "procedural"
+      ],
+      "description": "Rotating 3D-projected vector wireframe icosahedron inside concentric Vectrex radar rings and cardinal azimuth ticks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/vector-wireframe-icosahedron-radar.js",
+      "preview": "assets/library/previews/vector-wireframe-icosahedron-radar.jpg",
+      "bytes": 3311
+    },
+    {
+      "id": "generative-plotter-molnar-cubes-3d",
+      "name": "Generative Plotter Molnar Cubes 3D",
+      "kind": "Generator",
+      "tags": [
+        "generative-plotter",
+        "molnar",
+        "plotter",
+        "3d",
+        "cubes",
+        "algorithmic",
+        "procedural"
+      ],
+      "description": "Vera Molnar-inspired 3D grid of stepped cubic frames in technical ink and vermilion accent on archival cream paper.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/generative-plotter-molnar-cubes-3d.js",
+      "preview": "assets/library/previews/generative-plotter-molnar-cubes-3d.jpg",
+      "bytes": 1352
+    },
+    {
+      "id": "generative-plotter-mohr-hypercube-3d",
+      "name": "Generative Plotter Mohr Hypercube 3D",
+      "kind": "Generator",
+      "tags": [
+        "generative-plotter",
+        "mohr",
+        "hypercube",
+        "lattice",
+        "3d",
+        "plotter",
+        "procedural"
+      ],
+      "description": "Manfred Mohr-inspired algorithmic hypercube lattice of intersecting orthogonal beams and vermilion node markers.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/generative-plotter-mohr-hypercube-3d.js",
+      "preview": "assets/library/previews/generative-plotter-mohr-hypercube-3d.jpg",
+      "bytes": 1620
+    },
+    {
+      "id": "future-garage-sub-reese-bass-synth",
+      "name": "Future Garage Sub Reese Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "future-garage",
+        "audio",
+        "dsp",
+        "bass",
+        "rhodes",
+        "uk-garage"
+      ],
+      "description": "Detuned dual-saw sub-bass synthesizer with warm lowpass filter drift and subtle saturation for UK garage basslines.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/future-garage-sub-reese-bass-synth.inf",
+      "preview": "assets/library/previews/future-garage-sub-reese-bass-synth.jpg",
+      "bytes": 2189
+    },
+    {
+      "id": "future-garage-glass-rhodes-chord-synth",
+      "name": "Future Garage Glass Rhodes Chord Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "future-garage",
+        "audio",
+        "dsp",
+        "bass",
+        "rhodes",
+        "uk-garage"
+      ],
+      "description": "Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/future-garage-glass-rhodes-chord-synth.inf",
+      "preview": "assets/library/previews/future-garage-glass-rhodes-chord-synth.jpg",
+      "bytes": 1984
+    },
+    {
+      "id": "acid-house-303-resonant-squelch-fx",
+      "name": "Acid House 303 Resonant Squelch FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "acid-house",
+        "audio",
+        "dsp",
+        "filter",
+        "delay",
+        "303"
+      ],
+      "description": "Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/acid-house-303-resonant-squelch-fx.inf",
+      "preview": "assets/library/previews/acid-house-303-resonant-squelch-fx.jpg",
+      "bytes": 1819
+    },
+    {
+      "id": "acid-house-tape-dub-delay-fx",
+      "name": "Acid House Tape Dub Delay FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "acid-house",
+        "audio",
+        "dsp",
+        "filter",
+        "delay",
+        "303"
+      ],
+      "description": "Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 4,
+      "file": "assets/templates/acid-house-tape-dub-delay-fx.inf",
+      "preview": "assets/library/previews/acid-house-tape-dub-delay-fx.jpg",
+      "bytes": 1807
+    },
+    {
+      "id": "ukiyoe-cartography-archipelago-contours",
+      "name": "Ukiyoe Cartography Archipelago Contours",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "cartography",
+        "woodblock",
+        "contours",
+        "map",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Topographical Edo woodblock archipelago map with animated contour ripples, rhumb lines, and a vermilion hanko seal.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ukiyoe-cartography-archipelago-contours.field",
+      "preview": "assets/library/previews/ukiyoe-cartography-archipelago-contours.jpg",
+      "bytes": 2233
+    },
+    {
+      "id": "ukiyoe-cartography-compass-tide-chart",
+      "name": "Ukiyoe Cartography Compass Tide Chart",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "compass",
+        "cartography",
+        "woodblock",
+        "tide",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Indigo woodblock nautical tide chart with a 16-point compass rose, Great Wave arc bands, and vermilion markers.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ukiyoe-cartography-compass-tide-chart.field",
+      "preview": "assets/library/previews/ukiyoe-cartography-compass-tide-chart.jpg",
+      "bytes": 2637
     }
   ]
 }

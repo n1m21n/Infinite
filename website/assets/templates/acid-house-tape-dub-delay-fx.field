@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid House Tape Dub Delay FX",
+    "author": "Infinite",
+    "description": "Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float feedback = 0.54 [0.0, 0.82];\nparam float damping = 0.44 [0.1, 0.92];\nparam float drive = 1.45 [1.0, 3.5];\nparam float mix = 0.52 [0.0, 1.0];\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float lp = 0;\n\nfCut = clamp(0.12 + (1.0 - damping) * 0.28, 0.03, 0.42);\nlp = lp + fCut * (in - lp);\n\ntap1 = tap1 + 0.072 * (lp + tap3 * feedback * 0.52 - tap1);\ntap2 = tap2 + 0.056 * (tap1 - tap2);\ntap3 = tap3 + 0.046 * (tap2 - tap3);\n\necho = (tap1 * 0.45 + tap2 * 0.35 + tap3 * 0.25) * drive;\nsat = echo / (1.0 + abs(echo) * 0.38);\n\nprocessed = in * (1.0 - mix) + sat * mix;\nout = processed * 0.94;\n",
+    "params": {
+      "feedback": 0.54,
+      "damping": 0.44,
+      "drive": 1.45,
+      "mix": 0.52
+    }
+  }
+}

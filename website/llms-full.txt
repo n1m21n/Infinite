@@ -301,6 +301,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Vaporwave Midnight Chorus Lead Synth](https://infinitedevices.org/library/vaporwave-midnight-chorus-lead-synth.html): Dreamy dual-oscillator detuned saw-triangle lead with gentle vibrato, chorus drift, and silky lowpass filter. (file: https://infinitedevices.org/assets/templates/vaporwave-midnight-chorus-lead-synth.inf)
 - [Synthwave Ensemble Chorus Wash FX](https://infinitedevices.org/library/synthwave-ensemble-chorus-wash-fx.html): Analog-inspired multi-voice modulated chorus wash with warm high-frequency smoothing for retro synth leads and pads. (file: https://infinitedevices.org/assets/templates/synthwave-ensemble-chorus-wash-fx.inf)
 - [Synthwave Gated Analog Delay FX](https://infinitedevices.org/library/synthwave-gated-analog-delay-fx.html): Retro-futuristic multi-tap analog delay with warm tape saturation and damped feedback tail. (file: https://infinitedevices.org/assets/templates/synthwave-gated-analog-delay-fx.inf)
+- [Future Garage Sub Reese Bass Synth](https://infinitedevices.org/library/future-garage-sub-reese-bass-synth.html): Detuned dual-saw sub-bass synthesizer with warm lowpass filter drift and subtle saturation for UK garage basslines. (file: https://infinitedevices.org/assets/templates/future-garage-sub-reese-bass-synth.inf)
+- [Future Garage Glass Rhodes Chord Synth](https://infinitedevices.org/library/future-garage-glass-rhodes-chord-synth.html): Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay. (file: https://infinitedevices.org/assets/templates/future-garage-glass-rhodes-chord-synth.inf)
+- [Acid House 303 Resonant Squelch FX](https://infinitedevices.org/library/acid-house-303-resonant-squelch-fx.html): Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation. (file: https://infinitedevices.org/assets/templates/acid-house-303-resonant-squelch-fx.inf)
+- [Acid House Tape Dub Delay FX](https://infinitedevices.org/library/acid-house-tape-dub-delay-fx.html): Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive. (file: https://infinitedevices.org/assets/templates/acid-house-tape-dub-delay-fx.inf)
 
 ## Library: Community
 
@@ -533,6 +537,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Suprematist Blocks Malevich Floating Plane](https://infinitedevices.org/library/suprematist-blocks-malevich-floating-plane.html): Balanced asymmetric field of a rotated black quadrilateral and vermilion satellite bars suspended over warm paper ivory. (file: https://infinitedevices.org/assets/library/pixel/suprematist-blocks-malevich-floating-plane.field)
 - [Brutalist Architecture Monolith Facade](https://infinitedevices.org/library/brutalist-architecture-monolith-facade.html): Board-formed concrete facade with rhythmic cantilevered coffer bays and diagonal architectural shadow shafts. (file: https://infinitedevices.org/assets/library/pixel/brutalist-architecture-monolith-facade.field)
 - [Brutalist Architecture Spomenik Rib Vault](https://infinitedevices.org/library/brutalist-architecture-spomenik-rib-vault.html): Monumental Spomenik concrete rib vault with radiating cantilevered fins, terraced plinths, and brutalist oculus. (file: https://infinitedevices.org/assets/library/pixel/brutalist-architecture-spomenik-rib-vault.field)
+- [Ukiyoe Cartography Archipelago Contours](https://infinitedevices.org/library/ukiyoe-cartography-archipelago-contours.html): Topographical Edo woodblock archipelago map with animated contour ripples, rhumb lines, and a vermilion hanko seal. (file: https://infinitedevices.org/assets/library/pixel/ukiyoe-cartography-archipelago-contours.field)
+- [Ukiyoe Cartography Compass Tide Chart](https://infinitedevices.org/library/ukiyoe-cartography-compass-tide-chart.html): Indigo woodblock nautical tide chart with a 16-point compass rose, Great Wave arc bands, and vermilion markers. (file: https://infinitedevices.org/assets/library/pixel/ukiyoe-cartography-compass-tide-chart.field)
 
 ## Library: Sketch
 
@@ -634,6 +640,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Lilliputian Surreal Titanic Staircase Pilgrims](https://infinitedevices.org/library/lilliputian-surreal-titanic-staircase-pilgrims.html): Monumental stepped alabaster monoliths and sweeping arches traversed by miniature terracotta figures in quiet scale contrast. (file: https://infinitedevices.org/assets/library/sketch/lilliputian-surreal-titanic-staircase-pilgrims.js)
 - [Indie Psychedelic Liquid Oil Prism](https://infinitedevices.org/library/indie-psychedelic-liquid-oil-prism.html): Liquified harmonic oil-lens rings and floating chromatic spores drifting across a deep plum field. (file: https://infinitedevices.org/assets/library/sketch/indie-psychedelic-liquid-oil-prism.js)
 - [Indie Psychedelic Chromatic Mycelium](https://infinitedevices.org/library/indie-psychedelic-chromatic-mycelium.html): Sinuous radiating mycelium filaments and glowing elliptical spore nodes blooming on deep violet. (file: https://infinitedevices.org/assets/library/sketch/indie-psychedelic-chromatic-mycelium.js)
+- [Vector Wireframe Trench Horizon](https://infinitedevices.org/library/vector-wireframe-trench-horizon.html): Perspective CRT vector trench corridor with receding horizon grid, targeting reticle, and phosphor scanlines. (file: https://infinitedevices.org/assets/library/sketch/vector-wireframe-trench-horizon.js)
+- [Vector Wireframe Icosahedron Radar](https://infinitedevices.org/library/vector-wireframe-icosahedron-radar.html): Rotating 3D-projected vector wireframe icosahedron inside concentric Vectrex radar rings and cardinal azimuth ticks. (file: https://infinitedevices.org/assets/library/sketch/vector-wireframe-icosahedron-radar.js)
 
 ## Library: Sketch 3D
 
@@ -730,6 +738,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Cymatics Sine Harmonic Toroid Resonator 3D](https://infinitedevices.org/library/cymatics-sine-harmonic-toroid-resonator-3d.html): Nested cymatic torus rings and radial harmonic spokes oscillating around a central acoustic focal core. (file: https://infinitedevices.org/assets/library/sketch/cymatics-sine-harmonic-toroid-resonator-3d.js)
 - [Technical Blueprint Turbine Assembly 3D](https://infinitedevices.org/library/technical-blueprint-turbine-assembly-3d.html): Precision CAD-style axial turbine rotor with radial airfoil blades, stepped shaft collars, and stator rings. (file: https://infinitedevices.org/assets/library/sketch/technical-blueprint-turbine-assembly-3d.js)
 - [Technical Blueprint Geodesic Observatory 3D](https://infinitedevices.org/library/technical-blueprint-geodesic-observatory-3d.html): Drafting-style geodesic observatory dome with meridian ribs, azimuth tracks, and central collimator tower. (file: https://infinitedevices.org/assets/library/sketch/technical-blueprint-geodesic-observatory-3d.js)
+- [Generative Plotter Molnar Cubes 3D](https://infinitedevices.org/library/generative-plotter-molnar-cubes-3d.html): Vera Molnar-inspired 3D grid of stepped cubic frames in technical ink and vermilion accent on archival cream paper. (file: https://infinitedevices.org/assets/library/sketch/generative-plotter-molnar-cubes-3d.js)
+- [Generative Plotter Mohr Hypercube 3D](https://infinitedevices.org/library/generative-plotter-mohr-hypercube-3d.html): Manfred Mohr-inspired algorithmic hypercube lattice of intersecting orthogonal beams and vermilion node markers. (file: https://infinitedevices.org/assets/library/sketch/generative-plotter-mohr-hypercube-3d.js)
 
 ## Library: Synths
 
@@ -826,6 +836,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Downtempo Dusty Rhodes Bell Pad Synth](https://infinitedevices.org/library/downtempo-dusty-rhodes-bell-pad-synth.html): Warm dusty electric-tine and bell pad synthesizer with soft FM overtone bloom, gentle chorus detune, and mellow decay. (file: https://infinitedevices.org/assets/templates/downtempo-dusty-rhodes-bell-pad-synth.inf)
 - [Vaporwave Mallsoft Rhodes Pad Synth](https://infinitedevices.org/library/vaporwave-mallsoft-rhodes-pad-synth.html): Lush detuned electric-tine pad synthesizer with slow tape wow, soft FM bell shimmer, and warm lowpass bloom. (file: https://infinitedevices.org/assets/templates/vaporwave-mallsoft-rhodes-pad-synth.inf)
 - [Vaporwave Midnight Chorus Lead Synth](https://infinitedevices.org/library/vaporwave-midnight-chorus-lead-synth.html): Dreamy dual-oscillator detuned saw-triangle lead with gentle vibrato, chorus drift, and silky lowpass filter. (file: https://infinitedevices.org/assets/templates/vaporwave-midnight-chorus-lead-synth.inf)
+- [Future Garage Sub Reese Bass Synth](https://infinitedevices.org/library/future-garage-sub-reese-bass-synth.html): Detuned dual-saw sub-bass synthesizer with warm lowpass filter drift and subtle saturation for UK garage basslines. (file: https://infinitedevices.org/assets/templates/future-garage-sub-reese-bass-synth.inf)
+- [Future Garage Glass Rhodes Chord Synth](https://infinitedevices.org/library/future-garage-glass-rhodes-chord-synth.html): Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay. (file: https://infinitedevices.org/assets/templates/future-garage-glass-rhodes-chord-synth.inf)
 
 ## Library: Audio Effects
 
@@ -925,6 +937,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Minimal Techno Sub Harmonic Shaper FX](https://infinitedevices.org/library/minimal-techno-sub-harmonic-shaper-fx.html): Plastikman-inspired resonant lowpass sculpt and asymmetric soft-clipper for tight minimal techno basslines and percussive clicks. (file: https://infinitedevices.org/assets/templates/minimal-techno-sub-harmonic-shaper-fx.inf)
 - [Synthwave Ensemble Chorus Wash FX](https://infinitedevices.org/library/synthwave-ensemble-chorus-wash-fx.html): Analog-inspired multi-voice modulated chorus wash with warm high-frequency smoothing for retro synth leads and pads. (file: https://infinitedevices.org/assets/templates/synthwave-ensemble-chorus-wash-fx.inf)
 - [Synthwave Gated Analog Delay FX](https://infinitedevices.org/library/synthwave-gated-analog-delay-fx.html): Retro-futuristic multi-tap analog delay with warm tape saturation and damped feedback tail. (file: https://infinitedevices.org/assets/templates/synthwave-gated-analog-delay-fx.inf)
+- [Acid House 303 Resonant Squelch FX](https://infinitedevices.org/library/acid-house-303-resonant-squelch-fx.html): Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation. (file: https://infinitedevices.org/assets/templates/acid-house-303-resonant-squelch-fx.inf)
+- [Acid House Tape Dub Delay FX](https://infinitedevices.org/library/acid-house-tape-dub-delay-fx.html): Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive. (file: https://infinitedevices.org/assets/templates/acid-house-tape-dub-delay-fx.inf)
 
 ## Nodes
 
@@ -1238,7 +1252,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 117 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 119 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1356,3 +1370,5 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Suprematist Blocks Malevich Floating Plane](https://infinitedevices.org/embeds/suprematist-blocks-malevich-floating-plane.html): Audio-reactive Malevich-inspired Suprematist planes. Bass pulses the central black quadrilateral, mids drift the vermilion satellite bars, and highs sharpen the edge tension.
 - [Brutalist Architecture Monolith Facade](https://infinitedevices.org/embeds/brutalist-architecture-monolith-facade.html): Audio-reactive Brutalist concrete facade inspired by Le Corbusier and Soviet modernism. Bass shifts the monumental cantilevers, mids sweep the shadow angle, and highs sharpen the concrete relief.
 - [Brutalist Architecture Spomenik Rib Vault](https://infinitedevices.org/embeds/brutalist-architecture-spomenik-rib-vault.html): Audio-reactive Spomenik concrete monument. Bass pulses the brutalist oculus and ribs, mids rotate the directional sun relief, and highs illuminate the raw concrete edges.
+- [Ukiyoe Cartography Archipelago Contours](https://infinitedevices.org/embeds/ukiyoe-cartography-archipelago-contours.html): Audio-reactive Ukiyo-e woodblock cartography map. Bass swells the island elevation contours, mids drift the sea currents, and highs illuminate the rhumb lines and hanko seal.
+- [Ukiyoe Cartography Compass Tide Chart](https://infinitedevices.org/embeds/ukiyoe-cartography-compass-tide-chart.html): Audio-reactive Ukiyo-e nautical tide chart. Bass pulses the compass rose, mids roll the Great Wave arc bands, and highs sharpen the woodblock degree ticks.
