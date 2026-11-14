@@ -2842,8 +2842,10 @@ void RunBindModTest(int f)
          for (const ParamRef& pr : Modulation::Instance().FrameParams())
             if (pr.nodeIndex == dst)
                ++mine;
-         printf("  [diag] k17: frame %d, not registered yet (%s); nodes=%zu frameParams=%zu forDst=%zu probe=%d probeAll=%d\n", f, e.c_str(), gNodes.size(),
-                Modulation::Instance().FrameParams().size(), mine, gParamProbeNode, (int)gHeadlessProbeAll);
+         const GraphNode* dgn = FindNodeByIndex(dst);
+         printf("  [diag] k17: frame %d (%s) nodes=%zu fp=%zu forDst=%zu probe=%d all=%d | dst: node=%d type=%s params=%d hidden=%d\n", f, e.c_str(), gNodes.size(),
+                Modulation::Instance().FrameParams().size(), mine, gParamProbeNode, (int)gHeadlessProbeAll, dgn && dgn->node ? 1 : 0,
+                dgn ? dgn->typeName.c_str() : "?", dgn ? (int)dgn->showParams : -1, dgn ? (int)dgn->hiddenFromCanvas : -1);
       }
    }
 
