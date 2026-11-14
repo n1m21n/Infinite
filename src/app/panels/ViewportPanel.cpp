@@ -140,6 +140,9 @@ namespace app
       // IAudioSource (its own audio track) but, unlike every other audio
       // node, GetOutputTexture() is a real video frame, not 0 - so it still
       // belongs in the viewport panel/projector.
+      // Audio Texture is the other exception: audio in, a real spectrum/wave picture out.
+      if (dynamic_cast<AudioTextureNode*>(n) != nullptr)
+         return true;
       if ((dynamic_cast<IAudioSource*>(n) != nullptr && dynamic_cast<VideoSourceNode*>(n) == nullptr) ||
           n->AudioInputSlot(0) != nullptr ||
           dynamic_cast<INoteSource*>(n) != nullptr || n->NoteInputSlot(0) != nullptr)

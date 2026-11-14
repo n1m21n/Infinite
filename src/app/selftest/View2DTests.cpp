@@ -1,6 +1,7 @@
 // 2D View self-test (INFINITE_VIEW2DTEST): the Scene 2D document model, its save
 // text, the composite it draws, and the plan's two Block A tasks (T1 poster, T2
 // overlay) built from node and fill layers only. Plan: internal/plans/2d-view.
+#include <cstdlib>
 #include "app/AppShared.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/Scene2DNode.h"
@@ -915,6 +916,76 @@ void RunView2DTest()
       Check("M5: a setting change lands within a frame or two", undoMax + commitMax + cookMax < 50.0);
    }
 
+   // ---- B: real 3D. Objects draw through the comp camera at document size with their own depth: two intersecting
+   // cubes hide each other per pixel whatever the layer order, a tilted card passes through a cube. ----
+   {
+      NewPatch();
+      GraphNode* ca = SpawnNode("Cube", "3D", 0.0f, 0.0f);
+      GraphNode* cb = SpawnNode("Cube", "3D", 0.0f, 300.0f);
+      GraphNode* nz = SpawnNode("Noise", "Source", 0.0f, 600.0f);
+      auto paint = [](GraphNode* g, float r, float gg, float b) {
+         if (auto* n = g != nullptr ? dynamic_cast<GeometryNode*>(g->node.get()) : nullptr)
+         {
+            n->color[0] = n->color[1] = n->color[2] = 0.0f;
+            n->emissionColor[0] = r;
+            n->emissionColor[1] = gg;
+            n->emissionColor[2] = b;
+            n->emission = 1.0f;
+         }
+      };
+      paint(ca, 1, 0, 0);
+      paint(cb, 0, 0, 1);
+      Scene2DNode pic;
+      pic.SetDocText("doc 512 512 0 0 0 0 0 0 0 0 1 32 4 30 10 1 1\n");
+      pic.Doc().background = 1;
+      Layer& la = pic.AddLayer(Kind::Node, ca != nullptr ? ca->uid : 0);
+      la.is3d = true;
+      Layer& lb = pic.AddLayer(Kind::Node, cb != nullptr ? cb->uid : 0);
+      lb.is3d = true;
+      lb.ry = 45.0f;
+      const int ia = la.id, ib = lb.id;
+      pic.Commit();
+      Cook(&pic);
+      Cook(&pic);   // the first render resolves depth
+      // Half the cube's side in px: the bounding sphere is 0.8 of the 512 box, the cube's half side 1/sqrt(3) of it.
+      const int hs = (int)(0.4f * 512.0f / std::sqrt(3.0f));
+      auto red = [&](int x, int y) { auto p = Pixel(&pic, x, y); return p[0] > p[2] + 0.2f; };
+      auto blue = [&](int x, int y) { auto p = Pixel(&pic, x, y); return p[2] > p[0] + 0.2f; };
+      const int c = 256, side = c + (int)(0.6f * hs);
+      const bool order1 = blue(c, c) && red(side, c) && red(512 - side, c);
+      pic.MoveLayer(ia, ib, false);   // red on top now
+      pic.Commit();
+      Cook(&pic);
+      Cook(&pic);
+      const bool order2 = blue(c, c) && red(side, c) && red(512 - side, c);
+      printf("  B occlusion: order 1 %d, order 2 %d (half side %d px)\n", order1 ? 1 : 0, order2 ? 1 : 0, hs);
+      Check("B: two intersecting objects hide each other per pixel, either layer order", order1 && order2);
+      int rw = 0;   // ids may change on a restack: ask every layer
+      for (const Layer& l : pic.Layers())
+         rw = std::max(rw, pic.GeometryRenderWidth(l.id));
+      printf("  B render width %d\n", rw);
+      Check("B: an object renders at the document's size", rw == 512);
+      // A tilted card through the red cube: one side in front of the cube, the other behind it.
+      pic.RemoveLayer(ib);
+      Layer& card = pic.AddLayer(Kind::Node, nz != nullptr ? nz->uid : 0);
+      card.is3d = true;
+      card.ry = 70.0f;   // full size: it leaves the cube's front face one side of the centre
+      pic.Commit();
+      Cook(&pic);
+      Cook(&pic);
+      const int off = (int)(0.5f * hs);
+      const bool l = red(c - off, c), r = red(c + off, c);
+      printf("  B card through cube: left red %d, right red %d\n", l ? 1 : 0, r ? 1 : 0);
+      Check("B: a card passes through an object (one side in front, one behind)", l != r);
+      Check("B: the cube shows at the card's centre line", red(c, c - hs / 2) || red(c, c + hs / 2));
+      pic.SetDocText("doc 320 200 0 0 0 0 0 0 0 0 1 32 4 30 10 1 1\n");
+      Layer& small = pic.AddLayer(Kind::Node, ca != nullptr ? ca->uid : 0);
+      small.is3d = true;
+      pic.Commit();
+      Cook(&pic);
+      Check("B: the render follows a new document size", pic.GeometryRenderWidth(small.id) == 320);
+   }
+
    // ---- H2 procedural layers: a Field Pixel is a layer and a mask at any document size; a Field Modifier is a 3D card ----
    {
       GraphNode* fp = SpawnNode("FieldPixel", "Source", 0.0f, 600.0f);
@@ -1083,6 +1154,9 @@ void RunView2DTest()
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");
+   // Done: quit with the result (no teardown), so a runner needs no timeout kill.
+   fflush(stdout);
+   std::_Exit(ok ? 0 : 1);
 }
 
 } // namespace app

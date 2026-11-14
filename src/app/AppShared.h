@@ -5930,6 +5930,8 @@ extern ImVec2 gView2DRectMin, gView2DRectMax;
 void DrawView2DDocked(const char* id, const ImVec2& size);
 bool View2DCanAdd(const GraphNode& gn);
 void View2DAddNode(GraphNode& gn);
+// RPC "view2d": read the open 2D document's layers, or write them in one gated batch (one undo step).
+bool View2DRpc(const nlohmann::json& params, nlohmann::json& out, std::string& error);
 OutputNode* View2DEnsureOutput();
 // Drops an SVG file onto the open 2D View as a new vector layer.
 bool View2DImportSvg(const std::string& path);

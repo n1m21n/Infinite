@@ -4,6 +4,7 @@
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
 #include "app/AppShared.h"
+#include "ImageCable.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
@@ -22,6 +23,7 @@
 #include "nodes/SceneNodes.h"
 #include "nodes/ImageSourceNode.h"
 #include "nodes/OutputNode.h"
+#include "nodes/PredictiveColoringNode.h"
 #include "nodes/Scene2DNode.h"
 #include "nodes/SketchNode.h"
 #include "nodes/TextNode.h"
@@ -101,7 +103,16 @@ namespace
    // Paint tools. The brush and the eraser keep their own settings.
    BrushEngine::Brush sBrush, sEraser;
    // The brush's numbers are params of the open document, after Drive A..D and before the layer slots.
-   constexpr int kBrushSizeParam = 4, kBrushOpacityParam = 5, kBrushFlowParam = 6;
+   constexpr int kBrushSizeParam = 4, kBrushOpacityParam = 5, kBrushFlowParam = 6, kBrushHueParam = 7;
+   float sBrushHue = 0.0f;   // degrees, turns the colour each stroke starts with (sound as a paint input)
+   // Turns an RGB colour round the hue circle, keeping its value and saturation.
+   void HueTurn(float c[3], float degrees)
+   {
+      float h = 0, sat = 0, v = 0;
+      ImGui::ColorConvertRGBtoHSV(c[0], c[1], c[2], h, sat, v);
+      h = std::fmod(h + degrees / 360.0f + 1.0f, 1.0f);
+      ImGui::ColorConvertHSVtoRGB(h, sat, v, c[0], c[1], c[2]);
+   }
    int sBrushPreset = -1, sEraserPreset = -1;
    bool sBrushInit = false;
    float sFg[3] = { 0.0f, 0.0f, 0.0f }, sBg[3] = { 1.0f, 1.0f, 1.0f };
@@ -151,6 +162,8 @@ namespace
       std::vector<Layer> before;
       Layer l0;
       float hx = 0, hy = 0;       // the dragged handle, as a box fraction
+      int warpHandle = -1;        // kind 18: the handle (0..7) pulled; corners distort or perspective, edges skew
+      bool perspective = false;
       bool fromCentre = false;
       int guideAxis = 0;          // 0 vertical (x), 1 horizontal (y)
       int guideIndex = -1;
@@ -177,7 +190,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, AddAdjust, AddNode, ReplaceNode };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -1535,6 +1548,8 @@ namespace
          b.sourceOffset[1] = sCloneOffset.y;
       }
       std::copy(sFg, sFg + 3, b.color);
+      if (sTool == kBrush && sBrushHue != 0.0f)
+         HueTurn(b.color, sBrushHue);
       const ImVec2 from = line && sHaveLast ? sLastPaint : at;
       if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow()))
          return;
@@ -1694,6 +1709,15 @@ namespace
 
    void HandlePoint(Scene2DNode* doc, const Layer& l, float fx, float fy, ImVec2& out)
    {
+      // A distorted layer: the handles sit on its pulled corners (and between them).
+      float c[8];
+      if (l.warpOn && doc->Corners(l, c))
+      {
+         const float tx = c[0] + (c[2] - c[0]) * fx, ty = c[1] + (c[3] - c[1]) * fx;
+         const float bx = c[6] + (c[4] - c[6]) * fx, by = c[7] + (c[5] - c[7]) * fx;
+         out = ToScreen(doc, tx + (bx - tx) * fy, ty + (by - ty) * fy);
+         return;
+      }
       float bw = 1, bh = 1, m[6], x, y;
       doc->LayerBox(l, bw, bh);
       doc->LayerMatrix(l, m);
@@ -1740,6 +1764,59 @@ namespace
             sOp.before.push_back(*l);
       if (Layer* a = Active(doc))
          sOp.l0 = *a;
+   }
+
+   bool CanWarp(Scene2DNode* doc)
+   {
+      const Layer* l = Active(doc);
+      return l != nullptr && l->kind != Kind::Group && l->kind != Kind::Fill && l->kind != Kind::Adjust && !doc->IsObjectLayer(*l);
+   }
+
+   // Distort, perspective and skew all move the layer's corners (warp: document px per corner, TL TR BR BL).
+   void WarpActive(Scene2DNode* doc, ImVec2 mouse)
+   {
+      Layer* l = Active(doc);
+      if (l == nullptr || sOp.warpHandle < 0)
+         return;
+      const Layer& l0 = sOp.l0;
+      const ImVec2 md = ToDoc(doc, mouse);
+      float dx = md.x - sOp.docStart.x, dy = md.y - sOp.docStart.y;
+      *l = l0;
+      l->warpOn = true;
+      float c[8];
+      if (!doc->Corners(l0, c))
+         return;
+      auto pull = [&](int k, float x, float y) { l->warp[k * 2] += x; l->warp[k * 2 + 1] += y; };
+      const int h = sOp.warpHandle;
+      if (h % 2 == 0)
+      {
+         const int k = h == 0 ? 0 : h == 2 ? 1 : h == 4 ? 2 : 3;   // handle -> corner (TL TR BR BL)
+         if (!sOp.perspective)
+            pull(k, dx, dy);
+         else if (std::fabs(dx) >= std::fabs(dy))
+         {
+            pull(k, dx, 0.0f);   // along the top or bottom edge: its other corner moves the other way
+            pull(k ^ 1, -dx, 0.0f);
+         }
+         else
+         {
+            pull(k, 0.0f, dy);   // along the left or right edge
+            pull(3 - k, 0.0f, -dy);
+         }
+      }
+      else
+      {
+         // An edge slides along itself: both its corners move by the drag along the edge.
+         const int a = h == 1 ? 0 : h == 3 ? 1 : h == 5 ? 2 : 3, b = (a + 1) % 4;
+         float ex = c[b * 2] - c[a * 2], ey = c[b * 2 + 1] - c[a * 2 + 1];
+         const float len = std::max(1e-3f, std::sqrt(ex * ex + ey * ey));
+         ex /= len;
+         ey /= len;
+         const float t = dx * ex + dy * ey;
+         pull(a, ex * t, ey * t);
+         pull(b, ex * t, ey * t);
+      }
+      Touch();
    }
 
    void ScaleActive(Scene2DNode* doc, ImVec2 mouse)
@@ -1916,7 +1993,7 @@ namespace
       }
       for (int a = 0; a < 3; a++)
       {
-         if (mode == 2 && a == 2)
+         if (mode == 2 && a == 2 && !doc->IsObjectLayer(l))
             continue;   // a card has no thickness to scale
          const float tip[3] = { at[0] + ax[a][0] * len, at[1] + ax[a][1] * len, at[2] + ax[a][2] * len };
          ImVec2 s;
@@ -2039,7 +2116,8 @@ namespace
             k = std::max(0.01f, 1.0f + t);
             if (snap)
                k = std::max(0.1f, std::round(k * 10.0f) / 10.0f);
-            (a == 0 ? l->sx : l->sy) = (a == 0 ? l0.sx : l0.sy) * k;
+            float* v = a == 0 ? &l->sx : a == 1 ? &l->sy : &l->sz;
+            *v = (a == 0 ? l0.sx : a == 1 ? l0.sy : l0.sz) * k;
          }
       }
       Touch();
@@ -3243,6 +3321,15 @@ namespace
                BeginOp(doc, 16, mouse, sGizmoMode == 0 ? "Move layer" : sGizmoMode == 1 ? "Rotate layer" : "Scale layer");
                sOp.gizmoAxis = sGizmoHot;
             }
+            else if (hoverHandle >= 0 && hoverHandle < 8 && (io.KeyCtrl || io.KeySuper) && CanWarp(doc))
+            {
+               // Cmd/Ctrl: a corner distorts (with Alt+Shift, perspective), an edge skews.
+               const bool corner = hoverHandle % 2 == 0;
+               BeginOp(doc, 18, mouse, corner ? "Distort layer" : "Skew layer");
+               sOp.warpHandle = hoverHandle;
+               sOp.perspective = corner && io.KeyAlt && io.KeyShift;
+               sOp.docStart = ToDoc(doc, mouse);
+            }
             else if (hoverHandle >= 0 && hoverHandle < 8)
             {
                BeginOp(doc, 2, mouse, "Scale layer");
@@ -3300,6 +3387,8 @@ namespace
             RotateActive(doc, mouse);
          else if (sOp.kind == 16)
             DragGizmo3D(doc, mouse);
+         else if (sOp.kind == 18)
+            WarpActive(doc, mouse);
          else if (sOp.kind == 4)
             sPan = ImVec2(sOp.pan0.x + mouse.x - sOp.start.x, sOp.pan0.y + mouse.y - sOp.start.y);
          else if (sOp.kind == 5)
@@ -3512,6 +3601,13 @@ namespace
          ModBegin();
          BarSlider("##v2dflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
          ModEnd();
+         if (brush)
+         {
+            ModNextParam(kBrushHueParam);
+            ModBegin();
+            BarSlider("##v2dhue", &sBrushHue, -180.0f, 180.0f, "Hue %+.0f", kWellL);
+            ModEnd();
+         }
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          b.flow = flow / 100.0f;
@@ -4587,6 +4683,15 @@ namespace
             if (l->kind == Kind::Paint && MenuParts::Item(T("Convert to Draw Node"), nullptr)) sPending.what = Pending::ToDraw;
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
+            if (MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
+            if (doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
+            if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))
+            {
+               PushUndoCheckpoint("Reset distort");
+               l->warpOn = false;
+               std::fill(l->warp, l->warp + 8, 0.0f);
+               Touch();
+            }
             if (MenuParts::Item(T("Rename"), nullptr))
             {
                sRename = id;
@@ -5580,6 +5685,29 @@ namespace
             gRequestFitViewNodeIndex = self->index;
          }
          break;
+      case Pending::LayerOutput:
+         if (Layer* l = Active(doc))
+         {
+            PushUndoCheckpoint("Layer as output");
+            l->output = !l->output;
+            // Other nodes read it from the canvas, so the document becomes a node.
+            if (l->output && doc->panelOnly && self != nullptr)
+            {
+               doc->panelOnly = false;
+               self->hiddenFromCanvas = false;
+               gRequestSelectNodeIndex = self->index;
+            }
+            doc->Commit();
+         }
+         break;
+      case Pending::LayerBelow:
+         if (Layer* l = Active(doc))
+         {
+            PushUndoCheckpoint("Effect on below");
+            l->below = !l->below;
+            doc->Commit();
+         }
+         break;
       case Pending::RenderImage: RenderImage(); break;
       case Pending::RenderAnim: RenderAnimation(doc); break;
       case Pending::Group:
@@ -5932,6 +6060,523 @@ bool View2DCanAdd(const GraphNode& gn)
           (dynamic_cast<IGeometrySource*>(n) != nullptr || CanShowInViewportPanel(gn));
 }
 
+static bool Is3DNode(INode* n);
+// ---- H5: the 2D View for agents (RPC "view2d", CLI `infinite view2d`) ------------------------------------------
+// Every write is one batch through a shape gate: each call is checked first (layer ids, field names, kinds, ranges)
+// and a bad call fails the whole batch with typed errors and the closest names, the document untouched. A batch that
+// passes lands as one undo step "Agent: <label>".
+namespace
+{
+   using nlohmann::json;
+   const char* kV2KindNames[Scene2DNode::kKindCount] = { "node", "fill", "group", "paint", "vector", "text", "adjust" };
+
+   std::string V2Key(const std::string& s)
+   {
+      std::string k;
+      for (char c : s)
+         if (std::isalnum((unsigned char)c))
+            k += (char)std::tolower((unsigned char)c);
+      return k;
+   }
+
+   int V2Edit(const std::string& a, const std::string& b)
+   {
+      std::vector<int> row(b.size() + 1);
+      for (size_t j = 0; j <= b.size(); j++)
+         row[j] = (int)j;
+      for (size_t i = 1; i <= a.size(); i++)
+      {
+         int diag = row[0];
+         row[0] = (int)i;
+         for (size_t j = 1; j <= b.size(); j++)
+         {
+            const int up = row[j];
+            row[j] = std::min({ row[j] + 1, row[j - 1] + 1, diag + (a[i - 1] == b[j - 1] ? 0 : 1) });
+            diag = up;
+         }
+      }
+      return row[b.size()];
+   }
+
+   json V2Near(const std::string& want, const std::vector<std::string>& names)
+   {
+      std::vector<std::pair<int, std::string>> d;
+      for (const std::string& n : names)
+         d.push_back({ V2Edit(V2Key(want), V2Key(n)), n });
+      std::stable_sort(d.begin(), d.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+      json out = json::array();
+      for (size_t i = 0; i < d.size() && i < 4; i++)
+         out.push_back(d[i].second);
+      return out;
+   }
+
+   const std::vector<std::string> kV2Extra = { "name", "visible", "blend", "text", "color", "colorB", "is3d", "depthScale", "output", "below" };
+
+   std::vector<std::string> V2FieldNames()
+   {
+      std::vector<std::string> out;
+      for (int f = 0; f < Scene2DNode::kLfCount; f++)
+         out.push_back(Scene2DNode::LayerFieldName(f));
+      out.insert(out.end(), kV2Extra.begin(), kV2Extra.end());
+      return out;
+   }
+
+   int V2Field(const std::string& name)
+   {
+      const std::string k = V2Key(name);
+      for (int f = 0; f < Scene2DNode::kLfCount; f++)
+         if (V2Key(Scene2DNode::LayerFieldName(f)) == k)
+            return f;
+      return -1;
+   }
+
+   int V2Blend(const json& v)
+   {
+      const auto& names = BlendModes::Names();
+      if (v.is_number_integer())
+         return v.get<int>() >= 0 && v.get<int>() < (int)names.size() ? v.get<int>() : -1;
+      if (v.is_string())
+         for (size_t i = 0; i < names.size(); i++)
+            if (V2Key(names[i]) == V2Key(v.get<std::string>()))
+               return (int)i;
+      return -1;
+   }
+
+   bool V2Color(const json& v, float out[4])
+   {
+      if (!v.is_array() || v.size() < 3 || v.size() > 4)
+         return false;
+      for (size_t i = 0; i < v.size(); i++)
+      {
+         if (!v[i].is_number())
+            return false;
+         out[i] = std::clamp(v[i].get<float>(), 0.0f, 1.0f);
+      }
+      if (v.size() == 3)
+         out[3] = 1.0f;
+      return true;
+   }
+
+   json V2Layer(Scene2DNode* doc, const Layer& l)
+   {
+      json fields = json::object();
+      Layer copy = l;
+      for (int f = 0; f < Scene2DNode::kLfCount; f++)
+         if (Scene2DNode::LayerFieldApplies(l, f))
+            if (const float* v = Scene2DNode::LayerFieldPtr(copy, f))
+               fields[Scene2DNode::LayerFieldName(f)] = *v;
+      json out = { { "id", l.id }, { "kind", kV2KindNames[(int)l.kind] }, { "name", LayerName(l) }, { "parent", l.parent },
+                   { "visible", l.visible }, { "blend", BlendModes::Names()[std::clamp(l.blend, 0, (int)BlendModes::Names().size() - 1)] },
+                   { "is3d", l.is3d }, { "fields", fields } };
+      if (l.kind == Kind::Node)
+         if (GraphNode* gn = FindNodeByUid(l.uid))
+            out["node"] = gn->index;
+      if (l.kind == Kind::Text)
+         out["text"] = l.text;
+      (void)doc;
+      return out;
+   }
+
+   struct V2Err
+   {
+      json list = json::array();
+      void Add(size_t call, const char* code, const std::string& msg, json near = nullptr)
+      {
+         json e = { { "code", code }, { "call", (int)call }, { "message", msg } };
+         if (!near.is_null())
+            e["near"] = near;
+         list.push_back(e);
+      }
+   };
+
+   // Shape gate for one call. `made` holds the kinds the batch's earlier adds will make (layer -1 = the last one).
+   void V2Check(Scene2DNode* doc, size_t i, const json& c, std::vector<Kind>& made, V2Err& err)
+   {
+      const std::string op = c.value("op", std::string());
+      auto layerKind = [&](const char* key, bool required, Kind& kind) {
+         if (!c.contains(key))
+         {
+            if (required)
+               err.Add(i, "E_LAYER", std::string("'") + key + "' is missing");
+            return false;
+         }
+         if (!c[key].is_number_integer())
+         {
+            err.Add(i, "E_LAYER", std::string("'") + key + "' wants a layer id");
+            return false;
+         }
+         const int id = c[key].get<int>();
+         if (id == -1)
+         {
+            if (made.empty())
+            {
+               err.Add(i, "E_LAYER", "layer -1 means the batch's last add; there is none before this call");
+               return false;
+            }
+            kind = made.back();
+            return true;
+         }
+         const Layer* l = doc != nullptr ? doc->FindLayer(id) : nullptr;
+         if (l == nullptr)
+         {
+            json ids = json::array();
+            if (doc != nullptr)
+               for (const Layer& x : doc->Layers())
+                  ids.push_back(x.id);
+            err.Add(i, "E_LAYER", "no layer " + std::to_string(id), ids);
+            return false;
+         }
+         kind = l->kind;
+         return true;
+      };
+      Kind kind = Kind::Fill;
+      if (op == "add")
+      {
+         const std::string k = c.value("kind", std::string());
+         int found = -1;
+         for (int n = 0; n < Scene2DNode::kKindCount; n++)
+            if (k == kV2KindNames[n])
+               found = n;
+         if (found < 0 || found == (int)Kind::Vector)
+         {
+            err.Add(i, "E_KIND", "'" + k + "' is not a kind to add", json::array({ "fill", "text", "paint", "group", "adjust", "node" }));
+            return;
+         }
+         if (found == (int)Kind::Node)
+         {
+            GraphNode* gn = c.contains("node") && c["node"].is_number_integer() ? FindNodeByIndex(c["node"].get<int>()) : nullptr;
+            if (gn == nullptr)
+               err.Add(i, "E_NODE", "'node' wants a canvas node index");
+            else if (!View2DCanAdd(*gn))
+               err.Add(i, "E_NODE", "node " + std::to_string(gn->index) + " (" + gn->typeName + ") cannot be a layer");
+         }
+         if (found == (int)Kind::Adjust)
+         {
+            const std::string t = c.value("type", std::string("Pixelate"));
+            std::vector<std::string> names;
+            bool ok = false;
+            for (int a = 0; a < Scene2DNode::kAdjCount; a++)
+            {
+               names.push_back(Scene2DNode::AdjName(a));
+               ok = ok || V2Key(names.back()) == V2Key(t);
+            }
+            if (!ok)
+               err.Add(i, "E_ENUM", "'" + t + "' is not an adjustment", V2Near(t, names));
+         }
+         if (c.contains("above"))
+            layerKind("above", false, kind);
+         made.push_back((Kind)found);
+      }
+      else if (op == "set")
+      {
+         if (!layerKind("layer", true, kind))
+            return;
+         if (!c.contains("values") || !c["values"].is_object())
+         {
+            err.Add(i, "E_SHAPE", "'values' wants an object of field: value");
+            return;
+         }
+         Layer probe;
+         probe.kind = kind;
+         probe.is3d = true;
+         for (auto it = c["values"].begin(); it != c["values"].end(); ++it)
+         {
+            const std::string key = it.key();
+            const json& v = it.value();
+            const int f = V2Field(key);
+            if (f >= 0)
+            {
+               if (!v.is_number())
+                  err.Add(i, "E_VALUE", "'" + key + "' wants a number");
+               else if (!Scene2DNode::LayerFieldApplies(probe, f))
+                  err.Add(i, "E_FIELD_NA", "'" + key + "' does not apply to a " + kV2KindNames[(int)kind] + " layer");
+               continue;
+            }
+            const std::string k = V2Key(key);
+            if (k == "name" || k == "text")
+            {
+               if (!v.is_string())
+                  err.Add(i, "E_VALUE", "'" + key + "' wants a string");
+               else if (k == "text" && kind != Kind::Text)
+                  err.Add(i, "E_FIELD_NA", "'text' is for text layers");
+            }
+            else if (k == "visible" || k == "is3d" || k == "output" || k == "below")
+            {
+               if (!v.is_boolean())
+                  err.Add(i, "E_VALUE", "'" + key + "' wants true or false");
+            }
+            else if (k == "blend")
+            {
+               if (V2Blend(v) < 0)
+                  err.Add(i, "E_ENUM", "not a blend mode", V2Near(v.is_string() ? v.get<std::string>() : "", BlendModes::Names()));
+            }
+            else if (k == "color" || k == "colorb")
+            {
+               float tmp[4];
+               if (!V2Color(v, tmp))
+                  err.Add(i, "E_VALUE", "'" + key + "' wants [r, g, b] or [r, g, b, a], 0..1");
+            }
+            else if (k == "depthscale")
+            {
+               if (!v.is_number() || std::fabs(v.get<float>()) < 0.01f)
+                  err.Add(i, "E_VALUE", "'depthScale' wants a number, not near 0");
+            }
+            else
+               err.Add(i, "E_FIELD", "no field '" + key + "'", V2Near(key, V2FieldNames()));
+         }
+      }
+      else if (op == "move")
+      {
+         Kind k2;
+         layerKind("layer", true, kind);
+         layerKind("target", true, k2);
+         if (c.value("into", false) && k2 != Kind::Group)
+            err.Add(i, "E_LAYER", "'into' wants a group target");
+      }
+      else if (op == "remove")
+         layerKind("layer", true, kind);
+      else if (op == "select")
+      {
+         const std::string how = c.value("shape", std::string("rect"));
+         static const std::vector<std::string> kShapes = { "rect", "ellipse", "all", "none", "invert" };
+         if (std::find(kShapes.begin(), kShapes.end(), how) == kShapes.end())
+            err.Add(i, "E_ENUM", "'" + how + "' is not a selection shape", V2Near(how, kShapes));
+         else if ((how == "rect" || how == "ellipse") && !(c.contains("rect") && c["rect"].is_array() && c["rect"].size() == 4))
+            err.Add(i, "E_SHAPE", "'rect' wants [x0, y0, x1, y1] in document px");
+      }
+      else if (op == "fill" || op == "stroke")
+      {
+         if (layerKind("layer", true, kind) && kind != Kind::Paint)
+            err.Add(i, "E_FIELD_NA", op + " paints on a paint layer");
+         float tmp[4];
+         if (c.contains("color") && !V2Color(c["color"], tmp))
+            err.Add(i, "E_VALUE", "'color' wants [r, g, b], 0..1");
+         if (op == "fill" && !(c.contains("at") && c["at"].is_array() && c["at"].size() == 2))
+            err.Add(i, "E_SHAPE", "'at' wants [x, y] in document px");
+         if (op == "stroke" && !(c.contains("points") && c["points"].is_array() && c["points"].size() >= 2 && c["points"].size() % 2 == 0))
+            err.Add(i, "E_SHAPE", "'points' wants [x0, y0, x1, y1, ...] in document px");
+      }
+      else
+         err.Add(i, "E_OP", "'" + op + "' is not an op", V2Near(op, { "add", "set", "move", "remove", "select", "fill", "stroke" }));
+   }
+
+   // Applies one call that passed the gate; false when it still could not (the batch rolls back).
+   bool V2Apply(Scene2DNode* doc, const json& c, int& last, json& made)
+   {
+      const std::string op = c.value("op", std::string());
+      auto id = [&](const char* key) { const int v = c.value(key, 0); return v == -1 ? last : v; };
+      if (op == "add")
+      {
+         const std::string k = c.value("kind", std::string());
+         const int above = c.contains("above") ? id("above") : 0;
+         int nid = 0;
+         if (k == "paint")
+            nid = doc->AddPaintLayer(above);
+         else if (k == "node")
+         {
+            GraphNode* gn = FindNodeByIndex(c["node"].get<int>());
+            if (gn == nullptr)
+               return false;
+            Layer& l = doc->AddLayer(Kind::Node, gn->uid, above);
+            l.is3d = Is3DNode(gn->node.get());
+            nid = l.id;
+         }
+         else
+         {
+            const Kind kind = k == "fill" ? Kind::Fill : k == "text" ? Kind::Text : k == "group" ? Kind::Group : Kind::Adjust;
+            Layer& l = doc->AddLayer(kind, 0, above);
+            if (kind == Kind::Text)
+               l.text = c.value("text", std::string("Text"));
+            if (kind == Kind::Adjust)
+            {
+               const std::string t = c.value("type", std::string("Pixelate"));
+               for (int a = 0; a < Scene2DNode::kAdjCount; a++)
+                  if (V2Key(Scene2DNode::AdjName(a)) == V2Key(t))
+                     l.adjType = a;
+               l.adjAmt = l.adjTo = Scene2DNode::AdjDefault(l.adjType);
+            }
+            nid = l.id;
+         }
+         doc->Commit();
+         last = nid;
+         made.push_back(nid);
+         return nid > 0;
+      }
+      if (op == "set")
+      {
+         Layer* l = doc->FindLayer(id("layer"));
+         if (l == nullptr)
+            return false;
+         for (auto it = c["values"].begin(); it != c["values"].end(); ++it)
+         {
+            const json& v = it.value();
+            const int f = V2Field(it.key());
+            if (f >= 0)
+            {
+               float lo = 0, hi = 0;
+               doc->LayerFieldRange(*l, f, lo, hi);
+               if (float* p = Scene2DNode::LayerFieldPtr(*l, f))
+                  *p = hi > lo ? std::clamp(v.get<float>(), lo, hi) : v.get<float>();
+               continue;
+            }
+            const std::string k = V2Key(it.key());
+            if (k == "name")
+               l->name = v.get<std::string>();
+            else if (k == "text")
+               l->text = v.get<std::string>();
+            else if (k == "visible")
+               l->visible = v.get<bool>();
+            else if (k == "is3d")
+               l->is3d = v.get<bool>();
+            else if (k == "output")
+               l->output = v.get<bool>();
+            else if (k == "below")
+               l->below = v.get<bool>() && doc->CanTakeBelow(*l);
+            else if (k == "blend")
+               l->blend = V2Blend(v);
+            else if (k == "depthscale")
+               l->sz = v.get<float>();
+            else if (k == "color" || k == "colorb")
+            {
+               float rgba[4];
+               V2Color(v, rgba);
+               float* dst = k == "colorb" ? l->colorB : l->kind == Kind::Text ? l->textC : l->colorA;
+               std::copy(rgba, rgba + 4, dst);
+            }
+         }
+         doc->Commit();
+         return true;
+      }
+      if (op == "move")
+      {
+         doc->MoveLayer(id("layer"), id("target"), c.value("below", false), c.value("into", false));
+         doc->Commit();
+         return true;
+      }
+      if (op == "remove")
+      {
+         doc->RemoveLayer(id("layer"));
+         doc->Commit();
+         return true;
+      }
+      if (op == "select")
+      {
+         const std::string how = c.value("shape", std::string("rect"));
+         const std::string mode = c.value("mode", std::string("new"));
+         const int sop = mode == "add" ? Scene2DNode::kSelAdd : mode == "subtract" ? Scene2DNode::kSelSub
+                       : mode == "intersect" ? Scene2DNode::kSelIntersect : Scene2DNode::kSelNew;
+         if (how == "all")
+            doc->SelectAll();
+         else if (how == "none")
+            doc->Deselect();
+         else if (how == "invert")
+            doc->InvertSelection();
+         else
+         {
+            const json& r = c["rect"];
+            doc->SelectRect(r[0].get<float>(), r[1].get<float>(), r[2].get<float>(), r[3].get<float>(), sop, c.value("feather", 0.0f),
+                            how == "ellipse");
+         }
+         return true;
+      }
+      if (op == "fill" || op == "stroke")
+      {
+         float rgba[4] = { 0, 0, 0, 1 };
+         if (c.contains("color"))
+            V2Color(c["color"], rgba);
+         const int lid = id("layer");
+         if (op == "fill")
+            return doc->Bucket(lid, c["at"][0].get<float>(), c["at"][1].get<float>(), rgba, c.value("opacity", 1.0f),
+                               c.value("tolerance", 32), c.value("contiguous", true), false);
+         BrushEngine::Brush b;
+         b.size = c.value("size", 20.0f);
+         b.hardness = c.value("hardness", 1.0f);
+         std::copy(rgba, rgba + 3, b.color);
+         const json& pts = c["points"];
+         if (!doc->BeginPaint(lid, 0, b, pts[0].get<float>(), pts[1].get<float>(), 1.0f))
+            return false;
+         for (size_t k = 2; k + 1 < pts.size(); k += 2)
+            doc->PaintTo(pts[k].get<float>(), pts[k + 1].get<float>(), 1.0f);
+         doc->EndPaint();
+         return true;
+      }
+      return false;
+   }
+}
+
+bool View2DRpc(const json& params, json& out, std::string& error)
+{
+   const std::string op = params.value("op", std::string());
+   Scene2DNode* doc = FindDoc();
+   if (op == "layers" || op.empty())
+   {
+      json layers = json::array();
+      if (doc != nullptr)
+         for (const Layer& l : doc->Layers())
+            layers.push_back(V2Layer(doc, l));
+      out = { { "doc", doc != nullptr }, { "layers", layers } };
+      if (doc != nullptr)
+         out["size"] = { doc->Doc().w, doc->Doc().h };
+      return true;
+   }
+   if (op == "fields")
+   {
+      out = { { "fields", V2FieldNames() }, { "blends", BlendModes::Names() } };
+      return true;
+   }
+   // Writes: one call or a batch, all through the gate.
+   json calls = json::array();
+   if (op == "apply")
+   {
+      if (!params.contains("calls") || !params["calls"].is_array() || params["calls"].empty())
+      {
+         error = "apply wants 'calls': [{op, ...}, ...]";
+         return true;
+      }
+      calls = params["calls"];
+   }
+   else
+      calls.push_back(params);
+   V2Err err;
+   std::vector<Kind> made;
+   for (size_t i = 0; i < calls.size(); i++)
+      if (calls[i].is_object())
+         V2Check(doc, i, calls[i], made, err);
+      else
+         err.Add(i, "E_SHAPE", "each call is an object {op, ...}");
+   if (!err.list.empty())
+   {
+      out = { { "ok", false }, { "errors", err.list } };
+      return true;
+   }
+   if (doc == nullptr)
+      doc = MakeDoc(0.0f, 0.0f, "");
+   if (doc == nullptr)
+   {
+      error = "could not make a 2D document";
+      return true;
+   }
+   const std::string label = "Agent: " + params.value("label", op == "apply" ? std::string("2D View edit") : op + " layer");
+   PushUndoCheckpoint(label.c_str());
+   const std::string before = doc->DocText();
+   int last = 0;
+   json ids = json::array();
+   for (size_t i = 0; i < calls.size(); i++)
+      if (!V2Apply(doc, calls[i], last, ids))
+      {
+         doc->SetDocText(before);
+         doc->Commit();
+         err.Add(i, "E_APPLY", "the call passed the checks but could not be applied; nothing changed");
+         out = { { "ok", false }, { "errors", err.list } };
+         return true;
+      }
+   doc->Commit();
+   sSel.erase(std::remove_if(sSel.begin(), sSel.end(), [&](int id) { return doc->FindLayer(id) == nullptr; }), sSel.end());
+   Touch();
+   out = { { "ok", true }, { "ids", ids }, { "undo", label } };
+   return true;
+}
+
 // 3D nodes land as 3D cards.
 static bool Is3DNode(INode* n)
 {
@@ -6259,33 +6904,43 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             tl->ry = 35.0f;
             doc->Commit();
             doc->CookIfNeeded(++frame);
+            // A real object turns about its centre, so the spot travels far: search the whole object for the nearest UV.
+            auto nearestUv = [&](float& bx, float& by) {
+               float best = 1e9f;
+               auto scan = [&](float ox, float oy, float r, float step) {
+                  for (float dx = -r; dx <= r; dx += step)
+                     for (float dy = -r; dy <= r; dy += step)
+                     {
+                        Scene2DNode::SurfacePoint q;
+                        if (!doc->SurfaceAt(sid, ox + dx, oy + dy, q) || q.facing <= 0.0f)
+                           continue;
+                        float du = std::fabs(q.uv[0] - sp.uv[0]);
+                        du = std::min(du, 1.0f - du);
+                        const float d = du + std::fabs(q.uv[1] - sp.uv[1]);
+                        if (d < best)
+                        {
+                           best = d;
+                           bx = ox + dx;
+                           by = oy + dy;
+                        }
+                     }
+               };
+               scan(cx, cy, 420.0f, 12.0f);
+               scan(bx, by, 12.0f, 1.5f);
+               return best;
+            };
+            float ex = cx, ey = cy;
+            const float near = nearestUv(ex, ey);
             bool found = false;
-            for (float dx = -120.0f; dx <= 120.0f && !found; dx += 4.0f)
-               for (float dy = -120.0f; dy <= 120.0f && !found; dy += 4.0f)
-               {
-                  Scene2DNode::SurfacePoint q;
-                  if (doc->SurfaceAt(sid, cx + dx, cy + dy, q) && std::fabs(q.uv[0] - sp.uv[0]) < 0.01f && std::fabs(q.uv[1] - sp.uv[1]) < 0.01f)
-                  {
-                     float k[4] = { 0, 0, 0, 0 };
-                     found = doc->SkinAt(sid, q.uv[0], q.uv[1], k) && k[3] > 0.5f && k[0] > 0.8f;
-                  }
-               }
+            {
+               Scene2DNode::SurfacePoint q;
+               float k[4] = { 0, 0, 0, 0 };
+               found = near < 0.02f && doc->SurfaceAt(sid, ex, ey, q) && doc->SkinAt(sid, q.uv[0], q.uv[1], k) && k[3] > 0.5f && k[0] > 0.8f;
+               printf("  surface tilt: spot moved %.0f, %.0f px (uv off %.4f)\n", ex - cx, ey - cy, near);
+            }
             expect("after a tilt the paint is still on the object", found);
             // Erase at the original spot of the surface.
-            Scene2DNode::SurfacePoint e;
-            float ex = cx, ey = cy;
-            bool eh = false;
-            for (float dx = -120.0f; dx <= 120.0f && !eh; dx += 4.0f)
-               for (float dy = -120.0f; dy <= 120.0f && !eh; dy += 4.0f)
-               {
-                  Scene2DNode::SurfacePoint q;
-                  if (doc->SurfaceAt(sid, cx + dx, cy + dy, q) && std::fabs(q.uv[0] - sp.uv[0]) < 0.003f && std::fabs(q.uv[1] - sp.uv[1]) < 0.003f)
-                  {
-                     eh = true;
-                     ex = cx + dx;
-                     ey = cy + dy;
-                  }
-               }
+            const bool eh = near < 0.02f;
             b.mode = BrushEngine::kErase;
             b.size = 80.0f;
             const bool eb = eh && doc->BeginSurfacePaint(sid, b, ex, ey, 1.0f, 512);
@@ -6341,6 +6996,30 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
    expect("rotate X: only rx changes", std::fabs(r.rx - base.rx) > 1.0f && r.angle == base.angle);
    r = drag(2, 3, ImVec2(c.x + 40.0f, c.y), ImVec2(c.x + 80.0f, c.y));
    expect("scale centre: uniform x2", std::fabs(r.sx - base.sx * 2.0f) < 1e-3f && std::fabs(r.sy - base.sy * 2.0f) < 1e-3f);
+   // On a real 3D object the gizmo sits on the object and its depth arm scales the object's depth.
+   if (doc->IsObjectLayer(base))
+   {
+      *doc->FindLayer(id) = base;
+      doc->Commit();
+      float gx = 0, gy = 0;
+      Scene2DNode::SurfacePoint q;
+      expect("gizmo: the centre sits on the object", doc->ProjectPoint(at, gx, gy) && doc->SurfaceAt(id, gx, gy, q));
+      GizmoAxes(doc, base, 2, ax);
+      const float zt[3] = { at[0] + ax[2][0] * 100.0f, at[1] + ax[2][1] * 100.0f, at[2] + ax[2][2] * 100.0f };
+      ImVec2 zs;
+      if (GizmoScreen(doc, zt, zs))
+      {
+         const bool longArm = std::hypot(zs.x - c.x, zs.y - c.y) >= 10.0f;
+         r = drag(2, 2, c, longArm ? ImVec2(c.x + (zs.x - c.x) * 0.5f, c.y + (zs.y - c.y) * 0.5f) : ImVec2(c.x, c.y - 30.0f));
+         expect("gizmo: scale Z on an object changes only its depth", std::fabs(r.sz - base.sz) > 1e-3f && r.sx == base.sx && r.sy == base.sy);
+      }
+      // A turn about the object's own axis keeps the gizmo centre on the object.
+      Layer* lt = doc->FindLayer(id);
+      lt->ry = base.ry + 60.0f;
+      doc->Commit();
+      const float at2[3] = { lt->x, lt->y, lt->z };
+      expect("gizmo: after a turn the centre is still on the object", doc->ProjectPoint(at2, gx, gy) && doc->SurfaceAt(id, gx, gy, q));
+   }
    *doc->FindLayer(id) = base;
    sGizmoMode = 0;
    doc->Commit();
@@ -6403,6 +7082,253 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       doc->Commit();
       sBrush = keep;
       sDocUid = keepDoc;
+   }
+   // H5: an agent edits the document over RPC through the gate: one batch, one undo step; a bad call changes nothing.
+   {
+      using nlohmann::json;
+      json out;
+      std::string err;
+      const size_t n0 = doc->Layers().size(), u0 = gUndoStack.size();
+      View2DRpc({ { "op", "apply" }, { "label", "test" }, { "calls", json::array({
+                    { { "op", "add" }, { "kind", "fill" } },
+                    { { "op", "set" }, { "layer", -1 }, { "values", { { "Opacity", 0.5 }, { "name", "agent fill" }, { "color", { 1, 0, 0 } } } } } }) } },
+                out, err);
+      doc = FindDoc();
+      const Layer* made = out.value("ok", false) && out["ids"].size() == 1 ? doc->FindLayer(out["ids"][0].get<int>()) : nullptr;
+      expect("H5: an RPC batch adds and sets a layer", made != nullptr && made->opacity == 0.5f && made->name == "agent fill" && made->colorA[0] == 1.0f);
+      expect("H5: the batch is one undo step", gUndoStack.size() == u0 + 1);
+      Undo();
+      doc = FindDoc();
+      expect("H5: one undo removes it", doc != nullptr && doc->Layers().size() == n0);
+      if (doc == nullptr)
+         return fails;
+      const std::string t0 = doc->DocText();
+      const size_t u1 = gUndoStack.size();
+      out = json();
+      View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "add" }, { "kind", "fill" } },
+                                                              { { "op", "set" }, { "layer", -1 }, { "values", { { "opacty", 0.5 } } } } }) } },
+                out, err);
+      const bool typed = !out.value("ok", true) && out["errors"].size() == 1 && out["errors"][0]["code"] == "E_FIELD" &&
+                         out["errors"][0]["near"].size() > 0 && out["errors"][0]["near"][0] == "Opacity";
+      expect("H5: a misspelt field fails the batch with the closest name", typed);
+      expect("H5: a failed batch changes nothing", doc->DocText() == t0 && gUndoStack.size() == u1);
+      out = json();
+      View2DRpc({ { "op", "layers" } }, out, err);
+      expect("H5: layers lists the document", out.value("doc", false) && out["layers"].size() == doc->Layers().size());
+   }
+   // H7 one source, many outputs: the still export and the Output node (which also feeds the loop render and a live
+   // show) read the document's own frame; the written PNG holds exactly the live pixels.
+   if (OutputNode* out = EnsureOutputImpl())
+   {
+      static int h7 = 7300000;
+      doc->CookIfNeeded(++h7);
+      out->CookIfNeeded(h7);
+      std::vector<uint8_t> live, kept;
+      int lw = 0, lh = 0;
+      doc->ReadOutput(live, lw, lh);
+      const std::string png = (std::filesystem::temp_directory_path() / "infinite_h7.png").string();
+      ExportImage(out, png, 90, &kept);
+      expect("H7: the Output node is the document's size", out->GetOutputWidth() == lw && out->GetOutputHeight() == lh && lw > 0);
+      int worst = 0;
+      if (kept.size() == live.size())
+         for (size_t i = 0; i < live.size(); i++)
+            worst = std::max(worst, std::abs((int)kept[i] - (int)live[i]));
+      else
+         worst = 999;
+      std::vector<unsigned char> bytes;
+      if (std::ifstream f{ png, std::ios::binary })
+         bytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+      int fw = 0, fh = 0, ch = 0, fileWorst = 999;
+      if (unsigned char* img = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &fw, &fh, &ch, 4))
+      {
+         if (fw == lw && fh == lh)
+         {
+            fileWorst = 0;
+            for (int y = 0; y < fh; y++)   // the file is top row first, the read-back bottom row first
+               for (int x = 0; x < fw * 4; x++)
+                  fileWorst = std::max(fileWorst, std::abs((int)img[(size_t)y * fw * 4 + x] - (int)live[(size_t)(fh - 1 - y) * fw * 4 + x]));
+         }
+         stbi_image_free(img);
+      }
+      std::error_code ec;
+      std::filesystem::remove(png, ec);
+      printf("  H7 live vs export: Output node worst %d, PNG file worst %d (of 255)\n", worst, fileWorst);
+      expect("H7: the export frame is the live frame", worst <= 1);
+      expect("H7: the written PNG is the live frame", fileWorst <= 1);
+   }
+   // H6 Audio Texture as a layer source: the 2D View takes it, and a tone on FFT bin 64 lights its spectrum column.
+   {
+      AudioTextureNode at;
+      at.mode = AudioTextureNode::kModeSpectrum;
+      at.GetAudioInput().Connect(&at);   // any source: the picture is read from what the sink was handed
+      auto spectrumAt = [&](float cyclesPerSample, int frame) {
+         std::vector<float> in(1024), outL(1024), outR(1024), px;
+         for (int i = 0; i < 1024; i++)
+            in[i] = cyclesPerSample > 0 ? 0.8f * std::sin(6.28318530718f * cyclesPerSample * (float)i) : 0.0f;
+         float* inCh[1] = { in.data() };
+         float* outCh[2] = { outL.data(), outR.data() };
+         AudioBuffer ib{ inCh, 1, 1024 }, ob{ outCh, 2, 1024 };
+         const AudioBuffer* ins[1] = { &ib };
+         at.GetAudioNode()->ProcessBlock(ins, 1, ob);
+         at.CookIfNeeded(frame);
+         unsigned scratch = 0;
+         const int w = at.GetOutputWidth(), h = at.GetOutputHeight();
+         if (at.GetOutputTexture() == 0 || !GLUtil::ReadTexturePixels(scratch, at.GetOutputTexture(), w, h, px))
+            px.clear();
+         if (scratch != 0)
+            glDeleteFramebuffers(1, &scratch);
+         return std::make_pair(px, w);
+      };
+      const auto quiet = spectrumAt(0.0f, 1);
+      const auto tone = spectrumAt(64.0f / 1024.0f, 2);
+      auto col = [](const std::pair<std::vector<float>, int>& p, int x) {
+         const int w = p.second;
+         const size_t i = ((size_t)(w / 2) * w + x) * 4;
+         return w > 0 && p.first.size() > i ? p.first[i] : -1.0f;
+      };
+      int peak = -1;
+      float best = -1.0f;
+      for (int x = 1; x < tone.second; x++)
+         if (col(tone, x) > best)
+         {
+            best = col(tone, x);
+            peak = x;
+         }
+      // Columns run on log frequency, 20 Hz..20 kHz: bin 64 (2756 Hz at 44.1 kHz) sits at column ~364.
+      const int want = (int)std::lround(std::log((64.0f * 44100.0f / 1024.0f) / 20.0f) / std::log(1000.0f) * 511.0f);
+      printf("  H6 audio texture: column %d quiet %.2f tone %.2f, brightest column %d\n", want, col(quiet, want), col(tone, want), peak);
+      bool gate = false;
+      {
+         GraphNode probe;
+         probe.node.reset(new AudioTextureNode());
+         gate = View2DCanAdd(probe);
+      }
+      expect("H6: the 2D View takes an Audio Texture as a layer", gate);
+      {
+         GraphNode probe;   // H2: the one Prediction node with a picture is a layer (and so a mask) source
+         probe.node.reset(new PredictiveColoringNode());
+         expect("H2: the 2D View takes Predictive Coloring as a layer", View2DCanAdd(probe));
+      }
+      expect("H6: a tone lights its known spectrum pixel", col(tone, want) > col(quiet, want) + 0.3f && std::abs(peak - want) <= 1);
+   }
+   // H8 a layer as an output: a hidden red fill marked output reaches a cable on output 1, alone, and not the comp.
+   {
+      json out;
+      std::string err;
+      View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "add" }, { "kind", "fill" } },
+                                                              { { "op", "set" }, { "layer", -1 }, { "values", { { "name", "h8" }, { "color", { 1, 0, 0, 1 } }, { "visible", false } } } } }) } },
+                out, err);
+      doc = FindDoc();
+      Layer* h8 = doc != nullptr && out.value("ok", false) ? doc->FindLayer(out["ids"][0].get<int>()) : nullptr;
+      if (h8 != nullptr)
+      {
+         h8->output = true;
+         doc->Commit();
+         const bool saved = doc->DocText().find("out " + std::to_string(h8->id) + "\n") != std::string::npos;
+         ImageCable cable;
+         cable.Connect(doc, 1);
+         static int h8f = 7400000;
+         const unsigned tex = cable.Pull(++h8f);
+         std::vector<float> px, comp;
+         unsigned scratch = 0;
+         const int w = doc->GetOutputWidth(), h = doc->GetOutputHeight();
+         const bool readA = tex != 0 && GLUtil::ReadTexturePixels(scratch, tex, w, h, px);
+         const bool readB = GLUtil::ReadTexturePixels(scratch, doc->GetOutputTexture(), w, h, comp);
+         if (scratch != 0)
+            glDeleteFramebuffers(1, &scratch);
+         const size_t mid = ((size_t)(h / 2) * w + w / 2) * 4;
+         const bool red = readA && px.size() > mid + 3 && px[mid] > 0.9f && px[mid + 1] < 0.1f && px[mid + 3] > 0.9f;
+         const bool notComp = readB && comp.size() > mid + 3 && !(comp[mid] > 0.9f && comp[mid + 1] < 0.1f);
+         printf("  H8 outputs %d label '%s' layer px %.2f %.2f %.2f %.2f\n", doc->OutputCount(), doc->OutputLabel(1),
+                red ? px[mid] : -1.0f, readA ? px[mid + 1] : -1.0f, readA ? px[mid + 2] : -1.0f, readA ? px[mid + 3] : -1.0f);
+         expect("H8: a layer marked output adds a named output", doc->OutputCount() == 2 && std::string(doc->OutputLabel(1)) == "h8");
+         expect("H8: the output flag is saved", saved);
+         expect("H8: a cable on the layer output reads that layer alone", red);
+         expect("H8: a hidden output layer stays out of the comp", notComp);
+         doc->RemoveLayer(h8->id);
+         doc->Commit();
+         expect("H8: removing the layer removes the output", doc->OutputCount() == 1);
+      }
+      else
+         expect("H8: setup", false);
+   }
+   // C: an effect node as a layer runs on the picture under it (Invert over red reads cyan), and only there.
+   {
+      json out;
+      std::string err;
+      GraphNode* inv = SpawnNode("invert", "Compositing", -4000.0f, -4000.0f);
+      const int invIndex = inv != nullptr ? inv->index : -1;
+      View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "add" }, { "kind", "fill" } },
+                                                              { { "op", "set" }, { "layer", -1 }, { "values", { { "color", { 1, 0, 0, 1 } } } } },
+                                                              { { "op", "add" }, { "kind", "node" }, { "node", invIndex } },
+                                                              { { "op", "set" }, { "layer", -1 }, { "values", { { "below", true } } } } }) } },
+                out, err);
+      Scene2DNode* cd = FindDoc();
+      const bool ok = cd != nullptr && out.value("ok", false) && out["ids"].size() >= 2;
+      const Layer* fx = ok ? cd->FindLayer(out["ids"][1].get<int>()) : nullptr;
+      std::vector<float> px;
+      if (fx != nullptr)
+      {
+         static int cf = 7500000;
+         cd->CookIfNeeded(++cf);
+         unsigned scratch = 0;
+         GLUtil::ReadTexturePixels(scratch, cd->GetOutputTexture(), cd->GetOutputWidth(), cd->GetOutputHeight(), px);
+         if (scratch != 0)
+            glDeleteFramebuffers(1, &scratch);
+      }
+      const size_t mid = cd != nullptr ? ((size_t)(cd->GetOutputHeight() / 2) * cd->GetOutputWidth() + cd->GetOutputWidth() / 2) * 4 : 0;
+      const bool cyan = px.size() > mid + 2 && px[mid] < 0.1f && px[mid + 1] > 0.9f && px[mid + 2] > 0.9f;
+      printf("  C effect layer: below=%d centre %.2f %.2f %.2f\n", fx != nullptr && fx->below ? 1 : 0, cyan || px.size() > mid + 2 ? px[mid] : -1.0f,
+             px.size() > mid + 2 ? px[mid + 1] : -1.0f, px.size() > mid + 2 ? px[mid + 2] : -1.0f);
+      expect("C: an effect node layer runs on the picture under it", fx != nullptr && fx->below && cyan);
+      const bool saved = fx != nullptr && cd->DocText().find("below " + std::to_string(fx->id) + "\n") != std::string::npos;
+      expect("C: the effect flag is saved", saved);
+      ImageCable* in = inv != nullptr ? CableFor(*inv, 0) : nullptr;
+      expect("C: the node's own input is left as it was", in != nullptr && !in->IsConnected());
+      if (ok)
+      {
+         for (int k = 1; k >= 0; k--)
+            cd->RemoveLayer(out["ids"][k].get<int>());
+         cd->Commit();
+      }
+      if (invIndex >= 0)
+         RemoveNodeByIndex(invIndex);
+   }
+   // L: Cmd-drag a corner distorts it alone, an edge skews both its corners, Alt+Shift on a corner mirrors (perspective).
+   {
+      json out;
+      std::string err;
+      View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "add" }, { "kind", "text" } } }) } }, out, err);
+      doc = FindDoc();
+      Layer* lw = doc != nullptr && out.value("ok", false) ? doc->FindLayer(out["ids"][0].get<int>()) : nullptr;
+      if (lw != nullptr)
+      {
+         sSel = { lw->id };
+         auto drag = [&](int handle, bool persp, float dx, float dy) {
+            Layer* l = doc->FindLayer(lw->id);
+            l->warpOn = false;
+            std::fill(l->warp, l->warp + 8, 0.0f);
+            BeginOp(doc, 18, ImVec2(0, 0), nullptr);
+            sOp.warpHandle = handle;
+            sOp.perspective = persp;
+            sOp.docStart = ImVec2(0, 0);
+            WarpActive(doc, ToScreen(doc, dx, dy));
+            sOp = Op();
+            return *doc->FindLayer(lw->id);
+         };
+         const Layer a = drag(0, false, 30.0f, 20.0f);
+         expect("L: a corner drag distorts that corner alone", a.warpOn && std::fabs(a.warp[0] - 30.0f) < 0.5f && std::fabs(a.warp[1] - 20.0f) < 0.5f
+                && a.warp[2] == 0.0f && a.warp[4] == 0.0f && a.warp[6] == 0.0f);
+         const Layer b = drag(1, false, 25.0f, 40.0f);   // top edge, axis-aligned: only the x part counts
+         expect("L: an edge drag skews both its corners along it", std::fabs(b.warp[0] - 25.0f) < 0.5f && std::fabs(b.warp[2] - 25.0f) < 0.5f
+                && std::fabs(b.warp[1]) < 0.5f && b.warp[4] == 0.0f);
+         const Layer c = drag(0, true, 15.0f, 2.0f);
+         expect("L: perspective mirrors the partner corner", std::fabs(c.warp[0] - 15.0f) < 0.5f && std::fabs(c.warp[2] + 15.0f) < 0.5f);
+         doc->RemoveLayer(lw->id);
+         doc->Commit();
+      }
+      else
+         expect("L: setup", false);
    }
    return fails;
 }
@@ -6703,6 +7629,7 @@ static void RegisterBrushParams(const GraphNode& gn)
    ModSlider("Brush size", &sBrush.size, 1.0f, 1000.0f, "%.0f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushSizeParam);
    ModSlider("Brush opacity", &sBrush.opacity, 0.01f, 1.0f, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushOpacityParam);
    ModSlider("Brush flow", &sBrush.flow, 0.01f, 1.0f, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushFlowParam);
+   ModSlider("Brush hue", &sBrushHue, -180.0f, 180.0f, "%.0f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushHueParam);
    gParamRegisterOnly = was;
 }
 

@@ -596,6 +596,8 @@ namespace app
          outResult = json::object();
          return true;
       }
+      if (method == "view2d")
+         return View2DRpc(params, outResult, outError);
       if (method == "select")
       {
          ed::EditorContext* previous = ed::GetCurrentEditor();

@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include "BlendModes.h"
+#include "ImageCable.h"
 #include "Geometry3DNodes.h"
 #include "Modulation.h"
 #include "NodeViewport.h"
@@ -198,7 +199,11 @@ namespace
             "uniform sampler2D uPMask;\n"
             "uniform int uHasPMask;\n"
             "uniform sampler2D uVMask;\n"
-            "uniform int uHasVMask;\n")
+            "uniform int uHasVMask;\n"
+            "uniform sampler2D uGeoDepth;\n"
+            "uniform int uHasGeoDepth;\n"
+            "uniform vec2 uGeoNF;\n"
+            "uniform int uDirect;\n")
          + GLUtil::kSrgbGlsl
          + BlendModes::kBlendGLSL
          + "float ramp(float lo, float hi, float v) { return hi > lo + 1e-4 ? clamp((v - lo) / (hi - lo), 0.0, 1.0) : step(lo, v); }\n"
@@ -221,16 +226,20 @@ namespace
            "   return texture(uTex, uv);\n"
            "}\n"
            "void main() {\n"
-           "   vec4 acc = texture(uAcc, vUv);\n"
+           "   vec4 acc = uDirect == 1 ? vec4(0.0, 0.0, 0.0, 1.0) : texture(uAcc, vUv);\n"
            "   float dIn = uDepthMode != 0 ? texture(uDepthIn, vUv).r : 1e30;\n"
            "   fragDepth = dIn;\n"
            "   vec2 p = vec2(vUv.x * uDoc.x, (1.0 - vUv.y) * uDoc.y);\n"
            "   vec3 q = vec3(dot(uInvA, vec3(p, 1.0)), dot(uInvB, vec3(p, 1.0)), dot(uInvC, vec3(p, 1.0)));\n"
-           "   if (q.z <= 1e-12) { fragColor = acc; return; }\n"
-           "   vec2 b = q.xy / q.z;\n"
+           "   if (q.z <= 1e-12 && uKind != 4) { fragColor = uDirect == 1 ? vec4(0.0) : acc; return; }\n"
+           "   vec2 b = q.xy / max(q.z, 1e-12);\n"
            "   vec2 uvb = b / uBox;\n"
            "   vec2 uv = vec2(uvb.x, 1.0 - uvb.y);\n"
-           "   vec4 layer = layerAt(uvb, uv);\n"
+           "   vec4 layer;\n"
+           "   if (uKind == 4) {\n"
+           "      layer = texture(uTex, vUv);\n"
+           "      if (layer.a > 1e-5) layer.rgb /= layer.a;\n"
+           "   } else layer = layerAt(uvb, uv);\n"
            "   if (uLinear == 1 && uSrgb == 1) layer.rgb = SrgbDecode(layer.rgb);\n"
            "   if (uHasMask == 1) {\n"
            "      vec4 m = texture(uMask, uv);\n"
@@ -242,8 +251,15 @@ namespace
            "   if (uHasVMask == 1) layer.a *= texture(uVMask, uv).a;\n"
            "   float amt = uOpacity * layer.a;\n"
            "   if (uBif == 1) amt *= bifW(uBifT, gLum(layer.rgb)) * bifW(uBifU, gLum(acc.rgb));\n"
+           // Normal over an opaque picture: the hardware blends it (src alpha, one minus src alpha; alpha kept at 1).
+           "   if (uDirect == 1) { fragColor = vec4(layer.rgb, clamp(amt, 0.0, 1.0)); return; }\n"
            "   if (uDepthMode == 1) {\n"
            "      float d = 1.0 / q.z;\n"
+           "      if (uKind == 4) {\n"
+           "         float n = uGeoNF.x, f = uGeoNF.y;\n"
+           "         float zn = (uHasGeoDepth == 1 ? texture(uGeoDepth, vUv).r : 0.5) * 2.0 - 1.0;\n"
+           "         d = 2.0 * f * n / max((f + n) - zn * (f - n), 1e-6);\n"
+           "      }\n"
            "      if (d > dIn * 1.0005 + 0.01) { fragColor = acc; return; }\n"
            "      if (layer.a > 0.5) fragDepth = min(dIn, d);\n"
            "   }\n"
@@ -365,6 +381,8 @@ Scene2DNode::~Scene2DNode()
       GLUtil::DestroyFbo(p.f[1]);
    }
    GLUtil::DestroyFbo(mOut);
+   for (auto& kv : mLayerOut)
+      GLUtil::DestroyFbo(kv.second);
    GLUtil::DestroyFbo(mAdjFbo);
    GLUtil::DestroyFbo(mBelow);
    for (auto& kv : mSurfaces)
@@ -466,6 +484,9 @@ void Scene2DNode::RemoveLayer(int id)
    Layers();
    mLayers.erase(std::remove_if(mLayers.begin(), mLayers.end(), [&](const Layer& l) { return IsInside(l.id, id); }),
                  mLayers.end());
+   // Modulator slots of removed layers go too.
+   mDoc.slots.erase(std::remove_if(mDoc.slots.begin(), mDoc.slots.end(), [&](const ModSlot& m) { return FindConst(m.layer) == nullptr; }),
+                    mDoc.slots.end());
    Commit();
 }
 
@@ -773,6 +794,9 @@ void Scene2DNode::LayerMatrix(const Layer& l, float m[6])
 
 bool Scene2DNode::Corners(const Layer& l, float out[8])
 {
+   // A turned 3D object: its real outline, not the card it used to be.
+   if (l.is3d && l.kind == Kind::Node && !l.warpOn && dynamic_cast<IGeometrySource*>(Source(l)) != nullptr && GeometryCorners(l, out))
+      return true;
    float bw = 1, bh = 1;
    LayerBox(l, bw, bh);
    float h[9];
@@ -1029,6 +1053,12 @@ void Scene2DNode::Serialize()
           l.orient[2] != 0 || l.collapse)
          o << "d3 " << l.id << " " << +l.is3d << " " << l.z << " " << l.az << " " << l.rx << " " << l.ry << " "
            << l.orient[0] << " " << l.orient[1] << " " << l.orient[2] << " " << +l.collapse << "\n";
+      if (l.sz != 1.0f)
+         o << "sz " << l.id << " " << l.sz << "\n";
+      if (l.output)
+         o << "out " << l.id << "\n";
+      if (l.below)
+         o << "below " << l.id << "\n";
       if (l.skinMirror != 0)
          o << "skinm " << l.id << " " << l.skinMirror << "\n";
       if (l.warpOn || std::any_of(l.warp, l.warp + 8, [](float v) { return v != 0.0f; }))
@@ -1165,6 +1195,16 @@ void Scene2DNode::Parse()
             s >> on >> l->z >> l->az >> l->rx >> l->ry >> l->orient[0] >> l->orient[1] >> l->orient[2] >> col;
             l->is3d = on != 0;
             l->collapse = col != 0;
+         }
+         else if (key == "out")
+            l->output = true;
+         else if (key == "below")
+            l->below = true;
+         else if (key == "sz")
+         {
+            s >> l->sz;
+            if (!(std::fabs(l->sz) >= 0.01f))
+               l->sz = 1.0f;
          }
          else if (key == "skinm")
          {
@@ -1358,15 +1398,14 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
    // rest of the picture is never read or written.
    extern bool gScene2DBounds;
    const bool part = gScene2DBounds && depthMode == 0 && a.rect[2] > a.rect[0] && a.rect[3] > a.rect[1];
-   if (part)
+   // Normal over an opaque top-level picture: blend straight into the current buffer (no read of the picture, no
+   // second buffer, no copy back).
+   const bool direct = gScene2DBounds && depth == 0 && depthMode == 0 && mAccOpaque && a.blend == 0 && !a.clipMode && a.bif == nullptr;
+   const auto setup = [&]()
    {
-      glEnable(GL_SCISSOR_TEST);
-      glScissor(a.rect[0], a.rect[1], a.rect[2] - a.rect[0], a.rect[3] - a.rect[1]);
-   }
-   GLUtil::RunShaderPass(p.f[next], prog, [&]()
-   {
+      glUniform1i(glGetUniformLocation(prog, "uDirect"), direct ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, acc);
+      glBindTexture(GL_TEXTURE_2D, direct ? 0u : acc);
       glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, a.tex);
@@ -1388,6 +1427,12 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glUniform3f(glGetUniformLocation(prog, "uInvB"), a.inv[3], a.inv[4], a.inv[5]);
       glUniform3f(glGetUniformLocation(prog, "uInvC"), a.inv[6], a.inv[7], a.inv[8]);
       glUniform1i(glGetUniformLocation(prog, "uDepthMode"), depthMode);
+      glActiveTexture(GL_TEXTURE6);
+      glBindTexture(GL_TEXTURE_2D, a.geoDepth);
+      glUniform1i(glGetUniformLocation(prog, "uGeoDepth"), 6);
+      glUniform1i(glGetUniformLocation(prog, "uHasGeoDepth"), a.geoDepth != 0 ? 1 : 0);
+      glUniform2f(glGetUniformLocation(prog, "uGeoNF"), a.geoNF[0], a.geoNF[1]);
+      glActiveTexture(GL_TEXTURE0);
       if (depthMode != 0)
       {
          glActiveTexture(GL_TEXTURE5);
@@ -1424,7 +1469,25 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
          glUniform4fv(glGetUniformLocation(prog, "uColB"), 1, a.fill->colorB);
          glUniform1f(glGetUniformLocation(prog, "uFillAngle"), a.fill->fillAngle);
       }
-   });
+   };
+   if (direct)
+   {
+      const GLboolean wasBlend = glIsEnabled(GL_BLEND);
+      glEnable(GL_BLEND);
+      glBlendEquation(GL_FUNC_ADD);
+      glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+      const int sc[4] = { a.rect[0], a.rect[1], a.rect[2] - a.rect[0], a.rect[3] - a.rect[1] };
+      GLUtil::DrawPass(p.f[p.cur], prog, setup, part ? sc : nullptr);
+      if (!wasBlend)
+         glDisable(GL_BLEND);
+      return;
+   }
+   if (part)
+   {
+      glEnable(GL_SCISSOR_TEST);
+      glScissor(a.rect[0], a.rect[1], a.rect[2] - a.rect[0], a.rect[3] - a.rect[1]);
+   }
+   GLUtil::RunShaderPass(p.f[next], prog, setup);
    if (part)
    {
       glDisable(GL_SCISSOR_TEST);
@@ -1573,15 +1636,43 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    }
    else if (dynamic_cast<IGeometrySource*>(Source(l)) != nullptr)
    {
-      a.tex = GeometryTexture(l, a.texW, a.texH);
+      // Real 3D: the object drawn through the comp camera at document size, with its own depth.
+      if (!GeometryRender(l, a.tex, a.geoDepth, a.geoNF))
+         return;
+      a.kind = 4;
+      a.texW = mDoc.w;
+      a.texH = mDoc.h;
       a.srgb = true;
+      LayerBox(l, a.box[0], a.box[1]);
+      float hg[9];
+      LayerHomography(l, hg);   // masks still sit on the layer's box
+      Invert3(hg, a.inv);
+      a.card = l.is3d;
+      if (l.HasPixelMask() && l.pmaskOn)
+      {
+         auto it = mMasks.find(l.id);
+         if (it != mMasks.end())
+            a.pmask = (mStroke.Active() && mPaintId == l.id && mPaintTarget == 1) ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+      }
+      if (l.hasVMask && l.vmaskOn && !l.vmask.empty())
+         if (Raster* r = SyncRaster(mVMasks, l, true))
+            a.vmask = r->tex;
+      Pass(depth, a);
+      return;
    }
    else
    {
       INode* src = Source(l);
       if (src == nullptr)
          return;
-      src->CookIfNeeded(frameId);
+      if (l.below)
+      {
+         if (!CookOnBelow(l, src, PairAt(depth).Tex()))
+            return;
+         a.srgb = false;   // it ran on the working-space picture
+      }
+      else
+         src->CookIfNeeded(frameId);
       a.tex = src->GetOutputTexture();
       a.texW = src->GetOutputWidth();
       a.texH = src->GetOutputHeight();
@@ -1672,6 +1763,47 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
    });
    return true;
+}
+
+std::function<ImageCable*(uint64_t)> Scene2DNode::ImageInputOf;
+
+namespace
+{
+   // The picture under an effect layer, handed to its node as if a cable brought it.
+   class BelowPicture : public INode
+   {
+   public:
+      unsigned tex = 0;
+      int w = 0, h = 0;
+      unsigned long long rev = 0;
+      unsigned int GetOutputTexture() override { return tex; }
+      int GetOutputWidth() const override { return w; }
+      int GetOutputHeight() const override { return h; }
+      void CookIfNeeded(int) override {}
+      unsigned long long TextureRevision() const override { return rev; }
+   };
+}
+
+bool Scene2DNode::CookOnBelow(const Layer& l, INode* src, unsigned below)
+{
+   ImageCable* in = ImageInputOf ? ImageInputOf(l.uid) : nullptr;
+   if (in == nullptr || below == 0 || src != (ResolveUid ? ResolveUid(l.uid) : nullptr))
+      return false;
+   static BelowPicture pic;
+   static int fxFrame = -2000000000;   // its own frame ids: the canvas already cooked this node on its own input
+   pic.tex = below;
+   pic.w = mDoc.w;
+   pic.h = mDoc.h;
+   pic.rev = NextTextureRevision();
+   INode* was = in->GetSource();
+   const int wasOut = in->GetSourceOutput();
+   in->Connect(&pic, 0);
+   src->CookIfNeeded(++fxFrame);
+   if (was != nullptr)
+      in->Connect(was, wasOut);
+   else
+      in->Disconnect();
+   return src->GetOutputTexture() != 0;
 }
 
 bool Scene2DNode::sBelowCache = true;
@@ -1788,7 +1920,7 @@ void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
    const std::vector<const Layer*> kids = ListOf(parent);
    auto card = [](const Layer& l) { return IsCard(l); };
    // Top level: resume from the below cache when nothing under the edited entry changed.
-   const bool top = parent == 0 && depth == 0 && sBelowCache && mDepthLevel < 0;
+   const bool top = parent == 0 && depth == 0 && sBelowCache && mDepthLevel < 0 && !mIsolating;
    std::vector<unsigned long long> hashes;
    unsigned long long global = 0;
    size_t start = 0, changed = 0;
@@ -1910,6 +2042,45 @@ void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
    }
 }
 
+std::vector<int> Scene2DNode::OutputLayers() const
+{
+   std::vector<int> ids;
+   for (const Layer& l : mLayers)
+      if (l.output)
+         ids.push_back(l.id);
+   std::sort(ids.begin(), ids.end());
+   return ids;
+}
+
+int Scene2DNode::OutputCount() const
+{
+   return 1 + (int)OutputLayers().size();
+}
+
+const char* Scene2DNode::OutputLabel(int index) const
+{
+   const std::vector<int> ids = OutputLayers();
+   if (index <= 0 || index > (int)ids.size())
+      return "out";
+   const Layer* l = FindConst(ids[index - 1]);
+   const std::string want = l != nullptr && !l->name.empty() ? l->name : "layer " + std::to_string(ids[index - 1]);
+   std::string& slot = mOutLabels[ids[index - 1]];
+   if (slot != want)
+      slot = want;
+   return slot.c_str();
+}
+
+unsigned int Scene2DNode::GetOutputTexture(int index)
+{
+   if (index <= 0)
+      return GetOutputTexture();
+   const std::vector<int> ids = OutputLayers();
+   if (index > (int)ids.size())
+      return 0;
+   auto it = mLayerOut.find(ids[index - 1]);
+   return it != mLayerOut.end() ? GLUtil::FboTexture(it->second) : 0;
+}
+
 void Scene2DNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -1934,11 +2105,16 @@ void Scene2DNode::CookIfNeeded(int frameId)
    stamp = Mix(stamp, mPaintEdits);
    for (const Layer& l : mLayers)
    {
-      if (!Shown(l))
+      if (!Shown(l) && !l.output)
          continue;
       for (INode* n : { Source(l), l.maskOn ? MaskSource(l) : nullptr })
          if (n != nullptr)
          {
+            if (l.below && n == Source(l))
+            {
+               stamp = Mix(stamp, NextTextureRevision());   // its params live on the node: redraw each frame it shows
+               continue;   // cooked in the composite, on the picture under it
+            }
             n->CookIfNeeded(frameId);
             stamp = Mix(stamp, (unsigned long long)(uintptr_t)n);
             if (auto* geo = dynamic_cast<IGeometrySource*>(n))
@@ -1995,6 +2171,10 @@ void Scene2DNode::CookIfNeeded(int frameId)
       bg[3] = 1.0f;
    }
    Clear(root, bg);
+   mAccOpaque = bg[3] >= 1.0f;
+   for (const Layer& l : mLayers)
+      if (l.blend == BlendModes::kEraseMode || l.blend == BlendModes::kAntiEraseMode)
+         mAccOpaque = false;
    DrawList(0, 0, frameId, 1.0f);
 
    const unsigned int acc = PairAt(0).Tex();
@@ -2007,6 +2187,47 @@ void Scene2DNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
       GLUtil::SetImageHeadroom(prog, mDoc.headroom);
    });
+   // Output layers: each drawn alone on transparent, shown even when hidden in the comp.
+   const std::vector<int> outs = OutputLayers();
+   for (auto it = mLayerOut.begin(); it != mLayerOut.end();)
+      if (std::find(outs.begin(), outs.end(), it->first) == outs.end())
+      {
+         GLUtil::DestroyFbo(it->second);
+         it = mLayerOut.erase(it);
+      }
+      else
+         ++it;
+   for (int id : outs)
+   {
+      Layer* t = FindLayer(id);
+      GLUtil::Fbo& f = mLayerOut[id];
+      if (t == nullptr || !GLUtil::EnsureFbo(f, mDoc.w, mDoc.h, GLUtil::ImageWorkingFormat(), "Scene2D layer out"))
+         continue;
+      const int keepSolo = soloLayer;
+      const bool keepVis = t->visible;
+      soloLayer = id;
+      t->visible = true;
+      mIsolating = true;
+      const bool keepOpaque = mAccOpaque;
+      mAccOpaque = false;
+      const float none[4] = { 0, 0, 0, 0 };
+      Clear(PairAt(0), none);
+      DrawList(0, 0, frameId, 1.0f);
+      soloLayer = keepSolo;
+      if (Layer* back = FindLayer(id))
+         back->visible = keepVis;
+      mIsolating = false;
+      mAccOpaque = keepOpaque;
+      const unsigned int one = PairAt(0).Tex();
+      GLUtil::RunShaderPass(f, prog, [&]()
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, one);
+         glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
+         glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
+         GLUtil::SetImageHeadroom(prog, mDoc.headroom);
+      });
+   }
    mRevision++;
    mCookMs = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
 }

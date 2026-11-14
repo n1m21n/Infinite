@@ -1126,6 +1126,7 @@ Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disc
          set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>  mod curve <dst> <key> <-1..1>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
          select <node>...|all|none  focus <node>  copy  paste  duplicate  group  ungroup  view3d-add <node>...
+         view2d layers|fields|'<json call or [calls]>'|-   (one gated batch, one undo step)
 Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  import <file>... [into <node>]  files <words>  reveal <file>  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
 Play     play  stop  rewind  seek <seconds>  tempo <bpm>
 Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beats, key=value sets fields)
@@ -1596,6 +1597,26 @@ map, and the visual, sound and film crafts.
          for (const std::string& node : args)
             nodes.push_back(NodeRef(node));
          return call("edit", { { "action", "view3d-add" }, { "nodes", nodes } });
+      }
+      if (verb == "view2d")
+      {
+         // layers | fields | <json call or {op:apply, calls:[...]}> | - (the JSON on stdin)
+         need(1, "view2d layers | fields | '<json>' | -");
+         if (args[0] == "layers" || args[0] == "fields")
+            return call("view2d", { { "op", args[0] } });
+         std::string text = args[0];
+         if (text == "-")
+         {
+            std::stringstream in;
+            in << std::cin.rdbuf();
+            text = in.str();
+         }
+         json p = json::parse(text, nullptr, false);
+         if (p.is_array())
+            p = { { "op", "apply" }, { "calls", p } };
+         if (!p.is_object())
+            Fail("view2d wants a JSON call {op, ...} or an array of calls");
+         return call("view2d", p);
       }
       if (verb == "copy" || verb == "paste" || verb == "duplicate" || verb == "group" || verb == "ungroup")
          return call("edit", { { "action", verb } });

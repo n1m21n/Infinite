@@ -18,6 +18,7 @@
 // uid) and places it, so the node keeps animating and is never written to; a
 // deleted node leaves its layer as "source missing". No input pins: the
 // layers are the inputs. Plan: internal/plans/2d-view/README.md.
+class ImageCable;
 class Scene2DNode : public INode
 {
 public:
@@ -93,6 +94,8 @@ public:
       unsigned lock = 0;            // Lock bits
       int label = 0;                // colour label, 0 = none, 1..7
       bool clip = false;            // clipped to the nearest unclipped layer below
+      bool output = false;          // also a node output: this layer's own picture
+      bool below = false;           // effect: a node layer whose first image input reads the picture under it
       bool open = true;             // a group's row is expanded in the Layers list
       // Placement, in document pixels, y down. (x, y) is where the anchor sits;
       // the anchor is a fraction of the layer's own box.
@@ -151,6 +154,7 @@ public:
       bool is3d = false;
       float z = 0.0f, az = 0.0f;              // depth and anchor depth, px
       float rx = 0.0f, ry = 0.0f;             // X and Y rotation, degrees
+      float sz = 1.0f;                        // depth scale of a 3D object (on top of its width and height scale)
       float orient[3] = { 0.0f, 0.0f, 0.0f }; // orientation X Y Z, degrees, under the rotations
       bool collapse = false;                  // a pass-through group: its 3D layers sort with the outside
       // Distort: each corner (top left, top right, bottom right, bottom left) moved by dx, dy px.
@@ -181,7 +185,7 @@ public:
                      kLfAdjust, kLfFontSize, kLfTracking, kLfLeading, kLfMaskDensity, kLfFillAngle, kLfFxBase,
                      kLfFxFields = 4, kLfCount = kLfFxBase + kFxCount * kLfFxFields };   // per fx: size, distance, angle, opacity
    struct ModSlot { int layer = 0, field = 0, slot = 0; };
-   static constexpr int kSlotBase = 8, kSlotMax = 399;   // param indices (Drive A..D 0..3, brush 4..6; discrete params start at 400)
+   static constexpr int kSlotBase = 8, kSlotMax = 399;   // param indices (Drive A..D 0..3, brush 4..7; discrete params start at 400)
 
    struct Document
    {
@@ -203,6 +207,9 @@ public:
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
    static std::function<INode*(uint64_t)> ResolveUid;
+   // The first image input of the node with this uid (the app knows every node's cables), for effect layers.
+   static std::function<ImageCable*(uint64_t)> ImageInputOf;
+   bool CanTakeBelow(const Layer& l) const { return l.kind == Kind::Node && l.uid != 0 && ImageInputOf && ImageInputOf(l.uid) != nullptr; }
 
    // The model. Edits go through these so the saved text follows.
    std::vector<Layer>& Layers()
@@ -321,7 +328,10 @@ public:
       float texelsPerPx = 0;        // skin texels under one document pixel here
    };
    bool CanSurfacePaint(int id);
+   bool IsObjectLayer(const Layer& l);   // a layer that shows a real 3D object
    bool HasGeometryView(int id) const { auto it = mGeo.find(id); return it != mGeo.end() && it->second != nullptr; }
+   // The width of a 3D object layer's last render (it follows the document), 0 before one.
+   int GeometryRenderWidth(int id) const;
    // The surface under a document point, false when the ray misses the object.
    bool SurfaceAt(int id, float x, float y, SurfacePoint& out);
    // Starts a stroke (brush.size = document px on screen). Makes the skin (side x side) on first use.
@@ -386,6 +396,11 @@ public:
 
    // INode
    unsigned int GetOutputTexture() override { return GLUtil::FboTexture(mOut); }
+   // Output 0 is the comp; then one output per layer marked output, in id order.
+   unsigned int GetOutputTexture(int index) override;
+   int OutputCount() const override;
+   const char* OutputLabel(int index) const override;
+   std::vector<int> OutputLayers() const;
    int GetOutputWidth() const override { return mOut.w > 0 ? mOut.w : mDoc.w; }
    int GetOutputHeight() const override { return mOut.h > 0 ? mOut.h : mDoc.h; }
    void CookIfNeeded(int frameId) override;
@@ -432,7 +447,7 @@ private:
    {
       unsigned int tex = 0;
       int texW = 0, texH = 0;
-      int kind = 0;                 // 0 texture, 1 solid, 2 linear, 3 radial
+      int kind = 0;                 // 0 texture, 1 solid, 2 linear, 3 radial, 4 3D object (document size, premultiplied)
       float inv[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };   // document px -> box px (homogeneous)
       float box[2] = { 1, 1 };
       float crop[4] = { 0, 0, 1, 1 };        // visible part of the box, as uv (left, top, right, bottom)
@@ -450,6 +465,8 @@ private:
       const Layer* fill = nullptr;
       const Layer* bif = nullptr;   // blend if
       bool card = false;            // a 3D card: tested against and written to the run's depth
+      unsigned int geoDepth = 0;    // kind 4 (a 3D object at document size): its hardware depth
+      float geoNF[2] = { 1, 2 };    // and the near / far that depth was drawn with, document px
       int rect[4] = { 0, 0, 0, 0 }; // pixels the layer can touch (x0, y0, x1, y1, GL rows); empty = all
    };
    bool LayerRect(const float h[9], PassArgs& a) const;   // false: the layer is off the page
@@ -524,10 +541,23 @@ private:
    unsigned mAdjProgram = 0;
    bool mAdjTried = false, mAdjReady = false;
    bool RunAdjust(const Layer& l, unsigned src);
-   // Bare geometry cards: a solo render per layer.
-   std::map<int, std::shared_ptr<class NodeViewport>> mGeo;   // shared: the type stays incomplete here
-   unsigned GeometryTexture(const Layer& l, int& w, int& h);
+   bool CookOnBelow(const Layer& l, INode* src, unsigned below);
+   // 3D object layers: the object drawn by the 3D View's renderer straight through the comp camera at document size,
+   // with its depth, so objects and cards hide each other per pixel. Scene2D3D.cpp.
+   std::map<int, std::shared_ptr<struct Scene2DGeo>> mGeo;   // shared: the type stays incomplete here
+   // The layer's object -> comp camera: GL view and projection at document size, the eye in the object's world,
+   // near / far in document px. One place, so the render, the pick and the brush agree.
+   struct GeoCam;
+   bool GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out);
+   // A 3D object layer's outline on screen: its projected box (a turned object does not foreshorten like a card).
+   bool GeometryCorners(const Layer& l, float out[8]);
+   // Renders the object; colour (premultiplied) and hardware depth at document size. False: nothing to draw.
+   bool GeometryRender(const Layer& l, unsigned& color, unsigned& depthTex, float nf[2]);
    GLUtil::Fbo mOut;
+   std::map<int, GLUtil::Fbo> mLayerOut;          // output layers, by id
+   mutable std::map<int, std::string> mOutLabels;
+   bool mIsolating = false;                       // drawing one output layer: no below cache
+   bool mAccOpaque = false;                       // the top-level picture is opaque: Normal layers blend in place
    unsigned int mPassProgram = 0, mFinishProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;

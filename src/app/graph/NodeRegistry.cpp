@@ -11,6 +11,11 @@ namespace app
          return gn != nullptr ? gn->node.get() : nullptr;
       };
       Scene2DNode::ResolveUid = Scene3DNode::ResolveUid;
+      Scene2DNode::ImageInputOf = [](uint64_t uid) -> ImageCable*
+      {
+         GraphNode* gn = FindNodeByUid(uid);
+         return gn != nullptr && dynamic_cast<Scene2DNode*>(gn->node.get()) == nullptr ? CableFor(*gn, 0) : nullptr;
+      };
 #ifndef NDEBUG
       if (getenv("INFINITE_PREDBINDTEST") != nullptr)
          REGISTER_NODE(StubPredictorNode, Stub Predictor, "Modulators");

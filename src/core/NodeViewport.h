@@ -58,6 +58,10 @@ public:
    // `px`,`pyTop`: pixel in a w x h render, origin top left. False on a miss, an empty mesh or a group.
    bool PickSurface(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h, float px, float pyTop, int skinSide,
                     SurfaceHit& out);
+   // The same pick for any camera: a ray (world space, `dir` unit length) and the view-projection it was cast from,
+   // which sizes texelsPerPx against a w x h picture.
+   static bool RaySurface(IGeometrySource* geo, const float eye[3], const float dir[3], const Mat4& viewProj, int w, int h,
+                          int skinSide, SurfaceHit& out);
    // The surface point nearest an object-space point (mirrored strokes land on the far side of the mesh).
    static bool ClosestSurface(IGeometrySource* geo, const float pos[3], SurfaceHit& out);
 

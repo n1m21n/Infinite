@@ -5,6 +5,8 @@
 #include "gl3.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <memory>
 
 #include "BlendModes.h"
 #include "Geometry3DNodes.h"
@@ -436,16 +438,266 @@ void Scene2DNode::EndDepth(int depth)
    mDepthLevel = -1;
 }
 
+// ---- 3D object layers: real 3D in the comp camera ---------------------------------------------------------------
+
 namespace
 {
-   // The solo render's default view, turned with the comp camera. One place so the picture and the pick agree.
-   SharedViewportCamera GeoCamera(const Scene2DNode::CompCam& c)
+   // Row-major 4x4 helpers (the Mat4 type is column-major; To() converts).
+   struct M4
    {
-      SharedViewportCamera cam;
-      cam.azimuth += c.az;
-      cam.elevation = std::clamp(cam.elevation + c.el, -89.0f, 89.0f);
-      return cam;
+      float a[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+      float& at(int r, int c) { return a[r * 4 + c]; }
+      float at(int r, int c) const { return a[r * 4 + c]; }
+   };
+   M4 Mul(const M4& x, const M4& y)
+   {
+      M4 r;
+      for (int i = 0; i < 4; i++)
+         for (int j = 0; j < 4; j++)
+         {
+            float s = 0;
+            for (int k = 0; k < 4; k++)
+               s += x.at(i, k) * y.at(k, j);
+            r.at(i, j) = s;
+         }
+      return r;
    }
+   Mat4 To(const M4& x)
+   {
+      Mat4 m;
+      for (int r = 0; r < 4; r++)
+         for (int c = 0; c < 4; c++)
+            m.m[c * 4 + r] = x.at(r, c);
+      return m;
+   }
+   // An affine (rotation x positive scale + translation) inverted.
+   M4 InvAffine(const M4& x)
+   {
+      const float* m = x.a;
+      const float A = m[0], B = m[1], C = m[2], D = m[4], E = m[5], F = m[6], G = m[8], H = m[9], I = m[10];
+      const float det = A * (E * I - F * H) - B * (D * I - F * G) + C * (D * H - E * G);
+      const float id = std::fabs(det) > 1e-20f ? 1.0f / det : 0.0f;
+      M4 r;
+      r.at(0, 0) = (E * I - F * H) * id; r.at(0, 1) = (C * H - B * I) * id; r.at(0, 2) = (B * F - C * E) * id;
+      r.at(1, 0) = (F * G - D * I) * id; r.at(1, 1) = (A * I - C * G) * id; r.at(1, 2) = (C * D - A * F) * id;
+      r.at(2, 0) = (D * H - E * G) * id; r.at(2, 1) = (B * G - A * H) * id; r.at(2, 2) = (A * E - B * D) * id;
+      for (int i = 0; i < 3; i++)
+         r.at(i, 3) = -(r.at(i, 0) * m[3] + r.at(i, 1) * m[7] + r.at(i, 2) * m[11]);
+      return r;
+   }
+
+   // A painted skin over the object's albedo by UV: the same object, its colour and picture baked with the paint.
+   struct SkinProxy : public IGeometrySource
+   {
+      IGeometrySource* base = nullptr;
+      unsigned tex = 0;
+      unsigned long long rev = 0;
+      const Mesh& GetMesh() override { return base->GetMesh(); }
+      unsigned long long MeshRevision() override { return base->MeshRevision(); }
+      Mat4 GetModelMatrix() const override { return base->GetModelMatrix(); }
+      Material GetMaterial() const override
+      {
+         Material m = base->GetMaterial();
+         m.color[0] = m.color[1] = m.color[2] = 1.0f;   // baked into the picture
+         return m;
+      }
+      unsigned long long MaterialRevision() const override { return base->MaterialRevision() * 31ull + rev; }
+      unsigned int GetSurfaceTexture() override { return tex; }
+      unsigned long long SurfaceTextureRevision() const override { return rev; }
+      unsigned int GetMaterialTexture(int map) override { return map == 0 ? tex : base->GetMaterialTexture(map); }
+      void ObjectColor(float c[3]) const override { base->ObjectColor(c); }
+      bool CastsShadow() const override { return base->CastsShadow(); }
+      unsigned int LightMask() const override { return base->LightMask(); }
+   };
+
+   const char* kSkinBakeFrag = R"(#version 150
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uBase;
+uniform sampler2D uSkin;
+uniform int uHasBase;
+uniform vec3 uColor;
+void main() {
+   vec3 c = pow(max(uColor, vec3(0.0)), vec3(1.0 / 2.2));
+   vec4 b = uHasBase == 1 ? texture(uBase, vUv) : vec4(1.0);
+   vec4 s = texture(uSkin, vUv);
+   fragColor = vec4(mix(c * b.rgb, s.rgb, s.a), 1.0);
+}
+)";
+}
+
+struct Scene2DGeo
+{
+   std::unique_ptr<Render3DNode> render;
+   Render3DNode::Rig rig;
+   std::vector<float> stamp;
+   unsigned long long rigRev = 0;
+   int frame = 0;
+   // The object's frame for placing it: centre and radius, from its own mesh (so the node's own motion still shows).
+   const void* boundsSrc = nullptr;
+   unsigned long long boundsRev = ~0ull;
+   bool boundsOk = false;
+   float c[3] = { 0, 0, 0 };
+   float r = 1.0f;
+   float lo[3] = { -1, -1, -1 }, hi[3] = { 1, 1, 1 };
+   SkinProxy proxy;
+   GLUtil::Fbo bake;
+   unsigned bakeProgram = 0;
+   unsigned long long bakeKey = 0;
+};
+
+struct Scene2DNode::GeoCam
+{
+   Mat4 view, proj, viewProj;
+   float eye[3] = { 0, 0, 0 };   // in the object's world
+   float nf[2] = { 1, 2 };
+   float toObj[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };   // comp direction -> object world direction (rotation part)
+   M4 fromComp;                                      // comp world point -> object world point
+   M4 toComp;                                        // and back
+   float lo[3] = { -1, -1, -1 }, hi[3] = { 1, 1, 1 }; // the object's box in its world
+};
+
+bool Scene2DNode::GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out)
+{
+   if (geo == nullptr)
+      return false;
+   std::shared_ptr<Scene2DGeo>& g = mGeo[l.id];
+   if (!g)
+      g = std::make_shared<Scene2DGeo>();
+   // Bounds: the mesh's own (pre-model) box; an empty mesh (group, cloud) takes the render's once.
+   const Mesh& mesh = geo->GetMesh();
+   if (!mesh.vertices.empty())
+   {
+      const unsigned long long rev = geo->MeshRevision();
+      if (g->boundsSrc != geo || g->boundsRev != rev || !g->boundsOk)
+      {
+         float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+         for (const Vertex& v : mesh.vertices)
+         {
+            const float p[3] = { v.px, v.py, v.pz };
+            for (int k = 0; k < 3; k++)
+            {
+               lo[k] = std::min(lo[k], p[k]);
+               hi[k] = std::max(hi[k], p[k]);
+            }
+         }
+         float r2 = 0;
+         for (int k = 0; k < 3; k++)
+         {
+            g->c[k] = 0.5f * (lo[k] + hi[k]);
+            r2 += 0.25f * (hi[k] - lo[k]) * (hi[k] - lo[k]);
+         }
+         g->r = std::max(1e-4f, std::sqrt(r2));
+         std::copy(lo, lo + 3, g->lo);
+         std::copy(hi, hi + 3, g->hi);
+         g->boundsSrc = geo;
+         g->boundsRev = rev;
+         g->boundsOk = true;
+      }
+   }
+   else if (g->boundsSrc != geo || !g->boundsOk)
+   {
+      float lo[3], hi[3];
+      g->boundsSrc = geo;
+      g->boundsOk = false;
+      g->c[0] = g->c[1] = g->c[2] = 0.0f;
+      g->r = 1.0f;
+      if (g->render && g->render->SourceBounds(geo, lo, hi))
+      {
+         float r2 = 0;
+         for (int k = 0; k < 3; k++)
+         {
+            g->c[k] = 0.5f * (lo[k] + hi[k]);
+            r2 += 0.25f * (hi[k] - lo[k]) * (hi[k] - lo[k]);
+         }
+         g->r = std::max(1e-4f, std::sqrt(r2));
+         std::copy(lo, lo + 3, g->lo);
+         std::copy(hi, hi + 3, g->hi);
+         g->boundsOk = true;
+      }
+      else
+         for (int k = 0; k < 3; k++)
+         {
+            g->lo[k] = -1.0f;
+            g->hi[k] = 1.0f;
+         }
+   }
+
+   // Placement: the object's centre sits on the layer box's centre, its bounding sphere 0.8 of the box across, turned
+   // and scaled by the layer like a card (same order as CardHomography), so the gizmo's axes are the object's.
+   float bw = 1, bh = 1;
+   LayerBox(l, bw, bh);
+   const float S = std::max(1.0f, std::min(bw, bh));
+   const float s = 0.4f * S / g->r;
+   const bool d3 = l.is3d;
+   float R[9], t[9];
+   RotX(d3 ? l.orient[0] : 0.0f, R);
+   RotY(d3 ? l.orient[1] : 0.0f, t);
+   Mul3(R, t, R);
+   RotZ(d3 ? l.orient[2] : 0.0f, t);
+   Mul3(R, t, R);
+   RotX(d3 ? l.rx : 0.0f, t);
+   Mul3(R, t, R);
+   RotY(d3 ? l.ry : 0.0f, t);
+   Mul3(R, t, R);
+   RotZ(l.angle, t);
+   Mul3(R, t, R);
+   const float kx = std::fabs(l.sx), ky = std::fabs(l.sy), kz = std::sqrt(kx * ky) * std::max(0.01f, std::fabs(l.sz));
+   const float a[3] = { kx * (0.5f - l.ax) * bw, ky * (0.5f - l.ay) * bh, d3 ? -l.az : 0.0f };
+   float C[3];
+   for (int i = 0; i < 3; i++)
+      C[i] = (i == 0 ? l.x : i == 1 ? l.y : (d3 ? l.z : 0.0f)) + R[i * 3] * a[0] + R[i * 3 + 1] * a[1] + R[i * 3 + 2] * a[2];
+   // Object world (y up, z toward the viewer) -> comp world (y down, z away): flip y and z.
+   M4 M;
+   const float ks[3] = { s * kx, -s * ky, -s * kz };
+   for (int i = 0; i < 3; i++)
+   {
+      for (int j = 0; j < 3; j++)
+         M.at(i, j) = R[i * 3 + j] * ks[j];
+      M.at(i, 3) = C[i] - (M.at(i, 0) * g->c[0] + M.at(i, 1) * g->c[1] + M.at(i, 2) * g->c[2]);
+   }
+   // Comp world -> GL eye: the camera's rows, then y and z flipped (GL looks down -z with y up).
+   const CompCam cam = Camera();
+   M4 E;
+   for (int i = 0; i < 3; i++)
+   {
+      const float sg = i == 0 ? 1.0f : -1.0f;
+      for (int j = 0; j < 3; j++)
+         E.at(i, j) = sg * cam.rot[i * 3 + j];
+      E.at(i, 3) = -sg * (cam.rot[i * 3] * cam.pos[0] + cam.rot[i * 3 + 1] * cam.pos[1] + cam.rot[i * 3 + 2] * cam.pos[2]);
+   }
+   const M4 V = Mul(E, M);
+   out.fromComp = InvAffine(M);
+   out.toComp = M;
+   std::copy(g->lo, g->lo + 3, out.lo);
+   std::copy(g->hi, g->hi + 3, out.hi);
+   for (int i = 0; i < 3; i++)
+      out.eye[i] = out.fromComp.at(i, 0) * cam.pos[0] + out.fromComp.at(i, 1) * cam.pos[1] + out.fromComp.at(i, 2) * cam.pos[2] +
+                   out.fromComp.at(i, 3);
+   // Directions comp -> object: the rotation of M^-1 without its scale.
+   for (int i = 0; i < 3; i++)
+      for (int j = 0; j < 3; j++)
+         out.toObj[i * 3 + j] = R[j * 3 + i] * (i == 0 ? 1.0f : -1.0f);
+   // Depth range around the object's sphere, in document px.
+   const float dc = cam.rot[6] * (C[0] - cam.pos[0]) + cam.rot[7] * (C[1] - cam.pos[1]) + cam.rot[8] * (C[2] - cam.pos[2]);
+   const float rp = 1.2f * s * g->r * std::max(kx, std::max(ky, kz));
+   if (dc + rp <= 1.0f)
+      return false;   // behind the camera
+   const float N = std::max(1.0f, dc - rp), F = std::max(N + 1.0f, dc + rp);
+   out.nf[0] = N;
+   out.nf[1] = F;
+   const float W = (float)mDoc.w, H = (float)mDoc.h;
+   M4 P;
+   P.at(0, 0) = 2.0f * cam.zoom / W;
+   P.at(1, 1) = 2.0f * cam.zoom / H;
+   P.at(2, 2) = -(F + N) / (F - N);
+   P.at(2, 3) = -2.0f * F * N / (F - N);
+   P.at(3, 2) = -1.0f;
+   P.at(3, 3) = 0.0f;
+   out.view = To(V);
+   out.proj = To(P);
+   out.viewProj = To(Mul(P, V));
+   return true;
 }
 
 unsigned long long Scene2DNode::SkinRevision(const Layer& l) const
@@ -456,27 +708,157 @@ unsigned long long Scene2DNode::SkinRevision(const Layer& l) const
    return r;
 }
 
-unsigned Scene2DNode::GeometryTexture(const Layer& l, int& w, int& h)
+bool Scene2DNode::GeometryRender(const Layer& l, unsigned& color, unsigned& depthTex, float nf[2])
 {
+   color = depthTex = 0;
    auto* geo = dynamic_cast<IGeometrySource*>(Source(l));
-   if (geo == nullptr)
-      return 0;
-   std::shared_ptr<NodeViewport>& vp = mGeo[l.id];
-   if (!vp)
-      vp = std::make_shared<NodeViewport>();
-   const SharedViewportCamera cam = GeoCamera(Camera());
-   const int side = std::clamp(std::min(mDoc.w, mDoc.h), 64, 2048);
-   w = h = side;
+   GeoCam gc;
+   if (geo == nullptr || !GeoPlace(l, geo, gc))
+      return false;
+   Scene2DGeo& g = *mGeo[l.id];
+   if (!g.render)
+   {
+      g.render = std::make_unique<Render3DNode>();
+      g.render->samples = 2;
+      g.render->RequestDepth();
+   }
+   Render3DNode& r = *g.render;
    // The painted skin rides over the albedo by UV, so it turns with the object.
-   unsigned skin = 0;
+   IGeometrySource* draw = geo;
    if (l.HasSkin())
    {
       auto it = mSurfaces.find(l.id);
       if (it != mSurfaces.end())
-         skin = (mStroke.Active() && mPaintId == l.id && mPaintTarget == 0) ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+      {
+         const unsigned skin = (mStroke.Active() && mPaintId == l.id && mPaintTarget == 0) ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+         const unsigned base = geo->GetSurfaceTexture();
+         const Material mat = geo->GetMaterial();
+         unsigned long long key = SkinRevision(l) * 1315423911ull + skin * 2654435761ull + base * 97ull + geo->SurfaceTextureRevision();
+         for (float c : mat.color)
+         {
+            unsigned bits = 0;
+            std::memcpy(&bits, &c, sizeof bits);
+            key = key * 1099511628211ull + bits;
+         }
+         if (g.bakeProgram == 0)
+            g.bakeProgram = GLUtil::CompileProgram(kSkinBakeFrag);
+         if (g.bakeProgram != 0 && GLUtil::EnsureFbo(g.bake, l.pw, l.ph, GL_RGBA8, "Scene2D skin bake"))
+         {
+            if (key != g.bakeKey)
+            {
+               g.bakeKey = key;
+               const unsigned prog = g.bakeProgram;
+               GLUtil::RunShaderPass(g.bake, prog, [&]()
+               {
+                  glActiveTexture(GL_TEXTURE1);
+                  glBindTexture(GL_TEXTURE_2D, skin);
+                  glUniform1i(glGetUniformLocation(prog, "uSkin"), 1);
+                  glActiveTexture(GL_TEXTURE0);
+                  glBindTexture(GL_TEXTURE_2D, base);
+                  glUniform1i(glGetUniformLocation(prog, "uBase"), 0);
+                  glUniform1i(glGetUniformLocation(prog, "uHasBase"), base != 0 ? 1 : 0);
+                  glUniform3fv(glGetUniformLocation(prog, "uColor"), 1, mat.color);
+               });
+            }
+            g.proxy.base = geo;
+            g.proxy.tex = g.bake.tex;
+            g.proxy.rev = key;
+            draw = &g.proxy;
+         }
+      }
    }
-   vp->SetPaintOverlay(skin, SkinRevision(l));
-   return vp->Render(geo, cam, side, side);
+   r.geometry[0] = draw;
+   r.width = (float)mDoc.w;
+   r.height = (float)mDoc.h;
+   r.envAsBackground = false;
+   r.bgOpacity = 0.0f;
+   // The key light stays put in the comp (upper left, in front) however the layer turns the object.
+   {
+      float toL[3] = { -0.45f, -0.7f, -0.55f };
+      const float n = std::sqrt(toL[0] * toL[0] + toL[1] * toL[1] + toL[2] * toL[2]);
+      float o[3];
+      for (int i = 0; i < 3; i++)
+         o[i] = (gc.toObj[i * 3] * toL[0] + gc.toObj[i * 3 + 1] * toL[1] + gc.toObj[i * 3 + 2] * toL[2]) / n;
+      r.lightElevation = std::asin(std::clamp(o[1], -1.0f, 1.0f)) / kD2R;
+      r.lightAzimuth = std::atan2(o[2], o[0]) / kD2R;
+   }
+   g.rig.hasView = true;
+   g.rig.view = gc.view;
+   std::copy(gc.eye, gc.eye + 3, g.rig.eye);
+   g.rig.lens = nullptr;
+   g.rig.hasProj = true;
+   g.rig.proj = gc.proj;
+   std::vector<float> stamp(gc.view.m, gc.view.m + 16);
+   stamp.insert(stamp.end(), gc.proj.m, gc.proj.m + 16);
+   stamp.push_back(r.lightAzimuth);
+   stamp.push_back(r.lightElevation);
+   if (stamp != g.stamp)
+   {
+      g.stamp.swap(stamp);
+      g.rigRev++;
+   }
+   g.rig.revision = g.rigRev;
+   r.rig = &g.rig;
+   r.CookIfNeeded(++g.frame);
+   color = r.GetOutputTexture();
+   depthTex = r.DepthValid() ? r.DepthTexture() : 0;
+   nf[0] = gc.nf[0];
+   nf[1] = gc.nf[1];
+   return color != 0;
+}
+
+bool Scene2DNode::IsObjectLayer(const Layer& l)
+{
+   return l.kind == Kind::Node && dynamic_cast<IGeometrySource*>(Source(l)) != nullptr;
+}
+
+bool Scene2DNode::GeometryCorners(const Layer& l, float out[8])
+{
+   auto* geo = dynamic_cast<IGeometrySource*>(Source(l));
+   GeoCam gc;
+   if (geo == nullptr || !GeoPlace(l, geo, gc))
+      return false;
+   // The screen box of the object's eight box corners (the model's own matrix included).
+   const Mat4 model = geo->GetModelMatrix();
+   float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
+   int seen = 0;
+   for (int k = 0; k < 8; k++)
+   {
+      const float p[3] = { (k & 1) ? gc.hi[0] : gc.lo[0], (k & 2) ? gc.hi[1] : gc.lo[1], (k & 4) ? gc.hi[2] : gc.lo[2] };
+      float w[3], q[3];
+      for (int i = 0; i < 3; i++)
+         w[i] = model.m[i] * p[0] + model.m[4 + i] * p[1] + model.m[8 + i] * p[2] + model.m[12 + i];
+      for (int i = 0; i < 3; i++)
+         q[i] = gc.toComp.at(i, 0) * w[0] + gc.toComp.at(i, 1) * w[1] + gc.toComp.at(i, 2) * w[2] + gc.toComp.at(i, 3);
+      float x = 0, y = 0;
+      if (!ProjectPoint(q, x, y))
+         continue;
+      seen++;
+      x0 = std::min(x0, x);
+      y0 = std::min(y0, y);
+      x1 = std::max(x1, x);
+      y1 = std::max(y1, y);
+   }
+   if (seen == 0)
+      return false;
+   const float r[8] = { x0, y0, x1, y0, x1, y1, x0, y1 };
+   std::copy(r, r + 8, out);
+   return true;
+}
+
+int Scene2DNode::GeometryRenderWidth(int id) const
+{
+   // The width of the texture the object was drawn into (what the comp samples).
+   auto it = mGeo.find(id);
+   const unsigned tex = it != mGeo.end() && it->second && it->second->render ? it->second->render->GetOutputTexture() : 0;
+   if (tex == 0)
+      return 0;
+   GLint w = 0, prev = 0;
+   glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev);
+   glBindTexture(GL_TEXTURE_2D, tex);
+   glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+   glBindTexture(GL_TEXTURE_2D, (GLuint)prev);
+   return w;
 }
 
 // ---- 3D surface paint ----------------------------------------------------------
@@ -504,24 +886,31 @@ bool Scene2DNode::SurfaceAt(int id, float x, float y, SurfacePoint& out)
    if (l == nullptr || l->kind != Kind::Node)
       return false;
    auto* geo = dynamic_cast<IGeometrySource*>(Source(*l));
-   auto it = mGeo.find(id);
-   if (geo == nullptr || it == mGeo.end() || !it->second)
+   GeoCam gc;
+   if (geo == nullptr || !GeoPlace(*l, geo, gc))
       return false;
-   float bw = 1, bh = 1, bx = 0, by = 0;
-   LayerBox(*l, bw, bh);
-   DocToBox(*l, x, y, bx, by);
-   if (bx < 0 || by < 0 || bx >= bw || by >= bh)
+   // The ray through the document pixel, from the comp camera, into the object's world: what the render drew there.
+   const CompCam cam = Camera();
+   const float dv[3] = { (x - mDoc.w * 0.5f) / cam.zoom, (y - mDoc.h * 0.5f) / cam.zoom, 1.0f };
+   float dc[3];
+   for (int i = 0; i < 3; i++)
+      dc[i] = cam.rot[i] * dv[0] + cam.rot[3 + i] * dv[1] + cam.rot[6 + i] * dv[2];
+   float d[3];
+   for (int i = 0; i < 3; i++)
+      d[i] = gc.fromComp.at(i, 0) * dc[0] + gc.fromComp.at(i, 1) * dc[1] + gc.fromComp.at(i, 2) * dc[2];
+   const float dl = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+   if (dl < 1e-12f)
       return false;
-   const int side = std::clamp(std::min(mDoc.w, mDoc.h), 64, 2048);
+   for (float& v : d)
+      v /= dl;
    const int skin = l->HasSkin() ? l->pw : 1024;
    NodeViewport::SurfaceHit hit;
-   if (!it->second->PickSurface(geo, GeoCamera(Camera()), side, side, bx / bw * side, by / bh * side, skin, hit))
+   if (!NodeViewport::RaySurface(geo, gc.eye, d, gc.viewProj, mDoc.w, mDoc.h, skin, hit))
       return false;
    std::copy(hit.uv, hit.uv + 2, out.uv);
    std::copy(hit.pos, hit.pos + 3, out.pos);
    out.facing = hit.facing;
-   // Skin texels per render pixel -> per document pixel (the box is `side` render px across bw document px).
-   out.texelsPerPx = hit.texelsPerPx * (float)side / std::max(1.0f, bw);
+   out.texelsPerPx = hit.texelsPerPx;   // the pick ran at document size
    return true;
 }
 

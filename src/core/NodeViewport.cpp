@@ -629,7 +629,18 @@ bool NodeViewport::PickSurface(IGeometrySource* geo, const SharedViewportCamera&
    const float dl = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
    for (float& x : d)
       x /= std::max(1e-6f, dl);
+   return RaySurface(geo, eye, d, viewProj, w, h, skinSide, out);
+}
 
+bool NodeViewport::RaySurface(IGeometrySource* geo, const float eye[3], const float d[3], const Mat4& viewProj, int w, int h,
+                              int skinSide, SurfaceHit& out)
+{
+   if (geo == nullptr || geo->GroupChildCount() > 0 || w < 1 || h < 1)
+      return false;
+   const Mesh& mesh = geo->GetMesh();
+   if (mesh.indices.size() < 3)
+      return false;
+   const Mat4 model = geo->GetModelMatrix();
    const size_t tris = mesh.indices.size() / 3;
    float best = 1e30f, bu = 0, bv = 0;
    size_t bi = tris;
