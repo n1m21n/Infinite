@@ -19,6 +19,11 @@ namespace app
    bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
                          nlohmann::json& outResult, std::string& outError)
    {
+      // fork: every call starts with a clean error string. The return paths below decide success
+      // with outError.empty() (see the HandleTerminalRpc fallthrough at the end), so a caller that
+      // reuses one string across calls - the chat panel, an MCP client, a test harness - would
+      // otherwise see a stale error turn a successful command into a reported failure.
+      outError.clear();
       using json = nlohmann::json;
       // From the first command on, every control records whether it was drawn greyed or hidden
       // (read back by param_ui_state). Cheap: one flag test per registered control.
