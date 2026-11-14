@@ -954,6 +954,84 @@ void RunView2DTest()
       Check("M5: a setting change lands within a frame or two", undoMax + commitMax + cookMax < 50.0);
    }
 
+   // M6: a turning cube keeps its size on the page (only its outline width changes with the turn), and a turning
+   // object plus a stack of animated layers stays inside a frame.
+   {
+      using Clock = std::chrono::steady_clock;
+      NewPatch();
+      GraphNode* cubeGn = SpawnNode("Cube", "3D", 0.0f, 0.0f);
+      auto* cube = cubeGn != nullptr ? dynamic_cast<GeometryNode*>(cubeGn->node.get()) : nullptr;
+      Scene2DNode pic;
+      pic.SetDocText("doc 1920 1080 0 0 0 0 0 0 0 0 1 32 4 30 10 1 1\n");
+      pic.AddLayer(Kind::Node, cubeGn != nullptr ? cubeGn->uid : 0);
+      pic.Commit();
+      auto box = [&](float& w, float& h)
+      {
+         std::vector<float> px((size_t)1920 * 1080 * 4);
+         glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         // The page background is opaque, so the cube is wherever the colour leaves the corner pixel's.
+         int x0 = 1920, y0 = 1080, x1 = -1, y1 = -1;
+         for (int y = 0; y < 1080; y++)
+            for (int x = 0; x < 1920; x++)
+            {
+               const float* q = &px[((size_t)y * 1920 + x) * 4];
+               if (std::fabs(q[0] - px[0]) + std::fabs(q[1] - px[1]) + std::fabs(q[2] - px[2]) > 0.06f)
+               {
+                  x0 = std::min(x0, x); x1 = std::max(x1, x);
+                  y0 = std::min(y0, y); y1 = std::max(y1, y);
+               }
+            }
+         w = (float)std::max(0, x1 - x0 + 1);
+         h = (float)std::max(0, y1 - y0 + 1);
+      };
+      float w0 = 0, h0 = 0, w45 = 0, h45 = 0;
+      if (cube != nullptr)
+      {
+         cube->rotY = 0.0f;
+         Cook(&pic);
+         box(w0, h0);
+         cube->rotY = 45.0f;
+         Cook(&pic);
+         box(w45, h45);
+      }
+      printf("  M6 cube turn: 0deg %.0fx%.0f px, 45deg %.0fx%.0f px\n", w0, h0, w45, h45);
+      Check("M6: a cube turning about its up axis keeps its height on the page", h0 > 50 && std::fabs(h45 / h0 - 1.0f) < 0.08f);
+      auto timeIt = [&](auto&& step)
+      {
+         std::vector<double> t;
+         for (int f = 0; f < 30; f++)
+         {
+            step(f);
+            glFinish();
+            const auto t0 = Clock::now();
+            Cook(&pic);
+            glFinish();
+            t.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
+         }
+         std::sort(t.begin(), t.end());
+         return t[t.size() / 2];
+      };
+      const double still = timeIt([&](int) {});
+      const double turning = timeIt([&](int f) { if (cube) cube->rotY = 3.0f * f; });
+      // Eight animated noise layers under the turning cube, each half the page.
+      for (int i = 0; i < 8; i++)
+      {
+         GraphNode* nz = SpawnNode("Noise", "Source", 300.0f, 200.0f * i);
+         Layer& l = pic.AddLayer(Kind::Node, nz != nullptr ? nz->uid : 0);
+         l.opacity = 0.6f;
+         l.blend = i % 3;
+         l.x = 200.0f + 150.0f * i;
+         l.y = 300.0f;
+      }
+      pic.Commit();
+      Cook(&pic);
+      const double stack = timeIt([&](int f) { if (cube) cube->rotY = 3.0f * f; });
+      printf("  M6 timing: cube still %.2f ms, turning %.2f ms, turning + 8 animated noise layers %.2f ms\n", still, turning, stack);
+      Check("M6: a turning cube over 8 animated layers renders inside a 60 fps frame", stack < 16.7);
+   }
+
    // ---- B: real 3D. Objects draw through the comp camera at document size with their own depth: two intersecting
    // cubes hide each other per pixel whatever the layer order, a tilted card passes through a cube. ----
    {

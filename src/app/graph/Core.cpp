@@ -1,5 +1,8 @@
 // Node names, titles, links and field-bridge helpers (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include <string>
+
+extern char** environ; // file scope: a block-scope extern here would name a namespaced symbol
 
 namespace app
 {
@@ -552,8 +555,23 @@ namespace app
    {
       // Plugin engine mode (src/plugin/engine/HostAudio.h) is headless too: hidden window, no
       // splash, autosave, control port or update check.
+      // Any INFINITE_<NAME>TEST self-test run and the UI audit too: it holds the main thread for minutes, so a Dock icon and a
+      // window only show the owner a beachball they end up force-quitting.
+      static const bool sSelfTest = []()
+      {
+         for (char** e = environ; e != nullptr && *e != nullptr; e++)
+         {
+            const std::string kv(*e);
+            const size_t eq = kv.find('=');
+            const std::string k = kv.substr(0, eq);
+            if (k == "INFINITE_UIAUDIT" ||
+                (k.rfind("INFINITE_", 0) == 0 && k.size() > 13 && k.compare(k.size() - 4, 4, "TEST") == 0))
+               return true;
+         }
+         return false;
+      }();
       return HeadlessJobActive() || Platform::PluginModeActive() || getenv("INFINITE_EXITAFTER") != nullptr ||
-             getenv("INFINITE_COMPAUDIT") != nullptr || getenv("IMAGERESYNTH_SCREENSHOT") != nullptr;
+             getenv("INFINITE_COMPAUDIT") != nullptr || getenv("IMAGERESYNTH_SCREENSHOT") != nullptr || sSelfTest;
    }
 
 

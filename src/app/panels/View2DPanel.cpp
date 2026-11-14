@@ -3519,7 +3519,8 @@ namespace
       std::snprintf(a, sizeof a, fmt, lo);
       std::snprintf(b, sizeof b, fmt, hi);
       const float fit = std::max(ImGui::CalcTextSize(a).x, ImGui::CalcTextSize(b).x) + 2.0f * tok::space_2 + 4.0f;
-      ImGui::SetNextItemWidth(w > 0.0f ? std::min(w, fit) : fit);
+      // One width for every bar slider (wider only when its text needs it), so bars line up tool to tool.
+      ImGui::SetNextItemWidth(w > 0.0f ? std::max(w, fit) : fit);
       FieldWell::Slider(id, v, lo, hi, fmt);
       FormParts::Inline(0.0f, tok::space_1);
    }
@@ -3541,9 +3542,9 @@ namespace
    // Expand, contract, smooth or border the live selection by sSelModPx.
    void SelModChips(Scene2DNode* doc)
    {
-      if (!doc->HasSelection())
-         return;
+      // Always on the bar, greyed without a selection, so the bar never changes shape under the pointer.
       BarDivider();
+      ImGui::BeginDisabled(!doc->HasSelection());
       BarSlider("##v2dselmod", &sSelModPx, 1.0f, 100.0f, "%.0f px", kWellL);
       static const char* kOps[4] = { "Expand##v2dsm0", "Contract##v2dsm1", "Smooth##v2dsm2", "Border##v2dsm3" };
       static const char* kUndo[4] = { "Expand selection", "Contract selection", "Smooth selection", "Border selection" };
@@ -3558,6 +3559,7 @@ namespace
             Touch();
          }
       }
+      ImGui::EndDisabled();
    }
 
    void MatchChips()
@@ -3586,6 +3588,15 @@ namespace
          BarSlider("##v2drop", &op, 1.0f, 100.0f, "Strength %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
+         float spacing = b.spacing * 100.0f;
+         BarSlider("##v2drspace", &spacing, 1.0f, 200.0f, "Space %.0f%%", 0.0f);
+         b.spacing = spacing / 100.0f;
+         gap();
+         if (TextChip(L("Size##v2drpress"), b.pressureSize, T("Pen pressure sets size")))
+            b.pressureSize = !b.pressureSize;
+         next();
+         if (TextChip(L("Strength##v2drpressop"), b.pressureOpacity, T("Pen pressure sets strength")))
+            b.pressureOpacity = !b.pressureOpacity;
       }
       else if (sTool == kBrush || sTool == kEraser)
       {
@@ -3596,11 +3607,19 @@ namespace
          const char* shown = preset >= 0 && preset < (int)presets.size() ? presets[preset].name : "";
          if (MenuParts::BeginCombo("##v2dpreset", T(shown)))
          {
+            const char* group = nullptr;
             for (int i = 0; i < (int)presets.size(); i++)
             {
                const bool erase = presets[i].brush.mode == BrushEngine::kErase;
                if (erase != (sTool == kEraser))
                   continue;
+               if (!erase && presets[i].group != nullptr && (group == nullptr || std::strcmp(group, presets[i].group) != 0))
+               {
+                  if (group != nullptr)
+                     ImGui::Separator();
+                  group = presets[i].group;
+                  ImGui::TextDisabled("%s", T(group));
+               }
                if (MenuParts::Choice(T(presets[i].name), i == preset))
                {
                   preset = i;
@@ -3640,14 +3659,35 @@ namespace
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          b.flow = flow / 100.0f;
-         if (TextChip(L("Pressure##v2dpress"), b.pressureSize, T("Pen pressure sets size")))
+         gap();
+         float spacing = b.spacing * 100.0f, jitter = b.jitter * 100.0f, smooth = b.smoothing * 100.0f;
+         // Stroke shape: fit widths and short names, so the whole brush bar fits a laptop-width View.
+         BarSlider("##v2dspace", &spacing, 1.0f, 200.0f, "Space %.0f%%", 0.0f);
+         BarSlider("##v2djit", &jitter, 0.0f, 200.0f, "Scatter %.0f%%", 0.0f);
+         BarSlider("##v2dsmooth", &smooth, 0.0f, 100.0f, "Smooth %.0f%%", 0.0f);
+         b.spacing = spacing / 100.0f;
+         b.jitter = jitter / 100.0f;
+         b.smoothing = smooth / 100.0f;
+         gap();
+         if (TextChip(L("Size##v2dpress"), b.pressureSize, T("Pen pressure sets size")))
             b.pressureSize = !b.pressureSize;
-         if (a != nullptr && a->HasPixelMask())
+         next();
+         if (TextChip(L("Opacity##v2dpressop"), b.pressureOpacity, T("Pen pressure sets opacity")))
+            b.pressureOpacity = !b.pressureOpacity;
+         next();
+         if (TextChip(L("Follow##v2dfollow"), b.follow, T("The tip turns with the stroke")))
+            b.follow = !b.follow;
+         if (brush)
          {
             next();
-            if (TextChip(L("Mask##v2deditmask"), sEditMask, T("Paint the layer's mask")))
-               sEditMask = !sEditMask;
+            if (TextChip(L("Lock alpha##v2dlock"), b.lockAlpha, T("Paint only where there is paint")))
+               b.lockAlpha = !b.lockAlpha;
          }
+         next();
+         ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
+         if (TextChip(L("Mask##v2deditmask"), sEditMask && a != nullptr && a->HasPixelMask(), T("Paint the layer's mask")))
+            sEditMask = !sEditMask;
+         ImGui::EndDisabled();
       }
       else if (sTool == kFill)
          MatchChips();
@@ -4195,10 +4235,11 @@ namespace
    // The context bar: what the current tool can do (plan §5). Laid out on one tile row from the cursor.
    void DrawContextBarItems(Scene2DNode* doc);
 
-   // Wells, combos and chips share one 28 pt row: frames get the tile height so their text sits on the chips' line.
+   // Wells, combos and chips share one row height (the bar's sRowH): a well taller than its chips sat low and made
+   // the chips look like they floated.
    void DrawContextBar(Scene2DNode* doc)
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(1.0f, (sRowH - ImGui::GetFontSize()) * 0.5f)));
       DrawContextBarItems(doc);
       ImGui::PopStyleVar();
    }
@@ -4221,17 +4262,18 @@ namespace
          if (ImGui::IsItemClicked())
             sAutoSelect = !sAutoSelect;
          gap();
-         if (a != nullptr && a->is3d)
          {
+            ImGui::BeginDisabled(a == nullptr || !a->is3d);
             static const char* kModes[3] = { "Move##v2dgz0", "Rotate##v2dgz1", "Scale##v2dgz2" };
             static const char* kModeTip[3] = { "Move along X, Y or Z", "Rotate about X, Y or Z", "Scale the card" };
             for (int i = 0; i < 3; i++)
             {
                if (i > 0)
                   next();
-               if (TextChip(L(kModes[i]), sGizmoMode == i, T(kModeTip[i])))
+               if (TextChip(L(kModes[i]), sGizmoMode == i && a != nullptr && a->is3d, T(kModeTip[i])))
                   sGizmoMode = i;
             }
+            ImGui::EndDisabled();
             gap();
          }
          static const char* kAlign[6] = { "##al0", "##al1", "##al2", "##al3", "##al4", "##al5" };
@@ -4252,23 +4294,25 @@ namespace
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImU32 col = ImGui::GetColorU32(sSel.empty() ? ImGuiCol_TextDisabled : ImGuiCol_Text);
             const int side = i % 3;
+            // Drawn to the icon set's ink (0.78 of the role's em), so the align marks match the other bar icons.
+            const float k = 0.78f * (sChip < tok::tile ? tok::icon_sm : tok::icon_md) / 14.0f;
             if (i < 3)
             {
-               const float x = side == 0 ? c.x - 5 : side == 1 ? c.x : c.x + 5;
-               dl->AddLine(ImVec2(x, c.y - 7), ImVec2(x, c.y + 7), col, 1.5f);
-               const float w1 = 10, w2 = 6;
+               const float x = side == 0 ? c.x - 5 * k : side == 1 ? c.x : c.x + 5 * k;
+               dl->AddLine(ImVec2(x, c.y - 7 * k), ImVec2(x, c.y + 7 * k), col, 1.5f);
+               const float w1 = 10 * k, w2 = 6 * k;
                const float s1 = side == 0 ? x : side == 1 ? x - w1 / 2 : x - w1, s2 = side == 0 ? x : side == 1 ? x - w2 / 2 : x - w2;
-               dl->AddRectFilled(ImVec2(s1, c.y - 5), ImVec2(s1 + w1, c.y - 1), col);
-               dl->AddRectFilled(ImVec2(s2, c.y + 1), ImVec2(s2 + w2, c.y + 5), col);
+               dl->AddRectFilled(ImVec2(s1, c.y - 5 * k), ImVec2(s1 + w1, c.y - 1 * k), col);
+               dl->AddRectFilled(ImVec2(s2, c.y + 1 * k), ImVec2(s2 + w2, c.y + 5 * k), col);
             }
             else
             {
-               const float y = side == 0 ? c.y - 5 : side == 1 ? c.y : c.y + 5;
-               dl->AddLine(ImVec2(c.x - 7, y), ImVec2(c.x + 7, y), col, 1.5f);
-               const float h1 = 10, h2 = 6;
+               const float y = side == 0 ? c.y - 5 * k : side == 1 ? c.y : c.y + 5 * k;
+               dl->AddLine(ImVec2(c.x - 7 * k, y), ImVec2(c.x + 7 * k, y), col, 1.5f);
+               const float h1 = 10 * k, h2 = 6 * k;
                const float s1 = side == 0 ? y : side == 1 ? y - h1 / 2 : y - h1, s2 = side == 0 ? y : side == 1 ? y - h2 / 2 : y - h2;
-               dl->AddRectFilled(ImVec2(c.x - 5, s1), ImVec2(c.x - 1, s1 + h1), col);
-               dl->AddRectFilled(ImVec2(c.x + 1, s2), ImVec2(c.x + 5, s2 + h2), col);
+               dl->AddRectFilled(ImVec2(c.x - 5 * k, s1), ImVec2(c.x - 1 * k, s1 + h1), col);
+               dl->AddRectFilled(ImVec2(c.x + 1 * k, s2), ImVec2(c.x + 5 * k, s2 + h2), col);
             }
             if (hit)
                Align(doc, i);
@@ -4286,9 +4330,10 @@ namespace
             const ImVec2 c((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImU32 col = ImGui::GetColorU32(sSel.size() < 3 ? ImGuiCol_TextDisabled : ImGuiCol_Text);
+            const float ks = 0.78f * (sChip < tok::tile ? tok::icon_sm : tok::icon_md) / 14.0f;
             for (int k = -1; k <= 1; k++)
             {
-               const float o = k * 5.5f, len = k == 0 ? 4.0f : 6.0f;
+               const float o = k * 5.5f * ks, len = (k == 0 ? 4.0f : 6.0f) * ks;
                if (i == 0)
                   dl->AddRectFilled(ImVec2(c.x + o - 1.25f, c.y - len), ImVec2(c.x + o + 1.25f, c.y + len), col);
                else
@@ -4297,22 +4342,24 @@ namespace
             if (hit)
                Distribute(doc, i);
          }
-         if (a != nullptr && a->kind == Kind::Node)
          {
             gap();
-            if (TextChip(L("Flip H##v2dfh"), a->flipX, T("Flip horizontal")))
+            const bool canFlip = a != nullptr && a->kind == Kind::Node;
+            ImGui::BeginDisabled(!canFlip);
+            if (TextChip(L("Flip H##v2dfh"), canFlip && a->flipX, T("Flip horizontal")))
             {
                PushUndoCheckpoint("Flip layer");
                a->flipX = !a->flipX;
                Touch();
             }
             next();
-            if (TextChip(L("Flip V##v2dfv"), a->flipY, T("Flip vertical")))
+            if (TextChip(L("Flip V##v2dfv"), canFlip && a->flipY, T("Flip vertical")))
             {
                PushUndoCheckpoint("Flip layer");
                a->flipY = !a->flipY;
                Touch();
             }
+            ImGui::EndDisabled();
          }
       }
       else if (sTool == kCrop && sCropOn)
@@ -7597,7 +7644,7 @@ std::string View2DAuditState(int i)
 // changes only this still did something.
 std::string View2DAuditPanelState()
 {
-   char buf[640];
+   char buf[900];
    const BrushEngine::Brush& b = sBrush;
    const BrushEngine::Brush& e = sEraser;
    std::string sel;
@@ -7606,11 +7653,14 @@ std::string View2DAuditPanelState()
    snprintf(buf, sizeof buf,
             "tool %d tab %d side %d dock %d zoom %.4f pan %.1f %.1f fg %.3f %.3f %.3f bg %.3f %.3f %.3f fill %d tol %d cont %d all %d "
             "marq %d lasso %d feather %.2f selop %d surf %d skin %d mask %d auto %d img %d vid %d gizmo %d pick %d "
-            "brush %d %.2f %.3f %.3f %.3f %.3f %.3f %.1f %.3f %.3f %d %d %d %d eraser %.2f %.3f %d chip %d dialogs %d",
+            "brush %d %.2f %.3f %.3f %.3f %.3f %.3f %.1f %.3f %.3f %d %d %d %d %d %d eraser %.2f %.3f %d %d %d %d %.3f %.3f %.3f %.1f "
+            "retouch %.2f %.3f %.3f %.3f %d %d chip %d dialogs %d",
             sTool, sTab, sSideOpen, gView2DDock, sZoom, sPan.x, sPan.y, sFg[0], sFg[1], sFg[2], sBg[0], sBg[1], sBg[2], sFillKind, sTolerance,
             sContiguous, sAllLayers, sMarqueeShape, sLassoKind, sFeather, sSelOp, sSurfacePaint, sSkinSide, sEditMask, sAutoSelect,
             sImageFormat, sVideoFormat, sGizmoMode, sPickMode, b.tip, b.size, b.hardness, b.opacity, b.flow, b.spacing, b.jitter, b.angle,
-            b.roundness, b.smoothing, b.pencil, b.pressureSize, b.pressureOpacity, b.mode, e.size, e.hardness, e.mode, sBrushPreset, sAuditDialogs);
+            b.roundness, b.smoothing, b.pencil, b.pressureSize, b.pressureOpacity, b.mode, b.follow, b.lockAlpha, e.size, e.hardness, e.mode,
+            e.pressureSize, e.pressureOpacity, e.follow, e.spacing, e.jitter, e.smoothing, e.angle, sRetouch.size, sRetouch.hardness,
+            sRetouch.opacity, sRetouch.spacing, sRetouch.pressureSize, sRetouch.pressureOpacity, sBrushPreset, sAuditDialogs);
    Scene2DNode* doc = FindDoc();
    // The vector and text tools' "next item" settings, which the bar edits when nothing is picked.
    const Shape& v = sStyle;

@@ -23,6 +23,11 @@ namespace BrushEngine
          "uniform float uRound;\n"
          "uniform int uPencil;\n"
          "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }\n"
+         "float h1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
+         "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
+         "   return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), f.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), f.x), f.y); }\n"
+         "float rnd(float k) { return fract(sin(uSeed * 12.9898 + k * 78.233) * 43758.5453); }\n"
+         "vec2 turn(vec2 p, float t) { float c = cos(t), s = sin(t); return vec2(c * p.x + s * p.y, -s * p.x + c * p.y); }\n"
          "void main() {\n"
          "   vec2 p = gl_FragCoord.xy - uCenter;\n"
          "   float c = cos(uAngle), s = sin(uAngle);\n"
@@ -46,9 +51,56 @@ namespace BrushEngine
          "   } else if (uTip == 5) {\n"
          "      float n = hash(floor(gl_FragCoord.xy * 0.5)) * 0.55 + 0.45;\n"
          "      a = (1.0 - smoothstep(uHard * 0.6, 1.0, r)) * n;\n"
-         "   } else {\n"
+         "   } else if (uTip == 6) {\n"
          "      float n = hash(floor(gl_FragCoord.xy * 0.125)) * 0.35;\n"
          "      a = 1.0 - smoothstep(uHard - n, 1.0 + n, r);\n"
+         "   } else {\n"
+         "      vec2 fc = gl_FragCoord.xy;\n"
+         "      float disc = 1.0 - smoothstep(max(uHard, 0.55), 1.0, r);\n"
+         "      if (uTip == 7) {\n"            // bristle: hair lines along the stroke
+         "         float y = p.y / rad;\n"
+         "         float hair = h1(vec2(floor(y * 16.0), 3.0)) * 0.55 + vn(vec2(y * 7.0, 0.5)) * 0.45;\n"
+         "         a = (1.0 - smoothstep(0.7, 1.0, r)) * smoothstep(0.38, 0.62, hair);\n"
+         "      } else if (uTip == 8) {\n"     // paper grain: the tooth stays put on the page
+         "         float g = vn(fc * 0.35) * 0.6 + vn(fc * 0.9) * 0.4;\n"
+         "         a = (1.0 - smoothstep(uHard * 0.8, 1.0, r)) * smoothstep(0.3, 0.72, g);\n"
+         "      } else if (uTip == 9) {\n"     // halftone: dots on a fixed grid grow with coverage
+         "         float cov = 1.0 - smoothstep(uHard * 0.7, 1.0, r);\n"
+         "         float d = length(fract(fc / 9.0) - 0.5);\n"
+         "         float R = sqrt(cov) * 0.62;\n"
+         "         a = (1.0 - smoothstep(R - 0.07, R + 0.03, d)) * step(0.02, cov);\n"
+         "      } else if (uTip == 10) {\n"    // watercolour: ragged edge, pigment pooled at the rim
+         "         float n = vn(fc * 0.05 + uSeed) * 0.5 + vn(fc * 0.2) * 0.5;\n"
+         "         float rr = r * (0.82 + 0.36 * n);\n"
+         "         a = (1.0 - smoothstep(0.86, 1.0, rr)) * (0.3 + 0.7 * smoothstep(0.5, 0.95, rr)) * (0.75 + 0.25 * vn(fc * 0.6));\n"
+         "      } else if (uTip == 11) {\n"    // brushed metal: fine streaks along the stroke
+         "         float s = h1(vec2(floor(p.y * 1.3), 7.0)) * 0.6 + vn(vec2(p.y * 0.5, 1.0)) * 0.4;\n"
+         "         a = disc * (0.25 + 0.75 * s * s);\n"
+         "      } else if (uTip == 12) {\n"    // cloth: an over-under weave fixed on the page
+         "         vec2 w = fc / 6.0;\n"
+         "         float chk = mod(floor(w.x) + floor(w.y), 2.0);\n"
+         "         float thread = mix(0.5 + 0.5 * sin(w.y * 6.2832), 0.5 + 0.5 * sin(w.x * 6.2832), chk);\n"
+         "         a = (1.0 - smoothstep(uHard * 0.8, 1.0, r)) * (0.25 + 0.75 * thread) * (0.85 + 0.15 * vn(fc * 0.5));\n"
+         "      } else if (uTip == 13) {\n"    // leaf: a turned, sized leaf with a vein per dab
+         "         vec2 q = turn(p, rnd(1.0) * 6.2832) / (rad * (0.55 + 0.45 * rnd(2.0)));\n"
+         "         float wdt = 0.42 * (1.0 - q.x * q.x);\n"
+         "         a = (1.0 - smoothstep(wdt - 0.05, wdt, abs(q.y))) * step(abs(q.x), 1.0);\n"
+         "         a *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.04, abs(q.y))) * step(q.x, 0.85);\n"
+         "         a *= 0.75 + 0.25 * rnd(3.0);\n"
+         "      } else if (uTip == 14) {\n"    // grass: a blade rising from the dab, leaning and bending
+         "         vec2 q = turn(p, (rnd(1.0) - 0.5) * 0.9) / rad;\n"
+         "         float y = q.y / (0.6 + 0.4 * rnd(2.0));\n"
+         "         float bend = (rnd(3.0) - 0.5) * 0.7 * y * y;\n"
+         "         float wdt = 0.1 * (1.0 - y) + 0.005;\n"
+         "         a = step(0.0, y) * step(y, 1.0) * (1.0 - smoothstep(wdt * 0.6, wdt, abs(q.x - bend)));\n"
+         "      } else if (uTip == 15) {\n"    // sparkle: a four-point star with a soft core
+         "         vec2 q = turn(p, rnd(1.0) * 1.5708) / (rad * (0.35 + 0.65 * rnd(2.0)));\n"
+         "         float d = sqrt(abs(q.x)) + sqrt(abs(q.y));\n"
+         "         a = max(1.0 - smoothstep(0.8, 1.0, d), 0.6 * (1.0 - smoothstep(0.0, 0.3, length(q))));\n"
+         "      } else {\n"                    // sponge: open cells that change every dab
+         "         float c = vn(fc * 0.12 + uSeed * 3.1) * 0.65 + vn(fc * 0.33) * 0.35;\n"
+         "         a = (1.0 - smoothstep(0.7, 1.0, r)) * smoothstep(0.42, 0.56, c);\n"
+         "      }\n"
          "   }\n"
          "   a = clamp(a, 0.0, 1.0) * uFlow;\n"
          "   fragColor = vec4(a);\n"
@@ -144,7 +196,9 @@ namespace BrushEngine
 
    const std::vector<std::string>& TipNames()
    {
-      static const std::vector<std::string> names = { "Round", "Soft Round", "Hard Round", "Square", "Spray", "Chalk", "Ink Bleed" };
+      static const std::vector<std::string> names = { "Round", "Soft Round", "Hard Round", "Square", "Spray", "Chalk", "Ink Bleed",
+                                                               "Bristle", "Paper Grain", "Halftone", "Watercolour", "Brushed Metal", "Cloth",
+                                                               "Leaf", "Grass", "Sparkle", "Sponge" };
       return names;
    }
 
@@ -153,48 +207,89 @@ namespace BrushEngine
       static const std::vector<Preset> presets = []()
       {
          std::vector<Preset> p;
+         auto add = [&](const char* group, const char* name, const Brush& b) { p.push_back({ name, b, group }); };
+         // Basic
          Brush b = Make(kRound, 3, 1, 1, 1, 0.05f);
          b.pencil = true;
          b.pressureSize = false;
-         p.push_back({ "Pencil", b });
+         add("Basic", "Pencil", b);
          b = Make(kRound, 6, 0.9f, 1, 1, 0.08f);
          b.smoothing = 0.3f;
-         p.push_back({ "Ink", b });
+         add("Basic", "Ink", b);
          b = Make(kHardRound, 2, 1, 1, 1, 0.08f);
          b.pressureSize = false;
          b.smoothing = 0.2f;
-         p.push_back({ "Fine liner", b });
+         add("Basic", "Fine liner", b);
          b = Make(kRound, 24, 0.7f, 0.6f, 1, 0.1f);
          b.pressureSize = false;
-         p.push_back({ "Marker", b });
+         add("Basic", "Marker", b);
          b = Make(kSoftRound, 120, 0, 1, 0.08f, 0.1f);
          b.pressureSize = false;
          b.pressureOpacity = true;
-         p.push_back({ "Soft airbrush", b });
-         p.push_back({ "Hard round", Make(kRound, 30, 1, 1, 1, 0.12f) });
-         b = Make(kChalk, 40, 0.5f, 1, 0.6f, 0.15f);
-         p.push_back({ "Chalk", b });
-         b = Make(kSpray, 80, 0, 1, 0.5f, 0.2f);
-         b.jitter = 0.1f;
-         p.push_back({ "Spray", b });
-         b = Make(kInkBleed, 18, 0.4f, 0.9f, 0.7f, 0.12f);
-         b.jitter = 0.05f;
-         p.push_back({ "Charcoal", b });
+         add("Basic", "Soft airbrush", b);
+         add("Basic", "Hard round", Make(kRound, 30, 1, 1, 1, 0.12f));
          b = Make(kRound, 40, 0.9f, 1, 1, 0.06f);
          b.roundness = 0.2f;
          b.angle = 45.0f;
-         p.push_back({ "Flat", b });
+         add("Basic", "Flat", b);
+         // Creative
+         b = Make(kSpray, 80, 0, 1, 0.5f, 0.2f);
+         b.jitter = 0.1f;
+         add("Creative", "Spray", b);
          b = Make(kRound, 14, 0.9f, 1, 1, 1.5f);
          b.jitter = 2.0f;
          b.pressureSize = false;
-         p.push_back({ "Splatter", b });
+         add("Creative", "Splatter", b);
+         b = Make(kLeaf, 46, 0.9f, 1, 1, 0.7f);
+         b.jitter = 0.7f;
+         b.pressureSize = false;
+         add("Creative", "Leaves", b);
+         b = Make(kGrass, 70, 0.9f, 1, 1, 0.12f);
+         b.jitter = 0.35f;
+         b.pressureSize = false;
+         add("Creative", "Grass", b);
+         b = Make(kSparkle, 34, 0.9f, 1, 1, 1.4f);
+         b.jitter = 1.6f;
+         b.pressureSize = false;
+         add("Creative", "Sparkle", b);
+         b = Make(kHalftone, 140, 0.2f, 1, 1, 0.08f);
+         b.pressureSize = false;
+         add("Creative", "Halftone", b);
+         b = Make(kSponge, 80, 0.5f, 1, 0.8f, 0.35f);
+         b.pressureSize = false;
+         add("Creative", "Sponge", b);
+         // Texture
+         add("Texture", "Chalk", Make(kChalk, 40, 0.5f, 1, 0.6f, 0.15f));
+         b = Make(kInkBleed, 18, 0.4f, 0.9f, 0.7f, 0.12f);
+         b.jitter = 0.05f;
+         add("Texture", "Charcoal", b);
+         b = Make(kBristle, 44, 0.7f, 1, 0.9f, 0.04f);
+         b.follow = true;
+         add("Texture", "Bristle", b);
+         b = Make(kWatercolor, 90, 0.5f, 0.85f, 0.35f, 0.08f);
+         b.pressureSize = false;
+         b.pressureOpacity = true;
+         add("Texture", "Watercolour", b);
+         b = Make(kGrain, 50, 0.6f, 1, 0.8f, 0.08f);
+         add("Texture", "Paper grain", b);
+         b = Make(kMetal, 80, 0.8f, 1, 0.9f, 0.03f);
+         b.follow = true;
+         b.pressureSize = false;
+         add("Texture", "Brushed metal", b);
+         b = Make(kCloth, 70, 0.6f, 1, 0.9f, 0.08f);
+         b.pressureSize = false;
+         add("Texture", "Cloth", b);
+         // Eraser
          b = Make(kSoftRound, 60, 0, 1, 0.5f, 0.1f);
          b.mode = kErase;
-         p.push_back({ "Eraser soft", b });
+         add("Eraser", "Eraser soft", b);
          b = Make(kRound, 30, 1, 1, 1, 0.1f);
          b.mode = kErase;
          b.pressureSize = false;
-         p.push_back({ "Eraser hard", b });
+         add("Eraser", "Eraser hard", b);
+         b = Make(kGrain, 50, 0.6f, 1, 0.7f, 0.08f);
+         b.mode = kErase;
+         add("Eraser", "Eraser grain", b);
          return p;
       }();
       return presets;
@@ -256,6 +351,9 @@ namespace BrushEngine
       mLastY = mPenY = y;
       mLastP = mPenP = p;
       mCarry = 0.0f;
+      mDabX = x;
+      mDabY = y;
+      mDir = 0.0f;
       Dab(x, y, p, Rand(mRng) * 100.0f);
       mDisplayStale = true;
    }
@@ -264,20 +362,27 @@ namespace BrushEngine
    {
       if (!mActive)
          return;
+      // The heading comes from the dabs themselves, so a recorded replay turns the tip exactly as the live stroke did.
+      if (std::hypot(x - mDabX, y - mDabY) > 0.5f)
+      {
+         mDir = std::atan2(y - mDabY, x - mDabX);
+         mDabX = x;
+         mDabY = y;
+      }
       if (mBrush.jitter > 0.0f)
       {
          x += (Rand(mRng) - 0.5f) * mBrush.jitter * mBrush.size;
          y += (Rand(mRng) - 0.5f) * mBrush.jitter * mBrush.size;
       }
       const float p = pressure < 0.0f ? 1.0f : std::clamp(pressure, 0.0f, 1.0f);
-      Queue(x, y, p, seed);
+      Queue(x, y, p, seed, mDir);
       for (const auto& m : mMirrors)
-         Queue(m[0] * x + m[1] * y + m[2], m[3] * x + m[4] * y + m[5], p, seed);
+         Queue(m[0] * x + m[1] * y + m[2], m[3] * x + m[4] * y + m[5], p, seed, std::atan2(m[3] * std::cos(mDir) + m[4] * std::sin(mDir), m[0] * std::cos(mDir) + m[1] * std::sin(mDir)));
    }
 
-   void Stroke::Queue(float x, float y, float p, float seed)
+   void Stroke::Queue(float x, float y, float p, float seed, float dir)
    {
-      mQueue.push_back({ x, y, p, seed });
+      mQueue.push_back({ x, y, p, seed, dir });
       const float r = 0.5f * mBrush.size + 2.0f;
       if (!mAny)
       {
@@ -383,7 +488,7 @@ namespace BrushEngine
             glUniform1f(sDabLoc.flow, std::clamp(flow, 0.0f, 1.0f));
             glUniform1i(sDabLoc.tip, b.tip);
             glUniform1f(sDabLoc.seed, q.seed);
-            glUniform1f(sDabLoc.angle, angle);
+            glUniform1f(sDabLoc.angle, angle + (b.follow ? q.dir : 0.0f));
             glUniform1f(sDabLoc.round, std::clamp(b.roundness, 0.05f, 1.0f));
             glUniform1i(sDabLoc.pencil, b.pencil ? 1 : 0);
          }, clip);

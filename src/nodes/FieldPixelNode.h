@@ -10,6 +10,7 @@
 #include "field/ParamTable.h"
 #include "field/PinTable.h"
 #include "field/FieldDevice.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -222,6 +223,9 @@ private:
    int mLastCookFrame = -1;
 
    GLUtil::Fbo mOut;
+   // Material domain: a lit sphere wearing the material, so the node shows what it makes.
+   struct MatPreview;
+   std::unique_ptr<MatPreview> mPreview;
    Field::PixelStateBank mState;
    Field::ParamTable mParamTable;
    Field::PixelIRProgram mIR;

@@ -3,6 +3,8 @@
 #include "field/FieldLex.h"
 #include "field/FieldParse.h"
 #include "Transport.h"
+#include "Geometry3DNodes.h"
+#include "UtilityNodes.h"
 #include <algorithm>
 #include "gl3.h"
 #include <cmath>
@@ -1059,6 +1061,13 @@ FieldPixelNode::FieldPixelNode()
    code = Presets()[0].code;
 }
 
+struct FieldPixelNode::MatPreview
+{
+   GeometryNode sphere;
+   MaterialNode mat;
+   Render3DNode render;
+};
+
 FieldPixelNode::~FieldPixelNode()
 {
    if (mProgram != 0)
@@ -1071,15 +1080,20 @@ FieldPixelNode::~FieldPixelNode()
 // The ping-pong pair holds STATE, not picture. A state kernel renders its
 // colour into mOut on a second pass, so `col` means the same thing whether or
 // not the kernel declares state cells.
-unsigned int FieldPixelNode::GetOutputTexture() { return GLUtil::FboTexture(mOut); }
+unsigned int FieldPixelNode::GetOutputTexture()
+{
+   if (domain == 1)
+      return mPreview ? mPreview->render.GetOutputTexture() : 0;
+   return GLUtil::FboTexture(mOut);
+}
 unsigned int FieldPixelNode::GetOutputTexture(int index)
 {
    if (index == 1 && exposeAuxTexture && !mIR.declaredStates.empty())
       return mState.CurrentOutputTexture();
    return index == 0 ? GetOutputTexture() : 0;
 }
-int FieldPixelNode::GetOutputWidth() const { return mOut.w; }
-int FieldPixelNode::GetOutputHeight() const { return mOut.h; }
+int FieldPixelNode::GetOutputWidth() const { return domain == 1 ? (mPreview ? mPreview->render.GetOutputWidth() : 0) : mOut.w; }
+int FieldPixelNode::GetOutputHeight() const { return domain == 1 ? (mPreview ? mPreview->render.GetOutputHeight() : 0) : mOut.h; }
 
 const std::vector<std::string>& FieldPixelNode::DomainNames()
 {
@@ -1292,6 +1306,28 @@ void FieldPixelNode::CookIfNeeded(int frameId)
          Apply();
       else if (mMatApplied)
          RefreshMaterialProgram();
+      if (MaterialProgramId() != 0)
+      {
+         if (!mPreview)
+         {
+            mPreview = std::make_unique<MatPreview>();
+            const auto& names = GeometryNode::ShapeNames();
+            for (size_t i = 0; i < names.size(); i++)
+               if (names[i] == "Sphere")
+                  mPreview->sphere.shape = (int)i;
+            mPreview->mat.input = &mPreview->sphere;
+            mPreview->mat.FieldInput().Connect(this);
+            Render3DNode& r = mPreview->render;
+            r.geometry[0] = &mPreview->mat;
+            r.width = r.height = 384.0f;
+            r.envAsBackground = false;
+            r.bgOpacity = 0.0f;
+            r.camAzimuth = 0.0f;
+            r.camElevation = 15.0f;
+            r.camDistance = 2.6f;
+         }
+         mPreview->render.CookIfNeeded(frameId);
+      }
       return;
    }
    if (mMatApplied) // switched back to Image without an Apply

@@ -15,7 +15,9 @@
 // straight (not premultiplied) RGBA.
 namespace BrushEngine
 {
-   enum Tip { kRound = 0, kSoftRound, kHardRound, kSquare, kSpray, kChalk, kInkBleed, kTipCount };
+   enum Tip { kRound = 0, kSoftRound, kHardRound, kSquare, kSpray, kChalk, kInkBleed,
+               // Creative and texture tips, all procedural: no bitmaps to ship.
+               kBristle, kGrain, kHalftone, kWatercolor, kMetal, kCloth, kLeaf, kGrass, kSparkle, kSponge, kTipCount };
    enum Mode { kNormal = 0, kErase, kBehind, kClearMode, kMultiply, kScreen,
                // Retouch: the stroke reworks the pixels already there instead of laying colour.
                kBlur, kSharpen, kDodge, kBurn, kClone, kHeal };
@@ -39,6 +41,7 @@ namespace BrushEngine
       bool pressureOpacity = false;
       int mode = kNormal;
       bool lockAlpha = false;
+      bool follow = false;         // the tip turns with the stroke's direction
       float color[3] = { 0.0f, 0.0f, 0.0f };
       float sourceOffset[2] = { 0.0f, 0.0f };   // clone / heal: where to copy from, surface pixels from the dab
    };
@@ -47,6 +50,7 @@ namespace BrushEngine
    {
       const char* name;
       Brush brush;
+      const char* group = nullptr;   // "Basic", "Creative", "Texture", "Eraser": the preset menu's headers
    };
    const std::vector<Preset>& Presets();
 
@@ -89,7 +93,7 @@ namespace BrushEngine
    private:
       struct Pending
       {
-         float x, y, pressure, seed;
+         float x, y, pressure, seed, dir;
       };
       void Walk(float x, float y, float pressure);
       void Merge(const GLUtil::Fbo& surface, const GLUtil::Fbo& out);
@@ -100,6 +104,7 @@ namespace BrushEngine
       float mLastX = 0, mLastY = 0, mLastP = 1;   // where the last dab went
       float mPenX = 0, mPenY = 0, mPenP = 1;      // the real pen (smoothing)
       float mCarry = 0;                           // distance walked since the last dab
+      float mDabX = 0, mDabY = 0, mDir = 0;       // the last dab's place and the stroke's heading (radians)
       uint32_t mRng = 1;
       int mDabCount = 0;
       int mW = 0, mH = 0;
@@ -108,7 +113,7 @@ namespace BrushEngine
       bool mAny = false;
       std::vector<Pending> mQueue;
       std::vector<std::array<float, 6>> mMirrors;
-      void Queue(float x, float y, float p, float seed);
+      void Queue(float x, float y, float p, float seed, float dir);
       GLUtil::Fbo mCoverage, mDisplay, mMerge;
       bool mDisplayStale = true;
    };
