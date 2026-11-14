@@ -2,7 +2,7 @@
 // pointing at, the transport, modulation by control name, bypass, and the code errors of the
 // open patch. Same rules as Rpc.cpp: main thread, between frames, one undo step per edit.
 #include <algorithm>
-#include <cstdlib> // k17: std::strtol, for a node index written as a string
+#include <cstdlib> // fork: k17 std::strtol, for a node index written as a string
 #include "app/AppShared.h"
 #include "core/GestureRecorder.h"
 #include "platform/common/ProcessTree.h"
@@ -42,7 +42,7 @@ namespace app
          return param;
       }
 
-      // k17: how a node is named in a call. The same argument arrives as a bare integer (5), a numeric
+      // fork: k17 how a node is named in a call. The same argument arrives as a bare integer (5), a numeric
       // string ("5"), or an object ({"index":5} / {"node":5}) depending on which tool the caller
       // learned, and under two names - `dst` on bind_mod, `index` everywhere else. Reading one
       // spelling only is what made bind_mod answer "unknown node index" for a node that exists.
@@ -68,7 +68,7 @@ namespace app
          return -1;
       }
 
-      // k17: `key`, `param`, `name` and `control` mean the same thing, at the top level or inside the
+      // fork: k17 `key`, `param`, `name` and `control` mean the same thing, at the top level or inside the
       // destination object. An empty result is reported by the caller, never silently ignored.
       std::string ControlKeyFrom(const json& params, const json& node)
       {
@@ -205,7 +205,7 @@ namespace app
       }
       if (method == "set_expr" || method == "bind_mod" || method == "unbind_mod")
       {
-         // k17: `dst`, `index`, `node` and `target` all name the node. bind_mod's documentation says
+         // fork: k17 `dst`, `index`, `node` and `target` all name the node. bind_mod's documentation says
          // `dst`, but get_params, set_param and unbind_mod all say `index`, so a caller that learned
          // one spelling and wrote the other used to get "unknown node index" for a node that exists
          // (API-6). Each field also takes an integer, a numeric string, or an {index|node: n} object.
@@ -282,7 +282,7 @@ namespace app
          }
          else
          {
-            // k17: the modulator takes the same spellings as the destination, under the names an
+            // fork: k17 the modulator takes the same spellings as the destination, under the names an
             // agent reaches for (`src`, `source`, `from`, `modulator`), plus `output` / `out`.
             json srcField;
             for (const char* name : { "src", "source", "from", "modulator" })

@@ -54,12 +54,12 @@ Or run the CLI directly (same app binary): `{EXE} --cli context` with env `INFIN
 
 ## 3b. RPC cheat sheet (details: `infinite_rpc_methods`)
 
-- Node indexes are integers from `get_graph` (`nodes[].index`). Never pass objects where an index is expected (`"dst":5`, not `"dst":{"index":5}`; the nested form is tolerated for `bind_mod` only).
-- Control keys have a type-letter prefix: `f uRotation` (float), `i`, `b`, `c`, `s`. `get_params` / `describe` print them. `set_param` accepts the key with or without the letter (`uRotation`); `bind_mod`/`set_expr` too.
+- Node indexes are integers from `get_graph` (`nodes[].index`). A plain integer is best (`"dst":5`); a numeric string (`"dst":"5"`) or `{"index":5}` is also read. `bind_mod` takes the node as `dst`, `unbind_mod` as `index`, and either verb accepts either name.
+- Control keys have a type-letter prefix: `f rotation` (float), `i`, `b`, `c`, `s`. `get_params` / `describe` print them. `set_param` accepts the key with or without the letter (`rotation`); `bind_mod`/`set_expr` too.
 - Type names for `create_node`/`describe` are exact (`describe` with no `type` lists them).
-- Set a value: `infinite_rpc {"method":"set_param","params":{"index":5,"name":"uRotation","value":0.5}}`.
+- Set a value: `infinite_rpc {"method":"set_param","params":{"index":5,"name":"rotation","value":0.5}}`.
 - Set an expression: same call with a string value that starts with `=`: `"value":"=sin(t)*0.3"`, or `set_expr` with `text`.
-- Modulate a control from another node: `bind_mod {"dst":5,"key":"f uRotation","src":4,"output":0,"lo":0,"hi":1}`; remove with `unbind_mod {"index":5,"key":"f uRotation"}`.
+- Modulate a control from another node: `bind_mod {"dst":5,"key":"f rotation","src":4,"output":0,"lo":0,"hi":1}`; remove with `unbind_mod {"dst":5,"key":"f rotation"}` (`index` works for both). `src` also takes `source`/`from`/`modulator`. The answer names what was bound: `{"index","param","key","src","output"}`.
 - Cables: `connect {"srcIndex":4,"srcOutput":0,"dstIndex":5,"dstSlot":0}`; `disconnect {"linkId":N}` (ids in `get_graph`).
 - Save the patch: `save_patch {"path":"/abs/path/name.inf"}`. With no `path` it writes to the open patch's own file; if the patch has no file yet it returns an error. In that case do not invent a path: ask the user where to save. The path must be absolute; missing folders are created; the answer is `{"saved":"<real absolute path>"}` or an error that names the reason (no folder rights, not absolute, is a folder). Open with `load_patch {"path":...}`.
 - Undo your own change: `undo`.
