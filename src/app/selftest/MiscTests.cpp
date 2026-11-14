@@ -2734,6 +2734,11 @@ void RunBindModTest(int f)
    if (f == 4)
    {
       NewPatch();
+      // A node body is culled off-screen unless something drives it (StageNodeBodies, mustDraw),
+      // and a culled node never registers its controls. The window app has a person looking at the
+      // canvas; a harness run does not, so probe every body - the same hook PatchLoad uses while a
+      // keyed binding waits for its type to be joined.
+      gHeadlessProbeAll = true;
       sBindOk = true;
       json made;
       e.clear();
@@ -2825,8 +2830,8 @@ void RunBindModTest(int f)
          for (const ParamRef& pr : Modulation::Instance().FrameParams())
             if (pr.nodeIndex == dst)
                ++mine;
-         printf("  [diag] k17: frame %d, not registered yet (%s); nodes=%zu frameParams=%zu forDst=%zu probe=%d\n", f, e.c_str(), gNodes.size(),
-                Modulation::Instance().FrameParams().size(), mine, gParamProbeNode);
+         printf("  [diag] k17: frame %d, not registered yet (%s); nodes=%zu frameParams=%zu forDst=%zu probe=%d probeAll=%d\n", f, e.c_str(), gNodes.size(),
+                Modulation::Instance().FrameParams().size(), mine, gParamProbeNode, (int)gHeadlessProbeAll);
       }
    }
 
@@ -2892,7 +2897,8 @@ void RunBindModTest(int f)
    if (f >= 10)
    {
       if (!bound)
-         BindCheck("bind_mod: the node registered its controls within three frames", false);
+         BindCheck("bind_mod: the node registered its controls within six frames", false);
+      gHeadlessProbeAll = false;
       printf("BINDMODTEST %s\n", bound && sBindOk ? "OK" : "FAIL");
       NewPatch();
       dst = src = param = -1;
