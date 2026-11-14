@@ -812,7 +812,7 @@ namespace app
       // As Render 3D: both columns draw every row every frame, and a row that does not apply right now
       // is greyed, never dropped, so the body never grows or shifts as a value crosses zero. The rows
       // keep their registration order (the left column, then the right), which is what saved
-      // modulation is keyed on. Left: normal map, surface, emission (17). Right: coat & sheen, optics (18).
+      // modulation is keyed on. Left: normal map, surface, emission, coat & sheen. Right: optics, hair.
       const bool pbrUnused = n->shading != 0 && !gParamRegisterOnly;   // Normals/UV/Flat ignore the lighting model
       // The path tracer has no anisotropy, iridescence, dispersion, subsurface or non-Lit shading.
       const bool ptOnly = !gParamRegisterOnly && FeedsOnlyPathTracer(n);
@@ -855,12 +855,6 @@ namespace app
       ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
       ImGui::EndDisabled();
 
-      ImGui::EndGroup();
-
-      // --- Right Column ---
-      ImGui::SameLine(0.0f, gutter);
-      ImGui::BeginGroup();
-
       ImGui::BeginDisabled(pbrUnused);
       NodeSeparator("coat & sheen", colW);
       ModSlider("clearcoat", &n->clearcoat, 0.0f, 1.0f, "%.3f", colW);
@@ -873,7 +867,15 @@ namespace app
       ModSlider("sheen roughness", &n->sheenRoughness, 0.01f, 1.0f, "%.3f", colW);
       ModSlider("sheen direction", &n->sheenDirection, -1.0f, 1.0f, "%.2f", colW);
       ImGui::EndDisabled();
+      ImGui::EndDisabled();
 
+      ImGui::EndGroup();
+
+      // --- Right Column --- (the split sits here so both columns hold about the same rows: 22 left, 21 right)
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
+
+      ImGui::BeginDisabled(pbrUnused);
       NodeSeparator("optics", colW);
       ImGui::BeginDisabled(ptOnly);
       ModSlider("anisotropy", &n->anisotropy, -1.0f, 1.0f, "%.3f", colW);
@@ -926,37 +928,6 @@ namespace app
       }
 
       ImGui::EndGroup();
-
-      // Load map: pick a free map, then a file; an Image Source lands left of the node, cabled in.
-      // Not a registered param (nothing to modulate) and drawn last, so the rows' keys stay put.
-      if (gParamRegisterOnly)
-         return;
-      std::vector<std::string> names;
-      std::vector<int> maps;
-      for (int m = 0; m < kMapCount; ++m)
-         if (!n->MapInput(m).IsConnected())
-         {
-            names.push_back(n->InputLabel(1 + m));
-            maps.push_back(m);
-         }
-      if (names.empty())
-         return;
-      PushDropdownStyle();
-      if (NodeDropdownField("image##matLoadMap", ImVec2(colW * 2.0f + gutter, 0), "load map"))
-      {
-         gDropdown.options = names;
-         gDropdown.categories.clear();
-         gDropdown.current = -1;
-         gDropdown.justOpened = true;
-         gDropdown.focusSearch = false;
-         gDropdown.onSelect = [n, maps](int i)
-         {
-            const std::string path = Platform::OpenImageDialog();
-            if (!path.empty())
-               gPendingMapLoad = { n, maps[i], path };
-         };
-      }
-      PopDropdownStyle();
    }
 
 

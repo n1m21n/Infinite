@@ -1683,6 +1683,45 @@ namespace Platform
       return sFamilies;
    }
 
+   bool AddFontFile(const std::string& path, std::string& family)
+   {
+      family.clear();
+      @autoreleasepool
+      {
+         NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]];
+         if (url == nil)
+            return false;
+         CFArrayRef descs = CTFontManagerCreateFontDescriptorsFromURL((__bridge CFURLRef)url);
+         if (descs == nullptr)
+            return false;
+         if (CFArrayGetCount(descs) > 0)
+         {
+            CTFontDescriptorRef d = (CTFontDescriptorRef)CFArrayGetValueAtIndex(descs, 0);
+            CFStringRef name = (CFStringRef)CTFontDescriptorCopyAttribute(d, kCTFontFamilyNameAttribute);
+            if (name != nullptr)
+            {
+               family = [(__bridge NSString*)name UTF8String];
+               CFRelease(name);
+            }
+         }
+         CFRelease(descs);
+         if (family.empty())
+            return false;
+         CFErrorRef err = nullptr;
+         // Already registered (a second add of the same file) still counts: the family is there.
+         CTFontManagerRegisterFontsForURL((__bridge CFURLRef)url, kCTFontManagerScopeProcess, &err);
+         if (err != nullptr)
+            CFRelease(err);
+      }
+      auto& fam = const_cast<std::vector<std::string>&>(AvailableFontFamilies());
+      if (std::find(fam.begin(), fam.end(), family) == fam.end())
+      {
+         fam.push_back(family);
+         std::sort(fam.begin(), fam.end());
+      }
+      return true;
+   }
+
    bool GetTextOutlines(const std::string& text, const std::string& fontName,
                         float letterSpacing, std::vector<TextContour>& outContours,
                         std::string& outError)

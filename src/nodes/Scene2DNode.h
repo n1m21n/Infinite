@@ -471,6 +471,7 @@ private:
       bool card = false;            // a 3D card: tested against and written to the run's depth
       unsigned int geoDepth = 0;    // kind 4 (a 3D object at document size): its hardware depth
       float geoNF[2] = { 1, 2 };    // and the near / far that depth was drawn with, document px
+      float geoUv[4] = { 0, 0, 1, 1 }; // and the document uv box its picture covers (only the object's box is drawn)
       int rect[4] = { 0, 0, 0, 0 }; // pixels the layer can touch (x0, y0, x1, y1, GL rows); empty = all
    };
    bool LayerRect(const float h[9], PassArgs& a) const;   // false: the layer is off the page
@@ -554,9 +555,9 @@ private:
    struct GeoCam;
    bool GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out);
    // A 3D object layer's outline on screen: its projected box (a turned object does not foreshorten like a card).
-   bool GeometryCorners(const Layer& l, float out[8]);
+   bool GeometryCorners(const Layer& l, float out[8], bool needAll = false);   // needAll: false unless all 8 corners are in front of the camera
    // Renders the object; colour (premultiplied) and hardware depth at document size. False: nothing to draw.
-   bool GeometryRender(const Layer& l, unsigned& color, unsigned& depthTex, float nf[2]);
+   bool GeometryRender(const Layer& l, unsigned& color, unsigned& depthTex, float nf[2], float uv[4], int px[4]);
    GLUtil::Fbo mOut;
    std::map<int, GLUtil::Fbo> mLayerOut;          // output layers, by id
    mutable std::map<int, std::string> mOutLabels;

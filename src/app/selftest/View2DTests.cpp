@@ -8,6 +8,7 @@
 #include "nodes/SceneNodes.h"
 #include "core/TileStore.h"
 #include "gl3.h"
+#include "stb_image_write.h"
 
 extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 
@@ -985,6 +986,19 @@ void RunView2DTest()
             }
          w = (float)std::max(0, x1 - x0 + 1);
          h = (float)std::max(0, y1 - y0 + 1);
+         // INFINITE_V2D_DUMP=<dir>: the frame as a PNG, to look at the shading by eye.
+         if (const char* dir = getenv("INFINITE_V2D_DUMP"))
+         {
+            static int n = 0;
+            std::vector<unsigned char> rgb((size_t)1920 * 1080 * 3);
+            for (int y = 0; y < 1080; y++)
+               for (int x = 0; x < 1920; x++)
+                  for (int c = 0; c < 3; c++)
+                     rgb[((size_t)(1079 - y) * 1920 + x) * 3 + c] =
+                        (unsigned char)std::lround(std::clamp(px[((size_t)y * 1920 + x) * 4 + c], 0.0f, 1.0f) * 255.0f);
+            const std::string path = std::string(dir) + "/m6_" + std::to_string(n++) + ".png";
+            stbi_write_png(path.c_str(), 1920, 1080, 3, rgb.data(), 1920 * 3);
+         }
       };
       float w0 = 0, h0 = 0, w45 = 0, h45 = 0;
       if (cube != nullptr)
@@ -997,7 +1011,11 @@ void RunView2DTest()
          box(w45, h45);
       }
       printf("  M6 cube turn: 0deg %.0fx%.0f px, 45deg %.0fx%.0f px\n", w0, h0, w45, h45);
-      Check("M6: a cube turning about its up axis keeps its height on the page", h0 > 50 && std::fabs(h45 / h0 - 1.0f) < 0.08f);
+      // Seen from 22.9 degrees up, a turn stretches only the top face's depth: height (cos t + sqrt2 sin t)/(cos t + sin t)
+      // at 45 degrees, about 1.12. Anything else is the object itself scaling.
+      const float tl = 22.9183f * 3.14159265f / 180.0f;
+      const float want = (std::cos(tl) + std::sqrt(2.0f) * std::sin(tl)) / (std::cos(tl) + std::sin(tl));
+      Check("M6: a cube turning about its up axis keeps its size on the page", h0 > 50 && std::fabs(h45 / h0 / want - 1.0f) < 0.04f);
       auto timeIt = [&](auto&& step)
       {
          std::vector<double> t;
@@ -1080,7 +1098,7 @@ void RunView2DTest()
       for (const Layer& l : pic.Layers())
          rw = std::max(rw, pic.GeometryRenderWidth(l.id));
       printf("  B render width %d\n", rw);
-      Check("B: an object renders at the document's size", rw == 512);
+      Check("B: an object renders only its box, inside the document", rw > 0 && rw <= 512);
       // A tilted card through the red cube: one side in front of the cube, the other behind it.
       pic.RemoveLayer(ib);
       Layer& card = pic.AddLayer(Kind::Node, nz != nullptr ? nz->uid : 0);
@@ -1099,7 +1117,8 @@ void RunView2DTest()
       small.is3d = true;
       pic.Commit();
       Cook(&pic);
-      Check("B: the render follows a new document size", pic.GeometryRenderWidth(small.id) == 320);
+      const int sw = pic.GeometryRenderWidth(small.id);
+      Check("B: the render follows a new document size", sw > 0 && sw <= 320);
    }
 
    // ---- H2 procedural layers: a Field Pixel is a layer and a mask at any document size; a Field Modifier is a 3D card ----

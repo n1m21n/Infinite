@@ -21,6 +21,7 @@
 #include "platform/Platform.h"
 
 #include <fontconfig/fontconfig.h>
+#include <fontconfig/fcfreetype.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_OUTLINE_H
@@ -324,6 +325,32 @@ namespace Platform
       if (sFamilies.empty())
          sFamilies.push_back("DejaVu Sans");
       return sFamilies;
+   }
+
+   bool AddFontFile(const std::string& path, std::string& family)
+   {
+      family.clear();
+      auto& fam = const_cast<std::vector<std::string>&>(AvailableFontFamilies());
+      {
+         std::lock_guard<std::mutex> lock(gFtMutex);
+         int count = 0;
+         FcPattern* p = FcFreeTypeQuery((const FcChar8*)path.c_str(), 0, nullptr, &count);
+         if (p == nullptr)
+            return false;
+         FcChar8* f = nullptr;
+         if (FcPatternGetString(p, FC_FAMILY, 0, &f) == FcResultMatch && f != nullptr)
+            family = (const char*)f;
+         FcPatternDestroy(p);
+         FcConfig* config = SharedFcConfig();
+         if (family.empty() || config == nullptr || !FcConfigAppFontAddFile(config, (const FcChar8*)path.c_str()))
+            return false;
+      }
+      if (std::find(fam.begin(), fam.end(), family) == fam.end())
+      {
+         fam.push_back(family);
+         std::sort(fam.begin(), fam.end());
+      }
+      return true;
    }
 
    bool GetTextOutlines(const std::string& text, const std::string& fontName,

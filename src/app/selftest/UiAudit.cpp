@@ -856,6 +856,7 @@ namespace
       std::vector<std::pair<ImGuiID, ImRect>> opts;
       size_t opt = 0;
       int optsDead = 0, typedTook = 0;
+      bool popover = false;   // the popup holds controls (sliders, checks), not a list of options
       bool popupWin = false;   // the control lives in a popup the poke has to open first (not used yet)
    };
    std::vector<Poke> sQueue;
@@ -913,7 +914,7 @@ namespace
       }
       if (k.kind == Kind::Combo)
       {
-         if (k.opts.empty())
+         if (k.opts.empty() && !k.popover)
             Add("dropdown empty", k.state, r, "the menu showed no options");
          else if (k.optsDead >= 2)
             Add("option changes nothing", k.state, r, "%d of %zu options changed nothing", k.optsDead, k.opts.size());
@@ -1112,6 +1113,10 @@ namespace
                for (const Rec& r : sLast)
                   if (r.widget && !r.disabled && r.window == pn && sOnLast.count(r.id) == 0 && got.insert(r.id).second && r.bb.GetWidth() > 2 && !IdLike(r.label))
                      k.opts.push_back({ r.id, r.bb });
+               if (k.opts.empty())
+                  for (const Rec& r : sLast)
+                     if (r.widget && r.window == pn)
+                        k.popover = true;   // unlabelled controls only: a settings popover, poked as its own widgets
                if (k.opts.size() > 24)
                   k.opts.resize(24);
             }

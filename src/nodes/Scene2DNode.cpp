@@ -207,6 +207,7 @@ namespace
             "uniform sampler2D uGeoDepth;\n"
             "uniform int uHasGeoDepth;\n"
             "uniform vec2 uGeoNF;\n"
+            "uniform vec4 uGeoUv;\n"
             "uniform int uDirect;\n")
          + GLUtil::kSrgbGlsl
          + BlendModes::kBlendGLSL
@@ -240,8 +241,10 @@ namespace
            "   vec2 uvb = b / uBox;\n"
            "   vec2 uv = vec2(uvb.x, 1.0 - uvb.y);\n"
            "   vec4 layer;\n"
+           "   vec2 gUv = (vUv - uGeoUv.xy) / max(uGeoUv.zw - uGeoUv.xy, vec2(1e-6));\n"
            "   if (uKind == 4) {\n"
-           "      layer = texture(uTex, vUv);\n"
+           "      bool inBox = all(greaterThanEqual(gUv, vec2(0.0))) && all(lessThanEqual(gUv, vec2(1.0)));\n"
+           "      layer = inBox ? texture(uTex, gUv) : vec4(0.0);\n"
            "      if (layer.a > 1e-5) layer.rgb /= layer.a;\n"
            "   } else layer = layerAt(uvb, uv);\n"
            "   if (uLinear == 1 && uSrgb == 1) layer.rgb = SrgbDecode(layer.rgb);\n"
@@ -261,7 +264,7 @@ namespace
            "      float d = 1.0 / q.z;\n"
            "      if (uKind == 4) {\n"
            "         float n = uGeoNF.x, f = uGeoNF.y;\n"
-           "         float zn = (uHasGeoDepth == 1 ? texture(uGeoDepth, vUv).r : 0.5) * 2.0 - 1.0;\n"
+           "         float zn = (uHasGeoDepth == 1 ? texture(uGeoDepth, gUv).r : 0.5) * 2.0 - 1.0;\n"
            "         d = 2.0 * f * n / max((f + n) - zn * (f - n), 1e-6);\n"
            "      }\n"
            "      if (d > dIn * 1.0005 + 0.01) { fragColor = acc; return; }\n"
@@ -1458,6 +1461,7 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glUniform1i(glGetUniformLocation(prog, "uGeoDepth"), 6);
       glUniform1i(glGetUniformLocation(prog, "uHasGeoDepth"), a.geoDepth != 0 ? 1 : 0);
       glUniform2f(glGetUniformLocation(prog, "uGeoNF"), a.geoNF[0], a.geoNF[1]);
+      glUniform4f(glGetUniformLocation(prog, "uGeoUv"), a.geoUv[0], a.geoUv[1], a.geoUv[2], a.geoUv[3]);
       glActiveTexture(GL_TEXTURE0);
       if (depthMode != 0)
       {
@@ -1663,7 +1667,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    else if (dynamic_cast<IGeometrySource*>(Source(l)) != nullptr)
    {
       // Real 3D: the object drawn through the comp camera at document size, with its own depth.
-      if (!GeometryRender(l, a.tex, a.geoDepth, a.geoNF))
+      if (!GeometryRender(l, a.tex, a.geoDepth, a.geoNF, a.geoUv, a.rect))
          return;
       a.kind = 4;
       a.texW = mDoc.w;

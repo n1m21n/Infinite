@@ -683,12 +683,17 @@ bool Scene2DNode::GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out)
    for (int i = 0; i < 3; i++)
       C[i] = (i == 0 ? l.x : i == 1 ? l.y : (d3 ? l.z : 0.0f)) + R[i * 3] * a[0] + R[i * 3 + 1] * a[1] + R[i * 3 + 2] * a[2];
    // Object world (y up, z toward the viewer) -> comp world (y down, z away): flip y and z.
+   // Objects are seen the way the 3D View first shows them: from its default camera height (22.9 degrees up), so a
+   // turn reads as a turn. Straight on, a cube only shows its sides and a spin looks like it is growing and shrinking.
+   static const float kViewTilt = 22.9183f;
+   float Tl[9];
+   RotX(kViewTilt, Tl);
    M4 M;
    const float ks[3] = { s * kx, -s * ky, -s * kz };
    for (int i = 0; i < 3; i++)
    {
       for (int j = 0; j < 3; j++)
-         M.at(i, j) = R[i * 3 + j] * ks[j];
+         M.at(i, j) = R[i * 3] * ks[0] * Tl[j] + R[i * 3 + 1] * ks[1] * Tl[3 + j] + R[i * 3 + 2] * ks[2] * Tl[6 + j];
       M.at(i, 3) = C[i] - (M.at(i, 0) * g->c[0] + M.at(i, 1) * g->c[1] + M.at(i, 2) * g->c[2]);
    }
    // Comp world -> GL eye: the camera's rows, then y and z flipped (GL looks down -z with y up).
@@ -713,6 +718,14 @@ bool Scene2DNode::GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out)
    for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
          out.toObj[i * 3 + j] = R[j * 3 + i] * (i == 0 ? 1.0f : -1.0f);
+   {
+      // The view tilt sits inside the object frame: comp -> object then takes its inverse (transpose) too.
+      float t[9];
+      for (int i = 0; i < 3; i++)
+         for (int j = 0; j < 3; j++)
+            t[i * 3 + j] = Tl[i] * out.toObj[j] + Tl[3 + i] * out.toObj[3 + j] + Tl[6 + i] * out.toObj[6 + j];
+      std::copy(t, t + 9, out.toObj);
+   }
    // Depth range around the object's sphere, in document px.
    const float dc = cam.rot[6] * (C[0] - cam.pos[0]) + cam.rot[7] * (C[1] - cam.pos[1]) + cam.rot[8] * (C[2] - cam.pos[2]);
    const float rp = 1.2f * s * g->r * std::max(kx, std::max(ky, kz));
@@ -743,9 +756,12 @@ unsigned long long Scene2DNode::SkinRevision(const Layer& l) const
    return r;
 }
 
-bool Scene2DNode::GeometryRender(const Layer& l, unsigned& color, unsigned& depthTex, float nf[2])
+bool Scene2DNode::GeometryRender(const Layer& l, unsigned& color, unsigned& depthTex, float nf[2], float uv[4], int px[4])
 {
    color = depthTex = 0;
+   uv[0] = uv[1] = 0.0f;
+   uv[2] = uv[3] = 1.0f;
+   px[0] = px[1] = px[2] = px[3] = 0;
    auto* geo = dynamic_cast<IGeometrySource*>(Source(l));
    GeoCam gc;
    if (geo == nullptr || !GeoPlace(l, geo, gc))
@@ -803,10 +819,61 @@ bool Scene2DNode::GeometryRender(const Layer& l, unsigned& color, unsigned& dept
       }
    }
    r.geometry[0] = draw;
-   r.width = (float)mDoc.w;
-   r.height = (float)mDoc.h;
+   // Only the object's box on the page is drawn: the projection is cropped to it (an off-axis window of the same
+   // camera), so a small object turning costs its own pixels, not the whole document's. The box grows in 64 px steps
+   // so the render's buffers keep their size while the object moves.
+   Mat4 proj = gc.proj;
+   int bx0 = 0, by0 = 0, bw = mDoc.w, bh = mDoc.h;
+   {
+      float c8[8];
+      if (GeometryCorners(l, c8, true))
+      {
+         const float x0 = std::max(0.0f, c8[0] - 2.0f), y0 = std::max(0.0f, c8[1] - 2.0f);
+         const float x1 = std::min((float)mDoc.w, c8[4] + 2.0f), y1 = std::min((float)mDoc.h, c8[5] + 2.0f);
+         if (x1 <= x0 || y1 <= y0)
+            return false;   // wholly off the page
+         auto snap = [](float lo, float hi, int full, int& o, int& n)
+         {
+            n = std::min(full, ((int)std::ceil(hi - lo) + 63) / 64 * 64);
+            o = std::clamp((int)std::floor(0.5f * (lo + hi) - 0.5f * n), 0, full - n);
+         };
+         snap(x0, x1, mDoc.w, bx0, bw);
+         // y: page rows run down, GL rows up.
+         int gy = 0;
+         snap((float)mDoc.h - y1, (float)mDoc.h - y0, mDoc.h, gy, bh);
+         by0 = gy;
+         if (bw < mDoc.w || bh < mDoc.h)
+         {
+            const float ux0 = (float)bx0 / mDoc.w, ux1 = (float)(bx0 + bw) / mDoc.w;
+            const float vy0 = (float)by0 / mDoc.h, vy1 = (float)(by0 + bh) / mDoc.h;
+            // The NDC box [a, b] maps to [-1, 1]: x' = k * (x - (a + b) / 2), in clip space with w; per row of the
+            // column-major matrix (m[c * 4 + r]).
+            const float kx = 1.0f / (ux1 - ux0), mx = ux0 + ux1 - 1.0f;   // (a + b) / 2 with a = 2 * ux0 - 1, b = 2 * ux1 - 1
+            const float ky = 1.0f / (vy1 - vy0), my = vy0 + vy1 - 1.0f;
+            for (int c = 0; c < 4; c++)
+            {
+               const float w = gc.proj.m[c * 4 + 3];
+               proj.m[c * 4 + 0] = kx * (gc.proj.m[c * 4 + 0] - mx * w);
+               proj.m[c * 4 + 1] = ky * (gc.proj.m[c * 4 + 1] - my * w);
+            }
+            uv[0] = ux0;
+            uv[1] = vy0;
+            uv[2] = ux1;
+            uv[3] = vy1;
+            px[0] = bx0;
+            px[1] = by0;
+            px[2] = bx0 + bw;
+            px[3] = by0 + bh;
+         }
+      }
+   }
+   r.width = (float)bw;
+   r.height = (float)bh;
    r.envAsBackground = false;
    r.bgOpacity = 0.0f;
+   // No rim light on the page: it left dark blocks and stripes across flat faces near their edges (A/B against rim 0
+   // and env 0; the environment's colour is kept, the key light and surround still model the form).
+   r.rimIntensity = 0.0f;
    // The key light stays put in the comp (upper left, in front) however the layer turns the object.
    {
       float toL[3] = { -0.45f, -0.7f, -0.55f };
@@ -822,9 +889,9 @@ bool Scene2DNode::GeometryRender(const Layer& l, unsigned& color, unsigned& dept
    std::copy(gc.eye, gc.eye + 3, g.rig.eye);
    g.rig.lens = nullptr;
    g.rig.hasProj = true;
-   g.rig.proj = gc.proj;
+   g.rig.proj = proj;
    std::vector<float> stamp(gc.view.m, gc.view.m + 16);
-   stamp.insert(stamp.end(), gc.proj.m, gc.proj.m + 16);
+   stamp.insert(stamp.end(), proj.m, proj.m + 16);
    stamp.push_back(r.lightAzimuth);
    stamp.push_back(r.lightElevation);
    if (stamp != g.stamp)
@@ -847,7 +914,7 @@ bool Scene2DNode::IsObjectLayer(const Layer& l)
    return l.kind == Kind::Node && dynamic_cast<IGeometrySource*>(Source(l)) != nullptr;
 }
 
-bool Scene2DNode::GeometryCorners(const Layer& l, float out[8])
+bool Scene2DNode::GeometryCorners(const Layer& l, float out[8], bool needAll)
 {
    auto* geo = dynamic_cast<IGeometrySource*>(Source(l));
    GeoCam gc;
@@ -874,7 +941,7 @@ bool Scene2DNode::GeometryCorners(const Layer& l, float out[8])
       x1 = std::max(x1, x);
       y1 = std::max(y1, y);
    }
-   if (seen == 0)
+   if (seen == 0 || (needAll && seen < 8))
       return false;
    const float r[8] = { x0, y0, x1, y0, x1, y1, x0, y1 };
    std::copy(r, r + 8, out);

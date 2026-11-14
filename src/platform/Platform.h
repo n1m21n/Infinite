@@ -231,6 +231,9 @@ namespace Platform
    const std::vector<std::string>& AvailableFontFamilies();
    // The font file an installed family resolves to ("" when unknown).
    std::string FontFileForFamily(const std::string& family);
+   // A font file (.ttf/.otf/.ttc) for this run only, not installed system-wide: joins AvailableFontFamilies and every
+   // text render by its family name, which comes back in `family`. False when the file is not a font.
+   bool AddFontFile(const std::string& path, std::string& family);
 
    bool GetTextOutlines(const std::string& text, const std::string& fontName,
                         float letterSpacing, std::vector<TextContour>& outContours,

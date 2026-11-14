@@ -578,11 +578,13 @@ namespace
       const float inv = 1.0f / det;
       const float s[3] = { o[0] - a[0], o[1] - a[1], o[2] - a[2] };
       u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) * inv;
-      if (u < 0.0f || u > 1.0f)
+      // A small slack so a ray along a shared edge cannot slip between the two triangles on float error.
+      const float kE = 1e-5f;
+      if (u < -kE || u > 1.0f + kE)
          return false;
       const float q[3] = { s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0] };
       v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv;
-      if (v < 0.0f || u + v > 1.0f)
+      if (v < -kE || u + v > 1.0f + kE)
          return false;
       t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
       return t > 1e-5f;

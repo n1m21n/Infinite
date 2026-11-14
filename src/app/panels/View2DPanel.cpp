@@ -44,6 +44,7 @@ namespace app
 {
 static bool Is3DNode(INode* n);
 static bool ImportSvgInto(Scene2DNode* doc, const std::string& path);
+bool AddUserFont(const std::string& path, std::string& family);
 
 using I18n::L;
 using I18n::T;
@@ -123,6 +124,7 @@ namespace
    bool sBrushInit = false;
    float sFg[3] = { 0.0f, 0.0f, 0.0f }, sBg[3] = { 1.0f, 1.0f, 1.0f };
    int sFillKind = 1;              // gradient: 1 linear, 2 radial
+   bool sGradReverse = false;      // gradient runs background to foreground
    int sTolerance = 32;
    bool sContiguous = true, sAllLayers = false;
    int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
@@ -1381,7 +1383,10 @@ namespace
             targets.push_back(g);
       for (const Layer& l : doc->Layers())
       {
-         if (l.kind != Kind::Node || !doc->Shown(l) || std::find(moving.begin(), moving.end(), l.id) != moving.end())
+         // Every layer with a box of its own: photos, paint, text, shapes and nodes alike (fills and adjustments
+         // cover the page, whose edges are already targets; a group's children are listed themselves).
+         if (l.kind == Kind::Group || l.kind == Kind::Fill || l.kind == Kind::Adjust || !doc->Shown(l) ||
+             std::find(moving.begin(), moving.end(), l.id) != moving.end())
             continue;
          float lo[2], hi[2];
          if (!doc->Bounds(l.id, lo, hi))
@@ -1594,7 +1599,9 @@ namespace
       PushUndoCheckpoint("Gradient");
       int target = 0;
       const int id = PaintTarget(doc, target, true);
-      const float ca[4] = { sFg[0], sFg[1], sFg[2], 1.0f }, cb[4] = { sBg[0], sBg[1], sBg[2], 1.0f };
+      const float* c0 = sGradReverse ? sBg : sFg;
+      const float* c1 = sGradReverse ? sFg : sBg;
+      const float ca[4] = { c0[0], c0[1], c0[2], 1.0f }, cb[4] = { c1[0], c1[1], c1[2], 1.0f };
       if (id > 0 && target == 0)
          doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind == 2);
    }
@@ -1854,11 +1861,50 @@ namespace
       }
       if (!corner && std::fabs(sOp.hx - 0.5f) < 0.1f) kx = 1.0f;
       if (!corner && std::fabs(sOp.hy - 0.5f) < 0.1f) ky = 1.0f;
-      kx = std::fabs(kx) < 1e-3f ? 1e-3f : kx;
-      ky = std::fabs(ky) < 1e-3f ? 1e-3f : ky;
       // The fixed point stays where it was on the document.
       float fx0, fy0;
       Apply(m0, ox * bw, oy * bh, fx0, fy0);
+      // Magnetic: the dragged handle's edge snaps to the page, guides and other layers' edges and centres, the same
+      // targets a move uses. Upright 2D layers only (a turned box has no edge along the page's axes).
+      sSnapX.clear();
+      sSnapY.clear();
+      const bool snap = doc->Doc().snap != (ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper);
+      if (snap && !l0.is3d && std::fabs(std::remainder(l0.angle, 360.0f)) < 0.01f)
+      {
+         float hx0, hy0;
+         Apply(m0, sOp.hx * bw, sOp.hy * bh, hx0, hy0);
+         const std::vector<int> moving = { l0.id };
+         float r[2] = { 1.0f, 1.0f };
+         bool got[2] = { false, false };
+         for (int ax = 0; ax < 2; ax++)
+         {
+            const float h = ax == 0 ? sOp.hx : sOp.hy, k = ax == 0 ? kx : ky, f = ax == 0 ? fx0 : fy0, h0 = ax == 0 ? hx0 : hy0;
+            if (std::fabs(h - 0.5f) < 0.1f || std::fabs(h0 - f) < 1e-3f)
+               continue;
+            const float now = f + (h0 - f) * k;
+            const float e[3] = { now, now, now };
+            const float off = SnapAxis(doc, ax, e, moving);
+            if (off != 0.0f && std::fabs(now - f) > 1e-3f)
+            {
+               r[ax] = (now + off - f) / (now - f);
+               got[ax] = true;
+            }
+         }
+         if (corner && !ImGui::GetIO().KeyShift)
+         {
+            // Proportions held: one snap drives both; the other axis' lines no longer sit on an edge.
+            const int use = got[0] && got[1] ? (std::fabs(r[0] - 1.0f) < std::fabs(r[1] - 1.0f) ? 0 : 1) : (got[0] ? 0 : 1);
+            if (got[use])
+            {
+               r[1 - use] = r[use];
+               (use == 0 ? sSnapY : sSnapX).clear();
+            }
+         }
+         kx *= r[0];
+         ky *= r[1];
+      }
+      kx = std::fabs(kx) < 1e-3f ? 1e-3f : kx;
+      ky = std::fabs(ky) < 1e-3f ? 1e-3f : ky;
       *l = l0;
       l->sx = l0.sx * kx;
       l->sy = l0.sy * ky;
@@ -3062,7 +3108,7 @@ namespace
          if (std::hypot(mouse.x - p0.x, mouse.y - p0.y) > 6.0f)
             dl->AddRect(ImVec2(std::min(p0.x, mouse.x), std::min(p0.y, mouse.y)), ImVec2(std::max(p0.x, mouse.x), std::max(p0.y, mouse.y)), Hex(kOutline));
       }
-      if (sOp.kind == 1)
+      if (sOp.kind == 1 || sOp.kind == 2)
       {
          for (float x : sSnapX)
             dl->AddLine(ToScreen(doc, x, -1e5f), ToScreen(doc, x, 1e5f), Hex(kSmart));
@@ -3562,6 +3608,64 @@ namespace
       ImGui::EndDisabled();
    }
 
+   // A tool's less-used settings: one icon at the bar's end opens them as a vertical form (label, well), the way
+   // Photoshop's brush settings sit behind one button. Bars keep only the everyday controls, so none overflows.
+   template <class F> void BarMore(const char* id, F&& body)
+   {
+      const std::string pop = std::string(id) + "pop";
+      const bool open = ImGui::IsPopupOpen(pop.c_str());
+      if (IconChip(id, IconsInfinite::Settings, open, T("More settings")))
+         ImGui::OpenPopup(pop.c_str());
+      if (MenuParts::BeginPopup(pop.c_str()))
+      {
+         const float keepW = sFieldW;
+         sFieldW = 150.0f;
+         body();
+         sFieldW = keepW;
+         MenuParts::EndPopup();
+      }
+   }
+
+   void MoreHeader(const char* text, bool first = false)
+   {
+      if (!first)
+         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      ImGui::TextDisabled("%s", text);
+   }
+
+   // A percent row in a BarMore form: v is 0..1 (or 0..hi/100), shown as percent.
+   void MorePct(const char* label, float* v, float lo, float hi)
+   {
+      FieldLabel(label);
+      ImGui::SetNextItemWidth(sFieldW);
+      float pct = *v * 100.0f;
+      if (FieldWell::Slider(FormParts::Id(label).c_str(), &pct, lo, hi, "%.0f%%"))
+         *v = pct / 100.0f;
+   }
+
+   void MoreSlider(const char* label, float* v, float lo, float hi, const char* fmt)
+   {
+      FieldLabel(label);
+      ImGui::SetNextItemWidth(sFieldW);
+      FieldWell::Slider(FormParts::Id(label).c_str(), v, lo, hi, fmt);
+   }
+
+   void MoreCheck(const char* label, bool* v)
+   {
+      const float rowY = ImGui::GetCursorPosY();
+      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
+      bool on = *v;
+      if (CheckBox::Box(FormParts::Id(label).c_str(), &on))
+         *v = on;
+      FormParts::Inline(0.0f, tok::space_2);
+      ImGui::SetCursorPosY(rowY);
+      ImGui::AlignTextToFramePadding();
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
+      if (ImGui::IsItemClicked())
+         *v = !*v;
+   }
+
    void MatchChips()
    {
       float tol = (float)sTolerance;
@@ -3588,15 +3692,18 @@ namespace
          BarSlider("##v2drop", &op, 1.0f, 100.0f, "Strength %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
-         float spacing = b.spacing * 100.0f;
-         BarSlider("##v2drspace", &spacing, 1.0f, 200.0f, "Space %.0f%%", 0.0f);
-         b.spacing = spacing / 100.0f;
          gap();
-         if (TextChip(L("Size##v2drpress"), b.pressureSize, T("Pen pressure sets size")))
-            b.pressureSize = !b.pressureSize;
-         next();
-         if (TextChip(L("Strength##v2drpressop"), b.pressureOpacity, T("Pen pressure sets strength")))
-            b.pressureOpacity = !b.pressureOpacity;
+         BarMore("##v2drmore", [&]()
+         {
+            MoreHeader(T("Tip"), true);
+            MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
+            MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
+            MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+            MorePct(T("Smoothing"), &b.smoothing, 0.0f, 100.0f);
+            MoreHeader(T("Pen pressure"));
+            MoreCheck(T("Size"), &b.pressureSize);
+            MoreCheck(T("Strength"), &b.pressureOpacity);
+         });
       }
       else if (sTool == kBrush || sTool == kEraser)
       {
@@ -3649,45 +3756,45 @@ namespace
          ModBegin();
          BarSlider("##v2dflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
          ModEnd();
-         if (brush)
-         {
-            ModNextParam(kBrushHueParam);
-            ModBegin();
-            BarSlider("##v2dhue", &sBrushHue, -180.0f, 180.0f, "Hue %+.0f", kWellL);
-            ModEnd();
-         }
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          b.flow = flow / 100.0f;
-         gap();
-         float spacing = b.spacing * 100.0f, jitter = b.jitter * 100.0f, smooth = b.smoothing * 100.0f;
-         // Stroke shape: fit widths and short names, so the whole brush bar fits a laptop-width View.
-         BarSlider("##v2dspace", &spacing, 1.0f, 200.0f, "Space %.0f%%", 0.0f);
-         BarSlider("##v2djit", &jitter, 0.0f, 200.0f, "Scatter %.0f%%", 0.0f);
-         BarSlider("##v2dsmooth", &smooth, 0.0f, 100.0f, "Smooth %.0f%%", 0.0f);
-         b.spacing = spacing / 100.0f;
-         b.jitter = jitter / 100.0f;
+         float smooth = b.smoothing * 100.0f;
+         BarSlider("##v2dsmooth", &smooth, 0.0f, 100.0f, "Smoothing %.0f%%", kWellL);
          b.smoothing = smooth / 100.0f;
          gap();
-         if (TextChip(L("Size##v2dpress"), b.pressureSize, T("Pen pressure sets size")))
-            b.pressureSize = !b.pressureSize;
-         next();
-         if (TextChip(L("Opacity##v2dpressop"), b.pressureOpacity, T("Pen pressure sets opacity")))
-            b.pressureOpacity = !b.pressureOpacity;
-         next();
-         if (TextChip(L("Follow##v2dfollow"), b.follow, T("The tip turns with the stroke")))
-            b.follow = !b.follow;
-         if (brush)
+         BarMore("##v2dbmore", [&]()
          {
-            next();
-            if (TextChip(L("Lock alpha##v2dlock"), b.lockAlpha, T("Paint only where there is paint")))
-               b.lockAlpha = !b.lockAlpha;
-         }
-         next();
-         ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
-         if (TextChip(L("Mask##v2deditmask"), sEditMask && a != nullptr && a->HasPixelMask(), T("Paint the layer's mask")))
-            sEditMask = !sEditMask;
-         ImGui::EndDisabled();
+            MoreHeader(T("Tip"), true);
+            MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
+            MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
+            MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+            MoreCheck(T("Hard edge"), &b.pencil);
+            MoreHeader(T("Dynamics"));
+            MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
+            MoreCheck(T("Follow stroke"), &b.follow);
+            if (brush)
+            {
+               FieldLabel(T("Hue"));
+               ImGui::SetNextItemWidth(sFieldW);
+               ModNextParam(kBrushHueParam);
+               ModBegin();
+               FieldWell::Slider("##v2dhue", &sBrushHue, -180.0f, 180.0f, "%+.0f");
+               ModEnd();
+            }
+            MoreHeader(T("Pen pressure"));
+            MoreCheck(T("Size"), &b.pressureSize);
+            MoreCheck(T("Opacity"), &b.pressureOpacity);
+            MoreHeader(T("Paint"));
+            if (brush)
+               MoreCheck(T("Lock alpha"), &b.lockAlpha);
+            ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
+            bool mask = sEditMask && a != nullptr && a->HasPixelMask();
+            MoreCheck(T("Paint the mask"), &mask);
+            if (a != nullptr && a->HasPixelMask())
+               sEditMask = mask;
+            ImGui::EndDisabled();
+         });
       }
       else if (sTool == kFill)
          MatchChips();
@@ -3702,6 +3809,9 @@ namespace
             if (TextChip(id.c_str(), (sFillKind == 2) == (i == 1), nullptr))
                sFillKind = i + 1;
          }
+         gap();
+         if (TextChip(L("Reverse##v2dgrev"), sGradReverse, T("Background colour to foreground")))
+            sGradReverse = !sGradReverse;
       }
       else if (sTool == kMarquee || sTool == kLasso)
       {
@@ -3917,17 +4027,97 @@ namespace
       auto undo = [&]() { if (l != nullptr) PushUndoCheckpoint("Text style"); };
       const auto& fonts = Platform::AvailableFontFamilies();
       ImGui::SetNextItemWidth(2.0f * kWellM);
+      // A tall list with a search, every row previews on the canvas while hovered (the pick is undone on close
+      // without a click), and Add font... takes a .ttf / .otf for this and later runs.
+      static std::string sFontOrig;
+      static bool sFontOpen = false;
+      static char sFontFind[64] = "";
       const std::string shown = font.empty() ? (fonts.empty() ? std::string("Helvetica") : fonts.front()) : font;
-      if (MenuParts::BeginCombo("##v2dfont", shown.c_str()))
+      ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(FLT_MAX, 560.0f));
+      if (MenuParts::BeginCombo("##v2dfont", (sFontOpen ? sFontOrig : shown).c_str(), ImGuiComboFlags_HeightLargest))
       {
+         if (!sFontOpen)
+         {
+            sFontOpen = true;
+            sFontOrig = font;
+            sFontFind[0] = 0;
+            ImGui::SetKeyboardFocusHere();
+         }
+         ImGui::SetNextItemWidth(-1.0f);
+         FieldWell::InputText("##v2dfontfind", sFontFind, sizeof(sFontFind));
+         std::string want = sFontFind;
+         std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         const std::string* hovered = nullptr;
+         bool picked = false;
+         ImGui::BeginChild("##v2dfontlist", ImVec2(0.0f, 460.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
          for (const std::string& f : fonts)
-            if (MenuParts::Choice(f.c_str(), f == shown) && f != shown)
+         {
+            if (!want.empty())
+            {
+               std::string lf = f;
+               std::transform(lf.begin(), lf.end(), lf.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+               if (lf.find(want) == std::string::npos)
+                  continue;
+            }
+            const bool cur = f == sFontOrig || (sFontOrig.empty() && f == shown);
+            if (cur && ImGui::IsWindowAppearing())
+               ImGui::SetScrollHereY(0.4f);
+            if (MenuParts::Choice(f.c_str(), cur))
+            {
+               font = sFontOrig;
+               if (f != sFontOrig)
+               {
+                  undo();
+                  font = f;
+               }
+               changed = true;
+               picked = true;
+            }
+            if (ImGui::IsItemHovered())
+               hovered = &f;
+         }
+         ImGui::EndChild();
+         ImGui::Separator();
+         if (MenuParts::Choice(L("Add font...##v2dfontadd"), false))
+         {
+            std::string fam;
+            for (const std::string& path : Platform::OpenFilesDialog(T("Add font"), { "ttf", "otf", "ttc" }))
+               AddUserFont(path, fam);
+            font = sFontOrig;
+            if (!fam.empty())
             {
                undo();
-               font = f;
+               font = fam;
+            }
+            changed = true;
+            picked = true;
+         }
+         if (!picked)
+         {
+            // Preview: the hovered family on the layer, the original back when the pointer leaves the list.
+            const std::string& p = hovered != nullptr ? *hovered : sFontOrig;
+            if (font != p)
+            {
+               font = p;
                changed = true;
             }
+         }
+         else
+         {
+            sFontOpen = false;
+            ImGui::CloseCurrentPopup();
+         }
          MenuParts::EndCombo();
+      }
+      else if (sFontOpen)
+      {
+         // Closed with no pick (Esc, a click outside): back to what it was.
+         sFontOpen = false;
+         if (font != sFontOrig)
+         {
+            font = sFontOrig;
+            changed = true;
+         }
       }
       next();
       ImGui::SetNextItemWidth(kWellM);
@@ -4793,18 +4983,26 @@ namespace
       std::vector<std::string> names;
       if (group)
          names.push_back(T("Pass Through"));
-      for (const std::string& n : BlendModes::Names())
+      // The old Overlay / Soft / Hard Light only show on a layer that already uses one (patches from before the fix).
+      for (const std::string& n : BlendModes::NamesFor(current))
          names.push_back(T(n.c_str()));
-      (void)current;
       return names;
    }
 
    void DrawLayersCard(Scene2DNode* doc, float w, float listH)
    {
       Layer* a = Active(doc);
-      // Blend, opacity and fill sit over the list, where the eye already is.
-      if (a != nullptr)
+      // Blend, opacity and fill sit over the list, where the eye already is. Always there, greyed with nothing picked,
+      // so the panel never jumps when the selection empties.
       {
+         static Layer sNone;
+         const bool none = a == nullptr;
+         if (none)
+         {
+            sNone = Layer();
+            a = &sNone;
+         }
+         ImGui::BeginDisabled(none);
          const bool group = a->kind == Kind::Group;
          std::vector<std::string> names = BlendNames(a->blend, group);
          // Blend + Opacity, then Fill + Lock: tile-high wells so they share the chips' 28 pt rows, both rows flush to w.
@@ -4870,6 +5068,9 @@ namespace
             }
          }
          ImGui::PopStyleVar(2);
+         ImGui::EndDisabled();
+         if (none)
+            a = nullptr;
       }
       // The blend / opacity / lock rows above already took their height: the list gets what is left, so it scrolls.
       listH = std::max(3.0f * (kRowH + 1.0f), std::min(listH, ImGui::GetContentRegionAvail().y - 2.0f));
@@ -5314,10 +5515,17 @@ namespace
             sPending.what = Pending::AddAdjust;
             sPending.arg = t;
          }
-      Layer* l = Active(doc);
-      if (l != nullptr && l->kind == Kind::Adjust)
+      // Every adjustment in the document keeps its card, top of the stack first: adding a second one never takes
+      // the first one's settings away.
+      std::vector<Layer>& ls = doc->Layers();
+      for (int i = (int)ls.size() - 1; i >= 0; i--)
       {
-         SectionCard::Begin(T(Scene2DNode::AdjName(l->adjType)));
+         Layer* l = &ls[i];
+         if (l->kind != Kind::Adjust)
+            continue;
+         ImGui::PushID(l->id);
+         SectionCard::Begin(LayerName(*l).c_str());
+         BoolRow(T("On"), &l->visible);
          float lo = 0, hi = 1;
          Scene2DNode::AdjRange(l->adjType, lo, hi);
          if (l->adjType != Scene2DNode::kAdjGradientMap)
@@ -5327,6 +5535,7 @@ namespace
             ColorRow(T("Shadows"), l->colorA);
             ColorRow(T("Highlights"), l->colorB);
          }
+         ImGui::PopID();
       }
    }
 
@@ -7493,6 +7702,41 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
    return fails;
 }
 
+// Fonts added with Add font..., kept by path in the app's support folder and registered again at start.
+static std::string UserFontList()
+{
+   return AppPaths::AppSupportDir() + "/fonts.txt";
+}
+
+void LoadUserFonts()
+{
+   std::ifstream in(UserFontList());
+   std::string line, fam;
+   while (std::getline(in, line))
+      if (!line.empty())
+         Platform::AddFontFile(line, fam);
+}
+
+bool AddUserFont(const std::string& path, std::string& family)
+{
+   if (!Platform::AddFontFile(path, family))
+      return false;
+   std::vector<std::string> have;
+   {
+      std::ifstream in(UserFontList());
+      std::string line;
+      while (std::getline(in, line))
+         if (!line.empty())
+            have.push_back(line);
+   }
+   if (std::find(have.begin(), have.end(), path) == have.end())
+   {
+      std::ofstream out(UserFontList(), std::ios::app);
+      out << path << "\n";
+   }
+   return true;
+}
+
 #ifdef IMGUI_ENABLE_TEST_ENGINE
 // UI audit (INFINITE_UIAUDIT_VIEW2D, docs/plans/ui-system/ui-audit.md): a document holding one layer of every kind,
 // and the panel states the audit steps through (every side tab x every layer kind, every tool's bar, both docks).
@@ -7671,7 +7915,7 @@ std::string View2DAuditPanelState()
             sLockScale, sShapeKind, v.fillOn, v.fillC[0], v.fillC[1], v.fillC[2], v.fillC[3], v.strokeOn, v.strokeC[0], v.strokeC[1],
             v.strokeC[2], v.strokeC[3], v.width, v.cap, v.join, v.align, v.dash, v.gap, v.op, v.radius, sFont.c_str(), sTextSize,
             sLeading, sTracking, sTextAlign, sTextC[0], sTextC[1], sTextC[2], sTextC[3]);
-   return std::string(buf) + tools + " sel " + sel + (doc != nullptr ? " qm " + std::to_string(doc->quickMask) : std::string());
+   return std::string(buf) + tools + " grev " + std::to_string(sGradReverse ? 1 : 0) + " sel " + sel + (doc != nullptr ? " qm " + std::to_string(doc->quickMask) : std::string());
 }
 
 // The document survives its own save text: written, read back into a fresh node, written again, identical.

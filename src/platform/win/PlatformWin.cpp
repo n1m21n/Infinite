@@ -673,6 +673,34 @@ namespace Platform
       return sFonts;
    }
 
+   bool AddFontFile(const std::string& path, std::string& family)
+   {
+      family.clear();
+      auto& fam = const_cast<std::vector<std::string>&>(AvailableFontFamilies());
+      const std::wstring w = WinCommon::Utf8ToWide(path);
+      if (AddFontResourceExW(w.c_str(), FR_PRIVATE, nullptr) == 0)
+         return false;
+      // A private font is listed to this process only: the family is whatever the list gained.
+      std::vector<std::string> now;
+      HDC hdc = GetDC(nullptr);
+      if (hdc != nullptr)
+      {
+         LOGFONTW lf {};
+         lf.lfCharSet = DEFAULT_CHARSET;
+         EnumFontFamiliesExW(hdc, &lf, FontEnumProc, (LPARAM)&now, 0);
+         ReleaseDC(nullptr, hdc);
+      }
+      for (const std::string& n : now)
+         if (std::find(fam.begin(), fam.end(), n) == fam.end())
+         {
+            fam.push_back(n);
+            if (family.empty())
+               family = n;
+         }
+      std::sort(fam.begin(), fam.end());
+      return !family.empty();
+   }
+
    bool GetTextOutlines(const std::string& text, const std::string& fontName,
                         float letterSpacing, std::vector<TextContour>& outContours,
                         std::string& outError)

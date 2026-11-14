@@ -4,6 +4,7 @@
 #include "app/graph/LearningLog.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "platform/PluginCrashGuard.h"
+namespace app { void LoadUserFonts(); }
 #include "core/CliSetup.h"
 #include "app/graph/NoteGen.h"
 #include "app/ui/design/UiType.h"
@@ -1633,6 +1634,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    config.SettingsFile = graphPath.c_str();
    config.EnableSmoothZoom = true; // trackpad momentum made stepped zoom feel jumpy
    Patch::LoadRecents();
+   app::LoadUserFonts();   // fonts added in the 2D View's font list, before any text renders
    // CategoryColors::LoadPreference() already ran earlier, before the font/DPI
    // block, so gUiScale is available in time for font baking.
    LoadGeneralSettings();
