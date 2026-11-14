@@ -78,6 +78,13 @@ namespace BrushEngine
       bool Active() const { return mActive; }
       int DabCount() const { return mDabCount; }
       const Brush& CurrentBrush() const { return mBrush; }
+      // A modulated brush mid-stroke: the next dabs take the new size, opacity and flow (sound as a paint input).
+      void Follow(float size, float opacity, float flow)
+      {
+         mBrush.size = size;
+         mBrush.opacity = opacity;
+         mBrush.flow = flow;
+      }
 
    private:
       struct Pending

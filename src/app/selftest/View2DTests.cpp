@@ -915,6 +915,106 @@ void RunView2DTest()
       Check("M5: a setting change lands within a frame or two", undoMax + commitMax + cookMax < 50.0);
    }
 
+   // ---- H2 procedural layers: a Field Pixel is a layer and a mask at any document size; a Field Modifier is a 3D card ----
+   {
+      GraphNode* fp = SpawnNode("FieldPixel", "Source", 0.0f, 600.0f);
+      const uint64_t fpUid = fp != nullptr ? fp->uid : 0;
+      Check("H2: a Field Pixel can be a layer", fp != nullptr && View2DCanAdd(*fp));
+      GraphNode* fm = SpawnNode("Field Modifier", "3D", 0.0f, 800.0f);
+      Check("H2: a Field Modifier can be a layer", fm != nullptr && View2DCanAdd(*fm));
+      for (int size : { 64, 1920 })
+      {
+         Scene2DNode pic;
+         pic.Layers();
+         pic.Doc().w = size;
+         pic.Doc().h = size;
+         pic.Doc().background = 1;
+         pic.AddLayer(Kind::Node, fpUid, 0);
+         pic.Commit();
+         if (GraphNode* g = FindNodeByUid(fpUid))
+            g->node->CookIfNeeded(++sFrame);
+         Cook(&pic);
+         std::vector<uint8_t> src;
+         int w = 0, h = 0;
+         const bool read = pic.ReadOutput(src, w, h);
+         long lit = 0;
+         for (size_t k = 0; k + 3 < src.size(); k += 4)
+            lit += src[k] + src[k + 1] + src[k + 2] > 30 ? 1 : 0;
+         printf("  H2 Field Pixel layer at %d: %ld of %d px lit\n", size, lit, w * h);
+         Check(size == 64 ? "H2: a Field Pixel layer draws (64 px)" : "H2: a Field Pixel layer draws (1920 px)",
+               read && w == size && lit > (long)w * h / 20);
+         // As a mask: a white fill masked by the Field Pixel differs from the bare fill.
+         Scene2DNode m;
+         m.Layers();
+         m.Doc().w = size;
+         m.Doc().h = size;
+         m.Doc().background = 1;
+         Layer& f = m.AddLayer(Kind::Fill, 0);
+         for (int c = 0; c < 4; c++)
+            f.colorA[c] = 1.0f;
+         m.Commit();
+         Cook(&m);
+         std::vector<uint8_t> bare, masked;
+         m.ReadOutput(bare, w, h);
+         m.Layers()[0].maskUid = fpUid;
+         m.Layers()[0].maskOn = true;
+         m.Commit();
+         Cook(&m);
+         m.ReadOutput(masked, w, h);
+         Check(size == 64 ? "H2: a Field Pixel masks a layer (64 px)" : "H2: a Field Pixel masks a layer (1920 px)",
+               !bare.empty() && bare.size() == masked.size() && bare != masked);
+      }
+   }
+
+   // ---- H3 recipes: an early setting changed after ten later edits still re-renders, and going back is lossless ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 96;
+      pic.Doc().h = 96;
+      pic.Doc().background = 1;
+      Layer& base = pic.AddLayer(Kind::Fill, 0);
+      base.colorA[0] = 1.0f; base.colorA[1] = 0.2f; base.colorA[2] = 0.1f; base.colorA[3] = 1.0f;
+      const int baseId = base.id;
+      pic.Commit();
+      Cook(&pic);
+      std::vector<uint8_t> first;
+      int w = 0, h = 0;
+      pic.ReadOutput(first, w, h);
+      // Ten later edits: adjustments, a text, a second fill at half opacity, moves, blend changes.
+      const int adj = pic.AddLayer(Kind::Adjust, 0).id;
+      pic.FindLayer(adj)->adjType = Scene2DNode::kAdjPosterize;
+      pic.FindLayer(adj)->adjAmt = 6.0f;
+      const int txt = pic.AddTextLayer("Recipe", 10.0f, 10.0f, 80.0f);
+      Layer& over = pic.AddLayer(Kind::Fill, 0);
+      over.colorA[2] = 1.0f; over.colorA[3] = 1.0f; over.opacity = 0.3f;
+      const int overId = over.id;
+      pic.FindLayer(txt)->x += 4.0f;
+      pic.FindLayer(overId)->blend = 2;
+      pic.FindLayer(adj)->adjAmt = 4.0f;
+      pic.FindLayer(txt)->fontSize = 18.0f;
+      pic.FindLayer(overId)->opacity = 0.25f;
+      pic.FindLayer(txt)->angle = 5.0f;
+      pic.Commit();
+      Cook(&pic);
+      std::vector<uint8_t> before;
+      pic.ReadOutput(before, w, h);
+      // Change the first layer's colour: everything above re-renders over it.
+      pic.FindLayer(baseId)->colorA[1] = 0.9f;
+      pic.Commit();
+      Cook(&pic);
+      std::vector<uint8_t> changed;
+      pic.ReadOutput(changed, w, h);
+      Check("H3: an early setting re-renders after ten later edits", !before.empty() && before != changed);
+      pic.FindLayer(baseId)->colorA[1] = 0.2f;
+      pic.Commit();
+      Cook(&pic);
+      std::vector<uint8_t> back;
+      pic.ReadOutput(back, w, h);
+      Check("H3: setting it back gives the same pixels (nothing baked)", back == before);
+      Check("H3: the first state was not the last (the edits show)", first != before);
+   }
+
    // The panel checks get a fresh document of their own: NewPatch frees the one above.
    NewPatch();
    gView2DOpen = false;
@@ -922,6 +1022,64 @@ void RunView2DTest()
       View2DAddNode(*seed);
    doc = Doc();
    Check("a fresh document for the panel checks", doc != nullptr);
+
+   // ---- H1 motion-first layers: a layer number bound to a modulator saves its slot and moves the picture ----
+   if (doc != nullptr)
+   {
+      GraphNode* dg = nullptr;
+      for (GraphNode& g : gNodes)
+         if (g.node.get() == doc)
+            dg = &g;
+      doc->Doc().background = 1;   // black
+      Layer& f = doc->AddLayer(Kind::Fill, 0);
+      f.colorA[0] = 1.0f; f.colorA[1] = 0.0f; f.colorA[2] = 0.0f; f.colorA[3] = 1.0f;
+      const int fid = f.id;
+      for (Layer& o : doc->Layers())
+         o.visible = o.id == fid;   // the seed layer under it would show through
+      doc->Commit();
+      const int slot = doc->SlotFor(fid, Scene2DNode::kLfOpacity, true);
+      Check("H1: a layer number gets a slot", slot >= Scene2DNode::kSlotBase && doc->SlotFor(fid, Scene2DNode::kLfOpacity, false) == slot);
+      Check("H1: another number gets the next slot", doc->SlotFor(fid, Scene2DNode::kLfX, true) == slot + 1);
+      Check("H1: an unbound number has none", doc->SlotFor(fid, Scene2DNode::kLfY, false) == -1);
+      {
+         Scene2DNode copy;
+         copy.SetDocText(doc->DocText());
+         Check("H1: slots save", copy.Doc().slots.size() == 2 && copy.SlotFor(fid, Scene2DNode::kLfOpacity, false) == slot);
+      }
+      Check("H1: every field has a name and a pointer", [&]() {
+         Layer& l = *doc->FindLayer(fid);
+         for (int k = 0; k < Scene2DNode::kLfCount; k++)
+            if (Scene2DNode::LayerFieldName(k)[0] == 0 || Scene2DNode::LayerFieldPtr(l, k) == nullptr)
+               return false;
+         return true;
+      }());
+      const int cx = doc->Doc().w / 2, cy = doc->Doc().h / 2;
+      Cook(doc);
+      const float lit = Pixel(doc, cx, cy)[0];
+      Modulation::Instance().ClearFrameParams();
+      if (dg != nullptr)
+         RegisterScene2DParams(*dg);
+      bool registered = false;
+      for (const ParamRef& r : Modulation::Instance().FrameParams())
+         registered = registered || (dg != nullptr && r.nodeIndex == dg->index && r.paramIndex == slot && r.value == &doc->FindLayer(fid)->opacity);
+      Check("H1: a 2D-View-only document registers its bound numbers", registered);
+      if (dg != nullptr)
+         Modulation::Instance().SetExpression(dg->index, slot, "0");
+      ApplyModulationAndPalette(++sFrame);
+      Cook(doc);
+      const float dark = Pixel(doc, cx, cy)[0];
+      printf("  H1 red before %.3f, after the expression drives opacity to 0: %.3f (opacity %.3f)\n", lit, dark, doc->FindLayer(fid)->opacity);
+      Check("H1: an expression drives the layer's opacity in the picture", lit > 0.9f && dark < 0.05f);
+      if (dg != nullptr)
+         Modulation::Instance().ClearExpression(dg->index, slot);
+      Modulation::Instance().ClearFrameParams();
+      doc->RemoveLayer(fid);
+      for (Layer& o : doc->Layers())
+         o.visible = true;
+      doc->Doc().slots.clear();
+      doc->Doc().background = 0;
+      doc->Commit();
+   }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");

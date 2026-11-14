@@ -5935,6 +5935,7 @@ OutputNode* View2DEnsureOutput();
 bool View2DImportSvg(const std::string& path);
 // The Scene 2D node's canvas body: its size and Open in 2D View.
 void DrawScene2DBody(GraphNode& gn);
+void RegisterScene2DParams(GraphNode& gn);   // a 2D-View-only doc: register its params without a card
 GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId);
 void View3DAddMaterial(Scene3DNode* scene, int itemId);
 // The Material tab's preview ball for this material (192 px, GL texture).

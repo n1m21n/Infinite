@@ -37,6 +37,116 @@ void Scene2DNode::AdjRange(int type, float& lo, float& hi)
    hi = kHi[t];
 }
 
+const char* Scene2DNode::LayerFieldName(int f)
+{
+   static const char* kNames[kLfFxBase] = { "Opacity", "Fill", "X", "Y", "Scale X", "Scale Y", "Angle", "Depth",
+                                            "Rotate X", "Rotate Y", "Amount", "Text size", "Tracking", "Leading",
+                                            "Mask density", "Fill angle" };
+   static const char* kFx[kLfCount - kLfFxBase] = {
+      "Shadow size", "Shadow distance", "Shadow angle", "Shadow opacity",
+      "Inner shadow size", "Inner shadow distance", "Inner shadow angle", "Inner shadow opacity",
+      "Glow size", "Glow distance", "Glow angle", "Glow opacity",
+      "Stroke width", "Stroke distance", "Stroke angle", "Stroke opacity",
+      "Overlay size", "Overlay distance", "Overlay angle", "Overlay opacity" };
+   if (f < 0 || f >= kLfCount)
+      return "";
+   return f < kLfFxBase ? kNames[f] : kFx[f - kLfFxBase];
+}
+
+float* Scene2DNode::LayerFieldPtr(Layer& l, int f)
+{
+   switch (f)
+   {
+      case kLfOpacity: return &l.opacity;
+      case kLfFill: return &l.fill;
+      case kLfX: return &l.x;
+      case kLfY: return &l.y;
+      case kLfScaleX: return &l.sx;
+      case kLfScaleY: return &l.sy;
+      case kLfAngle: return &l.angle;
+      case kLfZ: return &l.z;
+      case kLfRotX: return &l.rx;
+      case kLfRotY: return &l.ry;
+      case kLfAdjust: return &l.adjAmt;
+      case kLfFontSize: return &l.fontSize;
+      case kLfTracking: return &l.tracking;
+      case kLfLeading: return &l.leading;
+      case kLfMaskDensity: return &l.maskDensity;
+      case kLfFillAngle: return &l.fillAngle;
+      default: break;
+   }
+   if (f < kLfFxBase || f >= kLfCount)
+      return nullptr;
+   Fx& x = l.fx[(f - kLfFxBase) / kLfFxFields];
+   switch ((f - kLfFxBase) % kLfFxFields)
+   {
+      case 0: return &x.size;
+      case 1: return &x.dist;
+      case 2: return &x.angle;
+      default: return &x.c[3];
+   }
+}
+
+bool Scene2DNode::LayerFieldApplies(const Layer& l, int f)
+{
+   switch (f)
+   {
+      case kLfFill: return l.kind != Kind::Group;
+      case kLfZ: case kLfRotX: case kLfRotY: return l.is3d;
+      case kLfAdjust: return l.kind == Kind::Adjust;
+      case kLfFontSize: case kLfTracking: case kLfLeading: return l.kind == Kind::Text;
+      case kLfMaskDensity: return l.maskUid != 0;
+      case kLfFillAngle: return l.kind == Kind::Fill;
+      default: break;
+   }
+   if (f >= kLfFxBase && f < kLfCount)
+      return l.kind != Kind::Group && l.kind != Kind::Adjust;
+   return f >= 0 && f < kLfCount;
+}
+
+void Scene2DNode::LayerFieldRange(const Layer& l, int f, float& lo, float& hi)
+{
+   const float w = (float)Doc().w, h = (float)Doc().h;
+   lo = 0.0f;
+   hi = 1.0f;
+   switch (f)
+   {
+      case kLfX: lo = -w; hi = 2.0f * w; return;
+      case kLfY: lo = -h; hi = 2.0f * h; return;
+      case kLfScaleX: case kLfScaleY: hi = 4.0f; return;
+      case kLfAngle: case kLfFillAngle: case kLfRotX: case kLfRotY: lo = -180.0f; hi = 180.0f; return;
+      case kLfZ: lo = -2000.0f; hi = 2000.0f; return;
+      case kLfAdjust: AdjRange(l.adjType, lo, hi); return;
+      case kLfFontSize: lo = 4.0f; hi = 800.0f; return;
+      case kLfTracking: lo = -100.0f; hi = 400.0f; return;
+      case kLfLeading: lo = 0.5f; hi = 3.0f; return;
+      default: break;
+   }
+   if (f >= kLfFxBase && f < kLfCount)
+   {
+      const int k = (f - kLfFxBase) % kLfFxFields;
+      if (k == 0 || k == 1) hi = 200.0f;
+      else if (k == 2) { lo = -180.0f; hi = 180.0f; }
+   }
+}
+
+int Scene2DNode::SlotFor(int layer, int field, bool make)
+{
+   Document& d = Doc();
+   int next = kSlotBase;
+   for (const ModSlot& m : d.slots)
+   {
+      if (m.layer == layer && m.field == field)
+         return m.slot;
+      next = std::max(next, m.slot + 1);
+   }
+   if (!make || next > kSlotMax || FindLayer(layer) == nullptr || field < 0 || field >= kLfCount)
+      return -1;
+   d.slots.push_back({ layer, field, next });
+   Commit();
+   return next;
+}
+
 float Scene2DNode::AdjAmount(const Layer& l) const
 {
    if (l.adjDrive < 1 || l.adjDrive > kDrives)
@@ -852,6 +962,8 @@ void Scene2DNode::Serialize()
       o << "cam " << d.camUid << "\n";
    if (d.symmetry != 0 || d.symN != 6)
       o << "sym " << d.symmetry << " " << d.symN << "\n";
+   for (const ModSlot& m : d.slots)
+      o << "mslot " << m.layer << " " << m.field << " " << m.slot << "\n";
    for (const Layer& l : mLayers)
    {
       o << "layer " << l.id << " " << (int)l.kind << " " << l.parent << " " << l.uid << " " << +l.visible << " "
@@ -1000,6 +1112,12 @@ void Scene2DNode::Parse()
          float g = 0;
          while (s >> g)
             (key == "guidesx" ? mDoc.guidesX : mDoc.guidesY).push_back(g);
+      }
+      else if (key == "mslot")
+      {
+         ModSlot m;
+         if (s >> m.layer >> m.field >> m.slot && m.field >= 0 && m.field < kLfCount && m.slot >= kSlotBase && m.slot <= kSlotMax)
+            mDoc.slots.push_back(m);
       }
       else if (key == "cam")
          s >> mDoc.camUid;
@@ -1829,6 +1947,15 @@ void Scene2DNode::CookIfNeeded(int frameId)
             stamp = Mix(stamp, (unsigned long long)n->GetOutputWidth() * 65536ull + (unsigned long long)n->GetOutputHeight());
          }
    }
+   // Bound layer numbers: a modulator writes them straight into the layers, not the text.
+   for (const ModSlot& m : mDoc.slots)
+      if (Layer* l = FindLayer(m.layer))
+         if (const float* v = LayerFieldPtr(*l, m.field))
+         {
+            unsigned bits = 0;
+            std::memcpy(&bits, v, sizeof bits);
+            stamp = Mix(stamp, bits);
+         }
    // Drive A..D move adjustment layers.
    for (float v : drive)
    {

@@ -100,6 +100,8 @@ namespace
 
    // Paint tools. The brush and the eraser keep their own settings.
    BrushEngine::Brush sBrush, sEraser;
+   // The brush's numbers are params of the open document, after Drive A..D and before the layer slots.
+   constexpr int kBrushSizeParam = 4, kBrushOpacityParam = 5, kBrushFlowParam = 6;
    int sBrushPreset = -1, sEraserPreset = -1;
    bool sBrushInit = false;
    float sFg[3] = { 0.0f, 0.0f, 0.0f }, sBg[3] = { 1.0f, 1.0f, 1.0f };
@@ -842,6 +844,60 @@ namespace
          PushUndoCheckpoint(what);
    }
 
+   // Motion-first layers: ModNext names the layer number the next row edits. Right-click on that row binds it
+   // (modulator, expression, recording, MIDI learn, matrix); while something drives it, the row shows the driven
+   // value and does not take edits.
+   struct ModTarget { int layer = -1, field = -1; bool driven = false; int slot = -1; };
+   ModTarget sModNext;
+   void ModNext(const Layer& l, int field) { sModNext = { l.id, field, false, -1 }; }
+   // A fixed param of the open document (the brush): no layer, a set index.
+   void ModNextParam(int slot) { sModNext = { -1, 0, false, slot }; }
+
+   int DocNodeIndex()
+   {
+      GraphNode* g = sDocUid != 0 ? FindNodeByUid(sDocUid) : nullptr;
+      return g != nullptr ? g->index : -1;
+   }
+
+   bool LayerFieldDriven(Scene2DNode* doc, int layer, int field, int fixed = -1)
+   {
+      const int ni = DocNodeIndex();
+      const int slot = fixed >= 0 ? (ni >= 0 ? fixed : -1) : doc != nullptr && ni >= 0 ? doc->SlotFor(layer, field, false) : -1;
+      return slot >= 0 && (Modulation::Instance().IsModulated(ni, slot) || Modulation::Instance().HasExpression(ni, slot));
+   }
+
+   void ModBegin()
+   {
+      if (sModNext.field < 0)
+         return;
+      sModNext.driven = LayerFieldDriven(FindDoc(), sModNext.layer, sModNext.field, sModNext.slot);
+      if (sModNext.driven)
+         ImGui::BeginDisabled();
+   }
+
+   void ModEnd()
+   {
+      if (sModNext.field < 0)
+         return;
+      if (sModNext.driven)
+         ImGui::EndDisabled();
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      {
+         Scene2DNode* doc = FindDoc();
+         const int ni = DocNodeIndex();
+         const int slot = sModNext.slot >= 0 ? (ni >= 0 ? sModNext.slot : -1)
+                          : doc != nullptr && ni >= 0 ? doc->SlotFor(sModNext.layer, sModNext.field, true) : -1;
+         if (slot >= 0)
+         {
+            gModBindingMenuNode = ni;
+            gModBindingMenuParam = slot;
+            gOpenModBindingMenu = true;
+            gParamRightClickConsumedThisFrame = true;
+         }
+      }
+      sModNext = {};
+   }
+
    bool DragRow(const char* label, float* v, float speed, const char* fmt, float lo = -1e6f, float hi = 1e6f)
    {
       FieldLabel(label);
@@ -876,7 +932,9 @@ namespace
                }
          }
       }
+      ModBegin();
       const bool changed = ImGui::DragFloat(wid.c_str(), v, speed, lo, hi, fmt);
+      ModEnd();
       FieldWell::PopStyle();
       UndoOnActivate();
       if (changed)
@@ -885,7 +943,8 @@ namespace
    }
 
    // Two or three numbers on one row ("Position  X 120  Y 80"); returns a bit per field that changed.
-   int DragMulti(const char* label, float* const* v, const char* const* fmts, int n, float speed, float lo = -1e6f, float hi = 1e6f)
+   int DragMulti(const char* label, float* const* v, const char* const* fmts, int n, float speed, float lo = -1e6f, float hi = 1e6f,
+                 const Layer* modLayer = nullptr, const int* modFields = nullptr)
    {
       FieldLabel(label);
       const float each = (sFieldW - (n - 1) * tok::space_1) / n;
@@ -898,8 +957,12 @@ namespace
             ImGui::SameLine(0.0f, tok::space_1);
          ImGui::PushID(i);
          ImGui::SetNextItemWidth(each);
+         if (modLayer != nullptr && modFields != nullptr && modFields[i] >= 0)
+            ModNext(*modLayer, modFields[i]);
+         ModBegin();
          if (ImGui::DragFloat("##v", v[i], speed, lo, hi, fmts[i]))
             changed |= 1 << i;
+         ModEnd();
          UndoOnActivate();
          ImGui::PopID();
       }
@@ -914,7 +977,9 @@ namespace
    {
       FieldLabel(label);
       ImGui::SetNextItemWidth(sFieldW);
+      ModBegin();
       const bool changed = FieldWell::Slider(FormParts::Id(label).c_str(), v, lo, hi, fmt);
+      ModEnd();
       UndoOnActivate();
       if (changed)
          Touch();
@@ -3244,7 +3309,11 @@ namespace
             if (sSurfaceStroke)
                doc->SurfacePaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
             else
+            {
+               if (sTool == kBrush)
+                  doc->PaintFollow(sBrush);
                doc->PaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+            }
          }
          else if (sOp.kind == 10)
          {
@@ -3425,11 +3494,24 @@ namespace
             MenuParts::EndCombo();
          }
          next();
+         const bool brush = &b == &sBrush;   // the brush's numbers can follow a modulator (sound, LFO); the eraser's do not
+         if (brush)
+            ModNextParam(kBrushSizeParam);
+         ModBegin();
          BarSlider("##v2dsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
+         ModEnd();
          float hard = b.hardness * 100.0f, op = b.opacity * 100.0f, flow = b.flow * 100.0f;
          BarSlider("##v2dhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
+         if (brush)
+            ModNextParam(kBrushOpacityParam);
+         ModBegin();
          BarSlider("##v2dop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+         ModEnd();
+         if (brush)
+            ModNextParam(kBrushFlowParam);
+         ModBegin();
          BarSlider("##v2dflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
+         ModEnd();
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          b.flow = flow / 100.0f;
@@ -4563,20 +4645,26 @@ namespace
          FormParts::Inline(0.0f, tok::space_1);
          ImGui::SetNextItemWidth(w - half - tok::space_1);
          float pct = a->opacity * 100.0f;
+         ModNext(*a, Scene2DNode::kLfOpacity);
+         ModBegin();
          if (FieldWell::Slider("##v2dopacity", &pct, 0.0f, 100.0f, "Opacity %.0f%%"))
          {
             a->opacity = pct / 100.0f;
             Touch();
          }
+         ModEnd();
          UndoOnActivate("Opacity");
          const float lockW = ImGui::CalcTextSize(T("Lock")).x + 4.0f * (tok::space_1 + sChip);
          ImGui::SetNextItemWidth(std::max(kWellM, w - lockW - tok::space_1));
          float fillPct = a->fill * 100.0f;
+         ModNext(*a, Scene2DNode::kLfFill);
+         ModBegin();
          if (FieldWell::Slider("##v2dfill", &fillPct, 0.0f, 100.0f, "Fill %.0f%%"))
          {
             a->fill = fillPct / 100.0f;
             Touch();
          }
+         ModEnd();
          UndoOnActivate("Fill");
          // Lock row, Photoshop's four icons: transparent pixels, image pixels, position, all.
          struct { unsigned bit; const char* id; const char* glyph; const char* tip; } kLocks[4] = {
@@ -4745,6 +4833,7 @@ namespace
             SliderRow(T("To alpha"), &l->colorB[3], 0.0f, 1.0f, "%.2f");
          }
          if (type == 1)
+            ModNext(*l, Scene2DNode::kLfFillAngle);
             SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
       }
       if (l->kind == Kind::Adjust)
@@ -4764,6 +4853,7 @@ namespace
          const char* fmt = l->adjType == Scene2DNode::kAdjThreshold ? "%.2f" : "%.0f";
          if (l->adjType != Scene2DNode::kAdjGradientMap)
          {
+            ModNext(*l, Scene2DNode::kLfAdjust);
             SliderRow(T("Amount"), &l->adjAmt, lo, hi, fmt);
             int drive = l->adjDrive;
             if (ComboRow(T("Drive"), &drive, { T("None"), "A", "B", "C", "D" }))
@@ -4791,8 +4881,11 @@ namespace
          }
          FieldWell::PopStyle();
          UndoOnActivate("Edit text");
+         ModNext(*l, Scene2DNode::kLfFontSize);
          SliderRow(T("Size"), &l->fontSize, 4.0f, 800.0f, "%.0f px");
+         ModNext(*l, Scene2DNode::kLfLeading);
          SliderRow(T("Leading"), &l->leading, 0.5f, 3.0f, "%.2f");
+         ModNext(*l, Scene2DNode::kLfTracking);
          SliderRow(T("Tracking"), &l->tracking, -100.0f, 400.0f, "%.0f");
          ColorRow(T("Colour"), l->textC);
          DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", 0.0f, 8192.0f);
@@ -4809,7 +4902,8 @@ namespace
          {
             float* const pos[2] = { &l->x, &l->y };
             const char* const fmts[2] = { "X %.0f", "Y %.0f" };
-            DragMulti(T("Position"), pos, fmts, 2, 1.0f);
+            const int mf[2] = { Scene2DNode::kLfX, Scene2DNode::kLfY };
+            DragMulti(T("Position"), pos, fmts, 2, 1.0f, -1e6f, 1e6f, l, mf);
          }
          float bw = 1, bh = 1;
          doc->LayerBox(*l, bw, bh);
@@ -4828,7 +4922,8 @@ namespace
             float pct[2] = { l->sx * 100.0f, l->sy * 100.0f };
             float* const pp[2] = { &pct[0], &pct[1] };
             const char* const pf[2] = { "W %.1f%%", "H %.1f%%" };
-            const int c = DragMulti(T("Scale"), pp, pf, 2, 0.5f, 0.1f, 10000.0f);
+            const int mf[2] = { Scene2DNode::kLfScaleX, Scene2DNode::kLfScaleY };
+            const int c = DragMulti(T("Scale"), pp, pf, 2, 0.5f, 0.1f, 10000.0f, l, mf);
             if (c != 0)
             {
                if (sLockScale)
@@ -4849,13 +4944,18 @@ namespace
          BoolRow(T("3D"), &l->is3d);
          if (l->is3d)
          {
+            ModNext(*l, Scene2DNode::kLfZ);
             DragRow(T("Depth"), &l->z, 1.0f, "Z %.0f");
             float* const rot[3] = { &l->rx, &l->ry, &l->angle };
             const char* const fmts[3] = { "X %.0f\xC2\xB0", "Y %.0f\xC2\xB0", "Z %.0f\xC2\xB0" };
-            DragMulti(T("Rotate"), rot, fmts, 3, 0.5f, -360.0f, 360.0f);
+            const int mf[3] = { Scene2DNode::kLfRotX, Scene2DNode::kLfRotY, Scene2DNode::kLfAngle };
+            DragMulti(T("Rotate"), rot, fmts, 3, 0.5f, -360.0f, 360.0f, l, mf);
          }
          else
+         {
+            ModNext(*l, Scene2DNode::kLfAngle);
             DragRow(T("Angle"), &l->angle, 0.5f, "%.1f\xC2\xB0", -180.0f, 180.0f);
+         }
          int anchor = (int)std::lround(l->ay * 2.0f) * 3 + (int)std::lround(l->ax * 2.0f);
          if (AnchorRow(T("Anchor"), &anchor))
          {
@@ -4960,6 +5060,7 @@ namespace
             int ch = l->maskChannel;
             if (ComboRow(T("From"), &ch, { T("Luminance"), T("Alpha") }))
                l->maskChannel = ch;
+            ModNext(*l, Scene2DNode::kLfMaskDensity);
             SliderRow(T("Density"), &l->maskDensity, 0.0f, 1.0f, "%.2f");
          }
       }
@@ -4983,12 +5084,18 @@ namespace
          if (f.on)
          {
             ColorRow(T("Colour"), f.c);
+            const int fb = Scene2DNode::kLfFxBase + t * Scene2DNode::kLfFxFields;
+            ModNext(*l, fb + 3);
             SliderRow(T("Opacity"), &f.c[3], 0.0f, 1.0f, "%.2f");
             if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner)
             {
+               ModNext(*l, fb + 2);
                SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+               ModNext(*l, fb + 1);
                SliderRow(T("Distance"), &f.dist, 0.0f, 200.0f, "%.0f px");
             }
+            if (t != Scene2DNode::kFxOverlay)
+               ModNext(*l, fb);
             if (t != Scene2DNode::kFxOverlay)
                SliderRow(T(t == Scene2DNode::kFxStroke ? "Width" : "Size"), &f.size, 0.0f, 200.0f, "%.0f px");
             if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || t == Scene2DNode::kFxGlow)
@@ -6237,6 +6344,66 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
    *doc->FindLayer(id) = base;
    sGizmoMode = 0;
    doc->Commit();
+
+   // H6 sound as a paint input: the brush's size is a param of the open document, so a modulator (an Audio Analyze
+   // level, an LFO, an expression) sets it, and a stroke already under way follows it. A spectrum is a mask source.
+   {
+      GraphNode* dg = nullptr;
+      for (GraphNode& g : gNodes)
+         if (g.node.get() == doc)
+            dg = &g;
+      const uint64_t keepDoc = sDocUid;
+      sDocUid = dg != nullptr ? dg->uid : 0;
+      const BrushEngine::Brush keep = sBrush;
+      Modulation::Instance().ClearFrameParams();
+      if (dg != nullptr)
+         RegisterScene2DParams(*dg);
+      bool reg = false;
+      for (const ParamRef& r : Modulation::Instance().FrameParams())
+         reg = reg || (dg != nullptr && r.nodeIndex == dg->index && r.paramIndex == kBrushSizeParam && r.value == &sBrush.size);
+      expect("H6: the brush size is a param of the open document", reg);
+      sBrush.size = 4.0f;
+      sBrush.hardness = 1.0f;
+      sBrush.opacity = sBrush.flow = 1.0f;
+      sBrush.color[0] = 1.0f; sBrush.color[1] = sBrush.color[2] = 0.0f;
+      const int pl = doc->AddPaintLayer();
+      doc->Commit();
+      const float W2 = (float)doc->Doc().w, H2 = (float)doc->Doc().h;
+      // A thin stroke starts; then an expression drives the size to 120 and the rest of the stroke is wide.
+      bool began = doc->BeginPaint(pl, 0, sBrush, W2 * 0.2f, H2 * 0.5f, 1.0f);
+      doc->PaintTo(W2 * 0.3f, H2 * 0.5f, 1.0f);
+      if (dg != nullptr)
+         Modulation::Instance().SetExpression(dg->index, kBrushSizeParam, "120");
+      ApplyModulationAndPalette(7100000);
+      const float driven = sBrush.size;
+      doc->PaintFollow(sBrush);
+      doc->PaintTo(W2 * 0.8f, H2 * 0.5f, 1.0f);
+      doc->EndPaint();
+      doc->Commit();
+      std::vector<uint8_t> px;
+      int pw = 0, ph = 0;
+      static int frame = 7200000;
+      doc->soloLayer = pl;
+      doc->CookIfNeeded(++frame);
+      doc->ReadOutput(px, pw, ph);
+      doc->soloLayer = 0;
+      auto red = [&](float fx, float fy) {
+         const int x = (int)(fx * pw), y = (int)(fy * ph);
+         const size_t at = ((size_t)y * pw + x) * 4;
+         return at + 3 < px.size() && px[at] > 200 && px[at + 1] < 60;
+      };
+      printf("  H6 brush size driven to %.0f; thin part 40 px off the line %s, wide part %s\n", driven,
+             red(0.25f, 0.5f + 40.0f / H2) ? "painted" : "clear", red(0.65f, 0.5f + 40.0f / H2) ? "painted" : "clear");
+      expect("H6: a modulator drives the brush size", began && std::fabs(driven - 120.0f) < 0.5f);
+      expect("H6: the stroke follows the driven size", red(0.65f, 0.5f) && red(0.65f, 0.5f + 40.0f / H2) && !red(0.25f, 0.5f + 40.0f / H2));
+      if (dg != nullptr)
+         Modulation::Instance().ClearExpression(dg->index, kBrushSizeParam);
+      Modulation::Instance().ClearFrameParams();
+      doc->RemoveLayer(pl);
+      doc->Commit();
+      sBrush = keep;
+      sDocUid = keepDoc;
+   }
    return fails;
 }
 
@@ -6526,6 +6693,37 @@ void View2DAddNode(GraphNode& gn)
    SelectOnly(l.id);
 }
 
+// The brush follows modulators through the open document: registered, not drawn (the tool bar is where it shows).
+static void RegisterBrushParams(const GraphNode& gn)
+{
+   if (gn.uid != sDocUid)
+      return;
+   const bool was = gParamRegisterOnly;
+   gParamRegisterOnly = true;
+   ModSlider("Brush size", &sBrush.size, 1.0f, 1000.0f, "%.0f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushSizeParam);
+   ModSlider("Brush opacity", &sBrush.opacity, 0.01f, 1.0f, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushOpacityParam);
+   ModSlider("Brush flow", &sBrush.flow, 0.01f, 1.0f, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushFlowParam);
+   gParamRegisterOnly = was;
+}
+
+// Bound layer numbers are this node's params after Drive D: one slider each on the card, so the pin takes a cable.
+static void DrawScene2DSlots(Scene2DNode* doc)
+{
+   const std::vector<Scene2DNode::ModSlot> slots = doc->Doc().slots;   // a slider may commit, which rewrites the list
+   for (const Scene2DNode::ModSlot& m : slots)
+   {
+      Layer* l = doc->FindLayer(m.layer);
+      float* v = l != nullptr ? Scene2DNode::LayerFieldPtr(*l, m.field) : nullptr;
+      if (v == nullptr)
+         continue;
+      float lo = 0.0f, hi = 1.0f;
+      doc->LayerFieldRange(*l, m.field, lo, hi);
+      const std::string name = LayerName(*l) + " " + T(Scene2DNode::LayerFieldName(m.field));
+      const std::string label = name + "##v2dslot" + std::to_string(m.slot);
+      ModSlider(label.c_str(), v, lo, hi, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, m.slot, name.c_str());
+   }
+}
+
 void DrawScene2DBody(GraphNode& gn)
 {
    auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get());
@@ -6543,6 +6741,27 @@ void DrawScene2DBody(GraphNode& gn)
    static const char* kLabels[Scene2DNode::kDrives] = { "Drive A", "Drive B", "Drive C", "Drive D" };
    for (int i = 0; i < Scene2DNode::kDrives; i++)
       ModSlider(kLabels[i], &doc->drive[i], 0.0f, 1.0f, "%.2f");
+   RegisterBrushParams(gn);
+   DrawScene2DSlots(doc);
+}
+
+// A 2D-View-only document never draws a card, so nothing would register its params: register them here without
+// drawing, so a modulator bound in the 2D View keeps driving the layer.
+void RegisterScene2DParams(GraphNode& gn)
+{
+   auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get());
+   if (doc == nullptr)
+      return;
+   BeginNodeParams(gn.index);
+   const bool was = gParamRegisterOnly;
+   gParamRegisterOnly = true;
+   static const char* kLabels[Scene2DNode::kDrives] = { "Drive A", "Drive B", "Drive C", "Drive D" };
+   for (int i = 0; i < Scene2DNode::kDrives; i++)
+      ModSlider(kLabels[i], &doc->drive[i], 0.0f, 1.0f, "%.2f");
+   RegisterBrushParams(gn);
+   DrawScene2DSlots(doc);
+   gParamRegisterOnly = was;
+   EndNodeParams();
 }
 
 void DrawView2DDocked(const char* id, const ImVec2& size)

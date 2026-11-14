@@ -511,6 +511,19 @@ void Scene2DNode::PaintTo(float x, float y, float pressure)
       mStroke.MoveTo(sx, sy, pressure);
 }
 
+void Scene2DNode::PaintFollow(const BrushEngine::Brush& b)
+{
+   if (!mStroke.Active() || mPaintTarget == 2)
+      return;
+   const Layer* l = FindConst(mPaintId);
+   const BrushEngine::Brush& cur = mStroke.CurrentBrush();
+   float sx = 0, sy = 0, scale = 1;
+   if (l == nullptr || !DocToSurface(*l, mPaintTarget, 0.0f, 0.0f, sx, sy, scale))
+      return;
+   if (cur.size != b.size * scale || cur.opacity != b.opacity || cur.flow != b.flow)
+      mStroke.Follow(b.size * scale, b.opacity, b.flow);
+}
+
 void Scene2DNode::EndPaint()
 {
    mSkinStroke.on = false;

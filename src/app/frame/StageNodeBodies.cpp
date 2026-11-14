@@ -74,7 +74,10 @@ void DrawNodeBodies(FrameCtx& fc)
          // an encapsulated instrument, §4) are unaffected - those register
          // normally since the FieldGraphNode box itself is never hidden.
          if (gn.hiddenFromCanvas)
+         {
+            RegisterScene2DParams(gn);
             continue;
+         }
 
          bool b6NodeIsVisible = true;
          double b6NodeDrawStartMs = 0.0;

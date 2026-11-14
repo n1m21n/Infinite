@@ -174,6 +174,15 @@ public:
       }
    };
 
+   // Motion-first layers: a layer number that a modulator, expression, recorded gesture or MSEG can drive. A
+   // field gets a slot (its param index on this node) the first time it is bound; slots save with the document,
+   // so a binding keeps pointing at the same layer number across saves and undo.
+   enum LayerField { kLfOpacity = 0, kLfFill, kLfX, kLfY, kLfScaleX, kLfScaleY, kLfAngle, kLfZ, kLfRotX, kLfRotY,
+                     kLfAdjust, kLfFontSize, kLfTracking, kLfLeading, kLfMaskDensity, kLfFillAngle, kLfFxBase,
+                     kLfFxFields = 4, kLfCount = kLfFxBase + kFxCount * kLfFxFields };   // per fx: size, distance, angle, opacity
+   struct ModSlot { int layer = 0, field = 0, slot = 0; };
+   static constexpr int kSlotBase = 8, kSlotMax = 399;   // param indices (Drive A..D 0..3, brush 4..6; discrete params start at 400)
+
    struct Document
    {
       int w = 1920, h = 1080;
@@ -189,6 +198,7 @@ public:
       uint64_t camUid = 0;                   // a Camera node for 3D layers; 0 = the default 50 mm camera
       int symmetry = 0;                      // painting: 0 off, 1 left-right, 2 top-bottom, 3 both, 4 radial
       int symN = 6;                          // radial copies
+      std::vector<ModSlot> slots;            // bound layer numbers (motion-first layers)
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
@@ -208,6 +218,12 @@ public:
       return mDoc;
    }
    Layer* FindLayer(int id);
+   static const char* LayerFieldName(int field);           // "Opacity", "Shadow size"
+   static float* LayerFieldPtr(Layer& l, int field);
+   static bool LayerFieldApplies(const Layer& l, int field); // the field means something on this layer kind
+   void LayerFieldRange(const Layer& l, int field, float& lo, float& hi);
+   // The param index a layer number is bound through; -1 when it has none (make: give it one).
+   int SlotFor(int layer, int field, bool make);
    // A new layer above `above` (0: top of the document), inside the same parent.
    Layer& AddLayer(Kind kind, uint64_t uid, int above = 0);
    void RemoveLayer(int id);         // a group takes its children with it
@@ -281,6 +297,8 @@ public:
    // Points are document pixels. EndPaint stores the touched tiles and commits.
    bool BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure);
    void PaintTo(float x, float y, float pressure);
+   // The brush may be moving (a modulator on its size / opacity / flow): the stroke follows it from the next dab.
+   void PaintFollow(const BrushEngine::Brush& b);
    void EndPaint();
    bool Painting() const { return mStroke.Active(); }
    int PaintingLayer() const { return mPaintId; }
