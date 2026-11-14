@@ -398,8 +398,29 @@ namespace
          }
          float c[8];
          doc->Corners(l, c);
-         if (InQuad(c, p))
-            return l.id;
+         if (!InQuad(c, p))
+            continue;
+         // Inside the box is not enough: a painted layer counts where it has paint, an object where the ray meets it.
+         if (l.kind == Kind::Paint && l.pw > 0 && !l.tiles.empty())
+         {
+            float bx = 0, by = 0, bw = 1, bh = 1;
+            doc->DocToBox(l, p.x, p.y, bx, by);
+            doc->LayerBox(l, bw, bh);
+            const int kT = 256;   // TileStore::kTile
+            const int cols = (l.pw + kT - 1) / kT;
+            const int tx = std::clamp((int)(bx * l.pw / bw) / kT, 0, cols - 1);
+            const int ty = std::clamp((int)((l.ph - by * l.ph / bh)) / kT, 0, (int)(l.tiles.size() / cols) - 1);
+            const size_t idx = (size_t)ty * cols + tx;
+            if (idx < l.tiles.size() && l.tiles[idx] == "-" && !(doc->Painting() && doc->PaintingLayer() == l.id))
+               continue;
+         }
+         else if (l.kind == Kind::Node && doc->CanSurfacePaint(l.id))
+         {
+            Scene2DNode::SurfacePoint sp;
+            if (!doc->SurfaceAt(l.id, p.x, p.y, sp) && doc->HasGeometryView(l.id))
+               continue;
+         }
+         return l.id;
       }
       return 0;
    }
@@ -2812,6 +2833,12 @@ namespace
          drawPath(sOp.path, false);
       if (!sPoly.empty())
          drawPath(sPoly, true);
+      if (sOp.kind == 17)
+      {
+         const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y);
+         dl->AddRectFilled(p0, mouse, IM_COL32(80, 160, 255, 40));
+         dl->AddRect(p0, mouse, IM_COL32(80, 160, 255, 220), 0.0f, 0, 1.0f);
+      }
       if (sOp.kind == 8)
       {
          const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y);
@@ -3060,9 +3087,17 @@ namespace
                      sSel.push_back(hit);
                   }
                }
-               else if (sAutoSelect && !io.KeyShift)
+               else if (!io.KeyShift)
                   sSel.clear();
-               if (!sSel.empty())
+               if (hit == 0)
+               {
+                  // Dragging over empty canvas rubber-bands layers; Shift adds to the selection.
+                  BeginOp(doc, 17, mouse, nullptr);
+                  sOp.docStart = sMouseDoc;
+                  sOp.selOp = io.KeyShift ? 1 : 0;
+                  sOp.before.clear();
+               }
+               else if (!sSel.empty())
                   BeginOp(doc, 1, mouse, "Move layer");
             }
          }
@@ -3131,6 +3166,27 @@ namespace
                std::vector<Shape>* items = Items(pl);
                if (items != nullptr && sPenItem >= 0 && sPenItem < (int)items->size() && (*items)[sPenItem].closed)
                   sPenItem = -1;
+            }
+            else if (sOp.kind == 17)
+            {
+               const float x0 = std::min(sOp.docStart.x, sMouseDoc.x), x1 = std::max(sOp.docStart.x, sMouseDoc.x);
+               const float y0 = std::min(sOp.docStart.y, sMouseDoc.y), y1 = std::max(sOp.docStart.y, sMouseDoc.y);
+               for (const Layer& l : doc->Layers())
+               {
+                  if (l.kind == Kind::Group || l.kind == Kind::Fill || l.kind == Kind::Adjust || !doc->Shown(l) ||
+                      (l.lock & Scene2DNode::kLockAll) != 0)
+                     continue;
+                  float c[8];
+                  doc->Corners(l, c);
+                  float lx0 = c[0], lx1 = c[0], ly0 = c[1], ly1 = c[1];
+                  for (int i = 1; i < 4; i++)
+                  {
+                     lx0 = std::min(lx0, c[i * 2]); lx1 = std::max(lx1, c[i * 2]);
+                     ly0 = std::min(ly0, c[i * 2 + 1]); ly1 = std::max(ly1, c[i * 2 + 1]);
+                  }
+                  if (lx1 >= x0 && lx0 <= x1 && ly1 >= y0 && ly0 <= y1 && !Selected(l.id))
+                     sSel.push_back(l.id);
+               }
             }
             else if (sOp.kind == 15)
                TextRelease(doc, mouse);
@@ -4417,6 +4473,8 @@ namespace
          }
          ImGui::PopStyleVar(2);
       }
+      // The blend / opacity / lock rows above already took their height: the list gets what is left, so it scrolls.
+      listH = std::max(3.0f * (kRowH + 1.0f), std::min(listH, ImGui::GetContentRegionAvail().y - 2.0f));
       ImGui::BeginChild("##v2dlayers", ImVec2(w, listH), ImGuiChildFlags_None);
       const float rowsW = ImGui::GetContentRegionAvail().x;
       if (doc->Layers().empty())

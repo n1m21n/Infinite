@@ -303,6 +303,7 @@ public:
       float texelsPerPx = 0;        // skin texels under one document pixel here
    };
    bool CanSurfacePaint(int id);
+   bool HasGeometryView(int id) const { auto it = mGeo.find(id); return it != mGeo.end() && it->second != nullptr; }
    // The surface under a document point, false when the ray misses the object.
    bool SurfaceAt(int id, float x, float y, SurfacePoint& out);
    // Starts a stroke (brush.size = document px on screen). Makes the skin (side x side) on first use.
