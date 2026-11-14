@@ -185,6 +185,7 @@ namespace app
       REGISTER_NODE(ProjectionNode, Projection, "Utility");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");
+      REGISTER_NODE(FieldModulatorNode, Field Modulator, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
       REGISTER_NODE(MathNode, Math, "Modulators");
       REGISTER_NODE(CompareNode, Compare, "Modulators");

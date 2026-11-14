@@ -9,6 +9,7 @@
 #include "field/ParamTable.h"
 #include "field/PinTable.h"
 #include "core/field/FieldDevice.h"
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -228,4 +229,42 @@ private:
    int mLastBuiltTopology = -1;
    int mLastCookFrame = -1;
    size_t mLastParamHash = 0;
+};
+
+// Field Modulator: a Field kernel whose `publish` is a modulator, nothing else. The Field Primitive engine in
+// value mode, shown as a modulator: one green output (0..1) that wires to any parameter like an LFO.
+class FieldModulatorNode : public FieldPrimitiveNode, public IModulator
+{
+public:
+   static INode* Create() { return new FieldModulatorNode(); }
+
+   FieldModulatorNode()
+   {
+      valueMode = true;
+      publishScalarOutput = true;
+      count = 1;
+      code = "publish = 0.5 + 0.5 * sin(t * 0.5)\n";
+   }
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      FieldPrimitiveNode::VisitParams(v);
+      valueMode = true;
+      publishScalarOutput = true;
+   }
+
+   // Output 0 is the value; declared pins follow it (the base counts them after its mesh and publish outputs).
+   int OutputCount() const override { return 1 + DeclaredOutputCount(); }
+   const char* OutputLabel(int index) const override { return index == 0 ? "value" : FieldPrimitiveNode::OutputLabel(index + 1); }
+   IModulator* ModulatorOutput(int index) override
+   {
+      return index == 0 ? static_cast<IModulator*>(this) : FieldPrimitiveNode::ModulatorOutput(index + 1);
+   }
+   bool IsGeometryOutputIndex(int) const override { return false; }
+
+   float Value01() override
+   {
+      IModulator* m = FieldPrimitiveNode::ModulatorOutput(1);
+      return m != nullptr ? std::clamp(m->Value01(), 0.0f, 1.0f) : 0.0f;
+   }
 };

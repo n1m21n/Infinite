@@ -3525,7 +3525,7 @@ void FrameTest_FIELDPATCHERTEST(int frameId, GLFWwindow* window)
    }
    if (frameId == 21)
    {
-      FieldPatcherOpenStarter(2); // Spiral: boxes and wires
+      FieldPatcherOpenStarter(0); // Spiral: boxes and wires
    }
    // Keys on the canvas, as on the main canvas: the pointer rests on the canvas, the keys go to the patcher.
    ImGuiIO& kio = ImGui::GetIO();

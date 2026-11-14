@@ -1181,10 +1181,11 @@ namespace app
    }
 
 
-   void SpawnFieldPresetNode(const FieldSearchEntry& entry, float x, float y)
+   GraphNode* SpawnFieldPresetNode(const FieldSearchEntry& entry, float x, float y)
    {
       PushUndoCheckpoint();
-      if (GraphNode* gn = SpawnNode(entry.nodeType, entry.nodeCategory, x, y))
+      GraphNode* gn = SpawnNode(entry.nodeType, entry.nodeCategory, x, y);
+      if (gn != nullptr)
       {
          if (auto* sn = dynamic_cast<FieldSynthNode*>(gn->node.get()))
          {
@@ -1218,6 +1219,7 @@ namespace app
          }
          gPatchDirty = true;
       }
+      return gn;
    }
 
 

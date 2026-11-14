@@ -243,6 +243,10 @@ public:
    CompCam Camera();
    // A 3D layer's depth from the camera at its box centre (sort key, far first).
    float CardDepth(const Layer& l);
+   // A world point (document px, z away from the camera) to document pixels; false behind the camera.
+   bool ProjectPoint(const float p[3], float& x, float& y, float* depth = nullptr);
+   // The 3D gizmo's frame: the world axis the X, Y and Z rotations turn about, and the card's right and down.
+   void CardAxes(const Layer& l, float rot[3][3], float card[2][3]);
    // The four corners in document pixels (top left, top right, bottom right, bottom left), after the crop.
    bool Corners(const Layer& l, float out[8]);
    // The document box a layer covers; a group: the union of its children.

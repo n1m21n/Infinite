@@ -19,6 +19,7 @@ extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 
 namespace app
 {
+int View2DPanelSelfCheck(Scene2DNode* doc); // View2DPanel.cpp
 namespace
 {
    using Layer = Scene2DNode::Layer;
@@ -916,6 +917,8 @@ void RunView2DTest()
 
    NewPatch();
    gView2DOpen = false;
+   if (View2DPanelSelfCheck(doc) > 0)
+      ok = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");
 }
 

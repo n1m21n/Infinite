@@ -58,6 +58,23 @@ namespace
    constexpr float kSideChip = 22.0f;    // the layers side panel packs its chips and wells tighter
    constexpr float kRowH = 22.0f;        // one layer row
    float sChip = tok::tile;              // chip size for the panel being drawn
+   float sRowH = tok::tile;              // height of text chips and bar rows in the part being drawn
+
+   // The top and bottom bars use the side panel's compact row, so a bar slider and a panel slider are the same size.
+   float CompactRowH() { return std::round(ImGui::GetFontSize() + 6.0f); }
+   struct CompactBar
+   {
+      CompactBar()
+      {
+         sRowH = sChip = CompactRowH();
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, 3.0f));
+      }
+      ~CompactBar()
+      {
+         ImGui::PopStyleVar();
+         sRowH = sChip = tok::tile;
+      }
+   };
    constexpr float kRuler = 18.0f;
    constexpr float kHandle = 7.0f;
    constexpr float kSnapPx = 6.0f;
@@ -94,7 +111,7 @@ namespace
    ImVec2 sLastPaint(0.0f, 0.0f);
    uint64_t sDocUid = 0;
    std::vector<int> sSel;          // layer ids, in click order
-   int sTab = 0;                   // 0 Layer, 1 Document, 2 Output
+   int sTab = 0;                   // 0 Layers, 1 Layer, 2 Transform, 3 Document, 4 Output
    bool sSideOpen = true;
    bool sAutoSelect = true;
    bool sDirty = false;            // a widget changed the model this frame
@@ -129,7 +146,12 @@ namespace
       int cropHandle = -1;        // 0..7 handle, 8 inside
       ImVec2 pan0;
       bool made = false;          // the shape tool has added its item
+      int gizmoAxis = -1;         // 16: the 3D gizmo part held (0..2 axes, 3 centre)
    } sOp;
+
+   // The 3D gizmo on a 3D layer: 0 move, 1 rotate, 2 scale (W / E / R, like the 3D View).
+   int sGizmoMode = 0;
+   int sGizmoHot = -1;
 
    bool sCropOn = false;
    float sCrop[4] = { 0, 0, 0, 0 };   // x0 y0 x1 y1, document px
@@ -580,17 +602,17 @@ namespace
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const ImVec2 sz = ImGui::CalcTextSize(text);
       const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y); // device-pixel snap, as ActionButton
-      ImGui::GetWindowDrawList()->AddText(ImVec2(p.x, std::round((rowTop + (tok::tile - sz.y) * 0.5f) * px) / px),
+      ImGui::GetWindowDrawList()->AddText(ImVec2(p.x, std::round((rowTop + (sRowH - sz.y) * 0.5f) * px) / px),
                                           ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text), text);
       ImGui::SetCursorScreenPos(ImVec2(p.x, rowTop));
-      ImGui::Dummy(ImVec2(sz.x, tok::tile));
+      ImGui::Dummy(ImVec2(sz.x, sRowH));
    }
 
    bool TextChip(const char* label, bool on, const char* tip)
    {
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
       const float w = ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_2;
-      const bool clicked = ActionButton::Draw(label, ImVec2(w, tok::tile));
+      const bool clicked = ActionButton::Draw(label, ImVec2(w, sRowH));
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       if (tip != nullptr && ImGui::IsItemHovered())
          HelpTip("%s", tip);
@@ -1468,6 +1490,250 @@ namespace
          angle = std::round(angle / 15.0f) * 15.0f;
       angle = std::fmod(angle + 540.0f, 360.0f) - 180.0f;
       l->angle = angle;
+      Touch();
+   }
+
+   // ---- the 3D gizmo (3D layers) -----------------------------------------
+
+   constexpr unsigned kGizmoHex[3] = { 0xFF3352, 0x8BDC00, 0x2890FF };   // the 3D View's axis colours
+   constexpr float kGizmoPx = 80.0f;
+
+   bool GizmoScreen(Scene2DNode* doc, const float p[3], ImVec2& out)
+   {
+      float x, y;
+      if (!doc->ProjectPoint(p, x, y))
+         return false;
+      out = ToScreen(doc, x, y);
+      return true;
+   }
+
+   // The three directions the gizmo shows for the mode: world X / Y-up / Z for move, the rotation axes for
+   // rotate, the card's right / up / normal for scale.
+   void GizmoAxes(Scene2DNode* doc, const Layer& l, int mode, float ax[3][3])
+   {
+      float rot[3][3], card[2][3];
+      doc->CardAxes(l, rot, card);
+      if (mode == 1)
+         std::memcpy(ax, rot, sizeof(rot));
+      else if (mode == 2)
+      {
+         for (int i = 0; i < 3; i++)
+         {
+            ax[0][i] = card[0][i];
+            ax[1][i] = -card[1][i];
+         }
+         ax[2][0] = card[0][1] * card[1][2] - card[0][2] * card[1][1];
+         ax[2][1] = card[0][2] * card[1][0] - card[0][0] * card[1][2];
+         ax[2][2] = card[0][0] * card[1][1] - card[0][1] * card[1][0];
+      }
+      else
+      {
+         const float w[3][3] = { { 1, 0, 0 }, { 0, -1, 0 }, { 0, 0, -1 } };
+         std::memcpy(ax, w, sizeof(w));
+      }
+   }
+
+   // World length of the gizmo's arms: a fixed size on screen whatever the depth.
+   float GizmoLen(Scene2DNode* doc, const Layer& l)
+   {
+      const float p[3] = { l.x, l.y, l.z };
+      float x, y, depth = 1.0f;
+      doc->ProjectPoint(p, x, y, &depth);
+      return kGizmoPx / std::max(sZoom, 1e-4f) * std::max(depth, 1.0f) / std::max(doc->Camera().zoom, 1.0f);
+   }
+
+   float SegDist2D(ImVec2 p, ImVec2 a, ImVec2 b)
+   {
+      const float dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+      const float t = l2 > 0 ? std::clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / l2, 0.0f, 1.0f) : 0.0f;
+      return std::hypot(p.x - a.x - dx * t, p.y - a.y - dy * t);
+   }
+
+   // Draws the gizmo; returns the part under the pointer (0..2 axes, 3 centre) or -1.
+   int DrawGizmo3D(ImDrawList* dl, Scene2DNode* doc, const Layer& l, ImVec2 mouse, int held)
+   {
+      const float at[3] = { l.x, l.y, l.z };
+      ImVec2 c;
+      if (!GizmoScreen(doc, at, c))
+         return -1;
+      const int mode = sGizmoMode;
+      float ax[3][3];
+      GizmoAxes(doc, l, mode, ax);
+      const float len = GizmoLen(doc, l);
+      const ImU32 white = IM_COL32(255, 255, 255, 255);
+      auto tone = [&](int id, float alpha) { return held == id || (held < 0 && sGizmoHot == id) ? white : Hex(kGizmoHex[id], alpha); };
+      int hot = -1;
+      float best = 9.0f;
+      if (mode == 1)
+      {
+         for (int a = 0; a < 3; a++)
+         {
+            // Two vectors across the ring's plane.
+            const float* n = ax[a];
+            float u[3] = { -n[1], n[0], 0.0f };
+            if (std::fabs(n[2]) > 0.9f)
+            {
+               u[0] = 0.0f;
+               u[1] = -n[2];
+               u[2] = n[1];
+            }
+            const float ul = std::max(1e-6f, std::sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]));
+            for (float& v : u) v /= ul;
+            const float v[3] = { n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0] };
+            ImVec2 prev;
+            bool prevOk = false;
+            for (int i = 0; i <= 64; i++)
+            {
+               const float t = (float)i / 64.0f * 2.0f * kPi;
+               float p[3];
+               for (int k = 0; k < 3; k++)
+                  p[k] = at[k] + (u[k] * std::cos(t) + v[k] * std::sin(t)) * len;
+               ImVec2 q;
+               const bool ok = GizmoScreen(doc, p, q);
+               if (ok && prevOk)
+               {
+                  dl->AddLine(prev, q, tone(a, 1.0f), 2.5f);
+                  const float d = SegDist2D(mouse, prev, q);
+                  if (d < best)
+                  {
+                     best = d;
+                     hot = a;
+                  }
+               }
+               prev = q;
+               prevOk = ok;
+            }
+         }
+         return hot;
+      }
+      for (int a = 0; a < 3; a++)
+      {
+         if (mode == 2 && a == 2)
+            continue;   // a card has no thickness to scale
+         const float tip[3] = { at[0] + ax[a][0] * len, at[1] + ax[a][1] * len, at[2] + ax[a][2] * len };
+         ImVec2 s;
+         if (!GizmoScreen(doc, tip, s))
+            continue;
+         const float dx = s.x - c.x, dy = s.y - c.y, sl = std::hypot(dx, dy);
+         if (sl < 10.0f)
+         {
+            // Pointing at the camera: a dot that drags with the pointer's up and down.
+            dl->AddCircleFilled(ImVec2(c.x + 16.0f, c.y - 16.0f), 5.0f, tone(a, 1.0f));
+            const float d = std::hypot(mouse.x - c.x - 16.0f, mouse.y - c.y + 16.0f);
+            if (d < best)
+            {
+               best = d;
+               hot = a;
+            }
+            continue;
+         }
+         const ImVec2 dir(dx / sl, dy / sl), side(-dy / sl, dx / sl);
+         const ImU32 col = tone(a, 1.0f);
+         dl->AddLine(ImVec2(c.x + dir.x * 12.0f, c.y + dir.y * 12.0f), s, col, 2.5f);
+         if (mode == 0)
+            dl->AddTriangleFilled(ImVec2(s.x + dir.x * 14.0f, s.y + dir.y * 14.0f), ImVec2(s.x + side.x * 5.5f, s.y + side.y * 5.5f),
+                                  ImVec2(s.x - side.x * 5.5f, s.y - side.y * 5.5f), col);
+         else
+            dl->AddRectFilled(ImVec2(s.x - 5, s.y - 5), ImVec2(s.x + 5, s.y + 5), col);
+         const float d = SegDist2D(mouse, c, ImVec2(s.x + dir.x * 14.0f, s.y + dir.y * 14.0f));
+         if (d < best && std::hypot(mouse.x - c.x, mouse.y - c.y) > 11.0f)
+         {
+            best = d;
+            hot = a;
+         }
+      }
+      dl->AddCircle(c, 8.0f, held == 3 || (held < 0 && sGizmoHot == 3) ? white : IM_COL32(255, 255, 255, 190), 24, 1.5f);
+      if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= 10.0f)
+         hot = 3;
+      return hot;
+   }
+
+   void DragGizmo3D(Scene2DNode* doc, ImVec2 mouse)
+   {
+      Layer* l = Active(doc);
+      if (l == nullptr)
+         return;
+      const Layer& l0 = sOp.l0;
+      const int a = sOp.gizmoAxis, mode = sGizmoMode;
+      const float at[3] = { l0.x, l0.y, l0.z };
+      ImVec2 c;
+      if (!GizmoScreen(doc, at, c))
+         return;
+      float ax[3][3];
+      GizmoAxes(doc, l0, mode, ax);
+      const float len = GizmoLen(doc, l0);
+      const float mx = mouse.x - sOp.start.x, my = mouse.y - sOp.start.y;
+      const bool snap = ImGui::GetIO().KeyShift;
+      *l = l0;
+      // The axis on screen: how far the pointer moved along it, in arm lengths.
+      auto along = [&](int k, float& t) {
+         const float tip[3] = { at[0] + ax[k][0] * len, at[1] + ax[k][1] * len, at[2] + ax[k][2] * len };
+         ImVec2 s;
+         if (!GizmoScreen(doc, tip, s))
+            return false;
+         const float dx = s.x - c.x, dy = s.y - c.y, l2 = dx * dx + dy * dy;
+         t = l2 >= 100.0f ? (mx * dx + my * dy) / l2 : -my / kGizmoPx;
+         return true;
+      };
+      if (mode == 0)
+      {
+         if (a == 3)
+         {
+            float depth = 1.0f, x, y;
+            doc->ProjectPoint(at, x, y, &depth);
+            const float k = std::max(depth, 1.0f) / std::max(doc->Camera().zoom, 1.0f) / std::max(sZoom, 1e-4f);
+            l->x = l0.x + mx * k;
+            l->y = l0.y + my * k;
+         }
+         else
+         {
+            float t = 0.0f;
+            if (!along(a, t))
+               return;
+            float d = t * len;
+            if (snap)
+               d = std::round(d / 10.0f) * 10.0f;
+            l->x = l0.x + ax[a][0] * d;
+            l->y = l0.y + ax[a][1] * d;
+            l->z = l0.z + ax[a][2] * d;
+         }
+      }
+      else if (mode == 1)
+      {
+         const float a0 = std::atan2(sOp.start.y - c.y, sOp.start.x - c.x), a1 = std::atan2(mouse.y - c.y, mouse.x - c.x);
+         float deg = (a1 - a0) * 180.0f / kPi;
+         // Turning the way the pointer goes round: flip when the axis points away from the camera.
+         const Scene2DNode::CompCam cam = doc->Camera();
+         const float facing = ax[a][0] * cam.rot[6] + ax[a][1] * cam.rot[7] + ax[a][2] * cam.rot[8];
+         if (facing < 0.0f)
+            deg = -deg;
+         float* v = a == 0 ? &l->rx : a == 1 ? &l->ry : &l->angle;
+         float r = (a == 0 ? l0.rx : a == 1 ? l0.ry : l0.angle) + deg;
+         if (snap)
+            r = std::round(r / 15.0f) * 15.0f;
+         *v = std::fmod(r + 540.0f, 360.0f) - 180.0f;
+      }
+      else
+      {
+         float k = 1.0f;
+         if (a == 3)
+         {
+            const float d0 = std::max(1.0f, std::hypot(sOp.start.x - c.x, sOp.start.y - c.y));
+            k = std::hypot(mouse.x - c.x, mouse.y - c.y) / d0;
+            l->sx = l0.sx * k;
+            l->sy = l0.sy * k;
+         }
+         else
+         {
+            float t = 0.0f;
+            if (!along(a, t))
+               return;
+            k = std::max(0.01f, 1.0f + t);
+            if (snap)
+               k = std::max(0.1f, std::round(k * 10.0f) / 10.0f);
+            (a == 0 ? l->sx : l->sy) = (a == 0 ? l0.sx : l0.sy) * k;
+         }
+      }
       Touch();
    }
 
@@ -2369,7 +2635,14 @@ namespace
                   q[i] = ToScreen(doc, c[i * 2], c[i * 2 + 1]);
                dl->AddPolyline(q, 4, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
             }
-      if (canTransform)
+      const bool gizmo3d = canTransform && active->is3d;
+      sGizmoHot = -1;
+      if (gizmo3d)
+      {
+         const int h = DrawGizmo3D(dl, doc, *active, mouse, sOp.kind == 16 ? sOp.gizmoAxis : -1);
+         sGizmoHot = hovered && sOp.kind == 0 ? h : -1;
+      }
+      else if (canTransform)
       {
          for (int i = 0; i < 8; i++)
          {
@@ -2489,7 +2762,7 @@ namespace
       // Cursor hints.
       int guideAxis = 0;
       const int hoverGuide = sTool == kMove && hovered ? HoverGuide(doc, mouse, guideAxis) : -1;
-      const int hoverHandle = canTransform && hovered ? HoverHandle(doc, *active, mouse) : -1;
+      const int hoverHandle = canTransform && hovered && !gizmo3d ? HoverHandle(doc, *active, mouse) : -1;
       if (hovered && sOp.kind == 0)
       {
          if (panTool)
@@ -2502,7 +2775,7 @@ namespace
          else if (hoverGuide >= 0)
             ImGui::SetMouseCursor(guideAxis == 0 ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
       }
-      if (hovered && !panTool && hoverHandle < 0 && hoverGuide < 0 && !BrushTool(sTool))
+      if (hovered && !panTool && hoverHandle < 0 && hoverGuide < 0 && sGizmoHot < 0 && !BrushTool(sTool))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
          DrawToolCursor(dl, mouse);
@@ -2646,7 +2919,12 @@ namespace
             TextClick(doc, mouse);
          else if (sTool == kMove)
          {
-            if (hoverHandle >= 0 && hoverHandle < 8)
+            if (sGizmoHot >= 0)
+            {
+               BeginOp(doc, 16, mouse, sGizmoMode == 0 ? "Move layer" : sGizmoMode == 1 ? "Rotate layer" : "Scale layer");
+               sOp.gizmoAxis = sGizmoHot;
+            }
+            else if (hoverHandle >= 0 && hoverHandle < 8)
             {
                BeginOp(doc, 2, mouse, "Scale layer");
                sOp.hx = kHandleAt[hoverHandle][0];
@@ -2693,6 +2971,8 @@ namespace
             ScaleActive(doc, mouse);
          else if (sOp.kind == 3)
             RotateActive(doc, mouse);
+         else if (sOp.kind == 16)
+            DragGizmo3D(doc, mouse);
          else if (sOp.kind == 4)
             sPan = ImVec2(sOp.pan0.x + mouse.x - sOp.start.x, sOp.pan0.y + mouse.y - sOp.start.y);
          else if (sOp.kind == 5)
@@ -2782,17 +3062,22 @@ namespace
       ImGui::SameLine(0.0f, tok::space_2);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float x = std::round(p.x) + 0.5f;
-      ImGui::GetWindowDrawList()->AddLine(ImVec2(x, top + 6.0f), ImVec2(x, top + tok::tile - 6.0f), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
+      ImGui::GetWindowDrawList()->AddLine(ImVec2(x, top + 6.0f), ImVec2(x, top + sRowH - 6.0f), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
       ImGui::SetCursorScreenPos(ImVec2(p.x, top));
-      ImGui::Dummy(ImVec2(1.0f, tok::tile));
+      ImGui::Dummy(ImVec2(1.0f, sRowH));
       ImGui::SameLine(0.0f, tok::space_2);
    }
 
    // ---- the pixel tools' context bar ---------------------------------------
 
-   void BarSlider(const char* id, float* v, float lo, float hi, const char* fmt, float w = kWellL)
+   void BarSlider(const char* id, float* v, float lo, float hi, const char* fmt, float w = 0.0f)
    {
-      ImGui::SetNextItemWidth(w);
+      // As wide as its longest text ("Hardness 100%") plus the well's padding, so bars carry no empty wells.
+      char a[64], b[64];
+      std::snprintf(a, sizeof a, fmt, lo);
+      std::snprintf(b, sizeof b, fmt, hi);
+      const float fit = std::max(ImGui::CalcTextSize(a).x, ImGui::CalcTextSize(b).x) + 2.0f * tok::space_2 + 4.0f;
+      ImGui::SetNextItemWidth(w > 0.0f ? std::min(w, fit) : fit);
       FieldWell::Slider(id, v, lo, hi, fmt);
       FormParts::Inline(0.0f, tok::space_1);
    }
@@ -2947,7 +3232,7 @@ namespace
          changed = true;
       }
       next();
-      if (FormParts::ColorDot("##v2dvfillc", t.fillC, 18.0f, tok::tile))
+      if (FormParts::ColorDot("##v2dvfillc", t.fillC, std::min(18.0f, sRowH - 4.0f), sRowH))
          changed = true;
       gap();
       if (TextChip(L("Stroke##v2dvstroke"), t.strokeOn, T("Stroke on or off")))
@@ -2957,7 +3242,7 @@ namespace
          changed = true;
       }
       next();
-      if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, 18.0f, tok::tile))
+      if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, std::min(18.0f, sRowH - 4.0f), sRowH))
          changed = true;
       next();
       ImGui::SetNextItemWidth(kWellS);
@@ -3135,7 +3420,7 @@ namespace
          }
       }
       gap();
-      if (FormParts::ColorDot("##v2dtextc", colour, 18.0f, tok::tile))
+      if (FormParts::ColorDot("##v2dtextc", colour, std::min(18.0f, sRowH - 4.0f), sRowH))
          changed = true;
       if (changed && l != nullptr)
          Touch();
@@ -3421,7 +3706,7 @@ namespace
          bool autoSel = sAutoSelect;
          // Checkbox and label sit on the chips' centre line; the cursor then returns to the row's top edge.
          const ImVec2 row0 = ImGui::GetCursorScreenPos();
-         ImGui::SetCursorScreenPos(ImVec2(row0.x, row0.y + (tok::tile - CheckBox::kSize) * 0.5f));
+         ImGui::SetCursorScreenPos(ImVec2(row0.x, row0.y + (sRowH - CheckBox::kSize) * 0.5f));
          if (CheckBox::Box("##v2dauto", &autoSel))
             sAutoSelect = autoSel;
          ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_1, row0.y));
@@ -3429,6 +3714,19 @@ namespace
          if (ImGui::IsItemClicked())
             sAutoSelect = !sAutoSelect;
          gap();
+         if (a != nullptr && a->is3d)
+         {
+            static const char* kModes[3] = { "Move##v2dgz0", "Rotate##v2dgz1", "Scale##v2dgz2" };
+            static const char* kModeTip[3] = { "Move along X, Y or Z", "Rotate about X, Y or Z", "Scale the card" };
+            for (int i = 0; i < 3; i++)
+            {
+               if (i > 0)
+                  next();
+               if (TextChip(L(kModes[i]), sGizmoMode == i, T(kModeTip[i])))
+                  sGizmoMode = i;
+            }
+            gap();
+         }
          static const char* kAlign[6] = { "##al0", "##al1", "##al2", "##al3", "##al4", "##al5" };
          static const char* kAlignTip[6] = { "Align left edges", "Align horizontal centres", "Align right edges",
                                              "Align top edges", "Align vertical centres", "Align bottom edges" };
@@ -3437,7 +3735,7 @@ namespace
             if (i > 0)
                next();
             ImGui::BeginDisabled(sSel.empty());
-            const bool hit = ActionButton::Draw(kAlign[i], ImVec2(kIconW, tok::tile));
+            const bool hit = ActionButton::Draw(kAlign[i], ImVec2(kIconW, sRowH));
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                HelpTip("%s", T(kAlignTip[i]));
@@ -3473,7 +3771,7 @@ namespace
          {
             next();
             ImGui::BeginDisabled(sSel.size() < 3);
-            const bool hit = ActionButton::Draw(i == 0 ? "##dist0" : "##dist1", ImVec2(kIconW, tok::tile));
+            const bool hit = ActionButton::Draw(i == 0 ? "##dist0" : "##dist1", ImVec2(kIconW, sRowH));
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                HelpTip("%s", T(i == 0 ? "Distribute horizontally" : "Distribute vertically"));
@@ -3567,7 +3865,7 @@ namespace
       const char* renderL = L("Render##v2drender");
       const char* convertL = L("Convert##v2dconvert");
       auto chipW = [](const char* l) { return ImGui::CalcTextSize(l, ImGui::FindRenderedTextEnd(l)).x + 2.0f * tok::space_2; };
-      const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + tok::space_1 + kIconW;
+      const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + tok::space_1 + sChip;
       const float rowTop = ImGui::GetCursorScreenPos().y;
       const float barRoom = availW - rightW - tok::space_3;
       // A bar wider than its room is clipped at a chip edge-free boundary and a "..." chip opens the whole bar.
@@ -3577,7 +3875,7 @@ namespace
       if (overflow)
       {
          const float clipW = std::max(0.0f, barRoom - kIconW - tok::space_1);
-         ImGui::BeginChild("##v2dbarclip", ImVec2(clipW, tok::tile), ImGuiChildFlags_None,
+         ImGui::BeginChild("##v2dbarclip", ImVec2(clipW, sRowH), ImGuiChildFlags_None,
                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
          DrawContextBar(doc);
          sBarW = ImGui::GetItemRectMax().x - barX;
@@ -3600,18 +3898,26 @@ namespace
       ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, ImGui::GetWindowPos().x + startX + availW - rightW), rowTop));
       if (doc->panelOnly)
       {
-         if (ActionButton::Draw(convertL, ImVec2(chipW(convertL), tok::tile)))
+         if (ActionButton::Draw(convertL, ImVec2(chipW(convertL), sRowH)))
             sPending.what = Pending::Convert;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Put this document on the canvas"));
          FormParts::Inline(0.0f, tok::space_1);
       }
       ImGui::BeginDisabled(gOfflineRender.active);
-      if (ActionButton::Draw(renderL, ImVec2(chipW(renderL), tok::tile)))
-         sPending.what = Pending::RenderImage;
+      if (ActionButton::Draw(renderL, ImVec2(chipW(renderL), sRowH)))
+         ImGui::OpenPopup("##v2drendermenu");
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", Sc(T("Render Image (F12). Ctrl+F12 renders the animation")));
+         HelpTip("%s", Sc(T("Render an image (F12) or the animation (Ctrl+F12)")));
+      if (MenuParts::BeginPopup("##v2drendermenu"))
+      {
+         if (MenuParts::Item(T("Image"), "F12"))
+            sPending.what = Pending::RenderImage;
+         if (MenuParts::Item(T("Animation"), Sc("Ctrl+F12")))
+            sPending.what = Pending::RenderAnim;
+         MenuParts::EndPopup();
+      }
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dside", IconsInfinite::Layers, sSideOpen, T("Layers and properties"))) sSideOpen = !sSideOpen;
    }
@@ -3630,7 +3936,7 @@ namespace
       float pct = sZoom * 100.0f;
       ImGui::SetNextItemWidth(kWellS);
       FieldWell::PushStyle();
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (sRowH - ImGui::GetFontSize()) * 0.5f));
       const bool zoomTyped = ImGui::InputFloat("##v2dzoompct", &pct, 0.0f, 0.0f, "%.0f%%", ImGuiInputTextFlags_EnterReturnsTrue);
       ImGui::PopStyleVar();
       if (zoomTyped)
@@ -4054,7 +4360,8 @@ namespace
 
    // ---- tabs ------------------------------------------------------------
 
-   void DrawLayerTab(Scene2DNode* doc)
+   // part 0: the layer's own settings and mask; part 1: where it sits (transform, 3D, crop).
+   void DrawLayerTab(Scene2DNode* doc, int part)
    {
       Layer* l = Active(doc);
       if (l == nullptr)
@@ -4062,6 +4369,13 @@ namespace
          CentredText(ImGui::GetCursorScreenPos().y, T("No layer selected"));
          return;
       }
+      if (part == 1 && (l->kind == Kind::Group || l->kind == Kind::Fill || l->kind == Kind::Adjust))
+      {
+         CentredText(ImGui::GetCursorScreenPos().y, T("Nothing to transform"));
+         return;
+      }
+      if (part == 0)
+      {
       SectionCard::Begin(T("Layer"));
       if (l->kind == Kind::Node)
       {
@@ -4151,7 +4465,8 @@ namespace
          SectionCard::Begin(T("Vector"));
          ImGui::TextDisabled("%d %s", (int)l->shapes.size(), T("items"));
       }
-      if (l->kind != Kind::Group && l->kind != Kind::Fill && l->kind != Kind::Adjust)
+      }
+      if (part == 1)
       {
          SectionCard::Begin(T("Transform"));
          {
@@ -4222,7 +4537,7 @@ namespace
             DragRow(T("Bottom"), &l->crop[3], 1.0f, "%.0f px", 0.0f, bh);
          }
       }
-      if (l->kind != Kind::Group || true)
+      if (part == 0)
       {
          SectionCard::Begin(T("Mask"));
          if (l->HasPixelMask())
@@ -4443,39 +4758,52 @@ namespace
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       ImGui::GetStyle().WindowPadding = savedPad;
       PopDockedPanelStyle();
-      const float availW = ImGui::GetContentRegionAvail().x;
-      DrawDocPicker(doc, availW);
-      sChip = kSideChip;
-      const float roomH = ImGui::GetContentRegionAvail().y;
-      // The list is as tall as its rows (plus one spare for dropping below the last), up to half the panel.
-      const float rowsH = (CountRows(doc, 0) + 1) * (kRowH + 1.0f) + 4.0f;
-      DrawLayersCard(doc, availW, std::clamp(rowsH, 3.0f * (kRowH + 1.0f), std::max(3.0f * (kRowH + 1.0f), roomH * 0.5f)));
-      ImGui::Dummy(ImVec2(0, 2.0f));
-      const struct { const char* id; const char* label; } kTabs[3] = { { "##v2dt0", "Layer" }, { "##v2dt1", "Document" }, { "##v2dt2", "Output" } };
-      const float tabW = std::floor((availW - 2.0f * tok::space_1) / 3.0f);
-      for (int i = 0; i < 3; i++)
-      {
-         if (i > 0)
-            FormParts::Inline(0.0f, tok::space_1);
-         ActionButton::Scoped() = sTab == i ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         if (ActionButton::Draw((std::string(T(kTabs[i].label)) + kTabs[i].id).c_str(), ImVec2(i == 2 ? availW - 2.0f * (tabW + tok::space_1) : tabW, sChip)))
+
+      // The tab column, as the 3D View: each group of settings one click away instead of down one long scroll.
+      const struct { const char* id; const char* icon; const char* tip; } kTabs[5] = {
+         { "##v2dt0", IconsInfinite::Layers, "Layers" },
+         { "##v2dt1", IconsInfinite::Edit, "Layer" },
+         { "##v2dt2", IconsInfinite::ToolMove, "Transform" },
+         { "##v2dt3", IconsInfinite::Crop, "Document" },
+         { "##v2dt4", IconsInfinite::ShadeRender, "Render" },
+      };
+      sTab = std::clamp(sTab, 0, 4);
+      ImGui::BeginGroup();
+      for (int i = 0; i < 5; i++)
+         if (IconChip(kTabs[i].id, kTabs[i].icon, sTab == i, T(kTabs[i].tip)))
             sTab = i;
-         ActionButton::Scoped() = ActionButton::Kind::Plain;
+      ImGui::EndGroup();
+      ActionButton::RowNext();
+
+      sChip = kSideChip;
+      if (sTab == 0)
+      {
+         ImGui::BeginChild("##v2dlayers", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+         const float availW = ImGui::GetContentRegionAvail().x;
+         DrawDocPicker(doc, availW);
+         const float roomH = ImGui::GetContentRegionAvail().y;
+         DrawLayersCard(doc, availW, std::max(3.0f * (kRowH + 1.0f), roomH - 4.0f));
+         ImGui::EndChild();
       }
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::kPad, 0.0f));
-      ImGui::BeginChild("##v2dprops", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
-      ImGui::PopStyleVar();
-      SectionCard::BeginWindow();
-      const float w = ImGui::GetContentRegionAvail().x;
-      sFieldW = std::max(70.0f, w - kLabelW);
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, 3.0f));
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 3.0f));
-      if (sTab == 0) DrawLayerTab(doc);
-      else if (sTab == 1) DrawDocumentTab(doc);
-      else DrawOutputTab(doc, w);
-      ImGui::PopStyleVar(2);
-      SectionCard::EndWindow();
-      ImGui::EndChild();
+      else
+      {
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::kPad, 0.0f));
+         ImGui::BeginChild("##v2dprops", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
+         ImGui::PopStyleVar();
+         SectionCard::BeginWindow();
+         ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+         const float w = ImGui::GetContentRegionAvail().x;
+         sFieldW = std::max(70.0f, w - kLabelW);
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, 3.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 3.0f));
+         if (sTab == 1) DrawLayerTab(doc, 0);
+         else if (sTab == 2) DrawLayerTab(doc, 1);
+         else if (sTab == 3) DrawDocumentTab(doc);
+         else DrawOutputTab(doc, w);
+         ImGui::PopStyleVar(2);
+         SectionCard::EndWindow();
+         ImGui::EndChild();
+      }
       ImGui::EndChild();
       sChip = tok::tile;
    }
@@ -4697,7 +5025,7 @@ namespace
          {
             sClip = doc->CopyLayers(sSel);
             sPasteCount = 0;
-            if (sPending.what == Pending::Cut)
+            if (todo.what == Pending::Cut)
                DeleteSelected(doc);
          }
          break;
@@ -4713,7 +5041,7 @@ namespace
          break;
       case Pending::Delete: DeleteSelected(doc); break;
       case Pending::AddFill: AddFill(doc); break;
-      case Pending::AddAdjust: AddAdjust(doc, sPending.arg); break;
+      case Pending::AddAdjust: AddAdjust(doc, todo.arg); break;
       case Pending::AddPaint: AddPaint(doc); break;
       case Pending::AddMask:
          if (Layer* a = Active(doc))
@@ -4839,20 +5167,26 @@ namespace
       sPanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
 
       const float headTop = ImGui::GetCursorScreenPos().y;
-      DrawHeader(doc);
+      {
+         CompactBar bar;
+         DrawHeader(doc);
+      }
       DrawDockMenu(headTop, ImGui::GetCursorScreenPos().y);
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideW = sSideOpen ? std::min(kSideW, avail.x * 0.5f) : 0.0f;
       const float viewW = std::max(120.0f, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
-      const float statusH = tok::tile + ImGui::GetStyle().ItemSpacing.y;
+      const float statusH = CompactRowH() + ImGui::GetStyle().ItemSpacing.y;
       const float canvasH = std::max(80.0f, avail.y - statusH);
       const float stripW = StripWidth(StripColumns(canvasH));
       DrawToolStrip(canvasH, doc);
       ActionButton::RowNext();
       ImGui::BeginGroup();
       DrawCanvas(doc, ImVec2(viewW - stripW - tok::space_1, canvasH));
-      DrawStatus(doc);
+      {
+         CompactBar bar;
+         DrawStatus(doc);
+      }
       ImGui::EndGroup();
       if (sSideOpen)
       {
@@ -4907,6 +5241,79 @@ static bool Is3DNode(INode* n)
 {
    return dynamic_cast<IGeometrySource*>(n) != nullptr || dynamic_cast<Render3DNode*>(n) != nullptr ||
           dynamic_cast<Scene3DNode*>(n) != nullptr;
+}
+
+// INFINITE_VIEW2DTEST: the panel's own actions on a real document (the Effects menu, the 3D gizmo). Returns failures.
+int View2DPanelSelfCheck(Scene2DNode* doc)
+{
+   int fails = 0;
+   auto expect = [&](const char* what, bool pass) {
+      printf("  [%s] panel: %s\n", pass ? "pass" : "FAIL", what);
+      fails += pass ? 0 : 1;
+   };
+   if (doc == nullptr || doc->Layers().empty())
+   {
+      expect("a document to test on", false);
+      return fails;
+   }
+   // Effects menu: each pick adds that adjustment, not always the first (Pixelate).
+   for (int type : { (int)Scene2DNode::kAdjThreshold, (int)Scene2DNode::kAdjPosterize, (int)Scene2DNode::kAdjHalftone })
+   {
+      sPending.what = Pending::AddAdjust;
+      sPending.arg = type;
+      RunPending(doc);
+      const Layer* l = Active(doc);
+      expect("an Effects pick adds that adjustment", l != nullptr && l->kind == Kind::Adjust && l->adjType == type);
+   }
+   // 3D gizmo: each handle changes only what it should.
+   int id = 0;
+   for (const Layer& l : doc->Layers())
+      if (l.kind == Kind::Node)
+         id = l.id;
+   Layer* l = doc->FindLayer(id);
+   expect("a node layer for the gizmo", l != nullptr);
+   if (l == nullptr)
+      return fails;
+   l->is3d = true;
+   doc->Commit();
+   SelectOnly(id);
+   const Layer base = *l;
+   const float at[3] = { base.x, base.y, base.z };
+   ImVec2 c;
+   const bool seen = GizmoScreen(doc, at, c);
+   expect("the gizmo centre is on screen", seen);
+   if (!seen)
+      return fails;
+   auto drag = [&](int mode, int axis, ImVec2 from, ImVec2 to) {
+      *doc->FindLayer(id) = base;
+      sGizmoMode = mode;
+      BeginOp(doc, 16, from, nullptr);
+      sOp.gizmoAxis = axis;
+      DragGizmo3D(doc, to);
+      sOp = Op();
+      return *doc->FindLayer(id);
+   };
+   Layer r = drag(0, 3, c, ImVec2(c.x + 40.0f, c.y));
+   expect("move centre: x changes, z stays", std::fabs(r.x - base.x) > 1e-3f && r.z == base.z);
+   float ax[3][3];
+   GizmoAxes(doc, base, 0, ax);
+   const float tip[3] = { at[0] + ax[0][0] * 100.0f, at[1] + ax[0][1] * 100.0f, at[2] + ax[0][2] * 100.0f };
+   ImVec2 tx;
+   if (GizmoScreen(doc, tip, tx))
+   {
+      r = drag(0, 0, c, ImVec2(c.x + (tx.x - c.x) * 0.5f, c.y + (tx.y - c.y) * 0.5f));
+      expect("move X: only x changes", std::fabs(r.x - base.x) > 1e-3f && std::fabs(r.y - base.y) < 1e-3f && std::fabs(r.z - base.z) < 1e-3f);
+   }
+   r = drag(1, 2, ImVec2(c.x + 50.0f, c.y), ImVec2(c.x, c.y + 50.0f));
+   expect("rotate Z: only the angle changes", std::fabs(r.angle - base.angle) > 1.0f && r.rx == base.rx && r.ry == base.ry);
+   r = drag(1, 0, ImVec2(c.x + 50.0f, c.y), ImVec2(c.x, c.y + 50.0f));
+   expect("rotate X: only rx changes", std::fabs(r.rx - base.rx) > 1.0f && r.angle == base.angle);
+   r = drag(2, 3, ImVec2(c.x + 40.0f, c.y), ImVec2(c.x + 80.0f, c.y));
+   expect("scale centre: uniform x2", std::fabs(r.sx - base.sx * 2.0f) < 1e-3f && std::fabs(r.sy - base.sy * 2.0f) < 1e-3f);
+   *doc->FindLayer(id) = base;
+   sGizmoMode = 0;
+   doc->Commit();
+   return fails;
 }
 
 void View2DAddNode(GraphNode& gn)

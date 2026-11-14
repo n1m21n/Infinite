@@ -3823,7 +3823,7 @@ void DrawPluginSearchPanel();
       int presetIndex = 0;
    };
 
-void SpawnFieldPresetNode(const FieldSearchEntry& entry, float x, float y);
+GraphNode* SpawnFieldPresetNode(const FieldSearchEntry& entry, float x, float y);
 
 void DrawFieldSearchPanel();
 

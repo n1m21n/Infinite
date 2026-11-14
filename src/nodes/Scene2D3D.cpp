@@ -320,6 +320,51 @@ float Scene2DNode::CardDepth(const Layer& l)
    return d;
 }
 
+bool Scene2DNode::ProjectPoint(const float p[3], float& x, float& y, float* depth)
+{
+   const CompCam cam = Camera();
+   const float v[3] = { p[0] - cam.pos[0], p[1] - cam.pos[1], p[2] - cam.pos[2] };
+   const float cx = cam.rot[0] * v[0] + cam.rot[1] * v[1] + cam.rot[2] * v[2];
+   const float cy = cam.rot[3] * v[0] + cam.rot[4] * v[1] + cam.rot[5] * v[2];
+   const float cz = cam.rot[6] * v[0] + cam.rot[7] * v[1] + cam.rot[8] * v[2];
+   if (depth != nullptr)
+      *depth = cz;
+   if (cz <= 1.0f)
+      return false;
+   x = cam.zoom * cx / cz + mDoc.w * 0.5f;
+   y = cam.zoom * cy / cz + mDoc.h * 0.5f;
+   return true;
+}
+
+void Scene2DNode::CardAxes(const Layer& l, float rot[3][3], float card[2][3])
+{
+   // Same order as CardHomography: orient, then X, Y, Z. Each rotation turns about its axis as the ones before
+   // it left it.
+   float R[9], t[9];
+   RotX(l.orient[0], R);
+   RotY(l.orient[1], t);
+   Mul3(R, t, R);
+   RotZ(l.orient[2], t);
+   Mul3(R, t, R);
+   for (int i = 0; i < 3; i++)
+      rot[0][i] = R[i * 3];
+   RotX(l.rx, t);
+   Mul3(R, t, R);
+   for (int i = 0; i < 3; i++)
+      rot[1][i] = R[i * 3 + 1];
+   RotY(l.ry, t);
+   Mul3(R, t, R);
+   for (int i = 0; i < 3; i++)
+      rot[2][i] = R[i * 3 + 2];
+   RotZ(l.angle, t);
+   Mul3(R, t, R);
+   for (int i = 0; i < 3; i++)
+   {
+      card[0][i] = R[i * 3];
+      card[1][i] = R[i * 3 + 1];
+   }
+}
+
 std::vector<const Scene2DNode::Layer*> Scene2DNode::ListOf(int parent)
 {
    std::vector<const Layer*> out;

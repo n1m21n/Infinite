@@ -178,6 +178,13 @@ void DrawTemplatesWindow(bool* open)
    }
    // Field Patcher starters: a scratch page in the current patch, not a new patch.
    {
+      auto StarterBlurb = [](const Field::PatcherStarter& st) {
+         const std::string d = st.domain;
+         if (d == "notes") return "Boxes that play notes";
+         if (d == "pixel") return "Boxes that draw pixels";
+         if (d == "sample") return "Boxes that shape sound";
+         return st.valueMode ? "Boxes that modulate" : "Boxes that make points";
+      };
       SectionCard::Begin(T("Field patches"));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float cardH = CardHeight(kCardW);
@@ -186,7 +193,7 @@ void DrawTemplatesWindow(bool* open)
       {
          const Field::PatcherStarter& st = Field::kPatcherStarters[k];
          const Entry e { std::string("fieldstarter-") + std::to_string(k), "", T(st.name),
-                         T(std::string(st.domain) == "notes" ? "Boxes that play notes" : "Boxes in the Field Patcher") };
+                         T(StarterBlurb(st)) };
          ImGui::SetCursorScreenPos(ImVec2(origin.x + (float)(k % perRow) * (kCardW + gap),
                                           origin.y + (float)(k / perRow) * (cardH + gap)));
          if (Card(e, kCardW))

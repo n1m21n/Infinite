@@ -17,6 +17,7 @@ namespace app
    extern bool gFieldPatcherClaimedKeys;  // the pointer is over the panel: its keys, not the canvas's
    extern bool gFieldPatcherMaximised;    // ⤢: the panel takes the whole window
    extern float gFieldPatcherShownHeight; // this frame's height (gFieldPatcherHeight, or the window when maximised)
+   extern ImVec2 gFieldPatcherRectMin, gFieldPatcherRectMax; // the panel on screen this frame (Library drops)
 
    void DrawFieldPatcherDocked(const char* id, const ImVec2& size);
    void FieldPatcherOpenNode(uint64_t uid); // open the panel on that Field node's page

@@ -2441,6 +2441,7 @@ namespace app
             if (MenuParts::Item(L("Floating Window"), nullptr, gPerfPanelDock == kDockFloating)) gPerfPanelDock = kDockFloating;
             ImGui::EndMenu();
          }
+         if (MenuParts::Item(L("Close Performance Panel"))) gPerfPanelOpen = false;
          MenuParts::Separator();
          if (MenuParts::SubMenu(L("+ Add Control")))
          {

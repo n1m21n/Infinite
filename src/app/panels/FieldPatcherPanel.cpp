@@ -22,12 +22,15 @@
 #include "core/field/FieldPatcherStarters.h"
 #include "nodes/FieldElementNode.h"
 #include "nodes/FieldNotesNode.h"
+#include "nodes/FieldPixelNode.h"
 #include "nodes/FieldPrimitiveNode.h"
+#include "nodes/FieldSampleNode.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <set>
@@ -37,6 +40,7 @@
 namespace app
 {
 bool gFieldPatcherOpen = false;
+ImVec2 gFieldPatcherRectMin, gFieldPatcherRectMax;
 int gFieldPatcherDock = 0;
 float gFieldPatcherHeight = 380.0f;
 bool gFieldPatcherClaimedKeys = false;
@@ -70,6 +74,10 @@ namespace
             return n->Apply();
          if (auto* n = dynamic_cast<FieldElementNode*>(gn->node.get()))
             return n->Apply();
+         if (auto* n = dynamic_cast<FieldPixelNode*>(gn->node.get()))
+            return n->Apply();
+         if (auto* n = dynamic_cast<FieldSampleNode*>(gn->node.get()))
+            return n->Apply();
          return false;
       }
    };
@@ -78,7 +86,8 @@ namespace
    {
       INode* n = gn.node.get();
       return dynamic_cast<FieldNotesNode*>(n) != nullptr || dynamic_cast<FieldPrimitiveNode*>(n) != nullptr ||
-             dynamic_cast<FieldElementNode*>(n) != nullptr;
+             dynamic_cast<FieldElementNode*>(n) != nullptr || dynamic_cast<FieldPixelNode*>(n) != nullptr ||
+             dynamic_cast<FieldSampleNode*>(n) != nullptr;
    }
 
    Host HostOf(GraphNode* gn)
@@ -95,6 +104,15 @@ namespace
          h.error = n->LastError();
          h.params = &n->GetParamTable();
          h.publish = n->publishScalarOutput ? n->ModulatorOutput(1) : nullptr;
+      }
+      else if (auto* m = dynamic_cast<FieldModulatorNode*>(gn->node.get()))
+      {
+         h.code = &m->code;
+         h.mask = Field::HostPrimitive;
+         h.nodeName = "Field Modulator";
+         h.error = m->LastError();
+         h.params = &m->GetParamTable();
+         h.publish = m->ModulatorOutput(0);
       }
       else if (auto* n = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
       {
@@ -113,6 +131,22 @@ namespace
          h.error = n->LastError();
          h.params = &n->GetParamTable();
          h.publish = n->publishScalarOutput ? n->ModulatorOutput(1) : nullptr;
+      }
+      else if (auto* n = dynamic_cast<FieldPixelNode*>(gn->node.get()))
+      {
+         h.code = &n->code;
+         h.mask = Field::HostPixel;
+         h.nodeName = "Field Pixel";
+         h.error = n->LastError();
+         h.params = &n->GetParamTable();
+      }
+      else if (auto* n = dynamic_cast<FieldSampleNode*>(gn->node.get()))
+      {
+         h.code = &n->code;
+         h.mask = Field::HostSample;
+         h.nodeName = "Field Effect";
+         h.error = n->LastError();
+         h.params = &n->GetParamTable();
       }
       return h;
    }
@@ -281,11 +315,51 @@ namespace
 
    // ---- the page's source text
 
-   // A scratch page runs where its program can: a note() call makes it a Field Notes page, anything else a
-   // Field Primitive one (where the value outlets and the geometry outlets both live).
+   int StarterIndex(const char* name)
+   {
+      for (int k = 0; k < Field::kPatcherStarterCount; k++)
+         if (std::strcmp(Field::kPatcherStarters[k].name, name) == 0)
+            return k;
+      return 0;
+   }
+
+   // True when some line of `src` assigns `name` (`col = ...`, `out=...`).
+   bool AssignsLine(const std::string& src, const char* name)
+   {
+      const size_t n = std::strlen(name);
+      size_t at = 0;
+      while (at < src.size())
+      {
+         size_t b = at;
+         while (b < src.size() && (src[b] == ' ' || src[b] == '\t'))
+            b++;
+         if (src.compare(b, n, name) == 0)
+         {
+            size_t e = b + n;
+            while (e < src.size() && src[e] == ' ')
+               e++;
+            if (e < src.size() && src[e] == '=' && (e + 1 >= src.size() || src[e + 1] != '='))
+               return true;
+         }
+         const size_t nl = src.find('\n', at);
+         if (nl == std::string::npos)
+            break;
+         at = nl + 1;
+      }
+      return false;
+   }
+
+   // A scratch page runs where its program can: a note() call makes it a Field Notes page, `col =` a Field Pixel
+   // page, `out =` a Field Effect page, anything else a Field Primitive one (value and geometry outlets both live there).
    uint32_t ScratchMask(const std::string& src)
    {
-      return src.find("note(") != std::string::npos ? Field::HostNotes : Field::HostPrimitive;
+      if (src.find("note(") != std::string::npos)
+         return Field::HostNotes;
+      if (AssignsLine(src, "col"))
+         return Field::HostPixel;
+      if (AssignsLine(src, "out"))
+         return Field::HostSample;
+      return Field::HostPrimitive;
    }
 
    std::string SourceOf(Page& p, Host& h)
@@ -638,6 +712,9 @@ namespace
                gFieldPatcherDock = kCodes[i];
          ImGui::EndMenu();
       }
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Close Field Patcher")))
+         gFieldPatcherOpen = false;
    }
 
    // Boxes only: paste, select all and the dock live on keys and the strip.
@@ -645,7 +722,7 @@ namespace
    {
       State& s = S();
       bool added = false;
-      ImGui::SetNextItemWidth(220.0f);
+      ImGui::SetNextItemWidth(150.0f);
       if (ImGui::IsWindowAppearing())
       {
          s.search[0] = 0; // a stale query from last time would open on an empty list
@@ -1243,8 +1320,12 @@ namespace
       bool valueMode = false;
    };
 
-   ExportTarget TargetOf(const Field::BoxGraph& g)
+   ExportTarget TargetOf(const Field::BoxGraph& g, uint32_t mask = Field::HostPrimitive)
    {
+      if (mask & Field::HostPixel)
+         return { "FieldPixel", "Source", "Field Pixel", false };
+      if (mask & Field::HostSample)
+         return { "Field Effect", "AudioEffects", "Field Effect", false };
       bool notes = false, geo = false, value = false;
       for (const Field::BoxNode& b : g.boxes)
       {
@@ -1257,13 +1338,13 @@ namespace
       if (geo)
          return { "Field Primitive", "3D", "Field Primitive", false };
       if (value)
-         return { "Field Primitive", "3D", "Field Primitive · Value", true };
+         return { "Field Modulator", "Modulators", "Field Modulator", true };
       return {};
    }
 
    void Export(Page& p)
    {
-      const ExportTarget t = TargetOf(p.graph);
+      const ExportTarget t = TargetOf(p.graph, ScratchMask(p.scratchCode));
       if (t.typeName == nullptr)
          return;
       PushUndoCheckpoint("Export Field Page");
@@ -1277,6 +1358,16 @@ namespace
          n->valueMode = t.valueMode;
          if (t.valueMode)
             n->publishScalarOutput = true;
+         n->Apply();
+      }
+      else if (auto* n = dynamic_cast<FieldPixelNode*>(gn->node.get()))
+      {
+         n->code = p.scratchCode;
+         n->Apply();
+      }
+      else if (auto* n = dynamic_cast<FieldSampleNode*>(gn->node.get()))
+      {
+         n->code = p.scratchCode;
          n->Apply();
       }
       else if (auto* n = dynamic_cast<FieldNotesNode*>(gn->node.get()))
@@ -1430,8 +1521,12 @@ namespace
             AddScratch("", "");
          MenuParts::Separator();
          for (int k = 0; k < Field::kPatcherStarterCount; k++)
+         {
+            if (k > 0 && k % (Field::kPatcherStarterCount / 5) == 0)
+               MenuParts::Separator();
             if (MenuParts::Item(T(Field::kPatcherStarters[k].name)))
                FieldPatcherOpenStarter(k);
+         }
          MenuParts::EndPopup();
       }
       FormParts::Inline(0.0f, tok::space_1);
@@ -1472,7 +1567,7 @@ namespace
       ImGui::SetCursorPosY(y0);
       if (p.uid == 0)
       {
-         const ExportTarget t = TargetOf(p.graph);
+         const ExportTarget t = TargetOf(p.graph, ScratchMask(p.scratchCode));
          const std::string err = CompileCheck(p.scratchCode);
          if (!err.empty())
             text(err.c_str(), &warn);
@@ -1529,31 +1624,38 @@ namespace
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y * 0.4f), T("New patch"), T("Select a Field node, or start from one of these"));
-      // Starters in a wrapping grid of equal buttons, centred under the message.
-      const float bw = 150.0f, gap = tok::space_2;
-      const int cols = std::max(1, (int)((avail.x + gap) / (bw + gap)));
-      const int total = Field::kPatcherStarterCount + 1;
-      const int shownCols = std::min(cols, total);
-      const float gridW = shownCols * bw + (shownCols - 1) * gap;
+      // Empty page on top, then one column per kind (Primitive, Modulator, Notes, Pixel, Effect), four starters each.
+      static const char* kKinds[] = { "Primitive", "Modulator", "Notes", "Pixel", "Effect" };
+      constexpr int kKindCount = 5;
+      const int perKind = Field::kPatcherStarterCount / kKindCount;
+      const float gap = tok::space_2;
+      const float bw = std::clamp((avail.x - (kKindCount - 1) * gap - 2.0f * gap) / kKindCount, 84.0f, 150.0f);
+      const float gridW = kKindCount * bw + (kKindCount - 1) * gap;
       const float x0 = mn.x + std::max(0.0f, (avail.x - gridW) * 0.5f);
+      const float rowH = ImGui::GetFrameHeight() + gap;
       float y = mn.y + avail.y * 0.4f + tok::space_2;
-      for (int k = 0; k < total; k++)
+      ImGui::SetCursorScreenPos(ImVec2(x0 + (gridW - bw) * 0.5f, y));
+      if (ActionButton::Draw(T("Empty page"), ImVec2(bw, 0)))
+         AddScratch("", "");
+      y += rowH + gap;
+      for (int c = 0; c < kKindCount; c++)
       {
-         const int col = k % shownCols;
-         if (col == 0 && k > 0)
-            y += ImGui::GetFrameHeight() + gap;
-         ImGui::SetCursorScreenPos(ImVec2(x0 + col * (bw + gap), y));
+         const char* head = T(kKinds[c]);
+         const float tw = ImGui::CalcTextSize(head).x;
+         ImGui::SetCursorScreenPos(ImVec2(x0 + c * (bw + gap) + (bw - tw) * 0.5f, y));
+         ImGui::TextDisabled("%s", head);
+      }
+      y += ImGui::GetTextLineHeight() + gap;
+      for (int k = 0; k < Field::kPatcherStarterCount; k++)
+      {
+         const int c = std::min(k / perKind, kKindCount - 1), r = k - c * perKind;
+         ImGui::SetCursorScreenPos(ImVec2(x0 + c * (bw + gap), y + r * rowH));
          ImGui::PushID(k);
-         const char* name = k == 0 ? T("Empty page") : T(Field::kPatcherStarters[k - 1].name);
-         if (ActionButton::Draw(name, ImVec2(bw, 0)))
-         {
-            if (k == 0)
-               AddScratch("", "");
-            else
-               FieldPatcherOpenStarter(k - 1);
-         }
+         if (ActionButton::Draw(T(Field::kPatcherStarters[k].name), ImVec2(bw, 0)))
+            FieldPatcherOpenStarter(k);
          ImGui::PopID();
       }
+      y += (perKind - 1) * rowH;
       ImGui::SetCursorScreenPos(ImVec2(mn.x, y + ImGui::GetFrameHeight()));
       ImGui::Dummy(ImVec2(0.0f, 0.0f));
    }
@@ -1702,6 +1804,8 @@ void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
    const int dock = gFieldPatcherDock;
    const bool gripFirst = dock == 0;
    ImGui::BeginChild(id, size, false);
+   gFieldPatcherRectMin = ImGui::GetWindowPos();
+   gFieldPatcherRectMax = ImVec2(gFieldPatcherRectMin.x + ImGui::GetWindowWidth(), gFieldPatcherRectMin.y + ImGui::GetWindowHeight());
    gFieldPatcherClaimedKeys = false;
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]() {
@@ -1789,7 +1893,7 @@ int FieldPatcherSelfCheck()
    if (prim != nullptr)
    {
       auto* n = dynamic_cast<FieldPrimitiveNode*>(prim->node.get());
-      n->code = Field::kPatcherStarters[2].code; // Spiral
+      n->code = Field::kPatcherStarters[StarterIndex("Spiral")].code;
       n->Apply();
       FieldPatcherOpenNode(prim->uid);
       Page* p = Front();
@@ -1828,7 +1932,7 @@ int FieldPatcherSelfCheck()
 
    // 2. Scratch pages export to the node their outlets need.
    const int before = (int)gNodes.size();
-   FieldPatcherOpenStarter(1); // Melody from counting
+   FieldPatcherOpenStarter(StarterIndex("Melody from counting"));
    Page* mel = Front();
    Reparse(*mel, mel->scratchCode, ScratchMask(mel->scratchCode));
    expect("the melody starter targets Field Notes", TargetOf(mel->graph).typeName != nullptr &&
@@ -1840,18 +1944,22 @@ int FieldPatcherSelfCheck()
    if (notes != nullptr)
       expect("the exported melody compiles", dynamic_cast<FieldNotesNode*>(notes->node.get())->LastError().empty());
 
-   FieldPatcherOpenStarter(3); // Breathing light
+   FieldPatcherOpenStarter(StarterIndex("Slow LFO"));
    Page* light = Front();
    Reparse(*light, light->scratchCode, ScratchMask(light->scratchCode));
    Export(*light);
    GraphNode* val = light->uid != 0 ? FindNodeByUid(light->uid) : nullptr;
-   auto* vp = val != nullptr ? dynamic_cast<FieldPrimitiveNode*>(val->node.get()) : nullptr;
-   expect("a value-only page exports a Field Primitive in Value mode", vp != nullptr && vp->valueMode && vp->publishScalarOutput);
+   auto* vp = val != nullptr ? dynamic_cast<FieldModulatorNode*>(val->node.get()) : nullptr;
+   expect("a value-only page exports a Field Modulator", vp != nullptr && vp->valueMode && vp->publishScalarOutput);
    if (vp != nullptr)
    {
-      expect("Value mode has no mesh", vp->GetMesh().vertices.empty());
-      expect("Value mode publishes", vp->ModulatorOutput(1) != nullptr);
-      expect("the light compiles", vp->LastError().empty());
+      expect("the modulator has no mesh", vp->GetMesh().vertices.empty());
+      expect("the modulator's first outlet is its value", vp->ModulatorOutput(0) != nullptr && vp->OutputLabel(0) == std::string("value"));
+      expect("the modulator is not a geometry outlet", !vp->IsGeometryOutputIndex(0));
+      expect("the LFO compiles", vp->LastError().empty());
+      vp->CookIfNeeded(987654);
+      const float v = vp->Value01();
+      expect("the LFO value is in 0..1", v >= 0.0f && v <= 1.0f);
    }
 
    // 3. Scratch pages and pins survive save and load.
@@ -1870,7 +1978,9 @@ int FieldPatcherSelfCheck()
    {
       Field::BoxGraph g;
       Field::FieldError err;
-      const uint32_t mask = std::string(Field::kPatcherStarters[k].domain) == "notes" ? Field::HostNotes : Field::HostPrimitive;
+      const std::string dom = Field::kPatcherStarters[k].domain;
+      const uint32_t mask = dom == "notes" ? Field::HostNotes : dom == "pixel" ? Field::HostPixel : dom == "sample" ? Field::HostSample : Field::HostPrimitive;
+      expect((std::string("kind guessed: ") + Field::kPatcherStarters[k].name).c_str(), ScratchMask(Field::kPatcherStarters[k].code) == mask);
       const bool ok = Field::ParseCodeToBoxGraph(Field::kPatcherStarters[k].code, mask, g, err) && g.CountCodeBoxes() == 0;
       expect(Field::kPatcherStarters[k].name, ok);
    }
@@ -1891,7 +2001,12 @@ int FieldPatcherSelfCheck()
          if (auto* fn = dynamic_cast<FieldNotesNode*>(gn->node.get()))
             err = fn->LastError(), kind = std::string(st.domain) == "notes";
          else if (auto* fp = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
-            err = fp->LastError(), kind = std::string(st.domain) == "element" && fp->valueMode == st.valueMode;
+            err = fp->LastError(), kind = std::string(st.domain) == "element" && fp->valueMode == st.valueMode &&
+                                          (dynamic_cast<FieldModulatorNode*>(fp) != nullptr) == st.valueMode;
+         else if (auto* px = dynamic_cast<FieldPixelNode*>(gn->node.get()))
+            err = px->LastError(), kind = std::string(st.domain) == "pixel";
+         else if (auto* fs = dynamic_cast<FieldSampleNode*>(gn->node.get()))
+            err = fs->LastError(), kind = std::string(st.domain) == "sample";
       }
       const std::string what = std::string("placed: ") + st.name + (err.empty() ? "" : " (" + err + ")");
       expect(what.c_str(), gn != nullptr && kind && err.empty() && PageTitle(*pg) == T(st.name));

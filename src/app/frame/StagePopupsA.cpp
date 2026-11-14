@@ -2,6 +2,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "core/CliSetup.h"
 #include "core/FactoryPresets.h"
 #include "arrange/MidiImport.h"
@@ -920,6 +921,20 @@ void DrawPopupsA(FrameCtx& fc)
                // Drag-state reset (gSampleDragActive etc.) happens once,
                // unconditionally, right after this whole if/else-if chain -
                // no need to repeat it here.
+            }
+            else if (gSampleDragKind == LibraryDragKind::FieldPreset && gFieldPatcherOpen &&
+                     mp.x >= gFieldPatcherRectMin.x && mp.x < gFieldPatcherRectMax.x &&
+                     mp.y >= gFieldPatcherRectMin.y && mp.y < gFieldPatcherRectMax.y)
+            {
+               // Dropped on the Field Patcher: place the device and open it as a page.
+               FieldSearchEntry entry;
+               entry.name = gFieldDragPresetName;
+               entry.nodeType = gFieldDragNodeType;
+               entry.nodeCategory = gFieldDragNodeCategory;
+               entry.presetIndex = gFieldDragIndex;
+               const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas);
+               if (GraphNode* gn = SpawnFieldPresetNode(entry, at.x, at.y))
+                  FieldPatcherOpenNode(gn->uid);
             }
             else if (gSampleDragKind == LibraryDragKind::FieldPreset)
             {

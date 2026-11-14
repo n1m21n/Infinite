@@ -78,6 +78,7 @@ namespace app
          // ---------------- Modulators ----------------
          { "LFO", I18N_KEY("Sine, triangle, saw up/down, square and seeded sample-and-hold. Rate as a synced division, free beats or Hz; phase from the transport, free-running, or restarted by the trig input; plus phase and an output range.") },
          { "Random", I18N_KEY("A new random value every step, with adjustable smoothing between steps. The rate is synced to a note division, free beats or Hz. Seeded and deterministic, so rewinding replays the same sequence.") },
+         { "Field Modulator", I18N_KEY("A modulator written in Field code: publish is its value, 0..1. Patch it in the Field Patcher, or start from Slow LFO, Triangle LFO, Pulse train or Skipping beat.") },
          { "Pattern", I18N_KEY("A 16-step sequencer: drag the bar grid (paint across bars by dragging horizontally), choose how many steps to use or fit them to the transport's time signature, and it loops through them one step every N beats. Optional glide between steps and a bipolar display mode.") },
          { "Math", I18N_KEY("Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant, shown as an editable slider; a patched input just shows as 'patched'.") },
          { "Compare", I18N_KEY("Outputs 1 when the comparison holds, 0 otherwise - >, >=, <, <=, ==, != between two modulators, with a tolerance for the equality checks.") },
@@ -1190,6 +1191,7 @@ namespace app
             { "Modulators", {
                { "LFO", I18N_KEY("Sine, triangle, saw up/down, square and seeded sample-and-hold. Rate as a synced division, free beats or Hz; phase from the transport, free-running, or restarted by the trig input; plus phase and an output range.") },
                { "Random", I18N_KEY("A new random value every step, with adjustable smoothing between steps. The rate is synced to a note division, free beats or Hz. Seeded and deterministic, so rewinding replays the same sequence.") },
+               { "Field Modulator", I18N_KEY("A modulator written in Field code: publish is its value, 0..1. Patch it in the Field Patcher, or start from Slow LFO, Triangle LFO, Pulse train or Skipping beat.") },
                { "Pattern", I18N_KEY("A 16-step sequencer with a drag-paint bar grid. Choose how many steps to use, or fit them to the time signature, and it loops through them one step every N beats. Optional glide and bipolar display.") },
                { "Math", I18N_KEY("Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant.") },
                { "Compare", I18N_KEY("Outputs 1 when the comparison holds, 0 otherwise.") },
