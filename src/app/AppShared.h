@@ -5924,6 +5924,7 @@ void View3DAddNode(GraphNode& gn);
 extern bool gView2DOpen;
 extern float gView2DHeight;
 extern int gView2DDock; // 0 = bottom, 3 = top
+extern std::string gView2DTools; // the 2D View tool strip: order, "-" marks hidden
 extern bool gView2DClaimedKeys;
 extern ImVec2 gView2DRectMin, gView2DRectMax;
 void DrawView2DDocked(const char* id, const ImVec2& size);

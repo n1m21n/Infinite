@@ -799,6 +799,51 @@ void RunView2DTest()
       Check("M4: a 1080p brush frame is under 16.7 ms", p95 < 16.7);
    }
 
+   // M5: a setting change (blend, opacity, move) on a doc with a 3D card, a cube layer and a noise layer must
+   // land the next frame: undo checkpoint + commit + cook, each timed.
+   {
+      using Clock = std::chrono::steady_clock;
+      NewPatch();
+      GraphNode* cubeGn = SpawnNode("Cube", "3D", 0.0f, 0.0f);
+      GraphNode* renderGn = SpawnNode("Render 3D", "3D", 300.0f, 0.0f);
+      GraphNode* noiseGn = SpawnNode("Noise", "Source", 0.0f, 300.0f);
+      if (cubeGn != nullptr && renderGn != nullptr)
+         if (auto* r3 = dynamic_cast<Render3DNode*>(renderGn->node.get()))
+            r3->geometry[0] = dynamic_cast<IGeometrySource*>(cubeGn->node.get());
+      Scene2DNode pic;
+      pic.SetDocText("doc 1920 1080 0 0 0 0 0 0 0 0 1 32 4 30 10 1 1\n");
+      pic.AddLayer(Kind::Node, noiseGn != nullptr ? noiseGn->uid : 0);
+      Layer& card = pic.AddLayer(Kind::Node, renderGn != nullptr ? renderGn->uid : 0);
+      card.is3d = true;
+      card.ry = 25.0f;
+      pic.AddLayer(Kind::Node, cubeGn != nullptr ? cubeGn->uid : 0);
+      pic.Commit();
+      Cook(&pic);
+      glFinish();
+      double undoMax = 0, commitMax = 0, cookMax = 0;
+      for (int i = 0; i < 24; i++)
+      {
+         Layer& l = pic.Layers()[i % 3];
+         auto t0 = Clock::now();
+         PushUndoCheckpoint("Blend mode");
+         auto t1 = Clock::now();
+         if (i % 3 == 0) l.blend = (l.blend + 1) % 12;
+         else if (i % 3 == 1) l.opacity = 0.5f + 0.02f * i;
+         else l.x += 3.0f;
+         pic.Commit();
+         auto t2 = Clock::now();
+         Cook(&pic);
+         glFinish();
+         auto t3 = Clock::now();
+         auto ms = [](Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+         undoMax = std::max(undoMax, ms(t0, t1));
+         commitMax = std::max(commitMax, ms(t1, t2));
+         cookMax = std::max(cookMax, ms(t2, t3));
+      }
+      printf("  M5 setting change: undo max %.2f ms, commit max %.2f ms, cook max %.2f ms\n", undoMax, commitMax, cookMax);
+      Check("M5: a setting change lands within a frame or two", undoMax + commitMax + cookMax < 50.0);
+   }
+
    NewPatch();
    gView2DOpen = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");

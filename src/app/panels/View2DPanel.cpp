@@ -44,6 +44,7 @@ bool gView2DOpen = false;
 float gView2DHeight = 460.0f;
 int gView2DDock = 0;
 bool gView2DClaimedKeys = false;
+std::string gView2DTools;
 ImVec2 gView2DRectMin, gView2DRectMax;
 
 namespace
@@ -54,6 +55,9 @@ namespace
    constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = 300.0f;
    constexpr float kIconW = tok::tile;   // icon chips are square, one tile
+   constexpr float kSideChip = 22.0f;    // the layers side panel packs its chips and wells tighter
+   constexpr float kRowH = 22.0f;        // one layer row
+   float sChip = tok::tile;              // chip size for the panel being drawn
    constexpr float kRuler = 18.0f;
    constexpr float kHandle = 7.0f;
    constexpr float kSnapPx = 6.0f;
@@ -63,17 +67,20 @@ namespace
    // Overlay colours are an image editor's, not the app's: they are read against the picture.
    constexpr unsigned kPasteboard = 0x282828, kOutline = 0x2D8CFF, kSmart = 0xFF2DB4, kGuide = 0x00D2E6, kGrid = 0x808080;
 
-   enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand, kPen, kNode, kShape, kText };
+   enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand, kPen, kNode, kShape, kText,
+               kGradient, kClone, kHeal, kBlur, kSharpen, kDodge, kBurn, kToolCount };
    int sTool = kMove;
-   bool PaintTool(int t) { return t == kBrush || t == kEraser || t == kFill; }
-   bool PixelTool(int t) { return t >= kBrush && t <= kWand; }
+   bool RetouchTool(int t) { return t >= kClone && t <= kBurn; }
+   bool BrushTool(int t) { return t == kBrush || t == kEraser || RetouchTool(t); }
+   bool PaintTool(int t) { return BrushTool(t) || t == kFill || t == kGradient; }
+   bool PixelTool(int t) { return (t >= kBrush && t <= kWand) || t >= kGradient; }
 
    // Paint tools. The brush and the eraser keep their own settings.
    BrushEngine::Brush sBrush, sEraser;
    int sBrushPreset = -1, sEraserPreset = -1;
    bool sBrushInit = false;
    float sFg[3] = { 0.0f, 0.0f, 0.0f }, sBg[3] = { 1.0f, 1.0f, 1.0f };
-   int sFillKind = 0;              // 0 bucket, 1 linear, 2 radial
+   int sFillKind = 1;              // gradient: 1 linear, 2 radial
    int sTolerance = 32;
    bool sContiguous = true, sAllLayers = false;
    bool sEditMask = false;         // the brush paints the active layer's pixel mask
@@ -473,6 +480,31 @@ namespace
       Touch();
    }
 
+   // Even spacing: the outer two stay, the centres between them step evenly along the axis.
+   void Distribute(Scene2DNode* doc, int axis)
+   {
+      std::vector<std::pair<float, int>> order;
+      for (int id : sSel)
+      {
+         float a[2], b[2];
+         if (doc->Bounds(id, a, b))
+            order.push_back({ (a[axis] + b[axis]) * 0.5f, id });
+      }
+      if (order.size() < 3)
+         return;
+      std::sort(order.begin(), order.end());
+      PushUndoCheckpoint("Distribute in 2D View");
+      const float first = order.front().first, step = (order.back().first - first) / (float)(order.size() - 1);
+      for (size_t i = 1; i + 1 < order.size(); i++)
+      {
+         const float d = first + step * (float)i - order[i].first;
+         for (Layer& l : doc->Layers())
+            if (l.kind != Kind::Group && Movable(l) && doc->IsInside(l.id, order[i].second))
+               (axis == 0 ? l.x : l.y) += d;
+      }
+      Touch();
+   }
+
    void DeleteSelected(Scene2DNode* doc)
    {
       if (sSel.empty())
@@ -521,15 +553,17 @@ namespace
 
    // ---- widgets ---------------------------------------------------------
 
-   bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, float w = kIconW)
+   bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, float w = 0.0f)
    {
+      if (w <= 0.0f)
+         w = sChip;
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw(id, ImVec2(w, tok::tile));
+      const bool clicked = ActionButton::Draw(id, ImVec2(w, sChip));
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", tip);
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md,
+      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), sChip < tok::tile ? tok::icon_sm : tok::icon_md,
                   on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
       return clicked;
    }
@@ -572,8 +606,25 @@ namespace
    {
       ImGui::AlignTextToFramePadding();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", text);
+      const char* end = ImGui::FindRenderedTextEnd(text);   // "Width##img" shows as "Width"
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%.*s", (int)(end - text), text);
       FormParts::Inline(kLabelW);
+   }
+
+   // Shortcut text in the platform's words: Cmd on macOS, Ctrl elsewhere.
+   const char* Sc(const char* s)
+   {
+#ifdef __APPLE__
+      static std::string buf[8];
+      static int next = 0;
+      std::string& b = buf[next++ & 7];
+      b = s;
+      for (size_t at = b.find("Ctrl"); at != std::string::npos; at = b.find("Ctrl", at))
+         b.replace(at, 4, "Cmd");
+      return b.c_str();
+#else
+      return s;
+#endif
    }
 
    void UndoOnActivate(const char* what = kUndo)
@@ -621,6 +672,32 @@ namespace
       const bool changed = ImGui::DragFloat(wid.c_str(), v, speed, lo, hi, fmt);
       FieldWell::PopStyle();
       UndoOnActivate();
+      if (changed)
+         Touch();
+      return changed;
+   }
+
+   // Two or three numbers on one row ("Position  X 120  Y 80"); returns a bit per field that changed.
+   int DragMulti(const char* label, float* const* v, const char* const* fmts, int n, float speed, float lo = -1e6f, float hi = 1e6f)
+   {
+      FieldLabel(label);
+      const float each = (sFieldW - (n - 1) * tok::space_1) / n;
+      int changed = 0;
+      FieldWell::PushStyle();
+      ImGui::PushID(label);
+      for (int i = 0; i < n; i++)
+      {
+         if (i > 0)
+            ImGui::SameLine(0.0f, tok::space_1);
+         ImGui::PushID(i);
+         ImGui::SetNextItemWidth(each);
+         if (ImGui::DragFloat("##v", v[i], speed, lo, hi, fmts[i]))
+            changed |= 1 << i;
+         UndoOnActivate();
+         ImGui::PopID();
+      }
+      ImGui::PopID();
+      FieldWell::PopStyle();
       if (changed)
          Touch();
       return changed;
@@ -858,16 +935,60 @@ namespace
 
    bool HandleVectorKeys(Scene2DNode* doc);
 
+   // Layer edits work from the layer list as well as the canvas: delete, copy, cut, paste, duplicate, group,
+   // clip, restack and select all.
+   void HandleLayerKeys(Scene2DNode* doc, bool cmd, bool shift, bool alt, bool onCanvas)
+   {
+      auto key = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
+         sPending.what = Pending::Delete;
+      if (cmd && !shift && (key(ImGuiKey_J) || (key(ImGuiKey_D) && !(onCanvas && PixelTool(sTool))))) sPending.what = Pending::Duplicate;
+      if (cmd && !shift)
+      {
+         if (key(ImGuiKey_C)) sPending.what = Pending::Copy;
+         if (key(ImGuiKey_X)) sPending.what = Pending::Cut;
+         if (key(ImGuiKey_V)) sPending.what = Pending::Paste;
+      }
+      if (cmd && !shift && !alt && key(ImGuiKey_G)) sPending.what = Pending::Group;
+      if (cmd && shift && key(ImGuiKey_G)) sPending.what = Pending::Ungroup;
+      if (cmd && alt && key(ImGuiKey_G))
+         if (Layer* a = Active(doc))
+         {
+            PushUndoCheckpoint("Clipping mask");
+            a->clip = !a->clip;
+            Touch();
+         }
+      if (cmd && key(ImGuiKey_LeftBracket)) Restack(doc, shift ? 2 : 0);
+      if (cmd && key(ImGuiKey_RightBracket)) Restack(doc, shift ? 3 : 1);
+      if (cmd && key(ImGuiKey_A) && onCanvas && PixelTool(sTool))
+         doc->SelectAll();
+      else if (cmd && key(ImGuiKey_A))
+      {
+         sSel.clear();
+         for (const Layer& l : doc->Layers())
+            if (l.parent == 0)
+               sSel.push_back(l.id);
+      }
+   }
+
+   bool sPanelHovered = false;   // pointer anywhere over the 2D View (side panel included)
+   bool gView2DTestCmd = false;
+
    void HandleKeys(Scene2DNode* doc, bool hovered)
    {
       const ImGuiIO& io = ImGui::GetIO();
-      if (!hovered || ImGui::GetIO().WantTextInput)
+      if ((!hovered && (!sPanelHovered || ImGui::IsAnyItemActive())) || ImGui::GetIO().WantTextInput)
          return;
       gView2DClaimedKeys = true;
-      const bool cmd = io.KeyCtrl || io.KeySuper;
+      const bool cmd = io.KeyCtrl || io.KeySuper || gView2DTestCmd;
       const bool shift = io.KeyShift, alt = io.KeyAlt;
       auto key = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
       auto rep = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, true); };
+      if (!hovered)
+      {
+         HandleLayerKeys(doc, cmd, shift, alt, false);
+         return;
+      }
       if (!cmd && !alt)
       {
          if (key(ImGuiKey_V)) sTool = kMove;
@@ -876,7 +997,11 @@ namespace
          if (key(ImGuiKey_Z)) sTool = kZoom;
          if (key(ImGuiKey_B)) sTool = kBrush;
          if (key(ImGuiKey_E)) sTool = kEraser;
-         if (key(ImGuiKey_G)) sTool = kFill;
+         if (key(ImGuiKey_G)) sTool = sTool == kFill ? kGradient : kFill;
+         if (key(ImGuiKey_S)) sTool = kClone;
+         if (key(ImGuiKey_J)) sTool = kHeal;
+         if (key(ImGuiKey_R)) sTool = sTool == kBlur ? kSharpen : kBlur;
+         if (key(ImGuiKey_O)) sTool = sTool == kDodge ? kBurn : kDodge;
          if (key(ImGuiKey_I)) sTool = kPick;
          if (key(ImGuiKey_M)) sTool = kMarquee;
          if (key(ImGuiKey_L)) sTool = kLasso;
@@ -920,35 +1045,7 @@ namespace
       }
       if (key(ImGuiKey_Escape) && sOp.kind == 0 && sPoly.empty() && !PixelTool(sTool))
          sSel.clear();
-      if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
-         sPending.what = Pending::Delete;
-      if (cmd && !shift && (key(ImGuiKey_J) || (key(ImGuiKey_D) && !PixelTool(sTool)))) sPending.what = Pending::Duplicate;
-      if (cmd && !shift)
-      {
-         if (key(ImGuiKey_C)) sPending.what = Pending::Copy;
-         if (key(ImGuiKey_X)) sPending.what = Pending::Cut;
-         if (key(ImGuiKey_V)) sPending.what = Pending::Paste;
-      }
-      if (cmd && !shift && key(ImGuiKey_G)) sPending.what = Pending::Group;
-      if (cmd && shift && key(ImGuiKey_G)) sPending.what = Pending::Ungroup;
-      if (cmd && alt && key(ImGuiKey_G))
-         if (Layer* a = Active(doc))
-         {
-            PushUndoCheckpoint("Clipping mask");
-            a->clip = !a->clip;
-            Touch();
-         }
-      if (cmd && key(ImGuiKey_LeftBracket)) Restack(doc, shift ? 2 : 0);
-      if (cmd && key(ImGuiKey_RightBracket)) Restack(doc, shift ? 3 : 1);
-      if (cmd && key(ImGuiKey_A) && PixelTool(sTool))
-         doc->SelectAll();
-      else if (cmd && key(ImGuiKey_A))
-      {
-         sSel.clear();
-         for (const Layer& l : doc->Layers())
-            if (l.parent == 0)
-               sSel.push_back(l.id);
-      }
+      HandleLayerKeys(doc, cmd, shift, alt, true);
       const float step = shift ? 10.0f : 1.0f;
       if (!cmd && sTool == kMove)
       {
@@ -1022,7 +1119,30 @@ namespace
       sEraser.mode = BrushEngine::kErase;
    }
 
-   BrushEngine::Brush& ToolBrush() { return sTool == kEraser ? sEraser : sBrush; }
+   // Retouch tools share one brush; the tool picks what it does to the pixels.
+   BrushEngine::Brush sRetouch = []()
+   {
+      BrushEngine::Brush b;
+      b.size = 40.0f;
+      b.hardness = 0.4f;
+      b.opacity = 0.5f;
+      b.spacing = 0.1f;
+      return b;
+   }();
+   ImVec2 sCloneSrc(0, 0), sCloneOffset(0, 0);
+   bool sHaveCloneSrc = false, sCloneOffsetSet = false;
+
+   BrushEngine::Brush& ToolBrush()
+   {
+      if (RetouchTool(sTool))
+      {
+         static const int kModes[] = { BrushEngine::kClone, BrushEngine::kHeal, BrushEngine::kBlur, BrushEngine::kSharpen,
+                                       BrushEngine::kDodge, BrushEngine::kBurn };
+         sRetouch.mode = kModes[sTool - kClone];
+         return sRetouch;
+      }
+      return sTool == kEraser ? sEraser : sBrush;
+   }
 
    float PenNow()
    {
@@ -1069,12 +1189,26 @@ namespace
 
    void BeginStroke(Scene2DNode* doc, ImVec2 at, bool line)
    {
-      PushUndoCheckpoint(sTool == kEraser ? "Erase" : "Paint");
+      const bool cloning = sTool == kClone || sTool == kHeal;
+      if (cloning && !sHaveCloneSrc)
+         return;   // Alt-click sets the source first
+      PushUndoCheckpoint(sTool == kEraser ? "Erase" : RetouchTool(sTool) ? "Retouch" : "Paint");
       int target = 0;
       const int id = PaintTarget(doc, target, sTool == kBrush);
       if (id == 0)
          return;
       BrushEngine::Brush b = ToolBrush();
+      if (cloning)
+      {
+         // Aligned: the first stroke after Alt-click fixes the offset; later strokes keep it.
+         if (!sCloneOffsetSet)
+         {
+            sCloneOffset = ImVec2(sCloneSrc.x - at.x, sCloneSrc.y - at.y);
+            sCloneOffsetSet = true;
+         }
+         b.sourceOffset[0] = sCloneOffset.x;
+         b.sourceOffset[1] = sCloneOffset.y;
+      }
       std::copy(sFg, sFg + 3, b.color);
       const ImVec2 from = line && sHaveLast ? sLastPaint : at;
       if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow()))
@@ -1133,6 +1267,40 @@ namespace
    }
 
    // The brush outline at its real size, and the hardness inside it.
+   const char* ToolGlyph(int tool);
+
+   // The pointer follows the tool, as in every image editor: an I-beam for text, a crosshair with the tool's
+   // badge for tools that act on a point, the arrow for the selection tools.
+   void DrawToolCursor(ImDrawList* dl, ImVec2 mouse)
+   {
+      if (sTool == kText)
+      {
+         ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+         return;
+      }
+      if (sTool == kMove || sTool == kNode || sTool == kHand)
+         return;
+      const char* g = ToolGlyph(sTool);
+      if (g == nullptr)
+         return;
+      ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+      for (int pass = 0; pass < 2; pass++)
+      {
+         const ImU32 col = pass == 0 ? IM_COL32(0, 0, 0, 170) : IM_COL32(255, 255, 255, 255);
+         const float th = pass == 0 ? 3.0f : 1.0f;
+         dl->AddLine(ImVec2(mouse.x - 8, mouse.y), ImVec2(mouse.x - 2, mouse.y), col, th);
+         dl->AddLine(ImVec2(mouse.x + 2, mouse.y), ImVec2(mouse.x + 8, mouse.y), col, th);
+         dl->AddLine(ImVec2(mouse.x, mouse.y - 8), ImVec2(mouse.x, mouse.y - 2), col, th);
+         dl->AddLine(ImVec2(mouse.x, mouse.y + 2), ImVec2(mouse.x, mouse.y + 8), col, th);
+      }
+      const ImVec2 badge(mouse.x + 15.0f, mouse.y + 15.0f);
+      for (int dx = -1; dx <= 1; dx++)
+         for (int dy = -1; dy <= 1; dy++)
+            if (dx != 0 || dy != 0)
+               glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_md, IM_COL32(0, 0, 0, 200), g);
+      glyph::Draw(dl, badge, tok::icon_md, IM_COL32(255, 255, 255, 255), g);
+   }
+
    void DrawBrushCursor(ImDrawList* dl, ImVec2 mouse)
    {
       const BrushEngine::Brush& b = ToolBrush();
@@ -1166,7 +1334,7 @@ namespace
          if (key(ImGuiKey_Q)) doc->quickMask = !doc->quickMask;
          if (key(ImGuiKey_X)) SwapColours();
          if (key(ImGuiKey_D)) DefaultColours();
-         if (sTool == kBrush || sTool == kEraser)
+         if (BrushTool(sTool))
          {
             BrushEngine::Brush& b = ToolBrush();
             if (!shift && rep(ImGuiKey_LeftBracket)) b.size = std::max(1.0f, b.size * 0.9f - 1.0f);
@@ -1994,11 +2162,12 @@ namespace
       ImVec2 c[4] = { BoxScreen(doc, *l, 0, 0), BoxScreen(doc, *l, bw, 0), BoxScreen(doc, *l, bw, bh), BoxScreen(doc, *l, 0, bh) };
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddPolyline(c, 4, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
-      const float w = std::clamp(bw * sZoom, 220.0f, 520.0f);
-      const float h = ImGui::GetTextLineHeight() * 4.0f + 2.0f * ImGui::GetStyle().FramePadding.y;
-      ImVec2 at(std::min(c[0].x, c[3].x), std::max(c[2].y, c[3].y) + 6.0f);
-      at.x = std::clamp(at.x, sViewMn.x + 4.0f, std::max(sViewMn.x + 4.0f, sViewMx.x - w - 4.0f));
-      at.y = std::clamp(at.y, sViewMn.y + 4.0f, std::max(sViewMn.y + 4.0f, sViewMx.y - h - 4.0f));
+      // Type in place: the layer itself shows the text, so the input sits invisibly over the layer's box and
+      // only a caret is drawn (one copy of the text, not two).
+      const ImVec2 bmn(std::min(std::min(c[0].x, c[1].x), std::min(c[2].x, c[3].x)), std::min(std::min(c[0].y, c[1].y), std::min(c[2].y, c[3].y)));
+      const ImVec2 bmx(std::max(std::max(c[0].x, c[1].x), std::max(c[2].x, c[3].x)), std::max(std::max(c[0].y, c[1].y), std::max(c[2].y, c[3].y)));
+      const float w = std::max(40.0f, bmx.x - bmn.x), h = std::max(ImGui::GetFrameHeight(), bmx.y - bmn.y);
+      const ImVec2 at = bmn;
       const ImVec2 keep = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(at);
       ImGui::PushID(sTextEdit);
@@ -2007,9 +2176,28 @@ namespace
          ImGui::SetKeyboardFocusHere();
          sTextFocus = false;
       }
-      FieldWell::PushStyle();
-      const bool changed = ImGui::InputTextMultiline("##v2dtextedit", sTextBuf, sizeof(sTextBuf), ImVec2(w, h));
-      FieldWell::PopStyle();
+      const ImU32 clear = IM_COL32(0, 0, 0, 0);
+      ImGui::PushStyleColor(ImGuiCol_Text, clear);
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, clear);
+      ImGui::PushStyleColor(ImGuiCol_Border, clear);
+      ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, clear);
+      ImGui::PushStyleColor(ImGuiCol_InputTextCursor, clear);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+      const bool changed = ImGui::InputTextMultiline("##v2dtextedit", sTextBuf, sizeof(sTextBuf), ImVec2(w, h),
+                                                     ImGuiInputTextFlags_NoHorizontalScroll);
+      const bool editing = ImGui::IsItemActive();
+      ImGui::PopStyleVar();
+      ImGui::PopStyleColor(5);
+      if (editing && std::fmod(ImGui::GetTime(), 1.0) < 0.6)
+      {
+         // Caret at the end of the last line, on the layer's right edge.
+         int lines = 1;
+         for (const char* q = sTextBuf; *q; q++)
+            lines += *q == '\n';
+         const float f = (float)(lines - 1) / (float)lines;
+         const ImVec2 top(c[1].x + (c[2].x - c[1].x) * f + 2.0f, c[1].y + (c[2].y - c[1].y) * f);
+         dl->AddLine(top, ImVec2(c[2].x + 2.0f, c[2].y), Hex(kOutline), 1.5f);
+      }
       sEditMn = ImGui::GetItemRectMin();
       sEditMx = ImGui::GetItemRectMax();
       const bool done = ImGui::IsItemDeactivated();
@@ -2057,27 +2245,27 @@ namespace
       if (MenuParts::BeginContextItem("##v2dcanvasmenu"))
       {
          const bool any = !sSel.empty();
-         if (MenuParts::Item(T("Copy"), "Ctrl+C", false, any)) sPending.what = Pending::Copy;
-         if (MenuParts::Item(T("Cut"), "Ctrl+X", false, any)) sPending.what = Pending::Cut;
-         if (MenuParts::Item(T("Paste"), "Ctrl+V", false, !sClip.empty())) sPending.what = Pending::Paste;
-         if (MenuParts::Item(T("Duplicate"), "Ctrl+J", false, any)) sPending.what = Pending::Duplicate;
+         if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"), false, any)) sPending.what = Pending::Copy;
+         if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"), false, any)) sPending.what = Pending::Cut;
+         if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
+         if (MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"), false, any)) sPending.what = Pending::Duplicate;
          if (MenuParts::Item(T("Delete"), "Delete", false, any)) sPending.what = Pending::Delete;
          MenuParts::Separator();
-         if (MenuParts::Item(T("Group"), "Ctrl+G", false, any)) sPending.what = Pending::Group;
-         if (MenuParts::Item(T("Bring to Front"), "Shift+Ctrl+]", false, any)) Restack(doc, 3);
-         if (MenuParts::Item(T("Bring Forward"), "Ctrl+]", false, any)) Restack(doc, 1);
-         if (MenuParts::Item(T("Send Backward"), "Ctrl+[", false, any)) Restack(doc, 0);
-         if (MenuParts::Item(T("Send to Back"), "Shift+Ctrl+[", false, any)) Restack(doc, 2);
+         if (MenuParts::Item(T("Group"), Sc("Ctrl+G"), false, any)) sPending.what = Pending::Group;
+         if (MenuParts::Item(T("Bring to Front"), Sc("Shift+Ctrl+]"), false, any)) Restack(doc, 3);
+         if (MenuParts::Item(T("Bring Forward"), Sc("Ctrl+]"), false, any)) Restack(doc, 1);
+         if (MenuParts::Item(T("Send Backward"), Sc("Ctrl+["), false, any)) Restack(doc, 0);
+         if (MenuParts::Item(T("Send to Back"), Sc("Shift+Ctrl+["), false, any)) Restack(doc, 2);
          MenuParts::Separator();
-         if (MenuParts::Item(T("Select All"), "Ctrl+A"))
+         if (MenuParts::Item(T("Select All"), Sc("Ctrl+A")))
          {
             sSel.clear();
             for (const Layer& l : doc->Layers())
                if (l.parent == 0)
                   sSel.push_back(l.id);
          }
-         if (MenuParts::Item(T("Fit on Screen"), "Ctrl+0")) FitView(doc);
-         if (MenuParts::Item(T("Actual Pixels"), "Ctrl+1"))
+         if (MenuParts::Item(T("Fit on Screen"), Sc("Ctrl+0"))) FitView(doc);
+         if (MenuParts::Item(T("Actual Pixels"), Sc("Ctrl+1")))
          {
             sZoom = 1.0f;
             sPan = ImVec2(0, 0);
@@ -2314,7 +2502,29 @@ namespace
          else if (hoverGuide >= 0)
             ImGui::SetMouseCursor(guideAxis == 0 ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
       }
-      if (hovered && !panTool && (sTool == kBrush || sTool == kEraser) && !io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7))
+      if (hovered && !panTool && hoverHandle < 0 && hoverGuide < 0 && !BrushTool(sTool))
+      {
+         dl->PushClipRect(sViewMn, sViewMx, true);
+         DrawToolCursor(dl, mouse);
+         dl->PopClipRect();
+      }
+      if (hovered && (sTool == kClone || sTool == kHeal) && sHaveCloneSrc)
+      {
+         // Where the stamp copies from: the source point, or (once aligned) the pointer plus the offset.
+         const ImVec2 src = sCloneOffsetSet ? ToScreen(doc, sMouseDoc.x + sCloneOffset.x, sMouseDoc.y + sCloneOffset.y)
+                                            : ToScreen(doc, sCloneSrc.x, sCloneSrc.y);
+         dl->PushClipRect(sViewMn, sViewMx, true);
+         for (int pass = 0; pass < 2; pass++)
+         {
+            const ImU32 col = pass == 0 ? IM_COL32(0, 0, 0, 170) : IM_COL32(255, 255, 255, 255);
+            const float th = pass == 0 ? 3.0f : 1.0f;
+            dl->AddLine(ImVec2(src.x - 7, src.y), ImVec2(src.x + 7, src.y), col, th);
+            dl->AddLine(ImVec2(src.x, src.y - 7), ImVec2(src.x, src.y + 7), col, th);
+            dl->AddCircle(src, 4.0f, col, 16, th);
+         }
+         dl->PopClipRect();
+      }
+      if (hovered && !panTool && BrushTool(sTool) && !io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
          DrawBrushCursor(dl, mouse);
@@ -2341,6 +2551,12 @@ namespace
          }
          else if (sTool == kZoom)
             ZoomAt(doc, io.KeyAlt ? 0.5f : 2.0f, mouse);
+         else if ((sTool == kClone || sTool == kHeal) && io.KeyAlt)
+         {
+            sCloneSrc = sMouseDoc;
+            sHaveCloneSrc = true;
+            sCloneOffsetSet = false;
+         }
          else if (sTool == kPick || ((sTool == kBrush || sTool == kFill) && io.KeyAlt))
          {
             // The eyedropper; Alt with the brush or bucket picks too. Alt on the eyedropper sets the background.
@@ -2348,11 +2564,11 @@ namespace
             sOp.kind = 11;
             sOp.selOp = sTool == kPick && io.KeyAlt ? 1 : 0;
          }
-         else if (sTool == kBrush || sTool == kEraser)
-            BeginStroke(doc, sMouseDoc, io.KeyShift);
-         else if (sTool == kFill && sFillKind == 0)
-            FillAt(doc, sMouseDoc);
+         else if (BrushTool(sTool))
+            BeginStroke(doc, sMouseDoc, io.KeyShift && !RetouchTool(sTool));
          else if (sTool == kFill)
+            FillAt(doc, sMouseDoc);
+         else if (sTool == kGradient)
          {
             sOp = Op();
             sOp.kind = 8;
@@ -2612,7 +2828,17 @@ namespace
       auto gap = []() { BarDivider(); };
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
       Layer* a = Active(doc);
-      if (sTool == kBrush || sTool == kEraser)
+      if (RetouchTool(sTool))
+      {
+         BrushEngine::Brush& b = ToolBrush();
+         BarSlider("##v2drsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
+         float hard = b.hardness * 100.0f, op = b.opacity * 100.0f;
+         BarSlider("##v2drhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
+         BarSlider("##v2drop", &op, 1.0f, 100.0f, "Strength %.0f%%", kWellL);
+         b.hardness = hard / 100.0f;
+         b.opacity = op / 100.0f;
+      }
+      else if (sTool == kBrush || sTool == kEraser)
       {
          BrushEngine::Brush& b = ToolBrush();
          int& preset = sTool == kEraser ? sEraserPreset : sBrushPreset;
@@ -2655,20 +2881,17 @@ namespace
          }
       }
       else if (sTool == kFill)
+         MatchChips();
+      else if (sTool == kGradient)
       {
-         static const char* kKinds[3] = { "Bucket", "Linear", "Radial" };
-         for (int i = 0; i < 3; i++)
+         static const char* kKinds[2] = { "Linear", "Radial" };
+         for (int i = 0; i < 2; i++)
          {
             if (i > 0)
                next();
             const std::string id = std::string(L(kKinds[i])) + "##v2dfk" + std::to_string(i);
-            if (TextChip(id.c_str(), sFillKind == i, i == 0 ? T("Click fills alike pixels") : T("Drag for the gradient")))
-               sFillKind = i;
-         }
-         if (sFillKind == 0)
-         {
-            gap();
-            MatchChips();
+            if (TextChip(id.c_str(), (sFillKind == 2) == (i == 1), nullptr))
+               sFillKind = i + 1;
          }
       }
       else if (sTool == kMarquee || sTool == kLasso)
@@ -2922,37 +3145,125 @@ namespace
 
    // The tools, down the left of the picture as in every image editor, in Photoshop's order and sections
    // (Photopea and PhotoCraft keep the same). Under them the foreground / background chips and quick mask.
-   struct ToolDef { int tool; const char* id; const char* glyph; const char* tip; };
-   const ToolDef kTools[15] = {
-      { kMove, "##v2dmove", IconsInfinite::ToolMove, "Move (V)" },
-      { kMarquee, "##v2dmarquee", IconsInfinite::Marquee, "Marquee (M)" },
-      { kLasso, "##v2dlasso", IconsInfinite::Lasso, "Lasso (L)" },
-      { kWand, "##v2dwand", IconsInfinite::Wand, "Magic wand (W)" },
-      { kCrop, "##v2dcrop", IconsInfinite::Crop, "Crop (C). Enter applies, Esc cancels" },
-      { kPick, "##v2dpick", IconsInfinite::Eyedropper, "Eyedropper (I). Alt sets the background" },
-      { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line" },
-      { kEraser, "##v2derase", IconsInfinite::Erase, "Eraser (E)" },
-      { kFill, "##v2dfilltool", IconsInfinite::Fill, "Fill and gradient (G)" },
-      { kPen, "##v2dpen", IconsInfinite::PenTool, "Pen (P). Drag for curves, Enter ends" },
-      { kText, "##v2dtext", IconsInfinite::Type, "Text (T). Click for a line, drag for a box" },
-      { kNode, "##v2dnode", IconsInfinite::Pointer, "Direct select (A). Alt-click an anchor makes a corner" },
-      { kShape, "##v2dshape", IconsInfinite::Shape, "Shape (U). Shift keeps it square, Alt from the centre" },
-      { kHand, "##v2dhand", IconsInfinite::Hand, "Hand (H, or hold Space)" },
-      { kZoom, "##v2dzoom", IconsInfinite::Zoom, "Zoom (Z). Alt-click zooms out" },
+   struct ToolDef { int tool; const char* id; const char* glyph; const char* tip; int section; };
+   const ToolDef kTools[kToolCount] = {
+      { kMove, "##v2dmove", IconsInfinite::ToolMove, "Move (V)", 0 },
+      { kMarquee, "##v2dmarquee", IconsInfinite::Marquee, "Marquee (M)", 1 },
+      { kLasso, "##v2dlasso", IconsInfinite::Lasso, "Lasso (L)", 1 },
+      { kWand, "##v2dwand", IconsInfinite::Wand, "Magic wand (W)", 1 },
+      { kCrop, "##v2dcrop", IconsInfinite::Crop, "Crop (C). Enter applies, Esc cancels", 1 },
+      { kPick, "##v2dpick", IconsInfinite::Eyedropper, "Eyedropper (I). Alt sets the background", 1 },
+      { kHeal, "##v2dheal", IconsInfinite::Heal, "Healing brush (J). Alt-click sets the source", 2 },
+      { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line", 2 },
+      { kClone, "##v2dclone", IconsInfinite::CloneStamp, "Clone stamp (S). Alt-click sets the source", 2 },
+      { kEraser, "##v2derase", IconsInfinite::Erase, "Eraser (E)", 2 },
+      { kGradient, "##v2dgradient", IconsInfinite::Gradient, "Gradient (G). Drag to draw", 2 },
+      { kFill, "##v2dfilltool", IconsInfinite::Fill, "Paint bucket (G)", 2 },
+      { kBlur, "##v2dblur", IconsInfinite::Blur, "Blur (R)", 2 },
+      { kSharpen, "##v2dsharpen", IconsInfinite::Sharpen, "Sharpen (R)", 2 },
+      { kDodge, "##v2ddodge", IconsInfinite::Dodge, "Dodge (O). Lightens", 2 },
+      { kBurn, "##v2dburn", IconsInfinite::Burn, "Burn (O). Darkens", 2 },
+      { kPen, "##v2dpen", IconsInfinite::PenTool, "Pen (P). Drag for curves, Enter ends", 3 },
+      { kText, "##v2dtext", IconsInfinite::Type, "Text (T). Click for a line, drag for a box", 3 },
+      { kNode, "##v2dnode", IconsInfinite::Pointer, "Direct select (A). Alt-click an anchor makes a corner", 3 },
+      { kShape, "##v2dshape", IconsInfinite::Shape, "Shape (U). Shift keeps it square, Alt from the centre", 3 },
+      { kHand, "##v2dhand", IconsInfinite::Hand, "Hand (H, or hold Space)", 4 },
+      { kZoom, "##v2dzoom", IconsInfinite::Zoom, "Zoom (Z). Alt-click zooms out", 4 },
    };
-   bool SectionStart(int i) { return i == 1 || i == 6 || i == 9 || i == 13; }   // select | paint | vector | view
+   // "Brush (B). Alt picks..." -> "Brush"
+   const char* ToolTitle(const char* tip)
+   {
+      static std::string buf;
+      buf = tip;
+      const size_t cut = buf.find_first_of("(.");
+      if (cut != std::string::npos)
+         buf.erase(buf.find_last_not_of(' ', cut - 1) + 1);
+      return buf.c_str();
+   }
+
+   const ToolDef* ToolFor(int tool)
+   {
+      for (const ToolDef& t : kTools)
+         if (t.tool == tool)
+            return &t;
+      return nullptr;
+   }
+
+   const char* ToolGlyph(int tool)
+   {
+      const ToolDef* t = ToolFor(tool);
+      return t != nullptr ? t->glyph : nullptr;
+   }
+
+   // The strip's order and hidden tools, kept in the workspace settings as "move,marquee,-lasso,...": drag a tool
+   // to move it, right-click the strip to show or hide tools.
+   std::vector<int> sStripOrder;     // indices into kTools
+   std::vector<bool> sStripHidden;
+   std::string sStripParsed = "\x01";
+
+   void ParseStrip()
+   {
+      if (sStripParsed == gView2DTools)
+         return;
+      sStripParsed = gView2DTools;
+      sStripOrder.clear();
+      sStripHidden.assign(kToolCount, false);
+      std::vector<bool> seen(kToolCount, false);
+      size_t at = 0;
+      while (at < gView2DTools.size())
+      {
+         size_t end = gView2DTools.find(',', at);
+         if (end == std::string::npos)
+            end = gView2DTools.size();
+         std::string name = gView2DTools.substr(at, end - at);
+         at = end + 1;
+         const bool hide = !name.empty() && name[0] == '-';
+         if (hide)
+            name.erase(0, 1);
+         for (int i = 0; i < kToolCount; i++)
+            if (!seen[i] && name == kTools[i].id + 5)
+            {
+               seen[i] = true;
+               sStripOrder.push_back(i);
+               sStripHidden[i] = hide;
+            }
+      }
+      for (int i = 0; i < kToolCount; i++)   // tools added since the order was saved go at their default place
+         if (!seen[i])
+            sStripOrder.insert(sStripOrder.begin() + std::min((size_t)i, sStripOrder.size()), i);
+   }
+
+   void SaveStrip()
+   {
+      std::string out;
+      for (int i : sStripOrder)
+         out += (out.empty() ? "" : ",") + std::string(sStripHidden[i] ? "-" : "") + (kTools[i].id + 5);
+      gView2DTools = out;
+      sStripParsed = out;
+      SaveWorkspaceSettings();
+   }
+
+   int VisibleTools()
+   {
+      ParseStrip();
+      int n = 0;
+      for (int i : sStripOrder)
+         n += !sStripHidden[i] || kTools[i].tool == sTool;
+      return n;
+   }
 
    // One column when the tools fit the height, else as many as it takes (never clipped, never scrolled).
    int StripColumns(float h)
    {
+      const int n = VisibleTools();
       const float step = tok::tile + tok::space_1;
-      const float oneCol = 15 * step + 4 * (tok::space_1 + 1.0f) + tok::space_1 + 2 * step;   // + sections + chips row
+      const float oneCol = n * step + 4 * (tok::space_1 + 1.0f) + tok::space_1 + 2 * step;   // + sections + chips row
       if (oneCol <= h)
          return 1;
-      for (int cols = 2; cols < 5; cols++)
-         if (((15 + cols - 1) / cols + 1) * step + tok::space_1 <= h)
+      for (int cols = 2; cols < 6; cols++)
+         if (((n + cols - 1) / cols + 1) * step + tok::space_1 <= h)
             return cols;
-      return 5;
+      return 6;
    }
 
    float StripWidth(int cols) { return cols * tok::tile + (cols - 1) * tok::space_1; }
@@ -3008,9 +3319,14 @@ namespace
       ImGui::BeginChild("##v2dtools", ImVec2(w, h), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_1, tok::space_1));
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      for (int i = 0; i < 15; i++)
+      ParseStrip();
+      int shown = 0, lastSection = -1, dropFrom = -1, dropTo = -1;
+      for (int k = 0; k < (int)sStripOrder.size(); k++)
       {
-         if (cols == 1 && SectionStart(i))
+         const int i = sStripOrder[k];
+         if (sStripHidden[i] && kTools[i].tool != sTool)
+            continue;
+         if (cols == 1 && shown > 0 && kTools[i].section != lastSection)
          {
             // A hairline between sections, centred in its gap.
             const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -3018,10 +3334,50 @@ namespace
             dl->AddLine(ImVec2(p.x + 4.0f, y), ImVec2(p.x + w - 4.0f, y), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
             ImGui::Dummy(ImVec2(w, 1.0f));
          }
-         else if (cols > 1 && i % cols != 0)
+         else if (cols > 1 && shown % cols != 0)
             ImGui::SameLine(0.0f, tok::space_1);
-         if (IconChip(kTools[i].id, kTools[i].glyph, sTool == kTools[i].tool, T(kTools[i].tip)))
+         lastSection = kTools[i].section;
+         shown++;
+         if (IconChip(kTools[i].id, kTools[i].glyph, sTool == kTools[i].tool, Sc(T(kTools[i].tip))))
             sTool = kTools[i].tool;
+         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+         {
+            ImGui::SetDragDropPayload("V2DTOOL", &k, sizeof(int));
+            ImGui::EndDragDropSource();
+         }
+         if (ImGui::BeginDragDropTarget())
+         {
+            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2DTOOL"))
+            {
+               dropFrom = *(const int*)pl->Data;
+               dropTo = k;
+            }
+            ImGui::EndDragDropTarget();
+         }
+      }
+      if (dropFrom >= 0 && dropFrom != dropTo)
+      {
+         const int moved = sStripOrder[dropFrom];
+         sStripOrder.erase(sStripOrder.begin() + dropFrom);
+         sStripOrder.insert(sStripOrder.begin() + dropTo, moved);
+         SaveStrip();
+      }
+      if (MenuParts::BeginContextWindow("##v2dtoolsmenu", ImGuiPopupFlags_MouseButtonRight))
+      {
+         for (int i : sStripOrder)
+            if (MenuParts::Item((std::string(T(ToolTitle(kTools[i].tip))) + kTools[i].id).c_str(), nullptr, !sStripHidden[i]))
+            {
+               sStripHidden[i] = !sStripHidden[i];
+               SaveStrip();
+            }
+         ImGui::Separator();
+         if (MenuParts::Item(T("Reset Tools")))
+         {
+            gView2DTools.clear();
+            ParseStrip();
+            sStripParsed = "\x01";
+         }
+         MenuParts::EndPopup();
       }
       ImGui::Dummy(ImVec2(w, 0.0f));
       ColourChips();
@@ -3112,6 +3468,30 @@ namespace
             if (hit)
                Align(doc, i);
          }
+         // Distribute: three bars, evenly spaced across (horizontal) or down (vertical).
+         for (int i = 0; i < 2; i++)
+         {
+            next();
+            ImGui::BeginDisabled(sSel.size() < 3);
+            const bool hit = ActionButton::Draw(i == 0 ? "##dist0" : "##dist1", ImVec2(kIconW, tok::tile));
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+               HelpTip("%s", T(i == 0 ? "Distribute horizontally" : "Distribute vertically"));
+            const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+            const ImVec2 c((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImU32 col = ImGui::GetColorU32(sSel.size() < 3 ? ImGuiCol_TextDisabled : ImGuiCol_Text);
+            for (int k = -1; k <= 1; k++)
+            {
+               const float o = k * 5.5f, len = k == 0 ? 4.0f : 6.0f;
+               if (i == 0)
+                  dl->AddRectFilled(ImVec2(c.x + o - 1.25f, c.y - len), ImVec2(c.x + o + 1.25f, c.y + len), col);
+               else
+                  dl->AddRectFilled(ImVec2(c.x - len, c.y + o - 1.25f), ImVec2(c.x + len, c.y + o + 1.25f), col);
+            }
+            if (hit)
+               Distribute(doc, i);
+         }
          if (a != nullptr && a->kind == Kind::Node)
          {
             gap();
@@ -3160,10 +3540,10 @@ namespace
          DrawTextBar(doc);
       else
       {
-         if (TextChip(L("Fit##v2dfit"), false, T("Fit on screen (Ctrl+0)")))
+         if (TextChip(L("Fit##v2dfit"), false, Sc(T("Fit on screen (Ctrl+0)"))))
             FitView(doc);
          next();
-         if (TextChip("100%##v2d100", false, T("Actual pixels (Ctrl+1)")))
+         if (TextChip("100%##v2d100", false, Sc(T("Actual pixels (Ctrl+1)"))))
          {
             sZoom = 1.0f;
             sPan = ImVec2(0, 0);
@@ -3231,7 +3611,7 @@ namespace
          sPending.what = Pending::RenderImage;
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Render Image (F12). Ctrl+F12 renders the animation"));
+         HelpTip("%s", Sc(T("Render Image (F12). Ctrl+F12 renders the animation")));
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dside", IconsInfinite::Layers, sSideOpen, T("Layers and properties"))) sSideOpen = !sSideOpen;
    }
@@ -3243,7 +3623,7 @@ namespace
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
       float row0Y = 0.0f;
       const ImVec2 mid((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
-      if (ZoomChip("##v2dzout", false, T("Zoom out (Ctrl+-)")))
+      if (ZoomChip("##v2dzout", false, Sc(T("Zoom out (Ctrl+-)"))))
          ZoomAt(doc, 0.8f, mid);
       row0Y = ImGui::GetItemRectMin().y;   // every later item and the text share this chip's top edge
       next();
@@ -3259,13 +3639,13 @@ namespace
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Zoom - type a percentage"));
       next();
-      if (ZoomChip("##v2dzin", true, T("Zoom in (Ctrl++)")))
+      if (ZoomChip("##v2dzin", true, Sc(T("Zoom in (Ctrl++)"))))
          ZoomAt(doc, 1.25f, mid);
       next();
-      if (TextChip(L("Fit##v2dstfit"), false, T("Fit on screen (Ctrl+0)")))
+      if (TextChip(L("Fit##v2dstfit"), false, Sc(T("Fit on screen (Ctrl+0)"))))
          FitView(doc);
       next();
-      if (TextChip("1:1##v2dst11", false, T("Actual pixels (Ctrl+1)")))
+      if (TextChip("1:1##v2dst11", false, Sc(T("Actual pixels (Ctrl+1)"))))
       {
          sZoom = 1.0f;
          sPan = ImVec2(0, 0);
@@ -3286,12 +3666,12 @@ namespace
       dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), IM_COL32(40, 40, 40, 255), 2.0f);
       if (l.kind == Kind::Group)
       {
-         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_md, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Folder);
+         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Folder);
          return;
       }
       if (l.kind == Kind::Adjust)
       {
-         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_md, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::ShadeSolid);
+         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::ShadeSolid);
          return;
       }
       if (l.kind == Kind::Fill)
@@ -3344,6 +3724,15 @@ namespace
                                 IM_COL32(90, 190, 90, 255), IM_COL32(80, 150, 235, 255), IM_COL32(160, 110, 220, 255),
                                 IM_COL32(150, 150, 150, 255) };
 
+   int CountRows(Scene2DNode* doc, int parent)
+   {
+      int n = 0;
+      for (int id : doc->ChildrenOf(parent))
+         if (const Layer* l = doc->FindLayer(id))
+            n += 1 + (l->kind == Kind::Group && l->open ? CountRows(doc, id) : 0);
+      return n;
+   }
+
    void DrawLayerRows(Scene2DNode* doc, int parent, int depth, float w)
    {
       std::vector<int> kids = doc->ChildrenOf(parent);
@@ -3355,7 +3744,7 @@ namespace
             continue;
          const int id = l->id;
          ImGui::PushID(id);
-         const float rowH = 30.0f;
+         const float rowH = kRowH;
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const bool sel = Selected(id);
@@ -3364,8 +3753,8 @@ namespace
          if (l->label > 0 && l->label < 8)
             dl->AddRectFilled(ImVec2(p.x, p.y + 3), ImVec2(p.x + 3, p.y + rowH - 3), kLabelCol[l->label]);
          // Eye: Alt-click shows only this one.
-         ImGui::SetCursorScreenPos(ImVec2(p.x + 4, p.y + (rowH - 20) * 0.5f));
-         if (ImGui::InvisibleButton("##eye", ImVec2(20, 20)))
+         ImGui::SetCursorScreenPos(ImVec2(p.x + 4, p.y + (rowH - 18) * 0.5f));
+         if (ImGui::InvisibleButton("##eye", ImVec2(18, 18)))
          {
             if (io.KeyAlt)
                doc->soloLayer = doc->soloLayer == id ? 0 : id;
@@ -3376,12 +3765,12 @@ namespace
                Touch();
             }
          }
-         glyph::Draw(dl, ImVec2(p.x + 14, p.y + rowH * 0.5f), tok::icon_md,
+         glyph::Draw(dl, ImVec2(p.x + 13, p.y + rowH * 0.5f), tok::icon_sm,
                      ImGui::GetColorU32(l->visible ? ImGuiCol_Text : ImGuiCol_TextDisabled), l->visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
-         float x = p.x + 28.0f + depth * 14.0f;
+         float x = p.x + 24.0f + depth * 12.0f;
          if (l->kind == Kind::Group)
          {
-            ImGui::SetCursorScreenPos(ImVec2(x, p.y + 7));
+            ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - 16) * 0.5f));
             if (ImGui::InvisibleButton("##open", ImVec2(12, 16)))
             {
                l->open = !l->open;
@@ -3399,12 +3788,12 @@ namespace
          {
             // The bent arrow that points down at the layer it is clipped to.
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            dl->AddLine(ImVec2(x, p.y + 8), ImVec2(x, p.y + rowH - 9), col, 1.5f);
-            dl->AddLine(ImVec2(x, p.y + rowH - 9), ImVec2(x + 6, p.y + rowH - 9), col, 1.5f);
+            dl->AddLine(ImVec2(x, p.y + 5), ImVec2(x, p.y + rowH - 6), col, 1.5f);
+            dl->AddLine(ImVec2(x, p.y + rowH - 6), ImVec2(x + 6, p.y + rowH - 6), col, 1.5f);
             x += 10.0f;
          }
-         DrawThumb(dl, doc, *l, ImVec2(x, p.y + 3), ImVec2(36, rowH - 6));
-         x += 42.0f;
+         DrawThumb(dl, doc, *l, ImVec2(x, p.y + 2), ImVec2(28, rowH - 4));
+         x += 33.0f;
          ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - ImGui::GetFrameHeight()) * 0.5f));
          if (sRename == id)
          {
@@ -3479,14 +3868,14 @@ namespace
          {
             if (!Selected(id))
                SelectOnly(id);
-            if (MenuParts::Item(T("Copy"), "Ctrl+C")) sPending.what = Pending::Copy;
-            if (MenuParts::Item(T("Cut"), "Ctrl+X")) sPending.what = Pending::Cut;
-            if (MenuParts::Item(T("Paste"), "Ctrl+V", false, !sClip.empty())) sPending.what = Pending::Paste;
-            if (MenuParts::Item(T("Duplicate Layer"), "Ctrl+J")) sPending.what = Pending::Duplicate;
+            if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
+            if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
+            if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
+            if (MenuParts::Item(T("Duplicate Layer"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
             MenuParts::Separator();
-            if (MenuParts::Item(T("Group Layers"), "Ctrl+G")) sPending.what = Pending::Group;
-            if (l->kind == Kind::Group && MenuParts::Item(T("Ungroup"), "Shift+Ctrl+G")) sPending.what = Pending::Ungroup;
-            if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), "Alt+Ctrl+G"))
+            if (MenuParts::Item(T("Group Layers"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
+            if (l->kind == Kind::Group && MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
+            if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), Sc("Alt+Ctrl+G")))
             {
                PushUndoCheckpoint("Clipping mask");
                l->clip = !l->clip;
@@ -3541,7 +3930,8 @@ namespace
          const bool group = a->kind == Kind::Group;
          std::vector<std::string> names = BlendNames(a->blend, group);
          // Blend + Opacity, then Fill + Lock: tile-high wells so they share the chips' 28 pt rows, both rows flush to w.
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (sChip - ImGui::GetFontSize()) * 0.5f));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, tok::space_1));
          const float half = (w - tok::space_1) * 0.5f;
          ImGui::SetNextItemWidth(half);
          const int offset = group ? -1 : 0;
@@ -3566,7 +3956,7 @@ namespace
             Touch();
          }
          UndoOnActivate("Opacity");
-         const float lockW = ImGui::CalcTextSize(T("Lock")).x + 4.0f * (tok::space_1 + kIconW);
+         const float lockW = ImGui::CalcTextSize(T("Lock")).x + 4.0f * (tok::space_1 + sChip);
          ImGui::SetNextItemWidth(std::max(kWellM, w - lockW - tok::space_1));
          float fillPct = a->fill * 100.0f;
          if (FieldWell::Slider("##v2dfill", &fillPct, 0.0f, 100.0f, "Fill %.0f%%"))
@@ -3595,7 +3985,7 @@ namespace
                Touch();
             }
          }
-         ImGui::PopStyleVar();
+         ImGui::PopStyleVar(2);
       }
       ImGui::BeginChild("##v2dlayers", ImVec2(w, listH), ImGuiChildFlags_None);
       const float rowsW = ImGui::GetContentRegionAvail().x;
@@ -3620,7 +4010,7 @@ namespace
       }
       ImGui::EndChild();
       // The strip under the list, as in every layers panel, centred under it.
-      const float footW = 8 * kIconW + 7 * tok::space_1;
+      const float footW = 8 * sChip + 7 * tok::space_1;
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
       if (IconChip("##v2dnewpaint", IconsInfinite::Brush, false, T("New layer")))
          sPending.what = Pending::AddPaint;
@@ -3644,7 +4034,7 @@ namespace
       if (IconChip("##v2dnewvec", IconsInfinite::PenTool, false, T("New vector layer")))
          sPending.what = Pending::AddVector;
       FormParts::Inline(0.0f, tok::space_1);
-      if (IconChip("##v2dnewgroup", IconsInfinite::Folder, false, T("Group (Ctrl+G)")))
+      if (IconChip("##v2dnewgroup", IconsInfinite::Folder, false, Sc(T("Group (Ctrl+G)"))))
          sPending.what = Pending::Group;
       FormParts::Inline(0.0f, tok::space_1);
       ImGui::BeginDisabled(a == nullptr || a->kind == Kind::Group);
@@ -3654,7 +4044,7 @@ namespace
       ImGui::EndDisabled();
       FormParts::Inline(0.0f, tok::space_1);
       ImGui::BeginDisabled(sSel.empty());
-      if (IconChip("##v2ddup", IconsInfinite::Copy, false, T("Duplicate (Ctrl+J)")))
+      if (IconChip("##v2ddup", IconsInfinite::Copy, false, Sc(T("Duplicate (Ctrl+J)"))))
          sPending.what = Pending::Duplicate;
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2ddel", IconsInfinite::Close, false, T("Delete layer")))
@@ -3764,16 +4154,34 @@ namespace
       if (l->kind != Kind::Group && l->kind != Kind::Fill && l->kind != Kind::Adjust)
       {
          SectionCard::Begin(T("Transform"));
-         DragRow("X", &l->x, 1.0f, "%.1f px");
-         DragRow("Y", &l->y, 1.0f, "%.1f px");
+         {
+            float* const pos[2] = { &l->x, &l->y };
+            const char* const fmts[2] = { "X %.0f", "Y %.0f" };
+            DragMulti(T("Position"), pos, fmts, 2, 1.0f);
+         }
          float bw = 1, bh = 1;
          doc->LayerBox(*l, bw, bh);
          float wpx = bw * l->sx, hpx = bh * l->sy;
-         if (DragRow("W", &wpx, 1.0f, "%.1f px"))
-            l->sx = bw > 0 ? wpx / bw : 1.0f;
-         if (DragRow("H", &hpx, 1.0f, "%.1f px"))
-            l->sy = bh > 0 ? hpx / bh : 1.0f;
-         DragRow(T("Angle"), &l->angle, 0.5f, "%.1f\xC2\xB0", -180.0f, 180.0f);
+         {
+            float* const size[2] = { &wpx, &hpx };
+            const char* const fmts[2] = { "W %.0f", "H %.0f" };
+            const int c = DragMulti(T("Size"), size, fmts, 2, 1.0f);
+            if (c & 1)
+               l->sx = bw > 0 ? wpx / bw : 1.0f;
+            if (c & 2)
+               l->sy = bh > 0 ? hpx / bh : 1.0f;
+         }
+         // 3D: the layer is a card the comp camera sees; Z pushes it away, X / Y / Z rotate it.
+         BoolRow(T("3D"), &l->is3d);
+         if (l->is3d)
+         {
+            DragRow(T("Depth"), &l->z, 1.0f, "Z %.0f");
+            float* const rot[3] = { &l->rx, &l->ry, &l->angle };
+            const char* const fmts[3] = { "X %.0f\xC2\xB0", "Y %.0f\xC2\xB0", "Z %.0f\xC2\xB0" };
+            DragMulti(T("Rotate"), rot, fmts, 3, 0.5f, -360.0f, 360.0f);
+         }
+         else
+            DragRow(T("Angle"), &l->angle, 0.5f, "%.1f\xC2\xB0", -180.0f, 180.0f);
          int anchor = (int)std::lround(l->ay * 2.0f) * 3 + (int)std::lround(l->ax * 2.0f);
          if (AnchorRow(T("Anchor"), &anchor))
          {
@@ -3798,6 +4206,7 @@ namespace
             l->y = doc->Doc().h * 0.5f;
             l->sx = l->sy = 1.0f;
             l->angle = 0.0f;
+            l->z = l->rx = l->ry = 0.0f;
             l->ax = l->ay = 0.5f;
             l->flipX = l->flipY = false;
             Touch();
@@ -3972,7 +4381,7 @@ namespace
       if (ActionButton::Draw(L("Render Animation##v2danim"), ImVec2(availW, 0)))
          sPending.what = Pending::RenderAnim;
       ImGui::EndDisabled();
-      ImGui::TextDisabled("%s", "Ctrl+F12");
+      ImGui::TextDisabled("%s", Sc("Ctrl+F12"));
       OutputNode* out = FindOutput();
       if (out != nullptr && !out->RecordStatus().empty())
          ImGui::TextDisabled("%s", out->RecordStatus().c_str());
@@ -4036,9 +4445,12 @@ namespace
       PopDockedPanelStyle();
       const float availW = ImGui::GetContentRegionAvail().x;
       DrawDocPicker(doc, availW);
+      sChip = kSideChip;
       const float roomH = ImGui::GetContentRegionAvail().y;
-      DrawLayersCard(doc, availW, std::max(90.0f, roomH * 0.42f - 70.0f));
-      ImGui::Dummy(ImVec2(0, tok::space_1));
+      // The list is as tall as its rows (plus one spare for dropping below the last), up to half the panel.
+      const float rowsH = (CountRows(doc, 0) + 1) * (kRowH + 1.0f) + 4.0f;
+      DrawLayersCard(doc, availW, std::clamp(rowsH, 3.0f * (kRowH + 1.0f), std::max(3.0f * (kRowH + 1.0f), roomH * 0.5f)));
+      ImGui::Dummy(ImVec2(0, 2.0f));
       const struct { const char* id; const char* label; } kTabs[3] = { { "##v2dt0", "Layer" }, { "##v2dt1", "Document" }, { "##v2dt2", "Output" } };
       const float tabW = std::floor((availW - 2.0f * tok::space_1) / 3.0f);
       for (int i = 0; i < 3; i++)
@@ -4046,7 +4458,7 @@ namespace
          if (i > 0)
             FormParts::Inline(0.0f, tok::space_1);
          ActionButton::Scoped() = sTab == i ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         if (ActionButton::Draw((std::string(T(kTabs[i].label)) + kTabs[i].id).c_str(), ImVec2(i == 2 ? availW - 2.0f * (tabW + tok::space_1) : tabW, tok::tile)))
+         if (ActionButton::Draw((std::string(T(kTabs[i].label)) + kTabs[i].id).c_str(), ImVec2(i == 2 ? availW - 2.0f * (tabW + tok::space_1) : tabW, sChip)))
             sTab = i;
          ActionButton::Scoped() = ActionButton::Kind::Plain;
       }
@@ -4056,12 +4468,16 @@ namespace
       SectionCard::BeginWindow();
       const float w = ImGui::GetContentRegionAvail().x;
       sFieldW = std::max(70.0f, w - kLabelW);
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, 3.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 3.0f));
       if (sTab == 0) DrawLayerTab(doc);
       else if (sTab == 1) DrawDocumentTab(doc);
       else DrawOutputTab(doc, w);
+      ImGui::PopStyleVar(2);
       SectionCard::EndWindow();
       ImGui::EndChild();
       ImGui::EndChild();
+      sChip = tok::tile;
    }
 
    // ---- deferred actions -------------------------------------------------
@@ -4420,6 +4836,7 @@ namespace
          doc->soloLayer = 0;
       sDirty = false;
       PumpStill();
+      sPanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
 
       const float headTop = ImGui::GetCursorScreenPos().y;
       DrawHeader(doc);
