@@ -2,6 +2,7 @@
 // pointing at, the transport, modulation by control name, bypass, and the code errors of the
 // open patch. Same rules as Rpc.cpp: main thread, between frames, one undo step per edit.
 #include <algorithm>
+#include <cstdlib> // k17: std::strtol, for a node index written as a string
 #include "app/AppShared.h"
 #include "core/GestureRecorder.h"
 #include "platform/common/ProcessTree.h"
@@ -39,6 +40,44 @@ namespace app
          gParamProbeNode = -1;
          outError = "'" + key + "' is not a modulatable control of " + gn.typeName + "; `infinite params " + std::to_string(gn.index) + "` lists its keys";
          return param;
+      }
+
+      // k17: how a node is named in a call. The same argument arrives as a bare integer (5), a numeric
+      // string ("5"), or an object ({"index":5} / {"node":5}) depending on which tool the caller
+      // learned, and under two names - `dst` on bind_mod, `index` everywhere else. Reading one
+      // spelling only is what made bind_mod answer "unknown node index" for a node that exists.
+      int NodeIndexOfField(const json& field)
+      {
+         if (field.is_number_integer())
+            return field.get<int>();
+         if (field.is_number())
+            return (int)field.get<double>();
+         if (field.is_string())
+         {
+            const std::string text = field.get<std::string>();
+            if (text.empty())
+               return -1;
+            char* end = nullptr;
+            const long parsed = std::strtol(text.c_str(), &end, 10);
+            return (end != text.c_str() && *end == '\0') ? (int)parsed : -1;
+         }
+         if (field.is_object())
+            for (const char* name : { "index", "node", "id", "dst" })
+               if (field.contains(name) && !field[name].is_null())
+                  return NodeIndexOfField(field[name]);
+         return -1;
+      }
+
+      // k17: `key`, `param`, `name` and `control` mean the same thing, at the top level or inside the
+      // destination object. An empty result is reported by the caller, never silently ignored.
+      std::string ControlKeyFrom(const json& params, const json& node)
+      {
+         for (const json* holder : { &params, &node })
+            if (holder->is_object())
+               for (const char* name : { "key", "param", "name", "control" })
+                  if (holder->contains(name) && (*holder)[name].is_string() && !(*holder)[name].get<std::string>().empty())
+                     return (*holder)[name].get<std::string>();
+         return std::string();
       }
 
       json CodeIssue(const GraphNode& gn, const std::string& message)
@@ -166,23 +205,29 @@ namespace app
       }
       if (method == "set_expr" || method == "bind_mod" || method == "unbind_mod")
       {
-         // fork: also accept the shapes an agent naturally writes: dst / src as {index, output, param|key}.
-         const json& dstField = method == "bind_mod" ? params.value("dst", json()) : params.value("index", json());
-         int dstIndex = dstField.is_number_integer() ? dstField.get<int>() : -1;
-         std::string key;
-         if (const json k = params.value("key", json()); k.is_string())
-            key = k.get<std::string>();
-         if (dstField.is_object())
-         {
-            dstIndex = dstField.value("index", -1);
-            for (const char* name : { "key", "param", "name" })
-               if (dstField.contains(name) && dstField[name].is_string() && key.empty())
-                  key = dstField[name].get<std::string>();
-         }
+         // k17: `dst`, `index`, `node` and `target` all name the node. bind_mod's documentation says
+         // `dst`, but get_params, set_param and unbind_mod all say `index`, so a caller that learned
+         // one spelling and wrote the other used to get "unknown node index" for a node that exists
+         // (API-6). Each field also takes an integer, a numeric string, or an {index|node: n} object.
+         json dstField;
+         for (const char* name : { "dst", "index", "node", "target" })
+            if (params.contains(name) && !params[name].is_null())
+            {
+               dstField = params[name];
+               break;
+            }
+         const int dstIndex = NodeIndexOfField(dstField);
+         const std::string key = ControlKeyFrom(params, dstField);
          GraphNode* gn = FindNodeByIndex(dstIndex);
          if (gn == nullptr)
          {
-            outError = "unknown node index (dst/index must be an integer node index from get_graph)";
+            outError = "unknown node index " + (dstIndex >= 0 ? std::to_string(dstIndex) : std::string("<missing>")) +
+                       ": pass dst (or index) as the integer node index from get_graph";
+            return true;
+         }
+         if (key.empty())
+         {
+            outError = "missing control key: pass key with its type letter, e.g. \"f rotation\"; `infinite params " + std::to_string(gn->index) + "` lists them";
             return true;
          }
          // A bare name ("uRotation") works as well as the typed key ("f uRotation").
@@ -225,29 +270,58 @@ namespace app
          }
          else if (method == "unbind_mod")
          {
-            PushUndoCheckpoint();
+            // An unbind of something that was never bound used to push an empty undo step; keep the
+            // history honest by only checkpointing a change that exists.
+            const bool wasBound = Modulation::Instance().IsModulated(gn->index, param);
+            if (wasBound)
+               PushUndoCheckpoint();
             Modulation::Instance().Unbind(gn->index, param);
+            gPatchDirty = gPatchDirty || wasBound;
+            outResult = { { "index", gn->index }, { "param", param }, { "key", key }, { "wasModulated", wasBound } };
+            return true;
          }
          else
          {
-            const json srcField = params.value("src", json());
-            const int srcIndex = srcField.is_number_integer() ? srcField.get<int>() : srcField.is_object() ? srcField.value("index", -1) : -1;
+            // k17: the modulator takes the same spellings as the destination, under the names an
+            // agent reaches for (`src`, `source`, `from`, `modulator`), plus `output` / `out`.
+            json srcField;
+            for (const char* name : { "src", "source", "from", "modulator" })
+               if (params.contains(name) && !params[name].is_null())
+               {
+                  srcField = params[name];
+                  break;
+               }
+            const int srcIndex = NodeIndexOfField(srcField);
             GraphNode* src = FindNodeByIndex(srcIndex);
-            int output = params.value("output", json()).is_number_integer() ? params.value("output", 0) : 0;
-            if (srcField.is_object() && srcField.value("output", json()).is_number_integer())
-               output = srcField.value("output", 0);
-            if (src == nullptr || output < 0 || output >= GraphNode::kStride - GraphNode::kOutputBase)
+            int output = 0;
+            for (const char* name : { "output", "out" })
+               if (params.contains(name) && params[name].is_number_integer())
+                  output = params[name].get<int>();
+            if (srcField.is_object())
+               for (const char* name : { "output", "out" })
+                  if (srcField.contains(name) && srcField[name].is_number_integer())
+                     output = srcField[name].get<int>();
+            if (src == nullptr)
             {
-               outError = "unknown modulator node or output";
+               outError = "unknown modulator node " + (srcIndex >= 0 ? std::to_string(srcIndex) : std::string("<missing>")) +
+                          ": pass src as the integer node index of a modulator from get_graph";
+               return true;
+            }
+            if (output < 0 || output >= GraphNode::kStride - GraphNode::kOutputBase)
+            {
+               outError = "unknown output " + std::to_string(output) + " of " + src->typeName;
                return true;
             }
             PushUndoCheckpoint();
             Modulation::Instance().Bind(gn->index, param, src->index, output);
             if (params.contains("lo") && params.contains("hi"))
                Modulation::Instance().SetRange(gn->index, param, params.value("lo", 0.0f), params.value("hi", 1.0f));
+            gPatchDirty = true;
+            outResult = { { "index", gn->index }, { "param", param }, { "key", key }, { "src", src->index }, { "output", output } };
+            return true;
          }
          gPatchDirty = true;
-         outResult = { { "index", gn->index }, { "param", param } };
+         outResult = { { "index", gn->index }, { "param", param }, { "key", key } };
          return true;
       }
       if (method == "code_errors")
