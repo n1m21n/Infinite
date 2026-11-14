@@ -530,13 +530,13 @@ int RunUnicodePathTest()
    // Settings: point the per-user folder at the Unicode folder.
 #if defined(_WIN32)
    _wputenv_s(L"APPDATA", AppPaths::FsPath(root).wstring().c_str());
-   const std::string wantSettings = root + "/Infinite";
+   const std::string wantSettings = root + "/InfiniteTU";  // fork:
 #elif defined(__APPLE__)
    setenv("HOME", root.c_str(), 1);
-   const std::string wantSettings = root + "/Library/Application Support/Infinite";
+   const std::string wantSettings = root + "/Library/Application Support/InfiniteTU";  // fork:
 #else
    setenv("XDG_CONFIG_HOME", root.c_str(), 1);
-   const std::string wantSettings = root + "/Infinite";
+   const std::string wantSettings = root + "/InfiniteTU";  // fork:
 #endif
    const std::string settings = AppPaths::AppSupportDir();
    check(settings == wantSettings, "settings folder is " + settings);

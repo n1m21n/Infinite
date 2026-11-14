@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/graph/NodeClipboard.h"
@@ -182,6 +183,10 @@ void DrawKeyboard(FrameCtx& fc)
       // Shift+U: the docked edit history
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_U, false))
          gHistoryOpen = !gHistoryOpen;
+
+      // fork: Shift+I: the Inspector
+      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_I, false))
+         gInspectorOpen = !gInspectorOpen;
 
       // Shift+W: the docked Sample studio (plain W pans the canvas)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_W, false))
@@ -1017,8 +1022,11 @@ void DrawKeyboard(FrameCtx& fc)
       // Deferred from GlobalScaleToggle() above - see comment on
       // gGlobalScaleTooltipHovered. This is the first point after the
       // per-node draw loop where an ed::Suspend()'d tooltip is safe to draw.
+      // fork: one tooltip window per frame - scale toggle, then diagnostics, then help (a later one used to cover the earlier).
+      bool tipShown = false;
       if (gGlobalScaleTooltipHovered)
       {
+         tipShown = true;
          ImGui::BeginTooltip();
          ImGui::TextUnformatted(gGlobalScaleTooltipEnabled ? "Global Scale: ON (click to disable)"
                                                             : "Global Scale: OFF (click to enable)");
@@ -1026,7 +1034,9 @@ void DrawKeyboard(FrameCtx& fc)
       }
 
       // Deferred from the node draw loop (cook warning, live schema issue).
-      if (!gNodeHoverTip.empty())
+      if (tipShown)
+         ;
+      else if (!gNodeHoverTip.empty())
          ImGui::SetTooltip("%s", gNodeHoverTip.c_str());
       else if (!gNodeHelpTip.empty() && ImGui::BeginTooltip())
       {

@@ -507,6 +507,7 @@ set(COMMON_SOURCES
     src/app/graph/ExportImage.cpp
     src/app/graph/GraphHosts.cpp
     src/app/graph/NodeRegistry.cpp
+    src/app/graph/PortProbeCache.cpp
     src/app/graph/PatchFiles.cpp
     src/app/graph/PatchShare.cpp
     src/app/graph/PatchIO.cpp
@@ -549,6 +550,11 @@ set(COMMON_SOURCES
     src/app/panels/ChatPanel.cpp
     src/core/CliSetup.cpp
     src/core/chat/AgentStream.cpp
+    src/core/chat/Providers.cpp
+    src/core/chat/HttpAgent.cpp
+    src/core/McpHttp.cpp
+    src/app/panels/CustomAgentForm.cpp
+    src/app/panels/ConnectAgentForm.cpp
     src/core/chat/ChatCatalog.cpp
     src/core/chat/PatchGrammar.cpp
     src/core/chat/ReplyLinks.cpp
@@ -566,6 +572,7 @@ set(COMMON_SOURCES
     src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
+    src/app/panels/InspectorPanel.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp
     src/app/panels/ViewportPanel.cpp
@@ -616,6 +623,7 @@ set(COMMON_SOURCES
     src/app/ui/ModWidgets.cpp
     src/app/ui/ParamWidgets.cpp
     src/app/ui/Theme.cpp
+    src/app/ui/ThemeFiles.cpp # fork: JSON themes
     src/app/ui/design/UiAnim.cpp
     src/app/ui/design/UiType.cpp
     src/app/ui/design/UiInteract.cpp
@@ -783,6 +791,7 @@ set(COMMON_SOURCES
     src/nodes/PredictiveModulatorNode.cpp
     src/audio/NoteModel.cpp
     src/nodes/OscNodes.cpp
+    src/nodes/OscPortHub.cpp
     src/nodes/NoiseNode.cpp
     src/nodes/SketchNode.cpp
     src/nodes/Sketch3DNode.cpp
@@ -958,6 +967,7 @@ file(GLOB INFINITE_NOTO_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ext
 
 set(APPLE_SOURCES
     src/platform/Platform.mm
+    src/platform/AgentNetMac.mm
     src/platform/MidiOutMac.mm
     src/platform/HeadTracker.mm
     src/audio/AudioFileWriter.mm
@@ -996,6 +1006,7 @@ set(WIN32_SOURCES
     # activeCodePage UTF-8: narrow paths, getenv and argv become UTF-8 (W1).
     src/platform/win/Infinite.manifest
     src/platform/win/PlatformWin.cpp
+    src/platform/AgentNetWin.cpp
     src/platform/HeadTrackerStub.cpp
     src/platform/win/TextWin.cpp
     src/platform/win/CrashHandlerWin.cpp
@@ -1029,6 +1040,7 @@ set(WIN32_SOURCES
 
 set(LINUX_SOURCES
     src/platform/linux/PlatformLinux.cpp
+    src/platform/AgentNetStub.cpp
     src/platform/HeadTrackerStub.cpp
     src/platform/linux/TextLinux.cpp
     src/platform/linux/CrashHandlerLinux.cpp
@@ -1236,6 +1248,8 @@ add_executable(Infinite ${COMMON_SOURCES})
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
 # User-Agent header, etc.).
 target_compile_definitions(Infinite PRIVATE INFINITE_VERSION_STRING="${INFINITE_VERSION}")
+# fork: the executable is InfiniteTU(.exe) so it installs beside the official Infinite.
+set_target_properties(Infinite PROPERTIES OUTPUT_NAME InfiniteTU)
 # Plugin licence (src/core/License.h): the engine reads only the key's id, for the refund check.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/worker/license/PUBLIC_KEY.txt" INFINITE_LICENSE_PUBKEY_HEX)
 string(STRIP "${INFINITE_LICENSE_PUBKEY_HEX}" INFINITE_LICENSE_PUBKEY_HEX)
@@ -1427,7 +1441,7 @@ if(WIN32)
     add_executable(infinite-cli src/cli_main_win.cpp)
     target_compile_definitions(infinite-cli PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
     set_target_properties(infinite-cli PROPERTIES
-        OUTPUT_NAME Infinite
+        OUTPUT_NAME InfiniteTU  # fork:
         SUFFIX ".com"
         PDB_NAME infinite-cli)
     add_dependencies(Infinite infinite-cli)
@@ -1754,7 +1768,7 @@ endif()
 
 if(APPLE)
     target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
-    set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
+    set_source_files_properties(src/platform/Platform.mm src/platform/AgentNetMac.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
@@ -1840,6 +1854,7 @@ if(APPLE)
 
     target_link_libraries(Infinite PRIVATE
         "-framework OpenGL"
+        "-framework Security"  # fork: Keychain for the built-in agent
         "-framework Cocoa"
         "-framework IOKit"
         "-framework CoreVideo"
@@ -1870,8 +1885,8 @@ if(APPLE)
 
     set_target_properties(Infinite PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "Infinite"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "com.namansoni.infinite"
+        MACOSX_BUNDLE_BUNDLE_NAME "Infinite TU"  # fork:
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.deriio.infinitetu"  # fork:
         MACOSX_BUNDLE_BUNDLE_VERSION "${INFINITE_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${INFINITE_VERSION}"
         MACOSX_BUNDLE_ICON_FILE "Infinite"

@@ -1,4 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "core/McpHttp.h"
+#include "core/ForkIdentity.h"
 #include "plugin/engine/HostAudio.h"
 #include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
@@ -11,7 +13,17 @@
 #include "app/frame/FrameCtx.h"
 #include "platform/HeadTracker.h"
 #include "platform/AppPaths.h"
+#include "app/ui/ThemeFiles.h" // fork
 #include "core/DawPluginInstall.h"
+
+// fork: ask NVIDIA Optimus / AMD PowerXpress laptops for the discrete GPU (not verified on Windows).
+#if defined(_WIN32)
+extern "C"
+{
+   __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+   __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
 
 namespace app
 {
@@ -206,6 +218,9 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 
 int InitApp(FrameCtx& fc, int argc, char** argv)
 {
+   // fork: before any setting, index, autosave or log is read - a portable copy (portable.txt beside
+   // the exe) keeps all of it in its own Data folder, see AppPaths::ResolvePortableDataDir.
+   AppPaths::ResolvePortableDataDir(Platform::ExecutablePath());
    auto& sMainRssStartMb = fc.sMainRssStartMb;
    auto& sMainFootStartMb = fc.sMainFootStartMb;
    auto& tPreWindow = fc.tPreWindow;
@@ -1175,7 +1190,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    mainWindowHints.scaleToMonitor = gHeadlessTestWindow ? GLFW_FALSE : GLFW_TRUE;
    if (LauncherCard::Enabled())
       glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-   window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
+   window = glfwCreateWindow(1600, 1000, "Infinite TU"  /* fork: */, nullptr, nullptr);
    if (!window)
    {
       if (pluginNoGraphics("no OpenGL 3.3 window"))
@@ -1436,6 +1451,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Loaded here (rather than down with the other Load*Settings() calls)
    // because the font/DPI block right below needs gUiScale before it bakes
    // the font atlas - loading it after the atlas already exists is too late.
+   ThemeFiles::Init(); // fork: user themes (themes/*.json) must exist before the saved theme name is resolved
    CategoryColors::LoadPreference();
 
    // Interface language: an explicit choice wins, otherwise the first OS preference that is one of
@@ -1699,14 +1715,15 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // screenshot run (INFINITE_SHOT_REQUEST), which is driven over this port.
    if (!IsHeadlessProcess() || getenv("INFINITE_SHOT_REQUEST") != nullptr)
    {
-      int controlPort = 7777;
+      int controlPort = ForkIdentity::kControlPort;  // fork:
       if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
          controlPort = atoi(portEnv);
       RemoteControl::Start(controlPort);
+      McpHttp::StartFromSettings();  // fork: the in-app MCP over HTTP, off unless Settings turned it on
 
       // The OSC control API (core/OscControl.h): loopback UDP, port 9100,
       // INFINITE_OSC_PORT to move it, 0 to turn it off.
-      int oscPort = 9100;
+      int oscPort = ForkIdentity::kOscPort;  // fork:
       if (const char* oscEnv = getenv("INFINITE_OSC_PORT"))
          oscPort = atoi(oscEnv);
       if (oscPort > 0)

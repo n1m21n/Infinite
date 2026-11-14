@@ -1,4 +1,5 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector pin wrappers
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/CheckBox.h"
@@ -6,6 +7,7 @@
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 #include "imgui_internal.h"
 
 #include <cmath>
@@ -79,6 +81,23 @@ namespace app
          ImGui::EndTooltip();
       }
       va_end(args);
+   }
+
+
+   // fork: diagnostic tooltip that is safe inside a node body (see NodeTip.h). Last writer wins within a frame.
+   void NodeTip(const char* fmt, ...)
+   {
+      char buf[512];
+      va_list args;
+      va_start(args, fmt);
+      vsnprintf(buf, sizeof(buf), fmt, args);
+      va_end(args);
+      if (gInsideNodeCanvas)
+      {
+         gNodeHoverTip = buf;
+         return;
+      }
+      ImGui::SetTooltip("%s", buf);
    }
 
 
@@ -562,9 +581,9 @@ namespace app
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_ForTooltip))
       {
          if (sGateNode == nodeIndex && !sGateLabel.empty())
-            ImGui::SetTooltip("%s %s", T("Off: set by"), sGateLabel.c_str());
+            NodeTip("%s %s", T("Off: set by"), sGateLabel.c_str());
          else
-            ImGui::SetTooltip("%s", T("Off in this mode"));
+            NodeTip("%s", T("Off in this mode"));
       }
    }
 
@@ -718,8 +737,8 @@ namespace app
       const int pinId = h.nodeIndex * GraphNode::kStride + GraphNode::kParamBase + h.paramIndex;
       gDrawnParamPins.insert(pinId);
 
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      insp::BeginPin(pinId, ed::PinKind::Input);
+      insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       const ImVec2 p = controlHeight > 0.0f
@@ -732,7 +751,7 @@ namespace app
       const bool isLight = IsThemeLight();
       PinDot::Param(dl, c, h.modulated ? PinDot::State::Modulated : PinDot::State::Idle, isLight);
       ExpandPinHit(c, p.x + box);
-      ed::EndPin();
+      insp::EndPin();
 
       GraphNode* curGn = FindNodeByIndex(h.nodeIndex);
       // rowMin starts after the pin box + its SameLine gap, not at the pin

@@ -9,6 +9,11 @@
 #include "core/chat/ChatFiles.h"
 #include "core/chat/ChatThread.h"
 #include "core/chat/PatchGrammar.h"
+#include "core/chat/HttpAgent.h"
+#include "core/chat/Providers.h"
+#include "core/McpHttp.h"
+#include "core/RemoteControl.h"
+#include "platform/AgentNet.h"
 #include "core/chat/ReplyLinks.h"
 #include "core/chat/ChatGuide.h"
 #include "core/chat/NodeFinder.h"
@@ -244,6 +249,143 @@ namespace app
                   std::find(next.begin(), next.end(), "--resume") != next.end() && next.back() == "hello",
                "claude: first turn names the session, later turns resume it");
          check(chat::TerminalResumeLine(chat::AgentKind::Claude, "abc") == "claude --resume abc", "terminal face resumes the same session");
+         {  // fork: provider table and the custom (OpenAI-compatible) agent
+            check(chat::FindProvider("codex") != nullptr && chat::FindProvider("codex")->kind == chat::AgentKind::Codex && chat::FindProvider("nope") == nullptr &&
+                     chat::FindProvider(chat::AgentKind::Custom) != nullptr && std::string(chat::FindProvider(chat::AgentKind::Custom)->id) == "custom",
+                  "providers: the table finds agents by id and kind");
+            check(chat::AgentArgs(chat::AgentKind::Custom, "hi", "s", false).empty(), "custom: the built-in agent has no argv (no child process)");
+            check(chat::CustomProblem("", "m", "K").size() > 0 && chat::CustomProblem("http://x", "", "K").size() > 0 && chat::CustomProblem("http://x", "m", "a b;").size() > 0 &&
+                     chat::CustomProblem("http://x", "m", "CUSTOM_LLM_API_KEY").empty() && chat::CustomProblem("http://x", "m", "").empty(),
+                  "custom: an incomplete form or a bad variable name blocks the turn");
+            check(chat::ChatUrl("https://openrouter.ai/api/v1/") == "https://openrouter.ai/api/v1/chat/completions" && chat::MaskKey("sk-abcdefghijkl") == "sk-…ijkl" && chat::MaskKey("abc") == "…",
+                  "custom: the chat URL is the base + /chat/completions; keys are masked");
+            {
+               chat::SseChat sc;
+               const std::string stream =
+                  "data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\r\n\r\n: keep-alive\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n"
+                  "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"infinite_cli\",\"arguments\":\"{\\\"args\\\":\"}}]}}]}\n"
+                  "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"[\\\"undo\\\"]}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n"
+                  "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":7,\"prompt_tokens_details\":{\"cached_tokens\":40}}}\ndata: [DONE]\n";
+               for (size_t i = 0; i < stream.size(); i += 7)  // arbitrary chunking
+                  sc.Feed(stream.data() + i, std::min<size_t>(7, stream.size() - i));
+               check(sc.text == "Hello" && sc.calls.size() == 1 && sc.calls[0].id == "c1" && sc.calls[0].name == "infinite_cli" && sc.calls[0].args == "{\"args\":[\"undo\"]}" &&
+                        sc.finish == "tool_calls" && sc.usage.input == 60 && sc.usage.cached == 40 && sc.usage.output == 7 && sc.done,
+                     "custom: SSE chunks give text, a tool call assembled from pieces, usage");
+               check(chat::OpenAiTools().size() == 5 && chat::OpenAiTools()[0]["type"] == "function" && chat::DescribeCall("infinite_cli", nlohmann::json::parse("{\"args\":[\"add\",\"Osc\"]}")) == "infinite add Osc",
+                     "custom: Infinite's tools are offered in OpenAI form");
+            }
+         }
+         {
+            if (const char* mock = std::getenv("INFINITE_MOCK_LLM_PORT"))  // fork: only with tools/mock_openai_server.py running
+            {
+               chat::HttpAgentConfig hc;
+               hc.baseUrl = std::string("http://127.0.0.1:") + mock + "/v1";
+               hc.model = "mock";
+               hc.tools = false;
+               const auto turn = [&](const chat::HttpAgentConfig& c, std::vector<chat::AgentEvent>& ev)
+               { chat::RunHttpTurn(c, "sess-1", false, "hello", [&](const chat::AgentEvent& e) { ev.push_back(e); }, [] { return false; }); };
+               std::vector<chat::AgentEvent> ev;
+               turn(hc, ev);  // the mock wants "Bearer test-key": no key is set here, so it refuses with 401
+               check(!ev.empty() && ev.back().kind == chat::AgentEvent::Kind::End && ev.back().error && ev.back().text.find("401") != std::string::npos, "mock llm: a refused key ends the turn with the status");
+               AgentNet::SecretSet(chat::kKeyService, chat::kKeyAccount, "test-key");
+               ev.clear();
+               turn(hc, ev);
+               bool streamed = false;
+               for (const auto& e : ev)
+                  streamed = streamed || (e.kind == chat::AgentEvent::Kind::Text && e.text.find("Hello from the mock") != std::string::npos);
+               check(streamed && !ev.back().error && ev.back().usage.output == 5, "mock llm: the keychain key is sent, the stream becomes the answer, usage is read");
+               const chat::ConnectionResult cr = chat::TestConnection(hc);
+               check(cr.ok, "mock llm: test connection says connected");
+               AgentNet::SecretDelete(chat::kKeyService, chat::kKeyAccount);
+            }
+            {  // fork: no RPC method may take the app down. Each method gets {}, wrong types and absent indices through
+               // the same guard the control socket and the HTTP MCP use.
+               static const char* const kKeys[] = { "index", "type", "typeName", "name", "value", "key", "src", "dst", "output", "text", "calls", "nodes",
+                                                    "action", "srcIndex", "dstIndex", "srcOutput", "dstSlot", "linkId", "what", "x", "y", "bypassed",
+                                                    "lo", "hi", "id", "category", "full", "all", "advanced", "bpm", "seconds" };
+               // Writes files, replaces the patch or changes app settings: only called with values that are not strings.
+               static const char* const kGuarded[] = { "save_patch", "load_patch", "new_patch", "settings", "load_patch_text", "batch", "edit", "transport", "view" };
+               const std::vector<nlohmann::json> garbage = { nullptr, true, -1, 987654, 1.5, nlohmann::json::array({ 1, "a" }), nlohmann::json::object({ { "index", 4 }, { "output", 11 } }) };
+               int bad = 0, calls = 0;
+               std::string firstBad;
+               for (const std::string& method : McpHttp::RpcMethodNames())
+               {
+                  if (method == "undo" || method == "redo" || method == "new_patch")
+                     continue;  // take no parameters and would change the state later checks rely on
+                  const bool guarded = std::find(std::begin(kGuarded), std::end(kGuarded), method) != std::end(kGuarded);
+                  std::vector<nlohmann::json> payloads = { nlohmann::json::object() };
+                  for (const nlohmann::json& g : garbage)
+                  {
+                     nlohmann::json p = nlohmann::json::object();
+                     for (const char* k : kKeys)
+                        p[k] = g;
+                     payloads.push_back(p);
+                  }
+                  if (!guarded)
+                  {
+                     nlohmann::json p = nlohmann::json::object();
+                     for (const char* k : kKeys)
+                        p[k] = "zzz-not-a-thing";
+                     payloads.push_back(p);
+                  }
+                  for (const nlohmann::json& payload : payloads)
+                  {
+                     if (guarded && method != "view" && method != "transport" && method != "edit" && method != "batch" && !payload.empty() && payload.begin().value().is_string())
+                        continue;
+                     nlohmann::json out;
+                     std::string err;
+                     calls++;
+                     bool ok = false;
+                     try
+                     {
+                        ok = RemoteControl::SafeDispatch(app::HandleRpcCommand, method, payload, out, err);
+                     }
+                     catch (...)
+                     {
+                        bad++;
+                        if (firstBad.empty())
+                           firstBad = method + " threw";
+                     }
+                     if (!ok && err.empty())
+                     {
+                        bad++;
+                        if (firstBad.empty())
+                           firstBad = method + " failed without a message";
+                     }
+                  }
+               }
+               check(bad == 0 && calls > 100, ("rpc fuzz: every method survives odd input with a message (" + std::to_string(calls) + " calls) " + firstBad).c_str());
+               nlohmann::json out;
+               std::string err;
+               const bool ok = RemoteControl::SafeDispatch(app::HandleRpcCommand, "bind_mod",
+                                                           nlohmann::json::parse(R"({"src":{"index":4,"output":11},"dst":{"index":5,"param":"uRotation"}})"), out, err);
+               check(!ok && !err.empty() && err.find("unknown node index") != std::string::npos, "rpc: bind_mod with nested src/dst on a missing node is an error, not a crash");
+               {  // save_patch: errors name the reason and nothing is written
+                  nlohmann::json o2;
+                  std::string e2;
+                  const bool rel = RemoteControl::SafeDispatch(app::HandleRpcCommand, "save_patch", nlohmann::json::parse(R"({"path":"relative/x.inf"})"), o2, e2);
+                  check(!rel && e2.find("absolute") != std::string::npos, "save_patch: a relative path is refused with the reason");
+                  const bool num = RemoteControl::SafeDispatch(app::HandleRpcCommand, "save_patch", nlohmann::json::parse(R"({"path":12})"), o2, e2);
+                  check(!num && e2.find("string") != std::string::npos, "save_patch: a non-string path is refused with an example");
+               }
+               nlohmann::json ex;
+               check(!RemoteControl::SafeDispatch([](const std::string&, const nlohmann::json&, nlohmann::json&, std::string&) -> bool { throw std::runtime_error("boom"); },
+                                                  "connect", nlohmann::json::object(), ex, err) && err.find("Example:") != std::string::npos,
+                     "rpc: a throwing handler becomes an error that quotes an example");
+            }
+            {  // fork: the in-app MCP over HTTP answers the protocol without a socket
+               const std::string init = McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\"}}");
+               const std::string list = McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
+               check(init.find("2025-03-26") != std::string::npos && list.find("infinite_cli") != std::string::npos && list.find("infinite_rpc_methods") != std::string::npos,
+                     "mcp http: initialize echoes the version, tools/list names the tools");
+               check(McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}").empty() && McpHttp::Handle("nope").find("-32700") != std::string::npos &&
+                        McpHttp::Handle("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"x\"}").find("-32601") != std::string::npos,
+                     "mcp http: notifications get no reply; bad JSON and unknown methods are errors");
+               check(McpHttp::NewToken().size() == 32 && McpHttp::AgentInstructions({ true, 7790, "tok123" }, "/x/Infinite").find("Bearer tok123") != std::string::npos,
+                     "mcp http: instructions carry the real token");
+            }
+
+         }
 
          // A turn through the login shell: a stand-in agent prints stream-json, the runner hands it over.
          auto runTurn = [](const std::vector<std::string>& argv, std::vector<chat::AgentEvent>& out)

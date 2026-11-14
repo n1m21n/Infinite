@@ -7,6 +7,7 @@
 // must keep the exact signature declared in ../Platform.h.
 
 #include "../Platform.h"
+#include "core/ForkIdentity.h"
 
 #include "WinCommon.h"
 
@@ -985,7 +986,7 @@ namespace Platform
    {
       // Explicit AppUserModelID ensures Windows Taskbar groups windows under
       // the Infinite application and displays the correct pinned taskbar icon.
-      SetCurrentProcessExplicitAppUserModelID(L"Infinite.Synthesizer");
+      SetCurrentProcessExplicitAppUserModelID(ForkIdentity::kAppUserModel  /* fork: */);
    }
    void InitDocumentHandlingPostGlfw() {}
 
@@ -1256,7 +1257,7 @@ namespace Platform
       if (!CanSelfUpdate(outError))
          return false;
       const std::wstring dir = WinCommon::Utf8ToWide(payload);
-      const std::string got = ExeVersion(dir + L"\\Infinite.exe");
+      const std::string got = ExeVersion(dir + L"\\InfiniteTU.exe");
       if (got.empty())
       {
          outError = "The download has no Infinite.exe.";
@@ -1310,7 +1311,7 @@ namespace Platform
       // relaunches. -EncodedCommand sidesteps every quoting rule between CreateProcess and PowerShell.
       const std::wstring script =
          L"$p=" + std::to_wstring(GetCurrentProcessId()) + L"; $src=" + PsQuote(sStagedUpdate) + L"; $dst=" +
-         PsQuote(dst) + L"; $old=" + PsQuote(dst + L".old") + L"; $exe=" + PsQuote(dst + L"\\Infinite.exe") + L"\n"
+         PsQuote(dst) + L"; $old=" + PsQuote(dst + L".old") + L"; $exe=" + PsQuote(dst + L"\\InfiniteTU.exe") + L"\n"
          L"Wait-Process -Id $p -ErrorAction SilentlyContinue\n"
          L"robocopy $dst $old /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null\n"
          L"$backed = $LASTEXITCODE -lt 8\n"

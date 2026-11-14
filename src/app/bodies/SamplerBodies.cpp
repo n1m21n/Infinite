@@ -1,4 +1,5 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector pin wrappers
 #include "app/ui/design/components/StepCell.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FormParts.h"
@@ -2131,15 +2132,15 @@ namespace app
             const float pinY = y0 + rowH * 0.5f;
             const int pinId = gn.OutputPinId(1 + lane);
 
-            ed::BeginPin(pinId, ed::PinKind::Output);
-            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            insp::BeginPin(pinId, ed::PinKind::Output);
+            insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
             const ImVec2 pinCenter(pinX, pinY);
             const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
-            ed::PinRect(pinMin, pinMax);
+            insp::PinRect(pinMin, pinMax);
 
             PinDot::Cable(dl, pinCenter, /*prediction=*/false, isLight);
-            ed::EndPin();
+            insp::EndPin();
 
             ImGui::PopID();
          }

@@ -1,9 +1,11 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector pin wrappers
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 
 namespace app
 {
@@ -290,18 +292,18 @@ namespace app
             // to an absolute position and never advances it, so each
             // successive pin's group-derived bounds would balloon to include
             // every prior cell too - only the last-drawn pin would end up
-            // hit-testable across the whole grid. ed::PinRect() sets the
+            // hit-testable across the whole grid. insp::PinRect() sets the
             // pin's bounds explicitly, sidestepping that group-bounds path.
             ImGui::PushID(outputIndex);
             const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kOutputBase + outputIndex;
-            ed::BeginPin(pinId, ed::PinKind::Output);
-            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            insp::BeginPin(pinId, ed::PinKind::Output);
+            insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
             const ImVec2 pinCenter(cellMax.x - 9.0f, cellMax.y - 9.0f);
             const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
-            ed::PinRect(pinMin, pinMax);
+            insp::PinRect(pinMin, pinMax);
             PinDot::Cable(dl, pinCenter, /*prediction=*/false, isLight, /*small=*/true);
-            ed::EndPin();
+            insp::EndPin();
             ImGui::PopID();
          }
       }
@@ -2425,7 +2427,7 @@ namespace app
       // The requested sample count is clamped by both the driver and a memory
       // budget, so say what actually happened when they disagree.
       if (n->ActiveSamples() != wantedAa && ImGui::IsItemHovered())
-         ImGui::SetTooltip("antialias reduced to %dx at this size", n->ActiveSamples());
+         NodeTip("antialias reduced to %dx at this size", n->ActiveSamples());
       DropdownButton("tonemap", Render3DNode::TonemapNames(), n->tonemap,
                      [n](int i) { n->tonemap = i; }, colW);
       ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);
