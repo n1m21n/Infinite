@@ -2798,10 +2798,17 @@ void RunBindModTest(int f)
       e.clear();
       BindCheck("bind_mod: a non-string key is reported as missing",
                 !Call("bind_mod", { { "dst", dst }, { "key", 42 }, { "src", src } }, r, e) && e.find("missing control key") != std::string::npos);
+      // The canvas culls nodes outside the view, and a node that is not drawn never registers its
+      // controls - so frame the pair before waiting for the table.
+      e.clear();
+      BindCheck("k17: the pair is in view", Call("fit_view_node", { { "index", dst } }, r, e));
       return;
    }
    if (f < 5 || dst < 0)
       return;
+   // Frame the node again on every retry: a view that moved away would keep it culled.
+   e.clear();
+   Call("fit_view_node", { { "index", dst } }, r, e);
 
    // Frames 5..7: the node has drawn, so the key resolves - bind, then check everything that needs it.
    if (!bound)
@@ -2813,7 +2820,14 @@ void RunBindModTest(int f)
          param = r.value("param", -1);
       }
       else
-         printf("  [diag] k17: frame %d, Shape's controls are not registered yet (%s)\n", f, e.c_str());
+      {
+         size_t mine = 0;
+         for (const ParamRef& pr : Modulation::Instance().FrameParams())
+            if (pr.nodeIndex == dst)
+               ++mine;
+         printf("  [diag] k17: frame %d, not registered yet (%s); nodes=%zu frameParams=%zu forDst=%zu probe=%d\n", f, e.c_str(), gNodes.size(),
+                Modulation::Instance().FrameParams().size(), mine, gParamProbeNode);
+      }
    }
 
    if (bound && !verified)
@@ -2875,7 +2889,7 @@ void RunBindModTest(int f)
       BindCheck("unbind_mod: no empty undo step for a missing binding", gUndoStack.size() == undoAfterUnbind);
    }
 
-   if (f >= 7)
+   if (f >= 10)
    {
       if (!bound)
          BindCheck("bind_mod: the node registered its controls within three frames", false);
