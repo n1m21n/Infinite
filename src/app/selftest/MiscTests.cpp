@@ -2598,15 +2598,20 @@ void RunRpcBatchTest()
 
    // fork: the arrange loop had no RPC. Zero-length must be refused, never armed over nothing
    // (Transport drops a zero span, so the button would read "on" while playback ignored it).
-   {
+        {
       json tr;
       NewPatch();
       Check("transport loop refuses an empty range", !Call("transport", { {"action", "loop"}, {"enabled", true} }, tr, e));
+
+      e.clear(); // Clear the error from the previous test so it doesn't break the next call
       Check("transport loop sets a range in beats",
             Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 4}, {"end", 12} }, tr, e) &&
                tr.value("loopEnabled", false) && std::abs(tr.value("loopStart", 0.0) - 4.0) < 1e-6 &&
                std::abs(tr.value("loopEnd", 0.0) - 12.0) < 1e-6);
+
       Check("transport loop refuses a zero span", !Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 8}, {"end", 8} }, tr, e));
+
+      e.clear(); // Clear the error from the zero span test
       Check("transport loop turns off", Call("transport", { {"action", "loop"}, {"enabled", false} }, tr, e) && !tr.value("loopEnabled", true));
    }
    NewPatch();
