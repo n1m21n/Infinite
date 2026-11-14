@@ -911,6 +911,13 @@ void DrawPopupsA(FrameCtx& fc)
                // These two panels load a file straight in; each takes only its own kind.
                (overStudioForDrop ? gSampleStudioPendingDrop : gPianoRollPendingDrop) = gSampleDragPath;
             }
+            else if (fileDrag && gView2DOpen && mp.x >= gView2DRectMin.x && mp.x < gView2DRectMax.x &&
+                     mp.y >= gView2DRectMin.y && mp.y < gView2DRectMax.y)
+            {
+               // The 2D View takes a Library file as it takes a dropped one: a source node and a layer at the drop point.
+               gDroppedFiles = { gSampleDragPath };
+               gDropPos = mp;
+            }
             else if (overArrangePanelForDrop &&
                 (gSampleDragKind == LibraryDragKind::Sample || gSampleDragKind == LibraryDragKind::Media) &&
                 !gSampleDragPath.empty())

@@ -25,6 +25,9 @@
 #include "nodes/Scene2DNode.h"
 #include "nodes/SketchNode.h"
 #include "nodes/TextNode.h"
+#include "nodes/ModelSourceNode.h"
+#include "nodes/VideoSourceNode.h"
+#include "audio/MediaExtensions.h"
 #include "platform/Platform.h"
 
 #include <algorithm>
@@ -37,6 +40,9 @@
 
 namespace app
 {
+static bool Is3DNode(INode* n);
+static bool ImportSvgInto(Scene2DNode* doc, const std::string& path);
+
 using I18n::L;
 using I18n::T;
 
@@ -162,10 +168,15 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, AddAdjust };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, AddAdjust, AddNode, ReplaceNode };
       What what = None;
-      int arg = 0;   // AddAdjust: the type
+      int arg = 0;         // AddAdjust: the type
+      uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
    } sPending;
+
+   // Click-a-node-on-the-canvas mode, as the 3D View has: 0 off, 1 add the picked node as a layer, 2 replace the active layer's source.
+   int sPickMode = 0;
+   uint64_t sPickedUid = 0;
 
    ImU32 Hex(unsigned rgb, float a = 1.0f)
    {
@@ -197,7 +208,17 @@ namespace
       ed::EditorContext* prev = ed::GetCurrentEditor();
       ed::SetCurrentEditor(gEditor);
       static uint64_t sFollowed = 0;
-      uint64_t selected = 0;
+      static uint64_t sLastNode = 0;
+      uint64_t selected = 0, anyNode = 0;
+      for (GraphNode& gn : gNodes)
+         if (ed::IsNodeSelected(gn.NodeId()))
+         {
+            anyNode = gn.uid;
+            break;
+         }
+      if (anyNode != 0 && anyNode != sLastNode && sPickMode != 0 && View2DCanAdd(*FindNodeByUid(anyNode)))
+         sPickedUid = anyNode;
+      sLastNode = anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene2DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
          {
@@ -571,6 +592,61 @@ namespace
       if (doc->HasSelection())
          doc->MaskFromSelection(id);
       SelectOnly(id);
+   }
+
+   // A canvas node as a layer, centred at a document point (the middle when null).
+   int AddNodeLayer(Scene2DNode* doc, uint64_t uid, const ImVec2* at)
+   {
+      GraphNode* gn = FindNodeByUid(uid);
+      if (gn == nullptr || !View2DCanAdd(*gn))
+         return 0;
+      Layer* a = Active(doc);
+      Layer& l = doc->AddLayer(Kind::Node, uid, a != nullptr && a->kind != Kind::Group ? a->id : 0);
+      l.is3d = Is3DNode(gn->node.get());
+      if (at != nullptr)
+      {
+         l.x = at->x;
+         l.y = at->y;
+      }
+      const int id = l.id;
+      doc->Commit();
+      SelectOnly(id);
+      return id;
+   }
+
+   // Swap a node layer's source and keep everything else: transform, 3D pose, mask, blend, effects.
+   bool ReplaceSource(Scene2DNode* doc, int id, uint64_t uid)
+   {
+      Layer* l = doc->FindLayer(id);
+      GraphNode* gn = FindNodeByUid(uid);
+      if (l == nullptr || l->kind != Kind::Node || gn == nullptr || !View2DCanAdd(*gn) || gn->node.get() == doc || l->uid == uid)
+         return false;
+      l->uid = uid;
+      doc->Commit();
+      return true;
+   }
+
+   // "From canvas": every node that can be a layer, the one in use ticked.
+   void NodeChoiceMenu(const char* label, Scene2DNode* doc, Pending::What what, uint64_t current)
+   {
+      if (!MenuParts::SubMenu(label, true))
+         return;
+      bool any = false;
+      for (GraphNode& gn : gNodes)
+      {
+         if (gn.node.get() == doc || !View2DCanAdd(gn))
+            continue;
+         any = true;
+         const std::string name = gn.typeName + " " + std::to_string(gn.index) + "##n" + std::to_string(gn.uid);
+         if (MenuParts::Item(name.c_str(), nullptr, gn.uid == current))
+         {
+            sPending.what = what;
+            sPending.uid = gn.uid;
+         }
+      }
+      if (!any)
+         ImGui::TextDisabled("%s", T("No fitting nodes"));
+      ImGui::EndMenu();
    }
 
    // ---- widgets ---------------------------------------------------------
@@ -2517,6 +2593,10 @@ namespace
          if (MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"), false, any)) sPending.what = Pending::Duplicate;
          if (MenuParts::Item(T("Delete"), "Delete", false, any)) sPending.what = Pending::Delete;
          MenuParts::Separator();
+         NodeChoiceMenu(T("Add Node as Layer"), doc, Pending::AddNode, 0);
+         if (Layer* ra = Active(doc); ra != nullptr && ra->kind == Kind::Node)
+            NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, ra->uid);
+         MenuParts::Separator();
          if (MenuParts::Item(T("Group"), Sc("Ctrl+G"), false, any)) sPending.what = Pending::Group;
          if (MenuParts::Item(T("Bring to Front"), Sc("Shift+Ctrl+]"), false, any)) Restack(doc, 3);
          if (MenuParts::Item(T("Bring Forward"), Sc("Ctrl+]"), false, any)) Restack(doc, 1);
@@ -4195,6 +4275,12 @@ namespace
                if (!l->hasVMask && MenuParts::Item(T("Add Vector Mask"), nullptr)) sPending.what = Pending::AddVMask;
                if (l->hasVMask && MenuParts::Item(T("Delete Vector Mask"), nullptr)) sPending.what = Pending::RemoveVMask;
             }
+            if (l->kind == Kind::Node)
+            {
+               NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, l->uid);
+               if (MenuParts::Item(T("Replace by Clicking a Node"), nullptr, sPickMode == 2))
+                  sPickMode = sPickMode == 2 ? 0 : 2;
+            }
             if (l->kind == Kind::Paint && MenuParts::Item(T("Convert to Draw Node"), nullptr)) sPending.what = Pending::ToDraw;
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
@@ -4316,7 +4402,7 @@ namespace
       }
       ImGui::EndChild();
       // The strip under the list, as in every layers panel, centred under it.
-      const float footW = 8 * sChip + 7 * tok::space_1;
+      const float footW = 9 * sChip + 8 * tok::space_1;
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
       if (IconChip("##v2dnewpaint", IconsInfinite::Brush, false, T("New layer")))
          sPending.what = Pending::AddPaint;
@@ -4339,6 +4425,31 @@ namespace
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dnewvec", IconsInfinite::PenTool, false, T("New vector layer")))
          sPending.what = Pending::AddVector;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v2dnewnode", IconsInfinite::Plus, sPickMode == 1, T("Add a node from the canvas as a layer")))
+         ImGui::OpenPopup("##v2dnodepop");
+      if (MenuParts::BeginPopup("##v2dnodepop"))
+      {
+         if (MenuParts::Item(T("Click a Node on the Canvas"), nullptr, sPickMode == 1))
+            sPickMode = sPickMode == 1 ? 0 : 1;
+         MenuParts::Separator();
+         bool any = false;
+         for (GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == doc || !View2DCanAdd(gn))
+               continue;
+            any = true;
+            const std::string name = gn.typeName + " " + std::to_string(gn.index) + "##n" + std::to_string(gn.uid);
+            if (MenuParts::Item(name.c_str(), nullptr, false))
+            {
+               sPending.what = Pending::AddNode;
+               sPending.uid = gn.uid;
+            }
+         }
+         if (!any)
+            ImGui::TextDisabled("%s", T("No fitting nodes"));
+         MenuParts::EndPopup();
+      }
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dnewgroup", IconsInfinite::Folder, false, Sc(T("Group (Ctrl+G)"))))
          sPending.what = Pending::Group;
@@ -4380,6 +4491,9 @@ namespace
       if (l->kind == Kind::Node)
       {
          NodeRow(T("Source"), &l->uid, false, doc);
+         if (ActionButton::Draw(sPickMode == 2 ? T("Click a node on the canvas...") : T("Replace from canvas..."), ImVec2(-1.0f, 0.0f),
+                                sPickMode == 2 ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+            sPickMode = sPickMode == 2 ? 0 : 2;
          int fit = l->fit;
          if (ComboRow(T("Fit"), &fit, { T("None"), T("Fit"), T("Fill"), T("Stretch") }))
          {
@@ -5115,6 +5229,19 @@ namespace
             if (a->kind == Kind::Text)
                ConvertToTextNode(doc, a->id);
          break;
+      case Pending::AddNode:
+      {
+         PushUndoCheckpoint("Add node as layer");
+         AddNodeLayer(doc, todo.uid, nullptr);
+         break;
+      }
+      case Pending::ReplaceNode:
+      {
+         const int id = sSel.empty() ? 0 : sSel.back();
+         PushUndoCheckpoint("Replace layer source");
+         ReplaceSource(doc, id, todo.uid);
+         break;
+      }
       case Pending::None: break;
       }
    }
@@ -5141,6 +5268,81 @@ namespace
             gView2DOpen = false;
          MenuParts::EndPopup();
       }
+   }
+
+   // Files dropped on the 2D View: each one spawns its source node (the same node types the canvas
+   // drop makes) off-canvas and lands as a layer centred on the drop point. Returns the layers added.
+   int DropFiles(Scene2DNode* doc, const std::vector<std::string>& files, ImVec2 docPt)
+   {
+      static const std::vector<std::string> kModels = { "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc" };
+      static const std::vector<std::string> kGltf = { "gltf", "glb" };
+      static const std::vector<std::string> kSvg = { "svg" };
+      GraphNode* self = DocGraphNode();
+      const ImVec2 base = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      PushUndoCheckpoint("Drop into 2D View");
+      gSuppressUndoCheckpoints = true;
+      int added = 0;
+      auto place = [&](GraphNode* gn) {
+         if (gn == nullptr)
+            return;
+         gn->hiddenFromCanvas = true;
+         const ImVec2 at(docPt.x + 24.0f * (float)added, docPt.y + 24.0f * (float)added);
+         if (AddNodeLayer(doc, gn->uid, &at) != 0)
+            added++;
+      };
+      float row = 0.0f;
+      for (const std::string& path : files)
+      {
+         const ImVec2 spot(base.x - 360.0f, base.y + row);
+         row += 200.0f;
+         if (HasExtension(path, kSvg))
+         {
+            if (ImportSvgInto(doc, path))
+               added++;
+         }
+         else if (HasExtension(path, kGltf))
+         {
+            for (int index : SpawnGltfParts(path, spot.x, spot.y))
+               place(FindNodeByIndex(index));
+         }
+         else if (HasExtension(path, kModels))
+         {
+            GraphNode* gn = SpawnNode("Model 3D", "3D", spot.x, spot.y);
+            if (gn != nullptr)
+               static_cast<ModelSourceNode*>(gn->node.get())->Load(path);
+            place(gn);
+         }
+         else if (HasExtension(path, MediaExtensions::Video()))
+         {
+            GraphNode* gn = SpawnNode("Video", "Source", spot.x, spot.y);
+            if (gn != nullptr)
+               static_cast<VideoSourceNode*>(gn->node.get())->Open(path);
+            place(gn);
+         }
+         else if (HasExtension(path, MediaExtensions::Image()))
+         {
+            GraphNode* gn = SpawnNode("Image Source", "Source", spot.x, spot.y);
+            if (gn != nullptr)
+               static_cast<ImageSourceNode*>(gn->node.get())->Load(path);
+            place(gn);
+         }
+         // Anything else (audio, patches, plugins) has no picture to put on a layer.
+      }
+      gSuppressUndoCheckpoints = wasSuppressed;
+      if (added > 0)
+         gPatchDirty = true;
+      return added;
+   }
+
+   void TakeDroppedFiles(Scene2DNode* doc)
+   {
+      if (gDroppedFiles.empty() || !gView2DOpen || gDropPos.x < gView2DRectMin.x || gDropPos.x >= gView2DRectMax.x ||
+          gDropPos.y < gView2DRectMin.y || gDropPos.y >= gView2DRectMax.y)
+         return;
+      const std::vector<std::string> files = std::move(gDroppedFiles);
+      gDroppedFiles.clear();
+      DropFiles(doc, files, ToDoc(doc, gDropPos));
    }
 
    void DrawPanel()
@@ -5195,6 +5397,23 @@ namespace
       }
       if (sDirty)
          doc->Commit();
+      TakeDroppedFiles(doc);
+      if (sPickedUid != 0)
+      {
+         // A node clicked on the canvas while a pick mode was on.
+         if (sPickMode == 1)
+         {
+            sPending.what = Pending::AddNode;
+            sPending.uid = sPickedUid;
+         }
+         else if (sPickMode == 2)
+         {
+            sPending.what = Pending::ReplaceNode;
+            sPending.uid = sPickedUid;
+         }
+         sPickedUid = 0;
+         sPickMode = 0;
+      }
       RunPending(doc);
    }
 }
@@ -5203,7 +5422,11 @@ OutputNode* View2DEnsureOutput() { return EnsureOutputImpl(); }
 
 bool View2DImportSvg(const std::string& path)
 {
-   Scene2DNode* doc = FindDoc();
+   return ImportSvgInto(FindDoc(), path);
+}
+
+static bool ImportSvgInto(Scene2DNode* doc, const std::string& path)
+{
    if (doc == nullptr)
       return false;
    std::ifstream f(path, std::ios::binary);
@@ -5264,6 +5487,73 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       RunPending(doc);
       const Layer* l = Active(doc);
       expect("an Effects pick adds that adjustment", l != nullptr && l->kind == Kind::Adjust && l->adjType == type);
+   }
+   // Node layers: From canvas adds, Replace swaps the source and keeps the pose.
+   {
+      GraphNode* na = SpawnNode("Image Source", "Source", 0.0f, 0.0f);
+      GraphNode* nb = SpawnNode("Image Source", "Source", 0.0f, 0.0f);
+      expect("two source nodes to use", na != nullptr && nb != nullptr);
+      if (na != nullptr && nb != nullptr)
+      {
+         const size_t n0 = doc->Layers().size();
+         sPending.what = Pending::AddNode;
+         sPending.uid = na->uid;
+         RunPending(doc);
+         Layer* l = Active(doc);
+         expect("From canvas adds the node as a layer",
+                l != nullptr && l->kind == Kind::Node && l->uid == na->uid && doc->Layers().size() == n0 + 1);
+         if (l != nullptr)
+         {
+            const int id = l->id;
+            l->x = 111.0f; l->rx = 20.0f; l->opacity = 0.5f; l->blend = 3; l->is3d = true; l->z = 40.0f;
+            doc->Commit();
+            sSel = { id };
+            sPending.what = Pending::ReplaceNode;
+            sPending.uid = nb->uid;
+            RunPending(doc);
+            const Layer* r = doc->FindLayer(id);
+            expect("Replace swaps the source", r != nullptr && r->uid == nb->uid);
+            expect("Replace keeps transform, 3D pose, blend and opacity",
+                   r != nullptr && r->x == 111.0f && r->rx == 20.0f && r->opacity == 0.5f && r->blend == 3 && r->is3d && r->z == 40.0f);
+            expect("Replace keeps the layer count", doc->Layers().size() == n0 + 1);
+         }
+      }
+   }
+   // File drops: a picture, an SVG and a model each land as a layer at the drop point; a video makes its node.
+   {
+      namespace fs = std::filesystem;
+      const fs::path dir = fs::temp_directory_path() / "inf_v2d_drop";
+      fs::create_directories(dir);
+      static const unsigned char kPng[] = {
+         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01,
+         0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41,
+         0x54, 0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0xF0, 0x1F, 0x00, 0x05, 0x00, 0x01, 0xFF, 0x89, 0x99, 0x3D, 0x1D, 0x00, 0x00,
+         0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82 };
+      auto put = [&](const char* name, const std::string& bytes) {
+         const fs::path f = dir / name;
+         std::ofstream(f, std::ios::binary).write(bytes.data(), (std::streamsize)bytes.size());
+         return f.string();
+      };
+      const std::string png = put("d.png", std::string((const char*)kPng, sizeof(kPng)));
+      const std::string svg = put("d.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\"><rect x=\"0\" y=\"0\" width=\"40\" height=\"30\" fill=\"#ff0000\"/></svg>");
+      const std::string obj = put("d.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+      const std::string mp4 = put("d.mp4", "not a movie");
+      const ImVec2 at(300.0f, 200.0f);
+      size_t n = doc->Layers().size();
+      expect("a dropped picture is one layer", DropFiles(doc, { png }, at) == 1 && doc->Layers().size() == n + 1);
+      const Layer* pl = Active(doc);
+      expect("it sits at the drop point and is not 3D", pl != nullptr && pl->kind == Kind::Node && pl->x == at.x && pl->y == at.y && !pl->is3d);
+      n = doc->Layers().size();
+      expect("a dropped SVG is one vector layer", DropFiles(doc, { svg }, at) == 1 && doc->Layers().size() == n + 1 && Active(doc)->kind == Kind::Vector);
+      n = doc->Layers().size();
+      const int addedModel = DropFiles(doc, { obj }, at);
+      expect("a dropped model is one 3D layer", addedModel == 1 && doc->Layers().size() == n + 1 && Active(doc)->is3d);
+      size_t nodes = gNodes.size();
+      DropFiles(doc, { mp4 }, at);
+      expect("a dropped video spawns a Video node", gNodes.size() == nodes + 1 && gNodes.back().typeName == "Video");
+      n = doc->Layers().size();
+      expect("an audio file adds nothing", DropFiles(doc, { put("d.wav", "RIFF") }, at) == 0 && doc->Layers().size() == n);
+      fs::remove_all(dir);
    }
    // 3D gizmo: each handle changes only what it should.
    int id = 0;
