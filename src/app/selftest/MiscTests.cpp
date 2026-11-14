@@ -2808,6 +2808,13 @@ void RunBindModTest(int f)
       e.clear();
       BindCheck("bind_mod: a non-string key is reported as missing",
                 !Call("bind_mod", { { "dst", dst }, { "key", 42 }, { "src", src } }, r, e) && e.find("missing control key") != std::string::npos);
+      // A node is created with its parameter body collapsed (GraphNode::showParams), and a collapsed
+      // node only runs the register-only dispatch for something already driving it. Open it first -
+      // that is exactly what a person does before patching a modulator onto a control.
+      e.clear();
+      BindCheck("k17: the destination body is open", Call("expand_node", { { "index", dst } }, r, e));
+      e.clear();
+      BindCheck("k17: the modulator body is open", Call("expand_node", { { "index", src } }, r, e));
       // The canvas culls nodes outside the view, and a node that is not drawn never registers its
       // controls - so frame the pair before waiting for the table.
       e.clear();
