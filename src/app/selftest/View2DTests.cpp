@@ -761,6 +761,53 @@ void RunView2DTest()
          const double median = ms[ms.size() / 2];
          printf("  M3 20 layers at 1080p: median %.2f ms (cook + finish, %d layers)\n", median, (int)pic.Layers().size());
          Check("M3: 20 layers at 1080p composite in under 4 ms", pic.Layers().size() == 20 && median < 4.0);
+
+         // Below cache: editing an upper layer redraws only it and what sits above, and the picture matches a
+         // full redraw exactly.
+         auto timeEdit = [&](int index)
+         {
+            std::vector<double> t;
+            for (int f = 0; f < 30; f++)
+            {
+               pic.Layers()[index].opacity = 0.7f + 0.001f * (f % 2);
+               pic.Commit();
+               glFinish();
+               const auto t0 = Clock::now();
+               Cook(&pic);
+               glFinish();
+               t.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
+            }
+            std::sort(t.begin(), t.end());
+            return t[t.size() / 2];
+         };
+         const double topMs = timeEdit(19), midMs = timeEdit(8);
+         printf("  M3b edit: top layer %.2f ms, middle layer %.2f ms (bottom %.2f ms)\n", topMs, midMs, median);
+         auto grab = [&]()
+         {
+            std::vector<float> px((size_t)1920 * 1080 * 4);
+            glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+            glBindTexture(GL_TEXTURE_2D, 0);
+            return px;
+         };
+         pic.Layers()[12].opacity = 0.55f;
+         pic.Commit();
+         Cook(&pic);
+         pic.Layers()[12].opacity = 0.5f;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> cached = grab();
+         Scene2DNode::sBelowCache = false;
+         pic.Layers()[12].opacity = 0.55f;
+         pic.Commit();
+         Cook(&pic);
+         pic.Layers()[12].opacity = 0.5f;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> full = grab();
+         Scene2DNode::sBelowCache = true;
+         Check("M3b: below cache matches a full redraw exactly", cached == full);
+         Check("M3b: an upper-layer edit is faster than a bottom one", topMs < median && midMs < median);
       }
    }
 

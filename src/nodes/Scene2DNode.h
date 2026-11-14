@@ -471,5 +471,18 @@ private:
    int mLastCookFrame = -1;
    unsigned long long mRevision = 1;
    unsigned long long mStamp = 0;    // what the last cook drew
+   // Below cache: the top-level composite as it stood at the start of top-level entry mBelowAt, so an edit to one
+   // layer redraws only it and what sits above. mKidHash is last cook's per-entry change stamp.
+   GLUtil::Fbo mBelow;
+   size_t mBelowAt = 0;
+   unsigned long long mBelowKey = 0;
+   unsigned long long mGlobalHash = 0;
+   std::vector<unsigned long long> mKidHash;
+   void TopHashes(const std::vector<const Layer*>& kids, std::vector<unsigned long long>& out, unsigned long long& global);
+   unsigned long long BelowKey(const std::vector<const Layer*>& kids, const std::vector<unsigned long long>& hashes, size_t at,
+                               unsigned long long global);
+public:
+   static bool sBelowCache;          // tests turn it off to compare pictures
+private:
    float mCookMs = 0.0f;
 };

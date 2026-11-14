@@ -1,4 +1,5 @@
 #include "Scene2DNode.h"
+#include <map>
 
 #include "gl3.h"
 #include <algorithm>
@@ -255,6 +256,7 @@ Scene2DNode::~Scene2DNode()
    }
    GLUtil::DestroyFbo(mOut);
    GLUtil::DestroyFbo(mAdjFbo);
+   GLUtil::DestroyFbo(mBelow);
    for (auto& kv : mSurfaces)
       GLUtil::DestroyFbo(kv.second.fbo);
    for (auto& kv : mMasks)
@@ -1461,13 +1463,169 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
    return true;
 }
 
+bool Scene2DNode::sBelowCache = true;
+
+namespace
+{
+   bool IsCard(const Scene2DNode::Layer& l)
+   {
+      using K = Scene2DNode::Kind;
+      return l.is3d && !l.clip && l.kind != K::Group && l.kind != K::Fill && l.kind != K::Adjust;
+   }
+
+   void Blit(unsigned src, unsigned dst, int w, int h)
+   {
+      GLint prevR = 0, prevD = 0;
+      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevR);
+      glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevD);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, src);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst);
+      glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, prevR);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevD);
+   }
+}
+
+// One stamp per top-level entry (the layer and everything inside it): its saved lines, what its sources hand back,
+// and the shared state it reads. `global` takes the lines that touch every layer.
+void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<unsigned long long>& out, unsigned long long& global)
+{
+   std::map<int, unsigned long long> lines;
+   global = 1469598103934665603ull;
+   size_t pos = 0;
+   while (pos < mText.size())
+   {
+      size_t eol = mText.find('\n', pos);
+      if (eol == std::string::npos)
+         eol = mText.size();
+      const size_t sp = mText.find(' ', pos);
+      const std::string key = mText.substr(pos, (sp == std::string::npos || sp > eol ? eol : sp) - pos);
+      int id = 0;
+      const bool perLayer = key != "doc" && key != "next" && key != "panel" && key != "cam" && key != "sym" && sp != std::string::npos
+                            && sp < eol && std::sscanf(mText.c_str() + sp + 1, "%d", &id) == 1 && FindConst(id) != nullptr;
+      if (key != "next" && key != "guidesx" && key != "guidesy")
+      {
+         unsigned long long& h = perLayer ? lines[id] : global;
+         for (size_t k = pos; k < eol; k++)
+            h = Mix(h, (unsigned char)mText[k]);
+         h = Mix(h, '\n');
+      }
+      pos = eol + 1;
+   }
+   global = Mix(global, (unsigned long long)soloLayer);
+   const CompCam cam = Camera();
+   out.assign(kids.size(), 0);
+   for (size_t i = 0; i < kids.size(); i++)
+   {
+      unsigned long long h = 1469598103934665603ull;
+      for (const Layer& l : mLayers)
+      {
+         if (!IsInside(l.id, kids[i]->id))
+            continue;
+         h = Mix(Mix(h, (unsigned long long)l.id), lines[l.id]);
+         for (INode* n : { Source(l), l.maskOn ? MaskSource(l) : nullptr })
+            if (n != nullptr)
+            {
+               h = Mix(h, (unsigned long long)(uintptr_t)n);
+               if (auto* geo = dynamic_cast<IGeometrySource*>(n))
+                  h = Mix(Mix(h, geo->MeshRevision()), geo->MaterialRevision());
+               h = Mix(h, n->TextureRevision());
+               h = Mix(h, (unsigned long long)n->GetOutputWidth() * 65536ull + (unsigned long long)n->GetOutputHeight());
+            }
+         if (l.kind == Kind::Paint || l.kind == Kind::Vector || l.kind == Kind::Text || l.HasPixelMask())
+            h = Mix(h, mPaintEdits);
+         if (mStroke.Active() && mPaintId == l.id)
+            h = Mix(h, (unsigned long long)mStroke.DabCount() + 1ull);
+         if (l.kind == Kind::Adjust)
+            for (float v : drive)
+            {
+               unsigned bits = 0;
+               std::memcpy(&bits, &v, sizeof bits);
+               h = Mix(h, bits);
+            }
+         if (l.is3d || dynamic_cast<IGeometrySource*>(Source(l)) != nullptr)
+            for (float v : { cam.zoom, cam.pos[0], cam.pos[1], cam.pos[2], cam.rot[0], cam.rot[1], cam.rot[2], cam.rot[4], cam.rot[8] })
+            {
+               unsigned bits = 0;
+               std::memcpy(&bits, &v, sizeof bits);
+               h = Mix(h, bits);
+            }
+      }
+      out[i] = h;
+   }
+}
+
+// What must hold for a picture saved at the start of entry `at` to be reused: everything below it unchanged, and
+// the entry itself still starting a new step of DrawList (clip chains and 3D runs end where they ended).
+unsigned long long Scene2DNode::BelowKey(const std::vector<const Layer*>& kids, const std::vector<unsigned long long>& hashes,
+                                         size_t at, unsigned long long global)
+{
+   unsigned long long k = Mix(global, (unsigned long long)at);
+   for (size_t i = 0; i < at && i < hashes.size(); i++)
+      k = Mix(k, hashes[i]);
+   if (at < kids.size())
+   {
+      k = Mix(k, (unsigned long long)kids[at]->clip * 2ull + (IsCard(*kids[at]) ? 1ull : 0ull));
+      k = Mix(k, at + 1 < kids.size() && kids[at + 1]->clip ? 7ull : 3ull);
+   }
+   return k;
+}
+
 void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
 {
    const std::vector<const Layer*> kids = ListOf(parent);
-   auto card = [](const Layer& l)
-   { return l.is3d && !l.clip && l.kind != Kind::Group && l.kind != Kind::Fill && l.kind != Kind::Adjust; };
-   for (size_t i = 0; i < kids.size(); i++)
+   auto card = [](const Layer& l) { return IsCard(l); };
+   // Top level: resume from the below cache when nothing under the edited entry changed.
+   const bool top = parent == 0 && depth == 0 && sBelowCache && mDepthLevel < 0;
+   std::vector<unsigned long long> hashes;
+   unsigned long long global = 0;
+   size_t start = 0, changed = 0;
+   if (top)
    {
+      TopHashes(kids, hashes, global);
+      if (global == mGlobalHash && hashes.size() == mKidHash.size())
+      {
+         changed = hashes.size();
+         for (size_t i = 0; i < hashes.size(); i++)
+            if (hashes[i] != mKidHash[i])
+            {
+               changed = i;
+               break;
+            }
+         if (changed == hashes.size())
+            changed = 0;   // the stamp moved for a reason no entry shows: draw it all, save nothing
+      }
+      else if (global == mGlobalHash)
+      {
+         // Layers added or removed: the first entry that differs.
+         while (changed < hashes.size() && changed < mKidHash.size() && hashes[changed] == mKidHash[changed])
+            changed++;
+      }
+      const bool sized = GLUtil::EnsureFbo(mBelow, mDoc.w, mDoc.h, GLUtil::ImageWorkingFormat(), "Scene2D below");
+      if (!sized)
+         mBelowAt = 0;
+      if (mBelowAt > 0 && mBelowAt <= changed && mBelowAt <= kids.size() && mBelowKey == BelowKey(kids, hashes, mBelowAt, global))
+      {
+         Pair& root = PairAt(0);
+         Blit(mBelow.fbo, root.f[root.cur].fbo, mDoc.w, mDoc.h);
+         start = mBelowAt;
+      }
+      else
+         mBelowAt = 0;
+      mGlobalHash = global;
+      mKidHash = hashes;
+   }
+   for (size_t i = start; i < kids.size(); i++)
+   {
+      // Save the picture so far at each step start up to the edited entry; the last one saved is where the next
+      // frame resumes.
+      if (top && i > mBelowAt && i <= changed)
+      {
+         Pair& root = PairAt(0);
+         Blit(root.f[root.cur].fbo, mBelow.fbo, mDoc.w, mDoc.h);
+         mBelowAt = i;
+         mBelowKey = BelowKey(kids, hashes, i, global);
+      }
       const Layer& base = *kids[i];
       // A clipped layer with nothing unclipped below it in its list is drawn as it is.
       size_t end = i + 1;
