@@ -11,6 +11,7 @@
 #include "NodeViewport.h"
 #include "SceneNodes.h"
 #include "SharedViewportCamera.h"
+#include "TileStore.h"
 
 namespace
 {
@@ -435,6 +436,26 @@ void Scene2DNode::EndDepth(int depth)
    mDepthLevel = -1;
 }
 
+namespace
+{
+   // The solo render's default view, turned with the comp camera. One place so the picture and the pick agree.
+   SharedViewportCamera GeoCamera(const Scene2DNode::CompCam& c)
+   {
+      SharedViewportCamera cam;
+      cam.azimuth += c.az;
+      cam.elevation = std::clamp(cam.elevation + c.el, -89.0f, 89.0f);
+      return cam;
+   }
+}
+
+unsigned long long Scene2DNode::SkinRevision(const Layer& l) const
+{
+   unsigned long long r = mPaintEdits * 1000003ull + 7ull;
+   if (mStroke.Active() && mPaintId == l.id)
+      r += (unsigned long long)mStroke.DabCount() + 1ull;
+   return r;
+}
+
 unsigned Scene2DNode::GeometryTexture(const Layer& l, int& w, int& h)
 {
    auto* geo = dynamic_cast<IGeometrySource*>(Source(l));
@@ -443,14 +464,211 @@ unsigned Scene2DNode::GeometryTexture(const Layer& l, int& w, int& h)
    std::shared_ptr<NodeViewport>& vp = mGeo[l.id];
    if (!vp)
       vp = std::make_shared<NodeViewport>();
-   // The solo render's default view, turned with the comp camera.
-   SharedViewportCamera cam;
-   const CompCam c = Camera();
-   cam.azimuth += c.az;
-   cam.elevation = std::clamp(cam.elevation + c.el, -89.0f, 89.0f);
+   const SharedViewportCamera cam = GeoCamera(Camera());
    const int side = std::clamp(std::min(mDoc.w, mDoc.h), 64, 2048);
    w = h = side;
+   // The painted skin rides over the albedo by UV, so it turns with the object.
+   unsigned skin = 0;
+   if (l.HasSkin())
+   {
+      auto it = mSurfaces.find(l.id);
+      if (it != mSurfaces.end())
+         skin = (mStroke.Active() && mPaintId == l.id && mPaintTarget == 0) ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+   }
+   vp->SetPaintOverlay(skin, SkinRevision(l));
    return vp->Render(geo, cam, side, side);
+}
+
+// ---- 3D surface paint ----------------------------------------------------------
+
+bool Scene2DNode::CanSurfacePaint(int id)
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind != Kind::Node || (l->lock & (kLockPixels | kLockAll)) != 0)
+      return false;
+   auto* geo = dynamic_cast<IGeometrySource*>(Source(*l));
+   return geo != nullptr && geo->GroupChildCount() == 0;
+}
+
+int Scene2DNode::SkinSide(int id)
+{
+   const Layer* l = FindConst(id);
+   return l != nullptr && l->HasSkin() ? l->pw : 0;
+}
+
+bool Scene2DNode::SurfaceAt(int id, float x, float y, SurfacePoint& out)
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind != Kind::Node)
+      return false;
+   auto* geo = dynamic_cast<IGeometrySource*>(Source(*l));
+   auto it = mGeo.find(id);
+   if (geo == nullptr || it == mGeo.end() || !it->second)
+      return false;
+   float bw = 1, bh = 1, bx = 0, by = 0;
+   LayerBox(*l, bw, bh);
+   DocToBox(*l, x, y, bx, by);
+   if (bx < 0 || by < 0 || bx >= bw || by >= bh)
+      return false;
+   const int side = std::clamp(std::min(mDoc.w, mDoc.h), 64, 2048);
+   const int skin = l->HasSkin() ? l->pw : 1024;
+   NodeViewport::SurfaceHit hit;
+   if (!it->second->PickSurface(geo, GeoCamera(Camera()), side, side, bx / bw * side, by / bh * side, skin, hit))
+      return false;
+   std::copy(hit.uv, hit.uv + 2, out.uv);
+   std::copy(hit.pos, hit.pos + 3, out.pos);
+   out.facing = hit.facing;
+   // Skin texels per render pixel -> per document pixel (the box is `side` render px across bw document px).
+   out.texelsPerPx = hit.texelsPerPx * (float)side / std::max(1.0f, bw);
+   return true;
+}
+
+bool Scene2DNode::BeginSurfacePaint(int id, const BrushEngine::Brush& b, float x, float y, float pressure, int side)
+{
+   if (!CanSurfacePaint(id))
+      return false;
+   if (mStroke.Active())
+      EndPaint();
+   Layer* l = FindLayer(id);
+   if (l == nullptr)
+      return false;
+   if (!l->HasSkin())
+   {
+      side = std::clamp(side, 64, 4096);
+      l->pw = l->ph = side;
+      const int n = ((side + TileStore::kTile - 1) / TileStore::kTile) * ((side + TileStore::kTile - 1) / TileStore::kTile);
+      l->tiles.assign(n, "-");
+   }
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return false;
+   SurfacePoint sp;
+   if (!SurfaceAt(id, x, y, sp))
+      return false;
+   BrushEngine::Brush brush = b;
+   brush.lockAlpha = brush.lockAlpha || (l->lock & kLockAlpha) != 0;
+   brush.pressureSize = false;      // the size is a screen size; pressure and facing drive the opacity
+   brush.pressureOpacity = true;
+   brush.jitter = 0.0f;
+   mSkinStroke = SkinStroke();
+   mSkinStroke.screen = std::max(1.0f, b.size);
+   mSkinStroke.spacing = std::max(0.02f, b.spacing);
+   mSkinStroke.texels = std::max(0.05f, sp.texelsPerPx);
+   brush.size = std::clamp(mSkinStroke.screen * mSkinStroke.texels, 1.0f, (float)l->pw * 0.5f);
+   mPaintId = id;
+   mPaintTarget = 0;
+   mStroke.SetMirrors({});
+   const float t0 = std::clamp((sp.facing - 0.08f) / 0.42f, 0.0f, 1.0f);
+   mStroke.Begin(it->second.fbo, brush, sp.uv[0] * (float)l->pw, sp.uv[1] * (float)l->ph,
+                 std::clamp(pressure < 0.0f ? 1.0f : pressure, 0.0f, 1.0f) * t0 * t0 * (3.0f - 2.0f * t0), 0);
+   if (!mStroke.Active())
+      return false;
+   mSkinStroke.on = true;
+   mSkinStroke.lx = x;
+   mSkinStroke.ly = y;
+   SkinDab(*l, x, y, pressure, true);
+   return true;
+}
+
+void Scene2DNode::SkinDab(const Layer& l, float x, float y, float pressure, bool skipMain)
+{
+   SurfacePoint sp;
+   if (!SurfaceAt(l.id, x, y, sp))
+      return;
+   // Strokes fade out toward grazing angles instead of smearing across the surface.
+   const float t = std::clamp((sp.facing - 0.08f) / 0.42f, 0.0f, 1.0f);
+   const float fall = t * t * (3.0f - 2.0f * t);
+   if (fall <= 0.0f)
+      return;
+   const float P = std::clamp(pressure, 0.0f, 1.0f) * fall;
+   const float side = (float)l.pw;
+   if (!skipMain)
+      mStroke.Dab(sp.uv[0] * side, sp.uv[1] * side, P, mSkinStroke.seed++);
+   if (l.skinMirror == 0)
+      return;
+   auto* geo = dynamic_cast<IGeometrySource*>(Source(l));
+   for (int m = 1; m < 8; m++)
+   {
+      if ((m & ~l.skinMirror) != 0)
+         continue;
+      float q[3] = { sp.pos[0] * ((m & 1) ? -1.0f : 1.0f), sp.pos[1] * ((m & 2) ? -1.0f : 1.0f), sp.pos[2] * ((m & 4) ? -1.0f : 1.0f) };
+      NodeViewport::SurfaceHit h;
+      if (NodeViewport::ClosestSurface(geo, q, h))
+         mStroke.Dab(h.uv[0] * side, h.uv[1] * side, P, mSkinStroke.seed++);
+   }
+}
+
+void Scene2DNode::SurfacePaintTo(float x, float y, float pressure)
+{
+   if (!mSkinStroke.on || !mStroke.Active())
+      return;
+   const Layer* l = FindConst(mPaintId);
+   if (l == nullptr)
+      return;
+   const float dx = x - mSkinStroke.lx, dy = y - mSkinStroke.ly;
+   const float d = std::sqrt(dx * dx + dy * dy);
+   if (d < 1e-4f)
+      return;
+   const float step = std::max(0.5f, mSkinStroke.spacing * mSkinStroke.screen);
+   float pos = 0.0f;
+   while (mSkinStroke.carry + (d - pos) >= step)
+   {
+      pos += step - mSkinStroke.carry;
+      mSkinStroke.carry = 0.0f;
+      SkinDab(*l, mSkinStroke.lx + dx * pos / d, mSkinStroke.ly + dy * pos / d, pressure);
+   }
+   mSkinStroke.carry += d - pos;
+   mSkinStroke.lx = x;
+   mSkinStroke.ly = y;
+}
+
+bool Scene2DNode::SkinAt(int id, float u, float v, float rgba[4])
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || !l->HasSkin())
+      return false;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return false;
+   const int px = std::clamp((int)std::floor(u * l->pw), 0, l->pw - 1), py = std::clamp((int)std::floor(v * l->ph), 0, l->ph - 1);
+   float c[4] = { 0, 0, 0, 0 };
+   GLint prev = 0;
+   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, it->second.fbo.fbo);
+   glReadPixels(px, py, 1, 1, GL_RGBA, GL_FLOAT, c);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
+   std::copy(c, c + 4, rgba);
+   return true;
+}
+
+bool Scene2DNode::SurfaceColor(int id, float x, float y, float rgba[4])
+{
+   SurfacePoint sp;
+   if (!SurfaceAt(id, x, y, sp))
+      return false;
+   float c[4];
+   if (!SkinAt(id, sp.uv[0], sp.uv[1], c) || c[3] <= 0.0f)
+      return false;
+   std::copy(c, c + 4, rgba);
+   return true;
+}
+
+void Scene2DNode::ClearSkin(int id)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || !l->HasSkin())
+      return;
+   if (mStroke.Active())
+      EndPaint();
+   l->tiles.assign(l->tiles.size(), "-");
+   mPaintEdits++;
+   Commit();
 }
 
 // ---- layer fx ------------------------------------------------------------

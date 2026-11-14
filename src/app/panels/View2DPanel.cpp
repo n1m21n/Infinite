@@ -106,6 +106,9 @@ namespace
    int sFillKind = 1;              // gradient: 1 linear, 2 radial
    int sTolerance = 32;
    bool sContiguous = true, sAllLayers = false;
+   bool sSurfacePaint = true;      // brush / eraser / eyedropper work on a 3D object's surface
+   bool sSurfaceStroke = false;    // the stroke now running paints a surface
+   int sSkinSide = 2;              // 0..3: 512 .. 4096 px, for the next new skin
    bool sEditMask = false;         // the brush paints the active layer's pixel mask
    int sMarqueeShape = 0;          // 0 rectangle, 1 ellipse
    int sLassoKind = 0;             // 0 freehand, 1 polygon
@@ -1290,6 +1293,26 @@ namespace
       const bool cloning = sTool == kClone || sTool == kHeal;
       if (cloning && !sHaveCloneSrc)
          return;   // Alt-click sets the source first
+      // A 3D object under the brush takes the paint on its surface (by UV) instead of a flat layer.
+      if (Layer* a = Active(doc); a != nullptr && sSurfacePaint && !sEditMask && (sTool == kBrush || sTool == kEraser) &&
+                                  doc->CanSurfacePaint(a->id))
+      {
+         Scene2DNode::SurfacePoint sp;
+         if (doc->SurfaceAt(a->id, at.x, at.y, sp))
+         {
+            PushUndoCheckpoint(sTool == kEraser ? "Erase surface" : "Paint surface");
+            BrushEngine::Brush b = ToolBrush();
+            std::copy(sFg, sFg + 3, b.color);
+            if (doc->BeginSurfacePaint(a->id, b, at.x, at.y, PenNow(), 512 << sSkinSide))
+            {
+               sOp = Op();
+               sOp.kind = 7;
+               sOp.docStart = at;
+               sSurfaceStroke = true;
+               return;
+            }
+         }
+      }
       PushUndoCheckpoint(sTool == kEraser ? "Erase" : RetouchTool(sTool) ? "Retouch" : "Paint");
       int target = 0;
       const int id = PaintTarget(doc, target, sTool == kBrush);
@@ -1320,6 +1343,7 @@ namespace
 
    void EndStroke(Scene2DNode* doc)
    {
+      sSurfaceStroke = false;
       if (doc->Painting())
          doc->EndPaint();
       sLastPaint = sMouseDoc;
@@ -3058,7 +3082,12 @@ namespace
          else if (sOp.kind == 5)
             DragCrop(doc, mouse);
          else if (sOp.kind == 7)
-            doc->PaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+         {
+            if (sSurfaceStroke)
+               doc->SurfacePaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+            else
+               doc->PaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+         }
          else if (sOp.kind == 10)
          {
             const ImVec2 last = ToScreen(doc, sOp.path[sOp.path.size() - 2], sOp.path.back());
@@ -3075,7 +3104,15 @@ namespace
          else if (sOp.kind == 14)
             NodeDrag(doc);
          else if (sOp.kind == 11)
-            doc->Pick(sMouseDoc.x, sMouseDoc.y, sOp.selOp == 1 ? sBg : sFg);
+         {
+            // On a painted 3D surface the eyedropper reads the paint, not the lit picture.
+            float c[4];
+            Layer* a = Active(doc);
+            if (a != nullptr && sSurfacePaint && a->HasSkin() && doc->SurfaceColor(a->id, sMouseDoc.x, sMouseDoc.y, c))
+               std::copy(c, c + 3, sOp.selOp == 1 ? sBg : sFg);
+            else
+               doc->Pick(sMouseDoc.x, sMouseDoc.y, sOp.selOp == 1 ? sBg : sFg);
+         }
          else if (sOp.kind == 6)
          {
             std::vector<float>& gs = sOp.guideAxis == 0 ? d.guidesX : d.guidesY;
@@ -4651,6 +4688,36 @@ namespace
             DragRow(T("Bottom"), &l->crop[3], 1.0f, "%.0f px", 0.0f, bh);
          }
       }
+      if (part == 0 && doc->CanSurfacePaint(l->id))
+      {
+         SectionCard::Begin(T("Surface"));
+         BoolRow(T("Paint on surface"), &sSurfacePaint);
+         if (!l->HasSkin())
+            ComboRow(T("Skin"), &sSkinSide, { "512", "1024", "2048", "4096" });
+         else
+         {
+            const std::string sk = std::to_string(l->pw) + " px";
+            ImGui::TextUnformatted(sk.c_str());
+         }
+         const char* const axis[3] = { "X##v2dsmx", "Y##v2dsmy", "Z##v2dsmz" };
+         ImGui::TextUnformatted(T("Mirror"));
+         for (int i = 0; i < 3; i++)
+         {
+            ImGui::SameLine();
+            if (TextChip(axis[i], (l->skinMirror >> i & 1) != 0, T("Mirror strokes across the object")))
+            {
+               PushUndoCheckpoint("Surface mirror");
+               l->skinMirror ^= 1 << i;
+               Touch();
+            }
+         }
+         if (l->HasSkin() && TextChip(L("Clear paint##v2dskc"), false, T("Remove all paint from the surface")))
+         {
+            PushUndoCheckpoint("Clear surface paint");
+            doc->ClearSkin(l->id);
+            Touch();
+         }
+      }
       if (part == 0)
       {
          SectionCard::Begin(T("Mask"));
@@ -5554,6 +5621,87 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       n = doc->Layers().size();
       expect("an audio file adds nothing", DropFiles(doc, { put("d.wav", "RIFF") }, at) == 0 && doc->Layers().size() == n);
       fs::remove_all(dir);
+   }
+   // 3D surface paint: a stroke on a sphere lands by UV, erases, survives a tilt and is saved with the patch.
+   {
+      GraphNode* sph = SpawnNode("Sphere", "3D", 0.0f, 0.0f);
+      expect("a 3D object to paint on", sph != nullptr);
+      if (sph != nullptr)
+      {
+         sPending.what = Pending::AddNode;
+         sPending.uid = sph->uid;
+         RunPending(doc);
+         Layer* sl = Active(doc);
+         const int sid = sl != nullptr ? sl->id : 0;
+         int frame = 9000;
+         doc->CookIfNeeded(++frame);
+         expect("an object layer can take surface paint", sid != 0 && doc->CanSurfacePaint(sid));
+         Scene2DNode::SurfacePoint sp;
+         const float cx = sl != nullptr ? sl->x : 0.0f, cy = sl != nullptr ? sl->y : 0.0f;
+         const bool hit = sid != 0 && doc->SurfaceAt(sid, cx, cy, sp);
+         expect("the ray through the layer centre hits the object", hit && sp.facing > 0.5f);
+         if (hit)
+         {
+            BrushEngine::Brush b;
+            b.size = 40.0f;
+            b.hardness = 1.0f;
+            b.color[0] = 1.0f;
+            b.color[1] = b.color[2] = 0.0f;
+            expect("a surface stroke begins", doc->BeginSurfacePaint(sid, b, cx, cy, 1.0f, 512));
+            doc->SurfacePaintTo(cx + 6.0f, cy, 1.0f);
+            doc->EndPaint();
+            const Layer* now = doc->FindLayer(sid);
+            expect("the stroke made a skin", now != nullptr && now->HasSkin());
+            float c[4] = { 0, 0, 0, 0 };
+            expect("the painted texel at the picked UV is red", doc->SkinAt(sid, sp.uv[0], sp.uv[1], c) && c[3] > 0.5f && c[0] > 0.8f && c[1] < 0.2f);
+            doc->CookIfNeeded(++frame);
+            float shown[3] = { 0, 0, 0 };
+            expect("the composite shows the paint on the object", doc->Pick(cx, cy, shown) && shown[0] > shown[1] + 0.2f);
+            expect("the eyedropper reads the paint", doc->SurfaceColor(sid, cx, cy, c) && c[0] > 0.8f);
+            const std::string saved = doc->DocText();
+            expect("the skin is saved with the patch", saved.find("paint " + std::to_string(sid) + " 512 512") != std::string::npos);
+            // Tilt the object card: the same UV is now under a different document point, still painted.
+            Layer* tl = doc->FindLayer(sid);
+            tl->is3d = true;
+            tl->ry = 35.0f;
+            doc->Commit();
+            doc->CookIfNeeded(++frame);
+            bool found = false;
+            for (float dx = -120.0f; dx <= 120.0f && !found; dx += 4.0f)
+               for (float dy = -120.0f; dy <= 120.0f && !found; dy += 4.0f)
+               {
+                  Scene2DNode::SurfacePoint q;
+                  if (doc->SurfaceAt(sid, cx + dx, cy + dy, q) && std::fabs(q.uv[0] - sp.uv[0]) < 0.01f && std::fabs(q.uv[1] - sp.uv[1]) < 0.01f)
+                  {
+                     float k[4] = { 0, 0, 0, 0 };
+                     found = doc->SkinAt(sid, q.uv[0], q.uv[1], k) && k[3] > 0.5f && k[0] > 0.8f;
+                  }
+               }
+            expect("after a tilt the paint is still on the object", found);
+            // Erase at the original spot of the surface.
+            Scene2DNode::SurfacePoint e;
+            float ex = cx, ey = cy;
+            bool eh = false;
+            for (float dx = -120.0f; dx <= 120.0f && !eh; dx += 4.0f)
+               for (float dy = -120.0f; dy <= 120.0f && !eh; dy += 4.0f)
+               {
+                  Scene2DNode::SurfacePoint q;
+                  if (doc->SurfaceAt(sid, cx + dx, cy + dy, q) && std::fabs(q.uv[0] - sp.uv[0]) < 0.003f && std::fabs(q.uv[1] - sp.uv[1]) < 0.003f)
+                  {
+                     eh = true;
+                     ex = cx + dx;
+                     ey = cy + dy;
+                  }
+               }
+            b.mode = BrushEngine::kErase;
+            b.size = 80.0f;
+            const bool eb = eh && doc->BeginSurfacePaint(sid, b, ex, ey, 1.0f, 512);
+            doc->EndPaint();
+            expect("the eraser takes the paint off", eb && doc->SkinAt(sid, sp.uv[0], sp.uv[1], c) && c[3] < 0.2f);
+            doc->ClearSkin(sid);
+            expect("Clear removes the skin paint", doc->SkinAt(sid, sp.uv[0], sp.uv[1], c) && c[3] < 0.01f);
+         }
+      }
    }
    // 3D gizmo: each handle changes only what it should.
    int id = 0;

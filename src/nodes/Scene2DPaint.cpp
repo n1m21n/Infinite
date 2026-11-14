@@ -285,7 +285,7 @@ void Scene2DNode::SyncSurfaces()
    std::vector<int> paintIds, maskIds;
    for (const Layer& l : mLayers)
    {
-      if (l.kind == Kind::Paint && SyncSurface(mSurfaces, l.id, l.pw, l.ph, l.tiles) != nullptr)
+      if ((l.kind == Kind::Paint || l.HasSkin()) && SyncSurface(mSurfaces, l.id, l.pw, l.ph, l.tiles) != nullptr)
          paintIds.push_back(l.id);
       if (l.HasPixelMask() && SyncSurface(mMasks, l.id, l.mw, l.mh, l.mtiles) != nullptr)
          maskIds.push_back(l.id);
@@ -513,6 +513,7 @@ void Scene2DNode::PaintTo(float x, float y, float pressure)
 
 void Scene2DNode::EndPaint()
 {
+   mSkinStroke.on = false;
    if (!mStroke.Active())
       return;
    Layers();

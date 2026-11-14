@@ -81,11 +81,14 @@ namespace
       "uniform vec3 uCamPos;\n"
       "uniform sampler2D uTexture;\n"
       "uniform int uHasTexture;\n"
+      "uniform sampler2D uPaint;\n"
+      "uniform int uHasPaint;\n"
       "void main() {\n"
       "   vec3 n = normalize(vNormal);\n"
       "   if (!gl_FrontFacing) n = -n;\n"
       "   vec3 base = uBaseColor * vVertexColor;\n"
       "   if (uHasTexture == 1) base *= texture(uTexture, vUv).rgb;\n"
+      "   if (uHasPaint == 1) { vec4 pt = texture(uPaint, vUv); base = mix(base, pt.rgb, pt.a); }\n"
       "   vec3 l = normalize(uLightDir);\n"
       "   float ndl = max(dot(n, l), 0.0);\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
@@ -559,6 +562,194 @@ const Mesh& NodeViewport::GroupPreviewMesh(IGeometrySource* group)
    return mGroupPreview.mesh;
 }
 
+
+// ---- picking ---------------------------------------------------------------
+
+namespace
+{
+   // Moller-Trumbore. t out; u,v are the barycentric weights of b and c.
+   bool RayTri(const float o[3], const float d[3], const float a[3], const float b[3], const float c[3], float& t, float& u, float& v)
+   {
+      const float e1[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, e2[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+      const float p[3] = { d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0] };
+      const float det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2];
+      if (std::fabs(det) < 1e-12f)
+         return false;
+      const float inv = 1.0f / det;
+      const float s[3] = { o[0] - a[0], o[1] - a[1], o[2] - a[2] };
+      u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) * inv;
+      if (u < 0.0f || u > 1.0f)
+         return false;
+      const float q[3] = { s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0] };
+      v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv;
+      if (v < 0.0f || u + v > 1.0f)
+         return false;
+      t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
+      return t > 1e-5f;
+   }
+
+   void ToWorld(const Mat4& m, const Vertex& v, float out[3])
+   {
+      for (int k = 0; k < 3; k++)
+         out[k] = m.m[k] * v.px + m.m[4 + k] * v.py + m.m[8 + k] * v.pz + m.m[12 + k];
+   }
+}
+
+bool NodeViewport::PickSurface(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h, float px, float pyTop,
+                               int skinSide, SurfaceHit& out)
+{
+   if (geo == nullptr || geo->GroupChildCount() > 0 || !mFramed || w < 1 || h < 1)
+      return false;
+   const Mesh& mesh = geo->GetMesh();
+   if (mesh.indices.size() < 3)
+      return false;
+   const Mat4 model = geo->GetModelMatrix();
+   const float aspect = (float)w / (float)h;
+   const float az = cam.azimuth * 3.14159265f / 180.0f, el = cam.elevation * 3.14159265f / 180.0f;
+   const float ce = std::cos(el);
+   const float eye[3] = { mTarget[0] + mDistance * ce * std::cos(az), mTarget[1] + mDistance * std::sin(el),
+                          mTarget[2] + mDistance * ce * std::sin(az) };
+   const float up[3] = { 0.0f, 1.0f, 0.0f };
+   const Mat4 view = Mat4::LookAt(eye, mTarget, up);
+   const Mat4 proj = Mat4::Perspective(kFovDegrees * 3.14159265f / 180.0f, aspect, 0.05f, std::max(50.0f, mDistance * 4.0f));
+   const Mat4 viewProj = Mat4::Multiply(proj, view);
+   // The ray: from the eye through the pixel, along the view's own axes.
+   float f[3] = { mTarget[0] - eye[0], mTarget[1] - eye[1], mTarget[2] - eye[2] };
+   const float fl = std::sqrt(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
+   for (float& x : f)
+      x /= std::max(1e-6f, fl);
+   float r[3] = { f[1] * up[2] - f[2] * up[1], f[2] * up[0] - f[0] * up[2], f[0] * up[1] - f[1] * up[0] };
+   const float rl = std::sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]);
+   for (float& x : r)
+      x /= std::max(1e-6f, rl);
+   const float u3[3] = { r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0] };
+   const float th = std::tan(kFovDegrees * 0.5f * 3.14159265f / 180.0f);
+   const float nx = (2.0f * px / (float)w - 1.0f) * th * aspect, ny = (1.0f - 2.0f * pyTop / (float)h) * th;
+   float d[3] = { f[0] + r[0] * nx + u3[0] * ny, f[1] + r[1] * nx + u3[1] * ny, f[2] + r[2] * nx + u3[2] * ny };
+   const float dl = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+   for (float& x : d)
+      x /= std::max(1e-6f, dl);
+
+   const size_t tris = mesh.indices.size() / 3;
+   float best = 1e30f, bu = 0, bv = 0;
+   size_t bi = tris;
+   for (size_t t = 0; t < tris; t++)
+   {
+      float a[3], b[3], c[3], tt, uu, vv;
+      ToWorld(model, mesh.vertices[mesh.indices[t * 3]], a);
+      ToWorld(model, mesh.vertices[mesh.indices[t * 3 + 1]], b);
+      ToWorld(model, mesh.vertices[mesh.indices[t * 3 + 2]], c);
+      // Back faces are culled in the render, so the pick skips them too.
+      const float g1[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, g2[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+      const float gn[3] = { g1[1] * g2[2] - g1[2] * g2[1], g1[2] * g2[0] - g1[0] * g2[2], g1[0] * g2[1] - g1[1] * g2[0] };
+      if (gn[0] * d[0] + gn[1] * d[1] + gn[2] * d[2] > 0.0f)
+         continue;
+      if (RayTri(eye, d, a, b, c, tt, uu, vv) && tt < best)
+      {
+         best = tt;
+         bu = uu;
+         bv = vv;
+         bi = t;
+      }
+   }
+   if (bi == tris)
+      return false;
+   const Vertex& A = mesh.vertices[mesh.indices[bi * 3]];
+   const Vertex& B = mesh.vertices[mesh.indices[bi * 3 + 1]];
+   const Vertex& C = mesh.vertices[mesh.indices[bi * 3 + 2]];
+   const float wa = 1.0f - bu - bv;
+   out.tri = (int)bi;
+   out.uv[0] = wa * A.u + bu * B.u + bv * C.u;
+   out.uv[1] = wa * A.v + bu * B.v + bv * C.v;
+   out.pos[0] = wa * A.px + bu * B.px + bv * C.px;
+   out.pos[1] = wa * A.py + bu * B.py + bv * C.py;
+   out.pos[2] = wa * A.pz + bu * B.pz + bv * C.pz;
+   // Facing: the geometric normal against the way back to the eye.
+   float a[3], b[3], c[3];
+   ToWorld(model, A, a);
+   ToWorld(model, B, b);
+   ToWorld(model, C, c);
+   const float e1[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, e2[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+   float n[3] = { e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0] };
+   const float nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+   out.facing = nl > 1e-12f ? std::fabs(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / nl : 0.0f;
+   // Skin texels per screen pixel: the triangle's screen footprint against its UV footprint.
+   auto screen = [&](const float p[3], float s[2]) {
+      const float* m = viewProj.m;
+      const float cx = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
+      const float cy = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+      const float cw = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
+      const float iw = 1.0f / std::max(1e-6f, cw);
+      s[0] = (cx * iw * 0.5f + 0.5f) * (float)w;
+      s[1] = (0.5f - cy * iw * 0.5f) * (float)h;
+   };
+   float sa[2], sb[2], sc[2];
+   screen(a, sa);
+   screen(b, sb);
+   screen(c, sc);
+   const float scr = std::fabs((sb[0] - sa[0]) * (sc[1] - sa[1]) - (sb[1] - sa[1]) * (sc[0] - sa[0]));
+   const float uvA = std::fabs((B.u - A.u) * (C.v - A.v) - (B.v - A.v) * (C.u - A.u));
+   out.texelsPerPx = scr > 1e-6f ? std::sqrt(uvA / scr) * (float)skinSide : 0.0f;
+   return true;
+}
+
+bool NodeViewport::ClosestSurface(IGeometrySource* geo, const float pos[3], SurfaceHit& out)
+{
+   if (geo == nullptr || geo->GroupChildCount() > 0)
+      return false;
+   const Mesh& mesh = geo->GetMesh();
+   const size_t tris = mesh.indices.size() / 3;
+   float best = 1e30f;
+   for (size_t t = 0; t < tris; t++)
+   {
+      const Vertex& A = mesh.vertices[mesh.indices[t * 3]];
+      const Vertex& B = mesh.vertices[mesh.indices[t * 3 + 1]];
+      const Vertex& C = mesh.vertices[mesh.indices[t * 3 + 2]];
+      // Closest point on a triangle (Ericson), in barycentric weights.
+      const float ab[3] = { B.px - A.px, B.py - A.py, B.pz - A.pz }, ac[3] = { C.px - A.px, C.py - A.py, C.pz - A.pz };
+      const float ap[3] = { pos[0] - A.px, pos[1] - A.py, pos[2] - A.pz };
+      auto dot = [](const float x[3], const float y[3]) { return x[0] * y[0] + x[1] * y[1] + x[2] * y[2]; };
+      float wb = 0, wc = 0;
+      const float d1 = dot(ab, ap), d2 = dot(ac, ap);
+      if (d1 <= 0 && d2 <= 0) { wb = 0; wc = 0; }
+      else
+      {
+         const float bp[3] = { pos[0] - B.px, pos[1] - B.py, pos[2] - B.pz };
+         const float d3 = dot(ab, bp), d4 = dot(ac, bp);
+         const float cp[3] = { pos[0] - C.px, pos[1] - C.py, pos[2] - C.pz };
+         const float d5 = dot(ab, cp), d6 = dot(ac, cp);
+         const float vc = d1 * d4 - d3 * d2, vb = d5 * d2 - d1 * d6, va = d3 * d6 - d5 * d4;
+         if (d3 >= 0 && d4 <= d3) { wb = 1; wc = 0; }
+         else if (vc <= 0 && d1 >= 0 && d3 <= 0) { wb = d1 / std::max(1e-12f, d1 - d3); wc = 0; }
+         else if (d6 >= 0 && d5 <= d6) { wb = 0; wc = 1; }
+         else if (vb <= 0 && d2 >= 0 && d6 <= 0) { wb = 0; wc = d2 / std::max(1e-12f, d2 - d6); }
+         else if (va <= 0 && (d4 - d3) >= 0 && (d5 - d6) >= 0)
+         {
+            wb = (d4 - d3) / std::max(1e-12f, (d4 - d3) + (d5 - d6));
+            wc = 1.0f - wb;
+         }
+         else
+         {
+            const float den = 1.0f / std::max(1e-12f, va + vb + vc);
+            wb = vb * den;
+            wc = vc * den;
+         }
+      }
+      const float wa = 1.0f - wb - wc;
+      const float q[3] = { wa * A.px + wb * B.px + wc * C.px, wa * A.py + wb * B.py + wc * C.py, wa * A.pz + wb * B.pz + wc * C.pz };
+      const float dd = (q[0] - pos[0]) * (q[0] - pos[0]) + (q[1] - pos[1]) * (q[1] - pos[1]) + (q[2] - pos[2]) * (q[2] - pos[2]);
+      if (dd < best)
+      {
+         best = dd;
+         out.tri = (int)t;
+         out.uv[0] = wa * A.u + wb * B.u + wc * C.u;
+         out.uv[1] = wa * A.v + wb * B.v + wc * C.v;
+         std::copy(q, q + 3, out.pos);
+      }
+   }
+   return out.tri >= 0;
+}
+
 unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
                                   bool forceRedraw)
 {
@@ -651,7 +842,8 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    // Geometry3DNodes.cpp.
    const bool textureChanged = surfaceTexture != mLastSurfaceTexture ||
       surfaceTextureRevision != mLastSurfaceTextureRevision;
-   const bool needsRedraw = forceRedraw || !mHasRendered || revision != mLastRenderedRevision ||
+   const bool paintChanged = mPaintTex != mLastPaintTex || mPaintRev != mLastPaintRev;
+   const bool needsRedraw = paintChanged || forceRedraw || !mHasRendered || revision != mLastRenderedRevision ||
                             cameraChanged || modelChanged || materialChanged || instancingChanged ||
                             textureChanged || w != mWidth || h != mHeight;
    if (!needsRedraw)
@@ -869,6 +1061,11 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glBindTexture(GL_TEXTURE_2D, surfaceTexture != 0 ? surfaceTexture : WhiteTexture());
    glUniform1i(glGetUniformLocation(program, "uTexture"), 0);
    glUniform1i(glGetUniformLocation(program, "uHasTexture"), surfaceTexture != 0 ? 1 : 0);
+   glActiveTexture(GL_TEXTURE5);
+   glBindTexture(GL_TEXTURE_2D, mPaintTex != 0 ? mPaintTex : WhiteTexture());
+   glUniform1i(glGetUniformLocation(program, "uPaint"), 5);
+   glUniform1i(glGetUniformLocation(program, "uHasPaint"), mPaintTex != 0 ? 1 : 0);
+   glActiveTexture(GL_TEXTURE0);
 
    // A stamp with its own face selection keeps the CPU matrices: the overlay
    // below reads them through aInstance.
@@ -1139,6 +1336,8 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    mLastPointMatrix = pointMatrix;
    mLastMaterial = material;
    mLastSurfaceTexture = surfaceTexture;
+   mLastPaintTex = mPaintTex;
+   mLastPaintRev = mPaintRev;
    mLastSurfaceTextureRevision = surfaceTextureRevision;
    mHasRendered = true;
    return mColorTex;

@@ -131,6 +131,10 @@ public:
       int mw = 0, mh = 0;
       std::vector<std::string> mtiles;
       bool HasPixelMask() const { return mw > 0 && mh > 0; }
+      // Node layers with a 3D object: a painted skin laid over its surface by UV (pw x ph, same tiles).
+      // skinMirror: bit 0/1/2 mirror strokes across the object's X / Y / Z.
+      bool HasSkin() const { return kind == Kind::Node && pw > 0 && ph > 0 && !tiles.empty(); }
+      int skinMirror = 0;
       // Vector layers: items bottom to top; pw/ph hold the box size.
       std::vector<Shape> shapes;
       // Vector mask (any layer but a group): inside the items shows. No items shows all.
@@ -287,6 +291,29 @@ public:
    bool Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], bool radial);
    // The picture's colour (display values) at a document point.
    bool Pick(float x, float y, float rgb[3]);
+
+   // ---- 3D surface paint ---------------------------------------------------
+   // A node layer whose source is a 3D object can be painted on its surface: a stroke is picked by ray through the
+   // layer's view onto the mesh, lands by UV in the layer's skin, and stays on the object when it turns.
+   struct SurfacePoint
+   {
+      float uv[2] = { 0, 0 };
+      float pos[3] = { 0, 0, 0 };   // object space
+      float facing = 0;             // 1 face-on .. 0 edge-on
+      float texelsPerPx = 0;        // skin texels under one document pixel here
+   };
+   bool CanSurfacePaint(int id);
+   // The surface under a document point, false when the ray misses the object.
+   bool SurfaceAt(int id, float x, float y, SurfacePoint& out);
+   // Starts a stroke (brush.size = document px on screen). Makes the skin (side x side) on first use.
+   bool BeginSurfacePaint(int id, const BrushEngine::Brush& b, float x, float y, float pressure, int side = 1024);
+   void SurfacePaintTo(float x, float y, float pressure);
+   // The painted colour (straight RGBA, 0..1) at a document point; false off the object or unpainted.
+   bool SurfaceColor(int id, float x, float y, float rgba[4]);
+   // The skin's colour at a UV (straight RGBA, 0..1).
+   bool SkinAt(int id, float u, float v, float rgba[4]);
+   void ClearSkin(int id);
+   int SkinSide(int id);
    // The paint surface's texture and size, 0 when not a paint layer (Convert to Draw node).
    bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
    // The paint surface's live texture (thumbnails), 0 when none.
@@ -437,6 +464,14 @@ private:
    std::map<int, TextBox> mTextBoxes;
    BrushEngine::Stroke mStroke;
    int mPaintId = 0, mPaintTarget = 0;
+   struct SkinStroke
+   {
+      bool on = false;
+      float lx = 0, ly = 0, carry = 0, screen = 20.0f, spacing = 0.15f, texels = 1.0f;
+      float seed = 1.0f;
+   } mSkinStroke;
+   void SkinDab(const Layer& l, float x, float y, float pressure, bool skipMain = false);
+   unsigned long long SkinRevision(const Layer& l) const;
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
    bool mSelAny = false, mSelDirty = false;
    GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch;

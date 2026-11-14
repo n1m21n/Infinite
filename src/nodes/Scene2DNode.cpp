@@ -877,7 +877,7 @@ void Scene2DNode::Serialize()
          for (float v : l.colorB) o << " " << v;
          o << " " << l.fillAngle << "\n";
       }
-      if (l.kind == Kind::Paint)
+      if (l.kind == Kind::Paint || l.HasSkin())
       {
          o << "paint " << l.id << " " << l.pw << " " << l.ph;
          for (const std::string& k : l.tiles) o << " " << k;
@@ -917,6 +917,8 @@ void Scene2DNode::Serialize()
           l.orient[2] != 0 || l.collapse)
          o << "d3 " << l.id << " " << +l.is3d << " " << l.z << " " << l.az << " " << l.rx << " " << l.ry << " "
            << l.orient[0] << " " << l.orient[1] << " " << l.orient[2] << " " << +l.collapse << "\n";
+      if (l.skinMirror != 0)
+         o << "skinm " << l.id << " " << l.skinMirror << "\n";
       if (l.warpOn || std::any_of(l.warp, l.warp + 8, [](float v) { return v != 0.0f; }))
       {
          o << "warp " << l.id << " " << +l.warpOn;
@@ -1045,6 +1047,11 @@ void Scene2DNode::Parse()
             s >> on >> l->z >> l->az >> l->rx >> l->ry >> l->orient[0] >> l->orient[1] >> l->orient[2] >> col;
             l->is3d = on != 0;
             l->collapse = col != 0;
+         }
+         else if (key == "skinm")
+         {
+            s >> l->skinMirror;
+            l->skinMirror = std::clamp(l->skinMirror, 0, 7);
          }
          else if (key == "warp")
          {
@@ -1619,7 +1626,7 @@ void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<u
                h = Mix(h, n->TextureRevision());
                h = Mix(h, (unsigned long long)n->GetOutputWidth() * 65536ull + (unsigned long long)n->GetOutputHeight());
             }
-         if (l.kind == Kind::Paint || l.kind == Kind::Vector || l.kind == Kind::Text || l.HasPixelMask())
+         if (l.kind == Kind::Paint || l.kind == Kind::Vector || l.kind == Kind::Text || l.HasPixelMask() || l.HasSkin())
             h = Mix(h, mPaintEdits);
          if (mStroke.Active() && mPaintId == l.id)
             h = Mix(h, (unsigned long long)mStroke.DabCount() + 1ull);

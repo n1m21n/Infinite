@@ -38,6 +38,29 @@ public:
    void Orbit(SharedViewportCamera& cam, float dAzimuth, float dElevation);
    void Zoom(float wheelDelta);
 
+   // A painted skin laid over the albedo by UV (straight RGBA, alpha = coverage). Pass 0 to clear it.
+   // `revision` changes whenever the skin's pixels do, so the picture redraws.
+   void SetPaintOverlay(unsigned tex, unsigned long long revision)
+   {
+      mPaintTex = tex;
+      mPaintRev = revision;
+   }
+
+   // What a ray through one pixel of the last render hits on the mesh.
+   struct SurfaceHit
+   {
+      float uv[2] = { 0, 0 };
+      float pos[3] = { 0, 0, 0 };     // object space
+      float facing = 0;               // |normal . toward the eye|, 1 face-on .. 0 edge-on
+      float texelsPerPx = 0;          // skin texels under one screen pixel here (skinSide wide)
+      int tri = -1;
+   };
+   // `px`,`pyTop`: pixel in a w x h render, origin top left. False on a miss, an empty mesh or a group.
+   bool PickSurface(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h, float px, float pyTop, int skinSide,
+                    SurfaceHit& out);
+   // The surface point nearest an object-space point (mirrored strokes land on the far side of the mesh).
+   static bool ClosestSurface(IGeometrySource* geo, const float pos[3], SurfaceHit& out);
+
    // The mesh Render() draws for a Group 3D: its children baked into one,
    // rebuilt only when a child's mesh, placement, colour or instancer changed.
    // Needs no GL context, so the self-test can check it headless.
@@ -68,6 +91,9 @@ private:
    void UploadMesh(const Mesh& mesh, unsigned long long revision);
    void UpdateSelectionBuffer(const Mesh& mesh, unsigned long long revision);
    void UploadPoints(const std::vector<Particle>& points, unsigned long long revision);
+
+   unsigned int mPaintTex = 0, mLastPaintTex = 0;
+   unsigned long long mPaintRev = 0, mLastPaintRev = 0;
 
    unsigned int mFbo = 0, mColorTex = 0, mDepthBuffer = 0;
    int mWidth = 0, mHeight = 0;
