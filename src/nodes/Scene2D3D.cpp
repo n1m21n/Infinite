@@ -85,22 +85,22 @@ in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uSrc;
 uniform vec2 uDir;
-uniform vec3 uSigma;
+uniform vec4 uSigma;
 uniform int uTaps;
 uniform float uStride;
 uniform int uFirst;
 void main() {
-   vec3 acc = vec3(0.0), wsum = vec3(0.0);
-   vec3 s2 = 2.0 * max(uSigma * uSigma, vec3(1e-4));
+   vec4 acc = vec4(0.0), wsum = vec4(0.0);
+   vec4 s2 = 2.0 * max(uSigma * uSigma, vec4(1e-4));
    for (int i = -64; i <= 64; i++) {
       if (abs(i) > uTaps) continue;
       float x = float(i) * uStride;
-      vec3 w = exp(-x * x / s2);
+      vec4 w = exp(-x * x / s2);
       vec4 t = texture(uSrc, vUv + uDir * x);
-      acc += (uFirst == 1 ? vec3(t.a) : t.rgb) * w;
+      acc += (uFirst == 1 ? vec4(t.a) : t) * w;
       wsum += w;
    }
-   fragColor = vec4(acc / max(wsum, vec3(1e-6)), 1.0);
+   fragColor = acc / max(wsum, vec4(1e-6));
 }
 )";
 
@@ -109,9 +109,13 @@ in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uL;
 uniform sampler2D uB;
+uniform sampler2D uB2;
 uniform vec2 uDoc;
-uniform int uShOn, uInOn, uGlOn, uStOn, uOvOn, uStPos;
-uniform vec4 uShC, uInC, uGlC, uStC, uOvC;
+uniform int uShOn, uInOn, uGlOn, uStOn, uOvOn, uStPos, uIgOn, uBvOn, uGrOn;
+uniform vec4 uShC, uInC, uGlC, uStC, uOvC, uIgC, uBvHi, uBvLo, uGrA, uGrB;
+uniform vec2 uGrDir;
+uniform vec3 uBvLight;
+uniform float uIgSpread, uBvDepth;
 uniform vec2 uShOff, uInOff;
 uniform float uShSpread, uInSpread, uGlSpread, uStSize, uFill;
 vec4 over(vec4 d, vec4 s) {
@@ -126,7 +130,24 @@ void main() {
    if (uShOn == 1) res = over(res, vec4(uShC.rgb, spreadA(texture(uB, vUv - uShOff).r, uShSpread) * uShC.a));
    if (uGlOn == 1) res = over(res, vec4(uGlC.rgb, spreadA(texture(uB, vUv).g, uGlSpread) * uGlC.a));
    res = over(res, vec4(L.rgb, L.a * uFill));
+   if (uGrOn == 1) {
+      float t = clamp(dot(vUv - 0.5, uGrDir) + 0.5, 0.0, 1.0);
+      res = over(res, vec4(mix(uGrA.rgb, uGrB.rgb, t), L.a * uGrA.a));
+   }
    if (uOvOn == 1) res = over(res, vec4(uOvC.rgb, L.a * uOvC.a));
+   if (uBvOn == 1) {
+      vec2 px = 1.0 / uDoc;
+      float gx = texture(uB2, vUv + vec2(px.x, 0.0)).g - texture(uB2, vUv - vec2(px.x, 0.0)).g;
+      float gy = texture(uB2, vUv + vec2(0.0, px.y)).g - texture(uB2, vUv - vec2(0.0, px.y)).g;
+      vec3 n = normalize(vec3(-gx * uBvDepth, -gy * uBvDepth, 1.0));
+      float s = dot(n, uBvLight) - uBvLight.z;
+      res = over(res, vec4(uBvHi.rgb, L.a * clamp(s * 3.0, 0.0, 1.0) * uBvHi.a));
+      res = over(res, vec4(uBvLo.rgb, L.a * clamp(-s * 3.0, 0.0, 1.0) * uBvHi.a));
+   }
+   if (uIgOn == 1) {
+      float e = spreadA(texture(uB2, vUv).r, uIgSpread);
+      res = over(res, vec4(uIgC.rgb, L.a * (1.0 - e) * uIgC.a));
+   }
    if (uInOn == 1) {
       float lit = spreadA(texture(uB, vUv - uInOff).b, uInSpread);
       res = over(res, vec4(uInC.rgb, L.a * (1.0 - lit) * uInC.a));
@@ -172,6 +193,19 @@ Scene2DNode::Fx Scene2DNode::FxDefault(int type)
       f.c[0] = 1.0f; f.c[3] = 1.0f;
       f.dist = 0.0f; f.size = 0.0f;
       break;
+   case kFxInnerGlow:
+      f.c[0] = 1.0f; f.c[1] = 1.0f; f.c[2] = 0.75f; f.c[3] = 0.75f;
+      f.dist = 0.0f; f.size = 15.0f;
+      break;
+   case kFxBevel:
+      f.c[0] = 1.0f; f.c[1] = 1.0f; f.c[2] = 1.0f; f.c[3] = 0.75f;
+      f.c2[0] = 0.0f; f.c2[1] = 0.0f; f.c2[2] = 0.0f;
+      f.angle = 120.0f; f.dist = 100.0f; f.size = 5.0f;
+      break;
+   case kFxGradient:
+      f.c[0] = 0.0f; f.c[1] = 0.0f; f.c[2] = 0.0f; f.c[3] = 1.0f;
+      f.angle = 90.0f; f.dist = 0.0f; f.size = 0.0f;
+      break;
    default: break;
    }
    return f;
@@ -179,7 +213,8 @@ Scene2DNode::Fx Scene2DNode::FxDefault(int type)
 
 const char* Scene2DNode::FxName(int type)
 {
-   static const char* names[kFxCount] = { "Drop Shadow", "Inner Shadow", "Outer Glow", "Stroke", "Colour Overlay" };
+   static const char* names[kFxCount] = { "Drop Shadow", "Inner Shadow", "Outer Glow", "Stroke", "Colour Overlay", "Inner Glow", "Bevel",
+                                           "Gradient Overlay" };
    return type >= 0 && type < kFxCount ? names[type] : "";
 }
 
@@ -1112,23 +1147,47 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
    const float maxSig = std::max({ sig[0], sig[1], sig[2] });
    const float stride = std::max(1.0f, 3.0f * maxSig / 48.0f);
    const int taps = std::min(64, (int)std::ceil(3.0f * maxSig / stride));
-   if (sh.on || gl.on || in.on)
+   const Fx& ig = l.fx[kFxInnerGlow];
+   const Fx& bv = l.fx[kFxBevel];
+   const Fx& gr = l.fx[kFxGradient];
+   // Separable gaussian of the layer's alpha into `fb`, one sigma per channel.
+   auto blur = [&](GLUtil::Fbo* fb, const float* s4)
+   {
+      const float mx = std::max({ s4[0], s4[1], s4[2], s4[3] });
+      const float strideB = std::max(1.0f, 3.0f * mx / 48.0f);
+      const int tapsB = std::min(64, (int)std::ceil(3.0f * mx / strideB));
       for (int pass = 0; pass < 2; pass++)
       {
-         const unsigned src = pass == 0 ? L : mFxBlur[0].tex;
-         GLUtil::RunShaderPass(mFxBlur[pass], mBlurProgram, [&]()
+         const unsigned src = pass == 0 ? L : fb[0].tex;
+         GLUtil::RunShaderPass(fb[pass], mBlurProgram, [&]()
          {
             const unsigned prog = mBlurProgram;
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, src);
             glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
             glUniform2f(glGetUniformLocation(prog, "uDir"), pass == 0 ? 1.0f / W : 0.0f, pass == 0 ? 0.0f : 1.0f / H);
-            glUniform3f(glGetUniformLocation(prog, "uSigma"), sig[0], sig[1], sig[2]);
-            glUniform1i(glGetUniformLocation(prog, "uTaps"), taps);
-            glUniform1f(glGetUniformLocation(prog, "uStride"), stride);
+            glUniform4f(glGetUniformLocation(prog, "uSigma"), s4[0], s4[1], s4[2], s4[3]);
+            glUniform1i(glGetUniformLocation(prog, "uTaps"), tapsB);
+            glUniform1f(glGetUniformLocation(prog, "uStride"), strideB);
             glUniform1i(glGetUniformLocation(prog, "uFirst"), pass == 0 ? 1 : 0);
          });
       }
+   };
+   (void)stride; (void)taps;
+   if (sh.on || gl.on || in.on)
+   {
+      const float s4[4] = { sig[0], sig[1], sig[2], 0.0f };
+      blur(mFxBlur, s4);
+   }
+   // Second set: r for the inner glow, g for the bevel's height.
+   const bool two = ig.on || bv.on;
+   if (two)
+   {
+      if (!GLUtil::EnsureFbo(mFxBlur2[0], W, H, GL_RGBA16F, "Scene2DFx") || !GLUtil::EnsureFbo(mFxBlur2[1], W, H, GL_RGBA16F, "Scene2DFx"))
+         return;
+      const float s4[4] = { ig.on ? std::max(0.0f, ig.size) * 0.5f : 0.0f, bv.on ? std::max(0.5f, bv.size) * 0.5f : 0.0f, 0.0f, 0.0f };
+      blur(mFxBlur2, s4);
+   }
    const bool lin = mDoc.linear;
    auto col = [&](const Fx& f, const char* name)
    {
@@ -1150,7 +1209,37 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, mFxBlur[1].tex);
       glUniform1i(glGetUniformLocation(prog, "uB"), 1);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, two ? mFxBlur2[1].tex : mFxBlur[1].tex);
+      glUniform1i(glGetUniformLocation(prog, "uB2"), 2);
       glActiveTexture(GL_TEXTURE0);
+      glUniform1i(glGetUniformLocation(prog, "uIgOn"), ig.on ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uBvOn"), bv.on ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uGrOn"), gr.on ? 1 : 0);
+      col(ig, "uIgC");
+      col(bv, "uBvHi");
+      col(gr, "uGrA");
+      auto col2 = [&](const Fx& f, const char* name)
+      {
+         glUniform4f(glGetUniformLocation(mFxProgram, name), ToWorking(f.c2[0], lin), ToWorking(f.c2[1], lin), ToWorking(f.c2[2], lin),
+                     std::clamp(f.c2[3], 0.0f, 1.0f));
+      };
+      col2(bv, "uBvLo");
+      col2(gr, "uGrB");
+      glUniform1f(glGetUniformLocation(prog, "uIgSpread"), std::clamp(ig.spread, 0.0f, 1.0f));
+      // Bevel: height slope scaled by its size and depth; light from `angle`, 30 degrees up. uv is y up.
+      glUniform1f(glGetUniformLocation(prog, "uBvDepth"), std::max(0.5f, bv.size) * std::clamp(bv.dist, 0.0f, 1000.0f) * 0.04f);
+      {
+         const float a = bv.angle * kD2R, el = 30.0f * kD2R;
+         glUniform3f(glGetUniformLocation(prog, "uBvLight"), std::cos(a) * std::cos(el), std::sin(a) * std::cos(el), std::sin(el));
+      }
+      {
+         // Gradient overlay: start colour where the angle points away from, across the document.
+         const float a = gr.angle * kD2R;
+         const float dx = std::cos(a), dy = std::sin(a);
+         const float span = std::abs(dx) + std::abs(dy);
+         glUniform2f(glGetUniformLocation(prog, "uGrDir"), dx / span * 2.0f * 0.5f, dy / span * 2.0f * 0.5f);
+      }
       glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)W, (float)H);
       glUniform1i(glGetUniformLocation(prog, "uShOn"), sh.on ? 1 : 0);
       glUniform1i(glGetUniformLocation(prog, "uInOn"), in.on ? 1 : 0);

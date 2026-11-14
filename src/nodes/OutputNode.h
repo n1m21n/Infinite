@@ -126,6 +126,7 @@ public:
    int recordFps = 30;
    bool includeAudio = false;
    int imageFormat = 0; // 0 = .png, 1 = .jpg
+   int jpegQuality = 90; // 1..100, JPEG stills only
    int videoFormat = 0; // 0 = .mp4, 1 = .mov
    std::string exportImagePath;
    std::string recordVideoPath;
@@ -263,6 +264,7 @@ public:
       v.Int("recordFps", recordFps);
       v.Bool("includeAudio", includeAudio);
       v.Int("imageFormat", imageFormat);
+      v.Int("jpegQuality", jpegQuality);
       v.Int("videoFormat", videoFormat);
       v.Text("exportImagePath", exportImagePath);
       v.Text("recordVideoPath", recordVideoPath);

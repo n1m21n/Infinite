@@ -649,6 +649,44 @@ void RunView2DTest()
          Check("T-D: the colour overlay recolours the pixels", Pixel(&pic, 200, 150)[2] > 0.9f && Pixel(&pic, 200, 150)[0] < 0.1f);
       }
 
+      // I: inner glow, bevel, gradient overlay on a grey square.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         const int a = Card(pic, 200, 150, 160, 160, 0.5f, 0.5f, 0.5f);
+         Layer* l = pic.FindLayer(a);
+         Scene2DNode::Fx& g = l->fx[Scene2DNode::kFxGradient];
+         g.on = true;
+         g.angle = 0.0f;   // black on the left, white on the right
+         pic.Commit();
+         Cook(&pic);
+         const float gl = Pixel(&pic, 130, 150)[0], gr = Pixel(&pic, 270, 150)[0];
+         Check("I: gradient overlay runs start to end along its angle", gl < gr - 0.1f);
+         l = pic.FindLayer(a);
+         l->fx[Scene2DNode::kFxGradient].on = false;
+         Scene2DNode::Fx& b = l->fx[Scene2DNode::kFxBevel];
+         b.on = true;
+         b.angle = 90.0f;   // light from the top
+         b.size = 10.0f;
+         b.c[3] = 1.0f;
+         pic.Commit();
+         Cook(&pic);
+         const float bt = Pixel(&pic, 200, 74)[0], bb = Pixel(&pic, 200, 226)[0], bc = Pixel(&pic, 200, 150)[0];
+         Check("I: bevel lights the top edge and shades the bottom", bt > bc + 0.1f && bb < bc - 0.1f);
+         l = pic.FindLayer(a);
+         l->fx[Scene2DNode::kFxBevel].on = false;
+         Scene2DNode::Fx& ig = l->fx[Scene2DNode::kFxInnerGlow];
+         ig.on = true;
+         ig.c[0] = 1.0f; ig.c[1] = 0.0f; ig.c[2] = 0.0f; ig.c[3] = 1.0f;
+         ig.size = 20.0f;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> e = Pixel(&pic, 122, 150);
+         const std::vector<float> m = Pixel(&pic, 200, 150);
+         Check("I: inner glow tints the inside edge, not the middle", e[0] > e[1] + 0.15f && Near(m[0], m[1], 0.03f));
+         std::printf("  I fx: gradient %.2f..%.2f bevel top %.2f mid %.2f bottom %.2f glow edge %.2f/%.2f\n", gl, gr, bt, bc, bb, e[0], e[1]);
+      }
+
       // Blend if: a red layer shows only over the light half of what is below.
       {
          Scene2DNode pic;

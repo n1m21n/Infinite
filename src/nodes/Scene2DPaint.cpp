@@ -802,6 +802,76 @@ void Scene2DNode::InvertSelection()
    mSelDirty = true;
 }
 
+void Scene2DNode::ModifySelection(int op, int px)
+{
+   const int w = mDoc.w, h = mDoc.h, r = std::clamp(px, 1, 100);
+   if (!mSelAny || mSel.size() != (size_t)w * h)
+      return;
+   // Separable max (grow) or min (shrink) over a (2rr+1) square, a pass per axis.
+   auto morph = [&](const std::vector<uint8_t>& src, bool grow, int rr) {
+      std::vector<uint8_t> tmp(src.size()), dst(src.size());
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            uint8_t v = grow ? 0 : 255;
+            for (int k = std::max(0, x - rr); k <= std::min(w - 1, x + rr); k++)
+               v = grow ? std::max(v, src[(size_t)y * w + k]) : std::min(v, src[(size_t)y * w + k]);
+            tmp[(size_t)y * w + x] = v;
+         }
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            uint8_t v = grow ? 0 : 255;
+            for (int k = std::max(0, y - rr); k <= std::min(h - 1, y + rr); k++)
+               v = grow ? std::max(v, tmp[(size_t)k * w + x]) : std::min(v, tmp[(size_t)k * w + x]);
+            dst[(size_t)y * w + x] = v;
+         }
+      return dst;
+   };
+   if (op == 0)
+      mSel = morph(mSel, true, r);
+   else if (op == 1)
+      mSel = morph(mSel, false, r);
+   else if (op == 2)
+   {
+      // Box blur (running sums, a pass per axis) then a hard cut at half: corners round, specks under r go.
+      std::vector<int> tmp((size_t)w * h);
+      for (int y = 0; y < h; y++)
+      {
+         int sum = 0;
+         for (int x = -r; x <= r; x++)
+            sum += mSel[(size_t)y * w + std::clamp(x, 0, w - 1)];
+         for (int x = 0; x < w; x++)
+         {
+            tmp[(size_t)y * w + x] = sum;
+            sum += mSel[(size_t)y * w + std::min(w - 1, x + r + 1)] - mSel[(size_t)y * w + std::max(0, x - r)];
+         }
+      }
+      const long long n = (long long)(2 * r + 1) * (2 * r + 1);
+      for (int x = 0; x < w; x++)
+      {
+         long long sum = 0;
+         for (int y = -r; y <= r; y++)
+            sum += tmp[(size_t)std::clamp(y, 0, h - 1) * w + x];
+         for (int y = 0; y < h; y++)
+         {
+            mSel[(size_t)y * w + x] = sum * 2 >= n * 255 ? 255 : 0;
+            sum += tmp[(size_t)std::min(h - 1, y + r + 1) * w + x] - tmp[(size_t)std::max(0, y - r) * w + x];
+         }
+      }
+   }
+   else
+   {
+      // A ring r wide straddling the edge: grown by half, minus shrunk by half.
+      const int half = std::max(1, r / 2);
+      const std::vector<uint8_t> out = morph(mSel, true, half), in = morph(mSel, false, half);
+      for (size_t i = 0; i < mSel.size(); i++)
+         mSel[i] = (uint8_t)(out[i] * (255 - in[i]) / 255);
+   }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+}
+
 float Scene2DNode::SelectionAt(int x, int y) const
 {
    if (!mSelAny || x < 0 || y < 0 || x >= mDoc.w || y >= mDoc.h || mSel.size() != (size_t)mDoc.w * mDoc.h)

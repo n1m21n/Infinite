@@ -28,7 +28,8 @@ public:
    enum class Kind { Node = 0, Fill = 1, Group = 2, Paint = 3, Vector = 4, Text = 5, Adjust = 6 };
    static constexpr int kKindCount = 7;
    // Adjustment layers: the picture below, changed in place (masks and clip limit where).
-   enum AdjType { kAdjPixelate = 0, kAdjHalftone, kAdjDither, kAdjThreshold, kAdjGradientMap, kAdjPosterize, kAdjCount };
+   enum AdjType { kAdjPixelate = 0, kAdjHalftone, kAdjDither, kAdjThreshold, kAdjGradientMap, kAdjPosterize,
+                  kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjCount };
    static const char* AdjName(int type);
    static float AdjDefault(int type);
    static void AdjRange(int type, float& lo, float& hi);
@@ -66,7 +67,7 @@ public:
 
    // Layer fx (Photoshop order): drop shadow and outer glow under the pixels,
    // colour overlay and inner shadow on them, stroke on top.
-   enum FxType { kFxShadow = 0, kFxInner, kFxGlow, kFxStroke, kFxOverlay, kFxCount };
+   enum FxType { kFxShadow = 0, kFxInner, kFxGlow, kFxStroke, kFxOverlay, kFxInnerGlow, kFxBevel, kFxGradient, kFxCount };
    struct Fx
    {
       bool on = false;
@@ -76,6 +77,7 @@ public:
       float size = 10.0f;     // blur (shadows, glow) or width (stroke), px
       float spread = 0.0f;    // shadows and glow: 0..1, how hard the edge is
       int pos = 0;            // stroke: 0 outside, 1 inside, 2 centre
+      float c2[4] = { 1.0f, 1.0f, 1.0f, 1.0f };   // bevel: shadow colour; gradient overlay: end colour
    };
    static Fx FxDefault(int type);
    static const char* FxName(int type);
@@ -160,7 +162,7 @@ public:
       // Distort: each corner (top left, top right, bottom right, bottom left) moved by dx, dy px.
       bool warpOn = false;
       float warp[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-      Fx fx[kFxCount] = { FxDefault(0), FxDefault(1), FxDefault(2), FxDefault(3), FxDefault(4) };
+      Fx fx[kFxCount] = { FxDefault(0), FxDefault(1), FxDefault(2), FxDefault(3), FxDefault(4), FxDefault(5), FxDefault(6), FxDefault(7) };
       // Blend if (grey): this layer's and the underlying picture's black lo/hi and white lo/hi, 0..1.
       float bifT[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
       float bifU[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
@@ -383,6 +385,8 @@ public:
    void SelectAll();
    void Deselect();
    void InvertSelection();
+   // 0 expand, 1 contract, 2 smooth (rounds corners, drops specks), 3 border (a ring px wide on the edge).
+   void ModifySelection(int op, int px);
    bool HasSelection() const { return mSelAny; }
    bool SelectionBounds(float lo[2], float hi[2]) const;
    float SelectionAt(int x, int y) const;   // 0..1, document px
@@ -533,7 +537,7 @@ private:
    std::map<int, DepthBufs> mDepth;
    int mDepthLevel = -1;
    // Layer fx scratch: blurred alpha (two ping-pong), the finished layer.
-   GLUtil::Fbo mFxBlur[2], mFxOut;
+   GLUtil::Fbo mFxBlur[2], mFxBlur2[2], mFxOut;
    unsigned mBlurProgram = 0, mFxProgram = 0;
    bool mFxTried = false;
    // Adjustment layers: the picture below, changed, ready for the layer's normal pass.

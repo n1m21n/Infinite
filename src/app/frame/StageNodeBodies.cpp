@@ -1240,7 +1240,7 @@ void DrawNodeBodies(FrameCtx& fc)
                      PopSelectedButtonColors();
 
                   if (ActionButton::Draw(L("Export Image"), ImVec2(kPreviewSize, 0)))
-                     ExportImage(n, n->exportImagePath);
+                     ExportImage(n, n->exportImagePath, std::clamp(n->jpegQuality, 1, 100));
 
                   ImGui::Dummy(ImVec2(0, 4));
 

@@ -19,20 +19,21 @@ std::function<INode*(uint64_t)> Scene2DNode::ResolveUid;
 
 const char* Scene2DNode::AdjName(int type)
 {
-   static const char* kNames[kAdjCount] = { "Pixelate", "Halftone", "Dither", "Threshold", "Gradient Map", "Posterize" };
+   static const char* kNames[kAdjCount] = { "Pixelate", "Halftone", "Dither", "Threshold", "Gradient Map", "Posterize",
+                                                 "Brightness", "Contrast", "Hue", "Saturation", "Exposure", "Invert" };
    return kNames[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 float Scene2DNode::AdjDefault(int type)
 {
-   static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f };
+   static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f };
    return kDef[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 void Scene2DNode::AdjRange(int type, float& lo, float& hi)
 {
-   static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f };
-   static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f };
+   static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f };
+   static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f };
    const int t = std::clamp(type, 0, kAdjCount - 1);
    lo = kLo[t];
    hi = kHi[t];
@@ -48,7 +49,10 @@ const char* Scene2DNode::LayerFieldName(int f)
       "Inner shadow size", "Inner shadow distance", "Inner shadow angle", "Inner shadow opacity",
       "Glow size", "Glow distance", "Glow angle", "Glow opacity",
       "Stroke width", "Stroke distance", "Stroke angle", "Stroke opacity",
-      "Overlay size", "Overlay distance", "Overlay angle", "Overlay opacity" };
+      "Overlay size", "Overlay distance", "Overlay angle", "Overlay opacity",
+      "Inner glow size", "Inner glow distance", "Inner glow angle", "Inner glow opacity",
+      "Bevel size", "Bevel depth", "Bevel angle", "Bevel opacity",
+      "Gradient size", "Gradient distance", "Gradient angle", "Gradient opacity" };
    if (f < 0 || f >= kLfCount)
       return "";
    return f < kLfFxBase ? kNames[f] : kFx[f - kLfFxBase];
@@ -336,6 +340,23 @@ namespace
          "      float n = max(2.0, floor(uAmt + 0.5));\n"
          "      c = floor(c * n) / (n - 1.0);\n"
          "      c = min(c, vec3(1.0));\n"
+         "   } else if (uType == 6) {\n"
+         "      c = c + uAmt;\n"
+         "   } else if (uType == 7) {\n"
+         "      float k = uAmt >= 0.0 ? 1.0 / max(1e-3, 1.0 - uAmt) : 1.0 + uAmt;\n"
+         "      c = (c - 0.5) * k + 0.5;\n"
+         "   } else if (uType == 8) {\n"
+         "      float a = radians(uAmt);\n"
+         "      vec3 k = vec3(0.57735);\n"
+         "      c = c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a));\n"
+         "   } else if (uType == 9) {\n"
+         "      c = mix(vec3(Luma(c)), c, uAmt);\n"
+         "   } else if (uType == 10) {\n"
+         "      vec3 l = uLinear == 1 ? max(src.rgb, 0.0) : SrgbDecode(c);\n"
+         "      l *= exp2(uAmt);\n"
+         "      c = SrgbEncode(clamp(l, 0.0, 1.0));\n"
+         "   } else if (uType == 11) {\n"
+         "      c = mix(c, 1.0 - c, uAmt);\n"
          "   }\n"
          "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(Luma(c), 0.0, 1.0));\n"
          "   c = clamp(c, 0.0, 1.0);\n"
@@ -1072,11 +1093,13 @@ void Scene2DNode::Serialize()
          const Fx& f = l.fx[t];
          const Fx z = FxDefault(t);
          if (f.on == z.on && std::equal(f.c, f.c + 4, z.c) && f.angle == z.angle && f.dist == z.dist && f.size == z.size &&
-             f.spread == z.spread && f.pos == z.pos)
+             f.spread == z.spread && f.pos == z.pos && std::equal(f.c2, f.c2 + 4, z.c2))
             continue;
          o << "fx " << l.id << " " << t << " " << +f.on;
          for (float v : f.c) o << " " << v;
-         o << " " << f.angle << " " << f.dist << " " << f.size << " " << f.spread << " " << f.pos << "\n";
+         o << " " << f.angle << " " << f.dist << " " << f.size << " " << f.spread << " " << f.pos;
+         for (float v : f.c2) o << " " << v;
+         o << "\n";
       }
       if (l.HasBlendIf())
       {
@@ -1227,6 +1250,9 @@ void Scene2DNode::Parse()
                Fx& f = l->fx[t];
                s >> on >> f.c[0] >> f.c[1] >> f.c[2] >> f.c[3] >> f.angle >> f.dist >> f.size >> f.spread >> f.pos;
                f.on = on != 0;
+               float c2[4];
+               if (s >> c2[0] >> c2[1] >> c2[2] >> c2[3])   // older docs stop at pos
+                  std::copy(c2, c2 + 4, f.c2);
             }
          }
          else if (key == "bif")

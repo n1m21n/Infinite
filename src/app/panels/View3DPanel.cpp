@@ -7236,7 +7236,7 @@ namespace
       OutputNode* out = sStillPath.empty() ? nullptr : FindOutput();
       if (out == nullptr || out->GetOutputWidth() <= 0)
          return;
-      ExportImage(out, sStillPath);
+      ExportImage(out, sStillPath, std::clamp(out->jpegQuality, 1, 100));
       KeepRender(sStillPath);
       sStillPath.clear();
    }

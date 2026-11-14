@@ -104,6 +104,12 @@ namespace
    BrushEngine::Brush sBrush, sEraser;
    // The brush's numbers are params of the open document, after Drive A..D and before the layer slots.
    constexpr int kBrushSizeParam = 4, kBrushOpacityParam = 5, kBrushFlowParam = 6, kBrushHueParam = 7;
+   // Whole steps for counts and degrees, two decimals for the rest.
+   const char* AdjFmt(int t)
+   {
+      using S = Scene2DNode;
+      return t == S::kAdjPixelate || t == S::kAdjHalftone || t == S::kAdjDither || t == S::kAdjPosterize || t == S::kAdjHue ? "%.0f" : "%.2f";
+   }
    float sBrushHue = 0.0f;   // degrees, turns the colour each stroke starts with (sound as a paint input)
    // Turns an RGB colour round the hue circle, keeping its value and saturation.
    void HueTurn(float c[3], float degrees)
@@ -127,6 +133,7 @@ namespace
    int sMarqueeShape = 0;          // 0 rectangle, 1 ellipse
    int sLassoKind = 0;             // 0 freehand, 1 polygon
    float sFeather = 0.0f;
+   float sSelModPx = 4.0f;         // Expand / Contract / Smooth / Border, document px
    int sSelOp = 0;                 // Scene2DNode::SelOp
    std::vector<float> sPoly;       // polygon lasso points so far, document px
    int sPolyOp = 0;
@@ -1229,7 +1236,7 @@ namespace
       OutputNode* out = sStillPath.empty() ? nullptr : FindOutput();
       if (out == nullptr || out->GetOutputWidth() <= 0)
          return;
-      ExportImage(out, sStillPath);
+      ExportImage(out, sStillPath, std::clamp(out->jpegQuality, 1, 100));
       sLastRender = sStillPath;
       sStillPath.clear();
    }
@@ -3531,6 +3538,28 @@ namespace
       }
    }
 
+   // Expand, contract, smooth or border the live selection by sSelModPx.
+   void SelModChips(Scene2DNode* doc)
+   {
+      if (!doc->HasSelection())
+         return;
+      BarDivider();
+      BarSlider("##v2dselmod", &sSelModPx, 1.0f, 100.0f, "%.0f px", kWellL);
+      static const char* kOps[4] = { "Expand##v2dsm0", "Contract##v2dsm1", "Smooth##v2dsm2", "Border##v2dsm3" };
+      static const char* kUndo[4] = { "Expand selection", "Contract selection", "Smooth selection", "Border selection" };
+      for (int i = 0; i < 4; i++)
+      {
+         if (i > 0)
+            FormParts::Inline(0.0f, tok::space_1);
+         if (TextChip(L(kOps[i]), false, nullptr))
+         {
+            PushUndoCheckpoint(kUndo[i]);
+            doc->ModifySelection(i, (int)std::lround(sSelModPx));
+            Touch();
+         }
+      }
+   }
+
    void MatchChips()
    {
       float tol = (float)sTolerance;
@@ -3646,12 +3675,14 @@ namespace
          SelOpChips("v2dop");
          gap();
          BarSlider("##v2dfeather", &sFeather, 0.0f, 250.0f, "Feather %.0f px", kWellL);
+         SelModChips(doc);
       }
       else if (sTool == kWand)
       {
          SelOpChips("v2dwop");
          gap();
          MatchChips();
+         SelModChips(doc);
       }
    }
 
@@ -4955,7 +4986,7 @@ namespace
          }
          float lo = 0, hi = 1;
          Scene2DNode::AdjRange(l->adjType, lo, hi);
-         const char* fmt = l->adjType == Scene2DNode::kAdjThreshold ? "%.2f" : "%.0f";
+         const char* fmt = AdjFmt(l->adjType);
          if (l->adjType != Scene2DNode::kAdjGradientMap)
          {
             ModNext(*l, Scene2DNode::kLfAdjust);
@@ -5188,22 +5219,32 @@ namespace
          BoolRow(T("On"), &f.on);
          if (f.on)
          {
-            ColorRow(T("Colour"), f.c);
+            const bool two = t == Scene2DNode::kFxBevel || t == Scene2DNode::kFxGradient;
+            ColorRow(T(t == Scene2DNode::kFxBevel ? "Highlight" : two ? "Start" : "Colour"), f.c);
+            if (two)
+               ColorRow(T(t == Scene2DNode::kFxBevel ? "Shadow" : "End"), f.c2);
             const int fb = Scene2DNode::kLfFxBase + t * Scene2DNode::kLfFxFields;
             ModNext(*l, fb + 3);
             SliderRow(T("Opacity"), &f.c[3], 0.0f, 1.0f, "%.2f");
-            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner)
+            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || two)
             {
                ModNext(*l, fb + 2);
                SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
-               ModNext(*l, fb + 1);
-               SliderRow(T("Distance"), &f.dist, 0.0f, 200.0f, "%.0f px");
             }
-            if (t != Scene2DNode::kFxOverlay)
+            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || t == Scene2DNode::kFxBevel)
+            {
+               ModNext(*l, fb + 1);
+               if (t == Scene2DNode::kFxBevel)
+                  SliderRow(T("Depth"), &f.dist, 0.0f, 200.0f, "%.0f%%");
+               else
+                  SliderRow(T("Distance"), &f.dist, 0.0f, 200.0f, "%.0f px");
+            }
+            if (t != Scene2DNode::kFxOverlay && t != Scene2DNode::kFxGradient)
+            {
                ModNext(*l, fb);
-            if (t != Scene2DNode::kFxOverlay)
                SliderRow(T(t == Scene2DNode::kFxStroke ? "Width" : "Size"), &f.size, 0.0f, 200.0f, "%.0f px");
-            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || t == Scene2DNode::kFxGlow)
+            }
+            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || t == Scene2DNode::kFxGlow || t == Scene2DNode::kFxInnerGlow)
                SliderRow(T("Spread"), &f.spread, 0.0f, 1.0f, "%.2f");
             if (t == Scene2DNode::kFxStroke)
             {
@@ -5233,7 +5274,7 @@ namespace
          float lo = 0, hi = 1;
          Scene2DNode::AdjRange(l->adjType, lo, hi);
          if (l->adjType != Scene2DNode::kAdjGradientMap)
-            SliderRow(T("Amount"), &l->adjAmt, lo, hi, l->adjType == Scene2DNode::kAdjThreshold ? "%.2f" : "%.0f");
+            SliderRow(T("Amount"), &l->adjAmt, lo, hi, AdjFmt(l->adjType));
          if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
          {
             ColorRow(T("Shadows"), l->colorA);
@@ -5370,6 +5411,12 @@ namespace
       Scene2DNode::Document& d = doc->Doc();
       SectionCard::Begin(T("Render"));
       ComboRow(T("Image"), &sImageFormat, { "PNG", "JPEG" });
+      if (OutputNode* o = sImageFormat == 1 ? FindOutput() : nullptr)
+      {
+         float q = (float)std::clamp(o->jpegQuality, 1, 100);
+         if (SliderRow(T("Quality"), &q, 1.0f, 100.0f, "%.0f"))
+            o->jpegQuality = (int)std::lround(q);
+      }
       ImGui::BeginDisabled(gOfflineRender.active);
       if (ActionButton::Draw(L("Render Image##v2dimg"), ImVec2(availW, 0)))
          sPending.what = Pending::RenderImage;
@@ -6471,6 +6518,8 @@ namespace
             doc->Deselect();
          else if (how == "invert")
             doc->InvertSelection();
+         else if (how == "expand" || how == "contract" || how == "smooth" || how == "border")
+            doc->ModifySelection(how == "expand" ? 0 : how == "contract" ? 1 : how == "smooth" ? 2 : 3, std::clamp(c.value("px", 4), 1, 100));
          else
          {
             const json& r = c["rect"];
@@ -7293,6 +7342,70 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       }
       if (invIndex >= 0)
          RemoveNodeByIndex(invIndex);
+   }
+   // D: the new colour adjustments land on a known pixel (red under Invert reads cyan, under Saturation 0 reads grey).
+   {
+      auto centreUnder = [&](const char* type, float amt) {
+         json out;
+         std::string err;
+         View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "add" }, { "kind", "fill" } },
+                                                                 { { "op", "set" }, { "layer", -1 }, { "values", { { "color", { 1, 0, 0, 1 } } } } },
+                                                                 { { "op", "add" }, { "kind", "adjust" }, { "type", type } },
+                                                                 { { "op", "set" }, { "layer", -1 }, { "values", { { "Amount", amt } } } } }) } },
+                   out, err);
+         std::vector<float> px;
+         Scene2DNode* dd = FindDoc();
+         if (dd == nullptr || !out.value("ok", false))
+         {
+            printf("  D %s: %s\n", type, err.c_str());
+            return px;
+         }
+         static int df = 7600000;
+         dd->CookIfNeeded(++df);
+         unsigned scratch = 0;
+         const int w = dd->GetOutputWidth(), h = dd->GetOutputHeight();
+         std::vector<float> all;
+         GLUtil::ReadTexturePixels(scratch, dd->GetOutputTexture(), w, h, all);
+         if (scratch != 0)
+            glDeleteFramebuffers(1, &scratch);
+         const size_t mid = ((size_t)(h / 2) * w + w / 2) * 4;
+         if (all.size() > mid + 2)
+            px.assign(all.begin() + mid, all.begin() + mid + 3);
+         for (int k = (int)out["ids"].size() - 1; k >= 0; k--)
+            dd->RemoveLayer(out["ids"][k].get<int>());
+         dd->Commit();
+         return px;
+      };
+      const std::vector<float> inv = centreUnder("Invert", 1.0f), sat = centreUnder("Saturation", 0.0f), bri = centreUnder("Brightness", -1.0f);
+      printf("  D adjust: invert %.2f %.2f %.2f  sat0 %.2f %.2f %.2f  bright-1 %.2f\n", inv.size() == 3 ? inv[0] : -1.0f, inv.size() == 3 ? inv[1] : -1.0f,
+             inv.size() == 3 ? inv[2] : -1.0f, sat.size() == 3 ? sat[0] : -1.0f, sat.size() == 3 ? sat[1] : -1.0f, sat.size() == 3 ? sat[2] : -1.0f,
+             bri.size() == 3 ? bri[0] : -1.0f);
+      expect("D: Invert turns red cyan", inv.size() == 3 && inv[0] < 0.05f && inv[1] > 0.95f && inv[2] > 0.95f);
+      expect("D: Saturation 0 turns red grey", sat.size() == 3 && std::fabs(sat[0] - sat[1]) < 0.02f && std::fabs(sat[1] - sat[2]) < 0.02f && sat[0] > 0.02f);
+      expect("D: Brightness -1 turns red black", bri.size() == 3 && bri[0] < 0.02f);
+   }
+   // J: expand, contract, smooth and border change a 100 px square selection where they should.
+   if (Scene2DNode* sd = FindDoc())
+   {
+      const int cx = sd->Doc().w / 2, cy = sd->Doc().h / 2;
+      auto square = [&]() { sd->SelectRect((float)cx - 50, (float)cy - 50, (float)cx + 50, (float)cy + 50, Scene2DNode::kSelNew, 0.0f, false); };
+      square();
+      sd->ModifySelection(0, 10);
+      const bool grew = sd->SelectionAt(cx - 56, cy) > 0.5f && sd->SelectionAt(cx - 64, cy) < 0.5f;
+      square();
+      sd->ModifySelection(1, 10);
+      const bool shrank = sd->SelectionAt(cx - 44, cy) < 0.5f && sd->SelectionAt(cx - 36, cy) > 0.5f;
+      square();
+      sd->ModifySelection(3, 10);
+      const bool ring = sd->SelectionAt(cx - 50, cy) > 0.5f && sd->SelectionAt(cx, cy) < 0.5f && sd->SelectionAt(cx - 70, cy) < 0.5f;
+      square();
+      sd->ModifySelection(2, 10);
+      const bool round = sd->SelectionAt(cx, cy) > 0.5f && sd->SelectionAt(cx - 49, cy - 49) < 0.5f;
+      sd->Deselect();
+      expect("J: Expand grows the selection by its px", grew);
+      expect("J: Contract shrinks it by its px", shrank);
+      expect("J: Border is a ring on the edge", ring);
+      expect("J: Smooth rounds the corners", round);
    }
    // L: Cmd-drag a corner distorts it alone, an edge skews both its corners, Alt+Shift on a corner mirrors (perspective).
    {
