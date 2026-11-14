@@ -1229,6 +1229,15 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
    const int next = 1 - p.cur;
    const unsigned int prog = mPassProgram;
    const int depthMode = depth == mDepthLevel ? (a.card ? 1 : 2) : 0;
+   // A layer that covers part of the frame: draw only that part into the other buffer and copy it back, so the
+   // rest of the picture is never read or written.
+   extern bool gScene2DBounds;
+   const bool part = gScene2DBounds && depthMode == 0 && a.rect[2] > a.rect[0] && a.rect[3] > a.rect[1];
+   if (part)
+   {
+      glEnable(GL_SCISSOR_TEST);
+      glScissor(a.rect[0], a.rect[1], a.rect[2] - a.rect[0], a.rect[3] - a.rect[1]);
+   }
    GLUtil::RunShaderPass(p.f[next], prog, [&]()
    {
       glActiveTexture(GL_TEXTURE0);
@@ -1291,6 +1300,20 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
          glUniform1f(glGetUniformLocation(prog, "uFillAngle"), a.fill->fillAngle);
       }
    });
+   if (part)
+   {
+      glDisable(GL_SCISSOR_TEST);
+      GLint prevR = 0, prevD = 0;
+      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevR);
+      glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevD);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, p.f[next].fbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, p.f[p.cur].fbo);
+      glBlitFramebuffer(a.rect[0], a.rect[1], a.rect[2], a.rect[3], a.rect[0], a.rect[1], a.rect[2], a.rect[3],
+                        GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, prevR);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevD);
+      return;
+   }
    if (depthMode != 0)
    {
       GLint prev = 0;
@@ -1300,6 +1323,40 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glBindFramebuffer(GL_FRAMEBUFFER, prev);
    }
    p.cur = next;
+}
+
+// The box's corners through the layer's homography, padded a little for filtering. Outside them the pass leaves
+// the picture as it is (the layer reads as clear there), except Anti-Erase, which clears what it does not cover.
+bool Scene2DNode::LayerRect(const float h[9], PassArgs& a) const
+{
+   if (a.blend == BlendModes::kAntiEraseMode)
+      return true;
+   float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
+   for (int c = 0; c < 4; c++)
+   {
+      const float bx = ((c == 1 || c == 2) ? a.crop[2] : a.crop[0]) * a.box[0], by = (c >= 2 ? a.crop[3] : a.crop[1]) * a.box[1];
+      const float w = h[6] * bx + h[7] * by + h[8];
+      if (!(w > 1e-6f))
+         return true;   // a corner behind the camera: the shape is unbounded on screen
+      const float x = (h[0] * bx + h[1] * by + h[2]) / w, y = (h[3] * bx + h[4] * by + h[5]) / w;
+      x0 = std::min(x0, x);
+      x1 = std::max(x1, x);
+      y0 = std::min(y0, y);
+      y1 = std::max(y1, y);
+   }
+   const int W = mDoc.w, H = mDoc.h;
+   const int rx0 = (int)std::clamp(std::floor(x0) - 2.0f, 0.0f, (float)W), rx1 = (int)std::clamp(std::ceil(x1) + 2.0f, 0.0f, (float)W);
+   const int ry0 = (int)std::clamp(std::floor(H - y1) - 2.0f, 0.0f, (float)H), ry1 = (int)std::clamp(std::ceil(H - y0) + 2.0f, 0.0f, (float)H);
+   if (rx1 <= rx0 || ry1 <= ry0)
+      return false;
+   // Most of the frame anyway: one full pass is cheaper than a pass plus a copy.
+   if ((double)(rx1 - rx0) * (ry1 - ry0) > 0.6 * (double)W * H)
+      return true;
+   a.rect[0] = rx0;
+   a.rect[1] = ry0;
+   a.rect[2] = rx1;
+   a.rect[3] = ry1;
+   return true;
 }
 
 void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacityMul, bool clipMode)
@@ -1420,6 +1477,33 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.crop[3] = std::clamp(1.0f - l.crop[3] / a.box[1], a.crop[1], 1.0f);
    }
    a.nearest = l.nearest;
+   // A paint layer shows only its painted tiles: crop to them (one texel wider, so filtering reads the same), which
+   // lets the pass touch only that part of the frame.
+   if (l.kind == Kind::Paint && !(mStroke.Active() && mPaintId == l.id) && l.pw > 0 && l.ph > 0)
+   {
+      const int kT = TileStore::kTile, cols = (l.pw + kT - 1) / kT;
+      int tx0 = l.pw, ty0 = l.ph, tx1 = 0, ty1 = 0;
+      for (size_t i = 0; i < l.tiles.size(); i++)
+         if (l.tiles[i] != "-")
+         {
+            const int x0 = (int)(i % cols) * kT, y0 = (int)(i / cols) * kT;
+            tx0 = std::min(tx0, x0);
+            ty0 = std::min(ty0, y0);
+            tx1 = std::max(tx1, std::min(l.pw, x0 + kT));
+            ty1 = std::max(ty1, std::min(l.ph, y0 + kT));
+         }
+      if (tx1 <= tx0 || ty1 <= ty0)
+         return;   // nothing painted
+      // Texture rows count from the bottom; the box's v from the top.
+      const float u0 = (tx0 - 1.0f) / l.pw, u1 = (tx1 + 1.0f) / l.pw;
+      const float v0 = 1.0f - (ty1 + 1.0f) / l.ph, v1 = 1.0f - (ty0 - 1.0f) / l.ph;
+      a.crop[0] = std::max(a.crop[0], u0);
+      a.crop[1] = std::max(a.crop[1], v0);
+      a.crop[2] = std::min(a.crop[2], u1);
+      a.crop[3] = std::min(a.crop[3], v1);
+      if (a.crop[2] <= a.crop[0] || a.crop[3] <= a.crop[1])
+         return;
+   }
    if (l.HasPixelMask() && l.pmaskOn)
    {
       auto it = mMasks.find(l.id);
@@ -1432,6 +1516,8 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    if (l.hasVMask && l.vmaskOn && !l.vmask.empty())
       if (Raster* r = SyncRaster(mVMasks, l, true))
          a.vmask = r->tex;
+   if (!LayerRect(h, a))
+      return;
    Pass(depth, a);
 }
 
@@ -1464,6 +1550,7 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
 }
 
 bool Scene2DNode::sBelowCache = true;
+bool gScene2DBounds = true;   // tests turn it off to compare with full-frame passes
 
 namespace
 {

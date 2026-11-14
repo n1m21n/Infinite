@@ -398,7 +398,9 @@ private:
       const Layer* fill = nullptr;
       const Layer* bif = nullptr;   // blend if
       bool card = false;            // a 3D card: tested against and written to the run's depth
+      int rect[4] = { 0, 0, 0, 0 }; // pixels the layer can touch (x0, y0, x1, y1, GL rows); empty = all
    };
+   bool LayerRect(const float h[9], PassArgs& a) const;   // false: the layer is off the page
    void Pass(int depth, const PassArgs& a);
 
    // Paint surfaces, live on the GPU, filled from the tiles the text names.

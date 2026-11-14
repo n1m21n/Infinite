@@ -8,6 +8,8 @@
 #include "core/TileStore.h"
 #include "gl3.h"
 
+extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -805,7 +807,28 @@ void RunView2DTest()
          pic.Commit();
          Cook(&pic);
          const std::vector<float> full = grab();
+         // Bounded passes against full-frame ones: the same picture (full passes round the untouched pixels
+         // through the blend; bounded ones leave them as they are).
+         gScene2DBounds = false;
+         pic.Layers()[12].opacity = 0.55f;
+         pic.Commit();
+         Cook(&pic);
+         pic.Layers()[12].opacity = 0.5f;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> unbounded = grab();
+         gScene2DBounds = true;
          Scene2DNode::sBelowCache = true;
+         double worst = 0;
+         for (size_t k = 0; k < full.size(); k += 4)
+         {
+            const float a0 = full[k + 3], a1 = unbounded[k + 3];
+            worst = std::max(worst, (double)std::fabs(a0 - a1));
+            for (int c = 0; c < 3; c++)
+               worst = std::max(worst, (double)std::fabs(full[k + c] * a0 - unbounded[k + c] * a1));
+         }
+         printf("  M3b bounded vs full passes: worst difference %.6f\n", worst);
+         Check("M3b: bounded passes match full-frame passes", worst < 1e-3);
          Check("M3b: below cache matches a full redraw exactly", cached == full);
          Check("M3b: an upper-layer edit is faster than a bottom one", topMs < median && midMs < median);
       }
