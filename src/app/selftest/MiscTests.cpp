@@ -2742,9 +2742,11 @@ void RunBindModTest(int f)
       sBindOk = true;
       json made;
       e.clear();
-      BindCheck("k17: the destination exists", Call("create_node", { { "typeName", "Shape" }, { "category", "Source" } }, made, e));
+      BindCheck("k17: the destination exists",
+                Call("create_node", { { "typeName", "Shape" }, { "category", "Source" }, { "x", 0.0f }, { "y", 0.0f } }, made, e));
       dst = made.value("index", -1);
-      BindCheck("k17: the modulator exists", Call("create_node", { { "typeName", "LFO" }, { "category", "Modulators" } }, made, e));
+      BindCheck("k17: the modulator exists",
+                Call("create_node", { { "typeName", "LFO" }, { "category", "Modulators" }, { "x", 320.0f }, { "y", 0.0f } }, made, e));
       src = made.value("index", -1);
 
       const json garbage[] = { json::array({ 1, 2, 3 }), json("not an object"), json(nullptr), json(7) };
