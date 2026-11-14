@@ -133,5 +133,13 @@
  "text-center": 59779,
  "text-left": 59780,
  "text-right": 59781,
- "zoom-out": 59782
+ "zoom-out": 59782,
+ "blur": 59783,
+ "burn": 59784,
+ "clone-stamp": 59785,
+ "dodge": 59786,
+ "gradient": 59787,
+ "heal": 59788,
+ "sharpen": 59789
 }
+

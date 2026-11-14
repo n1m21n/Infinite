@@ -67,11 +67,34 @@ namespace BrushEngine
          "uniform float uOpacity;\n"
          "uniform int uMode;\n"
          "uniform int uLock;\n"
+         "uniform vec2 uTexel;\n"
+         "uniform vec2 uOff;\n"
+         "uniform float uSpread;\n"
+         "vec3 soft(vec2 uv) {\n"
+         "   vec3 s = vec3(0.0); float w = 0.0;\n"
+         "   for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) {\n"
+         "      float k = exp(-float(i * i + j * j) * 0.25);\n"
+         "      s += texture(uSurf, uv + vec2(float(i), float(j)) * uTexel * uSpread).rgb * k; w += k;\n"
+         "   }\n"
+         "   return s / w;\n"
+         "}\n"
          "void main() {\n"
          "   vec4 d = texture(uSurf, vUv);\n"
          "   float a = clamp(texture(uCov, vUv).a * uOpacity, 0.0, 1.0);\n"
          "   if (uHasSel == 1) a *= texture(uSel, vUv).r;\n"
          "   if (a <= 0.0) { fragColor = d; return; }\n"
+         "   if (uMode >= 6) {\n"
+         "      vec2 src = vUv + uOff * uTexel;\n"
+         "      if (uMode == 10) { fragColor = mix(d, texture(uSurf, src), a); return; }\n"
+         "      vec3 r = d.rgb;\n"
+         "      if (uMode == 6) r = soft(vUv);\n"
+         "      if (uMode == 7) r = clamp(d.rgb + (d.rgb - soft(vUv)) * 1.5, 0.0, 1.0);\n"
+         "      if (uMode == 8) r = pow(max(d.rgb, 0.0), vec3(0.7));\n"
+         "      if (uMode == 9) r = pow(max(d.rgb, 0.0), vec3(1.45));\n"
+         "      if (uMode == 11) r = clamp(texture(uSurf, src).rgb + soft(vUv) - soft(src), 0.0, 1.0);\n"
+         "      fragColor = vec4(mix(d.rgb, r, a), d.a);\n"
+         "      return;\n"
+         "   }\n"
          "   if (uMode == 3) { fragColor = vec4(d.rgb, d.a * (1.0 - a)); return; }\n"
          "   if (uMode == 1) { fragColor = uLock == 1 ? d : vec4(d.rgb, d.a * (1.0 - a)); return; }\n"
          "   if (uMode == 2) {\n"
@@ -393,6 +416,9 @@ namespace BrushEngine
          glUniform1f(glGetUniformLocation(sMerge, "uOpacity"), std::clamp(mBrush.opacity, 0.0f, 1.0f));
          glUniform1i(glGetUniformLocation(sMerge, "uMode"), mBrush.mode);
          glUniform1i(glGetUniformLocation(sMerge, "uLock"), mBrush.lockAlpha ? 1 : 0);
+         glUniform2f(glGetUniformLocation(sMerge, "uTexel"), 1.0f / std::max(1, surface.w), 1.0f / std::max(1, surface.h));
+         glUniform2f(glGetUniformLocation(sMerge, "uOff"), mBrush.sourceOffset[0], mBrush.sourceOffset[1]);
+         glUniform1f(glGetUniformLocation(sMerge, "uSpread"), std::max(1.0f, mBrush.size * 0.06f));
          glActiveTexture(GL_TEXTURE0);
       });
       if (blendOn)

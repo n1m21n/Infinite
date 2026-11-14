@@ -16,7 +16,9 @@
 namespace BrushEngine
 {
    enum Tip { kRound = 0, kSoftRound, kHardRound, kSquare, kSpray, kChalk, kInkBleed, kTipCount };
-   enum Mode { kNormal = 0, kErase, kBehind, kClearMode, kMultiply, kScreen };
+   enum Mode { kNormal = 0, kErase, kBehind, kClearMode, kMultiply, kScreen,
+               // Retouch: the stroke reworks the pixels already there instead of laying colour.
+               kBlur, kSharpen, kDodge, kBurn, kClone, kHeal };
 
    const std::vector<std::string>& TipNames();
 
@@ -38,6 +40,7 @@ namespace BrushEngine
       int mode = kNormal;
       bool lockAlpha = false;
       float color[3] = { 0.0f, 0.0f, 0.0f };
+      float sourceOffset[2] = { 0.0f, 0.0f };   // clone / heal: where to copy from, surface pixels from the dab
    };
 
    struct Preset

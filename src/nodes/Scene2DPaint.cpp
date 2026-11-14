@@ -469,6 +469,16 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    if (!DocToSurface(target == 2 ? Layer() : *l, target, x, y, sx, sy, scale))
       return false;
    brush.size *= scale;
+   if (brush.mode == BrushEngine::kClone || brush.mode == BrushEngine::kHeal)
+   {
+      // The source offset arrives in document pixels; the shader wants it on this surface.
+      float ox = 0, oy = 0, s2 = 1;
+      if (DocToSurface(target == 2 ? Layer() : *l, target, x + b.sourceOffset[0], y + b.sourceOffset[1], ox, oy, s2))
+      {
+         brush.sourceOffset[0] = ox - sx;
+         brush.sourceOffset[1] = oy - sy;
+      }
+   }
    // Paint lands only inside the selection, resampled to the surface when it is placed differently.
    unsigned sel = 0;
    if (target != 2 && mSelAny && EnsurePaintShaders())

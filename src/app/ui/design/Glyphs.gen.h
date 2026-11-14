@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE986;
+   inline constexpr unsigned kLast = 0xE98D;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -139,4 +139,11 @@ namespace IconsInfinite
    inline constexpr const char* TextLeft = "\xee\xa6\x84"; // U+E984 text-left
    inline constexpr const char* TextRight = "\xee\xa6\x85"; // U+E985 text-right
    inline constexpr const char* ZoomOut = "\xee\xa6\x86"; // U+E986 zoom-out
+   inline constexpr const char* Blur = "\xee\xa6\x87"; // U+E987 blur
+   inline constexpr const char* Burn = "\xee\xa6\x88"; // U+E988 burn
+   inline constexpr const char* CloneStamp = "\xee\xa6\x89"; // U+E989 clone-stamp
+   inline constexpr const char* Dodge = "\xee\xa6\x8a"; // U+E98A dodge
+   inline constexpr const char* Gradient = "\xee\xa6\x8b"; // U+E98B gradient
+   inline constexpr const char* Heal = "\xee\xa6\x8c"; // U+E98C heal
+   inline constexpr const char* Sharpen = "\xee\xa6\x8d"; // U+E98D sharpen
 }
