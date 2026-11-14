@@ -3,6 +3,8 @@
 
   python3 tools/ui-audit/run.py                 run the debug build, write ui-audit/report.md
   python3 tools/ui-audit/run.py --rebaseline    accept today's findings as tools/ui-audit/baseline.tsv
+  python3 tools/ui-audit/run.py --view2d        the 2D View only: every tab x layer kind, every tool, both docks;
+                                                writes registry.json + coverage.tsv; fails on any untested control
 
 Needs a debug build (python3 scripts/ibuild.py build --mode dev). Exit 1 when a finding is not in the
 baseline, or when a canary check did not fire (the audit is not looking).
@@ -13,6 +15,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 BIN = os.path.join(ROOT, "build-dev/Infinite.app/Contents/MacOS/Infinite")
 PATCH = os.path.join(ROOT, "tests/render3d/shadows.inf")
 BASELINE = os.path.join(ROOT, "tools/ui-audit/baseline.tsv")
+V2D_BASELINE = os.path.join(ROOT, "tools/ui-audit/view2d-baseline.tsv")
+V2D_SKIP = os.path.join(ROOT, "tools/ui-audit/view2d-skip.tsv")
 CANARY = {"duplicate id", "clipped", "tiny target", "overlap", "hit smaller than drawn", "text overflow", "contrast text"}
 
 
@@ -37,7 +41,15 @@ def main():
     ap.add_argument("--nodes", default="", help="comma list of node types to cover, or none (default: every registered type)")
     ap.add_argument("--dark-only", action="store_true")
     ap.add_argument("--rebaseline", action="store_true")
+    ap.add_argument("--view2d", action="store_true", help="audit the 2D View alone (registry + coverage gate)")
+    ap.add_argument("--shots", default="", help="--view2d: also save the panel's pixels per state into this folder")
+    ap.add_argument("--app", default="", help="the debug app binary to run (default build-dev)")
     a = ap.parse_args()
+    global BASELINE
+    if a.view2d:
+        BASELINE = V2D_BASELINE
+        if a.out == os.path.join(ROOT, "ui-audit"):
+            a.out = os.path.join(ROOT, "ui-audit-view2d")
     os.makedirs(a.out, exist_ok=True)
     tsv = os.path.join(a.out, "report.tsv")
     if os.path.exists(tsv):
@@ -49,9 +61,16 @@ def main():
         env["INFINITE_UIAUDIT_NODES"] = a.nodes
     if a.dark_only:
         env["INFINITE_UIAUDIT_DARK_ONLY"] = "1"
+    if a.view2d:
+        env.pop("INFINITE_UIAUDIT_PATCH", None)
+        env["INFINITE_UIAUDIT_VIEW2D"] = "1"
+        env["INFINITE_UIAUDIT_V2D_SKIP"] = V2D_SKIP
+        if a.shots:
+            os.makedirs(a.shots, exist_ok=True)
+            env["INFINITE_UIAUDIT_V2D_SHOTS"] = os.path.abspath(a.shots)
     t0 = time.time()
     # Under a pty: redirected output is lost if the run is killed.
-    p = subprocess.Popen(["script", "-q", log, BIN], env=env, stdin=subprocess.DEVNULL,
+    p = subprocess.Popen(["script", "-q", log, a.app or BIN], env=env, stdin=subprocess.DEVNULL,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         p.wait(timeout=a.budget)
@@ -65,7 +84,9 @@ def main():
         return 2
     canary = [r for r in rows if r["window"] == "UI audit canary"]
     rows = [r for r in rows if r["window"] != "UI audit canary"]
-    missed = sorted(CANARY - {r["check"] for r in canary})
+    missed = [] if a.view2d else sorted(CANARY - {r["check"] for r in canary})
+    cov_rows, cov_tail = read_tsv(os.path.join(a.out, "coverage.tsv")) if a.view2d else ([], "")
+    untested = [r for r in cov_rows if r["status"] == "untested"]
     base, _ = read_tsv(BASELINE)
     known = {key(r) for r in base}
     new = [r for r in rows if key(r) not in known]
@@ -81,6 +102,13 @@ def main():
     with open(os.path.join(a.out, "report.md"), "w") as f:
         f.write("# UI audit\n\n%d findings, %d new, %s, %.0f s\n\n" % (len(rows), len(new), tail, time.time() - t0))
         f.write("Canary: %s\n\n" % ("all checks fired" if not missed else "MISSED " + ", ".join(missed)))
+        if a.view2d:
+            f.write("Coverage: %s\n\n" % cov_tail)
+            if untested:
+                f.write("| Untested | Kind | Window | Tip | State |\n|---|---|---|---|---|\n")
+                for r in untested:
+                    f.write("| %s | %s | %s | %s | %s |\n" % (r["label"].replace("|", "\\|"), r["kind"], r["window"], r["tip"], r["state"]))
+                f.write("\n")
         f.write("| Check | Count |\n|---|---|\n")
         for c in sorted(by):
             f.write("| %s | %d |\n" % (c, len(by[c])))
@@ -92,7 +120,9 @@ def main():
     print("%d findings (%d new), %s; canary %s -> %s" % (len(rows), len(new), tail,
                                                        "ok" if not missed else "MISSED " + ",".join(missed),
                                                        os.path.join(a.out, "report.md")))
-    return 1 if new or missed else 0
+    if a.view2d:
+        print("coverage: %s" % cov_tail)
+    return 1 if new or missed or untested else 0
 
 
 if __name__ == "__main__":

@@ -63,3 +63,7 @@ glyph-sheet.png
 .media_scratch_*
 /ui-audit/
 tools/blender-ab/assets/bed/
+
+# 2D View audit output and per-machine golden shots (tools/ui/golden_view2d.py)
+ui-audit-view2d/
+tools/ui/golden-view2d/

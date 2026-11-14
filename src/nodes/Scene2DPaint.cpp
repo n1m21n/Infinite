@@ -629,6 +629,16 @@ bool Scene2DNode::Pick(float x, float y, float rgb[3])
    return true;
 }
 
+bool Scene2DNode::ReadOutput(std::vector<uint8_t>& rgba, int& w, int& h)
+{
+   if (mOut.fbo == 0)
+      return false;
+   w = mOut.w;
+   h = mOut.h;
+   ReadRect(mOut, 0, 0, w, h, rgba);
+   return true;
+}
+
 bool Scene2DNode::ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h)
 {
    Layers();

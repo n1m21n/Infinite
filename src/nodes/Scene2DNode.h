@@ -317,6 +317,8 @@ public:
    int SkinSide(int id);
    // The paint surface's texture and size, 0 when not a paint layer (Convert to Draw node).
    bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
+   // The composited picture as last cooked (bottom row first); false before the first cook.
+   bool ReadOutput(std::vector<uint8_t>& rgba, int& w, int& h);
    // The paint surface's live texture (thumbnails), 0 when none.
    unsigned PaintTexture(int id);
 

@@ -18,8 +18,21 @@
 #include <unordered_map>
 #include "core/CategoryColors.h"
 #include "core/NodeFactory.h"
+#include "app/ui/design/Tokens.gen.h"
 
-namespace app { bool View3DAuditState(int tab); }
+namespace app
+{
+   bool View3DAuditState(int tab);
+   extern std::string gShotNowPath;
+   extern int gShotNowRect[4];
+   int View2DAuditStateCount();
+   std::string View2DAuditState(int i);
+   std::string View2DAuditPanelState();
+   std::string View2DAuditRoundTrip();
+   uint64_t View2DAuditRenderHash();
+   std::string View2DAuditRanges();
+   void View2DAuditRestore();
+}
 
 namespace
 {
@@ -32,6 +45,7 @@ namespace
       bool disabled = false;
       bool overlapOk = false;  // SetNextItemAllowOverlap: built to sit over or under another item
       bool checkable = false;  // ImGui's own checkbox/radio (the label sits inside the item's rect)
+      bool inputable = false;  // takes typed text (drags and sliders after a double-click, input fields)
       float labelW = 0;        // visible label text
       ImVec4 textCol, bgCol;   // ImGuiCol_Text and WindowBg when the item was added
    };
@@ -39,6 +53,7 @@ namespace
    struct ItemNote { const char* kind = nullptr; float textW = 0, availW = 0; bool hasFill = false; ImVec4 fill; };
    struct NodeBox { ImRect box; ImVec4 bg; };
    struct RowBox { float x0, y0, rowH, cellW; int count; };
+   struct Ink { int kind; ImRect r; float size; std::string tip, glyph, window; ImGuiID item; ImRect itemBb; };
 
    int sFrame = -1;
    std::vector<Rec> sCur, sLast;
@@ -46,6 +61,8 @@ namespace
    std::unordered_map<ImGuiID, ItemNote> sNotes, sNotesLast;
    std::vector<NodeBox> sNodes, sNodesLast;
    std::vector<RowBox> sRows, sRowsLast;
+   std::vector<Ink> sInks, sInksLast;
+   std::set<ImGuiID> sOn, sOnLast;
 
    void Roll(ImGuiContext* ctx)
    {
@@ -62,6 +79,10 @@ namespace
       sNodes.clear();
       sRowsLast.swap(sRows);
       sRows.clear();
+      sInksLast.swap(sInks);
+      sInks.clear();
+      sOnLast.swap(sOn);
+      sOn.clear();
    }
 
    // "3D View/##v3dprops_1A2B3C4D" -> "3D View/##v3dprops": child names carry their parent's id.
@@ -102,6 +123,7 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* lab
          it->widget = true;
          it->label = label != nullptr ? label : "";
          it->checkable = (flags & ImGuiItemStatusFlags_Checkable) != 0;
+         it->inputable = (flags & ImGuiItemStatusFlags_Inputable) != 0;
          it->labelW = label != nullptr ? ImGui::CalcTextSize(label, nullptr, true).x : 0.0f;
          return;
       }
@@ -147,6 +169,12 @@ void UiAudit::NoteKind(const char* kind, const char* label, float textW, float a
       }
 }
 
+void UiAudit::NoteOn()
+{
+   Roll(GImGui);
+   sOn.insert(GImGui->LastItemData.ID);
+}
+
 void UiAudit::NoteFill(ImVec4 fill)
 {
    if (!GImGui->TestEngineHookItems)
@@ -173,6 +201,23 @@ void UiAudit::NoteRow(float x0, float y0, float rowH, float cellW, int count)
    sRows.push_back({ x0, y0, rowH, cellW, count });
 }
 
+void UiAudit::NoteInk(int kind, ImVec2 mn, ImVec2 mx, float size, const char* tip, const char* glyph)
+{
+   if (!GImGui->TestEngineHookItems || GImGui->CurrentWindow == nullptr)
+      return;
+   Roll(GImGui);
+   Ink k;
+   k.kind = kind;
+   k.r = ImRect(mn, mx);
+   k.size = size;
+   k.tip = tip != nullptr ? tip : "";
+   k.glyph = glyph != nullptr ? glyph : "";
+   k.window = BaseName(GImGui->CurrentWindow->Name);
+   k.item = kind <= 1 || kind == 5 ? GImGui->LastItemData.ID : 0;
+   k.itemBb = GImGui->LastItemData.Rect;
+   sInks.push_back(std::move(k));
+}
+
 namespace app
 {
 namespace
@@ -183,8 +228,10 @@ namespace
    int sChecked = 0, sPoked = 0;
    std::string sThemeTag;         // " (light)" while the light theme runs: contrast findings are per theme
 
+   void RegFinding(const std::string& window, const std::string& label);
    void Add(const char* check, const std::string& state, const Rec& r, const char* fmt, ...)
    {
+      RegFinding(r.window, r.label);
       const std::string win = r.window + (strncmp(check, "contrast", 8) == 0 ? sThemeTag : std::string());
       const std::string key = std::string(check) + "|" + win + "|" + r.label;
       if (!sSeen.insert(key).second)
@@ -195,6 +242,75 @@ namespace
       vsnprintf(buf, sizeof buf, fmt, ap);
       va_end(ap);
       sFindings.push_back({ check, state, win, r.label.empty() ? "(no label)" : r.label, buf });
+   }
+
+   // --- 2D View mode (INFINITE_UIAUDIT_VIEW2D) ---
+   bool sOnlyV2D = false;
+   bool IsV2D(const std::string& w) { return w.find("view2d") != std::string::npos || w.find("v2d") != std::string::npos; }
+   bool IsPopupWin(const std::string& w)
+   {
+      return w.rfind("##Popup_", 0) == 0 || w.rfind("##Combo_", 0) == 0 || w.rfind("##Menu_", 0) == 0 || w.rfind("##Tooltip", 0) == 0;
+   }
+   bool InScope(const std::string& w) { return !sOnlyV2D || IsV2D(w) || IsPopupWin(w); }
+   // The last path piece of a window name, without ImGui's id suffix: "Main/##view2dcontent_1A2B/##v2dside" -> "##v2dside".
+   std::string ShortWin(const std::string& w)
+   {
+      const size_t at = w.rfind('/');
+      return at == std::string::npos ? w : w.substr(at + 1);
+   }
+   // The tip an icon chip shows, by item id, from this frame's ink notes.
+   std::string TipOf(ImGuiID id)
+   {
+      for (const Ink& k : sInksLast)
+         if (k.item == id && !k.tip.empty())
+            return k.tip;
+      return std::string();
+   }
+   std::string GlyphOf(ImGuiID id)
+   {
+      for (const Ink& k : sInksLast)
+         if (k.item == id && k.kind == 1)
+            return k.glyph;
+      return std::string();
+   }
+   bool HasInk(ImGuiID id)
+   {
+      for (const Ink& k : sInksLast)
+         if (k.item == id && (k.kind == 0 || k.kind == 1 || k.kind == 5))
+            return true;
+      return false;
+   }
+
+   // The registry: every control the 2D View drew, where, and what testing it gave.
+   struct Entry
+   {
+      std::string key, window, label, tip, glyph, kind, state, status = "untested", reason;
+      ImRect bb;
+      int findings = 0;
+      bool poked = false;
+   };
+   std::vector<Entry> sReg;
+   std::unordered_map<std::string, size_t> sRegAt;
+   std::set<std::string> sV2DPoked;   // registry keys already queued for a poke
+   std::vector<std::pair<std::string, std::string>> sSkips;   // (label or tip substring, reason)
+
+   std::string KeyOf(const std::string& window, const std::string& label) { return ShortWin(window) + "|" + label; }
+   Entry* RegFind(const std::string& key)
+   {
+      auto it = sRegAt.find(key);
+      return it == sRegAt.end() ? nullptr : &sReg[it->second];
+   }
+   void RegFinding(const std::string& window, const std::string& label)
+   {
+      if (Entry* e = RegFind(KeyOf(window, label)))
+         e->findings++;
+   }
+   const char* SkipReason(const std::string& label, const std::string& tip)
+   {
+      for (const auto& [pat, why] : sSkips)
+         if ((!label.empty() && label.find(pat) != std::string::npos) || (!tip.empty() && tip.find(pat) != std::string::npos))
+            return why.c_str();
+      return nullptr;
    }
 
    // UiInteract items carry a key ("lib.modules", "##grip") as their ImGui label; it is never drawn.
@@ -264,7 +380,7 @@ namespace
       std::unordered_map<std::string, std::vector<const Rec*>> byWindow;
       for (const Rec& r : recs)
       {
-         if (!r.widget || !Visible(r))
+         if (!r.widget || !Visible(r) || !InScope(r.window))
             continue;
          sChecked++;
          if (auto [it, fresh] = first.emplace(r.id, &r); !fresh)
@@ -276,7 +392,9 @@ namespace
          if (r.bb.Min.x < r.clip.Min.x - 0.5f || r.bb.Max.x > r.clip.Max.x + 0.5f)
             Add("clipped", state, r, "%.0f px of %.0f cut", std::max(0.0f, r.clip.Min.x - r.bb.Min.x) +
                 std::max(0.0f, r.bb.Max.x - r.clip.Max.x), r.bb.GetWidth());
-         if (!r.disabled && (r.bb.GetWidth() < 12.0f || r.bb.GetHeight() < 12.0f))
+         // A splitter grip is long and thin by design: hit along its length, so only its short side is small.
+         const bool grip = std::max(r.bb.GetWidth(), r.bb.GetHeight()) >= 100.0f && std::min(r.bb.GetWidth(), r.bb.GetHeight()) >= 6.0f;
+         if (!r.disabled && !grip && (r.bb.GetWidth() < 12.0f || r.bb.GetHeight() < 12.0f))
             Add("tiny target", state, r, "%.0f x %.0f", r.bb.GetWidth(), r.bb.GetHeight());
          const SliderNote* sn = nullptr;
          if (auto s = sSlidersLast.find(r.id); s != sSlidersLast.end())
@@ -358,6 +476,239 @@ namespace
             }
    }
 
+
+   // --- 2D View layout rules (1 px tolerance) ---
+   float Mode(std::vector<float> v)
+   {
+      if (v.empty())
+         return 0.0f;
+      std::unordered_map<int, int> n;
+      int best = 0;
+      float at = v[0];
+      for (float x : v)
+      {
+         const int k = (int)std::lround(x * 2.0f);
+         if (++n[k] > best || (n[k] == best && x < at))
+         {
+            best = n[k];
+            at = k * 0.5f;
+         }
+      }
+      return at;
+   }
+   float Median(std::vector<float> v)
+   {
+      if (v.empty())
+         return 0.0f;
+      std::sort(v.begin(), v.end());
+      return v[v.size() / 2];
+   }
+   Rec Pseudo(const std::string& window, const std::string& label)
+   {
+      Rec r;
+      r.window = window;
+      r.label = label;
+      return r;
+   }
+   std::unordered_map<std::string, std::string> sTipGlyph;   // the icon each tip was first seen with
+
+   void V2DLayout(const std::string& state)
+   {
+      constexpr float tol = 1.0f;
+      const float divider = 2.0f * tok::space_2 + 1.0f;
+      struct It { const Rec* r; const Ink* text = nullptr; const Ink* icon = nullptr; };
+      std::unordered_map<std::string, std::vector<It>> byWin;
+      std::set<ImGuiID> seen;
+      for (const Rec& r : sLast)
+      {
+         if (!r.widget || !Visible(r) || !FullyShown(r) || !IsV2D(r.window) || !seen.insert(r.id).second)
+            continue;
+         It it{ &r };
+         for (const Ink& k : sInksLast)
+            if (k.item == r.id)
+            {
+               if (k.kind == 0 || k.kind == 5)
+                  it.text = &k;
+               else if (k.kind == 1)
+                  it.icon = &k;
+            }
+         byWin[r.window].push_back(it);
+         // Off the panel: a control drawn outside the 2D View's own rectangle.
+         const ImRect panel(gView2DRectMin, gView2DRectMax);
+         if (panel.GetWidth() > 0 && !panel.Contains(r.bb))
+            Add("off panel", state, r, "%.0f,%.0f-%.0f,%.0f outside the panel", r.bb.Min.x, r.bb.Min.y, r.bb.Max.x, r.bb.Max.y);
+      }
+      for (auto& [w, items] : byWin)
+      {
+         // Text and icon centred in their chip; text inside it.
+         for (It& it : items)
+         {
+            const ImVec2 c = it.r->bb.GetCenter();
+            if (it.text != nullptr)
+            {
+               const ImVec2 tc = it.text->r.GetCenter();
+               if (std::fabs(tc.y - c.y) > tol)
+                  Add("text off centre", state, *it.r, "text centre %+.1f px from the chip's", tc.y - c.y);
+               if (it.text->kind == 0 && std::fabs(tc.x - c.x) > tol)
+                  Add("text off centre", state, *it.r, "text %+.1f px across", tc.x - c.x);
+               if (it.text->r.Min.x < it.r->bb.Min.x - 0.5f || it.text->r.Max.x > it.r->bb.Max.x + 0.5f)
+                  Add("text clipped", state, *it.r, "%.0f px of text in a %.0f px chip", it.text->r.GetWidth(), it.r->bb.GetWidth());
+            }
+            if (it.icon != nullptr)
+            {
+               const ImVec2 ic = it.icon->r.GetCenter();
+               if (it.text == nullptr && (std::fabs(ic.x - c.x) > tol || std::fabs(ic.y - c.y) > tol))
+                  Add("icon off centre", state, *it.r, "ink centre %+.1f, %+.1f px", ic.x - c.x, ic.y - c.y);
+               // The same action has the same icon everywhere.
+               if (!it.icon->tip.empty())
+               {
+                  auto [g, fresh] = sTipGlyph.emplace(it.icon->tip, it.icon->glyph);
+                  if (!fresh && g->second != it.icon->glyph)
+                     Add("icon differs", state, *it.r, "\"%s\" drawn with another icon elsewhere", it.icon->tip.c_str());
+               }
+            }
+         }
+         // Rows of chips: one height, one centre line, one icon size, near one ink size, even gaps.
+         std::vector<It*> chips;
+         for (It& it : items)
+            if (it.text != nullptr || it.icon != nullptr)
+               chips.push_back(&it);
+         std::sort(chips.begin(), chips.end(), [](It* a, It* b) { return a->r->bb.GetCenter().y < b->r->bb.GetCenter().y; });
+         std::vector<std::vector<It*>> rows;
+         for (It* it : chips)
+         {
+            if (!rows.empty() && std::fabs(rows.back().front()->r->bb.GetCenter().y - it->r->bb.GetCenter().y) <= 3.0f)
+               rows.back().push_back(it);
+            else
+               rows.push_back({ it });
+         }
+         for (auto& row : rows)
+         {
+            if (row.size() < 2)
+               continue;
+            std::sort(row.begin(), row.end(), [](It* a, It* b) { return a->r->bb.Min.x < b->r->bb.Min.x; });
+            std::vector<float> hs, cys, iws, isz, ink, gaps;
+            for (It* it : row)
+            {
+               hs.push_back(it->r->bb.GetHeight());
+               cys.push_back(it->r->bb.GetCenter().y);
+               if (it->icon != nullptr && it->text == nullptr)
+               {
+                  iws.push_back(it->r->bb.GetWidth());
+                  isz.push_back(it->icon->size);
+                  ink.push_back(std::max(it->icon->r.GetWidth(), it->icon->r.GetHeight()));
+               }
+            }
+            for (size_t i = 1; i < row.size(); i++)
+               gaps.push_back(row[i]->r->bb.Min.x - row[i - 1]->r->bb.Max.x);
+            const float mh = Mode(hs), mc = Mode(cys), mw = Mode(iws), ms = Mode(isz), mi = Median(ink), mg = Mode(gaps);
+            size_t ii = 0;
+            for (size_t i = 0; i < row.size(); i++)
+            {
+               const Rec& r = *row[i]->r;
+               if (std::fabs(r.bb.GetHeight() - mh) > tol)
+                  Add("chip height", state, r, "%.0f px in a row of %.0f", r.bb.GetHeight(), mh);
+               if (std::fabs(r.bb.GetCenter().y - mc) > tol)
+                  Add("row centre", state, r, "centre %+.1f px off the row's", r.bb.GetCenter().y - mc);
+               if (row[i]->icon != nullptr && row[i]->text == nullptr)
+               {
+                  if (std::fabs(r.bb.GetWidth() - mw) > tol)
+                     Add("chip width", state, r, "%.0f px among %.0f px icon chips", r.bb.GetWidth(), mw);
+                  if (std::fabs(isz[ii] - ms) > 0.5f)
+                     Add("icon size", state, r, "%.0f px icon among %.0f px", isz[ii], ms);
+                  if (std::fabs(ink[ii] - mi) > 2.0f)
+                     Add("ink size", state, r, "ink %.0f px, the row's median %.0f", ink[ii], mi);
+                  ii++;
+               }
+               if (i > 0)
+               {
+                  const float g = gaps[i - 1];
+                  if (g < -0.5f)
+                     Add("overlap", state, r, "%.0f px over the chip before it", -g);
+                  else if (std::fabs(g - mg) > tol && g < divider - tol && std::fabs(g - tok::space_1) > tol)
+                     Add("uneven gap", state, r, "%.1f px gap, the row's is %.1f", g, mg);
+               }
+            }
+         }
+      }
+      // Form rows: labels share a left edge, fields a right edge, and a label sits on its field's centre line.
+      std::unordered_map<std::string, std::vector<const Ink*>> labels, checks;
+      for (const Ink& k : sInksLast)
+         if (IsV2D(k.window) && (k.kind == 3 || k.kind == 4))
+            (k.kind == 3 ? labels : checks)[k.window].push_back(&k);
+      for (auto& [w, ls] : labels)
+      {
+         std::vector<float> lx, fx;
+         std::vector<const Rec*> field(ls.size(), nullptr);
+         for (size_t i = 0; i < ls.size(); i++)
+         {
+            lx.push_back(ls[i]->r.Min.x);
+            for (const Rec& r : sLast)
+               if (r.widget && r.window == w && r.bb.Min.x >= ls[i]->r.Max.x - 1.0f && r.bb.Min.y <= ls[i]->r.GetCenter().y &&
+                   r.bb.Max.y >= ls[i]->r.GetCenter().y && (field[i] == nullptr || r.bb.Max.x > field[i]->bb.Max.x))
+                  field[i] = &r;
+            if (field[i] != nullptr)
+               fx.push_back(field[i]->bb.Max.x);
+         }
+         const float ml = Mode(lx), mf = Mode(fx);
+         for (size_t i = 0; i < ls.size(); i++)
+         {
+            const Rec pr = Pseudo(w, ls[i]->tip);
+            const float dx = ls[i]->r.Min.x - ml;
+            if (std::fabs(dx) > tol && std::fabs(dx) < 40.0f)
+               Add("label edge", state, pr, "left edge %+.0f px from the column's", dx);
+            if (field[i] != nullptr)
+            {
+               const float df = field[i]->bb.Max.x - mf;
+               if (std::fabs(df) > tol && std::fabs(df) < 60.0f)
+                  Add("field edge", state, pr, "field ends %+.0f px from the column's", df);
+               const float dy = ls[i]->r.GetCenter().y - field[i]->bb.GetCenter().y;
+               if (std::fabs(dy) > tol)
+                  Add("label off row", state, pr, "label centre %+.1f px from its field's", dy);
+            }
+         }
+      }
+      for (auto& [w, cs] : checks)
+      {
+         std::vector<float> gaps;
+         std::vector<std::pair<const Ink*, const Rec*>> pairs;
+         for (const Ink* k : cs)
+         {
+            const Rec* box = nullptr;
+            for (const Rec& r : sLast)
+               if (r.widget && r.window == w && r.bb.Max.x <= k->r.Min.x + 0.5f && r.bb.Min.y <= k->r.GetCenter().y + 2 &&
+                   r.bb.Max.y >= k->r.GetCenter().y - 2 && (box == nullptr || r.bb.Max.x > box->bb.Max.x))
+                  box = &r;
+            if (box == nullptr)
+               continue;
+            pairs.push_back({ k, box });
+            gaps.push_back(k->r.Min.x - box->bb.Max.x);
+         }
+         const float mg = Mode(gaps);
+         for (auto& [k, box] : pairs)
+         {
+            const Rec pr = Pseudo(w, k->tip);
+            if (std::fabs(k->r.Min.x - box->bb.Max.x - mg) > tol)
+               Add("checkbox gap", state, pr, "%.0f px from its box, the others %.0f", k->r.Min.x - box->bb.Max.x, mg);
+            const float dy = k->r.GetCenter().y - box->bb.GetCenter().y;
+            if (std::fabs(dy) > tol)
+               Add("checkbox label off centre", state, pr, "%+.1f px from the box's centre", dy);
+         }
+      }
+      // Loose text on a tile row sits on the row's centre line.
+      for (const Ink& k : sInksLast)
+      {
+         if (k.kind != 2 || !IsV2D(k.window))
+            continue;
+         std::vector<float> cys;
+         for (const Rec& r : sLast)
+            if (r.widget && r.window == k.window && HasInk(r.id) && r.bb.Min.y <= k.r.GetCenter().y && r.bb.Max.y >= k.r.GetCenter().y)
+               cys.push_back(r.bb.GetCenter().y);
+         if (!cys.empty() && std::fabs(k.r.GetCenter().y - Median(cys)) > tol)
+            Add("text off row", state, Pseudo(k.window, k.tip), "%+.1f px from the chips' centre line", k.r.GetCenter().y - Median(cys));
+      }
+   }
+
    // The 3D View's settings column, or the side child around it when that is what scrolls.
    ImGuiWindow* PropsScroller()
    {
@@ -405,7 +756,11 @@ namespace
    ImVec2 sMouse(-10000.0f, -10000.0f);
    int sButton = -1;   // -1 nothing to send, else 0 up / 1 down
    float sWheel = 0.0f;
-   int sKey = -1;      // -1 nothing to send, else 0 up / 1 down (Escape)
+   int sKey = -1;      // -1 nothing to send, else 0 up / 1 down (sKeyName, Escape unless a poke set another)
+   ImGuiKey sKeyName = ImGuiKey_Escape;
+   bool sKeyCmd = false;   // hold the shortcut modifier with the key
+   std::string sChars;     // characters to type this frame
+   bool sAllowDouble = false;
    void OwnMouse(ImGuiContext* ctx, ImGuiContextHook*)
    {
       if (!ctx->TestEngineHookItems)
@@ -418,16 +773,25 @@ namespace
       ctx->IO.AddMousePosEvent(sMouse.x, sMouse.y);
       // Every press is a single click: pokes come frames apart, and a press near the last one would count as a
       // double-click (a slider then opens its number field instead of dragging).
-      if (sButton == 1)
+      if (sButton == 1 && !sAllowDouble)
          ctx->IO.MouseClickedTime[0] = -FLT_MAX;
       if (sButton >= 0)
          ctx->IO.AddMouseButtonEvent(0, sButton == 1);
       if (sWheel != 0.0f)
          ctx->IO.AddMouseWheelEvent(0.0f, sWheel);
       if (sKey >= 0)
-         ctx->IO.AddKeyEvent(ImGuiKey_Escape, sKey == 1);
+      {
+         if (sKeyCmd)
+            ctx->IO.AddKeyEvent(ImGuiMod_Ctrl, sKey == 1);
+         ctx->IO.AddKeyEvent(sKeyName, sKey == 1);
+      }
+      for (char c : sChars)
+         ctx->IO.AddInputCharacter((unsigned)c);
+      sChars.clear();
       sButton = -1;
       sKey = -1;
+      sKeyName = ImGuiKey_Escape;
+      sKeyCmd = false;
       sWheel = 0.0f;
    }
 
@@ -473,7 +837,7 @@ namespace
 
    // Layer 3. Kinds: slider (press at 25%, drag to each end, release, undo), hover (wheel over it, nothing changes),
    // popup (dropdown, colour dot: one popup opens, Esc closes it, nothing changes), toggle (click twice).
-   enum class Kind { Slider, Hover, Popup, Toggle };
+   enum class Kind { Slider, Hover, Popup, Toggle, Click, Combo, Typed };
    struct Poke
    {
       Kind kind = Kind::Slider;
@@ -483,9 +847,16 @@ namespace
       bool inNode = false;
       float before = 0, at25 = 0, atMax = 0, atMin = 0;
       size_t depth = 0;
-      bool undoable = false, took = false, gone = false;
+      bool undoable = false, took = false, gone = false, on = false;
       std::string over, fp0, fp1;   // the window under the press; patch text before, after the first click
       int popups = 0, popupsAfter = 0, step = 0;
+      // 2D View pokes: panel state and picture before/after, and the dropdown's options as found when it opened.
+      std::string ps0, ps1, tip, rangeBad, typedText;
+      uint64_t rh0 = 0, rh1 = 0;
+      std::vector<std::pair<ImGuiID, ImRect>> opts;
+      size_t opt = 0;
+      int optsDead = 0, typedTook = 0;
+      bool popupWin = false;   // the control lives in a popup the poke has to open first (not used yet)
    };
    std::vector<Poke> sQueue;
    Poke sPoke;
@@ -519,7 +890,51 @@ namespace
       sPoked++;
       Rec r = PokeRec(k);
       if (k.gone)
-         return;   // scrolled away by an earlier poke; the snapshot has already seen it
+      {
+         sV2DPoked.erase(KeyOf(k.window, k.label));   // an earlier poke took it away (crop Apply ends Cancel): a later state retries
+         return;
+      }
+      if (Entry* e = RegFind(KeyOf(k.window, k.label)))
+         e->poked = true;
+      if (k.kind == Kind::Click)
+      {
+         const bool doc = k.fp1 != k.fp0, panel = k.ps1 != k.ps0, pic = k.rh1 != k.rh0;
+         if (!doc && !panel && !pic && k.popups == 0 && k.typedTook == 0 && !k.on)
+            Add("click does nothing", k.state, r, "%s", k.tip.empty() ? "no value, panel state, picture or popup changed" : k.tip.c_str());
+         if (k.popups > 1)
+            Add("more than one popup", k.state, r, "%d popups open after one click", k.popups);
+         if (doc && !k.undoable)
+            Add("no undo step", k.state, r, "changed the document with no undo step, near: %s", FirstDiff(k.fp0, k.fp1).c_str());
+         else if (doc && k.fp0 != k.fp1 && !k.over.empty())
+            Add("undo does not restore", k.state, r, "near: %s", k.over.c_str());
+         if (!k.rangeBad.empty())
+            Add("value out of range", k.state, r, "%s", k.rangeBad.c_str());
+         return;
+      }
+      if (k.kind == Kind::Combo)
+      {
+         if (k.opts.empty())
+            Add("dropdown empty", k.state, r, "the menu showed no options");
+         else if (k.optsDead >= 2)
+            Add("option changes nothing", k.state, r, "%d of %zu options changed nothing", k.optsDead, k.opts.size());
+         if (!k.rangeBad.empty())
+            Add("value out of range", k.state, r, "%s", k.rangeBad.c_str());
+         if (!k.over.empty())
+            Add("undo does not restore", k.state, r, "near: %s", k.over.c_str());
+         return;
+      }
+      if (k.kind == Kind::Typed)
+      {
+         if (k.typedTook == 0)
+            return;   // a double-click opens no text field here; the slider poke covers it
+         if (!k.rangeBad.empty())
+            Add("typed value not clamped", k.state, r, "typed %s: %s", k.typedText.c_str(), k.rangeBad.c_str());
+         if (k.fp1 != k.fp0 && !k.undoable)
+            Add("no undo step", k.state, r, "typed %s with no undo step", k.typedText.c_str());
+         else if (!k.over.empty())
+            Add("undo does not restore", k.state, r, "near: %s", k.over.c_str());
+         return;
+      }
       if (k.kind == Kind::Hover)
       {
          if (Fingerprint() != k.fp0)
@@ -540,11 +955,11 @@ namespace
       }
       if (k.kind == Kind::Toggle)
       {
-         if (k.fp1 == k.fp0)
+         if (k.fp1 == k.fp0 && k.ps1 == k.ps0)
             Add("click does not toggle", k.state, r, "first click changed nothing");
          if (k.popups > 0)
             Add("more than one popup", k.state, r, "a checkbox click opened %d popups", k.popups);
-         if (Fingerprint() != k.fp0)
+         if (Fingerprint() != k.fp0 || (sOnlyV2D && app::View2DAuditPanelState() != k.ps0))
             Add("toggle does not return", k.state, r, "near: %s", FirstDiff(k.fp0, Fingerprint()).c_str());
          return;
       }
@@ -560,9 +975,10 @@ namespace
          Add("drag misses max", k.state, r, "right end gave %.0f%%", k.atMax * 100.0f);
       if (k.atMin > 0.01f)
          Add("drag misses min", k.state, r, "left end gave %.0f%%", k.atMin * 100.0f);
-      if (!k.undoable)
+      // A tool option (brush size) is not the document's: no undo step is right when the drag left the document alone.
+      if (!k.undoable && k.fp1 != k.fp0)
          Add("no undo step", k.state, r, "the drag pushed no undo checkpoint");
-      else if (std::fabs(SliderFrac(k.id, -1.0f) - k.before) > 1e-4f)
+      else if (k.undoable && std::fabs(SliderFrac(k.id, -1.0f) - k.before) > 1e-4f)
          Add("undo does not restore", k.state, r, "%.3f before, %.3f after undo", k.before, SliderFrac(k.id, -1.0f));
    }
 
@@ -632,13 +1048,149 @@ namespace
       case Kind::Toggle:
          switch (k.step++)
          {
-         case 0: k.fp0 = Fingerprint(); sMouse = c; break;
+         case 0: k.fp0 = Fingerprint(); if (sOnlyV2D) k.ps0 = app::View2DAuditPanelState(); sMouse = c; break;
          case 1: sButton = 1; break;
          case 2: sButton = 0; break;
-         case 5: k.fp1 = Fingerprint(); k.popups = OpenPopups(); CloseAllPopups(); sButton = 1; break;
+         case 5: k.fp1 = Fingerprint(); if (sOnlyV2D) k.ps1 = app::View2DAuditPanelState(); k.popups = OpenPopups(); CloseAllPopups(); sButton = 1; break;
          case 6: sButton = 0; break;
          case 9: sMouse = ImVec2(-10000.0f, -10000.0f); break;
          case 11: Judge(k); sPoking = false; break;
+         default: break;
+         }
+         return true;
+      case Kind::Click:
+         switch (k.step++)
+         {
+         case 0:
+            k.fp0 = Fingerprint(); k.ps0 = app::View2DAuditPanelState(); k.rh0 = app::View2DAuditRenderHash();
+            k.depth = gUndoStack.size(); sMouse = c; break;
+         case 1: sButton = 1; break;
+         case 2: sButton = 0; break;
+         case 6:
+            k.fp1 = Fingerprint(); k.ps1 = app::View2DAuditPanelState(); k.rh1 = app::View2DAuditRenderHash();
+            k.popups = OpenPopups(); k.typedTook = GImGui->ActiveId != 0 && ImGui::TempInputIsActive(GImGui->ActiveId) ? 1 : 0;
+            k.rangeBad = app::View2DAuditRanges();
+            if (k.popups > 0)
+            {
+               // The chip opens a menu: walk its options as a dropdown would.
+               Poke m = k;
+               m.kind = Kind::Combo;
+               m.step = 0;
+               m.opts.clear();
+               sQueue.push_back(m);
+            }
+            sKey = 1; break;
+         case 7: sKey = 0; break;
+         case 9:
+            CloseAllPopups(); sMouse = ImVec2(-10000.0f, -10000.0f);
+            k.undoable = gUndoStack.size() > k.depth;
+            while (gUndoStack.size() > k.depth)
+               Undo();
+            break;
+         case 11:
+            if (k.fp1 != k.fp0 && k.undoable && Fingerprint() != k.fp0)
+               k.over = FirstDiff(k.fp0, Fingerprint());
+            Judge(k); app::View2DAuditRestore(); sPoking = false; break;
+         default: break;
+         }
+         return true;
+      case Kind::Combo:
+      {
+         // Open, gather the options of the top popup, click option opt, reopen for the next; Esc and undo at the end.
+         const int s = k.step++;
+         if (s == 0) { k.fp0 = Fingerprint(); k.ps0 = app::View2DAuditPanelState(); k.rh0 = app::View2DAuditRenderHash(); k.depth = gUndoStack.size(); sMouse = c; }
+         else if (s == 1) sButton = 1;
+         else if (s == 2) sButton = 0;
+         else if (s == 5)
+         {
+            if (OpenPopups() == 0) { k.step = 100; return true; }
+            if (k.opts.empty())
+            {
+               ImGuiWindow* pw = GImGui->OpenPopupStack.back().Window;
+               const std::string pn = pw != nullptr ? BaseName(pw->Name) : std::string();
+               std::set<ImGuiID> got;
+               for (const Rec& r : sLast)
+                  if (r.widget && !r.disabled && r.window == pn && sOnLast.count(r.id) == 0 && got.insert(r.id).second && r.bb.GetWidth() > 2 && !IdLike(r.label))
+                     k.opts.push_back({ r.id, r.bb });
+               if (k.opts.size() > 24)
+                  k.opts.resize(24);
+            }
+            if (k.opt >= k.opts.size()) { k.step = 100; return true; }
+            k.fp1 = Fingerprint(); k.ps1 = app::View2DAuditPanelState(); k.rh1 = app::View2DAuditRenderHash();
+            sMouse = k.opts[k.opt].second.GetCenter();
+         }
+         else if (s == 6) sButton = 1;
+         else if (s == 7) sButton = 0;
+         else if (s == 10)
+         {
+            if (Fingerprint() == k.fp1 && app::View2DAuditPanelState() == k.ps1 && app::View2DAuditRenderHash() == k.rh1)
+               k.optsDead++;
+            if (k.rangeBad.empty())
+               k.rangeBad = app::View2DAuditRanges();
+            CloseAllPopups();
+            k.opt++;
+            sMouse = c;
+            k.step = k.opt < k.opts.size() ? 1 : 100;
+         }
+         else if (s == 100)
+         {
+            CloseAllPopups(); sMouse = ImVec2(-10000.0f, -10000.0f);
+            while (gUndoStack.size() > k.depth)
+               Undo();
+         }
+         else if (s == 102)
+         {
+            if (Fingerprint() != k.fp0)
+               k.over = FirstDiff(k.fp0, Fingerprint());
+            Judge(k); app::View2DAuditRestore(); sPoking = false;
+         }
+         return true;
+      }
+      case Kind::Typed:
+         switch (k.step++)
+         {
+         case 0: k.fp0 = Fingerprint(); k.depth = gUndoStack.size(); sMouse = c; sAllowDouble = true; break;
+         case 1: sButton = 1; break;
+         case 2: sButton = 0; break;
+         case 3: sButton = 1; break;
+         case 4: sButton = 0; break;
+         case 7:
+            sAllowDouble = false;
+            if (GImGui->ActiveId != 0 && ImGui::TempInputIsActive(GImGui->ActiveId))
+            {
+               k.typedTook = 1;
+               sKeyName = ImGuiKey_A; sKeyCmd = true; sKey = 1;
+            }
+            else if (GImGui->ActiveId != 0 && (GImGui->InputTextState.ID == GImGui->ActiveId))
+            {
+               k.typedTook = 1;
+               sKeyName = ImGuiKey_A; sKeyCmd = true; sKey = 1;
+            }
+            else
+               k.step = 20;
+            break;
+         case 8: sKeyName = ImGuiKey_A; sKeyCmd = true; sKey = 0; break;
+         case 9: sChars = k.typedText; break;
+         case 11: sKeyName = ImGuiKey_Enter; sKey = 1; break;
+         case 12: sKeyName = ImGuiKey_Enter; sKey = 0; break;
+         case 13:
+            // A multi-line field keeps focus on Enter; a person clicks away before they undo.
+            if (GImGui->ActiveId != 0 && GImGui->InputTextState.ID == GImGui->ActiveId)
+               ImGui::ClearActiveID();
+            break;
+         case 15:
+            k.fp1 = Fingerprint(); k.rangeBad = app::View2DAuditRanges(); sMouse = ImVec2(-10000.0f, -10000.0f);
+            k.undoable = gUndoStack.size() > k.depth;
+            while (gUndoStack.size() > k.depth)
+               Undo();
+            break;
+         case 17:
+            if (k.fp1 != k.fp0 && k.undoable && Fingerprint() != k.fp0)
+               k.over = FirstDiff(k.fp0, Fingerprint());
+            break;
+         case 21:
+            sAllowDouble = false; ImGui::ClearActiveID(); CloseAllPopups();
+            Judge(k); app::View2DAuditRestore(); sPoking = false; break;
          default: break;
          }
          return true;
@@ -653,6 +1205,7 @@ namespace
       case 0:
          k.before = SliderFrac(k.id, 0);
          k.depth = gUndoStack.size();
+         k.fp0 = Fingerprint();
          sMouse = ImVec2(left.x + w * 0.25f, left.y);
          break;
       case 1: sButton = 1; break;
@@ -661,7 +1214,7 @@ namespace
          k.took = GImGui->ActiveId == k.id;
          k.over = GImGui->HoveredWindow != nullptr ? BaseName(GImGui->HoveredWindow->Name) : "nothing";
          k.at25 = SliderFrac(k.id, -1); sMouse = ImVec2(right.x - 1.0f, right.y); break;
-      case 5: k.atMax = SliderFrac(k.id, -1); sMouse = ImVec2(left.x + 1.0f, left.y); break;
+      case 5: k.atMax = SliderFrac(k.id, -1); k.fp1 = Fingerprint(); sMouse = ImVec2(left.x + 1.0f, left.y); break;
       case 7: k.atMin = SliderFrac(k.id, -1); sButton = 0; break;
       case 8: sMouse = ImVec2(-10000.0f, -10000.0f); break;
       case 9:
@@ -670,10 +1223,185 @@ namespace
          if (k.undoable)
             Undo();
          break;
-      case 11: Judge(k); sPoking = false; break;
+      case 11:
+         Judge(k);
+         if (sOnlyV2D)
+            app::View2DAuditRestore();
+         sPoking = false;
+         break;
       default: break;
       }
       return true;
+   }
+
+   // 2D View: register every control drawn in this state, then poke each control once across all states.
+   std::string KindOf(const Rec& r)
+   {
+      const auto note = sNotesLast.find(r.id);
+      if (note != sNotesLast.end() && note->second.kind != nullptr)
+         return note->second.kind;
+      if (sSlidersLast.count(r.id) != 0)
+         return "slider";
+      if (r.checkable)
+         return "checkbox";
+      if (r.inputable)
+         return "field";
+      if (!GlyphOf(r.id).empty())
+         return "icon";
+      if (HasInk(r.id))
+         return "button";
+      return "item";
+   }
+   void V2DRegisterAndPoke(const std::string& state)
+   {
+      std::set<ImGuiID> seen;
+      int queued = 0;
+      for (const Rec& r : sLast)
+      {
+         if (!r.widget || !IsV2D(r.window) || !Visible(r) || !seen.insert(r.id).second)
+            continue;
+         const std::string key = KeyOf(r.window, r.label);
+         Entry* e = RegFind(key);
+         if (e == nullptr)
+         {
+            sRegAt[key] = sReg.size();
+            sReg.push_back({});
+            e = &sReg.back();
+            e->key = key;
+            e->window = ShortWin(r.window);
+            e->label = r.label;
+            e->tip = TipOf(r.id);
+            e->glyph = GlyphOf(r.id);
+            e->kind = KindOf(r);
+            e->state = state;
+            e->bb = r.bb;
+         }
+         if (r.disabled || !FullyShown(r) || sV2DPoked.count(key) != 0)
+            continue;
+         if (const char* why = SkipReason(r.label, e->tip))
+         {
+            if (e->reason.empty())
+               e->reason = why;
+            continue;
+         }
+         Poke k;
+         k.id = r.id;
+         k.bb = r.bb;
+         k.label = r.label;
+         k.window = r.window;
+         k.state = state;
+         k.tip = e->tip;
+         k.on = sOnLast.count(r.id) != 0;
+         const std::string& kind = e->kind;
+         bool any = true;
+         if (kind == "slider")
+         {
+            k.kind = Kind::Slider;
+            sQueue.insert(sQueue.begin(), k);
+            if (r.inputable)
+            {
+               k.kind = Kind::Typed; k.typedText = "99999"; sQueue.insert(sQueue.begin(), k);
+               k.typedText = "-99999"; sQueue.insert(sQueue.begin(), k);
+            }
+         }
+         else if (kind == "dropdown")
+         {
+            k.kind = Kind::Combo;
+            sQueue.insert(sQueue.begin(), k);
+         }
+         else if (kind == "colour")
+         {
+            k.kind = Kind::Popup;
+            sQueue.insert(sQueue.begin(), k);
+         }
+         else if (kind == "checkbox")
+         {
+            k.kind = Kind::Toggle;
+            sQueue.insert(sQueue.begin(), k);
+         }
+         else if (r.inputable)
+         {
+            k.kind = Kind::Typed; k.typedText = "99999"; sQueue.insert(sQueue.begin(), k);
+            k.typedText = "-99999"; sQueue.insert(sQueue.begin(), k);
+         }
+         else if (kind == "icon" || kind == "button" || kind == "item" || HasInk(r.id))
+         {
+            // Ink-less items (a layer row, its eye, a colour dot, the anchor grid) are clicked too: each must
+            // change something, open something, or carry a reason in the skip file.
+            k.kind = Kind::Click;
+            sQueue.insert(sQueue.begin(), k);
+         }
+         else
+            any = false;
+         if (any)
+         {
+            sV2DPoked.insert(key);
+            queued++;
+         }
+      }
+      // Per state: the document survives its save text and holds no out-of-range value.
+      const std::string rt = app::View2DAuditRoundTrip();
+      if (!rt.empty())
+         Add("save/load differs", state, Pseudo("##view2dcontent", "document"), "%s", rt.c_str());
+      const std::string rg = app::View2DAuditRanges();
+      if (!rg.empty())
+         Add("value out of range", state, Pseudo("##view2dcontent", "document"), "%s", rg.c_str());
+      printf("UIAUDIT v2d %s: %zu items, %zu registered, %d queued\n", state.c_str(), sLast.size(), sReg.size(), queued);
+   }
+
+   std::string JsonEsc(const std::string& s)
+   {
+      std::string o;
+      for (char c : s)
+      {
+         if (c == '"' || c == '\\') { o += '\\'; o += c; }
+         else if ((unsigned char)c < 0x20) { char b[8]; snprintf(b, sizeof b, "\\u%04x", c); o += b; }
+         else o += c;
+      }
+      return o;
+   }
+
+   void WriteRegistry(const char* dir)
+   {
+      int pass = 0, fail = 0, skipped = 0, untested = 0;
+      std::ofstream j(std::string(dir) + "/registry.json"), t(std::string(dir) + "/coverage.tsv");
+      t << "status\tkind\twindow\tlabel\ttip\tstate\treason\n";
+      j << "[\n";
+      for (size_t i = 0; i < sReg.size(); i++)
+      {
+         Entry& e = sReg[i];
+         if (e.findings > 0) { e.status = "fail"; fail++; }
+         else if (e.poked) { e.status = "pass"; pass++; }
+         else if (!e.reason.empty()) { e.status = "skipped"; skipped++; }
+         else { e.status = "untested"; untested++; }
+         t << e.status << '\t' << e.kind << '\t' << e.window << '\t' << e.label << '\t' << e.tip << '\t' << e.state << '\t' << e.reason << '\n';
+         j << "  {\"key\": \"" << JsonEsc(e.key) << "\", \"kind\": \"" << e.kind << "\", \"window\": \"" << JsonEsc(e.window)
+           << "\", \"label\": \"" << JsonEsc(e.label) << "\", \"tip\": \"" << JsonEsc(e.tip) << "\", \"glyph_bytes\": " << e.glyph.size()
+           << ", \"state\": \"" << JsonEsc(e.state) << "\", \"status\": \"" << e.status << "\", \"reason\": \"" << JsonEsc(e.reason)
+           << "\", \"findings\": " << e.findings << ", \"bb\": [" << e.bb.Min.x << ", " << e.bb.Min.y << ", " << e.bb.Max.x << ", " << e.bb.Max.y
+           << "]}" << (i + 1 < sReg.size() ? "," : "") << "\n";
+      }
+      j << "]\n";
+      t << "#\tpass " << pass << "\tfail " << fail << "\tskipped " << skipped << "\tuntested " << untested << '\n';
+      printf("UIAUDIT v2d registry: %zu controls, pass %d fail %d skipped %d untested %d\n", sReg.size(), pass, fail, skipped, untested);
+   }
+
+   void LoadSkips()
+   {
+      const char* path = getenv("INFINITE_UIAUDIT_V2D_SKIP");
+      if (path == nullptr)
+         return;
+      std::ifstream f(path);
+      std::string line;
+      while (std::getline(f, line))
+      {
+         if (line.empty() || (line[0] == '#' && line.compare(0, 2, "##") != 0))   // "# note"; "##id" is a pattern
+            continue;
+         const size_t tab = line.find('\t');
+         if (tab != std::string::npos)
+            sSkips.emplace_back(line.substr(0, tab), line.substr(tab + 1));
+      }
+      printf("UIAUDIT v2d skips: %zu from %s\n", sSkips.size(), path);
    }
 
    // Sliders only in the 3D View's column and on node bodies; popups, toggles and hover for every control.
@@ -745,7 +1473,7 @@ namespace
    }
 
    // --- the driver: themes x (3D View tabs, other panels, one node of every type) ---
-   enum class Phase { Start, Tabs, Panels, ClearNodes, Nodes, NextTheme, Done };
+   enum class Phase { Start, Tabs, Panels, ClearNodes, Nodes, NextTheme, View2D, Done };
    struct PanelFlag { const char* name; bool* flag; };
 
    std::string ThemeName(int t) { return t == 0 ? "dark" : "light"; }
@@ -804,6 +1532,14 @@ void FrameTest_UIAUDIT(int frameId, GLFWwindow* window)
       const char* patch = getenv("INFINITE_UIAUDIT_PATCH");
       const bool opened = patch != nullptr && LoadPatchFrom(patch);
       printf("UIAUDIT patch %s opened=%d, %zu node types\n", patch != nullptr ? patch : "(none)", opened ? 1 : 0, sTypes.size());
+      if (getenv("INFINITE_UIAUDIT_VIEW2D") != nullptr)
+      {
+         sOnlyV2D = true;
+         LoadSkips();
+         sPhase = Phase::View2D;
+         sWait = 40;
+         return;
+      }
       gView3DOpen = true;
       sTabAt = 0;
       sWait = 30;   // the scene, its previews and the panel settle
@@ -964,6 +1700,91 @@ void FrameTest_UIAUDIT(int frameId, GLFWwindow* window)
          sWait = 2;
          return;
       }
+   }
+
+   if (sPhase == Phase::View2D)
+   {
+      static int sState = -1, sPage2 = 0;
+      static std::string sName;
+      if (sWait > 0)
+      {
+         if (--sWait == 0)
+         {
+            for (const Notices::Notice& n : Notices::Active())
+               Notices::DismissId(n.id);
+            CloseAllPopups();
+            if (sPage2 == 0)
+            {
+               sState++;
+               sName = app::View2DAuditState(sState);
+               if (sName.empty())
+               {
+                  if (sTheme == 0 && getenv("INFINITE_UIAUDIT_DARK_ONLY") == nullptr)
+                  {
+                     sTheme = 1;
+                     SetTheme(1);
+                     sState = -1;
+                     sV2DPoked.clear();   // the light theme gets the layout checks, not a second round of pokes
+                     sWait = 20;
+                     return;
+                  }
+                  const char* out = getenv("INFINITE_UIAUDIT_OUT");
+                  Write(out != nullptr ? out : ".");
+                  WriteRegistry(out != nullptr ? out : ".");
+                  printf("UIAUDIT done findings=%zu checked=%d poked=%d\n", sFindings.size(), sChecked, sPoked);
+                  sDone = true;
+                  GImGui->TestEngineHookItems = false;
+                  glfwSetWindowShouldClose(window, GLFW_TRUE);
+                  return;
+               }
+            }
+            else
+               app::View2DAuditRestore();
+            for (const char* nm : { "##v2dprops", "##v2dlayers" })
+               for (ImGuiWindow* w : GImGui->Windows)
+                  if ((w->Active || w->WasActive) && BaseName(w->Name).find(nm) != std::string::npos)
+                     ImGui::SetScrollY(w, w->InnerRect.GetHeight() * 0.8f * (float)sPage2);
+            sWait = -4;
+         }
+         return;
+      }
+      if (sWait < 0 && ++sWait < 0)
+      {
+         // Golden shots: the panel's pixels for each state's first page, written as this frame ends.
+         static const char* shots = getenv("INFINITE_UIAUDIT_V2D_SHOTS");
+         if (sWait == -1 && sPage2 == 0 && shots != nullptr)
+         {
+            std::string file = tn + "_" + sName;
+            for (char& c : file)
+               if (!std::isalnum((unsigned char)c))
+                  c = '_';
+            const ImVec2 s = ImGui::GetIO().DisplayFramebufferScale;
+            gShotNowPath = std::string(shots) + "/" + file + ".png";
+            gShotNowRect[0] = (int)std::lround(gView2DRectMin.x * s.x);
+            gShotNowRect[1] = (int)std::lround(gView2DRectMin.y * s.y);
+            gShotNowRect[2] = (int)std::lround(gView2DRectMax.x * s.x);
+            gShotNowRect[3] = (int)std::lround(gView2DRectMax.y * s.y);
+         }
+         return;
+      }
+      const std::string state = tn + " " + sName + (sPage2 > 0 ? " p" + std::to_string(sPage2 + 1) : "");
+      Snapshot(state);
+      V2DLayout(state);
+      if (sTheme == 0)
+         V2DRegisterAndPoke(state);
+      float maxY = 0, y = 0;
+      for (ImGuiWindow* w : GImGui->Windows)
+         if ((w->Active || w->WasActive) && BaseName(w->Name).find("##v2dprops") != std::string::npos)   // Active is cleared until the panel draws again
+         {
+            maxY = std::max(maxY, w->ScrollMax.y);
+            y = w->Scroll.y;
+         }
+      if (y < maxY - 1.0f && sPage2 < 8)
+         sPage2++;
+      else
+         sPage2 = 0;
+      sWait = 2;
+      return;
    }
 
    if (sPhase == Phase::NextTheme)

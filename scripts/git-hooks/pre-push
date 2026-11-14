@@ -11,6 +11,7 @@ PRIVATE='session_history_corpus|antigravity_history_corpus|session_analysis_corp
 IDX=tools/semi-brain/1_extractors/output/knowledge_index.db
 fail=0
 # Paths that can change app behaviour or the ui group; everything else pushes without a build.
+V2D='^(src/app/panels/View2D|src/nodes/Scene2D|src/app/selftest/(UiAudit|View2D)|src/app/ui/design/components/(ActionButton|FieldWell)|tools/ui-audit/|tools/ui/golden)'
 CODE='^(src/|CMakeLists\.txt|cmake/|external/|resources/|assets/|shaders/|tools/design/|\.claude/skills/run-infinite-hygiene/|scripts/(ibuild|bench))'
 while read -r lref lsha rref rsha; do
   [[ "$lsha" == "$ZERO" ]] && continue
@@ -28,6 +29,22 @@ while read -r lref lsha rref rsha; do
   (( fail )) && exit 1
   if [[ "${INFINITE_SKIP_PREPUSH_TESTS:-0}" == 1 ]]; then
     echo "pre-push: tests SKIPPED by INFINITE_SKIP_PREPUSH_TESTS=1" >&2; continue
+  fi
+  # 2D View: the audit (every control registered, poked, laid out) and the golden shots must pass. They need the
+  # debug build, which builds the working tree, so this runs only when the pushed commit is the clean HEAD.
+  if git diff --name-only "$range" 2>/dev/null | grep -Eq "$V2D"; then
+    v2tree=$(git rev-parse "$lsha^{tree}")
+    v2stamp="$(git rev-parse --git-common-dir)/prepush-v2d-ok/$v2tree"
+    if [[ -e "$v2stamp" ]]; then
+      echo "pre-push: tree ${v2tree:0:7} already passed the 2D View audit - skipped" >&2
+    elif [[ "$(git rev-parse HEAD)" != "$lsha" || -n "$(git status --porcelain --untracked-files=no -- src CMakeLists.txt cmake tools/ui-audit tools/ui)" ]]; then
+      echo "pre-push: BLOCKED - 2D View files changed; push the clean HEAD so the 2D audit can run on it" >&2; exit 1
+    else
+      echo "pre-push: 2D View changed - dev build + 2D audit + golden shots" >&2
+      ( cd "$ROOT" && python3 scripts/ibuild.py build --mode dev --target Infinite >/dev/null && python3 tools/ui/golden_view2d.py check ) 2>&1 | tail -4 >&2
+      [[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "pre-push: BLOCKED - 2D View audit or golden shots failed (ui-audit-view2d/report.md, golden.md)" >&2; exit 1; }
+      mkdir -p "$(dirname "$v2stamp")" && : > "$v2stamp"
+    fi
   fi
   # Only code can break the ui group: skip the build when the push touches none.
   if ! git diff --name-only "$range" 2>/dev/null | grep -Eq "$CODE"; then

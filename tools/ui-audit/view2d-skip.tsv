@@ -1,0 +1,5 @@
+# 2D View audit: controls the audit does not click, and why (label or tip substring<TAB>reason).
+# Native dialogs are stubbed in audit runs (AuditNoDialog in View2DPanel.cpp), so nothing needs skipping for them.
+##view2dcanvas	the canvas: every tool's stroke, click, undo, redo and refusal is View2DPanelSelfCheck's tool matrix
+##view2dgrip	dock resize grip: a drag, not a click; the dock top and dock bottom states lay the panel out both ways
+##open	group open/closed is view state kept in the document, not an edit; the layers self-check covers expand and collapse

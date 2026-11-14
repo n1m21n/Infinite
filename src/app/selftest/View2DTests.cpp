@@ -915,9 +915,14 @@ void RunView2DTest()
       Check("M5: a setting change lands within a frame or two", undoMax + commitMax + cookMax < 50.0);
    }
 
+   // The panel checks get a fresh document of their own: NewPatch frees the one above.
    NewPatch();
    gView2DOpen = false;
-   if (View2DPanelSelfCheck(doc) > 0)
+   if (GraphNode* seed = SpawnNode("Noise", "Source", 0.0f, 0.0f))
+      View2DAddNode(*seed);
+   doc = Doc();
+   Check("a fresh document for the panel checks", doc != nullptr);
+   if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");
 }

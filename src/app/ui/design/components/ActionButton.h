@@ -13,6 +13,7 @@
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/GlyphDraw.h"
+#include "app/selftest/UiAudit.h"
 
 namespace app { ImVec4 AccentEmphasisSelected(); bool IsThemeLight(); }
 
@@ -54,6 +55,8 @@ namespace ActionButton
          ImGui::ButtonLabelHook(label); // headless --describe lists the buttons a node draws, as ImGui::Button does
       const bool clicked = ImGui::InvisibleButton(label, ImVec2(w, h));
       const bool held = ImGui::IsItemActive();
+      if (kind == Kind::Selected)
+         UiAudit::NoteOn();
       const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
       const bool light = app::IsThemeLight();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
@@ -83,7 +86,16 @@ namespace ActionButton
          glyph::Draw(dl, ImVec2(std::round(x0 + 7.0f), std::round(p.y + h * 0.5f)), 14.0f, ink, glyph);
       // Snap to device pixels, not points: 13 pt text in a 28 pt tile sits at 7.5 pt, where ImGui's own frames put it.
       const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
-      dl->AddText(ImVec2(std::round(x0 + iconW), std::round((p.y + (h - ts.y) * 0.5f) * px) / px), ink, shown.c_str());
+      const ImVec2 tp(std::round(x0 + iconW), std::round((p.y + (h - ts.y) * 0.5f) * px) / px);
+      dl->AddText(tp, ink, shown.c_str());
+      if (glyph != nullptr)
+      {
+         ImVec2 gmn, gmx;
+         glyph::InkBox(ImVec2(std::round(x0 + 7.0f), std::round(p.y + h * 0.5f)), 14.0f, glyph, gmn, gmx);
+         UiAudit::NoteInk(1, gmn, gmx, 14.0f, shown.c_str(), glyph);
+      }
+      if (!shown.empty())
+         UiAudit::NoteInk(glyph != nullptr ? 5 : 0, tp, ImVec2(tp.x + ts.x, tp.y + ts.y));
       return clicked;
    }
 

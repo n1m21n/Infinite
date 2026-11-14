@@ -164,6 +164,9 @@ namespace
    int sGizmoHot = -1;
 
    bool sCropOn = false;
+   int sImageW = 0, sImageH = 0;   // Document tab's Image size fields (namespace scope: the audit sets them)
+   uint64_t sSizeFor = 0;           // the document and size those fields were last synced to
+   int sSizeSeenW = 0, sSizeSeenH = 0;
    float sCrop[4] = { 0, 0, 0, 0 };   // x0 y0 x1 y1, document px
    std::vector<Scene2DNode::Layer> sClip;   // Copy / Cut: the layers waiting to be pasted
    int sPasteCount = 0;                     // each paste of the same copy steps further from the original
@@ -423,6 +426,67 @@ namespace
          return l.id;
       }
       return 0;
+   }
+
+   // What a layer marquee touches, in document px: a painted layer only where it has paint (as the click hit), the
+   // rest by their corners. False when the layer has nothing to pick.
+   bool PickBox(Scene2DNode* doc, const Layer& l, float lo[2], float hi[2])
+   {
+      lo[0] = lo[1] = 1e30f;
+      hi[0] = hi[1] = -1e30f;
+      auto grow = [&](float x, float y) {
+         lo[0] = std::min(lo[0], x); lo[1] = std::min(lo[1], y);
+         hi[0] = std::max(hi[0], x); hi[1] = std::max(hi[1], y);
+      };
+      if (l.kind == Kind::Paint && l.pw > 0 && !l.tiles.empty())
+      {
+         float bw = 1, bh = 1;
+         doc->LayerBox(l, bw, bh);
+         const int kT = 256;   // TileStore::kTile
+         const int cols = (l.pw + kT - 1) / kT;
+         bool any = false;
+         for (size_t i = 0; i < l.tiles.size(); i++)
+         {
+            if (l.tiles[i] == "-")
+               continue;
+            any = true;
+            const int tx = (int)(i % cols), ty = (int)(i / cols);
+            const float bx0 = tx * kT * bw / l.pw, bx1 = std::min((float)l.pw, (float)(tx + 1) * kT) * bw / l.pw;
+            const float by0 = std::max(0.0f, (float)(l.ph - (ty + 1) * kT)) * bh / l.ph, by1 = (float)(l.ph - ty * kT) * bh / l.ph;
+            for (float bx : { bx0, bx1 })
+               for (float by : { by0, by1 })
+               {
+                  float x = 0, y = 0;
+                  doc->BoxToDoc(l, bx, by, x, y);
+                  grow(x, y);
+               }
+         }
+         return any;
+      }
+      float c[8];
+      doc->Corners(l, c);
+      for (int i = 0; i < 4; i++)
+         grow(c[i * 2], c[i * 2 + 1]);
+      return true;
+   }
+
+   // Layer marquee: every pickable layer the rectangle a..b (document px) touches joins the selection; without add the
+   // selection starts empty.
+   void MarqueeLayers(Scene2DNode* doc, ImVec2 a, ImVec2 b, bool add)
+   {
+      if (!add)
+         sSel.clear();
+      const float x0 = std::min(a.x, b.x), x1 = std::max(a.x, b.x);
+      const float y0 = std::min(a.y, b.y), y1 = std::max(a.y, b.y);
+      for (const Layer& l : doc->Layers())
+      {
+         if (l.kind == Kind::Group || l.kind == Kind::Fill || l.kind == Kind::Adjust || !doc->Shown(l) ||
+             (l.lock & Scene2DNode::kLockAll) != 0)
+            continue;
+         float lo[2], hi[2];
+         if (PickBox(doc, l, lo, hi) && hi[0] >= x0 && lo[0] <= x1 && hi[1] >= y0 && lo[1] <= y1 && !Selected(l.id))
+            sSel.push_back(l.id);
+      }
    }
 
    // The selection's bounds in document px.
@@ -686,8 +750,24 @@ namespace
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", tip);
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), sChip < tok::tile ? tok::icon_sm : tok::icon_md,
-                  on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
+      const ImVec2 gc((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+      const float roleGs = sChip < tok::tile ? tok::icon_sm : tok::icon_md;
+      float gs = roleGs;
+      {
+         // Same ink, not just the same box: a glyph drawn small inside its em (the pointer, the dot grid) is
+         // scaled up to the set's ink, about 0.78 of the em, so a bar of icons reads as one size.
+         ImVec2 imn, imx;
+         glyph::InkBox(gc, gs, glyphStr, imn, imx);
+         const float ink = std::max(imx.x - imn.x, imx.y - imn.y), target = 0.78f * gs;
+         if (ink > 1.0f && ink < target - 1.5f)
+            gs = std::round(gs * std::min(1.4f, target / ink));
+      }
+      glyph::Draw(ImGui::GetWindowDrawList(), gc, gs, on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+      ImVec2 imn, imx;
+      glyph::InkBox(gc, gs, glyphStr, imn, imx);
+      UiAudit::NoteInk(1, imn, imx, roleGs, tip, glyphStr);   // the role's size; the ink is what was drawn
+#endif
       return clicked;
    }
 
@@ -698,15 +778,18 @@ namespace
 
    // Dimmed text centred on a tile row that starts at rowTop. Drawn, not laid out as Text: ImGui shifts Text by the
    // line's frame-padding baseline offset, which put labels ~6 pt under the chips' centre line.
-   void CentredText(float rowTop, const char* text, bool dim = true)
+   void CentredText(float rowTop, const char* text, bool dim = true, float rowH = 0.0f)
    {
+      if (rowH <= 0.0f)
+         rowH = sRowH;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const ImVec2 sz = ImGui::CalcTextSize(text);
       const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y); // device-pixel snap, as ActionButton
-      ImGui::GetWindowDrawList()->AddText(ImVec2(p.x, std::round((rowTop + (sRowH - sz.y) * 0.5f) * px) / px),
-                                          ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text), text);
+      const ImVec2 tp(p.x, std::round((rowTop + (rowH - sz.y) * 0.5f) * px) / px);
+      ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text), text);
+      UiAudit::NoteInk(2, tp, ImVec2(tp.x + sz.x, tp.y + sz.y), 0.0f, text);
       ImGui::SetCursorScreenPos(ImVec2(p.x, rowTop));
-      ImGui::Dummy(ImVec2(sz.x, sRowH));
+      ImGui::Dummy(ImVec2(sz.x, rowH));
    }
 
    bool TextChip(const char* label, bool on, const char* tip)
@@ -731,6 +814,7 @@ namespace
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const char* end = ImGui::FindRenderedTextEnd(text);   // "Width##img" shows as "Width"
       ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%.*s", (int)(end - text), text);
+      UiAudit::NoteInk(3, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, std::string(text, end).c_str());
       FormParts::Inline(kLabelW);
    }
 
@@ -878,6 +962,7 @@ namespace
       ImGui::AlignTextToFramePadding();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
+      UiAudit::NoteInk(4, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, label);
       if (ImGui::IsItemClicked())
       {
          on = !on;
@@ -945,12 +1030,18 @@ namespace
    // 3x3 anchor picker (row major from top left).
    bool AnchorRow(const char* label, int* anchor)
    {
+      // The label sits on the grid's centre line, as every other label sits on its field's.
+      const float cell = 14.0f;
+      const ImVec2 row = ImGui::GetCursorScreenPos();
+      ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + std::round((cell * 3.0f - ImGui::GetFrameHeight()) * 0.5f)));
       FieldLabel(label);
+      ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, row.y));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       bool changed = false;
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float cell = 14.0f;
       ImGui::InvisibleButton(FormParts::Id(label).c_str(), ImVec2(cell * 3, cell * 3));
+      if (*anchor == 4)
+         UiAudit::NoteOn();   // the grid's centre cell is the chosen one: a click there rightly changes nothing
       if (ImGui::IsItemClicked())
       {
          const ImVec2 m = ImGui::GetIO().MousePos;
@@ -1009,9 +1100,22 @@ namespace
       return text.size() >= n && text.compare(text.size() - n, n, tail) == 0;
    }
 
+   int sAuditDialogs = 0;   // UI audit: native dialogs it asked for (and did not open)
+   bool AuditNoDialog()
+   {
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+      if (getenv("INFINITE_UIAUDIT_VIEW2D") != nullptr)
+      {
+         sAuditDialogs++;
+         return true;
+      }
+#endif
+      return false;
+   }
+
    void RenderImage()
    {
-      if (gOfflineRender.active)
+      if (gOfflineRender.active || AuditNoDialog())
          return;
       const std::string path = Platform::SaveRenderDialog(sImageFormat == 1 ? "infinite_2d.jpg" : "infinite_2d.png", false);
       if (path.empty())
@@ -1026,7 +1130,7 @@ namespace
 
    void RenderAnimation(Scene2DNode* doc)
    {
-      if (gOfflineRender.active)
+      if (gOfflineRender.active || AuditNoDialog())
          return;
       const std::string path = Platform::SaveRenderDialog(sVideoFormat == 1 ? "infinite_2d.mov" : "infinite_2d.mp4", true);
       if (path.empty())
@@ -1310,6 +1414,17 @@ namespace
       return id;
    }
 
+   // The active layer takes no paint: hidden (Photoshop refuses too) or its pixels locked. Nothing is made, no undo step.
+   bool PaintRefused(Scene2DNode* doc)
+   {
+      if (doc->quickMask)
+         return false;
+      const Layer* a = Active(doc);
+      if (a == nullptr || (a->kind != Kind::Paint && !(sEditMask && a->HasPixelMask())))
+         return false;
+      return !doc->Shown(*a) || (!sEditMask && (a->lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) != 0);
+   }
+
    void BeginStroke(Scene2DNode* doc, ImVec2 at, bool line)
    {
       const bool cloning = sTool == kClone || sTool == kHeal;
@@ -1335,6 +1450,8 @@ namespace
             }
          }
       }
+      if (PaintRefused(doc))
+         return;
       PushUndoCheckpoint(sTool == kEraser ? "Erase" : RetouchTool(sTool) ? "Retouch" : "Paint");
       int target = 0;
       const int id = PaintTarget(doc, target, sTool == kBrush);
@@ -1374,6 +1491,8 @@ namespace
 
    void FillAt(Scene2DNode* doc, ImVec2 at)
    {
+      if (PaintRefused(doc))
+         return;
       PushUndoCheckpoint("Fill");
       int target = 0;
       const int id = PaintTarget(doc, target, true);
@@ -1383,6 +1502,8 @@ namespace
 
    void GradientTo(Scene2DNode* doc, ImVec2 a, ImVec2 b)
    {
+      if (PaintRefused(doc))
+         return;
       PushUndoCheckpoint("Gradient");
       int target = 0;
       const int id = PaintTarget(doc, target, true);
@@ -2038,6 +2159,7 @@ namespace
 
    using Shape = Scene2DNode::Shape;
    Shape sStyle;                   // what the next drawn item gets
+   bool sLockScale = true;         // Transform tab: W and H % move together
    int sShapeKind = 0;             // 0 rectangle, 1 rounded, 2 ellipse, 3 polygon, 4 star, 5 line
    int sVecTarget = 0;             // 0 the layer's items, 1 its vector mask
    int sItem = -1, sItemLayer = 0; // the picked item and the layer it is in
@@ -3168,26 +3290,7 @@ namespace
                   sPenItem = -1;
             }
             else if (sOp.kind == 17)
-            {
-               const float x0 = std::min(sOp.docStart.x, sMouseDoc.x), x1 = std::max(sOp.docStart.x, sMouseDoc.x);
-               const float y0 = std::min(sOp.docStart.y, sMouseDoc.y), y1 = std::max(sOp.docStart.y, sMouseDoc.y);
-               for (const Layer& l : doc->Layers())
-               {
-                  if (l.kind == Kind::Group || l.kind == Kind::Fill || l.kind == Kind::Adjust || !doc->Shown(l) ||
-                      (l.lock & Scene2DNode::kLockAll) != 0)
-                     continue;
-                  float c[8];
-                  doc->Corners(l, c);
-                  float lx0 = c[0], lx1 = c[0], ly0 = c[1], ly1 = c[1];
-                  for (int i = 1; i < 4; i++)
-                  {
-                     lx0 = std::min(lx0, c[i * 2]); lx1 = std::max(lx1, c[i * 2]);
-                     ly0 = std::min(ly0, c[i * 2 + 1]); ly1 = std::max(ly1, c[i * 2 + 1]);
-                  }
-                  if (lx1 >= x0 && lx0 <= x1 && ly1 >= y0 && ly0 <= y1 && !Selected(l.id))
-                     sSel.push_back(l.id);
-               }
-            }
+               MarqueeLayers(doc, sOp.docStart, sMouseDoc, true);   // the press already cleared it unless Shift
             else if (sOp.kind == 15)
                TextRelease(doc, mouse);
             else if (sOp.kind == 8 && std::hypot(mouse.x - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).x,
@@ -3407,7 +3510,14 @@ namespace
       }
       next();
       if (FormParts::ColorDot("##v2dvfillc", t.fillC, std::min(18.0f, sRowH - 4.0f), sRowH))
+      {
+         // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
+         static double sAt = -1.0;
+         if (ImGui::GetTime() - sAt > 1.0)
+            undo();
+         sAt = ImGui::GetTime();
          changed = true;
+      }
       gap();
       if (TextChip(L("Stroke##v2dvstroke"), t.strokeOn, T("Stroke on or off")))
       {
@@ -3417,7 +3527,14 @@ namespace
       }
       next();
       if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, std::min(18.0f, sRowH - 4.0f), sRowH))
+      {
+         // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
+         static double sAt = -1.0;
+         if (ImGui::GetTime() - sAt > 1.0)
+            undo();
+         sAt = ImGui::GetTime();
          changed = true;
+      }
       next();
       ImGui::SetNextItemWidth(kWellS);
       changed |= FieldWell::Slider("##v2dvwidth", &t.width, 0.0f, 200.0f, "%.0f px");
@@ -3595,7 +3712,14 @@ namespace
       }
       gap();
       if (FormParts::ColorDot("##v2dtextc", colour, std::min(18.0f, sRowH - 4.0f), sRowH))
+      {
+         // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
+         static double sAt = -1.0;
+         if (ImGui::GetTime() - sAt > 1.0)
+            undo();
+         sAt = ImGui::GetTime();
          changed = true;
+      }
       if (changed && l != nullptr)
          Touch();
    }
@@ -4041,7 +4165,7 @@ namespace
       auto chipW = [](const char* l) { return ImGui::CalcTextSize(l, ImGui::FindRenderedTextEnd(l)).x + 2.0f * tok::space_2; };
       const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + tok::space_1 + sChip;
       const float rowTop = ImGui::GetCursorScreenPos().y;
-      const float barRoom = availW - rightW - tok::space_3;
+      const float barRoom = availW - rightW - (2.0f * tok::space_2 + 1.0f);   // one bar divider before the right cluster
       // A bar wider than its room is clipped at a chip edge-free boundary and a "..." chip opens the whole bar.
       static float sBarW = 0.0f;
       const bool overflow = sBarW > barRoom;
@@ -4051,8 +4175,9 @@ namespace
          const float clipW = std::max(0.0f, barRoom - kIconW - tok::space_1);
          ImGui::BeginChild("##v2dbarclip", ImVec2(clipW, sRowH), ImGuiChildFlags_None,
                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
+         const ImGuiID before = ImGui::GetItemID();
          DrawContextBar(doc);
-         sBarW = ImGui::GetItemRectMax().x - barX;
+         sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
          ImGui::EndChild();
          ImGui::SameLine(0.0f, tok::space_1);
          if (TextChip("...##v2dmore", false, T("More options")))
@@ -4062,11 +4187,13 @@ namespace
             DrawContextBar(doc);
             MenuParts::EndPopup();
          }
+         BarDivider();   // the clipped bar ends in "..."; a divider, not a loose gap, sets the right cluster apart
       }
       else
       {
+         const ImGuiID before = ImGui::GetItemID();
          DrawContextBar(doc);
-         sBarW = ImGui::GetItemRectMax().x - barX;
+         sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
       }
       ImGui::SameLine();
       ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, ImGui::GetWindowPos().x + startX + availW - rightW), rowTop));
@@ -4460,7 +4587,7 @@ namespace
          };
          FormParts::Inline(0.0f, tok::space_1);
          const float lockTop = ImGui::GetCursorScreenPos().y;
-         CentredText(lockTop, T("Lock"));
+         CentredText(lockTop, T("Lock"), true, sChip);   // the lock chips' centre line, not the tool bar's
          for (auto& lk : kLocks)
          {
             FormParts::Inline(0.0f, tok::space_1);
@@ -4698,7 +4825,6 @@ namespace
          }
          {
             // Scale in percent, as Photoshop's options bar: typed, dragged, or locked to one ratio.
-            static bool sLockScale = true;
             float pct[2] = { l->sx * 100.0f, l->sy * 100.0f };
             float* const pp[2] = { &pct[0], &pct[1] };
             const char* const pf[2] = { "W %.1f%%", "H %.1f%%" };
@@ -4931,14 +5057,12 @@ namespace
             }
          MenuParts::EndCombo();
       }
-      static int sCanvasW = 0, sCanvasH = 0, sAnchor = 4, sImageW = 0, sImageH = 0;
-      static uint64_t sFor = 0;
-      static int sSeenW = 0, sSeenH = 0;
-      if (sFor != sDocUid || sSeenW != d.w || sSeenH != d.h)
+      static int sCanvasW = 0, sCanvasH = 0, sAnchor = 4;
+      if (sSizeFor != sDocUid || sSizeSeenW != d.w || sSizeSeenH != d.h)
       {
-         sFor = sDocUid;
-         sSeenW = sCanvasW = sImageW = d.w;
-         sSeenH = sCanvasH = sImageH = d.h;
+         sSizeFor = sDocUid;
+         sSizeSeenW = sCanvasW = sImageW = d.w;
+         sSizeSeenH = sCanvasH = sImageH = d.h;
       }
       SectionCard::Begin(T("Canvas size"));
       {
@@ -5060,7 +5184,8 @@ namespace
          ImGui::TextDisabled("%s", sLastRender.c_str());
          ImGui::PopTextWrapPos();
          if (ActionButton::Draw(L("Reveal##v2dreveal"), ImVec2(availW, 0)))
-            Platform::RevealInFileManager(sLastRender);
+            if (!AuditNoDialog())
+               Platform::RevealInFileManager(sLastRender);
       }
    }
 
@@ -5729,6 +5854,193 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       const Layer* l = Active(doc);
       expect("an Effects pick adds that adjustment", l != nullptr && l->kind == Kind::Adjust && l->adjType == type);
    }
+
+   // Pixels of the composite, for "the render changed".
+   auto picture = [&](Scene2DNode* d) {
+      static int frame = 7000000;
+      d->CookIfNeeded(++frame);
+      std::vector<uint8_t> px;
+      int w = 0, h = 0;
+      d->ReadOutput(px, w, h);
+      return px;
+   };
+   const float W = (float)doc->Doc().w, H = (float)doc->Doc().h;
+   auto stroke = [&](int id, float x0, float y0, float x1, float y1) {
+      BrushEngine::Brush b;
+      b.size = 30.0f;
+      b.hardness = 1.0f;
+      b.color[0] = 1.0f;
+      if (doc->BeginPaint(id, 0, b, x0, y0, 1.0f))
+      {
+         doc->PaintTo(x1, y1, 1.0f);
+         doc->EndPaint();
+      }
+   };
+   // Layer marquee: touches only layers whose paint it covers; Shift adds to what is picked.
+   {
+      const int a = doc->AddPaintLayer();
+      stroke(a, W * 0.08f, H * 0.12f, W * 0.1f, H * 0.12f);
+      const int b = doc->AddPaintLayer();
+      stroke(b, W * 0.85f, H * 0.85f, W * 0.88f, H * 0.85f);
+      doc->Commit();
+      sSel = { b };
+      MarqueeLayers(doc, ImVec2(W * 0.05f, H * 0.08f), ImVec2(W * 0.14f, H * 0.16f), false);
+      expect("marquee picks the layer it covers, not one painted elsewhere", Selected(a) && !Selected(b));
+      sSel = { b };
+      MarqueeLayers(doc, ImVec2(W * 0.05f, H * 0.08f), ImVec2(W * 0.14f, H * 0.16f), true);
+      expect("Shift marquee adds to the selection", Selected(a) && Selected(b));
+      MarqueeLayers(doc, ImVec2(W * 0.45f, H * 0.45f), ImVec2(W * 0.46f, H * 0.46f), false);
+      expect("marquee over empty paint picks neither", !Selected(a) && !Selected(b));
+      // Pixel-accurate hit: the top layer is b, painted bottom right; a click on a's paint is a, not b's empty box.
+      expect("a click on paint picks that layer", HitLayer(doc, ImVec2(W * 0.09f, H * 0.12f)) == a);
+      const int empty = HitLayer(doc, ImVec2(W * 0.5f, H * 0.5f));
+      expect("a click on empty paint picks neither paint layer", empty != a && empty != b);
+   }
+   // Pixel-accurate hit on a 3D object: the box corner misses the sphere, the centre hits it.
+   {
+      GraphNode* sph = SpawnNode("Sphere", "3D", 0.0f, 0.0f);
+      if (sph != nullptr)
+      {
+         sPending.what = Pending::AddNode;
+         sPending.uid = sph->uid;
+         RunPending(doc);
+         const Layer* sl = Active(doc);
+         const int sid = sl != nullptr ? sl->id : 0;
+         static int frame = 9500;
+         doc->CookIfNeeded(++frame);
+         float c[8] = {};
+         if (sl != nullptr)
+            doc->Corners(*sl, c);
+         const float cx = (c[0] + c[2] + c[4] + c[6]) * 0.25f, cy = (c[1] + c[3] + c[5] + c[7]) * 0.25f;
+         const ImVec2 corner(c[0] + (cx - c[0]) * 0.04f, c[1] + (cy - c[1]) * 0.04f);
+         expect("a click on the object picks it", sid != 0 && HitLayer(doc, ImVec2(cx, cy)) == sid);
+         expect("a click beside the object, inside its box, does not", sid != 0 && HitLayer(doc, corner) != sid);
+      }
+   }
+   // Effects tab: switching a layer style on changes the picture.
+   {
+      const int a = doc->AddPaintLayer();
+      stroke(a, W * 0.3f, H * 0.5f, W * 0.4f, H * 0.5f);
+      doc->Commit();
+      const std::vector<uint8_t> before = picture(doc);
+      Layer* l = doc->FindLayer(a);
+      Scene2DNode::Fx& f = l->fx[Scene2DNode::kFxStroke];
+      f.on = true;
+      f.size = 12.0f;
+      f.c[0] = 0.0f; f.c[1] = 1.0f; f.c[2] = 0.0f; f.c[3] = 1.0f;
+      doc->Commit();
+      const std::vector<uint8_t> on = picture(doc);
+      expect("a layer style switched on changes the render", !before.empty() && on != before);
+      doc->FindLayer(a)->fx[Scene2DNode::kFxStroke].on = false;
+      doc->Commit();
+      expect("switched off, the render is back", picture(doc) == before);
+   }
+   // Colour tab: a button adds that adjustment right above the active layer, in its group.
+   {
+      const int a = doc->GroupLayers({ doc->AddPaintLayer() });
+      const int inner = doc->ChildrenOf(a).empty() ? 0 : doc->ChildrenOf(a)[0];
+      doc->AddPaintLayer();   // something above, so "on top" is not the same as "above the active"
+      doc->Commit();
+      SelectOnly(inner);
+      auto indexOf = [&](int id) {
+         for (size_t i = 0; i < doc->Layers().size(); i++)
+            if (doc->Layers()[i].id == id)
+               return (int)i;
+         return -1;
+      };
+      const int at = indexOf(inner);
+      sPending.what = Pending::AddAdjust;
+      sPending.arg = Scene2DNode::kAdjPosterize;
+      RunPending(doc);
+      const Layer* adj = Active(doc);
+      expect("a Colour button adds that adjustment", adj != nullptr && adj->kind == Kind::Adjust && adj->adjType == Scene2DNode::kAdjPosterize);
+      expect("it lands right above the active layer, in its group",
+             adj != nullptr && indexOf(adj->id) == at + 1 && adj->parent == doc->FindLayer(inner)->parent);
+   }
+   // Tool x layer: brush, eraser, fill and gradient paint, undo and redo; a hidden, a pixel-locked layer and the
+   // area outside the selection take nothing.
+   {
+      const int tools[] = { kBrush, kEraser, kFill, kGradient };
+      const char* names[] = { "brush", "eraser", "fill", "gradient" };
+      const int keepTool = sTool;
+      for (int ti = 0; ti < 4; ti++)
+      {
+         doc = FindDoc() != nullptr ? FindDoc() : doc;
+         const int p = doc->AddPaintLayer();
+         stroke(p, W * 0.2f, H * 0.3f, W * 0.6f, H * 0.3f);
+         doc->Commit();
+         doc->Deselect();
+         sTool = tools[ti];
+         sFg[0] = 0.0f; sFg[1] = 0.0f; sFg[2] = 1.0f;
+         auto use = [&]() {
+            const ImVec2 a(W * 0.3f, H * 0.3f), b(W * 0.5f, H * 0.32f);
+            if (sTool == kFill)
+               FillAt(doc, a);
+            else if (sTool == kGradient)
+               GradientTo(doc, a, b);
+            else
+            {
+               BeginStroke(doc, a, false);
+               if (doc->Painting())
+                  doc->PaintTo(b.x, b.y, 1.0f);
+               EndStroke(doc);
+            }
+            doc->Commit();
+         };
+         char what[160];
+         SelectOnly(p);
+         const std::string t0 = doc->DocText();
+         const size_t undo0 = gUndoStack.size();
+         use();
+         const std::string t1 = doc->DocText();
+         snprintf(what, sizeof what, "%s changes the paint layer", names[ti]);
+         expect(what, t1 != t0);
+         snprintf(what, sizeof what, "%s pushes one undo step", names[ti]);
+         expect(what, gUndoStack.size() == undo0 + 1);
+         Undo();
+         doc = FindDoc();
+         snprintf(what, sizeof what, "%s: undo restores the layer", names[ti]);
+         expect(what, doc != nullptr && doc->DocText() == t0);
+         Redo();
+         doc = FindDoc();
+         snprintf(what, sizeof what, "%s: redo puts it back", names[ti]);
+         expect(what, doc != nullptr && doc->DocText() == t1);
+         if (doc == nullptr)
+            return fails;
+         const size_t n = doc->Layers().size();
+         auto refuses = [&](const char* how) {
+            const std::string b0 = doc->DocText();
+            const size_t u0 = gUndoStack.size();
+            use();
+            snprintf(what, sizeof what, "%s on a %s layer changes nothing", names[ti], how);
+            expect(what, doc->DocText() == b0 && doc->Layers().size() == n);
+            snprintf(what, sizeof what, "%s on a %s layer pushes no undo step", names[ti], how);
+            expect(what, gUndoStack.size() == u0);
+         };
+         SelectOnly(p);
+         doc->FindLayer(p)->lock = Scene2DNode::kLockPixels;
+         doc->Commit();
+         refuses("pixel-locked");
+         doc->FindLayer(p)->lock = 0;
+         doc->FindLayer(p)->visible = false;
+         doc->Commit();
+         refuses("hidden");
+         doc->FindLayer(p)->visible = true;
+         doc->Commit();
+         // Outside the selection: select a far corner, paint in the middle.
+         doc->SelectRect(W * 0.9f, H * 0.9f, W * 0.95f, H * 0.95f, Scene2DNode::kSelNew, 0.0f, false);
+         {
+            const std::string b0 = doc->DocText();
+            const std::vector<uint8_t> pic0 = picture(doc);
+            use();
+            snprintf(what, sizeof what, "%s outside the selection leaves the picture alone", names[ti]);
+            expect(what, picture(doc) == pic0);
+            (void)b0;
+         }
+         doc->Deselect();
+      }
+      sTool = keepTool;
+   }
    // Node layers: From canvas adds, Replace swaps the source and keeps the pose.
    {
       GraphNode* na = SpawnNode("Image Source", "Source", 0.0f, 0.0f);
@@ -5927,6 +6239,274 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
    doc->Commit();
    return fails;
 }
+
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+// UI audit (INFINITE_UIAUDIT_VIEW2D, docs/plans/ui-system/ui-audit.md): a document holding one layer of every kind,
+// and the panel states the audit steps through (every side tab x every layer kind, every tool's bar, both docks).
+namespace
+{
+   constexpr int kAuditKinds = 10;   // 9 layer kinds and "nothing selected"
+   const char* kAuditKindNames[kAuditKinds] = { "paint", "node", "3D node", "text", "shape", "fill", "adjust", "group", "masked", "none" };
+   const char* kAuditTabNames[7] = { "Layers", "Layer", "Transform", "Document", "Render", "Effects", "Colour" };
+   const char* kAuditToolNames[kToolCount] = { "Move", "Crop", "Hand", "Zoom", "Brush", "Eraser", "Fill", "Pick", "Marquee", "Lasso", "Wand",
+                                               "Pen", "Node", "Shape", "Text", "Gradient", "Clone", "Heal", "Blur", "Sharpen", "Dodge", "Burn" };
+   uint64_t sAuditDoc = 0;
+   int sAuditIds[kAuditKinds - 1] = {};
+   int sAuditState = -1;
+
+   Scene2DNode* AuditDoc()
+   {
+      Scene2DNode* doc = FindDoc();
+      if (doc != nullptr && sAuditDoc == sDocUid && doc->FindLayer(sAuditIds[0]) != nullptr)
+         return doc;
+      if (doc == nullptr)
+         doc = MakeDoc(0.0f, 0.0f, "");
+      if (doc == nullptr)
+         return nullptr;
+      sAuditDoc = sDocUid;
+      doc->Doc().w = 960;
+      doc->Doc().h = 540;
+      doc->Commit();
+      int* id = sAuditIds;
+      sSel.clear();
+      id[0] = doc->AddPaintLayer();
+      {
+         BrushEngine::Brush b;
+         b.size = 60.0f;
+         b.color[0] = 0.9f;
+         if (doc->BeginPaint(id[0], 0, b, 200.0f, 200.0f, 1.0f))
+         {
+            doc->PaintTo(400.0f, 260.0f, 1.0f);
+            doc->EndPaint();
+         }
+      }
+      const uint64_t noise = [] { GraphNode* g = SpawnNode("Noise", "Source", 0.0f, 0.0f); return g != nullptr ? g->uid : 0; }();
+      const uint64_t sphere = [] { GraphNode* g = SpawnNode("Sphere", "3D", 0.0f, 0.0f); return g != nullptr ? g->uid : 0; }();
+      sSel.clear();
+      id[1] = noise != 0 ? AddNodeLayer(doc, noise, nullptr) : 0;
+      sSel.clear();
+      id[2] = sphere != 0 ? AddNodeLayer(doc, sphere, nullptr) : 0;
+      id[3] = doc->AddTextLayer("Audit", 480.0f, 270.0f, 300.0f);
+      id[4] = doc->AddVectorLayer();
+      doc->ImportSvg(id[4], "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"120\"><rect x=\"0\" y=\"0\" width=\"200\" height=\"120\" fill=\"#3366ff\"/></svg>");
+      id[5] = doc->AddLayer(Kind::Fill, 0).id;
+      id[6] = doc->AddLayer(Kind::Adjust, 0).id;
+      id[7] = doc->GroupLayers({ doc->AddPaintLayer() });
+      id[8] = doc->AddPaintLayer();
+      doc->AddPixelMask(id[8]);
+      if (Layer* f = doc->FindLayer(id[5]))
+         f->opacity = 0.3f;
+      doc->Commit();
+      sSel.clear();
+      sNeedFit = true;
+      return doc;
+   }
+}
+
+int View2DAuditStateCount() { return 7 * kAuditKinds + kToolCount + 4; }
+
+// Puts the panel into state i and returns its name ("Effects / text", "tool Brush", "dock top"); empty past the end.
+std::string View2DAuditState(int i)
+{
+   gView2DOpen = true;
+   Scene2DNode* doc = AuditDoc();
+   if (doc == nullptr || i < 0 || i >= View2DAuditStateCount())
+      return std::string();
+   sAuditState = i;
+   sSideOpen = true;
+   sOp = Op();
+   sRename = 0;
+   auto select = [&](int k) {
+      sSel.clear();
+      if (k < kAuditKinds - 1 && doc->FindLayer(sAuditIds[k]) != nullptr)
+         sSel = { sAuditIds[k] };
+   };
+   if (i < 7 * kAuditKinds)
+   {
+      gView2DDock = 0;
+      sTool = kMove;
+      sTab = i / kAuditKinds;
+      select(i % kAuditKinds);
+      sSizeFor = sDocUid;   // synced, so the panel keeps the audit's numbers
+      sSizeSeenW = doc->Doc().w;
+      sSizeSeenH = doc->Doc().h;
+      sImageW = doc->Doc().w / 2;   // Image size's Apply is live only off the document's own size
+      sImageH = doc->Doc().h / 2;
+      if (doc->Doc().guidesX.empty())
+         doc->Doc().guidesX = { 240.0f };   // so Clear Guides has something to clear
+      return std::string(kAuditTabNames[sTab]) + " / " + kAuditKindNames[i % kAuditKinds];
+   }
+   i -= 7 * kAuditKinds;
+   if (i < kToolCount)
+   {
+      gView2DDock = 0;
+      sTab = 0;
+      select(i == kText ? 3 : i == kPen || i == kNode || i == kShape ? 4 : 0);
+      sTool = i;
+      if (i == kHand)
+      {
+         sZoom = 0.37f;   // off the fit, so the bar's Fit has a view to change
+         sPan = ImVec2(0.0f, 0.0f);
+      }
+      return std::string("tool ") + kAuditToolNames[i];
+   }
+   i -= kToolCount;
+   sTool = kMove;
+   if (i == 3)
+   {
+      // A crop in progress: the tool state's Apply ends the crop before Cancel's turn, so Cancel gets its own state.
+      gView2DDock = 0;
+      sTab = 0;
+      select(0);
+      sTool = kCrop;
+      sCropOn = true;
+      sCrop[0] = 100.0f; sCrop[1] = 80.0f; sCrop[2] = 700.0f; sCrop[3] = 420.0f;
+      return "crop open";
+   }
+   if (i == 2)
+   {
+      // Three layers picked: align and distribute come alive.
+      gView2DDock = 0;
+      sTab = 0;
+      sSel.clear();
+      // Uneven spacing on both axes, so distribute has gaps to even out.
+      static const float kAt[3][2] = { { 160.0f, 120.0f }, { 260.0f, 220.0f }, { 760.0f, 420.0f } };
+      for (int k = 0; k < 3; k++)
+         if (Layer* l = doc->FindLayer(sAuditIds[k]))
+         {
+            l->x = kAt[k][0];
+            l->y = kAt[k][1];
+            sSel.push_back(sAuditIds[k]);
+         }
+      doc->Commit();
+      return "three picked";
+   }
+   sTab = 1;
+   select(0);
+   gView2DDock = i == 0 ? 3 : 0;
+   return i == 0 ? "dock top" : "dock bottom";
+}
+
+// The panel's own state that is not saved with the patch (tool, tab, selection, view, tool settings): a click that
+// changes only this still did something.
+std::string View2DAuditPanelState()
+{
+   char buf[640];
+   const BrushEngine::Brush& b = sBrush;
+   const BrushEngine::Brush& e = sEraser;
+   std::string sel;
+   for (int id : sSel)
+      sel += std::to_string(id) + ",";
+   snprintf(buf, sizeof buf,
+            "tool %d tab %d side %d dock %d zoom %.4f pan %.1f %.1f fg %.3f %.3f %.3f bg %.3f %.3f %.3f fill %d tol %d cont %d all %d "
+            "marq %d lasso %d feather %.2f selop %d surf %d skin %d mask %d auto %d img %d vid %d gizmo %d pick %d "
+            "brush %d %.2f %.3f %.3f %.3f %.3f %.3f %.1f %.3f %.3f %d %d %d %d eraser %.2f %.3f %d chip %d dialogs %d",
+            sTool, sTab, sSideOpen, gView2DDock, sZoom, sPan.x, sPan.y, sFg[0], sFg[1], sFg[2], sBg[0], sBg[1], sBg[2], sFillKind, sTolerance,
+            sContiguous, sAllLayers, sMarqueeShape, sLassoKind, sFeather, sSelOp, sSurfacePaint, sSkinSide, sEditMask, sAutoSelect,
+            sImageFormat, sVideoFormat, sGizmoMode, sPickMode, b.tip, b.size, b.hardness, b.opacity, b.flow, b.spacing, b.jitter, b.angle,
+            b.roundness, b.smoothing, b.pencil, b.pressureSize, b.pressureOpacity, b.mode, e.size, e.hardness, e.mode, sBrushPreset, sAuditDialogs);
+   Scene2DNode* doc = FindDoc();
+   // The vector and text tools' "next item" settings, which the bar edits when nothing is picked.
+   const Shape& v = sStyle;
+   char tools[512];
+   snprintf(tools, sizeof tools,
+            " lockscale %d shape %d vec %d %.3f %.3f %.3f %.3f %d %.3f %.3f %.3f %.3f %.2f %d %d %d %.1f %.1f %d %.1f"
+            " text %s %.1f %.2f %.1f %d %.3f %.3f %.3f %.3f",
+            sLockScale, sShapeKind, v.fillOn, v.fillC[0], v.fillC[1], v.fillC[2], v.fillC[3], v.strokeOn, v.strokeC[0], v.strokeC[1],
+            v.strokeC[2], v.strokeC[3], v.width, v.cap, v.join, v.align, v.dash, v.gap, v.op, v.radius, sFont.c_str(), sTextSize,
+            sLeading, sTracking, sTextAlign, sTextC[0], sTextC[1], sTextC[2], sTextC[3]);
+   return std::string(buf) + tools + " sel " + sel + (doc != nullptr ? " qm " + std::to_string(doc->quickMask) : std::string());
+}
+
+// The document survives its own save text: written, read back into a fresh node, written again, identical.
+std::string View2DAuditRoundTrip()
+{
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr)
+      return "no document";
+   const std::string a = doc->DocText();
+   Scene2DNode copy;
+   copy.SetDocText(a);
+   const std::string b = copy.DocText();
+   if (a == b)
+      return std::string();
+   size_t i = 0;
+   while (i < a.size() && i < b.size() && a[i] == b[i])
+      i++;
+   const size_t from = i > 24 ? i - 24 : 0;
+   std::string q = a.substr(from, 56) + " -> " + b.substr(from, 56);
+   for (char& c : q)
+      if (c == '\n' || c == '\t')
+         c = ' ';
+   return q;
+}
+
+// A hash of the composited picture (cooked now), for "the control changed the render".
+uint64_t View2DAuditRenderHash()
+{
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr)
+      return 0;
+   static int frame = 5000000;
+   doc->CookIfNeeded(++frame);
+   std::vector<uint8_t> px;
+   int w = 0, h = 0;
+   if (!doc->ReadOutput(px, w, h))
+      return 0;
+   uint64_t hsh = 1469598103934665603ull;
+   for (size_t k = 0; k < px.size(); k += 7)
+      hsh = (hsh ^ px[k]) * 1099511628211ull;
+   return hsh ^ ((uint64_t)w << 32) ^ (uint64_t)h;
+}
+
+// Values a typed number must never leave in the document (opacity past 1, a negative size, NaN): empty when all hold.
+std::string View2DAuditRanges()
+{
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr)
+      return std::string();
+   char buf[160];
+   for (const Layer& l : doc->Layers())
+   {
+      auto bad = [&](const char* what, float v, float lo, float hi) {
+         if (!(v >= lo && v <= hi))
+         {
+            snprintf(buf, sizeof buf, "layer %d %s = %g (%g..%g)", l.id, what, v, lo, hi);
+            return true;
+         }
+         return false;
+      };
+      if (bad("opacity", l.opacity, 0, 1) || bad("fill", l.fill, 0, 1) || bad("x", l.x, -1e6f, 1e6f) || bad("y", l.y, -1e6f, 1e6f) ||
+          bad("scale x", l.sx, -1e4f, 1e4f) || bad("scale y", l.sy, -1e4f, 1e4f) || bad("angle", l.angle, -1e6f, 1e6f) ||
+          bad("mask density", l.maskDensity, 0, 1))
+         return buf;
+      for (int f = 0; f < Scene2DNode::kFxCount; f++)
+         if (bad("fx opacity", l.fx[f].c[3], 0, 1) || bad("fx size", l.fx[f].size, 0, 1e4f) || bad("fx spread", l.fx[f].spread, 0, 1))
+            return buf;
+   }
+   const auto& d = doc->Doc();
+   if (d.w < 1 || d.h < 1 || d.w > 16384 || d.h > 16384)
+   {
+      snprintf(buf, sizeof buf, "document %d x %d", d.w, d.h);
+      return buf;
+   }
+   for (const BrushEngine::Brush* b : { &sBrush, &sEraser })
+      if (!(b->size >= 1.0f && b->size <= 5000.0f) || !(b->hardness >= 0 && b->hardness <= 1) || !(b->opacity >= 0 && b->opacity <= 1) ||
+          !(b->flow >= 0 && b->flow <= 1))
+      {
+         snprintf(buf, sizeof buf, "brush size %g hardness %g opacity %g flow %g", b->size, b->hardness, b->opacity, b->flow);
+         return buf;
+      }
+   return std::string();
+}
+
+// Puts the panel back as the current state had it (a poke may have changed the tool, tab or selection).
+void View2DAuditRestore()
+{
+   if (sAuditState >= 0)
+      View2DAuditState(sAuditState);
+}
+#endif
 
 void View2DAddNode(GraphNode& gn)
 {

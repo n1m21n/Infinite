@@ -131,6 +131,9 @@ namespace FieldWell
       PushStyle(id ^ 0x9e3779b9u);
       ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
+      // The grab is invisible and the fill spans the whole well, so the value maps over the whole well too:
+      // a press lands where the fill will end, even in a narrow well (ImGui otherwise maps over well minus grab).
+      ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 1.0f);
       // The text field gets a quiet accent edge instead of ImGui's bright blue nav ring.
       const bool typing = editing || sTypeId == id;
       if (typing)
@@ -148,6 +151,7 @@ namespace FieldWell
       }
       if (typing)
          ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar();
       ImGui::PopStyleColor(2);
       PopStyle();
       return r || restored;

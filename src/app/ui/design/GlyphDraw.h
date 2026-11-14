@@ -36,6 +36,24 @@ namespace glyph
       dl->AddText(font, size, ImVec2(left, (float)(int)(TopFor(font, center, size) + 0.5f)), col, g);
    }
 
+   // The box the glyph's ink covers when drawn by Draw at `center` (for the UI audit's centring checks).
+   inline void InkBox(ImVec2 center, float size, const char* g, ImVec2& mn, ImVec2& mx)
+   {
+      ImFont* font = ImGui::GetFont();
+      const unsigned char* u = (const unsigned char*)g;
+      const unsigned int cp = (u[0] & 0xF0) == 0xE0 ? ((u[0] & 0x0Fu) << 12) | ((u[1] & 0x3Fu) << 6) | (u[2] & 0x3Fu) : u[0];
+      const ImFontGlyph* gl = font->GetFontBaked(size)->FindGlyphNoFallback((ImWchar)cp);
+      const float top = (float)(int)(TopFor(font, center, size) + 0.5f);
+      if (gl == nullptr)
+      {
+         mn = mx = center;
+         return;
+      }
+      const float left = center.x - (gl->X0 + gl->X1) * 0.5f;
+      mn = ImVec2(left + gl->X0, top + gl->Y0);
+      mx = ImVec2(left + gl->X1, top + gl->Y1);
+   }
+
    // Call-site wrappers (same argument order the retired glyph:: icons used). A trailing stroke argument is accepted and
    // ignored: stroke weight is part of the glyph, not the call site.
 #define INF_GLYPH_FN(Name, Glyph) \

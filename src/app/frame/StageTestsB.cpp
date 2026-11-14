@@ -1,4 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include <algorithm>
+#include <string>
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
@@ -6,6 +8,9 @@
 
 namespace app
 {
+std::string gShotNowPath;
+int gShotNowRect[4] = {};
+
 int DrawTestsB(FrameCtx& fc)
 {
    auto& window = fc.window;
@@ -763,6 +768,24 @@ int DrawTestsB(FrameCtx& fc)
                printf("FAILED to write %s (%dx%d)\n", shotPath, fbW, fbH);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+      }
+
+      // A test hook (the 2D View audit's golden shots) asks for one crop of this frame: path + framebuffer rect.
+      if (!gShotNowPath.empty())
+      {
+         const int x0 = std::clamp(gShotNowRect[0], 0, fbW), y0 = std::clamp(gShotNowRect[1], 0, fbH);
+         const int x1 = std::clamp(gShotNowRect[2], x0, fbW), y1 = std::clamp(gShotNowRect[3], y0, fbH);
+         if (x1 > x0 && y1 > y0)
+         {
+            const int w = x1 - x0, h = y1 - y0;
+            std::vector<unsigned char> px((size_t)w * h * 4);
+            glReadPixels(x0, fbH - y1, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            for (size_t i = 3; i < px.size(); i += 4)
+               px[i] = 255;
+            stbi_flip_vertically_on_write(1);
+            stbi_write_png(gShotNowPath.c_str(), w, h, 4, px.data(), w * 4);
+         }
+         gShotNowPath.clear();
       }
 
       // INFINITE_SHOT_REQUEST=<file>: a scripted run (docs/showcase/shoot.sh) writes an output path into
