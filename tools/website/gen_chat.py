@@ -141,7 +141,7 @@ def head_and_tail():
     ld = ('<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "%s", "url": "%s", '
           '"description": "%s", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "%s"}}</script>' % (TITLE, url, DESC, BASE))
     head = re.sub(r'<script type="application/ld\+json">.*?</script>', lambda m: ld, head, count=1, flags=re.S)
-    head = head.replace('<link rel="stylesheet" href="dev.css', '<link rel="stylesheet" href="chat.css?v=3">\n  <link rel="stylesheet" href="dev.css', 1)
+    head = head.replace('<link rel="stylesheet" href="dev.css', '<link rel="stylesheet" href="chat.css?v=1c1480ea">\n  <link rel="stylesheet" href="dev.css', 1)
     rest = re.sub(r'\s*<script src="audience\.js[^"]*" defer></script>', "", rest)
     return head, rest
 
