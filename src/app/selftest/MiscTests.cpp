@@ -2691,6 +2691,72 @@ void RunRpcBatchTest()
       e.clear();
       Check("unbind_mod: `index` works too", Call("unbind_mod", { {"index", dst}, {"key", key} }, r, e) && !r.value("wasModulated", true));
       Check("unbind_mod: no empty undo step for a missing binding", gUndoStack.size() == undoAfterUnbind);
+
+      // Garbage instead of a call has to come back as an error, never as a crash: a batch, the chat
+      // panel and this test reach the handler directly, without RemoteControl::SafeDispatch's guard.
+      {
+         const json garbage[] = { json::array({ 1, 2, 3 }), json("not an object"), json(nullptr), json(7) };
+         bool refusedAll = true, threw = false;
+         for (const json& g : garbage)
+         {
+            try
+            {
+               e.clear();
+               refusedAll = refusedAll && !Call("bind_mod", g, r, e) && !e.empty();
+            }
+            catch (...)
+            {
+               threw = true;
+            }
+         }
+         Check("bind_mod: non-object params are refused, not thrown", refusedAll && !threw);
+
+         json deep = 5;
+         for (int i = 0; i < 500; i++)
+            deep = { { "index", deep } };
+         e.clear();
+         bool threwDeep = false;
+         bool deepRefused = false;
+         try
+         {
+            deepRefused = !Call("bind_mod", { { "dst", deep }, { "key", "f rotation" }, { "src", src } }, r, e) && !e.empty();
+         }
+         catch (...)
+         {
+            threwDeep = true;
+         }
+         Check("bind_mod: a 500-deep {index} chain is refused politely", deepRefused && !threwDeep);
+
+         const json wild[] = { json(1e300), json(-1e300), json("999999999999999999999"), json(true), json(nullptr) };
+         bool wildRefused = true, wildThrew = false;
+         for (const json& w : wild)
+         {
+            try
+            {
+               e.clear();
+               wildRefused = wildRefused && !Call("bind_mod", { { "dst", w }, { "key", "f rotation" }, { "src", src } }, r, e);
+            }
+            catch (...)
+            {
+               wildThrew = true;
+            }
+         }
+         Check("bind_mod: a wild node value is an error, not a cast", wildRefused && !wildThrew);
+
+         e.clear();
+         Check("bind_mod: a non-string key is reported as missing",
+               !Call("bind_mod", { { "dst", dst }, { "key", 42 }, { "src", src } }, r, e) && e.find("missing control key") != std::string::npos);
+
+         e.clear();
+         Check("bind_mod: half a range is refused, not half applied",
+               !Call("bind_mod", { { "dst", dst }, { "key", key }, { "src", src }, { "lo", 0.2f } }, r, e) && e.find("lo and hi") != std::string::npos);
+         e.clear();
+         Check("bind_mod: a string range is refused, not thrown",
+               !Call("bind_mod", { { "dst", dst }, { "key", key }, { "src", src }, { "lo", "0.2" }, { "hi", 1 } }, r, e) && e.find("lo and hi") != std::string::npos);
+         e.clear();
+         Check("set_expr: a non-string text is refused, not thrown",
+               !Call("set_expr", { { "index", dst }, { "key", key }, { "text", 42 } }, r, e) && e.find("text must be a string") != std::string::npos);
+      }
    }
    NewPatch();
 

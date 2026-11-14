@@ -2,6 +2,7 @@
 // pointing at, the transport, modulation by control name, bypass, and the code errors of the
 // open patch. Same rules as Rpc.cpp: main thread, between frames, one undo step per edit.
 #include <algorithm>
+#include <climits> // fork: k17 INT_MIN/INT_MAX, so a wild number is refused instead of cast
 #include <cstdlib> // fork: k17 std::strtol, for a node index written as a string
 #include "app/AppShared.h"
 #include "core/GestureRecorder.h"
@@ -46,12 +47,28 @@ namespace app
       // string ("5"), or an object ({"index":5} / {"node":5}) depending on which tool the caller
       // learned, and under two names - `dst` on bind_mod, `index` everywhere else. Reading one
       // spelling only is what made bind_mod answer "unknown node index" for a node that exists.
-      int NodeIndexOfField(const json& field)
+      // Bounded and total: any JSON value at all is accepted and answered with -1, never an exception
+      // and never a walk into a pathological nesting an agent could send by accident.
+      int NodeIndexOfField(const json& field, int depth = 0)
       {
+         if (depth > 8)
+            return -1;
+         if (field.is_number_unsigned())
+         {
+            const unsigned long long wide = field.get<unsigned long long>();
+            return wide <= (unsigned long long)INT_MAX ? (int)wide : -1;
+         }
          if (field.is_number_integer())
-            return field.get<int>();
+         {
+            const long long wide = field.get<long long>();
+            return (wide >= INT_MIN && wide <= INT_MAX) ? (int)wide : -1;
+         }
          if (field.is_number())
-            return (int)field.get<double>();
+         {
+            // A double outside int range is not a node index; casting it is undefined behaviour.
+            const double wide = field.get<double>();
+            return (wide >= (double)INT_MIN && wide <= (double)INT_MAX) ? (int)wide : -1;
+         }
          if (field.is_string())
          {
             const std::string text = field.get<std::string>();
@@ -59,12 +76,14 @@ namespace app
                return -1;
             char* end = nullptr;
             const long parsed = std::strtol(text.c_str(), &end, 10);
-            return (end != text.c_str() && *end == '\0') ? (int)parsed : -1;
+            if (end == text.c_str() || *end != '\0' || parsed < INT_MIN || parsed > INT_MAX)
+               return -1;
+            return (int)parsed;
          }
          if (field.is_object())
             for (const char* name : { "index", "node", "id", "dst" })
                if (field.contains(name) && !field[name].is_null())
-                  return NodeIndexOfField(field[name]);
+                  return NodeIndexOfField(field[name], depth + 1);
          return -1;
       }
 
@@ -205,6 +224,14 @@ namespace app
       }
       if (method == "set_expr" || method == "bind_mod" || method == "unbind_mod")
       {
+         // The control socket checks this (RemoteControl::SafeDispatch), but a batch, the chat panel and
+         // the self-tests call the handler directly, and nlohmann's value() throws on a non-object.
+         // Refuse the shape here instead of letting an exception escape the command.
+         if (!params.is_object())
+         {
+            outError = "params must be a JSON object, e.g. {\"dst\":5,\"key\":\"f rotation\",\"src\":4}";
+            return true;
+         }
          // fork: k17 `dst`, `index`, `node` and `target` all name the node. bind_mod's documentation says
          // `dst`, but get_params, set_param and unbind_mod all say `index`, so a caller that learned
          // one spelling and wrote the other used to get "unknown node index" for a node that exists
@@ -248,7 +275,14 @@ namespace app
          if (method == "set_expr")
          {
             // The same as typing `=formula` into the field: the `=` is how a person says it, not part of it.
-            std::string text = params.value("text", std::string());
+            // A non-string text (yaml-style `text: 5`) is named instead of thrown at: value<string>()
+            // raises a type error, and the caller is an agent that can fix its own arguments.
+            if (params.contains("text") && !params["text"].is_null() && !params["text"].is_string())
+            {
+               outError = "text must be a string, e.g. \"sin(t)*0.3\"; an empty string clears the expression";
+               return true;
+            }
+            std::string text = params.contains("text") && params["text"].is_string() ? params["text"].get<std::string>() : std::string();
             auto trim = [](std::string& t)
             {
                const size_t a = t.find_first_not_of(" \t\n");
@@ -293,14 +327,25 @@ namespace app
                }
             const int srcIndex = NodeIndexOfField(srcField);
             GraphNode* src = FindNodeByIndex(srcIndex);
+            // NodeIndexOfField is the same total reader the destination uses: it clamps, so a wild
+            // `output` (1e300, a huge unsigned, "x") comes back as -1 and is refused below instead of
+            // being cast (an out-of-range cast is undefined and threw out of json::get<int>() before).
             int output = 0;
             for (const char* name : { "output", "out" })
-               if (params.contains(name) && params[name].is_number_integer())
-                  output = params[name].get<int>();
+               if (params.contains(name) && !params[name].is_null())
+                  output = NodeIndexOfField(params[name]);
             if (srcField.is_object())
                for (const char* name : { "output", "out" })
-                  if (srcField.contains(name) && srcField[name].is_number_integer())
-                     output = srcField[name].get<int>();
+                  if (srcField.contains(name) && !srcField[name].is_null())
+                     output = NodeIndexOfField(srcField[name]);
+            // lo/hi are validated before anything is bound: half a range or a string is a mistake the
+            // caller can fix, not a binding that silently keeps the destination's own span.
+            const bool wantsRange = params.contains("lo") || params.contains("hi");
+            if (wantsRange && (!params.contains("lo") || !params.contains("hi") || !params["lo"].is_number() || !params["hi"].is_number()))
+            {
+               outError = "pass lo and hi together as numbers, in destination units, e.g. \"lo\":0,\"hi\":1";
+               return true;
+            }
             if (src == nullptr)
             {
                outError = "unknown modulator node " + (srcIndex >= 0 ? std::to_string(srcIndex) : std::string("<missing>")) +
@@ -314,8 +359,8 @@ namespace app
             }
             PushUndoCheckpoint();
             Modulation::Instance().Bind(gn->index, param, src->index, output);
-            if (params.contains("lo") && params.contains("hi"))
-               Modulation::Instance().SetRange(gn->index, param, params.value("lo", 0.0f), params.value("hi", 1.0f));
+            if (wantsRange)
+               Modulation::Instance().SetRange(gn->index, param, params["lo"].get<float>(), params["hi"].get<float>());
             gPatchDirty = true;
             outResult = { { "index", gn->index }, { "param", param }, { "key", key }, { "src", src->index }, { "output", output } };
             return true;
