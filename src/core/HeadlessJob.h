@@ -21,6 +21,8 @@
 //   --plugin-params (--render, --audio-summary): the status's "plugins" block also lists every loaded plugin's parameters with their real ranges.
 //   --batch <list> (--audio-summary): after the first job, each line "patch<TAB>out.json[<TAB>out.wav]" is measured in this one
 //            process (the app starts once); every out.json then carries its own "plugins" block. One status line at the end.
+//   --batch <list> (--frame): each line "patch<TAB>out.png|out_dir/" renders the same times in this one process;
+//            each job also writes <out>.json (its frame_stats, or its load error) and a failed load skips to the next line.
 //   --size WxH rescales --frame / --frames-dir / --render --node output; --codec h264|prores4444 is for --render; --render --node tapped-node video needs --duration.
 //   --set also applies to --render, --frame and --audio-summary.
 //   --geometry <file.jsonl> (--frame, --frames-dir, with --node on a 3D node): one JSON line per exported time with that
@@ -61,7 +63,7 @@ namespace Headless
       std::string patch;
       std::string out;           // file for --render, file or directory for --frame, .json for --audio-summary
       std::string wavPath;       // --audio-summary --wav: the measured samples, as a file
-      std::string batch;         // --audio-summary --batch: more jobs, one "patch\tout.json[\tout.wav]" per line
+      std::string batch;         // --audio-summary / --frame --batch: more jobs, one "patch\tout[\tout.wav]" per line
       std::string notes;         // --audio-summary --notes: film events as JSON, injected as note-ons
       std::string noteMap;       // --note-map: event type -> note target (R471 7.5)
       std::string stemsDir;      // --stems-dir: where the per-node WAVs go

@@ -864,6 +864,27 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
    static std::vector<BatchJob> sBatch; // --batch: the jobs after the first, read when the first one is done
    static size_t sBatchNext = 0;
    static bool sBatchRead = false;
+   // --batch: one job per line, "patch<TAB>out[<TAB>out.wav]"; false when the list cannot be opened.
+   auto readBatch = [&]() -> bool
+   {
+      std::ifstream in(gHeadlessJob.batch);
+      if (!in)
+         return false;
+      for (std::string line; std::getline(in, line);)
+      {
+         if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+         std::vector<std::string> col;
+         for (size_t a = 0, b; a <= line.size(); a = b + 1)
+         {
+            b = std::min(line.find('\t', a), line.size());
+            col.push_back(line.substr(a, b - a));
+         }
+         if (col.size() >= 2 && !col[0].empty() && !col[1].empty())
+            sBatch.push_back({ col[0], col[1], col.size() > 2 ? col[2] : std::string() });
+      }
+      return true;
+   };
 
    const Headless::Job& job = gHeadlessJob;
    if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version ||
@@ -1920,7 +1941,10 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
                }
                int rw = 0, rh = 0;
                std::vector<unsigned char> rgba;
-               if (!ReadNodeImageRgba8(sTap, sTapOutput, !job.alpha, rw, rh, rgba))
+               // --frame keeps alpha with or without --size (its full-size path writes straight alpha too);
+               // only --frames-dir defaults to opaque.
+               const bool opaque = sequence && !job.alpha;
+               if (!ReadNodeImageRgba8(sTap, sTapOutput, opaque, rw, rh, rgba))
                   return fail("E_RENDER", "could not read " + path);
                std::vector<uint16_t> deep;
                if (sequence && job.depth == 16)
@@ -1930,7 +1954,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
                                  "--depth 16 needs a float source: this image is 8 bits per channel, so a 16-bit PNG would only pad it; drop --depth or tap a node with a 16-bit float output",
                                  sOut != nullptr ? sOutIndex : -1);
                   int dw = 0, dh = 0;
-                  if (!ReadNodeImageRgba16(sTap, sTapOutput, !job.alpha, dw, dh, deep))
+                  if (!ReadNodeImageRgba16(sTap, sTapOutput, opaque, dw, dh, deep))
                      return fail("E_RENDER", "could not read " + path);
                   if (job.sizeW > 0 && (dw != job.sizeW || dh != job.sizeH))
                      return fail("E_UNSUPPORTED_DEPTH", "--size with --depth 16 is not supported: render at the native size, or use --depth 8",
@@ -2012,6 +2036,58 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          sPhase = Phase::Warm;
          LoadPatchFrom(job.patch);
          return;
+      }
+      if (job.mode == Headless::Mode::Frame && !job.batch.empty())
+      {
+         // --frame --batch: every job leaves <out>.json with its frame_stats, then the next line loads in this
+         // same process. A line whose patch does not load leaves its error there and is skipped, not fatal.
+         auto sidecar = [](const std::string& out, const std::string& body)
+         {
+            std::string p = out;
+            while (p.size() > 1 && p.back() == '/')
+               p.pop_back();
+            if (FILE* f = std::fopen((p + ".json").c_str(), "wb"))
+            {
+               std::fwrite(body.data(), 1, body.size(), f);
+               std::fclose(f);
+            }
+         };
+         sidecar(job.out, "{\"ok\":true,\"patch\":\"" + Headless::JsonEscape(job.patch) + "\",\"frame_stats\":[" + sFrameStats + "]}\n");
+         if (!sBatchRead)
+         {
+            sBatchRead = true;
+            if (!readBatch())
+               return fail("E_USAGE", "--batch: could not read " + job.batch);
+         }
+         while (sBatchNext < sBatch.size())
+         {
+            const BatchJob& b = sBatch[sBatchNext++];
+            Patch::Data data;
+            std::string err;
+            if (!Patch::Read(b.patch, data, err))
+            {
+               sidecar(b.out, "{\"ok\":false,\"patch\":\"" + Headless::JsonEscape(b.patch) + "\",\"errors\":[{\"code\":\"E_LOAD\",\"message\":\"" +
+                                 Headless::JsonEscape(err) + "\"}]}\n");
+               continue;
+            }
+            std::vector<Headless::Issue> ignored;
+            PatchSchema::Resolve(data, MakeSchemaEnv(false), ignored);
+            gHeadlessPatch = data;
+            gHeadlessJob.patch = b.patch;
+            gHeadlessJob.out = b.out;
+            sStatus.patch = b.patch;
+            sStatus.out = b.out;
+            sFrameStats.clear();
+            sStatus.files.clear();
+            sTicks = 0;
+            sPrepTicks = 0;
+            sNextTime = 0;
+            sNextFrame = 0;
+            sPhase = Phase::Warm;
+            LoadPatchFrom(b.patch);
+            return;
+         }
+         sStatus.extraJson.push_back("\"batch_jobs\":" + std::to_string(sBatch.size() + 1));
       }
       if (sPngWriter != nullptr)
       {
@@ -2201,22 +2277,8 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          if (!sBatchRead)
          {
             sBatchRead = true;
-            std::ifstream in(job.batch);
-            if (!in)
+            if (!readBatch())
                return fail("E_USAGE", "--batch: could not read " + job.batch);
-            for (std::string line; std::getline(in, line);)
-            {
-               if (!line.empty() && line.back() == '\r')
-                  line.pop_back();
-               std::vector<std::string> col;
-               for (size_t a = 0, b; a <= line.size(); a = b + 1)
-               {
-                  b = std::min(line.find('\t', a), line.size());
-                  col.push_back(line.substr(a, b - a));
-               }
-               if (col.size() >= 2 && !col[0].empty() && !col[1].empty())
-                  sBatch.push_back({ col[0], col[1], col.size() > 2 ? col[2] : std::string() });
-            }
          }
          if (sBatchNext < sBatch.size())
          {
