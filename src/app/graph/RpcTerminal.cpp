@@ -107,12 +107,37 @@ namespace app
             }
             tr.SetTempo(bpm);
          }
+         else if (action == "loop")
+         {
+            // fork: the arrange loop had no RPC at all, so loopStart/loopEnd could only be set by
+            // dragging in the UI (API-7). Beats, like `timeline loop` and the transport itself.
+            // Goes through ArrangeSetLoop, never tr.SetLoop directly: the model republishes to the
+            // transport every frame (PublishArrangeLoop), so a direct write would be overwritten.
+            const Arrange::LoopRange& cur = gArrange.settings.loop;
+            bool enabled = params.value("enabled", true);
+            if (enabled && !params.contains("start") && !params.contains("end") && cur.end <= cur.start)
+            {
+               outError = "the loop has no range yet: give start and end (beats), e.g. {\"action\":\"loop\",\"enabled\":true,\"start\":0,\"end\":16}";
+               return true;
+            }
+            Arrange::Tick start = params.contains("start") ? Arrange::BeatsToTicks(params.value("start", 0.0)) : cur.start;
+            Arrange::Tick end = params.contains("end") ? Arrange::BeatsToTicks(params.value("end", 0.0)) : cur.end;
+            if (enabled && end <= start)
+            {
+               outError = "end must be after start: start " + std::to_string(start) + " tick, end " + std::to_string(end) +
+                          " tick. Beats, e.g. start 0 end 16 is four bars in 4/4";
+               return true;
+            }
+            ArrangeSetLoop(enabled, start, end);
+         }
          else
          {
             outError = "unknown transport action '" + action + "'";
             return true;
          }
-         outResult = { { "playing", tr.IsPlaying() }, { "seconds", tr.Seconds() }, { "bpm", tr.Tempo() } };
+         outResult = { { "playing", tr.IsPlaying() }, { "seconds", tr.Seconds() }, { "bpm", tr.Tempo() },
+                       { "loopEnabled", tr.LoopEnabled() }, { "loopStart", tr.LoopStartBeats() },
+                       { "loopEnd", tr.LoopEndBeats() } };
          return true;
       }
       if (method == "set_bypass")

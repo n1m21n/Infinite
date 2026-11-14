@@ -43,6 +43,14 @@
 | `src/core/RemoteControl.h/.cpp` | `RemoteControl::Call` — вызов из любого потока через ту же очередь | HTTP-MCP и встроенный агент | my/agents |
 | `src/app/Startup.cpp` | `McpHttp::StartFromSettings()` после `RemoteControl::Start` | HTTP-MCP | my/agents |
 | `CMakeLists.txt`, `src/app/selftest/ChatTests.cpp` | новые исходники (`Providers`, `HttpAgent`, `McpHttp`, формы, `AgentNet*`), `-framework Security`; тесты | | my/agents |
+| `src/app/graph/Rpc.cpp` | `create_node`: пустая `category` резолвится из `NodeFactory::CategoryOf`; `validate_patch_text`: `E_BAD_KEY` «could not be drawn here» не ошибка, а счётчик `deferredKeys` | round-trip `save_patch` → `load_patch_text`; валидатор не рубит штатные патчи с `mod` по имени контрола | tu/api-roundtrip |
+| `src/app/graph/PatchIO.cpp` | `BuildPatchData`: пустая категория ноды резолвится из имени типа перед записью | не писать `node 14  Set Vertex Color` (двойной пробел теряет ноду при загрузке) | tu/api-roundtrip |
+| `src/core/PatchSchema.cpp` | `Validate`: узел с непустой категорией без пробела и неизвестным типом проверяется как «категория + тип»; новый код `E_MISSING_CATEGORY` | назвать уже сохранённый битый файл, а не молча выбросить ноду | tu/api-roundtrip |
+| `src/app/graph/RpcTerminal.cpp` | `transport`: действие `loop` (`enabled`, `start`, `end` в битах) через `ArrangeSetLoop`; в ответ добавлены `loopEnabled/loopStart/loopEnd` | API-7: диапазон лупа программно | tu/api-roundtrip |
+| `src/app/graph/NodeRegistry.cpp` | `ArrangeSetLoop`: при `enabled` диапазон короче `kPPQ/16` поднимается до неё | луп не «включён», но нулевой (Transport такой отбрасывал — кнопка выглядела мёртвой) | tu/api-roundtrip |
+| `src/app/selftest/MiscTests.cpp` | в `RunRpcBatchTest` проверки round-trip категории, `deferredKeys`, действий `transport loop` | регрессии по трём карточкам | tu/api-roundtrip |
+| `src/platform/AppPaths.h` | `sPortableDataDir()` / `FileExists()` / `DirName()` / `ResolvePortableDataDir(exePath)`; `AppSupportDir()` в начале отдаёт портативную папку, если она задана | портативная копия держит всё состояние рядом с собой | tu/api-roundtrip |
+| `src/app/Startup.cpp` | одна строка в начале `InitApp`: `AppPaths::ResolvePortableDataDir(Platform::ExecutablePath())` | решить до первого чтения настроек/автосохранения/лога | tu/api-roundtrip |
 
 Наши новые файлы (конфликтов с апстримом нет): `src/core/chat/{Providers,HttpAgent}.*`, `src/core/{McpHttp.*,McpAgentDoc.h}`, `src/platform/AgentNet*.{h,mm,cpp}`, `src/app/panels/{CustomAgentForm,ConnectAgentForm}.cpp`, `tools/{mcp_http_probe,mock_openai_server,gen_agent_doc}.py`, `docs/{custom-agent,connect-agent}.md`.
 

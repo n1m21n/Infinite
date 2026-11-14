@@ -3,6 +3,7 @@
 #include "core/Notices.h"
 #include <filesystem>
 #include <fstream>
+#include <algorithm> // fork: std::remove_if in validate_patch_text
 #include "imgui_internal.h"
 
 namespace app
@@ -18,6 +19,11 @@ namespace app
    bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
                          nlohmann::json& outResult, std::string& outError)
    {
+      // fork: every call starts with a clean error string. The return paths below decide success
+      // with outError.empty() (see the HandleTerminalRpc fallthrough at the end), so a caller that
+      // reuses one string across calls - the chat panel, an MCP client, a test harness - would
+      // otherwise see a stale error turn a successful command into a reported failure.
+      outError.clear();
       using json = nlohmann::json;
       // From the first command on, every control records whether it was drawn greyed or hidden
       // (read back by param_ui_state). Cheap: one flag test per registered control.
@@ -67,7 +73,14 @@ namespace app
       else if (method == "create_node")
       {
          const std::string typeName = params.value("typeName", std::string());
-         const std::string category = params.value("category", std::string());
+         // fork: the category is a saved record field ("node <index> <category> <type>"), and an empty
+         // one writes "node 14  Set Vertex Color" - a double space that the loader reads back as
+         // category "Set", type "Vertex Color", then drops the node as an unknown type. The argument
+         // is documented as optional, so resolve the missing case here rather than save a node that
+         // cannot be loaded.
+         std::string category = params.value("category", std::string());
+         if (category.empty())
+            category = NodeFactory::Instance().CategoryOf(typeName);
          float x = params.value("x", 0.0f);
          float y = params.value("y", 0.0f);
          // No place given (an agent's or the CLI's add): a free spot, not the origin. A run of adds a few
@@ -828,6 +841,7 @@ namespace app
          Patch::Data data;
          std::string readError;
          std::vector<Headless::Issue> errors, warnings;
+         std::vector<Headless::Issue> deferredKeys; // fork: see the ResolveKeys call below
          if (!Patch::ReadText(params.value("text", std::string()), data, readError))
             errors.push_back({ "E_LOAD", readError, 0, -1 });
          else
@@ -836,8 +850,26 @@ namespace app
             PatchSchema::Resolve(data, env, errors);
             if (errors.empty())
                PatchSchema::ResolveKeys(data, env, errors);
+            // fork: a mod/expr line naming a control by key cannot be resolved until a node of that
+            // type has drawn, and the live window app never probes types (Headless.cpp JoinLiveTier1
+            // says so). The loader treats exactly this as deferred (PatchLoad.cpp keyErrors ->
+            // PendingKeyed), so the validator must agree with it instead of rejecting stock patches
+            // for "cannot look up 'sizeX': Shape could not be drawn here".
+            errors.erase(std::remove_if(errors.begin(), errors.end(),
+                                        [&](const Headless::Issue& is)
+                                        {
+                                           const bool unresolvedHere =
+                                              is.code == "E_BAD_KEY" && is.message.find("could not be drawn here") != std::string::npos;
+                                           if (unresolvedHere)
+                                              deferredKeys.push_back(is);
+                                           return unresolvedHere;
+                                        }),
+                         errors.end());
             if (errors.empty())
                PatchSchema::Validate(data, env, errors, warnings);
+            // A deferred key is not a warning: warnings[] feeds strict mode (PromoteWarnings in
+            // HeadlessJob.h), which would turn it straight back into the error this fixes. The count
+            // is reported separately, under its own "deferredKeys" key.
             if (params.value("strict", true))
                Headless::PromoteWarnings(warnings, errors);
          }
@@ -849,7 +881,7 @@ namespace app
             return a;
          };
          outResult = { {"ok", errors.empty()}, {"errors", issuesJson(errors)}, {"warnings", issuesJson(warnings)},
-                       {"nodes", (int)data.nodes.size()} };
+                       {"deferredKeys", (int)deferredKeys.size()}, {"nodes", (int)data.nodes.size()} };
          return true;
       }
       else if (method == "describe")

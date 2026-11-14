@@ -53,7 +53,7 @@ namespace McpHttp
          { "list_node_types", "none. Valid type names by category", "{}" },
          { "describe", "type?: node type name EXACTLY as list_node_types prints it (e.g. \"Bloom\"); omit to list all types. Returns control keys with a type letter prefix (f/i/b/c/s), e.g. \"f uRotation\"", "{\"type\":\"Kaleidoscope\"}" },
          { "get_params", "index: int node index; full?: bool. Keys carry the type letter prefix: \"f uRotation\"", "{\"index\":5}" },
-         { "create_node", "typeName: string; category?: string; x?: number; y?: number. Returns {index}", "{\"typeName\":\"Oscillator\",\"x\":100,\"y\":100}" },
+         { "create_node", "typeName: string; category?: string (resolved from list_node_types when omitted); x?: number; y?: number. Returns {index}", "{\"typeName\":\"Oscillator\",\"x\":100,\"y\":100}" },
          { "delete_node", "index: int", "{\"index\":5}" },
          { "connect", "srcIndex: int; srcOutput?: int (default 0); dstIndex: int; dstSlot?: int (default 0). Returns the link id", "{\"srcIndex\":4,\"srcOutput\":0,\"dstIndex\":5,\"dstSlot\":0}" },
          { "disconnect", "linkId: int (from get_graph)", "{\"linkId\":3}" },
@@ -80,7 +80,7 @@ namespace McpHttp
          { "load_patch", "path: string path of a .inf file", "{\"path\":\"/Users/me/song.inf\"}" },
          { "load_patch_text", "text: string, the patch file contents", "{\"text\":\"...\"}" },
          { "validate_patch_text", "text: string; strict?: bool", "{\"text\":\"...\"}" },
-         { "transport", "action: \"play\"|\"pause\"|\"stop\"|\"seek\"|\"bpm\"; bpm?: number; seconds?: number", "{\"action\":\"bpm\",\"bpm\":128}" },
+         { "transport", "action: \"play\"|\"pause\"|\"stop\"|\"seek\"|\"bpm\"|\"loop\"; bpm?: number; seconds?: number; loop: enabled?: bool, start?: number, end?: number (beats, end must be after start). Returns playing, bpm, loopEnabled, loopStart, loopEnd", "{\"action\":\"bpm\",\"bpm\":128}" },
          { "settings", "action?/name?/value?: read or change an app setting; see `infinite settings`", "{\"name\":\"bpm\"}" },
          { "view", "action: string; on?/show?/volume?/accent?: see `infinite help`", "{\"action\":\"fit\"}" },
       };

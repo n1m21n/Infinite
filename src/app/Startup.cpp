@@ -218,6 +218,9 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 
 int InitApp(FrameCtx& fc, int argc, char** argv)
 {
+   // fork: before any setting, index, autosave or log is read - a portable copy (portable.txt beside
+   // the exe) keeps all of it in its own Data folder, see AppPaths::ResolvePortableDataDir.
+   AppPaths::ResolvePortableDataDir(Platform::ExecutablePath());
    auto& sMainRssStartMb = fc.sMainRssStartMb;
    auto& sMainFootStartMb = fc.sMainFootStartMb;
    auto& tPreWindow = fc.tPreWindow;

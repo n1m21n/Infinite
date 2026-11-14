@@ -77,4 +77,5 @@ Or run the CLI directly (same app binary): `{EXE} --cli context` with env `INFIN
 - Loopback only. Do not try to reach it from another machine.
 - The token is a secret of the user's. Do not write it to files, logs, commits or messages other than their own client config.
 - A "show lock" in the app blocks edits that move the graph; the error says so. Ask the user to unlock it.
-- `infinite_context` works without the CLI (it reads the app's RPC in-process), so it also works on Windows. Not verified: `infinite_cli` on Windows.
+- `infinite_context` works without the CLI (it reads the app's RPC in-process), so it also works on Windows.
+- `infinite_cli` runs on Windows too: it starts `<this binary> --cli <args>` with the control port and token in its environment (`src/core/McpHttp.cpp`, `RunCli`), the same command the POSIX build runs. Verified by code review only — not yet exercised against a live Windows instance.
