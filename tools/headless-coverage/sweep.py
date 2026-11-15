@@ -148,6 +148,29 @@ def bare(patch):
     return "".join(l for l in patch.splitlines(True) if not into_node1(l))
 
 
+def fill_filter_menus(t):
+    """Filter menus and checkboxes (FilterDef enums/bools) reach --describe in `modulatable` with no key, so their
+    rows carry no options or range. The keyless entries come in the filter's param order: match them to the
+    keyless non-colour u-rows in order (by label when the counts differ: "uAxis" -> "axis")."""
+    norm = lambda s: "".join(c for c in s.lower() if c.isalnum())
+    ms = [m for m in t.get("modulatable", []) if not m.get("key")]
+    rows = [r for r in t.get("rows", []) if r["key"].startswith("u") and r["kind"] != "color"
+            and not r.get("options") and r.get("min") is None]
+    if len(ms) == len(rows):
+        pairs = list(zip(rows, ms))
+    else:
+        by_label = {norm(m.get("label") or ""): m for m in ms}
+        pairs = [(r, by_label[norm(r["key"][1:])]) for r in rows if norm(r["key"][1:]) in by_label]
+    for row, m in pairs:
+        row["min"], row["max"] = m.get("min"), m.get("max")
+        row["label"] = row.get("label") or m.get("label")
+        if m.get("enum"):
+            row["options"] = list(m["enum"])
+        elif m.get("bool"):
+            row["options"] = ["off", "on"]
+    return t
+
+
 def is_switch(row):
     # filter enums are saved as floats ("f uAxis 1"), so options alone make a switch
     return row["kind"] == "bool" or (row["kind"] in ("int", "float") and bool(row.get("options")))
@@ -568,7 +591,7 @@ def main():
     schema = a.describe or os.path.join(a.out, "describe.json")
     if not os.path.exists(schema):
         subprocess.run([a.bin, "--describe", "--json", schema], capture_output=True)
-    types = json.load(open(schema))["types"]
+    types = [fill_filter_menus(t) for t in json.load(open(schema))["types"]]
     if a.types:
         types = [t for t in types if t["type"] in a.types]
     if a.category:

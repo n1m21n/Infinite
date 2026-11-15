@@ -57,6 +57,18 @@ Before any DMG, zip or installer leaves this machine, run
 the binary still has the debug-only UI (UI Debugger, UI Style Editor), which
 means it was built without NDEBUG. Never ship `build-dev`.
 
+## Headless coverage report (H9)
+
+Every release carries the generated headless coverage report; the site's headless FAQ links to
+`releases/latest/download/headless-coverage.md`. After `gh release create`, with the release binary:
+
+```bash
+tools/headless-coverage/release_report.sh <Infinite.app/Contents/MacOS/Infinite> <tag> --upload
+```
+
+The sweep is resumable in 20-minute chunks (exit 3 = run it again). The report is published as it stands:
+a family that is not claimed yet is listed with its open rows, it does not block the release.
+
 ## Review
 
 Prints `git status --short` and the full `git diff HEAD` (staged + unstaged).
