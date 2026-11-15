@@ -792,6 +792,7 @@ int MixerPanelPageCount();
 void MixerPanelSelectPage(int page);
 int MixerPanelAddPage();              // spawns a Mixer + Audio Out pair; returns the Mixer's node index
 bool MixerPanelCreateFromAudioOuts(); // D13: wraps every Audio Out's source into one new Mixer
+int MixerPanelNewSendFx(int mixerIndex, int slot, const char* fxType); // B1: send bus -> effect -> return on the top Mixer
 bool MixerPanelShowMixer(int nodeIndex); // opens the panel on the page holding this Mixer; false if on no page
 int MixerPanelCurrentPageTop();          // node index of the shown page's top Mixer, -1 when none
 bool MixerPanelGroupOpen(int mixerIndex);

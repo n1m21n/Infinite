@@ -1,4 +1,5 @@
 // Cable / slot compatibility, connect, schema probe, cluster links, spawn (moved verbatim from main.cpp).
+#include "core/Notices.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -1149,6 +1150,9 @@ namespace app
       if (srcIsAudioNode && WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
       {
          outError = "would create an audio feedback loop";
+         // Shown too, so a refused send return (mixer-panel B1) or agent edit says why on screen.
+         Notices::Post(Notices::Level::Warning, "audio.cycle", T("Can't connect"),
+                       T("That would feed the audio back into itself."));
          return false;
       }
       if (srcIsNoteSource && WouldCreateNoteCycle(srcNode->node.get(), dstNode->node.get()))

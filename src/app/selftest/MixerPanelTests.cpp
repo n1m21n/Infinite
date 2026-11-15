@@ -1,9 +1,13 @@
 // Mixer panel self-test (INFINITE_MIXERPANELTEST). A3: five docks drawn where they belong, open/dock/size
 // survive save and load, Mixer Audio lets only page terminals reach the device. A4: a page of 8, 16 and
-// 32 strips laid out in every dock, page tabs, group strips, "Create from Audio Outs".
+// 32 strips laid out in every dock, page tabs, group strips, "Create from Audio Outs". B1: a reverb send
+// renders through the real topology, and a return into its own sender is refused with a notice.
 // Plan: internal/plans/mixer-panel.
 #include "app/AppShared.h"
 #include "nodes/AudioNodes.h"
+#include "nodes/AudioEffectNode.h"
+#include "audio/AudioEngine.h"
+#include "core/Notices.h"
 
 #include <cmath>
 #include <cstdio>
@@ -110,6 +114,127 @@ namespace
       NewPatch();
    }
 
+   // A steady 220 Hz sine, off the canvas: the topology walks cables, so a Mixer slot can hold it.
+   class ToneAudio : public AudioNode
+   {
+   public:
+      void ProcessBlock(const AudioBuffer* const*, int, AudioBuffer& out) override
+      {
+         for (int i = 0; i < out.numFrames; i++)
+         {
+            const float v = 0.5f * std::sin(mPhase);
+            mPhase += 2.0f * 3.14159265f * 220.0f / 48000.0f;
+            for (int ch = 0; ch < out.numChannels; ch++)
+               out.channels[ch][i] = v;
+         }
+         mPhase = std::fmod(mPhase, 2.0f * 3.14159265f);
+      }
+   private:
+      float mPhase = 0.0f;
+   };
+   class ToneNode : public INode, public IAudioSource
+   {
+   public:
+      unsigned int GetOutputTexture() override { return 0; }
+      int GetOutputWidth() const override { return 0; }
+      int GetOutputHeight() const override { return 0; }
+      void CookIfNeeded(int) override {}
+      void VisitParams(ParamVisitor&) override {}
+      AudioNode* GetAudioNode() override { return &mAudio; }
+   private:
+      ToneAudio mAudio;
+   };
+
+   // Peak of the console's output over `blocks` offline blocks, after cooking the canvas once.
+   float RenderPeak(int blocks)
+   {
+      static int sFrame = 100000;
+      ++sFrame;
+      for (GraphNode& gn : gNodes)
+         gn.node->CookIfNeeded(sFrame);
+      RebuildAudioTopology();
+      static float sL[512], sR[512];
+      float* ch[2] = { sL, sR };
+      AudioBuffer buf { ch, 2, 512 };
+      float peak = 0.0f;
+      for (int b = 0; b < blocks; b++)
+      {
+         AudioEngine::Instance().ProcessOffline(buf);
+         for (int i = 0; i < 512; i++)
+            peak = std::max(peak, std::max(std::fabs(sL[i]), std::fabs(sR[i])));
+      }
+      return peak;
+   }
+
+   void CheckSends()
+   {
+      // B1: one strip on a console wired straight to its Audio Out; "New send FX: Reverb" on it.
+      static ToneNode tone;
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      std::string err;
+      const bool wired = ConnectNodes(top, 0, out, 0, err);
+      auto* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get());
+      m->numChannels = 1;
+      m->inputs[0].Connect(&tone);
+      Check("B1 patch wires up: one console, one strip", wired && MixerPanelPageCount() == 1);
+      Check("a Mixer without sends has one output pin", m->OutputCount() == 1);
+
+      const int fx = MixerPanelNewSendFx(top, 0, "Reverb");
+      const int newTop = MixerPanelCurrentPageTop();
+      auto* nt = newTop >= 0 ? dynamic_cast<MixerNode*>(FindNodeByIndex(newTop)->node.get()) : nullptr;
+      GraphNode* fxGn = fx >= 0 ? FindNodeByIndex(fx) : nullptr;
+      auto* rev = fxGn ? dynamic_cast<AudioEffectNode*>(fxGn->node.get()) : nullptr;
+      Check("New send FX spawns a Reverb", rev != nullptr);
+      Check("G1: the console is wrapped, its old top now a group under a new top",
+            nt != nullptr && newTop != top && MixerPanelPageCount() == 1 &&
+            nt->inputs[0].GetSource() == m && MixerPanelGroupOpen(top));
+      Check("the sender gains a \"send 1\" pin", m->OutputCount() == 2 && std::string(m->OutputLabel(1)) == "send 1");
+      Check("send 1 feeds the Reverb, all wet",
+            rev && rev->input.GetSource() == m && rev->input.GetOutputSlot() == 1 && rev->mix == 1.0f);
+      Check("the return lands on the new top", nt && nt->numChannels == 2 && nt->inputs[1].GetSource() == rev);
+
+      // Render: dry strip muted on the top, so only the return can reach the output.
+      const bool deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      if (deviceWasRunning)
+         AudioEngine::Instance().Stop();
+      if (nt)
+         nt->mute[0] = true;
+      m->sendDb[0][0] = MixerNode::kSendOffDb;
+      const float silent = RenderPeak(20);
+      m->sendDb[0][0] = 0.0f;
+      const float wet = RenderPeak(60);
+      char label[160];
+      snprintf(label, sizeof(label), "send off: the return is silent (peak %.5f)", silent);
+      Check(label, silent < 1e-4f);
+      snprintf(label, sizeof(label), "send at 0 dB: the reverb return renders (peak %.3f)", wet);
+      Check(label, wet > 0.01f);
+      m->gainDb[0] = -60.0f;
+      m->sendPre[0] = true;
+      const float pre = RenderPeak(20);
+      snprintf(label, sizeof(label), "pre-fader send keeps sending with the fader down (peak %.3f)", pre);
+      Check(label, pre > 0.01f);
+      if (deviceWasRunning)
+      {
+         std::string startErr;
+         StartAudioEngine(startErr);
+      }
+
+      // The return into its own sender is a loop: refused, with a notice on screen.
+      for (const Notices::Notice& n : Notices::Active())
+         Notices::DismissId(n.id);
+      const bool refused = !ConnectNodes(fx, 0, top, 0, err);
+      bool noticed = false;
+      for (const Notices::Notice& n : Notices::Active())
+         noticed = noticed || n.key == "audio.cycle";
+      Check("a return wired back into its sender is refused with a notice", refused && noticed);
+      for (const Notices::Notice& n : Notices::Active())
+         Notices::DismissId(n.id);
+      m->inputs[0].Disconnect();
+      NewPatch();
+   }
+
    // A page whose top Mixer has `strips` slots, one source each, and one group Mixer on slot 0.
    void BuildConsole(int strips)
    {
@@ -184,6 +309,7 @@ bool MixerPanelTestStep(int frameId)
    if (sCase < 0)
    {
       CheckRoutingAndPersist();
+      CheckSends();
       sCase = 0;
       BuildConsole(kCounts[0]);
       gMixerPanelDock = kOrder[0];

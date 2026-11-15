@@ -136,6 +136,13 @@ namespace
 class AudioMixerNode : public AudioNode
 {
 public:
+   AudioMixerNode()
+   {
+      for (auto& bus : mSendDb)
+         for (auto& v : bus)
+            v.store(MixerNode::kSendOffDb, std::memory_order_relaxed);
+   }
+
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
       mMailbox.PrepareToPlay(sampleRate);
@@ -147,8 +154,32 @@ public:
       mPanPrimed = false;
    }
 
+   // Main out + four send buses (mixer-panel plan D5). The topology asks
+   // before every rebuild, so a Mixer without sends keeps one output buffer.
+   int AudioOutputCount() const override { return 1 + mBuses.load(std::memory_order_relaxed); }
+   void SetBusCount(int buses) { mBuses.store(std::clamp(buses, 0, (int)MixerNode::kSendBuses), std::memory_order_relaxed); }
+
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
    {
+      AudioBuffer* outs[1] = { &output };
+      ProcessBlockMulti(inputs, numInputs, outs, 1);
+   }
+
+   void ProcessBlockMulti(const AudioBuffer* const* inputs, int numInputs,
+                          AudioBuffer* const* outputs, int numOutputs) override
+   {
+      constexpr int kBuses = MixerNode::kSendBuses;
+      AudioBuffer* busOut[kBuses] = {};
+      for (int b = 0; b < kBuses && b + 1 < numOutputs; b++)
+      {
+         busOut[b] = outputs[b + 1];
+         if (busOut[b] != nullptr)
+            for (int ch = 0; ch < busOut[b]->numChannels; ch++)
+               std::fill(busOut[b]->channels[ch], busOut[b]->channels[ch] + busOut[b]->numFrames, 0.0f);
+      }
+      if (numOutputs < 1 || outputs[0] == nullptr)
+         return;
+      AudioBuffer& output = *outputs[0];
       const int activeChannels = std::clamp(mNumChannels.load(std::memory_order_relaxed), 0, (int)MixerNode::kMaxSlots);
       const int slots = std::min(numInputs, activeChannels);
       const int law = mPanLaw.load(std::memory_order_relaxed);
@@ -184,16 +215,42 @@ public:
          }
       }
 
-      // Pan, mute and solo change the gain pair at block rate; ramping from
-      // last block's pair across this one turns a mute, solo or pan jump
-      // from a step into a 10 ms fade. Steady state is untouched.
+      // Sends, trim (for pre-fader sends) and master are block-rate values
+      // ramped from last block's across this one, like the pan pair.
+      float sendLin[kBuses][MixerNode::kMaxSlots] = {};
+      bool busActive[kBuses] = {};
+      for (int b = 0; b < kBuses; b++)
+      {
+         if (busOut[b] == nullptr)
+            continue;
+         for (int s = 0; s < activeChannels; s++)
+         {
+            const float db = mSendDb[b][s].load(std::memory_order_relaxed);
+            sendLin[b][s] = db <= MixerNode::kSendOffDb ? 0.0f : DspMath::DbToLinear(db);
+            if (sendLin[b][s] != 0.0f || mPrevSend[b][s] != 0.0f)
+               busActive[b] = true;
+         }
+      }
+      float trimLin[MixerNode::kMaxSlots];
+      bool pre[MixerNode::kMaxSlots];
+      for (int s = 0; s < activeChannels; s++)
+      {
+         trimLin[s] = DspMath::DbToLinear(mTrimDb[s].load(std::memory_order_relaxed));
+         pre[s] = mSendPre[s].load(std::memory_order_relaxed) != 0;
+      }
+      const float masterLin = DspMath::DbToLinear(mMasterDb.load(std::memory_order_relaxed));
+
       if (!mPanPrimed)
       {
          for (int s = 0; s < MixerNode::kMaxSlots; s++)
          {
             mPrevPanL[s] = panL[s];
             mPrevPanR[s] = panR[s];
+            mPrevTrim[s] = s < activeChannels ? trimLin[s] : 1.0f;
+            for (int b = 0; b < kBuses; b++)
+               mPrevSend[b][s] = s < activeChannels ? sendLin[b][s] : 0.0f;
          }
+         mPrevMaster = masterLin;
          mPanPrimed = true;
       }
       const float invFrames = 1.0f / (float)std::max(1, output.numFrames);
@@ -225,11 +282,16 @@ public:
          }
       }
 
+      bool anySend = false;
+      for (int b = 0; b < kBuses; b++)
+         anySend = anySend || busActive[b];
+
       float channelPeak[MixerNode::kMaxSlots] = {};
       float peak = 0.0f;
       for (int i = 0; i < output.numFrames; i++)
       {
          float gL[MixerNode::kMaxSlots], gR[MixerNode::kMaxSlots];
+         float tr[MixerNode::kMaxSlots], sg[kBuses][MixerNode::kMaxSlots];
          const float t = (float)(i + 1) * invFrames;
          for (int s = 0; s < activeChannels; s++)
          {
@@ -238,6 +300,16 @@ public:
             gL[s] = mPrevPanL[s] + (panL[s] - mPrevPanL[s]) * t;
             gR[s] = mPrevPanR[s] + (panR[s] - mPrevPanR[s]) * t;
          }
+         if (anySend)
+         {
+            for (int s = 0; s < activeChannels; s++)
+               tr[s] = mPrevTrim[s] + (trimLin[s] - mPrevTrim[s]) * t;
+            for (int b = 0; b < kBuses; b++)
+               if (busActive[b])
+                  for (int s = 0; s < activeChannels; s++)
+                     sg[b][s] = mPrevSend[b][s] + (sendLin[b][s] - mPrevSend[b][s]) * t;
+         }
+         const float m = mPrevMaster + (masterLin - mPrevMaster) * t;
 
          for (int ch = 0; ch < output.numChannels; ch++)
          {
@@ -249,10 +321,20 @@ public:
             {
                if (inputs[s] == nullptr)
                   continue;
-               const float v = inputs[s]->channels[ch][i] * linear[s] * (right ? gR[s] : gL[s]);
+               const float in = inputs[s]->channels[ch][i];
+               const float g = right ? gR[s] : gL[s];
+               const float v = in * linear[s] * g;
                sum += v;
                channelPeak[s] = std::max(channelPeak[s], std::fabs(v));
+               if (anySend)
+               {
+                  const float sendSrc = pre[s] ? in * tr[s] * g : v;
+                  for (int b = 0; b < kBuses; b++)
+                     if (busActive[b] && ch < busOut[b]->numChannels)
+                        busOut[b]->channels[ch][i] += sendSrc * sg[b][s];
+               }
             }
+            sum *= m;
             output.channels[ch][i] = sum;
             peak = std::max(peak, std::fabs(sum));
          }
@@ -265,7 +347,14 @@ public:
       {
          mPrevPanL[s] = panL[s];
          mPrevPanR[s] = panR[s];
+         if (s < activeChannels)
+         {
+            mPrevTrim[s] = trimLin[s];
+            for (int b = 0; b < kBuses; b++)
+               mPrevSend[b][s] = sendLin[b][s];
+         }
       }
+      mPrevMaster = masterLin;
       mMeter.Write(&peak, 1);
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
          mChannelPeak[s].store(s < activeChannels ? channelPeak[s] : 0.0f, std::memory_order_relaxed);
@@ -276,11 +365,17 @@ public:
    {
       mNumChannels.store(n.numChannels, std::memory_order_relaxed);
       mPanLaw.store(std::clamp(n.panLaw, 0, 3), std::memory_order_relaxed);
+      mMasterDb.store(n.masterDb, std::memory_order_relaxed);
+      SetBusCount(n.SendBuses());
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
       {
-         const float db = n.gainDb[s] + n.trimDb[s] + n.masterDb;
+         const float db = n.gainDb[s] + n.trimDb[s];
          mGainDb[s].store(db, std::memory_order_relaxed);
          mMailbox.Push(s, db);
+         mTrimDb[s].store(n.trimDb[s], std::memory_order_relaxed);
+         mSendPre[s].store(n.sendPre[s] ? 1 : 0, std::memory_order_relaxed);
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            mSendDb[b][s].store(b < n.SendBuses() ? n.sendDb[b][s] : MixerNode::kSendOffDb, std::memory_order_relaxed);
          mPan[s].store(n.pan[s], std::memory_order_relaxed);
          mMute[s].store(n.mute[s] ? 1 : 0, std::memory_order_relaxed);
          mSolo[s].store(n.solo[s] ? 1 : 0, std::memory_order_relaxed);
@@ -298,6 +393,14 @@ private:
    float mPrevPanL[MixerNode::kMaxSlots] = {}, mPrevPanR[MixerNode::kMaxSlots] = {}; // audio thread only
    float mCachedDb[MixerNode::kMaxSlots] = {}, mCachedLinear[MixerNode::kMaxSlots] = {}; // audio thread only
    bool mPanPrimed = false;
+   float mPrevTrim[MixerNode::kMaxSlots] = {};                          // audio thread only
+   float mPrevSend[MixerNode::kSendBuses][MixerNode::kMaxSlots] = {};   // audio thread only
+   float mPrevMaster = 1.0f;                                            // audio thread only
+   std::atomic<int> mBuses { 0 };
+   std::atomic<float> mMasterDb { 0.0f };
+   std::atomic<float> mTrimDb[MixerNode::kMaxSlots] {};
+   std::atomic<int> mSendPre[MixerNode::kMaxSlots] {};
+   std::atomic<float> mSendDb[MixerNode::kSendBuses][MixerNode::kMaxSlots] {};
    std::atomic<int> mNumChannels { 8 };
    std::atomic<int> mPanLaw { 1 };
    std::atomic<float> mGainDb[MixerNode::kMaxSlots] {};
@@ -309,7 +412,11 @@ private:
    std::atomic<float> mChannelPeak[MixerNode::kMaxSlots] {};
 };
 
-MixerNode::MixerNode() = default;
+MixerNode::MixerNode()
+{
+   for (auto& bus : sendDb)
+      std::fill(std::begin(bus), std::end(bus), kSendOffDb);
+}
 MixerNode::~MixerNode() = default;
 
 void MixerNode::CookIfNeeded(int frameId)
@@ -374,12 +481,39 @@ void MixerNode::VisitParams(ParamVisitor& v)
    }
    v.Float("master", masterDb);
    masterDb = std::isfinite(masterDb) ? std::clamp(masterDb, kMinGainDb, kMaxGainDb) : 0.0f;
+   // Sends (plan D5): send<A..D><strip> in dB, sendpre<strip>, sendbuses.
+   struct SendNames
+   {
+      std::string db[kSendBuses][kMaxSlots], pre[kMaxSlots];
+      SendNames()
+      {
+         for (int i = 0; i < kMaxSlots; i++)
+         {
+            for (int b = 0; b < kSendBuses; b++)
+               db[b][i] = std::string("send") + (char)('A' + b) + std::to_string(i);
+            pre[i] = "sendpre" + std::to_string(i);
+         }
+      }
+   };
+   static const SendNames kSend;
+   v.Int("sendbuses", sendBuses);
+   sendBuses = std::clamp(sendBuses, 0, kSendBuses);
+   for (int b = 0; b < kSendBuses; b++)
+      for (int i = 0; i < kMaxSlots; i++)
+      {
+         v.Float(kSend.db[b][i].c_str(), sendDb[b][i]);
+         sendDb[b][i] = std::isfinite(sendDb[b][i]) ? std::clamp(sendDb[b][i], kSendOffDb, kMaxGainDb) : kSendOffDb;
+      }
+   for (int i = 0; i < kMaxSlots; i++)
+      v.Bool(kSend.pre[i].c_str(), sendPre[i]);
 }
 
 AudioNode* MixerNode::GetAudioNode()
 {
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMixerNode>();
+   // The topology reads AudioOutputCount() before this Mixer cooks.
+   mAudioNode->SetBusCount(SendBuses());
    return mAudioNode.get();
 }
 

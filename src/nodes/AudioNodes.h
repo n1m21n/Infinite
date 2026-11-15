@@ -136,9 +136,27 @@ public:
    // Hard-side boost relative to a unity centre: 0 = 0 dB (balance), 1 = +3 dB
    // (equal power, the law every older patch used), 2 = +4.5 dB, 3 = +6 dB (linear).
    int panLaw = 1;
-   // Console master fader (mixer-panel plan §1), folded into every strip's gain.
+   // Console master fader (mixer-panel plan §1): scales the main sum only,
+   // so sends leave the strip at its own level.
    float masterDb = 0.0f;
+   // Aux sends (mixer-panel plan D5): send buses 1..4 appear as extra output
+   // pins "send 1".."send 4" once sendBuses reaches them, so an old patch
+   // keeps its single output. kSendOffDb and below is off.
+   static constexpr int kSendBuses = 4;
+   static constexpr float kSendOffDb = -60.0f;
+   int sendBuses = 0;
+   float sendDb[kSendBuses][kMaxSlots];
+   bool sendPre[kMaxSlots] = {}; // pre-fader sends for this strip (all four)
    AudioCable inputs[kMaxSlots];
+
+   int SendBuses() const { return sendBuses < 0 ? 0 : (sendBuses > kSendBuses ? kSendBuses : sendBuses); }
+   int OutputCount() const override { return 1 + SendBuses(); }
+   const char* OutputLabel(int index) const override
+   {
+      static const char* kLabels[1 + kSendBuses] = { "out", "send 1", "send 2", "send 3", "send 4" };
+      return (index >= 0 && index <= SendBuses()) ? kLabels[index] : nullptr;
+   }
+   int AudioOutputSlotForPin(int pinIndex) const override { return pinIndex; }
 
 private:
    std::unique_ptr<AudioMixerNode> mAudioNode;

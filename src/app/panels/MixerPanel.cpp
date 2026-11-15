@@ -17,6 +17,9 @@
 #include <string>
 #include <vector>
 #include "nodes/AudioNodes.h"
+#include "nodes/AudioEffectNode.h"
+#include "core/Notices.h"
+#include <algorithm>
 
 namespace app
 {
@@ -64,6 +67,9 @@ namespace app
       constexpr float kStripMaxH = 360.0f;
       constexpr float kMinFaderH = 40.0f;
       constexpr int kMaxGroupDepth = 4;
+      constexpr float kSendH = 16.0f;     // §4.2 sends row: four mini knobs between name and trim
+      constexpr float kSendKnobD = 13.0f;
+      constexpr float kReturnGap = 14.0f; // returns sit in their own section right of the strips
 
       struct Page { int outIndex; int topIndex; uint64_t topUid; };
 
@@ -74,12 +80,29 @@ namespace app
          int srcIndex = -1;   // node on the cable, -1 when empty
          int groupIndex = -1; // a nested Mixer behind the cable (D3), -1 when not a group
          int depth = 0;
+         bool isReturn = false; // a top strip fed by some Mixer's send bus (G1)
+         bool sends = false;    // shows the sends row
       };
 
       uint64_t sPageUid = 0;            // top Mixer of the page shown
       std::set<uint64_t> sOpenGroups;   // folded-open group Mixers
       uint64_t sHighlightUid = 0;       // canvas selection, shown on its strip
       uint64_t sLastSelectedUid = 0;
+
+      // A return: the strip's source, followed up through single-input nodes, starts at a send pin.
+      bool IsReturnSource(INode* n)
+      {
+         for (int hop = 0; n != nullptr && hop < 4; hop++)
+         {
+            AudioCable* in = n->AudioInputSlot(0);
+            if (in == nullptr || !in->IsConnected())
+               return false;
+            if (dynamic_cast<MixerNode*>(in->GetSource()) != nullptr)
+               return in->GetOutputSlot() >= 1;
+            n = in->GetSource();
+         }
+         return false;
+      }
 
       GraphNode* GraphNodeOf(const INode* n)
       {
@@ -161,6 +184,8 @@ namespace app
                if (dynamic_cast<MixerNode*>(resolved) != nullptr)
                   if (GraphNode* g = GraphNodeOf(resolved))
                      r.groupIndex = g->index;
+               if (depth == 0 && r.groupIndex < 0)
+                  r.isReturn = IsReturnSource(c.GetSource());
             }
             out.push_back(r);
             if (r.groupIndex >= 0 && depth < kMaxGroupDepth)
@@ -177,6 +202,12 @@ namespace app
          std::vector<StripRef> out;
          std::set<int> seen;
          Flatten(topIndex, 0, allOpen, out, seen);
+         // G1: returns to the right; sends on every strip below the top. A console with no
+         // returns yet is unwrapped, so its direct strips carry sends too (the first send wraps it).
+         std::stable_partition(out.begin(), out.end(), [](const StripRef& r) { return !r.isReturn; });
+         const bool wrapped = std::any_of(out.begin(), out.end(), [](const StripRef& r) { return r.isReturn; });
+         for (StripRef& r : out)
+            r.sends = r.depth > 0 || (!wrapped && r.groupIndex < 0 && !r.isReturn);
          return out;
       }
 
@@ -287,7 +318,7 @@ namespace app
          return ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f));
       }
 
-      float FaderHeightFor(float stripH) { return std::max(kMinFaderH, stripH - kNameH - kKnobD - kButtonsH - 3.0f * kRowGap); }
+      float FaderHeightFor(float stripH) { return std::max(kMinFaderH, stripH - kNameH - kSendH - kKnobD - kButtonsH - 4.0f * kRowGap); }
 
       // A clipped one-line name; returns true on click.
       bool NameRow(ImDrawList* dl, ImVec2 p, float w, const char* name, ImU32 bar, bool dim)
@@ -328,6 +359,53 @@ namespace app
                HelpTip("%+.1f dB", *db);
          }
          DrawStripMeter(p.x + faderCell + 2.0f, p.y, meterW, h, level);
+      }
+
+      // §4.2: one mini knob per send bus of this strip's Mixer (right-click: pre/post), then "+" for a new send FX.
+      void DrawSends(ImVec2 p, MixerNode* m, const StripRef& r)
+      {
+         const int s = r.slot;
+         const float cell = (kStripW - 2.0f) / (float)MixerNode::kSendBuses;
+         const int buses = m->SendBuses();
+         const ImU32 post = ImGui::GetColorU32(ImGuiCol_SliderGrab);
+         const ImU32 pre = ImGui::GetColorU32(ImGuiCol_PlotHistogram);
+         for (int b = 0; b < buses; b++)
+         {
+            ImGui::PushID(b);
+            ImGui::SetCursorScreenPos(ImVec2(p.x + 1.0f + cell * (float)b, p.y));
+            const float before = m->sendDb[b][s];
+            KnobFloat("##send", &m->sendDb[b][s], MixerNode::kSendOffDb, 12.0f, "%.1f dB", kSendKnobD,
+                      m->sendPre[s] ? pre : post, false, cell);
+            UndoOnActivate(&m->sendDb[b][s], before);
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            {
+               PushUndoCheckpoint("Mixer strip");
+               m->sendPre[s] = !m->sendPre[s];
+            }
+            if (ImGui::IsItemHovered())
+            {
+               if (m->sendDb[b][s] <= MixerNode::kSendOffDb)
+                  HelpTip("%s %d  %s  %s", T("Send"), b + 1, T("off"), m->sendPre[s] ? T("pre") : T("post"));
+               else
+                  HelpTip("%s %d  %+.1f dB  %s", T("Send"), b + 1, m->sendDb[b][s], m->sendPre[s] ? T("pre") : T("post"));
+            }
+            ImGui::PopID();
+         }
+         if (buses >= MixerNode::kSendBuses)
+            return;
+         ImGui::SetCursorScreenPos(ImVec2(p.x + 1.0f + cell * (float)buses, p.y));
+         if (ActionButton::Draw("+##newsend", ImVec2(cell - 1.0f, kSendH)))
+            ImGui::OpenPopup("##newsendfx");
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("New send FX"));
+         if (MenuParts::BeginPopup("##newsendfx"))
+         {
+            static const char* kFx[] = { "Reverb", "Delay", "Chorus", "Flanger", "Phaser" };
+            for (const char* fx : kFx)
+               if (MenuParts::Item(L(fx)))
+                  MixerPanelNewSendFx(r.mixerIndex, s, fx);
+            MenuParts::EndPopup();
+         }
       }
 
       void DrawStrip(ImDrawList* dl, ImVec2 p, float h, const StripRef& r)
@@ -376,8 +454,12 @@ namespace app
          if (NameRow(dl, ImVec2(nameX, p.y), nameW, name.c_str(), CategoryColorOf(grp ? grp : src), src == nullptr) && (grp || src))
             SelectOnCanvas(grp ? grp->index : src->index);
 
-         // Trim and pan side by side.
          float y = p.y + kNameH + kRowGap;
+         if (r.sends)
+            DrawSends(ImVec2(p.x, y), m, r);
+         y += kSendH + kRowGap;
+
+         // Trim and pan side by side.
          const float cell = kStripW * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(p.x, y));
          float before = m->trimDb[s];
@@ -439,7 +521,7 @@ namespace app
          dl->AddRectFilled(p, ImVec2(p.x + kStripW, p.y + h), ImGui::GetColorU32(ImGuiCol_FrameBg, 0.6f), 4.0f);
          if (NameRow(dl, p, kStripW, T("Master"), CategoryColorOf(gn), false))
             SelectOnCanvas(topIndex);
-         const float y = p.y + kNameH + kRowGap + kKnobD + kRowGap;
+         const float y = p.y + kNameH + kRowGap + kSendH + kRowGap + kKnobD + kRowGap;
          FaderWithMeter(ImVec2(p.x + 2.0f, y), kStripW - 4.0f, FaderHeightFor(h), &m->masterDb, m->Level());
          ImGui::PopID();
          gMixerMasterMin = p;
@@ -547,7 +629,7 @@ namespace app
             // §4.4: master at the right edge on a wide dock, under the strips on a tall one.
             const float bodyW = bodyMax.x - bodyMin.x, bodyH = bodyMax.y - bodyMin.y;
             const float scrollH = ImGui::GetStyle().ScrollbarSize;
-            const float minStripH = kNameH + kKnobD + kButtonsH + 3.0f * kRowGap + kMinFaderH;
+            const float minStripH = kNameH + kSendH + kKnobD + kButtonsH + 4.0f * kRowGap + kMinFaderH;
             const bool tall = (gMixerPanelDock == 1 || gMixerPanelDock == 2) && bodyH >= 2.0f * minStripH + scrollH + kStripGap;
             float stripsW, stripsH, masterH;
             ImVec2 masterAt;
@@ -575,8 +657,16 @@ namespace app
                const ImVec2 wmn = ImGui::GetWindowPos();
                const float visL = wmn.x, visR = wmn.x + ImGui::GetWindowWidth();
                float x = base.x;
+               bool inReturns = false;
                for (const StripRef& r : strips)
                {
+                  if (r.isReturn && !inReturns)
+                  {
+                     inReturns = true;
+                     const float mid = x + (kReturnGap - kStripGap) * 0.5f - kStripGap * 0.5f;
+                     dl->AddLine(ImVec2(mid, base.y + 4.0f), ImVec2(mid, base.y + h - 4.0f), ImGui::GetColorU32(ImGuiCol_Separator));
+                     x += kReturnGap - kStripGap;
+                  }
                   if (x + kStripW >= visL && x <= visR)
                      DrawStrip(dl, ImVec2(x, base.y), h, r);
                   x += kStripW + kStripGap;
@@ -675,6 +765,104 @@ namespace app
       gSuppressUndoCheckpoints = wasSuppressed;
       RebuildAudioTopology();
       return mix;
+   }
+
+   // B1 / G1: a new effect on send bus N of the strip's Mixer, returned to the page's top Mixer.
+   // A console whose top still holds its strips directly is wrapped first: the old top becomes a
+   // group under a new top, so the return lands downstream of every strip that can send to it.
+   // One undo step. Returns the effect's node index, or -1 with a notice when refused.
+   int MixerPanelNewSendFx(int mixerIndex, int slot, const char* fxType)
+   {
+      MixerNode* m = MixerAt(mixerIndex);
+      GraphNode* mGn = FindNodeByIndex(mixerIndex);
+      if (m == nullptr || mGn == nullptr || slot < 0 || slot >= m->numChannels)
+         return -1;
+      if (m->SendBuses() >= MixerNode::kSendBuses)
+      {
+         Notices::Post(Notices::Level::Warning, "mixer.send", T("All four sends are in use"),
+                       T("Use an existing send knob on this strip."));
+         return -1;
+      }
+      const std::vector<Page> pages = CollectPages();
+      const Page* page = nullptr;
+      for (const Page& p : pages)
+      {
+         if (p.topIndex == mixerIndex)
+            page = &p;
+         else
+            for (const StripRef& r : Strips(p.topIndex, true))
+               if (r.mixerIndex == mixerIndex)
+                  page = &p;
+         if (page != nullptr)
+            break;
+      }
+      if (page == nullptr)
+         return -1;
+      const int outIndex = page->outIndex;
+      int topIndex = page->topIndex;
+      MixerNode* top = MixerAt(topIndex);
+      if (top == nullptr)
+         return -1;
+      const bool wrap = topIndex == mixerIndex;
+      if (!wrap && top->numChannels >= MixerNode::kMaxSlots)
+      {
+         Notices::Post(Notices::Level::Warning, "mixer.send", T("No free strip for the return"),
+                       T("The top Mixer already has 32 strips."));
+         return -1;
+      }
+
+      // The return must land downstream of the sending Mixer; a top that feeds it would loop.
+      if (!wrap && WouldCreateAudioCycle(m, top))
+      {
+         Notices::Post(Notices::Level::Warning, "audio.cycle", T("Can't return there"),
+                       T("That would feed the send back into itself."));
+         return -1;
+      }
+      PushUndoCheckpoint("New send FX");
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      gSuppressUndoCheckpoints = true;
+      int fxIndex = -1;
+      do
+      {
+         if (wrap)
+         {
+            const int newTop = SpawnAt("Mixer", mGn->liveX + 320.0f, mGn->liveY);
+            GraphNode* outGn = FindNodeByIndex(outIndex);
+            GraphNode* topGn = FindNodeByIndex(newTop);
+            mGn = FindNodeByIndex(mixerIndex);
+            if (outGn == nullptr || topGn == nullptr)
+               break;
+            auto* nt = static_cast<MixerNode*>(topGn->node.get());
+            nt->numChannels = 1;
+            nt->masterDb = m->masterDb; // the console's master fader moves up with the console
+            m->masterDb = 0.0f;
+            WireInputSlot(*mGn, *topGn, 0, 0);
+            DisconnectDstPin(outGn->InputPinId(0));
+            WireInputSlot(*topGn, *outGn, 0, 0);
+            sOpenGroups.insert(mGn->uid);
+            sPageUid = topGn->uid;
+            topIndex = newTop;
+            top = nt;
+         }
+         mGn = FindNodeByIndex(mixerIndex); // spawning may move gNodes
+         GraphNode* topGn = FindNodeByIndex(topIndex);
+         GraphNode* fxGn = SpawnNode(fxType, "AudioEffects", mGn->liveX + 160.0f, mGn->liveY + 260.0f);
+         if (fxGn == nullptr || topGn == nullptr)
+            break;
+         if (auto* fx = dynamic_cast<AudioEffectNode*>(fxGn->node.get()))
+            fx->mix = 1.0f; // a return is all wet; the strip's dry signal stays on its own path
+         const int bus = m->SendBuses();
+         m->sendBuses = bus + 1;
+         m->sendDb[bus][slot] = 0.0f;
+         WireInputSlot(*mGn, *fxGn, 0, 1 + bus);
+         const int ret = top->numChannels;
+         top->numChannels = ret + 1;
+         WireInputSlot(*fxGn, *topGn, ret, 0);
+         fxIndex = fxGn->index;
+      } while (false);
+      gSuppressUndoCheckpoints = wasSuppressed;
+      RebuildAudioTopology();
+      return fxIndex;
    }
 
    // D13: every Audio Out's source goes into one new Mixer, which feeds the first of those Audio Outs.
