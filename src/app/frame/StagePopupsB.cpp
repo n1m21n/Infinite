@@ -319,14 +319,16 @@ void DrawPopupsB(FrameCtx& fc)
 
          if (q.empty())
          {
-            // Link-drag search: a cable was just dropped on empty canvas, so
-            // lead with the node types compatible with the pin it came from
-            // rather than making the user scroll every category to find one.
+            // Link-drag search: show a compact top-N Suggested section so the popup
+            // keeps the same height and category-first layout as the normal node picker.
             if (!gLinkDragSuggestions.empty())
             {
+               constexpr size_t kMaxInlineSuggestions = 8;
+               const size_t nShow = std::min(gLinkDragSuggestions.size(), kMaxInlineSuggestions);
                ImGui::TextDisabled("%s", T("Suggested"));
-               for (const auto& t : gLinkDragSuggestions)
+               for (size_t i = 0; i < nShow; ++i)
                {
+                  const auto& t = gLinkDragSuggestions[i];
                   ++shown;
                   const std::string title = DisplayName(t.first);
                   const std::string category = DisplayName(t.second);
@@ -352,13 +354,30 @@ void DrawPopupsB(FrameCtx& fc)
 
             for (const std::string& category : cats)
             {
-               ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
-               if (MenuParts::SubMenu(DisplayName(category).c_str()))
+               std::vector<std::string> catNodes;
+               for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+                  if (IsUserSpawnable(name))
+                     catNodes.push_back(name);
+               bool anyCompatible = !dimByPort;
+               if (dimByPort)
                {
-                  for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+                  std::stable_partition(catNodes.begin(), catNodes.end(), [&](const std::string& name) {
+                     const bool ok = suggestedSet.find({ name, category }) != suggestedSet.end();
+                     if (ok)
+                        anyCompatible = true;
+                     return ok;
+                  });
+               }
+               ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
+               if (!anyCompatible)
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+               const bool openCat = MenuParts::SubMenu(DisplayName(category).c_str());
+               if (!anyCompatible)
+                  ImGui::PopStyleColor();
+               if (openCat)
+               {
+                  for (const std::string& name : catNodes)
                   {
-                     if (!IsUserSpawnable(name))
-                        continue;
                      ++shown;
                      const bool dimmed = dimByPort && suggestedSet.find({ name, category }) == suggestedSet.end();
                      if (drawMenuItem(DisplayName(name).c_str(), nullptr, dimmed))

@@ -1710,6 +1710,22 @@ namespace Platform
                      const std::string& destPath, const HttpProgress& progress,
                      std::string& outError, int timeoutSeconds = 600);
 
+   // Blocking/streaming HTTP(S) POST with JSON body and optional Bearer token.
+   // Call from a worker thread. `onChunk(bytes)` runs as response bytes arrive;
+   // returning false cancels the request. Fills `outStatus` on any HTTP response
+   // (even 4xx/5xx) and `outBodyOnError` on non-2xx if small, so callers can
+   // inspect server error payloads without logging secrets.
+   using HttpStreamChunk = std::function<bool(const std::string& chunk)>;
+   bool HttpPostStream(const std::string& url, const std::string& jsonBody,
+                       const std::string& bearerToken, const HttpStreamChunk& onChunk,
+                       int& outStatus, std::string& outErrorBody,
+                       std::string& outError, int timeoutSeconds = 60);
+
+   // OS keychain / credential manager storage for API keys (never stored in config/logs).
+   bool SecretStore(const std::string& account, const std::string& secret);
+   bool SecretLoad(const std::string& account, std::string& outSecret);
+   bool SecretClear(const std::string& account);
+
    // ---- output/projector window (Windows only) ----------------------------
    // Windows has no OS-level "make this app window fullscreen" affordance -
    // maximise keeps the title bar and taskbar, and an ordinary window stays

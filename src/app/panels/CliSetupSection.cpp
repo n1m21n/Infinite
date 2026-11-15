@@ -16,11 +16,17 @@
 #include "core/CliSetup.h"
 #include "core/chat/ChatThread.h"
 #include "core/chat/Onboarding.h"
+#include "core/chat/OpenAIAgent.h"
 #include "platform/AppPaths.h"
+#include "platform/Platform.h"
 
+#include <atomic>
+#include <cstring>
 #include <ctime>
 #include <fstream>
+#include <mutex>
 #include <sstream>
+#include <thread>
 
 namespace app
 {
@@ -324,6 +330,142 @@ namespace app
 
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
       SectionCard::End();
+
+      // Custom OpenAI-compatible agent (Ollama, DeepSeek, OpenRouter, custom base URL).
+      // API key is stored only in Platform::SecretStore (Keychain / Credential Manager), never in config.json.
+      SectionCard::Begin(T("Custom agent"));
+      {
+         const Paths cpaths = PathsFor(AppPaths::AppSupportDir(), os);
+         const auto& presets = chat::CustomPresets();
+         static bool sKeyLoaded = false;
+         static char sUrlBuf[512] = {};
+         static char sModelBuf[256] = {};
+         static char sKeyBuf[512] = {};
+         static std::string sLoadedUrl, sLoadedModel;
+         static std::mutex sTestMutex;
+         static std::atomic<bool> sTesting{ false };
+         static bool sTestOk = false;
+         static std::string sTestStatus;
+
+         if (sLoadedUrl != prefs.customBaseUrl)
+         {
+            sLoadedUrl = prefs.customBaseUrl;
+            std::snprintf(sUrlBuf, sizeof sUrlBuf, "%s", prefs.customBaseUrl.c_str());
+         }
+         if (sLoadedModel != prefs.customModel)
+         {
+            sLoadedModel = prefs.customModel;
+            std::snprintf(sModelBuf, sizeof sModelBuf, "%s", prefs.customModel.c_str());
+         }
+         if (!sKeyLoaded)
+         {
+            sKeyLoaded = true;
+            std::string sec;
+            if (Platform::SecretLoad("custom_agent_api_key", sec))
+               std::snprintf(sKeyBuf, sizeof sKeyBuf, "%s", sec.c_str());
+         }
+
+         FormParts::Label(L("Preset"));
+         const chat::CustomPreset* curPreset = chat::FindCustomPreset(prefs.customPreset);
+         const char* preview = curPreset ? curPreset->name : "Custom";
+         ImGui::SetNextItemWidth(-1.0f);
+         if (ImGui::BeginCombo("##custompreset", preview))
+         {
+            for (const chat::CustomPreset& p : presets)
+            {
+               const bool sel = (prefs.customPreset == p.id);
+               if (ImGui::Selectable(p.name, sel))
+               {
+                  prefs.customPreset = p.id;
+                  if (p.baseUrl[0] != '\0')
+                     prefs.customBaseUrl = p.baseUrl;
+                  if (p.defaultModel[0] != '\0')
+                     prefs.customModel = p.defaultModel;
+                  sLoadedUrl.clear();
+                  sLoadedModel.clear();
+                  SaveConfig(cpaths.config, prefs);
+               }
+            }
+            ImGui::EndCombo();
+         }
+
+         FormParts::Label(L("Base URL"));
+         ImGui::SetNextItemWidth(-1.0f);
+         ImGui::InputText("##customurl", sUrlBuf, sizeof sUrlBuf);
+         if (ImGui::IsItemDeactivatedAfterEdit())
+         {
+            prefs.customBaseUrl = sUrlBuf;
+            sLoadedUrl = prefs.customBaseUrl;
+            SaveConfig(cpaths.config, prefs);
+         }
+
+         FormParts::Label(L("Model ID"));
+         ImGui::SetNextItemWidth(-1.0f);
+         ImGui::InputText("##custommodel", sModelBuf, sizeof sModelBuf);
+         if (ImGui::IsItemDeactivatedAfterEdit())
+         {
+            prefs.customModel = sModelBuf;
+            sLoadedModel = prefs.customModel;
+            SaveConfig(cpaths.config, prefs);
+         }
+
+         FormParts::Label(L("API key"));
+         ImGui::SetNextItemWidth(-1.0f);
+         ImGui::InputTextWithHint("##customkey", T("Optional for local Ollama; stored in Keychain"), sKeyBuf, sizeof sKeyBuf, ImGuiInputTextFlags_Password);
+         if (ImGui::IsItemDeactivatedAfterEdit())
+         {
+            if (sKeyBuf[0] == '\0')
+               Platform::SecretClear("custom_agent_api_key");
+            else
+               Platform::SecretStore("custom_agent_api_key", sKeyBuf);
+         }
+
+         FormParts::Label(L("Active"));
+         const bool isActive = (prefs.agent == "custom");
+         value(isActive ? std::string(T("Selected in chat")) : std::string(T("Not selected")), !isActive);
+         if (!isActive && button(L("Use in chat"), false))
+         {
+            prefs.agent = "custom";
+            SaveConfig(cpaths.config, prefs);
+         }
+
+         FormParts::Label(L("Connection"));
+         {
+            std::lock_guard<std::mutex> lock(sTestMutex);
+            const std::string statusText = sTesting.load() ? std::string(T("Testing…")) : (sTestStatus.empty() ? std::string(T("Not tested")) : sTestStatus);
+            value(statusText, sTestStatus.empty() && !sTesting.load());
+         }
+         ImGui::BeginDisabled(sTesting.load());
+         if (button(L("Test connection"), false))
+         {
+            prefs.customBaseUrl = sUrlBuf;
+            prefs.customModel = sModelBuf;
+            SaveConfig(cpaths.config, prefs);
+            if (sKeyBuf[0] == '\0')
+               Platform::SecretClear("custom_agent_api_key");
+            else
+               Platform::SecretStore("custom_agent_api_key", sKeyBuf);
+
+            sTesting.store(true);
+            const std::string url = prefs.customBaseUrl;
+            const std::string model = prefs.customModel;
+            const std::string key = sKeyBuf;
+            std::thread([url, model, key]() {
+               std::string msg;
+               const bool ok = chat::TestOpenAIConnection(url, model, key, msg);
+               {
+                  std::lock_guard<std::mutex> lock(sTestMutex);
+                  sTestOk = ok;
+                  sTestStatus = msg;
+               }
+               sTesting.store(false);
+            }).detach();
+         }
+         ImGui::EndDisabled();
+
+         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         SectionCard::End();
+      }
    }
 
    // First open of the Terminal: what it is, which agent to connect, one button to set it up. Returns true

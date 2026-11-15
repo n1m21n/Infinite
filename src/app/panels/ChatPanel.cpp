@@ -23,6 +23,7 @@
 #include "audio/AudioEngine.h"
 #include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
+#include "core/chat/OpenAIAgent.h"
 #include "core/chat/Onboarding.h"
 #include "core/chat/ChatDiff.h"
 #include "core/chat/ChatFiles.h"
@@ -102,6 +103,7 @@ namespace app
          std::string agent;
          chat::AgentKind kind = chat::AgentKind::Claude;
          std::shared_ptr<chat::AgentRun> run;
+         std::shared_ptr<chat::OpenAIAgentRun> customRun;
          int steps = -1;  // its Working row in the thread
          std::string answer;
          bool error = false;
@@ -424,6 +426,8 @@ namespace app
 
       const char* AgentName(const std::string& id)
       {
+         if (id == "custom")
+            return "Custom";
          const CliSetup::Agent* a = CliSetup::FindAgent(id);
          return a != nullptr ? a->name : id.c_str();
       }
@@ -543,14 +547,24 @@ namespace app
          }
       }
 
+      bool CustomReady()
+      {
+         const auto& p = CliSetup::Prefs();
+         return !p.customBaseUrl.empty() && !p.customModel.empty();
+      }
+
       bool Ready(const std::string& id)
       {
+         if (id == "custom")
+            return CustomReady();
          auto it = sAgents.find(id);
          return it != sAgents.end() && it->second.ready.Ready() && !it->second.authBroken;
       }
 
       bool AnyReady()
       {
+         if (CustomReady())
+            return true;
          for (const auto& [id, s] : sAgents)
             if (s.ready.Ready() && !s.authBroken)
                return true;
@@ -1253,6 +1267,32 @@ namespace app
          r.prompt = prompt;
          r.dirs = dirs;
          r.retried = retried;
+         if (agent == "custom")
+         {
+            const auto& prefs = CliSetup::Prefs();
+            chat::OpenAIAgentRun::Options o;
+            o.baseUrl = prefs.customBaseUrl;
+            o.model = prefs.customModel;
+            Platform::SecretLoad("custom_agent_api_key", o.apiKey);
+            o.systemPrompt = chat::Briefing();
+            for (const Entry& e : sThread.entries)
+            {
+               if (e.kind == Entry::Kind::User && !e.text.empty())
+                  o.history.emplace_back("user", e.text);
+               else if (e.kind == Entry::Kind::Agent && !e.text.empty())
+                  o.history.emplace_back("assistant", e.text);
+            }
+            if (!o.history.empty() && o.history.back().first == "user" && o.history.back().second == prompt)
+               o.history.pop_back();
+            o.userPrompt = prompt;
+            o.maxSteps = 12;
+            r.customRun = chat::OpenAIAgentRun::Start(o);
+            r.steps = (int)sThread.entries.size();
+            Push(Make(Entry::Kind::Steps, "", agent));
+            r.startAt = ImGui::GetTime();
+            sRuns.push_back(std::move(r));
+            return;
+         }
          KindOf(agent, r.kind);
          chat::Session& s = sThread.sessions[agent];
          if (s.id.empty() && r.kind == chat::AgentKind::Claude)
@@ -1578,27 +1618,36 @@ namespace app
             return;
          for (Run& r : sRuns)
          {
-            if (r.run == nullptr)
+            if (r.run == nullptr && r.customRun == nullptr)
                continue;
             std::vector<chat::AgentEvent> events;
-            r.run->Poll(events);
-            // Once a second: a turn that asks for a sign-in waits for input nobody can type, and one that has
-            // printed nothing for a long time is stuck. Either is ended here and said plainly.
-            const double now = ImGui::GetTime();
-            if (r.activeAt < 0.0)
-               r.activeAt = now;
-            if (r.cut.empty() && now - r.checkedAt >= 1.0)
+            if (r.customRun != nullptr)
             {
-               r.checkedAt = now;
-               const unsigned long long b = r.run->Bytes();
-               if (b != r.bytes)
-                  r.bytes = b, r.activeAt = now;
-               if (chat::WaitsForSignIn(r.run->Log()))
-                  r.cut = "not signed in";
-               else if (now - r.activeAt > kTurnSilentSeconds)
-                  r.cut = T("It stopped responding, so the chat ended the turn. Try again.");
-               if (!r.cut.empty())
-                  r.run->Stop();
+               r.customRun->Poll(events, [](const std::string& method, const nlohmann::json& params, nlohmann::json& res, std::string& err) {
+                  return HandleRpcCommand(method, params, res, err);
+               });
+            }
+            else
+            {
+               r.run->Poll(events);
+               // Once a second: a turn that asks for a sign-in waits for input nobody can type, and one that has
+               // printed nothing for a long time is stuck. Either is ended here and said plainly.
+               const double now = ImGui::GetTime();
+               if (r.activeAt < 0.0)
+                  r.activeAt = now;
+               if (r.cut.empty() && now - r.checkedAt >= 1.0)
+               {
+                  r.checkedAt = now;
+                  const unsigned long long b = r.run->Bytes();
+                  if (b != r.bytes)
+                     r.bytes = b, r.activeAt = now;
+                  if (chat::WaitsForSignIn(r.run->Log()))
+                     r.cut = "not signed in";
+                  else if (now - r.activeAt > kTurnSilentSeconds)
+                     r.cut = T("It stopped responding, so the chat ended the turn. Try again.");
+                  if (!r.cut.empty())
+                     r.run->Stop();
+               }
             }
             Entry& steps = sThread.entries[(size_t)r.steps];
             for (const chat::AgentEvent& e : events)
@@ -1643,9 +1692,11 @@ namespace app
                      r.usage = e.usage;
                      break;
                }
-            if (r.run->Done())
+            const bool isDone = r.customRun != nullptr ? r.customRun->Done() : r.run->Done();
+            if (isDone)
             {
                r.run = nullptr;
+               r.customRun = nullptr;
                if (!r.cut.empty())
                   r.error = true, r.errorText = r.cut;
                FinishRun(r);
@@ -1656,7 +1707,7 @@ namespace app
          sRetry.clear();
          bool all = true;
          for (const Run& r : sRuns)
-            all = all && r.run == nullptr;
+            all = all && r.run == nullptr && r.customRun == nullptr;
          if (!all)
             return;
          sRuns.clear();
@@ -1871,6 +1922,8 @@ namespace app
             if (Ready(a.id) && (Score(handle, want) >= 0 || Score(a.id, want) >= 0 || Score(a.name, want) >= 0))
                out.push_back({ "@" + handle + " ", handle, a.name, "", tok::U32(tok::pin_pred, Light()), false });
          }
+         if (Ready("custom") && (Score("custom", want) >= 0))
+            out.push_back({ "@custom ", "custom", "Custom", "", tok::U32(tok::pin_pred, Light()), false });
       }
 
       // Rows read key then value; the label is in the tooltip, so nothing wraps or crowds.
@@ -5050,8 +5103,12 @@ namespace app
             {
                sQueueHold = true;
                for (Run& r : sRuns)
+               {
                   if (r.run != nullptr)
                      r.run->Stop();
+                  if (r.customRun != nullptr)
+                     r.customRun->Stop();
+               }
             }
          }
          else
@@ -5596,8 +5653,12 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
    void ChatShutdown()
    {
       for (Run& r : sRuns)
+      {
          if (r.run != nullptr)
             r.run->Stop();
+         if (r.customRun != nullptr)
+            r.customRun->Stop();
+      }
       sRuns.clear();
       for (auto& [id, s] : sAgents)
          if (s.setup != nullptr)

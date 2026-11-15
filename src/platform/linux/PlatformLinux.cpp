@@ -1012,6 +1012,8 @@ namespace Platform
       void (*easy_cleanup)(CURL*) = nullptr;
       CURLcode (*easy_getinfo)(CURL*, CURLINFO, ...) = nullptr;
       const char* (*easy_strerror)(CURLcode) = nullptr;
+      struct curl_slist* (*slist_append)(struct curl_slist*, const char*) = nullptr;
+      void (*slist_free_all)(struct curl_slist*) = nullptr;
 
       bool Load()
       {
@@ -1030,6 +1032,8 @@ namespace Platform
          easy_cleanup = (void (*)(CURL*))dlsym(handle, "curl_easy_cleanup");
          easy_getinfo = (CURLcode (*)(CURL*, CURLINFO, ...))dlsym(handle, "curl_easy_getinfo");
          easy_strerror = (const char* (*)(CURLcode))dlsym(handle, "curl_easy_strerror");
+         slist_append = (struct curl_slist* (*)(struct curl_slist*, const char*))dlsym(handle, "curl_slist_append");
+         slist_free_all = (void (*)(struct curl_slist*))dlsym(handle, "curl_slist_free_all");
 
          if (!easy_init || !easy_setopt || !easy_perform || !easy_cleanup || !easy_getinfo)
          {
@@ -1304,5 +1308,180 @@ namespace Platform
    const std::vector<std::string>& MattingModeNames()
    {
       return OrtMatting::MattingModeNames();
+   }
+
+   namespace
+   {
+      struct CurlStreamCtx
+      {
+         CURL* ch = nullptr;
+         CurlApi* curl = nullptr;
+         const HttpStreamChunk* onChunk = nullptr;
+         std::string* errorBody = nullptr;
+         int status = 0;
+         bool aborted = false;
+      };
+
+      size_t CurlStreamWrite(char* ptr, size_t size, size_t nmemb, void* userdata)
+      {
+         auto* ctx = static_cast<CurlStreamCtx*>(userdata);
+         const size_t total = size * nmemb;
+         if (ctx->status == 0 && ctx->curl && ctx->curl->easy_getinfo)
+         {
+            long code = 0;
+            ctx->curl->easy_getinfo(ctx->ch, CURLINFO_RESPONSE_CODE, &code);
+            ctx->status = (int)code;
+         }
+         if (ctx->status >= 200 && ctx->status < 300)
+         {
+            if (ctx->onChunk && *ctx->onChunk)
+            {
+               if (!(*ctx->onChunk)(std::string(ptr, total)))
+               {
+                  ctx->aborted = true;
+                  return 0;
+               }
+            }
+         }
+         else if (ctx->errorBody && ctx->errorBody->size() < 65536)
+         {
+            const size_t take = std::min(total, 65536 - ctx->errorBody->size());
+            ctx->errorBody->append(ptr, take);
+         }
+         return total;
+      }
+
+      std::string SecretFallbackPath(const std::string& account)
+      {
+         const char* home = getenv("HOME");
+         std::string dir = (home && *home) ? (std::string(home) + "/.config/infinite/secrets") : "/tmp/infinite-secrets";
+         std::string safe = account;
+         for (char& c : safe)
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-'))
+               c = '_';
+         return dir + "/" + safe;
+      }
+   }
+
+   bool HttpPostStream(const std::string& url, const std::string& jsonBody,
+                       const std::string& bearerToken, const HttpStreamChunk& onChunk,
+                       int& outStatus, std::string& outErrorBody,
+                       std::string& outError, int timeoutSeconds)
+   {
+      outStatus = 0;
+      outErrorBody.clear();
+      outError.clear();
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+
+      static CurlApi curl;
+      if (!curl.Load())
+      {
+         outError = "libcurl could not be loaded via dlopen";
+         return false;
+      }
+      CURL* ch = curl.easy_init();
+      if (!ch)
+      {
+         outError = "curl_easy_init failed";
+         return false;
+      }
+
+      struct curl_slist* headers = nullptr;
+      if (curl.slist_append)
+      {
+         headers = curl.slist_append(headers, "Content-Type: application/json");
+         headers = curl.slist_append(headers, "Accept: text/event-stream");
+         if (!bearerToken.empty())
+            headers = curl.slist_append(headers, ("Authorization: Bearer " + bearerToken).c_str());
+      }
+
+      CurlStreamCtx ctx;
+      ctx.ch = ch;
+      ctx.curl = &curl;
+      ctx.onChunk = &onChunk;
+      ctx.errorBody = &outErrorBody;
+
+      curl.easy_setopt(ch, CURLOPT_URL, url.c_str());
+      curl.easy_setopt(ch, CURLOPT_POST, 1L);
+      curl.easy_setopt(ch, CURLOPT_POSTFIELDS, jsonBody.c_str());
+      curl.easy_setopt(ch, CURLOPT_POSTFIELDSIZE, (long)jsonBody.size());
+      if (headers)
+         curl.easy_setopt(ch, CURLOPT_HTTPHEADER, headers);
+      curl.easy_setopt(ch, CURLOPT_WRITEFUNCTION, CurlStreamWrite);
+      curl.easy_setopt(ch, CURLOPT_WRITEDATA, &ctx);
+      curl.easy_setopt(ch, CURLOPT_TIMEOUT, (long)timeoutSeconds);
+      curl.easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
+
+      CURLcode res = curl.easy_perform(ch);
+      long code = 0;
+      curl.easy_getinfo(ch, CURLINFO_RESPONSE_CODE, &code);
+      outStatus = (int)code;
+      if (headers && curl.slist_free_all)
+         curl.slist_free_all(headers);
+      curl.easy_cleanup(ch);
+
+      if (ctx.aborted)
+      {
+         outError = "cancelled";
+         return false;
+      }
+      if (res != CURLE_OK)
+      {
+         const char* errStr = curl.easy_strerror ? curl.easy_strerror(res) : nullptr;
+         outError = errStr ? errStr : ("curl error " + std::to_string(res));
+         return false;
+      }
+      if (outStatus < 200 || outStatus >= 300)
+      {
+         outError = "http status " + std::to_string(outStatus);
+         return false;
+      }
+      return true;
+   }
+
+   bool SecretStore(const std::string& account, const std::string& secret)
+   {
+      if (account.empty())
+         return false;
+      const std::string path = SecretFallbackPath(account);
+      std::error_code ec;
+      std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+      FILE* f = fopen(path.c_str(), "wb");
+      if (!f)
+         return false;
+      fwrite(secret.data(), 1, secret.size(), f);
+      fclose(f);
+      chmod(path.c_str(), 0600);
+      return true;
+   }
+
+   bool SecretLoad(const std::string& account, std::string& outSecret)
+   {
+      outSecret.clear();
+      if (account.empty())
+         return false;
+      const std::string path = SecretFallbackPath(account);
+      FILE* f = fopen(path.c_str(), "rb");
+      if (!f)
+         return false;
+      char buf[4096];
+      size_t n = 0;
+      while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+         outSecret.append(buf, n);
+      fclose(f);
+      return true;
+   }
+
+   bool SecretClear(const std::string& account)
+   {
+      if (account.empty())
+         return false;
+      std::error_code ec;
+      std::filesystem::remove(SecretFallbackPath(account), ec);
+      return true;
    }
 }

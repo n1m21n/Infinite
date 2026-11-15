@@ -104,6 +104,10 @@ namespace CliSetup
       std::vector<std::string> commands;  // commands agents may run besides `infinite` ("ffprobe")
       bool introduced = false;    // the first-run folder card was answered
       bool tried = false;         // a first message was sent: the empty chat stops offering the beginner ideas
+      // Custom OpenAI-compatible agent settings (API key is stored only in Platform::SecretStore, never here)
+      std::string customPreset = "ollama";
+      std::string customBaseUrl = "http://localhost:11434/v1";
+      std::string customModel = "qwen2.5-coder:7b";
       // Tokens the chat's agents used, per agent id, since the user last reset them (Settings > Agents).
       struct Usage
       {

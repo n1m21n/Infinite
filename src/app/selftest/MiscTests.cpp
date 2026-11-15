@@ -19,6 +19,9 @@
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
+#include "core/CliSetup.h"
+#include "core/chat/OpenAIAgent.h"
+#include "platform/Platform.h"
 #include "gl3.h"
 #include "platform/AppPaths.h"
 #include <filesystem>
@@ -4752,5 +4755,88 @@ int RunExtensionsTest()
    std::filesystem::remove_all(AppPaths::FsPath(root), ec);
    printf("EXTENSIONSTEST %s\n", fails == 0 ? "ALL PASS" : "FAILED");
    return fails == 0 ? 0 : 1;
+}
+
+void RunCustomAgentTest()
+{
+   int fails = 0;
+   auto check = [&](bool cond, const char* msg) {
+      if (!cond)
+      {
+         fprintf(stderr, "CUSTOMAGENTTEST FAIL: %s\n", msg);
+         ++fails;
+      }
+   };
+
+   // 1. Presets & URL normalization
+   check(chat::FindCustomPreset("ollama") != nullptr, "ollama preset exists");
+   check(chat::FindCustomPreset("deepseek") != nullptr, "deepseek preset exists");
+   check(chat::FindCustomPreset("openrouter") != nullptr, "openrouter preset exists");
+   check(chat::NormalizeOpenAIBaseUrl("  https://api.deepseek.com/v1/  ") == "https://api.deepseek.com/v1", "normalize base url");
+
+   // 2. OpenAI SSE stream parser (chunked text + tool_calls + usage + [DONE])
+   {
+      chat::OpenAIStreamParser parser;
+      parser.Feed("data: {\"choices\":[{\"delta\":{\"content\":\"Hello \"}}]}\n\n");
+      parser.Feed("data: {\"choices\":[{\"delta\":{\"content\":\"world\",\"tool_calls\":[{\"index\":0,\"id\":\"tc_1\",\"function\":{\"name\":\"pro\"}}]}}]}\r\n");
+      parser.Feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"pose\",\"arguments\":\"{\\\"calls\\\":[{\\\"method\\\":\\\"status\\\"}]}\"}}]}}]}\n");
+      parser.Feed("data: {\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":8,\"prompt_tokens_details\":{\"cached_tokens\":4}}}\n");
+      parser.Feed("data: [DONE]\n");
+      parser.Finish();
+
+      check(parser.Text() == "Hello world", "SSE text accumulation");
+      check(parser.ToolCalls().size() == 1, "SSE tool call count");
+      if (!parser.ToolCalls().empty())
+      {
+         check(parser.ToolCalls()[0].id == "tc_1", "SSE tool call id");
+         check(parser.ToolCalls()[0].name == "propose", "SSE tool call name");
+         check(parser.ToolCalls()[0].arguments == "{\"calls\":[{\"method\":\"status\"}]}", "SSE tool call args");
+      }
+      check(parser.Usage().input == 12 && parser.Usage().output == 8 && parser.Usage().cached == 4, "SSE usage");
+      check(parser.SawDone(), "SSE [DONE]");
+   }
+
+   // 3. Tools unsupported fallback detection
+   check(chat::IsToolsUnsupportedError(400, "{\"error\":\"This model does not support tools\"}"), "400 tools unsupported");
+   check(chat::IsToolsUnsupportedError(422, "{\"message\":\"function calling is not supported\"}"), "422 function unsupported");
+   check(!chat::IsToolsUnsupportedError(500, "tools internal error"), "500 not treated as tools unsupported");
+
+   // 4. Config persistence never writes API keys; SecretStore/Load/Clear round-trip
+   {
+      const std::string tmpCfg = AppPaths::AppSupportDir() + "/custom_agent_test_config.json";
+      CliSetup::Config c;
+      c.customPreset = "deepseek";
+      c.customBaseUrl = "https://api.deepseek.com/v1";
+      c.customModel = "deepseek-chat";
+      CliSetup::SaveConfig(tmpCfg, c);
+
+      const CliSetup::Config loaded = CliSetup::LoadConfig(tmpCfg);
+      check(loaded.customPreset == "deepseek", "config customPreset round-trip");
+      check(loaded.customBaseUrl == "https://api.deepseek.com/v1", "config customBaseUrl round-trip");
+      check(loaded.customModel == "deepseek-chat", "config customModel round-trip");
+
+      std::ifstream ifs(AppPaths::FsPath(tmpCfg));
+      const std::string raw((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      check(raw.find("apiKey") == std::string::npos && raw.find("sk-") == std::string::npos, "config has no API key");
+
+      std::error_code ec;
+      std::filesystem::remove(AppPaths::FsPath(tmpCfg), ec);
+   }
+
+   {
+      const std::string testAcct = "custom_agent_test_key";
+      const std::string testVal = "sk-test-secret-12345";
+      Platform::SecretClear(testAcct);
+      check(Platform::SecretStore(testAcct, testVal), "SecretStore succeeds");
+      std::string got;
+      check(Platform::SecretLoad(testAcct, got) && got == testVal, "SecretLoad matches");
+      check(Platform::SecretClear(testAcct), "SecretClear succeeds");
+      std::string after;
+      check(!Platform::SecretLoad(testAcct, after), "SecretLoad empty after clear");
+   }
+
+   printf("CUSTOMAGENTTEST %s\n", fails == 0 ? "OK" : "FAILED");
+   if (fails != 0)
+      std::exit(1);
 }
 }

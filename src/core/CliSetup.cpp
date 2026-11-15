@@ -845,6 +845,12 @@ if ($Failed -gt 0) { exit 1 }
          for (auto it = j["models"].begin(); it != j["models"].end(); ++it)
             if (it.value().is_string() && FindAgent(it.key()) != nullptr)
                c.models[it.key()] = it.value().get<std::string>();
+      if (j.contains("customPreset") && j["customPreset"].is_string())
+         c.customPreset = j["customPreset"].get<std::string>();
+      if (j.contains("customBaseUrl") && j["customBaseUrl"].is_string())
+         c.customBaseUrl = j["customBaseUrl"].get<std::string>();
+      if (j.contains("customModel") && j["customModel"].is_string())
+         c.customModel = j["customModel"].get<std::string>();
       return c;
    }
 
@@ -858,6 +864,7 @@ if ($Failed -gt 0) { exit 1 }
       std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face },
                                                                 { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced }, { "tried", c.tried },
                                                                 { "models", c.models }, { "folders", c.folders }, { "commands", c.commands },
+                                                                { "customPreset", c.customPreset }, { "customBaseUrl", c.customBaseUrl }, { "customModel", c.customModel },
                                                                 { "usage", usage } }.dump(2) << "\n";
    }
 

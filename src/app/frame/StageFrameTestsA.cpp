@@ -1994,6 +1994,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunOscControlTest();
       if (getenv("INFINITE_PARAMRESETTEST") != nullptr && frameId == 4)
          RunParamResetTest();
+      if (getenv("INFINITE_CUSTOMAGENTTEST") != nullptr && frameId == 4)
+         RunCustomAgentTest();
       if (getenv("INFINITE_HISTORYTEST") != nullptr && frameId == 4)
          RunHistoryTest();
       if (getenv("INFINITE_CLIPBOARDTEST") != nullptr && frameId == 4)

@@ -6581,6 +6581,7 @@ int RunVST3BlocklistTest();
 void RunRpcBatchTest();
 void RunOscControlTest();
 void RunParamResetTest();
+void RunCustomAgentTest();
 void RunHistoryTest();
 void RunClipboardTest();
 void RunView3DTest();
