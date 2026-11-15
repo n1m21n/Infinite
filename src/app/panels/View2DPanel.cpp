@@ -4101,10 +4101,28 @@ namespace
 
    // Each family's name drawn in its own face: rendered once by the OS text engine, cached as a small white
    // texture tinted at draw time. A few new ones a frame, so opening the list never stalls.
-   struct FontFace { GLuint tex = 0; float w = 0.0f, h = 0.0f; bool tried = false; };
+   struct FontFace { GLuint tex = 0; float w = 0.0f, h = 0.0f, base = 0.0f; bool tried = false; };
    std::map<std::string, FontFace> sFaces;
    std::vector<std::string> sRecentFonts;   // last 5 picked, newest first
 
+   // Rows of ink in an RGBA canvas: [y0, y1], and columns [x0, x1]. False when empty.
+   bool InkBox(const std::vector<unsigned char>& px, int w, int h, int& x0, int& y0, int& x1, int& y1)
+   {
+      x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+            if (px[((size_t)y * w + x) * 4 + 3] > 8)
+            {
+               x0 = std::min(x0, x);
+               x1 = std::max(x1, x);
+               y0 = std::min(y0, y);
+               y1 = std::max(y1, y);
+            }
+      return x1 >= x0;
+   }
+
+   // Each face is drawn at one cap height (the UI font's), on one baseline, so a list of very different
+   // typefaces reads as one even column instead of jumping in size row to row.
    const FontFace* FaceFor(const std::string& fam, int& budget)
    {
       FontFace& f = sFaces[fam];
@@ -4115,55 +4133,64 @@ namespace
       budget--;
       f.tried = true;
       const float scale = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
-      const float px = ImGui::GetFontSize() * 1.15f * scale;
-      const int cw = (int)std::ceil(280.0f * scale), ch = (int)std::ceil(px * 1.7f);
-      std::vector<unsigned char> buf((size_t)cw * ch * 4, 0);
-      Platform::TextRasterRequest req;
-      req.text = fam;
-      req.fontName = fam;
-      req.fontSize = px;
-      req.align = 1;
-      req.posX = 0.5f;
-      req.posY = 0.5f;
-      req.wrapWidth = 1.0f;
-      req.wrapHeight = 1.0f;
-      float fitted = px;
-      Platform::RasterizeText(req, cw, ch, buf.data(), fitted);
-      int x0 = cw, x1 = -1;
-      for (int y = 0; y < ch; y++)
-         for (int x = 0; x < cw; x++)
-            if (buf[((size_t)y * cw + x) * 4 + 3] != 0)
-            {
-               x0 = std::min(x0, x);
-               x1 = std::max(x1, x);
-            }
-      if (x1 < x0)
+      const float probe = 40.0f * scale;   // render big, then scale down to the row
+      const int cw = (int)std::ceil(probe * 16.0f), ch = (int)std::ceil(probe * 2.0f);
+      auto raster = [&](const std::string& text, std::vector<unsigned char>& buf)
+      {
+         buf.assign((size_t)cw * ch * 4, 0);
+         Platform::TextRasterRequest req;
+         req.text = text;
+         req.fontName = fam;
+         req.fontSize = probe;
+         req.align = 1;
+         req.posX = 0.5f;
+         req.posY = 0.5f;
+         req.wrapWidth = 1.0f;
+         req.wrapHeight = 1.0f;
+         float fitted = probe;
+         Platform::RasterizeText(req, cw, ch, buf.data(), fitted);
+      };
+      std::vector<unsigned char> name, cap;
+      raster(fam, name);
+      raster("H", cap);
+      int nx0, ny0, nx1, ny1, hx0, hy0, hx1, hy1;
+      if (!InkBox(name, cw, ch, nx0, ny0, nx1, ny1))
          return nullptr;
-      const int w = x1 - x0 + 1;
-      std::vector<unsigned char> out((size_t)w * ch * 4);
-      for (int y = 0; y < ch; y++)
+      float capPx = probe * 0.7f, baseRow = (float)ny1;
+      if (InkBox(cap, cw, ch, hx0, hy0, hx1, hy1) && hy1 > hy0)
+      {
+         capPx = (float)(hy1 - hy0 + 1);
+         baseRow = (float)hy1 + 1.0f;
+      }
+      // Target: the UI font's cap height, in screen points.
+      const float k = std::clamp(ImGui::GetFontSize() * 0.74f / capPx, 0.0f, 4.0f);   // probe px -> points
+      const int w = nx1 - nx0 + 1, h = ny1 - ny0 + 1;
+      std::vector<unsigned char> out((size_t)w * h * 4);
+      for (int y = 0; y < h; y++)
          for (int x = 0; x < w; x++)
          {
-            const unsigned char* sp = &buf[((size_t)y * cw + x0 + x) * 4];
+            const unsigned char* sp = &name[((size_t)(ny0 + y) * cw + nx0 + x) * 4];
             unsigned char* dp = &out[((size_t)y * w + x) * 4];
             dp[0] = dp[1] = dp[2] = 255;   // white, tinted by the row's text colour
             dp[3] = sp[3];
          }
       glGenTextures(1, &f.tex);
       glBindTexture(GL_TEXTURE_2D, f.tex);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, ch, 0, GL_RGBA, GL_UNSIGNED_BYTE, out.data());
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, out.data());
+      glGenerateMipmap(GL_TEXTURE_2D);
       glBindTexture(GL_TEXTURE_2D, 0);
-      f.w = (float)w / scale;
-      f.h = (float)ch / scale;
+      f.w = (float)w * k;
+      f.h = (float)h * k;
+      f.base = (baseRow - (float)ny0) * k;   // image top to the baseline, points
       return &f;
    }
 
-   // One row: the name in its own face (the UI font until the face is ready, or when it draws nothing).
-   bool FontRow(const std::string& fam, bool cur, int& budget)
+   // One row: the name in its own face on the row's baseline (the UI font until the face is ready).
+   bool FontRow(const std::string& fam, const char* shownName, bool cur, int& budget)
    {
       ImGui::PushID(fam.c_str());
       const bool hit = MenuParts::Choice("##row", cur);
@@ -4173,16 +4200,19 @@ namespace
          return hit;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 col = cur ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : ImGui::GetColorU32(ImGuiCol_Text);
-      if (const FontFace* f = FaceFor(fam, budget))
+      const float baseline = a.y + ImGui::GetFontBaked()->Ascent;
+      const FontFace* f = fam.empty() ? nullptr : FaceFor(fam, budget);
+      if (f != nullptr)
       {
          const float maxW = b.x - a.x;
          const float w = std::min(f->w, maxW);
-         const float cy = (a.y + b.y) * 0.5f;
-         dl->AddImage((ImTextureID)(intptr_t)f->tex, ImVec2(a.x, cy - f->h * 0.5f), ImVec2(a.x + w, cy + f->h * 0.5f), ImVec2(0, 0),
-                      ImVec2(w / f->w, 1), col);
+         const float top = std::round(baseline - f->base);
+         dl->PushClipRect(ImVec2(a.x, a.y - 8.0f), ImVec2(b.x, b.y + 8.0f), true);
+         dl->AddImage((ImTextureID)(intptr_t)f->tex, ImVec2(a.x, top), ImVec2(a.x + w, top + f->h), ImVec2(0, 0), ImVec2(w / f->w, 1), col);
+         dl->PopClipRect();
       }
       else
-         dl->AddText(a, col, fam.c_str());
+         dl->AddText(a, col, shownName);
       return hit;
    }
 
@@ -4214,12 +4244,14 @@ namespace
       static std::string sOpenId;
       static char sFontFind[64] = "";
       const bool openHere = sOpenId == id;
-      const std::string shown = font.empty() ? (fonts.empty() ? std::string("Helvetica") : fonts.front()) : font;
+      auto nameOf = [](const std::string& f) { return f.empty() ? std::string(T("Default")) : f; };
       bool changed = false;
       ImGui::SetNextItemWidth(width);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(300.0f, MenuParts::ListMaxH(MenuParts::kMaxListRows + 6)));
-      if (MenuParts::BeginCombo(id, (openHere ? sFontOrig : shown).c_str(), ImGuiComboFlags_HeightLargest))
+      ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(300.0f, MenuParts::ListMaxH(MenuParts::kMaxListRows + 5)));
+      if (MenuParts::BeginCombo(id, nameOf(openHere ? sFontOrig : font).c_str(), ImGuiComboFlags_HeightLargest))
       {
+         // The bar's tile padding stops here: the search field and rows are the side panel's size.
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(1.0f, (kSideChip - ImGui::GetFontSize()) * 0.5f)));
          if (!openHere)
          {
             sOpenId = id;
@@ -4229,18 +4261,34 @@ namespace
          }
          ImGui::SetNextItemWidth(-1.0f);
          FieldWell::InputText("##fontfind", sFontFind, sizeof(sFontFind));
+         if (sFontFind[0] == 0)
+         {
+            const ImVec2 fa = ImGui::GetItemRectMin();
+            const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            ImGui::GetWindowDrawList()->AddText(ImVec2(fa.x + ImGui::GetStyle().FramePadding.x, fa.y + ImGui::GetStyle().FramePadding.y),
+                                                ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.4f)), T("Search"));
+         }
+         ImGui::Dummy(ImVec2(0.0f, 2.0f));
          std::string want = sFontFind;
          std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
          const std::string* hovered = nullptr;
          const std::string* picked = nullptr;
          int budget = 6;
-         auto isCur = [&](const std::string& f) { return f == sFontOrig || (sFontOrig.empty() && f == shown); };
+         auto isCur = [&](const std::string& f) { return f == sFontOrig; };
+         if (want.empty())
+         {
+            static const std::string kDefault;
+            if (FontRow(kDefault, T("Default"), isCur(kDefault), budget))
+               picked = &kDefault;
+            if (ImGui::IsItemHovered())
+               hovered = &kDefault;
+         }
          if (want.empty() && !sRecentFonts.empty())
          {
             DimHeader(T("Recent"));
             for (const std::string& f : sRecentFonts)
             {
-               if (FontRow(f, isCur(f), budget))
+               if (FontRow(f, f.c_str(), isCur(f), budget))
                   picked = &f;
                if (ImGui::IsItemHovered())
                   hovered = &f;
@@ -4264,8 +4312,20 @@ namespace
             rows.push_back(i);
          }
          const float rowH = MenuParts::kRow;
-         const float listH = std::min((float)rows.size(), (float)MenuParts::kMaxListRows) * rowH;
-         ImGui::BeginChild("##fontlist", ImVec2(0.0f, std::max(rowH, listH)), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+         // Default and Recent rows come out of the list's 12, so the whole popup stays one dropdown tall.
+         const int extra = want.empty() ? 1 + (sRecentFonts.empty() ? 0 : (int)sRecentFonts.size() + 2) : 0;
+         const int listRows = std::clamp(MenuParts::kMaxListRows - extra, 6, MenuParts::kMaxListRows);
+         const float listH = std::min((float)rows.size(), (float)listRows) * rowH;
+         // The list spans the popup edge to edge with the popup's own side padding, so its rows, washes and text
+         // line up with Add font... below (a bare child put the text against its left edge).
+         {
+            ImGuiWindow* pw = ImGui::GetCurrentWindow();
+            ImGui::SetCursorScreenPos(ImVec2(pw->Pos.x, ImGui::GetCursorScreenPos().y));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(MenuParts::kInset + MenuParts::kTextInset, 0.0f));
+         }
+         ImGui::BeginChild("##fontlist", ImVec2(ImGui::GetCurrentWindow()->Size.x, std::max(rowH, listH)), ImGuiChildFlags_AlwaysUseWindowPadding,
+                           ImGuiWindowFlags_NoBackground);
+         ImGui::PopStyleVar();
          if (ImGui::IsWindowAppearing() && curRow >= 0)
             ImGui::SetScrollY(std::max(0.0f, curRow * rowH - listH * 0.4f));
          ImGuiListClipper clip;
@@ -4274,7 +4334,7 @@ namespace
             for (int r = clip.DisplayStart; r < clip.DisplayEnd; r++)
             {
                const std::string& f = fonts[rows[r]];
-               if (FontRow(f, isCur(f), budget))
+               if (FontRow(f, f.c_str(), isCur(f), budget))
                   picked = &f;
                if (ImGui::IsItemHovered())
                   hovered = &f;
@@ -4293,7 +4353,7 @@ namespace
          {
             const std::string to = picked != nullptr ? *picked : added;
             font = sFontOrig;
-            if (!to.empty() && to != sFontOrig)
+            if ((picked != nullptr || !to.empty()) && to != sFontOrig)
             {
                undo();
                font = to;
@@ -4313,6 +4373,7 @@ namespace
                changed = true;
             }
          }
+         ImGui::PopStyleVar();
          MenuParts::EndCombo();
       }
       else if (openHere)
@@ -6436,7 +6497,12 @@ namespace
                PushUndoCheckpoint("Convert to shapes");
                if (const int vid = doc->ConvertTextToShapes(a->id))
                {
+                  // Straight into Direct select on the first letter: its anchors and handles show, a click picks another.
                   sSel.assign(1, vid);
+                  sTool = kNode;
+                  sVecTarget = 0;
+                  sItem = 0;
+                  sItemLayer = vid;
                   Touch();
                }
             }

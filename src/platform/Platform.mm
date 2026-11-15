@@ -1546,6 +1546,9 @@ namespace Platform
          float startX = 0.0f, startY = 0.0f;
          float offsetX = 0.0f, offsetY = 0.0f;
          float scale = 1.0f;
+         Platform::TextCurveBuilder curve { &current.curve };
+         float X(float x) const { return (x + offsetX) * scale; }
+         float Y(float y) const { return (y + offsetY) * scale; }
 
          void Push(float x, float y)
          {
@@ -1559,9 +1562,11 @@ namespace Platform
          {
             // Under four points is a degenerate contour - two points and a
             // close, say - and would only produce zero-area triangles.
+            curve.Close();
             if (current.points.size() >= 6)
                contours->push_back(current);
             current.points.clear();
+            current.curve.clear();
          }
       };
 
@@ -1579,13 +1584,16 @@ namespace Platform
                b->Close();
                b->startX = (float)p[0].x;
                b->startY = (float)p[0].y;
+               b->curve.Move(b->X((float)p[0].x), b->Y((float)p[0].y));
                b->Push((float)p[0].x, (float)p[0].y);
                break;
             case kCGPathElementAddLineToPoint:
+               b->curve.Line(b->X((float)p[0].x), b->Y((float)p[0].y));
                b->Push((float)p[0].x, (float)p[0].y);
                break;
             case kCGPathElementAddQuadCurveToPoint:
             {
+               b->curve.Quad(b->X((float)p[0].x), b->Y((float)p[0].y), b->X((float)p[1].x), b->Y((float)p[1].y));
                const float x0 = b->lastX, y0 = b->lastY;
                for (int i = 1; i <= kCurveSteps; i++)
                {
@@ -1599,6 +1607,8 @@ namespace Platform
             }
             case kCGPathElementAddCurveToPoint:
             {
+               b->curve.Cubic(b->X((float)p[0].x), b->Y((float)p[0].y), b->X((float)p[1].x), b->Y((float)p[1].y), b->X((float)p[2].x),
+                              b->Y((float)p[2].y));
                const float x0 = b->lastX, y0 = b->lastY;
                for (int i = 1; i <= kCurveSteps; i++)
                {
@@ -1846,6 +1856,11 @@ namespace Platform
             {
                c.points[i] -= cx;
                c.points[i + 1] -= cy;
+            }
+            for (size_t i = 0; i + 1 < c.curve.size(); i += 2)
+            {
+               c.curve[i] -= cx;
+               c.curve[i + 1] -= cy;
             }
          }
          return true;

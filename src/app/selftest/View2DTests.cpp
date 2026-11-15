@@ -481,6 +481,23 @@ void RunView2DTest()
          Check("T-C: text converts to shapes in the same place", sl != nullptr && sl->kind == Kind::Vector && sl->shapes.size() >= 8
                                                                 && !conv.FindLayer(pt)->visible && inkShapes > inkText / 2
                                                                 && inkShapes < inkText * 2);
+         // Round letters keep the font's curves: few anchors, with handles.
+         const int bog = conv.AddTextLayer("Bog", 40.0f, 40.0f, 0.0f);
+         conv.FindLayer(bog)->fontSize = 60.0f;
+         const int bs = conv.ConvertTextToShapes(bog);
+         int anchors = 0, curved = 0;
+         if (const Layer* bl = conv.FindLayer(bs))
+            for (const Shape& sh : bl->shapes)
+               for (int i = 0; i < sh.Anchors(); i++, anchors++)
+               {
+                  const float* q = &sh.pts[(size_t)i * 6];
+                  if (std::fabs(q[2] - q[0]) + std::fabs(q[3] - q[1]) + std::fabs(q[4] - q[0]) + std::fabs(q[5] - q[1]) > 0.01f)
+                     curved++;
+               }
+         printf("  T-C \"Bog\" as shapes: %d anchors, %d with handles\n", anchors, curved);
+#if defined(__APPLE__) || defined(__linux__)
+         Check("T-C: converted letters keep the font's curves (few anchors, with handles)", anchors > 10 && anchors < 120 && curved > 6);
+#endif
       }
       // A vector mask keeps only the left part of the logo.
       Layer* mv = copy.FindLayer(v);

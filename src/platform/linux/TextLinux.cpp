@@ -195,6 +195,9 @@ namespace
       float offsetX = 0.0f;
       float offsetY = 0.0f;
       float scale = 1.0f;
+      Platform::TextCurveBuilder curve { &current.curve };
+      float X(float x) const { return (x + offsetX) * scale; }
+      float Y(float y) const { return (y + offsetY) * scale; }
 
       void Push(float x, float y)
       {
@@ -206,9 +209,11 @@ namespace
 
       void Close()
       {
+         curve.Close();
          if (current.points.size() >= 6)
             contours->push_back(current);
          current.points.clear();
+         current.curve.clear();
       }
    };
 
@@ -218,6 +223,7 @@ namespace
    {
       auto* ctx = (OutlineDecomposeContext*)user;
       ctx->Close();
+      ctx->curve.Move(ctx->X((float)to->x), ctx->Y((float)to->y));
       ctx->Push((float)to->x, (float)to->y);
       return 0;
    }
@@ -225,6 +231,7 @@ namespace
    int OutlineLineTo(const FT_Vector* to, void* user)
    {
       auto* ctx = (OutlineDecomposeContext*)user;
+      ctx->curve.Line(ctx->X((float)to->x), ctx->Y((float)to->y));
       ctx->Push((float)to->x, (float)to->y);
       return 0;
    }
@@ -232,6 +239,7 @@ namespace
    int OutlineConicTo(const FT_Vector* control, const FT_Vector* to, void* user)
    {
       auto* ctx = (OutlineDecomposeContext*)user;
+      ctx->curve.Quad(ctx->X((float)control->x), ctx->Y((float)control->y), ctx->X((float)to->x), ctx->Y((float)to->y));
       const float x0 = ctx->lastX, y0 = ctx->lastY;
       const float x1 = (float)control->x, y1 = (float)control->y;
       const float x2 = (float)to->x, y2 = (float)to->y;
@@ -249,6 +257,8 @@ namespace
    int OutlineCubicTo(const FT_Vector* control1, const FT_Vector* control2, const FT_Vector* to, void* user)
    {
       auto* ctx = (OutlineDecomposeContext*)user;
+      ctx->curve.Cubic(ctx->X((float)control1->x), ctx->Y((float)control1->y), ctx->X((float)control2->x), ctx->Y((float)control2->y),
+                       ctx->X((float)to->x), ctx->Y((float)to->y));
       const float x0 = ctx->lastX, y0 = ctx->lastY;
       const float x1 = (float)control1->x, y1 = (float)control1->y;
       const float x2 = (float)control2->x, y2 = (float)control2->y;
@@ -479,6 +489,11 @@ namespace Platform
          {
             c.points[i] -= cx;
             c.points[i + 1] -= cy;
+         }
+         for (size_t i = 0; i + 1 < c.curve.size(); i += 2)
+         {
+            c.curve[i] -= cx;
+            c.curve[i + 1] -= cy;
          }
       }
 

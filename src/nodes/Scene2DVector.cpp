@@ -569,9 +569,54 @@ int Scene2DNode::ConvertTextToShapes(int id)
    float wide = 0.0f;
    for (const Line& ln : lines)
       wide = std::max(wide, ln.x1 - ln.x0);
-   // Lay out in text units, y down: align each line, stack by the leading, slant if italic.
+   // Lay out in text units, y down: align each line, stack by the leading, slant if italic. Each contour becomes
+   // anchors (x y inX inY outX outY): the font's own Bezier curves where the OS gives them, else the flattened
+   // outline thinned to the points that matter (Douglas-Peucker), so every letter stays editable by hand.
    std::vector<std::vector<float>> polys;
    float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
+   auto thin = [](const std::vector<float>& p, float tol)
+   {
+      const size_t n = p.size() / 2;
+      std::vector<char> keep(n, 0);
+      if (n < 3)
+      {
+         std::fill(keep.begin(), keep.end(), 1);
+      }
+      else
+      {
+         keep[0] = keep[n - 1] = 1;
+         std::vector<std::pair<size_t, size_t>> stack { { 0, n - 1 } };
+         while (!stack.empty())
+         {
+            const auto [a, b] = stack.back();
+            stack.pop_back();
+            const float ax = p[a * 2], ay = p[a * 2 + 1], bx = p[b * 2], by = p[b * 2 + 1];
+            const float dx = bx - ax, dy = by - ay, len = std::max(1e-6f, std::hypot(dx, dy));
+            float worst = 0.0f;
+            size_t at = 0;
+            for (size_t i = a + 1; i < b; i++)
+            {
+               const float d = std::fabs((p[i * 2] - ax) * dy - (p[i * 2 + 1] - ay) * dx) / len;
+               if (d > worst)
+               {
+                  worst = d;
+                  at = i;
+               }
+            }
+            if (worst > tol)
+            {
+               keep[at] = 1;
+               stack.push_back({ a, at });
+               stack.push_back({ at, b });
+            }
+         }
+      }
+      std::vector<float> out;
+      for (size_t i = 0; i < n; i++)
+         if (keep[i])
+            out.insert(out.end(), { p[i * 2], p[i * 2 + 1], p[i * 2], p[i * 2 + 1], p[i * 2], p[i * 2 + 1] });
+      return out;
+   };
    for (size_t li = 0; li < lines.size(); li++)
    {
       const Line& ln = lines[li];
@@ -581,23 +626,26 @@ int Scene2DNode::ConvertTextToShapes(int id)
       {
          if (c.points.size() < 6)
             continue;
-         std::vector<float> p;
-         p.reserve(c.points.size());
-         for (size_t i = 0; i + 1 < c.points.size(); i += 2)
+         std::vector<float> a = c.curve.size() >= 12 ? c.curve : thin(c.points, 0.004f);
+         for (size_t i = 0; i + 1 < a.size(); i += 2)
          {
-            const float yUp = c.points[i + 1];
-            float x = c.points[i] - ln.x0 + shift;
+            const float yUp = a[i + 1];
+            float x = a[i] - ln.x0 + shift;
             if (src->italic)
                x += yUp * 0.21f;
-            const float y = -yUp + (float)li * pitch;
-            p.push_back(x);
-            p.push_back(y);
+            a[i] = x;
+            a[i + 1] = -yUp + (float)li * pitch;
+         }
+         for (size_t i = 0; i + 1 < c.points.size(); i += 2)
+         {
+            const float x = c.points[i] - ln.x0 + shift + (src->italic ? c.points[i + 1] * 0.21f : 0.0f);
+            const float y = -c.points[i + 1] + (float)li * pitch;
             lo[0] = std::min(lo[0], x);
             hi[0] = std::max(hi[0], x);
             lo[1] = std::min(lo[1], y);
             hi[1] = std::max(hi[1], y);
          }
-         polys.push_back(std::move(p));
+         polys.push_back(std::move(a));
       }
    }
    if (polys.empty() || hi[0] <= lo[0] || hi[1] <= lo[1])
@@ -605,6 +653,8 @@ int Scene2DNode::ConvertTextToShapes(int id)
    // Fit onto the drawn box, same scale both ways, centred.
    const float k = std::min((float)tw / (hi[0] - lo[0]), (float)th / (hi[1] - lo[1]));
    const float ox = ((float)tw - (hi[0] - lo[0]) * k) * 0.5f, oy = ((float)th - (hi[1] - lo[1]) * k) * 0.5f;
+   // The layer's scale goes into the paths (a vector box drawn at its own size stays sharp when it was scaled up).
+   const float bx = std::clamp(std::fabs(src->sx), 0.01f, 100.0f), by = std::clamp(std::fabs(src->sy), 0.01f, 100.0f);
    std::vector<Shape> shapes;
    shapes.reserve(polys.size());
    for (const auto& p : polys)
@@ -615,14 +665,11 @@ int Scene2DNode::ConvertTextToShapes(int id)
       s.fillOn = true;
       std::copy(src->textC, src->textC + 4, s.fillC);
       s.op = shapes.empty() ? Shape::kAdd : Shape::kXor;
+      s.pts.resize(p.size());
       for (size_t i = 0; i + 1 < p.size(); i += 2)
       {
-         const float x = ox + (p[i] - lo[0]) * k, y = oy + (p[i + 1] - lo[1]) * k;
-         for (int r = 0; r < 3; r++)
-         {
-            s.pts.push_back(x);
-            s.pts.push_back(y);
-         }
+         s.pts[i] = (ox + (p[i] - lo[0]) * k) * bx;
+         s.pts[i + 1] = (oy + (p[i + 1] - lo[1]) * k) * by;
       }
       shapes.push_back(std::move(s));
    }
@@ -639,8 +686,10 @@ int Scene2DNode::ConvertTextToShapes(int id)
    v.tiles.clear();
    v.mtiles.clear();
    v.mw = v.mh = 0;
-   v.pw = tw;
-   v.ph = th;
+   v.pw = std::max(1, (int)std::lround(tw * bx));
+   v.ph = std::max(1, (int)std::lround(th * by));
+   v.sx = src->sx < 0.0f ? -1.0f : 1.0f;
+   v.sy = src->sy < 0.0f ? -1.0f : 1.0f;
    v.shapes = std::move(shapes);
    if (v.name.empty())
       v.name = "Shapes";

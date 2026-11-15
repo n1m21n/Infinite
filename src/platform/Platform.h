@@ -225,6 +225,43 @@ namespace Platform
    struct TextContour
    {
       std::vector<float> points; // x,y pairs
+      // The same outline as Bezier anchors when the OS gives the curves (macOS, Linux): per anchor
+      // x y inX inY outX outY, closed, same units as points. Empty: only the flattened points.
+      std::vector<float> curve;
+   };
+
+   // Builds TextContour::curve from path elements (already in output units).
+   struct TextCurveBuilder
+   {
+      std::vector<float>* out = nullptr;
+      void Move(float x, float y) { out->clear(); Line(x, y); }
+      void Line(float x, float y) { out->insert(out->end(), { x, y, x, y, x, y }); }
+      void Cubic(float ax, float ay, float bx, float by, float x, float y)
+      {
+         if (out->size() < 6)
+            return Line(x, y);
+         (*out)[out->size() - 2] = ax;
+         (*out)[out->size() - 1] = ay;
+         out->insert(out->end(), { x, y, bx, by, x, y });
+      }
+      void Quad(float cx, float cy, float x, float y)
+      {
+         if (out->size() < 6)
+            return Line(x, y);
+         const float lx = (*out)[out->size() - 6], ly = (*out)[out->size() - 5];
+         Cubic(lx + (cx - lx) * (2.0f / 3.0f), ly + (cy - ly) * (2.0f / 3.0f), x + (cx - x) * (2.0f / 3.0f), y + (cy - y) * (2.0f / 3.0f), x, y);
+      }
+      // The last anchor back on the first merges into it (its in handle moves over).
+      void Close()
+      {
+         const size_t n = out->size();
+         if (n >= 12 && std::fabs((*out)[n - 6] - (*out)[0]) < 1e-5f && std::fabs((*out)[n - 5] - (*out)[1]) < 1e-5f)
+         {
+            (*out)[2] = (*out)[n - 4];
+            (*out)[3] = (*out)[n - 3];
+            out->resize(n - 6);
+         }
+      }
    };
 
    // Installed font families, sorted, for the Text nodes' font pickers.
