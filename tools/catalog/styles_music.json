@@ -2678,6 +2678,312 @@
    "groove": 0.3,
    "fill": 0.2,
    "gain": 4.0
+  },
+  {
+   "id": "microtonal_ambient",
+   "family": "ambient",
+   "bpm": [
+    54,
+    76
+   ],
+   "swing": 0.0,
+   "scale": [
+    6,
+    12,
+    8
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": "o.......o......."
+   },
+   "bass": "0.......4.......",
+   "fx": [
+    "Convolution Reverb",
+    "Reverb",
+    "Chorus"
+   ],
+   "synth": [
+    "Partials",
+    "Spectral Synth",
+    "Wind",
+    "String"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.55,
+   "refs": [
+    "Kaitlyn Aurelia Smith",
+    "Kali Malone",
+    "Eliane Radigue"
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 4.0,
+    "strum": 110,
+    "human": 30
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Wind",
+     "Partials"
+    ],
+    "density": 0.25,
+    "octave": 2,
+    "gate": 90,
+    "gain": -10,
+    "rate": 0.5,
+    "range": 7,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.2,
+   "fill": 0.15,
+   "gain": -2.0
+  },
+  {
+   "id": "prepared_piano",
+   "family": "piano",
+   "bpm": [
+    72,
+    108
+   ],
+   "swing": 0.08,
+   "scale": [
+    1,
+    5,
+    13
+   ],
+   "drums": {
+    "kick": "x.......o.......",
+    "snare": "....o.......o...",
+    "chat": "o.o...o.o.o...o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "..o.......o.....",
+    "htom": "......o.......o.",
+    "bell": "o.....o...o....."
+   },
+   "bass": "0..3..0.5..1..0.",
+   "fx": [
+    "Convolution Reverb",
+    "Drive",
+    "Delay"
+   ],
+   "synth": [
+    "Piano",
+    "String",
+    "Metallic"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Chorus"
+   ],
+   "glitch": 0.05,
+   "mod": 0.35,
+   "refs": [
+    "John Cage, Sonatas and Interludes",
+    "Hauschka",
+    "Nils Frahm"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 2.0,
+    "strum": 15,
+    "human": 22
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Piano",
+     "Metallic"
+    ],
+    "density": 0.45,
+    "octave": 2,
+    "gate": 35,
+    "gain": -9,
+    "rate": 0.25,
+    "range": 8,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.65,
+   "fill": 0.5,
+   "gain": 2.0
+  },
+  {
+   "id": "berlin_school_sequencer",
+   "family": "experimental",
+   "bpm": [
+    104,
+    122
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    4,
+    7
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "....x.......x...",
+    "chat": "x.o.x.o.x.o.x.o.",
+    "ohat": "..o.......o.....",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.0.4.0.7.0.5.0.",
+   "fx": [
+    "Delay",
+    "Audio Filter",
+    "Reverb"
+   ],
+   "synth": [
+    "Analog",
+    "Oscillator",
+    "Wavetable"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.7,
+   "refs": [
+    "Tangerine Dream, Phaedra",
+    "Klaus Schulze",
+    "Emeralds"
+   ],
+   "chords": {
+    "size": [
+     3
+    ],
+    "beats": 4.0,
+    "strum": 30,
+    "human": 6
+   },
+   "notefx": [
+    "Note Echo",
+    "Humanizer"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Oscillator"
+    ],
+    "density": 0.65,
+    "octave": 2,
+    "gate": 45,
+    "gain": -11,
+    "rate": 0.125,
+    "range": 7,
+    "notefx": [
+     "Note Echo"
+    ]
+   },
+   "groove": 0.7,
+   "fill": 0.4,
+   "gain": -7.0
+  },
+  {
+   "id": "uk_dub_steppers",
+   "family": "bass_music",
+   "bpm": [
+    136,
+    142
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    5,
+    11
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "........x.......",
+    "chat": "x.o.x.o.x.o.x.o.",
+    "ohat": "..o.......o.....",
+    "clap": "........x.......",
+    "tom": "",
+    "htom": "",
+    "bell": "..o.........o..."
+   },
+   "bass": "0..0....3.0.5...",
+   "fx": [
+    "Delay",
+    "Audio Filter",
+    "Reverb",
+    "Drive"
+   ],
+   "synth": [
+    "Analog",
+    "FM",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush"
+   ],
+   "glitch": 0.05,
+   "mod": 0.5,
+   "refs": [
+    "Mala, Digital Mystikz",
+    "King Tubby",
+    "Aba Shanti-I"
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 2.0,
+    "strum": 10,
+    "human": 8
+   },
+   "notefx": [
+    "Note Echo",
+    "Humanizer"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wind"
+    ],
+    "density": 0.28,
+    "octave": 2,
+    "gate": 40,
+    "gain": -11,
+    "rate": 0.25,
+    "range": 6
+   },
+   "groove": 0.85,
+   "fill": 0.55,
+   "gain": -7.5
   }
  ]
 }

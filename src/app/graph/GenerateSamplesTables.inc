@@ -128,6 +128,18 @@ static const GenStyle kGenStyles[] = {
    { "chamber_winds", "chamber winds", "piano", 64, 88, 0.0f, "0,1,2,6", { "", "", "", "", "", "", "", "" }, "0.......3.......", "Convolution Reverb,Reverb,EQ", "Wind,String,Partials", "Bitcrush,Stutter,Ring Mod,Drive", 0.25f, false, "Humanizer,Velocity Curve", 0.3f, 0.2f, 4.0f, 0.0f,
      true, "3,4", 4.0f, 4, 85.0f, 28.0f,
      true, "Wind,String", 0.35f, 1, 85.0f, -9.0f, 7, 0.5f, "Humanizer" },
+   { "microtonal_ambient", "microtonal ambient", "ambient", 54, 76, 0.0f, "6,12,8", { "", "", "", "", "", "", "", "o.......o......." }, "0.......4.......", "Convolution Reverb,Reverb,Chorus", "Partials,Spectral Synth,Wind,String", "Bitcrush,Stutter,Drive", 0.55f, false, "Humanizer,Velocity Curve", 0.2f, 0.15f, -2.0f, 0.0f,
+     true, "4", 4.0f, 4, 110.0f, 30.0f,
+     true, "Wind,Partials", 0.25f, 2, 90.0f, -10.0f, 7, 0.5f, "Humanizer" },
+   { "prepared_piano", "prepared piano", "piano", 72, 108, 0.08f, "1,5,13", { "x.......o.......", "....o.......o...", "o.o...o.o.o...o.", "", "", "..o.......o.....", "......o.......o.", "o.....o...o....." }, "0..3..0.5..1..0.", "Convolution Reverb,Drive,Delay", "Piano,String,Metallic", "Bitcrush,Chorus", 0.35f, false, "Humanizer,Velocity Curve", 0.65f, 0.5f, 2.0f, 0.0f,
+     true, "3,4", 2.0f, 4, 15.0f, 22.0f,
+     true, "Piano,Metallic", 0.45f, 2, 35.0f, -9.0f, 8, 0.25f, "Humanizer" },
+   { "berlin_school_sequencer", "berlin school sequencer", "experimental", 104, 122, 0.0f, "1,4,7", { "x...x...x...x...", "....x.......x...", "x.o.x.o.x.o.x.o.", "..o.......o.....", "", "", "", "" }, "0.0.4.0.7.0.5.0.", "Delay,Audio Filter,Reverb", "Analog,Oscillator,Wavetable", "Bitcrush,Stutter", 0.7f, false, "Note Echo,Humanizer", 0.7f, 0.4f, -7.0f, 0.0f,
+     true, "3", 4.0f, 4, 30.0f, 6.0f,
+     true, "Analog,Oscillator", 0.65f, 2, 45.0f, -11.0f, 7, 0.125f, "Note Echo" },
+   { "uk_dub_steppers", "uk dub steppers", "bass_music", 136, 142, 0.0f, "1,5,11", { "x...x...x...x...", "........x.......", "x.o.x.o.x.o.x.o.", "..o.......o.....", "........x.......", "", "", "..o.........o..." }, "0..0....3.0.5...", "Delay,Audio Filter,Reverb,Drive", "Analog,FM,Field Synth", "Bitcrush", 0.5f, true, "Note Echo,Humanizer", 0.85f, 0.55f, -7.5f, 0.0f,
+     true, "3,4", 2.0f, 4, 10.0f, 8.0f,
+     true, "Analog,Wind", 0.28f, 2, 40.0f, -11.0f, 6, 0.25f, "" },
 };
 
 static const GenType kGenTypes[] = {
