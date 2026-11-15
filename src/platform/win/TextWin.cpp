@@ -45,13 +45,15 @@ namespace Platform
          return family;
       }
 
+      thread_local int tStyle = Gdiplus::FontStyleRegular;   // set per RasterizeText call from the request
+
       bool MeasureString(Gdiplus::Graphics& graphics, const Gdiplus::FontFamily& family,
                          const std::wstring& text, float size, Gdiplus::RectF& outBounds)
       {
          Gdiplus::GraphicsPath path;
          Gdiplus::StringFormat fmt(Gdiplus::StringFormat::GenericTypographic());
          const Gdiplus::PointF origin(0.0f, 0.0f);
-         path.AddString(text.c_str(), (int)text.size(), &family, Gdiplus::FontStyleRegular,
+         path.AddString(text.c_str(), (int)text.size(), &family, tStyle,
                         size, origin, &fmt);
          if (path.GetLastStatus() != Gdiplus::Ok)
             return false;
@@ -65,7 +67,7 @@ namespace Platform
                               const Gdiplus::PointF& origin)
       {
          Gdiplus::StringFormat fmt(Gdiplus::StringFormat::GenericTypographic());
-         path.AddString(text.c_str(), (int)text.size(), &family, Gdiplus::FontStyleRegular,
+         path.AddString(text.c_str(), (int)text.size(), &family, tStyle,
                         size, origin, &fmt);
       }
    }
@@ -74,6 +76,8 @@ namespace Platform
                       unsigned char* outPixelsRGBA, float& outFittedSize)
    {
       EnsureGdiplus();
+      tStyle = (req.bold ? Gdiplus::FontStyleBold : 0) | (req.italic ? Gdiplus::FontStyleItalic : 0) |
+               (req.underline ? Gdiplus::FontStyleUnderline : 0);
 
       Gdiplus::Bitmap bitmap(width, height, width * 4, PixelFormat32bppARGB,
                              (BYTE*)outPixelsRGBA);

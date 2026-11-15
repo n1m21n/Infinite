@@ -149,6 +149,7 @@ public:
       std::string text, font;
       float fontSize = 96.0f, leading = 1.2f, tracking = 0.0f;
       int align = 0;                // left, centre, right, justified
+      bool bold = false, italic = false, underline = false, caps = false;   // text style; caps = ALL CAPS
       float textC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float boxW = 0.0f;
       // 3D (After Effects model): the layer is a card the comp camera sees.
@@ -356,6 +357,9 @@ public:
    std::vector<std::pair<float, float>> SymmetryPoints(float x, float y);
    // The document's mirrors as doc-pixel affines (x' = m0 x + m1 y + m2, y' = m3 x + m4 y + m5), identity excluded.
    std::vector<std::array<float, 6>> DocMirrors() const;
+   static std::string UpperText(const std::string& in);
+   // Text layer -> a vector layer of its glyph outlines, same place and colour; returns the new layer's id (0 = failed).
+   int ConvertTextToShapes(int id);
 
    // ---- vector and text (Block C) ---------------------------------------
    int AddVectorLayer(int above = 0);

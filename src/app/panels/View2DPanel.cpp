@@ -36,6 +36,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <map>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -199,7 +200,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -2365,6 +2366,7 @@ namespace
    std::string sFont;
    float sTextSize = 0.0f, sLeading = 1.2f, sTracking = 0.0f;
    int sTextAlign = 0;
+   bool sBold = false, sItalic = false, sUnder = false, sCaps = false;
    float sTextC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
    int sTextEdit = 0;              // the text layer being typed into
    bool sTextFocus = false;
@@ -2848,6 +2850,10 @@ namespace
          l->leading = sLeading;
          l->tracking = sTracking;
          l->align = sTextAlign;
+         l->bold = sBold;
+         l->italic = sItalic;
+         l->underline = sUnder;
+         l->caps = sCaps;
          std::copy(sTextC, sTextC + 4, l->textC);
          doc->Commit();
       }
@@ -3038,6 +3044,27 @@ namespace
             dl->AddLine(ImVec2(ToScreen(doc, g, 0).x, sViewMn.y), ImVec2(ToScreen(doc, g, 0).x, sViewMx.y), Hex(kGuide));
          for (float g : d.guidesY)
             dl->AddLine(ImVec2(sViewMn.x, ToScreen(doc, 0, g).y), ImVec2(sViewMx.x, ToScreen(doc, 0, g).y), Hex(kGuide));
+      }
+
+      // Symmetry guides while a painting tool is up: the mirror axes, or the radial spokes, through the centre.
+      if (d.symmetry > 0 && (sTool == kBrush || sTool == kEraser || RetouchTool(sTool)))
+      {
+         const float cx = d.w * 0.5f, cy = d.h * 0.5f;
+         const ImU32 col = Hex(kGuide, 0.7f);
+         if (d.symmetry == 1 || d.symmetry == 3)
+            dl->AddLine(ToScreen(doc, cx, 0), ToScreen(doc, cx, (float)d.h), col);
+         if (d.symmetry == 2 || d.symmetry == 3)
+            dl->AddLine(ToScreen(doc, 0, cy), ToScreen(doc, (float)d.w, cy), col);
+         if (d.symmetry == 4)
+         {
+            const int n = std::clamp(d.symN, 2, 32);
+            const float r = std::hypot(cx, cy);
+            for (int k = 0; k < n; k++)
+            {
+               const float a = 2.0f * 3.14159265f * k / n - 1.5707963f;
+               dl->AddLine(ToScreen(doc, cx, cy), ToScreen(doc, cx + std::cos(a) * r, cy + std::sin(a) * r), col);
+            }
+         }
       }
 
       const ImVec2 mouse = io.MousePos;
@@ -3610,18 +3637,38 @@ namespace
 
    // A tool's less-used settings: one icon at the bar's end opens them as a vertical form (label, well), the way
    // Photoshop's brush settings sit behind one button. Bars keep only the everyday controls, so none overflows.
+   // A More.. form: side-panel rows (kSideChip tall, 4 px apart), a 150 px well column, capped height with a scroll.
+   struct MoreRows
+   {
+      float keepW;
+      MoreRows() : keepW(sFieldW)
+      {
+         sFieldW = 150.0f;
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(1.0f, (kSideChip - ImGui::GetFontSize()) * 0.5f)));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 4.0f));
+      }
+      ~MoreRows()
+      {
+         ImGui::PopStyleVar(2);
+         sFieldW = keepW;
+      }
+   };
+   struct MorePopupScope
+   {
+      MorePopupScope() { ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(200.0f, ImGui::GetMainViewport()->Size.y * 0.6f))); }
+   };
    template <class F> void BarMore(const char* id, F&& body)
    {
       const std::string pop = std::string(id) + "pop";
       const bool open = ImGui::IsPopupOpen(pop.c_str());
-      if (IconChip(id, IconsInfinite::Settings, open, T("More settings")))
+      const std::string chip = std::string(L("More..")) + id;
+      if (TextChip(chip.c_str(), open, T("More settings")))
          ImGui::OpenPopup(pop.c_str());
+      MorePopupScope scope;
       if (MenuParts::BeginPopup(pop.c_str()))
       {
-         const float keepW = sFieldW;
-         sFieldW = 150.0f;
+         MoreRows rows;
          body();
-         sFieldW = keepW;
          MenuParts::EndPopup();
       }
    }
@@ -3678,6 +3725,42 @@ namespace
          sAllLayers = !sAllLayers;
    }
 
+   // Painting symmetry (Procreate's drawing guide, Krita's mirror): every stroke repeats across the axes or round
+   // the centre. The document keeps it, so it saves with the patch; the canvas shows the guides while it is on.
+   void SymmetryChip(Scene2DNode* doc)
+   {
+      Scene2DNode::Document& d = doc->Doc();
+      static const char* const kNames[5] = { "Off", "Left-right", "Top-bottom", "Both", "Radial" };
+      if (TextChip(L("Symmetry##v2dsym"), d.symmetry > 0, T("Repeat strokes across the picture")))
+         ImGui::OpenPopup("##v2dsympop");
+      MorePopupScope scope;
+      if (MenuParts::BeginPopup("##v2dsympop"))
+      {
+         for (int i = 0; i < 5; i++)
+            if (MenuParts::Choice(T(kNames[i]), d.symmetry == i) && d.symmetry != i)
+            {
+               PushUndoCheckpoint("Symmetry");
+               d.symmetry = i;
+               Touch();
+            }
+         if (d.symmetry == 4)
+         {
+            MoreRows rows;
+            MenuParts::Separator();
+            float n = (float)d.symN;
+            FieldLabel(T("Spokes"));
+            ImGui::SetNextItemWidth(sFieldW);
+            if (FieldWell::Slider("##v2dsymn", &n, 2.0f, 32.0f, "%.0f"))
+            {
+               d.symN = std::clamp((int)std::lround(n), 2, 32);
+               Touch();
+            }
+            UndoOnActivate("Symmetry spokes");
+         }
+         MenuParts::EndPopup();
+      }
+   }
+
    void DrawPixelBar(Scene2DNode* doc)
    {
       auto gap = []() { BarDivider(); };
@@ -3693,6 +3776,8 @@ namespace
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          gap();
+         SymmetryChip(doc);
+         FormParts::Inline(0.0f, tok::space_1);
          BarMore("##v2drmore", [&]()
          {
             MoreHeader(T("Tip"), true);
@@ -3763,6 +3848,8 @@ namespace
          BarSlider("##v2dsmooth", &smooth, 0.0f, 100.0f, "Smoothing %.0f%%", kWellL);
          b.smoothing = smooth / 100.0f;
          gap();
+         SymmetryChip(doc);
+         FormParts::Inline(0.0f, tok::space_1);
          BarMore("##v2dbmore", [&]()
          {
             MoreHeader(T("Tip"), true);
@@ -4010,6 +4097,275 @@ namespace
       }
    }
 
+   // ---- font picker -----------------------------------------------------
+
+   // Each family's name drawn in its own face: rendered once by the OS text engine, cached as a small white
+   // texture tinted at draw time. A few new ones a frame, so opening the list never stalls.
+   struct FontFace { GLuint tex = 0; float w = 0.0f, h = 0.0f; bool tried = false; };
+   std::map<std::string, FontFace> sFaces;
+   std::vector<std::string> sRecentFonts;   // last 5 picked, newest first
+
+   const FontFace* FaceFor(const std::string& fam, int& budget)
+   {
+      FontFace& f = sFaces[fam];
+      if (f.tried)
+         return f.tex != 0 ? &f : nullptr;
+      if (budget <= 0)
+         return nullptr;
+      budget--;
+      f.tried = true;
+      const float scale = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
+      const float px = ImGui::GetFontSize() * 1.15f * scale;
+      const int cw = (int)std::ceil(280.0f * scale), ch = (int)std::ceil(px * 1.7f);
+      std::vector<unsigned char> buf((size_t)cw * ch * 4, 0);
+      Platform::TextRasterRequest req;
+      req.text = fam;
+      req.fontName = fam;
+      req.fontSize = px;
+      req.align = 1;
+      req.posX = 0.5f;
+      req.posY = 0.5f;
+      req.wrapWidth = 1.0f;
+      req.wrapHeight = 1.0f;
+      float fitted = px;
+      Platform::RasterizeText(req, cw, ch, buf.data(), fitted);
+      int x0 = cw, x1 = -1;
+      for (int y = 0; y < ch; y++)
+         for (int x = 0; x < cw; x++)
+            if (buf[((size_t)y * cw + x) * 4 + 3] != 0)
+            {
+               x0 = std::min(x0, x);
+               x1 = std::max(x1, x);
+            }
+      if (x1 < x0)
+         return nullptr;
+      const int w = x1 - x0 + 1;
+      std::vector<unsigned char> out((size_t)w * ch * 4);
+      for (int y = 0; y < ch; y++)
+         for (int x = 0; x < w; x++)
+         {
+            const unsigned char* sp = &buf[((size_t)y * cw + x0 + x) * 4];
+            unsigned char* dp = &out[((size_t)y * w + x) * 4];
+            dp[0] = dp[1] = dp[2] = 255;   // white, tinted by the row's text colour
+            dp[3] = sp[3];
+         }
+      glGenTextures(1, &f.tex);
+      glBindTexture(GL_TEXTURE_2D, f.tex);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, ch, 0, GL_RGBA, GL_UNSIGNED_BYTE, out.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+      f.w = (float)w / scale;
+      f.h = (float)ch / scale;
+      return &f;
+   }
+
+   // One row: the name in its own face (the UI font until the face is ready, or when it draws nothing).
+   bool FontRow(const std::string& fam, bool cur, int& budget)
+   {
+      ImGui::PushID(fam.c_str());
+      const bool hit = MenuParts::Choice("##row", cur);
+      ImGui::PopID();
+      const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+      if (!ImGui::IsRectVisible(a, b))
+         return hit;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 col = cur ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : ImGui::GetColorU32(ImGuiCol_Text);
+      if (const FontFace* f = FaceFor(fam, budget))
+      {
+         const float maxW = b.x - a.x;
+         const float w = std::min(f->w, maxW);
+         const float cy = (a.y + b.y) * 0.5f;
+         dl->AddImage((ImTextureID)(intptr_t)f->tex, ImVec2(a.x, cy - f->h * 0.5f), ImVec2(a.x + w, cy + f->h * 0.5f), ImVec2(0, 0),
+                      ImVec2(w / f->w, 1), col);
+      }
+      else
+         dl->AddText(a, col, fam.c_str());
+      return hit;
+   }
+
+   void NoteRecentFont(const std::string& fam)
+   {
+      if (fam.empty())
+         return;
+      sRecentFonts.erase(std::remove(sRecentFonts.begin(), sRecentFonts.end(), fam), sRecentFonts.end());
+      sRecentFonts.insert(sRecentFonts.begin(), fam);
+      if (sRecentFonts.size() > 5)
+         sRecentFonts.resize(5);
+   }
+
+   void DimHeader(const char* text)
+   {
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.5f));
+      ImGui::TextUnformatted(text);
+      ImGui::PopStyleColor();
+   }
+
+   // Font dropdown: search, Recent, All fonts (12 rows, scrolls), Add font... Hovering a row previews it on the
+   // layer; Esc or a click outside puts the old font back.
+   template <class Undo>
+   bool FontPicker(const char* id, std::string& font, float width, Undo&& undo)
+   {
+      const auto& fonts = Platform::AvailableFontFamilies();
+      static std::string sFontOrig;
+      static std::string sOpenId;
+      static char sFontFind[64] = "";
+      const bool openHere = sOpenId == id;
+      const std::string shown = font.empty() ? (fonts.empty() ? std::string("Helvetica") : fonts.front()) : font;
+      bool changed = false;
+      ImGui::SetNextItemWidth(width);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(300.0f, MenuParts::ListMaxH(MenuParts::kMaxListRows + 6)));
+      if (MenuParts::BeginCombo(id, (openHere ? sFontOrig : shown).c_str(), ImGuiComboFlags_HeightLargest))
+      {
+         if (!openHere)
+         {
+            sOpenId = id;
+            sFontOrig = font;
+            sFontFind[0] = 0;
+            ImGui::SetKeyboardFocusHere();
+         }
+         ImGui::SetNextItemWidth(-1.0f);
+         FieldWell::InputText("##fontfind", sFontFind, sizeof(sFontFind));
+         std::string want = sFontFind;
+         std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         const std::string* hovered = nullptr;
+         const std::string* picked = nullptr;
+         int budget = 6;
+         auto isCur = [&](const std::string& f) { return f == sFontOrig || (sFontOrig.empty() && f == shown); };
+         if (want.empty() && !sRecentFonts.empty())
+         {
+            DimHeader(T("Recent"));
+            for (const std::string& f : sRecentFonts)
+            {
+               if (FontRow(f, isCur(f), budget))
+                  picked = &f;
+               if (ImGui::IsItemHovered())
+                  hovered = &f;
+            }
+            DimHeader(T("All fonts"));
+         }
+         std::vector<int> rows;
+         rows.reserve(fonts.size());
+         int curRow = -1;
+         for (int i = 0; i < (int)fonts.size(); i++)
+         {
+            if (!want.empty())
+            {
+               std::string lf = fonts[i];
+               std::transform(lf.begin(), lf.end(), lf.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+               if (lf.find(want) == std::string::npos)
+                  continue;
+            }
+            if (isCur(fonts[i]))
+               curRow = (int)rows.size();
+            rows.push_back(i);
+         }
+         const float rowH = MenuParts::kRow;
+         const float listH = std::min((float)rows.size(), (float)MenuParts::kMaxListRows) * rowH;
+         ImGui::BeginChild("##fontlist", ImVec2(0.0f, std::max(rowH, listH)), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+         if (ImGui::IsWindowAppearing() && curRow >= 0)
+            ImGui::SetScrollY(std::max(0.0f, curRow * rowH - listH * 0.4f));
+         ImGuiListClipper clip;
+         clip.Begin((int)rows.size(), rowH);
+         while (clip.Step())
+            for (int r = clip.DisplayStart; r < clip.DisplayEnd; r++)
+            {
+               const std::string& f = fonts[rows[r]];
+               if (FontRow(f, isCur(f), budget))
+                  picked = &f;
+               if (ImGui::IsItemHovered())
+                  hovered = &f;
+            }
+         ImGui::EndChild();
+         MenuParts::Separator();
+         std::string added;
+         bool add = false;
+         if (MenuParts::Choice(L("Add font...##fontadd"), false))
+         {
+            for (const std::string& path : Platform::OpenFilesDialog(T("Add font"), { "ttf", "otf", "ttc" }))
+               AddUserFont(path, added);
+            add = true;
+         }
+         if (picked != nullptr || add)
+         {
+            const std::string to = picked != nullptr ? *picked : added;
+            font = sFontOrig;
+            if (!to.empty() && to != sFontOrig)
+            {
+               undo();
+               font = to;
+            }
+            NoteRecentFont(to);
+            changed = true;
+            sOpenId.clear();
+            ImGui::CloseCurrentPopup();
+         }
+         else
+         {
+            // Preview: the hovered family on the layer, the original back when the pointer leaves the list.
+            const std::string& p = hovered != nullptr ? *hovered : sFontOrig;
+            if (font != p)
+            {
+               font = p;
+               changed = true;
+            }
+         }
+         MenuParts::EndCombo();
+      }
+      else if (openHere)
+      {
+         // Closed with no pick (Esc, a click outside): back to what it was.
+         sOpenId.clear();
+         if (font != sFontOrig)
+         {
+            font = sFontOrig;
+            changed = true;
+         }
+      }
+      return changed;
+   }
+
+   // Justified: an icon chip with four full-width lines (the icon font has left, centre and right only).
+   bool JustifyChip(const char* id, bool on)
+   {
+      const bool hit = IconChip(id, "", on, T("Justify text"));
+      const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+      const float s = std::floor(std::min(b.x - a.x, b.y - a.y) * 0.5f);
+      const float cx = std::floor((a.x + b.x) * 0.5f), cy = std::floor((a.y + b.y) * 0.5f);
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+      for (int i = 0; i < 4; i++)
+      {
+         const float y = cy - s * 0.5f + i * s / 3.0f + 0.5f;
+         ImGui::GetWindowDrawList()->AddLine(ImVec2(cx - s * 0.5f, y), ImVec2(cx + s * 0.5f, y), col, 1.0f);
+      }
+      return hit;
+   }
+
+   // Bold, Italic, Underline, All caps: text chips, as every editor's character row.
+   template <class Undo, class Next>
+   bool TextStyleChips(bool* bold, bool* italic, bool* under, bool* caps, Undo&& undo, Next&& next)
+   {
+      bool* const v[4] = { bold, italic, under, caps };
+      static const char* const kLabels[4] = { "B##tsb", "I##tsi", "U##tsu", "TT##tsc" };
+      static const char* const kTips[4] = { "Bold", "Italic", "Underline", "All caps" };
+      bool changed = false;
+      for (int i = 0; i < 4; i++)
+      {
+         if (i > 0)
+            next();
+         if (TextChip(kLabels[i], *v[i], T(kTips[i])))
+         {
+            undo();
+            *v[i] = !*v[i];
+            changed = true;
+         }
+      }
+      return changed;
+   }
+
    void DrawTextBar(Scene2DNode* doc)
    {
       auto gap = []() { BarDivider(); };
@@ -4025,100 +4381,7 @@ namespace
       float* colour = l != nullptr ? l->textC : sTextC;
       bool changed = false;
       auto undo = [&]() { if (l != nullptr) PushUndoCheckpoint("Text style"); };
-      const auto& fonts = Platform::AvailableFontFamilies();
-      ImGui::SetNextItemWidth(2.0f * kWellM);
-      // A tall list with a search, every row previews on the canvas while hovered (the pick is undone on close
-      // without a click), and Add font... takes a .ttf / .otf for this and later runs.
-      static std::string sFontOrig;
-      static bool sFontOpen = false;
-      static char sFontFind[64] = "";
-      const std::string shown = font.empty() ? (fonts.empty() ? std::string("Helvetica") : fonts.front()) : font;
-      ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(FLT_MAX, 560.0f));
-      if (MenuParts::BeginCombo("##v2dfont", (sFontOpen ? sFontOrig : shown).c_str(), ImGuiComboFlags_HeightLargest))
-      {
-         if (!sFontOpen)
-         {
-            sFontOpen = true;
-            sFontOrig = font;
-            sFontFind[0] = 0;
-            ImGui::SetKeyboardFocusHere();
-         }
-         ImGui::SetNextItemWidth(-1.0f);
-         FieldWell::InputText("##v2dfontfind", sFontFind, sizeof(sFontFind));
-         std::string want = sFontFind;
-         std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-         const std::string* hovered = nullptr;
-         bool picked = false;
-         ImGui::BeginChild("##v2dfontlist", ImVec2(0.0f, 460.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
-         for (const std::string& f : fonts)
-         {
-            if (!want.empty())
-            {
-               std::string lf = f;
-               std::transform(lf.begin(), lf.end(), lf.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-               if (lf.find(want) == std::string::npos)
-                  continue;
-            }
-            const bool cur = f == sFontOrig || (sFontOrig.empty() && f == shown);
-            if (cur && ImGui::IsWindowAppearing())
-               ImGui::SetScrollHereY(0.4f);
-            if (MenuParts::Choice(f.c_str(), cur))
-            {
-               font = sFontOrig;
-               if (f != sFontOrig)
-               {
-                  undo();
-                  font = f;
-               }
-               changed = true;
-               picked = true;
-            }
-            if (ImGui::IsItemHovered())
-               hovered = &f;
-         }
-         ImGui::EndChild();
-         ImGui::Separator();
-         if (MenuParts::Choice(L("Add font...##v2dfontadd"), false))
-         {
-            std::string fam;
-            for (const std::string& path : Platform::OpenFilesDialog(T("Add font"), { "ttf", "otf", "ttc" }))
-               AddUserFont(path, fam);
-            font = sFontOrig;
-            if (!fam.empty())
-            {
-               undo();
-               font = fam;
-            }
-            changed = true;
-            picked = true;
-         }
-         if (!picked)
-         {
-            // Preview: the hovered family on the layer, the original back when the pointer leaves the list.
-            const std::string& p = hovered != nullptr ? *hovered : sFontOrig;
-            if (font != p)
-            {
-               font = p;
-               changed = true;
-            }
-         }
-         else
-         {
-            sFontOpen = false;
-            ImGui::CloseCurrentPopup();
-         }
-         MenuParts::EndCombo();
-      }
-      else if (sFontOpen)
-      {
-         // Closed with no pick (Esc, a click outside): back to what it was.
-         sFontOpen = false;
-         if (font != sFontOrig)
-         {
-            font = sFontOrig;
-            changed = true;
-         }
-      }
+      changed |= FontPicker("##v2dfont", font, 2.0f * kWellM, undo);
       next();
       ImGui::SetNextItemWidth(kWellM);
       changed |= FieldWell::Slider("##v2dfsize", &size, 4.0f, 800.0f, "%.0f px");
@@ -4137,18 +4400,21 @@ namespace
       gap();
       static const char* kAlignGlyphs[3] = { IconsInfinite::TextLeft, IconsInfinite::TextCenter, IconsInfinite::TextRight };
       static const char* kAlignTips[3] = { "Left align text", "Centre text", "Right align text" };
-      for (int i = 0; i < 3; i++)
+      for (int i = 0; i < 4; i++)
       {
          if (i > 0)
             next();
          const std::string id = std::string("##v2dtal") + std::to_string(i);
-         if (IconChip(id.c_str(), kAlignGlyphs[i], align == i, T(kAlignTips[i])) && align != i)
+         if ((i < 3 ? IconChip(id.c_str(), kAlignGlyphs[i], align == i, T(kAlignTips[i])) : JustifyChip(id.c_str(), align == i)) && align != i)
          {
             undo();
             align = i;
             changed = true;
          }
       }
+      gap();
+      changed |= TextStyleChips(l != nullptr ? &l->bold : &sBold, l != nullptr ? &l->italic : &sItalic,
+                                l != nullptr ? &l->underline : &sUnder, l != nullptr ? &l->caps : &sCaps, undo, next);
       gap();
       if (FormParts::ColorDot("##v2dtextc", colour, std::min(18.0f, sRowH - 4.0f), sRowH))
       {
@@ -4618,7 +4884,7 @@ namespace
       const float barX = ImGui::GetCursorScreenPos().x;
       if (overflow)
       {
-         const float clipW = std::max(0.0f, barRoom - kIconW - tok::space_1);
+         const float clipW = std::max(0.0f, barRoom - chipW(L("More..##v2dmore")) - tok::space_1);
          ImGui::BeginChild("##v2dbarclip", ImVec2(clipW, sRowH), ImGuiChildFlags_None,
                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
          const ImGuiID before = ImGui::GetItemID();
@@ -4626,14 +4892,14 @@ namespace
          sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
          ImGui::EndChild();
          ImGui::SameLine(0.0f, tok::space_1);
-         if (TextChip("...##v2dmore", false, T("More options")))
+         if (TextChip(L("More..##v2dmore"), false, T("The rest of the bar")))
             ImGui::OpenPopup("##v2dbarmore");
          if (MenuParts::BeginPopup("##v2dbarmore"))
          {
             DrawContextBar(doc);
             MenuParts::EndPopup();
          }
-         BarDivider();   // the clipped bar ends in "..."; a divider, not a loose gap, sets the right cluster apart
+         BarDivider();   // the clipped bar ends in "More.."; a divider, not a loose gap, sets the right cluster apart
       }
       else
       {
@@ -4951,6 +5217,7 @@ namespace
             if (l->kind == Kind::Paint && MenuParts::Item(T("Convert to Draw Node"), nullptr)) sPending.what = Pending::ToDraw;
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
+            if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Shapes"), nullptr)) sPending.what = Pending::ToShapes;
             if (MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
             if (doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
             if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))
@@ -5265,6 +5532,32 @@ namespace
          }
          FieldWell::PopStyle();
          UndoOnActivate("Edit text");
+         {
+            auto undo = []() { PushUndoCheckpoint("Text style"); };
+            auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
+            FieldLabel(T("Font"));
+            if (FontPicker("##v2dtabfont", l->font, sFieldW, undo))
+               Touch();
+            FieldLabel(T("Style"));
+            if (TextStyleChips(&l->bold, &l->italic, &l->underline, &l->caps, undo, next))
+               Touch();
+            FieldLabel(T("Align"));
+            static const char* kGlyphs[3] = { IconsInfinite::TextLeft, IconsInfinite::TextCenter, IconsInfinite::TextRight };
+            static const char* kTips[3] = { "Left align text", "Centre text", "Right align text" };
+            for (int i = 0; i < 4; i++)
+            {
+               if (i > 0)
+                  next();
+               const std::string id = std::string("##v2dtabal") + std::to_string(i);
+               if ((i < 3 ? IconChip(id.c_str(), kGlyphs[i], l->align == i, T(kTips[i])) : JustifyChip(id.c_str(), l->align == i)) &&
+                   l->align != i)
+               {
+                  undo();
+                  l->align = i;
+                  Touch();
+               }
+            }
+         }
          ModNext(*l, Scene2DNode::kLfFontSize);
          SliderRow(T("Size"), &l->fontSize, 4.0f, 800.0f, "%.0f px");
          ModNext(*l, Scene2DNode::kLfLeading);
@@ -5273,6 +5566,9 @@ namespace
          SliderRow(T("Tracking"), &l->tracking, -100.0f, 400.0f, "%.0f");
          ColorRow(T("Colour"), l->textC);
          DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", 0.0f, 8192.0f);
+         FieldLabel("");
+         if (TextChip(L("Convert to shapes##v2dtoshapes"), false, T("Outlines as a vector layer")))
+            sPending.what = Pending::ToShapes;
       }
       if (l->kind == Kind::Vector)
       {
@@ -6133,6 +6429,18 @@ namespace
             if (a->kind == Kind::Text)
                ConvertToTextNode(doc, a->id);
          break;
+      case Pending::ToShapes:
+         if (Layer* a = Active(doc))
+            if (a->kind == Kind::Text)
+            {
+               PushUndoCheckpoint("Convert to shapes");
+               if (const int vid = doc->ConvertTextToShapes(a->id))
+               {
+                  sSel.assign(1, vid);
+                  Touch();
+               }
+            }
+         break;
       case Pending::AddNode:
       {
          PushUndoCheckpoint("Add node as layer");
@@ -6273,10 +6581,7 @@ namespace
       sPanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
 
       const float headTop = ImGui::GetCursorScreenPos().y;
-      {
-         CompactBar bar;
-         DrawHeader(doc);
-      }
+      DrawHeader(doc);   // tile height, as Sample Studio's and the Piano Roll's bars
       DrawDockMenu(headTop, ImGui::GetCursorScreenPos().y);
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const float gapX = ImGui::GetStyle().ItemSpacing.x;

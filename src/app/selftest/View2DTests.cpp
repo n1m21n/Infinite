@@ -458,6 +458,30 @@ void RunView2DTest()
                picture = picture && std::fabs(p0[c] - p1[c]) < 0.02f;
          }
       Check("T-C: reopened, the picture is the same", picture);
+      {
+         // Text style and Convert to shapes, on a third copy so the checks below see the same document.
+         Scene2DNode conv;
+         conv.SetDocText(pic.DocText());
+         Cook(&conv);
+         const int inkText = Ink(&conv, 20, 180, 220, 236, 1);
+         int rw = 0, rh = 0, bw2 = 0, bh2 = 0;
+         conv.TextSize(*conv.FindLayer(pt), rw, rh);
+         conv.FindLayer(pt)->bold = true;
+         conv.FindLayer(pt)->caps = true;
+         conv.TextSize(*conv.FindLayer(pt), bw2, bh2);
+         conv.FindLayer(pt)->bold = false;
+         conv.FindLayer(pt)->caps = false;
+         printf("  T-C bold text: %dx%d -> %dx%d\n", rw, rh, bw2, bh2);
+         Check("T-C: bold text draws wider", bw2 > rw);
+         const int vs = conv.ConvertTextToShapes(pt);
+         Cook(&conv);
+         const Layer* sl = conv.FindLayer(vs);
+         const int inkShapes = Ink(&conv, 20, 180, 220, 236, 1);
+         printf("  T-C convert to shapes: %d items, ink %d text -> %d shapes\n", sl != nullptr ? (int)sl->shapes.size() : -1, inkText, inkShapes);
+         Check("T-C: text converts to shapes in the same place", sl != nullptr && sl->kind == Kind::Vector && sl->shapes.size() >= 8
+                                                                && !conv.FindLayer(pt)->visible && inkShapes > inkText / 2
+                                                                && inkShapes < inkText * 2);
+      }
       // A vector mask keeps only the left part of the logo.
       Layer* mv = copy.FindLayer(v);
       Shape keep;

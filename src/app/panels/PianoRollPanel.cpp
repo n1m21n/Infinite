@@ -776,7 +776,7 @@ namespace
    bool BeginPickerMenu(const char* id, ImVec2 bmin, ImVec2 bmax, float w)
    {
       ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(120.0f, w), 0.0f), ImVec2(280.0f, 10000.0f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(120.0f, w), 0.0f), ImVec2(280.0f, MenuParts::ListMaxH()));
       return MenuParts::BeginPopup(id);
    }
 
@@ -3300,7 +3300,7 @@ namespace
          s.openFunctions = false;
          ImGui::OpenPopup("##pianoFx");
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f, 0.0f), ImVec2(280.0f, 10000.0f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f, 0.0f), ImVec2(280.0f, MenuParts::ListMaxH()));
       if (MenuParts::BeginPopup("##pianoFx"))
       {
          DrawContextMenu(page);

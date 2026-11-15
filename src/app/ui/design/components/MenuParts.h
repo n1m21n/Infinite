@@ -4,6 +4,7 @@
 // fill is ours, so hover reads the same as the top bar tiles.
 #pragma once
 #include <algorithm>
+#include <cfloat>
 #include <cstring>
 #include <string>
 #include "app/ui/design/components/CheckBox.h"
@@ -19,6 +20,10 @@ namespace MenuParts
    constexpr float kTextInset = tok::space_2; // text distance from the wash edge
    constexpr float kRow = 24.0f;              // row pitch of every menu / dropdown / list popup (was tok::tile, 28)
    constexpr float kPadY = kInset + 4.0f;     // popup padding: the row wash starts 4 pt above its text
+   constexpr int kMaxListRows = 12;           // a dropdown list shows at most this many rows, then scrolls
+
+   // Height of a dropdown list that shows `rows` rows (padding included).
+   inline float ListMaxH(int rows = kMaxListRows) { return kRow * rows + 2.0f * kPadY; }
 
    // Popups are chrome, not canvas content: constant on-screen size at any canvas zoom (infinite-design-system).
 
@@ -180,6 +185,8 @@ namespace MenuParts
    // A combo whose list is a menu: same padding, row pitch and wash. Pair a true result with EndCombo().
    inline bool BeginCombo(const char* id, const char* preview, ImGuiComboFlags flags = 0)
    {
+      if (!(GImGui->NextWindowData.HasFlags & ImGuiNextWindowDataFlags_HasSizeConstraint))
+         ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, ListMaxH()));
       PushPopupPad();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
       const bool open = ImGui::BeginCombo(id, preview, flags | ImGuiComboFlags_NoArrowButton); // field well + value, never a chevron

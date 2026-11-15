@@ -147,7 +147,7 @@ namespace FormParts
          }
          shown += "...";
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(controlW, listMinW), 0.0f), ImVec2(std::max(kListMaxW, listMinW), FLT_MAX));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(controlW, listMinW), 0.0f), ImVec2(std::max(kListMaxW, listMinW), MenuParts::ListMaxH()));
       const bool open = ImGui::BeginCombo(Id(label).c_str(), shown.c_str(), ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar(2);
       FieldWell::PopStyle();
@@ -172,6 +172,7 @@ namespace FormParts
       FieldWell::PushStyle(ImGui::GetID(id) ^ 0x9e3779b9u);
       MenuParts::PushPopupPad();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, MenuParts::ListMaxH()));
       const bool open = ImGui::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar(2);
       FieldWell::PopStyle();

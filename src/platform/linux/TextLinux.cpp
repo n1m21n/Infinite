@@ -495,7 +495,8 @@ namespace Platform
       std::lock_guard<std::mutex> lock(gFtMutex);
       if (!EnsureFreeType()) return;
 
-      std::string path = ResolveFontPath(req.fontName);
+      std::string path = ResolveFontPath(req.fontName, req.bold, req.italic);
+      if (path.empty()) path = ResolveFontPath(req.fontName);
       if (path.empty()) path = ResolveFontPath("DejaVu Sans");
       if (path.empty()) path = ResolveFontPath("");
       if (path.empty()) return;

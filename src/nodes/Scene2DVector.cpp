@@ -505,6 +505,152 @@ bool Scene2DNode::ShapeBounds(const Shape& s, float lo[2], float hi[2])
 
 // ---- text -------------------------------------------------------------------
 
+// ALL CAPS for ASCII and Latin-1 letters (a..z, à..þ but ÷); other scripts pass through.
+std::string Scene2DNode::UpperText(const std::string& in)
+{
+   std::string out;
+   out.reserve(in.size());
+   for (size_t i = 0; i < in.size(); i++)
+   {
+      const unsigned char c = (unsigned char)in[i];
+      if (c >= 'a' && c <= 'z')
+         out += (char)(c - 32);
+      else if (c == 0xC3 && i + 1 < in.size())
+      {
+         unsigned char d = (unsigned char)in[i + 1];
+         if (d >= 0xA0 && d <= 0xBE && d != 0xB7)
+            d -= 0x20;
+         out += (char)c;
+         out += (char)d;
+         i++;
+      }
+      else
+         out += (char)c;
+   }
+   return out;
+}
+
+// Text to vector paths: one closed path per glyph contour, holes cut by Exclude. Lines come from hard breaks;
+// the result is fitted onto the text's drawn box so it lands where the text was. The text layer is hidden.
+int Scene2DNode::ConvertTextToShapes(int id)
+{
+   const Layer* src = FindConst(id);
+   if (src == nullptr || src->kind != Kind::Text || src->text.empty())
+      return 0;
+   int tw = 0, th = 0;
+   if (!TextSize(*src, tw, th) || tw <= 0 || th <= 0)
+      return 0;
+   const std::string text = src->caps ? UpperText(src->text) : src->text;
+   const float letter = src->fontSize > 0.0f ? src->tracking / src->fontSize : 0.0f;
+   // Cap height is one unit; an em is about 1.43 of it.
+   const float pitch = std::max(0.5f, src->leading) * 1.43f;
+   struct Line { std::vector<Platform::TextContour> c; float x0, x1; };
+   std::vector<Line> lines;
+   std::stringstream ss(text);
+   std::string row;
+   while (std::getline(ss, row))
+   {
+      Line ln;
+      ln.x0 = ln.x1 = 0.0f;
+      std::string err;
+      if (!row.empty() && Platform::GetTextOutlines(row, src->font, letter, ln.c, err))
+      {
+         ln.x0 = 1e30f;
+         ln.x1 = -1e30f;
+         for (const auto& c : ln.c)
+            for (size_t i = 0; i + 1 < c.points.size(); i += 2)
+            {
+               ln.x0 = std::min(ln.x0, c.points[i]);
+               ln.x1 = std::max(ln.x1, c.points[i]);
+            }
+      }
+      lines.push_back(std::move(ln));
+   }
+   float wide = 0.0f;
+   for (const Line& ln : lines)
+      wide = std::max(wide, ln.x1 - ln.x0);
+   // Lay out in text units, y down: align each line, stack by the leading, slant if italic.
+   std::vector<std::vector<float>> polys;
+   float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
+   for (size_t li = 0; li < lines.size(); li++)
+   {
+      const Line& ln = lines[li];
+      const float w = ln.x1 - ln.x0;
+      const float shift = src->align == 1 ? (wide - w) * 0.5f : src->align == 2 ? wide - w : 0.0f;
+      for (const auto& c : ln.c)
+      {
+         if (c.points.size() < 6)
+            continue;
+         std::vector<float> p;
+         p.reserve(c.points.size());
+         for (size_t i = 0; i + 1 < c.points.size(); i += 2)
+         {
+            const float yUp = c.points[i + 1];
+            float x = c.points[i] - ln.x0 + shift;
+            if (src->italic)
+               x += yUp * 0.21f;
+            const float y = -yUp + (float)li * pitch;
+            p.push_back(x);
+            p.push_back(y);
+            lo[0] = std::min(lo[0], x);
+            hi[0] = std::max(hi[0], x);
+            lo[1] = std::min(lo[1], y);
+            hi[1] = std::max(hi[1], y);
+         }
+         polys.push_back(std::move(p));
+      }
+   }
+   if (polys.empty() || hi[0] <= lo[0] || hi[1] <= lo[1])
+      return 0;
+   // Fit onto the drawn box, same scale both ways, centred.
+   const float k = std::min((float)tw / (hi[0] - lo[0]), (float)th / (hi[1] - lo[1]));
+   const float ox = ((float)tw - (hi[0] - lo[0]) * k) * 0.5f, oy = ((float)th - (hi[1] - lo[1]) * k) * 0.5f;
+   std::vector<Shape> shapes;
+   shapes.reserve(polys.size());
+   for (const auto& p : polys)
+   {
+      Shape s;
+      s.type = Shape::kPath;
+      s.closed = true;
+      s.fillOn = true;
+      std::copy(src->textC, src->textC + 4, s.fillC);
+      s.op = shapes.empty() ? Shape::kAdd : Shape::kXor;
+      for (size_t i = 0; i + 1 < p.size(); i += 2)
+      {
+         const float x = ox + (p[i] - lo[0]) * k, y = oy + (p[i + 1] - lo[1]) * k;
+         for (int r = 0; r < 3; r++)
+         {
+            s.pts.push_back(x);
+            s.pts.push_back(y);
+         }
+      }
+      shapes.push_back(std::move(s));
+   }
+   Layer v = *src;   // copy before the add: it may move the layers
+   const int vid = AddVectorLayer(id);
+   Layer* dst = FindLayer(vid);
+   if (dst == nullptr)
+      return 0;
+   v.id = vid;
+   v.kind = Kind::Vector;
+   v.uid = 0;
+   v.output = false;
+   v.text.clear();
+   v.tiles.clear();
+   v.mtiles.clear();
+   v.mw = v.mh = 0;
+   v.pw = tw;
+   v.ph = th;
+   v.shapes = std::move(shapes);
+   if (v.name.empty())
+      v.name = "Shapes";
+   *dst = std::move(v);
+   if (Layer* t = FindLayer(id))
+      t->visible = false;
+   Commit();
+   return vid;
+}
+
 bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
 {
    unsigned long long key = 1469598103934665603ull;
@@ -515,6 +661,7 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
    for (float f : l.textC)
       key = HF(key, f);
    key = H(key, (unsigned)l.align);
+   key = H(key, (unsigned)(l.bold | (l.italic << 1) | (l.underline << 2) | (l.caps << 3)));
    TextBox& tb = mTextBoxes[l.id];
    if (tb.key != key || tb.rgba.empty())
    {
@@ -545,7 +692,10 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       if (!l.text.empty())
       {
          Platform::TextRasterRequest req;
-         req.text = l.text;
+         req.text = l.caps ? UpperText(l.text) : l.text;
+         req.bold = l.bold;
+         req.italic = l.italic;
+         req.underline = l.underline;
          // Empty = the platform's own default sans (as the Text node), not the alphabetically first family.
          req.fontName = l.font;
          req.fontSize = size;

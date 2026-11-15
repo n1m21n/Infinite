@@ -1072,6 +1072,8 @@ void Scene2DNode::Serialize()
          o << "text " << l.id << " " << l.fontSize << " " << l.leading << " " << l.tracking << " " << l.align;
          for (float v : l.textC) o << " " << v;
          o << " " << l.boxW << " " << EscapeToken(l.font) << " " << EscapeToken(l.text) << "\n";
+         if (l.bold || l.italic || l.underline || l.caps)
+            o << "tstyle " << l.id << " " << +l.bold << " " << +l.italic << " " << +l.underline << " " << +l.caps << "\n";
       }
       if (l.is3d || l.z != 0 || l.az != 0 || l.rx != 0 || l.ry != 0 || l.orient[0] != 0 || l.orient[1] != 0 ||
           l.orient[2] != 0 || l.collapse)
@@ -1342,6 +1344,15 @@ void Scene2DNode::Parse()
             l->text = UnescapeToken(text);
             l->fontSize = std::clamp(l->fontSize, 1.0f, 2000.0f);
             l->align = std::clamp(l->align, 0, 3);
+         }
+         else if (key == "tstyle")
+         {
+            int b = 0, i = 0, u = 0, c = 0;
+            s >> b >> i >> u >> c;
+            l->bold = b != 0;
+            l->italic = i != 0;
+            l->underline = u != 0;
+            l->caps = c != 0;
          }
          else if (key == "paint" || key == "pmask")
          {

@@ -259,6 +259,9 @@ namespace Platform
       bool outlineOnly = false;
       float scaleX = 1.0f;
       float scaleY = 1.0f;
+      bool bold = false;       // the family's bold face, else a drawn bold
+      bool italic = false;     // the family's italic face, else a slant
+      bool underline = false;  // macOS and Windows
    };
 
    void RasterizeText(const TextRasterRequest& req, int width, int height,

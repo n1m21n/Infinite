@@ -1897,17 +1897,49 @@ namespace Platform
                CFStringRef nameRef = CFStringCreateWithCString(kCFAllocatorDefault, req.fontName.c_str(), kCFStringEncodingUTF8);
                CTFontRef trialFont = CTFontCreateWithName(nameRef, pointSize, nullptr);
                CFRelease(nameRef);
+               // Bold / italic: the family's own face when it has one; else a drawn bold (fill + stroke) or a slant.
+               bool fakeBold = false;
+               if (req.bold || req.italic)
+               {
+                  const CTFontSymbolicTraits want = (req.bold ? kCTFontBoldTrait : 0) | (req.italic ? kCTFontItalicTrait : 0);
+                  CTFontRef styled = CTFontCreateCopyWithSymbolicTraits(trialFont, pointSize, nullptr, want, want);
+                  if (styled == nullptr && req.bold && req.italic)
+                     styled = CTFontCreateCopyWithSymbolicTraits(trialFont, pointSize, nullptr, kCTFontBoldTrait, kCTFontBoldTrait);
+                  if (styled != nullptr)
+                  {
+                     CFRelease(trialFont);
+                     trialFont = styled;
+                  }
+                  const CTFontSymbolicTraits got = CTFontGetSymbolicTraits(trialFont);
+                  fakeBold = req.bold && (got & kCTFontBoldTrait) == 0;
+                  if (req.italic && (got & kCTFontItalicTrait) == 0)
+                  {
+                     const CGAffineTransform slant = CGAffineTransformMake(1.0, 0.0, 0.21, 1.0, 0.0, 0.0);
+                     if (CTFontRef sl = CTFontCreateCopyWithAttributes(trialFont, pointSize, &slant, nullptr))
+                     {
+                        CFRelease(trialFont);
+                        trialFont = sl;
+                     }
+                  }
+               }
+               float fakeStroke = -3.0f;   // percent of the size; negative = fill and stroke
+               CFNumberRef fakeStrokeNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &fakeStroke);
+               const bool useFake = fakeBold && req.outlineWidth <= 0.0f;
+               int ul = req.underline ? kCTUnderlineStyleSingle : kCTUnderlineStyleNone;
+               CFNumberRef ulNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &ul);
 
                CFStringRef keys[] = {
                   kCTFontAttributeName, kCTForegroundColorAttributeName, kCTKernAttributeName,
                   kCTStrokeWidthAttributeName, kCTStrokeColorAttributeName,
-                  kCTParagraphStyleAttributeName
+                  kCTParagraphStyleAttributeName, kCTUnderlineStyleAttributeName
                };
-               CFTypeRef values[] = { trialFont, fillColor, kern, strokeNum, strokeColor,
-                                      paragraphStyle };
+               CFTypeRef values[] = { trialFont, fillColor, kern, useFake ? fakeStrokeNum : strokeNum,
+                                      useFake ? fillColor : strokeColor, paragraphStyle, ulNum };
                CFDictionaryRef attrs = CFDictionaryCreate(
-                  kCFAllocatorDefault, (const void**)keys, (const void**)values, 6,
+                  kCFAllocatorDefault, (const void**)keys, (const void**)values, 7,
                   &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+               CFRelease(fakeStrokeNum);
+               CFRelease(ulNum);
                CFAttributedStringRef result =
                   CFAttributedStringCreate(kCFAllocatorDefault, cfText, attrs);
                CFRelease(attrs);
