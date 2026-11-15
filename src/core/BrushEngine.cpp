@@ -177,7 +177,7 @@ namespace BrushEngine
          "   vec3 col = c.a > 1e-5 ? clamp(c.rgb / c.a, 0.0, 1.0) : uColor;\n"
          "   if (uHasSel == 1) a *= texture(uSel, vUv).r;\n"
          "   if (a <= 0.0) { fragColor = d; return; }\n"
-         "   if (uMode >= 6) {\n"
+         "   if (uMode >= 6 && uMode <= 12) {\n"
          "      vec2 src = vUv + uOff * uTexel;\n"
          "      if (uMode == 10) { fragColor = mix(d, srcAt(src), a); return; }\n"
          "      vec3 r = d.rgb;\n"
@@ -194,6 +194,12 @@ namespace BrushEngine
          "      fragColor = vec4(mix(d.rgb, r, a), d.a);\n"
          "      return;\n"
          "   }\n"
+         "   if (uMode == 13) {\n"   // stack: the stroke's height lands on top of what is there
+         "      float oa = min(1.0, d.a + a);\n"
+         "      fragColor = vec4(mix(d.rgb, col, a / max(oa, 1e-4)), oa);\n"
+         "      return;\n"
+         "   }\n"
+         "   if (uMode == 14) { fragColor = vec4(d.rgb, d.a * (1.0 - 0.7 * a)); return; }\n"   // press: dents
          "   if (uMode == 3) { fragColor = vec4(d.rgb, d.a * (1.0 - a)); return; }\n"
          "   if (uMode == 1) { fragColor = uLock == 1 ? d : vec4(d.rgb, d.a * (1.0 - a)); return; }\n"
          "   if (uMode == 2) {\n"
@@ -212,7 +218,62 @@ namespace BrushEngine
          "   fragColor = vec4(rgb, oa);\n"
          "}\n";
 
-      unsigned sDab = 0, sMerge = 0, sSmudge = 0;
+      // Marbling: each pixel reads from where the float carried it from (inverse maps, uSrc is a copy of the surface).
+      // Drop (Jaffer's marbling): outside a drop of radius r, a point at distance d came from distance sqrt(d^2 - r^2).
+      const char* kWarpFrag =
+         "#version 150\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uSrc;\n"
+         "uniform sampler2D uSel;\n"
+         "uniform int uHasSel;\n"
+         "uniform vec2 uTexel;\n"
+         "uniform int uKind;\n"
+         "uniform vec2 uCenter;\n"
+         "uniform float uRadius;\n"
+         "uniform float uReach;\n"
+         "uniform float uStrength;\n"
+         "uniform vec3 uCol;\n"
+         "uniform vec2 uDir;\n"
+         "uniform float uStep;\n"
+         "uniform vec2 uTines[16];\n"
+         "uniform int uTineN;\n"
+         "uniform float uLambda;\n"
+         "uniform int uLock;\n"
+         "void main() {\n"
+         "   vec2 p = gl_FragCoord.xy;\n"
+         "   vec2 uv = p * uTexel;\n"
+         "   vec4 d = texture(uSrc, uv);\n"
+         "   vec2 from = p;\n"
+         "   vec4 r;\n"
+         "   if (uKind == 0) {\n"
+         "      vec2 v = p - uCenter;\n"
+         "      float dist = length(v);\n"
+         "      float k = sqrt(max(0.0, 1.0 - uRadius * uRadius / max(dist * dist, 1e-4)));\n"
+         "      from = mix(uCenter + v * k, p, smoothstep(0.6 * uReach, uReach, dist));\n"
+         "      r = texture(uSrc, from * uTexel);\n"
+         "      r = mix(r, vec4(uCol, 1.0), (1.0 - smoothstep(uRadius - 1.0, uRadius + 0.5, dist)) * uStrength);\n"
+         "   } else if (uKind == 1) {\n"
+         "      float w = 0.0;\n"
+         "      for (int i = 0; i < 16; i++) {\n"
+         "         if (i >= uTineN) break;\n"
+         "         float t = length(p - uTines[i]) / uLambda;\n"
+         "         w += exp(-t * t);\n"
+         "      }\n"
+         "      from = p - uDir * uStep * 0.8 * min(w, 1.0) * uStrength;\n"
+         "      r = texture(uSrc, from * uTexel);\n"
+         "   } else {\n"
+         "      vec2 v = p - uCenter;\n"
+         "      float f = 1.0 - smoothstep(0.0, uRadius, length(v));\n"
+         "      float a = -uStrength * 1.2 * f * f;\n"
+         "      from = uCenter + mat2(cos(a), sin(a), -sin(a), cos(a)) * v;\n"
+         "      r = texture(uSrc, from * uTexel);\n"
+         "   }\n"
+         "   float m = uHasSel == 1 ? texture(uSel, uv).r : 1.0;\n"
+         "   vec4 o = mix(d, r, m);\n"
+         "   fragColor = uLock == 1 ? vec4(o.rgb, d.a) : o;\n"
+         "}\n";
+
+      unsigned sDab = 0, sMerge = 0, sSmudge = 0, sWarp = 0;
       bool sTried = false;
       struct DabLoc
       {
@@ -361,6 +422,36 @@ namespace BrushEngine
          b = Make(kGrain, 50, 0.6f, 1, 0.7f, 0.08f);
          b.mode = kErase;
          add("Eraser", "Eraser grain", b);
+         // Relief: height in the layer's alpha, lit; the layer takes the preset's material.
+         b = Make(kRound, 34, 0.1f, 0.6f, 1, 0.08f);
+         b.relief = 0;
+         add("Relief", "Plasticine", b);
+         b = Make(kRound, 30, 0.3f, 0.7f, 1, 0.06f);
+         b.relief = 1;
+         b.follow = true;
+         add("Relief", "Metal", b);
+         b = Make(kRound, 26, 0.0f, 1, 1, 1.3f);
+         b.relief = 2;
+         b.jitter = 0.8f;
+         b.sizeJitter = 0.6f;
+         b.pressureSize = false;
+         add("Relief", "Chrome drops", b);
+         b = Make(kRound, 40, 0.1f, 0.6f, 1, 0.08f);
+         b.relief = 3;
+         add("Relief", "Ink stipple", b);
+         // Marbling: the paint floats on the layer.
+         b = Make(kRound, 50, 1, 1, 1, 1.6f);
+         b.mode = kDrop;
+         b.pressureSize = false;
+         add("Marbling", "Drops", b);
+         b = Make(kRound, 160, 1, 1, 1, 0.04f);
+         b.mode = kComb;
+         b.pressureSize = false;
+         add("Marbling", "Comb", b);
+         b = Make(kRound, 140, 1, 1, 1, 0.06f);
+         b.mode = kSwirl;
+         b.pressureSize = false;
+         add("Marbling", "Swirl", b);
          return p;
       }();
       return presets;
@@ -381,6 +472,7 @@ namespace BrushEngine
          sDab = GLUtil::CompileProgram(kDabFrag);
          sMerge = GLUtil::CompileProgram(kMergeFrag);
          sSmudge = GLUtil::CompileProgram(kSmudgeFrag);
+         sWarp = GLUtil::CompileProgram(kWarpFrag);
          if (sDab != 0)
          {
             sDabLoc.center = glGetUniformLocation(sDab, "uCenter");
@@ -395,7 +487,7 @@ namespace BrushEngine
             sDabLoc.col = glGetUniformLocation(sDab, "uCol");
          }
       }
-      return sDab != 0 && sMerge != 0 && sSmudge != 0;
+      return sDab != 0 && sMerge != 0 && sSmudge != 0 && sWarp != 0;
    }
 
    void Stroke::Begin(const GLUtil::Fbo& surface, const Brush& b, float x, float y, float pressure, unsigned selection)
@@ -480,7 +572,8 @@ namespace BrushEngine
    {
       Pending q{ x, y, p, seed, dir, mDist, mSize, mFlow, { mRgb[0], mRgb[1], mRgb[2] }, fx, fy };
       mQueue.push_back(q);
-      const float r = 0.5f * mBrush.size + 2.0f;
+      // A drop pushes paint out to five radii; a comb's tines drag a little past its width.
+      const float r = (mBrush.mode == kDrop ? 2.5f * mBrush.size : mBrush.mode == kComb ? 0.75f * mBrush.size : 0.5f * mBrush.size) + 2.0f;
       if (!mAny)
       {
          mDirty[0] = x - r;
@@ -593,6 +686,12 @@ namespace BrushEngine
          mDabCount++;
          return;
       }
+      if (MarbleMode(b.mode))
+      {
+         WarpDab(q, r, std::clamp(flow * b.opacity, 0.0f, 1.0f));
+         mDabCount++;
+         return;
+      }
       int sc[4] = { (int)std::floor(cx - r - 2), (int)std::floor(cy - r - 2), 0, 0 };
       sc[2] = (int)std::ceil(cx + r + 2) - sc[0];
       sc[3] = (int)std::ceil(cy + r + 2) - sc[1];
@@ -662,6 +761,76 @@ namespace BrushEngine
          glEnable(GL_BLEND);
    }
 
+   void Stroke::WarpDab(const Pending& q, float r, float strength)
+   {
+      if (mSurface == nullptr || strength <= 0.0f)
+         return;
+      const int kind = mBrush.mode == kDrop ? 0 : mBrush.mode == kComb ? 1 : 2;
+      float ux = q.x - q.fromX, uy = q.y - q.fromY;
+      const float step = std::sqrt(ux * ux + uy * uy);
+      if (kind == 1)
+      {
+         if (step < 1e-3f)
+            return;
+         ux /= step;
+         uy /= step;
+      }
+      const int n = std::clamp(mBrush.tines, 1, 16);
+      const float width = 2.0f * r;
+      const float lambda = n > 1 ? std::max(2.0f, width / (n - 1) * 0.3f) : std::max(2.0f, r * 0.5f);
+      const float reach = kind == 0 ? 5.0f * r : kind == 1 ? r + 3.0f * lambda + step : r;
+      const int x0 = std::max(0, (int)std::floor(q.x - reach - 2)), y0 = std::max(0, (int)std::floor(q.y - reach - 2));
+      const int x1 = std::min(mW, (int)std::ceil(q.x + reach + 2)), y1 = std::min(mH, (int)std::ceil(q.y + reach + 2));
+      if (x1 <= x0 || y1 <= y0)
+         return;
+      // Copy the square plus the step it may read from, so the pass never reads what it writes.
+      const int pad = (int)std::ceil(step) + 2;
+      const int cx0 = std::max(0, x0 - pad), cy0 = std::max(0, y0 - pad), cx1 = std::min(mW, x1 + pad), cy1 = std::min(mH, y1 + pad);
+      GLint prevRead = 0;
+      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, mSurface->fbo);
+      glBindTexture(GL_TEXTURE_2D, mMerge.tex);
+      glCopyTexSubImage2D(GL_TEXTURE_2D, 0, cx0, cy0, cx0, cy0, cx1 - cx0, cy1 - cy0);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, prevRead);
+      float tines[32] = {};
+      for (int i = 0; i < n; i++)
+      {
+         const float t = n > 1 ? (float)i / (n - 1) - 0.5f : 0.0f;
+         tines[i * 2] = q.x - uy * t * width;
+         tines[i * 2 + 1] = q.y + ux * t * width;
+      }
+      GLboolean blendOn = glIsEnabled(GL_BLEND);
+      glDisable(GL_BLEND);
+      const int clip[4] = { x0, y0, x1 - x0, y1 - y0 };
+      GLUtil::DrawPass(*mSurface, sWarp, [&]()
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, mMerge.tex);
+         glUniform1i(glGetUniformLocation(sWarp, "uSrc"), 0);
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, mSelection);
+         glUniform1i(glGetUniformLocation(sWarp, "uSel"), 1);
+         glUniform1i(glGetUniformLocation(sWarp, "uHasSel"), mSelection != 0 ? 1 : 0);
+         glUniform2f(glGetUniformLocation(sWarp, "uTexel"), 1.0f / std::max(1, mW), 1.0f / std::max(1, mH));
+         glUniform1i(glGetUniformLocation(sWarp, "uKind"), kind);
+         glUniform2f(glGetUniformLocation(sWarp, "uCenter"), q.x, q.y);
+         glUniform1f(glGetUniformLocation(sWarp, "uRadius"), r);
+         glUniform1f(glGetUniformLocation(sWarp, "uReach"), reach);
+         glUniform1f(glGetUniformLocation(sWarp, "uStrength"), strength);
+         glUniform3f(glGetUniformLocation(sWarp, "uCol"), q.rgb[0], q.rgb[1], q.rgb[2]);
+         glUniform2f(glGetUniformLocation(sWarp, "uDir"), ux, uy);
+         glUniform1f(glGetUniformLocation(sWarp, "uStep"), step);
+         glUniform2fv(glGetUniformLocation(sWarp, "uTines"), 16, tines);
+         glUniform1i(glGetUniformLocation(sWarp, "uTineN"), n);
+         glUniform1f(glGetUniformLocation(sWarp, "uLambda"), lambda);
+         glUniform1i(glGetUniformLocation(sWarp, "uLock"), mBrush.lockAlpha ? 1 : 0);
+         glActiveTexture(GL_TEXTURE0);
+      }, clip);
+      if (blendOn)
+         glEnable(GL_BLEND);
+   }
+
    void Stroke::Merge(const GLUtil::Fbo& surface, const GLUtil::Fbo& out)
    {
       GLboolean blendOn = glIsEnabled(GL_BLEND);
@@ -701,8 +870,8 @@ namespace BrushEngine
       if (!mActive)
          return surface.tex;
       Flush();
-      if (mBrush.mode == kSmudge)
-         return surface.tex;   // smudge already paints the surface itself
+      if (DirectMode(mBrush.mode))
+         return surface.tex;   // smudge and marbling already paint the surface itself
       if (mDisplayStale)
       {
          Merge(surface, mDisplay);
@@ -732,7 +901,7 @@ namespace BrushEngine
       dirty[1] = y0;
       dirty[2] = x1;
       dirty[3] = y1;
-      if (mBrush.mode == kSmudge)
+      if (DirectMode(mBrush.mode))
          return;   // already on the surface
       Merge(surface, mMerge);
       // Only the touched rectangle goes back, so the surface keeps its handle.

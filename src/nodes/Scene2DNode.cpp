@@ -21,23 +21,78 @@ std::function<bool(uint64_t, float&, float&)> Scene2DNode::NodeViewOf;
 const char* Scene2DNode::AdjName(int type)
 {
    static const char* kNames[kAdjCount] = { "Pixelate", "Halftone", "Dither", "Threshold", "Gradient Map", "Posterize",
-                                                 "Brightness", "Contrast", "Hue", "Saturation", "Exposure", "Invert" };
+                                                 "Brightness", "Contrast", "Hue", "Saturation", "Exposure", "Invert",
+                                                 "Levels", "Curves" };
    return kNames[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 float Scene2DNode::AdjDefault(int type)
 {
-   static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f };
+   static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f };
    return kDef[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 void Scene2DNode::AdjRange(int type, float& lo, float& hi)
 {
-   static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f };
-   static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f };
+   static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f, 0.1f, 0.0f };
+   static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f, 4.0f, 1.0f };
    const int t = std::clamp(type, 0, kAdjCount - 1);
    lo = kLo[t];
    hi = kHi[t];
+}
+
+void Scene2DNode::CurveLut(const std::vector<float>& pts, float* lut, int n)
+{
+   // Fritsch-Carlson: Hermite pieces with slopes cut back so no piece rises above or dips below its ends.
+   std::vector<float> x, y;
+   for (size_t i = 0; i + 1 < pts.size(); i += 2)
+   {
+      x.push_back(std::clamp(pts[i], 0.0f, 1.0f));
+      y.push_back(std::clamp(pts[i + 1], 0.0f, 1.0f));
+   }
+   if (x.size() < 2)
+   {
+      for (int i = 0; i < n; i++)
+         lut[i] = (float)i / (float)std::max(1, n - 1);
+      return;
+   }
+   const size_t k = x.size();
+   std::vector<float> d(k - 1), m(k);
+   for (size_t i = 0; i + 1 < k; i++)
+      d[i] = (y[i + 1] - y[i]) / std::max(1e-5f, x[i + 1] - x[i]);
+   m[0] = d[0];
+   m[k - 1] = d[k - 2];
+   for (size_t i = 1; i + 1 < k; i++)
+      m[i] = d[i - 1] * d[i] <= 0.0f ? 0.0f : (d[i - 1] + d[i]) * 0.5f;
+   for (size_t i = 0; i + 1 < k; i++)
+   {
+      if (d[i] == 0.0f)
+      {
+         m[i] = m[i + 1] = 0.0f;
+         continue;
+      }
+      const float a = m[i] / d[i], b = m[i + 1] / d[i], r = a * a + b * b;
+      if (r > 9.0f)
+      {
+         const float t = 3.0f / std::sqrt(r);
+         m[i] = t * a * d[i];
+         m[i + 1] = t * b * d[i];
+      }
+   }
+   for (int i = 0; i < n; i++)
+   {
+      const float t = (float)i / (float)std::max(1, n - 1);
+      if (t <= x[0]) { lut[i] = y[0]; continue; }
+      if (t >= x[k - 1]) { lut[i] = y[k - 1]; continue; }
+      size_t j = 0;
+      while (j + 2 < k && t > x[j + 1])
+         j++;
+      const float h = std::max(1e-5f, x[j + 1] - x[j]), u = (t - x[j]) / h;
+      const float u2 = u * u, u3 = u2 * u;
+      const float v = (2 * u3 - 3 * u2 + 1) * y[j] + (u3 - 2 * u2 + u) * h * m[j] + (-2 * u3 + 3 * u2) * y[j + 1] +
+                      (u3 - u2) * h * m[j + 1];
+      lut[i] = std::clamp(v, 0.0f, 1.0f);
+   }
 }
 
 const char* Scene2DNode::LayerFieldName(int f)
@@ -316,8 +371,11 @@ namespace
          "uniform int uMap;\n"
          "uniform vec4 uColA;\n"
          "uniform vec4 uColB;\n"
-         "uniform int uLinear;\n")
+         "uniform int uLinear;\n"
+         "uniform vec4 uLevels;\n"
+         "uniform float uLut[64];\n")
          + GLUtil::kSrgbGlsl +
+         "float Lut(float v) { float f = clamp(v, 0.0, 1.0) * 63.0; int i = min(int(f), 62); return mix(uLut[i], uLut[i + 1], f - float(i)); }\n"
          "vec3 Disp(vec4 c) { return uLinear == 1 ? SrgbEncode(max(c.rgb, 0.0)) : c.rgb; }\n"
          "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
          "const int kBayer[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);\n"
@@ -367,6 +425,12 @@ namespace
          "      c = SrgbEncode(clamp(l, 0.0, 1.0));\n"
          "   } else if (uType == 11) {\n"
          "      c = mix(c, 1.0 - c, uAmt);\n"
+         "   } else if (uType == 12) {\n"
+         "      c = clamp((c - uLevels.x) / max(uLevels.y - uLevels.x, 1e-3), 0.0, 1.0);\n"
+         "      c = pow(c, vec3(1.0 / max(uAmt, 0.01)));\n"
+         "      c = mix(vec3(uLevels.z), vec3(uLevels.w), c);\n"
+         "   } else if (uType == 13) {\n"
+         "      c = mix(c, vec3(Lut(c.r), Lut(c.g), Lut(c.b)), uAmt);\n"
          "   }\n"
          "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(Luma(c), 0.0, 1.0));\n"
          "   c = clamp(c, 0.0, 1.0);\n"
@@ -415,6 +479,8 @@ Scene2DNode::~Scene2DNode()
    for (auto& kv : mLayerOut)
       GLUtil::DestroyFbo(kv.second);
    GLUtil::DestroyFbo(mAdjFbo);
+   for (auto& kv : mRelief)
+      GLUtil::DestroyFbo(kv.second);
    GLUtil::DestroyFbo(mBelow);
    for (auto& kv : mSurfaces)
       GLUtil::DestroyFbo(kv.second.fbo);
@@ -428,7 +494,7 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mSelOverlay);
    GLUtil::DestroyFbo(mSelScratch);
    GLUtil::DestroyFbo(mCloneSrc);
-   for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram })
+   for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram, mReliefProgram })
       if (p != 0)
          glDeleteProgram(p);
    if (mPassProgram != 0)
@@ -1038,6 +1104,14 @@ void Scene2DNode::Serialize()
       if (l.kind == Kind::Adjust)
          o << "adj " << l.id << " " << l.adjType << " " << l.adjAmt << " " << l.adjTo << " " << l.adjDrive << " " << +l.adjMap
            << "\n";
+      if (l.kind == Kind::Adjust && l.adjType == kAdjLevels)
+         o << "levels " << l.id << " " << l.levels[0] << " " << l.levels[1] << " " << l.levels[2] << " " << l.levels[3] << "\n";
+      if (l.kind == Kind::Adjust && l.adjType == kAdjCurves)
+      {
+         o << "curve " << l.id << " " << l.curve.size() / 2;
+         for (float v : l.curve) o << " " << v;
+         o << "\n";
+      }
       if (l.kind == Kind::Fill || l.kind == Kind::Adjust)
       {
          o << "fillc " << l.id << " " << l.fillType;
@@ -1045,6 +1119,9 @@ void Scene2DNode::Serialize()
          for (float v : l.colorB) o << " " << v;
          o << " " << l.fillAngle << "\n";
       }
+      if (l.kind == Kind::Paint && l.relief)
+         o << "relief " << l.id << " " << l.reliefMat << " " << l.reliefLight << " " << l.reliefElev << " " << l.reliefDepth
+           << "\n";
       if (l.kind == Kind::Paint || l.HasSkin())
       {
          o << "paint " << l.id << " " << l.pw << " " << l.ph;
@@ -1293,6 +1370,26 @@ void Scene2DNode::Parse()
             l->adjType = std::clamp(l->adjType, 0, kAdjCount - 1);
             l->adjDrive = std::clamp(l->adjDrive, 0, kDrives);
             l->adjMap = map != 0;
+         }
+         else if (key == "relief")
+         {
+            s >> l->reliefMat >> l->reliefLight >> l->reliefElev >> l->reliefDepth;
+            l->relief = true;
+            l->reliefMat = std::clamp(l->reliefMat, 0, 3);
+         }
+         else if (key == "levels")
+         {
+            for (float& v : l->levels) s >> v;
+         }
+         else if (key == "curve")
+         {
+            int n = 0;
+            s >> n;
+            n = std::clamp(n, 0, 32);
+            std::vector<float> pts(n * 2);
+            for (float& v : pts) s >> v;
+            if (s && n >= 2)
+               l->curve = pts;
          }
          else if (key == "fillc")
          {
@@ -1667,6 +1764,9 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.tex = live ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
       a.texW = it->second.fbo.w;
       a.texH = it->second.fbo.h;
+      if (l.relief)
+         if (const unsigned lit = ShadeRelief(l, a.tex, a.texW, a.texH))
+            a.tex = lit;
    }
    else if (l.kind == Kind::Adjust)
    {
@@ -1787,6 +1887,83 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    Pass(depth, a);
 }
 
+namespace
+{
+   // Relief: the surface's alpha is height. The normal comes from a smoothed height slope (the surface is 8 bit),
+   // the light from reliefLight / reliefElev, the look from the material.
+   const char* kReliefFrag =
+      "#version 150\n"
+      "in vec2 vUv;\n"
+      "out vec4 fragColor;\n"
+      "uniform sampler2D uSurf;\n"
+      "uniform vec2 uTexel;\n"
+      "uniform vec3 uLight;\n"
+      "uniform float uDepth;\n"
+      "uniform int uMat;\n"
+      "float H(vec2 o) { return texture(uSurf, vUv + o * uTexel).a; }\n"
+      "float Hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
+      "void main() {\n"
+      "   vec4 s = texture(uSurf, vUv);\n"
+      "   float dx = (H(vec2(1, 1)) + 2.0 * H(vec2(1, 0)) + H(vec2(1, -1)) - H(vec2(-1, 1)) - 2.0 * H(vec2(-1, 0)) - H(vec2(-1, -1))) / 8.0;\n"
+      "   float dy = (H(vec2(1, 1)) + 2.0 * H(vec2(0, 1)) + H(vec2(-1, 1)) - H(vec2(1, -1)) - 2.0 * H(vec2(0, -1)) - H(vec2(-1, -1))) / 8.0;\n"
+      "   vec3 n = normalize(vec3(-dx * uDepth, -dy * uDepth, 1.0));\n"
+      "   vec3 L = normalize(uLight);\n"
+      "   vec3 Hv = normalize(L + vec3(0.0, 0.0, 1.0));\n"
+      "   float diff = max(dot(n, L), 0.0), nh = max(dot(n, Hv), 0.0);\n"
+      "   float cover = smoothstep(0.0, 0.08, s.a);\n"
+      "   vec3 base = s.rgb, c;\n"
+      "   if (uMat == 0) {\n"                 // plasticine: soft clay, a broad dull sheen
+      "      c = base * (0.35 + 0.75 * diff) + vec3(0.22) * pow(nh, 18.0);\n"
+      "   } else if (uMat == 1) {\n"          // metal: little diffuse, a tinted hard sheen
+      "      c = base * (0.18 + 0.32 * diff) + mix(base, vec3(1.0), 0.35) * pow(nh, 42.0) * 1.3;\n"
+      "   } else if (uMat == 2) {\n"          // chrome: mirrors a sky lit from the light's side
+      "      vec3 r = reflect(vec3(0.0, 0.0, -1.0), n);\n"
+      "      float t = dot(normalize(r.xy + 1e-4), normalize(L.xy + 1e-4)) * length(r.xy);\n"
+      "      float sky = mix(0.06, 1.0, smoothstep(-0.25, 0.55, t)) - 0.35 * smoothstep(0.0, 0.08, abs(t - 0.2)) + 0.35;\n"
+      "      c = mix(vec3(sky), base * sky, 0.25) + vec3(1.0) * pow(nh, 160.0);\n"
+      "   } else {\n"                         // ink stipple: dots, denser where the light does not reach
+      "      float lit = clamp(0.25 + 0.85 * diff, 0.0, 1.0);\n"
+      "      vec2 cell = floor(gl_FragCoord.xy / 3.0);\n"
+      "      vec2 f = fract(gl_FragCoord.xy / 3.0) - 0.5;\n"
+      "      float dot1 = step(lit, Hash(cell)) * (1.0 - smoothstep(0.3, 0.5, length(f)));\n"
+      "      fragColor = vec4(base, cover * dot1);\n"
+      "      return;\n"
+      "   }\n"
+      "   fragColor = vec4(clamp(c, 0.0, 1.0), cover);\n"
+      "}\n";
+}
+
+unsigned Scene2DNode::ShadeRelief(const Layer& l, unsigned tex, int w, int h)
+{
+   if (!mReliefTried)
+   {
+      mReliefTried = true;
+      mReliefProgram = GLUtil::CompileProgram(kReliefFrag);
+   }
+   if (mReliefProgram == 0 || tex == 0 || w <= 0 || h <= 0)
+      return 0;
+   GLUtil::Fbo& out = mRelief[l.id];
+   if (!GLUtil::EnsureFbo(out, w, h, GL_RGBA8, "Scene2DRelief"))
+      return 0;
+   const unsigned prog = mReliefProgram;
+   const float az = l.reliefLight * 3.14159265f / 180.0f, el = std::clamp(l.reliefElev, 1.0f, 90.0f) * 3.14159265f / 180.0f;
+   GLboolean blendOn = glIsEnabled(GL_BLEND);
+   glDisable(GL_BLEND);
+   GLUtil::RunShaderPass(out, prog, [&]()
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glUniform1i(glGetUniformLocation(prog, "uSurf"), 0);
+      glUniform2f(glGetUniformLocation(prog, "uTexel"), 1.0f / w, 1.0f / h);
+      glUniform3f(glGetUniformLocation(prog, "uLight"), std::cos(el) * std::cos(az), std::cos(el) * std::sin(az), std::sin(el));
+      glUniform1f(glGetUniformLocation(prog, "uDepth"), std::max(0.0f, l.reliefDepth));
+      glUniform1i(glGetUniformLocation(prog, "uMat"), std::clamp(l.reliefMat, 0, 3));
+   });
+   if (blendOn)
+      glEnable(GL_BLEND);
+   return out.tex;
+}
+
 bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
 {
    if (!mAdjTried)
@@ -1811,6 +1988,10 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       glUniform4fv(glGetUniformLocation(prog, "uColA"), 1, l.colorA);
       glUniform4fv(glGetUniformLocation(prog, "uColB"), 1, l.colorB);
       glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
+      glUniform4fv(glGetUniformLocation(prog, "uLevels"), 1, l.levels);
+      float lut[64];
+      CurveLut(l.curve, lut, 64);
+      glUniform1fv(glGetUniformLocation(prog, "uLut"), 64, lut);
    });
    return true;
 }

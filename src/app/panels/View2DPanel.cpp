@@ -1019,6 +1019,112 @@ namespace
       return changed;
    }
 
+   // Curves: the graph is the control. Click adds a point, drag moves it (ends move up and down only),
+   // double-click or right-click takes an inner point away.
+   int sCurveDrag = -1;
+   int sCurveLayer = 0;
+   void CurveEditor(Layer& l)
+   {
+      std::vector<float>& c = l.curve;
+      if (c.size() < 4)
+         c = { 0.0f, 0.0f, 1.0f, 1.0f };
+      const float w = ImGui::GetContentRegionAvail().x, h = std::min(w, 180.0f);
+      const ImVec2 p0 = ImGui::GetCursorScreenPos();
+      ImGui::InvisibleButton("##curve", ImVec2(w, h));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 p1(p0.x + w, p0.y + h);
+      dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_field);
+      for (int i = 1; i < 4; i++)
+      {
+         const float fx = p0.x + w * i / 4.0f, fy = p0.y + h * i / 4.0f;
+         dl->AddLine(ImVec2(fx, p0.y), ImVec2(fx, p1.y), ImGui::GetColorU32(ImGuiCol_Border));
+         dl->AddLine(ImVec2(p0.x, fy), ImVec2(p1.x, fy), ImGui::GetColorU32(ImGuiCol_Border));
+      }
+      const auto ToScreen = [&](float x, float y) { return ImVec2(p0.x + x * w, p1.y - y * h); };
+      const ImVec2 m = ImGui::GetIO().MousePos;
+      const float mx = std::clamp((m.x - p0.x) / std::max(1.0f, w), 0.0f, 1.0f);
+      const float my = std::clamp((p1.y - m.y) / std::max(1.0f, h), 0.0f, 1.0f);
+      const int n = (int)c.size() / 2;
+      int near = -1;
+      for (int i = 0; i < n; i++)
+      {
+         const ImVec2 q = ToScreen(c[i * 2], c[i * 2 + 1]);
+         if (std::fabs(q.x - m.x) < 7.0f && std::fabs(q.y - m.y) < 7.0f)
+            near = i;
+      }
+      bool changed = false;
+      if (ImGui::IsItemHovered() && (ImGui::IsMouseDoubleClicked(0) || ImGui::IsMouseClicked(1)) && near > 0 && near < n - 1)
+      {
+         PushUndoCheckpoint("Curves");
+         c.erase(c.begin() + near * 2, c.begin() + near * 2 + 2);
+         sCurveDrag = -1;
+         changed = true;
+      }
+      else if (ImGui::IsItemActivated())
+      {
+         PushUndoCheckpoint("Curves");
+         sCurveLayer = l.id;
+         sCurveDrag = near;
+         if (near < 0 && n < 16)
+         {
+            int at = 1;
+            while (at < n - 1 && c[at * 2] < mx)
+               at++;
+            c.insert(c.begin() + at * 2, { mx, my });
+            sCurveDrag = at;
+            changed = true;
+         }
+      }
+      if (ImGui::IsItemActive() && sCurveLayer == l.id && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / 2)
+      {
+         const int i = sCurveDrag, last = (int)c.size() / 2 - 1;
+         float x = mx;
+         if (i == 0)
+            x = 0.0f;
+         else if (i == last)
+            x = 1.0f;
+         else
+            x = std::clamp(x, c[(i - 1) * 2] + 0.01f, c[(i + 1) * 2] - 0.01f);
+         if (x != c[i * 2] || my != c[i * 2 + 1])
+         {
+            c[i * 2] = x;
+            c[i * 2 + 1] = my;
+            changed = true;
+         }
+      }
+      float lut[64];
+      Scene2DNode::CurveLut(c, lut, 64);
+      ImVec2 line[64];
+      for (int i = 0; i < 64; i++)
+         line[i] = ToScreen(i / 63.0f, lut[i]);
+      dl->AddPolyline(line, 64, ImGui::GetColorU32(ImGuiCol_Text), 0, 1.5f);
+      for (int i = 0; i < (int)c.size() / 2; i++)
+      {
+         const ImVec2 q = ToScreen(c[i * 2], c[i * 2 + 1]);
+         dl->AddCircleFilled(q, i == near || i == sCurveDrag ? 4.5f : 3.5f, ImGui::GetColorU32(ImGuiCol_Text));
+      }
+      if (changed)
+         Touch();
+   }
+
+   // The rows an adjustment has besides its amount (Levels' four ends, the Curves graph).
+   void AdjExtras(Layer& l)
+   {
+      if (l.adjType == Scene2DNode::kAdjLevels)
+      {
+         SliderRow(T("Input black"), &l.levels[0], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Input white"), &l.levels[1], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Output black"), &l.levels[2], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Output white"), &l.levels[3], 0.0f, 1.0f, "%.2f");
+      }
+      if (l.adjType == Scene2DNode::kAdjCurves)
+         CurveEditor(l);
+   }
+   const char* AdjAmountLabel(int t)
+   {
+      return t == Scene2DNode::kAdjLevels ? "Gamma" : "Amount";
+   }
+
    bool IntRow(const char* label, int* v)
    {
       FieldLabel(label);
@@ -1559,6 +1665,48 @@ namespace
       if (id == 0)
          return;
       BrushEngine::Brush b = ToolBrush();
+      if (target == 0 && sTool == kBrush)
+         if (Layer* L = doc->FindLayer(id))
+         {
+            const bool empty = std::all_of(L->tiles.begin(), L->tiles.end(), [](const std::string& k) { return k == "-"; });
+            // A relief preset makes its layer a relief (a new one above when this one already holds flat paint).
+            if (b.relief >= 0 && !L->relief)
+            {
+               if (!empty)
+               {
+                  const int nid = doc->AddPaintLayer(id);
+                  SelectOnly(nid);
+                  L = doc->FindLayer(nid);
+               }
+               L->relief = true;
+               L->reliefMat = b.relief;
+               if (L->name.empty())
+                  L->name = T("Relief");
+               doc->Commit();
+               Touch();
+            }
+            // Marbling floats on a bath: an empty layer fills with the background colour first.
+            if (BrushEngine::MarbleMode(b.mode) && empty)
+            {
+               doc->Bucket(L->id, at.x, at.y, sBg, 1.0f, 255, false, false);
+               if (L->name.empty())
+                  L->name = T("Marbling");
+            }
+            if (L->id != id)
+            {
+               const int nid = L->id;
+               std::copy(sFg, sFg + 3, b.color);
+               if (sBrushHue != 0.0f)
+                  HueTurn(b.color, sBrushHue);
+               const ImVec2 from = line && sHaveLast ? sLastPaint : at;
+               if (!doc->BeginPaint(nid, 0, b, from.x, from.y, PenNow()))
+                  return;
+               sOp = Op();
+               sOp.kind = 7;
+               sOp.docStart = at;
+               return;
+            }
+         }
       if (cloning)
       {
          // Aligned: the first stroke after Alt-click fixes the offset; later strokes keep it.
@@ -4173,14 +4321,29 @@ namespace
             MoreHeader(T("Paint"));
             if (brush)
             {
+               // Relief and marbling presets have their own modes.
                static const char* kModeNames[5] = { "Normal", "Behind", "Multiply", "Screen", "Smudge" };
                static const int kModeOf[5] = { BrushEngine::kNormal, BrushEngine::kBehind, BrushEngine::kMultiply, BrushEngine::kScreen, BrushEngine::kSmudge };
+               static const char* kReliefNames[4] = { "Raise", "Stack", "Press", "Erase" };
+               static const int kReliefOf[4] = { BrushEngine::kNormal, BrushEngine::kStack, BrushEngine::kPress, BrushEngine::kErase };
+               static const char* kMarbleNames[3] = { "Drop", "Comb", "Swirl" };
+               static const int kMarbleOf[3] = { BrushEngine::kDrop, BrushEngine::kComb, BrushEngine::kSwirl };
+               const bool marble = BrushEngine::MarbleMode(b.mode);
+               const char* const* names = b.relief >= 0 ? kReliefNames : marble ? kMarbleNames : kModeNames;
+               const int* of = b.relief >= 0 ? kReliefOf : marble ? kMarbleOf : kModeOf;
+               const int count = b.relief >= 0 ? 4 : marble ? 3 : 5;
                int m = 0;
-               for (int i = 0; i < 5; i++)
-                  if (kModeOf[i] == b.mode)
+               for (int i = 0; i < count; i++)
+                  if (of[i] == b.mode)
                      m = i;
-               if (MoreCombo(T("Mode"), &m, kModeNames, 5))
-                  b.mode = kModeOf[m];
+               if (MoreCombo(T("Mode"), &m, names, count))
+                  b.mode = of[m];
+               if (b.mode == BrushEngine::kComb)
+               {
+                  float tines = (float)b.tines;
+                  MoreSlider(T("Tines"), &tines, 1.0f, 16.0f, "%.0f");
+                  b.tines = std::clamp((int)std::lround(tines), 1, 16);
+               }
                MoreCheck(T("Lock alpha"), &b.lockAlpha);
             }
             ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
@@ -5897,6 +6060,18 @@ namespace
       if (ComboRow(T("Colour"), &label, { T("None"), T("Red"), T("Orange"), T("Yellow"), T("Green"), T("Blue"), T("Violet"), T("Grey") }))
          l->label = label;
       BoolRow(T("Clip to layer below"), &l->clip);
+      if (l->kind == Kind::Paint)
+      {
+         SectionCard::Begin(T("Relief"));
+         BoolRow(T("On"), &l->relief);
+      }
+      if (l->kind == Kind::Paint && l->relief)
+      {
+         ComboRow(T("Material"), &l->reliefMat, { T("Plasticine"), T("Metal"), T("Chrome"), T("Ink stipple") });
+         SliderRow(T("Light"), &l->reliefLight, -180.0f, 180.0f, "%.0f\xC2\xB0");
+         SliderRow(T("Light height"), &l->reliefElev, 5.0f, 90.0f, "%.0f\xC2\xB0");
+         SliderRow(T("Depth"), &l->reliefDepth, 0.0f, 40.0f, "%.1f px");
+      }
       if (l->kind == Kind::Fill)
       {
          SectionCard::Begin(T("Fill"));
@@ -5934,12 +6109,13 @@ namespace
          if (l->adjType != Scene2DNode::kAdjGradientMap)
          {
             ModNext(*l, Scene2DNode::kLfAdjust);
-            SliderRow(T("Amount"), &l->adjAmt, lo, hi, fmt);
+            SliderRow(T(AdjAmountLabel(l->adjType)), &l->adjAmt, lo, hi, fmt);
             int drive = l->adjDrive;
             if (ComboRow(T("Drive"), &drive, { T("None"), "A", "B", "C", "D" }))
                l->adjDrive = drive;
             if (l->adjDrive > 0)
                SliderRow(T("To"), &l->adjTo, lo, hi, fmt);
+            AdjExtras(*l);
             BoolRow(T("Map colours"), &l->adjMap);
          }
          if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
@@ -6254,7 +6430,10 @@ namespace
          float lo = 0, hi = 1;
          Scene2DNode::AdjRange(l->adjType, lo, hi);
          if (l->adjType != Scene2DNode::kAdjGradientMap)
-            SliderRow(T("Amount"), &l->adjAmt, lo, hi, AdjFmt(l->adjType));
+         {
+            SliderRow(T(AdjAmountLabel(l->adjType)), &l->adjAmt, lo, hi, AdjFmt(l->adjType));
+            AdjExtras(*l);
+         }
          if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
          {
             ColorRow(T("Shadows"), l->colorA);

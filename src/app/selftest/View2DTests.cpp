@@ -488,6 +488,225 @@ void RunView2DTest()
       Check("S2: diamond fill grows from the centre", diaC < 0.1f && diaCorner > 0.9f);
    }
 
+   // ---- S3 new paint: Levels, Curves, relief, marbling ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 300;
+      pic.Doc().h = 200;
+      pic.Doc().background = 1;   // black
+      pic.Commit();
+      const auto Clear = [&]() { while (!pic.Layers().empty()) pic.Layers().pop_back(); pic.Commit(); };
+      const auto Grey = [&](float v)
+      {
+         Layer& f = pic.AddLayer(Kind::Fill, 0);
+         f.colorA[0] = f.colorA[1] = f.colorA[2] = v;
+         f.colorA[3] = 1.0f;
+         pic.Commit();
+      };
+      // Levels: input 0.25..0.75 stretches 0.6 to 0.7; gamma 2 lifts it further; output 0.2..0.8 squeezes it.
+      Clear();
+      Grey(0.6f);
+      Cook(&pic);
+      const float plain = Pixel(&pic, 150, 100)[0];
+      {
+         Layer& a = pic.AddLayer(Kind::Adjust, 0, pic.Layers()[0].id);
+         a.adjType = Scene2DNode::kAdjLevels;
+         a.adjAmt = a.adjTo = 1.0f;
+         a.levels[0] = 0.25f;
+         a.levels[1] = 0.75f;
+      }
+      pic.Commit();
+      Cook(&pic);
+      const float stretched = Pixel(&pic, 150, 100)[0];
+      pic.Layers()[1].adjAmt = 2.0f;
+      pic.Commit();
+      Cook(&pic);
+      const float gamma = Pixel(&pic, 150, 100)[0];
+      pic.Layers()[1].adjAmt = 1.0f;
+      pic.Layers()[1].levels[0] = 0.0f;
+      pic.Layers()[1].levels[1] = 1.0f;
+      pic.Layers()[1].levels[2] = 0.5f;
+      pic.Layers()[1].levels[3] = 0.5f;
+      pic.Commit();
+      Cook(&pic);
+      const float flat = Pixel(&pic, 150, 100)[0];
+      printf("  levels: plain %.3f stretched %.3f gamma2 %.3f out 0.5..0.5 %.3f\n", plain, stretched, gamma, flat);
+      Check("S3: levels input range stretches", std::fabs(plain - 0.6f) < 0.02f && std::fabs(stretched - 0.7f) < 0.03f);
+      Check("S3: levels gamma lifts the mids", gamma > stretched + 0.05f);
+      Check("S3: levels output range", std::fabs(flat - 0.5f) < 0.02f);
+      // Curves: a point at (0.5, 0.8) lifts mid grey to 0.8; half strength lands between.
+      Clear();
+      Grey(0.5f);
+      {
+         Layer& a = pic.AddLayer(Kind::Adjust, 0, pic.Layers()[0].id);
+         a.adjType = Scene2DNode::kAdjCurves;
+         a.adjAmt = a.adjTo = 1.0f;
+         a.curve = { 0.0f, 0.0f, 0.5f, 0.8f, 1.0f, 1.0f };
+      }
+      pic.Commit();
+      Cook(&pic);
+      const float curved = Pixel(&pic, 150, 100)[0];
+      pic.Layers()[1].adjAmt = 0.5f;
+      pic.Commit();
+      Cook(&pic);
+      const float halfCurved = Pixel(&pic, 150, 100)[0];
+      printf("  curves: 0.5 -> %.3f (half strength %.3f)\n", curved, halfCurved);
+      Check("S3: curves lift mid grey to the point", std::fabs(curved - 0.8f) < 0.03f && std::fabs(halfCurved - 0.65f) < 0.03f);
+      float lut[64];
+      Scene2DNode::CurveLut({ 0.0f, 0.0f, 0.3f, 0.9f, 0.6f, 0.95f, 1.0f, 1.0f }, lut, 64);
+      bool rising = true;
+      for (int i = 1; i < 64; i++)
+         rising = rising && lut[i] >= lut[i - 1] - 1e-5f && lut[i] <= 1.0f;
+      Check("S3: a rising curve never dips or overshoots", rising);
+      {
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         const Layer& c = copy.Layers()[1];
+         Check("S3: curve and levels save", c.adjType == Scene2DNode::kAdjCurves && c.curve.size() == 6 && std::fabs(c.curve[3] - 0.8f) < 1e-5f);
+      }
+
+      BrushEngine::Brush hard = BrushEngine::Presets()[5].brush;   // Hard round
+      hard.pressureSize = false;
+      const auto Line = [&](int id, float x0, float y0, float x1, float y1, const BrushEngine::Brush& use)
+      {
+         pic.BeginPaint(id, 0, use, x0, y0, 1.0f);
+         const float len = std::hypot(x1 - x0, y1 - y0);
+         for (float t = 0.0f; t <= len; t += 4.0f)
+            pic.PaintTo(x0 + (x1 - x0) * t / len, y0 + (y1 - y0) * t / len, 1.0f);
+         pic.PaintTo(x1, y1, 1.0f);
+         pic.EndPaint();
+      };
+      const auto Colour = [](BrushEngine::Brush b, float r, float g, float bl) { b.color[0] = r; b.color[1] = g; b.color[2] = bl; return b; };
+
+      // Relief modes on height (seen as alpha over black): stack adds, raise builds softly, press dents.
+      Clear();
+      int L = pic.AddPaintLayer();
+      BrushEngine::Brush h = Colour(hard, 1, 1, 1);
+      h.size = 30.0f;
+      h.opacity = 0.4f;
+      Line(L, 20, 60, 280, 60, h);
+      Line(L, 20, 60, 280, 60, h);
+      h.mode = BrushEngine::kStack;
+      Line(L, 20, 140, 280, 140, h);
+      Line(L, 20, 140, 280, 140, h);
+      Cook(&pic);
+      const float raised = Pixel(&pic, 150, 60)[0], stacked = Pixel(&pic, 150, 140)[0];
+      h.mode = BrushEngine::kPress;
+      Line(L, 20, 140, 280, 140, h);
+      Cook(&pic);
+      const float pressed = Pixel(&pic, 150, 140)[0];
+      printf("  relief height: raise x2 %.3f, stack x2 %.3f, pressed %.3f\n", raised, stacked, pressed);
+      Check("S3: stack builds higher than raise", stacked > raised + 0.03f);
+      Check("S3: press dents", pressed < stacked - 0.05f);
+
+      // A relief stroke relights when the light turns: its upper flank is bright lit from above, dark from below.
+      Clear();
+      L = pic.AddPaintLayer();
+      BrushEngine::Brush clay = BrushEngine::Presets()[0].brush;
+      for (const BrushEngine::Preset& pr : BrushEngine::Presets())
+         if (std::string(pr.name) == "Plasticine")
+            clay = pr.brush;
+      clay = Colour(clay, 0.8f, 0.5f, 0.3f);
+      clay.size = 40.0f;
+      clay.pressureSize = false;
+      pic.FindLayer(L)->relief = true;
+      pic.FindLayer(L)->reliefMat = 0;
+      pic.Commit();
+      Line(L, 30, 100, 270, 100, clay);
+      float flank[4][2];
+      for (int mat = 0; mat < 4; mat++)
+      {
+         pic.FindLayer(L)->reliefMat = mat;
+         for (int k = 0; k < 2; k++)
+         {
+            pic.FindLayer(L)->reliefLight = k == 0 ? 90.0f : -90.0f;
+            pic.Commit();
+            Cook(&pic);
+            float sum = 0.0f;
+            for (int x = 140; x < 160; x++)   // stipple is dots: average a run
+               sum += Pixel(&pic, x, 90)[0];
+            flank[mat][k] = sum / 20.0f;
+         }
+      }
+      printf("  relief upper flank lit from top / bottom: clay %.3f/%.3f metal %.3f/%.3f chrome %.3f/%.3f stipple %.3f/%.3f\n",
+             flank[0][0], flank[0][1], flank[1][0], flank[1][1], flank[2][0], flank[2][1], flank[3][0], flank[3][1]);
+      Check("S3: a relief stroke relights when the light turns", flank[0][0] > flank[0][1] + 0.15f);
+      Check("S3: metal, chrome and stipple relight too", std::fabs(flank[1][0] - flank[1][1]) > 0.1f && std::fabs(flank[2][0] - flank[2][1]) > 0.1f
+                                                         && std::fabs(flank[3][0] - flank[3][1]) > 0.05f);
+      {
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         const Layer* c = copy.FindLayer(L);
+         Check("S3: relief saves", c != nullptr && c->relief && c->reliefMat == 3 && std::fabs(c->reliefLight + 90.0f) < 1e-4f);
+      }
+
+      // Marbling: a drop pushes a red line aside and takes its place.
+      const auto IsRed = [&](int x, int y) { const std::vector<float> c = Pixel(&pic, x, y); return c[0] > 0.4f && c[1] < 0.2f && c[2] < 0.2f; };
+      Clear();
+      L = pic.AddPaintLayer();
+      BrushEngine::Brush red = Colour(hard, 1, 0, 0);
+      red.size = 6.0f;
+      Line(L, 150, 10, 150, 190, red);
+      BrushEngine::Brush drop = Colour(hard, 0, 0, 1);
+      drop.mode = BrushEngine::kDrop;
+      drop.size = 50.0f;
+      pic.BeginPaint(L, 0, drop, 130.0f, 100.0f, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      int pushedTo = 0;
+      for (int x = 151; x < 200 && pushedTo == 0; x++)
+         if (IsRed(x, 100))
+            pushedTo = x;
+      printf("  drop: red line at 150 pushed to %d (expected ~162)\n", pushedTo);
+      Check("S3: a drop pushes paint aside", Pixel(&pic, 150, 100)[2] > 0.9f && pushedTo >= 158 && pushedTo <= 167 && IsRed(150, 10));
+      // Comb: a tine drawn down through a red line drags it down.
+      Clear();
+      L = pic.AddPaintLayer();
+      BrushEngine::Brush band = red;
+      band.size = 16.0f;
+      Line(L, 10, 60, 290, 60, band);
+      BrushEngine::Brush comb = hard;
+      comb.mode = BrushEngine::kComb;
+      comb.size = 40.0f;
+      comb.tines = 1;
+      comb.spacing = 0.25f;
+      Line(L, 150, 30, 150, 160, comb);
+      Cook(&pic);
+      int dragged = 0;
+      for (int y = 70; y < 170; y++)
+         dragged += IsRed(150, y) ? 1 : 0;
+      {
+         std::string col;
+         for (int y = 50; y < 170; y += 6)
+         {
+            const std::vector<float> c = Pixel(&pic, 150, y);
+            char b[48];
+            std::snprintf(b, sizeof(b), " %d:%.2f/%.2f", y, c[0], c[1]);
+            col += b;
+         }
+         printf("  comb column x=150:%s\n", col.c_str());
+      }
+      Check("S3: a comb drags the paint along", !IsRed(150, 60) && dragged > 10 && IsRed(40, 60));
+      // Swirl: turning round a point on the line bends it off its column.
+      Clear();
+      L = pic.AddPaintLayer();
+      Line(L, 150, 10, 150, 190, red);
+      BrushEngine::Brush swirl = hard;
+      swirl.mode = BrushEngine::kSwirl;
+      swirl.size = 80.0f;
+      swirl.spacing = 0.05f;
+      Line(L, 150, 100, 162, 100, swirl);
+      Cook(&pic);
+      int off = 0;
+      for (int y = 75; y < 125; y++)
+         for (int x = 120; x < 180; x++)
+            if (std::abs(x - 150) > 6 && IsRed(x, y))
+               off++;
+      printf("  swirl: %d red px off the column\n", off);
+      Check("S3: a swirl turns the paint", off > 20 && IsRed(150, 15));
+   }
+
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
    {
       Scene2DNode pic;

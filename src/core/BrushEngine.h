@@ -22,7 +22,13 @@ namespace BrushEngine
                // Retouch: the stroke reworks the pixels already there instead of laying colour.
                kBlur, kSharpen, kDodge, kBurn, kClone, kHeal,
                // Drags the colour under the brush along the stroke (paints straight onto the surface).
-               kSmudge };
+               kSmudge,
+               // Relief (height in alpha): Raise is Normal; Stack adds the stroke's height on top; Press dents.
+               kStack, kPress,
+               // Marbling: the paint floats. A drop pushes it apart, a comb drags tines through it, a swirl turns it.
+               kDrop, kComb, kSwirl };
+   inline bool DirectMode(int m) { return m == kSmudge || m == kDrop || m == kComb || m == kSwirl; }
+   inline bool MarbleMode(int m) { return m == kDrop || m == kComb || m == kSwirl; }
 
    const std::vector<std::string>& TipNames();
 
@@ -54,6 +60,8 @@ namespace BrushEngine
       int range = 1;               // dodge / burn: 0 shadows, 1 midtones, 2 highlights
       bool sampleAll = false;      // clone / heal: copy from the whole picture (the surface owner fills sourceTex)
       unsigned sourceTex = 0;      // clone / heal: read from this texture (surface-sized) instead of the surface
+      int relief = -1;             // relief preset: the material the layer takes (0 plasticine .. 3 ink stipple)
+      int tines = 5;               // comb: tines across the brush's width
       float color[3] = { 0.0f, 0.0f, 0.0f };
       float sourceOffset[2] = { 0.0f, 0.0f };   // clone / heal: where to copy from, surface pixels from the dab
    };
@@ -113,6 +121,7 @@ namespace BrushEngine
       };
       void DrawDab(const Pending& q, float taper);
       void SmudgeDab(const Pending& q, float r, float strength);
+      void WarpDab(const Pending& q, float r, float strength);
       void Walk(float x, float y, float pressure);
       void Merge(const GLUtil::Fbo& surface, const GLUtil::Fbo& out);
       bool EnsurePrograms();

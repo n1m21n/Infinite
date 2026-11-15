@@ -29,9 +29,12 @@ public:
    static constexpr int kKindCount = 7;
    // Adjustment layers: the picture below, changed in place (masks and clip limit where).
    enum AdjType { kAdjPixelate = 0, kAdjHalftone, kAdjDither, kAdjThreshold, kAdjGradientMap, kAdjPosterize,
-                  kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjCount };
+                  kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjLevels, kAdjCurves,
+                  kAdjCount };
    static const char* AdjName(int type);
    static float AdjDefault(int type);
+   // A smooth curve through the points that never overshoots between them, sampled n times over 0..1.
+   static void CurveLut(const std::vector<float>& pts, float* lut, int n);
    static void AdjRange(int type, float& lo, float& hi);
    static constexpr int kDrives = 4;   // Drive A..D: modulatable 0..1 knobs adjustment layers follow
 
@@ -127,10 +130,20 @@ public:
       float adjAmt = 16.0f, adjTo = 16.0f;
       int adjDrive = 0;
       bool adjMap = false;
+      // Levels (amount = gamma): input black, input white, output black, output white, 0..1.
+      float levels[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+      // Curves (amount = strength): x, y pairs in 0..1, sorted by x, ends included.
+      std::vector<float> curve = { 0.0f, 0.0f, 1.0f, 1.0f };
       // Paint layers: the surface's size and its tiles (TileStore keys, row
       // major from the bottom row, kTile px square).
       int pw = 0, ph = 0;
       std::vector<std::string> tiles;
+      // Relief (paint layers): alpha is height, lit by a light that turns. reliefMat: 0 plasticine, 1 metal,
+      // 2 chrome, 3 ink stipple. reliefLight: degrees the light comes from (90 = top); reliefElev: its height,
+      // degrees; reliefDepth: px of height at full alpha.
+      bool relief = false;
+      int reliefMat = 0;
+      float reliefLight = 120.0f, reliefElev = 40.0f, reliefDepth = 20.0f;
       // Pixel mask (any layer but a group): grey, white shows. Sized to the layer's box.
       bool pmaskOn = true;
       int mw = 0, mh = 0;
@@ -551,6 +564,11 @@ private:
    bool mFxTried = false;
    // Adjustment layers: the picture below, changed, ready for the layer's normal pass.
    GLUtil::Fbo mAdjFbo;
+   // Relief paint layers, lit; one per layer, redone each cook.
+   std::map<int, GLUtil::Fbo> mRelief;
+   unsigned mReliefProgram = 0;
+   bool mReliefTried = false;
+   unsigned ShadeRelief(const Layer& l, unsigned tex, int w, int h);
    unsigned mAdjProgram = 0;
    bool mAdjTried = false, mAdjReady = false;
    bool RunAdjust(const Layer& l, unsigned src);
