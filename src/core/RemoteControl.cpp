@@ -254,7 +254,11 @@ namespace RemoteControl
          {
             std::string error;
             json out;
-            if (handler(cmd->method, cmd->params, out, error))
+            bool ok = false;
+            // A wrongly typed field (a string where a list is expected) threw out of the handler and ended the app.
+            try { ok = handler(cmd->method, cmd->params, out, error); }
+            catch (const std::exception& e) { error = std::string("bad request: ") + e.what(); }
+            if (ok)
             {
                cmd->response.set_value(out);
             }

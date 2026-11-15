@@ -82,7 +82,7 @@ namespace app
          Transport& tr = Transport::Instance();
          outResult = { { "window", ProcessTree::Self() }, { "patch", gPatchPath }, { "dirty", gPatchDirty }, { "nodes", gNodes.size() }, { "cables", gLinks.size() },
                        { "playing", tr.IsPlaying() }, { "seconds", tr.Seconds() }, { "beats", tr.Beats() }, { "bpm", tr.Tempo() },
-                       { "showLock", gShowLock } };
+                       { "showLock", gShowLock }, { "fps", ImGui::GetIO().Framerate } };   // ImGui's 60-frame average
          return true;
       }
       if (method == "transport")

@@ -1,4 +1,5 @@
 // RPC command handler (moved verbatim from main.cpp).
+#include "core/CookProbe.h"
 #include "app/AppShared.h"
 #include "imgui_internal.h"
 
@@ -152,6 +153,14 @@ namespace app
             links.push_back(entry);
          }
          out["links"] = links;
+         if (CookProbe::gOn.load(std::memory_order_relaxed))   // View > Cook times on: each node's smoothed CPU cook ms
+         {
+            json cook = json::object();
+            for (const GraphNode& gn : gNodes)
+               if (gn.node != nullptr && CookProbe::Ms(gn.node.get()) >= 0.0f)
+                  cook[std::to_string(gn.index)] = CookProbe::Ms(gn.node.get());
+            out["cookMs"] = cook;
+         }
          outResult = out;
          return true;
       }

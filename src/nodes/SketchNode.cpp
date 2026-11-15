@@ -45,7 +45,8 @@ SketchNode::SketchNode() { code = Presets()[0].code; }
 
 SketchNode::~SketchNode()
 {
-   if (mTex != 0) glDeleteTextures(1, &mTex);
+   for (unsigned int& t : mRing)
+      if (t != 0) glDeleteTextures(1, &t);
 }
 
 void SketchNode::LoadPreset(int index)
@@ -166,9 +167,11 @@ void SketchNode::CookIfNeeded(int frameId)
    for (int y = 0; y < h; y++)
       std::memcpy(&mFlipped[(size_t)y * stride], &mPixels[(size_t)(h - 1 - y) * stride], stride);
 
-   if (mTex == 0) glGenTextures(1, &mTex);
-   glBindTexture(GL_TEXTURE_2D, mTex);
-   if (mUploadedW == w && mUploadedH == h)
+   mRingAt = (mRingAt + 1) % 3;
+   unsigned int& tex = mRing[mRingAt];
+   if (tex == 0) glGenTextures(1, &tex);
+   glBindTexture(GL_TEXTURE_2D, tex);
+   if (mRingW[mRingAt] == w && mRingH[mRingAt] == h)
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, mFlipped.data());
    else
    {
@@ -177,8 +180,10 @@ void SketchNode::CookIfNeeded(int frameId)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-      mUploadedW = w; mUploadedH = h;
+      mRingW[mRingAt] = w; mRingH[mRingAt] = h;
    }
+   mTex = tex;
+   mUploadedW = w; mUploadedH = h;
    glBindTexture(GL_TEXTURE_2D, 0);
    mW = w; mH = h;
    mRevision = NextTextureRevision();

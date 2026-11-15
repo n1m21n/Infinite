@@ -80,7 +80,12 @@ private:
 
    std::vector<unsigned char> mUploadedPixels;   // the picture in mTex, top row first
    int mUploads = 0;
-   unsigned int mTex = 0;
+   unsigned int mTex = 0;       // the newest of mRing
+   // Uploads rotate through three textures: writing into the one the GPU is still sampling made glTexSubImage2D wait
+   // for the GPU every frame (~20 ms of a 1024 px animated sketch, measured on the nov15 patch).
+   unsigned int mRing[3] = { 0, 0, 0 };
+   int mRingW[3] = { 0, 0, 0 }, mRingH[3] = { 0, 0, 0 };
+   int mRingAt = 0;
    int mW = 4, mH = 4;          // size of the uploaded texture
    int mUploadedW = 0, mUploadedH = 0;
    unsigned long long mRevision = 0;

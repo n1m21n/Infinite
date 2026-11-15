@@ -729,25 +729,44 @@ namespace MeshOps
       return out;
    }
 
-   // Neighbour sets over welded indices, built from triangle edges.
-   std::map<unsigned int, std::set<unsigned int>> BuildAdjacency(
-      const Mesh& in, const std::vector<unsigned int>& weld)
+   // Neighbour lists over welded indices, built from triangle edges: vertex v's neighbours are nb[off[v] .. off[v+1]),
+   // sorted and unique (the order std::set gave, so sums come out bit-identical). Flat arrays instead of a map of sets:
+   // Smooth after an animated Sketch 3D rebuilt the map every frame and it was ~16% of the frame (nov15 patch).
+   struct Adjacency
    {
-      std::map<unsigned int, std::set<unsigned int>> adjacency;
+      std::vector<unsigned int> off, nb;
+   };
+   Adjacency BuildAdjacency(const Mesh& in, const std::vector<unsigned int>& weld)
+   {
+      std::vector<uint64_t> edges;
+      edges.reserve(in.indices.size() * 2);
+      unsigned int top = 0;
       for (size_t t = 0; t + 2 < in.indices.size(); t += 3)
       {
-         const unsigned int v[3] = { weld[in.indices[t]], weld[in.indices[t + 1]],
-                                     weld[in.indices[t + 2]] };
+         const unsigned int v[3] = { weld[in.indices[t]], weld[in.indices[t + 1]], weld[in.indices[t + 2]] };
          for (int e = 0; e < 3; e++)
          {
-            const unsigned int a = v[e], b = v[(e + 1) % 3];
-            if (a == b)
+            const unsigned int x = v[e], y = v[(e + 1) % 3];
+            if (x == y)
                continue;
-            adjacency[a].insert(b);
-            adjacency[b].insert(a);
+            edges.push_back(((uint64_t)x << 32) | y);
+            edges.push_back(((uint64_t)y << 32) | x);
+            top = std::max(top, std::max(x, y) + 1);
          }
       }
-      return adjacency;
+      std::sort(edges.begin(), edges.end());
+      edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
+      Adjacency adj;
+      adj.off.assign((size_t)top + 1, 0);
+      adj.nb.resize(edges.size());
+      for (size_t i = 0; i < edges.size(); i++)
+      {
+         adj.off[(size_t)(edges[i] >> 32) + 1]++;
+         adj.nb[i] = (unsigned int)(edges[i] & 0xffffffffu);
+      }
+      for (size_t v = 0; v < top; v++)
+         adj.off[v + 1] += adj.off[v];
+      return adj;
    }
 
    // Catmull-Clark for a mesh whose faces are quads drawn as triangle pairs (a cube, a grid, a
@@ -1275,7 +1294,7 @@ namespace MeshOps
          return out;
 
       const std::vector<unsigned int> weld = BuildWeldMap(in);
-      const std::map<unsigned int, std::set<unsigned int>> adjacency = BuildAdjacency(in, weld);
+      const Adjacency adjacency = BuildAdjacency(in, weld);
 
       // Taubin: a positive Laplacian pass that relaxes the surface, then a
       // slightly larger negative one that pushes back out. Plain Laplacian
@@ -1298,17 +1317,18 @@ namespace MeshOps
          const float step = (pass % 2 == 0) ? lambda : mu;
          std::vector<float> nx = px, ny = py, nz = pz;
 
-         for (const auto& entry : adjacency)
+         for (unsigned int v = 0; v + 1 < (unsigned int)adjacency.off.size(); v++)
          {
-            const unsigned int v = entry.first;
-            if (entry.second.empty())
+            const unsigned int b0 = adjacency.off[v], b1 = adjacency.off[v + 1];
+            if (b0 == b1)
                continue;
             float sx = 0, sy = 0, sz = 0;
-            for (unsigned int n : entry.second)
+            for (unsigned int k = b0; k < b1; k++)
             {
+               const unsigned int n = adjacency.nb[k];
                sx += px[n]; sy += py[n]; sz += pz[n];
             }
-            const float inv = 1.0f / (float)entry.second.size();
+            const float inv = 1.0f / (float)(b1 - b0);
             nx[v] = px[v] + step * (sx * inv - px[v]);
             ny[v] = py[v] + step * (sy * inv - py[v]);
             nz[v] = pz[v] + step * (sz * inv - pz[v]);
@@ -2231,7 +2251,7 @@ namespace MeshOps
       }
 
       const std::vector<unsigned int> weld = BuildWeldMap(work);
-      const std::map<unsigned int, std::set<unsigned int>> adjacency = BuildAdjacency(work, weld);
+      const Adjacency adjacency = BuildAdjacency(work, weld);
 
       std::vector<float> px(work.vertices.size()), py(work.vertices.size()), pz(work.vertices.size());
       for (size_t i = 0; i < work.vertices.size(); i++)
@@ -2246,17 +2266,18 @@ namespace MeshOps
       for (int pass = 0; pass < 2; pass++)
       {
          std::vector<float> nx = px, ny = py, nz = pz;
-         for (const auto& entry : adjacency)
+         for (unsigned int v = 0; v + 1 < (unsigned int)adjacency.off.size(); v++)
          {
-            const unsigned int v = entry.first;
-            if (entry.second.empty())
+            const unsigned int b0 = adjacency.off[v], b1 = adjacency.off[v + 1];
+            if (b0 == b1)
                continue;
             float sx = 0, sy = 0, sz = 0;
-            for (unsigned int n : entry.second)
+            for (unsigned int k = b0; k < b1; k++)
             {
+               const unsigned int n = adjacency.nb[k];
                sx += px[n]; sy += py[n]; sz += pz[n];
             }
-            const float inv = 1.0f / (float)entry.second.size();
+            const float inv = 1.0f / (float)(b1 - b0);
             nx[v] = px[v] + (sx * inv - px[v]) * strength;
             ny[v] = py[v] + (sy * inv - py[v]) * strength;
             nz[v] = pz[v] + (sz * inv - pz[v]) * strength;
