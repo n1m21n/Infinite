@@ -2741,6 +2741,29 @@ void RunRpcBatchTest()
       }
    }
 
+   // Agent gate (propose): commits valid batches under one undo step, rolls back on failure.
+   {
+      NewPatch();
+      const size_t undo0 = gUndoStack.size();
+      json goodPropose = {
+         {"label", "add shape"},
+         {"calls", json::array({ { {"method", "create_node"}, {"params", { {"typeName", "Shape"}, {"category", "Source"} }} } })}
+      };
+      Check("propose: valid batch succeeds",
+            Call("propose", goodPropose, r, e) && r.value("ok", false) && gNodes.size() == 1 && gUndoStack.size() == undo0 + 1);
+
+      json badPropose = {
+         {"label", "bad call"},
+         {"calls", json::array({
+            { {"method", "create_node"}, {"params", { {"typeName", "Shape"}, {"category", "Source"} }} },
+            { {"method", "delete_node"}, {"params", { {"index", 99999} }} }
+         })}
+      };
+      Check("propose: failing call rolls back cleanly",
+            Call("propose", badPropose, r, e) && !r.value("ok", true) && !r["errors"].empty() &&
+               gNodes.size() == 1 && gUndoStack.size() == undo0 + 1);
+   }
+
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }
 
