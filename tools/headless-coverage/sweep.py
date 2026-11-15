@@ -348,6 +348,12 @@ class Sweep:
         return row
 
     # ---- rendering rounds ----------------------------------------------
+    def default_failed(self, d):
+        try:
+            return json.load(open(os.path.join(d, "defA.json"))).get("ok") is False
+        except (OSError, ValueError):
+            return False
+
     def render(self, staged_jobs, label):
         """staged_jobs: [(dir, chan, [(jid, patch text)])]. Writes the patches and renders what is not done,
         one chunk per run of whole types (a type larger than --chunk is a chunk of its own)."""
@@ -356,6 +362,10 @@ class Sweep:
             times = TIMES_3D if d in self.dirs_3d else TIMES
             os.makedirs(d, exist_ok=True)
             lines = []
+            if self.default_failed(d):
+                # the type does not render by default: analyse() marks every param an error, so its variants are
+                # not rendered (each would fail alone and restart the app)
+                jobs = [j for j in jobs if j[0] == "defA"]
             for jid, text in jobs:
                 pf = os.path.join(d, jid + ".inf")
                 with open(pf, "w") as f:
