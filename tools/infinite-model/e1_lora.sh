@@ -15,6 +15,6 @@ mkdir -p "$OUT/adapters"
   --adapter-path "$OUT/adapters/$TAG" --iters "$ITERS" --batch-size 4 --num-layers 8 \
   --learning-rate 1e-4 --mask-prompt --steps-per-eval 100 --save-every 200 --max-seq-length 1024 \
   2>&1 | tee "$OUT/adapters/lora-$TAG.log"
-"$PY" "$ROOT/tools/infinite-model/e1_eval.py" --arm lora --model "$MODEL" --adapter "$OUT/adapters/$TAG" --tag "$TAG" \
+"$PY" "$ROOT/tools/infinite-model/e1_eval.py" --arm lora --model "$MODEL" --adapter "$OUT/adapters/$TAG" --tag "$TAG" --cap "${CAP:-150}" \
   --compare "b2-$TAG" "lora-$TAG"
 "$PY" "$ROOT/tools/infinite-model/e1_sheet.py" "lora-$TAG"
