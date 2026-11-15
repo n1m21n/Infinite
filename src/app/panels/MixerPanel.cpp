@@ -49,6 +49,8 @@ namespace app
    int gMixerPanelStripCount = 0;
    float gMixerPanelFaderH = 0.0f;
    ImVec2 gMixerStripsMin, gMixerStripsMax, gMixerMasterMin, gMixerMasterMax;
+   bool gMixerRenderOpen = false;
+   ImVec2 gMixerRenderMin, gMixerRenderMax;
 
    bool IsMixerPageTerminal(const INode* terminal, const INode* resolvedSource)
    {
@@ -61,6 +63,7 @@ namespace app
       // Strip geometry. The fader takes whatever height is left after the fixed rows.
       constexpr float kStripW = 58.0f;
       constexpr float kStripGap = 4.0f;
+      constexpr float kRenderW = 196.0f;
       constexpr float kNameH = 22.0f;
       constexpr float kKnobD = 24.0f;
       constexpr float kButtonsH = 20.0f;
@@ -935,7 +938,15 @@ namespace app
             const bool mixerMode = gAudioMode == AudioMode::Mixer;
             const char* audioLabel = mixerMode ? T("Mixer Audio On") : T("Enable Mixer Audio");
             const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
+            const char* renderLabel = T("Render");
+            const float renderW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
             ImGui::SameLine();
+            ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + avail.x - audioW - renderW - tok::space_2), origin.y));
+            if (ChipButton::Draw(renderLabel, gMixerRenderOpen || MixerRenderActive(), tok::tile))
+               gMixerRenderOpen = !gMixerRenderOpen;
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Record this console to a file."));
+            ImGui::SameLine(0.0f, tok::space_2);
             ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + avail.x - audioW), origin.y));
             if (ChipButton::Draw(audioLabel, mixerMode, tok::tile))
                SetMixerAudio(!mixerMode);
@@ -945,8 +956,9 @@ namespace app
          }
 
          const ImVec2 bodyMin(origin.x, ImGui::GetCursorScreenPos().y + tok::space_2);
-         const ImVec2 bodyMax(origin.x + avail.x, origin.y + avail.y);
+         ImVec2 bodyMax(origin.x + avail.x, origin.y + avail.y);
          gMixerPanelStripCount = 0;
+         gMixerRenderMin = gMixerRenderMax = ImVec2(0.0f, 0.0f);
          if (current < 0)
          {
             if (bodyMax.y > bodyMin.y)
@@ -960,10 +972,21 @@ namespace app
             const bool canAdd = top && top->numChannels < MixerNode::kMaxSlots;
 
             // §4.4: master at the right edge on a wide dock, under the strips on a tall one.
-            const float bodyW = bodyMax.x - bodyMin.x, bodyH = bodyMax.y - bodyMin.y;
+            const float bodyH = bodyMax.y - bodyMin.y;
             const float scrollH = ImGui::GetStyle().ScrollbarSize;
             const float minStripH = kNameH + kInsertsH + kSendH + kKnobD + kButtonsH + 5.0f * kRowGap + kMinFaderH;
             const bool tall = (gMixerPanelDock == 1 || gMixerPanelDock == 2) && bodyH >= 2.0f * minStripH + scrollH + kStripGap;
+            // §5: the render column sits right of the master. A wide dock gives it the right edge;
+            // a tall one the space beside the master. Too narrow for it and it stays hidden.
+            const bool wantRender = gMixerRenderOpen || MixerRenderActive();
+            ImVec2 renderMin(0.0f, 0.0f), renderMax(0.0f, 0.0f);
+            if (wantRender && !tall && bodyMax.x - bodyMin.x >= kRenderW + 3.0f * kStripW + 4.0f * kStripGap)
+            {
+               renderMin = ImVec2(bodyMax.x - kRenderW, bodyMin.y);
+               renderMax = bodyMax;
+               bodyMax.x -= kRenderW + 2.0f * kStripGap;
+            }
+            const float bodyW = bodyMax.x - bodyMin.x;
             float stripsW, stripsH, masterH;
             ImVec2 masterAt;
             if (tall)
@@ -1028,6 +1051,23 @@ namespace app
             ImGui::EndChild();
             gMixerPanelStripCount = (int)strips.size();
             DrawMaster(ImGui::GetWindowDrawList(), masterAt, masterH, page.topIndex);
+            if (wantRender && tall && bodyW - kStripW - 2.0f * kStripGap >= 150.0f)
+            {
+               renderMin = ImVec2(masterAt.x + kStripW + 2.0f * kStripGap, masterAt.y);
+               renderMax = ImVec2(bodyMax.x, masterAt.y + masterH);
+            }
+            if (renderMax.x > renderMin.x && renderMax.y - renderMin.y > 40.0f)
+            {
+               std::vector<int> outs;
+               for (const Page& pg : pages)
+                  outs.push_back(pg.outIndex);
+               ImGui::SetCursorScreenPos(renderMin);
+               ImGui::BeginChild("##mixerrender", ImVec2(renderMax.x - renderMin.x, renderMax.y - renderMin.y), false);
+               DrawMixerRenderColumn(outs, page.outIndex);
+               ImGui::EndChild();
+               gMixerRenderMin = renderMin;
+               gMixerRenderMax = renderMax;
+            }
          }
 
          // Right-click empty panel space to move or close it (rect test, as the Mod Matrix does).

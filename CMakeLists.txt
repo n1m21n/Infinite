@@ -569,6 +569,7 @@ set(COMMON_SOURCES
     src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
     src/app/panels/MixerPanel.cpp
+    src/app/panels/MixerRender.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp
     src/app/panels/ViewportPanel.cpp

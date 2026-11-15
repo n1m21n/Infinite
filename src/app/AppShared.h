@@ -803,6 +803,39 @@ bool MixerPanelInsertBypass(int mixerIndex, int slot, int pos);
 int MixerPanelGroupStrips(int mixerIndex, const std::vector<int>& slots);
 bool MixerPanelUngroup(int mixerIndex, int slot);
 bool MixerPanelStripMove(int mixerIndex, int from, int to);
+// Block C: the render column (MixerRender.cpp). One take per Audio Out, through its own recorder.
+struct MixerRenderSettings
+{
+   int source = 0;     // 0 this page, 1 all pages (one file each)
+   int mode = 0;       // 0 live, 1 fast (offline)
+   int lengthUnit = 0; // 0 seconds, 1 bars, 2 until stop
+   float length = 30.0f;
+   float tail = 2.0f;  // seconds, rendered with the transport stopped
+   int start = 0;      // 0 now, 1 with transport play, 2 from the start
+   int format = 0;     // 0 WAV 16, 1 WAV 24, 2 FLAC, 3 MP3
+   std::string name = "{patch}-{take}";
+};
+struct MixerRenderResult
+{
+   std::string path;
+   float peak = 0.0f, lufs = -120.0f, truePeakDb = -120.0f;
+   int64_t frames = 0, bytes = 0;
+   double seconds = 0.0;
+};
+extern MixerRenderSettings gMixerRender;
+bool MixerRenderStart(const std::vector<int>& outIndices); // false + a notice when refused
+void MixerRenderCancel();                                  // live: stop and keep; fast or armed: drop
+void MixerRenderTick();                                    // every frame
+bool MixerRenderActive();
+bool MixerRenderArmed();
+float MixerRenderProgress();                               // 0..1, < 0 when there is no end yet
+double MixerRenderLengthSeconds();
+const std::vector<MixerRenderResult>& MixerRenderResults();
+const std::string& MixerRenderRefusal();
+std::string MixerRenderFileName(const std::string& tmpl, const std::string& dir, const char* ext);
+void DrawMixerRenderColumn(const std::vector<int>& pageOuts, int currentOut);
+extern bool gMixerRenderOpen;
+extern ImVec2 gMixerRenderMin, gMixerRenderMax; // the column's rect when drawn, zero when hidden
 bool MixerPanelShowMixer(int nodeIndex); // opens the panel on the page holding this Mixer; false if on no page
 int MixerPanelCurrentPageTop();          // node index of the shown page's top Mixer, -1 when none
 bool MixerPanelGroupOpen(int mixerIndex);

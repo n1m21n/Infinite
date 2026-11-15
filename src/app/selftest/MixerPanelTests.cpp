@@ -530,6 +530,100 @@ namespace
       NewPatch();
    }
 
+   // Block C: a Fast take is sample-exact, names never collide, and Fast refuses what it can't render.
+   void CheckRender()
+   {
+      namespace fs = std::filesystem;
+      std::error_code ec;
+      const fs::path dirPath = fs::temp_directory_path(ec) / "infinite-mixer-render-test";
+      fs::remove_all(dirPath, ec);
+      fs::create_directories(dirPath, ec);
+      const std::string dir = dirPath.string();
+
+      Check("a free name is used as it is", MixerRenderFileName("mix", dir, "wav") == "mix.wav");
+      { std::ofstream f(dir + "/mix.wav"); f << "x"; }
+      Check("a taken name gets a number, never an overwrite", MixerRenderFileName("mix", dir, "wav") == "mix-2.wav");
+      { std::ofstream f(dir + "/mix-001.wav"); f << "x"; }
+      Check("{take} counts past existing files", MixerRenderFileName("mix-{take}", dir, "wav") == "mix-002.wav");
+
+      static ToneNode tone;
+      tone.Set(220.0f);
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      std::string err;
+      ConnectNodes(top, 0, out, 0, err);
+      auto* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get());
+      auto* o = dynamic_cast<AudioOutputNode*>(FindNodeByIndex(out)->node.get());
+      m->numChannels = 1;
+      m->inputs[0].Connect(&tone);
+      o->recordDirectory = dir;
+      const bool deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      if (deviceWasRunning)
+         AudioEngine::Instance().Stop();
+      const bool wasPlaying = Transport::Instance().IsPlaying();
+
+      const MixerRenderSettings saved = gMixerRender;
+      gMixerRender = MixerRenderSettings();
+      gMixerRender.mode = 1;
+      gMixerRender.length = 1.0f;
+      gMixerRender.tail = 0.5f;
+      gMixerRender.name = "take-{take}";
+      auto runTake = [&]() {
+         if (!MixerRenderStart({ out }))
+            return false;
+         for (int i = 0; i < 200000 && MixerRenderActive(); i++)
+            MixerRenderTick();
+         return !MixerRenderActive();
+      };
+      char label[240];
+      const bool ran = runTake();
+      const std::vector<MixerRenderResult> first = MixerRenderResults();
+      Check("a Fast take runs to its end", ran && first.size() == 1);
+      if (first.size() == 1)
+      {
+         const MixerRenderResult& r = first[0];
+         const double rate = r.seconds > 0.0 ? (double)r.frames / r.seconds : 0.0;
+         const int64_t want = (int64_t)std::llround(1.5 * rate);
+         snprintf(label, sizeof(label), "length + tail is sample-exact: %lld frames at %.0f Hz, %lld bytes",
+                  (long long)r.frames, rate, (long long)r.bytes);
+         Check(label, rate > 0.0 && r.frames == want && r.bytes >= r.frames * 4 && r.bytes <= r.frames * 4 + 512);
+         snprintf(label, sizeof(label), "the result row has the take's numbers (peak %.3f, %.1f LUFS, %.1f dBTP)", r.peak, r.lufs, r.truePeakDb);
+         Check(label, r.peak > 0.05f && r.peak <= 1.0f && r.lufs > -40.0f && r.lufs < 0.0f && r.truePeakDb > -30.0f);
+         Check("the file is named from the template", r.path == dir + "/take-001.wav");
+      }
+      Check("the transport is handed back", !Transport::Instance().IsOfflineMode() && Transport::Instance().IsPlaying() == wasPlaying && !o->IsRecording());
+      const bool ranAgain = runTake();
+      Check("a second take gets the next number", ranAgain && MixerRenderResults().size() == 1 &&
+                                                    MixerRenderResults()[0].path == dir + "/take-002.wav");
+
+      // Cancel part-way: no file is left behind.
+      gMixerRender.length = 30.0f;
+      const bool started = MixerRenderStart({ out });
+      MixerRenderTick();
+      const bool midway = MixerRenderActive() && MixerRenderProgress() > 0.0f && MixerRenderProgress() < 1.0f;
+      MixerRenderCancel();
+      Check("cancel stops a Fast take and removes its file",
+            started && midway && !MixerRenderActive() && !fs::exists(dirPath / "take-003.wav") && !o->IsRecording() &&
+            !Transport::Instance().IsOfflineMode());
+
+      ClearNotices();
+      gMixerRender.lengthUnit = 2;
+      const bool refused = !MixerRenderStart({ out }) && !MixerRenderActive() && !MixerRenderRefusal().empty();
+      Check("Fast without a length is refused with a notice", refused && Noticed("mixer.render"));
+      ClearNotices();
+
+      gMixerRender = saved;
+      if (deviceWasRunning)
+      {
+         std::string startErr;
+         StartAudioEngine(startErr);
+      }
+      m->inputs[0].Disconnect();
+      NewPatch();
+      fs::remove_all(dirPath, ec);
+   }
+
    // A page whose top Mixer has `strips` slots, one source each, and one group Mixer on slot 0.
    void BuildConsole(int strips)
    {
@@ -608,6 +702,7 @@ bool MixerPanelTestStep(int frameId)
       CheckInserts();
       CheckGroups();
       CheckMeters();
+      CheckRender();
       sCase = 0;
       BuildConsole(kCounts[0]);
       gMixerPanelDock = kOrder[0];
@@ -640,6 +735,42 @@ bool MixerPanelTestStep(int frameId)
       }
       return false;
    }
+   // Block C: the render column, on a wide dock and on a tall one, stays inside the card and clear of the strips.
+   if (sCase < 17)
+   {
+      static bool sRenderSet = false;
+      if (!sRenderSet)
+      {
+         sRenderSet = true;
+         gMixerRenderOpen = true;
+         gMixerPanelDock = 0;
+         sCaseAt = frameId;
+         return false;
+      }
+      if (frameId < sCaseAt + 3)
+         return false;
+      const ImVec2 cmn = gMixerPanelRectMin, cmx = gMixerPanelRectMax;
+      const ImVec2 rmn = gMixerRenderMin, rmx = gMixerRenderMax;
+      auto apart = [](ImVec2 amn, ImVec2 amx, ImVec2 bmn, ImVec2 bmx) {
+         return amx.x <= bmn.x + 0.5f || bmx.x <= amn.x + 0.5f || amx.y <= bmn.y + 0.5f || bmx.y <= amn.y + 0.5f;
+      };
+      const bool drawn = rmx.x - rmn.x >= 150.0f && rmx.y - rmn.y > 40.0f;
+      const bool inside = rmn.x >= cmn.x - 1.0f && rmx.x <= cmx.x + 1.0f && rmn.y >= cmn.y - 1.0f && rmx.y <= cmx.y + 1.0f &&
+                          gMixerStripsMax.x <= cmx.x + 1.0f && gMixerMasterMax.x <= cmx.x + 1.0f;
+      const bool clear = apart(rmn, rmx, gMixerStripsMin, gMixerStripsMax) && apart(rmn, rmx, gMixerMasterMin, gMixerMasterMax) &&
+                         apart(gMixerMasterMin, gMixerMasterMax, gMixerStripsMin, gMixerStripsMax);
+      char label[160];
+      snprintf(label, sizeof(label), "render column, %s: %.0f px wide, inside the card, clear of strips and master",
+               sCase == 15 ? "bottom" : "right", rmx.x - rmn.x);
+      Check(label, drawn && inside && clear && gMixerPanelStripCount == 32);
+      if (++sCase < 17)
+      {
+         gMixerPanelDock = 1;
+         sCaseAt = frameId;
+      }
+      return false;
+   }
+   gMixerRenderOpen = false;
    NewPatch();
    gMixerPanelOpen = false;
    gMixerPanelDock = 0;
