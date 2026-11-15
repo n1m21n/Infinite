@@ -20,7 +20,6 @@ class ResynthNode : public INode
 {
 public:
    static INode* Create() { return new ResynthNode(); }
-   static const std::vector<std::string>& ModeNames();
 
    // The eight mutation operators the pad can sweep between. Each pad corner is
    // assigned one of these, and the orb's position bilinearly blends the four
@@ -69,7 +68,6 @@ public:
    float padX = 0.5f;
    float padY = 0.5f;
 
-   int mode = 0;
    float chaos = 0.35f;
    float mutation = 0.4f;
    float feedback = 0.85f;   // how much of the previous generation survives
@@ -85,7 +83,7 @@ public:
    // it was just encoded from mPath).
    void VisitParams(ParamVisitor& v) override
    {
-      v.Int("mode", mode); v.Float("chaos", chaos); v.Float("mutation", mutation);
+      v.Float("chaos", chaos); v.Float("mutation", mutation);
       v.Float("feedback", feedback); v.Float("sourcePull", sourcePull);
       v.Float("stepsPerBeat", stepsPerBeat);
       v.Bool("autoIterate", autoIterate); v.Bool("loopPath", loopPath);

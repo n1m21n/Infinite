@@ -101,7 +101,7 @@ def values_for(row):
         return ["0" if str(d) in ("1", "true") else "1"]
     if kind == "color":
         return ["1 0 0", "0 0.3 1"]
-    if kind == "int":
+    if kind == "int" or (kind == "float" and row.get("options")):
         dv = int(float(d or 0))
         opts = row.get("options") or []
         if opts:
@@ -149,7 +149,8 @@ def bare(patch):
 
 
 def is_switch(row):
-    return row["kind"] == "bool" or (row["kind"] == "int" and row.get("options"))
+    # filter enums are saved as floats ("f uAxis 1"), so options alone make a switch
+    return row["kind"] == "bool" or (row["kind"] in ("int", "float") and bool(row.get("options")))
 
 
 MAX_CONTEXTS = 12
@@ -429,6 +430,15 @@ class Sweep:
                 continue
             mid = (lo + hi) / 2
             v = str(int(round(mid))) if row["kind"] == "int" else f"{mid:.6g}"
+            out.append((f"{row['key']}={v}", with_param(base, f"{row['tag']} {row['key']} {v}")))
+        # knobs that gate the rest (a bloom threshold above the picture's brightest pixel) at their minimum
+        for i, row in enumerate(rows):
+            lo, hi, d = row.get("min"), row.get("max"), row.get("default")
+            if row["kind"] not in ("int", "float") or is_switch(row) or lo is None or hi is None or hi <= lo:
+                continue
+            if d is None or abs(float(d) - lo) <= 1e-6 or i in dead:
+                continue
+            v = str(int(lo)) if row["kind"] == "int" else f"{lo:.6g}"
             out.append((f"{row['key']}={v}", with_param(base, f"{row['tag']} {row['key']} {v}")))
         return out[:MAX_CONTEXTS]
 

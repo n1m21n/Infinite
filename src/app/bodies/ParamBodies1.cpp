@@ -1519,13 +1519,16 @@ namespace app
          if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
             n->PlayPath();
       }
-      ModCheckbox("loop path", &n->loopPath);
-      ImGui::SameLine();
+      // looping only means something once a path is recorded
+      if (n->Path().size() >= 2)
+      {
+         ModCheckbox("loop path", &n->loopPath);
+         ImGui::SameLine();
+      }
       if (ActionButton::Draw("clear"))
          n->ClearPath();
 
       NodeSeparator();
-      DropdownButton("mode", ResynthNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
       ModSlider("chaos", &n->chaos, 0.0f, 1.0f);
       ModSlider("mutation", &n->mutation, 0.0f, 1.0f);
       ModSlider("feedback", &n->feedback, 0.0f, 1.0f);
