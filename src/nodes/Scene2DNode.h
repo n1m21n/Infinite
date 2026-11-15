@@ -218,6 +218,8 @@ public:
       uint64_t camUid = 0;                   // a Camera node for 3D layers; 0 = the default 50 mm camera
       int symmetry = 0;                      // painting: 0 off, 1 left-right, 2 top-bottom, 3 both, 4 radial
       int symN = 6;                          // radial copies
+      uint64_t brushSrc[3] = { 0, 0, 0 };    // canvas nodes feeding the brush: tip, grain, colour (0 = built in)
+      bool brushLive = false;                // sources follow the node mid-stroke; off = frozen when the stroke starts
       std::vector<ModSlot> slots;            // bound layer numbers (motion-first layers)
    };
 
@@ -300,6 +302,7 @@ public:
    bool Shown(const Layer& l);
    INode* Source(const Layer& l) const;       // node layers, through bypass; nullptr = missing
    INode* MaskSource(const Layer& l) const;
+   INode* BrushSource(int slot) const;        // the doc's brush tip/grain/colour node, through bypass
 
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
@@ -562,6 +565,8 @@ private:
    void RestoreSelection();
    bool mSelAny = false, mSelDirty = false;
    GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch, mCloneSrc;
+   GLUtil::Fbo mBrushFrozen[3];   // node brush sources as they were when the stroke started
+   void ApplyBrushSources(BrushEngine::Brush& brush, bool snapshot);
    unsigned mFillProgram = 0, mAntsProgram = 0, mResampleProgram = 0;
    bool mPaintTried = false;
    unsigned long long mPaintEdits = 0;   // bumps when a surface changes outside a stroke

@@ -4904,6 +4904,57 @@ namespace
          MorePct(T("Refill"), &b.refill, 0.0f, 100.0f);
    }
 
+   // A canvas node feeds the brush: its picture as the tip, the canvas grain, or the colour (Rebelle's custom
+   // tips, Krita's pattern texture, Procreate's colour from a source). Kept by the document, so it saves.
+   void BrushSourceRows(Scene2DNode* doc)
+   {
+      Scene2DNode::Document& d = doc->Doc();
+      MoreHeader(T("From a node"));
+      static const char* const kLabels[3] = { "Tip from", "Grain from", "Colour from" };
+      for (int k = 0; k < 3; k++)
+      {
+         std::vector<std::string> names = { "Built in" };
+         std::vector<uint64_t> uids = { 0 };
+         int cur = 0;
+         for (GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == doc || !View2DCanAdd(gn))
+               continue;
+            if (gn.uid == d.brushSrc[k])
+               cur = (int)uids.size();
+            names.push_back(gn.typeName + " " + std::to_string(gn.index));
+            uids.push_back(gn.uid);
+         }
+         if (d.brushSrc[k] != 0 && cur == 0)
+         {
+            cur = (int)uids.size();
+            names.push_back("Node gone");
+            uids.push_back(d.brushSrc[k]);
+         }
+         std::vector<const char*> ptrs;
+         for (const std::string& n : names)
+            ptrs.push_back(n.c_str());
+         int pick = cur;
+         if (MoreCombo(T(kLabels[k]), &pick, ptrs.data(), (int)ptrs.size()) && pick != cur)
+         {
+            PushUndoCheckpoint("Brush source");
+            d.brushSrc[k] = uids[pick];
+            Touch();
+         }
+      }
+      if (d.brushSrc[0] != 0 || d.brushSrc[1] != 0 || d.brushSrc[2] != 0)
+      {
+         bool live = d.brushLive;
+         MoreCheck(T("Live"), &live);
+         if (live != d.brushLive)
+         {
+            PushUndoCheckpoint("Brush source live");
+            d.brushLive = live;
+            Touch();
+         }
+      }
+   }
+
    void MatchChips()
    {
       float tol = (float)sTolerance;
@@ -5122,7 +5173,10 @@ namespace
                MoreCheck(T("Lock alpha"), &b.lockAlpha);
             }
             if (brush && !BrushEngine::DirectMode(b.mode) && b.relief < 0)
+            {
                MaterialRows(b);
+               BrushSourceRows(doc);
+            }
             ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
             bool mask = sEditMask && a != nullptr && a->HasPixelMask();
             MoreCheck(T("Paint the mask"), &mask);

@@ -517,9 +517,34 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
       ApplyFill(tmp, surf->w, surf->h, *l, 0, nullptr, nullptr, -2, nullptr, nullptr, 1.0f);
       brush.sourceTex = mCloneSrc.tex;
    }
+   ApplyBrushSources(brush, true);
    mStroke.SetMirrors(SurfaceMirrors(target == 2 ? Layer() : *l, target));
    mStroke.Begin(*surf, brush, sx, sy, pressure, sel);
    return mStroke.Active();
+}
+
+void Scene2DNode::ApplyBrushSources(BrushEngine::Brush& brush, bool snapshot)
+{
+   unsigned* texOf[3] = { &brush.tipTex, &brush.grainTex, &brush.colorTex };
+   for (int k = 0; k < 3; k++)
+   {
+      *texOf[k] = 0;
+      INode* n = BrushSource(k);
+      if (n == nullptr)
+         continue;
+      n->CookIfNeeded(std::max(0, mLastCookFrame));
+      unsigned tex = n->GetOutputTexture();
+      const int w = n->GetOutputWidth(), h = n->GetOutputHeight();
+      // Frozen: the stroke keeps the picture the node had when it started.
+      if (tex != 0 && snapshot && !mDoc.brushLive)
+         tex = BrushEngine::Snapshot(tex, w, h, mBrushFrozen[k]) ? mBrushFrozen[k].tex : 0;
+      *texOf[k] = tex;
+      if (k == 1)
+      {
+         brush.grainTexW = w;
+         brush.grainTexH = h;
+      }
+   }
 }
 
 void Scene2DNode::PaintTo(float x, float y, float pressure)

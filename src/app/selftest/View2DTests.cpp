@@ -907,6 +907,88 @@ void RunView2DTest()
       for (const auto& pr : BrushEngine::Presets())
          materials += pr.group != nullptr && std::string(pr.group) == "Material" ? 1 : 0;
       Check("B5: ten Material presets are listed", materials == 10);
+
+      // ---- Block 6: node-fed brushes (the section-4 done-check) ----
+      // A Voronoi Texture node as the tip paints cells; its scale changed mid-stroke leaves the stroke as it began
+      // (frozen) and reaches the next stroke; with Live on it reaches the stroke straight away.
+      GraphNode* texGn = SpawnNode("Texture", "Source", 0.0f, 900.0f);
+      auto* texNode = texGn != nullptr ? dynamic_cast<TextureNode*>(texGn->node.get()) : nullptr;
+      if (texNode == nullptr)
+         Check("B6: a Texture node spawns", false);
+      else
+      {
+         const uint64_t texUid = texGn->uid;
+         const int texIndex = texGn->index;
+         texNode->textureType = 0;      // Voronoi
+         texNode->voronoiFeature = 3;   // distance to edge: bright cells, dark borders
+         texNode->width = texNode->height = 256.0f;
+         texNode->scale = 4.0f;
+         texNode->CookIfNeeded(++sFrame);
+         pic.Doc().brushSrc[0] = texUid;
+         pic.Commit();
+         BrushEngine::Brush tipB = Colour(hard, 1, 1, 1);
+         tipB.size = 120.0f;
+         tipB.spacing = 1.0f;
+         // Crossings of the row's mean along y = 100 across the second dab: more cells, more crossings.
+         const auto Crossings = [&]() {
+            Cook(&pic);
+            std::vector<float> row;
+            for (int x = 108; x <= 212; x++)   // the dab at x = 160, drawn after the change
+               row.push_back(Pixel(&pic, x, 100)[0]);
+            float mean = 0.0f;
+            for (float v : row) mean += v;
+            mean /= (float)row.size();
+            int n = 0, side = 0;
+            for (float v : row)
+            {
+               const int now = v > mean + 0.04f ? 1 : v < mean - 0.04f ? -1 : side;
+               if (side != 0 && now != side) n++;
+               side = now;
+            }
+            return n;
+         };
+         const auto Stroke = [&](float midScale) {
+            Clear();
+            const int id = pic.AddPaintLayer();
+            pic.BeginPaint(id, 0, tipB, 40.0f, 100.0f, 1.0f);
+            pic.PaintTo(60.0f, 100.0f, 1.0f);
+            if (midScale > 0.0f)
+            {
+               texNode->scale = midScale;
+               texNode->CookIfNeeded(++sFrame);
+               Cook(&pic);
+            }
+            for (float x = 60.0f; x <= 240.0f; x += 6.0f)
+               pic.PaintTo(x, 100.0f, 1.0f);
+            pic.EndPaint();
+            return Crossings();
+         };
+         const int c0 = Stroke(0.0f);           // scale 4 throughout
+         const int c1 = Stroke(16.0f);          // 4, turned to 16 mid-stroke: frozen keeps 4
+         Cook(&pic);
+         const int c2 = Stroke(0.0f);           // the next stroke sees 16
+         texNode->scale = 4.0f;
+         texNode->CookIfNeeded(++sFrame);
+         pic.Doc().brushLive = true;
+         pic.Commit();
+         const int c3 = Stroke(16.0f);          // live: 16 reaches the stroke at once
+         printf("  node tip crossings: scale 4 %d, frozen after change %d, next stroke %d, live %d\n", c0, c1, c2, c3);
+         Check("B6: a Voronoi node as the tip paints cells", c0 >= 2);
+         Check("B6: changing the node mid-stroke leaves the stroke frozen", std::abs(c1 - c0) <= 1);
+         Check("B6: the next stroke takes the node's new scale", c2 >= c0 + 3);
+         Check("B6: Live takes the change straight away", c3 >= c0 + 3);
+         {
+            Scene2DNode copy;
+            copy.SetDocText(pic.DocText());
+            copy.Layers();
+            Check("B6: brush sources save", copy.Doc().brushSrc[0] == texUid && copy.Doc().brushSrc[1] == 0 && copy.Doc().brushLive);
+         }
+         pic.Doc().brushSrc[0] = 0;
+         pic.Doc().brushLive = false;
+         pic.Commit();
+         if (GraphNode* g = FindNodeByIndex(texIndex); g != nullptr && g->uid == texUid)
+            RemoveNodeByIndex(texIndex);
+      }
    }
 
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----

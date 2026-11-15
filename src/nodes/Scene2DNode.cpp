@@ -494,6 +494,8 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mSelOverlay);
    GLUtil::DestroyFbo(mSelScratch);
    GLUtil::DestroyFbo(mCloneSrc);
+   for (GLUtil::Fbo& f : mBrushFrozen)
+      GLUtil::DestroyFbo(f);
    for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram, mReliefProgram })
       if (p != 0)
          glDeleteProgram(p);
@@ -818,6 +820,16 @@ INode* Scene2DNode::Source(const Layer& l) const
    return (node != nullptr && !node->bypassed && node != this) ? node : nullptr;
 }
 
+INode* Scene2DNode::BrushSource(int slot) const
+{
+   if (slot < 0 || slot > 2 || mDoc.brushSrc[slot] == 0 || !ResolveUid)
+      return nullptr;
+   INode* node = ResolveUid(mDoc.brushSrc[slot]);
+   for (int hops = 0; node != nullptr && node->bypassed && hops < 64; hops++)
+      node = node->BypassSource();
+   return (node != nullptr && !node->bypassed && node != this) ? node : nullptr;
+}
+
 INode* Scene2DNode::MaskSource(const Layer& l) const
 {
    if (l.maskUid == 0 || !ResolveUid)
@@ -1100,6 +1112,11 @@ void Scene2DNode::Serialize()
       o << "cam " << d.camUid << "\n";
    if (d.symmetry != 0 || d.symN != 6)
       o << "sym " << d.symmetry << " " << d.symN << "\n";
+   for (int k = 0; k < 3; k++)
+      if (d.brushSrc[k] != 0)
+         o << "brushsrc " << k << " " << d.brushSrc[k] << "\n";
+   if (d.brushLive)
+      o << "brushlive 1\n";
    for (const ModSlot& m : d.slots)
       o << "mslot " << m.layer << " " << m.field << " " << m.slot << "\n";
    if (quickMask)
@@ -1322,6 +1339,19 @@ void Scene2DNode::Parse()
       }
       else if (key == "cam")
          s >> mDoc.camUid;
+      else if (key == "brushsrc")
+      {
+         int k = -1;
+         uint64_t uid = 0;
+         if (s >> k >> uid && k >= 0 && k < 3)
+            mDoc.brushSrc[k] = uid;
+      }
+      else if (key == "brushlive")
+      {
+         int on = 0;
+         s >> on;
+         mDoc.brushLive = on != 0;
+      }
       else if (key == "sym")
       {
          s >> mDoc.symmetry >> mDoc.symN;
@@ -2165,7 +2195,7 @@ void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<u
       const size_t sp = mText.find(' ', pos);
       const std::string key = mText.substr(pos, (sp == std::string::npos || sp > eol ? eol : sp) - pos);
       int id = 0;
-      const bool perLayer = key != "doc" && key != "next" && key != "panel" && key != "cam" && key != "sym" && sp != std::string::npos
+      const bool perLayer = key != "doc" && key != "next" && key != "panel" && key != "cam" && key != "sym" && key != "brushsrc" && key != "brushlive" && sp != std::string::npos
                             && sp < eol && std::sscanf(mText.c_str() + sp + 1, "%d", &id) == 1 && FindConst(id) != nullptr;
       if (key != "next" && key != "guidesx" && key != "guidesy")
       {
@@ -2419,6 +2449,12 @@ void Scene2DNode::CookIfNeeded(int frameId)
    SyncSurfaces();
    SyncRasters();
    // A stroke changes the picture before it changes the text; its queued dabs land now.
+   if (mStroke.Active() && mDoc.brushLive)
+   {
+      BrushEngine::Brush b;
+      ApplyBrushSources(b, false);   // live: the node as it is this frame
+      mStroke.SetSources(b.tipTex, b.grainTex, b.grainTexW, b.grainTexH, b.colorTex);
+   }
    if (mStroke.Active())
       mStroke.Flush();
    stamp = Mix(stamp, mStroke.Active() ? (unsigned long long)mStroke.DabCount() + 1ull : 0ull);
