@@ -17,6 +17,7 @@ extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 #include <cmath>
 #include <functional>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -988,6 +989,98 @@ void RunView2DTest()
          pic.Commit();
          if (GraphNode* g = FindNodeByIndex(texIndex); g != nullptr && g->uid == texUid)
             RemoveNodeByIndex(texIndex);
+      }
+   }
+
+   // ---- Block 7: effect stacks (the section-5 done-check) ----
+   // Gaussian Blur added to a layer's stack blurs it with no node on the canvas; an unchanged stack is not redrawn,
+   // a changed radius redraws it once; the stack saves, reloads and goes through a preset.
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 300;
+      pic.Doc().h = 200;
+      pic.Doc().background = 1;   // black
+      pic.Commit();
+      const int L = pic.AddPaintLayer();
+      BrushEngine::Brush br = BrushEngine::Presets()[5].brush;   // Hard round
+      br.size = 20.0f;
+      br.color[0] = 1.0f;
+      br.color[1] = br.color[2] = 0.1f;
+      pic.BeginPaint(L, 0, br, 150.0f, 20.0f, 1.0f);
+      for (float y = 20.0f; y <= 180.0f; y += 4.0f)
+         pic.PaintTo(150.0f, y, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      const float before = Pixel(&pic, 166, 100)[0];
+      GraphNode* blurGn = SpawnNode("gaussianblur", "Effects", 0.0f, 1200.0f);
+      if (blurGn == nullptr)
+         Check("B7: a Gaussian Blur node spawns", false);
+      else
+      {
+         const uint64_t blurUid = blurGn->uid;
+         const int blurIndex = blurGn->index;
+         INode* blur = blurGn->node.get();
+         struct SetRadius : ParamVisitor
+         {
+            float to = 0.0f;
+            void Float(const char* name, float& v) override { if (std::strstr(name, "adius") != nullptr) v = to; }
+            void Int(const char* name, int& v) override { if (std::strstr(name, "uality") != nullptr) v = 1; }
+            void Bool(const char*, bool&) override {}
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float*) override {}
+         } set;
+         set.to = 6.0f;
+         blur->VisitParams(set);
+         Scene2DNode::Effect e;
+         e.uid = blurUid;
+         e.entry = "Gaussian Blur";
+         pic.FindLayer(L)->effects.push_back(e);
+         pic.Commit();
+         HideEffectNodes(pic);
+         Check("B7: the stack's node is off the canvas", FindNodeByUid(blurUid) != nullptr && FindNodeByUid(blurUid)->hiddenFromCanvas);
+         Cook(&pic);
+         const float after = Pixel(&pic, 166, 100)[0];
+         const unsigned long long d0 = pic.mEffDraws;
+         Cook(&pic);
+         Cook(&pic);
+         const unsigned long long d1 = pic.mEffDraws;
+         set.to = 14.0f;
+         blur->VisitParams(set);
+         Cook(&pic);
+         const unsigned long long d2 = pic.mEffDraws;
+         const float wider = Pixel(&pic, 166, 100)[0];
+         Cook(&pic);
+         const unsigned long long d3 = pic.mEffDraws;
+         printf("  blur stack: edge+6 px %.3f -> %.3f -> %.3f, draws %llu %llu %llu %llu\n", before, after, wider, d0, d1, d2, d3);
+         Check("B7: Gaussian Blur in the stack blurs the layer", after > before + 0.02f);
+         Check("B7: an unchanged stack is not redrawn", d1 == d0);
+         Check("B7: a changed radius redraws once", d2 == d1 + 1 && d3 == d2 && wider != after);
+         // A native Black & White after it: the red turns grey.
+         Scene2DNode::Effect bw;
+         bw.adjType = Scene2DNode::kAdjBlackWhite;
+         bw.adjAmt = 1.0f;
+         bw.adjP = Scene2DNode::AdjParamDefault(bw.adjType);
+         pic.FindLayer(L)->effects.push_back(bw);
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> grey = Pixel(&pic, 150, 100);
+         printf("  black & white: %.2f %.2f %.2f\n", grey[0], grey[1], grey[2]);
+         Check("B7: Black & White in the stack makes the red grey", std::fabs(grey[0] - grey[1]) < 0.04f && std::fabs(grey[1] - grey[2]) < 0.04f && grey[0] > 0.05f);
+         {
+            Scene2DNode copy;
+            copy.SetDocText(pic.DocText());
+            copy.Layers();
+            const Layer* cl = copy.FindLayer(L);
+            Check("B7: the stack saves and reloads", cl != nullptr && cl->effects.size() == 2 && cl->effects[0].uid == blurUid &&
+                                                     cl->effects[0].entry == "Gaussian Blur" && cl->effects[1].adjType == Scene2DNode::kAdjBlackWhite &&
+                                                     cl->effects[1].adjP.size() == 6);
+            Layer fresh;
+            Check("B7: the stack goes through a preset", Scene2DNode::ParseEffects(Scene2DNode::EffectsText(*pic.FindLayer(L)), fresh) &&
+                                                         fresh.effects.size() == 2 && fresh.effects[1].adjType == Scene2DNode::kAdjBlackWhite);
+         }
+         if (GraphNode* g = FindNodeByIndex(blurIndex); g != nullptr && g->uid == blurUid)
+            RemoveNodeByIndex(blurIndex);
       }
    }
 
