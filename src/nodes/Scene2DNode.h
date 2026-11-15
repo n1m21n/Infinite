@@ -30,7 +30,15 @@ public:
    // Adjustment layers: the picture below, changed in place (masks and clip limit where).
    enum AdjType { kAdjPixelate = 0, kAdjHalftone, kAdjDither, kAdjThreshold, kAdjGradientMap, kAdjPosterize,
                   kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjLevels, kAdjCurves,
-                  kAdjCount };
+                  kAdjColorBalance, kAdjVibrance, kAdjSelective, kAdjMixer, kAdjBlackWhite, kAdjPhotoFilter,
+                  kAdjShadowsHighlights, kAdjLookup, kAdjCount };
+   // adjP layout per type (AdjParamCount): Colour Balance 9 (shadows, mids, highlights rgb, -1..1); Selective
+   // Colour 36 (reds, yellows, greens, cyans, blues, magentas, whites, neutrals, blacks x CMYK, -1..1); Channel
+   // Mixer 10 (rows R, G, B of R G B, then mono 0/1); Black & White 6 (reds..magentas, -2..3); Photo Filter 1
+   // (keep luminosity 0/1); Shadows / Highlights 2 (shadows, highlights 0..1).
+   static int AdjParamCount(int type);
+   static std::vector<float> AdjParamDefault(int type);
+   static const char* AdjGroup(int type);   // "Adjust", "Colour", "Stylize": the effect list's sections
    static const char* AdjName(int type);
    static float AdjDefault(int type);
    // A smooth curve through the points that never overshoots between them, sampled n times over 0..1.
@@ -85,6 +93,33 @@ public:
    static Fx FxDefault(int type);
    static const char* FxName(int type);
 
+   // One entry in a layer's effect stack (Photoshop's smart filters): a native adjustment, or a node the stack owns
+   // (kept off the canvas until "Show on canvas") that runs on the layer's picture. Runs before blend and opacity.
+   struct Effect
+   {
+      bool on = true;
+      uint64_t uid = 0;          // node effect: its node; 0 = native
+      bool shown = false;        // node effect: its node is on the canvas
+      bool animated = false;     // node effect that moves by itself (time, simulations): redraws every frame
+      bool toMask = false;       // node effect whose picture masks the layer instead of replacing it
+      std::string entry;         // node effect: the list entry it came from ("Gaussian Blur", "Remove background")
+      float opacity = 1.0f;
+      int blend = 0;             // 0 normal, 1 multiply, 2 screen, 3 overlay, 4 luminosity
+      // Native: the same settings as an adjustment layer.
+      int adjType = 0;
+      float adjAmt = 0.0f;
+      bool adjMap = false;
+      float colorA[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      float colorB[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+      float levels[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+      float levelsCh[3][4] = { { 0, 1, 0, 1 }, { 0, 1, 0, 1 }, { 0, 1, 0, 1 } };
+      std::vector<float> curve = { 0.0f, 0.0f, 1.0f, 1.0f };
+      std::vector<float> curveCh[3] = { { 0, 0, 1, 1 }, { 0, 0, 1, 1 }, { 0, 0, 1, 1 } };
+      std::vector<float> adjP;
+      std::string adjFile;
+   };
+   static const char* const kEffBlendNames[5];
+
    struct Layer
    {
       int id = 0;
@@ -134,6 +169,23 @@ public:
       float levels[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
       // Curves (amount = strength): x, y pairs in 0..1, sorted by x, ends included.
       std::vector<float> curve = { 0.0f, 0.0f, 1.0f, 1.0f };
+      // Per channel R, G, B on top of the master: levels (in black, in white, out black, out white) and curves.
+      float levelsCh[3][4] = { { 0, 1, 0, 1 }, { 0, 1, 0, 1 }, { 0, 1, 0, 1 } };
+      std::vector<float> curveCh[3] = { { 0, 0, 1, 1 }, { 0, 0, 1, 1 }, { 0, 0, 1, 1 } };
+      std::vector<float> adjP;          // the new adjustments' settings (AdjParamCount)
+      std::string adjFile;              // Colour Lookup: the .cube file
+      // Effect stack and its mask (a node's picture: white keeps the effects, black shows the layer as it was).
+      std::vector<Effect> effects;
+      uint64_t effMaskUid = 0;
+      bool HasEffects() const
+      {
+         if (kind == Kind::Adjust)
+            return false;
+         for (const Effect& e : effects)
+            if (e.on)
+               return true;
+         return false;
+      }
       // Paint layers: the surface's size and its tiles (TileStore keys, row
       // major from the bottom row, kTile px square).
       int pw = 0, ph = 0;
@@ -303,6 +355,23 @@ public:
    INode* Source(const Layer& l) const;       // node layers, through bypass; nullptr = missing
    INode* MaskSource(const Layer& l) const;
    INode* BrushSource(int slot) const;        // the doc's brush tip/grain/colour node, through bypass
+   INode* NodeThrough(uint64_t uid) const;    // any uid, through bypass; nullptr = gone
+   // Effect stacks as text (presets, .inf2dfx): every effect of the layer; parsing replaces them.
+   static std::string EffectsText(const Layer& l);
+   static bool ParseEffects(const std::string& text, Layer& l);
+   // A native effect's settings as a layer, for the adjustment shader.
+   static Layer AdjLayerOf(const Effect& e);
+   // The effect stack and the adjustment extras as text lines for layer `id`; parsing takes one line's key and the
+   // rest after the id, false for a key it does not know.
+   static void WriteEffectLines(std::ostream& o, const Layer& l, int id);
+   static bool ParseEffectLine(const std::string& key, std::istream& s, Layer& l);
+   unsigned long long mEffDraws = 0;   // effect stacks drawn (tests: an unchanged stack is not redrawn)
+   // Colour Lookup: a .cube file's size and RGB table (size^3 rows, red fastest); false when it cannot be read.
+   static bool ReadCube(const std::string& path, int& size, std::vector<float>& rgb);
+   // Levels' Auto: per channel black and white at the 0.1 % tails of the document's picture.
+   bool AutoLevels(int id, float out[3][4]);
+   // A small luminance histogram (bins, peak 1) of the document's picture: the panel draws it in Levels and Curves.
+   bool Histogram(int id, std::vector<float>& bins, int count = 64);
 
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
@@ -566,6 +635,17 @@ private:
    bool mSelAny = false, mSelDirty = false;
    GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch, mCloneSrc;
    GLUtil::Fbo mBrushFrozen[3];   // node brush sources as they were when the stroke started
+   GLUtil::Fbo mEff[2];           // effect stack ping-pong, document size
+   unsigned mEffMixProgram = 0, mLutTex = 0;
+   std::string mLutPath;
+   int mLutSize = 0;
+   GLUtil::Fbo mShBlur[2];         // Shadows / Highlights: the blurred luminance
+   void DrawEffects(const Layer& l, int depth, int frameId, float opacityMul, bool clipMode);
+   bool EffMix(int ping, unsigned base, unsigned fx, unsigned mask, float opacity, int blend, bool toMask);
+   unsigned long long EffectsHash(const Layer& l, int frameId);
+   unsigned mLumaBlurProgram = 0;
+   bool BindLookup(const std::string& path);
+   unsigned BlurLuma(unsigned src, float radius);
    void ApplyBrushSources(BrushEngine::Brush& brush, bool snapshot);
    unsigned mFillProgram = 0, mAntsProgram = 0, mResampleProgram = 0;
    bool mPaintTried = false;

@@ -10,6 +10,8 @@
 #include "platform/AppPaths.h"
 #include "audio/WavePeaks.h"
 
+class Scene2DNode;
+
 namespace app
 {
    // Every node renders its output at this size, square, above its params.
@@ -2426,6 +2428,7 @@ void NoteNodeAppended();
 void NoteNodeUidChanged(uint64_t oldUid, GraphNode* gn);
 
 GraphNode* FindNodeByUid(uint64_t uid);
+void HideEffectNodes(::Scene2DNode& doc);   // effect-stack nodes follow their Show on canvas
 
 void ArrangeCommitEdit();
 

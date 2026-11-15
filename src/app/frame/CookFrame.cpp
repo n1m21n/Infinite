@@ -751,6 +751,9 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
          gn.hiddenFromCanvas = doc->panelOnly;
       }
    }
+   for (GraphNode& gn : gNodes)
+      if (auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get()))
+         HideEffectNodes(*doc);
 
    // Colours, the same way and for the same reason: the registry was rebuilt
    // while the nodes drew, so every pointer here belongs to a node that
@@ -775,5 +778,15 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // would stamp every hand move made with playback stopped at one instant.
    MovementLog::Capture(ImGui::GetTime(), isNormalFrame);
    LearningLog::Frame(ImGui::GetTime());
+}
+
+// Nodes a layer's effect stack owns stay off the canvas until "Show on canvas"; they still cook (the stack runs them).
+void HideEffectNodes(Scene2DNode& doc)
+{
+   for (const Scene2DNode::Layer& l : doc.Layers())
+      for (const Scene2DNode::Effect& e : l.effects)
+         if (e.uid != 0)
+            if (GraphNode* owned = FindNodeByUid(e.uid))
+               owned->hiddenFromCanvas = !e.shown;
 }
 }

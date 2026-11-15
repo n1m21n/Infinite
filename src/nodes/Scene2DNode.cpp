@@ -22,20 +22,64 @@ const char* Scene2DNode::AdjName(int type)
 {
    static const char* kNames[kAdjCount] = { "Pixelate", "Halftone", "Dither", "Threshold", "Gradient Map", "Posterize",
                                                  "Brightness", "Contrast", "Hue", "Saturation", "Exposure", "Invert",
-                                                 "Levels", "Curves" };
+                                                 "Levels", "Curves", "Colour Balance", "Vibrance", "Selective Colour",
+                                                 "Channel Mixer", "Black & White", "Photo Filter", "Shadows / Highlights",
+                                                 "Colour Lookup" };
    return kNames[std::clamp(type, 0, kAdjCount - 1)];
+}
+
+const char* Scene2DNode::AdjGroup(int type)
+{
+   switch (type)
+   {
+   case kAdjPixelate: case kAdjHalftone: case kAdjDither: case kAdjThreshold: case kAdjPosterize: return "Stylize";
+   case kAdjGradientMap: case kAdjHue: case kAdjSaturation: case kAdjColorBalance: case kAdjVibrance: case kAdjSelective:
+   case kAdjMixer: case kAdjBlackWhite: case kAdjPhotoFilter: case kAdjLookup: case kAdjInvert: return "Colour";
+   default: return "Adjust";
+   }
+}
+
+int Scene2DNode::AdjParamCount(int type)
+{
+   switch (type)
+   {
+   case kAdjColorBalance: return 9;
+   case kAdjSelective: return 36;
+   case kAdjMixer: return 10;
+   case kAdjBlackWhite: return 6;
+   case kAdjPhotoFilter: return 1;
+   case kAdjShadowsHighlights: return 2;
+   default: return 0;
+   }
+}
+
+std::vector<float> Scene2DNode::AdjParamDefault(int type)
+{
+   std::vector<float> p((size_t)AdjParamCount(type), 0.0f);
+   if (type == kAdjMixer)
+      p = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+   else if (type == kAdjBlackWhite)
+      p = { 0.4f, 0.6f, 0.4f, 0.6f, 0.2f, 0.8f };   // Photoshop's default weights
+   else if (type == kAdjPhotoFilter)
+      p = { 1.0f };
+   else if (type == kAdjShadowsHighlights)
+      p = { 0.35f, 0.0f };
+   return p;
 }
 
 float Scene2DNode::AdjDefault(int type)
 {
-   static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f };
+   static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+                                          1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f };
    return kDef[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 void Scene2DNode::AdjRange(int type, float& lo, float& hi)
 {
-   static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f, 0.1f, 0.0f };
-   static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f, 4.0f, 1.0f };
+   static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f, 0.1f, 0.0f,
+                                         0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+   static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f, 4.0f, 1.0f,
+                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f };
    const int t = std::clamp(type, 0, kAdjCount - 1);
    lo = kLo[t];
    hi = kHi[t];
@@ -373,11 +417,25 @@ namespace
          "uniform vec4 uColB;\n"
          "uniform int uLinear;\n"
          "uniform vec4 uLevels;\n"
-         "uniform float uLut[64];\n")
+         "uniform float uLut[64];\n"
+         "uniform float uLutC[192];\n"
+         "uniform vec4 uLvCh[3];\n"
+         "uniform float uP[36];\n"
+         "uniform sampler3D uCube;\n"
+         "uniform float uCubeN;\n"
+         "uniform sampler2D uBlurL;\n")
          + GLUtil::kSrgbGlsl +
          "float Lut(float v) { float f = clamp(v, 0.0, 1.0) * 63.0; int i = min(int(f), 62); return mix(uLut[i], uLut[i + 1], f - float(i)); }\n"
          "vec3 Disp(vec4 c) { return uLinear == 1 ? SrgbEncode(max(c.rgb, 0.0)) : c.rgb; }\n"
          "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+         "float LutC(int ch, float v) { float f = clamp(v, 0.0, 1.0) * 63.0; int i = min(int(f), 62); return mix(uLutC[ch * 64 + i], uLutC[ch * 64 + i + 1], f - float(i)); }\n"
+         "float Hue(vec3 c) { float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), d = mx - mn;\n"
+         "   if (d < 1e-5) return 0.0;\n"
+         "   float h = mx == c.r ? mod((c.g - c.b) / d, 6.0) : mx == c.g ? (c.b - c.r) / d + 2.0 : (c.r - c.g) / d + 4.0;\n"
+         "   return h / 6.0; }\n"
+         "float Sat(vec3 c) { return max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b)); }\n"
+         // Weight of the hue sector centred on k/6: 1 there, 0 one sector away.
+         "float HueW(float h, int k) { float d = abs(fract(h - float(k) / 6.0 + 0.5) - 0.5) * 6.0; return clamp(1.0 - d, 0.0, 1.0); }\n"
          "const int kBayer[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);\n"
          "void main() {\n"
          "   vec2 px = gl_FragCoord.xy;\n"
@@ -429,8 +487,61 @@ namespace
          "      c = clamp((c - uLevels.x) / max(uLevels.y - uLevels.x, 1e-3), 0.0, 1.0);\n"
          "      c = pow(c, vec3(1.0 / max(uAmt, 0.01)));\n"
          "      c = mix(vec3(uLevels.z), vec3(uLevels.w), c);\n"
+         "      for (int i = 0; i < 3; i++) {\n"
+         "         vec4 L = uLvCh[i];\n"
+         "         c[i] = mix(L.z, L.w, clamp((c[i] - L.x) / max(L.y - L.x, 1e-3), 0.0, 1.0));\n"
+         "      }\n"
          "   } else if (uType == 13) {\n"
-         "      c = mix(c, vec3(Lut(c.r), Lut(c.g), Lut(c.b)), uAmt);\n"
+         "      vec3 m = vec3(Lut(c.r), Lut(c.g), Lut(c.b));\n"
+         "      m = vec3(LutC(0, m.r), LutC(1, m.g), LutC(2, m.b));\n"
+         "      c = mix(c, m, uAmt);\n"
+         "   } else if (uType == 14) {\n"   // colour balance: shift shadows, mids and highlights, keep the lightness
+         "      float l = Luma(c);\n"
+         "      float ws = 1.0 - smoothstep(0.0, 0.5, l), wh = smoothstep(0.5, 1.0, l), wm = max(0.0, 1.0 - ws - wh);\n"
+         "      vec3 sh = ws * vec3(uP[0], uP[1], uP[2]) + wm * vec3(uP[3], uP[4], uP[5]) + wh * vec3(uP[6], uP[7], uP[8]);\n"
+         "      vec3 n = clamp(c + sh * 0.4 * uAmt, 0.0, 1.0);\n"
+         "      c = n + (l - Luma(n));\n"
+         "   } else if (uType == 15) {\n"   // vibrance: dull colours gain most, grey and strong ones stay
+         "      float k = uAmt >= 0.0 ? 1.0 + uAmt * (1.0 - Sat(c)) * 1.5 : 1.0 + uAmt;\n"
+         "      c = mix(vec3(Luma(c)), c, k);\n"
+         "   } else if (uType == 16) {\n"   // selective colour: CMYK nudges per hue family, whites, neutrals, blacks
+         "      float h = Hue(c), s = Sat(c), l = Luma(c);\n"
+         "      float w[9];\n"
+         "      for (int k = 0; k < 6; k++) w[k] = HueW(h, k) * s;\n"
+         "      w[6] = smoothstep(0.5, 1.0, l) * (1.0 - s);\n"
+         "      w[8] = (1.0 - smoothstep(0.0, 0.5, l)) * (1.0 - s);\n"
+         "      w[7] = max(0.0, (1.0 - s) - w[6] - w[8]);\n"
+         "      vec3 cmy = 1.0 - c;\n"
+         "      vec3 d = vec3(0.0); float dk = 0.0;\n"
+         "      for (int k = 0; k < 9; k++) { d += w[k] * vec3(uP[k * 4], uP[k * 4 + 1], uP[k * 4 + 2]); dk += w[k] * uP[k * 4 + 3]; }\n"
+         "      cmy = clamp(cmy + d * 0.5 * uAmt + dk * 0.5 * uAmt, 0.0, 1.0);\n"
+         "      c = 1.0 - cmy;\n"
+         "   } else if (uType == 17) {\n"   // channel mixer
+         "      vec3 m = vec3(dot(c, vec3(uP[0], uP[1], uP[2])), dot(c, vec3(uP[3], uP[4], uP[5])), dot(c, vec3(uP[6], uP[7], uP[8])));\n"
+         "      if (uP[9] > 0.5) m = vec3(m.r);\n"
+         "      c = mix(c, m, uAmt);\n"
+         "   } else if (uType == 18) {\n"   // black & white: each hue family's weight sets how light it turns
+         "      float h = Hue(c), s = Sat(c);\n"
+         "      float k = 0.0, wsum = 0.0;\n"
+         "      for (int i = 0; i < 6; i++) { float wi = HueW(h, i); k += wi * uP[i]; wsum += wi; }\n"
+         "      float g = Luma(c) + s * (k / max(wsum, 1e-3) - 0.5) * 0.8;\n"
+         "      c = mix(c, vec3(g), uAmt);\n"
+         "   } else if (uType == 19) {\n"   // photo filter: through a coloured glass, lightness kept if asked
+         "      float l = Luma(c);\n"
+         "      vec3 n = c * mix(vec3(1.0), uColA.rgb, uAmt);\n"
+         "      if (uP[0] > 0.5) n *= l / max(Luma(n), 1e-3);\n"
+         "      c = n;\n"
+         "   } else if (uType == 20) {\n"   // shadows / highlights: lift what sits in dark surroundings, calm the bright
+         "      float b = texture(uBlurL, vUv).r;\n"
+         "      float lift = uP[0] * (1.0 - smoothstep(0.0, 0.5, b));\n"
+         "      float cut = uP[1] * smoothstep(0.5, 1.0, b);\n"
+         "      c = c * (1.0 + 2.0 * lift);\n"
+         "      c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 + 2.0 * cut);\n"
+         "   } else if (uType == 21) {\n"   // colour lookup (.cube)
+         "      if (uCubeN > 1.0) {\n"
+         "         vec3 q = clamp(c, 0.0, 1.0) * (uCubeN - 1.0) / uCubeN + 0.5 / uCubeN;\n"
+         "         c = mix(c, texture(uCube, q).rgb, uAmt);\n"
+         "      }\n"
          "   }\n"
          "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(Luma(c), 0.0, 1.0));\n"
          "   c = clamp(c, 0.0, 1.0);\n"
@@ -496,7 +607,11 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mCloneSrc);
    for (GLUtil::Fbo& f : mBrushFrozen)
       GLUtil::DestroyFbo(f);
-   for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram, mReliefProgram })
+   for (GLUtil::Fbo* f : { &mEff[0], &mEff[1], &mShBlur[0], &mShBlur[1] })
+      GLUtil::DestroyFbo(*f);
+   if (mLutTex != 0)
+      glDeleteTextures(1, &mLutTex);
+   for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram, mReliefProgram, mEffMixProgram, mLumaBlurProgram })
       if (p != 0)
          glDeleteProgram(p);
    if (mPassProgram != 0)
@@ -1176,6 +1291,7 @@ void Scene2DNode::Serialize()
          for (const std::string& k : l.tiles) o << " " << k;
          o << "\n";
       }
+      WriteEffectLines(o, l, l.id);
       auto shapeLine = [&](const char* key, const Shape& sh)
       {
          o << key << " " << l.id << " " << sh.type << " " << sh.x0 << " " << sh.y0 << " " << sh.x1 << " " << sh.y1 << " "
@@ -1391,7 +1507,10 @@ void Scene2DNode::Parse()
          Layer* l = find(id);
          if (l == nullptr)
             continue;
-         if (key == "xf")
+         if (ParseEffectLine(key, s, *l))
+         {
+         }
+         else if (key == "xf")
          {
             int fx = 0, fy = 0, nearest = 0;
             s >> l->x >> l->y >> l->sx >> l->sy >> l->angle >> l->ax >> l->ay >> fx >> fy >> l->fit >> nearest;
@@ -1829,6 +1948,11 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       DrawFx(l, depth, frameId, opacityMul, clipMode);
       return;
    }
+   if (l.HasEffects())
+   {
+      DrawEffects(l, depth, frameId, opacityMul, clipMode);
+      return;
+   }
    PassArgs a;
    a.bif = l.HasBlendIf() ? &l : nullptr;
    a.opacity = l.opacity * l.fill * opacityMul;
@@ -2092,6 +2216,8 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
    }
    if (mAdjProgram == 0 || src == 0)
       return false;
+   const unsigned cube = l.adjType == kAdjLookup && BindLookup(l.adjFile) ? mLutTex : 0;
+   const unsigned blurL = l.adjType == kAdjShadowsHighlights ? BlurLuma(src, AdjAmount(l)) : 0;
    if (!GLUtil::EnsureFbo(mAdjFbo, mDoc.w, mDoc.h, GLUtil::ImageWorkingFormat(), "Scene2DAdj"))
       return false;
    const unsigned prog = mAdjProgram;
@@ -2111,7 +2237,28 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       float lut[64];
       CurveLut(l.curve, lut, 64);
       glUniform1fv(glGetUniformLocation(prog, "uLut"), 64, lut);
+      float lutC[192];
+      for (int ch = 0; ch < 3; ch++)
+         CurveLut(l.curveCh[ch], lutC + ch * 64, 64);
+      glUniform1fv(glGetUniformLocation(prog, "uLutC"), 192, lutC);
+      glUniform4fv(glGetUniformLocation(prog, "uLvCh"), 3, &l.levelsCh[0][0]);
+      float p[36] = {};
+      const std::vector<float> def = AdjParamDefault(l.adjType);
+      for (size_t i = 0; i < def.size() && i < 36; i++)
+         p[i] = i < l.adjP.size() ? l.adjP[i] : def[i];
+      glUniform1fv(glGetUniformLocation(prog, "uP"), 36, p);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_3D, cube);
+      glUniform1i(glGetUniformLocation(prog, "uCube"), 1);
+      glUniform1f(glGetUniformLocation(prog, "uCubeN"), cube != 0 ? (float)mLutSize : 0.0f);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, blurL);
+      glUniform1i(glGetUniformLocation(prog, "uBlurL"), 2);
+      glActiveTexture(GL_TEXTURE0);
    });
+   glActiveTexture(GL_TEXTURE1);
+   glBindTexture(GL_TEXTURE_3D, 0);
+   glActiveTexture(GL_TEXTURE0);
    return true;
 }
 
@@ -2217,6 +2364,7 @@ void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<u
          if (!IsInside(l.id, kids[i]->id))
             continue;
          h = Mix(Mix(h, (unsigned long long)l.id), lines[l.id]);
+         h = Mix(h, EffectsHash(l, -1));
          for (INode* n : { Source(l), l.maskOn ? MaskSource(l) : nullptr })
             if (n != nullptr)
             {
@@ -2463,6 +2611,7 @@ void Scene2DNode::CookIfNeeded(int frameId)
    {
       if (!Shown(l) && !l.output)
          continue;
+      stamp = Mix(stamp, EffectsHash(l, frameId));
       for (INode* n : { Source(l), l.maskOn ? MaskSource(l) : nullptr })
          if (n != nullptr)
          {
