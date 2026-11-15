@@ -69,6 +69,11 @@ public:
    // Audio thread only: jump the smoother straight to the last pushed target.
    void SnapToTarget(int paramId);
 
+   // Audio thread only: true when the slot sits on its last pushed value with
+   // no ramp running or queued, so SmoothedValue would return the same value
+   // for every sample of the block. Lets a node hoist per-sample work.
+   bool IsSettled(int paramId) const;
+
 private:
    // Audio-thread state for one slot: a linear ramp toward `target`,
    // ending at engine time `endTime`, plus at most one queued ramp.

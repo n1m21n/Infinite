@@ -4424,6 +4424,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gArrangePanelOpen = o.find("arrange") != std::string::npos;
       gModMatrixOpen = o.find("modmatrix") != std::string::npos;
       gPerfPanelOpen = o.find("perf") != std::string::npos;
+      gMixerPanelOpen = o.find("mixer") != std::string::npos;
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
       gHistoryOpen = o.find("history") != std::string::npos;
@@ -4444,7 +4445,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       if (const size_t dk = o.find("dock="); dk != std::string::npos)
       {
          const int d = atoi(o.c_str() + dk + 5);
-         gModMatrixDock = gPerfPanelDock = gViewportPanelDock = d;
+         gModMatrixDock = gPerfPanelDock = gViewportPanelDock = gMixerPanelDock = d;
       }
       // "perfdemo": one of each Performance control, for design review screenshots.
       // "perfedit" is the same in Edit Mode with the first two cards selected and the third in MIDI learn.

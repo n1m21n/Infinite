@@ -769,6 +769,88 @@ void EndFloatingPanel();
 void DrawViewportPanelFloating();
 void DrawModMatrixFloating();
 void DrawPerfPanelFloating();
+// The Mixer panel (MixerPanel.cpp): the console view of the patch's Mixer nodes.
+void DrawMixerPanelFloating();
+void DrawMixerPanelDocked(const char* id, const ImVec2& size);
+void MixerPanelDockCombo();
+void SetMixerAudio(bool on); // AudioMode::Mixer on or off; on starts the device like the other audio chips
+void MixerPanelDockWrite(std::ostream& file);
+bool MixerPanelDockReadKey(const std::string& key, const std::string& val);
+bool MixerPanelTestStep(int frameId); // INFINITE_MIXERPANELTEST: true once finished (prints MIXERPANELTEST PASS/FAIL)
+extern bool  gMixerPanelOpen;
+extern int   gMixerPanelDock; // 0 bottom, 1 right, 2 left, 3 top, kDockFloating
+extern float gMixerPanelWidth;
+extern float gMixerPanelHeight;
+extern bool  gMixerClaimedKeys;
+extern ImVec2 gMixerPanelRectMin, gMixerPanelRectMax;
+inline const float kMixerPanelMinWidth = 320.0f;
+inline const float kMixerPanelMinHeight = 180.0f;
+// A page is one console: an Audio Out whose input resolves to a Mixer (that Mixer is the page's top).
+// Mixer Audio routes exactly these terminals; the panel lists exactly these pages.
+bool IsMixerPageTerminal(const INode* terminal, const INode* resolvedSource);
+INode* MixerPageTop(INode* resolvedSource); // the Mixer behind a terminal's source, up through master inserts
+inline constexpr int kMixerMasterSlot = -1; // MixerPanelInsert*: the chain between the top Mixer and its Audio Out
+int MixerPanelPageCount();
+void MixerPanelSelectPage(int page);
+int MixerPanelAddPage();              // spawns a Mixer + Audio Out pair; returns the Mixer's node index
+bool MixerPanelCreateFromAudioOuts(); // D13: wraps every Audio Out's source into one new Mixer
+int MixerPanelNewSendFx(int mixerIndex, int slot, const char* fxType); // B1: send bus -> effect -> return on the top Mixer
+// D4 inserts of one Mixer slot (signal order, node indices); each edit is one undo step. A shared chain (G4) refuses.
+std::vector<int> MixerPanelInsertChain(int mixerIndex, int slot, bool* shared = nullptr);
+int MixerPanelInsertAdd(int mixerIndex, int slot, const char* fxType);
+bool MixerPanelInsertRemove(int mixerIndex, int slot, int pos);
+bool MixerPanelInsertMove(int mixerIndex, int slot, int from, int to);
+bool MixerPanelInsertBypass(int mixerIndex, int slot, int pos);
+// B3: one undo step each. Group returns the new group Mixer's node index, -1 when refused.
+int MixerPanelGroupStrips(int mixerIndex, const std::vector<int>& slots);
+bool MixerPanelUngroup(int mixerIndex, int slot);
+bool MixerPanelStripMove(int mixerIndex, int from, int to);
+// B6: snapshots A-H over the whole console (top + groups), crossfaded by the top's snapfade; solo clear.
+bool MixerPanelSnapshotStore(int topIndex, int k);
+bool MixerPanelSnapshotRecall(int topIndex, int k);
+bool MixerPanelAnySolo(int topIndex);
+void MixerPanelClearSolos(int topIndex);
+// Block C: the render column (MixerRender.cpp). One take per Audio Out, through its own recorder.
+struct MixerRenderSettings
+{
+   int source = 0;     // 0 this page, 1 all pages (one file: the sum of every page, G8)
+   int mode = 0;       // 0 live, 1 fast (offline)
+   int lengthUnit = 0; // 0 seconds, 1 bars, 2 until stop, 3 arrange range (loop when on, else the whole arrangement)
+   float length = 30.0f;
+   float tail = 2.0f;  // seconds, rendered with the transport stopped
+   int start = 0;      // 0 now, 1 with transport play, 2 from the start
+   int format = 0;     // 0 WAV 16, 1 WAV 24, 2 FLAC, 3 MP3
+   std::string name = "{patch}-{take}";
+};
+struct MixerRenderResult
+{
+   std::string path;
+   float peak = 0.0f, lufs = -120.0f, truePeakDb = -120.0f;
+   int64_t frames = 0, bytes = 0;
+   double seconds = 0.0;
+};
+extern MixerRenderSettings gMixerRender;
+bool MixerRenderStart(const std::vector<int>& outIndices); // false + a notice when refused
+void MixerRenderCancel();                                  // live: stop and keep; fast or armed: drop
+void MixerRenderTick();                                    // every frame
+bool MixerRenderActive();
+bool MixerRenderArmed();
+float MixerRenderProgress();                               // 0..1, < 0 when there is no end yet
+double MixerRenderLengthSeconds();
+bool MixerRenderArrangeSpan(double& startSec, double& lengthSec); // lengthUnit 3; false when the arrangement is empty
+const std::vector<MixerRenderResult>& MixerRenderResults();
+const std::string& MixerRenderRefusal();
+std::string MixerRenderFileName(const std::string& tmpl, const std::string& dir, const char* ext);
+void DrawMixerRenderColumn(const std::vector<int>& pageOuts, int currentOut);
+extern bool gMixerRenderOpen;
+extern ImVec2 gMixerRenderMin, gMixerRenderMax; // the column's rect when drawn, zero when hidden
+bool MixerPanelShowMixer(int nodeIndex); // opens the panel on the page holding this Mixer; false if on no page
+int MixerPanelCurrentPageTop();          // node index of the shown page's top Mixer, -1 when none
+bool MixerPanelGroupOpen(int mixerIndex);
+// What the last drawn frame laid out, for the self-test.
+extern int gMixerPanelStripCount;
+extern float gMixerPanelFaderH;
+extern ImVec2 gMixerStripsMin, gMixerStripsMax, gMixerMasterMin, gMixerMasterMax;
 
 extern std::vector<int> gViewportPanelNodes;
 
@@ -944,7 +1026,7 @@ extern bool  gArrangeFocused;
    // a rebuild-driven mode leak rather than a routing rule.
    // Studio: the Sample studio's take alone (SampleStudioPanel.cpp). Canvas Audio Outs are bypassed as in Timeline,
    // and no clip is scheduled, so the take is heard on its own.
-   enum class AudioMode { Canvas, Timeline, Session, Studio };
+   enum class AudioMode { Canvas, Timeline, Session, Studio, Mixer };
 
 extern AudioMode gAudioMode;
 
@@ -2577,8 +2659,8 @@ ImageCable* CableFor(GraphNode& gn, int slot);
 
 
    // Upper bound on how many audio/note-input slots any single node exposes.
-   // The widest today is Mixer, at MixerNode::kMaxSlots (12).
-   inline const int kMaxAudioSlots = 12;
+   // The widest today is Mixer, at MixerNode::kMaxSlots (32).
+   inline const int kMaxAudioSlots = 32;
 
 
    // Every note-consuming node before AudioPluginNode carried its one note
@@ -5053,10 +5135,12 @@ extern uint64_t gArrangeAudioBuiltSessionGen;
 
 extern bool gArrangeAudioBuiltRouting;
 extern bool gArrangeAudioBuiltStudio;
+extern bool gArrangeAudioBuiltMixer;
 
 extern std::set<uint64_t> gArrangeRetriggerConflictClipIds;
 
 extern unsigned long long gAudioTopologyRebuildCount;
+extern int gAudioTopologyTerminalCount; // device terminals in the last published topology
 
 extern std::set<uint64_t> gArrangeVideoSourceConflictClipIds;
 
@@ -5069,6 +5153,7 @@ void ArrangeCollectClipModBindings(const GraphNode& node,
 
 bool ArrangeTimelineRoutingActive();
 bool StudioOnlyRouting(); // AudioMode::Studio outside an arrangement render: canvas bypassed, no clip scheduled
+bool MixerOnlyRouting(); // AudioMode::Mixer outside an arrangement render: only Audio Outs fed by a Mixer reach the device
 
 void ForceAudioRepare();
 

@@ -33,6 +33,7 @@ namespace app
             { "viewport", &gViewportPanelOpen, &gViewportPanelDock, true },
             { "modmatrix", &gModMatrixOpen, &gModMatrixDock, true },
             { "perf", &gPerfPanelOpen, &gPerfPanelDock, true },
+            { "mixer", &gMixerPanelOpen, &gMixerPanelDock, true },
             { "timeline", &gArrangePanelOpen, nullptr, false },
             { "session", &gSessionPanelOpen, nullptr, false },
             { "samplestudio", &gSampleStudioOpen, &gSampleStudioDock, false },

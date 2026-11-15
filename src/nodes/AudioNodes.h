@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio/dsp/MixerMeter.h"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -67,8 +68,11 @@ private:
 class MixerNode : public INode, public IAudioSource
 {
 public:
-   static constexpr int kMaxSlots = 12;
-   static constexpr int kSlots = 12;
+   static constexpr int kMaxSlots = 32;
+   static constexpr int kSlots = 32;
+   // The canvas body's "+" stops here; the Mixer panel adds the rest
+   // (32 strips at the body's fixed width would be 25 px each).
+   static constexpr int kBodySlots = 12;
 
    static INode* Create() { return new MixerNode(); }
    MixerNode();
@@ -88,7 +92,8 @@ public:
    const char* InputLabel(int slot) const override
    {
       static const char* kLabels[kMaxSlots] = {
-         "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"
+         "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
+         "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"
       };
       return (slot >= 0 && slot < numChannels) ? kLabels[slot] : nullptr;
    }
@@ -106,7 +111,7 @@ public:
    // reaches them, so the sweep raises it before probing their params.
    std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
    {
-      static const char* kStripPrefixes[] = { "gain", "pan", "mute", "solo" };
+      static const char* kStripPrefixes[] = { "gain", "pan", "mute", "solo", "trim", "phase", "solosafe" };
       for (const char* prefix : kStripPrefixes)
       {
          const size_t n = strlen(prefix);
@@ -116,6 +121,16 @@ public:
       return {};
    }
 
+   // Master loudness and true peak (mixer-panel plan B4). The meter runs only while something asks:
+   // the Mixer panel calls RequestMeters() each frame it draws this Mixer as a master.
+   void RequestMeters() { mMeterRequested = true; }
+   bool MetersRunning() const { return mMetersRunning; }
+   void ResetMeters();
+   float LoudnessMomentary() const { return mLoudM; }
+   float LoudnessShort() const { return mLoudS; }
+   float LoudnessIntegrated() const { return mLoudI; }
+   float TruePeakDb() const { return mTruePeakDb; }
+
    int numChannels = 8;
    float gainDb[kMaxSlots] = {};
    // -1 hard left .. +1 hard right. A mixer without pan can only ever build a
@@ -124,13 +139,70 @@ public:
    float pan[kMaxSlots] = {};
    bool mute[kMaxSlots] = {};
    bool solo[kMaxSlots] = {};
+   // Console strip controls (mixer-panel plan D6). Absent from older patches,
+   // and every default leaves the sound exactly as it was.
+   float trimDb[kMaxSlots] = {}; // pre-fader, +-24 dB
+   bool phase[kMaxSlots] = {};   // polarity invert
+   bool soloSafe[kMaxSlots] = {}; // stays in the mix while another strip is soloed
+   // Hard-side boost relative to a unity centre: 0 = 0 dB (balance), 1 = +3 dB
+   // (equal power, the law every older patch used), 2 = +4.5 dB, 3 = +6 dB (linear).
+   int panLaw = 1;
+   // Console master fader (mixer-panel plan §1): scales the main sum only,
+   // so sends leave the strip at its own level.
+   float masterDb = 0.0f;
+   // Aux sends (mixer-panel plan D5): send buses 1..4 appear as extra output
+   // pins "send 1".."send 4" once sendBuses reaches them, so an old patch
+   // keeps its single output. kSendOffDb and below is off.
+   static constexpr int kSendBuses = 4;
+   static constexpr float kSendOffDb = -60.0f;
+   int sendBuses = 0;
+   float sendDb[kSendBuses][kMaxSlots];
+   bool sendPre[kMaxSlots] = {}; // pre-fader sends for this strip (all four)
    AudioCable inputs[kMaxSlots];
+
+   // Snapshots A-H (mixer-panel plan D8 / B6): the whole strip and master state, saved in the patch.
+   // Recall crossfades on the main thread (dB and pan linear, switches at the midpoint, G3); the audio
+   // node's block-rate ramp smooths each step, so a recall during playback never clicks.
+   static constexpr int kSnapshots = 8;
+   struct Snapshot
+   {
+      bool has = false;
+      int count = 0;
+      float master = 0.0f;
+      float gain[kMaxSlots] = {}, pan[kMaxSlots] = {}, trim[kMaxSlots] = {};
+      float send[kSendBuses][kMaxSlots] = {};
+      bool mute[kMaxSlots] = {}, solo[kMaxSlots] = {}, phase[kMaxSlots] = {}, safe[kMaxSlots] = {}, pre[kMaxSlots] = {};
+   };
+   void SnapshotStore(int k);
+   bool SnapshotHas(int k) const { return k >= 0 && k < kSnapshots && mSnap[k].has; }
+   void SnapshotRecall(int k, float fadeMs); // fadeMs <= 0 sets the values at once
+   void SnapshotAdvance(float dtMs);         // CookIfNeeded calls it with wall time; tests drive it directly
+   bool SnapshotFading() const { return mFadeK >= 0; }
+   int SnapshotLast() const { return mSnapLast; }
+   int snapFadeMs = 200;
+
+   int SendBuses() const { return sendBuses < 0 ? 0 : (sendBuses > kSendBuses ? kSendBuses : sendBuses); }
+   int OutputCount() const override { return 1 + SendBuses(); }
+   const char* OutputLabel(int index) const override
+   {
+      static const char* kLabels[1 + kSendBuses] = { "out", "send 1", "send 2", "send 3", "send 4" };
+      return (index >= 0 && index <= SendBuses()) ? kLabels[index] : nullptr;
+   }
+   int AudioOutputSlotForPin(int pinIndex) const override { return pinIndex; }
 
 private:
    std::unique_ptr<AudioMixerNode> mAudioNode;
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
    float mChannelLevel[kMaxSlots] = {};
+   bool mMeterRequested = false, mMetersRunning = false;
+   float mLoudM = -120.0f, mLoudS = -120.0f, mLoudI = -120.0f, mTruePeakDb = -120.0f;
+   Snapshot mSnap[kSnapshots];
+   Snapshot mFadeFrom;
+   int mFadeK = -1, mSnapLast = -1;
+   float mFadeMs = 0.0f, mFadeAt = 0.0f;
+   double mFadeClock = 0.0;
+   void SnapshotApply(const Snapshot& to, float t);
 };
 
 // A two-input crossfader: blend=0 is input A only, 1 is input B only, 0.5 is
@@ -330,7 +402,17 @@ public:
    // Returns false (nothing opened) if the engine isn't running yet or the
    // file couldn't be created.
    // `sampleRate` 0 means the engine's (a headless test has no device and passes its own).
-   bool StartRecording(const std::string& path, double sampleRate = 0.0);
+   // bitDepth 16 or 24 (WAV, FLAC).
+   bool StartRecording(const std::string& path, double sampleRate = 0.0, int bitDepth = 16);
+   // Sample-exact takes (mixer-panel plan C): drop the first `skipFrames` that reach the recorder
+   // (plugin latency), then keep at most `limitFrames` (0 = no limit). Set after StartRecording.
+   void SetTakeWindow(int64_t skipFrames, int64_t limitFrames)
+   {
+      mTakeSkip = std::max<int64_t>(0, skipFrames);
+      mTakeLimit = std::max<int64_t>(0, limitFrames);
+   }
+   int64_t TakeFrames() const { return mTakeFrames; }
+   bool TakeComplete() const { return mTakeLimit > 0 && mTakeFrames >= mTakeLimit; }
    // Stops draining and finalizes the file's RIFF/data chunk sizes. Safe to
    // call when not recording.
    void StopRecording();
@@ -343,6 +425,9 @@ public:
    // it has stopped. The file formats clamp at full scale, so above 1.0 the
    // take was written clipped.
    float TakePeak() const { return mTakePeak; }
+   // Integrated loudness (LUFS) and true peak (dBTP) of the same take; -120 when nothing was measured.
+   float TakeLufs() const;
+   float TakeTruePeakDb() const;
 
    AudioCable input;
 
@@ -362,7 +447,10 @@ public:
 
 private:
    AudioCaptureRing mCaptureRing;
+   void MeterTake(const float* interleaved, int frames);
    AudioFileWriter mWriter;
    double mOpenSampleRate = 0.0;
    float mTakePeak = 0.0f;
+   int64_t mTakeSkip = 0, mTakeLimit = 0, mTakeFrames = 0;
+   std::unique_ptr<MixerMeter> mTakeMeter;
 };

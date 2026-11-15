@@ -29,6 +29,10 @@ public:
    // starting a recording must not require a topology rebuild to take effect.
    std::atomic<bool> enabled { false };
 
+   // Mixer panel "All pages" (plan G8): while the engine has a sum target, a ring with this set adds
+   // its block into one shared sum instead of writing itself, and the sum lands in the target ring.
+   std::atomic<bool> joinSum { false };
+
    // Incremented (audio thread) whenever the ring was full and samples were
    // dropped; read and reset by the consumer that reports it, so a stall
    // shows up in the UI instead of silently producing a glitched file.

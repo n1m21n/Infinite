@@ -108,7 +108,7 @@ public:
    // Must match kAudioMaxNodeInputs (AudioEngine.h) - a static_assert there
    // checks it. Can't reference that constant directly: AudioEngine.h is the
    // one that includes AudioNode.h, not the other way around.
-   static constexpr int kMaxInputPins = 12;
+   static constexpr int kMaxInputPins = 32;
 
    // Main thread only (RebuildAudioTopology, main.cpp). Plugin/effect delay
    // compensation (PDC) state for each of this node's input pins, one

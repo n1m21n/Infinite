@@ -94,10 +94,15 @@ struct OfflineGraph::Owned
 
 struct OfflineGraph::Entry
 {
+   Entry()
+   {
+      for (int& i : inputs)
+         i = -1;
+   }
    INode* owner = nullptr;
    AudioNode* node = nullptr;
    int numInputs = 0;
-   int inputs[kAudioMaxNodeInputs] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }; // buffer pair, -1 = silence
+   int inputs[kAudioMaxNodeInputs]; // buffer pair, -1 = silence (filled by the constructor)
    int numOutputs = 1;
    int firstOutput = 0; // buffer pair of output 0
 };

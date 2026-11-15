@@ -387,6 +387,11 @@ void DrawSidePanels(FrameCtx& fc)
          ImGui::SameLine(0.0f, 0.0f);
          DrawModMatrixDocked("##modmatrix_right", ImVec2(gModMatrixWidth, graphHeight));
       }
+      if (gMixerPanelOpen && gMixerPanelDock == 1)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         DrawMixerPanelDocked("##mixerpanel_right", ImVec2(gMixerPanelWidth, graphHeight));
+      }
 
       // Right-docked performance matrix
       if (perfRight)
@@ -723,6 +728,8 @@ void DrawSidePanels(FrameCtx& fc)
          DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
       if (matrixBottom)
          DrawModMatrixDocked("##modmatrix_bottom", ImVec2(0, gModMatrixHeight));
+      if (gMixerPanelOpen && gMixerPanelDock == 0)
+         DrawMixerPanelDocked("##mixerpanel_bottom", ImVec2(0, gMixerPanelHeight));
       if (perfBottom)
          DrawPerfPanelDocked("##perfpanel_bottom", ImVec2(0, gPerfPanelHeight));
       if (arrangeBottom)

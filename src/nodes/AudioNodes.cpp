@@ -1,8 +1,12 @@
+#include "audio/dsp/MixerMeter.h"
 #include "plugin/engine/HostAudio.h"
 #include "AudioNodes.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <sstream>
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioEngine.h"
@@ -96,21 +100,95 @@ AudioNode* GainNode::GetAudioNode()
 }
 
 // ---------------------------------------------------------------------- Mixer
+namespace
+{
+   // Pan gains for one strip, unity at centre under every law; the law only
+   // sets how far a hard-panned side rises above that (mixer-panel plan R5).
+   // Law 1 is the exact expression older patches were mixed with.
+   void MixerPanGains(float pan, int law, float& l, float& r)
+   {
+      const float p = std::clamp(pan, -1.0f, 1.0f);
+      const float x = (p + 1.0f) * 0.5f; // 0 = hard left, 1 = hard right
+      switch (law)
+      {
+      case 0: // 0 dB: balance - the far side fades, the near side stays at unity
+         l = std::min(1.0f, 2.0f * (1.0f - x));
+         r = std::min(1.0f, 2.0f * x);
+         return;
+      case 2: // +4.5 dB: geometric mean of equal power and linear
+      {
+         float el, er;
+         DspMath::EqualPowerPan(p, el, er);
+         const float centre = std::sqrt((float)M_SQRT1_2 * 0.5f);
+         l = std::sqrt(std::max(0.0f, el * (1.0f - x))) / centre;
+         r = std::sqrt(std::max(0.0f, er * x)) / centre;
+         return;
+      }
+      case 3: // +6 dB: linear
+         l = 2.0f * (1.0f - x);
+         r = 2.0f * x;
+         return;
+      default: // +3 dB: equal power
+         DspMath::EqualPowerPan(p, l, r);
+         l *= (float)M_SQRT2;
+         r *= (float)M_SQRT2;
+         return;
+      }
+   }
+}
+
 class AudioMixerNode : public AudioNode
 {
 public:
+   AudioMixerNode()
+   {
+      for (auto& bus : mSendDb)
+         for (auto& v : bus)
+            v.store(MixerNode::kSendOffDb, std::memory_order_relaxed);
+   }
+
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
       mMailbox.PrepareToPlay(sampleRate);
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
+      {
          mMailbox.SetImmediate(s, mGainDb[s].load(std::memory_order_relaxed));
+         mCachedDb[s] = std::nanf("");
+      }
       mPanPrimed = false;
+      mLoudness.Prepare(sampleRate);
+      mWasMetering = false;
    }
+
+   // Main out + four send buses (mixer-panel plan D5). The topology asks
+   // before every rebuild, so a Mixer without sends keeps one output buffer.
+   int AudioOutputCount() const override { return 1 + mBuses.load(std::memory_order_relaxed); }
+   void SetBusCount(int buses) { mBuses.store(std::clamp(buses, 0, (int)MixerNode::kSendBuses), std::memory_order_relaxed); }
 
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
    {
+      AudioBuffer* outs[1] = { &output };
+      ProcessBlockMulti(inputs, numInputs, outs, 1);
+   }
+
+   void ProcessBlockMulti(const AudioBuffer* const* inputs, int numInputs,
+                          AudioBuffer* const* outputs, int numOutputs) override
+   {
+      constexpr int kBuses = MixerNode::kSendBuses;
+      AudioBuffer* busOut[kBuses] = {};
+      for (int b = 0; b < kBuses && b + 1 < numOutputs; b++)
+      {
+         busOut[b] = outputs[b + 1];
+         if (busOut[b] != nullptr)
+            for (int ch = 0; ch < busOut[b]->numChannels; ch++)
+               std::fill(busOut[b]->channels[ch], busOut[b]->channels[ch] + busOut[b]->numFrames, 0.0f);
+      }
+      if (numOutputs < 1 || outputs[0] == nullptr)
+         return;
+      AudioBuffer& output = *outputs[0];
       const int activeChannels = std::clamp(mNumChannels.load(std::memory_order_relaxed), 0, (int)MixerNode::kMaxSlots);
       const int slots = std::min(numInputs, activeChannels);
+      const int law = mPanLaw.load(std::memory_order_relaxed);
 
       bool anySolo = false;
       for (int s = 0; s < activeChannels; s++)
@@ -122,79 +200,177 @@ public:
          }
       }
 
-      // Pan, mute and solo are read once per block, not smoothed per sample.
+      // Pan, mute, solo and polarity are read once per block, not smoothed per
+      // sample. Polarity rides on the gain pair, so a flip ramps through zero.
       float panL[MixerNode::kMaxSlots] = {}, panR[MixerNode::kMaxSlots] = {};
       for (int s = 0; s < activeChannels; s++)
       {
          const bool isMuted = mMute[s].load(std::memory_order_relaxed) != 0;
          const bool isSolo = mSolo[s].load(std::memory_order_relaxed) != 0;
-         if (isMuted || (anySolo && !isSolo))
+         const bool isSafe = mSoloSafe[s].load(std::memory_order_relaxed) != 0;
+         if (isMuted || (anySolo && !isSolo && !isSafe))
          {
             panL[s] = panR[s] = 0.0f;
             continue;
          }
-         DspMath::EqualPowerPan(mPan[s].load(std::memory_order_relaxed), panL[s], panR[s]);
-         // EqualPowerPan is 0.707/0.707 at centre; scaled back to unity so a
-         // centred, unity-gain channel passes through at exactly its input
-         // level rather than 3 dB down.
-         panL[s] *= (float)M_SQRT2;
-         panR[s] *= (float)M_SQRT2;
+         MixerPanGains(mPan[s].load(std::memory_order_relaxed), law, panL[s], panR[s]);
+         if (mPhase[s].load(std::memory_order_relaxed) != 0)
+         {
+            panL[s] = -panL[s];
+            panR[s] = -panR[s];
+         }
       }
 
-      // Pan, mute and solo change the gain pair at block rate; ramping from
-      // last block's pair across this one turns a mute, solo or pan jump
-      // from a step into a 10 ms fade. Steady state is untouched.
+      // Sends, trim (for pre-fader sends) and master are block-rate values
+      // ramped from last block's across this one, like the pan pair.
+      float sendLin[kBuses][MixerNode::kMaxSlots] = {};
+      bool busActive[kBuses] = {};
+      for (int b = 0; b < kBuses; b++)
+      {
+         if (busOut[b] == nullptr)
+            continue;
+         for (int s = 0; s < activeChannels; s++)
+         {
+            const float db = mSendDb[b][s].load(std::memory_order_relaxed);
+            sendLin[b][s] = db <= MixerNode::kSendOffDb ? 0.0f : DspMath::DbToLinear(db);
+            if (sendLin[b][s] != 0.0f || mPrevSend[b][s] != 0.0f)
+               busActive[b] = true;
+         }
+      }
+      float trimLin[MixerNode::kMaxSlots];
+      bool pre[MixerNode::kMaxSlots];
+      for (int s = 0; s < activeChannels; s++)
+      {
+         trimLin[s] = DspMath::DbToLinear(mTrimDb[s].load(std::memory_order_relaxed));
+         pre[s] = mSendPre[s].load(std::memory_order_relaxed) != 0;
+      }
+      const float masterLin = DspMath::DbToLinear(mMasterDb.load(std::memory_order_relaxed));
+
       if (!mPanPrimed)
       {
          for (int s = 0; s < MixerNode::kMaxSlots; s++)
          {
             mPrevPanL[s] = panL[s];
             mPrevPanR[s] = panR[s];
+            mPrevTrim[s] = s < activeChannels ? trimLin[s] : 1.0f;
+            for (int b = 0; b < kBuses; b++)
+               mPrevSend[b][s] = s < activeChannels ? sendLin[b][s] : 0.0f;
          }
+         mPrevMaster = masterLin;
          mPanPrimed = true;
       }
       const float invFrames = 1.0f / (float)std::max(1, output.numFrames);
+
+      // Fader + trim reach the mailbox as one dB value. A strip whose value is
+      // not moving gets its linear gain once per block; only a ramping strip
+      // pays the per-sample powf (32 strips x powf per sample otherwise).
+      bool ramping[MixerNode::kMaxSlots] = {};
+      float linear[MixerNode::kMaxSlots];
+      for (int s = 0; s < activeChannels; s++)
+      {
+         ramping[s] = !mMailbox.IsSettled(s);
+         if (!ramping[s])
+         {
+            const float db = mMailbox.SmoothedValue(s);
+            // A value that landed between the check and the read started a
+            // ramp: follow it per sample from here instead.
+            if (!mMailbox.IsSettled(s))
+            {
+               ramping[s] = true;
+               continue;
+            }
+            if (!(db == mCachedDb[s]))
+            {
+               mCachedDb[s] = db;
+               mCachedLinear[s] = DspMath::DbToLinear(db);
+            }
+            linear[s] = mCachedLinear[s];
+         }
+      }
+
+      bool anySend = false;
+      for (int b = 0; b < kBuses; b++)
+         anySend = anySend || busActive[b];
 
       float channelPeak[MixerNode::kMaxSlots] = {};
       float peak = 0.0f;
       for (int i = 0; i < output.numFrames; i++)
       {
-         float linear[MixerNode::kMaxSlots];
          float gL[MixerNode::kMaxSlots], gR[MixerNode::kMaxSlots];
+         float tr[MixerNode::kMaxSlots], sg[kBuses][MixerNode::kMaxSlots];
          const float t = (float)(i + 1) * invFrames;
          for (int s = 0; s < activeChannels; s++)
          {
-            linear[s] = DspMath::DbToLinear(mMailbox.SmoothedValue(s));
+            if (ramping[s])
+               linear[s] = DspMath::DbToLinear(mMailbox.SmoothedValue(s));
             gL[s] = mPrevPanL[s] + (panL[s] - mPrevPanL[s]) * t;
             gR[s] = mPrevPanR[s] + (panR[s] - mPrevPanR[s]) * t;
          }
+         if (anySend)
+         {
+            for (int s = 0; s < activeChannels; s++)
+               tr[s] = mPrevTrim[s] + (trimLin[s] - mPrevTrim[s]) * t;
+            for (int b = 0; b < kBuses; b++)
+               if (busActive[b])
+                  for (int s = 0; s < activeChannels; s++)
+                     sg[b][s] = mPrevSend[b][s] + (sendLin[b][s] - mPrevSend[b][s]) * t;
+         }
+         const float m = mPrevMaster + (masterLin - mPrevMaster) * t;
 
          for (int ch = 0; ch < output.numChannels; ch++)
          {
             // Channel 0 is left, 1 is right; anything beyond a stereo pair
             // gets the left law rather than being silently dropped.
-            const float law = (ch == 1) ? 1.0f : 0.0f;
+            const bool right = ch == 1;
             float sum = 0.0f;
             for (int s = 0; s < slots; s++)
             {
                if (inputs[s] == nullptr)
                   continue;
-               const float v = inputs[s]->channels[ch][i] * linear[s] *
-                               (law > 0.5f ? gR[s] : gL[s]);
+               const float in = inputs[s]->channels[ch][i];
+               const float g = right ? gR[s] : gL[s];
+               const float v = in * linear[s] * g;
                sum += v;
                channelPeak[s] = std::max(channelPeak[s], std::fabs(v));
+               if (anySend)
+               {
+                  const float sendSrc = pre[s] ? in * tr[s] * g : v;
+                  for (int b = 0; b < kBuses; b++)
+                     if (busActive[b] && ch < busOut[b]->numChannels)
+                        busOut[b]->channels[ch][i] += sendSrc * sg[b][s];
+               }
             }
+            sum *= m;
             output.channels[ch][i] = sum;
             peak = std::max(peak, std::fabs(sum));
          }
       }
+      for (int s = 0; s < activeChannels; s++)
+         if (ramping[s])
+            mCachedDb[s] = std::nanf("");
 
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
       {
          mPrevPanL[s] = panL[s];
          mPrevPanR[s] = panR[s];
+         if (s < activeChannels)
+         {
+            mPrevTrim[s] = trimLin[s];
+            for (int b = 0; b < kBuses; b++)
+               mPrevSend[b][s] = sendLin[b][s];
+         }
       }
+      mPrevMaster = masterLin;
       mMeter.Write(&peak, 1);
+      // Loudness and true peak of the main sum: only while the Mixer panel shows this master.
+      const bool metering = mMetering.load(std::memory_order_relaxed) != 0;
+      if (metering)
+      {
+         if (!mWasMetering)
+            mLoudness.Reset();
+         mLoudness.Process(output.channels[0], output.numChannels > 1 ? output.channels[1] : nullptr, output.numFrames);
+      }
+      mWasMetering = metering;
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
          mChannelPeak[s].store(s < activeChannels ? channelPeak[s] : 0.0f, std::memory_order_relaxed);
    }
@@ -203,43 +379,249 @@ public:
    void PushParams(const MixerNode& n)
    {
       mNumChannels.store(n.numChannels, std::memory_order_relaxed);
+      mPanLaw.store(std::clamp(n.panLaw, 0, 3), std::memory_order_relaxed);
+      mMasterDb.store(n.masterDb, std::memory_order_relaxed);
+      SetBusCount(n.SendBuses());
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
       {
-         mGainDb[s].store(n.gainDb[s], std::memory_order_relaxed);
-         mMailbox.Push(s, n.gainDb[s]);
+         const float db = n.gainDb[s] + n.trimDb[s];
+         mGainDb[s].store(db, std::memory_order_relaxed);
+         mMailbox.Push(s, db);
+         mTrimDb[s].store(n.trimDb[s], std::memory_order_relaxed);
+         mSendPre[s].store(n.sendPre[s] ? 1 : 0, std::memory_order_relaxed);
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            mSendDb[b][s].store(b < n.SendBuses() ? n.sendDb[b][s] : MixerNode::kSendOffDb, std::memory_order_relaxed);
          mPan[s].store(n.pan[s], std::memory_order_relaxed);
          mMute[s].store(n.mute[s] ? 1 : 0, std::memory_order_relaxed);
          mSolo[s].store(n.solo[s] ? 1 : 0, std::memory_order_relaxed);
+         mPhase[s].store(n.phase[s] ? 1 : 0, std::memory_order_relaxed);
+         mSoloSafe[s].store(n.soloSafe[s] ? 1 : 0, std::memory_order_relaxed);
       }
    }
 
    MeterRing& Meter() { return mMeter; }
    float ChannelPeak(int slot) const { return mChannelPeak[slot].load(std::memory_order_relaxed); }
+   void SetMetering(bool on) { mMetering.store(on ? 1 : 0, std::memory_order_relaxed); }
+   MixerMeter& Loudness() { return mLoudness; }
 
 private:
    ParamMailbox mMailbox;
    MeterRing mMeter;
+   MixerMeter mLoudness;            // audio thread; readouts are atomics
+   std::atomic<int> mMetering { 0 };
+   bool mWasMetering = false;       // audio thread only
    float mPrevPanL[MixerNode::kMaxSlots] = {}, mPrevPanR[MixerNode::kMaxSlots] = {}; // audio thread only
+   float mCachedDb[MixerNode::kMaxSlots] = {}, mCachedLinear[MixerNode::kMaxSlots] = {}; // audio thread only
    bool mPanPrimed = false;
+   float mPrevTrim[MixerNode::kMaxSlots] = {};                          // audio thread only
+   float mPrevSend[MixerNode::kSendBuses][MixerNode::kMaxSlots] = {};   // audio thread only
+   float mPrevMaster = 1.0f;                                            // audio thread only
+   std::atomic<int> mBuses { 0 };
+   std::atomic<float> mMasterDb { 0.0f };
+   std::atomic<float> mTrimDb[MixerNode::kMaxSlots] {};
+   std::atomic<int> mSendPre[MixerNode::kMaxSlots] {};
+   std::atomic<float> mSendDb[MixerNode::kSendBuses][MixerNode::kMaxSlots] {};
    std::atomic<int> mNumChannels { 8 };
+   std::atomic<int> mPanLaw { 1 };
    std::atomic<float> mGainDb[MixerNode::kMaxSlots] {};
    std::atomic<float> mPan[MixerNode::kMaxSlots] {};
    std::atomic<int> mMute[MixerNode::kMaxSlots] {};
    std::atomic<int> mSolo[MixerNode::kMaxSlots] {};
+   std::atomic<int> mPhase[MixerNode::kMaxSlots] {};
+   std::atomic<int> mSoloSafe[MixerNode::kMaxSlots] {};
    std::atomic<float> mChannelPeak[MixerNode::kMaxSlots] {};
 };
 
-MixerNode::MixerNode() = default;
+MixerNode::MixerNode()
+{
+   for (auto& bus : sendDb)
+      std::fill(std::begin(bus), std::end(bus), kSendOffDb);
+}
 MixerNode::~MixerNode() = default;
+
+void MixerNode::ResetMeters()
+{
+   if (mAudioNode)
+      mAudioNode->Loudness().Reset();
+   mLoudM = mLoudS = mLoudI = mTruePeakDb = MixerMeter::kSilent;
+}
+
+// ---- Snapshots A-H (B6) ----
+namespace
+{
+   MixerNode::Snapshot ReadConsole(const MixerNode& m)
+   {
+      MixerNode::Snapshot sn;
+      sn.has = true;
+      sn.count = m.numChannels;
+      sn.master = m.masterDb;
+      for (int i = 0; i < MixerNode::kMaxSlots; i++)
+      {
+         sn.gain[i] = m.gainDb[i]; sn.pan[i] = m.pan[i]; sn.trim[i] = m.trimDb[i];
+         sn.mute[i] = m.mute[i]; sn.solo[i] = m.solo[i]; sn.phase[i] = m.phase[i];
+         sn.safe[i] = m.soloSafe[i]; sn.pre[i] = m.sendPre[i];
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            sn.send[b][i] = m.sendDb[b][i];
+      }
+      return sn;
+   }
+
+   double SnapshotNowMs()
+   {
+      using namespace std::chrono;
+      return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
+   }
+
+   // One line: "count master" then per strip "gain pan trim sendA..D flags", flags = mute solo phase safe pre bits.
+   std::string SnapshotText(const MixerNode::Snapshot& sn)
+   {
+      if (!sn.has)
+         return std::string();
+      std::string out;
+      char buf[48];
+      snprintf(buf, sizeof(buf), "%d %g", sn.count, sn.master);
+      out += buf;
+      for (int i = 0; i < sn.count && i < MixerNode::kMaxSlots; i++)
+      {
+         snprintf(buf, sizeof(buf), " %g %g %g", sn.gain[i], sn.pan[i], sn.trim[i]);
+         out += buf;
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+         {
+            snprintf(buf, sizeof(buf), " %g", sn.send[b][i]);
+            out += buf;
+         }
+         const int flags = (sn.mute[i] ? 1 : 0) | (sn.solo[i] ? 2 : 0) | (sn.phase[i] ? 4 : 0) | (sn.safe[i] ? 8 : 0) | (sn.pre[i] ? 16 : 0);
+         snprintf(buf, sizeof(buf), " %d", flags);
+         out += buf;
+      }
+      return out;
+   }
+
+   float Finite(float v, float lo, float hi, float fallback)
+   {
+      return std::isfinite(v) ? std::clamp(v, lo, hi) : fallback;
+   }
+
+   MixerNode::Snapshot SnapshotParse(const std::string& text)
+   {
+      MixerNode::Snapshot sn;
+      std::istringstream in(text);
+      int count = 0;
+      float master = 0.0f;
+      if (!(in >> count >> master))
+         return sn;
+      sn.count = std::clamp(count, 0, MixerNode::kMaxSlots);
+      sn.master = Finite(master, kMinGainDb, kMaxGainDb, 0.0f);
+      for (int i = 0; i < MixerNode::kMaxSlots; i++)
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            sn.send[b][i] = MixerNode::kSendOffDb;
+      for (int i = 0; i < sn.count; i++)
+      {
+         float g = 0.0f, p = 0.0f, t = 0.0f, send[MixerNode::kSendBuses];
+         int flags = 0;
+         if (!(in >> g >> p >> t))
+            return MixerNode::Snapshot();
+         for (float& v : send)
+            if (!(in >> v))
+               return MixerNode::Snapshot();
+         if (!(in >> flags))
+            return MixerNode::Snapshot();
+         sn.gain[i] = Finite(g, kMinGainDb, kMaxGainDb, 0.0f);
+         sn.pan[i] = Finite(p, -1.0f, 1.0f, 0.0f);
+         sn.trim[i] = Finite(t, -24.0f, 24.0f, 0.0f);
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            sn.send[b][i] = Finite(send[b], MixerNode::kSendOffDb, kMaxGainDb, MixerNode::kSendOffDb);
+         sn.mute[i] = flags & 1; sn.solo[i] = flags & 2; sn.phase[i] = flags & 4; sn.safe[i] = flags & 8; sn.pre[i] = flags & 16;
+      }
+      sn.has = true;
+      return sn;
+   }
+}
+
+void MixerNode::SnapshotStore(int k)
+{
+   if (k < 0 || k >= kSnapshots)
+      return;
+   mSnap[k] = ReadConsole(*this);
+   mSnapLast = k;
+}
+
+void MixerNode::SnapshotRecall(int k, float fadeMs)
+{
+   if (!SnapshotHas(k))
+      return;
+   mSnapLast = k;
+   if (!(fadeMs > 0.0f))
+   {
+      mFadeK = -1;
+      SnapshotApply(mSnap[k], 1.0f);
+      return;
+   }
+   mFadeFrom = ReadConsole(*this);
+   mFadeK = k;
+   mFadeMs = fadeMs;
+   mFadeAt = 0.0f;
+   mFadeClock = SnapshotNowMs();
+}
+
+void MixerNode::SnapshotAdvance(float dtMs)
+{
+   if (mFadeK < 0)
+      return;
+   mFadeAt += std::max(0.0f, dtMs);
+   const float t = mFadeMs > 0.0f ? std::min(1.0f, mFadeAt / mFadeMs) : 1.0f;
+   SnapshotApply(mSnap[mFadeK], t);
+   if (t >= 1.0f)
+      mFadeK = -1;
+}
+
+void MixerNode::SnapshotApply(const Snapshot& to, float t)
+{
+   const Snapshot& from = mFadeK >= 0 ? mFadeFrom : to;
+   auto mix = [t](float a, float b) { return a + (b - a) * t; };
+   const bool late = t >= 0.5f; // G3: switches change at the midpoint
+   masterDb = mix(from.master, to.master);
+   for (int i = 0; i < to.count && i < kMaxSlots; i++)
+   {
+      gainDb[i] = mix(from.gain[i], to.gain[i]);
+      pan[i] = mix(from.pan[i], to.pan[i]);
+      trimDb[i] = mix(from.trim[i], to.trim[i]);
+      for (int b = 0; b < kSendBuses; b++)
+         sendDb[b][i] = mix(from.send[b][i], to.send[b][i]);
+      mute[i] = late ? to.mute[i] : from.mute[i];
+      solo[i] = late ? to.solo[i] : from.solo[i];
+      phase[i] = late ? to.phase[i] : from.phase[i];
+      soloSafe[i] = late ? to.safe[i] : from.safe[i];
+      sendPre[i] = late ? to.pre[i] : from.pre[i];
+   }
+}
 
 void MixerNode::CookIfNeeded(int frameId)
 {
    if (frameId == mLastCookFrame)
       return;
    mLastCookFrame = frameId;
+   if (mFadeK >= 0)
+   {
+      const double now = SnapshotNowMs();
+      SnapshotAdvance((float)(now - mFadeClock));
+      mFadeClock = now;
+   }
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMixerNode>();
    mAudioNode->PushParams(*this);
+   // B4: the panel asks every frame it draws this master; a frame without the ask stops the meter.
+   mAudioNode->SetMetering(mMeterRequested);
+   mMetersRunning = mMeterRequested;
+   mMeterRequested = false;
+   if (mMetersRunning)
+   {
+      MixerMeter& lm = mAudioNode->Loudness();
+      mLoudM = lm.Momentary();
+      mLoudS = lm.ShortTerm();
+      mLoudI = lm.Integrated();
+      mTruePeakDb = lm.TruePeakDb();
+   }
 
    float peak = 0.0f;
    if (mAudioNode->Meter().ReadLatest(peak))
@@ -252,37 +634,95 @@ void MixerNode::VisitParams(ParamVisitor& v)
 {
    v.Int("channels", numChannels);
    numChannels = std::clamp(numChannels, 0, kMaxSlots); // loaded unchecked; indexes inputs[]
-   static const char* kGainNames[kMaxSlots] = {
-      "gain0", "gain1", "gain2", "gain3", "gain4", "gain5",
-      "gain6", "gain7", "gain8", "gain9", "gain10", "gain11"
+   // Names are saved per strip as <prefix><index>; the four original families
+   // keep their old spelling, the console additions are appended after them.
+   struct Names
+   {
+      std::string gain[kMaxSlots], pan[kMaxSlots], mute[kMaxSlots], solo[kMaxSlots];
+      std::string trim[kMaxSlots], phase[kMaxSlots], safe[kMaxSlots];
+      Names()
+      {
+         for (int i = 0; i < kMaxSlots; i++)
+         {
+            const std::string n = std::to_string(i);
+            gain[i] = "gain" + n;
+            pan[i] = "pan" + n;
+            mute[i] = "mute" + n;
+            solo[i] = "solo" + n;
+            trim[i] = "trim" + n;
+            phase[i] = "phase" + n;
+            safe[i] = "solosafe" + n;
+         }
+      }
    };
-   static const char* kPanNames[kMaxSlots] = {
-      "pan0", "pan1", "pan2", "pan3", "pan4", "pan5",
-      "pan6", "pan7", "pan8", "pan9", "pan10", "pan11"
-   };
-   static const char* kMuteNames[kMaxSlots] = {
-      "mute0", "mute1", "mute2", "mute3", "mute4", "mute5",
-      "mute6", "mute7", "mute8", "mute9", "mute10", "mute11"
-   };
-   static const char* kSoloNames[kMaxSlots] = {
-      "solo0", "solo1", "solo2", "solo3", "solo4", "solo5",
-      "solo6", "solo7", "solo8", "solo9", "solo10", "solo11"
-   };
+   static const Names kNames;
    for (int i = 0; i < kMaxSlots; i++)
    {
-      v.Float(kGainNames[i], gainDb[i]);
-      v.Float(kPanNames[i], pan[i]);
-      v.Bool(kMuteNames[i], mute[i]);
-      v.Bool(kSoloNames[i], solo[i]);
+      v.Float(kNames.gain[i].c_str(), gainDb[i]);
+      v.Float(kNames.pan[i].c_str(), pan[i]);
+      v.Bool(kNames.mute[i].c_str(), mute[i]);
+      v.Bool(kNames.solo[i].c_str(), solo[i]);
       gainDb[i] = std::clamp(gainDb[i], kMinGainDb, kMaxGainDb); // as GainNode
       pan[i] = std::clamp(pan[i], -1.0f, 1.0f);
    }
+   v.Int("panlaw", panLaw);
+   panLaw = std::clamp(panLaw, 0, 3);
+   for (int i = 0; i < kMaxSlots; i++)
+   {
+      v.Float(kNames.trim[i].c_str(), trimDb[i]);
+      v.Bool(kNames.phase[i].c_str(), phase[i]);
+      v.Bool(kNames.safe[i].c_str(), soloSafe[i]);
+      trimDb[i] = std::isfinite(trimDb[i]) ? std::clamp(trimDb[i], -24.0f, 24.0f) : 0.0f;
+   }
+   v.Float("master", masterDb);
+   masterDb = std::isfinite(masterDb) ? std::clamp(masterDb, kMinGainDb, kMaxGainDb) : 0.0f;
+   // Sends (plan D5): send<A..D><strip> in dB, sendpre<strip>, sendbuses.
+   struct SendNames
+   {
+      std::string db[kSendBuses][kMaxSlots], pre[kMaxSlots];
+      SendNames()
+      {
+         for (int i = 0; i < kMaxSlots; i++)
+         {
+            for (int b = 0; b < kSendBuses; b++)
+               db[b][i] = std::string("send") + (char)('A' + b) + std::to_string(i);
+            pre[i] = "sendpre" + std::to_string(i);
+         }
+      }
+   };
+   static const SendNames kSend;
+   v.Int("sendbuses", sendBuses);
+   sendBuses = std::clamp(sendBuses, 0, kSendBuses);
+   for (int b = 0; b < kSendBuses; b++)
+      for (int i = 0; i < kMaxSlots; i++)
+      {
+         v.Float(kSend.db[b][i].c_str(), sendDb[b][i]);
+         sendDb[b][i] = std::isfinite(sendDb[b][i]) ? std::clamp(sendDb[b][i], kSendOffDb, kMaxGainDb) : kSendOffDb;
+      }
+   for (int i = 0; i < kMaxSlots; i++)
+      v.Bool(kSend.pre[i].c_str(), sendPre[i]);
+   // Snapshots (B6): one text line each, empty when the slot is unused. Text keeps them out of
+   // sweeps and modulation; snapfade is text for the same reason.
+   static const char* kSnapNames[kSnapshots] = { "snapA", "snapB", "snapC", "snapD", "snapE", "snapF", "snapG", "snapH" };
+   for (int k = 0; k < kSnapshots; k++)
+   {
+      std::string text = SnapshotText(mSnap[k]);
+      const std::string before = text;
+      v.Text(kSnapNames[k], text);
+      if (text != before)
+         mSnap[k] = text.empty() ? Snapshot() : SnapshotParse(text);
+   }
+   std::string fade = std::to_string(snapFadeMs);
+   v.Text("snapfade", fade);
+   snapFadeMs = std::clamp(atoi(fade.c_str()), 0, 10000);
 }
 
 AudioNode* MixerNode::GetAudioNode()
 {
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMixerNode>();
+   // The topology reads AudioOutputCount() before this Mixer cooks.
+   mAudioNode->SetBusCount(SendBuses());
    return mAudioNode.get();
 }
 
@@ -783,9 +1223,24 @@ void AudioOutputNode::CookIfNeeded(int /*frameId*/)
    int n;
    while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
    {
-      for (int i = 0; i < n; i++)
-         mTakePeak = std::max(mTakePeak, std::fabs(scratch[i]));
-      mWriter.Append(scratch, n / 2);
+      int frames = n / 2;
+      const float* src = scratch;
+      if (mTakeSkip > 0)
+      {
+         const int drop = (int)std::min<int64_t>(mTakeSkip, frames);
+         mTakeSkip -= drop;
+         src += (size_t)drop * 2;
+         frames -= drop;
+      }
+      if (mTakeLimit > 0)
+         frames = (int)std::min<int64_t>(frames, std::max<int64_t>(0, mTakeLimit - mTakeFrames));
+      if (frames <= 0)
+         continue;
+      for (int i = 0; i < frames * 2; i++)
+         mTakePeak = std::max(mTakePeak, std::fabs(src[i]));
+      mWriter.Append(src, frames);
+      MeterTake(src, frames);
+      mTakeFrames += frames;
    }
 }
 
@@ -796,7 +1251,29 @@ void AudioOutputNode::VisitParams(ParamVisitor& v)
    v.Bool("live", live);
 }
 
-bool AudioOutputNode::StartRecording(const std::string& path, double sampleRate)
+// The take's own loudness and true peak, measured on the samples that reach the file (plan G2).
+void AudioOutputNode::MeterTake(const float* interleaved, int frames)
+{
+   if (!mTakeMeter)
+      return;
+   float l[2048], r[2048];
+   for (int done = 0; done < frames;)
+   {
+      const int n = std::min(2048, frames - done);
+      for (int i = 0; i < n; i++)
+      {
+         l[i] = interleaved[(size_t)(done + i) * 2];
+         r[i] = interleaved[(size_t)(done + i) * 2 + 1];
+      }
+      mTakeMeter->Process(l, r, n);
+      done += n;
+   }
+}
+
+float AudioOutputNode::TakeLufs() const { return mTakeMeter ? mTakeMeter->Integrated() : MixerMeter::kSilent; }
+float AudioOutputNode::TakeTruePeakDb() const { return mTakeMeter ? mTakeMeter->TruePeakDb() : MixerMeter::kSilent; }
+
+bool AudioOutputNode::StartRecording(const std::string& path, double sampleRate, int bitDepth)
 {
    if (IsRecording())
       return false;
@@ -804,10 +1281,14 @@ bool AudioOutputNode::StartRecording(const std::string& path, double sampleRate)
       sampleRate = AudioEngine::Instance().SampleRate();
    if (sampleRate <= 0.0)
       return false;
-   if (!mWriter.Open(path, sampleRate, 2))
+   if (!mWriter.Open(path, sampleRate, 2, AudioFileWriter::Format::Auto, bitDepth == 24 ? 24 : 16))
       return false;
    mOpenSampleRate = sampleRate;
    mTakePeak = 0.0f;
+   if (!mTakeMeter)
+      mTakeMeter = std::make_unique<MixerMeter>();
+   mTakeMeter->Prepare(sampleRate);
+   mTakeSkip = mTakeLimit = mTakeFrames = 0;
    mCaptureRing.overflowCount.store(0, std::memory_order_relaxed);
    mCaptureRing.enabled.store(true, std::memory_order_relaxed);
    return true;

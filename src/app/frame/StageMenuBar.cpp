@@ -44,6 +44,7 @@ static void DrawPanelRail()
       { "viewport", "##railViewport", IconsInfinite::Viewport, IconsInfinite::ViewportFill, &gViewportPanelOpen, T("Viewport panel") },
       { "modmatrix", "##railModMatrix", IconsInfinite::GridDots, nullptr, &gModMatrixOpen, T("Modulation matrix") },
       { "perf", "##railPerf", IconsInfinite::Perform, nullptr, &gPerfPanelOpen, T("Performance mode") },
+      { "mixer", "##railMixer", IconsInfinite::Mixer, nullptr, &gMixerPanelOpen, T("Mixer - every Mixer node as a console (Shift+L)") },
       { "arrange", "##railArrange", IconsInfinite::Cube, nullptr, &gArrangePanelOpen, T("Arrangement timeline") },
       { "session", "##railSession", IconsInfinite::Session, nullptr, &gSessionPanelOpen, T("Session - launch clips by scene") },
       { "studio", "##railStudio", IconsInfinite::Waveform, nullptr, &gSampleStudioOpen,
@@ -417,6 +418,22 @@ void DrawMenuBar(FrameCtx& fc)
                         FieldWell::Slider(L("Height"), &gModMatrixHeight,
                                            kModMatrixMinHeight, 800.0f, "%.0f px");
                      }
+                  }
+                  ImGui::EndMenu();
+               }
+
+               if (MenuParts::SubMenu(L("Mixer")))
+               {
+                  MenuParts::Check(L("Show Mixer"), &gMixerPanelOpen);
+                  if (gMixerPanelOpen)
+                  {
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle(); MixerPanelDockCombo(); FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     if (gMixerPanelDock == 1 || gMixerPanelDock == 2)
+                        FieldWell::Slider(L("Width"), &gMixerPanelWidth, kMixerPanelMinWidth, 1600.0f, "%.0f px");
+                     else if (gMixerPanelDock != kDockFloating)
+                        FieldWell::Slider(L("Height"), &gMixerPanelHeight, kMixerPanelMinHeight, 800.0f, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -865,6 +882,16 @@ void DrawMenuBar(FrameCtx& fc)
                   HelpTip(engineOn
                      ? T("The Sample studio's take is driving audio. Click to hand it back to the canvas.")
                      : T("The Sample studio's take will drive audio once the engine is started."));
+            }
+            else if (gAudioMode == AudioMode::Mixer)
+            {
+               TopBarSameLine(4.0f);
+               if (ChipButton::Draw(L("Mixer##mixerbadge"), true, tok::tile, 0.0f, true))
+                  SetMixerAudio(false);
+               if (ImGui::IsItemHovered())
+                  HelpTip(engineOn
+                     ? T("The Mixer panel's console is driving audio. Click to hand it back to the canvas.")
+                     : T("The Mixer panel's console will drive audio once the engine is started."));
             }
          };
 

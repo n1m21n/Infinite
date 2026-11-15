@@ -663,11 +663,52 @@ void AudioEngine::ApplyNoteWiringIfNoDevice()
    ApplyNoteWiringIfNew(mCurrent.load(std::memory_order_acquire));
 }
 
+void AudioEngine::ApplyMonitor(AudioBuffer& buffer)
+{
+   const float gainTo = mMonitorDim.load(std::memory_order_relaxed) ? 0.1f : 1.0f; // -20 dB
+   const float widthTo = mMonitorMono.load(std::memory_order_relaxed) ? 0.0f : 1.0f;
+   const float gain0 = mMonitorGain, width0 = mMonitorWidth;
+   mMonitorGain = gainTo;
+   mMonitorWidth = widthTo;
+   if (gain0 == 1.0f && gainTo == 1.0f && width0 == 1.0f && widthTo == 1.0f)
+      return;
+   const int n = buffer.numFrames;
+   if (n <= 0 || buffer.numChannels <= 0)
+      return;
+   // One linear ramp per block from last block's values, so a toggle never steps.
+   const float step = 1.0f / (float)n;
+   if (buffer.numChannels >= 2)
+   {
+      float* l = buffer.channels[0];
+      float* r = buffer.channels[1];
+      for (int i = 0; i < n; i++)
+      {
+         const float t = (float)(i + 1) * step;
+         const float g = gain0 + (gainTo - gain0) * t;
+         const float w = width0 + (widthTo - width0) * t;
+         const float mid = 0.5f * (l[i] + r[i]), side = 0.5f * (l[i] - r[i]) * w;
+         l[i] = (mid + side) * g;
+         r[i] = (mid - side) * g;
+      }
+      for (int ch = 2; ch < buffer.numChannels; ch++)
+         for (int i = 0; i < n; i++)
+            buffer.channels[ch][i] *= gain0 + (gainTo - gain0) * (float)(i + 1) * step;
+   }
+   else
+   {
+      float* x = buffer.channels[0];
+      for (int i = 0; i < n; i++)
+         x[i] *= gain0 + (gainTo - gain0) * (float)(i + 1) * step;
+   }
+}
+
 void AudioEngine::ProcessOffline(AudioBuffer& buffer)
 {
    Transport::Instance().BeginOfflineAudioBlock(buffer.numFrames);
    ProcessList* list = mCurrent.load(std::memory_order_acquire);
+   BeginCaptureSum(buffer.numFrames);
    RunTopology(list, buffer);
+   EndCaptureSum(buffer.numFrames);
    NoteMasterOvers(buffer);
    Transport::Instance().EndOfflineAudioBlock();
 }
@@ -1115,7 +1156,9 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer, doub
                deviceBuffer.channels[ch][i] += src.channels[ch][i] * gain;
       }
 
-      if (terminal.capture != nullptr && terminal.capture->enabled.load(std::memory_order_relaxed))
+      const bool joinsSum = terminal.capture != nullptr && terminal.capture->joinSum.load(std::memory_order_relaxed) &&
+                            mSumTarget.load(std::memory_order_acquire) != nullptr;
+      if (terminal.capture != nullptr && (joinsSum || terminal.capture->enabled.load(std::memory_order_relaxed)))
       {
          // Always interleaved stereo for the WAV writer, regardless of the
          // topology's actual channel count - mono sources duplicate to both
@@ -1132,9 +1175,32 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer, doub
             mInterleaveScratch[(size_t)i * 2 + 0] = l;
             mInterleaveScratch[(size_t)i * 2 + 1] = r;
          }
-         terminal.capture->Write(mInterleaveScratch, numFrames * 2);
+         if (joinsSum)
+         {
+            for (int i = 0; i < numFrames * 2; i++)
+               mSumScratch[i] += mInterleaveScratch[i];
+         }
+         else
+            terminal.capture->Write(mInterleaveScratch, numFrames * 2);
       }
    }
+}
+
+void AudioEngine::BeginCaptureSum(int numFrames)
+{
+   if (mSumTarget.load(std::memory_order_acquire) == nullptr)
+      return;
+   const int n = std::min(numFrames, kAudioMaxBlockFrames);
+   for (int i = 0; i < n * 2; i++)
+      mSumScratch[i] = 0.0f;
+}
+
+void AudioEngine::EndCaptureSum(int numFrames)
+{
+   AudioCaptureRing* target = mSumTarget.load(std::memory_order_acquire);
+   if (target == nullptr || !target->enabled.load(std::memory_order_relaxed))
+      return;
+   target->Write(mSumScratch, std::min(numFrames, kAudioMaxBlockFrames) * 2);
 }
 
 // One block of a show-set switch: the tail list into scratch, the new list
@@ -1383,10 +1449,12 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    Tail* tail = mTail.load(std::memory_order_acquire);
    if (tail != nullptr && (tail->done.load(std::memory_order_relaxed) || tail->list == list))
       tail = nullptr; // finished, or published but not yet swapped in
+   BeginCaptureSum(numFrames);
    if (tail != nullptr)
       RunTail(*tail, list, buffer, stageMs);
    else
       RunTopology(list, buffer, stageMs);
+   EndCaptureSum(numFrames);
    // Published after RunTopology fully returns, so a main-thread reader never
    // observes this generation as "completed" while entry.node->ProcessBlock
    // calls against `list`'s (possibly about-to-be-retired) nodes are still
@@ -1433,6 +1501,8 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
       else
          mMetronome.Reset();
    }
+   // Last touch on the device buffer: every capture ring was written inside RunTopology, before this.
+   ApplyMonitor(buffer);
    const double topologyMs = NowMs() - topologyStartMs;
    NoteMasterOvers(buffer);
 

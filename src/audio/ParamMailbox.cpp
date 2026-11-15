@@ -143,3 +143,12 @@ void ParamMailbox::SnapToTarget(int paramId)
       return;
    SetImmediate(paramId, mTarget[paramId].load(std::memory_order_acquire));
 }
+
+bool ParamMailbox::IsSettled(int paramId) const
+{
+   if (paramId < 0 || paramId >= kMaxParams)
+      return true;
+   const Ramp& r = mRamps[paramId];
+   return r.primed && r.remaining == 0 && !r.hasPending &&
+          mTarget[paramId].load(std::memory_order_acquire) == r.seen;
+}
