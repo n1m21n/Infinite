@@ -1547,6 +1547,23 @@ namespace Platform
       }
    }
 
+   std::string SaveLayeredDialog(const std::string& suggestedName, const std::string& ext)
+   {
+      @autoreleasepool
+      {
+         NSSavePanel* panel = [NSSavePanel savePanel];
+         [panel setTitle:ext == "ora" ? @"Export ORA" : @"Export PSD"];
+         [panel setNameFieldStringValue:[NSString stringWithUTF8String:suggestedName.c_str()]];
+         if (@available(macOS 11.0, *))
+            if (UTType* t = [UTType typeWithFilenameExtension:[NSString stringWithUTF8String:ext.c_str()]])
+               [panel setAllowedContentTypes:@[ t ]];
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [panel URL];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
    std::string OpenModelDialog()
    {
       @autoreleasepool

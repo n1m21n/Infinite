@@ -844,6 +844,7 @@ set(COMMON_SOURCES
     src/nodes/Scene2DVector.cpp
     src/nodes/Scene2D3D.cpp
     src/nodes/Scene2DEffects.cpp
+    src/nodes/Scene2DFiles.cpp
     src/nodes/GeometryFeedbackNode.cpp
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp

@@ -218,6 +218,9 @@ namespace Platform
    // Where a render goes: .mp4/.mov for video, else .png/.jpg. Returns the chosen path, or "" if cancelled.
    std::string SaveRenderDialog(const std::string& suggestedName, bool video);
 
+   // A layered picture (.psd or .ora, `ext` without the dot). Returns the chosen path with the extension, or "" if cancelled.
+   std::string SaveLayeredDialog(const std::string& suggestedName, const std::string& ext);
+
    // ---- text outlines -----------------------------------------------------
    // Glyph outlines for a laid-out string, flattened to polygons in font units
    // normalised so cap height is roughly 1. Curves are subdivided here because

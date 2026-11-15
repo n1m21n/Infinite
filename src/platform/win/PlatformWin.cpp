@@ -560,6 +560,21 @@ namespace Platform
                            suggestedName, err);
    }
 
+   std::string SaveLayeredDialog(const std::string& suggestedName, const std::string& ext)
+   {
+      std::string err;
+      const bool ora = ext == "ora";
+      std::string path = RunSaveDialog(ora ? L"Export ORA" : L"Export PSD",
+                                       {
+                                          ora ? FilterSpec{ L"OpenRaster (*.ora)", L"*.ora" } : FilterSpec{ L"Photoshop (*.psd)", L"*.psd" },
+                                       },
+                                       suggestedName, err);
+      const std::string dotExt = "." + ext;
+      if (!path.empty() && (path.size() < dotExt.size() || path.compare(path.size() - dotExt.size(), dotExt.size(), dotExt) != 0))
+         path += dotExt;
+      return path;
+   }
+
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       std::string err;
