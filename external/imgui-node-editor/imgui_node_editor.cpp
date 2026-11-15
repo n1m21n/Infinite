@@ -2524,6 +2524,9 @@ ed::Control ed::EditorContext::BuildControl(bool allowOffscreen)
             activeObject = object;
     };
 
+    // Computed once: the group Center areas below defer to a cable under the cursor.
+    const bool linkUnderMouse = !isMouseOffscreen && FindLinkAt(mousePos) != nullptr;
+
     // Process live nodes and pins.
     for (auto nodeIt = m_Nodes.rbegin(), nodeItEnd = m_Nodes.rend(); nodeIt != nodeItEnd; ++nodeIt)
     {
@@ -2572,6 +2575,16 @@ ed::Control ed::EditorContext::BuildControl(bool allowOffscreen)
                 auto bounds = node->GetRegionBounds(region);
                 if (ImRect_IsEmpty(bounds))
                     continue;
+                // Infinite local change: a cable running through a group's empty interior must stay hoverable,
+                // selectable and deletable. Center is an interactive area, and links are only tested when nothing
+                // else is hot, so it used to swallow every cable inside a group. Let the cable win under the cursor,
+                // unless this very area is already held (a drag of the group that started here).
+                if (region == NodeRegion::Center && linkUnderMouse)
+                {
+                    const ImGuiID centerId = ImGui::GetCurrentWindow()->GetID(NodeId(static_cast<int>(region)).AsPointer());
+                    if (ImGui::GetActiveID() != centerId)
+                        continue;
+                }
                 checkInteractionsInArea(NodeId(static_cast<int>(region)), bounds, node);
             }
 
