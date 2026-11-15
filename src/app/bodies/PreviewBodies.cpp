@@ -359,6 +359,17 @@ namespace app
       {
          if (other.index == gn.index || dynamic_cast<GroupNode*>(other.node.get()) != nullptr)
             continue;
+         // Not yet placed: the editor reports (0,0) with no size, which can sit inside a group near the origin and
+         // stretch it across the canvas for a frame.
+         if (other.needsPosition)
+            continue;
+         if (other.noGroupAdoptUntilMoved)
+         {
+            const ImVec2 at = ed::GetNodePosition(other.NodeId());
+            if (std::abs(at.x - other.spawnX) < 1.0f && std::abs(at.y - other.spawnY) < 1.0f)
+               continue;
+            other.noGroupAdoptUntilMoved = false;
+         }
          GroupNode* owner = GroupOwning(other.index);
          if (owner != nullptr && owner != n)
             continue;

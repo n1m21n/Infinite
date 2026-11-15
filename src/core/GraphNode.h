@@ -93,6 +93,9 @@ struct GraphNode
    float spawnX = 0.0f;
    float spawnY = 0.0f;
    bool needsPosition = true;
+   // Set on a node dropped from a cable onto the canvas: a Group only adopts it
+   // once the user has moved it, not just because the drop landed in its box.
+   bool noGroupAdoptUntilMoved = false;
 
    // Build step 15 (FieldGraphNode "Instrument Mode" encapsulation): true
    // for a node mounted by a FieldGraphNode in encapsulated mode. Canvas-

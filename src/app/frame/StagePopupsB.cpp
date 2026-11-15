@@ -373,6 +373,8 @@ void DrawPopupsB(FrameCtx& fc)
          if (!spawnName.empty())
          {
             GraphNode* spawned = SpawnNode(spawnName, spawnCategory, gSpawnPos.x, gSpawnPos.y);
+            if (spawned != nullptr && gLinkDragSourcePin >= 0)
+               spawned->noGroupAdoptUntilMoved = true;
             if (gLinkDragSourcePin >= 0 && spawned != nullptr && !GraphNode::IsOutputPin(gLinkDragSourcePin))
                WireSpawnedNodeToPin(*spawned, gLinkDragSourcePin);
             else if (gLinkDragSourcePin >= 0 && spawned != nullptr)
