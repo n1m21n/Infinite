@@ -21,6 +21,7 @@ class PredictiveColoringNode : public INode
 {
 public:
    static INode* Create() { return new PredictiveColoringNode(); }
+   bool IsProfileDependent() const override { return true; }
 
    PredictiveColoringNode();
    ~PredictiveColoringNode() override;

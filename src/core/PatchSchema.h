@@ -90,6 +90,9 @@ namespace PatchSchema
       int joinRegistered = 0; // controls the draw pass registered
       int joinKeyed = 0;      // of those, with a saved key
       bool hardwareDriven = false;
+      bool liveInput = false;        // INode::IsLiveInput
+      bool machineDependent = false; // INode::IsMachineDependent
+      bool profileDependent = false; // INode::IsProfileDependent
       bool canBypass = false; // `flags bypassed=1` takes effect (CanBypass in main.cpp)
    };
 

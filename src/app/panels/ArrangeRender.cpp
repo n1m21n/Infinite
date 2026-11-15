@@ -114,8 +114,13 @@ namespace app
       gOfflineRender.vsyncWasOn = gVsync;
       SetCanvasSwapInterval(0);
 
-      gOfflineRender.startSeconds = Transport::Instance().Seconds();
       Transport::Instance().SetOfflineMode(true, takeSampleRate);
+      // H2: the job seeked to its start before this, but a transport that was playing in the app kept
+      // moving on the device callback until offline mode took the clock (headless never plays), so the
+      // in-app export began ~2 frames late. Seek again now that nothing else advances it.
+      if (isArrange && gOfflineRender.timelineVideo)
+         Transport::Instance().Seek(ArrangeRenderTickSeconds(gOfflineRender.rangeStartTick));
+      gOfflineRender.startSeconds = Transport::Instance().Seconds();
       Transport::Instance().SetPlaying(true);
       ForceAudioRepare();
       RebuildAudioTopology();

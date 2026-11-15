@@ -1,6 +1,7 @@
 // Patch load, auto layout, field graph regenerate, undo/redo, copy/paste (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 #include "core/UndoDescribe.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "core/MediaCollect.h"
 #include "core/Notices.h"
 #include "plugin/ipc/PluginIpc.h"
@@ -687,6 +688,7 @@ namespace app
          const std::string keptPath = gPatchPath;
          ApplyPatchData(data, &pending.remap, HeadlessJobActive());
          SampleStudioApply(data.studio); // here, not in ApplyPatchData: undo leaves the Studio alone
+         FieldPatcherLoadState(data.fieldPages); // same: undo leaves the pages alone
          PostSkippedTypes(path);
          ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
          StashPendingKeyed(pending);
@@ -706,6 +708,7 @@ namespace app
       }
       ApplyPatchData(data, &pending.remap, HeadlessJobActive());
       SampleStudioApply(data.studio);
+      FieldPatcherLoadState(data.fieldPages);
       PostSkippedTypes(path);
       ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
       StashPendingKeyed(pending);

@@ -1,4 +1,5 @@
 #include "FeedbackNodes.h"
+#include "core/SpawnSeed.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -302,9 +303,7 @@ void ReactionDiffusionNode::Seed(int w, int h)
 {
    GLUtil::EnsureFbo(mState[0], w, h, GL_RGBA16F);
    GLUtil::EnsureFbo(mState[1], w, h, GL_RGBA16F);
-   static float sSeedCounter = 0.0f;
-   sSeedCounter += 7.13f;
-   const float seedValue = sSeedCounter;
+   const float seedValue = (float)SpawnSeed::Next(SpawnSeed::ReactionDiffusion) * 7.13f;
    GLUtil::RunShaderPass(mState[mFront], mSeedProgram, [this, seedValue]()
    {
       glUniform1f(glGetUniformLocation(mSeedProgram, "uSeed"), seedValue);

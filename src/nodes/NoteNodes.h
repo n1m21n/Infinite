@@ -137,6 +137,7 @@ public:
    // on-screen keyboard is meant to show what you just played before this
    // node is patched into anything.
    bool RequiresAudioProcessing() const override { return true; }
+   bool IsLiveInput() const override { return true; } // played by a person; silent headless
 
    AudioNode* GetAudioNode() override;
 

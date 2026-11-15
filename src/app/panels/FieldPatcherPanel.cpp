@@ -16,6 +16,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "core/Modulation.h"
+#include "core/Patch.h"
 #include "core/field/FieldBoxGraph.h"
 #include "core/field/FieldLex.h"
 #include "core/field/FieldParse.h"
@@ -1962,14 +1963,26 @@ int FieldPatcherSelfCheck()
       expect("the LFO value is in 0..1", v >= 0.0f && v <= 1.0f);
    }
 
-   // 3. Scratch pages and pins survive save and load.
-   AddScratch("Keep me", "x = 1\n");
+   // 3. Scratch pages and pins survive save and load, through the .inf text itself.
+   AddScratch("Keep me", "x = 1\n\ty = x\n");
    const int pagesBefore = (int)s.pages.size();
-   const std::string saved = FieldPatcherSaveState();
-   FieldPatcherLoadState(saved);
+   Patch::Data written;
+   written.fieldPages = FieldPatcherSaveState();
+   Patch::NodeRecord shape; // a patch needs one node to read back
+   shape.index = 1;
+   shape.category = "Source";
+   shape.typeName = "Shape";
+   written.nodes.push_back(shape);
+   std::string inf;
+   Patch::Data reread;
+   std::string readErr;
+   const bool textOk = Patch::WriteText(written, inf) && Patch::ReadText(inf, reread, readErr);
+   expect("the patch text carries fieldpage lines", inf.find("fieldpage s\tKeep me") != std::string::npos);
+   expect("fieldpage lines read back unchanged", textOk && reread.fieldPages == written.fieldPages);
+   FieldPatcherLoadState(reread.fieldPages);
    bool found = false;
    for (const auto& p : s.pages)
-      found = found || (p->uid == 0 && p->scratchName == "Keep me" && p->scratchCode == "x = 1\n");
+      found = found || (p->uid == 0 && p->scratchName == "Keep me" && p->scratchCode == "x = 1\n\ty = x\n");
    expect("a scratch page survives save and load", found);
    expect("pages come back in number", (int)s.pages.size() <= pagesBefore && !s.pages.empty());
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include "core/SpawnSeed.h"
 #include <string>
 #include <vector>
 
@@ -39,7 +40,7 @@ public:
    static INode* Create();
    // S&H seeds come from their own counter, so spawning an LFO never moves
    // the seed the next Random gets (patches without a saved seed rely on it).
-   static float NextSeed() { static int sSpawnCounter = 0; return (float)(++sSpawnCounter) * 5.1f + 0.37f; }
+   static float NextSeed() { return (float)SpawnSeed::Next(SpawnSeed::LFO) * 5.1f + 0.37f; }
    static const std::vector<std::string>& ShapeNames();
    static const std::vector<std::string>& RateModeNames();
    static const std::vector<std::string>& PhaseModeNames();
@@ -140,7 +141,7 @@ class RandomNode : public INode, public IModulator, public VoiceMod::IVoiceModSo
 public:
    // Each spawned Random starts on a different seed. Two of them dropped on the
    // canvas should not march in lockstep, which is what a shared default does.
-   static float NextSeed() { static int sSpawnCounter = 0; return (float)(++sSpawnCounter) * 7.3f; }
+   static float NextSeed() { return (float)SpawnSeed::Next(SpawnSeed::Random) * 7.3f; }
 
    static INode* Create()
    {

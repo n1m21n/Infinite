@@ -795,28 +795,7 @@ namespace app
       // and "Add to Queue" can never disagree about what was asked
       // for - they differ only in where the job is put.
       auto buildJob = [&]() -> ArrangeRenderJob {
-         ArrangeRenderJob job;
-         job.rangeKind = rset.renderRangeKind;
-         job.startTick = rangeA;
-         job.endTick = rangeB;
-         job.audioSource = effectiveAudioSource();
-         job.videoSource = effectiveVideoSource();
-         // Always 0: this modal renders the timeline. The canvas
-         // Output-node take is the Output node's own record button,
-         // not a source choice hidden inside the timeline's render
-         // dialog - which is what the removed dropdowns were.
-         job.canvasVideoUid = 0;
-         job.width = rset.renderWidth;
-         job.height = rset.renderHeight;
-         job.fps = rset.renderFps;
-         // Follows Settings -> Audio, not rset.renderSampleRate: the
-         // graph only knows how to generate at the rate its nodes
-         // were prepared at, so a per-arrangement rate would be a
-         // choice nothing downstream could honour.
-         job.sampleRate = (int)llround(ArrangeRenderActiveSampleRate());
-         job.format = job.videoSource == kArrangeVideoNone ? 2 : (rset.renderFormat == 1 ? 1 : 0);
-         job.path = renderFullPath();
-         return job;
+         return ArrangeRenderJobFromSettings(sArrangeRenderMarkerA, sArrangeRenderMarkerB, renderFullPath());
       };
       auto commitJob = [](ArrangeRenderJob job, bool startNow) {
          job.id = gArrangeRenderNextJobId++;

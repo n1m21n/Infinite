@@ -225,6 +225,7 @@ namespace app
       data.viewport.height = gViewportPanelHeight;
       data.viewport.nodes = gViewportPanelNodes;
       data.studio = SampleStudioSerialize();
+      data.fieldPages = FieldPatcherSaveState();
       return data;
    }
 
@@ -519,21 +520,6 @@ namespace app
             gRailOrder = val;
          else if (key == "panelFieldPatcherDock")
             gFieldPatcherDock = atoi(val.c_str()) == 3 ? 3 : 0;
-         else if (key == "panelFieldPatcherPages")
-         {
-            std::string text;
-            for (size_t i = 0; i < val.size(); i++)
-            {
-               if (val[i] == '\\' && i + 1 < val.size())
-               {
-                  const char c = val[++i];
-                  text += c == 'n' ? '\n' : c;
-               }
-               else
-                  text += val[i];
-            }
-            FieldPatcherLoadState(text);
-         }
          else if (key == "panelTerminalOpen")
          {
             // Inside a DAW there is no shell: keep it closed, and write the app's value back untouched.
@@ -615,21 +601,6 @@ namespace app
       file << "panelFieldPatcherH=" << gFieldPatcherHeight << "\n";
       file << "panelFieldPatcherDock=" << gFieldPatcherDock << "\n";
       file << "panelRailOrder=" << gRailOrder << "\n";
-      {
-         // Scratch pages and pins, one line: \ and newlines escaped.
-         std::string pages;
-         for (char c : FieldPatcherSaveState())
-         {
-            if (c == '\\')
-               pages += "\\\\";
-            else if (c == '\n')
-               pages += "\\n";
-            else
-               pages += c;
-         }
-         if (!pages.empty())
-            file << "panelFieldPatcherPages=" << pages << "\n";
-      }
       file << "panelTerminalOpen=" << ((Platform::PluginModeActive() ? gTerminalOpenInApp : gTerminalOpen) ? 1 : 0) << "\n";
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";

@@ -2355,6 +2355,7 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--stems id,id --stems-dir dir` | audio-summary | Write one WAV per named node |
 | `--notes events.json --note-map map.json` | audio-summary | Play your own note events into the patch |
 | `--timeline` | audio-summary | Play the arrangement's audio lanes instead of the node graph alone |
+| `--timeline` | render | Render the arrangement as the Timeline's own Render does, to `.mp4`, `.mov` or `.wav`. The arrangement's render settings are the defaults; `--start`, `--duration`, `--size` and `--fps` override them. No canvas Output is needed. `.wav` writes the audio lanes only |
 | `--plugin-params` | render, audio-summary | List every loaded plugin's parameters (address, name, real range, default) in the `plugins` block of the result |
 | `--contact-sheet sheet.png` | frame | One image holding every requested frame |
 | `--png-level 0-9` | frame, frames-dir | PNG compression |
@@ -2853,6 +2854,7 @@ written. `--canonicalize` and `--validate` never lay out: a pos-less node still 
 | `--frame f.inf 0,1,2 dir/ --contact-sheet sheet.png` | several times in one image, each cell stamped with its time |
 | `--audio-summary f.inf out.json [--duration S] [--wav out.wav]` | what it sounds like, as numbers: loudness, peaks, clipping, silence, spectrum, tempo guess |
 | `--audio-summary f.inf out.json --timeline` | the same for the arrangement's audio lanes (Timeline audio mode) instead of the canvas Audio Outs; a clip's source node needs no cable |
+| `--render f.inf out.mp4 --timeline [--start S] [--duration S]` | the arrangement export, as the Timeline's Render dialog would write it (video lanes plus audio lanes) |
 | `--canonicalize in out` | the numeric form the GUI would write |
 
 Reading the result without opening a file: the status line (last line of stdout) carries the headline

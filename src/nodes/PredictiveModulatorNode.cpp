@@ -1,4 +1,5 @@
 #include "nodes/PredictiveModulatorNode.h"
+#include "core/SpawnSeed.h"
 
 #include "core/Base64.h"
 #include "core/Transport.h"
@@ -10,8 +11,7 @@ PredictiveModulatorNode::PredictiveModulatorNode()
 {
    // Two Modulators dropped on the canvas must not free-run identical noise (RandomNode::NextSeed's
    // lesson, same as DriftNode/MovesNode).
-   static int sSpawn = 0;
-   mFreeRng = 0x9E3779B97F4A7C15ull ^ (uint64_t)(++sSpawn) * 0x2545F4914F6CDD1Dull;
+   mFreeRng = 0x9E3779B97F4A7C15ull ^ (uint64_t)SpawnSeed::Next(SpawnSeed::PredictiveModulator) * 0x2545F4914F6CDD1Dull;
 }
 
 void PredictiveModulatorNode::CookIfNeeded(int)

@@ -355,6 +355,9 @@ namespace PatchSchema
    {
       std::string s = "{\"type\":" + Q(t.name) + ",\"category\":" + Q(t.category);
       s += ",\"hardware_driven\":" + std::string(t.hardwareDriven ? "true" : "false");
+      s += ",\"live_input\":" + std::string(t.liveInput ? "true" : "false");
+      s += ",\"machine_dependent\":" + std::string(t.machineDependent ? "true" : "false");
+      s += ",\"profile_dependent\":" + std::string(t.profileDependent ? "true" : "false");
       s += ",\"can_bypass\":" + std::string(t.canBypass ? "true" : "false");
       s += ",\"params\":[";
       for (size_t i = 0; i < t.params.size(); i++)

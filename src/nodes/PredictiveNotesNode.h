@@ -25,6 +25,7 @@ class PredictiveNotesNode : public INode, public INoteSource
 {
 public:
    static INode* Create() { return new PredictiveNotesNode(); }
+   bool IsProfileDependent() const override { return true; }
    PredictiveNotesNode();
    ~PredictiveNotesNode() override;
 

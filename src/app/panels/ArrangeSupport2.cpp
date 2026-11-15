@@ -688,6 +688,33 @@ namespace app
    }
 
 
+   // The job the Timeline's Render dialog builds from the arrangement's render settings. Shared with
+   // headless --render --timeline so the two can never disagree about range, size, fps or sources.
+   ArrangeRenderJob ArrangeRenderJobFromSettings(int markerA, int markerB, const std::string& path)
+   {
+      const Arrange::Settings& rset = gArrange.settings;
+      ArrangeRenderJob job;
+      job.rangeKind = rset.renderRangeKind;
+      Arrange::Tick a = 0, b = 0;
+      ArrangeRenderResolveRange(rset.renderRangeKind, markerA, markerB, rset.renderRangeStart, rset.renderRangeEnd, a, b);
+      job.startTick = a;
+      job.endTick = b;
+      job.audioSource = ArrangeRenderEffectiveAudioSource();
+      job.videoSource = ArrangeRenderEffectiveVideoSource(a, b);
+      // Always 0: the Timeline renders the timeline. The canvas Output take is the Output node's own record button.
+      job.canvasVideoUid = 0;
+      job.width = rset.renderWidth;
+      job.height = rset.renderHeight;
+      job.fps = rset.renderFps;
+      // Follows Settings -> Audio, not rset.renderSampleRate: the graph only generates at the rate its nodes
+      // were prepared at, so a per-arrangement rate would be a choice nothing downstream could honour.
+      job.sampleRate = (int)llround(ArrangeRenderActiveSampleRate());
+      job.format = job.videoSource == kArrangeVideoNone ? 2 : (rset.renderFormat == 1 ? 1 : 0);
+      job.path = path;
+      return job;
+   }
+
+
    // "name.mp4" -> "name (2).mp4", counting up past anything already on disk
    // or already queued (WP7 #8's Auto-rename).
    // Does an unfinished job already own this path? Two queued jobs writing

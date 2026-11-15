@@ -2509,6 +2509,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // Field Patcher: box edits reach the node, scratch pages export, Value mode, pages survive save.
       FrameTest_FIELDPATCHERTEST(frameId, window);
 
+      // The Timeline export in the app, for comparing with --render --timeline (H2).
+      FrameTest_TIMELINEEXPORTTEST(frameId, window);
+
       // Keyed mod/expr on a Star: lands on the named control, survives a shape change.
       FrameTest_KEYEDSTARTEST(frameId, window);
 

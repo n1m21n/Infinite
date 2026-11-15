@@ -581,6 +581,17 @@ static void WriteBody(std::ostream& file, const Data& data)
       }
    }
    {
+      size_t at = 0;
+      while (at < data.fieldPages.size())
+      {
+         const size_t nl = data.fieldPages.find('\n', at);
+         const std::string line = data.fieldPages.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+         if (!line.empty())
+            file << "fieldpage " << line << "\n";
+         at = nl == std::string::npos ? data.fieldPages.size() : nl + 1;
+      }
+   }
+   {
       // Painted pixels: a param that names tiles (2D View paint layers) brings them along.
       std::vector<std::string> keys;
       for (const NodeRecord& node : data.nodes)
@@ -1479,6 +1490,14 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          if (!rest.empty() && rest[0] == ' ')
             rest.erase(0, 1);
          outData.studio += rest + "\n";
+      }
+      else if (tag == "fieldpage")
+      {
+         std::string rest;
+         std::getline(in, rest);
+         if (!rest.empty() && rest[0] == ' ')
+            rest.erase(0, 1);
+         outData.fieldPages += rest + "\n";
       }
       else if (tag == "sessionmeta")
       {

@@ -275,6 +275,17 @@ public:
    // function to answer both, since the signatures match exactly.
    virtual bool IsHardwareDriven() const { return false; }
 
+   // Declarations for `--describe` (hardware_driven's two neighbours); neither refuses a render.
+   // Live input: the output comes from a person or the network at play time (on-screen Keyboard,
+   // OSC Receive) and is silent or still in a headless render. Hardware-driven sources are live too.
+   // A File > New Synth starts with a Keyboard, so it must not refuse Render Now the way MIDI In does.
+   virtual bool IsLiveInput() const { return IsHardwareDriven(); }
+   // Machine-dependent: the output needs something installed on this machine (a VST3/AU plugin,
+   // the tracking pack), so the same patch renders differently elsewhere.
+   virtual bool IsMachineDependent() const { return false; }
+   // Reads a learned profile or MovementStats on disk; headless runs without one.
+   virtual bool IsProfileDependent() const { return false; }
+
    // A param whose audible effect only shows up when another param sits at a
    // specific value (unison-spread params like "detune"/"stereoWidth" are a
    // no-op while "unison" == 1) needs that other param set first, or a sweep

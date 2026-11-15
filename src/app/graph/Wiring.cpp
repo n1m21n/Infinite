@@ -1300,6 +1300,9 @@ namespace app
                                    KindOfOutput(caps), caps.modulator || caps.predictor });
          }
          t->hardwareDriven = gn->node->IsHardwareDriven();
+         t->liveInput = gn->node->IsLiveInput();
+         t->machineDependent = gn->node->IsMachineDependent();
+         t->profileDependent = gn->node->IsProfileDependent();
          t->canBypass = CanBypass(*gn);
       }
       return t;

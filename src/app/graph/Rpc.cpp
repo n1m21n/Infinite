@@ -883,6 +883,7 @@ namespace app
             out.push_back({ {"label", oi.label}, {"kind", oi.kind}, {"modulator", oi.modulator} });
          outResult = { {"type", ts->name}, {"category", ts->category}, {"params", pj}, {"inputs", in}, {"outputs", out},
                        {"canBypass", ts->canBypass}, {"hardwareDriven", ts->hardwareDriven},
+                       {"liveInput", ts->liveInput}, {"machineDependent", ts->machineDependent}, {"profileDependent", ts->profileDependent},
                        {"help", NodeHelpTextFor(ts->name, ts->category)} };
          return true;
       }

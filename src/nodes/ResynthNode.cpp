@@ -10,10 +10,6 @@
 
 namespace
 {
-   const std::vector<std::string> kModeNames = {
-      "Drift", "Quilt", "Cellular", "Spectral", "Shatter"
-   };
-
    // Index order must match the uAmt[] slots the shader reads.
    const std::vector<std::string> kEffectNames = {
       "Flow Warp", "Patch Jump", "Cell Pull", "Ring Warp",
@@ -29,7 +25,6 @@ namespace
       "uniform sampler2D uPrev;\n"
       "uniform sampler2D uSrc;\n"
       "uniform vec2 uTexelSize;\n"
-      "uniform int uMode;\n"
       "uniform int uFirst;\n"
       "uniform float uChaos;\n"
       "uniform float uMutation;\n"
@@ -136,11 +131,6 @@ namespace
       "   outCol = mix(outCol, src.rgb, clamp(uSourcePull, 0.0, 1.0));\n"
       "   fragColor = vec4(clamp(outCol, 0.0, 1.0), max(prev.a, src.a));\n"
       "}\n";
-}
-
-const std::vector<std::string>& ResynthNode::ModeNames()
-{
-   return kModeNames;
 }
 
 const std::vector<std::string>& ResynthNode::EffectNames()
@@ -366,7 +356,6 @@ void ResynthNode::RunGeneration(unsigned int srcTex, int w, int h)
       glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 1);
 
       glUniform2f(glGetUniformLocation(mProgram, "uTexelSize"), 1.0f / w, 1.0f / h);
-      glUniform1i(glGetUniformLocation(mProgram, "uMode"), mode);
       glUniform1i(glGetUniformLocation(mProgram, "uFirst"), first ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgram, "uChaos"), chaos);
       glUniform1f(glGetUniformLocation(mProgram, "uMutation"), mutation);

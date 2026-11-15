@@ -28,6 +28,7 @@ class PredictiveRhythmNode : public INode, public INoteSource
 {
 public:
    static INode* Create() { return new PredictiveRhythmNode(); }
+   bool IsProfileDependent() const override { return true; }
    PredictiveRhythmNode();
    ~PredictiveRhythmNode() override;
 
