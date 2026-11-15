@@ -4,6 +4,7 @@
 #include "app/frame/FrameCtx.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "core/CliSetup.h"
+#include "nodes/AudioNodes.h"
 #include "core/FactoryPresets.h"
 #include "arrange/MidiImport.h"
 
@@ -290,6 +291,11 @@ void DrawPopupsA(FrameCtx& fc)
                      gViewportPanelNodes.push_back(gn->index);
                   gViewportPanelOpen = true;
                }
+            }
+            if (dynamic_cast<MixerNode*>(gn->node.get()) != nullptr)
+            {
+               if (MenuParts::Item(L("Open in Mixer panel"), "Shift+L"))
+                  MixerPanelShowMixer(gn->index);
             }
             if (dynamic_cast<IModulator*>(gn->node.get()) != nullptr)
             {

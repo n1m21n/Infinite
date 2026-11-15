@@ -210,17 +210,13 @@ namespace app
          sLastSelectedUid = sHighlightUid = gn->uid;
       }
 
-      // D2: selecting a Mixer or a strip's source on the canvas brings its page up and opens its groups.
-      void FollowCanvasSelection(const std::vector<Page>& pages)
+      // Brings up the page that holds g (a top Mixer, a group, or a strip's source) and opens its groups.
+      // Returns false when g is on no page.
+      bool ShowNode(const std::vector<Page>& pages, GraphNode* g)
       {
-         const uint64_t sel = SelectedNodeUid();
-         if (sel == sLastSelectedUid)
-            return;
-         sLastSelectedUid = sel;
-         sHighlightUid = sel;
-         GraphNode* g = sel ? FindNodeByUid(sel) : nullptr;
+         sHighlightUid = g ? g->uid : 0;
          if (g == nullptr)
-            return;
+            return false;
          for (const Page& p : pages)
          {
             const std::vector<StripRef> all = Strips(p.topIndex, true);
@@ -236,6 +232,8 @@ namespace app
             if (!found)
                continue;
             sPageUid = p.topUid;
+            if (dynamic_cast<MixerNode*>(g->node.get()) != nullptr && g->index != p.topIndex)
+               sOpenGroups.insert(g->uid); // a group itself opens to show its strips
             // Open every group on the way down to the owner.
             for (int guard = 0; owner >= 0 && owner != p.topIndex && guard < kMaxGroupDepth + 1; guard++)
             {
@@ -249,8 +247,19 @@ namespace app
                      parent = r.mixerIndex;
                owner = parent;
             }
-            return;
+            return true;
          }
+         return false;
+      }
+
+      // D2: selecting a Mixer or a strip's source on the canvas brings its page up and opens its groups.
+      void FollowCanvasSelection(const std::vector<Page>& pages)
+      {
+         const uint64_t sel = SelectedNodeUid();
+         if (sel == sLastSelectedUid)
+            return;
+         sLastSelectedUid = sel;
+         ShowNode(pages, sel ? FindNodeByUid(sel) : nullptr);
       }
 
       // One undo step per drag or toggle: the checkpoint has to hold the value from before the change.
@@ -617,6 +626,28 @@ namespace app
    }
 
    int MixerPanelPageCount() { return (int)CollectPages().size(); }
+
+   // A5: the canvas Mixer's "Open in Mixer panel". Opens the panel on the page that holds this Mixer.
+   bool MixerPanelShowMixer(int nodeIndex)
+   {
+      gMixerPanelOpen = true;
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      sLastSelectedUid = SelectedNodeUid(); // the menu's own selection must not move the page again
+      return ShowNode(CollectPages(), gn);
+   }
+
+   int MixerPanelCurrentPageTop()
+   {
+      const std::vector<Page> pages = CollectPages();
+      const int i = CurrentPage(pages);
+      return i < 0 ? -1 : pages[i].topIndex;
+   }
+
+   bool MixerPanelGroupOpen(int mixerIndex)
+   {
+      GraphNode* gn = FindNodeByIndex(mixerIndex);
+      return gn != nullptr && sOpenGroups.count(gn->uid) != 0;
+   }
 
    void MixerPanelSelectPage(int page)
    {

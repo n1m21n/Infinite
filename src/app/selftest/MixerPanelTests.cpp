@@ -90,6 +90,23 @@ namespace
       gAudioMode = AudioMode::Canvas;
       RebuildAudioTopology();
       Check("both sources now reach the device once, through the console", gAudioTopologyTerminalCount == 1);
+
+      // A5: "Open in Mixer panel" on a nested Mixer brings up its page with the group open.
+      NewPatch();
+      const int topA = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int outA = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      const int topB = SpawnNode("Mixer", "Utility", 400.0f, 400.0f)->index;
+      const int outB = SpawnNode("Audio Out", "Utility", 700.0f, 400.0f)->index;
+      const int grpB = SpawnNode("Mixer", "Utility", 200.0f, 400.0f)->index;
+      const int loose = SpawnNode("Mixer", "Utility", 200.0f, 800.0f)->index;
+      wired = ConnectNodes(topA, 0, outA, 0, err) && ConnectNodes(topB, 0, outB, 0, err) && ConnectNodes(grpB, 0, topB, 2, err);
+      Check("A5 patch wires up: two pages, a group on the second", wired && MixerPanelPageCount() == 2);
+      gMixerPanelOpen = false;
+      MixerPanelSelectPage(0);
+      Check("Open in Mixer panel on a group finds its page", MixerPanelShowMixer(grpB) && gMixerPanelOpen);
+      Check("the page shown is the group's console, folded open", MixerPanelCurrentPageTop() == topB && MixerPanelGroupOpen(grpB));
+      Check("a Mixer on no page still opens the panel", !MixerPanelShowMixer(loose) && gMixerPanelOpen);
+      gMixerPanelOpen = false;
       NewPatch();
    }
 
