@@ -265,6 +265,229 @@ void RunView2DTest()
       Check("T2: it cooks at the document size", p->GetOutputWidth() == 1920 && p->GetOutputHeight() == 1080);
    }
 
+   // ---- S2 tool settings: each one changes what a stroke leaves ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 300;
+      pic.Doc().h = 200;
+      pic.Doc().background = 1;   // black
+      pic.Commit();
+      BrushEngine::Brush hard = BrushEngine::Presets()[5].brush;   // Hard round
+      hard.size = 20.0f;
+      hard.pressureSize = false;
+      const auto Line = [&](int id, float x0, float x1, float y, const BrushEngine::Brush& use)
+      {
+         pic.BeginPaint(id, 0, use, x0, y, 1.0f);
+         for (float x = x0; x <= x1; x += 7.0f)
+            pic.PaintTo(x, y, 1.0f);
+         pic.EndPaint();
+      };
+      const auto Colour = [](BrushEngine::Brush b, float r, float g, float bl) { b.color[0] = r; b.color[1] = g; b.color[2] = bl; return b; };
+      const auto Fresh = [&]() { while (!pic.Layers().empty()) pic.Layers().pop_back(); pic.Commit(); return pic.AddPaintLayer(); };
+
+      // Mode: multiply and screen mix with what the layer holds; behind paints only where it is empty.
+      int L = Fresh();
+      Line(L, 20.0f, 280.0f, 100.0f, Colour(hard, 1, 0, 0));
+      BrushEngine::Brush m = Colour(hard, 0, 1, 0);
+      m.mode = BrushEngine::kMultiply;
+      Line(L, 20.0f, 280.0f, 100.0f, m);
+      Cook(&pic);
+      Check("S2: multiply green on red leaves black", Pixel(&pic, 150, 100)[0] < 0.05f && Pixel(&pic, 150, 100)[1] < 0.05f);
+      L = Fresh();
+      Line(L, 20.0f, 280.0f, 100.0f, Colour(hard, 1, 0, 0));
+      m.mode = BrushEngine::kScreen;
+      Line(L, 20.0f, 280.0f, 100.0f, m);
+      Cook(&pic);
+      Check("S2: screen green on red makes yellow", Pixel(&pic, 150, 100)[0] > 0.9f && Pixel(&pic, 150, 100)[1] > 0.9f);
+      L = Fresh();
+      Line(L, 20.0f, 280.0f, 100.0f, Colour(hard, 1, 0, 0));
+      BrushEngine::Brush behind = Colour(hard, 0, 0, 1);
+      behind.mode = BrushEngine::kBehind;
+      pic.BeginPaint(L, 0, behind, 150.0f, 40.0f, 1.0f);
+      for (float y = 40.0f; y <= 160.0f; y += 5.0f)
+         pic.PaintTo(150.0f, y, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      Check("S2: behind keeps the red, fills the empty", Pixel(&pic, 150, 100)[0] > 0.9f && Pixel(&pic, 150, 100)[2] < 0.05f
+                                                          && Pixel(&pic, 150, 50)[2] > 0.9f);
+
+      // Smudge drags the red past where it ended.
+      L = Fresh();
+      Line(L, 20.0f, 150.0f, 100.0f, Colour(hard, 1, 0, 0));
+      Cook(&pic);
+      const float before = Pixel(&pic, 185, 100)[0];
+      BrushEngine::Brush smudge = hard;
+      smudge.mode = BrushEngine::kSmudge;
+      smudge.spacing = 0.05f;
+      Line(L, 140.0f, 260.0f, 100.0f, smudge);
+      Cook(&pic);
+      Check("S2: smudge drags the paint along", before < 0.02f && Pixel(&pic, 185, 100)[0] > 0.3f);
+
+      // Taper in and out: the ends of the stroke are thin.
+      L = Fresh();
+      Line(L, 20.0f, 280.0f, 100.0f, Colour(hard, 1, 1, 1));
+      Cook(&pic);
+      const float fullIn = Pixel(&pic, 26, 107)[0], fullOut = Pixel(&pic, 268, 107)[0];
+      L = Fresh();
+      BrushEngine::Brush taper = Colour(hard, 1, 1, 1);
+      taper.taperIn = taper.taperOut = 100.0f;
+      Line(L, 20.0f, 280.0f, 100.0f, taper);
+      Cook(&pic);
+      Check("S2: taper in thins the start", fullIn > 0.9f && Pixel(&pic, 26, 107)[0] < 0.1f && Pixel(&pic, 150, 107)[0] > 0.9f);
+      Check("S2: taper out thins the end", fullOut > 0.9f && Pixel(&pic, 268, 107)[0] < 0.1f);
+
+      // Jitter: dabs set apart, each one's size, strength and colour drawn afresh.
+      BrushEngine::Brush apart = Colour(hard, 1, 0, 0);
+      apart.spacing = 1.5f;
+      const auto Dabs = [&](const BrushEngine::Brush& b, int& smallDabs, float& minR, float& maxGB)
+      {
+         const int id = Fresh();
+         Line(id, 20.0f, 280.0f, 100.0f, b);
+         Cook(&pic);
+         smallDabs = 0;
+         minR = 1.0f;
+         maxGB = 0.0f;
+         for (int x = 20; x <= 260; x += 30)   // dab centres
+         {
+            const std::vector<float> c = Pixel(&pic, x, 100), e = Pixel(&pic, x, 107);
+            smallDabs += e[0] + e[1] + e[2] < 0.3f ? 1 : 0;
+            minR = std::min(minR, std::max(c[0], std::max(c[1], c[2])));
+            maxGB = std::max(maxGB, std::max(c[1], c[2]));
+         }
+      };
+      int small0 = 0, small1 = 0, unusedI = 0;
+      float minR0 = 0, minR1 = 0, gb0 = 0, gb1 = 0, unusedF = 0;
+      Dabs(apart, small0, minR0, gb0);
+      BrushEngine::Brush j = apart;
+      j.sizeJitter = 1.0f;
+      Dabs(j, small1, unusedF, unusedF);
+      Check("S2: size jitter shrinks some dabs", small0 == 0 && small1 > 0);
+      j = apart;
+      j.opacityJitter = 1.0f;
+      Dabs(j, unusedI, minR1, unusedF);
+      Check("S2: opacity jitter fades some dabs", minR0 > 0.9f && minR1 < 0.8f);
+      j = apart;
+      j.hueJitter = 1.0f;
+      Dabs(j, unusedI, unusedF, gb1);
+      Check("S2: hue jitter turns some dabs off red", gb0 < 0.05f && gb1 > 0.2f);
+
+      // Dodge range: shadows lift the dark line only, highlights the light line only.
+      const auto Greys = [&]()
+      {
+         const int id = Fresh();
+         Line(id, 20.0f, 280.0f, 60.0f, Colour(hard, 0.2f, 0.2f, 0.2f));
+         Line(id, 20.0f, 280.0f, 140.0f, Colour(hard, 0.8f, 0.8f, 0.8f));
+         return id;
+      };
+      L = Greys();
+      Cook(&pic);
+      const float dark0 = Pixel(&pic, 150, 60)[0], light0 = Pixel(&pic, 150, 140)[0];
+      BrushEngine::Brush dodge = hard;
+      dodge.mode = BrushEngine::kDodge;
+      dodge.size = 200.0f;
+      dodge.range = 0;
+      pic.BeginPaint(L, 0, dodge, 150.0f, 100.0f, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      const float darkS = Pixel(&pic, 150, 60)[0], lightS = Pixel(&pic, 150, 140)[0];
+      L = Greys();
+      dodge.range = 2;
+      pic.BeginPaint(L, 0, dodge, 150.0f, 100.0f, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      const float darkH = Pixel(&pic, 150, 60)[0], lightH = Pixel(&pic, 150, 140)[0];
+      printf("  dodge: dark %.3f -> shadows %.3f highlights %.3f, light %.3f -> %.3f %.3f\n", dark0, darkS, darkH, light0, lightS, lightH);
+      Check("S2: dodge shadows lifts the dark, not the light", darkS > dark0 + 0.04f && std::fabs(lightS - light0) < 0.01f);
+      Check("S2: dodge highlights lifts the light, not the dark", lightH > light0 + 0.02f && std::fabs(darkH - dark0) < 0.01f);
+
+      // Clone all layers: an empty layer copies red from the layer under it.
+      L = Fresh();
+      Line(L, 20.0f, 280.0f, 50.0f, Colour(hard, 1, 0, 0));
+      const int top = pic.AddPaintLayer(L);
+      BrushEngine::Brush clone = hard;
+      clone.mode = BrushEngine::kClone;
+      clone.opacity = 1.0f;
+      clone.sourceOffset[0] = 0.0f;
+      clone.sourceOffset[1] = -100.0f;   // copy from 100 px above
+      Cook(&pic);
+      Line(top, 60.0f, 240.0f, 150.0f, clone);
+      Cook(&pic);
+      const float own = Pixel(&pic, 150, 150)[0];
+      clone.sampleAll = true;
+      Line(top, 60.0f, 240.0f, 150.0f, clone);
+      Cook(&pic);
+      Check("S2: clone all layers copies from the layer below", own < 0.02f && Pixel(&pic, 150, 150)[0] > 0.9f);
+
+      // Gradient kinds and opacity, black to white along a drag from (50,100) to (250,100).
+      const float k0[4] = { 0, 0, 0, 1 }, k1[4] = { 1, 1, 1, 1 };
+      float g[6][2];
+      for (int kind = 1; kind <= 5; kind++)
+      {
+         L = Fresh();
+         pic.Gradient(L, 50.0f, 100.0f, 250.0f, 100.0f, k0, k1, kind);
+         Cook(&pic);
+         g[kind][0] = Pixel(&pic, 20, 100)[0];
+         g[kind][1] = Pixel(&pic, 120, 170)[0];
+      }
+      L = Fresh();
+      pic.Gradient(L, 50.0f, 100.0f, 250.0f, 100.0f, k0, k1, 3);
+      Cook(&pic);
+      const float above = Pixel(&pic, 150, 95)[0], below = Pixel(&pic, 150, 105)[0];
+      Check("S2: reflected mirrors before the start", g[1][0] < 0.02f && g[4][0] > 0.1f);
+      Check("S2: diamond reaches further on the diagonal than radial", g[5][1] > g[2][1] + 0.05f);
+      Check("S2: angle wraps round the start", above > 0.8f && below < 0.2f);
+      L = Fresh();
+      pic.Gradient(L, 50.0f, 100.0f, 250.0f, 100.0f, k1, k1, 1, 0.5f);
+      Cook(&pic);
+      Check("S2: gradient opacity", Pixel(&pic, 150, 100)[0] > 0.3f && Pixel(&pic, 150, 100)[0] < 0.9f);
+
+      // Eyedropper: a 3x3 white dot reads white at a point, grey over 5x5; one layer reads through the one above.
+      L = Fresh();
+      BrushEngine::Brush dot = Colour(hard, 1, 1, 1);
+      dot.size = 3.0f;
+      dot.pencil = true;
+      pic.BeginPaint(L, 0, dot, 100.5f, 100.5f, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      float p1[3] = { 0, 0, 0 }, p5[3] = { 0, 0, 0 };
+      pic.Pick(100.5f, 100.5f, p1, 1);
+      pic.Pick(100.5f, 100.5f, p5, 5);
+      Check("S2: eyedropper 5x5 averages", p1[0] > 0.9f && p5[0] < 0.6f && p5[0] > 0.1f);
+      const int over = pic.AddPaintLayer(L);
+      Line(L, 20.0f, 280.0f, 150.0f, Colour(hard, 1, 0, 0));
+      Line(over, 20.0f, 280.0f, 150.0f, Colour(hard, 0, 0, 1));
+      Cook(&pic);
+      float all[3] = { 0, 0, 0 }, one[3] = { 0, 0, 0 };
+      pic.Pick(150.0f, 150.0f, all, 1, 0);
+      pic.Pick(150.0f, 150.0f, one, 1, L);
+      Check("S2: eyedropper current layer reads under the top", all[2] > 0.9f && one[0] > 0.9f && one[2] < 0.05f);
+
+      // Fill layer reflected and diamond.
+      while (!pic.Layers().empty())
+         pic.Layers().pop_back();
+      Layer& f = pic.AddLayer(Kind::Fill, 0);
+      f.colorA[0] = f.colorA[1] = f.colorA[2] = 0.0f;
+      f.colorA[3] = 1.0f;
+      f.colorB[0] = f.colorB[1] = f.colorB[2] = 1.0f;
+      f.colorB[3] = 1.0f;
+      f.fillAngle = 0.0f;
+      f.fillType = 1;
+      pic.Commit();
+      Cook(&pic);
+      const float linL = Pixel(&pic, 10, 100)[0], linR = Pixel(&pic, 290, 100)[0];
+      pic.Layers()[0].fillType = 3;
+      pic.Commit();
+      Cook(&pic);
+      const float refL = Pixel(&pic, 10, 100)[0], refR = Pixel(&pic, 290, 100)[0], refC = Pixel(&pic, 150, 100)[0];
+      pic.Layers()[0].fillType = 4;
+      pic.Commit();
+      Cook(&pic);
+      const float diaC = Pixel(&pic, 150, 100)[0], diaCorner = Pixel(&pic, 290, 190)[0];
+      Check("S2: reflected fill is dark in the middle, light at both ends", linL < 0.1f && linR > 0.9f && refC < 0.1f && refL > 0.8f && refR > 0.8f);
+      Check("S2: diamond fill grows from the centre", diaC < 0.1f && diaCorner > 0.9f);
+   }
+
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
    {
       Scene2DNode pic;

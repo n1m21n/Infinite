@@ -124,7 +124,12 @@ namespace
    int sBrushPreset = -1, sEraserPreset = -1;
    bool sBrushInit = false;
    float sFg[3] = { 0.0f, 0.0f, 0.0f }, sBg[3] = { 1.0f, 1.0f, 1.0f };
-   int sFillKind = 1;              // gradient: 1 linear, 2 radial
+   int sFillKind = 1;              // gradient: 1 linear, 2 radial, 3 angle, 4 reflected, 5 diamond
+   float sGradOpacity = 1.0f;
+   int sPickSize = 1;              // eyedropper: 1 point, 3 or 5 px square averaged
+   bool sPickLayer = false;        // eyedropper reads the active paint layer alone
+   bool sCloneAligned = true;      // clone / heal: the offset holds across strokes
+   bool sCloneAll = false;         // clone / heal: copy from the whole picture
    bool sGradReverse = false;      // gradient runs background to foreground
    int sTolerance = 32;
    bool sContiguous = true, sAllLayers = false;
@@ -134,6 +139,10 @@ namespace
    int sSkinSide = 2;              // 0..3: 512 .. 4096 px, for the next new skin
    bool sEditMask = false;         // the brush paints the active layer's pixel mask
    int sMarqueeShape = 0;          // 0 rectangle, 1 ellipse
+   int sMarqueeRatio = 0;          // 0 free, 1 1:1, 2 4:3, 3 16:9, 4 fixed size
+   float sMarqueeFixed[2] = { 256.0f, 256.0f };
+   int sCropRatio = 0;             // 0 free, 1 original, 2 1:1, 3 4:3, 4 3:2, 5 16:9, 6 9:16
+   bool sCropThirds = true;
    int sLassoKind = 0;             // 0 freehand, 1 polygon
    float sFeather = 0.0f;
    float sSelModPx = 4.0f;         // Expand / Contract / Smooth / Border, document px
@@ -1553,13 +1562,14 @@ namespace
       if (cloning)
       {
          // Aligned: the first stroke after Alt-click fixes the offset; later strokes keep it.
-         if (!sCloneOffsetSet)
+         if (!sCloneOffsetSet || !sCloneAligned)
          {
             sCloneOffset = ImVec2(sCloneSrc.x - at.x, sCloneSrc.y - at.y);
             sCloneOffsetSet = true;
          }
          b.sourceOffset[0] = sCloneOffset.x;
          b.sourceOffset[1] = sCloneOffset.y;
+         b.sampleAll = sCloneAll;
       }
       std::copy(sFg, sFg + 3, b.color);
       if (sTool == kBrush && sBrushHue != 0.0f)
@@ -1605,7 +1615,7 @@ namespace
       const float* c1 = sGradReverse ? sFg : sBg;
       const float ca[4] = { c0[0], c0[1], c0[2], 1.0f }, cb[4] = { c1[0], c1[1], c1[2], 1.0f };
       if (id > 0 && target == 0)
-         doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind == 2);
+         doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind, sGradOpacity);
    }
 
    void ClosePoly(Scene2DNode* doc)
@@ -2417,6 +2427,47 @@ namespace
       return -1;
    }
 
+   // The marquee's far corner under its Ratio: free, a fixed shape (width leads), or a fixed size in px.
+   ImVec2 MarqueeEnd(ImVec2 a, ImVec2 b)
+   {
+      static const float kR[4] = { 0.0f, 1.0f, 4.0f / 3.0f, 16.0f / 9.0f };
+      const float sx = b.x >= a.x ? 1.0f : -1.0f, sy = b.y >= a.y ? 1.0f : -1.0f;
+      if (sMarqueeRatio == 4)
+         return ImVec2(a.x + sx * sMarqueeFixed[0], a.y + sy * sMarqueeFixed[1]);
+      if (sMarqueeRatio >= 1 && sMarqueeRatio <= 3)
+         return ImVec2(b.x, a.y + sy * std::fabs(b.x - a.x) / kR[sMarqueeRatio]);
+      return b;
+   }
+
+   // Width over height for the crop's Ratio, 0 when free.
+   float CropRatio(Scene2DNode* doc)
+   {
+      static const float kR[7] = { 0.0f, 0.0f, 1.0f, 4.0f / 3.0f, 3.0f / 2.0f, 16.0f / 9.0f, 9.0f / 16.0f };
+      if (sCropRatio == 1)
+         return doc->Doc().h > 0 ? (float)doc->Doc().w / (float)doc->Doc().h : 0.0f;
+      return kR[std::clamp(sCropRatio, 0, 6)];
+   }
+
+   // The crop box set to the ratio, the same centre, as large as fits in the box it was.
+   void FitCropRatio(Scene2DNode* doc)
+   {
+      const float r = CropRatio(doc);
+      if (r <= 0.0f)
+         return;
+      const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
+      const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
+      float w = x1 - x0, h = y1 - y0;
+      if (w / std::max(h, 1.0f) > r)
+         w = h * r;
+      else
+         h = w / r;
+      const float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
+      sCrop[0] = std::round(cx - w * 0.5f);
+      sCrop[1] = std::round(cy - h * 0.5f);
+      sCrop[2] = std::round(cx + w * 0.5f);
+      sCrop[3] = std::round(cy + h * 0.5f);
+   }
+
    void DrawCropOverlay(ImDrawList* dl, Scene2DNode* doc)
    {
       const ImVec2 a = ToScreen(doc, std::min(sCrop[0], sCrop[2]), std::min(sCrop[1], sCrop[3]));
@@ -2427,7 +2478,7 @@ namespace
       dl->AddRectFilled(ImVec2(sViewMn.x, a.y), ImVec2(a.x, b.y), dim);
       dl->AddRectFilled(ImVec2(b.x, a.y), ImVec2(sViewMx.x, b.y), dim);
       dl->AddRect(a, b, IM_COL32(255, 255, 255, 230));
-      for (int i = 1; i < 3; i++)
+      for (int i = 1; i < 3 && sCropThirds; i++)
       {
          const float x = a.x + (b.x - a.x) * i / 3.0f, y = a.y + (b.y - a.y) * i / 3.0f;
          dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), IM_COL32(255, 255, 255, 70));
@@ -2473,10 +2524,33 @@ namespace
          if (fx == 1) c[2] += dx;
          if (fy == 0) c[1] += dy;
          if (fy == 1) c[3] += dy;
+         // A set ratio: a corner keeps the width and moves the free edge; a side handle grows the other side about the centre.
+         const float r = CropRatio(doc);
+         if (r > 0.0f)
+         {
+            const float w = std::fabs(c[2] - c[0]), hgt = std::fabs(c[3] - c[1]);
+            if (fx != 0.5f && fy != 0.5f)
+            {
+               const float sgn = (fy == 1 ? c[3] - c[1] : c[1] - c[3]) >= 0.0f || hgt < 1.0f ? 1.0f : -1.0f;
+               if (fy == 1) c[3] = c[1] + sgn * w / r;
+               else c[1] = c[3] - sgn * w / r;
+            }
+            else if (fy == 0.5f)
+            {
+               const float cy = (c[1] + c[3]) * 0.5f;
+               c[1] = cy - w / r * 0.5f;
+               c[3] = cy + w / r * 0.5f;
+            }
+            else
+            {
+               const float cx = (c[0] + c[2]) * 0.5f;
+               c[0] = cx - hgt * r * 0.5f;
+               c[2] = cx + hgt * r * 0.5f;
+            }
+         }
       }
       for (float& v : c)
          v = std::round(v);
-      (void)doc;
       std::copy(c, c + 4, sCrop);
    }
 
@@ -3289,7 +3363,8 @@ namespace
       const ImU32 ink = IM_COL32(255, 255, 255, 230), shade = IM_COL32(0, 0, 0, 160);
       if (sOp.kind == 9)
       {
-         const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y), p1 = mouse;
+         const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc);
+         const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y), p1 = ToScreen(doc, e.x, e.y);
          if (sMarqueeShape == 1)
          {
             const ImVec2 c((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);
@@ -3404,7 +3479,7 @@ namespace
       if (hovered && (sTool == kClone || sTool == kHeal) && sHaveCloneSrc)
       {
          // Where the stamp copies from: the source point, or (once aligned) the pointer plus the offset.
-         const ImVec2 src = sCloneOffsetSet ? ToScreen(doc, sMouseDoc.x + sCloneOffset.x, sMouseDoc.y + sCloneOffset.y)
+         const ImVec2 src = sCloneOffsetSet && (sCloneAligned || sOp.kind == 7) ? ToScreen(doc, sMouseDoc.x + sCloneOffset.x, sMouseDoc.y + sCloneOffset.y)
                                             : ToScreen(doc, sCloneSrc.x, sCloneSrc.y);
          dl->PushClipRect(sViewMn, sViewMx, true);
          for (int pass = 0; pass < 2; pass++)
@@ -3676,7 +3751,8 @@ namespace
             if (a != nullptr && sSurfacePaint && a->HasSkin() && doc->SurfaceColor(a->id, sMouseDoc.x, sMouseDoc.y, c))
                std::copy(c, c + 3, sOp.selOp == 1 ? sBg : sFg);
             else
-               doc->Pick(sMouseDoc.x, sMouseDoc.y, sOp.selOp == 1 ? sBg : sFg);
+               doc->Pick(sMouseDoc.x, sMouseDoc.y, sOp.selOp == 1 ? sBg : sFg, sPickSize,
+                         sPickLayer && a != nullptr && a->kind == Kind::Paint ? a->id : 0);
          }
          else if (sOp.kind == 6)
          {
@@ -3712,7 +3788,10 @@ namespace
                      doc->Deselect();
                }
                else
-                  doc->SelectRect(sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, sOp.selOp, sFeather, sMarqueeShape == 1);
+               {
+                  const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc);
+                  doc->SelectRect(sOp.docStart.x, sOp.docStart.y, e.x, e.y, sOp.selOp, sFeather, sMarqueeShape == 1);
+               }
             }
             else if (sOp.kind == 10)
             {
@@ -3882,6 +3961,31 @@ namespace
          *v = !*v;
    }
 
+   // A dropdown on a tool bar: the value well alone, names translated.
+   bool BarCombo(const char* id, int* v, const char* const* names, int n, float w)
+   {
+      bool changed = false;
+      ImGui::SetNextItemWidth(w);
+      if (MenuParts::BeginCombo(id, T(names[std::clamp(*v, 0, n - 1)])))
+      {
+         for (int i = 0; i < n; i++)
+            if (MenuParts::Choice(T(names[i]), *v == i) && *v != i)
+            {
+               *v = i;
+               changed = true;
+            }
+         MenuParts::EndCombo();
+      }
+      return changed;
+   }
+
+   // A dropdown row in a BarMore form.
+   bool MoreCombo(const char* label, int* v, const char* const* names, int n)
+   {
+      FieldLabel(label);
+      return BarCombo(FormParts::Id(label).c_str(), v, names, n, sFieldW);
+   }
+
    void MatchChips()
    {
       float tol = (float)sTolerance;
@@ -3944,6 +4048,21 @@ namespace
          BarSlider("##v2drop", &op, 1.0f, 100.0f, "Strength %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
+         if (sTool == kDodge || sTool == kBurn)
+         {
+            gap();
+            static const char* kRange[3] = { "Shadows", "Midtones", "Highlights" };
+            BarCombo("##v2drange", &b.range, kRange, 3, kWellL);
+         }
+         if (sTool == kClone || sTool == kHeal)
+         {
+            gap();
+            if (TextChip(L("Aligned##v2dalign"), sCloneAligned, T("The source moves with each stroke")))
+               sCloneAligned = !sCloneAligned;
+            next();
+            if (TextChip(L("All layers##v2dcloneall"), sCloneAll, T("Copy from the whole picture")))
+               sCloneAll = !sCloneAll;
+         }
          gap();
          SymmetryChip(doc);
          FormParts::Inline(0.0f, tok::space_1);
@@ -4029,6 +4148,16 @@ namespace
             MoreHeader(T("Dynamics"));
             MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
             MoreCheck(T("Follow stroke"), &b.follow);
+            MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
+            MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
+            MorePct(T("Size jitter"), &b.sizeJitter, 0.0f, 100.0f);
+            MorePct(T("Opacity jitter"), &b.opacityJitter, 0.0f, 100.0f);
+            if (brush)
+            {
+               MorePct(T("Hue jitter"), &b.hueJitter, 0.0f, 100.0f);
+               MorePct(T("Saturation jitter"), &b.satJitter, 0.0f, 100.0f);
+               MorePct(T("Brightness jitter"), &b.valJitter, 0.0f, 100.0f);
+            }
             if (brush)
             {
                FieldLabel(T("Hue"));
@@ -4043,7 +4172,17 @@ namespace
             MoreCheck(T("Opacity"), &b.pressureOpacity);
             MoreHeader(T("Paint"));
             if (brush)
+            {
+               static const char* kModeNames[5] = { "Normal", "Behind", "Multiply", "Screen", "Smudge" };
+               static const int kModeOf[5] = { BrushEngine::kNormal, BrushEngine::kBehind, BrushEngine::kMultiply, BrushEngine::kScreen, BrushEngine::kSmudge };
+               int m = 0;
+               for (int i = 0; i < 5; i++)
+                  if (kModeOf[i] == b.mode)
+                     m = i;
+               if (MoreCombo(T("Mode"), &m, kModeNames, 5))
+                  b.mode = kModeOf[m];
                MoreCheck(T("Lock alpha"), &b.lockAlpha);
+            }
             ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
             bool mask = sEditMask && a != nullptr && a->HasPixelMask();
             MoreCheck(T("Paint the mask"), &mask);
@@ -4056,16 +4195,15 @@ namespace
          MatchChips();
       else if (sTool == kGradient)
       {
-         static const char* kKinds[2] = { "Linear", "Radial" };
-         for (int i = 0; i < 2; i++)
-         {
-            if (i > 0)
-               next();
-            const std::string id = std::string(L(kKinds[i])) + "##v2dfk" + std::to_string(i);
-            if (TextChip(id.c_str(), (sFillKind == 2) == (i == 1), nullptr))
-               sFillKind = i + 1;
-         }
+         static const char* kKinds[5] = { "Linear", "Radial", "Angle", "Reflected", "Diamond" };
+         int k = std::clamp(sFillKind, 1, 5) - 1;
+         if (BarCombo("##v2dgkind", &k, kKinds, 5, kWellL))
+            sFillKind = k + 1;
          gap();
+         float op = sGradOpacity * 100.0f;
+         BarSlider("##v2dgop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+         sGradOpacity = op / 100.0f;
+         next();
          if (TextChip(L("Reverse##v2dgrev"), sGradReverse, T("Background colour to foreground")))
             sGradReverse = !sGradReverse;
       }
@@ -4081,7 +4219,32 @@ namespace
          SelOpChips("v2dop");
          gap();
          BarSlider("##v2dfeather", &sFeather, 0.0f, 250.0f, "Feather %.0f px", kWellL);
+         if (m)
+         {
+            gap();
+            static const char* kRatio[5] = { "Free", "1:1", "4:3", "16:9", "Fixed size" };
+            BarCombo("##v2dmratio", &sMarqueeRatio, kRatio, 5, kWellM);
+            if (sMarqueeRatio == 4)
+            {
+               next();
+               BarSlider("##v2dmfw", &sMarqueeFixed[0], 1.0f, 8192.0f, "W %.0f px", kWellM);
+               next();
+               BarSlider("##v2dmfh", &sMarqueeFixed[1], 1.0f, 8192.0f, "H %.0f px", kWellM);
+            }
+         }
          SelModChips(doc);
+      }
+      else if (sTool == kPick)
+      {
+         static const char* kSample[3] = { "Point", "3x3 average", "5x5 average" };
+         int si = sPickSize / 2;
+         if (BarCombo("##v2dpsize", &si, kSample, 3, kWellL))
+            sPickSize = si * 2 + 1;
+         gap();
+         static const char* kFrom[2] = { "All layers", "Current layer" };
+         int from = sPickLayer ? 1 : 0;
+         if (BarCombo("##v2dpfrom", &from, kFrom, 2, kWellL))
+            sPickLayer = from == 1;
       }
       else if (sTool == kWand)
       {
@@ -4241,6 +4404,33 @@ namespace
             if (ImGui::IsItemActivated())
                undo();
          }
+      }
+      // A picked live shape's box size (Photoshop's W / H): it grows from its top-left corner.
+      if (picked != nullptr && picked->type != Shape::kPath && picked->type != Shape::kLine)
+      {
+         gap();
+         float w = std::fabs(t.x1 - t.x0), h = std::fabs(t.y1 - t.y0);
+         ImGui::SetNextItemWidth(kWellM);
+         if (FieldWell::Slider("##v2dvw", &w, 1.0f, 8192.0f, "W %.0f"))
+         {
+            const float lo = std::min(t.x0, t.x1);
+            t.x0 = lo;
+            t.x1 = lo + std::max(1.0f, w);
+            changed = true;
+         }
+         if (ImGui::IsItemActivated())
+            undo();
+         next();
+         ImGui::SetNextItemWidth(kWellM);
+         if (FieldWell::Slider("##v2dvh", &h, 1.0f, 8192.0f, "H %.0f"))
+         {
+            const float lo = std::min(t.y0, t.y1);
+            t.y0 = lo;
+            t.y1 = lo + std::max(1.0f, h);
+            changed = true;
+         }
+         if (ImGui::IsItemActivated())
+            undo();
       }
       Layer* a = Active(doc);
       if (a != nullptr && a->hasVMask)
@@ -5055,6 +5245,13 @@ namespace
          const float rowTop = ImGui::GetCursorScreenPos().y;
          CentredText(rowTop, dims);
          gap();
+         static const char* kRatio[7] = { "Free", "Original", "1:1", "4:3", "3:2", "16:9", "9:16" };
+         if (BarCombo("##v2dcratio", &sCropRatio, kRatio, 7, kWellM))
+            FitCropRatio(doc);
+         next();
+         if (TextChip(L("Thirds##v2dthirds"), sCropThirds, T("Rule of thirds guides")))
+            sCropThirds = !sCropThirds;
+         gap();
          if (TextChip(L("Apply##v2dcropok"), false, T("Crop the document (Enter)")))
          {
             PushUndoCheckpoint("Crop document");
@@ -5704,7 +5901,7 @@ namespace
       {
          SectionCard::Begin(T("Fill"));
          int type = l->fillType;
-         if (ComboRow(T("Type"), &type, { T("Solid"), T("Linear"), T("Radial") }))
+         if (ComboRow(T("Type"), &type, { T("Solid"), T("Linear"), T("Radial"), T("Reflected"), T("Diamond") }))
             l->fillType = type;
          ColorRow(type == 0 ? T("Colour") : T("From"), l->colorA);
          SliderRow(type == 0 ? T("Alpha") : T("From alpha"), &l->colorA[3], 0.0f, 1.0f, "%.2f");
@@ -5713,9 +5910,11 @@ namespace
             ColorRow(T("To"), l->colorB);
             SliderRow(T("To alpha"), &l->colorB[3], 0.0f, 1.0f, "%.2f");
          }
-         if (type == 1)
+         if (type == 1 || type == 3 || type == 4)
+         {
             ModNext(*l, Scene2DNode::kLfFillAngle);
             SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+         }
       }
       if (l->kind == Kind::Adjust)
       {

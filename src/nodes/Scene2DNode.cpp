@@ -225,6 +225,12 @@ namespace
            "      return mix(uColA, uColB, t);\n"
            "   }\n"
            "   if (uKind == 3) return mix(uColA, uColB, clamp(length(uvb - 0.5) * 2.0, 0.0, 1.0));\n"
+           "   if (uKind == 5 || uKind == 6) {\n"   // reflected: from the centre line out; diamond: from the centre out to a turned square
+           "      float a = radians(uFillAngle);\n"
+           "      vec2 d = vec2(cos(a), sin(a)), e = vec2(-d.y, d.x), p = uvb - 0.5;\n"
+           "      float t = uKind == 5 ? abs(dot(p, d)) / (abs(d.x) + abs(d.y)) * 2.0 : (abs(dot(p, d)) + abs(dot(p, e))) * 2.0;\n"
+           "      return mix(uColA, uColB, clamp(t, 0.0, 1.0));\n"
+           "   }\n"
            "   if (uNearest == 1) {\n"
            "      ivec2 px = ivec2(clamp(floor(uv * uTexSize), vec2(0.0), uTexSize - 1.0));\n"
            "      return texelFetch(uTex, px, 0);\n"
@@ -421,6 +427,7 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mSelTex);
    GLUtil::DestroyFbo(mSelOverlay);
    GLUtil::DestroyFbo(mSelScratch);
+   GLUtil::DestroyFbo(mCloneSrc);
    for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram })
       if (p != 0)
          glDeleteProgram(p);
@@ -1643,7 +1650,8 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    }
    if (l.kind == Kind::Fill)
    {
-      a.kind = l.fillType == 1 ? 2 : l.fillType == 2 ? 3 : 1;
+      static const int kFillKinds[5] = { 1, 2, 3, 5, 6 };   // solid, linear, radial, reflected, diamond
+      a.kind = kFillKinds[std::clamp(l.fillType, 0, 4)];
       a.fill = &l;
       a.box[0] = (float)mDoc.w;
       a.box[1] = (float)mDoc.h;

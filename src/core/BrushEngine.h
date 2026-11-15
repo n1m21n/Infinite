@@ -20,7 +20,9 @@ namespace BrushEngine
                kBristle, kGrain, kHalftone, kWatercolor, kMetal, kCloth, kLeaf, kGrass, kSparkle, kSponge, kTipCount };
    enum Mode { kNormal = 0, kErase, kBehind, kClearMode, kMultiply, kScreen,
                // Retouch: the stroke reworks the pixels already there instead of laying colour.
-               kBlur, kSharpen, kDodge, kBurn, kClone, kHeal };
+               kBlur, kSharpen, kDodge, kBurn, kClone, kHeal,
+               // Drags the colour under the brush along the stroke (paints straight onto the surface).
+               kSmudge };
 
    const std::vector<std::string>& TipNames();
 
@@ -42,6 +44,16 @@ namespace BrushEngine
       int mode = kNormal;
       bool lockAlpha = false;
       bool follow = false;         // the tip turns with the stroke's direction
+      float taperIn = 0.0f;        // px of stroke over which the tip grows from a point
+      float taperOut = 0.0f;       // px at the end over which it shrinks back (the last dabs land when the pen lifts)
+      float sizeJitter = 0.0f;     // 0..1, each dab's size drops by up to this share
+      float opacityJitter = 0.0f;  // 0..1, each dab's flow drops by up to this share
+      float hueJitter = 0.0f;      // 0..1 of a half turn, per dab
+      float satJitter = 0.0f;      // 0..1, per dab
+      float valJitter = 0.0f;      // 0..1, per dab
+      int range = 1;               // dodge / burn: 0 shadows, 1 midtones, 2 highlights
+      bool sampleAll = false;      // clone / heal: copy from the whole picture (the surface owner fills sourceTex)
+      unsigned sourceTex = 0;      // clone / heal: read from this texture (surface-sized) instead of the surface
       float color[3] = { 0.0f, 0.0f, 0.0f };
       float sourceOffset[2] = { 0.0f, 0.0f };   // clone / heal: where to copy from, surface pixels from the dab
    };
@@ -94,7 +106,13 @@ namespace BrushEngine
       struct Pending
       {
          float x, y, pressure, seed, dir;
+         float dist;           // stroke length when the dab was placed (taper out)
+         float size, flow;     // jitter factors
+         float rgb[3];         // the dab's colour (colour jitter)
+         float fromX, fromY;   // smudge: where the previous dab sat
       };
+      void DrawDab(const Pending& q, float taper);
+      void SmudgeDab(const Pending& q, float r, float strength);
       void Walk(float x, float y, float pressure);
       void Merge(const GLUtil::Fbo& surface, const GLUtil::Fbo& out);
       bool EnsurePrograms();
@@ -105,6 +123,10 @@ namespace BrushEngine
       float mPenX = 0, mPenY = 0, mPenP = 1;      // the real pen (smoothing)
       float mCarry = 0;                           // distance walked since the last dab
       float mDabX = 0, mDabY = 0, mDir = 0;       // the last dab's place and the stroke's heading (radians)
+      float mDist = 0;                            // stroke length walked so far, px
+      float mPrevX = 0, mPrevY = 0;               // the last placed dab (smudge pick-up)
+      float mSize = 1, mFlow = 1, mRgb[3] = { 0, 0, 0 };   // the dab being placed: jitter and taper
+      bool mEnding = false;                       // the pen lifted: taper-out dabs land now
       uint32_t mRng = 1;
       int mDabCount = 0;
       int mW = 0, mH = 0;
@@ -113,7 +135,8 @@ namespace BrushEngine
       bool mAny = false;
       std::vector<Pending> mQueue;
       std::vector<std::array<float, 6>> mMirrors;
-      void Queue(float x, float y, float p, float seed, float dir);
+      void Queue(float x, float y, float p, float seed, float dir, float fx, float fy);
+      const GLUtil::Fbo* mSurface = nullptr;      // smudge paints into it directly
       GLUtil::Fbo mCoverage, mDisplay, mMerge;
       bool mDisplayStale = true;
    };

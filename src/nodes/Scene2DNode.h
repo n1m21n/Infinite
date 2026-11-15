@@ -117,7 +117,7 @@ public:
       int maskChannel = 0;          // 0 luminance, 1 alpha
       float maskDensity = 1.0f;
       // Fill layers.
-      int fillType = 0;             // 0 solid, 1 linear, 2 radial
+      int fillType = 0;             // 0 solid, 1 linear, 2 radial, 3 reflected, 4 diamond
       float colorA[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
       float colorB[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float fillAngle = 90.0f;      // linear: degrees, 90 = top to bottom
@@ -318,9 +318,11 @@ public:
    // clicked colour; contiguous or everywhere; sampled from the layer or the picture.
    bool Bucket(int id, float x, float y, const float rgb[3], float opacity, int tolerance, bool contiguous, bool sampleAll);
    // Gradient from a to b (document px), colour A to B; radial when `radial`.
-   bool Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], bool radial);
+   // kind: 1 linear, 2 radial, 3 angle, 4 reflected, 5 diamond.
+   bool Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity = 1.0f);
    // The picture's colour (display values) at a document point.
-   bool Pick(float x, float y, float rgb[3]);
+   // size: 1, 3 or 5 px square, averaged. layer: read that paint layer alone (0 = the whole picture).
+   bool Pick(float x, float y, float rgb[3], int size = 1, int layer = 0);
 
    // ---- 3D surface paint ---------------------------------------------------
    // A node layer whose source is a 3D object can be painted on its surface: a stroke is picked by ray through the
@@ -523,7 +525,7 @@ private:
    unsigned long long SkinRevision(const Layer& l) const;
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
    bool mSelAny = false, mSelDirty = false;
-   GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch;
+   GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch, mCloneSrc;
    unsigned mFillProgram = 0, mAntsProgram = 0, mResampleProgram = 0;
    bool mPaintTried = false;
    unsigned long long mPaintEdits = 0;   // bumps when a surface changes outside a stroke

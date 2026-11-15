@@ -48,6 +48,7 @@ namespace
       "   bool inDoc = duv.x >= 0.0 && duv.y >= 0.0 && duv.x <= 1.0 && duv.y <= 1.0;\n"
       "   float sel = uHasSel == 1 ? (inDoc ? texture(uSel, duv).r : 0.0) : 1.0;\n"
       "   if (uOp == 1) { fragColor = vec4(vec3(sel), 1.0); return; }\n"
+      "   if (uOp == 2) { fragColor = inDoc ? texture(uSel, duv) : vec4(0.0); return; }\n"   // the picture, onto this surface
       "   vec4 d = texture(uSurf, vUv);\n"
       "   float cov = uHasCov == 1 ? (inDoc ? texture(uCov, duv).r : 0.0) : 1.0;\n"
       "   vec4 c = uColA;\n"
@@ -56,6 +57,16 @@ namespace
       "      c = mix(uColA, uColB, clamp(dot(dp - uP0, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0));\n"
       "   } else if (uKind == 2) {\n"
       "      c = mix(uColA, uColB, clamp(length(dp - uP0) / max(length(uP1 - uP0), 1e-3), 0.0, 1.0));\n"
+      "   } else if (uKind == 3) {\n"   // angle: once round from the drag's direction
+      "      vec2 ab = uP1 - uP0, q = dp - uP0;\n"
+      "      float t = (atan(q.y, q.x) - atan(ab.y, ab.x)) / 6.2831853;\n"
+      "      c = mix(uColA, uColB, fract(t + 1.0));\n"
+      "   } else if (uKind == 4) {\n"   // reflected: the linear ramp mirrored back across the start
+      "      vec2 ab = uP1 - uP0;\n"
+      "      c = mix(uColA, uColB, clamp(abs(dot(dp - uP0, ab)) / max(dot(ab, ab), 1e-6), 0.0, 1.0));\n"
+      "   } else if (uKind == 5) {\n"   // diamond: a square turned to the drag, its corner at the end
+      "      vec2 ab = uP1 - uP0, e = vec2(-ab.y, ab.x), q = dp - uP0;\n"
+      "      c = mix(uColA, uColB, clamp((abs(dot(q, ab)) + abs(dot(q, e))) / max(dot(ab, ab), 1e-6), 0.0, 1.0));\n"
       "   }\n"
       "   float a = clamp(c.a * cov * sel * uOpacity, 0.0, 1.0);\n"
       "   if (uLock == 1) { fragColor = vec4(mix(d.rgb, c.rgb, a), d.a); return; }\n"
@@ -375,7 +386,8 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
    float m[6];
    LayerMatrix(l, m);
    const unsigned prog = mFillProgram;
-   const unsigned sel = mSelAny ? mSelTex.tex : 0;
+   // kind -2 samples the picture (mOut) through the same mapping: clone from all layers.
+   const unsigned sel = kind == -2 ? mOut.tex : mSelAny ? mSelTex.tex : 0;
    const float zero[4] = { 0, 0, 0, 0 };
    GLUtil::RunShaderPass(out, prog, [&]()
    {
@@ -391,7 +403,7 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
       glActiveTexture(GL_TEXTURE0);
       glUniform1i(glGetUniformLocation(prog, "uHasCov"), coverage != 0 ? 1 : 0);
       glUniform1i(glGetUniformLocation(prog, "uHasSel"), sel != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uOp"), kind < 0 ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uOp"), kind == -2 ? 2 : kind < 0 ? 1 : 0);
       glUniform2f(glGetUniformLocation(prog, "uSurfSize"), (float)sw, (float)sh);
       glUniform2f(glGetUniformLocation(prog, "uBox"), bw, bh);
       glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
@@ -494,6 +506,16 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    }
    mPaintId = id;
    mPaintTarget = target;
+   brush.sourceTex = 0;
+   if (target == 0 && b.sampleAll && (brush.mode == BrushEngine::kClone || brush.mode == BrushEngine::kHeal) && mOut.tex != 0 &&
+       EnsurePaintShaders() && GLUtil::EnsureFbo(mCloneSrc, surf->w, surf->h, GL_RGBA8, "Scene2DCloneSrc"))
+   {
+      // All layers: the picture as it stands, laid onto this surface's pixels, is what the clone copies from.
+      Surface tmp;
+      tmp.fbo = mCloneSrc;
+      ApplyFill(tmp, surf->w, surf->h, *l, 0, nullptr, nullptr, -2, nullptr, nullptr, 1.0f);
+      brush.sourceTex = mCloneSrc.tex;
+   }
    mStroke.SetMirrors(SurfaceMirrors(target == 2 ? Layer() : *l, target));
    mStroke.Begin(*surf, brush, sx, sy, pressure, sel);
    return mStroke.Active();
@@ -607,7 +629,7 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    return true;
 }
 
-bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], bool radial)
+bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -619,26 +641,55 @@ bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const
       return false;
    UploadSelection();
    const float p0[2] = { ax, ay }, p1[2] = { bx, by };
-   ApplyFill(it->second, l->pw, l->ph, *l, 0, a, b, radial ? 2 : 1, p0, p1, 1.0f);
+   ApplyFill(it->second, l->pw, l->ph, *l, 0, a, b, std::clamp(kind, 1, 5), p0, p1, opacity);
    const int all[4] = { 0, 0, l->pw, l->ph };
    StoreTiles(it->second, l->tiles, all);
    Commit();
    return true;
 }
 
-bool Scene2DNode::Pick(float x, float y, float rgb[3])
+bool Scene2DNode::Pick(float x, float y, float rgb[3], int size, int layer)
 {
-   const int px = (int)std::floor(x), py = mDoc.h - 1 - (int)std::floor(y);
-   if (mOut.fbo == 0 || px < 0 || py < 0 || px >= mOut.w || py >= mOut.h)
+   // Where to read: the picture (y flipped to texture rows) or one paint layer's own pixels.
+   const GLUtil::Fbo* src = &mOut;
+   int px = (int)std::floor(x), py = mDoc.h - 1 - (int)std::floor(y);
+   if (layer != 0)
+   {
+      Layers();
+      const Layer* l = FindConst(layer);
+      auto it = mSurfaces.find(layer);
+      float sx = 0, sy = 0, scale = 1;
+      if (l != nullptr && l->kind == Kind::Paint && it != mSurfaces.end() && DocToSurface(*l, 0, x, y, sx, sy, scale))
+      {
+         src = &it->second.fbo;
+         px = (int)std::floor(sx);
+         py = (int)std::floor(sy);
+      }
+   }
+   if (src->fbo == 0 || px < 0 || py < 0 || px >= src->w || py >= src->h)
       return false;
-   float v[4] = { 0, 0, 0, 0 };
+   const int half = std::clamp(size, 1, 5) / 2;
+   const int x0 = std::max(0, px - half), y0 = std::max(0, py - half);
+   const int x1 = std::min(src->w, px + half + 1), y1 = std::min(src->h, py + half + 1);
+   std::vector<float> v((size_t)(x1 - x0) * (y1 - y0) * 4, 0.0f);
    GLint prev = 0;
    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, mOut.fbo);
-   glReadPixels(px, py, 1, 1, GL_RGBA, GL_FLOAT, v);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, src->fbo);
+   glReadPixels(x0, y0, x1 - x0, y1 - y0, GL_RGBA, GL_FLOAT, v.data());
    glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
-   for (int i = 0; i < 3; i++)
-      rgb[i] = std::clamp(v[i], 0.0f, 1.0f);
+   // Averaged by alpha, so a transparent neighbour does not grey the colour.
+   double sum[3] = { 0, 0, 0 }, wsum = 0;
+   for (size_t i = 0; i < v.size(); i += 4)
+   {
+      const double w = src == &mOut ? 1.0 : std::clamp(v[i + 3], 0.0f, 1.0f);
+      for (int k = 0; k < 3; k++)
+         sum[k] += std::clamp(v[i + k], 0.0f, 1.0f) * w;
+      wsum += w;
+   }
+   if (wsum <= 1e-6)
+      return false;   // an empty spot on the layer: keep the colour
+   for (int k = 0; k < 3; k++)
+      rgb[k] = (float)(sum[k] / wsum);
    return true;
 }
 
