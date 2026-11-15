@@ -26,6 +26,7 @@ class DriftNode : public INode, public IModulator, public IPredictor
 {
 public:
    static INode* Create() { return new DriftNode(); }
+   bool IsProfileDependent() const override { return true; }
    DriftNode();
 
    unsigned int GetOutputTexture() override { return 0; }
@@ -214,6 +215,7 @@ class MovesNode : public INode, public IModulator, public IPredictor
 {
 public:
    static INode* Create() { return new MovesNode(); }
+   bool IsProfileDependent() const override { return true; }
    MovesNode();
 
    unsigned int GetOutputTexture() override { return 0; }

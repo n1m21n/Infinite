@@ -24,6 +24,7 @@ class PredictiveQuantizeNode : public INode, public INoteSource
 {
 public:
    static INode* Create() { return new PredictiveQuantizeNode(); }
+   bool IsProfileDependent() const override { return true; }
    PredictiveQuantizeNode();
    ~PredictiveQuantizeNode() override;
 

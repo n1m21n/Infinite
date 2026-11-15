@@ -28,6 +28,7 @@ class PredictiveVelocityNode : public INode, public INoteSource
 {
 public:
    static INode* Create() { return new PredictiveVelocityNode(); }
+   bool IsProfileDependent() const override { return true; }
    PredictiveVelocityNode();
    ~PredictiveVelocityNode() override;
 

@@ -283,6 +283,8 @@ public:
    // Machine-dependent: the output needs something installed on this machine (a VST3/AU plugin,
    // the tracking pack), so the same patch renders differently elsewhere.
    virtual bool IsMachineDependent() const { return false; }
+   // Reads a learned profile or MovementStats on disk; headless runs without one.
+   virtual bool IsProfileDependent() const { return false; }
 
    // A param whose audible effect only shows up when another param sits at a
    // specific value (unison-spread params like "detune"/"stereoWidth" are a

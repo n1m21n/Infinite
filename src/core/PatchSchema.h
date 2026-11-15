@@ -92,6 +92,7 @@ namespace PatchSchema
       bool hardwareDriven = false;
       bool liveInput = false;        // INode::IsLiveInput
       bool machineDependent = false; // INode::IsMachineDependent
+      bool profileDependent = false; // INode::IsProfileDependent
       bool canBypass = false; // `flags bypassed=1` takes effect (CanBypass in main.cpp)
    };
 
