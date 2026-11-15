@@ -9,6 +9,15 @@
   "url": "https://infinitedevices.org/blog/image-to-sound-spectrogram-additive-synthesis.html"
  },
  {
+  "slug": "out-of-process-vst3-au-plugin-shared-memory-ipc",
+  "title": "Out-of-process VST3 and AU plugin architecture with shared memory",
+  "description": "How Infinite runs a modular synth and GPU visual engine as a VST3 and AU plugin using lock-free shared-memory IPC, PBO readback, and host isolation.",
+  "date": "2026-11-15",
+  "updated": "2026-11-15",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/out-of-process-vst3-au-plugin-shared-memory-ipc.html"
+ },
+ {
   "slug": "modal-synthesis-and-physical-modelling-of-metallic-percussion",
   "title": "Modal synthesis and metallic percussion in real time",
   "description": "How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.",
