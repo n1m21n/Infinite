@@ -35,6 +35,7 @@ namespace BrushEngine
    inline bool DirectMode(int m) { return m == kSmudge || WarpMode(m); }
 
    const std::vector<std::string>& TipNames();
+   const std::vector<std::string>& MaterialNames();
 
    struct Brush
    {
@@ -66,6 +67,28 @@ namespace BrushEngine
       unsigned sourceTex = 0;      // clone / heal: read from this texture (surface-sized) instead of the surface
       int relief = -1;             // relief preset: the material the layer takes (0 plasticine .. 3 ink stipple)
       int tines = 5;               // comb: tines across the brush's width
+      // Material: the stroke carries a height across its width, lit while painting and baked into the colour.
+      int material = -1;           // -1 flat colour; 0 plasticine, 1 metal, 2 chrome, 3 stipple, 4 satin, 5 pearl
+      int profile = 1;             // height across the stroke: 0 flat, 1 round, 2 ridge, 3 ribbon
+      float depth = 1.0f;          // how steep the height reads, 0..3
+      float lightAz = 135.0f;      // degrees, the light's turn
+      float lightEl = 45.0f;       // degrees above the page
+      // Canvas texture: a grain fixed to the surface, not to each dab.
+      int grain = 0;               // 0 off, 1 paper, 2 weave, 3 noise
+      float grainScale = 1.0f;
+      float grainDepth = 0.6f;
+      int grainMode = 0;           // 0 multiply, 1 subtract, 2 height
+      // Dual brush: a second tip masks the first.
+      int dualTip = -1;
+      float dualScale = 0.5f;      // of the main tip
+      float dualScatter = 0.5f;    // of the main tip's size
+      // Colour along the stroke: from `color` to `colorB`.
+      int colorAlong = 0;          // 0 off, 1 along (repeats every colorPeriod px), 2 across
+      float colorB[3] = { 1.0f, 1.0f, 1.0f };
+      float colorPeriod = 200.0f;
+      // Wet mix: each dab picks up a share of the paint under it and refills from `color` as it goes.
+      float wet = 0.0f;            // 0..1 pick-up
+      float refill = 0.15f;        // 0..1 back toward the brush colour per dab
       float color[3] = { 0.0f, 0.0f, 0.0f };
       float sourceOffset[2] = { 0.0f, 0.0f };   // clone / heal: where to copy from, surface pixels from the dab
    };
@@ -151,6 +174,9 @@ namespace BrushEngine
       void Queue(float x, float y, float p, float seed, float dir, float fx, float fy);
       const GLUtil::Fbo* mSurface = nullptr;      // smudge paints into it directly
       GLUtil::Fbo mCoverage, mDisplay, mMerge;
+      GLUtil::Fbo mWetCarry[2];                      // wet mix: the colour the brush carries (1x1, ping-pong)
+      int mCarryIdx = 0;
+      void UpdateCarry(const Pending& q, float r);
       bool mDisplayStale = true;
    };
 }

@@ -23,88 +23,183 @@ namespace BrushEngine
          "uniform float uRound;\n"
          "uniform int uPencil;\n"
          "uniform vec3 uCol;\n"
+         "uniform vec2 uDir;\n"
+         "uniform float uAlong;\n"
+         "uniform int uMat;\n"
+         "uniform int uProfile;\n"
+         "uniform float uDepth;\n"
+         "uniform vec3 uLight;\n"
+         "uniform int uGrain;\n"
+         "uniform float uGrainScale;\n"
+         "uniform float uGrainDepth;\n"
+         "uniform int uGrainMode;\n"
+         "uniform int uDual;\n"
+         "uniform float uDualScale;\n"
+         "uniform vec2 uDualOff;\n"
+         "uniform vec3 uColB;\n"
+         "uniform int uColAlong;\n"
+         "uniform float uColPeriod;\n"
+         "uniform sampler2D uCarry;\n"
+         "uniform int uWet;\n"
          "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }\n"
          "float h1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
          "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
          "   return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), f.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), f.x), f.y); }\n"
          "float rnd(float k) { return fract(sin(uSeed * 12.9898 + k * 78.233) * 43758.5453); }\n"
          "vec2 turn(vec2 p, float t) { float c = cos(t), s = sin(t); return vec2(c * p.x + s * p.y, -s * p.x + c * p.y); }\n"
-         "void main() {\n"
-         "   vec2 p = gl_FragCoord.xy - uCenter;\n"
-         "   float c = cos(uAngle), s = sin(uAngle);\n"
-         "   p = vec2(c * p.x + s * p.y, -s * p.x + c * p.y);\n"
-         "   p.y /= max(uRound, 0.05);\n"
-         "   float rad = max(uRadius, 0.5);\n"
+         "// One tip's mask at p (the tip's own frame, px from its centre), fc the surface pixel.\n"
+         "float Tip(int tip, vec2 p, vec2 fc, float rad, float hard) {\n"
          "   float r = length(p) / rad;\n"
          "   float aa = min(1.0, 1.0 / rad);\n"
-         "   float a = 0.0;\n"
-         "   if (uPencil == 1) {\n"
-         "      a = (uTip == 3) ? step(max(abs(p.x), abs(p.y)), rad) : step(length(p), rad);\n"
-         "   } else if (uTip == 0 || uTip == 1) {\n"
-         "      a = 1.0 - smoothstep(min(uHard, 1.0 - aa), 1.0, r);\n"
-         "   } else if (uTip == 2) {\n"
-         "      a = 1.0 - smoothstep(min(0.94, 1.0 - aa), 1.0, r);\n"
-         "   } else if (uTip == 3) {\n"
-         "      float m = max(abs(p.x), abs(p.y)) / rad;\n"
-         "      a = 1.0 - smoothstep(min(uHard, 1.0 - aa), 1.0, m);\n"
-         "   } else if (uTip == 4) {\n"
-         "      a = (1.0 - smoothstep(0.0, 1.0, r)) * step(0.55, hash(floor(gl_FragCoord.xy)));\n"
-         "   } else if (uTip == 5) {\n"
-         "      float n = hash(floor(gl_FragCoord.xy * 0.5)) * 0.55 + 0.45;\n"
-         "      a = (1.0 - smoothstep(uHard * 0.6, 1.0, r)) * n;\n"
-         "   } else if (uTip == 6) {\n"
-         "      float n = hash(floor(gl_FragCoord.xy * 0.125)) * 0.35;\n"
-         "      a = 1.0 - smoothstep(uHard - n, 1.0 + n, r);\n"
-         "   } else {\n"
-         "      vec2 fc = gl_FragCoord.xy;\n"
-         "      float disc = 1.0 - smoothstep(max(uHard, 0.55), 1.0, r);\n"
-         "      if (uTip == 7) {\n"            // bristle: hair lines along the stroke
-         "         float y = p.y / rad;\n"
-         "         float hair = h1(vec2(floor(y * 16.0), 3.0)) * 0.55 + vn(vec2(y * 7.0, 0.5)) * 0.45;\n"
-         "         a = (1.0 - smoothstep(0.7, 1.0, r)) * smoothstep(0.38, 0.62, hair);\n"
-         "      } else if (uTip == 8) {\n"     // paper grain: the tooth stays put on the page
-         "         float g = vn(fc * 0.35) * 0.6 + vn(fc * 0.9) * 0.4;\n"
-         "         a = (1.0 - smoothstep(uHard * 0.8, 1.0, r)) * smoothstep(0.3, 0.72, g);\n"
-         "      } else if (uTip == 9) {\n"     // halftone: dots on a fixed grid grow with coverage
-         "         float cov = 1.0 - smoothstep(uHard * 0.7, 1.0, r);\n"
-         "         float d = length(fract(fc / 9.0) - 0.5);\n"
-         "         float R = sqrt(cov) * 0.62;\n"
-         "         a = (1.0 - smoothstep(R - 0.07, R + 0.03, d)) * step(0.02, cov);\n"
-         "      } else if (uTip == 10) {\n"    // watercolour: ragged edge, pigment pooled at the rim
-         "         float n = vn(fc * 0.05 + uSeed) * 0.5 + vn(fc * 0.2) * 0.5;\n"
-         "         float rr = r * (0.82 + 0.36 * n);\n"
-         "         a = (1.0 - smoothstep(0.86, 1.0, rr)) * (0.3 + 0.7 * smoothstep(0.5, 0.95, rr)) * (0.75 + 0.25 * vn(fc * 0.6));\n"
-         "      } else if (uTip == 11) {\n"    // brushed metal: fine streaks along the stroke
-         "         float s = h1(vec2(floor(p.y * 1.3), 7.0)) * 0.6 + vn(vec2(p.y * 0.5, 1.0)) * 0.4;\n"
-         "         a = disc * (0.25 + 0.75 * s * s);\n"
-         "      } else if (uTip == 12) {\n"    // cloth: an over-under weave fixed on the page
-         "         vec2 w = fc / 6.0;\n"
-         "         float chk = mod(floor(w.x) + floor(w.y), 2.0);\n"
-         "         float thread = mix(0.5 + 0.5 * sin(w.y * 6.2832), 0.5 + 0.5 * sin(w.x * 6.2832), chk);\n"
-         "         a = (1.0 - smoothstep(uHard * 0.8, 1.0, r)) * (0.25 + 0.75 * thread) * (0.85 + 0.15 * vn(fc * 0.5));\n"
-         "      } else if (uTip == 13) {\n"    // leaf: a turned, sized leaf with a vein per dab
-         "         vec2 q = turn(p, rnd(1.0) * 6.2832) / (rad * (0.55 + 0.45 * rnd(2.0)));\n"
-         "         float wdt = 0.42 * (1.0 - q.x * q.x);\n"
-         "         a = (1.0 - smoothstep(wdt - 0.05, wdt, abs(q.y))) * step(abs(q.x), 1.0);\n"
-         "         a *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.04, abs(q.y))) * step(q.x, 0.85);\n"
-         "         a *= 0.75 + 0.25 * rnd(3.0);\n"
-         "      } else if (uTip == 14) {\n"    // grass: a blade rising from the dab, leaning and bending
-         "         vec2 q = turn(p, (rnd(1.0) - 0.5) * 0.9) / rad;\n"
-         "         float y = q.y / (0.6 + 0.4 * rnd(2.0));\n"
-         "         float bend = (rnd(3.0) - 0.5) * 0.7 * y * y;\n"
-         "         float wdt = 0.1 * (1.0 - y) + 0.005;\n"
-         "         a = step(0.0, y) * step(y, 1.0) * (1.0 - smoothstep(wdt * 0.6, wdt, abs(q.x - bend)));\n"
-         "      } else if (uTip == 15) {\n"    // sparkle: a four-point star with a soft core
-         "         vec2 q = turn(p, rnd(1.0) * 1.5708) / (rad * (0.35 + 0.65 * rnd(2.0)));\n"
-         "         float d = sqrt(abs(q.x)) + sqrt(abs(q.y));\n"
-         "         a = max(1.0 - smoothstep(0.8, 1.0, d), 0.6 * (1.0 - smoothstep(0.0, 0.3, length(q))));\n"
-         "      } else {\n"                    // sponge: open cells that change every dab
-         "         float c = vn(fc * 0.12 + uSeed * 3.1) * 0.65 + vn(fc * 0.33) * 0.35;\n"
-         "         a = (1.0 - smoothstep(0.7, 1.0, r)) * smoothstep(0.42, 0.56, c);\n"
+         "   if (uPencil == 1) return (tip == 3) ? step(max(abs(p.x), abs(p.y)), rad) : step(length(p), rad);\n"
+         "   if (tip == 0 || tip == 1) return 1.0 - smoothstep(min(hard, 1.0 - aa), 1.0, r);\n"
+         "   if (tip == 2) return 1.0 - smoothstep(min(0.94, 1.0 - aa), 1.0, r);\n"
+         "   if (tip == 3) { float m = max(abs(p.x), abs(p.y)) / rad; return 1.0 - smoothstep(min(hard, 1.0 - aa), 1.0, m); }\n"
+         "   if (tip == 4) return (1.0 - smoothstep(0.0, 1.0, r)) * step(0.55, hash(floor(fc)));\n"
+         "   if (tip == 5) { float n = hash(floor(fc * 0.5)) * 0.55 + 0.45; return (1.0 - smoothstep(hard * 0.6, 1.0, r)) * n; }\n"
+         "   if (tip == 6) { float n = hash(floor(fc * 0.125)) * 0.35; return 1.0 - smoothstep(hard - n, 1.0 + n, r); }\n"
+         "   float disc = 1.0 - smoothstep(max(hard, 0.55), 1.0, r);\n"
+         "   if (tip == 7) {   // bristle: hair lines along the stroke\n"
+         "      float y = p.y / rad;\n"
+         "      float hair = h1(vec2(floor(y * 16.0), 3.0)) * 0.55 + vn(vec2(y * 7.0, 0.5)) * 0.45;\n"
+         "      return (1.0 - smoothstep(0.7, 1.0, r)) * smoothstep(0.38, 0.62, hair);\n"
+         "   }\n"
+         "   if (tip == 8) {   // paper grain: the tooth stays put on the page\n"
+         "      float g = vn(fc * 0.35) * 0.6 + vn(fc * 0.9) * 0.4;\n"
+         "      return (1.0 - smoothstep(hard * 0.8, 1.0, r)) * smoothstep(0.3, 0.72, g);\n"
+         "   }\n"
+         "   if (tip == 9) {   // halftone: dots on a fixed grid grow with coverage\n"
+         "      float cov = 1.0 - smoothstep(hard * 0.7, 1.0, r);\n"
+         "      float d = length(fract(fc / 9.0) - 0.5);\n"
+         "      float R = sqrt(cov) * 0.62;\n"
+         "      return (1.0 - smoothstep(R - 0.07, R + 0.03, d)) * step(0.02, cov);\n"
+         "   }\n"
+         "   if (tip == 10) {  // watercolour: ragged edge, pigment pooled at the rim\n"
+         "      float n = vn(fc * 0.05 + uSeed) * 0.5 + vn(fc * 0.2) * 0.5;\n"
+         "      float rr = r * (0.82 + 0.36 * n);\n"
+         "      return (1.0 - smoothstep(0.86, 1.0, rr)) * (0.3 + 0.7 * smoothstep(0.5, 0.95, rr)) * (0.75 + 0.25 * vn(fc * 0.6));\n"
+         "   }\n"
+         "   if (tip == 11) {  // brushed metal: fine streaks along the stroke\n"
+         "      float s = h1(vec2(floor(p.y * 1.3), 7.0)) * 0.6 + vn(vec2(p.y * 0.5, 1.0)) * 0.4;\n"
+         "      return disc * (0.25 + 0.75 * s * s);\n"
+         "   }\n"
+         "   if (tip == 12) {  // cloth: an over-under weave fixed on the page\n"
+         "      vec2 w = fc / 6.0;\n"
+         "      float chk = mod(floor(w.x) + floor(w.y), 2.0);\n"
+         "      float thread = mix(0.5 + 0.5 * sin(w.y * 6.2832), 0.5 + 0.5 * sin(w.x * 6.2832), chk);\n"
+         "      return (1.0 - smoothstep(hard * 0.8, 1.0, r)) * (0.25 + 0.75 * thread) * (0.85 + 0.15 * vn(fc * 0.5));\n"
+         "   }\n"
+         "   if (tip == 13) {  // leaf: a turned, sized leaf with a vein per dab\n"
+         "      vec2 q = turn(p, rnd(1.0) * 6.2832) / (rad * (0.55 + 0.45 * rnd(2.0)));\n"
+         "      float wdt = 0.42 * (1.0 - q.x * q.x);\n"
+         "      float a = (1.0 - smoothstep(wdt - 0.05, wdt, abs(q.y))) * step(abs(q.x), 1.0);\n"
+         "      a *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.04, abs(q.y))) * step(q.x, 0.85);\n"
+         "      return a * (0.75 + 0.25 * rnd(3.0));\n"
+         "   }\n"
+         "   if (tip == 14) {  // grass: a blade rising from the dab, leaning and bending\n"
+         "      vec2 q = turn(p, (rnd(1.0) - 0.5) * 0.9) / rad;\n"
+         "      float y = q.y / (0.6 + 0.4 * rnd(2.0));\n"
+         "      float bend = (rnd(3.0) - 0.5) * 0.7 * y * y;\n"
+         "      float wdt = 0.1 * (1.0 - y) + 0.005;\n"
+         "      return step(0.0, y) * step(y, 1.0) * (1.0 - smoothstep(wdt * 0.6, wdt, abs(q.x - bend)));\n"
+         "   }\n"
+         "   if (tip == 15) {  // sparkle: a four-point star with a soft core\n"
+         "      vec2 q = turn(p, rnd(1.0) * 1.5708) / (rad * (0.35 + 0.65 * rnd(2.0)));\n"
+         "      float d = sqrt(abs(q.x)) + sqrt(abs(q.y));\n"
+         "      return max(1.0 - smoothstep(0.8, 1.0, d), 0.6 * (1.0 - smoothstep(0.0, 0.3, length(q))));\n"
+         "   }\n"
+         "   // sponge: open cells that change every dab\n"
+         "   float c = vn(fc * 0.12 + uSeed * 3.1) * 0.65 + vn(fc * 0.33) * 0.35;\n"
+         "   return (1.0 - smoothstep(0.7, 1.0, r)) * smoothstep(0.42, 0.56, c);\n"
+         "}\n"
+         "// The canvas texture: sampled at the surface pixel, so it stays put under every dab and every stroke.\n"
+         "float Grain(vec2 fc) {\n"
+         "   vec2 g = fc / max(uGrainScale, 0.05);\n"
+         "   if (uGrain == 1) return vn(g * 0.35) * 0.6 + vn(g * 0.9) * 0.4;\n"
+         "   if (uGrain == 2) {\n"
+         "      vec2 w = g / 6.0;\n"
+         "      float chk = mod(floor(w.x) + floor(w.y), 2.0);\n"
+         "      return mix(0.5 + 0.5 * sin(w.y * 6.2832), 0.5 + 0.5 * sin(w.x * 6.2832), chk);\n"
+         "   }\n"
+         "   return h1(floor(g)) * 0.5 + vn(g * 0.5) * 0.5;\n"
+         "}\n"
+         "vec3 hueTurn(vec3 c, float t) {\n"
+         "   const vec3 k = vec3(0.57735);\n"
+         "   float cs = cos(t), sn = sin(t);\n"
+         "   return c * cs + cross(k, c) * sn + k * dot(k, c) * (1.0 - cs);\n"
+         "}\n"
+         "void main() {\n"
+         "   vec2 fc = gl_FragCoord.xy;\n"
+         "   vec2 w = fc - uCenter;\n"
+         "   float c = cos(uAngle), s = sin(uAngle);\n"
+         "   vec2 p = vec2(c * w.x + s * w.y, -s * w.x + c * w.y);\n"
+         "   p.y /= max(uRound, 0.05);\n"
+         "   float rad = max(uRadius, 0.5);\n"
+         "   float a = Tip(uTip, p, fc, rad, uHard);\n"
+         "   if (uDual >= 0) {\n"
+         "      float r2 = max(rad * uDualScale, 0.5);\n"
+         "      a *= Tip(uDual, w - uDualOff, fc, r2, 0.5);\n"
+         "   }\n"
+
+         "   // The stroke frame: across runs -1..1 over the width, along is px down the stroke.\n"
+         "   vec2 perp = vec2(-uDir.y, uDir.x);\n"
+         "   float across = clamp(dot(w, perp) / rad, -1.0, 1.0);\n"
+         "   float along = uAlong + dot(w, uDir);\n"
+         "   vec3 base = uCol;\n"
+         "   if (uColAlong == 1) {\n"
+         "      float t = fract(along / max(uColPeriod, 1.0));\n"
+         "      base = mix(uCol, uColB, 1.0 - abs(2.0 * t - 1.0));\n"
+         "   } else if (uColAlong == 2) base = mix(uCol, uColB, across * 0.5 + 0.5);\n"
+         "   if (uWet == 1) base = texture(uCarry, vec2(0.5)).rgb;\n"
+         "   if (uMat >= 0) {\n"
+         "      // Height across the stroke and its slope (per unit of across).\n"
+         "      float x = across, sl = 0.0;\n"
+         "      if (uProfile == 1) { float h = sqrt(max(1.0 - x * x, 0.0)); sl = -x / max(h, 0.2); }\n"
+         "      else if (uProfile == 2) { sl = 3.14159 * cos(3.14159 * abs(x)) * sign(x); }\n"
+         "      else if (uProfile == 3) { sl = 1.6 * sin(along * 6.2832 / max(rad * 8.0, 4.0)); }\n"
+         "      // Fibre tips: each fibre has its own ridge and a small value offset, so light lands between them.\n"
+         "      if (uTip == 7 || uTip == 11 || uTip == 12) {\n"
+         "         float u = (x * 0.5 + 0.5) * 14.0;\n"
+         "         float fib = h1(vec2(floor(u), 5.0));\n"
+         "         sl += -(fract(u) - 0.5) * 2.4;\n"
+         "         base *= 0.82 + 0.36 * fib;\n"
          "      }\n"
+         "      vec2 grad = perp * sl * uDepth;\n"
+         "      if (uGrain > 0 && uGrainMode == 2) {\n"
+         "         float gx = Grain(fc + vec2(1.0, 0.0)) - Grain(fc - vec2(1.0, 0.0));\n"
+         "         float gy = Grain(fc + vec2(0.0, 1.0)) - Grain(fc - vec2(0.0, 1.0));\n"
+         "         grad += vec2(gx, gy) * 4.0 * uGrainDepth;\n"
+         "      }\n"
+         "      vec3 n = normalize(vec3(-grad, 1.0));\n"
+         "      vec3 L = normalize(uLight);\n"
+         "      vec3 Hv = normalize(L + vec3(0.0, 0.0, 1.0));\n"
+         "      float diff = max(dot(n, L), 0.0), nh = max(dot(n, Hv), 0.0);\n"
+         "      vec3 col;\n"
+         "      if (uMat == 0) col = base * (0.35 + 0.75 * diff) + vec3(0.22) * pow(nh, 18.0);\n"
+         "      else if (uMat == 1) col = base * (0.18 + 0.32 * diff) + mix(base, vec3(1.0), 0.35) * pow(nh, 42.0) * 1.3;\n"
+         "      else if (uMat == 2) {\n"
+         "         vec3 rf = reflect(vec3(0.0, 0.0, -1.0), n);\n"
+         "         float t = dot(normalize(rf.xy + 1e-4), normalize(L.xy + 1e-4)) * length(rf.xy);\n"
+         "         float sky = mix(0.06, 1.0, smoothstep(-0.25, 0.55, t)) - 0.35 * smoothstep(0.0, 0.08, abs(t - 0.2)) + 0.35;\n"
+         "         col = mix(vec3(sky), base * sky, 0.25) + vec3(1.0) * pow(nh, 160.0);\n"
+         "      } else if (uMat == 3) {\n"
+         "         float lit = clamp(0.25 + 0.85 * diff, 0.0, 1.0);\n"
+         "         vec2 f = fract(fc / 3.0) - 0.5;\n"
+         "         a *= step(lit, h1(floor(fc / 3.0))) * (1.0 - smoothstep(0.3, 0.5, length(f)));\n"
+         "         col = base;\n"
+         "      } else if (uMat == 4) {   // satin: a sheen stretched along the threads (the stroke's heading)\n"
+         "         vec3 T = vec3(uDir, 0.0);\n"
+         "         float th = dot(T, Hv);\n"
+         "         float aniso = pow(sqrt(max(1.0 - th * th, 0.0)), 24.0);\n"
+         "         col = base * (0.3 + 0.6 * diff) + mix(base, vec3(1.0), 0.5) * aniso * 0.7;\n"
+         "      } else {                  // pearl: the hue turns with the surface's lean\n"
+         "         float ph = dot(n.xy, normalize(L.xy + 1e-4)) * 2.2 + along * 0.004;\n"
+         "         col = hueTurn(base, ph) * (0.45 + 0.55 * diff) + vec3(0.9, 0.95, 1.0) * pow(nh, 60.0) * 0.8;\n"
+         "      }\n"
+         "      base = clamp(col, 0.0, 1.0);\n"
          "   }\n"
          "   a = clamp(a, 0.0, 1.0) * uFlow;\n"
-         "   fragColor = vec4(uCol * a, a);\n"
+         "   fragColor = vec4(base * a, a);\n"
          "}\n";
 
       // Smudge: the pixels under the dab take the colour from where the last dab sat (copied into uSrc first).
@@ -153,6 +248,21 @@ namespace BrushEngine
          "uniform int uRange;\n"
          "uniform sampler2D uSrcTex;\n"
          "uniform int uHasSrc;\n"
+         "uniform int uGrain;\n"
+         "uniform float uGrainScale;\n"
+         "uniform float uGrainDepth;\n"
+         "uniform int uGrainMode;\n"
+         "float h1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
+         "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
+         "   return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), f.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), f.x), f.y); }\n"
+         // The same canvas texture as the dab shader's: on the whole stroke, so overlapping dabs do not fill it in.
+         "float Grain(vec2 fc) {\n"
+         "   vec2 g = fc / max(uGrainScale, 0.05);\n"
+         "   if (uGrain == 1) return vn(g * 0.35) * 0.6 + vn(g * 0.9) * 0.4;\n"
+         "   if (uGrain == 2) { vec2 w = g / 6.0; float chk = mod(floor(w.x) + floor(w.y), 2.0);\n"
+         "      return mix(0.5 + 0.5 * sin(w.y * 6.2832), 0.5 + 0.5 * sin(w.x * 6.2832), chk); }\n"
+         "   return h1(floor(g)) * 0.5 + vn(g * 0.5) * 0.5;\n"
+         "}\n"
          "vec4 srcAt(vec2 uv) { return uHasSrc == 1 ? texture(uSrcTex, uv) : texture(uSurf, uv); }\n"
          "vec3 softSrc(vec2 uv) {\n"
          "   vec3 s = vec3(0.0); float w = 0.0;\n"
@@ -176,6 +286,10 @@ namespace BrushEngine
          "   float a = clamp(c.a * uOpacity, 0.0, 1.0);\n"
          "   vec3 col = c.a > 1e-5 ? clamp(c.rgb / c.a, 0.0, 1.0) : uColor;\n"
          "   if (uHasSel == 1) a *= texture(uSel, vUv).r;\n"
+         "   if (uGrain > 0 && uGrainMode < 2) {\n"
+         "      float g = Grain(gl_FragCoord.xy);\n"
+         "      a = uGrainMode == 0 ? a * mix(1.0, g, uGrainDepth) : max(0.0, a - uGrainDepth * (1.0 - g));\n"
+         "   }\n"
          "   if (a <= 0.0) { fragColor = d; return; }\n"
          "   if (uMode >= 6 && uMode <= 12) {\n"
          "      vec2 src = vUv + uOff * uTexel;\n"
@@ -282,11 +396,36 @@ namespace BrushEngine
          "   fragColor = uLock == 1 ? vec4(o.rgb, d.a) : o;\n"
          "}\n";
 
-      unsigned sDab = 0, sMerge = 0, sSmudge = 0, sWarp = 0;
+      // Wet mix: the colour the brush carries takes a share of the paint under the dab, then refills toward its own.
+      const char* kCarryFrag =
+         "#version 150\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uPrev;\n"
+         "uniform sampler2D uSurf;\n"
+         "uniform vec2 uUv;\n"
+         "uniform vec2 uSpan;\n"
+         "uniform float uPick;\n"
+         "uniform float uRefill;\n"
+         "uniform vec3 uCol;\n"
+         "void main() {\n"
+         "   vec3 c = texture(uPrev, vec2(0.5)).rgb;\n"
+         "   vec3 rgb = vec3(0.0); float al = 0.0;\n"
+         "   for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {\n"
+         "      vec4 t = texture(uSurf, uUv + vec2(float(i), float(j)) * uSpan);\n"
+         "      rgb += t.rgb * t.a; al += t.a;\n"
+         "   }\n"
+         "   vec3 under = al > 1e-4 ? rgb / al : c;\n"
+         "   vec3 o = mix(c, under, uPick * al / 9.0);\n"
+         "   fragColor = vec4(mix(o, uCol, uRefill), 1.0);\n"
+         "}\n";
+
+      unsigned sDab = 0, sMerge = 0, sSmudge = 0, sWarp = 0, sCarry = 0;
       bool sTried = false;
       struct DabLoc
       {
          int center, radius, hard, flow, tip, seed, angle, round, pencil, col;
+         int dir, along, mat, profile, depth, light, grain, grainScale, grainDepth, grainMode;
+         int dual, dualScale, dualOff, colB, colAlong, colPeriod, carry, wet;
       } sDabLoc;
       uint32_t sStrokeSeed = 0x9E3779B9u;
 
@@ -340,6 +479,12 @@ namespace BrushEngine
       static const std::vector<std::string> names = { "Round", "Soft Round", "Hard Round", "Square", "Spray", "Chalk", "Ink Bleed",
                                                                "Bristle", "Paper Grain", "Halftone", "Watercolour", "Brushed Metal", "Cloth",
                                                                "Leaf", "Grass", "Sparkle", "Sponge" };
+      return names;
+   }
+
+   const std::vector<std::string>& MaterialNames()
+   {
+      static const std::vector<std::string> names = { "Plasticine", "Metal", "Chrome", "Stipple", "Satin", "Pearl" };
       return names;
    }
 
@@ -474,6 +619,95 @@ namespace BrushEngine
          add("Liquify", "Bloat", b);
          b.mode = kPinch;
          add("Liquify", "Pinch", b);
+         // Material: the stroke carries height, light and texture. Each is only a Brush value.
+         auto mat = [&](const char* name, Brush m) { add("Material", name, m); };
+         b = Make(kRound, 36, 0.9f, 1, 1, 0.04f);
+         b.pressureSize = false;
+         b.material = 4;
+         b.profile = 3;
+         b.colorAlong = 1;
+         b.color[0] = 0.75f; b.color[1] = 0.12f; b.color[2] = 0.3f;
+         b.colorB[0] = 1.0f; b.colorB[1] = 0.62f; b.colorB[2] = 0.72f;
+         b.colorPeriod = 260.0f;
+         mat("Silk ribbon", b);
+         b = Make(kRound, 30, 0.8f, 1, 1, 0.05f);
+         b.material = 1;
+         b.profile = 1;
+         b.depth = 1.4f;
+         b.grain = 3;
+         b.grainScale = 2.0f;
+         b.grainDepth = 0.35f;
+         b.grainMode = 2;
+         b.color[0] = 0.86f; b.color[1] = 0.66f; b.color[2] = 0.24f;
+         mat("Gold leaf", b);
+         b = Make(kMetal, 60, 0.85f, 1, 1, 0.03f);
+         b.pressureSize = false;
+         b.follow = true;
+         b.material = 1;
+         b.profile = 1;
+         b.depth = 1.5f;
+         b.color[0] = 0.62f; b.color[1] = 0.64f; b.color[2] = 0.68f;
+         mat("Brushed steel", b);
+         b = Make(kCloth, 56, 0.7f, 1, 1, 0.06f);
+         b.pressureSize = false;
+         b.material = 0;
+         b.profile = 0;
+         b.depth = 0.8f;
+         b.grain = 2;
+         b.grainMode = 2;
+         b.grainDepth = 0.5f;
+         b.color[0] = 0.18f; b.color[1] = 0.27f; b.color[2] = 0.48f;
+         mat("Denim", b);
+         b = Make(kSoftRound, 60, 0.3f, 1, 0.8f, 0.06f);
+         b.pressureSize = false;
+         b.material = 4;
+         b.profile = 1;
+         b.depth = 0.7f;
+         b.grain = 3;
+         b.grainScale = 0.6f;
+         b.grainDepth = 0.25f;
+         b.color[0] = 0.42f; b.color[1] = 0.05f; b.color[2] = 0.16f;
+         mat("Velvet", b);
+         b = Make(kRound, 34, 0.6f, 1, 1, 0.06f);
+         b.wet = 0.6f;
+         b.refill = 0.12f;
+         b.color[0] = 1.0f; b.color[1] = 1.0f; b.color[2] = 1.0f;
+         mat("Wet gouache", b);
+         b = Make(kBristle, 46, 0.7f, 1, 1, 0.04f);
+         b.follow = true;
+         b.material = 0;
+         b.profile = 1;
+         b.depth = 1.8f;
+         b.wet = 0.35f;
+         b.refill = 0.2f;
+         b.color[0] = 0.85f; b.color[1] = 0.55f; b.color[2] = 0.2f;
+         mat("Oil impasto", b);
+         b = Make(kRound, 24, 0.85f, 1, 1, 0.05f);
+         b.material = 5;
+         b.profile = 1;
+         b.color[0] = 0.85f; b.color[1] = 0.85f; b.color[2] = 0.9f;
+         mat("Pearl ink", b);
+         b = Make(kHardRound, 10, 1, 1, 1, 0.05f);
+         b.pressureSize = false;
+         b.smoothing = 0.3f;
+         b.material = 1;
+         b.profile = 1;
+         b.depth = 2.0f;
+         b.color[0] = 0.78f; b.color[1] = 0.42f; b.color[2] = 0.24f;
+         mat("Copper wire", b);
+         b = Make(kSoftRound, 50, 0.4f, 1, 0.9f, 0.08f);
+         b.pressureSize = false;
+         b.material = 0;
+         b.profile = 0;
+         b.grain = 3;
+         b.grainScale = 1.2f;
+         b.grainDepth = 0.55f;
+         b.grainMode = 1;
+         b.dualTip = kSponge;
+         b.dualScale = 1.2f;
+         b.dualScatter = 0.3f;
+         b.color[0] = 0.3f; b.color[1] = 0.5f; b.color[2] = 0.35f;
+         mat("Felt", b);
          return p;
       }();
       return presets;
@@ -484,6 +718,8 @@ namespace BrushEngine
       GLUtil::DestroyFbo(mCoverage);
       GLUtil::DestroyFbo(mDisplay);
       GLUtil::DestroyFbo(mMerge);
+      GLUtil::DestroyFbo(mWetCarry[0]);
+      GLUtil::DestroyFbo(mWetCarry[1]);
    }
 
    bool Stroke::EnsurePrograms()
@@ -495,6 +731,7 @@ namespace BrushEngine
          sMerge = GLUtil::CompileProgram(kMergeFrag);
          sSmudge = GLUtil::CompileProgram(kSmudgeFrag);
          sWarp = GLUtil::CompileProgram(kWarpFrag);
+         sCarry = GLUtil::CompileProgram(kCarryFrag);
          if (sDab != 0)
          {
             sDabLoc.center = glGetUniformLocation(sDab, "uCenter");
@@ -507,9 +744,27 @@ namespace BrushEngine
             sDabLoc.round = glGetUniformLocation(sDab, "uRound");
             sDabLoc.pencil = glGetUniformLocation(sDab, "uPencil");
             sDabLoc.col = glGetUniformLocation(sDab, "uCol");
+            sDabLoc.dir = glGetUniformLocation(sDab, "uDir");
+            sDabLoc.along = glGetUniformLocation(sDab, "uAlong");
+            sDabLoc.mat = glGetUniformLocation(sDab, "uMat");
+            sDabLoc.profile = glGetUniformLocation(sDab, "uProfile");
+            sDabLoc.depth = glGetUniformLocation(sDab, "uDepth");
+            sDabLoc.light = glGetUniformLocation(sDab, "uLight");
+            sDabLoc.grain = glGetUniformLocation(sDab, "uGrain");
+            sDabLoc.grainScale = glGetUniformLocation(sDab, "uGrainScale");
+            sDabLoc.grainDepth = glGetUniformLocation(sDab, "uGrainDepth");
+            sDabLoc.grainMode = glGetUniformLocation(sDab, "uGrainMode");
+            sDabLoc.dual = glGetUniformLocation(sDab, "uDual");
+            sDabLoc.dualScale = glGetUniformLocation(sDab, "uDualScale");
+            sDabLoc.dualOff = glGetUniformLocation(sDab, "uDualOff");
+            sDabLoc.colB = glGetUniformLocation(sDab, "uColB");
+            sDabLoc.colAlong = glGetUniformLocation(sDab, "uColAlong");
+            sDabLoc.colPeriod = glGetUniformLocation(sDab, "uColPeriod");
+            sDabLoc.carry = glGetUniformLocation(sDab, "uCarry");
+            sDabLoc.wet = glGetUniformLocation(sDab, "uWet");
          }
       }
-      return sDab != 0 && sMerge != 0 && sSmudge != 0 && sWarp != 0;
+      return sDab != 0 && sMerge != 0 && sSmudge != 0 && sWarp != 0 && sCarry != 0;
    }
 
    void Stroke::Begin(const GLUtil::Fbo& surface, const Brush& b, float x, float y, float pressure, unsigned selection)
@@ -526,6 +781,17 @@ namespace BrushEngine
       GLUtil::ClearFbo(mCoverage);
       mBrush = b;
       mBrush.size = std::max(0.5f, b.size);
+      if (b.wet > 0.0f && !DirectMode(b.mode))
+      {
+         if (!GLUtil::EnsureFbo(mWetCarry[0], 1, 1, GL_RGBA16F, "BrushCarry") || !GLUtil::EnsureFbo(mWetCarry[1], 1, 1, GL_RGBA16F, "BrushCarry"))
+            mBrush.wet = 0.0f;
+         else
+         {
+            const float c[4] = { b.color[0], b.color[1], b.color[2], 1.0f };
+            GLUtil::ClearFbo(mWetCarry[0], c);
+            mCarryIdx = 0;
+         }
+      }
       mSelection = selection;
       mSurface = &surface;
       mEnding = false;
@@ -723,6 +989,14 @@ namespace BrushEngine
          return;
       const int clip[4] = { x0, y0, x1 - x0, y1 - y0 };
       const float angle = b.angle * 3.14159265f / 180.0f;
+      const bool wet = b.wet > 0.0f;
+      if (wet)
+         UpdateCarry(q, r);
+      // The dual tip sits off the main one by a scatter fixed by the dab's seed, so replays match.
+      const float u1 = std::fmod(std::fabs(std::sin(q.seed * 12.9898f) * 43758.5453f), 1.0f);
+      const float u2 = std::fmod(std::fabs(std::sin(q.seed * 78.233f) * 24634.6345f), 1.0f);
+      const float scatter = b.dualScatter * b.size;
+      const float az = b.lightAz * 3.14159265f / 180.0f, el = std::clamp(b.lightEl, 1.0f, 90.0f) * 3.14159265f / 180.0f;
       GLUtil::DrawPass(mCoverage, sDab, [&]()
       {
          glUniform2f(sDabLoc.center, cx, cy);
@@ -735,8 +1009,60 @@ namespace BrushEngine
          glUniform1f(sDabLoc.round, std::clamp(b.roundness, 0.05f, 1.0f));
          glUniform1i(sDabLoc.pencil, b.pencil ? 1 : 0);
          glUniform3f(sDabLoc.col, q.rgb[0], q.rgb[1], q.rgb[2]);
+         glUniform2f(sDabLoc.dir, std::cos(q.dir), std::sin(q.dir));
+         glUniform1f(sDabLoc.along, q.dist);
+         glUniform1i(sDabLoc.mat, b.material);
+         glUniform1i(sDabLoc.profile, b.profile);
+         glUniform1f(sDabLoc.depth, std::clamp(b.depth, 0.0f, 3.0f));
+         glUniform3f(sDabLoc.light, std::cos(el) * std::cos(az), std::cos(el) * std::sin(az), std::sin(el));
+         glUniform1i(sDabLoc.grain, b.grain);
+         glUniform1f(sDabLoc.grainScale, std::max(0.05f, b.grainScale));
+         glUniform1f(sDabLoc.grainDepth, std::clamp(b.grainDepth, 0.0f, 1.0f));
+         glUniform1i(sDabLoc.grainMode, b.grainMode);
+         glUniform1i(sDabLoc.dual, b.dualTip >= 0 && b.dualTip < kTipCount ? b.dualTip : -1);
+         glUniform1f(sDabLoc.dualScale, std::clamp(b.dualScale, 0.05f, 2.0f));
+         glUniform2f(sDabLoc.dualOff, (u1 - 0.5f) * scatter, (u2 - 0.5f) * scatter);
+         glUniform3f(sDabLoc.colB, b.colorB[0], b.colorB[1], b.colorB[2]);
+         glUniform1i(sDabLoc.colAlong, b.colorAlong);
+         glUniform1f(sDabLoc.colPeriod, std::max(1.0f, b.colorPeriod));
+         glUniform1i(sDabLoc.wet, wet ? 1 : 0);
+         glUniform1i(sDabLoc.carry, 0);
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, wet ? mWetCarry[mCarryIdx].tex : 0);
       }, clip);
       mDabCount++;
+   }
+
+   void Stroke::UpdateCarry(const Pending& q, float r)
+   {
+      if (mSurface == nullptr || sCarry == 0)
+         return;
+      GLboolean blendOn = glIsEnabled(GL_BLEND);
+      glDisable(GL_BLEND);
+      const int from = mCarryIdx, to = 1 - mCarryIdx;
+      const Brush& b = mBrush;
+      // Pick-up and refill are shares per brush width travelled, so the spacing does not change the look.
+      const float per = std::clamp(b.spacing, 0.01f, 2.0f);
+      const float pick = 1.0f - std::pow(1.0f - std::clamp(b.wet, 0.0f, 0.999f), per);
+      const float refill = 1.0f - std::pow(1.0f - std::clamp(b.refill, 0.0f, 0.999f), per);
+      GLUtil::DrawPass(mWetCarry[to], sCarry, [&]()
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, mWetCarry[from].tex);
+         glUniform1i(glGetUniformLocation(sCarry, "uPrev"), 0);
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, mSurface->tex);
+         glUniform1i(glGetUniformLocation(sCarry, "uSurf"), 1);
+         glUniform2f(glGetUniformLocation(sCarry, "uUv"), q.x / std::max(1, mW), q.y / std::max(1, mH));
+         glUniform2f(glGetUniformLocation(sCarry, "uSpan"), 0.5f * r / std::max(1, mW), 0.5f * r / std::max(1, mH));
+         glUniform1f(glGetUniformLocation(sCarry, "uPick"), pick);
+         glUniform1f(glGetUniformLocation(sCarry, "uRefill"), refill);
+         glUniform3f(glGetUniformLocation(sCarry, "uCol"), q.rgb[0], q.rgb[1], q.rgb[2]);
+         glActiveTexture(GL_TEXTURE0);
+      });
+      mCarryIdx = to;
+      if (blendOn)
+         glEnable(GL_BLEND);
    }
 
    void Stroke::SmudgeDab(const Pending& q, float r, float strength)
@@ -882,6 +1208,10 @@ namespace BrushEngine
          glUniform1i(glGetUniformLocation(sMerge, "uSrcTex"), 3);
          glUniform1i(glGetUniformLocation(sMerge, "uHasSrc"), mBrush.sourceTex != 0 ? 1 : 0);
          glUniform1f(glGetUniformLocation(sMerge, "uSpread"), std::max(1.0f, mBrush.size * 0.06f));
+         glUniform1i(glGetUniformLocation(sMerge, "uGrain"), mBrush.grain);
+         glUniform1f(glGetUniformLocation(sMerge, "uGrainScale"), std::max(0.05f, mBrush.grainScale));
+         glUniform1f(glGetUniformLocation(sMerge, "uGrainDepth"), std::clamp(mBrush.grainDepth, 0.0f, 1.0f));
+         glUniform1i(glGetUniformLocation(sMerge, "uGrainMode"), mBrush.grainMode);
          glActiveTexture(GL_TEXTURE0);
       });
       if (blendOn)
