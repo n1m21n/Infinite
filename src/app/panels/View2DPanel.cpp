@@ -194,6 +194,9 @@ namespace
       bool made = false;          // the shape tool has added its item
       int gizmoAxis = -1;         // 16: the 3D gizmo part held (0..2 axes, 3 centre)
       float g0[4] = { 0, 0, 0, 0 };   // 20/21: the group box at the start, x0 y0 x1 y1
+      size_t undo0 = (size_t)-1;      // the undo depth before this drag's step, so Esc can drop it
+      float cropWas[4] = { 0, 0, 0, 0 };   // 5: the crop box before the drag
+      float zoom0 = 1.0f;             // 19: the zoom as the drag began
    } sOp;
 
    // The 3D gizmo on a 3D layer: 0 move, 1 rotate, 2 scale (W / E / R, like the 3D View).
@@ -1025,6 +1028,7 @@ namespace
    // double-click or right-click takes an inner point away.
    int sCurveDrag = -1;
    int sCurveLayer = 0;
+   uint64_t sCurveDoc = 0;         // the drag belongs to one layer of one document
    void CurveEditor(Layer& l)
    {
       std::vector<float>& c = l.curve;
@@ -1066,6 +1070,7 @@ namespace
       {
          PushUndoCheckpoint("Curves");
          sCurveLayer = l.id;
+         sCurveDoc = sDocUid;
          sCurveDrag = near;
          if (near < 0 && n < 16)
          {
@@ -1077,7 +1082,7 @@ namespace
             changed = true;
          }
       }
-      if (ImGui::IsItemActive() && sCurveLayer == l.id && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / 2)
+      if (ImGui::IsItemActive() && sCurveLayer == l.id && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / 2)
       {
          const int i = sCurveDrag, last = (int)c.size() / 2 - 1;
          float x = mx;
@@ -1186,12 +1191,16 @@ namespace
    {
       FieldLabel(label);
       const bool changed = FormParts::ColorDot(FormParts::Id(label).c_str(), rgb, 15.0f, ImGui::GetFrameHeight());
+      // One undo step per second of dragging in one row; another row always starts its own step.
       static double sLast = -1.0;
-      if (changed && ImGui::GetTime() - sLast > 1.0)
+      static ImGuiID sLastRow = 0;
+      const ImGuiID row = ImGui::GetID(label);
+      if (changed && (row != sLastRow || ImGui::GetTime() - sLast > 1.0))
          PushUndoCheckpoint(kUndo);
       if (changed)
       {
          sLast = ImGui::GetTime();
+         sLastRow = row;
          Touch();
       }
       return changed;
@@ -1368,6 +1377,76 @@ namespace
 
    bool HandleVectorKeys(Scene2DNode* doc);
 
+   bool PaintRefused(Scene2DNode* doc);
+   int PaintTarget(Scene2DNode* doc, int& target, bool make);
+
+   // A selection edit is an undo step: the selection is saved in the document text.
+   void SelStep(const char* label)
+   {
+      PushUndoCheckpoint(label);
+      Touch();
+   }
+
+   bool sFillAsk = false;          // Shift+F5: open the Fill dialog
+   int sFillWith = 0;              // 0 foreground, 1 background, 2 black, 3 white, 4 50% grey
+   float sFillOpacity = 1.0f;
+
+   // Delete and the fill keys. how: 0 clear, 1 foreground, 2 background, 3.. the Fill dialog's choice.
+   // Inside the selection when there is one, else the whole layer.
+   bool ClearOrFill(Scene2DNode* doc, int how, float opacity = 1.0f)
+   {
+      if (doc->quickMask || PaintRefused(doc))
+         return false;
+      const Layer* a = Active(doc);
+      if (how == 0 && (a == nullptr || a->kind != Kind::Paint))
+         return false;
+      PushUndoCheckpoint(how == 0 ? "Clear" : "Fill");
+      int target = 0;
+      const int id = PaintTarget(doc, target, how != 0);
+      if (id <= 0 || target != 0)
+         return false;
+      static const float kBlack[3] = { 0, 0, 0 }, kWhite[3] = { 1, 1, 1 }, kGrey[3] = { 0.5f, 0.5f, 0.5f };
+      const float* c = how == 1 ? sFg : how == 2 ? sBg : how == 3 ? kBlack : how == 4 ? kWhite : kGrey;
+      const bool ok = how == 0 ? doc->ClearPixels(id) : doc->FillPixels(id, c, opacity);
+      Touch();
+      return ok;
+   }
+
+   // Esc during a drag puts everything back and drops the drag's undo step.
+   bool CancelOp(Scene2DNode* doc)
+   {
+      const int k = sOp.kind;
+      const bool layers = k == 1 || k == 2 || k == 3 || k == 16 || k == 18 || k == 20 || k == 21;
+      if (layers)
+      {
+         for (const Layer& b : sOp.before)
+            if (Layer* l = doc->FindLayer(b.id))
+               *l = b;
+         if (Layer* l = doc->FindLayer(sOp.l0.id))
+            if (std::none_of(sOp.before.begin(), sOp.before.end(), [&](const Layer& b) { return b.id == l->id; }))
+               *l = sOp.l0;
+         while (sOp.undo0 != (size_t)-1 && gUndoStack.size() > sOp.undo0)
+            gUndoStack.pop_back();
+         Touch();
+      }
+      else if (k == 5)
+         std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);
+      else if (k == 19)
+         sZoom = sOp.zoom0, sPan = sOp.pan0;
+      else if (k != 8 && k != 9 && k != 10 && k != 17)
+         return false;
+      sOp = Op();
+      sSnapX.clear();
+      sSnapY.clear();
+      return true;
+   }
+
+   // A crop box under 2 px on a side is no box (a click without a drag).
+   bool CropBoxOk()
+   {
+      return std::fabs(sCrop[2] - sCrop[0]) >= 2.0f && std::fabs(sCrop[3] - sCrop[1]) >= 2.0f;
+   }
+
    // Layer edits work from the layer list as well as the canvas: delete, copy, cut, paste, duplicate, group,
    // clip, restack and select all.
    void HandleLayerKeys(Scene2DNode* doc, bool cmd, bool shift, bool alt, bool onCanvas)
@@ -1378,9 +1457,21 @@ namespace
          ViewDockToggleFill(2);
          return;
       }
-      if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
-         sPending.what = Pending::Delete;
-      if (cmd && !shift && (key(ImGuiKey_J) || (key(ImGuiKey_D) && !(onCanvas && PixelTool(sTool))))) sPending.what = Pending::Duplicate;
+      if (shift && !cmd && key(ImGuiKey_F5))
+         sFillAsk = true;
+      // Alt+Backspace fills with the foreground, Cmd/Ctrl+Backspace with the background (inside the selection when
+      // there is one); Delete with a selection clears the pixels inside it and keeps the layer.
+      if ((alt || cmd) && (key(ImGuiKey_Backspace) || key(ImGuiKey_Delete)))
+         ClearOrFill(doc, alt ? 1 : 2);
+      else if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
+      {
+         const Layer* a = Active(doc);
+         if (doc->HasSelection() && a != nullptr && a->kind == Kind::Paint)
+            ClearOrFill(doc, 0);
+         else
+            sPending.what = Pending::Delete;
+      }
+      if (cmd && !shift && key(ImGuiKey_J)) sPending.what = Pending::Duplicate;
       if (cmd && !shift)
       {
          if (key(ImGuiKey_C)) sPending.what = Pending::Copy;
@@ -1399,7 +1490,10 @@ namespace
       if (cmd && key(ImGuiKey_LeftBracket)) Restack(doc, shift ? 2 : 0);
       if (cmd && key(ImGuiKey_RightBracket)) Restack(doc, shift ? 3 : 1);
       if (cmd && key(ImGuiKey_A) && onCanvas && PixelTool(sTool))
+      {
+         SelStep("Select all");
          doc->SelectAll();
+      }
       else if (cmd && key(ImGuiKey_A))
       {
          sSel.clear();
@@ -1449,6 +1543,8 @@ namespace
          if (key(ImGuiKey_U)) sTool = kShape;
          if (key(ImGuiKey_T)) sTool = kText;
       }
+      if (key(ImGuiKey_Escape) && sOp.kind != 0 && CancelOp(doc))
+         return;
       if (HandleVectorKeys(doc))
          return;
       HandlePixelKeys(doc, cmd, shift);
@@ -1460,13 +1556,20 @@ namespace
       if (cmd && (rep(ImGuiKey_Equal) || rep(ImGuiKey_KeypadAdd))) ZoomAt(doc, 1.25f, mid);
       if (cmd && (rep(ImGuiKey_Minus) || rep(ImGuiKey_KeypadSubtract))) ZoomAt(doc, 0.8f, mid);
       Scene2DNode::Document& d = doc->Doc();
-      if (cmd && !shift && key(ImGuiKey_Apostrophe)) { d.grid = !d.grid; Touch(); }
-      if (cmd && !shift && key(ImGuiKey_R)) { d.rulers = !d.rulers; Touch(); }
-      if (cmd && !shift && key(ImGuiKey_Semicolon)) { d.guidesOn = !d.guidesOn; Touch(); }
-      if (cmd && shift && key(ImGuiKey_Semicolon)) { d.snap = !d.snap; Touch(); }
+      // The view switches are saved with the document, so each is an undo step like the same switch in the Document tab.
+      auto flip = [&](bool& v, const char* label)
+      {
+         PushUndoCheckpoint(label);
+         v = !v;
+         Touch();
+      };
+      if (cmd && !shift && key(ImGuiKey_Apostrophe)) flip(d.grid, "Grid");
+      if (cmd && !shift && key(ImGuiKey_R)) flip(d.rulers, "Rulers");
+      if (cmd && !shift && key(ImGuiKey_Semicolon)) flip(d.guidesOn, "Guides");
+      if (cmd && shift && key(ImGuiKey_Semicolon)) flip(d.snap, "Snap");
       if (sTool == kCrop && sCropOn)
       {
-         if (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter))
+         if ((key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)) && CropBoxOk())
          {
             PushUndoCheckpoint("Crop document");
             doc->CropTo(sCrop[0], sCrop[1], sCrop[2], sCrop[3]);
@@ -1489,6 +1592,20 @@ namespace
       }
       HandleLayerKeys(doc, cmd, shift, alt, true);
       const float step = shift ? 10.0f : 1.0f;
+      if (!cmd && !alt && sTool == kMove)
+         if (Layer* a = Active(doc))
+         {
+            // Digits set the layer's opacity (1 = 10% ... 0 = 100%), as in Photoshop's Move tool.
+            static const ImGuiKey kDigits[10] = { ImGuiKey_1, ImGuiKey_2, ImGuiKey_3, ImGuiKey_4, ImGuiKey_5,
+                                                  ImGuiKey_6, ImGuiKey_7, ImGuiKey_8, ImGuiKey_9, ImGuiKey_0 };
+            for (int i = 0; i < 10; i++)
+               if (key(kDigits[i]) && (a->lock & Scene2DNode::kLockAll) == 0)
+               {
+                  PushUndoCheckpoint("Layer opacity");
+                  a->opacity = (i + 1) / 10.0f;
+                  Touch();
+               }
+         }
       if (!cmd && sTool == kMove)
       {
          if (rep(ImGuiKey_LeftArrow)) Nudge(doc, -step, 0);
@@ -1643,6 +1760,110 @@ namespace
       return !doc->Shown(*a) || (!sEditMask && (a->lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) != 0);
    }
 
+   int sTextEdit = 0;              // the text layer being typed into
+   int sRasterAsk = 0;             // the text or vector layer a pixel tool was tried on
+   double sRasterAskAt = 0.0;
+
+   void RasterizeLayer(Scene2DNode* doc, int id)
+   {
+      const Layer* l = doc->FindLayer(id);
+      if (l == nullptr || (l->kind != Kind::Text && l->kind != Kind::Vector))
+         return;
+      PushUndoCheckpoint("Rasterize layer");
+      if (sTextEdit == id)
+         sTextEdit = 0;
+      doc->RasterizeLayer(id);
+      Touch();
+   }
+
+   // After a pixel tool met a text or vector layer: one chip at the top of the canvas, gone after a few seconds.
+   void DrawRasterAsk(Scene2DNode* doc)
+   {
+      if (sRasterAsk == 0)
+         return;
+      const Layer* l = doc->FindLayer(sRasterAsk);
+      if (l == nullptr || (l->kind != Kind::Text && l->kind != Kind::Vector) || ImGui::GetTime() - sRasterAskAt > 6.0)
+      {
+         sRasterAsk = 0;
+         return;
+      }
+      const ImVec2 keep = ImGui::GetCursorScreenPos();
+      ImGui::SetCursorScreenPos(ImVec2(sViewMn.x + tok::space_3, sViewMn.y + tok::space_3));
+      if (TextChip(L("Rasterize?##v2drasterask"), true, T("Turn this layer into pixels so the tool can work on it")))
+      {
+         RasterizeLayer(doc, sRasterAsk);
+         sRasterAsk = 0;
+      }
+      ImGui::SetCursorScreenPos(keep);
+   }
+
+   // Shift+F5: what to fill with and how strongly; one click on a row fills (the selection, else the layer).
+   void DrawFillDialog(Scene2DNode* doc)
+   {
+      if (sFillAsk)
+      {
+         sFillAsk = false;
+         ImGui::SetNextWindowPos(ImGui::GetMousePos(), ImGuiCond_Appearing);
+         ImGui::OpenPopup("##v2dfilldlg");
+      }
+      if (!MenuParts::BeginPopup("##v2dfilldlg"))
+         return;
+      float pct = sFillOpacity * 100.0f;
+      ImGui::SetNextItemWidth(160.0f);
+      if (FieldWell::Slider("##v2dfillop", &pct, 1.0f, 100.0f, "%.0f%%"))
+         sFillOpacity = std::clamp(pct / 100.0f, 0.01f, 1.0f);
+      static const char* kWith[5] = { "Foreground", "Background", "Black", "White", "50% Grey" };
+      for (int i = 0; i < 5; i++)
+         if (MenuParts::Item(T(kWith[i])))
+         {
+            sFillWith = i;
+            ClearOrFill(doc, i + 1, sFillOpacity);
+         }
+      MenuParts::EndPopup();
+   }
+
+   // Selections kept with the document under a name.
+   void SelectionMenu(Scene2DNode* doc)
+   {
+      if (MenuParts::Item(T("Fill..."), "Shift+F5"))
+         sFillAsk = true;
+      if (!ImGui::BeginMenu(T("Selection")))
+         return;
+      if (MenuParts::Item(T("Save Selection"), nullptr, false, doc->HasSelection()))
+      {
+         const std::vector<std::string> have = doc->SavedSelections();
+         std::string name;
+         for (int n = 1; name.empty(); n++)
+         {
+            const std::string c = std::string(T("Selection")) + " " + std::to_string(n);
+            if (std::find(have.begin(), have.end(), c) == have.end())
+               name = c;
+         }
+         PushUndoCheckpoint("Save selection");
+         doc->SaveSelection(name);
+         Touch();
+      }
+      for (const std::string& name : doc->SavedSelections())
+         if (ImGui::BeginMenu(name.c_str()))
+         {
+            static const char* kHow[4] = { "Load", "Add", "Subtract", "Intersect" };
+            for (int op = 0; op < 4; op++)
+               if (MenuParts::Item(T(kHow[op])))
+               {
+                  SelStep("Load selection");
+                  doc->LoadSelection(name, op);
+               }
+            if (MenuParts::Item(T("Delete")))
+            {
+               PushUndoCheckpoint("Delete saved selection");
+               doc->DeleteSavedSelection(name);
+               Touch();
+            }
+            ImGui::EndMenu();
+         }
+      ImGui::EndMenu();
+   }
+
    void BeginStroke(Scene2DNode* doc, ImVec2 at, bool line)
    {
       const bool cloning = sTool == kClone || sTool == kHeal;
@@ -1670,6 +1891,21 @@ namespace
       }
       if (PaintRefused(doc))
          return;
+      // The eraser and the retouch tools need pixels. On a text, vector or other layer nothing is made and no
+      // undo step is left; the canvas offers to rasterize instead.
+      if (sTool != kBrush && !doc->quickMask)
+      {
+         const Layer* a = Active(doc);
+         if (a == nullptr || (a->kind != Kind::Paint && !(sEditMask && a->HasPixelMask())))
+         {
+            if (a != nullptr && (a->kind == Kind::Text || a->kind == Kind::Vector))
+            {
+               sRasterAsk = a->id;
+               sRasterAskAt = ImGui::GetTime();
+            }
+            return;
+         }
+      }
       PushUndoCheckpoint(sTool == kEraser ? "Erase" : RetouchTool(sTool) ? "Retouch" : "Paint");
       int target = 0;
       const int id = PaintTarget(doc, target, sTool == kBrush);
@@ -1759,7 +1995,13 @@ namespace
       PushUndoCheckpoint("Fill");
       int target = 0;
       const int id = PaintTarget(doc, target, true);
-      if (id > 0 && target == 0)
+      if (target == 2)
+      {
+         // Quick mask: the bucket fills the mask, the foreground's lightness as the amount (black masks, white selects).
+         doc->BucketSelection(at.x, at.y, 1.0f - (sFg[0] + sFg[1] + sFg[2]) / 3.0f < 0.5f ? 1.0f : 0.0f, sTolerance, sContiguous);
+         Touch();
+      }
+      else if (id > 0 && target == 0)
          doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sAllLayers);
    }
 
@@ -1773,14 +2015,22 @@ namespace
       const float* c0 = sGradReverse ? sBg : sFg;
       const float* c1 = sGradReverse ? sFg : sBg;
       const float ca[4] = { c0[0], c0[1], c0[2], 1.0f }, cb[4] = { c1[0], c1[1], c1[2], 1.0f };
-      if (id > 0 && target == 0)
+      if (target == 2)
+      {
+         doc->GradientSelection(a.x, a.y, b.x, b.y, (c0[0] + c0[1] + c0[2]) / 3.0f, (c1[0] + c1[1] + c1[2]) / 3.0f, sFillKind);
+         Touch();
+      }
+      else if (id > 0 && target == 0)
          doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind, sGradOpacity);
    }
 
    void ClosePoly(Scene2DNode* doc)
    {
       if (sPoly.size() >= 6)
+      {
+         SelStep("Lasso");
          doc->SelectPolygon(sPoly, sPolyOp, sFeather);
+      }
       sPoly.clear();
    }
 
@@ -1854,6 +2104,15 @@ namespace
          ring(r * b.hardness, 0.45f);
    }
 
+   // Quick mask is part of the document, so switching it is an undo step.
+   void ToggleQuickMask(Scene2DNode* doc)
+   {
+      PushUndoCheckpoint("Quick mask");
+      doc->quickMask = !doc->quickMask;
+      doc->Commit();
+      Touch();
+   }
+
    // Keys for the pixel tools. Returns true when it used the key.
    void HandlePixelKeys(Scene2DNode* doc, bool cmd, bool shift)
    {
@@ -1861,7 +2120,7 @@ namespace
       auto rep = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, true); };
       if (!cmd)
       {
-         if (key(ImGuiKey_Q)) doc->quickMask = !doc->quickMask;
+         if (key(ImGuiKey_Q)) ToggleQuickMask(doc);
          if (key(ImGuiKey_X)) SwapColours();
          if (key(ImGuiKey_D)) DefaultColours();
          if (BrushTool(sTool))
@@ -1878,8 +2137,16 @@ namespace
                   b.opacity = (i + 1) / 10.0f;
          }
       }
-      if (cmd && !shift && key(ImGuiKey_D)) doc->Deselect();
-      if (cmd && shift && key(ImGuiKey_I)) doc->InvertSelection();
+      if (cmd && !shift && key(ImGuiKey_D) && doc->HasSelection())
+      {
+         SelStep("Deselect");
+         doc->Deselect();
+      }
+      if (cmd && shift && key(ImGuiKey_I))
+      {
+         SelStep("Invert selection");
+         doc->InvertSelection();
+      }
       if (sTool == kLasso && !sPoly.empty())
       {
          if (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)) ClosePoly(doc);
@@ -1943,7 +2210,10 @@ namespace
       sOp.start = mouse;
       sOp.pan0 = sPan;
       if (undo != nullptr)
+      {
+         sOp.undo0 = gUndoStack.size();
          PushUndoCheckpoint(undo);
+      }
       for (int id : MovingIds(doc))
          if (const Layer* l = doc->FindLayer(id))
             sOp.before.push_back(*l);
@@ -2729,9 +2999,11 @@ namespace
    int sTextAlign = 0;
    bool sBold = false, sItalic = false, sUnder = false, sCaps = false;
    float sTextC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-   int sTextEdit = 0;              // the text layer being typed into
    bool sTextFocus = false;
-   char sTextBuf[4096] = {};
+   std::string sTextBuf;           // grows with the text
+   bool sTextStep = false;         // editing an existing text: the undo step waits for the first keystroke
+   bool sTextNew = false;          // the text layer was made by this edit
+   size_t sTextUndo0 = 0;          // the undo depth before "New text", dropped again when nothing is typed
    ImVec2 sEditMn(0, 0), sEditMx(0, 0);
 
    bool VectorTool(int t) { return t == kPen || t == kNode || t == kShape; }
@@ -2982,7 +3254,9 @@ namespace
       for (int i = (int)items.size() - 1; i >= 0; i--)
       {
          float lo[2], hi[2];
-         if (Scene2DNode::ShapeBounds(items[i], lo, hi) && b.x >= lo[0] - pad && b.x <= hi[0] + pad && b.y >= lo[1] - pad && b.y <= hi[1] + pad)
+         // The item itself, not its box: a ring's hole and the space beside a diagonal line reach what is below.
+         if (Scene2DNode::ShapeBounds(items[i], lo, hi) && b.x >= lo[0] - pad && b.x <= hi[0] + pad && b.y >= lo[1] - pad && b.y <= hi[1] + pad &&
+             (items[i].type == Shape::kSvg || Scene2DNode::ShapeHit(items[i], b.x, b.y, pad)))
          {
             anchor = -1;
             part = 4;
@@ -3160,7 +3434,12 @@ namespace
       {
          doc->RemoveLayer(l->id);
          PruneSelection(doc);
+         // A text box left empty was never made: its undo step goes with it.
+         if (sTextNew)
+            while (gUndoStack.size() > sTextUndo0)
+               gUndoStack.pop_back();
       }
+      sTextNew = sTextStep = false;
    }
 
    void BeginTextEdit(Scene2DNode* doc, int id)
@@ -3172,7 +3451,7 @@ namespace
          EndTextEdit(doc);
       sTextEdit = id;
       sTextFocus = true;
-      std::snprintf(sTextBuf, sizeof(sTextBuf), "%s", l->text.c_str());
+      sTextBuf = l->text;
       SelectOnly(id);
    }
 
@@ -3183,8 +3462,8 @@ namespace
       Layer* hit = doc->FindLayer(HitLayer(doc, sMouseDoc));
       if (hit != nullptr && hit->kind == Kind::Text)
       {
-         PushUndoCheckpoint("Edit text");
          BeginTextEdit(doc, hit->id);
+         sTextStep = true;   // the step is pushed by the first keystroke, so a look without a change leaves none
          return;
       }
       sOp = Op();
@@ -3196,6 +3475,7 @@ namespace
    // A click places point text; a drag sets a box the text wraps in.
    void TextRelease(Scene2DNode* doc, ImVec2 mouse)
    {
+      const size_t undo0 = gUndoStack.size();
       PushUndoCheckpoint("New text");
       const bool box = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) > 6.0f;
       const float x = box ? std::min(sOp.docStart.x, sMouseDoc.x) : sOp.docStart.x;
@@ -3219,6 +3499,81 @@ namespace
          doc->Commit();
       }
       BeginTextEdit(doc, id);
+      sTextNew = true;
+      sTextUndo0 = undo0;
+   }
+
+   // Where the caret and the selection sit, in the layer's box (document px). Lines are the typed ones; text is
+   // measured by drawing it in the layer's own style, so the caret follows the real glyphs.
+   struct TextMarks
+   {
+      std::string key;
+      float caret[3] = { 0, 0, 0 };            // x, y0, y1
+      std::vector<std::array<float, 4>> sel;   // x0 y0 x1 y1 per line
+   } sTextMarks;
+
+   float TextRunWidth(Scene2DNode* doc, const Layer& l, const std::string& run)
+   {
+      if (run.empty())
+         return 0.0f;
+      Layer t = l;
+      t.id = -77;   // a cache slot of its own
+      t.text = run;
+      t.boxW = 0.0f;
+      int w = 0, h = 0;
+      doc->TextSize(t, w, h);
+      return (float)w;
+   }
+
+   void UpdateTextMarks(Scene2DNode* doc, const Layer& l, float bw, float bh, int cursor, int selA, int selB)
+   {
+      char num[160];
+      std::snprintf(num, sizeof(num), "|%d|%d|%d|%.2f|%.2f|%.2f|%d|%d|%.1f|%.1f|", cursor, selA, selB, l.fontSize, l.tracking, l.boxW, l.align,
+                    (int)(l.bold | (l.italic << 1) | (l.caps << 3)), bw, bh);
+      const std::string key = l.text + num + l.font;
+      if (key == sTextMarks.key)
+         return;
+      sTextMarks = TextMarks();
+      sTextMarks.key = key;
+      const std::string& text = l.text;
+      cursor = std::clamp(cursor, 0, (int)text.size());
+      if (selA > selB)
+         std::swap(selA, selB);
+      std::vector<std::pair<int, int>> lines;   // [start, end) of each typed line
+      for (int a = 0, i = 0; i <= (int)text.size(); i++)
+         if (i == (int)text.size() || text[i] == '\n')
+         {
+            lines.push_back({ a, i });
+            a = i + 1;
+         }
+      const float bar = TextRunWidth(doc, l, "|");
+      // The pen's place after `n` bytes of a line: a closing bar keeps trailing spaces in the measure.
+      auto advance = [&](const std::pair<int, int>& ln, int n)
+      {
+         return n <= 0 ? 0.0f : std::max(0.0f, TextRunWidth(doc, l, text.substr(ln.first, n) + "|") - bar);
+      };
+      const float rowH = bh / (float)lines.size();
+      for (size_t i = 0; i < lines.size(); i++)
+      {
+         const std::pair<int, int>& ln = lines[i];
+         const float lineW = TextRunWidth(doc, l, text.substr(ln.first, ln.second - ln.first));
+         const float left = l.align == 1 ? (bw - lineW) * 0.5f : l.align == 2 ? bw - lineW : 0.0f;
+         const float y0 = rowH * (float)i, y1 = rowH * (float)(i + 1);
+         if (cursor >= ln.first && cursor <= ln.second)
+         {
+            sTextMarks.caret[0] = left + advance(ln, cursor - ln.first);
+            sTextMarks.caret[1] = y0;
+            sTextMarks.caret[2] = y1;
+         }
+         if (selB > selA && selB > ln.first && selA <= ln.second)
+         {
+            const int a = std::max(selA, ln.first), b = std::min(selB, ln.second);
+            const float xa = left + advance(ln, a - ln.first);
+            // A selected line break shows as a sliver past the line's end.
+            const float xb = left + advance(ln, b - ln.first) + (selB > ln.second ? std::max(2.0f, l.fontSize * 0.25f) : 0.0f);
+            sTextMarks.sel.push_back({ xa, y0, xb, y1 });
+         }
+      }
    }
 
    // Typing happens in a field under the text; the picture above updates as you type.
@@ -3256,31 +3611,36 @@ namespace
       ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, clear);
       ImGui::PushStyleColor(ImGuiCol_InputTextCursor, clear);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-      const bool changed = ImGui::InputTextMultiline("##v2dtextedit", sTextBuf, sizeof(sTextBuf), ImVec2(w, h),
-                                                     ImGuiInputTextFlags_NoHorizontalScroll);
+      const ImGuiID editId = ImGui::GetID("##v2dtextedit");
+      const bool changed = ImGui::InputTextMultiline("##v2dtextedit", &sTextBuf, ImVec2(w, h), ImGuiInputTextFlags_NoHorizontalScroll);
       const bool editing = ImGui::IsItemActive();
       ImGui::PopStyleVar();
       ImGui::PopStyleColor(5);
-      if (editing && std::fmod(ImGui::GetTime(), 1.0) < 0.6)
+      if (changed)
       {
-         // Caret at the end of the last line, on the layer's right edge.
-         int lines = 1;
-         for (const char* q = sTextBuf; *q; q++)
-            lines += *q == '\n';
-         const float f = (float)(lines - 1) / (float)lines;
-         const ImVec2 top(c[1].x + (c[2].x - c[1].x) * f + 2.0f, c[1].y + (c[2].y - c[1].y) * f);
-         dl->AddLine(top, ImVec2(c[2].x + 2.0f, c[2].y), Hex(kOutline), 1.5f);
+         if (sTextStep)
+            PushUndoCheckpoint("Edit text");   // before the layer takes the new text
+         sTextStep = false;
+         l->text = sTextBuf;
+         Touch();
+         doc->LayerBox(*l, bw, bh);
+      }
+      if (const ImGuiInputTextState* st = ImGui::GetInputTextState(editId); editing && st != nullptr)
+      {
+         // The caret where the cursor is, and the selection behind the glyphs.
+         UpdateTextMarks(doc, *l, bw, bh, st->GetCursorPos(), st->GetSelectionStart(), st->GetSelectionEnd());
+         for (const std::array<float, 4>& r : sTextMarks.sel)
+            dl->AddQuadFilled(BoxScreen(doc, *l, r[0], r[1]), BoxScreen(doc, *l, r[2], r[1]), BoxScreen(doc, *l, r[2], r[3]),
+                              BoxScreen(doc, *l, r[0], r[3]), Hex(kOutline, 0.35f));
+         if (std::fmod(ImGui::GetTime(), 1.0) < 0.6)
+            dl->AddLine(BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[1]),
+                        BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[2]), Hex(kOutline), 1.5f);
       }
       sEditMn = ImGui::GetItemRectMin();
       sEditMx = ImGui::GetItemRectMax();
       const bool done = ImGui::IsItemDeactivated();
       ImGui::PopID();
       ImGui::SetCursorScreenPos(keep);
-      if (changed)
-      {
-         l->text = sTextBuf;
-         Touch();
-      }
       if (done)
          EndTextEdit(doc);
    }
@@ -3334,7 +3694,8 @@ namespace
          if (MenuParts::Item(T("Send Backward"), Sc("Ctrl+["), false, any)) Restack(doc, 0);
          if (MenuParts::Item(T("Send to Back"), Sc("Shift+Ctrl+["), false, any)) Restack(doc, 2);
          MenuParts::Separator();
-         if (MenuParts::Item(T("Select All"), Sc("Ctrl+A")))
+         SelectionMenu(doc);
+         if (MenuParts::Item(T("Select All Layers"), Sc("Ctrl+A")))
          {
             sSel.clear();
             for (const Layer& l : doc->Layers())
@@ -3393,10 +3754,10 @@ namespace
          {
             int n = 0;
             for (float x = 0; x <= d.w + 0.01f; x += sub, n++)
-               dl->AddLine(ToScreen(doc, x, 0), ToScreen(doc, x, (float)d.h), Hex(kGrid, n % d.gridSubdiv == 0 ? 0.55f : 0.2f));
+               dl->AddLine(ToScreen(doc, x, 0), ToScreen(doc, x, (float)d.h), Hex(kGrid, n % std::max(1, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
             n = 0;
             for (float y = 0; y <= d.h + 0.01f; y += sub, n++)
-               dl->AddLine(ToScreen(doc, 0, y), ToScreen(doc, (float)d.w, y), Hex(kGrid, n % d.gridSubdiv == 0 ? 0.55f : 0.2f));
+               dl->AddLine(ToScreen(doc, 0, y), ToScreen(doc, (float)d.w, y), Hex(kGrid, n % std::max(1, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
          }
       }
       if (d.guidesOn)
@@ -3677,7 +4038,14 @@ namespace
             Touch();
          }
          else if (sTool == kZoom)
-            ZoomAt(doc, io.KeyAlt ? 0.5f : 2.0f, mouse);
+         {
+            // A click zooms a step; a drag zooms smoothly about where it began (right in, left out).
+            sOp = Op();
+            sOp.kind = 19;
+            sOp.start = mouse;
+            sOp.zoom0 = sZoom;
+            sOp.pan0 = sPan;
+         }
          else if ((sTool == kClone || sTool == kHeal) && io.KeyAlt)
          {
             sCloneSrc = sMouseDoc;
@@ -3736,6 +4104,7 @@ namespace
          else if (sTool == kWand)
          {
             Layer* al = Active(doc);
+            SelStep("Magic wand");
             doc->SelectWand(sMouseDoc.x, sMouseDoc.y, sTolerance, sContiguous, SelOpFor(io), sAllLayers, al != nullptr ? al->id : 0);
          }
          else if (sTool == kCrop)
@@ -3744,6 +4113,7 @@ namespace
             sOp = Op();
             sOp.start = mouse;
             std::copy(sCrop, sCrop + 4, sOp.crop0);
+            std::copy(sCrop, sCrop + 4, sOp.cropWas);
             if (h >= 0)
             {
                sOp.kind = 5;
@@ -3876,6 +4246,15 @@ namespace
             sPan = ImVec2(sOp.pan0.x + mouse.x - sOp.start.x, sOp.pan0.y + mouse.y - sOp.start.y);
          else if (sOp.kind == 5)
             DragCrop(doc, mouse);
+         else if (sOp.kind == 19)
+         {
+            if (std::fabs(mouse.x - sOp.start.x) >= 3.0f)
+            {
+               sZoom = sOp.zoom0;
+               sPan = sOp.pan0;
+               ZoomAt(doc, std::exp((mouse.x - sOp.start.x) * 0.01f), sOp.start);
+            }
+         }
          else if (sOp.kind == 7)
          {
             if (sSurfaceStroke)
@@ -3924,6 +4303,10 @@ namespace
          {
             if (sOp.kind == 7)
                EndStroke(doc);
+            else if (sOp.kind == 19 && std::fabs(mouse.x - sOp.start.x) < 3.0f)
+               ZoomAt(doc, io.KeyAlt ? 0.5f : 2.0f, mouse);
+            else if (sOp.kind == 5 && !CropBoxOk())
+               std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);   // a click without a drag keeps the box there was
             else if (sOp.kind == 13)
             {
                Layer* pl = Active(doc);
@@ -3943,21 +4326,31 @@ namespace
                // A click without a drag drops the selection, as in every image editor.
                if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < 3.0f)
                {
-                  if (sOp.selOp == Scene2DNode::kSelNew)
+                  if (sOp.selOp == Scene2DNode::kSelNew && doc->HasSelection())
+                  {
+                     SelStep("Deselect");
                      doc->Deselect();
+                  }
                }
                else
                {
                   const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc);
+                  SelStep("Marquee");
                   doc->SelectRect(sOp.docStart.x, sOp.docStart.y, e.x, e.y, sOp.selOp, sFeather, sMarqueeShape == 1);
                }
             }
             else if (sOp.kind == 10)
             {
                if (sOp.path.size() >= 6)
+               {
+                  SelStep("Lasso");
                   doc->SelectPolygon(sOp.path, sOp.selOp, sFeather);
-               else if (sOp.selOp == Scene2DNode::kSelNew)
+               }
+               else if (sOp.selOp == Scene2DNode::kSelNew && doc->HasSelection())
+               {
+                  SelStep("Deselect");
                   doc->Deselect();
+               }
             }
             // A guide let go over its ruler goes away.
             if (sOp.kind == 6 && ((sOp.guideAxis == 1 && mouse.y < sViewMn.y) || (sOp.guideAxis == 0 && mouse.x < sViewMn.x)))
@@ -3975,6 +4368,8 @@ namespace
       dl->PopClipRect();
       if (sTextEdit != 0)
          DrawTextEditor(doc);
+      DrawRasterAsk(doc);
+      DrawFillDialog(doc);
    }
 
    // Between two groups of a bar: space_2, a 1 px hairline as tall as the chips' inner area, space_2 (Photopea's divider).
@@ -5268,7 +5663,7 @@ namespace
       else
          ImGui::SameLine(0.0f, tok::space_1);
       if (IconChip("##v2dqm", IconsInfinite::QuickMask, doc->quickMask, T(doc->quickMask ? "Quick mask on (Q)" : "Quick mask (Q)")))
-         doc->quickMask = !doc->quickMask;
+         ToggleQuickMask(doc);
       ImGui::PopStyleVar();
       ImGui::EndChild();
    }
@@ -5426,7 +5821,7 @@ namespace
          if (TextChip(L("Thirds##v2dthirds"), sCropThirds, T("Rule of thirds guides")))
             sCropThirds = !sCropThirds;
          gap();
-         if (TextChip(L("Apply##v2dcropok"), false, T("Crop the document (Enter)")))
+         if (TextChip(L("Apply##v2dcropok"), false, T("Crop the document (Enter)")) && CropBoxOk())
          {
             PushUndoCheckpoint("Crop document");
             doc->CropTo(sCrop[0], sCrop[1], sCrop[2], sCrop[3]);
@@ -5818,6 +6213,8 @@ namespace
                   sPickMode = sPickMode == 2 ? 0 : 2;
             }
             if (l->kind == Kind::Paint && MenuParts::Item(T("Convert to Draw Node"), nullptr)) sPending.what = Pending::ToDraw;
+            if ((l->kind == Kind::Text || l->kind == Kind::Vector) && MenuParts::Item(T("Rasterize Layer"), nullptr))
+               RasterizeLayer(doc, l->id);
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Shapes"), nullptr)) sPending.what = Pending::ToShapes;
@@ -7179,6 +7576,23 @@ namespace
       DropFiles(doc, files, ToDoc(doc, gDropPos));
    }
 
+   uint64_t sSeenDoc = 0;
+
+   // Another document came to the front: whatever was half-made in the last one ends there.
+   void OnDocSwitch(Scene2DNode* doc)
+   {
+      (void)doc;
+      sTextEdit = 0;
+      sCropOn = false;
+      sPenItem = -1;
+      sItem = -1;
+      sItemLayer = 0;
+      sAnchor = -1;
+      sPoly.clear();
+      sCurveDrag = -1;
+      sOp = Op();
+   }
+
    void DrawPanel()
    {
       InitBrushes();
@@ -7194,6 +7608,11 @@ namespace
       }
       if (GraphNode* self = DocGraphNode())
          sDocUid = self->uid;
+      if (sSeenDoc != sDocUid)
+      {
+         OnDocSwitch(doc);
+         sSeenDoc = sDocUid;
+      }
       doc->Layers();
       PruneSelection(doc);
       if (doc->FindLayer(doc->soloLayer) == nullptr)
@@ -8658,6 +9077,63 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       }
       else
          expect("L: setup", false);
+   }
+   // Block 4 bug hunt: Esc cancels a drag, a click is no crop box, Delete clears, a document switch drops edit state.
+   {
+      const int id = doc->AddPaintLayer();
+      stroke(id, W * 0.4f, H * 0.4f, W * 0.6f, H * 0.4f);
+      doc->Commit();
+      sSel = { id };
+      const Layer was = *doc->FindLayer(id);
+      const size_t depth = gUndoStack.size();
+      sOp = Op();
+      sOp.kind = 1;
+      sOp.before = { was };
+      sOp.l0 = was;
+      sOp.undo0 = depth;
+      PushUndoCheckpoint("Move");
+      doc->FindLayer(id)->x += 40.0f;
+      const bool cancelled = CancelOp(doc);
+      expect("Esc puts a dragged layer back", cancelled && doc->FindLayer(id)->x == was.x && sOp.kind == 0);
+      expect("Esc drops the drag's undo step", gUndoStack.size() == depth);
+
+      const float crop[4] = { 10, 10, 100, 80 };
+      std::copy(crop, crop + 4, sCrop);
+      sOp.kind = 5;
+      std::copy(crop, crop + 4, sOp.cropWas);
+      sCrop[2] = 11.0f;
+      expect("a crop box under 2 px is no box", !CropBoxOk());
+      CancelOp(doc);
+      expect("Esc restores the crop box", sCrop[2] == 100.0f && CropBoxOk());
+
+      const float z = sZoom;
+      const ImVec2 pan = sPan;
+      sOp.kind = 19;
+      sOp.zoom0 = z;
+      sOp.pan0 = pan;
+      sZoom = z * 3.0f;
+      CancelOp(doc);
+      expect("Esc restores the zoom", sZoom == z && sPan.x == pan.x);
+
+      const std::vector<uint8_t> full = picture(doc);
+      doc->SelectRect(W * 0.3f, H * 0.3f, W * 0.5f, H * 0.5f, 0, 0.0f, false);
+      const bool cleared = ClearOrFill(doc, 0);
+      const std::vector<uint8_t> cut = picture(doc);
+      expect("Delete clears inside the selection", cleared && cut != full);
+      doc->Deselect();
+      const bool filled = ClearOrFill(doc, 4);
+      expect("Fill covers the layer", filled && picture(doc) != cut);
+      doc->quickMask = true;
+      expect("no clear while Quick Mask is on", !ClearOrFill(doc, 0));
+      doc->quickMask = false;
+
+      sCropOn = true;
+      sTextEdit = id;
+      sOp.kind = 3;
+      OnDocSwitch(doc);
+      expect("a document switch drops crop, text edit and drag", !sCropOn && sTextEdit == 0 && sOp.kind == 0);
+      doc->RemoveLayer(id);
+      doc->Commit();
    }
    return fails;
 }

@@ -507,10 +507,26 @@ Scene2DNode::~Scene2DNode()
             glDeleteTextures(1, &t);
    GLUtil::DestroyFbo(mFxBlur[0]);
    GLUtil::DestroyFbo(mFxBlur[1]);
+   GLUtil::DestroyFbo(mFxBlur2[0]);
+   GLUtil::DestroyFbo(mFxBlur2[1]);
    GLUtil::DestroyFbo(mFxOut);
    for (unsigned p : { mBlurProgram, mFxProgram })
       if (p != 0)
          glDeleteProgram(p);
+}
+
+int Scene2DNode::LiveTextures() const
+{
+   int n = 0;
+   for (const auto& kv : mLayerOut) n += kv.second.tex != 0;
+   for (const auto& kv : mRelief) n += kv.second.tex != 0;
+   for (const auto& kv : mSurfaces) n += kv.second.fbo.tex != 0;
+   for (const auto& kv : mMasks) n += kv.second.fbo.tex != 0;
+   for (const auto* m : { &mVec, &mVMasks })
+      for (const auto& kv : *m) n += kv.second.tex != 0;
+   for (const auto& kv : mDepth)
+      for (unsigned t : kv.second.tex) n += t != 0;
+   return n;
 }
 
 // ---- model --------------------------------------------------------------
@@ -1086,6 +1102,21 @@ void Scene2DNode::Serialize()
       o << "sym " << d.symmetry << " " << d.symN << "\n";
    for (const ModSlot& m : d.slots)
       o << "mslot " << m.layer << " " << m.field << " " << m.slot << "\n";
+   if (quickMask)
+      o << "qmask 1\n";
+   auto selLine = [&](const char* key, const SelStore& st)
+   {
+      o << key;
+      if (!st.name.empty())
+         o << " " << EscapeToken(st.name);
+      o << " " << st.w << " " << st.h;
+      for (const std::string& k : st.keys) o << " " << k;
+      o << "\n";
+   };
+   if (mSelStore.w == d.w && mSelStore.h == d.h && !mSelStore.keys.empty())
+      selLine("sel", mSelStore);
+   for (const SelStore& st : mSelSaved)
+      selLine("selsave", st);
    for (const Layer& l : mLayers)
    {
       o << "layer " << l.id << " " << (int)l.kind << " " << l.parent << " " << l.uid << " " << +l.visible << " "
@@ -1216,8 +1247,13 @@ void Scene2DNode::Parse()
    mDoc = Document();
    panelOnly = false;
    mNextId = 1;
+   mSelStore = SelStore();
+   mSelSaved.clear();
+   quickMask = false;
+   std::map<int, int> alias;   // a repeated layer id: the later layer's new id, for the lines that follow it
    std::istringstream in(mText);
    std::string line;
+   auto unit = [](float v) { return v >= 0.0f ? std::min(v, 1.0f) : 0.0f; };   // NaN -> 0
    auto find = [&](int id) -> Layer*
    {
       for (Layer& l : mLayers)
@@ -1249,6 +1285,28 @@ void Scene2DNode::Parse()
          d.headroom = head != 0;
          d.w = std::clamp(d.w, 1, GLUtil::kMaxTargetSide);
          d.h = std::clamp(d.h, 1, GLUtil::kMaxTargetSide);
+         d.gridSubdiv = std::clamp(d.gridSubdiv, 1, 16);
+         d.gridSize = d.gridSize >= 1.0f ? std::min(d.gridSize, 100000.0f) : 1.0f;
+         d.background = std::clamp(d.background, 0, 3);
+      }
+      else if (key == "qmask")
+         quickMask = true;
+      else if (key == "sel" || key == "selsave")
+      {
+         SelStore st;
+         std::string name, k;
+         if (key == "selsave" && s >> name)
+            st.name = UnescapeToken(name);
+         s >> st.w >> st.h;
+         while (s >> k)
+            st.keys.push_back(k == "+" || TileStore::IsKey(k.data(), k.size()) ? k : "-");
+         if (st.w <= 0 || st.h <= 0 || st.w > GLUtil::kMaxTargetSide || st.h > GLUtil::kMaxTargetSide)
+            continue;
+         st.keys.resize((size_t)((st.w + TileStore::kTile - 1) / TileStore::kTile) * (size_t)((st.h + TileStore::kTile - 1) / TileStore::kTile), "-");
+         if (key == "sel")
+            mSelStore = st;
+         else if (!st.name.empty())
+            mSelSaved.push_back(st);
       }
       else if (key == "guidesx" || key == "guidesy")
       {
@@ -1279,6 +1337,18 @@ void Scene2DNode::Parse()
          l.visible = vis != 0;
          l.clip = clip != 0;
          l.open = open != 0;
+         l.blend = std::clamp(l.blend, kPassThrough, 34);
+         l.opacity = unit(l.opacity);
+         l.fill = unit(l.fill);
+         if (l.id <= 0 || find(l.id) != nullptr)
+         {
+            int nid = mNextId;
+            for (const Layer& o : mLayers) nid = std::max(nid, o.id + 1);
+            alias[l.id] = nid;
+            l.id = nid;
+         }
+         else
+            alias.erase(l.id);
          mNextId = std::max(mNextId, l.id + 1);
          mLayers.push_back(l);
       }
@@ -1286,6 +1356,8 @@ void Scene2DNode::Parse()
       {
          int id = 0;
          s >> id;
+         if (auto a = alias.find(id); a != alias.end())
+            id = a->second;
          Layer* l = find(id);
          if (l == nullptr)
             continue;
@@ -1379,7 +1451,11 @@ void Scene2DNode::Parse()
          }
          else if (key == "levels")
          {
-            for (float& v : l->levels) s >> v;
+            for (float& v : l->levels)
+            {
+               s >> v;
+               v = unit(v);
+            }
          }
          else if (key == "curve")
          {
@@ -1389,7 +1465,19 @@ void Scene2DNode::Parse()
             std::vector<float> pts(n * 2);
             for (float& v : pts) s >> v;
             if (s && n >= 2)
-               l->curve = pts;
+            {
+               // One limit with the editor (16 points), each in 0..1, in x order.
+               std::vector<std::pair<float, float>> xy;
+               for (int i = 0; i < std::min(n, 16); i++)
+                  xy.push_back({ unit(pts[i * 2]), unit(pts[i * 2 + 1]) });
+               std::stable_sort(xy.begin(), xy.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+               l->curve.clear();
+               for (const auto& q : xy)
+               {
+                  l->curve.push_back(q.first);
+                  l->curve.push_back(q.second);
+               }
+            }
          }
          else if (key == "fillc")
          {
@@ -1490,6 +1578,7 @@ void Scene2DNode::Parse()
          }
       }
    }
+   RestoreSelection();
    // A parent that is not a group (hand-written text) puts the layer back at the top level.
    for (Layer& l : mLayers)
    {
@@ -2382,6 +2471,18 @@ void Scene2DNode::CookIfNeeded(int frameId)
    {
       const Layer* l = FindConst(it->first);
       it = l == nullptr || dynamic_cast<IGeometrySource*>(Source(*l)) == nullptr ? mGeo.erase(it) : std::next(it);
+   }
+   // A relief target lives only while its layer is a relief.
+   for (auto it = mRelief.begin(); it != mRelief.end();)
+   {
+      const Layer* l = FindConst(it->first);
+      if (l == nullptr || !l->relief)
+      {
+         GLUtil::DestroyFbo(it->second);
+         it = mRelief.erase(it);
+      }
+      else
+         ++it;
    }
    if (stamp == mStamp && mOut.tex != 0 && mOut.w == mDoc.w && mOut.h == mDoc.h)
       return;

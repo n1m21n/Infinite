@@ -1859,6 +1859,273 @@ void RunView2DTest()
       doc->Doc().background = 0;
       doc->Commit();
    }
+   // ---- Block 4: the bug-hunt rows, each with the check that would have caught it ----
+   {
+      using Shape = Scene2DNode::Shape;
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 320;
+      pic.Doc().h = 240;
+      pic.Doc().background = 0;
+      pic.Commit();
+      const int p = pic.AddPaintLayer();
+      const float red[3] = { 1.0f, 0.0f, 0.0f };
+      Cook(&pic);
+      Check("B4: Fill covers the layer", pic.FillPixels(p, red, 1.0f));
+      Cook(&pic);
+      const std::vector<float> full = Pixel(&pic, 40, 40);
+      Check("B4: the fill is in the picture", full[0] > 0.9f && full[1] < 0.1f);
+
+      // #4 the selection is part of the document text, so undo and redo carry it.
+      const std::string t0 = pic.DocText();
+      pic.SelectRect(20, 20, 120, 100, Scene2DNode::kSelNew, 0.0f, false);
+      pic.Commit();
+      const std::string t1 = pic.DocText();
+      Check("B4 #4: a selection changes the document text", t1 != t0 && t1.find("\nsel ") != std::string::npos);
+      pic.SetDocText(t0);
+      pic.Layers();
+      Check("B4 #4: undo drops the selection", !pic.HasSelection());
+      pic.SetDocText(t1);
+      pic.Layers();
+      float lo[2] = { 0, 0 }, hi[2] = { 0, 0 };
+      Check("B4 #4: redo brings it back in place", pic.HasSelection() && pic.SelectionBounds(lo, hi) && std::fabs(lo[0] - 20.0f) <= 1.0f &&
+                                                   std::fabs(hi[0] - 120.0f) <= 1.0f && std::fabs(lo[1] - 20.0f) <= 1.0f && std::fabs(hi[1] - 100.0f) <= 1.0f);
+      pic.ModifySelection(0, 4);
+      pic.Commit();
+      Check("B4 #4: Expand changes the text too (its undo step is not empty)", pic.DocText() != t1);
+      pic.SetDocText(t1);
+      pic.Layers();
+
+      // #2 Delete with a selection clears the pixels inside it and keeps the layer.
+      Check("B4 #2: clear runs", pic.ClearPixels(p));
+      Cook(&pic);
+      const std::vector<float> in = Pixel(&pic, 60, 60), out = Pixel(&pic, 200, 200);
+      printf("  B4 clear: inside %.2f %.2f %.2f, outside %.2f %.2f %.2f\n", in[0], in[1], in[2], out[0], out[1], out[2]);
+      Check("B4 #2: the selected pixels are gone, the rest and the layer stay", pic.FindLayer(p) != nullptr && in[1] > 0.9f && out[0] > 0.9f && out[1] < 0.1f);
+
+      // Saved selections.
+      pic.SaveSelection("Sky");
+      pic.Deselect();
+      Check("B4: a saved selection loads back", !pic.HasSelection() && pic.LoadSelection("Sky", Scene2DNode::kSelNew) && pic.HasSelection() &&
+                                                pic.SelectionAt(60, 60) > 0.9f && pic.SelectionAt(200, 200) < 0.1f);
+      pic.Commit();
+      {
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         copy.Layers();
+         Check("B4: saved selections save with the document", copy.SavedSelections().size() == 1 && copy.SavedSelections()[0] == "Sky" && copy.HasSelection());
+         copy.Commit();
+         Check("B4: save, load, save gives the same text", copy.DocText() == pic.DocText());
+      }
+      pic.DeleteSavedSelection("Sky");
+      Check("B4: a saved selection can be deleted", pic.SavedSelections().empty());
+
+      // #8 quick mask: the bucket and the gradient reach the mask.
+      pic.Deselect();
+      pic.quickMask = true;
+      Check("B4 #8: the bucket fills the quick mask", pic.BucketSelection(10, 10, 1.0f, 32, true) && pic.HasSelection() && pic.SelectionAt(160, 120) > 0.9f);
+      Check("B4 #8: the gradient writes the quick mask", pic.GradientSelection(0, 0, 320, 0, 0.0f, 1.0f, 1) && pic.SelectionAt(10, 120) < 0.2f &&
+                                                         pic.SelectionAt(310, 120) > 0.8f);
+      pic.Commit();
+      {
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         copy.Layers();
+         Check("B4 #14: quick mask is in the text, so its switch can be undone", copy.quickMask);
+      }
+      pic.quickMask = false;
+      pic.Deselect();
+      pic.Commit();
+
+      // #1 #12 #24 a hand-edited or damaged file loads clamped.
+      {
+         std::string bad = pic.DocText();
+         Scene2DNode::Document& d = pic.Doc();
+         d.gridSubdiv = 0;
+         const auto AddAdj = [](Scene2DNode& n, int type) { Layer& a = n.AddLayer(Kind::Adjust, 0); a.adjType = type; return a.id; };
+         const int lv = AddAdj(pic, Scene2DNode::kAdjLevels), cv = AddAdj(pic, Scene2DNode::kAdjCurves);
+         Layer* L = pic.FindLayer(lv);
+         L->opacity = 7.0f;
+         L->blend = 999;
+         L->levels[0] = -3.0f;
+         L->levels[1] = 9.0f;
+         Layer* C = pic.FindLayer(cv);
+         C->curve.clear();
+         for (int i = 0; i < 32; i++)
+         {
+            C->curve.push_back(1.0f - (float)i / 31.0f);   // unsorted and too many
+            C->curve.push_back(2.0f);
+         }
+         pic.Commit();
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         copy.Layers();
+         const Layer* c = copy.FindLayer(cv);
+         const Layer* cl = copy.FindLayer(lv);
+         bool sorted = c != nullptr;
+         for (size_t i = 2; c != nullptr && i < c->curve.size(); i += 2)
+            sorted = sorted && c->curve[i] >= c->curve[i - 2];
+         Check("B4 #1: grid subdivisions of 0 load as 1", copy.Doc().gridSubdiv == 1);
+         Check("B4 #12: opacity, blend and levels load inside their ranges", cl != nullptr && cl->opacity <= 1.0f && cl->blend <= 34 && cl->levels[0] >= 0.0f &&
+                                                                       cl->levels[1] <= 1.0f);
+         Check("B4 #24: a curve loads with at most 16 points, sorted, inside 0..1", c != nullptr && c->curve.size() <= 32 && sorted &&
+                                                                               std::all_of(c->curve.begin(), c->curve.end(), [](float v) { return v >= 0.0f && v <= 1.0f; }));
+         pic.SetDocText(bad);
+         pic.Layers();
+      }
+      // #12 two layers with one id load as two layers with different ids.
+      {
+         const int q = pic.AddPaintLayer();
+         pic.Commit();
+         std::string twin = pic.DocText();
+         const std::string from = "\nlayer " + std::to_string(q) + " ", to = "\nlayer " + std::to_string(p) + " ";
+         const size_t at = twin.find(from);
+         if (at != std::string::npos)
+            twin.replace(at, from.size(), to);
+         Scene2DNode copy;
+         copy.SetDocText(twin);
+         std::vector<int> ids;
+         for (const Layer& l : copy.Layers())
+            ids.push_back(l.id);
+         std::sort(ids.begin(), ids.end());
+         Check("B4 #12: duplicate layer ids are renumbered on load", at != std::string::npos && ids.size() == pic.Layers().size() &&
+                                                                  std::adjacent_find(ids.begin(), ids.end()) == ids.end());
+         pic.RemoveLayer(q);
+         pic.Commit();
+      }
+
+      // #19 items are hit on their path, not their box.
+      {
+         Shape ring;
+         ring.type = Shape::kEllipse;
+         ring.x0 = 0; ring.y0 = 0; ring.x1 = 100; ring.y1 = 100;
+         ring.fillOn = false;
+         ring.strokeOn = true;
+         ring.width = 6.0f;
+         Shape line;
+         line.type = Shape::kLine;
+         line.x0 = 0; line.y0 = 0; line.x1 = 100; line.y1 = 100;
+         Shape disc = ring;
+         disc.fillOn = true;
+         Check("B4 #19: a ring is hit on its stroke, not in its hole or its box corner",
+               Scene2DNode::ShapeHit(ring, 50, 1, 2) && !Scene2DNode::ShapeHit(ring, 50, 50, 2) && !Scene2DNode::ShapeHit(ring, 3, 3, 2));
+         Check("B4 #19: a line is hit along itself only", Scene2DNode::ShapeHit(line, 50, 50, 2) && !Scene2DNode::ShapeHit(line, 90, 10, 2));
+         Check("B4 #19: a filled shape is hit inside", Scene2DNode::ShapeHit(disc, 50, 50, 2) && !Scene2DNode::ShapeHit(disc, 3, 3, 2));
+      }
+
+      // #13 Rasterize: the same picture, now pixels.
+      {
+         const int v = pic.AddVectorLayer();
+         Shape box;
+         box.type = Shape::kRect;
+         box.x0 = 200; box.y0 = 20; box.x1 = 300; box.y1 = 90;
+         box.fillC[0] = 0.0f; box.fillC[1] = 0.0f; box.fillC[2] = 1.0f;
+         pic.FindLayer(v)->shapes.push_back(box);
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> a0 = Pixel(&pic, 250, 50), b0 = Pixel(&pic, 250, 150);
+         Check("B4 #13: rasterize runs", pic.RasterizeLayer(v));
+         Cook(&pic);
+         const std::vector<float> a1 = Pixel(&pic, 250, 50), b1 = Pixel(&pic, 250, 150);
+         printf("  B4 rasterize: in box %.2f %.2f %.2f -> %.2f %.2f %.2f\n", a0[0], a0[1], a0[2], a1[0], a1[1], a1[2]);
+         auto same = [](const std::vector<float>& x, const std::vector<float>& y) {
+            return std::fabs(x[0] - y[0]) < 0.02f && std::fabs(x[1] - y[1]) < 0.02f && std::fabs(x[2] - y[2]) < 0.02f;
+         };
+         Check("B4 #13: a rasterized layer is a paint layer showing the same picture in the same place",
+               pic.FindLayer(v)->kind == Kind::Paint && a0[2] > 0.9f && a0[0] < 0.1f && same(a0, a1) && same(b0, b1));
+         pic.RemoveLayer(v);
+         pic.Commit();
+      }
+
+      // #5 #6 GL leak check: 50 layers added, drawn and removed leave no textures behind.
+      {
+         Cook(&pic);
+         const int live0 = pic.LiveTextures();
+         std::vector<int> made;
+         for (int i = 0; i < 50; i++)
+         {
+            const int id = pic.AddPaintLayer();
+            made.push_back(id);
+            if (i % 5 == 0)
+            {
+               pic.FindLayer(id)->relief = true;
+               pic.AddPixelMask(id);
+            }
+            pic.FillPixels(id, red, 0.5f);
+         }
+         pic.Commit();
+         Cook(&pic);
+         const int liveMid = pic.LiveTextures();
+         for (int id : made)
+            pic.RemoveLayer(id);
+         pic.Commit();
+         Cook(&pic);
+         Cook(&pic);
+         printf("  B4 textures: %d before, %d with 50 layers, %d after\n", live0, liveMid, pic.LiveTextures());
+         Check("B4 #6: removing 50 layers frees every texture they made", liveMid > live0 && pic.LiveTextures() <= live0);
+      }
+
+      // Standing sweep: every layer number, written and saved, loads back to the same text (save, load, save).
+      {
+         unsigned seed = 12345u;
+         auto rnd = [&]() { seed = seed * 1664525u + 1013904223u; return (float)((seed >> 8) & 0xFFFF) / 65535.0f; };
+         bool fixed = true;
+         std::string firstBad;
+         for (int round = 0; round < 12 && fixed; round++)
+         {
+            Scene2DNode a;
+            a.Layers();
+            a.Doc().w = 64 + (int)(rnd() * 400);
+            a.Doc().h = 64 + (int)(rnd() * 400);
+            a.Doc().gridSubdiv = 1 + (int)(rnd() * 15);
+            a.Commit();
+            const int n = 1 + (int)(rnd() * 5);
+            for (int i = 0; i < n; i++)
+            {
+               const float pickKind = rnd();
+               const int id = pickKind < 0.3f ? a.AddPaintLayer() : pickKind < 0.6f ? a.AddVectorLayer()
+                              : [&]() { Layer& n = a.AddLayer(Kind::Adjust, 0); n.adjType = pickKind < 0.8f ? Scene2DNode::kAdjLevels : Scene2DNode::kAdjCurves; return n.id; }();
+               Layer& l = *a.FindLayer(id);
+               for (int k = 0; k < Scene2DNode::kLfCount; k++)
+                  if (float* f = Scene2DNode::LayerFieldPtr(l, k); f != nullptr && Scene2DNode::LayerFieldApplies(l, k))
+                     *f = std::round(rnd() * 100.0f) / 100.0f;
+               l.blend = (int)(rnd() * 20);
+               l.opacity = std::round(rnd() * 100.0f) / 100.0f;
+               for (float& v : l.levels)
+                  v = std::round(rnd() * 100.0f) / 100.0f;
+               l.curve = { 0.0f, std::round(rnd() * 100.0f) / 100.0f, 0.5f, std::round(rnd() * 100.0f) / 100.0f, 1.0f, 1.0f };
+               l.relief = l.kind == Kind::Paint && rnd() < 0.5f;
+               for (Scene2DNode::Fx& fx : l.fx)
+               {
+                  fx.on = rnd() < 0.4f;
+                  fx.size = std::round(rnd() * 40.0f);
+                  fx.dist = std::round(rnd() * 40.0f);
+               }
+            }
+            a.Commit();
+            const std::string ta = a.DocText();
+            Scene2DNode b;
+            b.SetDocText(ta);
+            b.Layers();
+            b.Commit();
+            if (b.DocText() != ta)
+            {
+               fixed = false;
+               // The first line that differs, for the log.
+               std::istringstream sa(ta), sb(b.DocText());
+               for (std::string la, lb; std::getline(sa, la) && std::getline(sb, lb);)
+                  if (la != lb)
+                  {
+                     firstBad = la + "  ->  " + lb;
+                     break;
+                  }
+            }
+         }
+         if (!fixed)
+            printf("  B4 fuzz: first differing line: %s\n", firstBad.c_str());
+         Check("B4 sweep: a random document saves, loads and saves to the same text", fixed);
+      }
+   }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");

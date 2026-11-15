@@ -69,6 +69,7 @@ namespace
       "      c = mix(uColA, uColB, clamp((abs(dot(q, ab)) + abs(dot(q, e))) / max(dot(ab, ab), 1e-6), 0.0, 1.0));\n"
       "   }\n"
       "   float a = clamp(c.a * cov * sel * uOpacity, 0.0, 1.0);\n"
+      "   if (uOp == 3) { fragColor = vec4(d.rgb, d.a * (1.0 - clamp(cov * sel * uOpacity, 0.0, 1.0))); return; }\n"   // clear
       "   if (uLock == 1) { fragColor = vec4(mix(d.rgb, c.rgb, a), d.a); return; }\n"
       "   float oa = a + d.a * (1.0 - a);\n"
       "   fragColor = vec4((c.rgb * a + d.rgb * d.a * (1.0 - a)) / max(oa, 1e-4), oa);\n"
@@ -403,7 +404,7 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
       glActiveTexture(GL_TEXTURE0);
       glUniform1i(glGetUniformLocation(prog, "uHasCov"), coverage != 0 ? 1 : 0);
       glUniform1i(glGetUniformLocation(prog, "uHasSel"), sel != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uOp"), kind == -2 ? 2 : kind < 0 ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uOp"), kind == -3 ? 3 : kind == -2 ? 2 : kind < 0 ? 1 : 0);
       glUniform2f(glGetUniformLocation(prog, "uSurfSize"), (float)sw, (float)sh);
       glUniform2f(glGetUniformLocation(prog, "uBox"), bw, bh);
       glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
@@ -567,6 +568,8 @@ void Scene2DNode::EndPaint()
       }
       mPaintId = 0;
       mPaintEdits++;
+      mSelDirty = true;
+      StoreSelection();
       return;
    }
    Layer* l = FindLayer(mPaintId);
@@ -646,6 +649,259 @@ bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const
    StoreTiles(it->second, l->tiles, all);
    Commit();
    return true;
+}
+
+bool Scene2DNode::ClearPixels(int id)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll | kLockAlpha)) != 0 || !EnsurePaintShaders())
+      return false;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return false;
+   UploadSelection();
+   ApplyFill(it->second, l->pw, l->ph, *l, 0, nullptr, nullptr, -3, nullptr, nullptr, 1.0f);
+   const int all[4] = { 0, 0, l->pw, l->ph };
+   StoreTiles(it->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::FillPixels(int id, const float rgb[3], float opacity)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || !EnsurePaintShaders())
+      return false;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return false;
+   UploadSelection();
+   const float col[4] = { rgb[0], rgb[1], rgb[2], 1.0f };
+   ApplyFill(it->second, l->pw, l->ph, *l, 0, col, col, 0, nullptr, nullptr, opacity);
+   const int all[4] = { 0, 0, l->pw, l->ph };
+   StoreTiles(it->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::BucketSelection(float x, float y, float value, int tolerance, bool contiguous)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   if (mSel.size() != (size_t)W * H)
+      mSel.assign((size_t)W * H, 0);
+   std::vector<uint8_t> px((size_t)W * H * 4);
+   for (size_t i = 0; i < mSel.size(); i++)
+   {
+      px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = mSel[i];
+      px[i * 4 + 3] = 255;
+   }
+   std::vector<uint8_t> region;
+   MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
+   if (std::none_of(region.begin(), region.end(), [](uint8_t v) { return v != 0; }))
+      return false;
+   const int v = (int)std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f);
+   for (size_t i = 0; i < mSel.size(); i++)
+      mSel[i] = (uint8_t)((mSel[i] * (255 - region[i]) + v * region[i]) / 255);
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t s) { return s != 0; });
+   mSelDirty = true;
+   StoreSelection();
+   return true;
+}
+
+bool Scene2DNode::GradientSelection(float ax, float ay, float bx, float by, float va, float vb, int kind)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   const float dx = bx - ax, dy = by - ay, len2 = std::max(dx * dx + dy * dy, 1e-6f), len = std::sqrt(len2);
+   mSel.assign((size_t)W * H, 0);
+   for (int y = 0; y < H; y++)
+   {
+      uint8_t* row = &mSel[(size_t)(H - 1 - y) * W];
+      for (int x = 0; x < W; x++)
+      {
+         const float qx = x + 0.5f - ax, qy = y + 0.5f - ay;
+         float t = 0.0f;
+         if (kind == 2)
+            t = std::sqrt(qx * qx + qy * qy) / std::max(len, 1e-3f);
+         else if (kind == 3)
+         {
+            t = (std::atan2(qy, qx) - std::atan2(dy, dx)) / 6.2831853f + 1.0f;
+            t -= std::floor(t);
+         }
+         else if (kind == 4)
+            t = std::fabs(qx * dx + qy * dy) / len2;
+         else if (kind == 5)
+            t = (std::fabs(qx * dx + qy * dy) + std::fabs(qy * dx - qx * dy)) / len2;
+         else
+            t = (qx * dx + qy * dy) / len2;
+         t = std::clamp(t, 0.0f, 1.0f);
+         row[x] = (uint8_t)std::lround(std::clamp(va + (vb - va) * t, 0.0f, 1.0f) * 255.0f);
+      }
+   }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t s) { return s != 0; });
+   mSelDirty = true;
+   StoreSelection();
+   return true;
+}
+
+// ---- the selection in the doc text ---------------------------------------
+
+namespace
+{
+   // One key per 256 px tile: "-" nothing selected, "+" all of it, else a TileStore key (grey in RGB).
+   std::vector<std::string> SelEncode(const std::vector<uint8_t>& sel, int w, int h)
+   {
+      std::vector<std::string> keys;
+      std::vector<uint8_t> px;
+      for (int y0 = 0; y0 < h; y0 += kT)
+         for (int x0 = 0; x0 < w; x0 += kT)
+         {
+            const int tw = std::min(kT, w - x0), th = std::min(kT, h - y0);
+            bool none = true, all = true;
+            for (int y = 0; y < th && (none || all); y++)
+            {
+               const uint8_t* row = &sel[(size_t)(y0 + y) * w + x0];
+               for (int x = 0; x < tw; x++)
+               {
+                  none = none && row[x] == 0;
+                  all = all && row[x] == 255;
+               }
+            }
+            if (none || all)
+            {
+               keys.push_back(none ? "-" : "+");
+               continue;
+            }
+            px.resize((size_t)tw * th * 4);
+            for (int y = 0; y < th; y++)
+               for (int x = 0; x < tw; x++)
+               {
+                  uint8_t* o = &px[((size_t)y * tw + x) * 4];
+                  o[0] = o[1] = o[2] = sel[(size_t)(y0 + y) * w + x0 + x];
+                  o[3] = 255;
+               }
+            keys.push_back(TileStore::Put(px.data(), tw, th));
+         }
+      return keys;
+   }
+
+   bool SelDecode(const std::vector<std::string>& keys, int w, int h, std::vector<uint8_t>& sel)
+   {
+      const int cols = (w + kT - 1) / kT, rows = (h + kT - 1) / kT;
+      if (w <= 0 || h <= 0 || keys.size() != (size_t)cols * rows)
+         return false;
+      sel.assign((size_t)w * h, 0);
+      std::vector<uint8_t> px;
+      for (size_t i = 0; i < keys.size(); i++)
+      {
+         const int x0 = (int)(i % cols) * kT, y0 = (int)(i / cols) * kT;
+         const int tw = std::min(kT, w - x0), th = std::min(kT, h - y0);
+         if (keys[i] == "-")
+            continue;
+         int gw = 0, gh = 0;
+         const bool full = keys[i] == "+";
+         if (!full && (!TileStore::Get(keys[i], px, gw, gh) || gw != tw || gh != th))
+            continue;
+         for (int y = 0; y < th; y++)
+            for (int x = 0; x < tw; x++)
+               sel[(size_t)(y0 + y) * w + x0 + x] = full ? 255 : px[((size_t)y * tw + x) * 4];
+      }
+      return true;
+   }
+}
+
+void Scene2DNode::StoreSelection()
+{
+   mSelStore = SelStore();
+   if (mSelAny && mSel.size() == (size_t)mDoc.w * mDoc.h)
+   {
+      mSelStore.w = mDoc.w;
+      mSelStore.h = mDoc.h;
+      mSelStore.keys = SelEncode(mSel, mDoc.w, mDoc.h);
+   }
+   Commit();
+}
+
+// Called by Parse: the selection the text names (none when it names none, or the document changed size).
+void Scene2DNode::RestoreSelection()
+{
+   std::vector<uint8_t> sel;
+   if (mSelStore.w == mDoc.w && mSelStore.h == mDoc.h && SelDecode(mSelStore.keys, mDoc.w, mDoc.h, sel))
+   {
+      mSel.swap(sel);
+      mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   }
+   else
+   {
+      mSelStore = SelStore();
+      if (!mSelAny)
+         return;
+      mSel.clear();
+      mSelAny = false;
+   }
+   mSelDirty = true;
+}
+
+std::vector<std::string> Scene2DNode::SavedSelections() const
+{
+   std::vector<std::string> names;
+   for (const SelStore& s : mSelSaved)
+      names.push_back(s.name);
+   return names;
+}
+
+void Scene2DNode::SaveSelection(const std::string& name)
+{
+   Layers();
+   if (!mSelAny || name.empty() || mSel.size() != (size_t)mDoc.w * mDoc.h)
+      return;
+   SelStore s;
+   s.name = name;
+   s.w = mDoc.w;
+   s.h = mDoc.h;
+   s.keys = SelEncode(mSel, mDoc.w, mDoc.h);
+   auto it = std::find_if(mSelSaved.begin(), mSelSaved.end(), [&](const SelStore& o) { return o.name == name; });
+   if (it != mSelSaved.end())
+      *it = s;
+   else
+      mSelSaved.push_back(s);
+   Commit();
+}
+
+bool Scene2DNode::LoadSelection(const std::string& name, int op)
+{
+   Layers();
+   auto it = std::find_if(mSelSaved.begin(), mSelSaved.end(), [&](const SelStore& o) { return o.name == name; });
+   std::vector<uint8_t> t;
+   if (it == mSelSaved.end() || it->w != mDoc.w || it->h != mDoc.h || !SelDecode(it->keys, it->w, it->h, t))
+      return false;
+   if (mSel.size() != t.size())
+      mSel.assign(t.size(), 0);
+   if (op == kSelNew || !mSelAny)
+      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(t.size(), 0) : t;
+   else
+      for (size_t i = 0; i < t.size(); i++)
+      {
+         if (op == kSelAdd) mSel[i] = std::max(mSel[i], t[i]);
+         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - t[i]) / 255);
+         else mSel[i] = std::min(mSel[i], t[i]);
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
+   return true;
+}
+
+void Scene2DNode::DeleteSavedSelection(const std::string& name)
+{
+   Layers();
+   mSelSaved.erase(std::remove_if(mSelSaved.begin(), mSelSaved.end(), [&](const SelStore& o) { return o.name == name; }), mSelSaved.end());
+   Commit();
 }
 
 bool Scene2DNode::Pick(float x, float y, float rgb[3], int size, int layer)
@@ -775,6 +1031,7 @@ void Scene2DNode::SelectPolygon(const std::vector<float>& xy, int op, float feat
       }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
+   StoreSelection();
 }
 
 void Scene2DNode::SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse)
@@ -825,6 +1082,7 @@ void Scene2DNode::SelectWand(float x, float y, int tolerance, bool contiguous, i
       }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
+   StoreSelection();
 }
 
 void Scene2DNode::SelectAll()
@@ -833,6 +1091,7 @@ void Scene2DNode::SelectAll()
    mSel.assign((size_t)mDoc.w * mDoc.h, 255);
    mSelAny = true;
    mSelDirty = true;
+   StoreSelection();
 }
 
 void Scene2DNode::Deselect()
@@ -840,6 +1099,7 @@ void Scene2DNode::Deselect()
    mSel.clear();
    mSelAny = false;
    mSelDirty = true;
+   StoreSelection();
 }
 
 void Scene2DNode::InvertSelection()
@@ -851,6 +1111,7 @@ void Scene2DNode::InvertSelection()
       v = (uint8_t)(255 - v);
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
+   StoreSelection();
 }
 
 void Scene2DNode::ModifySelection(int op, int px)
@@ -921,6 +1182,7 @@ void Scene2DNode::ModifySelection(int op, int px)
    }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
+   StoreSelection();
 }
 
 float Scene2DNode::SelectionAt(int x, int y) const

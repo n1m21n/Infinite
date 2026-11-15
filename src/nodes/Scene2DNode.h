@@ -380,6 +380,8 @@ public:
 
    // ---- vector and text (Block C) ---------------------------------------
    int AddVectorLayer(int above = 0);
+   // A text or vector layer becomes a paint layer holding the same picture in the same place.
+   bool RasterizeLayer(int id);
    int AddTextLayer(const std::string& text, float x, float y, float boxW, int above = 0);
    // Document px <-> the layer's box px.
    void DocToBox(const Layer& l, float x, float y, float& bx, float& by);
@@ -387,6 +389,8 @@ public:
    // An item's outline as polylines in box px (anchors for paths), for the editor.
    static void Outline(const Shape& s, std::vector<std::vector<float>>& out);
    static bool ShapeBounds(const Shape& s, float lo[2], float hi[2]);
+   // True when (x, y) is on the item itself: inside its fill, or within `pad` of its outline or stroke.
+   static bool ShapeHit(const Shape& s, float x, float y, float pad);
    // The layer's vector or text picture (and vector mask) as a texture; 0 = none.
    unsigned VectorTexture(int id);
    // The items as an SVG document (Convert to Sketch node, Copy SVG).
@@ -398,7 +402,7 @@ public:
    static std::string EscapeToken(const std::string& s);
    static std::string UnescapeToken(const std::string& s);
 
-   // Selection: one per document, document-sized, not saved.
+   // Selection: one per document, document-sized, kept in the doc text (undo and save carry it).
    enum SelOp { kSelNew = 0, kSelAdd, kSelSub, kSelIntersect };
    void SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse);
    void SelectPolygon(const std::vector<float>& xy, int op, float feather);
@@ -409,6 +413,19 @@ public:
    // 0 expand, 1 contract, 2 smooth (rounds corners, drops specks), 3 border (a ring px wide on the edge).
    void ModifySelection(int op, int px);
    bool HasSelection() const { return mSelAny; }
+   // Delete / fill: the selected pixels of a paint layer (all of it with no selection) cleared, or covered with a colour.
+   bool ClearPixels(int id);
+   bool FillPixels(int id, const float rgb[3], float opacity);
+   // Quick mask: Bucket and Gradient aimed at the selection itself (values 0..1).
+   bool BucketSelection(float x, float y, float value, int tolerance, bool contiguous);
+   bool GradientSelection(float ax, float ay, float bx, float by, float va, float vb, int kind);
+   // Saved selections (named, kept in the document).
+   std::vector<std::string> SavedSelections() const;
+   void SaveSelection(const std::string& name);
+   bool LoadSelection(const std::string& name, int op);
+   void DeleteSavedSelection(const std::string& name);
+   // Live textures this document holds (leak check).
+   int LiveTextures() const;
    bool SelectionBounds(float lo[2], float hi[2]) const;
    float SelectionAt(int x, int y) const;   // 0..1, document px
    // Marching ants for the selection (or the red quick-mask tint), a document-sized overlay; 0 = none.
@@ -537,6 +554,12 @@ private:
    void SkinDab(const Layer& l, float x, float y, float pressure, bool skipMain = false);
    unsigned long long SkinRevision(const Layer& l) const;
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
+   // The selection as tile keys, written into the doc text so undo and save carry it ("-" empty, "+" full).
+   struct SelStore { std::string name; int w = 0, h = 0; std::vector<std::string> keys; };
+   SelStore mSelStore;
+   std::vector<SelStore> mSelSaved;
+   void StoreSelection();
+   void RestoreSelection();
    bool mSelAny = false, mSelDirty = false;
    GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch, mCloneSrc;
    unsigned mFillProgram = 0, mAntsProgram = 0, mResampleProgram = 0;

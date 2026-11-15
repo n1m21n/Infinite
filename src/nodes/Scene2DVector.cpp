@@ -4,6 +4,7 @@
 // one texture the compositor samples like any other layer.
 
 #include "Scene2DNode.h"
+#include "TileStore.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -399,6 +400,36 @@ void Scene2DNode::BoxToDoc(const Layer& l, float bx, float by, float& x, float& 
    const float w = std::max(1e-6f, h[6] * bx + h[7] * by + h[8]);
    x = (h[0] * bx + h[1] * by + h[2]) / w;
    y = (h[3] * bx + h[4] * by + h[5]) / w;
+}
+
+bool Scene2DNode::ShapeHit(const Shape& s, float x, float y, float pad)
+{
+   std::vector<std::vector<float>> lines;
+   Outline(s, lines);
+   const float reach = pad + (s.strokeOn || s.type == Shape::kLine ? s.width * 0.5f : 0.0f);
+   bool inside = false;
+   for (const std::vector<float>& p : lines)
+   {
+      const size_t n = p.size() / 2;
+      if (n < 2)
+         continue;
+      for (size_t i = 0; i + 1 < n; i++)
+      {
+         const float ax = p[i * 2], ay = p[i * 2 + 1], bx = p[i * 2 + 2], by = p[i * 2 + 3];
+         const float dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+         const float t = len2 > 0.0f ? std::clamp(((x - ax) * dx + (y - ay) * dy) / len2, 0.0f, 1.0f) : 0.0f;
+         if (std::hypot(x - (ax + dx * t), y - (ay + dy * t)) <= reach)
+            return true;
+      }
+      // Even-odd, the polyline closed back to its start (an open path fills that way too).
+      for (size_t i = 0, j = n - 1; i < n; j = i++)
+      {
+         const float ax = p[i * 2], ay = p[i * 2 + 1], bx = p[j * 2], by = p[j * 2 + 1];
+         if ((ay > y) != (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax)
+            inside = !inside;
+      }
+   }
+   return inside && s.fillOn && s.type != Shape::kLine;
 }
 
 void Scene2DNode::Outline(const Shape& s, std::vector<std::vector<float>>& out)
@@ -861,6 +892,50 @@ void Scene2DNode::SyncRasters()
       const Layer* l = FindConst(it->first);
       it = (l == nullptr || l->kind != Kind::Text) ? mTextBoxes.erase(it) : std::next(it);
    }
+}
+
+bool Scene2DNode::RasterizeLayer(int id)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || (l->kind != Kind::Vector && l->kind != Kind::Text))
+      return false;
+   Raster* r = SyncRaster(mVec, *l, false);
+   if (r == nullptr || r->tex == 0 || r->w <= 0 || r->h <= 0)
+      return false;
+   // The picture exactly as the compositor reads it, cut into the paint layer's tiles.
+   const int w = r->w, h = r->h, kT = TileStore::kTile, cols = (w + kT - 1) / kT, rows = (h + kT - 1) / kT;
+   std::vector<uint8_t> px((size_t)w * h * 4), tile;
+   glBindTexture(GL_TEXTURE_2D, r->tex);
+   glPixelStorei(GL_PACK_ALIGNMENT, 1);
+   glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+   glBindTexture(GL_TEXTURE_2D, 0);
+   std::vector<std::string> keys((size_t)cols * rows, "-");
+   for (size_t i = 0; i < keys.size(); i++)
+   {
+      const int x0 = (int)(i % cols) * kT, y0 = (int)(i / cols) * kT;
+      const int tw = std::min(kT, w - x0), th = std::min(kT, h - y0);
+      tile.resize((size_t)tw * th * 4);
+      bool any = false;
+      for (int y = 0; y < th; y++)
+      {
+         std::memcpy(&tile[(size_t)y * tw * 4], &px[((size_t)(y0 + y) * w + x0) * 4], (size_t)tw * 4);
+         for (int x = 0; x < tw && !any; x++)
+            any = tile[((size_t)y * tw + x) * 4 + 3] != 0;
+      }
+      if (any)
+         keys[i] = TileStore::Put(tile.data(), tw, th);
+   }
+   if (l->name.empty())
+      l->name = l->kind == Kind::Text ? l->text.substr(0, 24) : std::string();
+   l->kind = Kind::Paint;
+   l->pw = w;
+   l->ph = h;
+   l->tiles = std::move(keys);
+   l->shapes.clear();
+   l->text.clear();
+   Commit();
+   return true;
 }
 
 unsigned Scene2DNode::VectorTexture(int id)
