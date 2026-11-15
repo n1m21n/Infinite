@@ -193,7 +193,7 @@ class LM:
         mx.eval(logits)
         return cache, logits[:, -1, :]
 
-    def rank(self, pre, suf, cands):
+    def rank(self, pre, suf, cands, ftype):
         """Candidates sorted by the sum log-probability of their answer tokens (exact constrained decoding over a
         finite answer set). Returns (ranked, ms for this query with the prefix already cached)."""
         mx = self.mx
@@ -204,7 +204,7 @@ class LM:
         sid = self.tok.encode(suf, add_special_tokens=False) if hasattr(self.tok, "encode") else self.tok.encode(suf)
         logits = self.model(mx.array([sid]), cache=cache)
         last = logits[:, -1, :]
-        texts = [answer_text(*c) for c in cands]
+        texts = [answer_text(ftype, *c) for c in cands]
         toks = [self.tok.encode(t, add_special_tokens=False) for t in texts]
         L = max(len(t) for t in toks)
         pad = [t + [0] * (L - len(t)) for t in toks]
@@ -282,7 +282,7 @@ def run_arm(data, arm, a):
                 ms.append((time.time() - t0) * 1000)
             else:
                 pre, suf = prompt_parts(data, r)
-                ranked, t = lm.rank(pre, suf, data.candidates(r["type"]))
+                ranked, t = lm.rank(pre, suf, data.candidates(r["type"]), r["type"])
                 ms.append(t)
             s = score(data, r, ranked)
             hits.update(k for k, v in s.items() if v)
