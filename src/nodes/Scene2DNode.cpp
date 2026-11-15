@@ -616,6 +616,8 @@ Scene2DNode::~Scene2DNode()
          glDeleteProgram(p);
    if (mPassProgram != 0)
       glDeleteProgram(mPassProgram);
+   if (mBatchProgram != 0)
+      glDeleteProgram(mBatchProgram);
    if (mFinishProgram != 0)
       glDeleteProgram(mFinishProgram);
    for (auto& kv : mDepth)
@@ -1752,6 +1754,8 @@ bool Scene2DNode::EnsureShaders()
 
 Scene2DNode::Pair& Scene2DNode::PairAt(int depth)
 {
+   if (!mQueue.empty() && depth == mQueueDepth)
+      FlushQueue();
    while ((int)mPool.size() <= depth)
       mPool.emplace_back();
    Pair& p = mPool[depth];
@@ -1772,6 +1776,19 @@ void Scene2DNode::Clear(Pair& p, const float rgba[4])
 
 void Scene2DNode::Pass(int depth, const PassArgs& a)
 {
+   if (Batchable(depth, a))
+   {
+      if (!mQueue.empty() && mQueueDepth != depth)
+         FlushQueue();
+      mQueueDepth = depth;
+      mQueue.push_back(a);
+      if ((int)mQueue.size() >= kBatch)
+         FlushQueue();
+      return;
+   }
+   if (!mQueue.empty())
+      FlushQueue();
+   mPasses++;
    Pair& p = PairAt(depth);
    const unsigned int acc = p.Tex();
    const int next = 1 - p.cur;
@@ -1897,6 +1914,204 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
    p.cur = next;
 }
 
+bool Scene2DNode::sBatch = true;
+
+namespace
+{
+   // The single pass's texture-layer path (layerAt kind 0, blend, alpha over) for kBatch layers at once; slot k
+   // runs when uCount > k. Samplers are separate uniforms so every index is a constant.
+   const std::string& BatchSrc()
+   {
+      static const std::string src = []()
+      {
+         const int n = 15;   // Scene2DNode::kBatch
+         std::string s = std::string(
+                            "#version 150\n"
+                            "in vec2 vUv;\n"
+                            "out vec4 fragColor;\n"
+                            "uniform sampler2D uAcc;\n"
+                            "uniform vec2 uDoc;\n"
+                            "uniform int uLinear;\n"
+                            "uniform int uHead;\n"
+                            "uniform int uCount;\n")
+                         + "uniform vec3 uInvA[" + std::to_string(n) + "];\n"
+                         + "uniform vec3 uInvB[" + std::to_string(n) + "];\n"
+                         + "uniform vec3 uInvC[" + std::to_string(n) + "];\n"
+                         + "uniform vec2 uBox[" + std::to_string(n) + "];\n"
+                         + "uniform vec4 uCrop[" + std::to_string(n) + "];\n"
+                         + "uniform vec4 uRect[" + std::to_string(n) + "];\n"
+                         + "uniform vec2 uTexSize[" + std::to_string(n) + "];\n"
+                         + "uniform int uMode[" + std::to_string(n) + "];\n"
+                         + "uniform float uOpacity[" + std::to_string(n) + "];\n"
+                         + "uniform int uNearest[" + std::to_string(n) + "];\n"
+                         + "uniform int uSrgb[" + std::to_string(n) + "];\n";
+         for (int k = 0; k < n; k++)
+            s += "uniform sampler2D uT" + std::to_string(k) + ";\n";
+         s += GLUtil::kSrgbGlsl;
+         s += BlendModes::kBlendGLSL;
+         s += "vec4 over(vec4 acc, sampler2D t, int k) {\n"
+              "   vec4 r = uRect[k];\n"
+              "   if (gl_FragCoord.x < r.x || gl_FragCoord.y < r.y || gl_FragCoord.x > r.z || gl_FragCoord.y > r.w) return acc;\n"
+              "   vec2 p = vec2(vUv.x * uDoc.x, (1.0 - vUv.y) * uDoc.y);\n"
+              "   vec3 q = vec3(dot(uInvA[k], vec3(p, 1.0)), dot(uInvB[k], vec3(p, 1.0)), dot(uInvC[k], vec3(p, 1.0)));\n"
+              "   if (q.z <= 1e-12) return acc;\n"
+              "   vec2 uvb = (q.xy / max(q.z, 1e-12)) / uBox[k];\n"
+              "   vec2 uv = vec2(uvb.x, 1.0 - uvb.y);\n"
+              "   vec4 c = uCrop[k];\n"
+              "   vec4 layer;\n"
+              "   if (uvb.x < c.x || uvb.x > c.z || uvb.y < c.y || uvb.y > c.w) layer = vec4(0.0);\n"
+              "   else if (uNearest[k] == 1) layer = texelFetch(t, ivec2(clamp(floor(uv * uTexSize[k]), vec2(0.0), uTexSize[k] - 1.0)), 0);\n"
+              "   else layer = texture(t, uv);\n"
+              "   if (uLinear == 1 && uSrgb[k] == 1) layer.rgb = SrgbDecode(layer.rgb);\n"
+              "   float amt = uOpacity[k] * layer.a;\n"
+              "   vec3 cs = mix(layer.rgb, blendModeImage(uMode[k], acc.rgb, layer.rgb, 1, uHead), acc.a);\n"
+              "   float ar = amt + acc.a * (1.0 - amt);\n"
+              "   vec3 cr = (ar > 1e-5) ? (cs * amt + acc.rgb * acc.a * (1.0 - amt)) / ar : vec3(0.0);\n"
+              "   return vec4(cr, ar);\n"
+              "}\n"
+              "void main() {\n"
+              "   vec4 acc = texture(uAcc, vUv);\n";
+         for (int k = 0; k < n; k++)
+            s += "   if (uCount > " + std::to_string(k) + ") acc = over(acc, uT" + std::to_string(k) + ", " + std::to_string(k) + ");\n";
+         s += "   fragColor = acc;\n}\n";
+         return s;
+      }();
+      return src;
+   }
+}
+
+bool Scene2DNode::Batchable(int depth, const PassArgs& a) const
+{
+   static_assert(kBatch == 15, "BatchSrc builds 15 slots");
+   return sBatch && a.stable && a.kind == 0 && a.tex != 0 && a.mask == 0 && a.pmask == 0 && a.vmask == 0 && a.fill == nullptr &&
+          a.bif == nullptr && !a.clipMode && !a.card && a.geoDepth == 0 && depth != mDepthLevel &&
+          a.blend != BlendModes::kEraseMode && a.blend != BlendModes::kAntiEraseMode;
+}
+
+void Scene2DNode::FlushQueue()
+{
+   if (mQueue.empty())
+      return;
+   std::vector<PassArgs> q;
+   q.swap(mQueue);
+   const int depth = mQueueDepth;
+   mQueueDepth = -1;
+   if (!mBatchTried)
+   {
+      mBatchTried = true;
+      mBatchProgram = GLUtil::CompileProgram(BatchSrc().c_str());
+   }
+   if (q.size() == 1 || mBatchProgram == 0)
+   {
+      for (PassArgs& a : q)
+      {
+         a.stable = false;
+         Pass(depth, a);
+      }
+      return;
+   }
+   Pair& p = PairAt(depth);
+   const unsigned int acc = p.Tex();
+   const int next = 1 - p.cur;
+   const unsigned int prog = mBatchProgram;
+   const int n = (int)q.size();
+   float inv[3][kBatch * 3], box[kBatch * 2], crop[kBatch * 4], rect[kBatch * 4], ts[kBatch * 2], op[kBatch];
+   int mode[kBatch], nearest[kBatch], srgb[kBatch];
+   for (int k = 0; k < n; k++)
+   {
+      const PassArgs& a = q[k];
+      for (int r = 0; r < 3; r++)
+         for (int c = 0; c < 3; c++)
+            inv[r][k * 3 + c] = a.inv[r * 3 + c];
+      box[k * 2] = std::max(1e-3f, a.box[0]);
+      box[k * 2 + 1] = std::max(1e-3f, a.box[1]);
+      for (int c = 0; c < 4; c++)
+         crop[k * 4 + c] = a.crop[c];
+      const bool bounded = a.rect[2] > a.rect[0] && a.rect[3] > a.rect[1];
+      rect[k * 4 + 0] = bounded ? (float)a.rect[0] : -1e9f;
+      rect[k * 4 + 1] = bounded ? (float)a.rect[1] : -1e9f;
+      rect[k * 4 + 2] = bounded ? (float)a.rect[2] : 1e9f;
+      rect[k * 4 + 3] = bounded ? (float)a.rect[3] : 1e9f;
+      ts[k * 2] = (float)std::max(1, a.texW);
+      ts[k * 2 + 1] = (float)std::max(1, a.texH);
+      op[k] = std::clamp(a.opacity, 0.0f, 1.0f);
+      mode[k] = a.blend;
+      nearest[k] = a.nearest ? 1 : 0;
+      srgb[k] = a.srgb ? 1 : 0;
+   }
+   const auto setup = [&]()
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, acc);
+      glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
+      for (int k = 0; k < n; k++)
+      {
+         glActiveTexture(GL_TEXTURE1 + k);
+         glBindTexture(GL_TEXTURE_2D, q[k].tex);
+         glUniform1i(glGetUniformLocation(prog, ("uT" + std::to_string(k)).c_str()), 1 + k);
+      }
+      glActiveTexture(GL_TEXTURE0);
+      glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
+      glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uHead"), mDoc.headroom ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uCount"), n);
+      glUniform3fv(glGetUniformLocation(prog, "uInvA"), n, inv[0]);
+      glUniform3fv(glGetUniformLocation(prog, "uInvB"), n, inv[1]);
+      glUniform3fv(glGetUniformLocation(prog, "uInvC"), n, inv[2]);
+      glUniform2fv(glGetUniformLocation(prog, "uBox"), n, box);
+      glUniform4fv(glGetUniformLocation(prog, "uCrop"), n, crop);
+      glUniform4fv(glGetUniformLocation(prog, "uRect"), n, rect);
+      glUniform2fv(glGetUniformLocation(prog, "uTexSize"), n, ts);
+      glUniform1fv(glGetUniformLocation(prog, "uOpacity"), n, op);
+      glUniform1iv(glGetUniformLocation(prog, "uMode"), n, mode);
+      glUniform1iv(glGetUniformLocation(prog, "uNearest"), n, nearest);
+      glUniform1iv(glGetUniformLocation(prog, "uSrgb"), n, srgb);
+   };
+   // The part of the frame any of them can touch (a layer with no rect touches all of it).
+   extern bool gScene2DBounds;
+   int u[4] = { mDoc.w, mDoc.h, 0, 0 };
+   bool all = !gScene2DBounds;
+   for (const PassArgs& a : q)
+   {
+      if (!(a.rect[2] > a.rect[0] && a.rect[3] > a.rect[1]))
+         all = true;
+      u[0] = std::min(u[0], a.rect[0]);
+      u[1] = std::min(u[1], a.rect[1]);
+      u[2] = std::max(u[2], a.rect[2]);
+      u[3] = std::max(u[3], a.rect[3]);
+   }
+   const bool part = !all && (double)(u[2] - u[0]) * (u[3] - u[1]) <= 0.6 * (double)mDoc.w * mDoc.h;
+   const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+   if (part)
+   {
+      glEnable(GL_SCISSOR_TEST);
+      glScissor(u[0], u[1], u[2] - u[0], u[3] - u[1]);
+   }
+   else if (scissor)
+      glDisable(GL_SCISSOR_TEST);
+   GLUtil::RunShaderPass(p.f[next], prog, setup);
+   if (part)
+   {
+      // Only that part was drawn: copy it back into the current buffer, which holds the rest.
+      glDisable(GL_SCISSOR_TEST);
+      GLint prevR = 0, prevD = 0;
+      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevR);
+      glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevD);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, p.f[next].fbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, p.f[p.cur].fbo);
+      glBlitFramebuffer(u[0], u[1], u[2], u[3], u[0], u[1], u[2], u[3], GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, prevR);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevD);
+   }
+   else
+      p.cur = next;
+   if (scissor)
+      glEnable(GL_SCISSOR_TEST);
+   else
+      glDisable(GL_SCISSOR_TEST);
+   mBatched += n;
+}
+
 // The box's corners through the layer's homography, padded a little for filtering. Outside them the pass leaves
 // the picture as it is (the layer reads as clear there), except Anti-Erase, which clears what it does not cover.
 bool Scene2DNode::LayerRect(const float h[9], PassArgs& a) const
@@ -2007,9 +2222,13 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.tex = live ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
       a.texW = it->second.fbo.w;
       a.texH = it->second.fbo.h;
+      a.stable = !live;   // its surface holds still until the next stroke
       if (l.relief)
          if (const unsigned lit = ShadeRelief(l, a.tex, a.texW, a.texH))
+         {
             a.tex = lit;
+            a.stable = false;   // a shared scratch target
+         }
    }
    else if (l.kind == Kind::Adjust)
    {
@@ -2026,6 +2245,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.tex = r->tex;
       a.texW = r->w;
       a.texH = r->h;
+      a.stable = true;   // the layer's own raster
    }
    else if (dynamic_cast<IGeometrySource*>(Source(l)) != nullptr)
    {
@@ -2065,7 +2285,10 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
          a.srgb = false;   // it ran on the working-space picture
       }
       else
+      {
          src->CookIfNeeded(frameId);
+         a.stable = true;
+      }
       a.tex = src->GetOutputTexture();
       a.texW = src->GetOutputWidth();
       a.texH = src->GetOutputHeight();
@@ -2110,6 +2333,31 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.crop[1] = std::max(a.crop[1], v0);
       a.crop[2] = std::min(a.crop[2], u1);
       a.crop[3] = std::min(a.crop[3], v1);
+      if (a.crop[2] <= a.crop[0] || a.crop[3] <= a.crop[1])
+         return;
+   }
+   // A vector layer shows only where its items are: crop to their bounds (miter tips and filtering padded),
+   // same reason as paint above.
+   if (l.kind == Kind::Vector && !l.shapes.empty() && l.pw > 0 && l.ph > 0)
+   {
+      float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
+      for (const Shape& s : l.shapes)
+      {
+         float lo[2], hi[2];
+         if (!ShapeBounds(s, lo, hi))
+            continue;
+         const float pad = (s.strokeOn ? s.width * 2.0f : 0.0f) + 3.0f;
+         x0 = std::min(x0, lo[0] - pad);
+         y0 = std::min(y0, lo[1] - pad);
+         x1 = std::max(x1, hi[0] + pad);
+         y1 = std::max(y1, hi[1] + pad);
+      }
+      if (x1 <= x0)
+         return;   // nothing drawn
+      a.crop[0] = std::max(a.crop[0], x0 / l.pw);
+      a.crop[1] = std::max(a.crop[1], y0 / l.ph);
+      a.crop[2] = std::min(a.crop[2], x1 / l.pw);
+      a.crop[3] = std::min(a.crop[3], y1 / l.ph);
       if (a.crop[2] <= a.crop[0] || a.crop[3] <= a.crop[1])
          return;
    }

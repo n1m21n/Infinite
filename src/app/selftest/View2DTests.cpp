@@ -1648,7 +1648,7 @@ void RunView2DTest()
          pic.AddTextLayer("a 2D view", 1200.0f, 900.0f, 0.0f);
          Cook(&pic);
          glFinish();
-         std::vector<double> ms;
+         std::vector<double> ms, cpuMs;
          using Clock = std::chrono::steady_clock;
          for (int f = 0; f < 40; f++)
          {
@@ -1657,9 +1657,12 @@ void RunView2DTest()
             glFinish();
             const auto t0 = Clock::now();
             Cook(&pic);
+            cpuMs.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
             glFinish();
             ms.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
          }
+         std::sort(cpuMs.begin(), cpuMs.end());
+         printf("  M3 cpu submit median %.2f ms; batched layers %llu, single passes %llu\n", cpuMs[cpuMs.size() / 2], pic.mBatched, pic.mPasses);
          std::sort(ms.begin(), ms.end());
          const double median = ms[ms.size() / 2];
          printf("  M3 20 layers at 1080p: median %.2f ms (cook + finish, %d layers)\n", median, (int)pic.Layers().size());
@@ -1730,7 +1733,28 @@ void RunView2DTest()
          }
          printf("  M3b bounded vs full passes: worst difference %.6f\n", worst);
          Check("M3b: bounded passes match full-frame passes", worst < 1e-3);
-         Check("M3b: below cache matches a full redraw exactly", cached == full);
+         // Batched passes against one pass per layer.
+         Scene2DNode::sBatch = false;
+         pic.Layers()[12].opacity = 0.55f;
+         pic.Commit();
+         Cook(&pic);
+         pic.Layers()[12].opacity = 0.5f;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> single = grab();
+         Scene2DNode::sBatch = true;
+         double worstBatch = 0;
+         for (size_t k = 0; k < full.size(); k++)
+            worstBatch = std::max(worstBatch, (double)std::fabs(full[k] - single[k]));
+         printf("  M3c batched vs one pass per layer: worst difference %.6f\n", worstBatch);
+         Check("M3c: batched passes match one pass per layer", worstBatch < 2e-3);
+         // Batches split at the cache point on one side and not the other, so the two round through half floats a
+         // little differently; anything past that is a cache bug.
+         double worstCache = cached.size() == full.size() ? 0.0 : 1.0;
+         for (size_t k = 0; k < full.size() && k < cached.size(); k++)
+            worstCache = std::max(worstCache, (double)std::fabs(full[k] - cached[k]));
+         printf("  M3b below cache vs full redraw: worst difference %.6f\n", worstCache);
+         Check("M3b: below cache matches a full redraw", worstCache < 2e-3);
          Check("M3b: an upper-layer edit is faster than a bottom one", topMs < median && midMs < median);
       }
    }

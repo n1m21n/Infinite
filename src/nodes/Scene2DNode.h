@@ -366,6 +366,7 @@ public:
    static void WriteEffectLines(std::ostream& o, const Layer& l, int id);
    static bool ParseEffectLine(const std::string& key, std::istream& s, Layer& l);
    unsigned long long mEffDraws = 0;   // effect stacks drawn (tests: an unchanged stack is not redrawn)
+   unsigned long long mBatched = 0, mPasses = 0;   // layers drawn in a batch / single passes (tests)
    // Colour Lookup: a .cube file's size and RGB table (size^3 rows, red fastest); false when it cannot be read.
    static bool ReadCube(const std::string& path, int& size, std::vector<float>& rgb);
    // Levels' Auto: per channel black and white at the 0.1 % tails of the document's picture.
@@ -583,9 +584,19 @@ private:
       float geoNF[2] = { 1, 2 };    // and the near / far that depth was drawn with, document px
       float geoUv[4] = { 0, 0, 1, 1 }; // and the document uv box its picture covers (only the object's box is drawn)
       int rect[4] = { 0, 0, 0, 0 }; // pixels the layer can touch (x0, y0, x1, y1, GL rows); empty = all
+      bool stable = false;          // tex holds still for the whole frame (a node's output): the pass may wait and batch
    };
    bool LayerRect(const float h[9], PassArgs& a) const;   // false: the layer is off the page
    void Pass(int depth, const PassArgs& a);
+   // Plain full-frame layers wait in a queue and draw up to kBatch at a time in one pass (the picture is read and
+   // written once instead of once per layer). Any other use of that level's buffers (PairAt) draws the queue first.
+   static constexpr int kBatch = 15;   // 16 fragment texture units (the GL 3.2 minimum), one for the picture
+   bool Batchable(int depth, const PassArgs& a) const;
+   void FlushQueue();
+   std::vector<PassArgs> mQueue;
+   int mQueueDepth = -1;
+   unsigned int mBatchProgram = 0;
+   bool mBatchTried = false;
 
    // Paint surfaces, live on the GPU, filled from the tiles the text names.
    struct Surface
@@ -714,6 +725,7 @@ private:
                                unsigned long long global);
 public:
    static bool sBelowCache;          // tests turn it off to compare pictures
+   static bool sBatch;               // batched layer passes (tests turn it off to compare pictures)
 private:
    float mCookMs = 0.0f;
 };
