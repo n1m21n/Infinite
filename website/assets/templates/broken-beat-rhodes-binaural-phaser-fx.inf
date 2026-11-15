@@ -1,0 +1,77 @@
+infinite-patch 1
+# Broken Beat Rhodes Binaural Phaser FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 55
+  i note2 58
+  i note3 62
+  i note4 48
+  i note5 53
+  i note6 57
+  i note7 60
+  i note8 46
+  i note9 53
+  i note10 57
+  i note11 60
+  i note12 48
+  i note13 55
+  i note14 58
+  i note15 63
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2600.0
+  f resonance 0.22
+  f decay 0.48
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rate = 0.55 [0.05, 4.0];\nparam float depth = 0.72 [0.1, 1.0];\nparam float feedback = 0.48 [0.0, 0.85];\nparam float warmth = 1.45 [0.8, 2.8];\nparam float mix = 0.65 [0.0, 1.0];\nstate float lfo = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float ap3 = 0;\nstate float ap4 = 0;\nstate float ap5 = 0;\nstate float ap6 = 0;\nstate float fb = 0;\n\nlfo = (lfo + rate / sr) % 1.0;\nsweep = 0.5 + 0.5 * sin(6.2831853 * lfo);\ng = clamp(-0.25 + (sweep - 0.5) * depth * 1.15, -0.88, 0.88);\n\nx = in + fb * feedback;\ny1 = -g * x + ap1; ap1 = x + g * y1;\ny2 = -g * y1 + ap2; ap2 = y1 + g * y2;\ny3 = -g * y2 + ap3; ap3 = y2 + g * y3;\ny4 = -g * y3 + ap4; ap4 = y3 + g * y4;\ny5 = -g * y4 + ap5; ap5 = y4 + g * y5;\ny6 = -g * y5 + ap6; ap6 = y5 + g * y6;\n\ndriven = y6 * (warmth * 0.78);\nsat = driven / (1.0 + abs(driven) * 0.52);\nfb = clamp(sat, -0.85, 0.85);\n\nout = (in * (1.0 - mix) + sat * mix) * 0.74;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.56 0.34 0.16
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Broken Beat Rhodes Binaural Phaser FX. Six-stage cascaded allpass phaser with asymmetric LFO sweep, resonant notch feedback, and warm electric-piano preamp saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

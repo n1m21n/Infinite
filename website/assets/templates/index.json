@@ -3093,6 +3093,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "gamelan-polyrhythm-pelog-metallophone-synth",
+      "name": "Gamelan Polyrhythm Pelog Metallophone Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Paired bronze gamelan metallophone with Euler-Bernoulli bar partials, ombak detuned beating, mallet strike transient, and bamboo resonator warmth.",
+      "price": 0,
+      "preview": "assets/templates/gamelan-polyrhythm-pelog-metallophone-synth.webp",
+      "file": "assets/templates/gamelan-polyrhythm-pelog-metallophone-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "gamelan-polyrhythm-gong-ageng-synth",
+      "name": "Gamelan Polyrhythm Gong Ageng Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Deep Javanese suspended bronze gong with strike pitch sag, sub-octave boss fundamental, slow ombak beating, and nonlinear metal shimmer.",
+      "price": 0,
+      "preview": "assets/templates/gamelan-polyrhythm-gong-ageng-synth.webp",
+      "file": "assets/templates/gamelan-polyrhythm-gong-ageng-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "broken-beat-rhodes-binaural-phaser-fx",
+      "name": "Broken Beat Rhodes Binaural Phaser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Six-stage cascaded allpass phaser with asymmetric LFO sweep, resonant notch feedback, and warm electric-piano preamp saturation.",
+      "price": 0,
+      "preview": "assets/templates/broken-beat-rhodes-binaural-phaser-fx.webp",
+      "file": "assets/templates/broken-beat-rhodes-binaural-phaser-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "broken-beat-rhodes-bbd-ensemble-fx",
+      "name": "Broken Beat Rhodes BBD Ensemble FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-LFO bucket-brigade chorus ensemble with warm low-pass anti-alias rolloff, cross-coupled modulation, and soft analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/broken-beat-rhodes-bbd-ensemble-fx.webp",
+      "file": "assets/templates/broken-beat-rhodes-bbd-ensemble-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

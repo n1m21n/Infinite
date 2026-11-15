@@ -812,6 +812,113 @@ function draw(t) {
 }
 """.strip(),
         "field_pixel": """p = uv; col = mix(vec3(0.9, 0.4, 0.1), vec3(0.05, 0.1, 0.25), step(0.6, p.y));"""
+    },
+    "cyanotype_photogram": {
+        "family": "archival_optics",
+        "name": "Cyanotype Botanical Photogram",
+        "description": "Prussian blue ferric-oxalate contact prints, translucent botanical silhouettes, solar exposure halos, and fine paper grain.",
+        "tags": ["#cyanotype", "#photogram", "#blueprint", "#generative", "#archival"],
+        "palette": ["#103A7A", "#071A3C", "#D8E4F0", "#F2F6FA"],
+        "synth": "Metallic",
+        "note_source": "Chorder",
+        "sketch_2d": """
+param("fronds", 14, 6, 26);
+param("sway", 0.08, 0.0, 0.25);
+
+function draw(t) {
+  background(0.063, 0.227, 0.478);
+  translate(width * 0.5, height * 0.85);
+  noStroke();
+  for (let i = 0; i < fronds; i++) {
+    const u = i / fronds;
+    const y = -u * height * 0.7;
+    const len = (1.0 - u * 0.65) * width * 0.22;
+    fill(0.847, 0.894, 0.941, 0.85);
+    ellipse(-len * 0.5, y, len, 14);
+    ellipse(len * 0.5, y, len, 14);
+  }
+}
+""".strip(),
+        "sketch_3d": """
+param("ribs", 12, 4, 24);
+function draw(t) {
+  for (let i = 0; i < ribs; i++) {
+    push();
+    translate(0, (i - ribs * 0.5) * 0.18, 0);
+    fill(0.847, 0.894, 0.941);
+    box(1.4 - i * 0.08, 0.04, 0.18);
+    pop();
+  }
+}
+""".strip(),
+        "field_pixel": """p = (uv - 0.5) * aspect; r = length(p); col = mix(vec3(0.063, 0.227, 0.478), vec3(0.847, 0.894, 0.941), smoothstep(0.45, 0.12, r));"""
+    },
+    "origami_folded_vault": {
+        "family": "architectural_geometry",
+        "name": "Architectural Origami Folded Vault",
+        "description": "Miura-ori rigid-foldable tessellations, pleated concrete shells, crisp crease shadows, and warm travertine facets.",
+        "tags": ["#origami", "#architecture", "#miuraori", "#3d", "#geometry"],
+        "palette": ["#1B1D20", "#EAE6DE", "#6D6A64", "#C7A254"],
+        "synth": "Analog",
+        "note_source": "Note Sequencer",
+        "sketch_2d": """
+param("cols", 10, 4, 20);
+function draw(t) {
+  background(0.106, 0.114, 0.125);
+  stroke(0.918, 0.902, 0.871, 0.8);
+  for (let i = 0; i < cols; i++) {
+    const x = (i / cols) * width;
+    line(x, 0, x + 40 * sin(t + i), height);
+  }
+}
+""".strip(),
+        "sketch_3d": """
+param("folds", 8, 4, 16);
+function draw(t) {
+  for (let i = 0; i < folds; i++) {
+    push();
+    translate((i - folds * 0.5) * 0.28, 0.15 * (i % 2 === 0 ? 1 : -1), 0);
+    rotateZ(i % 2 === 0 ? 0.55 : -0.55);
+    fill(0.918, 0.902, 0.871);
+    box(0.32, 0.04, 1.8);
+    pop();
+  }
+}
+""".strip(),
+        "field_pixel": """p = (uv - 0.5) * aspect; f = abs(fract(p.x * 6.0 + abs(p.y * 3.0)) - 0.5); col = mix(vec3(0.106, 0.114, 0.125), vec3(0.918, 0.902, 0.871), smoothstep(0.1, 0.4, f));"""
+    },
+    "schlieren_caustics": {
+        "family": "archival_optics",
+        "name": "Schlieren Optical Caustics",
+        "description": "Knife-edge optical interferometry, refractive density plumes, nephroid caustic cusps, and amber-cobalt light envelopes.",
+        "tags": ["#schlieren", "#caustics", "#optics", "#shader", "#audioreactive"],
+        "palette": ["#090B10", "#1C4E8E", "#E89B3C", "#F4F7FC"],
+        "synth": "FM",
+        "note_source": "Arpeggiator",
+        "sketch_2d": """
+param("rays", 28, 8, 60);
+function draw(t) {
+  background(0.035, 0.043, 0.063);
+  stroke(0.910, 0.608, 0.235, 0.4);
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * TAU;
+    line(width * 0.5 + cos(a) * 320, height * 0.5 + sin(a) * 320, width * 0.5 + cos(a * 2.0 + t) * 160, height * 0.5 + sin(a * 2.0 + t) * 160);
+  }
+}
+""".strip(),
+        "sketch_3d": """
+param("rings", 10, 4, 20);
+function draw(t) {
+  for (let i = 0; i < rings; i++) {
+    push();
+    rotateX(0.6 + i * 0.1);
+    fill(0.910, 0.608, 0.235);
+    torus(0.3 + i * 0.12, 0.015);
+    pop();
+  }
+}
+""".strip(),
+        "field_pixel": """p = (uv - 0.5) * aspect * 2.0; r = length(p); c = pow(clamp(1.0 - abs(r - 0.55 - 0.18 * sin(atan2(p.y, p.x) * 2.0 + t)), 0.0, 1.0), 6.0); col = mix(vec3(0.035, 0.043, 0.063), vec3(0.910, 0.608, 0.235), c);"""
     }
 }
 

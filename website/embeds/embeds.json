@@ -615,6 +615,16 @@
       "slug": "ferrofluid-thinfilm-bismuth-corona",
       "title": "Ferrofluid Thinfilm Bismuth Corona",
       "description": "Audio-reactive bismuth thin-film interference visualizer. Bass pulses the dipole field lines, mids sweep the iridescent oil fringes, and highs ignite the corona ridges."
+    },
+    {
+      "slug": "schlieren-caustics-refraction-cusps",
+      "title": "Schlieren Caustics Refraction Cusps",
+      "description": "Audio-reactive optical schlieren caustic visualizer. Bass focuses the nephroid caustic envelope, mids shift refractive dispersion, and highs sharpen the focal cusps."
+    },
+    {
+      "slug": "schlieren-caustics-thermal-plume",
+      "title": "Schlieren Caustics Thermal Plume",
+      "description": "Audio-reactive convective schlieren plume visualizer. Bass drives thermal turbulence, mids sweep refractive fringe density, and highs ignite the ivory filaments."
     }
   ]
 }

@@ -313,6 +313,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Karplus Sympathetic Bowed Monochord Synth](https://infinitedevices.org/library/karplus-sympathetic-bowed-monochord-synth.html): Continuously bowed waveguide monochord with stick-slip rosin harmonic excitation, vibrato drift, and resonant body formants. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bowed-monochord-synth.inf)
 - [Spring Plate Dispersion Belton Tank FX](https://infinitedevices.org/library/spring-plate-dispersion-belton-tank-fx.html): Triple-spring tank dispersion network with cascaded allpass chirp stages, brass transducer drive, and mechanical tank damping. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-belton-tank-fx.inf)
 - [Spring Plate Dispersion Steel Plate FX](https://infinitedevices.org/library/spring-plate-dispersion-steel-plate-fx.html): Dense steel plate diffusion lattice with early metallic reflections, phase-modulated allpass tank, and warm sheen tilt. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-steel-plate-fx.inf)
+- [Gamelan Polyrhythm Pelog Metallophone Synth](https://infinitedevices.org/library/gamelan-polyrhythm-pelog-metallophone-synth.html): Paired bronze gamelan metallophone with Euler-Bernoulli bar partials, ombak detuned beating, mallet strike transient, and bamboo resonator warmth. (file: https://infinitedevices.org/assets/templates/gamelan-polyrhythm-pelog-metallophone-synth.inf)
+- [Gamelan Polyrhythm Gong Ageng Synth](https://infinitedevices.org/library/gamelan-polyrhythm-gong-ageng-synth.html): Deep Javanese suspended bronze gong with strike pitch sag, sub-octave boss fundamental, slow ombak beating, and nonlinear metal shimmer. (file: https://infinitedevices.org/assets/templates/gamelan-polyrhythm-gong-ageng-synth.inf)
+- [Broken Beat Rhodes Binaural Phaser FX](https://infinitedevices.org/library/broken-beat-rhodes-binaural-phaser-fx.html): Six-stage cascaded allpass phaser with asymmetric LFO sweep, resonant notch feedback, and warm electric-piano preamp saturation. (file: https://infinitedevices.org/assets/templates/broken-beat-rhodes-binaural-phaser-fx.inf)
+- [Broken Beat Rhodes BBD Ensemble FX](https://infinitedevices.org/library/broken-beat-rhodes-bbd-ensemble-fx.html): Dual-LFO bucket-brigade chorus ensemble with warm low-pass anti-alias rolloff, cross-coupled modulation, and soft analog saturation. (file: https://infinitedevices.org/assets/templates/broken-beat-rhodes-bbd-ensemble-fx.inf)
 
 ## Library: Community
 
@@ -673,7 +677,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 123 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 125 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -690,4 +694,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 108 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 110 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

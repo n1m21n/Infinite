@@ -10382,6 +10382,226 @@
       "file": "assets/library/pixel/ferrofluid-thinfilm-bismuth-corona.field",
       "preview": "assets/library/previews/ferrofluid-thinfilm-bismuth-corona.jpg",
       "bytes": 1783
+    },
+    {
+      "id": "cyanotype-photogram-botanical-frond",
+      "name": "Cyanotype Photogram Botanical Frond",
+      "kind": "Generator",
+      "tags": [
+        "cyanotype",
+        "photogram",
+        "botanical",
+        "blueprint",
+        "ferric",
+        "2d",
+        "procedural"
+      ],
+      "description": "Prussian blue ferric-oxalate contact print with overlapping botanical fern fronds, soft exposure halos, and herbarium margin ruling.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/cyanotype-photogram-botanical-frond.js",
+      "preview": "assets/library/previews/cyanotype-photogram-botanical-frond.jpg",
+      "bytes": 3363
+    },
+    {
+      "id": "cyanotype-photogram-solar-plate",
+      "name": "Cyanotype Photogram Solar Plate",
+      "kind": "Generator",
+      "tags": [
+        "cyanotype",
+        "blueprint",
+        "solar",
+        "ephemeris",
+        "optics",
+        "2d",
+        "procedural"
+      ],
+      "description": "Astronomical cyanotype contact plate featuring concentric orbital ephemeris rings, overlapping Fresnel lens exposures, and azimuth ticks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/cyanotype-photogram-solar-plate.js",
+      "preview": "assets/library/previews/cyanotype-photogram-solar-plate.jpg",
+      "bytes": 2404
+    },
+    {
+      "id": "origami-folded-vault-miura-shell-3d",
+      "name": "Origami Folded Vault Miura Shell 3D",
+      "kind": "Generator",
+      "tags": [
+        "origami",
+        "miura-ori",
+        "vault",
+        "architecture",
+        "travertine",
+        "3d",
+        "procedural"
+      ],
+      "description": "Rigid-foldable Miura-ori tessellated barrel vault in warm travertine and limestone with brass ridge pins and slate tie-rod plinth.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/origami-folded-vault-miura-shell-3d.js",
+      "preview": "assets/library/previews/origami-folded-vault-miura-shell-3d.jpg",
+      "bytes": 2104
+    },
+    {
+      "id": "origami-folded-vault-pleated-rotunda-3d",
+      "name": "Origami Folded Vault Pleated Rotunda 3D",
+      "kind": "Generator",
+      "tags": [
+        "origami",
+        "rotunda",
+        "pleated",
+        "cupola",
+        "architecture",
+        "3d",
+        "procedural"
+      ],
+      "description": "Radial accordion-pleated architectural cupola rising to a brass oculus compression ring above a stepped slate colonnade.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/origami-folded-vault-pleated-rotunda-3d.js",
+      "preview": "assets/library/previews/origami-folded-vault-pleated-rotunda-3d.jpg",
+      "bytes": 1613
+    },
+    {
+      "id": "gamelan-polyrhythm-pelog-metallophone-synth",
+      "name": "Gamelan Polyrhythm Pelog Metallophone Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "gamelan",
+        "metallophone",
+        "pelog",
+        "ombak",
+        "audio",
+        "dsp"
+      ],
+      "description": "Paired bronze gamelan metallophone with Euler-Bernoulli bar partials, ombak detuned beating, mallet strike transient, and bamboo resonator warmth.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/gamelan-polyrhythm-pelog-metallophone-synth.inf",
+      "preview": "assets/library/previews/gamelan-polyrhythm-pelog-metallophone-synth.jpg",
+      "bytes": 2243
+    },
+    {
+      "id": "gamelan-polyrhythm-gong-ageng-synth",
+      "name": "Gamelan Polyrhythm Gong Ageng Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "gamelan",
+        "gong",
+        "bronze",
+        "sub",
+        "audio",
+        "dsp"
+      ],
+      "description": "Deep Javanese suspended bronze gong with strike pitch sag, sub-octave boss fundamental, slow ombak beating, and nonlinear metal shimmer.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/gamelan-polyrhythm-gong-ageng-synth.inf",
+      "preview": "assets/library/previews/gamelan-polyrhythm-gong-ageng-synth.jpg",
+      "bytes": 1873
+    },
+    {
+      "id": "broken-beat-rhodes-binaural-phaser-fx",
+      "name": "Broken Beat Rhodes Binaural Phaser FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "phaser",
+        "allpass",
+        "rhodes",
+        "broken-beat",
+        "audio",
+        "dsp"
+      ],
+      "description": "Six-stage cascaded allpass phaser with asymmetric LFO sweep, resonant notch feedback, and warm electric-piano preamp saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/broken-beat-rhodes-binaural-phaser-fx.inf",
+      "preview": "assets/library/previews/broken-beat-rhodes-binaural-phaser-fx.jpg",
+      "bytes": 2148
+    },
+    {
+      "id": "broken-beat-rhodes-bbd-ensemble-fx",
+      "name": "Broken Beat Rhodes BBD Ensemble FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "chorus",
+        "ensemble",
+        "bbd",
+        "analog",
+        "audio",
+        "dsp"
+      ],
+      "description": "Dual-LFO bucket-brigade chorus ensemble with warm low-pass anti-alias rolloff, cross-coupled modulation, and soft analog saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/broken-beat-rhodes-bbd-ensemble-fx.inf",
+      "preview": "assets/library/previews/broken-beat-rhodes-bbd-ensemble-fx.jpg",
+      "bytes": 2228
+    },
+    {
+      "id": "schlieren-caustics-refraction-cusps",
+      "name": "Schlieren Caustics Refraction Cusps",
+      "kind": "Generator",
+      "tags": [
+        "schlieren",
+        "caustics",
+        "optics",
+        "refraction",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Optical nephroid caustic envelope with knife-edge schlieren refraction bands, sapphire density gradients, and incandescent amber focal cusps.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/schlieren-caustics-refraction-cusps.field",
+      "preview": "assets/library/previews/schlieren-caustics-refraction-cusps.jpg",
+      "bytes": 2111
+    },
+    {
+      "id": "schlieren-caustics-thermal-plume",
+      "name": "Schlieren Caustics Thermal Plume",
+      "kind": "Generator",
+      "tags": [
+        "schlieren",
+        "caustics",
+        "thermal",
+        "convection",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Domain-warped convective density-gradient schlieren field with knife-edge phase contrast, cobalt-amber optical fringes, and rising filament cusps.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/schlieren-caustics-thermal-plume.field",
+      "preview": "assets/library/previews/schlieren-caustics-thermal-plume.jpg",
+      "bytes": 1941
     }
   ]
 }
