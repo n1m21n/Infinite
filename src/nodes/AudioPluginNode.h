@@ -67,6 +67,7 @@ public:
    static INode* Create() { return new AudioPluginNode(); }
    AudioPluginNode(); // out-of-line: mAudioNode's pointee is forward-declared here
    ~AudioPluginNode() override;
+   bool IsMachineDependent() const override { return true; } // the plugin must be installed here
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }

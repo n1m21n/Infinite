@@ -214,6 +214,31 @@ std::string ExplainLive(bool json, bool all)
 // (what a patch's map<N>_min/max/value must use - not the display units).
 static void ReportPlugins(Headless::Status& st, bool withParams, bool withState = false)
 {
+   // A live input that does not refuse (Keyboard, OSC Receive) renders silent or still headless; say why,
+   // so an empty render is not read as a broken patch. Hardware-driven sources already refuse.
+   for (const GraphNode& gn : gNodes)
+      if (gn.node && gn.node->IsLiveInput() && !gn.node->IsHardwareDriven())
+         st.warnings.push_back({ "W_LIVE_INPUT", gn.typeName + " is played live (a person or the network); headless it adds nothing",
+                                 0, gn.index, "drive the synth from a Piano Roll, Note Sequencer or MIDI File instead" });
+   // Per-note gain and pan (`g=`, `pan=` on a note line) are saved but no voice reads them yet (ArrangeModel.h).
+   int gainPanNotes = 0;
+   auto countClip = [&](const Arrange::Clip& c)
+   {
+      for (const Arrange::Note& n : c.notes)
+         if (n.gainDb != 0.0f || n.pan != 0.0f)
+            gainPanNotes++;
+   };
+   for (const Arrange::Lane& lane : gArrange.lanes)
+   {
+      for (const Arrange::Clip& c : lane.clips)
+         countClip(c);
+      for (const Arrange::SessionSlot& s : lane.slots)
+         countClip(s.clip);
+   }
+   if (gainPanNotes > 0)
+      st.warnings.push_back({ "W_NOTE_GAIN_PAN_IGNORED", std::to_string(gainPanNotes) +
+                                 " note(s) set per-note gain or pan, which no voice applies yet", 0, -1,
+                              "use velocity for level, and the lane or clip pan" });
    std::string json;
    for (int i = 0; i < (int)gNodes.size(); i++)
    {

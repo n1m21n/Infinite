@@ -2,7 +2,8 @@
 """coverage.json -> report.md: headline numbers, per-category table, review lists."""
 import collections, json, os, sys
 
-CLASSES = ["effective", "mod-only", "conditional", "no-effect", "silent-default", "error", "live-only", "no-output", "text"]
+CLASSES = ["effective", "mod-only", "conditional", "no-effect", "inactive", "silent-default", "error", "live-only", "machine-dependent", "no-output", "text"]
+DECLARED = ("text", "inactive", "live-only", "machine-dependent", "no-output")  # not swept: declared
 
 
 def main(path):
@@ -17,13 +18,13 @@ def main(path):
             if "mod" in p:
                 mod[p["mod"]] += 1
     n = sum(tot.values())
-    swept = n - tot["text"] - tot["live-only"] - tot["no-output"]
+    swept = n - sum(tot[c] for c in DECLARED)
     covered = tot["effective"] + tot["mod-only"] + tot["conditional"]
     L = ["# Headless coverage", "",
-         f"{len(rows)} node types, {n} params. Swept (not text, not live-only): {swept}.", "",
+         f"{len(rows)} node types, {n} params. Swept (not declared: {', '.join(DECLARED)}): {swept}.", "",
          "| Class | Params | Share of swept |", "|---|---|---|"]
     for c in CLASSES:
-        share = f"{100 * tot[c] / swept:.1f} %" if swept and c not in ("text", "live-only", "no-output") else "–"
+        share = f"{100 * tot[c] / swept:.1f} %" if swept and c not in DECLARED else "–"
         L.append(f"| {c} | {tot[c]} | {share} |")
     testable = swept - tot["silent-default"] - tot["error"]
     L += ["", f"Covered (effective, mod-only or conditional): **{covered} / {swept} = {100 * covered / max(swept, 1):.1f} %**",
@@ -43,10 +44,9 @@ def main(path):
         L += [f"| {r['type']} | {r['channel']} | {sum(p['class'] == 'silent-default' for p in r['params'])} |" for r in sil]
     L += ["", "## No-effect params (review list)", "", "| Type | Params |", "|---|---|"]
     for r in rows:
-        ks = [p["key"] + ("" if p.get("ui") else "*") for p in r.get("params", []) if p["class"] == "no-effect"]
+        ks = [p["key"] for p in r.get("params", []) if p["class"] == "no-effect"]
         if ks:
             L.append(f"| {r['type']} | {', '.join(ks)} |")
-    L += ["", "`*` = not shown in the UI (saved-only key)."]
     out = os.path.join(os.path.dirname(path), "report.md")
     open(out, "w").write("\n".join(L) + "\n")
     print(f"covered {covered}/{swept} ({100 * covered / max(swept, 1):.1f} %), of testable {covered}/{testable} "

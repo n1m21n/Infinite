@@ -38,6 +38,7 @@ public:
    float high = 1.0f;
 
    void VisitParams(ParamVisitor& v) override;
+   bool IsLiveInput() const override { return true; } // values arrive over the network at play time
 
 private:
    void RestartListenerIfNeeded();

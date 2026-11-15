@@ -30,6 +30,7 @@ public:
 
    TrackNodeBase();
    ~TrackNodeBase() override;
+   bool IsMachineDependent() const override { return true; } // models live in the tracking pack
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }

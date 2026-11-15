@@ -17,7 +17,10 @@ Each param ends in one class:
                    input feeds): `needs` names that context (context pass, below)
   silent-default   the type's default output is silent or blank, so the param could not be judged
   no-effect        nothing changed in any context: dead or needs context the sweep does not try (review list)
-  live-only        hardware-driven type: refuses headless by design
+  inactive         no effect, and not in the panel at the node's default state (another op's fields, grid points
+                   past the active grid): declared by the panel, not reviewed
+  live-only        hardware-driven or live-input type (Keyboard, OSC Receive): nothing to render headless
+  machine-dependent  plugin or tracking-pack type: depends on what this machine has installed
   text             text params (paths, code): not swept here
   error            the variant patch failed to load or render
 and modulation separately: mod-effective / mod-no-effect / not-modulatable.
@@ -492,9 +495,14 @@ class Sweep:
     def run(self, types, contexts=True):
         rows, staged, work = [], [], []
         for t in types:
-            if t.get("hardware_driven"):
+            if t.get("hardware_driven") or t.get("live_input"):
                 rows.append({"type": t["type"], "cat": t["category"], "live_only": True,
                              "params": [{"key": r["key"], "kind": r["kind"], "class": "live-only"} for r in t.get("rows", [])]})
+                continue
+            if t.get("machine_dependent"):
+                # needs a plugin or the tracking pack installed: a result here would describe this machine
+                rows.append({"type": t["type"], "cat": t["category"], "machine_dependent": True,
+                             "params": [{"key": r["key"], "kind": r["kind"], "class": "machine-dependent"} for r in t.get("rows", [])]})
                 continue
             if t["type"] in NO_OUTPUT:
                 # annotations, containers and sinks to hardware/network: declared, nothing to render
@@ -519,6 +527,12 @@ class Sweep:
             if self.out_of_time:
                 print("budget used up in the context pass: re-run the same command to resume", flush=True)
                 return None
+        for row in swept.values():
+            # Not in the panel at the node's default state (another op's fields on a 3D modifier, grid points past
+            # the active grid, slots past the active count): the node does not read them in that state.
+            for p in row["params"]:
+                if p["class"] == "no-effect" and not p.get("ui"):
+                    p["class"] = "inactive"
         rows += swept.values()
         rows.sort(key=lambda r: (r["cat"], r["type"]))
         with open(os.path.join(self.out, "coverage.json"), "w") as f:
