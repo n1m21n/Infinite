@@ -111,8 +111,11 @@ uniform sampler2D uL;
 uniform sampler2D uB;
 uniform sampler2D uB2;
 uniform vec2 uDoc;
-uniform int uShOn, uInOn, uGlOn, uStOn, uOvOn, uStPos, uIgOn, uBvOn, uGrOn;
-uniform vec4 uShC, uInC, uGlC, uStC, uOvC, uIgC, uBvHi, uBvLo, uGrA, uGrB;
+uniform int uShOn, uInOn, uGlOn, uStOn, uOvOn, uStPos, uIgOn, uBvOn, uGrOn, uSaOn, uPaOn, uPaKind, uBvMat;
+uniform vec4 uShC, uInC, uGlC, uStC, uOvC, uIgC, uBvHi, uBvLo, uGrA, uGrB, uSaC, uPaA, uPaB;
+uniform vec4 uShK, uGlK, uBvK, uSaK;   // contours: two inner points (x y x y) of a 0..1 curve
+uniform vec2 uSaOff;
+uniform float uPaScale, uPaAngle;
 uniform vec2 uGrDir;
 uniform vec3 uBvLight;
 uniform float uIgSpread, uBvDepth;
@@ -124,25 +127,69 @@ vec4 over(vec4 d, vec4 s) {
    return vec4(c, a);
 }
 float spreadA(float v, float sp) { return clamp(v / (1.0 - min(sp, 0.99)), 0.0, 1.0); }
+float contour(float v, vec4 k) {
+   if (v < k.x) return k.x > 0.0 ? v / k.x * k.y : k.y;
+   if (v < k.z) return mix(k.y, k.w, (v - k.x) / max(k.z - k.x, 1e-4));
+   return k.z < 1.0 ? mix(k.w, 1.0, (v - k.z) / (1.0 - k.z)) : k.w;
+}
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float patternAt(vec2 uv) {
+   vec2 p = uv * uDoc;
+   float ca = cos(uPaAngle), sa = sin(uPaAngle);
+   p = vec2(ca * p.x - sa * p.y, sa * p.x + ca * p.y) / max(uPaScale, 2.0);
+   vec2 f = fract(p);
+   if (uPaKind == 0) return mod(floor(p.x) + floor(p.y), 2.0);
+   if (uPaKind == 1) return 1.0 - smoothstep(0.28, 0.34, length(f - 0.5));
+   if (uPaKind == 2) return step(0.5, f.x);
+   if (uPaKind == 3) return step(min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)), 0.06);
+   return hash(floor(p));
+}
+// The relief layers' materials (Scene2DNode kReliefFrag): one lighting model in the whole view.
+vec3 material(int m, vec3 base, vec3 n, vec3 L) {
+   vec3 Hv = normalize(L + vec3(0.0, 0.0, 1.0));
+   float diff = max(dot(n, L), 0.0), nh = max(dot(n, Hv), 0.0);
+   if (m == 0) return base * (0.35 + 0.75 * diff) + vec3(0.22) * pow(nh, 18.0);
+   if (m == 1) return base * (0.18 + 0.32 * diff) + mix(base, vec3(1.0), 0.35) * pow(nh, 42.0) * 1.3;
+   if (m == 2) {
+      vec3 r = reflect(vec3(0.0, 0.0, -1.0), n);
+      float t = dot(normalize(r.xy + 1e-4), normalize(L.xy + 1e-4)) * length(r.xy);
+      float sky = mix(0.06, 1.0, smoothstep(-0.25, 0.55, t)) - 0.35 * smoothstep(0.0, 0.08, abs(t - 0.2)) + 0.35;
+      return mix(vec3(sky), base * sky, 0.25) + vec3(1.0) * pow(nh, 160.0);
+   }
+   float lit = clamp(0.25 + 0.85 * diff, 0.0, 1.0);
+   vec2 cell = floor(gl_FragCoord.xy / 3.0);
+   float dot1 = step(lit, hash(cell)) * (1.0 - smoothstep(0.3, 0.5, length(fract(gl_FragCoord.xy / 3.0) - 0.5)));
+   return base * (1.0 - dot1);
+}
 void main() {
    vec4 L = texture(uL, vUv);
    vec4 res = vec4(0.0);
-   if (uShOn == 1) res = over(res, vec4(uShC.rgb, spreadA(texture(uB, vUv - uShOff).r, uShSpread) * uShC.a));
-   if (uGlOn == 1) res = over(res, vec4(uGlC.rgb, spreadA(texture(uB, vUv).g, uGlSpread) * uGlC.a));
+   if (uShOn == 1) res = over(res, vec4(uShC.rgb, contour(spreadA(texture(uB, vUv - uShOff).r, uShSpread), uShK) * uShC.a));
+   if (uGlOn == 1) res = over(res, vec4(uGlC.rgb, contour(spreadA(texture(uB, vUv).g, uGlSpread), uGlK) * uGlC.a));
    res = over(res, vec4(L.rgb, L.a * uFill));
+   if (uPaOn == 1) res = over(res, vec4(mix(uPaB.rgb, uPaA.rgb, patternAt(vUv)), L.a * uPaA.a));
    if (uGrOn == 1) {
       float t = clamp(dot(vUv - 0.5, uGrDir) + 0.5, 0.0, 1.0);
       res = over(res, vec4(mix(uGrA.rgb, uGrB.rgb, t), L.a * uGrA.a));
    }
    if (uOvOn == 1) res = over(res, vec4(uOvC.rgb, L.a * uOvC.a));
+   if (uSaOn == 1) {
+      float sa = abs(texture(uB2, vUv + uSaOff).b - texture(uB2, vUv - uSaOff).b);
+      res = over(res, vec4(uSaC.rgb, L.a * contour(clamp(sa, 0.0, 1.0), uSaK) * uSaC.a));
+   }
    if (uBvOn == 1) {
       vec2 px = 1.0 / uDoc;
-      float gx = texture(uB2, vUv + vec2(px.x, 0.0)).g - texture(uB2, vUv - vec2(px.x, 0.0)).g;
-      float gy = texture(uB2, vUv + vec2(0.0, px.y)).g - texture(uB2, vUv - vec2(0.0, px.y)).g;
+      float gx = contour(texture(uB2, vUv + vec2(px.x, 0.0)).g, uBvK) - contour(texture(uB2, vUv - vec2(px.x, 0.0)).g, uBvK);
+      float gy = contour(texture(uB2, vUv + vec2(0.0, px.y)).g, uBvK) - contour(texture(uB2, vUv - vec2(0.0, px.y)).g, uBvK);
       vec3 n = normalize(vec3(-gx * uBvDepth, -gy * uBvDepth, 1.0));
-      float s = dot(n, uBvLight) - uBvLight.z;
-      res = over(res, vec4(uBvHi.rgb, L.a * clamp(s * 3.0, 0.0, 1.0) * uBvHi.a));
-      res = over(res, vec4(uBvLo.rgb, L.a * clamp(-s * 3.0, 0.0, 1.0) * uBvHi.a));
+      if (uBvMat >= 0) {
+         vec3 lit = clamp(material(uBvMat, res.rgb, n, normalize(uBvLight)), 0.0, 1.0);
+         res = vec4(mix(res.rgb, lit, L.a * uBvHi.a), res.a);
+      } else {
+         float s = dot(n, uBvLight) - uBvLight.z;
+         res = over(res, vec4(uBvHi.rgb, L.a * clamp(s * 3.0, 0.0, 1.0) * uBvHi.a));
+         res = over(res, vec4(uBvLo.rgb, L.a * clamp(-s * 3.0, 0.0, 1.0) * uBvHi.a));
+      }
    }
    if (uIgOn == 1) {
       float e = spreadA(texture(uB2, vUv).r, uIgSpread);
@@ -168,6 +215,20 @@ void main() {
       res = over(res, vec4(uStC.rgb, clamp(dil - ero, 0.0, 1.0) * uStC.a));
    }
    fragColor = res;
+}
+)";
+
+   // Two fx results stacked: uTop over uBottom (straight alpha).
+   const char* kFxCombineFrag = R"(#version 150
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uTop;
+uniform sampler2D uBottom;
+void main() {
+   vec4 s = texture(uTop, vUv), d = texture(uBottom, vUv);
+   float a = s.a + d.a * (1.0 - s.a);
+   vec3 c = a > 1e-5 ? (s.rgb * s.a + d.rgb * d.a * (1.0 - s.a)) / a : vec3(0.0);
+   fragColor = vec4(c, a);
 }
 )";
 
@@ -206,15 +267,36 @@ Scene2DNode::Fx Scene2DNode::FxDefault(int type)
       f.c[0] = 0.0f; f.c[1] = 0.0f; f.c[2] = 0.0f; f.c[3] = 1.0f;
       f.angle = 90.0f; f.dist = 0.0f; f.size = 0.0f;
       break;
+   case kFxSatin:
+      f.c[3] = 0.5f;
+      f.angle = 19.0f; f.dist = 11.0f; f.size = 14.0f;
+      break;
+   case kFxPattern:
+      f.c[3] = 1.0f;
+      f.angle = 0.0f; f.dist = 0.0f; f.size = 20.0f;
+      break;
    default: break;
    }
    return f;
 }
 
+bool Scene2DNode::FxSame(const Fx& a, const Fx& b)
+{
+   return a.on == b.on && std::equal(a.c, a.c + 4, b.c) && a.angle == b.angle && a.dist == b.dist && a.size == b.size &&
+          a.spread == b.spread && a.pos == b.pos && std::equal(a.c2, a.c2 + 4, b.c2) && a.pattern == b.pattern &&
+          a.material == b.material && std::equal(a.contour, a.contour + 4, b.contour);
+}
+
+const char* Scene2DNode::FxPatternName(int p)
+{
+   static const char* names[kFxPatternCount] = { "Checker", "Dots", "Lines", "Grid", "Noise" };
+   return p >= 0 && p < kFxPatternCount ? names[p] : "";
+}
+
 const char* Scene2DNode::FxName(int type)
 {
    static const char* names[kFxCount] = { "Drop Shadow", "Inner Shadow", "Outer Glow", "Stroke", "Colour Overlay", "Inner Glow", "Bevel",
-                                           "Gradient Overlay" };
+                                           "Gradient Overlay", "Satin", "Pattern Overlay" };
    return type >= 0 && type < kFxCount ? names[type] : "";
 }
 
@@ -1209,6 +1291,7 @@ bool Scene2DNode::EnsureFxShaders()
       mFxTried = true;
       mBlurProgram = GLUtil::CompileProgram(kBlurFrag);
       mFxProgram = GLUtil::CompileProgram(kFxFrag);
+      mFxCombineProgram = GLUtil::CompileProgram(kFxCombineFrag);
    }
    return mBlurProgram != 0 && mFxProgram != 0;
 }
@@ -1218,6 +1301,7 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
    Layer plain = l;
    for (Fx& f : plain.fx)
       f.on = false;
+   plain.fxMore.clear();
    if (!EnsureFxShaders())
    {
       DrawLayer(plain, depth, frameId, opacityMul, clipMode);
@@ -1241,20 +1325,25 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
    if (!GLUtil::EnsureFbo(mFxBlur[0], W, H, GL_RGBA16F, "Scene2DFx") || !GLUtil::EnsureFbo(mFxBlur[1], W, H, GL_RGBA16F, "Scene2DFx") ||
        !GLUtil::EnsureFbo(mFxOut, W, H, fmt, "Scene2DFx"))
       return;
-   const Fx& sh = l.fx[kFxShadow];
-   const Fx& in = l.fx[kFxInner];
-   const Fx& gl = l.fx[kFxGlow];
-   const Fx& st = l.fx[kFxStroke];
-   const Fx& ov = l.fx[kFxOverlay];
+   // One fx pass of `l`'s styles over its picture L (fill fillV) into outFbo.
+   auto runFx = [&](const Layer& fl, float fillV, GLUtil::Fbo& outFbo) -> bool
+   {
+   const Fx& sh = fl.fx[kFxShadow];
+   const Fx& in = fl.fx[kFxInner];
+   const Fx& gl = fl.fx[kFxGlow];
+   const Fx& st = fl.fx[kFxStroke];
+   const Fx& ov = fl.fx[kFxOverlay];
    // Blurred alpha: r for the drop shadow, g for the glow, b for the inner shadow.
    const float sig[3] = { sh.on ? std::max(0.0f, sh.size) * 0.5f : 0.0f, gl.on ? std::max(0.0f, gl.size) * 0.5f : 0.0f,
                           in.on ? std::max(0.0f, in.size) * 0.5f : 0.0f };
    const float maxSig = std::max({ sig[0], sig[1], sig[2] });
    const float stride = std::max(1.0f, 3.0f * maxSig / 48.0f);
    const int taps = std::min(64, (int)std::ceil(3.0f * maxSig / stride));
-   const Fx& ig = l.fx[kFxInnerGlow];
-   const Fx& bv = l.fx[kFxBevel];
-   const Fx& gr = l.fx[kFxGradient];
+   const Fx& ig = fl.fx[kFxInnerGlow];
+   const Fx& bv = fl.fx[kFxBevel];
+   const Fx& gr = fl.fx[kFxGradient];
+   const Fx& sa = fl.fx[kFxSatin];
+   const Fx& pa = fl.fx[kFxPattern];
    // Separable gaussian of the layer's alpha into `fb`, one sigma per channel.
    auto blur = [&](GLUtil::Fbo* fb, const float* s4)
    {
@@ -1285,12 +1374,13 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       blur(mFxBlur, s4);
    }
    // Second set: r for the inner glow, g for the bevel's height.
-   const bool two = ig.on || bv.on;
+   const bool two = ig.on || bv.on || sa.on;
    if (two)
    {
       if (!GLUtil::EnsureFbo(mFxBlur2[0], W, H, GL_RGBA16F, "Scene2DFx") || !GLUtil::EnsureFbo(mFxBlur2[1], W, H, GL_RGBA16F, "Scene2DFx"))
-         return;
-      const float s4[4] = { ig.on ? std::max(0.0f, ig.size) * 0.5f : 0.0f, bv.on ? std::max(0.5f, bv.size) * 0.5f : 0.0f, 0.0f, 0.0f };
+         return false;
+      const float s4[4] = { ig.on ? std::max(0.0f, ig.size) * 0.5f : 0.0f, bv.on ? std::max(0.5f, bv.size) * 0.5f : 0.0f,
+                            sa.on ? std::max(0.5f, sa.size) * 0.5f : 0.0f, 0.0f };
       blur(mFxBlur2, s4);
    }
    const bool lin = mDoc.linear;
@@ -1305,7 +1395,7 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       const float a = f.angle * kD2R;
       glUniform2f(glGetUniformLocation(mFxProgram, name), -std::cos(a) * f.dist / W, -std::sin(a) * f.dist / H);
    };
-   GLUtil::RunShaderPass(mFxOut, mFxProgram, [&]()
+   GLUtil::RunShaderPass(outFbo, mFxProgram, [&]()
    {
       const unsigned prog = mFxProgram;
       glActiveTexture(GL_TEXTURE0);
@@ -1321,6 +1411,23 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       glUniform1i(glGetUniformLocation(prog, "uIgOn"), ig.on ? 1 : 0);
       glUniform1i(glGetUniformLocation(prog, "uBvOn"), bv.on ? 1 : 0);
       glUniform1i(glGetUniformLocation(prog, "uGrOn"), gr.on ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uSaOn"), sa.on ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uPaOn"), pa.on ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uPaKind"), std::clamp(pa.pattern, 0, kFxPatternCount - 1));
+      glUniform1i(glGetUniformLocation(prog, "uBvMat"), std::clamp(bv.material, -1, 3));
+      glUniform1f(glGetUniformLocation(prog, "uPaScale"), std::max(2.0f, pa.size));
+      glUniform1f(glGetUniformLocation(prog, "uPaAngle"), pa.angle * kD2R);
+      col(sa, "uSaC");
+      col(pa, "uPaA");
+      off(sa, "uSaOff");
+      auto contourU = [&](const Fx& f, const char* name)
+      {
+         glUniform4f(glGetUniformLocation(prog, name), f.contour[0], f.contour[1], f.contour[2], f.contour[3]);
+      };
+      contourU(sh, "uShK");
+      contourU(gl, "uGlK");
+      contourU(bv, "uBvK");
+      contourU(sa, "uSaK");
       col(ig, "uIgC");
       col(bv, "uBvHi");
       col(gr, "uGrA");
@@ -1331,6 +1438,7 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       };
       col2(bv, "uBvLo");
       col2(gr, "uGrB");
+      col2(pa, "uPaB");
       glUniform1f(glGetUniformLocation(prog, "uIgSpread"), std::clamp(ig.spread, 0.0f, 1.0f));
       // Bevel: height slope scaled by its size and depth; light from `angle`, 30 degrees up. uv is y up.
       glUniform1f(glGetUniformLocation(prog, "uBvDepth"), std::max(0.5f, bv.size) * std::clamp(bv.dist, 0.0f, 1000.0f) * 0.04f);
@@ -1363,10 +1471,44 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       glUniform1f(glGetUniformLocation(prog, "uInSpread"), std::clamp(in.spread, 0.0f, 1.0f));
       glUniform1f(glGetUniformLocation(prog, "uGlSpread"), std::clamp(gl.spread, 0.0f, 1.0f));
       glUniform1f(glGetUniformLocation(prog, "uStSize"), std::clamp(st.size, 0.0f, 250.0f));
-      glUniform1f(glGetUniformLocation(prog, "uFill"), std::clamp(l.fill, 0.0f, 1.0f));
+      glUniform1f(glGetUniformLocation(prog, "uFill"), std::clamp(fillV, 0.0f, 1.0f));
    });
+   return true;
+   };
+   if (!runFx(l, l.fill, mFxOut))
+      return;
+   unsigned outTex = mFxOut.tex;
+   // More of one kind: each drawn alone (no fill) and stacked, under the result for shadows and glows, over it otherwise.
+   if (!l.fxMore.empty() && mFxCombineProgram != 0 && GLUtil::EnsureFbo(mFxExtra, W, H, fmt, "Scene2DFx") &&
+       GLUtil::EnsureFbo(mFxMore[0], W, H, fmt, "Scene2DFx") && GLUtil::EnsureFbo(mFxMore[1], W, H, fmt, "Scene2DFx"))
+   {
+      int ping = 0;
+      for (const auto& m : l.fxMore)
+      {
+         if (!m.second.on || m.first < 0 || m.first >= kFxCount)
+            continue;
+         Layer one = plain;
+         one.fx[m.first] = m.second;
+         if (!runFx(one, 0.0f, mFxExtra))
+            continue;
+         const bool under = m.first == kFxShadow || m.first == kFxGlow;
+         const unsigned top = under ? outTex : mFxExtra.tex, bottom = under ? mFxExtra.tex : outTex;
+         GLUtil::RunShaderPass(mFxMore[ping], mFxCombineProgram, [&]()
+         {
+            const unsigned prog = mFxCombineProgram;
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, bottom);
+            glUniform1i(glGetUniformLocation(prog, "uBottom"), 1);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, top);
+            glUniform1i(glGetUniformLocation(prog, "uTop"), 0);
+         });
+         outTex = mFxMore[ping].tex;
+         ping ^= 1;
+      }
+   }
    PassArgs a;
-   a.tex = mFxOut.tex;
+   a.tex = outTex;
    a.texW = W;
    a.texH = H;
    a.box[0] = (float)W;

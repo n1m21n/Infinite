@@ -444,6 +444,35 @@ namespace
 
 // ---- drawing one layer alone ---------------------------------------------------------
 
+namespace
+{
+   // The finished picture of PairAt(0) into rgba, top-down straight RGBA8.
+   void ReadFinished(unsigned int acc, unsigned int prog, int w, int h, bool linear, float headroom, std::vector<uint8_t>& rgba)
+   {
+      GLUtil::Fbo f;
+      if (!GLUtil::EnsureFbo(f, w, h, GLUtil::ImageWorkingFormat(), "Scene2D file layer"))
+         return;
+      GLUtil::RunShaderPass(f, prog, [&]()
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, acc);
+         glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
+         glUniform1i(glGetUniformLocation(prog, "uLinear"), linear ? 1 : 0);
+         GLUtil::SetImageHeadroom(prog, headroom);
+      });
+      rgba.assign((size_t)w * h * 4, 0);
+      GLint prev = 0;
+      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, f.fbo);
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+      glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
+      FlipRows(rgba, w, h);
+      GLUtil::DestroyFbo(f);
+   }
+}
+
 bool Scene2DNode::RenderLayerAlone(int id, int frameId, std::vector<uint8_t>& rgba)
 {
    if (FindConst(id) == nullptr || !EnsureShaders() || mFinishProgram == 0)
@@ -464,42 +493,79 @@ bool Scene2DNode::RenderLayerAlone(int id, int frameId, std::vector<uint8_t>& rg
       }
       at = t->parent;
    }
-   GLUtil::Fbo f;
-   bool ok = GLUtil::EnsureFbo(f, mDoc.w, mDoc.h, GLUtil::ImageWorkingFormat(), "Scene2D file layer");
-   if (ok)
+   const int keepSolo = soloLayer;
+   const bool keepOpaque = mAccOpaque;
+   soloLayer = id;
+   mIsolating = true;
+   mAccOpaque = false;
+   const float none[4] = { 0, 0, 0, 0 };
+   Clear(PairAt(0), none);
+   DrawList(0, 0, frameId, 1.0f);
+   soloLayer = keepSolo;
+   mIsolating = false;
+   mAccOpaque = keepOpaque;
+   rgba.clear();
+   ReadFinished(PairAt(0).Tex(), mFinishProgram, mDoc.w, mDoc.h, mDoc.linear, mDoc.headroom, rgba);
+   mLayers = keep;
+   return !rgba.empty();
+}
+
+bool Scene2DNode::RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba)
+{
+   if (FindConst(id) == nullptr || !EnsureShaders() || mFinishProgram == 0)
+      return false;
+   // Hide the layer and everything drawn after it: later siblings at its level and at every group level above it.
+   const std::vector<Layer> keep = mLayers;
+   for (int at = id, level = 0; at != 0; level++)
    {
-      const int keepSolo = soloLayer;
-      const bool keepOpaque = mAccOpaque;
-      soloLayer = id;
-      mIsolating = true;
-      mAccOpaque = false;
-      const float none[4] = { 0, 0, 0, 0 };
-      Clear(PairAt(0), none);
-      DrawList(0, 0, frameId, 1.0f);
-      soloLayer = keepSolo;
-      mIsolating = false;
-      mAccOpaque = keepOpaque;
-      const unsigned int one = PairAt(0).Tex();
-      const unsigned int prog = mFinishProgram;
-      GLUtil::RunShaderPass(f, prog, [&]()
+      const Layer* t = FindConst(at);
+      if (t == nullptr)
+         break;
+      const int parent = t->parent;
+      bool after = false;
+      for (const Layer* k : ListOf(parent))
       {
-         glActiveTexture(GL_TEXTURE0);
-         glBindTexture(GL_TEXTURE_2D, one);
-         glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
-         glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
-         GLUtil::SetImageHeadroom(prog, mDoc.headroom);
-      });
-      rgba.assign((size_t)mDoc.w * mDoc.h * 4, 0);
-      GLint prev = 0;
-      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, f.fbo);
-      glPixelStorei(GL_PACK_ALIGNMENT, 1);
-      glReadPixels(0, 0, mDoc.w, mDoc.h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
-      glPixelStorei(GL_PACK_ALIGNMENT, 4);
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
-      FlipRows(rgba, mDoc.w, mDoc.h);
-      GLUtil::DestroyFbo(f);
+         if (k->id == at)
+         {
+            after = true;
+            if (level > 0)
+               continue;   // a group holding the layer: its lower layers stay
+         }
+         if (after)
+            if (Layer* m = FindLayer(k->id))
+               m->visible = false;
+      }
+      at = parent;
    }
+   const bool keepOpaque = mAccOpaque;
+   const int keepSolo = soloLayer;
+   soloLayer = 0;
+   mIsolating = true;
+   const float none[4] = { 0, 0, 0, 0 };
+   Clear(PairAt(0), none);
+   DrawList(0, 0, frameId, 1.0f);
+   mIsolating = false;
+   mAccOpaque = keepOpaque;
+   soloLayer = keepSolo;
+   rgba.clear();
+   ReadFinished(PairAt(0).Tex(), mFinishProgram, mDoc.w, mDoc.h, mDoc.linear, mDoc.headroom, rgba);
+   mLayers = keep;
+   return !rgba.empty();
+}
+
+bool Scene2DNode::PictureUnder(int id, int effect, int frameId, std::vector<uint8_t>& rgba)
+{
+   const Layer* l = FindConst(id);
+   if (l == nullptr)
+      return false;
+   if (effect < 0)
+      return RenderBelow(id, frameId, rgba);
+   // An effect: the layer alone with this effect and the ones after it off.
+   const std::vector<Layer> keep = mLayers;
+   if (Layer* m = FindLayer(id))
+      for (size_t i = (size_t)effect; i < m->effects.size(); i++)
+         m->effects[i].on = false;
+   const bool ok = RenderLayerAlone(id, frameId, rgba);
    mLayers = keep;
    return ok;
 }

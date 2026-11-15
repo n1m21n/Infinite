@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <fstream>
@@ -1088,16 +1089,31 @@ namespace
    int sCurveDrag = -1;
    int sCurveLayer = 0;
    uint64_t sCurveDoc = 0;         // the drag belongs to one layer of one document
-   std::vector<float> sHist;   // the document's luminance histogram, refreshed every half second
+   std::vector<float> sHist;   // the luminance histogram of the picture an adjustment works on, refreshed every half second
    double sHistAt = -1.0;
    uint64_t sHistDoc = 0;
-   const std::vector<float>& DocHistogram(Scene2DNode* doc)
+   int sHistKey = -1;
+   // An adjustment's key (AdjExtras): an adjustment layer's id, or 100000 + layer id * 64 + effect index.
+   void KeySource(int key, int& id, int& effect)
    {
-      if (doc != nullptr && (ImGui::GetTime() - sHistAt > 0.5 || sHistDoc != sDocUid))
+      id = key;
+      effect = -1;
+      if (key >= 100000)
+      {
+         id = (key - 100000) / 64;
+         effect = (key - 100000) % 64;
+      }
+   }
+   const std::vector<float>& DocHistogram(Scene2DNode* doc, int key = 0)
+   {
+      if (doc != nullptr && (ImGui::GetTime() - sHistAt > 0.5 || sHistDoc != sDocUid || sHistKey != key))
       {
          sHistAt = ImGui::GetTime();
          sHistDoc = sDocUid;
-         if (!doc->Histogram(0, sHist, 64))
+         sHistKey = key;
+         int id = 0, eff = -1;
+         KeySource(key, id, eff);
+         if (!doc->Histogram(id, sHist, 64, eff))
             sHist.clear();
       }
       return sHist;
@@ -1281,6 +1297,47 @@ namespace
    // The rows an adjustment has besides its amount: Levels and Curves per channel (with the picture's histogram and
    // Auto), and the settings of the newer adjustments. T is a Layer or an Effect: both hold the same fields.
    int sAdjCh = 0;          // 0 the master, 1..3 red, green, blue
+   // Curves / Hue picked on the picture (Photoshop's hand): armed for one adjustment key; a drag on the canvas then moves
+   // the curve point at the clicked tone up and down, or turns the hue left and right.
+   struct AdjPick { int key = 0; uint64_t doc = 0; } sAdjPick;
+   // Runs f on the adjustment fields an adjustment key names (a Layer or an Effect); false when it is gone.
+   template <class F> bool WithAdjKey(Scene2DNode* doc, int key, F f)
+   {
+      int id = 0, eff = -1;
+      KeySource(key, id, eff);
+      Layer* l = doc != nullptr ? doc->FindLayer(id) : nullptr;
+      if (l == nullptr)
+         return false;
+      if (eff < 0)
+         f(*l);
+      else if (eff < (int)l->effects.size())
+         f(l->effects[(size_t)eff]);
+      else
+         return false;
+      return true;
+   }
+   // The y of a curve at x, and the point at x (added when none is near).
+   float CurveAt(const std::vector<float>& c, float x)
+   {
+      float lut[256];
+      Scene2DNode::CurveLut(c, lut, 256);
+      return lut[std::clamp((int)(x * 255.0f + 0.5f), 0, 255)];
+   }
+   int CurvePointAt(std::vector<float>& c, float x)
+   {
+      const int n = (int)c.size() / 2;
+      for (int i = 0; i < n; i++)
+         if (std::fabs(c[(size_t)i * 2] - x) < 0.03f)
+            return i;
+      if (n >= 16)
+         return -1;
+      const float y = CurveAt(c, x);
+      int at = 1;
+      while (at < n - 1 && c[(size_t)at * 2] < x)
+         at++;
+      c.insert(c.begin() + at * 2, { x, y });
+      return at;
+   }
    int sAdjTone = 1;        // Colour Balance: shadows, midtones, highlights
    int sAdjRange = 0;       // Selective Colour: which colours
    int sAdjOut = 0;         // Channel Mixer: which output
@@ -1304,7 +1361,7 @@ namespace
       if (t == S::kAdjLevels)
       {
          float* lv = sAdjCh == 0 ? x.levels : x.levelsCh[sAdjCh - 1];
-         const std::vector<float>& h = DocHistogram(doc);
+         const std::vector<float>& h = DocHistogram(doc, key);
          if (!h.empty())
          {
             const float w = ImGui::GetContentRegionAvail().x;
@@ -1318,7 +1375,7 @@ namespace
          SliderRow(T("Output white"), &lv[3], 0.0f, 1.0f, "%.2f");
          float autoLv[3][4];
          if (ActionButton::Draw((std::string(T("Auto")) + "##v2dauto" + std::to_string(key)).c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
-             doc != nullptr && doc->AutoLevels(0, autoLv))
+             doc != nullptr && [&]() { int id = 0, eff = -1; KeySource(key, id, eff); return doc->AutoLevels(id, autoLv, eff); }())
          {
             PushUndoCheckpoint("Auto levels");
             for (int ch = 0; ch < 3; ch++)
@@ -1327,7 +1384,14 @@ namespace
          }
       }
       if (t == S::kAdjCurves)
-         CurveEditor(sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1], key * 4 + sAdjCh, &DocHistogram(doc));
+         CurveEditor(sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1], key * 4 + sAdjCh, &DocHistogram(doc, key));
+      if (t == S::kAdjCurves || t == S::kAdjHue)
+      {
+         const bool armed = sAdjPick.key == key && sAdjPick.doc == sDocUid;
+         if (ActionButton::Draw((std::string(armed ? T("Picking") : T("Pick on picture")) + "##v2dadjpick" + std::to_string(key)).c_str(),
+                                ImVec2(-1.0f, 0.0f), armed ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+            sAdjPick = armed ? AdjPick() : AdjPick{ key, sDocUid };
+      }
       if (t == S::kAdjColorBalance)
       {
          ComboRow(T("Tone"), &sAdjTone, { T("Shadows"), T("Midtones"), T("Highlights") });
@@ -1924,6 +1988,87 @@ namespace
 
    // ---- paint tools -------------------------------------------------------
 
+   // The brush and eraser settings kept between runs: "<b|e> <field> <values>" lines in the app's support folder.
+   std::string BrushFile() { return AppPaths::AppSupportDir() + "/2dview-brushes.txt"; }
+   template <class F> void BrushFields(BrushEngine::Brush& b, F f)
+   {
+      auto i = [&](const char* n, int& v) { float x = (float)v; f(n, &x, 1); v = (int)std::lround(x); };
+      auto bo = [&](const char* n, bool& v) { float x = v ? 1.0f : 0.0f; f(n, &x, 1); v = x > 0.5f; };
+      i("tip", b.tip); f("size", &b.size, 1); f("hardness", &b.hardness, 1); f("opacity", &b.opacity, 1);
+      f("flow", &b.flow, 1); f("spacing", &b.spacing, 1); f("jitter", &b.jitter, 1); f("angle", &b.angle, 1);
+      f("roundness", &b.roundness, 1); f("smoothing", &b.smoothing, 1); i("stabiliser", b.stabiliser);
+      bo("pencil", b.pencil); bo("pressureSize", b.pressureSize); bo("pressureOpacity", b.pressureOpacity);
+      i("mode", b.mode); bo("lockAlpha", b.lockAlpha); bo("follow", b.follow); f("taperIn", &b.taperIn, 1);
+      f("taperOut", &b.taperOut, 1); f("sizeJitter", &b.sizeJitter, 1); f("opacityJitter", &b.opacityJitter, 1);
+      f("hueJitter", &b.hueJitter, 1); f("satJitter", &b.satJitter, 1); f("valJitter", &b.valJitter, 1);
+      i("range", b.range); bo("sampleAll", b.sampleAll); i("relief", b.relief); i("tines", b.tines);
+      i("material", b.material); i("profile", b.profile); f("depth", &b.depth, 1); f("lightAz", &b.lightAz, 1);
+      f("lightEl", &b.lightEl, 1); i("grain", b.grain); f("grainScale", &b.grainScale, 1); f("grainDepth", &b.grainDepth, 1);
+      i("grainMode", b.grainMode); i("dualTip", b.dualTip); f("dualScale", &b.dualScale, 1); f("dualScatter", &b.dualScatter, 1);
+      i("colorAlong", b.colorAlong); f("colorB", b.colorB, 3); f("colorPeriod", &b.colorPeriod, 1); f("wet", &b.wet, 1);
+      f("refill", &b.refill, 1);
+   }
+   std::string BrushText()
+   {
+      std::ostringstream o;
+      auto put = [&](char who, BrushEngine::Brush& b)
+      {
+         BrushFields(b, [&](const char* n, float* v, int c)
+         {
+            o << who << " " << n;
+            for (int k = 0; k < c; k++)
+               o << " " << v[k];
+            o << "\n";
+         });
+      };
+      put('b', sBrush);
+      put('e', sEraser);
+      return o.str();
+   }
+   void LoadBrushes()
+   {
+      std::ifstream in(BrushFile());
+      std::string line;
+      while (std::getline(in, line))
+      {
+         std::istringstream s(line);
+         char who = 0;
+         std::string name;
+         if (!(s >> who >> name))
+            continue;
+         std::vector<float> vals;
+         for (float v; s >> v;)
+            vals.push_back(v);
+         BrushFields(who == 'e' ? sEraser : sBrush, [&](const char* n, float* v, int c)
+         {
+            if (name == n && (int)vals.size() >= c)
+               std::copy(vals.begin(), vals.begin() + c, v);
+         });
+      }
+      sEraser.mode = BrushEngine::kErase;
+   }
+   // Writes the settings when they changed, at most once a second.
+   void SaveBrushesIfChanged()
+   {
+      static std::string last;
+      static double at = -10.0;
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr || ImGui::GetTime() - at < 1.0)
+         return;
+      at = ImGui::GetTime();
+      const std::string now = BrushText();
+      if (last.empty())
+      {
+         last = now;   // the first look: what was loaded
+         return;
+      }
+      if (now == last)
+         return;
+      last = now;
+      std::error_code ec;
+      std::filesystem::create_directories(AppPaths::AppSupportDir(), ec);
+      std::ofstream(BrushFile()) << now;
+   }
+
    void InitBrushes()
    {
       if (sBrushInit)
@@ -1942,6 +2087,8 @@ namespace
       if (sEraserPreset >= 0)
          sEraser = presets[sEraserPreset].brush;
       sEraser.mode = BrushEngine::kErase;
+      if (std::getenv("INFINITE_VIEW2DTEST") == nullptr)
+         LoadBrushes();
    }
 
    // Retouch tools share one brush; the tool picks what it does to the pixels.
@@ -4488,6 +4635,33 @@ namespace
       }
       else if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Middle) || (panTool && ImGui::IsMouseClicked(ImGuiMouseButton_Left))))
          BeginOp(doc, 4, mouse, nullptr);
+      else if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && sAdjPick.key != 0 && sAdjPick.doc == sDocUid &&
+               !inRulerTop && !inRulerLeft)
+      {
+         // Curves / Hue from the picture: the tone (or hue) under the pointer is what the drag moves.
+         float c[3] = { 0, 0, 0 };
+         doc->Pick(sMouseDoc.x, sMouseDoc.y, c, 3, 0);
+         const int key = sAdjPick.key;
+         BeginOp(doc, 23, mouse, "Adjust from picture");
+         if (!WithAdjKey(doc, key, [&](auto& x)
+         {
+            if (x.adjType == Scene2DNode::kAdjCurves)
+            {
+               const float v = sAdjCh == 0 ? 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2] : c[sAdjCh - 1];
+               std::vector<float>& cv = sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1];
+               sOp.hx = std::clamp(v, 0.0f, 1.0f);
+               sOp.hy = CurveAt(cv, sOp.hx);
+            }
+            else
+               sOp.hy = x.adjAmt;
+         }))
+         {
+            sAdjPick = AdjPick();
+            sOp = Op();
+         }
+         else
+            sOp.guideIndex = key;
+      }
       else if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
       {
          if (inRulerTop || inRulerLeft)
@@ -4755,6 +4929,27 @@ namespace
             PenDrag(doc, mouse);
          else if (sOp.kind == 14)
             NodeDrag(doc);
+         else if (sOp.kind == 23)
+         {
+            const float dx = (mouse.x - sOp.start.x) / 300.0f, dy = (sOp.start.y - mouse.y) / 300.0f;
+            WithAdjKey(doc, sOp.guideIndex, [&](auto& x)
+            {
+               if (x.adjType == Scene2DNode::kAdjCurves)
+               {
+                  std::vector<float>& cv = sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1];
+                  const int i = CurvePointAt(cv, sOp.hx);
+                  if (i >= 0)
+                     cv[(size_t)i * 2 + 1] = std::clamp(sOp.hy + dy, 0.0f, 1.0f);
+               }
+               else
+               {
+                  float lo = 0.0f, hi = 1.0f;
+                  Scene2DNode::AdjRange(x.adjType, lo, hi);
+                  x.adjAmt = std::clamp(sOp.hy + dx * (hi - lo), lo, hi);
+               }
+            });
+            Touch();
+         }
          else if (sOp.kind == 11)
          {
             // On a painted 3D surface the eyedropper reads the paint, not the lit picture.
@@ -7398,16 +7593,20 @@ namespace
       const char* category;
       bool animated;          // moves by itself: redraws every frame
       bool toMask;            // its alpha cuts the layer
+      const char* helper = nullptr;      // a recipe: a second node wired into the effect's second input, left on the
+      const char* helperCat = nullptr;   // canvas beside the document so it can be fed (audio) or set (palette file)
    };
    const NodeEffectEntry kNodeEffects[] = {
       { "Gaussian Blur", "Blur", "gaussianblur", "Effects", false, false },
       { "Box Blur", "Blur", "boxblur", "Effects", false, false },
       { "Motion Blur", "Blur", "motionblur", "Effects", false, false },
       { "Displace", "Distort", "displace", "Effects", false, false },
+      { "Spectrum Displace", "Distort", "displace", "Effects", true, false, "Audio Texture", "Source" },
       { "Kaleidoscope", "Distort", "kaleidoscope", "Effects", false, false },
       { "Bloom", "Stylize", "bloom", "Effects", false, false },
       { "Audio Color Ramp", "Colour", "Audio Color Ramp", "Compositing", true, false },
       { "Predictive Coloring", "Colour", "Predictive Coloring", "Prediction", false, false },
+      { "Map to Palette", "Colour", "lookup", "Compositing", false, false, "Palette", "Modulators" },
       { "Feedback", "Time", "Feedback", "Compositing", true, false },
       { "Trails", "Time", "Trails", "Compositing", true, false },
       { "Time Machine", "Time", "Time Machine", "Compositing", true, false },
@@ -7421,6 +7620,27 @@ namespace
 
    struct EffAdd { int layer = 0; int native = -1; int node = -1; uint64_t doc = 0; } sEffAdd;
    struct EffOp { int layer = 0; int index = -1; int op = 0; uint64_t doc = 0; } sEffOp;   // 1 up, 2 down, 3 delete
+
+   // Spawns an entry's node (hidden) and its recipe helper (on the canvas, wired into the second input); 0 on failure.
+   uint64_t SpawnEffectNode(const NodeEffectEntry& ne, float x, float y)
+   {
+      GraphNode* gn = SpawnNode(ne.type, ne.category, x, y);   // checkpoints the undo itself
+      if (gn == nullptr)
+         return 0;
+      gn->hiddenFromCanvas = true;
+      const uint64_t uid = gn->uid;
+      if (ne.helper != nullptr)
+         if (GraphNode* h = SpawnNode(ne.helper, ne.helperCat, x - 260.0f, y))   // can move gNodes: find the effect again
+         {
+            const int hi = h->index;
+            if (GraphNode* again = FindNodeByUid(uid))
+            {
+               std::string err;
+               ConnectNodes(hi, 0, again->index, 1, err);
+            }
+         }
+      return uid;
+   }
 
    // A param name as a label: "edgeSoftness" -> "Edge softness".
    std::string ParamLabel(const char* name)
@@ -7558,6 +7778,88 @@ namespace
 
    std::string EffPresetDir() { return AppPaths::AppSupportDir() + "/2dfx"; }
 
+   // A node effect's params in a preset: one "name value" line each (texts with newlines escaped), set back by name.
+   class ParamLines : public ParamVisitor
+   {
+   public:
+      std::ostringstream o;
+      void Float(const char* n, float& v) override { o << n << " " << v << "\n"; }
+      void Int(const char* n, int& v) override { o << n << " " << v << "\n"; }
+      void Bool(const char* n, bool& v) override { o << n << " " << +v << "\n"; }
+      void Color(const char* n, float c[3]) override { o << n << " " << c[0] << " " << c[1] << " " << c[2] << "\n"; }
+      void Text(const char* n, std::string& v) override
+      {
+         std::string t;
+         for (char c : v)
+            t += c == '\n' ? std::string("\\n") : c == '\\' ? std::string("\\\\") : std::string(1, c);
+         o << n << " " << t << "\n";
+      }
+   };
+   class ParamSet : public ParamVisitor
+   {
+   public:
+      std::map<std::string, std::string> v;
+      bool Has(const char* n, std::istringstream& s)
+      {
+         const auto it = v.find(n);
+         if (it == v.end())
+            return false;
+         s.str(it->second);
+         return true;
+      }
+      void Float(const char* n, float& x) override { std::istringstream s; if (Has(n, s)) s >> x; }
+      void Int(const char* n, int& x) override { std::istringstream s; if (Has(n, s)) s >> x; }
+      void Bool(const char* n, bool& x) override { std::istringstream s; int b = x; if (Has(n, s) && (s >> b)) x = b != 0; }
+      void Color(const char* n, float c[3]) override { std::istringstream s; if (Has(n, s)) s >> c[0] >> c[1] >> c[2]; }
+      void Text(const char* n, std::string& x) override
+      {
+         const auto it = v.find(n);
+         if (it == v.end())
+            return;
+         std::string t;
+         for (size_t i = 0; i < it->second.size(); i++)
+            if (it->second[i] == '\\' && i + 1 < it->second.size())
+               t += it->second[++i] == 'n' ? '\n' : it->second[i];
+            else
+               t += it->second[i];
+         x = t;
+      }
+   };
+   // "--node <effect index>" then its param lines, after the stack text.
+   std::string EffectParamsText(const Layer& l)
+   {
+      std::string out;
+      for (size_t i = 0; i < l.effects.size(); i++)
+         if (l.effects[i].uid != 0)
+            if (GraphNode* gn = FindNodeByUid(l.effects[i].uid))
+               if (gn->node)
+               {
+                  ParamLines pl;
+                  gn->node->VisitParams(pl);
+                  out += "--node " + std::to_string(i) + "\n" + pl.o.str();
+               }
+      return out;
+   }
+   std::map<int, ParamSet> ParseEffectParams(const std::string& text)
+   {
+      std::map<int, ParamSet> out;
+      std::istringstream s(text);
+      std::string line;
+      int at = -1;
+      while (std::getline(s, line))
+      {
+         if (line.rfind("--node ", 0) == 0)
+         {
+            at = std::atoi(line.c_str() + 7);
+            continue;
+         }
+         const size_t sp = line.find(' ');
+         if (at >= 0 && sp != std::string::npos)
+            out[at].v[line.substr(0, sp)] = line.substr(sp + 1);
+      }
+      return out;
+   }
+
    void EffectPresets(Layer& l)
    {
       static char name[64] = "";
@@ -7572,7 +7874,7 @@ namespace
          std::error_code ec;
          std::filesystem::create_directories(EffPresetDir(), ec);
          std::ofstream f(EffPresetDir() + "/" + name + ".inf2dfx");
-         f << Scene2DNode::EffectsText(l);
+         f << Scene2DNode::EffectsText(l) << "\n--params\n" << EffectParamsText(l);
       }
       std::vector<std::string> files;
       std::error_code ec;
@@ -7593,14 +7895,22 @@ namespace
       std::ifstream f(EffPresetDir() + "/" + files[(size_t)pick] + ".inf2dfx");
       std::stringstream ss;
       ss << f.rdbuf();
-      Layer got = l;
-      if (!Scene2DNode::ParseEffects(ss.str(), got))
-         return;
-      // Node effects come back as new nodes of the same kind, with the saved params left to their defaults' owners:
-      // a preset holds the stack's shape and its native settings.
-      std::vector<Scene2DNode::Effect> keep;
-      for (Scene2DNode::Effect& e : got.effects)
+      std::string text = ss.str(), params;
+      const size_t cut = text.find("\n--params\n");
+      if (cut != std::string::npos)
       {
+         params = text.substr(cut + 10);
+         text.resize(cut);
+      }
+      Layer got = l;
+      if (!Scene2DNode::ParseEffects(text, got))
+         return;
+      std::map<int, ParamSet> sets = ParseEffectParams(params);
+      // Node effects come back as new nodes of the same kind, with the params the preset saved.
+      std::vector<Scene2DNode::Effect> keep;
+      for (int gi = 0; gi < (int)got.effects.size(); gi++)
+      {
+         Scene2DNode::Effect& e = got.effects[(size_t)gi];
          if (e.uid == 0)
          {
             keep.push_back(e);
@@ -7610,9 +7920,14 @@ namespace
          const std::string type = old != nullptr ? old->typeName : std::string();
          for (const NodeEffectEntry& ne : kNodeEffects)
             if (e.entry == ne.label)
-               if (GraphNode* gn = SpawnNode(ne.type, ne.category, 0.0f, 0.0f))
+               if (const uint64_t uid = SpawnEffectNode(ne, 0.0f, 0.0f))
                {
-                  e.uid = gn->uid;
+                  const auto ps = sets.find(gi);
+                  if (ps != sets.end())
+                     if (GraphNode* gn = FindNodeByUid(uid))
+                        if (gn->node)
+                           gn->node->VisitParams(ps->second);
+                  e.uid = uid;
                   e.shown = false;
                   keep.push_back(e);
                }
@@ -7654,13 +7969,12 @@ namespace
                   if (gn.node.get() == doc)
                      host = &gn;
                const float x = host != nullptr ? host->liveX - 300.0f : 0.0f, y = host != nullptr ? host->liveY + 200.0f : 0.0f;
-               if (GraphNode* gn = SpawnNode(ne.type, ne.category, x, y))   // checkpoints the undo itself
+               if (const uint64_t uid = SpawnEffectNode(ne, x, y))
                {
-                  e.uid = gn->uid;
+                  e.uid = uid;
                   e.entry = ne.label;
                   e.animated = ne.animated;
                   e.toMask = ne.toMask;
-                  gn->hiddenFromCanvas = true;
                   if (Layer* again = doc->FindLayer(sEffAdd.layer))
                      again->effects.push_back(e);
                   Touch();
@@ -7707,6 +8021,137 @@ namespace
       }
    }
 
+   // A style's settings; `primary` is the layer's own slot (its rows can be modulated), else one of its extras.
+   void FxContourRow(Scene2DNode::Fx& f, int key)
+   {
+      static const float kPre[4][4] = { { 0.25f, 0.25f, 0.75f, 0.75f }, { 0.3f, 0.1f, 0.7f, 0.9f }, { 0.45f, 0.05f, 0.55f, 0.95f },
+                                        { 0.4f, 1.0f, 0.8f, 0.0f } };
+      int pick = 4;
+      for (int i = 0; i < 4; i++)
+         if (std::equal(f.contour, f.contour + 4, kPre[i]))
+            pick = i;
+      if (ComboRow(T("Contour"), &pick, { T("Linear"), T("Soft"), T("Hard"), T("Ring"), T("Custom") }) && pick < 4)
+      {
+         std::copy(kPre[pick], kPre[pick] + 4, f.contour);
+         Touch();
+      }
+      if (pick == 4)
+      {
+         std::vector<float> c = { 0.0f, 0.0f, f.contour[0], f.contour[1], f.contour[2], f.contour[3], 1.0f, 1.0f };
+         CurveEditor(c, key);
+         const size_t n = c.size();
+         const float got[4] = { n >= 6 ? c[2] : 0.25f, n >= 6 ? c[3] : 0.25f, n >= 6 ? c[n - 4] : 0.75f, n >= 6 ? c[n - 3] : 0.75f };
+         if (!std::equal(got, got + 4, f.contour))
+         {
+            std::copy(got, got + 4, f.contour);
+            Touch();
+         }
+      }
+   }
+
+   void FxRows(Layer& l, int t, Scene2DNode::Fx& f, bool primary)
+   {
+      using S = Scene2DNode;
+      const bool two = t == S::kFxBevel || t == S::kFxGradient || t == S::kFxPattern;
+      ColorRow(T(t == S::kFxBevel ? "Highlight" : t == S::kFxGradient ? "Start" : "Colour"), f.c);
+      if (two && !(t == S::kFxBevel && f.material >= 0))
+         ColorRow(T(t == S::kFxBevel ? "Shadow" : t == S::kFxGradient ? "End" : "Second"), f.c2);
+      const int fb = S::kLfFxBase + t * S::kLfFxFields;
+      if (primary)
+         ModNext(l, fb + 3);
+      SliderRow(T("Opacity"), &f.c[3], 0.0f, 1.0f, "%.2f");
+      if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxSatin || two)
+      {
+         if (primary)
+            ModNext(l, fb + 2);
+         SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+      }
+      if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxBevel || t == S::kFxSatin)
+      {
+         if (primary)
+            ModNext(l, fb + 1);
+         if (t == S::kFxBevel)
+            SliderRow(T("Depth"), &f.dist, 0.0f, 200.0f, "%.0f%%");
+         else
+            SliderRow(T("Distance"), &f.dist, 0.0f, 200.0f, "%.0f px");
+      }
+      if (t != S::kFxOverlay && t != S::kFxGradient)
+      {
+         if (primary)
+            ModNext(l, fb);
+         SliderRow(T(t == S::kFxStroke ? "Width" : t == S::kFxPattern ? "Scale" : "Size"), &f.size, 0.0f, 200.0f, "%.0f px");
+      }
+      if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxGlow || t == S::kFxInnerGlow)
+         SliderRow(T("Spread"), &f.spread, 0.0f, 1.0f, "%.2f");
+      if (t == S::kFxStroke)
+      {
+         int pos = f.pos;
+         if (ComboRow(T("Position"), &pos, { T("Outside"), T("Inside"), T("Centre") }))
+            f.pos = pos;
+      }
+      if (t == S::kFxPattern)
+      {
+         std::vector<std::string> names;
+         for (int p = 0; p < S::kFxPatternCount; p++)
+            names.push_back(T(S::FxPatternName(p)));
+         int p = std::clamp(f.pattern, 0, S::kFxPatternCount - 1);
+         if (ComboRow(T("Pattern"), &p, names))
+            f.pattern = p;
+      }
+      if (t == S::kFxBevel)
+      {
+         int m = f.material + 1;
+         if (ComboRow(T("Material"), &m, { T("Plain"), T("Plasticine"), T("Metal"), T("Chrome"), T("Stipple") }))
+            f.material = m - 1;
+      }
+      if (t == S::kFxShadow || t == S::kFxGlow || t == S::kFxBevel || t == S::kFxSatin)
+         FxContourRow(f, 900000 + t * 64 + (int)(ImGui::GetID("ct") & 63));
+   }
+
+   std::string StylePresetDir() { return AppPaths::AppSupportDir() + "/2dstyle"; }
+
+   // Layer style presets: the layer's styles saved by name, applied to any layer (replacing its styles).
+   void StylePresets(Layer& l)
+   {
+      static char name[64] = "";
+      SectionCard::Begin(T("Style"));
+      FieldLabel(T("Preset"));
+      ImGui::SetNextItemWidth(sFieldW);
+      FieldWell::PushStyle();
+      ImGui::InputTextWithHint("##v2dstylename", T("Name"), name, sizeof name);
+      FieldWell::PopStyle();
+      if (ActionButton::Draw((std::string(T("Save style")) + "##v2dstylesave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
+          name[0] != 0 && l.AnyFx())
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(StylePresetDir(), ec);
+         std::ofstream(StylePresetDir() + "/" + name + ".inf2dstyle") << Scene2DNode::StyleText(l);
+      }
+      std::vector<std::string> files;
+      std::error_code ec;
+      for (const auto& de : std::filesystem::directory_iterator(StylePresetDir(), ec))
+         if (de.path().extension() == ".inf2dstyle")
+            files.push_back(de.path().stem().string());
+      if (files.empty())
+         return;
+      std::sort(files.begin(), files.end());
+      std::vector<std::string> names = { T("Apply style") };
+      names.insert(names.end(), files.begin(), files.end());
+      int shown = 0;
+      if (!ComboRow(T("Apply"), &shown, names) || shown <= 0)
+         return;
+      std::ifstream f(StylePresetDir() + "/" + files[(size_t)shown - 1] + ".inf2dstyle");
+      std::stringstream ss;
+      ss << f.rdbuf();
+      Layer got = l;
+      if (!Scene2DNode::ParseStyle(ss.str(), got))
+         return;
+      PushUndoCheckpoint("Apply layer style");
+      std::copy(got.fx, got.fx + Scene2DNode::kFxCount, l.fx);
+      l.fxMore = got.fxMore;
+      Touch();
+   }
+
    void DrawEffectsTab(Scene2DNode* doc)
    {
       Layer* l = Active(doc);
@@ -7720,49 +8165,46 @@ namespace
       l = Active(doc);
       if (l == nullptr || l->kind == Kind::Group)
          return;
+      StylePresets(*l);
+      int removeMore = -1;
       for (int t = 0; t < Scene2DNode::kFxCount; t++)
       {
-         Scene2DNode::Fx& f = l->fx[t];
          ImGui::PushID(t);
          SectionCard::Begin(T(Scene2DNode::FxName(t)));
-         BoolRow(T("On"), &f.on);
-         if (f.on)
+         BoolRow(T("On"), &l->fx[t].on);
+         if (l->fx[t].on)
          {
-            const bool two = t == Scene2DNode::kFxBevel || t == Scene2DNode::kFxGradient;
-            ColorRow(T(t == Scene2DNode::kFxBevel ? "Highlight" : two ? "Start" : "Colour"), f.c);
-            if (two)
-               ColorRow(T(t == Scene2DNode::kFxBevel ? "Shadow" : "End"), f.c2);
-            const int fb = Scene2DNode::kLfFxBase + t * Scene2DNode::kLfFxFields;
-            ModNext(*l, fb + 3);
-            SliderRow(T("Opacity"), &f.c[3], 0.0f, 1.0f, "%.2f");
-            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || two)
+            FxRows(*l, t, l->fx[t], true);
+            // More of the same kind, each with its own settings.
+            for (int m = 0; m < (int)l->fxMore.size(); m++)
             {
-               ModNext(*l, fb + 2);
-               SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+               if (l->fxMore[(size_t)m].first != t)
+                  continue;
+               ImGui::PushID(100 + m);
+               ImGui::Separator();
+               Scene2DNode::Fx& g = l->fxMore[(size_t)m].second;
+               BoolRow(T("On"), &g.on);
+               FxRows(*l, t, g, false);
+               if (ActionButton::Draw(T("Remove"), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+                  removeMore = m;
+               ImGui::PopID();
             }
-            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || t == Scene2DNode::kFxBevel)
+            if (ActionButton::Draw(T("Add another"), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
             {
-               ModNext(*l, fb + 1);
-               if (t == Scene2DNode::kFxBevel)
-                  SliderRow(T("Depth"), &f.dist, 0.0f, 200.0f, "%.0f%%");
-               else
-                  SliderRow(T("Distance"), &f.dist, 0.0f, 200.0f, "%.0f px");
-            }
-            if (t != Scene2DNode::kFxOverlay && t != Scene2DNode::kFxGradient)
-            {
-               ModNext(*l, fb);
-               SliderRow(T(t == Scene2DNode::kFxStroke ? "Width" : "Size"), &f.size, 0.0f, 200.0f, "%.0f px");
-            }
-            if (t == Scene2DNode::kFxShadow || t == Scene2DNode::kFxInner || t == Scene2DNode::kFxGlow || t == Scene2DNode::kFxInnerGlow)
-               SliderRow(T("Spread"), &f.spread, 0.0f, 1.0f, "%.2f");
-            if (t == Scene2DNode::kFxStroke)
-            {
-               int pos = f.pos;
-               if (ComboRow(T("Position"), &pos, { T("Outside"), T("Inside"), T("Centre") }))
-                  f.pos = pos;
+               PushUndoCheckpoint("Add layer style");
+               Scene2DNode::Fx g = l->fx[t];
+               g.on = true;
+               l->fxMore.emplace_back(t, g);
+               Touch();
             }
          }
          ImGui::PopID();
+      }
+      if (removeMore >= 0 && removeMore < (int)l->fxMore.size())
+      {
+         PushUndoCheckpoint("Remove layer style");
+         l->fxMore.erase(l->fxMore.begin() + removeMore);
+         Touch();
       }
    }
 
@@ -8601,6 +9043,7 @@ namespace
    void DrawPanel()
    {
       InitBrushes();
+      SaveBrushesIfChanged();
       FollowCanvasSelection();
       Scene2DNode* doc = FindDoc();
       if (doc == nullptr)

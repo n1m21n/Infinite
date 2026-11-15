@@ -139,6 +139,86 @@ void Scene2DNode::CurveLut(const std::vector<float>& pts, float* lut, int n)
    }
 }
 
+namespace
+{
+   // One layer style's settings after "<key> <id> <type>": on, colour, angle, distance, size, spread, position, second
+   // colour, pattern, material, contour. Older docs stop after position or after the second colour.
+   void WriteFxFields(std::ostream& o, const Scene2DNode::Fx& f)
+   {
+      o << +f.on;
+      for (float v : f.c) o << " " << v;
+      o << " " << f.angle << " " << f.dist << " " << f.size << " " << f.spread << " " << f.pos;
+      for (float v : f.c2) o << " " << v;
+      o << " " << f.pattern << " " << f.material;
+      for (float v : f.contour) o << " " << v;
+   }
+   void ReadFxFields(std::istream& s, Scene2DNode::Fx& f)
+   {
+      int on = 0;
+      s >> on >> f.c[0] >> f.c[1] >> f.c[2] >> f.c[3] >> f.angle >> f.dist >> f.size >> f.spread >> f.pos;
+      f.on = on != 0;
+      float c2[4];
+      if (s >> c2[0] >> c2[1] >> c2[2] >> c2[3])
+         std::copy(c2, c2 + 4, f.c2);
+      int pat = 0, mat = -1;
+      float ct[4];
+      if (s >> pat >> mat)
+      {
+         f.pattern = std::clamp(pat, 0, Scene2DNode::kFxPatternCount - 1);
+         f.material = std::clamp(mat, -1, 3);
+         if (s >> ct[0] >> ct[1] >> ct[2] >> ct[3])
+            for (int k = 0; k < 4; k++)
+               f.contour[k] = std::clamp(ct[k], 0.0f, 1.0f);
+      }
+   }
+}
+
+std::string Scene2DNode::StyleText(const Layer& l)
+{
+   std::ostringstream o;
+   o << "inf2dstyle 1\n";
+   for (int t = 0; t < kFxCount; t++)
+      if (!FxSame(l.fx[t], FxDefault(t)))
+      {
+         o << "fx " << t << " ";
+         WriteFxFields(o, l.fx[t]);
+         o << "\n";
+      }
+   for (const auto& m : l.fxMore)
+   {
+      o << "fx2 " << m.first << " ";
+      WriteFxFields(o, m.second);
+      o << "\n";
+   }
+   return o.str();
+}
+
+bool Scene2DNode::ParseStyle(const std::string& text, Layer& l)
+{
+   std::istringstream in(text);
+   std::string line;
+   if (!std::getline(in, line) || line.rfind("inf2dstyle", 0) != 0)
+      return false;
+   for (int t = 0; t < kFxCount; t++)
+      l.fx[t] = FxDefault(t);
+   l.fxMore.clear();
+   while (std::getline(in, line))
+   {
+      std::istringstream s(line);
+      std::string key;
+      int t = -1;
+      if (!(s >> key >> t) || t < 0 || t >= kFxCount || (key != "fx" && key != "fx2"))
+         continue;
+      Fx f = FxDefault(t);
+      ReadFxFields(s, f);
+      if (key == "fx")
+         l.fx[t] = f;
+      else
+         l.fxMore.emplace_back(t, f);
+   }
+   return true;
+}
+
 const char* Scene2DNode::LayerFieldName(int f)
 {
    static const char* kNames[kLfFxBase] = { "Opacity", "Fill", "X", "Y", "Scale X", "Scale Y", "Angle", "Depth",
@@ -152,7 +232,9 @@ const char* Scene2DNode::LayerFieldName(int f)
       "Overlay size", "Overlay distance", "Overlay angle", "Overlay opacity",
       "Inner glow size", "Inner glow distance", "Inner glow angle", "Inner glow opacity",
       "Bevel size", "Bevel depth", "Bevel angle", "Bevel opacity",
-      "Gradient size", "Gradient distance", "Gradient angle", "Gradient opacity" };
+      "Gradient size", "Gradient distance", "Gradient angle", "Gradient opacity",
+      "Satin size", "Satin distance", "Satin angle", "Satin opacity",
+      "Pattern scale", "Pattern distance", "Pattern angle", "Pattern opacity" };
    if (f < 0 || f >= kLfCount)
       return "";
    return f < kLfFxBase ? kNames[f] : kFx[f - kLfFxBase];
@@ -629,7 +711,10 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mFxBlur2[0]);
    GLUtil::DestroyFbo(mFxBlur2[1]);
    GLUtil::DestroyFbo(mFxOut);
-   for (unsigned p : { mBlurProgram, mFxProgram })
+   GLUtil::DestroyFbo(mFxExtra);
+   GLUtil::DestroyFbo(mFxMore[0]);
+   GLUtil::DestroyFbo(mFxMore[1]);
+   for (unsigned p : { mBlurProgram, mFxProgram, mFxCombineProgram })
       if (p != 0)
          glDeleteProgram(p);
 }
@@ -1344,19 +1429,17 @@ void Scene2DNode::Serialize()
          for (float v : l.warp) o << " " << v;
          o << "\n";
       }
-      for (int t = 0; t < kFxCount; t++)
+      auto fxLine = [&](const char* key, int t, const Fx& f)
       {
-         const Fx& f = l.fx[t];
-         const Fx z = FxDefault(t);
-         if (f.on == z.on && std::equal(f.c, f.c + 4, z.c) && f.angle == z.angle && f.dist == z.dist && f.size == z.size &&
-             f.spread == z.spread && f.pos == z.pos && std::equal(f.c2, f.c2 + 4, z.c2))
-            continue;
-         o << "fx " << l.id << " " << t << " " << +f.on;
-         for (float v : f.c) o << " " << v;
-         o << " " << f.angle << " " << f.dist << " " << f.size << " " << f.spread << " " << f.pos;
-         for (float v : f.c2) o << " " << v;
+         o << key << " " << l.id << " " << t << " ";
+         WriteFxFields(o, f);
          o << "\n";
-      }
+      };
+      for (int t = 0; t < kFxCount; t++)
+         if (!FxSame(l.fx[t], FxDefault(t)))
+            fxLine("fx", t, l.fx[t]);
+      for (const auto& m : l.fxMore)
+         fxLine("fx2", m.first, m.second);
       if (l.HasBlendIf())
       {
          o << "bif " << l.id;
@@ -1554,18 +1637,16 @@ void Scene2DNode::Parse()
             for (float& v : l->warp) s >> v;
             l->warpOn = on != 0;
          }
-         else if (key == "fx")
+         else if (key == "fx" || key == "fx2")
          {
-            int t = -1, on = 0;
+            int t = -1;
             s >> t;
             if (t >= 0 && t < kFxCount)
             {
-               Fx& f = l->fx[t];
-               s >> on >> f.c[0] >> f.c[1] >> f.c[2] >> f.c[3] >> f.angle >> f.dist >> f.size >> f.spread >> f.pos;
-               f.on = on != 0;
-               float c2[4];
-               if (s >> c2[0] >> c2[1] >> c2[2] >> c2[3])   // older docs stop at pos
-                  std::copy(c2, c2 + 4, f.c2);
+               Fx got = FxDefault(t);
+               ReadFxFields(s, key == "fx" ? l->fx[t] : got);
+               if (key == "fx2")
+                  l->fxMore.emplace_back(t, got);
             }
          }
          else if (key == "bif")
