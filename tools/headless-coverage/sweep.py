@@ -272,7 +272,9 @@ class Sweep:
                 print(f"    [{chan}] {len(lines)} jobs from {os.path.basename(first[0])}: {time.time() - t0:.1f} s  {tail[:160]}", flush=True)
             os.remove(lst)
             sc = sidecar(first[1])
+            first_fatal = False
             if not os.path.exists(sc) and tail.startswith("{"):
+                first_fatal = True
                 # the first (command-line) job failed and the app stopped: keep its error report as the sidecar
                 try:
                     rep = json.loads(tail)
@@ -282,7 +284,8 @@ class Sweep:
                 except (ValueError, NameError):
                     pass
             left = [x for x in lines if not os.path.exists(sidecar(x[1]))]
-            if left:
+            if left and not first_fatal:
+                # (a fatal first job stops the app before the batch: the next line is not to blame)
                 failed.append(left[0])  # the process stopped here: crash, timeout or a fatal first-job error
                 left = left[1:]
             lines = left
@@ -587,6 +590,7 @@ def main():
     ap.add_argument("--no-contexts", action="store_true", help="skip the context pass (rounds 2 and 3)")
     ap.add_argument("types", nargs="*")
     a = ap.parse_args()
+    a.out = os.path.abspath(a.out)  # the app resolves --batch lists from its own cwd
     os.makedirs(a.out, exist_ok=True)
     schema = a.describe or os.path.join(a.out, "describe.json")
     if not os.path.exists(schema):
