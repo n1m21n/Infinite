@@ -1,3 +1,4 @@
+#include "audio/dsp/MixerMeter.h"
 #include "plugin/engine/HostAudio.h"
 #include "AudioNodes.h"
 
@@ -152,6 +153,8 @@ public:
          mCachedDb[s] = std::nanf("");
       }
       mPanPrimed = false;
+      mLoudness.Prepare(sampleRate);
+      mWasMetering = false;
    }
 
    // Main out + four send buses (mixer-panel plan D5). The topology asks
@@ -356,6 +359,15 @@ public:
       }
       mPrevMaster = masterLin;
       mMeter.Write(&peak, 1);
+      // Loudness and true peak of the main sum: only while the Mixer panel shows this master.
+      const bool metering = mMetering.load(std::memory_order_relaxed) != 0;
+      if (metering)
+      {
+         if (!mWasMetering)
+            mLoudness.Reset();
+         mLoudness.Process(output.channels[0], output.numChannels > 1 ? output.channels[1] : nullptr, output.numFrames);
+      }
+      mWasMetering = metering;
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
          mChannelPeak[s].store(s < activeChannels ? channelPeak[s] : 0.0f, std::memory_order_relaxed);
    }
@@ -386,10 +398,15 @@ public:
 
    MeterRing& Meter() { return mMeter; }
    float ChannelPeak(int slot) const { return mChannelPeak[slot].load(std::memory_order_relaxed); }
+   void SetMetering(bool on) { mMetering.store(on ? 1 : 0, std::memory_order_relaxed); }
+   MixerMeter& Loudness() { return mLoudness; }
 
 private:
    ParamMailbox mMailbox;
    MeterRing mMeter;
+   MixerMeter mLoudness;            // audio thread; readouts are atomics
+   std::atomic<int> mMetering { 0 };
+   bool mWasMetering = false;       // audio thread only
    float mPrevPanL[MixerNode::kMaxSlots] = {}, mPrevPanR[MixerNode::kMaxSlots] = {}; // audio thread only
    float mCachedDb[MixerNode::kMaxSlots] = {}, mCachedLinear[MixerNode::kMaxSlots] = {}; // audio thread only
    bool mPanPrimed = false;
@@ -419,6 +436,13 @@ MixerNode::MixerNode()
 }
 MixerNode::~MixerNode() = default;
 
+void MixerNode::ResetMeters()
+{
+   if (mAudioNode)
+      mAudioNode->Loudness().Reset();
+   mLoudM = mLoudS = mLoudI = mTruePeakDb = MixerMeter::kSilent;
+}
+
 void MixerNode::CookIfNeeded(int frameId)
 {
    if (frameId == mLastCookFrame)
@@ -427,6 +451,18 @@ void MixerNode::CookIfNeeded(int frameId)
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMixerNode>();
    mAudioNode->PushParams(*this);
+   // B4: the panel asks every frame it draws this master; a frame without the ask stops the meter.
+   mAudioNode->SetMetering(mMeterRequested);
+   mMetersRunning = mMeterRequested;
+   mMeterRequested = false;
+   if (mMetersRunning)
+   {
+      MixerMeter& lm = mAudioNode->Loudness();
+      mLoudM = lm.Momentary();
+      mLoudS = lm.ShortTerm();
+      mLoudI = lm.Integrated();
+      mTruePeakDb = lm.TruePeakDb();
+   }
 
    float peak = 0.0f;
    if (mAudioNode->Meter().ReadLatest(peak))
@@ -1014,9 +1050,24 @@ void AudioOutputNode::CookIfNeeded(int /*frameId*/)
    int n;
    while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
    {
-      for (int i = 0; i < n; i++)
-         mTakePeak = std::max(mTakePeak, std::fabs(scratch[i]));
-      mWriter.Append(scratch, n / 2);
+      int frames = n / 2;
+      const float* src = scratch;
+      if (mTakeSkip > 0)
+      {
+         const int drop = (int)std::min<int64_t>(mTakeSkip, frames);
+         mTakeSkip -= drop;
+         src += (size_t)drop * 2;
+         frames -= drop;
+      }
+      if (mTakeLimit > 0)
+         frames = (int)std::min<int64_t>(frames, std::max<int64_t>(0, mTakeLimit - mTakeFrames));
+      if (frames <= 0)
+         continue;
+      for (int i = 0; i < frames * 2; i++)
+         mTakePeak = std::max(mTakePeak, std::fabs(src[i]));
+      mWriter.Append(src, frames);
+      MeterTake(src, frames);
+      mTakeFrames += frames;
    }
 }
 
@@ -1027,7 +1078,29 @@ void AudioOutputNode::VisitParams(ParamVisitor& v)
    v.Bool("live", live);
 }
 
-bool AudioOutputNode::StartRecording(const std::string& path, double sampleRate)
+// The take's own loudness and true peak, measured on the samples that reach the file (plan G2).
+void AudioOutputNode::MeterTake(const float* interleaved, int frames)
+{
+   if (!mTakeMeter)
+      return;
+   float l[2048], r[2048];
+   for (int done = 0; done < frames;)
+   {
+      const int n = std::min(2048, frames - done);
+      for (int i = 0; i < n; i++)
+      {
+         l[i] = interleaved[(size_t)(done + i) * 2];
+         r[i] = interleaved[(size_t)(done + i) * 2 + 1];
+      }
+      mTakeMeter->Process(l, r, n);
+      done += n;
+   }
+}
+
+float AudioOutputNode::TakeLufs() const { return mTakeMeter ? mTakeMeter->Integrated() : MixerMeter::kSilent; }
+float AudioOutputNode::TakeTruePeakDb() const { return mTakeMeter ? mTakeMeter->TruePeakDb() : MixerMeter::kSilent; }
+
+bool AudioOutputNode::StartRecording(const std::string& path, double sampleRate, int bitDepth)
 {
    if (IsRecording())
       return false;
@@ -1035,10 +1108,14 @@ bool AudioOutputNode::StartRecording(const std::string& path, double sampleRate)
       sampleRate = AudioEngine::Instance().SampleRate();
    if (sampleRate <= 0.0)
       return false;
-   if (!mWriter.Open(path, sampleRate, 2))
+   if (!mWriter.Open(path, sampleRate, 2, AudioFileWriter::Format::Auto, bitDepth == 24 ? 24 : 16))
       return false;
    mOpenSampleRate = sampleRate;
    mTakePeak = 0.0f;
+   if (!mTakeMeter)
+      mTakeMeter = std::make_unique<MixerMeter>();
+   mTakeMeter->Prepare(sampleRate);
+   mTakeSkip = mTakeLimit = mTakeFrames = 0;
    mCaptureRing.overflowCount.store(0, std::memory_order_relaxed);
    mCaptureRing.enabled.store(true, std::memory_order_relaxed);
    return true;

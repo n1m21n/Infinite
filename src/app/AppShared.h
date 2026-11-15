@@ -793,6 +793,16 @@ void MixerPanelSelectPage(int page);
 int MixerPanelAddPage();              // spawns a Mixer + Audio Out pair; returns the Mixer's node index
 bool MixerPanelCreateFromAudioOuts(); // D13: wraps every Audio Out's source into one new Mixer
 int MixerPanelNewSendFx(int mixerIndex, int slot, const char* fxType); // B1: send bus -> effect -> return on the top Mixer
+// D4 inserts of one Mixer slot (signal order, node indices); each edit is one undo step. A shared chain (G4) refuses.
+std::vector<int> MixerPanelInsertChain(int mixerIndex, int slot, bool* shared = nullptr);
+int MixerPanelInsertAdd(int mixerIndex, int slot, const char* fxType);
+bool MixerPanelInsertRemove(int mixerIndex, int slot, int pos);
+bool MixerPanelInsertMove(int mixerIndex, int slot, int from, int to);
+bool MixerPanelInsertBypass(int mixerIndex, int slot, int pos);
+// B3: one undo step each. Group returns the new group Mixer's node index, -1 when refused.
+int MixerPanelGroupStrips(int mixerIndex, const std::vector<int>& slots);
+bool MixerPanelUngroup(int mixerIndex, int slot);
+bool MixerPanelStripMove(int mixerIndex, int from, int to);
 bool MixerPanelShowMixer(int nodeIndex); // opens the panel on the page holding this Mixer; false if on no page
 int MixerPanelCurrentPageTop();          // node index of the shown page's top Mixer, -1 when none
 bool MixerPanelGroupOpen(int mixerIndex);

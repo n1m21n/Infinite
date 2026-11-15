@@ -8,9 +8,15 @@
 #include "nodes/AudioEffectNode.h"
 #include "audio/AudioEngine.h"
 #include "core/Notices.h"
+#include "core/Transport.h"
+#include "audio/dsp/MixerMeter.h"
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <vector>
 #include <sstream>
 #include <string>
 
@@ -123,13 +129,13 @@ namespace
          for (int i = 0; i < out.numFrames; i++)
          {
             const float v = 0.5f * std::sin(mPhase);
-            mPhase += 2.0f * 3.14159265f * 220.0f / 48000.0f;
+            mPhase += 2.0f * 3.14159265f * mHz / 48000.0f;
             for (int ch = 0; ch < out.numChannels; ch++)
                out.channels[ch][i] = v;
          }
          mPhase = std::fmod(mPhase, 2.0f * 3.14159265f);
       }
-   private:
+      float mHz = 220.0f;
       float mPhase = 0.0f;
    };
    class ToneNode : public INode, public IAudioSource
@@ -141,6 +147,8 @@ namespace
       void CookIfNeeded(int) override {}
       void VisitParams(ParamVisitor&) override {}
       AudioNode* GetAudioNode() override { return &mAudio; }
+      void Set(float hz) { mAudio.mHz = hz; mAudio.mPhase = 0.0f; }
+      void Rewind() { mAudio.mPhase = 0.0f; }
    private:
       ToneAudio mAudio;
    };
@@ -235,6 +243,293 @@ namespace
       NewPatch();
    }
 
+   // B2: the slot's inserts are the single-input chain above it; add, remove, reorder, bypass are one undo step each.
+   void CheckInserts()
+   {
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      const int src = SpawnNode("Gain", "AudioEffects", 0.0f, 0.0f)->index; // unplugged input: a source, not an insert
+      std::string err;
+      const bool wired = ConnectNodes(top, 0, out, 0, err) && ConnectNodes(src, 0, top, 0, err);
+      Check("B2 patch wires up: a source on slot 1", wired && MixerPanelInsertChain(top, 0).empty());
+
+      auto mixer = [&]() { return dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get()); };
+      auto nodeOf = [](int i) { GraphNode* g = FindNodeByIndex(i); return g ? g->node.get() : nullptr; };
+      auto inOf = [&](int i) { INode* n = nodeOf(i); AudioCable* c = n ? n->AudioInputSlot(0) : nullptr; return c ? c->GetSource() : nullptr; };
+      // Wiring matches `want`: src -> want... -> the slot.
+      auto wiredAs = [&](const std::vector<int>& want) {
+         if (MixerPanelInsertChain(top, 0) != want)
+            return false;
+         INode* prev = nodeOf(src);
+         for (int i : want)
+         {
+            if (inOf(i) != prev)
+               return false;
+            prev = nodeOf(i);
+         }
+         return mixer()->inputs[0].GetSource() == prev;
+      };
+
+      size_t undo0 = gUndoStack.size();
+      const int eq = MixerPanelInsertAdd(top, 0, "EQ");
+      Check("add: EQ spliced between the source and the slot", eq >= 0 && wiredAs({ eq }));
+      Check("add is one undo step", gUndoStack.size() == undo0 + 1);
+      const int dly = MixerPanelInsertAdd(top, 0, "Delay");
+      const int rev = MixerPanelInsertAdd(top, 0, "Reverb");
+      Check("adds append nearest the fader", dly >= 0 && rev >= 0 && wiredAs({ eq, dly, rev }));
+
+      undo0 = gUndoStack.size();
+      Check("reorder: Reverb to the top of the chain", MixerPanelInsertMove(top, 0, 2, 0) && wiredAs({ rev, eq, dly }));
+      Check("reorder is one undo step", gUndoStack.size() == undo0 + 1);
+      Undo();
+      Check("undo puts the old order back", wiredAs({ eq, dly, rev }));
+
+      undo0 = gUndoStack.size();
+      Check("remove: Delay leaves, its neighbours join", MixerPanelInsertRemove(top, 0, 1) && wiredAs({ eq, rev }) && nodeOf(dly) == nullptr);
+      Check("remove is one undo step", gUndoStack.size() == undo0 + 1);
+      Undo();
+      Check("undo brings the Delay back in place", wiredAs({ eq, dly, rev }));
+
+      undo0 = gUndoStack.size();
+      const bool bypassed = MixerPanelInsertBypass(top, 0, 0) && nodeOf(eq)->bypassed;
+      Check("bypass toggles the chip's node, one undo step", bypassed && gUndoStack.size() == undo0 + 1 && wiredAs({ eq, dly, rev }));
+
+      // G4: the Reverb also feeds slot 2, so the chain is shared and refuses inline edits.
+      for (const Notices::Notice& n : Notices::Active())
+         Notices::DismissId(n.id);
+      mixer()->inputs[1].Connect(nodeOf(rev));
+      bool shared = false;
+      MixerPanelInsertChain(top, 0, &shared);
+      undo0 = gUndoStack.size();
+      const bool refused = MixerPanelInsertAdd(top, 0, "EQ") < 0 && !MixerPanelInsertMove(top, 0, 0, 1);
+      bool noticed = false;
+      for (const Notices::Notice& n : Notices::Active())
+         noticed = noticed || n.key == "mixer.insert";
+      Check("fan-out makes the strip shared: edits refused with a notice, no undo step",
+            shared && refused && noticed && gUndoStack.size() == undo0);
+      for (const Notices::Notice& n : Notices::Active())
+         Notices::DismissId(n.id);
+      NewPatch();
+   }
+
+   // Hash of `blocks` offline blocks after `warm` warm-up blocks (the ramps settle first).
+   unsigned long long RenderHash(int warm, int blocks, float* peakOut = nullptr)
+   {
+      static int sFrame = 200000;
+      ++sFrame;
+      for (GraphNode& gn : gNodes)
+         gn.node->CookIfNeeded(sFrame);
+      RebuildAudioTopology();
+      static float sL[512], sR[512];
+      float* ch[2] = { sL, sR };
+      AudioBuffer buf { ch, 2, 512 };
+      unsigned long long hash = 1469598103934665603ull;
+      float peak = 0.0f;
+      for (int b = 0; b < warm + blocks; b++)
+      {
+         AudioEngine::Instance().ProcessOffline(buf);
+         if (b < warm)
+            continue;
+         for (int i = 0; i < 512; i++)
+            for (int c = 0; c < 2; c++)
+            {
+               unsigned int bits;
+               std::memcpy(&bits, &ch[c][i], 4);
+               hash = (hash ^ bits) * 1099511628211ull;
+               peak = std::max(peak, std::fabs(ch[c][i]));
+            }
+      }
+      if (peakOut)
+         *peakOut = peak;
+      return hash;
+   }
+
+   void ClearNotices()
+   {
+      for (const Notices::Notice& n : Notices::Active())
+         Notices::DismissId(n.id);
+   }
+   bool Noticed(const char* key)
+   {
+      for (const Notices::Notice& n : Notices::Active())
+         if (n.key == key)
+            return true;
+      return false;
+   }
+
+   // B3: group, ungroup and reorder are one undo step each, and group -> ungroup gives the same samples back.
+   void CheckGroups()
+   {
+      static ToneNode tones[3];
+      NewPatch();
+      const int top0 = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      std::string err;
+      const bool wired = ConnectNodes(top0, 0, out, 0, err);
+      MixerNode* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top0)->node.get());
+      m->numChannels = 3;
+      static const float kHz[3] = { 220.0f, 330.0f, 550.0f };
+      static const float kGain[3] = { -6.0f, -3.0f, -9.0f };
+      static const float kPan[3] = { -0.5f, 0.3f, 0.0f };
+      for (int i = 0; i < 3; i++)
+      {
+         m->inputs[i].Connect(&tones[i]);
+         m->gainDb[i] = kGain[i];
+         m->pan[i] = kPan[i];
+      }
+      Check("B3 patch wires up: three strips", wired && MixerPanelPageCount() == 1);
+      auto rewind = [&]() { for (int i = 0; i < 3; i++) tones[i].Set(kHz[i]); };
+      auto topIndex = [&]() { return MixerPanelCurrentPageTop(); };
+
+      const bool deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      if (deviceWasRunning)
+         AudioEngine::Instance().Stop();
+      rewind();
+      RenderHash(40, 20);
+      rewind();
+      float peakA = 0.0f;
+      const unsigned long long flat = RenderHash(40, 20, &peakA);
+
+      size_t undo0 = gUndoStack.size();
+      const int grp = MixerPanelGroupStrips(topIndex(), { 0, 1 });
+      m = dynamic_cast<MixerNode*>(FindNodeByIndex(topIndex())->node.get());
+      GraphNode* gGn = grp >= 0 ? FindNodeByIndex(grp) : nullptr;
+      MixerNode* g = gGn ? dynamic_cast<MixerNode*>(gGn->node.get()) : nullptr;
+      Check("group: two strips move into a new Mixer on the first one's slot",
+            g != nullptr && m->numChannels == 2 && m->inputs[0].GetSource() == g && m->inputs[1].GetSource() == &tones[2] &&
+            g->numChannels == 2 && g->inputs[0].GetSource() == &tones[0] && g->inputs[1].GetSource() == &tones[1]);
+      Check("group: the strips keep their settings, the group strip sits at unity",
+            g != nullptr && g->gainDb[0] == kGain[0] && g->gainDb[1] == kGain[1] && g->pan[0] == kPan[0] &&
+            m->gainDb[0] == 0.0f && m->pan[0] == 0.0f && m->gainDb[1] == kGain[2]);
+      Check("group is one undo step", gUndoStack.size() == undo0 + 1);
+      rewind();
+      float peakB = 0.0f;
+      RenderHash(40, 20, &peakB);
+      char label[200];
+      snprintf(label, sizeof(label), "the grouped console still sounds (peak %.3f flat, %.3f grouped)", peakA, peakB);
+      Check(label, peakA > 0.05f && peakB > 0.05f);
+
+      undo0 = gUndoStack.size();
+      const size_t nodes0 = gNodes.size();
+      const bool ungrouped = MixerPanelUngroup(topIndex(), 0);
+      m = dynamic_cast<MixerNode*>(FindNodeByIndex(topIndex())->node.get());
+      bool same = m->numChannels == 3;
+      for (int i = 0; i < 3 && same; i++)
+         same = m->inputs[i].GetSource() == &tones[i] && m->gainDb[i] == kGain[i] && m->pan[i] == kPan[i];
+      Check("ungroup: the strips return to their slots, the group Mixer is gone", ungrouped && same && gNodes.size() == nodes0 - 1);
+      Check("ungroup is one undo step", gUndoStack.size() == undo0 + 1);
+      rewind();
+      const unsigned long long back = RenderHash(40, 20);
+      Check("group then ungroup renders bit-identical", back == flat);
+
+      undo0 = gUndoStack.size();
+      const bool moved = MixerPanelStripMove(topIndex(), 0, 2);
+      Check("move: strip 1 to the end, its settings with it",
+            moved && m->inputs[0].GetSource() == &tones[1] && m->inputs[2].GetSource() == &tones[0] &&
+            m->gainDb[2] == kGain[0] && m->pan[2] == kPan[0] && m->gainDb[0] == kGain[1]);
+      Check("move is one undo step", gUndoStack.size() == undo0 + 1);
+      MixerPanelStripMove(topIndex(), 2, 0);
+      rewind();
+      Check("move there and back renders bit-identical", RenderHash(40, 20) == flat);
+
+      // A strip with a live send can't move into a group: its send bus lives on this Mixer.
+      ClearNotices();
+      m->sendBuses = 1;
+      m->sendDb[0][0] = 0.0f;
+      undo0 = gUndoStack.size();
+      const bool refused = MixerPanelGroupStrips(topIndex(), { 0, 1 }) < 0;
+      Check("a sending strip refuses to group, with a notice and no undo step",
+            refused && Noticed("mixer.group") && gUndoStack.size() == undo0);
+      ClearNotices();
+      if (deviceWasRunning)
+      {
+         std::string startErr;
+         StartAudioEngine(startErr);
+      }
+      for (int i = 0; i < 3; i++)
+         m->inputs[i].Disconnect();
+      NewPatch();
+   }
+
+   // B4: the meter against the EBU Tech 3341 reference signals, and its gate on the Mixer.
+   void CheckMeters()
+   {
+      const double rate = 48000.0;
+      static std::vector<float> l, r;
+      auto run = [&](MixerMeter& meter, double hz, double db, double seconds, double phase = 0.0) {
+         const int n = (int)(seconds * rate);
+         l.resize((size_t)n);
+         r.resize((size_t)n);
+         const double a = std::pow(10.0, db / 20.0);
+         for (int i = 0; i < n; i++)
+            l[(size_t)i] = r[(size_t)i] = (float)(a * std::sin(2.0 * 3.14159265358979 * hz * (double)i / rate + phase));
+         for (int at = 0; at < n; at += 512)
+            meter.Process(l.data() + at, r.data() + at, std::min(512, n - at));
+      };
+      char label[200];
+      {
+         static MixerMeter meter;
+         meter.Prepare(rate);
+         run(meter, 1000.0, -23.0, 20.0);
+         snprintf(label, sizeof(label), "1 kHz stereo sine at -23 dBFS reads -23 LUFS (M %.2f, S %.2f, I %.2f)",
+                  meter.Momentary(), meter.ShortTerm(), meter.Integrated());
+         Check(label, std::fabs(meter.Momentary() + 23.0f) <= 0.1f && std::fabs(meter.ShortTerm() + 23.0f) <= 0.1f &&
+                         std::fabs(meter.Integrated() + 23.0f) <= 0.1f);
+         snprintf(label, sizeof(label), "its true peak reads -23 dBTP (%.2f)", meter.TruePeakDb());
+         Check(label, std::fabs(meter.TruePeakDb() + 23.0f) <= 0.1f);
+         run(meter, 1000.0, -40.0, 20.0);
+         snprintf(label, sizeof(label), "a quiet passage 17 LU down is gated out of integrated (I %.2f)", meter.Integrated());
+         Check(label, std::fabs(meter.Integrated() + 23.0f) <= 0.2f);
+         meter.Reset();
+         run(meter, 1000.0, -33.0, 5.0);
+         snprintf(label, sizeof(label), "reset starts integrated over (I %.2f)", meter.Integrated());
+         Check(label, std::fabs(meter.Integrated() + 33.0f) <= 0.1f);
+      }
+      {
+         // A quarter-rate sine sampled 45 degrees off its crests: samples peak 3 dB under the wave.
+         static MixerMeter meter;
+         meter.Prepare(rate);
+         run(meter, rate / 4.0, 0.0, 1.0, 3.14159265358979 / 4.0);
+         snprintf(label, sizeof(label), "true peak finds the crest between samples (%.2f dBTP, samples at -3.01)", meter.TruePeakDb());
+         Check(label, meter.TruePeakDb() > -0.5f && meter.TruePeakDb() < 0.3f);
+      }
+
+      static ToneNode tone;
+      tone.Set(1000.0f);
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      std::string err;
+      ConnectNodes(top, 0, out, 0, err);
+      auto* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get());
+      m->numChannels = 1;
+      m->inputs[0].Connect(&tone);
+      const bool deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      if (deviceWasRunning)
+         AudioEngine::Instance().Stop();
+      RenderPeak(100);
+      RenderPeak(1);
+      Check("nobody asks: the master meter does not run", !m->MetersRunning() && m->LoudnessMomentary() <= -99.0f);
+      m->RequestMeters();
+      RenderPeak(150);
+      m->RequestMeters();
+      RenderPeak(1);
+      snprintf(label, sizeof(label), "the panel asks: the master reads the mix (M %.1f LUFS, TP %.1f dBTP)",
+               m->LoudnessMomentary(), m->TruePeakDb());
+      Check(label, m->MetersRunning() && m->LoudnessMomentary() > -30.0f && m->LoudnessMomentary() < 0.0f && m->TruePeakDb() > -30.0f);
+      RenderPeak(1);
+      RenderPeak(1);
+      Check("the panel stops asking: the meter stops", !m->MetersRunning());
+      if (deviceWasRunning)
+      {
+         std::string startErr;
+         StartAudioEngine(startErr);
+      }
+      m->inputs[0].Disconnect();
+      NewPatch();
+   }
+
    // A page whose top Mixer has `strips` slots, one source each, and one group Mixer on slot 0.
    void BuildConsole(int strips)
    {
@@ -310,6 +605,9 @@ bool MixerPanelTestStep(int frameId)
    {
       CheckRoutingAndPersist();
       CheckSends();
+      CheckInserts();
+      CheckGroups();
+      CheckMeters();
       sCase = 0;
       BuildConsole(kCounts[0]);
       gMixerPanelDock = kOrder[0];

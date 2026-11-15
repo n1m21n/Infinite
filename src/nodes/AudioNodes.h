@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio/dsp/MixerMeter.h"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -120,6 +121,16 @@ public:
       return {};
    }
 
+   // Master loudness and true peak (mixer-panel plan B4). The meter runs only while something asks:
+   // the Mixer panel calls RequestMeters() each frame it draws this Mixer as a master.
+   void RequestMeters() { mMeterRequested = true; }
+   bool MetersRunning() const { return mMetersRunning; }
+   void ResetMeters();
+   float LoudnessMomentary() const { return mLoudM; }
+   float LoudnessShort() const { return mLoudS; }
+   float LoudnessIntegrated() const { return mLoudI; }
+   float TruePeakDb() const { return mTruePeakDb; }
+
    int numChannels = 8;
    float gainDb[kMaxSlots] = {};
    // -1 hard left .. +1 hard right. A mixer without pan can only ever build a
@@ -163,6 +174,8 @@ private:
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
    float mChannelLevel[kMaxSlots] = {};
+   bool mMeterRequested = false, mMetersRunning = false;
+   float mLoudM = -120.0f, mLoudS = -120.0f, mLoudI = -120.0f, mTruePeakDb = -120.0f;
 };
 
 // A two-input crossfader: blend=0 is input A only, 1 is input B only, 0.5 is
@@ -362,7 +375,17 @@ public:
    // Returns false (nothing opened) if the engine isn't running yet or the
    // file couldn't be created.
    // `sampleRate` 0 means the engine's (a headless test has no device and passes its own).
-   bool StartRecording(const std::string& path, double sampleRate = 0.0);
+   // bitDepth 16 or 24 (WAV, FLAC).
+   bool StartRecording(const std::string& path, double sampleRate = 0.0, int bitDepth = 16);
+   // Sample-exact takes (mixer-panel plan C): drop the first `skipFrames` that reach the recorder
+   // (plugin latency), then keep at most `limitFrames` (0 = no limit). Set after StartRecording.
+   void SetTakeWindow(int64_t skipFrames, int64_t limitFrames)
+   {
+      mTakeSkip = std::max<int64_t>(0, skipFrames);
+      mTakeLimit = std::max<int64_t>(0, limitFrames);
+   }
+   int64_t TakeFrames() const { return mTakeFrames; }
+   bool TakeComplete() const { return mTakeLimit > 0 && mTakeFrames >= mTakeLimit; }
    // Stops draining and finalizes the file's RIFF/data chunk sizes. Safe to
    // call when not recording.
    void StopRecording();
@@ -375,6 +398,9 @@ public:
    // it has stopped. The file formats clamp at full scale, so above 1.0 the
    // take was written clipped.
    float TakePeak() const { return mTakePeak; }
+   // Integrated loudness (LUFS) and true peak (dBTP) of the same take; -120 when nothing was measured.
+   float TakeLufs() const;
+   float TakeTruePeakDb() const;
 
    AudioCable input;
 
@@ -394,7 +420,10 @@ public:
 
 private:
    AudioCaptureRing mCaptureRing;
+   void MeterTake(const float* interleaved, int frames);
    AudioFileWriter mWriter;
    double mOpenSampleRate = 0.0;
    float mTakePeak = 0.0f;
+   int64_t mTakeSkip = 0, mTakeLimit = 0, mTakeFrames = 0;
+   std::unique_ptr<MixerMeter> mTakeMeter;
 };
