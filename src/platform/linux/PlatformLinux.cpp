@@ -476,6 +476,21 @@ namespace Platform
       return AppendExtensionIfMissing(std::string(res), ".wav");
    }
 
+   std::string SaveLayeredDialog(const std::string& suggestedName, const std::string& ext)
+   {
+      if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
+      EnsureDialogBackendChecked();
+      const bool ora = ext == "ora";
+      const char* const patterns[] = { ora ? "*.ora" : "*.psd" };
+      const std::string dotExt = "." + ext;
+      const std::string defaultPath = AppendExtensionIfMissing(suggestedName, dotExt.c_str());
+      const char* res = tinyfd_saveFileDialog(ora ? "Export ORA" : "Export PSD", defaultPath.c_str(), 1, patterns,
+                                              ora ? "OpenRaster (*.ora)" : "Photoshop (*.psd)");
+      if (!res) return "";
+      return AppendExtensionIfMissing(std::string(res), dotExt.c_str());
+   }
+
    std::string SaveRenderDialog(const std::string& suggestedName, bool video)
    {
       if (IsHeadlessOrExitAfter()) return "";

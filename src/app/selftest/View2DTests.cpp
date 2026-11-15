@@ -1084,6 +1084,196 @@ void RunView2DTest()
       }
    }
 
+   // ---- B8: layered files - PSD and ORA out and back in keep the layers ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 300;
+      pic.Doc().h = 200;
+      pic.Doc().background = 3;
+      pic.Commit();
+      BrushEngine::Brush br = BrushEngine::Presets()[5].brush;   // Hard round
+      br.size = 30.0f;
+      br.pressureSize = false;
+      auto line = [&](int id, int target, float y, float r, float g, float b) {
+         BrushEngine::Brush c = br;
+         c.color[0] = r; c.color[1] = g; c.color[2] = b;
+         pic.BeginPaint(id, target, c, 20.0f, y, 1.0f);
+         for (float x = 20.0f; x <= 280.0f; x += 6.0f)
+            pic.PaintTo(x, y, 1.0f);
+         pic.EndPaint();
+      };
+      const int A = pic.AddPaintLayer();
+      line(A, 0, 60.0f, 1, 0, 0);
+      pic.AddPixelMask(A);
+      line(A, 1, 60.0f, 0, 0, 0);   // the mask hides the line
+      Layer& wash = pic.AddLayer(Kind::Fill, 0);
+      const int W = wash.id;
+      wash.colorA[0] = 0.2f; wash.colorA[1] = 0.4f; wash.colorA[2] = 0.9f; wash.colorA[3] = 1.0f;
+      wash.name = "Wash";
+      wash.blend = 11;   // Overlay
+      wash.opacity = 0.5f;
+      const int G = pic.AddLayer(Kind::Group, 0).id;
+      const int B = pic.AddPaintLayer();
+      pic.FindLayer(B)->parent = G;
+      line(B, 0, 140.0f, 0, 1, 0);
+      {
+         Layer& a = *pic.FindLayer(A);
+         a.name = "Ink";
+         a.blend = 2;   // Multiply
+         a.opacity = 0.6f;
+         Layer& g = *pic.FindLayer(G);
+         g.name = "Folder";
+         g.blend = 7;   // Screen
+         Layer& b = *pic.FindLayer(B);
+         b.name = "H\xC3\xB6he \xE2\x9C\x93";   // a name past ASCII
+         b.visible = false;
+      }
+      pic.Commit();
+      Cook(&pic);
+      std::vector<uint8_t> want;
+      int ww = 0, wh = 0;
+      pic.ReadOutput(want, ww, wh);
+      auto worst = [&](Scene2DNode& other) {
+         Cook(&other);
+         std::vector<uint8_t> got;
+         int gw = 0, gh = 0;
+         if (!other.ReadOutput(got, gw, gh) || gw != ww || gh != wh)
+            return 255;
+         int d = 0;
+         for (size_t i = 0; i < got.size(); i++)
+            d = std::max(d, std::abs((int)got[i] - (int)want[i]));
+         return d;
+      };
+      auto layersKept = [&](Scene2DNode& q, bool maskKept) {
+         const auto& ls = q.Layers();
+         if (ls.size() != 4)
+            return false;
+         const Layer &a = ls[0], &w = ls[1], &g = ls[2], &b = ls[3];
+         return a.name == "Ink" && a.blend == 2 && std::fabs(a.opacity - 0.6f) < 0.01f && a.kind == Kind::Paint
+                && (a.HasPixelMask() == maskKept) && w.name == "Wash" && w.blend == 11 && std::fabs(w.opacity - 0.5f) < 0.01f
+                && g.kind == Kind::Group && g.name == "Folder" && g.blend == 7 && b.parent == g.id && b.name == "H\xC3\xB6he \xE2\x9C\x93"
+                && !b.visible && b.kind == Kind::Paint;
+      };
+
+      std::vector<uint8_t> psd;
+      Check("B8: a PSD is written", pic.SavePsd(psd, ++sFrame) && psd.size() > 26 && std::memcmp(psd.data(), "8BPS", 4) == 0);
+      Scene2DNode fromPsd;
+      std::string err;
+      const bool psdOk = fromPsd.LoadPsd(psd, &err);
+      Check("B8: the PSD opens", psdOk);
+      Check("B8: the PSD keeps layers, names, blend, opacity, visibility, group and mask", psdOk && layersKept(fromPsd, true));
+      if (psdOk && fromPsd.Layers().size() == 4)
+      {
+         std::vector<uint8_t> mask;
+         int mw = 0, mh = 0;
+         const Layer& a = fromPsd.Layers()[0];
+         bool dark = false;
+         std::vector<uint8_t> tile;
+         for (const std::string& k : a.mtiles)
+            if (k != "-" && TileStore::Get(k, tile, mw, mh))
+               for (size_t i = 0; i < tile.size() && !dark; i += 4)
+                  dark = tile[i] < 40;
+         Check("B8: the PSD mask keeps what it hid", dark);
+      }
+      const int dPsd = psdOk ? worst(fromPsd) : 255;
+      printf("  B8 PSD round trip: worst pixel difference %d / 255\n", dPsd);
+      Check("B8: the PSD composites as it was", dPsd <= 4);
+
+      std::vector<uint8_t> ora;
+      Check("B8: an ORA is written", pic.SaveOra(ora, ++sFrame) && ora.size() > 40);
+      Scene2DNode fromOra;
+      const bool oraOk = fromOra.LoadOra(ora, &err);
+      Check("B8: the ORA opens", oraOk);
+      Check("B8: the ORA keeps layers, names, blend, opacity, visibility and group", oraOk && layersKept(fromOra, false));
+      const int dOra = oraOk ? worst(fromOra) : 255;
+      printf("  B8 ORA round trip: worst pixel difference %d / 255\n", dOra);
+      Check("B8: the ORA composites as it was", dOra <= 4);
+
+      // A flat 2 x 1 PSD (no layers, raw): it opens as one Background layer.
+      const uint8_t flat[] = { '8', 'B', 'P', 'S', 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 2, 0, 8, 0, 3,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               255, 0, 0, 0, 0, 255 };   // R plane, G plane, B plane: red, blue
+      Scene2DNode flatDoc;
+      const bool flatOk = flatDoc.LoadPsd(std::vector<uint8_t>(flat, flat + sizeof flat), &err);
+      bool flatPx = false;
+      if (flatOk && flatDoc.Layers().size() == 1)
+      {
+         const Layer& l = flatDoc.Layers()[0];
+         std::vector<uint8_t> t;
+         int tw = 0, th = 0;
+         flatPx = l.name == "Background" && l.pw == 2 && l.ph == 1 && TileStore::Get(l.tiles[0], t, tw, th) && t[0] == 255
+                  && t[2] == 0 && t[4] == 0 && t[6] == 255 && t[7] == 255;
+      }
+      Check("B8: a flat PSD opens as one Background layer", flatOk && flatDoc.Doc().w == 2 && flatPx);
+      Check("B8: a damaged file says why", !flatDoc.LoadPsd(std::vector<uint8_t>(flat, flat + 10), &err) && !err.empty());
+   }
+
+   // ---- B8: stabiliser and predicted points ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 300;
+      pic.Doc().h = 200;
+      pic.Doc().background = 1;   // black
+      pic.Commit();
+      BrushEngine::Brush pen = BrushEngine::Presets()[5].brush;   // Hard round
+      pen.size = 4.0f;
+      pen.pressureSize = false;
+      pen.color[0] = pen.color[1] = pen.color[2] = 1.0f;
+      // A shaky hand: a line along y = 100 that jumps 12 px up and down every 6 px, ending on the line.
+      const auto Shaky = [&](const BrushEngine::Brush& use)
+      {
+         while (!pic.Layers().empty())
+            pic.Layers().pop_back();
+         pic.Commit();
+         const int L = pic.AddPaintLayer();
+         pic.BeginPaint(L, 0, use, 20.0f, 100.0f, 1.0f);
+         int k = 0;
+         for (float x = 26.0f; x < 280.0f; x += 6.0f, k++)
+            pic.PaintTo(x, 100.0f + (k % 2 == 0 ? 12.0f : -12.0f), 1.0f);
+         pic.PaintTo(280.0f, 100.0f, 1.0f);
+         pic.EndPaint();
+         Cook(&pic);
+         const int w = pic.GetOutputWidth(), h = pic.GetOutputHeight();
+         std::vector<float> px((size_t)w * h * 4);
+         glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         return px;
+      };
+      const auto Lit = [](const std::vector<float>& px, int x, int y) { return px[((size_t)(199 - y) * 300 + x) * 4] > 0.5f; };
+      // Pixels lit 8+ px off the line between x 60 and 240: the shake that reached the picture.
+      const auto Wobble = [&](const std::vector<float>& px)
+      {
+         int n = 0;
+         for (int x = 60; x < 240; x++)
+            for (int y = 60; y < 140; y++)
+               if (std::abs(y - 100) >= 8 && Lit(px, x, y))
+                  n++;
+         return n;
+      };
+      const std::vector<float> raw = Shaky(pen);
+      BrushEngine::Brush steady = pen;
+      steady.stabiliser = 12;
+      const std::vector<float> calm = Shaky(steady);
+      const int wRaw = Wobble(raw), wCalm = Wobble(calm);
+      printf("  B8 stabiliser: %d px off the line raw, %d stabilised\n", wRaw, wCalm);
+      Check("B8: the stabiliser takes the shake out of a line", wRaw > 200 && wCalm * 10 < wRaw);
+      Check("B8: a stabilised stroke catches up to where the pen lifted", Lit(calm, 279, 100) && Lit(raw, 279, 100));
+      Check("B8: a stabilised stroke still starts where the pen went down", Lit(calm, 21, 100));
+
+      float to[2] = { 0, 0 };
+      const float a[3] = { 0.0f, 0.0f, 0.0f }, b[3] = { 10.0f, 5.0f, 16.0f };
+      Check("B8: prediction carries the last two samples 8 ms on",
+            BrushEngine::Stroke::Predict(a, b, 8.0f, 100.0f, to) && std::fabs(to[0] - 15.0f) < 1e-4f && std::fabs(to[1] - 7.5f) < 1e-4f);
+      const float c[3] = { 0.0f, 0.0f, 0.0f }, d[3] = { 40.0f, 0.0f, 4.0f };
+      Check("B8: prediction stops at its reach", BrushEngine::Stroke::Predict(c, d, 8.0f, 6.0f, to) && std::fabs(to[0] - 46.0f) < 1e-4f);
+      const float e[3] = { 10.0f, 5.0f, 20.0f };
+      Check("B8: no prediction from a still pen or one time", !BrushEngine::Stroke::Predict(b, e, 8.0f, 100.0f, to)
+                                                              && !BrushEngine::Stroke::Predict(a, a, 8.0f, 100.0f, to));
+   }
+
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
    {
       Scene2DNode pic;

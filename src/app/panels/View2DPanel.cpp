@@ -64,6 +64,8 @@ namespace
 {
    using Layer = Scene2DNode::Layer;
    using Kind = Scene2DNode::Kind;
+   bool OpenLayeredFile(const std::string& path, ImVec2 at);   // PSD or ORA as a new document
+   void ExportLayered(Scene2DNode* doc, const char* ext);
 
    constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = 300.0f;
@@ -221,7 +223,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -2435,6 +2437,38 @@ namespace
       glyph::Draw(dl, badge, tok::icon_md, IM_COL32(255, 255, 255, 255), g);
    }
 
+   // Predicted points: the last two pen samples carried 8 ms ahead and drawn in the paint colour, so the line
+   // reaches the pen instead of trailing it by a frame. Only a picture: the next real sample replaces it.
+   float sPen[2][3] = {};   // doc x, y, ms; [1] is the newest
+   int sPenN = 0;
+   void NotePenSample(ImVec2 at)
+   {
+      const float ms = (float)(ImGui::GetTime() * 1000.0);
+      if (sPenN > 0 && at.x == sPen[1][0] && at.y == sPen[1][1])
+         return;
+      std::copy(sPen[1], sPen[1] + 3, sPen[0]);
+      sPen[1][0] = at.x;
+      sPen[1][1] = at.y;
+      sPen[1][2] = ms;
+      sPenN = std::min(sPenN + 1, 2);
+   }
+
+   void DrawPredicted(Scene2DNode* doc, ImDrawList* dl)
+   {
+      const BrushEngine::Brush& b = sBrush;
+      float to[2];
+      if (sPenN < 2 || b.stabiliser > 0 || b.smoothing > 0.0f
+          || !BrushEngine::Stroke::Predict(sPen[0], sPen[1], 8.0f, std::max(4.0f, b.size * 2.0f), to))
+         return;
+      const ImVec2 a = ToScreen(doc, sPen[1][0], sPen[1][1]), c = ToScreen(doc, to[0], to[1]);
+      const float w = std::max(1.0f, b.size * sZoom);
+      const ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(sFg[0], sFg[1], sFg[2], 0.6f * b.opacity));
+      dl->PushClipRect(sViewMn, sViewMx, true);
+      dl->AddLine(a, c, col, w);
+      dl->AddCircleFilled(c, w * 0.5f, col);
+      dl->PopClipRect();
+   }
+
    void DrawBrushCursor(ImDrawList* dl, ImVec2 mouse)
    {
       const BrushEngine::Brush& b = ToolBrush();
@@ -4433,6 +4467,10 @@ namespace
          }
          dl->PopClipRect();
       }
+      if (sOp.kind != 7)
+         sPenN = 0;
+      else if (sTool == kBrush && !sSurfaceStroke)
+         DrawPredicted(doc, dl);
       if (hovered && !panTool && BrushTool(sTool) && !io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
@@ -4699,6 +4737,7 @@ namespace
                if (sTool == kBrush)
                   doc->PaintFollow(sBrush);
                doc->PaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+               NotePenSample(sMouseDoc);
             }
          }
          else if (sOp.kind == 10)
@@ -5254,6 +5293,9 @@ namespace
             MoreHeader(T("Dynamics"));
             MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
             MoreCheck(T("Follow stroke"), &b.follow);
+            float stab = (float)b.stabiliser;
+            MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
+            b.stabiliser = (int)std::lround(stab);
             MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
             MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
             MorePct(T("Size jitter"), &b.sizeJitter, 0.0f, 100.0f);
@@ -7956,6 +7998,10 @@ namespace
       {
          if (MenuParts::Item(T("New Document"))) sPending.what = Pending::NewDoc;
          if (MenuParts::Item(T("Duplicate Document"))) sPending.what = Pending::DuplicateDoc;
+         if (MenuParts::Item(T("Open PSD or ORA..."))) sPending.what = Pending::OpenFile;
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Export PSD..."), nullptr, false, doc != nullptr)) sPending.what = Pending::ExportPsd;
+         if (MenuParts::Item(T("Export ORA..."), nullptr, false, doc != nullptr)) sPending.what = Pending::ExportOra;
          MenuParts::Separator();
          if (MenuParts::Item(T("Delete Document"), nullptr, false, doc != nullptr)) sPending.what = Pending::DeleteDoc;
          MenuParts::EndPopup();
@@ -8199,6 +8245,15 @@ namespace
          break;
       }
       case Pending::DeleteDoc: DeleteDoc(doc); break;
+      case Pending::OpenFile:
+         if (!AuditNoDialog())
+            for (const std::string& path : Platform::OpenFilesDialog(T("Open"), { "psd", "ora" }))
+               OpenLayeredFile(path, ImVec2(at.x, at.y + 300.0f));
+         break;
+      case Pending::ExportPsd:
+      case Pending::ExportOra:
+         ExportLayered(doc, todo.what == Pending::ExportOra ? "ora" : "psd");
+         break;
       case Pending::Convert:
          if (self != nullptr)
          {
@@ -8409,6 +8464,41 @@ namespace
       }
    }
 
+   // A .psd or .ora opened as a new document, its layers as paint layers. False (and nothing added) when it does not read.
+   bool OpenLayeredFile(const std::string& path, ImVec2 at)
+   {
+      std::ifstream in(std::filesystem::u8path(path), std::ios::binary);
+      const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      Scene2DNode read;
+      std::string err;
+      static const std::vector<std::string> kOra = { "ora" };
+      const bool ora = HasExtension(path, kOra);
+      if (bytes.empty() || !(ora ? read.LoadOra(bytes, &err) : read.LoadPsd(bytes, &err)))
+      {
+         fprintf(stderr, "[2D View] could not open %s: %s\n", path.c_str(), err.empty() ? "unreadable" : err.c_str());
+         return false;
+      }
+      PushUndoCheckpoint("Open file");
+      return MakeDoc(at.x, at.y, read.DocText()) != nullptr;
+   }
+
+   void ExportLayered(Scene2DNode* doc, const char* ext)
+   {
+      if (doc == nullptr || AuditNoDialog())
+         return;
+      const std::string path = Platform::SaveLayeredDialog(std::string("infinite_2d.") + ext, ext);
+      if (path.empty())
+         return;
+      static int frame = 6000000;
+      std::vector<uint8_t> bytes;
+      const bool ok = std::strcmp(ext, "ora") == 0 ? doc->SaveOra(bytes, ++frame) : doc->SavePsd(bytes, ++frame);
+      std::ofstream out(std::filesystem::u8path(path), std::ios::binary);
+      if (!ok || !out.write((const char*)bytes.data(), (std::streamsize)bytes.size()))
+         fprintf(stderr, "[2D View] could not write %s\n", path.c_str());
+      else
+         sLastRender = path;
+   }
+
    // Files dropped on the 2D View: each one spawns its source node (the same node types the canvas
    // drop makes) off-canvas and lands as a layer centred on the drop point. Returns the layers added.
    int DropFiles(Scene2DNode* doc, const std::vector<std::string>& files, ImVec2 docPt)
@@ -8416,6 +8506,7 @@ namespace
       static const std::vector<std::string> kModels = { "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc" };
       static const std::vector<std::string> kGltf = { "gltf", "glb" };
       static const std::vector<std::string> kSvg = { "svg" };
+      static const std::vector<std::string> kLayered = { "psd", "ora" };
       GraphNode* self = DocGraphNode();
       const ImVec2 base = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
       const bool wasSuppressed = gSuppressUndoCheckpoints;
@@ -8438,6 +8529,12 @@ namespace
          if (HasExtension(path, kSvg))
          {
             if (ImportSvgInto(doc, path))
+               added++;
+         }
+         else if (HasExtension(path, kLayered))
+         {
+            // A layered file is a document of its own.
+            if (OpenLayeredFile(path, spot))
                added++;
          }
          else if (HasExtension(path, kGltf))

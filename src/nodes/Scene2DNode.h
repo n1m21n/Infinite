@@ -365,8 +365,8 @@ public:
    // rest after the id, false for a key it does not know.
    static void WriteEffectLines(std::ostream& o, const Layer& l, int id);
    static bool ParseEffectLine(const std::string& key, std::istream& s, Layer& l);
-   unsigned long long mEffDraws = 0;
-   unsigned long long mBatched = 0, mPasses = 0;   // layers drawn in a batch / single passes (tests)   // effect stacks drawn (tests: an unchanged stack is not redrawn)
+   unsigned long long mEffDraws = 0;   // effect stacks drawn (tests: an unchanged stack is not redrawn)
+   unsigned long long mBatched = 0, mPasses = 0;   // layers drawn in a batch / single passes (tests)
    // Colour Lookup: a .cube file's size and RGB table (size^3 rows, red fastest); false when it cannot be read.
    static bool ReadCube(const std::string& path, int& size, std::vector<float>& rgb);
    // Levels' Auto: per channel black and white at the 0.1 % tails of the document's picture.
@@ -440,6 +440,16 @@ public:
    bool ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h);
    // The composited picture as last cooked (bottom row first); false before the first cook.
    bool ReadOutput(std::vector<uint8_t>& rgba, int& w, int& h);
+   // ---- layered files (Block 8) ---------------------------------------------
+   // Photoshop .psd (8/16/32-bit RGB or grey in; 8-bit RGB out) and OpenRaster .ora. Loading replaces the
+   // document: its size, then every layer as a paint layer with name, opacity, blend, visibility, clipping,
+   // groups and (PSD) pixel masks. Saving cooks first; non-paint layers go out drawn alone. Adjustment layers stay out.
+   bool LoadPsd(const std::vector<uint8_t>& bytes, std::string* err = nullptr);
+   bool SavePsd(std::vector<uint8_t>& out, int frameId);
+   bool LoadOra(const std::vector<uint8_t>& bytes, std::string* err = nullptr);
+   bool SaveOra(std::vector<uint8_t>& out, int frameId);
+   // One layer drawn alone on transparent at full opacity and Normal, rows top-down (after a cook).
+   bool RenderLayerAlone(int id, int frameId, std::vector<uint8_t>& rgba);
    // The paint surface's live texture (thumbnails), 0 when none.
    unsigned PaintTexture(int id);
 
@@ -607,6 +617,8 @@ private:
    Surface* SyncSurface(std::map<int, Surface>& in, int id, int w, int h, const std::vector<std::string>& keys);
    void SyncSurfaces();
    void StoreTiles(Surface& s, std::vector<std::string>& keys, const int dirty[4]);
+   void ResetForFile(int w, int h);
+   int AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba);
    bool DocToSurface(const Layer& l, int target, float x, float y, float& sx, float& sy, float& scale);
    std::vector<std::array<float, 6>> SurfaceMirrors(const Layer& l, int target);
    bool EnsurePaintShaders();

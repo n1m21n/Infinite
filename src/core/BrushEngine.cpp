@@ -869,6 +869,7 @@ namespace BrushEngine
       mLastX = mPenX = x;
       mLastY = mPenY = y;
       mLastP = mPenP = p;
+      mStab.assign(1, { x, y, p });
       mCarry = 0.0f;
       mDabX = x;
       mDabY = y;
@@ -973,6 +974,11 @@ namespace BrushEngine
       mPenX = x;
       mPenY = y;
       mPenP = p;
+      if (mBrush.stabiliser > 0)
+      {
+         StabWalk(x, y, p);
+         return;
+      }
       if (mBrush.smoothing > 0.0f)
       {
          // The brush hangs on a string behind the pen and only moves once the string is taut.
@@ -986,6 +992,41 @@ namespace BrushEngine
          return;
       }
       Walk(x, y, p);
+   }
+
+   // The stabiliser: the brush goes to a weighted average of the last N pen samples, newer ones weighing more
+   // (weights 1..N), so a shaky hand comes out as a steady line that trails the pen a little.
+   void Stroke::StabWalk(float x, float y, float p)
+   {
+      const size_t n = (size_t)std::clamp(mBrush.stabiliser, 1, 64);
+      mStab.push_back({ x, y, p });
+      if (mStab.size() > n)
+         mStab.erase(mStab.begin(), mStab.end() - n);
+      float sx = 0, sy = 0, sp = 0, sw = 0;
+      for (size_t i = 0; i < mStab.size(); i++)
+      {
+         const float w = (float)(i + 1);
+         sx += mStab[i][0] * w;
+         sy += mStab[i][1] * w;
+         sp += mStab[i][2] * w;
+         sw += w;
+      }
+      Walk(sx / sw, sy / sw, sp / sw);
+   }
+
+   bool Stroke::Predict(const float a[3], const float b[3], float aheadMs, float maxPx, float out[2])
+   {
+      const float dt = b[2] - a[2];
+      const float dx = b[0] - a[0], dy = b[1] - a[1];
+      if (!(dt > 0.0f) || dx * dx + dy * dy < 1e-6f)
+         return false;
+      float k = aheadMs / dt;
+      const float d = std::sqrt(dx * dx + dy * dy) * k;
+      if (d > maxPx)
+         k *= maxPx / d;
+      out[0] = b[0] + dx * k;
+      out[1] = b[1] + dy * k;
+      return true;
    }
 
    void Stroke::Flush()
@@ -1321,8 +1362,12 @@ namespace BrushEngine
       dirty[0] = dirty[1] = dirty[2] = dirty[3] = 0;
       if (!mActive)
          return;
-      // A smoothed stroke catches up to where the pen let go.
-      if (mBrush.smoothing > 0.0f)
+      // A smoothed stroke catches up to where the pen let go: the stabiliser by feeding the last pen point
+      // until every sample in the window is it, the string by walking straight there.
+      if (mBrush.stabiliser > 0)
+         for (int k = 0; k < std::clamp(mBrush.stabiliser, 1, 64); k++)
+            StabWalk(mPenX, mPenY, mPenP);
+      else if (mBrush.smoothing > 0.0f)
          Walk(mPenX, mPenY, mPenP);
       mEnding = true;
       Flush();
