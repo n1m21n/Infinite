@@ -1699,6 +1699,9 @@ namespace app
       gn.node.reset(node);
       gn.typeName = typeName;
       gn.category = category;
+      // Shade nodes moved from 3D to Shader: a patch saved before that still names 3D.
+      if (category == "3D" && typeName.rfind("Shade ", 0) == 0)
+         gn.category = NodeFactory::Instance().CategoryOf(typeName);
       gn.index = gNextIndex++;
       // Every node gets one, not just the ones an arrangement clip happens to
       // point at: a node can be added to the timeline at any later moment, and

@@ -388,12 +388,48 @@ Color WithContrast(const Color& fg, const Color& bgA, const Color& bgB, float mi
 // under WCAG AA. Chrome text has to stay readable, so both text tones are lifted to 4.5:1 against
 // the window, the panel and a text field's well at load. The well is tinted toward the text, so it
 // moves when the text does: a few passes settle it.
+// Turns a colour round the hue circle by `turn` (0..1), keeping its saturation and value.
+Color HueTurn(const Color& c, float turn)
+{
+   const float mx = std::max({ c.r, c.g, c.b }), mn = std::min({ c.r, c.g, c.b }), d = mx - mn;
+   float h = 0.0f;
+   if (d > 1e-6f)
+   {
+      if (mx == c.r)
+         h = std::fmod((c.g - c.b) / d, 6.0f);
+      else if (mx == c.g)
+         h = (c.b - c.r) / d + 2.0f;
+      else
+         h = (c.r - c.g) / d + 4.0f;
+      h /= 6.0f;
+   }
+   h = std::fmod(h + turn + 1.0f, 1.0f);
+   const float s = mx > 1e-6f ? d / mx : 0.0f, v = mx;
+   const float f = h * 6.0f;
+   const int k = (int)f % 6;
+   const float fr = f - std::floor(f), p = v * (1 - s), q = v * (1 - s * fr), t = v * (1 - s * (1 - fr));
+   switch (k)
+   {
+      case 0: return { v, t, p };
+      case 1: return { q, v, p };
+      case 2: return { p, v, t };
+      case 3: return { p, q, v };
+      case 4: return { t, p, v };
+      default: return { v, p, q };
+   }
+}
+
 const std::vector<Preset>& Presets()
 {
    static const std::vector<Preset> presets = [] {
       std::vector<Preset> p = RawPresets();
       for (Preset& preset : p)
       {
+         // Shader: the theme's 3D colour turned a quarter of the way round the hue circle (sky blue -> violet in
+         // the Infinite themes), so it reads as kin of 3D but not the same family.
+         auto threeD = preset.categories.find("3D");
+         if (preset.categories.find("Shader") == preset.categories.end() && threeD != preset.categories.end())
+            preset.categories["Shader"] = HueTurn(threeD->second, 0.25f);
          UiTheme& ui = preset.ui;
          ui.text = WithContrast(ui.text, ui.windowBg, ui.panelBg, kMinTextContrast);
          for (int pass = 0; pass < 4 && ContrastRatio(ui.text, FieldWellBg(ui)) < kMinTextContrast; ++pass)
@@ -634,7 +670,7 @@ bool IsThemeLight()
 const std::vector<std::string>& CategoryNames()
 {
    static const std::vector<std::string> kCategories = {
-      "Source", "3D", "Compositing", "Effects", "Modulators", "Prediction",
+      "Source", "3D", "Shader", "Compositing", "Effects", "Modulators", "Prediction",
       "Macros", "Utility", "Notes", "Synths", "AudioEffects"
    };
    return kCategories;
@@ -1017,7 +1053,7 @@ int SemanticRank(const std::string& category)
    // 2D/video, then 3D, then audio, then modulators, prediction & macros, then utility
    static const std::vector<std::string> kOrder = {
       "Source", "Compositing", "Effects",
-      "3D",
+      "3D", "Shader",
       "Notes", "Synths", "AudioEffects",
       "Modulators", "Prediction", "Macros", "Utility",
    };

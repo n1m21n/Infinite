@@ -26,10 +26,10 @@ SIZES = {  # (w, h) canvas units, generous
     "FieldPixel": (340, 380), "Output": (340, 340), "Audio Out": (300, 220),
     "Render 3D": (360, 420), "Material": (320, 520), "Camera": (300, 320), "Light": (300, 320),
 }
-CAT_DEFAULT = {"Source": (300, 300), "Effects": (280, 240), "Compositing": (280, 240), "3D": (300, 320),
+CAT_DEFAULT = {"Source": (300, 300), "Effects": (280, 240), "Compositing": (280, 240), "3D": (300, 320), "Shader": (280, 260),
                "Utility": (320, 280), "Modulators": (250, 320), "Notes": (330, 300), "Synths": (700, 800),
                "AudioEffects": (460, 480), "Macros": (260, 260), "Prediction": (360, 360)}
-BAND_OF = {"Source": "Picture", "Effects": "Picture", "Compositing": "Picture", "3D": "Picture",
+BAND_OF = {"Source": "Picture", "Effects": "Picture", "Compositing": "Picture", "3D": "Picture", "Shader": "Picture",
            "Notes": "Sound", "Synths": "Sound", "AudioEffects": "Sound", "Modulators": "Modulation",
            "Macros": "Modulation", "Prediction": "Modulation"}
 ORDER = ["Picture", "Sound", "Modulation"]

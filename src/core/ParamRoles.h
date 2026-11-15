@@ -55,7 +55,7 @@ namespace ParamRoles
       if (c == "AudioEffects") return kAudioFx;
       if (c == "Notes") return kNotes;
       if (c == "Modulators") return kMod;
-      if (c == "3D") return k3D;
+      if (c == "3D" || c == "Shader") return k3D;
       if (c == "Compositing") return kComp;
       if (c == "Source") return kSource;
       if (c == "Effects") return kEffects;

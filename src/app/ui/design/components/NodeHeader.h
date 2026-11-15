@@ -18,7 +18,7 @@ namespace NodeHeader
    {
       struct Row { const char* name; const char* glyph; };
       static const Row rows[] = {
-         { "Source", IconsInfinite::FamilySource },         { "3D", IconsInfinite::Family3d },
+         { "Source", IconsInfinite::FamilySource },         { "3D", IconsInfinite::Family3d }, { "Shader", IconsInfinite::Family3d },
          { "Compositing", IconsInfinite::FamilyCompositing }, { "Effects", IconsInfinite::FamilyEffects },
          { "Modulators", IconsInfinite::FamilyModulators },   { "Prediction", IconsInfinite::FamilyPrediction },
          { "Macros", IconsInfinite::FamilyMacros },           { "Utility", IconsInfinite::FamilyUtility },

@@ -37,7 +37,7 @@ namespace PatchLayout
       };
 
       const TypeSize kCategorySizes[] = {
-         { "Source", 300, 300 }, { "Effects", 280, 240 }, { "Compositing", 280, 240 }, { "3D", 300, 320 },
+         { "Source", 300, 300 }, { "Effects", 280, 240 }, { "Compositing", 280, 240 }, { "3D", 300, 320 }, { "Shader", 280, 260 },
          { "Utility", 320, 280 }, { "Modulators", 250, 320 }, { "Notes", 330, 300 }, { "Synths", 700, 800 },
          { "AudioEffects", 460, 480 }, { "Macros", 260, 260 }, { "Prediction", 360, 360 },
       };

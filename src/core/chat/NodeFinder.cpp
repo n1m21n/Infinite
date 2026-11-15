@@ -213,7 +213,7 @@ namespace chat
       {
          if (c == "Synths" || c == "AudioEffects" || c == "Notes")
             return 1;
-         if (c == "3D" || c == "Compositing" || c == "Effects" || c == "Source")
+         if (c == "3D" || c == "Shader" || c == "Compositing" || c == "Effects" || c == "Source")
             return 2;
          return 0;
       }

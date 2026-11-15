@@ -2175,13 +2175,18 @@ void FrameTest_ROUNDTRIPTEST(int frameId, GLFWwindow* window)
             const std::string catText = NodeHelpTextFor("\x01no such node", "3D");
             for (int i = 0; i < kN; i++)
                if (catText != NodeHelpTextFor(kShade[i], "3D")) helpOk++;
+            // category: Shader, also for nodes spawned the way a patch saved before the move names them ("3D")
+            int shaderCat = 0;
+            for (auto& kv : idx)
+               if (GraphNode* g = FindNodeByIndex(kv.second); g != nullptr && g->category == "Shader")
+                  shaderCat++;
 
             printf("shade round trip: %d nodes, %d/%d cables, %d locals, program %d, channels %s\n", (int)idx.size(), wired,
                    wantWired, s0.locals, s0.ids.empty() ? 0 : s0.ids[0], channels ? "base+rough+metal+height+emission" : "MISSING");
             if (!s0.err.empty()) printf("  shade compose error: %s\n", s0.err.c_str());
-            printf("shade round trip: save/load %s, undo/redo %s, copy/paste %s, help rows %d/%d\n", loadOk ? "same" : "CHANGED",
-                   undoOk ? "same" : "CHANGED", copyOk ? "same" : "CHANGED", helpOk, kN);
-            shadeRoundTripOk = built && channels && loadOk && undoOk && copyOk && helpOk == kN;
+            printf("shade round trip: save/load %s, undo/redo %s, copy/paste %s, help rows %d/%d, Shader category %d/%d\n",
+                   loadOk ? "same" : "CHANGED", undoOk ? "same" : "CHANGED", copyOk ? "same" : "CHANGED", helpOk, kN, shaderCat, kN);
+            shadeRoundTripOk = built && channels && loadOk && undoOk && copyOk && helpOk == kN && shaderCat == kN;
             printf("shade round trip  %s\n", shadeRoundTripOk ? "OK" : "FAIL");
             NewPatch();
          }

@@ -533,6 +533,7 @@ namespace app
       if (category == "Effects") return I18N_KEY("Transforms one image into another. Its parameters (and the shape of its name) describe what it changes; see Menu > Help > Module reference for the effect families.");
       if (category == "Compositing") return I18N_KEY("Combines images, or otherwise manages how they flow through the patch - including colour, mask, and feedback/loop nodes. See Menu > Help > Module reference for the full family.");
       if (category == "Modulators") return I18N_KEY("Produces a changing number over time, not an image. Patch its output onto the small dot beside any slider to drive that parameter.");
+      if (category == "Shader") return I18N_KEY("A shading node - builds a surface per shading point, the way Blender's shader nodes do. Chain it into a Material's pins; the Material compiles the chain into one program for every Render 3D engine.");
       if (category == "3D") return I18N_KEY("Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights. Right-click a 3D node and choose Add to 3D View to arrange it in the 3D View.");
       if (category == "Notes") return I18N_KEY("Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.");
       if (category == "Synths") return I18N_KEY("A sound source - it produces audio rather than an image. With a note cable connected it plays polyphonically; with nothing patched into its note pin it free-runs at its own frequency. Route its output into an audio effect chain and on to Audio Out.");
@@ -1148,8 +1149,10 @@ namespace app
                { "Audio Displacement", I18N_KEY("Deforms 3D vertex geometries in real-time driven by live audio frequencies or RMS waveforms.") },
                { "Particle System & Cloth", I18N_KEY("Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind, an optional ground plane and an optional collider mesh.") },
                { "Material, Mapping & HDRI", I18N_KEY("Material is the shading block Render 3D reads per slot (base colour, metal/rough, emission, texture inputs). Mapping controls how a texture is projected onto the geometry. HDRI supplies the environment map for reflections and the background.") },
-               { "Shading nodes", I18N_KEY("Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight and Geometry build a surface per shading point, the way Blender's shader nodes do. Chain them into a Material's field, albedo, roughness, metallic, normal, emission or opacity pin; the Material compiles the chain into one program for every Render 3D engine.") },
                { "Field Primitive & Field Modifier", I18N_KEY("Signed-distance geometry written as Field kernels and combined/warped by modifiers, then meshed - the procedural counterpart to the fixed primitives.") },
+            } },
+            { "Shader", {
+               { "Shading nodes", I18N_KEY("Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight and Geometry build a surface per shading point, the way Blender's shader nodes do. Chain them into a Material's field, albedo, roughness, metallic, normal, emission or opacity pin; the Material compiles the chain into one program for every Render 3D engine.") },
             } },
             { "Compositing", {
                { "Transform", I18N_KEY("Translate, scale, rotate, flip horizontal and flip vertical.") },
