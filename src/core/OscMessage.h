@@ -35,9 +35,21 @@ namespace OscMessage
    bool Decode(const uint8_t* data, size_t len, std::string& outAddress, Arg& outArg);
 
    // Any number of arguments, including none (a query). False on a malformed
-   // packet, a bundle, or a type tag other than f/i/s.
+   // packet, a bundle, or an unsupported type tag.
    std::vector<uint8_t> EncodeMany(const std::string& address, const std::vector<Arg>& args);
    bool DecodeMany(const uint8_t* data, size_t len, std::string& outAddress, std::vector<Arg>& outArgs);
+
+   struct PacketMessage
+   {
+      std::string address;
+      std::vector<Arg> args;
+   };
+
+   // Decodes either a single OSC message or an OSC '#bundle' (recursively up to depth 8).
+   bool DecodePacket(const uint8_t* data, size_t len, std::vector<PacketMessage>& outMessages);
+
+   // OSC 1.0 address pattern matching with '*' and '?' wildcards (matching within path segments, not '/').
+   bool MatchAddress(const std::string& pattern, const std::string& address);
 
    Arg FloatArg(float f);
    Arg IntArg(int32_t i);

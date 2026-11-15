@@ -33,14 +33,21 @@ namespace OscControl
                                                       reinterpret_cast<sockaddr*>(&from), &fromLen);
             if (n <= 0)
                continue; // timeout (the stop flag is checked every 200 ms) or a bad packet
-            Request req;
-            if (!OscMessage::DecodeMany(buffer, static_cast<size_t>(n), req.address, req.args))
+            std::vector<OscMessage::PacketMessage> msgs;
+            if (!OscMessage::DecodePacket(buffer, static_cast<size_t>(n), msgs))
                continue;
-            req.from.ip = from.sin_addr.s_addr;
-            req.from.port = from.sin_port;
             std::lock_guard<std::mutex> lock(gQueueMutex);
-            if (gQueue.size() < kMaxQueued)
+            for (auto& m : msgs)
+            {
+               if (gQueue.size() >= kMaxQueued)
+                  break;
+               Request req;
+               req.address = std::move(m.address);
+               req.args = std::move(m.args);
+               req.from.ip = from.sin_addr.s_addr;
+               req.from.port = from.sin_port;
                gQueue.push_back(std::move(req));
+            }
          }
       }
    }

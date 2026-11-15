@@ -64,7 +64,7 @@ void OscReceiveNode::RestartListenerIfNeeded()
    mBoundPort = port;
 
    mThread = std::thread([this, fd]() {
-      uint8_t buffer[1024];
+      uint8_t buffer[4096];
       for (;;)
       {
          NetSsize n = NetCompat::NetRecv(fd, buffer, sizeof(buffer), 0);
@@ -73,9 +73,8 @@ void OscReceiveNode::RestartListenerIfNeeded()
          if (n <= 0)
             continue;
 
-         std::string addr;
-         OscMessage::Arg arg;
-         if (!OscMessage::Decode(buffer, static_cast<size_t>(n), addr, arg))
+         std::vector<OscMessage::PacketMessage> msgs;
+         if (!OscMessage::DecodePacket(buffer, static_cast<size_t>(n), msgs))
             continue;
 
          std::string filter;
@@ -83,17 +82,20 @@ void OscReceiveNode::RestartListenerIfNeeded()
             std::lock_guard<std::mutex> lock(mFilterMutex);
             filter = mAddressFilter;
          }
-         if (addr != filter)
-            continue;
-
-         float value = 0.0f;
-         switch (arg.type)
+         for (const auto& msg : msgs)
          {
-            case OscMessage::ArgType::Float:  value = arg.f; break;
-            case OscMessage::ArgType::Int:    value = static_cast<float>(arg.i); break;
-            case OscMessage::ArgType::String: continue; // no numeric value to report
+            if (msg.args.empty() || !OscMessage::MatchAddress(filter, msg.address))
+               continue;
+            const OscMessage::Arg& arg = msg.args[0];
+            float value = 0.0f;
+            switch (arg.type)
+            {
+               case OscMessage::ArgType::Float:  value = arg.f; break;
+               case OscMessage::ArgType::Int:    value = static_cast<float>(arg.i); break;
+               case OscMessage::ArgType::String: continue; // no numeric value to report
+            }
+            mLastValue.store(value);
          }
-         mLastValue.store(value);
       }
    });
 }

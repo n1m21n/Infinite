@@ -2879,6 +2879,95 @@ void RunOscControlTest()
    Undo();
    Check("delete is one undo step", FindNodeByIndex(shape) != nullptr);
 
+   // OSC bundles (DrivenByMoss-style), recursive bundles, T/F/d/h tags, and MatchAddress wildcards.
+   {
+      auto appendBE32 = [](std::vector<uint8_t>& out, uint32_t v)
+      {
+         out.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+         out.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
+         out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+         out.push_back(static_cast<uint8_t>(v & 0xFF));
+      };
+      auto appendBE64 = [](std::vector<uint8_t>& out, uint64_t v)
+      {
+         for (int shift = 56; shift >= 0; shift -= 8)
+            out.push_back(static_cast<uint8_t>((v >> shift) & 0xFF));
+      };
+      auto appendStr = [](std::vector<uint8_t>& out, const std::string& s)
+      {
+         out.insert(out.end(), s.begin(), s.end());
+         out.push_back(0);
+         while (out.size() % 4 != 0)
+            out.push_back(0);
+      };
+      auto makeBundle = [&](const std::vector<std::vector<uint8_t>>& elements)
+      {
+         std::vector<uint8_t> b;
+         const char hdr[8] = { '#', 'b', 'u', 'n', 'd', 'l', 'e', '\0' };
+         b.insert(b.end(), hdr, hdr + 8);
+         appendBE64(b, 1ULL); // immediate timetag
+         for (const auto& elem : elements)
+         {
+            appendBE32(b, static_cast<uint32_t>(elem.size()));
+            b.insert(b.end(), elem.begin(), elem.end());
+         }
+         return b;
+      };
+
+      // DrivenByMoss-style message with T, F, d, h tags.
+      std::vector<uint8_t> msgMute;
+      appendStr(msgMute, "/track/1/mute");
+      appendStr(msgMute, ",T");
+
+      std::vector<uint8_t> msgSolo;
+      appendStr(msgSolo, "/track/1/solo");
+      appendStr(msgSolo, ",F");
+
+      std::vector<uint8_t> msgTempo;
+      appendStr(msgTempo, "/tempo/raw");
+      appendStr(msgTempo, ",d");
+      double tempoVal = 128.5;
+      uint64_t tempoBits = 0;
+      std::memcpy(&tempoBits, &tempoVal, sizeof(tempoBits));
+      appendBE64(msgTempo, tempoBits);
+
+      std::vector<uint8_t> msgTick;
+      appendStr(msgTick, "/clock/tick");
+      appendStr(msgTick, ",h");
+      appendBE64(msgTick, 42000ULL);
+
+      const std::vector<uint8_t> innerBundle = makeBundle({ msgMute, msgSolo });
+      const std::vector<uint8_t> volMsg = OscMessage::EncodeFloat("/track/1/volume", 0.75f);
+      const std::vector<uint8_t> outerBundle = makeBundle({ volMsg, innerBundle, msgTempo, msgTick });
+
+      std::vector<OscMessage::PacketMessage> decoded;
+      Check("DecodePacket decodes recursive DrivenByMoss bundle",
+            OscMessage::DecodePacket(outerBundle.data(), outerBundle.size(), decoded) && decoded.size() == 5);
+      if (decoded.size() == 5)
+      {
+         Check("bundle[0] float value", decoded[0].address == "/track/1/volume" &&
+               decoded[0].args.size() == 1 && std::abs(decoded[0].args[0].f - 0.75f) < 1e-6f);
+         Check("bundle[1] T tag", decoded[1].address == "/track/1/mute" &&
+               decoded[1].args.size() == 1 && decoded[1].args[0].i == 1);
+         Check("bundle[2] F tag", decoded[2].address == "/track/1/solo" &&
+               decoded[2].args.size() == 1 && decoded[2].args[0].i == 0);
+         Check("bundle[3] d tag", decoded[3].address == "/tempo/raw" &&
+               decoded[3].args.size() == 1 && std::abs(decoded[3].args[0].f - 128.5f) < 1e-5f);
+         Check("bundle[4] h tag", decoded[4].address == "/clock/tick" &&
+               decoded[4].args.size() == 1 && decoded[4].args[0].i == 42000);
+      }
+
+      std::vector<uint8_t> badBundle = outerBundle;
+      badBundle.resize(12);
+      Check("DecodePacket rejects truncated bundle", !OscMessage::DecodePacket(badBundle.data(), badBundle.size(), decoded));
+
+      Check("MatchAddress * wildcard", OscMessage::MatchAddress("/track/*/volume", "/track/1/volume"));
+      Check("MatchAddress ? wildcard", OscMessage::MatchAddress("/track/?/mute", "/track/1/mute"));
+      Check("MatchAddress ? rejects multi-char", !OscMessage::MatchAddress("/track/?/mute", "/track/12/mute"));
+      Check("MatchAddress * stays within segment", !OscMessage::MatchAddress("/track/*", "/track/1/volume"));
+      Check("MatchAddress rejects mismatch", !OscMessage::MatchAddress("/track/*/volume", "/track/1/pan"));
+   }
+
    ClearOscListeners();
    if (startedHere)
       OscControl::Stop();
