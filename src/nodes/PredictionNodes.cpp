@@ -1,4 +1,5 @@
 #include "nodes/PredictionNodes.h"
+#include "core/SpawnSeed.h"
 
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
@@ -67,7 +68,7 @@ namespace
    // header comment on why that mismatch would be a dishonesty bug, not just polish.
    // `beats` is the transport beat position the sample lands on: the real transport now for
    // Tick, a projected future beat for Ghost.
-   void ApplyShaping(float rawX, double beats, int quantizeRate, float smoothness, float& heldX,
+   void ApplyShaping(float rawX, double beats, int quantizeRate, float smoothness, double dt, float& heldX,
                       long long& heldGridIdx, float& smoothedX)
    {
       float target = rawX;
@@ -85,7 +86,10 @@ namespace
             target = heldX;
          }
       }
-      const float k = std::clamp(smoothness, 0.0f, 0.95f);
+      // k is the per-frame decay at 60 fps, scaled to the real step, so the glide depends on time,
+      // not on how many times the graph cooked: a dt-0 cook (a repeat call at the same T, an offline
+      // render pumping several cooks per frame) leaves it where it was.
+      const float k = std::pow(std::clamp(smoothness, 0.0f, 0.95f), (float)(std::max(dt, 0.0) * 60.0));
       smoothedX = smoothedX * k + target * (1.0f - k);
    }
 
@@ -159,8 +163,7 @@ namespace
 DriftNode::DriftNode()
 {
    // Two Drifts dropped on the canvas must not walk in lockstep (RandomNode::NextSeed's lesson).
-   static int sSpawn = 0;
-   seed = 1000 + (++sSpawn) * 7919;
+   seed = 1000 + SpawnSeed::Next(SpawnSeed::Drift) * 7919;
    mStats = &MovementStats::Live();
    // Smoothing starts at the light setting that fixed the original jittery-output complaint
    // (Step 8 round 2); it's a user-facing slider again, this is just its default. Quantize is
@@ -487,7 +490,7 @@ void DriftNode::Tick(int frameId, double dt)
 
       // A/C: quantize sample-and-hold + smoothing, applied after the dynamics/mode step so
       // Follow/Recall's target-seeking writes to s.x are shaped exactly like Wander's.
-      ApplyShaping(s.x, Transport::Instance().Beats(), quantizeRate, smoothness, s.heldX, s.heldGridIdx,
+      ApplyShaping(s.x, Transport::Instance().Beats(), quantizeRate, smoothness, dt, s.heldX, s.heldGridIdx,
                    s.smoothedX);
 
       ++it;
@@ -650,7 +653,7 @@ int DriftNode::Ghost(const ParamKey& k, float* out, int maxPoints)
       {
          Step(x, v, rng, s.model, pr, EnergyFor(k), kGhostDt);
          const double futureBeats = nowBeats + (double)(i + 1) * kGhostDt * beatsPerSec;
-         ApplyShaping(x, futureBeats, quantizeRate, smoothness, ghHeldX, ghHeldGridIdx, ghSmoothedX);
+         ApplyShaping(x, futureBeats, quantizeRate, smoothness, kGhostDt, ghHeldX, ghHeldGridIdx, ghSmoothedX);
          // Same depth scaling ValuePos01For applies to the real output - otherwise the ghost
          // preview would forecast a wider swing than the knob will actually make.
          s.ghost[i] = std::clamp(0.5f + (std::clamp(ghSmoothedX, 0.0f, 1.0f) - 0.5f) *
@@ -1339,8 +1342,7 @@ bool RunPredFeedbackTest()
 MovesNode::MovesNode()
 {
    mStats = &MovementStats::Live();
-   static int sSpawn = 0;
-   mGestureRng = 1000 + (++sSpawn) * 7919; // two Motions must not wander in lockstep (Drift's own lesson)
+   mGestureRng = 1000 + SpawnSeed::Next(SpawnSeed::Moves) * 7919; // two Motions must not wander in lockstep (Drift's own lesson)
    mGestureX = gesture;
 }
 

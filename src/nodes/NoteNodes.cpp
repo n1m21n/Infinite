@@ -5006,6 +5006,7 @@ public:
    {
       mSampleRate = sampleRate;
       mSamplePos = 0;
+      mRng = DspMath::WhiteNoise(); // same start every (re)start, as the balls: an offline pass must not inherit live draws
       for (int i = 0; i < BouncingBallsNode::kMaxBalls; i++)
          mInitialized[i] = false;
       for (int i = 0; i < kMaxPending; i++)

@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <cstring>
 #include <chrono>
+#include <cmath>
+#include "core/Transport.h"
 #include <ctime>
 #include <sstream>
 
@@ -1391,9 +1393,19 @@ unsigned int Scene3DNode::Finish(unsigned int sceneTex, int w, int h, int frameI
 #else
       localtime_r(&now, &tmv);
 #endif
+      // Date is the day the picture was made; Time and Frame are where it sits in the animation (Blender's
+      // stamp), read off the transport so the same frame stamps the same text in every render.
       if (st.stampDate) { std::strftime(buf, sizeof(buf), "%Y-%m-%d", &tmv); add("Date", buf); }
-      if (st.stampTime) { std::strftime(buf, sizeof(buf), "%H:%M:%S", &tmv); add("Time", buf); }
-      if (st.stampFrame) add("Frame", std::to_string(frameId));
+      const double fps = st.fps > 0.0f ? (double)st.fps : 30.0;
+      const long long frameNo = (long long)std::llround(Transport::Instance().Seconds() * fps);
+      if (st.stampTime)
+      {
+         const long long f = std::max(0LL, frameNo), perSec = std::max(1LL, (long long)std::llround(fps));
+         const long long secs = f / perSec;
+         std::snprintf(buf, sizeof(buf), "%02lld:%02lld:%02lld:%02lld", secs / 3600, (secs / 60) % 60, secs % 60, f % perSec);
+         add("Time", buf);
+      }
+      if (st.stampFrame) add("Frame", std::to_string(frameNo));
       if (st.stampRange) add("Range", std::to_string(st.frameStart) + "-" + std::to_string((int)(st.seconds * st.fps)));
       Item* cam = activeCamera != 0 ? FindItem(activeCamera) : nullptr;
       if (st.stampCamera) add("Camera", cam != nullptr && !cam->name.empty() ? cam->name : std::string("Camera"));

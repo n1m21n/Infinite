@@ -1,5 +1,7 @@
 // Headless jobs: ExplainLive, ParamKeyJoiner, HeadlessTick (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/SpawnSeed.h"
+#include "core/MovementStats.h"
 #include "core/CoverageFlush.h"
 #include <atomic>
 #include <chrono>
@@ -805,6 +807,28 @@ static void ParamNamesOfNode(int nodeIndex, std::map<std::string, float>& names)
          names[r.name] = 0.0f;
 }
 
+// A job after the first in one process starts where the first one did: clock held offline at 0 and
+// spawn counters at 1. Without it, a seedless or beat-synced patch renders from wherever the previous
+// job left the transport, and the same file differs by its place in a batch.
+// The learned movement statistics (Drift, Moves and the other green nodes read them) as they were before the
+// first job: each job learns into them while it plays, so later jobs start from this copy, not from what the
+// jobs before them taught.
+static MovementStats::Engine& StatsAtStart()
+{
+   static MovementStats::Engine sCopy = MovementStats::Live();
+   return sCopy;
+}
+
+static void ResetForNextJob()
+{
+   SpawnSeed::ResetAll();
+   gNextNodeUid = 1; // a uid-less patch's nodes get the same uids in every job (Drift seeds its walk from them)
+   MovementStats::Live() = StatsAtStart();
+   Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
+   Transport::Instance().Seek(0.0);
+   Transport::Instance().SetOfflineVideoTime(0.0);
+}
+
 void HeadlessTick(int& frameId, GLFWwindow* window)
 {
    enum class Phase { Warm, Running, Frames, NodeRender, Audio, Done };
@@ -928,6 +952,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
 
    // Frame jobs hold the clock at zero from the first tick: the probe/load ticks and the warm-up cook the
    // graph too, and a wall-clock frame in a history node (Time Machine ring, Trails) makes two renders differ.
+   StatsAtStart(); // copy taken on the first tick, before any job has played
    const bool videoJob = job.mode == Headless::Mode::Frame || job.mode == Headless::Mode::Frames;
    static bool sClockHeld = false;
    if (videoJob && !sClockHeld)
@@ -1006,6 +1031,8 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          HeadlessFinish(window, sStatus, sWall);
          return;
       }
+      SpawnSeed::ResetAll(); // seedless nodes number from 1 in every job
+      gNextNodeUid = 1;
       LoadPatchFrom(job.patch); // starts from an empty canvas, so the probes are gone
       return;
    }
@@ -2044,6 +2071,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          sNextTime = 0;
          sNextFrame = 0;
          sPhase = Phase::Warm;
+         ResetForNextJob();
          LoadPatchFrom(job.patch);
          return;
       }
@@ -2094,6 +2122,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             sNextTime = 0;
             sNextFrame = 0;
             sPhase = Phase::Warm;
+            ResetForNextJob();
             LoadPatchFrom(b.patch);
             return;
          }
@@ -2312,6 +2341,9 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             sTicks = 0;
             sPrepTicks = 0;
             sPhase = Phase::Warm;
+            SpawnSeed::ResetAll(); // the Audio phase seeks to job.start itself
+            gNextNodeUid = 1;
+            MovementStats::Live() = StatsAtStart();
             LoadPatchFrom(b.patch);
             return;
          }
