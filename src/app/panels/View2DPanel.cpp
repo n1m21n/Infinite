@@ -4841,6 +4841,69 @@ namespace
       return BarCombo(FormParts::Id(label).c_str(), v, names, n, sFieldW);
    }
 
+   // The material stroke's rows: light and height, canvas texture, dual tip, colour along, wet mix.
+   void MaterialRows(BrushEngine::Brush& b)
+   {
+      MoreHeader(T("Material"));
+      static std::vector<const char*> mats;
+      if (mats.empty())
+      {
+         mats.push_back("Flat");
+         for (const std::string& n : BrushEngine::MaterialNames())
+            mats.push_back(n.c_str());
+      }
+      int m = b.material + 1;
+      if (MoreCombo(T("Look"), &m, mats.data(), (int)mats.size()))
+         b.material = m - 1;
+      if (b.material >= 0)
+      {
+         static const char* kProfiles[4] = { "Flat", "Round", "Ridge", "Ribbon" };
+         MoreCombo(T("Profile"), &b.profile, kProfiles, 4);
+         MorePct(T("Depth"), &b.depth, 0.0f, 300.0f);
+         MoreSlider(T("Light"), &b.lightAz, -180.0f, 180.0f, "%.0f\xC2\xB0");
+         MoreSlider(T("Light height"), &b.lightEl, 5.0f, 90.0f, "%.0f\xC2\xB0");
+      }
+      MoreHeader(T("Texture"));
+      static const char* kGrains[4] = { "Off", "Paper", "Weave", "Noise" };
+      MoreCombo(T("Grain"), &b.grain, kGrains, 4);
+      if (b.grain > 0)
+      {
+         static const char* kGrainModes[3] = { "Multiply", "Subtract", "Height" };
+         MoreCombo(T("Grain mode"), &b.grainMode, kGrainModes, 3);
+         MorePct(T("Grain scale"), &b.grainScale, 10.0f, 800.0f);
+         MorePct(T("Grain depth"), &b.grainDepth, 0.0f, 100.0f);
+      }
+      MoreHeader(T("Dual tip"));
+      static std::vector<const char*> tips;
+      if (tips.empty())
+      {
+         tips.push_back("Off");
+         for (const std::string& n : BrushEngine::TipNames())
+            tips.push_back(n.c_str());
+      }
+      int d = b.dualTip + 1;
+      if (MoreCombo(T("Second tip"), &d, tips.data(), (int)tips.size()))
+         b.dualTip = d - 1;
+      if (b.dualTip >= 0)
+      {
+         MorePct(T("Second size"), &b.dualScale, 5.0f, 200.0f);
+         MorePct(T("Second scatter"), &b.dualScatter, 0.0f, 200.0f);
+      }
+      MoreHeader(T("Colour"));
+      static const char* kAlong[3] = { "Flat", "Along", "Across" };
+      MoreCombo(T("Gradient"), &b.colorAlong, kAlong, 3);
+      if (b.colorAlong > 0)
+      {
+         FieldLabel(T("Second colour"));
+         ImGui::ColorEdit3("##v2dcolb", b.colorB, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
+         if (b.colorAlong == 1)
+            MoreSlider(T("Repeat"), &b.colorPeriod, 10.0f, 2000.0f, "%.0f px");
+      }
+      MorePct(T("Wet mix"), &b.wet, 0.0f, 100.0f);
+      if (b.wet > 0.0f)
+         MorePct(T("Refill"), &b.refill, 0.0f, 100.0f);
+   }
+
    void MatchChips()
    {
       float tol = (float)sTolerance;
@@ -4961,6 +5024,9 @@ namespace
                   b = presets[i].brush;
                   if (sTool == kEraser)
                      b.mode = BrushEngine::kErase;
+                  // A material's colour is part of the look (gold, steel, denim): it becomes the foreground.
+                  else if (presets[i].group != nullptr && std::strcmp(presets[i].group, "Material") == 0)
+                     std::copy(b.color, b.color + 3, sFg);
                }
             }
             MenuParts::EndCombo();
@@ -5055,6 +5121,8 @@ namespace
                }
                MoreCheck(T("Lock alpha"), &b.lockAlpha);
             }
+            if (brush && !BrushEngine::DirectMode(b.mode) && b.relief < 0)
+               MaterialRows(b);
             ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
             bool mask = sEditMask && a != nullptr && a->HasPixelMask();
             MoreCheck(T("Paint the mask"), &mask);

@@ -825,6 +825,88 @@ void RunView2DTest()
       for (const auto& pr : BrushEngine::Presets())
          presets |= pr.group != nullptr && std::string(pr.group) == "Liquify" && pr.brush.mode == BrushEngine::kPinch;
       Check("S3: the Liquify presets are listed", presets);
+
+      // ---- Block 5: material brushes (the section-3 done-checks) ----
+      const auto Find = [](const char* name) {
+         for (const auto& pr : BrushEngine::Presets())
+            if (std::string(pr.name) == name)
+               return pr.brush;
+         return BrushEngine::Brush{};
+      };
+      const auto Lum = [&](int x0, int x1, int y0, int y1) {
+         float sum = 0.0f;
+         int n = 0;
+         for (int y = y0; y <= y1; y++)
+            for (int x = x0; x <= x1; x++)
+            {
+               const std::vector<float> c = Pixel(&pic, x, y);
+               sum += 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2];
+               n++;
+            }
+         return n > 0 ? sum / n : 0.0f;
+      };
+      // Brushed steel: turning the light 180 degrees moves the bright edge to the other side of the stroke.
+      float side[2] = {};
+      for (int k = 0; k < 2; k++)
+      {
+         Clear();
+         L = pic.AddPaintLayer();
+         BrushEngine::Brush steel = Find("Brushed steel");
+         steel.lightAz = k == 0 ? 90.0f : -90.0f;
+         Line(L, 40, 100, 260, 100, steel);
+         Cook(&pic);
+         side[k] = Lum(130, 170, 84, 92) - Lum(130, 170, 108, 116);
+      }
+      printf("  brushed steel: top-minus-bottom %.3f, light turned %.3f\n", side[0], side[1]);
+      Check("B5: Brushed steel's bright edge follows the light", side[0] * side[1] < 0.0f && std::fabs(side[0]) > 0.03f && std::fabs(side[1]) > 0.03f);
+      // Grain: a canvas texture lands at the same canvas spot under two crossing strokes.
+      std::vector<float> cross[2];
+      for (int k = 0; k < 2; k++)
+      {
+         Clear();
+         L = pic.AddPaintLayer();
+         BrushEngine::Brush gb = Colour(hard, 1, 1, 1);
+         gb.size = 90.0f;
+         gb.grain = 1;
+         gb.grainMode = 1;
+         gb.grainDepth = 1.0f;
+         gb.grainScale = 1.5f;
+         if (k == 0)
+            Line(L, 30, 100, 270, 100, gb);
+         else
+            Line(L, 150, 10, 150, 190, gb);
+         Cook(&pic);
+         for (int y = 85; y < 115; y++)
+            for (int x = 135; x < 165; x++)
+               cross[k].push_back(Pixel(&pic, x, y)[0]);
+      }
+      const auto Corr = [](const std::vector<float>& a, const std::vector<float>& b) {
+         double ma = 0, mb = 0;
+         for (size_t i = 0; i < a.size(); i++) { ma += a[i]; mb += b[i]; }
+         ma /= a.size(); mb /= b.size();
+         double sab = 0, saa = 0, sbb = 0;
+         for (size_t i = 0; i < a.size(); i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) * (a[i] - ma); sbb += (b[i] - mb) * (b[i] - mb); }
+         return saa > 1e-9 && sbb > 1e-9 ? sab / std::sqrt(saa * sbb) : 0.0;
+      };
+      const float spread = *std::max_element(cross[0].begin(), cross[0].end()) - *std::min_element(cross[0].begin(), cross[0].end());
+      const double corr = Corr(cross[0], cross[1]);
+      printf("  grain: spread %.2f, crossing strokes correlate %.3f\n", spread, corr);
+      Check("B5: the grain stays put under crossing strokes", spread > 0.2f && corr > 0.8);
+      // Wet gouache: white drawn over red picks the red up, so its first 20 px are pink.
+      Clear();
+      L = pic.AddPaintLayer();
+      BrushEngine::Brush redBand = Colour(hard, 1, 0, 0);
+      redBand.size = 80.0f;
+      Line(L, 0, 100, 300, 100, redBand);
+      Line(L, 60, 100, 280, 100, Find("Wet gouache"));
+      Cook(&pic);
+      const std::vector<float> wet = Pixel(&pic, 70, 100);
+      printf("  wet gouache at x=70: %.2f %.2f %.2f\n", wet[0], wet[1], wet[2]);
+      Check("B5: Wet gouache over red leaves pink at the start", wet[0] > 0.8f && wet[1] > 0.25f && wet[1] < 0.85f && std::fabs(wet[1] - wet[2]) < 0.1f);
+      int materials = 0;
+      for (const auto& pr : BrushEngine::Presets())
+         materials += pr.group != nullptr && std::string(pr.group) == "Material" ? 1 : 0;
+      Check("B5: ten Material presets are listed", materials == 10);
    }
 
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
