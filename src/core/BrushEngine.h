@@ -36,6 +36,8 @@ namespace BrushEngine
 
    const std::vector<std::string>& TipNames();
    const std::vector<std::string>& MaterialNames();
+   // Copies `tex` (w x h) into `out`, so a stroke keeps the picture a node had when it started.
+   bool Snapshot(unsigned tex, int w, int h, GLUtil::Fbo& out);
 
    struct Brush
    {
@@ -89,6 +91,11 @@ namespace BrushEngine
       // Wet mix: each dab picks up a share of the paint under it and refills from `color` as it goes.
       float wet = 0.0f;            // 0..1 pick-up
       float refill = 0.15f;        // 0..1 back toward the brush colour per dab
+      // Node-fed: a canvas node's picture as the tip, the canvas texture or the colour (0 = built in).
+      unsigned tipTex = 0;         // luma x alpha is the mask, in the tip's frame (angle, roundness, follow)
+      unsigned grainTex = 0;       // tiled at its own pixel size x grainScale, fixed to the canvas
+      int grainTexW = 0, grainTexH = 0;
+      unsigned colorTex = 0;       // stretched over the surface: each pixel takes the colour under it
       float color[3] = { 0.0f, 0.0f, 0.0f };
       float sourceOffset[2] = { 0.0f, 0.0f };   // clone / heal: where to copy from, surface pixels from the dab
    };
@@ -130,6 +137,15 @@ namespace BrushEngine
       int DabCount() const { return mDabCount; }
       const Brush& CurrentBrush() const { return mBrush; }
       // A modulated brush mid-stroke: the next dabs take the new size, opacity and flow (sound as a paint input).
+      // Live node sources: the next dabs read these textures (0 = built in).
+      void SetSources(unsigned tip, unsigned grain, int grainW, int grainH, unsigned color)
+      {
+         mBrush.tipTex = tip;
+         mBrush.grainTex = grain;
+         mBrush.grainTexW = grainW;
+         mBrush.grainTexH = grainH;
+         mBrush.colorTex = color;
+      }
       void Follow(float size, float opacity, float flow)
       {
          mBrush.size = size;

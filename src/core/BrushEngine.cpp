@@ -41,6 +41,14 @@ namespace BrushEngine
          "uniform float uColPeriod;\n"
          "uniform sampler2D uCarry;\n"
          "uniform int uWet;\n"
+         "uniform sampler2D uTipTex;\n"
+         "uniform int uHasTipTex;\n"
+         "uniform sampler2D uGrainTex;\n"
+         "uniform int uHasGrainTex;\n"
+         "uniform vec2 uGrainTexSize;\n"
+         "uniform sampler2D uColTex;\n"
+         "uniform int uHasColTex;\n"
+         "uniform vec2 uSurfSize;\n"
          "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }\n"
          "float h1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
          "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
@@ -114,6 +122,10 @@ namespace BrushEngine
          "}\n"
          "// The canvas texture: sampled at the surface pixel, so it stays put under every dab and every stroke.\n"
          "float Grain(vec2 fc) {\n"
+         "   if (uHasGrainTex == 1) {\n"
+         "      vec4 t = texture(uGrainTex, fract(fc / max(uGrainTexSize * uGrainScale, vec2(1.0))));\n"
+         "      return dot(t.rgb, vec3(0.299, 0.587, 0.114)) * t.a;\n"
+         "   }\n"
          "   vec2 g = fc / max(uGrainScale, 0.05);\n"
          "   if (uGrain == 1) return vn(g * 0.35) * 0.6 + vn(g * 0.9) * 0.4;\n"
          "   if (uGrain == 2) {\n"
@@ -135,12 +147,24 @@ namespace BrushEngine
          "   vec2 p = vec2(c * w.x + s * w.y, -s * w.x + c * w.y);\n"
          "   p.y /= max(uRound, 0.05);\n"
          "   float rad = max(uRadius, 0.5);\n"
-         "   float a = Tip(uTip, p, fc, rad, uHard);\n"
+         "   float a;\n"
+         "   if (uHasTipTex == 1) {\n"
+         "      vec2 uv = p / (2.0 * rad) + 0.5;\n"
+         "      vec4 t = texture(uTipTex, uv);\n"
+         "      float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);\n"
+         "      a = dot(t.rgb, vec3(0.299, 0.587, 0.114)) * t.a * inside;\n"
+         "   } else\n"
+         "      a = Tip(uTip, p, fc, rad, uHard);\n"
          "   if (uDual >= 0) {\n"
          "      float r2 = max(rad * uDualScale, 0.5);\n"
          "      a *= Tip(uDual, w - uDualOff, fc, r2, 0.5);\n"
          "   }\n"
-
+         "   float g = 1.0;\n"
+         "   if (uGrain > 0) {\n"
+         "      g = Grain(fc);\n"
+         "      if (uGrainMode == 0) a *= mix(1.0, g, uGrainDepth);\n"
+         "      else if (uGrainMode == 1) a = max(0.0, a - uGrainDepth * (1.0 - g));\n"
+         "   }\n"
          "   // The stroke frame: across runs -1..1 over the width, along is px down the stroke.\n"
          "   vec2 perp = vec2(-uDir.y, uDir.x);\n"
          "   float across = clamp(dot(w, perp) / rad, -1.0, 1.0);\n"
@@ -150,6 +174,7 @@ namespace BrushEngine
          "      float t = fract(along / max(uColPeriod, 1.0));\n"
          "      base = mix(uCol, uColB, 1.0 - abs(2.0 * t - 1.0));\n"
          "   } else if (uColAlong == 2) base = mix(uCol, uColB, across * 0.5 + 0.5);\n"
+         "   if (uHasColTex == 1) base = texture(uColTex, fc / max(uSurfSize, vec2(1.0))).rgb;\n"
          "   if (uWet == 1) base = texture(uCarry, vec2(0.5)).rgb;\n"
          "   if (uMat >= 0) {\n"
          "      // Height across the stroke and its slope (per unit of across).\n"
@@ -252,11 +277,16 @@ namespace BrushEngine
          "uniform float uGrainScale;\n"
          "uniform float uGrainDepth;\n"
          "uniform int uGrainMode;\n"
+         "uniform sampler2D uGrainTex;\n"
+         "uniform int uHasGrainTex;\n"
+         "uniform vec2 uGrainTexSize;\n"
          "float h1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
          "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
          "   return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), f.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), f.x), f.y); }\n"
          // The same canvas texture as the dab shader's: on the whole stroke, so overlapping dabs do not fill it in.
          "float Grain(vec2 fc) {\n"
+         "   if (uHasGrainTex == 1) { vec4 t = texture(uGrainTex, fract(fc / max(uGrainTexSize * uGrainScale, vec2(1.0))));\n"
+         "      return dot(t.rgb, vec3(0.299, 0.587, 0.114)) * t.a; }\n"
          "   vec2 g = fc / max(uGrainScale, 0.05);\n"
          "   if (uGrain == 1) return vn(g * 0.35) * 0.6 + vn(g * 0.9) * 0.4;\n"
          "   if (uGrain == 2) { vec2 w = g / 6.0; float chk = mod(floor(w.x) + floor(w.y), 2.0);\n"
@@ -426,6 +456,7 @@ namespace BrushEngine
          int center, radius, hard, flow, tip, seed, angle, round, pencil, col;
          int dir, along, mat, profile, depth, light, grain, grainScale, grainDepth, grainMode;
          int dual, dualScale, dualOff, colB, colAlong, colPeriod, carry, wet;
+         int tipTex, hasTipTex, grainTex, hasGrainTex, grainTexSize, colTex, hasColTex, surfSize;
       } sDabLoc;
       uint32_t sStrokeSeed = 0x9E3779B9u;
 
@@ -480,6 +511,31 @@ namespace BrushEngine
                                                                "Bristle", "Paper Grain", "Halftone", "Watercolour", "Brushed Metal", "Cloth",
                                                                "Leaf", "Grass", "Sparkle", "Sponge" };
       return names;
+   }
+
+   bool Snapshot(unsigned tex, int w, int h, GLUtil::Fbo& out)
+   {
+      static unsigned sCopy = 0;
+      if (sCopy == 0)
+         sCopy = GLUtil::CompileProgram(
+            "#version 150\n"
+            "in vec2 vUv;\n"
+            "out vec4 fragColor;\n"
+            "uniform sampler2D uTex;\n"
+            "void main() { fragColor = texture(uTex, vUv); }\n");
+      if (tex == 0 || w <= 0 || h <= 0 || sCopy == 0 || !GLUtil::EnsureFbo(out, w, h, GL_RGBA8, "BrushSource"))
+         return false;
+      GLboolean blendOn = glIsEnabled(GL_BLEND);
+      glDisable(GL_BLEND);
+      GLUtil::RunShaderPass(out, sCopy, [&]()
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glUniform1i(glGetUniformLocation(sCopy, "uTex"), 0);
+      });
+      if (blendOn)
+         glEnable(GL_BLEND);
+      return true;
    }
 
    const std::vector<std::string>& MaterialNames()
@@ -762,6 +818,14 @@ namespace BrushEngine
             sDabLoc.colPeriod = glGetUniformLocation(sDab, "uColPeriod");
             sDabLoc.carry = glGetUniformLocation(sDab, "uCarry");
             sDabLoc.wet = glGetUniformLocation(sDab, "uWet");
+            sDabLoc.tipTex = glGetUniformLocation(sDab, "uTipTex");
+            sDabLoc.hasTipTex = glGetUniformLocation(sDab, "uHasTipTex");
+            sDabLoc.grainTex = glGetUniformLocation(sDab, "uGrainTex");
+            sDabLoc.hasGrainTex = glGetUniformLocation(sDab, "uHasGrainTex");
+            sDabLoc.grainTexSize = glGetUniformLocation(sDab, "uGrainTexSize");
+            sDabLoc.colTex = glGetUniformLocation(sDab, "uColTex");
+            sDabLoc.hasColTex = glGetUniformLocation(sDab, "uHasColTex");
+            sDabLoc.surfSize = glGetUniformLocation(sDab, "uSurfSize");
          }
       }
       return sDab != 0 && sMerge != 0 && sSmudge != 0 && sWarp != 0 && sCarry != 0;
@@ -1015,7 +1079,7 @@ namespace BrushEngine
          glUniform1i(sDabLoc.profile, b.profile);
          glUniform1f(sDabLoc.depth, std::clamp(b.depth, 0.0f, 3.0f));
          glUniform3f(sDabLoc.light, std::cos(el) * std::cos(az), std::cos(el) * std::sin(az), std::sin(el));
-         glUniform1i(sDabLoc.grain, b.grain);
+         glUniform1i(sDabLoc.grain, b.grainTex != 0 ? std::max(1, b.grain) : b.grain);
          glUniform1f(sDabLoc.grainScale, std::max(0.05f, b.grainScale));
          glUniform1f(sDabLoc.grainDepth, std::clamp(b.grainDepth, 0.0f, 1.0f));
          glUniform1i(sDabLoc.grainMode, b.grainMode);
@@ -1027,6 +1091,20 @@ namespace BrushEngine
          glUniform1f(sDabLoc.colPeriod, std::max(1.0f, b.colorPeriod));
          glUniform1i(sDabLoc.wet, wet ? 1 : 0);
          glUniform1i(sDabLoc.carry, 0);
+         glUniform1i(sDabLoc.tipTex, 1);
+         glUniform1i(sDabLoc.hasTipTex, b.tipTex != 0 ? 1 : 0);
+         glUniform1i(sDabLoc.grainTex, 2);
+         glUniform1i(sDabLoc.hasGrainTex, b.grainTex != 0 ? 1 : 0);
+         glUniform2f(sDabLoc.grainTexSize, (float)std::max(1, b.grainTexW), (float)std::max(1, b.grainTexH));
+         glUniform1i(sDabLoc.colTex, 3);
+         glUniform1i(sDabLoc.hasColTex, b.colorTex != 0 ? 1 : 0);
+         glUniform2f(sDabLoc.surfSize, (float)std::max(1, mW), (float)std::max(1, mH));
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, b.tipTex);
+         glActiveTexture(GL_TEXTURE2);
+         glBindTexture(GL_TEXTURE_2D, b.grainTex);
+         glActiveTexture(GL_TEXTURE3);
+         glBindTexture(GL_TEXTURE_2D, b.colorTex);
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, wet ? mWetCarry[mCarryIdx].tex : 0);
       }, clip);
@@ -1208,7 +1286,12 @@ namespace BrushEngine
          glUniform1i(glGetUniformLocation(sMerge, "uSrcTex"), 3);
          glUniform1i(glGetUniformLocation(sMerge, "uHasSrc"), mBrush.sourceTex != 0 ? 1 : 0);
          glUniform1f(glGetUniformLocation(sMerge, "uSpread"), std::max(1.0f, mBrush.size * 0.06f));
-         glUniform1i(glGetUniformLocation(sMerge, "uGrain"), mBrush.grain);
+         glUniform1i(glGetUniformLocation(sMerge, "uGrain"), mBrush.grainTex != 0 ? std::max(1, mBrush.grain) : mBrush.grain);
+         glActiveTexture(GL_TEXTURE4);
+         glBindTexture(GL_TEXTURE_2D, mBrush.grainTex);
+         glUniform1i(glGetUniformLocation(sMerge, "uGrainTex"), 4);
+         glUniform1i(glGetUniformLocation(sMerge, "uHasGrainTex"), mBrush.grainTex != 0 ? 1 : 0);
+         glUniform2f(glGetUniformLocation(sMerge, "uGrainTexSize"), (float)std::max(1, mBrush.grainTexW), (float)std::max(1, mBrush.grainTexH));
          glUniform1f(glGetUniformLocation(sMerge, "uGrainScale"), std::max(0.05f, mBrush.grainScale));
          glUniform1f(glGetUniformLocation(sMerge, "uGrainDepth"), std::clamp(mBrush.grainDepth, 0.0f, 1.0f));
          glUniform1i(glGetUniformLocation(sMerge, "uGrainMode"), mBrush.grainMode);
