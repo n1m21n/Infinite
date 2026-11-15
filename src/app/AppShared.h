@@ -769,6 +769,22 @@ void EndFloatingPanel();
 void DrawViewportPanelFloating();
 void DrawModMatrixFloating();
 void DrawPerfPanelFloating();
+// The Mixer panel (MixerPanel.cpp): the console view of the patch's Mixer nodes.
+void DrawMixerPanelFloating();
+void DrawMixerPanelDocked(const char* id, const ImVec2& size);
+void MixerPanelDockCombo();
+void SetMixerAudio(bool on); // AudioMode::Mixer on or off; on starts the device like the other audio chips
+void MixerPanelDockWrite(std::ostream& file);
+bool MixerPanelDockReadKey(const std::string& key, const std::string& val);
+bool MixerPanelTestStep(int frameId); // INFINITE_MIXERPANELTEST: true once finished (prints MIXERPANELTEST PASS/FAIL)
+extern bool  gMixerPanelOpen;
+extern int   gMixerPanelDock; // 0 bottom, 1 right, 2 left, 3 top, kDockFloating
+extern float gMixerPanelWidth;
+extern float gMixerPanelHeight;
+extern bool  gMixerClaimedKeys;
+extern ImVec2 gMixerPanelRectMin, gMixerPanelRectMax;
+inline const float kMixerPanelMinWidth = 320.0f;
+inline const float kMixerPanelMinHeight = 180.0f;
 
 extern std::vector<int> gViewportPanelNodes;
 
@@ -944,7 +960,7 @@ extern bool  gArrangeFocused;
    // a rebuild-driven mode leak rather than a routing rule.
    // Studio: the Sample studio's take alone (SampleStudioPanel.cpp). Canvas Audio Outs are bypassed as in Timeline,
    // and no clip is scheduled, so the take is heard on its own.
-   enum class AudioMode { Canvas, Timeline, Session, Studio };
+   enum class AudioMode { Canvas, Timeline, Session, Studio, Mixer };
 
 extern AudioMode gAudioMode;
 
@@ -5053,10 +5069,12 @@ extern uint64_t gArrangeAudioBuiltSessionGen;
 
 extern bool gArrangeAudioBuiltRouting;
 extern bool gArrangeAudioBuiltStudio;
+extern bool gArrangeAudioBuiltMixer;
 
 extern std::set<uint64_t> gArrangeRetriggerConflictClipIds;
 
 extern unsigned long long gAudioTopologyRebuildCount;
+extern int gAudioTopologyTerminalCount; // device terminals in the last published topology
 
 extern std::set<uint64_t> gArrangeVideoSourceConflictClipIds;
 
@@ -5069,6 +5087,7 @@ void ArrangeCollectClipModBindings(const GraphNode& node,
 
 bool ArrangeTimelineRoutingActive();
 bool StudioOnlyRouting(); // AudioMode::Studio outside an arrangement render: canvas bypassed, no clip scheduled
+bool MixerOnlyRouting(); // AudioMode::Mixer outside an arrangement render: only Audio Outs fed by a Mixer reach the device
 
 void ForceAudioRepare();
 

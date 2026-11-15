@@ -134,7 +134,7 @@ void DrawLayout(FrameCtx& fc)
          gArrangeClaimedKeys = inArrange;
          gSessionClaimedKeys = inSession;
          gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                           (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) ||
+                           (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
                            (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
                            (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
@@ -148,7 +148,7 @@ void DrawLayout(FrameCtx& fc)
          if (!gSessionPanelOpen)
             gSessionClaimedKeys = false;
          gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
                            (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
                            (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
@@ -273,6 +273,18 @@ void DrawLayout(FrameCtx& fc)
       if (viewportTop || viewportBottom) { topBottom += gViewportPanelHeight; topBottomRows++; }
       if (matrixTop   || matrixBottom)   { topBottom += gModMatrixHeight;     topBottomRows++; }
       if (perfTop     || perfBottom)     { topBottom += gPerfPanelHeight;     topBottomRows++; }
+      // The Mixer panel docks on any side or floats; its size is kept inside the window here.
+      gMixerPanelDock = std::clamp(gMixerPanelDock, 0, kDockFloating);
+      const bool mixerRow = gMixerPanelOpen && (gMixerPanelDock == 0 || gMixerPanelDock == 3);
+      if (mixerRow)
+      {
+         gMixerPanelHeight = std::clamp(gMixerPanelHeight, kMixerPanelMinHeight,
+                                        std::max(kMixerPanelMinHeight, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         topBottom += gMixerPanelHeight;
+         topBottomRows++;
+      }
+      gMixerPanelWidth = std::clamp(gMixerPanelWidth, kMixerPanelMinWidth,
+                                    std::max(kMixerPanelMinWidth, ImGui::GetContentRegionAvail().x - 300.0f));
       if (arrangeTop  || arrangeBottom)  { topBottom += gArrangePanelHeight;  topBottomRows++; }
       if (sessionTop  || sessionBottom)  { topBottom += gSessionPanelHeight;  topBottomRows++; }
       if (gSampleStudioOpen)
@@ -357,6 +369,8 @@ void DrawLayout(FrameCtx& fc)
          DrawModMatrixDocked("##modmatrix_top", ImVec2(0, gModMatrixHeight));
       if (perfTop)
          DrawPerfPanelDocked("##perfpanel_top", ImVec2(0, gPerfPanelHeight));
+      if (gMixerPanelOpen && gMixerPanelDock == 3)
+         DrawMixerPanelDocked("##mixerpanel_top", ImVec2(0, gMixerPanelHeight));
       if (arrangeTop)
          DrawArrangePanelDocked("##arrangepanel_top", ImVec2(0, gArrangePanelHeight));
       if (sessionTop)
@@ -396,6 +410,11 @@ void DrawLayout(FrameCtx& fc)
       if (matrixLeft)
       {
          DrawModMatrixDocked("##modmatrix_left", ImVec2(gModMatrixWidth, graphHeight));
+         ImGui::SameLine(0.0f, 0.0f);
+      }
+      if (gMixerPanelOpen && gMixerPanelDock == 2)
+      {
+         DrawMixerPanelDocked("##mixerpanel_left", ImVec2(gMixerPanelWidth, graphHeight));
          ImGui::SameLine(0.0f, 0.0f);
       }
       if (perfLeft)
@@ -464,6 +483,7 @@ void DrawLayout(FrameCtx& fc)
       if (viewportRight) rightReserved += gViewportPanelWidth;
       if (matrixRight) rightReserved += gModMatrixWidth;
       if (perfRight) rightReserved += gPerfPanelWidth;
+      if (gMixerPanelOpen && gMixerPanelDock == 1) rightReserved += gMixerPanelWidth;
       if (arrangeRight) rightReserved += gArrangePanelWidth;
       if (TerminalDocked() && gTerminalDock == 1) rightReserved += gTerminalWidth;
       if (gView3DOpen && gView3DDock == 1) rightReserved += gView3DWidth;

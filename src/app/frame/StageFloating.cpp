@@ -41,6 +41,8 @@ int DrawFloating(FrameCtx& fc)
          DrawModMatrixFloating();
       if (gPerfPanelOpen && gPerfPanelDock == kDockFloating)
          DrawPerfPanelFloating();
+      if (gMixerPanelOpen && gMixerPanelDock == kDockFloating)
+         DrawMixerPanelFloating();
 
 #ifndef NDEBUG
       // Stock ImGui windows, deliberately left un-themed (PushElevatedPanelStyle

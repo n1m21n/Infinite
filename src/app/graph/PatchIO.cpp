@@ -360,6 +360,30 @@ namespace app
       return true;
    }
 
+   // The Mixer panel's open flag, dock and sizes: one writer and one reader, so the self-test round-trips them.
+   void MixerPanelDockWrite(std::ostream& file)
+   {
+      file << "panelMixerOpen=" << (gMixerPanelOpen ? 1 : 0) << "\n";
+      file << "panelMixerDock=" << gMixerPanelDock << "\n";
+      file << "panelMixerW=" << gMixerPanelWidth << "\n";
+      file << "panelMixerH=" << gMixerPanelHeight << "\n";
+   }
+
+   bool MixerPanelDockReadKey(const std::string& key, const std::string& val)
+   {
+      if (key == "panelMixerOpen")
+         gMixerPanelOpen = (val != "0");
+      else if (key == "panelMixerDock")
+         gMixerPanelDock = std::clamp(atoi(val.c_str()), 0, kDockFloating);
+      else if (key == "panelMixerW")
+         gMixerPanelWidth = std::max(kMixerPanelMinWidth, std::strtof(val.c_str(), nullptr));
+      else if (key == "panelMixerH")
+         gMixerPanelHeight = std::max(kMixerPanelMinHeight, std::strtof(val.c_str(), nullptr));
+      else
+         return false;
+      return true;
+   }
+
    void LoadWorkspaceSettings()
    {
       const std::string path = WorkspaceSettingsPath();
@@ -422,6 +446,8 @@ namespace app
             gModMatrixWidth = std::max(kModMatrixMinWidth, std::strtof(val.c_str(), nullptr));
          else if (key == "panelMatrixH")
             gModMatrixHeight = std::max(kModMatrixMinHeight, std::strtof(val.c_str(), nullptr));
+         else if (MixerPanelDockReadKey(key, val))
+            ;
          else if (key == "panelPerfOpen")
             gPerfPanelOpen = (val != "0");
          else if (key == "panelPerfDock")
@@ -530,6 +556,7 @@ namespace app
       file << "panelMatrixDock=" << gModMatrixDock << "\n";
       file << "panelMatrixW=" << gModMatrixWidth << "\n";
       file << "panelMatrixH=" << gModMatrixHeight << "\n";
+      MixerPanelDockWrite(file);
       file << "panelPerfOpen=" << (gPerfPanelOpen ? 1 : 0) << "\n";
       file << "panelPerfDock=" << gPerfPanelDock << "\n";
       file << "panelPerfW=" << gPerfPanelWidth << "\n";
@@ -592,6 +619,8 @@ namespace app
                     gSampleStudioDock, gPianoRollDock, gTerminalDock,
                     gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
                     gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight, gTerminalHeight, gTerminalWidth);
+      std::snprintf(buf + std::strlen(buf), sizeof buf - std::strlen(buf), "|%d%d %.0f %.0f", gMixerPanelOpen, gMixerPanelDock,
+                    gMixerPanelWidth, gMixerPanelHeight);
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

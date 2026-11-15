@@ -568,6 +568,7 @@ set(COMMON_SOURCES
     src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
+    src/app/panels/MixerPanel.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp
     src/app/panels/ViewportPanel.cpp
@@ -578,6 +579,7 @@ set(COMMON_SOURCES
     src/app/selftest/MidiOutTests.cpp
     src/app/selftest/View3DNavTests.cpp
     src/app/selftest/View2DTests.cpp
+    src/app/selftest/MixerPanelTests.cpp
     src/app/selftest/EditMeshRefineTests.cpp
     src/app/selftest/FurTests.cpp
     src/app/selftest/CliSetupTests.cpp

@@ -168,6 +168,10 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_M, false))
          gModMatrixOpen = !gModMatrixOpen;
 
+      // Shift+L: the Mixer panel
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_L, false))
+         gMixerPanelOpen = !gMixerPanelOpen;
+
       // Shift+P: the docked performance matrix
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_P, false))
          gPerfPanelOpen = !gPerfPanelOpen;
@@ -375,7 +379,7 @@ void DrawKeyboard(FrameCtx& fc)
       if (!gSessionPanelOpen)
          gSessionClaimedKeys = false;
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
                         (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
                         (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 

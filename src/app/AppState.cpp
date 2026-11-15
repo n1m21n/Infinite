@@ -1526,6 +1526,7 @@ bool gHeadlessNeedProbe = false;
 
    bool gArrangeAudioBuiltRouting = false;
    bool gArrangeAudioBuiltStudio = false;
+   bool gArrangeAudioBuiltMixer = false;
 
    // Clip ids whose Retrigger flag was suppressed at the last rebuild because
    // their source node is also used by a clip on another lane - one physical
@@ -1538,6 +1539,7 @@ bool gHeadlessNeedProbe = false;
    // Every RebuildAudioTopology that got past gDeferAudioRebuild. Fixtures
    // read it to prove an edit costs exactly one rebuild and an idle frame none.
    unsigned long long gAudioTopologyRebuildCount = 0;
+   int gAudioTopologyTerminalCount = 0;
 
 
    // The video counterpart of gArrangeRetriggerConflictClipIds, and the reason
