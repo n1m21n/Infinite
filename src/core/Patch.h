@@ -570,6 +570,9 @@ namespace Patch
       // The Sample Studio's work (its source and slices), one `studio` line per line of its own text; empty: none.
       // Not part of undo: the Studio keeps its own history.
       std::string studio;
+      // Field Patcher scratch pages, pins and tab names, one `fieldpage` line per line of
+      // FieldPatcherSaveState (which escapes its own newlines and tabs). Empty: none.
+      std::string fieldPages;
       ArrangeSettingsRecord arrangeSettings;
       ViewportRecord viewport;
       // True when the file used an `id` line or a word where an index goes, so
