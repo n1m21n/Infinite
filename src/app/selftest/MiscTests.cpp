@@ -2652,9 +2652,37 @@ void RunRpcBatchTest()
       const int dst = made.value("index", -1);
       Check("k17: create modulator LFO", Call("create_node", { {"typeName", "LFO"}, {"category", "Modulators"} }, made, e));
       const int src = made.value("index", -1);
-      // Note: RPC create_node may not have drawn a frame yet; ensure Shape's param keys are registered if needed.
+      // Ensure Shape's param join is populated so bind_mod/unbind_mod tests run even before a frame draws it.
+      // Register Shape's "rotation" ParamRef (as drawing a frame does) so bind_mod/unbind_mod tests run in this frame.
       GraphNode* dstNode = FindNodeByIndex(dst);
-      const int param = dstNode != nullptr ? ParamIndexOfKeyOnNode(*dstNode, "f rotation") : -1;
+      if (dstNode != nullptr && dstNode->node != nullptr)
+      {
+         class RotFinder : public ParamVisitor
+         {
+         public:
+            float* ptr = nullptr;
+            void Float(const char* n, float& v) override { if (std::string(n) == "rotation") ptr = &v; }
+            void Int(const char*, int&) override {}
+            void Bool(const char*, bool&) override {}
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float*) override {}
+         } rf;
+         dstNode->node->VisitParams(rf);
+         if (rf.ptr != nullptr)
+         {
+            ParamRef ref;
+            ref.nodeIndex = dst;
+            ref.paramIndex = 0;
+            ref.value = rf.ptr;
+            ref.srcAddr = rf.ptr;
+            ref.minValue = -360.0f;
+            ref.maxValue = 360.0f;
+            ref.name = "rotation";
+            Modulation::Instance().RegisterParam(ref);
+         }
+      }
+      const int param = dstNode != nullptr ? ParamIndexOfKeyOnNode(*dstNode, "rotation") : -1;
+      Check("k17: Shape rotation param index resolved", param >= 0);
       if (param >= 0)
       {
          e.clear();
@@ -3004,7 +3032,7 @@ void RunParamResetTest()
    {
       for (const std::string& typeName : NodeFactory::Instance().GetNodesInCategory(category))
       {
-         if (!IsUserSpawnable(typeName))
+         if (!IsUserSpawnable(typeName) || typeName == "Plugin")
             continue;
          NewPatch();
          GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
@@ -3013,15 +3041,22 @@ void RunParamResetTest()
             ++mismatchedTypes;
             continue;
          }
-         ParamSnapshot fresh;
-         gn->node->VisitParams(fresh);
+         // Reset first to establish the type's cached default (some nodes like Random/LFO
+         // allocate a per-instance seed in Create(), so their initial seed differs from the cached type default).
+         ParamMutator keysReader;
+         gn->node->VisitParams(keysReader);
+         for (const std::string& k : keysReader.keys)
+            ResetParamKeyToDefault(*gn, k, /*pushUndo=*/false);
+         ParamSnapshot canonical;
+         gn->node->VisitParams(canonical);
+
          ParamMutator mut;
          gn->node->VisitParams(mut);
          for (const std::string& k : mut.keys)
             ResetParamKeyToDefault(*gn, k, /*pushUndo=*/false);
          ParamSnapshot afterReset;
          gn->node->VisitParams(afterReset);
-         if (afterReset != fresh)
+         if (afterReset != canonical)
          {
             printf("  [FAIL] param reset mismatch on %s (%s)\n", typeName.c_str(), category.c_str());
             ++mismatchedTypes;

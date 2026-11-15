@@ -21,9 +21,12 @@ namespace app
       int ParamIndexOfKey(const GraphNode& gn, const std::string& key, std::string& outError)
       {
          // Controls a script declares are saved as p.<name>, so both spellings work.
+         // Also accept a typed key ("f rotation") when VisitParams uses the bare name ("rotation").
          int param = ParamIndexOfKeyOnNode(gn, key);
          if (param < 0)
             param = ParamIndexOfKeyOnNode(gn, "p." + key);
+         if (param < 0 && key.size() > 2 && key[1] == ' ')
+            param = ParamIndexOfKeyOnNode(gn, key.substr(2));
          if (param >= 0)
          {
             gParamProbeNode = -1;
