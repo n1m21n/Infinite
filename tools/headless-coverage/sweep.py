@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from node_census import build  # noqa: E402  same auto-wiring as the census
 
 TIMES = "0.3,1.15"           # two times, not symmetric about an LFO zero crossing
+TIMES_3D = "0.1,0.4"         # 3D: 13 frames, not 36 (every frame re-traces GI probes when the scene moves)
 AUDIO_SECONDS = "1.2"
 LFO = "Modulators LFO"
 SIZE = "128x128"
@@ -54,6 +55,7 @@ _A = lambda *p: os.path.join(ROOT, *p)
 KIT = [_A("assets/drumkits/infinite-basic", f) for f in ("01-kick.wav", "02-snare.wav", "03-closed-hat.wav",
        "04-open-hat.wav", "05-clap.wav", "06-low-tom.wav", "07-high-tom.wav", "08-bell.wav")]
 TAKE = _A("assets/templates/media/studio-take.wav")
+STILL = _A("assets/icon_1024.png")
 CONTENT = {  # type -> file for its path param(s); pad/lane params take the kit in order
     "Sampler": TAKE, "Slicer": TAKE, "PaulStretch": TAKE, "Molder": TAKE, "Grain Molder": TAKE,
     "Granular": TAKE, "Audio File": TAKE, "Partials": TAKE, "MPC": KIT, "Drum Sequencer": KIT, "VMPC": KIT,
@@ -157,12 +159,18 @@ class Sweep:
         self.bin, self.out, self.procs, self.chunk, self.verbose = a.bin, a.out, a.procs, a.chunk, a.verbose
         self.deadline = time.time() + a.budget * 60 if a.budget else None
         self.out_of_time = False
+        self.dirs_3d = set()
 
     # ---- job generation -------------------------------------------------
     def jobs_for(self, t):
         """(job list, per-param plan) for one type. A job is (id, patch text, channel)."""
         patch, kind = build(t)
         patch = with_content(patch, t)
+        if t["category"] == "3D":
+            # A procedural image feed bumps its texture revision every frame, so Render 3D re-traces its GI probes
+            # on each frame (~340 ms) in offline renders; a still PNG keeps 3D jobs ~20x faster. Same pixels per job.
+            patch = patch.replace("Source Formula\nend", f"Source Image Source\n  s path {STILL}\nend")
+            patch = patch.replace("  f width 512\n  f height 512\n", "  f width 128\n  f height 128\n")
         # Seeded nodes (LFO, Random) draw their seed from a process-wide spawn counter when the patch omits it,
         # so a seedless patch renders differently by its place in a --batch: pin the default seed.
         for row in t.get("rows", []):
@@ -170,6 +178,8 @@ class Sweep:
                 patch = with_param(patch, f"{row['tag']} seed {float(row['default']):.6g}")
         chan = "audio" if kind in ("audio", "note") else "image"
         d = os.path.join(self.out, "types", safe(t["type"]))
+        if t["category"] == "3D":
+            self.dirs_3d.add(d)
         jobs = [("defA", patch), ("defB", patch)]
         plan = []
         for i, row in enumerate(t.get("rows", [])):
@@ -208,12 +218,12 @@ class Sweep:
             first, rest = lines[0], lines[1:]
             lst = sidecar(first[1]) + ".batch.txt"
             with open(lst, "w") as f:
-                for p, o, w in rest:
+                for p, o, w, _ in rest:
                     f.write(f"{p}\t{o}" + (f"\t{w}" if w else "") + "\n")
             # --timeout (seconds) covers the whole batch process: ~3 s a job is 10x the slowest seen
             budget = str(30 + 3 * len(lines))
             if chan == "image":
-                cmd = [self.bin, "--frame", first[0], TIMES, first[1], "--size", SIZE, "--lenient",
+                cmd = [self.bin, "--frame", first[0], first[3], first[1], "--size", SIZE, "--lenient",
                        "--timeout", budget, "--batch", lst]
             else:
                 cmd = [self.bin, "--audio-summary", first[0], first[1], "--duration", AUDIO_SECONDS,
@@ -343,6 +353,7 @@ class Sweep:
         one chunk per run of whole types (a type larger than --chunk is a chunk of its own)."""
         chunks = {"image": [[]], "audio": [[]]}
         for d, chan, jobs in staged_jobs:
+            times = TIMES_3D if d in self.dirs_3d else TIMES
             os.makedirs(d, exist_ok=True)
             lines = []
             for jid, text in jobs:
@@ -351,11 +362,11 @@ class Sweep:
                     f.write(text)
                 if not self.done(d, jid, chan):
                     wav = os.path.join(d, jid + ".wav") if chan == "audio" else ""
-                    lines.append((pf, self.out_path(d, jid, chan), wav))
+                    lines.append((pf, self.out_path(d, jid, chan), wav, times))
             if not lines:
                 continue
             cur = chunks[chan][-1]
-            if cur and len(cur) + len(lines) > self.chunk:
+            if cur and (len(cur) + len(lines) > self.chunk or cur[0][3] != times):
                 chunks[chan].append([])
             chunks[chan][-1].extend(lines)
         flat = [(c, l) for c, ls in chunks.items() for l in ls if l]
