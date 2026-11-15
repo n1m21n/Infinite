@@ -40,7 +40,7 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
-from node_census import build  # noqa: E402  same auto-wiring as the census
+from node_census import build, NO_OUTPUT  # noqa: E402  same auto-wiring as the census
 
 TIMES = "0.3,1.15"           # two times, not symmetric about an LFO zero crossing
 TIMES_3D = "0.1,0.4"         # 3D: 13 frames, not 36 (every frame re-traces GI probes when the scene moves)
@@ -58,10 +58,15 @@ TAKE = _A("assets/templates/media/studio-take.wav")
 STILL = _A("assets/icon_1024.png")
 CONTENT = {  # type -> file for its path param(s); pad/lane params take the kit in order
     "Sampler": TAKE, "Slicer": TAKE, "PaulStretch": TAKE, "Molder": TAKE, "Grain Molder": TAKE,
-    "Granular": TAKE, "Audio File": TAKE, "Partials": TAKE, "MPC": KIT, "Drum Sequencer": KIT, "VMPC": KIT,
+    "Granular": TAKE, "Audio File": TAKE, "Partials": TAKE, "MPC": KIT, "Drum Sequencer": KIT,
     "Image Source": _A("assets/icon_1024.png"), "Palette": _A("assets/icon_1024.png"),
-    "Video": _A("assets/videos/die.mov"), "Model 3D": _A("tests/render3d/skinned_two_bone.glb"),
+    "Video": _A("assets/videos/die.mov"), "VMPC": _A("assets/videos/die.mov"), "Model 3D": _A("tests/render3d/skinned_two_bone.glb"),
     "HDRI": _A("bench/assets/scenes/boat-moon/boat-moon media/infinite_bench_boat_moon.hdr"),
+}
+
+# Params a type needs before it can make output at all (a sequencer with no steps is silent).
+CONTENT_PARAMS = {
+    "Drum Sequencer": [f"f lane{l}_step{st} 1" for l in range(8) for st in ((l * 2) % 16, (l * 2 + 8) % 16)],
 }
 
 
@@ -80,6 +85,8 @@ def with_content(patch, t):
         else:
             v = f
         patch = with_param(patch, f"s {k} {v}")
+    for line in CONTENT_PARAMS.get(t["type"], []):
+        patch = with_param(patch, line)
     return patch
 
 
@@ -488,6 +495,11 @@ class Sweep:
             if t.get("hardware_driven"):
                 rows.append({"type": t["type"], "cat": t["category"], "live_only": True,
                              "params": [{"key": r["key"], "kind": r["kind"], "class": "live-only"} for r in t.get("rows", [])]})
+                continue
+            if t["type"] in NO_OUTPUT:
+                # annotations, containers and sinks to hardware/network: declared, nothing to render
+                rows.append({"type": t["type"], "cat": t["category"], "no_output": True,
+                             "params": [{"key": r["key"], "kind": r["kind"], "class": "no-output"} for r in t.get("rows", [])]})
                 continue
             d, chan, kind, jobs, plan = self.jobs_for(t)
             work.append((d, chan, jobs))

@@ -1355,15 +1355,25 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          return;
       }
 
-      // An offline render outruns real time, so an effect still building in
-      // the background (Shape Resonator's mode solve) would miss the start.
+      // An offline render outruns real time, so a node still building what it
+      // plays from in the background (Shape Resonator's mode solve, a sample's
+      // analysis in Partials / Slicer / Molder) would miss the start.
       // Wait for it, bounded so a patch that keeps re-solving still renders.
       if (job.mode == Headless::Mode::AudioSummary || job.mode == Headless::Mode::Render)
       {
          bool preparing = false;
          for (GraphNode& g : gNodes)
-            if (auto* fx = dynamic_cast<AudioEffectNode*>(g.node.get()))
+         {
+            INode* n = g.node.get();
+            if (auto* fx = dynamic_cast<AudioEffectNode*>(n))
                preparing = preparing || fx->KernelPreparing();
+            else if (auto* pa = dynamic_cast<PartialsNode*>(n))
+               preparing = preparing || pa->IsAnalyzing();
+            else if (auto* sl = dynamic_cast<SlicerNode*>(n))
+               preparing = preparing || sl->IsAnalyzing();
+            else if (auto* mo = dynamic_cast<MolderNode*>(n))
+               preparing = preparing || mo->IsRendering();
+         }
          if (preparing && ++sPrepTicks < 4 * kHeadlessProbeCapTicks)
          {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));

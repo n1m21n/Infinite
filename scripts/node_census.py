@@ -46,6 +46,10 @@ TAG = {"image": "cable", "geometry": "geo", "audio": "aud", "note": "note",
 # Where a 3D-side output plugs in on a Render 3D (Set Vertex Color for a palette).
 RENDER_SLOT = {"camera": 4, "light": 5, "environment": 8}
 SHAPE_POS_X = 5  # Shape modulatable index for "pos x": visible for any shape, never its size
+# Pad / slice players only sound for notes from 36 (C1) up; the default note feed (48-72) misses most of them.
+NOTE_RANGE = {"MPC": (36, 43), "VMPC": (36, 43), "Slicer": (36, 51)}
+# Nodes with no picture or sound of their own: annotations, containers and sinks to hardware or the network.
+NO_OUTPUT = {"Comment", "Group", "Field Graph", "Audio Out", "MIDI Out", "OSC Send", "Spatial Mixer"}
 
 
 def build(t):
@@ -57,14 +61,29 @@ def build(t):
         lines.append(f"node {nid[0]} {spec}\n{extra}end")
         return nid[0]
 
+    if t["type"] in NO_OUTPUT:
+        return "\n".join(lines) + "\n", "none"
     for s in t["inputs"]:
         k = s["kind"]
+        if k == "geometry" and s.get("name") == "layer":
+            continue  # Material's layer slot takes another Material, not raw geometry
         if k in FEED:
-            src = add(FEED[k])
+            extra = ""
+            if k == "note" and t["type"] in NOTE_RANGE:
+                lo, hi = NOTE_RANGE[t["type"]]
+                extra = f"  i rangeLow {lo}\n  i rangeHigh {hi}\n  b useGlobalScale 0\n  i scale 13\n"
+            src = add(FEED[k], extra)
             links.append(f"{TAG[k]} 1 {s['slot']} {src}" + (" 0" if k == "note" else ""))
     kind = t["outputs"][0]["kind"] if t["outputs"] else "none"
+    if t["type"] == "Output":
+        return "\n".join(lines + links) + "\n", "image"  # the node under test is the output
     out = add("Utility Output")
-    if kind == "image":
+    if t["category"] == "3D" and t["type"].startswith("Shade ") and kind == "image":
+        # shader nodes only mean something inside a material: feed its albedo on a lit cube
+        cube, mat = add("3D Cube"), add("3D Material")
+        r = add("3D Render 3D", "  f width 512\n  f height 512\n")
+        links += [f"geo {mat} 0 {cube}", f"cable {mat} 1 1", f"geo {r} 0 {mat}", f"cable {out} 0 {r}"]
+    elif kind == "image":
         links.append(f"cable {out} 0 1")
     elif kind == "geometry":
         r = add("3D Render 3D", "  f width 512\n  f height 512\n")

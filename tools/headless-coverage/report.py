@@ -2,7 +2,7 @@
 """coverage.json -> report.md: headline numbers, per-category table, review lists."""
 import collections, json, os, sys
 
-CLASSES = ["effective", "mod-only", "conditional", "no-effect", "silent-default", "error", "live-only", "text"]
+CLASSES = ["effective", "mod-only", "conditional", "no-effect", "silent-default", "error", "live-only", "no-output", "text"]
 
 
 def main(path):
@@ -17,13 +17,13 @@ def main(path):
             if "mod" in p:
                 mod[p["mod"]] += 1
     n = sum(tot.values())
-    swept = n - tot["text"] - tot["live-only"]
+    swept = n - tot["text"] - tot["live-only"] - tot["no-output"]
     covered = tot["effective"] + tot["mod-only"] + tot["conditional"]
     L = ["# Headless coverage", "",
          f"{len(rows)} node types, {n} params. Swept (not text, not live-only): {swept}.", "",
          "| Class | Params | Share of swept |", "|---|---|---|"]
     for c in CLASSES:
-        share = f"{100 * tot[c] / swept:.1f} %" if swept and c not in ("text", "live-only") else "–"
+        share = f"{100 * tot[c] / swept:.1f} %" if swept and c not in ("text", "live-only", "no-output") else "–"
         L.append(f"| {c} | {tot[c]} | {share} |")
     testable = swept - tot["silent-default"] - tot["error"]
     L += ["", f"Covered (effective, mod-only or conditional): **{covered} / {swept} = {100 * covered / max(swept, 1):.1f} %**",
