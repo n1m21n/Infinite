@@ -15,6 +15,7 @@ Each param ends in one class:
   mod-only         only the LFO changed it (the written values did not)
   conditional      no change in the default patch, but a change once another switch is set (or with no
                    input feeds): `needs` names that context (context pass, below)
+  silent-default   the type's default output is silent or blank, so the param could not be judged
   no-effect        nothing changed in any context: dead or needs context the sweep does not try (review list)
   live-only        hardware-driven type: refuses headless by design
   text             text params (paths, code): not swept here
@@ -46,6 +47,38 @@ AUDIO_SECONDS = "1.2"
 LFO = "Modulators LFO"
 SIZE = "128x128"
 IMAGE_KINDS = {"image", "geometry", "palette", "camera", "light", "environment", "none"}
+
+
+# Content for nodes that are silent or blank until a file is loaded (repo assets only)
+_A = lambda *p: os.path.join(ROOT, *p)
+KIT = [_A("assets/drumkits/infinite-basic", f) for f in ("01-kick.wav", "02-snare.wav", "03-closed-hat.wav",
+       "04-open-hat.wav", "05-clap.wav", "06-low-tom.wav", "07-high-tom.wav", "08-bell.wav")]
+TAKE = _A("assets/templates/media/studio-take.wav")
+CONTENT = {  # type -> file for its path param(s); pad/lane params take the kit in order
+    "Sampler": TAKE, "Slicer": TAKE, "PaulStretch": TAKE, "Molder": TAKE, "Grain Molder": TAKE,
+    "Granular": TAKE, "Audio File": TAKE, "Partials": TAKE, "MPC": KIT, "Drum Sequencer": KIT, "VMPC": KIT,
+    "Image Source": _A("assets/icon_1024.png"), "Palette": _A("assets/icon_1024.png"),
+    "Video": _A("assets/videos/die.mov"), "Model 3D": _A("tests/render3d/skinned_two_bone.glb"),
+    "HDRI": _A("bench/assets/scenes/boat-moon/boat-moon media/infinite_bench_boat_moon.hdr"),
+}
+
+
+def with_content(patch, t):
+    """Load the CONTENT file(s) into a type's path params; the patch unchanged for other types."""
+    f = CONTENT.get(t["type"])
+    if f is None:
+        return patch
+    for row in t.get("rows", []):
+        k = row["key"]
+        if row["kind"] != "text" or not (k in ("path", "pathB", "filePath") or k.endswith("_path")):
+            continue
+        if isinstance(f, list):
+            digits = "".join(c for c in k if c.isdigit())
+            v = f[int(digits) % len(f)] if digits else f[0]
+        else:
+            v = f
+        patch = with_param(patch, f"s {k} {v}")
+    return patch
 
 
 def values_for(row):
@@ -92,16 +125,22 @@ def with_mod(patch, row):
     return patch.rstrip("\n") + "\n" + lfo + f"mod 1 {row['modulatable_index']} 900 0 0 1 0{rng}\n"
 
 
+LINKS = ("cable", "note", "aud")
+
+
 def bare(patch):
-    """The patch with every cable into node 1 removed: the node on its own (e.g. a synth with no notes)."""
-    return "".join(l for l in patch.splitlines(True) if not l.startswith("cable 1 "))
+    """The patch with every link into node 1 removed (cables, notes, audio): the node on its own."""
+    def into_node1(l):
+        w = l.split()
+        return len(w) > 1 and w[0] in LINKS and w[1] == "1"
+    return "".join(l for l in patch.splitlines(True) if not into_node1(l))
 
 
 def is_switch(row):
     return row["kind"] == "bool" or (row["kind"] == "int" and row.get("options"))
 
 
-MAX_CONTEXTS = 6
+MAX_CONTEXTS = 12
 
 
 def sidecar(out):
@@ -116,11 +155,19 @@ def safe(s):
 class Sweep:
     def __init__(self, a):
         self.bin, self.out, self.procs, self.chunk, self.verbose = a.bin, a.out, a.procs, a.chunk, a.verbose
+        self.deadline = time.time() + a.budget * 60 if a.budget else None
+        self.out_of_time = False
 
     # ---- job generation -------------------------------------------------
     def jobs_for(self, t):
         """(job list, per-param plan) for one type. A job is (id, patch text, channel)."""
         patch, kind = build(t)
+        patch = with_content(patch, t)
+        # Seeded nodes (LFO, Random) draw their seed from a process-wide spawn counter when the patch omits it,
+        # so a seedless patch renders differently by its place in a --batch: pin the default seed.
+        for row in t.get("rows", []):
+            if row["key"] == "seed" and row.get("default") is not None:
+                patch = with_param(patch, f"{row['tag']} seed {float(row['default']):.6g}")
         chan = "audio" if kind in ("audio", "note") else "image"
         d = os.path.join(self.out, "types", safe(t["type"]))
         jobs = [("defA", patch), ("defB", patch)]
@@ -155,26 +202,41 @@ class Sweep:
         """lines: [(patch file, out, wav)]. Runs them in one process; a crash restarts after the crashing line."""
         failed = []
         while lines:
+            if self.deadline and time.time() > self.deadline:
+                self.out_of_time = True  # leave the rest unrendered: the next run resumes from the sidecars
+                return failed
             first, rest = lines[0], lines[1:]
             lst = sidecar(first[1]) + ".batch.txt"
             with open(lst, "w") as f:
                 for p, o, w in rest:
                     f.write(f"{p}\t{o}" + (f"\t{w}" if w else "") + "\n")
+            # --timeout (seconds) covers the whole batch process: ~3 s a job is 10x the slowest seen
+            budget = str(30 + 3 * len(lines))
             if chan == "image":
                 cmd = [self.bin, "--frame", first[0], TIMES, first[1], "--size", SIZE, "--lenient",
-                       "--timeout", "100000", "--batch", lst]
+                       "--timeout", budget, "--batch", lst]
             else:
                 cmd = [self.bin, "--audio-summary", first[0], first[1], "--duration", AUDIO_SECONDS,
-                       "--wav", first[2], "--lenient", "--timeout", "100000", "--batch", lst]
+                       "--wav", first[2], "--lenient", "--timeout", budget, "--batch", lst]
             t0 = time.time()
             try:
-                p = subprocess.run(cmd, capture_output=True, text=True, timeout=60 + 20 * len(lines))
-                tail = (p.stdout.strip().splitlines() or [""])[-1][:300]
+                p = subprocess.run(cmd, capture_output=True, text=True, timeout=60 + 4 * len(lines))
+                tail = (p.stdout.strip().splitlines() or [""])[-1]
             except subprocess.TimeoutExpired:
                 tail = "TIMEOUT"
             if self.verbose:
                 print(f"    [{chan}] {len(lines)} jobs from {os.path.basename(first[0])}: {time.time() - t0:.1f} s  {tail[:160]}", flush=True)
             os.remove(lst)
+            sc = sidecar(first[1])
+            if not os.path.exists(sc) and tail.startswith("{"):
+                # the first (command-line) job failed and the app stopped: keep its error report as the sidecar
+                try:
+                    rep = json.loads(tail)
+                    rep.pop("attribution", None)
+                    with open(sc, "w") as f:
+                        json.dump(rep, f)
+                except (ValueError, NameError):
+                    pass
             left = [x for x in lines if not os.path.exists(sidecar(x[1]))]
             if left:
                 failed.append(left[0])  # the process stopped here: crash, timeout or a fatal first-job error
@@ -234,6 +296,9 @@ class Sweep:
                     row["error_detail"] = json.load(open(err)).get("errors", [])[:1]
                 except ValueError:
                     pass
+            # every param of a type that does not render by default counts as an error, not as missing
+            row["params"] = [{"key": q["key"], "kind": q["kind"], "ui": q["ui"],
+                              "class": "text" if q.get("class") == "text" else "error"} for q in plan]
             return row
         noise = max(self.diff(A, B) or 0, self.diff(A, C) or 0)
         row["noise"] = round(noise, 5)
@@ -241,6 +306,13 @@ class Sweep:
             row["batch_leak"] = round(self.diff(A, C), 5)
         thr = max(noise * 3, 0.02 if chan == "image" else 1e-5)
         row["threshold"] = thr
+        # a silent or blank default can't show an effect: its untested params are silent-default, not no-effect
+        level = (float(np.sqrt((A[0] ** 2).mean())) if chan == "audio"
+                 else float(np.mean([a[..., :3].std() for a in A])))
+        row["default_level"] = round(level, 5)
+        silent = level < (1e-4 if chan == "audio" else 0.5)
+        if silent:
+            row["silent_default"] = True
         for p in plan:
             r = {"key": p["key"], "kind": p["kind"], "ui": p["ui"]}
             if p.get("class") == "text":
@@ -255,7 +327,7 @@ class Sweep:
                 elif md is not None and md > thr:
                     r["class"] = "mod-only"
                 else:
-                    r["class"] = "no-effect"
+                    r["class"] = "silent-default" if silent else "no-effect"
                 r["delta"] = [None if x is None else round(min(x, 1e9), 4) for x in ds]
                 if p["mod"]:
                     r["mod"] = "error" if md is None else ("mod-effective" if md > thr else "mod-no-effect")
@@ -302,14 +374,32 @@ class Sweep:
         return failed
 
     def contexts_for(self, t, base, dead):
-        """[(label, context patch)] for a type whose params in `dead` (row indices) showed no effect."""
-        out = [("bare", bare(base))] if "\ncable 1 " in "\n" + base else []
-        for i, row in enumerate(t.get("rows", [])):
-            if not is_switch(row) or i in dead and len(dead) == 1:
+        """[(label, context patch)] for a type whose params in `dead` (row indices) showed no effect:
+        bare (no links in), every option of short menus (<= 6; else the two sweep values), bools flipped,
+        and knobs that default to their minimum ("off" by default: unison 1, depth 0) set to mid-range."""
+        out = []
+        b = bare(base)
+        if b != base:
+            out.append(("bare", b))
+        rows = t.get("rows", [])
+        for i, row in enumerate(rows):
+            if not is_switch(row) or (i in dead and len(dead) == 1):
                 continue
-            for v in values_for(row):
+            opts = row.get("options") or []
+            d = int(float(row.get("default") or 0))
+            vals = [str(k) for k in range(len(opts)) if k != d] if 0 < len(opts) <= 6 else values_for(row)
+            for v in vals:
                 out.append((f"{row['key']}={v}", with_param(base, f"{row['tag']} {row['key']} {v}")))
-        return out[:MAX_CONTEXTS + 1]
+        for i, row in enumerate(rows):
+            lo, hi, d = row.get("min"), row.get("max"), row.get("default")
+            if row["kind"] not in ("int", "float") or is_switch(row) or lo is None or hi is None or hi <= lo:
+                continue
+            if d is None or abs(float(d) - lo) > 1e-6 or (i in dead and len(dead) == 1):
+                continue
+            mid = (lo + hi) / 2
+            v = str(int(round(mid))) if row["kind"] == "int" else f"{mid:.6g}"
+            out.append((f"{row['key']}={v}", with_param(base, f"{row['tag']} {row['key']} {v}")))
+        return out[:MAX_CONTEXTS]
 
     def context_pass(self, staged, rows_by_type):
         """Rounds 2 and 3: re-test no-effect params under other switch settings and with no input feeds."""
@@ -324,7 +414,7 @@ class Sweep:
             ctxs = self.contexts_for(t, base, set(dead))
             rws = t["rows"]
             jobs, cplan = [], []
-            for j, (label, cp) in enumerate(ctxs):
+            for label, cp in ctxs:
                 moved = [i for i in dead if not label.startswith(rws[i]["key"] + "=")]
                 vals = {i: values_for(rws[i]) for i in moved}
                 moved = [i for i in moved if vals[i]]
@@ -333,7 +423,8 @@ class Sweep:
                 allp = cp
                 for i in moved:
                     allp = with_param(allp, f"{rws[i]['tag']} {rws[i]['key']} {vals[i][0]}")
-                jobs += [(f"c{j}base", cp), (f"c{j}all", allp)]
+                j = "c_" + safe(label)
+                jobs += [(f"{j}base", cp), (f"{j}all", allp), (f"{j}base2", cp)]
                 cplan.append((j, label, cp, moved, vals))
             if jobs:
                 work.append((d, chan, jobs))
@@ -349,20 +440,22 @@ class Sweep:
             thr = row["threshold"]
             jobs = []
             for j, label, cp, moved, vals in cplan:
-                dv = self.diff(load(d, f"c{j}base"), load(d, f"c{j}all"))
-                if dv is None or dv <= thr:
+                cthr = max(thr, 3 * (self.diff(load(d, f"{j}base"), load(d, f"{j}base2")) or 0))
+                row.setdefault("context_threshold", {})[label] = round(min(cthr, 1e9), 5)
+                dv = self.diff(load(d, f"{j}base"), load(d, f"{j}all"))
+                if dv is None or dv <= cthr:
                     continue
                 for i in moved:
-                    jobs.append((f"c{j}p{i}", with_param(cp, f"{t['rows'][i]['tag']} {t['rows'][i]['key']} {vals[i][0]}")))
+                    jobs.append((f"{j}p{i}", with_param(cp, f"{t['rows'][i]['tag']} {t['rows'][i]['key']} {vals[i][0]}")))
                     checks.append((row, d, chan, j, i, label))
             if jobs:
                 work3.append((d, chan, jobs))
         self.render(work3, "per-param in contexts")
         for row, d, chan, j, i, label in checks:
             load = self.load_image if chan == "image" else self.load_audio
-            dv = self.diff(load(d, f"c{j}base"), load(d, f"c{j}p{i}"))
+            dv = self.diff(load(d, f"{j}base"), load(d, f"{j}p{i}"))
             p = row["params"][i]
-            if dv is not None and dv > row["threshold"]:
+            if dv is not None and dv > row["context_threshold"][label]:
                 p["class"] = "conditional"
                 p.setdefault("needs", []).append(label)
                 p["context_delta"] = max(p.get("context_delta", 0), round(min(dv, 1e9), 4))
@@ -381,12 +474,18 @@ class Sweep:
         failed = self.render(work, "main")
         with open(os.path.join(self.out, "crashed.txt"), "w") as f:
             f.writelines(x[0] + "\n" for x in failed)
+        if self.out_of_time:
+            print("budget used up in the main round: re-run the same command to resume", flush=True)
+            return None
 
         swept = {}
         for t, d, chan, kind, plan, base in staged:
             swept[t["type"]] = self.analyse(t, d, chan, kind, plan)
         if contexts:
             self.context_pass(staged, swept)
+            if self.out_of_time:
+                print("budget used up in the context pass: re-run the same command to resume", flush=True)
+                return None
         rows += swept.values()
         rows.sort(key=lambda r: (r["cat"], r["type"]))
         with open(os.path.join(self.out, "coverage.json"), "w") as f:
@@ -402,6 +501,9 @@ def main():
     ap.add_argument("--procs", type=int, default=3)
     ap.add_argument("--chunk", type=int, default=150)
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--budget", type=float, help="minutes; stop starting chunks after this (resume by re-running)")
+    ap.add_argument("--category", action="append", help="sweep only these categories (repeatable)")
+    ap.add_argument("--skip-category", action="append", help="skip these categories (repeatable)")
     ap.add_argument("--no-contexts", action="store_true", help="skip the context pass (rounds 2 and 3)")
     ap.add_argument("types", nargs="*")
     a = ap.parse_args()
@@ -412,7 +514,13 @@ def main():
     types = json.load(open(schema))["types"]
     if a.types:
         types = [t for t in types if t["type"] in a.types]
+    if a.category:
+        types = [t for t in types if t["category"] in a.category]
+    if a.skip_category:
+        types = [t for t in types if t["category"] not in a.skip_category]
     rows = Sweep(a).run(types, contexts=not a.no_contexts)
+    if rows is None:
+        sys.exit(3)
     subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "report.py"),
                     os.path.join(a.out, "coverage.json")])
     print(f"{len(rows)} types -> {os.path.join(a.out, 'coverage.json')}")
