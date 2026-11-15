@@ -51,6 +51,7 @@ namespace BrushEngine
       float angle = 0.0f;          // degrees
       float roundness = 1.0f;      // 1 round .. 0.05 flat
       float smoothing = 0.0f;      // 0..1, lazy-mouse string
+      int stabiliser = 0;          // 0 off, else the brush follows a weighted average of this many pen samples
       bool pencil = false;         // hard pixels, no anti-aliasing
       bool pressureSize = true;
       bool pressureOpacity = false;
@@ -119,6 +120,9 @@ namespace BrushEngine
       // limiting where paint lands.
       void Begin(const GLUtil::Fbo& surface, const Brush& b, float x, float y, float pressure, unsigned selection = 0);
       void MoveTo(float x, float y, float pressure);
+      // Where the pen will be `aheadMs` after sample b, carried on from sample a ({x, y, ms} each), at most
+      // maxPx past b. False when the two samples give no direction or speed.
+      static bool Predict(const float a[3], const float b[3], float aheadMs, float maxPx, float out[2]);
       // A dab exactly here, no spacing walk (recorded replays).
       void Dab(float x, float y, float pressure, float seed);
       // Symmetry: every dab is also placed through each of these surface-pixel
@@ -173,6 +177,8 @@ namespace BrushEngine
       bool mActive = false;
       float mLastX = 0, mLastY = 0, mLastP = 1;   // where the last dab went
       float mPenX = 0, mPenY = 0, mPenP = 1;      // the real pen (smoothing)
+      std::vector<std::array<float, 3>> mStab;    // the stabiliser's last pen samples (x, y, pressure), oldest first
+      void StabWalk(float x, float y, float p);
       float mCarry = 0;                           // distance walked since the last dab
       float mDabX = 0, mDabY = 0, mDir = 0;       // the last dab's place and the stroke's heading (radians)
       float mDist = 0;                            // stroke length walked so far, px

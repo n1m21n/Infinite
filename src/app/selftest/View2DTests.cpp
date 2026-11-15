@@ -1209,6 +1209,71 @@ void RunView2DTest()
       Check("B8: a damaged file says why", !flatDoc.LoadPsd(std::vector<uint8_t>(flat, flat + 10), &err) && !err.empty());
    }
 
+   // ---- B8: stabiliser and predicted points ----
+   {
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 300;
+      pic.Doc().h = 200;
+      pic.Doc().background = 1;   // black
+      pic.Commit();
+      BrushEngine::Brush pen = BrushEngine::Presets()[5].brush;   // Hard round
+      pen.size = 4.0f;
+      pen.pressureSize = false;
+      pen.color[0] = pen.color[1] = pen.color[2] = 1.0f;
+      // A shaky hand: a line along y = 100 that jumps 12 px up and down every 6 px, ending on the line.
+      const auto Shaky = [&](const BrushEngine::Brush& use)
+      {
+         while (!pic.Layers().empty())
+            pic.Layers().pop_back();
+         pic.Commit();
+         const int L = pic.AddPaintLayer();
+         pic.BeginPaint(L, 0, use, 20.0f, 100.0f, 1.0f);
+         int k = 0;
+         for (float x = 26.0f; x < 280.0f; x += 6.0f, k++)
+            pic.PaintTo(x, 100.0f + (k % 2 == 0 ? 12.0f : -12.0f), 1.0f);
+         pic.PaintTo(280.0f, 100.0f, 1.0f);
+         pic.EndPaint();
+         Cook(&pic);
+         const int w = pic.GetOutputWidth(), h = pic.GetOutputHeight();
+         std::vector<float> px((size_t)w * h * 4);
+         glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         return px;
+      };
+      const auto Lit = [](const std::vector<float>& px, int x, int y) { return px[((size_t)(199 - y) * 300 + x) * 4] > 0.5f; };
+      // Pixels lit 8+ px off the line between x 60 and 240: the shake that reached the picture.
+      const auto Wobble = [&](const std::vector<float>& px)
+      {
+         int n = 0;
+         for (int x = 60; x < 240; x++)
+            for (int y = 60; y < 140; y++)
+               if (std::abs(y - 100) >= 8 && Lit(px, x, y))
+                  n++;
+         return n;
+      };
+      const std::vector<float> raw = Shaky(pen);
+      BrushEngine::Brush steady = pen;
+      steady.stabiliser = 12;
+      const std::vector<float> calm = Shaky(steady);
+      const int wRaw = Wobble(raw), wCalm = Wobble(calm);
+      printf("  B8 stabiliser: %d px off the line raw, %d stabilised\n", wRaw, wCalm);
+      Check("B8: the stabiliser takes the shake out of a line", wRaw > 200 && wCalm * 10 < wRaw);
+      Check("B8: a stabilised stroke catches up to where the pen lifted", Lit(calm, 279, 100) && Lit(raw, 279, 100));
+      Check("B8: a stabilised stroke still starts where the pen went down", Lit(calm, 21, 100));
+
+      float to[2] = { 0, 0 };
+      const float a[3] = { 0.0f, 0.0f, 0.0f }, b[3] = { 10.0f, 5.0f, 16.0f };
+      Check("B8: prediction carries the last two samples 8 ms on",
+            BrushEngine::Stroke::Predict(a, b, 8.0f, 100.0f, to) && std::fabs(to[0] - 15.0f) < 1e-4f && std::fabs(to[1] - 7.5f) < 1e-4f);
+      const float c[3] = { 0.0f, 0.0f, 0.0f }, d[3] = { 40.0f, 0.0f, 4.0f };
+      Check("B8: prediction stops at its reach", BrushEngine::Stroke::Predict(c, d, 8.0f, 6.0f, to) && std::fabs(to[0] - 46.0f) < 1e-4f);
+      const float e[3] = { 10.0f, 5.0f, 20.0f };
+      Check("B8: no prediction from a still pen or one time", !BrushEngine::Stroke::Predict(b, e, 8.0f, 100.0f, to)
+                                                              && !BrushEngine::Stroke::Predict(a, a, 8.0f, 100.0f, to));
+   }
+
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
    {
       Scene2DNode pic;

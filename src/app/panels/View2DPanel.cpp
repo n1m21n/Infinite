@@ -2437,6 +2437,38 @@ namespace
       glyph::Draw(dl, badge, tok::icon_md, IM_COL32(255, 255, 255, 255), g);
    }
 
+   // Predicted points: the last two pen samples carried 8 ms ahead and drawn in the paint colour, so the line
+   // reaches the pen instead of trailing it by a frame. Only a picture: the next real sample replaces it.
+   float sPen[2][3] = {};   // doc x, y, ms; [1] is the newest
+   int sPenN = 0;
+   void NotePenSample(ImVec2 at)
+   {
+      const float ms = (float)(ImGui::GetTime() * 1000.0);
+      if (sPenN > 0 && at.x == sPen[1][0] && at.y == sPen[1][1])
+         return;
+      std::copy(sPen[1], sPen[1] + 3, sPen[0]);
+      sPen[1][0] = at.x;
+      sPen[1][1] = at.y;
+      sPen[1][2] = ms;
+      sPenN = std::min(sPenN + 1, 2);
+   }
+
+   void DrawPredicted(Scene2DNode* doc, ImDrawList* dl)
+   {
+      const BrushEngine::Brush& b = sBrush;
+      float to[2];
+      if (sPenN < 2 || b.stabiliser > 0 || b.smoothing > 0.0f
+          || !BrushEngine::Stroke::Predict(sPen[0], sPen[1], 8.0f, std::max(4.0f, b.size * 2.0f), to))
+         return;
+      const ImVec2 a = ToScreen(doc, sPen[1][0], sPen[1][1]), c = ToScreen(doc, to[0], to[1]);
+      const float w = std::max(1.0f, b.size * sZoom);
+      const ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(sFg[0], sFg[1], sFg[2], 0.6f * b.opacity));
+      dl->PushClipRect(sViewMn, sViewMx, true);
+      dl->AddLine(a, c, col, w);
+      dl->AddCircleFilled(c, w * 0.5f, col);
+      dl->PopClipRect();
+   }
+
    void DrawBrushCursor(ImDrawList* dl, ImVec2 mouse)
    {
       const BrushEngine::Brush& b = ToolBrush();
@@ -4435,6 +4467,10 @@ namespace
          }
          dl->PopClipRect();
       }
+      if (sOp.kind != 7)
+         sPenN = 0;
+      else if (sTool == kBrush && !sSurfaceStroke)
+         DrawPredicted(doc, dl);
       if (hovered && !panTool && BrushTool(sTool) && !io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
@@ -4701,6 +4737,7 @@ namespace
                if (sTool == kBrush)
                   doc->PaintFollow(sBrush);
                doc->PaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+               NotePenSample(sMouseDoc);
             }
          }
          else if (sOp.kind == 10)
@@ -5256,6 +5293,9 @@ namespace
             MoreHeader(T("Dynamics"));
             MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
             MoreCheck(T("Follow stroke"), &b.follow);
+            float stab = (float)b.stabiliser;
+            MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
+            b.stabiliser = (int)std::lround(stab);
             MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
             MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
             MorePct(T("Size jitter"), &b.sizeJitter, 0.0f, 100.0f);
