@@ -575,6 +575,10 @@ struct Scene2DGeo
    float c[3] = { 0, 0, 0 };
    float r = 1.0f;
    float lo[3] = { -1, -1, -1 }, hi[3] = { 1, 1, 1 };
+   // Framed once, like the node's own viewport: a mesh whose points move (a Transform node turning it) keeps its
+   // size and place instead of being refitted to its new box every frame.
+   bool framed = false;
+   const void* framedSrc = nullptr;
    SkinProxy proxy;
    GLUtil::Fbo bake;
    unsigned bakeProgram = 0;
@@ -590,6 +594,7 @@ struct Scene2DNode::GeoCam
    M4 fromComp;                                      // comp world point -> object world point
    M4 toComp;                                        // and back
    float lo[3] = { -1, -1, -1 }, hi[3] = { 1, 1, 1 }; // the object's box in its world
+   float key[3] = { -0.45f, -0.7f, -0.55f };          // toward the key light, comp direction
 };
 
 bool Scene2DNode::GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out)
@@ -616,13 +621,21 @@ bool Scene2DNode::GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out)
                hi[k] = std::max(hi[k], p[k]);
             }
          }
-         float r2 = 0;
+         float r2 = 0, c[3];
          for (int k = 0; k < 3; k++)
          {
-            g->c[k] = 0.5f * (lo[k] + hi[k]);
+            c[k] = 0.5f * (lo[k] + hi[k]);
             r2 += 0.25f * (hi[k] - lo[k]) * (hi[k] - lo[k]);
          }
-         g->r = std::max(1e-4f, std::sqrt(r2));
+         const float r = std::max(1e-4f, std::sqrt(r2));
+         // Refit only for a new source or a mesh of another size altogether (a different primitive, a big resize).
+         if (!g->framed || g->framedSrc != geo || r > g->r * 2.0f || r < g->r * 0.5f)
+         {
+            std::copy(c, c + 3, g->c);
+            g->r = r;
+            g->framed = true;
+            g->framedSrc = geo;
+         }
          std::copy(lo, lo + 3, g->lo);
          std::copy(hi, hi + 3, g->hi);
          g->boundsSrc = geo;
@@ -685,9 +698,22 @@ bool Scene2DNode::GeoPlace(const Layer& l, IGeometrySource* geo, GeoCam& out)
    // Object world (y up, z toward the viewer) -> comp world (y down, z away): flip y and z.
    // Objects are seen the way the 3D View first shows them: from its default camera height (22.9 degrees up), so a
    // turn reads as a turn. Straight on, a cube only shows its sides and a spin looks like it is growing and shrinking.
-   static const float kViewTilt = 22.9183f;
-   float Tl[9];
-   RotX(kViewTilt, Tl);
+   // The view is the node's own viewport's (its orbit, default 34.4 degrees round, 22.9 up), so the page shows
+   // the object the way its node card does.
+   float viewAz = 34.3775f, viewEl = 22.9183f;
+   if (NodeViewOf)
+      NodeViewOf(l.uid, viewAz, viewEl);
+   float Tl[9], Ty[9];
+   RotX(viewEl, Tl);
+   RotY(viewAz - 90.0f, Ty);
+   Mul3(Tl, Ty, Tl);
+   // The node viewport's light (fixed in its world, up and to the right) as that view shows it, then held still on
+   // the page: an unturned layer is lit like the card, and turning the layer turns the object under the light.
+   {
+      const float d[3] = { 0.4f, 0.85f, 0.35f };
+      for (int i = 0; i < 3; i++)
+         out.key[i] = (i == 0 ? 1.0f : -1.0f) * (Tl[i * 3] * d[0] + Tl[i * 3 + 1] * d[1] + Tl[i * 3 + 2] * d[2]);
+   }
    M4 M;
    const float ks[3] = { s * kx, -s * ky, -s * kz };
    for (int i = 0; i < 3; i++)
@@ -874,9 +900,21 @@ bool Scene2DNode::GeometryRender(const Layer& l, unsigned& color, unsigned& dept
    // No rim light on the page: it left dark blocks and stripes across flat faces near their edges (A/B against rim 0
    // and env 0; the environment's colour is kept, the key light and surround still model the form).
    r.rimIntensity = 0.0f;
+   // One object on a page has nothing to bounce light off; the GI probes only rebuild once the scene holds still,
+   // so a turning object was lit by probes from an older pose (bands and blocks across flat faces).
+   r.probesOff = true;
+   r.lightIntensity = 4.0f;   // the card's lit side reads near white
+   r.tonemap = 0;             // the node viewport draws untonemapped; AgX greyed a white object
+   // A neutral surround, as the node's viewport: a white object stays white instead of taking the sky's blue.
+   for (int k = 0; k < 3; k++)
+   {
+      r.ambientColor[k] = 0.35f;
+      r.envSky[k] = r.envHorizon[k] = 0.55f;
+      r.envGround[k] = 0.3f;
+   }
    // The key light stays put in the comp (upper left, in front) however the layer turns the object.
    {
-      float toL[3] = { -0.45f, -0.7f, -0.55f };
+      float toL[3] = { gc.key[0], gc.key[1], gc.key[2] };
       const float n = std::sqrt(toL[0] * toL[0] + toL[1] * toL[1] + toL[2] * toL[2]);
       float o[3];
       for (int i = 0; i < 3; i++)

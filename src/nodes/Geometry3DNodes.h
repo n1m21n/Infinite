@@ -754,6 +754,7 @@ public:
    int liveEngineFeatures = 15;   // bit 0 RT shadows, 1 RT reflections, 2 GI, 3 settle (path trace once still)
    float ambientColor[3] = { 0.28f, 0.32f, 0.42f };
    float rimIntensity = 0.35f;
+   bool probesOff = false;   // no GI probes (a lone object on a 2D page: nothing to bounce off)
 
    // Procedural surround, sampled for both reflections and ambient. Not an
    // HDRI: a three-stop vertical gradient, which is enough to stop metal

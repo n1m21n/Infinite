@@ -2819,7 +2819,7 @@ void Render3DNode::CookOnce(int frameId)
                            lightSpotPenumbra, lightArea, lightTerms, lightCutoff);
    // Probes light raster's own frames; the tracers find their own bounce light.
    static const bool sEngineEnvSet = std::getenv("INFINITE_LIVE_ENGINE") != nullptr;
-   if (!mVelocityPass && mFaceOverride < 0 && !PathTraceActive() && !LiveActive() && !sEngineEnvSet && !SolidActive())
+   if (!mVelocityPass && mFaceOverride < 0 && !PathTraceActive() && !LiveActive() && !sEngineEnvSet && !SolidActive() && !probesOff)
       UpdateProbes(sceneSig);
 
    // --- shadow pass ---------------------------------------------------
@@ -3106,7 +3106,7 @@ void Render3DNode::CookOnce(int frameId)
                                     ambientColor[2] + (rig != nullptr ? rig->ambient[2] : 0.0f) };
       glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, rigAmbient);
       {
-         const bool probes = mProbeValid && mProbeTex != 0;
+         const bool probes = mProbeValid && mProbeTex != 0 && !probesOff;
          glActiveTexture(GL_TEXTURE16);
          glBindTexture(GL_TEXTURE_3D, probes ? mProbeTex : 0);
          glBindSampler(16, 0);

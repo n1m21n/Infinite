@@ -182,6 +182,7 @@ namespace
       ImVec2 pan0;
       bool made = false;          // the shape tool has added its item
       int gizmoAxis = -1;         // 16: the 3D gizmo part held (0..2 axes, 3 centre)
+      float g0[4] = { 0, 0, 0, 0 };   // 20/21: the group box at the start, x0 y0 x1 y1
    } sOp;
 
    // The 3D gizmo on a 3D layer: 0 move, 1 rotate, 2 scale (W / E / R, like the 3D View).
@@ -1781,6 +1782,118 @@ namespace
          sOp.l0 = *a;
    }
 
+   // A group or several layers picked: one upright box around them all, scaled (20) and turned (21) as one, like
+   // Photoshop's Free Transform on a group or a multi-layer selection.
+   bool GroupTarget(Scene2DNode* doc)
+   {
+      const Layer* a = Active(doc);
+      if (sTool != kMove || a == nullptr || (sSel.size() == 1 && a->kind != Kind::Group))
+         return false;
+      return !MovingIds(doc).empty();
+   }
+
+   // The outermost movable group a layer sits in, or the layer itself.
+   int OuterGroup(Scene2DNode* doc, int id)
+   {
+      int out = id;
+      for (const Layer* up = doc->FindLayer(id); up != nullptr && up->parent != 0;)
+      {
+         up = doc->FindLayer(up->parent);
+         if (up != nullptr && up->kind == Kind::Group && Movable(*up))
+            out = up->id;
+      }
+      return out;
+   }
+
+   ImVec2 GroupHandlePoint(Scene2DNode* doc, const float lo[2], const float hi[2], int i)
+   {
+      return ToScreen(doc, lo[0] + (hi[0] - lo[0]) * kHandleAt[i][0], lo[1] + (hi[1] - lo[1]) * kHandleAt[i][1]);
+   }
+
+   int HoverGroupHandle(Scene2DNode* doc, ImVec2 mouse)
+   {
+      float lo[2], hi[2];
+      if (!SelBounds(doc, lo, hi))
+         return -1;
+      for (int i = 0; i < 8; i++)
+      {
+         const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
+         if (std::fabs(mouse.x - p.x) <= kHandle && std::fabs(mouse.y - p.y) <= kHandle)
+            return i;
+      }
+      const ImVec2 a = ToScreen(doc, lo[0], lo[1]), b = ToScreen(doc, hi[0], hi[1]);
+      const bool inside = mouse.x >= a.x && mouse.x <= b.x && mouse.y >= a.y && mouse.y <= b.y;
+      for (int i = 0; i < 8; i += 2)
+      {
+         const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
+         const float dx = mouse.x - p.x, dy = mouse.y - p.y;
+         if (!inside && dx * dx + dy * dy <= 22.0f * 22.0f)
+            return 8;
+      }
+      return -1;
+   }
+
+   // One layer of the group, put back from its start state: its box centre goes where the group's move takes it,
+   // its own scale and angle take the rest.
+   void PlaceInGroup(Scene2DNode* doc, Layer& l, const Layer& b, float kx, float ky, float turnDeg, ImVec2 fix)
+   {
+      float bw = 1, bh = 1, m0[6], px, py;
+      doc->LayerBox(b, bw, bh);
+      doc->LayerMatrix(b, m0);
+      Apply(m0, bw * 0.5f, bh * 0.5f, px, py);
+      const float r = turnDeg * kPi / 180.0f, cs = std::cos(r), sn = std::sin(r);
+      const float qx = fix.x + ((px - fix.x) * cs - (py - fix.y) * sn) * kx;
+      const float qy = fix.y + ((px - fix.x) * sn + (py - fix.y) * cs) * ky;
+      l = b;
+      // A layer turned a quarter takes the group's width scale on its height.
+      const bool quarter = std::fabs(std::fabs(std::remainder(b.angle, 180.0f)) - 90.0f) < 45.0f;
+      l.sx = b.sx * (quarter ? ky : kx);
+      l.sy = b.sy * (quarter ? kx : ky);
+      l.angle = std::fmod(b.angle + turnDeg + 540.0f, 360.0f) - 180.0f;
+      float m1[6], nx, ny;
+      doc->LayerMatrix(l, m1);
+      Apply(m1, bw * 0.5f, bh * 0.5f, nx, ny);
+      l.x += qx - nx;
+      l.y += qy - ny;
+   }
+
+   void ScaleGroup(Scene2DNode* doc, ImVec2 mouse)
+   {
+      const float* g = sOp.g0;
+      const float w = std::max(g[2] - g[0], 1e-3f), h = std::max(g[3] - g[1], 1e-3f);
+      const float ox = sOp.fromCentre ? 0.5f : 1.0f - sOp.hx, oy = sOp.fromCentre ? 0.5f : 1.0f - sOp.hy;
+      const ImVec2 md = ToDoc(doc, mouse);
+      const float bx = (md.x - g[0]) / w, by = (md.y - g[1]) / h;
+      float kx = std::fabs(sOp.hx - ox) > 1e-3f ? (bx - ox) / (sOp.hx - ox) : 1.0f;
+      float ky = std::fabs(sOp.hy - oy) > 1e-3f ? (by - oy) / (sOp.hy - oy) : 1.0f;
+      const bool corner = std::fabs(sOp.hx - 0.5f) > 0.1f && std::fabs(sOp.hy - 0.5f) > 0.1f;
+      if (corner && !ImGui::GetIO().KeyShift)
+         kx = ky = std::fabs(kx) > std::fabs(ky) ? kx : ky;
+      if (!corner && std::fabs(sOp.hx - 0.5f) < 0.1f) kx = 1.0f;
+      if (!corner && std::fabs(sOp.hy - 0.5f) < 0.1f) ky = 1.0f;
+      kx = std::fabs(kx) < 1e-3f ? 1e-3f : kx;
+      ky = std::fabs(ky) < 1e-3f ? 1e-3f : ky;
+      const ImVec2 fix(g[0] + ox * w, g[1] + oy * h);
+      for (const Layer& b : sOp.before)
+         if (Layer* l = doc->FindLayer(b.id))
+            PlaceInGroup(doc, *l, b, kx, ky, 0.0f, fix);
+      Touch();
+   }
+
+   void RotateGroup(Scene2DNode* doc, ImVec2 mouse)
+   {
+      const float* g = sOp.g0;
+      const ImVec2 cd((g[0] + g[2]) * 0.5f, (g[1] + g[3]) * 0.5f), c = ToScreen(doc, cd.x, cd.y);
+      const float a0 = std::atan2(sOp.start.y - c.y, sOp.start.x - c.x), a1 = std::atan2(mouse.y - c.y, mouse.x - c.x);
+      float turn = (a1 - a0) * 180.0f / kPi;
+      if (ImGui::GetIO().KeyShift)
+         turn = std::round(turn / 15.0f) * 15.0f;
+      for (const Layer& b : sOp.before)
+         if (Layer* l = doc->FindLayer(b.id))
+            PlaceInGroup(doc, *l, b, 1.0f, 1.0f, turn, cd);
+      Touch();
+   }
+
    bool CanWarp(Scene2DNode* doc)
    {
       const Layer* l = Active(doc);
@@ -1981,6 +2094,24 @@ namespace
       return kGizmoPx / std::max(sZoom, 1e-4f) * std::max(depth, 1.0f) / std::max(doc->Camera().zoom, 1.0f);
    }
 
+   // A point of the gizmo on screen: a short step from its centre along `dir` (unit, world), projected and then
+   // stretched to the gizmo's screen size. A world-sized gizmo seen zoomed far out reached toward the camera and
+   // bent into huge arcs; this keeps it kGizmoPx and undistorted at any zoom.
+   bool GizmoPoint(Scene2DNode* doc, const float at[3], const float dir[3], ImVec2 c, float sizePx, ImVec2& out)
+   {
+      float x, y, depth = 1.0f;
+      doc->ProjectPoint(at, x, y, &depth);
+      const float eps = std::max(depth, 1.0f) * 0.01f;
+      const float p[3] = { at[0] + dir[0] * eps, at[1] + dir[1] * eps, at[2] + dir[2] * eps };
+      ImVec2 q;
+      if (!GizmoScreen(doc, p, q))
+         return false;
+      const float epsPx = eps * std::max(doc->Camera().zoom, 1.0f) / std::max(depth, 1.0f) * sZoom;
+      const float k = sizePx / std::max(epsPx, 1e-6f);
+      out = ImVec2(c.x + (q.x - c.x) * k, c.y + (q.y - c.y) * k);
+      return true;
+   }
+
    float SegDist2D(ImVec2 p, ImVec2 a, ImVec2 b)
    {
       const float dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
@@ -1998,7 +2129,6 @@ namespace
       const int mode = sGizmoMode;
       float ax[3][3];
       GizmoAxes(doc, l, mode, ax);
-      const float len = GizmoLen(doc, l);
       const ImU32 white = IM_COL32(255, 255, 255, 255);
       auto tone = [&](int id, float alpha) { return held == id || (held < 0 && sGizmoHot == id) ? white : Hex(kGizmoHex[id], alpha); };
       int hot = -1;
@@ -2024,11 +2154,11 @@ namespace
             for (int i = 0; i <= 64; i++)
             {
                const float t = (float)i / 64.0f * 2.0f * kPi;
-               float p[3];
+               float dir[3];
                for (int k = 0; k < 3; k++)
-                  p[k] = at[k] + (u[k] * std::cos(t) + v[k] * std::sin(t)) * len;
+                  dir[k] = u[k] * std::cos(t) + v[k] * std::sin(t);
                ImVec2 q;
-               const bool ok = GizmoScreen(doc, p, q);
+               const bool ok = GizmoPoint(doc, at, dir, c, kGizmoPx, q);
                if (ok && prevOk)
                {
                   dl->AddLine(prev, q, tone(a, 1.0f), 2.5f);
@@ -2049,9 +2179,8 @@ namespace
       {
          if (mode == 2 && a == 2 && !doc->IsObjectLayer(l))
             continue;   // a card has no thickness to scale
-         const float tip[3] = { at[0] + ax[a][0] * len, at[1] + ax[a][1] * len, at[2] + ax[a][2] * len };
          ImVec2 s;
-         if (!GizmoScreen(doc, tip, s))
+         if (!GizmoPoint(doc, at, ax[a], c, kGizmoPx, s))
             continue;
          const float dx = s.x - c.x, dy = s.y - c.y, sl = std::hypot(dx, dy);
          if (sl < 10.0f)
@@ -2106,9 +2235,8 @@ namespace
       *l = l0;
       // The axis on screen: how far the pointer moved along it, in arm lengths.
       auto along = [&](int k, float& t) {
-         const float tip[3] = { at[0] + ax[k][0] * len, at[1] + ax[k][1] * len, at[2] + ax[k][2] * len };
          ImVec2 s;
-         if (!GizmoScreen(doc, tip, s))
+         if (!GizmoPoint(doc, at, ax[k], c, kGizmoPx, s))
             return false;
          const float dx = s.x - c.x, dy = s.y - c.y, l2 = dx * dx + dy * dy;
          t = l2 >= 100.0f ? (mx * dx + my * dy) / l2 : -my / kGizmoPx;
@@ -3127,6 +3255,21 @@ namespace
          dl->AddLine(ImVec2(an.x - 7, an.y), ImVec2(an.x + 7, an.y), Hex(kOutline));
          dl->AddLine(ImVec2(an.x, an.y - 7), ImVec2(an.x, an.y + 7), Hex(kOutline));
       }
+      const bool groupT = !canTransform && GroupTarget(doc);
+      if (groupT)
+      {
+         float lo[2], hi[2];
+         if (SelBounds(doc, lo, hi))
+         {
+            dl->AddRect(ToScreen(doc, lo[0], lo[1]), ToScreen(doc, hi[0], hi[1]), Hex(kOutline), 0.0f, 0, 1.0f);
+            for (int i = 0; i < 8; i++)
+            {
+               const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
+               dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), IM_COL32(255, 255, 255, 255));
+               dl->AddRect(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), Hex(kOutline));
+            }
+         }
+      }
       if (VectorTool(sTool))
          DrawVectorOverlay(dl, doc, mouse, hovered);
       if (sOp.kind == 15)
@@ -3239,7 +3382,7 @@ namespace
       // Cursor hints.
       int guideAxis = 0;
       const int hoverGuide = sTool == kMove && hovered ? HoverGuide(doc, mouse, guideAxis) : -1;
-      const int hoverHandle = canTransform && hovered && !gizmo3d ? HoverHandle(doc, *active, mouse) : -1;
+      const int hoverHandle = !hovered || gizmo3d ? -1 : canTransform ? HoverHandle(doc, *active, mouse) : groupT ? HoverGroupHandle(doc, mouse) : -1;
       if (hovered && sOp.kind == 0)
       {
          if (panTool)
@@ -3401,6 +3544,17 @@ namespace
                BeginOp(doc, 16, mouse, sGizmoMode == 0 ? "Move layer" : sGizmoMode == 1 ? "Rotate layer" : "Scale layer");
                sOp.gizmoAxis = sGizmoHot;
             }
+            else if (groupT && hoverHandle >= 0)
+            {
+               BeginOp(doc, hoverHandle < 8 ? 20 : 21, mouse, hoverHandle < 8 ? "Scale layers" : "Rotate layers");
+               SelBounds(doc, sOp.g0, sOp.g0 + 2);
+               if (hoverHandle < 8)
+               {
+                  sOp.hx = kHandleAt[hoverHandle][0];
+                  sOp.hy = kHandleAt[hoverHandle][1];
+                  sOp.fromCentre = io.KeyAlt;
+               }
+            }
             else if (hoverHandle >= 0 && hoverHandle < 8 && (io.KeyCtrl || io.KeySuper) && CanWarp(doc))
             {
                // Cmd/Ctrl: a corner distorts (with Alt+Shift, perspective), an edge skews.
@@ -3427,10 +3581,21 @@ namespace
             }
             else
             {
-               const int hit = sAutoSelect || io.KeyCtrl || io.KeySuper ? HitLayer(doc, sMouseDoc) : 0;
+               int hit = sAutoSelect || io.KeyCtrl || io.KeySuper ? HitLayer(doc, sMouseDoc) : 0;
+               // A click picks the outermost group the layer sits in (Photoshop's Auto-Select Group, Figma);
+               // Cmd/Ctrl-click reaches the layer itself.
+               if (!(io.KeyCtrl || io.KeySuper))
+                  hit = OuterGroup(doc, hit);
                if (hit != 0)
                {
-                  if (io.KeyShift)
+                  // A layer inside a picked group moves the group (Photoshop's Auto-Select Group).
+                  bool inPicked = false;
+                  for (int id : sSel)
+                     if (id != hit && doc->IsInside(hit, id))
+                        inPicked = true;
+                  if (inPicked && !io.KeyShift)
+                     ;
+                  else if (io.KeyShift)
                      ToggleSel(hit);
                   else if (!Selected(hit))
                      SelectOnly(hit);
@@ -3465,6 +3630,10 @@ namespace
             ScaleActive(doc, mouse);
          else if (sOp.kind == 3)
             RotateActive(doc, mouse);
+         else if (sOp.kind == 20)
+            ScaleGroup(doc, mouse);
+         else if (sOp.kind == 21)
+            RotateGroup(doc, mouse);
          else if (sOp.kind == 16)
             DragGizmo3D(doc, mouse);
          else if (sOp.kind == 18)
@@ -7322,6 +7491,39 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       // Pixel-accurate hit: the top layer is b, painted bottom right; a click on a's paint is a, not b's empty box.
       expect("a click on paint picks that layer", HitLayer(doc, ImVec2(W * 0.09f, H * 0.12f)) == a);
       const int empty = HitLayer(doc, ImVec2(W * 0.5f, H * 0.5f));
+      // A group scales and turns as one box; a click on a layer inside picks the group.
+      {
+         const int g = doc->GroupLayers({ a, b });
+         doc->Commit();
+         expect("a click inside a group picks the group", OuterGroup(doc, HitLayer(doc, ImVec2(W * 0.09f, H * 0.12f))) == g);
+         const int tool0 = sTool;
+         sTool = kMove;
+         sSel = { g };
+         expect("a picked group shows one transform box", GroupTarget(doc));
+         float lo[2], hi[2], lo2[2], hi2[2];
+         SelBounds(doc, lo, hi);
+         BeginOp(doc, 20, ToScreen(doc, hi[0], hi[1]), nullptr);
+         SelBounds(doc, sOp.g0, sOp.g0 + 2);
+         sOp.hx = sOp.hy = 1.0f;
+         ScaleGroup(doc, ToScreen(doc, lo[0] + (hi[0] - lo[0]) * 0.5f, lo[1] + (hi[1] - lo[1]) * 0.5f));
+         doc->Commit();
+         SelBounds(doc, lo2, hi2);
+         const float kw = (hi2[0] - lo2[0]) / (hi[0] - lo[0]), kh = (hi2[1] - lo2[1]) / (hi[1] - lo[1]);
+         expect("group corner drag halves the group, top-left stays", std::fabs(kw - 0.5f) < 0.06f && std::fabs(kh - 0.5f) < 0.06f &&
+                                                                  std::fabs(lo2[0] - lo[0]) < 4.0f && std::fabs(lo2[1] - lo[1]) < 4.0f);
+         sOp = Op();
+         const ImVec2 c = ToScreen(doc, (lo2[0] + hi2[0]) * 0.5f, (lo2[1] + hi2[1]) * 0.5f);
+         BeginOp(doc, 21, ImVec2(c.x + 50.0f, c.y), nullptr);
+         SelBounds(doc, sOp.g0, sOp.g0 + 2);
+         RotateGroup(doc, ImVec2(c.x, c.y + 50.0f));
+         doc->Commit();
+         const Layer* la = doc->FindLayer(a);
+         const Layer* lb = doc->FindLayer(b);
+         expect("group turn turns every layer in it", la != nullptr && lb != nullptr && std::fabs(la->angle - 90.0f) < 1.0f && std::fabs(lb->angle - 90.0f) < 1.0f);
+         sOp = Op();
+         sTool = tool0;
+         doc->Ungroup(g);
+      }
       expect("a click on empty paint picks neither paint layer", empty != a && empty != b);
    }
    // Pixel-accurate hit on a 3D object: the box corner misses the sphere, the centre hits it.

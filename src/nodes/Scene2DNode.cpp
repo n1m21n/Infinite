@@ -16,6 +16,7 @@
 #include "TileStore.h"
 
 std::function<INode*(uint64_t)> Scene2DNode::ResolveUid;
+std::function<bool(uint64_t, float&, float&)> Scene2DNode::NodeViewOf;
 
 const char* Scene2DNode::AdjName(int type)
 {

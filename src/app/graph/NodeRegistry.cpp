@@ -11,6 +11,18 @@ namespace app
          return gn != nullptr ? gn->node.get() : nullptr;
       };
       Scene2DNode::ResolveUid = Scene3DNode::ResolveUid;
+      Scene2DNode::NodeViewOf = [](uint64_t uid, float& az, float& el) -> bool
+      {
+         GraphNode* gn = FindNodeByUid(uid);
+         if (gn == nullptr)
+            return false;
+         auto it = gNodeCameras.find(gn->index);
+         if (it == gNodeCameras.end())
+            return false;
+         az = it->second.azimuth;
+         el = it->second.elevation;
+         return true;
+      };
       Scene2DNode::ImageInputOf = [](uint64_t uid) -> ImageCable*
       {
          GraphNode* gn = FindNodeByUid(uid);

@@ -1003,6 +1003,9 @@ void RunView2DTest()
       NewPatch();
       GraphNode* cubeGn = SpawnNode("Cube", "3D", 0.0f, 0.0f);
       auto* cube = cubeGn != nullptr ? dynamic_cast<GeometryNode*>(cubeGn->node.get()) : nullptr;
+      // The page shows the node card's view; this check is about size, so look straight on from 22.9 up.
+      if (cubeGn != nullptr)
+         gNodeCameras[cubeGn->index] = SharedViewportCamera{ 90.0f, 22.9183f };
       Scene2DNode pic;
       pic.SetDocText("doc 1920 1080 0 0 0 0 0 0 0 0 1 32 4 30 10 1 1\n");
       pic.AddLayer(Kind::Node, cubeGn != nullptr ? cubeGn->uid : 0);
@@ -1097,6 +1100,9 @@ void RunView2DTest()
       NewPatch();
       GraphNode* ca = SpawnNode("Cube", "3D", 0.0f, 0.0f);
       GraphNode* cb = SpawnNode("Cube", "3D", 0.0f, 300.0f);
+      for (GraphNode* gn : { ca, cb })
+         if (gn != nullptr)
+            gNodeCameras[gn->index] = SharedViewportCamera{ 90.0f, 22.9183f };
       GraphNode* nz = SpawnNode("Noise", "Source", 0.0f, 600.0f);
       auto paint = [](GraphNode* g, float r, float gg, float b) {
          if (auto* n = g != nullptr ? dynamic_cast<GeometryNode*>(g->node.get()) : nullptr)

@@ -210,6 +210,8 @@ public:
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
    static std::function<INode*(uint64_t)> ResolveUid;
+   // A node's viewport orbit (azimuth, elevation in degrees), so a 3D object layer is seen as its node card shows it.
+   static std::function<bool(uint64_t, float&, float&)> NodeViewOf;
    // The first image input of the node with this uid (the app knows every node's cables), for effect layers.
    static std::function<ImageCable*(uint64_t)> ImageInputOf;
    bool CanTakeBelow(const Layer& l) const { return l.kind == Kind::Node && l.uid != 0 && ImageInputOf && ImageInputOf(l.uid) != nullptr; }
