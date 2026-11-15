@@ -2368,6 +2368,316 @@
    },
    "groove": 0.45,
    "fill": 0.2
+  },
+  {
+   "id": "gamelan_polyrhythm",
+   "family": "experimental",
+   "bpm": [
+    96,
+    128
+   ],
+   "swing": 0.0,
+   "scale": [
+    9,
+    5,
+    12
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "x.o.x.o.x.o.x.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "..x...o...x...o.",
+    "htom": "....x..o....x..o",
+    "bell": "x..o.x..o.x..o.."
+   },
+   "bass": "0.....4...2...0.",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "EQ"
+   ],
+   "synth": [
+    "Metallic",
+    "Partials",
+    "FM"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.35,
+   "refs": [
+    "Javanese and Balinese Gamelan",
+    "Steve Reich, Six Marimbas",
+    "Colin McPhee, Tabuh-Tabuhan"
+   ],
+   "chords": {
+    "size": [
+     2,
+     3
+    ],
+    "beats": 2.0,
+    "strum": 10,
+    "human": 14
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Metallic",
+     "FM"
+    ],
+    "density": 0.65,
+    "octave": 2,
+    "gate": 45,
+    "gain": -10,
+    "rate": 0.25,
+    "range": 8
+   },
+   "groove": 0.75,
+   "fill": 0.6,
+   "gain": -8.0
+  },
+  {
+   "id": "library_jazz",
+   "family": "downtempo",
+   "bpm": [
+    82,
+    108
+   ],
+   "swing": 0.28,
+   "scale": [
+    4,
+    3,
+    7,
+    11
+   ],
+   "drums": {
+    "kick": "x.....o...x..o..",
+    "snare": "....o.......x...",
+    "chat": "x..ox..ox..ox..o",
+    "ohat": "......o.......o.",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..2..4..5.3..1.",
+   "fx": [
+    "Saturator",
+    "Chorus",
+    "Reverb",
+    "EQ"
+   ],
+   "synth": [
+    "Piano",
+    "Wind",
+    "Analog"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.25,
+   "refs": [
+    "KPM / De Wolfe Library Records",
+    "David Axelrod, Song of Innocence",
+    "BadBadNotGood, III"
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 2.0,
+    "strum": 45,
+    "human": 22
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Wind",
+     "Piano"
+    ],
+    "density": 0.45,
+    "octave": 1,
+    "gate": 65,
+    "gain": -11,
+    "rate": 0.5,
+    "range": 7,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.85,
+   "fill": 0.5,
+   "gain": -7.0
+  },
+  {
+   "id": "broken_beat_rhodes",
+   "family": "breaks",
+   "bpm": [
+    120,
+    130
+   ],
+   "swing": 0.35,
+   "scale": [
+    4,
+    7,
+    1
+   ],
+   "drums": {
+    "kick": "x..o....x..o.x..",
+    "snare": "....x..o....x...",
+    "chat": "x.ox.ox.ox.ox.o.",
+    "ohat": "..o.......o.....",
+    "clap": "......x.......x.",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0..3...2.4.5.",
+   "fx": [
+    "Chorus",
+    "Phaser",
+    "Saturator",
+    "Reverb"
+   ],
+   "synth": [
+    "Piano",
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.4,
+   "refs": [
+    "Bugz in the Attic",
+    "4hero, Two Pages",
+    "Domu, Yussef Dayes"
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 2.0,
+    "strum": 55,
+    "human": 18
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Piano",
+     "Analog"
+    ],
+    "density": 0.4,
+    "octave": 2,
+    "gate": 55,
+    "gain": -11,
+    "rate": 0.25,
+    "range": 6
+   },
+   "groove": 0.9,
+   "fill": 0.7,
+   "gain": -8.0
+  },
+  {
+   "id": "chamber_winds",
+   "family": "piano",
+   "bpm": [
+    64,
+    88
+   ],
+   "swing": 0.0,
+   "scale": [
+    0,
+    1,
+    2,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......3.......",
+   "fx": [
+    "Convolution Reverb",
+    "Reverb",
+    "EQ"
+   ],
+   "synth": [
+    "Wind",
+    "String",
+    "Partials"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.25,
+   "refs": [
+    "Ravel, Introduction and Allegro",
+    "Colin Stetson / Sarah Neufeld",
+    "Penguin Cafe Orchestra"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 4.0,
+    "strum": 85,
+    "human": 28
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Wind",
+     "String"
+    ],
+    "density": 0.35,
+    "octave": 1,
+    "gate": 85,
+    "gain": -9,
+    "rate": 0.5,
+    "range": 7,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.3,
+   "fill": 0.2,
+   "gain": 4.0
   }
  ]
 }
