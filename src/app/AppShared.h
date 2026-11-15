@@ -2577,8 +2577,8 @@ ImageCable* CableFor(GraphNode& gn, int slot);
 
 
    // Upper bound on how many audio/note-input slots any single node exposes.
-   // The widest today is Mixer, at MixerNode::kMaxSlots (12).
-   inline const int kMaxAudioSlots = 12;
+   // The widest today is Mixer, at MixerNode::kMaxSlots (32).
+   inline const int kMaxAudioSlots = 32;
 
 
    // Every note-consuming node before AudioPluginNode carried its one note

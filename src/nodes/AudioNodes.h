@@ -67,8 +67,11 @@ private:
 class MixerNode : public INode, public IAudioSource
 {
 public:
-   static constexpr int kMaxSlots = 12;
-   static constexpr int kSlots = 12;
+   static constexpr int kMaxSlots = 32;
+   static constexpr int kSlots = 32;
+   // The canvas body's "+" stops here; the Mixer panel adds the rest
+   // (32 strips at the body's fixed width would be 25 px each).
+   static constexpr int kBodySlots = 12;
 
    static INode* Create() { return new MixerNode(); }
    MixerNode();
@@ -88,7 +91,8 @@ public:
    const char* InputLabel(int slot) const override
    {
       static const char* kLabels[kMaxSlots] = {
-         "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"
+         "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
+         "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"
       };
       return (slot >= 0 && slot < numChannels) ? kLabels[slot] : nullptr;
    }
@@ -106,7 +110,7 @@ public:
    // reaches them, so the sweep raises it before probing their params.
    std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
    {
-      static const char* kStripPrefixes[] = { "gain", "pan", "mute", "solo" };
+      static const char* kStripPrefixes[] = { "gain", "pan", "mute", "solo", "trim", "phase", "solosafe" };
       for (const char* prefix : kStripPrefixes)
       {
          const size_t n = strlen(prefix);
@@ -124,6 +128,14 @@ public:
    float pan[kMaxSlots] = {};
    bool mute[kMaxSlots] = {};
    bool solo[kMaxSlots] = {};
+   // Console strip controls (mixer-panel plan D6). Absent from older patches,
+   // and every default leaves the sound exactly as it was.
+   float trimDb[kMaxSlots] = {}; // pre-fader, +-24 dB
+   bool phase[kMaxSlots] = {};   // polarity invert
+   bool soloSafe[kMaxSlots] = {}; // stays in the mix while another strip is soloed
+   // Hard-side boost relative to a unity centre: 0 = 0 dB (balance), 1 = +3 dB
+   // (equal power, the law every older patch used), 2 = +4.5 dB, 3 = +6 dB (linear).
+   int panLaw = 1;
    AudioCable inputs[kMaxSlots];
 
 private:

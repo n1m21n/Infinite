@@ -30,7 +30,7 @@ namespace app
       // audio pin at slot 1" comment a few hundred lines up), so a node like
       // Sample Player - note pin at slot 0, its recording input at slot 1 -
       // has a real gap at slot 0 that isn't "past its declared slot count".
-      // Scanning the full range costs nothing (kMaxAudioSlots is 8) and
+      // Scanning the full range costs nothing (kMaxAudioSlots is 32) and
       // matches the equally-generic teardown loop nearby, which never
       // assumed contiguity either.
       for (int slot = 0; slot < kMaxAudioSlots && slot < kAudioMaxNodeInputs; slot++)

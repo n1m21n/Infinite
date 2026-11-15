@@ -18,14 +18,14 @@
 #include "../core/BenchReport.h"
 
 // Ceilings shared by the topology builder (main.cpp's RebuildAudioTopology)
-// and the engine's buffer pool. kAudioMaxNodeInputs is Mixer's 8-in ceiling
+// and the engine's buffer pool. kAudioMaxNodeInputs is Mixer's 32-in ceiling
 // (docs/plans/audio/audio-graph-semantics.md §2); kAudioMaxBlockFrames/
 // kAudioMaxChannels bound the fixed-capacity pooled buffers so allocation
 // happens only when a topology is built (main thread), never inside a real
 // device callback - generous enough that no real block size/channel count
 // should ever exceed them. A block that somehow does gets truncated to the
 // cap rather than overrunning a pooled buffer - see AudioEngine::RunTopology.
-constexpr int kAudioMaxNodeInputs = 12;
+constexpr int kAudioMaxNodeInputs = 32;
 constexpr int kAudioMaxNodeOutputs = 12;
 constexpr int kAudioMaxBlockFrames = 4096;
 constexpr int kAudioMaxChannels = 8;
@@ -66,8 +66,13 @@ inline const char* AudioStageName(int stageId)
 // output into. See docs/plans/audio/audio-graph-semantics.md §3.
 struct AudioTopologyEntry
 {
+   AudioTopologyEntry()
+   {
+      for (int& i : inputBufferIndices)
+         i = -1;
+   }
    AudioNode* node = nullptr;
-   int inputBufferIndices[kAudioMaxNodeInputs] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+   int inputBufferIndices[kAudioMaxNodeInputs];
    int numInputs = 0;
    int outputBufferIndices[kAudioMaxNodeOutputs] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
    int numOutputs = 1;

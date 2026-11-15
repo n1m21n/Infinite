@@ -221,7 +221,8 @@ namespace app
          FormParts::Inline(0.0f, gap);
          if (ActionButton::Draw("+##mixCh", ImVec2(btnH * 1.4f, btnH)))
             next = ch + 1;
-         next = std::clamp(next, 0, (int)MixerNode::kMaxSlots);
+         // The body's "+" stops at kBodySlots; a console the panel widened past it keeps its count.
+         next = std::clamp(next, 0, std::max(ch, (int)MixerNode::kBodySlots));
          if (next != ch)
          {
             PushUndoCheckpoint();

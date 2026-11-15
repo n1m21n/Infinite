@@ -96,6 +96,43 @@ AudioNode* GainNode::GetAudioNode()
 }
 
 // ---------------------------------------------------------------------- Mixer
+namespace
+{
+   // Pan gains for one strip, unity at centre under every law; the law only
+   // sets how far a hard-panned side rises above that (mixer-panel plan R5).
+   // Law 1 is the exact expression older patches were mixed with.
+   void MixerPanGains(float pan, int law, float& l, float& r)
+   {
+      const float p = std::clamp(pan, -1.0f, 1.0f);
+      const float x = (p + 1.0f) * 0.5f; // 0 = hard left, 1 = hard right
+      switch (law)
+      {
+      case 0: // 0 dB: balance - the far side fades, the near side stays at unity
+         l = std::min(1.0f, 2.0f * (1.0f - x));
+         r = std::min(1.0f, 2.0f * x);
+         return;
+      case 2: // +4.5 dB: geometric mean of equal power and linear
+      {
+         float el, er;
+         DspMath::EqualPowerPan(p, el, er);
+         const float centre = std::sqrt((float)M_SQRT1_2 * 0.5f);
+         l = std::sqrt(std::max(0.0f, el * (1.0f - x))) / centre;
+         r = std::sqrt(std::max(0.0f, er * x)) / centre;
+         return;
+      }
+      case 3: // +6 dB: linear
+         l = 2.0f * (1.0f - x);
+         r = 2.0f * x;
+         return;
+      default: // +3 dB: equal power
+         DspMath::EqualPowerPan(p, l, r);
+         l *= (float)M_SQRT2;
+         r *= (float)M_SQRT2;
+         return;
+      }
+   }
+}
+
 class AudioMixerNode : public AudioNode
 {
 public:
@@ -103,7 +140,10 @@ public:
    {
       mMailbox.PrepareToPlay(sampleRate);
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
+      {
          mMailbox.SetImmediate(s, mGainDb[s].load(std::memory_order_relaxed));
+         mCachedDb[s] = std::nanf("");
+      }
       mPanPrimed = false;
    }
 
@@ -111,6 +151,7 @@ public:
    {
       const int activeChannels = std::clamp(mNumChannels.load(std::memory_order_relaxed), 0, (int)MixerNode::kMaxSlots);
       const int slots = std::min(numInputs, activeChannels);
+      const int law = mPanLaw.load(std::memory_order_relaxed);
 
       bool anySolo = false;
       for (int s = 0; s < activeChannels; s++)
@@ -122,23 +163,25 @@ public:
          }
       }
 
-      // Pan, mute and solo are read once per block, not smoothed per sample.
+      // Pan, mute, solo and polarity are read once per block, not smoothed per
+      // sample. Polarity rides on the gain pair, so a flip ramps through zero.
       float panL[MixerNode::kMaxSlots] = {}, panR[MixerNode::kMaxSlots] = {};
       for (int s = 0; s < activeChannels; s++)
       {
          const bool isMuted = mMute[s].load(std::memory_order_relaxed) != 0;
          const bool isSolo = mSolo[s].load(std::memory_order_relaxed) != 0;
-         if (isMuted || (anySolo && !isSolo))
+         const bool isSafe = mSoloSafe[s].load(std::memory_order_relaxed) != 0;
+         if (isMuted || (anySolo && !isSolo && !isSafe))
          {
             panL[s] = panR[s] = 0.0f;
             continue;
          }
-         DspMath::EqualPowerPan(mPan[s].load(std::memory_order_relaxed), panL[s], panR[s]);
-         // EqualPowerPan is 0.707/0.707 at centre; scaled back to unity so a
-         // centred, unity-gain channel passes through at exactly its input
-         // level rather than 3 dB down.
-         panL[s] *= (float)M_SQRT2;
-         panR[s] *= (float)M_SQRT2;
+         MixerPanGains(mPan[s].load(std::memory_order_relaxed), law, panL[s], panR[s]);
+         if (mPhase[s].load(std::memory_order_relaxed) != 0)
+         {
+            panL[s] = -panL[s];
+            panR[s] = -panR[s];
+         }
       }
 
       // Pan, mute and solo change the gain pair at block rate; ramping from
@@ -155,16 +198,43 @@ public:
       }
       const float invFrames = 1.0f / (float)std::max(1, output.numFrames);
 
+      // Fader + trim reach the mailbox as one dB value. A strip whose value is
+      // not moving gets its linear gain once per block; only a ramping strip
+      // pays the per-sample powf (32 strips x powf per sample otherwise).
+      bool ramping[MixerNode::kMaxSlots] = {};
+      float linear[MixerNode::kMaxSlots];
+      for (int s = 0; s < activeChannels; s++)
+      {
+         ramping[s] = !mMailbox.IsSettled(s);
+         if (!ramping[s])
+         {
+            const float db = mMailbox.SmoothedValue(s);
+            // A value that landed between the check and the read started a
+            // ramp: follow it per sample from here instead.
+            if (!mMailbox.IsSettled(s))
+            {
+               ramping[s] = true;
+               continue;
+            }
+            if (!(db == mCachedDb[s]))
+            {
+               mCachedDb[s] = db;
+               mCachedLinear[s] = DspMath::DbToLinear(db);
+            }
+            linear[s] = mCachedLinear[s];
+         }
+      }
+
       float channelPeak[MixerNode::kMaxSlots] = {};
       float peak = 0.0f;
       for (int i = 0; i < output.numFrames; i++)
       {
-         float linear[MixerNode::kMaxSlots];
          float gL[MixerNode::kMaxSlots], gR[MixerNode::kMaxSlots];
          const float t = (float)(i + 1) * invFrames;
          for (int s = 0; s < activeChannels; s++)
          {
-            linear[s] = DspMath::DbToLinear(mMailbox.SmoothedValue(s));
+            if (ramping[s])
+               linear[s] = DspMath::DbToLinear(mMailbox.SmoothedValue(s));
             gL[s] = mPrevPanL[s] + (panL[s] - mPrevPanL[s]) * t;
             gR[s] = mPrevPanR[s] + (panR[s] - mPrevPanR[s]) * t;
          }
@@ -173,14 +243,13 @@ public:
          {
             // Channel 0 is left, 1 is right; anything beyond a stereo pair
             // gets the left law rather than being silently dropped.
-            const float law = (ch == 1) ? 1.0f : 0.0f;
+            const bool right = ch == 1;
             float sum = 0.0f;
             for (int s = 0; s < slots; s++)
             {
                if (inputs[s] == nullptr)
                   continue;
-               const float v = inputs[s]->channels[ch][i] * linear[s] *
-                               (law > 0.5f ? gR[s] : gL[s]);
+               const float v = inputs[s]->channels[ch][i] * linear[s] * (right ? gR[s] : gL[s]);
                sum += v;
                channelPeak[s] = std::max(channelPeak[s], std::fabs(v));
             }
@@ -188,6 +257,9 @@ public:
             peak = std::max(peak, std::fabs(sum));
          }
       }
+      for (int s = 0; s < activeChannels; s++)
+         if (ramping[s])
+            mCachedDb[s] = std::nanf("");
 
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
       {
@@ -203,13 +275,17 @@ public:
    void PushParams(const MixerNode& n)
    {
       mNumChannels.store(n.numChannels, std::memory_order_relaxed);
+      mPanLaw.store(std::clamp(n.panLaw, 0, 3), std::memory_order_relaxed);
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
       {
-         mGainDb[s].store(n.gainDb[s], std::memory_order_relaxed);
-         mMailbox.Push(s, n.gainDb[s]);
+         const float db = n.gainDb[s] + n.trimDb[s];
+         mGainDb[s].store(db, std::memory_order_relaxed);
+         mMailbox.Push(s, db);
          mPan[s].store(n.pan[s], std::memory_order_relaxed);
          mMute[s].store(n.mute[s] ? 1 : 0, std::memory_order_relaxed);
          mSolo[s].store(n.solo[s] ? 1 : 0, std::memory_order_relaxed);
+         mPhase[s].store(n.phase[s] ? 1 : 0, std::memory_order_relaxed);
+         mSoloSafe[s].store(n.soloSafe[s] ? 1 : 0, std::memory_order_relaxed);
       }
    }
 
@@ -220,12 +296,16 @@ private:
    ParamMailbox mMailbox;
    MeterRing mMeter;
    float mPrevPanL[MixerNode::kMaxSlots] = {}, mPrevPanR[MixerNode::kMaxSlots] = {}; // audio thread only
+   float mCachedDb[MixerNode::kMaxSlots] = {}, mCachedLinear[MixerNode::kMaxSlots] = {}; // audio thread only
    bool mPanPrimed = false;
    std::atomic<int> mNumChannels { 8 };
+   std::atomic<int> mPanLaw { 1 };
    std::atomic<float> mGainDb[MixerNode::kMaxSlots] {};
    std::atomic<float> mPan[MixerNode::kMaxSlots] {};
    std::atomic<int> mMute[MixerNode::kMaxSlots] {};
    std::atomic<int> mSolo[MixerNode::kMaxSlots] {};
+   std::atomic<int> mPhase[MixerNode::kMaxSlots] {};
+   std::atomic<int> mSoloSafe[MixerNode::kMaxSlots] {};
    std::atomic<float> mChannelPeak[MixerNode::kMaxSlots] {};
 };
 
@@ -252,30 +332,45 @@ void MixerNode::VisitParams(ParamVisitor& v)
 {
    v.Int("channels", numChannels);
    numChannels = std::clamp(numChannels, 0, kMaxSlots); // loaded unchecked; indexes inputs[]
-   static const char* kGainNames[kMaxSlots] = {
-      "gain0", "gain1", "gain2", "gain3", "gain4", "gain5",
-      "gain6", "gain7", "gain8", "gain9", "gain10", "gain11"
+   // Names are saved per strip as <prefix><index>; the four original families
+   // keep their old spelling, the console additions are appended after them.
+   struct Names
+   {
+      std::string gain[kMaxSlots], pan[kMaxSlots], mute[kMaxSlots], solo[kMaxSlots];
+      std::string trim[kMaxSlots], phase[kMaxSlots], safe[kMaxSlots];
+      Names()
+      {
+         for (int i = 0; i < kMaxSlots; i++)
+         {
+            const std::string n = std::to_string(i);
+            gain[i] = "gain" + n;
+            pan[i] = "pan" + n;
+            mute[i] = "mute" + n;
+            solo[i] = "solo" + n;
+            trim[i] = "trim" + n;
+            phase[i] = "phase" + n;
+            safe[i] = "solosafe" + n;
+         }
+      }
    };
-   static const char* kPanNames[kMaxSlots] = {
-      "pan0", "pan1", "pan2", "pan3", "pan4", "pan5",
-      "pan6", "pan7", "pan8", "pan9", "pan10", "pan11"
-   };
-   static const char* kMuteNames[kMaxSlots] = {
-      "mute0", "mute1", "mute2", "mute3", "mute4", "mute5",
-      "mute6", "mute7", "mute8", "mute9", "mute10", "mute11"
-   };
-   static const char* kSoloNames[kMaxSlots] = {
-      "solo0", "solo1", "solo2", "solo3", "solo4", "solo5",
-      "solo6", "solo7", "solo8", "solo9", "solo10", "solo11"
-   };
+   static const Names kNames;
    for (int i = 0; i < kMaxSlots; i++)
    {
-      v.Float(kGainNames[i], gainDb[i]);
-      v.Float(kPanNames[i], pan[i]);
-      v.Bool(kMuteNames[i], mute[i]);
-      v.Bool(kSoloNames[i], solo[i]);
+      v.Float(kNames.gain[i].c_str(), gainDb[i]);
+      v.Float(kNames.pan[i].c_str(), pan[i]);
+      v.Bool(kNames.mute[i].c_str(), mute[i]);
+      v.Bool(kNames.solo[i].c_str(), solo[i]);
       gainDb[i] = std::clamp(gainDb[i], kMinGainDb, kMaxGainDb); // as GainNode
       pan[i] = std::clamp(pan[i], -1.0f, 1.0f);
+   }
+   v.Int("panlaw", panLaw);
+   panLaw = std::clamp(panLaw, 0, 3);
+   for (int i = 0; i < kMaxSlots; i++)
+   {
+      v.Float(kNames.trim[i].c_str(), trimDb[i]);
+      v.Bool(kNames.phase[i].c_str(), phase[i]);
+      v.Bool(kNames.safe[i].c_str(), soloSafe[i]);
+      trimDb[i] = std::isfinite(trimDb[i]) ? std::clamp(trimDb[i], -24.0f, 24.0f) : 0.0f;
    }
 }
 

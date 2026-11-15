@@ -757,6 +757,188 @@ bool RunEffectMixAndLimiterFixture()
       all &= ok;
    }
 
+   // Mixer console strips (mixer-panel plan A2): 32 slots, trim, polarity,
+   // solo-safe and pan law, and a default strip still mixes exactly as before.
+   // Inputs are a short phrase (two notes, an attack and a decay), not a held tone.
+   {
+      constexpr int kBlock = 64;
+      constexpr int kBlocks = 40;
+      constexpr int kN = kBlock * kBlocks;
+      const double sr = 48000.0;
+      auto phrase = [&](int slot, int i, int ch) {
+         const double t = (double)i / sr;
+         const double f = 110.0 * (1.0 + 0.25 * (slot % 7)) * (i < kN / 2 ? 1.0 : 1.5);
+         const double env = std::min(1.0, t * 200.0) * std::exp(-3.0 * std::fmod(t, (double)kN / 2.0 / sr));
+         return (float)(0.4 * env * std::sin(2.0 * M_PI * f * t + 0.3 * ch + slot));
+      };
+      // Runs a mixer over the phrase on `used` slots; returns interleaved L/R.
+      auto run = [&](MixerNode& m, int used, auto&& input) {
+         m.CookIfNeeded(1);
+         AudioNode* an = m.GetAudioNode();
+         an->PrepareToPlay(sr, kBlock);
+         std::vector<std::vector<float>> in((size_t)used * 2, std::vector<float>(kBlock));
+         std::vector<float*> ptrs((size_t)used * 2);
+         std::vector<AudioBuffer> bufs((size_t)used);
+         std::vector<const AudioBuffer*> ins((size_t)used);
+         for (int s = 0; s < used; s++)
+         {
+            ptrs[(size_t)s * 2] = in[(size_t)s * 2].data();
+            ptrs[(size_t)s * 2 + 1] = in[(size_t)s * 2 + 1].data();
+            bufs[(size_t)s].channels = &ptrs[(size_t)s * 2];
+            bufs[(size_t)s].numChannels = 2;
+            bufs[(size_t)s].numFrames = kBlock;
+            ins[(size_t)s] = &bufs[(size_t)s];
+         }
+         float l[kBlock], r[kBlock];
+         float* po[2] = { l, r };
+         AudioBuffer bo;
+         bo.channels = po;
+         bo.numChannels = 2;
+         bo.numFrames = kBlock;
+         std::vector<float> out;
+         for (int b = 0; b < kBlocks; b++)
+         {
+            for (int s = 0; s < used; s++)
+               for (int i = 0; i < kBlock; i++)
+                  for (int ch = 0; ch < 2; ch++)
+                     in[(size_t)s * 2 + ch][(size_t)i] = input(s, b * kBlock + i, ch);
+            an->ProcessBlock(ins.data(), used, bo);
+            for (int i = 0; i < kBlock; i++)
+            {
+               out.push_back(l[i]);
+               out.push_back(r[i]);
+            }
+         }
+         return out;
+      };
+      auto maxDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+         double d = 0.0;
+         for (size_t i = 0; i < std::min(a.size(), b.size()); i++)
+            d = std::max(d, (double)std::fabs(a[i] - b[i]));
+         return d;
+      };
+      bool ok = true;
+
+      // 1. A strip with none of the new controls touched mixes as the old law
+      //    did (within float rounding; FMA contraction differs per call site): input * dB gain * equal-power pan scaled to unity at centre.
+      {
+         MixerNode m;
+         m.numChannels = 3;
+         const float gains[3] = { 0.0f, -6.0f, 3.5f }, pans[3] = { 0.0f, -0.7f, 0.4f };
+         for (int s = 0; s < 3; s++)
+         {
+            m.gainDb[s] = gains[s];
+            m.pan[s] = pans[s];
+         }
+         const std::vector<float> got = run(m, 3, phrase);
+         std::vector<float> want;
+         for (int i = 0; i < kN; i++)
+            for (int ch = 0; ch < 2; ch++)
+            {
+               float sum = 0.0f;
+               for (int s = 0; s < 3; s++)
+               {
+                  float pl, pr;
+                  DspMath::EqualPowerPan(pans[s], pl, pr);
+                  pl *= (float)M_SQRT2;
+                  pr *= (float)M_SQRT2;
+                  sum += phrase(s, i, ch) * DspMath::DbToLinear(gains[s]) * (ch == 1 ? pr : pl);
+               }
+               want.push_back(sum);
+            }
+         const double d = maxDiff(got, want);
+         const bool thisOk = d < 1e-6;
+         printf("DSPTEST Mixer default strip mixes as before: max diff %.3g  %s\n", d, thisOk ? "OK" : "FAIL");
+         ok &= thisOk;
+      }
+
+      // 2. Trim is pre-fader dB on top of the fader: +6 trim with -6 fader = unity.
+      {
+         MixerNode a, b;
+         a.numChannels = b.numChannels = 1;
+         a.gainDb[0] = -6.0f;
+         a.trimDb[0] = 6.0f;
+         const double d = maxDiff(run(a, 1, phrase), run(b, 1, phrase));
+         const bool thisOk = d < 1e-6;
+         printf("DSPTEST Mixer trim adds to the fader: max diff %.3g  %s\n", d, thisOk ? "OK" : "FAIL");
+         ok &= thisOk;
+      }
+
+      // 3. Polarity: the same phrase on two strips, one inverted, cancels.
+      {
+         MixerNode m;
+         m.numChannels = 2;
+         m.phase[1] = true;
+         const std::vector<float> got = run(m, 2, [&](int, int i, int ch) { return phrase(0, i, ch); });
+         double peak = 0.0;
+         for (float v : got)
+            peak = std::max(peak, (double)std::fabs(v));
+         const bool thisOk = peak < 1e-6;
+         printf("DSPTEST Mixer phase invert cancels an identical strip: peak %.3g  %s\n", peak, thisOk ? "OK" : "FAIL");
+         ok &= thisOk;
+      }
+
+      // 4. Pan laws: unity at centre under every law; hard right raises the
+      //    right side by 0 / 3 / 4.5 / 6 dB and silences the left.
+      {
+         const float wantDb[4] = { 0.0f, 3.0103f, 4.5154f, 6.0206f };
+         for (int law = 0; law < 4; law++)
+         {
+            MixerNode c, h;
+            c.numChannels = h.numChannels = 1;
+            c.panLaw = h.panLaw = law;
+            h.pan[0] = 1.0f;
+            auto dc = [](int, int, int) { return 0.5f; };
+            const std::vector<float> oc = run(c, 1, dc), oh = run(h, 1, dc);
+            const float centreL = oc[oc.size() - 2] / 0.5f, centreR = oc.back() / 0.5f;
+            const float hardL = oh[oh.size() - 2] / 0.5f, hardDb = 20.0f * std::log10(oh.back() / 0.5f);
+            const bool thisOk = std::fabs(centreL - 1.0f) < 1e-5f && std::fabs(centreR - 1.0f) < 1e-5f &&
+                                std::fabs(hardL) < 1e-6f && std::fabs(hardDb - wantDb[law]) < 0.05f;
+            printf("DSPTEST Mixer pan law %d: centre %.4f/%.4f, hard right L %.2g R %+.2f dB (want %+.2f)  %s\n", law,
+                   centreL, centreR, hardL, hardDb, wantDb[law], thisOk ? "OK" : "FAIL");
+            ok &= thisOk;
+         }
+      }
+
+      // 5. All 32 strips reach the sum.
+      {
+         MixerNode m;
+         m.numChannels = MixerNode::kMaxSlots;
+         const std::vector<float> got = run(m, MixerNode::kMaxSlots, [](int s, int, int) { return 0.001f * (float)(s + 1); });
+         const float want = 0.001f * (float)(MixerNode::kMaxSlots * (MixerNode::kMaxSlots + 1) / 2);
+         const bool thisOk = std::fabs(got.back() - want) < 1e-5f && std::fabs(got[got.size() - 2] - want) < 1e-5f;
+         printf("DSPTEST Mixer sums all %d strips: %.5f (want %.5f)  %s\n", MixerNode::kMaxSlots, got.back(), want,
+                thisOk ? "OK" : "FAIL");
+         ok &= thisOk;
+      }
+
+      // 6. Solo-safe: strip 0 soloed, strip 1 solo-safe, strip 2 neither.
+      {
+         MixerNode m;
+         m.numChannels = 3;
+         m.solo[0] = true;
+         m.soloSafe[1] = true;
+         const std::vector<float> got = run(m, 3, [](int s, int, int) { return s == 0 ? 0.1f : (s == 1 ? 0.02f : 0.5f); });
+         const bool thisOk = std::fabs(got.back() - 0.12f) < 1e-6f;
+         printf("DSPTEST Mixer solo-safe strip stays in a solo: %.4f (want 0.1200)  %s\n", got.back(), thisOk ? "OK" : "FAIL");
+         ok &= thisOk;
+      }
+
+      // 7. An old patch (no new params) loads the old defaults; junk is clamped.
+      {
+         MixerNode old;
+         Patch::LoadParams(&old, { { "i channels", "8" }, { "f gain0", "-3" }, { "f pan0", "0.5" } });
+         MixerNode junk;
+         Patch::LoadParams(&junk, { { "f trim0", "1e9" }, { "i panlaw", "99" }, { "i channels", "1000" } });
+         const bool thisOk = old.panLaw == 1 && old.trimDb[0] == 0.0f && !old.phase[0] && !old.soloSafe[0] &&
+                             old.gainDb[0] == -3.0f && junk.trimDb[0] == 24.0f && junk.panLaw == 3 &&
+                             junk.numChannels == MixerNode::kMaxSlots;
+         printf("DSPTEST Mixer old patch keeps old defaults, junk is clamped  %s\n", thisOk ? "OK" : "FAIL");
+         ok &= thisOk;
+      }
+      all &= ok;
+   }
+
    // A gain past the knob's range is clamped on load (B-K-032). 1e9 dB passes
    // Patch's int-range drop; 10^(1e9/20) is inf, and silence times inf is
    // NaN out of Gain. Mixer and Audio In share the -60..12 dB range; Velocity
