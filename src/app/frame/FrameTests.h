@@ -73,6 +73,7 @@ void FrameTest_CURVEBENCH(int frameId, GLFWwindow* window);
 void FrameTest_CURVEM1TEST(int frameId, GLFWwindow* window);
 void FrameTest_CURVEMOTIONTEST(int frameId, GLFWwindow* window);
 void FrameTest_FIELDPATCHERTEST(int frameId, GLFWwindow* window);
+void FrameTest_TIMELINEEXPORTTEST(int frameId, GLFWwindow* window);
 
 void FrameTest_KEYEDSTARTEST(int frameId, GLFWwindow* window);
 void FrameTest_ROUNDTRIPTEST(int frameId, GLFWwindow* window);

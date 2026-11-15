@@ -856,7 +856,8 @@ static void ResetForNextJob()
 
 void HeadlessTick(int& frameId, GLFWwindow* window)
 {
-   enum class Phase { Warm, Running, Frames, NodeRender, Audio, Done };
+   enum class Phase { Warm, Running, Frames, NodeRender, Audio, TimelineRender, Done };
+   static uint64_t sTimelineJobId = 0; // --render --timeline: the export-queue job this run waits on
    static Platform::RecorderHandle* sNodeRec = nullptr; // --render --node: the encoder, opened on the first frame
    static int sNodeRecW = 0, sNodeRecH = 0;
    static int sNodeStartFrame = 0, sNodeEndFrame = 0;
@@ -967,6 +968,8 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
    {
       if (gOfflineRender.active && gOfflineRender.node != nullptr)
          gOfflineRender.node->RequestFinishOfflineRender(true);
+      if (sTimelineJobId != 0)
+         ArrangeRenderCancelActive();
       fail("E_TIMEOUT", "job exceeded --timeout " + std::to_string((int)job.timeoutSec) + " s");
       return;
    }
@@ -1643,6 +1646,63 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          return;
       }
 
+      // --render --timeline: the Timeline's own Render, queued exactly as its dialog queues it, so a headless
+      // take of an arrangement is the in-app export. No canvas Output is needed.
+      if (job.mode == Headless::Mode::Render && job.timeline)
+      {
+         std::string ext = std::filesystem::path(job.out).extension().string();
+         for (char& c : ext)
+            c = (char)tolower((unsigned char)c);
+         if (ext != ".mp4" && ext != ".mov" && ext != ".wav")
+            return fail("E_UNSUPPORTED_CONTAINER", "--render --timeline writes .mp4, .mov or .wav, got '" + ext + "'");
+         if (!job.codec.empty() && job.codec != "h264")
+            return fail("E_UNSUPPORTED_CODEC", "--timeline renders through the Timeline's encoder; --codec " + job.codec + " is for canvas renders");
+         std::error_code ec;
+         const std::filesystem::path outAbs = std::filesystem::absolute(job.out, ec);
+         ArrangeRenderJob aj = ArrangeRenderJobFromSettings(0, 1, outAbs.u8string());
+         const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+         if (job.start > 0.0)
+            aj.startTick = Arrange::SecondsToTicks(job.start, bpm);
+         if (job.duration > 0.0)
+            aj.endTick = Arrange::SecondsToTicks(ArrangeRenderTickSeconds(aj.startTick) + job.duration, bpm);
+         aj.videoSource = ArrangeRenderEffectiveVideoSource(aj.startTick, aj.endTick);
+         if (ext == ".wav")
+         {
+            aj.videoSource = kArrangeVideoNone;
+            aj.format = 2;
+         }
+         else
+         {
+            if (aj.videoSource == kArrangeVideoNone)
+               return fail("E_NO_OUTPUT", "--timeline: no clip on a video lane in the range; render to .wav for the audio lanes");
+            aj.format = ext == ".mov" ? 1 : 0;
+         }
+         if (job.sizeW > 0 && job.sizeH > 0)
+         {
+            aj.width = job.sizeW;
+            aj.height = job.sizeH;
+         }
+         if (job.fpsGiven)
+            aj.fps = job.fps;
+         if (job.noAudio)
+            aj.audioSource = kArrangeAudioNone;
+         std::filesystem::remove(outAbs, ec);
+         aj.id = gArrangeRenderNextJobId++;
+         aj.status = kArrangeJobQueued;
+         sTimelineJobId = aj.id;
+         const double durSec = ArrangeRenderTickSeconds(aj.endTick) - ArrangeRenderTickSeconds(aj.startTick);
+         sStatus.width = aj.videoSource == kArrangeVideoNone ? 0 : aj.width;
+         sStatus.height = aj.videoSource == kArrangeVideoNone ? 0 : aj.height;
+         sStatus.frames = aj.videoSource == kArrangeVideoNone ? 0 : ArrangeRenderFrameBudget(durSec, aj.fps);
+         sStatus.fps = aj.fps;
+         sStatus.audioSampleRate = aj.audioSource == kArrangeAudioNone ? 0.0 : gHeadlessAudioRate;
+         sStatus.audioFrames = aj.audioSource == kArrangeAudioNone ? 0 : ArrangeRenderSampleBudget(durSec, gHeadlessAudioRate);
+         gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), aj);
+         gArrangeRenderQueueRunning = true;
+         sPhase = Phase::TimelineRender;
+         return;
+      }
+
       sTap = nullptr;
       sTapOutput = 0;
       if (!job.node.empty())
@@ -1854,6 +1914,26 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       if (!Headless::MovieHasIndex(job.out))
          return fail("E_RENDER", "the file was written but has no index (moov), so it cannot be played");
       sStatus.files.push_back(job.out);
+      ReportPlugins(sStatus, job.pluginParams, job.pluginState);
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
+      return;
+   }
+
+   if (sPhase == Phase::TimelineRender)
+   {
+      ArrangeRenderJob* aj = ArrangeRenderFindJob(sTimelineJobId);
+      if (aj == nullptr)
+         return fail("E_RENDER", "the timeline render job vanished");
+      if (aj->status == kArrangeJobQueued || aj->status == kArrangeJobRendering || aj->status == kArrangeJobFinalizing)
+         return;
+      if (aj->status != kArrangeJobDone)
+         return fail("E_RENDER", aj->message.empty() ? "the timeline render did not finish" : aj->message);
+      if (aj->format != 2 && !Headless::MovieHasIndex(aj->path))
+         return fail("E_RENDER", "the file was written but has no index (moov), so it cannot be played");
+      if (!aj->message.empty())
+         sStatus.warnings.push_back({ "W_CLIPPING", aj->message, 0, -1 });
+      sStatus.files.push_back(aj->path);
       ReportPlugins(sStatus, job.pluginParams, job.pluginState);
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);

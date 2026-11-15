@@ -3600,4 +3600,40 @@ void FrameTest_FIELDPATCHERTEST(int frameId, GLFWwindow* window)
       glfwSetWindowShouldClose(window, GLFW_TRUE);
    }
 }
+
+// The Timeline's own export, in the app: with INFINITE_LOADPATCH, queues the job the Render dialog builds
+// (ArrangeRenderJobFromSettings) to $INFINITE_TIMELINEEXPORTTEST, optionally cut to
+// $INFINITE_TIMELINEEXPORT_SECONDS, and exits when it settles. H2 compares this file with --render --timeline.
+void FrameTest_TIMELINEEXPORTTEST(int frameId, GLFWwindow* window)
+{
+   const char* out = getenv("INFINITE_TIMELINEEXPORTTEST");
+   if (out == nullptr)
+      return;
+   static uint64_t sId = 0;
+   if (frameId == 30)
+   {
+      ArrangeRenderJob j = ArrangeRenderJobFromSettings(0, 1, out);
+      if (const char* secs = getenv("INFINITE_TIMELINEEXPORT_SECONDS"))
+      {
+         const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+         j.endTick = Arrange::SecondsToTicks(ArrangeRenderTickSeconds(j.startTick) + std::atof(secs), bpm);
+      }
+      j.id = gArrangeRenderNextJobId++;
+      j.status = kArrangeJobQueued;
+      sId = j.id;
+      gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), j);
+      gArrangeRenderQueueRunning = true;
+   }
+   if (frameId > 30 && sId != 0)
+   {
+      const ArrangeRenderJob* j = ArrangeRenderFindJob(sId);
+      if (j == nullptr || j->status == kArrangeJobDone || j->status == kArrangeJobFailed || j->status == kArrangeJobCancelled)
+      {
+         printf("TIMELINEEXPORT %s %s\n", j != nullptr && j->status == kArrangeJobDone ? "OK" : "FAIL",
+                j != nullptr ? j->message.c_str() : "job vanished");
+         sId = 0;
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+   }
+}
 }

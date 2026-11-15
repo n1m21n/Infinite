@@ -4842,6 +4842,8 @@ int ArrangeRenderEffectiveAudioSource();
 
 int ArrangeRenderEffectiveVideoSource(Arrange::Tick a, Arrange::Tick b);
 
+ArrangeRenderJob ArrangeRenderJobFromSettings(int markerA, int markerB, const std::string& path);
+
 bool ArrangeRenderPathQueued(const std::string& path, uint64_t exceptJobId);
 
 void ArrangeRenderResolveRange(int kind, int markerA, int markerB, Arrange::Tick customStart,
@@ -5172,6 +5174,7 @@ void ArrangeRenderQueuePosition(int& outIndex, int& outTotal);
 bool ArrangeRenderBusy();
 
 ArrangeRenderJob* ArrangeRenderFindJob(uint64_t id);
+double ArrangeRenderTickSeconds(int64_t t);
 
 extern std::string gArrangeRenderFailNotice;
 

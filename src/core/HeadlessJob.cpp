@@ -286,6 +286,7 @@ namespace Headless
                return true;
             }
             job.fps = (int)v;
+            job.fpsGiven = true;
          }
          else if (a == "--sample-rate")
          {
@@ -469,7 +470,7 @@ namespace Headless
          }
          else if (a == "--no-audio")
             job.noAudio = true;
-         else if (a == "--timeline" && job.mode == Mode::AudioSummary)
+         else if (a == "--timeline" && (job.mode == Mode::AudioSummary || job.mode == Mode::Render))
             job.timeline = true;
          else if (a == "--plugin-params" && (job.mode == Mode::Render || job.mode == Mode::AudioSummary))
             job.pluginParams = true;
@@ -506,6 +507,11 @@ namespace Headless
       if (job.timeline && !job.output.empty())
       {
          usageError = "--timeline measures the arrangement mix; --output picks a canvas sink, which Timeline mode does not feed";
+         return true;
+      }
+      if (job.timeline && !job.node.empty())
+      {
+         usageError = "--timeline renders the arrangement; --node taps a canvas node, which the Timeline does not draw";
          return true;
       }
       if (!job.stems.empty() && job.stemsDir.empty())

@@ -18,6 +18,9 @@
 //            [--size WxH] [--depth 8|16] [--png-level 0..9]
 //   --bpm <N> overrides the patch tempo in --render, --frame, --frames-dir and --audio-summary.
 //   --timeline (--audio-summary): play the arrangement's audio lanes (Timeline audio mode) instead of the canvas Audio Outs.
+//   --timeline (--render): render the arrangement exactly as the Timeline's Render dialog does, with its saved render
+//            settings (range, size, fps) as the defaults; --start/--duration, --size and --fps override them.
+//            out.mp4/.mov = video lanes + audio lanes; out.wav = the audio lanes only.
 //   --plugin-params (--render, --audio-summary): the status's "plugins" block also lists every loaded plugin's parameters with their real ranges.
 //   --batch <list> (--audio-summary): after the first job, each line "patch<TAB>out.json[<TAB>out.wav]" is measured in this one
 //            process (the app starts once); every out.json then carries its own "plugins" block. One status line at the end.
@@ -85,9 +88,10 @@ namespace Headless
       double start = 0.0;        // --render range start, seconds
       double duration = -1.0;    // <= 0: use the Output's own duration (--audio-summary: 10 s without one)
       int fps = 30;
+      bool fpsGiven = false;     // --fps was passed (--render --timeline otherwise takes the arrangement's fps)
       double sampleRate = 48000.0;
       bool noAudio = false;
-      bool timeline = false;     // --audio-summary --timeline: the arrangement's audio lanes, not the canvas
+      bool timeline = false;     // --audio-summary / --render --timeline: the arrangement, not the canvas
       bool pluginState = false;  // --plugin-state: each loaded plugin's saved state (base64), a template for splicing presets in
       bool pluginParams = false; // --plugin-params: list each loaded plugin's parameters (address, name, real min/max/default, unit)
       std::string describeType; // --describe <type>, empty = every type
