@@ -16,6 +16,7 @@
 
 #import <objc/runtime.h>
 #import <Cocoa/Cocoa.h>
+#import <Security/Security.h>
 #import <dispatch/dispatch.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
@@ -9022,6 +9023,230 @@ namespace Platform
             return false;
          }
          return true;
+      }
+   }
+}
+
+@interface InfinitePostStreamDelegate : NSObject <NSURLSessionDataDelegate>
+@property (nonatomic, assign) const Platform::HttpStreamChunk* onChunk;
+@property (nonatomic, assign) int* outStatus;
+@property (nonatomic, assign) std::string* errorBody;
+@property (nonatomic, assign) std::string* errorMsg;
+@property (nonatomic, assign) bool* ok;
+@property (nonatomic, assign) bool* aborted;
+@property (nonatomic, strong) dispatch_semaphore_t doneSema;
+@end
+
+@implementation InfinitePostStreamDelegate
+- (void)URLSession:(NSURLSession*)session dataTask:(NSURLSessionDataTask*)dataTask
+didReceiveResponse:(NSURLResponse*)response
+ completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler
+{
+   (void)session;
+   (void)dataTask;
+   if ([response isKindOfClass:[NSHTTPURLResponse class]])
+      *self.outStatus = (int)[(NSHTTPURLResponse*)response statusCode];
+   completionHandler(NSURLSessionResponseAllow);
+}
+
+- (void)URLSession:(NSURLSession*)session dataTask:(NSURLSessionDataTask*)dataTask didReceiveData:(NSData*)data
+{
+   (void)session;
+   if (*self.aborted || data == nil || [data length] == 0)
+      return;
+   if (*self.outStatus >= 200 && *self.outStatus < 300)
+   {
+      if (self.onChunk && *self.onChunk)
+      {
+         std::string chunk((const char*)[data bytes], (size_t)[data length]);
+         if (!(*self.onChunk)(chunk))
+         {
+            *self.aborted = true;
+            [dataTask cancel];
+         }
+      }
+   }
+   else if (self.errorBody->size() < 65536)
+   {
+      const size_t take = std::min((size_t)[data length], 65536 - self.errorBody->size());
+      self.errorBody->append((const char*)[data bytes], take);
+   }
+}
+
+- (void)URLSession:(NSURLSession*)session task:(NSURLSessionTask*)task didCompleteWithError:(NSError*)error
+{
+   (void)session;
+   (void)task;
+   if (error != nil && !*self.aborted)
+   {
+      *self.ok = false;
+      *self.errorMsg = std::string([[error localizedDescription] UTF8String] ?: "request failed");
+   }
+   else if (*self.aborted)
+   {
+      *self.ok = false;
+      *self.errorMsg = "cancelled";
+   }
+   else
+   {
+      *self.ok = (*self.outStatus >= 200 && *self.outStatus < 300);
+      if (!*self.ok && self.errorMsg->empty())
+         *self.errorMsg = "http status " + std::to_string(*self.outStatus);
+   }
+   dispatch_semaphore_signal(self.doneSema);
+}
+@end
+
+namespace Platform
+{
+   bool HttpPostStream(const std::string& url, const std::string& jsonBody,
+                       const std::string& bearerToken, const HttpStreamChunk& onChunk,
+                       int& outStatus, std::string& outErrorBody,
+                       std::string& outError, int timeoutSeconds)
+   {
+      outStatus = 0;
+      outErrorBody.clear();
+      outError.clear();
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+
+      @autoreleasepool
+      {
+         NSURL* nsUrl = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
+         if (nsUrl == nil)
+         {
+            outError = "invalid url";
+            return false;
+         }
+         NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsUrl];
+         [request setHTTPMethod:@"POST"];
+         [request setTimeoutInterval:(NSTimeInterval)timeoutSeconds];
+         [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+         [request setValue:@"text/event-stream" forHTTPHeaderField:@"Accept"];
+         if (!bearerToken.empty())
+         {
+            NSString* auth = [NSString stringWithFormat:@"Bearer %s", bearerToken.c_str()];
+            [request setValue:auth forHTTPHeaderField:@"Authorization"];
+         }
+         [request setHTTPBody:[NSData dataWithBytes:jsonBody.data() length:jsonBody.size()]];
+
+         bool ok = false;
+         bool aborted = false;
+         std::string errBody;
+         std::string errMsg;
+         dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+         InfinitePostStreamDelegate* del = [[InfinitePostStreamDelegate alloc] init];
+         del.onChunk = &onChunk;
+         del.outStatus = &outStatus;
+         del.errorBody = &errBody;
+         del.errorMsg = &errMsg;
+         del.ok = &ok;
+         del.aborted = &aborted;
+         del.doneSema = sema;
+
+         NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+         config.timeoutIntervalForRequest = (NSTimeInterval)timeoutSeconds;
+         config.timeoutIntervalForResource = (NSTimeInterval)timeoutSeconds;
+         NSURLSession* session = [NSURLSession sessionWithConfiguration:config delegate:del delegateQueue:nil];
+         NSURLSessionDataTask* task = [session dataTaskWithRequest:request];
+         [task resume];
+
+         dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeoutSeconds + 2) * NSEC_PER_SEC);
+         if (dispatch_semaphore_wait(sema, deadline) != 0)
+         {
+            [task cancel];
+            [session invalidateAndCancel];
+            outError = "timed out";
+            return false;
+         }
+         [session finishTasksAndInvalidate];
+
+         outErrorBody = std::move(errBody);
+         if (!ok)
+         {
+            outError = errMsg.empty() ? "request failed" : errMsg;
+            return false;
+         }
+         return true;
+      }
+   }
+
+   bool SecretStore(const std::string& account, const std::string& secret)
+   {
+      if (account.empty())
+         return false;
+      @autoreleasepool
+      {
+         NSString* service = @"org.infinitedevices.Infinite";
+         NSString* acct = [NSString stringWithUTF8String:account.c_str()];
+         NSData* data = [NSData dataWithBytes:secret.data() length:secret.size()];
+
+         NSDictionary* query = @{
+            (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+            (__bridge id)kSecAttrService: service,
+            (__bridge id)kSecAttrAccount: acct
+         };
+         OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, nullptr);
+         if (status == errSecSuccess)
+         {
+            NSDictionary* update = @{ (__bridge id)kSecValueData: data };
+            return SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)update) == errSecSuccess;
+         }
+         NSDictionary* attrs = @{
+            (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+            (__bridge id)kSecAttrService: service,
+            (__bridge id)kSecAttrAccount: acct,
+            (__bridge id)kSecValueData: data
+         };
+         return SecItemAdd((__bridge CFDictionaryRef)attrs, nullptr) == errSecSuccess;
+      }
+   }
+
+   bool SecretLoad(const std::string& account, std::string& outSecret)
+   {
+      outSecret.clear();
+      if (account.empty())
+         return false;
+      @autoreleasepool
+      {
+         NSString* service = @"org.infinitedevices.Infinite";
+         NSString* acct = [NSString stringWithUTF8String:account.c_str()];
+         NSDictionary* query = @{
+            (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+            (__bridge id)kSecAttrService: service,
+            (__bridge id)kSecAttrAccount: acct,
+            (__bridge id)kSecReturnData: @YES,
+            (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
+         };
+         CFTypeRef result = nullptr;
+         OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+         if (status != errSecSuccess || result == nullptr)
+            return false;
+         NSData* data = (__bridge_transfer NSData*)result;
+         outSecret.assign((const char*)[data bytes], (size_t)[data length]);
+         return true;
+      }
+   }
+
+   bool SecretClear(const std::string& account)
+   {
+      if (account.empty())
+         return false;
+      @autoreleasepool
+      {
+         NSString* service = @"org.infinitedevices.Infinite";
+         NSString* acct = [NSString stringWithUTF8String:account.c_str()];
+         NSDictionary* query = @{
+            (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+            (__bridge id)kSecAttrService: service,
+            (__bridge id)kSecAttrAccount: acct
+         };
+         OSStatus status = SecItemDelete((__bridge CFDictionaryRef)query);
+         return status == errSecSuccess || status == errSecItemNotFound;
       }
    }
 }

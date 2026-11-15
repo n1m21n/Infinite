@@ -19,6 +19,9 @@
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
+#include "core/CliSetup.h"
+#include "core/chat/OpenAIAgent.h"
+#include "platform/Platform.h"
 #include "gl3.h"
 #include "platform/AppPaths.h"
 #include <filesystem>
@@ -2623,6 +2626,147 @@ void RunRpcBatchTest()
       Check("studio node with an unknown type errors", !e.empty());
    }
 
+   // transport loop action through ArrangeSetLoop.
+   {
+      NewPatch();
+      json tr;
+      e.clear();
+      Check("transport loop refuses an empty range",
+            !Call("transport", { {"action", "loop"}, {"enabled", true} }, tr, e) && !e.empty());
+      e.clear();
+      Check("transport loop sets a range in beats",
+            Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 4}, {"end", 12} }, tr, e) &&
+               e.empty() && tr.value("loopEnabled", false) &&
+               std::abs(tr.value("loopStart", 0.0) - 4.0) < 1e-6 &&
+               std::abs(tr.value("loopEnd", 0.0) - 12.0) < 1e-6);
+      e.clear();
+      Check("transport loop refuses a zero span",
+            !Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 8}, {"end", 8} }, tr, e) && !e.empty());
+      e.clear();
+      Check("transport loop turns off",
+            Call("transport", { {"action", "loop"}, {"enabled", false} }, tr, e) && e.empty() && !tr.value("loopEnabled", true));
+   }
+
+   // k17: tolerant argument spellings, range checks, depth limit, named errors for bind_mod/unbind_mod/set_expr.
+   {
+      NewPatch();
+      json made;
+      Check("k17: create destination Shape", Call("create_node", { {"typeName", "Shape"}, {"category", "Source"} }, made, e));
+      const int dst = made.value("index", -1);
+      Check("k17: create modulator LFO", Call("create_node", { {"typeName", "LFO"}, {"category", "Modulators"} }, made, e));
+      const int src = made.value("index", -1);
+      // Ensure Shape's param join is populated so bind_mod/unbind_mod tests run even before a frame draws it.
+      // Register Shape's "rotation" ParamRef (as drawing a frame does) so bind_mod/unbind_mod tests run in this frame.
+      GraphNode* dstNode = FindNodeByIndex(dst);
+      if (dstNode != nullptr && dstNode->node != nullptr)
+      {
+         class RotFinder : public ParamVisitor
+         {
+         public:
+            float* ptr = nullptr;
+            void Float(const char* n, float& v) override { if (std::string(n) == "rotation") ptr = &v; }
+            void Int(const char*, int&) override {}
+            void Bool(const char*, bool&) override {}
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float*) override {}
+         } rf;
+         dstNode->node->VisitParams(rf);
+         if (rf.ptr != nullptr)
+         {
+            ParamRef ref;
+            ref.nodeIndex = dst;
+            ref.paramIndex = 0;
+            ref.value = rf.ptr;
+            ref.srcAddr = rf.ptr;
+            ref.minValue = -360.0f;
+            ref.maxValue = 360.0f;
+            ref.name = "rotation";
+            Modulation::Instance().RegisterParam(ref);
+         }
+      }
+      const int param = dstNode != nullptr ? ParamIndexOfKeyOnNode(*dstNode, "rotation") : -1;
+      Check("k17: Shape rotation param index resolved", param >= 0);
+      if (param >= 0)
+      {
+         e.clear();
+         Check("bind_mod: dst + typed key binds",
+               Call("bind_mod", { {"dst", dst}, {"key", "f rotation"}, {"src", src} }, r, e) && e.empty() &&
+                  Modulation::Instance().IsModulated(dst, param));
+         e.clear();
+         Check("bind_mod: index + bare key binds",
+               Call("bind_mod", { {"index", dst}, {"key", "rotation"}, {"src", src} }, r, e) && e.empty() &&
+                  Modulation::Instance().IsModulated(dst, param));
+         e.clear();
+         Check("bind_mod: node object + param + numeric-string src",
+               Call("bind_mod", { {"node", { {"index", dst} }}, {"param", "rotation"}, {"source", std::to_string(src)} }, r, e) &&
+                  e.empty() && Modulation::Instance().ModulatorFor(dst, param).nodeIndex == src);
+         e.clear();
+         Check("bind_mod: target + control + lo/hi",
+               Call("bind_mod", { {"target", dst}, {"control", "rotation"}, {"modulator", src}, {"lo", 0.25f}, {"hi", 0.75f} }, r, e) &&
+                  e.empty() && std::abs(Modulation::Instance().ModulatorFor(dst, param).lo - 0.25f) < 1e-5f &&
+                  std::abs(Modulation::Instance().ModulatorFor(dst, param).hi - 0.75f) < 1e-5f);
+         e.clear();
+         Check("bind_mod: half range lo/hi refused",
+               !Call("bind_mod", { {"dst", dst}, {"key", "rotation"}, {"src", src}, {"lo", 0.1f} }, r, e) &&
+                  e.find("lo and hi") != std::string::npos);
+
+         // Depth > 8 object nesting is refused cleanly.
+         json deep = dst;
+         for (int d = 0; d < 10; ++d)
+            deep = json{ {"index", deep} };
+         e.clear();
+         Check("bind_mod: depth > 8 refused",
+               !Call("bind_mod", { {"dst", deep}, {"key", "rotation"}, {"src", src} }, r, e) &&
+                  e.find("unknown node index") != std::string::npos);
+
+         e.clear();
+         Check("bind_mod: missing key named",
+               !Call("bind_mod", { {"dst", dst}, {"src", src} }, r, e) &&
+                  e.find("missing control key") != std::string::npos);
+         e.clear();
+         Check("bind_mod: unknown key named",
+               !Call("bind_mod", { {"dst", dst}, {"key", "f nope"}, {"src", src} }, r, e) &&
+                  e.find("not a modulatable control") != std::string::npos);
+         e.clear();
+         Check("bind_mod: non-object params named",
+               !Call("bind_mod", json::array(), r, e) && e.find("JSON object") != std::string::npos);
+
+         const size_t undoBefore = gUndoStack.size();
+         e.clear();
+         Check("unbind_mod: unbinds",
+               Call("unbind_mod", { {"node", dst}, {"name", "rotation"} }, r, e) && e.empty() &&
+                  !Modulation::Instance().IsModulated(dst, param) && r.value("wasModulated", false));
+         Check("unbind_mod: pushed one undo step", gUndoStack.size() == undoBefore + 1);
+         e.clear();
+         Check("unbind_mod: second unbind pushes no undo step",
+               Call("unbind_mod", { {"node", dst}, {"name", "rotation"} }, r, e) && e.empty() &&
+                  !r.value("wasModulated", true) && gUndoStack.size() == undoBefore + 1);
+      }
+   }
+
+   // Agent gate (propose): commits valid batches under one undo step, rolls back on failure.
+   {
+      NewPatch();
+      const size_t undo0 = gUndoStack.size();
+      json goodPropose = {
+         {"label", "add shape"},
+         {"calls", json::array({ { {"method", "create_node"}, {"params", { {"typeName", "Shape"}, {"category", "Source"} }} } })}
+      };
+      Check("propose: valid batch succeeds",
+            Call("propose", goodPropose, r, e) && r.value("ok", false) && gNodes.size() == 1 && gUndoStack.size() == undo0 + 1);
+
+      json badPropose = {
+         {"label", "bad call"},
+         {"calls", json::array({
+            { {"method", "create_node"}, {"params", { {"typeName", "Shape"}, {"category", "Source"} }} },
+            { {"method", "delete_node"}, {"params", { {"index", 99999} }} }
+         })}
+      };
+      Check("propose: failing call rolls back cleanly",
+            Call("propose", badPropose, r, e) && !r.value("ok", true) && !r["errors"].empty() &&
+               gNodes.size() == 1 && gUndoStack.size() == undo0 + 1);
+   }
+
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }
 
@@ -2789,11 +2933,207 @@ void RunOscControlTest()
    Undo();
    Check("delete is one undo step", FindNodeByIndex(shape) != nullptr);
 
+   // OSC bundles (DrivenByMoss-style), recursive bundles, T/F/d/h tags, and MatchAddress wildcards.
+   {
+      auto appendBE32 = [](std::vector<uint8_t>& out, uint32_t v)
+      {
+         out.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+         out.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
+         out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+         out.push_back(static_cast<uint8_t>(v & 0xFF));
+      };
+      auto appendBE64 = [](std::vector<uint8_t>& out, uint64_t v)
+      {
+         for (int shift = 56; shift >= 0; shift -= 8)
+            out.push_back(static_cast<uint8_t>((v >> shift) & 0xFF));
+      };
+      auto appendStr = [](std::vector<uint8_t>& out, const std::string& s)
+      {
+         out.insert(out.end(), s.begin(), s.end());
+         out.push_back(0);
+         while (out.size() % 4 != 0)
+            out.push_back(0);
+      };
+      auto makeBundle = [&](const std::vector<std::vector<uint8_t>>& elements)
+      {
+         std::vector<uint8_t> b;
+         const char hdr[8] = { '#', 'b', 'u', 'n', 'd', 'l', 'e', '\0' };
+         b.insert(b.end(), hdr, hdr + 8);
+         appendBE64(b, 1ULL); // immediate timetag
+         for (const auto& elem : elements)
+         {
+            appendBE32(b, static_cast<uint32_t>(elem.size()));
+            b.insert(b.end(), elem.begin(), elem.end());
+         }
+         return b;
+      };
+
+      // DrivenByMoss-style message with T, F, d, h tags.
+      std::vector<uint8_t> msgMute;
+      appendStr(msgMute, "/track/1/mute");
+      appendStr(msgMute, ",T");
+
+      std::vector<uint8_t> msgSolo;
+      appendStr(msgSolo, "/track/1/solo");
+      appendStr(msgSolo, ",F");
+
+      std::vector<uint8_t> msgTempo;
+      appendStr(msgTempo, "/tempo/raw");
+      appendStr(msgTempo, ",d");
+      double tempoVal = 128.5;
+      uint64_t tempoBits = 0;
+      std::memcpy(&tempoBits, &tempoVal, sizeof(tempoBits));
+      appendBE64(msgTempo, tempoBits);
+
+      std::vector<uint8_t> msgTick;
+      appendStr(msgTick, "/clock/tick");
+      appendStr(msgTick, ",h");
+      appendBE64(msgTick, 42000ULL);
+
+      const std::vector<uint8_t> innerBundle = makeBundle({ msgMute, msgSolo });
+      const std::vector<uint8_t> volMsg = OscMessage::EncodeFloat("/track/1/volume", 0.75f);
+      const std::vector<uint8_t> outerBundle = makeBundle({ volMsg, innerBundle, msgTempo, msgTick });
+
+      std::vector<OscMessage::PacketMessage> decoded;
+      Check("DecodePacket decodes recursive DrivenByMoss bundle",
+            OscMessage::DecodePacket(outerBundle.data(), outerBundle.size(), decoded) && decoded.size() == 5);
+      if (decoded.size() == 5)
+      {
+         Check("bundle[0] float value", decoded[0].address == "/track/1/volume" &&
+               decoded[0].args.size() == 1 && std::abs(decoded[0].args[0].f - 0.75f) < 1e-6f);
+         Check("bundle[1] T tag", decoded[1].address == "/track/1/mute" &&
+               decoded[1].args.size() == 1 && decoded[1].args[0].i == 1);
+         Check("bundle[2] F tag", decoded[2].address == "/track/1/solo" &&
+               decoded[2].args.size() == 1 && decoded[2].args[0].i == 0);
+         Check("bundle[3] d tag", decoded[3].address == "/tempo/raw" &&
+               decoded[3].args.size() == 1 && std::abs(decoded[3].args[0].f - 128.5f) < 1e-5f);
+         Check("bundle[4] h tag", decoded[4].address == "/clock/tick" &&
+               decoded[4].args.size() == 1 && decoded[4].args[0].i == 42000);
+      }
+
+      std::vector<uint8_t> badBundle = outerBundle;
+      badBundle.resize(12);
+      Check("DecodePacket rejects truncated bundle", !OscMessage::DecodePacket(badBundle.data(), badBundle.size(), decoded));
+
+      Check("MatchAddress * wildcard", OscMessage::MatchAddress("/track/*/volume", "/track/1/volume"));
+      Check("MatchAddress ? wildcard", OscMessage::MatchAddress("/track/?/mute", "/track/1/mute"));
+      Check("MatchAddress ? rejects multi-char", !OscMessage::MatchAddress("/track/?/mute", "/track/12/mute"));
+      Check("MatchAddress * stays within segment", !OscMessage::MatchAddress("/track/*", "/track/1/volume"));
+      Check("MatchAddress rejects mismatch", !OscMessage::MatchAddress("/track/*/volume", "/track/1/pan"));
+   }
+
    ClearOscListeners();
    if (startedHere)
       OscControl::Stop();
    NewPatch();
    printf("OSCCONTROLTEST %s\n", ok ? "OK" : "FAIL");
+}
+
+// ====================================================== INFINITE_PARAMRESETTEST
+void RunParamResetTest()
+{
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+
+   class ParamMutator : public ParamVisitor
+   {
+   public:
+      std::vector<std::string> keys;
+      void Float(const char* n, float& v) override { keys.push_back(n); v += 1.25f; }
+      void Int(const char* n, int& v) override { keys.push_back(n); v += 1; }
+      void Bool(const char* n, bool& v) override { keys.push_back(n); v = !v; }
+      void Text(const char* n, std::string& v) override { keys.push_back(n); v += "_x"; }
+      void Color(const char* n, float rgb[3]) override { keys.push_back(n); rgb[0] += 0.1f; }
+   };
+
+   // 1. Walk every spawnable node type, mutate every VisitParams key, reset each, and match fresh.
+   int testedTypes = 0;
+   int mismatchedTypes = 0;
+   for (const std::string& category : NodeFactory::Instance().GetCategories())
+   {
+      for (const std::string& typeName : NodeFactory::Instance().GetNodesInCategory(category))
+      {
+         if (!IsUserSpawnable(typeName) || typeName == "Plugin")
+            continue;
+         NewPatch();
+         GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
+         if (gn == nullptr || !gn->node)
+         {
+            ++mismatchedTypes;
+            continue;
+         }
+         // Reset first to establish the type's cached default (some nodes like Random/LFO
+         // allocate a per-instance seed in Create(), so their initial seed differs from the cached type default).
+         ParamMutator keysReader;
+         gn->node->VisitParams(keysReader);
+         for (const std::string& k : keysReader.keys)
+            ResetParamKeyToDefault(*gn, k, /*pushUndo=*/false);
+         ParamSnapshot canonical;
+         gn->node->VisitParams(canonical);
+
+         ParamMutator mut;
+         gn->node->VisitParams(mut);
+         for (const std::string& k : mut.keys)
+            ResetParamKeyToDefault(*gn, k, /*pushUndo=*/false);
+         ParamSnapshot afterReset;
+         gn->node->VisitParams(afterReset);
+         if (afterReset != canonical)
+         {
+            printf("  [FAIL] param reset mismatch on %s (%s)\n", typeName.c_str(), category.c_str());
+            ++mismatchedTypes;
+         }
+         ++testedTypes;
+      }
+   }
+   Check("all node types reset every VisitParams key to match a fresh node", testedTypes > 0 && mismatchedTypes == 0);
+
+   // 2. Undo restores previous value; Redo restores default; reset_param RPC works.
+   NewPatch();
+   GraphNode* shape = SpawnNode("Shape", "Source", 0.0f, 0.0f);
+   Check("Shape spawned for undo/RPC reset test", shape != nullptr && shape->node != nullptr);
+   if (shape != nullptr && shape->node != nullptr)
+   {
+      auto getFloat = [&](const char* key) -> float
+      {
+         class Reader : public ParamVisitor
+         {
+         public:
+            explicit Reader(const char* k) : target(k) {}
+            const char* target;
+            float val = 0.0f;
+            void Float(const char* n, float& v) override { if (std::string(target) == n) val = v; }
+            void Int(const char*, int&) override {}
+            void Bool(const char*, bool&) override {}
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float*) override {}
+         } r(key);
+         shape->node->VisitParams(r);
+         return r.val;
+      };
+      const float defRot = getFloat("rotation");
+      nlohmann::json r;
+      std::string e;
+      Check("set_param changes rotation",
+            HandleRpcCommand("set_param", { {"index", shape->index}, {"name", "rotation"}, {"value", defRot + 0.5f} }, r, e));
+      Check("rotation changed", std::abs(getFloat("rotation") - (defRot + 0.5f)) < 1e-5f);
+      Check("reset_param RPC resets rotation",
+            HandleRpcCommand("reset_param", { {"index", shape->index}, {"key", "rotation"} }, r, e) && e.empty());
+      Check("rotation matches default after reset", std::abs(getFloat("rotation") - defRot) < 1e-5f);
+      Undo();
+      Check("undo restores previous rotation", std::abs(getFloat("rotation") - (defRot + 0.5f)) < 1e-5f);
+      Redo();
+      Check("redo restores default rotation", std::abs(getFloat("rotation") - defRot) < 1e-5f);
+      Check("reset_param refuses unknown key",
+            !HandleRpcCommand("reset_param", { {"index", shape->index}, {"key", "no_such_key"} }, r, e) && !e.empty());
+   }
+
+   NewPatch();
+   printf("PARAMRESETTEST %s\n", ok ? "OK" : "FAIL");
 }
 
 // ====================================================== INFINITE_PATCHWATCHTEST
@@ -4415,5 +4755,88 @@ int RunExtensionsTest()
    std::filesystem::remove_all(AppPaths::FsPath(root), ec);
    printf("EXTENSIONSTEST %s\n", fails == 0 ? "ALL PASS" : "FAILED");
    return fails == 0 ? 0 : 1;
+}
+
+void RunCustomAgentTest()
+{
+   int fails = 0;
+   auto check = [&](bool cond, const char* msg) {
+      if (!cond)
+      {
+         fprintf(stderr, "CUSTOMAGENTTEST FAIL: %s\n", msg);
+         ++fails;
+      }
+   };
+
+   // 1. Presets & URL normalization
+   check(chat::FindCustomPreset("ollama") != nullptr, "ollama preset exists");
+   check(chat::FindCustomPreset("deepseek") != nullptr, "deepseek preset exists");
+   check(chat::FindCustomPreset("openrouter") != nullptr, "openrouter preset exists");
+   check(chat::NormalizeOpenAIBaseUrl("  https://api.deepseek.com/v1/  ") == "https://api.deepseek.com/v1", "normalize base url");
+
+   // 2. OpenAI SSE stream parser (chunked text + tool_calls + usage + [DONE])
+   {
+      chat::OpenAIStreamParser parser;
+      parser.Feed("data: {\"choices\":[{\"delta\":{\"content\":\"Hello \"}}]}\n\n");
+      parser.Feed("data: {\"choices\":[{\"delta\":{\"content\":\"world\",\"tool_calls\":[{\"index\":0,\"id\":\"tc_1\",\"function\":{\"name\":\"pro\"}}]}}]}\r\n");
+      parser.Feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"pose\",\"arguments\":\"{\\\"calls\\\":[{\\\"method\\\":\\\"status\\\"}]}\"}}]}}]}\n");
+      parser.Feed("data: {\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":8,\"prompt_tokens_details\":{\"cached_tokens\":4}}}\n");
+      parser.Feed("data: [DONE]\n");
+      parser.Finish();
+
+      check(parser.Text() == "Hello world", "SSE text accumulation");
+      check(parser.ToolCalls().size() == 1, "SSE tool call count");
+      if (!parser.ToolCalls().empty())
+      {
+         check(parser.ToolCalls()[0].id == "tc_1", "SSE tool call id");
+         check(parser.ToolCalls()[0].name == "propose", "SSE tool call name");
+         check(parser.ToolCalls()[0].arguments == "{\"calls\":[{\"method\":\"status\"}]}", "SSE tool call args");
+      }
+      check(parser.Usage().input == 12 && parser.Usage().output == 8 && parser.Usage().cached == 4, "SSE usage");
+      check(parser.SawDone(), "SSE [DONE]");
+   }
+
+   // 3. Tools unsupported fallback detection
+   check(chat::IsToolsUnsupportedError(400, "{\"error\":\"This model does not support tools\"}"), "400 tools unsupported");
+   check(chat::IsToolsUnsupportedError(422, "{\"message\":\"function calling is not supported\"}"), "422 function unsupported");
+   check(!chat::IsToolsUnsupportedError(500, "tools internal error"), "500 not treated as tools unsupported");
+
+   // 4. Config persistence never writes API keys; SecretStore/Load/Clear round-trip
+   {
+      const std::string tmpCfg = AppPaths::AppSupportDir() + "/custom_agent_test_config.json";
+      CliSetup::Config c;
+      c.customPreset = "deepseek";
+      c.customBaseUrl = "https://api.deepseek.com/v1";
+      c.customModel = "deepseek-chat";
+      CliSetup::SaveConfig(tmpCfg, c);
+
+      const CliSetup::Config loaded = CliSetup::LoadConfig(tmpCfg);
+      check(loaded.customPreset == "deepseek", "config customPreset round-trip");
+      check(loaded.customBaseUrl == "https://api.deepseek.com/v1", "config customBaseUrl round-trip");
+      check(loaded.customModel == "deepseek-chat", "config customModel round-trip");
+
+      std::ifstream ifs(AppPaths::FsPath(tmpCfg));
+      const std::string raw((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      check(raw.find("apiKey") == std::string::npos && raw.find("sk-") == std::string::npos, "config has no API key");
+
+      std::error_code ec;
+      std::filesystem::remove(AppPaths::FsPath(tmpCfg), ec);
+   }
+
+   {
+      const std::string testAcct = "custom_agent_test_key";
+      const std::string testVal = "sk-test-secret-12345";
+      Platform::SecretClear(testAcct);
+      check(Platform::SecretStore(testAcct, testVal), "SecretStore succeeds");
+      std::string got;
+      check(Platform::SecretLoad(testAcct, got) && got == testVal, "SecretLoad matches");
+      check(Platform::SecretClear(testAcct), "SecretClear succeeds");
+      std::string after;
+      check(!Platform::SecretLoad(testAcct, after), "SecretLoad empty after clear");
+   }
+
+   printf("CUSTOMAGENTTEST %s\n", fails == 0 ? "OK" : "FAILED");
+   if (fails != 0)
+      std::exit(1);
 }
 }

@@ -37,10 +37,10 @@ namespace app
                 m == "auto_wire_inputs" || m == "undo" || m == "redo" ||
                 m == "load_patch" || m == "load_patch_text" || m == "new_patch" ||
                 m == "bind_mod" || m == "unbind_mod" || m == "set_expr" || m == "set_bypass" ||
-                m == "edit" || m == "spawn";
+                m == "edit" || m == "spawn" || m == "propose";
       };
       bool movesGraph = MovesTheGraph(method);
-      if (method == "batch" && params.contains("calls") && params["calls"].is_array())
+      if ((method == "batch" || method == "propose") && params.contains("calls") && params["calls"].is_array())
          for (const json& call : params["calls"])
             movesGraph = movesGraph || (call.is_object() && MovesTheGraph(call.value("method", std::string())));
       if (movesGraph && ShowLockBlocks())
@@ -956,6 +956,108 @@ namespace app
             return false;
          }
          outResult = { {"results", results} };
+         return true;
+      }
+      else if (method == "propose")
+      {
+         // Agent gate (agent-collab Block B): runs calls[] tentatively under one undo step,
+         // validates the resulting graph (PatchSchema) and node code (CodeError()), and rolls
+         // everything back if anything fails.
+         if (!params.contains("calls") || !params["calls"].is_array())
+         {
+            outError = "propose needs a 'calls' array of {method, params}";
+            return false;
+         }
+         const std::string label = params.value("label", std::string());
+         const std::string undoLabel = label.empty() ? std::string("Agent") : ("Agent: " + label);
+         PushUndoCheckpoint(undoLabel.c_str());
+         const size_t undoDepth = gUndoStack.size();
+         const bool wasSuppressed = gSuppressUndoCheckpoints;
+         gSuppressUndoCheckpoints = true;
+
+         json results = json::array();
+         json errors = json::array();
+
+         auto rollback = [&]()
+         {
+            gSuppressUndoCheckpoints = wasSuppressed;
+            if (gUndoStack.size() == undoDepth)
+            {
+               const bool wasLocked = gShowLock;
+               gShowLock = false;
+               Undo();
+               gShowLock = wasLocked;
+               gRedoStack.clear();
+            }
+            outResult = { {"ok", false}, {"errors", errors} };
+            return true;
+         };
+
+         for (size_t i = 0; i < params["calls"].size(); i++)
+         {
+            const json& call = params["calls"][i];
+            const std::string m = call.value("method", std::string());
+            if (m.empty() || m == "batch" || m == "propose" || m == "undo" || m == "redo" ||
+                m == "new_patch" || m == "load_patch" || m == "load_patch_text")
+            {
+               errors.push_back({ {"code", "E_DISALLOWED_METHOD"}, {"call", (int)i}, {"method", m},
+                                  {"message", "method '" + m + "' is not allowed inside propose"} });
+               return rollback();
+            }
+            json callParams = call.contains("params") ? call["params"] : json::object();
+            if (callParams.is_object())
+               for (auto& [name, value] : callParams.items())
+                  if (value.is_string())
+                  {
+                     const std::string text = value.get<std::string>();
+                     const size_t dot = text.find('.');
+                     if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)
+                     {
+                        const int at = atoi(text.substr(1, dot - 1).c_str());
+                        const std::string field = text.substr(dot + 1);
+                        if (at >= 0 && at < (int)results.size() && results[at].contains(field))
+                           value = results[at][field];
+                     }
+                  }
+            json r;
+            std::string e;
+            if (!HandleRpcCommand(m, callParams, r, e))
+            {
+               errors.push_back({ {"code", "E_CALL_FAILED"}, {"call", (int)i}, {"method", m}, {"message", e} });
+               return rollback();
+            }
+            results.push_back(r);
+         }
+         gSuppressUndoCheckpoints = wasSuppressed;
+
+         // Graph validation via PatchSchema.
+         Patch::Data data = BuildPatchData();
+         std::vector<Headless::Issue> schemaErrors, schemaWarnings;
+         const PatchSchema::Env env = MakeSchemaEnv(false);
+         PatchSchema::Resolve(data, env, schemaErrors);
+         if (schemaErrors.empty())
+            PatchSchema::ResolveKeys(data, env, schemaErrors);
+         if (schemaErrors.empty())
+            PatchSchema::Validate(data, env, schemaErrors, schemaWarnings);
+         for (const Headless::Issue& is : schemaErrors)
+            errors.push_back({ {"code", is.code}, {"message", is.message}, {"line", is.line}, {"node", is.node}, {"hint", is.hint} });
+
+         // Code validation on all nodes.
+         for (GraphNode& gn : gNodes)
+            if (gn.node)
+               if (const std::string err = gn.node->CodeError(); !err.empty())
+               {
+                  const bool sketch = gn.typeName == "Sketch" || gn.typeName == "Sketch 3D";
+                  const bool glsl = gn.typeName == "Shadertoy";
+                  const bool formula = gn.typeName == "Formula" || gn.typeName == "Equation Synth";
+                  const char* code = glsl ? "E_GLSL_COMPILE" : sketch ? "E_SKETCH_COMPILE" : formula ? "E_FORMULA_COMPILE" : "E_FIELD_COMPILE";
+                  errors.push_back({ {"code", code}, {"node", gn.index}, {"type", gn.typeName}, {"message", err} });
+               }
+
+         if (!errors.empty())
+            return rollback();
+
+         outResult = { {"ok", true}, {"results", results}, {"undo_id", gUndoStack.size()}, {"label", label} };
          return true;
       }
       else if (method == "save_patch")

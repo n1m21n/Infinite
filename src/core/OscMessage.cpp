@@ -1,5 +1,7 @@
 #include "OscMessage.h"
 
+#include <algorithm>
+#include <climits>
 #include <cstring>
 
 namespace OscMessage
@@ -62,6 +64,46 @@ namespace OscMessage
          out = (static_cast<uint32_t>(data[pos]) << 24) | (static_cast<uint32_t>(data[pos + 1]) << 16) |
                (static_cast<uint32_t>(data[pos + 2]) << 8) | static_cast<uint32_t>(data[pos + 3]);
          pos += 4;
+         return true;
+      }
+
+      bool ReadUInt64(const uint8_t* data, size_t len, size_t& pos, uint64_t& out)
+      {
+         if (pos + 8 > len)
+            return false;
+         out = (static_cast<uint64_t>(data[pos]) << 56) | (static_cast<uint64_t>(data[pos + 1]) << 48) |
+               (static_cast<uint64_t>(data[pos + 2]) << 40) | (static_cast<uint64_t>(data[pos + 3]) << 32) |
+               (static_cast<uint64_t>(data[pos + 4]) << 24) | (static_cast<uint64_t>(data[pos + 5]) << 16) |
+               (static_cast<uint64_t>(data[pos + 6]) << 8) | static_cast<uint64_t>(data[pos + 7]);
+         pos += 8;
+         return true;
+      }
+
+      bool DecodePacketImpl(const uint8_t* data, size_t len, int depth, std::vector<PacketMessage>& outMessages)
+      {
+         if (data == nullptr || len == 0 || depth > 8)
+            return false;
+         if (len >= 8 && std::memcmp(data, "#bundle\0", 8) == 0)
+         {
+            // Bundle header: "#bundle\0" (8 bytes) + 8-byte OSC timetag.
+            if (len < 16)
+               return false;
+            size_t pos = 16;
+            while (pos < len)
+            {
+               uint32_t elemSize = 0;
+               if (!ReadUInt32(data, len, pos, elemSize) || elemSize == 0 || elemSize > len - pos)
+                  return false;
+               if (!DecodePacketImpl(data + pos, elemSize, depth + 1, outMessages))
+                  return false;
+               pos += elemSize;
+            }
+            return true;
+         }
+         PacketMessage msg;
+         if (!DecodeMany(data, len, msg.address, msg.args))
+            return false;
+         outMessages.push_back(std::move(msg));
          return true;
       }
    }
@@ -150,6 +192,35 @@ namespace OscMessage
                if (!ReadPaddedString(data, len, pos, a.s))
                   return false;
             }
+            else if (typeTag[t] == 'T')
+            {
+               a.type = ArgType::Int;
+               a.i = 1;
+            }
+            else if (typeTag[t] == 'F')
+            {
+               a.type = ArgType::Int;
+               a.i = 0;
+            }
+            else if (typeTag[t] == 'd')
+            {
+               uint64_t be64 = 0;
+               if (!ReadUInt64(data, len, pos, be64))
+                  return false;
+               double d = 0.0;
+               std::memcpy(&d, &be64, sizeof(d));
+               a.type = ArgType::Float;
+               a.f = static_cast<float>(d);
+            }
+            else if (typeTag[t] == 'h')
+            {
+               uint64_t be64 = 0;
+               if (!ReadUInt64(data, len, pos, be64))
+                  return false;
+               const int64_t v = static_cast<int64_t>(be64);
+               a.type = ArgType::Int;
+               a.i = static_cast<int32_t>(std::clamp<int64_t>(v, INT32_MIN, INT32_MAX));
+            }
             else
                return false;
             args.push_back(a);
@@ -158,6 +229,46 @@ namespace OscMessage
       outAddress = address;
       outArgs = std::move(args);
       return true;
+   }
+
+   bool DecodePacket(const uint8_t* data, size_t len, std::vector<PacketMessage>& outMessages)
+   {
+      std::vector<PacketMessage> parsed;
+      if (!DecodePacketImpl(data, len, 0, parsed))
+         return false;
+      outMessages = std::move(parsed);
+      return true;
+   }
+
+   bool MatchAddress(const std::string& pattern, const std::string& address)
+   {
+      size_t pi = 0;
+      size_t ai = 0;
+      size_t starP = std::string::npos;
+      size_t starA = 0;
+      while (ai < address.size())
+      {
+         if (pi < pattern.size() && (pattern[pi] == address[ai] || (pattern[pi] == '?' && address[ai] != '/')))
+         {
+            ++pi;
+            ++ai;
+         }
+         else if (pi < pattern.size() && pattern[pi] == '*')
+         {
+            starP = pi++;
+            starA = ai;
+         }
+         else if (starP != std::string::npos && address[starA] != '/')
+         {
+            pi = starP + 1;
+            ai = ++starA;
+         }
+         else
+            return false;
+      }
+      while (pi < pattern.size() && pattern[pi] == '*')
+         ++pi;
+      return pi == pattern.size();
    }
 
    std::vector<uint8_t> Encode(const std::string& address, const Arg& arg)
@@ -193,61 +304,12 @@ namespace OscMessage
 
    bool Decode(const uint8_t* data, size_t len, std::string& outAddress, Arg& outArg)
    {
-      if (data == nullptr || len == 0)
-         return false;
-
-      size_t pos = 0;
       std::string address;
-      if (!ReadPaddedString(data, len, pos, address))
+      std::vector<Arg> args;
+      if (!DecodeMany(data, len, address, args) || args.empty())
          return false;
-      if (address.empty() || address[0] != '/')
-         return false; // '#bundle' or otherwise malformed - not a message we handle
-
-      std::string typeTag;
-      if (!ReadPaddedString(data, len, pos, typeTag))
-         return false;
-      if (typeTag.empty() || typeTag[0] != ',' || typeTag.size() < 2)
-         return false; // no arguments - nothing to decode
-
-      const char tag = typeTag[1];
-      if (tag == 'f')
-      {
-         if (pos + 4 > len)
-            return false;
-         uint32_t be = (static_cast<uint32_t>(data[pos]) << 24) |
-                       (static_cast<uint32_t>(data[pos + 1]) << 16) |
-                       (static_cast<uint32_t>(data[pos + 2]) << 8) |
-                        static_cast<uint32_t>(data[pos + 3]);
-         float value;
-         std::memcpy(&value, &be, sizeof(value));
-         outArg.type = ArgType::Float;
-         outArg.f = value;
-      }
-      else if (tag == 'i')
-      {
-         if (pos + 4 > len)
-            return false;
-         uint32_t be = (static_cast<uint32_t>(data[pos]) << 24) |
-                       (static_cast<uint32_t>(data[pos + 1]) << 16) |
-                       (static_cast<uint32_t>(data[pos + 2]) << 8) |
-                        static_cast<uint32_t>(data[pos + 3]);
-         outArg.type = ArgType::Int;
-         outArg.i = static_cast<int32_t>(be);
-      }
-      else if (tag == 's')
-      {
-         std::string s;
-         if (!ReadPaddedString(data, len, pos, s))
-            return false;
-         outArg.type = ArgType::String;
-         outArg.s = s;
-      }
-      else
-      {
-         return false; // unsupported type tag - not needed by these nodes
-      }
-
-      outAddress = address;
+      outAddress = std::move(address);
+      outArg = std::move(args[0]);
       return true;
    }
 }

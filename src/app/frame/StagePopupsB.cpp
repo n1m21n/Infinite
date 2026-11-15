@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include <set>
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -286,16 +287,48 @@ void DrawPopupsB(FrameCtx& fc)
          std::string spawnName, spawnCategory;
          int shown = 0;
 
+         // #53: dim incompatible node types on cable drop (except modulator cables),
+         // keeping every item clickable. Fold gLinkDragSuggestions into a set once per frame.
+         bool isModulatorCable = false;
+         if (gLinkDragSourcePin >= 0)
+         {
+            if (GraphNode::IsParamPin(gLinkDragSourcePin))
+               isModulatorCable = true;
+            else if (GraphNode::IsOutputPin(gLinkDragSourcePin))
+            {
+               if (GraphNode* dragSrc = FindNodeByIndex(GraphNode::NodeIndexFromPin(gLinkDragSourcePin)))
+               {
+                  const int outSlot = GraphNode::OutputIndexFromPin(gLinkDragSourcePin);
+                  isModulatorCable = (dynamic_cast<IModulator*>(dragSrc->node.get()) != nullptr ||
+                                      ModulatorForOutput(dragSrc->node.get(), outSlot) != nullptr);
+               }
+            }
+         }
+         const std::set<std::pair<std::string, std::string>> suggestedSet(
+            gLinkDragSuggestions.begin(), gLinkDragSuggestions.end());
+         const bool dimByPort = !isModulatorCable && !suggestedSet.empty();
+         auto drawMenuItem = [&](const char* label, const char* shortcut, bool dimmed) -> bool
+         {
+            if (dimmed)
+               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            const bool picked = MenuParts::Item(label, shortcut);
+            if (dimmed)
+               ImGui::PopStyleColor();
+            return picked;
+         };
+
          if (q.empty())
          {
-            // Link-drag search: a cable was just dropped on empty canvas, so
-            // lead with the node types compatible with the pin it came from
-            // rather than making the user scroll every category to find one.
+            // Link-drag search: show a compact top-N Suggested section so the popup
+            // keeps the same height and category-first layout as the normal node picker.
             if (!gLinkDragSuggestions.empty())
             {
+               constexpr size_t kMaxInlineSuggestions = 8;
+               const size_t nShow = std::min(gLinkDragSuggestions.size(), kMaxInlineSuggestions);
                ImGui::TextDisabled("%s", T("Suggested"));
-               for (const auto& t : gLinkDragSuggestions)
+               for (size_t i = 0; i < nShow; ++i)
                {
+                  const auto& t = gLinkDragSuggestions[i];
                   ++shown;
                   const std::string title = DisplayName(t.first);
                   const std::string category = DisplayName(t.second);
@@ -321,15 +354,33 @@ void DrawPopupsB(FrameCtx& fc)
 
             for (const std::string& category : cats)
             {
-               ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
-               if (MenuParts::SubMenu(DisplayName(category).c_str()))
+               std::vector<std::string> catNodes;
+               for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+                  if (IsUserSpawnable(name))
+                     catNodes.push_back(name);
+               bool anyCompatible = !dimByPort;
+               if (dimByPort)
                {
-                  for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+                  std::stable_partition(catNodes.begin(), catNodes.end(), [&](const std::string& name) {
+                     const bool ok = suggestedSet.find({ name, category }) != suggestedSet.end();
+                     if (ok)
+                        anyCompatible = true;
+                     return ok;
+                  });
+               }
+               ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
+               if (!anyCompatible)
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+               const bool openCat = MenuParts::SubMenu(DisplayName(category).c_str());
+               if (!anyCompatible)
+                  ImGui::PopStyleColor();
+               if (openCat)
+               {
+                  for (const std::string& name : catNodes)
                   {
-                     if (!IsUserSpawnable(name))
-                        continue;
                      ++shown;
-                     if (MenuParts::Item(DisplayName(name).c_str()))
+                     const bool dimmed = dimByPort && suggestedSet.find({ name, category }) == suggestedSet.end();
+                     if (drawMenuItem(DisplayName(name).c_str(), nullptr, dimmed))
                      {
                         spawnName = name;
                         spawnCategory = category;
@@ -341,21 +392,31 @@ void DrawPopupsB(FrameCtx& fc)
          }
          else
          {
+            std::vector<std::pair<std::string, std::string>> matches;
             for (const auto& t : allTypes)
             {
                std::string hay = DisplayName(t.first) + " " + DisplayName(t.second);
                if (I18n::CurrentLanguage() != "en")
                   hay += " " + NodeSearchHaystack(t.first, t.second);
-               if (!NodeSearchMatches(hay, q))
-                  continue;
+               if (NodeSearchMatches(hay, q))
+                  matches.push_back(t);
+            }
+            if (dimByPort)
+               std::stable_partition(matches.begin(), matches.end(), [&](const auto& t) {
+                  return suggestedSet.find(t) != suggestedSet.end();
+               });
+
+            for (const auto& t : matches)
+            {
                ++shown;
                const std::string title = DisplayName(t.first);
                const std::string category = DisplayName(t.second);
+               const bool dimmed = dimByPort && suggestedSet.find(t) == suggestedSet.end();
                // Two node types can share a display name ("Invert" is both a Modulator and a Compositing effect); the
                // row id comes from the label, so the type name keeps each row's id unique.
                ImGui::PushID(t.first.c_str());
                ImGui::PushID(t.second.c_str());
-               bool activate = MenuParts::Item(title.c_str(), category.c_str());
+               bool activate = drawMenuItem(title.c_str(), category.c_str(), dimmed);
                ImGui::PopID();
                ImGui::PopID();
                if (shown == 1 && pickFirst)

@@ -63,6 +63,13 @@ std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForPin(int 
          if (probe.node && FirstOutputFitting(&probe, dragPin) >= 0)
             result.emplace_back(name, category);
       }
+   std::stable_sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+      const int ca = CategoryColors::SemanticRank(a.second);
+      const int cb = CategoryColors::SemanticRank(b.second);
+      if (ca != cb)
+         return ca < cb;
+      return DisplayName(a.first) < DisplayName(b.first);
+   });
    return result;
 }
 

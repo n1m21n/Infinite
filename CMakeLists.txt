@@ -563,6 +563,7 @@ set(COMMON_SOURCES
     src/core/chat/NodeFinder.cpp
     src/core/chat/FileFinder.cpp
     src/core/chat/ChatThread.cpp
+    src/core/chat/OpenAIAgent.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp
@@ -1936,6 +1937,7 @@ if(APPLE)
 
         target_link_libraries(infinite-vst3-scanner PRIVATE
             "-framework Cocoa"
+        "-framework Security"
             "-framework CoreFoundation"
             "-framework CoreAudio"
             "-framework AudioToolbox"
@@ -1968,6 +1970,7 @@ if(APPLE)
     target_link_libraries(Infinite PRIVATE
         "-framework OpenGL"
         "-framework Cocoa"
+        "-framework Security"
         "-framework IOKit"
         "-framework CoreVideo"
         "-framework CoreText"

@@ -20,6 +20,7 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <winhttp.h>
+#include <wincred.h>
 #include <psapi.h>
 #pragma comment(lib, "psapi.lib")
 #include <shlwapi.h>
@@ -1847,5 +1848,164 @@ namespace Platform
    {
       if (wglGetCurrentContext() != (HGLRC)rc_ || wglGetCurrentDC() != (HDC)dc_)
          wglMakeCurrent((HDC)dc_, (HGLRC)rc_);
+   }
+
+   bool HttpPostStream(const std::string& url, const std::string& jsonBody,
+                       const std::string& bearerToken, const HttpStreamChunk& onChunk,
+                       int& outStatus, std::string& outErrorBody,
+                       std::string& outError, int timeoutSeconds)
+   {
+      outStatus = 0;
+      outErrorBody.clear();
+      outError.clear();
+      const bool isHttps = url.rfind("https://", 0) == 0;
+      if (!isHttps && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+
+      URL_COMPONENTS parts;
+      ZeroMemory(&parts, sizeof(parts));
+      parts.dwStructSize = sizeof(parts);
+      wchar_t host[256] = {};
+      wchar_t path[2048] = {};
+      parts.lpszHostName = host;
+      parts.dwHostNameLength = 256;
+      parts.lpszUrlPath = path;
+      parts.dwUrlPathLength = 2048;
+      std::wstring wideUrl = WinCommon::Utf8ToWide(url);
+      if (!WinHttpCrackUrl(wideUrl.c_str(), 0, 0, &parts))
+      {
+         outError = "invalid url";
+         return false;
+      }
+
+      WinHttpHandleGuard session(WinHttpOpen(L"Infinite/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                             WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
+      if (!session)
+      {
+         outError = "WinHttpOpen failed";
+         return false;
+      }
+      const int timeoutMs = std::max(1, timeoutSeconds) * 1000;
+      WinHttpSetTimeouts(session, timeoutMs, timeoutMs, timeoutMs, timeoutMs);
+
+      WinHttpHandleGuard connect(WinHttpConnect(session, parts.lpszHostName, parts.nPort, 0));
+      if (!connect)
+      {
+         outError = "WinHttpConnect failed";
+         return false;
+      }
+
+      const DWORD flags = isHttps ? WINHTTP_FLAG_SECURE : 0;
+      WinHttpHandleGuard request(WinHttpOpenRequest(connect, L"POST", parts.lpszUrlPath,
+                                                    nullptr, WINHTTP_NO_REFERER,
+                                                    WINHTTP_DEFAULT_ACCEPT_TYPES, flags));
+      if (!request)
+      {
+         outError = "WinHttpOpenRequest failed";
+         return false;
+      }
+
+      std::wstring headers = L"Content-Type: application/json\r\nAccept: text/event-stream\r\n";
+      if (!bearerToken.empty())
+         headers += L"Authorization: Bearer " + WinCommon::Utf8ToWide(bearerToken) + L"\r\n";
+
+      if (!WinHttpSendRequest(request, headers.c_str(), (DWORD)headers.size(),
+                              (LPVOID)jsonBody.data(), (DWORD)jsonBody.size(),
+                              (DWORD)jsonBody.size(), 0) ||
+          !WinHttpReceiveResponse(request, nullptr))
+      {
+         outError = "WinHttp request failed";
+         return false;
+      }
+
+      DWORD statusCode = 0;
+      DWORD statusSize = sizeof(statusCode);
+      WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                          WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+      outStatus = (int)statusCode;
+
+      for (;;)
+      {
+         DWORD available = 0;
+         if (!WinHttpQueryDataAvailable(request, &available))
+         {
+            outError = "WinHttpQueryDataAvailable failed";
+            return false;
+         }
+         if (available == 0)
+            break;
+
+         std::string chunk(available, '\0');
+         DWORD read = 0;
+         if (!WinHttpReadData(request, &chunk[0], available, &read))
+         {
+            outError = "WinHttpReadData failed";
+            return false;
+         }
+         chunk.resize(read);
+         if (read == 0)
+            break;
+         if (outStatus >= 200 && outStatus < 300)
+         {
+            if (onChunk && !onChunk(chunk))
+            {
+               outError = "cancelled";
+               return false;
+            }
+         }
+         else if (outErrorBody.size() < 65536)
+         {
+            const size_t take = std::min(chunk.size(), 65536 - outErrorBody.size());
+            outErrorBody.append(chunk.data(), take);
+         }
+      }
+
+      if (outStatus < 200 || outStatus >= 300)
+      {
+         outError = "http status " + std::to_string(outStatus);
+         return false;
+      }
+      return true;
+   }
+
+   bool SecretStore(const std::string& account, const std::string& secret)
+   {
+      if (account.empty())
+         return false;
+      std::wstring target = L"Infinite/" + WinCommon::Utf8ToWide(account);
+      CREDENTIALW cred = {};
+      cred.Type = CRED_TYPE_GENERIC;
+      cred.TargetName = &target[0];
+      cred.CredentialBlobSize = (DWORD)secret.size();
+      cred.CredentialBlob = (LPBYTE)secret.data();
+      cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
+      return CredWriteW(&cred, 0) != FALSE;
+   }
+
+   bool SecretLoad(const std::string& account, std::string& outSecret)
+   {
+      outSecret.clear();
+      if (account.empty())
+         return false;
+      std::wstring target = L"Infinite/" + WinCommon::Utf8ToWide(account);
+      PCREDENTIALW pcred = nullptr;
+      if (!CredReadW(target.c_str(), CRED_TYPE_GENERIC, 0, &pcred) || pcred == nullptr)
+         return false;
+      outSecret.assign((const char*)pcred->CredentialBlob, (size_t)pcred->CredentialBlobSize);
+      CredFree(pcred);
+      return true;
+   }
+
+   bool SecretClear(const std::string& account)
+   {
+      if (account.empty())
+         return false;
+      std::wstring target = L"Infinite/" + WinCommon::Utf8ToWide(account);
+      if (CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0))
+         return true;
+      return GetLastError() == ERROR_NOT_FOUND;
    }
 }

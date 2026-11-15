@@ -1,5 +1,7 @@
 // Patch file watching, unsaved-changes guard (moved verbatim from main.cpp).
+#include <array>
 #include "app/AppShared.h"
+#include "core/GestureRecorder.h"
 #include "core/MediaCollect.h"
 #include "core/Notices.h"
 #include "platform/AppPaths.h"
@@ -286,6 +288,158 @@ namespace app
       private:
          std::string key;
       };
+
+      class AddrKeyFinder : public ParamVisitor
+      {
+      public:
+         explicit AddrKeyFinder(const void* a) : target(a) {}
+         std::string key;
+         void Float(const char* n, float& v) override { if (&v == target) key = n; }
+         void Int(const char* n, int& v) override { if (&v == target) key = n; }
+         void Bool(const char* n, bool& v) override { if (&v == target) key = n; }
+         void Text(const char* n, std::string& v) override { if (&v == target) key = n; }
+         void Color(const char* n, float rgb[3]) override { if (rgb == target) key = n; }
+      private:
+         const void* target;
+      };
+
+      struct DefaultParamMap
+      {
+         std::unordered_map<std::string, float> floats;
+         std::unordered_map<std::string, int> ints;
+         std::unordered_map<std::string, bool> bools;
+         std::unordered_map<std::string, std::string> texts;
+         std::unordered_map<std::string, std::array<float, 3>> colors;
+
+         bool Has(const std::string& k) const
+         {
+            return floats.count(k) || ints.count(k) || bools.count(k) || texts.count(k) || colors.count(k);
+         }
+      };
+
+      class DefaultCollector : public ParamVisitor
+      {
+      public:
+         explicit DefaultCollector(DefaultParamMap& m) : map(m) {}
+         void Float(const char* n, float& v) override { map.floats[n] = v; }
+         void Int(const char* n, int& v) override { map.ints[n] = v; }
+         void Bool(const char* n, bool& v) override { map.bools[n] = v; }
+         void Text(const char* n, std::string& v) override { map.texts[n] = v; }
+         void Color(const char* n, float rgb[3]) override { map.colors[n] = { rgb[0], rgb[1], rgb[2] }; }
+      private:
+         DefaultParamMap& map;
+      };
+
+      class SingleKeyResetter : public ParamVisitor
+      {
+      public:
+         SingleKeyResetter(const std::string& k, const DefaultParamMap& m) : key(k), map(m) {}
+         bool applied = false;
+         const void* appliedAddr = nullptr;
+         float appliedFloat = 0.0f;
+         bool hasFloatValue = false;
+
+         void Float(const char* n, float& v) override
+         {
+            if (key == n)
+               if (auto it = map.floats.find(n); it != map.floats.end())
+               {
+                  v = it->second;
+                  applied = true;
+                  appliedAddr = &v;
+                  appliedFloat = v;
+                  hasFloatValue = true;
+               }
+         }
+         void Int(const char* n, int& v) override
+         {
+            if (key == n)
+               if (auto it = map.ints.find(n); it != map.ints.end())
+               {
+                  v = it->second;
+                  applied = true;
+                  appliedAddr = &v;
+                  appliedFloat = (float)v;
+                  hasFloatValue = true;
+               }
+         }
+         void Bool(const char* n, bool& v) override
+         {
+            if (key == n)
+               if (auto it = map.bools.find(n); it != map.bools.end())
+               {
+                  v = it->second;
+                  applied = true;
+                  appliedAddr = &v;
+                  appliedFloat = v ? 1.0f : 0.0f;
+                  hasFloatValue = true;
+               }
+         }
+         void Text(const char* n, std::string& v) override
+         {
+            if (key == n)
+               if (auto it = map.texts.find(n); it != map.texts.end())
+               {
+                  v = it->second;
+                  applied = true;
+               }
+         }
+         void Color(const char* n, float rgb[3]) override
+         {
+            if (key == n)
+               if (auto it = map.colors.find(n); it != map.colors.end())
+               {
+                  rgb[0] = it->second[0];
+                  rgb[1] = it->second[1];
+                  rgb[2] = it->second[2];
+                  applied = true;
+               }
+         }
+      private:
+         std::string key;
+         const DefaultParamMap& map;
+      };
+
+      const DefaultParamMap* DefaultParamsForType(const std::string& typeName)
+      {
+         static std::unordered_map<std::string, DefaultParamMap> sCache;
+         if (auto it = sCache.find(typeName); it != sCache.end())
+            return &it->second;
+         std::unique_ptr<INode> probe(NodeFactory::Instance().MakeNode(typeName));
+         if (!probe)
+            return nullptr;
+         DefaultParamMap map;
+         DefaultCollector col(map);
+         probe->VisitParams(col);
+         auto [inserted, _] = sCache.emplace(typeName, std::move(map));
+         return &inserted->second;
+      }
+
+      std::string VisitKeyForParam(const GraphNode& gn, int paramIndex)
+      {
+         const ParamRef* ref = nullptr;
+         for (const ParamRef& r : Modulation::Instance().FrameParams())
+            if (r.nodeIndex == gn.index && r.paramIndex == paramIndex)
+            {
+               ref = &r;
+               break;
+            }
+         if (ref != nullptr && ref->srcAddr != nullptr && gn.node != nullptr)
+         {
+            AddrKeyFinder finder(ref->srcAddr);
+            gn.node->VisitParams(finder);
+            if (!finder.key.empty())
+               return finder.key;
+         }
+         if (ref != nullptr && !ref->key.empty())
+            return ref->key;
+         auto j = gParamJoin.find(gn.typeName);
+         if (j != gParamJoin.end())
+            for (const auto& kv : j->second.paramOfKey)
+               if (kv.second == paramIndex)
+                  return kv.first;
+         return std::string();
+      }
    }
 
    int ParamIndexOfKeyOnNode(const GraphNode& gn, const std::string& key)
@@ -304,6 +458,68 @@ namespace app
          return -1;
       auto k = j->second.paramOfKey.find(key);
       return k == j->second.paramOfKey.end() ? -1 : k->second;
+   }
+
+   bool CanResetParam(int nodeIndex, int paramIndex)
+   {
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      if (gn == nullptr || !gn->node)
+         return false;
+      Modulation& mod = Modulation::Instance();
+      GestureRecorder& rec = GestureRecorder::Instance();
+      const bool modulated = mod.IsModulated(nodeIndex, paramIndex);
+      const bool hasExpr = !modulated && mod.HasExpression(nodeIndex, paramIndex);
+      const bool hasPlayback = !modulated && !hasExpr && rec.Playbacks().count({ nodeIndex, paramIndex }) > 0;
+      if (hasExpr || hasPlayback)
+         return false;
+      const std::string key = VisitKeyForParam(*gn, paramIndex);
+      if (key.empty())
+         return false;
+      const DefaultParamMap* defaults = DefaultParamsForType(gn->typeName);
+      return defaults != nullptr && defaults->Has(key);
+   }
+
+   bool ResetParamKeyToDefault(GraphNode& gn, const std::string& key, bool pushUndo)
+   {
+      if (!gn.node || key.empty())
+         return false;
+      const DefaultParamMap* defaults = DefaultParamsForType(gn.typeName);
+      if (defaults == nullptr)
+         return false;
+      std::string resolvedKey = key;
+      if (!defaults->Has(resolvedKey) && resolvedKey.size() > 2 && resolvedKey[1] == ' ')
+      {
+         const std::string stripped = resolvedKey.substr(2);
+         if (defaults->Has(stripped))
+            resolvedKey = stripped;
+      }
+      if (!defaults->Has(resolvedKey))
+         return false;
+      if (pushUndo)
+         PushUndoCheckpoint();
+      SingleKeyResetter resetter(resolvedKey, *defaults);
+      gn.node->VisitParams(resetter);
+      if (!resetter.applied)
+         return false;
+      if (resetter.hasFloatValue)
+      {
+         for (const ParamRef& r : Modulation::Instance().FrameParams())
+            if (r.nodeIndex == gn.index && r.srcAddr == resetter.appliedAddr && r.value != nullptr && r.value != r.srcAddr)
+               *r.value = resetter.appliedFloat;
+      }
+      gPatchDirty = true;
+      return true;
+   }
+
+   bool ResetParamToDefault(int nodeIndex, int paramIndex, bool pushUndo)
+   {
+      if (!CanResetParam(nodeIndex, paramIndex))
+         return false;
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      if (gn == nullptr)
+         return false;
+      const std::string key = VisitKeyForParam(*gn, paramIndex);
+      return ResetParamKeyToDefault(*gn, key, pushUndo);
    }
 
    // Resolves the keyed bindings a load had to postpone (see PendingKeyed). Runs once a frame; waits for

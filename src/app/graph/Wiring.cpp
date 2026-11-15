@@ -1603,6 +1603,50 @@ namespace app
                result.emplace_back(name, category);
          }
       }
+
+      // Rank suggestions so the most useful downstream nodes appear first:
+      // 1) domain-specific primary sinks (e.g. Output/Blend for video, Scene/Render for 3D, AudioOut for audio)
+      // 2) CategoryColors::SemanticRank(category)
+      // 3) DisplayName(name)
+      auto rankOf = [&](const std::pair<std::string, std::string>& item) -> int {
+         const std::string& n = item.first;
+         if (srcGeometry != nullptr)
+         {
+            if (n == "Scene" || n == "Render3D" || n == "Transform3D" || n == "Material")
+               return 0;
+         }
+         else if (srcIsAudioNode)
+         {
+            if (n == "AudioOut" || n == "Gain" || n == "Mixer" || n == "Spectrum" || n == "Waveform")
+               return 0;
+         }
+         else if (srcIsNoteSource)
+         {
+            if (n == "Synthesizer" || n == "Sampler" || n == "MidiOut" || n == "Arpeggiator")
+               return 0;
+         }
+         else if (srcPalette != nullptr)
+         {
+            if (n == "ColorRamp" || n == "Shape" || n == "Background" || n == "Gradient")
+               return 0;
+         }
+         else if (!srcIsModulator && !srcIsPredictor)
+         {
+            if (n == "Output" || n == "Blend" || n == "Transform" || n == "Blur" || n == "ColorAdjust" || n == "Feedback")
+               return 0;
+         }
+         return 1;
+      };
+      std::stable_sort(result.begin(), result.end(), [&](const auto& a, const auto& b) {
+         const int ra = rankOf(a), rb = rankOf(b);
+         if (ra != rb)
+            return ra < rb;
+         const int ca = CategoryColors::SemanticRank(a.second);
+         const int cb = CategoryColors::SemanticRank(b.second);
+         if (ca != cb)
+            return ca < cb;
+         return DisplayName(a.first) < DisplayName(b.first);
+      });
       return result;
    }
 
