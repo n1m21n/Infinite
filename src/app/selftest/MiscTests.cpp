@@ -3055,7 +3055,7 @@ void RunParamResetTest()
          return r.val;
       };
       const float defRot = getFloat("rotation");
-      json r;
+      nlohmann::json r;
       std::string e;
       Check("set_param changes rotation",
             HandleRpcCommand("set_param", { {"index", shape->index}, {"name", "rotation"}, {"value", defRot + 0.5f} }, r, e));
