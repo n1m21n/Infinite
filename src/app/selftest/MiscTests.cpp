@@ -2623,6 +2623,96 @@ void RunRpcBatchTest()
       Check("studio node with an unknown type errors", !e.empty());
    }
 
+   // transport loop action through ArrangeSetLoop.
+   {
+      NewPatch();
+      json tr;
+      e.clear();
+      Check("transport loop refuses an empty range",
+            !Call("transport", { {"action", "loop"}, {"enabled", true} }, tr, e) && !e.empty());
+      e.clear();
+      Check("transport loop sets a range in beats",
+            Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 4}, {"end", 12} }, tr, e) &&
+               e.empty() && tr.value("loopEnabled", false) &&
+               std::abs(tr.value("loopStart", 0.0) - 4.0) < 1e-6 &&
+               std::abs(tr.value("loopEnd", 0.0) - 12.0) < 1e-6);
+      e.clear();
+      Check("transport loop refuses a zero span",
+            !Call("transport", { {"action", "loop"}, {"enabled", true}, {"start", 8}, {"end", 8} }, tr, e) && !e.empty());
+      e.clear();
+      Check("transport loop turns off",
+            Call("transport", { {"action", "loop"}, {"enabled", false} }, tr, e) && e.empty() && !tr.value("loopEnabled", true));
+   }
+
+   // k17: tolerant argument spellings, range checks, depth limit, named errors for bind_mod/unbind_mod/set_expr.
+   {
+      NewPatch();
+      json made;
+      Check("k17: create destination Shape", Call("create_node", { {"typeName", "Shape"}, {"category", "Source"} }, made, e));
+      const int dst = made.value("index", -1);
+      Check("k17: create modulator LFO", Call("create_node", { {"typeName", "LFO"}, {"category", "Modulators"} }, made, e));
+      const int src = made.value("index", -1);
+      // Note: RPC create_node may not have drawn a frame yet; ensure Shape's param keys are registered if needed.
+      GraphNode* dstNode = FindNodeByIndex(dst);
+      const int param = dstNode != nullptr ? ParamIndexOfKeyOnNode(*dstNode, "f rotation") : -1;
+      if (param >= 0)
+      {
+         e.clear();
+         Check("bind_mod: dst + typed key binds",
+               Call("bind_mod", { {"dst", dst}, {"key", "f rotation"}, {"src", src} }, r, e) && e.empty() &&
+                  Modulation::Instance().IsModulated(dst, param));
+         e.clear();
+         Check("bind_mod: index + bare key binds",
+               Call("bind_mod", { {"index", dst}, {"key", "rotation"}, {"src", src} }, r, e) && e.empty() &&
+                  Modulation::Instance().IsModulated(dst, param));
+         e.clear();
+         Check("bind_mod: node object + param + numeric-string src",
+               Call("bind_mod", { {"node", { {"index", dst} }}, {"param", "rotation"}, {"source", std::to_string(src)} }, r, e) &&
+                  e.empty() && Modulation::Instance().ModulatorFor(dst, param).nodeIndex == src);
+         e.clear();
+         Check("bind_mod: target + control + lo/hi",
+               Call("bind_mod", { {"target", dst}, {"control", "rotation"}, {"modulator", src}, {"lo", 0.25f}, {"hi", 0.75f} }, r, e) &&
+                  e.empty() && std::abs(Modulation::Instance().ModulatorFor(dst, param).lo - 0.25f) < 1e-5f &&
+                  std::abs(Modulation::Instance().ModulatorFor(dst, param).hi - 0.75f) < 1e-5f);
+         e.clear();
+         Check("bind_mod: half range lo/hi refused",
+               !Call("bind_mod", { {"dst", dst}, {"key", "rotation"}, {"src", src}, {"lo", 0.1f} }, r, e) &&
+                  e.find("lo and hi") != std::string::npos);
+
+         // Depth > 8 object nesting is refused cleanly.
+         json deep = dst;
+         for (int d = 0; d < 10; ++d)
+            deep = json{ {"index", deep} };
+         e.clear();
+         Check("bind_mod: depth > 8 refused",
+               !Call("bind_mod", { {"dst", deep}, {"key", "rotation"}, {"src", src} }, r, e) &&
+                  e.find("unknown node index") != std::string::npos);
+
+         e.clear();
+         Check("bind_mod: missing key named",
+               !Call("bind_mod", { {"dst", dst}, {"src", src} }, r, e) &&
+                  e.find("missing control key") != std::string::npos);
+         e.clear();
+         Check("bind_mod: unknown key named",
+               !Call("bind_mod", { {"dst", dst}, {"key", "f nope"}, {"src", src} }, r, e) &&
+                  e.find("not a modulatable control") != std::string::npos);
+         e.clear();
+         Check("bind_mod: non-object params named",
+               !Call("bind_mod", json::array(), r, e) && e.find("JSON object") != std::string::npos);
+
+         const size_t undoBefore = gUndoStack.size();
+         e.clear();
+         Check("unbind_mod: unbinds",
+               Call("unbind_mod", { {"node", dst}, {"name", "rotation"} }, r, e) && e.empty() &&
+                  !Modulation::Instance().IsModulated(dst, param) && r.value("wasModulated", false));
+         Check("unbind_mod: pushed one undo step", gUndoStack.size() == undoBefore + 1);
+         e.clear();
+         Check("unbind_mod: second unbind pushes no undo step",
+               Call("unbind_mod", { {"node", dst}, {"name", "rotation"} }, r, e) && e.empty() &&
+                  !r.value("wasModulated", true) && gUndoStack.size() == undoBefore + 1);
+      }
+   }
+
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }
 
