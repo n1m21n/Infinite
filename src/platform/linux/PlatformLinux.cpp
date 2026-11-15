@@ -202,6 +202,13 @@ namespace Platform
       return 0.0;
    }
 
+
+   double PollTrackpadRotationDelta()
+   {
+      // GLFW does not expose trackpad rotate gestures on X11/Wayland.
+      return 0.0;
+   }
+
    double ProcessRssMb()
    {
       // /proc/self/status's VmRSS line is already in kB and needs no root

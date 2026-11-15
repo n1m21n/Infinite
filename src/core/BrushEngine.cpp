@@ -261,11 +261,20 @@ namespace BrushEngine
          "      }\n"
          "      from = p - uDir * uStep * 0.8 * min(w, 1.0) * uStrength;\n"
          "      r = texture(uSrc, from * uTexel);\n"
-         "   } else {\n"
+         "   } else if (uKind == 2) {\n"
          "      vec2 v = p - uCenter;\n"
          "      float f = 1.0 - smoothstep(0.0, uRadius, length(v));\n"
          "      float a = -uStrength * 1.2 * f * f;\n"
          "      from = uCenter + mat2(cos(a), sin(a), -sin(a), cos(a)) * v;\n"
+         "      r = texture(uSrc, from * uTexel);\n"
+         "   } else {\n"
+         // Bloat reads from nearer the centre (the paint swells), Pinch from further out (it draws in); both fade to
+         // nothing at the rim so the edge of the brush leaves no seam.
+         "      vec2 v = p - uCenter;\n"
+         "      float t = clamp(length(v) / max(uRadius, 1.0), 0.0, 1.0);\n"
+         "      float f = (1.0 - t * t) * (1.0 - t * t);\n"
+         "      float s = (uKind == 3 ? -0.5 : 0.5) * uStrength * f;\n"
+         "      from = uCenter + v * (1.0 + s);\n"
          "      r = texture(uSrc, from * uTexel);\n"
          "   }\n"
          "   float m = uHasSel == 1 ? texture(uSel, uv).r : 1.0;\n"
@@ -452,6 +461,19 @@ namespace BrushEngine
          b.mode = kSwirl;
          b.pressureSize = false;
          add("Marbling", "Swirl", b);
+         // Liquify: pushes the pixels already on the layer around.
+         b = Make(kRound, 120, 1, 1, 1, 0.05f);
+         b.pressureSize = false;
+         b.mode = kPush;
+         add("Liquify", "Push", b);
+         b.mode = kTwirl;
+         b.flow = 0.5f;
+         add("Liquify", "Twirl", b);
+         b.mode = kBloat;
+         b.flow = 0.35f;
+         add("Liquify", "Bloat", b);
+         b.mode = kPinch;
+         add("Liquify", "Pinch", b);
          return p;
       }();
       return presets;
@@ -573,7 +595,7 @@ namespace BrushEngine
       Pending q{ x, y, p, seed, dir, mDist, mSize, mFlow, { mRgb[0], mRgb[1], mRgb[2] }, fx, fy };
       mQueue.push_back(q);
       // A drop pushes paint out to five radii; a comb's tines drag a little past its width.
-      const float r = (mBrush.mode == kDrop ? 2.5f * mBrush.size : mBrush.mode == kComb ? 0.75f * mBrush.size : 0.5f * mBrush.size) + 2.0f;
+      const float r = (mBrush.mode == kDrop ? 2.5f * mBrush.size : mBrush.mode == kComb || mBrush.mode == kPush ? 0.75f * mBrush.size : 0.5f * mBrush.size) + 2.0f;
       if (!mAny)
       {
          mDirty[0] = x - r;
@@ -686,7 +708,7 @@ namespace BrushEngine
          mDabCount++;
          return;
       }
-      if (MarbleMode(b.mode))
+      if (WarpMode(b.mode))
       {
          WarpDab(q, r, std::clamp(flow * b.opacity, 0.0f, 1.0f));
          mDabCount++;
@@ -765,7 +787,8 @@ namespace BrushEngine
    {
       if (mSurface == nullptr || strength <= 0.0f)
          return;
-      const int kind = mBrush.mode == kDrop ? 0 : mBrush.mode == kComb ? 1 : 2;
+      const int m = mBrush.mode;
+      const int kind = m == kDrop ? 0 : m == kComb || m == kPush ? 1 : m == kSwirl || m == kTwirl ? 2 : m == kBloat ? 3 : 4;
       float ux = q.x - q.fromX, uy = q.y - q.fromY;
       const float step = std::sqrt(ux * ux + uy * uy);
       if (kind == 1)
@@ -775,7 +798,7 @@ namespace BrushEngine
          ux /= step;
          uy /= step;
       }
-      const int n = std::clamp(mBrush.tines, 1, 16);
+      const int n = m == kPush ? 1 : std::clamp(mBrush.tines, 1, 16);
       const float width = 2.0f * r;
       const float lambda = n > 1 ? std::max(2.0f, width / (n - 1) * 0.3f) : std::max(2.0f, r * 0.5f);
       const float reach = kind == 0 ? 5.0f * r : kind == 1 ? r + 3.0f * lambda + step : r;

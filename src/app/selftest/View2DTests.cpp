@@ -15,6 +15,7 @@ extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <cstdio>
 #include <sstream>
 #include <string>
@@ -789,6 +790,41 @@ void RunView2DTest()
                off++;
       printf("  swirl: %d red px off the column\n", off);
       Check("S3: a swirl turns the paint", off > 20 && IsRed(150, 15));
+      // Liquify: Bloat swells a red dot, Pinch draws it in; both leave paint outside the brush alone.
+      const auto RedArea = [&]() {
+         Cook(&pic);
+         int n = 0;
+         for (int y = 60; y < 140; y++)
+            for (int x = 110; x < 190; x++)
+               n += IsRed(x, y) ? 1 : 0;
+         return n;
+      };
+      int liquified[2] = {};
+      for (int k = 0; k < 2; k++)
+      {
+         Clear();
+         L = pic.AddPaintLayer();
+         BrushEngine::Brush dot = red;
+         dot.size = 20.0f;
+         Line(L, 150, 100, 150.5f, 100, dot);
+         Line(L, 20, 20, 20.5f, 20, dot);
+         const int before = RedArea();
+         BrushEngine::Brush lq = hard;
+         lq.mode = k == 0 ? BrushEngine::kBloat : BrushEngine::kPinch;
+         lq.size = 70.0f;
+         lq.flow = 0.6f;
+         lq.spacing = 0.02f;
+         Line(L, 148, 100, 152, 100, lq);
+         liquified[k] = RedArea() - before;
+         printf("  %s: red area %d -> %+d\n", k == 0 ? "bloat" : "pinch", before, liquified[k]);
+      }
+      Check("S3: Liquify Bloat swells the paint", liquified[0] > 40);
+      Check("S3: Liquify Pinch draws the paint in", liquified[1] < -40);
+      Check("S3: Liquify leaves paint outside the brush", IsRed(20, 20));
+      bool presets = false;
+      for (const auto& pr : BrushEngine::Presets())
+         presets |= pr.group != nullptr && std::string(pr.group) == "Liquify" && pr.brush.mode == BrushEngine::kPinch;
+      Check("S3: the Liquify presets are listed", presets);
    }
 
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
@@ -2125,6 +2161,61 @@ void RunView2DTest()
             printf("  B4 fuzz: first differing line: %s\n", firstBad.c_str());
          Check("B4 sweep: a random document saves, loads and saves to the same text", fixed);
       }
+   }
+   // Sweep: every layer setting the panel writes (relief, levels, curve, layer fx, adjustment) survives an undo
+   // round trip: change it, undo, and the document's text is what it was. The History panel names the step.
+   {
+      doc = Doc();
+      int paint = 0, adj = 0;
+      if (doc != nullptr)
+      {
+         paint = doc->AddPaintLayer();
+         adj = doc->AddLayer(Kind::Adjust, 0).id;
+         doc->Commit();
+      }
+      struct Write
+      {
+         const char* what;
+         std::function<void(Layer&, Layer&)> change;
+      };
+      const std::vector<Write> writes = {
+         { "relief on", [](Layer& p, Layer&) { p.relief = true; } },
+         { "relief material", [](Layer& p, Layer&) { p.relief = true; p.reliefMat = 2; } },
+         { "relief light", [](Layer& p, Layer&) { p.relief = true; p.reliefLight = -30.0f; p.reliefElev = 70.0f; p.reliefDepth = 5.0f; } },
+         { "levels", [](Layer&, Layer& a) { a.adjType = Scene2DNode::kAdjLevels; a.levels[0] = 0.2f; a.levels[3] = 0.8f; } },
+         { "curve", [](Layer&, Layer& a) { a.adjType = Scene2DNode::kAdjCurves; a.curve = { 0.0f, 0.1f, 0.5f, 0.7f, 1.0f, 0.9f }; } },
+         { "adjustment", [](Layer&, Layer& a) { a.adjType = Scene2DNode::kAdjPosterize; a.adjAmt = 3.0f; a.adjMap = true; } },
+         { "layer fx", [](Layer& p, Layer&) { p.fx[0].on = true; p.fx[0].dist = 33.0f; p.fx[0].c[0] = 0.5f; } },
+         { "fill and opacity", [](Layer& p, Layer&) { p.fill = 0.4f; p.opacity = 0.6f; p.blend = 3; } },
+      };
+      int bad = 0;
+      for (const Write& w : writes)
+      {
+         doc = Doc();
+         Layer* p = doc != nullptr ? doc->FindLayer(paint) : nullptr;
+         Layer* a = doc != nullptr ? doc->FindLayer(adj) : nullptr;
+         if (p == nullptr || a == nullptr)
+         {
+            printf("  undo round trip: %s found no layers (doc=%d paint=%d adj=%d)\n", w.what, doc != nullptr, paint, adj);
+            bad++;
+            break;
+         }
+         const std::string before = doc->DocText();
+         PushUndoCheckpoint(w.what);
+         w.change(*p, *a);
+         doc->Commit();
+         const bool changed = doc->DocText() != before, named = UndoLabelAt(0) == w.what;
+         Undo();
+         doc = Doc();
+         const bool back = doc != nullptr && doc->DocText() == before;
+         if (!changed || !named || !back)
+         {
+            printf("  undo round trip: %s changed=%d named=%d back=%d\n", w.what, changed, named, back);
+            bad++;
+         }
+      }
+      Check("Sweep: every layer setting undoes back to the same document", bad == 0);
+      doc = Doc();
    }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;

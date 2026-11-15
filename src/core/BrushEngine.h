@@ -26,9 +26,13 @@ namespace BrushEngine
                // Relief (height in alpha): Raise is Normal; Stack adds the stroke's height on top; Press dents.
                kStack, kPress,
                // Marbling: the paint floats. A drop pushes it apart, a comb drags tines through it, a swirl turns it.
-               kDrop, kComb, kSwirl };
-   inline bool DirectMode(int m) { return m == kSmudge || m == kDrop || m == kComb || m == kSwirl; }
+               kDrop, kComb, kSwirl,
+               // Liquify: the same warp on any layer, no bath. Push drags, Twirl turns, Bloat swells, Pinch draws in.
+               kPush, kTwirl, kBloat, kPinch };
    inline bool MarbleMode(int m) { return m == kDrop || m == kComb || m == kSwirl; }
+   inline bool LiquifyMode(int m) { return m == kPush || m == kTwirl || m == kBloat || m == kPinch; }
+   inline bool WarpMode(int m) { return MarbleMode(m) || LiquifyMode(m); }
+   inline bool DirectMode(int m) { return m == kSmudge || WarpMode(m); }
 
    const std::vector<std::string>& TipNames();
 

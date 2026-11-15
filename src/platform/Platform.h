@@ -93,6 +93,11 @@ namespace Platform
    // exists yet. Always returns 0.0 on Windows (no equivalent gesture).
    double PollTrackpadMagnificationDelta();
 
+   // Trackpad two-finger turn (macOS rotate gesture), drained like the pinch:
+   // degrees since the last call, counter-clockwise positive. 0.0 on Windows
+   // and Linux (GLFW forwards no rotate gesture there).
+   double PollTrackpadRotationDelta();
+
    // Native open panel filtered to image types. Returns "" if cancelled.
    std::string OpenImageDialog();
 

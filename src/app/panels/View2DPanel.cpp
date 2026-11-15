@@ -57,6 +57,7 @@ float gView2DWidth = 620.0f;
 int gView2DDockBack = 0;
 bool gView2DClaimedKeys = false;
 std::string gView2DTools;
+std::string gView2DSwatches;
 ImVec2 gView2DRectMin, gView2DRectMax;
 
 namespace
@@ -126,6 +127,7 @@ namespace
    int sBrushPreset = -1, sEraserPreset = -1;
    bool sBrushInit = false;
    float sFg[3] = { 0.0f, 0.0f, 0.0f }, sBg[3] = { 1.0f, 1.0f, 1.0f };
+   void NoteColourUsed(const float* c);   // the recent-colours row, below
    int sFillKind = 1;              // gradient: 1 linear, 2 radial, 3 angle, 4 reflected, 5 diamond
    float sGradOpacity = 1.0f;
    int sPickSize = 1;              // eyedropper: 1 point, 3 or 5 px square averaged
@@ -161,6 +163,7 @@ namespace
    bool sDirty = false;            // a widget changed the model this frame
    float sZoom = 1.0f;
    ImVec2 sPan(0.0f, 0.0f);        // the document centre's offset from the view centre, screen px
+   float sViewAngle = 0.0f;        // the view turned about the document centre, radians, clockwise on screen
    bool sNeedFit = true;
    uint64_t sFitFor = 0;
    int sFitW = 0, sFitH = 0;
@@ -197,6 +200,7 @@ namespace
       size_t undo0 = (size_t)-1;      // the undo depth before this drag's step, so Esc can drop it
       float cropWas[4] = { 0, 0, 0, 0 };   // 5: the crop box before the drag
       float zoom0 = 1.0f;             // 19: the zoom as the drag began
+      float angle0 = 0.0f;            // 22: the view angle as the turn began
    } sOp;
 
    // The 3D gizmo on a 3D layer: 0 move, 1 rotate, 2 scale (W / E / R, like the 3D View).
@@ -346,26 +350,77 @@ namespace
 
    // ---- view mapping ----------------------------------------------------
 
+   // Where the document's centre sits on screen.
+   ImVec2 DocCentre()
+   {
+      return ImVec2((sViewMn.x + sViewMx.x) * 0.5f + sPan.x, (sViewMn.y + sViewMx.y) * 0.5f + sPan.y);
+   }
+   // The document's (0, 0) on screen when the view is upright (the rulers only draw then).
    ImVec2 DocOrigin(Scene2DNode* doc)
    {
-      const ImVec2 c((sViewMn.x + sViewMx.x) * 0.5f + sPan.x, (sViewMn.y + sViewMx.y) * 0.5f + sPan.y);
+      const ImVec2 c = DocCentre();
       return ImVec2(c.x - doc->Doc().w * sZoom * 0.5f, c.y - doc->Doc().h * sZoom * 0.5f);
    }
+   bool ViewTurned() { return std::fabs(sViewAngle) > 1e-4f; }
    ImVec2 ToScreen(Scene2DNode* doc, float x, float y)
    {
-      const ImVec2 o = DocOrigin(doc);
-      return ImVec2(o.x + x * sZoom, o.y + y * sZoom);
+      const ImVec2 c = DocCentre();
+      const float dx = (x - doc->Doc().w * 0.5f) * sZoom, dy = (y - doc->Doc().h * 0.5f) * sZoom;
+      if (!ViewTurned())
+         return ImVec2(c.x + dx, c.y + dy);
+      const float co = std::cos(sViewAngle), si = std::sin(sViewAngle);
+      return ImVec2(c.x + co * dx - si * dy, c.y + si * dx + co * dy);
+   }
+   // A screen-px step as a document-px step (the view's turn and zoom undone).
+   ImVec2 DocDelta(float sx, float sy)
+   {
+      const float co = std::cos(sViewAngle), si = std::sin(sViewAngle);
+      return ImVec2((co * sx + si * sy) / sZoom, (-si * sx + co * sy) / sZoom);
    }
    ImVec2 ToDoc(Scene2DNode* doc, ImVec2 s)
    {
-      const ImVec2 o = DocOrigin(doc);
-      return ImVec2((s.x - o.x) / sZoom, (s.y - o.y) / sZoom);
+      const ImVec2 c = DocCentre();
+      const ImVec2 d = DocDelta(s.x - c.x, s.y - c.y);
+      return ImVec2(d.x + doc->Doc().w * 0.5f, d.y + doc->Doc().h * 0.5f);
+   }
+   // A document-space box drawn on screen (it turns with the view).
+   void DocRect(Scene2DNode* doc, float x0, float y0, float x1, float y1, ImVec2 q[4])
+   {
+      q[0] = ToScreen(doc, x0, y0);
+      q[1] = ToScreen(doc, x1, y0);
+      q[2] = ToScreen(doc, x1, y1);
+      q[3] = ToScreen(doc, x0, y1);
+   }
+   void AddDocRect(ImDrawList* dl, Scene2DNode* doc, float x0, float y0, float x1, float y1, ImU32 col, float thick = 1.0f)
+   {
+      ImVec2 q[4];
+      DocRect(doc, x0, y0, x1, y1, q);
+      dl->AddPolyline(q, 4, col, ImDrawFlags_Closed, thick);
+   }
+   // Turn the view by `rad` about a screen point (the document centre when it is the pivot).
+   void TurnViewAbout(Scene2DNode* doc, float rad, ImVec2 at)
+   {
+      const ImVec2 before = ToDoc(doc, at);
+      sViewAngle = std::remainder(sViewAngle + rad, 6.2831853f);
+      const ImVec2 after = ToScreen(doc, before.x, before.y);
+      sPan.x += at.x - after.x;
+      sPan.y += at.y - after.y;
+   }
+
+   // Within 3 degrees of a multiple of 15 the turn settles on it, so upright is easy to find again.
+   float SnapViewAngle(float a)
+   {
+      const float step = 15.0f * 3.14159265f / 180.0f, k = std::round(a / step) * step;
+      return std::fabs(a - k) < 3.0f * 3.14159265f / 180.0f ? k : a;
    }
 
    void FitView(Scene2DNode* doc)
    {
       const float vw = std::max(40.0f, sViewMx.x - sViewMn.x - 48.0f), vh = std::max(40.0f, sViewMx.y - sViewMn.y - 48.0f);
-      sZoom = std::clamp(std::min(vw / (float)doc->Doc().w, vh / (float)doc->Doc().h), 0.01f, 64.0f);
+      // A turned document fits by its turned box.
+      const float co = std::fabs(std::cos(sViewAngle)), si = std::fabs(std::sin(sViewAngle));
+      const float bw = co * doc->Doc().w + si * doc->Doc().h, bh = si * doc->Doc().w + co * doc->Doc().h;
+      sZoom = std::clamp(std::min(vw / std::max(1.0f, bw), vh / std::max(1.0f, bh)), 0.01f, 64.0f);
       sPan = ImVec2(0, 0);
    }
 
@@ -1413,6 +1468,50 @@ namespace
    }
 
    // Esc during a drag puts everything back and drops the drag's undo step.
+   // Free transform (Cmd/Ctrl+T): every move, scale and rotate drag until Enter is one undo step, and Esc puts
+   // the layers back as they were when it began.
+   struct FreeTransform
+   {
+      Scene2DNode* doc = nullptr;
+      std::vector<Layer> before;
+      size_t undo0 = (size_t)-1;
+   } sFreeT;
+
+   bool FreeTransformOn(Scene2DNode* doc) { return sFreeT.doc != nullptr && sFreeT.doc == doc; }
+
+   void BeginFreeTransform(Scene2DNode* doc)
+   {
+      sFreeT = FreeTransform();
+      for (int id : MovingIds(doc))
+         if (const Layer* l = doc->FindLayer(id))
+            sFreeT.before.push_back(*l);
+      if (sFreeT.before.empty())
+         return;
+      sFreeT.doc = doc;
+      sFreeT.undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Free transform");
+      sTool = kMove;
+   }
+
+   void EndFreeTransform(Scene2DNode* doc, bool keep)
+   {
+      if (!FreeTransformOn(doc))
+      {
+         sFreeT = FreeTransform();
+         return;
+      }
+      if (!keep)
+      {
+         for (const Layer& b : sFreeT.before)
+            if (Layer* l = doc->FindLayer(b.id))
+               *l = b;
+         while (sFreeT.undo0 != (size_t)-1 && gUndoStack.size() > sFreeT.undo0)
+            gUndoStack.pop_back();
+         Touch();
+      }
+      sFreeT = FreeTransform();
+   }
+
    bool CancelOp(Scene2DNode* doc)
    {
       const int k = sOp.kind;
@@ -1433,6 +1532,8 @@ namespace
          std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);
       else if (k == 19)
          sZoom = sOp.zoom0, sPan = sOp.pan0;
+      else if (k == 22)
+         sViewAngle = sOp.angle0, sPan = sOp.pan0;
       else if (k != 8 && k != 9 && k != 10 && k != 17)
          return false;
       sOp = Op();
@@ -1545,12 +1646,38 @@ namespace
       }
       if (key(ImGuiKey_Escape) && sOp.kind != 0 && CancelOp(doc))
          return;
+      if (sFreeT.doc != nullptr && (sFreeT.doc != doc || sTool != kMove))
+         EndFreeTransform(sFreeT.doc == doc ? doc : nullptr, true);   // leaving it keeps what was done
+      if (FreeTransformOn(doc) && sOp.kind == 0)
+      {
+         if (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter))
+         {
+            EndFreeTransform(doc, true);
+            return;
+         }
+         if (key(ImGuiKey_Escape))
+         {
+            EndFreeTransform(doc, false);
+            return;
+         }
+      }
+      if (cmd && !shift && key(ImGuiKey_T))
+      {
+         if (FreeTransformOn(doc))
+            EndFreeTransform(doc, true);
+         else
+            BeginFreeTransform(doc);
+         return;
+      }
       if (HandleVectorKeys(doc))
          return;
       HandlePixelKeys(doc, cmd, shift);
       if (key(ImGuiKey_F12))
          sPending.what = cmd ? Pending::RenderAnim : Pending::RenderImage;
-      if (cmd && key(ImGuiKey_0)) FitView(doc);
+      if (cmd && shift && key(ImGuiKey_0))
+         TurnViewAbout(doc, -sViewAngle, ImVec2((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f));
+      else if (cmd && key(ImGuiKey_0))
+         FitView(doc);
       if (cmd && key(ImGuiKey_1)) { sZoom = 1.0f; sPan = ImVec2(0, 0); }
       const ImVec2 mid((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
       if (cmd && (rep(ImGuiKey_Equal) || rep(ImGuiKey_KeypadAdd))) ZoomAt(doc, 1.25f, mid);
@@ -1972,6 +2099,8 @@ namespace
       const ImVec2 from = line && sHaveLast ? sLastPaint : at;
       if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow()))
          return;
+      if (sTool == kBrush && !BrushEngine::LiquifyMode(b.mode))
+         NoteColourUsed(sFg);
       sOp = Op();
       sOp.kind = 7;
       sOp.docStart = at;
@@ -2003,6 +2132,7 @@ namespace
       }
       else if (id > 0 && target == 0)
          doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sAllLayers);
+         NoteColourUsed(sFg);
    }
 
    void GradientTo(Scene2DNode* doc, ImVec2 a, ImVec2 b)
@@ -2032,6 +2162,96 @@ namespace
          doc->SelectPolygon(sPoly, sPolyOp, sFeather);
       }
       sPoly.clear();
+   }
+
+   // Recent colours: the last ten painted or filled with, newest first (this session). Swatches: the ones kept,
+   // saved with the panel settings as "rrggbb,rrggbb,...".
+   struct Rgb
+   {
+      float c[3];
+   };
+   std::vector<Rgb> sRecentCols;
+
+   bool SameColour(const float* a, const float* b)
+   {
+      return std::fabs(a[0] - b[0]) < 0.002f && std::fabs(a[1] - b[1]) < 0.002f && std::fabs(a[2] - b[2]) < 0.002f;
+   }
+
+   void NoteColourUsed(const float* c)
+   {
+      sRecentCols.erase(std::remove_if(sRecentCols.begin(), sRecentCols.end(), [&](const Rgb& r) { return SameColour(r.c, c); }),
+                        sRecentCols.end());
+      sRecentCols.insert(sRecentCols.begin(), Rgb{ { c[0], c[1], c[2] } });
+      if (sRecentCols.size() > 10)
+         sRecentCols.resize(10);
+   }
+
+   std::vector<Rgb> Swatches()
+   {
+      std::vector<Rgb> out;
+      size_t at = 0;
+      while (at + 6 <= gView2DSwatches.size())
+      {
+         unsigned v = 0;
+         if (std::sscanf(gView2DSwatches.c_str() + at, "%6x", &v) == 1)
+            out.push_back(Rgb{ { ((v >> 16) & 255) / 255.0f, ((v >> 8) & 255) / 255.0f, (v & 255) / 255.0f } });
+         at += 7;
+      }
+      return out;
+   }
+
+   void SetSwatches(const std::vector<Rgb>& list)
+   {
+      std::string s;
+      char hex[8];
+      for (const Rgb& r : list)
+      {
+         auto byte = [](float f) { return (unsigned)std::lround(std::clamp(f, 0.0f, 1.0f) * 255.0f); };
+         std::snprintf(hex, sizeof(hex), "%02x%02x%02x", byte(r.c[0]), byte(r.c[1]), byte(r.c[2]));
+         s += (s.empty() ? "" : ",") + std::string(hex);
+      }
+      gView2DSwatches = s;
+   }
+
+   // A row of colour chips; a click returns its index, a right click its index in `removed`.
+   int ColourChips(const char* id, const std::vector<Rgb>& list, bool addChip, int* removed)
+   {
+      const float sq = 16.0f, gap = 3.0f;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 edge = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      int picked = -1;
+      ImGui::PushID(id);
+      const int n = (int)list.size() + (addChip ? 1 : 0);
+      for (int i = 0; i < n; i++)
+      {
+         if (i > 0 && i % 10 != 0)
+            ImGui::SameLine(0.0f, gap);
+         ImGui::PushID(i);
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         ImGui::InvisibleButton("##chip", ImVec2(sq, sq));
+         if (i < (int)list.size())
+         {
+            const float* c = list[i].c;
+            dl->AddRectFilled(p, ImVec2(p.x + sq, p.y + sq), ImGui::GetColorU32(ImVec4(c[0], c[1], c[2], 1.0f)), tok::radius_cell);
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+               picked = i;
+            if (removed != nullptr && ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               *removed = i;
+         }
+         else
+         {
+            const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text);
+            const ImVec2 c(p.x + sq * 0.5f, p.y + sq * 0.5f);
+            dl->AddLine(ImVec2(c.x - 4, c.y), ImVec2(c.x + 4, c.y), ink, 1.2f);
+            dl->AddLine(ImVec2(c.x, c.y - 4), ImVec2(c.x, c.y + 4), ink, 1.2f);
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+               picked = i;
+         }
+         dl->AddRect(p, ImVec2(p.x + sq, p.y + sq), ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : edge, tok::radius_cell);
+         ImGui::PopID();
+      }
+      ImGui::PopID();
+      return picked;
    }
 
    void SwapColours()
@@ -2209,6 +2429,8 @@ namespace
       sOp.kind = kind;
       sOp.start = mouse;
       sOp.pan0 = sPan;
+      if (FreeTransformOn(doc) && (kind == 1 || kind == 2 || kind == 3 || kind == 20 || kind == 21))
+         undo = nullptr;   // the free transform's one step covers it
       if (undo != nullptr)
       {
          sOp.undo0 = gUndoStack.size();
@@ -2260,8 +2482,8 @@ namespace
          if (std::fabs(mouse.x - p.x) <= kHandle && std::fabs(mouse.y - p.y) <= kHandle)
             return i;
       }
-      const ImVec2 a = ToScreen(doc, lo[0], lo[1]), b = ToScreen(doc, hi[0], hi[1]);
-      const bool inside = mouse.x >= a.x && mouse.x <= b.x && mouse.y >= a.y && mouse.y <= b.y;
+      const ImVec2 md = ToDoc(doc, mouse);
+      const bool inside = md.x >= lo[0] && md.x <= hi[0] && md.y >= lo[1] && md.y <= hi[1];
       for (int i = 0; i < 8; i += 2)
       {
          const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
@@ -2746,7 +2968,8 @@ namespace
 
    void MoveSelection(Scene2DNode* doc, ImVec2 mouse)
    {
-      float dx = (mouse.x - sOp.start.x) / sZoom, dy = (mouse.y - sOp.start.y) / sZoom;
+      const ImVec2 dd = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
+      float dx = dd.x, dy = dd.y;
       if (ImGui::GetIO().KeyShift)
          (std::fabs(dx) > std::fabs(dy) ? dy : dx) = 0.0f;
       for (const Layer& b : sOp.before)
@@ -2776,6 +2999,32 @@ namespace
       Touch();
    }
 
+   // The transparency checker on a turned view: cells of 8 screen px laid in document space, only those in sight.
+   void DrawCheckerTurned(ImDrawList* dl, Scene2DNode* doc)
+   {
+      const float w = (float)doc->Doc().w, h = (float)doc->Doc().h, s = 8.0f / std::max(sZoom, 1e-4f);
+      ImVec2 q[4];
+      DocRect(doc, 0, 0, w, h, q);
+      dl->AddQuadFilled(q[0], q[1], q[2], q[3], IM_COL32(255, 255, 255, 255));
+      float lo[2] = { 1e9f, 1e9f }, hi[2] = { -1e9f, -1e9f };
+      const ImVec2 corner[4] = { sViewMn, ImVec2(sViewMx.x, sViewMn.y), sViewMx, ImVec2(sViewMn.x, sViewMx.y) };
+      for (const ImVec2& c : corner)
+      {
+         const ImVec2 p = ToDoc(doc, c);
+         lo[0] = std::min(lo[0], p.x), lo[1] = std::min(lo[1], p.y), hi[0] = std::max(hi[0], p.x), hi[1] = std::max(hi[1], p.y);
+      }
+      const int i0 = std::max(0, (int)std::floor(lo[0] / s)), i1 = std::min((int)std::ceil(w / s), (int)std::ceil(hi[0] / s));
+      const int j0 = std::max(0, (int)std::floor(lo[1] / s)), j1 = std::min((int)std::ceil(h / s), (int)std::ceil(hi[1] / s));
+      if ((long long)(i1 - i0) * (j1 - j0) > 40000)
+         return;   // far too small to see: the white is enough
+      for (int j = j0; j < j1; j++)
+         for (int i = i0 + ((i0 + j) % 2 == 0 ? 1 : 0); i < i1; i += 2)
+         {
+            DocRect(doc, i * s, j * s, std::min(w, (i + 1) * s), std::min(h, (j + 1) * s), q);
+            dl->AddQuadFilled(q[0], q[1], q[2], q[3], IM_COL32(204, 204, 204, 255));
+         }
+   }
+
    void DrawChecker(ImDrawList* dl, ImVec2 a, ImVec2 b)
    {
       const float s = 8.0f;
@@ -2799,6 +3048,8 @@ namespace
       const ImU32 bg = ImGui::GetColorU32(ImGuiCol_FrameBg), text = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       dl->AddRectFilled(mn, ImVec2(mx.x, mn.y + kRuler), bg);
       dl->AddRectFilled(mn, ImVec2(mn.x + kRuler, mx.y), bg);
+      if (ViewTurned())
+         return;   // the document's axes no longer run along the rulers
       const float step = RulerStep();
       const ImVec2 o = DocOrigin(doc);
       const float x0 = std::floor(((mn.x + kRuler) - o.x) / sZoom / step) * step;
@@ -2841,14 +3092,15 @@ namespace
       const Scene2DNode::Document& d = doc->Doc();
       if (!d.guidesOn)
          return -1;
+      const ImVec2 md = ToDoc(doc, mouse);
       for (int i = 0; i < (int)d.guidesX.size(); i++)
-         if (std::fabs(ToScreen(doc, d.guidesX[i], 0).x - mouse.x) <= 3.0f)
+         if (std::fabs(d.guidesX[i] - md.x) * sZoom <= 3.0f)
          {
             axis = 0;
             return i;
          }
       for (int i = 0; i < (int)d.guidesY.size(); i++)
-         if (std::fabs(ToScreen(doc, 0, d.guidesY[i]).y - mouse.y) <= 3.0f)
+         if (std::fabs(d.guidesY[i] - md.y) * sZoom <= 3.0f)
          {
             axis = 1;
             return i;
@@ -2899,43 +3151,50 @@ namespace
 
    void DrawCropOverlay(ImDrawList* dl, Scene2DNode* doc)
    {
-      const ImVec2 a = ToScreen(doc, std::min(sCrop[0], sCrop[2]), std::min(sCrop[1], sCrop[3]));
-      const ImVec2 b = ToScreen(doc, std::max(sCrop[0], sCrop[2]), std::max(sCrop[1], sCrop[3]));
+      // Document-space box, so it turns with the view; the dim is four document-space bands around it.
+      const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
+      const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
       const ImU32 dim = IM_COL32(0, 0, 0, 140);
-      dl->AddRectFilled(sViewMn, ImVec2(sViewMx.x, a.y), dim);
-      dl->AddRectFilled(ImVec2(sViewMn.x, b.y), sViewMx, dim);
-      dl->AddRectFilled(ImVec2(sViewMn.x, a.y), ImVec2(a.x, b.y), dim);
-      dl->AddRectFilled(ImVec2(b.x, a.y), ImVec2(sViewMx.x, b.y), dim);
-      dl->AddRect(a, b, IM_COL32(255, 255, 255, 230));
+      const float far = 1e6f;
+      const float band[4][4] = { { -far, -far, far, y0 }, { -far, y1, far, far }, { -far, y0, x0, y1 }, { x1, y0, far, y1 } };
+      ImVec2 q[4];
+      for (const auto& b : band)
+      {
+         DocRect(doc, b[0], b[1], b[2], b[3], q);
+         dl->AddQuadFilled(q[0], q[1], q[2], q[3], dim);
+      }
+      AddDocRect(dl, doc, x0, y0, x1, y1, IM_COL32(255, 255, 255, 230));
       for (int i = 1; i < 3 && sCropThirds; i++)
       {
-         const float x = a.x + (b.x - a.x) * i / 3.0f, y = a.y + (b.y - a.y) * i / 3.0f;
-         dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), IM_COL32(255, 255, 255, 70));
-         dl->AddLine(ImVec2(a.x, y), ImVec2(b.x, y), IM_COL32(255, 255, 255, 70));
+         const float x = x0 + (x1 - x0) * i / 3.0f, y = y0 + (y1 - y0) * i / 3.0f;
+         dl->AddLine(ToScreen(doc, x, y0), ToScreen(doc, x, y1), IM_COL32(255, 255, 255, 70));
+         dl->AddLine(ToScreen(doc, x0, y), ToScreen(doc, x1, y), IM_COL32(255, 255, 255, 70));
       }
       for (int i = 0; i < 8; i++)
       {
-         const ImVec2 p(a.x + (b.x - a.x) * kHandleAt[i][0], a.y + (b.y - a.y) * kHandleAt[i][1]);
+         const ImVec2 p = ToScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
          dl->AddRectFilled(ImVec2(p.x - 4, p.y - 4), ImVec2(p.x + 4, p.y + 4), IM_COL32(255, 255, 255, 255));
       }
    }
 
    int HoverCropHandle(Scene2DNode* doc, ImVec2 mouse)
    {
-      const ImVec2 a = ToScreen(doc, std::min(sCrop[0], sCrop[2]), std::min(sCrop[1], sCrop[3]));
-      const ImVec2 b = ToScreen(doc, std::max(sCrop[0], sCrop[2]), std::max(sCrop[1], sCrop[3]));
+      const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
+      const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
       for (int i = 0; i < 8; i++)
       {
-         const ImVec2 p(a.x + (b.x - a.x) * kHandleAt[i][0], a.y + (b.y - a.y) * kHandleAt[i][1]);
+         const ImVec2 p = ToScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
          if (std::fabs(mouse.x - p.x) <= kHandle && std::fabs(mouse.y - p.y) <= kHandle)
             return i;
       }
-      return mouse.x > a.x && mouse.x < b.x && mouse.y > a.y && mouse.y < b.y ? 8 : -1;
+      const ImVec2 md = ToDoc(doc, mouse);
+      return md.x > x0 && md.x < x1 && md.y > y0 && md.y < y1 ? 8 : -1;
    }
 
    void DragCrop(Scene2DNode* doc, ImVec2 mouse)
    {
-      const float dx = (mouse.x - sOp.start.x) / sZoom, dy = (mouse.y - sOp.start.y) / sZoom;
+      const ImVec2 dd = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
+      const float dx = dd.x, dy = dd.y;
       float c[4];
       std::copy(sOp.crop0, sOp.crop0 + 4, c);
       // Normalise so 0,1 is the low corner.
@@ -3682,6 +3941,8 @@ namespace
          if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"), false, any)) sPending.what = Pending::Cut;
          if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
          if (MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"), false, any)) sPending.what = Pending::Duplicate;
+         if (MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"), FreeTransformOn(doc), any))
+            FreeTransformOn(doc) ? EndFreeTransform(doc, true) : BeginFreeTransform(doc);
          if (MenuParts::Item(T("Delete"), "Delete", false, any)) sPending.what = Pending::Delete;
          MenuParts::Separator();
          NodeChoiceMenu(T("Add Node as Layer"), doc, Pending::AddNode, 0);
@@ -3708,6 +3969,8 @@ namespace
             sZoom = 1.0f;
             sPan = ImVec2(0, 0);
          }
+         if (MenuParts::Item(T("Reset Rotation"), Sc("Ctrl+Shift+0"), false, ViewTurned()))
+            TurnViewAbout(doc, -sViewAngle, ImVec2((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f));
          MenuParts::EndPopup();
       }
       const ImVec2 mp = ImGui::GetIO().MousePos;
@@ -3735,17 +3998,28 @@ namespace
       dl->PushClipRect(mn, mx, true);
       dl->AddRectFilled(mn, mx, Hex(kPasteboard));
       const ImVec2 a = ToScreen(doc, 0, 0), b = ToScreen(doc, (float)d.w, (float)d.h);
-      // The picture: the Scene 2D's own output, so what is seen here is what renders.
+      ImVec2 pq[4];
+      DocRect(doc, 0, 0, (float)d.w, (float)d.h, pq);
+      // The picture: the Scene 2D's own output, so what is seen here is what renders. A quad, so the view can turn.
       dl->PushClipRect(sViewMn, sViewMx, true);
       if (d.background == 3)
-         DrawChecker(dl, a, b);
+      {
+         if (ViewTurned())
+            DrawCheckerTurned(dl, doc);
+         else
+            DrawChecker(dl, a, b);
+      }
+      const ImVec2 uv[4] = { ImVec2(0, 1), ImVec2(1, 1), ImVec2(1, 0), ImVec2(0, 0) };
       if (const unsigned tex = doc->GetOutputTexture())
-         dl->AddImage((ImTextureID)(intptr_t)tex, a, b, ImVec2(0, 1), ImVec2(1, 0));
+         dl->AddImageQuad((ImTextureID)(intptr_t)tex, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       // The selection's marching ants, or the red quick mask, over the picture.
       if (doc->HasSelection() || doc->quickMask)
          if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
-            dl->AddImage((ImTextureID)(intptr_t)ants, a, b, ImVec2(0, 1), ImVec2(1, 0));
-      dl->AddRect(ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), IM_COL32(0, 0, 0, 120));
+            dl->AddImageQuad((ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
+      if (ViewTurned())
+         dl->AddPolyline(pq, 4, IM_COL32(0, 0, 0, 120), ImDrawFlags_Closed, 1.0f);
+      else
+         dl->AddRect(ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), IM_COL32(0, 0, 0, 120));
 
       if (d.grid && d.gridSize > 0.0f)
       {
@@ -3763,9 +4037,9 @@ namespace
       if (d.guidesOn)
       {
          for (float g : d.guidesX)
-            dl->AddLine(ImVec2(ToScreen(doc, g, 0).x, sViewMn.y), ImVec2(ToScreen(doc, g, 0).x, sViewMx.y), Hex(kGuide));
+            dl->AddLine(ToScreen(doc, g, -1e5f), ToScreen(doc, g, 1e5f), Hex(kGuide));
          for (float g : d.guidesY)
-            dl->AddLine(ImVec2(sViewMn.x, ToScreen(doc, 0, g).y), ImVec2(sViewMx.x, ToScreen(doc, 0, g).y), Hex(kGuide));
+            dl->AddLine(ToScreen(doc, -1e5f, g), ToScreen(doc, 1e5f, g), Hex(kGuide));
       }
 
       // Symmetry guides while a painting tool is up: the mirror axes, or the radial spokes, through the centre.
@@ -3805,7 +4079,7 @@ namespace
                {
                   float lo[2], hi[2];
                   if (doc->Bounds(id, lo, hi))
-                     dl->AddRect(ToScreen(doc, lo[0], lo[1]), ToScreen(doc, hi[0], hi[1]), Hex(kOutline), 0.0f, 0, 1.0f);
+                     AddDocRect(dl, doc, lo[0], lo[1], hi[0], hi[1], Hex(kOutline));
                   continue;
                }
                if (l->kind == Kind::Fill || l->kind == Kind::Adjust)
@@ -3855,7 +4129,7 @@ namespace
          float lo[2], hi[2];
          if (SelBounds(doc, lo, hi))
          {
-            dl->AddRect(ToScreen(doc, lo[0], lo[1]), ToScreen(doc, hi[0], hi[1]), Hex(kOutline), 0.0f, 0, 1.0f);
+            AddDocRect(dl, doc, lo[0], lo[1], hi[0], hi[1], Hex(kOutline));
             for (int i = 0; i < 8; i++)
             {
                const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
@@ -3870,7 +4144,7 @@ namespace
       {
          const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y);
          if (std::hypot(mouse.x - p0.x, mouse.y - p0.y) > 6.0f)
-            dl->AddRect(ImVec2(std::min(p0.x, mouse.x), std::min(p0.y, mouse.y)), ImVec2(std::max(p0.x, mouse.x), std::max(p0.y, mouse.y)), Hex(kOutline));
+            AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, Hex(kOutline));
       }
       if (sOp.kind == 1 || sOp.kind == 2)
       {
@@ -3884,19 +4158,21 @@ namespace
       if (sOp.kind == 9)
       {
          const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc);
-         const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y), p1 = ToScreen(doc, e.x, e.y);
          if (sMarqueeShape == 1)
          {
-            const ImVec2 c((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);
-            const ImVec2 rr(std::fabs(p1.x - p0.x) * 0.5f, std::fabs(p1.y - p0.y) * 0.5f);
-            dl->AddEllipse(c, rr, shade, 0.0f, 64, 2.5f);
-            dl->AddEllipse(c, rr, ink, 0.0f, 64, 1.0f);
+            // Traced in document space, so it turns with the view.
+            const float cx = (sOp.docStart.x + e.x) * 0.5f, cy = (sOp.docStart.y + e.y) * 0.5f;
+            const float rx = std::fabs(e.x - sOp.docStart.x) * 0.5f, ry = std::fabs(e.y - sOp.docStart.y) * 0.5f;
+            ImVec2 ring[64];
+            for (int i = 0; i < 64; i++)
+               ring[i] = ToScreen(doc, cx + rx * std::cos(i * 6.2831853f / 64.0f), cy + ry * std::sin(i * 6.2831853f / 64.0f));
+            dl->AddPolyline(ring, 64, shade, ImDrawFlags_Closed, 2.5f);
+            dl->AddPolyline(ring, 64, ink, ImDrawFlags_Closed, 1.0f);
          }
          else
          {
-            const ImVec2 lo(std::min(p0.x, p1.x), std::min(p0.y, p1.y)), hi(std::max(p0.x, p1.x), std::max(p0.y, p1.y));
-            dl->AddRect(lo, hi, shade, 0.0f, 0, 2.5f);
-            dl->AddRect(lo, hi, ink, 0.0f, 0, 1.0f);
+            AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, e.x, e.y, shade, 2.5f);
+            AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, e.x, e.y, ink, 1.0f);
          }
       }
       auto drawPath = [&](const std::vector<float>& pts, bool toMouse)
@@ -3918,9 +4194,10 @@ namespace
          drawPath(sPoly, true);
       if (sOp.kind == 17)
       {
-         const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y);
-         dl->AddRectFilled(p0, mouse, IM_COL32(80, 160, 255, 40));
-         dl->AddRect(p0, mouse, IM_COL32(80, 160, 255, 220), 0.0f, 0, 1.0f);
+         ImVec2 q[4];
+         DocRect(doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, q);
+         dl->AddQuadFilled(q[0], q[1], q[2], q[3], IM_COL32(80, 160, 255, 40));
+         dl->AddPolyline(q, 4, IM_COL32(80, 160, 255, 220), ImDrawFlags_Closed, 1.0f);
       }
       if (sOp.kind == 8)
       {
@@ -3963,6 +4240,16 @@ namespace
             sZoomVel += io.MouseWheel * (pinch ? 0.10f : 0.045f);
             sZoomAt = mouse;
          }
+      }
+      {
+         // A two-finger turn on the trackpad turns the view about the pointer. Drained every frame so a turn made
+         // elsewhere never lands here later.
+         static int sRotFrame = -2;
+         const double turn = Platform::PollTrackpadRotationDelta();
+         const bool fresh = sRotFrame == ImGui::GetFrameCount() - 1;
+         sRotFrame = ImGui::GetFrameCount();
+         if (hovered && fresh && turn != 0.0 && sOp.kind == 0)
+            TurnViewAbout(doc, -(float)turn * 3.14159265f / 180.0f, mouse);
       }
       if (std::fabs(sZoomVel) > 0.0005f)
       {
@@ -4021,7 +4308,13 @@ namespace
 
       const bool inRulerTop = d.rulers && mouse.y < mn.y + kRuler && mouse.x > mn.x + kRuler;
       const bool inRulerLeft = d.rulers && mouse.x < mn.x + kRuler && mouse.y > mn.y + kRuler;
-      if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Middle) || (panTool && ImGui::IsMouseClicked(ImGuiMouseButton_Left))))
+      if (hovered && space && io.KeyShift && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         // Shift + Space drag turns the view about its centre (Krita's key; R is Blur / Sharpen here).
+         BeginOp(doc, 22, mouse, nullptr);
+         sOp.angle0 = sViewAngle;
+      }
+      else if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Middle) || (panTool && ImGui::IsMouseClicked(ImGuiMouseButton_Left))))
          BeginOp(doc, 4, mouse, nullptr);
       else if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
       {
@@ -4244,6 +4537,14 @@ namespace
             WarpActive(doc, mouse);
          else if (sOp.kind == 4)
             sPan = ImVec2(sOp.pan0.x + mouse.x - sOp.start.x, sOp.pan0.y + mouse.y - sOp.start.y);
+         else if (sOp.kind == 22)
+         {
+            const ImVec2 vc((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
+            const float turn = std::atan2(mouse.y - vc.y, mouse.x - vc.x) - std::atan2(sOp.start.y - vc.y, sOp.start.x - vc.x);
+            sViewAngle = sOp.angle0;
+            sPan = sOp.pan0;
+            TurnViewAbout(doc, SnapViewAngle(sOp.angle0 + turn) - sOp.angle0, vc);
+         }
          else if (sOp.kind == 5)
             DragCrop(doc, mouse);
          else if (sOp.kind == 19)
@@ -4734,10 +5035,12 @@ namespace
                static const int kReliefOf[4] = { BrushEngine::kNormal, BrushEngine::kStack, BrushEngine::kPress, BrushEngine::kErase };
                static const char* kMarbleNames[3] = { "Drop", "Comb", "Swirl" };
                static const int kMarbleOf[3] = { BrushEngine::kDrop, BrushEngine::kComb, BrushEngine::kSwirl };
-               const bool marble = BrushEngine::MarbleMode(b.mode);
-               const char* const* names = b.relief >= 0 ? kReliefNames : marble ? kMarbleNames : kModeNames;
-               const int* of = b.relief >= 0 ? kReliefOf : marble ? kMarbleOf : kModeOf;
-               const int count = b.relief >= 0 ? 4 : marble ? 3 : 5;
+               static const char* kLiquifyNames[4] = { "Push", "Twirl", "Bloat", "Pinch" };
+               static const int kLiquifyOf[4] = { BrushEngine::kPush, BrushEngine::kTwirl, BrushEngine::kBloat, BrushEngine::kPinch };
+               const bool marble = BrushEngine::MarbleMode(b.mode), liquify = BrushEngine::LiquifyMode(b.mode);
+               const char* const* names = b.relief >= 0 ? kReliefNames : marble ? kMarbleNames : liquify ? kLiquifyNames : kModeNames;
+               const int* of = b.relief >= 0 ? kReliefOf : marble ? kMarbleOf : liquify ? kLiquifyOf : kModeOf;
+               const int count = b.relief >= 0 ? 4 : marble ? 3 : liquify ? 4 : 5;
                int m = 0;
                for (int i = 0; i < count; i++)
                   if (of[i] == b.mode)
@@ -5584,7 +5887,32 @@ namespace
       for (int i = 0; i < 2; i++)
          if (ImGui::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
          {
-            ImGui::ColorPicker3("##pick", i == 0 ? sFg : sBg, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview);
+            float* col = i == 0 ? sFg : sBg;
+            ImGui::ColorPicker3("##pick", col, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview);
+            if (!sRecentCols.empty())
+            {
+               ImGui::TextDisabled("%s", T("Recent"));
+               const int r = ColourChips("##recent", sRecentCols, false, nullptr);
+               if (r >= 0)
+                  std::copy(sRecentCols[r].c, sRecentCols[r].c + 3, col);
+            }
+            ImGui::TextDisabled("%s", T("Swatches"));
+            std::vector<Rgb> sw = Swatches();
+            int removed = -1;
+            const int k = ColourChips("##swatches", sw, true, &removed);
+            if (k == (int)sw.size())
+            {
+               if (std::none_of(sw.begin(), sw.end(), [&](const Rgb& r) { return SameColour(r.c, col); }))
+                  sw.push_back(Rgb{ { col[0], col[1], col[2] } });
+               SetSwatches(sw);
+            }
+            else if (k >= 0)
+               std::copy(sw[k].c, sw[k].c + 3, col);
+            if (removed >= 0)
+            {
+               sw.erase(sw.begin() + removed);
+               SetSwatches(sw);
+            }
             ImGui::EndPopup();
          }
    }
@@ -8248,6 +8576,73 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("a document to test on", false);
       return fails;
    }
+   // Canvas rotate: a turned view maps screen to document and back exactly, turning about the pointer keeps the
+   // document point under it fixed, and Esc during a turn puts the view back.
+   {
+      const float zoom0 = sZoom, angle0 = sViewAngle;
+      const ImVec2 pan0 = sPan, mn0 = sViewMn, mx0 = sViewMx;
+      sViewMn = ImVec2(0, 0), sViewMx = ImVec2(800, 600), sZoom = 0.5f, sPan = ImVec2(13, -7), sViewAngle = 0.0f;
+      const ImVec2 pin(250, 180), under = ToDoc(doc, pin);
+      TurnViewAbout(doc, 30.0f * 3.14159265f / 180.0f, pin);
+      const ImVec2 still = ToDoc(doc, pin);
+      expect("turning about the pointer keeps the document point under it", std::fabs(still.x - under.x) < 0.01f && std::fabs(still.y - under.y) < 0.01f);
+      const ImVec2 s0 = ToScreen(doc, 37.0f, 91.0f), back = ToDoc(doc, s0);
+      expect("a turned view maps document to screen and back", std::fabs(back.x - 37.0f) < 0.01f && std::fabs(back.y - 91.0f) < 0.01f);
+      const ImVec2 sx = ToScreen(doc, 1.0f, 0.0f), so = ToScreen(doc, 0.0f, 0.0f);
+      expect("the view turns by the asked angle", std::fabs(std::atan2(sx.y - so.y, sx.x - so.x) - 30.0f * 3.14159265f / 180.0f) < 1e-3f);
+      expect("near a 15 degree step the turn settles on it", std::fabs(SnapViewAngle(46.5f * 3.14159265f / 180.0f) - 45.0f * 3.14159265f / 180.0f) < 1e-5f);
+      sOp = Op();
+      BeginOp(doc, 22, ImVec2(600, 300), nullptr);
+      sOp.angle0 = sViewAngle;
+      const ImVec2 panTurn = sPan;
+      TurnViewAbout(doc, 1.0f, ImVec2(400, 300));
+      CancelOp(doc);
+      expect("Esc during a turn puts the view back", std::fabs(sViewAngle - 30.0f * 3.14159265f / 180.0f) < 1e-5f && std::fabs(sPan.x - panTurn.x) < 1e-3f && std::fabs(sPan.y - panTurn.y) < 1e-3f);
+      sOp = Op();
+      sZoom = zoom0, sPan = pan0, sViewAngle = angle0, sViewMn = mn0, sViewMx = mx0;
+   }
+   // Swatches round-trip through their saved text; recent colours keep ten, newest first, no repeats.
+   {
+      const std::string keep = gView2DSwatches;
+      const std::vector<Rgb> was = sRecentCols;
+      SetSwatches({ Rgb{ { 1.0f, 0.5f, 0.0f } }, Rgb{ { 0.0f, 0.0f, 1.0f } } });
+      const std::vector<Rgb> sw = Swatches();
+      expect("swatches save and load", gView2DSwatches == "ff8000,0000ff" && sw.size() == 2 && std::fabs(sw[0].c[1] - 128 / 255.0f) < 1e-4f);
+      sRecentCols.clear();
+      for (int i = 0; i < 12; i++)
+      {
+         const float c[3] = { i / 12.0f, 0.0f, 0.0f };
+         NoteColourUsed(c);
+      }
+      const float again[3] = { 5 / 12.0f, 0.0f, 0.0f }, last[3] = { 11 / 12.0f, 0.0f, 0.0f };
+      NoteColourUsed(again);
+      expect("recent colours keep ten, newest first, no repeats", sRecentCols.size() == 10 && SameColour(sRecentCols[0].c, again)
+                                                                   && !SameColour(sRecentCols[6].c, again) && SameColour(sRecentCols[1].c, last));
+      gView2DSwatches = keep;
+      sRecentCols = was;
+   }
+   // Free transform: drags inside it share one undo step; Esc puts the layer back, Enter keeps it.
+   if (Layer* a = Active(doc))
+   {
+      const int id = a->id;
+      const float x0 = a->x;
+      const size_t depth = gUndoStack.size();
+      BeginFreeTransform(doc);
+      expect("Cmd+T starts a free transform", FreeTransformOn(doc) && gUndoStack.size() == depth + 1);
+      BeginOp(doc, 1, ImVec2(0, 0), "Move layer");
+      sOp = Op();
+      BeginOp(doc, 3, ImVec2(0, 0), "Rotate layer");
+      sOp = Op();
+      doc->FindLayer(id)->x = x0 + 40.0f;
+      expect("drags inside a free transform add no steps of their own", gUndoStack.size() == depth + 1);
+      EndFreeTransform(doc, false);
+      expect("Esc puts the layer back and drops the step", doc->FindLayer(id)->x == x0 && gUndoStack.size() == depth && !FreeTransformOn(doc));
+      BeginFreeTransform(doc);
+      doc->FindLayer(id)->x = x0 + 40.0f;
+      EndFreeTransform(doc, true);
+      expect("Enter keeps the transform as one step", doc->FindLayer(id)->x == x0 + 40.0f && gUndoStack.size() == depth + 1);
+      doc->FindLayer(id)->x = x0;
+   }
    // Effects menu: each pick adds that adjustment, not always the first (Pixelate).
    for (int type : { (int)Scene2DNode::kAdjThreshold, (int)Scene2DNode::kAdjPosterize, (int)Scene2DNode::kAdjHalftone })
    {
@@ -9236,7 +9631,7 @@ namespace
    }
 }
 
-int View2DAuditStateCount() { return 7 * kAuditKinds + kToolCount + 4; }
+int View2DAuditStateCount() { return 7 * kAuditKinds + kToolCount + 8; }
 
 // Puts the panel into state i and returns its name ("Effects / text", "tool Brush", "dock top"); empty past the end.
 std::string View2DAuditState(int i)
@@ -9249,6 +9644,15 @@ std::string View2DAuditState(int i)
    sSideOpen = true;
    sOp = Op();
    sRename = 0;
+   // The last states (relief, curves, marbling, liquify) dress the audit layers and the brush; every state starts
+   // from them undressed so the earlier states read the same as before.
+   static int sAuditAdjWas = -1;
+   if (Layer* p = doc->FindLayer(sAuditIds[0]); p != nullptr && p->relief)
+      p->relief = false, doc->Commit();
+   if (Layer* a = doc->FindLayer(sAuditIds[6]); a != nullptr && sAuditAdjWas >= 0)
+      a->adjType = sAuditAdjWas, sAuditAdjWas = -1, doc->Commit();
+   if (BrushEngine::WarpMode(sBrush.mode))
+      sBrush.mode = BrushEngine::kNormal;
    auto select = [&](int k) {
       sSel.clear();
       if (k < kAuditKinds - 1 && doc->FindLayer(sAuditIds[k]) != nullptr)
@@ -9313,6 +9717,34 @@ std::string View2DAuditState(int i)
          }
       doc->Commit();
       return "three picked";
+   }
+   if (i >= 4)
+   {
+      gView2DDock = 0;
+      if (i == 4 || i == 5)
+      {
+         // The Relief card (a paint layer with relief on) and the Curves graph (an adjustment set to Curves).
+         sTab = 1;
+         select(i == 4 ? 0 : 6);
+         if (i == 4)
+         {
+            if (Layer* p = doc->FindLayer(sAuditIds[0]))
+               p->relief = true;
+         }
+         else if (Layer* a = doc->FindLayer(sAuditIds[6]))
+         {
+            sAuditAdjWas = a->adjType;
+            a->adjType = Scene2DNode::kAdjCurves;
+         }
+         doc->Commit();
+         return i == 4 ? "relief card" : "curves editor";
+      }
+      // The brush bar with a marbling comb (Mode + Tines) or a Liquify brush (its own Mode list).
+      sTab = 0;
+      select(0);
+      sTool = kBrush;
+      sBrush.mode = i == 6 ? BrushEngine::kComb : BrushEngine::kPinch;
+      return i == 6 ? "brush marbling" : "brush liquify";
    }
    sTab = 1;
    select(0);

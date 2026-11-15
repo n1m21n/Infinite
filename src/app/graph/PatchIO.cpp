@@ -493,6 +493,8 @@ namespace app
             ;
          else if (key == "panelView2DTools")
             gView2DTools = val;
+         else if (key == "panelView2DSwatches")
+            gView2DSwatches = val;
          else if (key == "panelStudioDock")
             gSampleStudioDock = (val == "3") ? 3 : 0;
       }
@@ -540,6 +542,8 @@ namespace app
       ViewDockWrite(file);
       if (!gView2DTools.empty())
          file << "panelView2DTools=" << gView2DTools << "\n";
+      if (!gView2DSwatches.empty())
+         file << "panelView2DSwatches=" << gView2DSwatches << "\n";
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
       file << "panelPianoRollH=" << gPianoRollHeight << "\n";
       file << "panelPianoRollDock=" << gPianoRollDock << "\n";

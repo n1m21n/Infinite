@@ -5943,6 +5943,7 @@ bool ViewDockReadKey(const std::string& key, const std::string& val);
 // Self-test: one step per frame from frame 4; true once the five docks are checked.
 bool View2DDockTestStep(int frameId);
 extern std::string gView2DTools; // the 2D View tool strip: order, "-" marks hidden
+extern std::string gView2DSwatches; // the 2D View colour swatches: "rrggbb,rrggbb,..."
 extern bool gView2DClaimedKeys;
 extern ImVec2 gView2DRectMin, gView2DRectMax;
 void DrawView2DDocked(const char* id, const ImVec2& size);

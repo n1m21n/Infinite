@@ -386,6 +386,13 @@ namespace Platform
       return 0.0;
    }
 
+
+   double PollTrackpadRotationDelta()
+   {
+      // Windows precision touchpads expose no rotate gesture to GLFW.
+      return 0.0;
+   }
+
    double ProcessRssMb()
    {
       PROCESS_MEMORY_COUNTERS counters = {};

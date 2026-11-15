@@ -86,6 +86,35 @@ static std::atomic<double> gPendingTrackpadMagnification{0.0};
 }
 @end
 
+// Backs Platform::PollTrackpadRotationDelta(): the same running-total-to-delta
+// bookkeeping for NSRotationGestureRecognizer (degrees). Both recognizers are
+// allowed to run at once, so a pinch that also turns still zooms.
+static std::atomic<double> gPendingTrackpadRotation{0.0};
+
+@interface InfiniteRotateGestureHandler : NSObject <NSGestureRecognizerDelegate>
+@property(nonatomic, assign) CGFloat lastRotation;
+- (void)handleRotate:(NSRotationGestureRecognizer*)recognizer;
+@end
+
+@implementation InfiniteRotateGestureHandler
+- (void)handleRotate:(NSRotationGestureRecognizer*)recognizer
+{
+   if (recognizer.state == NSGestureRecognizerStateBegan)
+      self.lastRotation = 0.0;
+   const CGFloat delta = recognizer.rotationInDegrees - self.lastRotation;
+   self.lastRotation = recognizer.rotationInDegrees;
+   double expected = gPendingTrackpadRotation.load(std::memory_order_relaxed);
+   while (!gPendingTrackpadRotation.compare_exchange_weak(
+      expected, expected + (double)delta, std::memory_order_relaxed))
+   {
+   }
+}
+- (BOOL)gestureRecognizer:(NSGestureRecognizer*)a shouldRecognizeSimultaneouslyWithGestureRecognizer:(NSGestureRecognizer*)b
+{
+   return YES;
+}
+@end
+
 namespace
 {
    // One display's refresh clock for projector pacing (see
@@ -260,6 +289,24 @@ namespace Platform
          [window.contentView addGestureRecognizer:recognizer];
       }
       return gPendingTrackpadMagnification.exchange(0.0, std::memory_order_relaxed);
+   }
+
+   double PollTrackpadRotationDelta()
+   {
+      static InfiniteRotateGestureHandler* sHandler = nil;
+      if (sHandler == nil)
+      {
+         // Same lazy attach as the pinch: the GLFW window appears after the first calls.
+         NSWindow* window = [NSApp keyWindow] ?: [NSApp mainWindow];
+         if (window == nil || window.contentView == nil)
+            return 0.0;
+         sHandler = [[InfiniteRotateGestureHandler alloc] init];
+         NSRotationGestureRecognizer* recognizer = [[NSRotationGestureRecognizer alloc]
+            initWithTarget:sHandler action:@selector(handleRotate:)];
+         recognizer.delegate = sHandler;
+         [window.contentView addGestureRecognizer:recognizer];
+      }
+      return gPendingTrackpadRotation.exchange(0.0, std::memory_order_relaxed);
    }
 
    // The crashreporter daemon writes the `.ips` report without app-side
