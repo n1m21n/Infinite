@@ -113,6 +113,8 @@ namespace
    const char* AdjFmt(int t)
    {
       using S = Scene2DNode;
+      if (t == S::kAdjShadowsHighlights)
+         return "%.0f px";
       return t == S::kAdjPixelate || t == S::kAdjHalftone || t == S::kAdjDither || t == S::kAdjPosterize || t == S::kAdjHue ? "%.0f" : "%.2f";
    }
    float sBrushHue = 0.0f;   // degrees, turns the colour each stroke starts with (sound as a paint input)
@@ -1084,9 +1086,32 @@ namespace
    int sCurveDrag = -1;
    int sCurveLayer = 0;
    uint64_t sCurveDoc = 0;         // the drag belongs to one layer of one document
-   void CurveEditor(Layer& l)
+   std::vector<float> sHist;   // the document's luminance histogram, refreshed every half second
+   double sHistAt = -1.0;
+   uint64_t sHistDoc = 0;
+   const std::vector<float>& DocHistogram(Scene2DNode* doc)
    {
-      std::vector<float>& c = l.curve;
+      if (doc != nullptr && (ImGui::GetTime() - sHistAt > 0.5 || sHistDoc != sDocUid))
+      {
+         sHistAt = ImGui::GetTime();
+         sHistDoc = sDocUid;
+         if (!doc->Histogram(0, sHist, 64))
+            sHist.clear();
+      }
+      return sHist;
+   }
+   void HistogramUnder(ImDrawList* dl, ImVec2 p0, ImVec2 p1, const std::vector<float>& bins)
+   {
+      const int n = (int)bins.size();
+      for (int i = 0; i < n; i++)
+      {
+         const float x0 = p0.x + (p1.x - p0.x) * i / n, x1 = p0.x + (p1.x - p0.x) * (i + 1) / n;
+         dl->AddRectFilled(ImVec2(x0, p1.y - (p1.y - p0.y) * bins[i]), ImVec2(x1, p1.y), ImGui::GetColorU32(ImGuiCol_Border));
+      }
+   }
+
+   void CurveEditor(std::vector<float>& c, int key, const std::vector<float>* hist = nullptr)
+   {
       if (c.size() < 4)
          c = { 0.0f, 0.0f, 1.0f, 1.0f };
       const float w = ImGui::GetContentRegionAvail().x, h = std::min(w, 180.0f);
@@ -1095,6 +1120,8 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 p1(p0.x + w, p0.y + h);
       dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_field);
+      if (hist != nullptr)
+         HistogramUnder(dl, p0, p1, *hist);
       for (int i = 1; i < 4; i++)
       {
          const float fx = p0.x + w * i / 4.0f, fy = p0.y + h * i / 4.0f;
@@ -1124,7 +1151,7 @@ namespace
       else if (ImGui::IsItemActivated())
       {
          PushUndoCheckpoint("Curves");
-         sCurveLayer = l.id;
+         sCurveLayer = key;
          sCurveDoc = sDocUid;
          sCurveDrag = near;
          if (near < 0 && n < 16)
@@ -1137,7 +1164,7 @@ namespace
             changed = true;
          }
       }
-      if (ImGui::IsItemActive() && sCurveLayer == l.id && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / 2)
+      if (ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / 2)
       {
          const int i = sCurveDrag, last = (int)c.size() / 2 - 1;
          float x = mx;
@@ -1169,22 +1196,10 @@ namespace
          Touch();
    }
 
-   // The rows an adjustment has besides its amount (Levels' four ends, the Curves graph).
-   void AdjExtras(Layer& l)
-   {
-      if (l.adjType == Scene2DNode::kAdjLevels)
-      {
-         SliderRow(T("Input black"), &l.levels[0], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Input white"), &l.levels[1], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Output black"), &l.levels[2], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Output white"), &l.levels[3], 0.0f, 1.0f, "%.2f");
-      }
-      if (l.adjType == Scene2DNode::kAdjCurves)
-         CurveEditor(l);
-   }
    const char* AdjAmountLabel(int t)
    {
-      return t == Scene2DNode::kAdjLevels ? "Gamma" : "Amount";
+      using S = Scene2DNode;
+      return t == S::kAdjLevels ? "Gamma" : t == S::kAdjPhotoFilter ? "Density" : t == S::kAdjShadowsHighlights ? "Radius" : "Amount";
    }
 
    bool IntRow(const char* label, int* v)
@@ -1261,6 +1276,125 @@ namespace
       return changed;
    }
 
+   // The rows an adjustment has besides its amount: Levels and Curves per channel (with the picture's histogram and
+   // Auto), and the settings of the newer adjustments. T is a Layer or an Effect: both hold the same fields.
+   int sAdjCh = 0;          // 0 the master, 1..3 red, green, blue
+   int sAdjTone = 1;        // Colour Balance: shadows, midtones, highlights
+   int sAdjRange = 0;       // Selective Colour: which colours
+   int sAdjOut = 0;         // Channel Mixer: which output
+   template <class A> void AdjExtras(A& x, int key, Scene2DNode* doc)
+   {
+      using S = Scene2DNode;
+      const int t = x.adjType;
+      const int np = S::AdjParamCount(t);
+      if ((int)x.adjP.size() < np)
+      {
+         const std::vector<float> def = S::AdjParamDefault(t);
+         for (int i = (int)x.adjP.size(); i < np; i++)
+            x.adjP.push_back(def[(size_t)i]);
+      }
+      float* p = x.adjP.data();
+      if (t == S::kAdjLevels || t == S::kAdjCurves)
+      {
+         ComboRow(T("Channel"), &sAdjCh, { T("RGB"), T("Red"), T("Green"), T("Blue") });
+         sAdjCh = std::clamp(sAdjCh, 0, 3);
+      }
+      if (t == S::kAdjLevels)
+      {
+         float* lv = sAdjCh == 0 ? x.levels : x.levelsCh[sAdjCh - 1];
+         const std::vector<float>& h = DocHistogram(doc);
+         if (!h.empty())
+         {
+            const float w = ImGui::GetContentRegionAvail().x;
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            ImGui::Dummy(ImVec2(w, 40.0f));
+            HistogramUnder(ImGui::GetWindowDrawList(), p0, ImVec2(p0.x + w, p0.y + 40.0f), h);
+         }
+         SliderRow(T("Input black"), &lv[0], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Input white"), &lv[1], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Output black"), &lv[2], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Output white"), &lv[3], 0.0f, 1.0f, "%.2f");
+         float autoLv[3][4];
+         if (ActionButton::Draw((std::string(T("Auto")) + "##v2dauto" + std::to_string(key)).c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
+             doc != nullptr && doc->AutoLevels(0, autoLv))
+         {
+            PushUndoCheckpoint("Auto levels");
+            for (int ch = 0; ch < 3; ch++)
+               std::copy(autoLv[ch], autoLv[ch] + 4, x.levelsCh[ch]);
+            Touch();
+         }
+      }
+      if (t == S::kAdjCurves)
+         CurveEditor(sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1], key * 4 + sAdjCh, &DocHistogram(doc));
+      if (t == S::kAdjColorBalance)
+      {
+         ComboRow(T("Tone"), &sAdjTone, { T("Shadows"), T("Midtones"), T("Highlights") });
+         sAdjTone = std::clamp(sAdjTone, 0, 2);
+         float* q = p + sAdjTone * 3;
+         SliderRow(T("Cyan - Red"), &q[0], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Magenta - Green"), &q[1], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Yellow - Blue"), &q[2], -1.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjSelective)
+      {
+         ComboRow(T("Colours"), &sAdjRange, { T("Reds"), T("Yellows"), T("Greens"), T("Cyans"), T("Blues"), T("Magentas"),
+                                             T("Whites"), T("Neutrals"), T("Blacks") });
+         sAdjRange = std::clamp(sAdjRange, 0, 8);
+         float* q = p + sAdjRange * 4;
+         SliderRow(T("Cyan"), &q[0], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Magenta"), &q[1], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Yellow"), &q[2], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Black"), &q[3], -1.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjMixer)
+      {
+         bool mono = p[9] > 0.5f;
+         if (BoolRow(T("Monochrome"), &mono))
+            p[9] = mono ? 1.0f : 0.0f;
+         if (!mono)
+         {
+            ComboRow(T("Output"), &sAdjOut, { T("Red"), T("Green"), T("Blue") });
+            sAdjOut = std::clamp(sAdjOut, 0, 2);
+         }
+         float* q = p + (mono ? 0 : sAdjOut) * 3;
+         SliderRow(T("Red"), &q[0], -2.0f, 2.0f, "%.2f");
+         SliderRow(T("Green"), &q[1], -2.0f, 2.0f, "%.2f");
+         SliderRow(T("Blue"), &q[2], -2.0f, 2.0f, "%.2f");
+      }
+      if (t == S::kAdjBlackWhite)
+      {
+         static const char* const kHues[6] = { "Reds", "Yellows", "Greens", "Cyans", "Blues", "Magentas" };
+         for (int i = 0; i < 6; i++)
+            SliderRow(T(kHues[i]), &p[i], 0.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjPhotoFilter)
+      {
+         ColorRow(T("Filter"), x.colorA);
+         bool keep = p[0] > 0.5f;
+         if (BoolRow(T("Keep lightness"), &keep))
+            p[0] = keep ? 1.0f : 0.0f;
+      }
+      if (t == S::kAdjShadowsHighlights)
+      {
+         SliderRow(T("Shadows"), &p[0], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Highlights"), &p[1], 0.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjLookup)
+      {
+         FieldLabel(T("Lookup"));
+         const std::string shown = x.adjFile.empty() ? std::string(T("None")) : x.adjFile.substr(x.adjFile.find_last_of("/\\") + 1);
+         if (ActionButton::Draw((shown + "##v2dcube" + std::to_string(key)).c_str(), ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain))
+         {
+            const std::vector<std::string> got = Platform::OpenFilesDialog(T("Colour lookup"), { "cube" });
+            if (!got.empty())
+            {
+               PushUndoCheckpoint("Colour lookup");
+               x.adjFile = got[0];
+               Touch();
+            }
+         }
+      }
+   }
    // A node picker over every node that can be a layer; 0 = none (when allowed).
    bool NodeRow(const char* label, uint64_t* uid, bool allowNone, Scene2DNode* doc)
    {
@@ -6975,7 +7109,7 @@ namespace
                l->adjDrive = drive;
             if (l->adjDrive > 0)
                SliderRow(T("To"), &l->adjTo, lo, hi, fmt);
-            AdjExtras(*l);
+            AdjExtras(*l, l->id, doc);
             BoolRow(T("Map colours"), &l->adjMap);
          }
          if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
@@ -7212,14 +7346,338 @@ namespace
    }
 
    // Layer effects (Photoshop's Layer Style): each one on or off, with its own settings, for the active layer.
+   // ---- effect stack (Photoshop's smart filters) --------------------------------------------------------------
+   // Node entries: a node the stack owns, kept off the canvas, run on the layer's picture.
+   struct NodeEffectEntry
+   {
+      const char* label;
+      const char* group;
+      const char* type;       // factory name
+      const char* category;
+      bool animated;          // moves by itself: redraws every frame
+      bool toMask;            // its alpha cuts the layer
+   };
+   const NodeEffectEntry kNodeEffects[] = {
+      { "Gaussian Blur", "Blur", "gaussianblur", "Effects", false, false },
+      { "Box Blur", "Blur", "boxblur", "Effects", false, false },
+      { "Motion Blur", "Blur", "motionblur", "Effects", false, false },
+      { "Displace", "Distort", "displace", "Effects", false, false },
+      { "Kaleidoscope", "Distort", "kaleidoscope", "Effects", false, false },
+      { "Bloom", "Stylize", "bloom", "Effects", false, false },
+      { "Audio Color Ramp", "Colour", "Audio Color Ramp", "Compositing", true, false },
+      { "Predictive Coloring", "Colour", "Predictive Coloring", "Prediction", false, false },
+      { "Feedback", "Time", "Feedback", "Compositing", true, false },
+      { "Trails", "Time", "Trails", "Compositing", true, false },
+      { "Time Machine", "Time", "Time Machine", "Compositing", true, false },
+      { "Optical Flow", "Time", "Optical Flow", "Compositing", true, false },
+      { "Fluid", "Sim", "Fluid", "Compositing", true, false },
+      { "Reaction Diffusion", "Sim", "Reaction Diffusion", "Compositing", true, false },
+      { "Field Pixel", "Code", "FieldPixel", "Source", true, false },
+      { "Remove Background", "Mask", "Remove Background", "Compositing", true, true },
+   };
+   const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Stylize", "Colour", "Time", "Sim", "Code", "Mask" };
+
+   struct EffAdd { int layer = 0; int native = -1; int node = -1; uint64_t doc = 0; } sEffAdd;
+   struct EffOp { int layer = 0; int index = -1; int op = 0; uint64_t doc = 0; } sEffOp;   // 1 up, 2 down, 3 delete
+
+   // A param name as a label: "edgeSoftness" -> "Edge softness".
+   std::string ParamLabel(const char* name)
+   {
+      std::string out;
+      for (const char* c = name; *c; c++)
+      {
+         if (std::isupper((unsigned char)*c) && !out.empty())
+         {
+            out += ' ';
+            out += (char)std::tolower((unsigned char)*c);
+         }
+         else
+            out += *c == '_' ? ' ' : *c;
+      }
+      if (!out.empty())
+         out[0] = (char)std::toupper((unsigned char)out[0]);
+      return out;
+   }
+
+   // The owned node's own params, generic (its full body, with modulation, is one "Show on canvas" away).
+   class EffParamRows : public ParamVisitor
+   {
+   public:
+      void Float(const char* name, float& v) override
+      {
+         const std::string label = ParamLabel(name);
+         FieldLabel(label.c_str());
+         ImGui::SetNextItemWidth(sFieldW);
+         FieldWell::PushStyle();
+         const float speed = std::max(0.001f, std::fabs(v) * 0.01f);
+         if (ImGui::DragFloat(FormParts::Id(label.c_str()).c_str(), &v, speed, 0.0f, 0.0f, "%.3g"))
+            Touch();
+         FieldWell::PopStyle();
+         UndoOnActivate("Effect");
+      }
+      void Int(const char* name, int& v) override
+      {
+         const std::string label = ParamLabel(name);
+         if (IntRow(label.c_str(), &v))
+            Touch();
+         UndoOnActivate("Effect");
+      }
+      void Bool(const char* name, bool& v) override { BoolRow(ParamLabel(name).c_str(), &v); }
+      void Text(const char*, std::string&) override {}
+      void Color(const char* name, float rgb[3]) override
+      {
+         float c[4] = { rgb[0], rgb[1], rgb[2], 1.0f };
+         if (ColorRow(ParamLabel(name).c_str(), c))
+            std::copy(c, c + 3, rgb);
+      }
+   };
+
+   void EffectRows(Scene2DNode* doc, Layer& l, int i)
+   {
+      using S = Scene2DNode;
+      S::Effect& e = l.effects[(size_t)i];
+      const std::string name = e.uid != 0 ? e.entry : std::string(T(S::AdjName(e.adjType)));
+      SectionCard::Begin(name.c_str());
+      BoolRow(T("On"), &e.on);
+      FormParts::Inline(0.0f, tok::space_2);
+      const std::string base = "##v2deff" + std::to_string(l.id) + "_" + std::to_string(i);
+      if (i > 0 && IconChip((base + "up").c_str(), IconsInfinite::ChevronUp, false, T("Earlier")))
+         sEffOp = { l.id, i, 1, sDocUid };
+      FormParts::Inline(0.0f, tok::space_1);
+      if (i + 1 < (int)l.effects.size() && IconChip((base + "dn").c_str(), IconsInfinite::ChevronDown, false, T("Later")))
+         sEffOp = { l.id, i, 2, sDocUid };
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove effect")))
+         sEffOp = { l.id, i, 3, sDocUid };
+      if (!e.on)
+         return;
+      SliderRow(T("Opacity"), &e.opacity, 0.0f, 1.0f, "%.2f");
+      if (!e.toMask)
+      {
+         std::vector<std::string> blends;
+         for (const char* b : S::kEffBlendNames)
+            blends.push_back(T(b));
+         ComboRow(T("Blend"), &e.blend, blends);
+      }
+      if (e.uid == 0)
+      {
+         float lo = 0, hi = 1;
+         S::AdjRange(e.adjType, lo, hi);
+         if (e.adjType != S::kAdjGradientMap)
+         {
+            SliderRow(T(AdjAmountLabel(e.adjType)), &e.adjAmt, lo, hi, AdjFmt(e.adjType));
+            AdjExtras(e, 100000 + l.id * 64 + i, doc);
+         }
+         if (e.adjType == S::kAdjGradientMap || e.adjMap)
+         {
+            ColorRow(T("Shadows"), e.colorA);
+            ColorRow(T("Highlights"), e.colorB);
+         }
+         return;
+      }
+      GraphNode* gn = FindNodeByUid(e.uid);
+      if (gn == nullptr)
+      {
+         FieldLabel(T("Node gone"));
+         return;
+      }
+      EffParamRows rows;
+      gn->node->VisitParams(rows);
+      if (ActionButton::Draw((std::string(e.shown ? T("Hide from canvas") : T("Show on canvas")) + base + "show").c_str(), ImVec2(-1.0f, 0.0f),
+                             ActionButton::Kind::Plain))
+      {
+         PushUndoCheckpoint("Show effect node");
+         e.shown = !e.shown;
+         Touch();
+      }
+   }
+
+   void AddEffectMenu(Layer& l)
+   {
+      using S = Scene2DNode;
+      if (ActionButton::Draw((std::string(T("Add effect")) + "##v2deffadd").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+         ImGui::OpenPopup("##v2deffpop");
+      if (!MenuParts::BeginPopup("##v2deffpop"))
+         return;
+      for (const char* g : kEffGroups)
+      {
+         if (!ImGui::BeginMenu(T(g)))
+            continue;
+         for (int t = 0; t < S::kAdjCount; t++)
+            if (std::strcmp(S::AdjGroup(t), g) == 0 && MenuParts::Item(T(S::AdjName(t)), nullptr, false, true))
+               sEffAdd = { l.id, t, -1, sDocUid };
+         for (int k = 0; k < (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])); k++)
+            if (std::strcmp(kNodeEffects[k].group, g) == 0 && MenuParts::Item(T(kNodeEffects[k].label), nullptr, false, true))
+               sEffAdd = { l.id, -1, k, sDocUid };
+         ImGui::EndMenu();
+      }
+      MenuParts::EndPopup();
+   }
+
+   std::string EffPresetDir() { return AppPaths::AppSupportDir() + "/2dfx"; }
+
+   void EffectPresets(Layer& l)
+   {
+      static char name[64] = "";
+      FieldLabel(T("Preset"));
+      ImGui::SetNextItemWidth(sFieldW);
+      FieldWell::PushStyle();
+      ImGui::InputTextWithHint("##v2deffname", T("Name"), name, sizeof name);
+      FieldWell::PopStyle();
+      if (ActionButton::Draw((std::string(T("Save stack")) + "##v2deffsave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
+          name[0] != 0 && !l.effects.empty())
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(EffPresetDir(), ec);
+         std::ofstream f(EffPresetDir() + "/" + name + ".inf2dfx");
+         f << Scene2DNode::EffectsText(l);
+      }
+      std::vector<std::string> files;
+      std::error_code ec;
+      for (const auto& de : std::filesystem::directory_iterator(EffPresetDir(), ec))
+         if (de.path().extension() == ".inf2dfx")
+            files.push_back(de.path().stem().string());
+      if (files.empty())
+         return;
+      std::sort(files.begin(), files.end());
+      int pick = -1;
+      std::vector<std::string> names = { T("Load stack") };
+      names.insert(names.end(), files.begin(), files.end());
+      int shown = 0;
+      if (ComboRow(T("Load"), &shown, names) && shown > 0)
+         pick = shown - 1;
+      if (pick < 0)
+         return;
+      std::ifstream f(EffPresetDir() + "/" + files[(size_t)pick] + ".inf2dfx");
+      std::stringstream ss;
+      ss << f.rdbuf();
+      Layer got = l;
+      if (!Scene2DNode::ParseEffects(ss.str(), got))
+         return;
+      // Node effects come back as new nodes of the same kind, with the saved params left to their defaults' owners:
+      // a preset holds the stack's shape and its native settings.
+      std::vector<Scene2DNode::Effect> keep;
+      for (Scene2DNode::Effect& e : got.effects)
+      {
+         if (e.uid == 0)
+         {
+            keep.push_back(e);
+            continue;
+         }
+         GraphNode* old = FindNodeByUid(e.uid);
+         const std::string type = old != nullptr ? old->typeName : std::string();
+         for (const NodeEffectEntry& ne : kNodeEffects)
+            if (e.entry == ne.label)
+               if (GraphNode* gn = SpawnNode(ne.type, ne.category, 0.0f, 0.0f))
+               {
+                  e.uid = gn->uid;
+                  e.shown = false;
+                  keep.push_back(e);
+               }
+         (void)type;
+      }
+      PushUndoCheckpoint("Load effect stack");
+      for (Scene2DNode::Effect& e : keep)
+         l.effects.push_back(e);
+      Touch();
+   }
+
+   // Adds, moves and removes effects after the rows are drawn (adding spawns nodes, which can move gNodes).
+   void ApplyEffectEdits(Scene2DNode* doc)
+   {
+      using S = Scene2DNode;
+      if (sEffAdd.layer != 0 && sEffAdd.doc == sDocUid)
+         if (Layer* l = doc->FindLayer(sEffAdd.layer))
+         {
+            S::Effect e;
+            if (sEffAdd.native >= 0)
+            {
+               e.adjType = sEffAdd.native;
+               e.adjAmt = S::AdjDefault(e.adjType);
+               e.adjP = S::AdjParamDefault(e.adjType);
+               if (e.adjType == S::kAdjPhotoFilter)
+               {
+                  const float warm[4] = { 0.93f, 0.54f, 0.13f, 1.0f };   // Photoshop's Warming Filter (85)
+                  std::copy(warm, warm + 4, e.colorA);
+               }
+               PushUndoCheckpoint("Add effect");
+               l->effects.push_back(e);
+               Touch();
+            }
+            else if (sEffAdd.node >= 0)
+            {
+               const NodeEffectEntry& ne = kNodeEffects[sEffAdd.node];
+               GraphNode* host = nullptr;
+               for (GraphNode& gn : gNodes)
+                  if (gn.node.get() == doc)
+                     host = &gn;
+               const float x = host != nullptr ? host->liveX - 300.0f : 0.0f, y = host != nullptr ? host->liveY + 200.0f : 0.0f;
+               if (GraphNode* gn = SpawnNode(ne.type, ne.category, x, y))   // checkpoints the undo itself
+               {
+                  e.uid = gn->uid;
+                  e.entry = ne.label;
+                  e.animated = ne.animated;
+                  e.toMask = ne.toMask;
+                  gn->hiddenFromCanvas = true;
+                  if (Layer* again = doc->FindLayer(sEffAdd.layer))
+                     again->effects.push_back(e);
+                  Touch();
+               }
+            }
+         }
+      sEffAdd = {};
+      if (sEffOp.layer != 0 && sEffOp.doc == sDocUid)
+         if (Layer* l = doc->FindLayer(sEffOp.layer))
+         {
+            const int i = sEffOp.index, n = (int)l->effects.size();
+            if (i >= 0 && i < n)
+            {
+               PushUndoCheckpoint("Edit effects");
+               if (sEffOp.op == 1 && i > 0)
+                  std::swap(l->effects[(size_t)i], l->effects[(size_t)i - 1]);
+               else if (sEffOp.op == 2 && i + 1 < n)
+                  std::swap(l->effects[(size_t)i], l->effects[(size_t)i + 1]);
+               else if (sEffOp.op == 3)
+               {
+                  const uint64_t uid = l->effects[(size_t)i].uid;
+                  l->effects.erase(l->effects.begin() + i);
+                  if (GraphNode* gn = uid != 0 ? FindNodeByUid(uid) : nullptr)
+                     RemoveNodeByIndex(gn->index);
+               }
+               Touch();
+            }
+         }
+      sEffOp = {};
+   }
+
+   void EffectStack(Scene2DNode* doc, Layer& l)
+   {
+      SectionCard::Begin(T("Stack"));
+      AddEffectMenu(l);
+      if (!l.effects.empty())
+         NodeRow(T("Mask from"), &l.effMaskUid, true, doc);
+      EffectPresets(l);
+      for (int i = 0; i < (int)l.effects.size(); i++)
+      {
+         ImGui::PushID(1000 + i);
+         EffectRows(doc, l, i);
+         ImGui::PopID();
+      }
+   }
+
    void DrawEffectsTab(Scene2DNode* doc)
    {
       Layer* l = Active(doc);
-      if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Adjust)
+      if (l == nullptr || l->kind == Kind::Adjust)
       {
          CentredText(ImGui::GetCursorScreenPos().y, l == nullptr ? T("No layer selected") : T("No effects here"));
          return;
       }
+      EffectStack(doc, *l);
+      ApplyEffectEdits(doc);
+      l = Active(doc);
+      if (l == nullptr || l->kind == Kind::Group)
+         return;
       for (int t = 0; t < Scene2DNode::kFxCount; t++)
       {
          Scene2DNode::Fx& f = l->fx[t];
@@ -7292,7 +7750,7 @@ namespace
          if (l->adjType != Scene2DNode::kAdjGradientMap)
          {
             SliderRow(T(AdjAmountLabel(l->adjType)), &l->adjAmt, lo, hi, AdjFmt(l->adjType));
-            AdjExtras(*l);
+            AdjExtras(*l, l->id, doc);
          }
          if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
          {
