@@ -42,6 +42,8 @@ using I18n::T;
 bool gView3DOpen = false;
 float gView3DHeight = 420.0f;
 int gView3DDock = 0;
+float gView3DWidth = 620.0f;
+int gView3DDockBack = 0;
 bool gView3DClaimedKeys = false;
 ImVec2 gView3DRectMin, gView3DRectMax;
 
@@ -2398,6 +2400,13 @@ namespace
                it.visible = false;
          scene->Commit();
       }
+      if (command && io.KeyShift && pressed(ImGuiKey_F))
+      {
+         ViewDockToggleFill(3);
+         return;
+      }
+      if (!command && !io.KeyShift && !io.KeyAlt && gView3DDock == 4 && pressed(ImGuiKey_Escape))
+         ViewDockToggleFill(3);   // Esc with no tool busy leaves Fill
       if (command && pressed(ImGuiKey_GraveAccent))
          sOverlays = !sOverlays;
       if (command && pressed(ImGuiKey_G))
@@ -5683,7 +5692,7 @@ namespace
       if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
       ActionButton::RowNext();
       // Pinned right like the Sample Studio's Convert.
-      const float rightX = startX + availW - kIconW;
+      const float rightX = startX + availW - 2.0f * kIconW - tok::space_1;
       if (scene->panelOnly)
       {
          const char* convertL = L("Convert##v3dconvert");
@@ -5697,6 +5706,8 @@ namespace
       }
       ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX));
       if (IconChip("##v3dside", IconsInfinite::Edit, sSideOpen, T("Properties (N)"))) sSideOpen = !sSideOpen;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v3dfill", IconsInfinite::PopOut, gView3DDock == 4, ViewDockFillTip())) ViewDockToggleFill(3);
    }
 
    OutputNode* FindOutput()
@@ -8188,11 +8199,7 @@ namespace
       {
          if (MenuParts::SubMenu(T("Dock Position")))
          {
-            const bool atTop = gView3DDock == 3;
-            if (MenuParts::Item(T("3D View at Bottom"), nullptr, !atTop) && atTop)
-               gView3DDock = 0;
-            if (MenuParts::Item(T("3D View at Top"), nullptr, atTop) && !atTop)
-               gView3DDock = 3;
+            DrawViewDockMenuItems(3);
             ImGui::EndMenu();
          }
          ImGui::Dummy(ImVec2(0.0f, tok::space_1));
@@ -8501,40 +8508,9 @@ void View3DAddNode(GraphNode& gn)
 
 void DrawView3DDocked(const char* id, const ImVec2& size)
 {
-   const float kGrip = PanelFrame::kGap;
-   const bool gripFirst = gView3DDock != 3;
-   ImGui::BeginChild(id, size, false);
-   gView3DRectMin = ImGui::GetWindowPos();
-   gView3DRectMax = ImVec2(gView3DRectMin.x + ImGui::GetWindowSize().x, gView3DRectMin.y + ImGui::GetWindowSize().y);
    gView3DClaimedKeys = false;
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
-   auto grip = [&]()
-   {
-      ImGui::InvisibleButton("##view3dgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
-      DrawPanelSeam(false, gripFirst);
-      if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-      if (ImGui::IsItemActive())
-      {
-         gView3DHeight += gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y;
-         gView3DHeight = std::max(kMinHeight, gView3DHeight);
-      }
-   };
-   if (gripFirst)
-      grip();
-   const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-   const ImVec2 cardSize(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
-   PanelFrame::Insets in;
-   if (gripFirst)
-      in.t = 0.0f;
-   else
-      in.b = 0.0f;
-   PanelFrame::BeginCard("##view3dcontent", cardSize, in);
-   DrawPanel();
-   PanelFrame::EndCard();
-   if (!gripFirst)
-      grip();
-   ImGui::EndChild();
+   DrawViewDocked(id, size, gView3DDock, gView3DHeight, gView3DWidth, "##view3dgrip", "##view3dcontent", gView3DRectMin,
+                  gView3DRectMax, [] { DrawPanel(); });
 }
 
 } // namespace app

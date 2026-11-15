@@ -16,6 +16,7 @@ extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -51,9 +52,92 @@ namespace
    void Cook(Scene2DNode* doc) { doc->CookIfNeeded(++sFrame); }
 }
 
+namespace
+{
+   bool sDockOk = true;
+}
+
+// Sets each of the five docks and reads the rect the view was drawn in, two frames later.
+bool View2DDockTestStep(int frameId)
+{
+   static const char* kNames[5] = { "bottom", "right", "left", "top", "fill" };
+   static const int kOrder[5] = { 0, 3, 1, 2, 4 };
+   static float sTopY = 0.0f;
+   static int sStep = -1, sSetAt = 0;
+   auto Check = [&](const std::string& label, bool pass)
+   {
+      printf("  [%s] dock: %s\n", pass ? "pass" : "FAIL", label.c_str());
+      if (!pass)
+         sDockOk = false;
+   };
+   if (sStep >= 5)
+      return true;
+   if (sStep < 0)
+   {
+      gView2DOpen = true;
+      gView3DOpen = gArrangePanelOpen = gSessionPanelOpen = gSampleStudioOpen = gPianoRollOpen = false;
+      gViewportPanelOpen = gModMatrixOpen = gPerfPanelOpen = gTerminalOpen = gHistoryOpen = false;
+      gView2DHeight = 400.0f;
+      gView2DWidth = 500.0f;
+      sStep = 0;
+      SetViewDock(2, kOrder[0]);
+      sSetAt = frameId;
+      return false;
+   }
+   if (frameId < sSetAt + 3)
+      return false;
+   const int dock = kOrder[sStep];
+   const ImVec2 mn = gView2DRectMin, mx = gView2DRectMax;
+   const ImVec2 disp = ImGui::GetIO().DisplaySize;
+   const float w = mx.x - mn.x, h = mx.y - mn.y;
+   printf("  dock %s: rect %.0f,%.0f .. %.0f,%.0f in a %.0f x %.0f window\n", kNames[dock], mn.x, mn.y, mx.x, mx.y, disp.x, disp.y);
+   switch (dock)
+   {
+      case 0: Check("bottom sits on the window's bottom edge at its height", std::fabs(mx.y - disp.y) < 2.0f && std::fabs(h - 400.0f) < 2.0f && w > disp.x * 0.9f); break;
+      case 3:
+         sTopY = mn.y;
+         Check("top sits under the menu bar at its height", mn.y < 80.0f && std::fabs(h - 400.0f) < 2.0f && w > disp.x * 0.9f);
+         break;
+      case 1: Check("right is a column at its width, right of the canvas", std::fabs(w - 500.0f) < 2.0f && mn.x > gGraphScreenTL.x + 100.0f && std::fabs(mn.y - sTopY) < 2.0f); break;
+      case 2: Check("left is a column at its width, on the window's left edge", std::fabs(w - 500.0f) < 2.0f && mn.x < 2.0f && gGraphScreenTL.x >= mx.x - 1.0f); break;
+      default:
+         Check("fill is the window less the menu bar", std::fabs(mn.y - sTopY) < 2.0f && std::fabs(mx.y - disp.y) < 2.0f && w > disp.x * 0.9f);
+         Check("fill hides the canvas below the window", gGraphScreenTL.y > disp.y);
+         break;
+   }
+   if (++sStep < 5)
+   {
+      SetViewDock(2, kOrder[sStep]);
+      sSetAt = frameId;
+      return false;
+   }
+   // Fill remembers where it came from; one view fills at a time; the setting survives its save text.
+   Check("fill remembers the dock it came from", gView2DDock == 4 && gView2DDockBack == 2);
+   SetViewDock(3, 4);
+   Check("a second view on Fill sends the first back", gView3DDock == 4 && gView2DDock == 2);
+   ViewDockToggleFill(3);
+   Check("the toggle leaves Fill for the old dock", gView3DDock == 0);
+   SetViewDock(2, 4);
+   gView2DWidth = 777.0f;
+   std::ostringstream saved;
+   ViewDockWrite(saved);
+   gView2DDock = 0; gView2DDockBack = 0; gView2DWidth = 400.0f;
+   std::istringstream in(saved.str());
+   for (std::string line; std::getline(in, line);)
+   {
+      const size_t eq = line.find('=');
+      if (eq != std::string::npos)
+         ViewDockReadKey(line.substr(0, eq), line.substr(eq + 1));
+   }
+   Check("dock, width and the way back survive save and load", gView2DDock == 4 && gView2DDockBack == 2 && gView2DWidth == 777.0f);
+   SetViewDock(2, 0);
+   gView3DOpen = false;
+   return true;
+}
+
 void RunView2DTest()
 {
-   bool ok = true;
+   bool ok = sDockOk;
    auto Check = [&](const char* label, bool pass)
    {
       printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);

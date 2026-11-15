@@ -408,6 +408,16 @@ void DrawSidePanels(FrameCtx& fc)
          FormParts::Inline(0.0f, 0.0f);
          DrawTerminalDocked("##terminal_right", ImVec2(gTerminalWidth, graphHeight));
       }
+      if (gView3DOpen && gView3DDock == 1)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         DrawView3DDocked("##view3d_right", ImVec2(gView3DWidth, graphHeight));
+      }
+      if (gView2DOpen && gView2DDock == 1)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         DrawView2DDocked("##view2d_right", ImVec2(gView2DWidth, graphHeight));
+      }
 
       // Right-docked edit history (always right; Edit > History or Shift+U)
       if (gHistoryOpen)
@@ -702,6 +712,13 @@ void DrawSidePanels(FrameCtx& fc)
       // just its trailing gap - which also zeroed it for every popup/menu
       // opened *inside* that panel (e.g. its right-click dock menu), and was
       // why those popups rendered with no padding only when bottom-docked.
+      if (fc.viewFill)
+      {
+         // Back from the off-window canvas row to the line under the filling view.
+         ImGui::SetCursorPos(fc.viewFillResume);
+         ImGui::GetCurrentWindow()->DC.CursorMaxPos = fc.viewFillMax;
+         ImGui::GetCurrentWindow()->DC.IsSetPos = false;   // nothing was extended: the row is back where it was
+      }
       if (viewportBottom)
          DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
       if (matrixBottom)
@@ -718,9 +735,9 @@ void DrawSidePanels(FrameCtx& fc)
       // Piano Roll (View > Piano Roll or Shift+R), bottom or top like the Timeline.
       if (gPianoRollOpen && gPianoRollDock != 3)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
-      if (gView3DOpen && gView3DDock != 3)
+      if (gView3DOpen && gView3DDock == 0)
          DrawView3DDocked("##view3d_bottom", ImVec2(0, gView3DHeight));
-      if (gView2DOpen && gView2DDock != 3)
+      if (gView2DOpen && gView2DDock == 0)
          DrawView2DDocked("##view2d_bottom", ImVec2(0, gView2DHeight));
       // Curve Editor (View > Curve Editor or Shift+E) at the bottom; the other sides draw with their row.
       if (gCurveEditorOpen && gCurveEditorDock == 0)

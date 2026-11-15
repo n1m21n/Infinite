@@ -1998,7 +1998,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunClipboardTest();
       if (getenv("INFINITE_VIEW3DTEST") != nullptr && frameId == 4)
          RunView3DTest();
-      if (getenv("INFINITE_VIEW2DTEST") != nullptr && frameId == 4)
+      // The docks need drawn frames, so they are checked over the frames before the document tests.
+      if (getenv("INFINITE_VIEW2DTEST") != nullptr && frameId >= 4 && View2DDockTestStep(frameId))
          RunView2DTest();
       if (getenv("INFINITE_VIEW3DNAVTEST") != nullptr)
          RunView3DNavTest(frameId);

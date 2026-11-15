@@ -53,6 +53,8 @@ using I18n::T;
 bool gView2DOpen = false;
 float gView2DHeight = 460.0f;
 int gView2DDock = 0;
+float gView2DWidth = 620.0f;
+int gView2DDockBack = 0;
 bool gView2DClaimedKeys = false;
 std::string gView2DTools;
 ImVec2 gView2DRectMin, gView2DRectMax;
@@ -1371,6 +1373,11 @@ namespace
    void HandleLayerKeys(Scene2DNode* doc, bool cmd, bool shift, bool alt, bool onCanvas)
    {
       auto key = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      if (cmd && shift && key(ImGuiKey_F))
+      {
+         ViewDockToggleFill(2);
+         return;
+      }
       if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
          sPending.what = Pending::Delete;
       if (cmd && !shift && (key(ImGuiKey_J) || (key(ImGuiKey_D) && !(onCanvas && PixelTool(sTool))))) sPending.what = Pending::Duplicate;
@@ -1475,7 +1482,11 @@ namespace
          return;
       }
       if (key(ImGuiKey_Escape) && sOp.kind == 0 && sPoly.empty() && !PixelTool(sTool))
+      {
+         if (sSel.empty() && gView2DDock == 4)
+            ViewDockToggleFill(2);   // Esc with nothing to drop leaves Fill
          sSel.clear();
+      }
       HandleLayerKeys(doc, cmd, shift, alt, true);
       const float step = shift ? 10.0f : 1.0f;
       if (!cmd && sTool == kMove)
@@ -5465,7 +5476,7 @@ namespace
       const char* renderL = L("Render##v2drender");
       const char* convertL = L("Convert##v2dconvert");
       auto chipW = [](const char* l) { return ImGui::CalcTextSize(l, ImGui::FindRenderedTextEnd(l)).x + 2.0f * tok::space_2; };
-      const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + tok::space_1 + sChip;
+      const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + 2.0f * (tok::space_1 + sChip);
       const float rowTop = ImGui::GetCursorScreenPos().y;
       const float barRoom = availW - rightW - (2.0f * tok::space_2 + 1.0f);   // one bar divider before the right cluster
       // A bar wider than its room is clipped at a chip edge-free boundary and a "..." chip opens the whole bar.
@@ -5523,6 +5534,8 @@ namespace
       }
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dside", IconsInfinite::Layers, sSideOpen, T("Layers and properties"))) sSideOpen = !sSideOpen;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v2dfill", IconsInfinite::PopOut, gView2DDock == 4, ViewDockFillTip())) ViewDockToggleFill(2);
    }
 
    // The bottom row: zoom out / in, the zoom itself (click it to type one), Fit and 1:1, then the document facts.
@@ -7081,11 +7094,7 @@ namespace
       {
          if (MenuParts::SubMenu(T("Dock Position")))
          {
-            const bool atTop = gView2DDock == 3;
-            if (MenuParts::Item(T("2D View at Bottom"), nullptr, !atTop) && atTop)
-               gView2DDock = 0;
-            if (MenuParts::Item(T("2D View at Top"), nullptr, atTop) && !atTop)
-               gView2DDock = 3;
+            DrawViewDockMenuItems(2);
             ImGui::EndMenu();
          }
          ImGui::Dummy(ImVec2(0.0f, tok::space_1));
@@ -9049,42 +9058,108 @@ void RegisterScene2DParams(GraphNode& gn)
    EndNodeParams();
 }
 
-void DrawView2DDocked(const char* id, const ImVec2& size)
+void SetViewDock(int which, int dock)
+{
+   int& mine = which == 2 ? gView2DDock : gView3DDock;
+   int& back = which == 2 ? gView2DDockBack : gView3DDockBack;
+   int& other = which == 2 ? gView3DDock : gView2DDock;
+   const int otherBack = which == 2 ? gView3DDockBack : gView2DDockBack;
+   dock = std::clamp(dock, 0, 4);
+   if (dock == 4)
+   {
+      if (mine != 4)
+         back = mine;
+      if (other == 4)
+         other = otherBack == 4 ? 0 : otherBack;   // one view fills at a time; the last one set wins
+   }
+   mine = dock;
+}
+
+const char* ViewDockFillTip() { return Sc(T("Fill the window (Ctrl+Shift+F)")); }
+
+void ViewDockToggleFill(int which)
+{
+   const int mine = which == 2 ? gView2DDock : gView3DDock;
+   const int back = which == 2 ? gView2DDockBack : gView3DDockBack;
+   SetViewDock(which, mine == 4 ? (back == 4 ? 0 : back) : 4);
+}
+
+void DrawViewDockMenuItems(int which)
+{
+   static const char* kDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Fill") };
+   const int mine = which == 2 ? gView2DDock : gView3DDock;
+   for (int i = 0; i < 5; i++)
+      if (MenuParts::Item(T(kDocks[i]), i == 4 ? Sc("Ctrl+Shift+F") : nullptr, mine == i) && mine != i)
+         SetViewDock(which, i);
+}
+
+void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height, float& width, const char* gripId,
+                    const char* cardId, ImVec2& rectMin, ImVec2& rectMax, void (*drawPanel)())
 {
    const float kGrip = PanelFrame::kGap;
-   const bool gripFirst = gView2DDock != 3;
+   const bool fill = dock == 4;                    // no seam: nothing to resize against
+   const bool vertical = dock == 1 || dock == 2;   // the seam is a column
+   const bool gripFirst = dock == 0 || dock == 1;  // the canvas is above or to the left
    ImGui::BeginChild(id, size, false);
-   gView2DRectMin = ImGui::GetWindowPos();
-   gView2DRectMax = ImVec2(gView2DRectMin.x + ImGui::GetWindowSize().x, gView2DRectMin.y + ImGui::GetWindowSize().y);
-   gView2DClaimedKeys = false;
+   rectMin = ImGui::GetWindowPos();
+   rectMax = ImVec2(rectMin.x + ImGui::GetWindowSize().x, rectMin.y + ImGui::GetWindowSize().y);
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]()
    {
-      ImGui::InvisibleButton("##view2dgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
-      DrawPanelSeam(false, gripFirst);
+      ImGui::InvisibleButton(gripId, vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
+      DrawPanelSeam(vertical, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+         ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
       if (ImGui::IsItemActive())
       {
-         gView2DHeight += gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y;
-         gView2DHeight = std::max(kMinHeight, gView2DHeight);
+         const ImVec2 d = ImGui::GetIO().MouseDelta;
+         switch (dock)
+         {
+            case 0: height -= d.y; break;
+            case 1: width -= d.x; break;
+            case 2: width += d.x; break;
+            default: height += d.y; break;
+         }
+         height = std::max(300.0f, height);
+         width = std::max(320.0f, width);
       }
    };
-   if (gripFirst)
+   if (gripFirst && !fill)
+   {
       grip();
+      if (vertical)
+         FormParts::Inline();
+   }
    const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-   const ImVec2 cardSize(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+   const ImVec2 cardSize = fill ? ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y))
+                         : vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), std::max(1.0f, inner.y))
+                                    : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
    PanelFrame::Insets in;
-   if (gripFirst)
-      in.t = 0.0f;
-   else
-      in.b = 0.0f;
-   PanelFrame::BeginCard("##view2dcontent", cardSize, in);
-   DrawPanel();
+   switch (dock)   // the seam side needs no inset of its own
+   {
+      case 0: in.t = 0.0f; break;
+      case 1: in.l = 0.0f; break;
+      case 2: in.r = 0.0f; break;
+      case 3: in.b = 0.0f; break;
+      default: break;
+   }
+   PanelFrame::BeginCard(cardId, cardSize, in);
+   drawPanel();
    PanelFrame::EndCard();
-   if (!gripFirst)
+   if (!gripFirst && !fill)
+   {
+      if (vertical)
+         FormParts::Inline();
       grip();
+   }
    ImGui::EndChild();
+}
+
+void DrawView2DDocked(const char* id, const ImVec2& size)
+{
+   gView2DClaimedKeys = false;
+   DrawViewDocked(id, size, gView2DDock, gView2DHeight, gView2DWidth, "##view2dgrip", "##view2dcontent", gView2DRectMin,
+                  gView2DRectMax, [] { DrawPanel(); });
 }
 
 } // namespace app

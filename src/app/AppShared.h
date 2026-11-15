@@ -5911,7 +5911,9 @@ std::string PianoRollExportMidi(uint64_t clipId, std::string path, std::string& 
 extern bool gPianoRollClaimedKeys;
 extern bool gView3DOpen;
 extern float gView3DHeight;
-extern int gView3DDock; // 0 = bottom, 3 = top
+extern int gView3DDock; // 0 bottom, 1 right, 2 left, 3 top, 4 fill (the canvas is hidden)
+extern float gView3DWidth;
+extern int gView3DDockBack; // the dock Fill returns to
 extern bool gView3DClaimedKeys;
 extern ImVec2 gView3DRectMin, gView3DRectMax;
 void DrawView3DDocked(const char* id, const ImVec2& size);
@@ -5923,7 +5925,23 @@ void View3DAddNode(GraphNode& gn);
 // The 2D View (View2DPanel.cpp): a Scene 2D document's layers over node outputs.
 extern bool gView2DOpen;
 extern float gView2DHeight;
-extern int gView2DDock; // 0 = bottom, 3 = top
+extern int gView2DDock; // 0 bottom, 1 right, 2 left, 3 top, 4 fill (the canvas is hidden)
+extern float gView2DWidth;
+extern int gView2DDockBack; // the dock Fill returns to
+// Sets a view's dock (which: 2 or 3). Fill remembers the dock it came from, and only one view fills at a time:
+// the other drops back to its old dock. ViewDockToggleFill flips Fill on and off.
+void SetViewDock(int which, int dock);
+void ViewDockToggleFill(int which);
+// One docked view (2D or 3D): the outer child, the resize seam on the canvas side, the card. Shared by both views.
+void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height, float& width, const char* gripId,
+                    const char* cardId, ImVec2& rectMin, ImVec2& rectMax, void (*drawPanel)());
+// The Dock Position submenu both views show in their header menu, and the maximise chip of their top bar.
+void DrawViewDockMenuItems(int which);
+const char* ViewDockFillTip();
+void ViewDockWrite(std::ostream& file);
+bool ViewDockReadKey(const std::string& key, const std::string& val);
+// Self-test: one step per frame from frame 4; true once the five docks are checked.
+bool View2DDockTestStep(int frameId);
 extern std::string gView2DTools; // the 2D View tool strip: order, "-" marks hidden
 extern bool gView2DClaimedKeys;
 extern ImVec2 gView2DRectMin, gView2DRectMax;

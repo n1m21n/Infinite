@@ -69,6 +69,11 @@ struct FrameCtx
    bool arrangeRight{};
    bool sessionBottom{};
    float graphHeight{};
+   // A 2D or 3D View on Fill: the canvas row is laid out past the window's bottom edge (it still cooks), and the
+   // bottom-docked rows resume from here.
+   bool viewFill{};
+   ImVec2 viewFillResume{};
+   ImVec2 viewFillMax{};
    bool dropInsideArrangePanel{};
    std::optional<ConditionalStageTimer> timerNodeBodies;
    std::optional<Bench::ConditionalGpuStageTimer> timerNodeBodiesGpu;

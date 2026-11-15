@@ -519,8 +519,35 @@ void DrawMenuBar(FrameCtx& fc)
                   ImGui::EndMenu();
                };
                dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
-               dockedPanelMenu(L("3D View"), L("Show 3D View"), gView3DOpen, gView3DDock, gView3DHeight, "##view3ddock");
-               dockedPanelMenu(L("2D View"), L("Show 2D View"), gView2DOpen, gView2DDock, gView2DHeight, "##view2ddock");
+               // The 2D and 3D Views dock on every side, or fill the window in the canvas's place.
+               auto viewPanelMenu = [](const char* name, const char* show, bool& open, int which, float& height, float& width, const char* dockId) {
+                  if (!MenuParts::SubMenu(name))
+                     return;
+                  MenuParts::Check(show, &open);
+                  if (open)
+                  {
+                     static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Fill") };
+                     const int dock = which == 2 ? gView2DDock : gView3DDock;
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     if (MenuParts::BeginCombo(dockId, T(kDockNames[dock])))
+                     {
+                        for (int i = 0; i < 5; ++i)
+                           if (MenuParts::Choice(L(kDockNames[i]), i == dock))
+                              SetViewDock(which, i);
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     if (dock == 1 || dock == 2)
+                        FieldWell::Slider(L("Width"), &width, 320.0f, 1600.0f, "%.0f px");
+                     else if (dock != 4)
+                        FieldWell::Slider(L("Height"), &height, 300.0f, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               };
+               viewPanelMenu(L("3D View"), L("Show 3D View"), gView3DOpen, 3, gView3DHeight, gView3DWidth, "##view3ddock");
+               viewPanelMenu(L("2D View"), L("Show 2D View"), gView2DOpen, 2, gView2DHeight, gView2DWidth, "##view2ddock");
                dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
                if (!Platform::PluginModeActive() && MenuParts::SubMenu(L("Terminal"))) // no shell inside a DAW
                {

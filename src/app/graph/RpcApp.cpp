@@ -37,8 +37,8 @@ namespace app
             { "session", &gSessionPanelOpen, nullptr, false },
             { "samplestudio", &gSampleStudioOpen, &gSampleStudioDock, false },
             { "pianoroll", &gPianoRollOpen, &gPianoRollDock, false },
-            { "view3d", &gView3DOpen, &gView3DDock, false },
-            { "view2d", &gView2DOpen, &gView2DDock, false },
+            { "view3d", &gView3DOpen, &gView3DDock, true },
+            { "view2d", &gView2DOpen, &gView2DDock, true },
             { "terminal", &gTerminalOpen, &gTerminalDock, true },
             { "curveeditor", &gCurveEditorOpen, &gCurveEditorDock, false },
             { "fieldpatcher", &gFieldPatcherOpen, &gFieldPatcherDock, false },
@@ -510,13 +510,18 @@ namespace app
                }
                else if (params.contains("dock"))
                {
-                  const int code = DockCode(params.value("dock", std::string()));
+                  const bool view = panel.dock == &gView2DDock || panel.dock == &gView3DDock;
+                  const std::string side = params.value("dock", std::string());
+                  const int code = view && side == "fill" ? 4 : DockCode(side);   // Fill: the view takes the canvas's place
                   if (panel.dock == nullptr || code < 0 || (!panel.fourSides && code != 0 && code != 3))
                   {
-                     outError = name + (panel.fourSides ? " docks bottom, right, left or top" : panel.dock ? " docks bottom or top" : " has no dock position");
+                     outError = name + (view ? " docks bottom, right, left, top or fill" : panel.fourSides ? " docks bottom, right, left or top" : panel.dock ? " docks bottom or top" : " has no dock position");
                      return true;
                   }
-                  *panel.dock = code;
+                  if (view)
+                     SetViewDock(panel.dock == &gView2DDock ? 2 : 3, code);
+                  else
+                     *panel.dock = code;
                }
             }
             all[panel.name] = { { "open", *panel.open } };

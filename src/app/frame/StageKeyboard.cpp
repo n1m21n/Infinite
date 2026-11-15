@@ -375,7 +375,7 @@ void DrawKeyboard(FrameCtx& fc)
       if (!gSessionPanelOpen)
          gSessionClaimedKeys = false;
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys) || (gView2DOpen && gView2DClaimedKeys) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) ||
                         (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
                         (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 

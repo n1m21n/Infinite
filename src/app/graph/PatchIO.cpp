@@ -317,6 +317,49 @@ namespace app
    }
 
 
+   // The 2D and 3D Views' open flag, dock (0 bottom, 1 right, 2 left, 3 top, 4 fill), sizes and the dock Fill
+   // returns to: one writer and one reader, so the self-test can round-trip them without the settings file.
+   void ViewDockWrite(std::ostream& file)
+   {
+      file << "panelView3DOpen=" << (gView3DOpen ? 1 : 0) << "\n";
+      file << "panelView3DH=" << gView3DHeight << "\n";
+      file << "panelView3DDock=" << gView3DDock << "\n";
+      file << "panelView3DW=" << gView3DWidth << "\n";
+      file << "panelView3DDockBack=" << gView3DDockBack << "\n";
+      file << "panelView2DOpen=" << (gView2DOpen ? 1 : 0) << "\n";
+      file << "panelView2DH=" << gView2DHeight << "\n";
+      file << "panelView2DDock=" << gView2DDock << "\n";
+      file << "panelView2DW=" << gView2DWidth << "\n";
+      file << "panelView2DDockBack=" << gView2DDockBack << "\n";
+   }
+
+   bool ViewDockReadKey(const std::string& key, const std::string& val)
+   {
+      if (key == "panelView3DOpen")
+         gView3DOpen = (val != "0");
+      else if (key == "panelView3DH")
+         gView3DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
+      else if (key == "panelView3DDock")
+         gView3DDock = std::clamp(atoi(val.c_str()), 0, 4);
+      else if (key == "panelView3DW")
+         gView3DWidth = std::max(320.0f, std::strtof(val.c_str(), nullptr));
+      else if (key == "panelView3DDockBack")
+         gView3DDockBack = std::clamp(atoi(val.c_str()), 0, 3);
+      else if (key == "panelView2DOpen")
+         gView2DOpen = (val != "0");
+      else if (key == "panelView2DH")
+         gView2DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
+      else if (key == "panelView2DDock")
+         gView2DDock = std::clamp(atoi(val.c_str()), 0, 4);
+      else if (key == "panelView2DW")
+         gView2DWidth = std::max(320.0f, std::strtof(val.c_str(), nullptr));
+      else if (key == "panelView2DDockBack")
+         gView2DDockBack = std::clamp(atoi(val.c_str()), 0, 3);
+      else
+         return false;
+      return true;
+   }
+
    void LoadWorkspaceSettings()
    {
       const std::string path = WorkspaceSettingsPath();
@@ -446,18 +489,8 @@ namespace app
             gTerminalFloating = (val == "1");
          else if (key == "panelTerminalW")
             gTerminalWidth = std::max(280.0f, std::strtof(val.c_str(), nullptr));
-         else if (key == "panelView3DOpen")
-            gView3DOpen = (val != "0");
-         else if (key == "panelView3DH")
-            gView3DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
-         else if (key == "panelView3DDock")
-            gView3DDock = (val == "3") ? 3 : 0;
-         else if (key == "panelView2DOpen")
-            gView2DOpen = (val != "0");
-         else if (key == "panelView2DH")
-            gView2DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
-         else if (key == "panelView2DDock")
-            gView2DDock = (val == "3") ? 3 : 0;
+         else if (ViewDockReadKey(key, val))
+            ;
          else if (key == "panelView2DTools")
             gView2DTools = val;
          else if (key == "panelStudioDock")
@@ -504,12 +537,7 @@ namespace app
       file << "panelStudioOpen=" << (gSampleStudioOpen ? 1 : 0) << "\n";
       file << "panelStudioH=" << gSampleStudioHeight << "\n";
       file << "panelStudioDock=" << gSampleStudioDock << "\n";
-      file << "panelView3DOpen=" << (gView3DOpen ? 1 : 0) << "\n";
-      file << "panelView3DH=" << gView3DHeight << "\n";
-      file << "panelView3DDock=" << gView3DDock << "\n";
-      file << "panelView2DOpen=" << (gView2DOpen ? 1 : 0) << "\n";
-      file << "panelView2DH=" << gView2DHeight << "\n";
-      file << "panelView2DDock=" << gView2DDock << "\n";
+      ViewDockWrite(file);
       if (!gView2DTools.empty())
          file << "panelView2DTools=" << gView2DTools << "\n";
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
