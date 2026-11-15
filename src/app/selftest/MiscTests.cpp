@@ -2975,6 +2975,106 @@ void RunOscControlTest()
    printf("OSCCONTROLTEST %s\n", ok ? "OK" : "FAIL");
 }
 
+// ====================================================== INFINITE_PARAMRESETTEST
+void RunParamResetTest()
+{
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+
+   class ParamMutator : public ParamVisitor
+   {
+   public:
+      std::vector<std::string> keys;
+      void Float(const char* n, float& v) override { keys.push_back(n); v += 1.25f; }
+      void Int(const char* n, int& v) override { keys.push_back(n); v += 1; }
+      void Bool(const char* n, bool& v) override { keys.push_back(n); v = !v; }
+      void Text(const char* n, std::string& v) override { keys.push_back(n); v += "_x"; }
+      void Color(const char* n, float rgb[3]) override { keys.push_back(n); rgb[0] += 0.1f; }
+   };
+
+   // 1. Walk every spawnable node type, mutate every VisitParams key, reset each, and match fresh.
+   int testedTypes = 0;
+   int mismatchedTypes = 0;
+   for (const std::string& category : NodeFactory::Instance().GetCategories())
+   {
+      for (const std::string& typeName : NodeFactory::Instance().GetNodesInCategory(category))
+      {
+         if (!IsUserSpawnable(typeName))
+            continue;
+         NewPatch();
+         GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
+         if (gn == nullptr || !gn->node)
+         {
+            ++mismatchedTypes;
+            continue;
+         }
+         ParamSnapshot fresh;
+         gn->node->VisitParams(fresh);
+         ParamMutator mut;
+         gn->node->VisitParams(mut);
+         for (const std::string& k : mut.keys)
+            ResetParamKeyToDefault(*gn, k, /*pushUndo=*/false);
+         ParamSnapshot afterReset;
+         gn->node->VisitParams(afterReset);
+         if (afterReset != fresh)
+         {
+            printf("  [FAIL] param reset mismatch on %s (%s)\n", typeName.c_str(), category.c_str());
+            ++mismatchedTypes;
+         }
+         ++testedTypes;
+      }
+   }
+   Check("all node types reset every VisitParams key to match a fresh node", testedTypes > 0 && mismatchedTypes == 0);
+
+   // 2. Undo restores previous value; Redo restores default; reset_param RPC works.
+   NewPatch();
+   GraphNode* shape = SpawnNode("Shape", "Source", 0.0f, 0.0f);
+   Check("Shape spawned for undo/RPC reset test", shape != nullptr && shape->node != nullptr);
+   if (shape != nullptr && shape->node != nullptr)
+   {
+      auto getFloat = [&](const char* key) -> float
+      {
+         class Reader : public ParamVisitor
+         {
+         public:
+            explicit Reader(const char* k) : target(k) {}
+            const char* target;
+            float val = 0.0f;
+            void Float(const char* n, float& v) override { if (std::string(target) == n) val = v; }
+            void Int(const char*, int&) override {}
+            void Bool(const char*, bool&) override {}
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float*) override {}
+         } r(key);
+         shape->node->VisitParams(r);
+         return r.val;
+      };
+      const float defRot = getFloat("rotation");
+      json r;
+      std::string e;
+      Check("set_param changes rotation",
+            HandleRpcCommand("set_param", { {"index", shape->index}, {"name", "rotation"}, {"value", defRot + 0.5f} }, r, e));
+      Check("rotation changed", std::abs(getFloat("rotation") - (defRot + 0.5f)) < 1e-5f);
+      Check("reset_param RPC resets rotation",
+            HandleRpcCommand("reset_param", { {"index", shape->index}, {"key", "rotation"} }, r, e) && e.empty());
+      Check("rotation matches default after reset", std::abs(getFloat("rotation") - defRot) < 1e-5f);
+      Undo();
+      Check("undo restores previous rotation", std::abs(getFloat("rotation") - (defRot + 0.5f)) < 1e-5f);
+      Redo();
+      Check("redo restores default rotation", std::abs(getFloat("rotation") - defRot) < 1e-5f);
+      Check("reset_param refuses unknown key",
+            !HandleRpcCommand("reset_param", { {"index", shape->index}, {"key", "no_such_key"} }, r, e) && !e.empty());
+   }
+
+   NewPatch();
+   printf("PARAMRESETTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 // ====================================================== INFINITE_PATCHWATCHTEST
 //
 // R39: the open file changing on disk. Drives the real LoadPatchFromImpl /

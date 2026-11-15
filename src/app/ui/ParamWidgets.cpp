@@ -585,6 +585,11 @@ namespace app
             gTouchParamIndex = paramIndex;
          }
       }
+      if (hovered && ImGui::GetIO().KeyAlt && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         if (ResetParamToDefault(nodeIndex, paramIndex, /*pushUndo=*/true))
+            ImGui::ClearActiveID();
+      }
       if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
       {
          gModBindingMenuNode = nodeIndex;

@@ -5768,6 +5768,10 @@ void RunAutoLayoutTick();
 
 int ParamIndexOfKeyOnNode(const GraphNode& gn, const std::string& key);
 
+bool CanResetParam(int nodeIndex, int paramIndex);
+bool ResetParamToDefault(int nodeIndex, int paramIndex, bool pushUndo = true);
+bool ResetParamKeyToDefault(GraphNode& gn, const std::string& key, bool pushUndo = true);
+
 bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
 
 bool LoadPatchFromImpl(const std::string& path, bool reload);
@@ -6576,6 +6580,7 @@ int RunVST3BlocklistTest();
 
 void RunRpcBatchTest();
 void RunOscControlTest();
+void RunParamResetTest();
 void RunHistoryTest();
 void RunClipboardTest();
 void RunView3DTest();

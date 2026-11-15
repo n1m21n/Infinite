@@ -351,6 +351,42 @@ namespace app
          outResult = { { "index", gn->index }, { "param", param }, { "key", key } };
          return true;
       }
+      if (method == "reset_param")
+      {
+         if (!params.is_object())
+         {
+            outError = "params must be a JSON object, e.g. {\"index\":5,\"key\":\"rotation\"}";
+            return true;
+         }
+         json dstField;
+         for (const char* name : { "dst", "index", "node", "target" })
+            if (params.contains(name) && !params[name].is_null())
+            {
+               dstField = params[name];
+               break;
+            }
+         const int dstIndex = NodeIndexOfField(dstField);
+         const std::string key = ControlKeyFrom(params, dstField);
+         GraphNode* gn = FindNodeByIndex(dstIndex);
+         if (gn == nullptr)
+         {
+            outError = "unknown node index " + (dstIndex >= 0 ? std::to_string(dstIndex) : std::string("<missing>")) +
+                       ": pass index as the integer node index from get_graph";
+            return true;
+         }
+         if (key.empty())
+         {
+            outError = "missing control key: pass key, e.g. \"rotation\"; `infinite params " + std::to_string(gn->index) + "` lists them";
+            return true;
+         }
+         if (!ResetParamKeyToDefault(*gn, key, /*pushUndo=*/true))
+         {
+            outError = "'" + key + "' has no resettable default on " + gn->typeName;
+            return true;
+         }
+         outResult = { { "index", gn->index }, { "key", key }, { "reset", true } };
+         return true;
+      }
       if (method == "code_errors")
       {
          json errors = json::array();

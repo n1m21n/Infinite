@@ -482,6 +482,7 @@ void DrawPopupsA(FrameCtx& fc)
          const GestureRecorder::Key gestureKey(nodeIndex, paramIndex);
          const bool hasPlayback = rec.Playbacks().count(gestureKey) > 0;
          const bool isRecordingState = !modulated && !hasExpr && (rec.IsArmed(nodeIndex, paramIndex) || hasPlayback);
+         const bool canReset = CanResetParam(nodeIndex, paramIndex);
 
          // The destination's own declared min/max/step, looked up the same
          // way Bind() does - this frame's FrameParams, keyed by (nodeIndex,
@@ -684,6 +685,8 @@ void DrawPopupsA(FrameCtx& fc)
                   mod.SetRange(nodeIndex, paramIndex, src.hi, src.lo);
             }
             MenuParts::Separator();
+            if (MenuParts::Item(L("Reset"), "Alt+Click", false, canReset))
+               ResetParamToDefault(nodeIndex, paramIndex, /*pushUndo=*/true);
             if (MenuParts::Item(L("Unbind")))
             {
                PushUndoCheckpoint();
@@ -728,6 +731,8 @@ void DrawPopupsA(FrameCtx& fc)
                   mod.SetExpressionRange(nodeIndex, paramIndex, hi, lo);
             }
             MenuParts::Separator();
+            if (MenuParts::Item(L("Reset"), "Alt+Click", false, false))
+               ;
             if (MenuParts::Item(L("Unbind")))
             {
                PushUndoCheckpoint();
@@ -787,6 +792,8 @@ void DrawPopupsA(FrameCtx& fc)
                   rec.ArmParam(nodeIndex, paramIndex);
             }
             MenuParts::Separator();
+            if (MenuParts::Item(L("Reset"), "Alt+Click", false, canReset))
+               ResetParamToDefault(nodeIndex, paramIndex, /*pushUndo=*/true);
             if (MenuParts::Item(L("Unbind")))
             {
                rec.CancelArm(nodeIndex, paramIndex);
@@ -825,6 +832,9 @@ void DrawPopupsA(FrameCtx& fc)
                      rec.ArmParam(nodeIndex, paramIndex);
                   }
                }
+               MenuParts::Separator();
+               if (MenuParts::Item(L("Reset"), "Alt+Click", false, canReset))
+                  ResetParamToDefault(nodeIndex, paramIndex, /*pushUndo=*/true);
             }
          }
          MenuParts::EndPopup();
