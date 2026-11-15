@@ -9940,6 +9940,226 @@
       "file": "assets/library/pixel/ukiyoe-cartography-compass-tide-chart.field",
       "preview": "assets/library/previews/ukiyoe-cartography-compass-tide-chart.jpg",
       "bytes": 2637
+    },
+    {
+      "id": "jacquard-loom-warp-weft-draft",
+      "name": "Jacquard Loom Warp Weft Draft",
+      "kind": "Generator",
+      "tags": [
+        "jacquard",
+        "loom",
+        "weaving",
+        "textile",
+        "draft",
+        "bauhaus",
+        "procedural"
+      ],
+      "description": "Multi-layered twill and satin weaving draft with animated shuttle passes, tie-up matrix, and linen selvedge grain.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/jacquard-loom-warp-weft-draft.js",
+      "preview": "assets/library/previews/jacquard-loom-warp-weft-draft.jpg",
+      "bytes": 4523
+    },
+    {
+      "id": "jacquard-loom-perforated-tabulature",
+      "name": "Jacquard Loom Perforated Tabulature",
+      "kind": "Generator",
+      "tags": [
+        "jacquard",
+        "punchcard",
+        "binary",
+        "textile",
+        "notation",
+        "bauhaus",
+        "procedural"
+      ],
+      "description": "Linked binary loom punchcard strips with sprocket guide tracks, terracotta lacing cords, and woven herringbone preview.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/jacquard-loom-perforated-tabulature.js",
+      "preview": "assets/library/previews/jacquard-loom-perforated-tabulature.jpg",
+      "bytes": 3881
+    },
+    {
+      "id": "sashimono-joinery-kumiko-lattice-3d",
+      "name": "Sashimono Joinery Kumiko Lattice 3D",
+      "kind": "Generator",
+      "tags": [
+        "sashimono",
+        "kumiko",
+        "joinery",
+        "timber",
+        "3d",
+        "architecture",
+        "procedural"
+      ],
+      "description": "Interlocking Japanese Kumiko cypress latticework framed in charred sugi timber with brass corner dowels.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/sashimono-joinery-kumiko-lattice-3d.js",
+      "preview": "assets/library/previews/sashimono-joinery-kumiko-lattice-3d.jpg",
+      "bytes": 2041
+    },
+    {
+      "id": "sashimono-joinery-kanawa-tsugi-3d",
+      "name": "Sashimono Joinery Kanawa Tsugi 3D",
+      "kind": "Generator",
+      "tags": [
+        "sashimono",
+        "kanawa-tsugi",
+        "joinery",
+        "woodwork",
+        "3d",
+        "architecture",
+        "procedural"
+      ],
+      "description": "Exploded Kanawa-tsugi scarf joint timber assembly with stepped mortise hooks and central charred sugi draw-pin wedge.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/sashimono-joinery-kanawa-tsugi-3d.js",
+      "preview": "assets/library/previews/sashimono-joinery-kanawa-tsugi-3d.jpg",
+      "bytes": 2119
+    },
+    {
+      "id": "west-coast-buchla-complex-wavefold-synth",
+      "name": "West Coast Buchla Complex Wavefold Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "west-coast",
+        "buchla",
+        "audio",
+        "dsp",
+        "wavefolding",
+        "fm"
+      ],
+      "description": "Dual-oscillator PM/FM complex wavefolder with multi-stage trigonometric folding and vactrol low-pass gate decay.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/west-coast-buchla-complex-wavefold-synth.inf",
+      "preview": "assets/library/previews/west-coast-buchla-complex-wavefold-synth.jpg",
+      "bytes": 2353
+    },
+    {
+      "id": "west-coast-buchla-krell-pendulum-synth",
+      "name": "West Coast Buchla Krell Pendulum Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "west-coast",
+        "buchla",
+        "audio",
+        "dsp",
+        "wavefolding",
+        "fm"
+      ],
+      "description": "Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/west-coast-buchla-krell-pendulum-synth.inf",
+      "preview": "assets/library/previews/west-coast-buchla-krell-pendulum-synth.jpg",
+      "bytes": 2312
+    },
+    {
+      "id": "tape-loop-polyphony-oxide-dispersion-fx",
+      "name": "Tape Loop Polyphony Oxide Dispersion FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "tape-loop",
+        "audio",
+        "dsp",
+        "allpass",
+        "delay",
+        "saturation"
+      ],
+      "description": "Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/tape-loop-polyphony-oxide-dispersion-fx.inf",
+      "preview": "assets/library/previews/tape-loop-polyphony-oxide-dispersion-fx.jpg",
+      "bytes": 2131
+    },
+    {
+      "id": "tape-loop-polyphony-frippertronics-echo-fx",
+      "name": "Tape Loop Polyphony Frippertronics Echo FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "tape-loop",
+        "audio",
+        "dsp",
+        "allpass",
+        "delay",
+        "saturation"
+      ],
+      "description": "Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/tape-loop-polyphony-frippertronics-echo-fx.inf",
+      "preview": "assets/library/previews/tape-loop-polyphony-frippertronics-echo-fx.jpg",
+      "bytes": 2127
+    },
+    {
+      "id": "reaction-diffusion-belousov-spiral-waves",
+      "name": "Reaction Diffusion Belousov Spiral Waves",
+      "kind": "Generator",
+      "tags": [
+        "reaction-diffusion",
+        "belousov",
+        "spiral",
+        "chemical",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Belousov-Zhabotinsky chemical spiral wave interference with domain-warped fronts in verdigris, ochre, and cinnabar glaze.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/reaction-diffusion-belousov-spiral-waves.field",
+      "preview": "assets/library/previews/reaction-diffusion-belousov-spiral-waves.jpg",
+      "bytes": 2085
+    },
+    {
+      "id": "reaction-diffusion-belousov-turing-coral",
+      "name": "Reaction Diffusion Belousov Turing Coral",
+      "kind": "Generator",
+      "tags": [
+        "turing",
+        "reaction-diffusion",
+        "morphogenesis",
+        "coral",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Anisotropic Turing coral-spot morphogenesis with cellular ridge fronts and mineral verdigris-cinnabar banding.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/reaction-diffusion-belousov-turing-coral.field",
+      "preview": "assets/library/previews/reaction-diffusion-belousov-turing-coral.jpg",
+      "bytes": 1769
     }
   ]
 }

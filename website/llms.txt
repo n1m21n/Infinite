@@ -305,6 +305,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Future Garage Glass Rhodes Chord Synth](https://infinitedevices.org/library/future-garage-glass-rhodes-chord-synth.html): Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay. (file: https://infinitedevices.org/assets/templates/future-garage-glass-rhodes-chord-synth.inf)
 - [Acid House 303 Resonant Squelch FX](https://infinitedevices.org/library/acid-house-303-resonant-squelch-fx.html): Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation. (file: https://infinitedevices.org/assets/templates/acid-house-303-resonant-squelch-fx.inf)
 - [Acid House Tape Dub Delay FX](https://infinitedevices.org/library/acid-house-tape-dub-delay-fx.html): Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive. (file: https://infinitedevices.org/assets/templates/acid-house-tape-dub-delay-fx.inf)
+- [West Coast Buchla Complex Wavefold Synth](https://infinitedevices.org/library/west-coast-buchla-complex-wavefold-synth.html): Dual-oscillator PM/FM complex wavefolder with multi-stage trigonometric folding and vactrol low-pass gate decay. (file: https://infinitedevices.org/assets/templates/west-coast-buchla-complex-wavefold-synth.inf)
+- [West Coast Buchla Krell Pendulum Synth](https://infinitedevices.org/library/west-coast-buchla-krell-pendulum-synth.html): Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation. (file: https://infinitedevices.org/assets/templates/west-coast-buchla-krell-pendulum-synth.inf)
+- [Tape Loop Polyphony Oxide Dispersion FX](https://infinitedevices.org/library/tape-loop-polyphony-oxide-dispersion-fx.html): Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-oxide-dispersion-fx.inf)
+- [Tape Loop Polyphony Frippertronics Echo FX](https://infinitedevices.org/library/tape-loop-polyphony-frippertronics-echo-fx.html): Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-frippertronics-echo-fx.inf)
 
 ## Library: Community
 
@@ -665,7 +669,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 119 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 121 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -682,4 +686,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 104 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 106 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

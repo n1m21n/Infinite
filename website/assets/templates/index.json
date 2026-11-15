@@ -2961,6 +2961,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "west-coast-buchla-complex-wavefold-synth",
+      "name": "West Coast Buchla Complex Wavefold Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Dual-oscillator PM/FM complex wavefolder with multi-stage trigonometric folding and vactrol low-pass gate decay.",
+      "price": 0,
+      "preview": "assets/templates/west-coast-buchla-complex-wavefold-synth.webp",
+      "file": "assets/templates/west-coast-buchla-complex-wavefold-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "west-coast-buchla-krell-pendulum-synth",
+      "name": "West Coast Buchla Krell Pendulum Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/west-coast-buchla-krell-pendulum-synth.webp",
+      "file": "assets/templates/west-coast-buchla-krell-pendulum-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "tape-loop-polyphony-oxide-dispersion-fx",
+      "name": "Tape Loop Polyphony Oxide Dispersion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter.",
+      "price": 0,
+      "preview": "assets/templates/tape-loop-polyphony-oxide-dispersion-fx.webp",
+      "file": "assets/templates/tape-loop-polyphony-oxide-dispersion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "tape-loop-polyphony-frippertronics-echo-fx",
+      "name": "Tape Loop Polyphony Frippertronics Echo FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation.",
+      "price": 0,
+      "preview": "assets/templates/tape-loop-polyphony-frippertronics-echo-fx.webp",
+      "file": "assets/templates/tape-loop-polyphony-frippertronics-echo-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

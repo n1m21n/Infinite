@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Tape Loop Polyphony Oxide Dispersion FX",
+    "author": "Infinite",
+    "description": "Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float dispersion = 0.62 [0.0, 0.9];\nparam float oxideDrive = 1.65 [0.8, 3.5];\nparam float flutter = 0.35 [0.0, 1.0];\nparam float tone = 0.68 [0.15, 1.0];\nparam float mix = 0.65 [0.0, 1.0];\nstate float lfo = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float ap3 = 0;\nstate float ap4 = 0;\nstate float lp = 0;\n\nlfo = (lfo + 1.85 / sr) % 1.0;\nmod = sin(6.2831853 * lfo) * flutter * 0.14;\ng = clamp(dispersion + mod, -0.88, 0.88);\n\n# 4-stage cascaded allpass dispersion network\ny1 = -g * in + ap1;\nap1 = in + g * y1;\n\ny2 = -g * y1 + ap2;\nap2 = y1 + g * y2;\n\ny3 = -g * y2 + ap3;\nap3 = y2 + g * y3;\n\ny4 = -g * y3 + ap4;\nap4 = y3 + g * y4;\n\n# Reel-to-reel oxide hysteresis saturation + high-frequency roll-off\ndriven = y4 * oxideDrive;\nsat = driven / (1.0 + abs(driven) * 0.45);\nfCut = clamp(0.08 + tone * 0.34, 0.04, 0.44);\nlp = lp + fCut * (sat - lp);\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "dispersion": 0.62,
+      "oxideDrive": 1.65,
+      "flutter": 0.35,
+      "tone": 0.68,
+      "mix": 0.65
+    }
+  }
+}

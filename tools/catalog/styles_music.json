@@ -2087,6 +2087,147 @@
     "Note Echo"
    ],
    "gain": 14.0
+  },
+  {
+   "id": "west_coast_buchla",
+   "family": "experimental",
+   "bpm": [
+    96,
+    118
+   ],
+   "swing": 0.08,
+   "scale": [
+    12,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "..o...o...o...o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "x..x..o...x.o...",
+    "htom": "..o..x..o...x...",
+    "bell": "x.....o...x...o."
+   },
+   "bass": "0..2.4.0..5.2...",
+   "fx": [
+    "Audio Filter",
+    "Delay",
+    "Reverb"
+   ],
+   "synth": [
+    "Field Synth",
+    "Wavetable",
+    "Oscillator"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.05,
+   "mod": 0.85,
+   "refs": [
+    "Don Buchla 259 Complex Waveform Generator",
+    "Morton Subotnick, Silver Apples of the Moon",
+    "San Francisco Tape Music Center wavefolding & vactrol LPGs"
+   ],
+   "chords": {
+    "size": [
+     2,
+     3
+    ],
+    "beats": 4.0,
+    "strum": 12,
+    "human": 6
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "motif": {
+    "synth": [
+     "Field Synth"
+    ],
+    "density": 0.55,
+    "octave": 3,
+    "gate": 35,
+    "gain": -8
+   },
+   "groove": 0.55,
+   "fill": 0.35
+  },
+  {
+   "id": "tape_loop_polyphony",
+   "family": "ambient",
+   "bpm": [
+    64,
+    86
+   ],
+   "swing": 0.0,
+   "scale": [
+    4,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......4.......",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "Phaser",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth",
+    "Partials"
+   ],
+   "ban": [
+    "Stutter",
+    "Bitcrush",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.65,
+   "refs": [
+    "William Basinski, The Disintegration Loops",
+    "Robert Fripp & Brian Eno (Frippertronics)",
+    "Reel-to-reel oxide hysteresis & asynchronous tape loops"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 8.0,
+    "strum": 30,
+    "human": 14
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.25,
+    "octave": 3,
+    "gate": 75,
+    "gain": -10
+   },
+   "groove": 0.4,
+   "fill": 0.2
   }
  ]
 }

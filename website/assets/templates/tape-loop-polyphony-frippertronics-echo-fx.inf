@@ -1,0 +1,77 @@
+infinite-patch 1
+# Tape Loop Polyphony Frippertronics Echo FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 50
+  i note2 55
+  i note3 57
+  i note4 48
+  i note5 55
+  i note6 52
+  i note7 50
+  i note8 48
+  i note9 50
+  i note10 55
+  i note11 60
+  i note12 48
+  i note13 55
+  i note14 52
+  i note15 57
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+  f resonance 0.25
+  f decay 0.45
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float feedback = 0.62 [0.0, 0.88];\nparam float damping = 0.42 [0.05, 0.85];\nparam float wow = 0.28 [0.0, 1.0];\nparam float drive = 1.35 [0.8, 2.8];\nparam float mix = 0.58 [0.0, 1.0];\nstate float lfo = 0;\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float lp = 0;\n\nlfo = (lfo + 0.55 / sr) % 1.0;\ndrift = 1.0 + sin(6.2831853 * lfo) * wow * 0.12;\n\nfCut = clamp(0.10 + (1.0 - damping) * 0.30, 0.03, 0.42);\nlp = lp + fCut * (in - lp);\n\n# Asynchronous multi-tap tape loop\nr1 = clamp(0.068 * drift, 0.02, 0.18);\nr2 = clamp(0.051 * drift, 0.02, 0.18);\nr3 = clamp(0.039 * drift, 0.02, 0.18);\n\ntap1 = tap1 + r1 * (lp + tap3 * feedback * 0.55 - tap1);\ntap2 = tap2 + r2 * (tap1 - tap2);\ntap3 = tap3 + r3 * (tap2 - tap3);\n\necho = (tap1 * 0.42 + tap2 * 0.36 + tap3 * 0.28) * drive;\nsat = echo / (1.0 + abs(echo) * 0.40);\n\nout = (in * (1.0 - mix) + sat * mix) * 0.94;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.26 0.16 0.22
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Tape Loop Polyphony Frippertronics Echo FX. Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

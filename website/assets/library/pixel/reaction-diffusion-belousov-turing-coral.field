@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Reaction Diffusion Belousov Turing Coral",
+    "author": "Infinite",
+    "description": "Anisotropic Turing coral-spot morphogenesis with cellular ridge fronts and mineral verdigris-cinnabar banding.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float cellScale = 4.2 [2.0, 9.0];\nparam float anisotropy = 0.38 [0.0, 0.9];\nparam float ridgeWidth = 0.14 [0.04, 0.35];\nparam float contourFreq = 6.0 [2.0, 12.0];\nparam float warmth = 0.75 [0.2, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\ncSlate = vec3(0.055, 0.102, 0.118);\ncVerdigris = vec3(0.165, 0.482, 0.482);\ncOchre = vec3(0.910, 0.773, 0.537);\ncCinnabar = vec3(0.851, 0.349, 0.298);\n\n# Anisotropic Turing domain distortion\nwarp = vec2(sin(p.y * 3.2 + t * 0.3), cos(p.x * 3.0 - t * 0.25)) * anisotropy;\nq = (p + warp) * cellScale;\n\n# Multi-frequency Turing coral interference\nt1 = sin(q.x * 1.4 + cos(q.y * 1.3 + t * 0.35));\nt2 = sin(q.y * 1.5 - sin(q.x * 1.2 - t * 0.28));\nt3 = cos((q.x + q.y) * 1.1 + t * 0.22) * sin((q.x - q.y) * 1.15);\nmorph = (t1 + t2 + t3) / 3.0;\n\n# Cellular ridge & contour bands\nridge = 1.0 - smoothstep(0.0, ridgeWidth, abs(morph));\nspots = smoothstep(0.15, 0.55, morph);\nband = 0.5 + 0.5 * sin(morph * contourFreq * 3.14159);\n\nbaseCol = mix(cSlate, cVerdigris, spots * 0.85);\nbaseCol = mix(baseCol, cOchre, band * 0.42 * warmth);\nbaseCol = mix(baseCol, cCinnabar, ridge * 0.92);\n\ncol = clamp(baseCol, 0.0, 1.0);\n",
+    "params": {
+      "cellScale": 4.2,
+      "anisotropy": 0.38,
+      "ridgeWidth": 0.14,
+      "contourFreq": 6.0,
+      "warmth": 0.75
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

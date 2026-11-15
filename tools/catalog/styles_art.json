@@ -1006,6 +1006,121 @@
     "Carsten Nicolai / Alva Noto",
     "Monochrome, grid, signal-as-image"
    ]
+  },
+  {
+   "id": "jacquard_loom",
+   "taxonomy": "new",
+   "name": "Jacquard Punchcard",
+   "palette": [
+    "#F3EFE6",
+    "#1B2028",
+    "#B84A32",
+    "#2E5A68"
+   ],
+   "sources": [
+    "Rectangle",
+    "Line",
+    "Circle"
+   ],
+   "fx": [
+    "displace",
+    "grain"
+   ],
+   "comp": [
+    "threshold",
+    "Color Ramp"
+   ],
+   "ban": [
+    "bloom",
+    "glitch"
+   ],
+   "motion": 0.35,
+   "pairs": [
+    "idm",
+    "minimal_techno",
+    "tape_loop_polyphony"
+   ],
+   "refs": [
+    "Joseph Marie Jacquard (1804 loom punchcards)",
+    "Anni Albers (Bauhaus weaving drafts)",
+    "Binary warp/weft interlacing & textile notation"
+   ]
+  },
+  {
+   "id": "sashimono_joinery",
+   "taxonomy": "new",
+   "name": "Sashimono Joinery",
+   "palette": [
+    "#EAE3D5",
+    "#8C5A32",
+    "#2B2118",
+    "#C89D66"
+   ],
+   "sources": [
+    "Cube",
+    "Array",
+    "Cylinder"
+   ],
+   "fx": [
+    "edge outline",
+    "bevel"
+   ],
+   "comp": [
+    "Color Ramp"
+   ],
+   "ban": [
+    "bloom",
+    "glitch"
+   ],
+   "motion": 0.25,
+   "pairs": [
+    "ambient",
+    "solo_piano",
+    "tape_loop_polyphony"
+   ],
+   "refs": [
+    "Kanawa-tsugi & Koshikake timber scarf joints",
+    "Kumiko cypress latticework",
+    "Kengo Kuma architectural timber joinery"
+   ]
+  },
+  {
+   "id": "reaction_diffusion_belousov",
+   "taxonomy": "new",
+   "name": "Belousov-Zhabotinsky Reaction",
+   "palette": [
+    "#0E1A1E",
+    "#2A7B7B",
+    "#E8C589",
+    "#D9594C"
+   ],
+   "sources": [
+    "Noise",
+    "FieldPixel",
+    "Ramp"
+   ],
+   "fx": [
+    "displace",
+    "edge outline"
+   ],
+   "comp": [
+    "gradientmap",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.65,
+   "pairs": [
+    "west_coast_buchla",
+    "drone_kosmische",
+    "idm"
+   ],
+   "refs": [
+    "Belousov-Zhabotinsky oscillating chemical waves",
+    "Alan Turing (1952 morphogenesis reaction-diffusion)",
+    "Celadon, verdigris & cinnabar mineral glazes"
+   ]
   }
  ]
 }
