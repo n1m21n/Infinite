@@ -136,6 +136,8 @@ public:
    // Hard-side boost relative to a unity centre: 0 = 0 dB (balance), 1 = +3 dB
    // (equal power, the law every older patch used), 2 = +4.5 dB, 3 = +6 dB (linear).
    int panLaw = 1;
+   // Console master fader (mixer-panel plan §1), folded into every strip's gain.
+   float masterDb = 0.0f;
    AudioCable inputs[kMaxSlots];
 
 private:

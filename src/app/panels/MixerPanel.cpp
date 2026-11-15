@@ -1,6 +1,7 @@
 // Mixer panel: the console view of the patch's Mixer nodes (internal/plans/mixer-panel).
-// A3 is the shell: docks on four sides or floats, resizes from its seam, persists, and owns
-// the "Enable Mixer Audio" chip that hands the device to the console (AudioMode::Mixer).
+// A3 is the shell (five docks, persist, the "Enable Mixer Audio" chip). A4 is the console: page
+// tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
+// open, canvas-selection follow, and the empty state.
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -8,7 +9,13 @@
 #include "app/ui/design/UiType.h"
 #include "app/AppShared.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/ActionButton.h"
 #include "audio/AudioEngine.h"
+#include "core/CategoryColors.h"
+
+#include <set>
+#include <string>
+#include <vector>
 #include "nodes/AudioNodes.h"
 
 namespace app
@@ -35,8 +42,61 @@ namespace app
       RebuildAudioTopology();
    }
 
+   int gMixerPanelStripCount = 0;
+   float gMixerPanelFaderH = 0.0f;
+   ImVec2 gMixerStripsMin, gMixerStripsMax, gMixerMasterMin, gMixerMasterMax;
+
+   bool IsMixerPageTerminal(const INode* terminal, const INode* resolvedSource)
+   {
+      return dynamic_cast<const AudioOutputNode*>(terminal) != nullptr &&
+             dynamic_cast<const MixerNode*>(resolvedSource) != nullptr;
+   }
+
    namespace
    {
+      // Strip geometry. The fader takes whatever height is left after the fixed rows.
+      constexpr float kStripW = 58.0f;
+      constexpr float kStripGap = 4.0f;
+      constexpr float kNameH = 22.0f;
+      constexpr float kKnobD = 24.0f;
+      constexpr float kButtonsH = 20.0f;
+      constexpr float kRowGap = 4.0f;
+      constexpr float kStripMaxH = 360.0f;
+      constexpr float kMinFaderH = 40.0f;
+      constexpr int kMaxGroupDepth = 4;
+
+      struct Page { int outIndex; int topIndex; uint64_t topUid; };
+
+      struct StripRef
+      {
+         int mixerIndex = 0;  // the Mixer this slot belongs to
+         int slot = 0;
+         int srcIndex = -1;   // node on the cable, -1 when empty
+         int groupIndex = -1; // a nested Mixer behind the cable (D3), -1 when not a group
+         int depth = 0;
+      };
+
+      uint64_t sPageUid = 0;            // top Mixer of the page shown
+      std::set<uint64_t> sOpenGroups;   // folded-open group Mixers
+      uint64_t sHighlightUid = 0;       // canvas selection, shown on its strip
+      uint64_t sLastSelectedUid = 0;
+
+      GraphNode* GraphNodeOf(const INode* n)
+      {
+         if (n == nullptr)
+            return nullptr;
+         for (GraphNode& gn : gNodes)
+            if (gn.node.get() == n)
+               return &gn;
+         return nullptr;
+      }
+
+      MixerNode* MixerAt(int index)
+      {
+         GraphNode* gn = FindNodeByIndex(index);
+         return gn ? dynamic_cast<MixerNode*>(gn->node.get()) : nullptr;
+      }
+
       int CountMixers()
       {
          int n = 0;
@@ -46,17 +106,407 @@ namespace app
          return n;
       }
 
+      std::vector<Page> CollectPages()
+      {
+         std::vector<Page> pages;
+         for (GraphNode& gn : gNodes)
+         {
+            AudioCable* in = gn.node ? gn.node->AudioInputSlot(0) : nullptr;
+            if (in == nullptr || !in->IsConnected())
+               continue;
+            INode* resolved = ResolvedAudioSource(in->GetSource());
+            if (!IsMixerPageTerminal(gn.node.get(), resolved))
+               continue;
+            GraphNode* top = GraphNodeOf(resolved);
+            if (top == nullptr)
+               continue;
+            bool dup = false;
+            for (const Page& p : pages)
+               dup = dup || p.topIndex == top->index;
+            if (!dup)
+               pages.push_back({ gn.index, top->index, top->uid });
+         }
+         return pages;
+      }
+
+      int CurrentPage(const std::vector<Page>& pages)
+      {
+         for (int i = 0; i < (int)pages.size(); i++)
+            if (pages[i].topUid == sPageUid)
+               return i;
+         if (!pages.empty())
+            sPageUid = pages[0].topUid;
+         return pages.empty() ? -1 : 0;
+      }
+
+      // The console as a flat row: each slot of the top Mixer, and an open group's slots right after it.
+      // allOpen walks every group (selection follow), ignoring the folds.
+      void Flatten(int mixerIndex, int depth, bool allOpen, std::vector<StripRef>& out, std::set<int>& seen)
+      {
+         MixerNode* m = MixerAt(mixerIndex);
+         if (m == nullptr || !seen.insert(mixerIndex).second)
+            return;
+         for (int slot = 0; slot < m->numChannels; slot++)
+         {
+            StripRef r;
+            r.mixerIndex = mixerIndex;
+            r.slot = slot;
+            r.depth = depth;
+            const AudioCable& c = m->inputs[slot];
+            if (c.IsConnected())
+            {
+               if (GraphNode* src = GraphNodeOf(c.GetSource()))
+                  r.srcIndex = src->index;
+               INode* resolved = ResolvedAudioSource(c.GetSource());
+               if (dynamic_cast<MixerNode*>(resolved) != nullptr)
+                  if (GraphNode* g = GraphNodeOf(resolved))
+                     r.groupIndex = g->index;
+            }
+            out.push_back(r);
+            if (r.groupIndex >= 0 && depth < kMaxGroupDepth)
+            {
+               GraphNode* g = FindNodeByIndex(r.groupIndex);
+               if (allOpen || (g && sOpenGroups.count(g->uid)))
+                  Flatten(r.groupIndex, depth + 1, allOpen, out, seen);
+            }
+         }
+      }
+
+      std::vector<StripRef> Strips(int topIndex, bool allOpen)
+      {
+         std::vector<StripRef> out;
+         std::set<int> seen;
+         Flatten(topIndex, 0, allOpen, out, seen);
+         return out;
+      }
+
+      uint64_t SelectedNodeUid()
+      {
+         if (gEditor == nullptr)
+            return 0;
+         ed::EditorContext* prev = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+         uint64_t uid = 0;
+         if (ed::GetSelectedObjectCount() == 1)
+            for (GraphNode& gn : gNodes)
+               if (ed::IsNodeSelected(gn.NodeId()))
+               {
+                  uid = gn.uid;
+                  break;
+               }
+         ed::SetCurrentEditor(prev);
+         return uid;
+      }
+
+      void SelectOnCanvas(int nodeIndex)
+      {
+         GraphNode* gn = FindNodeByIndex(nodeIndex);
+         if (gn == nullptr || gEditor == nullptr)
+            return;
+         ed::EditorContext* prev = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+         ed::SelectNode(gn->NodeId(), false);
+         ed::SetCurrentEditor(prev);
+         sLastSelectedUid = sHighlightUid = gn->uid;
+      }
+
+      // D2: selecting a Mixer or a strip's source on the canvas brings its page up and opens its groups.
+      void FollowCanvasSelection(const std::vector<Page>& pages)
+      {
+         const uint64_t sel = SelectedNodeUid();
+         if (sel == sLastSelectedUid)
+            return;
+         sLastSelectedUid = sel;
+         sHighlightUid = sel;
+         GraphNode* g = sel ? FindNodeByUid(sel) : nullptr;
+         if (g == nullptr)
+            return;
+         for (const Page& p : pages)
+         {
+            const std::vector<StripRef> all = Strips(p.topIndex, true);
+            bool found = p.topIndex == g->index;
+            int owner = -1;
+            for (const StripRef& r : all)
+               if (r.srcIndex == g->index || r.groupIndex == g->index)
+               {
+                  found = true;
+                  owner = r.mixerIndex;
+                  break;
+               }
+            if (!found)
+               continue;
+            sPageUid = p.topUid;
+            // Open every group on the way down to the owner.
+            for (int guard = 0; owner >= 0 && owner != p.topIndex && guard < kMaxGroupDepth + 1; guard++)
+            {
+               GraphNode* og = FindNodeByIndex(owner);
+               if (og == nullptr)
+                  break;
+               sOpenGroups.insert(og->uid);
+               int parent = -1;
+               for (const StripRef& r : all)
+                  if (r.groupIndex == owner)
+                     parent = r.mixerIndex;
+               owner = parent;
+            }
+            return;
+         }
+      }
+
+      // One undo step per drag or toggle: the checkpoint has to hold the value from before the change.
+      void UndoOnActivate(float* v, float before)
+      {
+         if (!ImGui::IsItemActivated())
+            return;
+         const float now = *v;
+         *v = before;
+         PushUndoCheckpoint("Mixer strip");
+         *v = now;
+      }
+      void UndoOnToggle(bool* v)
+      {
+         *v = !*v;
+         PushUndoCheckpoint("Mixer strip");
+         *v = !*v;
+      }
+
+      ImU32 CategoryColorOf(const GraphNode* gn)
+      {
+         if (gn == nullptr)
+            return ImGui::GetColorU32(ImGuiCol_Border);
+         const CategoryColors::Color& c = CategoryColors::ColorFor(gn->category);
+         return ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f));
+      }
+
+      float FaderHeightFor(float stripH) { return std::max(kMinFaderH, stripH - kNameH - kKnobD - kButtonsH - 3.0f * kRowGap); }
+
+      // A clipped one-line name; returns true on click.
+      bool NameRow(ImDrawList* dl, ImVec2 p, float w, const char* name, ImU32 bar, bool dim)
+      {
+         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + 3.0f), bar, 1.5f);
+         ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + 3.0f));
+         const bool clicked = ImGui::InvisibleButton("##name", ImVec2(w, kNameH - 3.0f));
+         const ImVec2 ts = ImGui::CalcTextSize(name);
+         const float tx = p.x + std::max(2.0f, (w - ts.x) * 0.5f);
+         dl->PushClipRect(ImVec2(p.x + 2.0f, p.y), ImVec2(p.x + w - 2.0f, p.y + kNameH), true);
+         dl->AddText(ImVec2(tx, p.y + 5.0f), ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text), name);
+         dl->PopClipRect();
+         if (ImGui::IsItemHovered() && ts.x > w - 4.0f)
+            HelpTip("%s", name);
+         return clicked;
+      }
+
+      // Fader with its meter on the right; double-click returns to 0 dB.
+      void FaderWithMeter(ImVec2 p, float w, float h, float* db, float level)
+      {
+         const float meterW = kFaderMeterW;
+         const float faderCell = w - meterW - 4.0f;
+         ImGui::SetCursorScreenPos(p);
+         const float before = *db;
+         VFaderFloat("##fader", db, -60.0f, 12.0f, "%.1f dB", h, ImGui::GetColorU32(ImGuiCol_SliderGrab), false,
+                     faderCell, ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos);
+         UndoOnActivate(db, before);
+         if (ImGui::IsItemHovered())
+         {
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            {
+               PushUndoCheckpoint("Mixer strip");
+               *db = 0.0f;
+            }
+            if (*db <= -60.0f)
+               HelpTip("-inf dB");
+            else
+               HelpTip("%+.1f dB", *db);
+         }
+         DrawStripMeter(p.x + faderCell + 2.0f, p.y, meterW, h, level);
+      }
+
+      void DrawStrip(ImDrawList* dl, ImVec2 p, float h, const StripRef& r)
+      {
+         MixerNode* m = MixerAt(r.mixerIndex);
+         if (m == nullptr)
+            return;
+         GraphNode* src = r.srcIndex >= 0 ? FindNodeByIndex(r.srcIndex) : nullptr;
+         GraphNode* grp = r.groupIndex >= 0 ? FindNodeByIndex(r.groupIndex) : nullptr;
+         const int s = r.slot;
+         ImGui::PushID(r.mixerIndex);
+         ImGui::PushID(s);
+
+         const ImVec2 q(p.x + kStripW, p.y + h);
+         if (r.depth > 0)
+            dl->AddRectFilled(p, q, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.35f + 0.15f * (float)std::min(r.depth, 3)), 4.0f);
+         const bool lit = sHighlightUid != 0 && ((src && src->uid == sHighlightUid) || (grp && grp->uid == sHighlightUid));
+         if (lit)
+            dl->AddRect(p, q, ImGui::GetColorU32(ImGuiCol_CheckMark), 4.0f, 0, 1.5f);
+
+         // Name: the node on the cable. A group strip carries a fold arrow and its Mixer's name.
+         std::string name = grp ? NodeTitle(*grp) : src ? NodeTitle(*src) : std::string(T("Empty"));
+         float nameX = p.x, nameW = kStripW;
+         if (grp)
+         {
+            const bool open = sOpenGroups.count(grp->uid) != 0;
+            ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + 3.0f));
+            if (ImGui::InvisibleButton("##fold", ImVec2(14.0f, kNameH - 3.0f)))
+            {
+               if (open)
+                  sOpenGroups.erase(grp->uid);
+               else
+                  sOpenGroups.insert(grp->uid);
+            }
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", open ? T("Fold group") : T("Open group"));
+            const ImVec2 c(p.x + 7.0f, p.y + 3.0f + (kNameH - 3.0f) * 0.5f);
+            const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+            if (open)
+               dl->AddTriangleFilled(ImVec2(c.x - 4.0f, c.y - 2.0f), ImVec2(c.x + 4.0f, c.y - 2.0f), ImVec2(c.x, c.y + 3.0f), col);
+            else
+               dl->AddTriangleFilled(ImVec2(c.x - 2.0f, c.y - 4.0f), ImVec2(c.x - 2.0f, c.y + 4.0f), ImVec2(c.x + 3.0f, c.y), col);
+            nameX += 12.0f;
+            nameW -= 12.0f;
+         }
+         if (NameRow(dl, ImVec2(nameX, p.y), nameW, name.c_str(), CategoryColorOf(grp ? grp : src), src == nullptr) && (grp || src))
+            SelectOnCanvas(grp ? grp->index : src->index);
+
+         // Trim and pan side by side.
+         float y = p.y + kNameH + kRowGap;
+         const float cell = kStripW * 0.5f;
+         ImGui::SetCursorScreenPos(ImVec2(p.x, y));
+         float before = m->trimDb[s];
+         BipolarKnobFloat("##trim", &m->trimDb[s], -24.0f, 24.0f, "%.1f dB", kKnobD, ImGui::GetColorU32(ImGuiCol_SliderGrab), false, cell,
+                          -1, -1, false, 0.0f, 0.0f, false, true);
+         UndoOnActivate(&m->trimDb[s], before);
+         if (ImGui::IsItemHovered())
+            HelpTip("%s %+.1f dB", T("Trim"), m->trimDb[s]);
+         ImGui::SetCursorScreenPos(ImVec2(p.x + cell, y));
+         before = m->pan[s];
+         BipolarKnobFloat("##pan", &m->pan[s], -1.0f, 1.0f, "%.2f", kKnobD, ImGui::GetColorU32(ImGuiCol_SliderGrab), false, cell,
+                          -1, -1, false, 0.0f, 0.0f, false, true);
+         UndoOnActivate(&m->pan[s], before);
+         if (ImGui::IsItemHovered())
+            HelpTip("%s %+.0f", T("Pan"), m->pan[s] * 100.0f);
+
+         // Fader | meter.
+         y += kKnobD + kRowGap;
+         const float faderH = FaderHeightFor(h);
+         gMixerPanelFaderH = faderH;
+         FaderWithMeter(ImVec2(p.x + 2.0f, y), kStripW - 4.0f, faderH, &m->gainDb[s], m->ChannelLevel(s));
+
+         // M S Ø.
+         y += faderH + kRowGap;
+         const float bw = (kStripW - 4.0f) / 3.0f;
+         ImGui::SetCursorScreenPos(ImVec2(p.x + 1.0f, y));
+         if (AudioMuteButton("M##m", &m->mute[s], bw, kButtonsH))
+            UndoOnToggle(&m->mute[s]);
+         ImGui::SetCursorScreenPos(ImVec2(p.x + 2.0f + bw, y));
+         if (AudioSoloButton("S##s", &m->solo[s], bw, kButtonsH))
+            UndoOnToggle(&m->solo[s]);
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         {
+            PushUndoCheckpoint("Mixer strip");
+            m->soloSafe[s] = !m->soloSafe[s];
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", m->soloSafe[s] ? T("Solo safe (right-click)") : T("Solo (right-click: solo safe)"));
+         ImGui::SetCursorScreenPos(ImVec2(p.x + 3.0f + 2.0f * bw, y));
+         if (ActionButton::Draw("\xC3\x98##ph", ImVec2(bw, kButtonsH), m->phase[s] ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+         {
+            PushUndoCheckpoint("Mixer strip");
+            m->phase[s] = !m->phase[s];
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Invert polarity"));
+
+         ImGui::PopID();
+         ImGui::PopID();
+      }
+
+      void DrawMaster(ImDrawList* dl, ImVec2 p, float h, int topIndex)
+      {
+         MixerNode* m = MixerAt(topIndex);
+         GraphNode* gn = FindNodeByIndex(topIndex);
+         if (m == nullptr || gn == nullptr)
+            return;
+         ImGui::PushID("master");
+         dl->AddRectFilled(p, ImVec2(p.x + kStripW, p.y + h), ImGui::GetColorU32(ImGuiCol_FrameBg, 0.6f), 4.0f);
+         if (NameRow(dl, p, kStripW, T("Master"), CategoryColorOf(gn), false))
+            SelectOnCanvas(topIndex);
+         const float y = p.y + kNameH + kRowGap + kKnobD + kRowGap;
+         FaderWithMeter(ImVec2(p.x + 2.0f, y), kStripW - 4.0f, FaderHeightFor(h), &m->masterDb, m->Level());
+         ImGui::PopID();
+         gMixerMasterMin = p;
+         gMixerMasterMax = ImVec2(p.x + kStripW, p.y + h);
+      }
+
+      int SpawnAt(const char* type, float x, float y)
+      {
+         GraphNode* gn = SpawnNode(type, "Utility", x, y);
+         return gn ? gn->index : -1;
+      }
+
+      // Right of everything on the canvas, so a new pair never lands on a node.
+      ImVec2 FreeCanvasSpot()
+      {
+         float x = 0.0f, y = 0.0f;
+         bool any = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            x = any ? std::max(x, gn.liveX) : gn.liveX;
+            y = any ? std::min(y, gn.liveY) : gn.liveY;
+            any = true;
+         }
+         return any ? ImVec2(x + 420.0f, y) : ImVec2(0.0f, 0.0f);
+      }
+
+      void DrawPageTabs(const std::vector<Page>& pages, int current)
+      {
+         for (int i = 0; i < (int)pages.size(); i++)
+         {
+            GraphNode* top = FindNodeByIndex(pages[i].topIndex);
+            const std::string label = (top ? NodeTitle(*top) : std::string(T("Page"))) + "##page" + std::to_string(i);
+            if (ChipButton::Draw(label.c_str(), i == current, tok::tile))
+               sPageUid = pages[i].topUid;
+            ImGui::SameLine(0.0f, tok::space_1);
+         }
+         if (ChipButton::Draw((std::string("+ ") + T("page") + "##addpage").c_str(), false, tok::tile))
+            MixerPanelAddPage();
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("New Mixer + Audio Out"));
+      }
+
+      void DrawEmpty(ImVec2 mn, ImVec2 mx)
+      {
+         const bool noMixer = CountMixers() == 0;
+         bool anyOut = false;
+         for (GraphNode& gn : gNodes)
+            if (auto* out = dynamic_cast<AudioOutputNode*>(gn.node.get()))
+               anyOut = anyOut || out->input.IsConnected();
+         EmptyState::DrawTo(ImGui::GetWindowDrawList(), mn, ImVec2(mx.x, mn.y + (mx.y - mn.y) * 0.6f),
+                            noMixer ? T("No Mixer yet") : T("No Mixer feeds an Audio Out"));
+         if (!anyOut)
+            return;
+         const char* label = T("Create from Audio Outs");
+         const float w = ImGui::CalcTextSize(label).x + 2.0f * tok::space_3;
+         ImGui::SetCursorScreenPos(ImVec2((mn.x + mx.x - w) * 0.5f, mn.y + (mx.y - mn.y) * 0.6f));
+         if (ActionButton::Draw(label, ImVec2(w, 0.0f), ActionButton::Kind::Primary))
+            MixerPanelCreateFromAudioOuts();
+      }
+
       void DrawMixerPanelContent()
       {
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const std::vector<Page> pages = CollectPages();
+         FollowCanvasSelection(pages);
+         const int current = CurrentPage(pages);
 
-         // Header: the title left, Mixer Audio pinned right (the twin of Session's and the Timeline's chip).
+         // Header: the title and page tabs left, Mixer Audio pinned right (the twin of Session's chip).
          ImGui::AlignTextToFramePadding();
          {
             UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
             ImGui::TextUnformatted(T("Mixer"));
          }
+         ImGui::SameLine(0.0f, tok::space_3);
+         DrawPageTabs(pages, current);
          {
             const bool mixerMode = gAudioMode == AudioMode::Mixer;
             const char* audioLabel = mixerMode ? T("Mixer Audio On") : T("Enable Mixer Audio");
@@ -72,16 +522,85 @@ namespace app
 
          const ImVec2 bodyMin(origin.x, ImGui::GetCursorScreenPos().y + tok::space_2);
          const ImVec2 bodyMax(origin.x + avail.x, origin.y + avail.y);
-         if (CountMixers() == 0 && bodyMax.y > bodyMin.y)
-            EmptyState::DrawTo(ImGui::GetWindowDrawList(), bodyMin, bodyMax, T("No Mixer yet"),
-                               T("Add a Mixer node to see its strips here."));
+         gMixerPanelStripCount = 0;
+         if (current < 0)
+         {
+            if (bodyMax.y > bodyMin.y)
+               DrawEmpty(bodyMin, bodyMax);
+         }
+         else if (bodyMax.y - bodyMin.y > 40.0f)
+         {
+            const Page& page = pages[current];
+            const std::vector<StripRef> strips = Strips(page.topIndex, false);
+            MixerNode* top = MixerAt(page.topIndex);
+            const bool canAdd = top && top->numChannels < MixerNode::kMaxSlots;
 
-         // Right-click anywhere on the panel to move or close it (rect test, as the Mod Matrix does).
+            // §4.4: master at the right edge on a wide dock, under the strips on a tall one.
+            const float bodyW = bodyMax.x - bodyMin.x, bodyH = bodyMax.y - bodyMin.y;
+            const float scrollH = ImGui::GetStyle().ScrollbarSize;
+            const float minStripH = kNameH + kKnobD + kButtonsH + 3.0f * kRowGap + kMinFaderH;
+            const bool tall = (gMixerPanelDock == 1 || gMixerPanelDock == 2) && bodyH >= 2.0f * minStripH + scrollH + kStripGap;
+            float stripsW, stripsH, masterH;
+            ImVec2 masterAt;
+            if (tall)
+            {
+               stripsW = bodyW;
+               stripsH = std::min(kStripMaxH + scrollH, (bodyH - kStripGap) * 0.5f);
+               masterH = std::min(kStripMaxH, bodyH - stripsH - kStripGap);
+               masterAt = ImVec2(bodyMin.x, bodyMin.y + stripsH + kStripGap);
+            }
+            else
+            {
+               stripsW = std::max(kStripW, bodyW - kStripW - kStripGap * 2.0f);
+               stripsH = std::min(kStripMaxH + scrollH, bodyH);
+               masterH = stripsH - scrollH;
+               masterAt = ImVec2(bodyMax.x - kStripW, bodyMin.y);
+            }
+
+            ImGui::SetCursorScreenPos(bodyMin);
+            ImGui::BeginChild("##mixerstrips", ImVec2(stripsW, stripsH), false, ImGuiWindowFlags_HorizontalScrollbar);
+            {
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               const ImVec2 base = ImGui::GetCursorScreenPos();
+               const float h = stripsH - scrollH;
+               const ImVec2 wmn = ImGui::GetWindowPos();
+               const float visL = wmn.x, visR = wmn.x + ImGui::GetWindowWidth();
+               float x = base.x;
+               for (const StripRef& r : strips)
+               {
+                  if (x + kStripW >= visL && x <= visR)
+                     DrawStrip(dl, ImVec2(x, base.y), h, r);
+                  x += kStripW + kStripGap;
+               }
+               if (canAdd)
+               {
+                  ImGui::SetCursorScreenPos(ImVec2(x, base.y + kNameH));
+                  if (ActionButton::Draw("+##addstrip", ImVec2(24.0f, 24.0f)))
+                  {
+                     PushUndoCheckpoint("Add strip");
+                     top->numChannels = std::min(top->numChannels + 1, (int)MixerNode::kMaxSlots);
+                     RebuildAudioTopology();
+                  }
+                  if (ImGui::IsItemHovered())
+                     HelpTip("%s", T("Add strip"));
+                  x += 24.0f + kStripGap;
+               }
+               ImGui::SetCursorScreenPos(base);
+               ImGui::Dummy(ImVec2(std::max(1.0f, x - base.x), h));
+               gMixerStripsMin = wmn;
+               gMixerStripsMax = ImVec2(wmn.x + ImGui::GetWindowWidth(), wmn.y + ImGui::GetWindowHeight());
+            }
+            ImGui::EndChild();
+            gMixerPanelStripCount = (int)strips.size();
+            DrawMaster(ImGui::GetWindowDrawList(), masterAt, masterH, page.topIndex);
+         }
+
+         // Right-click empty panel space to move or close it (rect test, as the Mod Matrix does).
          const ImVec2 mouse = ImGui::GetIO().MousePos;
          const bool overPanel = mouse.x >= origin.x && mouse.x < origin.x + avail.x &&
                                 mouse.y >= origin.y && mouse.y < origin.y + avail.y;
          gMixerClaimedKeys = overPanel && !ImGui::GetIO().WantTextInput;
-         if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+         if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
             ImGui::OpenPopup("##mixerpanelctx");
          if (MenuParts::BeginPopup("##mixerpanelctx"))
          {
@@ -95,6 +614,88 @@ namespace app
             MenuParts::EndPopup();
          }
       }
+   }
+
+   int MixerPanelPageCount() { return (int)CollectPages().size(); }
+
+   void MixerPanelSelectPage(int page)
+   {
+      const std::vector<Page> pages = CollectPages();
+      if (page >= 0 && page < (int)pages.size())
+         sPageUid = pages[page].topUid;
+   }
+
+   // G8: a page is a Mixer feeding its own Audio Out. One undo step for the pair and its cable.
+   int MixerPanelAddPage()
+   {
+      const ImVec2 at = FreeCanvasSpot();
+      PushUndoCheckpoint("New mixer page");
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      gSuppressUndoCheckpoints = true;
+      const int mix = SpawnAt("Mixer", at.x, at.y);
+      const int out = SpawnAt("Audio Out", at.x + 320.0f, at.y);
+      GraphNode* mixGn = FindNodeByIndex(mix);
+      GraphNode* outGn = FindNodeByIndex(out);
+      if (mixGn && outGn)
+      {
+         WireInputSlot(*mixGn, *outGn, 0, 0);
+         sPageUid = mixGn->uid;
+      }
+      gSuppressUndoCheckpoints = wasSuppressed;
+      RebuildAudioTopology();
+      return mix;
+   }
+
+   // D13: every Audio Out's source goes into one new Mixer, which feeds the first of those Audio Outs.
+   // The others are unplugged so nothing plays twice.
+   bool MixerPanelCreateFromAudioOuts()
+   {
+      std::vector<int> outs;
+      for (GraphNode& gn : gNodes)
+         if (auto* out = dynamic_cast<AudioOutputNode*>(gn.node.get()))
+            if (out->input.IsConnected() && dynamic_cast<MixerNode*>(ResolvedAudioSource(out->input.GetSource())) == nullptr)
+               outs.push_back(gn.index);
+      if (outs.empty())
+         return false;
+      struct Feed { int src; int outSlot; };
+      std::vector<Feed> feeds;
+      for (int oi : outs)
+      {
+         auto* out = dynamic_cast<AudioOutputNode*>(FindNodeByIndex(oi)->node.get());
+         if (GraphNode* src = GraphNodeOf(out->input.GetSource()))
+            feeds.push_back({ src->index, out->input.GetOutputSlot() });
+      }
+      if (feeds.empty() || feeds.size() > (size_t)MixerNode::kMaxSlots)
+         return false;
+      GraphNode* first = FindNodeByIndex(outs[0]);
+      const ImVec2 at(first->liveX - 300.0f, first->liveY);
+
+      PushUndoCheckpoint("Create Mixer from Audio Outs");
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      gSuppressUndoCheckpoints = true;
+      const int mix = SpawnAt("Mixer", at.x, at.y);
+      if (MixerNode* m = MixerAt(mix))
+         m->numChannels = std::max(m->numChannels, (int)feeds.size());
+      for (size_t k = 0; k < feeds.size(); k++)
+      {
+         GraphNode* src = FindNodeByIndex(feeds[k].src);
+         GraphNode* mixGn = FindNodeByIndex(mix);
+         if (src && mixGn)
+            WireInputSlot(*src, *mixGn, (int)k, feeds[k].outSlot);
+      }
+      for (size_t i = 1; i < outs.size(); i++)
+         if (GraphNode* o = FindNodeByIndex(outs[i]))
+            DisconnectDstPin(o->InputPinId(0));
+      GraphNode* mixGn = FindNodeByIndex(mix);
+      GraphNode* firstOut = FindNodeByIndex(outs[0]);
+      if (mixGn && firstOut)
+      {
+         WireInputSlot(*mixGn, *firstOut, 0, 0);
+         sPageUid = mixGn->uid;
+      }
+      gSuppressUndoCheckpoints = wasSuppressed;
+      RebuildAudioTopology();
+      return mixGn != nullptr;
    }
 
    void MixerPanelDockCombo()

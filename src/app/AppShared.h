@@ -785,6 +785,17 @@ extern bool  gMixerClaimedKeys;
 extern ImVec2 gMixerPanelRectMin, gMixerPanelRectMax;
 inline const float kMixerPanelMinWidth = 320.0f;
 inline const float kMixerPanelMinHeight = 180.0f;
+// A page is one console: an Audio Out whose input resolves to a Mixer (that Mixer is the page's top).
+// Mixer Audio routes exactly these terminals; the panel lists exactly these pages.
+bool IsMixerPageTerminal(const INode* terminal, const INode* resolvedSource);
+int MixerPanelPageCount();
+void MixerPanelSelectPage(int page);
+int MixerPanelAddPage();              // spawns a Mixer + Audio Out pair; returns the Mixer's node index
+bool MixerPanelCreateFromAudioOuts(); // D13: wraps every Audio Out's source into one new Mixer
+// What the last drawn frame laid out, for the self-test.
+extern int gMixerPanelStripCount;
+extern float gMixerPanelFaderH;
+extern ImVec2 gMixerStripsMin, gMixerStripsMax, gMixerMasterMin, gMixerMasterMax;
 
 extern std::vector<int> gViewportPanelNodes;
 

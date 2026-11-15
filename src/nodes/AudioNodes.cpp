@@ -278,7 +278,7 @@ public:
       mPanLaw.store(std::clamp(n.panLaw, 0, 3), std::memory_order_relaxed);
       for (int s = 0; s < MixerNode::kMaxSlots; s++)
       {
-         const float db = n.gainDb[s] + n.trimDb[s];
+         const float db = n.gainDb[s] + n.trimDb[s] + n.masterDb;
          mGainDb[s].store(db, std::memory_order_relaxed);
          mMailbox.Push(s, db);
          mPan[s].store(n.pan[s], std::memory_order_relaxed);
@@ -372,6 +372,8 @@ void MixerNode::VisitParams(ParamVisitor& v)
       v.Bool(kNames.safe[i].c_str(), soloSafe[i]);
       trimDb[i] = std::isfinite(trimDb[i]) ? std::clamp(trimDb[i], -24.0f, 24.0f) : 0.0f;
    }
+   v.Float("master", masterDb);
+   masterDb = std::isfinite(masterDb) ? std::clamp(masterDb, kMinGainDb, kMaxGainDb) : 0.0f;
 }
 
 AudioNode* MixerNode::GetAudioNode()

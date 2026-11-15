@@ -625,7 +625,7 @@ namespace app
                   // resolved's own node is still walked into `order` above,
                   // so if it happens to BE (or feed) an active clip's node,
                   // that clip's own terminal below still finds it processed.
-                  if (!timelineRouting && (!mixerOnly || dynamic_cast<MixerNode*>(resolved) != nullptr))
+                  if (!timelineRouting && (!mixerOnly || IsMixerPageTerminal(gn.node.get(), resolved)))
                   {
                      // Capture is set unconditionally, gated at write-time on
                      // the ring's own `enabled` flag - see AudioTerminal's comment.

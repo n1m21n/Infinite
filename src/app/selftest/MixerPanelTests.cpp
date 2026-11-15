@@ -1,7 +1,9 @@
-// Mixer panel self-test (INFINITE_MIXERPANELTEST): the A3 shell. Five docks drawn where they belong,
-// open/dock/size survive save and load, and Mixer Audio lets only a Mixer-fed Audio Out reach the device.
+// Mixer panel self-test (INFINITE_MIXERPANELTEST). A3: five docks drawn where they belong, open/dock/size
+// survive save and load, Mixer Audio lets only page terminals reach the device. A4: a page of 8, 16 and
+// 32 strips laid out in every dock, page tabs, group strips, "Create from Audio Outs".
 // Plan: internal/plans/mixer-panel.
 #include "app/AppShared.h"
+#include "nodes/AudioNodes.h"
 
 #include <cmath>
 #include <cstdio>
@@ -70,7 +72,47 @@ namespace
 
       SetMixerAudio(false);
       Check("leaving Mixer Audio returns to the canvas", gAudioMode == AudioMode::Canvas && gAudioTopologyTerminalCount == 2);
+      Check("one page: the Mixer-fed Audio Out", MixerPanelPageCount() == 1);
+      const int page2 = MixerPanelAddPage();
+      Check("+ page adds a Mixer + Audio Out pair", page2 > 0 && MixerPanelPageCount() == 2);
       NewPatch();
+
+      // D13: two direct Audio Outs become one console feeding the first; the second is unplugged.
+      const int c = SpawnNode("Delay", "AudioEffects", 0.0f, 0.0f)->index;
+      const int d = SpawnNode("Delay", "AudioEffects", 0.0f, 300.0f)->index;
+      const int o1 = SpawnNode("Audio Out", "Utility", 600.0f, 0.0f)->index;
+      const int o2 = SpawnNode("Audio Out", "Utility", 600.0f, 300.0f)->index;
+      wired = ConnectNodes(c, 0, o1, 0, err) && ConnectNodes(d, 0, o2, 0, err);
+      Check("D13 patch wires up", wired && MixerPanelPageCount() == 0);
+      Check("Create from Audio Outs makes one page", MixerPanelCreateFromAudioOuts() && MixerPanelPageCount() == 1);
+      auto* unplugged = dynamic_cast<AudioOutputNode*>(FindNodeByIndex(o2)->node.get());
+      Check("the other Audio Out is unplugged, so nothing plays twice", unplugged && !unplugged->input.IsConnected());
+      gAudioMode = AudioMode::Canvas;
+      RebuildAudioTopology();
+      Check("both sources now reach the device once, through the console", gAudioTopologyTerminalCount == 1);
+      NewPatch();
+   }
+
+   // A page whose top Mixer has `strips` slots, one source each, and one group Mixer on slot 0.
+   void BuildConsole(int strips)
+   {
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      auto* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get());
+      m->numChannels = strips;
+      std::string err;
+      bool ok = ConnectNodes(top, 0, out, 0, err);
+      const int grp = SpawnNode("Mixer", "Utility", 200.0f, 0.0f)->index;
+      ok = ConnectNodes(grp, 0, top, 0, err) && ok;
+      for (int i = 1; i < strips; i++)
+      {
+         const int src = SpawnNode("Gain", "AudioEffects", 0.0f, 120.0f * (float)i)->index;
+         ok = ConnectNodes(src, 0, top, i, err) && ok;
+      }
+      if (!ok)
+         Check("console patch wires up: " + err, false);
+      MixerPanelSelectPage(0);
    }
 }
 
@@ -119,7 +161,45 @@ bool MixerPanelTestStep(int frameId)
       }
       return false;
    }
-   CheckRoutingAndPersist();
+   // A4: every strip count in every dock. The strip row and the master lie inside the card.
+   static const int kCounts[3] = { 8, 16, 32 };
+   static int sCase = -1, sCaseAt = 0;
+   if (sCase < 0)
+   {
+      CheckRoutingAndPersist();
+      sCase = 0;
+      BuildConsole(kCounts[0]);
+      gMixerPanelDock = kOrder[0];
+      gMixerPanelOpen = true;
+      sCaseAt = frameId;
+      return false;
+   }
+   if (sCase < 15)
+   {
+      if (frameId < sCaseAt + 3)
+         return false;
+      const int count = kCounts[sCase / 5];
+      const int dock = kOrder[sCase % 5];
+      const ImVec2 cmn = gMixerPanelRectMin, cmx = gMixerPanelRectMax;
+      const bool inside = gMixerStripsMin.x >= cmn.x - 1.0f && gMixerStripsMax.x <= cmx.x + 1.0f &&
+                          gMixerStripsMin.y >= cmn.y - 1.0f && gMixerStripsMax.y <= cmx.y + 1.0f &&
+                          gMixerMasterMin.x >= cmn.x - 1.0f && gMixerMasterMax.x <= cmx.x + 1.0f &&
+                          gMixerMasterMax.y <= cmx.y + 1.0f;
+      const bool overlap = gMixerMasterMin.x < gMixerStripsMax.x && gMixerMasterMin.y < gMixerStripsMax.y;
+      char label[160];
+      snprintf(label, sizeof(label), "%d strips, %s: %d laid out, fader %.0f px, inside the card, master clear of strips",
+               count, kNames[dock], gMixerPanelStripCount, gMixerPanelFaderH);
+      Check(label, gMixerPanelStripCount == count && gMixerPanelFaderH >= 40.0f && inside && !overlap);
+      if (++sCase < 15)
+      {
+         if (sCase % 5 == 0)
+            BuildConsole(kCounts[sCase / 5]);
+         gMixerPanelDock = kOrder[sCase % 5];
+         sCaseAt = frameId;
+      }
+      return false;
+   }
+   NewPatch();
    gMixerPanelOpen = false;
    gMixerPanelDock = 0;
    printf("MIXERPANELTEST %s\n", sOk ? "PASS" : "FAIL");
