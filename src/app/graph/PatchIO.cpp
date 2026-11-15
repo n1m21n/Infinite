@@ -2,6 +2,7 @@
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/PanelRail.h"
 #include <algorithm>
+#include <cmath>
 #include "app/AppShared.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/graph/LearningLog.h"
@@ -367,6 +368,16 @@ namespace app
       file << "panelMixerDock=" << gMixerPanelDock << "\n";
       file << "panelMixerW=" << gMixerPanelWidth << "\n";
       file << "panelMixerH=" << gMixerPanelHeight << "\n";
+      // The render column's settings (Block C): the next take starts where the last one was set.
+      const MixerRenderSettings& r = gMixerRender;
+      file << "mixerRenderSource=" << r.source << "\n";
+      file << "mixerRenderMode=" << r.mode << "\n";
+      file << "mixerRenderLengthUnit=" << r.lengthUnit << "\n";
+      file << "mixerRenderLength=" << r.length << "\n";
+      file << "mixerRenderTail=" << r.tail << "\n";
+      file << "mixerRenderStart=" << r.start << "\n";
+      file << "mixerRenderFormat=" << r.format << "\n";
+      file << "mixerRenderName=" << r.name << "\n";
    }
 
    bool MixerPanelDockReadKey(const std::string& key, const std::string& val)
@@ -379,6 +390,28 @@ namespace app
          gMixerPanelWidth = std::max(kMixerPanelMinWidth, std::strtof(val.c_str(), nullptr));
       else if (key == "panelMixerH")
          gMixerPanelHeight = std::max(kMixerPanelMinHeight, std::strtof(val.c_str(), nullptr));
+      else if (key == "mixerRenderSource")
+         gMixerRender.source = std::clamp(atoi(val.c_str()), 0, 1);
+      else if (key == "mixerRenderMode")
+         gMixerRender.mode = std::clamp(atoi(val.c_str()), 0, 1);
+      else if (key == "mixerRenderLengthUnit")
+         gMixerRender.lengthUnit = std::clamp(atoi(val.c_str()), 0, 3);
+      else if (key == "mixerRenderLength")
+      {
+         const float v = std::strtof(val.c_str(), nullptr);
+         gMixerRender.length = std::isfinite(v) ? std::clamp(v, 1.0f, 3600.0f) : 30.0f;
+      }
+      else if (key == "mixerRenderTail")
+      {
+         const float v = std::strtof(val.c_str(), nullptr);
+         gMixerRender.tail = std::isfinite(v) ? std::clamp(v, 0.0f, 30.0f) : 2.0f;
+      }
+      else if (key == "mixerRenderStart")
+         gMixerRender.start = std::clamp(atoi(val.c_str()), 0, 2);
+      else if (key == "mixerRenderFormat")
+         gMixerRender.format = std::clamp(atoi(val.c_str()), 0, 3);
+      else if (key == "mixerRenderName")
+         gMixerRender.name = val.empty() ? std::string("{patch}-{take}") : val;
       else
          return false;
       return true;

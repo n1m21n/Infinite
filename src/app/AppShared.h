@@ -788,6 +788,8 @@ inline const float kMixerPanelMinHeight = 180.0f;
 // A page is one console: an Audio Out whose input resolves to a Mixer (that Mixer is the page's top).
 // Mixer Audio routes exactly these terminals; the panel lists exactly these pages.
 bool IsMixerPageTerminal(const INode* terminal, const INode* resolvedSource);
+INode* MixerPageTop(INode* resolvedSource); // the Mixer behind a terminal's source, up through master inserts
+inline constexpr int kMixerMasterSlot = -1; // MixerPanelInsert*: the chain between the top Mixer and its Audio Out
 int MixerPanelPageCount();
 void MixerPanelSelectPage(int page);
 int MixerPanelAddPage();              // spawns a Mixer + Audio Out pair; returns the Mixer's node index
@@ -803,12 +805,17 @@ bool MixerPanelInsertBypass(int mixerIndex, int slot, int pos);
 int MixerPanelGroupStrips(int mixerIndex, const std::vector<int>& slots);
 bool MixerPanelUngroup(int mixerIndex, int slot);
 bool MixerPanelStripMove(int mixerIndex, int from, int to);
+// B6: snapshots A-H over the whole console (top + groups), crossfaded by the top's snapfade; solo clear.
+bool MixerPanelSnapshotStore(int topIndex, int k);
+bool MixerPanelSnapshotRecall(int topIndex, int k);
+bool MixerPanelAnySolo(int topIndex);
+void MixerPanelClearSolos(int topIndex);
 // Block C: the render column (MixerRender.cpp). One take per Audio Out, through its own recorder.
 struct MixerRenderSettings
 {
-   int source = 0;     // 0 this page, 1 all pages (one file each)
+   int source = 0;     // 0 this page, 1 all pages (one file: the sum of every page, G8)
    int mode = 0;       // 0 live, 1 fast (offline)
-   int lengthUnit = 0; // 0 seconds, 1 bars, 2 until stop
+   int lengthUnit = 0; // 0 seconds, 1 bars, 2 until stop, 3 arrange range (loop when on, else the whole arrangement)
    float length = 30.0f;
    float tail = 2.0f;  // seconds, rendered with the transport stopped
    int start = 0;      // 0 now, 1 with transport play, 2 from the start
@@ -830,6 +837,7 @@ bool MixerRenderActive();
 bool MixerRenderArmed();
 float MixerRenderProgress();                               // 0..1, < 0 when there is no end yet
 double MixerRenderLengthSeconds();
+bool MixerRenderArrangeSpan(double& startSec, double& lengthSec); // lengthUnit 3; false when the arrangement is empty
 const std::vector<MixerRenderResult>& MixerRenderResults();
 const std::string& MixerRenderRefusal();
 std::string MixerRenderFileName(const std::string& tmpl, const std::string& dir, const char* ext);

@@ -52,10 +52,30 @@ namespace app
    bool gMixerRenderOpen = false;
    ImVec2 gMixerRenderMin, gMixerRenderMax;
 
+   // D4: master inserts are the effects between the top Mixer's main output and its Audio Out, so the
+   // walk goes up input 0 until it meets a Mixer. A chain that starts at a send pin is a return, not a page.
+   INode* MixerPageTop(INode* resolvedSource)
+   {
+      INode* n = resolvedSource;
+      for (int hop = 0; n != nullptr && hop < 64; hop++)
+      {
+         if (dynamic_cast<MixerNode*>(n) != nullptr)
+            return n;
+         AudioCable* in = n->AudioInputSlot(0);
+         if (in == nullptr || !in->IsConnected())
+            return nullptr;
+         INode* up = ResolvedAudioSource(in->GetSource());
+         if (dynamic_cast<MixerNode*>(up) != nullptr && in->GetOutputSlot() != 0)
+            return nullptr;
+         n = up;
+      }
+      return nullptr;
+   }
+
    bool IsMixerPageTerminal(const INode* terminal, const INode* resolvedSource)
    {
       return dynamic_cast<const AudioOutputNode*>(terminal) != nullptr &&
-             dynamic_cast<const MixerNode*>(resolvedSource) != nullptr;
+             MixerPageTop(const_cast<INode*>(resolvedSource)) != nullptr;
    }
 
    namespace
@@ -105,6 +125,7 @@ namespace app
       };
 
       using Consumers = std::unordered_map<const INode*, int>;
+      bool ChainAt(int mixerIndex, int slot, Chain& ch); // defined with the insert edits below
 
       Consumers CountConsumers()
       {
@@ -216,7 +237,7 @@ namespace app
             INode* resolved = ResolvedAudioSource(in->GetSource());
             if (!IsMixerPageTerminal(gn.node.get(), resolved))
                continue;
-            GraphNode* top = GraphNodeOf(resolved);
+            GraphNode* top = GraphNodeOf(MixerPageTop(resolved));
             if (top == nullptr)
                continue;
             bool dup = false;
@@ -637,7 +658,7 @@ namespace app
       }
 
       // §4.2 / D4: the strip's insert chain as chips, then "+". A shared chain is edited on the canvas.
-      void DrawInserts(ImDrawList* dl, ImVec2 p, const StripRef& r)
+      void DrawInserts(ImDrawList* dl, ImVec2 p, const StripRef& r, int rows = kInsertRows)
       {
          const float w = kStripW - 2.0f;
          const float x = p.x + 1.0f;
@@ -652,8 +673,8 @@ namespace app
             return;
          }
          const int n = (int)r.inserts.size();
-         const bool overflow = n > kInsertRows - 1;
-         const int shown = overflow ? kInsertRows - 1 : n;
+         const bool overflow = n > rows - 1;
+         const int shown = overflow ? rows - 1 : n;
          for (int i = 0; i < shown; i++)
             if (DrawInsertChip(dl, ImVec2(x, p.y + (float)i * (kInsertRowH + 1.0f)), w, r, i))
                return;
@@ -799,14 +820,22 @@ namespace app
             UndoOnToggle(&m->mute[s]);
          ImGui::SetCursorScreenPos(ImVec2(p.x + 2.0f + bw, y));
          if (AudioSoloButton("S##s", &m->solo[s], bw, kButtonsH))
-            UndoOnToggle(&m->solo[s]);
+         {
+            if (ImGui::GetIO().KeyAlt) // §4.3: Alt-click S clears every solo on the console
+            {
+               m->solo[s] = !m->solo[s];
+               MixerPanelClearSolos(MixerPanelCurrentPageTop());
+            }
+            else
+               UndoOnToggle(&m->solo[s]);
+         }
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          {
             PushUndoCheckpoint("Mixer strip");
             m->soloSafe[s] = !m->soloSafe[s];
          }
          if (ImGui::IsItemHovered())
-            HelpTip("%s", m->soloSafe[s] ? T("Solo safe (right-click)") : T("Solo (right-click: solo safe)"));
+            HelpTip("%s", m->soloSafe[s] ? T("Solo safe (right-click)") : T("Solo (Alt-click: clear all, right-click: solo safe)"));
          ImGui::SetCursorScreenPos(ImVec2(p.x + 3.0f + 2.0f * bw, y));
          if (ActionButton::Draw("\xC3\x98##ph", ImVec2(bw, kButtonsH), m->phase[s] ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
          {
@@ -858,7 +887,46 @@ namespace app
                            ImGui::GetColorU32(over ? ImGuiCol_PlotHistogram : ImGuiCol_Text), txt);
             }
          }
-         FaderWithMeter(ImVec2(p.x + 2.0f, y), kStripW - 4.0f, FaderHeightFor(h), &m->masterDb, m->Level());
+         // D4: master inserts, the chain between this Mixer and its Audio Out.
+         {
+            StripRef r;
+            r.mixerIndex = topIndex;
+            r.slot = kMixerMasterSlot;
+            Chain ch;
+            if (ChainAt(topIndex, kMixerMasterSlot, ch))
+            {
+               r.inserts = ch.fx;
+               r.shared = ch.shared;
+               ImGui::PushID("masterins");
+               DrawInserts(dl, ImVec2(p.x, p.y + kNameH + kRowGap + 60.0f + 2.0f), r, 2);
+               ImGui::PopID();
+            }
+         }
+         if (MixerAt(topIndex) != m)
+         {
+            ImGui::PopID();
+            return;
+         }
+         const float faderH = FaderHeightFor(h);
+         FaderWithMeter(ImVec2(p.x + 2.0f, y), kStripW - 4.0f, faderH, &m->masterDb, m->Level());
+         // D7: mono check and dim, monitor-only (AudioEngine::ApplyMonitor); never in a render or capture.
+         {
+            AudioEngine& eng = AudioEngine::Instance();
+            const bool mono = eng.MonitorMono(), dim = eng.MonitorDim();
+            const float by = y + faderH + kRowGap, monoW = 31.0f, dimW = kStripW - 4.0f - monoW - 1.0f;
+            ImGui::SetCursorScreenPos(ImVec2(p.x + 2.0f, by));
+            if (ActionButton::Draw((std::string(T("Mono")) + "##mono").c_str(), ImVec2(monoW, kButtonsH),
+                                   mono ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+               eng.SetMonitor(!mono, dim);
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Mono check. Speakers only: never in a render."));
+            ImGui::SetCursorScreenPos(ImVec2(p.x + 3.0f + monoW, by));
+            if (ActionButton::Draw((std::string(T("Dim")) + "##dim").c_str(), ImVec2(dimW, kButtonsH),
+                                   dim ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+               eng.SetMonitor(mono, !dim);
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Dim -20 dB. Speakers only: never in a render."));
+         }
          ImGui::PopID();
          gMixerMasterMin = p;
          gMixerMasterMax = ImVec2(p.x + kStripW, p.y + h);
@@ -900,6 +968,72 @@ namespace app
             HelpTip("%s", T("New Mixer + Audio Out"));
       }
 
+      // §4.3 / D8: A-H. Click recalls, Shift-click stores, right-click sets the crossfade. Keys 1-8 (Shift
+      // stores) while the panel claims keys (G5). Then "Clear solo" while any strip is soloed.
+      void DrawSnapshots(int topIndex)
+      {
+         MixerNode* top = MixerAt(topIndex);
+         if (top == nullptr)
+            return;
+         static const char* kNames[MixerNode::kSnapshots] = { "A", "B", "C", "D", "E", "F", "G", "H" };
+         const bool shift = ImGui::GetIO().KeyShift;
+         for (int k = 0; k < MixerNode::kSnapshots; k++)
+         {
+            const std::string label = std::string(kNames[k]) + "##snap" + std::to_string(k);
+            const bool has = top->SnapshotHas(k);
+            if (!has)
+               ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+            const bool clicked = ChipButton::Draw(label.c_str(), has && top->SnapshotLast() == k, tok::tile);
+            if (!has)
+               ImGui::PopStyleVar();
+            if (clicked)
+            {
+               if (shift || !has)
+                  MixerPanelSnapshotStore(topIndex, k);
+               else
+                  MixerPanelSnapshotRecall(topIndex, k);
+            }
+            if (ImGui::IsItemHovered())
+               HelpTip("%s %s", T("Snapshot"), has ? T("(click recalls, Shift-click stores)") : T("(click stores)"));
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               ImGui::OpenPopup("##snapfade");
+            ImGui::SameLine(0.0f, 2.0f);
+         }
+         if (MenuParts::BeginPopup("##snapfade"))
+         {
+            static const int kFades[] = { 0, 50, 200, 500, 1000, 2000 };
+            for (int ms : kFades)
+            {
+               const std::string item = ms == 0 ? std::string(T("No crossfade")) : std::to_string(ms) + " ms";
+               if (MenuParts::Item(item.c_str(), nullptr, top->snapFadeMs == ms))
+               {
+                  PushUndoCheckpoint("Snapshot crossfade");
+                  top->snapFadeMs = ms;
+               }
+            }
+            MenuParts::EndPopup();
+         }
+         if (gMixerClaimedKeys && !ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeySuper && !ImGui::GetIO().KeyAlt)
+         {
+            static const ImGuiKey kKeys[MixerNode::kSnapshots] = { ImGuiKey_1, ImGuiKey_2, ImGuiKey_3, ImGuiKey_4,
+                                                                   ImGuiKey_5, ImGuiKey_6, ImGuiKey_7, ImGuiKey_8 };
+            for (int k = 0; k < MixerNode::kSnapshots; k++)
+               if (ImGui::IsKeyPressed(kKeys[k], false))
+               {
+                  if (shift)
+                     MixerPanelSnapshotStore(topIndex, k);
+                  else
+                     MixerPanelSnapshotRecall(topIndex, k);
+               }
+         }
+         if (MixerPanelAnySolo(topIndex))
+         {
+            ImGui::SameLine(0.0f, tok::space_2);
+            if (ChipButton::Draw((std::string(T("Clear solo")) + "##clearsolo").c_str(), true, tok::tile))
+               MixerPanelClearSolos(topIndex);
+         }
+      }
+
       void DrawEmpty(ImVec2 mn, ImVec2 mx)
       {
          const bool noMixer = CountMixers() == 0;
@@ -934,6 +1068,11 @@ namespace app
          }
          ImGui::SameLine(0.0f, tok::space_3);
          DrawPageTabs(pages, current);
+         if (current >= 0)
+         {
+            ImGui::SameLine(0.0f, tok::space_3);
+            DrawSnapshots(pages[current].topIndex);
+         }
          {
             const bool mixerMode = gAudioMode == AudioMode::Mixer;
             const char* audioLabel = mixerMode ? T("Mixer Audio On") : T("Enable Mixer Audio");
@@ -1115,6 +1254,66 @@ namespace app
       return gn != nullptr && sOpenGroups.count(gn->uid) != 0;
    }
 
+   // ---- B6: snapshots A-H and solo clear. A snapshot covers the whole console: the top and every group. ----
+
+   namespace
+   {
+   std::vector<MixerNode*> MixerPanelConsoleMixers(int topIndex)
+   {
+      std::vector<MixerNode*> out;
+      if (MixerNode* top = MixerAt(topIndex))
+         out.push_back(top);
+      for (const StripRef& r : Strips(topIndex, true))
+         if (r.groupIndex >= 0)
+            if (MixerNode* g = MixerAt(r.groupIndex))
+               if (std::find(out.begin(), out.end(), g) == out.end())
+                  out.push_back(g);
+      return out;
+   }
+   }
+
+   bool MixerPanelSnapshotStore(int topIndex, int k)
+   {
+      const std::vector<MixerNode*> ms = MixerPanelConsoleMixers(topIndex);
+      if (ms.empty() || k < 0 || k >= MixerNode::kSnapshots)
+         return false;
+      PushUndoCheckpoint("Store snapshot");
+      for (MixerNode* m : ms)
+         m->SnapshotStore(k);
+      return true;
+   }
+
+   bool MixerPanelSnapshotRecall(int topIndex, int k)
+   {
+      const std::vector<MixerNode*> ms = MixerPanelConsoleMixers(topIndex);
+      if (ms.empty() || !ms[0]->SnapshotHas(k))
+         return false;
+      PushUndoCheckpoint("Recall snapshot");
+      const float fade = (float)ms[0]->snapFadeMs;
+      for (MixerNode* m : ms)
+         m->SnapshotRecall(k, fade);
+      return true;
+   }
+
+   bool MixerPanelAnySolo(int topIndex)
+   {
+      for (MixerNode* m : MixerPanelConsoleMixers(topIndex))
+         for (int s = 0; s < m->numChannels; s++)
+            if (m->solo[s])
+               return true;
+      return false;
+   }
+
+   void MixerPanelClearSolos(int topIndex)
+   {
+      if (!MixerPanelAnySolo(topIndex))
+         return;
+      PushUndoCheckpoint("Clear solo");
+      for (MixerNode* m : MixerPanelConsoleMixers(topIndex))
+         for (int s = 0; s < MixerNode::kMaxSlots; s++)
+            m->solo[s] = false;
+   }
+
    void MixerPanelSelectPage(int page)
    {
       const std::vector<Page> pages = CollectPages();
@@ -1247,12 +1446,32 @@ namespace app
 
    namespace
    {
-      bool ChainAt(int mixerIndex, int slot, Chain& ch)
+      // The cable a chain hangs from: a Mixer slot, or for kMixerMasterSlot the Audio Out this Mixer
+      // feeds (master inserts, D4).
+      AudioCable* ChainCable(int mixerIndex, int slot)
       {
          MixerNode* m = MixerAt(mixerIndex);
-         if (m == nullptr || slot < 0 || slot >= m->numChannels)
+         if (m == nullptr)
+            return nullptr;
+         if (slot == kMixerMasterSlot)
+         {
+            for (GraphNode& gn : gNodes)
+            {
+               auto* out = dynamic_cast<AudioOutputNode*>(gn.node.get());
+               if (out != nullptr && out->input.IsConnected() && MixerPageTop(ResolvedAudioSource(out->input.GetSource())) == m)
+                  return &out->input;
+            }
+            return nullptr;
+         }
+         return slot >= 0 && slot < m->numChannels ? &m->inputs[slot] : nullptr;
+      }
+
+      bool ChainAt(int mixerIndex, int slot, Chain& ch)
+      {
+         AudioCable* c = ChainCable(mixerIndex, slot);
+         if (c == nullptr)
             return false;
-         ch = WalkInserts(m->inputs[slot], CountConsumers());
+         ch = WalkInserts(*c, CountConsumers());
          return true;
       }
 
@@ -1282,12 +1501,12 @@ namespace app
             prev = g->node.get();
             prevOut = orderOut[k];
          }
-         if (MixerNode* m = MixerAt(mixerIndex))
+         if (AudioCable* c = ChainCable(mixerIndex, slot))
          {
             if (prev != nullptr)
-               m->inputs[slot].Connect(prev, prevOut);
+               c->Connect(prev, prevOut);
             else
-               m->inputs[slot].Disconnect();
+               c->Disconnect();
          }
       }
 
@@ -1319,12 +1538,14 @@ namespace app
    int MixerPanelInsertAdd(int mixerIndex, int slot, const char* fxType)
    {
       Chain ch;
-      if (!ChainAt(mixerIndex, slot, ch) || RefuseShared(ch) || !MixerAt(mixerIndex)->inputs[slot].IsConnected())
+      if (!ChainAt(mixerIndex, slot, ch) || RefuseShared(ch) || !ChainCable(mixerIndex, slot)->IsConnected())
          return -1;
       GraphNode* mGn = FindNodeByIndex(mixerIndex);
       if (mGn == nullptr)
          return -1;
-      const float x = mGn->liveX - 220.0f, y = mGn->liveY + 60.0f * (float)slot;
+      const bool master = slot == kMixerMasterSlot;
+      const float x = mGn->liveX + (master ? 260.0f + 200.0f * (float)ch.fx.size() : -220.0f);
+      const float y = mGn->liveY + (master ? 0.0f : 60.0f * (float)slot);
       UndoScope undo("Add insert");
       GraphNode* fx = SpawnNode(fxType, "AudioEffects", x, y);
       if (fx == nullptr || fx->node->AudioInputSlot(0) == nullptr)
@@ -1582,7 +1803,7 @@ namespace app
       std::vector<int> outs;
       for (GraphNode& gn : gNodes)
          if (auto* out = dynamic_cast<AudioOutputNode*>(gn.node.get()))
-            if (out->input.IsConnected() && dynamic_cast<MixerNode*>(ResolvedAudioSource(out->input.GetSource())) == nullptr)
+            if (out->input.IsConnected() && MixerPageTop(ResolvedAudioSource(out->input.GetSource())) == nullptr)
                outs.push_back(gn.index);
       if (outs.empty())
          return false;

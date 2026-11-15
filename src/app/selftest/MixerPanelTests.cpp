@@ -9,12 +9,18 @@
 #include "audio/AudioEngine.h"
 #include "core/Notices.h"
 #include "core/Transport.h"
+#include "audio/ParamMailbox.h"
+#include "core/Patch.h"
+#include "nodes/OutputNode.h"
+#include "arrange/ArrangeModel.h"
 #include "audio/dsp/MixerMeter.h"
 
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include <filesystem>
+#include <thread>
 #include <fstream>
 #include <vector>
 #include <sstream>
@@ -624,6 +630,393 @@ namespace
       fs::remove_all(dirPath, ec);
    }
 
+   // D4 master inserts: effects between the top Mixer and its Audio Out still make a page.
+   void CheckMasterInserts()
+   {
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 900.0f, 0.0f)->index;
+      std::string err;
+      ConnectNodes(top, 0, out, 0, err);
+      auto* o = dynamic_cast<AudioOutputNode*>(FindNodeByIndex(out)->node.get());
+      Check("master inserts: a bare console has none", MixerPanelInsertChain(top, kMixerMasterSlot).empty());
+      const int fx1 = MixerPanelInsertAdd(top, kMixerMasterSlot, "Gain");
+      const int fx2 = MixerPanelInsertAdd(top, kMixerMasterSlot, "Delay");
+      const std::vector<int> chain = MixerPanelInsertChain(top, kMixerMasterSlot);
+      Check("two master inserts, in signal order", fx1 >= 0 && fx2 >= 0 && chain.size() == 2 && chain[0] == fx1 && chain[1] == fx2);
+      Check("the Audio Out now hangs off the last insert", o->input.GetSource() == FindNodeByIndex(fx2)->node.get());
+      Check("an Audio Out behind master inserts is still a page", MixerPanelPageCount() == 1 && MixerPanelCurrentPageTop() == top);
+      gAudioMode = AudioMode::Mixer;
+      RebuildAudioTopology();
+      Check("Mixer Audio still routes that page", gAudioTopologyTerminalCount == 1);
+      gAudioMode = AudioMode::Canvas;
+      Check("reorder master inserts", MixerPanelInsertMove(top, kMixerMasterSlot, 1, 0) &&
+                                          MixerPanelInsertChain(top, kMixerMasterSlot).front() == fx2);
+      Check("remove both: the console feeds its Audio Out directly again",
+            MixerPanelInsertRemove(top, kMixerMasterSlot, 0) && MixerPanelInsertRemove(top, kMixerMasterSlot, 0) &&
+            MixerPanelInsertChain(top, kMixerMasterSlot).empty() && o->input.GetSource() == FindNodeByIndex(top)->node.get());
+
+      // A chain hanging from a send pin is a return, not a page.
+      auto* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get());
+      m->sendBuses = 1;
+      const int fx = SpawnNode("Gain", "AudioEffects", 600.0f, 300.0f)->index;
+      const int out2 = SpawnNode("Audio Out", "Utility", 900.0f, 300.0f)->index;
+      const bool wired = ConnectNodes(top, 1, fx, 0, err) && ConnectNodes(fx, 0, out2, 0, err);
+      Check("an Audio Out fed from a send pin through an effect is not a page", wired && MixerPanelPageCount() == 1);
+      NewPatch();
+   }
+
+   // D7: mono + dim act on the device buffer only; ProcessOffline (every render) never runs them.
+   void CheckMonitor()
+   {
+      AudioEngine& eng = AudioEngine::Instance();
+      static float sL[256], sR[256];
+      float* ch[2] = { sL, sR };
+      AudioBuffer buf { ch, 2, 256 };
+      auto fill = [&]() {
+         for (int i = 0; i < 256; i++)
+         {
+            sL[i] = 0.5f;
+            sR[i] = -0.25f;
+         }
+      };
+      eng.SetMonitor(false, false);
+      fill();
+      eng.ApplyMonitor(buf);
+      Check("monitor off leaves the block untouched", sL[255] == 0.5f && sR[255] == -0.25f);
+      eng.SetMonitor(true, true);
+      fill();
+      eng.ApplyMonitor(buf);
+      float step = 0.0f;
+      for (int i = 1; i < 256; i++)
+         step = std::max(step, std::fabs(sL[i] - sL[i - 1]));
+      Check("switching on ramps across the block, no step", step < 0.01f && std::fabs(sL[255] - 0.0125f) < 1e-5f);
+      fill();
+      eng.ApplyMonitor(buf);
+      Check("mono: both sides carry the mid", std::fabs(sL[10] - sR[10]) < 1e-7f && std::fabs(sL[10] - 0.0125f) < 1e-6f);
+      Check("dim: -20 dB", std::fabs(sL[100] / 0.125f - 0.1f) < 1e-5f);
+      eng.SetMonitor(false, false);
+      fill();
+      eng.ApplyMonitor(buf);
+      fill();
+      eng.ApplyMonitor(buf);
+      Check("switching off returns to unity", sL[0] == 0.5f && sR[0] == -0.25f);
+
+      // B5: a render with mono + dim on equals the clean render.
+      static ToneNode tone;
+      tone.Set(220.0f);
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      std::string err;
+      ConnectNodes(top, 0, out, 0, err);
+      auto* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get());
+      m->numChannels = 1;
+      m->inputs[0].Connect(&tone);
+      m->pan[0] = -1.0f;
+      const bool deviceWasRunning = eng.SampleRate() > 0.0;
+      if (deviceWasRunning)
+         eng.Stop();
+      tone.Rewind();
+      const float clean = RenderPeak(20);
+      eng.SetMonitor(true, true);
+      tone.Rewind();
+      const float monitored = RenderPeak(20);
+      eng.SetMonitor(false, false);
+      char label[160];
+      snprintf(label, sizeof(label), "a render with mono + dim on equals the clean one (%.5f vs %.5f)", monitored, clean);
+      Check(label, clean > 0.1f && std::fabs(monitored - clean) < 1e-6f);
+      if (deviceWasRunning)
+      {
+         std::string startErr;
+         StartAudioEngine(startErr);
+      }
+      m->inputs[0].Disconnect();
+      NewPatch();
+   }
+
+   // B6: snapshots A-H over the whole console, crossfaded, saved in the patch; Alt-clear's solo clear.
+   void CheckSnapshots()
+   {
+      static ToneNode tone;
+      tone.Set(220.0f);
+      NewPatch();
+      const int top = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int out = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      const int grp = SpawnNode("Mixer", "Utility", 200.0f, 0.0f)->index;
+      std::string err;
+      const bool wired = ConnectNodes(top, 0, out, 0, err) && ConnectNodes(grp, 0, top, 1, err);
+      auto* m = dynamic_cast<MixerNode*>(FindNodeByIndex(top)->node.get());
+      auto* g = dynamic_cast<MixerNode*>(FindNodeByIndex(grp)->node.get());
+      m->numChannels = 2;
+      m->inputs[0].Connect(&tone);
+      Check("B6 patch wires up: a console with a group", wired && MixerPanelPageCount() == 1);
+      Check("an empty snapshot does not recall", !MixerPanelSnapshotRecall(top, 0));
+
+      m->gainDb[0] = 0.0f; m->pan[0] = 0.0f; m->mute[0] = false; g->gainDb[0] = -6.0f; m->masterDb = 0.0f;
+      Check("store A", MixerPanelSnapshotStore(top, 0) && m->SnapshotHas(0) && g->SnapshotHas(0));
+      m->gainDb[0] = -30.0f; m->pan[0] = 1.0f; m->phase[0] = true; m->soloSafe[0] = true; g->gainDb[0] = 3.0f; m->masterDb = -10.0f;
+      m->sendDb[0][0] = -12.0f;
+      Check("store B", MixerPanelSnapshotStore(top, 1));
+
+      // Persist: the snapshot text survives the patch's own param round trip, and garbage is ignored.
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(m, params);
+      MixerNode fresh;
+      Patch::LoadParams(&fresh, params);
+      fresh.SnapshotRecall(1, 0.0f);
+      Check("snapshots are saved in the patch", fresh.SnapshotHas(0) && fresh.SnapshotHas(1) && !fresh.SnapshotHas(2) &&
+                                                     fresh.gainDb[0] == -30.0f && fresh.pan[0] == 1.0f && fresh.phase[0] &&
+                                                     fresh.soloSafe[0] && fresh.masterDb == -10.0f && fresh.sendDb[0][0] == -12.0f);
+      MixerNode junk;
+      Patch::LoadParams(&junk, { { "s snapA", "3 nan x" }, { "s snapfade", "-5" } });
+      Check("a damaged snapshot loads as empty; the fade is clamped", !junk.SnapshotHas(0) && junk.snapFadeMs == 0);
+
+      // Recall A during playback with a 200 ms crossfade: no sample-to-sample step above the tone's own.
+      const bool deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      if (deviceWasRunning)
+         AudioEngine::Instance().Stop();
+      m->snapFadeMs = 200;
+      m->phase[0] = false; // a polarity switch flips at the midpoint by design; keep this pass to the faded values
+      // Prepare the nodes at a real rate, as a running device or the Fast render does, so fader values ramp.
+      const double rateWas = gHeadlessAudioRate;
+      if (!(gHeadlessAudioRate > 0.0))
+         gHeadlessAudioRate = 48000.0;
+      ForceAudioRepare();
+      RenderPeak(4);
+      Check("recall A starts a crossfade", MixerPanelSnapshotRecall(top, 0) && m->SnapshotFading());
+      static float sL[512], sR[512];
+      float* ch[2] = { sL, sR };
+      AudioBuffer buf { ch, 2, 512 };
+      float last = 0.0f, maxStep = 0.0f, midGain = 0.0f;
+      bool first = true;
+      static int sFrame = 300000;
+      // No UI frame stamps here: the mailbox uses its fallback ramp per pushed value, as between frames.
+      ParamMailbox::PublishFrame(-1.0, 0.0);
+      for (int b = 0; b < 40; b++)
+      {
+         m->SnapshotAdvance(512.0f * 1000.0f / 48000.0f);
+         g->SnapshotAdvance(512.0f * 1000.0f / 48000.0f);
+         ++sFrame;
+         for (GraphNode& gn : gNodes)
+            gn.node->CookIfNeeded(sFrame);
+         if (b == 9)
+            midGain = m->gainDb[0];
+         AudioEngine::Instance().ProcessOffline(buf);
+         for (int i = 0; i < 512; i++)
+         {
+            if (!first)
+               maxStep = std::max(maxStep, std::fabs(sL[i] - last));
+            last = sL[i];
+            first = false;
+         }
+      }
+      char label[200];
+      snprintf(label, sizeof(label), "crossfade passes through the middle (gain %.1f dB at ~107 ms)", midGain);
+      Check(label, midGain < -5.0f && midGain > -25.0f);
+      snprintf(label, sizeof(label), "recall during playback is click-free (largest step %.4f)", maxStep);
+      Check(label, maxStep < 0.03f);
+      gHeadlessAudioRate = rateWas;
+      Check("A is back on every Mixer of the console", !m->SnapshotFading() && m->gainDb[0] == 0.0f && m->pan[0] == 0.0f &&
+                                                           !m->phase[0] && !m->soloSafe[0] && g->gainDb[0] == -6.0f &&
+                                                           m->masterDb == 0.0f && m->SnapshotLast() == 0);
+      m->snapFadeMs = 0;
+      MixerPanelSnapshotRecall(top, 1);
+      Check("no crossfade: B lands at once", !m->SnapshotFading() && m->gainDb[0] == -30.0f && g->gainDb[0] == 3.0f);
+      if (deviceWasRunning)
+      {
+         std::string startErr;
+         StartAudioEngine(startErr);
+      }
+
+      m->solo[0] = true;
+      g->solo[0] = true;
+      Check("a solo anywhere on the console counts", MixerPanelAnySolo(top));
+      MixerPanelClearSolos(top);
+      Check("Clear solo clears the top and its groups", !MixerPanelAnySolo(top) && !m->solo[0] && !g->solo[0]);
+      m->inputs[0].Disconnect();
+      NewPatch();
+   }
+
+   // Block C extras: All pages as one sum, arrange range, formats, Live, refusals, saved settings.
+   void CheckRenderMore()
+   {
+      namespace fs = std::filesystem;
+      std::error_code ec;
+      const fs::path dirPath = fs::temp_directory_path(ec) / "infinite-mixer-render-test2";
+      fs::remove_all(dirPath, ec);
+      fs::create_directories(dirPath, ec);
+      const std::string dir = dirPath.string();
+
+      // Settings saved with the workspace.
+      const MixerRenderSettings saved = gMixerRender;
+      gMixerRender.source = 1; gMixerRender.mode = 1; gMixerRender.lengthUnit = 3; gMixerRender.length = 12.0f;
+      gMixerRender.tail = 4.5f; gMixerRender.start = 2; gMixerRender.format = 2; gMixerRender.name = "mix-{date}";
+      std::ostringstream ws;
+      MixerPanelDockWrite(ws);
+      gMixerRender = MixerRenderSettings();
+      std::istringstream in(ws.str());
+      for (std::string line; std::getline(in, line);)
+      {
+         const size_t eq = line.find('=');
+         if (eq != std::string::npos)
+            MixerPanelDockReadKey(line.substr(0, eq), line.substr(eq + 1));
+      }
+      const MixerRenderSettings& r = gMixerRender;
+      Check("render settings are saved with the workspace", r.source == 1 && r.mode == 1 && r.lengthUnit == 3 &&
+                                                               r.length == 12.0f && r.tail == 4.5f && r.start == 2 &&
+                                                               r.format == 2 && r.name == "mix-{date}");
+      MixerPanelDockReadKey("mixerRenderLengthUnit", "9");
+      MixerPanelDockReadKey("mixerRenderTail", "nan");
+      Check("bad render settings are clamped on load", gMixerRender.lengthUnit == 3 && gMixerRender.tail == 2.0f);
+
+      // Two pages, a tone on each.
+      static ToneNode toneA, toneB;
+      toneA.Set(220.0f);
+      toneB.Set(330.0f);
+      NewPatch();
+      const int topA = SpawnNode("Mixer", "Utility", 400.0f, 0.0f)->index;
+      const int outA = SpawnNode("Audio Out", "Utility", 700.0f, 0.0f)->index;
+      const int topB = SpawnNode("Mixer", "Utility", 400.0f, 400.0f)->index;
+      const int outB = SpawnNode("Audio Out", "Utility", 700.0f, 400.0f)->index;
+      std::string err;
+      ConnectNodes(topA, 0, outA, 0, err);
+      ConnectNodes(topB, 0, outB, 0, err);
+      auto* ma = dynamic_cast<MixerNode*>(FindNodeByIndex(topA)->node.get());
+      auto* mb = dynamic_cast<MixerNode*>(FindNodeByIndex(topB)->node.get());
+      auto* oa = dynamic_cast<AudioOutputNode*>(FindNodeByIndex(outA)->node.get());
+      auto* ob = dynamic_cast<AudioOutputNode*>(FindNodeByIndex(outB)->node.get());
+      ma->numChannels = mb->numChannels = 1;
+      ma->inputs[0].Connect(&toneA);
+      mb->inputs[0].Connect(&toneB);
+      oa->recordDirectory = ob->recordDirectory = dir;
+      const bool deviceWasRunning = AudioEngine::Instance().SampleRate() > 0.0;
+      if (deviceWasRunning)
+         AudioEngine::Instance().Stop();
+
+      gMixerRender = MixerRenderSettings();
+      gMixerRender.mode = 1;
+      gMixerRender.length = 1.0f;
+      gMixerRender.tail = 0.0f;
+      auto run = [&](const std::vector<int>& outs) {
+         toneA.Rewind();
+         toneB.Rewind();
+         if (!MixerRenderStart(outs))
+            return false;
+         for (int i = 0; i < 200000 && MixerRenderActive(); i++)
+            MixerRenderTick();
+         return !MixerRenderActive() && MixerRenderResults().size() == 1;
+      };
+      char label[240];
+      gMixerRender.name = "pageA";
+      const bool aRan = run({ outA });
+      const MixerRenderResult alone = aRan ? MixerRenderResults()[0] : MixerRenderResult();
+      gMixerRender.source = 1;
+      gMixerRender.name = "summuted";
+      mb->mute[0] = true;
+      const bool mutedRan = run({ outA, outB });
+      const MixerRenderResult mutedSum = mutedRan ? MixerRenderResults()[0] : MixerRenderResult();
+      snprintf(label, sizeof(label), "All pages with page B muted equals page A alone (peak %.4f vs %.4f, %lld vs %lld frames)",
+               mutedSum.peak, alone.peak, (long long)mutedSum.frames, (long long)alone.frames);
+      Check(label, aRan && mutedRan && alone.peak > 0.1f && std::fabs(mutedSum.peak - alone.peak) < 1e-4f &&
+                   mutedSum.frames == alone.frames);
+      mb->mute[0] = false;
+      gMixerRender.name = "sum";
+      const bool sumRan = run({ outA, outB });
+      const MixerRenderResult sum = sumRan ? MixerRenderResults()[0] : MixerRenderResult();
+      snprintf(label, sizeof(label), "All pages writes one file, the sum (peak %.3f vs %.3f, %.1f LUFS vs %.1f alone)",
+               sum.peak, alone.peak, sum.lufs, alone.lufs);
+      Check(label, sumRan && sum.peak > alone.peak + 0.05f && sum.lufs > alone.lufs + 1.0f &&
+                   !fs::exists(dirPath / "sum-2.wav") && !oa->CaptureRing().joinSum.load() && !ob->CaptureRing().joinSum.load());
+      gMixerRender.source = 0;
+
+      // Formats.
+      struct Fmt { int format; const char* ext; int bytesPerFrame; };
+      const Fmt fmts[3] = { { 1, "wav", 6 }, { 2, "flac", 0 }, { 3, "mp3", 0 } };
+      for (const Fmt& f : fmts)
+      {
+         gMixerRender.format = f.format;
+         gMixerRender.name = std::string("fmt-") + f.ext;
+         const bool ok = run({ outA });
+         const MixerRenderResult res = ok ? MixerRenderResults()[0] : MixerRenderResult();
+         const bool named = res.path == dir + "/fmt-" + f.ext + "." + f.ext;
+         const bool sized = f.bytesPerFrame > 0 ? (res.bytes >= res.frames * f.bytesPerFrame && res.bytes <= res.frames * f.bytesPerFrame + 512)
+                                                : (res.bytes > 1000 && res.bytes < res.frames * 4);
+         snprintf(label, sizeof(label), "%s take: %lld frames, %lld bytes, peak %.3f", f.format == 1 ? "WAV 24" : f.ext,
+                  (long long)res.frames, (long long)res.bytes, res.peak);
+         Check(label, ok && named && sized && res.frames == (int64_t)std::llround(res.seconds * 48000.0) && res.peak > 0.1f);
+      }
+      gMixerRender.format = 0;
+
+      // Arrange range: the loop when it is on.
+      const auto savedLoop = gArrange.settings.loop;
+      gArrange.settings.loop.enabled = true;
+      gArrange.settings.loop.start = Arrange::kTicksPerBar;
+      gArrange.settings.loop.end = Arrange::kTicksPerBar * 2;
+      gMixerRender.lengthUnit = 3;
+      gMixerRender.name = "range";
+      double rs = 0.0, rl = 0.0;
+      const bool span = MixerRenderArrangeSpan(rs, rl);
+      const bool rangeRan = run({ outA });
+      const MixerRenderResult rr = rangeRan ? MixerRenderResults()[0] : MixerRenderResult();
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      const double barSec = Arrange::TicksToSeconds(Arrange::kTicksPerBar, bpm);
+      snprintf(label, sizeof(label), "arrange range renders the loop: starts %.2f s, %.2f s long, %lld frames", rs, rl, (long long)rr.frames);
+      Check(label, span && std::fabs(rs - barSec) < 1e-9 && std::fabs(rl - barSec) < 1e-9 && rangeRan &&
+                   rr.frames == (int64_t)std::llround(barSec * 48000.0));
+      gArrange.settings.loop = savedLoop;
+      gMixerRender.lengthUnit = 0;
+
+      // Fast refuses a hardware source.
+      ClearNotices();
+      SpawnNode("MIDI CC", "Modulators", 0.0f, 800.0f);
+      const bool hwRefused = !MixerRenderStart({ outA }) && !MixerRenderActive() && Noticed("mixer.render");
+      Check("Fast refuses a patch with a live source, with a notice", hwRefused);
+      ClearNotices();
+
+      // Live: needs the device. Without one it is refused; with one, a short take lands on length + tail.
+      gMixerRender.mode = 0;
+      gMixerRender.length = 0.5f;
+      gMixerRender.tail = 0.25f;
+      gMixerRender.name = "live";
+      const bool liveRefused = !MixerRenderStart({ outA }) && Noticed("mixer.render");
+      Check("Live with audio off is refused with a notice", liveRefused);
+      ClearNotices();
+      std::string startErr;
+      if (StartAudioEngine(startErr))
+      {
+         const double rate = AudioEngine::Instance().SampleRate();
+         const bool started = MixerRenderStart({ outA });
+         const auto t0 = std::chrono::steady_clock::now();
+         static int sLiveFrame = 400000;
+         while (started && MixerRenderActive() &&
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 5.0)
+         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            ++sLiveFrame;
+            for (GraphNode& gn : gNodes)
+               gn.node->CookIfNeeded(sLiveFrame);
+            MixerRenderTick();
+         }
+         const bool done = started && !MixerRenderActive() && MixerRenderResults().size() == 1;
+         const MixerRenderResult live = done ? MixerRenderResults()[0] : MixerRenderResult();
+         snprintf(label, sizeof(label), "a Live take stops at length + tail: %lld frames at %.0f Hz", (long long)live.frames, rate);
+         Check(label, done && live.frames == (int64_t)std::llround(0.5 * rate) + (int64_t)std::llround(0.25 * rate) && live.peak > 0.1f);
+         if (!deviceWasRunning)
+            AudioEngine::Instance().Stop();
+      }
+      else
+         printf("  [skip] Live take: no audio device (%s)\n", startErr.c_str());
+
+      gMixerRender = saved;
+      if (deviceWasRunning && AudioEngine::Instance().SampleRate() <= 0.0)
+         StartAudioEngine(startErr);
+      ma->inputs[0].Disconnect();
+      mb->inputs[0].Disconnect();
+      NewPatch();
+      fs::remove_all(dirPath, ec);
+   }
+
    // A page whose top Mixer has `strips` slots, one source each, and one group Mixer on slot 0.
    void BuildConsole(int strips)
    {
@@ -703,6 +1096,10 @@ bool MixerPanelTestStep(int frameId)
       CheckGroups();
       CheckMeters();
       CheckRender();
+      CheckMasterInserts();
+      CheckMonitor();
+      CheckSnapshots();
+      CheckRenderMore();
       sCase = 0;
       BuildConsole(kCounts[0]);
       gMixerPanelDock = kOrder[0];

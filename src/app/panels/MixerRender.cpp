@@ -14,6 +14,7 @@
 #include "core/Transport.h"
 #include "nodes/AudioNodes.h"
 #include "nodes/OutputNode.h"
+#include "arrange/ArrangeModel.h"
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
 
@@ -54,6 +55,7 @@ namespace app
          const char* ext = "wav";
          std::string name;
          std::vector<Take> takes;
+         std::vector<uint64_t> sumUids; // G8 "All pages": every page's Audio Out, summed into takes[0]
       };
 
       Job sJob;
@@ -98,8 +100,28 @@ namespace app
       }
 
       // Opens every take's file. A name is picked only now, so an armed take never reserves one.
+      void EndSum()
+      {
+         if (sJob.sumUids.empty())
+            return;
+         AudioEngine::Instance().SetCaptureSum(nullptr);
+         for (uint64_t uid : sJob.sumUids)
+            if (AudioOutputNode* o = OutOf(uid))
+               o->CaptureRing().joinSum.store(false, std::memory_order_relaxed);
+      }
+
       bool Begin()
       {
+         if (!sJob.sumUids.empty() && !sJob.takes.empty())
+         {
+            // Join first, then point the engine at the target: until the target ring is enabled by
+            // StartRecording, the sum is formed but written nowhere, so the file starts on one block.
+            for (uint64_t uid : sJob.sumUids)
+               if (AudioOutputNode* o = OutOf(uid))
+                  o->CaptureRing().joinSum.store(true, std::memory_order_relaxed);
+            if (AudioOutputNode* target = OutOf(sJob.takes[0].outUid))
+               AudioEngine::Instance().SetCaptureSum(&target->CaptureRing());
+         }
          for (Take& t : sJob.takes)
          {
             AudioOutputNode* out = OutOf(t.outUid);
@@ -157,6 +179,7 @@ namespace app
             r.bytes = SizeOf(t.path);
             results.push_back(r);
          }
+         EndSum();
          LeaveOffline();
          if (keep)
             sResults = results;
@@ -288,9 +311,30 @@ namespace app
       return all > 0 ? (float)std::min(1.0, (double)FramesSoFar() / (double)all) : 0.0f;
    }
 
+   bool MixerRenderArrangeSpan(double& startSec, double& lengthSec)
+   {
+      Arrange::Tick a = 0, b = 0;
+      if (gArrange.settings.loop.enabled && gArrange.settings.loop.end > gArrange.settings.loop.start)
+      {
+         a = gArrange.settings.loop.start;
+         b = gArrange.settings.loop.end;
+      }
+      else
+         b = ArrangeRenderableEndTick();
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      startSec = Arrange::TicksToSeconds(a, bpm);
+      lengthSec = b > a ? Arrange::TicksToSeconds(b - a, bpm) : 0.0;
+      return lengthSec > 0.0;
+   }
+
    double MixerRenderLengthSeconds()
    {
       const MixerRenderSettings& s = gMixerRender;
+      if (s.lengthUnit == 3)
+      {
+         double startSec = 0.0, lengthSec = 0.0;
+         return MixerRenderArrangeSpan(startSec, lengthSec) ? lengthSec : 0.0;
+      }
       if (s.lengthUnit == 1)
       {
          const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
@@ -320,11 +364,22 @@ namespace app
       }
       if (job.takes.empty())
          return false;
+      if (s.source == 1 && job.takes.size() > 1)
+      {
+         for (const Take& t : job.takes)
+            job.sumUids.push_back(t.outUid);
+         job.takes.resize(1); // one writer: the first page's Audio Out records the sum
+      }
       job.fast = s.mode == 1;
       job.untilStop = s.lengthUnit == 2;
       const double lengthSec = MixerRenderLengthSeconds();
       if (!job.untilStop && lengthSec <= 0.0)
-         return Refuse(T("Set a length first."));
+         return Refuse(s.lengthUnit == 3 ? T("The arrangement is empty.") : T("Set a length first."));
+      // Arrange range: the take always starts at the range start, whatever Start says.
+      double rangeStart = 0.0, rangeLen = 0.0;
+      const bool arrange = s.lengthUnit == 3 && MixerRenderArrangeSpan(rangeStart, rangeLen);
+      const int startMode = arrange ? 2 : s.start;
+      const double startAt = arrange ? rangeStart : 0.0;
       static const char* kExt[4] = { "wav", "wav", "flac", "mp3" };
       const int format = std::clamp(s.format, 0, 3);
       job.ext = kExt[format];
@@ -351,14 +406,14 @@ namespace app
          job.tailFrames = (int64_t)std::llround(std::max(0.0f, s.tail) * job.rate);
          job.skip = std::max(0, AudioEngine::Instance().OutputLatencySamples());
          sJob = job;
-         if (s.start == 1 && !tr.IsPlaying())
+         if (startMode == 1 && !tr.IsPlaying())
          {
             sJob.phase = Phase::Armed;
             return true;
          }
-         if (s.start == 2)
+         if (startMode == 2)
          {
-            tr.Seek(0.0);
+            tr.Seek(startAt);
             tr.SetPlaying(true);
          }
          if (!Begin())
@@ -383,9 +438,9 @@ namespace app
       job.lengthFrames = (int64_t)std::llround(lengthSec * job.rate);
       job.tailFrames = (int64_t)std::llround(std::max(0.0f, s.tail) * job.rate);
       job.wasPlaying = tr.IsPlaying();
-      if (s.start == 2)
-         tr.Seek(0.0);
-      job.startSec = s.start == 2 ? 0.0 : tr.Seconds();
+      if (startMode == 2)
+         tr.Seek(startAt);
+      job.startSec = startMode == 2 ? startAt : tr.Seconds();
       tr.SetOfflineMode(true, job.rate);
       tr.SetPlaying(true);
       tr.SetOfflineVideoTime(job.startSec);
@@ -530,12 +585,23 @@ namespace app
       ImGui::BeginDisabled(active);
       FormParts::Combo(T("Source"), &s.source, Items({ I18N_KEY("This page"), I18N_KEY("All pages") }).c_str());
       if (ImGui::IsItemHovered())
-         HelpTip("%s", T("All pages writes one file per page."));
+         HelpTip("%s", T("All pages writes one file: every page summed."));
       FormParts::Combo(T("Mode"), &s.mode, Items({ I18N_KEY("Live"), I18N_KEY("Fast") }).c_str());
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Live records what plays. Fast renders offline, quicker than real time; live inputs can't be rendered that way."));
-      FormParts::Combo(T("Length"), &s.lengthUnit, Items({ I18N_KEY("Seconds"), I18N_KEY("Bars"), I18N_KEY("Until stop") }).c_str());
-      if (s.lengthUnit != 2)
+      FormParts::Combo(T("Length"), &s.lengthUnit,
+                       Items({ I18N_KEY("Seconds"), I18N_KEY("Bars"), I18N_KEY("Until stop"), I18N_KEY("Arrange range") }).c_str());
+      if (s.lengthUnit == 3)
+      {
+         double startSec = 0.0, lengthSec = 0.0;
+         const bool any = MixerRenderArrangeSpan(startSec, lengthSec);
+         FormParts::Label("##lenrange");
+         if (any)
+            ImGui::TextDisabled("%.1f s %s", lengthSec, gArrange.settings.loop.enabled ? T("(loop)") : T("(whole)"));
+         else
+            ImGui::TextDisabled("%s", T("Empty"));
+      }
+      else if (s.lengthUnit != 2)
       {
          FormParts::Label("##lenval");
          ImGui::SetNextItemWidth(FormParts::ControlW());
@@ -545,7 +611,9 @@ namespace app
       FormParts::SliderFloat(T("Tail"), &s.tail, 0.0f, 30.0f, "%.1f s");
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Extra time after the length, with the transport stopped, so reverbs and delays ring out."));
+      ImGui::BeginDisabled(s.lengthUnit == 3);
       FormParts::Combo(T("Start"), &s.start, Items({ I18N_KEY("Now"), I18N_KEY("With play"), I18N_KEY("From start") }).c_str());
+      ImGui::EndDisabled();
       FormParts::Combo(T("Format"), &s.format, Items({ "WAV 16", "WAV 24", "FLAC", "MP3" }).c_str());
       FormParts::Label(T("Name"));
       ImGui::SetNextItemWidth(FormParts::ControlW());

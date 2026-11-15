@@ -555,6 +555,24 @@ public:
    // The Sample studio's take on the transport (StudioLoopPlayer.h), mixed in right after the preview.
    StudioLoopPlayer& StudioLoop() { return mStudioLoop; }
 
+   // Monitor stage (Mixer panel D7): mono check and dim -20 dB on what the device plays, and nothing
+   // else. It runs on the device buffer after the graph, so no Audio Out capture, take or offline
+   // render ever carries it. Main thread sets, audio thread reads.
+   void SetMonitor(bool mono, bool dim)
+   {
+      mMonitorMono.store(mono, std::memory_order_relaxed);
+      mMonitorDim.store(dim, std::memory_order_relaxed);
+   }
+   bool MonitorMono() const { return mMonitorMono.load(std::memory_order_relaxed); }
+   bool MonitorDim() const { return mMonitorDim.load(std::memory_order_relaxed); }
+   // Called by Process() once per device block; public so a test can run it on an offline block.
+   void ApplyMonitor(AudioBuffer& buffer);
+
+   // Capture sum (Mixer panel "All pages", G8): every capture ring with joinSum set is summed into one
+   // block, written to `target` (when its `enabled` is on) once per block, before the monitor stage.
+   // nullptr ends it. Main thread sets joinSum on the rings first.
+   void SetCaptureSum(AudioCaptureRing* target) { mSumTarget.store(target, std::memory_order_release); }
+
    // The metronome: mixed into the device output after the graph and the
    // preview, only while the transport plays. Main thread sets, audio thread
    // reads; relaxed atomics because the three values are independent.
@@ -772,6 +790,12 @@ private:
    SamplePreviewPlayer mPreviewPlayer;
    StudioLoopPlayer mStudioLoop;
 
+   std::atomic<bool> mMonitorMono { false }, mMonitorDim { false };
+   std::atomic<AudioCaptureRing*> mSumTarget { nullptr };
+   float mSumScratch[kAudioMaxBlockFrames * 2] = {};
+   void BeginCaptureSum(int numFrames);
+   void EndCaptureSum(int numFrames);
+   float mMonitorGain = 1.0f, mMonitorWidth = 1.0f; // audio thread only: last block's end values
    std::atomic<bool> mMetronomeOn { false };
    std::atomic<float> mMetronomeVolume { 0.5f };
    std::atomic<bool> mMetronomeAccent { true };

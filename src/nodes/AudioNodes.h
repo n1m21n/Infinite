@@ -160,6 +160,27 @@ public:
    bool sendPre[kMaxSlots] = {}; // pre-fader sends for this strip (all four)
    AudioCable inputs[kMaxSlots];
 
+   // Snapshots A-H (mixer-panel plan D8 / B6): the whole strip and master state, saved in the patch.
+   // Recall crossfades on the main thread (dB and pan linear, switches at the midpoint, G3); the audio
+   // node's block-rate ramp smooths each step, so a recall during playback never clicks.
+   static constexpr int kSnapshots = 8;
+   struct Snapshot
+   {
+      bool has = false;
+      int count = 0;
+      float master = 0.0f;
+      float gain[kMaxSlots] = {}, pan[kMaxSlots] = {}, trim[kMaxSlots] = {};
+      float send[kSendBuses][kMaxSlots] = {};
+      bool mute[kMaxSlots] = {}, solo[kMaxSlots] = {}, phase[kMaxSlots] = {}, safe[kMaxSlots] = {}, pre[kMaxSlots] = {};
+   };
+   void SnapshotStore(int k);
+   bool SnapshotHas(int k) const { return k >= 0 && k < kSnapshots && mSnap[k].has; }
+   void SnapshotRecall(int k, float fadeMs); // fadeMs <= 0 sets the values at once
+   void SnapshotAdvance(float dtMs);         // CookIfNeeded calls it with wall time; tests drive it directly
+   bool SnapshotFading() const { return mFadeK >= 0; }
+   int SnapshotLast() const { return mSnapLast; }
+   int snapFadeMs = 200;
+
    int SendBuses() const { return sendBuses < 0 ? 0 : (sendBuses > kSendBuses ? kSendBuses : sendBuses); }
    int OutputCount() const override { return 1 + SendBuses(); }
    const char* OutputLabel(int index) const override
@@ -176,6 +197,12 @@ private:
    float mChannelLevel[kMaxSlots] = {};
    bool mMeterRequested = false, mMetersRunning = false;
    float mLoudM = -120.0f, mLoudS = -120.0f, mLoudI = -120.0f, mTruePeakDb = -120.0f;
+   Snapshot mSnap[kSnapshots];
+   Snapshot mFadeFrom;
+   int mFadeK = -1, mSnapLast = -1;
+   float mFadeMs = 0.0f, mFadeAt = 0.0f;
+   double mFadeClock = 0.0;
+   void SnapshotApply(const Snapshot& to, float t);
 };
 
 // A two-input crossfader: blend=0 is input A only, 1 is input B only, 0.5 is

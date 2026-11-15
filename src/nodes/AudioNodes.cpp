@@ -3,7 +3,10 @@
 #include "AudioNodes.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <sstream>
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioEngine.h"
@@ -443,11 +446,167 @@ void MixerNode::ResetMeters()
    mLoudM = mLoudS = mLoudI = mTruePeakDb = MixerMeter::kSilent;
 }
 
+// ---- Snapshots A-H (B6) ----
+namespace
+{
+   MixerNode::Snapshot ReadConsole(const MixerNode& m)
+   {
+      MixerNode::Snapshot sn;
+      sn.has = true;
+      sn.count = m.numChannels;
+      sn.master = m.masterDb;
+      for (int i = 0; i < MixerNode::kMaxSlots; i++)
+      {
+         sn.gain[i] = m.gainDb[i]; sn.pan[i] = m.pan[i]; sn.trim[i] = m.trimDb[i];
+         sn.mute[i] = m.mute[i]; sn.solo[i] = m.solo[i]; sn.phase[i] = m.phase[i];
+         sn.safe[i] = m.soloSafe[i]; sn.pre[i] = m.sendPre[i];
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            sn.send[b][i] = m.sendDb[b][i];
+      }
+      return sn;
+   }
+
+   double SnapshotNowMs()
+   {
+      using namespace std::chrono;
+      return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
+   }
+
+   // One line: "count master" then per strip "gain pan trim sendA..D flags", flags = mute solo phase safe pre bits.
+   std::string SnapshotText(const MixerNode::Snapshot& sn)
+   {
+      if (!sn.has)
+         return std::string();
+      std::string out;
+      char buf[48];
+      snprintf(buf, sizeof(buf), "%d %g", sn.count, sn.master);
+      out += buf;
+      for (int i = 0; i < sn.count && i < MixerNode::kMaxSlots; i++)
+      {
+         snprintf(buf, sizeof(buf), " %g %g %g", sn.gain[i], sn.pan[i], sn.trim[i]);
+         out += buf;
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+         {
+            snprintf(buf, sizeof(buf), " %g", sn.send[b][i]);
+            out += buf;
+         }
+         const int flags = (sn.mute[i] ? 1 : 0) | (sn.solo[i] ? 2 : 0) | (sn.phase[i] ? 4 : 0) | (sn.safe[i] ? 8 : 0) | (sn.pre[i] ? 16 : 0);
+         snprintf(buf, sizeof(buf), " %d", flags);
+         out += buf;
+      }
+      return out;
+   }
+
+   float Finite(float v, float lo, float hi, float fallback)
+   {
+      return std::isfinite(v) ? std::clamp(v, lo, hi) : fallback;
+   }
+
+   MixerNode::Snapshot SnapshotParse(const std::string& text)
+   {
+      MixerNode::Snapshot sn;
+      std::istringstream in(text);
+      int count = 0;
+      float master = 0.0f;
+      if (!(in >> count >> master))
+         return sn;
+      sn.count = std::clamp(count, 0, MixerNode::kMaxSlots);
+      sn.master = Finite(master, kMinGainDb, kMaxGainDb, 0.0f);
+      for (int i = 0; i < MixerNode::kMaxSlots; i++)
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            sn.send[b][i] = MixerNode::kSendOffDb;
+      for (int i = 0; i < sn.count; i++)
+      {
+         float g = 0.0f, p = 0.0f, t = 0.0f, send[MixerNode::kSendBuses];
+         int flags = 0;
+         if (!(in >> g >> p >> t))
+            return MixerNode::Snapshot();
+         for (float& v : send)
+            if (!(in >> v))
+               return MixerNode::Snapshot();
+         if (!(in >> flags))
+            return MixerNode::Snapshot();
+         sn.gain[i] = Finite(g, kMinGainDb, kMaxGainDb, 0.0f);
+         sn.pan[i] = Finite(p, -1.0f, 1.0f, 0.0f);
+         sn.trim[i] = Finite(t, -24.0f, 24.0f, 0.0f);
+         for (int b = 0; b < MixerNode::kSendBuses; b++)
+            sn.send[b][i] = Finite(send[b], MixerNode::kSendOffDb, kMaxGainDb, MixerNode::kSendOffDb);
+         sn.mute[i] = flags & 1; sn.solo[i] = flags & 2; sn.phase[i] = flags & 4; sn.safe[i] = flags & 8; sn.pre[i] = flags & 16;
+      }
+      sn.has = true;
+      return sn;
+   }
+}
+
+void MixerNode::SnapshotStore(int k)
+{
+   if (k < 0 || k >= kSnapshots)
+      return;
+   mSnap[k] = ReadConsole(*this);
+   mSnapLast = k;
+}
+
+void MixerNode::SnapshotRecall(int k, float fadeMs)
+{
+   if (!SnapshotHas(k))
+      return;
+   mSnapLast = k;
+   if (!(fadeMs > 0.0f))
+   {
+      mFadeK = -1;
+      SnapshotApply(mSnap[k], 1.0f);
+      return;
+   }
+   mFadeFrom = ReadConsole(*this);
+   mFadeK = k;
+   mFadeMs = fadeMs;
+   mFadeAt = 0.0f;
+   mFadeClock = SnapshotNowMs();
+}
+
+void MixerNode::SnapshotAdvance(float dtMs)
+{
+   if (mFadeK < 0)
+      return;
+   mFadeAt += std::max(0.0f, dtMs);
+   const float t = mFadeMs > 0.0f ? std::min(1.0f, mFadeAt / mFadeMs) : 1.0f;
+   SnapshotApply(mSnap[mFadeK], t);
+   if (t >= 1.0f)
+      mFadeK = -1;
+}
+
+void MixerNode::SnapshotApply(const Snapshot& to, float t)
+{
+   const Snapshot& from = mFadeK >= 0 ? mFadeFrom : to;
+   auto mix = [t](float a, float b) { return a + (b - a) * t; };
+   const bool late = t >= 0.5f; // G3: switches change at the midpoint
+   masterDb = mix(from.master, to.master);
+   for (int i = 0; i < to.count && i < kMaxSlots; i++)
+   {
+      gainDb[i] = mix(from.gain[i], to.gain[i]);
+      pan[i] = mix(from.pan[i], to.pan[i]);
+      trimDb[i] = mix(from.trim[i], to.trim[i]);
+      for (int b = 0; b < kSendBuses; b++)
+         sendDb[b][i] = mix(from.send[b][i], to.send[b][i]);
+      mute[i] = late ? to.mute[i] : from.mute[i];
+      solo[i] = late ? to.solo[i] : from.solo[i];
+      phase[i] = late ? to.phase[i] : from.phase[i];
+      soloSafe[i] = late ? to.safe[i] : from.safe[i];
+      sendPre[i] = late ? to.pre[i] : from.pre[i];
+   }
+}
+
 void MixerNode::CookIfNeeded(int frameId)
 {
    if (frameId == mLastCookFrame)
       return;
    mLastCookFrame = frameId;
+   if (mFadeK >= 0)
+   {
+      const double now = SnapshotNowMs();
+      SnapshotAdvance((float)(now - mFadeClock));
+      mFadeClock = now;
+   }
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMixerNode>();
    mAudioNode->PushParams(*this);
@@ -542,6 +701,20 @@ void MixerNode::VisitParams(ParamVisitor& v)
       }
    for (int i = 0; i < kMaxSlots; i++)
       v.Bool(kSend.pre[i].c_str(), sendPre[i]);
+   // Snapshots (B6): one text line each, empty when the slot is unused. Text keeps them out of
+   // sweeps and modulation; snapfade is text for the same reason.
+   static const char* kSnapNames[kSnapshots] = { "snapA", "snapB", "snapC", "snapD", "snapE", "snapF", "snapG", "snapH" };
+   for (int k = 0; k < kSnapshots; k++)
+   {
+      std::string text = SnapshotText(mSnap[k]);
+      const std::string before = text;
+      v.Text(kSnapNames[k], text);
+      if (text != before)
+         mSnap[k] = text.empty() ? Snapshot() : SnapshotParse(text);
+   }
+   std::string fade = std::to_string(snapFadeMs);
+   v.Text("snapfade", fade);
+   snapFadeMs = std::clamp(atoi(fade.c_str()), 0, 10000);
 }
 
 AudioNode* MixerNode::GetAudioNode()
