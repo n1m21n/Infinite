@@ -1,5 +1,14 @@
 [
  {
+  "slug": "image-to-sound-spectrogram-additive-synthesis",
+  "title": "Image to sound: real-time spectrogram additive synthesis",
+  "description": "How to turn live shaders, drawings, and textures into polyphonic sound in real time using Infinite's Spectral Synth additive partial bank.",
+  "date": "2026-11-15",
+  "updated": "2026-11-15",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/image-to-sound-spectrogram-additive-synthesis.html"
+ },
+ {
   "slug": "modal-synthesis-and-physical-modelling-of-metallic-percussion",
   "title": "Modal synthesis and metallic percussion in real time",
   "description": "How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.",
