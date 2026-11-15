@@ -309,6 +309,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [West Coast Buchla Krell Pendulum Synth](https://infinitedevices.org/library/west-coast-buchla-krell-pendulum-synth.html): Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation. (file: https://infinitedevices.org/assets/templates/west-coast-buchla-krell-pendulum-synth.inf)
 - [Tape Loop Polyphony Oxide Dispersion FX](https://infinitedevices.org/library/tape-loop-polyphony-oxide-dispersion-fx.html): Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-oxide-dispersion-fx.inf)
 - [Tape Loop Polyphony Frippertronics Echo FX](https://infinitedevices.org/library/tape-loop-polyphony-frippertronics-echo-fx.html): Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-frippertronics-echo-fx.inf)
+- [Karplus Sympathetic Waveguide Harp Synth](https://infinitedevices.org/library/karplus-sympathetic-waveguide-harp-synth.html): Physical-modeling plucked waveguide harp with dual harmonic comb resonators, sympathetic octave body, and wooden-bridge saturation. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-waveguide-harp-synth.inf)
+- [Karplus Sympathetic Bowed Monochord Synth](https://infinitedevices.org/library/karplus-sympathetic-bowed-monochord-synth.html): Continuously bowed waveguide monochord with stick-slip rosin harmonic excitation, vibrato drift, and resonant body formants. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bowed-monochord-synth.inf)
+- [Spring Plate Dispersion Belton Tank FX](https://infinitedevices.org/library/spring-plate-dispersion-belton-tank-fx.html): Triple-spring tank dispersion network with cascaded allpass chirp stages, brass transducer drive, and mechanical tank damping. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-belton-tank-fx.inf)
+- [Spring Plate Dispersion Steel Plate FX](https://infinitedevices.org/library/spring-plate-dispersion-steel-plate-fx.html): Dense steel plate diffusion lattice with early metallic reflections, phase-modulated allpass tank, and warm sheen tilt. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-steel-plate-fx.inf)
 
 ## Library: Community
 
@@ -669,7 +673,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 121 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 123 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -686,4 +690,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 106 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 108 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

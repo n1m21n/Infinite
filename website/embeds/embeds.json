@@ -605,6 +605,16 @@
       "slug": "reaction-diffusion-belousov-turing-coral",
       "title": "Reaction Diffusion Belousov Turing Coral",
       "description": "Audio-reactive Turing morphogenesis visualizer. Bass swells the coral-spot cells, mids bend the anisotropic lattice, and highs sharpen the cinnabar ridge contours."
+    },
+    {
+      "slug": "ferrofluid-thinfilm-magnetic-spikes",
+      "title": "Ferrofluid Thinfilm Magnetic Spikes",
+      "description": "Audio-reactive ferrofluid spike visualizer. Bass drives the magnetic spike amplitude, mids shift the thin-film interference spectrum, and highs sharpen the studio rim reflections."
+    },
+    {
+      "slug": "ferrofluid-thinfilm-bismuth-corona",
+      "title": "Ferrofluid Thinfilm Bismuth Corona",
+      "description": "Audio-reactive bismuth thin-film interference visualizer. Bass pulses the dipole field lines, mids sweep the iridescent oil fringes, and highs ignite the corona ridges."
     }
   ]
 }

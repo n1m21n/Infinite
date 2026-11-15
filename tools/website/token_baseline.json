@@ -592,6 +592,14 @@
   "embeds/reaction-diffusion-belousov-turing-coral.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/ferrofluid-thinfilm-magnetic-spikes.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ferrofluid-thinfilm-bismuth-corona.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

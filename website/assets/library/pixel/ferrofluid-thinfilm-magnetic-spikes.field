@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ferrofluid Thinfilm Magnetic Spikes",
+    "author": "Infinite",
+    "description": "Raymarched magnetic ferrofluid dome with normal-field spike lattice, specular studio rim highlights, and bismuth thin-film interference.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float spikeFreq = 22.0 [8.0, 36.0];\nparam float spikeAmp = 0.34 [0.10, 0.55];\nparam float filmShift = 0.45 [0.0, 1.0];\nparam float rimPower = 2.2 [1.0, 4.5];\nparam float chroma = 0.92 [0.2, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x);\n\n# High-frequency hexagonal normal-field ferrofluid spike lattice\nhex1 = sin(p.x * spikeFreq + t * 0.8);\nhex2 = sin((p.x * 0.5 + p.y * 0.866) * spikeFreq - t * 0.7);\nhex3 = sin((p.x * 0.5 - p.y * 0.866) * spikeFreq + t * 0.5);\nspikeField = abs(hex1 * hex2 * hex3);\nridge = pow(clamp(1.0 - abs(hex1 + hex2 + hex3) * 0.45, 0.0, 1.0), 3.0);\n\n# Concentric dome + sharp magnetic peaks\ndome = smoothstep(1.08, 0.06, r);\nheight = dome * (0.28 + spikeAmp * 2.8 * pow(spikeField, 0.45));\nspec = pow(clamp(ridge * dome + spikeField * dome * 0.65, 0.0, 1.0), rimPower);\n\n# Thin-film optical interference colors\nphase = height * 9.0 + r * 4.5 + filmShift * 6.28 + t * 0.5;\nirid = vec3(0.5 + 0.5 * cos(phase), 0.5 + 0.5 * cos(phase + 2.1), 0.5 + 0.5 * cos(phase + 4.2));\n\ncObsidian = vec3(0.031, 0.039, 0.059);\ncCobalt = vec3(0.094, 0.188, 0.533);\ncCyan = vec3(0.180, 0.847, 0.875);\ncSpec = vec3(0.961, 0.973, 0.980);\n\ncol = mix(cObsidian, cCobalt * 1.15, clamp(height * 0.95, 0.0, 1.0));\ncol = mix(col, irid * cCyan * 1.2, clamp(spec * chroma * 0.9, 0.0, 1.0));\ncol = col + cSpec * pow(spec, 2.0) * 0.95;\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "spikeFreq": 22.0,
+      "spikeAmp": 0.34,
+      "filmShift": 0.45,
+      "rimPower": 2.2,
+      "chroma": 0.92
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

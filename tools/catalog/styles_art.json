@@ -1121,6 +1121,121 @@
     "Alan Turing (1952 morphogenesis reaction-diffusion)",
     "Celadon, verdigris & cinnabar mineral glazes"
    ]
+  },
+  {
+   "id": "guilloche_intaglio",
+   "taxonomy": "new",
+   "name": "Guilloche Intaglio Engraving",
+   "palette": [
+    "#F4F0E6",
+    "#1A1D22",
+    "#D4AF37",
+    "#8E2438"
+   ],
+   "sources": [
+    "Line",
+    "Ring",
+    "Polygon"
+   ],
+   "fx": [
+    "edge outline"
+   ],
+   "comp": [
+    "Color Ramp"
+   ],
+   "ban": [
+    "bloom",
+    "glitch",
+    "pixelate"
+   ],
+   "motion": 0.25,
+   "pairs": [
+    "neo_classical",
+    "karplus_sympathetic",
+    "ambient_piano"
+   ],
+   "refs": [
+    "Rose-engine lathe guilloche & banknote intaglio",
+    "Abraham-Louis Breguet engine-turned watch dials",
+    "Engravers Gothic & fine-line security moire"
+   ]
+  },
+  {
+   "id": "tensegrity_pavilion",
+   "taxonomy": "new",
+   "name": "Tensegrity Space-Frame Pavilion",
+   "palette": [
+    "#DCE4EC",
+    "#6E7885",
+    "#B8C0C8",
+    "#222830"
+   ],
+   "sources": [
+    "Cylinder",
+    "Array",
+    "Line 3D"
+   ],
+   "fx": [
+    "bevel",
+    "edge outline"
+   ],
+   "comp": [
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch",
+    "pixelate"
+   ],
+   "motion": 0.35,
+   "pairs": [
+    "ambient",
+    "drone_kosmische",
+    "spring_plate_dispersion"
+   ],
+   "refs": [
+    "Kenneth Snelson Needle Tower (1968)",
+    "R. Buckminster Fuller tensional integrity & geodesic domes",
+    "VTF Grotesk & architectural structural engineering"
+   ]
+  },
+  {
+   "id": "ferrofluid_thinfilm",
+   "taxonomy": "new",
+   "name": "Ferrofluid & Thin-Film Iridescence",
+   "palette": [
+    "#080A0F",
+    "#F5F8FA",
+    "#183088",
+    "#2ED8DF"
+   ],
+   "sources": [
+    "FieldPixel",
+    "Sphere",
+    "Noise"
+   ],
+   "fx": [
+    "displace",
+    "bloom"
+   ],
+   "comp": [
+    "gradientmap",
+    "Color Ramp"
+   ],
+   "ban": [
+    "pixelate",
+    "dither"
+   ],
+   "motion": 0.75,
+   "pairs": [
+    "electro",
+    "idm",
+    "karplus_sympathetic"
+   ],
+   "refs": [
+    "Sachiko Kodama ferrofluid normal-field instability",
+    "Bismuth & soap-film thin-film optical interference",
+    "Terminal Grotesque & specular studio rim lighting"
+   ]
   }
  ]
 }

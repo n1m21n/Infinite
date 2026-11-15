@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ferrofluid Thinfilm Bismuth Corona",
+    "author": "Infinite",
+    "description": "Multi-pole magnetic field line interference with iridescent bismuth thin-film fringes, obsidian ridges, and corona shimmer.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float dipoleSep = 0.42 [0.15, 0.75];\nparam float fluxDensity = 12.0 [4.0, 22.0];\nparam float filmOrder = 4.2 [1.5, 8.0];\nparam float ridgeSharp = 3.0 [1.2, 6.0];\nparam float glow = 0.78 [0.2, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\npA = p - vec2(-dipoleSep, 0.14 * sin(t * 0.6));\npB = p - vec2(dipoleSep, -0.14 * sin(t * 0.6));\nrA = length(pA) + 0.02;\nrB = length(pB) + 0.02;\naA = atan2(pA.y, pA.x);\naB = atan2(pB.y, pB.x);\n\n# Magnetic dipole flux potential & interference fringes\nflux = sin(rA * fluxDensity - t * 1.2) + sin(rB * fluxDensity + t * 1.0);\nlines = sin((aA - aB) * 6.0 + flux * 1.4);\nridge = pow(clamp(0.5 + 0.5 * lines, 0.0, 1.0), ridgeSharp);\n\n# Thin-film interference palette\noptPath = (rA + rB) * filmOrder + flux * 0.8 + t * 0.4;\nirid = vec3(0.5 + 0.5 * sin(optPath + 0.3), 0.5 + 0.5 * sin(optPath + 2.4), 0.5 + 0.5 * sin(optPath + 4.5));\n\ncObsidian = vec3(0.031, 0.039, 0.059);\ncCobalt = vec3(0.094, 0.188, 0.533);\ncSpec = vec3(0.961, 0.973, 0.980);\n\ncol = mix(cObsidian, cCobalt * 1.2, clamp(0.5 + 0.35 * flux, 0.0, 1.0));\ncol = mix(col, irid, ridge * glow);\ncol = col + cSpec * pow(ridge, 3.2) * 0.75;\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "dipoleSep": 0.42,
+      "fluxDensity": 12.0,
+      "filmOrder": 4.2,
+      "ridgeSharp": 3.0,
+      "glow": 0.78
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

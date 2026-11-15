@@ -2228,6 +2228,146 @@
    },
    "groove": 0.4,
    "fill": 0.2
+  },
+  {
+   "id": "karplus_sympathetic",
+   "family": "experimental",
+   "bpm": [
+    88,
+    112
+   ],
+   "swing": 0.08,
+   "scale": [
+    4,
+    6,
+    9
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0...3...5...7...",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Field Synth",
+    "String"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.6,
+   "refs": [
+    "Karplus-Strong plucked string waveguide synthesis (1983)",
+    "Bowed & sympathetic string physical modeling",
+    "Julius O. Smith III digital waveguide acoustics"
+   ],
+   "chords": {
+    "size": [
+     2,
+     3
+    ],
+    "beats": 4.0,
+    "strum": 24,
+    "human": 10
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Strum"
+   ],
+   "motif": {
+    "synth": [
+     "Field Synth"
+    ],
+    "density": 0.45,
+    "octave": 3,
+    "gate": 60,
+    "gain": -9
+   },
+   "groove": 0.5,
+   "fill": 0.25
+  },
+  {
+   "id": "spring_plate_dispersion",
+   "family": "ambient",
+   "bpm": [
+    76,
+    98
+   ],
+   "swing": 0.04,
+   "scale": [
+    1,
+    4,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......5.......",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Phaser",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.7,
+   "refs": [
+    "EMT 140 steel plate & Hammond/Belton spring tank dispersion",
+    "King Tubby & dub studio spring-tank feedback matrices",
+    "Allpass chirp dispersion & transducer nonlinearity"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 4.0,
+    "strum": 18,
+    "human": 8
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.35,
+    "octave": 3,
+    "gate": 65,
+    "gain": -10
+   },
+   "groove": 0.45,
+   "fill": 0.2
   }
  ]
 }

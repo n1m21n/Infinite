@@ -309,6 +309,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [West Coast Buchla Krell Pendulum Synth](https://infinitedevices.org/library/west-coast-buchla-krell-pendulum-synth.html): Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation. (file: https://infinitedevices.org/assets/templates/west-coast-buchla-krell-pendulum-synth.inf)
 - [Tape Loop Polyphony Oxide Dispersion FX](https://infinitedevices.org/library/tape-loop-polyphony-oxide-dispersion-fx.html): Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-oxide-dispersion-fx.inf)
 - [Tape Loop Polyphony Frippertronics Echo FX](https://infinitedevices.org/library/tape-loop-polyphony-frippertronics-echo-fx.html): Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-frippertronics-echo-fx.inf)
+- [Karplus Sympathetic Waveguide Harp Synth](https://infinitedevices.org/library/karplus-sympathetic-waveguide-harp-synth.html): Physical-modeling plucked waveguide harp with dual harmonic comb resonators, sympathetic octave body, and wooden-bridge saturation. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-waveguide-harp-synth.inf)
+- [Karplus Sympathetic Bowed Monochord Synth](https://infinitedevices.org/library/karplus-sympathetic-bowed-monochord-synth.html): Continuously bowed waveguide monochord with stick-slip rosin harmonic excitation, vibrato drift, and resonant body formants. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bowed-monochord-synth.inf)
+- [Spring Plate Dispersion Belton Tank FX](https://infinitedevices.org/library/spring-plate-dispersion-belton-tank-fx.html): Triple-spring tank dispersion network with cascaded allpass chirp stages, brass transducer drive, and mechanical tank damping. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-belton-tank-fx.inf)
+- [Spring Plate Dispersion Steel Plate FX](https://infinitedevices.org/library/spring-plate-dispersion-steel-plate-fx.html): Dense steel plate diffusion lattice with early metallic reflections, phase-modulated allpass tank, and warm sheen tilt. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-steel-plate-fx.inf)
 
 ## Library: Community
 
@@ -545,6 +549,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Ukiyoe Cartography Compass Tide Chart](https://infinitedevices.org/library/ukiyoe-cartography-compass-tide-chart.html): Indigo woodblock nautical tide chart with a 16-point compass rose, Great Wave arc bands, and vermilion markers. (file: https://infinitedevices.org/assets/library/pixel/ukiyoe-cartography-compass-tide-chart.field)
 - [Reaction Diffusion Belousov Spiral Waves](https://infinitedevices.org/library/reaction-diffusion-belousov-spiral-waves.html): Belousov-Zhabotinsky chemical spiral wave interference with domain-warped fronts in verdigris, ochre, and cinnabar glaze. (file: https://infinitedevices.org/assets/library/pixel/reaction-diffusion-belousov-spiral-waves.field)
 - [Reaction Diffusion Belousov Turing Coral](https://infinitedevices.org/library/reaction-diffusion-belousov-turing-coral.html): Anisotropic Turing coral-spot morphogenesis with cellular ridge fronts and mineral verdigris-cinnabar banding. (file: https://infinitedevices.org/assets/library/pixel/reaction-diffusion-belousov-turing-coral.field)
+- [Ferrofluid Thinfilm Magnetic Spikes](https://infinitedevices.org/library/ferrofluid-thinfilm-magnetic-spikes.html): Raymarched magnetic ferrofluid dome with normal-field spike lattice, specular studio rim highlights, and bismuth thin-film interference. (file: https://infinitedevices.org/assets/library/pixel/ferrofluid-thinfilm-magnetic-spikes.field)
+- [Ferrofluid Thinfilm Bismuth Corona](https://infinitedevices.org/library/ferrofluid-thinfilm-bismuth-corona.html): Multi-pole magnetic field line interference with iridescent bismuth thin-film fringes, obsidian ridges, and corona shimmer. (file: https://infinitedevices.org/assets/library/pixel/ferrofluid-thinfilm-bismuth-corona.field)
 
 ## Library: Sketch
 
@@ -650,6 +656,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Vector Wireframe Icosahedron Radar](https://infinitedevices.org/library/vector-wireframe-icosahedron-radar.html): Rotating 3D-projected vector wireframe icosahedron inside concentric Vectrex radar rings and cardinal azimuth ticks. (file: https://infinitedevices.org/assets/library/sketch/vector-wireframe-icosahedron-radar.js)
 - [Jacquard Loom Warp Weft Draft](https://infinitedevices.org/library/jacquard-loom-warp-weft-draft.html): Multi-layered twill and satin weaving draft with animated shuttle passes, tie-up matrix, and linen selvedge grain. (file: https://infinitedevices.org/assets/library/sketch/jacquard-loom-warp-weft-draft.js)
 - [Jacquard Loom Perforated Tabulature](https://infinitedevices.org/library/jacquard-loom-perforated-tabulature.html): Linked binary loom punchcard strips with sprocket guide tracks, terracotta lacing cords, and woven herringbone preview. (file: https://infinitedevices.org/assets/library/sketch/jacquard-loom-perforated-tabulature.js)
+- [Guilloche Intaglio Banknote Rosette](https://infinitedevices.org/library/guilloche-intaglio-banknote-rosette.html): Engine-turned rose-lathe guilloche rosette with cycloidal moire lobes, fine-line micro-hatch border, and ruby jewel center. (file: https://infinitedevices.org/assets/library/sketch/guilloche-intaglio-banknote-rosette.js)
+- [Guilloche Intaglio Lathe Cartouche](https://infinitedevices.org/library/guilloche-intaglio-lathe-cartouche.html): Horizontal banknote guilloche ribbon lattice with phase-shifted sine interference, diamond-turned oval bezel, and micro-hatch shading. (file: https://infinitedevices.org/assets/library/sketch/guilloche-intaglio-lathe-cartouche.js)
 
 ## Library: Sketch 3D
 
@@ -750,6 +758,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Generative Plotter Mohr Hypercube 3D](https://infinitedevices.org/library/generative-plotter-mohr-hypercube-3d.html): Manfred Mohr-inspired algorithmic hypercube lattice of intersecting orthogonal beams and vermilion node markers. (file: https://infinitedevices.org/assets/library/sketch/generative-plotter-mohr-hypercube-3d.js)
 - [Sashimono Joinery Kumiko Lattice 3D](https://infinitedevices.org/library/sashimono-joinery-kumiko-lattice-3d.html): Interlocking Japanese Kumiko cypress latticework framed in charred sugi timber with brass corner dowels. (file: https://infinitedevices.org/assets/library/sketch/sashimono-joinery-kumiko-lattice-3d.js)
 - [Sashimono Joinery Kanawa Tsugi 3D](https://infinitedevices.org/library/sashimono-joinery-kanawa-tsugi-3d.html): Exploded Kanawa-tsugi scarf joint timber assembly with stepped mortise hooks and central charred sugi draw-pin wedge. (file: https://infinitedevices.org/assets/library/sketch/sashimono-joinery-kanawa-tsugi-3d.js)
+- [Tensegrity Pavilion Snelson Mast 3D](https://infinitedevices.org/library/tensegrity-pavilion-snelson-mast-3d.html): Three-stage helical tensegrity tower with brushed stainless compression struts, tensioned cable network, and dark slate plinth. (file: https://infinitedevices.org/assets/library/sketch/tensegrity-pavilion-snelson-mast-3d.js)
+- [Tensegrity Pavilion Geodesic Cantilever 3D](https://infinitedevices.org/library/tensegrity-pavilion-geodesic-cantilever-3d.html): Suspended space-frame truss cantilever with triangulated stainless struts, counterweight ring, and tension tendons. (file: https://infinitedevices.org/assets/library/sketch/tensegrity-pavilion-geodesic-cantilever-3d.js)
 
 ## Library: Synths
 
@@ -850,6 +860,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Future Garage Glass Rhodes Chord Synth](https://infinitedevices.org/library/future-garage-glass-rhodes-chord-synth.html): Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay. (file: https://infinitedevices.org/assets/templates/future-garage-glass-rhodes-chord-synth.inf)
 - [West Coast Buchla Complex Wavefold Synth](https://infinitedevices.org/library/west-coast-buchla-complex-wavefold-synth.html): Dual-oscillator PM/FM complex wavefolder with multi-stage trigonometric folding and vactrol low-pass gate decay. (file: https://infinitedevices.org/assets/templates/west-coast-buchla-complex-wavefold-synth.inf)
 - [West Coast Buchla Krell Pendulum Synth](https://infinitedevices.org/library/west-coast-buchla-krell-pendulum-synth.html): Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation. (file: https://infinitedevices.org/assets/templates/west-coast-buchla-krell-pendulum-synth.inf)
+- [Karplus Sympathetic Waveguide Harp Synth](https://infinitedevices.org/library/karplus-sympathetic-waveguide-harp-synth.html): Physical-modeling plucked waveguide harp with dual harmonic comb resonators, sympathetic octave body, and wooden-bridge saturation. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-waveguide-harp-synth.inf)
+- [Karplus Sympathetic Bowed Monochord Synth](https://infinitedevices.org/library/karplus-sympathetic-bowed-monochord-synth.html): Continuously bowed waveguide monochord with stick-slip rosin harmonic excitation, vibrato drift, and resonant body formants. (file: https://infinitedevices.org/assets/templates/karplus-sympathetic-bowed-monochord-synth.inf)
 
 ## Library: Audio Effects
 
@@ -953,6 +965,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Acid House Tape Dub Delay FX](https://infinitedevices.org/library/acid-house-tape-dub-delay-fx.html): Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive. (file: https://infinitedevices.org/assets/templates/acid-house-tape-dub-delay-fx.inf)
 - [Tape Loop Polyphony Oxide Dispersion FX](https://infinitedevices.org/library/tape-loop-polyphony-oxide-dispersion-fx.html): Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-oxide-dispersion-fx.inf)
 - [Tape Loop Polyphony Frippertronics Echo FX](https://infinitedevices.org/library/tape-loop-polyphony-frippertronics-echo-fx.html): Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation. (file: https://infinitedevices.org/assets/templates/tape-loop-polyphony-frippertronics-echo-fx.inf)
+- [Spring Plate Dispersion Belton Tank FX](https://infinitedevices.org/library/spring-plate-dispersion-belton-tank-fx.html): Triple-spring tank dispersion network with cascaded allpass chirp stages, brass transducer drive, and mechanical tank damping. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-belton-tank-fx.inf)
+- [Spring Plate Dispersion Steel Plate FX](https://infinitedevices.org/library/spring-plate-dispersion-steel-plate-fx.html): Dense steel plate diffusion lattice with early metallic reflections, phase-modulated allpass tank, and warm sheen tilt. (file: https://infinitedevices.org/assets/templates/spring-plate-dispersion-steel-plate-fx.inf)
 
 ## Nodes
 
@@ -1266,7 +1280,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 121 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 123 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1388,3 +1402,5 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Ukiyoe Cartography Compass Tide Chart](https://infinitedevices.org/embeds/ukiyoe-cartography-compass-tide-chart.html): Audio-reactive Ukiyo-e nautical tide chart. Bass pulses the compass rose, mids roll the Great Wave arc bands, and highs sharpen the woodblock degree ticks.
 - [Reaction Diffusion Belousov Spiral Waves](https://infinitedevices.org/embeds/reaction-diffusion-belousov-spiral-waves.html): Audio-reactive Belousov-Zhabotinsky chemical wave visualizer. Bass expands the spiral wavefronts, mids advect the domain warp, and highs ignite the cinnabar reaction fronts.
 - [Reaction Diffusion Belousov Turing Coral](https://infinitedevices.org/embeds/reaction-diffusion-belousov-turing-coral.html): Audio-reactive Turing morphogenesis visualizer. Bass swells the coral-spot cells, mids bend the anisotropic lattice, and highs sharpen the cinnabar ridge contours.
+- [Ferrofluid Thinfilm Magnetic Spikes](https://infinitedevices.org/embeds/ferrofluid-thinfilm-magnetic-spikes.html): Audio-reactive ferrofluid spike visualizer. Bass drives the magnetic spike amplitude, mids shift the thin-film interference spectrum, and highs sharpen the studio rim reflections.
+- [Ferrofluid Thinfilm Bismuth Corona](https://infinitedevices.org/embeds/ferrofluid-thinfilm-bismuth-corona.html): Audio-reactive bismuth thin-film interference visualizer. Bass pulses the dipole field lines, mids sweep the iridescent oil fringes, and highs ignite the corona ridges.

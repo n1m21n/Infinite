@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spring Plate Dispersion Steel Plate FX",
+    "author": "Infinite",
+    "description": "Dense steel plate diffusion lattice with early metallic reflections, phase-modulated allpass tank, and warm sheen tilt.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float density = 0.72 [0.15, 0.88];\nparam float shimmer = 0.42 [0.0, 1.0];\nparam float sheen = 0.74 [0.2, 1.0];\nparam float warmth = 1.35 [0.8, 2.8];\nparam float mix = 0.64 [0.0, 1.0];\nstate float lfo1 = 0;\nstate float lfo2 = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float ap3 = 0;\nstate float ap4 = 0;\nstate float lp = 0;\nstate float hpState = 0;\n\nlfo1 = (lfo1 + 0.62 / sr) % 1.0;\nlfo2 = (lfo2 + 1.18 / sr) % 1.0;\ng1 = clamp(density + sin(6.2831853 * lfo1) * 0.09 * shimmer, -0.88, 0.88);\ng2 = clamp(density * 0.88 + cos(6.2831853 * lfo2) * 0.09 * shimmer, -0.88, 0.88);\n\ny1 = -g1 * in + ap1;\nap1 = in + g1 * y1;\n\ny2 = -g2 * y1 + ap2;\nap2 = y1 + g2 * y2;\n\ny3 = -g1 * y2 + ap3;\nap3 = y2 + g1 * y3;\n\ny4 = -g2 * y3 + ap4;\nap4 = y3 + g2 * y4;\n\n# Plate sheen tilt + soft transformer warmth\nhpState = hpState + 0.06 * (y4 - hpState);\nbright = y4 + (y4 - hpState) * (sheen * 0.45);\nfCut = clamp(0.12 + sheen * 0.30, 0.05, 0.44);\nlp = lp + fCut * (bright - lp);\n\nsat = (lp * warmth) / (1.0 + abs(lp * warmth) * 0.40);\nout = in * (1.0 - mix) + sat * mix;\n",
+    "params": {
+      "density": 0.72,
+      "shimmer": 0.42,
+      "sheen": 0.74,
+      "warmth": 1.35,
+      "mix": 0.64
+    }
+  }
+}

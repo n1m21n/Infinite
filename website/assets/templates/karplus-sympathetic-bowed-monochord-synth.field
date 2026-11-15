@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Karplus Sympathetic Bowed Monochord Synth",
+    "author": "Infinite",
+    "description": "Continuously bowed waveguide monochord with stick-slip rosin harmonic excitation, vibrato drift, and resonant body formants.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float bowPressure = 0.62 [0.2, 1.0];\nparam float rosinEdge = 0.48 [0.0, 1.0];\nparam float vibrato = 0.35 [0.0, 1.0];\nparam float release = 0.75 [0.15, 2.0];\nstate float p1 = 0;\nstate float pSub = 0;\nstate float vibLfo = 0;\nstate float env = 0;\nstate float fLp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\nrelRate = clamp(1.0 / (sr * release), 0.0001, 0.02);\nenv = if(target > env, env + (target - env) * 0.035, env - env * relRate);\n\nvibLfo = (vibLfo + 4.8 / sr) % 1.0;\nf0 = clamp(freq * (1.0 + sin(6.2831853 * vibLfo) * 0.006 * vibrato), 40.0, 2000.0);\np1 = (p1 + f0 / sr) % 1.0;\npSub = (pSub + (f0 * 0.5) / sr) % 1.0;\n\nbowMod = sin(6.2831853 * p1) * bowPressure * (0.65 + 0.35 * rosinEdge);\ncore = sin(6.2831853 * p1 + bowMod) * 0.72 + sin(6.2831853 * pSub) * 0.28;\nfLp = fLp + 0.14 * (core - fLp);\n\nsat = (fLp * 1.35) / (1.0 + abs(fLp * 1.35) * 0.45);\nout = sat * env * 0.50;\n",
+    "params": {
+      "bowPressure": 0.62,
+      "rosinEdge": 0.48,
+      "vibrato": 0.35,
+      "release": 0.75
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

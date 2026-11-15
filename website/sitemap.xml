@@ -168,6 +168,8 @@
   <url><loc>https://infinitedevices.org/embeds/ukiyoe-cartography-compass-tide-chart.html</loc><lastmod>2026-11-15</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/reaction-diffusion-belousov-spiral-waves.html</loc><lastmod>2026-11-15</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/reaction-diffusion-belousov-turing-coral.html</loc><lastmod>2026-11-15</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/ferrofluid-thinfilm-magnetic-spikes.html</loc><lastmod>2026-11-15</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/ferrofluid-thinfilm-bismuth-corona.html</loc><lastmod>2026-11-15</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-15</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-15</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-15</lastmod><priority>0.7</priority></url>
@@ -369,6 +371,10 @@
   <url><loc>https://infinitedevices.org/library/west-coast-buchla-krell-pendulum-synth.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/tape-loop-polyphony-oxide-dispersion-fx.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/tape-loop-polyphony-frippertronics-echo-fx.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/karplus-sympathetic-waveguide-harp-synth.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/karplus-sympathetic-bowed-monochord-synth.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spring-plate-dispersion-belton-tank-fx.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spring-plate-dispersion-steel-plate-fx.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
@@ -983,6 +989,16 @@
   <url><loc>https://infinitedevices.org/library/tape-loop-polyphony-frippertronics-echo-fx.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/reaction-diffusion-belousov-spiral-waves.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/reaction-diffusion-belousov-turing-coral.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/guilloche-intaglio-banknote-rosette.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/guilloche-intaglio-lathe-cartouche.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tensegrity-pavilion-snelson-mast-3d.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tensegrity-pavilion-geodesic-cantilever-3d.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/karplus-sympathetic-waveguide-harp-synth.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/karplus-sympathetic-bowed-monochord-synth.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spring-plate-dispersion-belton-tank-fx.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spring-plate-dispersion-steel-plate-fx.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ferrofluid-thinfilm-magnetic-spikes.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ferrofluid-thinfilm-bismuth-corona.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-15</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-15</lastmod><priority>0.5</priority></url>
