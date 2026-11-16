@@ -3382,7 +3382,7 @@
       "bass": "0..0..5.3..2....",
       "fx": [
         "Phaser",
-        "Tape",
+        "Saturator",
         "Delay"
       ],
       "synth": [
@@ -3453,10 +3453,10 @@
       "fx": [
         "Chorus",
         "Delay",
-        "Saturation"
+        "Saturator"
       ],
       "synth": [
-        "Organ",
+        "Wind",
         "Analog",
         "FM"
       ],
@@ -3485,7 +3485,7 @@
       ],
       "motif": {
         "synth": [
-          "Organ",
+          "Wind",
           "Analog"
         ],
         "density": 0.6,
