@@ -1,0 +1,2 @@
+  src/nodes/Scene3DNode.cpp:1380 has _WIN32 - the OS branch belongs behind a Platform:: seam, not in a node
+OUTPUTSWEEP 209 cross-platform Platform:: functions, 1 node-layer _WIN32 uses, 1 problem(s): PROBLEMS
