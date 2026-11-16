@@ -81,17 +81,16 @@ namespace app
    namespace
    {
       // Strip geometry. The fader takes whatever height is left after the fixed rows.
-      constexpr float kStripW = 58.0f;
+      constexpr float kStripW = 92.0f; // control width inside a strip
+      constexpr float kStripFaceW = 112.0f; // a strip's full width: wide, fixed, the console scrolls
       constexpr float kStripGap = 4.0f;
       constexpr float kRenderW = 196.0f;
-      constexpr float kNameH = 22.0f;
-      constexpr float kKnobD = 24.0f;
-      constexpr float kButtonsH = 20.0f;
+                  constexpr float kButtonsH = 26.0f;
       constexpr float kRowGap = 4.0f;
-      constexpr float kStripMaxH = 360.0f;
+      constexpr float kStripMaxH = 520.0f;
       constexpr float kMinFaderH = 40.0f;
       constexpr int kMaxGroupDepth = 4;
-      constexpr float kSendH = 16.0f;     // §4.2 sends row: four mini knobs between name and trim
+      constexpr float kSendH = 18.0f;     // §4.2 sends row: four mini knobs between name and trim
       constexpr float kSendKnobD = 13.0f;
       constexpr float kReturnGap = 14.0f; // returns sit in their own section right of the strips
       constexpr int kInsertRows = 3;      // §4.2 inserts: chips, the last row holds "+"
@@ -423,28 +422,38 @@ namespace app
          return ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f));
       }
 
-      float FaderHeightFor(float stripH) { return std::max(kMinFaderH, stripH - kNameH - kInsertsH - kSendH - kKnobD - kButtonsH - 5.0f * kRowGap); }
+      constexpr unsigned kPalette[12] = { 0xE5484D, 0xF76B15, 0xFFB224, 0xE5D52B, 0x8BD450, 0x30A46C,
+                                          0x12A594, 0x05A2C2, 0x3E63DD, 0x8E4EC6, 0xD6409F, 0x889096 };
 
-      // B3 on a strip's name: Cmd/Shift-click picks it, drag reorders within its Mixer, right-click groups.
-      // Returns true when the click was a pick (so it does not also select the node on the canvas).
+      // Rename: one strip at a time, double-click the name or right-click > Rename.
+      uint64_t sEditUid = 0;
+      int sEditSlot = -1;
+      char sEditBuf[40] = {};
+      bool sEditFocus = false;
+
+      void BeginRename(const MixerNode& m, uint64_t uid, int slot, const std::string& shown)
+      {
+         sEditUid = uid;
+         sEditSlot = slot;
+         sEditFocus = true;
+         const std::string cur = m.chName[slot].empty() ? shown : m.chName[slot];
+         snprintf(sEditBuf, sizeof(sEditBuf), "%s", cur.c_str());
+      }
+
+      // The name's right-click menu and drag-to-reorder. Returns true when the click should not select the node.
       bool StripNameActions(ImDrawList* dl, ImVec2 p, float w, const char* name, const StripRef& r, bool clicked)
       {
          GraphNode* mGn = FindNodeByIndex(r.mixerIndex);
-         if (mGn == nullptr)
+         MixerNode* m = MixerAt(r.mixerIndex);
+         if (mGn == nullptr || m == nullptr)
             return false;
-         const std::pair<uint64_t, int> key(mGn->uid, r.slot);
-         const ImGuiIO& io = ImGui::GetIO();
+         (void)dl; (void)p; (void)w; (void)clicked;
          bool picked = false;
-         if (clicked && (io.KeyShift || io.KeyCtrl || io.KeySuper))
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
-            if (!sSelStrips.erase(key))
-               sSelStrips.insert(key);
+            BeginRename(*m, mGn->uid, r.slot, name);
             picked = true;
          }
-         else if (clicked)
-            sSelStrips.clear();
-         if (sSelStrips.count(key))
-            dl->AddRectFilled(ImVec2(p.x, p.y + 3.0f), ImVec2(p.x + w, p.y + kNameH), ImGui::GetColorU32(ImGuiCol_Header), 2.0f);
          if (ImGui::BeginDragDropSource())
          {
             const int payload[2] = { r.mixerIndex, r.slot };
@@ -464,18 +473,57 @@ namespace app
          }
          if (MenuParts::BeginContextItem("##stripctx"))
          {
-            const MixerNode* m = MixerAt(r.mixerIndex);
-            const int n = m ? m->numChannels : 0;
-            if (MenuParts::Item(T("Group")))
+            const int n = m->numChannels;
+            if (MenuParts::Item(T("Rename")))
+               BeginRename(*m, mGn->uid, r.slot, name);
+            if (MenuParts::Item(T("Reset name"), nullptr, false, !m->chName[r.slot].empty()))
             {
-               std::vector<int> slots { r.slot };
-               for (const auto& k : sSelStrips)
-                  if (k.first == mGn->uid)
-                     slots.push_back(k.second);
-               MixerPanelGroupStrips(r.mixerIndex, slots);
+               PushUndoCheckpoint("Rename channel");
+               m->chName[r.slot].clear();
             }
-            if (MenuParts::Item(T("Ungroup"), nullptr, false, r.groupIndex >= 0))
-               MixerPanelUngroup(r.mixerIndex, r.slot);
+            if (MenuParts::SubMenu(T("Colour")))
+            {
+               for (int i = 0; i < 12; i++)
+               {
+                  ImGui::PushID(i);
+                  if (i % 6 != 0)
+                     ImGui::SameLine(0.0f, 4.0f);
+                  const unsigned c = kPalette[i];
+                  if (ImGui::ColorButton("##c", ImVec4((float)((c >> 16) & 0xFF) / 255.0f, (float)((c >> 8) & 0xFF) / 255.0f, (float)(c & 0xFF) / 255.0f, 1.0f),
+                                         ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoAlpha, ImVec2(18.0f, 18.0f)))
+                  {
+                     PushUndoCheckpoint("Channel colour");
+                     m->chColor[r.slot] = c;
+                     ImGui::CloseCurrentPopup();
+                  }
+                  ImGui::PopID();
+               }
+               if (MenuParts::Item(T("Auto"), nullptr, m->chColor[r.slot] == 0))
+               {
+                  PushUndoCheckpoint("Channel colour");
+                  m->chColor[r.slot] = 0;
+               }
+               ImGui::EndMenu();
+            }
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Solo safe"), nullptr, m->soloSafe[r.slot]))
+            {
+               PushUndoCheckpoint("Mixer strip");
+               m->soloSafe[r.slot] = !m->soloSafe[r.slot];
+            }
+            if (m->SendBuses() > 0 && MenuParts::Item(T("Pre-fader sends"), nullptr, m->sendPre[r.slot]))
+            {
+               PushUndoCheckpoint("Mixer strip");
+               m->sendPre[r.slot] = !m->sendPre[r.slot];
+            }
+            if (MenuParts::Item(T("Reset strip")))
+            {
+               PushUndoCheckpoint("Mixer strip");
+               m->gainDb[r.slot] = 0.0f;
+               m->trimDb[r.slot] = 0.0f;
+               m->pan[r.slot] = 0.0f;
+               m->mute[r.slot] = m->solo[r.slot] = m->phase[r.slot] = false;
+            }
             MenuParts::Separator();
             if (MenuParts::Item(T("Move left"), nullptr, false, r.slot > 0))
                MixerPanelStripMove(r.mixerIndex, r.slot, r.slot - 1);
@@ -486,52 +534,10 @@ namespace app
          return picked;
       }
 
-      // A clipped one-line name; returns true on click.
-      bool NameRow(ImDrawList* dl, ImVec2 p, float w, const char* name, ImU32 bar, bool dim, const StripRef* strip = nullptr)
-      {
-         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + 3.0f), bar, 1.5f);
-         ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + 3.0f));
-         bool clicked = ImGui::InvisibleButton("##name", ImVec2(w, kNameH - 3.0f));
-         const bool hovered = ImGui::IsItemHovered();
-         if (strip != nullptr && StripNameActions(dl, p, w, name, *strip, clicked))
-            clicked = false;
-         const ImVec2 ts = ImGui::CalcTextSize(name);
-         const float tx = p.x + std::max(2.0f, (w - ts.x) * 0.5f);
-         dl->PushClipRect(ImVec2(p.x + 2.0f, p.y), ImVec2(p.x + w - 2.0f, p.y + kNameH), true);
-         dl->AddText(ImVec2(tx, p.y + 5.0f), ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text), name);
-         dl->PopClipRect();
-         if (hovered && ts.x > w - 4.0f && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-            HelpTip("%s", name);
-         return clicked;
-      }
-
-      // Fader with its meter on the right; double-click returns to 0 dB.
-      void FaderWithMeter(ImVec2 p, float w, float h, float* db, float level)
-      {
-         const float meterW = kFaderMeterW;
-         const float faderCell = w - meterW - 4.0f;
-         ImGui::SetCursorScreenPos(p);
-         const float before = *db;
-         VFaderFloat("##fader", db, -60.0f, 12.0f, "%.1f dB", h, ImGui::GetColorU32(ImGuiCol_SliderGrab), false,
-                     faderCell, ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos);
-         UndoOnActivate(db, before);
-         if (ImGui::IsItemHovered())
-         {
-            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-            {
-               PushUndoCheckpoint("Mixer strip");
-               *db = 0.0f;
-            }
-            if (*db <= -60.0f)
-               HelpTip("-inf dB");
-            else
-               HelpTip("%+.1f dB", *db);
-         }
-         DrawStripMeter(p.x + faderCell + 2.0f, p.y, meterW, h, level);
-      }
+      void DrawConsoleMeter(float x, float y, float w, float h, float level);
 
       // §4.2: one mini knob per send bus of this strip's Mixer (right-click: pre/post), then "+" for a new send FX.
-      void DrawSends(ImVec2 p, MixerNode* m, const StripRef& r)
+      [[maybe_unused]] void DrawSends(ImVec2 p, MixerNode* m, const StripRef& r)
       {
          const int s = r.slot;
          const float cell = (kStripW - 2.0f) / (float)MixerNode::kSendBuses;
@@ -578,7 +584,7 @@ namespace app
       }
 
       // Bypass, move and remove for chip i; true when the graph changed.
-      bool InsertMenuItems(const StripRef& r, int i)
+      [[maybe_unused]] bool InsertMenuItems(const StripRef& r, int i)
       {
          const int n = (int)r.inserts.size();
          GraphNode* g = FindNodeByIndex(r.inserts[i]);
@@ -598,7 +604,7 @@ namespace app
 
       // One insert chip: bypass dot, name; click selects, drag reorders, right-click for the rest.
       // Returns true when the graph changed, so the caller stops drawing this strip's stale chain.
-      bool DrawInsertChip(ImDrawList* dl, ImVec2 p, float w, const StripRef& r, int i)
+      [[maybe_unused]] bool DrawInsertChip(ImDrawList* dl, ImVec2 p, float w, const StripRef& r, int i)
       {
          GraphNode* g = FindNodeByIndex(r.inserts[i]);
          if (g == nullptr)
@@ -658,7 +664,7 @@ namespace app
       }
 
       // §4.2 / D4: the strip's insert chain as chips, then "+". A shared chain is edited on the canvas.
-      void DrawInserts(ImDrawList* dl, ImVec2 p, const StripRef& r, int rows = kInsertRows)
+      [[maybe_unused]] void DrawInserts(ImDrawList* dl, ImVec2 p, const StripRef& r, int rows = kInsertRows)
       {
          const float w = kStripW - 2.0f;
          const float x = p.x + 1.0f;
@@ -725,10 +731,313 @@ namespace app
          }
       }
 
-      void DrawStrip(ImDrawList* dl, ImVec2 p, float h, const StripRef& r)
+      // A segmented level meter with a calibrated -60..0 dB scale, unlit segments always visible and a falling peak
+      // marker held for a moment (state kept per meter in ImGui's storage).
+      void DrawConsoleMeter(float x, float y, float w, float h, float level)
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 tl(x, y), br(x + w, y + h);
+         dl->AddRectFilled(tl, br, IM_COL32(0, 0, 0, 120), 2.0f);
+         const float db = level > 1e-4f ? 20.0f * log10f(level) : -120.0f;
+         auto frac = [](float d) { return std::clamp((d + 60.0f) / 60.0f, 0.0f, 1.0f); };
+         const float seg = 3.0f, gap = 1.0f, step = seg + gap;
+         const int n = std::max(1, (int)((h - 2.0f) / step));
+         const float lit = frac(db) * (float)n;
+         ImGuiStorage* st = ImGui::GetStateStorage();
+         const ImGuiID id = ImGui::GetID("##mpk");
+         float peak = st->GetFloat(id, 0.0f);
+         const float dt = ImGui::GetIO().DeltaTime;
+         peak = std::max(lit, peak - 14.0f * dt * (float)n / 30.0f);
+         st->SetFloat(id, peak);
+         for (int i = 0; i < n; i++)
+         {
+            const float topY = br.y - 1.0f - (float)(i + 1) * step + gap;
+            const float segDb = -60.0f + 60.0f * ((float)i + 0.5f) / (float)n;
+            const bool on = (float)i + 0.5f <= lit;
+            const ImU32 base = segDb > -3.0f ? IM_COL32(255, 86, 80, 255) : segDb > -12.0f ? IM_COL32(236, 190, 70, 255)
+                                                                                           : IM_COL32(84, 214, 140, 255);
+            dl->AddRectFilled(ImVec2(x + 1.5f, topY), ImVec2(br.x - 1.5f, topY + seg), on ? base : (base & 0x00FFFFFF) | (38u << 24), 0.5f);
+         }
+         const int pi = std::clamp((int)peak, 0, n - 1);
+         if (peak > 1.0f)
+         {
+            const float topY = br.y - 1.0f - (float)(pi + 1) * step + gap;
+            dl->AddRectFilled(ImVec2(x + 1.5f, topY), ImVec2(br.x - 1.5f, topY + seg), IM_COL32(255, 255, 255, 200), 0.5f);
+         }
+         static const float kTicks[] = { 0.0f, -6.0f, -12.0f, -24.0f, -48.0f };
+         for (float t : kTicks)
+            dl->AddLine(ImVec2(x - 3.0f, br.y - 1.0f - (h - 2.0f) * frac(t)), ImVec2(x - 1.0f, br.y - 1.0f - (h - 2.0f) * frac(t)),
+                        IM_COL32(255, 255, 255, 70), 1.0f);
+         dl->AddRect(tl, br, IM_COL32(255, 255, 255, 26), 2.0f);
+      }
+
+      // ---- Hardware desk look -------------------------------------------------------------------------------
+      // References: SSL 4000 G (colour cap, scribble name, trim/pan pots, M/S keys with LEDs, long-throw fader with
+      // an LED ladder beside it), Yamaha CL/QL and Allen & Heath SQ (a colour per channel, a readout under the
+      // fader). A desk is dark in both themes, so these tones are fixed on purpose.
+      constexpr float kCardPad = 8.0f;
+      constexpr float kContentMaxW = 92.0f;
+      constexpr float kMinStripW = 76.0f;
+      constexpr float kScribbleH = 38.0f;
+      constexpr float kPotD = 30.0f;
+      constexpr float kPotRowH = kPotD + 12.0f;
+      constexpr float kPlateH = 16.0f;
+
+      float Lerp(float a, float b, float t) { return a + (b - a) * t; }
+      ImU32 Grey(int v, int a = 255) { return IM_COL32(v, v, v, a); }
+      ImU32 Tint(ImU32 c, float k, int a = 255) // k < 1 darkens, k > 1 lightens
+      {
+         const float r = std::min(255.0f, (float)(c & 0xFF) * k), g = std::min(255.0f, (float)((c >> 8) & 0xFF) * k),
+                     b = std::min(255.0f, (float)((c >> 16) & 0xFF) * k);
+         return IM_COL32((int)r, (int)g, (int)b, a);
+      }
+      ImU32 RgbToU32(unsigned rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 255); }
+
+
+      float StripFaderH(float h, bool sends)
+      {
+         return std::max(kMinFaderH, h - 2.0f * kCardPad - kScribbleH - kPotRowH - (sends ? kSendH + 2.0f : 0.0f) - kButtonsH -
+                                         2.0f * kPlateH - 6.0f * kRowGap);
+      }
+
+      void DrawScrew(ImDrawList* dl, ImVec2 c)
+      {
+         dl->AddCircleFilled(ImVec2(c.x, c.y + 0.6f), 3.0f, Grey(0, 120), 10);
+         dl->AddCircleFilled(c, 2.6f, Grey(92), 10);
+         dl->AddCircleFilled(ImVec2(c.x - 0.5f, c.y - 0.5f), 1.6f, Grey(138), 8);
+         dl->AddLine(ImVec2(c.x - 1.6f, c.y + 1.0f), ImVec2(c.x + 1.6f, c.y - 1.0f), Grey(30), 1.0f);
+      }
+
+      // The console chassis behind every strip: a dark steel bed with a lit top rail, so the strips sit in it.
+      void DrawChassis(ImDrawList* dl, ImVec2 p, ImVec2 q)
+      {
+         dl->AddRectFilled(p, q, IM_COL32(18, 19, 22, 255), 5.0f);
+         dl->AddRectFilledMultiColor(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + 9), Grey(255, 22), Grey(255, 22), Grey(255, 0), Grey(255, 0));
+         dl->AddRect(p, q, Grey(0, 200), 5.0f, 0, 1.0f);
+      }
+
+      // A strip face: graphite plate, fine vertical brushing (a fixed hash, so nothing swims), a bevelled edge and a
+      // colour cap on top. `lit` is the canvas selection.
+      void DrawFace(ImDrawList* dl, ImVec2 p, ImVec2 q, ImU32 cap, bool lit)
+      {
+         const float r = 3.0f;
+         dl->AddRectFilledMultiColor(p, q, IM_COL32(58, 61, 68, 255), IM_COL32(58, 61, 68, 255), IM_COL32(36, 38, 43, 255), IM_COL32(36, 38, 43, 255));
+         dl->PushClipRect(p, q, true);
+         for (float x = p.x + 1.0f; x < q.x; x += 2.0f)
+         {
+            const unsigned hsh = (unsigned)((int)(x * 7.0f) * 2654435761u) >> 24;
+            dl->AddLine(ImVec2(x, p.y), ImVec2(x, q.y), hsh & 1 ? Grey(255, 5 + (int)(hsh % 7)) : Grey(0, 6 + (int)(hsh % 9)), 1.0f);
+         }
+         dl->PopClipRect();
+         dl->AddRect(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, q.y - 1), Grey(255, 28), r, 0, 1.0f); // lit bevel
+         dl->AddRect(p, q, Grey(0, 220), r, 0, 1.0f);
+         dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + 6), cap, r, ImDrawFlags_RoundCornersTop);
+         dl->AddRectFilledMultiColor(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + 6), Grey(255, 70), Grey(255, 70), Grey(0, 50), Grey(0, 50));
+         dl->AddLine(ImVec2(p.x + 1, p.y + 6.5f), ImVec2(q.x - 1, p.y + 6.5f), Grey(0, 160), 1.0f);
+         if (lit)
+            dl->AddRect(p, q, ImGui::GetColorU32(ImGuiCol_CheckMark), r, 0, 1.5f);
+      }
+
+      // A rotary pot: knurled skirt, domed cap, a pointer, and an arc in the strip colour for the value. Drag up or
+      // down; Shift is fine; double-click resets. Returns true while the value changes.
+      bool Pot(const char* id, float* v, float lo, float hi, float def, bool bipolar, float cellW, ImU32 col, const char* tag)
+      {
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         ImGui::InvisibleButton(id, ImVec2(cellW, kPotRowH));
+         const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
+         bool changed = false;
+         if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
+         {
+            const float speed = ImGui::GetIO().KeyShift ? 0.002f : 0.007f;
+            const float nv = std::clamp(*v - ImGui::GetIO().MouseDelta.y * speed * (hi - lo), lo, hi);
+            changed = nv != *v;
+            *v = nv;
+         }
+         if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         {
+            PushUndoCheckpoint("Mixer strip");
+            *v = def;
+            changed = true;
+         }
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float R = kPotD * 0.5f;
+         const ImVec2 c(p.x + cellW * 0.5f, p.y + R + 1.0f);
+         const float a0 = 0.75f * IM_PI, a1 = 2.25f * IM_PI; // 270 degrees, gap at the bottom
+         const float t = hi > lo ? (*v - lo) / (hi - lo) : 0.0f;
+         const float ang = Lerp(a0, a1, t);
+         // value arc, from the left stop (unipolar) or from the centre (bipolar)
+         const float from = bipolar ? Lerp(a0, a1, 0.5f) : a0;
+         dl->PathArcTo(c, R + 2.5f, a0, a1, 24);
+         dl->PathStroke(Grey(0, 150), 0, 2.5f);
+         if (std::fabs(ang - from) > 0.01f)
+         {
+            dl->PathArcTo(c, R + 2.5f, std::min(from, ang), std::max(from, ang), 24);
+            dl->PathStroke(col, 0, 2.5f);
+         }
+         dl->AddCircleFilled(ImVec2(c.x, c.y + 1.5f), R, Grey(0, 130), 28);        // drop shadow
+         dl->AddCircleFilled(c, R, Grey(22), 28);                                   // skirt
+         for (int i = 0; i < 24; i++)                                               // knurl
+         {
+            const float a = (float)i / 24.0f * 2.0f * IM_PI;
+            dl->AddLine(ImVec2(c.x + cosf(a) * (R - 3.0f), c.y + sinf(a) * (R - 3.0f)), ImVec2(c.x + cosf(a) * (R - 0.5f), c.y + sinf(a) * (R - 0.5f)),
+                        Grey(255, hovered || active ? 70 : 46), 1.0f);
+         }
+         const float cr = R - 4.0f;
+         dl->AddCircleFilled(c, cr, IM_COL32(70, 73, 80, 255), 24);                 // cap
+         dl->AddCircleFilled(ImVec2(c.x - 1.0f, c.y - 1.5f), cr - 1.5f, IM_COL32(98, 102, 111, 255), 24);
+         dl->AddCircleFilled(ImVec2(c.x - 1.5f, c.y - 2.5f), cr - 4.0f, IM_COL32(112, 117, 126, 255), 20);
+         dl->AddCircle(c, cr, Grey(0, 170), 24, 1.0f);
+         dl->AddLine(ImVec2(c.x + cosf(ang) * 2.0f, c.y + sinf(ang) * 2.0f), ImVec2(c.x + cosf(ang) * (cr - 0.5f), c.y + sinf(ang) * (cr - 0.5f)),
+                     col, 2.2f);
+         const float fs = ImGui::GetFontSize() * 0.72f;
+         const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, tag).x;
+         dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (cellW - tw) * 0.5f, p.y + kPotD + 3.0f), Grey(255, 140), tag);
+         return changed;
+      }
+
+      // A desk key: a raised cap with an LED bar above the legend, lit when on. Returns true on click.
+      bool Key(const char* id, const char* legend, bool on, ImU32 led, ImVec2 size)
+      {
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         const bool clicked = ImGui::InvisibleButton(id, size);
+         const bool hovered = ImGui::IsItemHovered(), down = ImGui::IsItemActive();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 q(p.x + size.x, p.y + size.y);
+         dl->AddRectFilled(ImVec2(p.x, p.y + 1), ImVec2(q.x, q.y + 1), Grey(0, 150), 3.0f);
+         const float dip = down ? 1.0f : 0.0f;
+         const ImVec2 a(p.x, p.y + dip), b(q.x, q.y - 1.0f + dip);
+         dl->AddRectFilledMultiColor(a, b, Grey(hovered ? 96 : 84), Grey(hovered ? 96 : 84), Grey(54), Grey(54));
+         dl->AddRect(a, b, Grey(0, 220), 3.0f, 0, 1.0f);
+         dl->AddLine(ImVec2(a.x + 2, a.y + 1.5f), ImVec2(b.x - 2, a.y + 1.5f), Grey(255, 60), 1.0f);
+         const ImVec2 la(a.x + 4.0f, a.y + 3.0f), lb(b.x - 4.0f, a.y + 5.5f);
+         dl->AddRectFilled(la, lb, on ? led : Tint(led, 0.22f), 1.0f);
+         if (on)
+            dl->AddRectFilled(ImVec2(la.x - 1, la.y - 1), ImVec2(lb.x + 1, lb.y + 1), (led & 0x00FFFFFF) | (60u << 24), 2.0f);
+         const float fs = ImGui::GetFontSize() * 0.92f;
+         const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, legend);
+         dl->AddText(ImGui::GetFont(), fs, ImVec2(a.x + (size.x - ts.x) * 0.5f, a.y + 6.0f + (b.y - a.y - 6.0f - ts.y) * 0.5f),
+                     on ? Grey(255) : Grey(255, 190), legend);
+         return clicked;
+      }
+
+      // A long-throw fader: engraved scale left of a dark slot, a metal cap with grips and a white index line.
+      // The ladder meter takes the right-hand side. Drag follows the cap; double-click returns to 0 dB.
+      void DeskFader(ImVec2 p, float w, float h, float* db, float level, ImU32 col)
+      {
+         const float meterW = 12.0f, scaleW = 22.0f;
+         const float slotX = p.x + scaleW + (w - scaleW - meterW - 4.0f) * 0.5f;
+         const float capW = 24.0f, capH = 17.0f;
+         const float top = p.y + capH * 0.5f, bottom = p.y + h - capH * 0.5f;
+         auto pos01 = [&](float d) { return std::clamp(ConsoleFaderTaper::ValueToPos(d, -60.0f, 12.0f), 0.0f, 1.0f); };
+         ImGui::SetCursorScreenPos(ImVec2(slotX - capW * 0.5f, p.y));
+         const float before = *db;
+         ImGui::InvisibleButton("##fader", ImVec2(capW, h));
+         const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
+         UndoOnActivate(db, before);
+         if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
+         {
+            const float next = pos01(*db) - ImGui::GetIO().MouseDelta.y * (ImGui::GetIO().KeyShift ? 0.25f : 1.0f) / (bottom - top);
+            *db = std::clamp(ConsoleFaderTaper::PosToValue(std::clamp(next, 0.0f, 1.0f), -60.0f, 12.0f), -60.0f, 12.0f);
+         }
+         if (hovered)
+         {
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            {
+               PushUndoCheckpoint("Mixer strip");
+               *db = 0.0f;
+            }
+            if (*db <= -60.0f)
+               HelpTip("-inf dB");
+            else
+               HelpTip("%+.1f dB", *db);
+         }
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float capY = bottom - pos01(*db) * (bottom - top);
+         // scale
+         static const float kMarks[] = { 12.0f, 0.0f, -10.0f, -20.0f, -30.0f, -60.0f };
+         static const char* kLabels[] = { "+12", "0", "10", "20", "30", "-60" };
+         const float fs = ImGui::GetFontSize() * 0.68f;
+         for (int i = 0; i < 6; i++)
+         {
+            const float y = bottom - pos01(kMarks[i]) * (bottom - top);
+            const bool zero = kMarks[i] == 0.0f;
+            dl->AddLine(ImVec2(p.x + scaleW - 5.0f, y), ImVec2(p.x + scaleW - 1.0f, y), Grey(255, zero ? 200 : 110), 1.0f);
+            const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, kLabels[i]).x;
+            dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + scaleW - 7.0f - tw, y - fs * 0.5f), Grey(255, zero ? 210 : 120), kLabels[i]);
+         }
+         // slot, with a colour fill below the cap
+         dl->AddRectFilled(ImVec2(slotX - 3.0f, top - 4.0f), ImVec2(slotX + 3.0f, bottom + 4.0f), Grey(0, 235), 3.0f);
+         dl->AddRect(ImVec2(slotX - 3.0f, top - 4.0f), ImVec2(slotX + 3.0f, bottom + 4.0f), Grey(255, 26), 3.0f);
+         dl->AddRectFilled(ImVec2(slotX - 1.0f, capY), ImVec2(slotX + 1.0f, bottom + 3.0f), Tint(col, 0.8f, 200), 1.0f);
+         const float y0 = bottom - pos01(0.0f) * (bottom - top);
+         dl->AddLine(ImVec2(slotX - 6.0f, y0), ImVec2(slotX + 6.0f, y0), Grey(255, 60), 1.0f);
+         // cap
+         const ImVec2 a(slotX - capW * 0.5f, capY - capH * 0.5f), b(slotX + capW * 0.5f, capY + capH * 0.5f);
+         dl->AddRectFilled(ImVec2(a.x, a.y + 2.5f), ImVec2(b.x, b.y + 2.5f), Grey(0, 140), 3.0f);
+         dl->AddRectFilledMultiColor(a, b, Grey(active ? 200 : hovered ? 188 : 176), Grey(active ? 200 : hovered ? 188 : 176), Grey(104), Grey(104));
+         dl->AddRect(a, b, Grey(0, 230), 3.0f, 0, 1.0f);
+         dl->AddLine(ImVec2(a.x + 1.5f, a.y + 1.5f), ImVec2(b.x - 1.5f, a.y + 1.5f), Grey(255, 150), 1.0f);
+         for (int i = -2; i <= 2; i++) // grip ridges
+         {
+            const float gy = capY + (float)i * 3.0f + (i > 0 ? 1.5f : -1.5f) * 0.0f;
+            if (i == 0)
+               continue;
+            dl->AddLine(ImVec2(a.x + 3.0f, gy), ImVec2(b.x - 3.0f, gy), Grey(0, 110), 1.0f);
+            dl->AddLine(ImVec2(a.x + 3.0f, gy + 1.0f), ImVec2(b.x - 3.0f, gy + 1.0f), Grey(255, 70), 1.0f);
+         }
+         dl->AddLine(ImVec2(a.x + 2.0f, capY), ImVec2(b.x - 2.0f, capY), Grey(255), 2.0f);
+         // meter
+         ImGui::PushID("mtr");
+         DrawConsoleMeter(p.x + w - meterW, p.y, meterW, h, level);
+         ImGui::PopID();
+      }
+
+      // The readout plate under a fader: dark glass with the value in console green.
+      void Plate(ImDrawList* dl, ImVec2 p, float w, const char* text, ImU32 ink)
+      {
+         const ImVec2 q(p.x + w, p.y + kPlateH);
+         dl->AddRectFilled(p, q, IM_COL32(10, 14, 12, 255), 2.0f);
+         dl->AddRect(p, q, Grey(255, 30), 2.0f);
+         const float fs = ImGui::GetFontSize() * 0.86f;
+         const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, text);
+         dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (w - ts.x) * 0.5f, p.y + (kPlateH - ts.y) * 0.5f), ink, text);
+      }
+
+      // The scribble strip: the channel number and name on a dark inset under the colour cap. Click selects the
+      // source on the canvas; double-click renames; right-click opens the strip menu. Returns true on a plain click.
+      bool Scribble(ImDrawList* dl, ImVec2 p, float w, const char* name, int number, ImU32 col, bool dim, const StripRef* strip)
+      {
+         const ImVec2 q(p.x + w, p.y + kScribbleH);
+         dl->AddRectFilled(p, q, IM_COL32(12, 13, 15, 255), 3.0f);
+         dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + 5), Tint(col, 0.95f, 255), 2.0f, ImDrawFlags_RoundCornersTop);
+         dl->AddRect(p, q, Grey(255, 34), 3.0f);
+         ImGui::SetCursorScreenPos(p);
+         bool clicked = ImGui::InvisibleButton("##name", ImVec2(w, kScribbleH));
+         const bool hovered = ImGui::IsItemHovered();
+         if (strip != nullptr && StripNameActions(dl, p, w, name, *strip, clicked))
+            clicked = false;
+         if (hovered)
+            dl->AddRect(p, q, Grey(255, 70), 3.0f);
+         char num[8];
+         snprintf(num, sizeof(num), "%d", number);
+         const float nfs = ImGui::GetFontSize() * 0.78f;
+         if (number > 0)
+            dl->AddText(ImGui::GetFont(), nfs, ImVec2(p.x + 4.0f, p.y + 7.0f), Tint(col, 1.25f), num);
+         const ImVec2 ts = ImGui::CalcTextSize(name);
+         const float tx = p.x + std::max(4.0f, (w - ts.x) * 0.5f);
+         dl->PushClipRect(ImVec2(p.x + 3.0f, p.y), ImVec2(q.x - 3.0f, q.y), true);
+         dl->AddText(ImVec2(tx, p.y + 17.0f), dim ? Grey(255, 110) : Grey(250), name);
+         dl->PopClipRect();
+         if (hovered && ts.x > w - 8.0f && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+            HelpTip("%s", name);
+         return clicked;
+      }
+
+      void DrawStrip(ImDrawList* dl, ImVec2 p, float w, float h, const StripRef& r)
       {
          MixerNode* m = MixerAt(r.mixerIndex);
-         if (m == nullptr)
+         GraphNode* mGn = FindNodeByIndex(r.mixerIndex);
+         if (m == nullptr || mGn == nullptr)
             return;
          GraphNode* src = r.srcIndex >= 0 ? FindNodeByIndex(r.srcIndex) : nullptr;
          GraphNode* grp = r.groupIndex >= 0 ? FindNodeByIndex(r.groupIndex) : nullptr;
@@ -736,43 +1045,45 @@ namespace app
          ImGui::PushID(r.mixerIndex);
          ImGui::PushID(s);
 
-         const ImVec2 q(p.x + kStripW, p.y + h);
-         if (r.depth > 0)
-            dl->AddRectFilled(p, q, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.35f + 0.15f * (float)std::min(r.depth, 3)), 4.0f);
-         const bool lit = sHighlightUid != 0 && ((src && src->uid == sHighlightUid) || (grp && grp->uid == sHighlightUid));
-         if (lit)
-            dl->AddRect(p, q, ImGui::GetColorU32(ImGuiCol_CheckMark), 4.0f, 0, 1.5f);
-
-         // Name: the node on the cable. A group strip carries a fold arrow and its Mixer's name.
-         // With inserts the name is the source above them; a return is named by its first fx.
          GraphNode* head = r.headIndex >= 0 ? FindNodeByIndex(r.headIndex) : nullptr;
-         GraphNode* first = !r.inserts.empty() ? FindNodeByIndex(r.inserts.front()) : nullptr;
-         GraphNode* named = grp ? grp : (r.isReturn && first) ? first : (head && !r.isReturn) ? head : src;
-         std::string name = named ? NodeTitle(*named) : std::string(T("Empty"));
-         float nameX = p.x, nameW = kStripW;
-         if (grp)
+         GraphNode* named = grp ? grp : (head && !r.isReturn) ? head : src;
+         const ImU32 col = m->chColor[s] ? RgbToU32(m->chColor[s]) : CategoryColorOf(named);
+         const bool lit = sHighlightUid != 0 && ((src && src->uid == sHighlightUid) || (grp && grp->uid == sHighlightUid));
+         DrawFace(dl, p, ImVec2(p.x + w, p.y + h), col, lit);
+
+         const float cw = std::min(kContentMaxW, w - 2.0f * kCardPad);
+         const float cx = p.x + (w - cw) * 0.5f;
+         float y = p.y + kCardPad + 4.0f;
+
+         std::string shown = named ? NodeTitle(*named) : std::string(T("Ch")) + " " + std::to_string(s + 1);
+         const std::string name = m->chName[s].empty() ? shown : m->chName[s];
+         const float nameW = w - 2.0f * kCardPad;
+         const float nameX = p.x + kCardPad;
+         if (sEditUid == mGn->uid && sEditSlot == s)
          {
-            const bool open = sOpenGroups.count(grp->uid) != 0;
-            ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + 3.0f));
-            if (ImGui::InvisibleButton("##fold", ImVec2(14.0f, kNameH - 3.0f)))
+            ImGui::SetCursorScreenPos(ImVec2(nameX, y + 10.0f));
+            ImGui::SetNextItemWidth(nameW);
+            if (sEditFocus)
             {
-               if (open)
-                  sOpenGroups.erase(grp->uid);
-               else
-                  sOpenGroups.insert(grp->uid);
+               ImGui::SetKeyboardFocusHere();
+               sEditFocus = false;
             }
-            if (ImGui::IsItemHovered())
-               HelpTip("%s", open ? T("Fold group") : T("Open group"));
-            const ImVec2 c(p.x + 7.0f, p.y + 3.0f + (kNameH - 3.0f) * 0.5f);
-            const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            if (open)
-               dl->AddTriangleFilled(ImVec2(c.x - 4.0f, c.y - 2.0f), ImVec2(c.x + 4.0f, c.y - 2.0f), ImVec2(c.x, c.y + 3.0f), col);
-            else
-               dl->AddTriangleFilled(ImVec2(c.x - 2.0f, c.y - 4.0f), ImVec2(c.x - 2.0f, c.y + 4.0f), ImVec2(c.x + 3.0f, c.y), col);
-            nameX += 12.0f;
-            nameW -= 12.0f;
+            const bool done = ImGui::InputText("##rename", sEditBuf, sizeof(sEditBuf),
+                                               ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+            if (done || ImGui::IsItemDeactivatedAfterEdit())
+            {
+               if (m->chName[s] != sEditBuf)
+               {
+                  PushUndoCheckpoint("Rename channel");
+                  m->chName[s] = sEditBuf;
+               }
+               sEditUid = 0;
+            }
+            else if (ImGui::IsItemDeactivated() || (!ImGui::IsItemActive() && !sEditFocus && ImGui::GetFrameCount() > 0 &&
+                                                    ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+               sEditUid = 0;
          }
-         if (NameRow(dl, ImVec2(nameX, p.y), nameW, name.c_str(), CategoryColorOf(named), src == nullptr, &r) && named)
+         else if (Scribble(dl, ImVec2(nameX, y), nameW, name.c_str(), s + 1, col, src == nullptr && m->chName[s].empty(), &r) && named)
             SelectOnCanvas(named->index);
          if (sStripsStale)
          {
@@ -780,48 +1091,43 @@ namespace app
             ImGui::PopID();
             return;
          }
+         y += kScribbleH + kRowGap;
 
-         float y = p.y + kNameH + kRowGap;
-         if (src != nullptr)
-            DrawInserts(dl, ImVec2(p.x, y), r);
-         y += kInsertsH + kRowGap;
-         if (r.sends)
-            DrawSends(ImVec2(p.x, y), m, r);
-         y += kSendH + kRowGap;
-
-         // Trim and pan side by side.
-         const float cell = kStripW * 0.5f;
-         ImGui::SetCursorScreenPos(ImVec2(p.x, y));
+         // Trim and pan pots side by side.
+         const float cell = cw * 0.5f;
+         ImGui::SetCursorScreenPos(ImVec2(cx, y));
          float before = m->trimDb[s];
-         BipolarKnobFloat("##trim", &m->trimDb[s], -24.0f, 24.0f, "%.1f dB", kKnobD, ImGui::GetColorU32(ImGuiCol_SliderGrab), false, cell,
-                          -1, -1, false, 0.0f, 0.0f, false, true);
+         Pot("##trim", &m->trimDb[s], -24.0f, 24.0f, 0.0f, true, cell, col, T("TRIM"));
          UndoOnActivate(&m->trimDb[s], before);
          if (ImGui::IsItemHovered())
             HelpTip("%s %+.1f dB", T("Trim"), m->trimDb[s]);
-         ImGui::SetCursorScreenPos(ImVec2(p.x + cell, y));
+         ImGui::SetCursorScreenPos(ImVec2(cx + cell, y));
          before = m->pan[s];
-         BipolarKnobFloat("##pan", &m->pan[s], -1.0f, 1.0f, "%.2f", kKnobD, ImGui::GetColorU32(ImGuiCol_SliderGrab), false, cell,
-                          -1, -1, false, 0.0f, 0.0f, false, true);
+         Pot("##pan", &m->pan[s], -1.0f, 1.0f, 0.0f, true, cell, col, T("PAN"));
          UndoOnActivate(&m->pan[s], before);
          if (ImGui::IsItemHovered())
             HelpTip("%s %+.0f", T("Pan"), m->pan[s] * 100.0f);
+         y += kPotRowH + kRowGap;
 
-         // Fader | meter.
-         y += kKnobD + kRowGap;
-         const float faderH = FaderHeightFor(h);
-         gMixerPanelFaderH = faderH;
-         FaderWithMeter(ImVec2(p.x + 2.0f, y), kStripW - 4.0f, faderH, &m->gainDb[s], m->ChannelLevel(s));
-
-         // M S Ø.
-         y += faderH + kRowGap;
-         const float bw = (kStripW - 4.0f) / 3.0f;
-         ImGui::SetCursorScreenPos(ImVec2(p.x + 1.0f, y));
-         if (AudioMuteButton("M##m", &m->mute[s], bw, kButtonsH))
-            UndoOnToggle(&m->mute[s]);
-         ImGui::SetCursorScreenPos(ImVec2(p.x + 2.0f + bw, y));
-         if (AudioSoloButton("S##s", &m->solo[s], bw, kButtonsH))
+         // Aux sends, only once the console has send buses.
+         const int buses = m->SendBuses();
+         if (buses > 0)
          {
-            if (ImGui::GetIO().KeyAlt) // §4.3: Alt-click S clears every solo on the console
+            DrawSends(ImVec2(cx - 1.0f, y), m, r);
+            y += kSendH + 2.0f + kRowGap;
+         }
+
+         // Keys: mute, solo, polarity.
+         const float bw = (cw - 2.0f * 2.0f) / 3.0f;
+         ImGui::SetCursorScreenPos(ImVec2(cx, y));
+         if (Key("##m", "M", m->mute[s], IM_COL32(255, 86, 80, 255), ImVec2(bw, kButtonsH)))
+            UndoOnToggle(&m->mute[s]);
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Mute"));
+         ImGui::SetCursorScreenPos(ImVec2(cx + bw + 2.0f, y));
+         if (Key("##s", "S", m->solo[s], IM_COL32(255, 214, 64, 255), ImVec2(bw, kButtonsH)))
+         {
+            if (ImGui::IsKeyDown(ImGuiMod_Alt)) // Alt-click S clears every solo on the console
             {
                m->solo[s] = !m->solo[s];
                MixerPanelClearSolos(MixerPanelCurrentPageTop());
@@ -836,42 +1142,69 @@ namespace app
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", m->soloSafe[s] ? T("Solo safe (right-click)") : T("Solo (Alt-click: clear all, right-click: solo safe)"));
-         ImGui::SetCursorScreenPos(ImVec2(p.x + 3.0f + 2.0f * bw, y));
-         if (ActionButton::Draw("\xC3\x98##ph", ImVec2(bw, kButtonsH), m->phase[s] ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+         ImGui::SetCursorScreenPos(ImVec2(cx + 2.0f * (bw + 2.0f), y));
+         if (Key("##ph", "\xC3\x98", m->phase[s], IM_COL32(120, 190, 255, 255), ImVec2(bw, kButtonsH)))
          {
             PushUndoCheckpoint("Mixer strip");
             m->phase[s] = !m->phase[s];
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Invert polarity"));
+         y += kButtonsH + kRowGap;
+
+         // Fader and ladder meter fill what is left.
+         const float faderH = StripFaderH(h, buses > 0);
+         gMixerPanelFaderH = faderH;
+         DeskFader(ImVec2(cx, y), cw, faderH, &m->gainDb[s], m->ChannelLevel(s), col);
+         y += faderH + kRowGap;
+
+         char val[16];
+         if (m->gainDb[s] <= -60.0f)
+            snprintf(val, sizeof(val), "-inf");
+         else
+            snprintf(val, sizeof(val), "%+.1f", m->gainDb[s]);
+         Plate(dl, ImVec2(cx, y), cw, val, m->mute[s] ? IM_COL32(255, 120, 110, 255) : IM_COL32(120, 235, 160, 255));
 
          ImGui::PopID();
          ImGui::PopID();
       }
 
-      void DrawMaster(ImDrawList* dl, ImVec2 p, float h, int topIndex)
+      void DrawMaster(ImDrawList* dl, ImVec2 p, float w, float h, int topIndex)
       {
          MixerNode* m = MixerAt(topIndex);
          GraphNode* gn = FindNodeByIndex(topIndex);
          if (m == nullptr || gn == nullptr)
             return;
          ImGui::PushID("master");
-         dl->AddRectFilled(p, ImVec2(p.x + kStripW, p.y + h), ImGui::GetColorU32(ImGuiCol_FrameBg, 0.6f), 4.0f);
-         if (NameRow(dl, p, kStripW, T("Master"), CategoryColorOf(gn), false))
+         const ImU32 cap = ImGui::GetColorU32(ImGuiCol_CheckMark);
+         DrawFace(dl, p, ImVec2(p.x + w, p.y + h), cap, false);
+         DrawScrew(dl, ImVec2(p.x + 6.0f, p.y + 12.0f));
+         DrawScrew(dl, ImVec2(p.x + w - 6.0f, p.y + 12.0f));
+         DrawScrew(dl, ImVec2(p.x + 6.0f, p.y + h - 6.0f));
+         DrawScrew(dl, ImVec2(p.x + w - 6.0f, p.y + h - 6.0f));
+         const float cw = std::min(kContentMaxW, w - 2.0f * kCardPad - 6.0f);
+         const float cx = p.x + (w - cw) * 0.5f;
+         float y = p.y + kCardPad + 4.0f;
+         if (Scribble(dl, ImVec2(p.x + kCardPad, y), w - 2.0f * kCardPad, T("Master"), 0, cap, false, nullptr))
             SelectOnCanvas(topIndex);
-         const float y = p.y + kNameH + kRowGap + kInsertsH + kRowGap + kSendH + kRowGap + kKnobD + kRowGap;
-         // B4: true peak and LUFS M / S / I above the fader. Asking each frame is what keeps the meter running.
+         y += kScribbleH + kRowGap;
+
+         // True peak and LUFS M / S / I on a dark display. Asking each frame keeps the meter running.
          m->RequestMeters();
          {
-            const float top = p.y + kNameH + kRowGap, rowH = 15.0f;
-            ImGui::SetCursorScreenPos(ImVec2(p.x, top));
-            if (ImGui::InvisibleButton("##loud", ImVec2(kStripW, 4.0f * rowH)))
+            const float dispH = kPotRowH;
+            const ImVec2 dp(cx, y);
+            dl->AddRectFilled(dp, ImVec2(dp.x + cw, dp.y + dispH), IM_COL32(10, 14, 12, 255), 2.0f);
+            dl->AddRect(dp, ImVec2(dp.x + cw, dp.y + dispH), Grey(255, 30), 2.0f);
+            ImGui::SetCursorScreenPos(dp);
+            if (ImGui::InvisibleButton("##loud", ImVec2(cw, dispH)))
                m->ResetMeters();
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset."));
             const char* tags[4] = { "TP", "M", "S", "I" };
             const float vals[4] = { m->TruePeakDb(), m->LoudnessMomentary(), m->LoudnessShort(), m->LoudnessIntegrated() };
-            const float fs = ImGui::GetFontSize() * 0.85f;
+            const float fs = ImGui::GetFontSize() * 0.78f;
+            const float rowH = dispH * 0.5f;
             for (int i = 0; i < 4; i++)
             {
                char txt[16];
@@ -879,67 +1212,57 @@ namespace app
                   snprintf(txt, sizeof(txt), "-inf");
                else
                   snprintf(txt, sizeof(txt), "%.1f", vals[i]);
-               const float ry = top + (float)i * rowH;
+               const float colX = dp.x + (i % 2) * (cw * 0.5f);
+               const float ry = dp.y + (i / 2) * rowH + (rowH - fs) * 0.5f;
                const bool over = i == 0 && vals[0] > -1.0f; // above -1 dBTP: likely to clip once encoded
-               dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + 4.0f, ry), ImGui::GetColorU32(ImGuiCol_TextDisabled), tags[i]);
+               dl->AddText(ImGui::GetFont(), fs, ImVec2(colX + 3.0f, ry), Grey(255, 110), tags[i]);
                const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, txt).x;
-               dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + kStripW - 4.0f - tw, ry),
-                           ImGui::GetColorU32(over ? ImGuiCol_PlotHistogram : ImGuiCol_Text), txt);
+               dl->AddText(ImGui::GetFont(), fs, ImVec2(colX + cw * 0.5f - 3.0f - tw, ry),
+                           over ? IM_COL32(255, 110, 100, 255) : IM_COL32(120, 235, 160, 255), txt);
             }
          }
-         // D4: master inserts, the chain between this Mixer and its Audio Out.
-         {
-            StripRef r;
-            r.mixerIndex = topIndex;
-            r.slot = kMixerMasterSlot;
-            Chain ch;
-            if (ChainAt(topIndex, kMixerMasterSlot, ch))
-            {
-               r.inserts = ch.fx;
-               r.shared = ch.shared;
-               ImGui::PushID("masterins");
-               DrawInserts(dl, ImVec2(p.x, p.y + kNameH + kRowGap + 60.0f + 2.0f), r, 2);
-               ImGui::PopID();
-            }
-         }
-         if (MixerAt(topIndex) != m)
-         {
-            ImGui::PopID();
-            return;
-         }
-         const float faderH = FaderHeightFor(h);
-         FaderWithMeter(ImVec2(p.x + 2.0f, y), kStripW - 4.0f, faderH, &m->masterDb, m->Level());
-         // D7: mono check and dim, monitor-only (AudioEngine::ApplyMonitor); never in a render or capture.
+         y += kPotRowH + kRowGap;
+
+         // Mono check and dim, monitor-only (AudioEngine::ApplyMonitor); never in a render or capture.
          {
             AudioEngine& eng = AudioEngine::Instance();
             const bool mono = eng.MonitorMono(), dim = eng.MonitorDim();
-            const float by = y + faderH + kRowGap, monoW = 31.0f, dimW = kStripW - 4.0f - monoW - 1.0f;
-            ImGui::SetCursorScreenPos(ImVec2(p.x + 2.0f, by));
-            if (ActionButton::Draw((std::string(T("Mono")) + "##mono").c_str(), ImVec2(monoW, kButtonsH),
-                                   mono ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+            const float bw = (cw - 2.0f) * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(cx, y));
+            if (Key("##mono", T("Mono"), mono, IM_COL32(120, 190, 255, 255), ImVec2(bw, kButtonsH)))
                eng.SetMonitor(!mono, dim);
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Mono check. Speakers only: never in a render."));
-            ImGui::SetCursorScreenPos(ImVec2(p.x + 3.0f + monoW, by));
-            if (ActionButton::Draw((std::string(T("Dim")) + "##dim").c_str(), ImVec2(dimW, kButtonsH),
-                                   dim ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+            ImGui::SetCursorScreenPos(ImVec2(cx + bw + 2.0f, y));
+            if (Key("##dim", T("Dim"), dim, IM_COL32(255, 214, 64, 255), ImVec2(bw, kButtonsH)))
                eng.SetMonitor(mono, !dim);
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Dim -20 dB. Speakers only: never in a render."));
          }
+         y += kButtonsH + kRowGap;
+
+         const float faderH = StripFaderH(h, false);
+         DeskFader(ImVec2(cx, y), cw, faderH, &m->masterDb, m->Level(), cap);
+         y += faderH + kRowGap;
+         char val[16];
+         if (m->masterDb <= -60.0f)
+            snprintf(val, sizeof(val), "-inf");
+         else
+            snprintf(val, sizeof(val), "%+.1f", m->masterDb);
+         Plate(dl, ImVec2(cx, y), cw, val, IM_COL32(120, 235, 160, 255));
          ImGui::PopID();
          gMixerMasterMin = p;
-         gMixerMasterMax = ImVec2(p.x + kStripW, p.y + h);
+         gMixerMasterMax = ImVec2(p.x + w, p.y + h);
       }
 
-      int SpawnAt(const char* type, float x, float y)
+      [[maybe_unused]] int SpawnAt(const char* type, float x, float y)
       {
          GraphNode* gn = SpawnNode(type, "Utility", x, y);
          return gn ? gn->index : -1;
       }
 
       // Right of everything on the canvas, so a new pair never lands on a node.
-      ImVec2 FreeCanvasSpot()
+      [[maybe_unused]] ImVec2 FreeCanvasSpot()
       {
          float x = 0.0f, y = 0.0f;
          bool any = false;
@@ -952,7 +1275,7 @@ namespace app
          return any ? ImVec2(x + 420.0f, y) : ImVec2(0.0f, 0.0f);
       }
 
-      void DrawPageTabs(const std::vector<Page>& pages, int current)
+      [[maybe_unused]] void DrawPageTabs(const std::vector<Page>& pages, int current)
       {
          for (int i = 0; i < (int)pages.size(); i++)
          {
@@ -970,7 +1293,7 @@ namespace app
 
       // §4.3 / D8: A-H. Click recalls, Shift-click stores, right-click sets the crossfade. Keys 1-8 (Shift
       // stores) while the panel claims keys (G5). Then "Clear solo" while any strip is soloed.
-      void DrawSnapshots(int topIndex)
+      [[maybe_unused]] void DrawSnapshots(int topIndex)
       {
          MixerNode* top = MixerAt(topIndex);
          if (top == nullptr)
@@ -1060,18 +1383,24 @@ namespace app
          FollowCanvasSelection(pages);
          const int current = CurrentPage(pages);
 
-         // Header: the title and page tabs left, Mixer Audio pinned right (the twin of Session's chip).
+         // Header, as the other panels: the title and page tabs (only when there is more than one page) left,
+         // Render and Mixer Audio pinned right.
          ImGui::AlignTextToFramePadding();
          {
             UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
             ImGui::TextUnformatted(T("Mixer"));
          }
-         ImGui::SameLine(0.0f, tok::space_3);
-         DrawPageTabs(pages, current);
-         if (current >= 0)
+         if (pages.size() > 1)
          {
             ImGui::SameLine(0.0f, tok::space_3);
-            DrawSnapshots(pages[current].topIndex);
+            for (int i = 0; i < (int)pages.size(); i++)
+            {
+               GraphNode* top = FindNodeByIndex(pages[i].topIndex);
+               const std::string label = (top ? NodeTitle(*top) : std::string(T("Page"))) + "##page" + std::to_string(i);
+               if (ChipButton::Draw(label.c_str(), i == current, tok::tile))
+                  sPageUid = pages[i].topUid;
+               ImGui::SameLine(0.0f, tok::space_1);
+            }
          }
          {
             const bool mixerMode = gAudioMode == AudioMode::Mixer;
@@ -1106,95 +1435,59 @@ namespace app
          else if (bodyMax.y - bodyMin.y > 40.0f)
          {
             const Page& page = pages[current];
-            const std::vector<StripRef> strips = Strips(page.topIndex, false);
-            MixerNode* top = MixerAt(page.topIndex);
-            const bool canAdd = top && top->numChannels < MixerNode::kMaxSlots;
+            // A fixed console: one strip per channel of the top Mixer, in slot order, no groups, no returns row.
+            std::vector<StripRef> strips = Strips(page.topIndex, false);
+            strips.erase(std::remove_if(strips.begin(), strips.end(), [](const StripRef& r) { return r.depth > 0; }), strips.end());
+            std::stable_sort(strips.begin(), strips.end(), [](const StripRef& a, const StripRef& b) { return a.slot < b.slot; });
 
-            // §4.4: master at the right edge on a wide dock, under the strips on a tall one.
-            const float bodyH = bodyMax.y - bodyMin.y;
-            const float scrollH = ImGui::GetStyle().ScrollbarSize;
-            const float minStripH = kNameH + kInsertsH + kSendH + kKnobD + kButtonsH + 5.0f * kRowGap + kMinFaderH;
-            const bool tall = (gMixerPanelDock == 1 || gMixerPanelDock == 2) && bodyH >= 2.0f * minStripH + scrollH + kStripGap;
-            // §5: the render column sits right of the master. A wide dock gives it the right edge;
-            // a tall one the space beside the master. Too narrow for it and it stays hidden.
+            // The render column takes the right edge when asked for and there is room.
             const bool wantRender = gMixerRenderOpen || MixerRenderActive();
             ImVec2 renderMin(0.0f, 0.0f), renderMax(0.0f, 0.0f);
-            if (wantRender && !tall && bodyMax.x - bodyMin.x >= kRenderW + 3.0f * kStripW + 4.0f * kStripGap)
+            if (wantRender && bodyMax.x - bodyMin.x >= kRenderW + 3.0f * kMinStripW + 4.0f * kStripGap)
             {
                renderMin = ImVec2(bodyMax.x - kRenderW, bodyMin.y);
                renderMax = bodyMax;
                bodyMax.x -= kRenderW + 2.0f * kStripGap;
             }
             const float bodyW = bodyMax.x - bodyMin.x;
-            float stripsW, stripsH, masterH;
-            ImVec2 masterAt;
-            if (tall)
-            {
-               stripsW = bodyW;
-               stripsH = std::min(kStripMaxH + scrollH, (bodyH - kStripGap) * 0.5f);
-               masterH = std::min(kStripMaxH, bodyH - stripsH - kStripGap);
-               masterAt = ImVec2(bodyMin.x, bodyMin.y + stripsH + kStripGap);
-            }
-            else
-            {
-               stripsW = std::max(kStripW, bodyW - kStripW - kStripGap * 2.0f);
-               stripsH = std::min(kStripMaxH + scrollH, bodyH);
-               masterH = stripsH - scrollH;
-               masterAt = ImVec2(bodyMax.x - kStripW, bodyMin.y);
-            }
+            const float bodyH = bodyMax.y - bodyMin.y;
+            const int n = std::max(1, (int)strips.size());
+
+            // Strips and the master are wide, fixed-width desk strips; a long console scrolls sideways.
+            const float scrollH = ImGui::GetStyle().ScrollbarSize;
+            const float stripW = kStripFaceW;
+            const float stripsW = std::max(kMinStripW, bodyW - stripW - kStripGap);
+            const float contentW = (float)n * stripW + (float)(n - 1) * kStripGap;
+            const bool scrolls = contentW > stripsW + 0.5f;
+            const float colH = scrolls ? std::max(1.0f, bodyH - scrollH) : bodyH;
+            DrawChassis(ImGui::GetWindowDrawList(), bodyMin, ImVec2(bodyMax.x, bodyMin.y + colH));
 
             ImGui::SetCursorScreenPos(bodyMin);
-            ImGui::BeginChild("##mixerstrips", ImVec2(stripsW, stripsH), false, ImGuiWindowFlags_HorizontalScrollbar);
+            ImGui::BeginChild("##mixerstrips", ImVec2(stripsW, bodyH), false, ImGuiWindowFlags_HorizontalScrollbar);
             {
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const ImVec2 base = ImGui::GetCursorScreenPos();
-               const float h = stripsH - scrollH;
                const ImVec2 wmn = ImGui::GetWindowPos();
                const float visL = wmn.x, visR = wmn.x + ImGui::GetWindowWidth();
                float x = base.x;
-               bool inReturns = false;
                sStripsStale = false;
                for (const StripRef& r : strips)
                {
                   if (sStripsStale)
                      break;
-                  if (r.isReturn && !inReturns)
-                  {
-                     inReturns = true;
-                     const float mid = x + (kReturnGap - kStripGap) * 0.5f - kStripGap * 0.5f;
-                     dl->AddLine(ImVec2(mid, base.y + 4.0f), ImVec2(mid, base.y + h - 4.0f), ImGui::GetColorU32(ImGuiCol_Separator));
-                     x += kReturnGap - kStripGap;
-                  }
-                  if (x + kStripW >= visL && x <= visR)
-                     DrawStrip(dl, ImVec2(x, base.y), h, r);
-                  x += kStripW + kStripGap;
-               }
-               if (canAdd)
-               {
-                  ImGui::SetCursorScreenPos(ImVec2(x, base.y + kNameH));
-                  if (ActionButton::Draw("+##addstrip", ImVec2(24.0f, 24.0f)))
-                  {
-                     PushUndoCheckpoint("Add strip");
-                     top->numChannels = std::min(top->numChannels + 1, (int)MixerNode::kMaxSlots);
-                     RebuildAudioTopology();
-                  }
-                  if (ImGui::IsItemHovered())
-                     HelpTip("%s", T("Add strip"));
-                  x += 24.0f + kStripGap;
+                  if (x + stripW >= visL && x <= visR)
+                     DrawStrip(dl, ImVec2(x, base.y), stripW, colH, r);
+                  x += stripW + kStripGap;
                }
                ImGui::SetCursorScreenPos(base);
-               ImGui::Dummy(ImVec2(std::max(1.0f, x - base.x), h));
+               ImGui::Dummy(ImVec2(std::max(1.0f, x - base.x - kStripGap), colH));
                gMixerStripsMin = wmn;
                gMixerStripsMax = ImVec2(wmn.x + ImGui::GetWindowWidth(), wmn.y + ImGui::GetWindowHeight());
             }
             ImGui::EndChild();
             gMixerPanelStripCount = (int)strips.size();
-            DrawMaster(ImGui::GetWindowDrawList(), masterAt, masterH, page.topIndex);
-            if (wantRender && tall && bodyW - kStripW - 2.0f * kStripGap >= 150.0f)
-            {
-               renderMin = ImVec2(masterAt.x + kStripW + 2.0f * kStripGap, masterAt.y);
-               renderMax = ImVec2(bodyMax.x, masterAt.y + masterH);
-            }
+            const ImVec2 masterAt(bodyMax.x - stripW, bodyMin.y);
+            DrawMaster(ImGui::GetWindowDrawList(), masterAt, stripW, colH, page.topIndex);
             if (renderMax.x > renderMin.x && renderMax.y - renderMin.y > 40.0f)
             {
                std::vector<int> outs;
@@ -1218,10 +1511,11 @@ namespace app
             ImGui::OpenPopup("##mixerpanelctx");
          if (MenuParts::BeginPopup("##mixerpanelctx"))
          {
-            static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
-            for (int i = 0; i < 5; i++)
-               if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gMixerPanelDock))
-                  gMixerPanelDock = i;
+            static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+            static const int kDocks[] = { 0, 3 };
+            for (int i = 0; i < 2; i++)
+               if (MenuParts::Item(L(kDockLabels[i]), nullptr, kDocks[i] == gMixerPanelDock))
+                  gMixerPanelDock = kDocks[i];
             MenuParts::Separator();
             if (MenuParts::Item(L("Close panel")))
                gMixerPanelOpen = false;
@@ -1615,6 +1909,7 @@ namespace app
          float send[MixerNode::kSendBuses];
          INode* src = nullptr;
          int out = 0;
+         std::string name;
          StripState() { std::fill(std::begin(send), std::end(send), MixerNode::kSendOffDb); }
       };
 
@@ -1622,6 +1917,7 @@ namespace app
       {
          StripState st;
          st.gain = m.gainDb[s]; st.pan = m.pan[s]; st.trim = m.trimDb[s];
+         st.name = m.chName[s];
          st.mute = m.mute[s]; st.solo = m.solo[s]; st.phase = m.phase[s]; st.safe = m.soloSafe[s]; st.pre = m.sendPre[s];
          for (int b = 0; b < MixerNode::kSendBuses; b++)
             st.send[b] = m.sendDb[b][s];
@@ -1636,6 +1932,7 @@ namespace app
       void SetStrip(MixerNode& m, int s, const StripState& st)
       {
          m.gainDb[s] = st.gain; m.pan[s] = st.pan; m.trimDb[s] = st.trim;
+         m.chName[s] = st.name;
          m.mute[s] = st.mute; m.solo[s] = st.solo; m.phase[s] = st.phase; m.soloSafe[s] = st.safe; m.sendPre[s] = st.pre;
          for (int b = 0; b < MixerNode::kSendBuses; b++)
             m.sendDb[b][s] = st.send[b];
@@ -1850,13 +2147,14 @@ namespace app
 
    void MixerPanelDockCombo()
    {
-      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
-      gMixerPanelDock = std::clamp(gMixerPanelDock, 0, kDockFloating);
-      if (MenuParts::BeginCombo("##mixerpaneldock", T(kDockLabels[gMixerPanelDock])))
+      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+      static const int kDocks[] = { 0, 3 };
+      gMixerPanelDock = gMixerPanelDock == 3 ? 3 : 0;
+      if (MenuParts::BeginCombo("##mixerpaneldock", T(kDockLabels[gMixerPanelDock == 3 ? 1 : 0])))
       {
-         for (int i = 0; i < 5; i++)
-            if (MenuParts::Choice(L(kDockLabels[i]), i == gMixerPanelDock))
-               gMixerPanelDock = i;
+         for (int i = 0; i < 2; i++)
+            if (MenuParts::Choice(L(kDockLabels[i]), kDocks[i] == gMixerPanelDock))
+               gMixerPanelDock = kDocks[i];
          MenuParts::EndCombo();
       }
    }

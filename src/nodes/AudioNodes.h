@@ -132,6 +132,10 @@ public:
    float TruePeakDb() const { return mTruePeakDb; }
 
    int numChannels = 8;
+   // Channel names, set from the Mixer panel. Empty shows the source node's title.
+   std::string chName[kMaxSlots];
+   // Strip colour as 0xRRGGBB; 0 follows the source node's category colour.
+   unsigned int chColor[kMaxSlots] = {};
    float gainDb[kMaxSlots] = {};
    // -1 hard left .. +1 hard right. A mixer without pan can only ever build a
    // mono sum, which is most of why the previous knob-grid version read as a

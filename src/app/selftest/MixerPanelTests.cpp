@@ -42,7 +42,7 @@ namespace
    {
       // Save and load: one writer, one reader.
       gMixerPanelOpen = true;
-      gMixerPanelDock = 2;
+      gMixerPanelDock = 3;
       gMixerPanelWidth = 640.0f;
       gMixerPanelHeight = 333.0f;
       std::ostringstream saved;
@@ -56,10 +56,10 @@ namespace
             MixerPanelDockReadKey(line.substr(0, eq), line.substr(eq + 1));
       }
       Check("open, dock and sizes survive save and load",
-            gMixerPanelOpen && gMixerPanelDock == 2 && gMixerPanelWidth == 640.0f && gMixerPanelHeight == 333.0f);
+            gMixerPanelOpen && gMixerPanelDock == 3 && gMixerPanelWidth == 640.0f && gMixerPanelHeight == 333.0f);
       MixerPanelDockReadKey("panelMixerDock", "99");
       MixerPanelDockReadKey("panelMixerW", "3");
-      Check("a bad dock or size is clamped on load", gMixerPanelDock == kDockFloating && gMixerPanelWidth == kMixerPanelMinWidth);
+      Check("a bad dock or size is clamped on load", gMixerPanelDock == 0 && gMixerPanelWidth == kMixerPanelMinWidth);
 
       // Routing: Delay A -> Audio Out 1 (direct); Delay B -> Mixer -> Audio Out 2 (a console).
       NewPatch();
@@ -768,6 +768,13 @@ namespace
       Check("snapshots are saved in the patch", fresh.SnapshotHas(0) && fresh.SnapshotHas(1) && !fresh.SnapshotHas(2) &&
                                                      fresh.gainDb[0] == -30.0f && fresh.pan[0] == 1.0f && fresh.phase[0] &&
                                                      fresh.soloSafe[0] && fresh.masterDb == -10.0f && fresh.sendDb[0][0] == -12.0f);
+      // Strip name and colour (the desk's scribble strip) are saved with the Mixer.
+      m->chName[1] = "Kick"; m->chColor[1] = 0x3E63DD;
+      std::vector<std::pair<std::string, std::string>> nameParams;
+      Patch::SaveParams(m, nameParams);
+      MixerNode named;
+      Patch::LoadParams(&named, nameParams);
+      Check("strip name and colour are saved in the patch", named.chName[1] == "Kick" && named.chColor[1] == 0x3E63DD && named.chColor[0] == 0u);
       MixerNode junk;
       Patch::LoadParams(&junk, { { "s snapA", "3 nan x" }, { "s snapfade", "-5" } });
       Check("a damaged snapshot loads as empty; the fade is clamped", !junk.SnapshotHas(0) && junk.snapFadeMs == 0);

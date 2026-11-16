@@ -712,6 +712,22 @@ void MixerNode::VisitParams(ParamVisitor& v)
       if (text != before)
          mSnap[k] = text.empty() ? Snapshot() : SnapshotParse(text);
    }
+   for (int i = 0; i < kMaxSlots; i++)
+   {
+      static const std::string kNameKeys[kMaxSlots] = {
+         "chname0", "chname1", "chname2", "chname3", "chname4", "chname5", "chname6", "chname7",
+         "chname8", "chname9", "chname10", "chname11", "chname12", "chname13", "chname14", "chname15",
+         "chname16", "chname17", "chname18", "chname19", "chname20", "chname21", "chname22", "chname23",
+         "chname24", "chname25", "chname26", "chname27", "chname28", "chname29", "chname30", "chname31" };
+      v.Text(kNameKeys[i].c_str(), chName[i]);
+      if (chName[i].size() > 32)
+         chName[i].resize(32);
+      char hex[16];
+      snprintf(hex, sizeof(hex), "%06X", chColor[i] & 0xFFFFFFu);
+      std::string col = chColor[i] ? hex : "";
+      v.Text(("chcolor" + std::to_string(i)).c_str(), col);
+      chColor[i] = col.empty() ? 0u : (unsigned int)(strtoul(col.c_str(), nullptr, 16) & 0xFFFFFFu);
+   }
    std::string fade = std::to_string(snapFadeMs);
    v.Text("snapfade", fade);
    snapFadeMs = std::clamp(atoi(fade.c_str()), 0, 10000);
