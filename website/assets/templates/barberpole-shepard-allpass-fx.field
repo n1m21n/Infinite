@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Barberpole Shepard Allpass FX",
+    "author": "Infinite",
+    "description": "Infinite rising six-stage allpass barberpole phaser with quadrature crossfade envelope, resonant feedback, and analog headroom saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rateHz = 0.28 [0.05, 1.5];\nparam float feedback = 0.48 [0.0, 0.82];\nparam float depth = 0.85 [0.1, 1.0];\nparam float mix = 0.72 [0.0, 1.0];\nstate float phA = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float b1 = 0; state float b2 = 0; state float b3 = 0;\nstate float fbState = 0;\n\nphA = (phA + rateHz / sr) % 1.0;\nphB = (phA + 0.5) % 1.0;\n\n# Raised-sine quadrature windows so sawtooth reset is seamless\nwA = sin(3.14159265 * phA);\nwB = sin(3.14159265 * phB);\ngA = clamp(-0.88 + phA * 1.72 * depth, -0.9, 0.9);\ngB = clamp(-0.88 + phB * 1.72 * depth, -0.9, 0.9);\n\nx = in + fbState * feedback * 0.45;\n\n# Bank A: 3-stage cascaded 1st-order allpass\nyA1 = -gA * x + a1;   a1 = x + gA * yA1;\nyA2 = -gA * yA1 + a2; a2 = yA1 + gA * yA2;\nyA3 = -gA * yA2 + a3; a3 = yA2 + gA * yA3;\n\n# Bank B: 3-stage cascaded 1st-order allpass (180-deg phase offset)\nyB1 = -gB * x + b1;   b1 = x + gB * yB1;\nyB2 = -gB * yB1 + b2; b2 = yB1 + gB * yB2;\nyB3 = -gB * yB2 + b3; b3 = yB2 + gB * yB3;\n\nwet = yA3 * (wA * wA) + yB3 * (wB * wB);\nfbState = clamp(wet / (1.0 + abs(wet) * 0.35), -0.85, 0.85);\nout = (in * (1.0 - mix) + (in + wet * 0.85) * 0.55 * mix) * 0.82;\n",
+    "params": {
+      "rateHz": 0.28,
+      "feedback": 0.48,
+      "depth": 0.85,
+      "mix": 0.72
+    }
+  }
+}

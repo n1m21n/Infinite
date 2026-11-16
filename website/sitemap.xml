@@ -175,6 +175,8 @@
   <url><loc>https://infinitedevices.org/embeds/ferrofluid-thinfilm-bismuth-corona.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/schlieren-caustics-refraction-cusps.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/schlieren-caustics-thermal-plume.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/dichroic-fresnel-stepped-bullseye.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/dichroic-fresnel-prismatic-caustics.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-16</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-16</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
@@ -384,6 +386,10 @@
   <url><loc>https://infinitedevices.org/library/gamelan-polyrhythm-gong-ageng-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/broken-beat-rhodes-binaural-phaser-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/broken-beat-rhodes-bbd-ensemble-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/trautonium-subharmonic-mixtur-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/trautonium-subharmonic-formant-bow-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/barberpole-shepard-allpass-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/magnetic-wire-hysteresis-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
@@ -512,48 +518,30 @@
   <url><loc>https://infinitedevices.org/library/chladni-cymatics.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/rossler-attractor.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/torus-knot-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/space-tape-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/quantum-vortex.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/de-jong-attractor.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/mobius-strip-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/supersaw-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/tape-phaser-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/pulsar-beam.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/hopalong-attractor.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/klein-bottle-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/fm-bell-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/shimmer-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neural-synapse.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/gumowski-mira.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/enneper-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/phase-distortion-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/formant-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/aurora-borealis.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ikeda-attractor.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/dini-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/wavetable-morph-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/wavefolder-drive-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cosmic-nebula.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/svensson-attractor.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bour-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/additive-harmonic-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/comb-resonator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/spectral-caustics.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/tinkerbell-map.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/kuen-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/hard-sync-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/ring-modulator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/plasma-filament.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/halvorsen-attractor.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/boy-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/subharmonic-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/bitcrush-degrader-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/solar-flare.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/dejong-attractor.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/breather-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/karplus-strong-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/frequency-shifter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/gravitational-lensing.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/harmonograph-resonance.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chua-circuit.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
@@ -622,402 +610,248 @@
   <url><loc>https://infinitedevices.org/library/apollonian-gasket.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/plucker-conoid-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/seifert-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/feedback-fm-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/spectral-additive-organ-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/stereo-pingpong-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/tube-preamp-overdrive-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/accretion-disk.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chromatic-quasicrystal.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/hyperbolic-poincare-disk.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chladni-plate-harmonics.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/gyroid-minimal-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/villarceau-circles-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/inharmonic-chime-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/analog-supershape-pad-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/multiband-tape-saturator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dimension-spatial-chorus-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/hyperbolic-disk-fractal.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/magnetar-quantum-flux.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riemann-zeta-spiral.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cayley-hyperbolic-tree.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/pseudosphere-tractroid-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/kummer-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/spectral-drone-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/resonant-brass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/biquad-morph-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/stellar-nursery-nebula.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/quantum-chromodynamic-lattice.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ulam-spiral-primes.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/mandelbrot-buddhabrot-path.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cross-cap-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/barth-sextic-surface-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/buchla-complex-oscillator-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/string-resonator-modal-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/superconducting-magnetic-vortex.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/gravitational-caustic-microlens.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-halftone-manga.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-wave-strata.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/swiss-brutalist-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/kinetic-moire-sculpture-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/cyber-acid-303-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/spectral-resonator-bell-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/analog-tape-warble-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/spectral-freeze-reverb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-pop-screen.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-vhs-glitch.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ditherpunk-halftone-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-schematic.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/liminal-void-corridor-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/retro-surreal-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/liminal-drone-pad-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/ditherpunk-chiptune-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/chavetta-tape-saturator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/op-art-phaser-matrix-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ditherpunk-terminal-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/liminal-void-haze.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-acid-starburst.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neo-brutalist-grid-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-chrome-torus-orbit-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-cloud-pagoda-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-bass-303-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/brutalist-sub-bass-rumble-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/glitch-bitcrush-buffer-stutter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-liquid-chrome-rave.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neo-brutalist-concrete-monolith.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-vector-oscilloscope.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-kinetic-wave-moire.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-wireframe-terrain-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-hyperbolic-cage-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/analog-crt-phosphor-beam-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/op-art-spectral-chime-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/analog-crt-tape-flutter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/op-art-frequency-shifter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-phosphor-bloom.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-hypnotic-vortex.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-contour-flow.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-spiral-lattice.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-geodesic-sphere-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-torus-knot-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dub-techno-chord-stab-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dub-techno-sub-rumble-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/drone-kosmische-space-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-resonance.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-ripples.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-constructivist-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-geometric-rotary.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-floating-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-geometric-cantilever-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-house-transistor-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-house-resonant-sub-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/psytrance-resonant-comb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/psytrance-spectral-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-kaleido-melt.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-liquid-dream.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-signal-raster-scanner.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-signal-binary-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-contour-mesh-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-topological-ridge-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/liquid-dnb-roller-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/liquid-dnb-rhodes-glide-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/french-touch-disco-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/french-touch-phaser-sweep-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-sine-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-rotozoom-bloom.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-panel-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-action-burst.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lilliputian-surreal-monolith-sphere-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lilliputian-surreal-archway-colonnade-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/electro-robotic-pulse-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/electro-cybernetic-sync-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/future-garage-ghost-reverb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/future-garage-pitch-drift-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/pixel-art-8bit-dither-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/pixel-art-8bit-scanline-scroller.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/swiss-typographic-modular-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/swiss-typographic-geometric-axis.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-concrete-cantilever-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-concrete-megastructure-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/detroit-techno-soul-chord-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/detroit-techno-machine-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/uk-garage-sub-drive-saturator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/uk-garage-chopped-vocal-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/holographic-iridescent-thin-film.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/holographic-iridescent-prismatic-flux.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/acid-graphics-starburst-lattice.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/acid-graphics-warp-typography.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vaporwave-collage-ionic-colonnade-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vaporwave-collage-pedestal-temple-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/deep-house-rhodes-electric-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/deep-house-organ-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/jungle-amen-tape-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/jungle-sub-bass-resonator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-buffer-tear.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-pixel-displace.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/thundr-brutalist-hazard-crosshair.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/thundr-brutalist-technical-slab.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/synthwave-grid-perspective-horizon-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/synthwave-grid-neon-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/industrial-techno-warehouse-rumble-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/industrial-techno-metallic-fm-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/classic-trance-euphoric-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/classic-trance-resonant-sweep-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cyberpunk-neon-rain-reflections.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cyberpunk-neon-hologram-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chavetta-montage-torn-ephemera.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chavetta-montage-classical-medallion.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-cartography-topographic-peak-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-cartography-compass-archipelago-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/neurofunk-reese-roller-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/neurofunk-modulated-growl-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dubstep-sub-drive-saturator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dubstep-formant-vowel-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-drafting-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-specimen-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/retro-surreal-celestial-arch.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/retro-surreal-botanical-monolith.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/liminal-void-floating-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/liminal-void-dusk-colonnade-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/breakbeat-hardcore-sub-roller-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/breakbeat-hoover-rave-stab-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dark-ambient-abyssal-drone-reverb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dark-ambient-spectral-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-acid-chrome-starburst.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-acid-liquid-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-undulating-moire-lattice.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-concentric-vibration-field.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neo-brutalist-monolithic-pylon-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neo-brutalist-cantilever-plinth-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/minimal-techno-sine-core-sub-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/minimal-techno-transient-chirp-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/idm-algorithmic-comb-resonator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/idm-pitch-warp-granular-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ditherpunk-bayer-matrix-threshold.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ditherpunk-cyber-glyph-lattice.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-geometry-constructivist-lattice.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-geometry-asymmetric-rotary-composition.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-monolithic-facade-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-stepped-cantilever-monument-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/french-filter-house-pumping-saw-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/french-filter-house-disco-stab-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/downtempo-tape-flutter-warm-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/downtempo-analog-warmth-resonant-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-forms-kinetic-red-wedge.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-forms-floating-black-quadrilateral.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-rotozoom-raster-bars.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-sine-wave-interference.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/holographic-iridescent-faceted-polytope-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/holographic-iridescent-prismatic-gem-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/progressive-house-euphoric-pluck-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/progressive-house-driving-sub-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/lofi-beats-tape-flutter-cassette-warmth-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/lofi-beats-nostalgic-vinyl-crackle-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-topographic-frequency-contour.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-bathymetric-elevation-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-curved-flow-lines.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-nested-polygon-spirals.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-gyroscope-icosahedron-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-topological-hypercube-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/tech-house-rolling-sub-groove-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/tech-house-percussive-chord-stab-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dub-techno-tape-delay-diffusion-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dub-techno-resonant-space-reverb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-nodal-frequency-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-quadrupole-field.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-raster-beam-oscilloscope.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-magnetic-deflection-lattice.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-armillary-sphere-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-planetary-gear-lattice-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/footwork-syncopated-808-sub-roller-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/footwork-rapid-fire-percussive-stab-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/amapiano-log-drum-warm-saturator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/amapiano-lush-spatial-reverb-diffusion-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vaporwave-collage-retro-sunset-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vaporwave-collage-prismatic-chroma-wave.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-kinetic-composition.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-geometric-axis.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-geometry-kinetic-mobile-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-geometry-cantilever-monument-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/gabber-distorted-909-kick-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/gabber-hoover-rave-stab-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/liquid-dnb-rhodes-lush-chorus-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/liquid-dnb-sub-warmth-ladder-filter-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/acid-graphics-iridescent-liquid-twirl.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/acid-graphics-kaleido-chroma-warp.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-signal-oscilloscope-vector.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-signal-precision-graticule.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lilliputian-surreal-celestial-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lilliputian-surreal-orbital-observatory-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-house-303-saw-squelch-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-house-accented-square-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/future-garage-dusk-tape-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/future-garage-vinyl-dust-reverb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-liquid-oil-wheel.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-kaleido-prism-flower.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-zine-screentone-burst.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-zine-speedline-panel.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/thundr-brutalist-modular-techwear-pylon-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/thundr-brutalist-hazard-cantilever-tower-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/classic-trance-supersaw-anthem-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/classic-trance-rolling-offbeat-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/industrial-techno-warehouse-distortion-reverb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/industrial-techno-grimy-bitcrush-saturator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-concentric-moire-interference.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-hypnotic-checkerboard-warp.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/swiss-typographic-grid-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/swiss-typographic-diagonal-construct.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-monolith-bastion-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-cantilevered-stele-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/synthwave-analog-poly-brass-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/synthwave-neon-running-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/glitch-buffer-stutter-repeater-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/glitch-spectral-aliasing-bitcrush-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-curvilinear-flowfield.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-concentric-isotonic.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-cartography-archipelago-wave-contour.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-cartography-mountain-strata-relief.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chavetta-montage-assemblage-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chavetta-montage-cantilever-ephemera-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/neo-classical-felt-piano-harmonic-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/neo-classical-chamber-strings-cello-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/ambient-piano-cloud-reverb-diffusion-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/ambient-piano-tape-flutter-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/retro-surreal-celestial-portal-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/retro-surreal-astronomical-clockwork-horizon.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-plate-nodal-resonance.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-standing-wave-radial-ripples.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neo-brutalist-cantilever-monolith-bastion-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neo-brutalist-stepped-colonnade-plinth-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/solo-piano-acoustic-hammer-felt-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/solo-piano-sympathetic-soundboard-resonance-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dark-ambient-subterranean-drone-resonator-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/dark-ambient-abyssal-space-diffusion-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-geometry-constructivist-orbital-harmony.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bauhaus-geometry-kinetic-quadrant-tessellation.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/liminal-void-infinite-colonnade-water-mirror.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/liminal-void-submerged-monolith-stairwell.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-constructivist-proun-monolith-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-kinetic-intersecting-cuboids-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/drone-kosmische-berlin-school-analog-drift-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/drone-kosmische-sub-harmonic-meditation-generator-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/vaporwave-tape-warble-chorus-diffusion-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/vaporwave-hypnagogic-slowdown-reverb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-phosphor-tesseract-hypercube.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-geodesic-radar-horizon.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-isometric-gear-schematic.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-aerospace-telemetry-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/pixel-art-8bit-voxel-monolith-citadel-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/pixel-art-8bit-isometric-arcade-ziggurat-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/uk-garage-warped-sub-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/uk-garage-2step-organ-stab-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/detroit-techno-motor-city-tape-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/detroit-techno-warehouse-chorus-diffusion-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-zine-halftone-dot-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-manga-zine-chromatic-ink-misregistration.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-pulsar-elevation-profile.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-bathymetric-isoline-survey.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-rotozoom-helix-twister-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-amiga-copper-polyhedron-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/psytrance-rolling-saw-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/psytrance-acid-squelch-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/electro-robotic-vocoder-comb-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/electro-cybernetic-bbd-flanger-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-signal-datamatics-barcode-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/minimal-signal-raster-oscillogram-sweep.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ditherpunk-atkinson-cluster-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ditherpunk-bayer-crosshatch-monolith.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-acid-hyper-starburst-polyhedron-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-acid-chrome-metaball-lattice-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/jungle-sub-bass-pressure-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/jungle-atmospheric-pad-drone-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/deep-house-warm-analog-chorus-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/deep-house-dusty-tape-space-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-chroma-displacement-scan.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-macroblock-slice-corruption.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/swiss-typographic-modular-grid-harmony.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/swiss-typographic-geometric-tension-matrix.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/holographic-iridescent-prismatic-polytope-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/holographic-iridescent-faceted-torus-lattice-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/neurofunk-modulated-reese-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/neurofunk-cybernetic-growl-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/french-filter-house-pumping-disco-sweep-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/french-filter-house-creamy-phaser-drive-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-plate-resonance.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-modal-interference.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-riley-perceptual-moire-grid.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-vasarely-hyperbolic-deformation.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-spomenik-monolithic-pylon-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-cantilever-colonnade-citadel-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/idm-crystalline-granular-bell-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/idm-algorithmic-drift-reese-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/breakbeat-transient-saturation-drive-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/breakbeat-syncopated-tape-echo-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-aperture-grille-phosphor-bloom.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-electron-beam-raster-deflection.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lilliputian-surreal-colossal-orb-procession.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lilliputian-surreal-titanic-staircase-pilgrims.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-nodal-shell-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-toroid-resonator-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/downtempo-warm-sub-tape-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/downtempo-dusty-rhodes-bell-pad-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/minimal-techno-dub-chord-echo-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/minimal-techno-sub-harmonic-shaper-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-kinetic-red-wedge.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-blocks-malevich-floating-plane.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-liquid-oil-prism.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/indie-psychedelic-chromatic-mycelium.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-turbine-assembly-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/technical-blueprint-geodesic-observatory-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/vaporwave-mallsoft-rhodes-pad-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/vaporwave-midnight-chorus-lead-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/synthwave-ensemble-chorus-wash-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/synthwave-gated-analog-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-monolith-facade.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/brutalist-architecture-spomenik-rib-vault.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-trench-horizon.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vector-wireframe-icosahedron-radar.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-molnar-cubes-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/generative-plotter-mohr-hypercube-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/future-garage-sub-reese-bass-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/future-garage-glass-rhodes-chord-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-house-303-resonant-squelch-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/acid-house-tape-dub-delay-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-cartography-archipelago-contours.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ukiyoe-cartography-compass-tide-chart.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/jacquard-loom-warp-weft-draft.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/jacquard-loom-perforated-tabulature.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/sashimono-joinery-kumiko-lattice-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/sashimono-joinery-kanawa-tsugi-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/west-coast-buchla-complex-wavefold-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/west-coast-buchla-krell-pendulum-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/tape-loop-polyphony-oxide-dispersion-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/tape-loop-polyphony-frippertronics-echo-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/reaction-diffusion-belousov-spiral-waves.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/reaction-diffusion-belousov-turing-coral.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/guilloche-intaglio-banknote-rosette.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/guilloche-intaglio-lathe-cartouche.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/tensegrity-pavilion-snelson-mast-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/tensegrity-pavilion-geodesic-cantilever-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/karplus-sympathetic-waveguide-harp-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/karplus-sympathetic-bowed-monochord-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/spring-plate-dispersion-belton-tank-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/spring-plate-dispersion-steel-plate-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ferrofluid-thinfilm-magnetic-spikes.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ferrofluid-thinfilm-bismuth-corona.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cyanotype-photogram-botanical-frond.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cyanotype-photogram-solar-plate.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/origami-folded-vault-miura-shell-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/origami-folded-vault-pleated-rotunda-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/gamelan-polyrhythm-pelog-metallophone-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/gamelan-polyrhythm-gong-ageng-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/broken-beat-rhodes-binaural-phaser-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/library/broken-beat-rhodes-bbd-ensemble-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/schlieren-caustics-refraction-cusps.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/schlieren-caustics-thermal-plume.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/harmonograph-pendulum-damped-lissajous.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/harmonograph-pendulum-rotary-rosette.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/nervi-ferrocement-palazzetto-dome-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/nervi-ferrocement-hyperbolic-shell-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dichroic-fresnel-stepped-bullseye.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dichroic-fresnel-prismatic-caustics.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-16</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>

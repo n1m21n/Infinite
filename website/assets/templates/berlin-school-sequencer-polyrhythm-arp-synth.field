@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Berlin School Sequencer Polyrhythm Arp Synth",
+    "author": "Infinite",
+    "description": "Detuned fifth wavefolder synthesizer with LFO timbre drift, resonant state-variable lowpass sweep, and punchy arp envelope.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fold = 1.85 [0.6, 3.5];\nparam float fifth = 0.42 [0.0, 0.9];\nparam float lfoRate = 0.35 [0.05, 3.0];\nparam float res = 0.38 [0.0, 0.75];\nparam float decay = 0.44 [0.12, 0.95];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecRate = clamp(1.0 / (sr * (0.12 + decay * 0.85)), 0.0001, 0.03);\nenv = if(target > env, env + (target - env) * 0.35, env - env * decRate);\n\nf0 = clamp(freq, 40.0, 2400.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 1.4983) / sr) % 1.0;\nlfo = (lfo + lfoRate / sr) % 1.0;\n\nsaw1 = 2.0 * p1 - 1.0;\nsaw2 = 2.0 * p2 - 1.0;\nlfoMod = 0.5 + 0.5 * sin(6.2831853 * lfo);\nraw = saw1 * 0.72 + saw2 * fifth;\n\nfolded = sin(raw * (fold * (0.7 + 0.5 * lfoMod)) * 2.2);\nfc = clamp(0.08 + env * 0.32 + lfoMod * 0.14, 0.03, 0.46);\nfb = clamp((lp1 - lp2) * res * 1.25, -0.6, 0.6);\nlp1 = lp1 + fc * (folded + fb - lp1);\nlp2 = lp2 + fc * (lp1 - lp2);\n\nsat = (lp2 * 1.45) / (1.0 + abs(lp2 * 1.45) * 0.4);\nout = sat * env * 0.65;\n",
+    "params": {
+      "fold": 1.85,
+      "fifth": 0.42,
+      "lfoRate": 0.35,
+      "res": 0.38,
+      "decay": 0.44
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

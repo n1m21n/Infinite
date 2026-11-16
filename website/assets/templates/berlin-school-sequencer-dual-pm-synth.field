@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Berlin School Sequencer Dual PM Synth",
+    "author": "Infinite",
+    "description": "Dual-operator phase-modulation sequencer synth with sub-octave reinforcement, velocity filter envelope, and diode saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float ratio = 2.0 [0.5, 6.0];\nparam float index = 1.65 [0.1, 4.0];\nparam float sub = 0.45 [0.0, 1.0];\nparam float cutoff = 0.62 [0.1, 0.95];\nparam float decay = 0.48 [0.12, 0.95];\nstate float pc = 0;\nstate float pm = 0;\nstate float ps = 0;\nstate float env = 0;\nstate float fenv = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecRate = clamp(1.0 / (sr * (0.14 + decay * 0.95)), 0.0001, 0.03);\nenv = if(target > env, env + (target - env) * 0.32, env - env * decRate);\nfenv = if(target > fenv, fenv + (target - fenv) * 0.24, fenv - fenv * (decRate * 1.4));\n\nf0 = clamp(freq, 40.0, 2400.0);\npc = (pc + f0 / sr) % 1.0;\npm = (pm + (f0 * ratio) / sr) % 1.0;\nps = (ps + (f0 * 0.5) / sr) % 1.0;\n\nmodSig = sin(6.2831853 * pm) * index * (0.35 + 0.65 * fenv);\ncarrier = sin(6.2831853 * pc + modSig);\nsubOsc = sin(6.2831853 * ps) * sub;\nraw = carrier * 0.72 + subOsc * 0.45;\n\nfc = clamp(0.06 + cutoff * 0.32 + fenv * 0.28, 0.03, 0.48);\nlp1 = lp1 + fc * (raw - lp1);\nlp2 = lp2 + fc * (lp1 - lp2);\n\ndriven = lp2 * 1.55;\nsat = driven / (1.0 + abs(driven) * 0.42);\nout = sat * env * 0.68;\n",
+    "params": {
+      "ratio": 2.0,
+      "index": 1.65,
+      "sub": 0.45,
+      "cutoff": 0.62,
+      "decay": 0.48
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

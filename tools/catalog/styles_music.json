@@ -1,2989 +1,3657 @@
 {
- "_doc": "Electronic-music style table: the internal taxonomy that drives sample generation. Not shown on the site. Drum lanes follow assets/drumkits/infinite-basic (kick,snare,closed hat,open hat,clap,low tom,high tom,bell); 16 steps, x=hit o=soft .=rest. scale = MusicTime ScaleType index (0 maj,1 min,2 harm min,3 mel min,4 dorian,5 phrygian,6 lydian,7 mixolydian,8 locrian,9 maj pent,10 min pent,11 blues,12 whole tone,13 chromatic). rate = RateDivision index (6 1/4, 9 1/8, 12 1/16). bass = scale degrees per 16th (0=root, .=rest). glitch 0..1 = how much stutter/bitcrush/stop-start the style tolerates. mod 0..1 = how much the modulators move. Research notes in docs/plans/patch-corpus/taxonomy/music.md.",
- "styles": [
-  {
-   "id": "deep_house",
-   "family": "house",
-   "bpm": [
-    118,
-    124
-   ],
-   "swing": 0.12,
-   "scale": [
-    4,
-    1
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..o...o...o...o.",
-    "ohat": "..x...x...x...x.",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..0..2.0..0..3.",
-   "fx": [
-    "Chorus",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth",
-    "Wavetable"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod"
-   ],
-   "glitch": 0.0,
-   "mod": 0.3,
-   "refs": [
-    "Chicago house (Frankie Knuckles, Warehouse)",
-    "Larry Heard, Mr. Fingers",
-    "Moodymann, Theo Parrish (Detroit deep house)"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 4.0,
-    "strum": 20,
-    "human": 8
-   },
-   "notefx": [
-    "Humanizer"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.3,
-    "octave": 2,
-    "gate": 50,
-    "gain": -13
-   },
-   "groove": 0.6
-  },
-  {
-   "id": "acid_house",
-   "family": "house",
-   "bpm": [
-    120,
-    130
-   ],
-   "swing": 0.05,
-   "scale": [
-    10,
-    5
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..x...x...x...x.",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.0.12.0.0.1.5.0",
-   "fx": [
-    "Audio Filter",
-    "Delay",
-    "Drive"
-   ],
-   "synth": [
-    "Analog",
-    "Oscillator"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.05,
-   "mod": 0.8,
-   "refs": [
-    "Phuture, Acid Tracks (1987)",
-    "Roland TB-303",
-    "Hardfloor, Josh Wink"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.8,
-    "rate": 0.25,
-    "octave": 1,
-    "gate": 45,
-    "gain": -9
-   },
-   "groove": 0.4,
-   "fill": 0.5
-  },
-  {
-   "id": "tech_house",
-   "family": "house",
-   "bpm": [
-    124,
-    128
-   ],
-   "swing": 0.08,
-   "scale": [
-    1,
-    5
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": ".o.o.o.o.o.o.o.o",
-    "ohat": "..x...x...x...x.",
-    "clap": "....x.......x..o",
-    "tom": "..........o....o",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..0.0..0..0.0.3",
-   "fx": [
-    "Delay",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "FM",
-    "Wavetable"
-   ],
-   "ban": [
-    "Bitcrush"
-   ],
-   "glitch": 0.1,
-   "mod": 0.4,
-   "refs": [
-    "Ricardo Villalobos",
-    "Richie Hawtin (minimal crossover)",
-    "Fabric/Berlin club scene"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     3
-    ],
-    "beats": 2.0,
-    "strum": 10,
-    "human": 6
-   },
-   "notefx": [
-    "Humanizer"
-   ],
-   "gain": -12,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.35,
-    "octave": 2,
-    "gate": 40,
-    "gain": -12
-   },
-   "groove": 0.7
-  },
-  {
-   "id": "progressive_house",
-   "family": "house",
-   "bpm": [
-    124,
-    130
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..o...o...o...o.",
-    "ohat": "..x...x...x...x.",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..0..0..0..0..0",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "Chorus"
-   ],
-   "synth": [
-    "Field Synth",
-    "Analog",
-    "Wavetable"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod"
-   ],
-   "glitch": 0.0,
-   "mod": 0.5,
-   "refs": [
-    "Sasha and John Digweed",
-    "Deep Dish",
-    "Hybrid, Lange"
-   ],
-   "sidechain": true,
-   "notefx": [
-    "Humanizer"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.45,
-    "rate": 0.5,
-    "octave": 2,
-    "notefx": [
-     "Note Echo"
-    ],
-    "gain": -12
-   },
-   "fill": 0.7
-  },
-  {
-   "id": "french_filter_house",
-   "family": "house",
-   "bpm": [
-    120,
-    126
-   ],
-   "swing": 0.1,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..o...o...o...o.",
-    "ohat": "..x...x...x...x.",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..0..0..0..3..5",
-   "fx": [
-    "Audio Filter",
-    "Phaser",
-    "Dynamics"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.7,
-   "refs": [
-    "Daft Punk, Homework / Discovery",
-    "Stardust, Music Sounds Better With You",
-    "Cassius, Alan Braxe"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 4.0,
-    "strum": 25,
-    "human": 8
-   },
-   "notefx": [
-    "Humanizer"
-   ],
-   "gain": -8,
-   "motif": {
-    "synth": [
-     "Analog"
-    ],
-    "density": 0.5,
-    "octave": 2,
-    "gain": -12
-   },
-   "groove": 0.6
-  },
-  {
-   "id": "detroit_techno",
-   "family": "techno",
-   "bpm": [
-    128,
-    138
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..x...x...x...x.",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": "x.......x......."
-   },
-   "bass": "0.....0.......3.",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "Chorus"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth",
-    "FM"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.4,
-   "refs": [
-    "Belleville Three: Juan Atkins, Derrick May, Kevin Saunderson",
-    "Underground Resistance",
-    "Reynolds, Energy Flash"
-   ],
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 8.0,
-    "strum": 30,
-    "human": 6
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Echo"
-   ],
-   "gain": -10,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.3,
-    "octave": 2,
-    "gain": -12
-   },
-   "groove": 0.5
-  },
-  {
-   "id": "minimal_techno",
-   "family": "techno",
-   "bpm": [
-    122,
-    128
-   ],
-   "swing": 0.06,
-   "scale": [
-    1,
-    5
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": ".o..o..o..o..o..",
-    "ohat": "",
-    "clap": "..........o.....",
-    "tom": "o.......o...o...",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.......0...3...",
-   "fx": [
-    "Delay",
-    "Reverb",
-    "EQ"
-   ],
-   "synth": [
-    "FM",
-    "Wavetable",
-    "Analog"
-   ],
-   "ban": [
-    "Bitcrush"
-   ],
-   "glitch": 0.2,
-   "mod": 0.5,
-   "refs": [
-    "Basic Channel, Chain Reaction",
-    "Plastikman, Richie Hawtin",
-    "Ricardo Villalobos, Perlon"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.25,
-    "octave": 2,
-    "gate": 30,
-    "gain": -11
-   },
-   "groove": 0.8,
-   "fill": 0.3
-  },
-  {
-   "id": "dub_techno",
-   "family": "techno",
-   "bpm": [
-    116,
-    124
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..o...o...o...o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0...............",
-   "fx": [
-    "Delay",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.3,
-   "refs": [
-    "Basic Channel / Rhythm & Sound",
-    "Deepchord, Echospace",
-    "Gas (Wolfgang Voigt)"
-   ],
-   "chords": {
-    "size": [
-     3
-    ],
-    "beats": 4.0,
-    "strum": 30,
-    "human": 5
-   },
-   "notefx": [
-    "Note Echo"
-   ],
-   "gain": -9,
-   "groove": 0.3,
-   "fill": 0.2
-  },
-  {
-   "id": "industrial_techno",
-   "family": "techno",
-   "bpm": [
-    135,
-    150
-   ],
-   "swing": 0.0,
-   "scale": [
-    5,
-    1
-   ],
-   "drums": {
-    "kick": "x..xx..xx..xx...",
-    "snare": "",
-    "chat": ".o.o.o.o.o.o.o.o",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.0.0.0.0.0.0.0.",
-   "fx": [
-    "Drive",
-    "Saturator",
-    "Reverb"
-   ],
-   "synth": [
-    "Analog",
-    "FM",
-    "Metallic"
-   ],
-   "ban": [
-    "Chorus"
-   ],
-   "glitch": 0.15,
-   "mod": 0.5,
-   "refs": [
-    "Surgeon, Regis, Blawan",
-    "Perc, Ancient Methods",
-    "Throbbing Gristle, Cabaret Voltaire (ancestors)"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.4,
-    "octave": 1,
-    "gate": 70,
-    "gain": -12
-   },
-   "groove": 0.3,
-   "fill": 0.6,
-   "trim": -7.0
-  },
-  {
-   "id": "classic_trance",
-   "family": "trance",
-   "bpm": [
-    132,
-    140
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..x...x...x...x.",
-    "ohat": "..x...x...x...x.",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": ".0.0.0.0.0.0.0.0",
-   "fx": [
-    "Delay",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth",
-    "Wavetable"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.6,
-   "refs": [
-    "Paul van Dyk, Tiesto, Armin van Buuren",
-    "Oakenfold, Goa lineage",
-    "Reynolds, Energy Flash (trance chapter)"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 4.0,
-    "strum": 10,
-    "human": 0
-   },
-   "gain": -10,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.65,
-    "rate": 0.25,
-    "octave": 3,
-    "notefx": [
-     "Note Echo"
-    ],
-    "gain": -11
-   },
-   "fill": 0.9
-  },
-  {
-   "id": "psytrance",
-   "family": "trance",
-   "bpm": [
-    140,
-    148
-   ],
-   "swing": 0.0,
-   "scale": [
-    5,
-    1
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": ".o.o.o.o.o.o.o.o",
-    "ohat": "..x...x...x...x.",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": ".0.0.0.0.0.0.0.0",
-   "fx": [
-    "Delay",
-    "Audio Filter",
-    "Drive"
-   ],
-   "synth": [
-    "Analog",
-    "FM",
-    "Oscillator"
-   ],
-   "ban": [
-    "Bitcrush"
-   ],
-   "glitch": 0.1,
-   "mod": 0.8,
-   "refs": [
-    "Goa trance (Juno Reactor, Hallucinogen)",
-    "Infected Mushroom, Astrix",
-    "Full-on / dark psy (Zenon, Parasense)"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.55,
-    "octave": 3,
-    "gate": 50,
-    "gain": -12
-   },
-   "fill": 0.6
-  },
-  {
-   "id": "liquid_dnb",
-   "family": "drum_and_bass",
-   "bpm": [
-    170,
-    176
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x.........x.....",
-    "snare": "....x.......x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.........0.3...",
-   "fx": [
-    "Reverb",
-    "Chorus",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Field Synth",
-    "Analog",
-    "Wavetable"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.4,
-   "refs": [
-    "LTJ Bukem, Good Looking Records",
-    "Hospital Records, Calibre",
-    "High Contrast, Netsky"
-   ],
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 8.0,
-    "strum": 35,
-    "human": 10
-   },
-   "notefx": [
-    "Humanizer"
-   ],
-   "gain": -9,
-   "groove": 0.7,
-   "fill": 0.7
-  },
-  {
-   "id": "neurofunk",
-   "family": "drum_and_bass",
-   "bpm": [
-    172,
-    178
-   ],
-   "swing": 0.0,
-   "scale": [
-    5,
-    1
-   ],
-   "drums": {
-    "kick": "x.........x.....",
-    "snare": "....x.......x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.0.0...0.0.3...",
-   "fx": [
-    "Drive",
-    "Audio Filter",
-    "Saturator"
-   ],
-   "synth": [
-    "Analog",
-    "FM",
-    "Wavetable"
-   ],
-   "ban": [
-    "Chorus"
-   ],
-   "glitch": 0.2,
-   "mod": 0.9,
-   "refs": [
-    "Ed Rush & Optical, Konflict",
-    "Noisia, Phace, Mefjus",
-    "Photek (precursor)"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.5,
-    "octave": 1,
-    "gate": 65,
-    "gain": -11
-   },
-   "groove": 0.4,
-   "fill": 0.6
-  },
-  {
-   "id": "jungle",
-   "family": "drum_and_bass",
-   "bpm": [
-    160,
-    170
-   ],
-   "swing": 0.05,
-   "scale": [
-    1,
-    10
-   ],
-   "drums": {
-    "kick": "x.........x.....",
-    "snare": "....x..o.o..x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.........0.....",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "EQ"
-   ],
-   "synth": [
-    "Sampler",
-    "Analog"
-   ],
-   "ban": [
-    "Bitcrush"
-   ],
-   "glitch": 0.2,
-   "mod": 0.4,
-   "refs": [
-    "Amen break lineage (The Winstons)",
-    "Goldie, Timeless",
-    "Shy FX, Congo Natty, Rebel MC"
-   ],
-   "groove": 0.9,
-   "fill": 0.8
-  },
-  {
-   "id": "uk_garage",
-   "family": "bass_music",
-   "bpm": [
-    130,
-    138
-   ],
-   "swing": 0.28,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x.........x.....",
-    "snare": "....x.......x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.....0.....3...",
-   "fx": [
-    "Chorus",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.05,
-   "mod": 0.4,
-   "refs": [
-    "2-step: Artful Dodger, MJ Cole",
-    "Burial, Untrue",
-    "Todd Edwards"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 2.0,
-    "strum": 15,
-    "human": 10
-   },
-   "notefx": [
-    "Humanizer"
-   ],
-   "gain": -10,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.4,
-    "octave": 2,
-    "gain": -12
-   },
-   "groove": 0.8
-  },
-  {
-   "id": "dubstep",
-   "family": "bass_music",
-   "bpm": [
-    138,
-    142
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    5
-   ],
-   "drums": {
-    "kick": "x...............",
-    "snare": "........x.......",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.......0.......",
-   "fx": [
-    "Drive",
-    "Audio Filter",
-    "Reverb"
-   ],
-   "synth": [
-    "Analog",
-    "Wavetable",
-    "FM"
-   ],
-   "ban": [
-    "Chorus"
-   ],
-   "glitch": 0.1,
-   "mod": 0.9,
-   "refs": [
-    "Digital Mystikz, Loefah, Skream, Benga",
-    "Mala, Coki",
-    "Skream Midnight Request Line"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.3,
-    "rate": 0.5,
-    "octave": 1,
-    "gate": 80,
-    "gain": -10
-   },
-   "fill": 0.4
-  },
-  {
-   "id": "breakbeat",
-   "family": "breaks",
-   "bpm": [
-    125,
-    140
-   ],
-   "swing": 0.05,
-   "scale": [
-    1,
-    10
-   ],
-   "drums": {
-    "kick": "x.....x...x.....",
-    "snare": "....x..o.o..x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.....0...0.....",
-   "fx": [
-    "Delay",
-    "Drive",
-    "Reverb"
-   ],
-   "synth": [
-    "Analog",
-    "Sampler"
-   ],
-   "ban": [
-    "Bitcrush"
-   ],
-   "glitch": 0.1,
-   "mod": 0.5,
-   "refs": [
-    "Prodigy, Chemical Brothers, Fatboy Slim (big beat)",
-    "Nu skool breaks (Plump DJs)",
-    "Detroit breakdown tradition"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.4,
-    "octave": 2,
-    "gain": -12
-   },
-   "groove": 0.8,
-   "fill": 0.7
-  },
-  {
-   "id": "electro",
-   "family": "breaks",
-   "bpm": [
-    118,
-    132
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    5
-   ],
-   "drums": {
-    "kick": "x.....x...x.....",
-    "snare": "....x.......x...",
-    "chat": "..o...o...o...o.",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.....0...0.....",
-   "fx": [
-    "Chorus",
-    "Delay",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "FM",
-    "Oscillator"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.05,
-   "mod": 0.5,
-   "refs": [
-    "Kraftwerk, Planet Rock (Afrika Bambaataa, Arthur Baker)",
-    "Drexciya, Dopplereffekt",
-    "Roland TR-808 era"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.5,
-    "octave": 2,
-    "gate": 40,
-    "gain": -11
-   },
-   "groove": 0.3
-  },
-  {
-   "id": "ambient",
-   "family": "ambient",
-   "bpm": [
-    60,
-    90
-   ],
-   "swing": 0.0,
-   "scale": [
-    6,
-    9,
-    4
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": "x.......o......."
-   },
-   "bass": "0...............",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "Chorus"
-   ],
-   "synth": [
-    "Field Synth",
-    "Partials",
-    "Granular",
-    "Spectral Synth"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Drive",
-    "Ring Mod"
-   ],
-   "glitch": 0.0,
-   "mod": 0.2,
-   "refs": [
-    "Brian Eno, Music for Airports",
-    "Aphex Twin, Selected Ambient Works 85-92",
-    "Stars of the Lid, Hiroshi Yoshimura"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 8.0,
-    "strum": 120,
-    "human": 12
-   },
-   "notefx": [
-    "Note Echo"
-   ],
-   "gain": 3.0
-  },
-  {
-   "id": "dark_ambient",
-   "family": "ambient",
-   "bpm": [
-    50,
-    80
-   ],
-   "swing": 0.0,
-   "scale": [
-    5,
-    8
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "x...............",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0...............",
-   "fx": [
-    "Reverb",
-    "Convolution Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Granular",
-    "Partials",
-    "Spectral Synth",
-    "Metallic"
-   ],
-   "ban": [
-    "Chorus",
-    "Bitcrush"
-   ],
-   "glitch": 0.0,
-   "mod": 0.3,
-   "refs": [
-    "Lustmord",
-    "Raison d'etre, Atrium Carceri",
-    "Tim Hecker, Ben Frost"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 8.0,
-    "strum": 60,
-    "human": 12
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Echo"
-   ],
-   "gain": 3
-  },
-  {
-   "id": "idm",
-   "family": "experimental",
-   "bpm": [
-    100,
-    170
-   ],
-   "swing": 0.0,
-   "scale": [
-    4,
-    5,
-    13
-   ],
-   "drums": {
-    "kick": "x....x....x..x..",
-    "snare": "....x..o....x.o.",
-    "chat": "o.oo.o.oo.o.oo.o",
-    "ohat": "",
-    "clap": "",
-    "tom": "..o.....o...o...",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..2..0...5..3..",
-   "fx": [
-    "Delay",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "FM",
-    "Wavetable",
-    "Analog"
-   ],
-   "ban": [],
-   "glitch": 0.45,
-   "mod": 0.8,
-   "refs": [
-    "Warp Records: Autechre, Aphex Twin, Boards of Canada",
-    "Squarepusher, Venetian Snares",
-    "Artificial Intelligence compilation (1992)"
-   ],
-   "notefx": [
-    "Note Echo",
-    "Humanizer"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth",
-     "Wavetable"
-    ],
-    "density": 0.55,
-    "octave": 2,
-    "notefx": [
-     "Humanizer"
-    ],
-    "gain": -12
-   },
-   "groove": 1.0,
-   "fill": 0.8
-  },
-  {
-   "id": "glitch",
-   "family": "experimental",
-   "bpm": [
-    90,
-    140
-   ],
-   "swing": 0.0,
-   "scale": [
-    13,
-    5
-   ],
-   "drums": {
-    "kick": "x..x..x...x.x...",
-    "snare": "....x.......x.x.",
-    "chat": "o.o.oo.o.oo.o.oo",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..0.......0.3..",
-   "fx": [
-    "Stutter",
-    "Bitcrush",
-    "Delay"
-   ],
-   "synth": [
-    "Wavetable",
-    "FM",
-    "Sampler"
-   ],
-   "ban": [],
-   "glitch": 1.0,
-   "mod": 0.9,
-   "refs": [
-    "Oval, Ryoji Ikeda, Alva Noto",
-    "Mille Plateaux / Clicks and Cuts",
-    "Kim Cascone, The Aesthetics of Failure (2000)"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.6,
-    "octave": 3,
-    "gate": 25,
-    "notefx": [
-     "Note Strum"
-    ],
-    "gain": -12
-   },
-   "groove": 1.0,
-   "fill": 0.8
-  },
-  {
-   "id": "downtempo",
-   "family": "downtempo",
-   "bpm": [
-    80,
-    100
-   ],
-   "swing": 0.15,
-   "scale": [
-    4,
-    1,
-    10
-   ],
-   "drums": {
-    "kick": "x.....x...x.....",
-    "snare": "....x.......x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.....0...3.....",
-   "fx": [
-    "Reverb",
-    "Chorus",
-    "Delay"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth",
-    "Sampler"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.3,
-   "refs": [
-    "Massive Attack, Portishead (trip-hop)",
-    "Bonobo, Thievery Corporation",
-    "Ninja Tune, Mo' Wax"
-   ],
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 4.0,
-    "strum": 30,
-    "human": 12
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "gain": -9,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.35,
-    "rate": 0.5,
-    "octave": 2,
-    "notefx": [
-     "Note Echo"
-    ],
-    "gain": -12
-   },
-   "groove": 0.8
-  },
-  {
-   "id": "lofi_beats",
-   "family": "downtempo",
-   "bpm": [
-    70,
-    90
-   ],
-   "swing": 0.22,
-   "scale": [
-    4,
-    1,
-    10
-   ],
-   "drums": {
-    "kick": "x.....x...x.....",
-    "snare": "....x.......x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.....0...3.....",
-   "fx": [
-    "Chorus",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Sampler",
-    "Field Synth"
-   ],
-   "ban": [
-    "Stutter",
-    "Drive"
-   ],
-   "glitch": 0.02,
-   "mod": 0.2,
-   "refs": [
-    "J Dilla, Donuts (2006)",
-    "Nujabes",
-    "Lofi hip hop radio culture (2010s)"
-   ],
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 2.0,
-    "strum": 35,
-    "human": 22
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "groove": 0.9,
-   "fill": 0.4,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.3,
-    "rate": 0.5,
-    "octave": 2,
-    "gain": -13
-   }
-  },
-  {
-   "id": "synthwave",
-   "family": "retro",
-   "bpm": [
-    96,
-    118
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    0
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "....x.......x...",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.0.0.0.0.0.0.0.",
-   "fx": [
-    "Chorus",
-    "Reverb",
-    "Delay"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth",
-    "Oscillator"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.3,
-   "refs": [
-    "Kavinsky, Perturbator, Carpenter Brut",
-    "Drive (2011), Stranger Things (2016) soundtracks",
-    "Giorgio Moroder, Vangelis (ancestors)"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 4.0,
-    "strum": 5,
-    "human": 4
-   },
-   "notefx": [
-    "Humanizer"
-   ],
-   "gain": -10,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.6,
-    "octave": 3,
-    "gate": 70,
-    "notefx": [
-     "Note Echo"
-    ],
-    "gain": -11
-   }
-  },
-  {
-   "id": "vaporwave",
-   "family": "retro",
-   "bpm": [
-    60,
-    85
-   ],
-   "swing": 0.0,
-   "scale": [
-    6,
-    0
-   ],
-   "drums": {
-    "kick": "x.......x.......",
-    "snare": "........x.......",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0...............",
-   "fx": [
-    "Chorus",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Field Synth",
-    "Sampler",
-    "Analog"
-   ],
-   "ban": [
-    "Stutter",
-    "Drive",
-    "Bitcrush"
-   ],
-   "glitch": 0.0,
-   "mod": 0.2,
-   "refs": [
-    "Macintosh Plus, Floral Shoppe (2011)",
-    "Vektroid, 2814",
-    "Fuji TV, mall-music and elevator-music reappropriation"
-   ],
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 4.0,
-    "strum": 40,
-    "human": 10
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Echo"
-   ],
-   "gain": -9,
-   "groove": 0.2,
-   "fill": 0.1
-  },
-  {
-   "id": "footwork",
-   "family": "bass_music",
-   "bpm": [
-    155,
-    165
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    5
-   ],
-   "drums": {
-    "kick": "x..x..x...x..x..",
-    "snare": "..o.....o.o.....",
-    "chat": "o.o.o.o.o.o.o.o.",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..0..0...0..0..",
-   "fx": [
-    "Delay",
-    "Reverb",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Sampler",
-    "Analog",
-    "FM"
-   ],
-   "ban": [
-    "Chorus"
-   ],
-   "glitch": 0.2,
-   "mod": 0.5,
-   "refs": [
-    "Chicago juke / footwork: DJ Rashad, RP Boo, DJ Spinn",
-    "Teklife crew",
-    "Planet Mu, Dancemania"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.5,
-    "octave": 2,
-    "gate": 35,
-    "gain": -12
-   },
-   "groove": 1.0,
-   "fill": 0.6
-  },
-  {
-   "id": "gabber",
-   "family": "hard",
-   "bpm": [
-    165,
-    190
-   ],
-   "swing": 0.0,
-   "scale": [
-    5,
-    1
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "..x...x...x...x.",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0...0...0...0...",
-   "fx": [
-    "Drive",
-    "Saturator",
-    "Dynamics"
-   ],
-   "synth": [
-    "Analog",
-    "FM"
-   ],
-   "ban": [
-    "Chorus",
-    "Reverb"
-   ],
-   "glitch": 0.1,
-   "mod": 0.4,
-   "refs": [
-    "Rotterdam hardcore: Rotterdam Terror Corps, Neophyte",
-    "Thunderdome (1992-2012)",
-    "Mokum, Euromasters"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wavetable"
-    ],
-    "density": 0.45,
-    "octave": 2,
-    "gate": 70,
-    "gain": -11
-   },
-   "fill": 0.8,
-   "trim": -13.0
-  },
-  {
-   "id": "solo_piano",
-   "family": "piano",
-   "bpm": [
-    60,
-    84
-   ],
-   "swing": 0.0,
-   "scale": [
-    0,
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "",
-   "fx": [
-    "Reverb",
-    "EQ",
-    "Convolution Reverb"
-   ],
-   "synth": [
-    "FM",
-    "Partials"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.15,
-   "refs": [
-    "Satie, Gymnopedies",
-    "Ludovico Einaudi",
-    "Nils Frahm, Felt"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 2.0,
-    "strum": 70,
-    "human": 30
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve",
-    "Note Echo"
-   ],
-   "gain": 6.0
-  },
-  {
-   "id": "neo_classical",
-   "family": "piano",
-   "bpm": [
-    66,
-    96
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    0,
-    2
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.....4.....2...",
-   "fx": [
-    "Reverb",
-    "Chorus",
-    "Delay"
-   ],
-   "synth": [
-    "FM",
-    "Partials",
-    "Analog"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.2,
-   "refs": [
-    "Max Richter",
-    "Olafur Arnalds",
-    "Joep Beving"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 2.0,
-    "strum": 55,
-    "human": 25
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Echo"
-   ],
-   "gain": 6.0
-  },
-  {
-   "id": "ambient_piano",
-   "family": "piano",
-   "bpm": [
-    50,
-    72
-   ],
-   "swing": 0.0,
-   "scale": [
-    0,
-    4,
-    6
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "Convolution Reverb",
-    "Chorus"
-   ],
-   "synth": [
-    "FM",
-    "Partials",
-    "Granular"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.3,
-   "refs": [
-    "Brian Eno, Music for Airports",
-    "Harold Budd",
-    "Hania Rani"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 8.0,
-    "strum": 140,
-    "human": 35
-   },
-   "notefx": [
-    "Note Echo",
-    "Humanizer"
-   ],
-   "gain": 6.0
-  },
-  {
-   "id": "amapiano",
-   "family": "house",
-   "bpm": [
-    110,
-    114
-   ],
-   "swing": 0.22,
-   "scale": [
-    4,
-    1
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "",
-    "chat": "x.xxx.xxx.xxx.xx",
-    "ohat": "",
-    "clap": "....x.......x...",
-    "tom": "",
-    "htom": "",
-    "bell": "..x....x..x....."
-   },
-   "bass": "0..0.0..3..0..5.",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "EQ"
-   ],
-   "synth": [
-    "Wavetable",
-    "FM",
-    "Analog"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.3,
-   "refs": [
-    "Kabza De Small",
-    "DJ Maphorisa",
-    "Log drum bass lineage"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 2.0,
-    "strum": 30,
-    "human": 14
-   },
-   "notefx": [
-    "Humanizer"
-   ],
-   "groove": 0.9,
-   "fill": 0.5,
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.35,
-    "octave": 2,
-    "gain": -12
-   }
-  },
-  {
-   "id": "future_garage",
-   "family": "bass_music",
-   "bpm": [
-    130,
-    135
-   ],
-   "swing": 0.3,
-   "scale": [
-    1,
-    4
-   ],
-   "drums": {
-    "kick": "x.....x.....x...",
-    "snare": "....x.......x...",
-    "chat": "..o...o...o...o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.....3...2.....",
-   "fx": [
-    "Reverb",
-    "Chorus",
-    "Audio Filter",
-    "Delay"
-   ],
-   "synth": [
-    "Wavetable",
-    "Analog",
-    "Field Synth"
-   ],
-   "ban": [
-    "Stutter"
-   ],
-   "glitch": 0.05,
-   "mod": 0.5,
-   "refs": [
-    "Burial, Untrue",
-    "Mount Kimbie",
-    "Four Tet"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 4.0,
-    "strum": 40,
-    "human": 20
-   },
-   "notefx": [
-    "Note Echo",
-    "Humanizer"
-   ],
-   "groove": 0.6,
-   "fill": 0.3
-  },
-  {
-   "id": "drone_kosmische",
-   "family": "experimental",
-   "bpm": [
-    40,
-    70
-   ],
-   "swing": 0.0,
-   "scale": [
-    5,
-    12
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0...............",
-   "fx": [
-    "Reverb",
-    "Phaser",
-    "Delay",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Oscillator",
-    "Partials"
-   ],
-   "ban": [
-    "Stutter",
-    "Bitcrush"
-   ],
-   "glitch": 0.0,
-   "mod": 0.8,
-   "refs": [
-    "Tangerine Dream, Phaedra",
-    "Klaus Schulze",
-    "Eliane Radigue"
-   ],
-   "chords": {
-    "size": [
-     2,
-     3
-    ],
-    "beats": 16.0,
-    "strum": 0,
-    "human": 0
-   },
-   "notefx": [
-    "Note Echo"
-   ],
-   "gain": 14.0
-  },
-  {
-   "id": "west_coast_buchla",
-   "family": "experimental",
-   "bpm": [
-    96,
-    118
-   ],
-   "swing": 0.08,
-   "scale": [
-    12,
-    6
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "..o...o...o...o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "x..x..o...x.o...",
-    "htom": "..o..x..o...x...",
-    "bell": "x.....o...x...o."
-   },
-   "bass": "0..2.4.0..5.2...",
-   "fx": [
-    "Audio Filter",
-    "Delay",
-    "Reverb"
-   ],
-   "synth": [
-    "Field Synth",
-    "Wavetable",
-    "Oscillator"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.05,
-   "mod": 0.85,
-   "refs": [
-    "Don Buchla 259 Complex Waveform Generator",
-    "Morton Subotnick, Silver Apples of the Moon",
-    "San Francisco Tape Music Center wavefolding & vactrol LPGs"
-   ],
-   "chords": {
-    "size": [
-     2,
-     3
-    ],
-    "beats": 4.0,
-    "strum": 12,
-    "human": 6
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Echo"
-   ],
-   "motif": {
-    "synth": [
-     "Field Synth"
-    ],
-    "density": 0.55,
-    "octave": 3,
-    "gate": 35,
-    "gain": -8
-   },
-   "groove": 0.55,
-   "fill": 0.35
-  },
-  {
-   "id": "tape_loop_polyphony",
-   "family": "ambient",
-   "bpm": [
-    64,
-    86
-   ],
-   "swing": 0.0,
-   "scale": [
-    4,
-    6
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.......4.......",
-   "fx": [
-    "Delay",
-    "Reverb",
-    "Phaser",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth",
-    "Partials"
-   ],
-   "ban": [
-    "Stutter",
-    "Bitcrush",
-    "Ring Mod"
-   ],
-   "glitch": 0.0,
-   "mod": 0.65,
-   "refs": [
-    "William Basinski, The Disintegration Loops",
-    "Robert Fripp & Brian Eno (Frippertronics)",
-    "Reel-to-reel oxide hysteresis & asynchronous tape loops"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 8.0,
-    "strum": 30,
-    "human": 14
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Echo"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.25,
-    "octave": 3,
-    "gate": 75,
-    "gain": -10
-   },
-   "groove": 0.4,
-   "fill": 0.2
-  },
-  {
-   "id": "karplus_sympathetic",
-   "family": "experimental",
-   "bpm": [
-    88,
-    112
-   ],
-   "swing": 0.08,
-   "scale": [
-    4,
-    6,
-    9
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0...3...5...7...",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Field Synth",
-    "String"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.6,
-   "refs": [
-    "Karplus-Strong plucked string waveguide synthesis (1983)",
-    "Bowed & sympathetic string physical modeling",
-    "Julius O. Smith III digital waveguide acoustics"
-   ],
-   "chords": {
-    "size": [
-     2,
-     3
-    ],
-    "beats": 4.0,
-    "strum": 24,
-    "human": 10
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Strum"
-   ],
-   "motif": {
-    "synth": [
-     "Field Synth"
-    ],
-    "density": 0.45,
-    "octave": 3,
-    "gate": 60,
-    "gain": -9
-   },
-   "groove": 0.5,
-   "fill": 0.25
-  },
-  {
-   "id": "spring_plate_dispersion",
-   "family": "ambient",
-   "bpm": [
-    76,
-    98
-   ],
-   "swing": 0.04,
-   "scale": [
-    1,
-    4,
-    6
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.......5.......",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "Phaser",
-    "Audio Filter"
-   ],
-   "synth": [
-    "Analog",
-    "Field Synth"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.7,
-   "refs": [
-    "EMT 140 steel plate & Hammond/Belton spring tank dispersion",
-    "King Tubby & dub studio spring-tank feedback matrices",
-    "Allpass chirp dispersion & transducer nonlinearity"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 4.0,
-    "strum": 18,
-    "human": 8
-   },
-   "notefx": [
-    "Humanizer",
-    "Note Echo"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Field Synth"
-    ],
-    "density": 0.35,
-    "octave": 3,
-    "gate": 65,
-    "gain": -10
-   },
-   "groove": 0.45,
-   "fill": 0.2
-  },
-  {
-   "id": "gamelan_polyrhythm",
-   "family": "experimental",
-   "bpm": [
-    96,
-    128
-   ],
-   "swing": 0.0,
-   "scale": [
-    9,
-    5,
-    12
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "x.o.x.o.x.o.x.o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "..x...o...x...o.",
-    "htom": "....x..o....x..o",
-    "bell": "x..o.x..o.x..o.."
-   },
-   "bass": "0.....4...2...0.",
-   "fx": [
-    "Reverb",
-    "Delay",
-    "EQ"
-   ],
-   "synth": [
-    "Metallic",
-    "Partials",
-    "FM"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.35,
-   "refs": [
-    "Javanese and Balinese Gamelan",
-    "Steve Reich, Six Marimbas",
-    "Colin McPhee, Tabuh-Tabuhan"
-   ],
-   "chords": {
-    "size": [
-     2,
-     3
-    ],
-    "beats": 2.0,
-    "strum": 10,
-    "human": 14
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "motif": {
-    "synth": [
-     "Metallic",
-     "FM"
-    ],
-    "density": 0.65,
-    "octave": 2,
-    "gate": 45,
-    "gain": -10,
-    "rate": 0.25,
-    "range": 8
-   },
-   "groove": 0.75,
-   "fill": 0.6,
-   "gain": -8.0
-  },
-  {
-   "id": "library_jazz",
-   "family": "downtempo",
-   "bpm": [
-    82,
-    108
-   ],
-   "swing": 0.28,
-   "scale": [
-    4,
-    3,
-    7,
-    11
-   ],
-   "drums": {
-    "kick": "x.....o...x..o..",
-    "snare": "....o.......x...",
-    "chat": "x..ox..ox..ox..o",
-    "ohat": "......o.......o.",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..2..4..5.3..1.",
-   "fx": [
-    "Saturator",
-    "Chorus",
-    "Reverb",
-    "EQ"
-   ],
-   "synth": [
-    "Piano",
-    "Wind",
-    "Analog"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod"
-   ],
-   "glitch": 0.0,
-   "mod": 0.25,
-   "refs": [
-    "KPM / De Wolfe Library Records",
-    "David Axelrod, Song of Innocence",
-    "BadBadNotGood, III"
-   ],
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 2.0,
-    "strum": 45,
-    "human": 22
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "motif": {
-    "synth": [
-     "Wind",
-     "Piano"
-    ],
-    "density": 0.45,
-    "octave": 1,
-    "gate": 65,
-    "gain": -11,
-    "rate": 0.5,
-    "range": 7,
-    "notefx": [
-     "Humanizer"
-    ]
-   },
-   "groove": 0.85,
-   "fill": 0.5,
-   "gain": -7.0
-  },
-  {
-   "id": "broken_beat_rhodes",
-   "family": "breaks",
-   "bpm": [
-    120,
-    130
-   ],
-   "swing": 0.35,
-   "scale": [
-    4,
-    7,
-    1
-   ],
-   "drums": {
-    "kick": "x..o....x..o.x..",
-    "snare": "....x..o....x...",
-    "chat": "x.ox.ox.ox.ox.o.",
-    "ohat": "..o.......o.....",
-    "clap": "......x.......x.",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0..0..3...2.4.5.",
-   "fx": [
-    "Chorus",
-    "Phaser",
-    "Saturator",
-    "Reverb"
-   ],
-   "synth": [
-    "Piano",
-    "Analog",
-    "Field Synth"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod"
-   ],
-   "glitch": 0.0,
-   "mod": 0.4,
-   "refs": [
-    "Bugz in the Attic",
-    "4hero, Two Pages",
-    "Domu, Yussef Dayes"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 2.0,
-    "strum": 55,
-    "human": 18
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "motif": {
-    "synth": [
-     "Piano",
-     "Analog"
-    ],
-    "density": 0.4,
-    "octave": 2,
-    "gate": 55,
-    "gain": -11,
-    "rate": 0.25,
-    "range": 6
-   },
-   "groove": 0.9,
-   "fill": 0.7,
-   "gain": -8.0
-  },
-  {
-   "id": "chamber_winds",
-   "family": "piano",
-   "bpm": [
-    64,
-    88
-   ],
-   "swing": 0.0,
-   "scale": [
-    0,
-    1,
-    2,
-    6
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.......3.......",
-   "fx": [
-    "Convolution Reverb",
-    "Reverb",
-    "EQ"
-   ],
-   "synth": [
-    "Wind",
-    "String",
-    "Partials"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Ring Mod",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.25,
-   "refs": [
-    "Ravel, Introduction and Allegro",
-    "Colin Stetson / Sarah Neufeld",
-    "Penguin Cafe Orchestra"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 4.0,
-    "strum": 85,
-    "human": 28
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "motif": {
-    "synth": [
-     "Wind",
-     "String"
-    ],
-    "density": 0.35,
-    "octave": 1,
-    "gate": 85,
-    "gain": -9,
-    "rate": 0.5,
-    "range": 7,
-    "notefx": [
-     "Humanizer"
-    ]
-   },
-   "groove": 0.3,
-   "fill": 0.2,
-   "gain": 4.0
-  },
-  {
-   "id": "microtonal_ambient",
-   "family": "ambient",
-   "bpm": [
-    54,
-    76
-   ],
-   "swing": 0.0,
-   "scale": [
-    6,
-    12,
-    8
-   ],
-   "drums": {
-    "kick": "",
-    "snare": "",
-    "chat": "",
-    "ohat": "",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": "o.......o......."
-   },
-   "bass": "0.......4.......",
-   "fx": [
-    "Convolution Reverb",
-    "Reverb",
-    "Chorus"
-   ],
-   "synth": [
-    "Partials",
-    "Spectral Synth",
-    "Wind",
-    "String"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter",
-    "Drive"
-   ],
-   "glitch": 0.0,
-   "mod": 0.55,
-   "refs": [
-    "Kaitlyn Aurelia Smith",
-    "Kali Malone",
-    "Eliane Radigue"
-   ],
-   "chords": {
-    "size": [
-     4
-    ],
-    "beats": 4.0,
-    "strum": 110,
-    "human": 30
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "motif": {
-    "synth": [
-     "Wind",
-     "Partials"
-    ],
-    "density": 0.25,
-    "octave": 2,
-    "gate": 90,
-    "gain": -10,
-    "rate": 0.5,
-    "range": 7,
-    "notefx": [
-     "Humanizer"
-    ]
-   },
-   "groove": 0.2,
-   "fill": 0.15,
-   "gain": -2.0
-  },
-  {
-   "id": "prepared_piano",
-   "family": "piano",
-   "bpm": [
-    72,
-    108
-   ],
-   "swing": 0.08,
-   "scale": [
-    1,
-    5,
-    13
-   ],
-   "drums": {
-    "kick": "x.......o.......",
-    "snare": "....o.......o...",
-    "chat": "o.o...o.o.o...o.",
-    "ohat": "",
-    "clap": "",
-    "tom": "..o.......o.....",
-    "htom": "......o.......o.",
-    "bell": "o.....o...o....."
-   },
-   "bass": "0..3..0.5..1..0.",
-   "fx": [
-    "Convolution Reverb",
-    "Drive",
-    "Delay"
-   ],
-   "synth": [
-    "Piano",
-    "String",
-    "Metallic"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Chorus"
-   ],
-   "glitch": 0.05,
-   "mod": 0.35,
-   "refs": [
-    "John Cage, Sonatas and Interludes",
-    "Hauschka",
-    "Nils Frahm"
-   ],
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 2.0,
-    "strum": 15,
-    "human": 22
-   },
-   "notefx": [
-    "Humanizer",
-    "Velocity Curve"
-   ],
-   "motif": {
-    "synth": [
-     "Piano",
-     "Metallic"
-    ],
-    "density": 0.45,
-    "octave": 2,
-    "gate": 35,
-    "gain": -9,
-    "rate": 0.25,
-    "range": 8,
-    "notefx": [
-     "Humanizer"
-    ]
-   },
-   "groove": 0.65,
-   "fill": 0.5,
-   "gain": 2.0
-  },
-  {
-   "id": "berlin_school_sequencer",
-   "family": "experimental",
-   "bpm": [
-    104,
-    122
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    4,
-    7
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "....x.......x...",
-    "chat": "x.o.x.o.x.o.x.o.",
-    "ohat": "..o.......o.....",
-    "clap": "",
-    "tom": "",
-    "htom": "",
-    "bell": ""
-   },
-   "bass": "0.0.4.0.7.0.5.0.",
-   "fx": [
-    "Delay",
-    "Audio Filter",
-    "Reverb"
-   ],
-   "synth": [
-    "Analog",
-    "Oscillator",
-    "Wavetable"
-   ],
-   "ban": [
-    "Bitcrush",
-    "Stutter"
-   ],
-   "glitch": 0.0,
-   "mod": 0.7,
-   "refs": [
-    "Tangerine Dream, Phaedra",
-    "Klaus Schulze",
-    "Emeralds"
-   ],
-   "chords": {
-    "size": [
-     3
-    ],
-    "beats": 4.0,
-    "strum": 30,
-    "human": 6
-   },
-   "notefx": [
-    "Note Echo",
-    "Humanizer"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Oscillator"
-    ],
-    "density": 0.65,
-    "octave": 2,
-    "gate": 45,
-    "gain": -11,
-    "rate": 0.125,
-    "range": 7,
-    "notefx": [
-     "Note Echo"
-    ]
-   },
-   "groove": 0.7,
-   "fill": 0.4,
-   "gain": -7.0
-  },
-  {
-   "id": "uk_dub_steppers",
-   "family": "bass_music",
-   "bpm": [
-    136,
-    142
-   ],
-   "swing": 0.0,
-   "scale": [
-    1,
-    5,
-    11
-   ],
-   "drums": {
-    "kick": "x...x...x...x...",
-    "snare": "........x.......",
-    "chat": "x.o.x.o.x.o.x.o.",
-    "ohat": "..o.......o.....",
-    "clap": "........x.......",
-    "tom": "",
-    "htom": "",
-    "bell": "..o.........o..."
-   },
-   "bass": "0..0....3.0.5...",
-   "fx": [
-    "Delay",
-    "Audio Filter",
-    "Reverb",
-    "Drive"
-   ],
-   "synth": [
-    "Analog",
-    "FM",
-    "Field Synth"
-   ],
-   "ban": [
-    "Bitcrush"
-   ],
-   "glitch": 0.05,
-   "mod": 0.5,
-   "refs": [
-    "Mala, Digital Mystikz",
-    "King Tubby",
-    "Aba Shanti-I"
-   ],
-   "sidechain": true,
-   "chords": {
-    "size": [
-     3,
-     4
-    ],
-    "beats": 2.0,
-    "strum": 10,
-    "human": 8
-   },
-   "notefx": [
-    "Note Echo",
-    "Humanizer"
-   ],
-   "motif": {
-    "synth": [
-     "Analog",
-     "Wind"
-    ],
-    "density": 0.28,
-    "octave": 2,
-    "gate": 40,
-    "gain": -11,
-    "rate": 0.25,
-    "range": 6
-   },
-   "groove": 0.85,
-   "fill": 0.55,
-   "gain": -7.5
-  }
- ]
+  "_doc": "Electronic-music style table: the internal taxonomy that drives sample generation. Not shown on the site. Drum lanes follow assets/drumkits/infinite-basic (kick,snare,closed hat,open hat,clap,low tom,high tom,bell); 16 steps, x=hit o=soft .=rest. scale = MusicTime ScaleType index (0 maj,1 min,2 harm min,3 mel min,4 dorian,5 phrygian,6 lydian,7 mixolydian,8 locrian,9 maj pent,10 min pent,11 blues,12 whole tone,13 chromatic). rate = RateDivision index (6 1/4, 9 1/8, 12 1/16). bass = scale degrees per 16th (0=root, .=rest). glitch 0..1 = how much stutter/bitcrush/stop-start the style tolerates. mod 0..1 = how much the modulators move. Research notes in docs/plans/patch-corpus/taxonomy/music.md.",
+  "styles": [
+    {
+      "id": "deep_house",
+      "family": "house",
+      "bpm": [
+        118,
+        124
+      ],
+      "swing": 0.12,
+      "scale": [
+        4,
+        1
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..o...o...o...o.",
+        "ohat": "..x...x...x...x.",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0..2.0..0..3.",
+      "fx": [
+        "Chorus",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Chicago house (Frankie Knuckles, Warehouse)",
+        "Larry Heard, Mr. Fingers",
+        "Moodymann, Theo Parrish (Detroit deep house)"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "strum": 20,
+        "human": 8
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.3,
+        "octave": 2,
+        "gate": 50,
+        "gain": -13
+      },
+      "groove": 0.6
+    },
+    {
+      "id": "acid_house",
+      "family": "house",
+      "bpm": [
+        120,
+        130
+      ],
+      "swing": 0.05,
+      "scale": [
+        10,
+        5
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..x...x...x...x.",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.0.12.0.0.1.5.0",
+      "fx": [
+        "Audio Filter",
+        "Delay",
+        "Drive"
+      ],
+      "synth": [
+        "Analog",
+        "Oscillator"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.8,
+      "refs": [
+        "Phuture, Acid Tracks (1987)",
+        "Roland TB-303",
+        "Hardfloor, Josh Wink"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.8,
+        "rate": 0.25,
+        "octave": 1,
+        "gate": 45,
+        "gain": -9
+      },
+      "groove": 0.4,
+      "fill": 0.5
+    },
+    {
+      "id": "tech_house",
+      "family": "house",
+      "bpm": [
+        124,
+        128
+      ],
+      "swing": 0.08,
+      "scale": [
+        1,
+        5
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": ".o.o.o.o.o.o.o.o",
+        "ohat": "..x...x...x...x.",
+        "clap": "....x.......x..o",
+        "tom": "..........o....o",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0.0..0..0.0.3",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "FM",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.1,
+      "mod": 0.4,
+      "refs": [
+        "Ricardo Villalobos",
+        "Richie Hawtin (minimal crossover)",
+        "Fabric/Berlin club scene"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "strum": 10,
+        "human": 6
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "gain": -12,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.35,
+        "octave": 2,
+        "gate": 40,
+        "gain": -12
+      },
+      "groove": 0.7
+    },
+    {
+      "id": "progressive_house",
+      "family": "house",
+      "bpm": [
+        124,
+        130
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..o...o...o...o.",
+        "ohat": "..x...x...x...x.",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0..0..0..0..0",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "Chorus"
+      ],
+      "synth": [
+        "Field Synth",
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.5,
+      "refs": [
+        "Sasha and John Digweed",
+        "Deep Dish",
+        "Hybrid, Lange"
+      ],
+      "sidechain": true,
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.45,
+        "rate": 0.5,
+        "octave": 2,
+        "notefx": [
+          "Note Echo"
+        ],
+        "gain": -12
+      },
+      "fill": 0.7
+    },
+    {
+      "id": "french_filter_house",
+      "family": "house",
+      "bpm": [
+        120,
+        126
+      ],
+      "swing": 0.1,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..o...o...o...o.",
+        "ohat": "..x...x...x...x.",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0..0..0..3..5",
+      "fx": [
+        "Audio Filter",
+        "Phaser",
+        "Dynamics"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.7,
+      "refs": [
+        "Daft Punk, Homework / Discovery",
+        "Stardust, Music Sounds Better With You",
+        "Cassius, Alan Braxe"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "strum": 25,
+        "human": 8
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "gain": -8,
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gain": -12
+      },
+      "groove": 0.6
+    },
+    {
+      "id": "detroit_techno",
+      "family": "techno",
+      "bpm": [
+        128,
+        138
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..x...x...x...x.",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": "x.......x......."
+      },
+      "bass": "0.....0.......3.",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "Chorus"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "Belleville Three: Juan Atkins, Derrick May, Kevin Saunderson",
+        "Underground Resistance",
+        "Reynolds, Energy Flash"
+      ],
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 8.0,
+        "strum": 30,
+        "human": 6
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "gain": -10,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.3,
+        "octave": 2,
+        "gain": -12
+      },
+      "groove": 0.5
+    },
+    {
+      "id": "minimal_techno",
+      "family": "techno",
+      "bpm": [
+        122,
+        128
+      ],
+      "swing": 0.06,
+      "scale": [
+        1,
+        5
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": ".o..o..o..o..o..",
+        "ohat": "",
+        "clap": "..........o.....",
+        "tom": "o.......o...o...",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.......0...3...",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "EQ"
+      ],
+      "synth": [
+        "FM",
+        "Wavetable",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.2,
+      "mod": 0.5,
+      "refs": [
+        "Basic Channel, Chain Reaction",
+        "Plastikman, Richie Hawtin",
+        "Ricardo Villalobos, Perlon"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.25,
+        "octave": 2,
+        "gate": 30,
+        "gain": -11
+      },
+      "groove": 0.8,
+      "fill": 0.3
+    },
+    {
+      "id": "dub_techno",
+      "family": "techno",
+      "bpm": [
+        116,
+        124
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...............",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Basic Channel / Rhythm & Sound",
+        "Deepchord, Echospace",
+        "Gas (Wolfgang Voigt)"
+      ],
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "strum": 30,
+        "human": 5
+      },
+      "notefx": [
+        "Note Echo"
+      ],
+      "gain": -9,
+      "groove": 0.3,
+      "fill": 0.2
+    },
+    {
+      "id": "industrial_techno",
+      "family": "techno",
+      "bpm": [
+        135,
+        150
+      ],
+      "swing": 0.0,
+      "scale": [
+        5,
+        1
+      ],
+      "drums": {
+        "kick": "x..xx..xx..xx...",
+        "snare": "",
+        "chat": ".o.o.o.o.o.o.o.o",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.0.0.0.0.0.0.0.",
+      "fx": [
+        "Drive",
+        "Saturator",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "FM",
+        "Metallic"
+      ],
+      "ban": [
+        "Chorus"
+      ],
+      "glitch": 0.15,
+      "mod": 0.5,
+      "refs": [
+        "Surgeon, Regis, Blawan",
+        "Perc, Ancient Methods",
+        "Throbbing Gristle, Cabaret Voltaire (ancestors)"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.4,
+        "octave": 1,
+        "gate": 70,
+        "gain": -12
+      },
+      "groove": 0.3,
+      "fill": 0.6,
+      "trim": -7.0
+    },
+    {
+      "id": "classic_trance",
+      "family": "trance",
+      "bpm": [
+        132,
+        140
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..x...x...x...x.",
+        "ohat": "..x...x...x...x.",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": ".0.0.0.0.0.0.0.0",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.6,
+      "refs": [
+        "Paul van Dyk, Tiesto, Armin van Buuren",
+        "Oakenfold, Goa lineage",
+        "Reynolds, Energy Flash (trance chapter)"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 10,
+        "human": 0
+      },
+      "gain": -10,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.65,
+        "rate": 0.25,
+        "octave": 3,
+        "notefx": [
+          "Note Echo"
+        ],
+        "gain": -11
+      },
+      "fill": 0.9
+    },
+    {
+      "id": "psytrance",
+      "family": "trance",
+      "bpm": [
+        140,
+        148
+      ],
+      "swing": 0.0,
+      "scale": [
+        5,
+        1
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": ".o.o.o.o.o.o.o.o",
+        "ohat": "..x...x...x...x.",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": ".0.0.0.0.0.0.0.0",
+      "fx": [
+        "Delay",
+        "Audio Filter",
+        "Drive"
+      ],
+      "synth": [
+        "Analog",
+        "FM",
+        "Oscillator"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.1,
+      "mod": 0.8,
+      "refs": [
+        "Goa trance (Juno Reactor, Hallucinogen)",
+        "Infected Mushroom, Astrix",
+        "Full-on / dark psy (Zenon, Parasense)"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.55,
+        "octave": 3,
+        "gate": 50,
+        "gain": -12
+      },
+      "fill": 0.6
+    },
+    {
+      "id": "liquid_dnb",
+      "family": "drum_and_bass",
+      "bpm": [
+        170,
+        176
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x.........x.....",
+        "snare": "....x.......x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.........0.3...",
+      "fx": [
+        "Reverb",
+        "Chorus",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Field Synth",
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "LTJ Bukem, Good Looking Records",
+        "Hospital Records, Calibre",
+        "High Contrast, Netsky"
+      ],
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 8.0,
+        "strum": 35,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "gain": -9,
+      "groove": 0.7,
+      "fill": 0.7
+    },
+    {
+      "id": "neurofunk",
+      "family": "drum_and_bass",
+      "bpm": [
+        172,
+        178
+      ],
+      "swing": 0.0,
+      "scale": [
+        5,
+        1
+      ],
+      "drums": {
+        "kick": "x.........x.....",
+        "snare": "....x.......x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.0.0...0.0.3...",
+      "fx": [
+        "Drive",
+        "Audio Filter",
+        "Saturator"
+      ],
+      "synth": [
+        "Analog",
+        "FM",
+        "Wavetable"
+      ],
+      "ban": [
+        "Chorus"
+      ],
+      "glitch": 0.2,
+      "mod": 0.9,
+      "refs": [
+        "Ed Rush & Optical, Konflict",
+        "Noisia, Phace, Mefjus",
+        "Photek (precursor)"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.5,
+        "octave": 1,
+        "gate": 65,
+        "gain": -11
+      },
+      "groove": 0.4,
+      "fill": 0.6
+    },
+    {
+      "id": "jungle",
+      "family": "drum_and_bass",
+      "bpm": [
+        160,
+        170
+      ],
+      "swing": 0.05,
+      "scale": [
+        1,
+        10
+      ],
+      "drums": {
+        "kick": "x.........x.....",
+        "snare": "....x..o.o..x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.........0.....",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "EQ"
+      ],
+      "synth": [
+        "Sampler",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.2,
+      "mod": 0.4,
+      "refs": [
+        "Amen break lineage (The Winstons)",
+        "Goldie, Timeless",
+        "Shy FX, Congo Natty, Rebel MC"
+      ],
+      "groove": 0.9,
+      "fill": 0.8
+    },
+    {
+      "id": "uk_garage",
+      "family": "bass_music",
+      "bpm": [
+        130,
+        138
+      ],
+      "swing": 0.28,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x.........x.....",
+        "snare": "....x.......x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.....0.....3...",
+      "fx": [
+        "Chorus",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.4,
+      "refs": [
+        "2-step: Artful Dodger, MJ Cole",
+        "Burial, Untrue",
+        "Todd Edwards"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 15,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "gain": -10,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gain": -12
+      },
+      "groove": 0.8
+    },
+    {
+      "id": "dubstep",
+      "family": "bass_music",
+      "bpm": [
+        138,
+        142
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        5
+      ],
+      "drums": {
+        "kick": "x...............",
+        "snare": "........x.......",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.......0.......",
+      "fx": [
+        "Drive",
+        "Audio Filter",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Wavetable",
+        "FM"
+      ],
+      "ban": [
+        "Chorus"
+      ],
+      "glitch": 0.1,
+      "mod": 0.9,
+      "refs": [
+        "Digital Mystikz, Loefah, Skream, Benga",
+        "Mala, Coki",
+        "Skream Midnight Request Line"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.3,
+        "rate": 0.5,
+        "octave": 1,
+        "gate": 80,
+        "gain": -10
+      },
+      "fill": 0.4
+    },
+    {
+      "id": "breakbeat",
+      "family": "breaks",
+      "bpm": [
+        125,
+        140
+      ],
+      "swing": 0.05,
+      "scale": [
+        1,
+        10
+      ],
+      "drums": {
+        "kick": "x.....x...x.....",
+        "snare": "....x..o.o..x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.....0...0.....",
+      "fx": [
+        "Delay",
+        "Drive",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Sampler"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.1,
+      "mod": 0.5,
+      "refs": [
+        "Prodigy, Chemical Brothers, Fatboy Slim (big beat)",
+        "Nu skool breaks (Plump DJs)",
+        "Detroit breakdown tradition"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gain": -12
+      },
+      "groove": 0.8,
+      "fill": 0.7
+    },
+    {
+      "id": "electro",
+      "family": "breaks",
+      "bpm": [
+        118,
+        132
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        5
+      ],
+      "drums": {
+        "kick": "x.....x...x.....",
+        "snare": "....x.......x...",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.....0...0.....",
+      "fx": [
+        "Chorus",
+        "Delay",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "FM",
+        "Oscillator"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.5,
+      "refs": [
+        "Kraftwerk, Planet Rock (Afrika Bambaataa, Arthur Baker)",
+        "Drexciya, Dopplereffekt",
+        "Roland TR-808 era"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 40,
+        "gain": -11
+      },
+      "groove": 0.3
+    },
+    {
+      "id": "ambient",
+      "family": "ambient",
+      "bpm": [
+        60,
+        90
+      ],
+      "swing": 0.0,
+      "scale": [
+        6,
+        9,
+        4
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": "x.......o......."
+      },
+      "bass": "0...............",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "Chorus"
+      ],
+      "synth": [
+        "Field Synth",
+        "Partials",
+        "Granular",
+        "Spectral Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Drive",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.2,
+      "refs": [
+        "Brian Eno, Music for Airports",
+        "Aphex Twin, Selected Ambient Works 85-92",
+        "Stars of the Lid, Hiroshi Yoshimura"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 8.0,
+        "strum": 120,
+        "human": 12
+      },
+      "notefx": [
+        "Note Echo"
+      ],
+      "gain": 3.0
+    },
+    {
+      "id": "dark_ambient",
+      "family": "ambient",
+      "bpm": [
+        50,
+        80
+      ],
+      "swing": 0.0,
+      "scale": [
+        5,
+        8
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "x...............",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...............",
+      "fx": [
+        "Reverb",
+        "Convolution Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Granular",
+        "Partials",
+        "Spectral Synth",
+        "Metallic"
+      ],
+      "ban": [
+        "Chorus",
+        "Bitcrush"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Lustmord",
+        "Raison d'etre, Atrium Carceri",
+        "Tim Hecker, Ben Frost"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 8.0,
+        "strum": 60,
+        "human": 12
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "gain": 3
+    },
+    {
+      "id": "idm",
+      "family": "experimental",
+      "bpm": [
+        100,
+        170
+      ],
+      "swing": 0.0,
+      "scale": [
+        4,
+        5,
+        13
+      ],
+      "drums": {
+        "kick": "x....x....x..x..",
+        "snare": "....x..o....x.o.",
+        "chat": "o.oo.o.oo.o.oo.o",
+        "ohat": "",
+        "clap": "",
+        "tom": "..o.....o...o...",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..2..0...5..3..",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "FM",
+        "Wavetable",
+        "Analog"
+      ],
+      "ban": [],
+      "glitch": 0.45,
+      "mod": 0.8,
+      "refs": [
+        "Warp Records: Autechre, Aphex Twin, Boards of Canada",
+        "Squarepusher, Venetian Snares",
+        "Artificial Intelligence compilation (1992)"
+      ],
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth",
+          "Wavetable"
+        ],
+        "density": 0.55,
+        "octave": 2,
+        "notefx": [
+          "Humanizer"
+        ],
+        "gain": -12
+      },
+      "groove": 1.0,
+      "fill": 0.8
+    },
+    {
+      "id": "glitch",
+      "family": "experimental",
+      "bpm": [
+        90,
+        140
+      ],
+      "swing": 0.0,
+      "scale": [
+        13,
+        5
+      ],
+      "drums": {
+        "kick": "x..x..x...x.x...",
+        "snare": "....x.......x.x.",
+        "chat": "o.o.oo.o.oo.o.oo",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0.......0.3..",
+      "fx": [
+        "Stutter",
+        "Bitcrush",
+        "Delay"
+      ],
+      "synth": [
+        "Wavetable",
+        "FM",
+        "Sampler"
+      ],
+      "ban": [],
+      "glitch": 1.0,
+      "mod": 0.9,
+      "refs": [
+        "Oval, Ryoji Ikeda, Alva Noto",
+        "Mille Plateaux / Clicks and Cuts",
+        "Kim Cascone, The Aesthetics of Failure (2000)"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.6,
+        "octave": 3,
+        "gate": 25,
+        "notefx": [
+          "Note Strum"
+        ],
+        "gain": -12
+      },
+      "groove": 1.0,
+      "fill": 0.8
+    },
+    {
+      "id": "downtempo",
+      "family": "downtempo",
+      "bpm": [
+        80,
+        100
+      ],
+      "swing": 0.15,
+      "scale": [
+        4,
+        1,
+        10
+      ],
+      "drums": {
+        "kick": "x.....x...x.....",
+        "snare": "....x.......x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.....0...3.....",
+      "fx": [
+        "Reverb",
+        "Chorus",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth",
+        "Sampler"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Massive Attack, Portishead (trip-hop)",
+        "Bonobo, Thievery Corporation",
+        "Ninja Tune, Mo' Wax"
+      ],
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "strum": 30,
+        "human": 12
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "gain": -9,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.35,
+        "rate": 0.5,
+        "octave": 2,
+        "notefx": [
+          "Note Echo"
+        ],
+        "gain": -12
+      },
+      "groove": 0.8
+    },
+    {
+      "id": "lofi_beats",
+      "family": "downtempo",
+      "bpm": [
+        70,
+        90
+      ],
+      "swing": 0.22,
+      "scale": [
+        4,
+        1,
+        10
+      ],
+      "drums": {
+        "kick": "x.....x...x.....",
+        "snare": "....x.......x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.....0...3.....",
+      "fx": [
+        "Chorus",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Sampler",
+        "Field Synth"
+      ],
+      "ban": [
+        "Stutter",
+        "Drive"
+      ],
+      "glitch": 0.02,
+      "mod": 0.2,
+      "refs": [
+        "J Dilla, Donuts (2006)",
+        "Nujabes",
+        "Lofi hip hop radio culture (2010s)"
+      ],
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 35,
+        "human": 22
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "groove": 0.9,
+      "fill": 0.4,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.3,
+        "rate": 0.5,
+        "octave": 2,
+        "gain": -13
+      }
+    },
+    {
+      "id": "synthwave",
+      "family": "retro",
+      "bpm": [
+        96,
+        118
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        0
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "....x.......x...",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.0.0.0.0.0.0.0.",
+      "fx": [
+        "Chorus",
+        "Reverb",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth",
+        "Oscillator"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Kavinsky, Perturbator, Carpenter Brut",
+        "Drive (2011), Stranger Things (2016) soundtracks",
+        "Giorgio Moroder, Vangelis (ancestors)"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 5,
+        "human": 4
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "gain": -10,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.6,
+        "octave": 3,
+        "gate": 70,
+        "notefx": [
+          "Note Echo"
+        ],
+        "gain": -11
+      }
+    },
+    {
+      "id": "vaporwave",
+      "family": "retro",
+      "bpm": [
+        60,
+        85
+      ],
+      "swing": 0.0,
+      "scale": [
+        6,
+        0
+      ],
+      "drums": {
+        "kick": "x.......x.......",
+        "snare": "........x.......",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...............",
+      "fx": [
+        "Chorus",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Field Synth",
+        "Sampler",
+        "Analog"
+      ],
+      "ban": [
+        "Stutter",
+        "Drive",
+        "Bitcrush"
+      ],
+      "glitch": 0.0,
+      "mod": 0.2,
+      "refs": [
+        "Macintosh Plus, Floral Shoppe (2011)",
+        "Vektroid, 2814",
+        "Fuji TV, mall-music and elevator-music reappropriation"
+      ],
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "strum": 40,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "gain": -9,
+      "groove": 0.2,
+      "fill": 0.1
+    },
+    {
+      "id": "footwork",
+      "family": "bass_music",
+      "bpm": [
+        155,
+        165
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        5
+      ],
+      "drums": {
+        "kick": "x..x..x...x..x..",
+        "snare": "..o.....o.o.....",
+        "chat": "o.o.o.o.o.o.o.o.",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0..0...0..0..",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Sampler",
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Chorus"
+      ],
+      "glitch": 0.2,
+      "mod": 0.5,
+      "refs": [
+        "Chicago juke / footwork: DJ Rashad, RP Boo, DJ Spinn",
+        "Teklife crew",
+        "Planet Mu, Dancemania"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 35,
+        "gain": -12
+      },
+      "groove": 1.0,
+      "fill": 0.6
+    },
+    {
+      "id": "gabber",
+      "family": "hard",
+      "bpm": [
+        165,
+        190
+      ],
+      "swing": 0.0,
+      "scale": [
+        5,
+        1
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "..x...x...x...x.",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...0...0...0...",
+      "fx": [
+        "Drive",
+        "Saturator",
+        "Dynamics"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Chorus",
+        "Reverb"
+      ],
+      "glitch": 0.1,
+      "mod": 0.4,
+      "refs": [
+        "Rotterdam hardcore: Rotterdam Terror Corps, Neophyte",
+        "Thunderdome (1992-2012)",
+        "Mokum, Euromasters"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wavetable"
+        ],
+        "density": 0.45,
+        "octave": 2,
+        "gate": 70,
+        "gain": -11
+      },
+      "fill": 0.8,
+      "trim": -13.0
+    },
+    {
+      "id": "solo_piano",
+      "family": "piano",
+      "bpm": [
+        60,
+        84
+      ],
+      "swing": 0.0,
+      "scale": [
+        0,
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "",
+      "fx": [
+        "Reverb",
+        "EQ",
+        "Convolution Reverb"
+      ],
+      "synth": [
+        "FM",
+        "Partials"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.15,
+      "refs": [
+        "Satie, Gymnopedies",
+        "Ludovico Einaudi",
+        "Nils Frahm, Felt"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 70,
+        "human": 30
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve",
+        "Note Echo"
+      ],
+      "gain": 6.0
+    },
+    {
+      "id": "neo_classical",
+      "family": "piano",
+      "bpm": [
+        66,
+        96
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        0,
+        2
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.....4.....2...",
+      "fx": [
+        "Reverb",
+        "Chorus",
+        "Delay"
+      ],
+      "synth": [
+        "FM",
+        "Partials",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.2,
+      "refs": [
+        "Max Richter",
+        "Olafur Arnalds",
+        "Joep Beving"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 55,
+        "human": 25
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "gain": 6.0
+    },
+    {
+      "id": "ambient_piano",
+      "family": "piano",
+      "bpm": [
+        50,
+        72
+      ],
+      "swing": 0.0,
+      "scale": [
+        0,
+        4,
+        6
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "Convolution Reverb",
+        "Chorus"
+      ],
+      "synth": [
+        "FM",
+        "Partials",
+        "Granular"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Brian Eno, Music for Airports",
+        "Harold Budd",
+        "Hania Rani"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 8.0,
+        "strum": 140,
+        "human": 35
+      },
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "gain": 6.0
+    },
+    {
+      "id": "amapiano",
+      "family": "house",
+      "bpm": [
+        110,
+        114
+      ],
+      "swing": 0.22,
+      "scale": [
+        4,
+        1
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "",
+        "chat": "x.xxx.xxx.xxx.xx",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "",
+        "htom": "",
+        "bell": "..x....x..x....."
+      },
+      "bass": "0..0.0..3..0..5.",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "EQ"
+      ],
+      "synth": [
+        "Wavetable",
+        "FM",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Kabza De Small",
+        "DJ Maphorisa",
+        "Log drum bass lineage"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 30,
+        "human": 14
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "groove": 0.9,
+      "fill": 0.5,
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.35,
+        "octave": 2,
+        "gain": -12
+      }
+    },
+    {
+      "id": "future_garage",
+      "family": "bass_music",
+      "bpm": [
+        130,
+        135
+      ],
+      "swing": 0.3,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x.....x.....x...",
+        "snare": "....x.......x...",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.....3...2.....",
+      "fx": [
+        "Reverb",
+        "Chorus",
+        "Audio Filter",
+        "Delay"
+      ],
+      "synth": [
+        "Wavetable",
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.5,
+      "refs": [
+        "Burial, Untrue",
+        "Mount Kimbie",
+        "Four Tet"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "strum": 40,
+        "human": 20
+      },
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "groove": 0.6,
+      "fill": 0.3
+    },
+    {
+      "id": "drone_kosmische",
+      "family": "experimental",
+      "bpm": [
+        40,
+        70
+      ],
+      "swing": 0.0,
+      "scale": [
+        5,
+        12
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...............",
+      "fx": [
+        "Reverb",
+        "Phaser",
+        "Delay",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Oscillator",
+        "Partials"
+      ],
+      "ban": [
+        "Stutter",
+        "Bitcrush"
+      ],
+      "glitch": 0.0,
+      "mod": 0.8,
+      "refs": [
+        "Tangerine Dream, Phaedra",
+        "Klaus Schulze",
+        "Eliane Radigue"
+      ],
+      "chords": {
+        "size": [
+          2,
+          3
+        ],
+        "beats": 16.0,
+        "strum": 0,
+        "human": 0
+      },
+      "notefx": [
+        "Note Echo"
+      ],
+      "gain": 14.0
+    },
+    {
+      "id": "west_coast_buchla",
+      "family": "experimental",
+      "bpm": [
+        96,
+        118
+      ],
+      "swing": 0.08,
+      "scale": [
+        12,
+        6
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "x..x..o...x.o...",
+        "htom": "..o..x..o...x...",
+        "bell": "x.....o...x...o."
+      },
+      "bass": "0..2.4.0..5.2...",
+      "fx": [
+        "Audio Filter",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "Wavetable",
+        "Oscillator"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.85,
+      "refs": [
+        "Don Buchla 259 Complex Waveform Generator",
+        "Morton Subotnick, Silver Apples of the Moon",
+        "San Francisco Tape Music Center wavefolding & vactrol LPGs"
+      ],
+      "chords": {
+        "size": [
+          2,
+          3
+        ],
+        "beats": 4.0,
+        "strum": 12,
+        "human": 6
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.55,
+        "octave": 3,
+        "gate": 35,
+        "gain": -8
+      },
+      "groove": 0.55,
+      "fill": 0.35
+    },
+    {
+      "id": "tape_loop_polyphony",
+      "family": "ambient",
+      "bpm": [
+        64,
+        86
+      ],
+      "swing": 0.0,
+      "scale": [
+        4,
+        6
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.......4.......",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "Phaser",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth",
+        "Partials"
+      ],
+      "ban": [
+        "Stutter",
+        "Bitcrush",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.65,
+      "refs": [
+        "William Basinski, The Disintegration Loops",
+        "Robert Fripp & Brian Eno (Frippertronics)",
+        "Reel-to-reel oxide hysteresis & asynchronous tape loops"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 8.0,
+        "strum": 30,
+        "human": 14
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.25,
+        "octave": 3,
+        "gate": 75,
+        "gain": -10
+      },
+      "groove": 0.4,
+      "fill": 0.2
+    },
+    {
+      "id": "karplus_sympathetic",
+      "family": "experimental",
+      "bpm": [
+        88,
+        112
+      ],
+      "swing": 0.08,
+      "scale": [
+        4,
+        6,
+        9
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...3...5...7...",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Field Synth",
+        "String"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.6,
+      "refs": [
+        "Karplus-Strong plucked string waveguide synthesis (1983)",
+        "Bowed & sympathetic string physical modeling",
+        "Julius O. Smith III digital waveguide acoustics"
+      ],
+      "chords": {
+        "size": [
+          2,
+          3
+        ],
+        "beats": 4.0,
+        "strum": 24,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Strum"
+      ],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.45,
+        "octave": 3,
+        "gate": 60,
+        "gain": -9
+      },
+      "groove": 0.5,
+      "fill": 0.25
+    },
+    {
+      "id": "spring_plate_dispersion",
+      "family": "ambient",
+      "bpm": [
+        76,
+        98
+      ],
+      "swing": 0.04,
+      "scale": [
+        1,
+        4,
+        6
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.......5.......",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "Phaser",
+        "Audio Filter"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.7,
+      "refs": [
+        "EMT 140 steel plate & Hammond/Belton spring tank dispersion",
+        "King Tubby & dub studio spring-tank feedback matrices",
+        "Allpass chirp dispersion & transducer nonlinearity"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 18,
+        "human": 8
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.35,
+        "octave": 3,
+        "gate": 65,
+        "gain": -10
+      },
+      "groove": 0.45,
+      "fill": 0.2
+    },
+    {
+      "id": "gamelan_polyrhythm",
+      "family": "experimental",
+      "bpm": [
+        96,
+        128
+      ],
+      "swing": 0.0,
+      "scale": [
+        9,
+        5,
+        12
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "..x...o...x...o.",
+        "htom": "....x..o....x..o",
+        "bell": "x..o.x..o.x..o.."
+      },
+      "bass": "0.....4...2...0.",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "EQ"
+      ],
+      "synth": [
+        "Metallic",
+        "Partials",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Javanese and Balinese Gamelan",
+        "Steve Reich, Six Marimbas",
+        "Colin McPhee, Tabuh-Tabuhan"
+      ],
+      "chords": {
+        "size": [
+          2,
+          3
+        ],
+        "beats": 2.0,
+        "strum": 10,
+        "human": 14
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "motif": {
+        "synth": [
+          "Metallic",
+          "FM"
+        ],
+        "density": 0.65,
+        "octave": 2,
+        "gate": 45,
+        "gain": -10,
+        "rate": 0.25,
+        "range": 8
+      },
+      "groove": 0.75,
+      "fill": 0.6,
+      "gain": -8.0
+    },
+    {
+      "id": "library_jazz",
+      "family": "downtempo",
+      "bpm": [
+        82,
+        108
+      ],
+      "swing": 0.28,
+      "scale": [
+        4,
+        3,
+        7,
+        11
+      ],
+      "drums": {
+        "kick": "x.....o...x..o..",
+        "snare": "....o.......x...",
+        "chat": "x..ox..ox..ox..o",
+        "ohat": "......o.......o.",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..2..4..5.3..1.",
+      "fx": [
+        "Saturator",
+        "Chorus",
+        "Reverb",
+        "EQ"
+      ],
+      "synth": [
+        "Piano",
+        "Wind",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.25,
+      "refs": [
+        "KPM / De Wolfe Library Records",
+        "David Axelrod, Song of Innocence",
+        "BadBadNotGood, III"
+      ],
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 45,
+        "human": 22
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Piano"
+        ],
+        "density": 0.45,
+        "octave": 1,
+        "gate": 65,
+        "gain": -11,
+        "rate": 0.5,
+        "range": 7,
+        "notefx": [
+          "Humanizer"
+        ]
+      },
+      "groove": 0.85,
+      "fill": 0.5,
+      "gain": -7.0
+    },
+    {
+      "id": "broken_beat_rhodes",
+      "family": "breaks",
+      "bpm": [
+        120,
+        130
+      ],
+      "swing": 0.35,
+      "scale": [
+        4,
+        7,
+        1
+      ],
+      "drums": {
+        "kick": "x..o....x..o.x..",
+        "snare": "....x..o....x...",
+        "chat": "x.ox.ox.ox.ox.o.",
+        "ohat": "..o.......o.....",
+        "clap": "......x.......x.",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0..3...2.4.5.",
+      "fx": [
+        "Chorus",
+        "Phaser",
+        "Saturator",
+        "Reverb"
+      ],
+      "synth": [
+        "Piano",
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "Bugz in the Attic",
+        "4hero, Two Pages",
+        "Domu, Yussef Dayes"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 55,
+        "human": 18
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "motif": {
+        "synth": [
+          "Piano",
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 55,
+        "gain": -11,
+        "rate": 0.25,
+        "range": 6
+      },
+      "groove": 0.9,
+      "fill": 0.7,
+      "gain": -8.0
+    },
+    {
+      "id": "chamber_winds",
+      "family": "piano",
+      "bpm": [
+        64,
+        88
+      ],
+      "swing": 0.0,
+      "scale": [
+        0,
+        1,
+        2,
+        6
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.......3.......",
+      "fx": [
+        "Convolution Reverb",
+        "Reverb",
+        "EQ"
+      ],
+      "synth": [
+        "Wind",
+        "String",
+        "Partials"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.25,
+      "refs": [
+        "Ravel, Introduction and Allegro",
+        "Colin Stetson / Sarah Neufeld",
+        "Penguin Cafe Orchestra"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 85,
+        "human": 28
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "String"
+        ],
+        "density": 0.35,
+        "octave": 1,
+        "gate": 85,
+        "gain": -9,
+        "rate": 0.5,
+        "range": 7,
+        "notefx": [
+          "Humanizer"
+        ]
+      },
+      "groove": 0.3,
+      "fill": 0.2,
+      "gain": 4.0
+    },
+    {
+      "id": "microtonal_ambient",
+      "family": "ambient",
+      "bpm": [
+        54,
+        76
+      ],
+      "swing": 0.0,
+      "scale": [
+        6,
+        12,
+        8
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": "o.......o......."
+      },
+      "bass": "0.......4.......",
+      "fx": [
+        "Convolution Reverb",
+        "Reverb",
+        "Chorus"
+      ],
+      "synth": [
+        "Partials",
+        "Spectral Synth",
+        "Wind",
+        "String"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Drive"
+      ],
+      "glitch": 0.0,
+      "mod": 0.55,
+      "refs": [
+        "Kaitlyn Aurelia Smith",
+        "Kali Malone",
+        "Eliane Radigue"
+      ],
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "strum": 110,
+        "human": 30
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Partials"
+        ],
+        "density": 0.25,
+        "octave": 2,
+        "gate": 90,
+        "gain": -10,
+        "rate": 0.5,
+        "range": 7,
+        "notefx": [
+          "Humanizer"
+        ]
+      },
+      "groove": 0.2,
+      "fill": 0.15,
+      "gain": -2.0
+    },
+    {
+      "id": "prepared_piano",
+      "family": "piano",
+      "bpm": [
+        72,
+        108
+      ],
+      "swing": 0.08,
+      "scale": [
+        1,
+        5,
+        13
+      ],
+      "drums": {
+        "kick": "x.......o.......",
+        "snare": "....o.......o...",
+        "chat": "o.o...o.o.o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "..o.......o.....",
+        "htom": "......o.......o.",
+        "bell": "o.....o...o....."
+      },
+      "bass": "0..3..0.5..1..0.",
+      "fx": [
+        "Convolution Reverb",
+        "Drive",
+        "Delay"
+      ],
+      "synth": [
+        "Piano",
+        "String",
+        "Metallic"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Chorus"
+      ],
+      "glitch": 0.05,
+      "mod": 0.35,
+      "refs": [
+        "John Cage, Sonatas and Interludes",
+        "Hauschka",
+        "Nils Frahm"
+      ],
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 15,
+        "human": 22
+      },
+      "notefx": [
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "motif": {
+        "synth": [
+          "Piano",
+          "Metallic"
+        ],
+        "density": 0.45,
+        "octave": 2,
+        "gate": 35,
+        "gain": -9,
+        "rate": 0.25,
+        "range": 8,
+        "notefx": [
+          "Humanizer"
+        ]
+      },
+      "groove": 0.65,
+      "fill": 0.5,
+      "gain": 2.0
+    },
+    {
+      "id": "berlin_school_sequencer",
+      "family": "experimental",
+      "bpm": [
+        104,
+        122
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        4,
+        7
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "....x.......x...",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "..o.......o.....",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.0.4.0.7.0.5.0.",
+      "fx": [
+        "Delay",
+        "Audio Filter",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Oscillator",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.7,
+      "refs": [
+        "Tangerine Dream, Phaedra",
+        "Klaus Schulze",
+        "Emeralds"
+      ],
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "strum": 30,
+        "human": 6
+      },
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Oscillator"
+        ],
+        "density": 0.65,
+        "octave": 2,
+        "gate": 45,
+        "gain": -11,
+        "rate": 0.125,
+        "range": 7,
+        "notefx": [
+          "Note Echo"
+        ]
+      },
+      "groove": 0.7,
+      "fill": 0.4,
+      "gain": -7.0
+    },
+    {
+      "id": "uk_dub_steppers",
+      "family": "bass_music",
+      "bpm": [
+        136,
+        142
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        5,
+        11
+      ],
+      "drums": {
+        "kick": "x...x...x...x...",
+        "snare": "........x.......",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "..o.......o.....",
+        "clap": "........x.......",
+        "tom": "",
+        "htom": "",
+        "bell": "..o.........o..."
+      },
+      "bass": "0..0....3.0.5...",
+      "fx": [
+        "Delay",
+        "Audio Filter",
+        "Reverb",
+        "Drive"
+      ],
+      "synth": [
+        "Analog",
+        "FM",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.05,
+      "mod": 0.5,
+      "refs": [
+        "Mala, Digital Mystikz",
+        "King Tubby",
+        "Aba Shanti-I"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 10,
+        "human": 8
+      },
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Wind"
+        ],
+        "density": 0.28,
+        "octave": 2,
+        "gate": 40,
+        "gain": -11,
+        "rate": 0.25,
+        "range": 6
+      },
+      "groove": 0.85,
+      "fill": 0.55,
+      "gain": -7.5
+    },
+    {
+      "id": "spectral_dub_chamber",
+      "family": "bass_music",
+      "bpm": [
+        116,
+        128
+      ],
+      "swing": 0.08,
+      "scale": [
+        1,
+        4,
+        5
+      ],
+      "drums": {
+        "kick": "x.......x.......",
+        "snare": "........x.......",
+        "chat": "..o...o...o...o.",
+        "ohat": "......x.......x.",
+        "clap": "........x.......",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0..3.0...5...",
+      "fx": [
+        "Delay",
+        "Audio Filter",
+        "Reverb",
+        "Field Effect"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.05,
+      "mod": 0.55,
+      "refs": [
+        "King Tubby spring & tape-dub chamber",
+        "Rhythm & Sound sub-bass chord dispersion"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 15,
+        "human": 10
+      },
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog",
+          "Field Synth"
+        ],
+        "density": 0.3,
+        "octave": 2,
+        "gate": 42,
+        "gain": -11,
+        "rate": 0.25,
+        "range": 5
+      },
+      "groove": 0.75,
+      "fill": 0.45,
+      "gain": -7.5
+    },
+    {
+      "id": "bossa_rhodes_quintet",
+      "family": "downtempo",
+      "bpm": [
+        118,
+        132
+      ],
+      "swing": 0.14,
+      "scale": [
+        0,
+        4,
+        6
+      ],
+      "drums": {
+        "kick": "x..x..x.x..x..x.",
+        "snare": "...o..o...o..o..",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "......o.......o.",
+        "clap": "",
+        "tom": "..o.......o.....",
+        "htom": "",
+        "bell": "x..x..x...x..x.."
+      },
+      "bass": "0..0..4.0..5..3.",
+      "fx": [
+        "Chorus",
+        "Reverb",
+        "Saturator",
+        "EQ"
+      ],
+      "synth": [
+        "Piano",
+        "Wind",
+        "String"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Antonio Carlos Jobim & Joao Gilberto acoustic bossa",
+        "Arthur Verocai warm tape-saturated chamber jazz"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 28,
+        "human": 14
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Strum"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Piano"
+        ],
+        "density": 0.45,
+        "octave": 2,
+        "gate": 65,
+        "gain": -11,
+        "rate": 0.5,
+        "range": 7
+      },
+      "groove": 0.85,
+      "fill": 0.4,
+      "gain": -8.0
+    },
+    {
+      "id": "gnawa_desert_trance",
+      "family": "experimental",
+      "bpm": [
+        104,
+        118
+      ],
+      "swing": 0.16,
+      "scale": [
+        5,
+        10,
+        7
+      ],
+      "drums": {
+        "kick": "x..o..x...o.x...",
+        "snare": "....x.......x...",
+        "chat": "x.o.o.x.o.o.x.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "x.....x..o..x...",
+        "htom": "...o.....x.....o",
+        "bell": "x..x..x..x..x..x"
+      },
+      "bass": "0.0.3.0.5.3.0.2.",
+      "fx": [
+        "Resonator Bank",
+        "Drive",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "String",
+        "Metallic",
+        "Wave Terrain"
+      ],
+      "ban": [
+        "Bitcrush"
+      ],
+      "glitch": 0.05,
+      "mod": 0.65,
+      "refs": [
+        "Gnawa guembri & qraqeb interlocking trance",
+        "Tinariwen / Mdou Moctar desert polyrhythm"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "strum": 18,
+        "human": 12
+      },
+      "notefx": [
+        "Humanizer",
+        "Glide"
+      ],
+      "motif": {
+        "synth": [
+          "String",
+          "Metallic"
+        ],
+        "density": 0.65,
+        "octave": 2,
+        "gate": 48,
+        "gain": -10,
+        "rate": 0.25,
+        "range": 6
+      },
+      "groove": 0.9,
+      "fill": 0.6,
+      "gain": -7.5
+    },
+    {
+      "id": "koto_glass_minimalism",
+      "family": "piano",
+      "bpm": [
+        108,
+        126
+      ],
+      "swing": 0.02,
+      "scale": [
+        9,
+        6,
+        12
+      ],
+      "drums": {
+        "kick": "x.......o.......",
+        "snare": "",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "....o.......o...",
+        "htom": "..o.......o.....",
+        "bell": "x..o..x..o..x..o"
+      },
+      "bass": "0...4...2...5...",
+      "fx": [
+        "Convolution Reverb",
+        "Delay",
+        "Stereo"
+      ],
+      "synth": [
+        "String",
+        "Partials",
+        "Metallic"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Drive",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Steve Reich / Philip Glass interlocking mallet & string patterns",
+        "Midori Takada percussive glass minimalism"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 12,
+        "human": 6
+      },
+      "notefx": [
+        "Arpeggiator",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "Partials",
+          "String"
+        ],
+        "density": 0.75,
+        "octave": 3,
+        "gate": 38,
+        "gain": -10.5,
+        "rate": 0.25,
+        "range": 8
+      },
+      "groove": 0.55,
+      "fill": 0.35,
+      "gain": -8.5
+    },
+    {
+      "id": "trautonium_subharmonic",
+      "family": "experimental",
+      "bpm": [
+        82,
+        108
+      ],
+      "swing": 0.04,
+      "scale": [
+        1,
+        4,
+        8
+      ],
+      "drums": {
+        "kick": "x.......o.......",
+        "snare": "",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "....o.......o...",
+        "htom": "",
+        "bell": "x.....o...x....."
+      },
+      "bass": "0...0...3...2...",
+      "fx": [
+        "Delay",
+        "Convolution Reverb",
+        "Stereo"
+      ],
+      "synth": [
+        "FM",
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.55,
+      "refs": [
+        "Oskar Sala 1930s Mixtur-Trautonium integer subharmonic division",
+        "Dual resonant formant filter bank and triode saturation"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 8,
+        "human": 4
+      },
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "FM",
+          "Analog"
+        ],
+        "density": 0.55,
+        "octave": 3,
+        "gate": 65,
+        "gain": -9.0,
+        "rate": 0.5,
+        "range": 7
+      },
+      "groove": 0.45,
+      "fill": 0.25,
+      "gain": -8.5
+    },
+    {
+      "id": "barberpole_wire_dispersion",
+      "family": "experimental",
+      "bpm": [
+        96,
+        122
+      ],
+      "swing": 0.08,
+      "scale": [
+        1,
+        5,
+        10
+      ],
+      "drums": {
+        "kick": "x..o..x...o.....",
+        "snare": "....x.......x..o",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "......o.......o.",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0..0..5.3..2....",
+      "fx": [
+        "Phaser",
+        "Saturator",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.72,
+      "refs": [
+        "Six-stage quadrature barberpole allpass phaser dispersion",
+        "1940s Peirce steel-wire magnetic recorder hysteresis and flutter"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "strum": 14,
+        "human": 8
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.6,
+        "octave": 3,
+        "gate": 50,
+        "gain": -9.5,
+        "rate": 0.25,
+        "range": 6
+      },
+      "groove": 0.5,
+      "fill": 0.35,
+      "gain": -8.5
+    },
+    {
+      "id": "ethio_jazz_organ",
+      "family": "downtempo",
+      "bpm": [
+        92,
+        106
+      ],
+      "swing": 0.18,
+      "scale": [
+        1,
+        4,
+        10
+      ],
+      "drums": {
+        "kick": "x..o..x...o.x...",
+        "snare": "....x..o....x..o",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "......o.......o.",
+        "clap": "",
+        "tom": "..........o.....",
+        "htom": ".............o..",
+        "bell": "x..x..o.x..x..o."
+      },
+      "bass": "0..0..2.3..2..4.",
+      "fx": [
+        "Chorus",
+        "EQ",
+        "Saturator",
+        "Reverb"
+      ],
+      "synth": [
+        "Wind",
+        "Piano",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Mulatu Astatke, Tezeta / Yekermo Sew (1970s Addis Ababa ethio-jazz)",
+        "Hailu Mergia, Farfisa organ & horn counterpoint"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 24,
+        "human": 12
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Strum"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Piano"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 62,
+        "gain": -10.5,
+        "rate": 0.25,
+        "range": 7
+      },
+      "groove": 0.85,
+      "fill": 0.45,
+      "gain": -8.5
+    },
+    {
+      "id": "cumbia_dub_rebajada",
+      "family": "bass_music",
+      "bpm": [
+        78,
+        90
+      ],
+      "swing": 0.14,
+      "scale": [
+        1,
+        2,
+        5
+      ],
+      "drums": {
+        "kick": "x..o..x.x..o..x.",
+        "snare": "....o.......o...",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "..o...o...o...o.",
+        "clap": "",
+        "tom": "..x.......x.....",
+        "htom": "......o.......o.",
+        "bell": "x.x.o.x.x.x.o.x."
+      },
+      "bass": "0...2.4.0...2.5.",
+      "fx": [
+        "Delay",
+        "Audio Filter",
+        "Reverb",
+        "Saturator"
+      ],
+      "synth": [
+        "Analog",
+        "Wind",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.02,
+      "mod": 0.55,
+      "refs": [
+        "Monterrey cumbia rebajada pitched-down tape groove",
+        "Frente Cumbiero / Mad Professor dub percussion"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 18,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Analog"
+        ],
+        "density": 0.42,
+        "octave": 2,
+        "gate": 52,
+        "gain": -11.0,
+        "rate": 0.25,
+        "range": 6
+      },
+      "groove": 0.88,
+      "fill": 0.5,
+      "gain": -7.5
+    },
+    {
+      "id": "kora_polyrhythm",
+      "family": "ambient",
+      "bpm": [
+        98,
+        114
+      ],
+      "swing": 0.1,
+      "scale": [
+        0,
+        6,
+        7
+      ],
+      "drums": {
+        "kick": "x.....o...x.....",
+        "snare": "",
+        "chat": "..o..o..o..o..o.",
+        "ohat": "",
+        "clap": "....o.......o...",
+        "tom": "x..o....x..o....",
+        "htom": "..o..x....o..x..",
+        "bell": "x..o..x..o..x..o"
+      },
+      "bass": "0..2..4.0..5..4.",
+      "fx": [
+        "Convolution Reverb",
+        "Delay",
+        "Chorus",
+        "Stereo"
+      ],
+      "synth": [
+        "String",
+        "Partials",
+        "Piano"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Drive",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "Toumani Diabate West African 21-string kora interlocking cascades",
+        "Ballake Sissoko & Vincent Segal chamber string counterpoint"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 32,
+        "human": 14
+      },
+      "notefx": [
+        "Arpeggiator",
+        "Humanizer",
+        "Note Strum"
+      ],
+      "motif": {
+        "synth": [
+          "String",
+          "Partials"
+        ],
+        "density": 0.72,
+        "octave": 3,
+        "gate": 42,
+        "gain": -10.0,
+        "rate": 0.25,
+        "range": 8
+      },
+      "groove": 0.78,
+      "fill": 0.35,
+      "gain": -9.0
+    }
+  ]
 }
