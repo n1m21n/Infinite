@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
 #include <sstream>
 
 #include "Platform.h"
@@ -48,6 +49,17 @@ namespace
          h = HF(h, g.t);
          for (float f : g.c) h = HF(h, f);
       }
+      h = HS(h, s.fillImage);
+      h = H(h, (unsigned)s.imageMode);
+      for (const auto& c : s.meshC) for (float f : c) h = HF(h, f);
+      for (int i = 0; i < 4; i++)
+      {
+         h = HF(h, s.cornerR[i]);
+         h = H(h, (unsigned)s.cornerType[i]);
+      }
+      for (float f : { s.noise, s.miter, s.dashPhase, s.arrowSize, s.taperS, s.taperE, s.pressMin })
+         h = HF(h, f);
+      h = H(h, (unsigned)(s.arrowS * 64 + s.arrowE * 8 + s.balanced * 4 + s.behind * 2 + s.scaleStroke));
       h = H(h, (unsigned)(s.sides * 64 + s.cap * 16 + s.join * 4 + s.align));
       h = H(h, (unsigned)(s.op * 8 + s.closed * 4 + s.fillOn * 2 + s.strokeOn));
       for (float f : s.pts) h = HF(h, f);
@@ -81,6 +93,70 @@ namespace
       }
    }
 
+   // A rectangle whose corners differ from one plain radius: per-corner radii or a corner that is not round.
+   bool CustomCorners(const Scene2DNode::Shape& s)
+   {
+      for (int i = 0; i < 4; i++)
+         if (s.cornerType[i] != 0 || (s.cornerR[i] >= 0.0f && s.cornerR[i] != s.radius))
+            return true;
+      return false;
+   }
+
+   // The rectangle's outline with each corner cut its own way, clockwise from the top left, flattened.
+   // Round: a quarter circle; straight: a chamfer; concave: a quarter circle bitten in; inset: a square notch.
+   void RectCorners(const Scene2DNode::Shape& s, std::vector<float>& p)
+   {
+      const float x0 = std::min(s.x0, s.x1), y0 = std::min(s.y0, s.y1);
+      const float x1 = std::max(s.x0, s.x1), y1 = std::max(s.y0, s.y1);
+      const float cap = std::min(x1 - x0, y1 - y0) * 0.5f;
+      // Corner i: its point, and the unit steps along the edge it comes in on and the one it leaves by.
+      const float cx[4] = { x0, x1, x1, x0 }, cy[4] = { y0, y0, y1, y1 };
+      const float inX[4] = { 0, -1, 0, 1 }, inY[4] = { 1, 0, -1, 0 };    // back along the incoming edge
+      const float outX[4] = { 1, 0, -1, 0 }, outY[4] = { 0, 1, 0, -1 };  // along the outgoing edge
+      p.clear();
+      for (int i = 0; i < 4; i++)
+      {
+         const float r = std::clamp(s.CornerR(i), 0.0f, cap);
+         const float ax = cx[i] + inX[i] * r, ay = cy[i] + inY[i] * r;     // where the corner starts
+         const float bx = cx[i] + outX[i] * r, by = cy[i] + outY[i] * r;   // where it ends
+         if (r <= 0.0f)
+         {
+            p.insert(p.end(), { cx[i], cy[i] });
+            continue;
+         }
+         p.insert(p.end(), { ax, ay });
+         switch (s.cornerType[i])
+         {
+         case 1:
+            break;   // straight: a to b
+         case 3:
+         {
+            // Inset: in from a, across, out to b.
+            p.insert(p.end(), { cx[i] + (inX[i] + outX[i]) * r, cy[i] + (inY[i] + outY[i]) * r });
+            break;
+         }
+         default:
+         {
+            // Round about the inner centre; concave about the corner itself.
+            const bool concave = s.cornerType[i] == 2;
+            const float ox = concave ? cx[i] : cx[i] + (inX[i] + outX[i]) * r;
+            const float oy = concave ? cy[i] : cy[i] + (inY[i] + outY[i]) * r;
+            const float a0 = std::atan2(ay - oy, ax - ox), a1 = std::atan2(by - oy, bx - ox);
+            float d = a1 - a0;
+            while (d > kPi) d -= 2 * kPi;
+            while (d < -kPi) d += 2 * kPi;
+            for (int k = 1; k < 12; k++)
+            {
+               const float a = a0 + d * (float)k / 12.0f;
+               p.insert(p.end(), { ox + std::cos(a) * r, oy + std::sin(a) * r });
+            }
+            break;
+         }
+         }
+         p.insert(p.end(), { bx, by });
+      }
+   }
+
    // The item's geometry as the canvas's current path. False: nothing to draw.
    bool BuildPath(plutovg_canvas_t* cv, const Scene2DNode::Shape& s)
    {
@@ -93,6 +169,16 @@ namespace
       case S::kRect:
          if (w <= 0 || h <= 0)
             return false;
+         if (CustomCorners(s))
+         {
+            std::vector<float> p;
+            RectCorners(s, p);
+            plutovg_canvas_move_to(cv, p[0], p[1]);
+            for (size_t i = 2; i + 1 < p.size(); i += 2)
+               plutovg_canvas_line_to(cv, p[i], p[i + 1]);
+            plutovg_canvas_close_path(cv);
+            return true;
+         }
          if (s.radius > 0.0f)
          {
             const float r = std::min(s.radius, std::min(w, h) * 0.5f);
@@ -211,8 +297,250 @@ namespace
                                             PLUTOVG_SPREAD_METHOD_PAD, ps.data(), (int)ps.size(), &m);
    }
 
-   // One item (fill, then stroke with its alignment) drawn over `cv` with SRC_OVER.
-   void DrawItem(plutovg_canvas_t* cv, const Scene2DNode::Shape& s, bool mask)
+   // Premultiplied ARGB32, the layout plutovg surfaces hold.
+   uint32_t Argb(const float c[4])
+   {
+      const float a = std::clamp(c[3], 0.0f, 1.0f);
+      auto ch = [&](float v) { return (uint32_t)std::lround(std::clamp(v, 0.0f, 1.0f) * a * 255.0f); };
+      return ((uint32_t)std::lround(a * 255.0f) << 24) | (ch(c[0]) << 16) | (ch(c[1]) << 8) | ch(c[2]);
+   }
+
+   // Bitmap fills: each file decoded once (plutovg's own loader) and kept while the app runs; a few dozen at most.
+   plutovg_surface_t* FillBitmap(const std::string& path)
+   {
+      static std::map<std::string, plutovg_surface_t*> cache;
+      auto it = cache.find(path);
+      if (it != cache.end())
+         return it->second;
+      plutovg_surface_t* img = path.empty() ? nullptr : plutovg_surface_load_from_image_file(path.c_str());
+      if (cache.size() > 64)
+      {
+         for (auto& kv : cache)
+            if (kv.second != nullptr)
+               plutovg_surface_destroy(kv.second);
+         cache.clear();
+      }
+      cache[path] = img;
+      return img;
+   }
+
+   // The fill's paint on `cv`: a colour, a gradient, or a surface made for the item's box (conical, mesh) or the
+   // bitmap. Returns a surface the caller destroys after the fill, if one was made.
+   plutovg_surface_t* SetFillPaint(plutovg_canvas_t* cv, const Scene2DNode::Shape& s)
+   {
+      if (s.fillType >= 1 && s.fillType <= 3)
+      {
+         SetGradient(cv, s);
+         return nullptr;
+      }
+      float lo[2], hi[2];
+      if (s.fillType < 4 || !Scene2DNode::ShapeBounds(s, lo, hi))
+      {
+         plutovg_canvas_set_rgba(cv, s.fillC[0], s.fillC[1], s.fillC[2], s.fillC[3]);
+         return nullptr;
+      }
+      const float bw = std::max(1.0f, hi[0] - lo[0]), bh = std::max(1.0f, hi[1] - lo[1]);
+      plutovg_matrix_t m;
+      plutovg_matrix_init_translate(&m, lo[0], lo[1]);
+      if (s.fillType == 5)
+      {
+         plutovg_surface_t* img = FillBitmap(s.fillImage);
+         if (img == nullptr)
+         {
+            plutovg_canvas_set_rgba(cv, s.fillC[0], s.fillC[1], s.fillC[2], s.fillC[3]);
+            return nullptr;
+         }
+         const float iw = (float)plutovg_surface_get_width(img), ih = (float)plutovg_surface_get_height(img);
+         if (s.imageMode == 3)
+         {
+            plutovg_canvas_set_texture(cv, img, PLUTOVG_TEXTURE_TYPE_TILED, s.fillC[3], &m);
+            return nullptr;
+         }
+         float kx = bw / iw, ky = bh / ih;
+         if (s.imageMode == 1 || s.imageMode == 2)
+            kx = ky = s.imageMode == 1 ? std::max(kx, ky) : std::min(kx, ky);
+         plutovg_matrix_translate(&m, (bw - iw * kx) * 0.5f, (bh - ih * ky) * 0.5f);
+         plutovg_matrix_scale(&m, kx, ky);
+         plutovg_canvas_set_texture(cv, img, PLUTOVG_TEXTURE_TYPE_PLAIN, s.fillC[3], &m);
+         return nullptr;
+      }
+      // Conical and mesh: drawn per pixel at the box's size (a big box costs one pass on the CPU, as the raster).
+      const int w = std::clamp((int)std::ceil(bw), 1, 8192), h = std::clamp((int)std::ceil(bh), 1, 8192);
+      plutovg_surface_t* surf = plutovg_surface_create(w, h);
+      unsigned char* data = plutovg_surface_get_data(surf);
+      const int stride = plutovg_surface_get_stride(surf);
+      const std::vector<Scene2DNode::GradStop> st = FillStops(s);
+      const float a0 = s.fillAngle * kPi / 180.0f;
+      for (int y = 0; y < h; y++)
+      {
+         uint32_t* row = (uint32_t*)(data + (size_t)y * stride);
+         const float v = ((float)y + 0.5f) / (float)h;
+         for (int x = 0; x < w; x++)
+         {
+            const float u = ((float)x + 0.5f) / (float)w;
+            float c[4];
+            if (s.fillType == 4)
+            {
+               float t = (std::atan2(v - 0.5f, u - 0.5f) - a0) / (2.0f * kPi);
+               t -= std::floor(t);
+               Scene2DNode::GradAt(st, st.front().c, st.back().c, t, c);
+            }
+            else
+               for (int k = 0; k < 4; k++)
+                  c[k] = (s.meshC[0][k] * (1 - u) + s.meshC[1][k] * u) * (1 - v) + (s.meshC[3][k] * (1 - u) + s.meshC[2][k] * u) * v;
+            row[x] = Argb(c);
+         }
+      }
+      plutovg_canvas_set_texture(cv, surf, PLUTOVG_TEXTURE_TYPE_PLAIN, 1.0f, &m);
+      return surf;
+   }
+
+   // Grain: each pixel of `surf` keeps a random share of its alpha (the same grain every redraw).
+   void Grain(plutovg_surface_t* surf, float amount)
+   {
+      unsigned char* data = plutovg_surface_get_data(surf);
+      const int w = plutovg_surface_get_width(surf), h = plutovg_surface_get_height(surf), stride = plutovg_surface_get_stride(surf);
+      for (int y = 0; y < h; y++)
+      {
+         uint32_t* row = (uint32_t*)(data + (size_t)y * stride);
+         for (int x = 0; x < w; x++)
+         {
+            uint32_t n = (uint32_t)x * 374761393u + (uint32_t)y * 668265263u;
+            n = (n ^ (n >> 13)) * 1274126177u;
+            const float r = (float)((n ^ (n >> 16)) & 0xffff) / 65535.0f;
+            const float k = 1.0f - amount * r;
+            const uint32_t p = row[x];
+            auto sc = [&](int sh) { return (uint32_t)std::lround((float)((p >> sh) & 0xff) * k) << sh; };
+            row[x] = sc(24) | sc(16) | sc(8) | sc(0);   // premultiplied: every channel scales with alpha
+         }
+      }
+   }
+
+   // A stroke whose width changes along the path (pressure): each polyline as one filled outline, thinning to
+   // pressMin over taperS of the length at the start and taperE at the end.
+   void TaperStroke(plutovg_canvas_t* cv, const Scene2DNode::Shape& s, float width)
+   {
+      std::vector<std::vector<float>> lines;
+      Scene2DNode::Outline(s, lines);
+      for (const std::vector<float>& p : lines)
+      {
+         const size_t n = p.size() / 2;
+         if (n < 2)
+            continue;
+         std::vector<float> len(n, 0.0f);
+         for (size_t i = 1; i < n; i++)
+            len[i] = len[i - 1] + std::hypot(p[i * 2] - p[i * 2 - 2], p[i * 2 + 1] - p[i * 2 - 1]);
+         const float total = std::max(1e-3f, len[n - 1]);
+         std::vector<float> left, right;
+         for (size_t i = 0; i < n; i++)
+         {
+            const size_t a = i > 0 ? i - 1 : 0, b = i + 1 < n ? i + 1 : n - 1;
+            float dx = p[b * 2] - p[a * 2], dy = p[b * 2 + 1] - p[a * 2 + 1];
+            const float dl = std::max(1e-6f, std::hypot(dx, dy));
+            dx /= dl;
+            dy /= dl;
+            const float t = len[i] / total;
+            float f = 1.0f;
+            if (s.taperS > 0.0f && t < s.taperS)
+               f = std::min(f, t / s.taperS);
+            if (s.taperE > 0.0f && t > 1.0f - s.taperE)
+               f = std::min(f, (1.0f - t) / s.taperE);
+            f = f * f * (3.0f - 2.0f * f);
+            const float hw = width * 0.5f * (s.pressMin + (1.0f - s.pressMin) * f);
+            left.insert(left.end(), { p[i * 2] - dy * hw, p[i * 2 + 1] + dx * hw });
+            right.insert(right.end(), { p[i * 2] + dy * hw, p[i * 2 + 1] - dx * hw });
+         }
+         plutovg_canvas_new_path(cv);
+         plutovg_canvas_move_to(cv, left[0], left[1]);
+         for (size_t i = 2; i + 1 < left.size(); i += 2)
+            plutovg_canvas_line_to(cv, left[i], left[i + 1]);
+         for (size_t i = right.size(); i >= 2; i -= 2)
+            plutovg_canvas_line_to(cv, right[i - 2], right[i - 1]);
+         plutovg_canvas_close_path(cv);
+         plutovg_canvas_set_fill_rule(cv, PLUTOVG_FILL_RULE_NON_ZERO);
+         plutovg_canvas_fill(cv);
+      }
+   }
+
+   // Arrowheads at an open item's ends, in the stroke's colour, reaching out past the end.
+   void Arrowheads(plutovg_canvas_t* cv, const Scene2DNode::Shape& s, float width)
+   {
+      std::vector<std::vector<float>> lines;
+      Scene2DNode::Outline(s, lines);
+      if (lines.empty() || lines[0].size() < 4)
+         return;
+      const std::vector<float>& p = lines[0];
+      const size_t n = p.size() / 2;
+      auto head = [&](int kind, size_t at, size_t from)
+      {
+         if (kind <= 0)
+            return;
+         const float ex = p[at * 2], ey = p[at * 2 + 1];
+         float dx = ex - p[from * 2], dy = ey - p[from * 2 + 1];
+         const float dl = std::hypot(dx, dy);
+         if (dl < 1e-6f)
+            return;
+         dx /= dl;
+         dy /= dl;
+         const float L = std::max(1.0f, s.arrowSize * width), W = L * 0.5f;
+         const float nx = -dy, ny = dx;
+         plutovg_canvas_new_path(cv);
+         switch (kind)
+         {
+         case 1:   // arrow: an open V
+            plutovg_canvas_move_to(cv, ex - dx * L * 0.2f + nx * W, ey - dy * L * 0.2f + ny * W);
+            plutovg_canvas_line_to(cv, ex + dx * L * 0.8f, ey + dy * L * 0.8f);
+            plutovg_canvas_line_to(cv, ex - dx * L * 0.2f - nx * W, ey - dy * L * 0.2f - ny * W);
+            plutovg_canvas_set_line_width(cv, width);
+            plutovg_canvas_set_line_join(cv, PLUTOVG_LINE_JOIN_MITER);
+            plutovg_canvas_stroke(cv);
+            return;
+         case 2:   // triangle
+            plutovg_canvas_move_to(cv, ex + nx * W, ey + ny * W);
+            plutovg_canvas_line_to(cv, ex + dx * L, ey + dy * L);
+            plutovg_canvas_line_to(cv, ex - nx * W, ey - ny * W);
+            plutovg_canvas_close_path(cv);
+            break;
+         case 3:   // circle
+            plutovg_canvas_circle(cv, ex + dx * W * 0.5f, ey + dy * W * 0.5f, W);
+            break;
+         case 4:   // square
+            plutovg_canvas_move_to(cv, ex + nx * W, ey + ny * W);
+            plutovg_canvas_line_to(cv, ex + nx * W + dx * L, ey + ny * W + dy * L);
+            plutovg_canvas_line_to(cv, ex - nx * W + dx * L, ey - ny * W + dy * L);
+            plutovg_canvas_line_to(cv, ex - nx * W, ey - ny * W);
+            plutovg_canvas_close_path(cv);
+            break;
+         default:  // bar across the end
+            plutovg_canvas_move_to(cv, ex + nx * W, ey + ny * W);
+            plutovg_canvas_line_to(cv, ex - nx * W, ey - ny * W);
+            plutovg_canvas_set_line_width(cv, width);
+            plutovg_canvas_set_line_cap(cv, PLUTOVG_LINE_CAP_BUTT);
+            plutovg_canvas_stroke(cv);
+            return;
+         }
+         plutovg_canvas_fill(cv);
+      };
+      // The direction from a point a little way back, so a curve's last tiny segment does not swing the head.
+      auto back = [&](size_t at, int step)
+      {
+         size_t i = at;
+         float d = 0.0f;
+         while (d < width && ((step < 0 && i > 0) || (step > 0 && i + 1 < n)))
+         {
+            const size_t j = (size_t)((long long)i + step);
+            d += std::hypot(p[j * 2] - p[i * 2], p[j * 2 + 1] - p[i * 2 + 1]);
+            i = j;
+         }
+         return i;
+      };
+      head(s.arrowS, 0, back(0, 1));
+      head(s.arrowE, n - 1, back(n - 1, -1));
+   }
+
+   // One item (fill and stroke, the stroke under the fill when `behind`) drawn over `cv` with SRC_OVER.
+   // strokeK scales stroke widths that do not follow the layer's scale (1 / that scale).
+   void DrawItem(plutovg_canvas_t* cv, const Scene2DNode::Shape& s, bool mask, float strokeK = 1.0f)
    {
       using S = Scene2DNode::Shape;
       if (s.type == S::kSvg)
@@ -221,37 +549,92 @@ namespace
          return;
       }
       const bool fill = (s.fillOn || mask) && s.type != S::kLine && !(s.type == S::kPath && !s.closed && !mask && !s.fillOn);
-      const bool stroke = s.strokeOn && !mask && s.width > 0.0f;
+      const float width = s.width * (s.scaleStroke ? 1.0f : strokeK);
+      const bool stroke = s.strokeOn && !mask && width > 0.0f;
       auto setColor = [&](const float c[4]) { plutovg_canvas_set_rgba(cv, mask ? 1.0f : c[0], mask ? 1.0f : c[1], mask ? 1.0f : c[2], mask ? 1.0f : c[3]); };
-      if (fill && BuildPath(cv, s))
+      auto drawFill = [&]()
       {
-         if (!mask && s.fillType > 0)
-            SetGradient(cv, s);
-         else
+         if (!fill || !BuildPath(cv, s))
+            return;
+         if (mask)
+         {
             setColor(s.fillC);
+            plutovg_canvas_fill(cv);
+            return;
+         }
+         if (s.noise <= 0.0f)
+         {
+            plutovg_surface_t* own = SetFillPaint(cv, s);
+            plutovg_canvas_fill(cv);
+            if (own != nullptr)
+               plutovg_surface_destroy(own);
+            return;
+         }
+         // Grain: the fill alone on its own surface, grained, then laid on.
+         plutovg_surface_t* base = plutovg_canvas_get_surface(cv);
+         plutovg_surface_t* tmp = plutovg_surface_create(plutovg_surface_get_width(base), plutovg_surface_get_height(base));
+         plutovg_canvas_t* t = plutovg_canvas_create(tmp);
+         BuildPath(t, s);
+         plutovg_surface_t* own = SetFillPaint(t, s);
+         plutovg_canvas_fill(t);
+         plutovg_canvas_destroy(t);
+         if (own != nullptr)
+            plutovg_surface_destroy(own);
+         Grain(tmp, std::clamp(s.noise, 0.0f, 1.0f));
+         plutovg_canvas_save(cv);
+         plutovg_canvas_new_path(cv);
+         plutovg_canvas_set_texture(cv, tmp, PLUTOVG_TEXTURE_TYPE_PLAIN, 1.0f, nullptr);
+         plutovg_canvas_rect(cv, 0, 0, (float)plutovg_surface_get_width(tmp), (float)plutovg_surface_get_height(tmp));
          plutovg_canvas_fill(cv);
-      }
-      if (!stroke || !BuildPath(cv, s))
+         plutovg_canvas_restore(cv);
+         plutovg_surface_destroy(tmp);
+      };
+      if (!stroke)
+      {
+         drawFill();
          return;
+      }
+      if (!s.behind)
+         drawFill();
       static const plutovg_line_cap_t caps[3] = { PLUTOVG_LINE_CAP_BUTT, PLUTOVG_LINE_CAP_ROUND, PLUTOVG_LINE_CAP_SQUARE };
       static const plutovg_line_join_t joins[3] = { PLUTOVG_LINE_JOIN_MITER, PLUTOVG_LINE_JOIN_ROUND, PLUTOVG_LINE_JOIN_BEVEL };
-      plutovg_canvas_save(cv);
-      plutovg_canvas_set_line_cap(cv, caps[std::clamp(s.cap, 0, 2)]);
-      plutovg_canvas_set_line_join(cv, joins[std::clamp(s.join, 0, 2)]);
-      if (s.dash > 0.0f)
-      {
-         const float d[2] = { s.dash, std::max(0.0f, s.gap > 0.0f ? s.gap : s.dash) };
-         plutovg_canvas_set_dash_array(cv, d, 2);
-      }
       const bool closedShape = s.type != S::kLine && !(s.type == S::kPath && !s.closed);
       const int align = closedShape ? s.align : 0;
+      // Line settings for one canvas: caps, joins, miter, dashes (balanced: stretched to a whole number round a
+      // closed outline, so it never ends on a stub).
+      auto lineStyle = [&](plutovg_canvas_t* c)
+      {
+         plutovg_canvas_set_line_cap(c, caps[std::clamp(s.cap, 0, 2)]);
+         plutovg_canvas_set_line_join(c, joins[std::clamp(s.join, 0, 2)]);
+         plutovg_canvas_set_miter_limit(c, std::clamp(s.miter, 1.0f, 100.0f));
+         if (s.dash > 0.0f)
+         {
+            float d[2] = { s.dash, std::max(0.0f, s.gap > 0.0f ? s.gap : s.dash) };
+            if (s.balanced && closedShape && BuildPath(c, s))
+            {
+               const float total = plutovg_path_length(plutovg_canvas_get_path(c));
+               const float period = d[0] + d[1];
+               const float n = std::max(1.0f, std::round(total / period));
+               const float k = total / (n * period);
+               d[0] *= k;
+               d[1] *= k;
+            }
+            plutovg_canvas_set_dash(c, s.dashPhase, d, 2);
+         }
+      };
+      plutovg_canvas_save(cv);
       setColor(s.strokeC);
-      if (align == 1)
+      const bool tapered = s.taperS > 0.0f || s.taperE > 0.0f;
+      if (tapered)
+         TaperStroke(cv, s, width);
+      else if (align == 1 && BuildPath(cv, s))
       {
          // Inside: twice the width, clipped to the shape.
+         lineStyle(cv);
+         BuildPath(cv, s);
          plutovg_canvas_clip(cv);
          BuildPath(cv, s);
-         plutovg_canvas_set_line_width(cv, s.width * 2.0f);
+         plutovg_canvas_set_line_width(cv, width * 2.0f);
          plutovg_canvas_stroke(cv);
       }
       else if (align == 2)
@@ -260,16 +643,10 @@ namespace
          plutovg_surface_t* tmp = plutovg_surface_create(plutovg_surface_get_width(plutovg_canvas_get_surface(cv)),
                                                          plutovg_surface_get_height(plutovg_canvas_get_surface(cv)));
          plutovg_canvas_t* t = plutovg_canvas_create(tmp);
-         plutovg_canvas_set_line_cap(t, caps[std::clamp(s.cap, 0, 2)]);
-         plutovg_canvas_set_line_join(t, joins[std::clamp(s.join, 0, 2)]);
-         if (s.dash > 0.0f)
-         {
-            const float d[2] = { s.dash, std::max(0.0f, s.gap > 0.0f ? s.gap : s.dash) };
-            plutovg_canvas_set_dash_array(t, d, 2);
-         }
+         lineStyle(t);
          BuildPath(t, s);
          plutovg_canvas_set_rgba(t, s.strokeC[0], s.strokeC[1], s.strokeC[2], s.strokeC[3]);
-         plutovg_canvas_set_line_width(t, s.width * 2.0f);
+         plutovg_canvas_set_line_width(t, width * 2.0f);
          plutovg_canvas_stroke(t);
          BuildPath(t, s);
          plutovg_canvas_set_operator(t, PLUTOVG_OPERATOR_DST_OUT);
@@ -282,17 +659,28 @@ namespace
          plutovg_canvas_fill(cv);
          plutovg_surface_destroy(tmp);
       }
-      else
+      else if (BuildPath(cv, s))
       {
-         plutovg_canvas_set_line_width(cv, s.width);
+         lineStyle(cv);
+         BuildPath(cv, s);
+         plutovg_canvas_set_line_width(cv, width);
          plutovg_canvas_stroke(cv);
       }
+      if (!closedShape && (s.arrowS > 0 || s.arrowE > 0))
+      {
+         plutovg_canvas_set_dash_array(cv, nullptr, 0);
+         setColor(s.strokeC);
+         Arrowheads(cv, s, width);
+      }
       plutovg_canvas_restore(cv);
+      if (s.behind)
+         drawFill();
    }
 
    // Every item, bottom to top, each combined with what is below by its boolean op.
    // Returns straight RGBA8, top row first.
-   void RasterShapes(const std::vector<Scene2DNode::Shape>& shapes, int w, int h, bool mask, std::vector<uint8_t>& out)
+   void RasterShapes(const std::vector<Scene2DNode::Shape>& shapes, int w, int h, bool mask, std::vector<uint8_t>& out,
+                     float strokeK = 1.0f)
    {
       using S = Scene2DNode::Shape;
       plutovg_surface_t* surf = plutovg_surface_create(w, h);
@@ -301,14 +689,14 @@ namespace
       {
          if (s.op == S::kAdd)
          {
-            DrawItem(cv, s, mask);
+            DrawItem(cv, s, mask, strokeK);
             continue;
          }
          // The item alone, then onto the layer with the op over the whole box (so
          // Intersect also clears what lies outside the item).
          plutovg_surface_t* tmp = plutovg_surface_create(w, h);
          plutovg_canvas_t* t = plutovg_canvas_create(tmp);
-         DrawItem(t, s, mask);
+         DrawItem(t, s, mask, strokeK);
          plutovg_canvas_destroy(t);
          static const plutovg_operator_t ops[4] = { PLUTOVG_OPERATOR_SRC_OVER, PLUTOVG_OPERATOR_DST_OUT, PLUTOVG_OPERATOR_DST_IN,
                                                     PLUTOVG_OPERATOR_XOR };
@@ -491,6 +879,15 @@ void Scene2DNode::Outline(const Shape& s, std::vector<std::vector<float>>& out)
    case Shape::kRect:
    case Shape::kSvg:
    {
+      if (s.type == Shape::kRect && CustomCorners(s))
+      {
+         std::vector<float> p;
+         RectCorners(s, p);
+         p.push_back(p[0]);
+         p.push_back(p[1]);
+         out.push_back(p);
+         return;
+      }
       const float r = s.type == Shape::kRect ? std::min(s.radius, std::min(x1 - x0, y1 - y0) * 0.5f) : 0.0f;
       if (r <= 0.0f)
       {
@@ -574,7 +971,9 @@ bool Scene2DNode::ShapeBounds(const Shape& s, float lo[2], float hi[2])
       }
    if (s.strokeOn && s.type != Shape::kSvg)
    {
-      const float pad = s.width * (s.align == 2 ? 1.0f : 0.5f);
+      float pad = s.width * (s.align == 2 ? 1.0f : 0.5f);
+      if (s.arrowS > 0 || s.arrowE > 0)
+         pad = std::max(pad, s.width * std::max(1.0f, s.arrowSize));
       lo[0] -= pad;
       lo[1] -= pad;
       hi[0] += pad;
@@ -888,6 +1287,8 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
 {
    int w = 0, h = 0;
    unsigned long long key = 1469598103934665603ull;
+   bool fixedStroke = false;
+   float strokeK = 1.0f;
    if (l.kind == Kind::Text && !mask)
    {
       if (!TextSize(l, w, h) && l.text.empty())
@@ -901,7 +1302,17 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
       w = std::clamp((int)std::lround(bw), 1, GLUtil::kMaxTargetSide);
       h = std::clamp((int)std::lround(bh), 1, GLUtil::kMaxTargetSide);
       for (const Shape& s : mask ? l.vmask : l.shapes)
+      {
          key = HashShape(key, s);
+         if (!s.scaleStroke && s.strokeOn)
+            fixedStroke = true;
+      }
+      // Strokes that keep their width when the layer scales are drawn thinner in the layer's box.
+      if (fixedStroke)
+      {
+         strokeK = 1.0f / std::sqrt(std::max(1e-4f, std::fabs(l.sx * l.sy)));
+         key = H(key, (unsigned)std::lround(strokeK * 4096.0f));
+      }
    }
    key = H(H(key, (unsigned)w), (unsigned)h);
    Raster& r = in[l.id];
@@ -913,7 +1324,7 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
    else
    {
       std::vector<uint8_t> px;
-      RasterShapes(mask ? l.vmask : l.shapes, w, h, mask, px);
+      RasterShapes(mask ? l.vmask : l.shapes, w, h, mask, px, strokeK);
       Upload(r.tex, r.w, r.h, w, h, px);
    }
    mPaintEdits++;
@@ -1116,7 +1527,7 @@ std::string Scene2DNode::ToSvg(const Layer& l)
          }
          const bool fill = s.fillOn && s.type != Shape::kLine && !(s.type == Shape::kPath && !s.closed);
          float lo[2], hi[2];
-         if (fill && s.fillType > 0 && ShapeBounds(s, lo, hi))
+         if (fill && s.fillType > 0 && s.fillType < 4 && ShapeBounds(s, lo, hi))
          {
             // The same geometry as SetGradient, in the box's own 0..1 units.
             const std::string gid = "g" + std::to_string(++gradN);
@@ -1147,6 +1558,10 @@ std::string Scene2DNode::ToSvg(const Layer& l)
                el << " stroke-opacity=\"" << s.strokeC[3] << "\"";
             if (s.dash > 0)
                el << " stroke-dasharray=\"" << s.dash << " " << (s.gap > 0 ? s.gap : s.dash) << "\"";
+            if (s.dash > 0 && s.dashPhase != 0.0f)
+               el << " stroke-dashoffset=\"" << s.dashPhase << "\"";
+            if (s.join == 0 && s.miter != 4.0f)
+               el << " stroke-miterlimit=\"" << s.miter << "\"";
          }
          el << "/>\n";
       }

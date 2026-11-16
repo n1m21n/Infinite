@@ -6428,10 +6428,10 @@ namespace
       if (MenuParts::BeginPopup("##v2dvfillpop"))
       {
          ImGui::TextDisabled("%s", T("Fill"));
-         static const char* kFillKinds[4] = { "Solid", "Linear", "Radial", "Reflected" };
-         for (int i = 0; i < 4; i++)
+         static const char* kFillKinds[7] = { "Solid", "Linear", "Radial", "Reflected", "Conical", "Bitmap", "Mesh" };
+         for (int i = 0; i < 7; i++)
          {
-            if (i > 0)
+            if (i > 0 && i != 4)
                FormParts::Inline(0.0f, tok::space_1);
             const std::string cid = std::string(T(kFillKinds[i])) + "##v2dvft" + std::to_string(i);
             if (TextChip(cid.c_str(), t.fillType == i, nullptr) && t.fillType != i)
@@ -6441,13 +6441,52 @@ namespace
                changed = true;
             }
          }
-         if (t.fillType > 0)
+         if (t.fillType >= 1 && t.fillType <= 4)
          {
             if (t.fillType != 2)
                changed |= SliderRow(T("Angle##v2dvfa"), &t.fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
             const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
             if (GradientRows("##v2dvfillstops", t.fillStops, t.fillC, white))
                changed = true;
+         }
+         else if (t.fillType == 5)
+         {
+            // Bitmap: an image file, placed in the shape's box. Opacity is the fill colour's alpha.
+            const std::string shown = t.fillImage.empty() ? std::string(T("Choose image")) : t.fillImage.substr(t.fillImage.find_last_of("/\\") + 1);
+            if (ImGui::Button((shown + "##v2dvfimg").c_str()))
+            {
+               const std::string path = Platform::OpenImageDialog();
+               if (!path.empty())
+               {
+                  undo();
+                  t.fillImage = path;
+                  changed = true;
+               }
+            }
+            static const char* kModes[4] = { "Stretch", "Fill", "Fit", "Tile" };
+            for (int i = 0; i < 4; i++)
+            {
+               if (i > 0)
+                  FormParts::Inline(0.0f, tok::space_1);
+               const std::string cid = std::string(T(kModes[i])) + "##v2dvfim" + std::to_string(i);
+               if (TextChip(cid.c_str(), t.imageMode == i, nullptr) && t.imageMode != i)
+               {
+                  undo();
+                  t.imageMode = i;
+                  changed = true;
+               }
+            }
+         }
+         else if (t.fillType == 6)
+         {
+            // Mesh: one colour per corner, blended across the box.
+            static const char* kCorner[4] = { "Top left", "Top right", "Bottom right", "Bottom left" };
+            for (int i = 0; i < 4; i++)
+               changed |= ColorRow((std::string(T(kCorner[i])) + "##v2dvmesh" + std::to_string(i)).c_str(), t.meshC[i]);
+         }
+         if (t.fillType > 0)
+         {
+            changed |= SliderRow(T("Noise##v2dvfnoise"), &t.noise, 0.0f, 1.0f, "%.2f");
          }
          MenuParts::EndPopup();
       }
@@ -6509,7 +6548,65 @@ namespace
          changed |= FieldWell::Slider("##v2dvgap", &t.gap, 0.0f, 200.0f, "Gap %.0f");
          if (ImGui::IsItemActivated())
             undo();
+         FormParts::Inline(0.0f, tok::space_1);
+         ImGui::SetNextItemWidth(kWellL);
+         changed |= FieldWell::Slider("##v2dvphase", &t.dashPhase, -200.0f, 200.0f, "Phase %.0f");
+         if (ImGui::IsItemActivated())
+            undo();
+         FormParts::Inline(0.0f, tok::space_1);
+         if (TextChip(L("Balanced##v2dvbal"), t.balanced, T("Even dashes round a closed shape")))
+         {
+            undo();
+            t.balanced = !t.balanced;
+            changed = true;
+         }
          ImGui::EndDisabled();
+         if (t.join == 0)
+         {
+            ImGui::SetNextItemWidth(kWellL);
+            changed |= FieldWell::Slider("##v2dvmiter", &t.miter, 1.0f, 100.0f, "Miter %.1f");
+            if (ImGui::IsItemActivated())
+               undo();
+         }
+         pick("Start", &t.arrowS, { "None", "Arrow", "Triangle", "Circle", "Square", "Bar" });
+         pick("End", &t.arrowE, { "None", "Arrow", "Triangle", "Circle", "Square", "Bar" });
+         if (t.arrowS > 0 || t.arrowE > 0)
+         {
+            ImGui::SetNextItemWidth(kWellL);
+            changed |= FieldWell::Slider("##v2dvarrow", &t.arrowSize, 1.0f, 20.0f, "Head %.1f\xC3\x97");
+            if (ImGui::IsItemActivated())
+               undo();
+         }
+         ImGui::TextDisabled("%s", T("Pressure"));
+         ImGui::SetNextItemWidth(kWellL);
+         changed |= FieldWell::Slider("##v2dvtaps", &t.taperS, 0.0f, 1.0f, "In %.2f");
+         if (ImGui::IsItemActivated())
+            undo();
+         FormParts::Inline(0.0f, tok::space_1);
+         ImGui::SetNextItemWidth(kWellL);
+         changed |= FieldWell::Slider("##v2dvtape", &t.taperE, 0.0f, 1.0f, "Out %.2f");
+         if (ImGui::IsItemActivated())
+            undo();
+         FormParts::Inline(0.0f, tok::space_1);
+         ImGui::BeginDisabled(t.taperS <= 0.0f && t.taperE <= 0.0f);
+         ImGui::SetNextItemWidth(kWellL);
+         changed |= FieldWell::Slider("##v2dvpmin", &t.pressMin, 0.0f, 1.0f, "Min %.2f");
+         if (ImGui::IsItemActivated())
+            undo();
+         ImGui::EndDisabled();
+         if (TextChip(L("Behind##v2dvbehind"), t.behind, T("Stroke under the fill")))
+         {
+            undo();
+            t.behind = !t.behind;
+            changed = true;
+         }
+         FormParts::Inline(0.0f, tok::space_1);
+         if (TextChip(L("Scale##v2dvscst"), t.scaleStroke, T("Stroke width scales with the layer")))
+         {
+            undo();
+            t.scaleStroke = !t.scaleStroke;
+            changed = true;
+         }
          MenuParts::EndPopup();
       }
       gap();
@@ -6538,6 +6635,50 @@ namespace
          changed |= FieldWell::Slider("##v2dvrad", &t.radius, 0.0f, 500.0f, "Radius %.0f");
          if (ImGui::IsItemActivated())
             undo();
+         next();
+         // Each corner on its own: radius (blank follows Radius) and type.
+         if (IconChip("##v2dvcorners", IconsInfinite::StrokeStyle, false, T("Corners")))
+            ImGui::OpenPopup("##v2dvcornpop");
+         if (MenuParts::BeginPopup("##v2dvcornpop"))
+         {
+            static const char* kCorner[4] = { "Top left", "Top right", "Bottom right", "Bottom left" };
+            static const char* kTypes[4] = { "Round", "Straight", "Concave", "Inset" };
+            for (int c = 0; c < 4; c++)
+            {
+               ImGui::TextDisabled("%s", T(kCorner[c]));
+               float r = t.CornerR(c);
+               ImGui::SetNextItemWidth(kWellL);
+               if (FieldWell::Slider(("##v2dvcr" + std::to_string(c)).c_str(), &r, 0.0f, 500.0f, "%.0f"))
+               {
+                  t.cornerR[c] = r;
+                  changed = true;
+               }
+               if (ImGui::IsItemActivated())
+                  undo();
+               for (int k = 0; k < 4; k++)
+               {
+                  FormParts::Inline(0.0f, tok::space_1);
+                  const std::string cid = std::string(T(kTypes[k])) + "##v2dvct" + std::to_string(c * 4 + k);
+                  if (TextChip(cid.c_str(), t.cornerType[c] == k, nullptr) && t.cornerType[c] != k)
+                  {
+                     undo();
+                     t.cornerType[c] = k;
+                     changed = true;
+                  }
+               }
+            }
+            if (ImGui::Button(T("Same for all##v2dvcrall")))
+            {
+               undo();
+               for (int c = 0; c < 4; c++)
+               {
+                  t.cornerR[c] = -1.0f;
+                  t.cornerType[c] = t.cornerType[0];
+               }
+               changed = true;
+            }
+            MenuParts::EndPopup();
+         }
       }
       if (poly && (picked != nullptr || sTool == kShape))
       {

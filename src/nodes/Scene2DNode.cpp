@@ -1627,6 +1627,14 @@ void Scene2DNode::Serialize()
          for (float v : sh.pts) o << " " << v;
          o << " " << sh.fillType << " " << sh.fillAngle;
          WriteStops(o, sh.fillStops);
+         // Later settings, read back only when present.
+         o << " " << EscapeToken(sh.fillImage) << " " << sh.imageMode;
+         for (const auto& c : sh.meshC) for (float v : c) o << " " << v;
+         o << " " << sh.noise;
+         for (int i = 0; i < 4; i++) o << " " << sh.cornerR[i] << " " << sh.cornerType[i];
+         o << " " << sh.miter << " " << sh.dashPhase << " " << +sh.balanced << " " << sh.arrowS << " " << sh.arrowE << " "
+           << sh.arrowSize << " " << sh.taperS << " " << sh.taperE << " " << sh.pressMin << " " << +sh.behind << " "
+           << +sh.scaleStroke;
          o << "\n";
       };
       if (l.kind == Kind::Vector)
@@ -1999,8 +2007,31 @@ void Scene2DNode::Parse()
             sh.pts.resize(sh.pts.size() / 6 * 6);
             if (s >> sh.fillType >> sh.fillAngle)
             {
-               sh.fillType = std::clamp(sh.fillType, 0, 3);
+               sh.fillType = std::clamp(sh.fillType, 0, 6);
                ReadStops(s, sh.fillStops);
+               std::string img;
+               if (s >> img >> sh.imageMode)
+               {
+                  sh.fillImage = UnescapeToken(img);
+                  sh.imageMode = std::clamp(sh.imageMode, 0, 3);
+                  for (auto& c : sh.meshC) for (float& v : c) s >> v;
+                  s >> sh.noise;
+                  for (int i = 0; i < 4; i++)
+                  {
+                     s >> sh.cornerR[i] >> sh.cornerType[i];
+                     sh.cornerType[i] = std::clamp(sh.cornerType[i], 0, 3);
+                  }
+                  int bal = 0, beh = 0, sc = 1;
+                  s >> sh.miter >> sh.dashPhase >> bal >> sh.arrowS >> sh.arrowE >> sh.arrowSize >> sh.taperS >> sh.taperE >>
+                     sh.pressMin >> beh >> sc;
+                  sh.balanced = bal != 0;
+                  sh.behind = beh != 0;
+                  sh.scaleStroke = sc != 0;
+                  sh.arrowS = std::clamp(sh.arrowS, 0, 5);
+                  sh.arrowE = std::clamp(sh.arrowE, 0, 5);
+                  sh.noise = std::clamp(sh.noise, 0.0f, 1.0f);
+                  sh.miter = std::clamp(sh.miter, 1.0f, 100.0f);
+               }
             }
             (key == "shape" ? l->shapes : l->vmask).push_back(sh);
          }

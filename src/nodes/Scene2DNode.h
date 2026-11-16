@@ -85,9 +85,27 @@ public:
       bool closed = false;
       bool fillOn = true;
       float fillC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-      int fillType = 0;                       // 0 solid (fillC), 1 linear, 2 radial (fits the box), 3 reflected
-      float fillAngle = 90.0f;                // linear and reflected: degrees, 90 = top to bottom
+      // 0 solid (fillC), 1 linear, 2 radial (fits the box), 3 reflected, 4 conical (sweeps round the centre from
+      // fillAngle), 5 bitmap (fillImage), 6 mesh (meshC at the box's corners, blended between them)
+      int fillType = 0;
+      float fillAngle = 90.0f;                // linear, reflected, conical: degrees, 90 = top to bottom
       std::vector<GradStop> fillStops;        // gradient fills: 2..kMaxStops
+      std::string fillImage;                  // bitmap fill: an image file
+      int imageMode = 0;                      // bitmap fill: 0 stretch to the box, 1 fill (crop), 2 fit, 3 tile
+      float meshC[4][4] = { { 1, 0, 0, 1 }, { 1, 1, 0, 1 }, { 0, 0, 1, 1 }, { 0, 1, 0, 1 } };   // TL, TR, BR, BL
+      float noise = 0.0f;                     // 0..1: grain mixed into the fill's alpha
+      float cornerR[4] = { -1, -1, -1, -1 };  // rectangle: TL, TR, BR, BL radius; -1 = `radius`
+      int cornerType[4] = { 0, 0, 0, 0 };     // rectangle: 0 round, 1 straight (chamfer), 2 concave, 3 cut-out
+      float miter = 10.0f;                    // miter joins: longest spike, in widths
+      float dashPhase = 0.0f;                 // px the dash pattern starts into
+      bool balanced = false;                  // dashes stretched so a closed outline ends on a whole dash
+      int arrowS = 0, arrowE = 0;             // 0 none, 1 arrow, 2 triangle, 3 circle, 4 square, 5 bar
+      float arrowSize = 3.0f;                 // arrowheads: widths
+      float taperS = 0.0f, taperE = 0.0f;     // pressure: 0..1 of the length the stroke thins over at each end
+      float pressMin = 0.0f;                  // pressure: the width the tapers reach, fraction of `width`
+      bool behind = false;                    // stroke drawn under the fill
+      bool scaleStroke = true;                // stroke width follows the layer's scale
+      float CornerR(int i) const { return cornerR[i] >= 0.0f ? cornerR[i] : radius; }
       bool strokeOn = false;
       float strokeC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float width = 4.0f;
