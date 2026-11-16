@@ -7,6 +7,8 @@
 // its masks baked in. Adjustment layers have no pixels and are left out.
 // Coming in, every pixel layer becomes a paint layer.
 
+#include <fstream>
+#include <iterator>
 #include "Scene2DNode.h"
 #include "gl3.h"
 #include <algorithm>
@@ -575,7 +577,7 @@ namespace
    // Placement a file can carry as-is: no turn, scale, flip, crop or anything that changes pixels on the way out.
    bool PlainPaint(const Layer& l)
    {
-      return l.kind == Kind::Paint && l.pw > 0 && l.ph > 0 && l.sx == 1.0f && l.sy == 1.0f && l.angle == 0.0f && !l.flipX &&
+      return l.kind == Kind::Paint && l.pw > 0 && l.ph > 0 && l.sx == 1.0f && l.sy == 1.0f && l.angle == 0.0f && l.shear == 0.0f && !l.flipX &&
              !l.flipY && !l.cropOn && !l.relief && l.fill >= 1.0f && !l.HasEffects() && !l.hasVMask && l.maskUid == 0;
    }
 }
@@ -944,6 +946,7 @@ bool Scene2DNode::LoadPsd(const std::vector<uint8_t>& bytes, std::string* err)
 bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
 {
    Layers();
+   struct ExportScope { bool was = sExport; ExportScope() { sExport = true; } ~ExportScope() { sExport = was; } } exporting;
    CookIfNeeded(frameId);
    const int W = mDoc.w, H = mDoc.h;
    out.clear();
@@ -973,7 +976,7 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
       for (size_t i = 0; i < mLayers.size(); i++)
       {
          const Layer l = mLayers[i];
-         if (l.parent != parent || l.kind == Kind::Adjust)
+         if (l.parent != parent || l.kind == Kind::Adjust || l.noExport)
             continue;
          if (l.kind == Kind::Group)
          {
@@ -1285,6 +1288,7 @@ bool Scene2DNode::LoadOra(const std::vector<uint8_t>& bytes, std::string* err)
 bool Scene2DNode::SaveOra(std::vector<uint8_t>& out, int frameId)
 {
    Layers();
+   struct ExportScope { bool was = sExport; ExportScope() { sExport = true; } ~ExportScope() { sExport = was; } } exporting;
    CookIfNeeded(frameId);
    const int W = mDoc.w, H = mDoc.h;
    mz_zip_archive zip;
@@ -1306,7 +1310,7 @@ bool Scene2DNode::SaveOra(std::vector<uint8_t>& out, int frameId)
       for (size_t i = mLayers.size(); i-- > 0;)
       {
          const Layer l = mLayers[i];
-         if (l.parent != parent || l.kind == Kind::Adjust)
+         if (l.parent != parent || l.kind == Kind::Adjust || l.noExport)
             continue;
          const std::string common = " name=\"" + XmlEscape(l.name.empty() ? "Layer " + std::to_string(l.id) : l.name) +
                                     "\" opacity=\"" + std::to_string(std::clamp(l.opacity, 0.0f, 1.0f)) +
@@ -1371,4 +1375,45 @@ bool Scene2DNode::SaveOra(std::vector<uint8_t>& out, int frameId)
    mz_free(buf);
    mz_zip_writer_end(&zip);
    return ok;
+}
+
+// Bitmap fill layers: the file's picture as a texture, rows top first (the fill samples it by document uv, y down).
+unsigned Scene2DNode::FillTexture(const std::string& path, int& w, int& h)
+{
+   if (path.empty())
+      return 0;
+   auto it = mFillPics.find(path);
+   if (it == mFillPics.end())
+   {
+      FillPic pic;
+      int c = 0;
+      stbi_set_flip_vertically_on_load_thread(0);
+      std::ifstream in(path, std::ios::binary);
+      const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      if (unsigned char* px = bytes.empty() ? nullptr
+                                : stbi_load_from_memory((const unsigned char*)bytes.data(), (int)bytes.size(), &pic.w, &pic.h, &c, 4))
+      {
+         glGenTextures(1, &pic.tex);
+         glBindTexture(GL_TEXTURE_2D, pic.tex);
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, pic.w, pic.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+         glBindTexture(GL_TEXTURE_2D, 0);
+         stbi_image_free(px);
+      }
+      if (mFillPics.size() > 16)
+      {
+         for (auto& kv : mFillPics)
+            if (kv.second.tex != 0)
+               glDeleteTextures(1, &kv.second.tex);
+         mFillPics.clear();
+      }
+      it = mFillPics.emplace(path, pic).first;
+   }
+   w = it->second.w;
+   h = it->second.h;
+   return it->second.tex;
 }

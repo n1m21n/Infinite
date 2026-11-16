@@ -1525,6 +1525,7 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
    a.opacity = l.opacity * opacityMul;
    a.clipMode = clipMode;
    a.bif = l.HasBlendIf() ? &l : nullptr;
+   a.gamma = BlendGammaOf(l);
    Pass(depth, a);
 }
 

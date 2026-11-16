@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <cstdint>
 #include <deque>
@@ -198,6 +199,7 @@ public:
       float angle = 0.0f;           // degrees, clockwise on screen
       float ax = 0.5f, ay = 0.5f;
       bool flipX = false, flipY = false;
+      float shear = 0.0f;           // degrees, x leans with y in the layer's own box (2D layers only)
       int fit = kFitFit;            // node layers: how the node's picture is sized before the transform
       bool nearest = false;         // node layers: sampling
       // Layer crop, in the layer's own box pixels, from each side.
@@ -209,7 +211,9 @@ public:
       int maskChannel = 0;          // 0 luminance, 1 alpha
       float maskDensity = 1.0f;
       // Fill layers.
-      int fillType = 0;             // 0 solid, 1 linear, 2 radial, 3 reflected, 4 diamond
+      int fillType = 0;             // 0 solid, 1 linear, 2 radial, 3 reflected, 4 diamond, 5 conical, 6 bitmap
+      float fillNoise = 0.0f;       // grain: each pixel keeps a random share of the fill's alpha, 0..1
+      std::string fillImage;        // bitmap: picture file, stretched over the document
       float colorA[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
       float colorB[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float fillAngle = 90.0f;      // linear: degrees, 90 = top to bottom
@@ -297,6 +301,9 @@ public:
       // Blend if (grey): this layer's and the underlying picture's black lo/hi and white lo/hi, 0..1.
       float bifT[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
       float bifU[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+      float blendGamma = 2.2f;      // the gamma the layer blends at (2.2 = the document's own)
+      int aaMode = 0;               // 0 default, 1 on, 2 off (hard edges: shapes, text, nearest sampling)
+      bool noExport = false;        // drawn in the view, left out of exported pictures and layered files
       bool AnyFx() const
       {
          for (const Fx& f : fx)
@@ -689,6 +696,7 @@ private:
       unsigned int vmask = 0;       // vector mask, alpha
       const Layer* fill = nullptr;
       const Layer* bif = nullptr;   // blend if
+      float gamma = 1.0f;           // blend gamma / 2.2: colours raised to this while blending
       bool card = false;            // a 3D card: tested against and written to the run's depth
       unsigned int geoDepth = 0;    // kind 4 (a 3D object at document size): its hardware depth
       float geoNF[2] = { 1, 2 };    // and the near / far that depth was drawn with, document px
@@ -697,6 +705,7 @@ private:
       bool stable = false;          // tex holds still for the whole frame (a node's output): the pass may wait and batch
    };
    bool LayerRect(const float h[9], PassArgs& a) const;   // false: the layer is off the page
+   static float BlendGammaOf(const Layer& l) { return std::fabs(l.blendGamma - 2.2f) < 1e-4f ? 1.0f : std::clamp(l.blendGamma, 0.1f, 10.0f) / 2.2f; }
    void Pass(int depth, const PassArgs& a);
    // Plain full-frame layers wait in a queue and draw up to kBatch at a time in one pass (the picture is read and
    // written once instead of once per layer). Any other use of that level's buffers (PairAt) draws the queue first.
@@ -831,6 +840,8 @@ private:
    // Below cache: the top-level composite as it stood at the start of top-level entry mBelowAt, so an edit to one
    // layer redraws only it and what sits above. mKidHash is last cook's per-entry change stamp.
    GLUtil::Fbo mBelow;
+   struct FillPic { unsigned tex = 0; int w = 0, h = 0; };
+   std::map<std::string, FillPic> mFillPics;
    size_t mBelowAt = 0;
    unsigned long long mBelowKey = 0;
    unsigned long long mGlobalHash = 0;
@@ -841,6 +852,8 @@ private:
 public:
    static bool sBelowCache;          // tests turn it off to compare pictures
    static bool sBatch;               // batched layer passes (tests turn it off to compare pictures)
+   static bool sExport;              // drawing for an export: layers marked noExport stay out
+   unsigned FillTexture(const std::string& path, int& w, int& h);   // bitmap fill layers: the picture, cached
 private:
    float mCookMs = 0.0f;
 };

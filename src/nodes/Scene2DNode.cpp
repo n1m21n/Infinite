@@ -565,6 +565,8 @@ namespace
             "uniform vec4 uColA;\n"
             "uniform vec4 uColB;\n"
             "uniform float uFillAngle;\n"
+            "uniform float uFillNoise;\n"
+            "uniform float uGamma;\n"
             + std::string(Scene2DNode::kStopGlsl) +
             "uniform sampler2D uPMask;\n"
             "uniform int uHasPMask;\n"
@@ -580,8 +582,10 @@ namespace
          + "float ramp(float lo, float hi, float v) { return hi > lo + 1e-4 ? clamp((v - lo) / (hi - lo), 0.0, 1.0) : step(lo, v); }\n"
            "float bifW(vec4 t, float l) { return ramp(t.x, t.y, l) * (1.0 - ramp(t.z, t.w, l)); }\n"
            "float gLum(vec3 c) { c = clamp(c, 0.0, 1.0); return Lum(uLinear == 1 ? SrgbEncode(c) : c); }\n"
-           "vec4 layerAt(vec2 uvb, vec2 uv) {\n"
-           "   if (uvb.x < uCrop.x || uvb.x > uCrop.z || uvb.y < uCrop.y || uvb.y > uCrop.w) return vec4(0.0);\n"
+           "float grain(vec2 px) { uvec2 q = uvec2(max(px, vec2(0.0)));\n"
+           "   uint n = q.x * 374761393u + q.y * 668265263u; n = (n ^ (n >> 13u)) * 1274126177u;\n"
+           "   return float((n ^ (n >> 16u)) & 65535u) / 65535.0; }\n"
+           "vec4 fillAt(vec2 uvb) {\n"
            "   if (uKind == 1) return uColA;\n"
            "   if (uKind == 2) {\n"
            "      float a = radians(uFillAngle);\n"
@@ -590,11 +594,23 @@ namespace
            "      return gradAt(t, uColA, uColB);\n"
            "   }\n"
            "   if (uKind == 3) return gradAt(length(uvb - 0.5) * 2.0, uColA, uColB);\n"
-           "   if (uKind == 5 || uKind == 6) {\n"   // reflected: from the centre line out; diamond: from the centre out to a turned square
-           "      float a = radians(uFillAngle);\n"
-           "      vec2 d = vec2(cos(a), sin(a)), e = vec2(-d.y, d.x), p = uvb - 0.5;\n"
-           "      float t = uKind == 5 ? abs(dot(p, d)) / (abs(d.x) + abs(d.y)) * 2.0 : (abs(dot(p, d)) + abs(dot(p, e))) * 2.0;\n"
-           "      return gradAt(t, uColA, uColB);\n"
+           "   if (uKind == 7) {\n"   // conical: once round the centre, from the angle, clockwise on screen
+           "      vec2 p = (uvb - 0.5) * uBox;\n"
+           "      float t = (atan(p.y, p.x) - radians(uFillAngle)) / 6.2831853;\n"
+           "      return gradAt(t - floor(t), uColA, uColB);\n"
+           "   }\n"
+           "   if (uKind == 8) return texture(uTex, uvb);\n"   // bitmap, stretched over the document (rows top first)
+           "   float a = radians(uFillAngle);\n"   // reflected: from the centre line out; diamond: to a turned square
+           "   vec2 d = vec2(cos(a), sin(a)), e = vec2(-d.y, d.x), p = uvb - 0.5;\n"
+           "   float t = uKind == 5 ? abs(dot(p, d)) / (abs(d.x) + abs(d.y)) * 2.0 : (abs(dot(p, d)) + abs(dot(p, e))) * 2.0;\n"
+           "   return gradAt(t, uColA, uColB);\n"
+           "}\n"
+           "vec4 layerAt(vec2 uvb, vec2 uv) {\n"
+           "   if (uvb.x < uCrop.x || uvb.x > uCrop.z || uvb.y < uCrop.y || uvb.y > uCrop.w) return vec4(0.0);\n"
+           "   if (uKind >= 1 && uKind != 4) {\n"
+           "      vec4 c = fillAt(uvb);\n"
+           "      if (uFillNoise > 0.0) c.a *= 1.0 - uFillNoise * grain(floor(uvb * uBox));\n"
+           "      return c;\n"
            "   }\n"
            "   if (uNearest == 1) {\n"
            "      ivec2 px = ivec2(clamp(floor(uv * uTexSize), vec2(0.0), uTexSize - 1.0));\n"
@@ -644,12 +660,15 @@ namespace
            "   }\n"
            "   if (uMode == " + std::to_string(BlendModes::kEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - amt)); return; }\n"
            "   if (uMode == " + std::to_string(BlendModes::kAntiEraseMode) + ") { fragColor = vec4(acc.rgb, acc.a * (1.0 - (1.0 - layer.a) * uOpacity)); return; }\n"
-           "   vec3 blended = blendModeImage(uMode, acc.rgb, layer.rgb, 1, uHead);\n"
-           "   vec3 cs = mix(layer.rgb, blended, acc.a);\n"
-           "   if (uClip == 1) { fragColor = vec4(mix(acc.rgb, cs, amt), acc.a); return; }\n"
+           // Blend gamma: both colours raised to blendGamma / 2.2 while they mix, then back.
+           "   vec3 A = acc.rgb, L = layer.rgb;\n"
+           "   if (uGamma != 1.0) { A = pow(max(A, vec3(0.0)), vec3(uGamma)); L = pow(max(L, vec3(0.0)), vec3(uGamma)); }\n"
+           "   vec3 blended = blendModeImage(uMode, A, L, 1, uHead);\n"
+           "   vec3 cs = mix(L, blended, acc.a);\n"
            "   float ar = amt + acc.a * (1.0 - amt);\n"
-           "   vec3 cr = (ar > 1e-5) ? (cs * amt + acc.rgb * acc.a * (1.0 - amt)) / ar : vec3(0.0);\n"
-           "   fragColor = vec4(cr, ar);\n"
+           "   vec3 cr = uClip == 1 ? mix(A, cs, amt) : (ar > 1e-5) ? (cs * amt + A * acc.a * (1.0 - amt)) / ar : vec3(0.0);\n"
+           "   if (uGamma != 1.0) cr = pow(max(cr, vec3(0.0)), vec3(1.0 / uGamma));\n"
+           "   fragColor = uClip == 1 ? vec4(cr, acc.a) : vec4(cr, ar);\n"
            "}\n";
       return src;
    }
@@ -896,6 +915,9 @@ Scene2DNode::~Scene2DNode()
    for (auto& kv : mLayerOut)
       GLUtil::DestroyFbo(kv.second);
    GLUtil::DestroyFbo(mAdjFbo);
+   for (auto& kv : mFillPics)
+      if (kv.second.tex != 0)
+         glDeleteTextures(1, &kv.second.tex);
    for (auto& kv : mRelief)
       GLUtil::DestroyFbo(kv.second);
    GLUtil::DestroyFbo(mBelow);
@@ -1340,10 +1362,12 @@ void Scene2DNode::LayerMatrix(const Layer& l, float m[6])
    const float a = l.angle * 3.14159265f / 180.0f;
    const float c = std::cos(a), s = std::sin(a);
    const float kx = l.sx * (l.flipX ? -1.0f : 1.0f), ky = l.sy * (l.flipY ? -1.0f : 1.0f);
+   // R * diag(kx, ky) * [[1, tan(shear)], [0, 1]]: the box leans before it scales and turns.
+   const float t = l.is3d ? 0.0f : std::tan(std::clamp(l.shear, -80.0f, 80.0f) * 3.14159265f / 180.0f);
    m[0] = c * kx;
-   m[1] = -s * ky;
+   m[1] = c * kx * t - s * ky;
    m[3] = s * kx;
-   m[4] = c * ky;
+   m[4] = s * kx * t + c * ky;
    // The anchor point of the box lands on (x, y); a flip turns about the anchor.
    const float px = l.ax * bw, py = l.ay * bh;
    m[2] = l.x - (m[0] * px + m[1] * py);
@@ -1417,7 +1441,7 @@ bool Scene2DNode::Shown(const Layer& l)
    const Layer* p = &l;
    for (int hops = 0; p != nullptr && hops < 64; hops++)
    {
-      if (!p->visible)
+      if (!p->visible || (sExport && p->noExport))
          return false;
       p = p->parent != 0 ? FindConst(p->parent) : nullptr;
    }
@@ -1573,6 +1597,8 @@ void Scene2DNode::Serialize()
         << +l.open << "\n";
       o << "xf " << l.id << " " << l.x << " " << l.y << " " << l.sx << " " << l.sy << " " << l.angle << " " << l.ax
         << " " << l.ay << " " << +l.flipX << " " << +l.flipY << " " << l.fit << " " << +l.nearest << "\n";
+      if (l.shear != 0.0f || l.blendGamma != 2.2f || l.aaMode != 0 || l.noExport)
+         o << "lx " << l.id << " " << l.shear << " " << l.blendGamma << " " << l.aaMode << " " << +l.noExport << "\n";
       if (!l.name.empty())
          o << "name " << l.id << " " << l.name << "\n";
       if (l.cropOn || l.crop[0] != 0 || l.crop[1] != 0 || l.crop[2] != 0 || l.crop[3] != 0)
@@ -1604,6 +1630,8 @@ void Scene2DNode::Serialize()
             WriteStops(o, l.stops);
             o << "\n";
          }
+         if (l.kind == Kind::Fill && (l.fillNoise > 0.0f || !l.fillImage.empty()))
+            o << "fillx " << l.id << " " << l.fillNoise << " " << EscapeToken(l.fillImage) << "\n";
       }
       if (l.kind == Kind::Paint && l.relief)
          o << "relief " << l.id << " " << l.reliefMat << " " << l.reliefLight << " " << l.reliefElev << " " << l.reliefDepth
@@ -1859,6 +1887,22 @@ void Scene2DNode::Parse()
             l->flipY = fy != 0;
             l->nearest = nearest != 0;
          }
+         else if (key == "lx")
+         {
+            int ne = 0;
+            s >> l->shear >> l->blendGamma >> l->aaMode >> ne;
+            l->shear = std::clamp(l->shear, -80.0f, 80.0f);
+            l->blendGamma = std::isfinite(l->blendGamma) ? std::clamp(l->blendGamma, 0.1f, 10.0f) : 2.2f;
+            l->aaMode = std::clamp(l->aaMode, 0, 2);
+            l->noExport = ne != 0;
+         }
+         else if (key == "fillx")
+         {
+            std::string img;
+            s >> l->fillNoise >> img;
+            l->fillNoise = std::clamp(l->fillNoise, 0.0f, 1.0f);
+            l->fillImage = UnescapeToken(img);
+         }
          else if (key == "name")
          {
             s >> std::ws;
@@ -1970,6 +2014,7 @@ void Scene2DNode::Parse()
          else if (key == "fillc")
          {
             s >> l->fillType;
+            l->fillType = std::clamp(l->fillType, 0, 6);
             for (float& v : l->colorA) s >> v;
             for (float& v : l->colorB) s >> v;
             s >> l->fillAngle;
@@ -2184,7 +2229,8 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
    const bool part = gScene2DBounds && depthMode == 0 && a.rect[2] > a.rect[0] && a.rect[3] > a.rect[1];
    // Normal over an opaque top-level picture: blend straight into the current buffer (no read of the picture, no
    // second buffer, no copy back).
-   const bool direct = gScene2DBounds && depth == 0 && depthMode == 0 && mAccOpaque && a.blend == 0 && !a.clipMode && a.bif == nullptr;
+   const bool direct = gScene2DBounds && depth == 0 && depthMode == 0 && mAccOpaque && a.blend == 0 && !a.clipMode && a.bif == nullptr &&
+                       a.gamma == 1.0f;
    const auto setup = [&]()
    {
       glUniform1i(glGetUniformLocation(prog, "uDirect"), direct ? 1 : 0);
@@ -2248,6 +2294,8 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glUniform1i(glGetUniformLocation(prog, "uHead"), mDoc.headroom ? 1 : 0);
       glUniform1f(glGetUniformLocation(prog, "uOpacity"), std::clamp(a.opacity, 0.0f, 1.0f));
       glUniform1f(glGetUniformLocation(prog, "uMaskDensity"), std::clamp(a.maskDensity, 0.0f, 1.0f));
+      glUniform1f(glGetUniformLocation(prog, "uGamma"), std::clamp(a.gamma, 0.05f, 5.0f));
+      glUniform1f(glGetUniformLocation(prog, "uFillNoise"), a.fill != nullptr ? std::clamp(a.fill->fillNoise, 0.0f, 1.0f) : 0.0f);
       if (a.fill != nullptr)
       {
          glUniform4fv(glGetUniformLocation(prog, "uColA"), 1, a.fill->colorA);
@@ -2300,6 +2348,7 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
 }
 
 bool Scene2DNode::sBatch = true;
+bool Scene2DNode::sExport = false;
 
 namespace
 {
@@ -2369,7 +2418,7 @@ bool Scene2DNode::Batchable(int depth, const PassArgs& a) const
 {
    static_assert(kBatch == 15, "BatchSrc builds 15 slots");
    return sBatch && a.stable && a.kind == 0 && a.tex != 0 && a.mask == 0 && a.pmask == 0 && a.vmask == 0 && a.fill == nullptr &&
-          a.bif == nullptr && !a.clipMode && !a.card && a.geoDepth == 0 && depth != mDepthLevel &&
+          a.bif == nullptr && a.gamma == 1.0f && !a.clipMode && !a.card && a.geoDepth == 0 && depth != mDepthLevel &&
           a.blend != BlendModes::kEraseMode && a.blend != BlendModes::kAntiEraseMode;
 }
 
@@ -2555,6 +2604,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    }
    PassArgs a;
    a.bif = l.HasBlendIf() ? &l : nullptr;
+   a.gamma = BlendGammaOf(l);
    a.opacity = l.opacity * l.fill * opacityMul;
    a.blend = l.kind == Kind::Group && l.blend == kPassThrough ? 0 : std::clamp(l.blend, 0, BlendModes::kContrastInvertMode);
    a.clipMode = clipMode;
@@ -2590,9 +2640,15 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    }
    if (l.kind == Kind::Fill)
    {
-      static const int kFillKinds[5] = { 1, 2, 3, 5, 6 };   // solid, linear, radial, reflected, diamond
-      a.kind = kFillKinds[std::clamp(l.fillType, 0, 4)];
+      static const int kFillKinds[7] = { 1, 2, 3, 5, 6, 7, 8 };   // solid, linear, radial, reflected, diamond, conical, bitmap
+      a.kind = kFillKinds[std::clamp(l.fillType, 0, 6)];
       a.fill = &l;
+      if (a.kind == 8)
+      {
+         a.tex = FillTexture(l.fillImage, a.texW, a.texH);
+         if (a.tex == 0)
+            a.kind = 1;   // no picture: the colour
+      }
       a.box[0] = (float)mDoc.w;
       a.box[1] = (float)mDoc.h;
       Pass(depth, a);
@@ -2693,7 +2749,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.crop[2] = std::clamp(1.0f - l.crop[2] / a.box[0], a.crop[0], 1.0f);
       a.crop[3] = std::clamp(1.0f - l.crop[3] / a.box[1], a.crop[1], 1.0f);
    }
-   a.nearest = l.nearest;
+   a.nearest = l.nearest || l.aaMode == 2;
    // A paint layer shows only its painted tiles: crop to them (one texel wider, so filtering reads the same), which
    // lets the pass touch only that part of the frame.
    if (l.kind == Kind::Paint && !(mStroke.Active() && mPaintId == l.id) && l.pw > 0 && l.ph > 0)
@@ -3053,7 +3109,7 @@ void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
    const std::vector<const Layer*> kids = ListOf(parent);
    auto card = [](const Layer& l) { return IsCard(l); };
    // Top level: resume from the below cache when nothing under the edited entry changed.
-   const bool top = parent == 0 && depth == 0 && sBelowCache && mDepthLevel < 0 && !mIsolating;
+   const bool top = parent == 0 && depth == 0 && sBelowCache && mDepthLevel < 0 && !mIsolating && !sExport;
    std::vector<unsigned long long> hashes;
    unsigned long long global = 0;
    size_t start = 0, changed = 0;
@@ -3229,6 +3285,7 @@ void Scene2DNode::CookIfNeeded(int frameId)
    for (char c : mText)
       stamp = Mix(stamp, (unsigned char)c);
    stamp = Mix(stamp, (unsigned long long)soloLayer);
+   stamp = Mix(stamp, sExport ? 1ull : 0ull);
    SyncSurfaces();
    SyncRasters();
    // A stroke changes the picture before it changes the text; its queued dabs land now.

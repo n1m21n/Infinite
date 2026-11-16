@@ -112,7 +112,7 @@ namespace BrushEngine
       int sourceBlend = 0;         // clone: 0 normal, 1 multiply, 2 screen, 3 overlay, 4 darken, 5 lighten, 6 difference
       bool protectHue = false;     // dodge / burn / sponge: the hue stays put
       int sharpMode = 1;           // sharpen: 0 clarity, 1 unsharp mask, 2 harsh
-      int spongeMode = 0;          // sponge: 0 saturate, 1 desaturate
+      int spongeMode = 0;          // sponge: 0 saturate, 1 desaturate, 2 vibrance (dull colours gain most)
       float key[3] = { 0.0f, 0.0f, 0.0f };   // colour replace / background erase: the colour sampled where the stroke began
       float keyTolerance = 0.25f;  // 0..1 of the RGB distance
       bool wetEdges = false;       // the stroke's edge holds more paint than its middle

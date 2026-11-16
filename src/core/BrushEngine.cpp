@@ -358,13 +358,14 @@ namespace BrushEngine
          "      vec2 src = (uAnchor + uOff + uSrcM * (px - uAnchor)) * uTexel;\n"
          "      if (uMode == 10) { vec4 s = srcAt(src); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
          "         fragColor = mix(d, s, a); return; }\n"
-         "      if (uMode == 24) { vec4 s = srcAt(vUv); fragColor = mix(d, s, a); return; }\n"   // undo brush: the earlier state
+         "      if (uMode == 24) { vec4 s = srcAt(vUv); fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"   // undo brush: the earlier state
          "      if (uMode == 26) { float k = 1.0 - smoothstep(uKeyTol * 0.6, uKeyTol, distance(d.rgb, uKey));\n"   // background erase
          "         fragColor = vec4(d.rgb, d.a * (1.0 - a * k)); return; }\n"
          "      if (uMode == 28) { fragColor = uFinal == 1 ? d : vec4(mix(d.rgb, vec3(1.0, 0.25, 0.3), a * 0.55), max(d.a, a * 0.55)); return; }\n"
          "      vec3 r = d.rgb;\n"
          "      if (uMode == 6) r = soft(vUv);\n"
-         "      if (uMode == 22) { float l = lum(d.rgb); r = clamp(mix(vec3(l), d.rgb, uSponge == 0 ? 1.6 : 0.35), 0.0, 1.0);\n"
+         "      if (uMode == 22) { float l = lum(d.rgb); float sat = max(d.r, max(d.g, d.b)) - min(d.r, min(d.g, d.b));\n"
+         "         r = clamp(mix(vec3(l), d.rgb, uSponge == 0 ? 1.6 : uSponge == 1 ? 0.35 : 1.0 + 0.8 * (1.0 - sat)), 0.0, 1.0);\n"
          "         if (uProtectHue == 1) r = keepHue(d.rgb, r); }\n"
          "      if (uMode == 23) {\n"   // median of the 3x3 around, spread with the brush
          "         vec3 v[9]; int n = 0;\n"

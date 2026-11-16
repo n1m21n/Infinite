@@ -1813,6 +1813,27 @@ void RunView2DTest()
                   && copy.Doc().symmetry == 4 && copy.Doc().symN == 8);
       }
 
+      // Save: shear, blend gamma, antialias, export visibility and the fill layer's noise and bitmap round-trip.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 400, 300);
+         const int a = Card(pic, 200, 150, 100, 100, 1, 0, 0);
+         Layer* l = pic.FindLayer(a);
+         l->shear = 12.5f; l->blendGamma = 1.0f; l->aaMode = 2; l->noExport = true;
+         Layer& f = pic.AddLayer(Scene2DNode::Kind::Fill, 0);
+         f.fillType = 6; f.fillNoise = 0.3f; f.fillImage = "/tmp/a b.png";
+         pic.Commit();
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         const Layer* c = nullptr;
+         const Layer* g = nullptr;
+         for (const Layer& x : copy.Layers())
+            (x.kind == Scene2DNode::Kind::Fill ? g : c) = &x;
+         Check("Parity C: shear, blend gamma, antialias, in export, fill noise and bitmap save",
+               c != nullptr && g != nullptr && c->shear == 12.5f && c->blendGamma == 1.0f && c->aaMode == 2 && c->noExport
+                  && g->fillType == 6 && Near(g->fillNoise, 0.3f, 1e-4f) && g->fillImage == "/tmp/a b.png");
+      }
+
       // M3: 20 layers at 1080p (10 node, 6 paint, 4 vector/text) composite in under 4 ms.
       {
          Scene2DNode pic;

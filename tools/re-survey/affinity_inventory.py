@@ -81,7 +81,7 @@ INF = {
     "burn": _RETOUCH + ["Shadows", "Midtones", "Highlights", "Protect hue##v2dphue"],
     "clone": _RETOUCH + _SOURCE + ["##v2dsblend"], "heal": _RETOUCH + _SOURCE,
     "blur": _RETOUCH, "sharpen": _RETOUCH + ["##v2dsharpmode"],
-    "sponge": _RETOUCH + ["Saturate", "Desaturate"], "median": _RETOUCH, "undobrush": _RETOUCH,
+    "sponge": _RETOUCH + ["Saturate", "Desaturate", "Vibrance"], "median": _RETOUCH, "undobrush": _RETOUCH + ["Protect alpha##v2dupa"],
     "colourreplace": _RETOUCH + ["Tolerance %.0f%%"], "bgerase": _RETOUCH + ["Tolerance %.0f%%"],
     "inpaint": _RETOUCH, "redeye": [], "flooderase": ["Tolerance %.0f%%", "Contiguous"],
     "mixer": ["Size %.0f px", "Hardness %.0f%%", "Opacity %.0f%%", "Wet %.0f%%", "Refill %.0f%%"],
@@ -108,10 +108,10 @@ SAME = {
     "Contiguous": "Contiguous", "Paragraph Leading": "Leading", "Font Size": "%.0f px", "Mode (sharpen)": None,
     "Wet Edges": "Wet edges", "Protect Hue": "Protect hue", "Rotation": "Rotation",
     "Scale": "Scale", "Flip": "Flip X", "Antialias": "Antialias", "Antialiased": "Antialias", "From Center": "From centre",
-    "Saturate": "Saturate", "Desaturate": "Desaturate", "Auto Load Brush": "Refill",
+    "Saturate": "Saturate", "Desaturate": "Desaturate", "Vibrance": "Vibrance", "Auto Load Brush": "Refill",
 }
 # Per-tool overrides of SAME, where one Affinity word means a different control in that tool.
-TOOL_SAME = {("sharpenBrush", "Mode"): "##v2dsharpmode", ("cloneBrush", "Blend mode"): "##v2dsblend"}
+TOOL_SAME = {("sharpenBrush", "Mode"): "##v2dsharpmode", ("undoBrush", "Protect Alpha"): "Protect alpha", ("cloneBrush", "Blend mode"): "##v2dsblend"}
 # Affinity adjustment -> the 2D View adjustment that covers it, where the names differ.
 ADJ_SAME = {"Brightness / Contrast": "Brightness", "HSL": "Hue", "LUT": "Colour Lookup", "Lens Filter": "Photo Filter"}
 # Context-bar entries that are actions, panels or document-level options rather than tool settings.
@@ -338,6 +338,24 @@ LAYER_SAME = {
     ("Text: character", "capsType"): "caps", ("Text: character", "underlineType"): "underline",
     ("Text: character", "penFill"): "textC", ("Text: character", "shearX"): "italic",
     ("Text: paragraph", "alignXType"): "Align", ("Text: paragraph", "absoluteLeading"): "leading",
+    # Block A-C (2026-11-16): vector fills and strokes, character and paragraph basics, layer settings.
+    ("Layer", "gamma"): "blendGamma", ("Layer", "antialiasingMode"): "aaMode", ("Layer", "shear"): "shear",
+    ("Layer", "isVisibleInExport"): "noExport",
+    ("Fill layer", "conical"): "Conical", ("Fill layer", "bitmap"): "fillImage", ("Fill layer", "noise"): "fillNoise",
+    ("Vector fill", "conical"): "Conical", ("Vector fill", "bitmap"): "fillImage", ("Vector fill", "mesh"): "meshC",
+    ("Vector fill", "noise"): "noise", ("Vector shape", "corner type per corner"): "cornerType",
+    ("Vector stroke", "miterLimit"): "miter", ("Vector stroke", "dashPhase"): "dashPhase",
+    ("Vector stroke", "hasBalancedDashes"): "balanced", ("Vector stroke", "frontArrowHead"): "arrowS",
+    ("Vector stroke", "backArrowHead"): "arrowE", ("Vector stroke", "pressure"): "pressMin",
+    ("Vector stroke", "isBehind"): "behind", ("Vector stroke", "isScale"): "scaleStroke",
+    ("Text: character", "strikeoutType"): "strike", ("Text: character", "superSubType"): "script",
+    ("Text: character", "baselineAdvance"): "baseShift", ("Text: character", "offsetY"): "baseShift",
+    ("Text: character", "manualKerning"): "kerning", ("Text: character", "scaleX"): "textSX",
+    ("Text: character", "scaleY"): "textSY", ("Text: character", "highlightFill"): "highlightC",
+    ("Text: character", "transparency"): "textC",
+    ("Text: paragraph", "leftIndent"): "indentL", ("Text: paragraph", "rightIndent"): "indentR",
+    ("Text: paragraph", "firstLineIndent"): "indentFirst", ("Text: paragraph", "spaceBefore"): "spaceBefore",
+    ("Text: paragraph", "spaceAfter"): "spaceAfter",
 }
 # 2D View layer settings Affinity has no direct twin for (kept so the report shows both directions).
 LAYER_EXTRA = ["satin effect", "pattern overlay effect", "per-effect contour curve", "relief materials",

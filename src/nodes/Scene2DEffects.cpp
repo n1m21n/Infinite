@@ -425,6 +425,7 @@ void Scene2DNode::DrawEffects(const Layer& l, int depth, int frameId, float opac
    }
    PassArgs a;
    a.bif = l.HasBlendIf() ? &l : nullptr;
+   a.gamma = BlendGammaOf(l);
    a.tex = cur;
    a.texW = mDoc.w;
    a.texH = mDoc.h;

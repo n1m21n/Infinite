@@ -1814,7 +1814,21 @@ namespace
       OutputNode* out = sStillPath.empty() ? nullptr : FindOutput();
       if (out == nullptr || out->GetOutputWidth() <= 0)
          return;
+      // Layers left out of export: draw the document once without them for the file.
+      Scene2DNode* doc = FindDoc();
+      bool hide = false;
+      if (doc != nullptr)
+         for (const Layer& l : doc->Layers())
+            hide = hide || l.noExport;
+      if (hide)
+      {
+         static int ef = 7400000;
+         Scene2DNode::sExport = true;
+         doc->CookIfNeeded(++ef);
+         out->CookIfNeeded(ef);
+      }
       ExportImage(out, sStillPath, std::clamp(out->jpegQuality, 1, 100));
+      Scene2DNode::sExport = false;
       sLastRender = sStillPath;
       sStillPath.clear();
    }
@@ -6040,8 +6054,14 @@ namespace
          if (sTool == kSponge)
          {
             next();
-            static const char* kSpongeModes[2] = { "Saturate", "Desaturate" };
-            BarCombo("##v2dspongemode", &b.spongeMode, kSpongeModes, 2, kWellL);
+            static const char* kSpongeModes[3] = { "Saturate", "Desaturate", "Vibrance" };
+            BarCombo("##v2dspongemode", &b.spongeMode, kSpongeModes, 3, kWellL);
+         }
+         if (sTool == kUndoBrush)
+         {
+            gap();
+            if (TextChip(L("Protect alpha##v2dupa"), b.lockAlpha, nullptr))
+               b.lockAlpha = !b.lockAlpha;
          }
          if (sTool == kSharpen)
          {
@@ -8271,6 +8291,14 @@ namespace
       if (ComboRow(T("Colour"), &label, { T("None"), T("Red"), T("Orange"), T("Yellow"), T("Green"), T("Blue"), T("Violet"), T("Grey") }))
          l->label = label;
       BoolRow(T("Clip to layer below"), &l->clip);
+      SliderRow(T("Blend gamma"), &l->blendGamma, 0.1f, 10.0f, "%.2f");
+      if (l->kind == Kind::Vector || l->kind == Kind::Text || l->kind == Kind::Node)
+         ComboRow(T("Antialias"), &l->aaMode, { T("Default"), T("On"), T("Off") });
+      {
+         bool inExport = !l->noExport;
+         if (BoolRow(T("In export"), &inExport))
+            l->noExport = !inExport;
+      }
       if (l->kind == Kind::Paint)
       {
          SectionCard::Begin(T("Relief"));
@@ -8287,9 +8315,24 @@ namespace
       {
          SectionCard::Begin(T("Fill"));
          int type = l->fillType;
-         if (ComboRow(T("Type"), &type, { T("Solid"), T("Linear"), T("Radial"), T("Reflected"), T("Diamond") }))
+         if (ComboRow(T("Type"), &type, { T("Solid"), T("Linear"), T("Radial"), T("Reflected"), T("Diamond"), T("Conical"), T("Bitmap") }))
             l->fillType = type;
-         if (type == 0)
+         if (type == 6)
+         {
+            const std::string shown = l->fillImage.empty() ? std::string(T("Choose image")) : l->fillImage.substr(l->fillImage.find_last_of("/\\") + 1);
+            FieldLabel(T("Image"));
+            if (ImGui::Button((shown + "##v2dfillimg").c_str(), ImVec2(sFieldW, 0.0f)))
+            {
+               const std::string path = Platform::OpenImageDialog();
+               if (!path.empty())
+               {
+                  PushUndoCheckpoint("Fill image");
+                  l->fillImage = path;
+                  Touch();
+               }
+            }
+         }
+         else if (type == 0)
          {
             ColorRow(T("Colour"), l->colorA);
             SliderRow(T("Alpha"), &l->colorA[3], 0.0f, 1.0f, "%.2f");
@@ -8300,7 +8343,8 @@ namespace
             std::copy(l->stops.front().c, l->stops.front().c + 4, l->colorA);
             std::copy(l->stops.back().c, l->stops.back().c + 4, l->colorB);
          }
-         if (type == 1 || type == 3 || type == 4)
+         SliderRow(T("Noise"), &l->fillNoise, 0.0f, 1.0f, "%.2f");
+         if (type == 1 || type == 3 || type == 4 || type == 5)
          {
             ModNext(*l, Scene2DNode::kLfFillAngle);
             SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
@@ -8471,6 +8515,7 @@ namespace
          {
             ModNext(*l, Scene2DNode::kLfAngle);
             DragRow(T("Angle"), &l->angle, 0.5f, "%.1f\xC2\xB0", -180.0f, 180.0f);
+            DragRow(T("Shear"), &l->shear, 0.5f, "%.1f\xC2\xB0", -80.0f, 80.0f);
          }
          int anchor = (int)std::lround(l->ay * 2.0f) * 3 + (int)std::lround(l->ax * 2.0f);
          if (AnchorRow(T("Anchor"), &anchor))
@@ -8499,6 +8544,7 @@ namespace
             l->z = l->rx = l->ry = 0.0f;
             l->ax = l->ay = 0.5f;
             l->flipX = l->flipY = false;
+            l->shear = 0.0f;
             Touch();
          }
 
@@ -12247,10 +12293,17 @@ int View2DAffinityAb(const char* dir)
    namespace fs = std::filesystem;
    const std::string photo = std::string(dir) + "/photo.png";
    int fails = 0, frame = 7000000;
+   InitBrushes();   // the panel does this on its first draw, which the A/B never reaches
    struct AbOp { const char* name; std::function<bool(Scene2DNode*, int)> run; };
-   auto stroke = [&](Scene2DNode* doc, int tool, ImVec2 a, ImVec2 b, float size, float hard) {
+   auto stroke = [&](Scene2DNode* doc, int tool, ImVec2 a, ImVec2 b, float size, float hard,
+                     std::function<void(BrushEngine::Brush&)> setup = nullptr) {
       sTool = tool;
       BrushEngine::Brush& br = ToolBrush();
+      br.mode = tool == kBrush ? 0 : br.mode;
+      br.lockAlpha = false;
+      br.spongeMode = 0;
+      if (setup)
+         setup(br);
       br.size = size;
       br.hardness = hard;
       br.opacity = br.flow = 1.0f;
@@ -12265,6 +12318,31 @@ int View2DAffinityAb(const char* dir)
       return true;
    };
    const float kRed[3] = { 1.0f, 0.0f, 0.0f };
+   const ImVec2 kBhA(330, 520), kBhB(480, 520);   // behaviour strokes: across the green slope
+   auto shape = [&](Scene2DNode* doc, int type, float x0, float y0, float x1, float y1, const float* fill, bool line, float opacity,
+                    int blend) {
+      const Layer* a = Active(doc);
+      const int id = doc->AddVectorLayer(a != nullptr ? a->id : 0);
+      Layer* l = doc->FindLayer(id);
+      if (l == nullptr)
+         return false;
+      Shape sh;
+      sh.type = type;
+      sh.x0 = x0, sh.y0 = y0, sh.x1 = x1, sh.y1 = y1;
+      sh.fillOn = true;
+      std::copy(fill, fill + 3, sh.fillC);
+      sh.fillC[3] = 1.0f;
+      sh.strokeOn = line;
+      const float blue[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+      std::copy(blue, blue + 4, sh.strokeC);
+      sh.width = 8.0f;
+      l->shapes.push_back(sh);
+      l->opacity = opacity;
+      l->blend = blend;
+      doc->Commit();
+      SelectOnly(id);
+      return true;
+   };
    auto adjust = [&](Scene2DNode* doc, int type, std::vector<float> p) {
       AddAdjust(doc, type);
       Layer* a = Active(doc);
@@ -12329,6 +12407,71 @@ int View2DAffinityAb(const char* dir)
       { "adj_normals", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjNormals, { 45.0f, 0.75f, 0.0f, 1.0f }); } },
       { "adj_tone_compression", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjToneCompression, { 1.5f, 0.8f, 0.25f }); } },
       { "adj_tone_stretch", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjToneStretch, { 0.25f, 1.0f, 0.0f }); } },
+      // Vector shapes and layer settings, which Affinity's SDK can draw too.
+      { "shape_rect", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 100, 200, 250, 320, kRed, false, 1.0f, 0); } },
+      { "shape_ellipse_stroke", [&](Scene2DNode* d, int) { return shape(d, Shape::kEllipse, 150, 450, 350, 590, kRed, true, 1.0f, 0); } },
+      { "shape_multiply", [&](Scene2DNode* d, int) {
+           const float c[3] = { 1.0f, 0.5f, 0.25f };
+           return shape(d, Shape::kRect, 50, 100, 460, 700, c, false, 1.0f, 2); } },
+      { "shape_opacity", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 100, 200, 250, 320, kRed, false, 0.5f, 0); } },
+      { "layer_opacity", [&](Scene2DNode* d, int src) {
+           Layer* l = d->FindLayer(src);
+           if (l == nullptr)
+              return false;
+           l->opacity = 0.5f;
+           d->Commit();
+           return true; } },
+      // Behaviour checks: brush tools the SDK cannot stroke. Python checks what each did to the photo (bh_* in
+      // affinity_probe.py), against what Affinity's help says the tool does.
+      { "bh_dodge", [&](Scene2DNode* d, int) { return stroke(d, kDodge, kBhA, kBhB, 60.0f, 0.5f); } },
+      { "bh_burn", [&](Scene2DNode* d, int) { return stroke(d, kBurn, kBhA, kBhB, 60.0f, 0.5f); } },
+      { "bh_sponge_sat", [&](Scene2DNode* d, int) { return stroke(d, kSponge, kBhA, kBhB, 60.0f, 0.5f); } },
+      { "bh_sponge_desat", [&](Scene2DNode* d, int) {
+           return stroke(d, kSponge, kBhA, kBhB, 60.0f, 0.5f, [](BrushEngine::Brush& b) { b.spongeMode = 1; }); } },
+      { "bh_sponge_vibrance", [&](Scene2DNode* d, int) {
+           return stroke(d, kSponge, kBhA, kBhB, 60.0f, 0.5f, [](BrushEngine::Brush& b) { b.spongeMode = 2; }); } },
+      { "bh_sharpen", [&](Scene2DNode* d, int) { return stroke(d, kSharpen, kBhA, kBhB, 60.0f, 0.5f); } },
+      { "bh_median", [&](Scene2DNode* d, int) { return stroke(d, kMedian, kBhA, kBhB, 60.0f, 0.5f); } },
+      { "bh_paint", [&](Scene2DNode* d, int) {
+           std::copy(kRed, kRed + 3, sFg);
+           return stroke(d, kBrush, kBhA, kBhB, 60.0f, 1.0f); } },
+      { "bh_smudge", [&](Scene2DNode* d, int) {
+           EnsurePixels(d);   // smudge drags the photo's own pixels
+           return stroke(d, kBrush, ImVec2(330, 330), ImVec2(480, 520), 60.0f, 0.5f, [](BrushEngine::Brush& b) { b.mode = BrushEngine::kSmudge; }); } },
+      { "bh_clone", [&](Scene2DNode* d, int) {
+           sHaveCloneSrc = true;
+           sCloneSrc = ImVec2(330, 200);
+           sCloneOffsetSet = false;
+           sCloneAligned = true;
+           return stroke(d, kClone, kBhA, kBhB, 60.0f, 1.0f); } },
+      { "bh_colour_replace", [&](Scene2DNode* d, int) {
+           std::copy(kRed, kRed + 3, sFg);
+           return stroke(d, kColourReplace, kBhA, kBhB, 60.0f, 1.0f, [](BrushEngine::Brush& b) { b.keyTolerance = 0.4f; }); } },
+      { "bh_bg_erase", [&](Scene2DNode* d, int) {
+           return stroke(d, kBgErase, ImVec2(330, 120), ImVec2(480, 120), 60.0f, 1.0f, [](BrushEngine::Brush& b) { b.keyTolerance = 0.25f; }); } },
+      { "bh_undo", [&](Scene2DNode* d, int) {
+           EnsurePixels(d);
+           if (Layer* al = Active(d))
+              d->SetUndoSource(al->id);
+           std::copy(kRed, kRed + 3, sFg);
+           return stroke(d, kBrush, kBhA, kBhB, 60.0f, 1.0f) && stroke(d, kUndoBrush, kBhA, kBhB, 90.0f, 1.0f); } },
+      { "bh_redeye", [&](Scene2DNode* d, int) {
+           EnsurePixels(d);
+           std::copy(kRed, kRed + 3, sFg);
+           d->SelectRect(340, 500, 470, 540, Scene2DNode::kSelNew, 0, true);
+           ClearOrFill(d, 1);
+           d->Deselect();
+           return stroke(d, kRedEye, kBhA, kBhB, 90.0f, 1.0f); } },
+      { "bh_gradient", [&](Scene2DNode* d, int) {
+           EnsurePixels(d);
+           const float blue[3] = { 0.0f, 0.0f, 1.0f };
+           std::copy(kRed, kRed + 3, sFg);
+           std::copy(blue, blue + 3, sBg);
+           sFillKind = 1;
+           sGradOpacity = 1.0f;
+           sGradReverse = false;
+           GradientTo(d, ImVec2(0, 384), ImVec2(512, 384));
+           return true; } },
    };
    const char* only = std::getenv("INFINITE_AB2D_OP");
    for (const AbOp& op : ops)
@@ -12356,6 +12499,8 @@ int View2DAffinityAb(const char* dir)
       doc->Doc().w = 512;
       doc->Doc().h = 768;
       doc->Doc().background = 3;
+      // Affinity's RGB/8 document blends display values; shapes and layer opacity are compared that way.
+      doc->Doc().linear = std::strncmp(op.name, "shape_", 6) != 0 && std::strncmp(op.name, "layer_", 6) != 0;
       Layer& l = doc->Layers().back();
       l.x = 256.0f;
       l.y = 384.0f;

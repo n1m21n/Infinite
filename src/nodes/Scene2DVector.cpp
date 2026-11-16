@@ -1338,17 +1338,33 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
          key = H(key, (unsigned)std::lround(strokeK * 4096.0f));
       }
    }
-   key = H(H(key, (unsigned)w), (unsigned)h);
+   key = H(H(H(key, (unsigned)w), (unsigned)h), (unsigned)l.aaMode);
    Raster& r = in[l.id];
    if (r.key == key && r.tex != 0)
       return &r;
    r.key = key;
+   // Antialiasing off: every edge pixel is in or out (straight RGBA, so the colour stays).
+   auto hard = [&](std::vector<uint8_t>& px) {
+      if (l.aaMode == 2)
+         for (size_t i = 3; i < px.size(); i += 4)
+            px[i] = px[i] >= 128 ? 255 : 0;
+   };
    if (l.kind == Kind::Text && !mask)
-      Upload(r.tex, r.w, r.h, w, h, mTextBoxes[l.id].rgba);
+   {
+      if (l.aaMode == 2)
+      {
+         std::vector<uint8_t> px = mTextBoxes[l.id].rgba;
+         hard(px);
+         Upload(r.tex, r.w, r.h, w, h, px);
+      }
+      else
+         Upload(r.tex, r.w, r.h, w, h, mTextBoxes[l.id].rgba);
+   }
    else
    {
       std::vector<uint8_t> px;
       RasterShapes(mask ? l.vmask : l.shapes, w, h, mask, px, strokeK);
+      hard(px);
       Upload(r.tex, r.w, r.h, w, h, px);
    }
    mPaintEdits++;
