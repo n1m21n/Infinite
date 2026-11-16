@@ -21,7 +21,7 @@ namespace PanelFrame
    {
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_group);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_container);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
       ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, 0.9f));
@@ -55,8 +55,8 @@ namespace PanelFrame
       ImDrawList* dl = ImGui::GetWindowDrawList();
       for (int i = 6; i >= 1; --i)   // soft shadow: stacked, widening, fainter rings
          dl->AddRectFilled(ImVec2(c0.x - i, c0.y - i + 2.0f), ImVec2(c1.x + i, c1.y + i + 2.0f),
-                           ImGui::GetColorU32(ImVec4(0, 0, 0, 7 / 255.0f)), tok::radius_group + i);
-      dl->AddRectFilled(c0, c1, ImGui::GetColorU32(ImGuiCol_ChildBg), tok::radius_group);
+                           ImGui::GetColorU32(ImVec4(0, 0, 0, 7 / 255.0f)), tok::radius_container + i);
+      dl->AddRectFilled(c0, c1, ImGui::GetColorU32(ImGuiCol_ChildBg), tok::radius_container);
    }
 
    // Call after PushDockedPanelStyle(true) so ChildBg carries the panel fill the surface samples. `size` is the

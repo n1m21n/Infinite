@@ -23,7 +23,7 @@ namespace FormParts
    constexpr float kLabelW = 200.0f;
    constexpr float kControlW = 150.0f;
    constexpr float kSliderW = kControlW;   // sliders, dropdowns and inputs share one width in Settings
-   constexpr float kRowH = 28.0f;
+   constexpr float kRowH = tok::control_h + tok::row_gap;   // a settings row: one control plus the row gap
 
    // A narrow side column (a panel's inspector) has no room for the Settings columns: inside a Narrow scope the
    // label column shrinks and every control fills the rest of the row.
@@ -266,7 +266,7 @@ namespace FormParts
       ImGui::PushStyleColor(ImGuiCol_TabDimmed, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_TabDimmedSelected, ImVec4(t.x, t.y, t.z, 0.14f));
       ImGui::PushStyleColor(ImGuiCol_TabDimmedSelectedOverline, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleVar(ImGuiStyleVar_TabRounding, tok::radius_tile);
+      ImGui::PushStyleVar(ImGuiStyleVar_TabRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_TabBarBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_TabBarOverlineSize, 0.0f);
    }
@@ -325,7 +325,7 @@ namespace FormParts
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(t.x, t.y, t.z, headerFill ? 0.06f : 0.0f));   // off when a card is the surface
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(t.x, t.y, t.z, 0.09f));
       ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(t.x, t.y, t.z, 0.12f));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
    }
    inline void PopReferenceStyle()
    {

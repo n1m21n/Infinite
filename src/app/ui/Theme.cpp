@@ -565,7 +565,7 @@ namespace app
       edStyle.Colors[ed::StyleColor_NodeBorder] = vec(t.border, isLight ? 0.70f : 0.40f);
       edStyle.NodeRounding = CategoryColors::GetNodeRounding();
       // N4: backdrops use the group radius token; N3/N5: hover, selection and marquee all speak accent.
-      edStyle.GroupRounding = tok::radius_group;
+      edStyle.GroupRounding = tok::radius_container;
       edStyle.Colors[ed::StyleColor_HovLinkBorder] = vec(t.accent, 0.90f);
       edStyle.Colors[ed::StyleColor_SelLinkBorder] = vec(t.accent, 1.0f);
       edStyle.Colors[ed::StyleColor_NodeSelRect] = vec(t.accent, 0.08f);

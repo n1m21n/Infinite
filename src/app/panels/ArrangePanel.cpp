@@ -29,7 +29,7 @@ namespace app
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          const ImVec4 bg = *v ? onCol : ImVec4(t.x, t.y, t.z, 0.06f + 0.05f * hv);
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32(bg), tok::radius_tile);
+         dl->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32(bg), tok::radius_control);
          const ImVec2 ts = ImGui::CalcTextSize(letter);
          dl->AddText(ImVec2(std::round(p.x + (sz - ts.x) * 0.5f), std::round(p.y + (sz - ts.y) * 0.5f) - 1.0f),
                      ImGui::GetColorU32(*v ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.8f)), letter);
@@ -1889,8 +1889,8 @@ namespace app
          const ImVec2 w1(w0.x + (timelineChildWidth < 0.0f ? wa.x + timelineChildWidth : wa.x), w0.y + wa.y);
          const bool wellLight = IsThemeLight();
          ImDrawList* wdl = ImGui::GetWindowDrawList();
-         wdl->AddRectFilled(w0, w1, ImGui::GetColorU32(ImVec4(0, 0, 0, wellLight ? 0.04f : 0.27f)), tok::radius_pill);
-         wdl->AddRect(w0, w1, ImGui::GetColorU32(wellLight ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+         wdl->AddRectFilled(w0, w1, ImGui::GetColorU32(ImVec4(0, 0, 0, wellLight ? 0.04f : 0.27f)), tok::radius_container);
+         wdl->AddRect(w0, w1, ImGui::GetColorU32(wellLight ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_container);
       }
       PushDockedPanelStyle(/*isChild=*/true);
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
@@ -2741,7 +2741,7 @@ namespace app
             ImVec4 selAcc = app::AccentEmphasisSelected();
             selAcc.w = 0.28f;
             dl->AddRectFilled(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f),
-                              ImGui::GetColorU32(selAcc), tok::radius_tile);
+                              ImGui::GetColorU32(selAcc), tok::radius_control);
          }
 
          ImGui::SetCursorScreenPos(ImVec2(indentX, rowTop + 4.0f));
@@ -3037,7 +3037,7 @@ namespace app
          {
             const ImVec4 selA = AccentEmphasisSelected();
             dl->AddRectFilled(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f),
-                              ImGui::GetColorU32(ImVec4(selA.x, selA.y, selA.z, 0.28f)), tok::radius_tile);
+                              ImGui::GetColorU32(ImVec4(selA.x, selA.y, selA.z, 0.28f)), tok::radius_control);
          }
 
          // Beat/bar grid lines through the lane body
@@ -3218,12 +3218,12 @@ namespace app
                   const ImVec4 ot = ImGui::GetStyleColorVec4(ImGuiCol_Text);
                   const float hot = ImGui::IsItemHovered() || ImGui::IsItemActive() ? 0.04f : 0.0f;
                   const ImVec2 oe(op.x + kMixStripW, op.y + kMixCtl);
-                  dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.06f + hot)), tok::radius_tile);
+                  dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.06f + hot)), tok::radius_control);
                   const float fx = op.x + kMixStripW * std::clamp(pct / 100.0f, 0.0f, 1.0f);
                   if (fx > op.x + 1.0f)
                   {
                      dl->PushClipRect(op, ImVec2(fx, oe.y), true);
-                     dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.12f)), tok::radius_tile);
+                     dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.12f)), tok::radius_control);
                      dl->PopClipRect();
                   }
                   char opTxt[16];

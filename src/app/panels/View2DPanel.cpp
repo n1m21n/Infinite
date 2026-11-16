@@ -75,7 +75,7 @@ namespace
    constexpr float kSideW = 300.0f;
    constexpr float kIconW = PanelKit::kChip;   // icon chips are square, one panel chip
    constexpr float kSideChip = PanelKit::kChip;    // the layers side panel packs its chips and wells tighter
-   constexpr float kRowH = 22.0f;        // one layer row
+   constexpr float kRowH = tok::row_h;   // one layer row
    float sChip = PanelKit::kChip;        // chip size for the panel being drawn
    float sRowH = PanelKit::kChip;        // height of text chips and bar rows in the part being drawn
 
@@ -1160,7 +1160,7 @@ namespace
       ImGui::InvisibleButton("##curve", ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 p1(p0.x + w, p0.y + h);
-      dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_field);
+      dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
       if (hist != nullptr)
          HistogramUnder(dl, p0, p1, *hist);
       for (int i = 1; i < 4; i++)

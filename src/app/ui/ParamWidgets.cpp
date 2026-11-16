@@ -200,7 +200,7 @@ namespace app
          StateRing::DrawCircle(kdl, ImVec2((rmin.x + rmax.x) * 0.5f, (rmin.y + rmax.y) * 0.5f), (rmax.x - rmin.x) * 0.5f,
                                StateRing::Kind::Select, IsThemeLight());
       else
-         StateRing::Draw(kdl, rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_field);
+         StateRing::Draw(kdl, rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_control);
       bool changed = false;
       if (gKbNudge != 0 && !Modulation::Instance().IsModulated(nodeIndex, paramIndex))
       {
@@ -383,7 +383,7 @@ namespace app
          const ImU32 alpha = vividState ? (isLight ? 225 : 205) : (isLight ? 110 : 86);
          const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
          dl->PushClipRect(r0, ImVec2(fillX, r1.y), true);
-         dl->AddRectFilled(r0, r1, soft, tok::radius_tile);
+         dl->AddRectFilled(r0, r1, soft, tok::radius_control);
          dl->PopClipRect();
       }
 
@@ -461,7 +461,7 @@ namespace app
          const ImU32 amber = tok::U32(tok::pin_mod, isLight);
          const ImU32 soft = (amber & 0x00FFFFFF) | ((ImU32)(isLight ? 110 : 86) << 24);
          dl->PushClipRect(r0, ImVec2(r0.x + w * t, r1.y), true);
-         dl->AddRectFilled(r0, r1, soft, tok::radius_tile);
+         dl->AddRectFilled(r0, r1, soft, tok::radius_control);
          dl->PopClipRect();
       }
 
@@ -573,7 +573,7 @@ namespace app
       EndParamDraw(nodeIndex, paramIndex);
       // A link to this control (a chat chip, "View in Modulation Matrix"): ring it until the flash ends.
       if (nodeIndex == gModMatrixHighlightNode && paramIndex == gModMatrixHighlightParam && ImGui::GetTime() < gModMatrixHighlightUntil)
-         StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
+         StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
       // What the user points at and last touched, for the agents' `infinite context`.
       if (hovered)
       {
@@ -640,7 +640,7 @@ namespace app
          return 0;
       const ImVec2 rmin = ImGui::GetItemRectMin();
       const ImVec2 rmax = ImGui::GetItemRectMax();
-      StateRing::Draw(ImGui::GetWindowDrawList(), rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_field);
+      StateRing::Draw(ImGui::GetWindowDrawList(), rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_control);
       const int step = gKbNudge > 0 ? 1 : (gKbNudge < 0 ? -1 : 0);
       gKbNudge = 0;
       return step;
@@ -908,7 +908,7 @@ namespace app
       }
       if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
          dl->AddRect(ImVec2(bp.x - 2, bp.y - 2), ImVec2(bp.x + CheckBox::kSize + 2, bp.y + CheckBox::kSize + 2),
-                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_field + 2.0f, 0, 1.5f);
+                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 1.5f);
       return clicked;
    }
 

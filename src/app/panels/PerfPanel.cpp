@@ -374,7 +374,7 @@ namespace app
          // Draw live snap grid highlight at the non-overlapping target cell
          ImVec2 snapTL(gridOrigin.x + snapX * (cellSize + gap) + gap * 0.5f, gridOrigin.y + snapY * (cellSize + gap) + gap * 0.5f);
          ImVec2 snapBR(snapTL.x + cardSize.x, snapTL.y + cardSize.y);
-         StateRing::Draw(dl, snapTL, snapBR, StateRing::Kind::Target, isLight, tok::radius_pill);
+         StateRing::Draw(dl, snapTL, snapBR, StateRing::Kind::Target, isLight, tok::radius_container);
 
          // Floating live card position
          cellPos = ImVec2(gridOrigin.x + gPerfDragOriginCellX * (cellSize + gap) + gap * 0.5f + (m.x - gPerfDragMouseStart.x),
@@ -390,7 +390,7 @@ namespace app
 
       // Card background & theme tint
       ImU32 themeTint = GetPerfElementColor(elem, dstNode, isLight);
-      const float kCardR = tok::radius_pill;
+      const float kCardR = tok::radius_container;
       const ImVec4 uiText = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImU32 cardBg = isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.62f))
                                    : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.06f));
@@ -1065,7 +1065,7 @@ namespace app
             valY = newY;
          }
 
-         dl->AddRectFilled(origin, padBR, wellCol(0.07f), tok::radius_tile);
+         dl->AddRectFilled(origin, padBR, wellCol(0.07f), tok::radius_control);
          dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y + 4.0f), ImVec2(origin.x + padSize * 0.5f, padBR.y - 4.0f), wellCol(0.10f));
          dl->AddLine(ImVec2(origin.x + 4.0f, origin.y + padSize * 0.5f), ImVec2(padBR.x - 4.0f, origin.y + padSize * 0.5f), wellCol(0.10f));
 
@@ -1222,7 +1222,7 @@ namespace app
          ImVec2 bTL(centerX, centerY);
          ImVec2 bBR(centerX + boxW, centerY + boxH);
 
-         dl->AddRectFilled(bTL, bBR, wellCol(0.07f), tok::radius_tile);
+         dl->AddRectFilled(bTL, bBR, wellCol(0.07f), tok::radius_control);
 
          ImGui::SetCursorScreenPos(bTL);
          float v = dragSeed(val);
@@ -1414,7 +1414,7 @@ namespace app
                ? themeTint
                : wellCol(0.08f);
 
-            dl->AddRectFilled(sTL, sBR, stepBg, tok::radius_tile);
+            dl->AddRectFilled(sTL, sBR, stepBg, tok::radius_control);
 
             if (isCurrent && Transport::Instance().IsPlaying())
                dl->AddRectFilled(ImVec2(sx + 2.0f, sBR.y + 3.0f), ImVec2(sx + stepW - 2.0f, sBR.y + 5.0f), wellCol(0.85f), 1.0f);
@@ -2077,8 +2077,8 @@ namespace app
       // Same neutral strip as the performance panel's listening banner: recessed well, hairline, plain text.
       const ImVec2 a(vp->Pos.x + (vp->Size.x - tsz.x) * 0.5f - tok::space_3, vp->Pos.y + 44.0f);
       const ImVec2 b(a.x + tsz.x + 2.0f * tok::space_3, a.y + 30.0f);
-      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_pill);
-      dl->AddRect(a, b, ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_container);
+      dl->AddRect(a, b, ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_container);
       dl->AddText(ImVec2(a.x + tok::space_3, std::round(a.y + (30.0f - tsz.y) * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.9f)), text);
    }
 
@@ -2133,8 +2133,8 @@ namespace app
          const float stripW = ImGui::GetContentRegionAvail().x;
          ImDrawList* sdl = ImGui::GetWindowDrawList();
          // Same recessed well as the Library list: neutral, no accent colour.
-         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(ImVec4(0, 0, 0, isLightT ? 0.04f : 0.27f)), tok::radius_pill);
-         sdl->AddRect(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(ImVec4(0, 0, 0, isLightT ? 0.04f : 0.27f)), tok::radius_container);
+         sdl->AddRect(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_container);
          const float cy = sp.y + stripH * 0.5f;
          const std::string axisStr = (gPerfMidiLearnAxis == 1) ? " \xC2\xB7 Y axis" : (elem.kind == 4 ? " \xC2\xB7 X axis" : "");
          const bool pad = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7);

@@ -27,7 +27,7 @@ namespace AudioViz
       f.dl = ImGui::GetWindowDrawList();
       f.origin = origin;
       f.br = ImVec2(origin.x + w, origin.y + h);
-      f.dl->AddRectFilled(f.origin, f.br, app::ScopeBgCol(), tok::radius_field);
+      f.dl->AddRectFilled(f.origin, f.br, app::ScopeBgCol(), tok::radius_control);
       f.dl->PushClipRect(f.origin, f.br, true);
       return f;
    }
@@ -36,18 +36,18 @@ namespace AudioViz
    // The two halves of the frame for visualizers that manage their own clip (viewers with several layers).
    inline void Fill(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx)
    {
-      dl->AddRectFilled(mn, mx, app::ScopeBgCol(), tok::radius_field);
+      dl->AddRectFilled(mn, mx, app::ScopeBgCol(), tok::radius_control);
    }
    inline void Border(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx, ImU32 hotBorder = 0)
    {
-      dl->AddRect(mn, mx, hotBorder ? hotBorder : app::ScopeBorderCol(), tok::radius_field);
+      dl->AddRect(mn, mx, hotBorder ? hotBorder : app::ScopeBorderCol(), tok::radius_control);
    }
 
    // Ends the clip and draws the border; `hotBorder` (0 = none) replaces the border colour while hovered.
    inline void End(const Frame& f, ImU32 hotBorder = 0)
    {
       f.dl->PopClipRect();
-      f.dl->AddRect(f.origin, f.br, hotBorder ? hotBorder : app::ScopeBorderCol(), tok::radius_field);
+      f.dl->AddRect(f.origin, f.br, hotBorder ? hotBorder : app::ScopeBorderCol(), tok::radius_control);
    }
 
    // A sample's envelope over the visible fraction [a, b) of it, one column per screen pixel: the

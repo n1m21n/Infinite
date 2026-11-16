@@ -596,9 +596,9 @@ namespace
             continue;
          const ImVec4 col = ClipColor(c, page);
          const bool on = s.clips.count(c.id) != 0;
-         dl->AddRectFilled(ImVec2(cx0, y0), ImVec2(cx1, y1), WithAlpha(col, c.enabled ? (on ? 0.85f : 0.55f) : 0.2f), tok::radius_tile);
+         dl->AddRectFilled(ImVec2(cx0, y0), ImVec2(cx1, y1), WithAlpha(col, c.enabled ? (on ? 0.85f : 0.55f) : 0.2f), tok::radius_control);
          if (on)
-            dl->AddRect(ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(0.9f), tok::radius_tile);
+            dl->AddRect(ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(0.9f), tok::radius_control);
          if (!c.enabled || LinkedNode(page) == nullptr)
             DrawArrangeHatch(dl, ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(0.25f));
          if (!c.name.empty())
@@ -725,7 +725,7 @@ namespace
             if (!editing || pl.repeat)
                depth *= 0.35f;
             const ImVec2 p0(x0, y + 0.5f), p1(x1, y + s.keyH - 0.5f);
-            const float round = std::min(tok::radius_tile * 0.5f, s.keyH * 0.25f);
+            const float round = std::min(tok::radius_control * 0.5f, s.keyH * 0.25f);
             dl->AddRectFilled(p0, p1, WithAlpha(col, depth), round);
             dl->AddRect(p0, p1, sel ? Tint(1.0f) : WithAlpha(col, editing && !pl.repeat ? 1.0f : 0.45f), round);
             if (pl.note->mute || !c.enabled)

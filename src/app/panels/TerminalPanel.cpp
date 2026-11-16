@@ -42,7 +42,7 @@ namespace
 {
    constexpr float kMinHeight = 160.0f;
    constexpr float kMinWidth = 280.0f;
-   constexpr float kTabRowH = 26.0f;
+   constexpr float kTabRowH = tok::row_h;
    constexpr float kLineHeight = 1.3f;
    constexpr int kWheelLines = 3;
 
@@ -719,7 +719,7 @@ namespace
          const float width = ImGui::CalcTextSize(title.c_str()).x + 44.0f;
          ImGui::PushID(i);
          ImGui::SetCursorScreenPos(ImVec2(x, start.y));
-         ImGui::InvisibleButton("##tab", ImVec2(width, kTabRowH - 4.0f));
+         ImGui::InvisibleButton("##tab", ImVec2(width, kTabRowH));
          const bool hovered = ImGui::IsItemHovered();
          // The close mark is part of this button: a second button on top of it never gets the hover.
          const ImVec2 closeMin(x + width - 20.0f, start.y + 3.0f), closeMax(closeMin.x + 16.0f, closeMin.y + 16.0f);
@@ -732,14 +732,14 @@ namespace
             gTerminalFocus = true;
          }
          if (i == sActive || hovered)
-            dl->AddRectFilled(ImVec2(x, start.y), ImVec2(x + width, start.y + kTabRowH - 4.0f),
-                              ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_field);
+            dl->AddRectFilled(ImVec2(x, start.y), ImVec2(x + width, start.y + kTabRowH),
+                              ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
          // Status dot: running, attention, or a failed last command.
          const bool busy = snap && snap->busy;
          const bool failed = snap && snap->exited && snap->exitCode != 0;
          const ImU32 dot = failed ? Ansi(1) : tab.attention ? Ansi(3) : busy ? Ansi(2) : dimColor;
-         dl->AddCircleFilled(ImVec2(x + 10.0f, start.y + (kTabRowH - 4.0f) * 0.5f), 3.0f, dot);
-         dl->AddText(ImVec2(x + 19.0f, start.y + (kTabRowH - 4.0f - ImGui::GetFontSize()) * 0.5f),
+         dl->AddCircleFilled(ImVec2(x + 10.0f, start.y + (kTabRowH) * 0.5f), 3.0f, dot);
+         dl->AddText(ImVec2(x + 19.0f, start.y + (kTabRowH - ImGui::GetFontSize()) * 0.5f),
                      i == sActive ? textColor : dimColor, title.c_str());
          if (hovered || i == sActive)
          {
@@ -752,9 +752,9 @@ namespace
          x += width + 4.0f;
       }
       ImGui::SetCursorScreenPos(ImVec2(x, start.y));
-      ImGui::InvisibleButton("##newtab", ImVec2(22.0f, kTabRowH - 4.0f));
+      ImGui::InvisibleButton("##newtab", ImVec2(kTabRowH, kTabRowH));
       {
-         const ImVec2 c(x + 11.0f, start.y + (kTabRowH - 4.0f) * 0.5f);
+         const ImVec2 c(x + kTabRowH * 0.5f, start.y + kTabRowH * 0.5f);
          const ImU32 mark = ImGui::IsItemHovered() ? textColor : dimColor;
          dl->AddLine(ImVec2(c.x - 4.5f, c.y), ImVec2(c.x + 4.5f, c.y), mark, 1.25f);
          dl->AddLine(ImVec2(c.x, c.y - 4.5f), ImVec2(c.x, c.y + 4.5f), mark, 1.25f);
@@ -776,7 +776,7 @@ namespace
       }
       if (closeIndex >= 0)
          CloseTab(closeIndex);
-      ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + kTabRowH));
+      ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + kTabRowH + tok::row_gap));
    }
 
    void DrawSearchRow(Tab& tab, const term::Snapshot* snap)
@@ -1004,7 +1004,7 @@ namespace
       }
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + avail.x, origin.y + avail.y), tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight()), tok::radius_field);
+      dl->AddRectFilled(origin, ImVec2(origin.x + avail.x, origin.y + avail.y), tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight()), tok::radius_control);
       ImGui::InvisibleButton("##terminalcells", avail, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
       if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
          gTerminalFocus = true;

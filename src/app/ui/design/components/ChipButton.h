@@ -29,7 +29,7 @@ namespace ChipButton
       // soft: a quiet selected state (text-tinted well, full-strength label) for secondary groups next to an accent chip
       const bool acc = on && !soft;
       const ImVec4 bg = acc ? a : ImVec4(t.x, t.y, t.z, (on ? 0.16f : 0.06f) + 0.05f * hv);
-      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(bg), tok::radius_tile);
+      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(bg), tok::radius_control);
       dl->AddText(ImVec2(std::round(p.x + (sz.x - ts.x) * 0.5f), std::round(p.y + (sz.y - ts.y) * 0.5f)),
                   ImGui::GetColorU32(acc ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, on ? 1.0f : 0.8f)), shown.c_str());
       return clicked;

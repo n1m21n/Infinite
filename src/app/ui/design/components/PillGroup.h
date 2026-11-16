@@ -25,7 +25,7 @@ namespace PillGroup
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       dl->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.Right(), r.Bottom()),
-                        ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.06f)), tok::radius_group);
+                        ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.06f)), tok::radius_container);
       const UiLayout::Rect inner = r.Inset(2.0f);
       std::vector<UiLayout::Cell> cells(static_cast<size_t>(count), UiLayout::Flex());
       const std::vector<UiLayout::Rect> rects = UiLayout::Row(inner, cells, 0.0f);
@@ -39,7 +39,7 @@ namespace PillGroup
          const UiLayout::Rect sel = UiLayout::Snap(rects[static_cast<size_t>(selected)]);
          const float px = UiAnim::Value(gid, sel.x, tok::motion_on);
          const ImVec4 a = app::AccentEmphasisSelected();
-         dl->AddRectFilled(ImVec2(px, sel.y), ImVec2(px + sel.w, sel.Bottom()), ImGui::GetColorU32(a), tok::radius_pill);
+         dl->AddRectFilled(ImVec2(px, sel.y), ImVec2(px + sel.w, sel.Bottom()), ImGui::GetColorU32(a), tok::radius_container);
       }
       for (int i = 0; i < count; ++i)
       {
@@ -49,10 +49,10 @@ namespace PillGroup
          const float hv = UiAnim::Hover(s.id, s.hovered && i != selected, tok::motion_hover_in, tok::motion_hover_out);
          if (hv > 0.001f)
             dl->AddRectFilled(ImVec2(cr.x, cr.y), ImVec2(cr.Right(), cr.Bottom()),
-                              ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.06f * hv)), tok::radius_pill);
+                              ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.06f * hv)), tok::radius_container);
          if (s.focused)
             dl->AddRect(ImVec2(cr.x - 1, cr.y - 1), ImVec2(cr.Right() + 1, cr.Bottom() + 1),
-                        ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_pill + 1.0f, 0, 2.0f);
+                        ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_container + 1.0f, 0, 2.0f);
          UiType::Scope ts(labelSize, UiType::Weight::Medium);
          // A longer label (another language, a bigger font) is cut with an ellipsis instead of spilling out of its pill.
          std::string shown(segs[i].label);

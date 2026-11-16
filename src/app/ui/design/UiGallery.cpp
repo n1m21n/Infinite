@@ -110,7 +110,7 @@ namespace UiGallery
          UiLayout::Rect bar = sec[13];
          bar.w = std::min(bar.w, 1500.0f);
          ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(bar.x, bar.y), ImVec2(bar.Right(), bar.Bottom()),
-                                                   ImGui::GetColorU32(ImVec4(0.5f, 0.5f, 0.5f, 0.06f)), tok::radius_tile);
+                                                   ImGui::GetColorU32(ImVec4(0.5f, 0.5f, 0.5f, 0.06f)), tok::radius_control);
          const UiLayout::Rect in = bar.Inset(0.0f, 0.0f, tok::space_2, 0.0f);
          const float g = tok::space_2;
          const float wFile = TextButton::WidthFor("File"), wEdit = TextButton::WidthFor("Edit"), wMenu = TextButton::WidthFor("Menu");

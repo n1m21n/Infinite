@@ -16,8 +16,8 @@ namespace ColourChip
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 q(p.x + size.x, p.y + h);
-      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::radius_tile);
-      dl->AddRect(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.18f + 0.45f * hv)), tok::radius_tile, 0, 1.0f);
+      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::radius_control);
+      dl->AddRect(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.18f + 0.45f * hv)), tok::radius_control, 0, 1.0f);
       return clicked;
    }
 
@@ -36,9 +36,9 @@ namespace ColourChip
       FieldWell::Draw(dl, mn, mx, hovered, ImGui::IsItemActive());
       const float sw = 30.0f, inset = 3.0f;
       const ImVec2 sMin(mx.x - inset - sw, mn.y + inset), sMax(mx.x - inset, mx.y - inset);
-      dl->AddRectFilled(sMin, sMax, ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::radius_tile);
+      dl->AddRectFilled(sMin, sMax, ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::radius_control);
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      dl->AddRect(sMin, sMax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.18f)), tok::radius_tile, 0, 1.0f);
+      dl->AddRect(sMin, sMax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.18f)), tok::radius_control, 0, 1.0f);
       ImVec4 dim = labelTint != nullptr ? *labelTint : ImVec4(t.x, t.y, t.z, t.w * 0.55f);
       dl->PushClipRect(mn, ImVec2(sMin.x - pad, mx.y), true);
       dl->AddText(ImVec2(mn.x + pad, mn.y + (h - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(dim), caption);

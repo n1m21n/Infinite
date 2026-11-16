@@ -78,7 +78,7 @@ namespace ActionButton
          fill = ImVec4(std::clamp(fill.x + lift, 0.0f, 1.0f), std::clamp(fill.y + lift, 0.0f, 1.0f), std::clamp(fill.z + lift, 0.0f, 1.0f), 1.0f);
       }
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(fill), tok::radius_tile);
+      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(fill), tok::radius_control);
       const float iconW = glyph != nullptr ? 20.0f : 0.0f; // 14px glyph + 6px gap
       const ImU32 ink = ImGui::GetColorU32(kind == Kind::Solo ? ImVec4(0.10f, 0.10f, 0.12f, 1.0f) : solid ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.85f));
       const float x0 = p.x + (w - ts.x - iconW) * 0.5f;

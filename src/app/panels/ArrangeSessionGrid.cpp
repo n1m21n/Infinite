@@ -24,9 +24,9 @@ namespace app
       constexpr float kSceneColW = 136.0f;
       constexpr float kColMinW = 112.0f;
       constexpr float kColMaxW = 176.0f;
-      constexpr float kHeaderH = 28.0f;
-      constexpr float kRowH = 30.0f;
-      constexpr float kFooterH = 30.0f;
+      constexpr float kHeaderH = tok::row_h;
+      constexpr float kRowH = tok::row_h;
+      constexpr float kFooterH = tok::row_h;
       constexpr float kGap = 2.0f;
       constexpr int kMinRows = 6;
 
@@ -606,7 +606,7 @@ namespace app
          const Arrange::Lane& lane = gArrange.lanes[(size_t)li];
          const float x0 = o.x + kSceneColW + colW * (float)li;
          const ImVec2 a(x0 + kGap, o.y + kGap), b(x0 + colW - kGap, o.y + kHeaderH - kGap);
-         dl->AddRectFilled(a, b, TextCol(0.06f), tok::radius_field);
+         dl->AddRectFilled(a, b, TextCol(0.06f), tok::radius_control);
          const std::string name = lane.name.empty() ? (lane.type == Arrange::kLaneVideo ? T("Video") : T("Audio"))
                                                     : lane.name;
          const float th = ImGui::GetTextLineHeight();
@@ -699,7 +699,7 @@ namespace app
             HelpTip("%s", rowHasClip ? T("Click to launch this row on every track, click again to stop it. Drag to reorder. Right-click for its tempo and what plays next.")
                                      : T("Right-click to rename this scene or set its tempo"));
          ImGui::PopID();
-         dl->AddRectFilled(a, b, TextCol(hov ? 0.10f : 0.05f), tok::radius_field);
+         dl->AddRectFilled(a, b, TextCol(hov ? 0.10f : 0.05f), tok::radius_control);
          const float cy = (a.y + b.y) * 0.5f;
          // Scene state: playing = every filled cell of the row is running (a ring sweeps with the clip),
          // queued = the launch is waiting for the quantize point (the play glyph pulses on the beat).
@@ -714,9 +714,9 @@ namespace app
                break;
             }
          if (sSelScene == row)
-            dl->AddRect(a, b, TextCol(0.70f), tok::radius_field, 0, 1.5f);
+            dl->AddRect(a, b, TextCol(0.70f), tok::radius_control, 0, 1.5f);
          if (rowPlaying)
-            dl->AddRectFilled(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.10f), tok::radius_field);
+            dl->AddRectFilled(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.10f), tok::radius_control);
          if (rowPlaying)
             DrawProgressRing(dl, ImVec2(a.x + 13.0f, cy), 7.0f, rowProgress, TextCol(0.95f));
          else
@@ -864,14 +864,14 @@ namespace app
                ImU32 fill = SlotFill(ss->clip, isVideo, st.playing || held);
                if (muted)
                   fill = isLight ? tok::U32(tok::pal::c_B0B2BADC) : tok::U32(tok::pal::c_484850DC);
-               dl->AddRectFilled(a, b, fill, tok::radius_field);
+               dl->AddRectFilled(a, b, fill, tok::radius_control);
                if (muted)
                   DrawArrangeHatch(dl, a, b, isLight ? tok::U32(tok::pal::c_0000002D) : tok::U32(tok::pal::c_FFFFFF26));
                const ImU32 ink = muted ? TextCol(0.55f) : LabelOn(fill);
                if (st.playing)
-                  dl->AddRect(a, b, tok::U32(tok::pal::c_FFFFFFF0), tok::radius_field, 0, 1.5f);
+                  dl->AddRect(a, b, tok::U32(tok::pal::c_FFFFFFF0), tok::radius_control, 0, 1.5f);
                else if (hov)
-                  dl->AddRect(a, b, tok::U32(tok::pal::c_E6E6F0DC), tok::radius_field, 0, 1.0f);
+                  dl->AddRect(a, b, tok::U32(tok::pal::c_E6E6F0DC), tok::radius_control, 0, 1.0f);
                const ImVec2 ic(a.x + 13.0f, cy);
                if (st.playing)
                   DrawProgressRing(dl, ic, 7.0f, st.progress, tok::U32(tok::pal::c_FFFFFFFF));
@@ -883,7 +883,7 @@ namespace app
                   // target - a pulsing outline, steady under Reduce Motion.
                   const float ap = UiAnim::ReduceMotion() ? 1.0f : 0.55f + 0.45f * std::sin((float)ImGui::GetTime() * 5.0f);
                   dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
-                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), ap), tok::radius_field, 0, 2.5f);
+                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), ap), tok::radius_control, 0, 2.5f);
                   HelpTip("%s", T("Click a node on the canvas to assign it. Esc cancels."));
                }
                if (gArrangeFlashClipId == ss->clip.id)
@@ -893,15 +893,15 @@ namespace app
                      gArrangeFlashClipId = 0;
                   else
                      dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
-                                 IM_COL32(255, 255, 255, (int)(255.0f * (1.0f - ft / 1.2f))), tok::radius_field, 0, 2.5f);
+                                 IM_COL32(255, 255, 255, (int)(255.0f * (1.0f - ft / 1.2f))), tok::radius_control, 0, 2.5f);
                }
                if (st.queued)
-                  dl->AddRect(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.9f * pulse), tok::radius_field, 0, 1.5f);
+                  dl->AddRect(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.9f * pulse), tok::radius_control, 0, 1.5f);
                if (st.upNext)
                {
                   // Up next (a follow action is about to start this clip): a steady inner outline and a chevron.
                   dl->AddRect(ImVec2(a.x + 2.0f, a.y + 2.0f), ImVec2(b.x - 2.0f, b.y - 2.0f),
-                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.75f), tok::radius_field, 0, 1.0f);
+                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.75f), tok::radius_control, 0, 1.0f);
                   glyph::DrawChevronDown(dl, ImVec2(b.x - 14.0f, a.y + 8.0f), tok::icon_control, WithAlpha(ink, 0.9f));
                }
                const std::string label = SlotLabel(ss->clip);
@@ -918,7 +918,7 @@ namespace app
             {
                // Empty: a quiet recess. While the track plays, the cell is a
                // stop button, and says so on hover.
-               dl->AddRectFilled(a, b, TextCol(hov ? 0.08f : 0.035f), tok::radius_field);
+               dl->AddRectFilled(a, b, TextCol(hov ? 0.08f : 0.035f), tok::radius_control);
                if (hov)
                {
                   // A plus: a double-click adds an unassigned clip to this cell.
@@ -934,7 +934,7 @@ namespace app
             // The keyboard cursor / selected clip.
             if ((ss != nullptr && gArrangeSel.count(ss->clip.id) != 0) || (laneId == sCurLaneId && row == sCurRow))
                dl->AddRect(ImVec2(a.x - 1.0f, a.y - 1.0f), ImVec2(b.x + 1.0f, b.y + 1.0f),
-                           WithAlpha(TextCol(1.0f), gSessionClaimedKeys ? 0.9f : 0.45f), tok::radius_field, 0, 1.5f);
+                           WithAlpha(TextCol(1.0f), gSessionClaimedKeys ? 0.9f : 0.45f), tok::radius_control, 0, 1.5f);
             if (ss != nullptr && gArrangeRenamingClipId == ss->clip.id)
             {
                static uint64_t sRenameFocusedId = 0;
@@ -1004,7 +1004,7 @@ namespace app
                ArrangeSessionStopLane(laneId);
             const bool hov = ImGui::IsItemHovered();
             ImGui::EndDisabled();
-            dl->AddRectFilled(a, b, TextCol(canStop ? (hov ? 0.12f : 0.07f) : 0.03f), tok::radius_field);
+            dl->AddRectFilled(a, b, TextCol(canStop ? (hov ? 0.12f : 0.07f) : 0.03f), tok::radius_control);
             const float alpha = !canStop ? 0.22f : (ls.stopQueued ? 0.9f * pulse : 0.85f);
             DrawStopSquare(dl, ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), 9.0f, TextCol(alpha));
             if (hov)
@@ -1027,7 +1027,7 @@ namespace app
          {
             const float x0 = o.x + kSceneColW + colW * (float)li, y0 = bodyTop + kRowH * (float)row;
             dl->AddRect(ImVec2(x0 + kGap - 1.0f, y0 + kGap - 1.0f), ImVec2(x0 + colW - kGap + 1.0f, y0 + kRowH - kGap + 1.0f),
-                        TextCol(0.95f), tok::radius_field, 0, 2.0f);
+                        TextCol(0.95f), tok::radius_control, 0, 2.0f);
          }
          if (srcLane != nullptr && SlotOf(*srcLane, sDrag.row) != nullptr)
          {

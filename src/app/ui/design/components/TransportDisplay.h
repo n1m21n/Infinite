@@ -24,7 +24,7 @@ namespace TransportDisplay
 
    inline void Well(ImVec2 mn, ImVec2 mx)
    {
-      ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, ImGui::GetColorU32(Text(0.06f)), tok::radius_group);
+      ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, ImGui::GetColorU32(Text(0.06f)), tok::radius_container);
    }
 
    inline void Divider(float x, float top)
@@ -51,6 +51,6 @@ namespace TransportDisplay
       const float a = down ? 0.12f : 0.07f * hover;
       if (a > 0.001f)
          ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(mn.x + 1, mn.y + 2), ImVec2(mx.x - 1, mx.y - 2),
-                                                   ImGui::GetColorU32(Text(a)), tok::radius_tile);
+                                                   ImGui::GetColorU32(Text(a)), tok::radius_control);
    }
 }

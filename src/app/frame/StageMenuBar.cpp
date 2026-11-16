@@ -727,7 +727,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (sMenuMidYPtr != nullptr)
                *sMenuMidYPtr = mid;
             menuDl->AddRectFilled(ImVec2(menuGroupP.x - 2.0f, mid - tok::control_h * 0.5f), ImVec2(menuGroupMaxX + 2.0f, mid + tok::control_h * 0.5f),
-               ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.06f)), tok::radius_tile);
+               ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.06f)), tok::radius_control);
          }
          menuDl->ChannelsMerge();
 
@@ -742,7 +742,7 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_1000_1000_1000_80));
          ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_1000_1000_1000_160));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
          // 24 pt controls (tok::control_h) on one centre line; the cursor Y below pins them in the bar.
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (tok::control_h - ImGui::GetFontSize()) * 0.5f));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
@@ -1317,7 +1317,7 @@ void DrawMenuBar(FrameCtx& fc)
                const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const ImVec4 ac = ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
-               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? 0.28f : 0.16f)), tok::radius_tile);
+               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? 0.28f : 0.16f)), tok::radius_control);
                const ImU32 fg = ImGui::GetColorU32(ac);
                dl->AddLine(ImVec2(c.x, c.y - 6.0f), ImVec2(c.x, c.y + 4.0f), fg, 1.8f);
                dl->AddLine(ImVec2(c.x - 4.5f, c.y), ImVec2(c.x, c.y + 4.5f), fg, 1.8f);

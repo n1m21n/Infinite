@@ -173,10 +173,10 @@ namespace app
    // Small breathing room between the title row and the render/image below
    // it - without this the render started at the exact next-line cursor with
    // zero gap, so it visually touched the title row.
-   // A card is a group well: padding on every side, a 28 px title row (title left, close tile right), then
+   // A card is a group well: padding on every side, a row_h title row (title left, close tile right), then
    // the render in a rounded tile.
    constexpr float kViewportCardPad = tok::space_2;
-   constexpr float kViewportCardTitleRow = 28.0f;
+   constexpr float kViewportCardTitleRow = tok::row_h;
 
    float ViewportPanelTitleHeight()
    {
@@ -201,7 +201,7 @@ namespace app
       {
          ImVec4 w = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          w.w *= 0.05f;
-         dl->AddRectFilled(cardMin, cardMax, ImGui::GetColorU32(w), tok::radius_group);
+         dl->AddRectFilled(cardMin, cardMax, ImGui::GetColorU32(w), tok::radius_container);
       }
 
       // Title row: name on the left, a quiet close tile on the right (neutral wash on hover, no red).
@@ -217,7 +217,7 @@ namespace app
          ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          if (hot)
             dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, ImGui::IsItemActive() ? 0.12f : 0.07f)),
-                              tok::radius_tile);
+                              tok::radius_control);
          t.w *= hot ? 1.0f : 0.55f;
          glyph::DrawX(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tile * 0.5f, ImGui::GetColorU32(t));
       }
@@ -234,7 +234,7 @@ namespace app
 
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
-      DrawCheckerboardBackdrop(dl, origin, br, tok::radius_tile);
+      DrawCheckerboardBackdrop(dl, origin, br, tok::radius_control);
 
       if (auto* geo = dynamic_cast<IGeometrySource*>(gn.node.get()))
       {
@@ -247,7 +247,7 @@ namespace app
          const unsigned int tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(gn.node.get())),
                                                   cam, (int)imageSize.x, (int)imageSize.y);
          if (tex != 0)
-            dl->AddImageRounded((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_tile);
+            dl->AddImageRounded((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
          else
             EmptyState::DrawCaption(origin, br, EmptyPreviewLabel(gn.node.get(), "no geometry"));
 
@@ -274,7 +274,7 @@ namespace app
          // matching drag-orbit just above on this same gNodeCameras entry.
          ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_tile, 0, 1.0f);
+            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, 1.0f);
          // Layout cursor already sits at origin+imageSize from the
          // InvisibleButton above; the trailing Dummy(imageSize) below is
          // shared with the non-geometry branch, so rewind rather than
@@ -380,7 +380,7 @@ namespace app
             // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
             ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_tile, 0, 1.0f);
+               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, 1.0f);
             ImGui::SetCursorScreenPos(origin);
          }
       }

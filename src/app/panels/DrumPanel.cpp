@@ -57,11 +57,11 @@ namespace app
       constexpr int kMaxSteps = DrumSequencerNode::kMaxSteps;
       constexpr int kPageSteps = DrumSequencerNode::kEditPageSteps;
       constexpr float kInspectorW = 268.0f;
-      constexpr float kRowH = 28.0f;     // a lane row: fixed, so the grid never squashes as the panel shrinks
+      constexpr float kRowH = tok::row_h;  // a lane row: fixed, so the grid never squashes as the panel shrinks
       constexpr float kLabelW = 178.0f;  // lane name + M S, left of the grid
-      constexpr float kRulerH = 26.0f;
+      constexpr float kRulerH = tok::row_h;
       constexpr float kGroupGap = 4.0f; // extra space between four-step key groups
-      constexpr float kRowGap = 6.0f;
+      constexpr float kRowGap = tok::row_gap;
       constexpr float kCellGap = 2.0f;
       constexpr float kDefaultVel = 0.8f;
 

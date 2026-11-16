@@ -160,7 +160,7 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          if (sel || hov)
             dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 0.14f : 0.08f)),
-                              tok::radius_tile);
+                              tok::radius_control);
          const char* label = T(kTabs[i]); // drawn text, not a widget label: L() would add the "###id" part
          const ImVec2 ts = ImGui::CalcTextSize(label);
          dl->AddText(ImVec2(p.x + kNavInset, p.y + (h - ts.y) * 0.5f),

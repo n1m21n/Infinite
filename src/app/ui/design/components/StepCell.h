@@ -12,7 +12,7 @@ namespace StepCell
    inline void PlayheadOutline(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx, float thickness = 1.5f)
    {
       const bool light = app::IsThemeLight();
-      dl->AddRect(mn, mx, light ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6), tok::radius_field, 0,
+      dl->AddRect(mn, mx, light ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6), tok::radius_control, 0,
                   thickness);
    }
 
@@ -20,7 +20,7 @@ namespace StepCell
                     bool hovered = false)
    {
       const bool light = app::IsThemeLight();
-      const float r = tok::radius_field;
+      const float r = tok::radius_control;
       dl->AddRectFilled(mn, mx, light ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_0B0C10FF), r);
       if (on)
          dl->AddRectFilled(mn, mx,

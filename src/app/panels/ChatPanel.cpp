@@ -220,7 +220,7 @@ namespace app
       };
       std::vector<Queued> sQueue;
       bool sQueueHold = false;
-      constexpr float kQueueRowH = 26.0f;
+      constexpr float kQueueRowH = tok::row_h;
       constexpr float kQueuePad = 3.0f;  // air above and below the tray's rows
       bool sCursorToEnd = false;
       // Selecting an agent's words: every word and chip DrawFlow lays out this frame, with where it
@@ -539,7 +539,7 @@ namespace app
          {
             // No mark: its first letter on a neutral tile, the icon tile's shape.
             const ImVec2 a(std::round(c.x - r), std::round(c.y - r)), b(a.x + std::round(r * 2.0f), a.y + std::round(r * 2.0f));
-            dl->AddRectFilled(a, b, TextTint(0.08f), std::min(tok::radius_tile, r * 0.5f));
+            dl->AddRectFilled(a, b, TextTint(0.08f), std::min(tok::radius_control, r * 0.5f));
             const char name[2] = { (char)std::toupper((unsigned char)AgentName(id)[0]), 0 };
             UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
             const ImVec2 ts = ImGui::CalcTextSize(name);
@@ -1769,12 +1769,12 @@ namespace app
             return;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         const float inset = tok::radius_tile * 2.0f;  // the composer's corner: the tray meets its straight edge
+         const float inset = tok::radius_control * 2.0f;  // the composer's corner: the tray meets its straight edge
          const float pad = tok::space_3;                // the composer's own inset
          const ImVec2 t0(at.x + inset, at.y), t1(at.x + width - inset, at.y + QueueHeight());
-         dl->AddRectFilled(t0, t1, TextTint(0.04f), tok::radius_tile * 2.0f, ImDrawFlags_RoundCornersTop);
+         dl->AddRectFilled(t0, t1, TextTint(0.04f), tok::radius_control * 2.0f, ImDrawFlags_RoundCornersTop);
          {  // open outline (no bottom edge: the tray sits on the composer)
-            const float r = tok::radius_tile * 2.0f;
+            const float r = tok::radius_control * 2.0f;
             const ImVec2 a(t0.x + 0.5f, t0.y + 0.5f), b(t1.x - 0.5f, t1.y);
             dl->PathClear();
             dl->PathLineTo(ImVec2(a.x, b.y));
@@ -1805,7 +1805,7 @@ namespace app
                drop = (int)i;
             const float cy = std::floor(p.y + kQueueRowH * 0.5f);
             if (hot)
-               dl->AddRectFilled(ImVec2(p.x + 3.0f, p.y), ImVec2(p.x + rowW - 3.0f, p.y + kQueueRowH), TextTint(0.05f), tok::radius_tile);
+               dl->AddRectFilled(ImVec2(p.x + 3.0f, p.y), ImVec2(p.x + rowW - 3.0f, p.y + kQueueRowH), TextTint(0.05f), tok::radius_control);
             glyph::Draw(dl, ImVec2(leftC, cy), tok::icon_control, Dim(), IconsInfinite::History);
             const float tx = leftC + 7.0f + tok::space_2, ty = cy - ImGui::GetFontSize() * 0.5f;
             std::string one = sQueue[i].text.substr(0, sQueue[i].text.find('\n'));
@@ -2612,8 +2612,8 @@ namespace app
          const bool folderHot = ImGui::IsItemHovered() && exists;
          ImGui::PopID();
 
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + cardH), TextTint(hot ? 0.08f : 0.05f), tok::radius_tile * 2.0f);
-         dl->AddRect(at, ImVec2(at.x + width, at.y + cardH), TextTint(0.08f), tok::radius_tile * 2.0f);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + cardH), TextTint(hot ? 0.08f : 0.05f), tok::radius_control * 2.0f);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + cardH), TextTint(0.08f), tok::radius_control * 2.0f);
          dl->AddCircleFilled(bc, btn * 0.5f, exists ? WithAlpha(accent, hot ? 0.95f : 0.85f) : TextTint(0.08f), 32);
          const ImU32 onAccent = IM_COL32_WHITE;  // as on Send
          if (playing)
@@ -2662,13 +2662,13 @@ namespace app
 
          const ImVec2 fc(folderX + folder * 0.5f, at.y + cardH * 0.5f);
          if (folderHot)
-            dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
+            dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(0.08f), tok::radius_control);
          glyph::Draw(dl, fc, tok::icon_control, folderHot ? text : Dim(), IconsInfinite::Folder);
          if (folderHot)
             ImGui::SetTooltip("%s", T("Show in folder"));
          const ImVec2 sc(samplerX + folder * 0.5f, at.y + cardH * 0.5f);
          if (samplerHot)
-            dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
+            dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(0.08f), tok::radius_control);
          glyph::Draw(dl, sc, tok::icon_control, samplerHot ? text : Dim(), IconsInfinite::Waveform);
          if (samplerHot)
             ImGui::SetTooltip("%s", T("Open in a Sampler"));
@@ -2747,7 +2747,7 @@ namespace app
          const bool clicked = ImGui::InvisibleButton("##file", ImVec2(width, rowH)) && exists;
          ImGui::PopID();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_tile);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_control);
          glyph::Draw(dl, ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), tok::icon_control, Dim(), IconsInfinite::Library);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
@@ -2791,7 +2791,7 @@ namespace app
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImGui::Image((ImTextureID)(intptr_t)FrameOf(*t), ImVec2(w * s, h * s));
          const bool hot = ImGui::IsItemHovered();
-         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(hot ? 0.24f : 0.12f), tok::radius_field);
+         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(hot ? 0.24f : 0.12f), tok::radius_control);
          if (hot)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          if (ImGui::IsItemClicked())
@@ -2823,8 +2823,8 @@ namespace app
             const ImVec2 sz(std::floor(t->w * fit), std::floor(t->h * fit));
             const ImVec2 p0(std::floor(vp->Pos.x + (vp->Size.x - sz.x) * 0.5f), std::floor(vp->Pos.y + (vp->Size.y - sz.y) * 0.5f));
             const ImVec2 p1(p0.x + sz.x, p0.y + sz.y);
-            dl->AddImageRounded((ImTextureID)(intptr_t)FrameOf(*t), p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, tok::radius_field);
-            dl->AddRect(p0, p1, TextTint(0.12f), tok::radius_field);
+            dl->AddImageRounded((ImTextureID)(intptr_t)FrameOf(*t), p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, tok::radius_control);
+            dl->AddRect(p0, p1, TextTint(0.12f), tok::radius_control);
             const std::string name = std::filesystem::path(sViewing).filename().string();
             char size[32];
             std::snprintf(size, sizeof size, "%d × %d", t->w, t->h);
@@ -2927,8 +2927,8 @@ namespace app
          const bool hot = ImGui::IsItemHovered();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          // Frames come row-flipped for GL: draw them with v running bottom to top.
-         dl->AddImageRounded((ImTextureID)(intptr_t)v->tex, at, end, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_field);
-         dl->AddRect(at, end, TextTint(hot ? 0.24f : 0.12f), tok::radius_field);
+         dl->AddImageRounded((ImTextureID)(intptr_t)v->tex, at, end, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
+         dl->AddRect(at, end, TextTint(hot ? 0.24f : 0.12f), tok::radius_control);
          const bool playing = v->handle != nullptr;
          const ImVec2 c(std::floor((at.x + end.x) * 0.5f), std::floor((at.y + end.y) * 0.5f));
          const ImU32 shade = WithAlpha(IM_COL32_BLACK, 0.47f);
@@ -3024,9 +3024,9 @@ namespace app
          if (hot)
             ImGui::SetTooltip("%s", on ? T("Close code") : T("Open code"));
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), TextTint(hot ? 0.10f : 0.06f), tok::radius_field);
+         dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), TextTint(hot ? 0.10f : 0.06f), tok::radius_control);
          if (on)
-            dl->AddRect(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(AccentEmphasisSelected()), tok::radius_field);
+            dl->AddRect(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(AccentEmphasisSelected()), tok::radius_control);
          const ImU32 fg = on ? ImGui::GetColorU32(AccentEmphasisSelected()) : (hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim());
          glyph::Draw(dl, ImVec2(p.x + pad + icon * 0.5f, p.y + sz.y * 0.5f), icon, fg, IconsInfinite::Code);
          dl->AddText(ImVec2(p.x + pad + icon + 6.0f, std::round(p.y + (sz.y - ImGui::GetFontSize()) * 0.5f)), fg, label);
@@ -3410,7 +3410,7 @@ namespace app
             ImGui::PopID();
          }
          dl->ChannelsSetCurrent(0);
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + h), TextTint(0.05f), tok::radius_tile);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + h), TextTint(0.05f), tok::radius_control);
          dl->ChannelsMerge();
          ImGui::SetCursorScreenPos(at);
          ImGui::Dummy(ImVec2(width, h));
@@ -3549,7 +3549,7 @@ namespace app
             dl->ChannelsSetCurrent(1);
             const float h = DrawFlow(segs, ImVec2(box.x + tok::space_2, box.y + tok::space_1 + 1.0f), w - 2.0f * tok::space_2, id, ImGui::GetColorU32(ImGuiCol_Text));
             dl->ChannelsSetCurrent(0);
-            dl->AddRectFilled(box, ImVec2(box.x + w, box.y + h + 2.0f * tok::space_1 + 2.0f), TextTint(0.09f), tok::radius_tile);
+            dl->AddRectFilled(box, ImVec2(box.x + w, box.y + h + 2.0f * tok::space_1 + 2.0f), TextTint(0.09f), tok::radius_control);
             dl->ChannelsMerge();
             y += h + 2.0f * tok::space_1 + 2.0f;
          }
@@ -3564,7 +3564,7 @@ namespace app
                x = origin.x + width, y += 24.0f;
             x -= w;
             const ImVec2 p(x, y + 3.0f);
-            dl->AddRect(p, ImVec2(p.x + w, p.y + 20.0f), TextTint(0.16f), tok::radius_tile);
+            dl->AddRect(p, ImVec2(p.x + w, p.y + 20.0f), TextTint(0.16f), tok::radius_control);
             dl->AddText(ImVec2(p.x + tok::space_2, p.y + (20.0f - ImGui::GetFontSize()) * 0.5f), TextTint(0.8f), name.c_str());
             x -= tok::space_1;
          }
@@ -3578,8 +3578,8 @@ namespace app
       void GlassCard(ImVec2 at, float width, float height)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), TextTint(0.045f), tok::radius_tile + 4.0f);
-         dl->AddRect(at, ImVec2(at.x + width, at.y + height), TextTint(0.10f), tok::radius_tile + 4.0f, 0, 1.0f);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), TextTint(0.045f), tok::radius_control + 4.0f);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + height), TextTint(0.10f), tok::radius_control + 4.0f, 0, 1.0f);
       }
 
       // ── First run (docs/CHAT.md, First run) ─────────────────────────────────
@@ -3796,7 +3796,7 @@ namespace app
             if (click)
                o.pick = a.id;
             if (on || hot)
-               dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), TextTint(on ? 0.09f : 0.05f), tok::radius_tile);
+               dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), TextTint(on ? 0.09f : 0.05f), tok::radius_control);
             DrawAvatar(dl, ImVec2(c.x + 11.0f, p.y + rowH * 0.5f), 11.0f, a.id);
             const float ty = p.y + (rowH - ImGui::GetFontSize()) * 0.5f;
             dl->AddText(ImVec2(c.x + 30.0f, ty), usable ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), a.name);
@@ -4206,8 +4206,8 @@ namespace app
                   at.y = lp.min.y - h - 2.0f * pad - tok::space_1;
                at.x = std::clamp(at.x, win->InnerRect.Min.x, win->InnerRect.Max.x - w);
                const ImVec2 bg1(at.x + w, at.y + h + 2.0f * pad);
-               dl->AddRectFilled(at, bg1, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_tile + pad);
-               dl->AddRect(at, bg1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_tile + pad);
+               dl->AddRectFilled(at, bg1, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_control + pad);
+               dl->AddRect(at, bg1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control + pad);
                // Hit-tested by hand, not ImGui items: while the composer holds focus ImGui hovers nothing else,
                // and the press would fall through to the words and start a new selection.
                const float cw = ImGui::CalcTextSize(T("Copy")).x + 2.0f * tok::space_2;
@@ -4220,7 +4220,7 @@ namespace app
                   const ImRect& r = k == 0 ? copyR : replyR;
                   const bool hov = r.Contains(m);
                   const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-                  dl->AddRectFilled(r.Min, r.Max, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 0.12f : 0.06f)), tok::radius_tile);
+                  dl->AddRectFilled(r.Min, r.Max, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 0.12f : 0.06f)), tok::radius_control);
                   const char* label = k == 0 ? T("Copy") : T("Reply");
                   const ImVec2 ts = ImGui::CalcTextSize(label);
                   dl->AddText(ImVec2(std::round(r.Min.x + (r.GetWidth() - ts.x) * 0.5f), std::round(r.Min.y + (h - ts.y) * 0.5f)),
@@ -4492,7 +4492,7 @@ namespace app
          ImGui::SetNextWindowPos(ImVec2(anchor.x, anchor.y - tok::space_1), ImGuiCond_Always, ImVec2(0.0f, 1.0f));
          ImGui::SetNextWindowSize(ImVec2(width, h));
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_1, tok::space_1));
-         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_tile);
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_control);
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
          const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                         ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus;
@@ -4517,7 +4517,7 @@ namespace app
                   sPick = i, sPickByKey = false;
                if (i == sPick && !c.info)
                {
-                  dl->AddRectFilled(at, ImVec2(at.x + rowW, at.y + rowH), TextTint(EnterPicks() ? 0.10f : 0.05f), tok::radius_field);
+                  dl->AddRectFilled(at, ImVec2(at.x + rowW, at.y + rowH), TextTint(EnterPicks() ? 0.10f : 0.05f), tok::radius_control);
                   if (sPickByKey && (at.y < ImGui::GetWindowPos().y || at.y + rowH > ImGui::GetWindowPos().y + ImGui::GetWindowHeight()))
                   {
                      ImGui::SetScrollHereY(at.y < ImGui::GetWindowPos().y ? 0.0f : 1.0f);
@@ -4623,7 +4623,7 @@ namespace app
       void BeginMenuStyle()
       {
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_group);
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_container);
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
          ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
       }
@@ -4647,7 +4647,7 @@ namespace app
          const bool hot = ImGui::IsItemHovered() && enabled;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          if (hot)
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), TextTint(0.08f), tok::radius_tile);
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), TextTint(0.08f), tok::radius_control);
          float x = p.x + tok::space_2;
          if (!avatar.empty())
          {
@@ -4793,7 +4793,7 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
          if (hot)
-            dl->AddRectFilled(mn, mx, TextTint(0.06f), tok::radius_tile);
+            dl->AddRectFilled(mn, mx, TextTint(0.06f), tok::radius_control);
          if (!avatar.empty())
             DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + 7.0f, mn.y + h * 0.5f), 7.0f, avatar);
          dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), text.c_str());
@@ -4942,8 +4942,8 @@ namespace app
          const float replyH = ReplyHeight();
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.07f), tok::radius_tile * 2.0f);
-         dl->AddRect(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.10f), tok::radius_tile * 2.0f);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.07f), tok::radius_control * 2.0f);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.10f), tok::radius_control * 2.0f);
 
          // Reply: a glass card inside the well, an accent edge, who it quotes in one line, a close mark.
          if (replyH > 0.0f)
@@ -4954,7 +4954,7 @@ namespace app
                capFs = ImGui::GetFontSize();
             }
             const ImVec2 a(at.x + pad, at.y + pad), b(at.x + width - pad, at.y + pad + replyH - 6.0f);
-            const float r = tok::radius_tile + 2.0f;
+            const float r = tok::radius_control + 2.0f;
             dl->AddRectFilled(a, b, TextTint(0.06f), r);
             dl->AddRect(a, b, TextTint(0.12f), r);
             dl->AddRectFilled(ImVec2(a.x + 8.0f, a.y + 8.0f), ImVec2(a.x + 11.0f, b.y - 8.0f), ImGui::GetColorU32(ImGuiCol_CheckMark), 2.0f);
@@ -4988,12 +4988,12 @@ namespace app
             if (x + w + (i + 1 < sAttach.size() ? moreW + tok::space_1 : 0.0f) > at.x + width - pad)
             {
                const ImVec2 p(x, at.y + pad + replyH);
-               dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
+               dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + 22.0f), TextTint(0.08f), tok::radius_control);
                dl->AddText(ImVec2(p.x + tok::space_2, p.y + (22.0f - fs) * 0.5f), Dim(), more.c_str());
                break;
             }
             const ImVec2 p(x, at.y + pad + replyH);
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + 22.0f), TextTint(0.08f), tok::radius_control);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::RenderTextEllipsis(dl, ImVec2(p.x + tok::space_2, p.y + (22.0f - fs) * 0.5f), ImVec2(p.x + w - 20.0f, p.y + 22.0f), p.x + w - 20.0f, name.c_str(), nullptr, nullptr);
             ImGui::PopStyleColor();
@@ -5081,7 +5081,7 @@ namespace app
             const bool hot = ImGui::IsItemHovered();
             if (hot)
             {
-               dl->AddRectFilled(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f), ImVec2(ac.x + sendW * 0.5f, ac.y + sendW * 0.5f), TextTint(0.10f), tok::radius_tile);
+               dl->AddRectFilled(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f), ImVec2(ac.x + sendW * 0.5f, ac.y + sendW * 0.5f), TextTint(0.10f), tok::radius_control);
                ImGui::SetTooltip("%s", T("Attach files"));
             }
             glyph::Draw(dl, ac, tok::icon_control, hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(0.70f), IconsInfinite::Plus);
@@ -5095,7 +5095,7 @@ namespace app
          {
             const bool stop = ImGui::InvisibleButton("##chatstop", ImVec2(sendW, sendW));
             const bool hot = ImGui::IsItemHovered();
-            dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? 0.16f : 0.10f), tok::radius_tile);
+            dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? 0.16f : 0.10f), tok::radius_control);
             glyph::Draw(dl, sc, tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::StopFill);
             if (hot)
                ImGui::SetTooltip("%s", T("Stop"));
@@ -5117,7 +5117,7 @@ namespace app
             const bool clicked = ImGui::InvisibleButton("##chatsend", ImVec2(sendW, sendW));
             const bool hot = ImGui::IsItemHovered();
             if (canSend)
-               dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_tile);
+               dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_control);
             glyph::Draw(dl, sc, tok::icon_control, canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f), IconsInfinite::Send);
             if (hot && canSend)
                ImGui::SetTooltip("%s", T("Send"));
@@ -5157,7 +5157,7 @@ namespace app
       {
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + w, at.y + h), TextTint(0.035f), tok::radius_field);
+         dl->AddRectFilled(at, ImVec2(at.x + w, at.y + h), TextTint(0.035f), tok::radius_control);
          dl->AddLine(ImVec2(at.x + w - 0.5f, at.y), ImVec2(at.x + w - 0.5f, at.y + h), TextTint(0.08f));
          const float pad = tok::space_2;
          const float rowW = w - 2.0f * pad - 1.0f;
@@ -5191,7 +5191,7 @@ namespace app
             ImDrawList* cd = ImGui::GetWindowDrawList();
             const bool current = t.id == sThread.id;
             if (hot || current)
-               cd->AddRectFilled(p, ImVec2(p.x + rw, p.y + rh), TextTint(current ? 0.10f : 0.06f), tok::radius_tile);
+               cd->AddRectFilled(p, ImVec2(p.x + rw, p.y + rh), TextTint(current ? 0.10f : 0.06f), tok::radius_control);
             const float ty = p.y + (rh - ImGui::GetFontSize()) * 0.5f;
             const std::string age = Age(t.updated);
             const float aw = ImGui::CalcTextSize(age.c_str()).x;
@@ -5226,7 +5226,7 @@ namespace app
       {
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
          const float rowH = 26.0f;
          {
             Weight s(UiType::Weight::Medium);
@@ -5487,7 +5487,7 @@ namespace app
          const ImVec2 all = ImGui::GetContentRegionAvail();
          const float railW = 220.0f;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
-         ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + all.x, origin.y + all.y), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
+         ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + all.x, origin.y + all.y), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
          ImGui::BeginChild("##chatrail", ImVec2(railW, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
          DrawRail(railW, all.y);
          ImGui::EndChild();
@@ -5530,7 +5530,7 @@ namespace app
    {
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
-      ImGui::GetWindowDrawList()->AddRectFilled(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
+      ImGui::GetWindowDrawList()->AddRectFilled(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
       const float width = avail.x;
       DrawHeader(width);
       ImGui::Dummy(ImVec2(0.0f, tok::space_2));  // air under the header, as in Claude

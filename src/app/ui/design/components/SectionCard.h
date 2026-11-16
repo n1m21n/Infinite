@@ -1,4 +1,4 @@
-// SectionCard: the grouping used by inspectors and dialogs. A soft well (5% text tint, radius_group) sits behind a
+// SectionCard: the grouping used by inspectors and dialogs. A soft well (5% text tint, radius_container) sits behind a
 // muted title and its rows; Begin() closes the previous card and opens the next, so a caller only marks where a
 // section starts. Cards reach kPad into the window padding, so the window needs at least that much of its own.
 // Also here: the label column (RowLabel), the dialog title, and a thin progress bar.
@@ -30,7 +30,7 @@ namespace SectionCard
       return s;
    }
 
-   // The soft well itself (5% text tint, hairline edge, radius_group), on the current window's draw list.
+   // The soft well itself (5% text tint, hairline edge, radius_container), on the current window's draw list.
    inline void Well(ImVec2 a, ImVec2 b)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -40,9 +40,9 @@ namespace SectionCard
          return;
       }
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_group);
+      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_container);
       dl->AddRect(a, b, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
-                  tok::radius_group);
+                  tok::radius_container);
    }
 
    // Call right after the window / child begins (and before its first card).

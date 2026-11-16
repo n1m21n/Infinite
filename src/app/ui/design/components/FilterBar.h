@@ -21,22 +21,22 @@ namespace FilterBar
    {
       inline ImVec4 TextCol() { return ImGui::GetStyleColorVec4(ImGuiCol_Text); }
 
-      // Same construction as PillGroup: a group well (6% text, radius_group) with a 2 pt inset pill inside.
+      // Same construction as PillGroup: a group well (6% text, radius_container) with a 2 pt inset pill inside.
       // Hover lights the pill at 6%; `tint` swaps it for the accent pill (an active filter), like a selected tab.
       inline void Well(ImDrawList* dl, const UiLayout::Rect& r, float hv, float tint)
       {
          const ImVec4 t = TextCol();
          dl->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.Right(), r.Bottom()),
-                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f)), tok::radius_group);
+                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f)), tok::radius_container);
          const UiLayout::Rect in = r.Inset(2.0f);
          if (hv > 0.001f)
             dl->AddRectFilled(ImVec2(in.x, in.y), ImVec2(in.Right(), in.Bottom()),
-                              ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f * hv)), tok::radius_pill);
+                              ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f * hv)), tok::radius_container);
          if (tint > 0.001f)
          {
             const ImVec4 a = app::AccentEmphasisSelected();
             dl->AddRectFilled(ImVec2(in.x, in.y), ImVec2(in.Right(), in.Bottom()),
-                              ImGui::GetColorU32(ImVec4(a.x, a.y, a.z, tint)), tok::radius_pill);
+                              ImGui::GetColorU32(ImVec4(a.x, a.y, a.z, tint)), tok::radius_container);
          }
       }
 

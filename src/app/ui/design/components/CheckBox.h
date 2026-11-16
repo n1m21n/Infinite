@@ -18,14 +18,14 @@ namespace CheckBox
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 q(p.x + kSize, p.y + kSize);
       UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, 0.08f));
-      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.08f + 0.06f * hv)), tok::radius_field);
+      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.08f + 0.06f * hv)), tok::radius_control);
       dl->AddRect(p, q, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.10f) : ImVec4(1, 1, 1, 0.08f)),
-                  tok::radius_field);
+                  tok::radius_control);
       if (onv <= 0.001f)
          return;
       ImVec4 a = tint ? *tint : app::AccentEmphasisSelected();
       a.w *= onv;
-      dl->AddRectFilled(p, q, ImGui::GetColorU32(a), tok::radius_field);
+      dl->AddRectFilled(p, q, ImGui::GetColorU32(a), tok::radius_control);
       // Tick: two strokes, drawn along their length by `onv`.
       const ImVec2 a0(p.x + kSize * 0.24f, p.y + kSize * 0.52f);
       const ImVec2 a1(p.x + kSize * 0.43f, p.y + kSize * 0.71f);
@@ -65,7 +65,7 @@ namespace CheckBox
       Draw(ImGui::GetWindowDrawList(), p, onv, hv);
       if (focused && ImGui::GetIO().NavVisible)
          ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x - 2, p.y - 2), ImVec2(p.x + kSize + 2, p.y + kSize + 2),
-                                             ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_field + 2.0f, 0, 1.5f);
+                                             ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 1.5f);
       return clicked;
    }
 }

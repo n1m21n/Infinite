@@ -17,7 +17,7 @@ namespace CodeBlock
       const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tx.x, tx.y, tx.z, 0.06f));
       ImGui::PushStyleColor(ImGuiCol_Border, FormParts::EdgeCol());
-      ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tok::radius_tile);
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
       ImGui::PushFont(app::TerminalMonoFont(), 0.0f);  // nullptr keeps the current face when the install lacks it
       const float outer = ImGui::GetContentRegionAvail().x;

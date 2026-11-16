@@ -11,7 +11,7 @@ namespace StateRing
 {
    enum class Kind { Select, Learn, Target };
 
-   inline void Draw(ImDrawList* dl, ImVec2 a, ImVec2 b, Kind kind, bool isLight, float radius = tok::radius_tile)
+   inline void Draw(ImDrawList* dl, ImVec2 a, ImVec2 b, Kind kind, bool isLight, float radius = tok::radius_control)
    {
       constexpr float kOutset = 2.0f;
       constexpr float kWeight = 1.5f;

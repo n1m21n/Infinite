@@ -27,7 +27,7 @@ namespace TopBarParts
       const float hv = UiAnim::Hover(aid, ImGui::IsItemHovered() || open, tok::motion_hover_in, tok::motion_hover_out);
       if (hv > 0.001f)
          ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
-            ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, (open ? 0.10f : 0.06f) * hv)), tok::radius_tile);
+            ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, (open ? 0.10f : 0.06f) * hv)), tok::radius_control);
       return open;
    }
 

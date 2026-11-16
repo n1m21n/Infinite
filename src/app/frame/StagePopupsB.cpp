@@ -983,7 +983,7 @@ void DrawPopupsB(FrameCtx& fc)
                if (pInfo.isCircle)
                   StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
                else
-                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
+                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
             }
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -1058,7 +1058,7 @@ void DrawPopupsB(FrameCtx& fc)
                if (pInfo.isCircle)
                   StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
                else
-                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
+                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
                const std::string srcTitle = NodeTitleWithInstance(*srcGn);
                ed::Suspend();
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -1098,7 +1098,7 @@ void DrawPopupsB(FrameCtx& fc)
             if (pInfo.isCircle)
                StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
             else
-               StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
+               StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
             ed::Suspend();
             ImGui::SetTooltip(T("Record %s: %s"), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
             ed::Resume();

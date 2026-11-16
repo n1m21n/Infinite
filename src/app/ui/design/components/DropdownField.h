@@ -98,7 +98,7 @@ namespace DropdownField
       {
          const ImVec4 a = app::AccentEmphasisSelected();
          dl->AddRectFilled(ImVec2(segL + segW * (float)current, mn.y + 2.0f), ImVec2(segL + segW * (float)(current + 1), mx.y - 2.0f),
-                           ImGui::GetColorU32(a), tok::radius_pill);
+                           ImGui::GetColorU32(a), tok::radius_container);
       }
       for (int i = 0; i < n; ++i)
       {

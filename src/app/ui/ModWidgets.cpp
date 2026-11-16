@@ -586,7 +586,7 @@ namespace app
       }
 
       if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
-         StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Learn, isLight, tok::radius_field);
+         StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Learn, isLight, tok::radius_control);
       changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, ImGui::GetItemRectMin(),
                           ImVec2(std::min(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().x + (width - box - 4.0f)), ImGui::GetItemRectMax().y),
                           false) || changed;
@@ -1555,7 +1555,7 @@ namespace app
             if (kbCircle)
                StateRing::DrawCircle(ImGui::GetWindowDrawList(), ImVec2((kmin.x + kmax.x) * 0.5f, (kmin.y + kmax.y) * 0.5f), diameter * 0.5f, StateRing::Kind::Learn, IsThemeLight());
             else
-               StateRing::Draw(ImGui::GetWindowDrawList(), kmin, kmax, StateRing::Kind::Learn, IsThemeLight(), tok::radius_field);
+               StateRing::Draw(ImGui::GetWindowDrawList(), kmin, kmax, StateRing::Kind::Learn, IsThemeLight(), tok::radius_control);
          }
          changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kmin, kmax, kbCircle) || changed;
       }

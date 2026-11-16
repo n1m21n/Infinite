@@ -60,7 +60,7 @@ namespace MenuParts
       const float a = (down ? 0.12f : (open ? 0.10f : 0.07f)) * hv;
       w->DrawList->AddRectFilled(ImVec2(w->Pos.x + kInset, ImGui::GetItemRectMin().y + 1.0f),
                                  ImVec2(w->Pos.x + w->Size.x - kInset, ImGui::GetItemRectMax().y - 1.0f),
-                                 ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a)), tok::radius_tile);
+                                 ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a)), tok::radius_control);
    }
 
    // A shortcut ends flush with the row's right text inset, mirroring the label's left inset; ImGui still sizes

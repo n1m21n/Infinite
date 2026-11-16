@@ -792,6 +792,7 @@ namespace
       const Field::BoxSpec* spec = Field::FindBoxSpec(b.specId);
       ed::BeginNode(b.id);
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, kNodeFramePadY));
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, kNodeFrameRounding);
       ImGui::PushID(b.id);
       ImGui::TextUnformatted(BoxTitle(b));
       const std::string sub = BoxSubtitle(b, spec);
@@ -870,7 +871,7 @@ namespace
          }
       }
       ImGui::PopID();
-      ImGui::PopStyleVar();
+      ImGui::PopStyleVar(2);
       ed::EndNode();
    }
 

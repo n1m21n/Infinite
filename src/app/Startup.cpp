@@ -1494,9 +1494,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    glfwSetWindowContentScaleCallback(window, [](GLFWwindow*, float, float) { UiScale::RequestRescale(); });
 
    ImGuiStyle& style = ImGui::GetStyle();
-   style.FrameRounding = 3.0f;
+   style.FrameRounding = tok::radius_control;   // UI system sheet 2f: every 24 pt control
    style.SelectableRounding = style.FrameRounding; // was a vendored ImGui patch before 1.92
-   style.GrabRounding = 3.0f;
+   style.GrabRounding = tok::radius_control;
    style.WindowRounding = 4.0f;
    style.ItemSpacing = ImVec2(6, 5);
    // UI system sheet: every frame (button, field, slider, dropdown, check row) is one control tall, 24 pt.
@@ -1505,7 +1505,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // don't share WindowRounding/FrameRounding's blast radius (node-ui-pillars
    // P1-P9 grid math), so they can read softer without touching a single
    // knob row. Left unset before this, which meant they inherited 0.
-   style.PopupRounding = 12.0f;
+   style.PopupRounding = tok::radius_container;   // containers: popover, menu, card, dialog
    style.ScrollbarRounding = 10.0f;
    // 12 pt track with a 3 pt inset: a 6 pt pill with an even gutter on both sides.
    style.ScrollbarSize = 12.0f;
