@@ -7331,6 +7331,37 @@ namespace
       return t != nullptr ? t->glyph : nullptr;
    }
 
+   // The tools a first-time user needs; the rest wait in the tool picker (the grid button under the strip).
+   bool Essential(int tool)
+   {
+      switch (tool)
+      {
+         case kMove: case kMarquee: case kLasso: case kWand: case kCrop: case kPick: case kHeal: case kBrush: case kClone:
+         case kEraser: case kGradient: case kFill: case kPen: case kText: case kShape: case kHand: case kZoom:
+            return true;
+         default:
+            return false;
+      }
+   }
+
+   // The picker's groups, in the order they are listed.
+   struct ToolGroup { const char* name; std::vector<int> tools; };
+   const std::vector<std::vector<ToolGroup>>& PickerColumns()
+   {
+      static const std::vector<std::vector<ToolGroup>> cols = {
+         { { "Move", { kMove, kPerspective, kMeshWarp } },
+           { "Select", { kMarquee, kLasso, kWand, kSelBrush, kObjectSel } },
+           { "Crop and sample", { kCrop, kPick, kStylePick, kMeasure } } },
+         { { "Retouch", { kHeal, kBlemish, kPatch, kInpaint, kRedEye } },
+           { "Paint", { kBrush, kMixer, kColourReplace, kClone, kUndoBrush } },
+           { "Erase", { kEraser, kBgErase, kFloodErase } } },
+         { { "Fill and tune", { kGradient, kFill, kBlur, kSharpen, kMedian, kDodge, kBurn, kSponge } },
+           { "Draw and type", { kPen, kText, kNode, kShape } },
+           { "View", { kHand, kZoom } } },
+      };
+      return cols;
+   }
+
    // The strip's order and hidden tools, kept in the workspace settings as "move,marquee,-lasso,...": drag a tool
    // to move it, right-click the strip to show or hide tools.
    std::vector<int> sStripOrder;     // indices into kTools
@@ -7366,7 +7397,10 @@ namespace
       }
       for (int i = 0; i < kToolCount; i++)   // tools added since the order was saved go at their default place
          if (!seen[i])
+         {
             sStripOrder.insert(sStripOrder.begin() + std::min((size_t)i, sStripOrder.size()), i);
+            sStripHidden[i] = !Essential(kTools[i].tool);   // only the essentials show until the user picks more
+         }
    }
 
    void SaveStrip()
@@ -7393,11 +7427,11 @@ namespace
    {
       const int n = VisibleTools();
       const float step = tok::tile + tok::space_1;
-      const float oneCol = n * step + 4 * (tok::space_1 + 1.0f) + tok::space_1 + 2 * step;   // + sections + chips row
+      const float oneCol = n * step + 4 * (tok::space_1 + 1.0f) + tok::space_1 + 3 * step;   // + sections + chips rows
       if (oneCol <= h)
          return 1;
       for (int cols = 2; cols < 6; cols++)
-         if (((n + cols - 1) / cols + 1) * step + tok::space_1 <= h)
+         if (((n + cols - 1) / cols + (cols >= 3 ? 1 : 2)) * step + tok::space_1 <= h)
             return cols;
       return 6;
    }
@@ -7473,6 +7507,70 @@ namespace
          }
    }
 
+   // The window behind the grid button: every tool in its group with a tick, the strip shows the ticked ones.
+   void DrawToolPicker()
+   {
+      if (!MenuParts::BeginPopup("##v2dtoolpick"))
+         return;
+      ParseStrip();
+      ImGui::TextDisabled("%s", T("Tools on the strip"));
+      ImGui::Spacing();
+      if (ImGui::BeginTable("##v2dpicktbl", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
+      {
+         ImGui::TableNextRow();
+         for (const std::vector<ToolGroup>& col : PickerColumns())
+         {
+            ImGui::TableNextColumn();
+            for (const ToolGroup& g : col)
+            {
+               ImGui::TextDisabled("%s", T(g.name));
+               for (int tool : g.tools)
+               {
+                  int idx = -1;
+                  for (int i = 0; i < kToolCount; i++)
+                     if (kTools[i].tool == tool)
+                        idx = i;
+                  if (idx < 0)
+                     continue;
+                  bool on = !sStripHidden[idx];
+                  ImGui::PushID(idx);
+                  if (CheckBox::Box("##tick", &on))
+                  {
+                     sStripHidden[idx] = !on;
+                     SaveStrip();
+                  }
+                  ImGui::SameLine(0.0f, tok::space_2);
+                  const ImVec2 gp = ImGui::GetCursorScreenPos();
+                  glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + 8.0f, gp.y + ImGui::GetFrameHeight() * 0.5f), tok::icon_sm,
+                              ImGui::GetColorU32(ImGuiCol_Text), kTools[idx].glyph);
+                  ImGui::Dummy(ImVec2(18.0f, 0.0f));
+                  ImGui::SameLine(0.0f, tok::space_1);
+                  ImGui::AlignTextToFramePadding();
+                  ImGui::TextUnformatted(T(ToolTitle(kTools[idx].tip)));
+                  ImGui::PopID();
+               }
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+            }
+         }
+         ImGui::EndTable();
+      }
+      ImGui::Separator();
+      if (MenuParts::Item(T("Show essentials only")))
+      {
+         gView2DTools.clear();
+         ParseStrip();
+         sStripParsed = "\x01";
+         SaveWorkspaceSettings();
+      }
+      if (MenuParts::Item(T("Show all tools")))
+      {
+         for (int i = 0; i < kToolCount; i++)
+            sStripHidden[i] = false;
+         SaveStrip();
+      }
+      MenuParts::EndPopup();
+   }
+
    void DrawToolStrip(float h, Scene2DNode* doc)
    {
       const int cols = StripColumns(h);
@@ -7482,6 +7580,7 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ParseStrip();
       int shown = 0, lastSection = -1, dropFrom = -1, dropTo = -1;
+      bool openPicker = false;
       for (int k = 0; k < (int)sStripOrder.size(); k++)
       {
          const int i = sStripOrder[k];
@@ -7523,23 +7622,8 @@ namespace
          sStripOrder.insert(sStripOrder.begin() + dropTo, moved);
          SaveStrip();
       }
-      if (MenuParts::BeginContextWindow("##v2dtoolsmenu", ImGuiPopupFlags_MouseButtonRight))
-      {
-         for (int i : sStripOrder)
-            if (MenuParts::Item((std::string(T(ToolTitle(kTools[i].tip))) + kTools[i].id).c_str(), nullptr, !sStripHidden[i]))
-            {
-               sStripHidden[i] = !sStripHidden[i];
-               SaveStrip();
-            }
-         ImGui::Separator();
-         if (MenuParts::Item(T("Reset Tools")))
-         {
-            gView2DTools.clear();
-            ParseStrip();
-            sStripParsed = "\x01";
-         }
-         MenuParts::EndPopup();
-      }
+      if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         openPicker = true;
       ImGui::Dummy(ImVec2(w, 0.0f));
       ColourChips();
       if (cols == 1)
@@ -7548,6 +7632,13 @@ namespace
          ImGui::SameLine(0.0f, tok::space_1);
       if (IconChip("##v2dqm", IconsInfinite::QuickMask, doc->quickMask, T(doc->quickMask ? "Quick mask on (Q)" : "Quick mask (Q)")))
          ToggleQuickMask(doc);
+      if (cols >= 3)
+         ImGui::SameLine(0.0f, tok::space_1);
+      if (IconChip("##v2dmoretools", IconsInfinite::GridDots, false, T("More tools. Tick the ones to show")))
+         openPicker = true;
+      if (openPicker)
+         ImGui::OpenPopup("##v2dtoolpick");
+      DrawToolPicker();
       ImGui::PopStyleVar();
       ImGui::EndChild();
    }
@@ -9361,8 +9452,34 @@ namespace
          return;
       StylePresets(*l);
       int removeMore = -1;
+      {
+         // Styles that are off stay in a drop-down; turning one on gives it a card, its On box turns it off again.
+         SectionCard::Begin(T("Layer styles"));
+         FieldLabel(T("Add"));
+         ImGui::SetNextItemWidth(sFieldW);
+         if (MenuParts::BeginCombo("##v2daddstyle", T("Choose...")))
+         {
+            bool any = false;
+            for (int t = 0; t < Scene2DNode::kFxCount; t++)
+               if (!l->fx[t].on)
+               {
+                  any = true;
+                  if (MenuParts::Choice((std::string(T(Scene2DNode::FxName(t))) + "##v2daddfx" + std::to_string(t)).c_str(), false))
+                  {
+                     PushUndoCheckpoint("Add layer style");
+                     l->fx[t].on = true;
+                     Touch();
+                  }
+               }
+            if (!any)
+               ImGui::TextDisabled("%s", T("All styles are on"));
+            MenuParts::EndCombo();
+         }
+      }
       for (int t = 0; t < Scene2DNode::kFxCount; t++)
       {
+         if (!l->fx[t].on)
+            continue;
          ImGui::PushID(t);
          SectionCard::Begin(T(Scene2DNode::FxName(t)));
          BoolRow(T("On"), &l->fx[t].on);
@@ -9406,12 +9523,23 @@ namespace
    void DrawColourTab(Scene2DNode* doc)
    {
       SectionCard::Begin(T("Adjustments"));
-      for (int t = 0; t < Scene2DNode::kAdjCount; t++)
-         if (ActionButton::Draw((std::string(T(Scene2DNode::AdjName(t))) + "##v2dcadj" + std::to_string(t)).c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+      // One drop-down, grouped as the Effects menu is, instead of a button per adjustment.
+      FieldLabel(T("Add"));
+      ImGui::SetNextItemWidth(sFieldW);
+      if (MenuParts::BeginCombo("##v2daddadj", T("Choose...")))
+      {
+         for (const char* g : { "Adjust", "Colour", "Stylize" })
          {
-            sPending.what = Pending::AddAdjust;
-            sPending.arg = t;
+            ImGui::TextDisabled("%s", T(g));
+            for (int t = 0; t < Scene2DNode::kAdjCount; t++)
+               if (std::strcmp(Scene2DNode::AdjGroup(t), g) == 0 && MenuParts::Choice((std::string(T(Scene2DNode::AdjName(t))) + "##v2dcadj" + std::to_string(t)).c_str(), false))
+               {
+                  sPending.what = Pending::AddAdjust;
+                  sPending.arg = t;
+               }
          }
+         MenuParts::EndCombo();
+      }
       // Every adjustment in the document keeps its card, top of the stack first: adding a second one never takes
       // the first one's settings away.
       std::vector<Layer>& ls = doc->Layers();
@@ -9699,6 +9827,7 @@ namespace
          else if (sTab == 5) DrawEffectsTab(doc);
          else if (sTab == 6) DrawColourTab(doc);
          else DrawOutputTab(doc, w);
+         ImGui::Dummy(ImVec2(0.0f, tok::space_5));   // room under the last card so a scroll never ends on the edge
          ImGui::PopStyleVar(2);
          SectionCard::EndWindow();
          ImGui::EndChild();
@@ -10985,6 +11114,31 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       RunPending(doc);
       const Layer* l = Active(doc);
       expect("an Effects pick adds that adjustment", l != nullptr && l->kind == Kind::Adjust && l->adjType == type);
+   }
+
+   // Tool strip: a fresh profile shows the essentials only; every other tool waits in the picker.
+   {
+      const std::string keepTools = gView2DTools;
+      gView2DTools.clear();
+      sStripParsed = "\x01";
+      ParseStrip();
+      int shownN = 0, essentialN = 0;
+      bool offOk = true;
+      for (int i = 0; i < kToolCount; i++)
+      {
+         shownN += !sStripHidden[i];
+         essentialN += Essential(kTools[i].tool);
+         offOk = offOk && (sStripHidden[i] == !Essential(kTools[i].tool));
+      }
+      expect("a fresh tool strip shows the essentials only", offOk && shownN == essentialN && shownN < kToolCount / 2 + 2);
+      // Every tool is in exactly one picker group, so none can be lost from the picker.
+      int grouped = 0;
+      for (const std::vector<ToolGroup>& col : PickerColumns())
+         for (const ToolGroup& g : col)
+            grouped += (int)g.tools.size();
+      expect("every tool sits in the picker", grouped == kToolCount);
+      gView2DTools = keepTools;
+      sStripParsed = "\x01";
    }
 
    // Pixels of the composite, for "the render changed".

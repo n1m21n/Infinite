@@ -1487,6 +1487,7 @@ int Scene2DNode::RasterizeNodeLayer(int id, int frameId)
    const int w = mDoc.w, h = mDoc.h, kT = TileStore::kTile, cols = (w + kT - 1) / kT, rows = (h + kT - 1) / kT;
    std::vector<uint8_t> tile;
    std::vector<std::string> keys((size_t)cols * rows, "-");
+   bool anyPixel = false;
    for (size_t i = 0; i < keys.size(); i++)
    {
       const int x0 = (int)(i % cols) * kT, y0 = (int)(i / cols) * kT;
@@ -1501,8 +1502,15 @@ int Scene2DNode::RasterizeNodeLayer(int id, int frameId)
             any = tile[((size_t)y * tw + x) * 4 + 3] != 0;
       }
       if (any)
+      {
          keys[i] = TileStore::Put(tile.data(), tw, th);
+         anyPixel = true;
+      }
    }
+   // Nothing visible inside the document (the picture is off the page, or the node gave no frame): keep the layer
+   // as it is rather than swap it for an empty one that looks like it vanished.
+   if (!anyPixel)
+      return 0;
    const std::string name = src->name;
    const float opacity = src->opacity;
    const int blend = src->blend;
