@@ -31,7 +31,8 @@ public:
    enum AdjType { kAdjPixelate = 0, kAdjHalftone, kAdjDither, kAdjThreshold, kAdjGradientMap, kAdjPosterize,
                   kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjLevels, kAdjCurves,
                   kAdjColorBalance, kAdjVibrance, kAdjSelective, kAdjMixer, kAdjBlackWhite, kAdjPhotoFilter,
-                  kAdjShadowsHighlights, kAdjLookup, kAdjWhiteBalance, kAdjSplitToning, kAdjRecolour, kAdjCount };
+                  kAdjShadowsHighlights, kAdjLookup, kAdjWhiteBalance, kAdjSplitToning, kAdjRecolour,
+                  kAdjNormals, kAdjToneCompression, kAdjToneStretch, kAdjCount };
    // adjP layout per type (AdjParamCount): Colour Balance 9 (shadows, mids, highlights rgb, -1..1); Selective
    // Colour 36 (reds, yellows, greens, cyans, blues, magentas, whites, neutrals, blacks x CMYK, -1..1); Channel
    // Mixer 10 (rows R, G, B of R G B, then mono 0/1); Black & White 6 (reds..magentas, -2..3); Photo Filter 1
@@ -433,6 +434,28 @@ public:
    // The picture's colour (display values) at a document point.
    // size: 1, 3 or 5 px square, averaged. layer: read that paint layer alone (0 = the whole picture).
    bool Pick(float x, float y, float rgb[3], int size = 1, int layer = 0);
+   // ---- retouch (Affinity's photo tools) ---------------------------------
+   // The Undo brush paints back the layer as it was when first shown (or when SetUndoSource last ran).
+   void SetUndoSource(int id);
+   // Rebuilds the masked pixels (mask 0..255, w x h) from around them; `off` px to a clean patch, or the best nearby
+   // one when autoOff. Rows and offset in the same frame as px.
+   static bool HealRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask, int ox, int oy, bool autoOff);
+   // Patch: the selected pixels healed from the place (dx, dy) document px away.
+   bool PatchSelection(int id, float dx, float dy);
+   // Blemish removal: a disc (document px) healed from the best clean place nearby.
+   bool Blemish(int id, float x, float y, float radius);
+   // Flood erase: the region the wand would pick at (x, y) cleared; the selection stays as it was.
+   bool FloodErase(int id, float x, float y, int tolerance, bool contiguous, bool sampleAll);
+   // Object selection: the thing inside a box (document px) told from what is round its edge, as a selection.
+   void SelectObject(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId);
+   // Mesh warp: a paint layer's pixels pulled through a 4 x 4 grid. `from` is the layer's tiles when the warp
+   // began; `moved` the 16 grid points' document positions, row by row from the layer's top left.
+   bool MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store);
+   // The grid's rest positions (document px) for a paint layer.
+   bool MeshRest(int id, float out[32]);
+   // Style picker: blend, opacity, fill and layer effects copied from one layer to another.
+   bool CopyLayerStyle(int from, int to);
+   bool wandAntialias = true;   // the wand's and bucket's soft edge (panel only, not saved)
 
    // ---- 3D surface paint ---------------------------------------------------
    // A node layer whose source is a 3D object can be painted on its surface: a stroke is picked by ray through the
@@ -652,6 +675,9 @@ private:
    void ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned coverage, const float colA[4], const float colB[4],
                   int kind, const float p0[2], const float p1[2], float opacity);
    std::map<int, Surface> mSurfaces, mMasks;
+   std::map<int, std::vector<std::string>> mUndoTiles;   // the Undo brush's source per paint layer
+   std::map<int, Surface> mUndoSurf;
+   unsigned mWarpProgram = 0;
    // CPU-rastered layers (vector, text) and vector masks, re-rastered when their key changes.
    struct Raster
    {

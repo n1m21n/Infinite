@@ -24,7 +24,8 @@ const char* Scene2DNode::AdjName(int type)
                                                  "Brightness", "Contrast", "Hue", "Saturation", "Exposure", "Invert",
                                                  "Levels", "Curves", "Colour Balance", "Vibrance", "Selective Colour",
                                                  "Channel Mixer", "Black & White", "Photo Filter", "Shadows / Highlights",
-                                                 "Colour Lookup", "White Balance", "Split Toning", "Recolour" };
+                                                 "Colour Lookup", "White Balance", "Split Toning", "Recolour", "Normals",
+                                                 "Tone Compression", "Tone Stretch" };
    return kNames[std::clamp(type, 0, kAdjCount - 1)];
 }
 
@@ -53,6 +54,9 @@ int Scene2DNode::AdjParamCount(int type)
    case kAdjWhiteBalance: return 2;
    case kAdjSplitToning: return 5;
    case kAdjRecolour: return 3;
+   case kAdjNormals: return 4;
+   case kAdjToneCompression: return 3;
+   case kAdjToneStretch: return 3;
    default: return 0;
    }
 }
@@ -72,22 +76,28 @@ std::vector<float> Scene2DNode::AdjParamDefault(int type)
       p = { 0.0f, 0.0f, 0.0f, 0.0f, 0.5f };
    else if (type == kAdjRecolour)
       p = { 0.0f, 1.0f, 0.0f };
+   else if (type == kAdjNormals)
+      p = { 0.0f, 1.0f, 0.0f, 0.0f };   // rotation (degrees), scale, flip x, flip y
+   else if (type == kAdjToneCompression)
+      p = { 1.0f, 1.0f, 0.5f };   // exposure, gamma, colour
+   else if (type == kAdjToneStretch)
+      p = { 0.125f, 1.0f, 0.5f };   // stretch, gamma, compression
    return p;
 }
 
 float Scene2DNode::AdjDefault(int type)
 {
    static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-                                          1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+                                          1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
    return kDef[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 void Scene2DNode::AdjRange(int type, float& lo, float& hi)
 {
    static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f, 0.1f, 0.0f,
-                                         0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+                                         0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
    static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f, 4.0f, 1.0f,
-                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
    const int t = std::clamp(type, 0, kAdjCount - 1);
    lo = kLo[t];
    hi = kHi[t];
@@ -721,6 +731,24 @@ namespace
          "      l = uP[2] < 0.0 ? l * (1.0 + uP[2]) : l + (1.0 - l) * uP[2];\n"
          "      float ch = (1.0 - abs(2.0 * l - 1.0)) * clamp(uP[1], 0.0, 1.0);\n"
          "      c = mix(c, l + ch * (HueRgb(uP[0]) - 0.5), uAmt);\n"
+         "   } else if (uType == 25) {\n"   // normals (Affinity's, measured): xy scaled, flipped, turned, z rebuilt
+         "      vec2 v = (c.rg * 2.0 - 1.0) * uP[1]; float a = radians(uP[0]);\n"   // flips come before the turn
+         "      if (uP[2] > 0.5) v.x = -v.x;\n"
+         "      if (uP[3] > 0.5) v.y = -v.y;\n"
+         "      v = vec2(v.x * cos(a) - v.y * sin(a), v.x * sin(a) + v.y * cos(a));\n"
+         "      float vl = length(v); if (vl > 1.0) v /= vl;\n"
+         "      c = mix(c, vec3(v, sqrt(max(0.0, 1.0 - dot(v, v)))) * 0.5 + 0.5, uAmt);\n"
+         "   } else if (uType == 26) {\n"   // tone compression (Affinity's, measured): a Reinhard curve per channel or on luma
+         "      float e = max(uP[0], 0.01);\n"
+         "      vec3 lv = c * e; vec3 pc = lv * (1.0 + 0.006 * lv) / (1.0 + lv);\n"
+         "      float l = dot(c, vec3(0.2126, 0.7152, 0.0722)), ll = l * e;\n"
+         "      vec3 pl = c * ((ll * (1.0 + 0.006 * ll) / (1.0 + ll)) / max(l, 1e-6));\n"
+         "      c = mix(c, pow(clamp(mix(pc, pl, uP[2]), 0.0, 1.0), vec3(max(uP[1], 0.01))), uAmt);\n"
+         "   } else if (uType == 27) {\n"   // tone stretch (Affinity's, fitted; approximate on saturated colour above 0 compression)
+         "      float k = clamp(uP[2], 0.0, 1.0), pw = 1.32 - 0.31 * k, ap = pow(0.00194 * exp(0.31 * k), pw);\n"
+         "      vec3 u = pow(max(c * uP[0], 0.0), vec3(pw));\n"
+         "      vec3 h = (204.0 - 73.0 * k) / 255.0 * u / (u + ap);\n"
+         "      c = mix(c, pow(clamp(h, 0.0, 1.0), vec3(max(uP[1], 0.01))), uAmt);\n"
          "   }\n"
          "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(Luma(c), 0.0, 1.0));\n"
          "   c = clamp(c, 0.0, 1.0);\n"
@@ -784,6 +812,12 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mSelOverlay);
    GLUtil::DestroyFbo(mSelScratch);
    GLUtil::DestroyFbo(mCloneSrc);
+   for (auto& kv : mUndoSurf)
+      GLUtil::DestroyFbo(kv.second.fbo);
+   mUndoSurf.clear();
+   if (mWarpProgram != 0)
+      glDeleteProgram(mWarpProgram);
+   mWarpProgram = 0;
    for (GLUtil::Fbo& f : mBrushFrozen)
       GLUtil::DestroyFbo(f);
    for (GLUtil::Fbo* f : { &mEff[0], &mEff[1], &mShBlur[0], &mShBlur[1] })

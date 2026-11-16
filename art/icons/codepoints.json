@@ -140,6 +140,22 @@
  "dodge": 59786,
  "gradient": 59787,
  "heal": 59788,
- "sharpen": 59789
+ "sharpen": 59789,
+ "bg-erase": 59790,
+ "blemish": 59791,
+ "colour-replace": 59792,
+ "flood-erase": 59793,
+ "inpaint": 59794,
+ "measure": 59795,
+ "median": 59796,
+ "mesh-warp": 59797,
+ "object-sel": 59798,
+ "paint-mixer": 59799,
+ "patch": 59800,
+ "perspective": 59801,
+ "red-eye": 59802,
+ "sel-brush": 59803,
+ "sponge": 59804,
+ "style-pick": 59805,
+ "undo-brush": 59806
 }
-

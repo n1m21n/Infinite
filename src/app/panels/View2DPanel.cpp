@@ -103,12 +103,18 @@ namespace
    constexpr unsigned kPasteboard = 0x282828, kOutline = 0x2D8CFF, kSmart = 0xFF2DB4, kGuide = 0x00D2E6, kGrid = 0x808080;
 
    enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand, kPen, kNode, kShape, kText,
-               kGradient, kClone, kHeal, kBlur, kSharpen, kDodge, kBurn, kToolCount };
+               kGradient, kClone, kHeal, kBlur, kSharpen, kDodge, kBurn, kSponge, kMedian, kUndoBrush, kColourReplace, kMixer,
+               kBgErase, kFloodErase, kSelBrush, kObjectSel, kRedEye, kBlemish, kPatch, kInpaint, kMeshWarp, kPerspective, kStylePick,
+               kMeasure, kToolCount };
    int sTool = kMove;
-   bool RetouchTool(int t) { return t >= kClone && t <= kBurn; }
-   bool BrushTool(int t) { return t == kBrush || t == kEraser || RetouchTool(t); }
+   bool RetouchTool(int t)
+   {
+      return (t >= kClone && t <= kBurn) || t == kSponge || t == kMedian || t == kUndoBrush || t == kColourReplace || t == kBgErase ||
+             t == kRedEye || t == kInpaint;
+   }
+   bool BrushTool(int t) { return t == kBrush || t == kEraser || t == kMixer || t == kSelBrush || RetouchTool(t); }
    bool PaintTool(int t) { return BrushTool(t) || t == kFill || t == kGradient; }
-   bool PixelTool(int t) { return (t >= kBrush && t <= kWand) || t >= kGradient; }
+   bool PixelTool(int t) { return (t >= kBrush && t <= kWand) || (t >= kGradient && t != kPerspective && t != kStylePick); }
 
    // Paint tools. The brush and the eraser keep their own settings.
    BrushEngine::Brush sBrush, sEraser;
@@ -1467,6 +1473,28 @@ namespace
          SliderRow(T("Saturation"), &p[1], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Lightness"), &p[2], -1.0f, 1.0f, "%.2f");
       }
+      if (t == S::kAdjNormals)
+      {
+         SliderRow(T("Rotation"), &p[0], -180.0f, 180.0f, "%.0f°");
+         SliderRow(T("Scale"), &p[1], 0.0f, 2.0f, "%.2f");
+         bool fx = p[2] > 0.5f, fy = p[3] > 0.5f;
+         if (BoolRow(T("Flip X"), &fx))
+            p[2] = fx ? 1.0f : 0.0f;
+         if (BoolRow(T("Flip Y"), &fy))
+            p[3] = fy ? 1.0f : 0.0f;
+      }
+      if (t == S::kAdjToneCompression)
+      {
+         SliderRow(T("Exposure"), &p[0], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Colour"), &p[2], 0.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjToneStretch)
+      {
+         SliderRow(T("Stretch"), &p[0], 0.0f, 1.0f, "%.3f");
+         SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Compression"), &p[2], 0.0f, 1.0f, "%.2f");
+      }
       if (t == S::kAdjLookup)
       {
          FieldLabel(T("Lookup"));
@@ -1888,17 +1916,24 @@ namespace
          if (key(ImGuiKey_C)) sTool = kCrop;
          if (key(ImGuiKey_H)) sTool = kHand;
          if (key(ImGuiKey_Z)) sTool = kZoom;
-         if (key(ImGuiKey_B)) sTool = kBrush;
-         if (key(ImGuiKey_E)) sTool = kEraser;
-         if (key(ImGuiKey_G)) sTool = sTool == kFill ? kGradient : kFill;
-         if (key(ImGuiKey_S)) sTool = kClone;
-         if (key(ImGuiKey_J)) sTool = kHeal;
-         if (key(ImGuiKey_R)) sTool = sTool == kBlur ? kSharpen : kBlur;
-         if (key(ImGuiKey_O)) sTool = sTool == kDodge ? kBurn : kDodge;
-         if (key(ImGuiKey_I)) sTool = kPick;
+         // A key pressed again steps through the tools that share it (Photoshop's Shift-cycling, without Shift).
+         auto cycle = [](std::initializer_list<int> ts) {
+            const int* b = ts.begin();
+            for (size_t i = 0; i < ts.size(); i++)
+               if (b[i] == sTool) { sTool = b[(i + 1) % ts.size()]; return; }
+            sTool = *b;
+         };
+         if (key(ImGuiKey_B)) cycle({ kBrush, kMixer, kColourReplace });
+         if (key(ImGuiKey_E)) cycle({ kEraser, kBgErase, kFloodErase });
+         if (key(ImGuiKey_G)) cycle({ kFill, kGradient });
+         if (key(ImGuiKey_S)) cycle({ kClone, kUndoBrush });
+         if (key(ImGuiKey_J)) cycle({ kHeal, kBlemish, kPatch, kInpaint, kRedEye });
+         if (key(ImGuiKey_R)) cycle({ kBlur, kSharpen, kMedian });
+         if (key(ImGuiKey_O)) cycle({ kDodge, kBurn, kSponge });
+         if (key(ImGuiKey_I)) cycle({ kPick, kStylePick, kMeasure });
          if (key(ImGuiKey_M)) sTool = kMarquee;
          if (key(ImGuiKey_L)) sTool = kLasso;
-         if (key(ImGuiKey_W)) sTool = kWand;
+         if (key(ImGuiKey_W)) cycle({ kWand, kSelBrush, kObjectSel });
          if (key(ImGuiKey_P)) sTool = kPen;
          if (key(ImGuiKey_A)) sTool = kNode;
          if (key(ImGuiKey_U)) sTool = kShape;
@@ -2161,18 +2196,60 @@ namespace
       b.spacing = 0.1f;
       return b;
    }();
-   ImVec2 sCloneSrc(0, 0), sCloneOffset(0, 0);
+   ImVec2 sCloneSrc(0, 0), sCloneOffset(0, 0), sCloneAnchor(0, 0);
    bool sHaveCloneSrc = false, sCloneOffsetSet = false;
+   // Paint mixer: the brush with wet paint; selection brush: paints the selection.
+   BrushEngine::Brush sMixer = []()
+   {
+      BrushEngine::Brush b;
+      b.size = 40.0f;
+      b.wet = 0.6f;
+      b.refill = 0.1f;
+      return b;
+   }();
+   BrushEngine::Brush sSelBrush = []()
+   {
+      BrushEngine::Brush b;
+      b.size = 40.0f;
+      b.hardness = 0.8f;
+      return b;
+   }();
+   float sBlemishSize = 24.0f;      // blemish removal: the spot's width, document px
+   int sStyleFrom = 0;              // style picker: the layer whose style is held
+   ImVec2 sMeasureA(0, 0), sMeasureB(0, 0);
+   bool sMeasureOn = false;
+   bool sMarqueeCentre = false, sMarqueeAA = true;
+   // Mesh warp: the layer, its pixels when the warp began, and the grid as moved.
+   int sMeshId = 0, sMeshPoint = -1;
+   std::vector<std::string> sMeshFrom, sMeshStored;
+   float sMeshPts[32] = {}, sMeshPts0[32] = {};
 
    BrushEngine::Brush& ToolBrush()
    {
       if (RetouchTool(sTool))
       {
-         static const int kModes[] = { BrushEngine::kClone, BrushEngine::kHeal, BrushEngine::kBlur, BrushEngine::kSharpen,
-                                       BrushEngine::kDodge, BrushEngine::kBurn };
-         sRetouch.mode = kModes[sTool - kClone];
+         switch (sTool)
+         {
+         case kClone: sRetouch.mode = BrushEngine::kClone; break;
+         case kHeal: sRetouch.mode = BrushEngine::kHeal; break;
+         case kBlur: sRetouch.mode = BrushEngine::kBlur; break;
+         case kSharpen: sRetouch.mode = BrushEngine::kSharpen; break;
+         case kDodge: sRetouch.mode = BrushEngine::kDodge; break;
+         case kBurn: sRetouch.mode = BrushEngine::kBurn; break;
+         case kSponge: sRetouch.mode = BrushEngine::kSpongeMode; break;
+         case kMedian: sRetouch.mode = BrushEngine::kMedian; break;
+         case kUndoBrush: sRetouch.mode = BrushEngine::kUndo; break;
+         case kColourReplace: sRetouch.mode = BrushEngine::kColourReplace; break;
+         case kBgErase: sRetouch.mode = BrushEngine::kBgErase; break;
+         case kRedEye: sRetouch.mode = BrushEngine::kRedEye; break;
+         default: sRetouch.mode = BrushEngine::kInpaint; break;
+         }
          return sRetouch;
       }
+      if (sTool == kMixer)
+         return sMixer;
+      if (sTool == kSelBrush)
+         return sSelBrush;
       return sTool == kEraser ? sEraser : sBrush;
    }
 
@@ -2375,11 +2452,26 @@ namespace
             }
          }
       }
+      if (sTool == kSelBrush)
+      {
+         // The selection brush paints the selection itself: white adds, Alt takes away.
+         SelStep("Selection brush");
+         BrushEngine::Brush b = sSelBrush;
+         b.mode = ImGui::GetIO().KeyAlt ? BrushEngine::kErase : BrushEngine::kNormal;
+         b.color[0] = b.color[1] = b.color[2] = 1.0f;
+         if (!doc->BeginPaint(-1, 2, b, at.x, at.y, PenNow()))
+            return;
+         sOp = Op();
+         sOp.kind = 7;
+         sOp.docStart = at;
+         return;
+      }
       if (PaintRefused(doc))
          return;
+      const bool painter = sTool == kBrush || sTool == kMixer;
       // The eraser and the retouch tools need pixels. On a text, vector or other layer nothing is made and no
       // undo step is left; the canvas offers to rasterize instead.
-      if (sTool != kBrush && !doc->quickMask)
+      if (!painter && !doc->quickMask)
       {
          if (!sEditMask)
             EnsurePixels(doc);
@@ -2396,10 +2488,17 @@ namespace
       }
       PushUndoCheckpoint(sTool == kEraser ? "Erase" : RetouchTool(sTool) ? "Retouch" : "Paint");
       int target = 0;
-      const int id = PaintTarget(doc, target, sTool == kBrush);
+      const int id = PaintTarget(doc, target, painter);
       if (id == 0)
          return;
       BrushEngine::Brush b = ToolBrush();
+      if (sTool == kColourReplace || sTool == kBgErase)
+      {
+         // The colour under the first dab is the one replaced (or erased).
+         float k[3] = { 0, 0, 0 };
+         if (doc->Pick(at.x, at.y, k, 1, sAllLayers ? 0 : id))
+            std::copy(k, k + 3, b.key);
+      }
       if (target == 0 && sTool == kBrush)
          if (Layer* L = doc->FindLayer(id))
          {
@@ -2448,10 +2547,13 @@ namespace
          if (!sCloneOffsetSet || !sCloneAligned)
          {
             sCloneOffset = ImVec2(sCloneSrc.x - at.x, sCloneSrc.y - at.y);
+            sCloneAnchor = at;
             sCloneOffsetSet = true;
          }
          b.sourceOffset[0] = sCloneOffset.x;
          b.sourceOffset[1] = sCloneOffset.y;
+         b.sourceAnchor[0] = sCloneAnchor.x;
+         b.sourceAnchor[1] = sCloneAnchor.y;
          b.sampleAll = sCloneAll;
       }
       std::copy(sFg, sFg + 3, b.color);
@@ -2460,7 +2562,7 @@ namespace
       const ImVec2 from = line && sHaveLast ? sLastPaint : at;
       if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow()))
          return;
-      if (sTool == kBrush && !BrushEngine::LiquifyMode(b.mode))
+      if (painter && !BrushEngine::LiquifyMode(b.mode))
          NoteColourUsed(sFg);
       sOp = Op();
       sOp.kind = 7;
@@ -3001,6 +3103,134 @@ namespace
       Touch();
    }
 
+   // Mesh warp: a 4 x 4 grid on the active paint layer. A drag moves one point; the pixels are pulled from the layer
+   // as it was when this warp began, so a second drag does not resample the first.
+   void MeshPress(Scene2DNode* doc, ImVec2 mouse)
+   {
+      Layer* al = Active(doc);
+      if (al == nullptr || PaintRefused(doc))
+         return;
+      if (sMeshId != al->id || (al->tiles != sMeshFrom && al->tiles != sMeshStored))
+      {
+         if (!doc->MeshRest(al->id, sMeshPts))
+            return;
+         std::copy(sMeshPts, sMeshPts + 32, sMeshPts0);
+         sMeshId = al->id;
+         sMeshFrom = al->tiles;
+         sMeshStored = al->tiles;
+      }
+      sMeshPoint = -1;
+      float bd = 10.0f;
+      for (int k = 0; k < 16; k++)
+      {
+         const ImVec2 q = ToScreen(doc, sMeshPts[k * 2], sMeshPts[k * 2 + 1]);
+         const float dd = std::hypot(q.x - mouse.x, q.y - mouse.y);
+         if (dd < bd) { bd = dd; sMeshPoint = k; }
+      }
+      if (sMeshPoint < 0)
+         return;
+      PushUndoCheckpoint("Mesh warp");
+      sOp = Op();
+      sOp.kind = 27;
+      sOp.start = mouse;
+      sOp.docStart = sMouseDoc;
+   }
+
+   void MeshDrag(Scene2DNode* doc)
+   {
+      if (sMeshPoint < 0 || sMeshPoint >= 16)
+         return;
+      sMeshPts[sMeshPoint * 2] = sMouseDoc.x;
+      sMeshPts[sMeshPoint * 2 + 1] = sMouseDoc.y;
+      if (doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, false))
+         Touch();
+   }
+
+   void MeshRelease(Scene2DNode* doc)
+   {
+      if (sMeshPoint >= 0 && doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, true))
+         if (const Layer* l = doc->FindLayer(sMeshId))
+            sMeshStored = l->tiles;
+      sMeshPoint = -1;
+      Touch();
+   }
+
+   // What the newer pixel tools show on the canvas: boxes and lines being dragged, the mesh, corners, the spot.
+   void DrawToolOverlays(Scene2DNode* doc, ImDrawList* dl, ImU32 ink, ImU32 shade)
+   {
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      auto line = [&](ImVec2 a, ImVec2 b) {
+         dl->AddLine(a, b, shade, 2.5f);
+         dl->AddLine(a, b, ink, 1.0f);
+      };
+      auto dot = [&](ImVec2 p, float r, bool hot) {
+         dl->AddCircleFilled(p, r + 1.5f, shade);
+         dl->AddCircleFilled(p, r, hot ? Hex(kOutline) : ink);
+      };
+      if (sOp.kind == 24)
+      {
+         AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, shade, 2.5f);
+         AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, ink, 1.0f);
+      }
+      if (sOp.kind == 25 && doc->HasSelection())
+      {
+         float lo[2], hi[2];
+         if (doc->SelectionBounds(lo, hi))
+         {
+            const float dx = sMouseDoc.x - sOp.docStart.x, dy = sMouseDoc.y - sOp.docStart.y;
+            AddDocRect(dl, doc, lo[0] + dx, lo[1] + dy, hi[0] + dx, hi[1] + dy, shade, 2.5f);
+            AddDocRect(dl, doc, lo[0] + dx, lo[1] + dy, hi[0] + dx, hi[1] + dy, ink, 1.0f);
+         }
+      }
+      if (sTool == kMeasure && sMeasureOn)
+      {
+         const ImVec2 a = ToScreen(doc, sMeasureA.x, sMeasureA.y), b = ToScreen(doc, sMeasureB.x, sMeasureB.y);
+         line(a, b);
+         dot(a, 2.5f, false);
+         dot(b, 2.5f, false);
+         const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
+         char t[64];
+         std::snprintf(t, sizeof t, "%.0f px  %.1f\xc2\xb0", std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f);
+         const ImVec2 at(b.x + 10.0f, b.y + 6.0f);
+         dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
+         dl->AddText(at, ink, t);
+      }
+      if (sTool == kMeshWarp)
+         if (const Layer* al = Active(doc))
+         {
+            float pts[32];
+            const bool live = sMeshId == al->id && (al->tiles == sMeshFrom || al->tiles == sMeshStored);
+            if (live)
+               std::copy(sMeshPts, sMeshPts + 32, pts);
+            if (live || doc->MeshRest(al->id, pts))
+            {
+               auto P = [&](int i, int j) { return ToScreen(doc, pts[(j * 4 + i) * 2], pts[(j * 4 + i) * 2 + 1]); };
+               for (int j = 0; j < 4; j++)
+                  for (int i = 0; i < 3; i++)
+                  {
+                     line(P(i, j), P(i + 1, j));
+                     line(P(j, i), P(j, i + 1));
+                  }
+               for (int k = 0; k < 16; k++)
+                  dot(P(k % 4, k / 4), 3.5f, live && k == sMeshPoint);
+            }
+         }
+      if (sTool == kPerspective)
+         if (const Layer* al = Active(doc))
+         {
+            float c[8];
+            if (CanWarp(doc) && doc->Corners(*al, c))
+               for (int k = 0; k < 4; k++)
+                  dot(ToScreen(doc, c[k * 2], c[k * 2 + 1]), 4.0f, sOp.kind == 18 && sOp.warpHandle == k * 2);
+         }
+      if (sTool == kBlemish && sMouseIn)
+      {
+         const float r = std::max(2.0f, sBlemishSize * 0.5f * sZoom);
+         dl->AddCircle(mouse, r, shade, 48, 2.5f);
+         dl->AddCircle(mouse, r, ink, 48, 1.0f);
+      }
+   }
+
    void ScaleActive(Scene2DNode* doc, ImVec2 mouse)
    {
       Layer* l = Active(doc);
@@ -3502,6 +3732,14 @@ namespace
    }
 
    // The marquee's far corner under its Ratio: free, a fixed shape (width leads), or a fixed size in px.
+   ImVec2 MarqueeEnd(ImVec2 a, ImVec2 b);
+   // From centre: the press is the middle, so the box starts as far the other way.
+   ImVec2 MarqueeStart(ImVec2 a, ImVec2 e)
+   {
+      if (!sMarqueeCentre)
+         return a;
+      return ImVec2(2.0f * a.x - e.x, 2.0f * a.y - e.y);
+   }
    ImVec2 MarqueeEnd(ImVec2 a, ImVec2 b)
    {
       static const float kR[4] = { 0.0f, 1.0f, 4.0f / 3.0f, 16.0f / 9.0f };
@@ -4619,14 +4857,15 @@ namespace
       }
       // Shapes being dragged out by the pixel tools.
       const ImU32 ink = IM_COL32(255, 255, 255, 230), shade = IM_COL32(0, 0, 0, 160);
+      DrawToolOverlays(doc, dl, ink, shade);
       if (sOp.kind == 9)
       {
-         const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc);
+         const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc), s0 = MarqueeStart(sOp.docStart, e);
          if (sMarqueeShape == 1)
          {
             // Traced in document space, so it turns with the view.
-            const float cx = (sOp.docStart.x + e.x) * 0.5f, cy = (sOp.docStart.y + e.y) * 0.5f;
-            const float rx = std::fabs(e.x - sOp.docStart.x) * 0.5f, ry = std::fabs(e.y - sOp.docStart.y) * 0.5f;
+            const float cx = (s0.x + e.x) * 0.5f, cy = (s0.y + e.y) * 0.5f;
+            const float rx = std::fabs(e.x - s0.x) * 0.5f, ry = std::fabs(e.y - s0.y) * 0.5f;
             ImVec2 ring[64];
             for (int i = 0; i < 64; i++)
                ring[i] = ToScreen(doc, cx + rx * std::cos(i * 6.2831853f / 64.0f), cy + ry * std::sin(i * 6.2831853f / 64.0f));
@@ -4635,8 +4874,8 @@ namespace
          }
          else
          {
-            AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, e.x, e.y, shade, 2.5f);
-            AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, e.x, e.y, ink, 1.0f);
+            AddDocRect(dl, doc, s0.x, s0.y, e.x, e.y, shade, 2.5f);
+            AddDocRect(dl, doc, s0.x, s0.y, e.x, e.y, ink, 1.0f);
          }
       }
       auto drawPath = [&](const std::vector<float>& pts, bool toMouse)
@@ -4847,8 +5086,78 @@ namespace
             sOp.kind = 11;
             sOp.selOp = sTool == kPick && io.KeyAlt ? 1 : 0;
          }
+         else if (sTool == kUndoBrush && io.KeyAlt)
+         {
+            // Alt-click: the layer as it is now becomes what the undo brush paints back to.
+            if (Layer* al = Active(doc))
+               doc->SetUndoSource(al->id);
+         }
          else if (BrushTool(sTool))
             BeginStroke(doc, sMouseDoc, io.KeyShift && !RetouchTool(sTool));
+         else if (sTool == kFloodErase || sTool == kBlemish)
+         {
+            if (!PaintRefused(doc))
+            {
+               EnsurePixels(doc);
+               Layer* al = Active(doc);
+               if (al != nullptr && al->kind == Kind::Paint)
+               {
+                  PushUndoCheckpoint(sTool == kBlemish ? "Blemish removal" : "Flood erase");
+                  if (sTool == kBlemish)
+                     doc->Blemish(al->id, sMouseDoc.x, sMouseDoc.y, sBlemishSize * 0.5f);
+                  else
+                     doc->FloodErase(al->id, sMouseDoc.x, sMouseDoc.y, sTolerance, sContiguous, sAllLayers);
+                  Touch();
+               }
+            }
+         }
+         else if (sTool == kStylePick)
+         {
+            // The first click holds a layer's style; each later click gives it to the layer clicked. Alt picks again.
+            const int hit = HitLayer(doc, sMouseDoc);
+            if (hit != 0 && (sStyleFrom == 0 || io.KeyAlt || doc->FindLayer(sStyleFrom) == nullptr))
+               sStyleFrom = hit;
+            else if (hit != 0 && hit != sStyleFrom)
+            {
+               PushUndoCheckpoint("Paste style");
+               doc->CopyLayerStyle(sStyleFrom, hit);
+               Touch();
+            }
+         }
+         else if (sTool == kObjectSel || sTool == kPatch || sTool == kMeasure)
+         {
+            sOp = Op();
+            sOp.kind = sTool == kObjectSel ? 24 : sTool == kPatch ? 25 : 26;
+            sOp.docStart = sMouseDoc;
+            sOp.start = mouse;
+            sOp.selOp = SelOpFor(io);
+         }
+         else if (sTool == kMeshWarp)
+            MeshPress(doc, mouse);
+         else if (sTool == kPerspective)
+         {
+            // A corner of the active layer pulled on its own: the card takes the perspective.
+            Layer* al = Active(doc);
+            float c[8];
+            if (al != nullptr && CanWarp(doc) && doc->Corners(*al, c))
+            {
+               int best = -1;
+               float bd = 12.0f;
+               for (int k = 0; k < 4; k++)
+               {
+                  const ImVec2 q = ToScreen(doc, c[k * 2], c[k * 2 + 1]);
+                  const float dd = std::hypot(q.x - mouse.x, q.y - mouse.y);
+                  if (dd < bd) { bd = dd; best = k; }
+               }
+               if (best >= 0)
+               {
+                  BeginOp(doc, 18, mouse, "Perspective");
+                  sOp.warpHandle = best * 2;   // corner -> handle (TL 0, TR 2, BR 4, BL 6)
+                  sOp.perspective = false;
+                  sOp.docStart = ToDoc(doc, mouse);
+               }
+            }
+         }
          else if (sTool == kFill)
             FillAt(doc, sMouseDoc);
          else if (sTool == kGradient)
@@ -5030,6 +5339,14 @@ namespace
             DragGizmo3D(doc, mouse);
          else if (sOp.kind == 18)
             WarpActive(doc, mouse);
+         else if (sOp.kind == 27)
+            MeshDrag(doc);
+         else if (sOp.kind == 26)
+         {
+            sMeasureA = sOp.docStart;
+            sMeasureB = sMouseDoc;
+            sMeasureOn = true;
+         }
          else if (sOp.kind == 4)
             sPan = ImVec2(sOp.pan0.x + mouse.x - sOp.start.x, sOp.pan0.y + mouse.y - sOp.start.y);
          else if (sOp.kind == 22)
@@ -5134,6 +5451,27 @@ namespace
             }
             else if (sOp.kind == 17)
                MarqueeLayers(doc, sOp.docStart, sMouseDoc, true);   // the press already cleared it unless Shift
+            else if (sOp.kind == 24 && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= 3.0f)
+            {
+               Layer* al = Active(doc);
+               SelStep("Object selection");
+               doc->SelectObject(sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, sOp.selOp, sAllLayers, al != nullptr ? al->id : 0);
+            }
+            else if (sOp.kind == 25 && doc->HasSelection() && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= 3.0f &&
+                     !PaintRefused(doc))
+            {
+               // The selection is mended from where it was dragged to.
+               EnsurePixels(doc);
+               Layer* al = Active(doc);
+               if (al != nullptr && al->kind == Kind::Paint)
+               {
+                  PushUndoCheckpoint("Patch");
+                  doc->PatchSelection(al->id, sMouseDoc.x - sOp.docStart.x, sMouseDoc.y - sOp.docStart.y);
+                  Touch();
+               }
+            }
+            else if (sOp.kind == 27)
+               MeshRelease(doc);
             else if (sOp.kind == 15)
                TextRelease(doc, mouse);
             else if (sOp.kind == 8 && std::hypot(mouse.x - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).x,
@@ -5152,9 +5490,9 @@ namespace
                }
                else
                {
-                  const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc);
+                  const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc), s0 = MarqueeStart(sOp.docStart, e);
                   SelStep("Marquee");
-                  doc->SelectRect(sOp.docStart.x, sOp.docStart.y, e.x, e.y, sOp.selOp, sFeather, sMarqueeShape == 1);
+                  doc->SelectRect(s0.x, s0.y, e.x, e.y, sOp.selOp, sMarqueeAA ? std::max(sFeather, 1.0f) : sFeather, sMarqueeShape == 1);
                }
             }
             else if (sOp.kind == 10)
@@ -5534,16 +5872,43 @@ namespace
       {
          BrushEngine::Brush& b = ToolBrush();
          BarSlider("##v2drsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
-         float hard = b.hardness * 100.0f, op = b.opacity * 100.0f;
+         float hard = b.hardness * 100.0f, op = b.opacity * 100.0f, flow = b.flow * 100.0f;
          BarSlider("##v2drhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
-         BarSlider("##v2drop", &op, 1.0f, 100.0f, "Strength %.0f%%", kWellL);
+         BarSlider("##v2drop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+         BarSlider("##v2drflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
+         b.flow = flow / 100.0f;
          if (sTool == kDodge || sTool == kBurn)
          {
             gap();
             static const char* kRange[3] = { "Shadows", "Midtones", "Highlights" };
             BarCombo("##v2drange", &b.range, kRange, 3, kWellL);
+         }
+         if (sTool == kDodge || sTool == kBurn || sTool == kSponge)
+         {
+            gap();
+            if (TextChip(L("Protect hue##v2dphue"), b.protectHue, nullptr))
+               b.protectHue = !b.protectHue;
+         }
+         if (sTool == kSponge)
+         {
+            next();
+            static const char* kSpongeModes[2] = { "Saturate", "Desaturate" };
+            BarCombo("##v2dspongemode", &b.spongeMode, kSpongeModes, 2, kWellL);
+         }
+         if (sTool == kSharpen)
+         {
+            gap();
+            static const char* kSharp[3] = { "Clarity", "Unsharp", "Harsh" };
+            BarCombo("##v2dsharpmode", &b.sharpMode, kSharp, 3, kWellL);
+         }
+         if (sTool == kColourReplace || sTool == kBgErase)
+         {
+            gap();
+            float tol = b.keyTolerance * 100.0f;
+            BarSlider("##v2dkeytol", &tol, 0.0f, 100.0f, "Tolerance %.0f%%", kWellL);
+            b.keyTolerance = tol / 100.0f;
          }
          if (sTool == kClone || sTool == kHeal)
          {
@@ -5553,6 +5918,24 @@ namespace
             next();
             if (TextChip(L("All layers##v2dcloneall"), sCloneAll, T("Copy from the whole picture")))
                sCloneAll = !sCloneAll;
+            gap();
+            BarSlider("##v2dsrot", &b.sourceRotate, -180.0f, 180.0f, "Rotation %.0f\xC2\xB0", kWellM);
+            next();
+            float sc = b.sourceScale * 100.0f;
+            BarSlider("##v2dsscale", &sc, 10.0f, 400.0f, "Scale %.0f%%", kWellM);
+            b.sourceScale = sc / 100.0f;
+            next();
+            if (TextChip(L("Flip X##v2dsflipx"), b.sourceFlipX, nullptr))
+               b.sourceFlipX = !b.sourceFlipX;
+            next();
+            if (TextChip(L("Flip Y##v2dsflipy"), b.sourceFlipY, nullptr))
+               b.sourceFlipY = !b.sourceFlipY;
+            if (sTool == kClone)
+            {
+               next();
+               static const char* kCloneBlend[7] = { "Normal", "Multiply", "Screen", "Overlay", "Darken", "Lighten", "Difference" };
+               BarCombo("##v2dsblend", &b.sourceBlend, kCloneBlend, 7, kWellM);
+            }
          }
          gap();
          SymmetryChip(doc);
@@ -5564,9 +5947,13 @@ namespace
             MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
             MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
             MorePct(T("Smoothing"), &b.smoothing, 0.0f, 100.0f);
+            float stab = (float)b.stabiliser;
+            MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
+            b.stabiliser = (int)std::lround(stab);
+            MoreCheck(T("Wet edges"), &b.wetEdges);
             MoreHeader(T("Pen pressure"));
             MoreCheck(T("Size"), &b.pressureSize);
-            MoreCheck(T("Strength"), &b.pressureOpacity);
+            MoreCheck(T("Opacity"), &b.pressureOpacity);
          });
       }
       else if (sTool == kBrush || sTool == kEraser)
@@ -5647,8 +6034,18 @@ namespace
             b.stabiliser = (int)std::lround(stab);
             MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
             MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
+            float scatterY = b.scatterY < 0.0f ? b.jitter : b.scatterY;
+            MorePct(T("Scatter Y"), &scatterY, 0.0f, 200.0f);
+            if (std::fabs(scatterY - (b.scatterY < 0.0f ? b.jitter : b.scatterY)) > 1e-6f)
+               b.scatterY = scatterY;
             MorePct(T("Size jitter"), &b.sizeJitter, 0.0f, 100.0f);
-            MorePct(T("Opacity jitter"), &b.opacityJitter, 0.0f, 100.0f);
+            MorePct(T("Flow jitter"), &b.opacityJitter, 0.0f, 100.0f);
+            MorePct(T("Hardness jitter"), &b.hardJitter, 0.0f, 100.0f);
+            MorePct(T("Rotation jitter"), &b.angleJitter, 0.0f, 100.0f);
+            MorePct(T("Shape jitter"), &b.roundJitter, 0.0f, 100.0f);
+            MorePct(T("Accumulation"), &b.accumulation, 0.0f, 100.0f);
+            MorePct(T("Accumulation jitter"), &b.accumJitter, 0.0f, 100.0f);
+            MoreCheck(T("Wet edges"), &b.wetEdges);
             if (brush)
             {
                MorePct(T("Hue jitter"), &b.hueJitter, 0.0f, 100.0f);
@@ -5710,6 +6107,60 @@ namespace
             ImGui::EndDisabled();
          });
       }
+      else if (sTool == kMixer || sTool == kSelBrush)
+      {
+         BrushEngine::Brush& b = ToolBrush();
+         BarSlider("##v2dxsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
+         float hard = b.hardness * 100.0f;
+         BarSlider("##v2dxhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
+         b.hardness = hard / 100.0f;
+         if (sTool == kMixer)
+         {
+            float op = b.opacity * 100.0f, wet = b.wet * 100.0f, refill = b.refill * 100.0f;
+            BarSlider("##v2dxop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+            gap();
+            BarSlider("##v2dxwet", &wet, 0.0f, 100.0f, "Wet %.0f%%", kWellL);
+            BarSlider("##v2dxrefill", &refill, 0.0f, 100.0f, "Refill %.0f%%", kWellL);
+            b.opacity = op / 100.0f;
+            b.wet = wet / 100.0f;
+            b.refill = refill / 100.0f;
+         }
+         else
+         {
+            gap();
+            SelModChips(doc);
+         }
+      }
+      else if (sTool == kBlemish)
+         BarSlider("##v2dblemsize", &sBlemishSize, 2.0f, 500.0f, "Size %.0f px", kWellL);
+      else if (sTool == kFloodErase)
+         MatchChips();
+      else if (sTool == kObjectSel)
+      {
+         SelOpChips("v2doop");
+         gap();
+         if (TextChip(L("All layers##v2doall"), sAllLayers, T("Sample the whole picture")))
+            sAllLayers = !sAllLayers;
+         SelModChips(doc);
+      }
+      else if (sTool == kMeasure)
+      {
+         if (sMeasureOn)
+         {
+            const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("%.1f px   %.1f\xC2\xB0   W %.0f  H %.0f", std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f, std::fabs(dx),
+                        std::fabs(dy));
+            next();
+            if (TextChip(L("Clear##v2dmclear"), false, nullptr))
+               sMeasureOn = false;
+         }
+         else
+         {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", T("Drag to measure"));
+         }
+      }
       else if (sTool == kFill)
          MatchChips();
       else if (sTool == kGradient)
@@ -5740,6 +6191,12 @@ namespace
          BarSlider("##v2dfeather", &sFeather, 0.0f, 250.0f, "Feather %.0f px", kWellL);
          if (m)
          {
+            next();
+            if (TextChip(L("From centre##v2dmcentre"), sMarqueeCentre, nullptr))
+               sMarqueeCentre = !sMarqueeCentre;
+            next();
+            if (TextChip(L("Antialias##v2dmaa"), sMarqueeAA, nullptr))
+               sMarqueeAA = !sMarqueeAA;
             gap();
             static const char* kRatio[5] = { "Free", "1:1", "4:3", "16:9", "Fixed size" };
             BarCombo("##v2dmratio", &sMarqueeRatio, kRatio, 5, kWellM);
@@ -5770,6 +6227,9 @@ namespace
          SelOpChips("v2dwop");
          gap();
          MatchChips();
+         FormParts::Inline(0.0f, tok::space_1);
+         if (TextChip(L("Antialias##v2dwaa"), doc->wandAntialias, nullptr))
+            doc->wandAntialias = !doc->wandAntialias;
          SelModChips(doc);
       }
    }
@@ -6375,21 +6835,38 @@ namespace
    struct ToolDef { int tool; const char* id; const char* glyph; const char* tip; int section; };
    const ToolDef kTools[kToolCount] = {
       { kMove, "##v2dmove", IconsInfinite::ToolMove, "Move (V)", 0 },
+      { kPerspective, "##v2dpersp", IconsInfinite::Perspective, "Perspective. Drag a corner", 0 },
+      { kMeshWarp, "##v2dmesh", IconsInfinite::MeshWarp, "Mesh warp. Drag a grid point", 0 },
       { kMarquee, "##v2dmarquee", IconsInfinite::Marquee, "Marquee (M)", 1 },
       { kLasso, "##v2dlasso", IconsInfinite::Lasso, "Lasso (L)", 1 },
       { kWand, "##v2dwand", IconsInfinite::Wand, "Magic wand (W)", 1 },
+      { kSelBrush, "##v2dselbrush", IconsInfinite::SelBrush, "Selection brush (W). Alt takes away", 1 },
+      { kObjectSel, "##v2dobjsel", IconsInfinite::ObjectSel, "Object selection (W). Drag a box round it", 1 },
       { kCrop, "##v2dcrop", IconsInfinite::Crop, "Crop (C). Enter applies, Esc cancels", 1 },
       { kPick, "##v2dpick", IconsInfinite::Eyedropper, "Eyedropper (I). Alt sets the background", 1 },
+      { kStylePick, "##v2dstylepick", IconsInfinite::StylePick, "Style picker (I). Click to take, click to give", 1 },
+      { kMeasure, "##v2dmeasure", IconsInfinite::Measure, "Measure (I). Drag a line", 1 },
       { kHeal, "##v2dheal", IconsInfinite::Heal, "Healing brush (J). Alt-click sets the source", 2 },
+      { kBlemish, "##v2dblemish", IconsInfinite::Blemish, "Blemish removal (J). Click a spot", 2 },
+      { kPatch, "##v2dpatch", IconsInfinite::Patch, "Patch (J). Drag the selection to clean pixels", 2 },
+      { kInpaint, "##v2dinpaint", IconsInfinite::Inpaint, "Inpainting brush (J). Paint over to remove", 2 },
+      { kRedEye, "##v2dredeye", IconsInfinite::RedEye, "Red eye (J)", 2 },
       { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line", 2 },
+      { kMixer, "##v2dmixer", IconsInfinite::PaintMixer, "Paint mixer (B). Wet paint", 2 },
+      { kColourReplace, "##v2dcolrep", IconsInfinite::ColourReplace, "Colour replacement (B)", 2 },
       { kClone, "##v2dclone", IconsInfinite::CloneStamp, "Clone stamp (S). Alt-click sets the source", 2 },
+      { kUndoBrush, "##v2dundobrush", IconsInfinite::UndoBrush, "Undo brush (S). Alt-click sets the state", 2 },
       { kEraser, "##v2derase", IconsInfinite::Erase, "Eraser (E)", 2 },
+      { kBgErase, "##v2dbgerase", IconsInfinite::BgErase, "Background eraser (E)", 2 },
+      { kFloodErase, "##v2dflooderase", IconsInfinite::FloodErase, "Flood eraser (E)", 2 },
       { kGradient, "##v2dgradient", IconsInfinite::Gradient, "Gradient (G). Drag to draw", 2 },
       { kFill, "##v2dfilltool", IconsInfinite::Fill, "Paint bucket (G)", 2 },
       { kBlur, "##v2dblur", IconsInfinite::Blur, "Blur (R)", 2 },
       { kSharpen, "##v2dsharpen", IconsInfinite::Sharpen, "Sharpen (R)", 2 },
+      { kMedian, "##v2dmedian", IconsInfinite::Median, "Median (R)", 2 },
       { kDodge, "##v2ddodge", IconsInfinite::Dodge, "Dodge (O). Lightens", 2 },
       { kBurn, "##v2dburn", IconsInfinite::Burn, "Burn (O). Darkens", 2 },
+      { kSponge, "##v2dsponge", IconsInfinite::Sponge, "Sponge (O)", 2 },
       { kPen, "##v2dpen", IconsInfinite::PenTool, "Pen (P). Drag for curves, Enter ends", 3 },
       { kText, "##v2dtext", IconsInfinite::Type, "Text (T). Click for a line, drag for a box", 3 },
       { kNode, "##v2dnode", IconsInfinite::Pointer, "Direct select (A). Alt-click an anchor makes a corner", 3 },
@@ -10903,7 +11380,10 @@ namespace
    const char* kAuditKindNames[kAuditKinds] = { "paint", "node", "3D node", "text", "shape", "fill", "adjust", "group", "masked", "none" };
    const char* kAuditTabNames[7] = { "Layers", "Layer", "Transform", "Document", "Render", "Effects", "Colour" };
    const char* kAuditToolNames[kToolCount] = { "Move", "Crop", "Hand", "Zoom", "Brush", "Eraser", "Fill", "Pick", "Marquee", "Lasso", "Wand",
-                                               "Pen", "Node", "Shape", "Text", "Gradient", "Clone", "Heal", "Blur", "Sharpen", "Dodge", "Burn" };
+                                               "Pen", "Node", "Shape", "Text", "Gradient", "Clone", "Heal", "Blur", "Sharpen", "Dodge", "Burn",
+                                               "Sponge", "Median", "UndoBrush", "ColourReplace", "PaintMixer", "BgErase", "FloodErase",
+                                               "SelBrush", "ObjectSel", "RedEye", "Blemish", "Patch", "Inpaint", "MeshWarp", "Perspective",
+                                               "StylePick", "Measure" };
    uint64_t sAuditDoc = 0;
    int sAuditIds[kAuditKinds - 1] = {};
    int sAuditState = -1;
@@ -11498,6 +11978,9 @@ int View2DAffinityAb(const char* dir)
       { "adj_white_balance", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjWhiteBalance, { 0.5f, 0.25f }); } },
       { "adj_split_toning", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjSplitToning, { 30.0f, 0.6f, 210.0f, 0.5f, 0.4f }); } },
       { "adj_recolour", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjRecolour, { 200.0f, 0.5f, 0.1f }); } },
+      { "adj_normals", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjNormals, { 45.0f, 0.75f, 0.0f, 1.0f }); } },
+      { "adj_tone_compression", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjToneCompression, { 1.5f, 0.8f, 0.25f }); } },
+      { "adj_tone_stretch", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjToneStretch, { 0.25f, 1.0f, 0.0f }); } },
    };
    const char* only = std::getenv("INFINITE_AB2D_OP");
    for (const AbOp& op : ops)

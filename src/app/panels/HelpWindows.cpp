@@ -771,8 +771,9 @@ namespace app
       // 2D View - every key but the panel toggle needs the pointer over the view
       { I18N_KEY("2D View"), I18N_KEY("2D View Panel"), "Shift+2", I18N_KEY("Show or hide the 2D View. Every other key in this section needs the pointer over the view") },
       { I18N_KEY("2D View"), I18N_KEY("Tools"), "V / C / H / Z", I18N_KEY("Move, Crop, Hand, Zoom; hold Space for the hand") },
-      { I18N_KEY("2D View"), I18N_KEY("Paint Tools"), "B / E / G / I", I18N_KEY("Brush, Eraser, Fill (bucket or gradient), Eyedropper; Alt-click picks a colour with the brush or fill") },
-      { I18N_KEY("2D View"), I18N_KEY("Selection Tools"), "M / L / W", I18N_KEY("Marquee, Lasso, Magic Wand; Shift adds, Alt subtracts. Enter closes a polygon lasso, Esc drops it") },
+      { I18N_KEY("2D View"), I18N_KEY("Paint Tools"), "B / E / G / I", I18N_KEY("Press again to cycle. B: Brush, Paint Mixer, Colour Replace. E: Eraser, Background Erase, Flood Erase. G: Fill, Gradient. I: Eyedropper, Style Picker, Measure. Alt-click picks a colour with the brush or fill") },
+      { I18N_KEY("2D View"), I18N_KEY("Retouch Tools"), "S / J / R / O", I18N_KEY("Press again to cycle. S: Clone, Undo Brush. J: Heal, Blemish, Patch, Inpaint, Red Eye. R: Blur, Sharpen, Median. O: Dodge, Burn, Sponge") },
+      { I18N_KEY("2D View"), I18N_KEY("Selection Tools"), "M / L / W", I18N_KEY("Marquee, Lasso; W cycles Magic Wand, Selection Brush, Object Selection. Shift adds, Alt subtracts. Enter closes a polygon lasso, Esc drops it") },
       { I18N_KEY("2D View"), I18N_KEY("Vector Tools"), "P / A / U / T", I18N_KEY("Pen, Node, Shape, Text. Pen: click the first point to close, Enter or Esc ends the path. Node: Alt-click makes a corner, Delete removes the shape") },
       { I18N_KEY("2D View"), I18N_KEY("Brush Size / Hardness"), "[ / ]", I18N_KEY("Smaller or larger brush; with Shift softer or harder") },
       { I18N_KEY("2D View"), I18N_KEY("Brush Opacity"), "1 ... 0", I18N_KEY("10% to 100%") },

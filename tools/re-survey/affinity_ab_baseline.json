@@ -1,9 +1,18 @@
 {
+ "adj_normals": {
+  "flip": 0.0068
+ },
  "adj_recolour": {
   "flip": 0.0047
  },
  "adj_split_toning": {
   "flip": 0.0071
+ },
+ "adj_tone_compression": {
+  "flip": 0.0106
+ },
+ "adj_tone_stretch": {
+  "flip": 0.0472
  },
  "adj_white_balance": {
   "flip": 0.0182

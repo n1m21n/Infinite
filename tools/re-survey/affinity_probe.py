@@ -76,7 +76,7 @@ OPS = [
     {"name": "bucket", "proxy": False,
      "js": RASTERISE + "doc.executeCommand(DocumentCommand.createRasterFloodFill(sel(), new G.Point(300,100), 0.2, true, true, dom.RasterFloodFillSamplingSource.CurrentLayer, BlendMode.Normal, red()));"},
 ]
-# Adjustment layers over the photo (fitted maths in Scene2DNode: White Balance, Split Toning, Recolour).
+# Adjustment layers over the photo (fitted maths in Scene2DNode: White Balance, Split Toning, Recolour, Normals, Tone Compression, Tone Stretch).
 def _adj(kind, setter):
     return (f"const ap = N.{kind}AdjustmentParameters.create(); {setter} "
             f"doc.addNode(N.{kind}AdjustmentRasterNodeDefinition.create(ap), null, undefined, false);")
@@ -86,6 +86,11 @@ OPS += [
      "js": _adj("SplitToning", "ap.highlightsHue = 0.5236; ap.highlightsSaturation = 0.6; ap.shadowsHue = 3.6652; "
                                "ap.shadowsSaturation = 0.5; ap.balance = 0.4;")},
     {"name": "adj_recolour", "proxy": False, "js": _adj("Recolour", "ap.hue = 3.4907; ap.saturation = 0.5; ap.lightness = 0.1;")},
+    {"name": "adj_normals", "proxy": False, "js": _adj("Normals", "ap.rotation = 0.7854; ap.scale = 0.75; ap.flipY = true;")},
+    {"name": "adj_tone_compression", "proxy": False,
+     "js": _adj("ToneCompression", "ap.exposure = 1.5; ap.gamma = 0.8; ap.colour = 0.25;")},
+    {"name": "adj_tone_stretch", "proxy": False,
+     "js": _adj("ToneStretch", "ap.stretchFactor = 0.25; ap.gamma = 1.0; ap.compression = 0.0;")},
 ]
 # Reached in neither direction by script: Affinity's SDK has no raster stroke (RasterBrush.createDefault is "not
 # yet implemented") and no gradient fill on pixels, so these are compared by the help pages only.
@@ -417,6 +422,18 @@ ADJ_CASES = {
     **{f"rch_{i}": ("Recolour", f"p.hue = {i * math.pi / 6}; p.saturation = 1; p.lightness = 0;") for i in range(12)},
     **{f"rcs_{i}": ("Recolour", f"p.hue = 0; p.saturation = {i / 4}; p.lightness = 0;") for i in range(5)},
     **{f"rcl_{i}": ("Recolour", f"p.hue = 0; p.saturation = 1; p.lightness = {(i - 4) / 4};") for i in range(9)},
+    "nm_0": ("Normals", ""),
+    **{f"nmr_{i}": ("Normals", f"p.rotation = {(i - 4) * math.pi / 4};") for i in range(9)},
+    **{f"nms_{i}": ("Normals", f"p.scale = {i / 4};") for i in range(9)},
+    "nm_fx": ("Normals", "p.flipX = true;"), "nm_fy": ("Normals", "p.flipY = true;"),
+    "tc_0": ("ToneCompression", ""),
+    **{f"tce_{i}": ("ToneCompression", f"p.exposure = {i / 4};") for i in range(9)},
+    **{f"tcg_{i}": ("ToneCompression", f"p.gamma = {i / 4};") for i in range(9)},
+    **{f"tcc_{i}": ("ToneCompression", f"p.colour = {i / 4};") for i in range(5)},
+    "ts_0": ("ToneStretch", ""),
+    **{f"tsf_{i}": ("ToneStretch", f"p.stretchFactor = {i / 8};") for i in range(9)},
+    **{f"tsg_{i}": ("ToneStretch", f"p.gamma = {i / 4};") for i in range(9)},
+    **{f"tsc_{i}": ("ToneStretch", f"p.compression = {i / 4};") for i in range(5)},
 }
 ADJ_JS = r"""
 const { app } = require('/application.js'); const D = require('/document.js'); const N = require('/nodes.js');

@@ -4,6 +4,7 @@
 
 #include "gl3.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 
@@ -119,6 +120,235 @@ namespace
       glBindTexture(GL_TEXTURE_2D, 0);
    }
 
+   // Two-pass running box blur of an n-channel float image (w x h), radius r.
+   void BoxBlurF(std::vector<float>& a, int w, int h, int ch, int r)
+   {
+      if (r <= 0)
+         return;
+      std::vector<float> t(a.size());
+      for (int pass = 0; pass < 2; pass++)
+      {
+         for (int y = 0; y < h; y++)
+            for (int c = 0; c < ch; c++)
+            {
+               float sum = 0;
+               for (int k = -r; k <= r; k++)
+                  sum += a[((size_t)y * w + std::clamp(k, 0, w - 1)) * ch + c];
+               for (int x = 0; x < w; x++)
+               {
+                  t[((size_t)y * w + x) * ch + c] = sum / (2 * r + 1);
+                  sum += a[((size_t)y * w + std::min(w - 1, x + r + 1)) * ch + c] - a[((size_t)y * w + std::max(0, x - r)) * ch + c];
+               }
+            }
+         for (int x = 0; x < w; x++)
+            for (int c = 0; c < ch; c++)
+            {
+               float sum = 0;
+               for (int k = -r; k <= r; k++)
+                  sum += t[((size_t)std::clamp(k, 0, h - 1) * w + x) * ch + c];
+               for (int y = 0; y < h; y++)
+               {
+                  a[((size_t)y * w + x) * ch + c] = sum / (2 * r + 1);
+                  sum += t[((size_t)std::min(h - 1, y + r + 1) * w + x) * ch + c] - t[((size_t)std::max(0, y - r) * w + x) * ch + c];
+               }
+            }
+      }
+   }
+
+   // Fills the holes of `img` (RGBA floats, w x h; hole[i] true) from the known pixels around: a push-pull pyramid.
+   void PushPull(std::vector<float>& img, const std::vector<uint8_t>& hole, int w, int h)
+   {
+      struct Lv { int w, h; std::vector<float> c; };   // premultiplied by weight, weight in [4]
+      std::vector<Lv> lv(1);
+      lv[0].w = w;
+      lv[0].h = h;
+      lv[0].c.assign((size_t)w * h * 5, 0.0f);
+      for (size_t i = 0; i < (size_t)w * h; i++)
+         if (!hole[i])
+         {
+            for (int c = 0; c < 4; c++)
+               lv[0].c[i * 5 + c] = img[i * 4 + c];
+            lv[0].c[i * 5 + 4] = 1.0f;
+         }
+      while (lv.back().w > 1 || lv.back().h > 1)
+      {
+         const Lv& a = lv.back();
+         Lv b;
+         b.w = std::max(1, (a.w + 1) / 2);
+         b.h = std::max(1, (a.h + 1) / 2);
+         b.c.assign((size_t)b.w * b.h * 5, 0.0f);
+         for (int y = 0; y < a.h; y++)
+            for (int x = 0; x < a.w; x++)
+            {
+               const float* s = &a.c[((size_t)y * a.w + x) * 5];
+               float* d = &b.c[((size_t)(y / 2) * b.w + x / 2) * 5];
+               for (int c = 0; c < 5; c++)
+                  d[c] += s[c];
+            }
+         for (size_t i = 0; i < (size_t)b.w * b.h; i++)   // keep weight at most 1: a full cell counts as one known pixel
+         {
+            float* d = &b.c[i * 5];
+            if (d[4] > 1.0f)
+            {
+               for (int c = 0; c < 4; c++)
+                  d[c] /= d[4];
+               d[4] = 1.0f;
+            }
+         }
+         lv.push_back(std::move(b));
+      }
+      for (int k = (int)lv.size() - 2; k >= 0; k--)
+      {
+         Lv& a = lv[k];
+         const Lv& b = lv[k + 1];
+         for (int y = 0; y < a.h; y++)
+            for (int x = 0; x < a.w; x++)
+            {
+               float* d = &a.c[((size_t)y * a.w + x) * 5];
+               if (d[4] >= 1.0f)
+                  continue;
+               // Bilinear from the coarser level (all its cells are full by now).
+               const float fx = std::clamp((x + 0.5f) / 2.0f - 0.5f, 0.0f, (float)b.w - 1), fy = std::clamp((y + 0.5f) / 2.0f - 0.5f, 0.0f, (float)b.h - 1);
+               const int ix = (int)fx, iy = (int)fy, jx = std::min(b.w - 1, ix + 1), jy = std::min(b.h - 1, iy + 1);
+               const float tx = fx - ix, ty = fy - iy;
+               float up[4];
+               for (int c = 0; c < 4; c++)
+               {
+                  auto at = [&](int xx, int yy) { const float* q = &b.c[((size_t)yy * b.w + xx) * 5]; return q[4] > 0 ? q[c] / q[4] : 0.0f; };
+                  up[c] = (at(ix, iy) * (1 - tx) + at(jx, iy) * tx) * (1 - ty) + (at(ix, jy) * (1 - tx) + at(jx, jy) * tx) * ty;
+               }
+               const float wk = d[4];
+               for (int c = 0; c < 4; c++)
+                  d[c] = d[c] + up[c] * (1.0f - wk);
+               d[4] = 1.0f;
+            }
+      }
+      for (size_t i = 0; i < (size_t)w * h; i++)
+         if (hole[i])
+            for (int c = 0; c < 4; c++)
+               img[i * 4 + c] = lv[0].c[i * 5 + c];
+   }
+
+}   // namespace
+
+// The masked pixels (mask 0..255, the surface's size) rebuilt from around them: the smooth colour from a push-pull
+// fill, the texture from a clean patch `off` away (the best-matching one nearby when autoOff) healed onto it.
+bool Scene2DNode::HealRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask, int ox, int oy, bool autoOff)
+{
+   int bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+         if (mask[(size_t)y * w + x] > 8)
+         {
+            bx0 = std::min(bx0, x);
+            by0 = std::min(by0, y);
+            bx1 = std::max(bx1, x);
+            by1 = std::max(by1, y);
+         }
+   if (bx1 < 0)
+      return false;
+   const int bw = bx1 - bx0 + 1, bh = by1 - by0 + 1, big = std::max(bw, bh);
+   const int R = std::clamp(big / 8 + 2, 3, 24);
+   const int reach = autoOff ? big * 2 + R + 4 : std::max(std::abs(ox), std::abs(oy)) + R + 4;
+   const int cx0 = std::max(0, bx0 - reach), cy0 = std::max(0, by0 - reach);
+   const int cx1 = std::min(w, bx1 + 1 + reach), cy1 = std::min(h, by1 + 1 + reach);
+   const int cw = cx1 - cx0, chh = cy1 - cy0;
+   std::vector<float> img((size_t)cw * chh * 4);
+   std::vector<uint8_t> hole((size_t)cw * chh), m8((size_t)cw * chh);
+   for (int y = 0; y < chh; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         const size_t si = (size_t)(y + cy0) * w + (x + cx0), di = (size_t)y * cw + x;
+         for (int c = 0; c < 4; c++)
+            img[di * 4 + c] = px[si * 4 + c] / 255.0f;
+         m8[di] = mask[si];
+         hole[di] = mask[si] > 8;
+      }
+   const std::vector<float> orig = img;
+   PushPull(img, hole, cw, chh);
+   auto inHole = [&](int x, int y) { return x < 0 || y < 0 || x >= cw || y >= chh || hole[(size_t)y * cw + x]; };
+   if (autoOff)
+   {
+      // The ring just outside the hole, matched against the same ring moved: the closest clean place wins.
+      std::vector<std::pair<int, int>> ring, inner;
+      const int step = std::max(1, big / 24);
+      for (int y = 0; y < chh; y += step)
+         for (int x = 0; x < cw; x += step)
+         {
+            if (hole[(size_t)y * cw + x])
+            {
+               inner.push_back({ x, y });
+               continue;
+            }
+            bool near = false;
+            for (int k = -R; k <= R && !near; k += std::max(1, R / 2))
+            {
+               const int xx = x + k, yy = y + k;
+               near = (xx >= 0 && xx < cw && hole[(size_t)y * cw + xx] != 0) || (yy >= 0 && yy < chh && hole[(size_t)yy * cw + x] != 0);
+            }
+            if (near)
+               ring.push_back({ x, y });
+         }
+      float best = 1e30f;
+      ox = oy = 0;
+      for (int ring_d = 0; ring_d < 3; ring_d++)
+         for (int a = 0; a < 16; a++)
+         {
+            const float d = big * (0.75f + 0.5f * ring_d) + R;
+            const int tx = (int)std::lround(std::cos(a * 0.3926991f) * d), ty = (int)std::lround(std::sin(a * 0.3926991f) * d);
+            bool ok = true;
+            for (const auto& q : inner)
+               if (inHole(q.first + tx, q.second + ty)) { ok = false; break; }
+            if (!ok)
+               continue;
+            float e = 0;
+            int n = 0;
+            for (const auto& q : ring)
+            {
+               const int sx = q.first + tx, sy = q.second + ty;
+               if (sx < 0 || sy < 0 || sx >= cw || sy >= chh)
+                  continue;
+               for (int c = 0; c < 3; c++)
+               {
+                  const float dv = orig[((size_t)q.second * cw + q.first) * 4 + c] - orig[((size_t)sy * cw + sx) * 4 + c];
+                  e += dv * dv;
+               }
+               n++;
+            }
+            e = n > 0 ? e / n + 1e-4f * (tx * tx + ty * ty) / (float)(big * big) : 1e30f;
+            if (e < best)
+            {
+               best = e;
+               ox = tx;
+               oy = ty;
+            }
+         }
+   }
+   std::vector<float> low = img;
+   BoxBlurF(low, cw, chh, 4, R);
+   for (int y = 0; y < chh; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         const size_t di = (size_t)y * cw + x;
+         const float k = m8[di] / 255.0f;
+         if (k <= 0.0f)
+            continue;
+         const int sx = std::clamp(x + ox, 0, cw - 1), sy = std::clamp(y + oy, 0, chh - 1);
+         const size_t si = (size_t)sy * cw + sx;
+         const bool clean = (ox != 0 || oy != 0) && !hole[si];
+         for (int c = 0; c < 4; c++)
+         {
+            const float v = clean ? img[si * 4 + c] + low[di * 4 + c] - low[si * 4 + c] : img[di * 4 + c];
+            const float o = orig[di * 4 + c] * (1.0f - k) + std::clamp(v, 0.0f, 1.0f) * k;
+            px[((size_t)(y + cy0) * w + (x + cx0)) * 4 + c] = (uint8_t)std::lround(std::clamp(o, 0.0f, 1.0f) * 255.0f);
+         }
+      }
+   return true;
+}
+
+namespace
+{
+
    // Box blur, three times: close to a gaussian of the same radius.
    void Feather(std::vector<uint8_t>& a, int w, int h, float radius)
    {
@@ -185,8 +415,12 @@ namespace
    // The antialiased edge Affinity gives its wand and flood fill (measured to 0.001): each pixel just outside the
    // region is covered by how far along the step from an in-region neighbour q the tolerance is crossed,
    // (tol - d_q) / (d_p - d_q), the largest over its 8 neighbours. Inside stays full, so a region never shrinks.
+   bool sMatchSoft = true;   // the soft edge on (Scene2DNode::wandAntialias, set before each match)
+
    void SoftenEdge(const std::vector<uint8_t>& px, int w, int h, const uint8_t* ref, int tol, std::vector<uint8_t>& out)
    {
+      if (!sMatchSoft)
+         return;
       const float r = (float)tol * 1.7320508f;
       std::vector<uint8_t> edge(out.size(), 0);
       for (int y = 0; y < h; y++)
@@ -353,7 +587,11 @@ void Scene2DNode::SyncSurfaces()
    for (const Layer& l : mLayers)
    {
       if ((l.kind == Kind::Paint || l.HasSkin()) && SyncSurface(mSurfaces, l.id, l.pw, l.ph, l.tiles) != nullptr)
+      {
          paintIds.push_back(l.id);
+         if (l.kind == Kind::Paint && mUndoTiles.find(l.id) == mUndoTiles.end())
+            mUndoTiles[l.id] = l.tiles;   // the Undo brush paints back to the layer as first shown
+      }
       if (l.HasPixelMask() && SyncSurface(mMasks, l.id, l.mw, l.mh, l.mtiles) != nullptr)
          maskIds.push_back(l.id);
    }
@@ -546,6 +784,12 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
          brush.sourceOffset[0] = ox - sx;
          brush.sourceOffset[1] = oy - sy;
       }
+      // Rotation, scale and flip turn the source about where the aligned run began (else the stroke's start).
+      float ax = sx, ay = sy, s3 = 1;
+      if (b.sourceAnchor[0] != 0.0f || b.sourceAnchor[1] != 0.0f)
+         DocToSurface(target == 2 ? Layer() : *l, target, b.sourceAnchor[0], b.sourceAnchor[1], ax, ay, s3);
+      brush.sourceAnchor[0] = ax;
+      brush.sourceAnchor[1] = ay;
    }
    // Paint lands only inside the selection, resampled to the surface when it is placed differently.
    unsigned sel = 0;
@@ -571,6 +815,14 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
       tmp.fbo = mCloneSrc;
       ApplyFill(tmp, surf->w, surf->h, *l, 0, nullptr, nullptr, -2, nullptr, nullptr, 1.0f);
       brush.sourceTex = mCloneSrc.tex;
+   }
+   if (target == 0 && brush.mode == BrushEngine::kUndo)
+   {
+      auto u = mUndoTiles.find(id);
+      if (u == mUndoTiles.end() || u->second.size() != l->tiles.size())
+         mUndoTiles[id] = l->tiles;
+      if (Surface* us = SyncSurface(mUndoSurf, id, l->pw, l->ph, mUndoTiles[id]))
+         brush.sourceTex = us->fbo.tex;
    }
    ApplyBrushSources(brush, true);
    mStroke.SetMirrors(SurfaceMirrors(target == 2 ? Layer() : *l, target));
@@ -661,7 +913,27 @@ void Scene2DNode::EndPaint()
       mPaintId = 0;
       return;
    }
+   const bool inpaint = mStroke.CurrentBrush().mode == BrushEngine::kInpaint && mPaintTarget == 0;
    mStroke.End(it->second.fbo, dirty);
+   if (inpaint && dirty[2] > dirty[0] && dirty[3] > dirty[1])
+   {
+      // Inpainting: where the stroke went is rebuilt from around it.
+      const GLUtil::Fbo& cov = mStroke.Coverage();
+      const int w = it->second.fbo.w, h = it->second.fbo.h, cw = std::min(w, cov.w), ch = std::min(h, cov.h);
+      std::vector<uint8_t> px, cv, mask((size_t)w * h, 0);
+      ReadRect(it->second.fbo, 0, 0, w, h, px);
+      ReadRect(cov, 0, 0, cw, ch, cv);
+      for (int y = 0; y < ch; y++)
+         for (int x = 0; x < cw; x++)
+            mask[(size_t)y * w + x] = cv[((size_t)y * cw + x) * 4 + 3] > 20 ? 255 : 0;
+      if (HealRegion(px, w, h, mask, 0, 0, true))
+      {
+         WriteRect(it->second.fbo, 0, 0, w, h, px.data());
+         dirty[0] = dirty[1] = 0;
+         dirty[2] = w;
+         dirty[3] = h;
+      }
+   }
    if (dirty[2] > dirty[0] && dirty[3] > dirty[1])
    {
       StoreTiles(it->second, mPaintTarget == 0 ? l->tiles : l->mtiles, dirty);
@@ -692,6 +964,7 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    else
       ReadRect(it->second.fbo, 0, 0, W, H, px);
    std::vector<uint8_t> region;
+   sMatchSoft = wandAntialias;
    MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
    if (std::none_of(region.begin(), region.end(), [](uint8_t v) { return v != 0; }))
       return false;
@@ -781,6 +1054,7 @@ bool Scene2DNode::BucketSelection(float x, float y, float value, int tolerance, 
       px[i * 4 + 3] = 255;
    }
    std::vector<uint8_t> region;
+   sMatchSoft = wandAntialias;
    MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
    if (std::none_of(region.begin(), region.end(), [](uint8_t v) { return v != 0; }))
       return false;
@@ -1148,6 +1422,7 @@ void Scene2DNode::SelectWand(float x, float y, int tolerance, bool contiguous, i
    else
       return;
    std::vector<uint8_t> region;
+   sMatchSoft = wandAntialias;
    MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
    if (mSel.size() != region.size())
       mSel.assign(region.size(), 0);
@@ -1359,4 +1634,387 @@ unsigned Scene2DNode::PaintTexture(int id)
    SyncSurfaces();
    auto it = mSurfaces.find(id);
    return it == mSurfaces.end() ? 0u : it->second.fbo.tex;
+}
+
+// ---- retouch tools ---------------------------------------------------------
+
+namespace
+{
+   const char* kMeshFrag =
+      "#version 150\n"
+      "in vec2 vUv;\n"
+      "out vec4 fragColor;\n"
+      "uniform sampler2D uSrc;\n"
+      "uniform vec2 uD[16];\n"   // each grid point's move, in uv, row by row from the top
+      "vec2 disp(vec2 p) {\n"
+      "   vec2 g = clamp(vec2(p.x, 1.0 - p.y), 0.0, 1.0) * 3.0;\n"
+      "   ivec2 i = ivec2(min(floor(g), vec2(2.0)));\n"
+      "   vec2 f = g - vec2(i);\n"
+      "   int k = i.y * 4 + i.x;\n"
+      "   return mix(mix(uD[k], uD[k + 1], f.x), mix(uD[k + 4], uD[k + 5], f.x), f.y);\n"
+      "}\n"
+      "void main() {\n"
+      "   vec2 p = vUv;\n"
+      "   for (int it = 0; it < 12; it++) p = vUv - disp(p);\n"   // where this pixel came from
+      "   if (p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0) { fragColor = vec4(0.0); return; }\n"
+      "   fragColor = texture(uSrc, p);\n"
+      "}\n";
+}
+
+// The selection (document px) laid onto a layer's surface, rows as the surface reads back (bottom first).
+static void SelOnSurface(const std::vector<uint8_t>& sel, int W, int H, int sw, int sh, const float inv[6], std::vector<uint8_t>& out)
+{
+   // inv: surface px -> document px (x = a*sx + b*sy + c, y = d*sx + e*sy + f), sy counted from the bottom.
+   out.assign((size_t)sw * sh, 0);
+   for (int y = 0; y < sh; y++)
+      for (int x = 0; x < sw; x++)
+      {
+         const float sx = x + 0.5f, sy = y + 0.5f;
+         const int dx = (int)std::floor(inv[0] * sx + inv[1] * sy + inv[2]), dy = (int)std::floor(inv[3] * sx + inv[4] * sy + inv[5]);
+         if (dx >= 0 && dy >= 0 && dx < W && dy < H)
+            out[(size_t)y * sw + x] = sel[(size_t)(H - 1 - dy) * W + dx];
+      }
+}
+
+void Scene2DNode::SetUndoSource(int id)
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind != Kind::Paint)
+      return;
+   mUndoTiles[id] = l->tiles;
+}
+
+bool Scene2DNode::PatchSelection(int id, float dx, float dy)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || !mSelAny)
+      return false;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return false;
+   const int sw = it->second.fbo.w, sh = it->second.fbo.h;
+   // The surface's inverse place, from three points (a flat layer is affine on its surface).
+   float o[2], ux[2], uy[2], s = 1;
+   if (!DocToSurface(*l, 0, 0, 0, o[0], o[1], s) || !DocToSurface(*l, 0, 1, 0, ux[0], ux[1], s) || !DocToSurface(*l, 0, 0, 1, uy[0], uy[1], s))
+      return false;
+   const float a = ux[0] - o[0], c = ux[1] - o[1], b = uy[0] - o[0], d = uy[1] - o[1], det = a * d - b * c;
+   if (std::fabs(det) < 1e-9f)
+      return false;
+   const float inv[6] = { d / det, -b / det, -(d * o[0] - b * o[1]) / det, -c / det, a / det, -(-c * o[0] + a * o[1]) / det };
+   std::vector<uint8_t> mask, px;
+   SelOnSurface(mSel, mDoc.w, mDoc.h, sw, sh, inv, mask);
+   ReadRect(it->second.fbo, 0, 0, sw, sh, px);
+   const int ox = (int)std::lround(a * dx + b * dy), oy = (int)std::lround(c * dx + d * dy);
+   if (!HealRegion(px, sw, sh, mask, ox, oy, false))
+      return false;
+   WriteRect(it->second.fbo, 0, 0, sw, sh, px.data());
+   const int all[4] = { 0, 0, sw, sh };
+   StoreTiles(it->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::Blemish(int id, float x, float y, float radius)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0)
+      return false;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return false;
+   float sx = 0, sy = 0, s = 1;
+   if (!DocToSurface(*l, 0, x, y, sx, sy, s))
+      return false;
+   const int sw = it->second.fbo.w, sh = it->second.fbo.h;
+   const float r = std::max(1.0f, radius * s);
+   std::vector<uint8_t> mask((size_t)sw * sh, 0), px;
+   for (int yy = std::max(0, (int)(sy - r - 1)); yy < std::min(sh, (int)(sy + r + 2)); yy++)
+      for (int xx = std::max(0, (int)(sx - r - 1)); xx < std::min(sw, (int)(sx + r + 2)); xx++)
+      {
+         const float dd = std::hypot(xx + 0.5f - sx, yy + 0.5f - sy);
+         mask[(size_t)yy * sw + xx] = (uint8_t)std::lround(std::clamp(r + 0.5f - dd, 0.0f, 1.0f) * 255.0f);
+      }
+   ReadRect(it->second.fbo, 0, 0, sw, sh, px);
+   if (!HealRegion(px, sw, sh, mask, 0, 0, true))
+      return false;
+   WriteRect(it->second.fbo, 0, 0, sw, sh, px.data());
+   const int all[4] = { 0, 0, sw, sh };
+   StoreTiles(it->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::FloodErase(int id, float x, float y, int tolerance, bool contiguous, bool sampleAll)
+{
+   Layers();
+   const std::vector<uint8_t> keep = mSel;
+   const bool keepAny = mSelAny;
+   const SelStore keepStore = mSelStore;
+   SelectWand(x, y, tolerance, contiguous, kSelNew, sampleAll, id);
+   const bool ok = mSelAny && ClearPixels(id);
+   mSel = keep;
+   mSelAny = keepAny;
+   mSelStore = keepStore;
+   mSelDirty = true;
+   Commit();
+   return ok;
+}
+
+void Scene2DNode::SelectObject(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   else
+      return;
+   if (x1 < x0) std::swap(x0, x1);
+   if (y1 < y0) std::swap(y0, y1);
+   const int bx0 = std::clamp((int)x0, 0, W - 1), bx1 = std::clamp((int)x1, bx0 + 1, W);
+   const int by0 = std::clamp((int)y0, 0, H - 1), by1 = std::clamp((int)y1, by0 + 1, H);
+   const int bw = bx1 - bx0, bh = by1 - by0;
+   if (bw < 4 || bh < 4)
+      return;
+   auto colAt = [&](int x, int y, float c[3]) {
+      const uint8_t* p = &px[((size_t)(H - 1 - y) * W + x) * 4];
+      c[0] = p[0] / 255.0f; c[1] = p[1] / 255.0f; c[2] = p[2] / 255.0f;
+   };
+   // Colour groups for what is round the box's edge (background) and what is in its middle (the object).
+   const int K = 6, band = std::max(2, std::min(bw, bh) / 20);
+   std::vector<std::array<float, 3>> bgS, fgS;
+   const int step = std::max(1, (int)std::sqrt((double)bw * bh / 40000.0));
+   for (int y = by0; y < by1; y += step)
+      for (int x = bx0; x < bx1; x += step)
+      {
+         std::array<float, 3> c;
+         colAt(x, y, c.data());
+         const bool edge = x < bx0 + band || x >= bx1 - band || y < by0 + band || y >= by1 - band;
+         const bool mid = std::abs(x - (bx0 + bx1) / 2) < bw / 4 && std::abs(y - (by0 + by1) / 2) < bh / 4;
+         if (edge) bgS.push_back(c);
+         else if (mid) fgS.push_back(c);
+      }
+   auto kmeans = [&](const std::vector<std::array<float, 3>>& s, std::vector<std::array<float, 3>>& cent) {
+      cent.clear();
+      if (s.empty())
+         return;
+      for (int k = 0; k < K; k++)
+         cent.push_back(s[(size_t)k * s.size() / K]);
+      std::vector<std::array<float, 4>> acc(K);
+      for (int iter = 0; iter < 8; iter++)
+      {
+         for (auto& a : acc) a = { 0, 0, 0, 0 };
+         for (const auto& c : s)
+         {
+            int best = 0;
+            float bd = 1e9f;
+            for (int k = 0; k < K; k++)
+            {
+               const float d = (c[0] - cent[k][0]) * (c[0] - cent[k][0]) + (c[1] - cent[k][1]) * (c[1] - cent[k][1]) + (c[2] - cent[k][2]) * (c[2] - cent[k][2]);
+               if (d < bd) { bd = d; best = k; }
+            }
+            for (int q = 0; q < 3; q++) acc[best][q] += c[q];
+            acc[best][3] += 1;
+         }
+         for (int k = 0; k < K; k++)
+            if (acc[k][3] > 0)
+               for (int q = 0; q < 3; q++) cent[k][q] = acc[k][q] / acc[k][3];
+      }
+   };
+   auto nearest = [](const std::vector<std::array<float, 3>>& cent, const float c[3]) {
+      float bd = 1e9f;
+      for (const auto& m : cent)
+         bd = std::min(bd, (c[0] - m[0]) * (c[0] - m[0]) + (c[1] - m[1]) * (c[1] - m[1]) + (c[2] - m[2]) * (c[2] - m[2]));
+      return bd;
+   };
+   std::vector<std::array<float, 3>> bgC, fgC;
+   std::vector<uint8_t> fg((size_t)bw * bh, 0);
+   for (int round = 0; round < 3; round++)
+   {
+      kmeans(bgS, bgC);
+      kmeans(fgS, fgC);
+      if (bgC.empty() || fgC.empty())
+         return;
+      std::vector<std::array<float, 3>> nbg, nfg;
+      for (int y = 0; y < bh; y++)
+         for (int x = 0; x < bw; x++)
+         {
+            float c[3];
+            colAt(bx0 + x, by0 + y, c);
+            const bool edge = x < band || x >= bw - band || y < band || y >= bh - band;
+            const bool f = !edge && nearest(fgC, c) < nearest(bgC, c);
+            fg[(size_t)y * bw + x] = f ? 1 : 0;
+            if (((x | y) % step) == 0)
+               (f ? nfg : nbg).push_back({ c[0], c[1], c[2] });
+         }
+      bgS.swap(nbg);
+      fgS.swap(nfg);
+   }
+   // Majority smoothing, then the largest piece with its holes filled.
+   const int rr = std::max(1, std::min(bw, bh) / 100);
+   std::vector<int> sat((size_t)(bw + 1) * (bh + 1), 0);
+   for (int y = 0; y < bh; y++)
+      for (int x = 0; x < bw; x++)
+         sat[(size_t)(y + 1) * (bw + 1) + x + 1] = fg[(size_t)y * bw + x] + sat[(size_t)y * (bw + 1) + x + 1] + sat[(size_t)(y + 1) * (bw + 1) + x] - sat[(size_t)y * (bw + 1) + x];
+   std::vector<uint8_t> sm(fg.size());
+   for (int y = 0; y < bh; y++)
+      for (int x = 0; x < bw; x++)
+      {
+         const int ax = std::max(0, x - rr), ay = std::max(0, y - rr), cx = std::min(bw, x + rr + 1), cy = std::min(bh, y + rr + 1);
+         const int sum = sat[(size_t)cy * (bw + 1) + cx] - sat[(size_t)ay * (bw + 1) + cx] - sat[(size_t)cy * (bw + 1) + ax] + sat[(size_t)ay * (bw + 1) + ax];
+         sm[(size_t)y * bw + x] = sum * 2 > (cx - ax) * (cy - ay) ? 1 : 0;
+      }
+   std::vector<int> lab(sm.size(), 0), stack;
+   int bestLab = 0, bestN = 0, next = 0;
+   for (size_t i = 0; i < sm.size(); i++)
+   {
+      if (!sm[i] || lab[i])
+         continue;
+      int n = 0;
+      lab[i] = ++next;
+      stack.assign(1, (int)i);
+      while (!stack.empty())
+      {
+         const int p = stack.back();
+         stack.pop_back();
+         n++;
+         const int x = p % bw, y = p / bw;
+         const int nb[4] = { x > 0 ? p - 1 : -1, x < bw - 1 ? p + 1 : -1, y > 0 ? p - bw : -1, y < bh - 1 ? p + bw : -1 };
+         for (int q : nb)
+            if (q >= 0 && sm[q] && !lab[q]) { lab[q] = next; stack.push_back(q); }
+      }
+      if (n > bestN) { bestN = n; bestLab = next; }
+   }
+   if (bestN == 0)
+      return;
+   // Outside: reached from the box's edge without crossing the piece; everything else is the object.
+   std::vector<uint8_t> outside(sm.size(), 0);
+   stack.clear();
+   for (int x = 0; x < bw; x++) { stack.push_back(x); stack.push_back((bh - 1) * bw + x); }
+   for (int y = 0; y < bh; y++) { stack.push_back(y * bw); stack.push_back(y * bw + bw - 1); }
+   while (!stack.empty())
+   {
+      const int p = stack.back();
+      stack.pop_back();
+      if (outside[p] || lab[p] == bestLab)
+         continue;
+      outside[p] = 1;
+      const int x = p % bw, y = p / bw;
+      if (x > 0) stack.push_back(p - 1);
+      if (x < bw - 1) stack.push_back(p + 1);
+      if (y > 0) stack.push_back(p - bw);
+      if (y < bh - 1) stack.push_back(p + bw);
+   }
+   std::vector<uint8_t> region((size_t)W * H, 0);
+   for (int y = 0; y < bh; y++)
+      for (int x = 0; x < bw; x++)
+         if (!outside[(size_t)y * bw + x])
+            region[(size_t)(H - 1 - (by0 + y)) * W + bx0 + x] = 255;
+   if (mSel.size() != region.size())
+      mSel.assign(region.size(), 0);
+   if (op == kSelNew || !mSelAny)
+      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(region.size(), 0) : region;
+   else
+      for (size_t i = 0; i < region.size(); i++)
+      {
+         if (op == kSelAdd) mSel[i] = std::max(mSel[i], region[i]);
+         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - region[i]) / 255);
+         else mSel[i] = std::min(mSel[i], region[i]);
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
+}
+
+bool Scene2DNode::MeshRest(int id, float out[32])
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   float c[8];
+   if (l == nullptr || l->kind != Kind::Paint || !Corners(*l, c))
+      return false;
+   for (int j = 0; j < 4; j++)
+      for (int i = 0; i < 4; i++)
+      {
+         const float u = i / 3.0f, v = j / 3.0f;
+         // TL TR BR BL
+         out[(j * 4 + i) * 2] = (1 - v) * ((1 - u) * c[0] + u * c[2]) + v * ((1 - u) * c[6] + u * c[4]);
+         out[(j * 4 + i) * 2 + 1] = (1 - v) * ((1 - u) * c[1] + u * c[3]) + v * ((1 - u) * c[7] + u * c[5]);
+      }
+   return true;
+}
+
+bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || from.size() != l->tiles.size())
+      return false;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return false;
+   if (mWarpProgram == 0)
+      mWarpProgram = GLUtil::CompileProgram(kMeshFrag);
+   // The pixels as the warp began, kept beside the undo brush's (a negative id is never a layer's).
+   Surface* src = SyncSurface(mUndoSurf, -id, l->pw, l->ph, from);
+   if (mWarpProgram == 0 || src == nullptr)
+      return false;
+   float d[32];
+   for (int j = 0; j < 4; j++)
+      for (int i = 0; i < 4; i++)
+      {
+         float sx = 0, sy = 0, s = 1;
+         DocToSurface(*l, 0, moved[(j * 4 + i) * 2], moved[(j * 4 + i) * 2 + 1], sx, sy, s);
+         d[(j * 4 + i) * 2] = sx / (float)l->pw - i / 3.0f;
+         d[(j * 4 + i) * 2 + 1] = sy / (float)l->ph - (1.0f - j / 3.0f);
+      }
+   const unsigned prog = mWarpProgram, tex = src->fbo.tex;
+   GLUtil::DrawPass(it->second.fbo, prog, [&]() {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
+      glUniform2fv(glGetUniformLocation(prog, "uD"), 16, d);
+   });
+   // Shown now; the tiles follow when the drag ends.
+   mPaintEdits++;
+   if (store)
+   {
+      const int all[4] = { 0, 0, l->pw, l->ph };
+      StoreTiles(it->second, l->tiles, all);
+      auto u = mUndoSurf.find(-id);
+      if (u != mUndoSurf.end())
+      {
+         GLUtil::DestroyFbo(u->second.fbo);
+         mUndoSurf.erase(u);
+      }
+      Commit();
+   }
+   return true;
+}
+
+bool Scene2DNode::CopyLayerStyle(int from, int to)
+{
+   Layers();
+   const Layer* a = FindConst(from);
+   Layer* b = FindLayer(to);
+   if (a == nullptr || b == nullptr || a == b || (b->lock & kLockAll) != 0)
+      return false;
+   b->blend = a->blend;
+   b->opacity = a->opacity;
+   b->fill = a->fill;
+   for (int k = 0; k < kFxCount; k++)
+      b->fx[k] = a->fx[k];
+   b->fxMore = a->fxMore;
+   Commit();
+   return true;
 }

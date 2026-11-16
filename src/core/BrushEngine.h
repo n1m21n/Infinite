@@ -28,7 +28,11 @@ namespace BrushEngine
                // Marbling: the paint floats. A drop pushes it apart, a comb drags tines through it, a swirl turns it.
                kDrop, kComb, kSwirl,
                // Liquify: the same warp on any layer, no bath. Push drags, Twirl turns, Bloat swells, Pinch draws in.
-               kPush, kTwirl, kBloat, kPinch };
+               kPush, kTwirl, kBloat, kPinch,
+               // More retouch (Affinity's brush tools): saturate / desaturate, median, paint back an earlier state,
+               // replace a sampled colour, erase a sampled colour, red eye, and inpaint (filled on the CPU at the end).
+               kSpongeMode, kMedian, kUndo, kColourReplace, kBgErase, kRedEye, kInpaint };
+   inline bool RetouchMode(int m) { return (m >= kBlur && m <= kHeal) || m >= kSpongeMode; }
    inline bool MarbleMode(int m) { return m == kDrop || m == kComb || m == kSwirl; }
    inline bool LiquifyMode(int m) { return m == kPush || m == kTwirl || m == kBloat || m == kPinch; }
    inline bool WarpMode(int m) { return MarbleMode(m) || LiquifyMode(m); }
@@ -99,6 +103,25 @@ namespace BrushEngine
       unsigned colorTex = 0;       // stretched over the surface: each pixel takes the colour under it
       float color[3] = { 0.0f, 0.0f, 0.0f };
       float sourceOffset[2] = { 0.0f, 0.0f };   // clone / heal: where to copy from, surface pixels from the dab
+      // Clone / heal source transform (Affinity's Rotation, Scale, Flip), about the stroke's first point; the
+      // surface owner fills sourceAnchor (surface pixels) from the document point.
+      float sourceRotate = 0.0f;   // degrees
+      float sourceScale = 1.0f;
+      bool sourceFlipX = false, sourceFlipY = false;
+      float sourceAnchor[2] = { 0.0f, 0.0f };
+      int sourceBlend = 0;         // clone: 0 normal, 1 multiply, 2 screen, 3 overlay, 4 darken, 5 lighten, 6 difference
+      bool protectHue = false;     // dodge / burn / sponge: the hue stays put
+      int sharpMode = 1;           // sharpen: 0 clarity, 1 unsharp mask, 2 harsh
+      int spongeMode = 0;          // sponge: 0 saturate, 1 desaturate
+      float key[3] = { 0.0f, 0.0f, 0.0f };   // colour replace / background erase: the colour sampled where the stroke began
+      float keyTolerance = 0.25f;  // 0..1 of the RGB distance
+      bool wetEdges = false;       // the stroke's edge holds more paint than its middle
+      float accumulation = 1.0f;   // 0..1, how much overlapping dabs build up inside one stroke
+      float accumJitter = 0.0f;    // 0..1, per dab
+      float hardJitter = 0.0f;     // 0..1, per dab
+      float angleJitter = 0.0f;    // 0..1 of a half turn, per dab
+      float roundJitter = 0.0f;    // 0..1 (shape jitter), per dab
+      float scatterY = -1.0f;      // across-stroke scatter, of the diameter; -1 = the same as jitter
    };
 
    struct Preset
@@ -136,6 +159,8 @@ namespace BrushEngine
       // the touched rectangle (x0, y0, x1, y1, surface px), empty when nothing landed.
       void End(GLUtil::Fbo& surface, int dirty[4]);
       void Cancel();
+      // The last stroke's coverage (alpha = how much of the stroke landed), kept until the next Begin.
+      const GLUtil::Fbo& Coverage() const { return mCoverage; }
 
       bool Active() const { return mActive; }
       int DabCount() const { return mDabCount; }
@@ -163,6 +188,7 @@ namespace BrushEngine
          float x, y, pressure, seed, dir;
          float dist;           // stroke length when the dab was placed (taper out)
          float size, flow;     // jitter factors
+         float hard = 1, rot = 0, round = 1;   // hardness, rotation (radians) and roundness jitter
          float rgb[3];         // the dab's colour (colour jitter)
          float fromX, fromY;   // smudge: where the previous dab sat
       };
@@ -184,6 +210,7 @@ namespace BrushEngine
       float mDist = 0;                            // stroke length walked so far, px
       float mPrevX = 0, mPrevY = 0;               // the last placed dab (smudge pick-up)
       float mSize = 1, mFlow = 1, mRgb[3] = { 0, 0, 0 };   // the dab being placed: jitter and taper
+      float mHard = 1, mRot = 0, mRound = 1;
       bool mEnding = false;                       // the pen lifted: taper-out dabs land now
       uint32_t mRng = 1;
       int mDabCount = 0;
@@ -200,5 +227,6 @@ namespace BrushEngine
       int mCarryIdx = 0;
       void UpdateCarry(const Pending& q, float r);
       bool mDisplayStale = true;
+      bool mFinal = false;                        // the merge that lands (End), not the live display
    };
 }

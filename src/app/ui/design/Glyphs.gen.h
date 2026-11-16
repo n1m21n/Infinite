@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE98D;
+   inline constexpr unsigned kLast = 0xE99E;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -146,4 +146,21 @@ namespace IconsInfinite
    inline constexpr const char* Gradient = "\xee\xa6\x8b"; // U+E98B gradient
    inline constexpr const char* Heal = "\xee\xa6\x8c"; // U+E98C heal
    inline constexpr const char* Sharpen = "\xee\xa6\x8d"; // U+E98D sharpen
+   inline constexpr const char* BgErase = "\xee\xa6\x8e"; // U+E98E bg-erase
+   inline constexpr const char* Blemish = "\xee\xa6\x8f"; // U+E98F blemish
+   inline constexpr const char* ColourReplace = "\xee\xa6\x90"; // U+E990 colour-replace
+   inline constexpr const char* FloodErase = "\xee\xa6\x91"; // U+E991 flood-erase
+   inline constexpr const char* Inpaint = "\xee\xa6\x92"; // U+E992 inpaint
+   inline constexpr const char* Measure = "\xee\xa6\x93"; // U+E993 measure
+   inline constexpr const char* Median = "\xee\xa6\x94"; // U+E994 median
+   inline constexpr const char* MeshWarp = "\xee\xa6\x95"; // U+E995 mesh-warp
+   inline constexpr const char* ObjectSel = "\xee\xa6\x96"; // U+E996 object-sel
+   inline constexpr const char* PaintMixer = "\xee\xa6\x97"; // U+E997 paint-mixer
+   inline constexpr const char* Patch = "\xee\xa6\x98"; // U+E998 patch
+   inline constexpr const char* Perspective = "\xee\xa6\x99"; // U+E999 perspective
+   inline constexpr const char* RedEye = "\xee\xa6\x9a"; // U+E99A red-eye
+   inline constexpr const char* SelBrush = "\xee\xa6\x9b"; // U+E99B sel-brush
+   inline constexpr const char* Sponge = "\xee\xa6\x9c"; // U+E99C sponge
+   inline constexpr const char* StylePick = "\xee\xa6\x9d"; // U+E99D style-pick
+   inline constexpr const char* UndoBrush = "\xee\xa6\x9e"; // U+E99E undo-brush
 }

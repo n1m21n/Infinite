@@ -271,6 +271,18 @@ namespace BrushEngine
          "uniform vec2 uOff;\n"
          "uniform float uSpread;\n"
          "uniform int uRange;\n"
+         "uniform int uProtectHue;\n"
+         "uniform int uSharpMode;\n"
+         "uniform int uSrcBlend;\n"
+         "uniform int uWetEdges;\n"
+         "uniform float uWetReach;\n"
+         "uniform float uAccum;\n"
+         "uniform vec2 uAnchor;\n"
+         "uniform mat2 uSrcM;\n"
+         "uniform int uSponge;\n"
+         "uniform vec3 uKey;\n"
+         "uniform float uKeyTol;\n"
+         "uniform int uFinal;\n"
          "uniform sampler2D uSrcTex;\n"
          "uniform int uHasSrc;\n"
          "uniform int uGrain;\n"
@@ -310,10 +322,30 @@ namespace BrushEngine
          "   }\n"
          "   return s / w;\n"
          "}\n"
+         "float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n"
+         // Keep d's hue and saturation, take r's lightness.
+         "vec3 keepHue(vec3 d, vec3 r) { float ld = lum(d), lr = lum(r);\n"
+         "   if (ld < 1e-4) return vec3(lr); vec3 o = d * (lr / ld); float m = max(o.r, max(o.g, o.b));\n"
+         "   return m > 1.0 ? mix(vec3(lr), o, (1.0 - lr) / max(m - lr, 1e-4)) : o; }\n"
+         "vec3 cloneBlend(vec3 b, vec3 s) {\n"
+         "   if (uSrcBlend == 1) return b * s;\n"
+         "   if (uSrcBlend == 2) return 1.0 - (1.0 - b) * (1.0 - s);\n"
+         "   if (uSrcBlend == 3) return mix(2.0 * b * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(0.5, b));\n"
+         "   if (uSrcBlend == 4) return min(b, s);\n"
+         "   if (uSrcBlend == 5) return max(b, s);\n"
+         "   if (uSrcBlend == 6) return abs(b - s);\n"
+         "   return s; }\n"
          "void main() {\n"
          "   vec4 d = texture(uSurf, vUv);\n"
          "   vec4 c = texture(uCov, vUv);\n"
-         "   float a = clamp(c.a * uOpacity, 0.0, 1.0);\n"
+         "   float cov = c.a;\n"
+         "   if (uAccum < 0.999) cov = 1.0 - pow(1.0 - clamp(cov, 0.0, 0.9999), mix(0.2, 1.0, uAccum));\n"
+         "   if (uWetEdges == 1 && cov > 1e-4) {\n"   // the middle thins, the rim keeps its paint
+         "      vec2 o = uTexel * uWetReach; float m = min(min(texture(uCov, vUv + vec2(o.x, 0.0)).a, texture(uCov, vUv - vec2(o.x, 0.0)).a),\n"
+         "         min(texture(uCov, vUv + vec2(0.0, o.y)).a, texture(uCov, vUv - vec2(0.0, o.y)).a));\n"
+         "      cov *= 0.45 + 0.55 * clamp(1.0 - m / cov, 0.0, 1.0);\n"
+         "   }\n"
+         "   float a = clamp(cov * uOpacity, 0.0, 1.0);\n"
          "   vec3 col = c.a > 1e-5 ? clamp(c.rgb / c.a, 0.0, 1.0) : uColor;\n"
          "   if (uHasSel == 1) a *= texture(uSel, vUv).r;\n"
          "   if (uGrain > 0 && uGrainMode < 2) {\n"
@@ -321,18 +353,43 @@ namespace BrushEngine
          "      a = uGrainMode == 0 ? a * mix(1.0, g, uGrainDepth) : max(0.0, a - uGrainDepth * (1.0 - g));\n"
          "   }\n"
          "   if (a <= 0.0) { fragColor = d; return; }\n"
-         "   if (uMode >= 6 && uMode <= 12) {\n"
-         "      vec2 src = vUv + uOff * uTexel;\n"
-         "      if (uMode == 10) { fragColor = mix(d, srcAt(src), a); return; }\n"
+         "   if ((uMode >= 6 && uMode <= 12) || uMode >= 22) {\n"
+         "      vec2 px = vUv / uTexel;\n"
+         "      vec2 src = (uAnchor + uOff + uSrcM * (px - uAnchor)) * uTexel;\n"
+         "      if (uMode == 10) { vec4 s = srcAt(src); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
+         "         fragColor = mix(d, s, a); return; }\n"
+         "      if (uMode == 24) { vec4 s = srcAt(vUv); fragColor = mix(d, s, a); return; }\n"   // undo brush: the earlier state
+         "      if (uMode == 26) { float k = 1.0 - smoothstep(uKeyTol * 0.6, uKeyTol, distance(d.rgb, uKey));\n"   // background erase
+         "         fragColor = vec4(d.rgb, d.a * (1.0 - a * k)); return; }\n"
+         "      if (uMode == 28) { fragColor = uFinal == 1 ? d : vec4(mix(d.rgb, vec3(1.0, 0.25, 0.3), a * 0.55), max(d.a, a * 0.55)); return; }\n"
          "      vec3 r = d.rgb;\n"
          "      if (uMode == 6) r = soft(vUv);\n"
-         "      if (uMode == 7) r = clamp(d.rgb + (d.rgb - soft(vUv)) * 1.5, 0.0, 1.0);\n"
+         "      if (uMode == 22) { float l = lum(d.rgb); r = clamp(mix(vec3(l), d.rgb, uSponge == 0 ? 1.6 : 0.35), 0.0, 1.0);\n"
+         "         if (uProtectHue == 1) r = keepHue(d.rgb, r); }\n"
+         "      if (uMode == 23) {\n"   // median of the 3x3 around, spread with the brush
+         "         vec3 v[9]; int n = 0;\n"
+         "         for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) { v[n] = texture(uSurf, vUv + vec2(float(i), float(j)) * uTexel * uSpread).rgb; n++; }\n"
+         "         for (int i = 0; i < 9; i++) for (int j = 0; j < 8; j++) { vec3 lo = min(v[j], v[j + 1]), hi = max(v[j], v[j + 1]); v[j] = lo; v[j + 1] = hi; }\n"
+         "         r = v[4];\n"
+         "      }\n"
+         "      if (uMode == 25) { float k = 1.0 - smoothstep(uKeyTol * 0.6, uKeyTol, distance(d.rgb, uKey));\n"   // colour replace
+         "         r = mix(d.rgb, keepHue(uColor, d.rgb), k); }\n"
+         "      if (uMode == 27) { float red = d.r - max(d.g, d.b);\n"   // red eye: red pupils go dark grey
+         "         float k = smoothstep(0.05, 0.25, red) * step(0.25, d.r); float g = (d.g + d.b) * 0.5;\n"
+         "         r = mix(d.rgb, vec3(g * 0.8, d.g * 0.9, d.b * 0.9), k); }\n"
+         "      if (uMode == 7) {\n"   // clarity: local contrast, midtones only; unsharp mask; harsh: strong and wide
+         "         vec3 bl = soft(vUv);\n"
+         "         if (uSharpMode == 0) { float l = lum(d.rgb); r = d.rgb + (d.rgb - bl) * 2.0 * (1.0 - abs(2.0 * l - 1.0)); }\n"
+         "         else r = d.rgb + (d.rgb - bl) * (uSharpMode == 2 ? 3.5 : 1.5);\n"
+         "         r = clamp(r, 0.0, 1.0);\n"
+         "      }\n"
          "      if (uMode == 8) r = pow(max(d.rgb, 0.0), vec3(0.7));\n"
          "      if (uMode == 9) r = pow(max(d.rgb, 0.0), vec3(1.45));\n"
          "      if (uMode == 11) r = clamp(srcAt(src).rgb + soft(vUv) - softSrc(src), 0.0, 1.0);\n"
          "      if (uMode == 8 || uMode == 9) {\n"   // dodge / burn reach shadows, midtones or highlights
          "         float l = dot(d.rgb, vec3(0.299, 0.587, 0.114));\n"
          "         float w = uRange == 0 ? 1.0 - smoothstep(0.15, 0.6, l) : uRange == 2 ? smoothstep(0.4, 0.85, l) : 1.0;\n"
+         "         if (uProtectHue == 1) r = keepHue(d.rgb, r);\n"
          "         r = mix(d.rgb, r, w);\n"
          "      }\n"
          "      fragColor = vec4(mix(d.rgb, r, a), d.a);\n"
@@ -892,10 +949,11 @@ namespace BrushEngine
          mDabX = x;
          mDabY = y;
       }
-      if (mBrush.jitter > 0.0f)
+      if (mBrush.jitter > 0.0f || mBrush.scatterY > 0.0f)
       {
+         const float sy = mBrush.scatterY >= 0.0f ? mBrush.scatterY : mBrush.jitter;
          x += (Rand(mRng) - 0.5f) * mBrush.jitter * mBrush.size;
-         y += (Rand(mRng) - 0.5f) * mBrush.jitter * mBrush.size;
+         y += (Rand(mRng) - 0.5f) * sy * mBrush.size;
       }
       const float p = pressure < 0.0f ? 1.0f : std::clamp(pressure, 0.0f, 1.0f);
       mDist += std::hypot(x - mPrevX, y - mPrevY);
@@ -908,6 +966,11 @@ namespace BrushEngine
       if (b.taperIn > 0.0f)
          mSize *= std::clamp(mDist / b.taperIn, 0.05f, 1.0f);
       mFlow = b.opacityJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.opacityJitter, 0.0f, 1.0f) : 1.0f;
+      if (b.accumJitter > 0.0f)
+         mFlow *= 1.0f - Rand(mRng) * std::clamp(b.accumJitter, 0.0f, 1.0f);
+      mHard = b.hardJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.hardJitter, 0.0f, 1.0f) : 1.0f;
+      mRot = b.angleJitter > 0.0f ? (Rand(mRng) - 0.5f) * 6.2831853f * std::clamp(b.angleJitter, 0.0f, 1.0f) : 0.0f;
+      mRound = b.roundJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.roundJitter, 0.0f, 0.95f) : 1.0f;
       if (b.hueJitter > 0.0f || b.satJitter > 0.0f || b.valJitter > 0.0f)
       {
          const float dh = (Rand(mRng) - 0.5f) * b.hueJitter, ds = (Rand(mRng) - 0.5f) * 2.0f * b.satJitter, dv = (Rand(mRng) - 0.5f) * 2.0f * b.valJitter;
@@ -923,7 +986,7 @@ namespace BrushEngine
 
    void Stroke::Queue(float x, float y, float p, float seed, float dir, float fx, float fy)
    {
-      Pending q{ x, y, p, seed, dir, mDist, mSize, mFlow, { mRgb[0], mRgb[1], mRgb[2] }, fx, fy };
+      Pending q{ x, y, p, seed, dir, mDist, mSize, mFlow, mHard, mRot, mRound, { mRgb[0], mRgb[1], mRgb[2] }, fx, fy };
       mQueue.push_back(q);
       // A drop pushes paint out to five radii; a comb's tines drag a little past its width.
       const float r = (mBrush.mode == kDrop ? 2.5f * mBrush.size : mBrush.mode == kComb || mBrush.mode == kPush ? 0.75f * mBrush.size : 0.5f * mBrush.size) + 2.0f;
@@ -1106,12 +1169,12 @@ namespace BrushEngine
       {
          glUniform2f(sDabLoc.center, cx, cy);
          glUniform1f(sDabLoc.radius, r);
-         glUniform1f(sDabLoc.hard, std::clamp(b.hardness, 0.0f, 0.98f));
+         glUniform1f(sDabLoc.hard, std::clamp(b.hardness * q.hard, 0.0f, 0.98f));
          glUniform1f(sDabLoc.flow, std::clamp(flow, 0.0f, 1.0f));
          glUniform1i(sDabLoc.tip, b.tip);
          glUniform1f(sDabLoc.seed, q.seed);
-         glUniform1f(sDabLoc.angle, angle + (b.follow ? q.dir : 0.0f));
-         glUniform1f(sDabLoc.round, std::clamp(b.roundness, 0.05f, 1.0f));
+         glUniform1f(sDabLoc.angle, angle + q.rot + (b.follow ? q.dir : 0.0f));
+         glUniform1f(sDabLoc.round, std::clamp(b.roundness * q.round, 0.05f, 1.0f));
          glUniform1i(sDabLoc.pencil, b.pencil ? 1 : 0);
          glUniform3f(sDabLoc.col, q.rgb[0], q.rgb[1], q.rgb[2]);
          glUniform2f(sDabLoc.dir, std::cos(q.dir), std::sin(q.dir));
@@ -1322,6 +1385,25 @@ namespace BrushEngine
          glUniform2f(glGetUniformLocation(sMerge, "uTexel"), 1.0f / std::max(1, surface.w), 1.0f / std::max(1, surface.h));
          glUniform2f(glGetUniformLocation(sMerge, "uOff"), mBrush.sourceOffset[0], mBrush.sourceOffset[1]);
          glUniform1i(glGetUniformLocation(sMerge, "uRange"), mBrush.range);
+         glUniform1i(glGetUniformLocation(sMerge, "uProtectHue"), mBrush.protectHue ? 1 : 0);
+         glUniform1i(glGetUniformLocation(sMerge, "uSponge"), mBrush.spongeMode);
+         glUniform3f(glGetUniformLocation(sMerge, "uKey"), mBrush.key[0], mBrush.key[1], mBrush.key[2]);
+         glUniform1f(glGetUniformLocation(sMerge, "uKeyTol"), std::max(0.005f, mBrush.keyTolerance * 1.7320508f));
+         glUniform1i(glGetUniformLocation(sMerge, "uFinal"), mFinal ? 1 : 0);
+         glUniform1i(glGetUniformLocation(sMerge, "uSharpMode"), mBrush.sharpMode);
+         glUniform1i(glGetUniformLocation(sMerge, "uSrcBlend"), mBrush.sourceBlend);
+         glUniform1i(glGetUniformLocation(sMerge, "uWetEdges"), mBrush.wetEdges ? 1 : 0);
+         glUniform1f(glGetUniformLocation(sMerge, "uWetReach"), std::max(1.5f, mBrush.size * 0.12f));
+         glUniform1f(glGetUniformLocation(sMerge, "uAccum"), std::clamp(mBrush.accumulation, 0.0f, 1.0f));
+         glUniform2f(glGetUniformLocation(sMerge, "uAnchor"), mBrush.sourceAnchor[0], mBrush.sourceAnchor[1]);
+         {
+            // Destination to source about the anchor: flip, then scale, then turn (column-major for GL).
+            const float t = mBrush.sourceRotate * 3.14159265f / 180.0f, k = 1.0f / std::max(0.05f, mBrush.sourceScale);
+            const float fx = mBrush.sourceFlipX ? -1.0f : 1.0f, fy = mBrush.sourceFlipY ? -1.0f : 1.0f;
+            const float c = std::cos(t) * k, s = std::sin(t) * k;
+            const float m[4] = { c * fx, s * fx, -s * fy, c * fy };
+            glUniformMatrix2fv(glGetUniformLocation(sMerge, "uSrcM"), 1, GL_FALSE, m);
+         }
          glActiveTexture(GL_TEXTURE3);
          glBindTexture(GL_TEXTURE_2D, mBrush.sourceTex);
          glUniform1i(glGetUniformLocation(sMerge, "uSrcTex"), 3);
@@ -1384,7 +1466,9 @@ namespace BrushEngine
       dirty[3] = y1;
       if (DirectMode(mBrush.mode))
          return;   // already on the surface
+      mFinal = true;
       Merge(surface, mMerge);
+      mFinal = false;
       // Only the touched rectangle goes back, so the surface keeps its handle.
       GLint prevRead = 0;
       glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
