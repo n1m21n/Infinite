@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE99E;
+   inline constexpr unsigned kLast = 0xE99F;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -163,4 +163,5 @@ namespace IconsInfinite
    inline constexpr const char* Sponge = "\xee\xa6\x9c"; // U+E99C sponge
    inline constexpr const char* StylePick = "\xee\xa6\x9d"; // U+E99D style-pick
    inline constexpr const char* UndoBrush = "\xee\xa6\x9e"; // U+E99E undo-brush
+   inline constexpr const char* Drum = "\xee\xa6\x9f"; // U+E99F drum
 }

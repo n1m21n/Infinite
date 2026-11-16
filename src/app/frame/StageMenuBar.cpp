@@ -50,7 +50,7 @@ static void DrawPanelRail()
       { "studio", "##railStudio", IconsInfinite::Waveform, nullptr, &gSampleStudioOpen,
         T("Sample studio - generate and shape a loop (Shift+W)") },
       { "piano", "##railPianoRoll", IconsInfinite::Piano, nullptr, &gPianoRollOpen, T("Piano roll - edit and generate notes (Shift+R)") },
-      { "drums", "##railDrums", IconsInfinite::FamilyNotes, nullptr, &gDrumPanelOpen, T("Drums - play and edit Drum Sequencers (Shift+J)") },
+      { "drums", "##railDrums", IconsInfinite::Drum, nullptr, &gDrumPanelOpen, T("Drums - play and edit Drum Sequencers (Shift+J)") },
       { "view3d", "##railView3D", IconsInfinite::View3d, nullptr, &gView3DOpen,
         T("3D View - arrange node outputs and render a camera (Shift+3)") },
       { "view2d", "##railView2D", IconsInfinite::Layers, nullptr, &gView2DOpen,
