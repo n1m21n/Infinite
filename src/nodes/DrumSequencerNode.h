@@ -132,6 +132,14 @@ public:
    // already-published main-thread state, so this is safe to call every
    // frame with no cross-thread read.
    int CurrentStep() const;
+   // Polymeter: a lane's own length (laneSteps, 0 = follow numSteps) and the step it is on now.
+   int LaneStepCount(int lane) const;
+   int LaneCurrentStep(int lane) const;
+   // Puts lane `lane`'s (-1 = every lane's) per-step probability, condition and nudge back to plain.
+   void ResetTrigs(int lane);
+   // Trig conditions, Elektron-style: 0 = always, then Fill, !Fill, 1st, !1st, and A:B (plays on loop A of every B).
+   static constexpr int kNumConds = 14;
+   static const char* CondName(int cond);
 
    void Randomize();
    void ClearPattern();
@@ -168,6 +176,18 @@ public:
    float laneAccentPitch[kNumLanes];
    // dB added to the same full-velocity steps (0..12). 0 = off, so patches saved before it sound unchanged.
    float laneAccentLevel[kNumLanes];
+
+   // ---- per step trig data (Drum panel Step page) ----------------------
+   float stepProb[kNumLanes][kMaxSteps];        // 0..1 chance the hit plays, 1 = always
+   int stepCond[kNumLanes][kMaxSteps] = {};     // 0 = none, see CondName
+   float stepNudge[kNumLanes][kMaxSteps] = {};  // micro timing, -0.48..0.48 of a step
+   // ---- per lane: own length, reverse, filter --------------------------
+   int laneSteps[kNumLanes] = {};    // 0 = follow numSteps, else 1..32 (polymeter)
+   bool laneReverse[kNumLanes] = {};
+   int laneFilter[kNumLanes] = {};   // 0 off, 1 low-pass, 2 high-pass
+   float laneCutoff[kNumLanes];      // 0..1 -> 20 Hz..20 kHz (log)
+   float laneReso[kNumLanes] = {};   // 0..1
+   bool fill = false;                // live, not saved: the panel's FILL button is held
 
    // Decimated min/max waveform for each lane card's visualizer, filled
    // once at load time (see FinishLaneBuffer) - mirrors SamplerNode's
@@ -296,6 +316,15 @@ private:
    float mLastGlobalDecay = -99.0f;
    float mLastGlobalPitch = -999.0f;
    float mLastGlobalPan = -99.0f;
+   float mLastStepProb[kNumLanes][kMaxSteps];
+   int mLastStepCond[kNumLanes][kMaxSteps];
+   float mLastStepNudge[kNumLanes][kMaxSteps];
+   int mLastLaneSteps[kNumLanes];
+   bool mLastLaneReverse[kNumLanes];
+   int mLastLaneFilter[kNumLanes];
+   float mLastLaneCutoff[kNumLanes];
+   float mLastLaneReso[kNumLanes];
+   bool mLastFill = false;
    bool mFirstCook = true;
    // The rate the decay/transient coefficients currently pushed were
    // computed against. PrepareToPlay may run after an earlier cook already
