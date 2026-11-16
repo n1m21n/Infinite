@@ -601,8 +601,10 @@ private:
       const int cond = mStepCond[lane][step].load(std::memory_order_relaxed);
       if (cond != 0)
       {
-         const long long rel = (long long)k - mStartK;
-         const long long iter = rel >= 0 ? rel / len : -((-rel + len - 1) / len);
+         // Loop number counted in whole lane passes since play started; a pass begins on the lane's step 1,
+         // so starting mid-pattern makes that first partial pass loop 0.
+         auto passOf = [len](long long x) { return x >= 0 ? x / len : -((-x + len - 1) / len); };
+         const long long iter = passOf((long long)k) - passOf(mStartK);
          switch (cond)
          {
          case 1: if (!fillOn) return false; break;
