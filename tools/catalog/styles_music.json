@@ -3382,7 +3382,7 @@
       "bass": "0..0..5.3..2....",
       "fx": [
         "Phaser",
-        "Tape",
+        "Saturator",
         "Delay"
       ],
       "synth": [
@@ -3425,6 +3425,233 @@
       "groove": 0.5,
       "fill": 0.35,
       "gain": -8.5
+    },
+    {
+      "id": "ethio_jazz_organ",
+      "family": "downtempo",
+      "bpm": [
+        92,
+        106
+      ],
+      "swing": 0.18,
+      "scale": [
+        1,
+        4,
+        10
+      ],
+      "drums": {
+        "kick": "x..o..x...o.x...",
+        "snare": "....x..o....x..o",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "......o.......o.",
+        "clap": "",
+        "tom": "..........o.....",
+        "htom": ".............o..",
+        "bell": "x..x..o.x..x..o."
+      },
+      "bass": "0..0..2.3..2..4.",
+      "fx": [
+        "Chorus",
+        "EQ",
+        "Saturator",
+        "Reverb"
+      ],
+      "synth": [
+        "Wind",
+        "Piano",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter",
+        "Ring Mod"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Mulatu Astatke, Tezeta / Yekermo Sew (1970s Addis Ababa ethio-jazz)",
+        "Hailu Mergia, Farfisa organ & horn counterpoint"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 24,
+        "human": 12
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Strum"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Piano"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 62,
+        "gain": -10.5,
+        "rate": 0.25,
+        "range": 7
+      },
+      "groove": 0.85,
+      "fill": 0.45,
+      "gain": -8.5
+    },
+    {
+      "id": "cumbia_dub_rebajada",
+      "family": "bass_music",
+      "bpm": [
+        78,
+        90
+      ],
+      "swing": 0.14,
+      "scale": [
+        1,
+        2,
+        5
+      ],
+      "drums": {
+        "kick": "x..o..x.x..o..x.",
+        "snare": "....o.......o...",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "..o...o...o...o.",
+        "clap": "",
+        "tom": "..x.......x.....",
+        "htom": "......o.......o.",
+        "bell": "x.x.o.x.x.x.o.x."
+      },
+      "bass": "0...2.4.0...2.5.",
+      "fx": [
+        "Delay",
+        "Audio Filter",
+        "Reverb",
+        "Saturator"
+      ],
+      "synth": [
+        "Analog",
+        "Wind",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.02,
+      "mod": 0.55,
+      "refs": [
+        "Monterrey cumbia rebajada pitched-down tape groove",
+        "Frente Cumbiero / Mad Professor dub percussion"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 18,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Analog"
+        ],
+        "density": 0.42,
+        "octave": 2,
+        "gate": 52,
+        "gain": -11.0,
+        "rate": 0.25,
+        "range": 6
+      },
+      "groove": 0.88,
+      "fill": 0.5,
+      "gain": -7.5
+    },
+    {
+      "id": "kora_polyrhythm",
+      "family": "ambient",
+      "bpm": [
+        98,
+        114
+      ],
+      "swing": 0.1,
+      "scale": [
+        0,
+        6,
+        7
+      ],
+      "drums": {
+        "kick": "x.....o...x.....",
+        "snare": "",
+        "chat": "..o..o..o..o..o.",
+        "ohat": "",
+        "clap": "....o.......o...",
+        "tom": "x..o....x..o....",
+        "htom": "..o..x....o..x..",
+        "bell": "x..o..x..o..x..o"
+      },
+      "bass": "0..2..4.0..5..4.",
+      "fx": [
+        "Convolution Reverb",
+        "Delay",
+        "Chorus",
+        "Stereo"
+      ],
+      "synth": [
+        "String",
+        "Partials",
+        "Piano"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Drive",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "Toumani Diabate West African 21-string kora interlocking cascades",
+        "Ballake Sissoko & Vincent Segal chamber string counterpoint"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 32,
+        "human": 14
+      },
+      "notefx": [
+        "Arpeggiator",
+        "Humanizer",
+        "Note Strum"
+      ],
+      "motif": {
+        "synth": [
+          "String",
+          "Partials"
+        ],
+        "density": 0.72,
+        "octave": 3,
+        "gate": 42,
+        "gain": -10.0,
+        "rate": 0.25,
+        "range": 8
+      },
+      "groove": 0.78,
+      "fill": 0.35,
+      "gain": -9.0
     }
   ]
 }

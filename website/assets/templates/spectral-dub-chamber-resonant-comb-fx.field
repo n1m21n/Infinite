@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Dub Chamber Resonant Comb FX",
+    "author": "Infinite",
+    "description": "Cascaded allpass dispersion and resonant dub filter with LFO cutoff sweep and warm tube saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.42 [0.05, 4.0];\nparam float depth = 0.68 [0.1, 1.0];\nparam float feedback = 0.52 [0.0, 0.85];\nparam float warmth = 1.50 [0.8, 2.8];\nparam float mix = 0.64 [0.0, 1.0];\nstate float lfo = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float ap3 = 0;\nstate float ap4 = 0;\nstate float lp = 0;\nstate float fb = 0;\n\nlfo = (lfo + rate / sr) % 1.0;\nsweep = 0.5 + 0.5 * sin(6.2831853 * lfo);\ng = clamp(-0.22 + (sweep - 0.5) * depth * 1.15, -0.86, 0.86);\n\nx = in + fb * feedback;\ny1 = -g * x + ap1; ap1 = x + g * y1;\ny2 = -g * y1 + ap2; ap2 = y1 + g * y2;\ny3 = -g * y2 + ap3; ap3 = y2 + g * y3;\ny4 = -g * y3 + ap4; ap4 = y3 + g * y4;\n\nfc = clamp(0.08 + sweep * 0.26, 0.04, 0.44);\nlp = lp + fc * (y4 - lp);\n\ndriven = lp * (warmth * 0.82);\nsat = driven / (1.0 + abs(driven) * 0.48);\nfb = clamp(sat, -0.82, 0.82);\n\nout = (in * (1.0 - mix) + sat * mix) * 0.82;\n",
+    "params": {
+      "rate": 0.42,
+      "depth": 0.68,
+      "feedback": 0.52,
+      "warmth": 1.5,
+      "mix": 0.64
+    }
+  }
+}
