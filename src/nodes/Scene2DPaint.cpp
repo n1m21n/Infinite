@@ -171,7 +171,53 @@ namespace
       return (float)d2 <= r * r;
    }
 
-   // Which pixels (document size, bottom row first) match the seed: flood or everywhere.
+   float SeedDist(const uint8_t* a, const uint8_t* b)
+   {
+      int d2 = 0;
+      for (int c = 0; c < 4; c++)
+      {
+         const int d = (int)a[c] - (int)b[c];
+         d2 += d * d;
+      }
+      return std::sqrt((float)d2);
+   }
+
+   // The antialiased edge Affinity gives its wand and flood fill (measured to 0.001): each pixel just outside the
+   // region is covered by how far along the step from an in-region neighbour q the tolerance is crossed,
+   // (tol - d_q) / (d_p - d_q), the largest over its 8 neighbours. Inside stays full, so a region never shrinks.
+   void SoftenEdge(const std::vector<uint8_t>& px, int w, int h, const uint8_t* ref, int tol, std::vector<uint8_t>& out)
+   {
+      const float r = (float)tol * 1.7320508f;
+      std::vector<uint8_t> edge(out.size(), 0);
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            const size_t i = (size_t)y * w + x;
+            if (out[i] != 0)
+               continue;
+            float best = 0.0f, dp = -1.0f;
+            for (int dy = -1; dy <= 1; dy++)
+               for (int dx = -1; dx <= 1; dx++)
+               {
+                  const int nx = x + dx, ny = y + dy;
+                  if ((dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= w || ny >= h)
+                     continue;
+                  const size_t n = (size_t)ny * w + nx;
+                  if (out[n] != 255)
+                     continue;
+                  if (dp < 0.0f)
+                     dp = SeedDist(&px[i * 4], ref);
+                  const float dq = SeedDist(&px[n * 4], ref);
+                  if (dp > dq)
+                     best = std::max(best, std::clamp((r - dq) / (dp - dq), 0.0f, 1.0f));
+               }
+            edge[i] = (uint8_t)std::lround(best * 255.0f);
+         }
+      for (size_t i = 0; i < out.size(); i++)
+         out[i] = std::max(out[i], edge[i]);
+   }
+
+   // Which pixels (document size, bottom row first) match the seed: flood or everywhere, with a soft 1 px edge.
    void MatchRegion(const std::vector<uint8_t>& px, int w, int h, int sx, int sy, int tol, bool contiguous,
                     std::vector<uint8_t>& out)
    {
@@ -185,6 +231,7 @@ namespace
       {
          for (size_t i = 0; i < out.size(); i++)
             out[i] = Near(&px[i * 4], ref, tol) ? 255 : 0;
+         SoftenEdge(px, w, h, ref, tol, out);
          return;
       }
       std::vector<int> stack;
@@ -203,6 +250,7 @@ namespace
                stack.push_back(n);
             }
       }
+      SoftenEdge(px, w, h, ref, tol, out);
    }
 }
 
