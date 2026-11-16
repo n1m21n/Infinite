@@ -5138,8 +5138,10 @@ namespace
       MorePopupScope scope;
       if (MenuParts::BeginPopup(pop.c_str()))
       {
-         MoreRows rows;
-         body();
+         {
+            MoreRows rows; // pops its style vars here, while the popup window is still current
+            body();
+         }
          MenuParts::EndPopup();
       }
    }
