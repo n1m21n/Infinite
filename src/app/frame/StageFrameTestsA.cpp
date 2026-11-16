@@ -2503,6 +2503,7 @@ void DrawFrameTestsA(FrameCtx& fc)
 
       // Debug builds: every item of every audited state checked, sliders dragged (docs/plans/ui-system/ui-audit.md).
       FrameTest_UIAUDIT(frameId, window);
+      FrameTest_JOURNEYS(frameId, window);
 
       // Curve Editor M8: open on 8 MSEG pages costs at most 1 ms a frame.
       FrameTest_CURVEBENCH(frameId, window);

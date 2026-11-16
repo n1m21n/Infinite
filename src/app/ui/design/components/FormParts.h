@@ -227,7 +227,7 @@ namespace FormParts
       return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
    }
 
-   // Action button: a chip, 28 pt tall. A size's x is a width floor.
+   // Action button: a chip, tok::control_h tall. A size's x is a width floor.
    inline bool Button(const char* label, ImVec2 size = ImVec2(0, 0))
    {
       return ChipButton::Draw(label, false, kRowH, size.x);

@@ -8,6 +8,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -72,25 +73,25 @@ namespace
 
    constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = 300.0f;
-   constexpr float kIconW = tok::tile;   // icon chips are square, one tile
-   constexpr float kSideChip = 22.0f;    // the layers side panel packs its chips and wells tighter
+   constexpr float kIconW = PanelKit::kChip;   // icon chips are square, one panel chip
+   constexpr float kSideChip = PanelKit::kChip;    // the layers side panel packs its chips and wells tighter
    constexpr float kRowH = 22.0f;        // one layer row
-   float sChip = tok::tile;              // chip size for the panel being drawn
-   float sRowH = tok::tile;              // height of text chips and bar rows in the part being drawn
+   float sChip = PanelKit::kChip;        // chip size for the panel being drawn
+   float sRowH = PanelKit::kChip;        // height of text chips and bar rows in the part being drawn
 
    // The top and bottom bars use the side panel's compact row, so a bar slider and a panel slider are the same size.
-   float CompactRowH() { return std::round(ImGui::GetFontSize() + 6.0f); }
+   float CompactRowH() { return PanelKit::kChip; }
    struct CompactBar
    {
       CompactBar()
       {
          sRowH = sChip = CompactRowH();
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, 3.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, PanelKit::FramePadY()));
       }
       ~CompactBar()
       {
          ImGui::PopStyleVar();
-         sRowH = sChip = tok::tile;
+         sRowH = sChip = PanelKit::kChip;
       }
    };
    constexpr float kRuler = 18.0f;
@@ -860,33 +861,7 @@ namespace
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, float w = 0.0f)
    {
-      if (w <= 0.0f)
-         w = sChip;
-      ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw(id, ImVec2(w, sChip));
-      ActionButton::Scoped() = ActionButton::Kind::Plain;
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", tip);
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      const ImVec2 gc((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-      const float roleGs = sChip < tok::tile ? tok::icon_sm : tok::icon_md;
-      float gs = roleGs;
-      {
-         // Same ink, not just the same box: a glyph drawn small inside its em (the pointer, the dot grid) is
-         // scaled up to the set's ink, about 0.78 of the em, so a bar of icons reads as one size.
-         ImVec2 imn, imx;
-         glyph::InkBox(gc, gs, glyphStr, imn, imx);
-         const float ink = std::max(imx.x - imn.x, imx.y - imn.y), target = 0.78f * gs;
-         if (ink > 1.0f && ink < target - 1.5f)
-            gs = std::round(gs * std::min(1.4f, target / ink));
-      }
-      glyph::Draw(ImGui::GetWindowDrawList(), gc, gs, on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
-#ifdef IMGUI_ENABLE_TEST_ENGINE
-      ImVec2 imn, imx;
-      glyph::InkBox(gc, gs, glyphStr, imn, imx);
-      UiAudit::NoteInk(1, imn, imx, roleGs, tip, glyphStr);   // the role's size; the ink is what was drawn
-#endif
-      return clicked;
+      return PanelKit::IconChip(id, glyphStr, on, tip, w > 0.0f ? w : sChip, sChip);
    }
 
    bool ZoomChip(const char* id, bool plus, const char* tip)
@@ -910,15 +885,9 @@ namespace
       ImGui::Dummy(ImVec2(sz.x, rowH));
    }
 
-   bool TextChip(const char* label, bool on, const char* tip)
+   bool TextChip(const char* label, bool on, const char* tip, float w = 0.0f)
    {
-      ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const float w = ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_2;
-      const bool clicked = ActionButton::Draw(label, ImVec2(w, sRowH));
-      ActionButton::Scoped() = ActionButton::Kind::Plain;
-      if (tip != nullptr && ImGui::IsItemHovered())
-         HelpTip("%s", tip);
-      return clicked;
+      return PanelKit::TextChip(label, on, tip, w, sRowH);
    }
 
    // Field widths by content class (plan §3): S numbers, M short words, L labelled sliders and names.
@@ -927,15 +896,52 @@ namespace
    constexpr float kLabelW = 84.0f;
    float sLabelW = kLabelW;   // the More.. forms widen it for their longer names
 
-   void FieldLabel(const char* text)
+   // rowH > 0: centred on a row of chips that tall (chips are not frames, so frame padding would sit it high).
+   void FieldLabel(const char* text, float rowH = 0.0f)
    {
-      ImGui::AlignTextToFramePadding();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const char* end = ImGui::FindRenderedTextEnd(text);   // "Width##img" shows as "Width"
-      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%.*s", (int)(end - text), text);
-      UiAudit::NoteInk(3, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, std::string(text, end).c_str());
+      if (rowH > 0.0f)
+      {
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         const ImVec2 sz = ImGui::CalcTextSize(text, end);
+         const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
+         const ImVec2 tp(p.x, std::round((p.y + (rowH - sz.y) * 0.5f) * px) / px);
+         ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.72f)), text, end);
+         UiAudit::NoteInk(3, tp, ImVec2(tp.x + sz.x, tp.y + sz.y), 0.0f, std::string(text, end).c_str());
+         ImGui::Dummy(ImVec2(sz.x, rowH));
+      }
+      else
+      {
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%.*s", (int)(end - text), text);
+         UiAudit::NoteInk(3, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, std::string(text, end).c_str());
+      }
       FormParts::Inline(sLabelW);
    }
+
+   // A row's control slot: in a grid, one cell (label goes in the well, fmt rewritten); else label column + well.
+   std::string sCellFmt;
+   const char* RowSlot(const char* label, const char* fmt)
+   {
+      const float cw = PanelKit::NextCell();
+      if (cw > 0.0f)
+      {
+         ImGui::SetNextItemWidth(cw);
+         sCellFmt = PanelKit::InWellFormat(label, fmt != nullptr ? fmt : "");
+         return sCellFmt.c_str();
+      }
+      FieldLabel(label);
+      ImGui::SetNextItemWidth(sFieldW);
+      return fmt;
+   }
+
+   // Short settings side by side (PanelKit form grid): the next rows share a row, `cols` across, each label inside
+   // its well. Spans the label column and the field column, so a grid row ends where a plain row does.
+   struct Pairs : PanelKit::GridScope
+   {
+      explicit Pairs(int cols = 2) : PanelKit::GridScope(cols, sLabelW + sFieldW) {}
+   };
 
    // Shortcut text in the platform's words: Cmd on macOS, Ctrl elsewhere.
    const char* Sc(const char* s)
@@ -1017,8 +1023,7 @@ namespace
 
    bool DragRow(const char* label, float* v, float speed, const char* fmt, float lo = -1e6f, float hi = 1e6f)
    {
-      FieldLabel(label);
-      ImGui::SetNextItemWidth(sFieldW);
+      fmt = RowSlot(label, fmt);
       FieldWell::PushStyle();
       const std::string wid = FormParts::Id(label);
       const ImGuiID gid = ImGui::GetID(wid.c_str());
@@ -1092,8 +1097,7 @@ namespace
 
    bool SliderRow(const char* label, float* v, float lo, float hi, const char* fmt)
    {
-      FieldLabel(label);
-      ImGui::SetNextItemWidth(sFieldW);
+      fmt = RowSlot(label, fmt);
       ModBegin();
       const bool changed = FieldWell::Slider(FormParts::Id(label).c_str(), v, lo, hi, fmt);
       ModEnd();
@@ -1271,6 +1275,8 @@ namespace
 
    bool BoolRow(const char* label, bool* v)
    {
+      const float cw = PanelKit::NextCell();   // in a Pairs grid, checks sit side by side, one per cell
+      const float x0 = ImGui::GetCursorPosX();
       const float rowY = ImGui::GetCursorPosY();
       ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
       bool on = *v;
@@ -1285,6 +1291,11 @@ namespace
       {
          on = !on;
          hit = true;
+      }
+      if (cw > 0.0f)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
       }
       if (!hit)
          return false;
@@ -1531,10 +1542,13 @@ namespace
             ImGui::Dummy(ImVec2(w, 40.0f));
             HistogramUnder(ImGui::GetWindowDrawList(), p0, ImVec2(p0.x + w, p0.y + 40.0f), h);
          }
-         SliderRow(T("Input black"), &lv[0], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Input white"), &lv[1], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Output black"), &lv[2], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Output white"), &lv[3], 0.0f, 1.0f, "%.2f");
+         {
+            Pairs g;
+            SliderRow(T("Input black"), &lv[0], 0.0f, 1.0f, "%.2f");
+            SliderRow(T("Input white"), &lv[1], 0.0f, 1.0f, "%.2f");
+            SliderRow(T("Output black"), &lv[2], 0.0f, 1.0f, "%.2f");
+            SliderRow(T("Output white"), &lv[3], 0.0f, 1.0f, "%.2f");
+         }
          float autoLv[3][4];
          if (ActionButton::Draw((std::string(T("Auto")) + "##v2dauto" + std::to_string(key)).c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
              doc != nullptr && [&]() { int id = 0, eff = -1; KeySource(key, id, eff); return doc->AutoLevels(id, autoLv, eff); }())
@@ -1569,10 +1583,13 @@ namespace
                                              T("Whites"), T("Neutrals"), T("Blacks") });
          sAdjRange = std::clamp(sAdjRange, 0, 8);
          float* q = p + sAdjRange * 4;
-         SliderRow(T("Cyan"), &q[0], -1.0f, 1.0f, "%.2f");
-         SliderRow(T("Magenta"), &q[1], -1.0f, 1.0f, "%.2f");
-         SliderRow(T("Yellow"), &q[2], -1.0f, 1.0f, "%.2f");
-         SliderRow(T("Black"), &q[3], -1.0f, 1.0f, "%.2f");
+         {
+            Pairs g;
+            SliderRow(T("Cyan"), &q[0], -1.0f, 1.0f, "%.2f");
+            SliderRow(T("Magenta"), &q[1], -1.0f, 1.0f, "%.2f");
+            SliderRow(T("Yellow"), &q[2], -1.0f, 1.0f, "%.2f");
+            SliderRow(T("Black"), &q[3], -1.0f, 1.0f, "%.2f");
+         }
       }
       if (t == S::kAdjMixer)
       {
@@ -1585,9 +1602,12 @@ namespace
             sAdjOut = std::clamp(sAdjOut, 0, 2);
          }
          float* q = p + (mono ? 0 : sAdjOut) * 3;
-         SliderRow(T("Red"), &q[0], -2.0f, 2.0f, "%.2f");
-         SliderRow(T("Green"), &q[1], -2.0f, 2.0f, "%.2f");
-         SliderRow(T("Blue"), &q[2], -2.0f, 2.0f, "%.2f");
+         {
+            Pairs g(3);
+            SliderRow(T("Red"), &q[0], -2.0f, 2.0f, "%.2f");
+            SliderRow(T("Green"), &q[1], -2.0f, 2.0f, "%.2f");
+            SliderRow(T("Blue"), &q[2], -2.0f, 2.0f, "%.2f");
+         }
       }
       if (t == S::kAdjBlackWhite)
       {
@@ -1604,13 +1624,19 @@ namespace
       }
       if (t == S::kAdjShadowsHighlights)
       {
-         SliderRow(T("Shadows"), &p[0], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Highlights"), &p[1], 0.0f, 1.0f, "%.2f");
+         {
+            Pairs g;
+            SliderRow(T("Shadows"), &p[0], 0.0f, 1.0f, "%.2f");
+            SliderRow(T("Highlights"), &p[1], 0.0f, 1.0f, "%.2f");
+         }
       }
       if (t == S::kAdjWhiteBalance)
       {
-         SliderRow(T("White Balance"), &p[0], -1.0f, 1.0f, "%.2f");
-         SliderRow(T("Tint"), &p[1], -1.0f, 1.0f, "%.2f");
+         {
+            Pairs g;
+            SliderRow(T("White Balance"), &p[0], -1.0f, 1.0f, "%.2f");
+            SliderRow(T("Tint"), &p[1], -1.0f, 1.0f, "%.2f");
+         }
       }
       if (t == S::kAdjSplitToning)
       {
@@ -1628,8 +1654,11 @@ namespace
       }
       if (t == S::kAdjNormals)
       {
-         SliderRow(T("Rotation"), &p[0], -180.0f, 180.0f, "%.0f°");
-         SliderRow(T("Scale"), &p[1], 0.0f, 2.0f, "%.2f");
+         {
+            Pairs g;
+            SliderRow(T("Rotation"), &p[0], -180.0f, 180.0f, "%.0f°");
+            SliderRow(T("Scale"), &p[1], 0.0f, 2.0f, "%.2f");
+         }
          bool fx = p[2] > 0.5f, fy = p[3] > 0.5f;
          if (BoolRow(T("Flip X"), &fx))
             p[2] = fx ? 1.0f : 0.0f;
@@ -1638,9 +1667,12 @@ namespace
       }
       if (t == S::kAdjToneCompression)
       {
-         SliderRow(T("Exposure"), &p[0], 0.0f, 2.0f, "%.2f");
-         SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
-         SliderRow(T("Colour"), &p[2], 0.0f, 1.0f, "%.2f");
+         {
+            Pairs g(3);
+            SliderRow(T("Exposure"), &p[0], 0.0f, 2.0f, "%.2f");
+            SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
+            SliderRow(T("Colour"), &p[2], 0.0f, 1.0f, "%.2f");
+         }
       }
       if (t == S::kAdjToneStretch)
       {
@@ -2993,8 +3025,8 @@ namespace
       for (int dx = -1; dx <= 1; dx++)
          for (int dy = -1; dy <= 1; dy++)
             if (dx != 0 || dy != 0)
-               glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_md, IM_COL32(0, 0, 0, 200), g);
-      glyph::Draw(dl, badge, tok::icon_md, IM_COL32(255, 255, 255, 255), g);
+               glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_control, IM_COL32(0, 0, 0, 200), g);
+      glyph::Draw(dl, badge, tok::icon_control, IM_COL32(255, 255, 255, 255), g);
    }
 
    // Predicted points: the last two pen samples carried 8 ms ahead and drawn in the paint colour, so the line
@@ -5854,7 +5886,12 @@ namespace
 
    // A tool's less-used settings: one icon at the bar's end opens them as a vertical form (label, well), the way
    // Photoshop's brush settings sit behind one button. Bars keep only the everyday controls, so none overflows.
-   // A More.. form: side-panel rows (kSideChip tall, 4 px apart), a 150 px well column, capped height with a scroll.
+   // A More.. form: panel rows (PanelKit::kRow tall, kRowGap apart), a 150 px well column, capped height with a scroll.
+   // A More.. form is folded into sections: a header click folds its rows, remembered per header. The More*
+   // rows below draw nothing while their section is folded (sMoreOpen), so the popover stays short.
+   bool sMoreOpen = true;
+
+
    struct MoreRows
    {
       float keepW, keepL;
@@ -5863,7 +5900,7 @@ namespace
          sFieldW = 150.0f;
          sLabelW = 140.0f;
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(1.0f, (kSideChip - ImGui::GetFontSize()) * 0.5f)));
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 4.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::kRowGap));
       }
       ~MoreRows()
       {
@@ -5888,38 +5925,44 @@ namespace
       {
          {
             MoreRows rows; // pops its style vars here, while the popup window is still current
+            sMoreOpen = true;
             body();
+            sMoreOpen = true;
          }
          MenuParts::EndPopup();
       }
    }
 
-   void MoreHeader(const char* text, bool first = false)
+
+   void MoreHeader(const char* text, bool first = false, bool startOpen = true)
    {
-      if (!first)
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      ImGui::TextDisabled("%s", text);
+      sMoreOpen = PanelKit::FoldHeader(text, first, startOpen);
    }
 
    // A percent row in a BarMore form: v is 0..1 (or 0..hi/100), shown as percent.
    void MorePct(const char* label, float* v, float lo, float hi)
    {
-      FieldLabel(label);
-      ImGui::SetNextItemWidth(sFieldW);
+      if (!sMoreOpen)
+         return;
+      const char* fmt = RowSlot(label, "%.0f%%");
       float pct = *v * 100.0f;
-      if (FieldWell::Slider(FormParts::Id(label).c_str(), &pct, lo, hi, "%.0f%%"))
+      if (FieldWell::Slider(FormParts::Id(label).c_str(), &pct, lo, hi, fmt))
          *v = pct / 100.0f;
    }
 
    void MoreSlider(const char* label, float* v, float lo, float hi, const char* fmt)
    {
-      FieldLabel(label);
-      ImGui::SetNextItemWidth(sFieldW);
-      FieldWell::Slider(FormParts::Id(label).c_str(), v, lo, hi, fmt);
+      if (!sMoreOpen)
+         return;
+      FieldWell::Slider(FormParts::Id(label).c_str(), v, lo, hi, RowSlot(label, fmt));
    }
 
    void MoreCheck(const char* label, bool* v)
    {
+      if (!sMoreOpen)
+         return;
+      const float cw = PanelKit::NextCell();   // in a grid, checks sit side by side, one per cell
+      const float x0 = ImGui::GetCursorPosX();
       const float rowY = ImGui::GetCursorPosY();
       ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
       bool on = *v;
@@ -5932,6 +5975,11 @@ namespace
       ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
       if (ImGui::IsItemClicked())
          *v = !*v;
+      if (cw > 0.0f)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
+      }
    }
 
    // A dropdown on a tool bar: the value well alone, names translated.
@@ -5955,6 +6003,8 @@ namespace
    // A dropdown row in a BarMore form.
    bool MoreCombo(const char* label, int* v, const char* const* names, int n)
    {
+      if (!sMoreOpen)
+         return false;
       FieldLabel(label);
       return BarCombo(FormParts::Id(label).c_str(), v, names, n, sFieldW);
    }
@@ -5962,7 +6012,7 @@ namespace
    // The material stroke's rows: light and height, canvas texture, dual tip, colour along, wet mix.
    void MaterialRows(BrushEngine::Brush& b)
    {
-      MoreHeader(T("Material"));
+      MoreHeader(T("Material"), false, false);
       static std::vector<const char*> mats;
       if (mats.empty())
       {
@@ -5981,7 +6031,7 @@ namespace
          MoreSlider(T("Light"), &b.lightAz, -180.0f, 180.0f, "%.0f\xC2\xB0");
          MoreSlider(T("Light height"), &b.lightEl, 5.0f, 90.0f, "%.0f\xC2\xB0");
       }
-      MoreHeader(T("Texture"));
+      MoreHeader(T("Texture"), false, false);
       static const char* kGrains[4] = { "Off", "Paper", "Weave", "Noise" };
       MoreCombo(T("Grain"), &b.grain, kGrains, 4);
       if (b.grain > 0)
@@ -5991,7 +6041,7 @@ namespace
          MorePct(T("Grain scale"), &b.grainScale, 10.0f, 800.0f);
          MorePct(T("Grain depth"), &b.grainDepth, 0.0f, 100.0f);
       }
-      MoreHeader(T("Dual tip"));
+      MoreHeader(T("Dual tip"), false, false);
       static std::vector<const char*> tips;
       if (tips.empty())
       {
@@ -6007,10 +6057,10 @@ namespace
          MorePct(T("Second size"), &b.dualScale, 5.0f, 200.0f);
          MorePct(T("Second scatter"), &b.dualScatter, 0.0f, 200.0f);
       }
-      MoreHeader(T("Colour"));
+      MoreHeader(T("Colour"), false, false);
       static const char* kAlong[3] = { "Flat", "Along", "Across" };
       MoreCombo(T("Gradient"), &b.colorAlong, kAlong, 3);
-      if (b.colorAlong > 0)
+      if (sMoreOpen && b.colorAlong > 0)
       {
          FieldLabel(T("Second colour"));
          ImGui::ColorEdit3("##v2dcolb", b.colorB, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
@@ -6027,7 +6077,7 @@ namespace
    void BrushSourceRows(Scene2DNode* doc)
    {
       Scene2DNode::Document& d = doc->Doc();
-      MoreHeader(T("From a node"));
+      MoreHeader(T("From a node"), false, false);
       static const char* const kLabels[3] = { "Tip from", "Grain from", "Colour from" };
       for (int k = 0; k < 3; k++)
       {
@@ -6220,8 +6270,11 @@ namespace
             b.stabiliser = (int)std::lround(stab);
             MoreCheck(T("Wet edges"), &b.wetEdges);
             MoreHeader(T("Pen pressure"));
-            MoreCheck(T("Size"), &b.pressureSize);
-            MoreCheck(T("Opacity"), &b.pressureOpacity);
+            {
+               Pairs g;
+               MoreCheck(T("Size"), &b.pressureSize);
+               MoreCheck(T("Opacity"), &b.pressureOpacity);
+            }
          });
       }
       else if (sTool == kBrush || sTool == kEraser)
@@ -6299,37 +6352,31 @@ namespace
          BarMore("##v2dbmore", [&]()
          {
             MoreHeader(T("Tip"), true);
-            MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
-            MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
-            MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
-            MoreCheck(T("Hard edge"), &b.pencil);
-            MoreHeader(T("Dynamics"));
-            MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
-            MoreCheck(T("Follow stroke"), &b.follow);
-            float stab = (float)b.stabiliser;
-            MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
-            b.stabiliser = (int)std::lround(stab);
-            MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
-            MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
-            float scatterY = b.scatterY < 0.0f ? b.jitter : b.scatterY;
-            MorePct(T("Scatter Y"), &scatterY, 0.0f, 200.0f);
-            if (std::fabs(scatterY - (b.scatterY < 0.0f ? b.jitter : b.scatterY)) > 1e-6f)
-               b.scatterY = scatterY;
-            MorePct(T("Size jitter"), &b.sizeJitter, 0.0f, 100.0f);
-            MorePct(T("Flow jitter"), &b.opacityJitter, 0.0f, 100.0f);
-            MorePct(T("Hardness jitter"), &b.hardJitter, 0.0f, 100.0f);
-            MorePct(T("Rotation jitter"), &b.angleJitter, 0.0f, 100.0f);
-            MorePct(T("Shape jitter"), &b.roundJitter, 0.0f, 100.0f);
-            MorePct(T("Accumulation"), &b.accumulation, 0.0f, 100.0f);
-            MorePct(T("Accumulation jitter"), &b.accumJitter, 0.0f, 100.0f);
-            MoreCheck(T("Wet edges"), &b.wetEdges);
-            if (brush)
             {
-               MorePct(T("Hue jitter"), &b.hueJitter, 0.0f, 100.0f);
-               MorePct(T("Saturation jitter"), &b.satJitter, 0.0f, 100.0f);
-               MorePct(T("Brightness jitter"), &b.valJitter, 0.0f, 100.0f);
+               Pairs g;
+               MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
+               MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
+               MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+               MoreCheck(T("Hard edge"), &b.pencil);
             }
-            if (brush)
+            MoreHeader(T("Dynamics"));
+            {
+               Pairs g;
+               float scatterY = b.scatterY < 0.0f ? b.jitter : b.scatterY;
+               MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
+               MorePct(T("Scatter Y"), &scatterY, 0.0f, 200.0f);
+               if (std::fabs(scatterY - (b.scatterY < 0.0f ? b.jitter : b.scatterY)) > 1e-6f)
+                  b.scatterY = scatterY;
+               MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
+               MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
+               float stab = (float)b.stabiliser;
+               MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
+               b.stabiliser = (int)std::lround(stab);
+               MorePct(T("Accumulation"), &b.accumulation, 0.0f, 100.0f);
+               MoreCheck(T("Follow stroke"), &b.follow);
+               MoreCheck(T("Wet edges"), &b.wetEdges);
+            }
+            if (brush && sMoreOpen)
             {
                FieldLabel(T("Hue"));
                ImGui::SetNextItemWidth(sFieldW);
@@ -6338,9 +6385,31 @@ namespace
                FieldWell::Slider("##v2dhue", &sBrushHue, -180.0f, 180.0f, "%+.0f");
                ModEnd();
             }
+            MoreHeader(T("Jitter"), false, false);
+            {
+               // The header names the set, so each well says only what jitters.
+               Pairs g;
+               ImGui::PushID("jit");
+               MorePct(T("Size"), &b.sizeJitter, 0.0f, 100.0f);
+               MorePct(T("Flow"), &b.opacityJitter, 0.0f, 100.0f);
+               MorePct(T("Hardness"), &b.hardJitter, 0.0f, 100.0f);
+               MorePct(T("Rotation"), &b.angleJitter, 0.0f, 100.0f);
+               MorePct(T("Shape"), &b.roundJitter, 0.0f, 100.0f);
+               MorePct(T("Accumulation"), &b.accumJitter, 0.0f, 100.0f);
+               if (brush)
+               {
+                  MorePct(T("Hue"), &b.hueJitter, 0.0f, 100.0f);
+                  MorePct(T("Saturation"), &b.satJitter, 0.0f, 100.0f);
+                  MorePct(T("Brightness"), &b.valJitter, 0.0f, 100.0f);
+               }
+               ImGui::PopID();
+            }
             MoreHeader(T("Pen pressure"));
-            MoreCheck(T("Size"), &b.pressureSize);
-            MoreCheck(T("Opacity"), &b.pressureOpacity);
+            {
+               Pairs g;
+               MoreCheck(T("Size"), &b.pressureSize);
+               MoreCheck(T("Opacity"), &b.pressureOpacity);
+            }
             MoreHeader(T("Paint"));
             if (brush)
             {
@@ -6376,6 +6445,7 @@ namespace
                MaterialRows(b);
                BrushSourceRows(doc);
             }
+            MoreHeader(T("Mask"));
             ImGui::BeginDisabled(a == nullptr || !a->HasPixelMask());
             bool mask = sEditMask && a != nullptr && a->HasPixelMask();
             MoreCheck(T("Paint the mask"), &mask);
@@ -6412,8 +6482,11 @@ namespace
             BarMore("##v2dxmore", [&]()
             {
                MoreHeader(T("Pen pressure"), true);
-               MoreCheck(T("Size"), &b.pressureSize);
-               MoreCheck(T("Opacity"), &b.pressureOpacity);
+               {
+                  Pairs g;
+                  MoreCheck(T("Size"), &b.pressureSize);
+                  MoreCheck(T("Opacity"), &b.pressureOpacity);
+               }
                MoreHeader(T("Paint"));
                MoreCheck(T("Lock alpha"), &b.lockAlpha);
             });
@@ -7253,24 +7326,11 @@ namespace
    }
 
    // Justified: an icon chip with four full-width lines (the icon font has left, centre and right only).
-   bool JustifyChip(const char* id, bool on)
-   {
-      const bool hit = IconChip(id, "", on, T("Justify text"));
-      const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
-      const float s = std::floor(std::min(b.x - a.x, b.y - a.y) * 0.5f);
-      const float cx = std::floor((a.x + b.x) * 0.5f), cy = std::floor((a.y + b.y) * 0.5f);
-      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-      for (int i = 0; i < 4; i++)
-      {
-         const float y = cy - s * 0.5f + i * s / 3.0f + 0.5f;
-         ImGui::GetWindowDrawList()->AddLine(ImVec2(cx - s * 0.5f, y), ImVec2(cx + s * 0.5f, y), col, 1.0f);
-      }
-      return hit;
-   }
+   bool JustifyChip(const char* id, bool on, float w = 0.0f) { return IconChip(id, IconsInfinite::TextJustify, on, T("Justify text"), w); }
 
    // Bold, Italic, Underline, All caps: text chips, as every editor's character row.
    template <class Undo, class Next>
-   bool TextStyleChips(bool* bold, bool* italic, bool* under, bool* caps, Undo&& undo, Next&& next)
+   bool TextStyleChips(bool* bold, bool* italic, bool* under, bool* caps, Undo&& undo, Next&& next, float chipW = 0.0f)
    {
       bool* const v[4] = { bold, italic, under, caps };
       static const char* const kLabels[4] = { "B##tsb", "I##tsi", "U##tsu", "TT##tsc" };
@@ -7280,7 +7340,9 @@ namespace
       {
          if (i > 0)
             next();
-         if (TextChip(kLabels[i], *v[i], T(kTips[i])))
+         // Cells fill the field column exactly, rounding spread so no chip is more than 1 px off another.
+         const float w = chipW > 0.0f ? PanelKit::StripW(sFieldW, 4, i) : 0.0f;
+         if (TextChip(kLabels[i], *v[i], T(kTips[i]), w))
          {
             undo();
             *v[i] = !*v[i];
@@ -7519,7 +7581,7 @@ namespace
    int StripColumns(float h)
    {
       const int n = VisibleTools();
-      const float step = tok::tile + tok::space_1;
+      const float step = PanelKit::kChip + tok::space_1;
       const float oneCol = n * step + 4 * (tok::space_1 + 1.0f) + tok::space_1 + 3 * step;   // + sections + chips rows
       if (oneCol <= h)
          return 1;
@@ -7529,14 +7591,14 @@ namespace
       return 6;
    }
 
-   float StripWidth(int cols) { return cols * tok::tile + (cols - 1) * tok::space_1; }
+   float StripWidth(int cols) { return cols * PanelKit::kChip + (cols - 1) * tok::space_1; }
 
    // Foreground over background in one tile, Photoshop's corner layout. Click either square for its picker;
    // the small corner arrow swaps (X), the tiny pair resets (D).
    void ColourChips()
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float t = tok::tile, sq = 17.0f;
+      const float t = PanelKit::kChip, sq = std::round(t * 0.6f);
       ImGui::InvisibleButton("##v2dcolours", ImVec2(t, t));
       const ImVec2 m = ImGui::GetIO().MousePos;
       const bool inFg = m.x < p.x + sq + 1 && m.y < p.y + sq + 1;
@@ -7634,7 +7696,7 @@ namespace
                   }
                   ImGui::SameLine(0.0f, tok::space_2);
                   const ImVec2 gp = ImGui::GetCursorScreenPos();
-                  glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + 8.0f, gp.y + ImGui::GetFrameHeight() * 0.5f), tok::icon_sm,
+                  glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + 8.0f, gp.y + ImGui::GetFrameHeight() * 0.5f), tok::icon_control,
                               ImGui::GetColorU32(ImGuiCol_Text), kTools[idx].glyph);
                   ImGui::Dummy(ImVec2(18.0f, 0.0f));
                   ImGui::SameLine(0.0f, tok::space_1);
@@ -7736,11 +7798,11 @@ namespace
       ImGui::EndChild();
    }
 
-   // Text centred on the 28 px tile row, so labels share the chips' centre line.
+   // Text centred on the chip row, so labels share the chips' centre line.
    void RowLabel(const char* text)
    {
       const float y = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f);
+      ImGui::SetCursorPosY(y + (sRowH - ImGui::GetTextLineHeight()) * 0.5f);
       ImGui::TextDisabled("%s", text);
       ImGui::SetCursorPosY(y);
    }
@@ -7808,7 +7870,7 @@ namespace
             const ImU32 col = ImGui::GetColorU32(sSel.empty() ? ImGuiCol_TextDisabled : ImGuiCol_Text);
             const int side = i % 3;
             // Drawn to the icon set's ink (0.78 of the role's em), so the align marks match the other bar icons.
-            const float k = 0.78f * (sChip < tok::tile ? tok::icon_sm : tok::icon_md) / 14.0f;
+            const float k = 0.78f * tok::icon_control / 14.0f;
             if (i < 3)
             {
                const float x = side == 0 ? c.x - 5 * k : side == 1 ? c.x : c.x + 5 * k;
@@ -7843,7 +7905,7 @@ namespace
             const ImVec2 c((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImU32 col = ImGui::GetColorU32(sSel.size() < 3 ? ImGuiCol_TextDisabled : ImGuiCol_Text);
-            const float ks = 0.78f * (sChip < tok::tile ? tok::icon_sm : tok::icon_md) / 14.0f;
+            const float ks = 0.78f * tok::icon_control / 14.0f;
             for (int k = -1; k <= 1; k++)
             {
                const float o = k * 5.5f * ks, len = (k == 0 ? 4.0f : 6.0f) * ks;
@@ -8057,12 +8119,12 @@ namespace
       dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), IM_COL32(40, 40, 40, 255), 2.0f);
       if (l.kind == Kind::Group)
       {
-         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Folder);
+         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Folder);
          return;
       }
       if (l.kind == Kind::Adjust)
       {
-         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::ShadeSolid);
+         glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::ShadeSolid);
          return;
       }
       if (l.kind == Kind::Fill)
@@ -8156,7 +8218,7 @@ namespace
                Touch();
             }
          }
-         glyph::Draw(dl, ImVec2(p.x + 13, p.y + rowH * 0.5f), tok::icon_sm,
+         glyph::Draw(dl, ImVec2(p.x + 13, p.y + rowH * 0.5f), tok::icon_control,
                      ImGui::GetColorU32(l->visible ? ImGuiCol_Text : ImGuiCol_TextDisabled), l->visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
          float x = p.x + 24.0f + depth * 12.0f;
          if (l->kind == Kind::Group)
@@ -8211,7 +8273,7 @@ namespace
                ImGui::TextUnformatted(name.c_str());
          }
          if (l->lock != 0)
-            glyph::Draw(dl, ImVec2(p.x + w - 12, p.y + rowH * 0.5f), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_TextDisabled), IconsInfinite::Lock);
+            glyph::Draw(dl, ImVec2(p.x + w - 12, p.y + rowH * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled), IconsInfinite::Lock);
          // The row itself: select, rename, drag to restack.
          ImGui::SetCursorScreenPos(ImVec2(x, p.y));
          ImGui::SetNextItemAllowOverlap();
@@ -8371,9 +8433,9 @@ namespace
          const bool group = a->kind == Kind::Group;
          std::vector<int> modes;
          std::vector<std::string> names = BlendNames(a->blend, group, &modes);
-         // Blend + Opacity, then Fill + Lock: tile-high wells so they share the chips' 28 pt rows, both rows flush to w.
+         // Blend + Opacity, then Fill + Lock: chip-high wells so they share the chips' rows, both rows flush to w.
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (sChip - ImGui::GetFontSize()) * 0.5f));
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, tok::space_1));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::kRowGap));
          const float half = (w - tok::space_1) * 0.5f;
          ImGui::SetNextItemWidth(half);
          const int shown = std::max(0, (int)(std::find(modes.begin(), modes.end(), a->blend) - modes.begin()) % (int)modes.size());
@@ -8576,7 +8638,7 @@ namespace
       if (ComboRow(T("Colour"), &label, { T("None"), T("Red"), T("Orange"), T("Yellow"), T("Green"), T("Blue"), T("Violet"), T("Grey") }))
          l->label = label;
       BoolRow(T("Clip to layer below"), &l->clip);
-      SliderRow(T("Blend gamma"), &l->blendGamma, 0.1f, 10.0f, "%.2f");
+      SliderRow(T("Gamma"), &l->blendGamma, 0.1f, 10.0f, "%.2f");
       if (l->kind == Kind::Vector || l->kind == Kind::Text || l->kind == Kind::Node)
          ComboRow(T("Antialias"), &l->aaMode, { T("Default"), T("On"), T("Off") });
       {
@@ -8592,8 +8654,11 @@ namespace
       if (l->kind == Kind::Paint && l->relief)
       {
          ComboRow(T("Material"), &l->reliefMat, { T("Plasticine"), T("Metal"), T("Chrome"), T("Ink stipple") });
-         SliderRow(T("Light"), &l->reliefLight, -180.0f, 180.0f, "%.0f\xC2\xB0");
-         SliderRow(T("Light height"), &l->reliefElev, 5.0f, 90.0f, "%.0f\xC2\xB0");
+         {
+            Pairs g;
+            SliderRow(T("Light"), &l->reliefLight, -180.0f, 180.0f, "%.0f\xC2\xB0");
+            SliderRow(T("Light height"), &l->reliefElev, 5.0f, 90.0f, "%.0f\xC2\xB0");
+         }
          SliderRow(T("Depth"), &l->reliefDepth, 0.0f, 40.0f, "%.1f px");
       }
       if (l->kind == Kind::Fill)
@@ -8687,10 +8752,12 @@ namespace
             FieldLabel(T("Font"));
             if (FontPicker("##v2dtabfont", l->font, sFieldW, undo))
                Touch();
-            FieldLabel(T("Style"));
-            if (TextStyleChips(&l->bold, &l->italic, &l->underline, &l->caps, undo, next))
+            // Four chips each, filling the field column so both rows end where the wells above and below do.
+            const float chipW = PanelKit::StripW(sFieldW, 4, 0);
+            FieldLabel(T("Style"), sRowH);
+            if (TextStyleChips(&l->bold, &l->italic, &l->underline, &l->caps, undo, next, chipW))
                Touch();
-            FieldLabel(T("Align"));
+            FieldLabel(T("Align"), sChip);
             static const char* kGlyphs[3] = { IconsInfinite::TextLeft, IconsInfinite::TextCenter, IconsInfinite::TextRight };
             static const char* kTips[3] = { "Left align text", "Centre text", "Right align text" };
             for (int i = 0; i < 4; i++)
@@ -8698,7 +8765,8 @@ namespace
                if (i > 0)
                   next();
                const std::string id = std::string("##v2dtabal") + std::to_string(i);
-               if ((i < 3 ? IconChip(id.c_str(), kGlyphs[i], l->align == i, T(kTips[i])) : JustifyChip(id.c_str(), l->align == i)) &&
+               const float w = PanelKit::StripW(sFieldW, 4, i);
+               if ((i < 3 ? IconChip(id.c_str(), kGlyphs[i], l->align == i, T(kTips[i]), w) : JustifyChip(id.c_str(), l->align == i, w)) &&
                    l->align != i)
                {
                   undo();
@@ -8707,12 +8775,15 @@ namespace
                }
             }
          }
-         ModNext(*l, Scene2DNode::kLfFontSize);
-         SliderRow(T("Size"), &l->fontSize, 4.0f, 800.0f, "%.0f px");
-         ModNext(*l, Scene2DNode::kLfLeading);
-         SliderRow(T("Leading"), &l->leading, 0.5f, 3.0f, "%.2f");
-         ModNext(*l, Scene2DNode::kLfTracking);
-         SliderRow(T("Tracking"), &l->tracking, -100.0f, 400.0f, "%.0f");
+         {
+            Pairs g;
+            ModNext(*l, Scene2DNode::kLfFontSize);
+            SliderRow(T("Size"), &l->fontSize, 4.0f, 800.0f, "%.0f px");
+            ModNext(*l, Scene2DNode::kLfLeading);
+            SliderRow(T("Leading"), &l->leading, 0.5f, 3.0f, "%.2f");
+            ModNext(*l, Scene2DNode::kLfTracking);
+            SliderRow(T("Tracking"), &l->tracking, -100.0f, 400.0f, "%.0f");
+         }
          ColorRow(T("Colour"), l->textC);
          DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", 0.0f, 8192.0f);
          // Character: lines, band, position and stretch.
@@ -8735,8 +8806,11 @@ namespace
             SliderRow(T("Outline width"), &l->outlineW, 0.0f, 50.0f, "%.1f px");
             ColorRow(T("Outline colour"), l->outlineC);
          }
-         BoolRow(T("No break"), &l->noBreak);
-         BoolRow(T("Optical align"), &l->optical);
+         {
+            Pairs g;
+            BoolRow(T("No break"), &l->noBreak);
+            BoolRow(T("Optical align"), &l->optical);
+         }
          SliderRow(T("Offset X"), &l->offsetX, -400.0f, 400.0f, "%.0f px");
          {
             // OpenType language tag (e.g. tr, nl, sr-Latn); empty = none.
@@ -8753,22 +8827,34 @@ namespace
             FieldWell::PopStyle();
             UndoOnActivate("Text language");
          }
-         BoolRow(T("Kerning"), &l->kerning);
-         BoolRow(T("Highlight"), &l->highlight);
+         {
+            Pairs g;
+            BoolRow(T("Kerning"), &l->kerning);
+            BoolRow(T("Highlight"), &l->highlight);
+         }
          if (l->highlight)
             ColorRow(T("Band"), l->highlightC);
          ComboRow(T("Position"), &l->script, { T("Normal"), T("Superscript"), T("Subscript") });
          SliderRow(T("Baseline"), &l->baseShift, -400.0f, 400.0f, "%.0f px");
-         SliderRow(T("Width"), &l->textSX, 0.1f, 4.0f, "%.2f\xC3\x97");
-         SliderRow(T("Height"), &l->textSY, 0.1f, 4.0f, "%.2f\xC3\x97");
+         {
+            Pairs g;
+            SliderRow(T("Width"), &l->textSX, 0.1f, 4.0f, "%.2f\xC3\x97");
+            SliderRow(T("Height"), &l->textSY, 0.1f, 4.0f, "%.2f\xC3\x97");
+         }
          // Paragraph: a new line starts one.
-         SliderRow(T("Indent left"), &l->indentL, 0.0f, 1000.0f, "%.0f px");
-         SliderRow(T("Indent right"), &l->indentR, 0.0f, 1000.0f, "%.0f px");
+         {
+            Pairs g;
+            SliderRow(T("Indent left"), &l->indentL, 0.0f, 1000.0f, "%.0f px");
+            SliderRow(T("Indent right"), &l->indentR, 0.0f, 1000.0f, "%.0f px");
+         }
          SliderRow(T("First line"), &l->indentFirst, -500.0f, 1000.0f, "%.0f px");
-         SliderRow(T("Space before"), &l->spaceBefore, 0.0f, 500.0f, "%.0f px");
-         SliderRow(T("Space after"), &l->spaceAfter, 0.0f, 500.0f, "%.0f px");
+         {
+            Pairs g;
+            SliderRow(T("Above"), &l->spaceBefore, 0.0f, 500.0f, "%.0f px");
+            SliderRow(T("Below"), &l->spaceAfter, 0.0f, 500.0f, "%.0f px");
+         }
          FieldLabel("");
-         if (TextChip(L("Convert to shapes##v2dtoshapes"), false, T("Outlines as a vector layer")))
+         if (TextChip(L("Convert to shapes##v2dtoshapes"), false, T("Outlines as a vector layer"), sFieldW))
             sPending.what = Pending::ToShapes;
       }
       if (l->kind == Kind::Vector)
@@ -8835,8 +8921,11 @@ namespace
          else
          {
             ModNext(*l, Scene2DNode::kLfAngle);
-            DragRow(T("Angle"), &l->angle, 0.5f, "%.1f\xC2\xB0", -180.0f, 180.0f);
-            DragRow(T("Shear"), &l->shear, 0.5f, "%.1f\xC2\xB0", -80.0f, 80.0f);
+            {
+               Pairs g;
+               DragRow(T("Angle"), &l->angle, 0.5f, "%.1f\xC2\xB0", -180.0f, 180.0f);
+               DragRow(T("Shear"), &l->shear, 0.5f, "%.1f\xC2\xB0", -80.0f, 80.0f);
+            }
          }
          int anchor = (int)std::lround(l->ay * 2.0f) * 3 + (int)std::lround(l->ax * 2.0f);
          if (AnchorRow(T("Anchor"), &anchor))
@@ -8853,8 +8942,11 @@ namespace
             l->y = oy;
             Touch();
          }
-         BoolRow(T("Flip horizontal"), &l->flipX);
-         BoolRow(T("Flip vertical"), &l->flipY);
+         {
+            Pairs g;
+            BoolRow(T("Flip horizontal"), &l->flipX);
+            BoolRow(T("Flip vertical"), &l->flipY);
+         }
          if (TextChip(L("Reset##v2dreset"), false, T("Back to the document centre, scale 1, no rotation")))
          {
             PushUndoCheckpoint("Reset transform");
@@ -8873,9 +8965,10 @@ namespace
          BoolRow(T("Crop layer"), &l->cropOn);
          if (l->cropOn)
          {
+            Pairs g;
             DragRow(T("Left"), &l->crop[0], 1.0f, "%.0f px", 0.0f, bw);
-            DragRow(T("Top"), &l->crop[1], 1.0f, "%.0f px", 0.0f, bh);
             DragRow(T("Right"), &l->crop[2], 1.0f, "%.0f px", 0.0f, bw);
+            DragRow(T("Top"), &l->crop[1], 1.0f, "%.0f px", 0.0f, bh);
             DragRow(T("Bottom"), &l->crop[3], 1.0f, "%.0f px", 0.0f, bh);
          }
       }
@@ -9039,7 +9132,10 @@ namespace
          ImGui::SetNextItemWidth(sFieldW);
          FieldWell::PushStyle();
          const float speed = std::max(0.001f, std::fabs(v) * 0.01f);
-         if (ImGui::DragFloat(FormParts::Id(label.c_str()).c_str(), &v, speed, 0.0f, 0.0f, "%.3g"))
+         // Plain digits sized to the value: 2120, 48.5, 0.25 (never 2.12e+03).
+         const float av = std::fabs(v);
+         const char* fmt = av >= 1000.0f ? "%.0f" : av >= 100.0f ? "%.1f" : av >= 1.0f || av == 0.0f ? "%.2f" : "%.3f";
+         if (ImGui::DragFloat(FormParts::Id(label.c_str()).c_str(), &v, speed, 0.0f, 0.0f, fmt))
             Touch();
          FieldWell::PopStyle();
          UndoOnActivate("Effect");
@@ -9066,19 +9162,65 @@ namespace
       using S = Scene2DNode;
       S::Effect& e = l.effects[(size_t)i];
       const std::string name = e.uid != 0 ? e.entry : std::string(T(S::AdjName(e.adjType)));
-      SectionCard::Begin(name.c_str());
-      BoolRow(T("On"), &e.on);
-      FormParts::Inline(0.0f, tok::space_2);
       const std::string base = "##v2deff" + std::to_string(l.id) + "_" + std::to_string(i);
-      if (i > 0 && IconChip((base + "up").c_str(), IconsInfinite::ChevronUp, false, T("Earlier")))
-         sEffOp = { l.id, i, 1, sDocUid };
+      // One header row: on box, fold arrow + name, then earlier / later / remove in fixed slots on the right (a
+      // missing arrow keeps its slot, so the chips line up card to card). A folded card is this row alone.
+      static std::map<std::string, bool> sFold;
+      const std::string foldKey = std::to_string(l.id) + "/" + (e.uid != 0 ? std::to_string(e.uid) : "a" + std::to_string(e.adjType));
+      bool& folded = sFold[foldKey];
+      SectionCard::Begin();
+      const float rowY = ImGui::GetCursorPosY();
+      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
+      bool on = e.on;
+      if (CheckBox::Box((base + "on").c_str(), &on))
+      {
+         PushUndoCheckpoint("Effect on");
+         e.on = on;
+         Touch();
+      }
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("On"));
+      FormParts::Inline(0.0f, tok::space_2);
+      ImGui::SetCursorPosY(rowY);
+      const float chipsW = 3.0f * sChip + 2.0f * tok::space_1;
+      const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
+      const ImVec2 np = ImGui::GetCursorScreenPos();
+      const float fh = ImGui::GetFrameHeight();
+      if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
+         folded = !folded;
+      {
+         const bool hov = ImGui::IsItemHovered();
+         const ImU32 col = ImGui::GetColorU32(e.on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !e.on ? 1.0f : 0.85f);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 c(np.x + 5.0f, np.y + fh * 0.5f);
+         if (!folded)
+            dl->AddTriangleFilled(ImVec2(c.x - 4, c.y - 2), ImVec2(c.x + 4, c.y - 2), ImVec2(c.x, c.y + 3), col);
+         else
+            dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 4), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 4), col);
+         dl->PushClipRect(np, ImVec2(np.x + nameW, np.y + fh), true);
+         dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, name.c_str());
+         dl->PopClipRect();
+      }
+      FormParts::Inline(0.0f, tok::space_2);
+      if (i > 0)
+      {
+         if (IconChip((base + "up").c_str(), IconsInfinite::ChevronUp, false, T("Earlier")))
+            sEffOp = { l.id, i, 1, sDocUid };
+      }
+      else
+         ImGui::Dummy(ImVec2(sChip, sChip));
       FormParts::Inline(0.0f, tok::space_1);
-      if (i + 1 < (int)l.effects.size() && IconChip((base + "dn").c_str(), IconsInfinite::ChevronDown, false, T("Later")))
-         sEffOp = { l.id, i, 2, sDocUid };
+      if (i + 1 < (int)l.effects.size())
+      {
+         if (IconChip((base + "dn").c_str(), IconsInfinite::ChevronDown, false, T("Later")))
+            sEffOp = { l.id, i, 2, sDocUid };
+      }
+      else
+         ImGui::Dummy(ImVec2(sChip, sChip));
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove effect")))
          sEffOp = { l.id, i, 3, sDocUid };
-      if (!e.on)
+      if (!e.on || folded)
          return;
       SliderRow(T("Opacity"), &e.opacity, 0.0f, 1.0f, "%.2f");
       if (!e.toMask)
@@ -9235,8 +9377,10 @@ namespace
       FieldWell::PushStyle();
       ImGui::InputTextWithHint("##v2deffname", T("Name"), name, sizeof name);
       FieldWell::PopStyle();
-      if (ActionButton::Draw((std::string(T("Save stack")) + "##v2deffsave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
-          name[0] != 0 && !l.effects.empty())
+      ImGui::BeginDisabled(name[0] == 0 || l.effects.empty());   // greyed until there is a name and a stack to save
+      const bool saveStack = ActionButton::Draw((std::string(T("Save stack")) + "##v2deffsave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain);
+      ImGui::EndDisabled();
+      if (saveStack && name[0] != 0 && !l.effects.empty())
       {
          std::error_code ec;
          std::filesystem::create_directories(EffPresetDir(), ec);
@@ -9498,8 +9642,10 @@ namespace
       FieldWell::PushStyle();
       ImGui::InputTextWithHint("##v2dstylename", T("Name"), name, sizeof name);
       FieldWell::PopStyle();
-      if (ActionButton::Draw((std::string(T("Save style")) + "##v2dstylesave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
-          name[0] != 0 && l.AnyFx())
+      ImGui::BeginDisabled(name[0] == 0 || !l.AnyFx());   // greyed until there is a name and a style to save
+      const bool saveStyle = ActionButton::Draw((std::string(T("Save style")) + "##v2dstylesave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain);
+      ImGui::EndDisabled();
+      if (saveStyle && name[0] != 0 && l.AnyFx())
       {
          std::error_code ec;
          std::filesystem::create_directories(StylePresetDir(), ec);
@@ -9716,10 +9862,19 @@ namespace
             sCanvasH = kPresets[pick - 1][1];
          }
       }
-      if (IntRow(T("Width"), &sCanvasW) && d.ratioLock)
-         sCanvasH = (int)std::lround(sCanvasW * (float)d.h / (float)d.w);
-      if (IntRow(T("Height"), &sCanvasH) && d.ratioLock)
-         sCanvasW = (int)std::lround(sCanvasH * (float)d.w / (float)d.h);
+      {
+         // W and H on one row, as the layer's Size.
+         float wh[2] = { (float)sCanvasW, (float)sCanvasH };
+         float* const p[2] = { &wh[0], &wh[1] };
+         const char* const fmts[2] = { "W %.0f", "H %.0f" };
+         const int c = DragMulti(T("Size"), p, fmts, 2, 1.0f, 1.0f, 16384.0f);
+         sCanvasW = (int)std::lround(wh[0]);
+         sCanvasH = (int)std::lround(wh[1]);
+         if ((c & 1) && d.ratioLock)
+            sCanvasH = (int)std::lround(sCanvasW * (float)d.h / (float)d.w);
+         if ((c & 2) && d.ratioLock)
+            sCanvasW = (int)std::lround(sCanvasH * (float)d.w / (float)d.h);
+      }
       AnchorRow(T("Anchor"), &sAnchor);
       BoolRow(T("Keep proportions"), &d.ratioLock);
       ImGui::BeginDisabled(sCanvasW == d.w && sCanvasH == d.h);
@@ -9730,10 +9885,18 @@ namespace
       }
       ImGui::EndDisabled();
       SectionCard::Begin(T("Image size"));
-      if (IntRow(T("Width##img"), &sImageW))
-         sImageH = (int)std::lround(sImageW * (float)d.h / (float)d.w);
-      if (IntRow(T("Height##img"), &sImageH))
-         sImageW = (int)std::lround(sImageH * (float)d.w / (float)d.h);
+      {
+         float wh[2] = { (float)sImageW, (float)sImageH };
+         float* const p[2] = { &wh[0], &wh[1] };
+         const char* const fmts[2] = { "W %.0f", "H %.0f" };
+         const int c = DragMulti(T("Size##img"), p, fmts, 2, 1.0f, 1.0f, 16384.0f);
+         sImageW = (int)std::lround(wh[0]);
+         sImageH = (int)std::lround(wh[1]);
+         if (c & 1)
+            sImageH = (int)std::lround(sImageW * (float)d.h / (float)d.w);
+         if (c & 2)
+            sImageW = (int)std::lround(sImageH * (float)d.w / (float)d.h);
+      }
       ImGui::BeginDisabled(sImageW == d.w && sImageH == d.h);
       if (TextChip(L("Apply##v2dimage"), false, T("Scale the document and every layer with it")))
       {
@@ -9750,10 +9913,13 @@ namespace
       BoolRow(T("Keep light above 1.0"), &d.headroom);
 
       SectionCard::Begin(T("Rulers, guides, grid"));
-      BoolRow(T("Rulers"), &d.rulers);
-      BoolRow(T("Guides"), &d.guidesOn);
-      BoolRow(T("Grid"), &d.grid);
-      BoolRow(T("Snap"), &d.snap);
+      {
+         Pairs g;
+         BoolRow(T("Rulers"), &d.rulers);
+         BoolRow(T("Guides"), &d.guidesOn);
+         BoolRow(T("Grid"), &d.grid);
+         BoolRow(T("Snap"), &d.snap);
+      }
       if (d.grid)
       {
          DragRow(T("Grid size"), &d.gridSize, 1.0f, "%.0f px", 2.0f, 4096.0f);
@@ -9801,8 +9967,11 @@ namespace
       ImGui::TextDisabled("%d x %d, F12", d.w, d.h);
       SectionCard::Begin(T("Animation"));
       ComboRow(T("Video"), &sVideoFormat, { "MP4", "MOV" });
-      DragRow(T("Frame rate"), &d.fps, 0.1f, "%.0f fps", 1.0f, 240.0f);
-      DragRow(T("Length"), &d.seconds, 0.1f, "%.1f s", 0.1f, 3600.0f);
+      {
+         Pairs g;
+         DragRow(T("Frame rate"), &d.fps, 0.1f, "%.0f fps", 1.0f, 240.0f);
+         DragRow(T("Length"), &d.seconds, 0.1f, "%.1f s", 0.1f, 3600.0f);
+      }
       ImGui::BeginDisabled(gOfflineRender.active);
       if (ActionButton::Draw(L("Render Animation##v2danim"), ImVec2(availW, 0)))
          sPending.what = Pending::RenderAnim;
@@ -9834,7 +10003,7 @@ namespace
       GraphNode* self = DocGraphNode();
       auto nameOf = [](const GraphNode* gn) { return std::string("Document ") + std::to_string(gn->index); };
       ImGui::SetNextItemWidth(w - kIconW - tok::space_1);
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (PanelKit::kChip - ImGui::GetFontSize()) * 0.5f));
       const bool docsOpen = MenuParts::BeginCombo("##v2ddocs", self != nullptr ? nameOf(self).c_str() : "");
       ImGui::PopStyleVar();
       if (docsOpen)
@@ -9886,11 +10055,13 @@ namespace
          { "##v2dt6", IconsInfinite::Curve, "Colour" },
       };
       sTab = std::clamp(sTab, 0, 6);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, tok::space_1));
       ImGui::BeginGroup();
       for (int i = 0; i < 7; i++)
          if (IconChip(kTabs[i].id, kTabs[i].icon, sTab == i, T(kTabs[i].tip)))
             sTab = i;
       ImGui::EndGroup();
+      ImGui::PopStyleVar();
       ActionButton::RowNext();
 
       sChip = kSideChip;
@@ -9898,9 +10069,12 @@ namespace
       {
          ImGui::BeginChild("##v2dlayers", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          const float availW = ImGui::GetContentRegionAvail().x;
+         // One row gap for the whole tab (PanelKit), so the document row sits on the same pitch as the rows below it.
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::kRowGap));
          DrawDocPicker(doc, availW);
          const float roomH = ImGui::GetContentRegionAvail().y;
          DrawLayersCard(doc, availW, std::max(3.0f * (kRowH + 1.0f), roomH - 4.0f));
+         ImGui::PopStyleVar();
          ImGui::EndChild();
       }
       else
@@ -9912,8 +10086,8 @@ namespace
          ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
          const float w = ImGui::GetContentRegionAvail().x;
          sFieldW = std::max(70.0f, w - kLabelW);
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, 3.0f));
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 3.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, PanelKit::FramePadY()));
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::kRowGap));
          if (sTab == 1) DrawLayerTab(doc, 0);
          else if (sTab == 2) DrawLayerTab(doc, 1);
          else if (sTab == 3) DrawDocumentTab(doc);
@@ -9926,7 +10100,7 @@ namespace
          ImGui::EndChild();
       }
       ImGui::EndChild();
-      sChip = tok::tile;
+      sChip = PanelKit::kChip;
    }
 
    // ---- deferred actions -------------------------------------------------
@@ -12264,6 +12438,10 @@ std::string View2DAuditState(int i)
       sTab = 0;
       select(i == kText ? 3 : i == kPen || i == kNode || i == kShape ? 4 : 0);
       sTool = i;
+      if (i == kMarquee)
+         doc->SelectRect(240.0f, 160.0f, 720.0f, 400.0f, 0, 0.0f, false);   // the bar's Expand / Contract / Smooth / Border need one
+      else if (doc->HasSelection())
+         doc->Deselect();
       if (i == kHand)
       {
          sZoom = 0.37f;   // off the fit, so the bar's Fit has a view to change
@@ -12367,7 +12545,17 @@ std::string View2DAuditPanelState()
             sLockScale, sShapeKind, v.fillOn, v.fillC[0], v.fillC[1], v.fillC[2], v.fillC[3], v.strokeOn, v.strokeC[0], v.strokeC[1],
             v.strokeC[2], v.strokeC[3], v.width, v.cap, v.join, v.align, v.dash, v.gap, v.op, v.radius, sFont.c_str(), sTextSize,
             sLeading, sTracking, sTextAlign, sTextC[0], sTextC[1], sTextC[2], sTextC[3]);
-   return std::string(buf) + tools + " grev " + std::to_string(sGradReverse ? 1 : 0) + " sel " + sel + (doc != nullptr ? " qm " + std::to_string(doc->quickMask) : std::string());
+   // Tool switches and the vector style's popover fields (gradient fill, per-corner shape): the bar edits them too.
+   const BrushEngine::Brush& r = sRetouch;
+   char more[384];
+   snprintf(more, sizeof more, " opts %d %d %d %d %d %d %d fillt %d %.1f %zu corn %.1f %.1f %.1f %.1f %d %d %d %d"
+            " strk %d %d %d %.1f %.2f %.2f %.2f %.1f %.1f %d %d",
+            sMarqueeCentre, sCloneAll, sObjSoft, sPatchClear, r.protectHue, r.sourceFlipX, r.sourceFlipY, v.fillType, v.fillAngle,
+            v.fillStops.size(), v.cornerR[0], v.cornerR[1], v.cornerR[2], v.cornerR[3], v.cornerType[0], v.cornerType[1], v.cornerType[2],
+            v.cornerType[3], v.arrowS, v.arrowE, v.balanced ? 1 : 0, v.arrowSize, v.taperS, v.taperE, v.pressMin, v.miter, v.dashPhase, v.behind ? 1 : 0, v.scaleStroke ? 1 : 0);
+   return std::string(buf) + tools + more + " grev " + std::to_string(sGradReverse ? 1 : 0) + " sbr " + std::to_string(sSelBrushSub ? 1 : 0) +
+          std::to_string(sSelBrushSoft ? 1 : 0) + std::to_string(r.lockAlpha ? 1 : 0) + std::to_string(sPatchSrc ? 1 : 0) +
+          std::to_string(sMeshNearest ? 1 : 0) + " sel " + sel + (doc != nullptr ? " qm " + std::to_string(doc->quickMask) : std::string());
 }
 
 // The document survives its own save text: written, read back into a fresh node, written again, identical.
@@ -12457,6 +12645,197 @@ void View2DAuditRestore()
 {
    if (sAuditState >= 0)
       View2DAuditState(sAuditState);
+}
+
+// ---- journeys (src/app/selftest/Journeys.cpp, internal/plans/ui-system/journey-tests.md)
+// Setup lines build the start state directly (not the journey's subject); queries read the result as plain text.
+
+namespace
+{
+   std::map<std::string, int> sJourneyNames;   // setup layer name -> id
+
+   int JourneyLayer(Scene2DNode* doc, const std::string& name)
+   {
+      auto it = sJourneyNames.find(name);
+      return it != sJourneyNames.end() && doc->FindLayer(it->second) != nullptr ? it->second : 0;
+   }
+
+   const char* KindName(Kind k)
+   {
+      static const char* const kNames[Scene2DNode::kKindCount] = { "node", "fill", "group", "paint", "vector", "text", "adjust" };
+      return kNames[(int)k];
+   }
+
+   std::string Fmt3(const float* c)
+   {
+      char b[64];
+      std::snprintf(b, sizeof b, "%.2f %.2f %.2f", c[0], c[1], c[2]);
+      return b;
+   }
+}
+
+// One setup line: "doc W H", "layer paint|text|vector NAME", "fill r g b" (the active paint layer, whole),
+// "fg r g b", "bg r g b", "active NAME", "tool NAME", "select x0 y0 x1 y1", "swatches rrggbb ...", "norecent".
+bool View2DJourneySetup(const std::string& line, std::string* err)
+{
+   std::istringstream in(line);
+   std::string cmd;
+   in >> cmd;
+   InitBrushes();
+   gView2DOpen = true;
+   sSideOpen = true;
+   if (cmd == "doc")
+   {
+      int w = 960, h = 540;
+      in >> w >> h;
+      sJourneyNames.clear();
+      Scene2DNode* doc = MakeDoc(0.0f, 0.0f, "");
+      if (doc == nullptr)
+         return *err = "no document", false;
+      doc->Doc().w = w;
+      doc->Doc().h = h;
+      doc->Commit();
+      sTool = kMove;
+      sTab = 0;
+      gView2DDock = 0;
+      return true;
+   }
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr)
+      return *err = "setup needs \"doc\" first", false;
+   if (cmd == "layer")
+   {
+      std::string kind, name;
+      in >> kind >> name;
+      const Layer* a = Active(doc);
+      const int above = a != nullptr ? a->id : 0;
+      int id = 0;
+      if (kind == "paint") id = doc->AddPaintLayer(above);
+      else if (kind == "vector") id = doc->AddVectorLayer(above);
+      else if (kind == "text") id = doc->AddTextLayer(name.empty() ? "Text" : name, doc->Doc().w * 0.5f, doc->Doc().h * 0.5f, 0.0f, above);
+      else return *err = "layer kind " + kind, false;
+      if (Layer* l = doc->FindLayer(id))
+         l->name = name;
+      sJourneyNames[name] = id;
+      doc->Commit();
+      SelectOnly(id);
+      return true;
+   }
+   if (cmd == "fill")
+   {
+      float c[3] = { 0, 0, 0 };
+      in >> c[0] >> c[1] >> c[2];
+      const Layer* a = Active(doc);
+      if (a == nullptr || !doc->FillPixels(a->id, c, 1.0f))
+         return *err = "fill needs an active paint layer", false;
+      doc->Commit();
+      return true;
+   }
+   if (cmd == "fg" || cmd == "bg")
+   {
+      float* c = cmd == "fg" ? sFg : sBg;
+      in >> c[0] >> c[1] >> c[2];
+      return true;
+   }
+   if (cmd == "active")
+   {
+      std::string name;
+      in >> name;
+      const int id = JourneyLayer(doc, name);
+      if (id == 0)
+         return *err = "no layer " + name, false;
+      SelectOnly(id);
+      return true;
+   }
+   if (cmd == "tool")
+   {
+      std::string name;
+      in >> name;
+      for (int i = 0; i < kToolCount; i++)
+         if (name == kAuditToolNames[i])
+            return sTool = i, true;
+      return *err = "no tool " + name, false;
+   }
+   if (cmd == "select")
+   {
+      float r[4];
+      in >> r[0] >> r[1] >> r[2] >> r[3];
+      doc->SelectRect(r[0], r[1], r[2], r[3], Scene2DNode::kSelNew, 0, false);
+      return true;
+   }
+   if (cmd == "swatches")
+   {
+      std::vector<Rgb> list;
+      std::string hex;
+      while (in >> hex)
+      {
+         unsigned v = 0;
+         std::sscanf(hex.c_str(), "%6x", &v);
+         Rgb c;
+         c.c[0] = ((v >> 16) & 255) / 255.0f, c.c[1] = ((v >> 8) & 255) / 255.0f, c.c[2] = (v & 255) / 255.0f;
+         list.push_back(c);
+      }
+      SetSwatches(list);
+      return true;
+   }
+   if (cmd == "norecent")
+   {
+      sRecentCols.clear();
+      return true;
+   }
+   return *err = "unknown setup " + cmd, false;
+}
+
+// A fact about the panel now, as text: "tool", "layers", "active.kind", "active.name", "selection", "fg",
+// "px X Y" (the picture), "layerpx NAME X Y" (that paint layer alone), "shape.fill" (the active vector layer's top
+// item), "rasterask" (the Rasterize? chip is up), "open.pianoroll", "open.view2d".
+std::string View2DJourneyQuery(const std::string& q)
+{
+   std::istringstream in(q);
+   std::string what;
+   in >> what;
+   Scene2DNode* doc = FindDoc();
+   if (what == "tool") return kAuditToolNames[std::clamp(sTool, 0, kToolCount - 1)];
+   if (what == "open.pianoroll") return gPianoRollOpen ? "1" : "0";
+   if (what == "open.view2d") return gView2DOpen ? "1" : "0";
+   if (what == "fg") return Fmt3(sFg);
+   if (doc == nullptr) return "no document";
+   const Layer* a = Active(doc);
+   if (what == "layers") return std::to_string(doc->Layers().size());
+   if (what == "active.kind") return a != nullptr ? KindName(a->kind) : "none";
+   if (what == "active.name") return a != nullptr ? a->name : "none";
+   if (what == "selection") return doc->HasSelection() ? "1" : "0";
+   if (what == "rasterask") return sRasterAsk != 0 ? "1" : "0";
+   if (what == "shape.fill") return a != nullptr && a->kind == Kind::Vector && !a->shapes.empty() ? Fmt3(a->shapes.back().fillC) : "none";
+   if (what == "px" || what == "layerpx" || what == "activepx")
+   {
+      int layer = what == "activepx" && a != nullptr ? a->id : 0;
+      if (what == "layerpx")
+      {
+         std::string name;
+         in >> name;
+         layer = JourneyLayer(doc, name);
+         if (layer == 0)
+            return "no layer " + name;
+      }
+      float x = 0, y = 0, rgb[3] = { 0, 0, 0 };
+      in >> x >> y;
+      doc->CookIfNeeded(ImGui::GetFrameCount() + 9000000);
+      if (!doc->Pick(x, y, rgb, 1, layer))
+         return "none";
+      return Fmt3(rgb);
+   }
+   return "unknown query " + what;
+}
+
+// A document point on screen (the view as last drawn).
+bool View2DJourneyToScreen(float x, float y, ImVec2* out)
+{
+   Scene2DNode* doc = FindDoc();
+   if (doc == nullptr || sViewMx.x <= sViewMn.x)
+      return false;
+   *out = ToScreen(doc, x, y);
+   return true;
 }
 #endif
 

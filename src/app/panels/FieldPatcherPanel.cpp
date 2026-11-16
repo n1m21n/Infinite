@@ -1181,11 +1181,11 @@ namespace
    void DrawRail(Page& p, Host& h, float height)
    {
       State& s = S();
-      ImGui::BeginChild("##fpRail", ImVec2(tok::tile, height), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+      ImGui::BeginChild("##fpRail", ImVec2(tok::control_h, height), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       for (int f = 0; f < (int)Field::BoxFamily::Count; f++)
       {
          ImGui::PushID(f);
-         if (IconTile::Draw("##fam", FamilyGlyph(f), FamilyGlyph(f), s.railFamily == f, tok::tile, tok::tile))
+         if (IconTile::Draw("##fam", FamilyGlyph(f), FamilyGlyph(f), s.railFamily == f, tok::control_h, tok::control_h))
          {
             s.railFamily = f;
             s.search[0] = 0;
@@ -1689,7 +1689,7 @@ namespace
       DrawRail(*p, h, bodyH);
       FormParts::Inline(0.0f, gap);
       const float inspW = std::min(kInspectorW, avail.x * 0.35f);
-      const float canvasW = std::max(80.0f, avail.x - tok::tile - inspW - 2.0f * gap);
+      const float canvasW = std::max(80.0f, avail.x - tok::control_h - inspW - 2.0f * gap);
       ImGui::BeginChild("##fpCanvasWrap", ImVec2(canvasW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawCanvas(*p, h, ImVec2(canvasW, bodyH));
       ImGui::EndChild();

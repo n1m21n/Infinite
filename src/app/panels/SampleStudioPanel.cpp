@@ -19,6 +19,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/TimeRuler.h"
 #include "app/ui/design/components/ToolCursor.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/DialogParts.h"
@@ -2774,7 +2775,7 @@ namespace
    }
 
    // ---- the toolbar ----
-   // One height (tok::tile) for every item, one gap inside a group (space_1) and one between groups (space_3).
+   // One height (PanelKit::kChip) for every item, one gap inside a group (space_1) and one between groups (space_3).
 
    void PushToolbarChip(bool on, bool green = false)
    {
@@ -2782,7 +2783,7 @@ namespace
    }
    void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
 
-   constexpr float kIconW = 30.0f;
+   constexpr float kIconW = PanelKit::kChip;
 
    float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
 
@@ -2790,20 +2791,20 @@ namespace
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {
       PushToolbarChip(on, green);
-      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, tok::tile));
+      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, PanelKit::kChip));
       PopToolbarChip();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", tip);
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
       const ImU32 icol = on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
       if (glyphStr != nullptr)
-         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, icol, glyphStr);
+         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_control, icol, glyphStr);
       return clicked;
    }
 
    bool TextChip(const char* label, ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
-      return ActionButton::Draw(label, ImVec2(TextW(label), tok::tile), kind);
+      return ActionButton::Draw(label, ImVec2(TextW(label), PanelKit::kChip), kind);
    }
 
    // A dropdown chip: the value, clipped to the chip, and the list below. The list fades and settles in
@@ -2813,7 +2814,7 @@ namespace
       static ImGuiID sOpenId = 0;
       static double sOpenedAt = -1.0;
       const ImGuiID pid = ImGui::GetID(id);
-      if (ActionButton::Draw(id, ImVec2(w, tok::tile)))
+      if (ActionButton::Draw(id, ImVec2(w, PanelKit::kChip)))
       {
          ImGui::OpenPopup(id);
          sOpenId = pid;
@@ -2974,7 +2975,7 @@ namespace
          // The tool dropdown, the same as the Timeline's and the Piano Roll's.
          const bool nonDefault = s.tool != 0;
          ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         const bool clicked = ActionButton::Draw("##studioToolPicker", ImVec2(tok::tile, tok::tile));
+         const bool clicked = ActionButton::Draw("##studioToolPicker", ImVec2(PanelKit::kChip, PanelKit::kChip));
          ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool"));
@@ -2982,7 +2983,7 @@ namespace
          const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
          const char* tg = s.tool == 1 ? IconsInfinite::Scissors : s.tool == 2 ? IconsInfinite::Hand : IconsInfinite::Pointer;
          ImDrawList* tdl = ImGui::GetWindowDrawList();
-         glyph::Draw(tdl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, col, tg);
+         glyph::Draw(tdl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_control, col, tg);
          if (clicked)
             ImGui::OpenPopup("##studioToolMenu");
          ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
@@ -3085,7 +3086,7 @@ namespace
          HelpTip("%s", T("Put the edit on the canvas: the patch that made it, or a node that plays it"));
       ImGui::EndDisabled();
       FormParts::Inline(0.0f, in);
-      if (ChipButton::Draw(audioL, studioMode, tok::tile))
+      if (ChipButton::Draw(audioL, studioMode, PanelKit::kChip))
          SetStudioAudio(!studioMode);
       if (ImGui::IsItemHovered())
          HelpTip("%s", !gAudioStartError.empty() && AudioEngine::Instance().SampleRate() <= 0.0

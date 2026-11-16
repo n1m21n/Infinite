@@ -15,7 +15,7 @@
 
 namespace FilterBar
 {
-   constexpr float kHeight = 32.0f;
+   constexpr float kHeight = tok::control_h;
 
    namespace detail
    {

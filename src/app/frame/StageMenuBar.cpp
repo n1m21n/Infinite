@@ -27,8 +27,8 @@ std::string gRailOrder; // saved tile order
 static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
-   const float step = tok::tile + tok::space_3;
-   const float top = (tok::bar_h - tok::tile) * 0.5f + step; // Library starts level with the Viewport tile
+   const float step = tok::control_h + tok::space_3;
+   const float top = (tok::bar_h - tok::control_h) * 0.5f + step; // Library starts level with the Viewport tile
    struct Entry
    {
       const char* key;
@@ -121,7 +121,7 @@ static void DrawPanelRail()
       for (int i = 0; i < kN; i++)
          gRailOrder += std::string(i ? "," : "") + kEntries[order[i]].key;
    }
-   const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
+   const float bottom = ImGui::GetWindowHeight() - tok::control_h - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
       gSettingsOpen = !gSettingsOpen;
@@ -212,7 +212,7 @@ void DrawMenuBar(FrameCtx& fc)
          float* sMenuMidYPtr = nullptr;
          // Infinite mark (the app icon): opens the About dialog.
          {
-            const float s = tok::tile;
+            const float s = tok::control_h;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
             // Same centre line as the File/Edit/Menu well (measured last frame), same height.
             static float sMenuMidY = 0.0f;
@@ -726,7 +726,7 @@ void DrawMenuBar(FrameCtx& fc)
             const float mid = (menuGroupY0 + menuGroupY1) * 0.5f;
             if (sMenuMidYPtr != nullptr)
                *sMenuMidYPtr = mid;
-            menuDl->AddRectFilled(ImVec2(menuGroupP.x - 2.0f, mid - tok::tile * 0.5f), ImVec2(menuGroupMaxX + 2.0f, mid + tok::tile * 0.5f),
+            menuDl->AddRectFilled(ImVec2(menuGroupP.x - 2.0f, mid - tok::control_h * 0.5f), ImVec2(menuGroupMaxX + 2.0f, mid + tok::control_h * 0.5f),
                ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.06f)), tok::radius_tile);
          }
          menuDl->ChannelsMerge();
@@ -743,8 +743,8 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_1000_1000_1000_160));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
-         // 28 pt controls (tok::tile) on one centre line; the cursor Y below pins them in the bar.
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (tok::tile - ImGui::GetFontSize()) * 0.5f));
+         // 24 pt controls (tok::control_h) on one centre line; the cursor Y below pins them in the bar.
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (tok::control_h - ImGui::GetFontSize()) * 0.5f));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
          // Right-edge items are placed at an absolute x on the bar's line.
@@ -771,18 +771,18 @@ void DrawMenuBar(FrameCtx& fc)
                UiType::Scope ts(UiType::Size::Title, UiType::Weight::Regular);
                w = std::max(Readout::Measure(widest), Readout::Measure(text));
             }
-            ImGui::Dummy(ImVec2(w, tok::tile));
-            Readout::Draw(key, UiLayout::Rect { p.x, p.y, w, tok::tile }, text, text, UiType::Size::Title,
+            ImGui::Dummy(ImVec2(w, tok::control_h));
+            Readout::Draw(key, UiLayout::Rect { p.x, p.y, w, tok::control_h }, text, text, UiType::Size::Title,
                           UiType::Weight::Regular, Readout::Align::Left, dim ? 0.5f : 1.0f);
          };
 
          auto& SectionBreak = TopBarParts::SectionBreak;
-         // Everything after the menus sits on one centre line, tok::tile tall in a tok::bar_h bar.
+         // Everything after the menus sits on one centre line, tok::control_h tall in a tok::bar_h bar.
 
          auto drawTransport = [&]()
          {
          // 1. Transport (Play, Rewind, Audio On/Off)
-         if (ActionButton::Draw("##transportplay", ImVec2(tok::tile + 4.0f, 0),
+         if (ActionButton::Draw("##transportplay", ImVec2(tok::control_h, 0),
                                 isTransportPlaying ? ActionButton::Kind::Go : ActionButton::Kind::Plain))
             LaunchRequestTogglePlay();
          {
@@ -790,7 +790,7 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = tok::icon_md;
+            const float iconSize = tok::icon_control;
             const ImU32 col = isTransportPlaying
                                   ? tok::U32(tok::pal::c_FFFFFFFF)
                                   : ImGui::GetColorU32(ImGuiCol_Text);
@@ -803,14 +803,14 @@ void DrawMenuBar(FrameCtx& fc)
             HelpTip(T("%s (Space)"), isTransportPlaying ? T("Pause") : T("Play"));
 
          ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + 4.0f, ImGui::GetItemRectMin().y));
-         if (ActionButton::Draw("##transportrewind", ImVec2(tok::tile + 4.0f, 0)))
+         if (ActionButton::Draw("##transportrewind", ImVec2(tok::control_h, 0)))
             LaunchRequestRewind();
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = tok::icon_md;
+            const float iconSize = tok::icon_control;
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
             glyph::DrawPlayerRewind(dl, center, iconSize, col);
          }
@@ -830,7 +830,7 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool audioOn = engineOn;
-            if (ChipButton::Draw(audioOn ? L("Stop Audio") : L("Start Audio"), audioOn, tok::tile, 0.0f, true))
+            if (ChipButton::Draw(audioOn ? L("Stop Audio") : L("Start Audio"), audioOn, tok::control_h, 0.0f, true))
             {
                if (audioOn)
                {
@@ -858,7 +858,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (gAudioMode == AudioMode::Timeline)
             {
                TopBarSameLine(4.0f);
-               if (ChipButton::Draw(T("Timeline"), true, tok::tile, 0.0f, true))
+               if (ChipButton::Draw(T("Timeline"), true, tok::control_h, 0.0f, true))
                   gAudioMode = AudioMode::Canvas;
                if (ImGui::IsItemHovered())
                   HelpTip(engineOn
@@ -868,7 +868,7 @@ void DrawMenuBar(FrameCtx& fc)
             else if (gAudioMode == AudioMode::Session)
             {
                TopBarSameLine(4.0f);
-               if (ChipButton::Draw(L("Session##sessionbadge"), true, tok::tile, 0.0f, true))
+               if (ChipButton::Draw(L("Session##sessionbadge"), true, tok::control_h, 0.0f, true))
                   gAudioMode = AudioMode::Canvas;
                if (ImGui::IsItemHovered())
                   HelpTip(engineOn
@@ -878,7 +878,7 @@ void DrawMenuBar(FrameCtx& fc)
             else if (gAudioMode == AudioMode::Studio)
             {
                TopBarSameLine(4.0f);
-               if (ChipButton::Draw(L("Studio##studiobadge"), true, tok::tile, 0.0f, true))
+               if (ChipButton::Draw(L("Studio##studiobadge"), true, tok::control_h, 0.0f, true))
                   gAudioMode = AudioMode::Canvas;
                if (ImGui::IsItemHovered())
                   HelpTip(engineOn
@@ -888,7 +888,7 @@ void DrawMenuBar(FrameCtx& fc)
             else if (gAudioMode == AudioMode::Mixer)
             {
                TopBarSameLine(4.0f);
-               if (ChipButton::Draw(L("Mixer##mixerbadge"), true, tok::tile, 0.0f, true))
+               if (ChipButton::Draw(L("Mixer##mixerbadge"), true, tok::control_h, 0.0f, true))
                   SetMixerAudio(false);
                if (ImGui::IsItemHovered())
                   HelpTip(engineOn
@@ -904,7 +904,7 @@ void DrawMenuBar(FrameCtx& fc)
          const float centreX = std::max(leftClusterEndX + tok::space_5,
                                         std::round((ImGui::GetWindowWidth() - sCentreW) * 0.5f));
          ImGui::SameLine(centreX);
-         ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::tile) * 0.5f));
+         ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::control_h) * 0.5f));
          const float centreStartScreenX = ImGui::GetCursorScreenPos().x;
          // Transport sits just left of the tempo, audio power just right of it.
          if (!Platform::PluginModeActive()) // the DAW's transport plays and stops the plugin
@@ -993,7 +993,7 @@ void DrawMenuBar(FrameCtx& fc)
             const float cellW = std::max({ tempoCellW, sigCellW, keyCellW });
             tempoCellW = sigCellW = keyCellW = cellW;
          }
-         const float centreY = ImGui::GetCursorScreenPos().y + tok::tile * 0.5f;
+         const float centreY = ImGui::GetCursorScreenPos().y + tok::control_h * 0.5f;
          const ImVec2 wellMin(std::round(ImGui::GetCursorScreenPos().x), std::round(centreY - TD::kHeight * 0.5f));
          // The metronome is the display's last cell: a square the height of the well, set off by a hairline.
          // Not inside a DAW: the host plays its own click.
@@ -1199,11 +1199,11 @@ void DrawMenuBar(FrameCtx& fc)
             AudioEngine::Instance().SetMetronome(false, gMetronomeVolume, gMetronomeAccent);
          else
          {
-         ImGui::SetCursorScreenPos(ImVec2(wellMax.x - clickCellW + (clickCellW - tok::tile) * 0.5f, centreY - tok::tile * 0.5f));
+         ImGui::SetCursorScreenPos(ImVec2(wellMax.x - clickCellW + (clickCellW - tok::control_h) * 0.5f, centreY - tok::control_h * 0.5f));
          {
             // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
             if (IconTile::Draw("##metronomeBtn", IconsInfinite::Metronome, IconsInfinite::MetronomeFill, gMetronomeOn,
-                               tok::tile, ImGui::GetFrameHeight(), true,
+                               tok::control_h, ImGui::GetFrameHeight(), true,
                                // Pendulum swings to the other side on every beat while the click is on and playing.
                                (gMetronomeOn && isTransportPlaying)
                                   ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
@@ -1242,7 +1242,7 @@ void DrawMenuBar(FrameCtx& fc)
          if (!Platform::PluginModeActive()) // the DAW owns the audio device
          {
             SectionBreak();
-            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::tile * 0.5f));
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::control_h * 0.5f));
             drawAudio();
          }
 
@@ -1304,13 +1304,13 @@ void DrawMenuBar(FrameCtx& fc)
 #endif
          if (showUpdate)
          {
-            const float updateWidth = tok::tile;
+            const float updateWidth = tok::control_h;
             if (cursorX - updateWidth - telemetryGap - telemetryW >= centreEndX + minGap)
             {
                cursorX -= updateWidth;
                TopBarPlaceAt(cursorX);
                ImGui::PushID("##updateicon");
-               const bool clicked = ImGui::InvisibleButton("##update", ImVec2(tok::tile, tok::tile));
+               const bool clicked = ImGui::InvisibleButton("##update", ImVec2(tok::control_h, tok::control_h));
                ImGui::PopID();
                const bool hov = ImGui::IsItemHovered();
                const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
@@ -1343,36 +1343,36 @@ void DrawMenuBar(FrameCtx& fc)
          if (Platform::PluginModeActive())
          {
             auto fits = [&](float w) { return cursorX - w - telemetryGap - telemetryW >= centreEndX + minGap; };
-            if (fits(tok::tile))
+            if (fits(tok::control_h))
             {
-               cursorX -= tok::tile;
+               cursorX -= tok::control_h;
                TopBarPlaceAt(cursorX);
                const bool popped = PluginView::Popped();
-               if (IconTile::Draw("##popout", IconsInfinite::PopOut, IconsInfinite::PopOut, popped, tok::tile,
+               if (IconTile::Draw("##popout", IconsInfinite::PopOut, IconsInfinite::PopOut, popped, tok::control_h,
                                   ImGui::GetFrameHeight()))
                   PluginView::RequestPopped(!popped);
                if (ImGui::IsItemHovered())
                   ImGui::SetTooltip("%s", popped ? T("Back to the plugin") : T("Pop out"));
                cursorX -= telemetryGap;
             }
-            if (fits(tok::tile))
+            if (fits(tok::control_h))
             {
-               cursorX -= tok::tile;
+               cursorX -= tok::control_h;
                TopBarPlaceAt(cursorX);
                const bool picture = PluginView::Picture();
-               if (IconTile::Draw("##picture", IconsInfinite::Viewport, IconsInfinite::ViewportFill, picture, tok::tile,
+               if (IconTile::Draw("##picture", IconsInfinite::Viewport, IconsInfinite::ViewportFill, picture, tok::control_h,
                                   ImGui::GetFrameHeight()))
                   PluginView::SetPicture(!picture);
                if (ImGui::IsItemHovered())
                   ImGui::SetTooltip("%s", picture ? T("Canvas") : T("Picture"));
                cursorX -= telemetryGap;
             }
-            if (fits(tok::tile))
+            if (fits(tok::control_h))
             {
-               cursorX -= tok::tile;
+               cursorX -= tok::control_h;
                TopBarPlaceAt(cursorX);
                if (IconTile::Draw("##slots", IconsInfinite::FamilyMacros, IconsInfinite::FamilyMacros,
-                                  ImGui::IsPopupOpen("##slotsmap"), tok::tile, ImGui::GetFrameHeight()))
+                                  ImGui::IsPopupOpen("##slotsmap"), tok::control_h, ImGui::GetFrameHeight()))
                   ImGui::OpenPopup("##slotsmap");
                if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("##slotsmap"))
                   ImGui::SetTooltip("%s", T("Host slots"));

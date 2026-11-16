@@ -1806,7 +1806,7 @@ namespace app
             const float cy = std::floor(p.y + kQueueRowH * 0.5f);
             if (hot)
                dl->AddRectFilled(ImVec2(p.x + 3.0f, p.y), ImVec2(p.x + rowW - 3.0f, p.y + kQueueRowH), TextTint(0.05f), tok::radius_tile);
-            glyph::Draw(dl, ImVec2(leftC, cy), tok::icon_sm, Dim(), IconsInfinite::History);
+            glyph::Draw(dl, ImVec2(leftC, cy), tok::icon_control, Dim(), IconsInfinite::History);
             const float tx = leftC + 7.0f + tok::space_2, ty = cy - ImGui::GetFontSize() * 0.5f;
             std::string one = sQueue[i].text.substr(0, sQueue[i].text.find('\n'));
             if (!sQueue[i].files.empty())
@@ -1815,7 +1815,7 @@ namespace app
             const float textEnd = rightC - 7.0f - tok::space_2;
             ImGui::RenderTextEllipsis(dl, ImVec2(tx, ty), ImVec2(textEnd, p.y + kQueueRowH), textEnd, one.c_str(), nullptr, nullptr);
             ImGui::PopStyleColor();
-            glyph::Draw(dl, ImVec2(rightC, cy), tok::icon_sm, xHot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+            glyph::Draw(dl, ImVec2(rightC, cy), tok::icon_control, xHot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (hot)
                ImGui::SetTooltip("%s", T("Edit"));
             else if (xHot)
@@ -2279,7 +2279,7 @@ namespace app
 
       // A button chip: glyph and label in an outlined pill; it dims with a tick once pressed, except
       // go and open, which stay pressable.
-      float ActionWidth(const chat::Seg& s) { return ImGui::CalcTextSize(s.text.c_str()).x + tok::icon_sm + 3.0f * tok::space_1 + 2.0f; }
+      float ActionWidth(const chat::Seg& s) { return ImGui::CalcTextSize(s.text.c_str()).x + tok::icon_control + 3.0f * tok::space_1 + 2.0f; }
 
       void DrawAction(ImDrawList* dl, ImVec2 at, const chat::Seg& s, float lineH, const std::string& id)
       {
@@ -2299,9 +2299,9 @@ namespace app
          dl->AddRectFilled(at, ImVec2(at.x + sz.x, at.y + sz.y), done || !live ? TextTint(0.05f) : WithAlpha(accent, 0.10f + 0.12f * hv), sz.y * 0.5f);
          if (!done && live)
             dl->AddRect(at, ImVec2(at.x + sz.x, at.y + sz.y), WithAlpha(accent, 0.45f + 0.35f * hv), sz.y * 0.5f);
-         glyph::Draw(dl, ImVec2(at.x + tok::space_1 + tok::icon_sm * 0.5f + 1.0f, at.y + sz.y * 0.5f), tok::icon_sm, done ? Dim() : accent,
+         glyph::Draw(dl, ImVec2(at.x + tok::space_1 + tok::icon_control * 0.5f + 1.0f, at.y + sz.y * 0.5f), tok::icon_control, done ? Dim() : accent,
                      done ? IconsInfinite::Snap : ActionGlyph(s));
-         dl->AddText(ImVec2(at.x + 2.0f * tok::space_1 + tok::icon_sm + 1.0f, at.y + (lineH - ts.y) * 0.5f), ink, s.text.c_str());
+         dl->AddText(ImVec2(at.x + 2.0f * tok::space_1 + tok::icon_control + 1.0f, at.y + (lineH - ts.y) * 0.5f), ink, s.text.c_str());
          if (hovered)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -2663,13 +2663,13 @@ namespace app
          const ImVec2 fc(folderX + folder * 0.5f, at.y + cardH * 0.5f);
          if (folderHot)
             dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
-         glyph::Draw(dl, fc, tok::icon_sm, folderHot ? text : Dim(), IconsInfinite::Folder);
+         glyph::Draw(dl, fc, tok::icon_control, folderHot ? text : Dim(), IconsInfinite::Folder);
          if (folderHot)
             ImGui::SetTooltip("%s", T("Show in folder"));
          const ImVec2 sc(samplerX + folder * 0.5f, at.y + cardH * 0.5f);
          if (samplerHot)
             dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
-         glyph::Draw(dl, sc, tok::icon_sm, samplerHot ? text : Dim(), IconsInfinite::Waveform);
+         glyph::Draw(dl, sc, tok::icon_control, samplerHot ? text : Dim(), IconsInfinite::Waveform);
          if (samplerHot)
             ImGui::SetTooltip("%s", T("Open in a Sampler"));
          if (hot || folderHot || samplerHot)
@@ -2748,7 +2748,7 @@ namespace app
          ImGui::PopID();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_tile);
-         glyph::Draw(dl, ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), tok::icon_sm, Dim(), IconsInfinite::Library);
+         glyph::Draw(dl, ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), tok::icon_control, Dim(), IconsInfinite::Library);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
          const float ty = at.y + (rowH - ImGui::GetFontSize()) * 0.5f;
@@ -3012,7 +3012,7 @@ namespace app
          const int n = LineCount(code);
          char label[48];
          std::snprintf(label, sizeof label, n == 1 ? T("%d line") : T("%d lines"), n);
-         const float icon = tok::icon_sm;
+         const float icon = tok::icon_control;
          const float pad = tok::space_2;
          const ImVec2 ts = ImGui::CalcTextSize(label);
          const ImVec2 sz(pad + icon + 6.0f + ts.x + pad, ChipButton::kHeight);
@@ -3324,7 +3324,7 @@ namespace app
             const ImVec2 h = ImGui::GetCursorScreenPos();
             const float headH = ChipButton::kHeight;
             const ImU32 accent = e.undone ? Dim() : (e.ok ? ImGui::GetColorU32(AccentEmphasisSelected()) : Red());
-            glyph::Draw(dl, ImVec2(h.x + 6.0f, h.y + headH * 0.5f), tok::icon_sm, accent, IconsInfinite::Bolt);
+            glyph::Draw(dl, ImVec2(h.x + 6.0f, h.y + headH * 0.5f), tok::icon_control, accent, IconsInfinite::Bolt);
             dl->AddText(ImVec2(h.x + 16.0f, std::round(h.y + (headH - ImGui::GetFontSize()) * 0.5f)), Dim(), e.undone ? T("Undone") : (e.ok ? T("Changed") : T("Did not run")));
             ImGui::Dummy(ImVec2(inner, headH + tok::space_1));
          }
@@ -3442,7 +3442,7 @@ namespace app
             BusyLine::Spinner();
          }
          else if (any)
-            glyph::Draw(dl, ImVec2(at.x + gutter * 0.5f, cy), tok::icon_sm, dim, ui.open ? IconsInfinite::ChevronDown : IconsInfinite::ChevronRight);
+            glyph::Draw(dl, ImVec2(at.x + gutter * 0.5f, cy), tok::icon_control, dim, ui.open ? IconsInfinite::ChevronDown : IconsInfinite::ChevronRight);
          std::string label;
          float tx = at.x + gutter;
          if (named)
@@ -3494,7 +3494,7 @@ namespace app
                const ImVec2 p = ImGui::GetCursorScreenPos();
                const float x0 = p.x + gutter, x1 = p.x + width;
                if (r.failed)
-                  glyph::Draw(dl, ImVec2(p.x + gutter * 0.5f, p.y + lineH * 0.5f), tok::icon_sm, Red(), IconsInfinite::Close);
+                  glyph::Draw(dl, ImVec2(p.x + gutter * 0.5f, p.y + lineH * 0.5f), tok::icon_control, Red(), IconsInfinite::Close);
                const ImU32 col = r.failed ? Red() : (r.note ? TextTint(0.7f) : Dim());
                const bool words = !r.phrase.empty();
                std::string one = words ? r.phrase : r.text.substr(0, r.text.find('\n'));
@@ -4970,7 +4970,7 @@ namespace app
             const float midY = (a.y + b.y) * 0.5f;
             ImGui::SetCursorScreenPos(ImVec2(b.x - 26.0f, midY - 12.0f));
             const bool close = ImGui::InvisibleButton("##unreply", ImVec2(24.0f, 24.0f));
-            glyph::Draw(dl, ImVec2(b.x - 14.0f, midY), tok::icon_sm, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+            glyph::Draw(dl, ImVec2(b.x - 14.0f, midY), tok::icon_control, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (close)
                sReplyTo.clear();
          }
@@ -5003,7 +5003,7 @@ namespace app
                remove = (int)i;
             const ImU32 mark = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim();
             ImGui::PopID();
-            glyph::Draw(dl, ImVec2(p.x + w - 10.0f, p.y + 11.0f), tok::icon_sm, mark, IconsInfinite::Close);
+            glyph::Draw(dl, ImVec2(p.x + w - 10.0f, p.y + 11.0f), tok::icon_control, mark, IconsInfinite::Close);
             x += w + tok::space_1;
          }
          if (remove >= 0)
@@ -5084,7 +5084,7 @@ namespace app
                dl->AddRectFilled(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f), ImVec2(ac.x + sendW * 0.5f, ac.y + sendW * 0.5f), TextTint(0.10f), tok::radius_tile);
                ImGui::SetTooltip("%s", T("Attach files"));
             }
-            glyph::Draw(dl, ac, tok::icon_md, hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(0.70f), IconsInfinite::Plus);
+            glyph::Draw(dl, ac, tok::icon_control, hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(0.70f), IconsInfinite::Plus);
          }
          // Send and Stop: Send fills with the accent once there is something to send; Stop is a neutral tile
          // while an agent works.
@@ -5096,7 +5096,7 @@ namespace app
             const bool stop = ImGui::InvisibleButton("##chatstop", ImVec2(sendW, sendW));
             const bool hot = ImGui::IsItemHovered();
             dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? 0.16f : 0.10f), tok::radius_tile);
-            glyph::Draw(dl, sc, tok::icon_sm, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::StopFill);
+            glyph::Draw(dl, sc, tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::StopFill);
             if (hot)
                ImGui::SetTooltip("%s", T("Stop"));
             if (stop)
@@ -5118,7 +5118,7 @@ namespace app
             const bool hot = ImGui::IsItemHovered();
             if (canSend)
                dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_tile);
-            glyph::Draw(dl, sc, tok::icon_sm, canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f), IconsInfinite::Send);
+            glyph::Draw(dl, sc, tok::icon_control, canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f), IconsInfinite::Send);
             if (hot && canSend)
                ImGui::SetTooltip("%s", T("Send"));
             if (clicked && canSend)
@@ -5203,7 +5203,7 @@ namespace app
             if (ImGui::InvisibleButton("##delete", ImVec2(24.0f, rh)))
                removeId = t.id;
             if (hot)
-               glyph::Draw(cd, ImVec2(p.x + rw - 12.0f, p.y + rh * 0.5f), tok::icon_sm, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+               glyph::Draw(cd, ImVec2(p.x + rw - 12.0f, p.y + rh * 0.5f), tok::icon_control, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", T("Delete"));
             if (open && sRuns.empty())

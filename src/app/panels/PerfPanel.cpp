@@ -2109,7 +2109,7 @@ namespace app
    }
 
 
-   constexpr float kPerfChipH = 28.0f;   // toolbar chips: one tile high
+   constexpr float kPerfChipH = tok::control_h;   // toolbar chips: one control high
 
    void DrawPerfPanelContent()
    {
@@ -2224,7 +2224,7 @@ namespace app
          opt.canAdd = gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages;
          opt.duplicate = opt.canAdd;
          opt.canDelete = gPerfLayout.pageCount > 1;
-         opt.maxW = std::max(120.0f, ImGui::GetContentRegionAvail().x - tok::tile - tok::space_2);
+         opt.maxW = std::max(120.0f, ImGui::GetContentRegionAvail().x - tok::control_h - tok::space_2);
          const PagePicker::Result r = PagePicker::Draw("##perfPages", entries, gPerfActivePage, T("Add New Page"), opt);
          const int p = r.index;
          switch (r.act)

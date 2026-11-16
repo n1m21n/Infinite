@@ -20,7 +20,6 @@ def build():
         L.append(f"   constexpr float motion_{k} = {float(v)}f;")
     L.append(f"   constexpr float hit_min = {float(b['hit_min'])}f;")
     L.append(f"   constexpr float bar_h = {float(b['bar_h'])}f;")
-    L.append(f"   constexpr float tile = {float(b['tile'])}f;")
     # The UI system sheet: one value per part (control height, list row, icon, radius ...), shared by every surface.
     for k, v in b.get("system", {}).items():
         if not k.startswith("_"):

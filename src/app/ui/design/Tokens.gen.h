@@ -17,8 +17,6 @@ namespace tok
    constexpr float type_body = 13.0f;
    constexpr float type_title = 15.0f;
    constexpr float type_display = 22.0f;
-   constexpr float icon_sm = 14.0f;
-   constexpr float icon_md = 18.0f;
    constexpr float icon_lg = 20.0f;
    constexpr float pin_r_cable = 7.0f;
    constexpr float pin_r_cable_sm = 5.0f;
@@ -37,7 +35,6 @@ namespace tok
    constexpr float motion_accent_fade = 188.0f;
    constexpr float hit_min = 24.0f;
    constexpr float bar_h = 48.0f;
-   constexpr float tile = 28.0f;
    constexpr float control_h = 24.0f;
    constexpr float row_h = 24.0f;
    constexpr float row_gap = 4.0f;

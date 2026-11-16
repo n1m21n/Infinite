@@ -1,5 +1,5 @@
 // TopBarParts: the two pieces of the top bar that are not a plain control (plan section 0, top bar).
-// MenuTile = a File/Edit/Menu title as a 28 pt rounded tile; SectionBreak = 24 pt of air with a hairline.
+// MenuTile = a File/Edit/Menu title as a 24 pt rounded tile; SectionBreak = 24 pt of air with a hairline.
 #pragma once
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiAnim.h"
@@ -13,7 +13,7 @@ namespace TopBarParts
    // Spacing is pushed only for the BeginMenu call so the popup keeps the normal metrics.
    inline bool MenuTile(const char* label)
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(16.0f, tok::tile - ImGui::GetFontSize()));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(16.0f, tok::control_h - ImGui::GetFontSize()));
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));   // the press flash is the tile wash below, never the accent
@@ -35,10 +35,10 @@ namespace TopBarParts
    inline void SectionBreak()
    {
       ImGui::SameLine(0.0f, tok::space_5 * 0.5f);
-      ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::tile) * 0.5f));
+      ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::control_h) * 0.5f));
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      ImGui::Dummy(ImVec2(1.0f, tok::tile));
-      Divider::Vertical(UiLayout::Rect { p.x, p.y, 1.0f, tok::tile }, 4.0f);
+      ImGui::Dummy(ImVec2(1.0f, tok::control_h));
+      Divider::Vertical(UiLayout::Rect { p.x, p.y, 1.0f, tok::control_h }, 4.0f);
       // Menu-bar lines do not carry a SetCursorPos y into the next SameLine; pin the line here.
       ImGui::GetCurrentWindow()->DC.CursorPosPrevLine.y = p.y;
       ImGui::SameLine(0.0f, tok::space_5 * 0.5f);

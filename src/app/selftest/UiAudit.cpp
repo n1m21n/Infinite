@@ -19,6 +19,9 @@
 #include "core/CategoryColors.h"
 #include "core/NodeFactory.h"
 #include "app/ui/design/Tokens.gen.h"
+#include "json.hpp"
+#include <filesystem>
+#include <sstream>
 
 namespace app
 {
@@ -32,6 +35,11 @@ namespace app
    uint64_t View2DAuditRenderHash();
    std::string View2DAuditRanges();
    void View2DAuditRestore();
+   bool View2DJourneySetup(const std::string& line, std::string* err);
+   std::string View2DJourneyQuery(const std::string& q);
+   bool View2DJourneyToScreen(float x, float y, ImVec2* out);
+   bool View3DJourneySetup(const std::string& line, std::string* err);
+   std::string View3DJourneyQuery(const std::string& q);
 }
 
 namespace
@@ -130,6 +138,29 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* lab
 }
 
 void ImGuiTestEngineHook_Log(ImGuiContext*, const char*, ...) {}
+
+bool UiAudit::FindItem(const char* label, const char* inWindow, int nth, ImVec2* mn, ImVec2* mx)
+{
+   const std::string want = label != nullptr ? label : "";
+   auto inWin = [&](const std::string& w) { return inWindow == nullptr || *inWindow == 0 || w.find(inWindow) != std::string::npos; };
+   int seen = 0;
+   for (const Rec& r : sLast)
+      if ((r.label == want || (want.find("##") == std::string::npos && r.label.substr(0, r.label.find("##")) == want)) && inWin(r.window) && seen++ == nth)
+      {
+         *mn = r.bb.Min;
+         *mx = r.bb.Max;
+         return true;
+      }
+   // Icon chips are named by their tip.
+   for (const Ink& k : sInksLast)
+      if (k.kind == 1 && k.tip == want && inWin(k.window) && seen++ == nth)
+      {
+         *mn = k.itemBb.Min;
+         *mx = k.itemBb.Max;
+         return true;
+      }
+   return false;
+}
 
 const char* ImGuiTestEngine_FindItemDebugLabel(ImGuiContext*, ImGuiID id)
 {
@@ -759,6 +790,7 @@ namespace
    int sKey = -1;      // -1 nothing to send, else 0 up / 1 down (sKeyName, Escape unless a poke set another)
    ImGuiKey sKeyName = ImGuiKey_Escape;
    bool sKeyCmd = false;   // hold the shortcut modifier with the key
+   bool sKeyShift = false;
    std::string sChars;     // characters to type this frame
    bool sAllowDouble = false;
    void OwnMouse(ImGuiContext* ctx, ImGuiContextHook*)
@@ -783,6 +815,8 @@ namespace
       {
          if (sKeyCmd)
             ctx->IO.AddKeyEvent(ImGuiMod_Ctrl, sKey == 1);
+         if (sKeyShift)
+            ctx->IO.AddKeyEvent(ImGuiMod_Shift, sKey == 1);
          ctx->IO.AddKeyEvent(sKeyName, sKey == 1);
       }
       for (char c : sChars)
@@ -792,6 +826,7 @@ namespace
       sKey = -1;
       sKeyName = ImGuiKey_Escape;
       sKeyCmd = false;
+      sKeyShift = false;
       sWheel = 0.0f;
    }
 
@@ -855,7 +890,7 @@ namespace
       uint64_t rh0 = 0, rh1 = 0;
       std::vector<std::pair<ImGuiID, ImRect>> opts;
       size_t opt = 0;
-      int optsDead = 0, typedTook = 0;
+      int optsDead = 0, typedTook = 0, optPopups = 0;
       bool popover = false;   // the popup holds controls (sliders, checks), not a list of options
       bool popupWin = false;   // the control lives in a popup the poke has to open first (not used yet)
    };
@@ -1122,13 +1157,16 @@ namespace
             }
             if (k.opt >= k.opts.size()) { k.step = 100; return true; }
             k.fp1 = Fingerprint(); k.ps1 = app::View2DAuditPanelState(); k.rh1 = app::View2DAuditRenderHash();
+            k.optPopups = OpenPopups();
             sMouse = k.opts[k.opt].second.GetCenter();
          }
          else if (s == 6) sButton = 1;
          else if (s == 7) sButton = 0;
          else if (s == 10)
          {
-            if (Fingerprint() == k.fp1 && app::View2DAuditPanelState() == k.ps1 && app::View2DAuditRenderHash() == k.rh1)
+            // An option that opens a submenu (a group row such as Add effect's Blur >) did its job.
+            if (Fingerprint() == k.fp1 && app::View2DAuditPanelState() == k.ps1 && app::View2DAuditRenderHash() == k.rh1 &&
+                OpenPopups() <= k.optPopups)
                k.optsDead++;
             if (k.rangeBad.empty())
                k.rangeBad = app::View2DAuditRanges();
@@ -1281,14 +1319,15 @@ namespace
             e->state = state;
             e->bb = r.bb;
          }
-         if (r.disabled || !FullyShown(r) || sV2DPoked.count(key) != 0)
-            continue;
+         // The reason first: a control skipped because it is greyed in the audit's states still gets its reason.
          if (const char* why = SkipReason(r.label, e->tip))
          {
             if (e->reason.empty())
                e->reason = why;
             continue;
          }
+         if (r.disabled || !FullyShown(r) || sV2DPoked.count(key) != 0)
+            continue;
          Poke k;
          k.id = r.id;
          k.bb = r.bb;
@@ -1816,11 +1855,290 @@ void FrameTest_UIAUDIT(int frameId, GLFWwindow* window)
       glfwSetWindowShouldClose(window, GLFW_TRUE);
    }
 }
+
+// ---- journeys (internal/plans/ui-system/journey-tests.md). INFINITE_JOURNEYS=<dir of *.json>, INFINITE_JOURNEYS_OUT=<dir>.
+// Each journey: setup lines build the start state, steps play through the same owned mouse and keys as the audit
+// (a click finds its control by label among the items drawn last frame), then each expect is checked by query.
+namespace
+{
+   using json = nlohmann::json;
+   struct Journey
+   {
+      std::string id, title, file;
+      int refSteps = 0;
+      bool area3d = false;   // setup starts with a "3d" line: the 3D View is the panel
+      std::vector<std::string> setup, expect;
+      json steps;
+   };
+   ImGuiKey KeyNamed(const std::string& k)
+   {
+      if (k.size() == 1 && k[0] >= 'a' && k[0] <= 'z') return (ImGuiKey)(ImGuiKey_A + (k[0] - 'a'));
+      if (k.size() == 1 && k[0] >= '0' && k[0] <= '9') return (ImGuiKey)(ImGuiKey_0 + (k[0] - '0'));
+      static const std::pair<const char*, ImGuiKey> kKeys[] = { { "delete", ImGuiKey_Delete }, { "backspace", ImGuiKey_Backspace },
+         { "enter", ImGuiKey_Enter }, { "escape", ImGuiKey_Escape }, { "tab", ImGuiKey_Tab }, { "space", ImGuiKey_Space },
+         { "left", ImGuiKey_LeftArrow }, { "right", ImGuiKey_RightArrow }, { "up", ImGuiKey_UpArrow }, { "down", ImGuiKey_DownArrow } };
+      for (const auto& [n, key] : kKeys)
+         if (k == n) return key;
+      return ImGuiKey_None;
+   }
+   bool NumsClose(const std::string& a, const std::string& b, float tol)
+   {
+      std::istringstream x(a), y(b);
+      float u, v;
+      int n = 0;
+      while (x >> u)
+      {
+         if (!(y >> v) || std::fabs(u - v) > tol) return false;
+         n++;
+      }
+      return n > 0 && !(y >> v);
+   }
+}
+
+void FrameTest_JOURNEYS(int frameId, GLFWwindow* window)
+{
+   static const char* dir = getenv("INFINITE_JOURNEYS");
+   if (dir == nullptr)
+      return;
+   static std::vector<Journey> sList;
+   static size_t sAt = 0;
+   static int sPhase = 0, sStep = 0, sSub = 0, sWait = 0, sRetry = 0;
+   static std::map<std::string, std::string> sBefore;
+   static std::string sFail, sOut;
+   static std::ofstream sTsv;
+   static bool sDone = false;
+   if (sDone || frameId < 3)
+      return;
+   if (frameId == 3)
+   {
+      GImGui->TestEngineHookItems = true;
+      static ImGuiContextHook hook;
+      hook.Type = ImGuiContextHookType_NewFramePre;
+      hook.Callback = OwnMouse;
+      ImGui::AddContextHook(GImGui, &hook);
+      SetCanvasSwapInterval(0);
+      const char* out = getenv("INFINITE_JOURNEYS_OUT");
+      sOut = out != nullptr ? out : ".";
+      std::filesystem::create_directories(sOut);
+      std::vector<std::string> files;
+      for (const auto& e : std::filesystem::directory_iterator(dir))
+         if (e.path().extension() == ".json")
+            files.push_back(e.path().string());
+      std::sort(files.begin(), files.end());
+      for (const std::string& f : files)
+      {
+         std::ifstream in(f);
+         json j = json::parse(in, nullptr, false);
+         if (j.is_discarded()) { printf("JOURNEY %s: bad json\n", f.c_str()); continue; }
+         Journey jn;
+         jn.file = f;
+         jn.id = j.value("id", std::filesystem::path(f).stem().string());
+         jn.title = j.value("title", "");
+         jn.refSteps = j.value("ref_steps", 0);
+         for (const auto& l : j.value("setup", json::array())) jn.setup.push_back(l.get<std::string>());
+         for (const auto& l : j.value("expect", json::array())) jn.expect.push_back(l.get<std::string>());
+         jn.steps = j.value("steps", json::array());
+         jn.area3d = !jn.setup.empty() && jn.setup[0].rfind("3d ", 0) == 0;
+         sList.push_back(jn);
+      }
+      sTsv.open(sOut + "/report.tsv");
+      sTsv << "id\tresult\tsteps\tref_steps\tdetail\n";
+      printf("JOURNEYS %zu from %s\n", sList.size(), dir);
+      sWait = 30;
+      return;
+   }
+   if (sWait > 0) { sWait--; return; }
+   const bool in3d = sAt < sList.size() && sList[sAt].area3d;
+   auto query = [&](const std::string& q)
+   {
+      const bool d3 = q.rfind("obj.", 0) == 0 || q.rfind("edit.", 0) == 0 || q.rfind("mesh.", 0) == 0;
+      return d3 ? View3DJourneyQuery(q) : View2DJourneyQuery(q);
+   };
+   const ImVec2 rmn = in3d ? gView3DRectMin : gView2DRectMin, rmx = in3d ? gView3DRectMax : gView2DRectMax;
+   auto centre = [&]() { return ImVec2((rmn.x + rmx.x) * 0.5f, (rmn.y + rmx.y) * 0.5f); };
+   auto split = [](const std::string& e, std::string* q, std::string* op, std::string* v) {
+      for (const char* o : { " == ", " != ", " ~= " })
+         if (size_t at = e.find(o); at != std::string::npos)
+         {
+            *q = e.substr(0, at), *op = std::string(o).substr(1, 2), *v = e.substr(at + 4);
+            return true;
+         }
+      return false;
+   };
+   auto finish = [&](const std::string& result, const std::string& detail) {
+      const Journey& jn = sList[sAt];
+      std::string d = detail;
+      for (char& c : d) if (c == '\t' || c == '\n') c = ' ';
+      sTsv << jn.id << '\t' << result << '\t' << jn.steps.size() << '\t' << jn.refSteps << '\t' << d << '\n';
+      sTsv.flush();
+      printf("JOURNEY %s %s %s\n", jn.id.c_str(), result.c_str(), d.c_str());
+      sMouse = ImVec2(-10000.0f, -10000.0f);
+      CloseAllPopups();
+      sAt++;
+      sPhase = 0;
+      sWait = 4;
+   };
+   if (sAt >= sList.size())
+   {
+      sTsv.close();
+      printf("JOURNEYS done\n");
+      sDone = true;
+      GImGui->TestEngineHookItems = false;
+      fflush(stdout);
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      return;
+   }
+   Journey& jn = sList[sAt];
+   if (sPhase == 0)   // fresh patch, then the setup lines
+   {
+      NewPatch();
+      sBefore.clear();
+      sFail.clear();
+      for (const std::string& l : jn.setup)
+      {
+         std::string err;
+         const bool ok = l.rfind("3d ", 0) == 0 ? View3DJourneySetup(l, &err) : View2DJourneySetup(l, &err);
+         if (!ok) { finish("error", "setup \"" + l + "\": " + err); return; }
+      }
+      sPhase = 1;
+      sWait = 20;   // the panel draws and fits the document
+      return;
+   }
+   if (sPhase == 1)   // capture what $before expects need, park the mouse over the canvas
+   {
+      for (const std::string& e : jn.expect)
+      {
+         std::string q, op, v;
+         if (split(e, &q, &op, &v) && v == "$before")
+            sBefore[q] = query(q);
+      }
+      sMouse = centre();
+      sPhase = 2, sStep = 0, sSub = 0, sRetry = 0;
+      sWait = 2;
+      return;
+   }
+   if (sPhase == 2)   // steps
+   {
+      if (sStep >= (int)jn.steps.size()) { sPhase = 3; sWait = 8; return; }
+      const json& st = jn.steps[sStep];
+      auto next = [&](int wait) { sStep++, sSub = 0, sRetry = 0, sWait = wait; };
+      auto docPt = [&](float x, float y, ImVec2* p) { return View2DJourneyToScreen(x, y, p); };
+      if (st.contains("click"))
+      {
+         const std::string label = st["click"].get<std::string>(), in = st.value("in", "");
+         const int nth = st.value("nth", 0);
+         if (sSub == 0)
+         {
+            ImVec2 mn = rmn, mx = rmx;   // "canvas": the view itself, "at" a fraction of it
+            bool found = label == "canvas" || UiAudit::FindItem(label.c_str(), in.c_str(), nth, &mn, &mx);
+            if (!found)
+            {
+               if (++sRetry > 20) { finish("fail", "step " + std::to_string(sStep + 1) + ": no control \"" + label + "\"" + (in.empty() ? "" : " in " + in)); return; }
+               sWait = 1;
+               return;
+            }
+            float fx = 0.5f, fy = 0.5f;
+            if (st.contains("at")) fx = st["at"][0].get<float>(), fy = st["at"][1].get<float>();
+            sMouse = ImVec2(mn.x + (mx.x - mn.x) * fx, mn.y + (mx.y - mn.y) * fy);
+            sSub = 1, sWait = 1;
+            return;
+         }
+         if (sSub == 1) { sButton = 1; sSub = 2; return; }
+         sButton = 0;
+         next(4);
+         return;
+      }
+      if (st.contains("key"))
+      {
+         std::string k = st["key"].get<std::string>();
+         bool cmd = false, shift = false;
+         for (size_t p; (p = k.find('+')) != std::string::npos; k = k.substr(p + 1))
+         {
+            const std::string m = k.substr(0, p);
+            cmd |= m == "cmd" || m == "ctrl";
+            shift |= m == "shift";
+         }
+         const ImGuiKey key = KeyNamed(k);
+         if (key == ImGuiKey_None) { finish("error", "step " + std::to_string(sStep + 1) + ": key " + k); return; }
+         sKeyName = key, sKeyCmd = cmd, sKeyShift = shift;
+         sKey = sSub == 0 ? 1 : 0;
+         if (sSub++ == 0) return;
+         next(4);
+         return;
+      }
+      if (st.contains("hover"))
+      {
+         ImVec2 p = centre();
+         if (st["hover"].is_array() && !docPt(st["hover"][0].get<float>(), st["hover"][1].get<float>(), &p))
+         { finish("error", "hover: no view"); return; }
+         sMouse = p;
+         next(2);
+         return;
+      }
+      if (st.contains("type"))
+      {
+         sChars = st["type"].get<std::string>();
+         next(3);
+         return;
+      }
+      if (st.contains("drag"))
+      {
+         const json& d = st["drag"];
+         ImVec2 a, b;
+         if (!docPt(d[0].get<float>(), d[1].get<float>(), &a) || !docPt(d[2].get<float>(), d[3].get<float>(), &b))
+         { finish("error", "drag: no view"); return; }
+         constexpr int kMoves = 8;
+         if (sSub == 0) { sMouse = a; sSub = 1; return; }
+         if (sSub == 1) { sButton = 1; sSub = 2; return; }
+         if (sSub < 2 + kMoves)
+         {
+            const float t = (float)(sSub - 1) / kMoves;
+            sMouse = ImVec2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+            sSub++;
+            return;
+         }
+         sButton = 0;
+         next(4);
+         return;
+      }
+      if (st.contains("wait")) { next(st["wait"].get<int>()); return; }
+      finish("error", "step " + std::to_string(sStep + 1) + ": unknown kind " + st.dump());
+      return;
+   }
+   if (sPhase == 3)   // expects, and the picture after
+   {
+      std::string detail;
+      bool ok = true;
+      for (const std::string& e : jn.expect)
+      {
+         std::string q, op, v;
+         if (!split(e, &q, &op, &v)) { finish("error", "expect \"" + e + "\""); return; }
+         if (v == "$before") v = sBefore[q];
+         const std::string got = query(q);
+         const bool pass = op == "==" ? got == v : op == "!=" ? got != v : NumsClose(got, v, 0.02f);
+         if (!pass)
+         {
+            ok = false;
+            detail += (detail.empty() ? "" : "; ") + q + " " + op + " " + v + ", got " + got;
+         }
+      }
+      const ImVec2 s = ImGui::GetIO().DisplayFramebufferScale;
+      gShotNowPath = sOut + "/" + jn.id + ".png";
+      gShotNowRect[0] = (int)std::lround(rmn.x * s.x);
+      gShotNowRect[1] = (int)std::lround(rmn.y * s.y);
+      gShotNowRect[2] = (int)std::lround(rmx.x * s.x);
+      gShotNowRect[3] = (int)std::lround(rmx.y * s.y);
+      const bool extra = ok && jn.refSteps > 0 && (int)jn.steps.size() > jn.refSteps;
+      finish(ok ? (extra ? "human-element" : "pass") : "fail", ok ? (extra ? "more steps than the reference" : "") : detail);
+      return;
+   }
+}
 }
 
 #else
 namespace app
 {
 void FrameTest_UIAUDIT(int, GLFWwindow*) {}
+void FrameTest_JOURNEYS(int, GLFWwindow*) {}
 }
 #endif

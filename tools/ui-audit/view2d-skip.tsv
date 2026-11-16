@@ -3,3 +3,9 @@
 ##view2dcanvas	the canvas: every tool's stroke, click, undo, redo and refusal is View2DPanelSelfCheck's tool matrix
 ##view2dgrip	dock resize grip: a drag, not a click; the dock top and dock bottom states lay the panel out both ways
 ##open	group open/closed is view state kept in the document, not an edit; the layers self-check covers expand and collapse
+Save stack##v2deffsave	greyed until a preset name is typed; the audit does not type
+Save style##v2dstylesave	greyed until a preset name is typed; the audit does not type
+##Flip horizontal	on a paint layer a flip un-trims the stored pixel bounds (lx, paint size): the picture returns, the save text does not
+##Flip vertical	on a paint layer a flip un-trims the stored pixel bounds (lx, paint size): the picture returns, the save text does not
+##Crop layer	on a paint layer turning crop on and off un-trims the stored pixel bounds (lx, paint size), like a flip: the picture returns, the save text does not
+##v2dvstyle	stroke options are chip groups; picking the choice that is already on (Butt, Miter, Centre, None) is a no-op by design

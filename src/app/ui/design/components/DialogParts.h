@@ -17,7 +17,7 @@
 namespace DialogParts
 {
    constexpr float kButtonMinW = 72.0f;   // buttons hug their label, never stretch
-   constexpr float kButtonH = 24.0f;
+   constexpr float kButtonH = tok::control_h;
    constexpr float kMaxW = 480.0f;        // widest a dialog grows; longer text wraps (other languages, bigger fonts)
 
    // Call after OpenPopup; pair a true result with End().

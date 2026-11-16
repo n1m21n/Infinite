@@ -6,6 +6,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -52,7 +53,7 @@ bool gCurveRecordPicking = false;
 namespace
 {
    constexpr float kMinHeight = 220.0f, kMinWidth = 360.0f;
-   constexpr float kIconW = tok::tile, kPageW = 140.0f, kSideW = 300.0f, kRulerH = 16.0f;
+   constexpr float kIconW = PanelKit::kChip, kPageW = 140.0f, kSideW = 300.0f, kRulerH = 16.0f;
    constexpr float kPad = 8.0f;     // graph edge to the 0 and 1 value lines
    constexpr float kHit = 7.0f;     // px a point or handle grabs from
    constexpr float kEraseR = 9.0f;  // px the eraser rubs out
@@ -486,15 +487,12 @@ namespace
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip)
    {
-      const bool clicked = IconTile::Draw(id, glyphStr, glyphStr, on, kIconW, tok::tile);
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", tip);
-      return clicked;
+      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::kChip);
    }
 
    bool PickerFace(const char* id, const char* value, float w, const char* tip, ImVec2& bmin, ImVec2& bmax)
    {
-      const bool clicked = ActionButton::Draw(id, ImVec2(w, tok::tile));
+      const bool clicked = ActionButton::Draw(id, ImVec2(w, PanelKit::kChip));
       if (tip != nullptr && ImGui::IsItemHovered())
          HelpTip("%s", tip);
       bmin = ImGui::GetItemRectMin();
@@ -1513,7 +1511,7 @@ namespace
       }
       PagePicker::Options opt;
       opt.deleteLabel = T("Delete Curve");
-      opt.maxW = std::max(1.0f, width - tok::tile - tok::space_1);
+      opt.maxW = std::max(1.0f, width - PanelKit::kChip - tok::space_1);
       uint64_t closeUid = 0;
       opt.extraMenu = [&](int i) {
          if (MenuParts::Item(T("Close Page")))
@@ -2466,7 +2464,7 @@ namespace
       }
       row.Next(tok::space_1);
       const bool armed = gCurveAssignUid == gn.uid;
-      if (ActionButton::Draw(AssignLabel(), ImVec2(AssignW(), tok::tile), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(AssignLabel(), ImVec2(AssignW(), PanelKit::kChip), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
          gCurveAssignUid = armed ? 0 : gn.uid;
       if (ImGui::IsItemHovered())
       {
@@ -2499,7 +2497,7 @@ namespace
                row.Next(tok::space_1);
             ActionButton::Scoped() = s.motion == (k == 1) ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
             const std::string id = std::string(label) + "##ceKind" + std::to_string(k);
-            if (ActionButton::Draw(id.c_str(), ImVec2(w, tok::tile)) && s.motion != (k == 1))
+            if (ActionButton::Draw(id.c_str(), ImVec2(w, PanelKit::kChip)) && s.motion != (k == 1))
             {
                s.motion = k == 1;
                const std::vector<GraphNode*> pages = ModePages();
@@ -2533,7 +2531,7 @@ namespace
 
    void DrawDockMenu()
    {
-      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + tok::tile + tok::space_3);
+      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::kChip + tok::space_3);
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##curveDockMenu");

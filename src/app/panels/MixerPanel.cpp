@@ -1288,11 +1288,11 @@ namespace app
          {
             GraphNode* top = FindNodeByIndex(pages[i].topIndex);
             const std::string label = (top ? NodeTitle(*top) : std::string(T("Page"))) + "##page" + std::to_string(i);
-            if (ChipButton::Draw(label.c_str(), i == current, tok::tile))
+            if (ChipButton::Draw(label.c_str(), i == current, tok::control_h))
                sPageUid = pages[i].topUid;
             ImGui::SameLine(0.0f, tok::space_1);
          }
-         if (ChipButton::Draw((std::string("+ ") + T("page") + "##addpage").c_str(), false, tok::tile))
+         if (ChipButton::Draw((std::string("+ ") + T("page") + "##addpage").c_str(), false, tok::control_h))
             MixerPanelAddPage();
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("New Mixer + Audio Out"));
@@ -1313,7 +1313,7 @@ namespace app
             const bool has = top->SnapshotHas(k);
             if (!has)
                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-            const bool clicked = ChipButton::Draw(label.c_str(), has && top->SnapshotLast() == k, tok::tile);
+            const bool clicked = ChipButton::Draw(label.c_str(), has && top->SnapshotLast() == k, tok::control_h);
             if (!has)
                ImGui::PopStyleVar();
             if (clicked)
@@ -1359,7 +1359,7 @@ namespace app
          if (MixerPanelAnySolo(topIndex))
          {
             ImGui::SameLine(0.0f, tok::space_2);
-            if (ChipButton::Draw((std::string(T("Clear solo")) + "##clearsolo").c_str(), true, tok::tile))
+            if (ChipButton::Draw((std::string(T("Clear solo")) + "##clearsolo").c_str(), true, tok::control_h))
                MixerPanelClearSolos(topIndex);
          }
       }
@@ -1484,13 +1484,13 @@ namespace app
             const float renderW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
             ImGui::SameLine();
             ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + avail.x - audioW - renderW - tok::space_2), origin.y));
-            if (ChipButton::Draw(renderLabel, gMixerRenderOpen || MixerRenderActive(), tok::tile))
+            if (ChipButton::Draw(renderLabel, gMixerRenderOpen || MixerRenderActive(), tok::control_h))
                gMixerRenderOpen = !gMixerRenderOpen;
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Record this console to a file."));
             ImGui::SameLine(0.0f, tok::space_2);
             ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + avail.x - audioW), origin.y));
-            if (ChipButton::Draw(audioLabel, mixerMode, tok::tile))
+            if (ChipButton::Draw(audioLabel, mixerMode, tok::control_h))
                SetMixerAudio(!mixerMode);
             if (ImGui::IsItemHovered())
                HelpTip("%s", mixerMode ? T("Only the console reaches the speakers. Click to hand audio back to the canvas.")

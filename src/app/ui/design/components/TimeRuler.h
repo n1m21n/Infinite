@@ -147,7 +147,7 @@ namespace TimeRuler
    inline int UnitPills(const char* id, const PillGroup::Segment* segs, int count, int selected)
    {
       const ImVec2 at = ImGui::GetCursorScreenPos();
-      const UiLayout::Rect r{ at.x, at.y, count > 2 ? 186.0f : 104.0f, tok::tile }; // "Samples" needs the room
+      const UiLayout::Rect r{ at.x, at.y, count > 2 ? 186.0f : 104.0f, tok::control_h }; // "Samples" needs the room
       const int picked = PillGroup::Draw(id, r, segs, count, selected);
       ImGui::SetCursorScreenPos(at);
       ImGui::Dummy(ImVec2(r.w, r.h));

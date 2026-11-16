@@ -233,7 +233,7 @@ namespace app
          const ImVec2 ns = ImGui::CalcTextSize(num);
          const float gx = rightCentre.x - ns.x - 9.0f;
          const ImVec2 gc(gx, rightCentre.y);
-         const float gs = tok::icon_sm;
+         const float gs = tok::icon_control;
          switch (ss.followAction)
          {
             case Arrange::kFollowNext: glyph::DrawChevronDown(dl, gc, gs, col); break;
@@ -720,7 +720,7 @@ namespace app
          if (rowPlaying)
             DrawProgressRing(dl, ImVec2(a.x + 13.0f, cy), 7.0f, rowProgress, TextCol(0.95f));
          else
-            glyph::DrawPlayerPlay(dl, ImVec2(a.x + 13.0f, cy), tok::icon_sm,
+            glyph::DrawPlayerPlay(dl, ImVec2(a.x + 13.0f, cy), tok::icon_control,
                                   rowQueued ? WithAlpha(TextCol(0.95f), pulse) : (rowHasClip ? TextCol(0.85f) : TextCol(0.25f)), true);
          const std::string label = SceneLabel(row);
          const float th = ImGui::GetTextLineHeight();
@@ -876,7 +876,7 @@ namespace app
                if (st.playing)
                   DrawProgressRing(dl, ic, 7.0f, st.progress, tok::U32(tok::pal::c_FFFFFFFF));
                else
-                  glyph::DrawPlayerPlay(dl, ic, tok::icon_sm, WithAlpha(ink, st.queued ? pulse : 0.85f), !st.queued);
+                  glyph::DrawPlayerPlay(dl, ic, tok::icon_control, WithAlpha(ink, st.queued ? pulse : 0.85f), !st.queued);
                if (gArrangeAssigningClipId == ss->clip.id)
                {
                   // Waiting for a canvas node: the same cue as the Timeline's
@@ -902,7 +902,7 @@ namespace app
                   // Up next (a follow action is about to start this clip): a steady inner outline and a chevron.
                   dl->AddRect(ImVec2(a.x + 2.0f, a.y + 2.0f), ImVec2(b.x - 2.0f, b.y - 2.0f),
                               WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.75f), tok::radius_field, 0, 1.0f);
-                  glyph::DrawChevronDown(dl, ImVec2(b.x - 14.0f, a.y + 8.0f), tok::icon_sm, WithAlpha(ink, 0.9f));
+                  glyph::DrawChevronDown(dl, ImVec2(b.x - 14.0f, a.y + 8.0f), tok::icon_control, WithAlpha(ink, 0.9f));
                }
                const std::string label = SlotLabel(ss->clip);
                const float badgeW = ss->followAction != Arrange::kFollowNone ? 30.0f : 0.0f;
@@ -1421,7 +1421,7 @@ namespace app
       });
       SectionCard::RowLabel(T("Loop"));
       bool loopOn = ss.loop;
-      if (ChipButton::Draw(loopOn ? L("On##slotloop") : L("Off##slotloop"), loopOn, tok::tile, fieldW))
+      if (ChipButton::Draw(loopOn ? L("On##slotloop") : L("Off##slotloop"), loopOn, tok::control_h, fieldW))
          edit([&](Arrange::SessionSlot& s) { s.loop = !loopOn; });
       const char* lenName = T("Clip Length");
       for (const LoopChoice& lc : kLoopChoices)
@@ -1699,7 +1699,7 @@ namespace app
          };
          auto nextTo = [](float gap) { ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + gap, ImGui::GetItemRectMin().y)); };
          ActionButton::Scoped() = sSessionShowMonitor ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         if (ActionButton::Draw("##sessionmonitortoggle", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##sessionmonitortoggle", ImVec2(tok::control_h, tok::control_h)))
             sSessionShowMonitor = !sSessionShowMonitor;
          ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
@@ -1725,7 +1725,7 @@ namespace app
          Transport& tr = Transport::Instance();
          const bool playing = tr.IsPlaying();
          ActionButton::Scoped() = playing ? ActionButton::Kind::Go : ActionButton::Kind::Plain;
-         if (ActionButton::Draw("##sessionplay", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##sessionplay", ImVec2(tok::control_h, tok::control_h)))
          {
             if (!playing && gAudioMode != AudioMode::Session)
                SetSessionAudio(true);
@@ -1735,16 +1735,16 @@ namespace app
          if (ImGui::IsItemHovered())
             HelpTip(playing ? T("Pause (Space)") : T("Play (Space)"));
          if (playing)
-            glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, tok::U32(tok::pal::c_FFFFFFFF));
+            glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, tok::U32(tok::pal::c_FFFFFFFF));
          else
-            glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, iconCol);
+            glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, iconCol);
          nextTo(tok::space_1);
          }
 
          // Record: what you launch is written into the Timeline as clips; Render Take turns it into a movie.
          const bool rec = ArrangeSessionRecording();
          ActionButton::Scoped() = rec ? ActionButton::Kind::Record : ActionButton::Kind::Plain;
-         if (ActionButton::Draw("##sessionrecord", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##sessionrecord", ImVec2(tok::control_h, tok::control_h)))
             ArrangeSessionSetRecording(!rec);
          ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
@@ -1752,19 +1752,19 @@ namespace app
                               : Platform::PluginModeActive() // Render Take is the DAW's bounce here
                                     ? T("Record your performance: the clips and scenes you launch are written into the Timeline.")
                                     : T("Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take."));
-         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md,
+         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control,
                      rec ? tok::U32(tok::pal::c_FFFFFFFF) : RecordDotCol(), IconsInfinite::RecordFill);
          nextTo(tok::space_1);
 
          // Stop All: every track stops at the next quantize point.
          const bool anyLaunched = ArrangeSessionAnyLaunched();
          ImGui::BeginDisabled(!anyLaunched);
-         if (ActionButton::Draw("##sessionstopall", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##sessionstopall", ImVec2(tok::control_h, tok::control_h)))
             ArrangeSessionStopAll();
          ImGui::EndDisabled();
          if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             HelpTip("%s", T("Stop All (.): every track stops at the next quantize point"));
-         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, WithAlpha(iconCol, anyLaunched ? 1.0f : 0.35f),
+         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, WithAlpha(iconCol, anyLaunched ? 1.0f : 0.35f),
                      IconsInfinite::StopFill);
          nextTo(tok::space_1);
 
@@ -1773,7 +1773,7 @@ namespace app
             const int q = std::clamp(gArrange.sessionQuantize, 0, 3);
             char qlabel[48];
             snprintf(qlabel, sizeof(qlabel), "%s##sessionquant", L(kQuantNames[q + 1]));
-            if (ChipButton::Draw(qlabel, false, tok::tile))
+            if (ChipButton::Draw(qlabel, false, tok::control_h))
                ImGui::OpenPopup("##sessionquantpop");
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Launch Quantize: launches and stops wait for this grid line, so everything stays in time"));
@@ -1791,12 +1791,12 @@ namespace app
          nextTo(tok::space_4);
          const bool inspWasOpen = gArrangeClipSettingsPanelOpen;
          ActionButton::Scoped() = inspWasOpen ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         if (ActionButton::Draw("##sessioninspectortoggle", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##sessioninspectortoggle", ImVec2(tok::control_h, tok::control_h)))
             gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
          ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
             HelpTip("%s", inspWasOpen ? T("Clip Inspector: Open") : T("Settings of the selected clip. Double-click a clip to open it."));
-         glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
+         glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
          const float toolbarBottom = ImGui::GetItemRectMax().y;
 
          // Pinned right: Session Audio (the twin of the Timeline's chip), and Render Take left of it.
@@ -1807,7 +1807,7 @@ namespace app
             const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
             const float right = ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - ImGui::GetStyle().WindowPadding.x;
             ImGui::SetCursorScreenPos(ImVec2(right - audioW, toolbarOrigin.y));
-            if (ChipButton::Draw(audioLabel, sessionMode, tok::tile))
+            if (ChipButton::Draw(audioLabel, sessionMode, tok::control_h))
                SetSessionAudio(!sessionMode);
             if (ImGui::IsItemHovered())
                HelpTip("%s", !gAudioStartError.empty() && AudioEngine::Instance().SampleRate() <= 0.0
@@ -1819,7 +1819,7 @@ namespace app
                const char* takeLabel = T("Render Take");
                const float takeW = ImGui::CalcTextSize(takeLabel).x + 2.0f * tok::space_2;
                ImGui::SetCursorScreenPos(ImVec2(right - audioW - tok::space_1 - takeW, toolbarOrigin.y));
-               if (ChipButton::Draw(takeLabel, false, tok::tile))
+               if (ChipButton::Draw(takeLabel, false, tok::control_h))
                {
                   // Record wrote the take onto the Timeline; the render dialog opens right here with its span
                   // set (audio and video together, saved to the folder you pick).

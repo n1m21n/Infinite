@@ -87,7 +87,7 @@ namespace PagePicker
       if (e.color != 0)
          w += 8.0f + tok::space_2;
       if (e.glyph != nullptr)
-         w += tok::icon_md + tok::space_1;
+         w += tok::icon_control + tok::space_1;
       return std::clamp(w, kMinW, kW);
    }
 
@@ -154,7 +154,7 @@ namespace PagePicker
 
       if (!pages.empty())
       {
-         ImGui::BeginChild("##strip", ImVec2(stripW, tok::tile), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+         ImGui::BeginChild("##strip", ImVec2(stripW, tok::control_h), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          if (scrolls && ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f)
             ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 40.0f);
          for (int i = 0; i < (int)pages.size(); i++)
@@ -187,7 +187,7 @@ namespace PagePicker
             }
             const bool on = i == current;
             ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-            if (ActionButton::Draw("##chip", ImVec2(w, tok::tile)) && !on)
+            if (ActionButton::Draw("##chip", ImVec2(w, tok::control_h)) && !on)
             {
                out.act = Act::Select;
                out.index = i;
@@ -235,8 +235,8 @@ namespace PagePicker
             }
             if (e.glyph != nullptr)
             {
-               glyph::Draw(dl, ImVec2(tx + tok::icon_md * 0.5f, cy), tok::icon_md * 0.8f, col, e.glyph);
-               tx += tok::icon_md + tok::space_1;
+               glyph::Draw(dl, ImVec2(tx + tok::icon_control * 0.5f, cy), tok::icon_control * 0.8f, col, e.glyph);
+               tx += tok::icon_control + tok::space_1;
             }
             dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);
             dl->AddText(ImVec2(tx, cy - ImGui::GetFontSize() * 0.5f), col, e.name.c_str());
@@ -280,12 +280,12 @@ namespace PagePicker
       {
          if (!pages.empty())
             ImGui::SameLine(0.0f, tok::space_1);
-         if (ActionButton::Draw("##add", ImVec2(tok::tile, tok::tile)))
+         if (ActionButton::Draw("##add", ImVec2(tok::control_h, tok::control_h)))
             out.act = Act::Add;
          if (ImGui::IsItemHovered())
             HelpTip("%s", addTip != nullptr ? addTip : T("New Page"));
          const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
-         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), tok::icon_md, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Plus);
+         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Plus);
       }
       ImGui::PopID();
       return out;

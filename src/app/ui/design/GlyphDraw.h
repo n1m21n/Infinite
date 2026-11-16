@@ -3,6 +3,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "imgui.h"
+#include <algorithm>
 #include <cmath>
 
 namespace glyph
@@ -52,6 +53,16 @@ namespace glyph
       const float left = center.x - (gl->X0 + gl->X1) * 0.5f;
       mn = ImVec2(left + gl->X0, top + gl->Y0);
       mx = ImVec2(left + gl->X1, top + gl->Y1);
+   }
+
+   // The size to draw `g` at so its ink fills 0.9 of `role` (the icon set's usual ink), so a bar of icons reads as one size.
+   // Glyphs that already fill it keep `role`; thin ones grow by at most 1.4x.
+   inline float FitSize(ImVec2 center, float role, const char* g)
+   {
+      ImVec2 mn, mx;
+      InkBox(center, role, g, mn, mx);
+      const float ink = std::max(mx.x - mn.x, mx.y - mn.y), target = 0.9f * role;
+      return ink > 1.0f && ink < target - 1.5f ? std::round(role * std::min(1.4f, target / ink)) : role;
    }
 
    // Call-site wrappers (same argument order the retired glyph:: icons used). A trailing stroke argument is accepted and

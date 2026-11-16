@@ -6,6 +6,7 @@
 #include "app/graph/SampleStyles.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -42,7 +43,7 @@ namespace app
 namespace
 {
    constexpr float kMinHeight = 240.0f;
-   constexpr float kIconW = 30.0f, kPageW = 140.0f;
+   constexpr float kIconW = PanelKit::kChip, kPageW = 140.0f;
    constexpr float kKeysW = 44.0f, kRulerH = 16.0f, kStripH = 16.0f;
    constexpr float kInspectorW = 268.0f;
    constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
@@ -534,7 +535,7 @@ namespace
 
    void DrawDockMenu()
    {
-      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + tok::tile + tok::space_3);
+      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::kChip + tok::space_3);
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##pianoDockMenu");
@@ -737,15 +738,7 @@ namespace
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {
-      ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, tok::tile), green ? ActionButton::Kind::Go : ActionButton::Kind::Plain);
-      ActionButton::Scoped() = ActionButton::Kind::Plain;
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", tip);
-      const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
-      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), tok::icon_md,
-                  on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
-      return clicked;
+      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::kChip, green ? ActionButton::Kind::Go : ActionButton::Kind::Plain);
    }
 
    float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
@@ -753,7 +746,7 @@ namespace
    bool TextChip(const char* label, bool on = false, ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw(label, ImVec2(TextW(label), tok::tile), kind);
+      const bool clicked = ActionButton::Draw(label, ImVec2(TextW(label), PanelKit::kChip), kind);
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       return clicked;
    }
@@ -761,7 +754,7 @@ namespace
    // A dropdown face in the Sample Studio's grammar: the value in a field well.
    bool PickerFace(const char* id, const char* value, float w, const char* tip, ImVec2& bmin, ImVec2& bmax)
    {
-      const bool clicked = ActionButton::Draw(id, ImVec2(w, tok::tile));
+      const bool clicked = ActionButton::Draw(id, ImVec2(w, PanelKit::kChip));
       if (ImGui::IsItemHovered())
          HelpTip("%s", tip);
       bmin = ImGui::GetItemRectMin();
@@ -832,14 +825,14 @@ namespace
       State& s = S();
       const bool nonDefault = s.tool != Tool::Select;
       ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw("##pianoToolPicker", ImVec2(kIconW, tok::tile));
+      const bool clicked = ActionButton::Draw("##pianoToolPicker", ImVec2(kIconW, PanelKit::kChip));
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       if (ImGui::IsItemHovered())
          HelpTip("%s", ToolTip(s.tool));
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
       const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      glyph::Draw(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, col, ToolGlyph(s.tool));
+      glyph::Draw(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_control, col, ToolGlyph(s.tool));
       if (clicked)
          ImGui::OpenPopup("##pianoToolMenu");
       ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
@@ -3201,7 +3194,7 @@ namespace
    {
       State& s = S();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const float toolbarH = tok::tile + ImGui::GetStyle().ItemSpacing.y;
+      const float toolbarH = PanelKit::kChip + ImGui::GetStyle().ItemSpacing.y;
       {
          const ImVec2 room = ImGui::GetContentRegionAvail();
          DrawToolbar(page, room.x - kKeysW, room.y - toolbarH - kRulerH - kStripH);

@@ -18,7 +18,7 @@ namespace MenuParts
 {
    constexpr float kInset = tok::space_1;   // wash distance from the popup edge
    constexpr float kTextInset = tok::space_2; // text distance from the wash edge
-   constexpr float kRow = 24.0f;              // row pitch of every menu / dropdown / list popup (was tok::tile, 28)
+   constexpr float kRow = tok::row_h;           // row pitch of every menu / dropdown / list popup
    constexpr float kPadY = kInset + 4.0f;     // popup padding: the row wash starts 4 pt above its text
    constexpr int kMaxListRows = 12;           // a dropdown list shows at most this many rows, then scrolls
 

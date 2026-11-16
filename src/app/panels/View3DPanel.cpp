@@ -6,6 +6,10 @@
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PanelKit.h"
+#include <set>
+#include <sstream>
+#include <tuple>
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -53,7 +57,7 @@ namespace
    constexpr float kSideW = 340.0f;
    constexpr float kPi = 3.14159265f;
    constexpr float kFov = 45.0f;
-   constexpr float kIconW = 30.0f;
+   constexpr float kIconW = PanelKit::kChip;
    constexpr float kGizmoPx = 84.0f;
 
    // Overlay colours are Blender's factory theme, not the app's: a 3D viewport is
@@ -4986,7 +4990,7 @@ namespace
          const bool hot = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) <= r;
          const bool on = (i == 2 && sCameraView) || (i == 3 && sCameraView && sLockCam) || sPadDrag == i + 1;
          dl->AddCircleFilled(c, r, Hex(on ? kSelected : 0x000000, hot || on ? 0.85f : 0.4f), 32);
-         glyph::Draw(dl, c, tok::icon_md, Hex(0xFFFFFF), icons[i]);
+         glyph::Draw(dl, c, tok::icon_control, Hex(0xFFFFFF), icons[i]);
          if (!hot)
             continue;
          onPad = true;
@@ -5617,15 +5621,7 @@ namespace
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip)
    {
-      ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, tok::tile));
-      ActionButton::Scoped() = ActionButton::Kind::Plain;
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", tip);
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md,
-                  on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
-      return clicked;
+      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::kChip);
    }
 
    void DrawHeader(Scene3DNode* scene)
@@ -5698,7 +5694,7 @@ namespace
          const char* convertL = L("Convert##v3dconvert");
          const float convertW = ImGui::CalcTextSize(convertL, ImGui::FindRenderedTextEnd(convertL)).x + 2.0f * tok::space_3;
          ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX - tok::space_1 - convertW));
-         if (ActionButton::Draw(convertL, ImVec2(convertW, tok::tile)))
+         if (ActionButton::Draw(convertL, ImVec2(convertW, PanelKit::kChip)))
             sPending.what = Pending::ConvertScene;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Put this scene on the canvas"));
@@ -6071,7 +6067,7 @@ namespace
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImU32 text = ImGui::GetColorU32(missing || !it.visible ? ImGuiCol_TextDisabled : ImGuiCol_Text);
          const float midY = p.y + rowH * 0.5f;
-         glyph::Draw(dl, ImVec2(p.x + 12.0f, midY), tok::icon_sm, text, KindGlyph(scene, it));
+         glyph::Draw(dl, ImVec2(p.x + 12.0f, midY), tok::icon_control, text, KindGlyph(scene, it));
          const std::string name = ItemName(it);
          const std::string shown = it.group != 0 ? name + "  (" + T("Group") + " " + std::to_string(it.group) + ")" : name;
          if (sRename == it.id)
@@ -6100,7 +6096,7 @@ namespace
             dl->PopClipRect();
          }
          if (it.id == scene->activeCamera)
-            glyph::Draw(dl, ImVec2(p.x + availW - 36.0f, midY), tok::icon_sm, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
+            glyph::Draw(dl, ImVec2(p.x + availW - 36.0f, midY), tok::icon_control, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
          float colX = availW - 24.0f;
          if (lf.colRender)
          {
@@ -6112,7 +6108,7 @@ namespace
                it.render = !it.render;
                scene->Commit();
             }
-            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_sm, text, it.render ? IconsInfinite::ViewCamera : IconsInfinite::EyeOff);
+            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_control, text, it.render ? IconsInfinite::ViewCamera : IconsInfinite::EyeOff);
          }
          if (lf.colSelect)
          {
@@ -6124,7 +6120,7 @@ namespace
                it.hideSelect = !it.hideSelect;
                scene->Commit();
             }
-            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_sm, text, it.hideSelect ? IconsInfinite::EyeOff : IconsInfinite::Cube);
+            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_control, text, it.hideSelect ? IconsInfinite::EyeOff : IconsInfinite::Cube);
          }
          ImGui::SetCursorScreenPos(ImVec2(p.x + availW - 24.0f, p.y));
          if (ImGui::InvisibleButton("##eye", ImVec2(24.0f, rowH)))
@@ -6135,7 +6131,7 @@ namespace
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", it.visible ? T("Hide (H)") : T("Show (Alt+H shows everything)"));
-         glyph::Draw(dl, ImVec2(p.x + availW - 12.0f, midY), tok::icon_sm, text, it.visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
+         glyph::Draw(dl, ImVec2(p.x + availW - 12.0f, midY), tok::icon_control, text, it.visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
          ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + rowH));
          ImGui::Dummy(ImVec2(0.0f, 0.0f));
          ImGui::PopID();
@@ -8362,6 +8358,62 @@ bool View3DAuditState(int tab)
    sSideOpen = true;
    sShading = Shading::Solid;
    return want == Kind::Missing || !sSel.empty();
+}
+
+// Journeys (internal/plans/ui-system/journey-tests.md): "3d cube" adds a Cube node to a fresh scene and selects it;
+// queries read the selected item: "obj.x" / "obj.y" / "obj.z", "obj.count", "edit.on", "mesh.points".
+bool View3DJourneySetup(const std::string& line, std::string* err)
+{
+   std::istringstream in(line);
+   std::string tag, cmd;
+   in >> tag >> cmd;
+   if (cmd == "cube")
+   {
+      GraphNode* gn = SpawnNode("Cube", "3D", 40.0f, 40.0f);
+      if (gn == nullptr)
+         return *err = "no Cube node", false;
+      View3DAddNode(*gn);
+      Scene3DNode* scene = FindScene();
+      if (scene == nullptr || scene->Items().empty())
+         return *err = "no scene", false;
+      sSel = { scene->Items().back().id };
+      sTool = 0;
+      gView3DOpen = true;
+      return true;
+   }
+   return *err = "unknown 3d setup " + cmd, false;
+}
+
+std::string View3DJourneyQuery(const std::string& q)
+{
+   Scene3DNode* scene = FindScene();
+   if (scene == nullptr)
+      return "no scene";
+   if (q == "obj.count")
+      return std::to_string(scene->Items().size());
+   if (q == "edit.on")
+      return sEdit.on ? "1" : "0";
+   const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.front());
+   if (it == nullptr)
+      return "none";
+   if (q == "mesh.points")
+   {
+      // Distinct corner positions of the edited mesh, the count Blender reports as vertices.
+      Mat4 world;
+      EditMeshNode* node = EditOf(*it, world);
+      if (node == nullptr)
+         return "no edit mesh";
+      std::set<std::tuple<long, long, long>> pts;
+      for (const Vertex& v : node->GetMesh().vertices)
+         pts.insert({ std::lround(v.px * 1000.0f), std::lround(v.py * 1000.0f), std::lround(v.pz * 1000.0f) });
+      return std::to_string(pts.size());
+   }
+   char b[32];
+   const int axis = q == "obj.x" ? 0 : q == "obj.y" ? 1 : q == "obj.z" ? 2 : -1;
+   if (axis < 0)
+      return "unknown query " + q;
+   std::snprintf(b, sizeof b, "%.3f", it->pos[axis]);
+   return b;
 }
 #endif
 

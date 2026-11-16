@@ -6705,6 +6705,9 @@ inline void FlipRowsRgba8(std::vector<unsigned char>& px, int w, int h)
    }
 }
 int View2DAffinityAb(const char* dir);   // INFINITE_AB2D: the Affinity A/B pictures (View2DPanel.cpp)
+bool View2DJourneySetup(const std::string& line, std::string* err);   // journeys (View2DPanel.cpp, debug builds)
+std::string View2DJourneyQuery(const std::string& q);
+bool View2DJourneyToScreen(float x, float y, ImVec2* out);
 
 void RunPatchWatchTest();
 

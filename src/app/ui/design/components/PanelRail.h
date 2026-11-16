@@ -11,7 +11,7 @@ namespace app { extern std::string gRailOrder; } // comma-separated tile keys, s
 
 namespace PanelRail
 {
-   constexpr float kWidth = 44.0f; // tile 28 + space_2 either side
+   constexpr float kWidth = tok::rail_w; // control_h + space_2 either side
 
    // Begins the rail window against the right edge of the viewport work area; always pair with End().
    inline void Begin(const ImGuiViewport* vp)
@@ -34,8 +34,8 @@ namespace PanelRail
    // One toggle, centred in the rail at `y` (window-local, the tile's top edge). Returns true on click.
    inline bool Item(const char* id, float y, const char* glyphOff, const char* glyphOn, bool on, const char* tooltip)
    {
-      ImGui::SetCursorPos(ImVec2((kWidth - tok::tile) * 0.5f, y));
-      const bool clicked = IconTile::Draw(id, glyphOff, glyphOn, on, tok::tile);
+      ImGui::SetCursorPos(ImVec2((kWidth - tok::control_h) * 0.5f, y));
+      const bool clicked = IconTile::Draw(id, glyphOff, glyphOn, on, tok::control_h);
       if (ImGui::IsItemHovered())
          app::HelpTip("%s", tooltip);
       return clicked;

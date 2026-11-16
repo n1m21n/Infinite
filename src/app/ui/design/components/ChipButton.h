@@ -10,7 +10,7 @@
 
 namespace ChipButton
 {
-   constexpr float kHeight = 22.0f;
+   constexpr float kHeight = tok::control_h;
 
    // Returns true when clicked. `onCol` overrides the accent used when on (e.g. solo amber).
    //  `h` is the chip height, `minW` an optional width floor (0 = hug the label).
