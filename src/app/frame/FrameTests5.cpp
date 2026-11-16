@@ -3247,7 +3247,7 @@ void FrameTest_UITYPETEST(int frameId, GLFWwindow*)
    if (UiType::Font(UiType::Weight::Semibold) == UiType::Font(UiType::Weight::Regular))
       bad("Semibold is the same font as Regular");
    // Sizes come from the tokens, one step apart in the scale.
-   const UiType::Size order[] = { UiType::Size::Caption, UiType::Size::Body, UiType::Size::Title, UiType::Size::Display };
+   const UiType::Size order[] = { UiType::Size::Caption, UiType::Size::Body, UiType::Size::Display };
    float prevH = 0.0f;
    for (UiType::Size sz : order)
    {
@@ -3262,10 +3262,10 @@ void FrameTest_UITYPETEST(int frameId, GLFWwindow*)
    }
    // Heavier weight is wider for the same text and size, and glyph icons still resolve in it.
    const char* sample = "Hamburgefonstiv 120.0 BPM";
-   UiType::Push(UiType::Size::Title, UiType::Weight::Regular);
+   UiType::Push(UiType::Size::Body, UiType::Weight::Regular);
    const float wr = ImGui::CalcTextSize(sample).x;
    UiType::Pop();
-   UiType::Push(UiType::Size::Title, UiType::Weight::Semibold);
+   UiType::Push(UiType::Size::Body, UiType::Weight::Semibold);
    const float ws = ImGui::CalcTextSize(sample).x;
    const float wicon = ImGui::CalcTextSize(IconsInfinite::Close).x;
    UiType::Pop();

@@ -108,7 +108,7 @@ void DrawCookOverlay()
    const bool light = CategoryColors::IsThemeLight();
    // A fixed size: the current font size here still carries the canvas zoom, so the number grew and shrank with it.
    ImFont* font = ImGui::GetFont();
-   constexpr float kPillText = tok::type_body;
+   constexpr float kPillText = tok::type_caption;
    const ImU32 amber = tok::U32(tok::action_learn, light), red = tok::U32(tok::action_record, light);   // same roles as the node issue badge
    static std::unordered_map<const INode*, int> sLevel;   // last level per node, for the hold; rebuilt each frame
    std::unordered_map<const INode*, int> nextLevel;

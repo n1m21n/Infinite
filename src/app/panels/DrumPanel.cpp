@@ -748,7 +748,7 @@ namespace app
             const bool inPat = s < maxLen, now = s == play, beat = s % 4 == 0;
             char num[4];
             snprintf(num, sizeof num, "%d", s + 1);
-            const float rfs = ImGui::GetFontSize() * 0.68f;
+            const float rfs = tok::type_caption;
             const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(rfs, FLT_MAX, 0.0f, num);
             if (g.cellW >= ts.x + 2.0f || beat)
                dl->AddText(ImGui::GetFont(), rfs, ImVec2(x0 + (g.cellW - ts.x) * 0.5f, p.y + 2.0f), DeskParts::Grey(beat || now ? 215 : 120, inPat ? 255 : 70), num);

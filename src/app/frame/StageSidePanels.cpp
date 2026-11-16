@@ -456,7 +456,7 @@ void DrawSidePanels(FrameCtx& fc)
                   sel = i;
             const ImVec2 cp = ImGui::GetCursorScreenPos();
             const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 32.0f };
-            const int hit = PillGroup::Draw("lib.tabs", r, segs, segCount, sel, UiType::Size::Title);
+            const int hit = PillGroup::Draw("lib.tabs", r, segs, segCount, sel, UiType::Size::Body);
             if (hit >= 0)
                gSearchPanelMode = kModes[hit];
             ImGui::SetCursorScreenPos(cp);

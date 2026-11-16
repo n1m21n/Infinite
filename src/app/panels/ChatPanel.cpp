@@ -4015,7 +4015,7 @@ namespace app
          const bool first = !CliSetup::Prefs().tried && AnyReady();
          const char* hello = first ? T("You're in") : T("What should we make?");
          {
-            UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
+            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
             const ImVec2 ts = ImGui::CalcTextSize(hello);
             ImGui::GetWindowDrawList()->AddText(ImVec2(mn.x + (ImGui::GetWindowWidth() - ts.x) * 0.5f, mn.y + h * 0.38f), TextTint(0.85f), hello);
          }

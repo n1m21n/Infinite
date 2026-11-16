@@ -339,7 +339,7 @@ void DrawNodeBodies(FrameCtx& fc)
          if (!isComment)
          {
             {
-               UiType::Scope titleType(UiType::Size::Title, UiType::Weight::Medium);
+               UiType::Scope titleType(UiType::Size::Body, UiType::Weight::Medium);
                ImGui::TextUnformatted(NodeTitle(gn).c_str());
             }
             int instanceTotal = 0;

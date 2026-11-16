@@ -37,7 +37,7 @@ namespace DialogParts
 
    inline void Title(const char* text)
    {
-      UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
+      UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
       ImGui::PushTextWrapPos(kMaxW - tok::space_4);
       ImGui::TextUnformatted(text);
       ImGui::PopTextWrapPos();

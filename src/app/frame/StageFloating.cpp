@@ -197,7 +197,7 @@ int DrawFloating(FrameCtx& fc)
          }
          ImGui::Dummy(ImVec2(0.0f, tok::space_2));
          {
-            UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
+            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
             Centered("Infinite", false);
          }
          char ver[64];

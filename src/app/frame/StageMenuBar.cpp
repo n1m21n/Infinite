@@ -768,11 +768,11 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 p = ImGui::GetCursorScreenPos();
             float w;
             {
-               UiType::Scope ts(UiType::Size::Title, UiType::Weight::Regular);
+               UiType::Scope ts(UiType::Size::Body, UiType::Weight::Regular);
                w = std::max(Readout::Measure(widest), Readout::Measure(text));
             }
             ImGui::Dummy(ImVec2(w, tok::control_h));
-            Readout::Draw(key, UiLayout::Rect { p.x, p.y, w, tok::control_h }, text, text, UiType::Size::Title,
+            Readout::Draw(key, UiLayout::Rect { p.x, p.y, w, tok::control_h }, text, text, UiType::Size::Body,
                           UiType::Weight::Regular, Readout::Align::Left, dim ? 0.5f : 1.0f);
          };
 
@@ -1281,7 +1281,7 @@ void DrawMenuBar(FrameCtx& fc)
 
          auto TabWidth = [](const char* widest, const char* text)
          {
-            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Regular);
+            UiType::Scope ts(UiType::Size::Body, UiType::Weight::Regular);
             return std::max(Readout::Measure(widest), Readout::Measure(text));
          };
          const char* cpuWidest = audioDead ? cpuReadout : "cpu 99%";

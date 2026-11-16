@@ -9,9 +9,8 @@ namespace tok
    constexpr float space_4 = 16.0f;
    constexpr float space_5 = 24.0f;
    constexpr float radius_cell = 2.0f;
-   constexpr float type_caption = 11.0f;
-   constexpr float type_body = 13.0f;
-   constexpr float type_title = 15.0f;
+   constexpr float type_caption = 13.0f;
+   constexpr float type_body = 15.0f;
    constexpr float type_display = 22.0f;
    constexpr float icon_lg = 20.0f;
    constexpr float pin_r_cable = 7.0f;

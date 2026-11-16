@@ -113,7 +113,7 @@ namespace SectionCard
    // Window title: Title size, semibold.
    inline void Title(const char* text)
    {
-      UiType::Scope s(UiType::Size::Title, UiType::Weight::Semibold);
+      UiType::Scope s(UiType::Size::Body, UiType::Weight::Semibold);
       ImGui::TextUnformatted(text);
    }
 

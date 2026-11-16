@@ -1,5 +1,5 @@
 // The only way UI code picks a text size or weight (docs/plans/ui-system/README.md, L1).
-// Sizes come from tokens.json (type.caption/body/title/display, in ImGui points); weights are separate
+// Sizes come from tokens.json (type.caption/body/display, in ImGui points); weights are separate
 // fonts registered by Startup. ImGui 1.92 rasterizes each (font, size) on demand, so any size is sharp.
 #pragma once
 #include "app/ui/design/Tokens.gen.h"
@@ -8,7 +8,7 @@
 namespace UiType
 {
    enum class Weight { Regular, Medium, Semibold, Count };
-   enum class Size { Caption, Body, Title, Display };
+   enum class Size { Caption, Body, Display };
 
    // Token value for a role, in points (the UI scale is applied by the framebuffer scale, not here).
    inline float Px(Size s)
@@ -17,10 +17,9 @@ namespace UiType
       {
       case Size::Caption: return tok::type_caption;
       case Size::Body: return tok::type_body;
-      case Size::Title: return tok::type_title;
       case Size::Display: return tok::type_display;
       }
-      return tok::type_title;
+      return tok::type_body;
    }
 
    void Reset();                         // Startup, before re-registering after a font rebuild

@@ -573,7 +573,7 @@ namespace app
       MixerRenderSettings& s = gMixerRender;
       FormParts::Narrow narrow(58.0f);
       {
-         UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
+         UiType::Scope hs(UiType::Size::Body, UiType::Weight::Semibold);
          ImGui::TextUnformatted(T("Render"));
       }
       GraphNode* gn = FindNodeByIndex(currentOut);

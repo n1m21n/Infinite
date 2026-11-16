@@ -509,7 +509,7 @@ namespace app
          y = EmptyState::DrawWrapped(dl, cx, y, colW, col, text);
       };
 
-      centred(UiType::Size::Title, UiType::Weight::Semibold, ImGui::GetColorU32(ImGuiCol_Text), T("Welcome to the Terminal"));
+      centred(UiType::Size::Body, UiType::Weight::Semibold, ImGui::GetColorU32(ImGuiCol_Text), T("Welcome to the Terminal"));
       y += tok::space_2;
       centred(UiType::Size::Body, UiType::Weight::Regular, dim, T("Connect a coding agent to build with Infinite."));
       y += tok::space_5;

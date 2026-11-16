@@ -67,7 +67,7 @@ namespace FilterBar
          ImDrawList* dl = ImGui::GetWindowDrawList();
          Well(dl, r, hv, on);
          const ImVec4 t = TextCol();
-         UiType::Scope ts(UiType::Size::Title);
+         UiType::Scope ts(UiType::Size::Body);
          const std::string cap = std::string(caption) + "  ";
          const float capW = ImGui::CalcTextSize(cap.c_str()).x;
          const std::string label = value;

@@ -2071,7 +2071,7 @@ namespace app
       ImDrawList* dl = ImGui::GetForegroundDrawList();
       const bool isLightT = CategoryColors::IsThemeLight();
       const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      UiType::Scope ts(UiType::Size::Title);
+      UiType::Scope ts(UiType::Size::Body);
       const ImVec2 tsz = ImGui::CalcTextSize(text);
       const ImGuiViewport* vp = ImGui::GetMainViewport();
       // Same neutral strip as the performance panel's listening banner: recessed well, hairline, plain text.
@@ -2144,7 +2144,7 @@ namespace app
                                 : "Move a knob, fader or wheel on your controller. Esc cancels.";
          float tx = sp.x + tok::space_3;
          {
-            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
+            UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold);
             sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.6f)), head.c_str());
             tx += ImGui::CalcTextSize(head.c_str()).x + tok::space_2;
             if (!target.empty())
@@ -2155,7 +2155,7 @@ namespace app
             tx += tok::space_3;
          }
          {
-            UiType::Scope ts(UiType::Size::Title);
+            UiType::Scope ts(UiType::Size::Body);
             const float room = sp.x + stripW - 84.0f - tx;
             if (ImGui::CalcTextSize(hint).x <= room)
                sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.4f)), hint);

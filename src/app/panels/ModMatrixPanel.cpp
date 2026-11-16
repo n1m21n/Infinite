@@ -380,7 +380,7 @@ namespace app
             ImGui::TableSetupColumn(L("Signal"), ImGuiTableColumnFlags_WidthFixed, vertical ? 42.0f : 55.0f);
             ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, 20.0f);
             {
-               UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
+               UiType::Scope hs(UiType::Size::Body, UiType::Weight::Semibold);
                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tcol.x, tcol.y, tcol.z, 0.6f));
                ImGui::TableHeadersRow();
                ImGui::PopStyleColor();

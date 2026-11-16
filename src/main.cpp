@@ -103,11 +103,7 @@ int main(int argc, char** argv)
       DrawDropHandling(fc);
       DrawFrameTestsA(fc);
       DrawBenchHarness(fc);
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, kNodeFramePadY));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, kNodeFrameRounding);
-      ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, kNodeFrameRounding);
       DrawNodeBodies(fc);
-      ImGui::PopStyleVar(3);
       DrawLinks(fc);
       DrawKeyboard(fc);
       DrawPopupsA(fc);

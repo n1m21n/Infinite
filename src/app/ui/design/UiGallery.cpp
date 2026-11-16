@@ -76,10 +76,10 @@ namespace UiGallery
       Heading(sec[6], "READOUT - tabular digits (same width for 1111 and 0000)");
       {
          const auto c = UiLayout::Row(sec[7], { UiLayout::Fixed(90), UiLayout::Fixed(90), UiLayout::Fixed(90), UiLayout::Fixed(90) }, gap);
-         Readout::Draw("g.ro.a", c[0], "1111", "A", UiType::Size::Title, UiType::Weight::Medium, Readout::Align::Left);
-         Readout::Draw("g.ro.b", c[1], "0000", "B", UiType::Size::Title, UiType::Weight::Medium, Readout::Align::Left);
-         Readout::Draw("g.ro.c", c[2], "120.0", "BPM", UiType::Size::Title, UiType::Weight::Medium, Readout::Align::Left);
-         Readout::Draw("g.ro.d", c[3], "-12.5 dB", "Gain", UiType::Size::Title, UiType::Weight::Medium, Readout::Align::Left);
+         Readout::Draw("g.ro.a", c[0], "1111", "A", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
+         Readout::Draw("g.ro.b", c[1], "0000", "B", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
+         Readout::Draw("g.ro.c", c[2], "120.0", "BPM", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
+         Readout::Draw("g.ro.d", c[3], "-12.5 dB", "Gain", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
       }
       Heading(sec[8], "DIVIDER - vertical, horizontal");
       {
@@ -87,12 +87,12 @@ namespace UiGallery
          Divider::Vertical(c[0]);
          Divider::Horizontal(c[1]);
       }
-      Heading(sec[10], "TYPE - caption, body, title, display x regular, medium, semibold");
+      Heading(sec[10], "TYPE - caption, body, display x regular, medium, semibold");
       {
          const auto rows = UiLayout::Column(sec[11], { UiLayout::Fixed(14), UiLayout::Fixed(18), UiLayout::Fixed(22), UiLayout::Fixed(34) }, 2.0f);
-         const UiType::Size sizes[] = { UiType::Size::Caption, UiType::Size::Body, UiType::Size::Title, UiType::Size::Display };
-         const char* names[] = { "Caption", "Body", "Title", "Display" };
-         for (int i = 0; i < 4; ++i)
+         const UiType::Size sizes[] = { UiType::Size::Caption, UiType::Size::Body, UiType::Size::Display };
+         const char* names[] = { "Caption", "Body", "Display" };
+         for (int i = 0; i < 3; ++i)
          {
             const auto cells = UiLayout::Row(rows[static_cast<size_t>(i)], { UiLayout::Fixed(220), UiLayout::Fixed(220), UiLayout::Fixed(220) }, gap);
             const UiType::Weight ws[] = { UiType::Weight::Regular, UiType::Weight::Medium, UiType::Weight::Semibold };
