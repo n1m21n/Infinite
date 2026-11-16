@@ -263,8 +263,8 @@ namespace app
       const bool isLight = IsThemeLight();
       const ImU32 bgCol = tok::U32(tok::sparkline_bg, isLight);
       const ImU32 borderCol = tok::U32(tok::sparkline_border, isLight);
-      dl->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), bgCol, 2.0f);
-      dl->AddRect(pos, ImVec2(pos.x + width, pos.y + height), borderCol, 2.0f);
+      dl->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), bgCol, tok::radius_cell);
+      dl->AddRect(pos, ImVec2(pos.x + width, pos.y + height), borderCol, tok::radius_cell);
 
       if (hist.count >= 2)
       {

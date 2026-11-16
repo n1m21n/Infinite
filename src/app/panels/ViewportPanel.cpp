@@ -45,7 +45,7 @@ namespace app
          EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(gn.node.get(), "no geometry"));
       }
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                  tok::U32(tok::pal::c_464A5AFF), 4.0f);
+                  tok::U32(tok::pal::c_464A5AFF), tok::radius_control);
 
       // Same drag-to-orbit / scroll-to-zoom feel as DrawPreview's embedded
       // Render3DNode viewport. Orbit rotates this node's own entry in

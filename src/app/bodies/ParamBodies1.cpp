@@ -1061,7 +1061,7 @@ namespace app
       const bool isLight = IsThemeLight();
 
       // ---- 1) Container chassis background ----
-      dl->AddRectFilled(origin, br, isLight ? tok::U32(tok::pal::c_ECF0F8FF) : tok::U32(tok::pal::c_101016FF), 4.0f);
+      dl->AddRectFilled(origin, br, isLight ? tok::U32(tok::pal::c_ECF0F8FF) : tok::U32(tok::pal::c_101016FF), tok::radius_control);
 
       // ---- 2) Subtle horizontal guide lines (25%, 50%, 75%) ----
       const float y25 = origin.y + height * 0.25f;
@@ -1092,18 +1092,18 @@ namespace app
          const ImU32 gridCol = isLight
             ? (isGroupStart ? tok::U32(tok::pal::c_D4DAE6FF) : tok::U32(tok::pal::c_E0E4EEFF))
             : (isGroupStart ? tok::U32(tok::pal::c_20232EFF) : tok::U32(tok::pal::c_161820FF));
-         dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y), gridCol, 2.0f);
+         dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y), gridCol, tok::radius_cell);
 
          // Column hover or playhead background wash
          if (isCurrent)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::U32(tok::pal::c_FFC85032) : tok::U32(tok::pal::c_FFBE5023), 2.0f);
+                              isLight ? tok::U32(tok::pal::c_FFC85032) : tok::U32(tok::pal::c_FFBE5023), tok::radius_cell);
          }
          else if (isHoveredCol)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF0C), 2.0f);
+                              isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF0C), tok::radius_cell);
          }
 
          const float v = std::clamp(n->steps[i], 0.0f, 1.0f);
@@ -1117,7 +1117,7 @@ namespace app
 
          if (std::fabs(fillBottom - fillTop) > 1.0f)
          {
-            dl->AddRectFilled(ImVec2(x0 + 1.0f, fillTop), ImVec2(x1 - 1.0f, fillBottom), fillCol, 2.0f);
+            dl->AddRectFilled(ImVec2(x0 + 1.0f, fillTop), ImVec2(x1 - 1.0f, fillBottom), fillCol, tok::radius_cell);
          }
 
          // Value Cap Pill at the level mark
@@ -1170,7 +1170,7 @@ namespace app
       }
 
       // Outer border
-      dl->AddRect(origin, br, isLight ? tok::U32(tok::pal::c_B9C0D0FF) : tok::U32(tok::pal::c_414655FF), 4.0f);
+      dl->AddRect(origin, br, isLight ? tok::U32(tok::pal::c_B9C0D0FF) : tok::U32(tok::pal::c_414655FF), tok::radius_control);
 
       const float labelRowH = ImGui::GetFontSize() + 5.0f;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));

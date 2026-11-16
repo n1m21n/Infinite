@@ -607,7 +607,7 @@ namespace app
       const float h = 118.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                        tok::U32(tok::pal::c_121218FF), 4.0f);
+                        tok::U32(tok::pal::c_121218FF), tok::radius_control);
 
       const int count = std::max(1, n->SwatchCount());
       const float pad = 6.0f;
@@ -648,7 +648,7 @@ namespace app
                   tok::U32(tok::pal::c_7E8498FF), status);
 
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                  tok::U32(tok::pal::c_464A5AFF), 4.0f);
+                  tok::U32(tok::pal::c_464A5AFF), tok::radius_control);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
    }
 
@@ -1014,7 +1014,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(tl.x + w, tl.y + h);
-      dl->AddRectFilled(tl, br, ImGui::GetColorU32(ImGuiCol_FrameBg), 4.0f);
+      dl->AddRectFilled(tl, br, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
       const ImVec2 a(tl.x + (w - iw) * 0.5f, tl.y), b(a.x + iw, br.y);
       const unsigned int tex = n->PreviewTexture();
       if (tex == 0)

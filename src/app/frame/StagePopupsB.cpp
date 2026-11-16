@@ -1165,7 +1165,7 @@ void DrawPopupsB(FrameCtx& fc)
                   }
                   else
                   {
-                     hoverDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, glowCol, 4.0f);
+                     hoverDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, glowCol, tok::radius_control);
                      hoverDl->AddRect(pInfo.rowMin, pInfo.rowMax, ringCol, 4.0f, 0, 1.0f);
                   }
                }

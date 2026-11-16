@@ -586,7 +586,7 @@ namespace app
                            : db > -6.0f ? tok::U32(tok::pal::c_FFBE5AF0)
                                         : tok::U32(tok::pal::c_78D2A0EB);
          dl->AddRectFilled(ImVec2(x + 1.0f, br.y - 1.0f - (h - 2.0f) * lvl),
-                           ImVec2(br.x - 1.0f, br.y - 1.0f), col, 2.0f);
+                           ImVec2(br.x - 1.0f, br.y - 1.0f), col, tok::radius_cell);
       }
       AudioViz::Border(dl, tl, br);
    }
@@ -2228,7 +2228,7 @@ namespace app
       const float hx = x0 + (x1 - x0) * 0.125f;
       const float lift = n->ActiveVoices() > 0 ? 2.0f : 6.0f;
       const float hw = 4.0f + 3.0f * n->hardness;
-      dl->AddRectFilled(ImVec2(hx - hw, y0 + spread + lift), ImVec2(hx + hw, br.y - 3.0f), trace, 2.0f);
+      dl->AddRectFilled(ImVec2(hx - hw, y0 + spread + lift), ImVec2(hx + hw, br.y - 3.0f), trace, tok::radius_cell);
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
@@ -2395,7 +2395,7 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 containerBr(origin.x + containerW, origin.y + previewH);
 
-         dl->AddRectFilled(origin, containerBr, tok::U32(tok::pal::c_0E1014FF), 4.0f);
+         dl->AddRectFilled(origin, containerBr, tok::U32(tok::pal::c_0E1014FF), tok::radius_control);
          dl->PushClipRect(origin, containerBr, true);
 
          const int frameCount = WaveTerrainNode::kDisplayFrameCount;
@@ -2883,7 +2883,7 @@ namespace app
          const ImVec2 containerBr(origin.x + containerW, origin.y + previewH);
 
          // Background panel
-         dl->AddRectFilled(origin, containerBr, tok::U32(tok::pal::c_0A0C10FF), 4.0f);
+         dl->AddRectFilled(origin, containerBr, tok::U32(tok::pal::c_0A0C10FF), tok::radius_control);
          dl->AddRect(origin, containerBr, tok::U32(tok::pal::c_242A36B4), 4.0f, 0, 1.0f);
 
          const float imgSize = previewH - 8.0f;

@@ -78,7 +78,7 @@ namespace app
          const ImVec2 a = toMinimap(ImVec2(gn.liveX, gn.liveY));
          const ImVec2 b = toMinimap(ImVec2(gn.liveX + kNodeW, gn.liveY + kNodeH));
          const bool selected = ed::IsNodeSelected(gn.NodeId());
-         dl->AddRectFilled(a, b, selected ? tok::U32(tok::pal::c_FFBE5AE6) : tok::U32(tok::pal::c_6E96D2C8), 2.0f);
+         dl->AddRectFilled(a, b, selected ? tok::U32(tok::pal::c_FFBE5AE6) : tok::U32(tok::pal::c_6E96D2C8), tok::radius_cell);
          if (FindIsMatch(gn.index))
             dl->AddRect(ImVec2(a.x - 1.5f, a.y - 1.5f), ImVec2(b.x + 1.5f, b.y + 1.5f),
                         ImGui::GetColorU32(AccentEmphasisSelected()), 2.0f, 0, 2.0f);

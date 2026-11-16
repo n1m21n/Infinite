@@ -3,6 +3,7 @@
 
   ratchet.py            check against ratchet.json (exit 1 if any file went up or a new file has any)
   ratchet.py --update   lower the stored counts to current (never raises them)
+  ratchet.py            also prints the 10 worst files per count, so each pass picks those first
   ratchet.py --reset    store the current counts as the baseline (once, when a UI system sheet step lands)
 Also verifies Tokens.gen.h matches tokens.json.
 """
@@ -56,6 +57,9 @@ def main():
     for k, v, o in badw: print(f"RATCHET: {k} has {v} raw widget calls (allowed {o}): use a component from ui/design/components")
     badz = [(k, v, old_z.get(k, 0)) for k, v in cur_z.items() if v > old_z.get(k, 0)]
     for k, v, o in badz: print(f"RATCHET: {k} has {v} size literals (allowed {o}): use control_h / row_h / radius_* / icon_control")
+    for name, cur in (("literal colours", cur_c), ("raw widget calls", cur_w), ("size literals", cur_z)):
+        top = sorted(cur.items(), key=lambda kv: -kv[1])[:10]
+        print(f"top {name}: " + ", ".join(f"{pathlib.Path(k).name} {v}" for k, v in top))
     r = subprocess.run([sys.executable, str(ROOT / "tools/design/build_tokens.py"), "--check"])
     print(f"ratchet: colours {sum(cur_c.values())} (stored {sum(old_c.values())}), raw widgets {sum(cur_w.values())} (stored {sum(old_w.values())}), "
           f"sizes {sum(cur_z.values())} (stored {sum(old_z.values())})")

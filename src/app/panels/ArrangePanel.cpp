@@ -3500,7 +3500,7 @@ namespace app
                : (clipActive ? tok::U32(tok::pal::c_FFFFFFF0) : (clipHovered ? tok::U32(tok::pal::c_E6E6F0DC) : tok::U32(tok::pal::c_141418B4)));
 
             dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
-                              clipActive ? clipActiveCol : clipBaseCol, 4.0f);
+                              clipActive ? clipActiveCol : clipBaseCol, tok::radius_control);
             if (muted)
                DrawArrangeHatch(dl, ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
                                 isLight ? tok::U32(tok::pal::c_0000002D) : tok::U32(tok::pal::c_FFFFFF26));
@@ -3599,7 +3599,7 @@ namespace app
                   // convention every other AddImage of a node texture uses.
                   dl->AddImage((ImTextureID)(intptr_t)thumbIt->second.fbo.tex, tl, br,
                                ImVec2(0, 1), ImVec2(1, 0));
-                  dl->AddRect(tl, br, tok::U32(tok::pal::c_0000008C), 2.0f);
+                  dl->AddRect(tl, br, tok::U32(tok::pal::c_0000008C), tok::radius_cell);
                   dl->PopClipRect();
                   thumbRight = br.x;
                }

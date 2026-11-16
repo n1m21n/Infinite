@@ -30,7 +30,7 @@ namespace VFader
          dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(rangeYLo, rangeYHi)), ImVec2(cx + 5.0f, std::max(rangeYLo, rangeYHi)),
                            PinDotAlpha(tok::U32(tok::pin_mod, isLight), 0.45f));
       if (hasFill)
-         dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fill, 2.0f);
+         dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fill, tok::radius_cell);
       for (int i = 0; i < nTicks; ++i)
       {
          dl->AddLine(ImVec2(cx + 6.0f, ticks[i]), ImVec2(cx + 9.0f, ticks[i]), tone(0.18f), 1.0f);

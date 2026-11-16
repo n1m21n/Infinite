@@ -4957,7 +4957,7 @@ namespace app
             const float r = tok::radius_control + 2.0f;
             dl->AddRectFilled(a, b, TextTint(0.06f), r);
             dl->AddRect(a, b, TextTint(0.12f), r);
-            dl->AddRectFilled(ImVec2(a.x + 8.0f, a.y + 8.0f), ImVec2(a.x + 11.0f, b.y - 8.0f), ImGui::GetColorU32(ImGuiCol_CheckMark), 2.0f);
+            dl->AddRectFilled(ImVec2(a.x + 8.0f, a.y + 8.0f), ImVec2(a.x + 11.0f, b.y - 8.0f), ImGui::GetColorU32(ImGuiCol_CheckMark), tok::radius_cell);
             std::string one = sReplyTo;
             for (char& c : one)
                if (c == '\n' || c == '\r' || c == '\t')

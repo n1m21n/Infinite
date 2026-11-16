@@ -65,7 +65,7 @@ namespace app
 
       const ImU32 line = light ? tok::U32(tok::pal::c_0000002D) : tok::U32(tok::pal::c_FFFFFF28);
       const ImU32 text = light ? tok::U32(tok::pal::c_00000096) : tok::U32(tok::pal::c_FFFFFF96);
-      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::U32(tok::pal::c_0000000E) : tok::U32(tok::pal::c_FFFFFF0A), 4.0f);
+      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::U32(tok::pal::c_0000000E) : tok::U32(tok::pal::c_FFFFFF0A), tok::radius_control);
       dl->AddCircle(centre, R, line, 64);
       for (float m : { 1.0f, 2.0f })
          dl->AddCircle(centre, R * RadiusFracFromDist(m), line, 48);
