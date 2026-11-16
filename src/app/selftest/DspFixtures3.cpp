@@ -1424,6 +1424,169 @@ static bool RunDrumSequencerFixture()
       ok &= noBurst;
    }
 
+   // ---- Block C: trig conditions, chance, nudge, FILL, lane length, reverse, filter -----------------
+   {
+      const int stepFrames = (int)std::lround(sampleRate * 0.125); // 1/16 at 120 BPM
+      auto onsets = [&](const std::vector<float>& buf) {
+         std::vector<int> out;
+         int at = FindOnset(buf, 0);
+         while (at >= 0)
+         {
+            out.push_back(at);
+            at = FindOnset(buf, at + stepFrames / 2);
+         }
+         return out;
+      };
+      // Lane 0, step 0 only, 4-step pattern: one hit per pass (24000 frames).
+      auto oneStep = [&](auto&& setup, int passes) {
+         resetTransport();
+         auto node = makeNode(shortClickPath);
+         node->numSteps = 4;
+         node->stepVel[0][0] = 0.8f;
+         setup(*node);
+         return onsets(Render(*node, passes * 4 * stepFrames, blockSize, sampleRate));
+      };
+      const int pass = 4 * stepFrames;
+      auto near = [](int a, int b, int tol) { return std::abs(a - b) <= tol; };
+
+      // C1) 1:2 plays passes 1 and 3 of 4.
+      {
+         const auto h = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 5; }, 4);
+         const bool good = h.size() == 2 && near(h[1] - h[0], 2 * pass, 2);
+         printf("DRUMSEQTEST cond 1:2 %s (hits=%zu)\n", good ? "OK" : "FAIL", h.size());
+         ok &= good;
+      }
+      // C2) 2:4 plays pass 2 only (of 4).
+      {
+         const auto h = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 11; }, 4);
+         const auto ref = oneStep([](DrumSequencerNode&) {}, 1);
+         const bool good = h.size() == 1 && !ref.empty() && near(h[0] - ref[0], pass, 2);
+         printf("DRUMSEQTEST cond 2:4 %s (hits=%zu)\n", good ? "OK" : "FAIL", h.size());
+         ok &= good;
+      }
+      // C3) 1st plays once; !1st plays every pass but the first.
+      {
+         const auto first = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 3; }, 3);
+         const auto notFirst = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 4; }, 3);
+         const bool good = first.size() == 1 && notFirst.size() == 2;
+         printf("DRUMSEQTEST cond 1st/!1st %s (1st=%zu !1st=%zu)\n", good ? "OK" : "FAIL", first.size(), notFirst.size());
+         ok &= good;
+      }
+      // C4) Fill steps play only while FILL is held; !Fill only while it is not.
+      {
+         const auto fillOff = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 1; }, 2);
+         const auto fillOn = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 1; n.fill = true; }, 2);
+         const auto notFillOn = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 2; n.fill = true; }, 2);
+         const auto notFillOff = oneStep([](DrumSequencerNode& n) { n.stepCond[0][0] = 2; }, 2);
+         const bool good = fillOff.empty() && fillOn.size() == 2 && notFillOn.empty() && notFillOff.size() == 2;
+         printf("DRUMSEQTEST FILL %s (fill: off=%zu on=%zu  !fill: on=%zu off=%zu)\n", good ? "OK" : "FAIL", fillOff.size(),
+                fillOn.size(), notFillOn.size(), notFillOff.size());
+         ok &= good;
+      }
+      // C5) Chance: 0 never plays, 1 always, 0.5 about half over 48 passes, the same both runs.
+      {
+         const auto never = oneStep([](DrumSequencerNode& n) { n.stepProb[0][0] = 0.0f; }, 8);
+         const auto half = oneStep([](DrumSequencerNode& n) { n.stepProb[0][0] = 0.5f; }, 48);
+         const auto half2 = oneStep([](DrumSequencerNode& n) { n.stepProb[0][0] = 0.5f; }, 48);
+         const bool good = never.empty() && half.size() >= 14 && half.size() <= 34 && half == half2;
+         printf("DRUMSEQTEST chance %s (0%%=%zu 50%%=%zu of 48, repeatable=%d)\n", good ? "OK" : "FAIL", never.size(), half.size(),
+                (int)(half == half2));
+         ok &= good;
+      }
+      // C6) Nudge: +0.25 lands a quarter step late, -0.25 a quarter step early (on step 1, so it can move earlier).
+      {
+         auto at1 = [&](float nudge) {
+            resetTransport();
+            auto node = makeNode(shortClickPath);
+            node->numSteps = 4;
+            node->stepVel[0][1] = 0.8f;
+            node->stepNudge[0][1] = nudge;
+            const auto h = onsets(Render(*node, pass, blockSize, sampleRate));
+            return h.empty() ? -1 : h[0];
+         };
+         const int straight = at1(0.0f), late = at1(0.25f), early = at1(-0.25f);
+         const bool good = straight > 0 && near(late - straight, stepFrames / 4, 3) && near(straight - early, stepFrames / 4, 3);
+         printf("DRUMSEQTEST nudge %s (late=%+d early=%+d expected=%d)\n", good ? "OK" : "FAIL", late - straight, early - straight,
+                stepFrames / 4);
+         ok &= good;
+      }
+      // C7) Lane length 3 inside a 4-step pattern loops every 3 steps (polymeter).
+      {
+         const auto h = oneStep([](DrumSequencerNode& n) { n.laneSteps[0] = 3; }, 3);
+         const bool good = h.size() >= 3 && near(h[1] - h[0], 3 * stepFrames, 2) && near(h[2] - h[1], 3 * stepFrames, 2);
+         printf("DRUMSEQTEST lane length %s (hits=%zu spacing=%d expected=%d)\n", good ? "OK" : "FAIL", h.size(),
+                h.size() >= 2 ? h[1] - h[0] : -1, 3 * stepFrames);
+         ok &= good;
+      }
+      // C8) Reverse: the click sits at the start of a 4000-frame file, so played backwards it sounds ~3800 frames late.
+      {
+         const auto fwd = oneStep([](DrumSequencerNode& n) { n.laneDecay[0] = 1.0f; }, 1);
+         const auto rev = oneStep([](DrumSequencerNode& n) { n.laneDecay[0] = 1.0f; n.laneReverse[0] = true; }, 1);
+         const int delta = (!fwd.empty() && !rev.empty()) ? rev[0] - fwd[0] : -1;
+         const bool good = delta > 3500 && delta < 4000;
+         printf("DRUMSEQTEST reverse %s (onset moved %d frames, expected ~3800)\n", good ? "OK" : "FAIL", delta);
+         ok &= good;
+      }
+      // C9) Filter on a held tone (DC): high-pass removes it, low-pass keeps it, off leaves it alone.
+      {
+         auto level = [&](int filter) {
+            resetTransport();
+            auto node = makeNode(longClickPath);
+            node->numSteps = 4;
+            node->stepVel[0][0] = 0.8f;
+            node->laneDecay[0] = 1.0f;
+            node->laneFilter[0] = filter;
+            node->laneCutoff[0] = 0.5f; // ~630 Hz
+            const auto buf = Render(*node, 12000, blockSize, sampleRate);
+            const int on = FindOnset(buf, 0, 0.05f);
+            double sum = 0.0;
+            int count = 0;
+            for (int i = std::max(0, on) + 3000; i < std::max(0, on) + 8000 && i < (int)buf.size(); i++, count++)
+               sum += (double)buf[i] * buf[i];
+            return count > 0 && AllFinite(buf) ? (float)std::sqrt(sum / count) : -1.0f;
+         };
+         const float off = level(0), lp = level(1), hp = level(2);
+         const bool good = off > 0.05f && lp > off * 0.7f && lp < off * 1.3f && hp >= 0.0f && hp < off * 0.05f;
+         printf("DRUMSEQTEST lane filter %s (rms off=%.4f lp=%.4f hp=%.4f)\n", good ? "OK" : "FAIL", off, lp, hp);
+         ok &= good;
+      }
+      // C10) Save/load keeps every Block C field; a lane of plain steps writes no trig data.
+      {
+         auto src = std::make_unique<DrumSequencerNode>();
+         src->stepVel[2][5] = 0.7f;
+         src->stepProb[2][5] = 0.37f;
+         src->stepCond[2][5] = 13;
+         src->stepNudge[2][5] = -0.3f;
+         src->laneSteps[4] = 7;
+         src->laneReverse[4] = true;
+         src->laneFilter[4] = 2;
+         src->laneCutoff[4] = 0.42f;
+         src->laneReso[4] = 0.6f;
+         src->fill = true;
+         std::vector<std::pair<std::string, std::string>> saved;
+         Patch::SaveParams(src.get(), saved);
+         bool plainEmpty = true, fillSaved = false;
+         for (const auto& kv : saved)
+         {
+            if (kv.first == "lane0_trigs" && !kv.second.empty())
+               plainEmpty = false;
+            if (kv.first == "fill")
+               fillSaved = true;
+         }
+         auto dst = std::make_unique<DrumSequencerNode>();
+         Patch::LoadParams(dst.get(), saved);
+         const bool good = std::fabs(dst->stepProb[2][5] - 0.37f) < 0.006f && dst->stepCond[2][5] == 13 &&
+                           std::fabs(dst->stepNudge[2][5] + 0.3f) < 0.006f && dst->laneSteps[4] == 7 && dst->laneReverse[4] &&
+                           dst->laneFilter[4] == 2 && std::fabs(dst->laneCutoff[4] - 0.42f) < 1e-4f &&
+                           std::fabs(dst->laneReso[4] - 0.6f) < 1e-4f && !dst->fill && plainEmpty && !fillSaved &&
+                           dst->stepProb[0][0] == 1.0f && dst->laneCutoff[0] == 1.0f;
+         printf("DRUMSEQTEST Block C save/load %s (prob=%.3f cond=%d nudge=%.3f len=%d rev=%d filt=%d plainEmpty=%d fillSaved=%d)\n",
+                good ? "OK" : "FAIL", dst->stepProb[2][5], dst->stepCond[2][5], dst->stepNudge[2][5], dst->laneSteps[4],
+                (int)dst->laneReverse[4], dst->laneFilter[4], (int)plainEmpty, (int)fillSaved);
+         ok &= good;
+      }
+   }
+
    DrumSequencerNode::SetKitDir(savedKitDir);
    {
       std::error_code ec;

@@ -9,6 +9,7 @@
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/DeskParts.h"
 
 namespace SectionCard
 {
@@ -20,6 +21,8 @@ namespace SectionCard
       ImDrawListSplitter split;
       bool open = false;
       float top = 0.0f;
+      bool desk = false;   // a panel with the desk look sets this: cards draw as graphite faces
+      ImU32 deskCap = 0;
    };
    inline State& S()
    {
@@ -31,6 +34,11 @@ namespace SectionCard
    inline void Well(ImVec2 a, ImVec2 b)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
+      if (S().desk)
+      {
+         DeskParts::Face(dl, a, b, S().deskCap, false);
+         return;
+      }
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       dl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_group);
       dl->AddRect(a, b, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),

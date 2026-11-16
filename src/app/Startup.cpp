@@ -4432,6 +4432,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gPianoRollOpen = o.find("pianoroll") != std::string::npos;
       gTerminalOpen = o.find("terminal") != std::string::npos;
       gCurveEditorOpen = o.find("curveeditor") != std::string::npos;
+      gDrumPanelOpen = o.find("drums") != std::string::npos;
       if (o.find("chatcode") != std::string::npos)
          ChatShotOpenCode();
       gShotNodeMenu = o.find("nodemenu") != std::string::npos;

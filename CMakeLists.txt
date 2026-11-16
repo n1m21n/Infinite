@@ -541,6 +541,7 @@ set(COMMON_SOURCES
     src/app/panels/PatchOpenerCheck.cpp
     src/app/panels/HistoryPanel.cpp
     src/app/panels/PianoRollPanel.cpp
+    src/app/panels/DrumPanel.cpp
     src/app/panels/CurveEditorPanel.cpp
     src/app/panels/FieldPatcherPanel.cpp
     src/app/panels/View3DPanel.cpp

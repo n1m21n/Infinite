@@ -50,6 +50,7 @@ static void DrawPanelRail()
       { "studio", "##railStudio", IconsInfinite::Waveform, nullptr, &gSampleStudioOpen,
         T("Sample studio - generate and shape a loop (Shift+W)") },
       { "piano", "##railPianoRoll", IconsInfinite::Piano, nullptr, &gPianoRollOpen, T("Piano roll - edit and generate notes (Shift+R)") },
+      { "drums", "##railDrums", IconsInfinite::FamilyNotes, nullptr, &gDrumPanelOpen, T("Drums - play and edit Drum Sequencers (Shift+J)") },
       { "view3d", "##railView3D", IconsInfinite::View3d, nullptr, &gView3DOpen,
         T("3D View - arrange node outputs and render a camera (Shift+3)") },
       { "view2d", "##railView2D", IconsInfinite::Layers, nullptr, &gView2DOpen,
@@ -566,6 +567,7 @@ void DrawMenuBar(FrameCtx& fc)
                viewPanelMenu(L("3D View"), L("Show 3D View"), gView3DOpen, 3, gView3DHeight, gView3DWidth, "##view3ddock");
                viewPanelMenu(L("2D View"), L("Show 2D View"), gView2DOpen, 2, gView2DHeight, gView2DWidth, "##view2ddock");
                dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
+               dockedPanelMenu(L("Drums"), L("Show Drums"), gDrumPanelOpen, gDrumPanelDock, gDrumPanelHeight, "##drumsdock");
                if (!Platform::PluginModeActive() && MenuParts::SubMenu(L("Terminal"))) // no shell inside a DAW
                {
                   MenuParts::Check(L("Show Terminal"), &gTerminalOpen);

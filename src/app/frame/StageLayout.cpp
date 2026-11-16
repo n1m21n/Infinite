@@ -135,7 +135,7 @@ void DrawLayout(FrameCtx& fc)
          gSessionClaimedKeys = inSession;
          gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
                            (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
-                           (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
+                           (gCurveEditorOpen && gCurveEditorClaimedKeys) || (gDrumPanelOpen && gDrumClaimedKeys) ||
                            (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
          gPerfMatrixClaimedKeys = inPerf;
@@ -149,7 +149,7 @@ void DrawLayout(FrameCtx& fc)
             gSessionClaimedKeys = false;
          gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
                         (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
-                           (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
+                           (gCurveEditorOpen && gCurveEditorClaimedKeys) || (gDrumPanelOpen && gDrumClaimedKeys) ||
                            (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
          if (!gPerfPanelOpen)
@@ -323,6 +323,14 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gPianoRollHeight;
          topBottomRows++;
       }
+      if (gDrumPanelDock != 3)
+         gDrumPanelDock = 0; // bottom or top only
+      if (gDrumPanelOpen)
+      {
+         gDrumPanelHeight = std::clamp(gDrumPanelHeight, 240.0f, std::max(240.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         topBottom += gDrumPanelHeight;
+         topBottomRows++;
+      }
       if (gCurveEditorDock != 3)
          gCurveEditorDock = 0; // bottom or top only
       if (gCurveEditorOpen)
@@ -379,6 +387,8 @@ void DrawLayout(FrameCtx& fc)
          DrawSampleStudioDocked("##samplestudio_top", ImVec2(0, gSampleStudioHeight));
       if (gPianoRollOpen && gPianoRollDock == 3)
          DrawPianoRollDocked("##pianoroll_top", ImVec2(0, gPianoRollHeight));
+      if (gDrumPanelOpen && gDrumPanelDock == 3)
+         DrawDrumPanelDocked("##drums_top", ImVec2(0, gDrumPanelHeight));
       if (gView3DOpen && gView3DDock == 3)
          DrawView3DDocked("##view3d_top", ImVec2(0, gView3DHeight));
       if (gView2DOpen && gView2DDock == 3)
