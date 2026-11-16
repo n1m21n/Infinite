@@ -14,14 +14,14 @@ function table() {
 }
 
 function findType(name) {
-  const t = table().types, n = String(name).toLowerCase().replace(/^effects\s+/, "").trim();
+  const t = table().types, n = String(name).toLowerCase().replace(/^(effects|compositing)\s+/, "").trim();
   if (t[n]) return n;
-  const squash = s => s.replace(/[\s_-]/g, "");
+  const squash = s => s.toLowerCase().replace(/[\s_-]/g, "");
   return Object.keys(t).find(k => squash(k) === squash(n)) || null;
 }
 
 // "detail down large", "detail down", "tones medium", "brightness up" -> {token: level|null}
-const ALIAS = { brightness: "luma", sharpness: "detail", opacity: "alpha", saturation: null };
+const ALIAS = { brightness: "luma", sharpness: "detail", opacity: "alpha", colour: "saturation", color: "saturation" };
 function parseWant(want) {
   const out = {}, bad = [];
   for (const raw of [].concat(want || [])) {
@@ -76,8 +76,8 @@ function findKnob(want, { nodeTypes = null, k = 5, full = false } = {}) {
 function nodeEffects(name) {
   const tb = table();
   if (!name) return {
-    family: tb.family, measured_at: `${tb.size}, t=${tb.time}s, on ${tb.sources.length} source pictures`,
-    types: Object.fromEntries(Object.entries(tb.types).map(([k, T]) => [k, fmt(T.add)]))
+    families: tb.families, measured_at: `${tb.size}, t=${tb.time}s, on ${tb.sources.length} source pictures`,
+    types: Object.fromEntries(Object.entries(tb.types).map(([k, T]) => [k, `${T.node_line}: ${fmt(T.add)}`]))
   };
   const ty = findType(name);
   if (!ty) throw new Error(`no measured effects for "${name}". Measured: ${Object.keys(tb.types).join(", ")}`);
@@ -98,7 +98,7 @@ function compare(a, b) {
   for (let i = 0; i < 16; i++) layout = Math.max(layout, Math.abs(A.facts.grid[i] - B.facts.grid[i]));
   const r3 = x => Math.round(x * 1000) / 1000;
   const facts = {};
-  for (const k of ["luma", "contrast", "spread", "red", "green", "blue", "black", "white", "alpha", "detail"])
+  for (const k of ["luma", "contrast", "spread", "red", "green", "blue", "saturation", "black", "white", "alpha", "detail"])
     facts[k] = { a: r3(A.facts[k]), b: r3(B.facts[k]) };
   const differences = describe(change);
   return {
