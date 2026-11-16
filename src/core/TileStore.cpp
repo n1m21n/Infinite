@@ -194,6 +194,8 @@ namespace TileStore
       if (png.empty())
          return false;
       int n = 0;
+      // Tiles are stored as they sit in the GL surface; never let another decoder's flip setting turn them over.
+      stbi_set_flip_vertically_on_load_thread(0);
       unsigned char* px = stbi_load_from_memory(png.data(), (int)png.size(), &w, &h, &n, 4);
       if (px == nullptr)
          return false;

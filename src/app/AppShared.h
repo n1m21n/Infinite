@@ -1,7 +1,9 @@
 #pragma once
 // Shared declarations for the code split out of main.cpp.
 #include "app/selftest/UiAudit.h"
+#include <cstring>
 #include <optional>
+#include <vector>
 #include "core/ModShapes.h"
 #include "core/Provenance.h"
 #include "app/ui/design/TokenColors.h"
@@ -6674,6 +6676,22 @@ void RunHistoryTest();
 void RunClipboardTest();
 void RunView3DTest();
 void RunView2DTest();
+// GL rows (bottom first) to file rows (top first), in place. Use this, never stbi_flip_vertically_on_write: that flag
+// is global, and the tile store encodes paint tiles on a worker thread, so a set flag stores them upside down.
+inline void FlipRowsRgba8(std::vector<unsigned char>& px, int w, int h)
+{
+   const size_t row = (size_t)w * 4;
+   std::vector<unsigned char> tmp(row);
+   for (int y = 0; y < h / 2; y++)
+   {
+      unsigned char* a = &px[(size_t)y * row];
+      unsigned char* b = &px[(size_t)(h - 1 - y) * row];
+      std::memcpy(tmp.data(), a, row);
+      std::memcpy(a, b, row);
+      std::memcpy(b, tmp.data(), row);
+   }
+}
+int View2DAffinityAb(const char* dir);   // INFINITE_AB2D: the Affinity A/B pictures (View2DPanel.cpp)
 
 void RunPatchWatchTest();
 

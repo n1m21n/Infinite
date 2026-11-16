@@ -755,7 +755,7 @@ int DrawTestsB(FrameCtx& fc)
          {
             std::vector<unsigned char> px(fbW * fbH * 4);
             glReadPixels(0, 0, fbW, fbH, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
-            stbi_flip_vertically_on_write(1);
+            FlipRowsRgba8(px, fbW, fbH);
             // Report the real result. This printed "wrote ..." unconditionally,
             // so a failed write announced success - and on macOS it fails
             // easily, because Cocoa chdir's a bundled app to
@@ -782,7 +782,7 @@ int DrawTestsB(FrameCtx& fc)
             glReadPixels(x0, fbH - y1, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
             for (size_t i = 3; i < px.size(); i += 4)
                px[i] = 255;
-            stbi_flip_vertically_on_write(1);
+            FlipRowsRgba8(px, w, h);
             stbi_write_png(gShotNowPath.c_str(), w, h, 4, px.data(), w * 4);
          }
          gShotNowPath.clear();
@@ -804,7 +804,7 @@ int DrawTestsB(FrameCtx& fc)
             {
                std::vector<unsigned char> px(fbW * fbH * 4);
                glReadPixels(0, 0, fbW, fbH, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
-               stbi_flip_vertically_on_write(1);
+               FlipRowsRgba8(px, fbW, fbH);
                const bool ok = stbi_write_png(out, fbW, fbH, 4, px.data(), fbW * 4) != 0;
                printf("%s %s (%dx%d)\n", ok ? "wrote" : "FAILED to write", out, fbW, fbH);
             }

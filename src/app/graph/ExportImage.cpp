@@ -25,7 +25,11 @@ namespace app
       glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
       glDeleteFramebuffers(1, &fbo);
 
-      stbi_flip_vertically_on_write(1);
+      // Top row first for the file. stb's flip flag is global and the tile store encodes paint tiles on a worker
+      // thread, so the rows are flipped here instead of with stbi_flip_vertically_on_write.
+      std::vector<unsigned char> topFirst(pixels.size());
+      for (int y = 0; y < h; y++)
+         std::memcpy(&topFirst[(size_t)y * w * 4], &pixels[(size_t)(h - 1 - y) * w * 4], (size_t)w * 4);
 
       std::string lowerPath = path;
       for (char& c : lowerPath) c = (char)tolower((unsigned char)c);
@@ -36,9 +40,9 @@ namespace app
          std::vector<unsigned char> rgb(w * h * 3);
          for (int i = 0; i < w * h; i++)
          {
-            rgb[i * 3 + 0] = pixels[i * 4 + 0];
-            rgb[i * 3 + 1] = pixels[i * 4 + 1];
-            rgb[i * 3 + 2] = pixels[i * 4 + 2];
+            rgb[i * 3 + 0] = topFirst[i * 4 + 0];
+            rgb[i * 3 + 1] = topFirst[i * 4 + 1];
+            rgb[i * 3 + 2] = topFirst[i * 4 + 2];
          }
          // Encode in memory so the credit comment can go in before the file is written.
          std::vector<uint8_t> jpg;
@@ -68,7 +72,7 @@ namespace app
                auto* bytes = static_cast<std::vector<uint8_t>*>(ctx);
                bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
             },
-            &png, w, h, 4, pixels.data(), w * 4);
+            &png, w, h, 4, topFirst.data(), w * 4);
          if (!png.empty())
          {
             png = Provenance::StampPng(png.data(), png.size());

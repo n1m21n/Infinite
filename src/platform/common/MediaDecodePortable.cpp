@@ -941,7 +941,7 @@ namespace Platform
          return false;
       }
 
-      stbi_set_flip_vertically_on_load(1);
+      stbi_set_flip_vertically_on_load_thread(1);   // this thread only: a global flag would flip every later decode (paint tiles too)
       std::vector<unsigned char> bytes;
       if (!ReadFileBytes(path, bytes, outError))
          return false;
@@ -975,7 +975,7 @@ namespace Platform
          return false;
       }
 
-      stbi_set_flip_vertically_on_load(1);
+      stbi_set_flip_vertically_on_load_thread(1);   // this thread only: a global flag would flip every later decode (paint tiles too)
       int w = 0, h = 0, comp = 0;
       stbi_uc* data = stbi_load_from_memory(bytes.data(), (int)bytes.size(), &w, &h, &comp, 4);
       if (data == nullptr)
@@ -1031,7 +1031,7 @@ namespace Platform
 
       // Everything else through stb_image's float loader (Radiance .hdr,
       // half-float PNG...). Row-flipped for GL like the RGBA path.
-      stbi_set_flip_vertically_on_load(1);
+      stbi_set_flip_vertically_on_load_thread(1);   // this thread only: a global flag would flip every later decode (paint tiles too)
       std::vector<unsigned char> bytes;
       if (!ReadFileBytes(path, bytes, outError))
          return false;
