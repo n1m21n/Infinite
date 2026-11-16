@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Schlieren Caustics Thermal Plume",
+    "author": "Infinite",
+    "description": "Domain-warped convective density-gradient schlieren field with knife-edge phase contrast, cobalt-amber optical fringes, and rising filament cusps.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float plumeWarp = 0.85 [0.2, 1.6];\nparam float fringeFreq = 8.5 [3.0, 16.0];\nparam float contrast = 2.6 [1.2, 4.5];\nparam float drift = 0.65 [0.1, 1.5];\nparam float warmth = 0.95 [0.2, 1.5];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\n\n# Convective multi-octave domain warp (rising thermal density plume)\nqx = sin(p.y * 3.1 - t * drift * 1.4 + sin(p.x * 2.7 + t * 0.5));\nqy = cos(p.x * 3.4 + t * drift * 0.9 + cos(p.y * 2.3 - t * 0.6));\nw = p + vec2(qx, qy) * 0.34 * plumeWarp;\n\n# Second-order refractive density gradient\ngradX = sin(w.x * fringeFreq + w.y * 2.4 - t * drift);\ngradY = cos(w.y * fringeFreq * 0.85 - w.x * 3.1 + t * drift * 0.7);\ndensity = gradX * 0.55 + gradY * 0.45;\n\n# Knife-edge optical cutoff highlights sharp density transitions\nfilament = pow(clamp(1.0 - abs(density) * contrast, 0.0, 1.0), 2.2);\nfield = smoothstep(-0.7, 0.8, density);\naperture = smoothstep(1.18, 0.15, r);\n\ncObsidian = vec3(0.035, 0.043, 0.063);\ncSapphire = vec3(0.110, 0.306, 0.557);\ncAmber = vec3(0.910, 0.608, 0.235);\ncIvory = vec3(0.957, 0.969, 0.988);\n\ncol = mix(cObsidian, cSapphire * 1.1, clamp(field * aperture, 0.0, 1.0));\ncol = mix(col, cAmber * warmth, clamp(filament * aperture * 0.85, 0.0, 1.0));\ncol = col + cIvory * pow(filament, 2.5) * aperture * 0.88;\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "plumeWarp": 0.85,
+      "fringeFreq": 8.5,
+      "contrast": 2.6,
+      "drift": 0.65,
+      "warmth": 0.95
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

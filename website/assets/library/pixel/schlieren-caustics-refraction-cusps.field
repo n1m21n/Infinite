@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Schlieren Caustics Refraction Cusps",
+    "author": "Infinite",
+    "description": "Optical nephroid caustic envelope with knife-edge schlieren refraction bands, sapphire density gradients, and incandescent amber focal cusps.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float cuspScale = 0.62 [0.25, 1.0];\nparam float knifeAngle = 0.45 [0.0, 3.14];\nparam float dispersion = 1.6 [0.5, 3.0];\nparam float sharpness = 3.2 [1.5, 6.0];\nparam float glow = 1.15 [0.4, 2.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x);\n\n# Optical phase wavefront with nephroid/cardioid caustic folding\nphi1 = r * 4.8 - t * 0.6 + sin(a * 2.0 + t * 0.35) * 0.75;\nphi2 = r * 7.2 + t * 0.45 + cos(a * 3.0 - t * 0.4) * 0.6;\nwave = sin(phi1) * 0.6 + cos(phi2) * 0.4;\n\n# Knife-edge directional schlieren gradient\nkx = cos(knifeAngle);\nky = sin(knifeAngle);\ngrad = p.x * kx + p.y * ky + wave * 0.38;\nschlieren = smoothstep(-0.65, 0.65, sin(grad * 5.2 + t * 0.3));\n\n# Nephroid caustic envelope inside circular optical aperture\naperture = smoothstep(1.05, 0.18, r);\ncuspDist = abs(r - cuspScale * (0.68 + 0.24 * cos(a * 2.0 + t * 0.5) + 0.10 * sin(a * 4.0 - t * 0.8)));\ncaustic = pow(clamp(1.0 - cuspDist * sharpness, 0.0, 1.0), 2.4) * aperture;\nsecondary = pow(clamp(1.0 - abs(sin(r * 9.0 + wave * dispersion)) * 1.4, 0.0, 1.0), 3.0) * aperture * 0.55;\n\ncObsidian = vec3(0.035, 0.043, 0.063);\ncSapphire = vec3(0.110, 0.306, 0.557);\ncAmber = vec3(0.910, 0.608, 0.235);\ncIvory = vec3(0.957, 0.969, 0.988);\n\ncol = mix(cObsidian, cSapphire, clamp(schlieren * aperture * 0.92, 0.0, 1.0));\ncol = mix(col, cAmber * glow, clamp((caustic + secondary) * 0.88, 0.0, 1.0));\ncol = col + cIvory * pow(caustic, 2.2) * 0.95;\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "cuspScale": 0.62,
+      "knifeAngle": 0.45,
+      "dispersion": 1.6,
+      "sharpness": 3.2,
+      "glow": 1.15
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Reaction Diffusion Belousov Spiral Waves",
+    "author": "Infinite",
+    "description": "Belousov-Zhabotinsky chemical spiral wave interference with domain-warped fronts in verdigris, ochre, and cinnabar glaze.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float waveFreq = 7.5 [3.0, 16.0];\nparam float warpAmt = 0.42 [0.05, 1.0];\nparam float spiralArms = 3.0 [1.0, 6.0];\nparam float sharpness = 2.4 [1.0, 5.0];\nparam float glazeMix = 0.72 [0.2, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\n# Mineral glaze palette\ncSlate = vec3(0.055, 0.102, 0.118);\ncVerdigris = vec3(0.165, 0.482, 0.482);\ncOchre = vec3(0.910, 0.773, 0.537);\ncCinnabar = vec3(0.851, 0.349, 0.298);\n\n# Domain warp simulating chemical advection\nw1 = vec2(sin(p.y * 2.6 + t * 0.4), cos(p.x * 2.4 - t * 0.35));\nw2 = vec2(sin((p.x + p.y) * 3.8 - t * 0.28), cos((p.x - p.y) * 3.5 + t * 0.32));\nq = p + (w1 * 0.65 + w2 * 0.35) * warpAmt;\n\n# Two coupled BZ spiral centers\ncA = q - vec2(-0.34, 0.18);\ncB = q - vec2(0.36, -0.22);\nrA = length(cA);\nrB = length(cB);\naA = atan2(cA.y, cA.x);\naB = atan2(cB.y, cB.x);\n\nphaseA = rA * waveFreq - aA * spiralArms - t * 1.4;\nphaseB = rB * (waveFreq * 0.92) + aB * spiralArms - t * 1.15;\n\nuField = 0.5 + 0.5 * sin(phaseA + 0.65 * sin(phaseB));\nvField = 0.5 + 0.5 * cos(phaseB - 0.55 * cos(phaseA));\n\n# Reaction front ridge sharpening\nfront = pow(clamp(uField * (1.0 - vField * 0.45), 0.0, 1.0), sharpness);\ncrest = smoothstep(0.58, 0.88, uField) * smoothstep(0.35, 0.75, 1.0 - abs(uField - vField));\n\nbaseCol = mix(cSlate, cVerdigris, smoothstep(0.15, 0.72, uField) * glazeMix);\nbaseCol = mix(baseCol, cOchre, front * 0.88);\nbaseCol = mix(baseCol, cCinnabar, crest * 0.95);\n\ncol = clamp(baseCol, 0.0, 1.0);\n",
+    "params": {
+      "waveFreq": 7.5,
+      "warpAmt": 0.42,
+      "spiralArms": 3.0,
+      "sharpness": 2.4,
+      "glazeMix": 0.72
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

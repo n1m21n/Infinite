@@ -1388,11 +1388,7 @@ unsigned int Scene3DNode::Finish(unsigned int sceneTex, int w, int h, int frameI
       char buf[96];
       std::time_t now = std::time(nullptr);
       std::tm tmv{};
-#ifdef _WIN32
-      localtime_s(&tmv, &now);
-#else
-      localtime_r(&now, &tmv);
-#endif
+      Platform::LocalTime(now, &tmv);
       // Date is the day the picture was made; Time and Frame are where it sits in the animation (Blender's
       // stamp), read off the transport so the same frame stamps the same text in every render.
       if (st.stampDate) { std::strftime(buf, sizeof(buf), "%Y-%m-%d", &tmv); add("Date", buf); }

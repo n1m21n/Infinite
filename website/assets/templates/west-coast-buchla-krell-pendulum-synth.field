@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "West Coast Buchla Krell Pendulum Synth",
+    "author": "Infinite",
+    "description": "Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float ratio = 2.0 [0.5, 5.0];\nparam float timbre = 2.2 [0.2, 4.5];\nparam float resonance = 0.42 [0.0, 0.78];\nparam float decay = 0.72 [0.15, 2.0];\nparam float warmth = 1.35 [0.8, 2.8];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float bp = 0;\nstate float lp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.03);\nenv = if(target > env, env + (target - env) * 0.085, env - env * decayRate);\n\nlfo = (lfo + 0.45 / sr) % 1.0;\nratioDrift = ratio + sin(6.2831853 * lfo) * 0.12;\n\nf0 = clamp(freq, 40.0, 2600.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * ratioDrift) / sr) % 1.0;\n\n# Harmonic FM core + soft odd-order wavefolder\nfm = sin(6.2831853 * p2) * timbre * (0.25 + 0.75 * env);\ncore = sin(6.2831853 * p1 + fm);\nfolded = sin(core * (1.2 + env * 1.4));\n\n# Resonant state-variable body filter\nfCut = clamp((240.0 + env * 2800.0) / sr * 3.14, 0.015, 0.42);\nq = 1.0 - resonance * 0.85;\nhp = folded - lp - q * bp;\nbp = clamp(bp + fCut * hp, -2.5, 2.5);\nlp = clamp(lp + fCut * bp, -2.5, 2.5);\n\nmixSig = lp * 0.75 + bp * 0.25;\nsat = (mixSig * warmth) / (1.0 + abs(mixSig * warmth) * 0.45);\nout = sat * env * 0.50;\n",
+    "params": {
+      "ratio": 2.0,
+      "timbre": 2.2,
+      "resonance": 0.42,
+      "decay": 0.72,
+      "warmth": 1.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

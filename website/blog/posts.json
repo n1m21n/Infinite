@@ -1,12 +1,21 @@
 [
  {
-  "slug": "spectral-field-real-time-stft-phase-vocoder-kernels",
-  "title": "Real-time STFT phase vocoder kernels in Spectral Field",
-  "description": "How Infinite runs per-bin STFT phase vocoder kernels on the audio thread: zero-phase framing, identity phase locking, per-bin state, and dual-mode synthesis.",
-  "date": "2026-11-13",
-  "updated": "2026-11-13",
+  "slug": "image-to-sound-spectrogram-additive-synthesis",
+  "title": "Image to sound: real-time spectrogram additive synthesis",
+  "description": "How to turn live shaders, drawings, and textures into polyphonic sound in real time using Infinite's Spectral Synth additive partial bank.",
+  "date": "2026-11-15",
+  "updated": "2026-11-15",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/image-to-sound-spectrogram-additive-synthesis.html"
+ },
+ {
+  "slug": "out-of-process-vst3-au-plugin-shared-memory-ipc",
+  "title": "Out-of-process VST3 and AU plugin architecture with shared memory",
+  "description": "How Infinite runs a modular synth and GPU visual engine as a VST3 and AU plugin using lock-free shared-memory IPC, PBO readback, and host isolation.",
+  "date": "2026-11-15",
+  "updated": "2026-11-15",
   "category": "product",
-  "url": "https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html"
+  "url": "https://infinitedevices.org/blog/out-of-process-vst3-au-plugin-shared-memory-ipc.html"
  },
  {
   "slug": "modal-synthesis-and-physical-modelling-of-metallic-percussion",

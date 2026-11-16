@@ -577,11 +577,27 @@
    "font-size": 2,
    "hex": 6
   },
-  "embeds/ukiyoe-cartography-isobar-waves.html": {
+  "embeds/ukiyoe-cartography-archipelago-contours.html": {
    "font-size": 2,
    "hex": 6
   },
-  "embeds/ukiyoe-cartography-woodblock-relief.html": {
+  "embeds/ukiyoe-cartography-compass-tide-chart.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/reaction-diffusion-belousov-spiral-waves.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/reaction-diffusion-belousov-turing-coral.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ferrofluid-thinfilm-magnetic-spikes.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ferrofluid-thinfilm-bismuth-corona.html": {
    "font-size": 2,
    "hex": 6
   }

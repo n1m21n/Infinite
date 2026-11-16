@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Build and Gate Runner for Creative Expansion Pack 43.
 Generates 10 items across the 5 core creative families:
-1. Sketch 2D (Theme: holographic_iridescent -> holographic-iridescent-foil-ribbon, holographic-iridescent-prism-blob)
-2. Sketch 3D (Theme: generative_plotter -> generative-plotter-molnar-lattice-3d, generative-plotter-torus-strata-3d)
-3. Field Synth (Theme: future_garage -> future-garage-sub-chord-organ-synth, future-garage-velvet-pad-drone-synth)
-4. Field Effects (Theme: acid_house -> acid-house-303-resonant-filter-fx, acid-house-overdrive-tape-delay-fx)
-5. Field Pixel & Embeds (Theme: ukiyoe_cartography -> ukiyoe-cartography-isobar-waves, ukiyoe-cartography-woodblock-relief)
+1. Sketch 2D (Theme: vector_wireframe -> vector-wireframe-trench-horizon, vector-wireframe-icosahedron-radar)
+2. Sketch 3D (Theme: generative_plotter -> generative-plotter-molnar-cubes-3d, generative-plotter-mohr-hypercube-3d)
+3. Field Synth (Theme: future_garage -> future-garage-sub-reese-bass-synth, future-garage-glass-rhodes-chord-synth)
+4. Field Effects (Theme: acid_house -> acid-house-303-resonant-squelch-fx, acid-house-tape-dub-delay-fx)
+5. Field Pixel & Embeds (Theme: ukiyoe_cartography -> ukiyoe-cartography-archipelago-contours, ukiyoe-cartography-compass-tide-chart)
 """
 import os, sys, json, subprocess, zipfile
 from PIL import Image, ImageStat
@@ -32,141 +32,218 @@ sys.path.insert(0, os.path.join(ROOT, "tools", "website"))
 import template_preview
 
 # -------------------------------------------------------------
-# 1. Sketch 2D Sources (Theme: holographic_iridescent)
-#    Palette: #a9f0ff (ice cyan), #ffb3f5 (pastel rose), #d6ff9e (lime), #ffffff (specular), #101428 (deep indigo)
+# 1. Sketch 2D Sources (Theme: vector_wireframe)
+#    Palette: #000000 (phosphor void), #00ff6a (Vectrex CRT green), #ffffff (beam white)
+#    Refs: Elite (1984), Battlezone, Tempest, Vectrex CRT
 # -------------------------------------------------------------
 SKETCH_2D_ITEMS = [
     {
-        "slug": "holographic-iridescent-foil-ribbon",
-        "title": "Holographic Iridescent Foil Ribbon",
-        "description": "Layered chromatic foil ribbons twisting across a deep indigo field with pastel cyan, rose, and lime interference bands.",
-        "tags": ["holographic", "iridescent", "foil", "ribbon", "y2k", "procedural"],
-        "code": """// Holographic Iridescent Foil Ribbon - Infinite Library (Sketch 2D)
-param("ribbon_count", 14, 6, 24);
-param("twist_freq", 3.2, 1.0, 6.0);
-param("wave_amp", 0.22, 0.06, 0.38);
-param("drift_speed", 0.5, 0.0, 1.5);
+        "slug": "vector-wireframe-trench-horizon",
+        "title": "Vector Wireframe Trench Horizon",
+        "description": "Perspective CRT vector trench corridor with receding horizon grid, targeting reticle, and phosphor scanlines.",
+        "tags": ["vector-wireframe", "vectrex", "crt", "wireframe", "perspective", "retro", "procedural"],
+        "code": """// Vector Wireframe Trench Horizon - Infinite Library (Sketch 2D)
+param("grid_depth", 14, 6, 24);
+param("trench_width", 0.42, 0.2, 0.7);
+param("reticle_size", 0.16, 0.06, 0.3);
+param("scroll_speed", 0.85, 0.0, 2.5);
 
 function draw(t) {
-  background(0.063, 0.078, 0.157);
+  background(0.015, 0.048, 0.028);
+
   const w = width;
   const h = height;
-  const nr = floor(ribbon_count);
+  const cx = w * 0.5;
+  const cy = h * 0.48;
+  const nd = floor(grid_depth);
 
-  // Soft iridescent halo glow
+  // Subtle CRT phosphor horizon band
   noStroke();
-  for (let k = 0; k < 5; k++) {
-    const ang = (k / 5) * Math.PI * 2.0 + t * drift_speed * 0.3;
-    const gx = w * 0.5 + Math.cos(ang) * w * 0.18;
-    const gy = h * 0.5 + Math.sin(ang) * h * 0.18;
-    if (k % 3 === 0) fill(0.663, 0.941, 1.0, 0.12);
-    else if (k % 3 === 1) fill(1.0, 0.702, 0.961, 0.12);
-    else fill(0.839, 1.0, 0.620, 0.12);
-    circle(gx, gy, w * 0.52);
+  fill(0.0, 0.35, 0.16, 0.22);
+  rect(w * 0.04, cy - h * 0.08, w * 0.92, h * 0.16);
+  fill(0.0, 0.55, 0.25, 0.16);
+  circle(cx, cy, min(w, h) * 0.42);
+
+  // Outer CRT bezel frame
+  noFill();
+  stroke(0.0, 1.0, 0.416, 0.7);
+  strokeWeight(3.5);
+  rect(w * 0.04, h * 0.04, w * 0.92, h * 0.92);
+
+  // Horizon line
+  stroke(1.0, 1.0, 1.0, 0.85);
+  strokeWeight(2.0);
+  line(w * 0.04, cy, w * 0.96, cy);
+
+  // Receding perspective floor & ceiling rays
+  const rays = 12;
+  for (let i = -rays; i <= rays; i++) {
+    const u = i / rays;
+    const xEnd = cx + u * w * 0.72;
+    const alpha = Math.abs(i) <= 2 ? 0.9 : 0.45;
+    stroke(0.0, 1.0, 0.416, alpha);
+    strokeWeight(Math.abs(i) % 3 === 0 ? 2.2 : 1.3);
+    line(cx + u * w * 0.03, cy, xEnd, h * 0.96);
+    line(cx + u * w * 0.03, cy, xEnd, h * 0.04);
   }
 
-  // Twisting holographic foil ribbons
-  for (let i = 0; i < nr; i++) {
-    const u = i / max(1, nr - 1);
-    const yBase = h * (0.14 + u * 0.72);
-    const phase = t * drift_speed + i * 0.42;
+  // Scrolling perspective depth ribs
+  const phase = (t * scroll_speed) % 1.0;
+  for (let d = 0; d < nd; d++) {
+    const u = (d + phase) / nd;
+    const z = Math.pow(u, 2.1);
+    const yOff = z * h * 0.48;
+    const xHalf = (0.04 + z * trench_width) * w;
 
-    if (i % 3 === 0) {
-      fill(0.663, 0.941, 1.0, 0.42);
-      stroke(1.0, 1.0, 1.0, 0.85);
-    } else if (i % 3 === 1) {
-      fill(1.0, 0.702, 0.961, 0.42);
-      stroke(0.663, 0.941, 1.0, 0.85);
-    } else {
-      fill(0.839, 1.0, 0.620, 0.40);
-      stroke(1.0, 0.702, 0.961, 0.85);
-    }
-    strokeWeight(2.2);
+    stroke(0.0, 1.0, 0.416, 0.25 + z * 0.72);
+    strokeWeight(1.2 + z * 2.2);
 
-    const segs = 64;
-    const bandH = h * (0.045 + 0.025 * Math.sin(i * 1.1 + t * 0.4));
-    beginShape();
-    for (let s = 0; s <= segs; s++) {
-      const sx = (s / segs) * w;
-      const nx = s / segs;
-      const dy = Math.sin(nx * Math.PI * twist_freq + phase) * h * wave_amp * 0.45
-               + Math.cos(nx * Math.PI * 1.5 - phase * 0.6) * h * 0.06;
-      vertex(sx, yBase + dy - bandH * 0.5);
-    }
-    for (let s = segs; s >= 0; s--) {
-      const sx = (s / segs) * w;
-      const nx = s / segs;
-      const dy = Math.sin(nx * Math.PI * twist_freq + phase) * h * wave_amp * 0.45
-               + Math.cos(nx * Math.PI * 1.5 - phase * 0.6) * h * 0.06;
-      const pinch = 0.5 + 0.5 * Math.cos(nx * Math.PI * 2.0 + i * 0.5);
-      vertex(sx, yBase + dy + bandH * (0.3 + 0.7 * pinch));
-    }
-    endShape(CLOSE);
+    // Lower floor rib & upper ceiling rib
+    line(w * 0.04, cy + yOff, w * 0.96, cy + yOff);
+    line(w * 0.04, cy - yOff, w * 0.96, cy - yOff);
+
+    // Trench wall vertical struts
+    stroke(1.0, 1.0, 1.0, 0.2 + z * 0.65);
+    line(cx - xHalf, cy - yOff, cx - xHalf, cy + yOff);
+    line(cx + xHalf, cy - yOff, cx + xHalf, cy + yOff);
+  }
+
+  // Central vector targeting reticle
+  const rr = min(w, h) * reticle_size;
+  noFill();
+  stroke(1.0, 1.0, 1.0, 0.95);
+  strokeWeight(2.4);
+  circle(cx, cy, rr * 2.0);
+  stroke(0.0, 1.0, 0.416, 0.95);
+  strokeWeight(2.0);
+  circle(cx, cy, rr * 1.15);
+
+  // Diamond crosshairs
+  const dOff = rr * 1.35;
+  line(cx - dOff, cy, cx - rr * 0.45, cy);
+  line(cx + rr * 0.45, cy, cx + dOff, cy);
+  line(cx, cy - dOff, cx, cy - rr * 0.45);
+  line(cx, cy + rr * 0.45, cx, cy + dOff);
+
+  // Corner telemetry ticks
+  stroke(0.0, 1.0, 0.416, 0.75);
+  strokeWeight(2.0);
+  for (let k = 0; k < 6; k++) {
+    const ty = h * 0.12 + k * 24;
+    const barW = 28 + ((k * 17) % 38);
+    line(w * 0.07, ty, w * 0.07 + barW, ty);
+    line(w * 0.93 - barW, ty, w * 0.93, ty);
   }
 }
 """
     },
     {
-        "slug": "holographic-iridescent-prism-blob",
-        "title": "Holographic Iridescent Prism Blob",
-        "description": "Morphing superellipse foil lobes with thin-film spectral contour rings and specular white highlights.",
-        "tags": ["holographic", "iridescent", "prism", "superellipse", "y2k", "procedural"],
-        "code": """// Holographic Iridescent Prism Blob - Infinite Library (Sketch 2D)
-param("shell_count", 16, 6, 28);
-param("lobe_order", 4, 2, 8);
-param("warp_depth", 0.18, 0.04, 0.35);
-param("spin_speed", 0.45, 0.0, 1.5);
+        "slug": "vector-wireframe-icosahedron-radar",
+        "title": "Vector Wireframe Icosahedron Radar",
+        "description": "Rotating 3D-projected vector wireframe icosahedron inside concentric Vectrex radar rings and cardinal azimuth ticks.",
+        "tags": ["vector-wireframe", "icosahedron", "radar", "crt", "vectrex", "geometry", "procedural"],
+        "code": """// Vector Wireframe Icosahedron Radar - Infinite Library (Sketch 2D)
+param("ring_count", 6, 3, 10);
+param("spin_speed", 0.55, 0.0, 2.0);
+param("poly_scale", 0.28, 0.14, 0.42);
+param("tick_density", 36, 12, 72);
 
 function draw(t) {
-  background(0.055, 0.067, 0.141);
+  background(0.015, 0.048, 0.028);
+
   const w = width;
   const h = height;
   const cx = w * 0.5;
   const cy = h * 0.5;
-  const maxR = min(w, h) * 0.43;
-  const ns = floor(shell_count);
-  const lo = floor(lobe_order);
+  const maxR = min(w, h) * 0.44;
+  const nr = floor(ring_count);
+  const nt = floor(tick_density);
 
-  // Outer prismatic bloom rings
-  for (let i = 0; i < ns; i++) {
-    const u = 1.0 - i / ns;
-    const rad = maxR * (0.14 + u * 0.86);
-    const phase = t * spin_speed + i * 0.32;
+  // Subtle CRT phosphor radar screen glow
+  noStroke();
+  fill(0.0, 0.32, 0.15, 0.22);
+  circle(cx, cy, maxR * 2.0);
+  fill(0.0, 0.55, 0.24, 0.18);
+  circle(cx, cy, maxR * 1.15);
 
-    if (i % 4 === 0) {
-      fill(0.663, 0.941, 1.0, 0.55);
-      stroke(1.0, 1.0, 1.0, 0.85);
-    } else if (i % 4 === 1) {
-      fill(1.0, 0.702, 0.961, 0.55);
-      stroke(0.663, 0.941, 1.0, 0.85);
-    } else if (i % 4 === 2) {
-      fill(0.839, 1.0, 0.620, 0.52);
-      stroke(1.0, 0.702, 0.961, 0.85);
-    } else {
-      fill(0.11, 0.14, 0.28, 0.82);
-      stroke(0.839, 1.0, 0.620, 0.90);
-    }
-    strokeWeight(2.4);
-
-    beginShape();
-    const segs = 80;
-    for (let s = 0; s < segs; s++) {
-      const a = (s / segs) * Math.PI * 2.0;
-      const mod1 = Math.sin(a * lo + phase) * warp_depth;
-      const mod2 = Math.cos(a * (lo + 1) - phase * 0.8) * (warp_depth * 0.5);
-      const r = rad * (1.0 + mod1 + mod2);
-      vertex(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-    }
-    endShape(CLOSE);
+  // Concentric radar range rings
+  noFill();
+  for (let i = 1; i <= nr; i++) {
+    const r = (i / nr) * maxR;
+    stroke(0.0, 1.0, 0.416, i === nr ? 0.92 : 0.48);
+    strokeWeight(i === nr ? 3.2 : 2.0);
+    circle(cx, cy, r * 2.0);
   }
 
-  // Specular foil glints
+  // Azimuthal ticks around outer ring
+  for (let i = 0; i < nt; i++) {
+    const ang = (i / nt) * Math.PI * 2.0;
+    const isMajor = (i % 3 === 0);
+    const r0 = maxR * (isMajor ? 0.92 : 0.96);
+    const r1 = maxR * 1.02;
+    stroke(isMajor ? 1.0 : 0.0, 1.0, isMajor ? 1.0 : 0.416, isMajor ? 0.9 : 0.5);
+    strokeWeight(isMajor ? 2.2 : 1.2);
+    line(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0, cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+  }
+
+  // Rotating radar sweep line
+  const sweepAng = t * spin_speed * 1.4;
+  stroke(0.0, 1.0, 0.416, 0.75);
+  strokeWeight(2.0);
+  line(cx, cy, cx + Math.cos(sweepAng) * maxR, cy + Math.sin(sweepAng) * maxR);
+
+  // 3D-projected icosahedron vertices
+  const phi = 1.6180339887;
+  const rawVerts = [
+    [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
+    [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
+    [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]
+  ];
+  const edges = [
+    [0,11],[0,5],[0,1],[0,7],[0,10],[1,5],[5,11],[11,10],[10,7],[7,1],
+    [3,9],[3,4],[3,2],[3,6],[3,8],[4,9],[2,4],[6,2],[8,6],[9,8],
+    [1,9],[5,4],[11,2],[10,6],[7,8],[9,5],[4,11],[2,10],[6,7],[8,1]
+  ];
+
+  const ay = t * spin_speed + 0.45;
+  const ax = t * spin_speed * 0.62 + 0.35;
+  const cyA = Math.cos(ay), syA = Math.sin(ay);
+  const cxA = Math.cos(ax), sxA = Math.sin(ax);
+  const sc = min(w, h) * poly_scale * 0.58;
+
+  const proj = [];
+  for (let i = 0; i < rawVerts.length; i++) {
+    const vx = rawVerts[i][0], vy = rawVerts[i][1], vz = rawVerts[i][2];
+    const x1 = vx * cyA - vz * syA;
+    const z1 = vx * syA + vz * cyA;
+    const y2 = vy * cxA - z1 * sxA;
+    const z2 = vy * sxA + z1 * cxA;
+    const persp = 4.2 / (4.2 - z2 * 0.45);
+    proj.push([cx + x1 * sc * persp, cy + y2 * sc * persp, z2]);
+  }
+
+  // Draw wireframe edges with depth-weighted phosphor intensity
+  for (let e = 0; e < edges.length; e++) {
+    const a = proj[edges[e][0]];
+    const b = proj[edges[e][1]];
+    const zAvg = (a[2] + b[2]) * 0.5;
+    const front = zAvg > 0.0;
+    if (front) {
+      stroke(1.0, 1.0, 1.0, 0.95);
+      strokeWeight(2.8);
+    } else {
+      stroke(0.0, 1.0, 0.416, 0.55);
+      strokeWeight(1.8);
+    }
+    line(a[0], a[1], b[0], b[1]);
+  }
+
+  // Vertex phosphor nodes
   noStroke();
-  for (let g = 0; g < 12; g++) {
-    const ga = (g / 12) * Math.PI * 2.0 + t * spin_speed * 0.5;
-    const gr = maxR * (0.42 + 0.32 * Math.sin(g * 1.7 + t * 0.6));
-    fill(1.0, 1.0, 1.0, 0.85);
-    circle(cx + Math.cos(ga) * gr, cy + Math.sin(ga) * gr, 10 + (g % 3) * 5);
+  for (let i = 0; i < proj.length; i++) {
+    const p = proj[i];
+    fill(p[2] > 0 ? 1.0 : 0.0, 1.0, p[2] > 0 ? 1.0 : 0.416, 0.95);
+    circle(p[0], p[1], p[2] > 0 ? 8 : 5);
   }
 }
 """
@@ -175,105 +252,134 @@ function draw(t) {
 
 # -------------------------------------------------------------
 # 2. Sketch 3D Sources (Theme: generative_plotter)
-#    Palette: #f5f1e6 (archival cream), #111111 (India ink), #d1301f (vermilion)
+#    Palette: #f5f1e6 (archival cream), #111111 (plotter ink), #d1301f (vermilion)
+#    Refs: Vera Molnar, Manfred Mohr, Frieder Nake
 # -------------------------------------------------------------
 SKETCH_3D_ITEMS = [
     {
-        "slug": "generative-plotter-molnar-lattice-3d",
-        "title": "Generative Plotter Molnar Lattice 3D",
-        "description": "Algorithmic 3D lattice of perturbed India-ink and vermilion frames inspired by Vera Molnar's Interruptions.",
-        "tags": ["generative-plotter", "plotter", "molnar", "3d", "algorithmic", "minimal"],
-        "code": """// Generative Plotter Molnar Lattice 3D - Infinite Library (Sketch 3D)
-param("grid_n", 5, 3, 7);
-param("jitter", 0.28, 0.05, 0.65);
-param("step_gap", 0.44, 0.30, 0.60);
-param("spin_rate", 0.25, 0.0, 1.0);
+        "slug": "generative-plotter-molnar-cubes-3d",
+        "title": "Generative Plotter Molnar Cubes 3D",
+        "description": "Vera Molnar-inspired 3D grid of stepped cubic frames in technical ink and vermilion accent on archival cream paper.",
+        "tags": ["generative-plotter", "molnar", "plotter", "3d", "cubes", "algorithmic", "procedural"],
+        "code": """// Generative Plotter Molnar Cubes 3D - Infinite Library (Sketch 3D)
+param("grid_size", 4, 3, 6);
+param("jitter_amt", 0.16, 0.0, 0.35);
+param("tilt_angle", 0.52, 0.1, 1.1);
+param("spin_speed", 0.25, 0.0, 1.0);
 
 function draw(t) {
-  rotateX(0.48);
-  rotateY(t * spin_rate + 0.55);
+  rotateX(tilt_angle);
+  rotateY(t * spin_speed + 0.62);
 
-  const n = floor(grid_n);
-  const half = (n - 1) * 0.5;
+  const ng = floor(grid_size);
+  const spacing = 0.62;
+  const offset = (ng - 1) * spacing * 0.5;
 
-  for (let ix = 0; ix < n; ix++) {
-    for (let iy = 0; iy < n; iy++) {
-      for (let iz = 0; iz < 2; iz++) {
-        const px = (ix - half) * step_gap;
-        const py = (iy - half) * step_gap;
-        const pz = (iz - 0.5) * step_gap * 1.4;
+  // Outer plotter registration frame
+  push();
+  fill(0.067, 0.067, 0.067);
+  torus(1.55, 0.018, 48, 8);
+  pop();
 
-        const seed = ix * 7.13 + iy * 13.71 + iz * 23.3;
-        const rx = Math.sin(seed + t * 0.3) * jitter;
-        const ry = Math.cos(seed * 1.3 - t * 0.2) * jitter;
+  for (let ix = 0; ix < ng; ix++) {
+    for (let iz = 0; iz < ng; iz++) {
+      const seed = ix * 17.3 + iz * 31.7;
+      const jx = Math.sin(seed + t * 0.3) * jitter_amt;
+      const jz = Math.cos(seed * 1.4 - t * 0.25) * jitter_amt;
+      const hStep = 0.28 + ((ix + iz * 2) % 3) * 0.24;
+      const isAccent = ((ix + iz) % 4 === 1);
 
-        push();
-        translate(px, py, pz);
-        rotateX(rx);
-        rotateY(ry);
+      push();
+      translate(ix * spacing - offset + jx, 0, iz * spacing - offset + jz);
+      rotateY(Math.sin(seed) * 0.28);
 
-        if ((ix + iy + iz) % 5 === 0) {
-          fill(0.820, 0.188, 0.122);
-        } else {
-          fill(0.067, 0.067, 0.067);
-        }
-
-        // Plotter square frame built from 4 thin struts
-        const s = step_gap * 0.38;
-        const th = 0.024;
-        push(); translate(0, s, 0); box(s * 2.0, th, th); pop();
-        push(); translate(0, -s, 0); box(s * 2.0, th, th); pop();
-        push(); translate(s, 0, 0); box(th, s * 2.0, th); pop();
-        push(); translate(-s, 0, 0); box(th, s * 2.0, th); pop();
-
-        pop();
+      if (isAccent) {
+        fill(0.820, 0.188, 0.122); // #d1301f vermilion
+      } else {
+        fill(0.067, 0.067, 0.067); // #111111 technical ink
       }
+
+      // Stepped plotter frame bars
+      box(0.42, 0.05, 0.42);
+      translate(0, hStep * 0.5, 0);
+      box(0.06, hStep, 0.06);
+      translate(0, hStep * 0.5, 0);
+      box(0.32, 0.05, 0.32);
+      pop();
     }
   }
 }
 """
     },
     {
-        "slug": "generative-plotter-torus-strata-3d",
-        "title": "Generative Plotter Torus Strata 3D",
-        "description": "Stepped concentric torus and cylinder elevation strata in India ink and vermilion red evoking pen-plotter contours.",
-        "tags": ["generative-plotter", "plotter", "strata", "3d", "contour", "algorithmic"],
-        "code": """// Generative Plotter Torus Strata 3D - Infinite Library (Sketch 3D)
-param("ring_count", 11, 5, 16);
-param("tilt_amt", 0.35, 0.05, 0.75);
-param("radius_span", 1.35, 0.8, 1.8);
-param("spin_rate", 0.22, 0.0, 1.0);
+        "slug": "generative-plotter-mohr-hypercube-3d",
+        "title": "Generative Plotter Mohr Hypercube 3D",
+        "description": "Manfred Mohr-inspired algorithmic hypercube lattice of intersecting orthogonal beams and vermilion node markers.",
+        "tags": ["generative-plotter", "mohr", "hypercube", "lattice", "3d", "plotter", "procedural"],
+        "code": """// Generative Plotter Mohr Hypercube 3D - Infinite Library (Sketch 3D)
+param("subdivisions", 3, 2, 5);
+param("beam_thick", 0.045, 0.02, 0.09);
+param("phase_shift", 0.45, 0.0, 1.5);
+param("spin_speed", 0.30, 0.0, 1.0);
 
 function draw(t) {
-  rotateX(0.62);
-  rotateY(t * spin_rate + 0.4);
+  rotateX(0.48 + Math.sin(t * 0.3) * 0.12);
+  rotateY(t * spin_speed + 0.78);
 
-  const nr = floor(ring_count);
+  const ns = floor(subdivisions);
+  const span = 1.35;
+  const bt = beam_thick;
 
-  // Central plotter calibration axis
-  push();
-  fill(0.820, 0.188, 0.122);
-  cylinder(0.035, 2.2, 16);
-  pop();
+  // Outer hypercube skeleton
+  for (let sx = -1; sx <= 1; sx += 2) {
+    for (let sy = -1; sy <= 1; sy += 2) {
+      push();
+      fill(0.067, 0.067, 0.067);
+      translate(sx * span * 0.5, sy * span * 0.5, 0);
+      box(bt, bt, span);
+      pop();
 
-  for (let i = 0; i < nr; i++) {
-    const u = i / max(1, nr - 1);
-    const y = (u - 0.5) * 1.45;
-    const rad = radius_span * (0.28 + 0.72 * Math.sin(u * Math.PI));
-    const tilt = Math.sin(u * 4.5 + t * 0.4) * tilt_amt;
+      push();
+      fill(0.067, 0.067, 0.067);
+      translate(sx * span * 0.5, 0, sy * span * 0.5);
+      box(bt, span, bt);
+      pop();
+
+      push();
+      fill(0.067, 0.067, 0.067);
+      translate(0, sx * span * 0.5, sy * span * 0.5);
+      box(span, bt, bt);
+      pop();
+    }
+  }
+
+  // Inner algorithmic subdivisions & vermilion nodes
+  for (let i = 0; i < ns; i++) {
+    const u = (i + 0.5) / ns - 0.5;
+    const p = u * span * 0.85;
+    const rot = phase_shift * (i + 1) + t * 0.2;
 
     push();
-    translate(0, y, 0);
-    rotateX(Math.PI * 0.5 + tilt);
-    rotateY(u * 1.2);
-    if (i % 4 === 1) {
-      fill(0.820, 0.188, 0.122);
-    } else {
-      fill(0.067, 0.067, 0.067);
-    }
-    torus(rad, 0.024, 48, 10);
+    rotateZ(rot * 0.35);
+    fill(0.067, 0.067, 0.067);
+    translate(p, 0, 0);
+    box(bt * 0.85, span * 0.75, bt * 0.85);
+    pop();
+
+    push();
+    fill(0.820, 0.188, 0.122); // #d1301f vermilion node
+    translate(p, Math.sin(rot) * 0.32, Math.cos(rot) * 0.32);
+    sphere(0.11, 16, 12);
     pop();
   }
+
+  // Central diagonal axis strut
+  push();
+  rotateZ(0.785);
+  rotateX(0.615);
+  fill(0.820, 0.188, 0.122);
+  cylinder(0.032, span * 1.45, 16);
+  pop();
 }
 """
     }
@@ -281,228 +387,240 @@ function draw(t) {
 
 # -------------------------------------------------------------
 # 3. Field Synth Sources (Theme: future_garage)
-#    130-135 BPM, Scale 1/4, Refs: Burial, Mount Kimbie, Four Tet
+#    130-135 BPM, swing 0.3, scale [1, 4], Refs: Burial, Mount Kimbie, Four Tet
 # -------------------------------------------------------------
 SYNTH_ITEMS = [
     {
-        "slug": "future-garage-sub-chord-organ-synth",
-        "title": "Future Garage Sub Chord Organ Synth",
-        "description": "Warm detuned sine-fifth sub organ with soft vinyl-like envelope and subtle pitch drift.",
-        "note_root": 48,
+        "slug": "future-garage-sub-reese-bass-synth",
+        "title": "Future Garage Sub Reese Bass Synth",
+        "description": "Detuned dual-saw sub-bass synthesizer with warm lowpass filter drift and subtle saturation for UK garage basslines.",
+        "note_root": 44,
         "params": {
-            "fifthMix": 0.45,
-            "detune": 0.008,
-            "warmth": 1200.0,
-            "drift": 0.30,
-            "decay": 0.75
+            "detune": 0.016,
+            "cutoff": 520.0,
+            "subLevel": 0.65,
+            "drive": 1.35,
+            "decay": 0.65
         },
-        "code": """param float fifthMix = 0.45 [0.0, 1.0];
-param float detune = 0.008 [0.0, 0.03];
-param float warmth = 1200.0 [200.0, 4000.0];
-param float drift = 0.30 [0.0, 1.0];
-param float decay = 0.75 [0.2, 2.0];
+        "code": """param float detune = 0.016 [0.002, 0.045];
+param float cutoff = 520.0 [120.0, 2200.0];
+param float subLevel = 0.65 [0.0, 1.0];
+param float drive = 1.35 [1.0, 3.0];
+param float decay = 0.65 [0.15, 1.8];
 state float p1 = 0;
 state float p2 = 0;
-state float p5 = 0;
-state float lfo = 0;
-state float env = 0;
-state float lp = 0;
-
-target = if(gate > 0.5, 1.0, 0.0);
-decayRate = clamp(1.0 / (sr * decay), 0.0001, 0.03);
-env = if(target > env, env + (target - env) * 0.05, env - env * decayRate);
-
-lfo = (lfo + 0.75 / sr) % 1.0;
-wow = 1.0 + sin(6.2831853 * lfo) * drift * 0.006;
-
-f0 = clamp(freq * wow, 35.0, 2400.0);
-p1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;
-p2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;
-p5 = (p5 + f0 * 1.4983 / sr) % 1.0;
-
-organ = (sin(6.2831853 * p1) + sin(6.2831853 * p2)) * 0.5 + sin(6.2831853 * p5) * fifthMix * 0.6;
-fCut = clamp(warmth / sr * 3.14, 0.01, 0.44);
-lp = lp + fCut * (organ - lp);
-
-out = lp * env * 0.72;
-"""
-    },
-    {
-        "slug": "future-garage-velvet-pad-drone-synth",
-        "title": "Future Garage Velvet Pad Drone Synth",
-        "description": "Shimmering dual-oscillator velvet pad with slow LFO filter sweep and gentle harmonic overtones.",
-        "note_root": 55,
-        "params": {
-            "detune": 0.013,
-            "cutoff": 1400.0,
-            "sweep": 0.45,
-            "shimmer": 0.35,
-            "decay": 0.95
-        },
-        "code": """param float detune = 0.013 [0.0, 0.035];
-param float cutoff = 1400.0 [250.0, 4200.0];
-param float sweep = 0.45 [0.0, 1.0];
-param float shimmer = 0.35 [0.0, 1.0];
-param float decay = 0.95 [0.25, 2.5];
-state float p1 = 0;
-state float p2 = 0;
-state float pOct = 0;
+state float pSub = 0;
 state float lfo = 0;
 state float env = 0;
 state float lp1 = 0;
 state float lp2 = 0;
 
 target = if(gate > 0.5, 1.0, 0.0);
-decayRate = clamp(1.0 / (sr * decay), 0.0001, 0.025);
-env = if(target > env, env + (target - env) * 0.04, env - env * decayRate);
+decayRate = clamp(1.0 / (sr * decay), 0.0001, 0.03);
+env = if(target > env, env + (target - env) * 0.09, env - env * decayRate);
 
-lfo = (lfo + 0.45 / sr) % 1.0;
-f0 = clamp(freq, 40.0, 2600.0);
+lfo = (lfo + 0.65 / sr) % 1.0;
+drift = 1.0 + sin(6.2831853 * lfo) * 0.18;
+
+f0 = clamp(freq, 30.0, 1600.0);
 p1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;
 p2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;
-pOct = (pOct + f0 * 2.002 / sr) % 1.0;
+pSub = (pSub + (f0 * 0.5) / sr) % 1.0;
 
-saw1 = p1 * 2.0 - 1.0;
-saw2 = p2 * 2.0 - 1.0;
-triOct = 1.0 - 4.0 * abs(pOct - 0.5);
-raw = (saw1 + saw2) * 0.35 + triOct * shimmer * 0.35;
+saw1 = 2.0 * p1 - 1.0;
+saw2 = 2.0 * p2 - 1.0;
+sub = sin(6.2831853 * pSub);
+raw = (saw1 + saw2) * 0.36 + sub * subLevel;
 
-modCut = cutoff * (1.0 + sin(6.2831853 * lfo) * sweep * 0.45);
-fCut = clamp(modCut / sr * 3.14, 0.01, 0.44);
+fCut = clamp((cutoff * drift + env * 340.0) / sr * 3.14, 0.008, 0.42);
 lp1 = lp1 + fCut * (raw - lp1);
 lp2 = lp2 + fCut * (lp1 - lp2);
 
-out = lp2 * env * 0.55;
+sat = (lp2 * drive) / (1.0 + abs(lp2 * drive) * 0.4);
+out = sat * env * 0.45;
+"""
+    },
+    {
+        "slug": "future-garage-glass-rhodes-chord-synth",
+        "title": "Future Garage Glass Rhodes Chord Synth",
+        "description": "Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay.",
+        "note_root": 56,
+        "params": {
+            "bell": 0.52,
+            "detune": 0.009,
+            "warmth": 1850.0,
+            "shimmer": 0.40,
+            "decay": 0.90
+        },
+        "code": """param float bell = 0.52 [0.0, 1.2];
+param float detune = 0.009 [0.0, 0.03];
+param float warmth = 1850.0 [350.0, 4500.0];
+param float shimmer = 0.40 [0.0, 1.0];
+param float decay = 0.90 [0.2, 2.2];
+state float p1 = 0;
+state float p2 = 0;
+state float pBell = 0;
+state float env = 0;
+state float lp = 0;
+
+target = if(gate > 0.5, 1.0, 0.0);
+decayRate = clamp(1.0 / (sr * decay), 0.0001, 0.03);
+env = if(target > env, env + (target - env) * 0.08, env - env * decayRate);
+
+f0 = clamp(freq, 40.0, 2800.0);
+p1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;
+p2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;
+pBell = (pBell + (f0 * 4.0) / sr) % 1.0;
+
+modSig = sin(6.2831853 * pBell) * bell * env * env;
+v1 = sin(6.2831853 * p1 + modSig);
+v2 = sin(6.2831853 * p2 + modSig * shimmer);
+raw = (v1 + v2) * 0.48;
+
+fCut = clamp(warmth / sr * 3.14, 0.01, 0.44);
+lp = lp + fCut * (raw - lp);
+
+out = lp * env * 1.15;
 """
     }
 ]
 
 # -------------------------------------------------------------
 # 4. Field Effects Sources (Theme: acid_house)
-#    120-130 BPM, Refs: Phuture, Roland TB-303, Hardfloor, Josh Wink
+#    120-130 BPM, Refs: Phuture (Acid Tracks 1987), Roland TB-303, Hardfloor
 # -------------------------------------------------------------
 FX_ITEMS = [
     {
-        "slug": "acid-house-303-resonant-filter-fx",
-        "title": "Acid House 303 Resonant Filter FX",
-        "description": "Sweeping resonant diode-style lowpass filter with soft waveshaped drive and LFO cutoff modulation.",
+        "slug": "acid-house-303-resonant-squelch-fx",
+        "title": "Acid House 303 Resonant Squelch FX",
+        "description": "Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation.",
         "params": {
-            "cutoff": 950.0,
-            "resonance": 0.55,
-            "lfoRate": 0.65,
+            "cutoff": 0.24,
+            "resonance": 0.68,
+            "sweepRate": 0.65,
             "drive": 1.6,
-            "mix": 0.80
+            "mix": 0.78
         },
-        "code": """param float cutoff = 950.0 [180.0, 4200.0];
-param float resonance = 0.55 [0.0, 0.85];
-param float lfoRate = 0.65 [0.1, 4.0];
-param float drive = 1.6 [0.5, 4.0];
-param float mix = 0.80 [0.0, 1.0];
+        "code": """param float cutoff = 0.24 [0.04, 0.55];
+param float resonance = 0.68 [0.0, 0.88];
+param float sweepRate = 0.65 [0.1, 4.0];
+param float drive = 1.6 [1.0, 3.5];
+param float mix = 0.78 [0.0, 1.0];
 state float lfo = 0;
 state float lp1 = 0;
 state float lp2 = 0;
 
-lfo = (lfo + lfoRate / sr) % 1.0;
-mod = 1.0 + 0.55 * sin(6.2831853 * lfo);
-fCut = clamp((cutoff * mod) / sr * 3.14, 0.02, 0.45);
+lfo = (lfo + sweepRate / sr) % 1.0;
+modCut = clamp(cutoff + sin(6.2831853 * lfo) * 0.14, 0.03, 0.52);
 
-fb = clamp(lp2 * resonance * 1.35, -0.95, 0.95);
-driven = in * drive - fb;
-sat = driven / (1.0 + abs(driven));
+fb = clamp(resonance * 0.82, 0.0, 0.78);
+sig = in - lp2 * fb;
+satIn = (sig * drive) / (1.0 + abs(sig * drive) * 0.45);
 
-lp1 = lp1 + fCut * (sat - lp1);
-lp2 = lp2 + fCut * (lp1 - lp2);
+lp1 = lp1 + modCut * (satIn - lp1);
+lp2 = lp2 + modCut * (lp1 - lp2);
 
-out = clamp(in * (1.0 - mix) + lp2 * mix * 1.15, -0.92, 0.92);
+processed = in * (1.0 - mix) + lp2 * mix;
+out = processed * 0.92;
 """
     },
     {
-        "slug": "acid-house-overdrive-tape-delay-fx",
-        "title": "Acid House Overdrive Tape Delay FX",
-        "description": "Punchy saturated analog delay with warm feedback damping and rhythmic echo smear.",
+        "slug": "acid-house-tape-dub-delay-fx",
+        "title": "Acid House Tape Dub Delay FX",
+        "description": "Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive.",
         "params": {
-            "feedback": 0.52,
-            "damping": 0.45,
-            "drive": 1.8,
-            "mix": 0.55
+            "feedback": 0.54,
+            "damping": 0.44,
+            "drive": 1.45,
+            "mix": 0.52
         },
-        "code": """param float feedback = 0.52 [0.0, 0.85];
-param float damping = 0.45 [0.1, 0.95];
-param float drive = 1.8 [0.5, 4.0];
-param float mix = 0.55 [0.0, 1.0];
-state float d1 = 0;
-state float d2 = 0;
+        "code": """param float feedback = 0.54 [0.0, 0.82];
+param float damping = 0.44 [0.1, 0.92];
+param float drive = 1.45 [1.0, 3.5];
+param float mix = 0.52 [0.0, 1.0];
+state float tap1 = 0;
+state float tap2 = 0;
+state float tap3 = 0;
 state float lp = 0;
 
-x = in * drive;
-sat = x / (1.0 + abs(x));
+fCut = clamp(0.12 + (1.0 - damping) * 0.28, 0.03, 0.42);
+lp = lp + fCut * (in - lp);
 
-d1 = d1 + 0.14 * (sat + d2 * feedback - d1);
-d2 = d2 + 0.09 * (d1 - d2);
+tap1 = tap1 + 0.072 * (lp + tap3 * feedback * 0.52 - tap1);
+tap2 = tap2 + 0.056 * (tap1 - tap2);
+tap3 = tap3 + 0.046 * (tap2 - tap3);
 
-fCut = clamp(1.0 - damping * 0.72, 0.08, 0.85);
-lp = lp + fCut * (d2 - lp);
+echo = (tap1 * 0.45 + tap2 * 0.35 + tap3 * 0.25) * drive;
+sat = echo / (1.0 + abs(echo) * 0.38);
 
-out = clamp((in * (1.0 - mix) + lp * mix * 1.15) * 0.62, -0.92, 0.92);
+processed = in * (1.0 - mix) + sat * mix;
+out = processed * 0.94;
 """
     }
 ]
 
 # -------------------------------------------------------------
 # 5. Field Pixel & Embeds Sources (Theme: ukiyoe_cartography)
-#    Palette: #1d3557 (indigo ink), #e63946 (vermilion seal), #f1faee (rice paper), #a8dadc (celadon mist)
+#    Palette: #f1faee (washi paper), #1d3557 (indigo ink), #a8dadc (cerulean sea), #e63946 (hanko vermilion)
 # -------------------------------------------------------------
 PIXEL_ITEMS = [
     {
-        "slug": "ukiyoe-cartography-isobar-waves",
-        "title": "Ukiyo-e Cartography Isobar Waves",
-        "description": "Woodblock-inspired topographical wave contours in Prussian indigo and celadon mist over warm rice paper with a vermilion seal accent.",
-        "embed_desc": "Audio-reactive Edo-period woodblock wave cartography. Bass ripples the isobar contours, mids drift the celadon mist, and highs sharpen the paper grain.",
-        "tags": ["ukiyoe", "cartography", "woodblock", "indigo", "waves", "shader", "webgl", "audio-reactive"],
+        "slug": "ukiyoe-cartography-archipelago-contours",
+        "title": "Ukiyoe Cartography Archipelago Contours",
+        "description": "Topographical Edo woodblock archipelago map with animated contour ripples, rhumb lines, and a vermilion hanko seal.",
+        "embed_desc": "Audio-reactive Ukiyo-e woodblock cartography map. Bass swells the island elevation contours, mids drift the sea currents, and highs illuminate the rhumb lines and hanko seal.",
+        "tags": ["ukiyoe", "cartography", "woodblock", "contours", "map", "shader", "webgl", "audio-reactive"],
         "params": {
-            "contourFreq": 14.0,
-            "waveAmp": 0.16,
-            "paperGrain": 0.04,
-            "sealRadius": 0.11,
-            "contrast": 1.06
+            "contourFreq": 18.0,
+            "islandScale": 1.45,
+            "rhumbCount": 8.0,
+            "grainAmt": 0.04,
+            "seaTint": 0.55
         },
-        "code": """param float contourFreq = 14.0 [6.0, 28.0];
-param float waveAmp = 0.16 [0.04, 0.35];
-param float paperGrain = 0.04 [0.0, 0.12];
-param float sealRadius = 0.11 [0.05, 0.22];
-param float contrast = 1.06 [0.8, 1.4];
+        "code": """param float contourFreq = 18.0 [8.0, 32.0];
+param float islandScale = 1.45 [0.8, 2.5];
+param float rhumbCount = 8.0 [4.0, 16.0];
+param float grainAmt = 0.04 [0.0, 0.12];
+param float seaTint = 0.55 [0.1, 1.0];
 
 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;
 
-# Ukiyo-e palette: Indigo (#1d3557), Celadon (#a8dadc), Rice paper (#f1faee), Vermilion (#e63946)
+# Ukiyo-e cartography palette
+cPaper = vec3(0.945, 0.922, 0.855);
 cIndigo = vec3(0.114, 0.208, 0.341);
-cCeladon = vec3(0.659, 0.855, 0.863);
-cPaper = vec3(0.945, 0.933, 0.890);
+cSea = vec3(0.659, 0.855, 0.863);
 cSeal = vec3(0.902, 0.224, 0.275);
 
-# Rice paper grain
-grain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * paperGrain;
+# Topographical elevation field
+q = p * islandScale;
+h1 = sin(q.x * 2.1 + sin(q.y * 1.7 + t * 0.25)) * cos(q.y * 2.0 - t * 0.15);
+h2 = 0.5 * sin(length(q - vec2(0.35, -0.25)) * 3.8 - t * 0.3);
+elev = h1 + h2;
 
-# Topographical wave heightfield
-w1 = sin(p.x * 2.8 + t * 0.4) * cos(p.y * 2.4 - t * 0.25) * waveAmp;
-w2 = sin((p.x + p.y) * 4.2 - t * 0.3) * (waveAmp * 0.45);
-h = p.y * 0.5 + w1 + w2;
+# Woodblock contour bands and fine ink lines
+band = smoothstep(-0.08, 0.08, elev);
+contourWave = abs(fract(elev * contourFreq * 0.25) - 0.5);
+inkLine = 1.0 - smoothstep(0.03, 0.09, contourWave);
 
-# Woodblock contour bands
-iso = abs(fract(h * contourFreq) - 0.5);
-lineMask = 1.0 - smoothstep(0.06, 0.14, iso);
-mistMask = smoothstep(-0.25, 0.35, h);
+# Cartographic rhumb lines from map center
+ang = atan2(p.y, p.x);
+rhumb = 1.0 - smoothstep(0.015, 0.045, abs(sin(ang * rhumbCount)));
 
-baseCol = mix(cCeladon, cPaper, mistMask);
-baseCol = mix(baseCol, cIndigo, lineMask * 0.88);
+# Paper fibre grain
+grain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grainAmt;
 
-# Red hanko cartographer seal in upper right
-sealPos = p - vec2(0.58, 0.56);
-sealBox = max(abs(sealPos.x), abs(sealPos.y));
-inSeal = 1.0 - smoothstep(sealRadius - 0.01, sealRadius + 0.01, sealBox);
+baseCol = mix(mix(cPaper, cSea, seaTint * 0.72), cPaper, band);
+baseCol = mix(baseCol, cIndigo, inkLine * 0.78);
+baseCol = mix(baseCol, cIndigo, rhumb * 0.24);
+
+# Vermilion hanko seal stamp in lower-right quadrant
+sealPos = abs(p - vec2(0.56, -0.56));
+inSeal = step(max(sealPos.x, sealPos.y), 0.14);
+sealInner = step(max(sealPos.x, sealPos.y), 0.105) * step(0.025, abs(sealPos.x - 0.03));
 baseCol = mix(baseCol, cSeal, inSeal * 0.92);
+baseCol = mix(baseCol, cPaper, sealInner * 0.75);
 
-col = clamp((baseCol + grain) * contrast, 0.0, 1.0);
+col = clamp(baseCol + grain, 0.0, 1.0);
 """,
         "glsl": """precision mediump float;
 uniform vec2 res;
@@ -516,91 +634,105 @@ void main() {
   vec2 uv = gl_FragCoord.xy / res;
   vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;
 
-  float b = audio_bass * 0.4;
-  float m = audio_mid * 0.4;
-  float h = audio_high * 0.4;
+  float b = audio_bass * 0.45;
+  float m = audio_mid * 0.45;
+  float h = audio_high * 0.45;
 
+  vec3 cPaper = vec3(0.945, 0.922, 0.855);
   vec3 cIndigo = vec3(0.114, 0.208, 0.341);
-  vec3 cCeladon = vec3(0.659, 0.855, 0.863);
-  vec3 cPaper = vec3(0.945, 0.933, 0.890);
+  vec3 cSea = vec3(0.659, 0.855, 0.863);
   vec3 cSeal = vec3(0.902, 0.224, 0.275);
 
-  float grain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * (0.04 + h * 0.08);
+  vec2 q = p * (1.45 - b * 0.22);
+  float h1 = sin(q.x * 2.1 + sin(q.y * 1.7 + t * 0.25 + m)) * cos(q.y * 2.0 - t * 0.15);
+  float h2 = 0.5 * sin(length(q - vec2(0.35, -0.25)) * 3.8 - t * 0.3);
+  float elev = h1 + h2 + b * 0.25;
 
-  float waveAmp = 0.16 + b * 0.22;
-  float w1 = sin(p.x * 2.8 + t * 0.4) * cos(p.y * 2.4 - t * 0.25) * waveAmp;
-  float w2 = sin((p.x + p.y) * 4.2 - t * 0.3 + m * 2.0) * (waveAmp * 0.45);
-  float hf = p.y * 0.5 + w1 + w2;
+  float band = smoothstep(-0.08, 0.08, elev);
+  float contourWave = abs(fract(elev * (18.0 + h * 6.0) * 0.25) - 0.5);
+  float inkLine = 1.0 - smoothstep(0.03, 0.09, contourWave);
 
-  float iso = abs(fract(hf * 14.0) - 0.5);
-  float lineMask = 1.0 - smoothstep(0.06, 0.14, iso);
-  float mistMask = smoothstep(-0.25, 0.35, hf);
+  float ang = atan(p.y, p.x);
+  float rhumb = 1.0 - smoothstep(0.015, 0.045, abs(sin(ang * 8.0)));
 
-  vec3 baseCol = mix(cCeladon, cPaper, mistMask);
-  baseCol = mix(baseCol, cIndigo, lineMask * 0.88);
+  float grain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.04;
 
-  vec2 sealPos = p - vec2(0.58, 0.56);
-  float sealBox = max(abs(sealPos.x), abs(sealPos.y));
-  float inSeal = 1.0 - smoothstep(0.10, 0.12, sealBox);
+  vec3 baseCol = mix(mix(cPaper, cSea, 0.55 * 0.72), cPaper, band);
+  baseCol = mix(baseCol, cIndigo, inkLine * 0.78);
+  baseCol = mix(baseCol, cIndigo, rhumb * (0.24 + h * 0.3));
+
+  vec2 sealPos = abs(p - vec2(0.56, -0.56));
+  float inSeal = step(max(sealPos.x, sealPos.y), 0.14 + b * 0.02);
+  float sealInner = step(max(sealPos.x, sealPos.y), 0.105) * step(0.025, abs(sealPos.x - 0.03));
   baseCol = mix(baseCol, cSeal, inSeal * 0.92);
+  baseCol = mix(baseCol, cPaper, sealInner * 0.75);
 
-  vec3 col = clamp((baseCol + grain) * 1.06, 0.0, 1.0);
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(clamp(baseCol + grain, 0.0, 1.0), 1.0);
 }
 """
     },
     {
-        "slug": "ukiyoe-cartography-woodblock-relief",
-        "title": "Ukiyo-e Cartography Woodblock Relief",
-        "description": "Layered Edo-era archipelago elevation strata with woodblock grain, directional relief, and vermilion cartographic markers.",
-        "embed_desc": "Audio-reactive woodblock archipelago relief map. Bass swells the island elevation contours, mids sweep the compass meridians, and highs crisp the woodblock ink.",
-        "tags": ["ukiyoe", "cartography", "woodblock", "relief", "archipelago", "shader", "webgl", "audio-reactive"],
+        "slug": "ukiyoe-cartography-compass-tide-chart",
+        "title": "Ukiyoe Cartography Compass Tide Chart",
+        "description": "Indigo woodblock nautical tide chart with a 16-point compass rose, Great Wave arc bands, and vermilion markers.",
+        "embed_desc": "Audio-reactive Ukiyo-e nautical tide chart. Bass pulses the compass rose, mids roll the Great Wave arc bands, and highs sharpen the woodblock degree ticks.",
+        "tags": ["ukiyoe", "compass", "cartography", "woodblock", "tide", "shader", "webgl", "audio-reactive"],
         "params": {
-            "strataCount": 10.0,
-            "islandScale": 2.4,
-            "grainAmt": 0.045,
-            "ringDensity": 12.0,
-            "contrast": 1.08
+            "rosePoints": 16.0,
+            "waveBands": 9.0,
+            "ringRadius": 0.62,
+            "grainAmt": 0.04,
+            "inkWeight": 0.85
         },
-        "code": """param float strataCount = 10.0 [4.0, 20.0];
-param float islandScale = 2.4 [1.0, 5.0];
-param float grainAmt = 0.045 [0.0, 0.12];
-param float ringDensity = 12.0 [4.0, 24.0];
-param float contrast = 1.08 [0.8, 1.4];
+        "code": """param float rosePoints = 16.0 [8.0, 32.0];
+param float waveBands = 9.0 [4.0, 16.0];
+param float ringRadius = 0.62 [0.35, 0.85];
+param float grainAmt = 0.04 [0.0, 0.12];
+param float inkWeight = 0.85 [0.4, 1.0];
 
 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;
 
+# Ukiyo-e nautical palette
+cPaper = vec3(0.945, 0.922, 0.855);
 cIndigo = vec3(0.114, 0.208, 0.341);
-cCeladon = vec3(0.659, 0.855, 0.863);
-cPaper = vec3(0.945, 0.933, 0.890);
+cSea = vec3(0.659, 0.855, 0.863);
 cSeal = vec3(0.902, 0.224, 0.275);
+
+r = length(p);
+ang = atan2(p.y, p.x);
+
+# Woodblock Great Wave scalloped tide bands
+tide = sin(p.x * 5.2 + t * 0.45) * 0.12 + p.y;
+wavePattern = abs(fract(tide * waveBands * 0.35) - 0.5);
+waveMask = 1.0 - smoothstep(0.06, 0.12, wavePattern);
+seaFill = smoothstep(0.0, 0.5, fract(tide * waveBands * 0.35));
+
+# Compass rose radial star and degree rings
+star = abs(cos(ang * rosePoints * 0.5 + t * 0.08));
+roseShape = 1.0 - smoothstep(0.02, 0.06, r - (0.18 + 0.32 * pow(star, 3.0)));
+outerRing = 1.0 - smoothstep(0.012, 0.032, abs(r - ringRadius));
+innerRing = 1.0 - smoothstep(0.010, 0.028, abs(r - ringRadius * 0.58));
+
+# Vermilion cardinal markers
+cardinal = 1.0 - smoothstep(0.02, 0.04, abs(r - ringRadius)) * (1.0 - smoothstep(0.96, 0.99, abs(cos(ang * 2.0))));
 
 grain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grainAmt;
 
-r = length(p);
-nr = max(r, 0.001);
-nx = p.x / nr;
-ny = p.y / nr;
+baseCol = mix(cPaper, cSea, seaFill * 0.55);
+baseCol = mix(baseCol, cIndigo, waveMask * 0.42 * inkWeight);
+baseCol = mix(baseCol, cPaper, smoothstep(ringRadius + 0.02, ringRadius - 0.02, r) * 0.62);
+baseCol = mix(baseCol, cIndigo, (outerRing + innerRing) * inkWeight);
+baseCol = mix(baseCol, cIndigo, roseShape * 0.85);
+baseCol = mix(baseCol, cSeal, step(r, 0.11));
 
-# Archipelago elevation field
-elev = exp(-r * r * 1.4) + 0.35 * sin(p.x * islandScale + t * 0.2) * cos(p.y * islandScale - t * 0.15);
-stepped = floor(elev * strataCount) / strataCount;
-contour = 1.0 - smoothstep(0.04, 0.11, abs(fract(elev * strataCount) - 0.5));
+# Cardinal vermilion pips
+pipN = step(length(p - vec2(0.0, ringRadius)), 0.055);
+pipS = step(length(p - vec2(0.0, -ringRadius)), 0.055);
+pipE = step(length(p - vec2(ringRadius, 0.0)), 0.055);
+pipW = step(length(p - vec2(-ringRadius, 0.0)), 0.055);
+baseCol = mix(baseCol, cSeal, clamp(pipN + pipS + pipE + pipW, 0.0, 1.0));
 
-# 8-point compass meridian rays
-crossAxis = min(abs(nx), abs(ny));
-diagAxis = abs(abs(nx) - abs(ny)) * 0.7071;
-meridian = 1.0 - smoothstep(0.015, 0.035, min(crossAxis, diagAxis));
-
-baseCol = mix(cPaper, cCeladon, clamp(stepped * 1.1, 0.0, 1.0));
-baseCol = mix(baseCol, cIndigo, contour * 0.85);
-baseCol = mix(baseCol, cIndigo, meridian * 0.25);
-
-# Vermilion summit ring
-summitRing = 1.0 - smoothstep(0.012, 0.028, abs(r - 0.24));
-baseCol = mix(baseCol, cSeal, summitRing * 0.9);
-
-col = clamp((baseCol + grain) * contrast, 0.0, 1.0);
+col = clamp(baseCol + grain, 0.0, 1.0);
 """,
         "glsl": """precision mediump float;
 uniform vec2 res;
@@ -614,38 +746,50 @@ void main() {
   vec2 uv = gl_FragCoord.xy / res;
   vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;
 
-  float b = audio_bass * 0.4;
-  float m = audio_mid * 0.4;
-  float h = audio_high * 0.4;
+  float b = audio_bass * 0.45;
+  float m = audio_mid * 0.45;
+  float h = audio_high * 0.45;
 
+  vec3 cPaper = vec3(0.945, 0.922, 0.855);
   vec3 cIndigo = vec3(0.114, 0.208, 0.341);
-  vec3 cCeladon = vec3(0.659, 0.855, 0.863);
-  vec3 cPaper = vec3(0.945, 0.933, 0.890);
+  vec3 cSea = vec3(0.659, 0.855, 0.863);
   vec3 cSeal = vec3(0.902, 0.224, 0.275);
-
-  float grain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * (0.045 + h * 0.08);
 
   float r = length(p);
   float ang = atan(p.y, p.x);
 
-  float elev = exp(-r * r * (1.4 - b * 0.4)) + 0.35 * sin(p.x * 2.4 + t * 0.2) * cos(p.y * 2.4 - t * 0.15);
-  float stepped = floor(elev * 10.0) / 10.0;
-  float contour = 1.0 - smoothstep(0.04, 0.11, abs(fract(elev * 10.0) - 0.5));
-  float meridian = 1.0 - smoothstep(0.015, 0.035, abs(sin(ang * 8.0 + t * 0.1 + m * 1.5)));
+  float tide = sin(p.x * 5.2 + t * 0.45 + m * 2.0) * 0.12 + p.y;
+  float wavePattern = abs(fract(tide * 9.0 * 0.35) - 0.5);
+  float waveMask = 1.0 - smoothstep(0.06, 0.12, wavePattern);
+  float seaFill = smoothstep(0.0, 0.5, fract(tide * 9.0 * 0.35));
 
-  vec3 baseCol = mix(cPaper, cCeladon, clamp(stepped * 1.1, 0.0, 1.0));
-  baseCol = mix(baseCol, cIndigo, contour * 0.85);
-  baseCol = mix(baseCol, cIndigo, meridian * 0.25);
+  float ringRadius = 0.62 + b * 0.06;
+  float star = abs(cos(ang * 8.0 + t * 0.08 + h * 0.3));
+  float roseShape = 1.0 - smoothstep(0.02, 0.06, r - (0.18 + (0.32 + b * 0.1) * pow(star, 3.0)));
+  float outerRing = 1.0 - smoothstep(0.012, 0.032, abs(r - ringRadius));
+  float innerRing = 1.0 - smoothstep(0.010, 0.028, abs(r - ringRadius * 0.58));
 
-  float summitRing = 1.0 - smoothstep(0.012, 0.028, abs(r - (0.24 + b * 0.08)));
-  baseCol = mix(baseCol, cSeal, summitRing * 0.9);
+  float grain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.04;
 
-  vec3 col = clamp((baseCol + grain) * 1.08, 0.0, 1.0);
-  gl_FragColor = vec4(col, 1.0);
+  vec3 baseCol = mix(cPaper, cSea, seaFill * 0.55);
+  baseCol = mix(baseCol, cIndigo, waveMask * 0.42 * 0.85);
+  baseCol = mix(baseCol, cPaper, smoothstep(ringRadius + 0.02, ringRadius - 0.02, r) * 0.62);
+  baseCol = mix(baseCol, cIndigo, (outerRing + innerRing) * 0.85);
+  baseCol = mix(baseCol, cIndigo, roseShape * 0.85);
+  baseCol = mix(baseCol, cSeal, step(r, 0.11 + b * 0.03));
+
+  float pipN = step(length(p - vec2(0.0, ringRadius)), 0.055);
+  float pipS = step(length(p - vec2(0.0, -ringRadius)), 0.055);
+  float pipE = step(length(p - vec2(ringRadius, 0.0)), 0.055);
+  float pipW = step(length(p - vec2(-ringRadius, 0.0)), 0.055);
+  baseCol = mix(baseCol, cSeal, clamp(pipN + pipS + pipE + pipW, 0.0, 1.0));
+
+  gl_FragColor = vec4(clamp(baseCol + grain, 0.0, 1.0), 1.0);
 }
 """
     }
 ]
+
 
 def make_embed_html(item):
     return f"""<!DOCTYPE html>
@@ -826,6 +970,7 @@ def make_embed_html(item):
 </html>
 """
 
+
 def main():
     report = []
     failed = False
@@ -909,7 +1054,7 @@ node 2 3D Render 3D
   pos 400 0
   f width 1080
   f height 1080
-  c bg 0.961 0.945 0.902
+  c bg 0.9608 0.9451 0.9020
 end
 node 3 Utility Output
   id out
@@ -1030,7 +1175,7 @@ end
 node 4 Source Shape
   id pic
   pos 0 162
-  c fillColor 0.22 0.24 0.38
+  c fillColor 0.16 0.24 0.34
   f size 0.24
 end
 node 5 Utility Output
@@ -1121,22 +1266,22 @@ node 1 Notes Note Sequencer
   pos 0 1024
   f rateBeats 0.25
   i steps 16
-  i note0 38
-  i note1 38
-  i note2 50
-  i note3 45
-  i note4 38
-  i note5 39
-  i note6 48
-  i note7 38
-  i note8 38
-  i note9 38
-  i note10 50
-  i note11 45
-  i note12 38
-  i note13 50
-  i note14 43
-  i note15 48
+  i note0 41
+  i note1 41
+  i note2 53
+  i note3 48
+  i note4 41
+  i note5 53
+  i note6 46
+  i note7 48
+  i note8 41
+  i note9 41
+  i note10 53
+  i note11 48
+  i note12 41
+  i note13 53
+  i note14 46
+  i note15 51
   b en0 1
   b en1 1
   b en2 1
@@ -1174,7 +1319,7 @@ end
 node 5 Source Shape
   id pic
   pos 0 162
-  c fillColor 0.22 0.30 0.20
+  c fillColor 0.26 0.16 0.22
   f size 0.24
 end
 node 6 Utility Output
@@ -1374,7 +1519,7 @@ cable out 0 px
                 "id": it["slug"],
                 "name": it["title"],
                 "kind": "Generator",
-                "tags": ["synth", "future-garage", "audio", "dsp", "organ", "pad"],
+                "tags": ["synth", "future-garage", "audio", "dsp", "bass", "rhodes", "uk-garage"],
                 "description": it["description"],
                 "price": 0,
                 "domain": "synth",
@@ -1391,7 +1536,7 @@ cable out 0 px
                 "id": it["slug"],
                 "name": it["title"],
                 "kind": "Generator",
-                "tags": ["effect", "acid-house", "audio", "dsp", "filter", "delay"],
+                "tags": ["effect", "acid-house", "audio", "dsp", "filter", "delay", "303"],
                 "description": it["description"],
                 "price": 0,
                 "domain": "effect",

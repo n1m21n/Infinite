@@ -4,6 +4,8 @@
 // block, so what is measured is what a patch hears.
 #include "app/AppShared.h"
 #include "audio/dsp/EquationDsp.h"
+#include "audio/dsp/PeakLimiter.h"
+#include "audio/dsp/SpatialMaster.h"
 #include "nodes/Text3DNode.h"
 #include <algorithm>
 #include <climits>
@@ -494,6 +496,43 @@ bool RunEffectMixAndLimiterFixture()
       const float gainDb = 10.0f * (float)std::log10(num / std::max(den, 1.0e-30));
       const bool ok = std::fabs(gainDb) < 0.05f;
       printf("DSPTEST limiter mix 0.5 below ceiling: level %+.2f dB (want 0.00)  %s\n", gainDb, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // 5b) Non-finite input: NaN and +/-Inf are sanitized so that output and state stay finite.
+   {
+      PeakLimiter lim;
+      lim.Prepare(sampleRate, 1.5f);
+      lim.Reset();
+      const float releaseCoeff = std::exp(-1.0f / (0.05f * (float)sampleRate));
+      float frame[2] = { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity() };
+      lim.ProcessFrame(frame, 2, 0.5f, releaseCoeff);
+      bool peakLimiterOk = true;
+      for (int i = 0; i < lim.Latency() + 10; ++i)
+      {
+         float f[2] = { 0.1f, -0.1f };
+         lim.ProcessFrame(f, 2, 0.5f, releaseCoeff);
+         if (!std::isfinite(f[0]) || !std::isfinite(f[1]))
+            peakLimiterOk = false;
+      }
+
+      SpatialMaster::Limiter smLim;
+      smLim.Prepare(sampleRate);
+      smLim.Reset();
+      float l = std::numeric_limits<float>::quiet_NaN();
+      float r = std::numeric_limits<float>::infinity();
+      smLim.Process(l, r, true);
+      bool smLimOk = true;
+      for (int i = 0; i < 70; ++i)
+      {
+         float sl = 0.1f, sr = -0.1f;
+         smLim.Process(sl, sr, true);
+         if (!std::isfinite(sl) || !std::isfinite(sr))
+            smLimOk = false;
+      }
+      const bool ok = peakLimiterOk && smLimOk;
+      printf("DSPTEST limiter non-finite input safety (NaN/Inf): PeakLimiter=%s SpatialMaster=%s  %s\n",
+             peakLimiterOk ? "OK" : "FAIL", smLimOk ? "OK" : "FAIL", ok ? "OK" : "FAIL");
       all &= ok;
    }
 

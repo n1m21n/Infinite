@@ -2897,15 +2897,15 @@
       ]
     },
     {
-      "id": "future-garage-sub-chord-organ-synth",
-      "name": "Future Garage Sub Chord Organ Synth",
+      "id": "future-garage-sub-reese-bass-synth",
+      "name": "Future Garage Sub Reese Bass Synth",
       "category": "Templates",
       "kind": "Template",
       "group": "Synths",
-      "description": "Warm detuned sine-fifth sub organ with soft vinyl-like envelope and subtle pitch drift.",
+      "description": "Detuned dual-saw sub-bass synthesizer with warm lowpass filter drift and subtle saturation for UK garage basslines.",
       "price": 0,
-      "preview": "assets/templates/future-garage-sub-chord-organ-synth.webp",
-      "file": "assets/templates/future-garage-sub-chord-organ-synth.inf",
+      "preview": "assets/templates/future-garage-sub-reese-bass-synth.webp",
+      "file": "assets/templates/future-garage-sub-reese-bass-synth.inf",
       "nodes": [
         "Note Sequencer",
         "Field Synth",
@@ -2913,15 +2913,15 @@
       ]
     },
     {
-      "id": "future-garage-velvet-pad-drone-synth",
-      "name": "Future Garage Velvet Pad Drone Synth",
+      "id": "future-garage-glass-rhodes-chord-synth",
+      "name": "Future Garage Glass Rhodes Chord Synth",
       "category": "Templates",
       "kind": "Template",
       "group": "Synths",
-      "description": "Shimmering dual-oscillator velvet pad with slow LFO filter sweep and gentle harmonic overtones.",
+      "description": "Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay.",
       "price": 0,
-      "preview": "assets/templates/future-garage-velvet-pad-drone-synth.webp",
-      "file": "assets/templates/future-garage-velvet-pad-drone-synth.inf",
+      "preview": "assets/templates/future-garage-glass-rhodes-chord-synth.webp",
+      "file": "assets/templates/future-garage-glass-rhodes-chord-synth.inf",
       "nodes": [
         "Note Sequencer",
         "Field Synth",
@@ -2929,15 +2929,15 @@
       ]
     },
     {
-      "id": "acid-house-303-resonant-filter-fx",
-      "name": "Acid House 303 Resonant Filter FX",
+      "id": "acid-house-303-resonant-squelch-fx",
+      "name": "Acid House 303 Resonant Squelch FX",
       "category": "Templates",
       "kind": "Template",
       "group": "Audio effects",
-      "description": "Sweeping resonant diode-style lowpass filter with soft waveshaped drive and LFO cutoff modulation.",
+      "description": "Resonant 2-pole diode-style lowpass filter with LFO cutoff sweep and acid overdrive saturation.",
       "price": 0,
-      "preview": "assets/templates/acid-house-303-resonant-filter-fx.webp",
-      "file": "assets/templates/acid-house-303-resonant-filter-fx.inf",
+      "preview": "assets/templates/acid-house-303-resonant-squelch-fx.webp",
+      "file": "assets/templates/acid-house-303-resonant-squelch-fx.inf",
       "nodes": [
         "Note Sequencer",
         "Analog",
@@ -2946,15 +2946,213 @@
       ]
     },
     {
-      "id": "acid-house-overdrive-tape-delay-fx",
-      "name": "Acid House Overdrive Tape Delay FX",
+      "id": "acid-house-tape-dub-delay-fx",
+      "name": "Acid House Tape Dub Delay FX",
       "category": "Templates",
       "kind": "Template",
       "group": "Audio effects",
-      "description": "Punchy saturated analog delay with warm feedback damping and rhythmic echo smear.",
+      "description": "Multi-tap acid dub delay with resonant feedback, high-frequency damping, and warm drive.",
       "price": 0,
-      "preview": "assets/templates/acid-house-overdrive-tape-delay-fx.webp",
-      "file": "assets/templates/acid-house-overdrive-tape-delay-fx.inf",
+      "preview": "assets/templates/acid-house-tape-dub-delay-fx.webp",
+      "file": "assets/templates/acid-house-tape-dub-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "west-coast-buchla-complex-wavefold-synth",
+      "name": "West Coast Buchla Complex Wavefold Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Dual-oscillator PM/FM complex wavefolder with multi-stage trigonometric folding and vactrol low-pass gate decay.",
+      "price": 0,
+      "preview": "assets/templates/west-coast-buchla-complex-wavefold-synth.webp",
+      "file": "assets/templates/west-coast-buchla-complex-wavefold-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "west-coast-buchla-krell-pendulum-synth",
+      "name": "West Coast Buchla Krell Pendulum Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Self-modulating Krell FM synthesizer with timbre-envelope harmonic sweep, resonant body filter, and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/west-coast-buchla-krell-pendulum-synth.webp",
+      "file": "assets/templates/west-coast-buchla-krell-pendulum-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "tape-loop-polyphony-oxide-dispersion-fx",
+      "name": "Tape Loop Polyphony Oxide Dispersion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Cascaded allpass phase dispersion and reel-to-reel oxide hysteresis saturator with gentle azimuth flutter.",
+      "price": 0,
+      "preview": "assets/templates/tape-loop-polyphony-oxide-dispersion-fx.webp",
+      "file": "assets/templates/tape-loop-polyphony-oxide-dispersion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "tape-loop-polyphony-frippertronics-echo-fx",
+      "name": "Tape Loop Polyphony Frippertronics Echo FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation.",
+      "price": 0,
+      "preview": "assets/templates/tape-loop-polyphony-frippertronics-echo-fx.webp",
+      "file": "assets/templates/tape-loop-polyphony-frippertronics-echo-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "karplus-sympathetic-waveguide-harp-synth",
+      "name": "Karplus Sympathetic Waveguide Harp Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical-modeling plucked waveguide harp with dual harmonic comb resonators, sympathetic octave body, and wooden-bridge saturation.",
+      "price": 0,
+      "preview": "assets/templates/karplus-sympathetic-waveguide-harp-synth.webp",
+      "file": "assets/templates/karplus-sympathetic-waveguide-harp-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "karplus-sympathetic-bowed-monochord-synth",
+      "name": "Karplus Sympathetic Bowed Monochord Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Continuously bowed waveguide monochord with stick-slip rosin harmonic excitation, vibrato drift, and resonant body formants.",
+      "price": 0,
+      "preview": "assets/templates/karplus-sympathetic-bowed-monochord-synth.webp",
+      "file": "assets/templates/karplus-sympathetic-bowed-monochord-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "spring-plate-dispersion-belton-tank-fx",
+      "name": "Spring Plate Dispersion Belton Tank FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Triple-spring tank dispersion network with cascaded allpass chirp stages, brass transducer drive, and mechanical tank damping.",
+      "price": 0,
+      "preview": "assets/templates/spring-plate-dispersion-belton-tank-fx.webp",
+      "file": "assets/templates/spring-plate-dispersion-belton-tank-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "spring-plate-dispersion-steel-plate-fx",
+      "name": "Spring Plate Dispersion Steel Plate FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dense steel plate diffusion lattice with early metallic reflections, phase-modulated allpass tank, and warm sheen tilt.",
+      "price": 0,
+      "preview": "assets/templates/spring-plate-dispersion-steel-plate-fx.webp",
+      "file": "assets/templates/spring-plate-dispersion-steel-plate-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "gamelan-polyrhythm-pelog-metallophone-synth",
+      "name": "Gamelan Polyrhythm Pelog Metallophone Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Paired bronze gamelan metallophone with Euler-Bernoulli bar partials, ombak detuned beating, mallet strike transient, and bamboo resonator warmth.",
+      "price": 0,
+      "preview": "assets/templates/gamelan-polyrhythm-pelog-metallophone-synth.webp",
+      "file": "assets/templates/gamelan-polyrhythm-pelog-metallophone-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "gamelan-polyrhythm-gong-ageng-synth",
+      "name": "Gamelan Polyrhythm Gong Ageng Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Deep Javanese suspended bronze gong with strike pitch sag, sub-octave boss fundamental, slow ombak beating, and nonlinear metal shimmer.",
+      "price": 0,
+      "preview": "assets/templates/gamelan-polyrhythm-gong-ageng-synth.webp",
+      "file": "assets/templates/gamelan-polyrhythm-gong-ageng-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "broken-beat-rhodes-binaural-phaser-fx",
+      "name": "Broken Beat Rhodes Binaural Phaser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Six-stage cascaded allpass phaser with asymmetric LFO sweep, resonant notch feedback, and warm electric-piano preamp saturation.",
+      "price": 0,
+      "preview": "assets/templates/broken-beat-rhodes-binaural-phaser-fx.webp",
+      "file": "assets/templates/broken-beat-rhodes-binaural-phaser-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "broken-beat-rhodes-bbd-ensemble-fx",
+      "name": "Broken Beat Rhodes BBD Ensemble FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-LFO bucket-brigade chorus ensemble with warm low-pass anti-alias rolloff, cross-coupled modulation, and soft analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/broken-beat-rhodes-bbd-ensemble-fx.webp",
+      "file": "assets/templates/broken-beat-rhodes-bbd-ensemble-fx.inf",
       "nodes": [
         "Note Sequencer",
         "Analog",

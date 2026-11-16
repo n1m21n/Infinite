@@ -2087,6 +2087,903 @@
     "Note Echo"
    ],
    "gain": 14.0
+  },
+  {
+   "id": "west_coast_buchla",
+   "family": "experimental",
+   "bpm": [
+    96,
+    118
+   ],
+   "swing": 0.08,
+   "scale": [
+    12,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "..o...o...o...o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "x..x..o...x.o...",
+    "htom": "..o..x..o...x...",
+    "bell": "x.....o...x...o."
+   },
+   "bass": "0..2.4.0..5.2...",
+   "fx": [
+    "Audio Filter",
+    "Delay",
+    "Reverb"
+   ],
+   "synth": [
+    "Field Synth",
+    "Wavetable",
+    "Oscillator"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.05,
+   "mod": 0.85,
+   "refs": [
+    "Don Buchla 259 Complex Waveform Generator",
+    "Morton Subotnick, Silver Apples of the Moon",
+    "San Francisco Tape Music Center wavefolding & vactrol LPGs"
+   ],
+   "chords": {
+    "size": [
+     2,
+     3
+    ],
+    "beats": 4.0,
+    "strum": 12,
+    "human": 6
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "motif": {
+    "synth": [
+     "Field Synth"
+    ],
+    "density": 0.55,
+    "octave": 3,
+    "gate": 35,
+    "gain": -8
+   },
+   "groove": 0.55,
+   "fill": 0.35
+  },
+  {
+   "id": "tape_loop_polyphony",
+   "family": "ambient",
+   "bpm": [
+    64,
+    86
+   ],
+   "swing": 0.0,
+   "scale": [
+    4,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......4.......",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "Phaser",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth",
+    "Partials"
+   ],
+   "ban": [
+    "Stutter",
+    "Bitcrush",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.65,
+   "refs": [
+    "William Basinski, The Disintegration Loops",
+    "Robert Fripp & Brian Eno (Frippertronics)",
+    "Reel-to-reel oxide hysteresis & asynchronous tape loops"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 8.0,
+    "strum": 30,
+    "human": 14
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.25,
+    "octave": 3,
+    "gate": 75,
+    "gain": -10
+   },
+   "groove": 0.4,
+   "fill": 0.2
+  },
+  {
+   "id": "karplus_sympathetic",
+   "family": "experimental",
+   "bpm": [
+    88,
+    112
+   ],
+   "swing": 0.08,
+   "scale": [
+    4,
+    6,
+    9
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0...3...5...7...",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Field Synth",
+    "String"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.6,
+   "refs": [
+    "Karplus-Strong plucked string waveguide synthesis (1983)",
+    "Bowed & sympathetic string physical modeling",
+    "Julius O. Smith III digital waveguide acoustics"
+   ],
+   "chords": {
+    "size": [
+     2,
+     3
+    ],
+    "beats": 4.0,
+    "strum": 24,
+    "human": 10
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Strum"
+   ],
+   "motif": {
+    "synth": [
+     "Field Synth"
+    ],
+    "density": 0.45,
+    "octave": 3,
+    "gate": 60,
+    "gain": -9
+   },
+   "groove": 0.5,
+   "fill": 0.25
+  },
+  {
+   "id": "spring_plate_dispersion",
+   "family": "ambient",
+   "bpm": [
+    76,
+    98
+   ],
+   "swing": 0.04,
+   "scale": [
+    1,
+    4,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......5.......",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Phaser",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.7,
+   "refs": [
+    "EMT 140 steel plate & Hammond/Belton spring tank dispersion",
+    "King Tubby & dub studio spring-tank feedback matrices",
+    "Allpass chirp dispersion & transducer nonlinearity"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 4.0,
+    "strum": 18,
+    "human": 8
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.35,
+    "octave": 3,
+    "gate": 65,
+    "gain": -10
+   },
+   "groove": 0.45,
+   "fill": 0.2
+  },
+  {
+   "id": "gamelan_polyrhythm",
+   "family": "experimental",
+   "bpm": [
+    96,
+    128
+   ],
+   "swing": 0.0,
+   "scale": [
+    9,
+    5,
+    12
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "x.o.x.o.x.o.x.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "..x...o...x...o.",
+    "htom": "....x..o....x..o",
+    "bell": "x..o.x..o.x..o.."
+   },
+   "bass": "0.....4...2...0.",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "EQ"
+   ],
+   "synth": [
+    "Metallic",
+    "Partials",
+    "FM"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.35,
+   "refs": [
+    "Javanese and Balinese Gamelan",
+    "Steve Reich, Six Marimbas",
+    "Colin McPhee, Tabuh-Tabuhan"
+   ],
+   "chords": {
+    "size": [
+     2,
+     3
+    ],
+    "beats": 2.0,
+    "strum": 10,
+    "human": 14
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Metallic",
+     "FM"
+    ],
+    "density": 0.65,
+    "octave": 2,
+    "gate": 45,
+    "gain": -10,
+    "rate": 0.25,
+    "range": 8
+   },
+   "groove": 0.75,
+   "fill": 0.6,
+   "gain": -8.0
+  },
+  {
+   "id": "library_jazz",
+   "family": "downtempo",
+   "bpm": [
+    82,
+    108
+   ],
+   "swing": 0.28,
+   "scale": [
+    4,
+    3,
+    7,
+    11
+   ],
+   "drums": {
+    "kick": "x.....o...x..o..",
+    "snare": "....o.......x...",
+    "chat": "x..ox..ox..ox..o",
+    "ohat": "......o.......o.",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..2..4..5.3..1.",
+   "fx": [
+    "Saturator",
+    "Chorus",
+    "Reverb",
+    "EQ"
+   ],
+   "synth": [
+    "Piano",
+    "Wind",
+    "Analog"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.25,
+   "refs": [
+    "KPM / De Wolfe Library Records",
+    "David Axelrod, Song of Innocence",
+    "BadBadNotGood, III"
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 2.0,
+    "strum": 45,
+    "human": 22
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Wind",
+     "Piano"
+    ],
+    "density": 0.45,
+    "octave": 1,
+    "gate": 65,
+    "gain": -11,
+    "rate": 0.5,
+    "range": 7,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.85,
+   "fill": 0.5,
+   "gain": -7.0
+  },
+  {
+   "id": "broken_beat_rhodes",
+   "family": "breaks",
+   "bpm": [
+    120,
+    130
+   ],
+   "swing": 0.35,
+   "scale": [
+    4,
+    7,
+    1
+   ],
+   "drums": {
+    "kick": "x..o....x..o.x..",
+    "snare": "....x..o....x...",
+    "chat": "x.ox.ox.ox.ox.o.",
+    "ohat": "..o.......o.....",
+    "clap": "......x.......x.",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0..3...2.4.5.",
+   "fx": [
+    "Chorus",
+    "Phaser",
+    "Saturator",
+    "Reverb"
+   ],
+   "synth": [
+    "Piano",
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.4,
+   "refs": [
+    "Bugz in the Attic",
+    "4hero, Two Pages",
+    "Domu, Yussef Dayes"
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 2.0,
+    "strum": 55,
+    "human": 18
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Piano",
+     "Analog"
+    ],
+    "density": 0.4,
+    "octave": 2,
+    "gate": 55,
+    "gain": -11,
+    "rate": 0.25,
+    "range": 6
+   },
+   "groove": 0.9,
+   "fill": 0.7,
+   "gain": -8.0
+  },
+  {
+   "id": "chamber_winds",
+   "family": "piano",
+   "bpm": [
+    64,
+    88
+   ],
+   "swing": 0.0,
+   "scale": [
+    0,
+    1,
+    2,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......3.......",
+   "fx": [
+    "Convolution Reverb",
+    "Reverb",
+    "EQ"
+   ],
+   "synth": [
+    "Wind",
+    "String",
+    "Partials"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.25,
+   "refs": [
+    "Ravel, Introduction and Allegro",
+    "Colin Stetson / Sarah Neufeld",
+    "Penguin Cafe Orchestra"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 4.0,
+    "strum": 85,
+    "human": 28
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Wind",
+     "String"
+    ],
+    "density": 0.35,
+    "octave": 1,
+    "gate": 85,
+    "gain": -9,
+    "rate": 0.5,
+    "range": 7,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.3,
+   "fill": 0.2,
+   "gain": 4.0
+  },
+  {
+   "id": "microtonal_ambient",
+   "family": "ambient",
+   "bpm": [
+    54,
+    76
+   ],
+   "swing": 0.0,
+   "scale": [
+    6,
+    12,
+    8
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": "o.......o......."
+   },
+   "bass": "0.......4.......",
+   "fx": [
+    "Convolution Reverb",
+    "Reverb",
+    "Chorus"
+   ],
+   "synth": [
+    "Partials",
+    "Spectral Synth",
+    "Wind",
+    "String"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.55,
+   "refs": [
+    "Kaitlyn Aurelia Smith",
+    "Kali Malone",
+    "Eliane Radigue"
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 4.0,
+    "strum": 110,
+    "human": 30
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Wind",
+     "Partials"
+    ],
+    "density": 0.25,
+    "octave": 2,
+    "gate": 90,
+    "gain": -10,
+    "rate": 0.5,
+    "range": 7,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.2,
+   "fill": 0.15,
+   "gain": -2.0
+  },
+  {
+   "id": "prepared_piano",
+   "family": "piano",
+   "bpm": [
+    72,
+    108
+   ],
+   "swing": 0.08,
+   "scale": [
+    1,
+    5,
+    13
+   ],
+   "drums": {
+    "kick": "x.......o.......",
+    "snare": "....o.......o...",
+    "chat": "o.o...o.o.o...o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "..o.......o.....",
+    "htom": "......o.......o.",
+    "bell": "o.....o...o....."
+   },
+   "bass": "0..3..0.5..1..0.",
+   "fx": [
+    "Convolution Reverb",
+    "Drive",
+    "Delay"
+   ],
+   "synth": [
+    "Piano",
+    "String",
+    "Metallic"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Chorus"
+   ],
+   "glitch": 0.05,
+   "mod": 0.35,
+   "refs": [
+    "John Cage, Sonatas and Interludes",
+    "Hauschka",
+    "Nils Frahm"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 2.0,
+    "strum": 15,
+    "human": 22
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "motif": {
+    "synth": [
+     "Piano",
+     "Metallic"
+    ],
+    "density": 0.45,
+    "octave": 2,
+    "gate": 35,
+    "gain": -9,
+    "rate": 0.25,
+    "range": 8,
+    "notefx": [
+     "Humanizer"
+    ]
+   },
+   "groove": 0.65,
+   "fill": 0.5,
+   "gain": 2.0
+  },
+  {
+   "id": "berlin_school_sequencer",
+   "family": "experimental",
+   "bpm": [
+    104,
+    122
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    4,
+    7
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "....x.......x...",
+    "chat": "x.o.x.o.x.o.x.o.",
+    "ohat": "..o.......o.....",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.0.4.0.7.0.5.0.",
+   "fx": [
+    "Delay",
+    "Audio Filter",
+    "Reverb"
+   ],
+   "synth": [
+    "Analog",
+    "Oscillator",
+    "Wavetable"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.7,
+   "refs": [
+    "Tangerine Dream, Phaedra",
+    "Klaus Schulze",
+    "Emeralds"
+   ],
+   "chords": {
+    "size": [
+     3
+    ],
+    "beats": 4.0,
+    "strum": 30,
+    "human": 6
+   },
+   "notefx": [
+    "Note Echo",
+    "Humanizer"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Oscillator"
+    ],
+    "density": 0.65,
+    "octave": 2,
+    "gate": 45,
+    "gain": -11,
+    "rate": 0.125,
+    "range": 7,
+    "notefx": [
+     "Note Echo"
+    ]
+   },
+   "groove": 0.7,
+   "fill": 0.4,
+   "gain": -7.0
+  },
+  {
+   "id": "uk_dub_steppers",
+   "family": "bass_music",
+   "bpm": [
+    136,
+    142
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    5,
+    11
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "........x.......",
+    "chat": "x.o.x.o.x.o.x.o.",
+    "ohat": "..o.......o.....",
+    "clap": "........x.......",
+    "tom": "",
+    "htom": "",
+    "bell": "..o.........o..."
+   },
+   "bass": "0..0....3.0.5...",
+   "fx": [
+    "Delay",
+    "Audio Filter",
+    "Reverb",
+    "Drive"
+   ],
+   "synth": [
+    "Analog",
+    "FM",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush"
+   ],
+   "glitch": 0.05,
+   "mod": 0.5,
+   "refs": [
+    "Mala, Digital Mystikz",
+    "King Tubby",
+    "Aba Shanti-I"
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 2.0,
+    "strum": 10,
+    "human": 8
+   },
+   "notefx": [
+    "Note Echo",
+    "Humanizer"
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wind"
+    ],
+    "density": 0.28,
+    "octave": 2,
+    "gate": 40,
+    "gain": -11,
+    "rate": 0.25,
+    "range": 6
+   },
+   "groove": 0.85,
+   "fill": 0.55,
+   "gain": -7.5
   }
  ]
 }

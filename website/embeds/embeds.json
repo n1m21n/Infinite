@@ -587,14 +587,44 @@
       "description": "Audio-reactive Spomenik concrete monument. Bass pulses the brutalist oculus and ribs, mids rotate the directional sun relief, and highs illuminate the raw concrete edges."
     },
     {
-      "slug": "ukiyoe-cartography-isobar-waves",
-      "title": "Ukiyo-e Cartography Isobar Waves",
-      "description": "Audio-reactive Edo-period woodblock wave cartography. Bass ripples the isobar contours, mids drift the celadon mist, and highs sharpen the paper grain."
+      "slug": "ukiyoe-cartography-archipelago-contours",
+      "title": "Ukiyoe Cartography Archipelago Contours",
+      "description": "Audio-reactive Ukiyo-e woodblock cartography map. Bass swells the island elevation contours, mids drift the sea currents, and highs illuminate the rhumb lines and hanko seal."
     },
     {
-      "slug": "ukiyoe-cartography-woodblock-relief",
-      "title": "Ukiyo-e Cartography Woodblock Relief",
-      "description": "Audio-reactive woodblock archipelago relief map. Bass swells the island elevation contours, mids sweep the compass meridians, and highs crisp the woodblock ink."
+      "slug": "ukiyoe-cartography-compass-tide-chart",
+      "title": "Ukiyoe Cartography Compass Tide Chart",
+      "description": "Audio-reactive Ukiyo-e nautical tide chart. Bass pulses the compass rose, mids roll the Great Wave arc bands, and highs sharpen the woodblock degree ticks."
+    },
+    {
+      "slug": "reaction-diffusion-belousov-spiral-waves",
+      "title": "Reaction Diffusion Belousov Spiral Waves",
+      "description": "Audio-reactive Belousov-Zhabotinsky chemical wave visualizer. Bass expands the spiral wavefronts, mids advect the domain warp, and highs ignite the cinnabar reaction fronts."
+    },
+    {
+      "slug": "reaction-diffusion-belousov-turing-coral",
+      "title": "Reaction Diffusion Belousov Turing Coral",
+      "description": "Audio-reactive Turing morphogenesis visualizer. Bass swells the coral-spot cells, mids bend the anisotropic lattice, and highs sharpen the cinnabar ridge contours."
+    },
+    {
+      "slug": "ferrofluid-thinfilm-magnetic-spikes",
+      "title": "Ferrofluid Thinfilm Magnetic Spikes",
+      "description": "Audio-reactive ferrofluid spike visualizer. Bass drives the magnetic spike amplitude, mids shift the thin-film interference spectrum, and highs sharpen the studio rim reflections."
+    },
+    {
+      "slug": "ferrofluid-thinfilm-bismuth-corona",
+      "title": "Ferrofluid Thinfilm Bismuth Corona",
+      "description": "Audio-reactive bismuth thin-film interference visualizer. Bass pulses the dipole field lines, mids sweep the iridescent oil fringes, and highs ignite the corona ridges."
+    },
+    {
+      "slug": "schlieren-caustics-refraction-cusps",
+      "title": "Schlieren Caustics Refraction Cusps",
+      "description": "Audio-reactive optical schlieren caustic visualizer. Bass focuses the nephroid caustic envelope, mids shift refractive dispersion, and highs sharpen the focal cusps."
+    },
+    {
+      "slug": "schlieren-caustics-thermal-plume",
+      "title": "Schlieren Caustics Thermal Plume",
+      "description": "Audio-reactive convective schlieren plume visualizer. Bass drives thermal turbulence, mids sweep refractive fringe density, and highs ignite the ivory filaments."
     }
   ]
 }

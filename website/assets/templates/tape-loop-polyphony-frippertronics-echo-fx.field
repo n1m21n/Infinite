@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Tape Loop Polyphony Frippertronics Echo FX",
+    "author": "Infinite",
+    "description": "Asynchronous multi-tap tape loop delay with prime-ratio diffusion, oxide damping, and warm feedback saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float feedback = 0.62 [0.0, 0.88];\nparam float damping = 0.42 [0.05, 0.85];\nparam float wow = 0.28 [0.0, 1.0];\nparam float drive = 1.35 [0.8, 2.8];\nparam float mix = 0.58 [0.0, 1.0];\nstate float lfo = 0;\nstate float tap1 = 0;\nstate float tap2 = 0;\nstate float tap3 = 0;\nstate float lp = 0;\n\nlfo = (lfo + 0.55 / sr) % 1.0;\ndrift = 1.0 + sin(6.2831853 * lfo) * wow * 0.12;\n\nfCut = clamp(0.10 + (1.0 - damping) * 0.30, 0.03, 0.42);\nlp = lp + fCut * (in - lp);\n\n# Asynchronous multi-tap tape loop\nr1 = clamp(0.068 * drift, 0.02, 0.18);\nr2 = clamp(0.051 * drift, 0.02, 0.18);\nr3 = clamp(0.039 * drift, 0.02, 0.18);\n\ntap1 = tap1 + r1 * (lp + tap3 * feedback * 0.55 - tap1);\ntap2 = tap2 + r2 * (tap1 - tap2);\ntap3 = tap3 + r3 * (tap2 - tap3);\n\necho = (tap1 * 0.42 + tap2 * 0.36 + tap3 * 0.28) * drive;\nsat = echo / (1.0 + abs(echo) * 0.40);\n\nout = (in * (1.0 - mix) + sat * mix) * 0.94;\n",
+    "params": {
+      "feedback": 0.62,
+      "damping": 0.42,
+      "wow": 0.28,
+      "drive": 1.35,
+      "mix": 0.58
+    }
+  }
+}

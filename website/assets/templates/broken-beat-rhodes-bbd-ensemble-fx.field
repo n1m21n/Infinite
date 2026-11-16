@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Broken Beat Rhodes BBD Ensemble FX",
+    "author": "Infinite",
+    "description": "Dual-LFO bucket-brigade chorus ensemble with warm low-pass anti-alias rolloff, cross-coupled modulation, and soft analog saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rateA = 0.65 [0.1, 3.5];\nparam float rateB = 2.15 [0.3, 6.5];\nparam float depth = 0.68 [0.1, 1.0];\nparam float tone = 0.62 [0.15, 1.0];\nparam float mix = 0.58 [0.0, 1.0];\nstate float lfoA = 0;\nstate float lfoB = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float ap3 = 0;\nstate float ap4 = 0;\nstate float lp = 0;\n\nlfoA = (lfoA + rateA / sr) % 1.0;\nlfoB = (lfoB + rateB / sr) % 1.0;\nmodA = sin(6.2831853 * lfoA) * 0.65 + sin(6.2831853 * lfoB) * 0.35;\nmodB = cos(6.2831853 * lfoA) * 0.65 - cos(6.2831853 * lfoB) * 0.35;\n\ng1 = clamp(0.42 + modA * depth * 0.38, -0.88, 0.88);\ng2 = clamp(-0.36 + modB * depth * 0.38, -0.88, 0.88);\n\ny1 = -g1 * in + ap1; ap1 = in + g1 * y1;\ny2 = -g1 * y1 + ap2; ap2 = y1 + g1 * y2;\ny3 = -g2 * y2 + ap3; ap3 = y2 + g2 * y3;\ny4 = -g2 * y3 + ap4; ap4 = y3 + g2 * y4;\n\nfCut = clamp(0.08 + tone * 0.36, 0.04, 0.45);\nlp = lp + fCut * (y4 - lp);\nsat = (lp * 1.35) / (1.0 + abs(lp * 1.35) * 0.45);\n\nout = (in * (1.0 - mix) + sat * mix) * 0.74;\n",
+    "params": {
+      "rateA": 0.65,
+      "rateB": 2.15,
+      "depth": 0.68,
+      "tone": 0.62,
+      "mix": 0.58
+    }
+  }
+}

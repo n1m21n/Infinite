@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Gamelan Polyrhythm Gong Ageng Synth",
+    "author": "Infinite",
+    "description": "Deep Javanese suspended bronze gong with strike pitch sag, sub-octave boss fundamental, slow ombak beating, and nonlinear metal shimmer.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float sag = 0.08 [0.0, 0.25];\nparam float shimmer = 0.65 [0.1, 1.0];\nparam float ombakRate = 1.4 [0.2, 4.5];\nparam float tail = 0.75 [0.2, 1.0];\nstate float pSub = 0;\nstate float p1 = 0;\nstate float p2 = 0;\nstate float lfo = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecRate = clamp(1.0 / (sr * (0.45 + tail * 2.2)), 0.00008, 0.015);\nenv = if(target > env, env + (target - env) * 0.16, env - env * decRate);\n\nlfo = (lfo + ombakRate / sr) % 1.0;\nf0 = clamp(freq * (1.0 - sag * (1.0 - env)), 36.0, 1200.0);\npSub = (pSub + (f0 * 0.5) / sr) % 1.0;\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 1.62) / sr) % 1.0;\n\ngong = sin(6.2831853 * pSub) * 0.45 + sin(6.2831853 * p1) * 0.42 + sin(6.2831853 * p2 + sin(6.2831853 * p1) * shimmer * 0.5) * 0.28;\nlp = lp + clamp(0.03 + env * 0.28, 0.02, 0.36) * (gong - lp);\n\nout = ((lp * 1.45) / (1.0 + abs(lp * 1.45) * 0.48)) * env * (0.78 + 0.22 * sin(6.2831853 * lfo)) * 0.65;\n",
+    "params": {
+      "sag": 0.08,
+      "shimmer": 0.65,
+      "ombakRate": 1.4,
+      "tail": 0.75
+    },
+    "nodeSettings": {
+      "maxVoices": 6
+    }
+  }
+}

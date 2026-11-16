@@ -96,8 +96,9 @@ public:
       float level = 0.0f;
       for (int ch = 0; ch < numChannels; ch++)
       {
+         const float inSample = std::isfinite(io[ch]) ? io[ch] : 0.0f;
          float* hist = mHistory[ch].data();
-         hist[pos & m] = io[ch];
+         hist[pos & m] = inSample;
 
          // Interval (k, k + 1), k = pos - kTpLag, from samples k-7 .. k+8.
          float interval = 0.0f;

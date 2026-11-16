@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ukiyoe Cartography Compass Tide Chart",
+    "author": "Infinite",
+    "description": "Indigo woodblock nautical tide chart with a 16-point compass rose, Great Wave arc bands, and vermilion markers.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float rosePoints = 16.0 [8.0, 32.0];\nparam float waveBands = 9.0 [4.0, 16.0];\nparam float ringRadius = 0.62 [0.35, 0.85];\nparam float grainAmt = 0.04 [0.0, 0.12];\nparam float inkWeight = 0.85 [0.4, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\n# Ukiyo-e nautical palette\ncPaper = vec3(0.945, 0.922, 0.855);\ncIndigo = vec3(0.114, 0.208, 0.341);\ncSea = vec3(0.659, 0.855, 0.863);\ncSeal = vec3(0.902, 0.224, 0.275);\n\nr = length(p);\nang = atan2(p.y, p.x);\n\n# Woodblock Great Wave scalloped tide bands\ntide = sin(p.x * 5.2 + t * 0.45) * 0.12 + p.y;\nwavePattern = abs(fract(tide * waveBands * 0.35) - 0.5);\nwaveMask = 1.0 - smoothstep(0.06, 0.12, wavePattern);\nseaFill = smoothstep(0.0, 0.5, fract(tide * waveBands * 0.35));\n\n# Compass rose radial star and degree rings\nstar = abs(cos(ang * rosePoints * 0.5 + t * 0.08));\nroseShape = 1.0 - smoothstep(0.02, 0.06, r - (0.18 + 0.32 * pow(star, 3.0)));\nouterRing = 1.0 - smoothstep(0.012, 0.032, abs(r - ringRadius));\ninnerRing = 1.0 - smoothstep(0.010, 0.028, abs(r - ringRadius * 0.58));\n\n# Vermilion cardinal markers\ncardinal = 1.0 - smoothstep(0.02, 0.04, abs(r - ringRadius)) * (1.0 - smoothstep(0.96, 0.99, abs(cos(ang * 2.0))));\n\ngrain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grainAmt;\n\nbaseCol = mix(cPaper, cSea, seaFill * 0.55);\nbaseCol = mix(baseCol, cIndigo, waveMask * 0.42 * inkWeight);\nbaseCol = mix(baseCol, cPaper, smoothstep(ringRadius + 0.02, ringRadius - 0.02, r) * 0.62);\nbaseCol = mix(baseCol, cIndigo, (outerRing + innerRing) * inkWeight);\nbaseCol = mix(baseCol, cIndigo, roseShape * 0.85);\nbaseCol = mix(baseCol, cSeal, step(r, 0.11));\n\n# Cardinal vermilion pips\npipN = step(length(p - vec2(0.0, ringRadius)), 0.055);\npipS = step(length(p - vec2(0.0, -ringRadius)), 0.055);\npipE = step(length(p - vec2(ringRadius, 0.0)), 0.055);\npipW = step(length(p - vec2(-ringRadius, 0.0)), 0.055);\nbaseCol = mix(baseCol, cSeal, clamp(pipN + pipS + pipE + pipW, 0.0, 1.0));\n\ncol = clamp(baseCol + grain, 0.0, 1.0);\n",
+    "params": {
+      "rosePoints": 16.0,
+      "waveBands": 9.0,
+      "ringRadius": 0.62,
+      "grainAmt": 0.04,
+      "inkWeight": 0.85
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

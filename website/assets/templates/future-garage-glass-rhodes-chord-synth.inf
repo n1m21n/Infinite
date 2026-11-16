@@ -1,0 +1,68 @@
+infinite-patch 1
+# Future Garage Glass Rhodes Chord Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 56
+  i note1 56
+  i note2 59
+  i note3 63
+  i note4 56
+  i note5 59
+  i note6 66
+  i note7 63
+  i note8 56
+  i note9 56
+  i note10 59
+  i note11 61
+  i note12 56
+  i note13 68
+  i note14 63
+  i note15 56
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float bell = 0.52 [0.0, 1.2];\nparam float detune = 0.009 [0.0, 0.03];\nparam float warmth = 1850.0 [350.0, 4500.0];\nparam float shimmer = 0.40 [0.0, 1.0];\nparam float decay = 0.90 [0.2, 2.2];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float pBell = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.03);\nenv = if(target > env, env + (target - env) * 0.08, env - env * decayRate);\n\nf0 = clamp(freq, 40.0, 2800.0);\np1 = (p1 + f0 * (1.0 - detune) / sr) % 1.0;\np2 = (p2 + f0 * (1.0 + detune) / sr) % 1.0;\npBell = (pBell + (f0 * 4.0) / sr) % 1.0;\n\nmodSig = sin(6.2831853 * pBell) * bell * env * env;\nv1 = sin(6.2831853 * p1 + modSig);\nv2 = sin(6.2831853 * p2 + modSig * shimmer);\nraw = (v1 + v2) * 0.48;\n\nfCut = clamp(warmth / sr * 3.14, 0.01, 0.44);\nlp = lp + fCut * (raw - lp);\n\nout = lp * env * 1.15;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.16 0.24 0.34
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Future Garage Glass Rhodes Chord Synth. Shimmering bell-harmonic electric piano synthesizer with soft stereo chorus drift and gentle envelope decay.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic
