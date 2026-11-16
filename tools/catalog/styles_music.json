@@ -3425,6 +3425,79 @@
       "groove": 0.5,
       "fill": 0.35,
       "gain": -8.5
+    },
+    {
+      "id": "doppler_rotary_speaker",
+      "family": "experimental",
+      "bpm": [
+        96,
+        118
+      ],
+      "swing": 0.08,
+      "scale": [
+        0,
+        3,
+        7
+      ],
+      "drums": {
+        "kick": "x.......o.......",
+        "snare": "....o.......o...",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": "x.....o.....x..."
+      },
+      "bass": "0...0...3...5...",
+      "fx": [
+        "Chorus",
+        "Delay",
+        "Saturation"
+      ],
+      "synth": [
+        "Organ",
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.65,
+      "refs": [
+        "Leslie Model 122 dual-rotor horn acoustic Doppler pitch & amplitude modulation",
+        "Overused Grotesk & Satoshi studio hardware plate typography"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 10,
+        "human": 4
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Organ",
+          "Analog"
+        ],
+        "density": 0.6,
+        "octave": 3,
+        "gate": 65,
+        "gain": -9.5,
+        "rate": 0.5,
+        "range": 6
+      },
+      "groove": 0.5,
+      "fill": 0.25,
+      "gain": -8.5
     }
   ]
 }

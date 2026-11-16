@@ -321,6 +321,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Trautonium Subharmonic Formant Bow Synth](https://infinitedevices.org/library/trautonium-subharmonic-formant-bow-synth.html): Bowed subharmonic Trautonium synthesizer with smooth portamento glide, wavefolded upper partials, and swept vocal formant bank. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-formant-bow-synth.inf)
 - [Barberpole Shepard Allpass FX](https://infinitedevices.org/library/barberpole-shepard-allpass-fx.html): Infinite rising six-stage allpass barberpole phaser with quadrature crossfade envelope, resonant feedback, and analog headroom saturation. (file: https://infinitedevices.org/assets/templates/barberpole-shepard-allpass-fx.inf)
 - [Magnetic Wire Hysteresis FX](https://infinitedevices.org/library/magnetic-wire-hysteresis-fx.html): 1940s Peirce steel-wire magnetic recorder processor with asymmetric hysteresis saturation, capstan flutter, and coil bandpass. (file: https://infinitedevices.org/assets/templates/magnetic-wire-hysteresis-fx.inf)
+- [Koto Glass Plucked Koto Synth](https://infinitedevices.org/library/koto-glass-plucked-koto-synth.html): Silk-string koto modal pluck synthesizer with bridge buzz dispersion, three-partial harmonic FM, and paulownia soundboard resonance. (file: https://infinitedevices.org/assets/templates/koto-glass-plucked-koto-synth.inf)
+- [Koto Glass Harmonic Marimba Synth](https://infinitedevices.org/library/koto-glass-harmonic-marimba-synth.html): Tuned glass and rosewood bar percussion synthesizer with 1:3.98:9.2 modal overtones, mallet hardness transient, and warm saturation. (file: https://infinitedevices.org/assets/templates/koto-glass-harmonic-marimba-synth.inf)
+- [Doppler Rotary Horn Cabinet FX](https://infinitedevices.org/library/doppler-rotary-horn-cabinet-fx.html): Dual-rotor Leslie horn Doppler dispersion processor with crossover baffle split, resonant birch cabinet coloration, and warm tube preamp saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-horn-cabinet-fx.inf)
+- [Doppler Rotary Leslie Chorale FX](https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html): Slow chorale-speed rotary baffle dispersion with asymmetric six-stage allpass phase drift, warm horn-throat rolloff, and soft transformer saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-leslie-chorale-fx.inf)
 
 ## Library: Community
 
@@ -681,7 +685,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 127 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 129 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -698,4 +702,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 112 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 114 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

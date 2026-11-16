@@ -175,6 +175,8 @@
   <url><loc>https://infinitedevices.org/embeds/schlieren-caustics-thermal-plume.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/dichroic-fresnel-stepped-bullseye.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/dichroic-fresnel-prismatic-caustics.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/raku-craquelure-celadon-veins.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/raku-craquelure-copper-kiln-glaze.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-16</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-16</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-16</lastmod><priority>0.7</priority></url>
@@ -388,6 +390,10 @@
   <url><loc>https://infinitedevices.org/library/trautonium-subharmonic-formant-bow-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/barberpole-shepard-allpass-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/magnetic-wire-hysteresis-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/koto-glass-plucked-koto-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/koto-glass-harmonic-marimba-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/doppler-rotary-horn-cabinet-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
@@ -1032,6 +1038,16 @@
   <url><loc>https://infinitedevices.org/library/magnetic-wire-hysteresis-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/dichroic-fresnel-stepped-bullseye.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/dichroic-fresnel-prismatic-caustics.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/astrolabe-planisphere-almucantar-projection.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/astrolabe-planisphere-ecliptic-rete.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/metabolist-capsule-nakagin-tower-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/metabolist-capsule-helical-cluster-3d.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/koto-glass-plucked-koto-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/koto-glass-harmonic-marimba-synth.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/doppler-rotary-horn-cabinet-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/raku-craquelure-celadon-veins.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/raku-craquelure-copper-kiln-glaze.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-16</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-16</lastmod><priority>0.5</priority></url>

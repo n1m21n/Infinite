@@ -635,6 +635,16 @@
       "slug": "dichroic-fresnel-prismatic-caustics",
       "title": "Dichroic Fresnel Prismatic Caustics",
       "description": "Audio-reactive dichroic beam-splitter prism. Bass pulses beam aperture, mids rotate the optical cube, and highs ignite prismatic caustic filaments."
+    },
+    {
+      "slug": "raku-craquelure-celadon-veins",
+      "title": "Raku Craquelure Celadon Veins",
+      "description": "Audio-reactive Goryeo celadon ceramic crackle glaze with Voronoi fracture plates and molten gold-leaf veins."
+    },
+    {
+      "slug": "raku-craquelure-copper-kiln-glaze",
+      "title": "Raku Craquelure Copper Kiln Glaze",
+      "description": "Audio-reactive copper-red and smoky carbon reduction raku glaze with Voronoi thermal-shock fissures and metallic luster."
     }
   ]
 }

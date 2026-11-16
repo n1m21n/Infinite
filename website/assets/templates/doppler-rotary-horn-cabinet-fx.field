@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Doppler Rotary Horn Cabinet FX",
+    "author": "Infinite",
+    "description": "Dual-rotor Leslie horn Doppler dispersion processor with crossover baffle split, resonant birch cabinet coloration, and warm tube preamp saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float hornHz = 5.4 [0.6, 8.5];\nparam float drumHz = 0.85 [0.2, 3.0];\nparam float dopplerDepth = 0.72 [0.1, 1.0];\nparam float tubeDrive = 1.45 [0.8, 2.8];\nparam float mix = 0.78 [0.0, 1.0];\nstate float phH = 0;\nstate float phD = 0;\nstate float lpX = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float cabBp = 0; state float cabLp = 0;\n\nphH = (phH + hornHz / sr) % 1.0;\nphD = (phD + drumHz / sr) % 1.0;\n\ntau = 6.2831853;\nlfoH = sin(tau * phH);\nlfoD = sin(tau * phD);\n\n# 800 Hz crossover split between low drum rotor and high horn rotor\nlpX = lpX + (in - lpX) * 0.095;\nhi = in - lpX;\n\n# Horn acoustic Doppler phase dispersion via 4-stage modulated allpass\ngH = clamp(0.18 + lfoH * 0.56 * dopplerDepth, -0.82, 0.82);\ny1 = -gH * hi + a1; a1 = hi + gH * y1;\ny2 = -gH * y1 + a2; a2 = y1 + gH * y2;\ny3 = -gH * y2 + a3; a3 = y2 + gH * y3;\ny4 = -gH * y3 + a4; a4 = y3 + gH * y4;\n\n# Horn directional beaming AM + low-drum rotor amplitude throb\nhBeam = 0.76 + 0.24 * cos(tau * phH + 0.4);\ndBeam = 0.84 + 0.16 * lfoD;\nhornSig = y4 * hBeam;\ndrumSig = lpX * dBeam;\n\n# Birch cabinet resonance around 380 Hz + 12AX7 tube saturation\ncomb = hornSig + drumSig;\ngCab = 0.05;\ncabBp = cabBp + gCab * (comb - cabLp - 0.65 * cabBp);\ncabLp = cabLp + gCab * cabBp;\n\ndrv = (comb * 0.82 + cabBp * 0.28) * tubeDrive;\nsat = drv / (1.0 + abs(drv) * 0.45);\nout = (in * (1.0 - mix) + sat * mix) * 0.78;\n",
+    "params": {
+      "hornHz": 5.4,
+      "drumHz": 0.85,
+      "dopplerDepth": 0.72,
+      "tubeDrive": 1.45,
+      "mix": 0.78
+    }
+  }
+}

@@ -1577,6 +1577,115 @@
         "Dichroic beam-splitter prism spectral refraction beams",
         "Technor & Terminal Grotesque optical instrument typography"
       ]
+    },
+    {
+      "id": "astrolabe_planisphere",
+      "taxonomy": "new",
+      "name": "Stereographic Astrolabe & Brass Planisphere",
+      "palette": [
+        "#141926",
+        "#C7AD5F",
+        "#E6D7B2",
+        "#3B665A"
+      ],
+      "sources": [
+        "Sketch",
+        "FieldPixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "blend"
+      ],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "minimal_ambient",
+        "neo_classical",
+        "koto_glass_minimalism"
+      ],
+      "refs": [
+        "Safavid hammered brass planispheric astrolabe stereographic almucantars",
+        "Pierced ecliptic rete star pointers & radial 1-degree vernier ticks",
+        "Instrument Serif & Micro Grotesk astronomical plate typography"
+      ]
+    },
+    {
+      "id": "metabolist_capsule",
+      "taxonomy": "new",
+      "name": "Metabolist Modular Concrete Capsules",
+      "palette": [
+        "#1E2124",
+        "#D2D3D0",
+        "#5B6066",
+        "#E89A3C"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette",
+        "grain"
+      ],
+      "comp": [
+        "tonemap"
+      ],
+      "ban": [
+        "neon",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "minimal_techno",
+        "drone_kosmische",
+        "ambient"
+      ],
+      "refs": [
+        "Kisho Kurokawa Nakagin Capsule Tower cantilevered concrete pods",
+        "Circular porthole apertures and dual structural service cores",
+        "Mourier & Manifont Grotesk Japanese architectural signage"
+      ]
+    },
+    {
+      "id": "raku_craquelure",
+      "taxonomy": "new",
+      "name": "Raku Ceramic Crackle Glaze & Gold-Vein Fracture",
+      "palette": [
+        "#171C19",
+        "#7F9986",
+        "#C8D5C4",
+        "#D49B42"
+      ],
+      "sources": [
+        "FieldPixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.45,
+      "pairs": [
+        "koto_glass_minimalism",
+        "microtonal_ambient",
+        "ambient"
+      ],
+      "refs": [
+        "Goryeo celadon & raku thermal-shock craze-line Voronoi fracture network",
+        "Kiln-fired copper-green glaze gradients with molten gold-vein seams",
+        "Instrument Serif & Hedvig Letters Serif museum ceramic catalog typography"
+      ]
     }
   ]
 }
