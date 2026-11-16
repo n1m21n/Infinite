@@ -201,8 +201,8 @@ void DrawKeyboard(FrameCtx& fc)
       if (terminalChord && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
          TerminalToggleShortcut();
 
-      // Shift+R: the docked Piano Roll
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_R, false))
+      // Shift+R: the docked Piano Roll (the 3D View keeps Shift+R for Repeat Last while it has the pointer)
+      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_R, false))
          gPianoRollOpen = !gPianoRollOpen;
 
       // Shift+J: the docked Drum panel (the Timeline keeps Shift+J for a new track while it has the keys)
@@ -229,7 +229,8 @@ void DrawKeyboard(FrameCtx& fc)
          gView2DOpen = !gView2DOpen;
 
       // Shift+Y: fit view to content, replacing the old menu-only entry
-      if (!typing && shiftOnly && !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_Y, false))
+      // Canvas-only keys (Shift+Y, Shift+H) stay off while any docked panel has the keys (gArrangeFocused, last frame).
+      if (!typing && shiftOnly && !gArrangeFocused && ImGui::IsKeyPressed(ImGuiKey_Y, false))
          gRequestFitView = true;
 
       // Shift+N: the type-to-filter node picker, without having to find empty
@@ -277,7 +278,7 @@ void DrawKeyboard(FrameCtx& fc)
       // "is anything showing?" either, or a canvas of audio nodes would make
       // the first press a no-op.
       // Not over the 3D View: Shift+H there hides the unselected items (View3DPanel HandleKeys).
-      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_H, false))
+      if (!typing && shiftOnly && !gArrangeFocused && ImGui::IsKeyPressed(ImGuiKey_H, false))
       {
          std::vector<GraphNode*> targets;
          const int count = ed::GetSelectedObjectCount();
