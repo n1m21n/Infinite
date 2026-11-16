@@ -374,7 +374,7 @@ def lib_thumb(name):
     """The library's own thumbnail for a preset id or an old picture path (assets/.../<id>.ext): the render for art presets, knobs and cables for the rest. None if there is none."""
     i = os.path.splitext(os.path.basename(name))[0]
     for ext in ("webp", "svg"):
-        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=6" % (i, ext)
+        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=7" % (i, ext)
     return None
 
 
@@ -662,11 +662,11 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="brand.css?v=36336012">
+  <link rel="stylesheet" href="brand.css?v=07695caf">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
   <link rel="stylesheet" href="blog.css?v=823c9183">
-  <link rel="stylesheet" href="audience.css?v=dd614df4">
+  <link rel="stylesheet" href="audience.css?v=f73df30a">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>

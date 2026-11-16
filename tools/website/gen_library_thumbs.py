@@ -183,21 +183,21 @@ def render_brand_card(item: dict) -> bytes:
     cat = item.get("category", "Library")
     cat_norm = "Audio Effects" if cat.lower() == "audio effects" else cat
 
-    im = Image.new("RGB", (SW, SH), GROUND)
+    im = Image.new("RGB", (SW, SH), DEEP)
     draw = ImageDraw.Draw(im)
 
-    # Programmed dot field (~5% Signal over Midnight ground)
-    dot_col = (30, 35, 62)
+    # Programmed dot field (~5% Signal over Midnight deep ground so it separates from page #151930)
+    dot_col = (24, 29, 54)
     for gx in range(32, SW - 20, 48):
         for gy in range(32, SH - 20, 48):
             draw.ellipse([gx - 2, gy - 2, gx + 2, gy + 2], fill=dot_col)
 
     # Right stage well (no outline, rounded 40px at 2x = 20px at 1x)
     sx1, sy1, sx2, sy2 = 660, 118, SW - 64, SH - 138
-    draw.rounded_rectangle([sx1, sy1, sx2, sy2], radius=40, fill=DEEP)
+    draw.rounded_rectangle([sx1, sy1, sx2, sy2], radius=40, fill=GROUND)
 
     # Subtle graticule inside stage
-    grat_col = (26, 30, 52)
+    grat_col = (30, 35, 62)
     for gx in range(sx1 + 64, sx2, 64):
         draw.line([(gx, sy1 + 16), (gx, sy2 - 16)], fill=grat_col, width=2)
     for gy in range(sy1 + 64, sy2, 64):
