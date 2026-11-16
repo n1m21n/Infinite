@@ -91,6 +91,12 @@ public:
    // "no kit", and LoadKitIntoEmptyLanes then does nothing. Main thread only.
    static void SetKitDir(const std::string& dir);
    static const std::string& KitDir();
+   // Root of the user's own kits (AppSupportDir()/kits, written by tools/drumkits/build_kits.py):
+   // <root>/<genre-slug>/NN.json, lane -> absolute path, gain_db, tune. A groove whose genre has a kit
+   // there fills empty lanes from the first one; lanes it lacks (or whose file is gone) take the bundled
+   // kit. Empty = bundled kit only. Main thread only.
+   static void SetUserKitRoot(const std::string& dir);
+   static const std::string& UserKitRoot();
 
    // Main thread. Replaces the whole pattern with groove `g`, part `part`
    // (0 = A, 1 = B, 2 = C): clears every step slot (including those past the
@@ -120,7 +126,7 @@ public:
    // `part` actually uses (non-null lane string). If lanes 2 and 3 (closed and
    // open hat) were both filled by this call and both have no choke group, puts
    // them in choke group 1. No-op when the kit directory is unset or missing.
-   void LoadKitIntoEmptyLanes(const DrumPatterns::Part& part);
+   void LoadKitIntoEmptyLanes(const DrumPatterns::Part& part, const char* genre = nullptr);
 
    const std::string& FilePath(int lane) const { return laneFilePath[Clamp(lane)]; }
    const std::string& FileName(int lane) const { return laneFileName[Clamp(lane)]; }

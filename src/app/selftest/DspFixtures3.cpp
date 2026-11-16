@@ -1030,6 +1030,8 @@ static bool RunDrumSequencerFixture()
          WriteClickWav(kitDir + "/" + DrumPatterns::KitFile(l), 4000, sampleRate);
    }
    const std::string savedKitDir = DrumSequencerNode::KitDir();
+   const std::string savedUserKits = DrumSequencerNode::UserKitRoot();
+   DrumSequencerNode::SetUserKitRoot("");   // these checks expect the bundled kit's files
    DrumSequencerNode::SetKitDir(kitDir);
 
    int nG = 0;
@@ -1588,6 +1590,7 @@ static bool RunDrumSequencerFixture()
    }
 
    DrumSequencerNode::SetKitDir(savedKitDir);
+   DrumSequencerNode::SetUserKitRoot(savedUserKits);
    {
       std::error_code ec;
       std::filesystem::remove_all(kitRoot, ec);

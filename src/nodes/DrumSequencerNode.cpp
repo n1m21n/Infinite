@@ -2,6 +2,11 @@
 #include "DrumPatterns.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <vector>
+#include <cctype>
+#include "json.hpp"
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -1144,6 +1149,55 @@ namespace
 void DrumSequencerNode::SetKitDir(const std::string& dir) { gKitDir = dir; }
 const std::string& DrumSequencerNode::KitDir() { return gKitDir; }
 
+namespace
+{
+   std::string gUserKitRoot;
+
+   struct UserLane { std::string path; float gainDb = 0.0f; float tune = 0.0f; };
+
+   // The first kit (by file name) in <root>/<genre slug>/, or false when there is none.
+   bool FindUserKit(const char* genre, UserLane (&lanes)[8])
+   {
+      if (gUserKitRoot.empty() || genre == nullptr || genre[0] == '\0')
+         return false;
+      std::string slug;
+      for (const char* c = genre; *c; c++)
+      {
+         const char ch = (char)std::tolower((unsigned char)*c);
+         if (std::isalnum((unsigned char)ch)) slug += ch;
+         else if (!slug.empty() && slug.back() != '-') slug += '-';
+      }
+      while (!slug.empty() && slug.back() == '-') slug.pop_back();
+      std::error_code ec;
+      const std::filesystem::path dir = std::filesystem::u8path(gUserKitRoot) / slug;
+      if (!std::filesystem::is_directory(dir, ec))
+         return false;
+      std::vector<std::filesystem::path> files;
+      for (const auto& e : std::filesystem::directory_iterator(dir, ec))
+         if (e.path().extension() == ".json")
+            files.push_back(e.path());
+      if (files.empty())
+         return false;
+      std::sort(files.begin(), files.end());
+      std::ifstream f(files.front());
+      const nlohmann::json j = nlohmann::json::parse(f, nullptr, false);
+      if (j.is_discarded() || !j.contains("lanes") || !j["lanes"].is_array())
+         return false;
+      const auto& arr = j["lanes"];
+      for (size_t i = 0; i < arr.size() && i < 8; i++)
+      {
+         if (!arr[i].is_object()) continue;
+         lanes[i].path = arr[i].value("path", std::string());
+         lanes[i].gainDb = arr[i].value("gain_db", 0.0f);
+         lanes[i].tune = arr[i].value("tune", 0.0f);
+      }
+      return true;
+   }
+}
+
+void DrumSequencerNode::SetUserKitRoot(const std::string& dir) { gUserKitRoot = dir; }
+const std::string& DrumSequencerNode::UserKitRoot() { return gUserKitRoot; }
+
 bool DrumSequencerNode::TryLoadLane(int lane, const std::string& path, std::string& error)
 {
    auto* decoded = new Platform::SampleBuffer();
@@ -1405,7 +1459,7 @@ void DrumSequencerNode::ApplyPattern(const DrumPatterns::Groove& g, int part)
    patternName = g.name;
    patternPart = part;
 
-   LoadKitIntoEmptyLanes(p);
+   LoadKitIntoEmptyLanes(p, g.category);
 }
 
 namespace
@@ -1553,12 +1607,14 @@ bool DrumSequencerNode::ApplyMidiFile(const std::string& path, std::string& erro
    return true;
 }
 
-void DrumSequencerNode::LoadKitIntoEmptyLanes(const DrumPatterns::Part& part)
+void DrumSequencerNode::LoadKitIntoEmptyLanes(const DrumPatterns::Part& part, const char* genre)
 {
-   if (gKitDir.empty())
+   UserLane user[8];
+   const bool hasUser = FindUserKit(genre, user);
+   if (gKitDir.empty() && !hasUser)
       return;
    const char sep = gKitDir.find('\\') != std::string::npos ? '\\' : '/';
-   const char tail = gKitDir.back();
+   const char tail = gKitDir.empty() ? '/' : gKitDir.back();
    const std::string base = gKitDir + ((tail == '/' || tail == '\\') ? "" : std::string(1, sep));
 
    bool filled[kNumLanes] = {};
@@ -1570,7 +1626,16 @@ void DrumSequencerNode::LoadKitIntoEmptyLanes(const DrumPatterns::Part& part)
       if (part.lanes[lane] == nullptr || !laneFilePath[lane].empty() || !laneFileName[lane].empty())
          continue;
       std::string error; // a missing kit is silent: lane status stays "--"
-      filled[lane] = TryLoadLane(lane, base + DrumPatterns::KitFile(lane), error);
+      if (hasUser && !user[lane].path.empty() && TryLoadLane(lane, user[lane].path, error))
+      {
+         // The kit's loudness match (gain_db against the lane's 0.8 default; lane volume tops out at 1).
+         laneVolume[lane] = std::clamp(0.8f * std::pow(10.0f, user[lane].gainDb / 20.0f), 0.0f, 1.0f);
+         lanePitch[lane] = std::clamp(user[lane].tune, -24.0f, 24.0f);
+         filled[lane] = true;
+         continue;
+      }
+      if (!gKitDir.empty())
+         filled[lane] = TryLoadLane(lane, base + DrumPatterns::KitFile(lane), error);
    }
    // Closed hat (lane 2) cuts the open hat (lane 3) - only when this call put
    // both there and the user has not set a choke group on either.

@@ -237,6 +237,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // infinite-basic); empty when the folder is absent, which the node treats as
    // "no kit". Set first so headless jobs that load patches see it too.
    DrumSequencerNode::SetKitDir(BundledResourcePath("drumkits/infinite-basic"));
+   // The user's own per-genre kits (tools/drumkits/build_kits.py); absent folder = bundled kit only.
+   if (const std::string sup = AppPaths::AppSupportDir(); !sup.empty())
+      DrumSequencerNode::SetUserKitRoot(sup + "/kits");
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
    sMainRssStartMb = Bench::ProcessRssMb();
    sMainFootStartMb = Bench::ProcessFootprintMb();
