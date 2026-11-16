@@ -11,7 +11,11 @@
 
 #ifdef IMGUI_ENABLE_TEST_ENGINE
 #include "imgui_internal.h"
+#include <chrono>
 #include <cmath>
+#include <map>
+#include <functional>
+#include <random>
 #include <cstdarg>
 #include <fstream>
 #include <set>
@@ -35,6 +39,7 @@ namespace app
    uint64_t View2DAuditRenderHash();
    std::string View2DAuditRanges();
    void View2DAuditRestore();
+   void View2DAuditEnd();
    bool View2DJourneySetup(const std::string& line, std::string* err);
    std::string View2DJourneyQuery(const std::string& q);
    bool View2DJourneyToScreen(float x, float y, ImVec2* out);
@@ -276,8 +281,14 @@ namespace
    std::string sThemeTag;         // " (light)" while the light theme runs: contrast findings are per theme
 
    void RegFinding(const std::string& window, const std::string& label);
+   // Crawler: controls drawn with no surface open (top bar, canvas nodes) are checked once in the home state, not
+   // again under every surface's name.
+   std::set<std::string> sChrome;
+   bool sChromeOn = false;
    void Add(const char* check, const std::string& state, const Rec& r, const char* fmt, ...)
    {
+      if (sChromeOn && sChrome.count(r.window + "|" + r.label) != 0)
+         return;
       RegFinding(r.window, r.label);
       const std::string win = r.window + (strncmp(check, "contrast", 8) == 0 ? sThemeTag : std::string());
       const std::string key = std::string(check) + "|" + win + "|" + r.label;
@@ -331,7 +342,7 @@ namespace
    // The registry: every control the 2D View drew, where, and what testing it gave.
    struct Entry
    {
-      std::string key, window, label, tip, glyph, kind, state, status = "untested", reason;
+      std::string key, window, label, tip, glyph, kind, state, status = "untested", reason, surface;
       ImRect bb;
       int findings = 0;
       bool poked = false;
@@ -341,7 +352,8 @@ namespace
    std::set<std::string> sV2DPoked;   // registry keys already queued for a poke
    std::vector<std::pair<std::string, std::string>> sSkips;   // (label or tip substring, reason)
 
-   std::string KeyOf(const std::string& window, const std::string& label) { return ShortWin(window) + "|" + label; }
+   std::string sKeyPrefix;   // the crawler's surface ("Mixer|"): the same window and label on two surfaces are two entries
+   std::string KeyOf(const std::string& window, const std::string& label) { return sKeyPrefix + ShortWin(window) + "|" + label; }
    Entry* RegFind(const std::string& key)
    {
       auto it = sRegAt.find(key);
@@ -559,6 +571,10 @@ namespace
    }
    std::unordered_map<std::string, std::string> sTipGlyph;   // the icon each tip was first seen with
 
+   // Block 5: the crawl runs the same symmetry checks on every window it scans; the 2D audit keeps them to the 2D View.
+   bool sLayoutAll = false;
+   bool InLayout(const std::string& w) { return sLayoutAll ? w.find("UI audit canary") == std::string::npos : IsV2D(w); }
+
    void V2DLayout(const std::string& state)
    {
       constexpr float tol = 1.0f;
@@ -568,7 +584,7 @@ namespace
       std::set<ImGuiID> seen;
       for (const Rec& r : sLast)
       {
-         if (!r.widget || !Visible(r) || !FullyShown(r) || !IsV2D(r.window) || !seen.insert(r.id).second)
+         if (!r.widget || !Visible(r) || !FullyShown(r) || !InLayout(r.window) || !seen.insert(r.id).second)
             continue;
          It it{ &r };
          for (const Ink& k : sInksLast)
@@ -582,7 +598,7 @@ namespace
          byWin[r.window].push_back(it);
          // Off the panel: a control drawn outside the 2D View's own rectangle.
          const ImRect panel(gView2DRectMin, gView2DRectMax);
-         if (panel.GetWidth() > 0 && !panel.Contains(r.bb))
+         if (!sLayoutAll && panel.GetWidth() > 0 && !panel.Contains(r.bb))
             Add("off panel", state, r, "%.0f,%.0f-%.0f,%.0f outside the panel", r.bb.Min.x, r.bb.Min.y, r.bb.Max.x, r.bb.Max.y);
       }
       for (auto& [w, items] : byWin)
@@ -672,7 +688,7 @@ namespace
                   const float g = gaps[i - 1];
                   if (g < -0.5f)
                      Add("overlap", state, r, "%.0f px over the chip before it", -g);
-                  else if (std::fabs(g - mg) > tol && g < divider - tol && std::fabs(g - tok::space_1) > tol)
+                  else if (std::fabs(g - mg) > tol && g < divider - tol && g < tok::space_3 - tol && std::fabs(g - tok::space_1) > tol)   // space_3+: a group break
                      Add("uneven gap", state, r, "%.1f px gap, the row's is %.1f", g, mg);
                }
             }
@@ -681,7 +697,7 @@ namespace
       // Form rows: labels share a left edge, fields a right edge, and a label sits on its field's centre line.
       std::unordered_map<std::string, std::vector<const Ink*>> labels, checks;
       for (const Ink& k : sInksLast)
-         if (IsV2D(k.window) && (k.kind == 3 || k.kind == 4))
+         if (InLayout(k.window) && (k.kind == 3 || k.kind == 4))
             (k.kind == 3 ? labels : checks)[k.window].push_back(&k);
       for (auto& [w, ls] : labels)
       {
@@ -745,7 +761,7 @@ namespace
       // Loose text on a tile row sits on the row's centre line.
       for (const Ink& k : sInksLast)
       {
-         if (k.kind != 2 || !IsV2D(k.window))
+         if (k.kind != 2 || !InLayout(k.window))
             continue;
          std::vector<float> cys;
          for (const Rec& r : sLast)
@@ -903,7 +919,7 @@ namespace
       int popups = 0, popupsAfter = 0, step = 0;
       // 2D View pokes: panel state and picture before/after, and the dropdown's options as found when it opened.
       std::string ps0, ps1, tip, rangeBad, typedText;
-      uint64_t rh0 = 0, rh1 = 0;
+      uint64_t rh0 = 0, rh1 = 0, ih0 = 0, ih1 = 0, dh0 = 0, dh1 = 0;   // ih: which controls are drawn (a tab click shows others)
       std::vector<std::pair<ImGuiID, ImRect>> opts;
       size_t opt = 0;
       int optsDead = 0, typedTook = 0, optPopups = 0;
@@ -921,6 +937,47 @@ namespace
          if (r.id == id && r.widget)
             return &r;
       return nullptr;
+   }
+
+   // Which controls were drawn last frame, by label: a click that opens a tab or a section changes it.
+   uint64_t ItemsHash()
+   {
+      std::vector<std::string> ls;
+      for (const Rec& r : sLast)
+         if (r.widget && !IsPopupWin(ShortWin(r.window)) && r.window.find("##Tooltip") == std::string::npos)
+            ls.push_back(r.window + "|" + r.label);
+      std::sort(ls.begin(), ls.end());
+      ls.erase(std::unique(ls.begin(), ls.end()), ls.end());
+      uint64_t h = 1469598103934665603ull;
+      for (const std::string& l : ls)
+         for (char c : l)
+            h = (h ^ (unsigned char)c) * 1099511628211ull;
+      return h;
+   }
+
+   // What the panel holding a control draws (positions and colours of every vertex in it and its children): a click
+   // that only changes a highlight or a mode the document does not keep still changes this.
+   uint64_t DrawHash(const std::string& window)
+   {
+      const size_t a = window.find('/');
+      const size_t b = a == std::string::npos ? std::string::npos : window.find('/', a + 1);
+      const std::string top = window.substr(0, b);
+      uint64_t h = 1469598103934665603ull;
+      for (ImGuiWindow* w : GImGui->Windows)
+      {
+         // The audit runs before the panels draw this frame: last frame's windows hold their draw lists still.
+         if (!(w->Active || w->WasActive) || w->DrawList == nullptr || (w->Flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)) != 0)
+            continue;
+         const std::string n = BaseName(w->Name);
+         if (n.compare(0, top.size(), top) != 0 || (n.size() > top.size() && n[top.size()] != '/' && n[top.size()] != '_'))
+            continue;
+         for (const ImDrawVert& v : w->DrawList->VtxBuffer)
+         {
+            const uint64_t x = ((uint64_t)(int)(v.pos.x * 4.0f) << 32) ^ (uint64_t)(int)(v.pos.y * 4.0f) ^ ((uint64_t)v.col << 16);
+            h = (h ^ x) * 1099511628211ull;
+         }
+      }
+      return h;
    }
 
    float SliderFrac(ImGuiID id, float fallback)
@@ -950,8 +1007,8 @@ namespace
          e->poked = true;
       if (k.kind == Kind::Click)
       {
-         const bool doc = k.fp1 != k.fp0, panel = k.ps1 != k.ps0, pic = k.rh1 != k.rh0;
-         if (!doc && !panel && !pic && k.popups == 0 && k.typedTook == 0 && !k.on)
+         const bool doc = k.fp1 != k.fp0, panel = k.ps1 != k.ps0, pic = k.rh1 != k.rh0, ui = k.ih1 != k.ih0 || k.dh1 != k.dh0;
+         if (!doc && !panel && !pic && !ui && k.popups == 0 && k.typedTook == 0 && !k.on)
             Add("click does nothing", k.state, r, "%s", k.tip.empty() ? "no value, panel state, picture or popup changed" : k.tip.c_str());
          if (k.popups > 1)
             Add("more than one popup", k.state, r, "%d popups open after one click", k.popups);
@@ -1115,12 +1172,14 @@ namespace
          {
          case 0:
             k.fp0 = Fingerprint(); k.ps0 = app::View2DAuditPanelState(); k.rh0 = app::View2DAuditRenderHash();
-            k.depth = gUndoStack.size(); sMouse = c; break;
+            k.ih0 = ItemsHash(); k.dh0 = DrawHash(k.inNode ? std::string("Infinite") : k.window); k.depth = gUndoStack.size(); sMouse = c; break;
          case 1: sButton = 1; break;
          case 2: sButton = 0; break;
-         case 6:
+         case 3: sMouse = ImVec2(-10000.0f, -10000.0f); break;   // off the control: its hover fades before the picture is read
+         case 12:
+            k.dh1 = DrawHash(k.inNode ? std::string("Infinite") : k.window);   // before Esc: Esc also drops a tool or mode the click chose
             k.fp1 = Fingerprint(); k.ps1 = app::View2DAuditPanelState(); k.rh1 = app::View2DAuditRenderHash();
-            k.popups = OpenPopups(); k.typedTook = GImGui->ActiveId != 0 && ImGui::TempInputIsActive(GImGui->ActiveId) ? 1 : 0;
+            k.ih1 = ItemsHash(); k.popups = OpenPopups(); k.typedTook = GImGui->ActiveId != 0 && ImGui::TempInputIsActive(GImGui->ActiveId) ? 1 : 0;
             k.rangeBad = app::View2DAuditRanges();
             if (k.popups > 0)
             {
@@ -1132,14 +1191,14 @@ namespace
                sQueue.push_back(m);
             }
             sKey = 1; break;
-         case 7: sKey = 0; break;
-         case 9:
-            CloseAllPopups(); sMouse = ImVec2(-10000.0f, -10000.0f);
+         case 13: sKey = 0; break;
+         case 16:
+            CloseAllPopups();
             k.undoable = gUndoStack.size() > k.depth;
             while (gUndoStack.size() > k.depth)
                Undo();
             break;
-         case 11:
+         case 18:
             if (k.fp1 != k.fp0 && k.undoable && Fingerprint() != k.fp0)
                k.over = FirstDiff(k.fp0, Fingerprint());
             Judge(k); app::View2DAuditRestore(); sPoking = false; break;
@@ -1311,14 +1370,24 @@ namespace
          return "button";
       return "item";
    }
-   void V2DRegisterAndPoke(const std::string& state)
+   // Register every control drawn in this state that `inScope` takes, then queue each one's poke once across all
+   // states. `node` (a type name) when one node sits alone on the canvas: its controls are canvas-space.
+   int RegisterAndPoke(const std::string& state, const std::function<bool(const Rec&)>& inScope, const std::string& node = std::string())
    {
       std::set<ImGuiID> seen;
       int queued = 0;
-      for (const Rec& r : sLast)
+      const ImRect* nodeBox = !node.empty() && !sNodesLast.empty() ? &sNodesLast.back().box : nullptr;
+      if (!node.empty() && nodeBox == nullptr)
+         return 0;
+      for (const Rec& r0 : sLast)
       {
-         if (!r.widget || !IsV2D(r.window) || !Visible(r) || !seen.insert(r.id).second)
+         if (!r0.widget || !Visible(r0) || !inScope(r0) || !seen.insert(r0.id).second)
             continue;
+         if (nodeBox != nullptr && !InsideNode(r0, *nodeBox))
+            continue;
+         Rec r = r0;
+         if (nodeBox != nullptr)
+            r.window = "node " + node;
          const std::string key = KeyOf(r.window, r.label);
          Entry* e = RegFind(key);
          if (e == nullptr)
@@ -1334,6 +1403,7 @@ namespace
             e->kind = KindOf(r);
             e->state = state;
             e->bb = r.bb;
+            e->surface = sKeyPrefix.empty() ? std::string() : sKeyPrefix.substr(0, sKeyPrefix.size() - 1);
          }
          // The reason first: a control skipped because it is greyed in the audit's states still gets its reason.
          if (const char* why = SkipReason(r.label, e->tip))
@@ -1342,7 +1412,7 @@ namespace
                e->reason = why;
             continue;
          }
-         if (r.disabled || !FullyShown(r) || sV2DPoked.count(key) != 0)
+         if (r.disabled || !FullyShown(r0) || sV2DPoked.count(key) != 0)
             continue;
          Poke k;
          k.id = r.id;
@@ -1351,6 +1421,7 @@ namespace
          k.window = r.window;
          k.state = state;
          k.tip = e->tip;
+         k.inNode = nodeBox != nullptr;
          k.on = sOnLast.count(r.id) != 0;
          const std::string& kind = e->kind;
          bool any = true;
@@ -1399,6 +1470,11 @@ namespace
             queued++;
          }
       }
+      return queued;
+   }
+   void V2DRegisterAndPoke(const std::string& state)
+   {
+      const int queued = RegisterAndPoke(state, [](const Rec& r) { return IsV2D(r.window); });
       // Per state: the document survives its save text and holds no out-of-range value.
       const std::string rt = app::View2DAuditRoundTrip();
       if (!rt.empty())
@@ -1408,6 +1484,7 @@ namespace
          Add("value out of range", state, Pseudo("##view2dcontent", "document"), "%s", rg.c_str());
       printf("UIAUDIT v2d %s: %zu items, %zu registered, %d queued\n", state.c_str(), sLast.size(), sReg.size(), queued);
    }
+
 
    std::string JsonEsc(const std::string& s)
    {
@@ -2169,6 +2246,685 @@ void FrameTest_JOURNEYS(int frameId, GLFWwindow* window)
       return;
    }
 }
+
+// ---- crawler (internal/plans/ui-system/next-session.md, Block 1). INFINITE_CRAWL=<out dir>.
+// Every surface in turn (each panel, each 3D View tab, each 2D View state, one node of every type), dark then
+// light. Dark: every control a surface draws is registered and poked by kind (the audit's pokes), then the surface
+// is scanned again until no new control shows (a tab click inside a panel shows more), then paged down. Light:
+// the layout and contrast checks only. Per poke and per surface: no NaN/inf in any value, save text round-trips,
+// no popup left after Esc, no frame over 100 ms (the crawler's own work taken out), no GL error.
+//   INFINITE_CRAWL_SURFACE=a,b   only surfaces whose name holds a or b ("panel", "v3d", "Mixer", "node-Blur")
+//   INFINITE_CRAWL_SKIP=<tsv>    label-or-tip substring <TAB> reason, like tools/ui-audit/view2d-skip.tsv
+//   INFINITE_CRAWL_PATCH=<inf>   the patch the panels open over
+//   INFINITE_CRAWL_WALK=N INFINITE_CRAWL_SEED=S [INFINITE_CRAWL_UPTO=K]   N random actions instead; a replay
+//                                stops at step K with a shot
+namespace
+{
+   struct Surface
+   {
+      std::string name;       // "panel-Mixer", "v3d-Scene", "v2d-12", "node-Blur"
+      int kind = 0;           // 0 panel, 1 3D View tab, 2 2D View state, 3 node
+      bool* flag = nullptr;
+      int index = 0;
+      std::string cat, type;
+   };
+   struct SurfStat { float slowMs = 0; std::string slowAt; int glErr = 0; };
+
+   std::vector<Surface> sSurf;
+   std::map<std::string, SurfStat> sStats;
+   std::string sCrawlOut;
+   FILE* sProgress = nullptr;
+   int sShots = 0, sWarm = 0;
+   double sOwnMs = 0;               // the crawler's own time last frame, taken out of the frame time
+
+   std::vector<std::pair<const char*, bool*>> CrawlPanels()
+   {
+      return { { "Settings", &gSettingsOpen }, { "Help", &gHelpOpen }, { "Shortcuts", &gShortcutsOpen },
+               { "Templates", &gTemplatesOpen }, { "History", &gHistoryOpen }, { "Piano Roll", &gPianoRollOpen },
+               { "Curve Editor", &gCurveEditorOpen }, { "Sample Studio", &gSampleStudioOpen }, { "Show Set", &gShowSetOpen },
+               { "Library", &gNodePanelOpen }, { "Viewport", &gViewportPanelOpen }, { "Arrange", &gArrangePanelOpen },
+               { "Mod Matrix", &gModMatrixOpen }, { "Performance", &gPerfPanelOpen }, { "Mixer", &gMixerPanelOpen },
+               { "Drums", &gDrumPanelOpen } };
+   }
+
+   void Progress(const std::string& line)
+   {
+      if (sProgress == nullptr)
+         return;
+      fprintf(sProgress, "%s\n", line.c_str());
+      fflush(sProgress);
+   }
+
+   void CrawlCloseAll()
+   {
+      for (auto& [n, f] : CrawlPanels())
+         *f = false;
+      gView3DOpen = false;
+      gView2DOpen = false;
+      app::View2DAuditEnd();
+   }
+
+   void ClearCanvas()
+   {
+      std::vector<int> ids;
+      for (GraphNode& gn : gNodes)
+         ids.push_back(gn.index);
+      for (int id : ids)
+         RemoveNodeByIndex(id);
+   }
+
+   // A value that reads as a number but is not finite ("nan", "inf"), anywhere in the patch.
+   std::string BadNumbers()
+   {
+      const Patch::Data d = BuildPatchData();
+      for (const Patch::NodeRecord& n : d.nodes)
+         for (const auto& [k, v] : n.params)
+         {
+            std::string tok;
+            std::istringstream in(v);
+            while (in >> tok)
+            {
+               while (!tok.empty() && (tok.back() == ',' || tok.back() == ';'))
+                  tok.pop_back();
+               char* end = nullptr;
+               const double x = strtod(tok.c_str(), &end);
+               if (end != tok.c_str() && *end == 0 && !std::isfinite(x))
+                  return n.typeName + " " + k + " = " + v.substr(0, 40);
+            }
+         }
+      return std::string();
+   }
+
+   // The patch's save text read back and written again is the same text.
+   std::string SaveRoundTrip()
+   {
+      std::string a, b, err;
+      Patch::Data back;
+      if (!Patch::WriteText(BuildPatchData(), a))
+         return "write failed";
+      if (!Patch::ReadText(a, back, err))
+         return "read failed: " + err;
+      Patch::WriteText(back, b);
+      return a == b ? std::string() : FirstDiff(a, b);
+   }
+
+   void ShotWhole(const std::string& file)
+   {
+      const ImVec2 s = ImGui::GetIO().DisplayFramebufferScale, d = ImGui::GetIO().DisplaySize;
+      std::filesystem::create_directories(sCrawlOut + "/shots");
+      gShotNowPath = sCrawlOut + "/shots/" + file + ".png";
+      gShotNowRect[0] = 0;
+      gShotNowRect[1] = 0;
+      gShotNowRect[2] = (int)std::lround(d.x * s.x);
+      gShotNowRect[3] = (int)std::lround(d.y * s.y);
+   }
+
+   // Findings a poke can raise about behaviour (not layout): each gets a shot of the window as it was.
+   bool Behaviour(const std::string& check)
+   {
+      static const std::set<std::string> kB = { "undo does not restore", "no undo step", "toggle does not return",
+         "Esc does not close", "more than one popup", "value out of range", "typed value not clamped", "press not taken",
+         "popup changes value", "hover/scroll changes value", "non-finite value", "save text differs", "popup stuck after Esc" };
+      return kB.count(check) != 0;
+   }
+
+   std::string FileSafe(std::string s)
+   {
+      for (char& c : s)
+         if (!std::isalnum((unsigned char)c) && c != '-')
+            c = '_';
+      return s;
+   }
+
+   void WriteCrawl()
+   {
+      const std::string dir = sCrawlOut;
+      std::ofstream t(dir + "/coverage.tsv");
+      t << "surface\tstatus\tkind\twindow\tlabel\ttip\tstate\treason\n";
+      for (Entry& e : sReg)
+      {
+         if (e.findings > 0) e.status = "fail";
+         else if (e.poked) e.status = "pass";
+         else if (!e.reason.empty()) e.status = "skipped";
+         else e.status = "untested";
+         t << e.surface << '\t' << e.status << '\t' << e.kind << '\t' << e.window << '\t' << e.label << '\t' << e.tip << '\t'
+           << e.state << '\t' << e.reason << '\n';
+      }
+      std::ofstream st(dir + "/stats.tsv");
+      st << "surface\tslow_ms\tslow_at\tgl_errors\n";
+      for (auto& [n, x] : sStats)
+         st << n << '\t' << x.slowMs << '\t' << x.slowAt << '\t' << x.glErr << '\n';
+   }
+
+   // Per frame while crawling: the frame time without the crawler's own work, and GL errors.
+   void FrameChecks(const std::string& surface, const char* at)
+   {
+      SurfStat& st = sStats[surface];
+      const double ms = ImGui::GetIO().DeltaTime * 1000.0 - sOwnMs;
+      if (sWarm > 0)
+         sWarm--;
+      else if (ms > 100.0 && ms > st.slowMs)
+      {
+         st.slowMs = (float)ms;
+         st.slowAt = at;
+      }
+      for (int n = 0; n < 8 && glGetError() != GL_NO_ERROR; n++)
+         st.glErr++;
+   }
+}
+
+void FrameTest_CRAWL(int frameId, GLFWwindow* window)
+{
+   static const char* out = getenv("INFINITE_CRAWL");
+   if (out == nullptr)
+      return;
+   enum class Ph { Init, Home, Open, Settle, Scan, Poking, Page, EscDown, EscUp, EscCheck, Close, Walk, Finish };
+   static Ph ph = Ph::Init;
+   static size_t si = 0;
+   static int wait = 0, theme = 0, round = 0, page = 0, lastQueued = 0;
+   static bool done = false;
+   static std::string patch;
+   if (done || frameId < 3)
+      return;
+   const auto t0 = std::chrono::steady_clock::now();
+   struct Own { std::chrono::steady_clock::time_point t; ~Own() { sOwnMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t).count(); } } own{ t0 };
+   if (GImGui->TestEngineHookItems)
+      ReadCanvas();
+
+   // ---- random walk state
+   static int walkN = 0, walkUpto = 0, walkStep = 0, walkSub = 0;
+   static unsigned walkSeed = 1;
+   static std::mt19937 rng;
+   static std::ofstream walkTsv, walkLog;
+   static std::string walkFp0, walkAct;
+   static size_t walkDepth0 = 0;
+   static int walkFails = 0;
+   static ImVec2 walkA, walkB;
+
+   if (frameId == 3)
+   {
+      sCrawlOut = out;
+      std::filesystem::create_directories(sCrawlOut);
+      sProgress = fopen((sCrawlOut + "/progress.txt").c_str(), "w");
+      GImGui->TestEngineHookItems = true;
+      static ImGuiContextHook hook;
+      hook.Type = ImGuiContextHookType_NewFramePre;
+      hook.Callback = OwnMouse;
+      ImGui::AddContextHook(GImGui, &hook);
+      SetCanvasSwapInterval(0);
+      setenv("INFINITE_NO_DIALOGS", "1", 1);   // Platform's file dialogs answer Cancel
+      gModulationFrozen = true;                 // bound values hold still: a change after a click was the click
+      if (const char* sk = getenv("INFINITE_CRAWL_SKIP"))
+      {
+         std::ifstream f(sk);
+         std::string line;
+         while (std::getline(f, line))
+            if (!line.empty() && !(line[0] == '#' && line.compare(0, 2, "##") != 0))
+               if (const size_t tab = line.find('\t'); tab != std::string::npos)
+                  sSkips.emplace_back(line.substr(0, tab), line.substr(tab + 1));
+      }
+      std::vector<std::string> only;
+      if (const char* o = getenv("INFINITE_CRAWL_SURFACE"))
+      {
+         std::stringstream ss(o);
+         for (std::string w; std::getline(ss, w, ',');)
+            if (!w.empty())
+               only.push_back(w);
+      }
+      auto want = [&](const std::string& n) {
+         if (only.empty())
+            return true;
+         for (const std::string& w : only)
+            if (n.find(w) != std::string::npos)
+               return true;
+         return false;
+      };
+      std::vector<Surface> all;
+      for (auto& [n, f] : CrawlPanels())
+         all.push_back({ std::string("panel-") + n, 0, f });
+      static const int kTabs[] = { 6, 0, 1, 2, 3, 4, 7, 5 };
+      static const char* kTabNames[] = { "Scene", "Render", "Output", "World", "Object", "Light", "Material", "Viewport" };
+      for (int i = 0; i < 8; i++)
+         all.push_back({ std::string("v3d-") + kTabNames[i], 1, nullptr, kTabs[i] });
+      for (int i = 0; i < app::View2DAuditStateCount(); i++)
+      {
+         char b[16];
+         snprintf(b, sizeof b, "v2d-%02d", i);
+         all.push_back({ b, 2, nullptr, i });
+      }
+      for (const std::string& cat : NodeFactory::Instance().GetCategories())
+         for (const std::string& n : NodeFactory::Instance().GetNodesInCategory(cat))
+            all.push_back({ "node-" + n, 3, nullptr, 0, cat, n });
+      std::ofstream names(sCrawlOut + "/surfaces.txt");
+      for (Surface& x : all)
+      {
+         names << x.name << (want(x.name) ? "\t*" : "") << '\n';
+         if (want(x.name))
+            sSurf.push_back(x);
+      }
+      if (const char* p = getenv("INFINITE_CRAWL_PATCH"))
+         patch = p;
+      if (!patch.empty())
+         LoadPatchFrom(patch);
+      if (const char* w = getenv("INFINITE_CRAWL_WALK"))
+         walkN = atoi(w);
+      if (const char* w = getenv("INFINITE_CRAWL_SEED"))
+         walkSeed = (unsigned)strtoul(w, nullptr, 10);
+      if (const char* w = getenv("INFINITE_CRAWL_UPTO"))
+         walkUpto = atoi(w);
+      printf("CRAWL %zu surfaces, walk %d seed %u -> %s\n", sSurf.size(), walkN, walkSeed, out);
+      CrawlCloseAll();
+      wait = 40;
+      sWarm = 60;   // the patch load and first panel layouts are not a click's frame time
+      ph = Ph::Home;
+      return;
+   }
+
+   const std::string surfName = si < sSurf.size() ? sSurf[si].name : std::string("walk");
+   static const char* kPh[] = { "init", "home", "open", "settle", "scan", "poking", "page", "esc", "esc", "esc", "close", "walk", "finish" };
+   FrameChecks(ph == Ph::Walk ? "walk" : surfName, sPoking ? sPoke.label.c_str() : kPh[(int)ph]);
+
+   if (ph == Ph::Poking || ph == Ph::Scan)
+   {
+      const Surface& s = sSurf[si];
+      if (s.kind == 0)
+         *s.flag = true;   // a poke may have closed the panel; it stays the subject
+   }
+   if (ph == Ph::Poking)
+   {
+      const size_t had = sFindings.size();
+      const std::string label = sPoking ? sPoke.label : std::string();
+      if (StepPoke())
+      {
+         for (size_t i = had; i < sFindings.size(); i++)
+            if (Behaviour(sFindings[i].check) && sShots < 60)
+            {
+               ShotWhole(FileSafe(sSurf[si].name + "-" + std::to_string(sShots++)));
+               Progress("  finding " + sFindings[i].check + ": " + sFindings[i].label + " (shot " + gShotNowPath + ")");
+               break;
+            }
+         if (!sPoking && !sQueue.empty())
+            Progress("  poke " + sQueue.back().label);
+         return;
+      }
+      ph = lastQueued > 0 && ++round < 6 ? Ph::Scan : Ph::Page;
+      wait = 2;
+      return;
+   }
+   if (wait > 0)
+   {
+      wait--;
+      return;
+   }
+
+   const std::string tn = ThemeName(theme);
+   switch (ph)
+   {
+   case Ph::Home:
+      sChromeOn = false;
+      Snapshot(tn + " home");
+      for (const Rec& r : sLast)
+         if (r.widget)
+            sChrome.insert(r.window + "|" + r.label);
+      sChromeOn = true;
+      Progress("home " + tn + ": " + std::to_string(sChrome.size()) + " chrome controls");
+      if (walkN > 0)
+      {
+         rng.seed(walkSeed);
+         walkTsv.open(sCrawlOut + "/walk.tsv");
+         walkTsv << "seed\tstep\taction\tinvariant\tdetail\n";
+         walkLog.open(sCrawlOut + "/walk-steps.tsv");
+         walkFp0 = Fingerprint();
+         walkDepth0 = gUndoStack.size();
+         ph = Ph::Walk;
+         return;
+      }
+      si = 0;
+      ph = si < sSurf.size() ? Ph::Open : Ph::Finish;
+      return;
+
+   case Ph::Open:
+   {
+      const Surface& s = sSurf[si];
+      sKeyPrefix = s.name + "|";
+      sChromeOn = s.kind != 3;   // a node surface clears the canvas: its controls are its own, whatever their names
+      CloseAllPopups();
+      CrawlCloseAll();
+      // Files so far, before each surface: a crash or GPU hang mid-run still leaves a report.
+      Write(sCrawlOut.c_str());
+      WriteCrawl();
+      Progress("open " + tn + " " + s.name);
+      if (s.kind == 0)
+         *s.flag = true;
+      else if (s.kind == 1)
+         gView3DOpen = true;
+      else if (s.kind == 2)
+         gView2DOpen = true;
+      else
+      {
+         ClearCanvas();
+         SpawnNode(s.type, s.cat, 300.0f, 200.0f);
+      }
+      round = page = 0;
+      wait = s.kind == 3 ? 4 : 20;
+      sWarm = 12;
+      ph = Ph::Settle;
+      return;
+   }
+
+   case Ph::Settle:
+   {
+      const Surface& s = sSurf[si];
+      for (const Notices::Notice& n : Notices::Active())
+         Notices::DismissId(n.id);
+      if (s.kind == 1)
+         View3DAuditState(s.index);
+      else if (s.kind == 2)
+         app::View2DAuditState(s.index);
+      else if (s.kind == 3)
+      {
+         ed::EditorContext* prev = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+         ed::NavigateToContent(0.0f);
+         ed::SetCurrentEditor(prev);
+      }
+      wait = s.kind == 3 ? 8 : 4;
+      sWarm = 6;
+      ph = Ph::Scan;
+      return;
+   }
+
+   case Ph::Scan:
+   {
+      const Surface& s = sSurf[si];
+      std::string state = tn + " " + s.name;
+      if (page > 0)
+         state += " p" + std::to_string(page + 1);
+      if (round > 0)
+         state += " r" + std::to_string(round + 1);
+      const std::string node = s.kind == 3 ? s.type : std::string();
+      Snapshot(state, node);
+      if (round == 0)
+      {
+         sLayoutAll = true;   // symmetry: centring, one row height and centre line, even gaps, label and field edges
+         V2DLayout(state);
+         sLayoutAll = false;
+      }
+      lastQueued = 0;
+      if (theme == 0)
+      {
+         auto scope = [&](const Rec& r) { return s.kind == 3 || sChrome.count(r.window + "|" + r.label) == 0; };
+         lastQueued = RegisterAndPoke(state, scope, node);
+      }
+      Progress("  scan " + state + ": " + std::to_string(lastQueued) + " queued");
+      ph = Ph::Poking;
+      return;
+   }
+
+   case Ph::Page:
+   {
+      const Surface& s = sSurf[si];
+      ImGuiWindow* best = nullptr;
+      if (s.kind == 1)
+         best = PropsScroller();
+      else if (s.kind != 3)
+      {
+         std::set<std::string> wins;
+         for (const Rec& r : sLast)
+            if (r.widget && sChrome.count(r.window + "|" + r.label) == 0)
+               wins.insert(r.window);
+         for (ImGuiWindow* w : GImGui->Windows)
+            if ((w->Active || w->WasActive) && w->ScrollMax.y > 0.0f && wins.count(BaseName(w->Name)) != 0 &&
+                (best == nullptr || w->ScrollMax.y > best->ScrollMax.y))
+               best = w;
+      }
+      if (best != nullptr && best->Scroll.y < best->ScrollMax.y - 1.0f && page < 8)
+      {
+         ImGui::SetScrollY(best, best->Scroll.y + best->InnerRect.GetHeight() * 0.8f);
+         page++;
+         round = 0;
+         wait = 3;
+         ph = Ph::Scan;
+         return;
+      }
+      ph = theme == 0 ? Ph::EscDown : Ph::Close;
+      sMouse = ImVec2(-10000.0f, -10000.0f);
+      return;
+   }
+
+   // Esc at the end of a surface: no popup may stay open.
+   case Ph::EscDown: sKeyName = ImGuiKey_Escape; sKey = 1; ph = Ph::EscUp; return;
+   case Ph::EscUp: sKeyName = ImGuiKey_Escape; sKey = 0; ph = Ph::EscCheck; wait = 3; return;
+   case Ph::EscCheck:
+   {
+      const Surface& s = sSurf[si];
+      const std::string state = tn + " " + s.name;
+      if (OpenPopups() > 0)
+         Add("popup stuck after Esc", state, Pseudo(s.name, "popup"), "%d open", OpenPopups());
+      if (const std::string b = BadNumbers(); !b.empty())
+         Add("non-finite value", state, Pseudo(s.name, "patch"), "%s", b.c_str());
+      if (const std::string rt = SaveRoundTrip(); !rt.empty())
+         Add("save text differs", state, Pseudo(s.name, "patch"), "near: %s", rt.c_str());
+      if (const SurfStat& x = sStats[s.name]; x.slowMs > 100.0f)
+         Add("slow frame", state, Pseudo(s.name, "frame"), "%d ms at %s", (int)x.slowMs, x.slowAt.c_str());
+      if (const SurfStat& x = sStats[s.name]; x.glErr > 0)
+         Add("GL error", state, Pseudo(s.name, "gl"), "%d", x.glErr);
+      ph = Ph::Close;
+      return;
+   }
+
+   case Ph::Close:
+   {
+      const Surface& s = sSurf[si];
+      CloseAllPopups();
+      if (s.kind == 3)
+         ClearCanvas();
+      CrawlCloseAll();
+      sKeyPrefix.clear();
+      si++;
+      if (si < sSurf.size())
+      {
+         // Back from the node phase to the panels (light pass): the patch returns.
+         if (s.kind == 3 && sSurf[si].kind != 3 && !patch.empty())
+            LoadPatchFrom(patch);
+         ph = Ph::Open;
+         wait = 2;
+         return;
+      }
+      if (theme == 0 && getenv("INFINITE_CRAWL_DARK_ONLY") == nullptr)
+      {
+         theme = 1;
+         SetTheme(1);
+         sV2DPoked.clear();
+         if (!patch.empty())
+            LoadPatchFrom(patch);
+         ph = Ph::Home;
+         wait = 20;
+         return;
+      }
+      ph = Ph::Finish;
+      return;
+   }
+
+   case Ph::Walk:
+   {
+      // One action every few frames, invariants after each; a failure names the seed and the step.
+      auto fail = [&](const char* inv, const std::string& detail) {
+         walkFails++;
+         walkTsv << walkSeed << '\t' << walkStep << '\t' << walkAct << '\t' << inv << '\t' << detail << '\n';
+         walkTsv.flush();
+         printf("CRAWL WALK FAIL seed %u step %d %s: %s\n", walkSeed, walkStep, inv, detail.c_str());
+         if (sShots < 20)
+            ShotWhole("walk-" + std::to_string(walkSeed) + "-" + std::to_string(walkStep) + "-" + std::to_string(sShots++));
+      };
+      auto pickWidget = [&](bool needWide) -> const Rec* {
+         std::vector<const Rec*> c;
+         std::set<ImGuiID> seen;
+         for (const Rec& r : sLast)
+            if (r.widget && !r.disabled && Visible(r) && FullyShown(r) && seen.insert(r.id).second &&
+                SkipReason(r.label, TipOf(r.id)) == nullptr && (!needWide || r.bb.GetWidth() >= 30.0f))
+               c.push_back(&r);
+         return c.empty() ? nullptr : c[rng() % c.size()];
+      };
+      if (walkSub == 0)
+      {
+         if (walkStep >= walkN || (walkUpto > 0 && walkStep >= walkUpto))
+         {
+            if (walkUpto > 0)
+               ShotWhole("replay-" + std::to_string(walkSeed) + "-" + std::to_string(walkStep));
+            else
+            {
+               CloseAllPopups();
+               if (gUndoStack.size() < kMaxUndoDepth)
+               {
+                  while (gUndoStack.size() > walkDepth0)
+                     Undo();
+                  if (Fingerprint() != walkFp0)
+                     fail("undo all does not restore", FirstDiff(walkFp0, Fingerprint()));
+               }
+            }
+            walkTsv << "#\tsteps " << walkStep << "\tfailures " << walkFails << '\n';
+            ph = Ph::Finish;
+            wait = 3;
+            return;
+         }
+         walkStep++;
+         const unsigned a = rng() % 100;
+         sMouse = ImVec2(-10000.0f, -10000.0f);
+         if (a < 45)
+         {
+            const Rec* r = pickWidget(false);
+            walkAct = r != nullptr ? "click " + r->label + " [" + ShortWin(r->window) + "]" : "click (nothing)";
+            if (r != nullptr)
+               sMouse = r->bb.GetCenter();
+            walkSub = 10;
+         }
+         else if (a < 60)
+         {
+            static const std::pair<ImGuiKey, int> kKeys[] = { { ImGuiKey_Escape, 0 }, { ImGuiKey_Enter, 0 }, { ImGuiKey_Space, 0 },
+               { ImGuiKey_Delete, 0 }, { ImGuiKey_Tab, 0 }, { ImGuiKey_LeftArrow, 0 }, { ImGuiKey_RightArrow, 0 },
+               { ImGuiKey_UpArrow, 0 }, { ImGuiKey_DownArrow, 0 }, { ImGuiKey_Z, 1 }, { ImGuiKey_Z, 3 }, { ImGuiKey_D, 1 },
+               { ImGuiKey_1, 0 }, { ImGuiKey_2, 0 }, { ImGuiKey_G, 0 }, { ImGuiKey_R, 0 }, { ImGuiKey_S, 0 } };
+            const auto& k = kKeys[rng() % (sizeof kKeys / sizeof kKeys[0])];
+            sKeyName = k.first;
+            sKeyCmd = (k.second & 1) != 0;
+            sKeyShift = (k.second & 2) != 0;
+            walkAct = std::string("key ") + (sKeyCmd ? "cmd+" : "") + (sKeyShift ? "shift+" : "") + ImGui::GetKeyName(k.first);
+            sKey = 1;
+            walkSub = 20;
+         }
+         else if (a < 75)
+         {
+            const Rec* r = pickWidget(true);
+            walkAct = r != nullptr ? "drag " + r->label + " [" + ShortWin(r->window) + "]" : "drag (nothing)";
+            if (r != nullptr)
+            {
+               const float y = r->bb.GetCenter().y;
+               walkA = ImVec2(r->bb.Min.x + r->bb.GetWidth() * 0.25f, y);
+               walkB = ImVec2(r->bb.Min.x + r->bb.GetWidth() * (rng() % 2 ? 0.9f : 0.05f), y);
+               sMouse = walkA;
+            }
+            walkSub = r != nullptr ? 30 : 90;
+         }
+         else if (a < 85)
+         {
+            const Rec* r = pickWidget(false);
+            walkAct = r != nullptr ? "wheel " + r->label : "wheel (nothing)";
+            if (r != nullptr)
+               sMouse = r->bb.GetCenter();
+            walkSub = 40;
+         }
+         else
+         {
+            std::vector<const Surface*> views;
+            for (const Surface& x : sSurf)
+               if (x.kind != 3)
+                  views.push_back(&x);
+            if (views.empty())
+            {
+               walkAct = "switch (no surface)";
+               walkSub = 90;
+            }
+            else
+            {
+               const Surface& x = *views[rng() % views.size()];
+               walkAct = "open " + x.name;
+               CrawlCloseAll();
+               if (x.kind == 0) *x.flag = true;
+               else if (x.kind == 1) gView3DOpen = true;
+               else gView2DOpen = true;
+               walkSub = 90;
+               wait = 6;
+            }
+         }
+         walkLog << walkStep << '\t' << walkAct << '\n';
+         walkLog.flush();
+         Progress("walk " + std::to_string(walkStep) + " " + walkAct);
+         return;
+      }
+      switch (walkSub)
+      {
+      case 10: sButton = 1; walkSub = 11; return;
+      case 11: sButton = 0; walkSub = 90; wait = 3; return;
+      case 20: sKey = 0; walkSub = 90; wait = 3; return;
+      case 30: sButton = 1; walkSub = 31; return;
+      case 31: case 32: case 33: case 34:
+      {
+         const float t = (walkSub - 30) / 4.0f;
+         sMouse = ImVec2(walkA.x + (walkB.x - walkA.x) * t, walkA.y + (walkB.y - walkA.y) * t);
+         walkSub++;
+         return;
+      }
+      case 35: sButton = 0; walkSub = 90; wait = 3; return;
+      case 40: sWheel = (rng() % 2) ? 1.0f : -1.0f; walkSub = 90; wait = 3; return;
+      default: break;
+      }
+      // Invariants after the step.
+      if (const std::string b = BadNumbers(); !b.empty())
+         fail("non-finite value", b);
+      if (OpenPopups() > 3)
+         fail("popup pile", std::to_string(OpenPopups()) + " popups open");
+      {
+         std::unordered_map<ImGuiID, const Rec*> first;
+         for (const Rec& r : sLast)
+            if (r.widget && Visible(r))
+               if (auto [it, fresh] = first.emplace(r.id, &r); !fresh &&
+                   (std::fabs(it->second->bb.Min.x - r.bb.Min.x) > 0.5f || std::fabs(it->second->bb.Min.y - r.bb.Min.y) > 0.5f))
+               {
+                  fail("duplicate id", r.label + " [" + ShortWin(r.window) + "]");
+                  break;
+               }
+      }
+      if (const SurfStat& w = sStats["walk"]; w.slowMs > 100.0f && w.slowAt != "reported")
+      {
+         fail("slow frame", std::to_string((int)w.slowMs) + " ms");
+         sStats["walk"].slowAt = "reported";
+         sStats["walk"].slowMs = 0;
+      }
+      if (walkStep % 25 == 0)
+         if (const std::string rt = SaveRoundTrip(); !rt.empty())
+            fail("save text differs", rt);
+      walkSub = 0;
+      return;
+   }
+
+   case Ph::Finish:
+      Write(sCrawlOut.c_str());
+      WriteCrawl();
+      printf("CRAWL done findings=%zu registered=%zu poked=%d\n", sFindings.size(), sReg.size(), sPoked);
+      Progress("done");
+      if (sProgress != nullptr)
+         fclose(sProgress);
+      done = true;
+      GImGui->TestEngineHookItems = false;
+      fflush(stdout);
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      return;
+
+   default:
+      return;
+   }
+}
 }
 
 #else
@@ -2176,5 +2932,6 @@ namespace app
 {
 void FrameTest_UIAUDIT(int, GLFWwindow*) {}
 void FrameTest_JOURNEYS(int, GLFWwindow*) {}
+void FrameTest_CRAWL(int, GLFWwindow*) {}
 }
 #endif

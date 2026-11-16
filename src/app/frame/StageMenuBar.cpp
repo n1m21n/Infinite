@@ -236,8 +236,10 @@ void DrawMenuBar(FrameCtx& fc)
          auto GroupTile = [&](const char* label) -> bool
          {
             // Menu-bar items do not share a y after the first; pin each tile to the group's line.
+            // A menu-bar title's box reaches 8 px left of the cursor (MenuTile's 16 spacing: +8 in, -16 out), so add 8 back
+            // for a true 2 px gap between tiles.
             if (menuGroupY1 > 0.0f)
-               ImGui::SetCursorScreenPos(ImVec2(menuGroupMaxX + 2.0f, menuGroupP.y));
+               ImGui::SetCursorScreenPos(ImVec2(menuGroupMaxX + 2.0f + 8.0f, menuGroupP.y));
             const bool open = MenuTile(label);
             menuGroupMaxX = std::max(menuGroupMaxX, ImGui::GetItemRectMax().x);
             if (menuGroupY1 <= 0.0f)

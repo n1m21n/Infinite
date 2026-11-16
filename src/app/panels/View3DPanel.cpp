@@ -5006,7 +5006,7 @@ namespace
       const char* icons[4] = { IconsInfinite::Zoom, IconsInfinite::Hand, IconsInfinite::ViewCamera,
                                sCameraView ? IconsInfinite::Lock : sOrtho ? IconsInfinite::ViewOrtho : IconsInfinite::ViewPersp };
       const char* tips[4] = { T("Zoom: drag"), T("Pan: drag"), T("Camera view (0)"),
-                              sCameraView ? T("Lock camera to view") : T("Perspective or orthographic (5)") };
+                              sCameraView ? T("Lock camera to view") : sOrtho ? T("Orthographic: click for perspective (5)") : T("Perspective: click for orthographic (5)") };
       for (int i = 0; i < 4; i++)
       {
          const ImVec2 c(mx.x - r - 12.0f - (float)(3 - i) * (r * 2.0f + 6.0f), y);
@@ -5677,9 +5677,17 @@ namespace
       next();
       if (IconChip("##v3dscale", IconsInfinite::ToolScale, sTool == 3, T("Scale tool (Shift+Space, S). S scales at once"))) sTool = 3;
       next();
+      // Sculpt and Edit need a selected geometry item (Blender greys modes with no active mesh); off, they stay live.
+      const Item* modeIt = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      const GraphNode* modeGn = modeIt != nullptr ? FindNodeByUid(modeIt->uid) : nullptr;
+      const bool modeOk = modeGn != nullptr && dynamic_cast<IGeometrySource*>(modeGn->node.get()) != nullptr;
+      ImGui::BeginDisabled(!modeOk && !sSculpt.on);
       if (IconChip("##v3dsculpt", IconsInfinite::Pencil, sSculpt.on, T("Sculpt (Ctrl+Tab)"))) ToggleSculpt(scene);
+      ImGui::EndDisabled();
       next();
+      ImGui::BeginDisabled(!modeOk && !sEdit.on);
       if (IconChip("##v3dedit", IconsInfinite::EditMesh, sEdit.on, T("Edit Mode (Tab)"))) ToggleEdit(scene);
+      ImGui::EndDisabled();
       gap();
       if (IconChip("##v3dwire", IconsInfinite::ShadeWire, sShading == Shading::Wire, T("Wireframe (Shift+Z)"))) sShading = Shading::Wire;
       next();
@@ -5694,7 +5702,7 @@ namespace
                    scene->activeCamera != 0 ? T("Camera view (Numpad 0 or 0)") : T("Add a camera from this view (0)")))
          ToggleCamera(scene);
       next();
-      if (IconChip("##v3dortho", sOrtho ? IconsInfinite::ViewOrtho : IconsInfinite::ViewPersp, sOrtho, T("Perspective or orthographic (5)")))
+      if (IconChip("##v3dortho", sOrtho ? IconsInfinite::ViewOrtho : IconsInfinite::ViewPersp, sOrtho, sOrtho ? T("Orthographic: click for perspective (5)") : T("Perspective: click for orthographic (5)")))
       {
          sOrtho = !sOrtho;
          sAutoOrtho = false;

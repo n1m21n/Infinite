@@ -19,6 +19,14 @@
 #import <Security/Security.h>
 #import <dispatch/dispatch.h>
 #import <CoreGraphics/CoreGraphics.h>
+
+// The crawler (INFINITE_NO_DIALOGS) clicks every Open/Save button: a file dialog then answers Cancel at once.
+static NSModalResponse PanelRunModal(NSSavePanel* panel)
+{
+   if (getenv("INFINITE_NO_DIALOGS") != nullptr)
+      return NSModalResponseCancel;
+   return [panel runModal];
+}
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <AVFoundation/AVFoundation.h>
@@ -423,7 +431,7 @@ namespace Platform
                [panel setAllowedContentTypes:contentTypes];
          }
 
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
 
          NSURL* url = [[panel URLs] firstObject];
@@ -456,7 +464,7 @@ namespace Platform
                [panel setAllowedContentTypes:types];
          }
 
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          if (url == nil)
@@ -1373,7 +1381,7 @@ namespace Platform
             if (types.count > 0)
                [panel setAllowedContentTypes:types];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1395,7 +1403,7 @@ namespace Platform
             if (type != nil)
                [panel setAllowedContentTypes:@[ type ]];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [panel URL];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1421,7 +1429,7 @@ namespace Platform
             if ([types count] > 0)
                [panel setAllowedContentTypes:types];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1447,7 +1455,7 @@ namespace Platform
             if ([types count] > 0)
                [panel setAllowedContentTypes:types];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1473,7 +1481,7 @@ namespace Platform
             if ([types count] > 0)
                [panel setAllowedContentTypes:types];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [panel URL];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1494,7 +1502,7 @@ namespace Platform
             UTType* t = [UTType typeWithFilenameExtension:@"infshow"];
             if (t != nil) [panel setAllowedContentTypes:@[ t ]];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1515,7 +1523,7 @@ namespace Platform
             UTType* t = [UTType typeWithFilenameExtension:@"infshow"];
             if (t != nil) [panel setAllowedContentTypes:@[ t ]];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [panel URL];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1532,7 +1540,7 @@ namespace Platform
             [NSString stringWithUTF8String:suggestedName.empty() ? "sample.wav" : suggestedName.c_str()]];
          if (@available(macOS 11.0, *))
             [panel setAllowedContentTypes:@[ UTTypeWAV ]];
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [panel URL];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1548,7 +1556,7 @@ namespace Platform
          [panel setNameFieldStringValue:[NSString stringWithUTF8String:suggestedName.c_str()]];
          if (@available(macOS 11.0, *))
             [panel setAllowedContentTypes:video ? @[ UTTypeMPEG4Movie, UTTypeQuickTimeMovie ] : @[ UTTypePNG, UTTypeJPEG ]];
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [panel URL];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1565,7 +1573,7 @@ namespace Platform
          if (@available(macOS 11.0, *))
             if (UTType* t = [UTType typeWithFilenameExtension:[NSString stringWithUTF8String:ext.c_str()]])
                [panel setAllowedContentTypes:@[ t ]];
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [panel URL];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -1599,7 +1607,7 @@ namespace Platform
                [panel setAllowedContentTypes:types];
          }
 
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          if (url == nil)
@@ -2349,7 +2357,7 @@ namespace Platform
          if (@available(macOS 11.0, *))
             [panel setAllowedContentTypes:@[ UTTypeMovie, UTTypeVideo, UTTypeQuickTimeMovie, UTTypeMPEG4Movie ]];
 
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          if (url == nil)
@@ -5404,7 +5412,7 @@ namespace Platform
          [panel setTitle:@"Open audio"];
          if (@available(macOS 11.0, *))
             [panel setAllowedContentTypes:@[ UTTypeAudio, UTTypeMP3, UTTypeWAV, UTTypeAIFF, UTTypeMPEG4Audio ]];
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -5430,7 +5438,7 @@ namespace Platform
                [panel setAllowedContentTypes:types];
          }
          std::vector<std::string> out;
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return out;
          for (NSURL* url in [panel URLs])
             if (url != nil && [url path] != nil)
@@ -5460,7 +5468,7 @@ namespace Platform
             if ([types count] > 0)
                [panel setAllowedContentTypes:types];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -5482,7 +5490,7 @@ namespace Platform
                                         isDirectory:YES];
             [panel setDirectoryURL:dirURL];
          }
-         if ([panel runModal] != NSModalResponseOK)
+         if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];
          return url ? std::string([[url path] UTF8String]) : std::string();
@@ -8657,6 +8665,8 @@ namespace Platform
    {
       if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
          return;
+      if (getenv("INFINITE_NO_DIALOGS") != nullptr)
+         return;
 
       @autoreleasepool
       {
@@ -8706,7 +8716,7 @@ namespace Platform
 
    void RevealInFileManager(const std::string& path)
    {
-      if (path.empty())
+      if (path.empty() || getenv("INFINITE_NO_DIALOGS") != nullptr)
          return;
       @autoreleasepool
       {

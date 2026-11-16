@@ -1,0 +1,16 @@
+# Crawler: controls it does not click, and why (label or tip substring<TAB>reason). Lines starting "##" are labels.
+# File dialogs, links and Reveal in Finder are stubbed under INFINITE_NO_DIALOGS (Platform.mm), so they need no row.
+Quit	ends the run
+Terminal	starts a shell; the crawl runs with no terminal panel
+Record	starts a screen/audio recording to disk; Render settings are covered, the export run is av-sync-sweep's
+Render movie	a full export to disk; covered by av-sync-sweep and the render tests
+Export	writes files to disk; covered by the export tests
+Check for updates	network
+Sign in	network
+Delete all	clears the patch; the walk's undo-all covers whole-patch deletes
+##view2dcanvas	the canvas: every tool's stroke is View2DPanelSelfCheck's tool matrix
+##view2dgrip	dock resize grip: a drag, not a click
+grip	panel resize grip: a drag, not a click; panel sizes are the layout tests
+##v3dxray	X-ray is view state kept with the patch; view toggles take no undo step (as Blender)
+##view3dcanvas	the 3D canvas: clicks, drags and tools are the View3D self-checks and the sculpt A/B
+##card	loads a whole template patch; node bodies are crawled one type at a time (node- surfaces), templates by the template tests

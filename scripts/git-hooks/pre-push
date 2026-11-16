@@ -51,6 +51,20 @@ while read -r lref lsha rref rsha; do
       mkdir -p "$(dirname "$v2stamp")" && : > "$v2stamp"
     fi
   fi
+  # Crawler: every setting on the surfaces whose source changed (tools/crawl/run.py --changed), dark theme only.
+  # Like the 2D audit it needs the clean HEAD; a dirty tree skips it with a note rather than blocking.
+  if git diff --name-only "$range" 2>/dev/null | grep -Eq '^src/(app|nodes)/'; then
+    crtree=$(git rev-parse "$lsha^{tree}"); crstamp="$(git rev-parse --git-common-dir)/prepush-crawl-ok/$crtree"
+    if [[ -e "$crstamp" ]]; then
+      echo "pre-push: tree ${crtree:0:7} already passed the crawler - skipped" >&2
+    elif [[ "$(git rev-parse HEAD)" != "$lsha" || -n "$(git status --porcelain --untracked-files=no -- src)" ]]; then
+      echo "pre-push: crawler skipped (not the clean HEAD)" >&2
+    else
+      ( cd "$ROOT" && python3 scripts/ibuild.py build --mode dev --target Infinite >/dev/null && python3 tools/crawl/run.py --changed --dark-only ) 2>&1 | tail -3 >&2
+      [[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "pre-push: BLOCKED - crawler found new failures (crawl/report.md)" >&2; exit 1; }
+      mkdir -p "$(dirname "$crstamp")" && : > "$crstamp"
+    fi
+  fi
   # Only code can break the ui group: skip the build when the push touches none.
   if ! git diff --name-only "$range" 2>/dev/null | grep -Eq "$CODE"; then
     echo "pre-push: no code in $range (docs/website/tools only) - ui group skipped" >&2; continue

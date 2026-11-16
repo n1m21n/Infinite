@@ -17,8 +17,8 @@ namespace CheckBox
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 q(p.x + kSize, p.y + kSize);
-      UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, 0.08f));
-      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.08f + 0.06f * hv)), tok::radius_control);
+      UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, 0.06f));
+      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f + 0.06f * hv)), tok::radius_control);
       dl->AddRect(p, q, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.10f) : ImVec4(1, 1, 1, 0.08f)),
                   tok::radius_control);
       if (onv <= 0.001f)

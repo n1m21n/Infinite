@@ -1733,7 +1733,10 @@ namespace
          s.gen.type = (NoteGen::Type)type;
 
       // Right-pinned, as in the other two: the settings toggle.
-      FormParts::Inline(std::max(ImGui::GetCursorPosX() + gap, ImGui::GetContentRegionMax().x - kIconW));
+      // After the last item, not GetCursorPosX(): that is already the next line's start, so a narrow panel put the chip
+      // over the Bars pill.
+      FormParts::Inline(std::max(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + ImGui::GetScrollX() + gap,
+                                 ImGui::GetContentRegionMax().x - kIconW));
       if (IconChip("##pianoSettings", IconsInfinite::Edit, s.settingsOpen || s.genOpen, T("Settings for the page, clip or note")))
       {
          const bool open = s.settingsOpen || s.genOpen;

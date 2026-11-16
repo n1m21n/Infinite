@@ -165,6 +165,9 @@ void RefreshParamDriverFlags()
    }
 }
 
+// The crawler (selftest/UiAudit.cpp) holds every bound value still, so a value that changes after a click was the click.
+bool gModulationFrozen = false;
+
 void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
 {
    // Live: pin this frame's clock to where the audio is now, interpolated
@@ -414,7 +417,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    const std::map<std::string, float>& globals = ExprGlobals::Values();
    for (const ParamRef& ref : modulation.FrameParams())
    {
-      if (ref.value == nullptr)
+      if (ref.value == nullptr || gModulationFrozen)
          continue;
       const Modulation::Source src = modulation.ResolvedSourceFor(ref);
       if (src.nodeIndex >= 0)
