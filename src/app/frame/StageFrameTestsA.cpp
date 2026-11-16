@@ -2005,6 +2005,13 @@ void DrawFrameTestsA(FrameCtx& fc)
       // The docks need drawn frames, so they are checked over the frames before the document tests.
       if (getenv("INFINITE_MIXERPANELTEST") != nullptr && frameId >= 4)
          MixerPanelTestStep(frameId);
+      if (getenv("INFINITE_AB2D") != nullptr && frameId == 4)
+      {
+         const int abFails = View2DAffinityAb(getenv("INFINITE_AB2D"));
+         printf("AB2D %s\n", abFails == 0 ? "OK" : "FAIL");
+         fflush(stdout);
+         std::_Exit(abFails == 0 ? 0 : 1);
+      }
       if (getenv("INFINITE_VIEW2DTEST") != nullptr && frameId >= 4 && View2DDockTestStep(frameId))
          RunView2DTest();
       if (getenv("INFINITE_VIEW3DNAVTEST") != nullptr)

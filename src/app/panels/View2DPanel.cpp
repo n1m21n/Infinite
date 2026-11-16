@@ -31,12 +31,14 @@
 #include "nodes/VideoSourceNode.h"
 #include "audio/MediaExtensions.h"
 #include "platform/Platform.h"
+#include "stb_image_write.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <fstream>
 #include <string>
@@ -907,6 +909,7 @@ namespace
    constexpr float kWellS = 56.0f, kWellM = 72.0f, kWellL = 110.0f;
    float sFieldW = 160.0f;
    constexpr float kLabelW = 84.0f;
+   float sLabelW = kLabelW;   // the More.. forms widen it for their longer names
 
    void FieldLabel(const char* text)
    {
@@ -915,7 +918,7 @@ namespace
       const char* end = ImGui::FindRenderedTextEnd(text);   // "Width##img" shows as "Width"
       ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%.*s", (int)(end - text), text);
       UiAudit::NoteInk(3, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, std::string(text, end).c_str());
-      FormParts::Inline(kLabelW);
+      FormParts::Inline(sLabelW);
    }
 
    // Shortcut text in the platform's words: Cmd on macOS, Ctrl elsewhere.
@@ -1633,6 +1636,8 @@ namespace
    bool HandleVectorKeys(Scene2DNode* doc);
 
    bool PaintRefused(Scene2DNode* doc);
+   bool EnsurePixels(Scene2DNode* doc);
+   bool SelectionActsOnPixels(Scene2DNode* doc);
    int PaintTarget(Scene2DNode* doc, int& target, bool make);
 
    // A selection edit is an undo step: the selection is saved in the document text.
@@ -1652,6 +1657,8 @@ namespace
    {
       if (doc->quickMask || PaintRefused(doc))
          return false;
+      if (how == 0 && SelectionActsOnPixels(doc))
+         EnsurePixels(doc);
       const Layer* a = Active(doc);
       if (how == 0 && (a == nullptr || a->kind != Kind::Paint))
          return false;
@@ -1665,6 +1672,34 @@ namespace
       const bool ok = how == 0 ? doc->ClearPixels(id) : doc->FillPixels(id, c, opacity);
       Touch();
       return ok;
+   }
+
+   // Copy / Cut / Ctrl+J with a pixel selection on a paint layer: a new paint layer holding only the selected
+   // pixels (Photoshop's Layer via Copy / Layer via Cut). Returns its id, 0 when the selection does not apply.
+   bool SelectionActsOnPixels(Scene2DNode* doc)
+   {
+      const Layer* a = Active(doc);
+      return a != nullptr && (a->kind == Kind::Paint || (a->kind == Kind::Node && !a->HasSkin())) && doc->HasSelection() &&
+             !doc->quickMask;
+   }
+
+   int SelectionToLayer(Scene2DNode* doc, bool cut)
+   {
+      if (!SelectionActsOnPixels(doc))
+         return 0;
+      EnsurePixels(doc);
+      const int src = Active(doc)->id;
+      const int nid = doc->Duplicate(src);
+      if (nid <= 0)
+         return 0;
+      if (Layer* n = doc->FindLayer(nid))
+         n->lock = 0;
+      doc->InvertSelection();
+      doc->ClearPixels(nid);
+      doc->InvertSelection();
+      if (cut)
+         doc->ClearPixels(src);
+      return nid;
    }
 
    // Esc during a drag puts everything back and drops the drag's undo step.
@@ -1767,12 +1802,18 @@ namespace
       else if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
       {
          const Layer* a = Active(doc);
-         if (doc->HasSelection() && a != nullptr && a->kind == Kind::Paint)
+         if (SelectionActsOnPixels(doc))
             ClearOrFill(doc, 0);
          else
             sPending.what = Pending::Delete;
       }
       if (cmd && !shift && key(ImGuiKey_J)) sPending.what = Pending::Duplicate;
+      if (cmd && shift && key(ImGuiKey_J) && SelectionActsOnPixels(doc))
+      {
+         PushUndoCheckpoint("Layer via cut");
+         if (const int nid = SelectionToLayer(doc, true))
+            SelectOnly(nid);
+      }
       if (cmd && !shift)
       {
          if (key(ImGuiKey_C)) sPending.what = Pending::Copy;
@@ -2186,6 +2227,22 @@ namespace
       Touch();
    }
 
+   // An image / node layer under a pixel tool or a pixel cut: made into pixels in place (as Affinity does), one undo step.
+   bool EnsurePixels(Scene2DNode* doc)
+   {
+      const Layer* a = Active(doc);
+      if (a == nullptr || a->kind != Kind::Node || a->HasSkin())
+         return false;
+      static int sRasterFrame = 1 << 20;
+      PushUndoCheckpoint("Rasterize layer");
+      const int nid = doc->RasterizeNodeLayer(a->id, ++sRasterFrame);
+      if (nid == 0)
+         return false;
+      SelectOnly(nid);
+      Touch();
+      return true;
+   }
+
    // After a pixel tool met a text or vector layer: one chip at the top of the canvas, gone after a few seconds.
    void DrawRasterAsk(Scene2DNode* doc)
    {
@@ -2305,6 +2362,8 @@ namespace
       // undo step is left; the canvas offers to rasterize instead.
       if (sTool != kBrush && !doc->quickMask)
       {
+         if (!sEditMask)
+            EnsurePixels(doc);
          const Layer* a = Active(doc);
          if (a == nullptr || (a->kind != Kind::Paint && !(sEditMask && a->HasPixelMask())))
          {
@@ -4256,13 +4315,84 @@ namespace
          if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"), false, any)) sPending.what = Pending::Cut;
          if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
          if (MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"), false, any)) sPending.what = Pending::Duplicate;
+         if (SelectionActsOnPixels(doc))
+            if (MenuParts::Item(T("Layer via Cut"), Sc("Shift+Ctrl+J")))
+            {
+               PushUndoCheckpoint("Layer via cut");
+               if (const int nid = SelectionToLayer(doc, true))
+                  SelectOnly(nid);
+            }
          if (MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"), FreeTransformOn(doc), any))
             FreeTransformOn(doc) ? EndFreeTransform(doc, true) : BeginFreeTransform(doc);
-         if (MenuParts::Item(T("Delete"), "Delete", false, any)) sPending.what = Pending::Delete;
+         if (MenuParts::Item(T("Delete"), "Delete", false, any))
+         {
+            if (SelectionActsOnPixels(doc))
+               ClearOrFill(doc, 0);
+            else
+               sPending.what = Pending::Delete;
+         }
          MenuParts::Separator();
+         // What the active layer is decides what else is offered: pixels, image, text, shapes, group, fill or adjustment.
+         if (Layer* k = Active(doc))
+         {
+            const bool picked = any && sSel.size() == 1;
+            if (doc->HasSelection())
+            {
+               if (MenuParts::Item(T("Mask from Selection"), nullptr, false, k->kind != Kind::Group)) sPending.what = Pending::MaskFromSel;
+               if (MenuParts::Item(T("Deselect"), Sc("Ctrl+D")))
+               {
+                  SelStep("Deselect");
+                  doc->Deselect();
+               }
+               if (MenuParts::Item(T("Invert Selection"), Sc("Shift+Ctrl+I")))
+               {
+                  SelStep("Invert selection");
+                  doc->InvertSelection();
+               }
+            }
+            switch (k->kind)
+            {
+               case Kind::Paint:
+                  if (MenuParts::Item(T("Fill..."), "Shift+F5")) sFillAsk = true;
+                  if (picked && MenuParts::Item(T("Convert to Draw Node"))) sPending.what = Pending::ToDraw;
+                  break;
+               case Kind::Node:
+                  if (!k->HasSkin() && MenuParts::Item(T("Rasterize Layer")))
+                     EnsurePixels(doc);
+                  if (doc->CanTakeBelow(*k) && MenuParts::Item(T("Effect on Below"), nullptr, k->below)) sPending.what = Pending::LayerBelow;
+                  NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, k->uid);
+                  break;
+               case Kind::Text:
+                  if (MenuParts::Item(T("Rasterize Layer"))) RasterizeLayer(doc, k->id);
+                  if (MenuParts::Item(T("Convert to Shapes"))) sPending.what = Pending::ToShapes;
+                  if (MenuParts::Item(T("Convert to Text Node"))) sPending.what = Pending::ToText;
+                  break;
+               case Kind::Vector:
+                  if (MenuParts::Item(T("Rasterize Layer"))) RasterizeLayer(doc, k->id);
+                  if (MenuParts::Item(T("Convert to Sketch Node"))) sPending.what = Pending::ToSketch;
+                  break;
+               case Kind::Group:
+                  if (MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
+                  break;
+               case Kind::Fill:
+               case Kind::Adjust:
+                  // A fill or adjustment has no pixels of its own: its settings live on the Layer tab.
+                  if (MenuParts::Item(k->kind == Kind::Fill ? T("Edit Fill...") : T("Edit Adjustment...")))
+                  {
+                     sTab = 1;
+                     sSideOpen = true;
+                  }
+                  break;
+               default: break;
+            }
+            if (k->kind != Kind::Group)
+            {
+               if (!k->HasPixelMask() && MenuParts::Item(T("Add Layer Mask"))) sPending.what = Pending::AddMask;
+               if (k->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"))) sPending.what = Pending::RemoveMask;
+            }
+            MenuParts::Separator();
+         }
          NodeChoiceMenu(T("Add Node as Layer"), doc, Pending::AddNode, 0);
-         if (Layer* ra = Active(doc); ra != nullptr && ra->kind == Kind::Node)
-            NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, ra->uid);
          MenuParts::Separator();
          if (MenuParts::Item(T("Group"), Sc("Ctrl+G"), false, any)) sPending.what = Pending::Group;
          if (MenuParts::Item(T("Bring to Front"), Sc("Shift+Ctrl+]"), false, any)) Restack(doc, 3);
@@ -5111,10 +5241,11 @@ namespace
    // A More.. form: side-panel rows (kSideChip tall, 4 px apart), a 150 px well column, capped height with a scroll.
    struct MoreRows
    {
-      float keepW;
-      MoreRows() : keepW(sFieldW)
+      float keepW, keepL;
+      MoreRows() : keepW(sFieldW), keepL(sLabelW)
       {
          sFieldW = 150.0f;
+         sLabelW = 140.0f;
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(1.0f, (kSideChip - ImGui::GetFontSize()) * 0.5f)));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 4.0f));
       }
@@ -5122,6 +5253,7 @@ namespace
       {
          ImGui::PopStyleVar(2);
          sFieldW = keepW;
+         sLabelW = keepL;
       }
    };
    struct MorePopupScope
@@ -5327,9 +5459,10 @@ namespace
 
    void MatchChips()
    {
-      float tol = (float)sTolerance;
-      BarSlider("##v2dtol", &tol, 0.0f, 255.0f, "Tolerance %.0f", kWellL);
-      sTolerance = (int)std::lround(tol);
+      // Shown as Affinity shows it, a share of the colour range (kept 0..255 inside, as patches and the wand read it).
+      float tol = (float)sTolerance * (100.0f / 255.0f);
+      BarSlider("##v2dtol", &tol, 0.0f, 100.0f, "Tolerance %.0f%%", kWellL);
+      sTolerance = std::clamp((int)std::lround(tol * 2.55f), 0, 255);
       if (TextChip(L("Contiguous##v2dcont"), sContiguous, T("Only touching pixels")))
          sContiguous = !sContiguous;
       FormParts::Inline(0.0f, tok::space_1);
@@ -7035,9 +7168,17 @@ namespace
                if (MenuParts::Item(T("Replace by Clicking a Node"), nullptr, sPickMode == 2))
                   sPickMode = sPickMode == 2 ? 0 : 2;
             }
+            if ((l->kind == Kind::Fill || l->kind == Kind::Adjust) &&
+                MenuParts::Item(l->kind == Kind::Fill ? T("Edit Fill...") : T("Edit Adjustment..."), nullptr))
+            {
+               sTab = 1;
+               sSideOpen = true;
+            }
             if (l->kind == Kind::Paint && MenuParts::Item(T("Convert to Draw Node"), nullptr)) sPending.what = Pending::ToDraw;
             if ((l->kind == Kind::Text || l->kind == Kind::Vector) && MenuParts::Item(T("Rasterize Layer"), nullptr))
                RasterizeLayer(doc, l->id);
+            if (l->kind == Kind::Node && !l->HasSkin() && MenuParts::Item(T("Rasterize Layer"), nullptr))
+               EnsurePixels(doc);
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Shapes"), nullptr)) sPending.what = Pending::ToShapes;
@@ -7162,6 +7303,14 @@ namespace
          if (none)
             a = nullptr;
       }
+      // New / delete up top, where the layer list starts (the same actions as the strip below).
+      if (IconChip("##v2dnl", IconsInfinite::Plus, false, T("New layer")))
+         sPending.what = Pending::AddPaint;
+      FormParts::Inline(0.0f, tok::space_1);
+      ImGui::BeginDisabled(sSel.empty());
+      if (IconChip("##v2ddl", IconsInfinite::Close, false, T("Delete layer")))
+         sPending.what = Pending::Delete;
+      ImGui::EndDisabled();
       // The blend / opacity / lock rows above already took their height: the list gets what is left, so it scrolls.
       listH = std::max(3.0f * (kRowH + 1.0f), std::min(listH, ImGui::GetContentRegionAvail().y - 2.0f));
       ImGui::BeginChild("##v2dlayers", ImVec2(w, listH), ImGuiChildFlags_None);
@@ -8752,7 +8901,13 @@ namespace
             }
          break;
       case Pending::Duplicate:
-         if (Layer* a = Active(doc))
+         if (SelectionActsOnPixels(doc))
+         {
+            PushUndoCheckpoint("Layer via copy");
+            if (const int nid = SelectionToLayer(doc, false))
+               SelectOnly(nid);
+         }
+         else if (Layer* a = Active(doc))
          {
             PushUndoCheckpoint("Duplicate layer");
             SelectOnly(doc->Duplicate(a->id));
@@ -8760,7 +8915,21 @@ namespace
          break;
       case Pending::Copy:
       case Pending::Cut:
-         if (!sSel.empty())
+         if (SelectionActsOnPixels(doc))
+         {
+            const bool cut = todo.what == Pending::Cut;
+            PushUndoCheckpoint(cut ? "Cut" : "Copy");
+            EnsurePixels(doc);
+            const int src = Active(doc)->id;
+            if (const int nid = SelectionToLayer(doc, cut))
+            {
+               sClip = doc->CopyLayers({ nid });
+               sPasteCount = 0;
+               doc->RemoveLayer(nid);
+               SelectOnly(src);
+            }
+         }
+         else if (!sSel.empty())
          {
             sClip = doc->CopyLayers(sSel);
             sPasteCount = 0;
@@ -11130,7 +11299,16 @@ void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height,
    const bool fill = dock == 4;                    // no seam: nothing to resize against
    const bool vertical = dock == 1 || dock == 2;   // the seam is a column
    const bool gripFirst = dock == 0 || dock == 1;  // the canvas is above or to the left
+   // Fill sits over the canvas row, which still cooks beneath it: back the whole rect with the opaque panel fill so
+   // no node, cable or pin shows through the toolbar band or the gap around the card.
+   if (fill)
+   {
+      const CategoryColors::UiTheme& th = CategoryColors::CurrentUiTheme();
+      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(th.panelBg.r, th.panelBg.g, th.panelBg.b, 1.0f));
+   }
    ImGui::BeginChild(id, size, false);
+   if (fill)
+      ImGui::PopStyleColor();
    rectMin = ImGui::GetWindowPos();
    rectMax = ImVec2(rectMin.x + ImGui::GetWindowSize().x, rectMin.y + ImGui::GetWindowSize().y);
    const ImVec2 inner = ImGui::GetContentRegionAvail();
@@ -11173,7 +11351,9 @@ void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height,
       case 3: in.b = 0.0f; break;
       default: break;
    }
+   PushDockedPanelStyle(/*isChild=*/true);   // opaque card fill, as every other docked panel
    PanelFrame::BeginCard(cardId, cardSize, in);
+   PopDockedPanelStyle();
    drawPanel();
    PanelFrame::EndCard();
    if (!gripFirst && !fill)
@@ -11192,4 +11372,135 @@ void DrawView2DDocked(const char* id, const ImVec2& size)
                   gView2DRectMax, [] { DrawPanel(); });
 }
 
+} // namespace app
+
+namespace app
+{
+// INFINITE_AB2D=<dir>: the Affinity A/B (tools/re-survey/affinity_probe.py). Reads <dir>/photo.png, runs each
+// operation through the panel's own actions on a fresh document holding the photo as an image layer, and writes
+// <dir>/inf_<op>.png. Coordinates and settings match the Affinity side (affinity_probe.py OPS). Returns failures.
+int View2DAffinityAb(const char* dir)
+{
+   namespace fs = std::filesystem;
+   const std::string photo = std::string(dir) + "/photo.png";
+   int fails = 0, frame = 7000000;
+   struct AbOp { const char* name; std::function<bool(Scene2DNode*, int)> run; };
+   auto stroke = [&](Scene2DNode* doc, int tool, ImVec2 a, ImVec2 b, float size, float hard) {
+      sTool = tool;
+      BrushEngine::Brush& br = ToolBrush();
+      br.size = size;
+      br.hardness = hard;
+      br.opacity = br.flow = 1.0f;
+      br.pressureSize = br.pressureOpacity = false;
+      sHaveLast = false;
+      BeginStroke(doc, a, false);
+      if (!doc->Painting())
+         return false;
+      for (int i = 1; i <= 64; i++)
+         doc->PaintTo(a.x + (b.x - a.x) * i / 64.0f, a.y + (b.y - a.y) * i / 64.0f, 1.0f);
+      EndStroke(doc);
+      return true;
+   };
+   const float kRed[3] = { 1.0f, 0.0f, 0.0f };
+   const std::vector<AbOp> ops = {
+      { "rasterize", [&](Scene2DNode* d, int) { return EnsurePixels(d); } },
+      { "delete_rect", [&](Scene2DNode* d, int) { d->SelectRect(100, 200, 250, 320, Scene2DNode::kSelNew, 0, false); return ClearOrFill(d, 0); } },
+      { "delete_ellipse", [&](Scene2DNode* d, int) { d->SelectRect(150, 450, 350, 590, Scene2DNode::kSelNew, 0, true); return ClearOrFill(d, 0); } },
+      { "copy_rect", [&](Scene2DNode* d, int src) {
+           d->SelectRect(100, 200, 250, 320, Scene2DNode::kSelNew, 0, false);
+           sPending.what = Pending::Duplicate;
+           RunPending(d);
+           const Layer* a = Active(d);
+           if (a == nullptr || a->id == src)
+              return false;
+           for (Layer& l : d->Layers())
+              if (l.id != a->id)
+                 l.visible = false;
+           d->Commit();
+           return true; } },
+      { "cut_rect", [&](Scene2DNode* d, int) {
+           d->SelectRect(100, 200, 250, 320, Scene2DNode::kSelNew, 0, false);
+           if (!SelectionActsOnPixels(d))
+              return false;
+           const int nid = SelectionToLayer(d, true);
+           if (Layer* n = d->FindLayer(nid))
+              n->visible = false;
+           d->Commit();
+           return nid != 0; } },
+      { "wand_delete", [&](Scene2DNode* d, int) {
+           EnsurePixels(d);   // the wand reads the active layer
+           const Layer* a = Active(d);
+           d->SelectWand(300, 100, 51, true, Scene2DNode::kSelNew, false, a != nullptr ? a->id : 0);
+           return d->HasSelection() && ClearOrFill(d, 0); } },
+      { "eraser", [&](Scene2DNode* d, int) { return stroke(d, kEraser, ImVec2(60, 600), ImVec2(450, 560), 40.0f, 1.0f); } },
+      { "blur_brush", [&](Scene2DNode* d, int) { return stroke(d, kBlur, ImVec2(120, 640), ImVec2(420, 640), 80.0f, 0.5f); } },
+      { "heal", [&](Scene2DNode* d, int) {
+           sHaveCloneSrc = true;
+           sCloneSrc = ImVec2(300, 380);
+           sCloneOffsetSet = false;
+           return stroke(d, kHeal, ImVec2(240, 380), ImVec2(241, 380), 50.0f, 0.5f); } },
+      { "fill_rect", [&](Scene2DNode* d, int) {
+           std::copy(kRed, kRed + 3, sFg);
+           d->SelectRect(100, 200, 250, 320, Scene2DNode::kSelNew, 0, false);
+           return ClearOrFill(d, 1); } },
+      { "bucket", [&](Scene2DNode* d, int) {
+           std::copy(kRed, kRed + 3, sFg);
+           sTolerance = 51;
+           sContiguous = true;
+           sAllLayers = false;
+           EnsurePixels(d);
+           FillAt(d, ImVec2(300, 100));
+           return true; } },
+   };
+   const char* only = std::getenv("INFINITE_AB2D_OP");
+   for (const AbOp& op : ops)
+   {
+      if (only != nullptr && std::strcmp(only, op.name) != 0)
+         continue;
+      NewPatch();
+      GraphNode* img = SpawnNode("Image Source", "Source", 0.0f, 0.0f);
+      if (img == nullptr || !static_cast<ImageSourceNode*>(img->node.get())->Load(photo))
+      {
+         printf("AB2D %s FAIL no photo\n", op.name);
+         return 1;
+      }
+      img->node->CookIfNeeded(++frame);
+      View2DAddNode(*img);
+      Scene2DNode* doc = nullptr;
+      for (GraphNode& gn : gNodes)
+         if (auto* s = dynamic_cast<Scene2DNode*>(gn.node.get()))
+            doc = s;
+      if (doc == nullptr || doc->Layers().empty())
+      {
+         printf("AB2D %s FAIL no document\n", op.name);
+         return 1;
+      }
+      doc->Doc().w = 512;
+      doc->Doc().h = 768;
+      doc->Doc().background = 3;
+      Layer& l = doc->Layers().back();
+      l.x = 256.0f;
+      l.y = 384.0f;
+      doc->Commit();
+      SelectOnly(l.id);
+      doc->CookIfNeeded(++frame);
+      sEditMask = false;
+      doc->quickMask = false;
+      const bool ran = op.run(doc, Active(doc) != nullptr ? Active(doc)->id : 0);
+      doc->Deselect();
+      doc->CookIfNeeded(++frame);
+      std::vector<uint8_t> px;
+      int w = 0, h = 0;
+      const bool read = doc->ReadOutput(px, w, h);
+      const Layer* a = Active(doc);
+      const std::string out = std::string(dir) + "/inf_" + op.name + ".png";
+      if (read)
+         FlipRowsRgba8(px, w, h);
+      const bool wrote = read && stbi_write_png(out.c_str(), w, h, 4, px.data(), w * 4) != 0;
+      printf("AB2D %s ran=%d kind=%d layers=%d size=%dx%d %s\n", op.name, ran ? 1 : 0, a != nullptr ? (int)a->kind : -1,
+             (int)doc->Layers().size(), w, h, wrote ? "ok" : "FAIL");
+      fails += wrote ? 0 : 1;
+   }
+   return fails;
+}
 } // namespace app

@@ -486,6 +486,8 @@ public:
    int AddVectorLayer(int above = 0);
    // A text or vector layer becomes a paint layer holding the same picture in the same place.
    bool RasterizeLayer(int id);
+   // An image / node layer as a paint layer in its place (the layer drawn alone at document size); the new id, 0 when it cannot.
+   int RasterizeNodeLayer(int id, int frameId);
    int AddTextLayer(const std::string& text, float x, float y, float boxW, int above = 0);
    // Document px <-> the layer's box px.
    void DocToBox(const Layer& l, float x, float y, float& bx, float& by);

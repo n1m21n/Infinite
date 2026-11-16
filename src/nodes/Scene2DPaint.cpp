@@ -156,12 +156,19 @@ namespace
          a[i] = (uint8_t)std::clamp((int)std::lround(buf[i]), 0, 255);
    }
 
+   // Distance from the seed in RGBA, against tolerance as a share of the RGB cube's diagonal (0..255 = 0..100 %):
+   // the rule Affinity's wand and flood fill follow (measured, tools/re-survey/affinity_probe.py), so a gradient
+   // sky goes in one click at 20 % as it does there. The per-channel test it replaces stopped far short.
    bool Near(const uint8_t* a, const uint8_t* b, int tol)
    {
+      int d2 = 0;
       for (int c = 0; c < 4; c++)
-         if (std::abs((int)a[c] - (int)b[c]) > tol)
-            return false;
-      return true;
+      {
+         const int d = (int)a[c] - (int)b[c];
+         d2 += d * d;
+      }
+      const float r = (float)tol * 1.7320508f;   // tol/255 of the diagonal, 255 * sqrt(3)
+      return (float)d2 <= r * r;
    }
 
    // Which pixels (document size, bottom row first) match the seed: flood or everywhere.

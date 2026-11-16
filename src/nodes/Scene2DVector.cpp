@@ -938,6 +938,52 @@ bool Scene2DNode::RasterizeLayer(int id)
    return true;
 }
 
+// An image / node layer turned into pixels: the layer drawn alone at document size becomes a paint layer in its place
+// (name, opacity, blend and place in the stack kept), so the eraser, wand and retouch tools can work on it.
+int Scene2DNode::RasterizeNodeLayer(int id, int frameId)
+{
+   Layers();
+   const Layer* src = FindConst(id);
+   if (src == nullptr || src->kind != Kind::Node)
+      return 0;
+   std::vector<uint8_t> top;
+   if (!RenderLayerAlone(id, frameId, top) || top.size() != (size_t)mDoc.w * mDoc.h * 4)
+      return 0;
+   const int w = mDoc.w, h = mDoc.h, kT = TileStore::kTile, cols = (w + kT - 1) / kT, rows = (h + kT - 1) / kT;
+   std::vector<uint8_t> tile;
+   std::vector<std::string> keys((size_t)cols * rows, "-");
+   for (size_t i = 0; i < keys.size(); i++)
+   {
+      const int x0 = (int)(i % cols) * kT, y0 = (int)(i / cols) * kT;
+      const int tw = std::min(kT, w - x0), th = std::min(kT, h - y0);
+      tile.resize((size_t)tw * th * 4);
+      bool any = false;
+      for (int y = 0; y < th; y++)
+      {
+         const int srcRow = h - 1 - (y0 + y);   // tiles are GL rows, bottom first
+         std::memcpy(&tile[(size_t)y * tw * 4], &top[((size_t)srcRow * w + x0) * 4], (size_t)tw * 4);
+         for (int x = 0; x < tw && !any; x++)
+            any = tile[((size_t)y * tw + x) * 4 + 3] != 0;
+      }
+      if (any)
+         keys[i] = TileStore::Put(tile.data(), tw, th);
+   }
+   const std::string name = src->name;
+   const float opacity = src->opacity;
+   const int blend = src->blend;
+   const bool visible = src->visible;
+   Layer& nl = AddLayer(Kind::Paint, 0, id);
+   nl.tiles = std::move(keys);
+   nl.name = name;
+   nl.opacity = opacity;
+   nl.blend = blend;
+   nl.visible = visible;
+   const int nid = nl.id;
+   RemoveLayer(id);
+   Commit();
+   return nid;
+}
+
 unsigned Scene2DNode::VectorTexture(int id)
 {
    Layers();
