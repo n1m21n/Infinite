@@ -1352,6 +1352,231 @@
         "Nephroid & cardioid optical caustic envelopes",
         "Terminal Grotesque & high-contrast optical refraction"
       ]
+    },
+    {
+      "id": "kinetic_moire_plotter",
+      "taxonomy": "new",
+      "name": "Kinetic Moire & Algorithmic Plotter",
+      "palette": [
+        "#F4F1EA",
+        "#111318",
+        "#D9381E",
+        "#1B498A"
+      ],
+      "sources": [
+        "Sketch",
+        "Line",
+        "Grid"
+      ],
+      "fx": [
+        "edge outline"
+      ],
+      "comp": [
+        "Blend"
+      ],
+      "ban": [
+        "bloom",
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.4,
+      "pairs": [
+        "berlin_school_sequencer",
+        "idm",
+        "minimal_techno"
+      ],
+      "refs": [
+        "Vera Molnar machine imaginaire & 1% disorder plotter drawings",
+        "Bridget Riley optical moire gratings",
+        "Steps Mono & archival pen-plotter ink registration"
+      ]
+    },
+    {
+      "id": "qrd_basalt_acoustics",
+      "taxonomy": "new",
+      "name": "QRD Skyline & Columnar Basalt Acoustics",
+      "palette": [
+        "#14110F",
+        "#2C2621",
+        "#8A745B",
+        "#EAE5DC"
+      ],
+      "sources": [
+        "Sketch 3D",
+        "Array",
+        "Box"
+      ],
+      "fx": [
+        "bevel",
+        "edge outline"
+      ],
+      "comp": [
+        "Color Ramp"
+      ],
+      "ban": [
+        "glitch",
+        "neon"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "spectral_dub_chamber",
+        "dub_techno",
+        "dark_ambient"
+      ],
+      "refs": [
+        "Schroeder Quadratic Residue acoustic skyline diffuser",
+        "Giants Causeway hexagonal columnar basalt prisms",
+        "Terminal Grotesque & raking architectural shadow relief"
+      ]
+    },
+    {
+      "id": "soap_film_interference",
+      "taxonomy": "new",
+      "name": "Thin-Film Soap Interference",
+      "palette": [
+        "#12100E",
+        "#E69C2C",
+        "#4CB8D4",
+        "#4F2B6B"
+      ],
+      "sources": [
+        "FieldPixel",
+        "Noise"
+      ],
+      "fx": [
+        "bloom",
+        "displace"
+      ],
+      "comp": [
+        "gradientmap",
+        "Color Ramp"
+      ],
+      "ban": [
+        "pixelate",
+        "dither"
+      ],
+      "motion": 0.75,
+      "pairs": [
+        "ambient",
+        "idm",
+        "berlin_school_sequencer"
+      ],
+      "refs": [
+        "Marangoni convection & thin-film optical phase interference",
+        "Newton black film drainage fringes",
+        "VG5000 & iridescent spectral dispersion"
+      ]
+    },
+    {
+      "id": "harmonograph_pendulum",
+      "taxonomy": "new",
+      "name": "Harmonograph Pendulum Ink Drawing",
+      "palette": [
+        "#F5F1E8",
+        "#191C3A",
+        "#B63B28",
+        "#8D7B5A"
+      ],
+      "sources": [
+        "Sketch",
+        "Noise"
+      ],
+      "fx": [
+        "vignette",
+        "grain"
+      ],
+      "comp": [
+        "Color Ramp"
+      ],
+      "ban": [
+        "pixelate",
+        "glitch"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "ambient_piano",
+        "neo_classical",
+        "trautonium_subharmonic"
+      ],
+      "refs": [
+        "19th-century Victorian four-pendulum mechanical harmonograph ink tracings",
+        "Damped Lissajous phase envelopes on cotton rag paper",
+        "Sentient & Fragment Mono mathematical plotting typography"
+      ]
+    },
+    {
+      "id": "nervi_ferrocement_vault",
+      "taxonomy": "new",
+      "name": "Nervi Ferrocement Rib Vault",
+      "palette": [
+        "#D8D2C7",
+        "#4B4842",
+        "#1F2124",
+        "#C49A5B"
+      ],
+      "sources": [
+        "Sketch 3D",
+        "Shape"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "levels"
+      ],
+      "ban": [
+        "pixelate",
+        "rgbshift"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "brutalist_architecture",
+        "minimal_techno",
+        "drone_kosmische"
+      ],
+      "refs": [
+        "Pier Luigi Nervi Palazzetto dello Sport diagrid ferrocement dome",
+        "Hyperbolic-paraboloid precast concrete coffered rib shells",
+        "Millimetre & Eurostile Italian structural rationalist typography"
+      ]
+    },
+    {
+      "id": "dichroic_fresnel_optics",
+      "taxonomy": "new",
+      "name": "Dichroic Fresnel Optical Caustics",
+      "palette": [
+        "#0B0D14",
+        "#FF7A2F",
+        "#2BC4F3",
+        "#8B4DFF"
+      ],
+      "sources": [
+        "FieldPixel",
+        "Noise"
+      ],
+      "fx": [
+        "bloom",
+        "chromatic"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.65,
+      "pairs": [
+        "idm",
+        "berlin_school_sequencer",
+        "barberpole_wire_dispersion"
+      ],
+      "refs": [
+        "Stepped concentric Fresnel lighthouse lens echelon rings",
+        "Dichroic beam-splitter prism spectral refraction beams",
+        "Technor & Terminal Grotesque optical instrument typography"
+      ]
     }
   ]
 }

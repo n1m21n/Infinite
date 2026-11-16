@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Trautonium Subharmonic Formant Bow Synth",
+    "author": "Infinite",
+    "description": "Bowed subharmonic Trautonium synthesizer with smooth portamento glide, wavefolded upper partials, and swept vocal formant bank.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float glide = 0.14 [0.01, 0.5];\nparam float fold = 1.65 [0.8, 3.2];\nparam float formantSweep = 0.58 [0.1, 1.0];\nparam float warmth = 1.35 [0.8, 2.5];\nstate float curFreq = 220.0;\nstate float p1 = 0;\nstate float p3 = 0;\nstate float env = 0;\nstate float lpA = 0;\nstate float bpA = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\nenv = if(target > env, env + (target - env) * 0.05, env * 0.9988);\n\n# Smooth ribbon-style portamento\ngCoeff = clamp(1.0 / (sr * (0.008 + glide * 0.16)), 0.0002, 0.05);\ncurFreq = curFreq + (clamp(freq, 45.0, 2000.0) - curFreq) * gCoeff;\n\np1 = (p1 + curFreq / sr) % 1.0;\np3 = (p3 + (curFreq * 0.333333) / sr) % 1.0;\n\n# Wavefolded fundamental + f/3 subharmonic undertone\nfolded = sin((sin(6.2831853 * p1) * 0.56 + (1.0 - 2.0 * p3) * 0.38) * fold * (0.65 + 0.55 * env));\n\n# Envelope-swept formant bandpass\ng = clamp(2.0 * sin(3.14159265 * clamp(240.0 + formantSweep * 1400.0 * (0.3 + 0.7 * env), 150.0, sr * 0.35) / sr), 0.01, 0.82);\nbpA = bpA + g * (folded - lpA - 0.36 * bpA);\nlpA = lpA + g * bpA;\n\ndriven = (folded * 0.42 + bpA * 0.58) * warmth;\nout = (driven / (1.0 + abs(driven) * 0.48)) * env * 0.56;\n",
+    "params": {
+      "glide": 0.14,
+      "fold": 1.65,
+      "formantSweep": 0.58,
+      "warmth": 1.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

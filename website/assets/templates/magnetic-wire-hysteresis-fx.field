@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Magnetic Wire Hysteresis FX",
+    "author": "Infinite",
+    "description": "1940s Peirce steel-wire magnetic recorder processor with asymmetric hysteresis saturation, capstan flutter, and coil bandpass.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float biasDrive = 1.85 [0.8, 3.6];\nparam float flutter = 0.38 [0.0, 1.0];\nparam float coilTone = 0.55 [0.15, 1.0];\nparam float mix = 0.82 [0.0, 1.0];\nstate float lfo1 = 0;\nstate float lfo2 = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float hpState = 0;\nstate float lpState = 0;\nstate float hyst = 0;\n\nlfo1 = (lfo1 + 1.35 / sr) % 1.0;\nlfo2 = (lfo2 + 5.70 / sr) % 1.0;\n\n# Capstan wow & flutter phase dispersion\nwobble = sin(6.2831853 * lfo1) * 0.65 + sin(6.2831853 * lfo2) * 0.35;\ng = clamp(0.32 + wobble * 0.28 * flutter, -0.82, 0.82);\ny1 = -g * in + ap1; ap1 = in + g * y1;\ny2 = -g * y1 + ap2; ap2 = y1 + g * y2;\n\n# Asymmetric magnetic steel-wire hysteresis curve\npre = y2 * biasDrive + 0.08 * biasDrive;\nhyst = hyst * 0.35 + pre * 0.65;\nsat = (hyst / (1.0 + abs(hyst) * 0.68)) - 0.055 * biasDrive;\n\n# Telephone-coil highpass + warm iron-core lowpass\nhpState = hpState + 0.012 * (sat - hpState);\nmidBand = sat - hpState;\nfCut = clamp(0.06 + coilTone * 0.36, 0.04, 0.45);\nlpState = lpState + fCut * (midBand - lpState);\n\nampFlutter = 1.0 - 0.08 * flutter * (0.5 + 0.5 * wobble);\nwet = lpState * ampFlutter;\nout = (in * (1.0 - mix) + wet * mix) * 0.78;\n",
+    "params": {
+      "biasDrive": 1.85,
+      "flutter": 0.38,
+      "coilTone": 0.55,
+      "mix": 0.82
+    }
+  }
+}

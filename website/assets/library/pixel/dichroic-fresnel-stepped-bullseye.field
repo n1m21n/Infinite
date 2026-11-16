@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dichroic Fresnel Stepped Bullseye",
+    "author": "Infinite",
+    "description": "Concentric stepped Fresnel echelon lens rings refracting thin-film dichroic spectral bands with brass spider-vane ribs and caustic highlights.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float ringCount = 14.0 [6.0, 26.0];\nparam float prismShift = 1.45 [0.5, 3.0];\nparam float vaneWidth = 0.026 [0.008, 0.06];\nparam float causticGain = 1.25 [0.5, 2.2];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x);\n\n# Stepped concentric Fresnel echelon sawtooth phase\nringCoord = r * ringCount - t * 0.45;\nechelon = fract(ringCoord);\nslope = (echelon - 0.5) * 2.0;\n\n# Off-axis light source incidence & thin-film optical path difference\nlightDir = vec2(cos(t * 0.35), sin(t * 0.35));\ninc = dot(normalize(p + vec2(0.0001, 0.0001)), lightDir);\noptPath = (r * 3.8 + slope * 1.35 + inc * 0.9) * prismShift + t * 0.5;\n\n# Dichroic spectral interference bands (amber, cyan, violet)\nspecR = 0.5 + 0.5 * sin(optPath + 0.15);\nspecG = 0.5 + 0.5 * sin(optPath + 2.10);\nspecB = 0.5 + 0.5 * sin(optPath + 4.15);\ndichroic = vec3(specR, specG * 0.88, specB);\n\n# Concentric caustic ridge & outer bullseye aperture mask\ncaustic = pow(clamp(1.0 - abs(echelon - 0.82) * 5.2, 0.0, 1.0), 2.2);\nbullseye = smoothstep(0.98, 0.88, r);\ncenterLens = smoothstep(0.24, 0.18, r);\n\n# Brass spider-vane mechanical frame ribs (4-fold + outer ring)\nvaneA = min(abs(sin(a * 2.0 + 0.35)), abs(cos(a * 2.0 + 0.35)));\nvaneMask = smoothstep(vaneWidth, vaneWidth * 1.8, vaneA * max(r, 0.18));\nouterFrame = smoothstep(0.028, 0.008, abs(r - 0.90));\n\ncObsidian = vec3(0.043, 0.051, 0.078);\ncBrass = vec3(0.769, 0.604, 0.357);\ncAmber = vec3(1.0, 0.478, 0.184);\n\ncol = mix(cObsidian, dichroic * (0.42 + 0.58 * bullseye), clamp(0.28 + bullseye * 0.72, 0.0, 1.0));\ncol = col + cAmber * caustic * causticGain * bullseye * 0.65;\ncol = mix(col, dichroic * 1.15 + vec3(0.18), centerLens * 0.45);\ncol = mix(cObsidian * 1.4, col, clamp(vaneMask, 0.18, 1.0));\ncol = mix(col, cBrass, outerFrame * 0.85);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "ringCount": 14.0,
+      "prismShift": 1.45,
+      "vaneWidth": 0.026,
+      "causticGain": 1.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

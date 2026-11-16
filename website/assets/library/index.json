@@ -10602,6 +10602,225 @@
       "file": "assets/library/pixel/schlieren-caustics-thermal-plume.field",
       "preview": "assets/library/previews/schlieren-caustics-thermal-plume.jpg",
       "bytes": 1941
+    },
+    {
+      "id": "harmonograph-pendulum-damped-lissajous",
+      "name": "Harmonograph Pendulum Damped Lissajous",
+      "kind": "Generator",
+      "tags": [
+        "harmonograph",
+        "lissajous",
+        "pendulum",
+        "ink",
+        "plotter",
+        "generative",
+        "2d"
+      ],
+      "description": "Four-pendulum damped harmonograph ink tracing on cotton rag paper with Prussian phase envelopes, vermilion harmonic loop, and brass calibration ticks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/harmonograph-pendulum-damped-lissajous.js",
+      "preview": "assets/library/previews/harmonograph-pendulum-damped-lissajous.jpg",
+      "bytes": 2829
+    },
+    {
+      "id": "harmonograph-pendulum-rotary-rosette",
+      "name": "Harmonograph Pendulum Rotary Rosette",
+      "kind": "Generator",
+      "tags": [
+        "harmonograph",
+        "rosette",
+        "pendulum",
+        "rotary",
+        "ink",
+        "plotter",
+        "2d"
+      ],
+      "description": "Rotary-table lateral harmonograph tracing dual counter-oscillating charcoal and vermilion ink rosettes inside a polar goniometer reticle.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/harmonograph-pendulum-rotary-rosette.js",
+      "preview": "assets/library/previews/harmonograph-pendulum-rotary-rosette.jpg",
+      "bytes": 2607
+    },
+    {
+      "id": "nervi-ferrocement-palazzetto-dome-3d",
+      "name": "Nervi Ferrocement Palazzetto Dome 3D",
+      "kind": "Generator",
+      "tags": [
+        "nervi",
+        "ferrocement",
+        "architecture",
+        "vault",
+        "dome",
+        "concrete",
+        "3d"
+      ],
+      "description": "Radial-diagrid ferrocement concrete dome with spiral intersecting ribs, brass oculus lantern ring, and perimeter Y-buttress columns.",
+      "price": 0,
+      "domain": "sketch3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/nervi-ferrocement-palazzetto-dome-3d.js",
+      "preview": "assets/library/previews/nervi-ferrocement-palazzetto-dome-3d.jpg",
+      "bytes": 2392
+    },
+    {
+      "id": "nervi-ferrocement-hyperbolic-shell-3d",
+      "name": "Nervi Ferrocement Hyperbolic Shell 3D",
+      "kind": "Generator",
+      "tags": [
+        "nervi",
+        "candela",
+        "hyperbolic",
+        "concrete",
+        "architecture",
+        "shell",
+        "3d"
+      ],
+      "description": "Twin-curved hyperbolic paraboloid ferrocement canopy with ruled concrete rib generators, edge fascia beams, and bronze tension ties.",
+      "price": 0,
+      "domain": "sketch3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/nervi-ferrocement-hyperbolic-shell-3d.js",
+      "preview": "assets/library/previews/nervi-ferrocement-hyperbolic-shell-3d.jpg",
+      "bytes": 1833
+    },
+    {
+      "id": "trautonium-subharmonic-mixtur-synth",
+      "name": "Trautonium Subharmonic Mixtur Synth",
+      "kind": "Template",
+      "tags": [
+        "trautonium",
+        "subharmonic",
+        "formant",
+        "berlin",
+        "synth",
+        "field"
+      ],
+      "description": "Oskar Sala Mixtur-Trautonium integer subharmonic divider synth with dual resonant formant filters and triode saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/trautonium-subharmonic-mixtur-synth.inf",
+      "preview": "assets/library/previews/trautonium-subharmonic-mixtur-synth.jpg",
+      "bytes": 2126
+    },
+    {
+      "id": "trautonium-subharmonic-formant-bow-synth",
+      "name": "Trautonium Subharmonic Formant Bow Synth",
+      "kind": "Template",
+      "tags": [
+        "trautonium",
+        "subharmonic",
+        "bowed",
+        "formant",
+        "synth",
+        "field"
+      ],
+      "description": "Bowed subharmonic Trautonium synthesizer with smooth portamento glide, wavefolded upper partials, and swept vocal formant bank.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/trautonium-subharmonic-formant-bow-synth.inf",
+      "preview": "assets/library/previews/trautonium-subharmonic-formant-bow-synth.jpg",
+      "bytes": 2251
+    },
+    {
+      "id": "barberpole-shepard-allpass-fx",
+      "name": "Barberpole Shepard Allpass FX",
+      "kind": "Template",
+      "tags": [
+        "barberpole",
+        "phaser",
+        "allpass",
+        "shepard",
+        "dispersion",
+        "fx",
+        "field"
+      ],
+      "description": "Infinite rising six-stage allpass barberpole phaser with quadrature crossfade envelope, resonant feedback, and analog headroom saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 4,
+      "file": "assets/templates/barberpole-shepard-allpass-fx.inf",
+      "preview": "assets/library/previews/barberpole-shepard-allpass-fx.jpg",
+      "bytes": 2419
+    },
+    {
+      "id": "magnetic-wire-hysteresis-fx",
+      "name": "Magnetic Wire Hysteresis FX",
+      "kind": "Template",
+      "tags": [
+        "magnetic",
+        "wire",
+        "hysteresis",
+        "tape",
+        "lo-fi",
+        "saturation",
+        "fx",
+        "field"
+      ],
+      "description": "1940s Peirce steel-wire magnetic recorder processor with asymmetric hysteresis saturation, capstan flutter, and coil bandpass.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 4,
+      "file": "assets/templates/magnetic-wire-hysteresis-fx.inf",
+      "preview": "assets/library/previews/magnetic-wire-hysteresis-fx.jpg",
+      "bytes": 2396
+    },
+    {
+      "id": "dichroic-fresnel-stepped-bullseye",
+      "name": "Dichroic Fresnel Stepped Bullseye",
+      "kind": "Generator",
+      "tags": [
+        "fresnel",
+        "dichroic",
+        "optics",
+        "refraction",
+        "caustics",
+        "pixel",
+        "shader"
+      ],
+      "description": "Concentric stepped Fresnel echelon lens rings refracting thin-film dichroic spectral bands with brass spider-vane ribs and caustic highlights.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/dichroic-fresnel-stepped-bullseye.field",
+      "preview": "assets/library/previews/dichroic-fresnel-stepped-bullseye.jpg",
+      "bytes": 2441
+    },
+    {
+      "id": "dichroic-fresnel-prismatic-caustics",
+      "name": "Dichroic Fresnel Prismatic Caustics",
+      "kind": "Generator",
+      "tags": [
+        "dichroic",
+        "prism",
+        "beams",
+        "caustics",
+        "optics",
+        "pixel",
+        "shader"
+      ],
+      "description": "Crossed dichroic beam-splitter cube splitting incident rays into textured amber, cyan, and violet interference beams over obsidian.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/dichroic-fresnel-prismatic-caustics.field",
+      "preview": "assets/library/previews/dichroic-fresnel-prismatic-caustics.jpg",
+      "bytes": 2249
     }
   ]
 }

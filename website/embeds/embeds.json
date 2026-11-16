@@ -625,6 +625,16 @@
       "slug": "schlieren-caustics-thermal-plume",
       "title": "Schlieren Caustics Thermal Plume",
       "description": "Audio-reactive convective schlieren plume visualizer. Bass drives thermal turbulence, mids sweep refractive fringe density, and highs ignite the ivory filaments."
+    },
+    {
+      "slug": "dichroic-fresnel-stepped-bullseye",
+      "title": "Dichroic Fresnel Stepped Bullseye",
+      "description": "Audio-reactive stepped Fresnel echelon lens with dichroic thin-film dispersion. Bass breathes the focal rings, mids shift spectral phase, and highs sharpen caustic glints."
+    },
+    {
+      "slug": "dichroic-fresnel-prismatic-caustics",
+      "title": "Dichroic Fresnel Prismatic Caustics",
+      "description": "Audio-reactive dichroic beam-splitter prism. Bass pulses beam aperture, mids rotate the optical cube, and highs ignite prismatic caustic filaments."
     }
   ]
 }

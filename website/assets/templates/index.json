@@ -3159,6 +3159,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "trautonium-subharmonic-mixtur-synth",
+      "name": "Trautonium Subharmonic Mixtur Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Oskar Sala Mixtur-Trautonium integer subharmonic divider synth with dual resonant formant filters and triode saturation.",
+      "price": 0,
+      "preview": "assets/templates/trautonium-subharmonic-mixtur-synth.webp",
+      "file": "assets/templates/trautonium-subharmonic-mixtur-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "trautonium-subharmonic-formant-bow-synth",
+      "name": "Trautonium Subharmonic Formant Bow Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Bowed subharmonic Trautonium synthesizer with smooth portamento glide, wavefolded upper partials, and swept vocal formant bank.",
+      "price": 0,
+      "preview": "assets/templates/trautonium-subharmonic-formant-bow-synth.webp",
+      "file": "assets/templates/trautonium-subharmonic-formant-bow-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "barberpole-shepard-allpass-fx",
+      "name": "Barberpole Shepard Allpass FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Infinite rising six-stage allpass barberpole phaser with quadrature crossfade envelope, resonant feedback, and analog headroom saturation.",
+      "price": 0,
+      "preview": "assets/templates/barberpole-shepard-allpass-fx.webp",
+      "file": "assets/templates/barberpole-shepard-allpass-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "magnetic-wire-hysteresis-fx",
+      "name": "Magnetic Wire Hysteresis FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "1940s Peirce steel-wire magnetic recorder processor with asymmetric hysteresis saturation, capstan flutter, and coil bandpass.",
+      "price": 0,
+      "preview": "assets/templates/magnetic-wire-hysteresis-fx.webp",
+      "file": "assets/templates/magnetic-wire-hysteresis-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }
