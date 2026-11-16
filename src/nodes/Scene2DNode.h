@@ -31,11 +31,14 @@ public:
    enum AdjType { kAdjPixelate = 0, kAdjHalftone, kAdjDither, kAdjThreshold, kAdjGradientMap, kAdjPosterize,
                   kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjLevels, kAdjCurves,
                   kAdjColorBalance, kAdjVibrance, kAdjSelective, kAdjMixer, kAdjBlackWhite, kAdjPhotoFilter,
-                  kAdjShadowsHighlights, kAdjLookup, kAdjCount };
+                  kAdjShadowsHighlights, kAdjLookup, kAdjWhiteBalance, kAdjSplitToning, kAdjRecolour, kAdjCount };
    // adjP layout per type (AdjParamCount): Colour Balance 9 (shadows, mids, highlights rgb, -1..1); Selective
    // Colour 36 (reds, yellows, greens, cyans, blues, magentas, whites, neutrals, blacks x CMYK, -1..1); Channel
    // Mixer 10 (rows R, G, B of R G B, then mono 0/1); Black & White 6 (reds..magentas, -2..3); Photo Filter 1
-   // (keep luminosity 0/1); Shadows / Highlights 2 (shadows, highlights 0..1).
+   // (keep luminosity 0/1); Shadows / Highlights 2 (shadows, highlights 0..1); White Balance 2 (temperature, tint -1..1);
+   // Split Toning 5 (highlight hue deg, saturation, shadow hue deg, saturation, balance 0..1); Recolour 3 (hue deg,
+   // saturation, lightness -1..1). The last three are Affinity's, measured: tools/re-survey/affinity_probe.py adjust.
+   static void WhiteBalanceMatrix(float temperature, float tint, float m[9]);   // linear sRGB, row-major
    static int AdjParamCount(int type);
    static std::vector<float> AdjParamDefault(int type);
    static const char* AdjGroup(int type);   // "Adjust", "Colour", "Stylize": the effect list's sections

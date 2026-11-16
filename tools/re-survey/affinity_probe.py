@@ -18,6 +18,7 @@ Usage:
   python3 tools/re-survey/affinity_probe.py run [--photo P] [--app build-dev/Infinite.app] [--op NAME] [--set-baseline]
   python3 tools/re-survey/affinity_probe.py facts          # probe.json only
   python3 tools/re-survey/affinity_probe.py ab [...]       # A/B only
+  python3 tools/re-survey/affinity_probe.py adjust [--case wbs_]  # adjustment renders for fitting
   python3 tools/re-survey/affinity_probe.py --self-test
 Exit: 0 ok, 1 failed / regressed, 2 usage error or Affinity not reachable.
 """
@@ -72,6 +73,17 @@ OPS = [
      "js": RASTERISE + "select(rectPoly(100,200,250,320)); doc.executeCommand(DocumentCommand.createRasterFill(sel(), dom.RasterFillMode.Colour, red(), 1.0, BlendMode.Normal));"},
     {"name": "bucket", "proxy": False,
      "js": RASTERISE + "doc.executeCommand(DocumentCommand.createRasterFloodFill(sel(), new G.Point(300,100), 0.2, true, true, dom.RasterFloodFillSamplingSource.CurrentLayer, BlendMode.Normal, red()));"},
+]
+# Adjustment layers over the photo (fitted maths in Scene2DNode: White Balance, Split Toning, Recolour).
+def _adj(kind, setter):
+    return (f"const ap = N.{kind}AdjustmentParameters.create(); {setter} "
+            f"doc.addNode(N.{kind}AdjustmentRasterNodeDefinition.create(ap), null, undefined, false);")
+OPS += [
+    {"name": "adj_white_balance", "proxy": False, "js": _adj("WhiteBalance", "ap.whiteBalance = 0.5; ap.tint = 0.25;")},
+    {"name": "adj_split_toning", "proxy": False,
+     "js": _adj("SplitToning", "ap.highlightsHue = 0.5236; ap.highlightsSaturation = 0.6; ap.shadowsHue = 3.6652; "
+                               "ap.shadowsSaturation = 0.5; ap.balance = 0.4;")},
+    {"name": "adj_recolour", "proxy": False, "js": _adj("Recolour", "ap.hue = 3.4907; ap.saturation = 0.5; ap.lightness = 0.1;")},
 ]
 # Reached in neither direction by script: Affinity's SDK has no raster stroke (RasterBrush.createDefault is "not
 # yet implemented") and no gradient fill on pixels, so these are compared by the help pages only.
@@ -373,6 +385,83 @@ def self_test():
     return 1 if fails else 0
 
 
+# Adjustment renders: a grey ramp (rows 0-63) over seeded random colours, through one Affinity adjustment layer.
+# Used to fit the maths (White Balance = Bradford in linear sRGB, etc.); pictures go to ~/re-output/affinity/adjust.
+ADJ = os.path.join(OUT, "adjust")
+ADJ_CASES = {
+    "wb_p50": ("WhiteBalance", "p.whiteBalance = 0.5;"), "wb_m50": ("WhiteBalance", "p.whiteBalance = -0.5;"),
+    "wb_p100": ("WhiteBalance", "p.whiteBalance = 1.0;"),
+    "tint_p50": ("WhiteBalance", "p.tint = 0.5;"), "tint_m50": ("WhiteBalance", "p.tint = -0.5;"),
+    "st_h0": ("SplitToning", "p.highlightsHue = 0; p.highlightsSaturation = 1;"),
+    "st_s120": ("SplitToning", "p.shadowsHue = 2.0944; p.shadowsSaturation = 1;"),
+    "st_both": ("SplitToning", "p.highlightsHue = 1.0472; p.highlightsSaturation = 0.5; "
+                               "p.shadowsHue = 4.18879; p.shadowsSaturation = 0.5;"),
+    "st_bal": ("SplitToning", "p.highlightsHue = 0; p.highlightsSaturation = 1; p.balance = 0.25;"),
+    "rc_0": ("Recolour", "p.hue = 0; p.saturation = 1; p.lightness = 0;"),
+    "rc_120h": ("Recolour", "p.hue = 2.0944; p.saturation = 0.5; p.lightness = 0.25;"),
+    "combo_a": ("WhiteBalance", "p.whiteBalance = 0.5; p.tint = 0.5;"),
+    "combo_b": ("WhiteBalance", "p.whiteBalance = -0.75; p.tint = 0.25;"),
+    "combo_c": ("WhiteBalance", "p.whiteBalance = 1; p.tint = -1;"),
+    **{f"wbs_{i}": ("WhiteBalance", f"p.whiteBalance = {(i - 8) / 8};") for i in range(17)},
+    **{f"tns_{i}": ("WhiteBalance", f"p.tint = {(i - 8) / 8};") for i in range(17)},
+    **{f"sth_{i}": ("SplitToning", f"p.highlightsHue = {i * math.pi / 6}; p.highlightsSaturation = 1;") for i in range(12)},
+    **{f"sts_{i}": ("SplitToning", f"p.highlightsHue = 0; p.highlightsSaturation = {i / 4};") for i in range(5)},
+    **{f"stb_{i}": ("SplitToning", f"p.highlightsHue = 0; p.highlightsSaturation = 1; p.shadowsHue = 3.14159; "
+                                   f"p.shadowsSaturation = 1; p.balance = {i / 4};") for i in range(5)},
+    **{f"sthb_{j}": ("SplitToning", f"p.highlightsHue = 0; p.highlightsSaturation = 0.25; p.balance = {j / 8};") for j in range(9)},
+    **{f"stsb_{j}": ("SplitToning", f"p.shadowsHue = 0; p.shadowsSaturation = 0.25; p.balance = {j / 8};") for j in range(9)},
+    **{f"sthc_{j}": ("SplitToning", f"p.highlightsHue = 4.18879; p.highlightsSaturation = 0.5; p.balance = {j / 8};") for j in range(9)},
+    **{f"stsc_{j}": ("SplitToning", f"p.shadowsHue = 1.0472; p.shadowsSaturation = 0.5; p.balance = {j / 8};") for j in range(9)},
+    **{f"rch_{i}": ("Recolour", f"p.hue = {i * math.pi / 6}; p.saturation = 1; p.lightness = 0;") for i in range(12)},
+    **{f"rcs_{i}": ("Recolour", f"p.hue = 0; p.saturation = {i / 4}; p.lightness = 0;") for i in range(5)},
+    **{f"rcl_{i}": ("Recolour", f"p.hue = 0; p.saturation = 1; p.lightness = {(i - 4) / 4};") for i in range(9)},
+}
+ADJ_JS = r"""
+const { app } = require('/application.js'); const D = require('/document.js'); const N = require('/nodes.js');
+const desk = app.userDesktopPath + '/affinity-ab';
+for (const d of D.Document.all) if (d.title.startsWith('src')) d.close();
+const doc = D.Document.load(desk + '/src.png');
+try {
+const p = N.KINDAdjustmentParameters.create(); SET
+doc.addNode(N.KINDAdjustmentRasterNodeDefinition.create(p), null, undefined, false);
+doc.export(desk + '/adj_NAME.png', D.FileExportOptions.createWithPresetName('PNG'), D.FileExportArea.createForWholeDocument());
+console.log(JSON.stringify({ok: true}));
+} finally { doc.close(); }
+"""
+
+
+def adj_source():
+    import numpy as np
+    from PIL import Image
+    n = 256
+    img = np.zeros((n, n, 3), np.uint8)
+    img[:64] = np.arange(n, dtype=np.uint8)[None, :, None]
+    img[64:] = np.random.default_rng(3).integers(0, 256, (n - 64, n, 3))
+    return Image.fromarray(img)
+
+
+def adjust(aff, prefixes):
+    desk = os.path.expanduser("~/Desktop/affinity-ab")
+    os.makedirs(desk, exist_ok=True)
+    os.makedirs(ADJ, exist_ok=True)
+    src = adj_source()
+    src.save(os.path.join(desk, "src.png"))
+    src.save(os.path.join(ADJ, "src.png"))
+    names = [k for k in ADJ_CASES if not prefixes or any(k.startswith(p) for p in prefixes)]
+    for name in names:
+        kind, setter = ADJ_CASES[name]
+        js = ADJ_JS.replace("KIND", kind).replace("SET", setter).replace("NAME", name)
+        r = aff.call("execute_script", {"script": js}, timeout=120)
+        got = os.path.join(desk, f"adj_{name}.png")
+        if os.path.exists(got):
+            os.replace(got, os.path.join(ADJ, f"adj_{name}.png"))
+        else:
+            print(name, "no picture:", str(r).strip().splitlines()[-1][:200])
+    os.remove(os.path.join(desk, "src.png"))
+    print(f"{len(names)} adjustment renders -> {ADJ}")
+    return 0
+
+
 def connect():
     from affinity_mcp import Affinity, AffinityUnavailable
     try:
@@ -386,13 +475,20 @@ def main():
     if "--self-test" in sys.argv:
         return self_test()
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["run", "facts", "ab"])
+    ap.add_argument("cmd", choices=["run", "facts", "ab", "adjust"])
     ap.add_argument("--photo", default=DEFAULT_PHOTO)
     ap.add_argument("--app", default=os.path.join(REPO, "build-dev", "Infinite.app"))
     ap.add_argument("--op")
+    ap.add_argument("--case", action="append", help="adjust: case-name prefix (repeatable); all when omitted")
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--infinite-only", action="store_true", help="reuse the Affinity pictures already in the ab folder")
     a = ap.parse_args()
+    if a.cmd == "adjust":
+        aff = connect()
+        try:
+            return adjust(aff, a.case)
+        finally:
+            aff.__exit__(None, None, None)
     os.makedirs(AB, exist_ok=True)
     prepare_photo(a.photo)
     aff = None if a.infinite_only else connect()

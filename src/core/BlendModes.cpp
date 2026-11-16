@@ -12,7 +12,8 @@ namespace BlendModes
          "Difference", "Exclusion", "Subtract", "Divide",
          "Hue", "Saturation", "Color", "Luminosity",
          "Average", "Negation", "Reflect", "Glow", "Erase", "Anti-Erase",
-         "Overlay (old)", "Soft Light (old)", "Hard Light (old)"
+         "Overlay (old)", "Soft Light (old)", "Hard Light (old)",
+         "Contrast Invert"
       };
    }
 
@@ -24,7 +25,8 @@ namespace BlendModes
    const std::vector<std::string>& NamesFor(int current)
    {
       static const std::vector<std::string> kLive(kNames.begin(), kNames.begin() + kAntiEraseMode + 1);
-      return current > kAntiEraseMode ? kNames : kLive;
+      static const std::vector<std::string> kOld(kNames.begin(), kNames.begin() + kContrastInvertMode);
+      return current > kAntiEraseMode ? kOld : kLive;
    }
 
    const char* kBlendGLSL =
@@ -86,6 +88,11 @@ namespace BlendModes
       "   if (mode == 27) return 1.0 - abs(1.0 - a - b);\n"
       "   if (mode == 28) return min(a*a / max(1.0-b, 1e-4), vec3(1.0));\n"
       "   if (mode == 29) return min(b*b / max(1.0-a, 1e-4), vec3(1.0));\n"
+      // Contrast Invert: the top, or its negative, whichever stands off the base (Rec. 601 luma, as Affinity).
+      "   if (mode == 35) {\n"
+      "      const vec3 k = vec3(0.299, 0.587, 0.114);\n"
+      "      return (dot(a, k) < 0.5) == (dot(b, k) < 0.5) ? 1.0 - b : b;\n"
+      "   }\n"
       "   return a;\n"
       "}\n"
       // The W3C Compositing and Blending Level 1 Hard Mix (a + b >= 1). Overlay,

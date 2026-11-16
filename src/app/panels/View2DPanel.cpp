@@ -1448,6 +1448,25 @@ namespace
          SliderRow(T("Shadows"), &p[0], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Highlights"), &p[1], 0.0f, 1.0f, "%.2f");
       }
+      if (t == S::kAdjWhiteBalance)
+      {
+         SliderRow(T("White Balance"), &p[0], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Tint"), &p[1], -1.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjSplitToning)
+      {
+         SliderRow(T("Highlights Hue"), &p[0], 0.0f, 360.0f, "%.0f");
+         SliderRow(T("Highlights Saturation"), &p[1], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Shadows Hue"), &p[2], 0.0f, 360.0f, "%.0f");
+         SliderRow(T("Shadows Saturation"), &p[3], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Balance"), &p[4], 0.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjRecolour)
+      {
+         SliderRow(T("Hue"), &p[0], 0.0f, 360.0f, "%.0f");
+         SliderRow(T("Saturation"), &p[1], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Lightness"), &p[2], -1.0f, 1.0f, "%.2f");
+      }
       if (t == S::kAdjLookup)
       {
          FieldLabel(T("Lookup"));
@@ -7209,14 +7228,30 @@ namespace
       }
    }
 
-   std::vector<std::string> BlendNames(int current, bool group)
+   // The menu's names and the mode each one sets (a group's Pass Through is -1). The old Overlay / Soft / Hard Light
+   // only show on a layer that already uses one; Contrast Invert sits after Erase, as in Affinity.
+   std::vector<std::string> BlendNames(int current, bool group, std::vector<int>* modes = nullptr)
    {
       std::vector<std::string> names;
+      std::vector<int> ids;
       if (group)
+      {
          names.push_back(T("Pass Through"));
-      // The old Overlay / Soft / Hard Light only show on a layer that already uses one (patches from before the fix).
-      for (const std::string& n : BlendModes::NamesFor(current))
-         names.push_back(T(n.c_str()));
+         ids.push_back(Scene2DNode::kPassThrough);
+      }
+      const std::vector<std::string>& all = BlendModes::NamesFor(current);
+      for (int i = 0; i < (int)all.size(); i++)
+      {
+         names.push_back(T(all[i].c_str()));
+         ids.push_back(i);
+      }
+      if (!group)
+      {
+         names.push_back(T(BlendModes::Names()[BlendModes::kContrastInvertMode].c_str()));
+         ids.push_back(BlendModes::kContrastInvertMode);
+      }
+      if (modes != nullptr)
+         *modes = std::move(ids);
       return names;
    }
 
@@ -7235,21 +7270,21 @@ namespace
          }
          ImGui::BeginDisabled(none);
          const bool group = a->kind == Kind::Group;
-         std::vector<std::string> names = BlendNames(a->blend, group);
+         std::vector<int> modes;
+         std::vector<std::string> names = BlendNames(a->blend, group, &modes);
          // Blend + Opacity, then Fill + Lock: tile-high wells so they share the chips' 28 pt rows, both rows flush to w.
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (sChip - ImGui::GetFontSize()) * 0.5f));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, tok::space_1));
          const float half = (w - tok::space_1) * 0.5f;
          ImGui::SetNextItemWidth(half);
-         const int offset = group ? -1 : 0;
-         const int shown = std::clamp(a->blend - offset, 0, (int)names.size() - 1);
+         const int shown = std::max(0, (int)(std::find(modes.begin(), modes.end(), a->blend) - modes.begin()) % (int)modes.size());
          if (MenuParts::BeginCombo("##v2dblend", names[shown].c_str()))
          {
             for (int i = 0; i < (int)names.size(); i++)
                if (MenuParts::Choice(names[i].c_str(), i == shown) && i != shown)
                {
                   PushUndoCheckpoint("Blend mode");
-                  a->blend = i + offset;
+                  a->blend = modes[i];
                   Touch();
                }
             MenuParts::EndCombo();
@@ -11402,6 +11437,15 @@ int View2DAffinityAb(const char* dir)
       return true;
    };
    const float kRed[3] = { 1.0f, 0.0f, 0.0f };
+   auto adjust = [&](Scene2DNode* doc, int type, std::vector<float> p) {
+      AddAdjust(doc, type);
+      Layer* a = Active(doc);
+      if (a == nullptr || a->kind != Kind::Adjust)
+         return false;
+      a->adjP = std::move(p);
+      doc->Commit();
+      return true;
+   };
    const std::vector<AbOp> ops = {
       { "rasterize", [&](Scene2DNode* d, int) { return EnsurePixels(d); } },
       { "delete_rect", [&](Scene2DNode* d, int) { d->SelectRect(100, 200, 250, 320, Scene2DNode::kSelNew, 0, false); return ClearOrFill(d, 0); } },
@@ -11451,6 +11495,9 @@ int View2DAffinityAb(const char* dir)
            EnsurePixels(d);
            FillAt(d, ImVec2(300, 100));
            return true; } },
+      { "adj_white_balance", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjWhiteBalance, { 0.5f, 0.25f }); } },
+      { "adj_split_toning", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjSplitToning, { 30.0f, 0.6f, 210.0f, 0.5f, 0.4f }); } },
+      { "adj_recolour", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjRecolour, { 200.0f, 0.5f, 0.1f }); } },
    };
    const char* only = std::getenv("INFINITE_AB2D_OP");
    for (const AbOp& op : ops)

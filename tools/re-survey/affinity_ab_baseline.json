@@ -1,9 +1,18 @@
 {
+ "adj_recolour": {
+  "flip": 0.0047
+ },
+ "adj_split_toning": {
+  "flip": 0.0071
+ },
+ "adj_white_balance": {
+  "flip": 0.0182
+ },
  "blur_brush": {
   "flip": 0.0032
  },
  "bucket": {
-  "flip": 0.0156
+  "flip": 0.0004
  },
  "copy_rect": {
   "flip": 0.0
@@ -30,6 +39,6 @@
   "flip": 0.0
  },
  "wand_delete": {
-  "flip": 0.0063
+  "flip": 0.0002
  }
 }

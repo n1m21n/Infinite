@@ -1514,7 +1514,7 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
    a.box[0] = (float)W;
    a.box[1] = (float)H;
    a.srgb = false;
-   a.blend = l.kind == Kind::Group && l.blend == kPassThrough ? 0 : std::clamp(l.blend, 0, (int)BlendModes::kAntiEraseMode);
+   a.blend = l.kind == Kind::Group && l.blend == kPassThrough ? 0 : std::clamp(l.blend, 0, BlendModes::kContrastInvertMode);
    a.opacity = l.opacity * opacityMul;
    a.clipMode = clipMode;
    a.bif = l.HasBlendIf() ? &l : nullptr;

@@ -24,7 +24,7 @@ const char* Scene2DNode::AdjName(int type)
                                                  "Brightness", "Contrast", "Hue", "Saturation", "Exposure", "Invert",
                                                  "Levels", "Curves", "Colour Balance", "Vibrance", "Selective Colour",
                                                  "Channel Mixer", "Black & White", "Photo Filter", "Shadows / Highlights",
-                                                 "Colour Lookup" };
+                                                 "Colour Lookup", "White Balance", "Split Toning", "Recolour" };
    return kNames[std::clamp(type, 0, kAdjCount - 1)];
 }
 
@@ -34,7 +34,8 @@ const char* Scene2DNode::AdjGroup(int type)
    {
    case kAdjPixelate: case kAdjHalftone: case kAdjDither: case kAdjThreshold: case kAdjPosterize: return "Stylize";
    case kAdjGradientMap: case kAdjHue: case kAdjSaturation: case kAdjColorBalance: case kAdjVibrance: case kAdjSelective:
-   case kAdjMixer: case kAdjBlackWhite: case kAdjPhotoFilter: case kAdjLookup: case kAdjInvert: return "Colour";
+   case kAdjMixer: case kAdjBlackWhite: case kAdjPhotoFilter: case kAdjLookup: case kAdjInvert: case kAdjWhiteBalance:
+   case kAdjSplitToning: case kAdjRecolour: return "Colour";
    default: return "Adjust";
    }
 }
@@ -49,6 +50,9 @@ int Scene2DNode::AdjParamCount(int type)
    case kAdjBlackWhite: return 6;
    case kAdjPhotoFilter: return 1;
    case kAdjShadowsHighlights: return 2;
+   case kAdjWhiteBalance: return 2;
+   case kAdjSplitToning: return 5;
+   case kAdjRecolour: return 3;
    default: return 0;
    }
 }
@@ -64,25 +68,96 @@ std::vector<float> Scene2DNode::AdjParamDefault(int type)
       p = { 1.0f };
    else if (type == kAdjShadowsHighlights)
       p = { 0.35f, 0.0f };
+   else if (type == kAdjSplitToning)
+      p = { 0.0f, 0.0f, 0.0f, 0.0f, 0.5f };
+   else if (type == kAdjRecolour)
+      p = { 0.0f, 1.0f, 0.0f };
    return p;
 }
 
 float Scene2DNode::AdjDefault(int type)
 {
    static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-                                          1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f };
+                                          1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f, 1.0f, 1.0f, 1.0f };
    return kDef[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 void Scene2DNode::AdjRange(int type, float& lo, float& hi)
 {
    static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f, 0.1f, 0.0f,
-                                         0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+                                         0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f };
    static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f, 4.0f, 1.0f,
-                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f };
+                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f, 1.0f, 1.0f, 1.0f };
    const int t = std::clamp(type, 0, kAdjCount - 1);
    lo = kLo[t];
    hi = kHi[t];
+}
+
+// Affinity's White Balance, measured to 0.3/255 (tools/re-survey/affinity_probe.py adjust, wbs_ / tns_ sweeps): a
+// Bradford adaptation in linear sRGB from a source white to D65. Temperature walks the source white along a measured
+// curve in CIE 1960 uv (with its luminance); tint moves it across that curve, square to it.
+void Scene2DNode::WhiteBalanceMatrix(float temperature, float tint, float m[9])
+{
+   static const float kUv[17][2] = { {0.24507f, 0.34668f}, {0.23471f, 0.34202f}, {0.22570f, 0.33696f}, {0.21894f, 0.33242f},
+                                     {0.21293f, 0.32771f}, {0.20833f, 0.32360f}, {0.20416f, 0.31941f}, {0.20094f, 0.31576f},
+                                     {0.19784f, 0.31222f}, {0.18881f, 0.29910f}, {0.18405f, 0.29037f}, {0.18086f, 0.28334f},
+                                     {0.17892f, 0.27839f}, {0.17746f, 0.27419f}, {0.17649f, 0.27108f}, {0.17571f, 0.26831f},
+                                     {0.17516f, 0.26620f} };
+   static const float kY[17] = { 0.9851f, 0.9877f, 0.9902f, 0.9921f, 0.9942f, 0.9956f, 0.9969f, 0.9973f, 1.0f,
+                                 1.0044f, 1.0077f, 1.0103f, 1.0120f, 1.0135f, 1.0146f, 1.0156f, 1.0164f };
+   const auto at = [&](float v, float out[3])
+   {
+      const float f = (std::clamp(v, -1.0f, 1.0f) + 1.0f) * 8.0f;
+      const int i = std::min((int)f, 15);
+      const float t = f - (float)i;
+      out[0] = kUv[i][0] + (kUv[i + 1][0] - kUv[i][0]) * t;
+      out[1] = kUv[i][1] + (kUv[i + 1][1] - kUv[i][1]) * t;
+      out[2] = kY[i] + (kY[i + 1] - kY[i]) * t;
+   };
+   float w[3], a[3], b[3];
+   at(temperature, w);
+   at(temperature + 0.0625f, a);
+   at(temperature - 0.0625f, b);
+   float tu = a[0] - b[0], tv = a[1] - b[1];
+   const float len = std::max(std::sqrt(tu * tu + tv * tv), 1e-9f);
+   tu /= len;
+   tv /= len;
+   const float u = w[0] + tint * (0.0053f * tu - 0.0202f * tv), v = w[1] + tint * (0.0053f * tv + 0.0202f * tu);
+   const float d = 2.0f * u - 8.0f * v + 4.0f, x = 3.0f * u / d, y = 2.0f * v / d;
+   const float src[3] = { x / y * w[2], w[2], (1.0f - x - y) / y * w[2] };
+   static const float kToXyz[9] = { 0.4124f, 0.3576f, 0.1805f, 0.2126f, 0.7152f, 0.0722f, 0.0193f, 0.1192f, 0.9505f };
+   static const float kBrad[9] = { 0.8951f, 0.2664f, -0.1614f, -0.7502f, 1.7135f, 0.0367f, 0.0389f, -0.0685f, 1.0296f };
+   float A[9] = {}, Ai[9];
+   for (int r = 0; r < 3; r++)
+      for (int c = 0; c < 3; c++)
+         for (int k = 0; k < 3; k++)
+            A[r * 3 + c] += kBrad[r * 3 + k] * kToXyz[k * 3 + c];
+   {   // inverse by the adjugate
+      const float det = A[0] * (A[4] * A[8] - A[5] * A[7]) - A[1] * (A[3] * A[8] - A[5] * A[6]) + A[2] * (A[3] * A[7] - A[4] * A[6]);
+      const float id = 1.0f / det;
+      Ai[0] = (A[4] * A[8] - A[5] * A[7]) * id; Ai[1] = (A[2] * A[7] - A[1] * A[8]) * id; Ai[2] = (A[1] * A[5] - A[2] * A[4]) * id;
+      Ai[3] = (A[5] * A[6] - A[3] * A[8]) * id; Ai[4] = (A[0] * A[8] - A[2] * A[6]) * id; Ai[5] = (A[2] * A[3] - A[0] * A[5]) * id;
+      Ai[6] = (A[3] * A[7] - A[4] * A[6]) * id; Ai[7] = (A[1] * A[6] - A[0] * A[7]) * id; Ai[8] = (A[0] * A[4] - A[1] * A[3]) * id;
+   }
+   float g[3];
+   for (int r = 0; r < 3; r++)
+   {
+      float d65 = 0.0f, s = 0.0f;   // cone response of D65 (linear white 1,1,1) and of the source white
+      for (int k = 0; k < 3; k++)
+      {
+         d65 += A[r * 3 + k];
+         s += kBrad[r * 3 + k] * src[k];
+      }
+      g[r] = d65 / std::max(s, 1e-6f);
+   }
+   for (int r = 0; r < 3; r++)
+      for (int c = 0; c < 3; c++)
+      {
+         float sum = 0.0f;
+         for (int k = 0; k < 3; k++)
+            sum += Ai[r * 3 + k] * g[k] * A[k * 3 + c];
+         m[r * 3 + c] = sum;
+      }
 }
 
 void Scene2DNode::CurveLut(const std::vector<float>& pts, float* lut, int n)
@@ -518,6 +593,9 @@ namespace
          "float Sat(vec3 c) { return max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b)); }\n"
          // Weight of the hue sector centred on k/6: 1 there, 0 one sector away.
          "float HueW(float h, int k) { float d = abs(fract(h - float(k) / 6.0 + 0.5) - 0.5) * 6.0; return clamp(1.0 - d, 0.0, 1.0); }\n"
+         "vec3 HueRgb(float deg) { return clamp(abs(fract(deg / 360.0 + vec3(0.0, 2.0, 1.0) / 3.0) * 6.0 - 3.0) - 1.0, 0.0, 1.0); }\n"
+         // Photoshop's soft light, the one Affinity's Split Toning matches
+         "vec3 SoftPs(vec3 b, vec3 t) { return mix(2.0 * b * (1.0 - t) + sqrt(max(b, 0.0)) * (2.0 * t - 1.0), 2.0 * b * t + b * b * (1.0 - 2.0 * t), step(t, vec3(0.5))); }\n"
          "const int kBayer[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);\n"
          "void main() {\n"
          "   vec2 px = gl_FragCoord.xy;\n"
@@ -624,6 +702,25 @@ namespace
          "         vec3 q = clamp(c, 0.0, 1.0) * (uCubeN - 1.0) / uCubeN + 0.5 / uCubeN;\n"
          "         c = mix(c, texture(uCube, q).rgb, uAmt);\n"
          "      }\n"
+         "   } else if (uType == 22) {\n"   // white balance (Affinity's, measured): a 3x3 in linear light, from uP[2..10]
+         "      vec3 l = SrgbDecode(c);\n"
+         "      vec3 n = vec3(dot(l, vec3(uP[2], uP[3], uP[4])), dot(l, vec3(uP[5], uP[6], uP[7])), dot(l, vec3(uP[8], uP[9], uP[10])));\n"
+         "      c = mix(c, SrgbEncode(clamp(n, 0.0, 1.0)), uAmt);\n"
+         "   } else if (uType == 23) {\n"   // split toning (Affinity's, measured): soft-light a hue in, Rec.601 luma kept
+         "      const vec3 k = vec3(0.299, 0.587, 0.114);\n"
+         "      float l = dot(c, k), p = uP[4];\n"
+         "      float wh = l > p ? sin(1.5707963 * clamp((l - p) / max(1.0 - p, 1e-6), 0.0, 1.0)) : 0.0;\n"
+         "      float ws = l < p ? sin(1.5707963 * clamp((p - l) / max(p, 1e-6), 0.0, 1.0)) : 0.0;\n"
+         "      vec3 eh = SoftPs(c, HueRgb(uP[0])) - c, es = SoftPs(c, HueRgb(uP[2])) - c;\n"
+         "      vec3 o = c + wh * uP[1] * (eh - dot(eh, k)) + ws * uP[3] * (es - dot(es, k));\n"
+         "      float lo = dot(o, k); vec3 ch = o - lo; float s = 1.0;\n"   // out of gamut: pull towards the luma, not clamp
+         "      for (int i = 0; i < 3; i++) s = ch[i] > 1e-6 ? min(s, (1.0 - lo) / ch[i]) : ch[i] < -1e-6 ? min(s, -lo / ch[i]) : s;\n"
+         "      c = mix(c, clamp(lo + ch * max(s, 0.0), 0.0, 1.0), uAmt);\n"
+         "   } else if (uType == 24) {\n"   // recolour (Affinity's, measured): HSL colourize, its lightness kept
+         "      float l = (max(c.r, max(c.g, c.b)) + min(c.r, min(c.g, c.b))) * 0.5;\n"
+         "      l = uP[2] < 0.0 ? l * (1.0 + uP[2]) : l + (1.0 - l) * uP[2];\n"
+         "      float ch = (1.0 - abs(2.0 * l - 1.0)) * clamp(uP[1], 0.0, 1.0);\n"
+         "      c = mix(c, l + ch * (HueRgb(uP[0]) - 0.5), uAmt);\n"
          "   }\n"
          "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(Luma(c), 0.0, 1.0));\n"
          "   c = clamp(c, 0.0, 1.0);\n"
@@ -2252,7 +2349,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    PassArgs a;
    a.bif = l.HasBlendIf() ? &l : nullptr;
    a.opacity = l.opacity * l.fill * opacityMul;
-   a.blend = l.kind == Kind::Group && l.blend == kPassThrough ? 0 : std::clamp(l.blend, 0, BlendModes::kAntiEraseMode);
+   a.blend = l.kind == Kind::Group && l.blend == kPassThrough ? 0 : std::clamp(l.blend, 0, BlendModes::kContrastInvertMode);
    a.clipMode = clipMode;
    if (INode* mask = l.maskOn ? MaskSource(l) : nullptr)
    {
@@ -2575,6 +2672,8 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       const std::vector<float> def = AdjParamDefault(l.adjType);
       for (size_t i = 0; i < def.size() && i < 36; i++)
          p[i] = i < l.adjP.size() ? l.adjP[i] : def[i];
+      if (l.adjType == kAdjWhiteBalance)
+         WhiteBalanceMatrix(p[0], p[1], p + 2);
       glUniform1fv(glGetUniformLocation(prog, "uP"), 36, p);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_3D, cube);
@@ -2862,7 +2961,7 @@ void Scene2DNode::DrawList(int parent, int depth, int frameId, float opacityMul)
       a.box[0] = (float)mDoc.w;
       a.box[1] = (float)mDoc.h;
       a.srgb = false;
-      a.blend = base.kind == Kind::Group && base.blend == kPassThrough ? 0 : std::clamp(base.blend, 0, BlendModes::kAntiEraseMode);
+      a.blend = base.kind == Kind::Group && base.blend == kPassThrough ? 0 : std::clamp(base.blend, 0, BlendModes::kContrastInvertMode);
       a.opacity = base.opacity * opacityMul;
       Pass(depth, a);
       i = end - 1;

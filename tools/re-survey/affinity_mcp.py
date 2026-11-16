@@ -12,6 +12,7 @@ This client speaks the public MCP JSON-RPC protocol only; nothing in Affinity's 
 
 import json
 import queue
+import re
 import threading
 import urllib.request
 
@@ -45,7 +46,12 @@ class Affinity:
                                  "clientInfo": {"name": "re-survey", "version": "1"}})
         self._notify("notifications/initialized")
         # Affinity refuses every other doc topic until the preamble was read in this session.
-        self.preamble = self.call("read_sdk_documentation_topic", {"filename": "preamble"})
+        try:
+            self.preamble = self.call("read_sdk_documentation_topic", {"filename": "preamble"})
+        except RuntimeError:  # newer Affinity builds name it differently; find it in the listing
+            topics = str(self.call("list_sdk_documentation", {}))
+            name = next((t for t in re.findall(r"[\w./-]+", topics) if "preamble" in t.lower()), None)
+            self.preamble = self.call("read_sdk_documentation_topic", {"filename": name}) if name else ""
         return self
 
     def __exit__(self, *a):

@@ -27,5 +27,9 @@ namespace BlendModes
    // Modes 32..34 are the pre-fix Overlay / Soft Light / Hard Light (the old
    // shader had Overlay and Hard Light swapped and Soft Light's pivot inverted).
    // Patches saved before the fix are mapped onto them so they keep their look.
+   // Affinity's Contrast Invert (measured, tools/re-survey/affinity_probe.py blend): after the old ones so no saved
+   // index moves. Only the 2D View offers it; the node dropdowns keep the 32 live modes.
+   const int kContrastInvertMode = 35;
+
    inline int LegacyMode(int mode) { return (mode >= 11 && mode <= 13) ? mode + 21 : mode; }
 }
