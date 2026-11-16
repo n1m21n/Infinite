@@ -215,13 +215,14 @@ const TOOLS = [
   },
   {
     name: "infinite_find_knob",
-    description: "Find which node and param move makes a wanted picture change, from measured renders (not guesses). Give `want` (e.g. [\"detail down large\", \"luma up\"]; facts: luma, contrast, spread, red, green, blue, warmth, saturation, black, white, alpha, detail, tones; levels small/medium/large optional) or `before` + `after` pictures (png, .inf or patch text) to work out the change. Returns the top moves with value, patch line and their measured effect. Coverage: Effects nodes and the Compositing colour nodes (color adjustments, curves, exposure, keys, alpha...); check each suggestion with infinite_compare_frames.",
+    description: "Find which node and param move makes a wanted picture change, from measured renders (not guesses). Give `want` (e.g. [\"detail down large\", \"luma up\"]; facts: luma, contrast, spread, red, green, blue, warmth, saturation, black, white, alpha, detail, tones; levels small/medium/large optional) or `before` + `after` pictures (png, .inf or patch text) to work out the change. Returns the top moves with value, patch line and their measured effect; with a `before` patch the candidates are applied to it and rendered, and ranked by how close they land. Coverage: Effects nodes and the Compositing colour nodes (color adjustments, curves, exposure, keys, alpha...); `want` alone is a hint from 10 mostly grey test pictures (weak for colour); before/after with a patch is checked by render and is the reliable mode.",
     inputSchema: {
       type: "object",
       properties: {
         want: { type: "array", items: { type: "string" }, description: "wanted change tokens: '<fact> up|down [small|medium|large]' or 'tones [level]'" },
         before: { type: "string", description: "current picture (png, .inf or patch text); with `after`, the change is measured" },
         after: { type: "string", description: "wanted picture (png, .inf or patch text)" },
+        picture_kind: { type: "string", enum: ["colour", "grey"], description: "kind of picture you are changing (default: worked out from `before`, else all pictures)" },
         node_types: { type: "array", items: { type: "string" }, description: "only consider these node types (e.g. the ones already in your patch)" },
         k: { type: "number", description: "how many suggestions (default 5)" }
       }
@@ -247,15 +248,32 @@ function handleToolCall(name, args) {
     if (args.want && args.want.length) ({ want, bad } = effects.parseWant(args.want));
     else if (args.before && args.after) {
       measured = effects.compare(args.before, args.after);
-      want = Object.fromEntries(Object.entries(measured.change_tokens).map(([t, l]) => [t, l]));
+      want = { ...measured.change_tokens };
     } else throw new Error("give `want` tokens, or both `before` and `after` pictures");
     if (!Object.keys(want).length) return { suggestions: [], note: measured ? "before and after already match on every measured fact" : `no usable tokens: ${bad.join(", ")}` };
+    const k = args.k || 5;
+    let kind = args.picture_kind || null;
+    if (!kind && measured) kind = measured.facts.saturation.a > 0.03 ? "colour" : "grey";
+    let suggestions = effects.findKnob(want, { nodeTypes: args.node_types, k: measured ? Math.max(k, 10) : k, full: !!measured, kind });
+    let verified = false;
+    const beforeText = measured && (() => { try { const t = require("./measure").patchFor(args.before); return /\.(png|jpe?g|webp|tiff?|bmp|exr|hdr)$/i.test(args.before) ? null : t; } catch (e) { return null; } })();
+    if (beforeText) {
+      const v = effects.verify(beforeText, measured.facts_b, suggestions);
+      if (v.length) {
+        const seen = new Set(v.map(c => c.patch_line + c.node_type));
+        suggestions = [...v, ...suggestions.filter(c => !seen.has(c.patch_line + c.node_type))];
+        verified = true;
+      }
+    }
+    if (measured) delete measured.facts_b;
     return {
-      wanted: want, ignored: bad, measured_change: measured ? measured.differences : undefined,
-      suggestions: effects.findKnob(want, { nodeTypes: args.node_types, k: args.k || 5, full: !!measured }),
-      note: "score = how often (share of pictures) the move caused each wanted change, minus side effects (opposite-way changes; with before/after, any change not in the target). Patch lines go inside the node block."
+      wanted: want, ignored: bad, picture_kind: kind || "all pictures", measured_change: measured ? measured.differences : undefined,
+      verified_by_render: verified, suggestions: suggestions.slice(0, k),
+      note: (verified ? "Each suggestion was applied to the before patch and rendered; rendered_distance 0 = lands on the after picture. " : "")
+        + "score = how often (share of pictures of that kind) the move caused each wanted change, minus side effects. Patch lines go inside the node block."
     };
   }
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "infinite-"));
   const binary = findBinary();
 
