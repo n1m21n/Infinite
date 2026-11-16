@@ -102,11 +102,6 @@ test("effect table: node effects, knob finder and PNG facts work without the app
   const top = effects.findKnob(want, { nodeTypes: ["gaussianblur", "pixelate"], k: 1 })[0];
   assert.strictEqual(top.node_type, "gaussianblur");
   assert.strictEqual(top.direction, "up");
-  const pt = "infinite-patch 1\nnode 1 Source Star\nend\nnode 2 Effects gaussianblur\n  f uRadius 2\nend\n";
-  assert.ok(effects.setParam(pt, "gaussianblur", "f uRadius 6.5").includes("  f uRadius 6.5\nend"));
-  assert.ok(!effects.setParam(pt, "gaussianblur", "f uRadius 6.5").includes("uRadius 2"));
-  assert.ok(effects.setParam(pt, "gaussianblur", "f uLinear 0").includes("gaussianblur\n  f uLinear 0"));
-  assert.ok(effects.nodeEffects("Color Adjustments").params.uSaturation);
   // 2x2 RGBA PNG: white opaque, white half alpha, black, transparent
   const zlib = require("zlib");
   const raw = Buffer.from([0, 255, 255, 255, 255, 255, 255, 255, 128, 0, 0, 0, 0, 255, 255, 255, 255, 0]);

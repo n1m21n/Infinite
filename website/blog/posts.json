@@ -1,5 +1,14 @@
 [
  {
+  "slug": "binaural-hrtf-spatial-audio-mixer-dsp",
+  "title": "Binaural HRTF spatial audio and head tracking in real-time DSP",
+  "description": "How Infinite's Spatial Mixer renders 12 3D audio objects on the audio thread with MIT KEMAR HRTF convolution, Woodworth ITD, head tracking, and BS.1770-4 metering.",
+  "date": "2026-11-16",
+  "updated": "2026-11-16",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/binaural-hrtf-spatial-audio-mixer-dsp.html"
+ },
+ {
   "slug": "image-to-sound-spectrogram-additive-synthesis",
   "title": "Image to sound: real-time spectrogram additive synthesis",
   "description": "How to turn live shaders, drawings, and textures into polyphonic sound in real time using Infinite's Spectral Synth additive partial bank.",
@@ -16,6 +25,15 @@
   "updated": "2026-11-15",
   "category": "product",
   "url": "https://infinitedevices.org/blog/out-of-process-vst3-au-plugin-shared-memory-ipc.html"
+ },
+ {
+  "slug": "spectral-field-real-time-stft-phase-vocoder-kernels",
+  "title": "Real-time STFT phase vocoder kernels in Spectral Field",
+  "description": "How Infinite runs per-bin STFT phase vocoder kernels on the audio thread: zero-phase framing, identity phase locking, per-bin state, and dual-mode synthesis.",
+  "date": "2026-11-13",
+  "updated": "2026-11-13",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html"
  },
  {
   "slug": "modal-synthesis-and-physical-modelling-of-metallic-percussion",

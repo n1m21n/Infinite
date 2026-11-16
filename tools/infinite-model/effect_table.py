@@ -131,30 +131,14 @@ def summarise(changes):
     return eff, sum(1 for b in changes if not b)
 
 
-COLOUR_SAT = 0.03  # a source picture is "colour" when its mean saturation is above this, else "grey"
-
-
-def by_kind(pairs, kinds):
-    """[(source, bucket)] -> {"all": [eff, none_share], "colour": ..., "grey": ...} (kinds with no pictures left out)."""
-    out = {}
-    for kname in ("all", "colour", "grey"):
-        ch = [b for s, b in pairs if kname == "all" or kinds[s] == kname]
-        if ch:
-            eff, none = summarise(ch)
-            out[kname] = [eff, round(none / len(ch), 2), len(ch)]
-    return out
-
-
 def type_row(out, t, src):
     """One node type's add effect and param moves, from its renders under OUT/renders/<type>."""
-    kinds = {s: ("colour" if f and f["saturation"] > COLOUR_SAT else "grey") for s, f in src.items()}
     tdir = os.path.join(out, "renders", t["type"].replace(" ", "_"))
     before = {s: facts_of(os.path.join(tdir, s, "before.json")) for s in SOURCES}
-    add = [(s, bucket(src[s], before[s])) for s in SOURCES if src[s] and before[s]]
+    add = [bucket(src[s], before[s]) for s in SOURCES if src[s] and before[s]]
     if not add:
         return None, 0
-    add_k = by_kind(add, kinds)
-    add_eff, add_none, _ = add_k["all"]
+    add_eff, add_none = summarise(add)
     params, n_moves = {}, 0
     for r in swept_params(t, None):  # params with no renders are skipped below
         moves = []
@@ -163,13 +147,12 @@ def type_row(out, t, src):
             for s in SOURCES:
                 af = facts_of(os.path.join(tdir, s, f"{r['key']}_{k}.json"))
                 if af and before[s]:
-                    ch.append((s, bucket(before[s], af)))
+                    ch.append(bucket(before[s], af))
             if not ch:
                 continue
-            k_eff = by_kind(ch, kinds)
-            eff, none, _ = k_eff["all"]
+            eff, none = summarise(ch)
             m = {"value": v, "direction": d, "patch_line": f"{r['tag']} {r['key']} {v}", "effect": eff,
-                 "no_change": none, "by_kind": {k: v2 for k, v2 in k_eff.items() if k != "all"}}
+                 "no_change": round(none / len(ch), 2)}
             if r.get("options"):
                 m["option"] = r["options"][int(float(v))] if int(float(v)) < len(r["options"]) else v
             moves.append(m)
@@ -180,8 +163,7 @@ def type_row(out, t, src):
             if r.get("options"):
                 p["options"] = r["options"]
             params[r["key"]] = p
-    return {"add": add_eff, "add_no_change": add_none, "add_by_kind": {k: v for k, v in add_k.items() if k != "all"},
-            "params": params}, n_moves
+    return {"add": add_eff, "add_no_change": round(add_none / len(add), 2), "params": params}, n_moves
 
 
 def main():
