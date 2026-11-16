@@ -18,6 +18,7 @@ Usage:
   scripts/ibuild.py linux [build|test|shell]    OrbStack container, started on demand, stopped after
 
 Modes: dev (build-dev, Debug, arm64) | asan (build-asan, +address,undefined) |
+       bench (build-bench, Release, arm64 - local M2 A/B) |
        release (build, universal arm64+x86_64 - shipping only)
 Exit: 0 ok, 1 build failed, 2 usage/lock timeout.
 """
@@ -30,10 +31,11 @@ LOCK = "/tmp/infinite-build.lock"          # machine-wide, shared by every workt
 os.environ.setdefault("CCACHE_BASEDIR", os.path.dirname(ROOT))
 os.environ.setdefault("CCACHE_NOHASHDIR", "1")
 MODES = {  # dir, cmake args, per-compile RAM estimate (MB), -j cap
-    "dev":     ("build-dev",  ["-DCMAKE_BUILD_TYPE=Debug", "-DCMAKE_OSX_ARCHITECTURES=arm64"], 450, 4),
-    "asan":    ("build-asan", ["-DCMAKE_BUILD_TYPE=Debug", "-DCMAKE_OSX_ARCHITECTURES=arm64",
-                               "-DINFINITE_SANITIZE=address,undefined"], 800, 3),
-    "release": ("build",      ["-DCMAKE_BUILD_TYPE=Release"], 600, 3),
+    "dev":     ("build-dev",   ["-DCMAKE_BUILD_TYPE=Debug", "-DCMAKE_OSX_ARCHITECTURES=arm64"], 450, 4),
+    "asan":    ("build-asan",  ["-DCMAKE_BUILD_TYPE=Debug", "-DCMAKE_OSX_ARCHITECTURES=arm64",
+                                "-DINFINITE_SANITIZE=address,undefined"], 800, 3),
+    "bench":   ("build-bench", ["-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_OSX_ARCHITECTURES=arm64"], 500, 3),
+    "release": ("build",       ["-DCMAKE_BUILD_TYPE=Release"], 600, 3),
 }
 
 
