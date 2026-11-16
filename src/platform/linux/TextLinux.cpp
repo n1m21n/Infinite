@@ -837,10 +837,20 @@ namespace Platform
             curX += ((double)face->glyph->advance.x / 64.0 + (double)req.tracking) * sx;
             prev = gIdx;
          }
+         auto c8 = [](float v) { return (uint8_t)std::clamp(v * 255.0f, 0.0f, 255.0f); };
          if (req.underline)
-            band(lineX0, baselineY + rule, lineX1, baselineY + rule * 2.0, fillR, fillG, fillB, 255);
+         {
+            const float* c = req.underlineColor;
+            band(lineX0, baselineY + rule, lineX1, baselineY + rule * 2.0, req.underlineOwn ? c8(c[0]) : fillR,
+                 req.underlineOwn ? c8(c[1]) : fillG, req.underlineOwn ? c8(c[2]) : fillB, req.underlineOwn ? c8(c[3]) : 255);
+         }
          if (req.strike)
-            band(lineX0, baselineY - asc * 0.3 * sy - rule * 0.5, lineX1, baselineY - asc * 0.3 * sy + rule * 0.5, fillR, fillG, fillB, 255);
+         {
+            const float* c = req.strikeColor;
+            band(lineX0, baselineY - asc * 0.3 * sy - rule * 0.5, lineX1, baselineY - asc * 0.3 * sy + rule * 0.5,
+                 req.strikeOwn ? c8(c[0]) : fillR, req.strikeOwn ? c8(c[1]) : fillG, req.strikeOwn ? c8(c[2]) : fillB,
+                 req.strikeOwn ? c8(c[3]) : 255);
+         }
       }
 
       if (stroker)

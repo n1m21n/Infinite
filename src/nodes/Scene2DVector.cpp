@@ -1191,8 +1191,14 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
    key = H(key, (unsigned)l.align);
    key = H(key, (unsigned)(l.bold | (l.italic << 1) | (l.underline << 2) | (l.caps << 3) | (l.strike << 4) | (l.highlight << 5) |
                            (l.kerning << 6) | (l.script << 7)));
-   for (float f : { l.baseShift, l.textSX, l.textSY, l.indentL, l.indentR, l.indentFirst, l.spaceBefore, l.spaceAfter })
+   for (float f : { l.baseShift, l.textSX, l.textSY, l.indentL, l.indentR, l.indentFirst, l.spaceBefore, l.spaceAfter, l.offsetX })
       key = HF(key, f);
+   key = H(key, (unsigned)(l.ulOwn | (l.stOwn << 1) | (l.noBreak << 2) | (l.optical << 3) | (l.outline << 4)));
+   key = HS(key, l.lang);
+   for (float f : l.ulC) key = HF(key, f);
+   for (float f : l.stC) key = HF(key, f);
+   for (float f : l.outlineC) key = HF(key, f);
+   key = HF(key, l.outlineW);
    if (l.highlight)
       for (float f : l.highlightC)
          key = HF(key, f);
@@ -1219,12 +1225,14 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       const float shift = l.baseShift + (l.script == 1 ? full * 0.33f : l.script == 2 ? -full * 0.14f : 0.0f);
       const float tsx = std::clamp(l.textSX, 0.01f, 100.0f), tsy = std::clamp(l.textSY, 0.01f, 100.0f);
       const int pad = (int)std::ceil(size * 0.5f + std::fabs(shift)) + 4;
-      int cw = l.boxW > 0.0f ? (int)std::ceil(l.boxW) + pad * 2
+      // No break: the box never wraps (laid out as point text).
+      const float boxW = l.noBreak ? 0.0f : l.boxW;
+      int cw = boxW > 0.0f ? (int)std::ceil(boxW) + pad * 2
                              : (int)std::ceil((longest * size * (0.9f + std::max(0.0f, l.tracking) * 0.01f) + l.indentL + l.indentFirst) * tsx) +
                                   pad * 2 + (int)size;
       int ch = (int)std::ceil((lines * size * std::max(0.5f, l.leading) * 1.4f + lines * (l.spaceBefore + l.spaceAfter)) * tsy) + pad * 2;
-      if (l.boxW > 0.0f)
-         ch = std::max(ch, (int)std::ceil(size * 1.5f * (1 + longest * size * 0.6f / std::max(1.0f, l.boxW)))) + pad * 2;
+      if (boxW > 0.0f)
+         ch = std::max(ch, (int)std::ceil(size * 1.5f * (1 + longest * size * 0.6f / std::max(1.0f, boxW)))) + pad * 2;
       cw = std::clamp(cw, 8, 8192);
       ch = std::clamp(ch, 8, 8192);
       std::vector<uint8_t> px((size_t)cw * ch * 4, 0);
@@ -1244,13 +1252,24 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          req.tracking = l.tracking;
          req.align = l.align;
          req.wordWrap = true;
-         req.wrapWidth = l.boxW > 0.0f ? std::clamp(l.boxW / (float)cw, 0.05f, 1.0f) : 1.0f;
+         req.wrapWidth = boxW > 0.0f ? std::clamp(boxW / (float)cw, 0.05f, 1.0f) : 1.0f;
          req.wrapHeight = 1.0f;
          req.lineSpacing = l.leading;
          req.strike = l.strike;
          req.kerning = l.kerning;
          req.baseShift = shift;
          req.highlight = l.highlight;
+         req.underlineOwn = l.ulOwn;
+         req.strikeOwn = l.stOwn;
+         std::copy(l.ulC, l.ulC + 4, req.underlineColor);
+         std::copy(l.stC, l.stC + 4, req.strikeColor);
+         req.language = l.lang;
+         // Outline: centred on the letter edge, px -> percent of the size.
+         if (l.outline && l.outlineW > 0.0f)
+         {
+            req.outlineWidth = l.outlineW / size * 100.0f;
+            std::copy(l.outlineC, l.outlineC + 3, req.outlineColor);
+         }
          std::copy(l.highlightC, l.highlightC + 4, req.highlightColor);
          req.indentL = l.indentL;
          req.indentR = l.indentR;
@@ -1283,10 +1302,10 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       }
       else
       {
-         if (l.boxW > 0.0f)
+         if (boxW > 0.0f)
          {
-            x0 = std::max(0, (cw - (int)std::ceil(l.boxW)) / 2);
-            x1 = std::min(cw - 1, x0 + (int)std::ceil(l.boxW) - 1);
+            x0 = std::max(0, (cw - (int)std::ceil(boxW)) / 2);
+            x1 = std::min(cw - 1, x0 + (int)std::ceil(boxW) - 1);
          }
          tb.w = x1 - x0 + 1;
          tb.h = y1 - y0 + 1;
@@ -1297,7 +1316,23 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          const float a = std::clamp(l.textC[3], 0.0f, 1.0f);
          if (a < 0.999f)
             for (size_t i = 3; i < tb.rgba.size(); i += 4)
-               tb.rgba[i] = (uint8_t)std::lround(tb.rgba[i] * a);
+               tb.rgba[i] = (uint8_t)std::lround(tb.rgba[i] * a);         // Offset X, and optical alignment (a leading quote, dash or bracket hangs into the margin):
+         // the ink moves by padding the side away from it, twice over (the box stays centred on the layer).
+         float shiftX = l.offsetX;
+         if (l.optical && !l.text.empty() && std::strchr("\"'([{-.,", l.text[0]) != nullptr)
+            shiftX -= size * 0.25f;
+         else if (l.optical && l.text.size() >= 3 && (unsigned char)l.text[0] == 0xE2 && (unsigned char)l.text[1] == 0x80)
+            shiftX -= size * 0.25f;   // curly quotes, en/em dash
+         const int padX = std::min(4096, (int)std::lround(std::fabs(shiftX) * 2.0f));
+         if (padX > 0)
+         {
+            const int nw = tb.w + padX, off = shiftX > 0.0f ? padX : 0;
+            std::vector<uint8_t> moved((size_t)nw * tb.h * 4, 0);
+            for (int y = 0; y < tb.h; y++)
+               std::memcpy(&moved[((size_t)y * nw + off) * 4], &tb.rgba[(size_t)y * tb.w * 4], (size_t)tb.w * 4);
+            tb.rgba.swap(moved);
+            tb.w = nw;
+         }
       }
    }
    w = tb.w;

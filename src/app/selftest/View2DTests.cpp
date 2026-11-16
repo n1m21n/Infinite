@@ -1834,6 +1834,35 @@ void RunView2DTest()
                   && g->fillType == 6 && Near(g->fillNoise, 0.3f, 1e-4f) && g->fillImage == "/tmp/a b.png");
       }
 
+      // Text character: line colours, no break, offset X, optical, language and outline save; outline, offset and
+      // no break change the box.
+      {
+         Scene2DNode pic;
+         NewPic(pic, 800, 300);
+         const int t = pic.AddTextLayer("one two three four", 400.0f, 150.0f, 120.0f);
+         Layer* l = pic.FindLayer(t);
+         l->fontSize = 40.0f;
+         int w0 = 0, h0 = 0, w1 = 0, h1 = 0, w2 = 0, h2 = 0, w3 = 0, h3 = 0;
+         pic.TextSize(*l, w0, h0);
+         l->noBreak = true;
+         pic.TextSize(*l, w1, h1);
+         l->offsetX = 30.0f;
+         pic.TextSize(*l, w2, h2);
+         l->outline = true; l->outlineW = 6.0f; l->outlineC[0] = 1.0f;
+         pic.TextSize(*l, w3, h3);
+         l->ulOwn = true; l->ulC[2] = 1.0f; l->stOwn = true; l->stC[1] = 0.5f; l->optical = true; l->lang = "tr";
+         pic.Commit();
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         const Layer& c = copy.Layers().back();
+         Check("Text character: line colours, no break, offset, optical, language and outline save",
+               c.ulOwn && c.ulC[2] == 1.0f && c.stOwn && c.stC[1] == 0.5f && c.noBreak && c.optical && c.lang == "tr"
+                  && c.outline && c.outlineW == 6.0f && c.outlineC[0] == 1.0f && c.offsetX == 30.0f);
+         std::printf("VIEW2DTEST text char boxes %dx%d %dx%d %d %dx%d\n", w0, h0, w1, h1, w2, w3, h3);
+         Check("Text character: no break is one line, offset and outline widen the box",
+               h1 < h0 && w1 > w0 && w2 >= w1 + 59 && w3 > w2 && h3 > h1);
+      }
+
       // M3: 20 layers at 1080p (10 node, 6 paint, 4 vector/text) composite in under 4 ms.
       {
          Scene2DNode pic;

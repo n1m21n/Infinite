@@ -318,6 +318,9 @@ namespace Platform
       float baseShift = 0.0f;  // px, letters moved up (highlight and lines stay)
       bool highlight = false;  // a band of highlightColor behind each line
       float highlightColor[4] = { 1, 1, 0, 1 };
+      bool underlineOwn = false, strikeOwn = false;   // own line colours, else the text colour
+      float underlineColor[4] = { 0, 0, 0, 1 }, strikeColor[4] = { 0, 0, 0, 1 };
+      std::string language;    // OpenType language tag (BCP 47, e.g. "tr"); empty = none
       // Paragraphs ('\n' starts one; word-wrapped text only): indents and spacing in px.
       float indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f;
       float spaceBefore = 0.0f, spaceAfter = 0.0f;

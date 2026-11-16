@@ -8431,7 +8431,43 @@ namespace
          ColorRow(T("Colour"), l->textC);
          DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", 0.0f, 8192.0f);
          // Character: lines, band, position and stretch.
+         if (l->underline)
+         {
+            BoolRow(T("Underline colour"), &l->ulOwn);
+            if (l->ulOwn)
+               ColorRow(T("Underline"), l->ulC);
+         }
          BoolRow(T("Strike"), &l->strike);
+         if (l->strike)
+         {
+            BoolRow(T("Strike colour"), &l->stOwn);
+            if (l->stOwn)
+               ColorRow(T("Strike line"), l->stC);
+         }
+         BoolRow(T("Outline"), &l->outline);
+         if (l->outline)
+         {
+            SliderRow(T("Outline width"), &l->outlineW, 0.0f, 50.0f, "%.1f px");
+            ColorRow(T("Outline colour"), l->outlineC);
+         }
+         BoolRow(T("No break"), &l->noBreak);
+         BoolRow(T("Optical align"), &l->optical);
+         SliderRow(T("Offset X"), &l->offsetX, -400.0f, 400.0f, "%.0f px");
+         {
+            // OpenType language tag (e.g. tr, nl, sr-Latn); empty = none.
+            char buf[24];
+            std::snprintf(buf, sizeof buf, "%s", l->lang.c_str());
+            FieldLabel(T("Language"));
+            ImGui::SetNextItemWidth(sFieldW);
+            FieldWell::PushStyle();
+            if (ImGui::InputText("##v2dtlang", buf, sizeof buf, ImGuiInputTextFlags_CharsNoBlank))
+            {
+               l->lang = buf;
+               Touch();
+            }
+            FieldWell::PopStyle();
+            UndoOnActivate("Text language");
+         }
          BoolRow(T("Kerning"), &l->kerning);
          BoolRow(T("Highlight"), &l->highlight);
          if (l->highlight)

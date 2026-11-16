@@ -2024,17 +2024,36 @@ namespace Platform
                CFNumberRef ulNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &ul);
 
                // Kerning on: tracking adds to the font's pair kerning. Off: a fixed kern replaces it (0 = none).
-               CFStringRef keys[] = {
+               CFStringRef keys[9] = {
                   kCTFontAttributeName, kCTForegroundColorAttributeName,
                   req.kerning ? kCTTrackingAttributeName : kCTKernAttributeName,
                   kCTStrokeWidthAttributeName, kCTStrokeColorAttributeName,
                   kCTParagraphStyleAttributeName, kCTUnderlineStyleAttributeName
                };
-               CFTypeRef values[] = { trialFont, fillColor, kern, useFake ? fakeStrokeNum : strokeNum,
-                                      useFake ? fillColor : strokeColor, paragraphStyle, ulNum };
+               CFTypeRef values[9] = { trialFont, fillColor, kern, useFake ? fakeStrokeNum : strokeNum,
+                                       useFake ? fillColor : strokeColor, paragraphStyle, ulNum };
+               CFIndex nAttr = 7;
+               // Own underline colour; OpenType language (locale forms, e.g. Turkish i).
+               CGColorRef ulColor = nullptr;
+               if (req.underline && req.underlineOwn)
+               {
+                  ulColor = CGColorCreateGenericRGB(req.underlineColor[0], req.underlineColor[1], req.underlineColor[2],
+                                                    std::clamp(req.underlineColor[3], 0.0f, 1.0f));
+                  keys[nAttr] = kCTUnderlineColorAttributeName;
+                  values[nAttr++] = ulColor;
+               }
+               CFStringRef langRef = nullptr;
+               if (!req.language.empty())
+               {
+                  langRef = CFStringCreateWithCString(kCFAllocatorDefault, req.language.c_str(), kCFStringEncodingUTF8);
+                  keys[nAttr] = kCTLanguageAttributeName;
+                  values[nAttr++] = langRef;
+               }
                CFDictionaryRef attrs = CFDictionaryCreate(
-                  kCFAllocatorDefault, (const void**)keys, (const void**)values, 7,
+                  kCFAllocatorDefault, (const void**)keys, (const void**)values, nAttr,
                   &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+               if (ulColor != nullptr) CGColorRelease(ulColor);
+               if (langRef != nullptr) CFRelease(langRef);
                CFRelease(fakeStrokeNum);
                CFRelease(ulNum);
                CFAttributedStringRef result =
@@ -2074,7 +2093,11 @@ namespace Platform
                CGFloat a = 0, d = 0, lead = 0;
                const double w = CTLineGetTypographicBounds(line, &a, &d, &lead) - CTLineGetTrailingWhitespaceWidth(line);
                const CGFloat t = std::max<CGFloat>(1.0, a / 14.0);
-               CGContextSetFillColorWithColor(ctx, fillColor);
+               if (req.strikeOwn)
+                  CGContextSetRGBFillColor(ctx, req.strikeColor[0], req.strikeColor[1], req.strikeColor[2],
+                                           std::clamp(req.strikeColor[3], 0.0f, 1.0f));
+               else
+                  CGContextSetFillColorWithColor(ctx, fillColor);
                CGContextFillRect(ctx, CGRectMake(o.x, o.y + req.baseShift + a * 0.3 - t * 0.5, w, t));
             };
 

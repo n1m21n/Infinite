@@ -282,6 +282,13 @@ public:
       float highlightC[4] = { 1.0f, 0.9f, 0.2f, 1.0f };
       int script = 0;
       float baseShift = 0.0f, textSX = 1.0f, textSY = 1.0f;
+      // Line colours (own = not the text colour), no break (never wraps), horizontal offset (px),
+      // optical alignment (leading punctuation hangs), OpenType language tag, outline (centred, px).
+      bool ulOwn = false, stOwn = false, noBreak = false, optical = false, outline = false;
+      float ulC[4] = { 0.0f, 0.0f, 0.0f, 1.0f }, stC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      float offsetX = 0.0f, outlineW = 2.0f;
+      float outlineC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      std::string lang;
       // Paragraph (a new line starts one; box text): indents and spacing, px.
       float indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f, spaceBefore = 0.0f, spaceAfter = 0.0f;
       // 3D (After Effects model): the layer is a card the comp camera sees.

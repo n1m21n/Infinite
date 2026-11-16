@@ -1691,6 +1691,15 @@ void Scene2DNode::Serialize()
             for (float v : l.highlightC) o << " " << v;
             o << "\n";
          }
+         if (l.ulOwn || l.stOwn || l.noBreak || l.optical || l.outline || l.offsetX != 0 || !l.lang.empty())
+         {
+            o << "tchar2 " << l.id << " " << +l.ulOwn << " " << +l.stOwn << " " << +l.noBreak << " " << +l.optical << " "
+              << +l.outline << " " << l.offsetX << " " << l.outlineW;
+            for (float v : l.ulC) o << " " << v;
+            for (float v : l.stC) o << " " << v;
+            for (float v : l.outlineC) o << " " << v;
+            o << " " << (l.lang.empty() ? std::string("-") : l.lang) << "\n";
+         }
          if (l.indentL != 0 || l.indentR != 0 || l.indentFirst != 0 || l.spaceBefore != 0 || l.spaceAfter != 0)
             o << "tpara " << l.id << " " << l.indentL << " " << l.indentR << " " << l.indentFirst << " " << l.spaceBefore << " "
               << l.spaceAfter << "\n";
@@ -2123,6 +2132,25 @@ void Scene2DNode::Parse()
                l->textSY = std::clamp(l->textSY, 0.01f, 100.0f);
                for (float& v : l->highlightC)
                   s >> v;
+            }
+         }
+         else if (key == "tchar2")
+         {
+            int uo = 0, so = 0, nb = 0, op = 0, ol = 0;
+            if (s >> uo >> so >> nb >> op >> ol >> l->offsetX >> l->outlineW)
+            {
+               l->ulOwn = uo != 0;
+               l->stOwn = so != 0;
+               l->noBreak = nb != 0;
+               l->optical = op != 0;
+               l->outline = ol != 0;
+               l->outlineW = std::clamp(l->outlineW, 0.0f, 200.0f);
+               for (float& v : l->ulC) s >> v;
+               for (float& v : l->stC) s >> v;
+               for (float& v : l->outlineC) s >> v;
+               std::string lg;
+               if (s >> lg && lg != "-")
+                  l->lang = lg;
             }
          }
          else if (key == "tpara")
