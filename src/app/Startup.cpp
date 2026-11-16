@@ -1502,6 +1502,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    style.GrabRounding = tok::radius_control;
    style.WindowRounding = 4.0f;
    style.ItemSpacing = ImVec2(6, 5);
+#ifndef NDEBUG
+   // Block 4b row-pitch shots: the same panels at another row gap, without a rebuild per value.
+   if (const char* rg = getenv("INFINITE_ROW_GAP"))
+      style.ItemSpacing.y = (float)atof(rg);
+#endif
    // UI system sheet: every frame (button, field, slider, dropdown, check row) is one control tall, 24 pt.
    style.FramePadding.y = (tok::control_h - UiScale::kBaseFontSize) * 0.5f;
    // Popups/context menus and scrollbars are chrome, not node bodies - they
