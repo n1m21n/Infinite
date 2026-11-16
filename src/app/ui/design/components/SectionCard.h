@@ -9,6 +9,7 @@
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/DeskParts.h"
 
 namespace SectionCard
 {
@@ -35,10 +36,7 @@ namespace SectionCard
       ImDrawList* dl = ImGui::GetWindowDrawList();
       if (S().desk)
       {
-         dl->AddRectFilledMultiColor(a, b, IM_COL32(58, 61, 68, 255), IM_COL32(58, 61, 68, 255), IM_COL32(36, 38, 43, 255), IM_COL32(36, 38, 43, 255));
-         dl->AddRect(ImVec2(a.x + 1, a.y + 1), ImVec2(b.x - 1, b.y - 1), IM_COL32(255, 255, 255, 28), 3.0f);
-         dl->AddRect(a, b, IM_COL32(0, 0, 0, 220), 3.0f);
-         dl->AddRectFilled(ImVec2(a.x + 1, a.y + 1), ImVec2(b.x - 1, a.y + 4), S().deskCap, 3.0f, ImDrawFlags_RoundCornersTop);
+         DeskParts::Face(dl, a, b, S().deskCap, false);
          return;
       }
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
