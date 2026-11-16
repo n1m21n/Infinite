@@ -44,7 +44,22 @@
  "heal": {
   "flip": 0.0013
  },
+ "layer_opacity": {
+  "flip": 0.0124
+ },
  "rasterize": {
+  "flip": 0.0
+ },
+ "shape_ellipse_stroke": {
+  "flip": 0.0007
+ },
+ "shape_multiply": {
+  "flip": 0.0
+ },
+ "shape_opacity": {
+  "flip": 0.0009
+ },
+ "shape_rect": {
   "flip": 0.0
  },
  "wand_delete": {

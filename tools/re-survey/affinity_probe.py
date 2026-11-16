@@ -32,6 +32,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -92,6 +93,38 @@ OPS += [
     {"name": "adj_tone_stretch", "proxy": False,
      "js": _adj("ToneStretch", "ap.stretchFactor = 0.25; ap.gamma = 1.0; ap.compression = 0.0;")},
 ]
+# Vector shapes and layer settings: Affinity draws the same items with its shape nodes. Strokes sit on the edge.
+def _shape(kind, box, fill, extra=""):
+    return (f"const s = shape(S.{kind}, {box}); doc.executeCommand(DocumentCommand.createSetBrushFill(s, rgb({fill}))); "
+            f"doc.executeCommand(DocumentCommand.createSetPenFill(s, null)); {extra}")
+OPS += [
+    {"name": "shape_rect", "proxy": False, "js": _shape("ShapeRectangle", "100,200,250,320", "255,0,0")},
+    {"name": "shape_ellipse_stroke", "proxy": False,
+     "js": _shape("ShapeEllipse", "150,450,350,590", "255,0,0",
+                  "doc.executeCommand(DocumentCommand.createSetPenFill(s, rgb(0,0,255))); "
+                  "doc.executeCommand(DocumentCommand.createSetLineStyle(s, LS.LineStyle.createDefaultWithWeight(8)));")},
+    {"name": "shape_multiply", "proxy": False,
+     "js": _shape("ShapeRectangle", "50,100,460,700", "255,128,64", "doc.executeCommand(DocumentCommand.createSetBlendMode(s, BlendMode.Multiply));")},
+    {"name": "shape_opacity", "proxy": False,
+     "js": _shape("ShapeRectangle", "100,200,250,320", "255,0,0", "doc.executeCommand(DocumentCommand.createSetOpacity(s, 0.5));")},
+    {"name": "layer_opacity", "proxy": False, "js": "doc.executeCommand(DocumentCommand.createSetOpacity(sel(), 0.5));"},
+]
+
+# Behaviour checks, Infinite only: brush tools Affinity's SDK cannot stroke. Each names the box (x0, y0, x1, y1) the
+# stroke covers and what Affinity's help says the tool does there; outside the box (well clear of the stroke) the
+# photo must be untouched. Strokes run (330,520) -> (480,520), 60 px, unless the op says otherwise.
+BH_BOX = (345, 505, 465, 535)
+BH = {
+    "bh_dodge": ("brightens", BH_BOX), "bh_burn": ("darkens", BH_BOX),
+    "bh_sponge_sat": ("saturates", BH_BOX), "bh_sponge_desat": ("desaturates", BH_BOX),
+    "bh_sponge_vibrance": ("saturates", BH_BOX), "bh_sharpen": ("more detail", BH_BOX),
+    "bh_median": ("less detail", BH_BOX), "bh_paint": ("red", BH_BOX), "bh_smudge": ("changes", (360, 360, 450, 490)),
+    "bh_clone": ("copies source", BH_BOX), "bh_colour_replace": ("redder", BH_BOX),
+    "bh_bg_erase": ("clears", (345, 105, 465, 135)), "bh_undo": ("restores", BH_BOX),
+    "bh_redeye": ("not red", BH_BOX), "bh_gradient": ("ramp", None),
+}
+OPS += [{"name": n, "proxy": False, "behaviour": True, "js": None} for n in BH]
+
 # Reached in neither direction by script: Affinity's SDK has no raster stroke (RasterBrush.createDefault is "not
 # yet implemented") and no gradient fill on pixels, so these are compared by the help pages only.
 NOT_SCRIPTABLE = ["clone", "smudge", "gradient", "paint brush", "dodge / burn", "sharpen brush"]
@@ -124,6 +157,13 @@ function capsulePoly(ax, ay, bx, by, r) { const dx = bx - ax, dy = by - ay, l = 
 function select(poly, feather) { doc.executeCommand(DocumentCommand.createSetRasterSelectionFromPolygon(poly, OP.New, true, feather || 0)); }
 function del() { doc.executeCommand(DocumentCommand.createDeleteSelection(sel(), false)); }
 function red() { return C.Colour.createRGBA8({ r: 255, g: 0, b: 0, alpha: 255 }); }
+function rgb(r, g, b) { return C.Colour.createRGBA8({ r, g, b, alpha: 255 }); }
+const S = require('/shapes.js');
+const LS = require('/linestyle.js');
+function shape(kind, x0, y0, x1, y1) {
+  const def = N.ShapeNodeDefinition.createDefault(); def.shape = kind.create();
+  def.setBoundingRectangle(new G.Rectangle(x0, y0, x1 - x0, y1 - y0));
+  doc.addNode(def, null, undefined, false); return Selection.create(doc, [kids()[kids().length - 1]]); }
 // The photo as a placed image layer (as a user drags a photo in), not the pixel layer a PNG opens as.
 doc.addNode(N.ImageNodeDefinition.create(RasterFormat.RGBA8).setBitmap(Bitmap.loadFromFile(desk + '/photo.png')), null, undefined, false);
 doc.deleteSelection(Selection.create(doc, kids().filter(c => c.isRasterNode)));
@@ -246,6 +286,8 @@ def facts(aff):
 def affinity_side(aff, ops):
     res = {}
     for op in ops:
+        if op.get("behaviour"):
+            continue
         out = os.path.join(DESK, "aff_%s.png" % op["name"])
         if os.path.exists(out):
             os.remove(out)
@@ -262,14 +304,15 @@ def infinite_side(app_path, only=None):
     exe = os.path.join(app_path, "Contents", "MacOS", "Infinite")
     if not os.path.exists(exe):
         sys.exit("no Infinite build at %s (python3 scripts/ibuild.py build --mode dev)" % exe)
-    env = dict(os.environ, INFINITE_AB2D=AB)
+    # A clean profile: saved brush presets and settings must not reach the ops.
+    env = dict(os.environ, INFINITE_AB2D=AB, HOME=tempfile.mkdtemp(prefix="ab2d-home-"))
     if only:
         env["INFINITE_AB2D_OP"] = only
     log = os.path.join(AB, "infinite.log")
     # Under a pty: redirected test output is lost when a run is killed on timeout.
     with open(log, "w") as f:
         try:
-            subprocess.run(["script", "-q", "/dev/null", exe], env=env, stdout=f, stderr=subprocess.STDOUT, timeout=300)
+            subprocess.run(["script", "-q", "/dev/null", exe], env=env, stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT, timeout=300)
         except subprocess.TimeoutExpired:
             f.write("\nTIMEOUT\n")
     text = open(log, errors="replace").read()
@@ -315,6 +358,65 @@ def changed(path, photo):
     return round(float((d > 4 / 255).mean()), 4)
 
 
+def bh_check(name, path, photo):
+    """Did the brush do what Affinity's help says, inside its box and nowhere far from it."""
+    import numpy as np
+    want, box = BH[name]
+    img, src = load_rgba(path), load_rgba(photo)
+    a, p = over_grey(img), over_grey(src)
+    if a.shape != p.shape:
+        return {"pass": False, "why": "size %s" % (a.shape,)}
+    if want == "ramp":
+        r, b_ = a[:, :, 0].mean(0), a[:, :, 2].mean(0)
+        ok = r[:16].mean() > 0.8 and b_[:16].mean() < 0.2 and b_[-16:].mean() > 0.8 and r[-16:].mean() < 0.2 \
+            and bool(np.all(np.diff(r[8:-8]) <= 0.01))
+        return {"pass": bool(ok), "left": [round(float(r[:16].mean()), 3), round(float(b_[:16].mean()), 3)],
+                "right": [round(float(r[-16:].mean()), 3), round(float(b_[-16:].mean()), 3)]}
+    x0, y0, x1, y1 = box
+    A, P = a[y0:y1, x0:x1], p[y0:y1, x0:x1]
+    luma = lambda c: float((c[..., 0] * 0.2126 + c[..., 1] * 0.7152 + c[..., 2] * 0.0722).mean())
+    chroma = lambda c: float((c.max(-1) - c.min(-1)).mean())
+    redness = lambda c: float((c[..., 0] - c[..., 1:].max(-1)).mean())
+
+    def detail(c):
+        g = c.mean(-1)
+        return float(np.abs(4 * g[1:-1, 1:-1] - g[:-2, 1:-1] - g[2:, 1:-1] - g[1:-1, :-2] - g[1:-1, 2:]).mean())
+    m = {}
+    if want == "brightens":
+        m["d"] = luma(A) - luma(P); ok = m["d"] > 0.02
+    elif want == "darkens":
+        m["d"] = luma(A) - luma(P); ok = m["d"] < -0.02
+    elif want == "saturates":
+        m["d"] = chroma(A) - chroma(P); ok = m["d"] > 0.01
+    elif want == "desaturates":
+        m["d"] = chroma(A) - chroma(P); ok = m["d"] < -0.01
+    elif want == "more detail":
+        m["d"] = detail(A) / max(detail(P), 1e-6); ok = m["d"] > 1.1
+    elif want == "less detail":
+        m["d"] = detail(A) / max(detail(P), 1e-6); ok = m["d"] < 0.9
+    elif want == "red":
+        m["d"] = redness(A); ok = m["d"] > 0.6
+    elif want == "redder":
+        m["d"] = redness(A) - redness(P); ok = m["d"] > 0.05
+    elif want == "not red":
+        m["d"] = redness(A); ok = m["d"] < 0.3
+    elif want == "changes":
+        m["d"] = float((np.abs(A - P).max(-1) > 4 / 255).mean()); ok = m["d"] > 0.2
+    elif want == "clears":
+        m["d"] = float(img[y0:y1, x0:x1, 3].mean()); ok = m["d"] < 0.5
+    elif want == "restores":
+        m["d"] = float(np.abs(A - P).mean()); ok = m["d"] < 0.03
+    elif want == "copies source":
+        S = p[y0 - 320:y1 - 320, x0:x1]
+        m["d"] = float(np.abs(A - S).mean()) / max(float(np.abs(P - S).mean()), 1e-6); ok = m["d"] < 0.5
+    else:
+        return {"pass": False, "why": "unknown check " + want}
+    far = np.ones(a.shape[:2], bool)
+    far[max(0, y0 - 60):y1 + 60, max(0, x0 - 60):x1 + 60] = False
+    m["far"] = float((np.abs(a - p).max(-1)[far] > 4 / 255).mean())
+    return {"pass": bool(ok) and m["far"] < 0.002, **{k: round(v, 4) for k, v in m.items()}}
+
+
 def ab(app_path, only=None, set_baseline=False, aff=None):
     ops = [o for o in OPS if only in (None, o["name"])]
     if aff is not None:
@@ -329,7 +431,11 @@ def ab(app_path, only=None, set_baseline=False, aff=None):
         n = op["name"]
         a, b = os.path.join(AB, "aff_%s.png" % n), os.path.join(AB, "inf_%s.png" % n)
         r = {"proxy": op["proxy"], "affinity": aff_res.get(n), "infinite": inf_res.get(n)}
-        if os.path.exists(a) and os.path.exists(b):
+        if op.get("behaviour"):
+            r.update(bh_check(n, b, photo) if os.path.exists(b) else {"pass": False, "why": "no picture"})
+            if not r["pass"]:
+                regressed.append(n)
+        elif os.path.exists(a) and os.path.exists(b):
             r.update(score_pair(a, b, os.path.join(AB, "sheet_%s.png" % n)))
             r["changed_aff"], r["changed_inf"] = changed(a, photo), changed(b, photo)
             if n in base and "flip" in r and r["flip"] > base[n]["flip"] + FLIP_SLACK:
@@ -341,8 +447,15 @@ def ab(app_path, only=None, set_baseline=False, aff=None):
         json.dump(rows, f, indent=1)
     print("\n%-15s %6s %8s %9s %9s %6s" % ("op", "flip", "baseline", "chg aff", "chg inf", "proxy"))
     for n, r in rows.items():
+        if "pass" in r:
+            continue
         print("%-15s %6s %8s %9s %9s %6s" % (n, r.get("flip", "-"), r.get("baseline_flip", "-"), r.get("changed_aff", "-"),
                                            r.get("changed_inf", "-"), "yes" if r["proxy"] else ""))
+    bh = {n: r for n, r in rows.items() if "pass" in r}
+    if bh:
+        print("\n%-20s %-14s %5s %8s %7s" % ("behaviour", "should", "pass", "measure", "far"))
+        for n, r in bh.items():
+            print("%-20s %-14s %5s %8s %7s" % (n, BH[n][0], "yes" if r["pass"] else "NO", r.get("d", "-"), r.get("far", "-")))
     if set_baseline:
         keep = {n: {"flip": r["flip"]} for n, r in rows.items() if "flip" in r}
         merged = dict(base, **keep)
@@ -370,7 +483,8 @@ def self_test():
     check("op names are unique", len(names) == len(set(names)))
     src = open(os.path.join(REPO, "src", "app", "panels", "View2DPanel.cpp")).read()
     check("every op has an Infinite side", all('{ "%s",' % n in src for n in names))
-    check("every op script closes its document", all("doc.close()" in op_script(o) for o in OPS))
+    check("every op script closes its document", all("doc.close()" in op_script(o) for o in OPS if not o.get("behaviour")))
+    check("every behaviour op has a check", all(o["name"] in BH for o in OPS if o.get("behaviour")))
     check("JSON is read from the last line", last_json("noise\n{\"a\": 1}\n") == {"a": 1})
     with tempfile.TemporaryDirectory() as d:
         rng = np.random.default_rng(1)
@@ -387,6 +501,19 @@ def self_test():
         check("a cleared square scores above 0", diff["flip"] > 0.0)
         check("changed() sees the cleared square", abs(changed(r, p) - 400 / (64 * 48)) < 0.02)
         check("changed() of the photo itself is 0", changed(p, p) == 0.0)
+        big = (rng.random((768, 512, 4)) * 200).astype(np.uint8)
+        big[..., 3] = 255
+        ph, lit = os.path.join(d, "photo.png"), os.path.join(d, "lit.png")
+        Image.fromarray(big).save(ph)
+        x0, y0, x1, y1 = BH_BOX
+        brighter = big.copy()
+        brighter[y0:y1, x0:x1, :3] += 40
+        Image.fromarray(brighter).save(lit)
+        check("bh_check passes a brightened box", bh_check("bh_dodge", lit, ph)["pass"])
+        check("bh_check fails an untouched photo", not bh_check("bh_dodge", ph, ph)["pass"])
+        brighter[10:40, 10:40, :3] += 40
+        Image.fromarray(brighter).save(lit)
+        check("bh_check fails a change far from the stroke", not bh_check("bh_dodge", lit, ph)["pass"])
     check("capsule polygon closes", "capsulePoly" in JS_PRELUDE and "i <= 64" in JS_PRELUDE)
     print("SELFTEST %s" % ("FAIL" if fails else "OK"))
     return 1 if fails else 0
