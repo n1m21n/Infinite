@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const readline = require("readline");
+const effects = require("./effects");
 const { ATTRIBUTION, CREDIT_LINE, SERVER_INSTRUCTIONS, findBinary, escapeCode, runCommand } = require("./engine");
 
 const TOOLS = [
@@ -199,10 +200,62 @@ const TOOLS = [
       },
       required: ["patch_path", "out_mp4"]
     }
+  },
+  {
+    name: "infinite_compare_frames",
+    description: "Compare two pictures as plain facts and say whether they match. Each side is a .png path, an .inf patch path, or patch text; patches are rendered at 128x128, t=0.5 s. Returns match yes/no, the differences in words (brightness, contrast, colour, opacity, fine detail, tone shape, layout), and change tokens you can pass straight to infinite_find_knob. Use it to check a render against a target before saying it is done.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        a: { type: "string", description: "first picture: png path, .inf path or patch text (e.g. the target)" },
+        b: { type: "string", description: "second picture: png path, .inf path or patch text (e.g. your render)" }
+      },
+      required: ["a", "b"]
+    }
+  },
+  {
+    name: "infinite_find_knob",
+    description: "Find which node and param move makes a wanted picture change, from measured renders (not guesses). Give `want` (e.g. [\"detail down large\", \"luma up\"]; facts: luma, contrast, spread, red, green, blue, warmth, black, white, alpha, detail, tones; levels small/medium/large optional) or `before` + `after` pictures (png, .inf or patch text) to work out the change. Returns the top moves with value, patch line and their measured effect. Coverage: Effects family nodes only for now; check each suggestion with infinite_compare_frames.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        want: { type: "array", items: { type: "string" }, description: "wanted change tokens: '<fact> up|down [small|medium|large]' or 'tones [level]'" },
+        before: { type: "string", description: "current picture (png, .inf or patch text); with `after`, the change is measured" },
+        after: { type: "string", description: "wanted picture (png, .inf or patch text)" },
+        node_types: { type: "array", items: { type: "string" }, description: "only consider these Effects types (e.g. the ones already in your patch)" },
+        k: { type: "number", description: "how many suggestions (default 5)" }
+      }
+    }
+  },
+  {
+    name: "infinite_node_effects",
+    description: "Measured effect table for Effects nodes: what adding a node at defaults does to a picture, and what each param does moved up or down (measured on 10 source pictures at 128x128). Omit node_type to list every measured type with its add effect.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        node_type: { type: "string", description: "Effects type, e.g. 'gaussianblur' or 'Effects gaussianblur'" }
+      }
+    }
   }
 ];
 
 function handleToolCall(name, args) {
+  if (name === "infinite_compare_frames") return effects.compare(args.a, args.b);
+  if (name === "infinite_node_effects") return effects.nodeEffects(args.node_type);
+  if (name === "infinite_find_knob") {
+    let want, bad = [], measured = null;
+    if (args.want && args.want.length) ({ want, bad } = effects.parseWant(args.want));
+    else if (args.before && args.after) {
+      measured = effects.compare(args.before, args.after);
+      want = Object.fromEntries(Object.entries(measured.change_tokens).map(([t, l]) => [t, l]));
+    } else throw new Error("give `want` tokens, or both `before` and `after` pictures");
+    if (!Object.keys(want).length) return { suggestions: [], note: measured ? "before and after already match on every measured fact" : `no usable tokens: ${bad.join(", ")}` };
+    return {
+      wanted: want, ignored: bad, measured_change: measured ? measured.differences : undefined,
+      suggestions: effects.findKnob(want, { nodeTypes: args.node_types, k: args.k || 5, full: !!measured }),
+      note: "score = how often (share of pictures) the move caused each wanted change, minus side effects (opposite-way changes; with before/after, any change not in the target). Patch lines go inside the node block."
+    };
+  }
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "infinite-"));
   const binary = findBinary();
 

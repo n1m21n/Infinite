@@ -65,7 +65,7 @@ test("serve answers initialize and lists nine tools", () => {
   const r = spawnSync(process.execPath, [cli, "serve"], { input, encoding: "utf-8", timeout: 10000 });
   const lines = r.stdout.trim().split("\n").map((l) => JSON.parse(l));
   assert.strictEqual(lines[0].result.serverInfo.name, "infinite-engine");
-  assert.strictEqual(lines[1].result.tools.length, 9);
+  assert.strictEqual(lines[1].result.tools.length, 12);
 });
 
 test("a tool call without the Infinite app reports an error, not success", () => {
@@ -90,4 +90,27 @@ test("the handshake carries credit instructions and every tool result carries th
   const body = JSON.parse(content[0].text);
   assert.strictEqual(body.attribution.credit_line, "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org");
   assert.match(content[1].text, /Credit: Infinite, by Naman Soni/);
+});
+
+test("effect table: node effects, knob finder and PNG facts work without the app", () => {
+  const effects = require("../lib/effects");
+  const m = require("../lib/measure");
+  const blur = effects.nodeEffects("Effects gaussianblur");
+  assert.strictEqual(blur.node_type, "gaussianblur");
+  assert.ok(blur.params.uRadius.up.length > 0);
+  const { want } = effects.parseWant(["detail down medium"]);
+  const top = effects.findKnob(want, { nodeTypes: ["gaussianblur", "pixelate"], k: 1 })[0];
+  assert.strictEqual(top.node_type, "gaussianblur");
+  assert.strictEqual(top.direction, "up");
+  // 2x2 RGBA PNG: white opaque, white half alpha, black, transparent
+  const zlib = require("zlib");
+  const raw = Buffer.from([0, 255, 255, 255, 255, 255, 255, 255, 128, 0, 0, 0, 0, 255, 255, 255, 255, 0]);
+  const chunk = (t, d) => { const b = Buffer.alloc(12 + d.length); b.writeUInt32BE(d.length, 0); b.write(t, 4, "ascii"); d.copy(b, 8); return b; };
+  const ihdr = Buffer.from([0, 0, 0, 2, 0, 0, 0, 2, 8, 6, 0, 0, 0]);
+  const f = path.join(home(), "t.png");
+  fs.writeFileSync(f, Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]));
+  const facts = m.factsOfPng(f);
+  assert.ok(Math.abs(facts.luma - (1 + 128 / 255) / 4) < 1e-9, "alpha is composited over black");
+  assert.ok(Math.abs(facts.alpha - (2 + 128 / 255) / 4 * 100) < 1e-9);
+  assert.deepStrictEqual(m.bucket(facts, facts), {});
 });
