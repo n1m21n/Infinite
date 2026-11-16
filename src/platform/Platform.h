@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <mutex>
 #include <unordered_set>
@@ -167,6 +168,11 @@ namespace Platform
    // glfwCreateWindow, GL context/loader setup) - call this instead of a
    // bare fprintf(stderr, ...) at any of those sites.
    void ShowFatalError(const std::string& title, const std::string& message);
+
+   // Thread-safe local time conversion from std::time_t to std::tm.
+   // Wraps localtime_r on POSIX (macOS, Linux) and localtime_s on Windows.
+   // Returns true on success, false if outTm is null or conversion failed.
+   bool LocalTime(std::time_t time, std::tm* outTm);
 
    // ---- 3D model loading --------------------------------------------------
    // Goes through ModelIO for the same reason image decoding goes through

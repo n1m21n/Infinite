@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <exception>
 #include <string>
 
@@ -279,5 +280,12 @@ namespace Platform
       fprintf(stderr, "%s: %s\n", title.c_str(), message.c_str());
       MessageBoxW(nullptr, WinCommon::Utf8ToWide(message).c_str(),
                   WinCommon::Utf8ToWide(title).c_str(), MB_OK | MB_ICONERROR);
+   }
+
+   bool LocalTime(std::time_t time, std::tm* outTm)
+   {
+      if (outTm == nullptr)
+         return false;
+      return localtime_s(outTm, &time) == 0;
    }
 }

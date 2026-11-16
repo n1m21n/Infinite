@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -296,6 +297,13 @@ namespace Platform
          ScopedHostEnvironment hostEnv;
          tinyfd_messageBox(title.c_str(), message.c_str(), "ok", "error", 1);
       }
+   }
+
+   bool LocalTime(std::time_t time, std::tm* outTm)
+   {
+      if (outTm == nullptr)
+         return false;
+      return localtime_r(&time, outTm) != nullptr;
    }
 
    std::string OpenImageDialog()
