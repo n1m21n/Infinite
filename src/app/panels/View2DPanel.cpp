@@ -8386,6 +8386,22 @@ namespace
          SliderRow(T("Tracking"), &l->tracking, -100.0f, 400.0f, "%.0f");
          ColorRow(T("Colour"), l->textC);
          DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", 0.0f, 8192.0f);
+         // Character: lines, band, position and stretch.
+         BoolRow(T("Strike"), &l->strike);
+         BoolRow(T("Kerning"), &l->kerning);
+         BoolRow(T("Highlight"), &l->highlight);
+         if (l->highlight)
+            ColorRow(T("Band"), l->highlightC);
+         ComboRow(T("Position"), &l->script, { T("Normal"), T("Superscript"), T("Subscript") });
+         SliderRow(T("Baseline"), &l->baseShift, -400.0f, 400.0f, "%.0f px");
+         SliderRow(T("Width"), &l->textSX, 0.1f, 4.0f, "%.2f\xC3\x97");
+         SliderRow(T("Height"), &l->textSY, 0.1f, 4.0f, "%.2f\xC3\x97");
+         // Paragraph: a new line starts one.
+         SliderRow(T("Indent left"), &l->indentL, 0.0f, 1000.0f, "%.0f px");
+         SliderRow(T("Indent right"), &l->indentR, 0.0f, 1000.0f, "%.0f px");
+         SliderRow(T("First line"), &l->indentFirst, -500.0f, 1000.0f, "%.0f px");
+         SliderRow(T("Space before"), &l->spaceBefore, 0.0f, 500.0f, "%.0f px");
+         SliderRow(T("Space after"), &l->spaceAfter, 0.0f, 500.0f, "%.0f px");
          FieldLabel("");
          if (TextChip(L("Convert to shapes##v2dtoshapes"), false, T("Outlines as a vector layer")))
             sPending.what = Pending::ToShapes;

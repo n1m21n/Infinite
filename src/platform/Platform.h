@@ -312,7 +312,15 @@ namespace Platform
       float scaleY = 1.0f;
       bool bold = false;       // the family's bold face, else a drawn bold
       bool italic = false;     // the family's italic face, else a slant
-      bool underline = false;  // macOS and Windows
+      bool underline = false;
+      bool strike = false;     // a line through the middle of the letters
+      bool kerning = true;     // the font's own pair kerning
+      float baseShift = 0.0f;  // px, letters moved up (highlight and lines stay)
+      bool highlight = false;  // a band of highlightColor behind each line
+      float highlightColor[4] = { 1, 1, 0, 1 };
+      // Paragraphs ('\n' starts one; word-wrapped text only): indents and spacing in px.
+      float indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f;
+      float spaceBefore = 0.0f, spaceAfter = 0.0f;
    };
 
    void RasterizeText(const TextRasterRequest& req, int width, int height,

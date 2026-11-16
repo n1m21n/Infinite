@@ -1656,6 +1656,16 @@ void Scene2DNode::Serialize()
          o << " " << l.boxW << " " << EscapeToken(l.font) << " " << EscapeToken(l.text) << "\n";
          if (l.bold || l.italic || l.underline || l.caps)
             o << "tstyle " << l.id << " " << +l.bold << " " << +l.italic << " " << +l.underline << " " << +l.caps << "\n";
+         if (l.strike || l.highlight || !l.kerning || l.script != 0 || l.baseShift != 0 || l.textSX != 1 || l.textSY != 1)
+         {
+            o << "tchar " << l.id << " " << +l.strike << " " << +l.highlight << " " << +l.kerning << " " << l.script << " "
+              << l.baseShift << " " << l.textSX << " " << l.textSY;
+            for (float v : l.highlightC) o << " " << v;
+            o << "\n";
+         }
+         if (l.indentL != 0 || l.indentR != 0 || l.indentFirst != 0 || l.spaceBefore != 0 || l.spaceAfter != 0)
+            o << "tpara " << l.id << " " << l.indentL << " " << l.indentR << " " << l.indentFirst << " " << l.spaceBefore << " "
+              << l.spaceAfter << "\n";
       }
       if (l.is3d || l.z != 0 || l.az != 0 || l.rx != 0 || l.ry != 0 || l.orient[0] != 0 || l.orient[1] != 0 ||
           l.orient[2] != 0 || l.collapse)
@@ -2055,6 +2065,23 @@ void Scene2DNode::Parse()
             l->underline = u != 0;
             l->caps = c != 0;
          }
+         else if (key == "tchar")
+         {
+            int st = 0, hi = 0, ke = 1;
+            if (s >> st >> hi >> ke >> l->script >> l->baseShift >> l->textSX >> l->textSY)
+            {
+               l->strike = st != 0;
+               l->highlight = hi != 0;
+               l->kerning = ke != 0;
+               l->script = std::clamp(l->script, 0, 2);
+               l->textSX = std::clamp(l->textSX, 0.01f, 100.0f);
+               l->textSY = std::clamp(l->textSY, 0.01f, 100.0f);
+               for (float& v : l->highlightC)
+                  s >> v;
+            }
+         }
+         else if (key == "tpara")
+            s >> l->indentL >> l->indentR >> l->indentFirst >> l->spaceBefore >> l->spaceAfter;
          else if (key == "paint" || key == "pmask")
          {
             const bool mask = key == "pmask";

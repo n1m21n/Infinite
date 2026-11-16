@@ -1189,7 +1189,13 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
    for (float f : l.textC)
       key = HF(key, f);
    key = H(key, (unsigned)l.align);
-   key = H(key, (unsigned)(l.bold | (l.italic << 1) | (l.underline << 2) | (l.caps << 3)));
+   key = H(key, (unsigned)(l.bold | (l.italic << 1) | (l.underline << 2) | (l.caps << 3) | (l.strike << 4) | (l.highlight << 5) |
+                           (l.kerning << 6) | (l.script << 7)));
+   for (float f : { l.baseShift, l.textSX, l.textSY, l.indentL, l.indentR, l.indentFirst, l.spaceBefore, l.spaceAfter })
+      key = HF(key, f);
+   if (l.highlight)
+      for (float f : l.highlightC)
+         key = HF(key, f);
    TextBox& tb = mTextBoxes[l.id];
    if (tb.key != key || tb.rgba.empty())
    {
@@ -1207,11 +1213,16 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          if ((c & 0xC0) != 0x80)
             longest = std::max(longest, ++cur);
       }
-      const float size = std::clamp(l.fontSize, 1.0f, 2000.0f);
-      const int pad = (int)std::ceil(size * 0.5f) + 4;
+      // Super/subscript: the letters at 58%, raised by a third or dropped by a seventh of the full size.
+      const float full = std::clamp(l.fontSize, 1.0f, 2000.0f);
+      const float size = l.script != 0 ? full * 0.58f : full;
+      const float shift = l.baseShift + (l.script == 1 ? full * 0.33f : l.script == 2 ? -full * 0.14f : 0.0f);
+      const float tsx = std::clamp(l.textSX, 0.01f, 100.0f), tsy = std::clamp(l.textSY, 0.01f, 100.0f);
+      const int pad = (int)std::ceil(size * 0.5f + std::fabs(shift)) + 4;
       int cw = l.boxW > 0.0f ? (int)std::ceil(l.boxW) + pad * 2
-                             : (int)std::ceil(longest * size * (0.9f + std::max(0.0f, l.tracking) * 0.01f)) + pad * 2 + (int)size;
-      int ch = (int)std::ceil(lines * size * std::max(0.5f, l.leading) * 1.4f) + pad * 2;
+                             : (int)std::ceil((longest * size * (0.9f + std::max(0.0f, l.tracking) * 0.01f) + l.indentL + l.indentFirst) * tsx) +
+                                  pad * 2 + (int)size;
+      int ch = (int)std::ceil((lines * size * std::max(0.5f, l.leading) * 1.4f + lines * (l.spaceBefore + l.spaceAfter)) * tsy) + pad * 2;
       if (l.boxW > 0.0f)
          ch = std::max(ch, (int)std::ceil(size * 1.5f * (1 + longest * size * 0.6f / std::max(1.0f, l.boxW)))) + pad * 2;
       cw = std::clamp(cw, 8, 8192);
@@ -1236,6 +1247,19 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          req.wrapWidth = l.boxW > 0.0f ? std::clamp(l.boxW / (float)cw, 0.05f, 1.0f) : 1.0f;
          req.wrapHeight = 1.0f;
          req.lineSpacing = l.leading;
+         req.strike = l.strike;
+         req.kerning = l.kerning;
+         req.baseShift = shift;
+         req.highlight = l.highlight;
+         std::copy(l.highlightC, l.highlightC + 4, req.highlightColor);
+         req.indentL = l.indentL;
+         req.indentR = l.indentR;
+         req.indentFirst = l.indentFirst;
+         req.spaceBefore = l.spaceBefore;
+         req.spaceAfter = l.spaceAfter;
+         // Width / height scale: the letters stretch about the box centre; a box keeps its width.
+         req.scaleX = tsx;
+         req.scaleY = tsy;
          float fitted = size;
          Platform::RasterizeText(req, cw, ch, px.data(), fitted);
       }

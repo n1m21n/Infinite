@@ -272,6 +272,14 @@ public:
       bool bold = false, italic = false, underline = false, caps = false;   // text style; caps = ALL CAPS
       float textC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float boxW = 0.0f;
+      // Character: strike, highlight band, super/subscript (0 none, 1 super, 2 sub), baseline shift (px, up),
+      // pair kerning, width and height scale.
+      bool strike = false, highlight = false, kerning = true;
+      float highlightC[4] = { 1.0f, 0.9f, 0.2f, 1.0f };
+      int script = 0;
+      float baseShift = 0.0f, textSX = 1.0f, textSY = 1.0f;
+      // Paragraph (a new line starts one; box text): indents and spacing, px.
+      float indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f, spaceBefore = 0.0f, spaceAfter = 0.0f;
       // 3D (After Effects model): the layer is a card the comp camera sees.
       // angle is the Z rotation; x, y place the anchor as in 2D, z pushes it away.
       bool is3d = false;

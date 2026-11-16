@@ -532,7 +532,7 @@ namespace Platform
          float w = 0.0f;
          std::vector<uint32_t> cps = Utf8ToCodepoints(line);
          FT_UInt prev = 0;
-         bool hasKerning = FT_HAS_KERNING(face);
+         bool hasKerning = FT_HAS_KERNING(face) && req.kerning;
          for (uint32_t cp : cps)
          {
             FT_UInt gIdx = FT_Get_Char_Index(face, cp);
@@ -557,7 +557,11 @@ namespace Platform
          while (start < req.text.size())
          {
             while (start < req.text.size() && (req.text[start] == ' ' || req.text[start] == '\t' || req.text[start] == '\n'))
+            {
+               if (req.text[start] == '\n' && req.wordWrap)
+                  words.push_back("\n");   // a paragraph break
                start++;
+            }
             if (start >= req.text.size()) break;
             size_t end = start;
             while (end < req.text.size() && req.text[end] != ' ' && req.text[end] != '\t' && req.text[end] != '\n')
@@ -569,48 +573,84 @@ namespace Platform
 
       std::vector<std::string> lines;
       std::vector<float> lineWidths;
+      // Per line: does it start / end a paragraph, and where its top sits (paragraph spacing included).
+      std::vector<char> paraStart, paraEnd;
+      std::vector<double> lineTops;
+      const double boxW = std::max(8.0, (double)width * std::max(0.05f, req.wrapWidth) / sx);
+      auto lineRoom = [&](bool first) { return std::max(8.0, boxW - req.indentL - req.indentR - (first ? req.indentFirst : 0.0f)); };
+      auto layoutTops = [&](double lineH)
+      {
+         lineTops.assign(lines.size(), 0.0);
+         double y = 0.0;
+         for (size_t i = 0; i < lines.size(); i++)
+         {
+            const bool ps = i < paraStart.size() && paraStart[i];
+            if (ps && i > 0)
+               y += req.spaceBefore;
+            lineTops[i] = y;
+            y += lineH;
+            if (i < paraEnd.size() && paraEnd[i] && i + 1 < lines.size())
+               y += req.spaceAfter;
+         }
+         return y;
+      };
 
       if (req.wordWrap)
       {
-         const double boxW = std::max(8.0, (double)width * std::max(0.05f, req.wrapWidth) / sx);
          const double boxH = std::max(8.0, (double)height * std::max(0.05f, req.wrapHeight) / sy);
 
          auto wrapLinesAt = [&](float size, std::vector<std::string>& outLines, std::vector<float>& outWidths)
          {
             outLines.clear();
             outWidths.clear();
+            paraStart.clear();
+            paraEnd.clear();
             if (words.empty()) return;
 
             const float spaceW = measureLine(" ", size);
             std::string curLine;
             float curW = 0.0f;
+            bool first = true;
+            auto flush = [&](bool endsPara)
+            {
+               outLines.push_back(curLine);
+               outWidths.push_back(curW);
+               paraStart.push_back(first ? 1 : 0);
+               paraEnd.push_back(endsPara ? 1 : 0);
+               first = endsPara;
+               curLine.clear();
+               curW = 0.0f;
+            };
 
             for (const auto& w : words)
             {
+               if (w == "\n")
+               {
+                  flush(true);
+                  continue;
+               }
                float wW = measureLine(w, size);
                if (curLine.empty())
                {
                   curLine = w;
                   curW = wW;
                }
-               else if (curW + spaceW + wW <= (float)boxW)
+               else if (curW + spaceW + wW <= (float)lineRoom(first))
                {
                   curLine += " " + w;
                   curW += spaceW + wW;
                }
                else
                {
-                  outLines.push_back(curLine);
-                  outWidths.push_back(curW);
+                  flush(false);
                   curLine = w;
                   curW = wW;
                }
             }
-            if (!curLine.empty())
-            {
-               outLines.push_back(curLine);
-               outWidths.push_back(curW);
-            }
+            if (!curLine.empty() || first)
+               flush(true);
+            else if (!paraEnd.empty())
+               paraEnd.back() = 1;
          };
 
          float usedSize = req.fontSize;
@@ -623,7 +663,7 @@ namespace Platform
                const float mid = (lo + hi) * 0.5f;
                wrapLinesAt(mid, lines, lineWidths);
                const double lineH = (double)mid * std::max(0.1f, req.lineSpacing);
-               const double totalH = (double)lines.size() * lineH;
+               const double totalH = layoutTops(lineH);
                float maxW = 0.0f;
                for (float w : lineWidths) if (w > maxW) maxW = w;
                if (totalH <= boxH && (double)maxW <= boxW)
@@ -648,7 +688,7 @@ namespace Platform
       FT_Set_Pixel_Sizes(face, 0, (FT_UInt)std::max(1.0f, renderSize));
 
       const double lineH = (double)renderSize * std::max(0.1f, req.lineSpacing);
-      const double totalH = (double)lines.size() * lineH;
+      const double totalH = layoutTops(lineH) * sy;
       const double top = anchorY - totalH * 0.5;
 
       const uint8_t fillR = (uint8_t)std::clamp(req.color[0] * 255.0f, 0.0f, 255.0f);
@@ -685,20 +725,51 @@ namespace Platform
          outPixelsRGBA[idx + 3] = (uint8_t)std::clamp((float)outPixelsRGBA[idx + 3] * invA + 255.0f * a, 0.0f, 255.0f);
       };
 
+      // A solid band (highlight, underline, strike) in premultiplied RGBA.
+      auto band = [&](double x0, double y0, double x1, double y1, uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+      {
+         for (int py = std::max(0, (int)std::floor(y0)); py < std::min(height, (int)std::ceil(y1)); py++)
+            for (int px = std::max(0, (int)std::floor(x0)); px < std::min(width, (int)std::ceil(x1)); px++)
+               blendPixel(px, py, r, g, b, a);
+      };
+      const double asc = (double)face->size->metrics.ascender / 64.0;
+      const double desc = (double)-face->size->metrics.descender / 64.0;
+      const double rule = std::max(1.0, renderSize / 16.0) * sy;
+
       for (size_t l = 0; l < lines.size(); l++)
       {
          double curX = anchorX;
-         if (drawAlign == 1)
+         if (req.wordWrap)
+         {
+            // In the box: the line's room is the box less the indents.
+            const bool ps = l < paraStart.size() && paraStart[l];
+            curX = anchorX + (-boxW * 0.5 + req.indentL + (ps ? req.indentFirst : 0.0f)) * sx;
+            const double room = lineRoom(ps);
+            if (drawAlign == 1)
+               curX += (room - (double)lineWidths[l]) * 0.5 * sx;
+            else if (drawAlign == 2)
+               curX += (room - (double)lineWidths[l]) * sx;
+         }
+         else if (drawAlign == 1)
             curX -= (double)lineWidths[l] * 0.5 * sx;
          else if (drawAlign == 2)
             curX -= (double)lineWidths[l] * sx;
 
-         const double slotTop = top + (double)l * lineH * sy;
-         const double baselineY = slotTop + (double)face->size->metrics.ascender / 64.0 * sy;
+         const double slotTop = top + (l < lineTops.size() ? lineTops[l] : (double)l * lineH) * sy;
+         const double lineBase = slotTop + asc * sy;
+         const double baselineY = lineBase - (double)req.baseShift * sy;
+         const double lineX0 = curX, lineX1 = curX + (double)lineWidths[l] * sx;
+         if (req.highlight)
+         {
+            const float* h = req.highlightColor;
+            band(lineX0, lineBase - asc * sy, lineX1, lineBase + desc * sy, (uint8_t)(std::clamp(h[0], 0.0f, 1.0f) * 255.0f),
+                 (uint8_t)(std::clamp(h[1], 0.0f, 1.0f) * 255.0f), (uint8_t)(std::clamp(h[2], 0.0f, 1.0f) * 255.0f),
+                 (uint8_t)(std::clamp(h[3], 0.0f, 1.0f) * 255.0f));
+         }
 
          std::vector<uint32_t> cps = Utf8ToCodepoints(lines[l]);
          FT_UInt prev = 0;
-         bool hasKerning = FT_HAS_KERNING(face);
+         bool hasKerning = FT_HAS_KERNING(face) && req.kerning;
 
          for (uint32_t cp : cps)
          {
@@ -766,6 +837,10 @@ namespace Platform
             curX += ((double)face->glyph->advance.x / 64.0 + (double)req.tracking) * sx;
             prev = gIdx;
          }
+         if (req.underline)
+            band(lineX0, baselineY + rule, lineX1, baselineY + rule * 2.0, fillR, fillG, fillB, 255);
+         if (req.strike)
+            band(lineX0, baselineY - asc * 0.3 * sy - rule * 0.5, lineX1, baselineY - asc * 0.3 * sy + rule * 0.5, fillR, fillG, fillB, 255);
       }
 
       if (stroker)

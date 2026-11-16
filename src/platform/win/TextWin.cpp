@@ -77,7 +77,7 @@ namespace Platform
    {
       EnsureGdiplus();
       tStyle = (req.bold ? Gdiplus::FontStyleBold : 0) | (req.italic ? Gdiplus::FontStyleItalic : 0) |
-               (req.underline ? Gdiplus::FontStyleUnderline : 0);
+               (req.underline ? Gdiplus::FontStyleUnderline : 0) | (req.strike ? Gdiplus::FontStyleStrikeout : 0);
 
       Gdiplus::Bitmap bitmap(width, height, width * 4, PixelFormat32bppARGB,
                              (BYTE*)outPixelsRGBA);
@@ -148,6 +148,22 @@ namespace Platform
          }
       };
 
+      // One line: the highlight band behind it, then the letters (moved up by baseShift).
+      auto drawAny = [&](const std::wstring& line, float size, double x, double yTop, double w, double bandTop, double bandH)
+      {
+         if (req.highlight && w > 0.0)
+         {
+            const float* h = req.highlightColor;
+            Gdiplus::SolidBrush band(Gdiplus::Color((BYTE)(std::clamp(h[3], 0.0f, 1.0f) * 255.0f), (BYTE)(h[0] * 255.0f),
+                                                    (BYTE)(h[1] * 255.0f), (BYTE)(h[2] * 255.0f)));
+            graphics->FillRectangle(&band, (Gdiplus::REAL)x, (Gdiplus::REAL)bandTop, (Gdiplus::REAL)w, (Gdiplus::REAL)bandH);
+         }
+         if (std::abs(req.tracking) > 0.001f)
+            drawTrackedLine(line, size, x, yTop - req.baseShift);
+         else
+            drawLine(line, size, x, yTop - req.baseShift);
+      };
+
       if (req.wordWrap)
       {
          const double boxW = std::max(8.0, (double)width * std::max(0.05f, req.wrapWidth) / sx);
@@ -160,7 +176,11 @@ namespace Platform
             while (start < full.size())
             {
                while (start < full.size() && (full[start] == L' ' || full[start] == L'\t' || full[start] == L'\n'))
+               {
+                  if (full[start] == L'\n')
+                     words.push_back(L"\n");   // a paragraph break
                   start++;
+               }
                if (start >= full.size())
                   break;
                size_t end = start;
@@ -171,13 +191,19 @@ namespace Platform
             }
          }
 
+         // Per line: does it start a paragraph, and does it end one.
+         std::vector<char> paraStart, paraEnd;
+         auto lineRoom = [&](bool first) { return std::max(8.0, boxW - req.indentL - req.indentR - (first ? req.indentFirst : 0.0f)); };
          auto wrapLinesAt = [&](float size, std::vector<std::wstring>& outLines,
                                 std::vector<float>& outLineWidths)
          {
             outLines.clear();
             outLineWidths.clear();
+            paraStart.clear();
+            paraEnd.clear();
             if (words.empty())
                return;
+            bool first = true;
 
             Gdiplus::RectF spaceBounds;
             MeasureString(*graphics, *family, L" ", size, spaceBounds);
@@ -186,8 +212,23 @@ namespace Platform
             std::wstring curLine;
             float curW = 0.0f;
 
+            auto flush = [&](bool endsPara)
+            {
+               outLines.push_back(curLine);
+               outLineWidths.push_back(curW);
+               paraStart.push_back(first ? 1 : 0);
+               paraEnd.push_back(endsPara ? 1 : 0);
+               first = endsPara;
+               curLine.clear();
+               curW = 0.0f;
+            };
             for (const auto& w : words)
             {
+               if (w == L"\n")
+               {
+                  flush(true);
+                  continue;
+               }
                Gdiplus::RectF wBounds;
                MeasureString(*graphics, *family, w, size, wBounds);
                const float wW = wBounds.Width + (w.empty() ? 0.0f : (float)(w.size() - 1) * req.tracking);
@@ -197,24 +238,39 @@ namespace Platform
                   curLine = w;
                   curW = wW;
                }
-               else if (curW + spaceW + wW <= (float)boxW)
+               else if (curW + spaceW + wW <= (float)lineRoom(first))
                {
                   curLine += L" " + w;
                   curW += spaceW + wW;
                }
                else
                {
-                  outLines.push_back(curLine);
-                  outLineWidths.push_back(curW);
+                  flush(false);
                   curLine = w;
                   curW = wW;
                }
             }
-            if (!curLine.empty())
+            if (!curLine.empty() || first)
+               flush(true);
+            else if (!paraEnd.empty())
+               paraEnd.back() = 1;
+         };
+         // Each line's top, with paragraph spacing; returns the total height.
+         std::vector<double> lineTops;
+         auto layoutTops = [&](double lineH)
+         {
+            lineTops.assign(paraStart.size(), 0.0);
+            double y = 0.0;
+            for (size_t i = 0; i < paraStart.size(); i++)
             {
-               outLines.push_back(curLine);
-               outLineWidths.push_back(curW);
+               if (paraStart[i] && i > 0)
+                  y += req.spaceBefore;
+               lineTops[i] = y;
+               y += lineH;
+               if (paraEnd[i] && i + 1 < paraStart.size())
+                  y += req.spaceAfter;
             }
+            return y;
          };
 
          float usedSize = req.fontSize;
@@ -230,7 +286,7 @@ namespace Platform
                const float mid = (lo + hi) * 0.5f;
                wrapLinesAt(mid, lines, lineWidths);
                const double lineH = (double)mid * std::max(0.1f, req.lineSpacing);
-               const double totalH = (double)lines.size() * lineH;
+               const double totalH = layoutTops(lineH);
                float maxW = 0.0f;
                for (float w : lineWidths)
                   if (w > maxW) maxW = w;
@@ -244,26 +300,23 @@ namespace Platform
 
          wrapLinesAt(usedSize, lines, lineWidths);
          const double lineH = (double)usedSize * std::max(0.1f, req.lineSpacing);
-         const double totalH = (double)lines.size() * lineH;
+         const double totalH = layoutTops(lineH);
          const double top = anchorY - totalH * 0.5;
 
          for (size_t i = 0; i < lines.size(); i++)
          {
-            double x = anchorX;
-            if (drawAlign == 0)
-               x -= boxW * 0.5;
-            else if (drawAlign == 1)
-               x -= (double)lineWidths[i] * 0.5;
+            // The line's room: the box less the indents (the first line of a paragraph adds its own).
+            const double left = anchorX - boxW * 0.5 + req.indentL + (paraStart[i] ? req.indentFirst : 0.0f);
+            const double room = lineRoom(paraStart[i] != 0);
+            double x = left;
+            if (drawAlign == 1)
+               x += (room - (double)lineWidths[i]) * 0.5;
             else if (drawAlign == 2)
-               x += boxW * 0.5 - (double)lineWidths[i];
+               x += room - (double)lineWidths[i];
 
-            const double slotTop = top + (double)i * lineH;
+            const double slotTop = top + lineTops[i];
             const double yTop = slotTop + std::max(0.0, (lineH - (double)usedSize) * 0.5);
-
-            if (std::abs(req.tracking) > 0.001f)
-               drawTrackedLine(lines[i], usedSize, x, yTop);
-            else
-               drawLine(lines[i], usedSize, x, yTop);
+            drawAny(lines[i], usedSize, x, yTop, lineWidths[i], yTop, (double)usedSize * 1.2);
          }
          outFittedSize = usedSize;
       }
@@ -279,11 +332,7 @@ namespace Platform
          else if (drawAlign == 2)
             x -= bounds.Width;
          const double yTop = anchorY - (double)req.fontSize * 0.5;
-
-         if (std::abs(req.tracking) > 0.001f)
-            drawTrackedLine(line, req.fontSize, x, yTop);
-         else
-            drawLine(line, req.fontSize, x, yTop);
+         drawAny(line, req.fontSize, x, yTop, bounds.Width, yTop, (double)req.fontSize * 1.2);
          outFittedSize = req.fontSize;
       }
 

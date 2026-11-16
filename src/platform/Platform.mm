@@ -1965,13 +1965,21 @@ namespace Platform
             else if (req.align == 3) ctAlign = kCTTextAlignmentJustified;
 
             CGFloat lineSpacingMultiple = std::max(0.1f, req.lineSpacing);
+            // Paragraph indents and spacing, px. A tail indent below 0 counts from the trailing edge.
+            CGFloat headIndent = req.indentL, firstIndent = req.indentL + req.indentFirst, tailIndent = -req.indentR;
+            CGFloat spaceBefore = std::max(0.0f, req.spaceBefore), spaceAfter = std::max(0.0f, req.spaceAfter);
             CTParagraphStyleSetting paragraphSettings[] = {
                { kCTParagraphStyleSpecifierAlignment, sizeof(ctAlign), &ctAlign },
                { kCTParagraphStyleSpecifierLineHeightMultiple,
                  sizeof(lineSpacingMultiple), &lineSpacingMultiple },
+               { kCTParagraphStyleSpecifierHeadIndent, sizeof(headIndent), &headIndent },
+               { kCTParagraphStyleSpecifierFirstLineHeadIndent, sizeof(firstIndent), &firstIndent },
+               { kCTParagraphStyleSpecifierTailIndent, sizeof(tailIndent), &tailIndent },
+               { kCTParagraphStyleSpecifierParagraphSpacingBefore, sizeof(spaceBefore), &spaceBefore },
+               { kCTParagraphStyleSpecifierParagraphSpacing, sizeof(spaceAfter), &spaceAfter },
             };
             CTParagraphStyleRef paragraphStyle =
-               CTParagraphStyleCreate(paragraphSettings, 2);
+               CTParagraphStyleCreate(paragraphSettings, 7);
 
             CFStringRef cfText = CFStringCreateWithCString(kCFAllocatorDefault, req.text.c_str(), kCFStringEncodingUTF8);
             CFNumberRef kern =
@@ -2015,8 +2023,10 @@ namespace Platform
                int ul = req.underline ? kCTUnderlineStyleSingle : kCTUnderlineStyleNone;
                CFNumberRef ulNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &ul);
 
+               // Kerning on: tracking adds to the font's pair kerning. Off: a fixed kern replaces it (0 = none).
                CFStringRef keys[] = {
-                  kCTFontAttributeName, kCTForegroundColorAttributeName, kCTKernAttributeName,
+                  kCTFontAttributeName, kCTForegroundColorAttributeName,
+                  req.kerning ? kCTTrackingAttributeName : kCTKernAttributeName,
                   kCTStrokeWidthAttributeName, kCTStrokeColorAttributeName,
                   kCTParagraphStyleAttributeName, kCTUnderlineStyleAttributeName
                };
@@ -2042,6 +2052,31 @@ namespace Platform
             CGContextTranslateCTM(ctx, anchorX, anchorY);
             CGContextScaleCTM(ctx, sx, sy);
             CGContextTranslateCTM(ctx, -anchorX, -anchorY);
+
+            // Highlight bands sit on each line; strike lines move with the letters (baseShift).
+            auto lineBand = [&](CTLineRef line, CGPoint o)
+            {
+               CGFloat a = 0, d = 0, lead = 0;
+               const double w = CTLineGetTypographicBounds(line, &a, &d, &lead) - CTLineGetTrailingWhitespaceWidth(line);
+               if (w <= 0.0)
+                  return;
+               if (req.highlight)
+               {
+                  CGContextSetRGBFillColor(ctx, req.highlightColor[0], req.highlightColor[1], req.highlightColor[2],
+                                           std::clamp(req.highlightColor[3], 0.0f, 1.0f));
+                  CGContextFillRect(ctx, CGRectMake(o.x, o.y - d, w, a + d));
+               }
+            };
+            auto lineStrike = [&](CTLineRef line, CGPoint o)
+            {
+               if (!req.strike)
+                  return;
+               CGFloat a = 0, d = 0, lead = 0;
+               const double w = CTLineGetTypographicBounds(line, &a, &d, &lead) - CTLineGetTrailingWhitespaceWidth(line);
+               const CGFloat t = std::max<CGFloat>(1.0, a / 14.0);
+               CGContextSetFillColorWithColor(ctx, fillColor);
+               CGContextFillRect(ctx, CGRectMake(o.x, o.y + req.baseShift + a * 0.3 - t * 0.5, w, t));
+            };
 
             if (req.wordWrap)
             {
@@ -2082,7 +2117,22 @@ namespace Platform
                CGRect box = CGRectMake(anchorX - boxW * 0.5, anchorY - frameH * 0.5, boxW, frameH);
                CGPathRef path = CGPathCreateWithRect(box, nullptr);
                CTFrameRef frame = CTFramesetterCreateFrame(setter, CFRangeMake(0, 0), path, nullptr);
+               CFArrayRef frameLines = CTFrameGetLines(frame);
+               const CFIndex nLines = CFArrayGetCount(frameLines);
+               std::vector<CGPoint> origins((size_t)std::max<CFIndex>(1, nLines));
+               if (nLines > 0)
+                  CTFrameGetLineOrigins(frame, CFRangeMake(0, 0), origins.data());
+               auto at = [&](CFIndex i) { return CGPointMake(box.origin.x + origins[i].x, box.origin.y + origins[i].y); };
+               if (req.highlight)
+                  for (CFIndex i = 0; i < nLines; i++)
+                     lineBand((CTLineRef)CFArrayGetValueAtIndex(frameLines, i), at(i));
+               CGContextSaveGState(ctx);
+               CGContextTranslateCTM(ctx, 0, req.baseShift);
                CTFrameDraw(frame, ctx);
+               CGContextRestoreGState(ctx);
+               if (req.strike)
+                  for (CFIndex i = 0; i < nLines; i++)
+                     lineStrike((CTLineRef)CFArrayGetValueAtIndex(frameLines, i), at(i));
                CFRelease(frame);
                CGPathRelease(path);
                CFRelease(setter);
@@ -2101,8 +2151,10 @@ namespace Platform
                else if (req.align == 2)
                   originX -= bounds.size.width;
 
-               CGContextSetTextPosition(ctx, originX, originY);
+               lineBand(line, CGPointMake(originX, originY));
+               CGContextSetTextPosition(ctx, originX, originY + req.baseShift);
                CTLineDraw(line, ctx);
+               lineStrike(line, CGPointMake(originX, originY));
                CFRelease(line);
                CFRelease(single);
                outFittedSize = req.fontSize;
