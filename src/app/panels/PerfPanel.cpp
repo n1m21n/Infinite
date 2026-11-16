@@ -2,6 +2,7 @@
 #include <cmath>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/StateRing.h"
@@ -2212,121 +2213,68 @@ namespace app
       // they never actually lined up against the fixed-height buttons
       // beside them).
       const bool isLight = IsThemeLight();
-
-      for (int p = 0; p < gPerfLayout.pageCount; p++)
       {
-         std::string pageTitle = (p < (int)gPerfLayout.pageNames.size() && !gPerfLayout.pageNames[p].empty())
-                                    ? gPerfLayout.pageNames[p]
-                                    : ("Page " + std::to_string(p + 1));
-         ImGui::PushID(p + 99000);
-         ImGui::SameLine();
-
-         if (gPerfRenamingPage == p)
+         // The page strip every paged panel shares (PagePicker).
+         std::vector<PagePicker::Entry> entries;
+         for (int p = 0; p < gPerfLayout.pageCount; p++)
+            entries.push_back({ p < (int)gPerfLayout.pageNames.size() && !gPerfLayout.pageNames[p].empty() ? gPerfLayout.pageNames[p]
+                                                                                                          : "Page " + std::to_string(p + 1) });
+         PagePicker::Options opt;
+         opt.colour = false;
+         opt.canAdd = gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages;
+         opt.duplicate = opt.canAdd;
+         opt.canDelete = gPerfLayout.pageCount > 1;
+         opt.maxW = std::max(120.0f, ImGui::GetContentRegionAvail().x - tok::tile - tok::space_2);
+         const PagePicker::Result r = PagePicker::Draw("##perfPages", entries, gPerfActivePage, T("Add New Page"), opt);
+         const int p = r.index;
+         switch (r.act)
          {
-            ImGui::SetNextItemWidth(90.0f);
-            ImGui::SetKeyboardFocusHere();
-            if (FieldWell::InputText("##renamingpagetab", gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer),
-                                 ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
-            {
-               PushUndoCheckpoint();
-               if (p < (int)gPerfLayout.pageNames.size())
-                  gPerfLayout.pageNames[p] = gPerfRenamePageBuffer;
-               gPerfRenamingPage = -1;
-            }
-            if (ImGui::IsItemDeactivated() && gPerfRenamingPage == p)
-            {
-               if (p < (int)gPerfLayout.pageNames.size())
-                  gPerfLayout.pageNames[p] = gPerfRenamePageBuffer;
-               gPerfRenamingPage = -1;
-            }
-         }
-         else
-         {
-            const bool isSelected = (gPerfActivePage == p);
-            if (ChipButton::Draw(pageTitle.c_str(), isSelected, kPerfChipH, 60.0f, /*soft=*/true))
-               gPerfActivePage = p;
-
-            // Double click to rename page
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-            {
-               gPerfRenamingPage = p;
-               snprintf(gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer), "%s", pageTitle.c_str());
-            }
-
-            // Drag and drop to reorder pages
-            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-            {
-               ImGui::SetDragDropPayload("PERF_PAGE_TAB", &p, sizeof(int));
-               ImGui::Text(T("Move %s"), pageTitle.c_str());
-               ImGui::EndDragDropSource();
-            }
-            if (ImGui::BeginDragDropTarget())
-            {
-               if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PERF_PAGE_TAB"))
-               {
-                  int srcPage = *(const int*)payload->Data;
-                  ReorderPerfPages(srcPage, p);
-               }
-               ImGui::EndDragDropTarget();
-            }
-
-            // Right click context menu on page tab
-            if (MenuParts::BeginContextItem("##pagetabcontext"))
-            {
-               if (MenuParts::Item(L("Rename Page")))
-               {
-                  gPerfRenamingPage = p;
-                  snprintf(gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer), "%s", pageTitle.c_str());
-               }
-               if (MenuParts::Item(L("Duplicate Page")))
-               {
-                  PushUndoCheckpoint();
-                  int newP = gPerfLayout.pageCount++;
-                  gPerfLayout.pageNames.push_back(pageTitle + " Copy");
-                  for (const auto& el : gPerfElements)
-                  {
-                     if (el.page == p)
-                     {
-                        Patch::PerfRecord copyEl = el;
-                        copyEl.page = newP;
-                        gPerfElements.push_back(copyEl);
-                     }
-                  }
-                  gPerfActivePage = newP;
-               }
-               if (gPerfLayout.pageCount > 1 && MenuParts::Item(L("Delete Page")))
-               {
-                  PushUndoCheckpoint();
-                  gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
-                                                     [p](const Patch::PerfRecord& r) { return r.page == p; }),
-                                      gPerfElements.end());
-                  for (auto& r : gPerfElements)
-                     if (r.page > p) r.page--;
-                  gPerfLayout.pageCount--;
-                  if (p < (int)gPerfLayout.pageNames.size())
-                     gPerfLayout.pageNames.erase(gPerfLayout.pageNames.begin() + p);
-                  if (gPerfActivePage >= gPerfLayout.pageCount)
-                     gPerfActivePage = gPerfLayout.pageCount - 1;
-               }
-               MenuParts::EndPopup();
-            }
-         }
-         ImGui::PopID();
-      }
-
-      // Add new page '+' button
-      if (gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages)
-      {
-         ImGui::SameLine();
-         if (ChipButton::Draw(L("+##addpagebtn"), false, kPerfChipH, kPerfChipH))
+         case PagePicker::Act::Select: gPerfActivePage = p; break;
+         case PagePicker::Act::Add:
          {
             PushUndoCheckpoint();
             int newP = gPerfLayout.pageCount++;
             gPerfLayout.pageNames.push_back("Page " + std::to_string(newP + 1));
             gPerfActivePage = newP;
+            break;
          }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Add New Page"));
+         case PagePicker::Act::Rename:
+            PushUndoCheckpoint();
+            if (p < (int)gPerfLayout.pageNames.size())
+               gPerfLayout.pageNames[p] = r.name;
+            break;
+         case PagePicker::Act::Move: ReorderPerfPages(p, r.to); break;
+         case PagePicker::Act::Duplicate:
+         {
+            PushUndoCheckpoint();
+            int newP = gPerfLayout.pageCount++;
+            gPerfLayout.pageNames.push_back(entries[p].name + " Copy");
+            const size_t n = gPerfElements.size();
+            for (size_t i = 0; i < n; i++)
+               if (gPerfElements[i].page == p)
+               {
+                  Patch::PerfRecord copyEl = gPerfElements[i];
+                  copyEl.page = newP;
+                  gPerfElements.push_back(copyEl);
+               }
+            gPerfActivePage = newP;
+            break;
+         }
+         case PagePicker::Act::Delete:
+            PushUndoCheckpoint();
+            gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
+                                               [p](const Patch::PerfRecord& r) { return r.page == p; }),
+                                gPerfElements.end());
+            for (auto& el : gPerfElements)
+               if (el.page > p) el.page--;
+            gPerfLayout.pageCount--;
+            if (p < (int)gPerfLayout.pageNames.size())
+               gPerfLayout.pageNames.erase(gPerfLayout.pageNames.begin() + p);
+            if (gPerfActivePage >= gPerfLayout.pageCount)
+               gPerfActivePage = gPerfLayout.pageCount - 1;
+            break;
+         default: break;
+         }
       }
 
       // Calculate dynamic content bounding box on active page

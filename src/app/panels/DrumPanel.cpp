@@ -522,7 +522,10 @@ namespace app
          const ImGuiIO& io = ImGui::GetIO();
          if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
             PagePicker::BeginRename("##drumPage", entries, current);
-         const PagePicker::Result r = PagePicker::Draw("##drumPage", entries, current, T("Pages: switch, add, rename, colour or delete one"));
+         PagePicker::Options opt;
+         opt.reorder = false; // the pages are the canvas's Drum Sequencers, in canvas order
+         opt.maxW = 360.0f;
+         const PagePicker::Result r = PagePicker::Draw("##drumPage", entries, current, T("New drum page"), opt);
          GraphNode* gn = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
          DrumSequencerNode* d = DrumOf(gn);
          switch (r.act)
@@ -549,6 +552,21 @@ namespace app
          case PagePicker::Act::Delete:
             if (gn != nullptr)
                sPendingDelete = gn->uid; // next frame: the rest of this frame still draws the page
+            break;
+         case PagePicker::Act::Duplicate:
+            if (gn != nullptr)
+            {
+               // The canvas duplicate (Shift+D) on this page's node; the copy is selected and its page comes up.
+               ed::EditorContext* prev = ed::GetCurrentEditor();
+               if (gEditor != nullptr)
+               {
+                  ed::SetCurrentEditor(gEditor);
+                  ed::ClearSelection();
+                  ed::SetCurrentEditor(prev);
+               }
+               SelectOnCanvas(gn);
+               gRequestDuplicate = true;
+            }
             break;
          default: break;
          }

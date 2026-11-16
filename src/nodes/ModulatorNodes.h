@@ -2,6 +2,8 @@
 
 #include <memory>
 #include "core/SpawnSeed.h"
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -806,6 +808,8 @@ public:
    uint64_t motionGroup = 0;
    int motionChannel = -1;
    int editorOrder = 0;
+   std::string pageName;       // the Curve Editor page name, empty = the node title
+   unsigned int pageColor = 0; // 0xRRGGBB, 0 = none
    bool RefreshExpression() const;
    const std::string& ExpressionError() const { return mExpressionError; }
    void BakeExpression(float tolerance = 0.001f);
@@ -876,6 +880,16 @@ public:
       v.Float("speed", speed); v.Int("play", play); v.Bool("freeRun", freeRun);
       v.Int("source", source); v.Text("expression", expression);
       v.Int("motionChannel", motionChannel); v.Int("editorOrder", editorOrder);
+      {
+         v.Text("pagename", pageName);
+         if (pageName.size() > 48)
+            pageName.resize(48);
+         char hex[16];
+         snprintf(hex, sizeof(hex), "%06X", pageColor & 0xFFFFFFu);
+         std::string col = pageColor ? hex : "";
+         v.Text("pagecolor", col);
+         pageColor = col.empty() ? 0u : (unsigned int)(strtoul(col.c_str(), nullptr, 16) & 0xFFFFFFu);
+      }
       std::string group = std::to_string(motionGroup);
       v.Text("motionGroup", group);
       try { motionGroup = std::stoull(group); } catch (...) { motionGroup = 0; }

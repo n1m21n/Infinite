@@ -13,6 +13,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/TimeRuler.h"
@@ -866,59 +867,58 @@ namespace
       MenuParts::EndPopup();
    }
 
-   // The page dropdown: switch, add, rename, delete. A rename swaps the face for a text field.
+   // The page strip (PagePicker, shared with the other paged panels): switch, add, rename, colour, delete.
    void DrawPagePicker()
    {
       State& s = S();
       const std::vector<Arrange::Lane*> pages = Pages();
       if (s.lane == 0 && !pages.empty())
          s.lane = pages.front()->id;
-      Arrange::Lane* page = Page();
-      if (page != nullptr && s.renameLane == page->id)
+      std::vector<PagePicker::Entry> entries;
+      int current = -1;
+      for (int i = 0; i < (int)pages.size(); i++)
       {
-         if (s.renameFocus)
-            ImGui::SetKeyboardFocusHere();
-         ImGui::SetNextItemWidth(kPageW);
-         const bool done = FieldWell::InputText("##pageRename", s.renameBuf, sizeof s.renameBuf,
-                                                ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-         const bool lost = !s.renameFocus && !ImGui::IsItemActive();
-         s.renameFocus = false;
-         if (done || lost)
-         {
-            const std::string name = s.renameBuf;
-            s.renameLane = 0;
-            if (!name.empty() && name != page->name)
-               ArrangeEdit([&] {
-                  page->name = name;
-                  gArrange.revision++;
-               });
-         }
-         return;
+         const Arrange::Lane* l = pages[i];
+         const bool coloured = l->colorR + l->colorG + l->colorB > 0.0f;
+         const auto c8 = [](float v) { return (unsigned int)std::clamp((int)std::lround(v * 255.0f), 0, 255); };
+         entries.push_back({ l->name, coloured ? (c8(l->colorR) << 16) | (c8(l->colorG) << 8) | c8(l->colorB) : 0u });
+         if (l->id == s.lane)
+            current = i;
       }
-      ImVec2 bmin, bmax;
-      if (PickerFace("##pianoPage", page != nullptr ? page->name.c_str() : T("No page"), kPageW, T("Pages: switch, add, rename or delete one ([ and ])"),
-                     bmin, bmax))
-         ImGui::OpenPopup("##pianoPageMenu");
-      if (!BeginPickerMenu("##pianoPageMenu", bmin, bmax, kPageW))
-         return;
-      for (const Arrange::Lane* l : pages)
+      if (s.renameLane != 0) // Cmd+R
       {
-         const std::string label = l->name + "##pg" + std::to_string(l->id);
-         if (MenuParts::Choice(label.c_str(), l->id == s.lane))
-            s.lane = l->id;
+         for (int i = 0; i < (int)pages.size(); i++)
+            if (pages[i]->id == s.renameLane)
+               PagePicker::BeginRename("##pianoPage", entries, i);
+         s.renameLane = 0;
       }
-      MenuParts::Separator();
-      if (MenuParts::Item(L("New Page")))
-         s.pendingAdd = true;
-      if (page != nullptr && MenuParts::Item(L("Rename"), "Cmd+R"))
+      PagePicker::Options opt;
+      opt.reorder = false;   // the pages are Timeline lanes, in Timeline order
+      opt.duplicate = false; // a page is a lane plus its linked node
+      opt.maxW = 360.0f;
+      const PagePicker::Result r = PagePicker::Draw("##pianoPage", entries, current, T("New Piano Roll page"), opt);
+      Arrange::Lane* page = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
+      switch (r.act)
       {
-         s.renameLane = page->id;
-         s.renameFocus = true;
-         std::snprintf(s.renameBuf, sizeof s.renameBuf, "%s", page->name.c_str());
+      case PagePicker::Act::Select: s.lane = page->id; break;
+      case PagePicker::Act::Add: s.pendingAdd = true; break;
+      case PagePicker::Act::Rename:
+         ArrangeEdit([&] {
+            page->name = r.name;
+            gArrange.revision++;
+         });
+         break;
+      case PagePicker::Act::Recolor:
+         ArrangeEdit([&] {
+            page->colorR = (float)((r.color >> 16) & 0xFF) / 255.0f;
+            page->colorG = (float)((r.color >> 8) & 0xFF) / 255.0f;
+            page->colorB = (float)(r.color & 0xFF) / 255.0f;
+            gArrange.revision++;
+         });
+         break;
+      case PagePicker::Act::Delete: s.pendingDelete = page->id; break;
+      default: break;
       }
-      if (page != nullptr && MenuParts::Item(L("Delete Page")))
-         s.pendingDelete = page->id;
-      MenuParts::EndPopup();
    }
 
    const char* GridLabel()

@@ -13,6 +13,7 @@
 #include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/TimeRuler.h"
@@ -1496,76 +1497,88 @@ namespace
    void DrawPageStrip(float width)
    {
       State& s = S();
-      ImGui::BeginChild("##cePages", ImVec2(std::max(1.0f, width), tok::tile), false, ImGuiWindowFlags_NoScrollbar);
-      if (ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f)
-         ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 40.0f);
-      static uint64_t sMenuPage = 0;
-      bool openMenu = false;
-      bool first = true;
-      for (GraphNode* gn : ModePages())
+      const std::vector<GraphNode*> pages = ModePages();
+      std::vector<PagePicker::Entry> entries;
+      int current = -1;
+      for (int i = 0; i < (int)pages.size(); i++)
       {
-         if (!first)
-            FormParts::Inline(0.0f, tok::space_1);
-         first = false;
-         const bool on = gn->uid == s.page;
+         GraphNode* gn = pages[i];
          const MSEGNode* pn = AsMseg(gn);
-         std::string title = NodeTitleWithInstance(*gn);
-         if (pn->motionGroup != 0 && pn->motionChannel >= 0 && pn->motionChannel < 3)
+         std::string title = pn->pageName.empty() ? NodeTitleWithInstance(*gn) : pn->pageName;
+         if (pn->pageName.empty() && pn->motionGroup != 0 && pn->motionChannel >= 0 && pn->motionChannel < 3)
             title += std::string(" ") + "XYZ"[pn->motionChannel];
-         const std::string id = "##cePage" + std::to_string(gn->uid);
-         const float w = std::min(kPageW, ImGui::CalcTextSize(title.c_str()).x + tok::icon_md + 3.0f * tok::space_3);
-         ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         if (ActionButton::Draw(id.c_str(), ImVec2(w, tok::tile)))
-            ShowPage(gn->uid);
-         ActionButton::Scoped() = ActionButton::Kind::Plain;
-         if (ImGui::BeginDragDropSource())
-         {
-            ImGui::SetDragDropPayload("INFINITE_CURVE_PAGE", &gn->uid, sizeof(gn->uid));
-            ImGui::TextUnformatted(title.c_str());
-            ImGui::EndDragDropSource();
-         }
-         if (ImGui::BeginDragDropTarget())
-         {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("INFINITE_CURVE_PAGE"))
-            {
-               const uint64_t uid = *static_cast<const uint64_t*>(payload->Data);
-               auto ordered = Pages(true);
-               const auto source = std::find_if(ordered.begin(), ordered.end(), [uid](GraphNode* page) { return page->uid == uid; });
-               if (source != ordered.end() && uid != gn->uid)
-               {
-                  PushUndoCheckpoint("Reorder Curves");
-                  GraphNode* moved = *source;
-                  ordered.erase(source);
-                  ordered.insert(std::find(ordered.begin(), ordered.end(), gn), moved);
-                  for (size_t i = 0; i < ordered.size(); ++i)
-                     AsMseg(ordered[i])->editorOrder = (int)i;
-                  gPatchDirty = true;
-               }
-            }
-            ImGui::EndDragDropTarget();
-         }
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-         {
-            sMenuPage = gn->uid;
-            openMenu = true;
-         }
-         const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-         const ImU32 col = on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const float cy = (bmin.y + bmax.y) * 0.5f;
-         glyph::Draw(dl, ImVec2(bmin.x + tok::space_2 + tok::icon_md * 0.5f, cy), tok::icon_md * 0.8f, col, PageGlyph(*gn));
-         dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);
-         dl->AddText(ImVec2(bmin.x + tok::space_2 + tok::icon_md + tok::space_1, cy - ImGui::GetFontSize() * 0.5f), col, title.c_str());
-         dl->PopClipRect();
+         entries.push_back({ title, pn->pageColor, PageGlyph(*gn) });
+         if (gn->uid == s.page)
+            current = i;
       }
-      if (!first)
-         FormParts::Inline(0.0f, tok::space_1);
-      if (IconChip("##ceAdd", IconsInfinite::Plus, false, T("New curve")))
+      PagePicker::Options opt;
+      opt.deleteLabel = T("Delete Curve");
+      opt.maxW = std::max(1.0f, width - tok::tile - tok::space_1);
+      uint64_t closeUid = 0;
+      opt.extraMenu = [&](int i) {
+         if (MenuParts::Item(T("Close Page")))
+            closeUid = pages[i]->uid;
+      };
+      const PagePicker::Result r = PagePicker::Draw("##cePages", entries, current, T("New curve"), opt);
+      GraphNode* gn = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
+      switch (r.act)
       {
+      case PagePicker::Act::Select: ShowPage(gn->uid); break;
+      case PagePicker::Act::Add:
          if (s.motion)
             ImGui::OpenPopup("##ceAddMenu");
          else
             AddPage();
+         break;
+      case PagePicker::Act::Rename:
+         PushUndoCheckpoint("Rename curve");
+         AsMseg(gn)->pageName = r.name;
+         gPatchDirty = true;
+         break;
+      case PagePicker::Act::Recolor:
+         PushUndoCheckpoint("Colour curve");
+         AsMseg(gn)->pageColor = r.color;
+         gPatchDirty = true;
+         break;
+      case PagePicker::Act::Move:
+      {
+         auto ordered = Pages(true);
+         GraphNode* target = pages[r.to];
+         const auto source = std::find(ordered.begin(), ordered.end(), gn);
+         if (source != ordered.end())
+         {
+            PushUndoCheckpoint("Reorder Curves");
+            ordered.erase(source);
+            ordered.insert(std::find(ordered.begin(), ordered.end(), target), gn);
+            for (size_t i = 0; i < ordered.size(); ++i)
+               AsMseg(ordered[i])->editorOrder = (int)i;
+            gPatchDirty = true;
+         }
+         break;
+      }
+      case PagePicker::Act::Duplicate:
+         // The canvas duplicate (Shift+D) on this curve's node; the copy is selected and its page comes up.
+         if (gEditor != nullptr)
+         {
+            ed::EditorContext* prev = ed::GetCurrentEditor();
+            ed::SetCurrentEditor(gEditor);
+            ed::ClearSelection();
+            ed::SelectNode(gn->NodeId(), false);
+            ed::SetCurrentEditor(prev);
+            gRequestDuplicate = true;
+         }
+         break;
+      case PagePicker::Act::Delete: DeletePage(gn->uid); break;
+      default: break;
+      }
+      if (closeUid != 0)
+      {
+         s.closed.push_back(closeUid);
+         if (s.page == closeUid)
+         {
+            s.page = 0;
+            ClearSelection();
+         }
       }
       if (MenuParts::BeginPopup("##ceAddMenu"))
       {
@@ -1578,24 +1591,6 @@ namespace
                AddGroup(k);
          MenuParts::EndPopup();
       }
-      if (openMenu)
-         ImGui::OpenPopup("##cePageMenu");
-      if (MenuParts::BeginPopup("##cePageMenu"))
-      {
-         if (MenuParts::Item(T("Close Page")))
-         {
-            s.closed.push_back(sMenuPage);
-            if (s.page == sMenuPage)
-            {
-               s.page = 0;
-               ClearSelection();
-            }
-         }
-         if (MenuParts::Item(T("Delete Curve")))
-            DeletePage(sMenuPage);
-         MenuParts::EndPopup();
-      }
-      ImGui::EndChild();
    }
 
    // ---- side panel rows: the 3D View's (View3DPanel.cpp Card/FieldLabel/...Row), so both panels read the same.

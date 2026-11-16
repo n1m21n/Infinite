@@ -1427,7 +1427,11 @@ namespace app
          if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift &&
              ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
             PagePicker::BeginRename("##mixerPage", entries, current);
-         const PagePicker::Result r = PagePicker::Draw("##mixerPage", entries, current, T("Pages: switch, add, rename, colour or delete one"));
+         PagePicker::Options opt;
+         opt.reorder = false;   // a page is a top Mixer on the canvas
+         opt.duplicate = false; // a copy would be a Mixer with no sources
+         opt.maxW = 360.0f;
+         const PagePicker::Result r = PagePicker::Draw("##mixerPage", entries, current, T("New mixer page"), opt);
          const Page* pg = r.index >= 0 && r.index < (int)pages.size() ? &pages[r.index] : nullptr;
          MixerNode* m = pg != nullptr ? PageMixer(*pg) : nullptr;
          switch (r.act)
