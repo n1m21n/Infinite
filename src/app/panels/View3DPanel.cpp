@@ -5831,23 +5831,29 @@ namespace
    }
 
    // Block 4b pairs: two short values of one setting (X | Y, min | max) share a row, each well half the field.
-   bool FloatPairRow(const char* label, float* a, float* b, float lo, float hi, const char* fmtA, const char* fmtB)
+   // One label, n equal fields on one row (X/Y pairs, X/Y/Z triples).
+   bool FloatMultiRow(const char* label, float* const* v, const char* const* fmt, int n, float lo, float hi)
    {
       FieldLabel(label);
-      const float half = (sFieldW - tok::space_1) * 0.5f;
+      const float w = (sFieldW - tok::space_1 * (n - 1)) / n;
       bool changed = false;
-      float* v[2] = { a, b };
-      const char* fmt[2] = { fmtA, fmtB };
-      for (int i = 0; i < 2; i++)
+      for (int i = 0; i < n; i++)
       {
          if (i > 0)
             ImGui::SameLine(0.0f, tok::space_1);
-         ImGui::SetNextItemWidth(i == 0 ? half : sFieldW - half - tok::space_1);
+         ImGui::SetNextItemWidth(i < n - 1 ? w : sFieldW - (w + tok::space_1) * (n - 1));
          const float was = *v[i];
-         changed |= FieldWell::Slider((RowId(label) + (i ? "b" : "a")).c_str(), v[i], lo, hi, fmt[i]);
+         changed |= FieldWell::Slider((RowId(label) + (char)('a' + i)).c_str(), v[i], lo, hi, fmt[i]);
          UndoableFrom(v[i], was, "Edit in 3D View");
       }
       return changed;
+   }
+
+   bool FloatPairRow(const char* label, float* a, float* b, float lo, float hi, const char* fmtA, const char* fmtB)
+   {
+      float* v[2] = { a, b };
+      const char* fmt[2] = { fmtA, fmtB };
+      return FloatMultiRow(label, v, fmt, 2, lo, hi);
    }
 
    bool ComboRow(const char* label, int* v, const std::vector<std::string>& names, const char* undo = "Edit in 3D View")
@@ -6412,9 +6418,11 @@ namespace
          FloatRow(T("Orbit"), &cam->azimuth, -180.0f, 180.0f, "%.1f");
          FloatRow(T("Elevation"), &cam->elevation, -90.0f, 90.0f, "%.1f");
          FloatRow(T("Roll"), &cam->roll, -180.0f, 180.0f, "%.1f");
-         FloatRow(T("Target X"), &cam->targetX, -50.0f, 50.0f, "%.2f");
-         FloatRow(T("Target Y"), &cam->targetY, -50.0f, 50.0f, "%.2f");
-         FloatRow(T("Target Z"), &cam->targetZ, -50.0f, 50.0f, "%.2f");
+         {
+            float* v[3] = { &cam->targetX, &cam->targetY, &cam->targetZ };
+            const char* fmt[3] = { "X %.2f", "Y %.2f", "Z %.2f" };
+            FloatMultiRow(T("Target"), v, fmt, 3, -50.0f, 50.0f);
+         }
       }
       if (Card(T("Lens")))
       {
@@ -6538,8 +6546,7 @@ namespace
                edit = true;
             }
             edit |= ComboRow(T("Frame method"), &back.fit, { T("Stretch"), T("Fit"), T("Crop") });
-            edit |= FloatRow(T("Offset X"), &back.offset[0], -2.0f, 2.0f, "%.3f");
-            edit |= FloatRow(T("Offset Y"), &back.offset[1], -2.0f, 2.0f, "%.3f");
+            edit |= FloatPairRow(T("Offset"), &back.offset[0], &back.offset[1], -2.0f, 2.0f, "X %.3f", "Y %.3f");
             edit |= FloatRow(T("Rotation"), &back.rotation, -180.0f, 180.0f, "%.1f");
             edit |= FloatRow(T("Scale"), &back.scale, 0.01f, 10.0f, "%.3f");
             edit |= BoolRow(T("Flip horizontally"), &back.flipX);
@@ -7741,9 +7748,14 @@ namespace
       if (Card(T("Grid"), nullptr, false))
       {
          BoolRow(T("Orthographic grid"), &set.orthoGrid);
-         BoolRow(T("Axis X"), &set.axisX);
-         BoolRow(T("Axis Y"), &set.axisY);
-         BoolRow(T("Axis Z"), &set.axisZ);
+         FieldLabel(T("Axes"));
+         ImGui::PushID("gridaxes");
+         BoolRow("X", &set.axisX);
+         ImGui::SameLine(0.0f, tok::space_3);
+         BoolRow("Y", &set.axisY);
+         ImGui::SameLine(0.0f, tok::space_3);
+         BoolRow("Z", &set.axisZ);
+         ImGui::PopID();
          FloatRow(T("Scale"), &set.gridScale, 0.001f, 1000.0f, "%.3f");
          if (IntInputRow(T("Lines"), &set.gridLines))
             set.gridLines = std::clamp(set.gridLines, 1, 200);
