@@ -2,8 +2,13 @@
 // The node on the canvas stays the source: every control here reads and writes the node's own fields,
 // so save/load, undo, modulation and headless renders see no new state. Only open/dock/height are saved.
 //
-//  header : Drums | page chips (one per node) + page | Run | 1-16 17-32 | Fill        Lane Kit
-//  body   : pad column (LED, pad, M S, level) | step grid | inspector (Lane or Kit)
+//  header : Drums | page chips (one per node) + page | Run | LCD (< groove >, rate, steps, swing) | 1-16 17-32 |
+//           FILL (hold) | Tools                                                           Lane Step Kit
+//  body   : lane strip (LED, pad, M S, tune decay level) | step keys | inspector (Lane, Step or Kit)
+//
+// Hardware cues (plan §1b): TR-style step keys in four-step colour groups with a chase light on the ruler,
+// TR-8S instrument colours on lit keys, a channel strip per lane, an LCD readout, a held FILL key, and an
+// Elektron-style trig page (Shift-click a key) for probability, condition and micro timing.
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -51,8 +56,9 @@ namespace app
       constexpr int kPageSteps = DrumSequencerNode::kEditPageSteps;
       constexpr float kMinHeight = 240.0f;
       constexpr float kInspectorW = 268.0f;
-      constexpr float kPadW = 216.0f;
-      constexpr float kRulerH = 16.0f;
+      constexpr float kPadW = 292.0f;
+      constexpr float kRulerH = 20.0f;
+      constexpr float kGroupGap = 4.0f; // extra space between four-step key groups
       constexpr float kRowGap = 3.0f;
       constexpr float kCellGap = 2.0f;
       constexpr float kDefaultVel = 0.8f;
@@ -60,7 +66,9 @@ namespace app
       uint64_t sPageUid = 0;
       uint64_t sLastSelectedUid = 0;
       int sLane = 0;          // the lane the inspector shows
-      bool sKit = false;      // inspector: false = Lane, true = Kit
+      enum Tab { kTabLane, kTabStep, kTabKit };
+      int sTab = kTabLane;    // inspector page
+      int sStep = 0;          // the step the Step page shows (lane = sLane)
       bool sFillAll = false;  // Fill menu scope
       float sPadFlash[kLanes] = {};
 
@@ -170,6 +178,29 @@ namespace app
          return ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, alpha));
       }
 
+      // TR-8S style: every instrument has its own colour; lit keys and the pad bar use it.
+      ImU32 LaneColor(int lane, float alpha = 1.0f)
+      {
+         static const float kHue[kLanes] = { 0.00f, 0.07f, 0.13f, 0.20f, 0.45f, 0.55f, 0.68f, 0.82f };
+         float r, g, b;
+         ImGui::ColorConvertHSVtoRGB(kHue[std::clamp(lane, 0, kLanes - 1)], IsThemeLight() ? 0.70f : 0.58f,
+                                     IsThemeLight() ? 0.82f : 0.95f, r, g, b);
+         return ImGui::GetColorU32(ImVec4(r, g, b, alpha));
+      }
+
+      // TR-808 step-key groups: red, orange, yellow, cream for steps 1-4, 5-8, 9-12, 13-16.
+      ImU32 GroupColor(int step, float alpha)
+      {
+         static const float kHSV[4][3] = { { 0.00f, 0.62f, 0.86f }, { 0.07f, 0.68f, 0.92f }, { 0.13f, 0.62f, 0.92f },
+                                           { 0.11f, 0.12f, 0.92f } };
+         const float* h = kHSV[(step / 4) % 4];
+         float r, g, b;
+         ImGui::ColorConvertHSVtoRGB(h[0], h[1], IsThemeLight() ? h[2] * 0.9f : h[2], r, g, b);
+         return ImGui::GetColorU32(ImVec4(r, g, b, alpha));
+      }
+
+      ImU32 Amber() { return IsThemeLight() ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF); }
+
       std::string LaneName(DrumSequencerNode* n, int lane)
       {
          const std::string& fn = n->FileName(lane);
@@ -186,6 +217,10 @@ namespace app
       }
 
       int PlayStep(DrumSequencerNode* n) { return n->run && Transport::Instance().IsPlaying() ? n->CurrentStep() : -1; }
+      int PlayStep(DrumSequencerNode* n, int lane)
+      {
+         return n->run && Transport::Instance().IsPlaying() ? n->LaneCurrentStep(lane) : -1;
+      }
 
       void Hit(DrumSequencerNode* n, int lane, float vel)
       {
@@ -230,7 +265,7 @@ namespace app
 
       void FillLane(DrumSequencerNode* n, int lane, Fill f)
       {
-         const int N = std::clamp(n->numSteps, 1, kMaxSteps);
+         const int N = n->LaneStepCount(lane);
          float* v = n->stepVel[lane];
          const int spb = StepsPerBeat(n);
          auto set = [&](auto pred) {
@@ -291,7 +326,10 @@ namespace app
                v[i] = v[i] > 0.0f ? 0.0f : kDefaultVel;
             break;
          case Fill::Randomise: n->RandomizeLane(lane); break;
-         case Fill::Clear: std::fill(v, v + N, 0.0f); break;
+         case Fill::Clear:
+            std::fill(v, v + N, 0.0f);
+            n->ResetTrigs(lane);
+            break;
          }
       }
 
@@ -314,17 +352,22 @@ namespace app
          PushUndoCheckpoint("Drums double");
          for (int l = 0; l < kLanes; l++)
             for (int i = 0; i < N; i++)
+            {
                n->stepVel[l][N + i] = n->stepVel[l][i];
+               n->stepProb[l][N + i] = n->stepProb[l][i];
+               n->stepCond[l][N + i] = n->stepCond[l][i];
+               n->stepNudge[l][N + i] = n->stepNudge[l][i];
+            }
          n->numSteps = N * 2;
          n->editPage = N * 2 > kPageSteps ? 1 : 0;
       }
 
       void DrawFillMenu(DrumSequencerNode* n)
       {
-         if (TextChip((std::string(T("Fill")) + "##fill").c_str(), ImGui::IsPopupOpen("##drumFill")))
+         if (TextChip((std::string(T("Tools")) + "##fill").c_str(), ImGui::IsPopupOpen("##drumFill")))
             ImGui::OpenPopup("##drumFill");
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Fill tools for the selected lane"));
+            HelpTip("%s", T("Pattern tools for the selected lane"));
          if (!MenuParts::BeginPopup("##drumFill"))
             return;
          MenuParts::Check(L("All lanes"), &sFillAll);
@@ -389,6 +432,88 @@ namespace app
          }
       }
 
+      int GrooveIndex(const DrumSequencerNode* n)
+      {
+         int count = 0;
+         const DrumPatterns::Groove* all = DrumPatterns::All(count);
+         for (int i = 0; i < count; i++)
+            if (n->patternName == all[i].name)
+               return i;
+         return -1;
+      }
+
+      // The LCD: a dark glass readout in amber, like a drum machine's display. < > step through the groove
+      // library (the node body's arrows); the readout shows part, rate, steps and swing.
+      void DrawLcd(DrumSequencerNode* n, float w)
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 mn = ImGui::GetCursorScreenPos(), mx(mn.x + w, mn.y + tok::tile);
+         dl->AddRectFilled(mn, mx, tok::U32(tok::pal::c_0B0C10FF), tok::radius_field);
+         dl->AddRect(mn, mx, IsThemeLight() ? tok::U32(tok::pal::c_B4BCCCFF) : tok::U32(tok::pal::c_404454FF), tok::radius_field);
+         const ImU32 lit = tok::U32(tok::pal::c_FFC850FF);
+         const float arrowW = 18.0f, th = ImGui::GetTextLineHeight(), ty = mn.y + (tok::tile - th) * 0.5f;
+         int count = 0;
+         DrumPatterns::All(count);
+         const int cur = GrooveIndex(n);
+         for (int side = 0; side < 2; side++)
+         {
+            const float ax = side == 0 ? mn.x : mx.x - arrowW;
+            ImGui::SetCursorScreenPos(ImVec2(ax, mn.y));
+            ImGui::PushID(side);
+            if (ImGui::InvisibleButton("##lcdarrow", ImVec2(arrowW, tok::tile)) && count > 0)
+            {
+               const int next = cur < 0 ? 0 : (cur + (side == 0 ? count - 1 : 1)) % count;
+               ApplyDrumGroove(n, next, n->patternPart);
+            }
+            const bool hov = ImGui::IsItemHovered();
+            if (hov)
+               HelpTip("%s", side == 0 ? T("Previous groove") : T("Next groove"));
+            ImGui::PopID();
+            const float cx = ax + arrowW * 0.5f, cy = mn.y + tok::tile * 0.5f, a = 3.5f;
+            const ImU32 c = hov ? lit : ImGui::GetColorU32(ImVec4(1.0f, 0.78f, 0.31f, 0.55f));
+            if (side == 0)
+               dl->AddTriangleFilled(ImVec2(cx + a * 0.6f, cy - a), ImVec2(cx + a * 0.6f, cy + a), ImVec2(cx - a * 0.8f, cy), c);
+            else
+               dl->AddTriangleFilled(ImVec2(cx - a * 0.6f, cy - a), ImVec2(cx - a * 0.6f, cy + a), ImVec2(cx + a * 0.8f, cy), c);
+         }
+         char right[64];
+         snprintf(right, sizeof right, "%s  %d  %d%%", MusicTime::RateDivisionName(n->rate), std::clamp(n->numSteps, 1, kMaxSteps),
+                  (int)std::lround(n->swing * 100.0f));
+         const float rw = ImGui::CalcTextSize(right).x;
+         std::string name = n->patternName.empty() ? std::string(T("no groove")) : n->patternName;
+         if (!n->patternName.empty() && cur >= 0)
+            name += std::string(" ") + "ABC"[std::clamp(n->patternPart, 0, 2)];
+         const float lx0 = mn.x + arrowW, rx = mx.x - arrowW - rw - 4.0f;
+         dl->PushClipRect(ImVec2(lx0, mn.y), ImVec2(rx - 8.0f, mx.y), true);
+         dl->AddText(ImVec2(lx0 + 2.0f, ty), lit, name.c_str());
+         dl->PopClipRect();
+         dl->AddText(ImVec2(rx, ty), ImGui::GetColorU32(ImVec4(1.0f, 0.78f, 0.31f, 0.7f)), right);
+         ImGui::SetCursorScreenPos(mn);
+         ImGui::Dummy(ImVec2(w, tok::tile));
+      }
+
+      // FILL: held = fill-conditioned steps play (TR / Elektron). Shift-click latches it.
+      void DrawFillKey(DrumSequencerNode* n)
+      {
+         static bool sLatched = false;
+         const char* label = "FILL##fillkey";
+         const float w = TextW("FILL") + 6.0f;
+         ActionButton::Scoped() = n->fill ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+         const bool clicked = ActionButton::Draw(label, ImVec2(w, tok::tile));
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
+         const bool held = ImGui::IsItemActive();
+         if (clicked && ImGui::GetIO().KeyShift)
+            sLatched = !sLatched;
+         n->fill = sLatched || held;
+         if (n->fill)
+         {
+            const ImVec2 imn = ImGui::GetItemRectMin(), imx = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddRect(imn, imx, Amber(), tok::radius_field, 0, 1.5f);
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Hold: steps set to Fill play, !Fill rest. Shift-click latches."));
+      }
+
       void DrawHeader(const std::vector<GraphNode*>& pages, int current, ImVec2 origin, float width)
       {
          ImGui::SetCursorScreenPos(origin);
@@ -425,6 +550,9 @@ namespace app
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Run this sequencer's steps (the transport keeps going)"));
 
+            ImGui::SameLine(0.0f, tok::space_3);
+            DrawLcd(n, 250.0f);
+
             // D4: step pages, a dot on the one the playhead is on.
             const bool paged = n->numSteps > kPageSteps;
             const int play = PlayStep(n);
@@ -448,17 +576,22 @@ namespace app
             if (!paged)
                ImGui::EndDisabled();
             ImGui::SameLine(0.0f, tok::space_3);
+            DrawFillKey(n);
+            ImGui::SameLine(0.0f, tok::space_1);
             DrawFillMenu(n);
 
-            // Inspector chips pinned right.
-            const float laneW = TextW(T("Lane")), kitW = TextW(T("Kit"));
+            // Inspector pages pinned right.
+            const char* kTabs[3] = { T("Lane"), T("Step"), T("Kit") };
+            const float tabsW = TextW(kTabs[0]) + TextW(kTabs[1]) + TextW(kTabs[2]) + 2.0f * tok::space_1;
             ImGui::SameLine();
-            ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + width - laneW - kitW - tok::space_1), origin.y));
-            if (TextChip(T("Lane"), !sKit))
-               sKit = false;
-            ImGui::SameLine(0.0f, tok::space_1);
-            if (TextChip(T("Kit"), sKit))
-               sKit = true;
+            ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + width - tabsW), origin.y));
+            for (int t = 0; t < 3; t++)
+            {
+               if (t > 0)
+                  ImGui::SameLine(0.0f, tok::space_1);
+               if (TextChip(kTabs[t], sTab == t))
+                  sTab = t;
+            }
          }
          DrawDockMenu(origin, ImVec2(origin.x + width, origin.y + tok::tile));
       }
@@ -471,7 +604,7 @@ namespace app
          const float btnW = 22.0f, knobCell = 28.0f;
          const float btnH = std::min(rowH, 22.0f);
          const float padX0 = p.x + 14.0f;
-         const float padX1 = p.x + kPadW - knobCell - 2.0f * btnW - 3.0f * kCellGap - 4.0f;
+         const float padX1 = p.x + kPadW - 3.0f * knobCell - 2.0f * btnW - 5.0f * kCellGap - 4.0f;
          const float dt = ImGui::GetIO().DeltaTime;
          for (int lane = 0; lane < kLanes; lane++)
          {
@@ -490,7 +623,7 @@ namespace app
             lit = std::clamp(std::max(lit, sPadFlash[lane]), 0.0f, 1.0f);
             dl->AddCircleFilled(ImVec2(p.x + 6.0f, cy), 3.5f, light ? tok::U32(tok::pal::c_B4BCCCFF) : tok::U32(tok::pal::c_404454FF));
             if (lit > 0.02f)
-               dl->AddCircleFilled(ImVec2(p.x + 6.0f, cy), 3.5f, NodeColor(gn, lit));
+               dl->AddCircleFilled(ImVec2(p.x + 6.0f, cy), 3.5f, LaneColor(lane, lit));
 
             // Pad: click hits it and selects the lane (Alt = accent velocity).
             const ImVec2 pmn(padX0, y), pmx(padX1, y + rowH);
@@ -500,17 +633,18 @@ namespace app
             if (ImGui::IsItemActivated())
             {
                sLane = lane;
-               sKit = false;
+               if (sTab == kTabKit)
+                  sTab = kTabLane;
                Hit(n, lane, ImGui::GetIO().KeyAlt ? 1.0f : kDefaultVel);
             }
             const bool sel = lane == sLane;
             dl->AddRectFilled(pmn, pmx, ImGui::GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), tok::radius_field);
             if (lit > 0.02f)
-               dl->AddRectFilled(pmn, pmx, NodeColor(gn, 0.28f * lit), tok::radius_field);
-            dl->AddRectFilled(pmn, ImVec2(pmn.x + 3.0f, pmx.y), NodeColor(gn, sel ? 1.0f : 0.45f), tok::radius_field,
+               dl->AddRectFilled(pmn, pmx, LaneColor(lane, 0.30f * lit), tok::radius_field);
+            dl->AddRectFilled(pmn, ImVec2(pmn.x + 4.0f, pmx.y), LaneColor(lane, sel ? 1.0f : 0.55f), tok::radius_field,
                               ImDrawFlags_RoundCornersLeft);
             if (sel)
-               dl->AddRect(pmn, pmx, NodeColor(gn), tok::radius_field, 0, 1.5f);
+               dl->AddRect(pmn, pmx, LaneColor(lane), tok::radius_field, 0, 1.5f);
             char num[4];
             snprintf(num, sizeof num, "%d", lane + 1);
             const float th = ImGui::GetTextLineHeight();
@@ -532,76 +666,118 @@ namespace app
             ImGui::SetCursorScreenPos(ImVec2(x, cy - btnH * 0.5f));
             if (AudioSoloButton("S##s", &n->laneSolo[lane], btnW, btnH))
                UndoOnToggle(&n->laneSolo[lane]);
-            x += btnW + kCellGap;
+            x += btnW + kCellGap + 2.0f;
+            // Channel strip: tune, decay, level (TR-8S has these three on every instrument).
             const float d = std::clamp(rowH - 2.0f, 16.0f, 24.0f);
-            ImGui::SetCursorScreenPos(ImVec2(x, cy - d * 0.5f));
-            const float before = n->laneVolume[lane];
-            KnobFloat("##lvl", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", d, NodeColor(gn), false, knobCell);
-            UndoOnActivate(&n->laneVolume[lane], before);
-            if (ImGui::IsItemHovered())
-               HelpTip("%s %.2f", T("Level"), n->laneVolume[lane]);
+            struct K { const char* id; const char* tip; float* v; float lo, hi; const char* fmt; bool bip; };
+            const K knobs[3] = {
+               { "##tune", T("Tune"), &n->lanePitch[lane], -24.0f, 24.0f, "%+.1f st", true },
+               { "##dec", T("Decay"), &n->laneDecay[lane], 0.0f, 1.0f, "%.2f", false },
+               { "##lvl", T("Level"), &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", false },
+            };
+            for (const K& k : knobs)
+            {
+               ImGui::SetCursorScreenPos(ImVec2(x, cy - d * 0.5f));
+               const float before = *k.v;
+               if (k.bip)
+                  BipolarKnobFloat(k.id, k.v, k.lo, k.hi, k.fmt, d, LaneColor(lane), false, knobCell, -1, -1, false, 0.0f, 0.0f, false, true);
+               else
+                  KnobFloat(k.id, k.v, k.lo, k.hi, k.fmt, d, LaneColor(lane), false, knobCell);
+               UndoOnActivate(k.v, before);
+               if (ImGui::IsItemHovered())
+               {
+                  char buf[32];
+                  snprintf(buf, sizeof buf, k.fmt, *k.v);
+                  HelpTip("%s %s", k.tip, buf);
+               }
+               x += knobCell + kCellGap;
+            }
             ImGui::PopID();
          }
       }
 
-      // ---- step grid ---------------------------------------------------------------------------------
+      // ---- step keys ---------------------------------------------------------------------------------
+      struct GridGeom
+      {
+         float x0 = 0.0f, cellW = 0.0f;
+         int cols = 0;
+         float X(int c) const { return x0 + (float)c * (cellW + kCellGap) + (float)(c / 4) * kGroupGap; }
+         int ColAt(float mx) const
+         {
+            for (int c = 0; c < cols; c++)
+               if (mx < X(c) + cellW + kCellGap * 0.5f + ((c % 4) == 3 ? kGroupGap * 0.5f : 0.0f))
+                  return c;
+            return cols;
+         }
+      };
+
       void DrawGrid(GraphNode* gn, DrumSequencerNode* n, ImVec2 p, float w, float rowH)
       {
+         (void)gn;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const bool light = IsThemeLight();
          const int N = std::clamp(n->numSteps, 1, kMaxSteps);
-         const bool paged = N > kPageSteps;
+         int maxLen = N;
+         for (int l = 0; l < kLanes; l++)
+            maxLen = std::max(maxLen, n->LaneStepCount(l));
+         const bool paged = maxLen > kPageSteps;
          n->editPage = paged ? std::clamp(n->editPage, 0, 1) : 0;
          const int base = n->editPage * kPageSteps;
-         const int cols = paged ? kPageSteps : N;
-         const int spb = StepsPerBeat(n);
+         GridGeom g;
+         g.cols = paged ? kPageSteps : maxLen;
+         g.x0 = p.x;
+         const float gaps = kCellGap * (float)(g.cols - 1) + kGroupGap * (float)((g.cols - 1) / 4);
+         g.cellW = std::max(6.0f, (w - gaps) / (float)g.cols);
          const int play = PlayStep(n);
-         const float cellW = std::max(6.0f, (w - kCellGap * (float)(cols - 1)) / (float)cols);
          const float gridY = p.y + kRulerH;
          const float gridH = (float)kLanes * (rowH + kRowGap) - kRowGap;
 
-         // Beat groups: every other beat sits on a lighter band, like the 4-step colour groups on a TR.
-         for (int c = 0; c < cols; c++)
+         // Ruler: a key cap per step in its TR group colour, number on it; the playhead cap is the chase light.
+         for (int c = 0; c < g.cols; c++)
          {
             const int s = base + c;
-            const float x0 = p.x + (float)c * (cellW + kCellGap);
-            if ((s / spb) % 2 == 1)
-               dl->AddRectFilled(ImVec2(x0 - kCellGap * 0.5f, gridY - 2.0f), ImVec2(x0 + cellW + kCellGap * 0.5f, gridY + gridH + 2.0f),
-                                 ImGui::GetColorU32(ImGuiCol_Text, light ? 0.045f : 0.035f));
-            // Ruler: step numbers, the beat starts brighter.
+            const float x0 = g.X(c);
+            const ImVec2 kmn(x0, p.y + 1.0f), kmx(x0 + g.cellW, p.y + kRulerH - 4.0f);
+            const bool inPat = s < N, now = s == play;
+            dl->AddRectFilled(kmn, kmx, GroupColor(s, now ? 1.0f : (inPat ? (light ? 0.55f : 0.42f) : 0.12f)), 2.0f);
             char num[4];
             snprintf(num, sizeof num, "%d", s + 1);
             const ImVec2 ts = ImGui::CalcTextSize(num);
-            if (cellW >= ts.x + 2.0f || s % spb == 0)
-               dl->AddText(ImVec2(x0 + (cellW - ts.x) * 0.5f, p.y), ImGui::GetColorU32(s % spb == 0 ? ImGuiCol_Text : ImGuiCol_TextDisabled,
-                                                                                        s < N ? 1.0f : 0.35f), num);
-            if (s == play)
-               dl->AddRectFilled(ImVec2(x0, p.y + kRulerH - 3.0f), ImVec2(x0 + cellW, p.y + kRulerH - 1.0f),
-                                 light ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF), 1.0f);
+            if (g.cellW >= ts.x + 2.0f || s % 4 == 0)
+               dl->AddText(ImVec2(x0 + (g.cellW - ts.x) * 0.5f, kmn.y + (kmx.y - kmn.y - ts.y) * 0.5f),
+                           now ? tok::U32(tok::pal::c_0B0C10FF) : ImGui::GetColorU32(ImGuiCol_Text, inPat ? 0.95f : 0.35f), num);
          }
 
-         // One hit target for the whole grid; the cell under the mouse is worked out here.
+         // One hit target for the whole grid; the key under the mouse is worked out here.
          ImGui::SetCursorScreenPos(ImVec2(p.x, gridY));
          ImGui::InvisibleButton("##drumgrid", ImVec2(std::max(1.0f, w), gridH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
          const bool gridHovered = ImGui::IsItemHovered();
          const ImVec2 m = ImGui::GetIO().MousePos;
          auto cellAt = [&](int& lane, int& step) {
-            const int c = (int)std::floor((m.x - p.x) / (cellW + kCellGap));
+            const int c = g.ColAt(m.x);
             const int l = (int)std::floor((m.y - gridY) / (rowH + kRowGap));
             lane = std::clamp(l, 0, kLanes - 1);
-            step = base + std::clamp(c, 0, cols - 1);
-            return c >= 0 && c < cols && l >= 0 && l < kLanes && base + c < N;
+            step = base + std::clamp(c, 0, g.cols - 1);
+            return m.x >= p.x && c < g.cols && l >= 0 && l < kLanes && step < n->LaneStepCount(lane);
          };
          int hl = -1, hs = -1;
          const bool overCell = (gridHovered || sDrag.mode != Drag::None) && cellAt(hl, hs);
          const ImGuiIO& io = ImGui::GetIO();
 
-         if (ImGui::IsItemActivated() && overCell)
+         if (ImGui::IsItemActivated() && overCell && io.KeyShift && !ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         {
+            // Shift-click: open the key on the Step page (Elektron: hold TRIG), no edit.
+            sLane = hl;
+            sStep = hs;
+            sTab = kTabStep;
+         }
+         else if (ImGui::IsItemActivated() && overCell)
          {
             PushUndoCheckpoint("Drums steps");
             float& v = n->stepVel[hl][hs];
             sDrag = { Drag::None, hl, hs, v, m.y };
             sLane = hl;
+            sStep = hs;
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
             {
                sDrag.mode = Drag::Erase;
@@ -652,38 +828,66 @@ namespace app
             sDrag = {};
          }
          if (gridHovered && sDrag.mode == Drag::None)
-            HelpTip("%s", T("Click: step on/off. Drag: paint. Drag up/down on a lit step: velocity.\nAlt-click: accent. Right-drag: erase."));
+            HelpTip("%s", T("Click: key on/off. Drag: paint. Drag up/down on a lit key: velocity.\nAlt-click: accent. Right-drag: erase. Shift-click: open on the Step page."));
 
-         // Cells.
+         // Keys.
+         const ImU32 badgeText = ImGui::GetColorU32(ImVec4(1, 1, 1, 0.92f));
          for (int lane = 0; lane < kLanes; lane++)
          {
             const float y0 = gridY + (float)lane * (rowH + kRowGap);
+            const int len = n->LaneStepCount(lane);
+            const int lanePlay = PlayStep(n, lane);
             if (lane == sLane)
-               dl->AddRectFilled(ImVec2(p.x - 3.0f, y0 - 1.5f), ImVec2(p.x + w + 3.0f, y0 + rowH + 1.5f), NodeColor(gn, 0.10f), tok::radius_field);
-            for (int c = 0; c < cols; c++)
+               dl->AddRectFilled(ImVec2(p.x - 3.0f, y0 - 1.5f), ImVec2(p.x + w + 3.0f, y0 + rowH + 1.5f), LaneColor(lane, 0.10f), tok::radius_field);
+            for (int c = 0; c < g.cols; c++)
             {
                const int s = base + c;
-               const float x0 = p.x + (float)c * (cellW + kCellGap);
-               const ImVec2 cMin(x0, y0), cMax(x0 + cellW, y0 + rowH);
-               if (s >= N)
+               const float x0 = g.X(c);
+               const ImVec2 cMin(x0, y0), cMax(x0 + g.cellW, y0 + rowH);
+               if (s >= len)
                {
-                  dl->AddRect(cMin, cMax, ImGui::GetColorU32(ImGuiCol_Border, 0.35f), tok::radius_field);
+                  dl->AddRect(cMin, cMax, ImGui::GetColorU32(ImGuiCol_Border, 0.30f), tok::radius_field);
                   continue;
                }
                StepCell::Draw(dl, cMin, cMax, false, false, overCell && hl == lane && hs == s);
                const float vel = n->stepVel[lane][s];
+               const bool now = s == lanePlay;
                if (vel > 0.0f)
                {
-                  const bool accent = vel >= 0.99f, now = s == play;
+                  const bool accent = vel >= 0.99f;
+                  const float prob = n->stepProb[lane][s];
+                  // Micro timing shows as the lit bar sliding inside its key.
+                  const float shift = n->stepNudge[lane][s] * (g.cellW - 4.0f);
                   const float top = y0 + (1.0f - vel) * (rowH - 2.0f);
-                  const ImU32 fill = now ? (light ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC864FF))
-                                         : accent ? NodeColor(gn, 1.0f) : NodeColor(gn, light ? 0.75f : 0.62f);
-                  dl->AddRectFilled(ImVec2(x0 + 1.0f, top), ImVec2(cMax.x - 1.0f, cMax.y - 1.0f), fill, 2.0f);
+                  const float a = (accent ? 1.0f : (light ? 0.78f : 0.66f)) * (prob < 1.0f ? 0.45f + 0.55f * prob : 1.0f);
+                  const ImU32 fill = now ? Amber() : LaneColor(lane, a);
+                  dl->PushClipRect(ImVec2(x0 + 1.0f, y0), ImVec2(cMax.x - 1.0f, cMax.y), true);
+                  dl->AddRectFilled(ImVec2(x0 + 1.0f + shift, top), ImVec2(cMax.x - 1.0f + shift, cMax.y - 1.0f), fill, 2.0f);
+                  dl->PopClipRect();
                   if (accent)
                      dl->AddRectFilled(ImVec2(x0 + 2.0f, y0 + 2.0f), ImVec2(cMax.x - 2.0f, y0 + 4.0f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.85f)), 1.0f);
+                  // Trig badges: condition name, else a probability %, small in the key's lower left.
+                  const int cond = n->stepCond[lane][s];
+                  char badge[8] = "";
+                  if (cond != 0)
+                     snprintf(badge, sizeof badge, "%s", DrumSequencerNode::CondName(cond));
+                  else if (prob < 1.0f)
+                     snprintf(badge, sizeof badge, "%d%%", (int)std::lround(prob * 100.0f));
+                  if (badge[0] != '\0')
+                  {
+                     UiType::Scope bs(UiType::Size::Caption, UiType::Weight::Semibold);
+                     const ImVec2 bsz = ImGui::CalcTextSize(badge);
+                     if (bsz.x + 4.0f <= g.cellW && bsz.y + 2.0f <= rowH)
+                        dl->AddText(ImVec2(x0 + 3.0f, cMax.y - bsz.y - 1.0f), badgeText, badge);
+                     else
+                        dl->AddTriangleFilled(ImVec2(cMax.x - 6.0f, cMax.y - 1.0f), ImVec2(cMax.x - 1.0f, cMax.y - 1.0f),
+                                              ImVec2(cMax.x - 1.0f, cMax.y - 6.0f), badgeText);
+                  }
                }
-               if (s == play)
+               if (now)
                   StepCell::PlayheadOutline(dl, cMin, cMax);
+               if (sTab == kTabStep && lane == sLane && s == sStep)
+                  dl->AddRect(ImVec2(cMin.x - 1.5f, cMin.y - 1.5f), ImVec2(cMax.x + 1.5f, cMax.y + 1.5f), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_field, 0, 1.5f);
             }
          }
       }
@@ -806,6 +1010,45 @@ namespace app
             r.Knob("acc tune", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", col, true);
             r.Knob("acc level", &n->laneAccentLevel[lane], 0.0f, 12.0f, "%+.1f dB", col);
             r.End();
+         }
+
+         SectionCard::Begin(T("Shape"));
+         {
+            KnobRow r(3);
+            r.Place();
+            float len = (float)n->laneSteps[lane];
+            const int before = n->laneSteps[lane];
+            KnobFloat("length", &len, 0.0f, (float)kMaxSteps, n->laneSteps[lane] == 0 ? "pattern" : "%.0f", r.d, col, false, r.cell);
+            n->laneSteps[lane] = std::clamp((int)std::lround(len), 0, kMaxSteps);
+            UndoOnActivate(&n->laneSteps[lane], before);
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Lane length. 0 follows the pattern; other lengths loop on their own (polymeter)"));
+            const bool filt = n->laneFilter[lane] != 0;
+            if (!filt)
+               ImGui::BeginDisabled();
+            r.Knob("cutoff", &n->laneCutoff[lane], 0.0f, 1.0f, "%.2f", col);
+            r.Knob("reso", &n->laneReso[lane], 0.0f, 1.0f, "%.2f", col);
+            if (!filt)
+               ImGui::EndDisabled();
+            r.End();
+         }
+         SectionCard::RowLabel(T("Filter"));
+         static const char* kFilt[3] = { "off##f0", "LP##f1", "HP##f2" };
+         for (int f = 0; f < 3; f++)
+         {
+            if (f > 0)
+               ImGui::SameLine(0.0f, 1.0f);
+            if (ChipButton::Draw(kFilt[f], n->laneFilter[lane] == f, tok::tile, 34.0f) && n->laneFilter[lane] != f)
+            {
+               PushUndoCheckpoint("Drums filter");
+               n->laneFilter[lane] = f;
+            }
+         }
+         SectionCard::RowLabel(T("Play"));
+         if (ChipButton::Draw(T("Reverse"), n->laneReverse[lane], tok::tile, 70.0f))
+         {
+            PushUndoCheckpoint("Drums reverse");
+            n->laneReverse[lane] = !n->laneReverse[lane];
          }
 
          SectionCard::Begin(T("Lane"));
@@ -956,13 +1199,77 @@ namespace app
          }
       }
 
+      // The selected key's trig: velocity, chance, micro timing, condition (Elektron trig page).
+      void DrawStepInspector(GraphNode* gn, DrumSequencerNode* n)
+      {
+         const int lane = std::clamp(sLane, 0, kLanes - 1);
+         const int s = std::clamp(sStep, 0, kMaxSteps - 1);
+         const ImU32 col = NodeColor(gn);
+         ImGui::PushID(lane * kMaxSteps + s);
+         char title[64];
+         snprintf(title, sizeof title, "%s %d  %s %d", T("Step"), s + 1, T("lane"), lane + 1);
+         SectionCard::Begin(title);
+         const float w = ImGui::GetContentRegionAvail().x;
+         float& vel = n->stepVel[lane][s];
+         if (vel <= 0.0f)
+         {
+            if (ActionButton::Draw(T("Turn on"), ImVec2(w, tok::tile)))
+            {
+               PushUndoCheckpoint("Drums steps");
+               vel = kDefaultVel;
+            }
+            ImGui::PopID();
+            return;
+         }
+         {
+            KnobRow r(3);
+            r.Knob("velocity", &vel, 0.05f, 1.0f, "%.2f", col);
+            float pct = n->stepProb[lane][s] * 100.0f;
+            const float before = n->stepProb[lane][s];
+            r.Place();
+            KnobFloat("chance", &pct, 0.0f, 100.0f, "%.0f%%", r.d, col, false, r.cell);
+            n->stepProb[lane][s] = std::clamp(std::round(pct) / 100.0f, 0.0f, 1.0f);
+            UndoOnActivate(&n->stepProb[lane][s], before);
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Chance the hit plays each time round"));
+            r.Knob("nudge", &n->stepNudge[lane][s], -0.48f, 0.48f, "%+.2f", col, true);
+            r.End();
+         }
+         SectionCard::Begin(T("Condition"));
+         const float cw = (w - 4.0f * 1.0f) / 5.0f;
+         for (int c = 0; c < DrumSequencerNode::kNumConds; c++)
+         {
+            // Rows: none + Fill pair + 1st pair | 1:2 2:2 1:3 2:3 3:3 | 1:4 .. 4:4
+            const bool rowStart = c == 0 || c == 5 || c == 10;
+            if (!rowStart)
+               ImGui::SameLine(0.0f, 1.0f);
+            char id[24];
+            snprintf(id, sizeof id, "%s##cd%d", DrumSequencerNode::CondName(c), c);
+            if (ChipButton::Draw(id, n->stepCond[lane][s] == c, tok::tile, cw) && n->stepCond[lane][s] != c)
+            {
+               PushUndoCheckpoint("Drums condition");
+               n->stepCond[lane][s] = c;
+            }
+         }
+         if (ActionButton::Draw(T("Reset trig"), ImVec2(w, 0.0f)))
+         {
+            PushUndoCheckpoint("Drums reset trig");
+            n->stepProb[lane][s] = 1.0f;
+            n->stepCond[lane][s] = 0;
+            n->stepNudge[lane][s] = 0.0f;
+         }
+         ImGui::PopID();
+      }
+
       void DrawInspector(GraphNode* gn, DrumSequencerNode* n, ImVec2 at, ImVec2 size)
       {
          ImGui::SetCursorScreenPos(at);
          ImGui::BeginChild("##drumInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
          SectionCard::BeginWindow();
-         if (sKit)
+         if (sTab == kTabKit)
             DrawKitInspector(gn, n);
+         else if (sTab == kTabStep)
+            DrawStepInspector(gn, n);
          else
             DrawLaneInspector(gn, n);
          SectionCard::EndWindow();
