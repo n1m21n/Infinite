@@ -5,6 +5,7 @@
 #include "app/panels/FieldPatcherPanel.h"
 #include "core/CliSetup.h"
 #include "nodes/AudioNodes.h"
+#include "nodes/DrumSequencerNode.h"
 #include "core/FactoryPresets.h"
 #include "arrange/MidiImport.h"
 
@@ -291,6 +292,11 @@ void DrawPopupsA(FrameCtx& fc)
                      gViewportPanelNodes.push_back(gn->index);
                   gViewportPanelOpen = true;
                }
+            }
+            if (dynamic_cast<DrumSequencerNode*>(gn->node.get()) != nullptr)
+            {
+               if (MenuParts::Item(L("Open in Drum panel"), "Shift+J"))
+                  DrumPanelShowNode(gn->index);
             }
             if (dynamic_cast<MixerNode*>(gn->node.get()) != nullptr)
             {

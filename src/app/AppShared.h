@@ -6006,6 +6006,15 @@ uint64_t PianoRollGenerate(const std::string& spec, uint64_t laneId, std::string
 std::string PianoRollExportMidi(uint64_t clipId, std::string path, std::string& err);
 // True while the pointer is over the panel: its keys beat the canvas's (the Timeline's rule).
 extern bool gPianoRollClaimedKeys;
+// The Drum panel (DrumPanel.cpp): the Drum Sequencer nodes' hardware face, bottom or top.
+extern bool gDrumPanelOpen;
+extern float gDrumPanelHeight;
+extern int gDrumPanelDock; // 0 = bottom, 3 = top
+extern bool gDrumClaimedKeys;
+extern ImVec2 gDrumPanelRectMin, gDrumPanelRectMax;
+void DrawDrumPanelDocked(const char* id, const ImVec2& size);
+// Opens the panel on this Drum Sequencer's page.
+void DrumPanelShowNode(int nodeIndex);
 extern bool gView3DOpen;
 extern float gView3DHeight;
 extern int gView3DDock; // 0 bottom, 1 right, 2 left, 3 top, 4 fill (the canvas is hidden)

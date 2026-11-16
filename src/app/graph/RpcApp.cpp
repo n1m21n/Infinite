@@ -38,6 +38,7 @@ namespace app
             { "session", &gSessionPanelOpen, nullptr, false },
             { "samplestudio", &gSampleStudioOpen, &gSampleStudioDock, false },
             { "pianoroll", &gPianoRollOpen, &gPianoRollDock, false },
+            { "drums", &gDrumPanelOpen, &gDrumPanelDock, false },
             { "view3d", &gView3DOpen, &gView3DDock, true },
             { "view2d", &gView2DOpen, &gView2DDock, true },
             { "terminal", &gTerminalOpen, &gTerminalDock, true },

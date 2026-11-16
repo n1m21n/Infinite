@@ -742,6 +742,9 @@ void DrawSidePanels(FrameCtx& fc)
       // Piano Roll (View > Piano Roll or Shift+R), bottom or top like the Timeline.
       if (gPianoRollOpen && gPianoRollDock != 3)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
+      // Drums (View > Drums or Shift+J), bottom or top.
+      if (gDrumPanelOpen && gDrumPanelDock != 3)
+         DrawDrumPanelDocked("##drums_bottom", ImVec2(0, gDrumPanelHeight));
       if (gView3DOpen && gView3DDock == 0)
          DrawView3DDocked("##view3d_bottom", ImVec2(0, gView3DHeight));
       if (gView2DOpen && gView2DDock == 0)

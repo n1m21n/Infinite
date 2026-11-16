@@ -504,6 +504,12 @@ namespace app
             gPianoRollHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelPianoRollDock")
             gPianoRollDock = (val == "3") ? 3 : 0;
+         else if (key == "panelDrumsOpen")
+            gDrumPanelOpen = (val != "0");
+         else if (key == "panelDrumsH")
+            gDrumPanelHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelDrumsDock")
+            gDrumPanelDock = (val == "3") ? 3 : 0;
          else if (key == "panelCurveEditorOpen")
             gCurveEditorOpen = (val != "0");
          else if (key == "panelCurveEditorH")
@@ -593,6 +599,9 @@ namespace app
       file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
       file << "panelPianoRollH=" << gPianoRollHeight << "\n";
       file << "panelPianoRollDock=" << gPianoRollDock << "\n";
+      file << "panelDrumsOpen=" << (gDrumPanelOpen ? 1 : 0) << "\n";
+      file << "panelDrumsH=" << gDrumPanelHeight << "\n";
+      file << "panelDrumsDock=" << gDrumPanelDock << "\n";
       file << "panelCurveEditorOpen=" << (gCurveEditorOpen ? 1 : 0) << "\n";
       file << "panelCurveEditorH=" << gCurveEditorHeight << "\n";
       file << "panelCurveEditorW=" << gCurveEditorWidth << "\n";
@@ -625,6 +634,7 @@ namespace app
                     gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight, gTerminalHeight, gTerminalWidth);
       std::snprintf(buf + std::strlen(buf), sizeof buf - std::strlen(buf), "|%d%d %.0f %.0f", gMixerPanelOpen, gMixerPanelDock,
                     gMixerPanelWidth, gMixerPanelHeight);
+      std::snprintf(buf + std::strlen(buf), sizeof buf - std::strlen(buf), "|%d%d %.0f", gDrumPanelOpen, gDrumPanelDock, gDrumPanelHeight);
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

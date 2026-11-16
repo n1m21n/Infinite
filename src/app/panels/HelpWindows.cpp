@@ -641,6 +641,7 @@ namespace app
       { I18N_KEY("Canvas & View"), I18N_KEY("Modulation Matrix"), "Shift+M", I18N_KEY("Toggle docked modulation matrix") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Mixer"), "Shift+L", I18N_KEY("Toggle the Mixer panel") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Drums"), "Shift+J", I18N_KEY("Toggle the Drum panel") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Fit View to Content"), "F / Shift+Y", I18N_KEY("Frame the whole patch in the canvas view") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Find"), MODKEY "+F", I18N_KEY("Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes") },
@@ -676,6 +677,11 @@ namespace app
       { I18N_KEY("Sample Studio"), I18N_KEY("Audition Slice"), "Q", I18N_KEY("Play the selected slice, or the one under the pointer") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Mute / Solo Slice"), "M / S", I18N_KEY("Mute or solo the selected slices") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Reverse Slice"), "V", I18N_KEY("Reverse the selected slices") },
+
+      // Drums
+      { I18N_KEY("Drums"), I18N_KEY("Play Pads"), "1-8", I18N_KEY("Play and select lanes 1-8 while the pointer is over the Drum panel (Shift = accent)") },
+      { I18N_KEY("Drums"), I18N_KEY("Steps"), "Click / drag", I18N_KEY("Click a step on or off, drag to paint, drag up or down on a lit step for velocity") },
+      { I18N_KEY("Drums"), I18N_KEY("Accent / Erase"), "Alt+click / right-drag", I18N_KEY("Alt-click toggles an accent (full velocity); right-drag erases steps") },
 
       // Piano Roll
       { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },

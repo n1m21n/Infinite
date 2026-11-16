@@ -205,6 +205,10 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_R, false))
          gPianoRollOpen = !gPianoRollOpen;
 
+      // Shift+J: the docked Drum panel (the Timeline keeps Shift+J for a new track while it has the keys)
+      if (!typing && shiftOnly && (!gArrangeFocused || (gDrumPanelOpen && gDrumClaimedKeys)) && ImGui::IsKeyPressed(ImGuiKey_J, false))
+         gDrumPanelOpen = !gDrumPanelOpen;
+
       // Shift+E: the docked Curve Editor
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_E, false))
          gCurveEditorOpen = !gCurveEditorOpen;
@@ -380,7 +384,7 @@ void DrawKeyboard(FrameCtx& fc)
          gSessionClaimedKeys = false;
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
                         (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
-                        (gCurveEditorOpen && gCurveEditorClaimedKeys) ||
+                        (gCurveEditorOpen && gCurveEditorClaimedKeys) || (gDrumPanelOpen && gDrumClaimedKeys) ||
                         (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
       bool doDelete = gRequestDelete ||
