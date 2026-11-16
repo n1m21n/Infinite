@@ -280,7 +280,7 @@ namespace app
                   {
                      CategoryColors::SaveAppearanceOverrides();
                   }
-                  ImGui::SameLine(0.0f, 6.0f);
+                  FormParts::Inline(0.0f, 6.0f);
                   ImGui::TextUnformatted(cat.c_str());
                }
                ImGui::EndTable();
@@ -310,7 +310,7 @@ namespace app
                   {
                      CategoryColors::SaveAppearanceOverrides();
                   }
-                  ImGui::SameLine(0.0f, 6.0f);
+                  FormParts::Inline(0.0f, 6.0f);
                   ImGui::TextUnformatted(cableNames[i].c_str());
                }
                ImGui::EndTable();
@@ -521,7 +521,7 @@ namespace app
                gCableVisibilityMask = 0x7;
                SaveWorkspaceSettings();
             }
-            ImGui::SameLine();
+            FormParts::Inline();
             if (FormParts::Button(L("Hide all cables")))
             {
                gCableVisibilityMask = 0x0;
@@ -943,7 +943,7 @@ namespace app
                if (!dir.empty())
                   Platform::RevealInFileManager(dir);
             }
-            ImGui::SameLine();
+            FormParts::Inline();
             const uint64_t folderBytes = MovementLog::GetLogFolderSizeBytes();
             const float folderMB = (float)folderBytes / (1024.0f * 1024.0f);
             ImGui::Text(T("(%.1f MB used)"), folderMB);
@@ -988,7 +988,7 @@ namespace app
                   if (!dir.empty())
                      Platform::RevealInFileManager(dir);
                }
-               ImGui::SameLine();
+               FormParts::Inline();
                static double sLearnSizedAt = -10.0; // walking the folder every frame would cost; once a second
                static float sLearnMB = 0.0f;
                if (ImGui::GetTime() - sLearnSizedAt > 1.0)
@@ -1070,11 +1070,11 @@ namespace app
             ImGui::Spacing();
             ImGui::SetNextItemWidth(220.0f);
             FormParts::BareCombo("##fieldtopic", &sSelectedSection, kSections, IM_ARRAYSIZE(kSections), 220.0f);
-            ImGui::SameLine(0.0f, 8.0f);
+            FormParts::Inline(0.0f, 8.0f);
             FormParts::SearchInput("##fieldsearch", "Search functions / syntax...", sFilterBuf, sizeof(sFilterBuf), 220.0f);
             if (sFilterBuf[0] != '\0')
             {
-               ImGui::SameLine(0.0f, 6.0f);
+               FormParts::Inline(0.0f, 6.0f);
                const float btnW = ImGui::GetFrameHeight();
                if (ActionButton::Draw("##clearfieldsearch", ImVec2(btnW, 0)))
                   sFilterBuf[0] = '\0';
@@ -1098,7 +1098,7 @@ namespace app
                HelpTip("%s", T("Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you."));
             if (!sFieldSkillStatus.empty())
             {
-               ImGui::SameLine();
+               FormParts::Inline();
                ImGui::TextDisabled("%s", sFieldSkillStatus.c_str());
             }
 
@@ -1432,7 +1432,7 @@ namespace app
                HelpTip("%s", T("Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you."));
             if (!sExprSkillStatus.empty())
             {
-               ImGui::SameLine();
+               FormParts::Inline();
                ImGui::TextDisabled("%s", sExprSkillStatus.c_str());
             }
             SectionCard::End();
@@ -1459,9 +1459,9 @@ namespace app
                   SaveDefaultExprGlobals();
                }
 
-               ImGui::SameLine();
+               FormParts::Inline();
                ImGui::TextUnformatted("=");
-               ImGui::SameLine();
+               FormParts::Inline();
 
                char exprBuf[512];
                snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
@@ -1491,10 +1491,10 @@ namespace app
 
                char valueText[32];
                snprintf(valueText, sizeof(valueText), "%.4f", g.value);
-               ImGui::SameLine();
+               FormParts::Inline();
                ImGui::SetCursorPosX(valueRightX - ImGui::CalcTextSize(valueText).x);
                ImGui::TextDisabled("%s", valueText);
-               ImGui::SameLine();
+               FormParts::Inline();
                ImGui::SetCursorPosX(btnX);
                {
                   if (ActionButton::Draw("##removeexprglobal", ImVec2(btnW, 0)))
@@ -1532,7 +1532,7 @@ namespace app
                gPatchDirty = true;
                SaveDefaultExprGlobals();
             }
-            ImGui::SameLine();
+            FormParts::Inline();
             if (FormParts::Button(L("Presets..."), ImVec2(110, 0)))
             {
                ImGui::OpenPopup("ExprPresetsMenuSettings");

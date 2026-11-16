@@ -682,19 +682,19 @@ namespace app
             DeskParts::ScribbleRow(dl, mn, mx, name.c_str(), lane + 1, NodeColor(gn, loaded ? 1.0f : 0.35f), !loaded);
             if (hov)
             {
-               dl->AddRect(mn, mx, DeskParts::Grey(255, 70), 3.0f);
+               dl->AddRect(mn, mx, DeskParts::Ink(70), 3.0f);
                HelpTip("%s %d: %s\n%s", T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
             }
             float x = scribbleX1 + pad;
             ImGui::SetCursorScreenPos(ImVec2(x, cy - keyH * 0.5f));
-            if (DeskParts::Key("M##m", "M", n->laneMute[lane], IM_COL32(255, 86, 80, 255), ImVec2(keyW, keyH)))
+            if (DeskParts::Key("M##m", "M", n->laneMute[lane], tok::U32(tok::desk_led_red), ImVec2(keyW, keyH)))
             {
                n->laneMute[lane] = !n->laneMute[lane];
                UndoOnToggle(&n->laneMute[lane]);
             }
             x += keyW + pad;
             ImGui::SetCursorScreenPos(ImVec2(x, cy - keyH * 0.5f));
-            if (DeskParts::Key("S##s", "S", n->laneSolo[lane], IM_COL32(255, 214, 64, 255), ImVec2(keyW, keyH)))
+            if (DeskParts::Key("S##s", "S", n->laneSolo[lane], tok::U32(tok::desk_led_yellow), ImVec2(keyW, keyH)))
             {
                n->laneSolo[lane] = !n->laneSolo[lane];
                UndoOnToggle(&n->laneSolo[lane]);
@@ -751,19 +751,19 @@ namespace app
             const float rfs = tok::type_caption;
             const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(rfs, FLT_MAX, 0.0f, num);
             if (g.cellW >= ts.x + 2.0f || beat)
-               dl->AddText(ImGui::GetFont(), rfs, ImVec2(x0 + (g.cellW - ts.x) * 0.5f, p.y + 2.0f), DeskParts::Grey(beat || now ? 215 : 120, inPat ? 255 : 70), num);
+               dl->AddText(ImGui::GetFont(), rfs, ImVec2(x0 + (g.cellW - ts.x) * 0.5f, p.y + 2.0f), DeskParts::Ink((beat || now ? 215 : 120) * (inPat ? 255 : 70) / 255), num);
             // engraved tick under the number, longer on the beat (like the fader scale)
             dl->AddLine(ImVec2(x0 + g.cellW * 0.5f, p.y + 3.0f + rfs), ImVec2(x0 + g.cellW * 0.5f, p.y + 3.0f + rfs + (beat ? 4.0f : 2.0f)),
-                        DeskParts::Grey(255, inPat ? (beat ? 200 : 110) : 50), 1.0f);
+                        DeskParts::Ink(inPat ? (beat ? 200 : 110) : 50), 1.0f);
             // Chase light: one LED per step, the playing one lit (TR step LEDs).
             if (inPat)
             {
-               const ImU32 chase = IM_COL32(255, 86, 80, 255);
+               const ImU32 chase = tok::U32(tok::desk_led_red);
                const ImVec2 lc(x0 + g.cellW * 0.5f, p.y + kRulerH - 4.0f);
                dl->AddCircleFilled(lc, 2.5f, DeskParts::Tint(chase, 0.22f), 10);
                if (now)
                {
-                  dl->AddCircleFilled(lc, 4.5f, IM_COL32(255, 86, 80, 60), 12);
+                  dl->AddCircleFilled(lc, 4.5f, tok::U32(tok::desk_led_red, 60), 12);
                   dl->AddCircleFilled(lc, 2.5f, chase, 10);
                }
             }
@@ -866,7 +866,7 @@ namespace app
                const ImVec2 cMin(x0, y0), cMax(x0 + g.cellW, y0 + rowH);
                if (s >= len)
                {
-                  dl->AddRectFilled(cMin, cMax, DeskParts::Grey(0, 90), 3.0f);
+                  dl->AddRectFilled(cMin, cMax, DeskParts::Lo(90), 3.0f);
                   continue;
                }
                const bool hov = overCell && hl == lane && hs == s;
@@ -882,8 +882,8 @@ namespace app
                   DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, Accent(1.0f), nullptr, true, lit);
                   if (now)
                   {
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 90), 3.0f);
-                     dl->AddRect(cMin, cMax, DeskParts::Grey(255), 3.0f, 0, 1.5f);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(90), 3.0f);
+                     dl->AddRect(cMin, cMax, DeskParts::Ink(), 3.0f, 0, 1.5f);
                   }
                   const float nudge = n->stepNudge[lane][s];
                   if (std::fabs(nudge) > 0.001f)
@@ -915,8 +915,8 @@ namespace app
                   DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, 0.0f, Accent(1.0f), nullptr, true);
                   if (now)
                   {
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 50), 3.0f);
-                     dl->AddRect(cMin, cMax, DeskParts::Grey(255, 200), 3.0f, 0, 1.5f);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(50), 3.0f);
+                     dl->AddRect(cMin, cMax, DeskParts::Ink(200), 3.0f, 0, 1.5f);
                   }
                }
                if (sTab == kTabStep && lane == sLane && s == sStep)
@@ -1116,10 +1116,10 @@ namespace app
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Lanes in one choke group cut each other off (closed hat stops the open hat)"));
          SectionCard::RowLabel(T("Mix"));
-         if (DeskParts::Key("M##im", "M", n->laneMute[lane], IM_COL32(255, 86, 80, 255), ImVec2(tok::control_h, tok::control_h)) && (n->laneMute[lane] = !n->laneMute[lane], true))
+         if (DeskParts::Key("M##im", "M", n->laneMute[lane], tok::U32(tok::desk_led_red), ImVec2(tok::control_h, tok::control_h)) && (n->laneMute[lane] = !n->laneMute[lane], true))
             UndoOnToggle(&n->laneMute[lane]);
          ImGui::SameLine(0.0f, 1.0f);
-         if (DeskParts::Key("S##is", "S", n->laneSolo[lane], IM_COL32(255, 214, 64, 255), ImVec2(tok::control_h, tok::control_h)) && (n->laneSolo[lane] = !n->laneSolo[lane], true))
+         if (DeskParts::Key("S##is", "S", n->laneSolo[lane], tok::U32(tok::desk_led_yellow), ImVec2(tok::control_h, tok::control_h)) && (n->laneSolo[lane] = !n->laneSolo[lane], true))
             UndoOnToggle(&n->laneSolo[lane]);
          ImGui::PopID();
       }
@@ -1326,9 +1326,9 @@ namespace app
          ImDrawList* pdl = ImGui::GetWindowDrawList();
          DeskParts::Chassis(pdl, ImVec2(at.x - 4.0f, at.y - 4.0f), ImVec2(at.x + size.x + 4.0f, at.y + size.y));
          ImGui::BeginChild("##drumInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
-         // A desk is dark in both themes: text and cards use fixed desk tones inside it.
-         ImGui::PushStyleColor(ImGuiCol_Text, DeskParts::Grey(228));
-         ImGui::PushStyleColor(ImGuiCol_TextDisabled, DeskParts::Grey(255, 140));
+         // Text and cards inside the desk use the desk tones (light desk in light mode).
+         ImGui::PushStyleColor(ImGuiCol_Text, DeskParts::Ink(228));
+         ImGui::PushStyleColor(ImGuiCol_TextDisabled, DeskParts::Ink(140));
          SectionCard::S().desk = true;
          SectionCard::S().deskCap = NodeColor(gn);
          SectionCard::BeginWindow();

@@ -109,8 +109,8 @@ namespace app
 
       // Scale: labelled ticks as short marks in the centre column plus a
       // faint line across each bar slot; unlabelled minor marks between.
-      dl->AddRectFilled(ImVec2(lx, barTop), ImVec2(lx + barW, barBot), slotCol, 2.0f);
-      dl->AddRectFilled(ImVec2(rx, barTop), ImVec2(rx + barW, barBot), slotCol, 2.0f);
+      dl->AddRectFilled(ImVec2(lx, barTop), ImVec2(lx + barW, barBot), slotCol, tok::radius_cell);
+      dl->AddRectFilled(ImVec2(rx, barTop), ImVec2(rx + barW, barBot), slotCol, tok::radius_cell);
       static const float kLabelled[] = { 0.0f, -6.0f, -12.0f, -24.0f, -36.0f, -48.0f };
       static const float kMinor[] = { 3.0f, -3.0f, -9.0f, -18.0f, -30.0f, -42.0f, -54.0f };
       for (float db : kMinor)
@@ -173,7 +173,7 @@ namespace app
       // Max-peak readouts, one per bar. Red box once that channel clipped.
       auto drawReadout = [&](float bx, float maxPeak, bool clipped) {
          const ImVec2 a(bx, readTop), b(bx + barW, readTop + readH);
-         dl->AddRectFilled(a, b, clipped ? kRed : slotCol, 2.0f);
+         dl->AddRectFilled(a, b, clipped ? kRed : slotCol, tok::radius_cell);
          char buf[12];
          FormatDb(buf, sizeof(buf), maxPeak);
          const ImVec2 ts = textSize(buf);
@@ -292,17 +292,17 @@ namespace app
       // where", and each stays in sync with the other since both write the
       // same n->start/n->end.
       AudioSlider("finetune", &n->finetune, -50.0f, 50.0f, "%.0f c", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
       AudioSlider("speed", &n->speed, -2.0f, 2.0f, "%.2fx", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->start = std::min(n->start, n->end - 0.01f);
          n->position = std::clamp(n->position, n->start, n->end);
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->end = std::max(n->end, n->start + 0.01f);
@@ -310,7 +310,7 @@ namespace app
       }
       if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->position = std::clamp(n->position, n->start, n->end);
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       // fade in / fade out close the grid as a pair. They are ms lengths
@@ -319,7 +319,7 @@ namespace app
       // Draw order is the pin numbering: they take the ordinals the old
       // single "loop xfade" row used (8) and the next (9).
       AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
    }
 
@@ -364,7 +364,7 @@ namespace app
       // SetDragDropPayload pair, since the drop target here is really
       // "whichever node the drop lands on", resolved once in one place
       // rather than duplicated as a per-node-type accept.
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool recording = n->IsRecording();
       if (ActionButton::Draw(recording ? "Stop##rec" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -382,7 +382,7 @@ namespace app
       // cable) a triggered voice sounds forever, and clicking the waveform
       // again only retriggers from a new point rather than silencing it, so
       // there needs to be a dedicated way to stop it.
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool playing = n->IsPlaying();
       if (ActionButton::Draw(playing ? "Stop##aud" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -412,7 +412,7 @@ namespace app
       // stale pre-resize width) visibly lagged behind it. Every other
       // control in this file already anchors off the fixed content width
       // for exactly this reason.
-      ImGui::SameLine();
+      FormParts::Inline();
       const float toggleW = 44.0f;
       const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
       const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
@@ -423,14 +423,14 @@ namespace app
          PushUndoCheckpoint();
          n->loop = loopBool;
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       bool reverseBool = n->reverse;
       if (AudioToggleButton("rev##samplerReverse", &reverseBool))
       {
          PushUndoCheckpoint();
          n->reverse = reverseBool;
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       bool pingpongBool = n->pingpong;
       if (AudioToggleButton("p-p##samplerPingpong", &pingpongBool))
       {
@@ -513,7 +513,7 @@ namespace app
       AudioBareDropdown("genPart", partNames, partIdx, [n](int i) { PushUndoCheckpoint(); n->part = (int)kParts[i]; }, thirdW3);
       if (ImGui::IsItemHovered())
          SetAudioReadout("part", "synths, keys, leads, pads, plucks, textures, bass, drums, kicks, snares, hats, toms, percussion, fx or foley");
-      ImGui::SameLine();
+      FormParts::Inline();
       if (state == State::Generating)
       {
          if (ActionButton::Draw("cancel##gen", ImVec2(thirdW3, 0), ActionButton::Kind::Record))
@@ -527,7 +527,7 @@ namespace app
       }
       if (ImGui::IsItemHovered())
          SetAudioReadout("#", "makes a new one each press");
-      ImGui::SameLine();
+      FormParts::Inline();
       // A loop made in this session can be exported; one reloaded from a patch has to be generated again.
       ImGui::BeginDisabled(!n->HasLoopToExport());
       if (ActionButton::Draw("export wav##gen", ImVec2(thirdW3, 0)))
@@ -541,7 +541,7 @@ namespace app
          SetAudioReadout("#", "saves the loop as a .wav anywhere you choose");
 
       AudioSlider("variation", &n->variation, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       {
          // Length: a loop is 1, 2, 4 or 8 bars, nothing between.
          static const std::vector<std::string> barNames = { "1 bar", "2 bars", "4 bars", "8 bars" };
@@ -564,7 +564,7 @@ namespace app
          }
          if (ImGui::IsItemHovered())
             SetAudioReadout("follow tempo", "on: the transport's tempo; off: the sound picks its own");
-         ImGui::SameLine();
+         FormParts::Inline();
          if (AudioToggleButton("follow scale##genFollowScale", &scale, AudioHalfWidth()))
          {
             PushUndoCheckpoint();
@@ -583,13 +583,13 @@ namespace app
             PushUndoCheckpoint();
             n->loop = loopBool;
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          if (AudioToggleButton("rev##genReverse", &reverseBool, thirdW))
          {
             PushUndoCheckpoint();
             n->reverse = reverseBool;
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          if (AudioToggleButton("p-p##genPingpong", &pingpongBool, thirdW))
          {
             PushUndoCheckpoint();
@@ -683,7 +683,7 @@ namespace app
             n->LoadFile(path);
          }
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool recording = n->IsRecording();
       if (ActionButton::Draw(recording ? "Stop##rec" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -694,7 +694,7 @@ namespace app
             n->StartRecording();
       }
 
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool playing = n->IsPlaying();
       if (ActionButton::Draw(playing ? "Stop##aud" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -706,7 +706,7 @@ namespace app
       if (ImGui::IsItemHovered())
          SetAudioReadout("#", "plays the whole sample on this node's own voice");
 
-      ImGui::SameLine();
+      FormParts::Inline();
       ImGui::BeginDisabled(n->FileName().empty() || n->sliceBy != 0);
       if (ActionButton::Draw("re-slice", ImVec2(90, 0)))
       {
@@ -738,7 +738,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       ImGui::BeginDisabled(!onsetMode);
       if (AudioSliderInt("count", &n->onsets, 1, SlicerNode::kMaxSlices, halfW))
          n->onsets = std::clamp(n->onsets, 1, SlicerNode::kMaxSlices);
@@ -755,13 +755,13 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       ImGui::BeginDisabled(!onsetMode);
       AudioSlider("sensitivity", &n->sensitivity, 0.0f, 100.0f, "%.0f %%", halfW);
       ImGui::EndDisabled();
 
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", halfW);
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("finetune", &n->finetune, -100.0f, 100.0f, "%.0f c", halfW);
 
       // attack extends the hidden 2 ms de-click ramp rather than adding a
@@ -769,7 +769,7 @@ namespace app
       // skew puts 100 ms at 12 o'clock over the 0..500 throw.
       AudioSlider("attack", &n->attack, 0.0f, 500.0f, "%.1f ms", halfW,
                   SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
-      ImGui::SameLine();
+      FormParts::Inline();
       // decay owns the ENVELOPE only. The top of its throw is a no-decay
       // detent - the slice holds at full level after its attack. Where it
       // stops is `crossthrough`'s business, not decay's.
@@ -781,7 +781,7 @@ namespace app
       // the 0.25..4 throw instead of a quarter of the way along it.
       AudioSlider("speed", &n->speed, 0.25f, 4.0f, "%.2fx", halfW, LogTaper::PosToValue,
                   LogTaper::ValueToPos);
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", halfW);
 
       // Row 6, left cell only: the right cell is the one deliberate spare
@@ -830,7 +830,7 @@ namespace app
             n->LoadFile(path);
          }
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool recording = n->IsRecording();
       if (ActionButton::Draw(recording ? "Stop##rec" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -841,7 +841,7 @@ namespace app
             n->StartRecording();
       }
 
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool playing = n->IsPlaying();
       if (ActionButton::Draw(playing ? "Stop##aud" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -851,7 +851,7 @@ namespace app
             n->TriggerPreview(n->start);
       }
 
-      ImGui::SameLine();
+      FormParts::Inline();
       const float toggleW = 44.0f;
       const float modsW = toggleW;
       const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
@@ -868,7 +868,7 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
       AudioSlider("stretch", &n->stretch, 1.0f, 1000.0f, "%.1fx", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("phase rand", &n->phaseRand, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       static const std::vector<std::string> sWinSizeNames = {
@@ -880,15 +880,15 @@ namespace app
                            PushUndoCheckpoint();
                            n->windowSizeIndex = idx;
                         }, AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
 
       AudioSlider("pitch", &n->pitchShift, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("finetune", &n->fineTune, -100.0f, 100.0f, "%.0f c", AudioHalfWidth());
 
       AudioSlider("freq shift", &n->freqShift, -1000.0f, 1000.0f, "%.0f Hz", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       // Int params go through AudioSliderInt, never a float copy on the
       // stack: the slider registers the pointer it is given, and next frame's
       // modulation pass reads and writes through it after this frame is gone.
@@ -897,7 +897,7 @@ namespace app
       ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
       AudioSlider("detune", &n->detune, 0.0f, 100.0f, "%.1f c", AudioHalfWidth());
       ImGui::EndDisabled();
-      ImGui::SameLine();
+      FormParts::Inline();
       if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->position = std::clamp(n->position, std::min(n->start, n->end), std::max(n->start, n->end));
@@ -909,7 +909,7 @@ namespace app
          n->start = std::min(n->start, n->end - 0.01f);
          n->position = std::clamp(n->position, n->start, n->end);
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->end = std::max(n->end, n->start + 0.01f);
@@ -1093,7 +1093,7 @@ namespace app
             n->LoadFile(path);
          }
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool recording = n->IsRecording();
       if (ActionButton::Draw(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -1104,19 +1104,19 @@ namespace app
             n->StartRecording();
       }
 
-      ImGui::SameLine();
+      FormParts::Inline();
       if (ActionButton::Draw("Roll", ImVec2(60, 0)))
       {
          PushUndoCheckpoint();
          n->Roll();
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       if (ActionButton::Draw("Iterate", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
          n->Iterate();
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       if (ActionButton::Draw("Reset##molder", ImVec2(60, 0)))
       {
          PushUndoCheckpoint();
@@ -1144,14 +1144,14 @@ namespace app
             PushUndoCheckpoint();
             n->loop = loopBool;
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          bool reverseBool = n->reverse;
          if (AudioToggleButton("rev##molderReverse", &reverseBool))
          {
             PushUndoCheckpoint();
             n->reverse = reverseBool;
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          bool pingpongBool = n->pingpong;
          if (AudioToggleButton("p-p##molderPingpong", &pingpongBool))
          {
@@ -1162,24 +1162,24 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       AudioSlider("chaos", &n->chaos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
 
       AudioSlider("tone", &n->tone, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("stretch", &n->stretch, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       AudioSlider("air", &n->air, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("snap", &n->snap, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       AudioSlider("time", &n->time, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("level", &n->level, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
 
       if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->start = std::min(n->start, n->end - 0.01f);
-      ImGui::SameLine();
+      FormParts::Inline();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->end = std::max(n->end, n->start + 0.01f);
 
@@ -1329,7 +1329,7 @@ namespace app
             n->LoadFile(path);
          }
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool recording = n->IsRecording();
       if (ActionButton::Draw(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -1340,7 +1340,7 @@ namespace app
             n->StartRecording();
       }
 
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool playing = n->IsPlaying();
       if (ActionButton::Draw(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(80, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -1351,7 +1351,7 @@ namespace app
       }
 
       // loop/rev/p-p toggles right-aligned on header row
-      ImGui::SameLine();
+      FormParts::Inline();
       const float toggleW = 44.0f;
       const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
       const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
@@ -1362,14 +1362,14 @@ namespace app
          PushUndoCheckpoint();
          n->loop = loopBool;
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       bool reverseBool = n->reverse;
       if (AudioToggleButton("rev##gmReverse", &reverseBool))
       {
          PushUndoCheckpoint();
          n->reverse = reverseBool;
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       bool pingpongBool = n->pingpong;
       if (AudioToggleButton("p-p##gmPingpong", &pingpongBool))
       {
@@ -1401,7 +1401,7 @@ namespace app
 
       // Row 1: grain | amount
       AudioSlider("grain", &n->grain, 10.0f, 500.0f, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("amount", &n->amount, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       // Row 2: key | order (or seed if random)
@@ -1414,7 +1414,7 @@ namespace app
             PushUndoCheckpoint();
             n->key = i;
          }, halfTrackW);
-         ImGui::SameLine();
+         FormParts::Inline();
 
          if (n->key == 2)
          {
@@ -1436,7 +1436,7 @@ namespace app
          n->start = std::min(n->start, n->end - 0.01f);
          n->position = std::clamp(n->position, n->start, n->end);
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->end = std::max(n->end, n->start + 0.01f);
@@ -1446,12 +1446,12 @@ namespace app
       // Row 4: position | level
       if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->position = std::clamp(n->position, n->start, n->end);
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("level", &n->level, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
 
       // Row 5: pitch | decay
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       EndAudioBody();
@@ -1477,7 +1477,7 @@ namespace app
             n->LoadFile(path);
          }
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       const bool recording = n->IsRecording();
       if (ActionButton::Draw(recording ? "Stop##granRec" : "Record##granRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -1488,7 +1488,7 @@ namespace app
             n->StartRecording();
       }
 
-      ImGui::SameLine();
+      FormParts::Inline();
       bool freezeBool = n->freeze;
       if (AudioToggleButton("freeze##granFreeze", &freezeBool))
       {
@@ -1496,7 +1496,7 @@ namespace app
          n->freeze = freezeBool;
       }
 
-      ImGui::SameLine();
+      FormParts::Inline();
       bool loopBool = n->loop;
       if (AudioToggleButton("loop##granLoop", &loopBool))
       {
@@ -1514,27 +1514,27 @@ namespace app
          PushUndoCheckpoint();
          n->Seek(n->position);
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("scan", &n->scan, -4.0f, 4.0f, "%.2fx", AudioHalfWidth());
 
       // Row 2: Grain Size & Density
       AudioSlider("size", &n->grainLength, 5.0f, 1000.0f, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("density", &n->density, 1.0f, 100.0f, "%.0f Hz", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       // Row 3: Random Position (Spray) & Random Length
       AudioSlider("spray", &n->randomPos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("rnd size", &n->randomLength, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       // Row 4: Random Pitch & Pitch Shift
       AudioSlider("pitch", &n->pitchShift, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("rnd pitch", &n->randomPitch, 0.0f, 24.0f, "%.1f st", AudioHalfWidth());
 
       // Row 5: Fine Tune & Reverse Probability
       AudioSlider("finetune", &n->fineTune, -100.0f, 100.0f, "%.0f c", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("reverse", &n->reverseProb, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       // Row 6: Window Envelope Shape & Pan Spread
@@ -1546,17 +1546,17 @@ namespace app
                            PushUndoCheckpoint();
                            n->windowShape = idx;
                         }, AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("pan spread", &n->randomPan, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       // Row 7: Master Pan & Width
       AudioSlider("pan", &n->pan, -1.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("width", &n->width, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
 
       // Row 8: Dry/Wet Mix & Volume
       AudioSlider("mix", &n->mix, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
 
       // Row 9: Trim Start & End
@@ -1566,7 +1566,7 @@ namespace app
          if (n->position < n->start)
             n->Seek(n->start);
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
       {
          n->end = std::max(n->end, n->start + 0.01f);
@@ -1671,13 +1671,13 @@ namespace app
       {
          const float half = AudioHalfWidth();
          AudioSlider("transient", &n->laneTransient[lane], -1.0f, 1.0f, "%.2f", half);
-         ImGui::SameLine();
+         FormParts::Inline();
          AudioSlider("decay", &n->laneDecay[lane], 0.0f, 1.0f, "%.2f", half);
          AudioSlider("pitch", &n->lanePitch[lane], -24.0f, 24.0f, "%.1f st", half);
-         ImGui::SameLine();
+         FormParts::Inline();
          AudioSlider("fine tune", &n->laneFineTune[lane], -50.0f, 50.0f, "%.0f c", half);
          AudioSlider("volume", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", half);
-         ImGui::SameLine();
+         FormParts::Inline();
          AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
          // Fourth row: the accent pair (pitch + level on full-velocity steps
          // only, for two-tone bells). Explicit param indices 300 + lane and
@@ -1690,7 +1690,7 @@ namespace app
          snprintf(levelName, sizeof(levelName), "lane %d accent vol", lane + 1);
          AudioSlider("accent", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", half, nullptr,
                      nullptr, 300 + lane, accentName);
-         ImGui::SameLine();
+         FormParts::Inline();
          AudioSlider("accent vol", &n->laneAccentLevel[lane], 0.0f, 12.0f, "%+.1f dB", half, nullptr,
                      nullptr, 310 + lane, levelName);
       }
@@ -1850,7 +1850,7 @@ namespace app
       for (int i = 0; i < count; i++)
       {
          if (i > 0)
-            ImGui::SameLine(0.0f, 1.0f);
+            FormParts::Inline(0.0f, 1.0f);
          bool on = (selected == i);
          char lbl[48];
          snprintf(lbl, sizeof(lbl), "%s##%s%d", labels[i], id, i);
@@ -1956,7 +1956,7 @@ namespace app
                                }
                             },
                             /*focusSearch=*/false);
-         ImGui::SameLine();
+         FormParts::Inline();
          // Built at the click, not every frame: the library, then each file in the grooves folder, then a last
          // "open folder" row so the folder can be found (it lives in the app's support directory).
          const std::string grvLabel = std::string(grooveIdx >= 0 ? gl.names[(size_t)grooveIdx].c_str()
@@ -1990,9 +1990,9 @@ namespace app
             gDropdown.focusSearch = true;
             gDropdown.filterBuf[0] = '\0';
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          const bool prev = ActionButton::Draw("<##drumgrvprev", ImVec2(navW, 0));
-         ImGui::SameLine();
+         FormParts::Inline();
          const bool next = ActionButton::Draw(">##drumgrvnext", ImVec2(navW, 0));
          if ((prev || next) && gl.count > 0)
          {
@@ -2000,7 +2000,7 @@ namespace app
                                              : (grooveIdx + (next ? 1 : gl.count - 1)) % gl.count;
             ApplyDrumGroove(n, target, part);
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          // Parts: greyed out until a groove has been picked (nothing to switch).
          if (grooveIdx < 0)
             ImGui::BeginDisabled();
@@ -2053,14 +2053,14 @@ namespace app
                PushUndoCheckpoint();
                n->RandomizeLane(lane);
             }
-            ImGui::SameLine(0.0f, 2.0f);
+            FormParts::Inline(0.0f, 2.0f);
             bool muteBool = n->laneMute[lane];
             if (AudioMuteButton("M##mute", &muteBool, toggleW, rowH))
             {
                PushUndoCheckpoint();
                n->laneMute[lane] = muteBool;
             }
-            ImGui::SameLine(0.0f, 2.0f);
+            FormParts::Inline(0.0f, 2.0f);
             bool soloBool = n->laneSolo[lane];
             if (AudioSoloButton("S##solo", &soloBool, toggleW, rowH))
             {
@@ -2115,7 +2115,7 @@ namespace app
                   const float fillTop = y0 + (1.0f - vel) * rowH;
                   const ImU32 fillCol = (s == curStep && n->run) ? (isLight ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC864FF))
                                                                  : (isLight ? tok::U32(tok::pal::c_2878EBF0) : tok::U32(tok::pal::c_78C8FFDC));
-                  dl->AddRectFilled(ImVec2(x0 + 1.0f, fillTop), ImVec2(cMax.x - 1.0f, y0 + rowH - 1.0f), fillCol, 2.0f);
+                  dl->AddRectFilled(ImVec2(x0 + 1.0f, fillTop), ImVec2(cMax.x - 1.0f, y0 + rowH - 1.0f), fillCol, tok::radius_cell);
                }
                if (isBar && s > 0)
                   dl->AddLine(ImVec2(x0 - cellGap * 0.5f, y0), ImVec2(x0 - cellGap * 0.5f, y0 + rowH),
@@ -2163,7 +2163,7 @@ namespace app
             const float startX = ImGui::GetCursorPosX();
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%d steps - %s", steps, MusicTime::RateDivisionName(n->rate));
-            ImGui::SameLine();
+            FormParts::Inline();
             ImGui::SetCursorPosX(startX + AudioFullWidth() - pillW);
             if (!paged)
                ImGui::BeginDisabled();
@@ -2207,13 +2207,13 @@ namespace app
          const float gap = ImGui::GetStyle().ItemSpacing.x;
          const float btnW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
          AudioToggleButton(n->run ? "Stop##drumrun" : "Run##drumrun", &n->run, btnW);
-         ImGui::SameLine();
+         FormParts::Inline();
          if (ActionButton::Draw("Randomise", ImVec2(btnW, 0)))
          {
             PushUndoCheckpoint();
             n->Randomize();
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          if (ActionButton::Draw("Clear", ImVec2(btnW, 0)))
          {
             PushUndoCheckpoint();
@@ -2427,13 +2427,13 @@ namespace app
       // Same rows, ranges and formats as the Sampler. Draw order is the pin
       // numbering: append only.
       AudioSlider("finetune", &n->finetune, -50.0f, 50.0f, "%.0f c", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
       AudioSlider("speed", &n->speed, -2.0f, 2.0f, "%.2fx", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
 
       {
@@ -2823,7 +2823,7 @@ namespace app
          const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
          if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
             openLoadPad = cur;
-         ImGui::SameLine();
+         FormParts::Inline();
          if (ActionButton::Draw("Folder...", ImVec2(thirdW, 0)))
          {
             const std::string folder = Platform::OpenFolderDialog("Load a folder into the 16 pads");
@@ -2833,7 +2833,7 @@ namespace app
                n->LoadFolder(folder);
             }
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          ImGui::BeginDisabled(!n->PadLoaded(cur));
          if (ActionButton::Draw("Clear", ImVec2(thirdW, 0)))
          {
@@ -2863,21 +2863,21 @@ namespace app
                            [value](int i) { PushUndoCheckpoint(); *value = i; }, width, /*showCaption=*/false);
          };
          dropdown(kMpcSync, AudioHalfWidth());
-         ImGui::SameLine();
+         FormParts::Inline();
          ImGui::BeginDisabled(n->padSync[cur] != MpcNode::kSynced);
          dropdown(kMpcDiv, AudioHalfWidth());
          ImGui::EndDisabled();
          slider(MpcNode::kFine, AudioHalfWidth());
-         ImGui::SameLine();
+         FormParts::Inline();
          slider(MpcNode::kPitch, AudioHalfWidth());
          slider(MpcNode::kSpeed, AudioHalfWidth());
-         ImGui::SameLine();
+         FormParts::Inline();
          slider(MpcNode::kVolume, AudioHalfWidth());
          slider(MpcNode::kPan, AudioHalfWidth());
-         ImGui::SameLine();
+         FormParts::Inline();
          dropdown(kMpcMode, AudioHalfWidth());
          slider(MpcNode::kFadeIn, AudioHalfWidth());
-         ImGui::SameLine();
+         FormParts::Inline();
          slider(MpcNode::kFadeOut, AudioHalfWidth());
          EndAudioSection();
       }
