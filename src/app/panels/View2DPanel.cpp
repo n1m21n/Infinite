@@ -2077,7 +2077,8 @@ namespace
          HandleLayerKeys(doc, cmd, shift, alt, false);
          return;
       }
-      if (!cmd && !alt)
+      // Plain letters only: Shift+letter belongs to the app (Shift+R Piano Roll, Shift+E Curve Editor, Shift+J Drums).
+      if (!cmd && !alt && !shift)
       {
          if (key(ImGuiKey_V)) sTool = kMove;
          if (key(ImGuiKey_C)) sTool = kCrop;
@@ -2476,6 +2477,7 @@ namespace
 
    int sTextEdit = 0;              // the text layer being typed into
    int sRasterAsk = 0;             // the text or vector layer a pixel tool was tried on
+   ImVec2 sRasterAskMn, sRasterAskMx; // last frame's chip rect: the canvas under it gives the click to the chip
    double sRasterAskAt = 0.0;
 
    void RasterizeLayer(Scene2DNode* doc, int id)
@@ -2506,6 +2508,65 @@ namespace
       return true;
    }
 
+   // A preset's look, painted once: one S stroke on a small clear surface, shown beside its name in the
+   // preset list (Photoshop's and Procreate's stroke thumbnails). Materials keep their colour; the rest paint in
+   // the text colour so they read on the menu.
+   unsigned BrushThumb(int i)
+   {
+      constexpr int kW = 96, kH = 24;
+      static std::map<int, GLUtil::Fbo> thumbs;
+      const auto& presets = BrushEngine::Presets();
+      if (i < 0 || i >= (int)presets.size())
+         return 0;
+      auto it = thumbs.find(i);
+      if (it != thumbs.end())
+         return it->second.tex;
+      GLUtil::Fbo& f = thumbs[i];
+      if (!GLUtil::EnsureFbo(f, kW, kH, GL_RGBA8, "BrushThumb"))
+         return 0;
+      GLint prevFbo = 0, vp[4];
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      glGetIntegerv(GL_VIEWPORT, vp);
+      glBindFramebuffer(GL_FRAMEBUFFER, f.fbo);
+      glViewport(0, 0, kW, kH);
+      glClearColor(0, 0, 0, 0);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+      glViewport(vp[0], vp[1], vp[2], vp[3]);
+      BrushEngine::Brush b = presets[i].brush;
+      if (BrushEngine::DirectMode(b.mode) || BrushEngine::RetouchMode(b.mode) || b.mode == BrushEngine::kErase || b.mode == BrushEngine::kClearMode)
+         return f.tex;   // these move or remove what is there: nothing to show on a clear surface
+      if (presets[i].group == nullptr || std::strcmp(presets[i].group, "Material") != 0)
+      {
+         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         b.color[0] = t.x;
+         b.color[1] = t.y;
+         b.color[2] = t.z;
+      }
+      b.size = std::clamp(b.size, 3.0f, (float)kH * 0.55f);
+      b.stabiliser = 0;
+      b.smoothing = 0.0f;
+      b.colorTex = b.tipTex = b.grainTex = 0;
+      BrushEngine::Stroke st;
+      const float pad = b.size * 0.5f + 2.0f;
+      auto at = [&](float u, float& x, float& y) {
+         x = pad + u * ((float)kW - 2.0f * pad);
+         y = (float)kH * 0.5f + std::sin(u * 6.2831853f) * ((float)kH * 0.5f - pad);
+      };
+      float x = 0, y = 0;
+      at(0.0f, x, y);
+      st.Begin(f, b, x, y, 0.3f);
+      for (int k = 1; k <= 48; k++)
+      {
+         const float u = (float)k / 48.0f;
+         at(u, x, y);
+         st.MoveTo(x, y, 0.3f + 0.7f * std::sin(u * 3.14159265f));
+      }
+      int dirty[4];
+      st.End(f, dirty);
+      return f.tex;
+   }
+
    // After a pixel tool met a text or vector layer: one chip at the top of the canvas, gone after a few seconds.
    void DrawRasterAsk(Scene2DNode* doc)
    {
@@ -2519,7 +2580,10 @@ namespace
       }
       const ImVec2 keep = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(sViewMn.x + tok::space_3, sViewMn.y + tok::space_3));
-      if (TextChip(L("Rasterize?##v2drasterask"), true, T("Turn this layer into pixels so the tool can work on it")))
+      const bool hit = TextChip(L("Rasterize?##v2drasterask"), true, T("Turn this layer into pixels so the tool can work on it"));
+      sRasterAskMn = ImGui::GetItemRectMin();
+      sRasterAskMx = ImGui::GetItemRectMax();
+      if (hit)
       {
          RasterizeLayer(doc, sRasterAsk);
          sRasterAsk = 0;
@@ -3004,9 +3068,9 @@ namespace
       auto rep = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, true); };
       if (!cmd)
       {
-         if (key(ImGuiKey_Q)) ToggleQuickMask(doc);
-         if (key(ImGuiKey_X)) SwapColours();
-         if (key(ImGuiKey_D)) DefaultColours();
+         if (!shift && key(ImGuiKey_Q)) ToggleQuickMask(doc);
+         if (!shift && key(ImGuiKey_X)) SwapColours();
+         if (!shift && key(ImGuiKey_D)) DefaultColours();
          if (BrushTool(sTool))
          {
             BrushEngine::Brush& b = ToolBrush();
@@ -4130,6 +4194,22 @@ namespace
       return lo[0] <= hi[0];
    }
 
+   // A new foreground colour (picker, swatch, eyedropper) carries into the next shape fill and the next text,
+   // as in Photoshop and Affinity. A colour set on the shape or text bar itself holds until the foreground moves again.
+   void TakeForeground()
+   {
+      static float seen[3] = { 0.0f, 0.0f, 0.0f };
+      if (seen[0] == sFg[0] && seen[1] == sFg[1] && seen[2] == sFg[2])
+         return;
+      std::copy(sFg, sFg + 3, seen);
+      std::copy(sFg, sFg + 3, sStyle.fillC);
+      sStyle.fillC[3] = 1.0f;
+      if (sStyle.fillType == 0)
+         sStyle.fillOn = true;
+      std::copy(sFg, sFg + 3, sTextC);
+      sTextC[3] = 1.0f;
+   }
+
    void CopyStyle(const Shape& from, Shape& to)
    {
       to.fillOn = from.fillOn;
@@ -4162,6 +4242,7 @@ namespace
          if (items == nullptr)
             return;
          static const int kTypes[6] = { Shape::kRect, Shape::kRect, Shape::kEllipse, Shape::kPolygon, Shape::kStar, Shape::kLine };
+         TakeForeground();
          Shape s = sStyle;
          s.type = kTypes[std::clamp(sShapeKind, 0, 5)];
          s.radius = sShapeKind == 1 ? std::max(1.0f, sStyle.radius) : 0.0f;
@@ -4231,6 +4312,7 @@ namespace
          items = Items(l);
          if (items == nullptr)
             return;
+         TakeForeground();
          Shape s = sStyle;
          s.type = Shape::kPath;
          s.pts.clear();
@@ -4540,6 +4622,7 @@ namespace
    {
       const size_t undo0 = gUndoStack.size();
       PushUndoCheckpoint("New text");
+      TakeForeground();
       const bool box = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) > 6.0f;
       const float x = box ? std::min(sOp.docStart.x, sMouseDoc.x) : sOp.docStart.x;
       const float y = box ? std::min(sOp.docStart.y, sMouseDoc.y) : sOp.docStart.y;
@@ -4850,7 +4933,8 @@ namespace
       }
       const ImVec2 mp = ImGui::GetIO().MousePos;
       const bool inEditor = sTextEdit != 0 && mp.x >= sEditMn.x && mp.x <= sEditMx.x && mp.y >= sEditMn.y && mp.y <= sEditMx.y;
-      const bool hovered = ImGui::IsItemHovered() && !inEditor;
+      const bool onAsk = sRasterAsk != 0 && mp.x >= sRasterAskMn.x && mp.x <= sRasterAskMx.x && mp.y >= sRasterAskMn.y && mp.y <= sRasterAskMx.y;
+      const bool hovered = ImGui::IsItemHovered() && !inEditor && !onAsk;
       const ImVec2 mx(mn.x + size.x, mn.y + size.y);
       Scene2DNode::Document& d = doc->Doc();
       const float r = d.rulers ? kRuler : 0.0f;
@@ -6147,6 +6231,7 @@ namespace
          const auto& presets = BrushEngine::Presets();
          ImGui::SetNextItemWidth(kWellL);
          const char* shown = preset >= 0 && preset < (int)presets.size() ? presets[preset].name : "";
+         ImGui::SetNextWindowSizeConstraints(ImVec2(260.0f, 0.0f), ImVec2(FLT_MAX, MenuParts::ListMaxH()));
          if (MenuParts::BeginCombo("##v2dpreset", T(shown)))
          {
             const char* group = nullptr;
@@ -6162,7 +6247,15 @@ namespace
                   group = presets[i].group;
                   ImGui::TextDisabled("%s", T(group));
                }
-               if (MenuParts::Choice(T(presets[i].name), i == preset))
+               const bool chose = MenuParts::Choice(T(presets[i].name), i == preset);
+               if (const unsigned thumb = erase ? 0u : BrushThumb(i))
+               {
+                  const ImVec2 rmx = ImGui::GetItemRectMax(), rmn = ImGui::GetItemRectMin();
+                  const float cy = (rmn.y + rmx.y) * 0.5f;
+                  ImGui::GetWindowDrawList()->AddImage((ImTextureID)(intptr_t)thumb, ImVec2(rmx.x - 96.0f - tok::space_2, cy - 12.0f),
+                                                       ImVec2(rmx.x - tok::space_2, cy + 12.0f), ImVec2(0, 1), ImVec2(1, 0));
+               }
+               if (chose)
                {
                   preset = i;
                   b = presets[i].brush;
