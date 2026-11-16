@@ -211,6 +211,9 @@ public:
    // Which library groove / part last landed here (ApplyPattern). Saved, but
    // informational: hand-editing steps afterwards does not clear it.
    std::string patternName;
+   // The Drums panel's page: its name (empty shows the node title) and colour as 0xRRGGBB (0 = none).
+   std::string pageName;
+   unsigned int pageColor = 0;
    int patternPart = 0; // 0 = A, 1 = B, 2 = C
    bool run = true;
 

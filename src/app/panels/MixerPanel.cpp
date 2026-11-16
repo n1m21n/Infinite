@@ -3,6 +3,7 @@
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -1121,7 +1122,10 @@ namespace app
          const float bw = (cw - 2.0f * 2.0f) / 3.0f;
          ImGui::SetCursorScreenPos(ImVec2(cx, y));
          if (Key("##m", "M", m->mute[s], IM_COL32(255, 86, 80, 255), ImVec2(bw, kButtonsH)))
+         {
+            m->mute[s] = !m->mute[s];
             UndoOnToggle(&m->mute[s]);
+         }
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Mute"));
          ImGui::SetCursorScreenPos(ImVec2(cx + bw + 2.0f, y));
@@ -1133,7 +1137,10 @@ namespace app
                MixerPanelClearSolos(MixerPanelCurrentPageTop());
             }
             else
+            {
+               m->solo[s] = !m->solo[s];
                UndoOnToggle(&m->solo[s]);
+            }
          }
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          {
@@ -1375,33 +1382,96 @@ namespace app
             MixerPanelCreateFromAudioOuts();
       }
 
+      bool sPendingAdd = false;
+      uint64_t sPendingDelete = 0;
+
+      // Page adds and deletes from the header land at the top of the next frame.
+      void ApplyPendingPageEdits()
+      {
+         if (sPendingAdd)
+         {
+            sPendingAdd = false;
+            MixerPanelAddPage();
+         }
+         if (sPendingDelete != 0)
+         {
+            GraphNode* gn = FindNodeByUid(sPendingDelete);
+            sPendingDelete = 0;
+            if (gn != nullptr)
+            {
+               PushUndoCheckpoint("Delete mixer page");
+               sPageUid = 0;
+               RemoveNodeByIndex(gn->index);
+               RebuildAudioTopology();
+            }
+         }
+      }
+
+      MixerNode* PageMixer(const Page& p)
+      {
+         GraphNode* top = FindNodeByIndex(p.topIndex);
+         return top != nullptr ? dynamic_cast<MixerNode*>(top->node.get()) : nullptr;
+      }
+
+      void DrawPagePicker(const std::vector<Page>& pages, int current)
+      {
+         std::vector<PagePicker::Entry> entries;
+         for (const Page& p : pages)
+         {
+            GraphNode* top = FindNodeByIndex(p.topIndex);
+            const MixerNode* m = PageMixer(p);
+            entries.push_back({ m != nullptr && !m->pageName.empty() ? m->pageName : (top ? NodeTitle(*top) : std::string(T("Page"))),
+                                m != nullptr ? m->pageColor : 0u });
+         }
+         const ImGuiIO& io = ImGui::GetIO();
+         if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift &&
+             ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
+            PagePicker::BeginRename("##mixerPage", entries, current);
+         const PagePicker::Result r = PagePicker::Draw("##mixerPage", entries, current, T("Pages: switch, add, rename, colour or delete one"));
+         const Page* pg = r.index >= 0 && r.index < (int)pages.size() ? &pages[r.index] : nullptr;
+         MixerNode* m = pg != nullptr ? PageMixer(*pg) : nullptr;
+         switch (r.act)
+         {
+         case PagePicker::Act::Select: sPageUid = pg->topUid; break;
+         case PagePicker::Act::Add: sPendingAdd = true; break;
+         case PagePicker::Act::Rename:
+            if (m != nullptr)
+            {
+               PushUndoCheckpoint("Rename mixer page");
+               m->pageName = r.name;
+            }
+            break;
+         case PagePicker::Act::Recolor:
+            if (m != nullptr)
+            {
+               PushUndoCheckpoint("Colour mixer page");
+               m->pageColor = r.color;
+            }
+            break;
+         case PagePicker::Act::Delete:
+            if (pg != nullptr)
+            {
+               // The page is its top Mixer; the sources and the Audio Out stay on the canvas. Next frame, so
+               // nothing drawn after the header this frame holds a removed node.
+               sPendingDelete = pg->topUid;
+            }
+            break;
+         default: break;
+         }
+      }
+
       void DrawMixerPanelContent()
       {
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          const ImVec2 avail = ImGui::GetContentRegionAvail();
+         ApplyPendingPageEdits();
          const std::vector<Page> pages = CollectPages();
          FollowCanvasSelection(pages);
          const int current = CurrentPage(pages);
 
-         // Header, as the other panels: the title and page tabs (only when there is more than one page) left,
+         // Header, as the other panels: the page dropdown left (no title: the rail icon names the panel),
          // Render and Mixer Audio pinned right.
-         ImGui::AlignTextToFramePadding();
-         {
-            UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
-            ImGui::TextUnformatted(T("Mixer"));
-         }
-         if (pages.size() > 1)
-         {
-            ImGui::SameLine(0.0f, tok::space_3);
-            for (int i = 0; i < (int)pages.size(); i++)
-            {
-               GraphNode* top = FindNodeByIndex(pages[i].topIndex);
-               const std::string label = (top ? NodeTitle(*top) : std::string(T("Page"))) + "##page" + std::to_string(i);
-               if (ChipButton::Draw(label.c_str(), i == current, tok::tile))
-                  sPageUid = pages[i].topUid;
-               ImGui::SameLine(0.0f, tok::space_1);
-            }
-         }
+         DrawPagePicker(pages, current);
          {
             const bool mixerMode = gAudioMode == AudioMode::Mixer;
             const char* audioLabel = mixerMode ? T("Mixer Audio On") : T("Enable Mixer Audio");

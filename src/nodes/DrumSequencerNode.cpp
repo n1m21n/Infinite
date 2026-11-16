@@ -1039,6 +1039,16 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
    volume = std::clamp(volume, 0.0f, 1.0f);
    v.Bool("run", run);
    v.Text("patternName", patternName);
+   {
+      v.Text("pagename", pageName);
+      if (pageName.size() > 48)
+         pageName.resize(48);
+      char hex[16];
+      snprintf(hex, sizeof(hex), "%06X", pageColor & 0xFFFFFFu);
+      std::string col = pageColor ? hex : "";
+      v.Text("pagecolor", col);
+      pageColor = col.empty() ? 0u : (unsigned int)(strtoul(col.c_str(), nullptr, 16) & 0xFFFFFFu);
+   }
    v.Int("patternPart", patternPart);
    v.Float("globalTransient", globalTransient);
    v.Float("globalDecay", globalDecay);

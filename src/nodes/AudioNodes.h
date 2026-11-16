@@ -132,6 +132,9 @@ public:
    float TruePeakDb() const { return mTruePeakDb; }
 
    int numChannels = 8;
+   // The Mixer panel's page: its name (empty shows the node title) and colour as 0xRRGGBB (0 = none).
+   std::string pageName;
+   unsigned int pageColor = 0;
    // Channel names, set from the Mixer panel. Empty shows the source node's title.
    std::string chName[kMaxSlots];
    // Strip colour as 0xRRGGBB; 0 follows the source node's category colour.

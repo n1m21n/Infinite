@@ -327,7 +327,8 @@ void DrawLayout(FrameCtx& fc)
          gDrumPanelDock = 0; // bottom or top only
       if (gDrumPanelOpen)
       {
-         gDrumPanelHeight = std::clamp(gDrumPanelHeight, 240.0f, std::max(240.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         // Fixed at the lanes' natural height (rows never squash, no empty desk below); only a short window trims it.
+         gDrumPanelHeight = std::clamp(gDrumPanelNaturalH, 200.0f, std::max(200.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
          topBottom += gDrumPanelHeight;
          topBottomRows++;
       }

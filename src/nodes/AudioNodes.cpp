@@ -728,6 +728,16 @@ void MixerNode::VisitParams(ParamVisitor& v)
       v.Text(("chcolor" + std::to_string(i)).c_str(), col);
       chColor[i] = col.empty() ? 0u : (unsigned int)(strtoul(col.c_str(), nullptr, 16) & 0xFFFFFFu);
    }
+   {
+      v.Text("pagename", pageName);
+      if (pageName.size() > 48)
+         pageName.resize(48);
+      char hex[16];
+      snprintf(hex, sizeof(hex), "%06X", pageColor & 0xFFFFFFu);
+      std::string col = pageColor ? hex : "";
+      v.Text("pagecolor", col);
+      pageColor = col.empty() ? 0u : (unsigned int)(strtoul(col.c_str(), nullptr, 16) & 0xFFFFFFu);
+   }
    std::string fade = std::to_string(snapFadeMs);
    v.Text("snapfade", fade);
    snapFadeMs = std::clamp(atoi(fade.c_str()), 0, 10000);

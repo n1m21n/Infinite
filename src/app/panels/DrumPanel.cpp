@@ -17,6 +17,7 @@
 #include "app/ui/design/components/DeskParts.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/StepCell.h"
@@ -40,6 +41,7 @@ namespace app
    float gDrumPanelHeight = 400.0f;
    int   gDrumPanelDock = 0; // 0 bottom, 3 top
    bool  gDrumClaimedKeys = false;
+   float gDrumPanelNaturalH = 400.0f; // the height that shows every lane at full row height and no more
    ImVec2 gDrumPanelRectMin(0.0f, 0.0f), gDrumPanelRectMax(0.0f, 0.0f);
 
    // The node body's groove helpers (SamplerBodies.cpp): the panel picks grooves the same way.
@@ -54,8 +56,8 @@ namespace app
       constexpr int kLanes = DrumSequencerNode::kNumLanes;
       constexpr int kMaxSteps = DrumSequencerNode::kMaxSteps;
       constexpr int kPageSteps = DrumSequencerNode::kEditPageSteps;
-      constexpr float kMinHeight = 240.0f;
       constexpr float kInspectorW = 268.0f;
+      constexpr float kRowH = 28.0f;     // a lane row: fixed, so the grid never squashes as the panel shrinks
       constexpr float kLabelW = 178.0f;  // lane name + M S, left of the grid
       constexpr float kRulerH = 26.0f;
       constexpr float kGroupGap = 4.0f; // extra space between four-step key groups
@@ -427,8 +429,12 @@ namespace app
             HelpTip("%s", T("Hold: steps set to Fill play, !Fill rest. Shift-click latches."));
       }
 
-      // < groove > : the groove library steps like the node body's arrows; the middle chip reads out
-      // part, rate, steps and swing.
+      void DrawGrooveMenu(DrumSequencerNode* n);
+      std::vector<std::string>& GrooveFiles();
+      constexpr float kGrooveW = 240.0f; // fixed: a long groove name never moves the bar
+
+      // < groove > : the arrows step the library like the node body's; the face is a dropdown of the whole
+      // library and reads out part, rate, steps and swing.
       void DrawGrooveChips(DrumSequencerNode* n)
       {
          int count = 0;
@@ -438,13 +444,30 @@ namespace app
          {
             if (side == 1)
             {
-               char mid[96];
                std::string name = n->patternName.empty() ? std::string(T("no groove")) : n->patternName;
                if (!n->patternName.empty() && cur >= 0)
                   name += std::string(" ") + "ABC"[std::clamp(n->patternPart, 0, 2)];
-               snprintf(mid, sizeof mid, "%s  %s  %d  %d%%##groovemid", name.c_str(), MusicTime::RateDivisionName(n->rate),
-                        std::clamp(n->numSteps, 1, kMaxSteps), (int)std::lround(n->swing * 100.0f));
-               ChipButton::Draw(mid, false, tok::tile);
+               char tail[48];
+               snprintf(tail, sizeof tail, "%s  %d  %d%%", MusicTime::RateDivisionName(n->rate), std::clamp(n->numSteps, 1, kMaxSteps),
+                        (int)std::lround(n->swing * 100.0f));
+               const bool clicked = ActionButton::Draw("##grooveFace", ImVec2(kGrooveW, tok::tile));
+               if (ImGui::IsItemHovered())
+                  HelpTip("%s", T("Groove: pick from the library"));
+               if (ImGui::IsItemActivated())
+                  GrooveFiles() = ScanDrumGrooveFiles();
+               const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               const float ty = (bmin.y + bmax.y - ImGui::GetFontSize()) * 0.5f;
+               const float tailW = ImGui::CalcTextSize(tail).x;
+               const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+               dl->AddText(ImVec2(bmax.x - tok::space_3 - tailW, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, t.w * 0.6f)), tail);
+               dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_3 - tailW - tok::space_2, bmax.y), true);
+               dl->AddText(ImVec2(bmin.x + tok::space_3, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
+               dl->PopClipRect();
+               if (clicked)
+                  ImGui::OpenPopup("##drumGroove");
+               ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
+               DrawGrooveMenu(n);
                ImGui::SameLine(0.0f, tok::space_1);
             }
             if (ChipButton::Draw(side == 0 ? "<##groovePrev" : ">##grooveNext", false, tok::tile) && count > 0)
@@ -456,29 +479,86 @@ namespace app
          }
       }
 
+      bool sPendingAdd = false;
+      uint64_t sPendingDelete = 0;
+
+      // Page adds and deletes from the header land at the top of the next frame, before pages are collected,
+      // so no GraphNode* held this frame outlives a spawn or a removal.
+      void ApplyPendingPageEdits()
+      {
+         if (sPendingAdd)
+         {
+            sPendingAdd = false;
+            AddPage();
+         }
+         if (sPendingDelete != 0)
+         {
+            GraphNode* gn = FindNodeByUid(sPendingDelete);
+            sPendingDelete = 0;
+            if (gn != nullptr)
+            {
+               PushUndoCheckpoint("Delete drum page");
+               sPageUid = 0;
+               RemoveNodeByIndex(gn->index);
+               RebuildAudioTopology();
+            }
+         }
+      }
+
+      std::vector<PagePicker::Entry> PageEntries(const std::vector<GraphNode*>& pages)
+      {
+         std::vector<PagePicker::Entry> out;
+         for (GraphNode* gn : pages)
+         {
+            const DrumSequencerNode* d = DrumOf(gn);
+            out.push_back({ d != nullptr && !d->pageName.empty() ? d->pageName : NodeTitle(*gn), d != nullptr ? d->pageColor : 0u });
+         }
+         return out;
+      }
+
+      void DrawPagePicker(const std::vector<GraphNode*>& pages, int current)
+      {
+         const std::vector<PagePicker::Entry> entries = PageEntries(pages);
+         const ImGuiIO& io = ImGui::GetIO();
+         if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
+            PagePicker::BeginRename("##drumPage", entries, current);
+         const PagePicker::Result r = PagePicker::Draw("##drumPage", entries, current, T("Pages: switch, add, rename, colour or delete one"));
+         GraphNode* gn = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
+         DrumSequencerNode* d = DrumOf(gn);
+         switch (r.act)
+         {
+         case PagePicker::Act::Select:
+            sPageUid = gn->uid;
+            SelectOnCanvas(gn);
+            break;
+         case PagePicker::Act::Add: sPendingAdd = true; break;
+         case PagePicker::Act::Rename:
+            if (d != nullptr)
+            {
+               PushUndoCheckpoint("Rename drum page");
+               d->pageName = r.name;
+            }
+            break;
+         case PagePicker::Act::Recolor:
+            if (d != nullptr)
+            {
+               PushUndoCheckpoint("Colour drum page");
+               d->pageColor = r.color;
+            }
+            break;
+         case PagePicker::Act::Delete:
+            if (gn != nullptr)
+               sPendingDelete = gn->uid; // next frame: the rest of this frame still draws the page
+            break;
+         default: break;
+         }
+      }
+
       void DrawHeader(const std::vector<GraphNode*>& pages, int current, ImVec2 origin, float width)
       {
          ImGui::SetCursorScreenPos(origin);
-         ImGui::AlignTextToFramePadding();
-         {
-            UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
-            ImGui::TextUnformatted(T("Drums"));
-         }
-         ImGui::SameLine(0.0f, tok::space_3);
-         for (int i = 0; i < (int)pages.size(); i++)
-         {
-            const std::string label = NodeTitle(*pages[i]) + "##page" + std::to_string(i);
-            if (ChipButton::Draw(label.c_str(), i == current, tok::tile))
-            {
-               sPageUid = pages[i]->uid;
-               SelectOnCanvas(pages[i]);
-            }
-            ImGui::SameLine(0.0f, tok::space_1);
-         }
-         if (ChipButton::Draw((std::string("+ ") + T("page") + "##addpage").c_str(), false, tok::tile))
-            AddPage();
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("New Drum Sequencer + Audio Out"));
+         // No title: the rail icon names the panel. The page dropdown leads, as in the Piano Roll.
+         DrawPagePicker(pages, current);
 
          DrumSequencerNode* n = current >= 0 ? DrumOf(pages[current]) : nullptr;
          if (n != nullptr)
@@ -1027,18 +1107,18 @@ namespace app
       }
 
       // The groove library by category, then My grooves (the .mid folder).
-      void DrawGroovePicker(DrumSequencerNode* n, float w)
+      std::vector<std::string>& GrooveFiles()
       {
-         const char* face = n->patternName.empty() ? T("Pick a groove") : n->patternName.c_str();
-         if (DeskKey((std::string(face) + "##groove").c_str(), false, w, tok::tile))
-            ImGui::OpenPopup("##drumGroove");
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Replaces the pattern, rate, swing and steps; fills empty lanes from the kit"));
          static std::vector<std::string> sFiles;
-         if (ImGui::IsItemActivated())
-            sFiles = ScanDrumGrooveFiles();
+         return sFiles;
+      }
+
+      // The groove library menu, opened by the header face or the Kit page's picker.
+      void DrawGrooveMenu(DrumSequencerNode* n)
+      {
          if (!MenuParts::BeginPopup("##drumGroove"))
             return;
+         const std::vector<std::string>& sFiles = GrooveFiles();
          int count = 0, nc = 0;
          const DrumPatterns::Groove* all = DrumPatterns::All(count);
          const char* const* cats = DrumPatterns::Categories(nc);
@@ -1068,6 +1148,18 @@ namespace app
             ImGui::EndMenu();
          }
          MenuParts::EndPopup();
+      }
+
+      void DrawGroovePicker(DrumSequencerNode* n, float w)
+      {
+         const char* face = n->patternName.empty() ? T("Pick a groove") : n->patternName.c_str();
+         if (DeskKey((std::string(face) + "##groove").c_str(), false, w, tok::tile))
+            ImGui::OpenPopup("##drumGroove");
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Replaces the pattern, rate, swing and steps; fills empty lanes from the kit"));
+         if (ImGui::IsItemActivated())
+            GrooveFiles() = ScanDrumGrooveFiles();
+         DrawGrooveMenu(n);
       }
 
       void DrawKitInspector(GraphNode* gn, DrumSequencerNode* n)
@@ -1262,6 +1354,7 @@ namespace app
 
       void DrawPanel()
       {
+         ApplyPendingPageEdits();
          FollowCanvasSelection();
          const std::vector<GraphNode*> pages = CollectPages();
          const int current = CurrentPage(pages);
@@ -1289,7 +1382,10 @@ namespace app
             const ImVec2 seqMin = bodyMin;
             const float seqH = bodyMax.y - seqMin.y;
             const float gridX0 = seqMin.x + kLabelW + tok::space_2;
-            const float rowH = std::clamp((seqH - kRulerH - (float)(kLanes - 1) * kRowGap) / (float)kLanes, 14.0f, 40.0f);
+            // Rows keep kRowH; they only give way when the window itself is too short for the panel.
+            const float rowH = std::clamp((seqH - kRulerH - (float)(kLanes - 1) * kRowGap) / (float)kLanes, 14.0f, kRowH);
+            // What the panel needs around the grid, measured, so the layout can stop the panel at the grid's foot.
+            gDrumPanelNaturalH = (gDrumPanelHeight - seqH) + kRulerH + (float)kLanes * kRowH + (float)(kLanes - 1) * kRowGap + 6.0f;
             DeskParts::Chassis(ImGui::GetWindowDrawList(), ImVec2(seqMin.x - 4.0f, seqMin.y - 4.0f), ImVec2(leftX1 + 4.0f, bodyMax.y));
             DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(seqMin.x + 1.0f, seqMin.y + 1.0f));
             DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(leftX1 - 1.0f, seqMin.y + 1.0f));
@@ -1326,13 +1422,7 @@ namespace app
       {
          ImGui::InvisibleButton("##drumgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
          DrawPanelSeam(false, gripFirst);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-         if (ImGui::IsItemActive())
-         {
-            gDrumPanelHeight += gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y;
-            gDrumPanelHeight = std::max(kMinHeight, gDrumPanelHeight);
-         }
+         // No drag: the panel is as tall as its eight lanes (gDrumPanelNaturalH), set by the stage layout.
       };
       if (gripFirst)
          grip();

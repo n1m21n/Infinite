@@ -6011,6 +6011,7 @@ extern bool gDrumPanelOpen;
 extern float gDrumPanelHeight;
 extern int gDrumPanelDock; // 0 = bottom, 3 = top
 extern bool gDrumClaimedKeys;
+extern float gDrumPanelNaturalH;
 extern ImVec2 gDrumPanelRectMin, gDrumPanelRectMax;
 void DrawDrumPanelDocked(const char* id, const ImVec2& size);
 // Opens the panel on this Drum Sequencer's page.
