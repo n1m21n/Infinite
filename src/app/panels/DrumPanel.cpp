@@ -773,7 +773,9 @@ namespace app
                   const float prob = n->stepProb[lane][s];
                   const float lit = (0.45f + 0.55f * vel) * (prob < 1.0f ? 0.5f + 0.5f * prob : 1.0f);
                   dl->AddRectFilled(cMin, cMax, well, 3.0f);
-                  dl->AddRectFilled(ImVec2(cMin.x, cMin.y + (pressed ? 1.0f : 0.0f)), cMax, now ? ImGui::GetColorU32(ImGuiCol_Text, 0.9f) : Accent(std::clamp(lit, 0.0f, 1.0f)), 3.0f);
+                  dl->AddRectFilled(ImVec2(cMin.x, cMin.y + (pressed ? 1.0f : 0.0f)), cMax, Accent(std::clamp(lit, 0.0f, 1.0f)), 3.0f);
+                  if (now)
+                     dl->AddRectFilled(cMin, cMax, ImGui::GetColorU32(ImGuiCol_Text, 0.45f), 3.0f);
                   const float nudge = n->stepNudge[lane][s];
                   if (std::fabs(nudge) > 0.001f)
                   {
@@ -1301,7 +1303,9 @@ namespace app
          in.t = 0.0f;
       else
          in.b = 0.0f;
+      PushDockedPanelStyle(/*isChild=*/true);
       PanelFrame::BeginCard("##drumpanelcontent", cardSize, in);
+      PopDockedPanelStyle();
       DrawPanel();
       PanelFrame::EndCard();
       if (!gripFirst)
