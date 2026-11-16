@@ -81,12 +81,12 @@ html .aud-code, html .ax-code pre, html .dv-cmd, html .term-panel pre, html .sig
 html .aud-card, html .dev-card, html .bm-card, html .dl-card, html .rel-card, html .predict-card, html .sys-card {
   background: var(--nm-up); box-shadow: var(--nm-raise); border: 0;
 }
-html .post-card, html .reel-card, html .nd-card, html .lib-card, html .ax-bento-t, html .ax-shot, html .bench {
+html .post-card, html .reel-card, html .nd-card, html .lib-card, html .mi-card, html .sw-card, html .ax-bento-t, html .ax-shot, html .bench {
   box-shadow: var(--nm-raise);
 }
 
 /* every card and panel shares one radius; text cards share one padding */
-html .aud-card, html .dev-card, html .bm-card, html .dl-card, html .rel-card, html .predict-card, html .sys-card, html .post-card, html .reel-card, html .nd-card, html .lib-card, html .ax-bento-t, html .ax-shot, html .bench { border-radius: var(--ui-card-radius); }
+html .aud-card, html .dev-card, html .bm-card, html .dl-card, html .rel-card, html .predict-card, html .sys-card, html .post-card, html .reel-card, html .nd-card, html .lib-card, html .mi-card, html .sw-card, html .ax-bento-t, html .ax-shot, html .bench { border-radius: var(--ui-card-radius); }
 html .aud-card, html .dev-card, html .bm-card, html .dl-card, html .rel-card, html .predict-card, html .sys-card { padding: var(--ui-card-pad); }
 
 /* mode switches (macOS / Windows / Linux, view toggles): no recess behind the buttons, the selected one is the pearl */
