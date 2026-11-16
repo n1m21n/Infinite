@@ -3,7 +3,8 @@
 Infinite's 2D View on one real photo.
 
 Black-box only: Affinity's public MCP server (Settings > Model Context Protocol > Enable MCP server, served at
-localhost:6767) and the SDK documentation it serves. Nothing in the bundle is read.
+localhost:6767) and the SDK documentation it serves. Nothing executable in the bundle is read; `inventory`
+(affinity_inventory.py) adds the public help pages, the accessibility menu map and bundle .strings metadata.
 
 What it records (~/re-output/affinity/probe.json):
   layer node types, blend modes, every live filter / adjustment with its defaults and ranges, the raster brush
@@ -19,6 +20,7 @@ Usage:
   python3 tools/re-survey/affinity_probe.py facts          # probe.json only
   python3 tools/re-survey/affinity_probe.py ab [...]       # A/B only
   python3 tools/re-survey/affinity_probe.py adjust [--case wbs_]  # adjustment renders for fitting
+  python3 tools/re-survey/affinity_probe.py inventory      # tools + settings + adjustments vs the 2D View
   python3 tools/re-survey/affinity_probe.py --self-test
 Exit: 0 ok, 1 failed / regressed, 2 usage error or Affinity not reachable.
 """
@@ -475,7 +477,7 @@ def main():
     if "--self-test" in sys.argv:
         return self_test()
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["run", "facts", "ab", "adjust"])
+    ap.add_argument("cmd", choices=["run", "facts", "ab", "adjust", "inventory"])
     ap.add_argument("--photo", default=DEFAULT_PHOTO)
     ap.add_argument("--app", default=os.path.join(REPO, "build-dev", "Infinite.app"))
     ap.add_argument("--op")
@@ -483,6 +485,9 @@ def main():
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--infinite-only", action="store_true", help="reuse the Affinity pictures already in the ab folder")
     a = ap.parse_args()
+    if a.cmd == "inventory":
+        import affinity_inventory
+        return affinity_inventory.main()
     if a.cmd == "adjust":
         aff = connect()
         try:
