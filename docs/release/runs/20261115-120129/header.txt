@@ -1,0 +1,4 @@
+Release gate run 2026-11-15 12:01:29
+commit: 4361fc35 on ; dirty files: 1
+phase: P1   binary: /Users/namansoni/Infinite/worktrees/bughunt/build/Infinite.app/Contents/MacOS/Infinite
+run folder: /Users/namansoni/Infinite/worktrees/bughunt/docs/release/runs/20261115-120129

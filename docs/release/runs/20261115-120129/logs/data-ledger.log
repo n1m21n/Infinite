@@ -1,0 +1,33 @@
+FAIL  ableton: plan has no item 2.9
+FAIL  ableton: plan has no item 2.17
+FAIL  app-bench: no consumer: docs/plans/re-survey/PROTOCOL-load.md missing
+FAIL  au-oop: no consumer: docs/plans/re-survey/dossiers/A.md missing
+FAIL  av-bench: stale: sources changed after the newest result (quiet machine). Re-run: python3 tools/re-survey/av_bench.py infinite
+FAIL  bitwig: no consumer: plan has no item 2.8; plan has no item 2.18
+FAIL  blender: no consumer: plan has no item 3.7
+FAIL  bounce-kit: no consumer: docs/plans/re-survey/coverage.md missing
+FAIL  builtins-kit: plan has no item 1.9
+FAIL  builtins-kit: stale: sources changed after the newest result. Re-run: python3 tools/re-survey/builtins_kit.py infinite && python3 tools/re-survey/builtins_kit.py analyse ~/re-output/builtins-kit/Infinite --out ~/re-output/builtins-kit/infinite.md
+FAIL  cables: no consumer: plan has no item 3.8
+FAIL  cables-app-rea-analysis.json.gz: no consumer: docs/plans/re-survey/README.md missing
+FAIL  capability-map: no consumer: plan has no item 2.31
+FAIL  host-audit: plan has no item 1.12
+FAIL  host-audit: stale: sources changed after the newest result. Re-run: python3 tools/re-survey/host_audit.py run --out ~/re-output/host-audit/results.md
+FAIL  inventory: no consumer: docs/plans/re-survey/README.md missing
+FAIL  latency: no consumer: docs/plans/re-survey/PROTOCOL-latency.md missing
+FAIL  load-bench: plan has no item 2.24
+FAIL  load-bench: stale: sources changed after the newest result (quiet machine). Re-run: python3 tools/re-survey/load_bench.py run --track node:Analog+node:EQ --out ~/re-output/load-bench/analog-eq.md && python3 tools/re-survey/load_bench.py run --track node:Wavetable+node:Reverb --out ~/re-output/load-bench/wt-reverb.md
+FAIL  logic: plan has no item 2.9
+FAIL  modulation: no consumer: docs/plans/modulation/BITWIG-GAPS-AND-OUTPACE.md missing
+FAIL  pixelmator: no consumer: plan has no item 3.5
+FAIL  plugin-probe: no consumer: plan has no item 2.11; docs/plans/re-survey/dossiers/C.md missing
+FAIL  plugins: plan has no item 2.11
+FAIL  project-bench: stale: sources changed after the newest result (quiet machine). Re-run: python3 tools/re-survey/project_bench.py infinite --out ~/re-output/project-bench/results.md
+FAIL  render-bench: plan has no item 3.5
+FAIL  render-bench: docs/plans/re-survey/dossiers/D.md missing
+FAIL  stress: docs/plans/re-survey/ROBUSTNESS.md missing
+FAIL  stress: stale: sources changed after the newest result. Re-run: python3 tools/re-survey/stress_kit.py all
+FAIL  touchdesigner: no consumer: plan has no item 3.1
+FAIL  ui-map: no consumer: plan has no item 2.3
+FAIL  workflow-cost: no consumer: plan has no item 2.1; plan has no item 2.2
+FAIL  29 datasets + 1 repo sets: 16 without a consumer, 6 stale, 10 other
