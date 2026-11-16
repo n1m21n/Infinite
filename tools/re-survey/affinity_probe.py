@@ -432,6 +432,19 @@ def ab(app_path, only=None, set_baseline=False, aff=None):
     inf_res = infinite_side(app_path, only)
     photo = os.path.join(AB, "photo.png")
     base = json.load(open(BASELINE)) if os.path.exists(BASELINE) else {}
+    # The Affinity pictures and the baseline are only comparable when made from this photo: a stale side is
+    # reported as stale, never as a regression.
+    import hashlib
+    ph = hashlib.sha256(open(photo, "rb").read()).hexdigest()[:16]
+    stamp = os.path.join(AB, "aff_photo.sha")
+    if aff is not None:
+        open(stamp, "w").write(ph)
+    aff_stale = (open(stamp).read().strip() if os.path.exists(stamp) else None) != ph
+    base_stale = base.get("_photo", ph) != ph
+    if aff_stale:
+        print("references stale: the aff_*.png came from another photo; re-run with Affinity open")
+    elif base_stale and not set_baseline:
+        print("baseline stale: it was set on another photo; re-run with --set-baseline once the numbers are checked")
     rows, regressed = {}, []
     for op in ops:
         n = op["name"]
@@ -444,7 +457,7 @@ def ab(app_path, only=None, set_baseline=False, aff=None):
         elif os.path.exists(a) and os.path.exists(b):
             r.update(score_pair(a, b, os.path.join(AB, "sheet_%s.png" % n)))
             r["changed_aff"], r["changed_inf"] = changed(a, photo), changed(b, photo)
-            if n in base and "flip" in r and r["flip"] > base[n]["flip"] + FLIP_SLACK:
+            if not aff_stale and not base_stale and n in base and "flip" in r and r["flip"] > base[n]["flip"] + FLIP_SLACK:
                 regressed.append(n)
             if n in base:
                 r["baseline_flip"] = base[n]["flip"]
@@ -464,7 +477,11 @@ def ab(app_path, only=None, set_baseline=False, aff=None):
             print("%-20s %-14s %5s %8s %7s" % (n, BH[n][0], "yes" if r["pass"] else "NO", r.get("d", "-"), r.get("far", "-")))
     if set_baseline:
         keep = {n: {"flip": r["flip"]} for n, r in rows.items() if "flip" in r}
+        if aff_stale:
+            print("baseline NOT written: the Affinity pictures are stale")
+            return 1
         merged = dict(base, **keep)
+        merged["_photo"] = ph
         with open(BASELINE, "w") as f:
             json.dump(merged, f, indent=1, sort_keys=True)
         print("baseline written: %s" % BASELINE)

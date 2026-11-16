@@ -1,27 +1,28 @@
 {
+ "_photo": "a41112d0975d5890",
  "adj_normals": {
-  "flip": 0.0068
+  "flip": 0.0065
  },
  "adj_recolour": {
-  "flip": 0.0047
+  "flip": 0.0048
  },
  "adj_split_toning": {
-  "flip": 0.0071
+  "flip": 0.007
  },
  "adj_tone_compression": {
-  "flip": 0.0106
+  "flip": 0.0107
  },
  "adj_tone_stretch": {
-  "flip": 0.0472
+  "flip": 0.0474
  },
  "adj_white_balance": {
-  "flip": 0.0182
+  "flip": 0.0181
  },
  "blur_brush": {
-  "flip": 0.0032
+  "flip": 0.0033
  },
  "bucket": {
-  "flip": 0.0004
+  "flip": 0.0006
  },
  "copy_rect": {
   "flip": 0.0
@@ -42,7 +43,7 @@
   "flip": 0.0
  },
  "heal": {
-  "flip": 0.0013
+  "flip": 0.0014
  },
  "layer_opacity": {
   "flip": 0.0124
