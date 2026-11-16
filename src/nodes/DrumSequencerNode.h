@@ -144,6 +144,8 @@ public:
    // name, status, waveform cache) but leaves the lane's pattern/knobs
    // alone.
    void ClearLane(int lane);
+   // Sounds one lane now, through its own mute/solo, choke and envelope (the Drum panel's pads).
+   void Audition(int lane, float vel);
 
    // ---- pattern: trigger + velocity only, per lane -----------------------
    float stepVel[kNumLanes][kMaxSteps] = {}; // 0 = off, >0 = on at that velocity (0.05..1.0)

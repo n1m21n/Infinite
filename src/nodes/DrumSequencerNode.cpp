@@ -116,6 +116,9 @@ public:
       mLaneBoostDecayCoeff[lane].store(boostDecayCoeff, std::memory_order_relaxed);
    }
 
+   // A pad hit from the Drum panel: fired on frame 0 of the next block, transport or not.
+   void PushAudition(int lane, float vel) { mAudition[lane].store(vel, std::memory_order_relaxed); }
+
    void PushLaneState(int lane, bool mute, bool solo, int choke)
    {
       mLaneMute[lane].store(mute, std::memory_order_relaxed);
@@ -321,6 +324,10 @@ public:
          }
          const float masterVolNow = mMailbox.SmoothedValue(kMasterVolumeParam);
 
+         if (i == 0)
+            for (int lane = 0; lane < kNumLanes; lane++)
+               if (const float av = mAudition[lane].exchange(0.0f, std::memory_order_relaxed); av > 0.0f)
+                  TriggerLane(lane, av, laneVolNow, lanePanNow, lanePitchNow);
          while (run && stepIdx < numStepEvts && stepEvts[stepIdx].frameOffset <= i)
          {
             TriggerLane(stepEvts[stepIdx].lane, stepEvts[stepIdx].vel, laneVolNow, lanePanNow, lanePitchNow);
@@ -546,6 +553,7 @@ private:
    std::atomic<float> mLaneAccentPitch[kNumLanes] = {};
    std::atomic<float> mLaneAccentGain[kNumLanes] = {}; // linear gain minus 1, so zero-init = no boost
    std::atomic<float> mStepVel[kNumLanes][kMaxSteps] = {};
+   std::atomic<float> mAudition[kNumLanes] = {};
    std::atomic<float> mLaneStart[kNumLanes] = {};
    std::atomic<float> mLaneEnd[kNumLanes] = {};
 
@@ -834,6 +842,12 @@ int DrumSequencerNode::CurrentStep() const
    const int steps = std::clamp(numSteps, 1, kMaxSteps);
    const int rawStep = (int)std::floor(rawPos);
    return ((rawStep % steps) + steps) % steps;
+}
+
+void DrumSequencerNode::Audition(int lane, float vel)
+{
+   if (mAudioNode)
+      mAudioNode->PushAudition(Clamp(lane), std::clamp(vel, 0.05f, 1.0f));
 }
 
 int DrumSequencerNode::LoadedLaneCount() const
