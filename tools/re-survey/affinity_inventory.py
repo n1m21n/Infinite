@@ -39,42 +39,55 @@ BRUSH_STRINGS = "/Applications/Affinity.app/Contents/Frameworks/libcocoaui.frame
 # Affinity tool (help slug, name) -> the 2D View tool that does the same job, or None.
 TOOLS = [
     ("move", "Move", "move"), ("pan", "View", "hand"), ("zoom", "Zoom", "zoom"), ("crop", "Crop", "crop"),
-    ("clrpicker", "Colour Picker", "pick"), ("stylePicker", "Style Picker", None), ("measure", "Measure", None),
-    ("selectionBrush", "Selection Brush", None), ("objectSelection", "Object Selection", None),
+    ("clrpicker", "Colour Picker", "pick"), ("stylePicker", "Style Picker", "stylepick"), ("measure", "Measure", "measure"),
+    ("selectionBrush", "Selection Brush", "selbrush"), ("objectSelection", "Object Selection", "objsel"),
     ("floodSelect", "Flood Select", "wand"), ("marquee", "Marquee (+ Freehand)", "marquee"),
     ("floodFill", "Flood Fill", "fill"), ("gradient", "Gradient", "gradient"),
-    ("paintBrush", "Paint Brush", "brush"), ("pixel", "Pixel", "brush"), ("clrReplacementBrush", "Colour Replacement", None),
-    ("paintMixerBrush", "Paint Mixer", None), ("eraseBrush", "Erase Brush", "eraser"),
-    ("backgroundEraseBrush", "Background Erase", None), ("floodErase", "Flood Erase", None),
-    ("dodgeBrush", "Dodge", "dodge"), ("burnBrush", "Burn", "burn"), ("spongeBrush", "Sponge", None),
-    ("cloneBrush", "Clone", "clone"), ("undoBrush", "Undo Brush", None), ("blurBrush", "Blur", "blur"),
-    ("sharpenBrush", "Sharpen", "sharpen"), ("medianBrush", "Median", None), ("smudgeBrush", "Smudge", "brush"),
-    ("healingBrush", "Healing", "heal"), ("patch", "Patch", None), ("blemishRemoval", "Blemish Removal", None),
-    ("inpaintingBrush", "Inpainting", None), ("redEye", "Red Eye", None),
+    ("paintBrush", "Paint Brush", "brush"), ("pixel", "Pixel", "brush"), ("clrReplacementBrush", "Colour Replacement", "colourreplace"),
+    ("paintMixerBrush", "Paint Mixer", "mixer"), ("eraseBrush", "Erase Brush", "eraser"),
+    ("backgroundEraseBrush", "Background Erase", "bgerase"), ("floodErase", "Flood Erase", "flooderase"),
+    ("dodgeBrush", "Dodge", "dodge"), ("burnBrush", "Burn", "burn"), ("spongeBrush", "Sponge", "sponge"),
+    ("cloneBrush", "Clone", "clone"), ("undoBrush", "Undo Brush", "undobrush"), ("blurBrush", "Blur", "blur"),
+    ("sharpenBrush", "Sharpen", "sharpen"), ("medianBrush", "Median", "median"), ("smudgeBrush", "Smudge", "brush"),
+    ("healingBrush", "Healing", "heal"), ("patch", "Patch", "patch"), ("blemishRemoval", "Blemish Removal", "blemish"),
+    ("inpaintingBrush", "Inpainting", "inpaint"), ("redEye", "Red Eye", "redeye"),
     ("pen", "Pen", "pen"), ("node", "Node", "node"), ("rectangle", "Shapes (Rectangle)", "shape"),
     ("artText", "Artistic Text", "text"), ("frameText", "Frame Text", "text"),
-    ("meshWarp", "Mesh Warp", None), ("perspective", "Perspective", None),
+    ("meshWarp", "Mesh Warp", "meshwarp"), ("perspective", "Perspective", "perspective"),
 ]
 
 # The 2D View's settings per tool, as the bar and its More.. popup label them (View2DPanel.cpp).
 _BRUSH = ["Size %.0f px", "Hardness %.0f%%", "Opacity %.0f%%", "Flow %.0f%%", "Smoothing", "Spacing", "Roundness", "Angle", "Hard edge", "Scatter",
-          "Follow stroke", "Stabiliser", "Taper in", "Taper out", "Size jitter", "Opacity jitter", "Hue jitter",
-          "Saturation jitter", "Brightness jitter", "Pen pressure", "Mode", "Lock alpha", "Paint the mask", "Symmetry"]
-_RETOUCH = ["Size %.0f px", "Hardness %.0f%%", "Strength %.0f%%", "Spacing", "Roundness", "Angle", "Smoothing", "Pen pressure", "Symmetry"]
+          "Follow stroke", "Stabiliser", "Taper in", "Taper out", "Size jitter", "Flow jitter", "Hue jitter",
+          "Saturation jitter", "Brightness jitter", "Hardness jitter", "Rotation jitter", "Shape jitter", "Scatter Y",
+          "Accumulation", "Accumulation jitter", "Wet edges", "Pen pressure", "Mode", "Lock alpha", "Paint the mask", "Symmetry"]
+_RETOUCH = ["Size %.0f px", "Hardness %.0f%%", "Opacity %.0f%%", "Flow %.0f%%", "Spacing", "Roundness", "Angle", "Smoothing",
+            "Stabiliser", "Wet edges", "Pen pressure", "Symmetry"]
+_SOURCE = ["Aligned", "All layers", r"Rotation %.0f\xC2\xB0", "Scale %.0f%%", "Flip X##v2dsflipx"]
 _SELOP = ["New selection", "Add to selection (Shift)", "Subtract from selection (Alt)", "Intersect with selection (Shift+Alt)"]
 INF = {
     "move": ["Auto-select", "Align left edges", "Distribute horizontally", "Flip horizontal"],
     "hand": [], "zoom": ["Fit on screen (Ctrl+0)", "Actual pixels (Ctrl+1)"],
     "crop": ["Free", "Original", "Thirds", "Apply", "Cancel"],
     "pick": ["Point", "3x3 average", "All layers", "Current layer"],
-    "wand": _SELOP + ["Tolerance %.0f%%", "Contiguous", "All layers", "Expand", "Contract", "Border", "Smooth"],
-    "marquee": _SELOP + ["Rectangle", "Ellipse", "Freehand", "Polygon", "Feather %.0f px", "Fixed size"],
+    "wand": _SELOP + ["Tolerance %.0f%%", "Contiguous", "All layers", "Expand", "Contract", "Border", "Smooth",
+                      "Antialias##v2dwaa"],
+    "marquee": _SELOP + ["Rectangle", "Ellipse", "Freehand", "Polygon", "Feather %.0f px", "Fixed size",
+                         "From centre##v2dmcentre", "Antialias##v2dmaa"],
     "fill": ["Tolerance %.0f%%", "Contiguous", "All layers"],
     "gradient": ["Linear", "Radial", "Angle", "Reflected", "Diamond", "Opacity %.0f%%", "Reverse"],
     "brush": _BRUSH + ["Normal", "Behind", "Multiply", "Screen", "Smudge"], "eraser": _BRUSH,
-    "dodge": _RETOUCH + ["Shadows", "Midtones", "Highlights"], "burn": _RETOUCH + ["Shadows", "Midtones", "Highlights"],
-    "clone": _RETOUCH + ["Aligned", "All layers"], "heal": _RETOUCH + ["Aligned", "All layers"],
-    "blur": _RETOUCH, "sharpen": _RETOUCH,
+    "dodge": _RETOUCH + ["Shadows", "Midtones", "Highlights", "Protect hue##v2dphue"],
+    "burn": _RETOUCH + ["Shadows", "Midtones", "Highlights", "Protect hue##v2dphue"],
+    "clone": _RETOUCH + _SOURCE + ["##v2dsblend"], "heal": _RETOUCH + _SOURCE,
+    "blur": _RETOUCH, "sharpen": _RETOUCH + ["##v2dsharpmode"],
+    "sponge": _RETOUCH + ["Saturate", "Desaturate"], "median": _RETOUCH, "undobrush": _RETOUCH,
+    "colourreplace": _RETOUCH + ["Tolerance %.0f%%"], "bgerase": _RETOUCH + ["Tolerance %.0f%%"],
+    "inpaint": _RETOUCH, "redeye": [], "flooderase": ["Tolerance %.0f%%", "Contiguous"],
+    "mixer": ["Size %.0f px", "Hardness %.0f%%", "Opacity %.0f%%", "Wet %.0f%%", "Refill %.0f%%"],
+    "selbrush": ["Size %.0f px", "Hardness %.0f%%"],
+    "objsel": _SELOP + ["All layers"], "blemish": ["Size %.0f px"], "patch": [],
+    "meshwarp": [], "perspective": [], "stylepick": [], "measure": ["Clear##v2dmclear"],
     "pen": ["Fill", "Stroke", "Stroke options", "Dash", "Gap %.0f"],
     "node": ["Fill", "Stroke"],
     "shape": ["Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line", "Fill", "Stroke", "Radius %.0f", "Inner %.2f"],
@@ -93,7 +106,12 @@ SAME = {
     "Freehand": "Freehand", "Polygonal": "Polygon", "Width (marquee)": "Fixed size", "Height": "Fixed size",
     "Strength": "Strength", "Aligned": "Aligned", "Opacity": "Opacity", "Flow": "Flow", "Hardness": "Hardness", "Font Family": "##v2dfont", "Bold": "Bold",
     "Contiguous": "Contiguous", "Paragraph Leading": "Leading", "Font Size": "%.0f px", "Mode (sharpen)": None,
+    "Wet Edges": "Wet edges", "Protect Hue": "Protect hue", "Rotation": "Rotation",
+    "Scale": "Scale", "Flip": "Flip X", "Antialias": "Antialias", "Antialiased": "Antialias", "From Center": "From centre",
+    "Saturate": "Saturate", "Desaturate": "Desaturate", "Auto Load Brush": "Refill",
 }
+# Per-tool overrides of SAME, where one Affinity word means a different control in that tool.
+TOOL_SAME = {("sharpenBrush", "Mode"): "##v2dsharpmode", ("cloneBrush", "Blend mode"): "##v2dsblend"}
 # Affinity adjustment -> the 2D View adjustment that covers it, where the names differ.
 ADJ_SAME = {"Brightness / Contrast": "Brightness", "HSL": "Hue", "LUT": "Colour Lookup", "Lens Filter": "Photo Filter"}
 # Context-bar entries that are actions, panels or document-level options rather than tool settings.
@@ -199,7 +217,7 @@ def build():
             aff = [("Width (marquee)" if s == "Width" else s) for s in aff]
         matched, missing = [], []
         for s in aff:
-            t = SAME.get(s, s)
+            t = TOOL_SAME.get((slug, s), SAME.get(s, s))
             (matched if inf and t in have else missing).append(s)
         if inf:
             missing_all[name] = missing
