@@ -1,0 +1,25 @@
+{
+ "id": "06_deselect",
+ "title": "Cmd+D: no selection, pixels untouched",
+ "ref": "Affinity: Cmd+D deselects",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint P",
+  "fill 1 0 0",
+  "select 50 50 150 150"
+ ],
+ "steps": [
+  {
+   "hover": "canvas"
+  },
+  {
+   "key": "cmd+d"
+  }
+ ],
+ "expect": [
+  "selection == 0",
+  "px 100 100 == $before",
+  "layers == $before"
+ ]
+}

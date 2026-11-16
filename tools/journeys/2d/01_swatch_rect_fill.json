@@ -1,0 +1,45 @@
+{
+ "id": "01_swatch_rect_fill",
+ "title": "Pick a swatch, draw a rectangle: it fills with the swatch",
+ "ref": "Affinity: swatch, rectangle tool, drag",
+ "ref_steps": 3,
+ "setup": [
+  "doc 400 300",
+  "layer vector V",
+  "swatches ff0000 00ff00",
+  "norecent",
+  "fg 0 0 0"
+ ],
+ "steps": [
+  {
+   "click": "##v2dcolours",
+   "at": [
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "click": "##chip",
+   "nth": 0
+  },
+  {
+   "key": "escape"
+  },
+  {
+   "click": "##v2dshape"
+  },
+  {
+   "drag": [
+    100,
+    100,
+    200,
+    200
+   ]
+  }
+ ],
+ "expect": [
+  "fg ~= 1 0 0",
+  "active.kind == vector",
+  "shape.fill ~= 1 0 0"
+ ]
+}

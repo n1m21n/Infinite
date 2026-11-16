@@ -1,0 +1,29 @@
+{
+ "id": "04_copy_paste_place",
+ "title": "Marquee, Cmd+C, Cmd+V: a new layer with the same pixels in the same place",
+ "ref": "Affinity: paste in place",
+ "ref_steps": 3,
+ "setup": [
+  "doc 400 300",
+  "layer paint P",
+  "fill 1 0 0",
+  "select 50 50 150 150"
+ ],
+ "steps": [
+  {
+   "hover": "canvas"
+  },
+  {
+   "key": "cmd+c"
+  },
+  {
+   "key": "cmd+v"
+  }
+ ],
+ "expect": [
+  "layers != $before",
+  "active.kind == paint",
+  "activepx 100 100 ~= 1 0 0",
+  "activepx 300 250 == none"
+ ]
+}

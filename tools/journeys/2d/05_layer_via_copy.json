@@ -1,0 +1,25 @@
+{
+ "id": "05_layer_via_copy",
+ "title": "Marquee, Cmd+J: layer via copy above",
+ "ref": "Affinity/Photoshop: Cmd+J duplicates the selection",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint P",
+  "fill 1 0 0",
+  "select 50 50 150 150"
+ ],
+ "steps": [
+  {
+   "hover": "canvas"
+  },
+  {
+   "key": "cmd+j"
+  }
+ ],
+ "expect": [
+  "layers != $before",
+  "activepx 100 100 ~= 1 0 0",
+  "activepx 300 250 == none"
+ ]
+}

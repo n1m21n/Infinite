@@ -1,0 +1,9 @@
+{
+ "id": "09_grab_x_2",
+ "title": "Cube, G X 2 Enter: the cube moves 2 along x",
+ "ref": "Blender: G X 2 Enter",
+ "ref_steps": 4,
+ "setup": ["3d cube"],
+ "steps": [{"hover": "canvas"}, {"key": "g"}, {"key": "x"}, {"key": "2"}, {"key": "enter"}],
+ "expect": ["obj.x ~= 2", "obj.y ~= 0", "obj.z ~= 0", "obj.count == $before"]
+}

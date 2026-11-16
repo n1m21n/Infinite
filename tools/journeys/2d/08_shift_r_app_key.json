@@ -1,0 +1,22 @@
+{
+ "id": "08_shift_r_app_key",
+ "title": "Shift+R over the 2D View opens the Piano Roll and keeps the tool",
+ "ref": "rule: plain letters are tools, Shift+letter belongs to the app",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint P"
+ ],
+ "steps": [
+  {
+   "hover": "canvas"
+  },
+  {
+   "key": "shift+r"
+  }
+ ],
+ "expect": [
+  "open.pianoroll != $before",
+  "tool == $before"
+ ]
+}

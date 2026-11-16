@@ -1,0 +1,27 @@
+{
+ "id": "03_delete_only_top",
+ "title": "Two layers, top active, marquee, Delete: only the top is cleared",
+ "ref": "Affinity: Delete clears the selection on the active layer",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint Bottom",
+  "fill 0 0 1",
+  "layer paint Top",
+  "fill 1 0 0",
+  "select 50 50 150 150"
+ ],
+ "steps": [
+  {
+   "hover": "canvas"
+  },
+  {
+   "key": "delete"
+  }
+ ],
+ "expect": [
+  "layerpx Bottom 100 100 == $before",
+  "layerpx Top 100 100 != $before",
+  "layerpx Top 300 250 == $before"
+ ]
+}

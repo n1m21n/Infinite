@@ -1,0 +1,24 @@
+{
+ "id": "07_copy_nothing",
+ "title": "Cmd+C with nothing selected changes nothing",
+ "ref": "rule: no selection, no copy side effects",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint P",
+  "fill 1 0 0"
+ ],
+ "steps": [
+  {
+   "hover": "canvas"
+  },
+  {
+   "key": "cmd+c"
+  }
+ ],
+ "expect": [
+  "layers == $before",
+  "px 100 100 == $before",
+  "selection == 0"
+ ]
+}
