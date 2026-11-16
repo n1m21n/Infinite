@@ -78,7 +78,9 @@ public:
 
    // Layer fx (Photoshop order): drop shadow and outer glow under the pixels,
    // colour overlay and inner shadow on them, stroke on top.
-   enum FxType { kFxShadow = 0, kFxInner, kFxGlow, kFxStroke, kFxOverlay, kFxInnerGlow, kFxBevel, kFxGradient, kFxCount };
+   enum FxType { kFxShadow = 0, kFxInner, kFxGlow, kFxStroke, kFxOverlay, kFxInnerGlow, kFxBevel, kFxGradient, kFxSatin, kFxPattern,
+                 kFxCount };
+   static constexpr int kFxPatternCount = 5;   // checker, dots, lines, grid, noise
    struct Fx
    {
       bool on = false;
@@ -88,8 +90,14 @@ public:
       float size = 10.0f;     // blur (shadows, glow) or width (stroke), px
       float spread = 0.0f;    // shadows and glow: 0..1, how hard the edge is
       int pos = 0;            // stroke: 0 outside, 1 inside, 2 centre
-      float c2[4] = { 1.0f, 1.0f, 1.0f, 1.0f };   // bevel: shadow colour; gradient overlay: end colour
+      float c2[4] = { 1.0f, 1.0f, 1.0f, 1.0f };   // bevel: shadow colour; gradient overlay: end colour; pattern: second colour
+      int pattern = 0;        // pattern overlay: kFxPatternCount kinds; size is the cell, angle turns it
+      int material = -1;      // bevel: -1 plain light, else the relief materials (0 plasticine, 1 metal, 2 chrome, 3 stipple)
+      float contour[4] = { 0.25f, 0.25f, 0.75f, 0.75f };   // shadow, glow, bevel, satin: the two inner points of a 0..1 curve
+      bool ContourIsLinear() const { return contour[0] == contour[1] && contour[2] == contour[3]; }
    };
+   static bool FxSame(const Fx& a, const Fx& b);
+   static const char* FxPatternName(int p);
    static Fx FxDefault(int type);
    static const char* FxName(int type);
 
@@ -228,7 +236,9 @@ public:
       // Distort: each corner (top left, top right, bottom right, bottom left) moved by dx, dy px.
       bool warpOn = false;
       float warp[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-      Fx fx[kFxCount] = { FxDefault(0), FxDefault(1), FxDefault(2), FxDefault(3), FxDefault(4), FxDefault(5), FxDefault(6), FxDefault(7) };
+      Fx fx[kFxCount] = { FxDefault(0), FxDefault(1), FxDefault(2), FxDefault(3), FxDefault(4), FxDefault(5), FxDefault(6), FxDefault(7),
+                          FxDefault(8), FxDefault(9) };
+      std::vector<std::pair<int, Fx>> fxMore;   // more of one kind (two strokes, three shadows): type and settings, drawn in order
       // Blend if (grey): this layer's and the underlying picture's black lo/hi and white lo/hi, 0..1.
       float bifT[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
       float bifU[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
@@ -236,6 +246,9 @@ public:
       {
          for (const Fx& f : fx)
             if (f.on)
+               return true;
+         for (const auto& m : fxMore)
+            if (m.second.on)
                return true;
          return false;
       }
@@ -364,15 +377,23 @@ public:
    // The effect stack and the adjustment extras as text lines for layer `id`; parsing takes one line's key and the
    // rest after the id, false for a key it does not know.
    static void WriteEffectLines(std::ostream& o, const Layer& l, int id);
+   // A layer's styles (fx and their extras) as a preset's text ("inf2dstyle" first), and back; Parse replaces them all.
+   static std::string StyleText(const Layer& l);
+   static bool ParseStyle(const std::string& text, Layer& l);
    static bool ParseEffectLine(const std::string& key, std::istream& s, Layer& l);
    unsigned long long mEffDraws = 0;   // effect stacks drawn (tests: an unchanged stack is not redrawn)
    unsigned long long mBatched = 0, mPasses = 0;   // layers drawn in a batch / single passes (tests)
    // Colour Lookup: a .cube file's size and RGB table (size^3 rows, red fastest); false when it cannot be read.
    static bool ReadCube(const std::string& path, int& size, std::vector<float>& rgb);
-   // Levels' Auto: per channel black and white at the 0.1 % tails of the document's picture.
-   bool AutoLevels(int id, float out[3][4]);
-   // A small luminance histogram (bins, peak 1) of the document's picture: the panel draws it in Levels and Curves.
-   bool Histogram(int id, std::vector<float>& bins, int count = 64);
+   // Levels' Auto: per channel black and white at the 0.1 % tails of the picture the adjustment works on: id 0 the
+   // document, an adjustment layer the picture under it, effect >= 0 that layer alone with effects from there on off.
+   bool AutoLevels(int id, float out[3][4], int effect = -1);
+   // A small luminance histogram (bins, peak 1) of the same picture: the panel draws it in Levels and Curves.
+   bool Histogram(int id, std::vector<float>& bins, int count = 64, int effect = -1);
+   // The picture the adjustment at (id, effect) works on, top-down RGBA8 at document size (see AutoLevels).
+   bool PictureUnder(int id, int effect, int frameId, std::vector<uint8_t>& rgba);
+   // Every layer under this one (it and the layers over it hidden), composited and finished.
+   bool RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba);
 
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
@@ -690,8 +711,8 @@ private:
    std::map<int, DepthBufs> mDepth;
    int mDepthLevel = -1;
    // Layer fx scratch: blurred alpha (two ping-pong), the finished layer.
-   GLUtil::Fbo mFxBlur[2], mFxBlur2[2], mFxOut;
-   unsigned mBlurProgram = 0, mFxProgram = 0;
+   GLUtil::Fbo mFxBlur[2], mFxBlur2[2], mFxOut, mFxExtra, mFxMore[2];
+   unsigned mBlurProgram = 0, mFxProgram = 0, mFxCombineProgram = 0;
    bool mFxTried = false;
    // Adjustment layers: the picture below, changed, ready for the layer's normal pass.
    GLUtil::Fbo mAdjFbo;

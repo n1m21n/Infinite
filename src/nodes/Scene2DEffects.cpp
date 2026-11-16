@@ -531,7 +531,7 @@ unsigned Scene2DNode::BlurLuma(unsigned src, float radius)
 
 namespace
 {
-   // The composite (display values, 8 bit) as the panel sees it: the document's own output.
+   // The composite (display values, 8 bit) as the panel sees it: the document's own output (bottom-up rows).
    bool ReadOut(Scene2DNode& doc, std::vector<unsigned char>& px, int& w, int& h)
    {
       const unsigned tex = doc.GetOutputTexture();
@@ -539,27 +539,37 @@ namespace
       h = doc.GetOutputHeight();
       if (tex == 0 || w <= 0 || h <= 0)
          return false;
-      // A small read is enough for a histogram: every 4th pixel each way.
       px.assign((size_t)w * h * 4, 0);
       glBindTexture(GL_TEXTURE_2D, tex);
       glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
       glBindTexture(GL_TEXTURE_2D, 0);
       return true;
    }
+
+   // The picture an adjustment works on (see Scene2DNode::AutoLevels).
+   bool ReadUnder(Scene2DNode& doc, int id, int effect, std::vector<unsigned char>& px, int& w, int& h)
+   {
+      if (id == 0)
+         return ReadOut(doc, px, w, h);
+      w = doc.Doc().w;
+      h = doc.Doc().h;
+      return doc.PictureUnder(id, effect, 0, px) && !px.empty();
+   }
 }
 
-bool Scene2DNode::Histogram(int id, std::vector<float>& bins, int count)
+bool Scene2DNode::Histogram(int id, std::vector<float>& bins, int count, int effect)
 {
-   (void)id;
    std::vector<unsigned char> px;
    int w = 0, h = 0;
-   if (count < 2 || !ReadOut(*this, px, w, h))
+   if (count < 2 || !ReadUnder(*this, id, effect, px, w, h))
       return false;
    bins.assign((size_t)count, 0.0f);
    for (int y = 0; y < h; y += 2)
       for (int x = 0; x < w; x += 2)
       {
          const unsigned char* p = &px[((size_t)y * w + x) * 4];
+         if (id != 0 && p[3] == 0)
+            continue;   // nothing there: not part of the picture
          const float L = (0.2126f * p[0] + 0.7152f * p[1] + 0.0722f * p[2]) / 255.0f;
          bins[(size_t)std::min(count - 1, (int)(L * count))] += 1.0f;
       }
@@ -569,12 +579,11 @@ bool Scene2DNode::Histogram(int id, std::vector<float>& bins, int count)
    return true;
 }
 
-bool Scene2DNode::AutoLevels(int id, float out[3][4])
+bool Scene2DNode::AutoLevels(int id, float out[3][4], int effect)
 {
-   (void)id;
    std::vector<unsigned char> px;
    int w = 0, h = 0;
-   if (!ReadOut(*this, px, w, h))
+   if (!ReadUnder(*this, id, effect, px, w, h))
       return false;
    for (int ch = 0; ch < 3; ch++)
    {
@@ -582,6 +591,8 @@ bool Scene2DNode::AutoLevels(int id, float out[3][4])
       size_t total = 0;
       for (size_t i = 0; i + 3 < px.size(); i += 4)
       {
+         if (id != 0 && px[i + 3] == 0)
+            continue;
          hist[px[i + ch]]++;
          total++;
       }
