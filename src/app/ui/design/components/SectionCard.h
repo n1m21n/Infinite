@@ -20,6 +20,8 @@ namespace SectionCard
       ImDrawListSplitter split;
       bool open = false;
       float top = 0.0f;
+      bool desk = false;   // a panel with the desk look sets this: cards draw as graphite faces
+      ImU32 deskCap = 0;
    };
    inline State& S()
    {
@@ -31,6 +33,14 @@ namespace SectionCard
    inline void Well(ImVec2 a, ImVec2 b)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
+      if (S().desk)
+      {
+         dl->AddRectFilledMultiColor(a, b, IM_COL32(58, 61, 68, 255), IM_COL32(58, 61, 68, 255), IM_COL32(36, 38, 43, 255), IM_COL32(36, 38, 43, 255));
+         dl->AddRect(ImVec2(a.x + 1, a.y + 1), ImVec2(b.x - 1, b.y - 1), IM_COL32(255, 255, 255, 28), 3.0f);
+         dl->AddRect(a, b, IM_COL32(0, 0, 0, 220), 3.0f);
+         dl->AddRectFilled(ImVec2(a.x + 1, a.y + 1), ImVec2(b.x - 1, a.y + 4), S().deskCap, 3.0f, ImDrawFlags_RoundCornersTop);
+         return;
+      }
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       dl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_group);
       dl->AddRect(a, b, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),

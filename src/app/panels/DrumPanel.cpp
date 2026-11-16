@@ -788,9 +788,12 @@ namespace app
                   const bool accent = vel >= 0.99f;
                   const float prob = n->stepProb[lane][s];
                   const float lit = std::clamp((0.45f + 0.55f * vel) * (prob < 1.0f ? 0.5f + 0.5f * prob : 1.0f), 0.0f, 1.0f);
-                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, Accent(1.0f), nullptr, true);
+                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, Accent(1.0f), nullptr, true, lit);
                   if (now)
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 70), 3.0f);
+                  {
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 90), 3.0f);
+                     dl->AddRect(cMin, cMax, DeskParts::Grey(255), 3.0f, 0, 1.5f);
+                  }
                   const float nudge = n->stepNudge[lane][s];
                   if (std::fabs(nudge) > 0.001f)
                   {
@@ -820,7 +823,10 @@ namespace app
                {
                   DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, 0.0f, Accent(1.0f), nullptr, true);
                   if (now)
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 36), 3.0f);
+                  {
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 50), 3.0f);
+                     dl->AddRect(cMin, cMax, DeskParts::Grey(255, 200), 3.0f, 0, 1.5f);
+                  }
                }
                if (sTab == kTabStep && lane == sLane && s == sStep)
                   dl->AddRect(ImVec2(cMin.x - 1.5f, cMin.y - 1.5f), ImVec2(cMax.x + 1.5f, cMax.y + 1.5f), ImGui::GetColorU32(ImGuiCol_Text), 2.0f, 0, 1.5f);
@@ -1200,7 +1206,14 @@ namespace app
       void DrawInspector(GraphNode* gn, DrumSequencerNode* n, ImVec2 at, ImVec2 size)
       {
          ImGui::SetCursorScreenPos(at);
+         ImDrawList* pdl = ImGui::GetWindowDrawList();
+         DeskParts::Chassis(pdl, ImVec2(at.x - 4.0f, at.y - 4.0f), ImVec2(at.x + size.x + 4.0f, at.y + size.y));
          ImGui::BeginChild("##drumInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+         // A desk is dark in both themes: text and cards use fixed desk tones inside it.
+         ImGui::PushStyleColor(ImGuiCol_Text, DeskParts::Grey(228));
+         ImGui::PushStyleColor(ImGuiCol_TextDisabled, DeskParts::Grey(255, 140));
+         SectionCard::S().desk = true;
+         SectionCard::S().deskCap = NodeColor(gn);
          SectionCard::BeginWindow();
          if (sTab == kTabKit)
             DrawKitInspector(gn, n);
@@ -1209,6 +1222,8 @@ namespace app
          else
             DrawLaneInspector(gn, n);
          SectionCard::EndWindow();
+         SectionCard::S().desk = false;
+         ImGui::PopStyleColor(2);
          ImGui::EndChild();
       }
 

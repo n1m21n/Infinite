@@ -60,7 +60,7 @@ namespace DeskParts
 
    // A key cap, drawn only: a raised cap with an LED bar above the legend. `ledLit` 0..1 is how bright the bar is.
    inline void KeyCap(ImDrawList* dl, ImVec2 p, ImVec2 q, bool hovered, bool down, float ledLit, ImU32 led, const char* legend = nullptr,
-                      bool small = false)
+                      bool small = false, float lamp = 0.0f)
    {
       const float ledH = small ? 2.0f : 2.5f;
       dl->AddRectFilled(ImVec2(p.x, p.y + 1), ImVec2(q.x, q.y + 1), Grey(0, 150), 3.0f);
@@ -70,6 +70,14 @@ namespace DeskParts
       dl->AddRectFilledMultiColor(a, b, Grey(top), Grey(top), Grey(54), Grey(54));
       dl->AddRect(a, b, Grey(0, 220), 3.0f, 0, 1.0f);
       dl->AddLine(ImVec2(a.x + 2, a.y + 1.5f), ImVec2(b.x - 2, a.y + 1.5f), Grey(255, 60), 1.0f);
+      if (lamp > 0.0f) // the whole cap lights in the key colour, brightness = lamp (0..1)
+      {
+         lamp = std::clamp(lamp, 0.0f, 1.0f);
+         const int al = (int)(120.0f + 135.0f * lamp);
+         const ImU32 t = Tint(led, 0.55f + 0.75f * lamp, al), bt = Tint(led, 0.35f + 0.5f * lamp, al);
+         dl->AddRectFilledMultiColor(ImVec2(a.x + 1, a.y + 1), ImVec2(b.x - 1, b.y - 1), t, t, bt, bt);
+         dl->AddRect(ImVec2(a.x + 1, a.y + 1), ImVec2(b.x - 1, b.y - 1), Grey(255, (int)(70.0f * lamp)), 3.0f, 0, 1.0f);
+      }
       const ImVec2 la(a.x + 4.0f, a.y + 3.0f), lb(b.x - 4.0f, a.y + 3.0f + ledH);
       ledLit = std::clamp(ledLit, 0.0f, 1.0f);
       dl->AddRectFilled(la, lb, ledLit > 0.0f ? Tint(led, 0.22f + 0.78f * ledLit) : Tint(led, 0.22f), 1.0f);
