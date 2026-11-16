@@ -38,6 +38,25 @@ namespace tok
    constexpr float hit_min = 24.0f;
    constexpr float bar_h = 48.0f;
    constexpr float tile = 28.0f;
+   constexpr float control_h = 24.0f;
+   constexpr float row_h = 24.0f;
+   constexpr float row_gap = 4.0f;
+   constexpr float section_gap = 12.0f;
+   constexpr float pad_panel = 8.0f;
+   constexpr float icon_control = 16.0f;
+   constexpr float button_min_w = 56.0f;
+   constexpr float dialog_button_min_w = 72.0f;
+   constexpr float dropdown_w_s = 96.0f;
+   constexpr float dropdown_w_m = 144.0f;
+   constexpr float label_col = 96.0f;
+   constexpr float check_box = 16.0f;
+   constexpr float switch_w = 30.0f;
+   constexpr float switch_h = 16.0f;
+   constexpr float rail_w = 40.0f;
+   constexpr float radius_control = 4.0f;
+   constexpr float radius_container = 8.0f;
+   static_assert(control_h >= hit_min, "a control is never smaller than the hit minimum");
+   static_assert(row_h == control_h, "a list row is one control tall");
 
    struct Rgba8 { unsigned char r, g, b, a; };
    struct Rgbaf { float r, g, b, a; };

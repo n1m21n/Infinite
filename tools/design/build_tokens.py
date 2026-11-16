@@ -21,6 +21,13 @@ def build():
     L.append(f"   constexpr float hit_min = {float(b['hit_min'])}f;")
     L.append(f"   constexpr float bar_h = {float(b['bar_h'])}f;")
     L.append(f"   constexpr float tile = {float(b['tile'])}f;")
+    # The UI system sheet: one value per part (control height, list row, icon, radius ...), shared by every surface.
+    for k, v in b.get("system", {}).items():
+        if not k.startswith("_"):
+            L.append(f"   constexpr float {k} = {float(v)}f;")
+    if "system" in b:
+        L.append("   static_assert(control_h >= hit_min, \"a control is never smaller than the hit minimum\");")
+        L.append("   static_assert(row_h == control_h, \"a list row is one control tall\");")
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
     for k, v in r["pairs"].items():
