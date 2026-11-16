@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dichroic Fresnel Prismatic Caustics",
+    "author": "Infinite",
+    "description": "Crossed dichroic beam-splitter cube splitting incident rays into textured amber, cyan, and violet interference beams over obsidian.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float prismSize = 0.24 [0.12, 0.42];\nparam float beamCount = 7.0 [4.0, 12.0];\nparam float dispersion = 1.65 [0.6, 3.0];\nparam float filament = 0.85 [0.2, 1.5];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nang = t * 0.28;\nca = cos(ang);\nsa = sin(ang);\npr = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca);\n\n# Central dichroic X-cube SDF & internal diagonal splitter planes\ncubeBox = max(abs(pr.x), abs(pr.y)) - prismSize;\ninCube = smoothstep(0.015, -0.015, cubeBox);\nedgeGlow = smoothstep(0.025, 0.0, abs(cubeBox));\ndiag1 = smoothstep(0.014, 0.0, abs(pr.x - pr.y)) * inCube;\ndiag2 = smoothstep(0.014, 0.0, abs(pr.x + pr.y)) * inCube;\n\n# Radial refracted spectral beams emanating from the prism faces\nr = length(p);\na = atan2(p.y, p.x);\nbeamPhase = a * beamCount + sin(r * 4.5 - t * 0.9) * 0.45 * dispersion;\nbeams = pow(clamp(0.5 + 0.5 * cos(beamPhase), 0.0, 1.0), 3.2);\nrayFade = smoothstep(0.16, 0.34, r) * smoothstep(1.38, 0.25, r);\n\n# Fine Fresnel caustic interference ripples across the beams\nfringe = 0.5 + 0.5 * sin(r * 22.0 - t * 1.4 + sin(a * 4.0) * 1.8);\ncObsidian = vec3(0.035, 0.043, 0.067);\ncAmber = vec3(1.0, 0.478, 0.184);\ncCyan = vec3(0.169, 0.769, 0.953);\ncViolet = vec3(0.545, 0.302, 1.0);\n\nbandColor = mix(cAmber, cCyan, 0.5 + 0.5 * sin(a * 2.0 + t * 0.5));\nbandColor = mix(bandColor, cViolet, 0.5 + 0.5 * cos(a * 3.0 - t * 0.4));\n\ncol = cObsidian + bandColor * beams * rayFade * (0.75 + 0.45 * fringe * filament);\ncol = mix(col, mix(cCyan, cViolet, 0.5 + 0.5 * sin(pr.x * 12.0 + pr.y * 12.0)), inCube * 0.65);\ncol = col + vec3(0.95, 0.96, 1.0) * (edgeGlow * 0.85 + (diag1 + diag2) * 0.72);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "prismSize": 0.24,
+      "beamCount": 7.0,
+      "dispersion": 1.65,
+      "filament": 0.85
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,77 @@
+infinite-patch 1
+# Barberpole Shepard Allpass FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 50
+  i note2 55
+  i note3 57
+  i note4 48
+  i note5 55
+  i note6 52
+  i note7 50
+  i note8 48
+  i note9 50
+  i note10 55
+  i note11 60
+  i note12 48
+  i note13 55
+  i note14 52
+  i note15 57
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+  f resonance 0.25
+  f decay 0.45
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rateHz = 0.28 [0.05, 1.5];\nparam float feedback = 0.48 [0.0, 0.82];\nparam float depth = 0.85 [0.1, 1.0];\nparam float mix = 0.72 [0.0, 1.0];\nstate float phA = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float b1 = 0; state float b2 = 0; state float b3 = 0;\nstate float fbState = 0;\n\nphA = (phA + rateHz / sr) % 1.0;\nphB = (phA + 0.5) % 1.0;\n\n# Raised-sine quadrature windows so sawtooth reset is seamless\nwA = sin(3.14159265 * phA);\nwB = sin(3.14159265 * phB);\ngA = clamp(-0.88 + phA * 1.72 * depth, -0.9, 0.9);\ngB = clamp(-0.88 + phB * 1.72 * depth, -0.9, 0.9);\n\nx = in + fbState * feedback * 0.45;\n\n# Bank A: 3-stage cascaded 1st-order allpass\nyA1 = -gA * x + a1;   a1 = x + gA * yA1;\nyA2 = -gA * yA1 + a2; a2 = yA1 + gA * yA2;\nyA3 = -gA * yA2 + a3; a3 = yA2 + gA * yA3;\n\n# Bank B: 3-stage cascaded 1st-order allpass (180-deg phase offset)\nyB1 = -gB * x + b1;   b1 = x + gB * yB1;\nyB2 = -gB * yB1 + b2; b2 = yB1 + gB * yB2;\nyB3 = -gB * yB2 + b3; b3 = yB2 + gB * yB3;\n\nwet = yA3 * (wA * wA) + yB3 * (wB * wB);\nfbState = clamp(wet / (1.0 + abs(wet) * 0.35), -0.85, 0.85);\nout = (in * (1.0 - mix) + (in + wet * 0.85) * 0.55 * mix) * 0.82;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.22 0.20 0.28
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Barberpole Shepard Allpass FX. Infinite rising six-stage allpass barberpole phaser with quadrature crossfade envelope, resonant feedback, and analog headroom saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

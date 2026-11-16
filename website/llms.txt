@@ -317,6 +317,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Gamelan Polyrhythm Gong Ageng Synth](https://infinitedevices.org/library/gamelan-polyrhythm-gong-ageng-synth.html): Deep Javanese suspended bronze gong with strike pitch sag, sub-octave boss fundamental, slow ombak beating, and nonlinear metal shimmer. (file: https://infinitedevices.org/assets/templates/gamelan-polyrhythm-gong-ageng-synth.inf)
 - [Broken Beat Rhodes Binaural Phaser FX](https://infinitedevices.org/library/broken-beat-rhodes-binaural-phaser-fx.html): Six-stage cascaded allpass phaser with asymmetric LFO sweep, resonant notch feedback, and warm electric-piano preamp saturation. (file: https://infinitedevices.org/assets/templates/broken-beat-rhodes-binaural-phaser-fx.inf)
 - [Broken Beat Rhodes BBD Ensemble FX](https://infinitedevices.org/library/broken-beat-rhodes-bbd-ensemble-fx.html): Dual-LFO bucket-brigade chorus ensemble with warm low-pass anti-alias rolloff, cross-coupled modulation, and soft analog saturation. (file: https://infinitedevices.org/assets/templates/broken-beat-rhodes-bbd-ensemble-fx.inf)
+- [Trautonium Subharmonic Mixtur Synth](https://infinitedevices.org/library/trautonium-subharmonic-mixtur-synth.html): Oskar Sala Mixtur-Trautonium integer subharmonic divider synth with dual resonant formant filters and triode saturation. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-mixtur-synth.inf)
+- [Trautonium Subharmonic Formant Bow Synth](https://infinitedevices.org/library/trautonium-subharmonic-formant-bow-synth.html): Bowed subharmonic Trautonium synthesizer with smooth portamento glide, wavefolded upper partials, and swept vocal formant bank. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-formant-bow-synth.inf)
+- [Barberpole Shepard Allpass FX](https://infinitedevices.org/library/barberpole-shepard-allpass-fx.html): Infinite rising six-stage allpass barberpole phaser with quadrature crossfade envelope, resonant feedback, and analog headroom saturation. (file: https://infinitedevices.org/assets/templates/barberpole-shepard-allpass-fx.inf)
+- [Magnetic Wire Hysteresis FX](https://infinitedevices.org/library/magnetic-wire-hysteresis-fx.html): 1940s Peirce steel-wire magnetic recorder processor with asymmetric hysteresis saturation, capstan flutter, and coil bandpass. (file: https://infinitedevices.org/assets/templates/magnetic-wire-hysteresis-fx.inf)
 
 ## Library: Community
 
@@ -677,7 +681,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 125 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 127 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -694,4 +698,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 110 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 112 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
