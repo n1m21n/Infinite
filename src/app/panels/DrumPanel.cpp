@@ -753,8 +753,13 @@ namespace app
          }
          else if (in.activated)
             Hit(n, lane, kDefaultVel);
-         if ((n->laneStart[lane] != s0 || n->laneEnd[lane] != e0) && ImGui::IsMouseClicked(ImGuiMouseButton_Left, false))
+         // One undo step per handle drag: checkpoint the values from before its first move.
+         static bool sTrimming = false;
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            sTrimming = false;
+         if ((n->laneStart[lane] != s0 || n->laneEnd[lane] != e0) && !sTrimming)
          {
+            sTrimming = true;
             const float s1 = n->laneStart[lane], e1 = n->laneEnd[lane];
             n->laneStart[lane] = s0;
             n->laneEnd[lane] = e0;
