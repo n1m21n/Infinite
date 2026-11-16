@@ -1499,6 +1499,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    style.GrabRounding = 3.0f;
    style.WindowRounding = 4.0f;
    style.ItemSpacing = ImVec2(6, 5);
+   // UI system sheet: every frame (button, field, slider, dropdown, check row) is one control tall, 24 pt.
+   style.FramePadding.y = (tok::control_h - UiScale::kBaseFontSize) * 0.5f;
    // Popups/context menus and scrollbars are chrome, not node bodies - they
    // don't share WindowRounding/FrameRounding's blast radius (node-ui-pillars
    // P1-P9 grid math), so they can read softer without touching a single

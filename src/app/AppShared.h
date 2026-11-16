@@ -88,6 +88,9 @@ extern float gViewportPanelHeight;
    // theory that size carries hierarchy; in practice it just made every row
    // look unfinished, because the mixed sizes read as an inconsistency rather
    // than as a ranking. Hierarchy comes from grouping and ordering instead.
+   // Node fields keep ImGui's 21 pt frame (15 pt text + 3 above and below) until the UI system sheet's step 6
+   // re-lays node bodies at tok::control_h; panels and chrome are already on it.
+   inline const float kNodeFramePadY = 3.0f;
    inline const float kKnobStd = 56.0f;
 
 
