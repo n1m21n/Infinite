@@ -44,7 +44,7 @@ def train(a):
                      layers_to_transform=list(range(n - 8, n)), task_type="CAUSAL_LM")
     m = get_peft_model(m, cfg)
     m.print_trainable_parameters()
-    d = os.path.join(a.out, "lora-data")
+    d = a.data or os.path.join(a.out, "lora-data")
 
     def rows(split):
         out = []
@@ -145,6 +145,7 @@ def main():
     ap.add_argument("--batch", type=int, default=4)
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--cap", type=int, default=150)
+    ap.add_argument("--data", help="train/valid jsonl folder (default <out>/lora-data)")
     a = ap.parse_args()
     if a.cmd in ("train", "both"):
         train(a)
