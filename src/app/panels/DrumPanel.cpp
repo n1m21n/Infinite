@@ -14,6 +14,7 @@
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/DeskParts.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -549,14 +550,6 @@ namespace app
          return std::clamp(lit, 0.0f, 1.0f);
       }
 
-      // The Mixer's insert dot: a ring when idle, filled in the check colour while the lane sounds.
-      void DrawLed(ImDrawList* dl, ImVec2 c, float lit, float r = 3.0f)
-      {
-         dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_TextDisabled), 12, 1.0f);
-         if (lit > 0.02f)
-            dl->AddCircleFilled(c, r, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.3f + 0.7f * lit), 12);
-      }
-
       void PickLane(DrumSequencerNode* n, int lane)
       {
          sLane = lane;
@@ -569,8 +562,8 @@ namespace app
       void DrawLabels(GraphNode* gn, DrumSequencerNode* n, ImVec2 p, float rowH)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         const float btnW = 20.0f;
-         const float btnH = std::min(rowH, 20.0f);
+         const float btnW = 22.0f;
+         const float btnH = std::min(rowH, 22.0f);
          const float nameX1 = p.x + kLabelW - 2.0f * btnW - 2.0f * kCellGap - 2.0f;
          for (int lane = 0; lane < kLanes; lane++)
          {
@@ -584,26 +577,42 @@ namespace app
                PickLane(n, lane);
             const bool hov = ImGui::IsItemHovered();
             const bool sel = lane == sLane;
-            // Mixer name row: a category bar on top, a flat well, the selected lane in the header tint.
-            dl->AddRectFilled(mn, mx, ImGui::GetColorU32(sel ? ImGuiCol_Header : ImGuiCol_FrameBg, hov && !sel ? 0.8f : 1.0f), 3.0f);
-            dl->AddRectFilled(mn, ImVec2(mn.x + 3.0f, mx.y), NodeColor(gn, n->FileName(lane).empty() ? 0.35f : 1.0f), 1.5f);
-            DrawLed(dl, ImVec2(mn.x + 12.0f, cy), LaneLit(n, lane));
+            // Desk scribble strip: a dark inset with the lane colour as a cap on the left, a lane LED and the name.
+            const bool loaded = !n->FileName(lane).empty();
+            dl->AddRectFilled(mn, mx, IM_COL32(12, 13, 15, 255), 3.0f);
+            dl->AddRect(mn, mx, sel ? ImGui::GetColorU32(ImGuiCol_CheckMark) : DeskParts::Grey(0, 220), 3.0f, 0, sel ? 1.5f : 1.0f);
+            dl->AddRectFilled(ImVec2(mn.x + 1, mn.y + 1), ImVec2(mn.x + 5.0f, mx.y - 1), DeskParts::Tint(NodeColor(gn, loaded ? 1.0f : 0.35f), 1.0f), 2.0f,
+                              ImDrawFlags_RoundCornersLeft);
+            if (hov && !sel)
+               dl->AddRectFilled(mn, mx, DeskParts::Grey(255, 14), 3.0f);
+            {
+               const ImVec2 lc(mn.x + 14.0f, cy);
+               const float lit = LaneLit(n, lane);
+               dl->AddCircleFilled(lc, 3.0f, DeskParts::Tint(IM_COL32(120, 255, 140, 255), 0.18f), 12);
+               if (lit > 0.02f)
+                  dl->AddCircleFilled(lc, 3.0f, DeskParts::Tint(IM_COL32(120, 255, 140, 255), 0.3f + 0.7f * lit), 12);
+            }
             const std::string name = LaneName(n, lane);
             const float th = ImGui::GetTextLineHeight();
-            dl->PushClipRect(ImVec2(mn.x + 20.0f, mn.y), ImVec2(mx.x - 4.0f, mx.y), true);
-            dl->AddText(ImVec2(mn.x + 22.0f, cy - th * 0.5f), ImGui::GetColorU32(n->FileName(lane).empty() ? ImGuiCol_TextDisabled : ImGuiCol_Text),
-                        name.c_str());
+            dl->PushClipRect(ImVec2(mn.x + 22.0f, mn.y), ImVec2(mx.x - 4.0f, mx.y), true);
+            dl->AddText(ImVec2(mn.x + 24.0f, cy - th * 0.5f), loaded ? DeskParts::Grey(232) : DeskParts::Grey(255, 110), name.c_str());
             dl->PopClipRect();
             if (hov)
                HelpTip("%s %d: %s\n%s", T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
             float x = nameX1 + kCellGap;
             ImGui::SetCursorScreenPos(ImVec2(x, cy - btnH * 0.5f));
-            if (AudioMuteButton("M##m", &n->laneMute[lane], btnW, btnH))
+            if (DeskParts::Key("M##m", "M", n->laneMute[lane], IM_COL32(255, 86, 80, 255), ImVec2(btnW, btnH)))
+            {
+               n->laneMute[lane] = !n->laneMute[lane];
                UndoOnToggle(&n->laneMute[lane]);
+            }
             x += btnW + kCellGap;
             ImGui::SetCursorScreenPos(ImVec2(x, cy - btnH * 0.5f));
-            if (AudioSoloButton("S##s", &n->laneSolo[lane], btnW, btnH))
+            if (DeskParts::Key("S##s", "S", n->laneSolo[lane], IM_COL32(255, 214, 64, 255), ImVec2(btnW, btnH)))
+            {
+               n->laneSolo[lane] = !n->laneSolo[lane];
                UndoOnToggle(&n->laneSolo[lane]);
+            }
             ImGui::PopID();
          }
       }
@@ -654,10 +663,19 @@ namespace app
             const ImVec2 ts = ImGui::CalcTextSize(num);
             if (g.cellW >= ts.x + 2.0f || beat)
                dl->AddText(ImVec2(x0 + (g.cellW - ts.x) * 0.5f, p.y),
-                           ImGui::GetColorU32(now ? ImGuiCol_Text : (beat ? ImGuiCol_Text : ImGuiCol_TextDisabled), inPat ? (beat || now ? 0.95f : 0.8f) : 0.3f), num);
+                           DeskParts::Grey(beat || now ? 235 : 150, inPat ? 255 : 80), num);
             // Chase light: one LED per step, the playing one lit (TR step LEDs).
             if (inPat)
-               DrawLed(dl, ImVec2(x0 + g.cellW * 0.5f, p.y + kRulerH - 7.0f), now ? 1.0f : 0.0f, 2.5f);
+            {
+               const ImU32 chase = IM_COL32(255, 86, 80, 255);
+               const ImVec2 lc(x0 + g.cellW * 0.5f, p.y + kRulerH - 7.0f);
+               dl->AddCircleFilled(lc, 2.5f, DeskParts::Tint(chase, 0.22f), 10);
+               if (now)
+               {
+                  dl->AddCircleFilled(lc, 4.5f, IM_COL32(255, 86, 80, 60), 12);
+                  dl->AddCircleFilled(lc, 2.5f, chase, 10);
+               }
+            }
          }
 
          // One hit target for the whole grid; the key under the mouse is worked out here.
@@ -757,25 +775,22 @@ namespace app
                const ImVec2 cMin(x0, y0), cMax(x0 + g.cellW, y0 + rowH);
                if (s >= len)
                {
-                  dl->AddRectFilled(cMin, cMax, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.20f), 3.0f);
+                  dl->AddRectFilled(cMin, cMax, DeskParts::Grey(0, 90), 3.0f);
                   continue;
                }
                const bool hov = overCell && hl == lane && hs == s;
                const bool now = s == lanePlay;
                const float vel = n->stepVel[lane][s];
                const bool pressed = hov && sDrag.mode != Drag::None;
-               // Flat Mixer wells: FrameBg, alternate beat groups a touch lighter, hover lifts.
-               const float wellA = ((s / 4) % 2 == 0 ? 0.85f : 0.6f) + (hov ? 0.15f : 0.0f);
-               const ImU32 well = ImGui::GetColorU32(ImGuiCol_FrameBg, std::min(1.0f, wellA));
+               // Desk keys: a raised cap with an LED bar; the bar glows in the lane colour, brightness = velocity.
                if (vel > 0.0f)
                {
                   const bool accent = vel >= 0.99f;
                   const float prob = n->stepProb[lane][s];
-                  const float lit = (0.45f + 0.55f * vel) * (prob < 1.0f ? 0.5f + 0.5f * prob : 1.0f);
-                  dl->AddRectFilled(cMin, cMax, well, 3.0f);
-                  dl->AddRectFilled(ImVec2(cMin.x, cMin.y + (pressed ? 1.0f : 0.0f)), cMax, Accent(std::clamp(lit, 0.0f, 1.0f)), 3.0f);
+                  const float lit = std::clamp((0.45f + 0.55f * vel) * (prob < 1.0f ? 0.5f + 0.5f * prob : 1.0f), 0.0f, 1.0f);
+                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, Accent(1.0f), nullptr, true);
                   if (now)
-                     dl->AddRectFilled(cMin, cMax, ImGui::GetColorU32(ImGuiCol_Text, 0.45f), 3.0f);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 70), 3.0f);
                   const float nudge = n->stepNudge[lane][s];
                   if (std::fabs(nudge) > 0.001f)
                   {
@@ -783,7 +798,7 @@ namespace app
                      dl->AddRectFilled(ImVec2(cx - 2.0f, cMax.y - 4.5f), ImVec2(cx + 2.0f, cMax.y - 3.0f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
                   }
                   if (accent)
-                     dl->AddRectFilled(ImVec2(x0 + 3.0f, y0 + 2.0f), ImVec2(cMax.x - 3.0f, y0 + 3.5f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
+                     dl->AddRectFilled(ImVec2(x0 + 3.0f, cMax.y - 3.5f), ImVec2(cMax.x - 3.0f, cMax.y - 2.0f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
                   const int cond = n->stepCond[lane][s];
                   char badge[8] = "";
                   if (cond != 0)
@@ -794,7 +809,7 @@ namespace app
                   {
                      UiType::Scope bs(UiType::Size::Caption, UiType::Weight::Semibold);
                      const ImVec2 bsz = ImGui::CalcTextSize(badge);
-                     if (bsz.x + 4.0f <= g.cellW && bsz.y + 2.0f <= rowH)
+                     if (bsz.x + 4.0f <= g.cellW && bsz.y + 8.0f <= rowH)
                         dl->AddText(ImVec2(x0 + 3.0f, cMax.y - bsz.y - 3.0f), badgeText, badge);
                      else
                         dl->AddTriangleFilled(ImVec2(cMax.x - 6.0f, cMax.y - 1.0f), ImVec2(cMax.x - 1.0f, cMax.y - 1.0f),
@@ -802,10 +817,10 @@ namespace app
                   }
                }
                else
-                  {
-                  dl->AddRectFilled(cMin, cMax, well, 3.0f);
+               {
+                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, 0.0f, Accent(1.0f), nullptr, true);
                   if (now)
-                     dl->AddRectFilled(cMin, cMax, ImGui::GetColorU32(ImGuiCol_Text, 0.18f), 3.0f);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Grey(255, 36), 3.0f);
                }
                if (sTab == kTabStep && lane == sLane && s == sStep)
                   dl->AddRect(ImVec2(cMin.x - 1.5f, cMin.y - 1.5f), ImVec2(cMax.x + 1.5f, cMax.y + 1.5f), ImGui::GetColorU32(ImGuiCol_Text), 2.0f, 0, 1.5f);
@@ -1253,6 +1268,9 @@ namespace app
             const float seqH = bodyMax.y - seqMin.y;
             const float gridX0 = seqMin.x + kLabelW + tok::space_2;
             const float rowH = std::clamp((seqH - kRulerH - (float)(kLanes - 1) * kRowGap) / (float)kLanes, 14.0f, 40.0f);
+            DeskParts::Chassis(ImGui::GetWindowDrawList(), ImVec2(seqMin.x - 4.0f, seqMin.y - 4.0f), ImVec2(leftX1 + 4.0f, bodyMax.y));
+            DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(seqMin.x + 1.0f, seqMin.y + 1.0f));
+            DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(leftX1 - 1.0f, seqMin.y + 1.0f));
             DrawLabels(gn, n, seqMin, rowH);
             DrawGrid(gn, n, ImVec2(gridX0, seqMin.y), leftX1 - gridX0, rowH);
             if (inspector)
