@@ -5830,6 +5830,26 @@ namespace
       return changed;
    }
 
+   // Block 4b pairs: two short values of one setting (X | Y, min | max) share a row, each well half the field.
+   bool FloatPairRow(const char* label, float* a, float* b, float lo, float hi, const char* fmtA, const char* fmtB)
+   {
+      FieldLabel(label);
+      const float half = (sFieldW - tok::space_1) * 0.5f;
+      bool changed = false;
+      float* v[2] = { a, b };
+      const char* fmt[2] = { fmtA, fmtB };
+      for (int i = 0; i < 2; i++)
+      {
+         if (i > 0)
+            ImGui::SameLine(0.0f, tok::space_1);
+         ImGui::SetNextItemWidth(i == 0 ? half : sFieldW - half - tok::space_1);
+         const float was = *v[i];
+         changed |= FieldWell::Slider((RowId(label) + (i ? "b" : "a")).c_str(), v[i], lo, hi, fmt[i]);
+         UndoableFrom(v[i], was, "Edit in 3D View");
+      }
+      return changed;
+   }
+
    bool ComboRow(const char* label, int* v, const std::vector<std::string>& names, const char* undo = "Edit in 3D View")
    {
       FieldLabel(label);
@@ -6421,8 +6441,7 @@ namespace
          }
          else
             FloatRow(T("Scale"), &cam->orthoHeight, 0.01f, 100.0f, "%.2f");
-         FloatRow(T("Shift X"), &cam->shiftX, -2.0f, 2.0f, "%.3f");
-         FloatRow(T("Shift Y"), &cam->shiftY, -2.0f, 2.0f, "%.3f");
+         FloatPairRow(T("Shift"), &cam->shiftX, &cam->shiftY, -2.0f, 2.0f, "X %.3f", "Y %.3f");
          FloatRow(T("Clip start"), &cam->nearPlane, 0.001f, 10.0f, "%.3f");
          FloatRow(T("Clip end"), &cam->farPlane, 1.0f, 10000.0f, "%.0f");
       }
@@ -7329,14 +7348,12 @@ namespace
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Samples per frame when rendering out."));
       }
-      if (Card(T("Shadows"), &look.shadowsEnabled))
+      if (Card(T("Shadows"), &look.shadowsEnabled) && look.shadowsEnabled)   // off: rows hidden, not greyed (Block 4b)
       {
-         ImGui::BeginDisabled(!look.shadowsEnabled);
          ComboRow(T("Quality"), &look.shadowQuality, Render3DNode::ShadowQualityNames());
          FloatRow(T("Strength"), &look.shadowStrength, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Softness"), &look.shadowSoftness, 0.0f, 4.0f, "%.2f");
          FloatRow(T("Bias"), &look.shadowBias, 0.0002f, 0.02f, "%.4f");
-         ImGui::EndDisabled();
       }
       if (Card(T("Ambient Occlusion")))
       {
@@ -7369,9 +7386,8 @@ namespace
                ColorRow(T("Background color"), sSet->bgColor);
          }
       }
-      if (Card(T("Cavity"), &look.cavity))
+      if (Card(T("Cavity"), &look.cavity) && look.cavity)   // off: rows hidden, not greyed (Block 4b)
       {
-         ImGui::BeginDisabled(!look.cavity);
          ComboRow(T("Type"), &look.cavityType, Render3DNode::CavityTypeNames());
          if (look.cavityType != 1)
          {
@@ -7384,7 +7400,6 @@ namespace
             FloatRow(T("Curvature ridge"), &look.curvatureRidge, 0.0f, 2.0f, "%.2f");
             FloatRow(T("Curvature valley"), &look.curvatureValley, 0.0f, 2.0f, "%.2f");
          }
-         ImGui::EndDisabled();
       }
       if (Card(T("Bloom")))
       {
@@ -7392,13 +7407,11 @@ namespace
          FloatRow(T("Threshold"), &look.bloomThreshold, 0.5f, 8.0f, "%.2f");
          FloatRow(T("Radius"), &look.bloomRadius, 0.0f, 1.0f, "%.2f");
       }
-      if (Card(T("Motion Blur"), &look.motionBlur))
+      if (Card(T("Motion Blur"), &look.motionBlur) && look.motionBlur)   // off: rows hidden, not greyed (Block 4b)
       {
-         ImGui::BeginDisabled(!look.motionBlur);
          ComboRow(T("Position"), &look.motionPosition, Render3DNode::MotionPositionNames());
          FloatRow(T("Shutter"), &look.motionShutter, 0.0f, 2.0f, "%.2f");
          FloatRow(T("Max blur"), &look.motionMax, 1.0f, 256.0f, "%.0f px");
-         ImGui::EndDisabled();
       }
       if (Card(T("Film")))
       {
@@ -7412,10 +7425,8 @@ namespace
          BoolRow(T("Region"), &sSet->border);
          if (sSet->border)
          {
-            FloatRow(T("Min X"), &sSet->borderMin[0], 0.0f, 1.0f, "%.3f");
-            FloatRow(T("Min Y"), &sSet->borderMin[1], 0.0f, 1.0f, "%.3f");
-            FloatRow(T("Max X"), &sSet->borderMax[0], 0.0f, 1.0f, "%.3f");
-            FloatRow(T("Max Y"), &sSet->borderMax[1], 0.0f, 1.0f, "%.3f");
+            FloatPairRow(T("Min"), &sSet->borderMin[0], &sSet->borderMin[1], 0.0f, 1.0f, "X %.3f", "Y %.3f");
+            FloatPairRow(T("Max"), &sSet->borderMax[0], &sSet->borderMax[1], 0.0f, 1.0f, "X %.3f", "Y %.3f");
             BoolRow(T("Crop to region"), &sSet->crop);
          }
       }
@@ -7435,10 +7446,24 @@ namespace
       if (Card(T("Format")))
       {
          int w = (int)scene->renderW, h = (int)scene->renderH;
-         if (IntInputRow(T("Resolution X"), &w))
-            KeepingLenses(scene, [&] { scene->renderW = (float)std::clamp(w, 16, 8192); });
-         if (IntInputRow(T("Y"), &h))
-            KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, 16, 8192); });
+         {
+            // X | Y on one row (Block 4b pairs).
+            FieldLabel(T("Resolution"));
+            const float half = (sFieldW - tok::space_1) * 0.5f;
+            FieldWell::PushStyle();
+            ImGui::SetNextItemWidth(half);
+            const bool cw = FieldWell::InputInt("##v3dresx", &w);
+            Undoable("Edit in 3D View");
+            ImGui::SameLine(0.0f, tok::space_1);
+            ImGui::SetNextItemWidth(sFieldW - half - tok::space_1);
+            const bool ch = FieldWell::InputInt("##v3dresy", &h);
+            Undoable("Edit in 3D View");
+            FieldWell::PopStyle();
+            if (cw)
+               KeepingLenses(scene, [&] { scene->renderW = (float)std::clamp(w, 16, 8192); });
+            if (ch)
+               KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, 16, 8192); });
+         }
          FloatRow(T("Resolution %"), &sSet->percent, 1.0f, 200.0f, "%.0f%%");
          FieldLabel(T("Final size"));
          char finalSize[32];
@@ -7450,8 +7475,7 @@ namespace
          if (ComboRow(T("Frame rate"), &rate, kRateNames))
             sSet->fps = (float)kRates[rate];
          FloatRow(T("Base"), &sSet->fpsBase, 1.0f, 1.01f, "%.3f");
-         FloatRow(T("Pixel aspect X"), &sSet->pixelAspect[0], 0.1f, 10.0f, "%.2f");
-         FloatRow(T("Pixel aspect Y"), &sSet->pixelAspect[1], 0.1f, 10.0f, "%.2f");
+         FloatPairRow(T("Pixel aspect"), &sSet->pixelAspect[0], &sSet->pixelAspect[1], 0.1f, 10.0f, "X %.2f", "Y %.2f");
       }
       if (Card(T("Frame Range")))
       {
@@ -7463,9 +7487,8 @@ namespace
          IntInputRow(T("Step"), &sSet->frameStep);
          sSet->frameStep = std::clamp(sSet->frameStep, 1, 100);
       }
-      if (Card(T("Stamp"), &sSet->stamp))
+      if (Card(T("Stamp"), &sSet->stamp) && sSet->stamp)   // off: rows hidden, not greyed (Block 4b)
       {
-         ImGui::BeginDisabled(!sSet->stamp);
          BoolRow(T("Date"), &sSet->stampDate);
          BoolRow(T("Time"), &sSet->stampTime);
          BoolRow(T("Frame"), &sSet->stampFrame);
@@ -7489,7 +7512,6 @@ namespace
          FloatRow(T("Font size"), &sSet->stampSize, 6.0f, 96.0f, "%.0f");
          ColorRow(T("Text"), sSet->stampFg);
          ColorRow(T("Background"), sSet->stampBg);
-         ImGui::EndDisabled();
       }
       if (Card(T("Output")))
       {
@@ -7739,7 +7761,7 @@ namespace
       }
       if (Card(T("Passepartout")))
          FloatRow(T("Opacity"), &set.passAlpha, 0.0f, 1.0f, "%.2f");
-      if (Card(T("Safe Areas"), &set.safe))
+      if (Card(T("Safe Areas"), &set.safe) && set.safe)
       {
          FloatRow(T("Title"), &set.safeTitle, 0.0f, 0.3f, "%.3f");
          FloatRow(T("Action"), &set.safeAction, 0.0f, 0.3f, "%.3f");

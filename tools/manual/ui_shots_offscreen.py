@@ -154,6 +154,10 @@ def scenes(s):
         "panel_studio": panel("samplestudio", "bottom"),
         "panel_pianoroll": panel("pianoroll", "bottom"),
         "panel_view3d": seq(panel("view3d", "bottom"), wait(3)),
+        # 3D View property tabs (rail at x 1226: Scene, Render, Output, World, ...); Camera opens from its outliner row.
+        "v3d_render": seq(panel("view3d", "bottom"), wait(3), click(1226, 560), wait(1.0)),
+        "v3d_output": seq(panel("view3d", "bottom"), wait(3), click(1226, 590), wait(1.0)),
+        "v3d_camera": seq(panel("view3d", "bottom"), wait(3), click(1298, 806), wait(1.5)),
         "panel_history_big": panel("history"),
         "window_settings": panel("settings"),
         **{f"settings_{n}": seq(panel("settings"), click(480, 263 + 28.8 * i), wait(1.0))

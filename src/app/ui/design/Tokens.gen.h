@@ -32,7 +32,7 @@ namespace tok
    constexpr float bar_h = 48.0f;
    constexpr float control_h = 24.0f;
    constexpr float row_h = 24.0f;
-   constexpr float row_gap = 4.0f;
+   constexpr float row_gap = 3.0f;
    constexpr float section_gap = 12.0f;
    constexpr float pad_panel = 8.0f;
    constexpr float icon_control = 16.0f;

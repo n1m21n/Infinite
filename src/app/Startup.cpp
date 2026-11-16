@@ -1501,7 +1501,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    style.SelectableRounding = style.FrameRounding; // was a vendored ImGui patch before 1.92
    style.GrabRounding = tok::radius_control;
    style.WindowRounding = 4.0f;
-   style.ItemSpacing = ImVec2(6, 5);
+   style.ItemSpacing = ImVec2(6, tok::row_gap);   // owner 2026-11-16: row gap 3 (Block 4b shot 1)
 #ifndef NDEBUG
    // Block 4b row-pitch shots: the same panels at another row gap, without a rebuild per value.
    if (const char* rg = getenv("INFINITE_ROW_GAP"))
