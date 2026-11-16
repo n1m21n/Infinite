@@ -2,13 +2,12 @@
 // The node on the canvas stays the source: every control here reads and writes the node's own fields,
 // so save/load, undo, modulation and headless renders see no new state. Only open/dock/height are saved.
 //
-//  header : Drums | page chips (one per node) + page | Run | LCD (< groove >, rate, steps, swing) | 1-16 17-32 |
-//           FILL (hold) | Tools                                                           Lane Step Kit
-//  body   : instrument strips (one per lane, Mixer-style: bar, LED + name, tune decay level pan)
-//           lane labels (LED, name, M S) | step grid                          | inspector (Lane, Step or Kit)
-//
-// Laid out like a 909 front panel / Drumazon: instruments on top, sequencer under them, an edit area at
-// the side. Drawn in the Mixer's language: one accent colour, flat cells, no per-lane rainbow.
+//  header : Drums | page chips (one per node) + page | Run | < groove > | 1-16 17-32 | FILL (hold) | Tools
+//           ...                                                                       Lane Step Kit
+//           every control is a ChipButton at tok::tile height, the Mixer header's own component.
+//  body   : lane labels (Mixer name row: category bar, dot, name, M S) | step grid | inspector
+//           (Lane, Step or Kit). Lanes are generic: the name is the loaded sample, "Empty" otherwise.
+// Drawn in the Mixer's language: FrameBg wells, one SliderGrab accent, ring/dot LEDs, no bevels.
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -16,7 +15,6 @@
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/EmptyState.h"
-#include "app/ui/design/components/HardwareParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
@@ -37,7 +35,6 @@
 
 namespace app
 {
-   namespace hw = HardwareParts;
    bool  gDrumPanelOpen = false;
    float gDrumPanelHeight = 400.0f;
    int   gDrumPanelDock = 0; // 0 bottom, 3 top
@@ -59,11 +56,6 @@ namespace app
       constexpr float kMinHeight = 240.0f;
       constexpr float kInspectorW = 268.0f;
       constexpr float kLabelW = 150.0f;  // lane name + M S, left of the grid
-      constexpr float kStripsH = 74.0f;  // instrument strips: name row + one knob row
-      constexpr float kStripGap = 4.0f;
-      constexpr float kNameH = 22.0f;
-      constexpr float kKnobD = 24.0f;
-      constexpr float kRowGapStrip = 4.0f;
       constexpr float kRulerH = 26.0f;
       constexpr float kGroupGap = 4.0f; // extra space between four-step key groups
       constexpr float kRowGap = 3.0f;
@@ -171,14 +163,6 @@ namespace app
 
       float TextW(const char* s) { return ImGui::CalcTextSize(s, nullptr, true).x + 2.0f * tok::space_2; }
 
-      bool TextChip(const char* label, bool on)
-      {
-         ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         const bool clicked = ActionButton::Draw(label, ImVec2(TextW(label), tok::tile));
-         ActionButton::Scoped() = ActionButton::Kind::Plain;
-         return clicked;
-      }
-
       ImU32 NodeColor(const GraphNode* gn, float alpha = 1.0f)
       {
          const CategoryColors::Color& c = CategoryColors::ColorFor(gn->category);
@@ -188,13 +172,11 @@ namespace app
       // One accent for lit keys, LEDs and strip bars: the Mixer's fader colour.
       ImU32 Accent(float alpha = 1.0f) { return ImGui::GetColorU32(ImGuiCol_SliderGrab, alpha); }
 
-      ImU32 Amber() { return IsThemeLight() ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF); }
-
       std::string LaneName(DrumSequencerNode* n, int lane)
       {
          const std::string& fn = n->FileName(lane);
          if (fn.empty())
-            return DrumPatterns::LaneRole(lane);
+            return T("Empty");
          const size_t dot = fn.find_last_of('.');
          return dot != std::string::npos && dot > 0 ? fn.substr(0, dot) : fn;
       }
@@ -353,7 +335,7 @@ namespace app
 
       void DrawFillMenu(DrumSequencerNode* n)
       {
-         if (TextChip((std::string(T("Tools")) + "##fill").c_str(), ImGui::IsPopupOpen("##drumFill")))
+         if (ChipButton::Draw((std::string(T("Tools")) + "##fill").c_str(), ImGui::IsPopupOpen("##drumFill"), tok::tile))
             ImGui::OpenPopup("##drumFill");
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Pattern tools for the selected lane"));
@@ -431,77 +413,46 @@ namespace app
          return -1;
       }
 
-      // The LCD: a dark glass readout in amber, like a drum machine's display. < > step through the groove
-      // library (the node body's arrows); the readout shows part, rate, steps and swing.
-      void DrawLcd(DrumSequencerNode* n, float w)
+      // FILL: held = fill-conditioned steps play (TR / Elektron). Shift-click latches it.
+      void DrawFillChip(DrumSequencerNode* n)
       {
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 mn = ImGui::GetCursorScreenPos(), mx(mn.x + w, mn.y + tok::tile);
-         hw::Well(dl, mn, mx, tok::U32(tok::pal::c_0B0C10FF), tok::radius_field);
-         const ImU32 lit = tok::U32(tok::pal::c_FFC850FF);
-         const float arrowW = 18.0f, th = ImGui::GetTextLineHeight(), ty = mn.y + (tok::tile - th) * 0.5f;
+         static bool sLatched = false;
+         const bool clicked = ChipButton::Draw("FILL##fillkey", n->fill, tok::tile);
+         const bool held = ImGui::IsItemActive();
+         if (clicked && ImGui::GetIO().KeyShift)
+            sLatched = !sLatched;
+         n->fill = sLatched || held;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Hold: steps set to Fill play, !Fill rest. Shift-click latches."));
+      }
+
+      // < groove > : the groove library steps like the node body's arrows; the middle chip reads out
+      // part, rate, steps and swing.
+      void DrawGrooveChips(DrumSequencerNode* n)
+      {
          int count = 0;
          DrumPatterns::All(count);
          const int cur = GrooveIndex(n);
          for (int side = 0; side < 2; side++)
          {
-            const float ax = side == 0 ? mn.x : mx.x - arrowW;
-            ImGui::SetCursorScreenPos(ImVec2(ax, mn.y));
-            ImGui::PushID(side);
-            if (ImGui::InvisibleButton("##lcdarrow", ImVec2(arrowW, tok::tile)) && count > 0)
+            if (side == 1)
             {
-               const int next = cur < 0 ? 0 : (cur + (side == 0 ? count - 1 : 1)) % count;
-               ApplyDrumGroove(n, next, n->patternPart);
+               char mid[96];
+               std::string name = n->patternName.empty() ? std::string(T("no groove")) : n->patternName;
+               if (!n->patternName.empty() && cur >= 0)
+                  name += std::string(" ") + "ABC"[std::clamp(n->patternPart, 0, 2)];
+               snprintf(mid, sizeof mid, "%s  %s  %d  %d%%##groovemid", name.c_str(), MusicTime::RateDivisionName(n->rate),
+                        std::clamp(n->numSteps, 1, kMaxSteps), (int)std::lround(n->swing * 100.0f));
+               ChipButton::Draw(mid, false, tok::tile);
+               ImGui::SameLine(0.0f, tok::space_1);
             }
-            const bool hov = ImGui::IsItemHovered();
-            if (hov)
+            if (ChipButton::Draw(side == 0 ? "<##groovePrev" : ">##grooveNext", false, tok::tile) && count > 0)
+               ApplyDrumGroove(n, cur < 0 ? 0 : (cur + (side == 0 ? count - 1 : 1)) % count, n->patternPart);
+            if (ImGui::IsItemHovered())
                HelpTip("%s", side == 0 ? T("Previous groove") : T("Next groove"));
-            ImGui::PopID();
-            const float cx = ax + arrowW * 0.5f, cy = mn.y + tok::tile * 0.5f, a = 3.5f;
-            const ImU32 c = hov ? lit : ImGui::GetColorU32(ImVec4(1.0f, 0.78f, 0.31f, 0.55f));
             if (side == 0)
-               dl->AddTriangleFilled(ImVec2(cx + a * 0.6f, cy - a), ImVec2(cx + a * 0.6f, cy + a), ImVec2(cx - a * 0.8f, cy), c);
-            else
-               dl->AddTriangleFilled(ImVec2(cx - a * 0.6f, cy - a), ImVec2(cx - a * 0.6f, cy + a), ImVec2(cx + a * 0.8f, cy), c);
+               ImGui::SameLine(0.0f, tok::space_1);
          }
-         char right[64];
-         snprintf(right, sizeof right, "%s  %d  %d%%", MusicTime::RateDivisionName(n->rate), std::clamp(n->numSteps, 1, kMaxSteps),
-                  (int)std::lround(n->swing * 100.0f));
-         const float rw = ImGui::CalcTextSize(right).x;
-         std::string name = n->patternName.empty() ? std::string(T("no groove")) : n->patternName;
-         if (!n->patternName.empty() && cur >= 0)
-            name += std::string(" ") + "ABC"[std::clamp(n->patternPart, 0, 2)];
-         const float lx0 = mn.x + arrowW, rx = mx.x - arrowW - rw - 4.0f;
-         dl->PushClipRect(ImVec2(lx0, mn.y), ImVec2(rx - 8.0f, mx.y), true);
-         dl->AddText(ImVec2(lx0 + 2.0f, ty), lit, name.c_str());
-         dl->PopClipRect();
-         dl->AddText(ImVec2(rx, ty), ImGui::GetColorU32(ImVec4(1.0f, 0.78f, 0.31f, 0.7f)), right);
-         ImGui::SetCursorScreenPos(mn);
-         ImGui::Dummy(ImVec2(w, tok::tile));
-      }
-
-      // FILL: held = fill-conditioned steps play (TR / Elektron). Shift-click latches it.
-      void DrawFillKey(DrumSequencerNode* n)
-      {
-         static bool sLatched = false;
-         const char* label = "FILL##fillkey";
-         const float w = TextW("FILL") + 18.0f;
-         const bool clicked = ImGui::InvisibleButton(label, ImVec2(w, tok::tile));
-         const bool held = ImGui::IsItemActive();
-         if (clicked && ImGui::GetIO().KeyShift)
-            sLatched = !sLatched;
-         n->fill = sLatched || held;
-         {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 imn = ImGui::GetItemRectMin(), imx = ImGui::GetItemRectMax();
-            hw::Key(dl, imn, imx, hw::KeyBody(), n->fill, Amber(), n->fill ? 0.85f : 0.0f, tok::radius_field);
-            const ImVec2 ts = ImGui::CalcTextSize("FILL");
-            const float sink = n->fill ? 1.5f : 0.0f;
-            dl->AddText(ImVec2(imn.x + (w - ts.x) * 0.5f, imn.y + sink + (tok::tile - 2.5f - ts.y) * 0.5f),
-                        n->fill ? tok::U32(tok::pal::c_0B0C10FF) : ImGui::GetColorU32(ImGuiCol_Text), "FILL");
-         }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Hold: steps set to Fill play, !Fill rest. Shift-click latches."));
       }
 
       void DrawHeader(const std::vector<GraphNode*>& pages, int current, ImVec2 origin, float width)
@@ -541,7 +492,7 @@ namespace app
                HelpTip("%s", T("Run this sequencer's steps (the transport keeps going)"));
 
             ImGui::SameLine(0.0f, tok::space_3);
-            DrawLcd(n, 250.0f);
+            DrawGrooveChips(n);
 
             // D4: step pages, a dot on the one the playhead is on.
             const bool paged = n->numSteps > kPageSteps;
@@ -553,20 +504,19 @@ namespace app
             for (int p = 0; p < 2; p++)
             {
                if (p > 0)
-                  ImGui::SameLine(0.0f, 1.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                if (ChipButton::Draw(kPages[p], paged && n->editPage == p, tok::tile))
                   n->editPage = p;
                if (paged && play >= 0 && play / kPageSteps == p)
                {
                   const ImVec2 mx = ImGui::GetItemRectMax(), mn = ImGui::GetItemRectMin();
-                  ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(mx.x - 5.0f, mn.y + 5.0f), 2.5f,
-                                                              IsThemeLight() ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF));
+                  ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(mx.x - 5.0f, mn.y + 5.0f), 2.5f, ImGui::GetColorU32(ImGuiCol_CheckMark));
                }
             }
             if (!paged)
                ImGui::EndDisabled();
             ImGui::SameLine(0.0f, tok::space_3);
-            DrawFillKey(n);
+            DrawFillChip(n);
             ImGui::SameLine(0.0f, tok::space_1);
             DrawFillMenu(n);
 
@@ -579,7 +529,7 @@ namespace app
             {
                if (t > 0)
                   ImGui::SameLine(0.0f, tok::space_1);
-               if (TextChip(kTabs[t], sTab == t))
+               if (ChipButton::Draw(kTabs[t], sTab == t, tok::tile))
                   sTab = t;
             }
          }
@@ -599,9 +549,12 @@ namespace app
          return std::clamp(lit, 0.0f, 1.0f);
       }
 
-      void DrawLed(ImDrawList* dl, ImVec2 c, float lit)
+      // The Mixer's insert dot: a ring when idle, filled in the check colour while the lane sounds.
+      void DrawLed(ImDrawList* dl, ImVec2 c, float lit, float r = 3.0f)
       {
-         hw::Led(dl, c, 3.0f, Accent(), lit);
+         dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_TextDisabled), 12, 1.0f);
+         if (lit > 0.02f)
+            dl->AddCircleFilled(c, r, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.3f + 0.7f * lit), 12);
       }
 
       void PickLane(DrumSequencerNode* n, int lane)
@@ -612,74 +565,8 @@ namespace app
          Hit(n, lane, ImGui::GetIO().KeyAlt ? 1.0f : kDefaultVel);
       }
 
-      // ---- instrument strips (top tier) ---------------------------------------------------------------
-      // One strip per lane, side by side like the Mixer's channel strips (and a 909's instrument row):
-      // colour bar, LED + name (click = play + select), then tune / decay / level / pan.
-      void DrawStrips(DrumSequencerNode* n, ImVec2 p, float w)
-      {
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const float sw = (w - kStripGap * (float)(kLanes - 1)) / (float)kLanes;
-         const ImU32 knobCol = ImGui::GetColorU32(ImGuiCol_SliderGrab);
-         for (int lane = 0; lane < kLanes; lane++)
-         {
-            ImGui::PushID(100 + lane);
-            const float x = p.x + (float)lane * (sw + kStripGap);
-            const ImVec2 mn(x, p.y), mx(x + sw, p.y + kStripsH);
-            const bool sel = lane == sLane;
-            hw::Plate(dl, mn, mx, hw::PlateBody(), 5.0f);
-            const ImVec2 kmn(x + 3.0f, p.y + 3.0f), kmx(mx.x - 3.0f, p.y + kNameH);
-            ImGui::SetCursorScreenPos(kmn);
-            ImGui::InvisibleButton("##sname", ImVec2(kmx.x - kmn.x, kmx.y - kmn.y));
-            if (ImGui::IsItemActivated())
-               PickLane(n, lane);
-            const bool hov = ImGui::IsItemHovered();
-            const bool down = ImGui::IsItemActive();
-            hw::Key(dl, kmn, kmx, hov ? hw::Shade(hw::KeyBody(), IsThemeLight() ? 1.0f : 1.18f) : hw::KeyBody(), down, Accent(), sel ? 0.22f : 0.0f);
-            const float cy = p.y + 3.0f + (kNameH - 5.5f) * 0.5f + (down ? 1.5f : 0.0f);
-            DrawLed(dl, ImVec2(x + 9.0f, cy), LaneLit(n, lane));
-            const std::string name = LaneName(n, lane);
-            const ImVec2 ts = ImGui::CalcTextSize(name.c_str());
-            const float tx0 = x + 18.0f, tx1 = mx.x - 6.0f;
-            dl->PushClipRect(ImVec2(tx0, p.y), ImVec2(tx1, p.y + kNameH), true);
-            dl->AddText(ImVec2(tx0 + std::max(0.0f, (tx1 - tx0 - ts.x) * 0.5f), cy - ts.y * 0.5f),
-                        ImGui::GetColorU32(n->FileName(lane).empty() ? ImGuiCol_TextDisabled : ImGuiCol_Text), name.c_str());
-            dl->PopClipRect();
-            if (hov)
-               HelpTip("%s %d: %s\n%s", T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
-
-            struct K { const char* label; float* v; float lo, hi; const char* fmt; bool bip; };
-            const K knobs[4] = {
-               { "tune", &n->lanePitch[lane], -24.0f, 24.0f, "%+.1f st", true },
-               { "decay", &n->laneDecay[lane], 0.0f, 1.0f, "%.2f", false },
-               { "level", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", false },
-               { "pan", &n->lanePan[lane], -1.0f, 1.0f, "%+.2f", true },
-            };
-            const float cell = sw / 4.0f;
-            const float d = std::clamp(cell - 12.0f, 16.0f, kKnobD);
-            const float ky = p.y + kNameH + kRowGapStrip;
-            for (int k = 0; k < 4; k++)
-            {
-               ImGui::SetCursorScreenPos(ImVec2(x + cell * (float)k, ky));
-               const float before = *knobs[k].v;
-               if (knobs[k].bip)
-                  BipolarKnobFloat(knobs[k].label, knobs[k].v, knobs[k].lo, knobs[k].hi, knobs[k].fmt, d, knobCol, false, cell, -1, -1, false, 0.0f,
-                                   0.0f, false, true);
-               else
-                  KnobFloat(knobs[k].label, knobs[k].v, knobs[k].lo, knobs[k].hi, knobs[k].fmt, d, knobCol, false, cell);
-               UndoOnActivate(knobs[k].v, before);
-               if (ImGui::IsItemHovered())
-               {
-                  char buf[32];
-                  snprintf(buf, sizeof buf, knobs[k].fmt, *knobs[k].v);
-                  HelpTip("%s %s", knobs[k].label, buf);
-               }
-            }
-            ImGui::PopID();
-         }
-      }
-
       // ---- lane labels (left of the grid) -------------------------------------------------------------
-      void DrawLabels(DrumSequencerNode* n, ImVec2 p, float rowH)
+      void DrawLabels(GraphNode* gn, DrumSequencerNode* n, ImVec2 p, float rowH)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const float btnW = 20.0f;
@@ -697,14 +584,14 @@ namespace app
                PickLane(n, lane);
             const bool hov = ImGui::IsItemHovered();
             const bool sel = lane == sLane;
-            const bool down = ImGui::IsItemActive();
-            hw::Key(dl, mn, mx, hov ? hw::Shade(hw::KeyBody(), IsThemeLight() ? 1.0f : 1.18f) : hw::KeyBody(), down, Accent(), sel ? 0.22f : 0.0f,
-                    tok::radius_field);
-            DrawLed(dl, ImVec2(mn.x + 9.0f, cy - 1.0f), LaneLit(n, lane));
+            // Mixer name row: a category bar on top, a flat well, the selected lane in the header tint.
+            dl->AddRectFilled(mn, mx, ImGui::GetColorU32(sel ? ImGuiCol_Header : ImGuiCol_FrameBg, hov && !sel ? 0.8f : 1.0f), 3.0f);
+            dl->AddRectFilled(mn, ImVec2(mn.x + 3.0f, mx.y), NodeColor(gn, n->FileName(lane).empty() ? 0.35f : 1.0f), 1.5f);
+            DrawLed(dl, ImVec2(mn.x + 12.0f, cy), LaneLit(n, lane));
             const std::string name = LaneName(n, lane);
             const float th = ImGui::GetTextLineHeight();
-            dl->PushClipRect(ImVec2(mn.x + 16.0f, mn.y), ImVec2(mx.x - 4.0f, mx.y), true);
-            dl->AddText(ImVec2(mn.x + 18.0f, cy - 1.0f - th * 0.5f), ImGui::GetColorU32(n->FileName(lane).empty() ? ImGuiCol_TextDisabled : ImGuiCol_Text),
+            dl->PushClipRect(ImVec2(mn.x + 20.0f, mn.y), ImVec2(mx.x - 4.0f, mx.y), true);
+            dl->AddText(ImVec2(mn.x + 22.0f, cy - th * 0.5f), ImGui::GetColorU32(n->FileName(lane).empty() ? ImGuiCol_TextDisabled : ImGuiCol_Text),
                         name.c_str());
             dl->PopClipRect();
             if (hov)
@@ -770,7 +657,7 @@ namespace app
                            ImGui::GetColorU32(now ? ImGuiCol_Text : (beat ? ImGuiCol_Text : ImGuiCol_TextDisabled), inPat ? (beat || now ? 0.95f : 0.8f) : 0.3f), num);
             // Chase light: one LED per step, the playing one lit (TR step LEDs).
             if (inPat)
-               hw::Led(dl, ImVec2(x0 + g.cellW * 0.5f, p.y + kRulerH - 7.0f), 2.5f, Accent(), now ? 1.0f : 0.0f);
+               DrawLed(dl, ImVec2(x0 + g.cellW * 0.5f, p.y + kRulerH - 7.0f), now ? 1.0f : 0.0f, 2.5f);
          }
 
          // One hit target for the whole grid; the key under the mouse is worked out here.
@@ -857,9 +744,6 @@ namespace app
 
          // Keys: raised caps on a recessed tray. A lit key glows in the accent, brightness = velocity;
          // a top line = accent; the bar under the cap shows nudge.
-         hw::Well(dl, ImVec2(p.x - 3.0f, gridY - 3.0f), ImVec2(p.x + w + 3.0f, gridY + gridH + 3.0f), hw::WellBody(), 4.0f);
-         const ImU32 keyBody = hw::KeyBody();
-         const ImU32 keyBodyAlt = hw::Shade(keyBody, IsThemeLight() ? 0.93f : 0.82f);
          const ImU32 badgeText = ImGui::GetColorU32(ImVec4(1, 1, 1, 0.92f));
          for (int lane = 0; lane < kLanes; lane++)
          {
@@ -873,22 +757,23 @@ namespace app
                const ImVec2 cMin(x0, y0), cMax(x0 + g.cellW, y0 + rowH);
                if (s >= len)
                {
-                  dl->AddRectFilled(cMin, cMax, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.20f), 2.0f);
+                  dl->AddRectFilled(cMin, cMax, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.20f), 3.0f);
                   continue;
                }
                const bool hov = overCell && hl == lane && hs == s;
                const bool now = s == lanePlay;
                const float vel = n->stepVel[lane][s];
                const bool pressed = hov && sDrag.mode != Drag::None;
-               ImU32 body = (s / 4) % 2 == 0 ? keyBody : keyBodyAlt;
-               if (hov)
-                  body = hw::Shade(body, IsThemeLight() ? 1.04f : 1.22f);
+               // Flat Mixer wells: FrameBg, alternate beat groups a touch lighter, hover lifts.
+               const float wellA = ((s / 4) % 2 == 0 ? 0.85f : 0.6f) + (hov ? 0.15f : 0.0f);
+               const ImU32 well = ImGui::GetColorU32(ImGuiCol_FrameBg, std::min(1.0f, wellA));
                if (vel > 0.0f)
                {
                   const bool accent = vel >= 0.99f;
                   const float prob = n->stepProb[lane][s];
                   const float lit = (0.45f + 0.55f * vel) * (prob < 1.0f ? 0.5f + 0.5f * prob : 1.0f);
-                  hw::Key(dl, cMin, cMax, body, pressed, now ? hw::Mix(Accent(), IM_COL32_WHITE, 0.45f) : Accent(), lit, 3.0f);
+                  dl->AddRectFilled(cMin, cMax, well, 3.0f);
+                  dl->AddRectFilled(ImVec2(cMin.x, cMin.y + (pressed ? 1.0f : 0.0f)), cMax, now ? ImGui::GetColorU32(ImGuiCol_Text, 0.9f) : Accent(std::clamp(lit, 0.0f, 1.0f)), 3.0f);
                   const float nudge = n->stepNudge[lane][s];
                   if (std::fabs(nudge) > 0.001f)
                   {
@@ -915,7 +800,11 @@ namespace app
                   }
                }
                else
-                  hw::Key(dl, cMin, cMax, body, pressed, ImGui::GetColorU32(ImGuiCol_Text), now ? 0.18f : 0.0f, 3.0f);
+                  {
+                  dl->AddRectFilled(cMin, cMax, well, 3.0f);
+                  if (now)
+                     dl->AddRectFilled(cMin, cMax, ImGui::GetColorU32(ImGuiCol_Text, 0.18f), 3.0f);
+               }
                if (sTab == kTabStep && lane == sLane && s == sStep)
                   dl->AddRect(ImVec2(cMin.x - 1.5f, cMin.y - 1.5f), ImVec2(cMax.x + 1.5f, cMax.y + 1.5f), ImGui::GetColorU32(ImGuiCol_Text), 2.0f, 0, 1.5f);
             }
@@ -1358,18 +1247,11 @@ namespace app
                sPadFlash[l] = std::max(0.0f, sPadFlash[l] - dt * 6.0f);
             const bool inspector = avail.x >= kLabelW + kInspectorW + 240.0f;
             const float leftX1 = inspector ? bodyMax.x - kInspectorW - tok::space_2 : bodyMax.x;
-            // Two tiers like a 909 front panel: instrument strips on top, the sequencer under them.
-            const bool strips = bodyH >= kStripsH + tok::space_2 + kRulerH + (float)kLanes * 18.0f;
-            ImVec2 seqMin = bodyMin;
-            if (strips)
-            {
-               DrawStrips(n, bodyMin, leftX1 - bodyMin.x);
-               seqMin.y += kStripsH + tok::space_2;
-            }
+            const ImVec2 seqMin = bodyMin;
             const float seqH = bodyMax.y - seqMin.y;
             const float gridX0 = seqMin.x + kLabelW + tok::space_2;
             const float rowH = std::clamp((seqH - kRulerH - (float)(kLanes - 1) * kRowGap) / (float)kLanes, 14.0f, 40.0f);
-            DrawLabels(n, seqMin, rowH);
+            DrawLabels(gn, n, seqMin, rowH);
             DrawGrid(gn, n, ImVec2(gridX0, seqMin.y), leftX1 - gridX0, rowH);
             if (inspector)
                DrawInspector(gn, n, ImVec2(bodyMax.x - kInspectorW, bodyMin.y), ImVec2(kInspectorW, bodyH));
