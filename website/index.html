@@ -145,6 +145,14 @@
       },
       {
         "@type": "Question",
+        "name": "Can I use Infinite inside other DAWs like Ableton Live, Logic Pro, or FL Studio?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Infinite is available as a paid VST3 and AU plugin for external DAWs (Ableton Live, Logic Pro, FL Studio, Reaper, Bitwig Studio, Cubase). It brings Infinite's modular canvas, synthesizers, custom DSP kernels, and real-time graphics directly into your host track as an instrument or effect. It is a one-time perpetual purchase of $99 ($79 launch price with code LAUNCH79), valid on two computers offline with zero subscriptions."
+        }
+      },
+      {
+        "@type": "Question",
         "name": "Can I host my existing VST3 and AU plugins inside Infinite?",
         "acceptedAnswer": {
           "@type": "Answer",
@@ -244,6 +252,7 @@
           <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
           <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
           <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M4 17h16M4 12h7"/><circle cx="17" cy="7" r="2.5"/><circle cx="14" cy="12" r="2.5"/></svg><span>Plugin (VST/AU)</span></a>
           <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
           <a href="plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
         </div>
@@ -727,6 +736,17 @@
             <div><dt>license</dt><dd>GPLv3 binary (bundled VST3), MIT source without VST3</dd></div>
           </dl>
 
+          <div class="plugin-banner" style="margin: 24px 0; padding: 18px 22px; border-radius: 14px; background: color-mix(in srgb, var(--accent-ink) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent-ink) 22%, transparent); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+            <div style="flex: 1; min-width: 260px;">
+              <strong style="display: block; font-size: 15px; color: var(--ink);">Want Infinite inside Ableton, Logic, FL Studio, or Reaper?</strong>
+              <span style="font-size: 13px; color: var(--muted);">Now available as a VST3 &amp; AU plugin. One-time $99 ($79 launch price with code LAUNCH79).</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <a href="plugin.html" class="btn btn-primary btn-sm">Explore Plugin</a>
+              <a href="buy.html" class="btn btn-ghost btn-sm">Pre-order</a>
+            </div>
+          </div>
+
           <div class="donate">
             <span>Infinite is made by one person. If it helps you, a small donation keeps it going.</span>
             <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm">
@@ -763,6 +783,16 @@
             </summary>
             <div class="faq-answer">
               <p>Yes. Infinite is fully open source under the MIT licence for source code and GPLv3 for pre-built binaries that bundle VST3 hosting. There are no subscriptions, account registrations, telemetry paywalls or feature locks.</p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">
+              <span>Can I use Infinite inside other DAWs like Ableton Live, Logic Pro, or FL Studio?</span>
+              <svg class="ic faq-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5L10 12.5L15 7.5"/></svg>
+            </summary>
+            <div class="faq-answer">
+              <p>Yes. Infinite is available as a paid VST3 and AU plugin for external DAWs (Ableton Live, Logic Pro, FL Studio, Reaper, Bitwig Studio, Cubase). It brings Infinite's modular canvas, synthesizers, custom DSP kernels, and real-time graphics directly into your host track as an instrument or effect. It is a one-time perpetual purchase of $99 ($79 launch price with code <code>LAUNCH79</code>), valid on two computers offline with zero subscriptions. See the <a href="plugin.html">plugin page</a> or <a href="buy.html">buy page</a> for details.</p>
             </div>
           </details>
 
@@ -941,6 +971,7 @@
     <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
     <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
     <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M4 17h16M4 12h7"/><circle cx="17" cy="7" r="2.5"/><circle cx="14" cy="12" r="2.5"/></svg><span>Plugin (VST/AU)</span></a>
     <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
     <a href="plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
   </div>
