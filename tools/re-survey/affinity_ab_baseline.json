@@ -1,0 +1,35 @@
+{
+ "blur_brush": {
+  "flip": 0.0032
+ },
+ "bucket": {
+  "flip": 0.0156
+ },
+ "copy_rect": {
+  "flip": 0.0
+ },
+ "cut_rect": {
+  "flip": 0.0
+ },
+ "delete_ellipse": {
+  "flip": 0.0005
+ },
+ "delete_rect": {
+  "flip": 0.0
+ },
+ "eraser": {
+  "flip": 0.0021
+ },
+ "fill_rect": {
+  "flip": 0.0
+ },
+ "heal": {
+  "flip": 0.0013
+ },
+ "rasterize": {
+  "flip": 0.0
+ },
+ "wand_delete": {
+  "flip": 0.0063
+ }
+}
