@@ -139,13 +139,29 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* lab
 
 void ImGuiTestEngineHook_Log(ImGuiContext*, const char*, ...) {}
 
+// Up to three recorded labels that share the wanted label's visible text or its ## id, for a "no control" report.
+std::string UiAudit::NearMiss(const char* label)
+{
+   const std::string want = label != nullptr ? label : "";
+   const size_t h = want.find("##");
+   const std::string shown = want.substr(0, h), id = h == std::string::npos ? "" : want.substr(h);
+   std::string out;
+   int n = 0;
+   for (const Rec& r : sLast)
+      if (n < 3 && !r.label.empty() && ((!shown.empty() && r.label.find(shown) != std::string::npos) || (!id.empty() && r.label.find(id) != std::string::npos)))
+         out += (n++ ? ", " : "") + r.label + " [" + r.window + "]";
+   return out.empty() ? "no near miss in " + std::to_string(sLast.size()) + " items" : out;
+}
+
 bool UiAudit::FindItem(const char* label, const char* inWindow, int nth, ImVec2* mn, ImVec2* mx)
 {
    const std::string want = label != nullptr ? label : "";
    auto inWin = [&](const std::string& w) { return inWindow == nullptr || *inWindow == 0 || w.find(inWindow) != std::string::npos; };
+   // L() labels read "shown###original" (a stable id across languages): a journey names the original.
+   auto key = [](const std::string& l) { const size_t t = l.find("###"); return t == std::string::npos ? l : l.substr(t + 3); };
    int seen = 0;
    for (const Rec& r : sLast)
-      if ((r.label == want || (want.find("##") == std::string::npos && r.label.substr(0, r.label.find("##")) == want)) && inWin(r.window) && seen++ == nth)
+      if ((key(r.label) == want || (want.find("##") == std::string::npos && r.label.substr(0, r.label.find("##")) == want)) && inWin(r.window) && seen++ == nth)
       {
          *mn = r.bb.Min;
          *mx = r.bb.Max;
@@ -1870,6 +1886,15 @@ namespace
       std::vector<std::string> setup, expect;
       json steps;
    };
+   // Steps a person takes: hover and wait are the runner's pacing, not actions, so they do not count against the reference.
+   int UserSteps(const Journey& jn)
+   {
+      int n = 0;
+      for (const auto& s : jn.steps)
+         if (!s.contains("hover") && !s.contains("wait"))
+            n++;
+      return n;
+   }
    ImGuiKey KeyNamed(const std::string& k)
    {
       if (k.size() == 1 && k[0] >= 'a' && k[0] <= 'z') return (ImGuiKey)(ImGuiKey_A + (k[0] - 'a'));
@@ -1969,7 +1994,7 @@ void FrameTest_JOURNEYS(int frameId, GLFWwindow* window)
       const Journey& jn = sList[sAt];
       std::string d = detail;
       for (char& c : d) if (c == '\t' || c == '\n') c = ' ';
-      sTsv << jn.id << '\t' << result << '\t' << jn.steps.size() << '\t' << jn.refSteps << '\t' << d << '\n';
+      sTsv << jn.id << '\t' << result << '\t' << UserSteps(jn) << '\t' << jn.refSteps << '\t' << d << '\n';
       sTsv.flush();
       printf("JOURNEY %s %s %s\n", jn.id.c_str(), result.c_str(), d.c_str());
       sMouse = ImVec2(-10000.0f, -10000.0f);
@@ -2033,7 +2058,18 @@ void FrameTest_JOURNEYS(int frameId, GLFWwindow* window)
             bool found = label == "canvas" || UiAudit::FindItem(label.c_str(), in.c_str(), nth, &mn, &mx);
             if (!found)
             {
-               if (++sRetry > 20) { finish("fail", "step " + std::to_string(sStep + 1) + ": no control \"" + label + "\"" + (in.empty() ? "" : " in " + in)); return; }
+               if (++sRetry > 20)
+               {
+                  // The picture at the failed step, so a missing control shows why without a rerun.
+                  const ImVec2 s = ImGui::GetIO().DisplayFramebufferScale;
+                  gShotNowPath = sOut + "/" + jn.id + ".png";
+                  gShotNowRect[0] = (int)std::lround(rmn.x * s.x);
+                  gShotNowRect[1] = (int)std::lround(rmn.y * s.y);
+                  gShotNowRect[2] = (int)std::lround(rmx.x * s.x);
+                  gShotNowRect[3] = (int)std::lround(rmx.y * s.y);
+                  finish("fail", "step " + std::to_string(sStep + 1) + ": no control \"" + label + "\"" + (in.empty() ? "" : " in " + in) + " (" + UiAudit::NearMiss(label.c_str()) + ")");
+                  return;
+               }
                sWait = 1;
                return;
             }
@@ -2128,7 +2164,7 @@ void FrameTest_JOURNEYS(int frameId, GLFWwindow* window)
       gShotNowRect[1] = (int)std::lround(rmn.y * s.y);
       gShotNowRect[2] = (int)std::lround(rmx.x * s.x);
       gShotNowRect[3] = (int)std::lround(rmx.y * s.y);
-      const bool extra = ok && jn.refSteps > 0 && (int)jn.steps.size() > jn.refSteps;
+      const bool extra = ok && jn.refSteps > 0 && UserSteps(jn) > jn.refSteps;
       finish(ok ? (extra ? "human-element" : "pass") : "fail", ok ? (extra ? "more steps than the reference" : "") : detail);
       return;
    }

@@ -1,6 +1,7 @@
 // UI audit (docs/plans/ui-system/ui-audit.md): debug builds record every ImGui item through Dear ImGui's
 // test-engine hooks; widgets that draw more than ImGui knows about note it here. Release builds compile nothing.
 #pragma once
+#include <string>
 #include "imgui.h"
 
 namespace UiAudit
@@ -25,6 +26,8 @@ namespace UiAudit
    // Journeys (src/app/selftest/Journeys.cpp): the rect last frame of the nth (0-based) item whose label is `label`
    // (or whose icon tip is), in a window whose name contains `inWindow` (null or empty: any). Needs the item hooks on.
    bool FindItem(const char* label, const char* inWindow, int nth, ImVec2* mn, ImVec2* mx);
+   // Labels last frame that share `label`'s visible text or ## id: what a failed lookup nearly matched.
+   std::string NearMiss(const char* label);
 #else
    inline void NoteSlider(ImGuiID, float, ImVec2, ImVec2, float = 0.0f) {}
    inline void NoteKind(const char*, const char*, float = 0.0f, float = 0.0f) {}
@@ -34,5 +37,6 @@ namespace UiAudit
    inline void NoteInk(int, ImVec2, ImVec2, float = 0.0f, const char* = nullptr, const char* = nullptr) {}
    inline void NoteOn() {}
    inline bool FindItem(const char*, const char*, int, ImVec2*, ImVec2*) { return false; }
+   inline std::string NearMiss(const char*) { return {}; }
 #endif
 }

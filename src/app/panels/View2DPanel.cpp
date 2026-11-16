@@ -4851,6 +4851,8 @@ namespace
    {
       ImGuiIO& io = ImGui::GetIO();
       const ImVec2 mn = ImGui::GetCursorScreenPos();
+      // Chips drawn over the canvas later in the frame (Rasterize?) must be able to take the hover and the click.
+      ImGui::SetNextItemAllowOverlap();
       ImGui::InvisibleButton("##view2dcanvas", size,
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle | ImGuiButtonFlags_MouseButtonRight);
       if (MenuParts::BeginContextItem("##v2dcanvasmenu"))

@@ -171,6 +171,7 @@ namespace
       int axis = -1;               // engine index; the Z key is 1, the vertical
       bool plane = false;          // Shift + axis: the plane without that axis
       std::string readout;         // the running op in the axes the user sees
+      std::string typed;           // a number typed while the op runs (Blender's numeric input); wins over the mouse
       ImVec2 start;
       float pivot[3] = { 0, 0, 0 };    // world
       float normal[3] = { 0, 1, 0 };   // world, the selected faces' (extrude)
@@ -4085,6 +4086,7 @@ namespace
       sEdit.axis = -1;
       sEdit.plane = false;
       sEdit.readout.clear();
+      sEdit.typed.clear();
       sEdit.start = mouse;
       sEdit.before = node->ops;
    }
@@ -4112,6 +4114,8 @@ namespace
       ImVec2 pc;
       Project(sEdit.pivot, pc);
       const float axes[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+      const bool hasTyped = !sEdit.typed.empty() && sEdit.typed != "-";
+      const float typed = hasTyped ? std::strtof(sEdit.typed.c_str(), nullptr) : 0.0f;
       char line[160] = "";
       if (sEdit.op == 'g')
       {
@@ -4139,6 +4143,13 @@ namespace
                w[k] = (sCam.right[k] * md.x - sCam.up[k] * md.y) * unit;
          float m[3];
          LinearBy(inv, w, m);
+         if (hasTyped)
+         {
+            // A typed distance moves along the locked axis (X when none), in the mesh's own units.
+            const int ax = sEdit.axis >= 0 && !sEdit.plane ? sEdit.axis : 0;
+            for (int k = 0; k < 3; k++)
+               m[k] = k == ax ? typed : 0.0f;
+         }
          snprintf(line, sizeof(line), "move %.5g %.5g %.5g", m[0], m[1], m[2]);
          // The op line stays in the engine's order (saved patches replay it); the readout is what the user sees.
          char shown[96];
@@ -4149,7 +4160,7 @@ namespace
       {
          const float a0 = std::atan2(-(sEdit.start.y - pc.y), sEdit.start.x - pc.x);
          const float a1 = std::atan2(-(mouse.y - pc.y), mouse.x - pc.x);
-         float deg = (a1 - a0) * 180.0f / kPi;
+         float deg = hasTyped ? typed : (a1 - a0) * 180.0f / kPi;
          // About the view axis toward the eye, or the locked axis turned to face it.
          float w[3] = { -sCam.fwd[0], -sCam.fwd[1], -sCam.fwd[2] };
          if (sEdit.axis >= 0)
@@ -4169,7 +4180,7 @@ namespace
       else if (sEdit.op == 's')
       {
          const float d0 = std::max(1.0f, std::hypot(sEdit.start.x - pc.x, sEdit.start.y - pc.y));
-         const float f = std::hypot(mouse.x - pc.x, mouse.y - pc.y) / d0;
+         const float f = hasTyped ? typed : std::hypot(mouse.x - pc.x, mouse.y - pc.y) / d0;
          float s[3] = { f, f, f };
          if (sEdit.axis >= 0)
             for (int k = 0; k < 3; k++)
@@ -4184,15 +4195,17 @@ namespace
          ImVec2 dir;
          const float px = ScreenAlong(sEdit.normal, dir);
          const float t = px > 2.0f ? (md.x * dir.x + md.y * dir.y) / px : -md.y * unit;
-         snprintf(line, sizeof(line), "extrude %.5g", t / WorldScale(world));
-         sEdit.readout = std::string("Extrude   ") + std::to_string(t / WorldScale(world));
+         const float d = hasTyped ? typed : t / WorldScale(world);
+         snprintf(line, sizeof(line), "extrude %.5g", d);
+         sEdit.readout = std::string("Extrude   ") + std::to_string(d);
       }
       else if (sEdit.op == 'i')
       {
          const float d0 = std::hypot(sEdit.start.x - pc.x, sEdit.start.y - pc.y);
          const float d = std::hypot(mouse.x - pc.x, mouse.y - pc.y);
-         snprintf(line, sizeof(line), "inset %.5g", std::max(0.0f, d0 - d) * unit / WorldScale(world));
-         sEdit.readout = std::string("Inset   ") + std::to_string(std::max(0.0f, d0 - d) * unit / WorldScale(world));
+         const float in = hasTyped ? std::max(0.0f, typed) : std::max(0.0f, d0 - d) * unit / WorldScale(world);
+         snprintf(line, sizeof(line), "inset %.5g", in);
+         sEdit.readout = std::string("Inset   ") + std::to_string(in);
       }
       node->ops = WithOp(sEdit.before, line);
    }
@@ -4301,6 +4314,16 @@ namespace
                sEdit.axis = again ? -1 : k;
                sEdit.plane = !again && asPlane;
             }
+         // Typed amount, as in object mode: digits, one point, a leading minus, Backspace.
+         for (int i = 0; i < 10; i++)
+            if (pressed((ImGuiKey)(ImGuiKey_0 + i)) || pressed((ImGuiKey)(ImGuiKey_Keypad0 + i)))
+               sEdit.typed += (char)('0' + i);
+         if ((pressed(ImGuiKey_Period) || pressed(ImGuiKey_KeypadDecimal)) && sEdit.typed.find('.') == std::string::npos)
+            sEdit.typed += '.';
+         if ((pressed(ImGuiKey_Minus) || pressed(ImGuiKey_KeypadSubtract)) && sEdit.typed.empty())
+            sEdit.typed = "-";
+         if (pressed(ImGuiKey_Backspace) && !sEdit.typed.empty())
+            sEdit.typed.pop_back();
          EditUpdate(node, world, mouse);
          ImVec2 pc;
          if (sEdit.op != 'g' && Project(sEdit.pivot, pc))
@@ -8360,7 +8383,7 @@ bool View3DAuditState(int tab)
    return want == Kind::Missing || !sSel.empty();
 }
 
-// Journeys (internal/plans/ui-system/journey-tests.md): "3d cube" adds a Cube node to a fresh scene and selects it;
+// Journeys (internal/plans/ui-system/journey-tests.md): "3d cube" adds a one-segment Cube node to a fresh scene and selects it;
 // queries read the selected item: "obj.x" / "obj.y" / "obj.z", "obj.count", "edit.on", "mesh.points".
 bool View3DJourneySetup(const std::string& line, std::string* err)
 {
@@ -8372,6 +8395,9 @@ bool View3DJourneySetup(const std::string& line, std::string* err)
       GraphNode* gn = SpawnNode("Cube", "3D", 40.0f, 40.0f);
       if (gn == nullptr)
          return *err = "no Cube node", false;
+      // One segment per side, Blender's default cube (8 vertices), so the journey's counts match the reference.
+      if (auto* geo = dynamic_cast<GeometryNode*>(gn->node.get()))
+         geo->detail = 8;
       View3DAddNode(*gn);
       Scene3DNode* scene = FindScene();
       if (scene == nullptr || scene->Items().empty())

@@ -12,7 +12,7 @@
 namespace TransportDisplay
 {
    constexpr float kHeight = 32.0f;
-   constexpr float kValueH = tok::type_display + 2.0f;
+   constexpr float kValueH = tok::type_body + 3.0f;
    constexpr float kValueY = (kHeight - kValueH) * 0.5f;  // value line top, from the well's top edge: centred
 
    inline ImVec4 Text(float a)
@@ -35,13 +35,13 @@ namespace TransportDisplay
 
    inline float ValueWidth(const char* widest)
    {
-      UiType::Scope ts(UiType::Size::Display, UiType::Weight::Medium);
+      UiType::Scope ts(UiType::Size::Body, UiType::Weight::Medium);
       return Readout::Measure(widest);
    }
 
    inline void Value(const char* key, float x, float w, float top, const char* text, float alpha = 1.0f)
    {
-      Readout::Draw(key, UiLayout::Rect { x, top + kValueY, w, kValueH }, text, text, UiType::Size::Display,
+      Readout::Draw(key, UiLayout::Rect { x, top + kValueY, w, kValueH }, text, text, UiType::Size::Body,
                     UiType::Weight::Medium, Readout::Align::Center, alpha);
    }
 

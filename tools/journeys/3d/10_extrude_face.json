@@ -3,8 +3,42 @@
  "title": "Cube, Tab, face mode, pick a face, E 1 Enter: the cube gains 4 vertices",
  "ref": "Blender: Tab 3 click E 1 Enter (8 -> 12 vertices)",
  "ref_steps": 6,
- "setup": ["3d cube"],
- "steps": [{"hover": "canvas"}, {"key": "tab"}, {"wait": 10}, {"key": "3"},
-           {"click": "canvas"}, {"key": "e"}, {"type": "1"}, {"key": "enter"}],
- "expect": ["edit.on == 1", "mesh.points == 12", "obj.count == $before"]
+ "setup": [
+  "3d cube"
+ ],
+ "steps": [
+  {
+   "hover": "canvas"
+  },
+  {
+   "key": "tab"
+  },
+  {
+   "wait": 10
+  },
+  {
+   "key": "3"
+  },
+  {
+   "click": "canvas",
+   "at": [
+    0.395,
+    0.55
+   ]
+  },
+  {
+   "key": "e"
+  },
+  {
+   "key": "1"
+  },
+  {
+   "key": "enter"
+  }
+ ],
+ "expect": [
+  "edit.on == 1",
+  "mesh.points == 12",
+  "obj.count == $before"
+ ]
 }

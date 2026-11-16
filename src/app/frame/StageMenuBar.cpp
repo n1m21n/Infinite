@@ -1166,12 +1166,15 @@ void DrawMenuBar(FrameCtx& fc)
                TD::Wash(ImVec2(x, wellMin.y), ImVec2(x + w, wellMin.y + TD::kHeight), hv, ImGui::IsItemActive());
                TD::Value(id, x, w, wellMin.y, shown);
             };
-            // Key and scale keep fixed widths (the scale's is the longest name's), so the pair never moves.
-            const float curScaleW = scaleW;
+            // The cell keeps one width (sized to "C#" and the longest scale); key and scale are sized to what they show,
+            // so "C Major" sits as one centred pair, not a key pinned left of a wide scale slot.
+            const char* keyShown = kKeyNames[std::clamp(curKey, 0, 11)];
+            const float curKeyW = TD::ValueWidth(keyShown) + fieldPad;
+            const float curScaleW = TD::ValueWidth(capScaleName.c_str()) + fieldPad;
             const float cellX = wellMin.x + tempoCellW + sigCellW;
-            const float kx = std::round(cellX + (keyCellW - (keyW + curScaleW)) * 0.5f);
-            Pick("##keyField", kx, keyW, kKeyNames[std::clamp(curKey, 0, 11)], "##globalKeyPopup");
-            Pick("##scaleField", kx + keyW, curScaleW, capScaleName.c_str(), "##globalScalePopup");
+            const float kx = std::round(cellX + (keyCellW - (curKeyW + curScaleW)) * 0.5f);
+            Pick("##keyField", kx, curKeyW, keyShown, "##globalKeyPopup");
+            Pick("##scaleField", kx + curKeyW, curScaleW, capScaleName.c_str(), "##globalScalePopup");
          }
 
          if (MenuParts::BeginPopup("##globalKeyPopup"))
