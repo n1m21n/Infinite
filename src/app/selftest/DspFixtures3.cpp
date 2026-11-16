@@ -3798,6 +3798,19 @@ static bool RunDecodeNonFiniteFixture()
    return ok;
 }
 
+static bool RunPlatformLocalTimeFixture()
+{
+   const std::time_t now = std::time(nullptr);
+   std::tm tmv{};
+   const bool ok1 = Platform::LocalTime(now, &tmv);
+   const bool ok2 = (tmv.tm_year > 100); // 2000+
+   const bool okNull = !Platform::LocalTime(now, nullptr);
+   const bool ok = ok1 && ok2 && okNull;
+   printf("DSPTEST Platform::LocalTime: year=%d nullGuard=%s  %s\n",
+          1900 + tmv.tm_year, okNull ? "OK" : "FAIL", ok ? "OK" : "FAIL");
+   return ok;
+}
+
 bool RunEffectMixAndLimiterFixture(); // DspFixtures4.cpp
 
 int RunDspTest()
@@ -3832,11 +3845,12 @@ int RunDspTest()
    const bool effectMixLimiterOk = RunEffectMixAndLimiterFixture();
    const bool decodeNonFiniteOk = RunDecodeNonFiniteFixture();
    const bool hostSyncOk = RunHostSyncFixture();
+   const bool localTimeOk = RunPlatformLocalTimeFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && slicerOk &&
                     paulStretchOk && granularOk && drumSeqOk && looperOk && mpcOk && wavetableShaperOk && eqOk && noteStackOk &&
                     freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk &&
-                    portableFftOk && effectMixLimiterOk && decodeNonFiniteOk && hostSyncOk;
+                    portableFftOk && effectMixLimiterOk && decodeNonFiniteOk && hostSyncOk && localTimeOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }

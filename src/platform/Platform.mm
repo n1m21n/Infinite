@@ -326,6 +326,13 @@ namespace Platform
       fprintf(stderr, "%s: %s\n", title.c_str(), message.c_str());
    }
 
+   bool LocalTime(std::time_t time, std::tm* outTm)
+   {
+      if (outTm == nullptr)
+         return false;
+      return localtime_r(&time, outTm) != nullptr;
+   }
+
    std::string OpenImageDialog()
    {
       @autoreleasepool

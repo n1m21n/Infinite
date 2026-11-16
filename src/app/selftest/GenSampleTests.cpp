@@ -725,7 +725,8 @@ bool RunGenSampleTest()
          drewLanded += c == 5;
          drewSkipped += c == 7;
       }
-      const bool tasteOk = drewLanded > 35 && drewSkipped * 10 < drewLanded * 6 && drewSkipped > 0;
+      const int uniformDraws = 1000 / std::max(1, SampleStyles::Count());
+      const bool tasteOk = drewLanded > uniformDraws && drewSkipped * 10 < drewLanded * 6 && drewSkipped > 0;
       printf("  weights pitch %.2f dur %.2f, taste landed %d / skipped %d of 1000 draws: %s\n", pr.pitchW, pr.durW, drewLanded, drewSkipped,
              shaped && tasteOk ? "ok" : "FAIL");
       fails += (shaped && tasteOk) ? 0 : 1;

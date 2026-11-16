@@ -196,7 +196,7 @@ namespace SpatialMaster
       inline void Process(float& l, float& r, bool enabled)
       {
          const unsigned m = kRing - 1;
-         const float in[2] = { l, r };
+         const float in[2] = { std::isfinite(l) ? l : 0.0f, std::isfinite(r) ? r : 0.0f };
          float peak = 0.0f;
          for (int c = 0; c < 2; c++)
          {
@@ -210,8 +210,8 @@ namespace SpatialMaster
          }
          mBlockTp = std::max(mBlockTp, peak);
          const float gt = (enabled && peak > mCeil) ? mCeil / peak : 1.0f;
-         mDel[0][mPos & m] = l;
-         mDel[1][mPos & m] = r;
+         mDel[0][mPos & m] = in[0];
+         mDel[1][mPos & m] = in[1];
          mGt[mPos & m] = gt;
 
          float wmin = 1.0f;
