@@ -27,8 +27,30 @@ void WavetableShaperKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffe
       const float driveDb = mMailbox.SmoothedValue(kDrive);
       const float bias = mMailbox.SmoothedValue(kBias);
       const float smooth = mMailbox.SmoothedValue(kSmooth);
-      const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputDb));
+      const float outputDb = mMailbox.SmoothedValue(kOutputDb);
+      if (!(outputDb == mCachedOutputDb))
+      {
+         mCachedOutputDb = outputDb;
+         mCachedOutputGain = DspMath::DbToLinear(outputDb);
+      }
+      const float outputGain = mCachedOutputGain;
       const float stereo = mMailbox.SmoothedValue(kStereo);
+
+      if (!(driveDb == mCachedDriveDb))
+      {
+         mCachedDriveDb = driveDb;
+         mCachedDriveLin = DspMath::DbToLinear(driveDb);
+      }
+      const double driveLin = (double)mCachedDriveLin;
+
+      if (!(smooth == mCachedSmooth))
+      {
+         mCachedSmooth = smooth;
+         mCachedSmoothMip = WavetableShaperDsp::SmoothToMip(smooth);
+         mCachedSlewThresh = std::exp2((double)mCachedSmoothMip) / (2.0 * Wavetable::kMaxHarmonic);
+      }
+      const float smoothMip = mCachedSmoothMip;
+      const double slewThresh = mCachedSlewThresh;
 
       // L reads position - stereo*0.5, R reads position + stereo*0.5; both
       // land on the same frame at stereo=0. Shape()/RawShape() already
@@ -42,22 +64,38 @@ void WavetableShaperKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffe
       if (numChannels > 0)
          lastInput = in.channels[0][i];
 
-      const float smoothMip = WavetableShaperDsp::SmoothToMip(smooth);
-      const double phaseZero = WavetableShaperDsp::ReadPhase(0.0f, driveDb, bias);
+      const double phaseZero = 0.5 + 0.5 * (double)bias * driveLin;
+      if (table != mCachedZeroTable || !(positionL == mCachedZeroPosL) || !(positionR == mCachedZeroPosR) ||
+          !(smoothMip == mCachedZeroSmoothMip) || !(phaseZero == mCachedZeroPhase))
+      {
+         mCachedZeroTable = table;
+         mCachedZeroPosL = positionL;
+         mCachedZeroPosR = positionR;
+         mCachedZeroSmoothMip = smoothMip;
+         mCachedZeroPhase = phaseZero;
+         mCachedZeroRefL = WavetableShaperDsp::ReadAtMip(phaseZero, table, positionL, smoothMip);
+         mCachedZeroRefR = (positionR == positionL)
+            ? mCachedZeroRefL
+            : WavetableShaperDsp::ReadAtMip(phaseZero, table, positionR, smoothMip);
+      }
+
       for (int ch = 0; ch < numChannels; ch++)
       {
          const float chPosition = (ch == 1) ? positionR : positionL;
          // Shape()'s zero reference, at the knob's own mip level.
-         const float zeroRef = WavetableShaperDsp::ReadAtMip(phaseZero, table, chPosition, smoothMip);
+         const float zeroRef = (ch == 1) ? mCachedZeroRefR : mCachedZeroRefL;
          float os[MinPhaseOversampler::kMaxFactor];
          mOversampler.Up(ch, in.channels[ch][i], os);
          for (int k = 0; k < mOversampler.Factor(); k++)
          {
-            const double phase = WavetableShaperDsp::ReadPhase(os[k], driveDb, bias);
-            const float slewMip = WavetableShaperDsp::MipForPhaseSpeed(std::fabs(phase - mPrevPhase[ch]));
+            const double phase = 0.5 + 0.5 * (double)(os[k] + bias) * driveLin;
+            const double phaseSpeed = std::fabs(phase - mPrevPhase[ch]);
             mPrevPhase[ch] = phase;
+            const float mipPos = (phaseSpeed > slewThresh)
+               ? std::max(smoothMip, WavetableShaperDsp::MipForPhaseSpeed(phaseSpeed))
+               : smoothMip;
             // Negated, as in WavetableShaperDsp::RawShape.
-            os[k] = zeroRef - WavetableShaperDsp::ReadAtMip(phase, table, chPosition, std::max(smoothMip, slewMip));
+            os[k] = zeroRef - WavetableShaperDsp::ReadAtMip(phase, table, chPosition, mipPos);
          }
          float x = mOversampler.Down(ch, os);
          x = mDcBlockers[ch].Process(x);
