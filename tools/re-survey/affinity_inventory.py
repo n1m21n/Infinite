@@ -250,6 +250,151 @@ def report(d):
     return "\n".join(L)
 
 
+# ---- Layer settings: per layer, per layer kind, per group -------------------------------------------------------
+# Affinity side: the SDK's own setters (doc copy in ~/re-output/affinity/sdk, read as text, never run), plus short
+# hand lists for what the Layers panel shows but the SDK spreads over getters. 2D View side: LAYER_SAME maps each
+# Affinity setting to the Scene2DNode.h field (or View2DPanel.cpp label) that does the same job, None = missing.
+# Every mapped name must exist in one of those two files, or the run reports it as stale.
+SDK = os.path.join(OUT, "sdk")
+HEADER = os.path.join(REPO, "src", "nodes", "Scene2DNode.h")
+LAYER_HAND = {
+    "Layer": ["blendMode", "globalOpacity", "fillOpacity", "isVisible", "masterSourceLayerRanges",
+              "masterUnderlyingCompositionRanges", "gamma", "antialiasingMode", "lock", "userDescription", "tagColour",
+              "mask", "clip", "layerEffects", "position", "rotation", "scale", "shear", "isVisibleInExport"],
+    "Group": ["blendMode passThrough", "globalOpacity", "layerEffects", "mask", "blend ranges", "lock", "expanded",
+              "isolate children 3D"],
+    "Pixel / image": ["protectAlpha", "placed image fit", "resampling", "crop to frame"],
+    "Fill layer": ["solid", "linear", "elliptical", "radial", "conical", "bitmap", "gradient stops", "noise"],
+    "Vector fill": ["solid", "linear", "elliptical", "radial", "conical", "bitmap", "mesh", "gradient stops", "noise"],
+    "Vector shape": ["corner radius", "corner type per corner", "sides", "star inner radius", "boolean op", "curve nodes"],
+}
+# (area, sdk file, class or None for the whole file, "set" or "get")
+LAYER_SDK = [
+    ("Effects: common", "layereffects.js", "LayerEffect", "get"),
+    ("Effects: Gaussian blur", "layereffects.js", "GaussianBlurLayerEffect", "set"),
+    ("Effects: outer shadow", "layereffects.js", "OuterShadowLayerEffect", "set"),
+    ("Effects: inner shadow", "layereffects.js", "InnerShadowLayerEffect", "set"),
+    ("Effects: outer glow", "layereffects.js", "OuterGlowLayerEffect", "set"),
+    ("Effects: inner glow", "layereffects.js", "InnerGlowLayerEffect", "set"),
+    ("Effects: outline", "layereffects.js", "OutlineLayerEffect", "set"),
+    ("Effects: bevel/emboss", "layereffects.js", "BevelEmbossLayerEffect", "set"),
+    ("Effects: 3D", "layereffects.js", "PhongBevelLayerEffect", "set"),
+    ("Effects: colour overlay", "layereffects.js", "ColourOverlayLayerEffect", "set"),
+    ("Effects: gradient overlay", "layereffects.js", "GradientOverlayLayerEffect", "set"),
+    ("Vector stroke", "linestyle.js", "LineStyle", "set"),
+    ("Vector stroke", "linestyle.js", "LineStyleDescriptor", "get"),
+    ("Text: character", "glyphatts.js", None, "set"),
+    ("Text: paragraph", "paragraphatts.js", None, "set"),
+]
+# SDK names that are not a layer setting a person edits (type tags, publishing-only, internal handles).
+LAYER_SKIP = {"isLayerEffect", "type", "lineStyle", "styleName", "tocRoleType", "pdfExportTagType", "isBookEndnotes",
+              "isIndex", "spellingLanguageId", "hyphenationLanguageId", "openTypeScriptTag", "isResolutionIndependent",
+              "isSolidLine", "brushFill", "autoKernMinHeight", "leadingOverrideType", "useModernLeading", "leadingType",
+              "relativeLeading", "useSpaceBeforeMode", "lineBreakModeType", "startAtHardBreakType"}
+LAYER_SAME = {
+    ("Layer", "blendMode"): "blend", ("Layer", "globalOpacity"): "opacity", ("Layer", "fillOpacity"): "fill",
+    ("Layer", "isVisible"): "visible", ("Layer", "masterSourceLayerRanges"): "bifT",
+    ("Layer", "masterUnderlyingCompositionRanges"): "bifU", ("Layer", "lock"): "kLockAll",
+    ("Layer", "userDescription"): "name", ("Layer", "tagColour"): "label", ("Layer", "mask"): "maskOn",
+    ("Layer", "clip"): "clip", ("Layer", "layerEffects"): "fx", ("Layer", "position"): "x",
+    ("Layer", "rotation"): "angle", ("Layer", "scale"): "sx",
+    ("Group", "blendMode passThrough"): "kPassThrough", ("Group", "globalOpacity"): "opacity",
+    ("Group", "layerEffects"): "fx", ("Group", "mask"): "maskOn", ("Group", "blend ranges"): "bifT",
+    ("Group", "lock"): "kLockAll", ("Group", "expanded"): "open", ("Group", "isolate children 3D"): "collapse",
+    ("Pixel / image", "protectAlpha"): "kLockAlpha", ("Pixel / image", "placed image fit"): "fit",
+    ("Pixel / image", "resampling"): "nearest", ("Pixel / image", "crop to frame"): "cropOn",
+    ("Fill layer", "solid"): "fillType", ("Fill layer", "linear"): "fillAngle", ("Fill layer", "radial"): "Radial",
+    ("Vector fill", "solid"): "fillC",
+    ("Vector shape", "corner radius"): "radius", ("Vector shape", "sides"): "sides",
+    ("Vector shape", "star inner radius"): "inner", ("Vector shape", "boolean op"): "kAdd",
+    ("Vector shape", "curve nodes"): "pts",
+    ("Effects: common", "enabled"): "on", ("Effects: common", "opacity"): "Opacity",
+    ("Effects: Gaussian blur", "radius"): "Add effect",
+    ("Effects: outer shadow", "radius"): "size", ("Effects: outer shadow", "colour"): "Colour",
+    ("Effects: outer shadow", "offset"): "dist", ("Effects: outer shadow", "angle"): "Angle",
+    ("Effects: outer shadow", "intensity"): "spread",
+    ("Effects: inner shadow", "radius"): "size", ("Effects: inner shadow", "colour"): "Colour",
+    ("Effects: inner shadow", "offset"): "dist", ("Effects: inner shadow", "angle"): "Angle",
+    ("Effects: inner shadow", "intensity"): "spread",
+    ("Effects: outer glow", "radius"): "size", ("Effects: outer glow", "colour"): "Colour",
+    ("Effects: outer glow", "intensity"): "spread",
+    ("Effects: inner glow", "radius"): "size", ("Effects: inner glow", "colour"): "Colour",
+    ("Effects: inner glow", "intensity"): "spread",
+    ("Effects: outline", "radius"): "Width", ("Effects: outline", "colour"): "Colour",
+    ("Effects: outline", "alignment"): "Position",
+    ("Effects: bevel/emboss", "radius"): "size", ("Effects: bevel/emboss", "depth"): "Depth",
+    ("Effects: bevel/emboss", "bevelProfile"): "contour", ("Effects: bevel/emboss", "azimuth"): "Angle",
+    ("Effects: bevel/emboss", "highlightColour"): "Highlight", ("Effects: bevel/emboss", "shadowColour"): "c2",
+    ("Effects: 3D", "depth"): "reliefDepth", ("Effects: 3D", "azimuth"): "reliefLight",
+    ("Effects: 3D", "elevation"): "reliefElev", ("Effects: 3D", "shininess"): "reliefMat",
+    ("Effects: colour overlay", "colour"): "Colour",
+    ("Effects: gradient overlay", "fillDescriptor"): "Start",
+    ("Vector stroke", "cap"): "cap", ("Vector stroke", "join"): "join", ("Vector stroke", "weight"): "width",
+    ("Vector stroke", "dashPattern"): "dash", ("Vector stroke", "strokeAlignment"): "align",
+    ("Text: character", "font"): "font", ("Text: character", "height"): "fontSize",
+    ("Text: character", "absoluteLeading"): "leading", ("Text: character", "characterSpacing"): "tracking",
+    ("Text: character", "capsType"): "caps", ("Text: character", "underlineType"): "underline",
+    ("Text: character", "penFill"): "textC", ("Text: character", "shearX"): "italic",
+    ("Text: paragraph", "alignXType"): "Align", ("Text: paragraph", "absoluteLeading"): "leading",
+}
+# 2D View layer settings Affinity has no direct twin for (kept so the report shows both directions).
+LAYER_EXTRA = ["satin effect", "pattern overlay effect", "per-effect contour curve", "relief materials",
+               "lock pixels / lock position as separate locks", "node layers (any node as a layer)",
+               "layer as node output", "effect on the picture below", "3D layer depth and X/Y rotation",
+               "mask channel (luminance / alpha) and density", "vector mask", "layer modulation slots"]
+
+
+def sdk_members(fname, cls, kind):
+    try:
+        src = open(os.path.join(SDK, fname)).read()
+    except OSError:
+        return []
+    if cls:
+        m = re.search(r"^class %s\b.*?(?=^class |\Z)" % cls, src, re.S | re.M)
+        src = m.group(0) if m else ""
+    out = []
+    for n in re.findall(r"^ +%s ([a-zA-Z]+)\(" % kind, src, re.M):
+        if n not in out and n not in LAYER_SKIP and not n.startswith("is" + (cls or "x")):
+            out.append(n)
+    return out
+
+
+def layer_areas():
+    areas = {k: list(v) for k, v in LAYER_HAND.items()}
+    for area, f, cls, kind in LAYER_SDK:
+        for n in sdk_members(f, cls, kind):
+            if n not in areas.setdefault(area, []):
+                areas[area].append(n)
+    return areas
+
+
+def build_layers():
+    words = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", open(HEADER).read())) | code_labels()
+    rows, stale = [], []
+    for area, names in layer_areas().items():
+        matched, missing = [], []
+        for n in names:
+            t = LAYER_SAME.get((area, n))
+            if t and t not in words:
+                stale.append("%s/%s -> %s" % (area, n, t))
+            (matched if t else missing).append(n)
+        rows.append({"area": area, "affinity": names, "matched": matched, "missing": missing})
+    return {"rows": rows, "stale": stale, "extra": LAYER_EXTRA}
+
+
+def report_layers(d):
+    n = sum(len(r["affinity"]) for r in d["rows"])
+    m = sum(len(r["matched"]) for r in d["rows"])
+    L = ["", "Layer settings (per layer, per kind, per group): %d of %d matched (%.0f%%)." % (m, n, 100.0 * m / max(n, 1)), "",
+         "| Area | Matched | Missing |", "|---|---|---|"]
+    for r in d["rows"]:
+        L.append("| %s | %d/%d | %s |" % (r["area"], len(r["matched"]), len(r["affinity"]), ", ".join(r["missing"]) or "-"))
+    L += ["", "2D View only: " + ", ".join(d["extra"])]
+    if d["stale"]:
+        L += ["", "STALE layer mappings (not in Scene2DNode.h or View2DPanel.cpp): " + ", ".join(d["stale"])]
+    return "\n".join(L)
+
+
 def self_test():
     page = ('<p>from the context toolbar:</p><ul><li><span class="ui">Width</span>&mdash;x<ul><li><span class="ui">Inner'
             '</span></li></ul></li><li><span class="ui">Mode:</span> y</li></ul><ul><li><span class="ui">Later</span></li></ul>')
@@ -263,14 +408,15 @@ def main():
     if "--self-test" in sys.argv:
         return self_test()
     d = build()
+    d["layers"] = build_layers()
     os.makedirs(OUT, exist_ok=True)
-    md = report(d)
+    md = report(d) + "\n" + report_layers(d["layers"])
     with open(os.path.join(OUT, "inventory.md"), "w") as f:
         f.write(md + "\n")
     with open(os.path.join(OUT, "inventory.json"), "w") as f:
         json.dump(d, f, indent=1)
     print(md)
-    return 1 if d["stale"] else 0
+    return 1 if d["stale"] or d["layers"]["stale"] else 0
 
 
 if __name__ == "__main__":
