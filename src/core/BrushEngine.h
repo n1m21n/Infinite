@@ -116,6 +116,7 @@ namespace BrushEngine
       float key[3] = { 0.0f, 0.0f, 0.0f };   // colour replace / background erase: the colour sampled where the stroke began
       float keyTolerance = 0.25f;  // 0..1 of the RGB distance
       bool wetEdges = false;       // the stroke's edge holds more paint than its middle
+      bool autoClean = true;       // wet mix: each stroke starts with clean paint (off: keeps what the last one picked up)
       float accumulation = 1.0f;   // 0..1, how much overlapping dabs build up inside one stroke
       float accumJitter = 0.0f;    // 0..1, per dab
       float hardJitter = 0.0f;     // 0..1, per dab
@@ -225,6 +226,7 @@ namespace BrushEngine
       GLUtil::Fbo mCoverage, mDisplay, mMerge;
       GLUtil::Fbo mWetCarry[2];                      // wet mix: the colour the brush carries (1x1, ping-pong)
       int mCarryIdx = 0;
+      bool mCarryReady = false;    // the carry holds a stroke's paint (auto clean off keeps it)
       void UpdateCarry(const Pending& q, float r);
       bool mDisplayStale = true;
       bool mFinal = false;                        // the merge that lands (End), not the live display

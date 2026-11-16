@@ -68,29 +68,32 @@ _SELOP = ["New selection", "Add to selection (Shift)", "Subtract from selection 
 INF = {
     "move": ["Auto-select", "Align left edges", "Distribute horizontally", "Flip horizontal"],
     "hand": [], "zoom": ["Fit on screen (Ctrl+0)", "Actual pixels (Ctrl+1)"],
-    "crop": ["Free", "Original", "Thirds", "Apply", "Cancel"],
+    "crop": ["Free", "Original", "Thirds", "Apply", "Cancel", "Darken##v2dcdark", "Reveal##v2dcrev"],
     "pick": ["Point", "3x3 average", "All layers", "Current layer"],
     "wand": _SELOP + ["Tolerance %.0f%%", "Contiguous", "All layers", "Expand", "Contract", "Border", "Smooth",
                       "Antialias##v2dwaa"],
     "marquee": _SELOP + ["Rectangle", "Ellipse", "Freehand", "Polygon", "Feather %.0f px", "Fixed size",
                          "From centre##v2dmcentre", "Antialias##v2dmaa"],
     "fill": ["Tolerance %.0f%%", "Contiguous", "All layers"],
-    "gradient": ["Linear", "Radial", "Angle", "Reflected", "Diamond", "Opacity %.0f%%", "Reverse"],
+    "gradient": ["Linear", "Radial", "Angle", "Reflected", "Diamond", "Opacity %.0f%%", "Reverse", "##v2dgext", "Dither##v2dgdither"],
     "brush": _BRUSH + ["Normal", "Behind", "Multiply", "Screen", "Smudge"], "eraser": _BRUSH,
     "dodge": _RETOUCH + ["Shadows", "Midtones", "Highlights", "Protect hue##v2dphue"],
     "burn": _RETOUCH + ["Shadows", "Midtones", "Highlights", "Protect hue##v2dphue"],
     "clone": _RETOUCH + _SOURCE + ["##v2dsblend"], "heal": _RETOUCH + _SOURCE,
     "blur": _RETOUCH, "sharpen": _RETOUCH + ["##v2dsharpmode"],
-    "sponge": _RETOUCH + ["Saturate", "Desaturate", "Vibrance"], "median": _RETOUCH, "undobrush": _RETOUCH + ["Protect alpha##v2dupa"],
+    "sponge": _RETOUCH + ["Saturate", "Desaturate", "Vibrance"], "median": _RETOUCH, "undobrush": _RETOUCH + ["Protect alpha##v2dupa", "##v2dublend"],
     "colourreplace": _RETOUCH + ["Tolerance %.0f%%"], "bgerase": _RETOUCH + ["Tolerance %.0f%%"],
     "inpaint": _RETOUCH, "redeye": [], "flooderase": ["Tolerance %.0f%%", "Contiguous"],
-    "mixer": ["Size %.0f px", "Hardness %.0f%%", "Opacity %.0f%%", "Wet %.0f%%", "Refill %.0f%%"],
-    "selbrush": ["Size %.0f px", "Hardness %.0f%%"],
-    "objsel": _SELOP + ["All layers"], "blemish": ["Size %.0f px"], "patch": [],
-    "meshwarp": [], "perspective": [], "stylepick": [], "measure": ["Clear##v2dmclear"],
+    "mixer": ["Size %.0f px", "Hardness %.0f%%", "Opacity %.0f%%", "Flow %.0f%%", "Wet %.0f%%", "Refill %.0f%%",
+              "Auto clean##v2dxclean", "Symmetry", "Pen pressure", "Lock alpha"],
+    "selbrush": ["Size %.0f px", "Hardness %.0f%%", "Add##v2dsbadd", "Subtract##v2dsbsub", "Soft edges##v2dsbsoft"],
+    "objsel": _SELOP + ["All layers", "Soft edges"], "blemish": ["Size %.0f px"], "patch": ["Selection is source##v2dpsrc", "Transparent##v2dpclear"],
+    "meshwarp": ["Nearest"], "perspective": [], "stylepick": ["Stroke##v2dsp0", "Fill##v2dsp1", "Opacity##v2dsp2", "Effects##v2dsp3", "Character##v2dsp4",
+                  "Paragraph##v2dsp5", "Object##v2dsp6"], "measure": ["Clear##v2dmclear"],
     "pen": ["Fill", "Stroke", "Stroke options", "Dash", "Gap %.0f"],
-    "node": ["Fill", "Stroke"],
-    "shape": ["Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line", "Fill", "Stroke", "Radius %.0f", "Inner %.2f"],
+    "node": ["Fill", "Stroke", "Stroke options"],
+    "shape": ["Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line", "Fill", "Stroke", "Radius %.0f", "Inner %.2f",
+              "Stroke options", "Same for all##v2dvcrall", "Absolute##v2dvrabs"],
     "text": ["##v2dfont", "Bold", "Italic", "Underline", "All caps", "Leading %.2f", "Tracking %.0f", "%.0f px"],
 }
 
@@ -111,7 +114,16 @@ SAME = {
     "Saturate": "Saturate", "Desaturate": "Desaturate", "Vibrance": "Vibrance", "Auto Load Brush": "Refill",
 }
 # Per-tool overrides of SAME, where one Affinity word means a different control in that tool.
-TOOL_SAME = {("sharpenBrush", "Mode"): "##v2dsharpmode", ("undoBrush", "Protect Alpha"): "Protect alpha", ("cloneBrush", "Blend mode"): "##v2dsblend"}
+TOOL_SAME = {("objectSelection", "Soft Edges"): "Soft edges", ("meshWarp", "Resampling"): "Nearest",
+             ("sharpenBrush", "Mode"): "##v2dsharpmode", ("undoBrush", "Protect Alpha"): "Protect alpha", ("cloneBrush", "Blend mode"): "##v2dsblend",
+             ("undoBrush", "Blend Mode"): "##v2dublend", ("gradient", "Extend"): "##v2dgext", ("gradient", "Quality"): "Dither",
+             ("paintMixerBrush", "Auto Clean Brush"): "Auto clean", ("selectionBrush", "Mode"): "Subtract",
+             ("selectionBrush", "Soft edges"): "Soft edges",
+             ("stylePicker", "Layer Opacity"): "Opacity", ("stylePicker", "Layer Effects"): "Effects",
+             ("stylePicker", "Character Settings"): "Character", ("stylePicker", "Paragraph Settings"): "Paragraph",
+             ("stylePicker", "Object Settings"): "Object", ("rectangle", "Single radius"): "Same for all",
+             ("rectangle", "Absolute sizes"): "Absolute", ("rectangle", "Stroke properties"): "Stroke options",
+             ("node", "Stroke properties"): "Stroke options"}
 # Affinity adjustment -> the 2D View adjustment that covers it, where the names differ.
 ADJ_SAME = {"Brightness / Contrast": "Brightness", "HSL": "Hue", "LUT": "Colour Lookup", "Lens Filter": "Photo Filter"}
 # Context-bar entries that are actions, panels or document-level options rather than tool settings.

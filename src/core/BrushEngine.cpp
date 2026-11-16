@@ -358,7 +358,8 @@ namespace BrushEngine
          "      vec2 src = (uAnchor + uOff + uSrcM * (px - uAnchor)) * uTexel;\n"
          "      if (uMode == 10) { vec4 s = srcAt(src); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
          "         fragColor = mix(d, s, a); return; }\n"
-         "      if (uMode == 24) { vec4 s = srcAt(vUv); fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"   // undo brush: the earlier state
+         "      if (uMode == 24) { vec4 s = srcAt(vUv); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
+         "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"   // undo brush: the earlier state
          "      if (uMode == 26) { float k = 1.0 - smoothstep(uKeyTol * 0.6, uKeyTol, distance(d.rgb, uKey));\n"   // background erase
          "         fragColor = vec4(d.rgb, d.a * (1.0 - a * k)); return; }\n"
          "      if (uMode == 28) { fragColor = uFinal == 1 ? d : vec4(mix(d.rgb, vec3(1.0, 0.25, 0.3), a * 0.55), max(d.a, a * 0.55)); return; }\n"
@@ -907,11 +908,12 @@ namespace BrushEngine
       {
          if (!GLUtil::EnsureFbo(mWetCarry[0], 1, 1, GL_RGBA16F, "BrushCarry") || !GLUtil::EnsureFbo(mWetCarry[1], 1, 1, GL_RGBA16F, "BrushCarry"))
             mBrush.wet = 0.0f;
-         else
+         else if (b.autoClean || !mCarryReady)
          {
             const float c[4] = { b.color[0], b.color[1], b.color[2], 1.0f };
             GLUtil::ClearFbo(mWetCarry[0], c);
             mCarryIdx = 0;
+            mCarryReady = true;
          }
       }
       mSelection = selection;

@@ -495,7 +495,9 @@ public:
    bool Bucket(int id, float x, float y, const float rgb[3], float opacity, int tolerance, bool contiguous, bool sampleAll);
    // Gradient from a to b (document px), colour A to B; radial when `radial`.
    // kind: 1 linear, 2 radial, 3 angle, 4 reflected, 5 diamond.
-   bool Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity = 1.0f);
+   // extend: past the ends 0 holds the end colour, 1 repeats, 2 reflects; dither breaks up 8-bit banding.
+   bool Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity = 1.0f,
+                 int extend = 0, bool dither = false);
    // The picture's colour (display values) at a document point.
    // size: 1, 3 or 5 px square, averaged. layer: read that paint layer alone (0 = the whole picture).
    bool Pick(float x, float y, float rgb[3], int size = 1, int layer = 0);
@@ -506,7 +508,9 @@ public:
    // one when autoOff. Rows and offset in the same frame as px.
    static bool HealRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask, int ox, int oy, bool autoOff);
    // Patch: the selected pixels healed from the place (dx, dy) document px away.
-   bool PatchSelection(int id, float dx, float dy);
+   // Patch: the selection mended from where it was dragged to; selIsSource sends its own pixels there instead;
+   // transparent keeps half of what was there.
+   bool PatchSelection(int id, float dx, float dy, bool selIsSource = false, bool transparent = false);
    // Blemish removal: a disc (document px) healed from the best clean place nearby.
    bool Blemish(int id, float x, float y, float radius);
    // Flood erase: the region the wand would pick at (x, y) cleared; the selection stays as it was.
@@ -515,11 +519,14 @@ public:
    void SelectObject(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId);
    // Mesh warp: a paint layer's pixels pulled through a 4 x 4 grid. `from` is the layer's tiles when the warp
    // began; `moved` the 16 grid points' document positions, row by row from the layer's top left.
-   bool MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store);
+   bool MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest = false);
    // The grid's rest positions (document px) for a paint layer.
    bool MeshRest(int id, float out[32]);
    // Style picker: blend, opacity, fill and layer effects copied from one layer to another.
-   bool CopyLayerStyle(int from, int to);
+   // Style picker parts: which of the style travels.
+   enum StylePart { kStStroke = 1, kStFill = 2, kStOpacity = 4, kStEffects = 8, kStCharacter = 16, kStParagraph = 32, kStObject = 64,
+                    kStAll = 127 };
+   bool CopyLayerStyle(int from, int to, int parts = kStOpacity | kStEffects);
    bool wandAntialias = true;   // the wand's and bucket's soft edge (panel only, not saved)
 
    // ---- 3D surface paint ---------------------------------------------------
@@ -608,7 +615,7 @@ public:
    void Deselect();
    void InvertSelection();
    // 0 expand, 1 contract, 2 smooth (rounds corners, drops specks), 3 border (a ring px wide on the edge).
-   void ModifySelection(int op, int px);
+   void ModifySelection(int op, int px);   // 0 expand, 1 contract, 2 smooth, 3 border, 4 feather (soft edges)
    bool HasSelection() const { return mSelAny; }
    // Delete / fill: the selected pixels of a paint layer (all of it with no selection) cleared, or covered with a colour.
    bool ClearPixels(int id);
@@ -790,6 +797,8 @@ private:
    unsigned BlurLuma(unsigned src, float radius);
    void ApplyBrushSources(BrushEngine::Brush& brush, bool snapshot);
    unsigned mFillProgram = 0, mAntsProgram = 0, mResampleProgram = 0;
+   int mGradExtend = 0;          // the next ApplyFill's gradient extend and dither (Gradient sets, then clears)
+   bool mGradDither = false;
    bool mPaintTried = false;
    unsigned long long mPaintEdits = 0;   // bumps when a surface changes outside a stroke
 

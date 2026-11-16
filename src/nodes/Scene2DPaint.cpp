@@ -41,6 +41,8 @@ namespace
       "uniform vec2 uP1;\n"
       "uniform float uOpacity;\n"
       "uniform int uLock;\n"
+      "uniform int uExtend;\n"
+      "uniform int uDither;\n"
       "void main() {\n"
       "   vec2 sp = vUv * uSurfSize;\n"
       "   vec2 bp = vec2(sp.x * uBox.x / uSurfSize.x, (uSurfSize.y - sp.y) * uBox.y / uSurfSize.y);\n"
@@ -53,21 +55,27 @@ namespace
       "   vec4 d = texture(uSurf, vUv);\n"
       "   float cov = uHasCov == 1 ? (inDoc ? texture(uCov, duv).r : 0.0) : 1.0;\n"
       "   vec4 c = uColA;\n"
+      "   float t = -1.0;\n"
       "   if (uKind == 1) {\n"
       "      vec2 ab = uP1 - uP0;\n"
-      "      c = mix(uColA, uColB, clamp(dot(dp - uP0, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0));\n"
+      "      t = dot(dp - uP0, ab) / max(dot(ab, ab), 1e-6);\n"
       "   } else if (uKind == 2) {\n"
-      "      c = mix(uColA, uColB, clamp(length(dp - uP0) / max(length(uP1 - uP0), 1e-3), 0.0, 1.0));\n"
+      "      t = length(dp - uP0) / max(length(uP1 - uP0), 1e-3);\n"
       "   } else if (uKind == 3) {\n"   // angle: once round from the drag's direction
       "      vec2 ab = uP1 - uP0, q = dp - uP0;\n"
-      "      float t = (atan(q.y, q.x) - atan(ab.y, ab.x)) / 6.2831853;\n"
-      "      c = mix(uColA, uColB, fract(t + 1.0));\n"
+      "      t = fract((atan(q.y, q.x) - atan(ab.y, ab.x)) / 6.2831853 + 1.0);\n"
       "   } else if (uKind == 4) {\n"   // reflected: the linear ramp mirrored back across the start
       "      vec2 ab = uP1 - uP0;\n"
-      "      c = mix(uColA, uColB, clamp(abs(dot(dp - uP0, ab)) / max(dot(ab, ab), 1e-6), 0.0, 1.0));\n"
+      "      t = abs(dot(dp - uP0, ab)) / max(dot(ab, ab), 1e-6);\n"
       "   } else if (uKind == 5) {\n"   // diamond: a square turned to the drag, its corner at the end
       "      vec2 ab = uP1 - uP0, e = vec2(-ab.y, ab.x), q = dp - uP0;\n"
-      "      c = mix(uColA, uColB, clamp((abs(dot(q, ab)) + abs(dot(q, e))) / max(dot(ab, ab), 1e-6), 0.0, 1.0));\n"
+      "      t = (abs(dot(q, ab)) + abs(dot(q, e))) / max(dot(ab, ab), 1e-6);\n"
+      "   }\n"
+      "   if (uKind >= 1 && uKind <= 5) {\n"
+      "      if (uExtend == 1) t = fract(t);\n"                       // repeat
+      "      else if (uExtend == 2) t = 1.0 - abs(mod(t, 2.0) - 1.0);\n"   // reflect
+      "      c = mix(uColA, uColB, clamp(t, 0.0, 1.0));\n"
+      "      if (uDither == 1) c.rgb += (fract(sin(dot(sp, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;\n"
       "   }\n"
       "   float a = clamp(c.a * cov * sel * uOpacity, 0.0, 1.0);\n"
       "   if (uOp == 3) { fragColor = vec4(d.rgb, d.a * (1.0 - clamp(cov * sel * uOpacity, 0.0, 1.0))); return; }\n"   // clear
@@ -710,6 +718,8 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
       glUniform2f(glGetUniformLocation(prog, "uP1"), p1 != nullptr ? p1[0] : 1.0f, p1 != nullptr ? p1[1] : 1.0f);
       glUniform1f(glGetUniformLocation(prog, "uOpacity"), std::clamp(opacity, 0.0f, 1.0f));
       glUniform1i(glGetUniformLocation(prog, "uLock"), (l.lock & kLockAlpha) != 0 ? 1 : 0);
+      glUniform1i(glGetUniformLocation(prog, "uExtend"), mGradExtend);
+      glUniform1i(glGetUniformLocation(prog, "uDither"), mGradDither ? 1 : 0);
    });
    GLint prevRead = 0;
    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
@@ -985,7 +995,8 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    return true;
 }
 
-bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity)
+bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity,
+                           int extend, bool dither)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -997,7 +1008,11 @@ bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const
       return false;
    UploadSelection();
    const float p0[2] = { ax, ay }, p1[2] = { bx, by };
+   mGradExtend = std::clamp(extend, 0, 2);
+   mGradDither = dither;
    ApplyFill(it->second, l->pw, l->ph, *l, 0, a, b, std::clamp(kind, 1, 5), p0, p1, opacity);
+   mGradExtend = 0;
+   mGradDither = false;
    const int all[4] = { 0, 0, l->pw, l->ph };
    StoreTiles(it->second, l->tiles, all);
    Commit();
@@ -1499,9 +1514,10 @@ void Scene2DNode::ModifySelection(int op, int px)
       mSel = morph(mSel, true, r);
    else if (op == 1)
       mSel = morph(mSel, false, r);
-   else if (op == 2)
+   else if (op == 2 || op == 4)
    {
       // Box blur (running sums, a pass per axis) then a hard cut at half: corners round, specks under r go.
+      // Op 4 (soft edges) keeps the blur: a feathered edge.
       std::vector<int> tmp((size_t)w * h);
       for (int y = 0; y < h; y++)
       {
@@ -1522,7 +1538,7 @@ void Scene2DNode::ModifySelection(int op, int px)
             sum += tmp[(size_t)std::clamp(y, 0, h - 1) * w + x];
          for (int y = 0; y < h; y++)
          {
-            mSel[(size_t)y * w + x] = sum * 2 >= n * 255 ? 255 : 0;
+            mSel[(size_t)y * w + x] = op == 4 ? (uint8_t)std::min<long long>(255, (sum + n / 2) / n) : sum * 2 >= n * 255 ? 255 : 0;
             sum += tmp[(size_t)std::min(h - 1, y + r + 1) * w + x] - tmp[(size_t)std::max(0, y - r) * w + x];
          }
       }
@@ -1685,7 +1701,7 @@ void Scene2DNode::SetUndoSource(int id)
    mUndoTiles[id] = l->tiles;
 }
 
-bool Scene2DNode::PatchSelection(int id, float dx, float dy)
+bool Scene2DNode::PatchSelection(int id, float dx, float dy, bool selIsSource, bool transparent)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -1707,9 +1723,28 @@ bool Scene2DNode::PatchSelection(int id, float dx, float dy)
    std::vector<uint8_t> mask, px;
    SelOnSurface(mSel, mDoc.w, mDoc.h, sw, sh, inv, mask);
    ReadRect(it->second.fbo, 0, 0, sw, sh, px);
-   const int ox = (int)std::lround(a * dx + b * dy), oy = (int)std::lround(c * dx + d * dy);
+   int ox = (int)std::lround(a * dx + b * dy), oy = (int)std::lround(c * dx + d * dy);
+   if (selIsSource)
+   {
+      // The selection's pixels go to where it was dragged: the hole moves there, its source is the selection.
+      std::vector<uint8_t> moved((size_t)sw * sh, 0);
+      for (int y = 0; y < sh; y++)
+         for (int x = 0; x < sw; x++)
+         {
+            const int sx = x - ox, sy = y - oy;
+            if (sx >= 0 && sy >= 0 && sx < sw && sy < sh)
+               moved[(size_t)y * sw + x] = mask[(size_t)sy * sw + sx];
+         }
+      mask.swap(moved);
+      ox = -ox;
+      oy = -oy;
+   }
+   const std::vector<uint8_t> before = transparent ? px : std::vector<uint8_t>();
    if (!HealRegion(px, sw, sh, mask, ox, oy, false))
       return false;
+   if (transparent)
+      for (size_t i = 0; i < px.size(); i++)
+         px[i] = (uint8_t)((px[i] + before[i] + 1) / 2);
    WriteRect(it->second.fbo, 0, 0, sw, sh, px.data());
    const int all[4] = { 0, 0, sw, sh };
    StoreTiles(it->second, l->tiles, all);
@@ -1953,7 +1988,7 @@ bool Scene2DNode::MeshRest(int id, float out[32])
    return true;
 }
 
-bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store)
+bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -1982,9 +2017,19 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
    GLUtil::DrawPass(it->second.fbo, prog, [&]() {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, tex);
+      const GLint filt = nearest ? GL_NEAREST : GL_LINEAR;
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filt);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filt);
       glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
       glUniform2fv(glGetUniformLocation(prog, "uD"), 16, d);
    });
+   if (nearest)
+   {
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glBindTexture(GL_TEXTURE_2D, 0);
+   }
    // Shown now; the tiles follow when the drag ends.
    mPaintEdits++;
    if (store)
@@ -2002,19 +2047,118 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
    return true;
 }
 
-bool Scene2DNode::CopyLayerStyle(int from, int to)
+bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
 {
    Layers();
    const Layer* a = FindConst(from);
    Layer* b = FindLayer(to);
    if (a == nullptr || b == nullptr || a == b || (b->lock & kLockAll) != 0)
       return false;
-   b->blend = a->blend;
-   b->opacity = a->opacity;
-   b->fill = a->fill;
-   for (int k = 0; k < kFxCount; k++)
-      b->fx[k] = a->fx[k];
-   b->fxMore = a->fxMore;
+   if (parts & kStOpacity)
+   {
+      b->blend = a->blend;
+      b->opacity = a->opacity;
+      b->fill = a->fill;
+   }
+   if (parts & kStEffects)
+   {
+      for (int k = 0; k < kFxCount; k++)
+         b->fx[k] = a->fx[k];
+      b->fxMore = a->fxMore;
+   }
+   // Vector shapes: the first shape's fill, stroke and object settings go to every shape.
+   if (!a->shapes.empty() && (parts & (kStStroke | kStFill | kStObject)))
+   {
+      const Shape& f = a->shapes.front();
+      for (Shape& t : b->shapes)
+      {
+         if (parts & kStFill)
+         {
+            t.fillOn = f.fillOn;
+            std::copy(f.fillC, f.fillC + 4, t.fillC);
+            t.fillType = f.fillType;
+            t.fillAngle = f.fillAngle;
+            t.fillStops = f.fillStops;
+            t.fillImage = f.fillImage;
+            t.imageMode = f.imageMode;
+            std::copy(&f.meshC[0][0], &f.meshC[0][0] + 16, &t.meshC[0][0]);
+            t.noise = f.noise;
+         }
+         if (parts & kStStroke)
+         {
+            t.strokeOn = f.strokeOn;
+            std::copy(f.strokeC, f.strokeC + 4, t.strokeC);
+            t.width = f.width;
+            t.cap = f.cap;
+            t.join = f.join;
+            t.align = f.align;
+            t.dash = f.dash;
+            t.gap = f.gap;
+            t.miter = f.miter;
+            t.dashPhase = f.dashPhase;
+            t.balanced = f.balanced;
+            t.arrowS = f.arrowS;
+            t.arrowE = f.arrowE;
+            t.arrowSize = f.arrowSize;
+            t.taperS = f.taperS;
+            t.taperE = f.taperE;
+            t.pressMin = f.pressMin;
+            t.behind = f.behind;
+            t.scaleStroke = f.scaleStroke;
+         }
+         if ((parts & kStObject) && t.type == f.type)
+         {
+            t.radius = f.radius;
+            t.sides = f.sides;
+            t.inner = f.inner;
+            std::copy(f.cornerR, f.cornerR + 4, t.cornerR);
+            std::copy(f.cornerType, f.cornerType + 4, t.cornerType);
+         }
+      }
+   }
+   if (a->kind == Kind::Text && b->kind == Kind::Text)
+   {
+      if (parts & kStCharacter)
+      {
+         b->font = a->font;
+         b->fontSize = a->fontSize;
+         b->tracking = a->tracking;
+         b->bold = a->bold;
+         b->italic = a->italic;
+         b->underline = a->underline;
+         b->caps = a->caps;
+         std::copy(a->textC, a->textC + 4, b->textC);
+         b->strike = a->strike;
+         b->highlight = a->highlight;
+         b->kerning = a->kerning;
+         std::copy(a->highlightC, a->highlightC + 4, b->highlightC);
+         b->script = a->script;
+         b->baseShift = a->baseShift;
+         b->textSX = a->textSX;
+         b->textSY = a->textSY;
+         b->ulOwn = a->ulOwn;
+         b->stOwn = a->stOwn;
+         std::copy(a->ulC, a->ulC + 4, b->ulC);
+         std::copy(a->stC, a->stC + 4, b->stC);
+         b->noBreak = a->noBreak;
+         b->optical = a->optical;
+         b->outline = a->outline;
+         b->outlineW = a->outlineW;
+         std::copy(a->outlineC, a->outlineC + 4, b->outlineC);
+         b->offsetX = a->offsetX;
+         b->lang = a->lang;
+      }
+      if (parts & kStParagraph)
+      {
+         b->align = a->align;
+         b->leading = a->leading;
+         b->indentL = a->indentL;
+         b->indentR = a->indentR;
+         b->indentFirst = a->indentFirst;
+         b->spaceBefore = a->spaceBefore;
+         b->spaceAfter = a->spaceAfter;
+      }
+   }
    Commit();
    return true;
 }

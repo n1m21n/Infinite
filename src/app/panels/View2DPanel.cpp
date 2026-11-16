@@ -148,6 +148,16 @@ namespace
    bool sCloneAligned = true;      // clone / heal: the offset holds across strokes
    bool sCloneAll = false;         // clone / heal: copy from the whole picture
    bool sGradReverse = false;      // gradient runs background to foreground
+   bool sMeshNearest = false;      // mesh warp: nearest-neighbour resampling (off: bilinear)
+   bool sObjSoft = false;          // object selection: feathered edge
+   bool sRadiusAbs = true;         // shape radius in px (off: % of the short side)
+   bool sPatchSrc = false, sPatchClear = false;   // patch: selection is source; transparent
+   int sStyleParts = Scene2DNode::kStAll;   // style picker: which parts travel
+   int sGradExtend = 0;            // past the ends: 0 pad, 1 repeat, 2 reflect
+   bool sGradDither = true;        // breaks up 8-bit banding
+   bool sCropDarken = true, sCropReveal = true;   // crop: dim outside the box; show it at all
+   bool sSelBrushSub = false;      // selection brush: takes away (Alt flips it)
+   bool sSelBrushSoft = true;      // selection brush: soft edges (off: hard)
    int sTolerance = 32;
    bool sContiguous = true, sAllLayers = false;
    int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
@@ -2614,8 +2624,10 @@ namespace
          // The selection brush paints the selection itself: white adds, Alt takes away.
          SelStep("Selection brush");
          BrushEngine::Brush b = sSelBrush;
-         b.mode = ImGui::GetIO().KeyAlt ? BrushEngine::kErase : BrushEngine::kNormal;
+         b.mode = ImGui::GetIO().KeyAlt != sSelBrushSub ? BrushEngine::kErase : BrushEngine::kNormal;
          b.color[0] = b.color[1] = b.color[2] = 1.0f;
+         if (!sSelBrushSoft)
+            b.hardness = 1.0f;
          if (!doc->BeginPaint(-1, 2, b, at.x, at.y, PenNow()))
             return;
          sOp = Op();
@@ -2771,7 +2783,7 @@ namespace
          Touch();
       }
       else if (id > 0 && target == 0)
-         doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind, sGradOpacity);
+         doc->Gradient(id, a.x, a.y, b.x, b.y, ca, cb, sFillKind, sGradOpacity, sGradExtend, sGradDither);
    }
 
    void ClosePoly(Scene2DNode* doc)
@@ -3299,13 +3311,13 @@ namespace
          return;
       sMeshPts[sMeshPoint * 2] = sMouseDoc.x;
       sMeshPts[sMeshPoint * 2 + 1] = sMouseDoc.y;
-      if (doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, false))
+      if (doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, false, sMeshNearest))
          Touch();
    }
 
    void MeshRelease(Scene2DNode* doc)
    {
-      if (sMeshPoint >= 0 && doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, true))
+      if (sMeshPoint >= 0 && doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, true, sMeshNearest))
          if (const Layer* l = doc->FindLayer(sMeshId))
             sMeshStored = l->tiles;
       sMeshPoint = -1;
@@ -3942,7 +3954,8 @@ namespace
       // Document-space box, so it turns with the view; the dim is four document-space bands around it.
       const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
       const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
-      const ImU32 dim = IM_COL32(0, 0, 0, 140);
+      // Darken dims what falls outside; Reveal off hides it.
+      const ImU32 dim = !sCropReveal ? Hex(kPasteboard) : IM_COL32(0, 0, 0, sCropDarken ? 140 : 0);
       const float far = 1e6f;
       const float band[4][4] = { { -far, -far, far, y0 }, { -far, y1, far, far }, { -far, y0, x0, y1 }, { x1, y0, far, y1 } };
       ImVec2 q[4];
@@ -4905,7 +4918,7 @@ namespace
       }
 
       // Symmetry guides while a painting tool is up: the mirror axes, or the radial spokes, through the centre.
-      if (d.symmetry > 0 && (sTool == kBrush || sTool == kEraser || RetouchTool(sTool)))
+      if (d.symmetry > 0 && (sTool == kBrush || sTool == kEraser || sTool == kMixer || RetouchTool(sTool)))
       {
          const float cx = d.w * 0.5f, cy = d.h * 0.5f;
          const ImU32 col = Hex(kGuide, 0.7f);
@@ -5280,7 +5293,7 @@ namespace
             else if (hit != 0 && hit != sStyleFrom)
             {
                PushUndoCheckpoint("Paste style");
-               doc->CopyLayerStyle(sStyleFrom, hit);
+               doc->CopyLayerStyle(sStyleFrom, hit, sStyleParts);
                Touch();
             }
          }
@@ -5616,6 +5629,8 @@ namespace
                Layer* al = Active(doc);
                SelStep("Object selection");
                doc->SelectObject(sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, sOp.selOp, sAllLayers, al != nullptr ? al->id : 0);
+               if (sObjSoft)
+                  doc->ModifySelection(4, 2);
             }
             else if (sOp.kind == 25 && doc->HasSelection() && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= 3.0f &&
                      !PaintRefused(doc))
@@ -5626,7 +5641,7 @@ namespace
                if (al != nullptr && al->kind == Kind::Paint)
                {
                   PushUndoCheckpoint("Patch");
-                  doc->PatchSelection(al->id, sMouseDoc.x - sOp.docStart.x, sMouseDoc.y - sOp.docStart.y);
+                  doc->PatchSelection(al->id, sMouseDoc.x - sOp.docStart.x, sMouseDoc.y - sOp.docStart.y, sPatchSrc, sPatchClear);
                   Touch();
                }
             }
@@ -6062,6 +6077,9 @@ namespace
             gap();
             if (TextChip(L("Protect alpha##v2dupa"), b.lockAlpha, nullptr))
                b.lockAlpha = !b.lockAlpha;
+            next();
+            static const char* kUndoBlend[7] = { "Normal", "Multiply", "Screen", "Overlay", "Darken", "Lighten", "Difference" };
+            BarCombo("##v2dublend", &b.sourceBlend, kUndoBlend, 7, kWellM);
          }
          if (sTool == kSharpen)
          {
@@ -6282,17 +6300,42 @@ namespace
          b.hardness = hard / 100.0f;
          if (sTool == kMixer)
          {
-            float op = b.opacity * 100.0f, wet = b.wet * 100.0f, refill = b.refill * 100.0f;
+            float op = b.opacity * 100.0f, flow = b.flow * 100.0f, wet = b.wet * 100.0f, refill = b.refill * 100.0f;
             BarSlider("##v2dxop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+            BarSlider("##v2dxflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
             gap();
             BarSlider("##v2dxwet", &wet, 0.0f, 100.0f, "Wet %.0f%%", kWellL);
             BarSlider("##v2dxrefill", &refill, 0.0f, 100.0f, "Refill %.0f%%", kWellL);
             b.opacity = op / 100.0f;
+            b.flow = flow / 100.0f;
             b.wet = wet / 100.0f;
             b.refill = refill / 100.0f;
+            next();
+            if (TextChip(L("Auto clean##v2dxclean"), b.autoClean, T("Each stroke starts with clean paint")))
+               b.autoClean = !b.autoClean;
+            gap();
+            SymmetryChip(doc);
+            FormParts::Inline(0.0f, tok::space_1);
+            BarMore("##v2dxmore", [&]()
+            {
+               MoreHeader(T("Pen pressure"), true);
+               MoreCheck(T("Size"), &b.pressureSize);
+               MoreCheck(T("Opacity"), &b.pressureOpacity);
+               MoreHeader(T("Paint"));
+               MoreCheck(T("Lock alpha"), &b.lockAlpha);
+            });
          }
          else
          {
+            gap();
+            if (TextChip(L("Add##v2dsbadd"), !sSelBrushSub, T("Paint into the selection")))
+               sSelBrushSub = false;
+            next();
+            if (TextChip(L("Subtract##v2dsbsub"), sSelBrushSub, T("Paint out of the selection (Alt)")))
+               sSelBrushSub = true;
+            next();
+            if (TextChip(L("Soft edges##v2dsbsoft"), sSelBrushSoft, nullptr))
+               sSelBrushSoft = !sSelBrushSoft;
             gap();
             SelModChips(doc);
          }
@@ -6307,7 +6350,38 @@ namespace
          gap();
          if (TextChip(L("All layers##v2doall"), sAllLayers, T("Sample the whole picture")))
             sAllLayers = !sAllLayers;
+         next();
+         if (TextChip(L("Soft edges##v2dosoft"), sObjSoft, nullptr))
+            sObjSoft = !sObjSoft;
+         gap();
          SelModChips(doc);
+      }
+      else if (sTool == kPatch)
+      {
+         if (TextChip(L("Selection is source##v2dpsrc"), sPatchSrc, T("Drag the selection's pixels onto another place")))
+            sPatchSrc = !sPatchSrc;
+         next();
+         if (TextChip(L("Transparent##v2dpclear"), sPatchClear, T("Blend the patch with what is there")))
+            sPatchClear = !sPatchClear;
+      }
+      else if (sTool == kMeshWarp)
+      {
+         if (TextChip(L("Nearest##v2dmnear"), sMeshNearest, T("Resample nearest neighbour, no smoothing")))
+            sMeshNearest = !sMeshNearest;
+      }
+      else if (sTool == kStylePick)
+      {
+         // What travels from the held layer: each part on or off.
+         static const char* kParts[7] = { "Stroke##v2dsp0", "Fill##v2dsp1", "Opacity##v2dsp2", "Effects##v2dsp3",
+                                          "Character##v2dsp4", "Paragraph##v2dsp5", "Object##v2dsp6" };
+         for (int i = 0; i < 7; i++)
+         {
+            if (i > 0)
+               next();
+            const bool on = (sStyleParts & (1 << i)) != 0;
+            if (TextChip(L(kParts[i]), on, nullptr))
+               sStyleParts ^= 1 << i;
+         }
       }
       else if (sTool == kMeasure)
       {
@@ -6342,6 +6416,12 @@ namespace
          next();
          if (TextChip(L("Reverse##v2dgrev"), sGradReverse, T("Background colour to foreground")))
             sGradReverse = !sGradReverse;
+         gap();
+         static const char* kExtend[3] = { "Pad", "Repeat", "Reflect" };
+         BarCombo("##v2dgext", &sGradExtend, kExtend, 3, kWellM);
+         next();
+         if (TextChip(L("Dither##v2dgdither"), sGradDither, T("No banding")))
+            sGradDither = !sGradDither;
       }
       else if (sTool == kMarquee || sTool == kLasso)
       {
@@ -6652,9 +6732,24 @@ namespace
       {
          gap();
          ImGui::SetNextItemWidth(kWellL);
-         changed |= FieldWell::Slider("##v2dvrad", &t.radius, 0.0f, 500.0f, "Radius %.0f");
+         // Absolute: the radius in px; off, in % of the shape's short side (kept in px either way).
+         const float side = std::max(1.0f, std::min(std::fabs(t.x1 - t.x0), std::fabs(t.y1 - t.y0)));
+         if (sRadiusAbs || picked == nullptr)
+            changed |= FieldWell::Slider("##v2dvrad", &t.radius, 0.0f, 500.0f, "Radius %.0f");
+         else
+         {
+            float pct = t.radius / side * 100.0f;
+            if (FieldWell::Slider("##v2dvradp", &pct, 0.0f, 50.0f, "Radius %.0f%%"))
+            {
+               t.radius = pct * side / 100.0f;
+               changed = true;
+            }
+         }
          if (ImGui::IsItemActivated())
             undo();
+         next();
+         if (TextChip(L("Absolute##v2dvrabs"), sRadiusAbs, T("Radius in px, not % of the shape")))
+            sRadiusAbs = !sRadiusAbs;
          next();
          // Each corner on its own: radius (blank follows Radius) and type.
          if (IconChip("##v2dvcorners", IconsInfinite::StrokeStyle, false, T("Corners")))
@@ -7609,6 +7704,12 @@ namespace
          next();
          if (TextChip(L("Thirds##v2dthirds"), sCropThirds, T("Rule of thirds guides")))
             sCropThirds = !sCropThirds;
+         next();
+         if (TextChip(L("Darken##v2dcdark"), sCropDarken, T("Dim outside the crop")))
+            sCropDarken = !sCropDarken;
+         next();
+         if (TextChip(L("Reveal##v2dcrev"), sCropReveal, T("Show outside the crop")))
+            sCropReveal = !sCropReveal;
          gap();
          if (TextChip(L("Apply##v2dcropok"), false, T("Crop the document (Enter)")) && CropBoxOk())
          {
@@ -12338,6 +12439,7 @@ int View2DAffinityAb(const char* dir)
       br.mode = tool == kBrush ? 0 : br.mode;
       br.lockAlpha = false;
       br.spongeMode = 0;
+      br.sourceBlend = 0;
       if (setup)
          setup(br);
       br.size = size;
@@ -12506,8 +12608,27 @@ int View2DAffinityAb(const char* dir)
            sFillKind = 1;
            sGradOpacity = 1.0f;
            sGradReverse = false;
+           sGradExtend = 0;
            GradientTo(d, ImVec2(0, 384), ImVec2(512, 384));
            return true; } },
+      { "bh_gradient_repeat", [&](Scene2DNode* d, int) {
+           EnsurePixels(d);
+           const float blue[3] = { 0.0f, 0.0f, 1.0f };
+           std::copy(kRed, kRed + 3, sFg);
+           std::copy(blue, blue + 3, sBg);
+           sFillKind = 1;
+           sGradOpacity = 1.0f;
+           sGradReverse = false;
+           sGradExtend = 1;
+           GradientTo(d, ImVec2(0, 384), ImVec2(100, 384));
+           sGradExtend = 0;
+           return true; } },
+      // Undo brush, multiply: the earlier state multiplies over the current one, so a mid-grey state darkens it.
+      { "bh_undo_multiply", [&](Scene2DNode* d, int) {
+           EnsurePixels(d);
+           if (Layer* al = Active(d))
+              d->SetUndoSource(al->id);
+           return stroke(d, kUndoBrush, kBhA, kBhB, 60.0f, 1.0f, [](BrushEngine::Brush& b) { b.sourceBlend = 1; }); } },
    };
    const char* only = std::getenv("INFINITE_AB2D_OP");
    for (const AbOp& op : ops)

@@ -121,7 +121,8 @@ BH = {
     "bh_median": ("less detail", BH_BOX), "bh_paint": ("red", BH_BOX), "bh_smudge": ("changes", (360, 360, 450, 490)),
     "bh_clone": ("copies source", BH_BOX), "bh_colour_replace": ("redder", BH_BOX),
     "bh_bg_erase": ("clears", (345, 105, 465, 135)), "bh_undo": ("restores", BH_BOX),
-    "bh_redeye": ("not red", BH_BOX), "bh_gradient": ("ramp", None),
+    "bh_redeye": ("not red", BH_BOX), "bh_gradient": ("ramp", None), "bh_gradient_repeat": ("repeats", None),
+    "bh_undo_multiply": ("darkens", BH_BOX),
 }
 OPS += [{"name": n, "proxy": False, "behaviour": True, "js": None} for n in BH]
 
@@ -372,6 +373,11 @@ def bh_check(name, path, photo):
             and bool(np.all(np.diff(r[8:-8]) <= 0.01))
         return {"pass": bool(ok), "left": [round(float(r[:16].mean()), 3), round(float(b_[:16].mean()), 3)],
                 "right": [round(float(r[-16:].mean()), 3), round(float(b_[-16:].mean()), 3)]}
+    if want == "repeats":
+        # Extend: repeat. The red to blue ramp starts over at each drag length: red falls, then jumps back up.
+        r = a[:, :, 0].mean(0)
+        drops = int((np.abs(np.diff(r)) > 0.5).sum())
+        return {"pass": drops >= 3, "drops": drops}
     x0, y0, x1, y1 = box
     A, P = a[y0:y1, x0:x1], p[y0:y1, x0:x1]
     luma = lambda c: float((c[..., 0] * 0.2126 + c[..., 1] * 0.7152 + c[..., 2] * 0.0722).mean())
