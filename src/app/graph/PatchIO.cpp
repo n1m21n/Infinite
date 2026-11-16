@@ -386,7 +386,7 @@ namespace app
       if (key == "panelMixerOpen")
          gMixerPanelOpen = (val != "0");
       else if (key == "panelMixerDock")
-         gMixerPanelDock = std::clamp(atoi(val.c_str()), 0, kDockFloating);
+         gMixerPanelDock = atoi(val.c_str()) == 3 ? 3 : 0; // bottom or top only
       else if (key == "panelMixerW")
          gMixerPanelWidth = std::max(kMixerPanelMinWidth, std::strtof(val.c_str(), nullptr));
       else if (key == "panelMixerH")

@@ -273,8 +273,8 @@ void DrawLayout(FrameCtx& fc)
       if (viewportTop || viewportBottom) { topBottom += gViewportPanelHeight; topBottomRows++; }
       if (matrixTop   || matrixBottom)   { topBottom += gModMatrixHeight;     topBottomRows++; }
       if (perfTop     || perfBottom)     { topBottom += gPerfPanelHeight;     topBottomRows++; }
-      // The Mixer panel docks on any side or floats; its size is kept inside the window here.
-      gMixerPanelDock = std::clamp(gMixerPanelDock, 0, kDockFloating);
+      // The Mixer panel docks at the bottom or the top; its size is kept inside the window here.
+      gMixerPanelDock = gMixerPanelDock == 3 ? 3 : 0; // bottom or top only
       const bool mixerRow = gMixerPanelOpen && (gMixerPanelDock == 0 || gMixerPanelDock == 3);
       if (mixerRow)
       {
