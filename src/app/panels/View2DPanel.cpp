@@ -1069,16 +1069,15 @@ namespace
                  const Layer* modLayer = nullptr, const int* modFields = nullptr)
    {
       FieldLabel(label);
-      const float each = (sFieldW - (n - 1) * tok::space_1) / n;
       int changed = 0;
       FieldWell::PushStyle();
       ImGui::PushID(label);
       for (int i = 0; i < n; i++)
       {
          if (i > 0)
-            ImGui::SameLine(0.0f, tok::space_1);
+            FormParts::Inline(0.0f, tok::space_1);
          ImGui::PushID(i);
-         ImGui::SetNextItemWidth(each);
+         ImGui::SetNextItemWidth(PanelKit::StripW(sFieldW, n, i));   // whole-pixel cells that end on the column edge
          if (modLayer != nullptr && modFields != nullptr && modFields[i] >= 0)
             ModNext(*modLayer, modFields[i]);
          ModBegin();
@@ -1294,7 +1293,7 @@ namespace
       }
       if (cw > 0.0f)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         FormParts::Inline(0.0f, 0.0f);
          ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
       }
       if (!hit)
@@ -2953,7 +2952,7 @@ namespace
       for (int i = 0; i < n; i++)
       {
          if (i > 0 && i % 10 != 0)
-            ImGui::SameLine(0.0f, gap);
+            FormParts::Inline(0.0f, gap);
          ImGui::PushID(i);
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImGui::InvisibleButton("##chip", ImVec2(sq, sq));
@@ -3014,7 +3013,7 @@ namespace
       ImGui::SetMouseCursor(ImGuiMouseCursor_None);
       for (int pass = 0; pass < 2; pass++)
       {
-         const ImU32 col = pass == 0 ? IM_COL32(0, 0, 0, 170) : IM_COL32(255, 255, 255, 255);
+         const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 170) : tok::U32(tok::canvas_ink);
          const float th = pass == 0 ? 3.0f : 1.0f;
          dl->AddLine(ImVec2(mouse.x - 8, mouse.y), ImVec2(mouse.x - 2, mouse.y), col, th);
          dl->AddLine(ImVec2(mouse.x + 2, mouse.y), ImVec2(mouse.x + 8, mouse.y), col, th);
@@ -3025,8 +3024,8 @@ namespace
       for (int dx = -1; dx <= 1; dx++)
          for (int dy = -1; dy <= 1; dy++)
             if (dx != 0 || dy != 0)
-               glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_control, IM_COL32(0, 0, 0, 200), g);
-      glyph::Draw(dl, badge, tok::icon_control, IM_COL32(255, 255, 255, 255), g);
+               glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_control, tok::U32(tok::canvas_shade, 200), g);
+      glyph::Draw(dl, badge, tok::icon_control, tok::U32(tok::canvas_ink), g);
    }
 
    // Predicted points: the last two pen samples carried 8 ms ahead and drawn in the paint colour, so the line
@@ -3073,10 +3072,10 @@ namespace
       };
       if (r < 2.0f)
       {
-         dl->AddLine(ImVec2(mouse.x - 6, mouse.y), ImVec2(mouse.x + 6, mouse.y), IM_COL32(0, 0, 0, 200), 2.5f);
-         dl->AddLine(ImVec2(mouse.x, mouse.y - 6), ImVec2(mouse.x, mouse.y + 6), IM_COL32(0, 0, 0, 200), 2.5f);
-         dl->AddLine(ImVec2(mouse.x - 6, mouse.y), ImVec2(mouse.x + 6, mouse.y), IM_COL32(255, 255, 255, 255));
-         dl->AddLine(ImVec2(mouse.x, mouse.y - 6), ImVec2(mouse.x, mouse.y + 6), IM_COL32(255, 255, 255, 255));
+         dl->AddLine(ImVec2(mouse.x - 6, mouse.y), ImVec2(mouse.x + 6, mouse.y), tok::U32(tok::canvas_shade, 200), 2.5f);
+         dl->AddLine(ImVec2(mouse.x, mouse.y - 6), ImVec2(mouse.x, mouse.y + 6), tok::U32(tok::canvas_shade, 200), 2.5f);
+         dl->AddLine(ImVec2(mouse.x - 6, mouse.y), ImVec2(mouse.x + 6, mouse.y), tok::U32(tok::canvas_ink));
+         dl->AddLine(ImVec2(mouse.x, mouse.y - 6), ImVec2(mouse.x, mouse.y + 6), tok::U32(tok::canvas_ink));
          return;
       }
       ring(r, 1.0f);
@@ -3678,7 +3677,7 @@ namespace
       const int mode = sGizmoMode;
       float ax[3][3];
       GizmoAxes(doc, l, mode, ax);
-      const ImU32 white = IM_COL32(255, 255, 255, 255);
+      const ImU32 white = tok::U32(tok::canvas_ink);
       auto tone = [&](int id, float alpha) { return held == id || (held < 0 && sGizmoHot == id) ? white : Hex(kGizmoHex[id], alpha); };
       int hot = -1;
       float best = 9.0f;
@@ -3759,7 +3758,7 @@ namespace
             hot = a;
          }
       }
-      dl->AddCircle(c, 8.0f, held == 3 || (held < 0 && sGizmoHot == 3) ? white : IM_COL32(255, 255, 255, 190), 24, 1.5f);
+      dl->AddCircle(c, 8.0f, held == 3 || (held < 0 && sGizmoHot == 3) ? white : tok::U32(tok::canvas_ink, 190), 24, 1.5f);
       if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= 10.0f)
          hot = 3;
       return hot;
@@ -3893,7 +3892,7 @@ namespace
       const float w = (float)doc->Doc().w, h = (float)doc->Doc().h, s = 8.0f / std::max(sZoom, 1e-4f);
       ImVec2 q[4];
       DocRect(doc, 0, 0, w, h, q);
-      dl->AddQuadFilled(q[0], q[1], q[2], q[3], IM_COL32(255, 255, 255, 255));
+      dl->AddQuadFilled(q[0], q[1], q[2], q[3], tok::U32(tok::canvas_ink));
       float lo[2] = { 1e9f, 1e9f }, hi[2] = { -1e9f, -1e9f };
       const ImVec2 corner[4] = { sViewMn, ImVec2(sViewMx.x, sViewMn.y), sViewMx, ImVec2(sViewMn.x, sViewMx.y) };
       for (const ImVec2& c : corner)
@@ -3909,17 +3908,17 @@ namespace
          for (int i = i0 + ((i0 + j) % 2 == 0 ? 1 : 0); i < i1; i += 2)
          {
             DocRect(doc, i * s, j * s, std::min(w, (i + 1) * s), std::min(h, (j + 1) * s), q);
-            dl->AddQuadFilled(q[0], q[1], q[2], q[3], IM_COL32(204, 204, 204, 255));
+            dl->AddQuadFilled(q[0], q[1], q[2], q[3], tok::U32(tok::canvas_check));
          }
    }
 
    void DrawChecker(ImDrawList* dl, ImVec2 a, ImVec2 b)
    {
       const float s = 8.0f;
-      dl->AddRectFilled(a, b, IM_COL32(255, 255, 255, 255));
+      dl->AddRectFilled(a, b, tok::U32(tok::canvas_ink));
       for (float y = a.y; y < b.y; y += s)
          for (float x = a.x + (((int)((y - a.y) / s)) % 2 == 0 ? s : 0.0f); x < b.x; x += 2.0f * s)
-            dl->AddRectFilled(ImVec2(x, y), ImVec2(std::min(b.x, x + s), std::min(b.y, y + s)), IM_COL32(204, 204, 204, 255));
+            dl->AddRectFilled(ImVec2(x, y), ImVec2(std::min(b.x, x + s), std::min(b.y, y + s)), tok::U32(tok::canvas_check));
    }
 
    float RulerStep()
@@ -4060,17 +4059,17 @@ namespace
          DocRect(doc, b[0], b[1], b[2], b[3], q);
          dl->AddQuadFilled(q[0], q[1], q[2], q[3], dim);
       }
-      AddDocRect(dl, doc, x0, y0, x1, y1, IM_COL32(255, 255, 255, 230));
+      AddDocRect(dl, doc, x0, y0, x1, y1, tok::U32(tok::canvas_ink, 230));
       for (int i = 1; i < 3 && sCropThirds; i++)
       {
          const float x = x0 + (x1 - x0) * i / 3.0f, y = y0 + (y1 - y0) * i / 3.0f;
-         dl->AddLine(ToScreen(doc, x, y0), ToScreen(doc, x, y1), IM_COL32(255, 255, 255, 70));
-         dl->AddLine(ToScreen(doc, x0, y), ToScreen(doc, x1, y), IM_COL32(255, 255, 255, 70));
+         dl->AddLine(ToScreen(doc, x, y0), ToScreen(doc, x, y1), tok::U32(tok::canvas_ink, 70));
+         dl->AddLine(ToScreen(doc, x0, y), ToScreen(doc, x1, y), tok::U32(tok::canvas_ink, 70));
       }
       for (int i = 0; i < 8; i++)
       {
          const ImVec2 p = ToScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
-         dl->AddRectFilled(ImVec2(p.x - 4, p.y - 4), ImVec2(p.x + 4, p.y + 4), IM_COL32(255, 255, 255, 255));
+         dl->AddRectFilled(ImVec2(p.x - 4, p.y - 4), ImVec2(p.x + 4, p.y + 4), tok::U32(tok::canvas_ink));
       }
    }
 
@@ -4543,7 +4542,7 @@ namespace
       if (items == nullptr)
          return;
       std::vector<std::vector<float>> lines;
-      const ImU32 white = IM_COL32(255, 255, 255, 255);
+      const ImU32 white = tok::U32(tok::canvas_ink);
       for (int i = 0; i < (int)items->size(); i++)
       {
          const Shape& s = (*items)[i];
@@ -4782,7 +4781,7 @@ namespace
          ImGui::SetKeyboardFocusHere();
          sTextFocus = false;
       }
-      const ImU32 clear = IM_COL32(0, 0, 0, 0);
+      const ImU32 clear = tok::U32(tok::transparent);
       ImGui::PushStyleColor(ImGuiCol_Text, clear);
       ImGui::PushStyleColor(ImGuiCol_FrameBg, clear);
       ImGui::PushStyleColor(ImGuiCol_Border, clear);
@@ -5010,9 +5009,9 @@ namespace
          if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
             dl->AddImageQuad((ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if (ViewTurned())
-         dl->AddPolyline(pq, 4, IM_COL32(0, 0, 0, 120), ImDrawFlags_Closed, 1.0f);
+         dl->AddPolyline(pq, 4, tok::U32(tok::canvas_shade, 120), ImDrawFlags_Closed, 1.0f);
       else
-         dl->AddRect(ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), IM_COL32(0, 0, 0, 120));
+         dl->AddRect(ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), tok::U32(tok::canvas_shade, 120));
 
       if (d.grid && d.gridSize > 0.0f)
       {
@@ -5108,7 +5107,7 @@ namespace
          {
             ImVec2 p;
             HandlePoint(doc, *active, kHandleAt[i][0], kHandleAt[i][1], p);
-            dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), IM_COL32(255, 255, 255, 255));
+            dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), tok::U32(tok::canvas_ink));
             dl->AddRect(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), Hex(kOutline));
          }
          const ImVec2 an = ToScreen(doc, active->x, active->y);
@@ -5126,7 +5125,7 @@ namespace
             for (int i = 0; i < 8; i++)
             {
                const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
-               dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), IM_COL32(255, 255, 255, 255));
+               dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), tok::U32(tok::canvas_ink));
                dl->AddRect(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), Hex(kOutline));
             }
          }
@@ -5147,7 +5146,7 @@ namespace
             dl->AddLine(ToScreen(doc, -1e5f, y), ToScreen(doc, 1e5f, y), Hex(kSmart));
       }
       // Shapes being dragged out by the pixel tools.
-      const ImU32 ink = IM_COL32(255, 255, 255, 230), shade = IM_COL32(0, 0, 0, 160);
+      const ImU32 ink = tok::U32(tok::canvas_ink, 230), shade = tok::U32(tok::canvas_shade, 160);
       DrawToolOverlays(doc, dl, ink, shade);
       if (sOp.kind == 9)
       {
@@ -5190,8 +5189,8 @@ namespace
       {
          ImVec2 q[4];
          DocRect(doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, q);
-         dl->AddQuadFilled(q[0], q[1], q[2], q[3], IM_COL32(80, 160, 255, 40));
-         dl->AddPolyline(q, 4, IM_COL32(80, 160, 255, 220), ImDrawFlags_Closed, 1.0f);
+         dl->AddQuadFilled(q[0], q[1], q[2], q[3], tok::U32(tok::canvas_select, 40));
+         dl->AddPolyline(q, 4, tok::U32(tok::canvas_select, 220), ImDrawFlags_Closed, 1.0f);
       }
       if (sOp.kind == 8)
       {
@@ -5285,7 +5284,7 @@ namespace
          dl->PushClipRect(sViewMn, sViewMx, true);
          for (int pass = 0; pass < 2; pass++)
          {
-            const ImU32 col = pass == 0 ? IM_COL32(0, 0, 0, 170) : IM_COL32(255, 255, 255, 255);
+            const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 170) : tok::U32(tok::canvas_ink);
             const float th = pass == 0 ? 3.0f : 1.0f;
             dl->AddLine(ImVec2(src.x - 7, src.y), ImVec2(src.x + 7, src.y), col, th);
             dl->AddLine(ImVec2(src.x, src.y - 7), ImVec2(src.x, src.y + 7), col, th);
@@ -5825,13 +5824,13 @@ namespace
    void BarDivider()
    {
       const float top = ImGui::GetItemRectMin().y;
-      ImGui::SameLine(0.0f, tok::space_2);
+      FormParts::Inline(0.0f, tok::space_2);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float x = std::round(p.x) + 0.5f;
       ImGui::GetWindowDrawList()->AddLine(ImVec2(x, top + 6.0f), ImVec2(x, top + sRowH - 6.0f), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
       ImGui::SetCursorScreenPos(ImVec2(p.x, top));
       ImGui::Dummy(ImVec2(1.0f, sRowH));
-      ImGui::SameLine(0.0f, tok::space_2);
+      FormParts::Inline(0.0f, tok::space_2);
    }
 
    // ---- the pixel tools' context bar ---------------------------------------
@@ -5979,7 +5978,7 @@ namespace
          *v = !*v;
       if (cw > 0.0f)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         FormParts::Inline(0.0f, 0.0f);
          ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
       }
    }
@@ -7628,8 +7627,8 @@ namespace
       dl->AddBezierQuadratic(ImVec2(s0.x, s0.y + 0.5f), ImVec2(s0.x + 6.0f, s0.y + 0.5f), ImVec2(s0.x + 6.0f, s0.y + 6.5f), ink, 1.2f);
       // reset: a tiny black-over-white pair in the bottom-left corner
       const ImVec2 r0(p.x + 1.5f, p.y + sq + 3.0f);
-      dl->AddRectFilled(ImVec2(r0.x + 2.5f, r0.y + 2.5f), ImVec2(r0.x + 7.0f, r0.y + 7.0f), IM_COL32(255, 255, 255, 255));
-      dl->AddRectFilled(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), IM_COL32(0, 0, 0, 255));
+      dl->AddRectFilled(ImVec2(r0.x + 2.5f, r0.y + 2.5f), ImVec2(r0.x + 7.0f, r0.y + 7.0f), tok::U32(tok::canvas_ink));
+      dl->AddRectFilled(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), tok::U32(tok::canvas_shade));
       dl->AddRect(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), edge);
       for (int i = 0; i < 2; i++)
          if (ImGui::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
@@ -7641,7 +7640,10 @@ namespace
                ImGui::TextDisabled("%s", T("Recent"));
                const int r = ColourChips("##recent", sRecentCols, false, nullptr);
                if (r >= 0)
+               {
                   std::copy(sRecentCols[r].c, sRecentCols[r].c + 3, col);
+                  ImGui::CloseCurrentPopup();   // a pick is the whole job, as a swatch click is in Affinity
+               }
             }
             ImGui::TextDisabled("%s", T("Swatches"));
             std::vector<Rgb> sw = Swatches();
@@ -7654,7 +7656,10 @@ namespace
                SetSwatches(sw);
             }
             else if (k >= 0)
+            {
                std::copy(sw[k].c, sw[k].c + 3, col);
+               ImGui::CloseCurrentPopup();
+            }
             if (removed >= 0)
             {
                sw.erase(sw.begin() + removed);
@@ -7696,12 +7701,12 @@ namespace
                      sStripHidden[idx] = !on;
                      SaveStrip();
                   }
-                  ImGui::SameLine(0.0f, tok::space_2);
+                  FormParts::Inline(0.0f, tok::space_2);
                   const ImVec2 gp = ImGui::GetCursorScreenPos();
                   glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + 8.0f, gp.y + ImGui::GetFrameHeight() * 0.5f), tok::icon_control,
                               ImGui::GetColorU32(ImGuiCol_Text), kTools[idx].glyph);
                   ImGui::Dummy(ImVec2(18.0f, 0.0f));
-                  ImGui::SameLine(0.0f, tok::space_1);
+                  FormParts::Inline(0.0f, tok::space_1);
                   ImGui::AlignTextToFramePadding();
                   ImGui::TextUnformatted(T(ToolTitle(kTools[idx].tip)));
                   ImGui::PopID();
@@ -7752,7 +7757,7 @@ namespace
             ImGui::Dummy(ImVec2(w, 1.0f));
          }
          else if (cols > 1 && shown % cols != 0)
-            ImGui::SameLine(0.0f, tok::space_1);
+            FormParts::Inline(0.0f, tok::space_1);
          lastSection = kTools[i].section;
          shown++;
          if (IconChip(kTools[i].id, kTools[i].glyph, sTool == kTools[i].tool, Sc(T(kTools[i].tip))))
@@ -7786,11 +7791,11 @@ namespace
       if (cols == 1)
          ImGui::Dummy(ImVec2(w, 0.0f));
       else
-         ImGui::SameLine(0.0f, tok::space_1);
+         FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dqm", IconsInfinite::QuickMask, doc->quickMask, T(doc->quickMask ? "Quick mask on (Q)" : "Quick mask (Q)")))
          ToggleQuickMask(doc);
       if (cols >= 3)
-         ImGui::SameLine(0.0f, tok::space_1);
+         FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dmoretools", IconsInfinite::GridDots, false, T("More tools. Tick the ones to show")))
          openPicker = true;
       if (openPicker)
@@ -8025,7 +8030,7 @@ namespace
          DrawContextBar(doc);
          sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
          ImGui::EndChild();
-         ImGui::SameLine(0.0f, tok::space_1);
+         FormParts::Inline(0.0f, tok::space_1);
          if (TextChip(L("More..##v2dmore"), false, T("The rest of the bar")))
             ImGui::OpenPopup("##v2dbarmore");
          if (MenuParts::BeginPopup("##v2dbarmore"))
@@ -8041,7 +8046,7 @@ namespace
          DrawContextBar(doc);
          sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, ImGui::GetWindowPos().x + startX + availW - rightW), rowTop));
       if (doc->panelOnly)
       {
@@ -8118,7 +8123,7 @@ namespace
 
    void DrawThumb(ImDrawList* dl, Scene2DNode* doc, const Layer& l, ImVec2 p, ImVec2 sz)
    {
-      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), IM_COL32(40, 40, 40, 255), 2.0f);
+      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), tok::U32(tok::backdrop_base, app::IsThemeLight()), tok::radius_cell);
       if (l.kind == Kind::Group)
       {
          glyph::Draw(dl, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Folder);
@@ -8134,7 +8139,7 @@ namespace
          const ImU32 ca = ImGui::GetColorU32(ImVec4(l.colorA[0], l.colorA[1], l.colorA[2], 1.0f));
          const ImU32 cb = ImGui::GetColorU32(ImVec4(l.colorB[0], l.colorB[1], l.colorB[2], 1.0f));
          if (l.fillType == 0)
-            dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ca, 2.0f);
+            dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ca, tok::radius_cell);
          else
             dl->AddRectFilledMultiColor(p, ImVec2(p.x + sz.x, p.y + sz.y), ca, ca, cb, cb);
          return;
@@ -8166,7 +8171,7 @@ namespace
       const unsigned tex = src != nullptr ? src->GetOutputTexture() : 0;
       if (tex == 0)
       {
-         dl->AddLine(p, ImVec2(p.x + sz.x, p.y + sz.y), IM_COL32(200, 60, 60, 255));
+         dl->AddLine(p, ImVec2(p.x + sz.x, p.y + sz.y), tok::U32(tok::record));
          return;
       }
       const float sw = (float)std::max(1, src->GetOutputWidth()), sh = (float)std::max(1, src->GetOutputHeight());
@@ -8175,9 +8180,9 @@ namespace
       dl->AddImage((ImTextureID)(intptr_t)tex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
    }
 
-   const ImU32 kLabelCol[8] = { 0, IM_COL32(230, 80, 80, 255), IM_COL32(240, 150, 60, 255), IM_COL32(235, 210, 70, 255),
-                                IM_COL32(90, 190, 90, 255), IM_COL32(80, 150, 235, 255), IM_COL32(160, 110, 220, 255),
-                                IM_COL32(150, 150, 150, 255) };
+   const ImU32 kLabelCol[8] = { 0, tok::U32(tok::label_red), tok::U32(tok::label_orange), tok::U32(tok::label_yellow),
+                                tok::U32(tok::label_green), tok::U32(tok::label_blue), tok::U32(tok::label_violet),
+                                tok::U32(tok::label_grey) };
 
    int CountRows(Scene2DNode* doc, int parent)
    {
@@ -8989,7 +8994,7 @@ namespace
          ImGui::TextUnformatted(T("Mirror"));
          for (int i = 0; i < 3; i++)
          {
-            ImGui::SameLine();
+            FormParts::Inline();
             if (TextChip(axis[i], (l->skinMirror >> i & 1) != 0, T("Mirror strokes across the object")))
             {
                PushUndoCheckpoint("Surface mirror");
@@ -10087,7 +10092,7 @@ namespace
          SectionCard::BeginWindow();
          ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
          const float w = ImGui::GetContentRegionAvail().x;
-         sFieldW = std::max(70.0f, w - kLabelW);
+         sFieldW = std::floor(std::max(70.0f, w - kLabelW));   // whole pixels, so strip cells and wells end on one edge
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, PanelKit::FramePadY()));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::kRowGap));
          if (sTab == 1) DrawLayerTab(doc, 0);
@@ -12643,6 +12648,8 @@ std::string View2DAuditRanges()
 }
 
 // Puts the panel back as the current state had it (a poke may have changed the tool, tab or selection).
+void View2DAuditEnd() { sAuditState = -1; }
+
 void View2DAuditRestore()
 {
    if (sAuditState >= 0)

@@ -49,7 +49,11 @@ namespace ActionButton
       const ImVec2 ts = ImGui::CalcTextSize(shown.c_str());
       const float h = size.y > 0.0f ? size.y : ImGui::GetFrameHeight();
       const float w = size.x < 0.0f ? std::max(1.0f, ImGui::GetContentRegionAvail().x + size.x + 1.0f)
-                                    : std::max(size.x, ts.x + (glyph != nullptr ? 20.0f : 0.0f) + 2.0f * tok::space_2);
+                                    : size.x > 0.0f
+                                    // A given width is a layout cell (a strip that must end flush): kept unless the
+                                    // label would not fit with even the small padding.
+                                    ? std::max(size.x, ts.x + (glyph != nullptr ? 20.0f : 0.0f) + 2.0f * tok::space_1)
+                                    : ts.x + (glyph != nullptr ? 20.0f : 0.0f) + 2.0f * tok::space_2;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       if (ImGui::ButtonLabelHook != nullptr)
          ImGui::ButtonLabelHook(label); // headless --describe lists the buttons a node draws, as ImGui::Button does

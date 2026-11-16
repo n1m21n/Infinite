@@ -1,7 +1,7 @@
 {
  "id": "01_swatch_rect_fill",
  "title": "Pick a swatch, draw a rectangle: it fills with the swatch",
- "ref": "Affinity: swatch, rectangle tool, drag",
+ "ref": "Affinity: swatch, rectangle tool, drag. Infinite needs one more: swatches live in the foreground popover (no docked Swatches panel), so it opens first; a pick closes it.",
  "ref_steps": 3,
  "setup": [
   "doc 400 300",
@@ -21,9 +21,6 @@
   {
    "click": "##chip",
    "nth": 0
-  },
-  {
-   "key": "escape"
   },
   {
    "click": "##v2dshape"
