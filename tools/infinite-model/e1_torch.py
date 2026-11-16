@@ -52,7 +52,7 @@ def train(a):
             r = json.loads(l)
             p = tok(r["prompt"], add_special_tokens=False)["input_ids"]
             c = tok(r["completion"], add_special_tokens=False)["input_ids"] + [tok.eos_token_id]
-            out.append((p + c)[:1024], len(p))
+            out.append(((p + c)[:1024], len(p)))
         return out
 
     tr, va = rows("train"), rows("valid")
@@ -111,9 +111,12 @@ class TorchLM:
             for k, t in enumerate(chunk):
                 x = ctx + t
                 ids[k, :len(x)] = torch.tensor(x); att[k, :len(x)] = 1
-            lp = torch.log_softmax(self.model(input_ids=ids.cuda(), attention_mask=att.cuda()).logits.float(), -1)
+            K = L - len(ctx) + 1  # logits only where answer tokens are predicted (full-vocab logits over the prompt OOM)
+            out = self.model(input_ids=ids.cuda(), attention_mask=att.cuda(), logits_to_keep=K).logits
+            lp = torch.log_softmax(out.float(), -1)
+            off = L - K
             for k, t in enumerate(chunk):
-                s = sum(lp[k, len(ctx) + j - 1, t[j]].item() for j in range(len(t)))
+                s = sum(lp[k, len(ctx) + j - 1 - off, t[j]].item() for j in range(len(t)))
                 scores.append(s)
         order = np.argsort(-np.asarray(scores))
         return [cands[i] for i in order], (time.time() - t0) * 1000
