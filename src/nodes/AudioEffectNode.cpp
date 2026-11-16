@@ -96,12 +96,14 @@ public:
       mKernel->ProcessBlock(in, sidechainPtr, wet);
 
       // A kernel that aligns its own dry signal (IEffectKernel::ProcessDry)
-      // replaces the delay ring below.
+      // replaces the delay ring below. When mix is settled at 1.0 on a linear
+      // mix effect, dryGain is 0.0f so ProcessDry's output is never read.
       AudioBuffer kernelDry;
       kernelDry.channels = mDryChannels;
       kernelDry.numChannels = numChannels;
       kernelDry.numFrames = output.numFrames;
-      const bool hasKernelDry = mKernel->ProcessDry(in, kernelDry);
+      const bool skipDry = mLinearMix && mMixTarget.load(std::memory_order_relaxed) == 1.0f && mMixSmoother.current == 1.0f;
+      const bool hasKernelDry = !skipDry && mKernel->ProcessDry(in, kernelDry);
 
       // A NaN or inf that reaches a recursive kernel (filter state, a delay
       // line, a reverb tail, an oversampler) never leaves: every later block

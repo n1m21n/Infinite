@@ -79,9 +79,23 @@ void WavetableShaperKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffe
             : WavetableShaperDsp::ReadAtMip(phaseZero, table, positionR, smoothMip);
       }
 
+      const int smoothMipLo = (int)smoothMip;
+      const int smoothMipHi = std::min(smoothMipLo + 1, Wavetable::kMipLevels - 1);
+      const float smoothMipFrac = smoothMip - (float)smoothMipLo;
+
       for (int ch = 0; ch < numChannels; ch++)
       {
          const float chPosition = (ch == 1) ? positionR : positionL;
+         const float posClamped = std::clamp(chPosition >= 0.0f ? chPosition : 0.0f, 0.0f, 1.0f);
+         const float framePos = posClamped * (float)(Wavetable::kFrames - 1);
+         const int frameLo = (int)framePos;
+         const int frameHi = std::min(frameLo + 1, Wavetable::kFrames - 1);
+         const float frameFrac = framePos - (float)frameLo;
+         const float* fLo0 = Wavetable::Frame(table, frameLo, smoothMipLo);
+         const float* fHi0 = Wavetable::Frame(table, frameHi, smoothMipLo);
+         const float* fLo1 = smoothMipFrac > 0.0f ? Wavetable::Frame(table, frameLo, smoothMipHi) : nullptr;
+         const float* fHi1 = smoothMipFrac > 0.0f ? Wavetable::Frame(table, frameHi, smoothMipHi) : nullptr;
+
          // Shape()'s zero reference, at the knob's own mip level.
          const float zeroRef = (ch == 1) ? mCachedZeroRefR : mCachedZeroRefL;
          float os[MinPhaseOversampler::kMaxFactor];
@@ -91,11 +105,21 @@ void WavetableShaperKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffe
             const double phase = 0.5 + 0.5 * (double)(os[k] + bias) * driveLin;
             const double phaseSpeed = std::fabs(phase - mPrevPhase[ch]);
             mPrevPhase[ch] = phase;
-            const float mipPos = (phaseSpeed > slewThresh)
-               ? std::max(smoothMip, WavetableShaperDsp::MipForPhaseSpeed(phaseSpeed))
-               : smoothMip;
+            float val;
+            if (phaseSpeed <= slewThresh || !std::isfinite(phase))
+            {
+               const float s0 = Wavetable::Sample(fLo0, fHi0, frameFrac, phase);
+               val = (fLo1 != nullptr)
+                  ? s0 + (Wavetable::Sample(fLo1, fHi1, frameFrac, phase) - s0) * smoothMipFrac
+                  : s0;
+            }
+            else
+            {
+               const float mipPos = std::max(smoothMip, WavetableShaperDsp::MipForPhaseSpeed(phaseSpeed));
+               val = WavetableShaperDsp::ReadAtMip(phase, table, chPosition, mipPos);
+            }
             // Negated, as in WavetableShaperDsp::RawShape.
-            os[k] = zeroRef - WavetableShaperDsp::ReadAtMip(phase, table, chPosition, mipPos);
+            os[k] = zeroRef - val;
          }
          float x = mOversampler.Down(ch, os);
          x = mDcBlockers[ch].Process(x);

@@ -92,11 +92,11 @@ namespace Wavetable
    inline float Sample(const float* frameLo, const float* frameHi, float frameFrac, double phase01)
    {
       // (int)NaN below is undefined; a NaN/inf phase reads frame position 0.
-      phase01 = std::isfinite(phase01) ? phase01 - floor(phase01) : 0.0;
-      const double x = phase01 * (double)kFrameSize;
-      const int i0 = (int)x & (kFrameSize - 1);
+      const double x = std::isfinite(phase01) ? phase01 * (double)kFrameSize : 0.0;
+      const double f = floor(x);
+      const int i0 = (int)(int64_t)f & (kFrameSize - 1);
       const int i1 = (i0 + 1) & (kFrameSize - 1);
-      const float fx = (float)(x - floor(x));
+      const float fx = (float)(x - f);
       const float a = frameLo[i0] + (frameLo[i1] - frameLo[i0]) * fx;
       const float b = frameHi[i0] + (frameHi[i1] - frameHi[i0]) * fx;
       return a + (b - a) * frameFrac;
