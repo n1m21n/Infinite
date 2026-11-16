@@ -37,7 +37,17 @@ FACTS = {
     "alpha": (100.0, (0.01, 0.05, 0.15)),
     "detail": (1.0, (0.1, 0.3, 0.8)),
     "tones": (1.0, (0.03, 0.1, 0.3)),
+    "saturation": (1.0, (0.01, 0.04, 0.12)),
 }
+
+# (family, render folder under build/, types or None for all). Compositing: the stateless one-input colour nodes.
+SETS = [
+    ("Effects", "e1", None),
+    ("Compositing", "e1-compositing", ["Curves", "Color Ramp", "color adjustments", "exposure", "invert", "posterize",
+                                       "threshold", "dither", "gradientmap", "coloroverlay", "opacity", "alpha invert",
+                                       "alpha from luma", "alpha levels", "premultiply", "chroma key", "luma key",
+                                       "outerglow", "dropshadow", "show alpha"]),
+]
 LEVELS = ("none", "small", "medium", "large")
 
 
@@ -53,11 +63,12 @@ def facts_px(png):
     mu = float((h * centers).sum())
     q = np.sort(y.ravel())
     r, g, b = (float(rgb[..., i].mean()) for i in range(3))
+    sat = float((rgb.max(axis=2) - rgb.min(axis=2)).mean())
     gx, gy = np.diff(y, axis=1)[:-1, :], np.diff(y, axis=0)[:, :-1]
     return {"luma": float(y.mean()), "contrast": float(q[int(0.98 * (q.size - 1))] - q[int(0.02 * (q.size - 1))]),
             "spread": float(np.sqrt((h * (centers - mu) ** 2).sum())), "red": r, "green": g, "blue": b,
             "warmth": r - b, "black": float((y < 0.02).mean() * 100), "white": float((y > 0.98).mean() * 100),
-            "alpha": float(a[..., 3].mean() * 100), "detail": float(np.sqrt((gx ** 2 + gy ** 2).mean())),
+            "alpha": float(a[..., 3].mean() * 100), "detail": float(np.sqrt((gx ** 2 + gy ** 2).mean())), "saturation": sat,
             "hist": h.tolist()}
 
 
@@ -84,9 +95,9 @@ def facts_of(sidecar):
         return None
 
 
-def source_only(a):
+def source_only(a, out):
     """Source -> Output renders, so 'adding node X' has a measured before."""
-    d = os.path.join(a.out, "renders", "_source")
+    d = os.path.join(out, "renders", "_source")
     os.makedirs(d, exist_ok=True)
     jobs = []
     for s, spec in SOURCES.items():
@@ -120,54 +131,69 @@ def summarise(changes):
     return eff, sum(1 for b in changes if not b)
 
 
+def type_row(out, t, src):
+    """One node type's add effect and param moves, from its renders under OUT/renders/<type>."""
+    tdir = os.path.join(out, "renders", t["type"].replace(" ", "_"))
+    before = {s: facts_of(os.path.join(tdir, s, "before.json")) for s in SOURCES}
+    add = [bucket(src[s], before[s]) for s in SOURCES if src[s] and before[s]]
+    if not add:
+        return None, 0
+    add_eff, add_none = summarise(add)
+    params, n_moves = {}, 0
+    for r in swept_params(t, None):  # params with no renders are skipped below
+        moves = []
+        for k, (v, d) in enumerate(values(r)):
+            ch = []
+            for s in SOURCES:
+                af = facts_of(os.path.join(tdir, s, f"{r['key']}_{k}.json"))
+                if af and before[s]:
+                    ch.append(bucket(before[s], af))
+            if not ch:
+                continue
+            eff, none = summarise(ch)
+            m = {"value": v, "direction": d, "patch_line": f"{r['tag']} {r['key']} {v}", "effect": eff,
+                 "no_change": round(none / len(ch), 2)}
+            if r.get("options"):
+                m["option"] = r["options"][int(float(v))] if int(float(v)) < len(r["options"]) else v
+            moves.append(m)
+            n_moves += 1
+        if moves:
+            p = {"label": r.get("label") or r["key"], "kind": r["kind"], "tag": r["tag"],
+                 "default": r.get("default"), "min": r["min"], "max": r["max"], "moves": moves}
+            if r.get("options"):
+                p["options"] = r["options"]
+            params[r["key"]] = p
+    return {"add": add_eff, "add_no_change": round(add_none / len(add), 2), "params": params}, n_moves
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bin", default=os.path.join(ROOT, "build-dev/Infinite.app/Contents/MacOS/Infinite"))
-    ap.add_argument("--out", default=os.path.join(ROOT, "build/e1"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "build"), help="folder holding the render sets (SETS)")
     ap.add_argument("--dest", default=DEST)
     a = ap.parse_args()
     from sweep import fill_filter_menus
-    types = [fill_filter_menus(t) for t in json.load(open(os.path.join(a.out, "describe.json")))["types"]
-             if t["category"] == e1_data.FAMILY and t["type"] not in e1_data.SKIP_TYPES]
-    src = source_only(a)
-    table = {"version": 1, "family": e1_data.FAMILY, "commit": e1_data.git_commit(), "size": e1_data.SIZE,
+    schema = json.load(open(os.path.join(a.out, "e1", "describe.json")))["types"]
+    table = {"version": 2, "families": [f for f, _, _ in SETS], "commit": e1_data.git_commit(), "size": e1_data.SIZE,
              "time": float(e1_data.TIME), "sources": sorted(SOURCES),
              "levels": {k: list(e) for k, (_, e) in FACTS.items()}, "scales": {k: s for k, (s, _) in FACTS.items()},
              "types": {}}
     n_moves = 0
-    for t in types:
-        tdir = os.path.join(a.out, "renders", t["type"].replace(" ", "_"))
-        before = {s: facts_of(os.path.join(tdir, s, "before.json")) for s in SOURCES}
-        add = [bucket(src[s], before[s]) for s in SOURCES if src[s] and before[s]]
-        if not add:
+    for fam, sub, only in SETS:
+        out = os.path.join(a.out, sub)
+        if not os.path.isdir(os.path.join(out, "renders")):
+            print(f"[table] skip {fam}: no renders in {out}")
             continue
-        add_eff, add_none = summarise(add)
-        params = {}
-        for r in swept_params(t, None):  # params with no renders (not claimed) are skipped below
-            moves = []
-            for k, (v, d) in enumerate(values(r)):
-                ch = []
-                for s in SOURCES:
-                    af = facts_of(os.path.join(tdir, s, f"{r['key']}_{k}.json"))
-                    if af and before[s]:
-                        ch.append(bucket(before[s], af))
-                if not ch:
-                    continue
-                eff, none = summarise(ch)
-                m = {"value": v, "direction": d, "patch_line": f"{r['tag']} {r['key']} {v}", "effect": eff,
-                     "no_change": round(none / len(ch), 2)}
-                if r.get("options"):
-                    m["option"] = r["options"][int(float(v))] if int(float(v)) < len(r["options"]) else v
-                moves.append(m)
-                n_moves += 1
-            if moves:
-                p = {"label": r.get("label") or r["key"], "kind": r["kind"], "tag": r["tag"],
-                     "default": r.get("default"), "min": r["min"], "max": r["max"], "moves": moves}
-                if r.get("options"):
-                    p["options"] = r["options"]
-                params[r["key"]] = p
-        table["types"][t["type"]] = {"node_line": f"{e1_data.FAMILY} {t['type']}", "add": add_eff,
-                                     "add_no_change": round(add_none / len(add), 2), "params": params}
+        types = [fill_filter_menus(t) for t in schema if t["category"] == fam and t["type"] not in e1_data.SKIP_TYPES
+                 and (only is None or t["type"] in only)]
+        src = source_only(a, out)
+        for t in types:
+            row, n = type_row(out, t, src)
+            if row:
+                row["family"] = fam
+                row["node_line"] = f"{fam} {t['type']}"
+                table["types"][t["type"]] = row
+                n_moves += n
     os.makedirs(os.path.dirname(a.dest), exist_ok=True)
     with open(a.dest, "w") as f:
         json.dump(table, f, separators=(",", ":"))

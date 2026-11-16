@@ -287,6 +287,7 @@ def stage_split(a, types):
 
 
 def main():
+    global FAMILY
     ap = argparse.ArgumentParser()
     ap.add_argument("--bin", default=os.path.join(ROOT, "build-dev/Infinite.app/Contents/MacOS/Infinite"))
     ap.add_argument("--out", default=os.path.join(ROOT, "build/e1"))
@@ -296,13 +297,17 @@ def main():
     ap.add_argument("--chunk", type=int, default=150)
     ap.add_argument("--budget", type=float, help="minutes; stop starting chunks after this (re-run resumes)")
     ap.add_argument("--stage", default="all", choices=["render", "rows", "split", "all"])
+    ap.add_argument("--family", default=FAMILY, help="node category to sweep (E1 itself is Effects)")
+    ap.add_argument("--types", help="comma list: only these types of the family")
     a = ap.parse_args()
+    FAMILY = a.family
+    only = set(a.types.split(",")) if a.types else None
     os.makedirs(a.out, exist_ok=True)
     schema = a.describe or os.path.join(a.out, "describe.json")
     if not os.path.exists(schema):
         subprocess.run([a.bin, "--describe", "--json", schema], capture_output=True)
     types = [fill_filter_menus(t) for t in json.load(open(schema))["types"]
-             if t["category"] == FAMILY and t["type"] not in SKIP_TYPES]
+             if t["category"] == FAMILY and t["type"] not in SKIP_TYPES and (only is None or t["type"] in only)]
     a.cov = {r["type"]: r for r in json.load(open(a.coverage))} if a.coverage else None
     if a.stage in ("render", "all"):
         stage_render(a, types)

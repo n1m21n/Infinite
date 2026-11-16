@@ -19,13 +19,14 @@ const FACTS = {
   white: [100.0, [0.01, 0.05, 0.15]],
   alpha: [100.0, [0.01, 0.05, 0.15]],
   detail: [1.0, [0.1, 0.3, 0.8]],
-  tones: [1.0, [0.03, 0.1, 0.3]]
+  tones: [1.0, [0.03, 0.1, 0.3]],
+  saturation: [1.0, [0.01, 0.04, 0.12]]
 };
 const LEVELS = ["none", "small", "medium", "large"];
 const WORDS = {
   luma: "brightness", contrast: "contrast (2-98 % luma range)", spread: "tonal spread", red: "red", green: "green",
   blue: "blue", warmth: "warmth (red minus blue)", black: "share of black pixels", white: "share of white pixels",
-  alpha: "opacity", detail: "fine detail / sharpness (RMS edge strength)", tones: "tone distribution (histogram shape)"
+  alpha: "opacity", detail: "fine detail / sharpness (RMS edge strength)", tones: "tone distribution (histogram shape)", saturation: "saturation (max minus min channel)"
 };
 
 function decodePng(file) {
@@ -70,11 +71,11 @@ function decodePng(file) {
 function factsOfPng(file) {
   const { w, h, rgba } = decodePng(file);
   const n = w * h, y = new Float64Array(n), hist = new Array(16).fill(0);
-  let R = 0, G = 0, B = 0, A = 0, black = 0, white = 0;
+  let R = 0, G = 0, B = 0, A = 0, black = 0, white = 0, S = 0;
   for (let i = 0; i < n; i++) {
     const al = rgba[i * 4 + 3], r = rgba[i * 4] * al, g = rgba[i * 4 + 1] * al, b = rgba[i * 4 + 2] * al;
     const l = r * 0.2126 + g * 0.7152 + b * 0.0722;
-    y[i] = l; R += r; G += g; B += b; A += al;
+    y[i] = l; R += r; G += g; B += b; A += al; S += Math.max(r, g, b) - Math.min(r, g, b);
     hist[Math.min(Math.floor(l * 16), 15)] += 1;
     if (l < 0.02) black++;
     if (l > 0.98) white++;
@@ -98,7 +99,7 @@ function factsOfPng(file) {
   return {
     luma: lum / n, contrast: q[Math.floor(0.98 * (n - 1))] - q[Math.floor(0.02 * (n - 1))], spread: Math.sqrt(v),
     red: R / n, green: G / n, blue: B / n, warmth: (R - B) / n, black: black / n * 100, white: white / n * 100,
-    alpha: A / n * 100, detail: Math.sqrt(g2 / ((w - 1) * (h - 1))), hist, grid
+    alpha: A / n * 100, detail: Math.sqrt(g2 / ((w - 1) * (h - 1))), saturation: S / n, hist, grid
   };
 }
 

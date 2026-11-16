@@ -215,25 +215,25 @@ const TOOLS = [
   },
   {
     name: "infinite_find_knob",
-    description: "Find which node and param move makes a wanted picture change, from measured renders (not guesses). Give `want` (e.g. [\"detail down large\", \"luma up\"]; facts: luma, contrast, spread, red, green, blue, warmth, black, white, alpha, detail, tones; levels small/medium/large optional) or `before` + `after` pictures (png, .inf or patch text) to work out the change. Returns the top moves with value, patch line and their measured effect. Coverage: Effects family nodes only for now; check each suggestion with infinite_compare_frames.",
+    description: "Find which node and param move makes a wanted picture change, from measured renders (not guesses). Give `want` (e.g. [\"detail down large\", \"luma up\"]; facts: luma, contrast, spread, red, green, blue, warmth, saturation, black, white, alpha, detail, tones; levels small/medium/large optional) or `before` + `after` pictures (png, .inf or patch text) to work out the change. Returns the top moves with value, patch line and their measured effect. Coverage: Effects nodes and the Compositing colour nodes (color adjustments, curves, exposure, keys, alpha...); check each suggestion with infinite_compare_frames.",
     inputSchema: {
       type: "object",
       properties: {
         want: { type: "array", items: { type: "string" }, description: "wanted change tokens: '<fact> up|down [small|medium|large]' or 'tones [level]'" },
         before: { type: "string", description: "current picture (png, .inf or patch text); with `after`, the change is measured" },
         after: { type: "string", description: "wanted picture (png, .inf or patch text)" },
-        node_types: { type: "array", items: { type: "string" }, description: "only consider these Effects types (e.g. the ones already in your patch)" },
+        node_types: { type: "array", items: { type: "string" }, description: "only consider these node types (e.g. the ones already in your patch)" },
         k: { type: "number", description: "how many suggestions (default 5)" }
       }
     }
   },
   {
     name: "infinite_node_effects",
-    description: "Measured effect table for Effects nodes: what adding a node at defaults does to a picture, and what each param does moved up or down (measured on 10 source pictures at 128x128). Omit node_type to list every measured type with its add effect.",
+    description: "Measured effect table for Effects nodes and Compositing colour nodes: what adding a node at defaults does to a picture, and what each param does moved up or down (measured on 10 source pictures at 128x128). Omit node_type to list every measured type with its add effect.",
     inputSchema: {
       type: "object",
       properties: {
-        node_type: { type: "string", description: "Effects type, e.g. 'gaussianblur' or 'Effects gaussianblur'" }
+        node_type: { type: "string", description: "node type, e.g. 'gaussianblur', 'Effects gaussianblur' or 'color adjustments'" }
       }
     }
   }
