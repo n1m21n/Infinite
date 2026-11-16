@@ -1303,6 +1303,149 @@ namespace
       return changed;
    }
 
+   // A gradient's stops on one bar (Affinity's and Photoshop's gradient editor): click the bar to add a stop, drag a
+   // marker to move it, drag it down off the bar or right-click it to remove it (two always stay). The picked stop's
+   // colour, alpha and location sit below. Empty stops start from the two colours a and b.
+   std::map<ImGuiID, int> sStopPick;
+   int sStopDrag = -1;
+   ImGuiID sStopDragId = 0;
+   bool GradientRows(const char* id, std::vector<Scene2DNode::GradStop>& owner, const float a[4], const float b[4])
+   {
+      using G = Scene2DNode::GradStop;
+      bool changed = false;
+      // Edited on a copy, so a gradient nobody touched keeps no stops of its own.
+      std::vector<G> st = owner;
+      if (st.size() < 2)
+      {
+         G s0, s1;
+         std::copy(a, a + 4, s0.c);
+         std::copy(b, b + 4, s1.c);
+         s1.t = 1.0f;
+         st = { s0, s1 };
+      }
+      ImGui::PushID(id);
+      const ImGuiID key = ImGui::GetID("bar");
+      int& pick = sStopPick[key];
+      pick = std::clamp(pick, 0, (int)st.size() - 1);
+      FieldLabel(T("Gradient"));
+      const float w = sFieldW, h = 16.0f, mk = 6.0f;
+      const ImVec2 p0 = ImGui::GetCursorScreenPos();
+      ImGui::InvisibleButton("##bar", ImVec2(w, h + mk + 4.0f));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      auto u32 = [](const float c[4]) { return ImGui::ColorConvertFloat4ToU32(ImVec4(c[0], c[1], c[2], 1.0f)); };
+      const float fx0 = p0.x, fx1 = p0.x + w;
+      dl->AddRectFilled(p0, ImVec2(fx0 + w * st.front().t, p0.y + h), u32(st.front().c));
+      for (size_t i = 1; i < st.size(); i++)
+      {
+         const float x0 = fx0 + w * st[i - 1].t, x1 = fx0 + w * st[i].t;
+         dl->AddRectFilledMultiColor(ImVec2(x0, p0.y), ImVec2(x1, p0.y + h), u32(st[i - 1].c), u32(st[i].c), u32(st[i].c),
+                                     u32(st[i - 1].c));
+      }
+      dl->AddRectFilled(ImVec2(fx0 + w * st.back().t, p0.y), ImVec2(fx1, p0.y + h), u32(st.back().c));
+      dl->AddRect(p0, ImVec2(fx1, p0.y + h), ImGui::GetColorU32(ImGuiCol_Border));
+      for (int i = 0; i < (int)st.size(); i++)
+      {
+         const float x = fx0 + w * st[(size_t)i].t, y = p0.y + h + 1.0f;
+         dl->AddTriangleFilled(ImVec2(x, y), ImVec2(x - mk * 0.6f, y + mk), ImVec2(x + mk * 0.6f, y + mk), u32(st[(size_t)i].c));
+         dl->AddTriangle(ImVec2(x, y), ImVec2(x - mk * 0.6f, y + mk), ImVec2(x + mk * 0.6f, y + mk),
+                         ImGui::GetColorU32(i == pick ? ImGuiCol_Text : ImGuiCol_Border), i == pick ? 2.0f : 1.0f);
+      }
+      const ImVec2 m = ImGui::GetIO().MousePos;
+      const float mt = std::clamp((m.x - fx0) / w, 0.0f, 1.0f);
+      auto nearest = [&]() {
+         int best = -1;
+         float bd = 6.0f;
+         for (int i = 0; i < (int)st.size(); i++)
+         {
+            const float d = std::fabs(fx0 + w * st[(size_t)i].t - m.x);
+            if (d < bd) { bd = d; best = i; }
+         }
+         return best;
+      };
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+      {
+         PushUndoCheckpoint(kUndo);
+         int hit = nearest();
+         if (hit < 0 && (int)st.size() < Scene2DNode::kMaxStops)
+         {
+            G g;
+            g.t = mt;
+            Scene2DNode::GradAt(st, a, b, mt, g.c);
+            st.push_back(g);
+            hit = (int)st.size() - 1;
+            changed = true;
+         }
+         if (hit >= 0)
+         {
+            sStopDrag = hit;
+            sStopDragId = key;
+            pick = hit;
+         }
+      }
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && st.size() > 2)
+      {
+         const int hit = nearest();
+         if (hit >= 0)
+         {
+            PushUndoCheckpoint(kUndo);
+            st.erase(st.begin() + hit);
+            pick = 0;
+            changed = true;
+         }
+      }
+      if (sStopDragId == key && sStopDrag >= 0 && sStopDrag < (int)st.size())
+      {
+         if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            if (st[(size_t)sStopDrag].t != mt)
+            {
+               st[(size_t)sStopDrag].t = mt;
+               changed = true;
+            }
+         }
+         else
+         {
+            // Released well below the bar: the stop goes (Photoshop's drag-off).
+            if (m.y > p0.y + h + mk + 24.0f && st.size() > 2)
+            {
+               st.erase(st.begin() + sStopDrag);
+               changed = true;
+            }
+            sStopDrag = -1;
+            sStopDragId = 0;
+         }
+      }
+      // Keep the picked stop picked while the list re-sorts.
+      G picked = st[(size_t)std::clamp(pick, 0, (int)st.size() - 1)];
+      const bool dragging = sStopDragId == key && sStopDrag >= 0;
+      Scene2DNode::SortStops(st);
+      for (int i = 0; i < (int)st.size(); i++)
+         if (st[(size_t)i] == picked)
+         {
+            if (dragging && sStopDrag == pick)
+               sStopDrag = i;
+            pick = i;
+            break;
+         }
+      G& g = st[(size_t)pick];
+      changed |= ColorRow(T("Stop"), g.c);
+      changed |= SliderRow(T("Stop alpha"), &g.c[3], 0.0f, 1.0f, "%.2f");
+      float loc = g.t * 100.0f;
+      if (SliderRow(T("Location"), &loc, 0.0f, 100.0f, "%.0f%%"))
+      {
+         g.t = loc / 100.0f;
+         changed = true;
+      }
+      ImGui::PopID();
+      if (changed)
+      {
+         Scene2DNode::SortStops(st);
+         owner = st;
+         Touch();
+      }
+      return changed;
+   }
+
    // The rows an adjustment has besides its amount: Levels and Curves per channel (with the picture's histogram and
    // Auto), and the settings of the newer adjustments. T is a Layer or an Effect: both hold the same fields.
    int sAdjCh = 0;          // 0 the master, 1..3 red, green, blue
@@ -3965,6 +4108,9 @@ namespace
       to.fillOn = from.fillOn;
       to.strokeOn = from.strokeOn;
       std::copy(from.fillC, from.fillC + 4, to.fillC);
+      to.fillType = from.fillType;
+      to.fillAngle = from.fillAngle;
+      to.fillStops = from.fillStops;
       std::copy(from.strokeC, from.strokeC + 4, to.strokeC);
       to.width = from.width;
       to.cap = from.cap;
@@ -6275,6 +6421,36 @@ namespace
          sAt = ImGui::GetTime();
          changed = true;
       }
+      next();
+      // Gradient fills live in one popup, beside the stroke's: type, angle and the stops.
+      if (IconChip("##v2dvfillgrad", IconsInfinite::Gradient, t.fillType > 0, T("Fill gradient")))
+         ImGui::OpenPopup("##v2dvfillpop");
+      if (MenuParts::BeginPopup("##v2dvfillpop"))
+      {
+         ImGui::TextDisabled("%s", T("Fill"));
+         static const char* kFillKinds[4] = { "Solid", "Linear", "Radial", "Reflected" };
+         for (int i = 0; i < 4; i++)
+         {
+            if (i > 0)
+               FormParts::Inline(0.0f, tok::space_1);
+            const std::string cid = std::string(T(kFillKinds[i])) + "##v2dvft" + std::to_string(i);
+            if (TextChip(cid.c_str(), t.fillType == i, nullptr) && t.fillType != i)
+            {
+               undo();
+               t.fillType = i;
+               changed = true;
+            }
+         }
+         if (t.fillType > 0)
+         {
+            if (t.fillType != 2)
+               changed |= SliderRow(T("Angle##v2dvfa"), &t.fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+            const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            if (GradientRows("##v2dvfillstops", t.fillStops, t.fillC, white))
+               changed = true;
+         }
+         MenuParts::EndPopup();
+      }
       gap();
       if (TextChip(L("Stroke##v2dvstroke"), t.strokeOn, T("Stroke on or off")))
       {
@@ -7972,12 +8148,16 @@ namespace
          int type = l->fillType;
          if (ComboRow(T("Type"), &type, { T("Solid"), T("Linear"), T("Radial"), T("Reflected"), T("Diamond") }))
             l->fillType = type;
-         ColorRow(type == 0 ? T("Colour") : T("From"), l->colorA);
-         SliderRow(type == 0 ? T("Alpha") : T("From alpha"), &l->colorA[3], 0.0f, 1.0f, "%.2f");
-         if (type != 0)
+         if (type == 0)
          {
-            ColorRow(T("To"), l->colorB);
-            SliderRow(T("To alpha"), &l->colorB[3], 0.0f, 1.0f, "%.2f");
+            ColorRow(T("Colour"), l->colorA);
+            SliderRow(T("Alpha"), &l->colorA[3], 0.0f, 1.0f, "%.2f");
+         }
+         else if (GradientRows("##v2dfillgrad", l->stops, l->colorA, l->colorB))
+         {
+            // The ends stay in colour A and B, which the rest of the layer (and older readers) know.
+            std::copy(l->stops.front().c, l->stops.front().c + 4, l->colorA);
+            std::copy(l->stops.back().c, l->stops.back().c + 4, l->colorB);
          }
          if (type == 1 || type == 3 || type == 4)
          {
@@ -8716,9 +8896,20 @@ namespace
    {
       using S = Scene2DNode;
       const bool two = t == S::kFxBevel || t == S::kFxGradient || t == S::kFxPattern;
-      ColorRow(T(t == S::kFxBevel ? "Highlight" : t == S::kFxGradient ? "Start" : "Colour"), f.c);
-      if (two && !(t == S::kFxBevel && f.material >= 0))
-         ColorRow(T(t == S::kFxBevel ? "Shadow" : t == S::kFxGradient ? "End" : "Second"), f.c2);
+      if (t == S::kFxGradient)
+      {
+         const float a[4] = { f.c[0], f.c[1], f.c[2], 1.0f }, b[4] = { f.c2[0], f.c2[1], f.c2[2], 1.0f };
+         if (GradientRows("##v2dfxgrad", f.stops, a, b))
+         {
+            // The ends stay in the two colours; the first colour's alpha is the effect's opacity.
+            std::copy(f.stops.front().c, f.stops.front().c + 3, f.c);
+            std::copy(f.stops.back().c, f.stops.back().c + 3, f.c2);
+         }
+      }
+      else
+         ColorRow(T(t == S::kFxBevel ? "Highlight" : "Colour"), f.c);
+      if (two && t != S::kFxGradient && !(t == S::kFxBevel && f.material >= 0))
+         ColorRow(T(t == S::kFxBevel ? "Shadow" : "Second"), f.c2);
       const int fb = S::kLfFxBase + t * S::kLfFxFields;
       if (primary)
          ModNext(l, fb + 3);

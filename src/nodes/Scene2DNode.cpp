@@ -170,6 +170,102 @@ void Scene2DNode::WhiteBalanceMatrix(float temperature, float tint, float m[9])
       }
 }
 
+void Scene2DNode::SortStops(std::vector<GradStop>& st)
+{
+   if (st.size() > (size_t)kMaxStops)
+      st.resize(kMaxStops);
+   for (GradStop& g : st)
+   {
+      g.t = std::clamp(g.t, 0.0f, 1.0f);
+      for (float& v : g.c)
+         v = std::clamp(v, 0.0f, 1.0f);
+   }
+   std::stable_sort(st.begin(), st.end(), [](const GradStop& a, const GradStop& b) { return a.t < b.t; });
+}
+
+void Scene2DNode::GradAt(const std::vector<GradStop>& st, const float a[4], const float b[4], float t, float out[4])
+{
+   t = std::clamp(t, 0.0f, 1.0f);
+   if (st.size() < 2)
+   {
+      for (int k = 0; k < 4; k++)
+         out[k] = a[k] + (b[k] - a[k]) * t;
+      return;
+   }
+   if (t <= st.front().t)
+   {
+      std::copy(st.front().c, st.front().c + 4, out);
+      return;
+   }
+   for (size_t i = 1; i < st.size(); i++)
+      if (t <= st[i].t)
+      {
+         const float u = (t - st[i - 1].t) / std::max(1e-5f, st[i].t - st[i - 1].t);
+         for (int k = 0; k < 4; k++)
+            out[k] = st[i - 1].c[k] + (st[i].c[k] - st[i - 1].c[k]) * u;
+         return;
+      }
+   std::copy(st.back().c, st.back().c + 4, out);
+}
+
+void Scene2DNode::WriteStops(std::ostream& o, const std::vector<GradStop>& st)
+{
+   o << " " << st.size();
+   for (const GradStop& g : st)
+   {
+      o << " " << g.t;
+      for (float v : g.c) o << " " << v;
+   }
+}
+
+void Scene2DNode::ReadStops(std::istream& s, std::vector<GradStop>& st)
+{
+   st.clear();
+   size_t n = 0;
+   if (!(s >> n))
+      return;
+   for (size_t i = 0; i < std::min<size_t>(n, kMaxStops); i++)
+   {
+      GradStop g;
+      if (!(s >> g.t >> g.c[0] >> g.c[1] >> g.c[2] >> g.c[3]))
+         break;
+      st.push_back(g);
+   }
+   if (st.size() < 2)
+      st.clear();
+   SortStops(st);
+}
+
+const char* Scene2DNode::kStopGlsl =
+   "uniform int uStopN;\n"
+   "uniform float uStopT[8];\n"
+   "uniform vec4 uStopC[8];\n"
+   "vec4 gradAt(float t, vec4 a, vec4 b) {\n"
+   "   t = clamp(t, 0.0, 1.0);\n"
+   "   if (uStopN < 2) return mix(a, b, t);\n"
+   "   if (t <= uStopT[0]) return uStopC[0];\n"
+   "   for (int i = 1; i < 8; i++) {\n"
+   "      if (i >= uStopN) break;\n"
+   "      if (t <= uStopT[i]) return mix(uStopC[i - 1], uStopC[i], (t - uStopT[i - 1]) / max(uStopT[i] - uStopT[i - 1], 1e-5));\n"
+   "   }\n"
+   "   return uStopC[uStopN - 1];\n"
+   "}\n";
+
+void Scene2DNode::StopUniforms(unsigned prog, const std::vector<GradStop>& st, float (*conv)(float, bool), bool lin)
+{
+   const int n = st.size() >= 2 ? (int)std::min<size_t>(st.size(), kMaxStops) : 0;
+   float t[kMaxStops] = {}, c[kMaxStops * 4] = {};
+   for (int i = 0; i < n; i++)
+   {
+      t[i] = st[(size_t)i].t;
+      for (int k = 0; k < 4; k++)
+         c[i * 4 + k] = conv != nullptr && k < 3 ? conv(st[(size_t)i].c[k], lin) : st[(size_t)i].c[k];
+   }
+   glUniform1i(glGetUniformLocation(prog, "uStopN"), n);
+   glUniform1fv(glGetUniformLocation(prog, "uStopT"), kMaxStops, t);
+   glUniform4fv(glGetUniformLocation(prog, "uStopC"), kMaxStops, c);
+}
+
 void Scene2DNode::CurveLut(const std::vector<float>& pts, float* lut, int n)
 {
    // Fritsch-Carlson: Hermite pieces with slopes cut back so no piece rises above or dips below its ends.
@@ -236,6 +332,7 @@ namespace
       for (float v : f.c2) o << " " << v;
       o << " " << f.pattern << " " << f.material;
       for (float v : f.contour) o << " " << v;
+      Scene2DNode::WriteStops(o, f.stops);
    }
    void ReadFxFields(std::istream& s, Scene2DNode::Fx& f)
    {
@@ -254,6 +351,7 @@ namespace
          if (s >> ct[0] >> ct[1] >> ct[2] >> ct[3])
             for (int k = 0; k < 4; k++)
                f.contour[k] = std::clamp(ct[k], 0.0f, 1.0f);
+         Scene2DNode::ReadStops(s, f.stops);
       }
    }
 }
@@ -467,6 +565,7 @@ namespace
             "uniform vec4 uColA;\n"
             "uniform vec4 uColB;\n"
             "uniform float uFillAngle;\n"
+            + std::string(Scene2DNode::kStopGlsl) +
             "uniform sampler2D uPMask;\n"
             "uniform int uHasPMask;\n"
             "uniform sampler2D uVMask;\n"
@@ -488,14 +587,14 @@ namespace
            "      float a = radians(uFillAngle);\n"
            "      vec2 d = vec2(cos(a), sin(a));\n"
            "      float t = clamp(dot(uvb - 0.5, d) / (abs(d.x) + abs(d.y)) * 2.0 * 0.5 + 0.5, 0.0, 1.0);\n"
-           "      return mix(uColA, uColB, t);\n"
+           "      return gradAt(t, uColA, uColB);\n"
            "   }\n"
-           "   if (uKind == 3) return mix(uColA, uColB, clamp(length(uvb - 0.5) * 2.0, 0.0, 1.0));\n"
+           "   if (uKind == 3) return gradAt(length(uvb - 0.5) * 2.0, uColA, uColB);\n"
            "   if (uKind == 5 || uKind == 6) {\n"   // reflected: from the centre line out; diamond: from the centre out to a turned square
            "      float a = radians(uFillAngle);\n"
            "      vec2 d = vec2(cos(a), sin(a)), e = vec2(-d.y, d.x), p = uvb - 0.5;\n"
            "      float t = uKind == 5 ? abs(dot(p, d)) / (abs(d.x) + abs(d.y)) * 2.0 : (abs(dot(p, d)) + abs(dot(p, e))) * 2.0;\n"
-           "      return mix(uColA, uColB, clamp(t, 0.0, 1.0));\n"
+           "      return gradAt(t, uColA, uColB);\n"
            "   }\n"
            "   if (uNearest == 1) {\n"
            "      ivec2 px = ivec2(clamp(floor(uv * uTexSize), vec2(0.0), uTexSize - 1.0));\n"
@@ -1499,6 +1598,12 @@ void Scene2DNode::Serialize()
          for (float v : l.colorA) o << " " << v;
          for (float v : l.colorB) o << " " << v;
          o << " " << l.fillAngle << "\n";
+         if (!l.stops.empty())
+         {
+            o << "stops " << l.id;
+            WriteStops(o, l.stops);
+            o << "\n";
+         }
       }
       if (l.kind == Kind::Paint && l.relief)
          o << "relief " << l.id << " " << l.reliefMat << " " << l.reliefLight << " " << l.reliefElev << " " << l.reliefDepth
@@ -1520,6 +1625,8 @@ void Scene2DNode::Serialize()
          o << " " << sh.width << " " << sh.cap << " " << sh.join << " " << sh.align << " " << sh.dash << " " << sh.gap << " "
            << sh.op << " " << EscapeToken(sh.svg) << " " << sh.pts.size();
          for (float v : sh.pts) o << " " << v;
+         o << " " << sh.fillType << " " << sh.fillAngle;
+         WriteStops(o, sh.fillStops);
          o << "\n";
       };
       if (l.kind == Kind::Vector)
@@ -1849,6 +1956,8 @@ void Scene2DNode::Parse()
             for (float& v : l->colorB) s >> v;
             s >> l->fillAngle;
          }
+         else if (key == "stops")
+            ReadStops(s, l->stops);
          else if (key == "vsize")
          {
             s >> l->pw >> l->ph;
@@ -1888,6 +1997,11 @@ void Scene2DNode::Parse()
             while (sh.pts.size() < n && s >> v)
                sh.pts.push_back(v);
             sh.pts.resize(sh.pts.size() / 6 * 6);
+            if (s >> sh.fillType >> sh.fillAngle)
+            {
+               sh.fillType = std::clamp(sh.fillType, 0, 3);
+               ReadStops(s, sh.fillStops);
+            }
             (key == "shape" ? l->shapes : l->vmask).push_back(sh);
          }
          else if (key == "text")
@@ -2082,6 +2196,7 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
          glUniform4fv(glGetUniformLocation(prog, "uColB"), 1, a.fill->colorB);
          glUniform1f(glGetUniformLocation(prog, "uFillAngle"), a.fill->fillAngle);
       }
+      StopUniforms(prog, a.fill != nullptr ? a.fill->stops : std::vector<GradStop>());
    };
    if (direct)
    {

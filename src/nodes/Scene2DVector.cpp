@@ -41,6 +41,13 @@ namespace
          h = HF(h, f);
       for (float f : s.fillC) h = HF(h, f);
       for (float f : s.strokeC) h = HF(h, f);
+      h = H(h, (unsigned)s.fillType);
+      h = HF(h, s.fillAngle);
+      for (const Scene2DNode::GradStop& g : s.fillStops)
+      {
+         h = HF(h, g.t);
+         for (float f : g.c) h = HF(h, f);
+      }
       h = H(h, (unsigned)(s.sides * 64 + s.cap * 16 + s.join * 4 + s.align));
       h = H(h, (unsigned)(s.op * 8 + s.closed * 4 + s.fillOn * 2 + s.strokeOn));
       for (float f : s.pts) h = HF(h, f);
@@ -165,6 +172,45 @@ namespace
       plutovg_surface_destroy(img);
    }
 
+   // A gradient fill's stops: its own, or its colour to white when it has none yet.
+   std::vector<Scene2DNode::GradStop> FillStops(const Scene2DNode::Shape& s)
+   {
+      if (s.fillStops.size() >= 2)
+         return s.fillStops;
+      Scene2DNode::GradStop a, b;
+      std::copy(s.fillC, s.fillC + 4, a.c);
+      b.t = 1.0f;
+      std::fill(b.c, b.c + 4, 1.0f);
+      return { a, b };
+   }
+
+   // The gradient geometry in the item's box, normalized 0..1 (the fill layer's: linear spans the box along the
+   // angle, radial reaches the box's edge mid-sides, reflected mirrors the linear ramp from the centre line).
+   void SetGradient(plutovg_canvas_t* cv, const Scene2DNode::Shape& s)
+   {
+      float lo[2], hi[2];
+      if (!Scene2DNode::ShapeBounds(s, lo, hi))
+         return;
+      const std::vector<Scene2DNode::GradStop> st = FillStops(s);
+      std::vector<plutovg_gradient_stop_t> ps;
+      for (const auto& g : st)
+         ps.push_back({ g.t, { g.c[0], g.c[1], g.c[2], g.c[3] } });
+      plutovg_matrix_t m;
+      plutovg_matrix_init_translate(&m, lo[0], lo[1]);
+      plutovg_matrix_scale(&m, std::max(1e-3f, hi[0] - lo[0]), std::max(1e-3f, hi[1] - lo[1]));
+      const float a = s.fillAngle * kPi / 180.0f, dx = std::cos(a), dy = std::sin(a);
+      const float k = (std::fabs(dx) + std::fabs(dy)) * 0.5f;
+      if (s.fillType == 2)
+         plutovg_canvas_set_radial_gradient(cv, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.0f, PLUTOVG_SPREAD_METHOD_PAD, ps.data(),
+                                            (int)ps.size(), &m);
+      else if (s.fillType == 3)
+         plutovg_canvas_set_linear_gradient(cv, 0.5f, 0.5f, 0.5f + dx * k, 0.5f + dy * k, PLUTOVG_SPREAD_METHOD_REFLECT,
+                                            ps.data(), (int)ps.size(), &m);
+      else
+         plutovg_canvas_set_linear_gradient(cv, 0.5f - dx * k, 0.5f - dy * k, 0.5f + dx * k, 0.5f + dy * k,
+                                            PLUTOVG_SPREAD_METHOD_PAD, ps.data(), (int)ps.size(), &m);
+   }
+
    // One item (fill, then stroke with its alignment) drawn over `cv` with SRC_OVER.
    void DrawItem(plutovg_canvas_t* cv, const Scene2DNode::Shape& s, bool mask)
    {
@@ -179,7 +225,10 @@ namespace
       auto setColor = [&](const float c[4]) { plutovg_canvas_set_rgba(cv, mask ? 1.0f : c[0], mask ? 1.0f : c[1], mask ? 1.0f : c[2], mask ? 1.0f : c[3]); };
       if (fill && BuildPath(cv, s))
       {
-         setColor(s.fillC);
+         if (!mask && s.fillType > 0)
+            SetGradient(cv, s);
+         else
+            setColor(s.fillC);
          plutovg_canvas_fill(cv);
       }
       if (!stroke || !BuildPath(cv, s))
@@ -1005,7 +1054,7 @@ std::string Scene2DNode::ToSvg(const Layer& l)
      << bh << "\">\n";
    static const char* caps[3] = { "butt", "round", "square" };
    static const char* joins[3] = { "miter", "round", "bevel" };
-   int maskN = 0;
+   int maskN = 0, gradN = 0;
    std::ostringstream body;
    for (const Shape& s : l.shapes)
    {
@@ -1066,9 +1115,30 @@ std::string Scene2DNode::ToSvg(const Layer& l)
             geo += "\"";
          }
          const bool fill = s.fillOn && s.type != Shape::kLine && !(s.type == Shape::kPath && !s.closed);
-         el << geo << " fill=\"" << (fill ? Hex(s.fillC) : "none") << "\"";
-         if (fill && s.fillC[3] < 0.999f)
-            el << " fill-opacity=\"" << s.fillC[3] << "\"";
+         float lo[2], hi[2];
+         if (fill && s.fillType > 0 && ShapeBounds(s, lo, hi))
+         {
+            // The same geometry as SetGradient, in the box's own 0..1 units.
+            const std::string gid = "g" + std::to_string(++gradN);
+            const float a = s.fillAngle * kPi / 180.0f, dx = std::cos(a), dy = std::sin(a);
+            const float k = (std::fabs(dx) + std::fabs(dy)) * 0.5f;
+            if (s.fillType == 2)
+               el << "<radialGradient id=\"" << gid << "\" cx=\"0.5\" cy=\"0.5\" r=\"0.5\">";
+            else
+               el << "<linearGradient id=\"" << gid << "\" x1=\"" << (s.fillType == 3 ? 0.5f : 0.5f - dx * k) << "\" y1=\""
+                  << (s.fillType == 3 ? 0.5f : 0.5f - dy * k) << "\" x2=\"" << 0.5f + dx * k << "\" y2=\"" << 0.5f + dy * k << "\""
+                  << (s.fillType == 3 ? " spreadMethod=\"reflect\"" : "") << ">";
+            for (const GradStop& g : FillStops(s))
+               el << "<stop offset=\"" << g.t << "\" stop-color=\"" << Hex(g.c) << "\" stop-opacity=\"" << g.c[3] << "\"/>";
+            el << (s.fillType == 2 ? "</radialGradient>\n" : "</linearGradient>\n");
+            el << geo << " fill=\"url(#" << gid << ")\"";
+         }
+         else
+         {
+            el << geo << " fill=\"" << (fill ? Hex(s.fillC) : "none") << "\"";
+            if (fill && s.fillC[3] < 0.999f)
+               el << " fill-opacity=\"" << s.fillC[3] << "\"";
+         }
          if (s.strokeOn && s.width > 0)
          {
             el << " stroke=\"" << Hex(s.strokeC) << "\" stroke-width=\"" << s.width << "\" stroke-linecap=\""

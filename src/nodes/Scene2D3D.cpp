@@ -121,6 +121,7 @@ uniform vec3 uBvLight;
 uniform float uIgSpread, uBvDepth;
 uniform vec2 uShOff, uInOff;
 uniform float uShSpread, uInSpread, uGlSpread, uStSize, uFill;
+//STOPS
 vec4 over(vec4 d, vec4 s) {
    float a = s.a + d.a * (1.0 - s.a);
    vec3 c = a > 1e-5 ? (s.rgb * s.a + d.rgb * d.a * (1.0 - s.a)) / a : vec3(0.0);
@@ -170,7 +171,8 @@ void main() {
    if (uPaOn == 1) res = over(res, vec4(mix(uPaB.rgb, uPaA.rgb, patternAt(vUv)), L.a * uPaA.a));
    if (uGrOn == 1) {
       float t = clamp(dot(vUv - 0.5, uGrDir) + 0.5, 0.0, 1.0);
-      res = over(res, vec4(mix(uGrA.rgb, uGrB.rgb, t), L.a * uGrA.a));
+      vec4 g = gradAt(t, vec4(uGrA.rgb, 1.0), vec4(uGrB.rgb, 1.0));
+      res = over(res, vec4(g.rgb, L.a * uGrA.a * g.a));
    }
    if (uOvOn == 1) res = over(res, vec4(uOvC.rgb, L.a * uOvC.a));
    if (uSaOn == 1) {
@@ -284,7 +286,7 @@ bool Scene2DNode::FxSame(const Fx& a, const Fx& b)
 {
    return a.on == b.on && std::equal(a.c, a.c + 4, b.c) && a.angle == b.angle && a.dist == b.dist && a.size == b.size &&
           a.spread == b.spread && a.pos == b.pos && std::equal(a.c2, a.c2 + 4, b.c2) && a.pattern == b.pattern &&
-          a.material == b.material && std::equal(a.contour, a.contour + 4, b.contour);
+          a.material == b.material && std::equal(a.contour, a.contour + 4, b.contour) && a.stops == b.stops;
 }
 
 const char* Scene2DNode::FxPatternName(int p)
@@ -1290,7 +1292,11 @@ bool Scene2DNode::EnsureFxShaders()
    {
       mFxTried = true;
       mBlurProgram = GLUtil::CompileProgram(kBlurFrag);
-      mFxProgram = GLUtil::CompileProgram(kFxFrag);
+      {
+         std::string src = kFxFrag;
+         src.replace(src.find("//STOPS"), 7, kStopGlsl);
+         mFxProgram = GLUtil::CompileProgram(src.c_str());
+      }
       mFxCombineProgram = GLUtil::CompileProgram(kFxCombineFrag);
    }
    return mBlurProgram != 0 && mFxProgram != 0;
@@ -1438,6 +1444,7 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       };
       col2(bv, "uBvLo");
       col2(gr, "uGrB");
+      StopUniforms(prog, gr.stops, ToWorking, lin);
       col2(pa, "uPaB");
       glUniform1f(glGetUniformLocation(prog, "uIgSpread"), std::clamp(ig.spread, 0.0f, 1.0f));
       // Bevel: height slope scaled by its size and depth; light from `angle`, 30 degrees up. uv is y up.

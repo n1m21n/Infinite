@@ -1,9 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <iosfwd>
 #include <map>
 #include <memory>
 #include <string>
@@ -50,6 +52,24 @@ public:
    static void AdjRange(int type, float& lo, float& hi);
    static constexpr int kDrives = 4;   // Drive A..D: modulatable 0..1 knobs adjustment layers follow
 
+   // A gradient's colour stops (fill layers, shape fills, the gradient overlay). Empty: the two colours the owner
+   // already has, start to end. Otherwise 2..kMaxStops stops, sorted by t (0..1), colours in display values.
+   struct GradStop
+   {
+      float t = 0.0f;
+      float c[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      bool operator==(const GradStop& o) const { return t == o.t && std::equal(c, c + 4, o.c); }
+   };
+   static constexpr int kMaxStops = 8;
+   static void SortStops(std::vector<GradStop>& st);
+   static void GradAt(const std::vector<GradStop>& st, const float a[4], const float b[4], float t, float out[4]);
+   static void WriteStops(std::ostream& o, const std::vector<GradStop>& st);   // " n t r g b a ..."
+   static void ReadStops(std::istream& s, std::vector<GradStop>& st);
+   // GLSL: uniforms uStopN, uStopT[8], uStopC[8] and vec4 gradAt(float t, vec4 a, vec4 b). StopUniforms sets them,
+   // each colour through `conv` (display to working space) when given.
+   static const char* kStopGlsl;
+   static void StopUniforms(unsigned prog, const std::vector<GradStop>& st, float (*conv)(float, bool) = nullptr, bool lin = false);
+
    // One vector item: a pen path, a live shape or an imported SVG. Points are
    // the layer's own box pixels, y down.
    struct Shape
@@ -65,6 +85,9 @@ public:
       bool closed = false;
       bool fillOn = true;
       float fillC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      int fillType = 0;                       // 0 solid (fillC), 1 linear, 2 radial (fits the box), 3 reflected
+      float fillAngle = 90.0f;                // linear and reflected: degrees, 90 = top to bottom
+      std::vector<GradStop> fillStops;        // gradient fills: 2..kMaxStops
       bool strokeOn = false;
       float strokeC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float width = 4.0f;
@@ -98,6 +121,7 @@ public:
       int pattern = 0;        // pattern overlay: kFxPatternCount kinds; size is the cell, angle turns it
       int material = -1;      // bevel: -1 plain light, else the relief materials (0 plasticine, 1 metal, 2 chrome, 3 stipple)
       float contour[4] = { 0.25f, 0.25f, 0.75f, 0.75f };   // shadow, glow, bevel, satin: the two inner points of a 0..1 curve
+      std::vector<GradStop> stops;   // gradient overlay: more than two colours (empty: c to c2)
       bool ContourIsLinear() const { return contour[0] == contour[1] && contour[2] == contour[3]; }
    };
    static bool FxSame(const Fx& a, const Fx& b);
@@ -171,6 +195,7 @@ public:
       float colorA[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
       float colorB[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       float fillAngle = 90.0f;      // linear: degrees, 90 = top to bottom
+      std::vector<GradStop> stops;  // gradients with more than two colours (empty: colorA to colorB)
       // Adjustment layers. adjDrive 1..4 moves the amount from adjAmt to adjTo with Drive A..D.
       // adjMap: after the effect, dark to colorA, light to colorB.
       int adjType = 0;
