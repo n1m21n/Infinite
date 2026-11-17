@@ -37,7 +37,7 @@ The tool exits 1 when a host or deferred item is unguarded, or when an item matc
 | Agents & Terminal Settings tab | Settings | No agent Terminal inside a DAW (features table) |
 | Autosave section | Settings > General | Engine autosave never runs in plugin mode; the DAW project saves the patch |
 | "Infinite x is available / Update" row | Settings > Extensions | The app updates; the plugin follows (8.11) |
-| Terminal rail tile, View > Panels > Terminal, Cmd+` (Ctrl+` elsewhere) | rail, menu, keys | No Terminal inside a DAW. On load the engine keeps it closed and writes the app's saved value back unchanged |
+| Terminal rail tile, View > Panels > Terminal, Ctrl+` | rail, menu, keys | No Terminal inside a DAW. On load the engine keeps it closed and writes the app's saved value back unchanged |
 | "Reference in chat" | node context menu | No Chat inside a DAW |
 | Output node "Record video" / "Stop recording" | node body | Video recording is Out (features table) |
 | Audio Out and Spatial Mixer Record / Choose..., format and bit-depth buttons | node bodies | The DAW records the plugin's output |

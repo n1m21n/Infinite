@@ -6,7 +6,7 @@ The same page is in the Node Field Guide (Using the App). The agent side is in `
 
 ## Set up an agent
 
-1. Open the Terminal panel. The chat is the default face; the Terminal button in the chat header switches to the shell (Cmd+` on macOS, Ctrl+` elsewhere).
+1. Open the Terminal panel. The chat is the default face; the Terminal button in the chat header switches to the shell (Ctrl+`).
 2. The empty chat says **Connect an agent**. Pick one and press **Set up**. Infinite installs the agent's command line if it is missing, puts the `infinite` command on your PATH, registers Infinite's MCP server with the agent and installs the live-session skill. Each step checks first and is skipped when done, so Set up is also the repair.
 3. When the agent needs a login, **Open sign-in page** opens your browser. If the agent asks for a code, paste it under **Paste the code from the browser** and press Submit.
 4. The row reads **Ready**. Type a line and send.

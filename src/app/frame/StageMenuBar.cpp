@@ -132,7 +132,7 @@ static void DrawPanelRail()
    // The agents' shell sits with the tools at the bottom, above Edit history.
    if (!Platform::PluginModeActive() && // no shell or agents inside a DAW
        PanelRail::Item("##railTerminal", bottom - 2.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
-                       T("Terminal - a real shell, for you and your coding agents (" MODKEY "+`)")))
+                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
    {
       gTerminalOpen = !gTerminalOpen;
       gTerminalFocus = gTerminalOpen;
