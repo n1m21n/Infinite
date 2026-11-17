@@ -49,7 +49,7 @@ GROUND = {
         "Delete": "Remove", "Frame selected": "Frame", "Group": "Group", "Ungroup": "Ungroup", "Add": "Add",
         "Select": "Select"}),
     "##studioWaveMenu": (P + "SampleStudioPanel.cpp", "Ableton Simpler slice", {
-        "Split": "Split here", "Join": "Join", "Copy": "Copy", "Paste": "Paste after", "Delete": "Delete",
+        "Split": "Split here", "Join": "Join", "Copy": "Copy", "Paste": "Paste at playhead", "Delete": "Delete",
         "Preview": "Play slice", "Reverse": "Reverse", "Colour": "Colour", "Zoom to selection": "Zoom to selection",
         "Slice to Drum Rack": "Convert to node"}),
     "##curveMenu": (P + "CurveEditorPanel.cpp", "Ableton envelope / Blender graph", {

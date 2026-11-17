@@ -1435,7 +1435,7 @@ namespace
          CopySelection(n);
       if (MenuParts::Item(T("Paste"), MODKEY "+V", false, !PointClipboard().empty()))
          PasteClipboard(n);
-      if (MenuParts::Item(T("Delete"), "Del", false, !S().sel.empty()))
+      if (MenuParts::Item(T("Delete"), "Backspace", false, !S().sel.empty()))
          DeleteSelection(n);
       MenuParts::EndPopup();
    }

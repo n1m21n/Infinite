@@ -107,15 +107,15 @@ void DrawPopupsA(FrameCtx& fc)
                g->renaming = true;
                g->renameJustStarted = true;
             }
-            if (MenuParts::Item(L("Ungroup")))
+            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
             {
-               ed::ClearSelection();
-               ed::SelectNode(gn->NodeId());
-               gRequestUngroup = true;
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCut = true;
             }
-            if (MenuParts::Item(g->on ? L("Turn Group Off") : L("Turn Group On")))
-               g->on = !g->on;
-            view3DItems(*gn);
             // Copy: the Edit menu's command on this node (or the selection it is part of).
             if (MenuParts::Item(L("Copy"), MODKEY "+C"))
             {
@@ -126,15 +126,6 @@ void DrawPopupsA(FrameCtx& fc)
                }
                gRequestCopy = true;
             }
-            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestCut = true;
-            }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -144,6 +135,15 @@ void DrawPopupsA(FrameCtx& fc)
                }
                gRequestDuplicate = true;
             }
+            if (MenuParts::Item(g->on ? L("Turn Group Off") : L("Turn Group On")))
+               g->on = !g->on;
+            if (MenuParts::Item(L("Ungroup")))
+            {
+               ed::ClearSelection();
+               ed::SelectNode(gn->NodeId());
+               gRequestUngroup = true;
+            }
+            view3DItems(*gn);
             MenuParts::Separator();
             ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_350_350_1000));
             ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::V4(tok::palf::v_850_200_200_250));
@@ -166,6 +166,34 @@ void DrawPopupsA(FrameCtx& fc)
                PushUndoCheckpoint();
                gCommentEdit.target = c;
                gCommentEdit.justOpened = true;
+            }
+            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCut = true;
+            }
+            // Copy: the Edit menu's command on this node (or the selection it is part of).
+            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCopy = true;
+            }
+            if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDuplicate = true;
             }
             if (MenuParts::SubMenu(L("Font Size")))
             {
@@ -191,34 +219,6 @@ void DrawPopupsA(FrameCtx& fc)
                gColor.justOpened = true;
             }
             view3DItems(*gn);
-            // Copy: the Edit menu's command on this node (or the selection it is part of).
-            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestCopy = true;
-            }
-            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestCut = true;
-            }
-            if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestDuplicate = true;
-            }
             if (GroupNode* owner = GroupOwning(gn->index))
             {
                if (MenuParts::Item(L("Ungroup")))
@@ -255,6 +255,34 @@ void DrawPopupsA(FrameCtx& fc)
          else
          {
             // Primary Actions
+            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCut = true;
+            }
+            // Copy: the Edit menu's command on this node (or the selection it is part of).
+            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCopy = true;
+            }
+            if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDuplicate = true;
+            }
             const char* bypassLabel = gn->node->bypassed ? "Enable Node" : "Bypass Node";
             if (MenuParts::Item(bypassLabel, "B"))
             {
@@ -267,34 +295,6 @@ void DrawPopupsA(FrameCtx& fc)
                }
             }
             view3DItems(*gn);
-            // Copy: the Edit menu's command on this node (or the selection it is part of).
-            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestCopy = true;
-            }
-            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestCut = true;
-            }
-            if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestDuplicate = true;
-            }
             if (const std::vector<FactoryPresets::Preset>* presets = FactoryPresets::For(gn->typeName))
             {
                if (MenuParts::SubMenu(L("Presets")))

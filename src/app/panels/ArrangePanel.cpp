@@ -118,6 +118,22 @@ namespace app
             }
 
             const std::vector<uint64_t> ctxSelIds = ArrangeSelectionIds();
+            // Cut, Copy, Duplicate sit right after Rename (docs/quality/context-menu-order.md). A session slot's own
+            // rows come from the grid.
+            auto drawClipEditRows = [&]()
+            {
+               if (ctxIsSlot)
+               {
+                  DrawArrangeSessionSlotEditItems(cid);
+                  return;
+               }
+               if (MenuParts::Item(L("Cut"), MODKEY "+X", false, !ctxSelIds.empty()) && ArrangeCopySelection())
+                  ArrangeDeleteSelection();
+               if (MenuParts::Item(L("Copy"), MODKEY "+C", false, !ctxSelIds.empty()))
+                  ArrangeCopySelection();
+               if (MenuParts::Item(L("Duplicate"), MODKEY "+D", false, !ctxSelIds.empty()))
+                  ArrangeDuplicateSelection();
+            };
             if (ctxSelIds.size() > 1)
             {
                // Multi-clip selection: an intentionally minimal menu. Every
@@ -137,6 +153,7 @@ namespace app
                         gArrangeRenameTargetIds.push_back(id);
                   snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
                }
+               drawClipEditRows();
                if (MenuParts::SubMenu(L("Colour Tint")))
                {
                   const Arrange::Clip* tc = Arrange::FindClip(gArrange, cid);
@@ -189,6 +206,7 @@ namespace app
                gArrangeRenameTargetIds.clear();
                snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
             }
+            drawClipEditRows();
             if (MenuParts::Item(L("Active"), nullptr, cp->enabled))
             {
                if (ctxIsSlot)
@@ -325,12 +343,6 @@ namespace app
             for (uint64_t id : ctxSelIds)
                if (const Arrange::Clip* sc = Arrange::FindClip(gArrange, id))
                   canSplit = canSplit || (ctxPlay > sc->start && ctxPlay < sc->start + sc->length);
-            if (MenuParts::Item(L("Cut"), MODKEY "+X", false, !ctxSelIds.empty()) && ArrangeCopySelection())
-               ArrangeDeleteSelection();
-            if (MenuParts::Item(L("Copy"), MODKEY "+C", false, !ctxSelIds.empty()))
-               ArrangeCopySelection();
-            if (MenuParts::Item(L("Duplicate"), MODKEY "+D", false, !ctxSelIds.empty()))
-               ArrangeDuplicateSelection();
             if (MenuParts::Item(L("Split at Playhead"), MODKEY "+E", false, canSplit))
                ArrangeSplitSelectionAt(ctxPlay);
             MenuParts::Separator();
@@ -338,8 +350,16 @@ namespace app
                ArrangeGroupSelection();
             if (MenuParts::Item(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
                ArrangeUngroupSelection();
+            MenuParts::Separator();
             if (MenuParts::Item(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
                ArrangeDeleteSelection();
+            }
+            else
+            {
+            // A session slot's own edit rows come from the grid; Delete stays last.
+            DrawArrangeSessionSlotPlaceItem(cid);
+            MenuParts::Separator();
+            DrawArrangeSessionSlotDeleteItem(cid);
             }
          }
          MenuParts::EndPopup();
@@ -3912,6 +3932,14 @@ namespace app
             for (size_t k = 0; k < gArrange.lanes.size(); k++)
                if (gArrange.lanes[k].id == ctxLaneId) { laneIdx = (int)k; break; }
 
+            if (MenuParts::Item(L("Rename Track"), MODKEY "+R"))
+            {
+               gArrangeRenamingLaneId = ctxLaneId;
+               gArrangeRenameJustStarted = true;
+            }
+            // Duplicate Track: the row's own Cmd+D, on this track (Ableton: Duplicate on a track header).
+            if (MenuParts::Item(L("Duplicate Track"), MODKEY "+D"))
+               ArrangeEdit([&]() { Arrange::DuplicateLane(gArrange, ctxLaneId); });
             if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = laneIdx;
@@ -3922,17 +3950,6 @@ namespace app
                gArrangeAddTrackInsertAfter = laneIdx;
                InsertArrangeTrack(false);
             }
-            if (MenuParts::Item(L("Rename Track"), MODKEY "+R"))
-            {
-               gArrangeRenamingLaneId = ctxLaneId;
-               gArrangeRenameJustStarted = true;
-            }
-            // Duplicate Track: the row's own Cmd+D, on this track (Ableton: Duplicate on a track header).
-            if (MenuParts::Item(L("Duplicate Track"), MODKEY "+D"))
-               ArrangeEdit([&]() { Arrange::DuplicateLane(gArrange, ctxLaneId); });
-            if (MenuParts::Item(L("Delete Track")))
-               laneToDelete = ctxLaneId;
-            MenuParts::Separator();
 
             const uint64_t curGroupId = ctxLane->groupId;
             if (curGroupId != 0 && MenuParts::Item(L("Remove from Group")))
@@ -3985,14 +4002,15 @@ namespace app
             }
 
 
-            if (!Platform::PluginModeActive())
-               MenuParts::Separator();
             if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
             {
                ArrangeRenderJob job = ArrangeBuildLaneScopedRenderJob(
                   { ctxLaneId }, ctxLane->name.empty() ? ("Track " + std::to_string(ctxLaneId)) : ctxLane->name);
                ArrangeCommitLaneScopedRenderJob(job);
             }
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Delete Track")))
+               laneToDelete = ctxLaneId;
          }
          MenuParts::EndPopup();
       }
@@ -4028,6 +4046,16 @@ namespace app
                for (size_t k = 0; k < gArrange.lanes.size(); k++)
                   if (gArrange.lanes[k].id == subtreeLanes.back()) { lastLaneIdx = (int)k; break; }
             }
+            if (MenuParts::Item(L("Rename Group"), MODKEY "+R"))
+            {
+               gArrangeRenamingLaneId = ctxGroupId;
+               gArrangeRenameJustStarted = true;
+            }
+            if (MenuParts::Item(L("Duplicate Group")))
+               ArrangeEdit([&]() { Arrange::DuplicateTrackGroup(gArrange, ctxGroupId); });
+            if (MenuParts::Item(L("Toggle Enabled"), nullptr, grpWasEnabled))
+               ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
+
             if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = lastLaneIdx;
@@ -4038,19 +4066,6 @@ namespace app
                gArrangeAddTrackInsertAfter = lastLaneIdx;
                InsertArrangeTrack(false, ctxGroupId);
             }
-            if (MenuParts::Item(L("Rename Group"), MODKEY "+R"))
-            {
-               gArrangeRenamingLaneId = ctxGroupId;
-               gArrangeRenameJustStarted = true;
-            }
-            MenuParts::Separator();
-
-            if (MenuParts::Item(L("Duplicate Group")))
-               ArrangeEdit([&]() { Arrange::DuplicateTrackGroup(gArrange, ctxGroupId); });
-            if (MenuParts::Item(L("Toggle Enabled"), nullptr, grpWasEnabled))
-               ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
-
-
             if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
             {
                const std::vector<uint64_t> subtreeLanes = Arrange::LanesInTrackGroupRecursive(gArrange, ctxGroupId);
