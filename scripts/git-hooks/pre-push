@@ -38,6 +38,7 @@ while read -r lref lsha rref rsha; do
   # Shortcuts: one chord, one action per area; app-wide keys only shared where the app steps aside.
   if git diff --name-only "$range" 2>/dev/null | grep -Eq '^src/'; then
     ( cd "$ROOT" && python3 tools/design/keys_gate.py ) >&2 || { echo "pre-push: BLOCKED - shortcut gate failed (tools/design/keys_gate.py)" >&2; exit 1; }
+    ( cd "$ROOT" && python3 tools/design/menu_lint.py ) >&2 || { echo "pre-push: BLOCKED - value fields inside a menu (tools/design/menu_lint.py)" >&2; exit 1; }
   fi
   # UTF-8 paths: no narrow file opens in Windows-compiled code.
   if git diff --name-only "$range" 2>/dev/null | grep -Eq '^src/'; then

@@ -1,4 +1,5 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
+#include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -138,32 +139,24 @@ namespace app
                }
                if (MenuParts::SubMenu(L("Colour Tint")))
                {
-                  const auto& kPaletteColors = kArrangePalette;
-                  for (int ci2 = 0; ci2 < 10; ci2++)
+                  const Arrange::Clip* tc = Arrange::FindClip(gArrange, cid);
+                  const int pick = tc != nullptr ? ColourChip::TintDots(tc->colorR, tc->colorG, tc->colorB) : -1;
+                  if (pick >= 0)
                   {
-                     if (ci2 % 5 != 0) ImGui::SameLine();
-                     ImGui::PushID(ci2 + 700);
-                     const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci2].col);
-                     if (ImGui::ColorButton(kPaletteColors[ci2].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
+                     const ImVec4 cVec = ColourChip::Tint(pick);
+                     ArrangeEdit([&]()
                      {
-                        const float r = ci2 == 0 ? 0.0f : cVec.x;
-                        const float g = ci2 == 0 ? 0.0f : cVec.y;
-                        const float b = ci2 == 0 ? 0.0f : cVec.z;
-                        ArrangeEdit([&]()
+                        for (uint64_t id : ctxSelIds)
                         {
-                           for (uint64_t id : ctxSelIds)
-                           {
-                              Arrange::Clip* c = Arrange::FindClip(gArrange, id);
-                              if (c == nullptr || (c->colorR == r && c->colorG == g && c->colorB == b))
-                                 continue;
-                              c->colorR = r;
-                              c->colorG = g;
-                              c->colorB = b;
-                              gArrange.revision++;
-                           }
-                        });
-                     }
-                     ImGui::PopID();
+                           Arrange::Clip* c = Arrange::FindClip(gArrange, id);
+                           if (c == nullptr || (c->colorR == cVec.x && c->colorG == cVec.y && c->colorB == cVec.z))
+                              continue;
+                           c->colorR = cVec.x;
+                           c->colorG = cVec.y;
+                           c->colorB = cVec.z;
+                           gArrange.revision++;
+                        }
+                     });
                   }
                   ImGui::EndMenu();
                }
@@ -204,168 +197,17 @@ namespace app
                   ArrangeToggleEnabledSelection();
             }
             MenuParts::Separator();
-            // Fade fields: live on the model, one undo entry per drag of a
-            // field (opened on the first change, pushed on deactivate, and
-            // only if something changed).
-            auto fieldGesture = [&](bool changed)
+            // Values (fades, gain, pan, pitch, tempo, opacity, grade) live in the Clip Settings inspector, never in
+            // this menu: menus hold verbs (lint: no sliders inside a menu).
+            if (MenuParts::Item(L("Clip Settings"), T("Double-click"), gArrangeClipSettingsPanelOpen && gArrangeSettingsPanelTarget == cid))
             {
-               if (changed && !gArrangeGestureOpen)
-                  ArrangeGestureBegin();
-            };
-            auto fieldGestureEnd = [&]()
-            {
-               if (ImGui::IsItemDeactivated())
-                  ArrangeGestureEnd();
-            };
-            // Same fields, same units, same typing as the docked inspector -
-            // one shared widget rather than a second copy here, which is how
-            // the two drifted apart in the first place.
-            auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
-                                 ArrangeTickUnit unit, Arrange::Tick* out) -> bool
-            {
-               return ArrangeTickField(label, cur, lo, hi, unit, 160.0f, out);
-            };
-            // Per clip-type settings only. Position and length are the
-            // mouse's (drag, trim handles, blade); clip gain and pan are
-            // deferred, the lane's own mix strip covers level for now.
-            if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneAudio)
-            {
-               Arrange::Tick nt = 0;
-               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeIn = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-               cp = Arrange::FindClip(gArrange, cid);
-               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeOut = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               float gainDb = cp->gainDb;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Gain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->gainDb = gainDb;
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float pan = cp->pan;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Pan", &pan, -1.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->pan = std::clamp(pan, -1.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float pitch = cp->pitch;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Pitch", &pitch, -24.0f, 24.0f, "%.1f st"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  // Pushed per-block onto the terminal's own sourceNode by
-                  // RunTopology's lookahead (ClipWindow::pitch), not written
-                  // here directly - a node can be the source of more than one
-                  // clip, and writing straight to it would make one clip's
-                  // pitch edit audible on every other clip sharing that node.
-                  cp->pitch = std::clamp(pitch, -24.0f, 24.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               // Sync to Tempo / Sample BPM: an Audio Sample-only concept
-               // (see Clip::sampleBpm's comment) - this menu used to show
-               // the checkbox for any single-lane-type audio selection,
-               // which meant it silently applied to a manually-patched
-               // Audio Clip too (step 5's consistency-sweep gap). Gated on
-               // sampleDropped here to match the docked Clip Settings panel.
-               cp = Arrange::FindClip(gArrange, cid);
-               if (cp->sampleDropped)
-               {
-                  bool syncToTempo = cp->syncToTempo;
-                  if (MenuParts::Check(L("Sync to Tempo"), &syncToTempo))
-                     ArrangeEdit([&]() { ArrangeSetSampleSync(cid, syncToTempo); });
-
-                  // Sample BPM only means something while synced (unsynced
-                  // plays at native speed), so it is locked while sync is off.
-                  cp = Arrange::FindClip(gArrange, cid);
-                  float sampleBpm = cp->sampleBpm;
-                  ImGui::BeginDisabled(!cp->syncToTempo);
-                  if (ArrangeDragFloat("Sample BPM", &sampleBpm, 0.1f, 20.0f, 999.0f, "%.2f", 160.0f))
-                  {
-                     fieldGesture(true);
-                     ArrangeSetSampleBpm(cid, sampleBpm);
-                  }
-                  fieldGestureEnd();
-                  if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
-                  {
-                     if (ci->origBpm > 0.0f && ci->origBpm != ci->sampleBpm &&
-                         MenuParts::Item(L("Reset Sample BPM to Detected")))
-                     {
-                        const float detected = ci->origBpm;
-                        ArrangeEdit([&]() { ArrangeSetSampleBpm(cid, detected); });
-                     }
-                  }
-                  ImGui::EndDisabled();
-                  if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
-                     ArrangeDrawSampleTempoInfo(*ci);
-               }
-
-               MenuParts::Separator();
-            }
-            else if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneVideo)
-            {
-               Arrange::Tick nt = 0;
-               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeIn = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-               cp = Arrange::FindClip(gArrange, cid);
-               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeOut = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float opacity = cp->opacity;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Opacity", &opacity, 0.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->opacity = std::clamp(opacity, 0.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               MenuParts::Separator();
+               gArrangeClipSettingsPanelOpen = true;
+               gArrangeSettingsPanelTarget = cid;
+               gArrangeRowSel.clear();
+               gArrangeRowSelAnchor = 0;
             }
 
-            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && MenuParts::SubMenu(L("Compositing")))
+            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && MenuParts::SubMenu(L("Blend Mode")))
             {
                // How this clip lays over the lanes below it. Applies to every
                // selected video clip, like Color Tint.
@@ -396,78 +238,27 @@ namespace app
                ImGui::EndMenu();
             }
 
-            if (ctxLaneType == Arrange::kLaneVideo && MenuParts::SubMenu(L("Colour Grade")))
-            {
-               // Basic grade only: brightness/contrast/saturation, consumed
-               // by the compositor as a per-clip shader pass. Defaults are a
-               // no-op (0/0/1) so this menu never needs a reset button.
-               cp = Arrange::FindClip(gArrange, cid);
-               float brightness = cp->colorBrightness;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Brightness", &brightness, -1.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->colorBrightness = std::clamp(brightness, -1.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float contrast = cp->colorContrast;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Contrast", &contrast, -1.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->colorContrast = std::clamp(contrast, -1.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float saturation = cp->colorSaturation;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Saturation", &saturation, 0.0f, 2.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->colorSaturation = std::clamp(saturation, 0.0f, 2.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               ImGui::EndMenu();
-            }
 
             if (MenuParts::SubMenu(L("Colour Tint")))
             {
-               const auto& kPaletteColors = kArrangePalette; // shared with the marker colours
-               for (int ci2 = 0; ci2 < 10; ci2++)
+               const Arrange::Clip* tc = Arrange::FindClip(gArrange, cid);
+               const int pick = tc != nullptr ? ColourChip::TintDots(tc->colorR, tc->colorG, tc->colorB) : -1;
+               if (pick >= 0)
                {
-                  if (ci2 % 5 != 0) ImGui::SameLine();
-                  ImGui::PushID(ci2 + 700);
-                  const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci2].col);
-                  if (ImGui::ColorButton(kPaletteColors[ci2].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
+                  const ImVec4 cVec = ColourChip::Tint(pick);
+                  ArrangeEdit([&]()
                   {
-                     const float r = ci2 == 0 ? 0.0f : cVec.x;
-                     const float g = ci2 == 0 ? 0.0f : cVec.y;
-                     const float b = ci2 == 0 ? 0.0f : cVec.z;
-                     ArrangeEdit([&]()
+                     for (uint64_t id : ArrangeSelectionIds())
                      {
-                        for (uint64_t id : ArrangeSelectionIds())
-                        {
-                           Arrange::Clip* c = Arrange::FindClip(gArrange, id);
-                           if (c == nullptr || (c->colorR == r && c->colorG == g && c->colorB == b))
-                              continue;
-                           c->colorR = r;
-                           c->colorG = g;
-                           c->colorB = b;
-                           gArrange.revision++;
-                        }
-                     });
-                  }
-                  ImGui::PopID();
+                        Arrange::Clip* c = Arrange::FindClip(gArrange, id);
+                        if (c == nullptr || (c->colorR == cVec.x && c->colorG == cVec.y && c->colorB == cVec.z))
+                           continue;
+                        c->colorR = cVec.x;
+                        c->colorG = cVec.y;
+                        c->colorB = cVec.z;
+                        gArrange.revision++;
+                     }
+                  });
                }
                ImGui::EndMenu();
             }
@@ -2293,20 +2084,25 @@ namespace app
                snprintf(gArrangeRenameMarkerBuffer, sizeof(gArrangeRenameMarkerBuffer), "%s", cm->name.c_str());
             }
             MenuParts::Separator();
-            ImGui::TextDisabled("%s", T("Colour"));
-            for (int pi = 0; pi < 10; pi++)
+            if (MenuParts::SubMenu(L("Colour")))
             {
-               if (pi % 5 != 0) ImGui::SameLine();
-               ImGui::PushID(pi + 900);
-               const uint32_t rgba = ArrangeMarkerRGBA(kArrangePalette[pi].col);
-               const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kArrangePalette[pi].col);
-               if (rgba == curColor)
-                  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
-               if (ImGui::ColorButton(kArrangePalette[pi].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
+               ImU32 cols[10];
+               const char* names[10];
+               int cur = -1;
+               for (int pi = 0; pi < 10; pi++)
+               {
+                  cols[pi] = kArrangePalette[pi].col;
+                  names[pi] = kArrangePalette[pi].name;
+                  if (ArrangeMarkerRGBA(kArrangePalette[pi].col) == curColor)
+                     cur = pi;
+               }
+               const int pick = ColourChip::Dots(cols, names, 10, cur, 5);
+               if (pick >= 0)
+               {
+                  const uint32_t rgba = ArrangeMarkerRGBA(kArrangePalette[pick].col);
                   ArrangeEdit([&]() { Arrange::RecolorMarker(gArrange, mid, rgba); });
-               if (rgba == curColor)
-                  ImGui::PopStyleVar();
-               ImGui::PopID();
+               }
+               ImGui::EndMenu();
             }
             MenuParts::Separator();
             if (MenuParts::Item(L("Delete Marker")))

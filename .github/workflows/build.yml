@@ -96,6 +96,8 @@ jobs:
         run: python3 tools/design/ratchet.py
       - name: Shortcut gate (overlap, drift, OS)
         run: python3 tools/design/keys_gate.py
+      - name: Menus hold verbs, not fields
+        run: python3 tools/design/menu_lint.py
       # W1: Windows reads narrow paths in the ANSI code page; every open goes through AppPaths.
       - name: No narrow file opens (UTF-8 paths on Windows)
         run: python3 scripts/check_utf8_paths.py

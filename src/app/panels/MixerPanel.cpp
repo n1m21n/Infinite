@@ -2,6 +2,7 @@
 // A3 is the shell (five docks, persist, the "Enable Mixer Audio" chip). A4 is the console: page
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
+#include "app/ui/design/components/ColourChip.h"
 #include "app/frame/CanvasLink.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PagePicker.h"
@@ -517,20 +518,20 @@ namespace app
             }
             if (MenuParts::SubMenu(T("Colour")))
             {
+               ImU32 dots[12];
+               int cur = -1;
                for (int i = 0; i < 12; i++)
                {
-                  ImGui::PushID(i);
-                  if (i % 6 != 0)
-                     ImGui::SameLine(0.0f, 4.0f);
                   const unsigned c = kPalette[i];
-                  if (ImGui::ColorButton("##c", ImVec4((float)((c >> 16) & 0xFF) / 255.0f, (float)((c >> 8) & 0xFF) / 255.0f, (float)(c & 0xFF) / 255.0f, 1.0f),
-                                         ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoAlpha, ImVec2(18.0f, 18.0f)))
-                  {
-                     PushUndoCheckpoint("Channel colour");
-                     m->chColor[r.slot] = c;
-                     ImGui::CloseCurrentPopup();
-                  }
-                  ImGui::PopID();
+                  dots[i] = IM_COL32((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, 0xFF);
+                  if (m->chColor[r.slot] == c)
+                     cur = i;
+               }
+               if (const int pick = ColourChip::Dots(dots, nullptr, 12, cur, 6); pick >= 0)
+               {
+                  PushUndoCheckpoint("Channel colour");
+                  m->chColor[r.slot] = kPalette[pick];
+                  ImGui::CloseCurrentPopup();
                }
                if (MenuParts::Item(T("Auto"), nullptr, m->chColor[r.slot] == 0))
                {
