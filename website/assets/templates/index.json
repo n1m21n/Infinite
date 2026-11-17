@@ -3291,6 +3291,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "tuareg-desert-pentatonic-lute-synth",
+      "name": "Tuareg Desert Pentatonic Lute Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Desert blues plucked lute synthesizer with micro-bend pitch envelope, fret-buzz harmonic FM, and warm cedar body resonance.",
+      "price": 0,
+      "preview": "assets/templates/tuareg-desert-pentatonic-lute-synth.webp",
+      "file": "assets/templates/tuareg-desert-pentatonic-lute-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "prepared-piano-bolt-harmonic-synth",
+      "name": "Prepared Piano Bolt Harmonic Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail.",
+      "price": 0,
+      "preview": "assets/templates/prepared-piano-bolt-harmonic-synth.webp",
+      "file": "assets/templates/prepared-piano-bolt-harmonic-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "shoegaze-chorus-wall-ensemble-fx",
+      "name": "Shoegaze Chorus Wall Ensemble FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation.",
+      "price": 0,
+      "preview": "assets/templates/shoegaze-chorus-wall-ensemble-fx.webp",
+      "file": "assets/templates/shoegaze-chorus-wall-ensemble-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "uk-dub-steppers-spring-filter-fx",
+      "name": "UK Dub Steppers Spring Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation.",
+      "price": 0,
+      "preview": "assets/templates/uk-dub-steppers-spring-filter-fx.webp",
+      "file": "assets/templates/uk-dub-steppers-spring-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
-  ]
+  ],
+  "count": 205
 }

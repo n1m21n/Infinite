@@ -645,6 +645,16 @@
       "slug": "raku-craquelure-copper-kiln-glaze",
       "title": "Raku Craquelure Copper Kiln Glaze",
       "description": "Audio-reactive copper-red and smoky carbon reduction raku glaze with Voronoi thermal-shock fissures and metallic luster."
+    },
+    {
+      "slug": "soap-film-newton-interference",
+      "title": "Soap Film Newton Interference",
+      "description": "Audio-reactive thin-film soap membrane optical interference with swirling Newton rings."
+    },
+    {
+      "slug": "mineral-birefringence-thin-section",
+      "title": "Mineral Birefringence Thin Section",
+      "description": "Audio-reactive cross-polarized mineral thin-section birefringence and Michel-Levy interference."
     }
   ]
 }

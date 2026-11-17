@@ -345,6 +345,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Koto Glass Harmonic Marimba Synth](https://infinitedevices.org/library/koto-glass-harmonic-marimba-synth.html): Tuned glass and rosewood bar percussion synthesizer with 1:3.98:9.2 modal overtones, mallet hardness transient, and warm saturation. (file: https://infinitedevices.org/assets/templates/koto-glass-harmonic-marimba-synth.inf)
 - [Doppler Rotary Horn Cabinet FX](https://infinitedevices.org/library/doppler-rotary-horn-cabinet-fx.html): Dual-rotor Leslie horn Doppler dispersion processor with crossover baffle split, resonant birch cabinet coloration, and warm tube preamp saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-horn-cabinet-fx.inf)
 - [Doppler Rotary Leslie Chorale FX](https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html): Slow chorale-speed rotary baffle dispersion with asymmetric six-stage allpass phase drift, warm horn-throat rolloff, and soft transformer saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-leslie-chorale-fx.inf)
+- [Tuareg Desert Pentatonic Lute Synth](https://infinitedevices.org/library/tuareg-desert-pentatonic-lute-synth.html): Desert blues plucked lute synthesizer with micro-bend pitch envelope, fret-buzz harmonic FM, and warm cedar body resonance. (file: https://infinitedevices.org/assets/templates/tuareg-desert-pentatonic-lute-synth.inf)
+- [Prepared Piano Bolt Harmonic Synth](https://infinitedevices.org/library/prepared-piano-bolt-harmonic-synth.html): Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail. (file: https://infinitedevices.org/assets/templates/prepared-piano-bolt-harmonic-synth.inf)
+- [Shoegaze Chorus Wall Ensemble FX](https://infinitedevices.org/library/shoegaze-chorus-wall-ensemble-fx.html): Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation. (file: https://infinitedevices.org/assets/templates/shoegaze-chorus-wall-ensemble-fx.inf)
+- [UK Dub Steppers Spring Filter FX](https://infinitedevices.org/library/uk-dub-steppers-spring-filter-fx.html): Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation. (file: https://infinitedevices.org/assets/templates/uk-dub-steppers-spring-filter-fx.inf)
 
 ## Library: Community
 
@@ -705,7 +709,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 129 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 131 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -722,4 +726,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 114 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 116 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

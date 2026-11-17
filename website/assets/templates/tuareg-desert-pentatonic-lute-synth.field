@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Tuareg Desert Pentatonic Lute Synth",
+    "author": "Infinite",
+    "description": "Desert blues plucked lute synthesizer with micro-bend pitch envelope, fret-buzz harmonic FM, and warm cedar body resonance.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float bendAmt = 0.042 [0.0, 0.12];\nparam float fretBuzz = 0.46 [0.0, 1.0];\nparam float decay = 0.99945 [0.996, 0.9998];\nparam float bodyHz = 380.0 [160.0, 900.0];\nstate float p1 = 0; state float p2 = 0;\nstate float env = 0; state float bp = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.18, env * decay);\nf0 = clamp(freq * (1.0 - bendAmt * (1.0 - env)), 50.0, 3200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.004) / sr) % 1.0;\n\nraw = sin(6.2831853 * p1 + sin(6.2831853 * p2) * (0.45 + fretBuzz * 1.5) * env) + sin(6.2831853 * p2) * 0.36;\nstrSig = raw * 0.78 + sin(raw * (1.2 + fretBuzz * 2.1 * env)) * fretBuzz * 0.30;\n\ng = clamp(2.0 * sin(3.14159265 * bodyHz / sr), 0.02, 0.85);\nbp = bp + g * (strSig - lp - 0.62 * bp);\nlp = lp + g * bp;\nsig = (strSig * 0.68 + bp * 0.58) * env * 0.34;\nout = sig / (1.0 + abs(sig) * 0.45);\n",
+    "params": {
+      "bendAmt": 0.042,
+      "fretBuzz": 0.46,
+      "decay": 0.99945,
+      "bodyHz": 380.0
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

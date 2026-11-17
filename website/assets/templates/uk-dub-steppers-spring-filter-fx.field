@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "UK Dub Steppers Spring Filter FX",
+    "author": "Infinite",
+    "description": "Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float sweepHz = 1.6 [0.2, 6.0];\nparam float cutoffHz = 1400.0 [240.0, 4500.0];\nparam float res = 0.48 [0.1, 0.85];\nparam float springMix = 0.56 [0.0, 1.0];\nparam float mix = 0.82 [0.0, 1.0];\nstate float ph = 0;\nstate float bp = 0; state float lp = 0;\nstate float s1 = 0; state float s2 = 0; state float s3 = 0; state float fb = 0;\n\nph = (ph + sweepHz / sr) % 1.0;\nmodHz = clamp(cutoffHz * (0.55 + 0.45 * sin(6.2831853 * ph)), 140.0, 6000.0);\ng = clamp(2.0 * sin(3.14159265 * modHz / sr), 0.02, 0.88);\nq = 1.15 - res * 0.92;\nbp = bp + g * (in - lp - q * bp);\nlp = lp + g * bp;\nfilt = lp * 0.78 + bp * 0.36;\n\n# Spring tank 3-stage allpass dispersion\nsx = filt + fb * 0.34;\ngs = 0.62;\ny1 = -gs * sx + s1; s1 = sx + gs * y1;\ny2 = -gs * y1 + s2; s2 = y1 + gs * y2;\ny3 = -gs * y2 + s3; s3 = y2 + gs * y3;\nfb = y3;\ncomb = filt * (1.0 - springMix * 0.35) + y3 * springMix * 0.65;\nsat = comb * 1.25 / (1.0 + abs(comb) * 0.48);\nout = (in * (1.0 - mix) + sat * mix) * 0.82;\n",
+    "params": {
+      "sweepHz": 1.6,
+      "cutoffHz": 1400.0,
+      "res": 0.48,
+      "springMix": 0.56,
+      "mix": 0.82
+    }
+  }
+}

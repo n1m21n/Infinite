@@ -1,0 +1,77 @@
+infinite-patch 1
+# Shoegaze Chorus Wall Ensemble FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 55
+  i note2 60
+  i note3 62
+  i note4 50
+  i note5 57
+  i note6 62
+  i note7 64
+  i note8 52
+  i note9 59
+  i note10 64
+  i note11 67
+  i note12 50
+  i note13 57
+  i note14 62
+  i note15 60
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2200.0
+  f resonance 0.28
+  f decay 0.52
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rateHz = 0.65 [0.1, 4.0];\nparam float depth = 0.68 [0.05, 1.0];\nparam float smear = 0.54 [0.0, 0.88];\nparam float drive = 1.35 [0.8, 2.5];\nparam float mix = 0.80 [0.0, 1.0];\nstate float ph1 = 0; state float ph2 = 0.33;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float fb = 0; state float lp = 0;\n\nph1 = (ph1 + rateHz / sr) % 1.0;\nph2 = (ph2 + (rateHz * 1.37) / sr) % 1.0;\nlfo1 = sin(6.2831853 * ph1);\nlfo2 = cos(6.2831853 * ph2);\n\nx = in + fb * smear * 0.48;\ng1 = clamp(0.28 + lfo1 * 0.42 * depth, -0.84, 0.84);\ng2 = clamp(-0.26 + lfo2 * 0.44 * depth, -0.84, 0.84);\ny1 = -g1 * x + a1; a1 = x + g1 * y1;\ny2 = -g2 * y1 + a2; a2 = y1 + g2 * y2;\ny3 = -g1 * y2 + a3; a3 = y2 + g1 * y3;\ny4 = -g2 * y3 + a4; a4 = y3 + g2 * y4;\n\nlp = lp + (y4 - lp) * 0.24;\nfb = lp;\nwet = (y4 * 0.68 + lp * 0.45) * drive;\nsat = wet / (1.0 + abs(wet) * 0.42);\nout = (in * (1.0 - mix) + sat * mix) * 0.82;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.22 0.24 0.30
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Shoegaze Chorus Wall Ensemble FX. Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

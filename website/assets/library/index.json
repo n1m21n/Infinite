@@ -220,7 +220,7 @@
     },
     {
       "id": "rossler-attractor",
-      "name": "Rössler Attractor",
+      "name": "R\u00f6ssler Attractor",
       "kind": "Generator",
       "tags": [
         "chaos",
@@ -332,7 +332,7 @@
     },
     {
       "id": "mobius-strip-3d",
-      "name": "Möbius Strip 3D",
+      "name": "M\u00f6bius Strip 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -340,7 +340,7 @@
         "topology",
         "parametric"
       ],
-      "description": "Parametric non-orientable Möbius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
+      "description": "Parametric non-orientable M\u00f6bius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1246,7 +1246,7 @@
         "kaleidoscope",
         "visuals"
       ],
-      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -1725,7 +1725,7 @@
         "3d",
         "parametric"
       ],
-      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold K\u00e4hler manifold with interlocking compactified sheets.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1928,7 +1928,7 @@
         "3d",
         "ruled-surface"
       ],
-      "description": "Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+      "description": "Eug\u00e8ne Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2100,7 +2100,7 @@
         "minimal-surface",
         "topology"
       ],
-      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary.",
+      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting M\u00f6bius band topology and Neil's parabola boundary.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2235,7 +2235,7 @@
         "Audio-Reactive",
         "Tessellation"
       ],
-      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -2284,7 +2284,7 @@
     },
     {
       "id": "plucker-conoid-3d",
-      "name": "Plücker's Conoid 3D",
+      "name": "Pl\u00fccker's Conoid 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -2438,7 +2438,7 @@
     },
     {
       "id": "hyperbolic-poincare-disk",
-      "name": "Hyperbolic Poincaré Disk",
+      "name": "Hyperbolic Poincar\u00e9 Disk",
       "kind": "Generator",
       "tags": [
         "hyperbolic",
@@ -2446,7 +2446,7 @@
         "geometry",
         "poincare"
       ],
-      "description": "Conformal Poincaré disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
+      "description": "Conformal Poincar\u00e9 disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
       "domain": "sketch",
       "category": "Sketch",
       "params": 7,
@@ -2598,7 +2598,7 @@
         "Audio-Reactive",
         "Colour"
       ],
-      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
+      "description": "Conformal hyperbolic Poincar\u00e9 disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
       "domain": "pixel",
       "category": "Pixel",
       "params": 5,
@@ -2655,7 +2655,7 @@
         "tree",
         "geometry"
       ],
-      "description": "Recursive Bethe lattice and Cayley tree projected onto the hyperbolic Poincaré plane with branching nodes and radial breathing.",
+      "description": "Recursive Bethe lattice and Cayley tree projected onto the hyperbolic Poincar\u00e9 plane with branching nodes and radial breathing.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch",
@@ -3076,7 +3076,7 @@
         "3d",
         "sculpture"
       ],
-      "description": "Concentric nested hyperboloid cages rotating with differential angular velocity, generating optical moiré interference lattices and topological phase shifts.",
+      "description": "Concentric nested hyperboloid cages rotating with differential angular velocity, generating optical moir\u00e9 interference lattices and topological phase shifts.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -5680,7 +5680,7 @@
     },
     {
       "id": "op-art-undulating-moire-lattice",
-      "name": "Op-Art Undulating Moiré Lattice",
+      "name": "Op-Art Undulating Moir\u00e9 Lattice",
       "kind": "Generator",
       "tags": [
         "op-art",
@@ -5690,7 +5690,7 @@
         "lattice",
         "drawing"
       ],
-      "description": "Optical illusion kinetic moiré lattice with undulating sine-phase contour lines, high-frequency grid interference, and visceral retinal vibration.",
+      "description": "Optical illusion kinetic moir\u00e9 lattice with undulating sine-phase contour lines, high-frequency grid interference, and visceral retinal vibration.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch",
@@ -7315,7 +7315,7 @@
     },
     {
       "id": "op-art-concentric-moire-interference",
-      "name": "Op-Art Concentric Moiré Interference",
+      "name": "Op-Art Concentric Moir\u00e9 Interference",
       "kind": "Generator",
       "tags": [
         "pixel",
@@ -7325,7 +7325,7 @@
         "kinetic",
         "shader"
       ],
-      "description": "Hypnotic kinetic op-art simulation generating pulsating moiré interference patterns from twin intersecting high-frequency circular wavefields, audio-reactive spatial frequency modulation, and optical edge vibration.",
+      "description": "Hypnotic kinetic op-art simulation generating pulsating moir\u00e9 interference patterns from twin intersecting high-frequency circular wavefields, audio-reactive spatial frequency modulation, and optical edge vibration.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -8865,7 +8865,7 @@
         "matrix",
         "geometric"
       ],
-      "description": "Dynamic Josef Müller-Brockmann inspired composition exploring radial and orthogonal typographic grid tension with vermilion arc sectors, stepped rules, and modernist structural cadence.",
+      "description": "Dynamic Josef M\u00fcller-Brockmann inspired composition exploring radial and orthogonal typographic grid tension with vermilion arc sectors, stepped rules, and modernist structural cadence.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch",
@@ -9052,7 +9052,7 @@
     },
     {
       "id": "op-art-riley-perceptual-moire-grid",
-      "name": "Op Art Riley Perceptual Moiré Grid",
+      "name": "Op Art Riley Perceptual Moir\u00e9 Grid",
       "kind": "Generator",
       "tags": [
         "op-art",
@@ -9063,7 +9063,7 @@
         "procedural",
         "contrast"
       ],
-      "description": "Perceptual optical illusion drafting system rendering high-contrast moiré interference bands through overlapping sinusoidal lines and mathematical wave displacement.",
+      "description": "Perceptual optical illusion drafting system rendering high-contrast moir\u00e9 interference bands through overlapping sinusoidal lines and mathematical wave displacement.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch",
@@ -11044,6 +11044,217 @@
       "file": "assets/library/pixel/raku-craquelure-copper-kiln-glaze.field",
       "preview": "assets/library/previews/raku-craquelure-copper-kiln-glaze.jpg",
       "bytes": 4466
+    },
+    {
+      "id": "zellij-girih-star-rosette",
+      "name": "Zellij Girih Star Rosette",
+      "kind": "Generator",
+      "tags": [
+        "sketch",
+        "zellij",
+        "girih",
+        "tessellation",
+        "islamic",
+        "geometric"
+      ],
+      "description": "Moroccan Fez zellij glazed tilework with 8-fold and 16-fold star rosettes, interlaced strapwork, and bone-ivory mortar seams.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/zellij-girih-star-rosette.js",
+      "preview": "assets/library/previews/zellij-girih-star-rosette.jpg",
+      "bytes": 3589
+    },
+    {
+      "id": "hilma-svanen-orbital-diagram",
+      "name": "Hilma Svanen Orbital Diagram",
+      "kind": "Generator",
+      "tags": [
+        "sketch",
+        "hilma",
+        "diagrammatic",
+        "modernist",
+        "geometric",
+        "orbital"
+      ],
+      "description": "Hilma af Klint spiritualist geometric plate with vermilion ground, split-hemisphere colour wheels, and fine compass construction arcs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/hilma-svanen-orbital-diagram.js",
+      "preview": "assets/library/previews/hilma-svanen-orbital-diagram.jpg",
+      "bytes": 4183
+    },
+    {
+      "id": "qrd-basalt-acoustic-diffuser-3d",
+      "name": "QRD Basalt Acoustic Diffuser 3D",
+      "kind": "Generator",
+      "tags": [
+        "sketch-3d",
+        "qrd",
+        "acoustics",
+        "basalt",
+        "architecture",
+        "diffuser"
+      ],
+      "description": "Schroeder N=13 quadratic residue acoustic diffuser sculpted as stepped hexagonal basalt columns with warm rim relief.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/qrd-basalt-acoustic-diffuser-3d.js",
+      "preview": "assets/library/previews/qrd-basalt-acoustic-diffuser-3d.jpg",
+      "bytes": 1616
+    },
+    {
+      "id": "gaudi-catenary-paraboloid-vault-3d",
+      "name": "Gaudi Catenary Paraboloid Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "sketch-3d",
+        "gaudi",
+        "catenary",
+        "vault",
+        "architecture",
+        "paraboloid"
+      ],
+      "description": "Antoni Gaudi hanging-chain catenary colonnade and branching hyperboloid vault ribs in warm limestone and terracotta.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/gaudi-catenary-paraboloid-vault-3d.js",
+      "preview": "assets/library/previews/gaudi-catenary-paraboloid-vault-3d.jpg",
+      "bytes": 2411
+    },
+    {
+      "id": "tuareg-desert-pentatonic-lute-synth",
+      "name": "Tuareg Desert Pentatonic Lute Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "tuareg",
+        "desert",
+        "pentatonic",
+        "plucked",
+        "dsp"
+      ],
+      "description": "Desert blues plucked lute synthesizer with micro-bend pitch envelope, fret-buzz harmonic FM, and warm cedar body resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/tuareg-desert-pentatonic-lute-synth.inf",
+      "preview": "assets/library/previews/tuareg-desert-pentatonic-lute-synth.jpg",
+      "bytes": 1957
+    },
+    {
+      "id": "prepared-piano-bolt-harmonic-synth",
+      "name": "Prepared Piano Bolt Harmonic Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "prepared-piano",
+        "modal",
+        "inharmonic",
+        "percussion",
+        "dsp"
+      ],
+      "description": "Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/prepared-piano-bolt-harmonic-synth.inf",
+      "preview": "assets/library/previews/prepared-piano-bolt-harmonic-synth.jpg",
+      "bytes": 2192
+    },
+    {
+      "id": "shoegaze-chorus-wall-ensemble-fx",
+      "name": "Shoegaze Chorus Wall Ensemble FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "shoegaze",
+        "chorus",
+        "ensemble",
+        "allpass",
+        "dsp"
+      ],
+      "description": "Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/shoegaze-chorus-wall-ensemble-fx.inf",
+      "preview": "assets/library/previews/shoegaze-chorus-wall-ensemble-fx.jpg",
+      "bytes": 2158
+    },
+    {
+      "id": "uk-dub-steppers-spring-filter-fx",
+      "name": "UK Dub Steppers Spring Filter FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "dub",
+        "steppers",
+        "filter",
+        "spring",
+        "dsp"
+      ],
+      "description": "Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/uk-dub-steppers-spring-filter-fx.inf",
+      "preview": "assets/library/previews/uk-dub-steppers-spring-filter-fx.jpg",
+      "bytes": 2178
+    },
+    {
+      "id": "soap-film-newton-interference",
+      "name": "Soap Film Newton Interference",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "soap-film",
+        "interference",
+        "optics",
+        "iridescent",
+        "shader"
+      ],
+      "description": "Thin-film optical interference in a swirling surfactant soap membrane with spectral Newton rings and audio-reactive ripples.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/soap-film-newton-interference.field",
+      "preview": "assets/library/previews/soap-film-newton-interference.jpg",
+      "bytes": 1670
+    },
+    {
+      "id": "mineral-birefringence-thin-section",
+      "name": "Mineral Birefringence Thin Section",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "mineral",
+        "birefringence",
+        "polarized",
+        "voronoi",
+        "shader"
+      ],
+      "description": "Cross-polarized petrographic microscopy of Voronoi crystal domains with Michel-Levy interference bands and analyzer rotation.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/mineral-birefringence-thin-section.field",
+      "preview": "assets/library/previews/mineral-birefringence-thin-section.jpg",
+      "bytes": 4009
     }
-  ]
+  ],
+  "count": 550
 }

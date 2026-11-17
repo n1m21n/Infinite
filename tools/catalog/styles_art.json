@@ -1686,6 +1686,142 @@
         "Kiln-fired copper-green glaze gradients with molten gold-vein seams",
         "Instrument Serif & Hedvig Letters Serif museum ceramic catalog typography"
       ]
+    },
+    {
+      "id": "zellij_girih_tessellation",
+      "taxonomy": "new",
+      "name": "Moroccan Zellij & Girih Star Tessellation",
+      "palette": [
+        "#1A3478",
+        "#D9A426",
+        "#2A6B4A",
+        "#EFEBE0"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "datamosh",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "gnawa_desert_trance",
+        "tuareg_pentatonic_guitar"
+      ],
+      "refs": [
+        "Fez zellij glazed terracotta 8/12/16-fold star rosettes and interlaced strapwork",
+        "Cobalt indigo, saffron ochre, emerald glaze, and bone-ivory mortar joints",
+        "Steps Mono & Mourier geometric modular grid typography"
+      ]
+    },
+    {
+      "id": "hilma_diagrammatic",
+      "taxonomy": "new",
+      "name": "Hilma af Klint Spiritualist Geometric Diagram",
+      "palette": [
+        "#C83E2B",
+        "#141518",
+        "#F2EFE9",
+        "#E5BC38"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.4,
+      "pairs": [
+        "chamber_winds",
+        "prepared_piano"
+      ],
+      "refs": [
+        "Hilma af Klint Svanen No. 17 split-hemisphere colour wheels and concentric orbital rings",
+        "Vermilion terracotta ground, obsidian, chalk white, dusty rose, cadmium yellow, cerulean",
+        "Fragment Mono & Steps Mono diagrammatic plate typography"
+      ]
+    },
+    {
+      "id": "gaudi_catenary_vault",
+      "taxonomy": "new",
+      "name": "Gaudi Hanging-Chain Catenary & Hyperbolic Vault",
+      "palette": [
+        "#1B1410",
+        "#9C4422",
+        "#D8C29D",
+        "#E09020"
+      ],
+      "sources": [
+        "Sketch3D"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "pixelate",
+        "dither"
+      ],
+      "motion": 0.4,
+      "pairs": [
+        "chamber_winds",
+        "microtonal_ambient"
+      ],
+      "refs": [
+        "Antoni Gaudi hanging-chain catenary arch models and Sagrada Familia branching hyperboloid columns",
+        "Warm limestone, brick terracotta, and amber stained-glass chiaroscuro",
+        "Azeret Mono & Fragment Mono architectural structural plate typography"
+      ]
+    },
+    {
+      "id": "mineral_birefringence",
+      "taxonomy": "new",
+      "name": "Cross-Polarized Mineral Thin-Section Birefringence",
+      "palette": [
+        "#141822",
+        "#D82B6B",
+        "#9EDB32",
+        "#F2A824"
+      ],
+      "sources": [
+        "FieldPixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.55,
+      "pairs": [
+        "microtonal_ambient",
+        "spectral_dub_chamber"
+      ],
+      "refs": [
+        "Cross-polarized petrographic thin section with Voronoi crystal domains and Michel-Levy interference bands",
+        "Birefringent magenta, chartreuse, amber-gold, and slate-blue crystalline extinction",
+        "Fragment Mono & Azeret Mono petrographic atlas typography"
+      ]
     }
   ]
 }
