@@ -8,6 +8,14 @@ Reads a ui-audit registry (every control's box, per panel and state) and reports
 
     python3 tools/design/density_lint.py [ui-audit-view2d/registry.json] [--strict]
 
+Where the registry comes from: it is NOT committed and NOT derived from source. The UI audit writes it
+when it runs the 2D View against a debug app:
+
+    python3 scripts/ibuild.py build --mode dev            # builds build-dev/Infinite.app (needs a machine that can build)
+    python3 tools/ui-audit/run.py --view2d                 # writes ui-audit-view2d/registry.json + coverage.tsv
+
+Without a registry the script exits 2 and says so; it never invents rows. ui-audit-view2d/ is gitignored.
+
 --strict exits 1 on any failing panel (for the pre-push gate once block 3 lands).
 """
 import collections
@@ -35,7 +43,14 @@ def rows_of(boxes):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     strict = "--strict" in sys.argv
-    reg = json.load(open(args[0] if args else "ui-audit-view2d/registry.json"))
+    path = args[0] if args else "ui-audit-view2d/registry.json"
+    try:
+        reg = json.load(open(path))
+    except FileNotFoundError:
+        print(f"density_lint: no registry at {path}. Produce it with: "
+              "python3 scripts/ibuild.py build --mode dev && python3 tools/ui-audit/run.py --view2d",
+              file=sys.stderr)
+        return 2
     groups = collections.defaultdict(list)
     for c in reg:
         b = c.get("bb")
