@@ -71,16 +71,16 @@ Infinite has **347 node types**:
 
 | Domain | Key nodes |
 |---|---|
-| **2D and video** | Image, folder Slideshow, Video (hardware-accelerated), Syphon In / Spout In, NDI In, Paint/Draw canvas, GLSL Formula editor, Sketch (JavaScript-drawn images, with SVG animation), Shapes (SDF), Noise and Gradient Ramps |
+| **2D and video** | Image, folder Slideshow, Video (hardware-accelerated), Syphon In / Spout In, NDI In, Paint/Draw canvas, GLSL Formula editor, Sketch (JavaScript-drawn images, with SVG animation), Shapes (SDF), Noise and Ramp (gradient) |
 | **2D FX and grading** | Blur, Bloom, Glitch (6 modes), Twirl, Ripple, Displace, Halftone, Curves (RGB/Luma splines), Dither, Color Ramp, .cube LUTs, Gradient Map, Palette extraction |
-| **Compositing and masks** | Blend (32 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction-Diffusion, Resynthesize |
-| **3D geometry and FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Point Distribution, Sketch 3D (JavaScript-built meshes), Mesh Deconstruction, Delaunay Mesh, Voronoi Cells, Decimate, Curve Ops, Armature, Taubin Smooth, Array, Instancing, Metaballs, Point Trails |
-| **3D scene and render** | 3D View, Camera (orbit/perspective/ortho), Lights, 32-bit HDRI Environment, PBR Materials, ACES tonemapping, multisampled antialiasing |
+| **Compositing and masks** | Blend (32 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction Diffusion, Resynthesize |
+| **3D geometry and FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Distribute Points in Grid / on Faces, Sketch 3D (JavaScript-built meshes), Mesh to Edges / Faces / Points, Delaunay Mesh, Voronoi Cells, Decimate, Curve Ops, Armature, Smooth, Array, Instancing, Metaballs, Point Trails |
+| **3D scene and render** | 3D View, Camera (orbit/perspective/ortho), Light, 32-bit HDRI Environment, PBR Materials, ACES tonemapping, multisampled antialiasing |
 | **Synths and sound** | Wavetable, Metallic modal resonator, String, Piano, Wind, Generate Samples, Granular, PaulStretch, Molder / Grain Molder (spectral resynthesis), Sampler, Slicer (onset-detecting sample chopper), 8-track Drum Sequencer, 16-pad MPC sampler, Looper (record and overdub, tempo-synced, latency-compensated), multi-waveform Oscillator |
 | **Field language** | Field Modifier, Field Primitive, Field Effect, Field Synth, Field Pixel, Field Notes, Field Graph (see [below](#field-and-code)) |
-| **Notes and MIDI** | Piano Roll, live MIDI input and clock, Arpeggiator, Note Sequencer, Chorder, Strum, Bouncing Balls (physics notes), Humanizer, Quantizer, MIDI File player, MIDI Out (hardware and virtual ports, CC and clock) |
-| **Audio FX and plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Lookahead Limiter, Delay, Reverb, Drive/Saturation, Pitch and Frequency Shifters, Chorus, Phaser, Formant |
-| **Modulators and analysis** | LFO, Random, Pattern CV, Envelope Follower, Math, XY Pad, Audio Analyze (8-band FFT, onset), Image Analyze (luminance, motion), Hand / Face / Pose Track (camera to modulators, via the Tracking pack) |
+| **Notes and MIDI** | Piano Roll, live MIDI input and clock, Arpeggiator, Note Sequencer, Chorder, Note Strum, Bouncing Balls (physics notes), Humanizer, Quantizer, MIDI File player, MIDI Out (hardware and virtual ports, CC and clock) |
+| **Audio FX and plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Limiter, Delay, Reverb, Drive/Saturation, Pitch and Frequency Shifters, Chorus, Phaser, Formant |
+| **Modulators and analysis** | LFO, Random, Pattern, Envelope, Math, XY Pad, Audio Analyze (8-band FFT, onset), Image Analyze (luminance, motion), Hand / Face / Pose Track (camera to modulators, via the Tracking pack) |
 | **Output and I/O** | Spatial Mixer (3D headphone mix with head tracking), PNG snapshot, H.264/MOV recording with synchronised audio, Syphon Out / Spout Out, NDI Out |
 
 ---
