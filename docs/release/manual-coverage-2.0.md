@@ -12,8 +12,17 @@ The audit below was written from source before any capture. Current state:
 - PDFs rebuilt (Node Reference, Field Language, Headless User Guide); `pdf_check.py` passes with blank-area warnings only.
 - Known exceptions: 12 node shots with a red boolean/instance outline (Intersect, Union, Difference, Instance on Points),
   recorded in `docs/shots/manifest.json` and `docs/release/known-issues-2.0.md`.
-- Dropdown (d) states: NOT DONE. This is a stated gap. The pass is last in the queue, to run only after the build
-  agent reports its test runs. Any item not covered by that pass stays listed in the gap section below.
+- Dropdown (d) states: NOT COVERED. This is a stated gap, not a skipped step. The 45-minute pass was started and
+  stopped without app runs, for these reasons:
+  - The existing dropdown hook (`INFINITE_NODEGALLERY` plus `INFINITE_GALLERYOPENDD=<param index>`,
+    `src/app/frame/StagePopupsB.cpp`) costs one app launch per dropdown, about 15 to 20 s each.
+  - It needs the param index of each node's enum control. `infinite --describe` takes about 15 s and printed no usable
+    enum lists, so the indexes would have to be guessed.
+  - The build copy at `infinte-base/build/Infinite.app` was being recompiled by the build lane, so the pass used the
+    release copy at `/private/tmp/claude-501/shotrun/Infinite.app` (2.0 release, built 22:02) instead.
+  - The 2.0 shot plan has zero "d" entries.
+  Covered: none of the dropdown or context-menu IDs in section E below. Next step is to build the enum list from the
+  node source (`Draw*Params` enum controls) and run one launch per dropdown after the build lane is done.
 - Video In caption: kept in the manifest, but Video In has no card in the chapter list, so the caption does not appear
   in the PDF text yet (stated gap).
 
