@@ -1,12 +1,16 @@
 name: Attach release assets
 
-# Copies the Windows zips and the Linux AppImage from a finished Build run onto a release, on GitHub's
-# servers, so a slow connection on the releasing machine does not matter. Run it once the Build is green.
+# Copies the Windows zips, the Linux AppImage and the macOS installers (Infinite.dmg, Infinite.pkg) onto a
+# release, on GitHub's servers, so a slow connection on the releasing machine does not matter. Run it once
+# the Build is green and the macOS installers run (macos-installers.yml) has finished.
 on:
   workflow_dispatch:
     inputs:
       run_id:
         description: Build run to take the artifacts from
+        required: true
+      mac_run_id:
+        description: macos-installers run that built Infinite.dmg and Infinite.pkg (artifact Infinite-macos-installers)
         required: true
       tag:
         description: Release tag (the release may still be a draft)
@@ -32,6 +36,10 @@ jobs:
                    ui-golden-macos ui-golden-windows ui-golden-linux; do
             gh run download "${{ inputs.run_id }}" -n "$a" -D "dl/$a" || echo "no artifact $a"
           done
+          # The macOS installers come from their own run, not the Build run.
+          gh run download "${{ inputs.mac_run_id }}" -n Infinite-macos-installers -D dl/Infinite-macos-installers
+          test -s dl/Infinite-macos-installers/Infinite.dmg
+          test -s dl/Infinite-macos-installers/Infinite.pkg
       - name: Compare UI goldens across platforms
         run: |
           pip install --quiet pillow || python3 -m pip install --quiet pillow
@@ -55,6 +63,8 @@ jobs:
       - name: Upload to the release
         run: |
           gh release upload "${{ inputs.tag }}" Infinite-windows-x64.zip Infinite-windows-ARM64.zip \
+            dl/Infinite-macos-installers/Infinite.dmg \
+            dl/Infinite-macos-installers/Infinite.pkg \
             dl/Infinite-x86_64.AppImage/Infinite-x86_64.AppImage \
             dl/Infinite-Setup-windows-x64/Infinite-Setup-windows-x64.exe \
             dl/Infinite-linux-x86_64.tar.gz/Infinite-linux-x86_64.tar.gz --clobber
