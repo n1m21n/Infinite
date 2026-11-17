@@ -154,6 +154,11 @@ namespace
    bool sCloneAll = false;         // clone / heal: copy from the whole picture
    bool sGradReverse = false;      // gradient runs background to foreground
    double sCloneAsk = -10.0;       // clone stamp pressed without a source: a canvas note says how to set one
+   double sGroupPickAsk = -10.0;   // eraser/retouch on an empty/locked group: a canvas note says "Pick a layer"
+   struct GroupStrokePt { float x = 0.0f, y = 0.0f, p = 1.0f; };
+   std::vector<int> sGroupStrokeIds;
+   std::vector<GroupStrokePt> sGroupStrokePts;
+   BrushEngine::Brush sGroupStrokeBrush;
    bool sMeshNearest = false;      // mesh warp: nearest-neighbour resampling (off: bilinear)
    bool sObjSoft = false;          // object selection: feathered edge
    bool sRadiusAbs = true;         // shape radius in px (off: % of the short side)
@@ -2995,6 +3000,62 @@ namespace
       if (!painter && !doc->quickMask)
       {
          Layer* a = Active(doc);
+         if (a != nullptr && a->kind == Kind::Group && !sEditMask)
+         {
+            std::vector<int> targets;
+            for (const Layer& l : doc->Layers())
+               if (l.kind == Kind::Paint && doc->IsInside(l.id, a->id) && doc->Shown(l) &&
+                   (l.lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) == 0)
+                  targets.push_back(l.id);
+            if (targets.empty())
+            {
+               sGroupPickAsk = ImGui::GetTime();
+               return;
+            }
+            PushUndoCheckpoint(sTool == kEraser ? "Erase" : "Retouch");
+            BrushEngine::Brush b = ToolBrush();
+            if (spotHeal)
+               b.mode = BrushEngine::kInpaint;
+            if (sTool == kColourReplace || sTool == kBgErase)
+            {
+               float k[3] = { 0, 0, 0 };
+               if (doc->Pick(at.x, at.y, k, 1, sAllLayers ? 0 : targets[0]))
+                  std::copy(k, k + 3, b.key);
+            }
+            if (cloning)
+            {
+               if (!sCloneOffsetSet || !sCloneAligned)
+               {
+                  sCloneOffset = ImVec2(sCloneSrc.x - at.x, sCloneSrc.y - at.y);
+                  sCloneAnchor = at;
+                  sCloneOffsetSet = true;
+               }
+               b.sourceOffset[0] = sCloneOffset.x;
+               b.sourceOffset[1] = sCloneOffset.y;
+               b.sourceAnchor[0] = sCloneAnchor.x;
+               b.sourceAnchor[1] = sCloneAnchor.y;
+               b.sampleAll = sCloneAll;
+            }
+            const ImVec2 from = line && sHaveLast ? sLastPaint : at;
+            const float pen = PenNow();
+            if (!doc->BeginPaint(targets[0], 0, b, from.x, from.y, pen))
+               return;
+            sOp = Op();
+            sOp.kind = 7;
+            sOp.docStart = at;
+            sGroupStrokeIds.assign(targets.begin() + 1, targets.end());
+            sGroupStrokePts.clear();
+            if (!sGroupStrokeIds.empty())
+            {
+               sGroupStrokeBrush = b;
+               sGroupStrokePts.push_back({ from.x, from.y, pen });
+               if (line && sHaveLast)
+                  sGroupStrokePts.push_back({ at.x, at.y, pen });
+            }
+            if (line && sHaveLast)
+               doc->PaintTo(at.x, at.y, pen);
+            return;
+         }
          const bool live = a != nullptr && (a->kind == Kind::Node || a->kind == Kind::Text || a->kind == Kind::Vector) &&
                            !(a->kind == Kind::Node && a->HasSkin());
          if (live && !sEditMask && sTool == kEraser)
@@ -3115,6 +3176,20 @@ namespace
       sSurfaceStroke = false;
       if (doc->Painting())
          doc->EndPaint();
+      if (!sGroupStrokeIds.empty() && !sGroupStrokePts.empty())
+      {
+         for (int gid : sGroupStrokeIds)
+         {
+            if (doc->BeginPaint(gid, 0, sGroupStrokeBrush, sGroupStrokePts[0].x, sGroupStrokePts[0].y, sGroupStrokePts[0].p))
+            {
+               for (size_t i = 1; i < sGroupStrokePts.size(); ++i)
+                  doc->PaintTo(sGroupStrokePts[i].x, sGroupStrokePts[i].y, sGroupStrokePts[i].p);
+               doc->EndPaint();
+            }
+         }
+      }
+      sGroupStrokeIds.clear();
+      sGroupStrokePts.clear();
       sLastPaint = sMouseDoc;
       sHaveLast = true;
    }
@@ -4015,6 +4090,13 @@ namespace
       if (sTool == kClone && ImGui::GetTime() - sCloneAsk < 2.5)
       {
          const char* t = T("Alt-click to set the source");
+         const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
+         dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
+         dl->AddText(at, ink, t);
+      }
+      if (ImGui::GetTime() - sGroupPickAsk < 2.5)
+      {
+         const char* t = T("Pick a layer");
          const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
@@ -6336,7 +6418,10 @@ namespace
             {
                if (sTool == kBrush)
                   doc->PaintFollow(sBrush);
-               doc->PaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+               const float pen = PenNow();
+               doc->PaintTo(sMouseDoc.x, sMouseDoc.y, pen);
+               if (!sGroupStrokeIds.empty())
+                  sGroupStrokePts.push_back({ sMouseDoc.x, sMouseDoc.y, pen });
                NotePenSample(sMouseDoc);
             }
          }
@@ -13238,6 +13323,42 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("a document switch drops crop, text edit and drag", !sCropOn && sTextEdit == 0 && sOp.kind == 0);
       doc->RemoveLayer(id);
       doc->Commit();
+
+      // Eraser on a group acts on every paint layer inside it in one undo step,
+      // and on an empty group shows the "Pick a layer" note.
+      {
+         const int ga = doc->AddPaintLayer();
+         const int gb = doc->AddPaintLayer();
+         BrushEngine::Brush fill;
+         fill.size = 80.0f;
+         fill.color[0] = 0.9f;
+         if (doc->BeginPaint(ga, 0, fill, W * 0.5f, H * 0.5f, 1.0f))
+            doc->EndPaint();
+         if (doc->BeginPaint(gb, 0, fill, W * 0.5f, H * 0.5f, 1.0f))
+            doc->EndPaint();
+         const int grp = doc->GroupLayers({ ga, gb });
+         doc->Commit();
+         SelectOnly(grp);
+         const std::vector<uint8_t> beforeGrp = picture(doc);
+         const int prevTool = sTool;
+         sTool = kEraser;
+         BeginStroke(doc, ImVec2(W * 0.5f, H * 0.5f));
+         EndStroke(doc);
+         const std::vector<uint8_t> afterGrp = picture(doc);
+         expect("eraser on a group changes pixels", afterGrp != beforeGrp);
+         Undo(doc);
+         expect("eraser on a group undoes in one step", picture(doc) == beforeGrp);
+         doc->RemoveLayer(grp);
+         const int emptyGrp = doc->AddLayer(Kind::Group, 0).id;
+         doc->Commit();
+         SelectOnly(emptyGrp);
+         sGroupPickAsk = -10.0;
+         BeginStroke(doc, ImVec2(W * 0.5f, H * 0.5f));
+         expect("eraser on an empty group sets Pick a layer note", ImGui::GetTime() - sGroupPickAsk < 1.0);
+         sTool = prevTool;
+         doc->RemoveLayer(emptyGrp);
+         doc->Commit();
+      }
    }
    return fails;
 }
