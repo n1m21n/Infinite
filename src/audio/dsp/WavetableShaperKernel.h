@@ -208,4 +208,21 @@ private:
    double mPrevPhase[kMaxChannels] = {};
    DcBlocker mDcBlockers[kMaxChannels];
    MeterRing mLevelMeter;
+
+   // Cached parameter conversions so the 8x oversampled loop avoids per-sample
+   // powf/ReadAtMip/log2 when parameters are unchanged.
+   float mCachedDriveDb = NAN;
+   float mCachedDriveLin = 1.0f;
+   float mCachedOutputDb = NAN;
+   float mCachedOutputGain = 1.0f;
+   float mCachedSmooth = NAN;
+   float mCachedSmoothMip = 0.0f;
+   double mCachedSlewThresh = 1.0 / (2.0 * Wavetable::kMaxHarmonic);
+   int mCachedZeroTable = -1;
+   float mCachedZeroPosL = NAN;
+   float mCachedZeroPosR = NAN;
+   float mCachedZeroSmoothMip = NAN;
+   double mCachedZeroPhase = NAN;
+   float mCachedZeroRefL = 0.0f;
+   float mCachedZeroRefR = 0.0f;
 };
