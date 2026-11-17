@@ -5045,6 +5045,7 @@ const char* HelpT(const char* key);
 void DrawSettingsWindow(bool* open);
 
 void DrawShortcutsWindow(bool* open);
+void DrawShortcutsTableBody(const char* idPrefix);
 // The shortcut table as plain text, English, this system's keys (the `shortcuts` RPC).
 std::string ShortcutsText();
 

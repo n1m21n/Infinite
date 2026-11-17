@@ -898,31 +898,13 @@ namespace app
       return out;
    }
 
-   void DrawShortcutsWindow(bool* open)
+   void DrawShortcutsTableBody(const char* idPrefix)
    {
-      // Every other floating dialog (Settings, Field editor, colour picker)
-      // goes through PushElevatedPanelStyle - this one didn't, which is why
-      // it was the one window still carrying a different backdrop/border/
-      // rounding than the rest of the "material above the canvas" family.
-      // Centering on first appearance matches Settings for the same reason
-      // (see DrawSettingsWindow).
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
-      PushElevatedPanelStyle(/*isChild=*/false);
-      FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
-      const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
-      FormParts::PopWindowPad();
-      if (!shortcutsVisible)
-      {
-         ImGui::End();
-         PopElevatedPanelStyle();
-         return;
-      }
-
-      SectionCard::BeginWindow();
       FormParts::PushReferenceStyle();
       static char filterBuf[128] = "";
-      FormParts::SearchInput("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
+      char filterId[64];
+      snprintf(filterId, sizeof(filterId), "##%sfilter", idPrefix);
+      FormParts::SearchInput(filterId, "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
       ImGui::SameLine();
       if (filterBuf[0] != '\0' && FormParts::Button(L("Clear")))
          filterBuf[0] = '\0';
@@ -931,7 +913,6 @@ namespace app
       std::string filter = filterBuf;
       for (char& c : filter)
          c = (char)tolower((unsigned char)c);
-
 
       const char* lastCat = nullptr;
       bool inTable = false;
@@ -963,8 +944,8 @@ namespace app
 
          if (!inTable)
          {
-            char tableId[64];
-            snprintf(tableId, sizeof(tableId), "tbl_%s", s.category);
+            char tableId[96];
+            snprintf(tableId, sizeof(tableId), "%stbl_%s", idPrefix, s.category);
             if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
             {
                ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 150.0f);
@@ -1000,8 +981,33 @@ namespace app
       if (inTable)
          ImGui::EndTable();
 
-      SectionCard::EndWindow();
       FormParts::PopReferenceStyle();
+   }
+
+   void DrawShortcutsWindow(bool* open)
+   {
+      // Every other floating dialog (Settings, Field editor, colour picker)
+      // goes through PushElevatedPanelStyle - this one didn't, which is why
+      // it was the one window still carrying a different backdrop/border/
+      // rounding than the rest of the "material above the canvas" family.
+      // Centering on first appearance matches Settings for the same reason
+      // (see DrawSettingsWindow).
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
+      PushElevatedPanelStyle(/*isChild=*/false);
+      FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
+      const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
+      FormParts::PopWindowPad();
+      if (!shortcutsVisible)
+      {
+         ImGui::End();
+         PopElevatedPanelStyle();
+         return;
+      }
+
+      SectionCard::BeginWindow();
+      DrawShortcutsTableBody("win_");
+      SectionCard::EndWindow();
       FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();

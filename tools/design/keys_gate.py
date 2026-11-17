@@ -384,6 +384,26 @@ def check_panel_focus():
     return len(PANEL_GUARDS), issues
 
 
+def check_settings_keys(kshortcuts_rows):
+    """Verify Settings > Keys renders every kShortcuts row (and vice versa) via DrawShortcutsTableBody."""
+    issues = []
+    help_text = SRC_HELP.read_text()
+    settings_path = ROOT / "src/app/panels/SettingsWindow.cpp"
+    settings_text = settings_path.read_text()
+
+    if "void DrawShortcutsTableBody(" not in help_text or "for (const auto& s : kShortcuts)" not in help_text:
+        issues.append("HelpWindows.cpp missing DrawShortcutsTableBody iterating kShortcuts")
+    if 'DrawShortcutsTableBody("win_")' not in help_text:
+        issues.append("DrawShortcutsWindow does not delegate to DrawShortcutsTableBody")
+    if 'I18N_KEY("Keys")' not in settings_text:
+        issues.append("SettingsWindow.cpp missing 'Keys' tab in kTabs")
+    if "DrawShortcutsTableBody(" not in settings_text:
+        issues.append("SettingsWindow.cpp > Keys does not render DrawShortcutsTableBody(kShortcuts)")
+
+    settings_rows = kshortcuts_rows if not issues else 0
+    return kshortcuts_rows, settings_rows, issues
+
+
 def check_drift(quiet=False):
     src, locate = appsrc.read_indexed(str(ROOT))
     tbl = re.search(r"static const ShortcutEntry kShortcuts\[\] = \{(.*?)\n      \};", src, re.S)
@@ -456,8 +476,9 @@ def main():
     verb_bad = check_core_verbs()
     n_panels, focus_bad = check_panel_focus()
     stats, drift_bad = check_drift(quiet=quiet)
+    k_rows, s_rows, settings_bad = check_settings_keys(stats["rows"] if stats else 0)
 
-    total_bad = len(overlap_bad) + len(verb_bad) + len(focus_bad) + len(drift_bad)
+    total_bad = len(overlap_bad) + len(verb_bad) + len(focus_bad) + len(drift_bad) + len(settings_bad)
     if not quiet:
         print(f"keys gate [overlap/os]: {n_chords} chords in {areas} areas x {len(PLATFORMS)} OS, {len(overlap_bad)} problem(s)")
         for b in overlap_bad:
@@ -468,6 +489,9 @@ def main():
         print(f"keys gate [panel focus]: {n_panels} panel areas checked, {len(focus_bad)} problem(s)")
         for f in focus_bad:
             print(" ", f)
+        print(f"keys gate [settings]: kShortcuts={k_rows} rows, Settings>Keys={s_rows} rows, {len(settings_bad)} problem(s)")
+        for sb in settings_bad:
+            print(" ", sb)
         if stats:
             print(
                 f"keys gate [drift]: {stats['rows']} documented rows, {stats['handled']} handled keys, "

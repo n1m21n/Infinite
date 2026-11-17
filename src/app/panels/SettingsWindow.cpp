@@ -95,7 +95,7 @@ namespace app
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
                                            I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins"),
                                            I18N_KEY("Agents & Terminal"), I18N_KEY("Infinite as VST3/AU"),
-                                           I18N_KEY("3D View") };
+                                           I18N_KEY("3D View"), I18N_KEY("Keys") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -1931,6 +1931,12 @@ namespace app
                DrawDawPluginSection();
             }
             SectionCard::End();
+         }
+
+         // 12. "Keys" Tab: every row of kShortcuts, searchable.
+         if (sTab == 11)
+         {
+            DrawShortcutsTableBody("settings_");
          }
 
       }
