@@ -130,6 +130,13 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Discord](https://discord.gg/GMeQTyJqkH): community and support
 - [YouTube](https://www.youtube.com/channel/UCpuCUMODr4utnpa162CkIug): tutorials and films
 
+## Workspaces & panels
+
+- **2D View (`Shift+2`)**: non-destructive layer and node compositing inside Infinite (39 tools, 7 layer kinds including 3D card layers, 36 blend modes, 28 adjustments, 10 layer styles, drag-to-reorder smart filter stack, PSD and ORA import/export).
+- **3D View (`Shift+3`)**: Blender-keymap scene composition and PBR rendering (6 light types, Principled BSDF materials with 10 texture maps, HDRI world, depth of field, bloom, Raster, Path trace and Metal Live engines).
+- **Field Patcher (`Shift+F`)**: Max-like visual box-and-wire editor synced two-way with Field code (5 host types, 10 box families, 20 starters, scratch pages).
+- **Mixer & Drum Sequencer**: hardware-desk panels with graphite strips, scribble strips, knurled pots, LED meters, trig conditions, probability, FILL, per-lane length, and drum kits per groove.
+
 ## File formats
 
 - `.inf` and `.infinite`: a patch. A line-based text file listing nodes and cables. Open it with File, Open in Infinite.

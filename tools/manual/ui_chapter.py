@@ -409,8 +409,30 @@ def html_chapter(P):
     b.append(page("<h2>3D View</h2>",
                   "<p>The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, move, rotate and scale, the pivot and orientation choices and the view toggles. "
                   "Drag the axis gizmo at the top right to orbit; the four buttons at the bottom right zoom, pan, fly the camera and lock it. "
-                  "The Scene list at the right lists every object; the eye hides one.</p>",
+                  "The Scene list at the right lists every object; the eye hides one. Viewport habits (orbit, zoom, gizmo sizes, mini axes) live in Settings &gt; 3D View (<code>settings/3d-view</code>).</p>",
                   fig("panel_view3d", "3D View docked at the bottom with the Scene list open.", box=(0, 610, 1600, 1000))))
+
+    b.append(page("<h2>2D View</h2>",
+                  "<p>The 2D View (<code>view2d</code>) is a layered 2D canvas backed by a <b>Scene 2D</b> node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. "
+                  "Right-click any picture node and choose <b>Add to 2D View</b>, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). "
+                  "Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. Docks bottom, right, left, top or fill; driven from the CLI with <code>infinite view2d</code>.</p>"))
+
+    b.append(page("<h2>Mixer panel</h2>",
+                  "<p>The Mixer panel (<code>mixer</code>) is a hardware-style mixing desk for Mixer and audio channels. "
+                  "It shares the standard page strip and 7-row page menu (<code>Cmd+R</code> renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. "
+                  "Right-click a Mixer node and choose <b>Open in Mixer panel</b>, or open it from the rail.</p>"))
+
+    b.append(page("<h2>Drums panel</h2>",
+                  "<p>The Drums panel (<code>drums</code>) is the hardware step-sequencer face for <b>Drum Sequencer</b> nodes. "
+                  "It shares the page strip and 7-row page menu, and provides step pads lit by velocity, lane strips with length/reverse/filter, trig conditions, probability, nudge, FILL key, and groove library presets. "
+                  "Right-click a Drum Sequencer node and choose <b>Open in Drum panel</b>, or dock it bottom or top.</p>"))
+
+    b.append(page("<h2>Field Patcher</h2>",
+                  "<p>The Field Patcher (<code>fieldpatcher</code>) is a visual node-box editor for building Field programs without writing code by hand. "
+                  "It includes pages (saved in the patch), a box canvas, a node pick menu, an inspector, starter templates and Value mode.</p>"))
+
+    b.append(page("<h2>Curve Editor</h2>",
+                  "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>"))
 
     b.append(page("<h2>Windows and dialogs</h2>",
                   row((fig("window_shortcuts", "All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.", box=(440, 240, 1130, 750)), 1),

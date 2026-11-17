@@ -89,11 +89,30 @@ Infinite has **347 node types**:
 
 Panels dock to the edges of the node canvas and open from the rail or a key; every shortcut is listed under [Manuals and shortcuts](#manuals-and-shortcuts).
 
+### 2D View
+
+<img src="docs/screenshots/v1/2d-view.png" alt="2D View compositing layers, masks, tools and node outputs" width="100%">
+
+A non-destructive 2D layer and node compositor (Shift + 2). Stack seven layer kinds (`Node`, `Fill`, `Group`, `Paint`, `Vector`, `Text` and `Adjust`, plus After-Effects-style 3D card layers) across 39 tools (Move, Marquee, Lasso, Magic Wand, Selection Brush, Healing, Brush, Clone Stamp, Eraser, Gradient, Pen, Shape, Text and more), 36 blend modes, 28 adjustment layers (with `Drive A..D` modulation), 10 layer styles and a drag-to-reorder Smart Filter stack of 18 GPU node effects. Live `Node` layers keep animating from the graph, and PSD and ORA files import and export with layers intact.
+
 ### 3D View
 
 <img src="docs/screenshots/v1/3d-view.png" alt="3D View composing node outputs into one scene" width="100%">
 
-The final stage of a 3D patch (Shift + 3). Right-click a 3D node, add it to the view, arrange the objects, look through a camera and render a still or an animation (seconds and frame rate). The world is a colour or an HDRI, each object picks which lights reach it, and the panel follows Blender's keymap and setting names, with depth of field, ambient occlusion, bloom, composition guides and safe areas. It composes; it does not model, so geometry, materials and simulation stay in the node chain.
+The final stage of a 3D patch (Shift + 3). Right-click a 3D node, add it to the view, arrange objects, look through a camera and render a still or animation. It follows Blender's keymap (`G`/`R`/`S` with axis locks, `1`/`3`/`7` views, `0` camera, `Tab` Edit Mode, `Ctrl/Cmd+Tab` Pose and Sculpt modes) and includes 6 light types with Kelvin temperature and light linking, Principled BSDF PBR materials with 10 texture maps, HDRI world lighting, depth of field, ambient occlusion, bloom, ACES/AgX colour management and Raster, Path trace and Metal Live engines.
+
+### Field Patcher
+
+<img src="docs/screenshots/v1/field-patcher.png" alt="Field Patcher editing a Field node as boxes and wires synced with code" width="100%">
+
+A docked visual box-and-wire editor for the Field language (Shift + F, or the **Boxes** button on any Field node). Edit `Field Notes`, `Field Primitive`, `Field Modulator`, `Field Modifier`, `Field Pixel` and `Field Effect` nodes visually across 10 box families (`Sources`, `Arithmetic`, `Range`, `Waves`, `Logic`, `Time & memory`, `Random`, `Geometry`, `Music`, `Inlets / outlets`) and 20 built-in starters, with two-way sync to the `Code` tab and scratch pages saved in the patch.
+
+### Mixer and Drum Sequencer
+
+| Mixer | Drum Sequencer |
+|---|---|
+| <img src="docs/screenshots/v1/mixer.png" alt="Hardware-desk Mixer with graphite channel strips, knurled pots and LED meters" width="100%"> | <img src="docs/screenshots/v1/drums.png" alt="Hardware-desk Drum Sequencer with lit step keys, trig conditions and waveform inspector" width="100%"> |
+| A hardware-desk mixer with graphite channel strips, colour caps, scribble strips, knurled trim and pan pots, M/S/phase buttons, LED meters and a Master bus with LUFS/true-peak readouts. | An 8-lane step sequencer in the same desk vocabulary: velocity-lit step keys, trig conditions, probability, nudge, FILL, per-lane length, reverse, filter, live audition and groove-matched kits from your own sample library. |
 
 ### Sample Studio
 

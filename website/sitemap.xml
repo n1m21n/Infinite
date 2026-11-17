@@ -7,6 +7,12 @@
   <url><loc>https://infinitedevices.org/blog/opengl-41-path-tracing-bvh-texture-buffers-agx.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/binaural-hrtf-spatial-audio-mixer-dsp.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/lock-free-audio-visualisers-textures-ribbons-3d-displacement.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/piano/</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/</loc><lastmod>2026-11-17</lastmod><priority>0.8</priority></url>
+  <url><loc>https://infinitedevices.org/blog/2d-view-non-destructive-layer-compositing-in-infinite.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/3d-view-blender-keymap-scene-composition-in-infinite.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/field-patcher-visual-box-and-wire-dsp-shader-editor.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/binaural-hrtf-spatial-audio-mixer-dsp.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/image-to-sound-spectrogram-additive-synthesis.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/out-of-process-vst3-au-plugin-shared-memory-ipc.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/spectral-field-real-time-stft-phase-vocoder-kernels.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
@@ -193,6 +199,9 @@
   <url><loc>https://infinitedevices.org/embeds/</loc><lastmod>2026-11-17</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/benchmarks.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artworks.html</loc><lastmod>2026-11-17</lastmod><priority>0.6</priority></url>
+  <url><loc>https://infinitedevices.org/privacy.html</loc><lastmod>2026-11-17</lastmod><priority>0.3</priority></url>
+  <url><loc>https://infinitedevices.org/refund.html</loc><lastmod>2026-11-17</lastmod><priority>0.3</priority></url>
+  <url><loc>https://infinitedevices.org/terms.html</loc><lastmod>2026-11-17</lastmod><priority>0.3</priority></url>
   <url><loc>https://infinitedevices.org/assets/library/catalog.json</loc><lastmod>2026-11-17</lastmod><priority>0.3</priority></url>
   <url><loc>https://infinitedevices.org/assets/benchmarks.json</loc><lastmod>2026-11-17</lastmod><priority>0.3</priority></url>
   <url><loc>https://infinitedevices.org/llms.txt</loc><lastmod>2026-11-17</lastmod><priority>0.6</priority></url>

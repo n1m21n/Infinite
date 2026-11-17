@@ -1,7 +1,7 @@
 ---
 title: Modal synthesis and metallic percussion in real time
 seo_title: Modal Synthesis and Metallic Percussion | Infinite
-description: How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.
+description: How real-time modal synthesis models metallic percussion: mallet strike exciters, inharmonic second-order resonators, waveguides, and Chladni plates.
 date: 2026-11-12
 category: creative
 tags: [modal synthesis, physical modelling, metallic percussion, sound design, dsp]

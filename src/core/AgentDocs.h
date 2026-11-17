@@ -217,7 +217,7 @@ Try: import a character model and spin it live using a rotation modulated by an 
 Chain: Model 3D -> Material -> Render 3D
 
 ### Material
-3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, subsurface, translucency (light through to the far side), iridescence, and can take up to eight image inputs to paint any of those channels from a texture.
+3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, iridescence, and can take up to eight image inputs to paint any of those channels from a texture.
 Try: feed a Noise texture into the roughness map input to give a single flat color a hand-worn, uneven sheen.
 Chain: Cube -> Material -> Render 3D
 
@@ -303,7 +303,7 @@ Chain: Icosphere -> Resynthesize 3D -> Render 3D
 Physics, the camera, the lights, and the render pass that turns geometry into a picture.
 
 ### Ocean Surface
-3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm; horizon stretches the outer grid so the sea reaches the skyline.
+3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm.
 )AGENTDOC"
 R"AGENTDOC(Try: drive wave amplitude straight from your track's bass so the sea swells with the low end.
 Chain: Audio Analyze (Bass) -> Ocean (Amplitude) -> Render 3D
@@ -1408,11 +1408,6 @@ Chain: Cube -> Armature -> Render 3D
 Try: project a Cylinder map onto a vase so the pattern wraps around it.
 Chain: Sphere -> UV Project -> Render 3D
 
-### Fur
-3D · GEOMETRY OUT. Grows strands on the faces as thin ribbons: fur, fleece, grass or hair. A curve in `guide` gives every strand its shape, for styled long hair. Comb leans the roots, Gravity droops them, Clump pulls tips together, Curl twists them. Normals Tangent feeds a Material set to model Hair.
-Try: grow 4 cm fur on a sphere, then wire an arc Curve into guide for long combed hair.
-Chain: Sphere -> Fur -> Material (model Hair) -> Render 3D
-
 ### Bevel
 3D · GEOMETRY OUT. Rounds or chamfers every sharp edge above the sharp angle. Width is the bevel size; one segment gives a flat chamfer and more give a smooth round.
 Try: bevel a box so its edges catch highlights.
@@ -1796,8 +1791,23 @@ Picture: Sample Studio: a take cut into eight slices. Toolbar: open, play, input
 Picture: Piano Roll: pages of notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar.
 
 ## 3D View
-The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, move, rotate and scale, the pivot and orientation choices and the view toggles. Drag the axis gizmo at the top right to orbit; the four buttons at the bottom right zoom, pan, fly the camera and lock it. The Scene list at the right lists every object; the eye hides one.
+The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, move, rotate and scale, the pivot and orientation choices and the view toggles. Drag the axis gizmo at the top right to orbit; the four buttons at the bottom right zoom, pan, fly the camera and lock it. The Scene list at the right lists every object; the eye hides one. Viewport habits (orbit, zoom, gizmo sizes, mini axes) live in Settings > 3D View (`settings/3d-view`).
 Picture: 3D View docked at the bottom with the Scene list open.
+
+## 2D View
+The 2D View (`view2d`) is a layered 2D canvas backed by a **Scene 2D** node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. Right-click any picture node and choose **Add to 2D View**, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. Docks bottom, right, left, top or fill; driven from the CLI with `infinite view2d`.
+
+## Mixer panel
+The Mixer panel (`mixer`) is a hardware-style mixing desk for Mixer and audio channels. It shares the standard page strip and 7-row page menu (`Cmd+R` renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. Right-click a Mixer node and choose **Open in Mixer panel**, or open it from the rail.
+
+## Drums panel
+The Drums panel (`drums`) is the hardware step-sequencer face for **Drum Sequencer** nodes. It shares the page strip and 7-row page menu, and provides step pads lit by velocity, lane strips with length/reverse/filter, trig conditions, probability, nudge, FILL key, and groove library presets. Right-click a Drum Sequencer node and choose **Open in Drum panel**, or dock it bottom or top.
+
+## Field Patcher
+The Field Patcher (`fieldpatcher`) is a visual node-box editor for building Field programs without writing code by hand. It includes pages (saved in the patch), a box canvas, a node pick menu, an inspector, starter templates and Value mode.
+
+## Curve Editor
+The Curve Editor (`curveeditor`) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.
 
 ## Windows and dialogs
 Picture: All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.
@@ -2231,6 +2241,73 @@ if (tick(1/8) > 0.5) {
 - Vector literals are no longer mistaken for scalars by the constant folder.
 
 Presets added since v1 include Gray-Scott reaction-diffusion and a flow and advection pair (Pixel), Verlet Rope and Buckling Ribbon (Element), and the pixel illusion, nature and Field Effect and Synth libraries.
+
+## 14. Patching Field
+
+The Field Patcher shows a Field program as boxes and wires. The code stays the program: every box you add, wire you
+draw or number you drag is written back into the node's code, compiled, and kept as one undo step. Open the code and
+the boxes side by side and either one can be edited.
+
+```
+ Canvas: [Field Notes 1]  [Field Primitive 2]
+              |                 |
+)AGENTDOC"
+R"AGENTDOC(              v   select one    v
+ +-- Field Patcher -----------------------------------------------+
+ | ♪ Field Notes 1 | ✦ Field Primitive 2 | ◌ Scratch 1 | + | ⤢     |
+ | rail | box canvas                          | Code | Box         |
+ |  ●   |  [time]--->[*]--->[floor]--->[...]  | step = floor(t*4)  |
+ |  ●   |                                     | ...                |
+ | Field Primitive  ✓   9 boxes                                    |
+ +----------------------------------------------------------------+
+```
+
+### 14.1 Opening it
+
+| From | What happens |
+|---|---|
+| View > Field Patcher, the panel rail, or Shift+F | the panel docks at the bottom (or top) |
+| **Boxes** on a Field Notes, Field Primitive or Field Modifier body | the panel opens on that node's page |
+| selecting one of those nodes on the canvas | its page comes to the front, unless the front page is pinned |
+| File > Template library > Field patches | a scratch page with that starter |
+
+### 14.2 Pages
+
+One page per node. Right-click a page to pin it (it then stays in front whatever you select), close it, move it, or
+delete the node. A **scratch page** (+) belongs to no node yet. When it has an outlet, the footer offers **⤓** to place
+it as a node:
+
+| The page has | It becomes |
+|---|---|
+| a play note box | Field Notes (with the publish output on if it also has a value or pulse outlet) |
+| a position, normal or colour outlet | Field Primitive |
+| only value or pulse outlets | Field Primitive in Value mode |
+
+Scratch pages are saved with the patch.
+
+### 14.3 Boxes
+
+The rail holds the ten families: sources, arithmetic, range, waves, logic, time and memory, random, geometry, music,
+inlets and outlets. Right-click the canvas, or drag a wire into empty space, to search every box by its name or Field
+word. Boxes the page's node cannot run are greyed out. Wire colours follow the kind: number, on/off, pulse, note,
+point, per-point. Pulse wires animate.
+
+Anything the boxes cannot show stays a **code** box with its text intact, so no program is ever lost by opening it.
+
+### 14.4 Value mode and publish
+
+**value** on Field Primitive turns it into a value source: no mesh, and its publish output carries the program's
+`publish`. Field Notes has the same **publish scalar output** toggle as the other Field nodes, so a melody page can
+also send a value or a pulse to any knob.
+
+```
+publish = 0 + (sin(t * 2) - -1) / (1 - -1) * (1 - 0) // Breathing light: 0..1, wire it to any knob
+```
+
+### 14.5 When a program breaks
+
+A broken program never silences the node: it keeps playing its last good program and the footer shows the error.
+Fix it in the boxes or the code and it takes over again.
 )AGENTDOC";
 
    inline const char* kHeadlessGuide =
@@ -2330,6 +2407,7 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--validate patch.inf [--for-render] [--lenient] [--json file]` | Check the file loads; report every problem |
 | `--explain patch.inf [--json] [--all] [--lenient]` | Print the built graph: nodes, non-default controls, wires, modulation ranges, world bounding boxes of geometry. `--all` lists every control |
 | `--frame patch.inf T[,T...] out.png or dir/` | Still images at the given times in seconds. Several times need a folder |
+| `--frame --batch jobs.json` | Run multiple frame renders in one process (`[{patch, t, out, size, node, ...}]`) |
 | `--frames-dir patch.inf out_dir --duration S` | A numbered PNG sequence. Options: `--start S`, `--fps N`, `--alpha`, `--depth 8 or 16` |
 | `--render patch.inf out.mp4 or out.mov` | A video with audio |
 | `--audio-summary patch.inf out.json` | The sound as numbers: loudness, peaks, clipping, silence, spectrum, tempo guess |
@@ -2349,14 +2427,17 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--codec h264 or prores4444` | render | Video codec. Use `prores4444` (in a `.mov`) when you need transparency |
 | `--no-audio` | render | Write a silent video |
 | `--node index[:output]` | frame, frames-dir, render | Render this node instead of the Output. Great for checking one stage |
+| `--geometry node` | frame, frames-dir | Also report world bounding-box stats for a geometry node |
 | `--set node.param=value` | frame, frames-dir, render | Override one control for this run without editing the file |
 | `--output node` | audio-summary | Measure one Audio Out or Output instead of the whole mix |
 | `--wav out.wav` | audio-summary | Also write the audio as a WAV |
 | `--stems id,id --stems-dir dir` | audio-summary | Write one WAV per named node |
 | `--notes events.json --note-map map.json` | audio-summary | Play your own note events into the patch |
-| `--timeline` | audio-summary | Play the arrangement's audio lanes instead of the node graph alone |
-| `--timeline` | render | Render the arrangement as the Timeline's own Render does, to `.mp4`, `.mov` or `.wav`. The arrangement's render settings are the defaults; `--start`, `--duration`, `--size` and `--fps` override them. No canvas Output is needed. `.wav` writes the audio lanes only |
+| `--timeline` | render, audio-summary | Render or measure the Timeline arrangement instead of the canvas graph alone |
 | `--plugin-params` | render, audio-summary | List every loaded plugin's parameters (address, name, real range, default) in the `plugins` block of the result |
+| `--plugin-state` | render, audio-summary | Include plugin state blobs in the result |
+| `--batch jobs.json` | frame, audio-summary | Run a JSON array of frame or audio-summary jobs in one process |
+| `--repeat 1-8` | frame | Repeat the frame render N times (determinism / warmup check) |
 | `--contact-sheet sheet.png` | frame | One image holding every requested frame |
 | `--png-level 0-9` | frame, frames-dir | PNG compression |
 | `--lenient` | all | Treat unknown keys and removed nodes as warnings, not errors |
@@ -2387,20 +2468,22 @@ prints the open patch, the selection and any code errors in one answer.
 | Group | Verbs |
 |---|---|
 | Look | `graph`, `explain`, `params`, `selection`, `status`, `nodes`, `describe` |
-| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `mod`, `expr`, `bypass`, `batch`, `undo`, `redo` |
-| Patch | `new`, `open`, `save`, `validate`, `canonicalize`, `apply` |
+| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d` |
+| Patch | `new`, `recent`, `open`, `save`, `import`, `files`, `reveal`, `validate`, `canonicalize`, `apply` |
 | Play | `play`, `stop`, `rewind`, `seek`, `tempo` |
 | Timeline | `timeline` prints it all; `timeline track`, `clip`, `marker`, `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
 | Session | `session scene`, `launch`, `launchrow`, `stop`, `add`, `insert`, `duplicatescene`, `deletescene`, `send`, `sceneset`, `slot`, `place`, `duplicate`, `clear`, `copy`, `paste`, `cut`, `quantize` |
-| Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>` |
+| Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>`, `export <clip>`, `generate <type> [key=value]` |
 | Performance Matrix | `perf get`, `add <kind> [label]`, `remove`, `assign`, `clear`, `unmidi`, `set`, `edit`, `page add|go|rename|delete|duplicate` |
-| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library`, `mod curve`, `studio get|set` |
+| Make | `studio generate <part> [bars=n]`, `studio status|export|node <type>|get|set` |
+| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library list|add|remove|refresh` |
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
-| Learn | `context`, `guide` |
+| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings`, `show`, `view`, `quit` |
+| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>` |
 | Watch | `watch` prints a JSON line for each change |
-| Terminal | `term list`, `read`, `send`, `run` |
+| Terminal | `term open`, `list`, `read`, `send`, `run` |
 
 A `<node>` is an index, `selected`, or a title or type only one node has. Exit codes match 4.4, plus 7: no
 running app answered. Each terminal is tied to its own app, so two running apps do not cross.
@@ -2437,7 +2520,8 @@ glob  <name> <expression>
 
 Rules worth remembering:
 
-- **Wires read destination first.** `cable out 0 shape` means "Output slot 0 is fed by shape".
+)AGENTDOC"
+R"AGENTDOC(- **Wires read destination first.** `cable out 0 shape` means "Output slot 0 is fed by shape".
 - **Names work everywhere.** Use a node's `id` instead of its number, a slot's name (`input`, `input_2`) instead of its position, and a control's key in `mod` and `expr`.
 - **Leave defaults out.** A node needs only the keys it changes.
 - **Free text goes last** on its line.
@@ -2450,8 +2534,7 @@ The full record reference is `docs/reference/patch-format.md`. Three small worki
 
 ## 6. Modulation: making things move
 
-)AGENTDOC"
-R"AGENTDOC(Three ways, from simplest to most flexible.
+Three ways, from simplest to most flexible.
 
 | Way | Example | Use it for |
 |---|---|---|
@@ -2484,7 +2567,6 @@ R"AGENTDOC(Three ways, from simplest to most flexible.
 | Bake | `i mode` AO, Curvature, Position, Normal, Thickness, Sculpt | Outputs an image, so wire it to an Output or to a Material slot. Sculpt mode needs a sculpted input |
 | Armature | `i bones`, `f curl`, `f waveAmount` | Pose and IK controls are `pose0..`; an optional `path` geometry input bends the chain along a curve |
 | UV Project | `i uvMode` Smart, Cube, Cylinder, Sphere | Same engine as Transform's UV Project operation |
-| Fur | `f furDensity` (per cm²), `f furLength` (m), `f furWidth`, `i furSegments`, `f furGravity`, `f furClump`, `f furCurl`, `i furNormals` Ribbon, Tangent | Optional `guide` geometry input (a Curve) styles every strand; `i furMaxStrands` caps the count. A Material with `i model 1` (Hair: `f melanin`, `f melaninRedness`, `f radialRoughness`, `f hairShift`) wants Tangent normals |
 | Model 3D | `s path file.glb`, `i clip`, `pose0..` | Skinned glTF clips, morphs and poses animate with the clock |
 | Cloth, Rigid Bodies | `geo` input, Cloth also `collider` | Cloth `colliderFriction`, `colliderDistance`; Rigid Bodies `collider` Box, Sphere, Convex hull. Both simulate from time 0, so ask `--frame` for a later second to see motion |
 | Render 3D | `i engine` Raster, Path trace, Live or Live + settle (Live: macOS) | `ptSamples`, `ptBounces` for the path tracer; `renderPass` and cavity, AO, depth of field controls for passes |
@@ -2854,7 +2936,6 @@ written. `--canonicalize` and `--validate` never lay out: a pos-less node still 
 | `--frame f.inf 0,1,2 dir/ --contact-sheet sheet.png` | several times in one image, each cell stamped with its time |
 | `--audio-summary f.inf out.json [--duration S] [--wav out.wav]` | what it sounds like, as numbers: loudness, peaks, clipping, silence, spectrum, tempo guess |
 | `--audio-summary f.inf out.json --timeline` | the same for the arrangement's audio lanes (Timeline audio mode) instead of the canvas Audio Outs; a clip's source node needs no cable |
-| `--render f.inf out.mp4 --timeline [--start S] [--duration S]` | the arrangement export, as the Timeline's Render dialog would write it (video lanes plus audio lanes) |
 | `--canonicalize in out` | the numeric form the GUI would write |
 
 Reading the result without opening a file: the status line (last line of stdout) carries the headline
@@ -3437,6 +3518,7 @@ command, never your memory.
 | What a node is for, a thing to try, a chain it fits | `infinite docs nodes <Type>` |
 | Keyboard shortcuts | `infinite docs shortcuts` |
 | Panels and how to open them | `infinite docs panels` |
+| What every panel, menu, column and button does | `infinite docs ui [part]` |
 | What can be cabled into what | `infinite docs connections` |
 | Field language, full manual | `infinite docs field`; quick reference `infinite code docs field` |
 | Sketch (JS 2D), Sketch 3D (three.js style), GLSL, expressions | `infinite code docs sketch\|sketch3d\|glsl\|expressions` |
@@ -3484,8 +3566,9 @@ Never hand the user code that has not passed its check.
 | Effects | change a picture | gaussianblur, bloom, glitch, kaleidoscope, displace, halftone, pixelate, ripple, edge outline |
 | Compositing | colour, layers, time | Blend, Layer Stack, Curves, Color Ramp, Feedback, Trails, Fluid, Reaction Diffusion, chroma key |
 | 3D | geometry to a render | primitives, Model 3D, Instance on Points, Particle System, Field Modifier, Sketch 3D, Material, Camera, Light, Render 3D |
+| Shader | procedural material graphs | Shade Coord, Shade Mapping, Shade Checker, Shade Noise, Shade Voronoi, Shade Gradient, Shade Brick, Shade Image, Bump, Normal Map, Fresnel, Layer Weight, Geometry, Math, Vector Math, Mix, Ramp, Map Range |
 | Synths | make sound | Analog, FM, Wavetable, Piano, String, Sampler, Granular, Drum Sequencer, Field Synth |
-| AudioEffects | change sound | Audio Filter, EQ, Dynamics, Delay, Reverb, Drive, Chorus, Stutter, Convolution Reverb |
+| AudioEffects | change sound | Audio Filter, EQ, Dynamics, Delay, Reverb, Drive, Chorus, Stutter, Convolution Reverb, Spectral Field |
 | Notes | notes and MIDI | MIDI Notes, Note Sequencer, Arpeggiator, Chorder, Piano Roll, Quantizer, Humanizer |
 | Modulators | move a value over time | LFO, Random, MSEG, Envelope, Audio Analyze, Audio to CV, Smoothing, Image Analyze, Hand Track |
 | Macros | knobs for playing live | Macro Knob, Macro XY, Macro Trigger |

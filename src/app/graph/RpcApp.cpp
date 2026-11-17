@@ -66,10 +66,14 @@ namespace app
          static const std::pair<const char*, const char*> kAlias[] = {
             { "nodes", "library" }, { "nodelibrary", "library" }, { "browser", "library" }, { "addnode", "library" },
             { "piano", "pianoroll" }, { "notes", "pianoroll" }, { "studio", "samplestudio" }, { "sample", "samplestudio" },
-            { "samples", "samplestudio" }, { "matrix", "modmatrix" },
+            { "samples", "samplestudio" }, { "drum", "drums" }, { "drumpanel", "drums" }, { "drumsequencer", "drums" },
+            { "mixerpanel", "mixer" }, { "desk", "mixer" }, { "matrix", "modmatrix" },
             { "modulation", "modmatrix" }, { "modulationmatrix", "modmatrix" }, { "performance", "perf" },
             { "arrange", "timeline" }, { "arrangement", "timeline" }, { "tracks", "timeline" }, { "3d", "view3d" },
-            { "3dview", "view3d" }, { "chat", "terminal" }, { "agent", "terminal" }, { "shell", "terminal" }, { "curve", "curveeditor" }, { "curves", "curveeditor" }, { "mseg", "curveeditor" },
+            { "3dview", "view3d" }, { "2d", "view2d" }, { "2dview", "view2d" }, { "scene2d", "view2d" },
+            { "chat", "terminal" }, { "agent", "terminal" }, { "shell", "terminal" },
+            { "curve", "curveeditor" }, { "curves", "curveeditor" }, { "mseg", "curveeditor" },
+            { "field", "fieldpatcher" }, { "patcher", "fieldpatcher" }, { "fieldpatch", "fieldpatcher" },
             { "preview", "viewport" }, { "output", "viewport" }, { "show", "showset" }, { "undo", "history" },
             { "keys", "shortcuts" }, { "keyboardshortcuts", "shortcuts" },
          };

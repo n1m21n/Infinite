@@ -123,6 +123,48 @@ namespace chat
          fn("status",
             "Inspect transport playback, FPS, and patch status.",
             { { "type", "object" }, { "properties", nlohmann::json::object() } }),
+         fn("attention",
+            "Inspect what the user is pointing at: selected nodes, last touched control, hovered control, keyboard focus, and open panels.",
+            { { "type", "object" }, { "properties", nlohmann::json::object() } }),
+         fn("selection",
+            "List the currently selected nodes on the canvas.",
+            { { "type", "object" }, { "properties", nlohmann::json::object() } }),
+         fn("explain",
+            "Explain the open patch: nodes, non-default controls, wires, modulation ranges, and geometry bounds.",
+            {
+               { "type", "object" },
+               { "properties", {
+                  { "all", { { "type", "boolean" }, { "description", "Include default parameter values too." } } }
+               } }
+            }),
+         fn("panel",
+            "Query all panels and their open/dock state, or open/close/dock a panel (e.g. mixer, drums, view2d, view3d, fieldpatcher, curveeditor, timeline, session, samplestudio, pianoroll, perf, modmatrix, viewport, terminal, settings/<place>).",
+            {
+               { "type", "object" },
+               { "properties", {
+                  { "name", { { "type", "string" } } },
+                  { "open", { { "type", "boolean" } } },
+                  { "dock", { { "type", "string" }, { "description", "bottom, right, left, top, or fill (for view2d/view3d)." } } }
+               } }
+            }),
+         fn("view2d",
+            "Inspect or edit 2D View (Scene 2D) layers, shapes, text, paint, and effects. Pass op='layers' or op='fields' to inspect, or op='batch' with calls.",
+            {
+               { "type", "object" },
+               { "properties", {
+                  { "op", { { "type", "string" } } },
+                  { "calls", { { "type", "array" }, { "items", { { "type", "object" } } } } }
+               } }
+            }),
+         fn("settings",
+            "Read or update app settings (pass key, and optionally value).",
+            {
+               { "type", "object" },
+               { "properties", {
+                  { "key", { { "type", "string" } } },
+                  { "value", {} }
+               } }
+            }),
       });
    }
 
