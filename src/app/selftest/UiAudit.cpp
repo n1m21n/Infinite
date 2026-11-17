@@ -2153,6 +2153,9 @@ void FrameTest_JOURNEYS(int frameId, GLFWwindow* window)
             float fx = 0.5f, fy = 0.5f;
             if (st.contains("at")) fx = st["at"][0].get<float>(), fy = st["at"][1].get<float>();
             sMouse = ImVec2(mn.x + (mx.x - mn.x) * fx, mn.y + (mx.y - mn.y) * fy);
+            ImVec2 dp;   // "doc": [x, y] clicks that document point
+            if (st.contains("doc") && docPt(st["doc"][0].get<float>(), st["doc"][1].get<float>(), &dp))
+               sMouse = dp;
             sSub = 1, sWait = 1;
             return;
          }

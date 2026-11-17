@@ -1133,7 +1133,7 @@ static bool RunDrumSequencerFixture()
          c->ApplyPattern(gs[gClosedOnly], pClosedOnly);
          kitOk &= !c->FilePath(2).empty() && c->FilePath(3).empty() && c->laneChoke[2] == 0 && c->laneChoke[3] == 0;
 
-         // a second apply never replaces what the first one loaded, nor a user choke setting
+         // a second apply of the same kit reloads nothing the first one loaded, nor a user choke setting
          a->laneChoke[2] = 2;
          a->laneChoke[3] = 0;
          a->ClearLane(3);
