@@ -78,7 +78,8 @@ def build(t):
     if t["type"] == "Output":
         return "\n".join(lines + links) + "\n", "image"  # the node under test is the output
     out = add("Utility Output")
-    if t["category"] == "3D" and t["type"].startswith("Shade ") and kind == "image":
+    # Shade nodes register under category "Shader" (NodeRegistry.cpp), not "3D": match by name.
+    if t["type"].startswith("Shade ") and kind == "image":
         # shader nodes only mean something inside a material: feed its albedo on a lit cube
         cube, mat = add("3D Cube"), add("3D Material")
         r = add("3D Render 3D", "  f width 512\n  f height 512\n")
