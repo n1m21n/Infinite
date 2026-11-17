@@ -240,8 +240,46 @@ namespace app
                done(ArrangeEdit([&] { Arrange::MoveClips(gArrange, { id(0) }, beat(1), args.size() > 2 ? atoi(args[2].c_str()) : 0); }));
             else if (action == "trim" && need(3))
                done(ArrangeEdit([&] { Arrange::TrimEdge(gArrange, id(0), args[1] == "end" ? Arrange::kEdgeEnd : Arrange::kEdgeStart, beat(2)); }));
+            else if (action == "split" && need(2) && args[1] == "playhead")
+            {
+               // The clip menu's Split at Playhead, on the named clip (the selection is set to it first).
+               gArrangeSel.clear();
+               gArrangeSel.insert(id(0));
+               done(ArrangeSplitSelectionAt(ArrangePlayTick()));
+            }
             else if (action == "split" && need(2))
                done(ArrangeEdit([&] { Arrange::Split(gArrange, id(0), beat(1)); }));
+            else if (action == "duplicate" && need(1) && fields.value("selection", false))
+            {
+               // The clip menu's Duplicate (selection=true): the same path as Cmd+D, which respawns cloned nodes.
+               const std::vector<uint64_t> ids = Ids(args, 0);
+               gArrangeSel.clear();
+               gArrangeSel.insert(ids.begin(), ids.end());
+               done(ArrangeDuplicateSelection());
+            }
+            else if (action == "copy" && need(1))
+            {
+               // The clip menu's Copy: the named clips become the clipboard, as the selection would.
+               const std::vector<uint64_t> ids = Ids(args, 0);
+               gArrangeSel.clear();
+               gArrangeSel.insert(ids.begin(), ids.end());
+               done(ArrangeCopySelection());
+            }
+            else if (action == "paste")
+               done(ArrangePasteAt(ArrangePlayTick()));
+            else if (action == "inspect" && need(1))
+            {
+               // The clip menu's Clip Settings: the inspector opens on this clip.
+               if (Arrange::FindClip(gArrange, id(0)) == nullptr)
+                  refused("inspect");
+               else
+               {
+                  gArrangeClipSettingsPanelOpen = true;
+                  gArrangeSettingsPanelTarget = id(0);
+                  gArrangeRowSel.clear();
+                  gArrangeRowSelAnchor = 0;
+               }
+            }
             else if (action == "duplicate" && need(1))
                done(ArrangeEdit([&] { Arrange::DuplicateBlock(gArrange, Ids(args, 0)); }));
             else if (action == "delete" && need(1))
@@ -287,6 +325,12 @@ namespace app
                done(ArrangeEdit([&] { Arrange::RenameMarker(gArrange, id(0), args[1]); }));
             else if (action == "delete" && need(1))
                done(ArrangeEdit([&] { Arrange::DeleteMarker(gArrange, id(0)); }));
+            else if (action == "color" && need(2))
+            {
+               // The marker menu's Colour: RRGGBB hex, packed as the marker colour is (r<<24|g<<16|b<<8|a, opaque).
+               const uint32_t rgb = static_cast<uint32_t>(strtoul(args[1].c_str(), nullptr, 16)) & 0xFFFFFFu;
+               done(ArrangeEdit([&] { Arrange::RecolorMarker(gArrange, id(0), (rgb << 8) | 0xFFu); }));
+            }
             else if (action == "next" || action == "prev")
                done(ArrangeJumpToMarker(action == "next" ? 1 : -1));
             else if (outError.empty())

@@ -323,7 +323,19 @@
   "panels/SettingsWindow.cpp:Continuous grab": "settings view3dContinuousGrab true|false",
   "panels/SettingsWindow.cpp:Zoom to mouse": "settings view3dZoomToMouse true|false",
   "panels/SettingsWindow.cpp:Orbit around selection": "settings view3dOrbitAroundSelection true|false",
-  "panels/SettingsWindow.cpp:Invert zoom direction": "settings view3dInvertZoom true|false"
+  "panels/SettingsWindow.cpp:Invert zoom direction": "settings view3dInvertZoom true|false",
+  "panels/ArrangePanel.cpp:Copy": "timeline clip copy <ids>",
+  "panels/ArrangePanel.cpp:Duplicate": "timeline clip duplicate <ids> selection=true",
+  "panels/ArrangePanel.cpp:Split at Playhead": "timeline clip split <id> playhead",
+  "panels/ArrangePanel.cpp:Paste at Playhead": "timeline clip paste",
+  "panels/ArrangePanel.cpp:Clip Settings": "timeline clip inspect <id>",
+  "panels/ArrangePanel.cpp:Colour": "timeline marker color <id> <RRGGBB>",
+  "panels/ArrangePanel.cpp:Colour Tint": "timeline clip set <id> color=",
+  "panels/ArrangePanel.cpp:Blend Mode": "timeline clip set <id> blendMode=",
+  "panels/ArrangePanel.cpp:Close Timeline": "panel timeline close",
+  "panels/ArrangePanel.cpp:Duplicate Track": "timeline track duplicate <id>",
+  "panels/ArrangeSessionGrid.cpp:Duplicate Track": "timeline track duplicate <id>",
+  "panels/ArrangeSessionGrid.cpp:Rename Track": "timeline track set <id> name="
  },
  "skip": {
   "frame/StagePopupsA.cpp:Reference in chat": "puts the node in the chat box as an @ reference; an agent already names nodes with @",
@@ -411,6 +423,7 @@
   "frame/HostSlots.cpp": "plugin mode only, where the Terminal is hidden; the DAW automates the bound knob from its own lanes",
   "panels/SettingsWindow.cpp:Tempo": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
   "panels/SettingsWindow.cpp:Playhead": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
-  "panels/SettingsWindow.cpp:Loop": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop"
+  "panels/SettingsWindow.cpp:Loop": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
+  "panels/ArrangePanel.cpp:Blade": "a mouse tool mode (the B key picks it), not a command: it changes how the next drag cuts"
  }
 }
