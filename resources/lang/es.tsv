@@ -2934,3 +2934,768 @@ Zoom around the pointer, or pan; middle-drag also pans	Zoom alrededor del punter
 Zoom the value axis around the pointer	Zoom del eje de valores alrededor del puntero
 param 	param 
 trig input	entrada trig
+%+.1f dB	=en
+%.1f s %s	=en
+%d x %d, %d layers	%d x %d, %d capas
+%d x %d, F12	=en
+%s %+.1f dB	=en
+%s %d  %+.1f dB  %s	=en
+%s %d: %s\n%s	=en
+(loop)	(bucle)
+(whole)	(completo)
+-inf dB	=en
+10% to 100%	10% a 100%
+2D View	Vista 2D
+2D View - lay out node outputs as layers and render a picture (Shift+2)	Vista 2D: organiza las salidas de los nodos como capas y renderiza una imagen (Mayús+2)
+2D View Panel	Panel Vista 2D
+3D	=en
+API key	Clave de API
+Above	Arriba
+Absolute	Absoluto
+Accent / Erase	Acento / Borrar
+Accumulation	Acumulación
+Actual Pixels	Píxeles reales
+Actual pixels (Ctrl+1)	Píxeles reales (Ctrl+1)
+Add Box	Añadir caja
+Add Layer Mask	Añadir máscara de capa
+Add Node as Layer	Añadir nodo como capa
+Add Vector Mask	Añadir máscara vectorial
+Add a layer mask (from the selection when there is one)	Añade una máscara de capa (desde la selección, si hay una)
+Add a node from the canvas as a layer	Añade un nodo del lienzo como capa
+Add an outlet to make a node	Añade una salida para crear un nodo
+Add another	Añadir otro
+Add effect	Añadir efecto
+Add font	Añadir fuente
+Add font...	Añadir fuente...
+Add insert	Añadir inserción
+Add to 2D View	Añadir a la vista 2D
+Add to Canvas	Añadir al lienzo
+Adjustment	Ajuste
+Adjustments	Ajustes
+Aligned	Alineado
+All fonts	Todas las fuentes
+All four sends are in use	Los cuatro envíos están en uso
+All lanes	Todas las pistas
+All layers	Todas las capas
+All pages	Todas las páginas
+All pages writes one file: every page summed.	«Todas las páginas» escribe un archivo: todas las páginas sumadas.
+All styles are on	Todos los estilos están activados
+Alpha	Alfa
+Alt-click to set the source	Alt-clic para fijar el origen
+Alt-click toggles an accent (full velocity); right-drag erases steps	Alt-clic alterna un acento (velocidad máxima); arrastrar con el botón derecho borra pasos
+Analyzing...	Analizando...
+Anchor	Ancla
+Angle	Ángulo
+Angle##v2dvfa	Ángulo##v2dvfa
+Animation	Animación
+Antialias	Antialias
+Apply (Enter)	Aplicar (Intro)
+Apply / Cancel Crop	Aplicar / cancelar recorte
+Apply style	Aplicar estilo
+Arrange	Organizar
+Arrange Layer	Organizar capa
+Arrange range	Organizar rango
+Audio is off. Start audio, or use Fast.	El audio está desactivado. Inicia el audio o usa Rápido.
+Auto	Auto
+Auto clean	Limpieza automática
+Auto-select	Autoselección
+Back to the document centre, scale 1, no rotation	Volver al centro del documento, escala 1, sin rotación
+Background colour to foreground	Цвет фона в цвет переднего плана
+Balance	Balance
+Balanced	Equilibrado
+Band	Banda
+Base URL	URL base
+Baseline	Línea base
+Behind	Detrás
+Below	Debajo
+Bitmap	Mapa de bits
+Black	Negro
+Blacks	Negros
+Blend Mode	Modo de fusión
+Blend in linear light	Mezclar en luz lineal
+Blend the patch with what is there	Mezcla el parche con lo que hay
+Block off	Bloque desactivado
+Blue	Azul
+Blues	Azules
+Box width	Ancho de la caja
+Boxes	Cajas
+Brightness	Brillo
+Bring Forward	Traer al frente
+Bring to Front	Traer al frente del todo
+Brush Opacity	Opacidad del pincel
+Brush Size / Hardness	Tamaño / dureza del pincel
+Builds a vector or colour from three values: RGB / XYZ, or hue, saturation, value in HSV mode. Patch a pin to drive that channel.	Crea un vector o un color a partir de tres valores: RGB / XYZ, o tono, saturación y valor en modo HSV. Conecta un pin para controlar ese canal.
+Bypass	Bypass
+Bypassed	En bypass
+Can't connect	No se puede conectar
+Can't group a strip that sends	No se puede agrupar una pista con envíos
+Can't return there	No se puede volver allí
+Can't ungroup	No se puede desagrupar
+Cancel (Esc)	Cancelar (Esc)
+Canvas size	Tamaño del lienzo
+Centre	Centro
+Centre Guides	Guías centrales
+Ch	Ca
+Chance the hit plays each time round	Probabilidad de que el golpe suene en cada vuelta
+Channel	Canal
+Choose	Elegir
+Choose image	Elegir imagen
+Choose...	Elegir...
+Chrome	Cromo
+Clear Cards	Borrar tarjetas
+Clear Guides	Borrar guías
+Clear Solos	Borrar solos
+Clear every solo on the console	Borra todos los solos de la consola
+Clear paint	Borrar pintura
+Click a	Haz clic en una
+Click a box	Haz clic en una caja
+Click a step on or off, drag to paint, drag up or down on a lit step for velocity	Clic en un paso para activarlo o desactivarlo, arrastra para pintar, arrastra arriba o abajo en un paso activo para la velocidad
+Click corners; Enter closes	Haz clic en las esquinas; Intro cierra
+Click to play and select (Alt = accent). Keys 1-8 too.	Clic para reproducir y seleccionar (Alt = acento). También teclas 1-8.
+Click: key on/off. Drag: paint. Drag up/down on a lit key: velocity.\nAlt-click: accent. Right-drag: erase. Shift-click: open on the Step page.	Clic: tecla activada/desactivada. Arrastrar: pintar. Arrastrar arriba/abajo en una tecla activa: velocidad.\nAlt-clic: acento. Arrastrar con botón derecho: borrar. Mayús-clic: abrir en la página de pasos.
+Clip Settings	Ajustes del clip
+Clip the active layer to the layer below	Recortar la capa activa a la capa inferior
+Clip to layer below	Recortar a la capa inferior
+Clipping Mask	Máscara de recorte
+Close 2D View	Cerrar vista 2D
+Close Chat	Cerrar chat
+Close Drums	Cerrar batería
+Close Field Patcher	Cerrar Field Patcher
+Close Mixer	Cerrar mezclador
+Close Mod Matrix	Cerrar matriz de modulación
+Close Performance	Cerrar interpretación
+Close Timeline	Cerrar línea de tiempo
+Close Viewport	Cerrar vista
+Colour Depth	Profundidad de color
+Colour Management	Gestión del color
+Colour Tint	Tinte de color
+Colour lookup	Búsqueda de color
+Colours	Colores
+Compression	Compresión
+Condition	Condición
+Conical	Cónico
+Contiguous	Contiguo
+Contour	Contorno
+Convert to Draw Node	Convertir en nodo Draw
+Convert to Shapes	Convertir en formas
+Convert to Sketch Node	Convertir en nodo Sketch
+Convert to Text Node	Convertir en nodo de texto
+Convert to shapes	Convertir en formas
+Copy / Clear Selection	Copiar / borrar selección
+Copy / Cut / Paste	Copiar / cortar / pegar
+Copy / Cut / Paste Boxes	Copiar / cortar / pegar cajas
+Copy from the whole picture	Copiar de toda la imagen
+Copy or cut the selected boxes, or paste them	Copia o corta las cajas seleccionadas, o pégalas
+Copy or cut the selected layers, or the selected pixels, or paste them	Copia o corta las capas o los píxeles seleccionados, o pégalos
+Copy the selected words of a message, or drop the selection	Copia las palabras seleccionadas de un mensaje, o quita la selección
+Corners	Esquinas
+Could not make one	No se pudo crear uno
+Couldn't create the file.	No se pudo crear el archivo.
+Create Clipping Mask	Crear máscara de recorte
+Crop layer	Recortar capa
+Crop the document (Enter)	Recortar el documento (Intro)
+Custom agent	Agente personalizado
+Cyan	Cian
+Cyan - Red	Cian - Rojo
+Cyans	Cianes
+Darken	Oscurecer
+Dash	Guion
+Delete Box or Wire	Borrar caja o cable
+Delete Document	Borrar documento
+Delete Layer	Borrar capa
+Delete Layer Mask	Borrar máscara de capa
+Delete Vector Mask	Borrar máscara vectorial
+Delete Wire	Borrar cable
+Delete layer	Borrar capa
+Delete the layer mask	Borra la máscara de capa
+Delete the vector mask	Borra la máscara vectorial
+Deselect	Deseleccionar
+Deselect / Invert	Deseleccionar / invertir
+Diamond	Rombo
+Dim	Atenuar
+Dim -20 dB. Speakers only: never in a render.	Atenuar −20 dB. Solo para altavoces: nunca en un render.
+Dim outside the crop	Atenuar fuera del recorte
+Disconnect	Desconectar
+Document	Documento
+Double pattern	Patrón doble
+Double-click	Doble clic
+Drag the selection's pixels onto another place	Arrastra los píxeles de la selección a otro lugar
+Drag to measure	Arrastra para medir
+Draw into the vector mask	Dibujar en la máscara vectorial
+Draw mask	Dibujar máscara
+Drive	Excitación
+Drop the pixel selection, or invert it	Quita la selección de píxeles, o invertirla
+Drums - play and edit Drum Sequencers (Shift+J)	Batería: reproduce y edita secuenciadores de batería (Mayús+J)
+Drums at Bottom	Batería abajo
+Drums at Top	Batería arriba
+Dual tip	Punta doble
+Duplicate (Ctrl+J)	Duplicar (Ctrl+J)
+Duplicate Boxes	Duplicar cajas
+Duplicate Document	Duplicar documento
+Duplicate Layer	Duplicar capa
+Duplicate the active layer	Duplica la capa activa
+Duplicate the selected boxes	Duplica las cajas seleccionadas
+Dynamics	Dinámica
+Each stroke starts with clean paint	Cada trazo empieza con pintura limpia
+Earlier	Antes
+Edit Adjustment...	Editar ajuste...
+Edit Fill...	Editar relleno...
+Edit Text	Editar texto
+Edit it on the canvas.	Edítalo en el lienzo.
+Effect on Below	Efecto sobre la capa inferior
+Ellipse	Elipse
+Empty	Vacío
+Empty page	Página vacía
+Enable	Activar
+Enabled	Activado
+Esc	Esc
+Essentials	Esenciales
+Even dashes round a closed shape	Guiones uniformes alrededor de una forma cerrada
+Every 2nd	Cada 2.º
+Every 4th	Cada 4.º
+Every 8th	Cada 8.º
+Every step	Cada paso
+Export ORA...	Exportar ORA...
+Export PSD...	Exportar PSD...
+Extra time after the length, with the transport stopped, so reverbs and delays ring out.	Tiempo extra tras la duración, con el transporte parado, para que reverbs y delays se apaguen.
+Fast	Rápido
+Fast can't render a live source (camera, MIDI, audio in). Use Live.	Rápido no puede renderizar una fuente en vivo (cámara, MIDI, entrada de audio). Usa Directo.
+Fast isn't available right now. Use Live.	Rápido no está disponible ahora. Usa Directo.
+Fast needs a length.	Rápido necesita una duración.
+Field Patcher	Field Patcher
+Field Patcher Panel	Panel Field Patcher
+Field patcher - Field as boxes (Shift+F)	Field Patcher: Field como cajas (Mayús+F)
+Field patches	Parches de Field
+File missing - drop a clip or Clear	Archivo no encontrado: suelta un clip o pulsa Borrar
+Fill gradient	Degradado de relleno
+Fill on or off	Relleno activado o desactivado
+Fill the Window	Llenar la ventana
+Fill the window (Ctrl+Shift+F)	Llenar la ventana (Ctrl+Mayús+F)
+Fill with a choice of colour, the foreground, or the background; inside the selection when there is one	Rellenar con un color elegido, el primer plano o el fondo; dentro de la selección si la hay
+Fill...	Relleno...
+First line	Primera línea
+Fit / Actual Pixels	Ajustar / píxeles reales
+Fit All	Ajustar todo
+Fit on Screen	Ajustar a pantalla
+Fit on screen (Ctrl+0)	Ajustar a pantalla (Ctrl+0)
+Fit the document on screen, or show it at 100%	Ajustar el documento a la pantalla, o mostrarlo al 100 %
+Flatten Image	Aplanar imagen
+Flip H	Voltear H
+Flip Horizontal	Voltear horizontal
+Flip V	Voltear V
+Flip Vertical	Voltear vertical
+Flip X	Voltear X
+Flip Y	Voltear Y
+Flip horizontal	Voltear horizontal
+Flip vertical	Voltear vertical
+Flow	Flujo
+Follow stroke	Seguir trazo
+Font	Fuente
+Frame every box on the page	Encuadrar todas las cajas de la página
+Free Transform	Transformación libre
+Freehand	A mano alzada
+From a node	Desde un nodo
+From centre	Desde el centro
+From start	Desde el inicio
+Generate again	Generar de nuevo
+Generating	Generando
+Gradient	Degradado
+Grain	Grano
+Grain depth	Profundidad del grano
+Grain mode	Modo de grano
+Grain scale	Escala del grano
+Green	Verde
+Greens	Verdes
+Grey	Gris
+Groove	Groove
+Groove: pick from the library	Groove: elegir de la biblioteca
+Group (Ctrl+G)	Agrupar (Ctrl+G)
+Group Colour	Color del grupo
+Group Layers	Agrupar capas
+Group the selected layers, or dissolve the group	Agrupa las capas seleccionadas, o desagrupa
+Grow or shrink the document; layers keep their place	Ampliar o reducir el documento; las capas mantienen su posición
+Grow the 2D View to fill the window, or put it back	Ampliar la vista 2D para llenar la ventana, o restaurarla
+Grow the 3D View to fill the window, or put it back	Ampliar la vista 3D para llenar la ventana, o restaurarla
+Guides	Guías
+HAP clip - no filmstrip	Clip HAP: sin tira de fotogramas
+Hard	Duro
+Hard edge	Borde duro
+Hardness	Dureza
+Hide from Canvas	Ocultar del lienzo
+Highlight	Resaltar
+Highlights	Altas luces
+Highlights Hue	Tono de altas luces
+Highlights Saturation	Saturación de altas luces
+Hold FILL to play Fill steps and mute !Fill steps; Shift-click latches it	Mantén FILL para reproducir los pasos Fill y silenciar los !Fill; Mayús-clic lo fija
+Hold: steps set to Fill play, !Fill rest. Shift-click latches.	Mantener: los pasos en Fill suenan, !Fill descansan. Mayús-clic lo fija.
+Hue	Tono
+Humanize velocity	Humanizar velocidad
+Image	Imagen
+Image size	Tamaño de imagen
+In export	En la exportación
+Indent left	Sangría izquierda
+Indent right	Sangría derecha
+Ink stipple	Punteado de tinta
+Input black	Negro de entrada
+Input white	Blanco de entrada
+Inside	Dentro
+Invert polarity	Invertir polaridad
+Jitter	Jitter
+Justify text	Justificar texto
+Keep light above 1.0	Mantener la luz por encima de 1,0
+Keep lightness	Mantener luminosidad
+Keep proportions	Mantener proporciones
+Kerning	Crenado
+Keys	Teclas
+Kit	Kit
+Label	Etiqueta
+Lane	Pista
+Lane length. 0 follows the pattern; other lengths loop on their own (polymeter)	Duración de la pista. 0 sigue el patrón; otras duraciones se repiten por sí solas (polimetría)
+Lanes in one choke group cut each other off (closed hat stops the open hat)	Las pistas de un mismo grupo choke se cortan entre sí (el hi-hat cerrado corta el abierto)
+Layer	Capa
+Layer as Output	Capa como salida
+Layer mask	Máscara de capa
+Layer mask: click to paint it, Shift-click to turn it off	Máscara de capa: clic para pintarla, Mayús-clic para desactivarla
+Layer via Cut	Capa mediante cortar
+Layers and properties	Capas y propiedades
+Leading	Interlineado
+Light height	Altura de la luz
+Lightness	Luminosidad
+Live	En directo
+Live records what plays. Fast renders offline, quicker than real time; live inputs can't be rendered that way.	En directo graba lo que suena. Rápido renderiza sin conexión, más rápido que tiempo real; las entradas en vivo no pueden renderizarse así.
+Load	Cargar
+Load stack	Cargar pila
+Loading preview...	Cargando vista previa...
+Lock alpha	Bloquear alfa
+Lookup	Búsqueda
+Luminance	Luminancia
+Magenta	Magenta
+Magenta - Green	Magenta - Verde
+Magentas	Magentas
+Map colours	Asignar colores
+Marbling	Veteado
+Marquee, Lasso; W cycles Magic Wand, Selection Brush, Object Selection. Shift adds, Alt subtracts. Enter closes a polygon lasso, Esc drops it	Marco, Lazo; W alterna Varita mágica, Pincel de selección, Selección de objeto. Mayús añade, Alt resta. Intro cierra un lazo poligonal, Esc lo descarta
+Mask	Máscara
+Mask from	Máscara desde
+Mask from Selection	Máscara desde selección
+Master	Máster
+Max	Máx
+Maximise (Esc returns)	Maximizar (Esc vuelve)
+Merge Down	Combinar con la inferior
+Merge Layers	Combinar capas
+Merge Visible	Combinar visibles
+Merge every shown layer into one pixel layer; hidden layers stay	Combina todas las capas visibles en una capa de píxeles; las ocultas se mantienen
+Merge the active layer into the one under it; with more selected, merge those	Combina la capa activa con la inferior; si hay más seleccionadas, combínalas
+Mirror strokes across the object	Reflejar trazos sobre el objeto
+Missing	Falta
+Mix	Mezcla
+Mixer	Mezclador
+Mixer - every Mixer node as a console (Shift+L)	Mezclador: cada nodo Mixer como consola (Mayús+L)
+Mixer at Bottom	Mezclador abajo
+Mixer at Top	Mezclador arriba
+Model ID	ID del modelo
+Molding...	Moldeando...
+Mono	Mono
+Mono check. Speakers only: never in a render.	Comprobación mono. Solo para altavoces: nunca en un render.
+Monochrome	Monocromo
+More settings	Más ajustes
+More tools. Tick the ones to show	Más herramientas. Marca las que quieras mostrar
+More..	Más...
+Move Left	Mover a la izquierda
+Move Right	Mover a la derecha
+Move down	Bajar
+Move the layer down or up; with Shift to the bottom or top	Mueve la capa arriba o abajo; con Mayús, al fondo o a la cima
+Move the selected pixels to a new layer	Mueve los píxeles seleccionados a una capa nueva
+Move the selection 1 or 10 pixels	Mueve la selección 1 o 10 píxeles
+Move up	Subir
+Move, Crop, Hand, Zoom; hold Space for the hand	Mover, recortar, mano, zoom; mantén Espacio para la mano
+Move, scale and turn the selected layers as one step; Enter keeps it, Esc puts them back	Mueve, escala y gira las capas seleccionadas en un solo paso; Intro lo mantiene, Esc las devuelve
+My grooves	Mis groove
+Nearest	Más cercano
+Neutrals	Neutros
+New Document	Nuevo documento
+New Drum Sequencer	Nuevo secuenciador de batería
+New Mixer	Nuevo mezclador
+New Piano Roll page	Nueva página de Piano Roll
+New adjustment layer	Nueva capa de ajuste
+New drum page	Nueva página de batería
+New fill layer	Nueva capa de relleno
+New layer	Nueva capa
+New mixer page	Nueva página de mezclador
+New scratch page	Nueva página de scratch
+New send FX	Nuevo efecto de envío
+New vector layer	Nueva capa vectorial
+New, duplicate or delete a document	Crear, duplicar o borrar un documento
+Next groove	Siguiente groove
+No Drum Sequencer yet	Aún no hay secuenciador de batería
+No Mixer feeds an Audio Out	Ningún mezclador alimenta una salida de audio
+No Mixer yet	Aún no hay mezclador
+No break	Sin pausa
+No box selected	Ninguna caja seleccionada
+No clip loaded	No hay clip cargado
+No effects here	No hay efectos aquí
+No fitting nodes	No hay nodos adecuados
+No free strip for the return	No hay pista libre para el retorno
+No geometry	Sin geometría
+No input	Sin entrada
+No layer selected	Ninguna capa seleccionada
+No layers	Sin capas
+No loop yet	Aún no hay bucle
+No matches	Sin coincidencias
+No preview	Sin vista previa
+No sample	Sin muestra
+No sample loaded	No hay muestra cargada
+No sample yet	Aún no hay muestra
+No sample · drop or click	Sin muestra · suelta o haz clic
+Node gone	Nodo eliminado
+Noise	Ruido
+Noise##v2dvfnoise	Ruido##v2dvfnoise
+Normal	Normal
+Not selected	No seleccionado
+Not tested	No probado
+Nothing in the 2D View yet	Aún no hay nada en la vista 2D
+Nothing to transform	Nada que transformar
+Now	Ahora
+Nudge	Desplazamiento
+Offbeats	Contratiempos
+Offset	Desplazamiento
+%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   An %.0f  Al %.0f
+Layer styles	Estilos de capa
+Metal	Metal
+Midtones	Medios tonos
+Min	Mín
+No banding	Sin bandas
+Only touching pixels	Solo píxeles contiguos
+Open	Abrir
+Open PSD or ORA...	Abrir PSD u ORA...
+Open grooves folder	Abrir carpeta de grooves
+Open in 2D View	Abrir en la vista 2D
+Open in Drum panel	Abrir en el panel de batería
+Open in Mixer panel	Abrir en el panel del mezclador
+Optical align	Alineación óptica
+Optional for local Ollama; stored in Keychain	Opcional para Ollama local; se guarda en el llavero
+Orange	Naranja
+Orthographic: click for perspective (5)	Ortográfica: clic para perspectiva (5)
+Outline colour	Color del contorno
+Outline width	Grosor del contorno
+Outlines as a vector layer	Contornos como capa vectorial
+Output black	Negro de salida
+Output white	Blanco de salida
+Outside	Fuera
+PAN	=en
+Paint	Pintar
+Paint Tools	Herramientas de pintura
+Paint a straight line from the last point	Pinta una línea recta desde el último punto
+Paint into the selection	Pintar dentro de la selección
+Paint mask	Máscara de pintura
+Paint on surface	Pintar sobre la superficie
+Paint out of the selection (Alt)	Pintar fuera de la selección (Alt)
+Paint the mask	Pinta la máscara
+Paint the selection with the brush; press again to leave	Pinta la selección con el pincel; pulsa de nuevo para salir
+Part	Parte
+Pass Through	Paso directo
+Paste at Playhead	Pegar en el cabezal
+Pattern	Patrón
+Pattern tools for the selected lane	Herramientas de patrón para la pista seleccionada
+Peak, integrated loudness, length and size of the file.	Pico, sonoridad integrada, duración y tamaño del archivo.
+Pen and shapes draw the mask	La pluma y las formas dibujan la máscara
+Pen pressure	Presión del lápiz
+Pen, Node, Shape, Text. Pen: click the first point to close, Enter or Esc ends the path. Node: Alt-click makes a corner, Delete removes the shape	Pluma, nodo, forma, texto. Pluma: clic en el primer punto para cerrar; Intro o Esc termina la ruta. Nodo: Alt-clic crea una esquina; Supr elimina la forma
+Perspective: click for orthographic (5)	Perspectiva: clic para ortográfica (5)
+Pick	Elegir
+Pick a groove	Elige un groove
+Pick a layer	Elige una capa
+Pick a part and generate	Elige una parte y genera
+Pick on Canvas	Elegir en el lienzo
+Pick on picture	Elegir en la imagen
+Picking	Seleccionando
+Pin page	Fijar página
+Pixel aspect	Relación de píxel
+Place this page as a node	Colocar esta página como nodo
+Plain	Simple
+Plasticine	Plastilina
+Play Pads	Tocar pads
+Play and select lanes 1-8 while the pointer is over the Drum panel (Shift = accent)	Toca y selecciona las pistas 1-8 con el puntero sobre el panel de batería (Mayús = acento)
+Polygon	Polígono
+Pre-fader sends	Envíos pre-fader
+Previous groove	Groove anterior
+Profile	Perfil
+Protect alpha	Proteger alfa
+Protect hue	Proteger tono
+Put this document on the canvas	Poner este documento en el lienzo
+Quick Mask	Máscara rápida
+REC %.1f s  %.1f MB	REC %.1f s  %.1f MB
+RGB	=en
+Radial	Radial
+Radius in px, not % of the shape	=en
+Ramp velocity	Rampa de velocidad
+Randomise	Aleatorizar
+Rasterize Layer	Rasterizar capa
+Rasterize?	¿Rasterizar?
+Reassign...	Reasignar...
+Recent	Recientes
+Rectangle	Rectángulo
+Red	Rojo
+Reds	Rojos
+Refill	Rellenar
+Reflected	Reflejado
+Release Clipping Mask	Liberar máscara de recorte
+Relief	Relieve
+Remove all paint from the surface	Quitar toda la pintura de la superficie
+Remove effect	Quitar efecto
+Remove the selected boxes or wires; the code updates as one undo step	Quita las cajas o cables seleccionados; el código se actualiza en un solo paso de deshacer
+Render Image / Animation	Renderizar imagen / animación
+Render an image (F12) or the animation (Ctrl+F12)	Renderizar una imagen (F12) o la animación (Ctrl+F12)
+Render folder	Carpeta de renderizado
+Render the document through an Output node	Renderizar el documento a través de un nodo Output
+Repeat	Repetir
+Repeat strokes across the picture	Repetir trazos por toda la imagen
+Replace with	Reemplazar con
+Replaces the pattern, rate, swing and steps; fills empty lanes from the kit	Reemplaza el patrón, la velocidad, el swing y los pasos; rellena las pistas vacías con el kit
+Resample nearest neighbour, no smoothing	Remuestreo por vecino más cercano, sin suavizado
+Reset Distort	Restablecer distorsión
+Reset Rotation	Restablecer rotación
+Reset name	Restablecer nombre
+Reset strip	Restablecer pista
+Reset trig	Restablecer disparo
+Restore Size	Restaurar tamaño
+Retouch Tools	Herramientas de retoque
+Return a maximised Field Patcher to its docked size	Devolver el Field Patcher maximizado a su tamaño acoplado
+Return to Start	Volver al inicio
+Reveal##folder	Mostrar##folder
+Right-click any node and choose Add to 2D View.	Haz clic derecho en cualquier nodo y elige Añadir a la vista 2D.
+Ring	Anillo
+Roll down	Enrollar hacia abajo
+Roll up	Enrollar hacia arriba
+Rotate 180°	Rotar 180°
+Rotate 90° Clockwise	Rotar 90° en sentido horario
+Rotate 90° Counter Clockwise	Rotar 90° en sentido antihorario
+Rotate View	Rotar vista
+Roundness	Redondez
+Rule of thirds guides	Guías de tercios
+Rulers	Reglas
+Rulers / Grid / Guides	Reglas / cuadrícula / guías
+Rulers, guides, grid	Reglas, guías, cuadrícula
+Run	Ejecutar
+Run this sequencer's steps (the transport keeps going)	Ejecutar los pasos de este secuenciador (el transporte sigue)
+Same for all##v2dvcrall	Igual para todos##v2dvcrall
+Sample the whole picture	Muestrear toda la imagen
+Saturation	Saturación
+Save Selection	Guardar selección
+Save stack	Guardar pila
+Save style	Guardar estilo
+Scale the document and every layer with it	Escalar el documento y todas las capas con él
+Scatter	Dispersión
+Scatter Y	Dispersión Y
+Scratch	Scratch
+Search boxes	Buscar cajas
+Search nodes	Buscar nodos
+Search the boxes this page's node can run; a dropped wire connects the new box	Busca las cajas que puede ejecutar el nodo de esta página; un cable soltado conecta la nueva caja
+Second colour	Segundo color
+Second scatter	Segunda dispersión
+Second size	Segundo tamaño
+Second tip	Segunda punta
+Select All Boxes	Seleccionar todas las cajas
+Select All Layers	Seleccionar todas las capas
+Select every box on the page	Selecciona todas las cajas de la página
+Select every top-level layer; with a paint or selection tool, every pixel	Selecciona todas las capas superiores; con una herramienta de pintura o selección, todos los píxeles
+Selected in chat	Seleccionado en el chat
+Selection	Selección
+Selection Tools	Herramientas de selección
+Selection is source	La selección es el origen
+Send Backward	Enviar hacia atrás
+Send to Back	Enviar al fondo
+Set a length first.	Define primero una duración.
+Shadows Hue	Tono de sombras
+Shadows Saturation	Saturación de sombras
+Shared	Compartido
+Shared chain	Cadena compartida
+Shared chain: edit it on the canvas	Cadena compartida: edítala en el lienzo
+Shear	Cizalla
+Shift	Mayús
+Shift left	Desplazar a la izquierda
+Shift right	Desplazar a la derecha
+Shift-click a step to open it on the Step page: velocity, chance, nudge and condition	Mayús-clic en un paso para abrirlo en la página de pasos: velocidad, probabilidad, desplazamiento y condición
+Show 2D View	Mostrar vista 2D
+Show Drums	Mostrar batería
+Show Field Patcher	Mostrar Field Patcher
+Show Mixer	Mostrar mezclador
+Show all tools	Mostrar todas las herramientas
+Show essentials only	Mostrar solo lo esencial
+Show on Canvas	Mostrar en el lienzo
+Show or hide the 2D View. Every other key in this section needs the pointer over the view	Mostrar u ocultar la vista 2D. Las demás teclas de esta sección requieren el puntero sobre la vista
+Show or hide them; drag from a ruler to pull a guide, drag it back to remove it	Mostrar u ocultar; arrastra desde una regla para sacar una guía y arrástrala de vuelta para quitarla
+Show outside the crop	Mostrar fuera del recorte
+Show the whole sample	Mostrar la muestra completa
+Size##img	Tamaño##img
+Skin	Piel
+Smaller or larger brush; with Shift softer or harder	Pincel más pequeño o grande; con Mayús, más suave o más duro
+Smoothing	Suavizado
+Soft	Suave
+Soft edges	Bordes suaves
+Solid	Sólido
+Solo (Alt-click: clear all, right-click: solo safe)	Solo (Alt-clic: borrar todos; clic derecho: solo seguro)
+Solo safe	Solo seguro
+Solo safe (right-click)	Solo seguro (clic derecho)
+Sound	Sonido
+Spacing	Espaciado
+Spectral field editor	Editor de campo espectral
+Spokes	Radios
+Spread	Dispersión
+Stabiliser	Estabilizador
+Stack	Pila
+Step Page	Página de pasos
+Stipple	Punteado
+Stop alpha	Detener alfa
+Straight Line	Línea recta
+Strike	Golpe
+Strike colour	Color del golpe
+Strike line	Línea de golpe
+Stroke	Trazo
+Stroke on or off	Trazo activado o desactivado
+Stroke options	Opciones de trazo
+Stroke under the fill	Trazo bajo el relleno
+Stroke width scales with the layer	El grosor del trazo escala con la capa
+Style	Estilo
+Subscript	Subíndice
+Subtract	Restar
+Superscript	Superíndice
+Swap the two colours, or reset them to black and white	Intercambia los dos colores o restablécelos a blanco y negro
+Swatches	Muestras
+Symmetry	Simetría
+TRIM	=en
+Tail	Cola
+Take the selected layers out; the nodes stay on the canvas	Saca las capas seleccionadas; los nodos permanecen en el lienzo
+Taper in	Afinar al inicio
+Taper out	Afinar al final
+Target	Destino
+Test connection	Probar conexión
+Testing…	Probando…
+Texture	Textura
+That would feed the audio back into itself.	Eso alimentaría el audio en sí mismo.
+That would feed the send back into itself.	Eso alimentaría el envío en sí mismo.
+The arrangement is empty.	El arreglo está vacío.
+The brush paints the mask	El pincel pinta la máscara
+The Mixer panel's console is driving audio. Click to hand it back to the canvas.	La consola del panel del mezclador controla el audio. Haz clic para devolverla al lienzo.
+The Mixer panel's console will drive audio once the engine is started.	La consola del panel del mezclador controlará el audio cuando se inicie el motor.
+The Mixer would pass 32 strips.	El mezclador tendría 32 pistas.
+The group has inserts, sends or a second cable. Edit it on the canvas.	El grupo tiene inserciones, envíos o un segundo cable. Edítalo en el lienzo.
+The rest of the bar	El resto del compás
+The source moves with each stroke	La fuente se mueve con cada trazo
+The top Mixer already has 32 strips.	El mezclador superior ya tiene 32 pistas.
+This Audio Out is already recording.	Esta salida de audio ya está grabando.
+This page	Esta página
+Tines	Púas
+Tip	Punta
+To	A
+Toggle the Drum panel	Mostrar u ocultar el panel de batería
+Toggle the Mixer panel	Mostrar u ocultar el panel del mezclador
+Tone	Tono
+Tool: Mute - click to choose a tool	Herramienta: silenciar; haz clic para elegir una herramienta
+Tools on the strip	Herramientas en la pista
+Tracking	Seguimiento
+Turn its sends off first.	Desactiva antes sus envíos.
+Turn on	Activar
+Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	Gira el lienzo o devuélvelo a su posición; el giro con dos dedos en el trackpad también funciona
+Turn this layer into pixels so the tool can work on it	Convierte esta capa en píxeles para que la herramienta pueda trabajar en ella
+Underline	Subrayado
+Underline colour	Color del subrayado
+Unpin page	Desfijar página
+Until stop	Hasta detener
+Use an existing send knob on this strip.	Usa un mando de envío existente en esta pista.
+Use in chat	Usar en el chat
+Vector	Vector
+Vector Tools	Herramientas vectoriales
+Vector mask	Máscara vectorial
+Viewport Colour	Color del viewport
+Violet	Violeta
+Waiting for play	Esperando a reproducir
+Waiting for the next grid line	Esperando a la siguiente línea de la cuadrícula
+Warp	Deformar
+Wet edges	Bordes húmedos
+Wet mix	Mezcla húmeda
+White	Blanco
+White Balance	Balance de blancos
+Whites	Blancos
+With play	Con reproducción
+With the Crop tool	Con la herramienta Recortar
+Yellow	Amarillo
+Yellow - Blue	Amarillo - Azul
+Yellows	Amarillos
+Your predictive macro faders: few faders drive many parameters based on learned co-movement PCA.	Tus faders macro predictivos: pocos faders controlan muchos parámetros según la covariación aprendida (PCA).
+Zoom - type a percentage	Zoom: escribe un porcentaje
+Zoom 2D View	Zoom en la vista 2D
+Zoom in (Ctrl++)	Acercar (Ctrl++)
+Zoom out (Ctrl+-)	Alejar (Ctrl+-)
+Zoom in or out; {mod} or Alt with the wheel zooms at the pointer	Acercar o alejar; {mod} o Alt con la rueda hace zoom en el puntero
+boxes	cajas
+code	código
+default	predeterminado
+field	=en
+items	elementos
+knob	mando
+lane	pista
+last good ·	último bueno ·
+max	máx
+min	mín
+more	más
+name	nombre
+no groove	sin groove
+node	nodo
+off	desactivado
+picture node	nodo de imagen
+pixels	píxeles
+post	post
+pre	pre
+refused: publish output is still wired	rechazado: la salida de publicación sigue conectada
+sound node	nodo de sonido
+source node	nodo fuente
+steps	pasos
+value	valor
+velocity	velocidad
+{patch} {take} {date} {time}. An existing file is never overwritten.	{patch} {take} {date} {time}. Nunca se sobrescribe un archivo existente.
+3D cell noise on the coordinate patched into vector (Generated when empty), times scale. Distance to the nearest point, Second nearest, Edge (the gap between the two), Cell (one grey per cell) or Colour (one colour per cell). Patch it into a Material's field input.	Ruido celular 3D sobre la coordenada conectada a vector (Generated si está vacío), por scale. Distancia al punto más cercano, Second nearest, Edge (la diferencia entre ambos), Cell (un gris por celda) o Colour (un color por celda). Conéctalo a la entrada field de un Material.
+A 3D checker of two colours on the coordinate patched into vector (Generated when empty), times scale. Patch it into a Material's field input to drive the base colour; the Material's other knobs still apply.	Damero 3D de dos colores sobre la coordenada conectada a vector (Generated si está vacío), por scale. Conéctalo a la entrada field de un Material para controlar el color base; los demás controles del Material siguen aplicándose.
+A blend weight by view angle, Fresnel or Facing. Blend sets how much of the surface is weighted.	Peso de mezcla según el ángulo de visión: Fresnel o Facing. Blend define cuánta superficie se pondera.
+A colour ramp of 2 to 8 stops read at the factor: Linear, Ease, Constant or B-Spline. Below the first stop and above the last the end colours hold.	Una rampa de color de 2 a 8 puntos, leída según el factor: Linear, Ease, Constant o B-Spline. Por debajo del primer punto y por encima del último se mantienen los colores extremos.
+A grey ramp of the coordinate patched into vector (Generated when empty), times scale: Linear, Quadratic, Easing, Diagonal, Spherical, Quadratic Sphere, Radial, Wave (bands along x) or Magic (interfering waves). Patch it into a Material's field input.	Rampa de grises de la coordenada conectada a vector (Generated si está vacío), por scale: Linear, Quadratic, Easing, Diagonal, Spherical, Quadratic Sphere, Radial, Wave (bandas en x) o Magic (ondas interferentes). Conéctalo a la entrada field de un Material.
+A height bends the normal by strength over distance; invert flips it. Wire it into Material's normal pin.	Una altura inclina la normal según la intensidad a lo largo de la distancia; invert la invierte. Conéctalo al pin normal del Material.
+A modulator written in Field code: publish is its value, 0..1. Patch it in the Field Patcher, or start from Slow LFO, Triangle LFO, Pulse train or Skipping beat.	Un modulador escrito en código Field: publish es su valor, 0..1. Conéctalo en el Field Patcher o parte de Slow LFO, Triangle LFO, Pulse train o Skipping beat.
+A note node whose body is a Field script. The script runs per sample against the transport beat; note(pitch, vel, len) inside an if sends a note out (len in beats, 0 holds as long as the incoming note). tick(div) fires on each beat division, deg(d) is a scale degree under Root/Scale, rand() is 0..1. Wire it into any synth or MIDI-out. publish scalar output adds a modulator pin carrying whatever publish holds. Boxes opens it in the Field Patcher.	Un nodo de notas cuyo cuerpo es un script Field. El script se ejecuta por muestra según el beat del transporte; note(pitch, vel, len) dentro de un if envía una nota (len en beats, 0 mantiene mientras la nota de entrada siga). tick(div) se dispara en cada división de beat, deg(d) es un grado de escala bajo Root/Scale, rand() va de 0 a 1. Conéctalo a cualquier sintetizador o MIDI out. La salida scalar de publish añade un pin de modulador con lo que publish contenga. Boxes lo abre en el Field Patcher.
+A shading node - builds a surface per shading point, the way Blender's shader nodes do. Chain it into a Material's pins; the Material compiles the chain into one program for every Render 3D engine.	Un nodo de sombreado: construye una superficie por punto de sombreado, como los nodos de sombreado de Blender. Encadénalo a los pines de un Material; el Material compila la cadena en un solo programa para cada motor de Render 3D.
+A spectral effect whose kernel you write in the node and which runs once per FFT bin: filters, freezes, pitch and frequency shifts, flips, robot and whisper voices, cross-synthesis.	Un efecto espectral cuyo kernel escribes en el nodo y que se ejecuta una vez por bin de FFT: filtros, congelado, desplazamientos de tono y frecuencia, inversiones, voces robot y susurro, síntesis cruzada.
+A tangent-space normal map colour (Shade Image set to Data) as a normal for Material's normal pin. Strength scales the tilt.	Un color de mapa de normales en espacio tangente (Shade Image en Data) como normal para el pin normal del Material. Strength escala la inclinación.
+A texture coordinate for the shading nodes: UV, Object, World, Generated (0 to 1 across the mesh's bounds), Normal, View or Reflection. Patch it into a Shade Mapping or a texture's vector input; the chain ends in a Material's field input.	Una coordenada de textura para los nodos de sombreado: UV, Object, World, Generated (de 0 a 1 en los límites de la malla), Normal, View o Reflection. Conéctala a un Shade Mapping o a la entrada vector de una textura; la cadena termina en la entrada field de un Material.
+An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the small 1-16 | 17-32 pill at the right of the line under it switches pages once steps goes past 16 - greyed out until then; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the small A B C pill at the end of the row; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern. A .mid file can become the pattern: drop it on the node, or keep .mid files in the My grooves folder (the last category in the groove picker, whose last row opens the folder). Its first two bars are placed on a 1/16 grid as 16 or 32 steps - General MIDI drum notes go to the matching lanes, and a melodic file gives its 8 lowest pitches to lanes 1-8 - at rate 1/16 with no swing, and the pattern takes the file's name. Each step also has a chance (how often it plays), a nudge (early or late, up to half a step) and a condition: Fill / !Fill follow the Drum panel's FILL button, 1st / !1st the first time round, and A:B plays on loop A of every B. Each lane can have its own length (polymeter), play its sample reversed, and run through a low-pass or high-pass filter with cutoff and resonance; these sit in the Drum panel (Shift+J).	Una caja de ritmos de 8 pistas y hasta 32 pasos: 8 tarjetas de pista (forma de onda + transitorio/caída/tono/afinación fina/volumen/paneo) sobre una rejilla de pasos de 8 pistas que muestra 16 pasos a la vez (la pastilla pequeña 1-16 | 17-32 a la derecha de la línea bajo ella cambia de página cuando los pasos superan 16; está atenuada hasta entonces; un punto marca la página donde está el cabezal). Haz clic en la forma de onda de una tarjeta para cargar su muestra (también sirven arrastrar desde el panel Samples o soltar un archivo del sistema), o arrastra sus asas de borde para recortar el rango de reproducción; x lo borra, y el botón choke recorre su grupo de choke (0 = ninguno: dos pistas del mismo grupo se cortan entre sí, como el hi-hat cerrado/abierto). En la rejilla, R aleatoriza el relleno de esa pista; M/S la silencia o la pone en solo. Haz clic en un paso para activarlo, arrastra verticalmente sobre un paso encendido para fijar su velocidad, arrastra horizontalmente para pintar una secuencia de pasos encendidos/apagados. Entre las tarjetas de pista y la rejilla, el selector de grooves tiene una biblioteca integrada de 141 grooves en 10 categorías: elige una categoría (salta a su primer groove) o un groove (la lista está agrupada y tiene un cuadro de filtro), avanza con < y >, y cambia la parte A estrofa / B puente / C estribillo del groove con la pastilla pequeña A B C al final de la fila; elegir uno reemplaza el patrón, la velocidad, el swing y el número de pasos en un solo paso de deshacer, y rellena las pistas vacías con el kit incluido (una pista que cargaste tú nunca se toca). Las filas inferiores afectan a todo el patrón: velocidad/pasos/swing/salida, y luego cuatro desplazamientos (transitorio/caída/tono/paneo) que se suman al valor de cada pista. Suena en cuanto se conecta, sincronizado con el transporte; no tiene entrada de notas, solo su propia secuencia derivada del Transport. run detiene los disparos de pasos de este nodo sin tocar el transporte; randomise siembra un patrón inicial musical de bombo/caja/hi-hat. Un archivo .mid puede convertirse en el patrón: suéltalo en el nodo, o guarda archivos .mid en la carpeta My grooves (la última categoría del selector, cuya última fila abre la carpeta). Sus dos primeros compases se colocan en una rejilla de 1/16 como 16 o 32 pasos: las notas de batería General MIDI van a las pistas correspondientes, y un archivo melódico asigna sus 8 tonos más graves a las pistas 1-8; velocidad 1/16 sin swing, y el patrón toma el nombre del archivo. Cada paso también tiene probabilidad (con qué frecuencia suena), desplazamiento (adelantado o retrasado, hasta medio paso) y condición: Fill / !Fill siguen el botón FILL del panel de batería, 1st / !1st la primera vez, y A:B suena en el bucle A de cada B. Cada pista puede tener su propia longitud (polirritmia), reproducir su muestra al revés y pasar por un filtro paso bajo o paso alto con frecuencia de corte y resonancia; esto está en el panel de batería (Mayús+J).
+Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sample Player. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload.	Re-síntesis por análisis/genoma: descompone una muestra cargada o grabada en parciales armónicos rastreados más una forma de onda residual real; Roll muta un genoma de parámetros y vuelve a renderizar una nueva muestra a partir de él; cada tirada se aleja más de la anterior, no de la original. Iterate vuelve a introducir el último render como nueva fuente y lo vuelve a analizar (consumiendo el sonido poco a poco); Reset vuelve por completo a la muestra cargada o grabada original: generación 0 y los seis mandos de forma (tone/air/snap/stretch/time/pitch) a neutro, y restaura el análisis, deshaciendo cualquier Iterate. chaos define cuánto salta la siguiente tirada; pitch se suma al recorrido de tono propio del genoma; tone equilibra parciales frente al residual; air/snap son los niveles de siseo constante y de ataque transitorio del residual; stretch escala la inarmonicidad junto con el espaciado armónico; time desplaza la temporización de ataque/caída sin cambiar la duración de la muestra. Es un diseñador de sonido, no un instrumento tocable: no recibe notas, solo una voz única de disparo propio con rango inicio/fin, bucle, reversa y ping-pong, con el mismo transporte que Sample Player. El análisis y el renderizado se ejecutan en un hilo de fondo, así que tirar nunca bloquea la interfaz. seed/gen/f0/harm en la lectura son el genoma exacto (semilla + número de generación) y el tono analizado: dos enteros bastan para reproducir cualquier sonido tirado al volver a cargarlo.
+Any image cable as a texture on the surface. Flat reads it at the vector (UV when unwired); Box projects it from three sides and blends by the normal. Colour decodes sRGB, Data reads raw values. Up to four pictures per material.	Cualquier cable de imagen como textura sobre la superficie. Flat la lee en el vector (UV si no está conectado); Box la proyecta desde tres lados y mezcla según la normal. Colour decodifica sRGB; Data lee los valores tal cual. Hasta cuatro imágenes por material.
+Applies shading, colour, metallic/roughness/opacity and emission to a geometry input, plus an optional normal map input (its strength slider only appears once something is patched into it). Detail scale reads the normal map a second time at a finer scale, Detail strength sets its tilt: weave or pores over the large folds. Model Hair shades a Fur mesh's strands as fibres, coloured by melanin. Translucency passes light through to the far side: leaves, sails, paper. Layer lays a second Material over this one where Mask is white, by Layer mix: paint over metal, dirt over paint, up to four deep.	Aplica sombreado, color, metálico/rugosidad/opacidad y emisión a una entrada de geometría, además de una entrada opcional de mapa de normales (su control de intensidad solo aparece cuando hay algo conectado). Detail scale lee el mapa de normales una segunda vez a una escala más fina; Detail strength define su inclinación: tejido o poros sobre los pliegues grandes. Model Hair sombrea los filamentos de una malla Fur como fibras, coloreadas por melanina. Translucency deja pasar la luz al otro lado: hojas, velas, papel. Layer superpone un segundo Material sobre este donde Mask es blanco, según Layer mix: pintura sobre metal, suciedad sobre pintura, hasta cuatro niveles.
+Blender's scalar maths on a, b and c: add to power, logs, rounding, modulo, trigonometry, compare and smooth min/max. Only the operands the operation reads are shown. Clamp limits the result to 0..1.	Matemáticas escalares de Blender sobre a, b y c: suma a potencia, logaritmos, redondeo, módulo, trigonometría, comparación y min/max suave. Solo se muestran los operandos que lee la operación. Clamp limita el resultado a 0..1.
+Blends a to b by factor, as a float, a vector or a colour. Colour runs b through one of the 30 blend modes first. Clamp factor holds the factor to 0..1.	Mezcla de a a b según factor, como float, vector o color. Colour aplica primero uno de los 30 modos de mezcla a b. Clamp factor mantiene el factor entre 0 y 1.
+Bricks in the x and y of the coordinate patched into vector (Generated when empty), times scale. Width and height size one brick, offset shifts every second row, mortar size is the gap, tint mixes each brick between colour 1 and colour 2 at random. Patch it into a Material's field input.	Ladrillos en x e y de la coordenada conectada a vector (Generated si está vacío), por scale. Width y height dan tamaño a un ladrillo, offset desplaza cada segunda hilada, mortar size es la junta, tint mezcla cada ladrillo al azar entre color 1 y color 2. Conéctalo a la entrada field de un Material.
+Generates procedural 3D point geometry from scratch using a per-element Field kernel (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot). value turns it into a value source: no mesh, publish is its output. Boxes opens it in the Field Patcher.	Genera geometría de puntos 3D procedural desde cero con un kernel Field por elemento (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot). value lo convierte en fuente de valor: sin malla; publish es su salida. Boxes lo abre en el Field Patcher.
+How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sample Player. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load.	Cómo usarlo: conecta out a Audio Out, suelta archivos de audio sobre los pads (o haz clic en un pad vacío, o usa Load... / Folder... para los primeros 16 archivos de una carpeta), y luego haz clic en un pad o envía notas a la entrada notes: las notas 36 a 51 tocan los pads 1 a 16. Un reproductor de muestras de 16 pads: el pad 1 está abajo a la izquierda, como en una MPC; cada pad es una baldosa cuadrada que muestra su forma de onda, número y modo, y cada pad tiene su propio pin CV, así que un modulador MIDI CC / Note o cualquier gate puede tocarlo. Cada pad es una voz independiente, por lo que los pads suenan juntos, y un clic suena al instante. Un golpe sigue el modo del pad: one shot reproduce la muestra entera y un nuevo golpe la reinicia; gate suena mientras se mantiene (ratón pulsado, CV alto o nota mantenida) y se detiene al soltar; loop alterna una reproducción en bucle con cada golpe. Hacer clic selecciona un pad (clic derecho selecciona sin tocar); las filas debajo de los pads editan el pad seleccionado: sync y rate, fine tune (cents), pitch (semitonos), speed (negativo reproduce hacia atrás), volumen, paneo, mode y fade in / fade out (ms, al inicio y al final de cada pasada), definidos igual que en Sample Player. sync es por pad: Free (el predeterminado) toca el golpe al instante; Synced guarda el golpe y lo dispara en la siguiente línea de la rejilla del transporte según la velocidad elegida (1/4, 1/8, 1 compás... las mismas divisiones que en cualquier otro nodo), con precisión de muestra; un golpe justo en la línea se dispara en ella, con el transporte detenido se dispara al instante, y en modo gate soltar antes de la línea cancela el golpe. En modo loop, un pad sincronizado vuelve a disparar la muestra en cada división mientras esté activo (una pasada por división: una muestra más larga se corta en la línea, una más corta deja un hueco), y con el transporte detenido suena como un bucle normal. El control de rate aparece atenuado mientras un pad está en Free. Todo parámetro de todos los pads se puede modular en cualquier momento: un cable sigue unido a su propio pad cuando seleccionas otro, y un punto naranja en una baldosa indica que ese pad tiene un parámetro modulado. Una baldosa muestra el modo y, si está sincronizado, la velocidad. La salida de audio del nodo es la mezcla de todos los pads. Las rutas de muestras cargadas y los ajustes de pads se guardan con el patch; el audio se vuelve a leer al cargar.
+How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sample Player's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened.	Cómo usarlo: conecta el sonido a loop en la entrada y out a Audio Out, pulsa Rec (con el transporte en marcha y sync activado, espera al siguiente compás; si pulsas hasta 200 ms tarde, la toma aún empieza en la línea que acaba de pasar), y la toma termina sola tras su longitud y luego se repite en bucle; Play detiene y reinicia, Dub superpone lo que entra, Clear la vacía. La forma de onda muestra el bucle con un cabezal y la rejilla de pulsos, y la línea bajo el título indica qué hace el looper. Cada botón tiene un pin CV, así que un pedal o una nota MIDI pueden accionarlos (un flanco de subida pulsa). take define la longitud: una división musical (1 compás por defecto) o free, donde la siguiente pulsación de Rec la termina. Pulsar Dub mientras se graba termina la toma y pasa directamente a overdub. Undo retrocede una capa cada vez (la última toma, overdub o Clear, hasta 8 pasos) y el bucle sigue sonando; pulsado durante un overdub descarta esa capa. La reproducción tiene los controles de Sample Player: finetune (cents), pitch (semitonos), speed (negativo reproduce hacia atrás), volumen y fade in / fade out (ms) al inicio y al final de cada pasada. A exactamente 1,00x el bucle se mantiene en la rejilla; a cualquier otra velocidad se reproduce en length / rate y se DESPLAZA respecto al transporte, y Dub se pausa mientras tanto (las capas solo se escriben a la velocidad con la que se grabaron). thru monitoriza la entrada en vivo. Cada toma siempre se desplaza según la latencia de ida y vuelta medida de la interfaz de audio, así que un bucle tocado a tiempo cae en la rejilla. El bucle (hasta 60 s) se guarda como WAV en tu carpeta Recordings y vuelve detenido al abrir el patch.
+Layered 3D noise on the coordinate patched into vector (Generated when empty), times scale. Detail adds octaves, roughness sets how strong each finer octave is, distortion warps the coordinate. Value is grey, Colour gives three different noises. Patch it into a Material's field input.	Ruido 3D en capas sobre la coordenada conectada a vector (Generated si está vacío), por scale. Detail añade octavas, roughness define cuánta fuerza tiene cada octava más fina, distortion deforma la coordenada. Value es gris; Colour da tres ruidos distintos. Conéctalo a la entrada field de un Material.
+On any other item: sculpt it with the brush. Ctrl+Tab or Esc leaves	En cualquier otro elemento: esculpe con el pincel. Ctrl+Tab o Esc salen
+One curve through 2 to 8 points, applied to each channel of the patched colour and blended in by factor. The default (0,0) to (1,1) leaves the colour unchanged.	Una curva que pasa por 2 a 8 puntos, aplicada a cada canal del color conectado y mezclada según factor. La curva predeterminada (0,0) a (1,1) deja el color sin cambios.
+Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sample Player) from the end of the chain.	Parte de la cadena de notas: recibe eventos de nota por su pin 'notes', los modifica y los pasa a la salida. Alimenta un sintetizador (Wavetable, Sample Player) desde el final de la cadena.
+Per-component vector maths on a, b and c, plus cross, project, reflect, refract, dot, distance, length and normalize. Dot, distance and length give a grey value. Scale only shows for Scale and Refract.	Matemáticas vectoriales por componente sobre a, b y c, además de cross, project, reflect, refract, dot, distance, length y normalize. Dot, distance y length dan un valor gris. Scale solo aparece en Scale y Refract.
+Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or Field Pixel.	Dibuja la salida de cualquier kernel Field como curva o superficie, para que veas lo que hace un kernel antes de conectarlo a Field Effect, Field Synth o Field Pixel.
+Position, normal, tangent, incoming, backfacing, curvature, cavity and per-object random, one per output.	Posición, normal, tangente, incidente, cara trasera, curvatura, cavidad y aleatorio por objeto, una salida para cada uno.
+Press again to cycle. B: Brush, Paint Mixer, Colour Replace. E: Eraser, Background Erase, Flood Erase. G: Fill, Gradient. I: Eyedropper, Style Picker, Measure. Alt-click picks a colour with the brush or fill	Pulsa de nuevo para cambiar de herramienta. B: Pincel, Paint Mixer, Colour Replace. E: Borrador, Background Erase, Flood Erase. G: Relleno, Degradado. I: Cuentagotas, Style Picker, Medir. Alt-clic elige un color con el pincel o el relleno
+Press again to cycle. S: Clone, Undo Brush. J: Heal, Blemish, Patch, Inpaint, Red Eye. R: Blur, Sharpen, Median. O: Dodge, Burn, Sponge	Pulsa de nuevo para cambiar. S: Clonar, Undo Brush. J: Curar, Blemish, Patch, Inpaint, Ojos rojos. R: Desenfocar, Enfocar, Mediana. O: Aclarar, Oscurecer, Esponja
+Reflectance of a dielectric of this IOR by view angle: low face-on, rising to 1 at grazing angles.	Reflectancia de un dieléctrico con este IOR según el ángulo de visión: baja de frente, sube hasta 1 en ángulos rasantes.
+Remaps a value from the from range to the to range: Linear, Stepped (steps), Smoothstep or Smootherstep. Clamp limits the result to the to range.	Reasigna un valor del rango from al rango to: Linear, Stepped (pasos), Smoothstep o Smootherstep. Clamp limita el resultado al rango to.
+Runs a Field kernel once per frequency bin: audio in, STFT, your kernel, inverse STFT, audio out. Read `bin`, `bins`, `binhz`, `hop`, `sr`; write `mag`, `phase` or `freq`. `mag.at(k)` reads another bin, `state` keeps per-bin memory, `input bin audio B` adds a second spectrum for cross-synthesis. Size trades time for frequency detail; latency is one Size.	Ejecuta un kernel Field una vez por bin de frecuencia: audio de entrada, STFT, tu kernel, STFT inversa, audio de salida. Lee `bin`, `bins`, `binhz`, `hop`, `sr`; escribe `mag`, `phase` o `freq`. `mag.at(k)` lee otro bin, `state` guarda memoria por bin, `input bin audio B` añade un segundo espectro para la síntesis cruzada. Size cambia tiempo por detalle de frecuencia; la latencia es un Size.
+Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution. It also runs over point clouds (compiled to GLSL when the input has GPU points), where life is available as an attribute; the point presets include Limit to Box and Project onto Shape. Boxes opens it in the Field Patcher.	Ejecuta un kernel Field por vértice sobre la geometría, modificando P, N, uv, Cd y atributos personalizados con ejecución inferida por tasa. También funciona sobre nubes de puntos (compilado a GLSL cuando la entrada tiene puntos en GPU), donde life está disponible como atributo; los preajustes de puntos incluyen Limit to Box y Project onto Shape. Boxes lo abre en el Field Patcher.
+Runs once per bin. Read: bin, bins, binhz, hop, sr. Write: mag, phase, freq. X.at(k) reads another bin.	Se ejecuta una vez por bin. Lee: bin, bins, binhz, hop, sr. Escribe: mag, phase, freq. X.at(k) lee otro bin.
+Select, Draw, Erase, Blade and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	Seleccionar, Dibujar, Borrar, Cuchilla y Mano (arrastra para desplazar), con las mismas teclas que la Línea de tiempo y Sample Studio, mientras el puntero esté sobre el Piano Roll (Esc también vuelve a Seleccionar). El desplegable de herramientas las incluye junto al zoom. Todas las teclas de esta sección necesitan el puntero allí
+Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight and Geometry build a surface per shading point, the way Blender's shader nodes do. Chain them into a Material's field, albedo, roughness, metallic, normal, emission or opacity pin; the Material compiles the chain into one program for every Render 3D engine.	Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight y Geometry construyen una superficie por punto de sombreado, como los nodos de sombreado de Blender. Encadénalos a los pines field, albedo, roughness, metallic, normal, emission u opacity de un Material; el Material compila la cadena en un solo programa para cada motor de Render 3D.
+Show or hide the docked Field Patcher; it opens the Field Notes, Field Primitive or Field Modifier node selected on the canvas	Muestra u oculta el Field Patcher acoplado; abre el nodo Field Notes, Field Primitive o Field Modifier seleccionado en el lienzo
+Takes one channel of a vector or colour as a grey value: R, G, B (or X, Y, Z), or hue, saturation, value in HSV mode.	Toma un canal de un vector o color como valor de gris: R, G, B (o X, Y, Z), o matiz, saturación, valor en modo HSV.
+The 2D View's document: node outputs, fills and groups stacked into one picture at the document's size. Right-click any node with a picture and choose Add to 2D View, then lay it out in the 2D View panel (Shift+2): V moves, C crops, H pans, Z zooms, B paints on a paint layer (pen pressure works), M, L and W select pixels; drag a handle to scale (Shift for free), drag outside a corner to rotate. Each layer has a blend mode, opacity, fill, lock, colour label, an optional node or painted pixel mask and clip to the layer below; a paint layer can be turned into a Draw node from its menu; groups pass through or isolate. P draws pen paths, U live shapes (rectangle, ellipse, polygon, star, line) with fill, stroke, dash and booleans, A edits points, T types point or box text; vector and text layers stay editable after reopen, take a vector mask, and turn into a Sketch or Text node from their menu. Drop an SVG on the 2D View to make it a vector layer. A layer only points at its node, so the node keeps animating and is never changed; a deleted node leaves its layer as source missing. F12 renders a picture and {mod}+F12 the animation, through an Output node.	El documento de la vista 2D: salidas de nodos, rellenos y grupos apilados en una imagen con el tamaño del documento. Haz clic derecho en cualquier nodo con imagen y elige Añadir a la vista 2D; luego organízalo en el panel Vista 2D (Mayús+2): V mueve, C recorta, H desplaza, Z hace zoom, B pinta en una capa de pintura (la presión del lápiz funciona), M, L y W seleccionan píxeles; arrastra un tirador para escalar (Mayús para libre), arrastra fuera de una esquina para rotar. Cada capa tiene modo de mezcla, opacidad, relleno, bloqueo, etiqueta de color, máscara opcional de nodo o píxeles pintados y recorte a la capa inferior; una capa de pintura puede convertirse en un nodo Draw desde su menú; los grupos pasan o aíslan. P dibuja trazados a pluma, U formas en vivo (rectángulo, elipse, polígono, estrella, línea) con relleno, trazo, guion y booleanas, A edita puntos, T escribe texto de punto o de caja; las capas vectoriales y de texto siguen siendo editables al reabrir, admiten máscara vectorial y se convierten en un nodo Sketch o Text desde su menú. Suelta un SVG en la vista 2D para convertirlo en capa vectorial. Una capa solo apunta a su nodo, así que el nodo sigue animándose y nunca se modifica; si se borra un nodo, su capa queda con el origen perdido. F12 renderiza una imagen y {mod}+F12 la animación, a través de un nodo Output.
+The only node that sums audio - every other audio input pin takes exactly one cable, so any time two signals have to meet, they meet here. Four to eight slots, each with its own gain, pan, mute and solo, summed to one output. The Mixer panel (Shift+L) shows every Mixer that feeds an Audio Out as a console: inserts and sends per strip, right-click a strip name to group, ungroup or move it, and the master strip reads true peak and loudness (momentary, short-term, integrated; click the readout to reset). Render in the panel header records the console to a file: Live records what plays for a set length plus a tail, Fast renders the same take offline, quicker than real time. Fast can't render live inputs (camera, MIDI, audio in). Files are named from a template ({patch} {take} {date} {time}) and never overwrite.	El único nodo que suma audio: cada otro pin de entrada de audio admite exactamente un cable, así que siempre que dos señales deban encontrarse, se encuentran aquí. De cuatro a ocho ranuras, cada una con su propia ganancia, paneo, silencio y solo, sumadas en una salida. El panel Mixer (Mayús+L) muestra cada Mixer que alimenta un Audio Out como una consola: inserciones y envíos por canal; haz clic derecho en el nombre de un canal para agrupar, desagrupar o mover; el canal master muestra el pico real y la sonoridad (momentánea, a corto plazo, integrada; haz clic en la lectura para reiniciar). Render en la cabecera del panel graba la consola en un archivo: Live graba lo que suena durante una longitud fija más una cola, Fast renderiza la misma toma sin conexión, más rápido que el tiempo real. Fast no puede renderizar entradas en vivo (cámara, MIDI, audio de entrada). Los archivos se nombran con una plantilla ({patch} {take} {date} {time}) y nunca se sobrescriben.
+Translates, rotates (degrees, X then Y then Z) and scales a shading coordinate. Point moves the coordinate, Texture moves the pattern (the inverse), Vector skips the translate, Normal keeps unit length. With nothing patched in it uses Generated.	Traslada, rota (grados, X luego Y luego Z) y escala una coordenada de sombreado. Point mueve la coordenada, Texture mueve el patrón (lo inverso), Vector omite la traslación, Normal mantiene longitud unitaria. Sin nada conectado usa Generated.
+True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset.	Pico real (dBTP) y sonoridad (LUFS): momentánea, a corto plazo, integrada. Haz clic para reiniciar.
+Your predictive macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style.	Tus faders macro predictivos: extrae los ejes principales de tus gestos de varios mandos mediante PCA sobre los cambios, de modo que unos pocos faders macro controlen muchos parámetros acoplados a tu estilo.
