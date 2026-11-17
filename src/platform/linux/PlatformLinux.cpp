@@ -1009,6 +1009,10 @@ namespace Platform
    constexpr CURLoption CURLOPT_FOLLOWLOCATION = 52;
    constexpr CURLoption CURLOPT_FAILONERROR = 45;
    constexpr CURLoption CURLOPT_NOSIGNAL = 99;
+   constexpr CURLoption CURLOPT_POST = 47;
+   constexpr CURLoption CURLOPT_POSTFIELDS = 10015;
+   constexpr CURLoption CURLOPT_POSTFIELDSIZE = 60;
+   constexpr CURLoption CURLOPT_HTTPHEADER = 10023;
    constexpr CURLINFO CURLINFO_RESPONSE_CODE = 0x200000 + 2;
 
    struct CurlApi
