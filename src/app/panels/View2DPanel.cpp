@@ -9290,6 +9290,8 @@ namespace
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsWindowHovered() &&
              ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w, p.y + rowH)) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
             ImGui::OpenPopup("##rowmenu");
+         else if (MenuParts::TestOpen("##rowmenu"))   // self-test: the top row, as a right-click on it would
+            ImGui::OpenPopup("##rowmenu");
          if (MenuParts::BeginPopup("##rowmenu"))
          {
             if (!Selected(id))
@@ -11540,6 +11542,8 @@ namespace
       const ImVec2 mn(ImGui::GetWindowPos().x, top), mx(mn.x + ImGui::GetWindowSize().x, bottom);
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+         ImGui::OpenPopup("##v2ddockmenu");
+      if (MenuParts::TestOpen("##v2ddockmenu"))
          ImGui::OpenPopup("##v2ddockmenu");
       if (MenuParts::BeginPopup("##v2ddockmenu"))
       {
@@ -14619,4 +14623,8 @@ int View2DAffinityAb(const char* dir)
    }
    return fails;
 }
+
+// MENUALIVETEST: the layer clipboard is state a person sees (Paste lights up), but the patch does not hold it.
+std::string View2DTestFingerprint() { return "v2dclip:" + std::to_string(sClip.size()); }
+void View2DTestReset() { sClip.clear(); }
 } // namespace app

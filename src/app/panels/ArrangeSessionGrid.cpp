@@ -78,6 +78,11 @@ namespace app
       // One menu for the "+" column and a track header's right-click.
       void DrawTrackMenu()
       {
+         if (!gArrange.lanes.empty() && MenuParts::TestOpen("##sessiontrackctx"))
+         {
+            sTrackCtxLaneId = gArrange.lanes.front().id;
+            ImGui::OpenPopup("##sessiontrackctx");
+         }
          if (!MenuParts::BeginPopup("##sessiontrackctx"))
             return;
          if (MenuParts::Item(L("Add Video Track")))
@@ -317,6 +322,17 @@ namespace app
 
       void DrawSlotMenu()
       {
+         // Self-test: the first empty cell of the first track, as a right-click on it would.
+         if (!gArrange.lanes.empty() && MenuParts::TestOpen("##sessionslotctx"))
+         {
+            const Arrange::Lane& l = gArrange.lanes.front();
+            int row = 0;
+            while (row < (int)l.slots.size() && l.slots[(size_t)row].Has())
+               row++;
+            sCtxLaneId = l.id;
+            sCtxRow = row;
+            sSlotCtxOpen = true;
+         }
          if (sSlotCtxOpen)
             ImGui::OpenPopup("##sessionslotctx");
          sSlotCtxOpen = false;
@@ -459,6 +475,13 @@ namespace app
 
       void DrawSceneMenu()
       {
+         if (!gArrange.scenes.empty() && MenuParts::TestOpen("##sessionscenectx"))
+         {
+            sSelScene = sSceneCtxRow = 0;
+            snprintf(sSceneNameBuf, sizeof(sSceneNameBuf), "%s", gArrange.scenes.front().name.c_str());
+            sSceneTempoEdit = gArrange.scenes.front().tempo;
+            sSceneCtxOpen = true;
+         }
          if (sSceneCtxOpen)
             ImGui::OpenPopup("##sessionscenectx");
          sSceneCtxOpen = false;
@@ -1853,6 +1876,8 @@ namespace app
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::IsAnyItemHovered() &&
                 ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##sessiondockctx"))
                ImGui::OpenPopup("##sessiondockctx");
+            if (MenuParts::TestOpen("##sessiondockctx"))
+               ImGui::OpenPopup("##sessiondockctx");
          }
          DrawArrangeRenderDialogs();
          if (MenuParts::BeginPopup("##sessiondockctx"))
@@ -1909,7 +1934,19 @@ namespace app
             ImGui::SetCursorScreenPos(ImVec2(gridX + gridW + spacing, rowOrigin.y));
             DrawArrangeClipSettingsChild(kInspectorW);
          }
-         DrawArrangeClipContextMenu(ArrangeSessionTakeClipCtxRequest());
+         bool clipCtx = ArrangeSessionTakeClipCtxRequest();
+         // Self-test: the first filled cell, selected, as a right-click on it would.
+         if (MenuParts::TestOpen("##arrangeclipctx"))
+            for (const Arrange::Lane& l : gArrange.lanes)
+               for (size_t r = 0; r < l.slots.size() && !clipCtx; r++)
+                  if (l.slots[r].Has())
+                  {
+                     gArrangeCtxClipId = l.slots[r].clip.id;
+                     gArrangeSel = { gArrangeCtxClipId };
+                     gArrangeSelAnchor = gArrangeCtxClipId;
+                     clipCtx = true;
+                  }
+         DrawArrangeClipContextMenu(clipCtx);
       }
    }
 
@@ -1953,4 +1990,17 @@ namespace app
       EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
+
+// MENUALIVETEST: the slot clipboard is state a person sees (Paste lights up), but the patch does not hold it.
+std::string ArrangeSessionTestFingerprint()
+{
+   return (sSlotClip.has ? "slotclip:" + std::to_string((int)sSlotClip.laneType) : std::string("slotclip:-")) +
+          " timelineclip:" + std::to_string(gArrangeClipboard.items.size());
+}
+void ArrangeSessionTestReset()
+{
+   sSlotClip = {};
+   gArrangeClipboard = {};
+   gArrangeSel.clear();
+}
 }

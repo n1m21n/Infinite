@@ -730,6 +730,8 @@ namespace
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##fpDockMenu");
+      if (MenuParts::TestOpen("##fpDockMenu"))
+         ImGui::OpenPopup("##fpDockMenu");
       if (MenuParts::BeginPopup("##fpDockMenu"))
       {
          DockItem();
@@ -1098,7 +1100,19 @@ namespace
       ed::Suspend();
       ed::NodeId ctxNode;
       ed::LinkId ctxLink;
-      if (ed::ShowNodeContextMenu(&ctxNode))
+      // Self-test: the first box (or wire), as a right-click on it would.
+      if (!p.graph.boxes.empty() && MenuParts::TestOpen("##fpNodeMenu"))
+      {
+         s.ctxBox = p.graph.boxes.front().id;
+         ed::SelectNode(ed::NodeId((uintptr_t)s.ctxBox), false);
+         ImGui::OpenPopup("##fpNodeMenu");
+      }
+      else if (!p.graph.wires.empty() && MenuParts::TestOpen("##fpLinkMenu"))
+      {
+         s.ctxLink = p.graph.wires.front().id;
+         ImGui::OpenPopup("##fpLinkMenu");
+      }
+      else if (ed::ShowNodeContextMenu(&ctxNode))
       {
          s.ctxBox = (int)ctxNode.Get();
          if (!ed::IsNodeSelected(ctxNode))
@@ -1899,6 +1913,10 @@ void FieldPatcherTestCounts(int& boxes, int& wires)
    boxes = p != nullptr ? (int)p->graph.boxes.size() : -1;
    wires = p != nullptr ? (int)p->graph.wires.size() : -1;
 }
+
+// MENUALIVETEST: the box clipboard is state a person sees (Paste lights up), but the patch does not hold it.
+std::string FieldPatcherTestFingerprint() { return "fpclip:" + std::to_string(S().clipBoxes.size()); }
+void FieldPatcherTestReset() { S().clipBoxes.clear(); S().clipWires.clear(); }
 
 void FieldPatcherTestSelect(int kind, int index)
 {

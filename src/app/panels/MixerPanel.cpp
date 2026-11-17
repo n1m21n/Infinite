@@ -1459,6 +1459,8 @@ namespace app
          if (overPanel && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
              !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))   // a page/strip menu opened on the click
             ImGui::OpenPopup("##mixerpanelctx");
+         if (MenuParts::TestOpen("##mixerpanelctx"))
+            ImGui::OpenPopup("##mixerpanelctx");
          if (MenuParts::BeginPopup("##mixerpanelctx"))
          {
             static const char* kDockLabels[] = { I18N_KEY("Mixer at Bottom"), I18N_KEY("Mixer at Top") };

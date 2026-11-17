@@ -8036,6 +8036,8 @@ namespace
          DrawAddItems(scene);
          MenuParts::EndPopup();
       }
+      if (MenuParts::TestOpen("##v3dcontext"))
+         ImGui::OpenPopup("##v3dcontext");
       if (MenuParts::BeginPopup("##v3dcontext"))
       {
          // On an object: what to do with it. On empty space: add, select, view.
@@ -8327,6 +8329,8 @@ namespace
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##v3ddockmenu");
+      if (MenuParts::TestOpen("##v3ddockmenu"))
+         ImGui::OpenPopup("##v3ddockmenu");
       if (MenuParts::BeginPopup("##v3ddockmenu"))
       {
          if (MenuParts::SubMenu(T("Dock Position")))
@@ -8502,9 +8506,10 @@ void View3DTestPose()
       scene->Items()[1].pos[0] = -1.5f;
       scene->Items()[2].pos[0] = 2.5f;
    }
-   scene->Commit();
+   // The cursor before the commit, so the patch holds it from the first frame (a later write reads as drift).
    const float cur[3] = { -0.6f, 0.3f, 0.45f };
    std::copy(cur, cur + 3, sSet->cursor);
+   scene->Commit();
    // The same start for every click: first item selected, the view off to one side, no mode, no glide.
    sSel = { it.id };
    sLocal.clear();

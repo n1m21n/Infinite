@@ -981,6 +981,8 @@ namespace app
           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
          ImGui::OpenPopup("##modmatrixctx");
 
+      if (MenuParts::TestOpen("##modmatrixctx"))
+         ImGui::OpenPopup("##modmatrixctx");
       if (MenuParts::BeginPopup("##modmatrixctx"))
       {
          static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };

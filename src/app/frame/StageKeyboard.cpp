@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/MenuParts.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
@@ -1089,6 +1090,12 @@ void DrawKeyboard(FrameCtx& fc)
          if (gShotNodeMenu && !gNodes.empty() && ImGui::GetTime() > 5.0 && !ImGui::IsPopupOpen("##nodecontext"))
          {
             gContextMenuNodeIndex = gNodes.front().index;
+            ImGui::OpenPopup("##nodecontext");
+         }
+         if (!gNodes.empty() && MenuParts::TestOpen("##nodecontext"))   // self-test: the first node, as a right-click on it would
+         {
+            gContextMenuNodeIndex = gNodes.front().index;
+            ed::SelectNode(gNodes.front().NodeId(), false);
             ImGui::OpenPopup("##nodecontext");
          }
          if (gView3DTestMenuNode >= 0)

@@ -683,6 +683,8 @@ namespace
           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
          ImGui::OpenPopup("##terminalDockMenu");
+      if (MenuParts::TestOpen("##terminalDockMenu"))
+         ImGui::OpenPopup("##terminalDockMenu");
       if (!MenuParts::BeginPopup("##terminalDockMenu"))
          return;
       if (MenuParts::SubMenu(L("Dock Position")))
