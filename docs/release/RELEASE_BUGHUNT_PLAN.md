@@ -235,7 +235,7 @@ The Mac is slow, so run G only in P3 with nothing else running, and use `ab.sh` 
 | Node-body rules | `node-ui-pillars`, `audio-node-ui`; PINDUPTEST, SIZETEST, TEXTFIT | Auto + Claude | see checklist |
 | Interaction: pins, cables, drag, groups, undo, copy/paste, selection | `node-ui-sweep` | Auto | all OK (PLUGINDRAGTEST flaky: needs 20 passes or a fix) |
 | Panels: modulation and performance matrices, browser, viewport cards | `panels-sweep` | Auto | all OK |
-| Shortcuts match the help window | `shortcuts-sweep/check.py` | Auto | static pass; Windows/Linux key does not collide |
+| Shortcuts match the help window | `tools/design/keys_gate.py` | Auto | static pass; Windows/Linux key does not collide |
 | Keyboard navigation and accessibility | KB*TEST, NAVTEST **[exists]** | Auto | all OK |
 | i18n | I18NTEST, `tools/i18n/lint.py`; the 3 unwrapped strings (BusyLine.h:50, ArrangeRender.cpp:558, :578) | Auto | lint clean |
 | First-run experience: New Synth (Cmd+Shift+N), sample drop, presets, timeline keys | `USER_TEST_CHECKLIST.md` | You | each flow works as written |
