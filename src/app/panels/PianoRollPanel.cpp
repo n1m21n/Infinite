@@ -2504,7 +2504,17 @@ namespace
       if (c0 == nullptr)
          return;
       float v = field(*c0);
-      const bool changed = FormParts::SliderFloat(label, &v, lo, hi, fmt);
+      bool changed;
+      if (s.menuCompact)
+      {
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextUnformatted(label);
+         FormParts::Inline(84.0f);
+         ImGui::SetNextItemWidth(112.0f);
+         changed = FieldWell::Slider((std::string("##m") + label).c_str(), &v, lo, hi, fmt);
+      }
+      else
+         changed = FormParts::SliderFloat(label, &v, lo, hi, fmt);
       if (ImGui::IsItemActivated())
          ArrangeGestureBegin();
       if (changed)
@@ -3281,12 +3291,13 @@ namespace
       }
       ClampView(a.rollB - a.rollY);
       HandlePointer(page, a, hovered, mouse);
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && mouse.y >= a.rollY && mouse.x >= a.x0)
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && mouse.y >= a.stripY && mouse.x >= a.x0 &&
+          (mouse.y >= a.rollY || ClipAt(page, (Tick)std::max(0.0, a.XTick(mouse.x))) != nullptr))
       {
          State& ms = S();
-         NoteHit hit; // what is under the pointer decides the menu
+         NoteHit hit; // what is under the pointer decides the menu; the clip header is always the clip
          const Tick at = (Tick)std::max(0.0, a.XTick(mouse.x));
-         if (HitNote(page, a, mouse, hit))
+         if (mouse.y >= a.rollY && HitNote(page, a, mouse, hit))
          {
             if (ms.notes.count({ hit.clip, hit.note.id }) == 0)
                ms.notes = { { hit.clip, hit.note.id } };
@@ -3402,7 +3413,12 @@ namespace
          s.genOpen = false;
       }
       if (MenuParts::Item(L("Duplicate"), "Shift+D"))
-         DuplicateSelection();
+      {
+         if (s.menuKind == 1)
+            DuplicateClips();
+         else
+            DuplicateSelection();
+      }
       if (MenuParts::Item(L("Mute"), "0"))
       {
          if (s.menuKind == 2)
@@ -3419,11 +3435,33 @@ namespace
             });
       }
       if (MenuParts::Item(L("Delete"), "Del"))
-         DeleteSelection();
+      {
+         if (s.menuKind == 1)
+         {
+            const std::vector<uint64_t> doomed(s.clips.begin(), s.clips.end());
+            ArrangeEdit([&] { Arrange::Delete(gArrange, doomed); });
+            s.clips.clear();
+         }
+         else
+            DeleteSelection();
+      }
+      if (s.menuKind == 1 && !s.clips.empty())
+      {
+         MenuParts::Separator();
+         using Clip = Arrange::Clip;
+         UiDensity::Compact compact;
+         s.menuCompact = true;
+         ClipField(T("Gain"), -60.0f, 12.0f, "%.1f dB", [](Clip& c) -> float& { return c.gainDb; });
+         ClipField(T("Velocity"), 0.0f, 2.0f, "%.2f", [](Clip& c) -> float& { return c.velScale; });
+         ClipField(T("Swing"), 0.0f, 1.0f, "%.2f", [](Clip& c) -> float& { return c.swing; });
+         ClipField(T("Chance"), 0.0f, 2.0f, "%.2f", [](Clip& c) -> float& { return c.chanceScale; });
+         s.menuCompact = false;
+      }
       if (s.menuKind == 2 && !s.notes.empty())
       {
          MenuParts::Separator();
          using Note = Arrange::Note;
+         UiDensity::Compact compact;
          s.menuCompact = true;
          NoteField(page, T("Velocity"), 1.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.vel; },
                    [](Note& n, float v) { n.vel = (uint8_t)std::lround(v); });
