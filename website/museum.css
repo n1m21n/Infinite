@@ -4,7 +4,7 @@
   --bg: #12152A;
   --ink: #EEF0F6;
   --ink2: #A3A9BA;
-  --muted: #8C93A8;
+  --muted: var(--ink-3);
   --line: var(--glass-edge);
   --accent: #F57F66;
   --brand-grad: linear-gradient(90deg, #F57F66, #D99A9C 35%, #C7AFC0 65%, #A9CDF1);
@@ -47,7 +47,7 @@ html, body {
 
 .vignette {
   position: fixed; inset: 0; pointer-events: none;
-  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(5, 8, 22, 0.45) 100%);
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(4, 5, 14, 0.45) 100%);
 }
 
 /* ---- opening ---- */

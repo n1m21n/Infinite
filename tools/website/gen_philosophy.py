@@ -51,7 +51,7 @@ FAQ = [
     ("Is Infinite free?",
      "Yes. Infinite is free to download for macOS, Windows and Linux. The source is on GitHub under the MIT licence, and the binary is GPLv3 by default because it bundles VST3 hosting."),
     ("Can AI agents use Infinite?",
-     "Yes. Patches are plain text, and Infinite can render them headless from the command line, from a Python SDK, or through nine MCP tools. The person decides what is kept."),
+     "Yes. Patches are plain text, and Infinite can render them headless from the command line, from a Python SDK, or through twelve MCP tools. The person decides what is kept."),
 ]
 
 

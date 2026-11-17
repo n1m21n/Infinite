@@ -95,10 +95,10 @@ const WALL_C = '#FFFFFF';   // surface colour lives in the grid texture (midnigh
 // notebook graph-paper: one tile = 5 x 5 cells = 2 m, so a cell is 40 cm
 const GRID_TILE = 2;
 const gridBase = canvasTex(640, 640, (g, w, h) => {
-  g.fillStyle = '#272E55'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#2a3052'; g.fillRect(0, 0, w, h);
   for (let k = 0; k < 5; k++) {
     const major = k === 0;
-    g.strokeStyle = major ? 'rgba(150,175,235,0.30)' : 'rgba(150,175,235,0.13)';
+    g.strokeStyle = major ? 'rgba(167, 177, 255,0.30)' : 'rgba(167, 177, 255,0.13)';
     g.lineWidth = major ? 3 : 2;
     const p = k * 128 + (major ? 1.5 : 1);
     g.beginPath(); g.moveTo(p, 0); g.lineTo(p, h); g.moveTo(0, p); g.lineTo(w, p); g.stroke();
@@ -129,7 +129,7 @@ const hallLeft = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallRight = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallEnd = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallStart = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
-const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#C9D0F0', map: gridMap(1, 1), transparent: true }));
+const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#d8d5e5', map: gridMap(1, 1), transparent: true }));
 const panelMat = new THREE.MeshBasicMaterial({ color: '#FBFAF6', transparent: true, fog: false });
 const hallPanels = Array.from({ length: 9 }, () => new THREE.Mesh(new THREE.PlaneGeometry(1, 1), panelMat));
 rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil, ...hallPanels);
@@ -138,7 +138,7 @@ rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil, ...hallPanels)
 const ROT_R = 3.7;
 const rotWall = new THREE.Mesh(new THREE.CylinderGeometry(ROT_R + 0.55, ROT_R + 0.55, 5.4, 96, 1, true), new THREE.MeshLambertMaterial({ color: WALL_C, side: THREE.BackSide, transparent: true }));
 rotWall.position.y = 2.7;
-const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#F1ECE0', side: THREE.DoubleSide, transparent: true }));
+const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#eff0f4', side: THREE.DoubleSide, transparent: true }));
 rotCeil.rotation.x = Math.PI / 2; rotCeil.position.y = 5.4;
 const rotHalo = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.9, 96), new THREE.MeshBasicMaterial({ color: '#FBFAF6', side: THREE.DoubleSide, transparent: true, fog: false }));
 rotHalo.rotation.x = Math.PI / 2; rotHalo.position.y = 5.39;
@@ -160,7 +160,7 @@ collectFadables();
 // Pieces
 // ---------------------------------------------------------------------------------------------
 const shadowTex = canvasTex(256, 256, (g, w, h) => {
-  g.shadowColor = 'rgba(40,28,14,0.55)'; g.shadowBlur = 38;
+  g.shadowColor = 'rgba(26, 31, 54,0.55)'; g.shadowBlur = 38;
   g.shadowOffsetX = 2000; g.shadowOffsetY = 2000;
   g.fillStyle = '#000';
   g.fillRect(70 - 2000, 70 - 2000, w - 140, h - 140);
@@ -188,7 +188,7 @@ function plaqueTex(no, title, meta) {
     g.fillText(`NO. ${no}`, 34, 62);
     g.fillStyle = '#12152A'; g.font = '700 92px "Caveat", cursive';
     g.fillText(title, 34, 146);
-    g.fillStyle = '#857C74'; g.font = '400 30px "Geist Mono", ui-monospace, monospace';
+    g.fillStyle = '#8890b1'; g.font = '400 30px "Geist Mono", ui-monospace, monospace';
     g.fillText(meta, 34, 196);
   });
 }
@@ -199,7 +199,7 @@ scene.add(artGroup);
 const reflGroup = new THREE.Group();
 scene.add(reflGroup);
 const hitMeshes = [];
-const frameMat = new THREE.MeshLambertMaterial({ color: '#1A1816' });
+const frameMat = new THREE.MeshLambertMaterial({ color: '#12152a' });
 const planeGeo = new THREE.PlaneGeometry(1, 1);
 const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 

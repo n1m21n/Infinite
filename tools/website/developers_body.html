@@ -1,6 +1,6 @@
 <div class="dev-wide">
           <h2>One-command AI agent setup</h2>
-          <p>Connect Infinite's nine MCP tools to Claude Desktop, Cursor and Windsurf with one terminal command:</p>
+          <p>Connect Infinite's twelve MCP tools to Claude Desktop, Cursor and Windsurf with one terminal command:</p>
           <pre class="aud-code"><code>npx -y infinite-engine init</code></pre>
           <p>For Python environments, run <code>pip install infinite-daw</code>.</p>
         </div>
@@ -22,7 +22,7 @@ field synth state float p = 0; p = (p + freq / sr) % 1.0; out = sin(6.28318 * p)
         </div>
 
         <div class="dev-wide">
-          <h2>The nine MCP tools</h2>
+          <h2>The twelve MCP tools</h2>
           <div class="table-wrap"><table>
             <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
             <tbody>
@@ -35,6 +35,9 @@ field synth state float p = 0; p = (p + freq / sr) % 1.0; out = sin(6.28318 * p)
             <tr><td><code>infinite_render_sketch3d</code></td><td>Render JavaScript-built 3D geometry to a PNG</td></tr>
             <tr><td><code>infinite_validate_patch</code></td><td>Check a .inf patch against the engine and report every problem</td></tr>
             <tr><td><code>infinite_render_video</code></td><td>Render an MP4 from a .inf patch, headless</td></tr>
+            <tr><td><code>infinite_compare_frames</code></td><td>Compare two pictures (.png, .inf path or patch text) as measured facts and say whether they match</td></tr>
+            <tr><td><code>infinite_find_knob</code></td><td>Find which node and param move makes a wanted picture change, from measured renders</td></tr>
+            <tr><td><code>infinite_node_effects</code></td><td>Measured effect table for Effects and colour nodes: what each param does when moved</td></tr>
             </tbody>
           </table></div>
         </div>

@@ -138,7 +138,7 @@ draw.text((R_X0 + 20, 148), "Isolated Infinite helper process", font=f_card_hdr,
 
 rrect((R_X0 + 18, 184, R_X1 - 18, 286), 12, SURF1, outline=SURF2)
 draw.text((R_X0 + 32, 198), "EngineSide Audio Loop", font=f_node_title, fill=GREEN)
-draw.text((R_X0 + 32, 218), "377 nodes · 23 synths · 29 FX", font=f_body, fill=INK2)
+draw.text((R_X0 + 32, 218), "372 nodes · 142 presets", font=f_body, fill=INK2)
 draw.text((R_X0 + 32, 236), "Wavetable · Granular · Field", font=f_body, fill=INK2)
 draw.text((R_X0 + 32, 256), "Zero-fills gaps on resync", font=f_mono_sm, fill=GREEN)
 

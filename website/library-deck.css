@@ -126,7 +126,7 @@
 .post-card[data-cat="creative"] { --cat: var(--accent); }
 .post-card[data-cat="engineering"] { --cat: var(--cat-3d); }
 .post-card[data-cat="product"] { --cat: var(--signal); }
-.post-card, .lib-card { background: radial-gradient(130% 75% at 50% 30%, color-mix(in srgb, var(--cat, var(--signal)) 42%, #0b0d18), #0b0d18 72%); }
+.post-card, .lib-card { background: radial-gradient(130% 75% at 50% 30%, color-mix(in srgb, var(--cat, var(--signal)) 42%, var(--deep)), var(--deep) 72%); }
 .post-card .post-media img, .lib-card .lib-media-link img {
   position: absolute; left: 14px; right: 14px; top: 22.5%; width: calc(100% - 28px); height: auto; aspect-ratio: 16 / 10;
   object-fit: cover; border-radius: var(--web-media-radius); box-shadow: 0 18px 40px color-mix(in srgb, #000 55%, transparent), 0 0 0 1px color-mix(in srgb, #fff 10%, transparent);

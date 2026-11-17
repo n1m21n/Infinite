@@ -277,8 +277,8 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bo
   position: fixed; inset: 0; z-index: 5; pointer-events: none;
   --uw: 0; opacity: var(--uw);
   background:
-    radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(2, 24, 40, 0.55) 100%),
-    rgba(18, 90, 120, 0.16);
+    radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(18, 21, 42, 0.55) 100%),
+    rgba(64, 70, 96, 0.16);
 }
 .row-volume { margin-top: var(--space-3); }
 .row-volume input { width: 100%; }
