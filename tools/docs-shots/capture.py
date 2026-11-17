@@ -14,8 +14,14 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "brand"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "manual"))
 import common as C  # noqa: E402
 import frame_shot  # noqa: E402
+import shot_config as cfg  # noqa: E402
+
+# Nodes whose default shows a personal path (capture config, shot_config.CAPTURE_CONFIG). Their panel shots (o, d)
+# are held back until the app blanks the path; --allow-personal-paths overrides for a local, non-release run.
+HELD_PERSONAL_PATH = {"Output": "export path (Desktop default, src/app/Startup.cpp)"}
 
 # id -> (title, OPENPANELS tokens, extra env). Whole-window shots of panels, windows and dialogs.
 SCENES = {
@@ -34,9 +40,16 @@ SCENES = {
 }
 
 
+PORT = None          # --port / INFINITE_SHOT_PORT: control port for this run (unset = the app's default)
+FORCE = False        # --force: shoot again even when the manifest says the shot is done
+ALLOW_PERSONAL = False
+
+
 def run_app(app, env_extra, out, timeout=120):
     env = dict(os.environ, INFINITE_NO_SINGLE_INSTANCE="1", INFINITE_NO_UPDATE_CHECK="1", INFINITE_NOSPLASH="1",
                INFINITE_HIDE_TELEMETRY="1", IMAGERESYNTH_SCREENSHOT=out, INFINITE_SCREENSHOT_FRAME="40")
+    if PORT:
+        env["INFINITE_CONTROL_PORT"] = str(PORT)
     env.update(env_extra)
     if os.path.exists(out):
         os.remove(out)
@@ -87,8 +100,19 @@ def finish(raw, sid, meta, manifest, mode="paper", ratio="none"):
     manifest["shots"][sid] = dict(meta, raw=rel(raw), framed=rel(base + ".png"), pdf=rel(pdf), width=img.width, height=img.height)
 
 
+def done_already(manifest, sid):
+    """Resume: a shot counts as done when the manifest has it and its framed file is still on disk."""
+    s = manifest["shots"].get(sid)
+    return bool(s and s.get("framed") and os.path.exists(os.path.join(C.ROOT, s["framed"])) and not FORCE)
+
+
 def shoot_node(app, cat, name, state, theme, manifest, dd=None):
     sid = f"node/{cat}/{name}/{state}"
+    if state in ("o", "d") and name in HELD_PERSONAL_PATH and not ALLOW_PERSONAL:
+        print(f"held {sid}: shows a personal path ({HELD_PERSONAL_PATH[name]}); blank it in a release build first")
+        return None
+    if done_already(manifest, sid):
+        return sid
     raw = os.path.join(C.SHOTS, "raw", C.slug(f"{cat}__{name}__{state}") + ".png")
     os.makedirs(os.path.dirname(raw), exist_ok=True)
     env = {"INFINITE_NODEGALLERY": f"{cat}|{name}", "INFINITE_GALLERYGRID": "1,100,100", "INFINITE_OPENPANELS": theme}
@@ -98,16 +122,31 @@ def shoot_node(app, cat, name, state, theme, manifest, dd=None):
         env["INFINITE_GALLERYOPENDD"] = str(dd or 0)
     if not run_app(app, env, raw, 120) or not crop_node(raw):
         return None
-    finish(raw, sid, dict(kind="node", category=cat, name=name, state=state, theme=theme), manifest)
+    try:
+        ok, w, h, msg = cfg.check_pixels(raw, "zoom")   # source image, not the framed copy
+        if not ok:
+            print("FAIL", sid, msg)
+            return None
+    except Exception as e:
+        print("FAIL", sid, e)
+        return None
+    finish(raw, sid, dict(kind="node", category=cat, name=name, state=state, theme=theme, source_px=[w, h]), manifest)
     return sid
 
 
 def shoot_scene(app, sid, theme, manifest):
     title, panels, extra = SCENES[sid]
+    if done_already(manifest, sid):
+        return sid
     raw = os.path.join(C.SHOTS, "raw", C.slug(sid) + ".png")
     os.makedirs(os.path.dirname(raw), exist_ok=True)
     env = dict(extra, INFINITE_OPENPANELS=",".join(x for x in (theme, panels) if x))
     if not run_app(app, env, raw, 120):
+        return None
+    try:
+        cfg.assert_pixels(raw, "ui")
+    except AssertionError as e:
+        print("FAIL", e)
         return None
     finish(raw, sid, dict(kind=sid.split("/")[0], name=title, theme=theme, state="-", category="-"), manifest, ratio="16:9")
     return sid
@@ -133,7 +172,13 @@ def main(argv=None):
     ap.add_argument("--scenes", default="", help="'all' or comma list of scene ids (panel/*, window/*, dialog/*, ui)")
     ap.add_argument("--no-nodes", action="store_true")
     ap.add_argument("--force", action="store_true", help="ignore the busy-build guard (not recommended)")
+    ap.add_argument("--shoot-again", action="store_true", help="re-shoot shots the manifest already has")
+    ap.add_argument("--port", type=int, default=None, help="control port for the shot app (default $INFINITE_SHOT_PORT, else the app's)")
+    ap.add_argument("--allow-personal-paths", action="store_true", help="shoot held nodes (Output) even with the Desktop path visible")
     a = ap.parse_args(argv)
+    global PORT, FORCE, ALLOW_PERSONAL
+    PORT = a.port or (int(os.environ["INFINITE_SHOT_PORT"]) if os.environ.get("INFINITE_SHOT_PORT") else None)
+    FORCE, ALLOW_PERSONAL = a.shoot_again, a.allow_personal_paths
 
     busy = C.build_running()
     if busy and not a.force:
@@ -160,7 +205,7 @@ def main(argv=None):
                 done += bool(sid)
                 fail += (not sid and st != "d")
                 print(("ok  " if sid else "FAIL"), cat, name, st, flush=True)
-            C.save_manifest(m)
+                C.save_manifest(m)   # after every shot: a crash loses at most the shot in progress
     want = [x for s in a.scenes.split(",") if s for x in (list(SCENES) if s == "all" else [s])]
     for s in want:
         if s in ("ui", "ui/gallery"):
@@ -169,6 +214,7 @@ def main(argv=None):
         elif s in SCENES:
             ok = shoot_scene(a.app, s, a.theme, m)
             done += bool(ok); fail += (not ok)
+            C.save_manifest(m)
             print(("ok  " if ok else "FAIL"), s, flush=True)
         else:
             print("unknown scene", s)

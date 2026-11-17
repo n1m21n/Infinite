@@ -50,6 +50,124 @@ def page(*parts):
     return '<div style="break-before:page"></div>' + "".join(parts)
 
 
+def shot(name, caption, box=None, width="100%"):
+    """A figure when its capture exists, else nothing: the text of a gap section is ready before its shot is taken,
+    and the shot appears in the next build once tools/manual/ui_shots_offscreen.py (or capture.py) writes it."""
+    return fig(name, caption, box=box, width=width) if os.path.exists(os.path.join(SHOTS, name + ".png")) else ""
+
+
+def gap_sections():
+    """Chapter 29 gaps found by tools/manual/coverage (docs/release/manual-coverage-2.0.md): Help menu, the rest of the
+    File and Menu items, the six panels with no page, the three settings tabs, every settings card, the dialogs, and
+    the dropdowns and right-click menus. Text is drafted from the source labels and tooltips; items marked VERIFY are
+    checked against their capture when it lands (see docs/release/shot-plan-2.0.json)."""
+    b = []
+    b.append(page("<h2>The Help menu</h2>",
+                  "<p>Help holds the references and the diagnostics. Everything in it opens a window or a dialog; none of them changes your patch.</p>",
+                  table(["Item", "What it does"], [
+                      ("All shortcuts...", "Opens the Shortcuts window: a filter box, then every shortcut grouped by area. The same list is in the Keys tab of Settings."),
+                      ("Help / module reference", "Opens the Help window: getting started, the controls, then every node with its help text."),
+                      ("UI Debugger / Item Picker", "A developer tool that lets you point at any control and read its ID. Useful for bug reports; it does not change the patch."),
+                      ("UI Style Editor", "A developer tool for the colours and spacing of the interface. Changes apply on screen only."),
+                      ("Collect diagnostics...", "Makes one zip on your Desktop with system info, logs, your settings (the home folder is hidden) and recent crash reports. Tick <i>Include the open patch</i> to add the patch. Nothing is sent anywhere."),
+                      ("About Infinite", "Version, build, credits and licence links."),
+                      ("Check for updates", "Looks for a newer version and says either that you have the latest, or which version is available. Buttons: Check for updates, Website, Close."),
+                  ]),
+                  row((shot("menu_help", "Menu, Help: every item in the Help menu.", box=None), 1),
+                      (shot("dialog_collect_diagnostics", "Collect diagnostics: the Include the open patch option, Collect and Cancel."), 1))))
+
+    b.append(page("<h2>File menu: the rest</h2>",
+                  table(["Item", "What it does"], [
+                      ("Open Recent", "A submenu of the patches you opened last. It is greyed out until there is one."),
+                      ("Template library...", "Opens the template library. Opening a template makes a copy; the template itself never changes."),
+                      ("Save with media...", "Saves the patch together with the media files it uses, so it opens on another computer. VERIFY the folder it asks for at capture."),
+                      ("Share Patch...", "Opens the Share Patch dialog. It is greyed out while a share is already running."),
+                  ]),
+                  row((shot("menu_file_recent", "File, Open Recent: the last patches you opened."), 1),
+                      (shot("menu_file_sharepatch", "File, Share Patch."), 1))))
+
+    b.append(page("<h2>Menu: the rest</h2>",
+                  table(["Item", "Shortcut", "What it does"], [
+                      ("Settings...", "Cmd+0", "Opens Settings on the page you left last."),
+                      ("Show Set", "", "The Show Set window: the list of patches for a live set, and where to jump between them."),
+                      ("Next patch / Previous patch", "", "Moves through the Show Set list."),
+                      ("Show lock", "Cmd+Shift+L", "Locks the canvas for a live show. Nodes and cables stay where they are; no drag, delete or undo. Knobs and sliders still play. Press again to unlock."),
+                      ("Panic", "Cmd+.", "Silences everything now: notes off on every MIDI Out and plugin, the sound fades in 5 ms, the transport stops. Resume after panic brings the audio back."),
+                      ("Pre-show check", "", "Looks over the patch before a show (audio device, outputs, missing media) and lists what needs attention. VERIFY the list at capture."),
+                  ]),
+                  row((shot("menu_menu_showlock", "Menu, Show lock: the canvas stays put while a show runs."), 1),
+                      (shot("menu_menu_panic", "Menu, Panic and Resume after panic."), 1))))
+
+    b.append(page("<h2>Panels you have not met yet</h2>",
+                  "<p>Six panels open from the rail or from Menu, Panels. Each one edits a kind of node, so each one is opened from that node too.</p>",
+                  table(["Panel", "Rail tile", "Shortcut", "Use it for"], [
+                      ("Mixer", "Mixer", "Shift+L", "Every Mixer node as a console. Right-click a Mixer node and choose <b>Open in Mixer panel</b>."),
+                      ("Drums", "Drums", "Shift+J", "The step-sequencer face of the Drum Sequencer nodes: step pads, lanes, conditions and groove presets."),
+                      ("2D View", "2D View", "Shift+2", "Layers for a Scene 2D node: compositing, paint and shapes. Right-click a picture node and choose <b>Add to 2D View</b>."),
+                      ("Curve Editor", "Curve", "Shift+E", "Draws MSEG curves for any knob to follow."),
+                      ("Field Patcher", "Field", "VERIFY", "Builds a Field program from boxes, without typing it."),
+                      ("Terminal", "Terminal (bottom of the rail)", "Ctrl+`", "A real shell in the patch folder. The Ctrl+` key is the physical key next to 1, on every keyboard layout."),
+                  ]),
+                  row((shot("panel_mixer", "Mixer panel."), 1), (shot("panel_drums", "Drums panel."), 1)),
+                  row((shot("panel_view2d", "2D View panel."), 1), (shot("panel_curve", "Curve Editor."), 1)),
+                  row((shot("panel_fieldpatcher", "Field Patcher."), 1), (shot("panel_terminal", "Terminal panel."), 1))))
+
+    b.append(page("<h2>Settings: the three tabs without a page</h2>",
+                  table(["Tab", "What it holds"], [
+                      ("Infinite as VST3/AU", "Plugin mode. The DAW sync section says who owns play and stop when Infinite runs inside a DAW. The plugin install section shows the status of the VST3 or AU plugin, with Install, Reinstall, Reveal and Uninstall."),
+                      ("3D View", "Viewport defaults for the 3D View: the mini axes (Off, Simple axes, Navigation) and the navigation settings, saved as your default for every new scene."),
+                      ("Keys", "The keyboard shortcut table. Find a command, see its key, and change it. Same list as Help, All shortcuts."),
+                  ]),
+                  row((shot("settings_infinite_as_vst3_au", "Infinite as VST3/AU: DAW sync and plugin install."), 1), (shot("settings_3d_view", "3D View settings."), 1)),
+                  row((shot("settings_keys", "Keys: the shortcut table."), 1), ("", 1))))
+
+    cards = [
+        ("Appearance", "Theme Preset &amp; Palette", "The colour theme: preset, accent and the light or dark palette."),
+        ("Appearance", "Node Module Category Colors", "One colour per node category (Source, Effects, Modulators and so on)."),
+        ("Appearance", "Cable Category Colors", "One colour per cable kind (audio, image, modulation, note and so on)."),
+        ("Appearance", "Node Card Styling", "VERIFY: the look of each node card."),
+        ("Appearance", "Display", "Interface font and the Preview Background choice."),
+        ("Appearance", "Transparency Backdrop", "VERIFY: how much of the canvas shows through a floating panel."),
+        ("Canvas & Workspace", "Grid &amp; Canvas", "VERIFY: grid and canvas options."),
+        ("Canvas & Workspace", "Minimap", "Where the minimap sits: Top left or Top right."),
+        ("Canvas & Workspace", "Cable Visibility", "Which cable kinds draw. The note on this card: the Image &amp; geometry toggle also covers palette cables."),
+        ("Audio", "Audio Devices &amp; Format", "Output and input device, sample rate, buffer size and the audio thread settings."),
+        ("Audio", "MIDI Inputs", "Which MIDI devices feed Infinite. Shows No MIDI inputs connected when none are."),
+        ("General & Performance", "Autosave", "Whether autosave is working (it warns when it is failing, and why), and how many saved copies to keep."),
+        ("General & Performance", "Performance &amp; Rendering", "The power profile (High performance, Power saving or Low latency) and the graphics processor to use."),
+        ("General & Performance", "Movement Log", "How much disk the kept takes and notes use, and what stays on this computer."),
+        ("General & Performance", "Learning", "VERIFY: learning and tips options."),
+        ("General & Performance", "Diagnostics", "VERIFY: diagnostics options, including Collect diagnostics."),
+        ("General & Performance", "Application &amp; Updates", "VERIFY: the version and update options."),
+        ("Field Language", "Topic dropdown and sections", "Pick a topic (Core Principles, Domains &amp; Reserved Names, Declarations, Types &amp; Vectors, Operators &amp; Math Functions), or All to see every topic. The search box filters across them."),
+        ("Expression Globals", "Globals", "Named values every formula can read. Each one shows its formula."),
+        ("Extensions", "Infinite / Extensions", "Install extension packs from the catalogue or from a file. Each shows its installed and available versions."),
+        ("Plugins", "Plugins and Scanned plugins", "The scanned plugins list, with each plugin's status."),
+        ("Agents & Terminal", "Reference", "How the chat works, the Terminal panel, and the infinite command line."),
+        ("3D View", "Viewport", "The mini axes setting: Off, Simple axes or Navigation."),
+        ("3D View", "Navigation", "VERIFY: navigation settings for the 3D View."),
+        ("Infinite as VST3/AU", "DAW sync", "Who owns play and stop when Infinite runs in a DAW: the DAW or Infinite."),
+    ]
+    b.append(page("<h2>Settings: every card</h2>",
+                  "<p>Each card is one group of settings on a Settings page. The card names are the headings you see in the window. "
+                  "Settings save as you change them; there is no Save button.</p>",
+                  table(["Page", "Card", "What it controls"], [(t, c, x) for t, c, x in cards])))
+    b.append(page("<h2>Dialogs</h2>",
+                  "<p>A dialog stops everything else until you answer it. Each one has a clear primary button and a Cancel.</p>",
+                  table(["Dialog", "When it appears", "Buttons"], [
+                      ("Unsaved changes", "You open, create or quit while the patch has unsaved changes. The title is Unsaved changes; the question is Save before closing?", "Save, Don't Save, Cancel"),
+                      ("Autosave recovery", "Infinite starts after it closed with unsaved work. The message says your work was saved automatically; recover it to carry on, or discard it. Your saved patch files are untouched.", "Recover, Discard"),
+                      ("Collect diagnostics", "Help, Collect diagnostics.", "Collect, Cancel; Include the open patch"),
+                      ("Check for updates", "Help, Check for updates.", "Check for updates, Website, Close"),
+                      ("Share Patch", "File, Share Patch.", "VERIFY at capture"),
+                      ("Pre-show check", "Menu, Pre-show check.", "VERIFY at capture"),
+                      ("Terminal quit", "You close the Terminal while a command is still running.", "VERIFY at capture"),
+                  ]),
+                  row((shot("dialog_unsaved", "Unsaved changes."), 1), (shot("dialog_recover", "Autosave recovery."), 1)),
+                  row((shot("dialog_check_updates", "Check for updates."), 1), (shot("dialog_share_patch", "Share Patch."), 1))))
+    return b
+
+
 def html_chapter(P):
     b = []
     b.append('<div class="kick">Chapter</div><div class="hand" style="font-size:40px;line-height:1">Twenty-nine</div>'
@@ -278,7 +396,7 @@ def html_chapter(P):
                       (fig("rc_palette_submenu", "Hover a category to see its nodes: compositing shown.", box=(880, 500, 1360, 1000)), 1))))
 
     b.extend((page("<h2>Settings</h2>",
-                  "<p>The gear at the bottom of the rail (or Cmd+0) opens Settings. It has nine pages.</p>",
+                  "<p>The gear at the bottom of the rail (or Cmd+0) opens Settings. It has twelve pages, down the left: Appearance, Canvas &amp; Workspace, Audio, General &amp; Performance, Field Language, Expression Globals, Extensions, Plugins, Agents &amp; Terminal, Infinite as VST3/AU, 3D View and Keys.</p>",
                   row((fig("settings_appearance", "Appearance", box=(410, 200, 1190, 805)), 1), (fig("settings_canvas", "Canvas & Workspace", box=(410, 200, 1190, 805)), 1)),
                   row((fig("settings_audio", "Audio", box=(410, 200, 1190, 805)), 1), (fig("settings_general", "General & Performance", box=(410, 200, 1190, 805)), 1)),
                   row((fig("settings_field", "Field Language", box=(410, 200, 1190, 805)), 1), (fig("settings_globals", "Expression Globals", box=(410, 200, 1190, 805)), 1))),
@@ -446,6 +564,7 @@ def html_chapter(P):
                   row((fig("window_templates", "Template library (File, Template library): opens a copy; the original never changes.", box=(410, 205, 1160, 770)), 1),
                       (fig("dialog_about", "About Infinite: version, build, credits, licence links.", box=(560, 230, 1040, 740)), 1))))
 
+    b.extend(gap_sections())
     b.append(page("<h2>Take your own screenshots</h2>",
                   "<p>Every picture in this guide was made by script, so you can regenerate them after an update or make your own for a tutorial.</p>",
                   table(["Tool", "What it does"], [
