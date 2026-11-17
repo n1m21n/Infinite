@@ -1,5 +1,14 @@
 [
  {
+  "slug": "opengl-41-path-tracing-bvh-texture-buffers-agx",
+  "title": "Real-time OpenGL 4.1 path tracing with BVH texture buffers and AgX",
+  "description": "How Infinite's Render 3D node runs a progressive OpenGL 4.1 path tracer using RGBA32F BVH texture buffers, 12 ms strip budgets, and shared AgX tonemapping.",
+  "date": "2026-11-17",
+  "updated": "2026-11-17",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/opengl-41-path-tracing-bvh-texture-buffers-agx.html"
+ },
+ {
   "slug": "lock-free-audio-visualisers-textures-ribbons-3d-displacement",
   "title": "Lock-free audio visualisers: GPU textures, ribbons, and 3D meshes",
   "description": "How Infinite's audio visualiser DSP bridges lock-free MeterRing buffers to GL_RGBA8 textures, 8-band spectral ramps, 3D ribbons, and mesh displacement.",
