@@ -1874,7 +1874,7 @@ namespace app
                }
                ImGui::EndMenu();
             }
-            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+            MenuParts::Separator();
             if (MenuParts::Item(L("Close Session")))
                gSessionPanelOpen = false;
             MenuParts::EndPopup();

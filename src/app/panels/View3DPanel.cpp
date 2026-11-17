@@ -8275,7 +8275,7 @@ namespace
             DrawViewDockMenuItems(3);
             ImGui::EndMenu();
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         MenuParts::Separator();
          if (MenuParts::Item(T("Close 3D View")))
             gView3DOpen = false;
          MenuParts::EndPopup();

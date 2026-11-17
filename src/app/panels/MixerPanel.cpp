@@ -1565,18 +1565,22 @@ namespace app
          const bool overPanel = mouse.x >= origin.x && mouse.x < origin.x + avail.x &&
                                 mouse.y >= origin.y && mouse.y < origin.y + avail.y;
          gMixerClaimedKeys = overPanel && !ImGui::GetIO().WantTextInput;
-         if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
+         if (overPanel && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
              !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))   // a page/strip menu opened on the click
             ImGui::OpenPopup("##mixerpanelctx");
          if (MenuParts::BeginPopup("##mixerpanelctx"))
          {
-            static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+            static const char* kDockLabels[] = { I18N_KEY("Mixer at Bottom"), I18N_KEY("Mixer at Top") };
             static const int kDocks[] = { 0, 3 };
-            for (int i = 0; i < 2; i++)
-               if (MenuParts::Item(L(kDockLabels[i]), nullptr, kDocks[i] == gMixerPanelDock))
-                  gMixerPanelDock = kDocks[i];
+            if (MenuParts::SubMenu(L("Dock Position")))
+            {
+               for (int i = 0; i < 2; i++)
+                  if (MenuParts::Item(L(kDockLabels[i]), nullptr, kDocks[i] == gMixerPanelDock))
+                     gMixerPanelDock = kDocks[i];
+               ImGui::EndMenu();
+            }
             MenuParts::Separator();
-            if (MenuParts::Item(L("Close panel")))
+            if (MenuParts::Item(L("Close Mixer")))
                gMixerPanelOpen = false;
             MenuParts::EndPopup();
          }

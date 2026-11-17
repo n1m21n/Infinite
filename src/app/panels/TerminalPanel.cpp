@@ -695,8 +695,8 @@ namespace
             gTerminalFloating = true;
          ImGui::EndMenu();
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      if (MenuParts::Item(L("Close Terminal")))
+      MenuParts::Separator();
+      if (MenuParts::Item(chat ? L("Close Chat") : L("Close Terminal")))
          gTerminalOpen = false;
       MenuParts::EndPopup();
    }

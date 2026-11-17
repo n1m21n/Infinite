@@ -1719,8 +1719,8 @@ namespace app
             }
             ImGui::EndMenu();
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-         if (MenuParts::Item(L("Close Arrangement Timeline")))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Close Timeline")))
          {
             gArrangePanelOpen = false;
          }

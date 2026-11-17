@@ -3241,7 +3241,7 @@ namespace
                gSampleStudioDock = 3;
             ImGui::EndMenu();
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         MenuParts::Separator();
          if (MenuParts::Item(L("Close Sample Studio")))
          {
             StopRecording(false);

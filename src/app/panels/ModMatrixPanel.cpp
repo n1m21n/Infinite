@@ -984,11 +984,15 @@ namespace app
       if (MenuParts::BeginPopup("##modmatrixctx"))
       {
          static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
-         for (int i = 0; i < 5; i++)
-            if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
-               gModMatrixDock = i;
+         if (MenuParts::SubMenu(L("Dock Position")))
+         {
+            for (int i = 0; i < 5; i++)
+               if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
+                  gModMatrixDock = i;
+            ImGui::EndMenu();
+         }
          MenuParts::Separator();
-         if (MenuParts::Item(L("Close panel")))
+         if (MenuParts::Item(L("Close Mod Matrix")))
             gModMatrixOpen = false;
          MenuParts::EndPopup();
       }

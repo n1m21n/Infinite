@@ -394,7 +394,7 @@ void DrawMenuBar(FrameCtx& fc)
                      MenuParts::Separator();
                      if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear cards")))
                         gViewportPanelNodes.clear();
-                     if (MenuParts::Item(L("Close viewport panel")))
+                     if (MenuParts::Item(L("Close Viewport")))
                         gViewportPanelOpen = false;
                   }
                   ImGui::EndMenu();

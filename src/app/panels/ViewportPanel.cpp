@@ -489,20 +489,21 @@ namespace app
       if (MenuParts::BeginPopup("##viewportpanelctx"))
       {
          static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
-         for (int i = 0; i < 5; i++)
-            if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gViewportPanelDock))
-               gViewportPanelDock = i;
-         MenuParts::Separator();
-         if (MenuParts::Item(L("Close panel")))
-            gViewportPanelOpen = false;
-         if (!gViewportPanelNodes.empty())
+         if (MenuParts::SubMenu(L("Dock Position")))
          {
-            if (MenuParts::Item(L("Clear all cards")))
-            {
-               gViewportPanelNodes.clear();
-               gViewportPanelOpen = false;
-            }
+            for (int i = 0; i < 5; i++)
+               if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gViewportPanelDock))
+                  gViewportPanelDock = i;
+            ImGui::EndMenu();
          }
+         if (MenuParts::Item(L("Clear Cards"), nullptr, false, !gViewportPanelNodes.empty()))
+         {
+            gViewportPanelNodes.clear();
+            gViewportPanelOpen = false;
+         }
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Close Viewport")))
+            gViewportPanelOpen = false;
          MenuParts::EndPopup();
       }
    }
