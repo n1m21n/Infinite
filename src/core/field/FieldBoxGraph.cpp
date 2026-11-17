@@ -2213,7 +2213,13 @@ namespace Field
                   BoxHeaderEntry e;
                   e.key = p.substr(0, sp);
                   if (std::sscanf(p.c_str() + sp + 1, "%f,%f", &e.x, &e.y) == 2)
+                  {
+                     const size_t q1 = p.find('"', sp + 1);
+                     const size_t q2 = q1 != std::string::npos ? p.find('"', q1 + 1) : std::string::npos;
+                     if (q2 != std::string::npos)
+                        e.title = p.substr(q1 + 1, q2 - q1 - 1);
                      outHeader.positions.push_back(std::move(e));
+                  }
                }
             }
          }
@@ -2231,6 +2237,8 @@ namespace Field
          if (!b.key.empty())
             oss << " | " << b.key << " " << static_cast<int>(std::round(b.x))
                 << "," << static_cast<int>(std::round(b.y));
+         if (!b.key.empty() && !b.title.empty())
+            oss << " \"" << b.title << "\"";
       }
       for (const BoxGroup& g : graph.groups)
       {
@@ -2313,6 +2321,7 @@ namespace Field
          {
             b.x = it->second.x;
             b.y = it->second.y;
+            b.title = it->second.title;
             b.hasExplicitPos = true;
          }
       }
