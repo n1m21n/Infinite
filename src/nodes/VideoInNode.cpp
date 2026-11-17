@@ -16,10 +16,9 @@ const std::vector<std::string>& VideoInNode::ResolutionNames()
    return sNames;
 }
 
-VideoInNode::VideoInNode()
-{
-   RefreshDevices();
-}
+// No camera scan here: the node picker builds every node type to test its inputs, and a scan (AVFoundation, slow with a
+// Continuity camera near) on each one hung a cable drop. The list loads when the camera opens or the dropdown shows.
+VideoInNode::VideoInNode() = default;
 
 VideoInNode::~VideoInNode()
 {
@@ -30,6 +29,12 @@ VideoInNode::~VideoInNode()
 
 void VideoInNode::RefreshDevices()
 {
+   // At most every 2 s: the parameter panel asks each frame it is open.
+   const auto now = std::chrono::steady_clock::now();
+   if (mDevicesScanned && now - mDevicesAt < std::chrono::seconds(2))
+      return;
+   mDevicesScanned = true;
+   mDevicesAt = now;
    mCachedDevices = Platform::CameraListDevices();
 }
 

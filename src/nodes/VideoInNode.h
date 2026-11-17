@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 
 #include <memory>
 #include <string>
@@ -66,6 +67,8 @@ private:
    unsigned long long mRevision = 1;
    std::vector<unsigned char> mFrame;
    std::vector<Platform::CameraDeviceInfo> mCachedDevices;
+   bool mDevicesScanned = false;
+   std::chrono::steady_clock::time_point mDevicesAt;
    std::string mLastError;
    int mLastCookFrame = -1;
    std::unique_ptr<Bench::MediaCameraCounters> mBench;
