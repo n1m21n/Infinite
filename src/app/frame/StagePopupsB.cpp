@@ -589,7 +589,7 @@ void DrawPopupsB(FrameCtx& fc)
          ImGui::OpenPopup("##fielddevicesave");
          gFieldDeviceSave.justOpened = false;
       }
-      if (ImGui::BeginPopup("##fielddevicesave"))
+      if (MenuParts::BeginPopup("##fielddevicesave"))
       {
          ImGui::TextDisabled("%s", T("Save device as:"));
          ImGui::SetNextItemWidth(220.0f);
@@ -612,7 +612,7 @@ void DrawPopupsB(FrameCtx& fc)
             }
             ImGui::CloseCurrentPopup();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       if (gAudioDropPicker.justOpened)

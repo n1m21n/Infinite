@@ -1381,7 +1381,7 @@ void DrawMenuBar(FrameCtx& fc)
                   ImGui::OpenPopup("##slotsmap");
                if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("##slotsmap"))
                   ImGui::SetTooltip("%s", T("Host slots"));
-               if (ImGui::BeginPopup("##slotsmap"))
+               if (MenuParts::BeginPopup("##slotsmap"))
                {
                   int shown = 0;
                   for (int i = 0; i < PluginEngine::kSlotCount; i++)
@@ -1394,7 +1394,7 @@ void DrawMenuBar(FrameCtx& fc)
                   }
                   if (shown == 0)
                      ImGui::TextDisabled("%s", T("No Macro is on a host slot"));
-                  ImGui::EndPopup();
+                  MenuParts::EndPopup();
                }
                cursorX -= telemetryGap;
             }

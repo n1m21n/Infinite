@@ -306,7 +306,7 @@ namespace app
             ImGui::OpenPopup("##clearchats");
          ImGui::EndDisabled();
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
-         if (ImGui::BeginPopup("##clearchats"))
+         if (MenuParts::BeginPopup("##clearchats"))
          {
             ImGui::TextUnformatted(T("Delete every saved chat?"));
             ImGui::Dummy(ImVec2(0.0f, tok::space_2));
@@ -324,7 +324,7 @@ namespace app
                ChatClearHistory();
                ImGui::CloseCurrentPopup();
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
          ImGui::PopStyleVar();
       }

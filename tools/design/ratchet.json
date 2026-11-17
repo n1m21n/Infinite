@@ -86,5 +86,9 @@
   "src/app/ui/design/components/VFader.h": 3
  },
  "font_scales": {},
- "roundings": {}
+ "roundings": {},
+ "popups": {
+  "src/app/frame/StagePopupsB.cpp": 1,
+  "src/app/panels/ArrangePanel.cpp": 1
+ }
 }

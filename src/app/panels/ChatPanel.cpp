@@ -14,6 +14,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/GlyphToggle.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/Switch.h"
 #include "core/CategoryColors.h"
 #include "core/CliSetup.h"
@@ -4863,7 +4864,7 @@ namespace app
          ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
          ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
          BeginMenuStyle();
-         if (ImGui::BeginPopup("##chatmodelmenu"))
+         if (MenuParts::BeginPopup("##chatmodelmenu"))
          {
             bool anyReady = false;
             for (const CliSetup::Agent& a : CliSetup::Agents())
@@ -4911,7 +4912,7 @@ namespace app
                      Do(a.id, v.act);
                   ImGui::PopID();
                }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
          EndMenuStyle();
       }

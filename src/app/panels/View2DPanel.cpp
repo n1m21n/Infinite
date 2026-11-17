@@ -8400,7 +8400,7 @@ namespace
       dl->AddRectFilled(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), tok::U32(tok::canvas_shade));
       dl->AddRect(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), edge);
       for (int i = 0; i < 2; i++)
-         if (ImGui::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
+         if (MenuParts::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
          {
             float* col = i == 0 ? sFg : sBg;
             ImGui::ColorPicker3("##pick", col, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview);
@@ -8434,7 +8434,7 @@ namespace
                sw.erase(sw.begin() + removed);
                SetSwatches(sw);
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
    }
 
