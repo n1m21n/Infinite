@@ -4827,25 +4827,26 @@ namespace Platform
       InputRing gInputRing[kMaxInputChannels];
       int gInputChannelCount = 0;
       int gInputCaptureWantCount = 0; // how many AudioInputNode instances are alive
-      bool gInputTapInstalled = false; // whether the tap is actually live on gInputEngine
+      bool gInputTapInstalled = false; // whether the capture unit is actually running
       std::atomic<uint32_t> gRequestedInputDeviceId { 0 };
       uint32_t gActiveInputDeviceId = 0;
 
-      // The capture tap's OWN engine, deliberately not the render engine
-      // AudioDeviceOpen runs. On macOS an AVAudioEngine's inputNode and
-      // outputNode are backed by one AUHAL, and AudioDeviceOpen sets that
-      // unit's device with kAudioOutputUnitProperty_CurrentDevice on the
-      // GLOBAL scope - which pins the input side to the chosen *output*
-      // device too. Pick any output-only device in the picker (the built-in
-      // speakers are a separate AudioObjectID from the built-in microphone
-      // on every modern Mac, as is any USB DAC) and that device reports
-      // zero input channels, so inputFormatForBus:0 came back with
-      // channelCount == 0, the tap never installed, and Audio In sat at
-      // "idle" forever while blaming the microphone privacy setting. A
-      // dedicated engine with no device override follows the system default
-      // *input* device instead - the same thing AudioStart (Audio Analyze's
-      // separate live tap) has always done.
-      AVAudioEngine* gInputEngine = nil;
+      // The capture's OWN AUHAL input unit, deliberately not the render
+      // engine AudioDeviceOpen runs. The render engine's AUHAL is pinned to the
+      // chosen *output* device, and an output-only device (the built-in
+      // speakers, any USB DAC) reports zero input channels, so Audio In sat at
+      // "idle" while blaming the microphone privacy setting. A separate unit
+      // with its own device follows the system default *input* device (or the
+      // one picked in the node) - the same thing AudioStart (Audio Analyze's
+      // separate live tap) has always done. It is a raw HAL input unit, not an
+      // AVAudioEngine tap, so audio arrives in device-buffer-sized pieces
+      // (the render buffer size, see gRenderBufferFrames) instead of 1024-frame
+      // batches that put ~21 ms between the microphone and the sound.
+      AudioUnit gInputUnit = nullptr;
+
+      // Set by AudioDeviceOpen/Close: the render buffer size the capture device
+      // is asked to match (0 = leave the device's own).
+      std::atomic<int> gRenderBufferFrames { 0 };
 
       // Set by AudioDeviceOpen/Close. The capture engine runs at the input
       // device's native rate while AudioInputCaptureRead is drained from the
@@ -4864,6 +4865,84 @@ namespace Platform
       constexpr int kInputTapMaxOut = 8192;
       double gInputResamplePos = 0.0;
       float gInputResampleScratch[kMaxInputChannels][kInputTapMaxOut] = {};
+
+      // Writes one buffer of captured audio into the ring, resampled to the
+      // render clock when the two rates differ. `channels` is non-interleaved.
+      void InputProduce(const float* const* channels, int numFrames, int chCount, double inRate)
+      {
+         if (numFrames <= 0 || chCount <= 0)
+            return;
+         const double outRate = gRenderSampleRate.load(std::memory_order_relaxed);
+         if (outRate <= 0.0 || std::fabs(outRate - inRate) < 1.0)
+         {
+            for (int ch = 0; ch < chCount; ch++)
+               gInputRing[ch].Write(channels[ch], numFrames);
+            gInputResamplePos = 0.0;
+            return;
+         }
+
+         // Linear resample to the render clock. Good enough for a mic
+         // input stage and, unlike an AVAudioConverter, allocation-free.
+         const double step = inRate / outRate;
+         double pos = gInputResamplePos;
+         int n = 0;
+         while (pos < (double)numFrames && n < kInputTapMaxOut)
+         {
+            const int i0 = std::max(0, (int)pos);
+            const int i1 = std::min(i0 + 1, numFrames - 1);
+            const float frac = (float)(pos - (double)i0);
+            for (int ch = 0; ch < chCount; ch++)
+               gInputResampleScratch[ch][n] = channels[ch][i0] + (channels[ch][i1] - channels[ch][i0]) * frac;
+            n++;
+            pos += step;
+         }
+         gInputResamplePos = pos - (double)numFrames; // carry the sub-sample phase into the next buffer
+         for (int ch = 0; ch < chCount; ch++)
+            gInputRing[ch].Write(gInputResampleScratch[ch], n);
+      }
+
+      // The input unit's render-thread callback: pulls the captured frames out
+      // of the unit into static scratch (no allocation on this thread) and
+      // hands them to the ring in pieces small enough for the resampler.
+      constexpr int kInputRenderMaxFrames = 4096;
+      constexpr int kInputProduceChunk = 1024;
+      float gInputRenderScratch[kMaxInputChannels][kInputRenderMaxFrames] = {};
+      struct InputBufferList
+      {
+         UInt32 mNumberBuffers;
+         AudioBuffer mBuffers[kMaxInputChannels];
+      };
+      InputBufferList gInputBufferList = {};
+      int gInputUnitChannels = 0;
+      double gInputUnitRate = 0.0;
+
+      OSStatus InputRenderCallback(void*, AudioUnitRenderActionFlags* flags, const AudioTimeStamp* stamp,
+                                   UInt32 bus, UInt32 frames, AudioBufferList*)
+      {
+         AudioUnit unit = gInputUnit;
+         const int chCount = gInputUnitChannels;
+         if (unit == nullptr || chCount <= 0 || frames == 0 || frames > (UInt32)kInputRenderMaxFrames)
+            return noErr;
+         gInputBufferList.mNumberBuffers = (UInt32)chCount;
+         for (int ch = 0; ch < chCount; ch++)
+         {
+            gInputBufferList.mBuffers[ch].mNumberChannels = 1;
+            gInputBufferList.mBuffers[ch].mDataByteSize = frames * (UInt32)sizeof(float);
+            gInputBufferList.mBuffers[ch].mData = gInputRenderScratch[ch];
+         }
+         const OSStatus status = AudioUnitRender(unit, flags, stamp, bus, frames, (AudioBufferList*)&gInputBufferList);
+         if (status != noErr)
+            return status;
+         for (int off = 0; off < (int)frames; off += kInputProduceChunk)
+         {
+            const int n = std::min(kInputProduceChunk, (int)frames - off);
+            const float* piece[kMaxInputChannels];
+            for (int ch = 0; ch < chCount; ch++)
+               piece[ch] = gInputRenderScratch[ch] + off;
+            InputProduce(piece, n, chCount, gInputUnitRate);
+         }
+         return noErr;
+      }
    }
 
    void AudioInputCaptureAddRef() { gInputCaptureWantCount++; }
@@ -4886,33 +4965,20 @@ namespace Platform
 
    void AudioInputCaptureTeardown()
    {
-      if (gInputEngine == nil)
+      if (gInputUnit != nullptr)
       {
-         gInputTapInstalled = false;
-         gActiveInputDeviceId = 0;
-         gInputChannelCount = 0;
-         return;
-      }
-      @autoreleasepool
-      {
-         // Same teardown hazard AudioDeviceClose documents: AVAudioEngine
-         // throws an NSException on bad teardown state rather than returning
-         // an error, and an uncaught one aborts the process.
-         @try
-         {
-            [[gInputEngine inputNode] removeTapOnBus:0];
-            [gInputEngine stop];
-         }
-         @catch (NSException* exception)
-         {
-            fprintf(stderr, "audio input capture teardown: %s\n",
-                    [[exception reason] UTF8String] ? [[exception reason] UTF8String] : "unknown");
-         }
-         gInputEngine = nil;
+         // Stop first: AudioOutputUnitStop returns only once the render
+         // callback is finished, so nothing touches the unit after this.
+         AudioUnit unit = gInputUnit;
+         AudioOutputUnitStop(unit);
+         gInputUnit = nullptr;
+         AudioUnitUninitialize(unit);
+         AudioComponentInstanceDispose(unit);
       }
       gInputTapInstalled = false;
       gActiveInputDeviceId = 0;
       gInputChannelCount = 0;
+      gInputUnitChannels = 0;
       for (int ch = 0; ch < kMaxInputChannels; ch++)
          gInputRing[ch].Clear();
    }
@@ -4960,91 +5026,112 @@ namespace Platform
             return;
          }
 
-         gInputEngine = [[AVAudioEngine alloc] init];
-         AVAudioInputNode* input = [gInputEngine inputNode];
-
-         AudioObjectID targetDevice = (AudioObjectID)reqDevice;
-         if (targetDevice != 0)
+         // A HAL input unit: input enabled on bus 1, output disabled on bus 0.
+         AudioComponentDescription desc = {};
+         desc.componentType = kAudioUnitType_Output;
+         desc.componentSubType = kAudioUnitSubType_HALOutput;
+         desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+         AudioComponent comp = AudioComponentFindNext(nullptr, &desc);
+         AudioUnit unit = nullptr;
+         if (comp == nullptr || AudioComponentInstanceNew(comp, &unit) != noErr || unit == nullptr)
          {
-            // Same stale-AudioObjectID hazard as AudioDeviceOpen's output
-            // path (a replug can reassign this ID to a different, possibly
-            // output-only, device) - verify it still names a live input
-            // device before handing it to the unit, otherwise fall back to
-            // whatever the input unit already defaults to.
-            uint32_t inChannels = 0;
-            if (DeviceHasScope(targetDevice, kAudioObjectPropertyScopeInput, inChannels))
-            {
-               AudioUnit inputUnit = input.audioUnit;
-               AudioUnitSetProperty(inputUnit, kAudioOutputUnitProperty_CurrentDevice,
-                                    kAudioUnitScope_Global, 0, &targetDevice, sizeof(targetDevice));
-            }
-         }
-
-         AVAudioFormat* format = [input inputFormatForBus:0];
-         if (format == nil || format.sampleRate <= 0 || format.channelCount == 0)
-         {
-            outError = "no audio input device available";
-            gInputEngine = nil;
+            outError = "audio input unit unavailable";
             return;
          }
+         const auto fail = [&](const char* what, OSStatus st)
+         {
+            outError = std::string(what) + " (" + std::to_string((int)st) + ")";
+            AudioComponentInstanceDispose(unit);
+         };
 
-         const int tapChannels = std::min((int)format.channelCount, kMaxInputChannels);
+         UInt32 on = 1, off = 0;
+         OSStatus st = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &on, sizeof(on));
+         if (st == noErr)
+            st = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &off, sizeof(off));
+         if (st != noErr)
+            return fail("audio input unit could not enable input", st);
+
+         // The picked device when it still names a live input device (a replug
+         // can reassign an AudioObjectID to an output-only one), else the
+         // system default input.
+         AudioObjectID targetDevice = (AudioObjectID)reqDevice;
+         uint32_t inChannels = 0;
+         if (targetDevice == 0 || !DeviceHasScope(targetDevice, kAudioObjectPropertyScopeInput, inChannels))
+            targetDevice = CoreAudioResolveDevice(0, kAudioHardwarePropertyDefaultInputDevice);
+         if (targetDevice == kAudioObjectUnknown)
+         {
+            outError = "no audio input device available";
+            AudioComponentInstanceDispose(unit);
+            return;
+         }
+         st = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                                   &targetDevice, sizeof(targetDevice));
+         if (st != noErr)
+            return fail("audio input device could not be selected", st);
+
+         // Ask the device for the render buffer size, so a captured block is the
+         // size the output pulls. A device that refuses keeps its own.
+         const int wantFrames = gRenderBufferFrames.load(std::memory_order_relaxed);
+         if (wantFrames > 0)
+         {
+            AudioObjectPropertyAddress bufferAddr { kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal,
+                                                    kAudioObjectPropertyElementMain };
+            UInt32 frames = (UInt32)wantFrames;
+            AudioObjectSetPropertyData(targetDevice, &bufferAddr, 0, nullptr, sizeof(frames), &frames);
+         }
+
+         // The device's own format (rate, channels) on the hardware side of bus 1.
+         AudioStreamBasicDescription hw = {};
+         UInt32 hwSize = sizeof(hw);
+         st = AudioUnitGetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 1, &hw, &hwSize);
+         if (st != noErr || hw.mSampleRate <= 0 || hw.mChannelsPerFrame == 0)
+         {
+            outError = "no audio input device available";
+            AudioComponentInstanceDispose(unit);
+            return;
+         }
+         const int tapChannels = std::min((int)hw.mChannelsPerFrame, kMaxInputChannels);
+
+         // What the unit hands us: the same rate, non-interleaved float32.
+         AudioStreamBasicDescription fmt = {};
+         fmt.mSampleRate = hw.mSampleRate;
+         fmt.mFormatID = kAudioFormatLinearPCM;
+         fmt.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved;
+         fmt.mFramesPerPacket = 1;
+         fmt.mBytesPerFrame = sizeof(float);
+         fmt.mBytesPerPacket = sizeof(float);
+         fmt.mChannelsPerFrame = (UInt32)tapChannels;
+         fmt.mBitsPerChannel = 32;
+         st = AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &fmt, sizeof(fmt));
+         if (st != noErr)
+            return fail("audio input format rejected", st);
+
+         AURenderCallbackStruct cb = {};
+         cb.inputProc = InputRenderCallback;
+         st = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &cb, sizeof(cb));
+         if (st != noErr)
+            return fail("audio input callback could not be set", st);
+
          gInputChannelCount = tapChannels;
+         gInputUnitChannels = tapChannels;
+         gInputUnitRate = hw.mSampleRate;
          gActiveInputDeviceId = reqDevice;
-
          for (int ch = 0; ch < kMaxInputChannels; ch++)
             gInputRing[ch].Clear();
          gInputResamplePos = 0.0;
+         gInputUnit = unit;
 
-         const double inRate = format.sampleRate;
-         [input installTapOnBus:0 bufferSize:1024 format:format
-                          block:^(AVAudioPCMBuffer* buffer, AVAudioTime*) {
-            const float* const* channels = buffer.floatChannelData;
-            if (channels == nullptr)
-               return;
-            const int numFrames = (int)buffer.frameLength;
-            if (numFrames <= 0)
-               return;
-
-            const int chCount = std::min((int)buffer.format.channelCount, kMaxInputChannels);
-            const double outRate = gRenderSampleRate.load(std::memory_order_relaxed);
-            if (outRate <= 0.0 || std::fabs(outRate - inRate) < 1.0)
-            {
-               for (int ch = 0; ch < chCount; ch++)
-                  gInputRing[ch].Write(channels[ch], numFrames);
-               gInputResamplePos = 0.0;
-               return;
-            }
-
-            // Linear resample to the render clock. Good enough for a mic
-            // input stage and, unlike an AVAudioConverter, allocation-free.
-            const double step = inRate / outRate;
-            double pos = gInputResamplePos;
-            int n = 0;
-            while (pos < (double)numFrames && n < kInputTapMaxOut)
-            {
-               const int i0 = std::max(0, (int)pos);
-               const int i1 = std::min(i0 + 1, numFrames - 1);
-               const float frac = (float)(pos - (double)i0);
-               for (int ch = 0; ch < chCount; ch++)
-                  gInputResampleScratch[ch][n] = channels[ch][i0] + (channels[ch][i1] - channels[ch][i0]) * frac;
-               n++;
-               pos += step;
-            }
-            gInputResamplePos = pos - (double)numFrames; // carry the sub-sample phase into the next buffer
-            for (int ch = 0; ch < chCount; ch++)
-               gInputRing[ch].Write(gInputResampleScratch[ch], n);
-         }];
-
-         NSError* err = nil;
-         [gInputEngine prepare];
-         if (![gInputEngine startAndReturnError:&err])
+         st = AudioUnitInitialize(unit);
+         if (st == noErr)
+            st = AudioOutputUnitStart(unit);
+         if (st != noErr)
          {
-            outError = err ? std::string([[err localizedDescription] UTF8String])
-                           : "input engine failed to start";
-            [input removeTapOnBus:0];
-            gInputEngine = nil;
-            return;
+            gInputUnit = nullptr;
+            gInputUnitChannels = 0;
+            gInputChannelCount = 0;
+            gActiveInputDeviceId = 0;
+            AudioUnitUninitialize(unit);
+            return fail("audio input failed to start", st);
          }
 
          gInputTapInstalled = true;
@@ -5185,6 +5272,7 @@ namespace Platform
             UInt32 frames = (UInt32)requestedBufferFrames;
             AudioObjectSetPropertyData(targetDevice, &bufferAddr, 0, nullptr, sizeof(frames), &frames);
          }
+         gRenderBufferFrames.store(requestedBufferFrames > 0 ? requestedBufferFrames : 0, std::memory_order_relaxed);
 
          h->outputDeviceId = targetDevice;
 #if !defined(INFINITE_VST3_SCANNER)
@@ -5316,11 +5404,12 @@ namespace Platform
          @try
          {
             // The input-capture tap used to live on this same engine and had
-            // to be dropped here; it now runs on its own gInputEngine (see
+            // to be dropped here; it now runs on its own gInputUnit (see
             // AudioInputCapturePump) whose lifetime is independent of the
             // render device, so there is nothing to detach - only the render
             // clock the tap resamples to goes away.
             gRenderSampleRate.store(0.0, std::memory_order_relaxed);
+            gRenderBufferFrames.store(0, std::memory_order_relaxed);
             [h->engine stop];
             [h->engine detachNode:h->source];
          }
