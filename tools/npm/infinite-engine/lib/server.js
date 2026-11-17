@@ -542,7 +542,7 @@ function startServer() {
           },
           serverInfo: {
             name: "infinite-engine",
-            version: "1.0.1"
+            version: "2.0.0"
           },
           instructions: SERVER_INSTRUCTIONS
         }

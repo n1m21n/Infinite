@@ -3,8 +3,8 @@
   "name": "io.github.n1m21n/infinite-engine",
   "description": "Infinite audiovisual engine for AI agents: sound, shaders and video patches. Free, MIT.",
   "repository": { "url": "https://github.com/n1m21n/Infinite", "source": "github", "subfolder": "tools/npm/infinite-engine" },
-  "version": "1.0.1",
+  "version": "2.0.0",
   "packages": [
-    { "registryType": "npm", "identifier": "infinite-engine", "version": "1.0.1", "transport": { "type": "stdio" } }
+    { "registryType": "npm", "identifier": "infinite-engine", "version": "2.0.0", "transport": { "type": "stdio" } }
   ]
 }
