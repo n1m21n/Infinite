@@ -22,6 +22,7 @@ namespace Field
       std::string key;    // Stable key for @boxes header (e.g. "b1", "k_rate")
       std::string specId; // Registry id, or "code", "ident", "output_pin", "input_pin", "assign_var"
       std::string label;
+      std::string title;  // the user's name for the box (Rename), kept in the @boxes header; empty = label
       float x = 0.0f;
       float y = 0.0f;
       bool hasExplicitPos = false;
@@ -100,6 +101,7 @@ namespace Field
       std::string key;
       float x = 0.0f;
       float y = 0.0f;
+      std::string title;
    };
 
    struct BoxHeaderGroup

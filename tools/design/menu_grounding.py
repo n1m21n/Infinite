@@ -54,12 +54,12 @@ GROUND = {
         "Slice to Drum Rack": "Convert to node"}),
     "##curveMenu": (P + "CurveEditorPanel.cpp", "Ableton envelope / Blender graph", {
         "Interpolation": "Handles", "Quantise": "Quantise to Grid", "Delete": "Delete", "Normalise": "Normalise",
-        "Copy": None, "Paste": None}),
+        "Copy": "Copy", "Paste": "Paste"}),
     "##mixerpanelctx": (P + "MixerPanel.cpp", "Ableton mixer", {
         "Insert return track": "New send FX", "Solo off": "Clear solo", "Snapshot": "Store snapshot"}),
     "##fpNodeMenu": (P + "FieldPatcherPanel.cpp", "TouchDesigner node", {
         "Duplicate": "Duplicate", "Copy": "Copy", "Cut": "Cut", "Delete": "Delete", "Disconnect": "Disconnect",
-        "Rename": None}),
+        "Rename": "Rename"}),
     "##fpLinkMenu": (P + "FieldPatcherPanel.cpp", "TouchDesigner wire", {"Delete": "Delete Wire"}),
 }
 

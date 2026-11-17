@@ -197,6 +197,9 @@ namespace
       std::vector<Field::BoxNode> clipBoxes; // copied boxes, with the wires that ran between them
       std::vector<Field::BoxWire> clipWires;
       int ctxBox = 0;             // the box a right-click menu is open on
+      int renameBox = 0;          // the box whose title is being edited in place
+      char boxNameBuf[64] = {};
+      bool boxNameFocus = false;
       int ctxLink = 0;
       int renaming = -1;          // the page whose tab is being renamed
       char renameBuf[64] = {};
@@ -413,6 +416,7 @@ namespace
          const Field::BoxNode* o = it->second[k++];
          b.x = o->x;
          b.y = o->y;
+         b.title = o->title;
          b.hasExplicitPos = true;
       }
       to.view = from.view;
@@ -687,6 +691,8 @@ namespace
          return T("code");
       if (b.specId == "assign_var")
          return b.varName.c_str();
+      if (!b.title.empty())
+         return b.title.c_str();
       if (!b.label.empty())
          return T(b.label.c_str());
       return b.specId.c_str();
@@ -832,7 +838,27 @@ namespace
       const Field::BoxSpec* spec = Field::FindBoxSpec(b.specId);
       ed::BeginNode(b.id);
       ImGui::PushID(b.id);
-      ImGui::TextUnformatted(BoxTitle(b));
+      if (S().renameBox == b.id)
+      {
+         State& rs = S();
+         if (rs.boxNameFocus)
+            ImGui::SetKeyboardFocusHere(), rs.boxNameFocus = false;
+         ImGui::SetNextItemWidth(140.0f);
+         const bool enter = FieldWell::InputText("##fpBoxName", rs.boxNameBuf, sizeof(rs.boxNameBuf), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+         if (enter || ImGui::IsItemDeactivated())
+         {
+            std::string name = rs.boxNameBuf;
+            name.erase(std::remove_if(name.begin(), name.end(), [](char c) { return c == '"' || c == '|' || c == '\n'; }), name.end());
+            if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false) && name != BoxTitle(b))
+            {
+               b.title = name;
+               changed = true;
+            }
+            rs.renameBox = 0;
+         }
+      }
+      else
+         ImGui::TextUnformatted(BoxTitle(b));
       const std::string sub = BoxSubtitle(b, spec);
       if (!sub.empty())
       {
@@ -1157,6 +1183,13 @@ namespace
                RemoveBox(p, id);
             changed = true;
          }
+         if (MenuParts::Item(T("Rename"), nullptr, false, s.ctxBox != 0))
+            if (const Field::BoxNode* rb = p.graph.FindBox(s.ctxBox))
+            {
+               s.renameBox = rb->id;
+               std::snprintf(s.boxNameBuf, sizeof(s.boxNameBuf), "%s", BoxTitle(*rb));
+               s.boxNameFocus = true;
+            }
          MenuParts::Separator();
          if (MenuParts::Item(T("Disconnect")))
          {
@@ -1915,8 +1948,8 @@ void FieldPatcherTestCounts(int& boxes, int& wires)
 }
 
 // MENUALIVETEST: the box clipboard is state a person sees (Paste lights up), but the patch does not hold it.
-std::string FieldPatcherTestFingerprint() { return "fpclip:" + std::to_string(S().clipBoxes.size()); }
-void FieldPatcherTestReset() { S().clipBoxes.clear(); S().clipWires.clear(); }
+std::string FieldPatcherTestFingerprint() { return "fpclip:" + std::to_string(S().clipBoxes.size()) + " fprename:" + std::to_string(S().renameBox); }
+void FieldPatcherTestReset() { S().clipBoxes.clear(); S().clipWires.clear(); S().renameBox = 0; }
 
 void FieldPatcherTestSelect(int kind, int index)
 {

@@ -967,6 +967,54 @@ namespace
       ClearSelection();
    }
 
+   // Copied points, x relative to the first one. Paste lands them just after the selection (none: after the start),
+   // inside the curve's end points; points past the end or over kMaxPoints are dropped.
+   std::vector<MSEGNode::Point>& PointClipboard()
+   {
+      static std::vector<MSEGNode::Point> clip;
+      return clip;
+   }
+
+   void CopySelection(const MSEGNode& n)
+   {
+      auto& clip = PointClipboard();
+      if (S().sel.empty())
+         return;
+      clip.clear();
+      for (int i : S().sel)
+         if (i >= 0 && i < (int)n.points.size())
+            clip.push_back(n.points[(size_t)i]);
+      const float x0 = clip.empty() ? 0.0f : clip.front().x;
+      for (auto& q : clip)
+         q.x -= x0;
+   }
+
+   void PasteClipboard(MSEGNode& n)
+   {
+      const auto& clip = PointClipboard();
+      if (clip.empty())
+         return;
+      State& s = S();
+      const float anchor = s.sel.empty() ? 0.0f : n.points[(size_t)std::min<int>(s.sel.back(), (int)n.points.size() - 1)].x;
+      const float at = anchor + 1.0f / 64.0f;
+      PushUndoCheckpoint("Paste Curve Points");
+      std::vector<float> xs;
+      for (MSEGNode::Point q : clip)
+      {
+         q.x += at;
+         if (q.x <= 0.0f || q.x >= 1.0f || (int)n.points.size() >= MSEGNode::kMaxPoints)
+            continue;
+         n.points.push_back(q);
+         xs.push_back(q.x);
+      }
+      n.Normalize();
+      ClearSelection();
+      for (int i = 0; i < (int)n.points.size(); i++)
+         if (std::find(xs.begin(), xs.end(), n.points[(size_t)i].x) != xs.end())
+            s.sel.push_back(i);
+      s.selCount = n.points.size();
+   }
+
    // The segments the selection's points start (none selected: every segment).
    std::pair<int, int> SelectionSpan(const MSEGNode& n)
    {
@@ -1383,6 +1431,10 @@ namespace
             n.Normalize(); ClearSelection();
          }
       MenuParts::Separator();
+      if (MenuParts::Item(T("Copy"), MODKEY "+C", false, !S().sel.empty()))
+         CopySelection(n);
+      if (MenuParts::Item(T("Paste"), MODKEY "+V", false, !PointClipboard().empty()))
+         PasteClipboard(n);
       if (MenuParts::Item(T("Delete"), "Del", false, !S().sel.empty()))
          DeleteSelection(n);
       MenuParts::EndPopup();
@@ -1445,6 +1497,10 @@ namespace
                SetInterp(n, numPick);
          }
       }
+      if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_C, false))
+         CopySelection(n);
+      if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_V, false))
+         PasteClipboard(n);
       if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false))
       {
          s.sel.clear();
