@@ -10,7 +10,7 @@ from PIL import Image, ImageChops
 root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 plat = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}[platform.system()]
 gdir = os.path.join(root, "tests", "ui-golden", plat)
-exe = os.path.join(root, "build/Infinite.app/Contents/MacOS/Infinite")
+exe = os.environ.get("INFINITE_BIN") or os.path.join(root, "build/Infinite.app/Contents/MacOS/Infinite")
 update = "--update" in sys.argv
 os.makedirs(gdir, exist_ok=True)
 bad = 0

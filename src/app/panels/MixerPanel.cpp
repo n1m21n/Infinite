@@ -1231,25 +1231,20 @@ namespace app
          return any ? ImVec2(x + 420.0f, y) : ImVec2(0.0f, 0.0f);
       }
 
+      bool sPendingAdd = false;   // header "+" and the empty page's New Mixer land at the top of the next frame
+
       void DrawEmpty(ImVec2 mn, ImVec2 mx)
       {
          const bool noMixer = CountMixers() == 0;
-         bool anyOut = false;
-         for (GraphNode& gn : gNodes)
-            if (auto* out = dynamic_cast<AudioOutputNode*>(gn.node.get()))
-               anyOut = anyOut || out->input.IsConnected();
          EmptyState::DrawTo(ImGui::GetWindowDrawList(), mn, ImVec2(mx.x, mn.y + (mx.y - mn.y) * 0.6f),
                             noMixer ? T("No Mixer yet") : T("No Mixer feeds an Audio Out"));
-         if (!anyOut)
-            return;
-         const char* label = T("Create from Audio Outs");
+         const char* label = T("New Mixer");
          const float w = ImGui::CalcTextSize(label).x + 2.0f * tok::space_3;
          ImGui::SetCursorScreenPos(ImVec2((mn.x + mx.x - w) * 0.5f, mn.y + (mx.y - mn.y) * 0.6f));
          if (ActionButton::Draw(label, ImVec2(w, 0.0f), ActionButton::Kind::Primary))
-            MixerPanelCreateFromAudioOuts();
+            sPendingAdd = true;
       }
 
-      bool sPendingAdd = false;
       uint64_t sPendingDelete = 0;
 
       // Page adds and deletes from the header land at the top of the next frame.
@@ -1599,7 +1594,7 @@ namespace app
    // G8: a page is a Mixer feeding its own Audio Out. One undo step for the pair and its cable.
    int MixerPanelAddPage()
    {
-      const ImVec2 at = FreeCanvasSpot();
+      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
       PushUndoCheckpoint("New Mixer Page");
       const bool wasSuppressed = gSuppressUndoCheckpoints;
       gSuppressUndoCheckpoints = true;
@@ -1611,6 +1606,7 @@ namespace app
       {
          WireInputSlot(*mixGn, *outGn, 0, 0);
          sPageUid = mixGn->uid;
+         RevealSpawned({ mixGn->uid, outGn->uid });
       }
       gSuppressUndoCheckpoints = wasSuppressed;
       RebuildAudioTopology();

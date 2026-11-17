@@ -841,6 +841,27 @@ void DrawPopupsB(FrameCtx& fc)
             gRequestSelectNodeIndex = -1;
          }
       }
+      // A page spawned nodes (New Drum Page, Add Piano Roll Page...): once drawn, select them and glide the canvas there,
+      // so the new node is never lost off-screen. Gives up after a second if a node never lays out.
+      if (!gRequestRevealUids.empty())
+      {
+         static int sRevealWait = 0;
+         bool ready = true;
+         for (uint64_t uid : gRequestRevealUids)
+            if (GraphNode* n = FindNodeByUid(uid))
+               ready = ready && ed::GetNodeSize(n->NodeId()).x > 0.0f;
+         if (ready || ++sRevealWait > 60)
+         {
+            ed::ClearSelection();
+            for (uint64_t uid : gRequestRevealUids)
+               if (GraphNode* n = FindNodeByUid(uid))
+                  ed::SelectNode(n->NodeId(), true);
+            if (ed::GetSelectedObjectCount() > 0)
+               ed::NavigateToSelection(false, 0.25f);
+            gRequestRevealUids.clear();
+            sRevealWait = 0;
+         }
+      }
       if (getenv("INFINITE_PALETTETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
       if ((getenv("INFINITE_AUDIOUITEST") != nullptr || getenv("INFINITE_FXGALLERY") != nullptr || getenv("INFINITE_NODEGALLERY") != nullptr) && frameId == 3)

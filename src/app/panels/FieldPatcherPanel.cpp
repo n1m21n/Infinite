@@ -1611,7 +1611,7 @@ namespace
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 mx(mn.x + std::max(1.0f, avail.x), mn.y + std::max(1.0f, avail.y));
-      ImU32 bg = IM_COL32(0, 0, 0, 255);
+      ImU32 bg = ImGui::GetColorU32(ImGuiCol_WindowBg);
       if (gEditor != nullptr)
       {
          ed::EditorContext* prev = ed::GetCurrentEditor();

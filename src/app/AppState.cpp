@@ -325,6 +325,7 @@ bool gHeadlessNeedProbe = false;
    int gRequestFitViewNodeIndex = -1;
    bool gRequestFitViewNodeZoom = false;
    int gRequestSelectNodeIndex = -1;
+   std::vector<uint64_t> gRequestRevealUids;
 
    // Set by the Edit menu, consumed next to the matching keyboard shortcuts.
    // The menu bar draws outside ed::Begin/End, and grouping needs the live

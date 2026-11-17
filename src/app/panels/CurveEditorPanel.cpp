@@ -309,7 +309,10 @@ namespace
    GraphNode* SpawnPage()
    {
       const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
-      return SpawnNode("MSEG", "Modulators", at.x, at.y);
+      GraphNode* gn = SpawnNode("MSEG", "Modulators", at.x, at.y);
+      if (gn != nullptr)
+         RevealSpawned({ gn->uid });
+      return gn;
    }
 
    void FreshView()

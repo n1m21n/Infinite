@@ -681,6 +681,8 @@ extern bool gRequestFitView;
 extern int gRequestFitViewNodeIndex;
 extern bool gRequestFitViewNodeZoom; // fit_view_node "zoom": scale up to fill the view so a screenshot has more pixels
 extern int gRequestSelectNodeIndex; // select this node alone on the next canvas frame (-1 = none)
+extern std::vector<uint64_t> gRequestRevealUids; // a page just spawned these: select them and glide the canvas to them once drawn
+inline void RevealSpawned(std::initializer_list<uint64_t> uids) { gRequestRevealUids.assign(uids.begin(), uids.end()); }
 
 extern bool gRequestGroup;
 

@@ -178,15 +178,13 @@ namespace app
       // One accent for lit keys, LEDs and strip bars: the Mixer's fader colour.
       ImU32 Accent(float alpha = 1.0f) { return ImGui::GetColorU32(ImGuiCol_SliderGrab, alpha); }
 
-      // The rhythm-composer step keys: four groups of four in red, orange, yellow and cream, a red LED on each.
-      // Off keys sit dim in their group colour; a set step lights its key and LED, brightness = velocity.
-      ImU32 TrKey(int step, float k)
+      // The step keys: one cream/grey key for every step, a red LED on each.
+      // Off keys sit dim grey; a set step lights its key and LED, brightness = velocity.
+      ImU32 TrKey(int /*step*/, float k)
       {
-         static const ImU32 kGroup[4] = { IM_COL32(196, 58, 44, 255), IM_COL32(226, 120, 38, 255), IM_COL32(230, 192, 64, 255),
-                                          IM_COL32(226, 220, 200, 255) };
-         return DeskParts::Tint(kGroup[(step / 4) & 3], k);
+         return DeskParts::Tint(tok::U32(tok::desk_key_cream), k);
       }
-      constexpr ImU32 kTrLed = IM_COL32(255, 52, 36, 255);
+      const ImU32 kTrLed = tok::U32(tok::desk_step_led);
 
       std::string LaneName(DrumSequencerNode* n, int lane)
       {
@@ -217,16 +215,8 @@ namespace app
 
       GraphNode* AddPage()
       {
-         float x = 0.0f, y = 0.0f;
-         bool any = false;
-         for (const GraphNode& gn : gNodes)
-         {
-            x = any ? std::max(x, gn.liveX) : gn.liveX;
-            y = any ? std::min(y, gn.liveY) : gn.liveY;
-            any = true;
-         }
-         if (any)
-            x += 420.0f;
+         const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
+         const float x = at.x, y = at.y;
          PushUndoCheckpoint("New Drum Page");
          const bool wasSuppressed = gSuppressUndoCheckpoints;
          gSuppressUndoCheckpoints = true;
@@ -239,7 +229,10 @@ namespace app
          gSuppressUndoCheckpoints = wasSuppressed;
          RebuildAudioTopology();
          if (drum)
+         {
             sPageUid = drum->uid;
+            RevealSpawned({ drum->uid, out ? out->uid : 0 });
+         }
          return drum;
       }
 

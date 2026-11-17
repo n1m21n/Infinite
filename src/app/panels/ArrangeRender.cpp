@@ -10,6 +10,7 @@
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/FormParts.h"
 
 namespace app
 {
@@ -945,7 +946,7 @@ namespace app
          SectionHeader(T("Rename All Selected"));
          ImGui::SetNextItemWidth(availW - 56.0f - tok::space_1);
          FieldWell::InputText("##bulkrenametext", sBulkRenameBuf, sizeof(sBulkRenameBuf));
-         ImGui::SameLine(0.0f, tok::space_1);
+         FormParts::Inline(0.0f, tok::space_1);
          if (ChipButton::Draw(L("Apply##bulkapplyrename"), false, ImGui::GetFrameHeight(), 56.0f))
          {
             ArrangeEdit([&]() {
@@ -1084,7 +1085,7 @@ namespace app
                         l->solo = solo;
                   });
                }
-               ImGui::SameLine(0.0f, tok::space_1);
+               FormParts::Inline(0.0f, tok::space_1);
                bool mute = lane->mute;
                if (ToggleChip(L("Mute##trackmute"), &mute, halfW))
                {

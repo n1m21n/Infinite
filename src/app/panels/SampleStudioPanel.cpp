@@ -1199,6 +1199,7 @@ namespace
       GraphNode* gn = SpawnNode(type, "Synths", at.x, at.y);
       if (gn == nullptr)
          return nullptr;
+      RevealSpawned({ gn->uid });
       INode* node = gn->node.get();
       if (generator)
       {

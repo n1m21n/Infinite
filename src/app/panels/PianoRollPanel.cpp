@@ -220,9 +220,11 @@ namespace
    void AddPage()
    {
       PushUndoCheckpoint("Add Piano Roll Page");
-      GraphNode* fresh = SpawnNode("Piano Roll", "Notes", gViewCenterCanvas.x, gViewCenterCanvas.y);
+      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
+      GraphNode* fresh = SpawnNode("Piano Roll", "Notes", at.x, at.y);
       if (fresh == nullptr)
          return;
+      RevealSpawned({ fresh->uid });
       const uint64_t lane = Arrange::AddLane(gArrange, Arrange::kLaneMidi);
       if (Arrange::Lane* l = Arrange::FindLane(gArrange, lane))
          l->name = Arrange::UniqueLaneName(gArrange, "Part", Arrange::kLaneMidi);

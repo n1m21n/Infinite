@@ -171,6 +171,8 @@ namespace tok
    constexpr Rgba8 desk_led_green = {84, 214, 140, 255};
    constexpr Rgba8 desk_led_yellow = {255, 214, 64, 255};
    constexpr Rgba8 desk_led_blue = {120, 190, 255, 255};
+   constexpr Rgba8 desk_key_cream = {226, 220, 200, 255};
+   constexpr Rgba8 desk_step_led = {255, 52, 36, 255};
    constexpr Rgba8 desk_readout = {120, 235, 160, 255};
    constexpr Rgba8 desk_readout_over = {255, 115, 105, 255};
    constexpr Pairf dropdown_fill = { {0.16f, 0.18f, 0.24f, 1.0f}, {0.86f, 0.88f, 0.94f, 1.0f} };
