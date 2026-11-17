@@ -5,9 +5,14 @@ The app runs off-screen (IMAGERESYNTH_SCREENSHOT), saves its own backbuffer on r
 opens panels over RPC and takes synthetic mouse and key input through the RPC "ui" method. No real mouse,
 no window capture, no Accessibility permission.
 
-  python3 tools/manual/ui_shots_offscreen.py [--app PATH] [--patch PATH] [shot ...]
+  python3 tools/manual/ui_shots_offscreen.py [--app PATH] [--patch PATH] [--port N] [--token-dir DIR] [--out DIR]
+                                             [--force] [shot ...]
 
-Writes docs/ui_screenshots/<shot>.png at 3200x2000 (a 1600x1000 pt window, 2x). Coordinates below are points.
+Writes <out>/<shot>.png at 3200x2000 (a 1600x1000 pt window, 2x). Coordinates below are points.
+Settings come from tools/manual/shot_config.py (env INFINITE_SHOT_APP / _PORT / _TOKEN_DIR / _OUT, or the flags here);
+with no flags and no env the defaults are the same as before.
+Resumable: a shot whose file is in <out>/manifest.json and still passes the pixel rule is skipped unless --force.
+Every shot is checked for >= 3200x2000 px; a shot that fails is removed and the run exits 1.
 """
 import argparse
 import os
@@ -19,13 +24,14 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import node_screenshot as ns  # noqa: E402
+import shot_config as cfg  # noqa: E402
 
-OUT = os.path.join(ROOT, "docs", "ui_screenshots")
+OUT = cfg.DEFAULT_OUT
 APP = os.path.join(ROOT, "build-dev", "Infinite.app", "Contents", "MacOS", "Infinite")
 PATCH = os.path.join(ROOT, "docs", "showcase", "infinite-v1-showcase.inf")
-TOKFILE = os.path.expanduser("~/Library/Application Support/Infinite/control_token")
-PORT = 7794
+PORT = cfg.DEFAULT_PORT
 
 # Panel rail (right edge), y per button.
 RAIL_X = 1578
@@ -36,8 +42,11 @@ PANELS = ["viewport", "modmatrix", "perf", "timeline", "session", "samplestudio"
 
 
 class Shooter:
-    def __init__(self, rpc, req, tmp):
+    def __init__(self, rpc, req, tmp, out=OUT, manifest=None):
         self.rpc, self.req, self.tmp = rpc, req, tmp
+        self.out = out
+        self.manifest = manifest or cfg.Manifest(out)
+        self.failed = []
 
     def ui(self, action, **kw):
         self.rpc.call("ui", action=action, **kw)
@@ -103,10 +112,19 @@ class Shooter:
         tmp = self.grab(name)
         if not os.path.exists(tmp):
             print(f"  {name}: no frame saved")
+            self.failed.append(name)
             return
-        os.makedirs(OUT, exist_ok=True)
-        shutil.copyfile(tmp, os.path.join(OUT, name + ".png"))
-        print(f"  {name}")
+        os.makedirs(self.out, exist_ok=True)
+        dest = os.path.join(self.out, name + ".png")
+        shutil.copyfile(tmp, dest)
+        try:
+            w, h = cfg.assert_pixels(dest, "ui")
+        except AssertionError as e:
+            print(f"  FAIL {e}")
+            self.failed.append(name)
+            return
+        self.manifest.record(name, dest, "ui")
+        print(f"  {name}  {w}x{h}")
 
 
 # Each scene: reset, then its steps, then one shot named after the scene.
@@ -172,9 +190,12 @@ def scenes(s):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--app", default=APP)
+    ap.add_argument("--app", default=cfg.app_path(None, APP), help="default: $INFINITE_SHOT_APP, $INFINITE_APP, then build-dev")
     ap.add_argument("--patch", default=PATCH)
-    ap.add_argument("--port", type=int, default=PORT)
+    ap.add_argument("--port", type=int, default=cfg.port(), help="default: $INFINITE_SHOT_PORT or 7794")
+    ap.add_argument("--token-dir", default=cfg.token_dir(), help="default: $INFINITE_SHOT_TOKEN_DIR or the app's settings folder")
+    ap.add_argument("--out", default=cfg.out_dir(), help="default: $INFINITE_SHOT_OUT or docs/ui_screenshots")
+    ap.add_argument("--force", action="store_true", help="shoot again even when the manifest says it is done")
     ap.add_argument("--attach", help="token file of an already running off-screen app (with --req)")
     ap.add_argument("--req", help="that app's INFINITE_SHOT_REQUEST path")
     ap.add_argument("shots", nargs="*")
@@ -183,12 +204,13 @@ def main():
     tmp = tempfile.mkdtemp(prefix="ui_shots_")
     proc = None
     tokbak = None
+    tokfile = os.path.join(a.token_dir, "control_token")
     if a.attach:
         tok, req = open(a.attach).read().strip(), a.req
     else:
-        if os.path.exists(TOKFILE):
+        if os.path.exists(tokfile):
             tokbak = os.path.join(tmp, "token.bak")
-            shutil.copyfile(TOKFILE, tokbak)
+            shutil.copyfile(tokfile, tokbak)
         req = os.path.join(tmp, "req")
         env = dict(os.environ, INFINITE_NO_SINGLE_INSTANCE="1", INFINITE_CONTROL_PORT=str(a.port), INFINITE_NOSPLASH="1",
                    INFINITE_NO_UPDATE_CHECK="1", INFINITE_HIDE_TELEMETRY="1",
@@ -197,9 +219,10 @@ def main():
         log = open(os.path.join(tmp, "app.log"), "w")
         proc = subprocess.Popen([a.app, os.path.abspath(a.patch)], env=env, stdout=log, stderr=subprocess.STDOUT)
         time.sleep(15)
-        tok = open(TOKFILE).read().strip()
+        tok = cfg.read_token(proc.pid, a.token_dir, a.port)   # this app's own token, not the shared file
     rpc = ns.RpcClient("127.0.0.1", a.port, tok)
-    s = Shooter(rpc, req, tmp)
+    manifest = cfg.Manifest(a.out)
+    s = Shooter(rpc, req, tmp, a.out, manifest)
     # Same Studio take and playing scene as docs/showcase/shoot.sh (the Studio does not resolve a relative path).
     media = os.path.join(os.path.dirname(os.path.abspath(a.patch)), "media")
     slices = "\n".join(f"slice id={i + 1} s={i * 24406} col={(3 * i + 3) % 10 or 1} n={60 + i}" for i in range(8))
@@ -210,6 +233,9 @@ def main():
     try:
         table = scenes(s)
         for name in a.shots or list(table):
+            if not a.force and manifest.done(name, "ui"):
+                print(f"  {name}  (done, skipped)")
+                continue
             s.reset()
             table[name]()
             s.shot(name)
@@ -223,8 +249,11 @@ def main():
             time.sleep(2)
             proc.kill()
         if tokbak:
-            shutil.copyfile(tokbak, TOKFILE)
+            shutil.copyfile(tokbak, tokfile)
         shutil.rmtree(tmp, ignore_errors=True)
+    if s.failed:
+        print("failed shots (removed, rerun to shoot again): " + ", ".join(s.failed))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

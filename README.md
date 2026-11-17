@@ -13,7 +13,7 @@
 
 **Infinite is a Free, open-source audiovisual workstation made by Naman Soni (n1m21n).** Visuals, music and code live on one node canvas, on **macOS**, **Windows** and **Linux**, in English, Spanish, German, Chinese, Japanese and Russian. GPU image and video compositing, procedural 3D geometry and physics, and a modular synth rack with AU and VST3 plugin hosting all patch into each other through one modulation graph. Most nodes do one fixed thing; **Field**, Infinite's own programming language, lets you write what a node does instead.
 
-![Infinite v1.0 with several panels open around the node canvas](docs/screenshots/v1/hero-panels.png)
+![Infinite 2.0 with several panels open around the node canvas](docs/screenshots/v2/hero-panels.png)
 
 ---
 
@@ -39,13 +39,13 @@ Start from a working patch instead of an empty canvas. 15 **Starters** each teac
 
 ### The node canvas
 
-![The Infinite node canvas](docs/screenshots/v1/node-graph.png)
+![The Infinite node canvas](docs/screenshots/v2/node-graph.png)
 
 Everything is a node, and every cable carries one kind of thing: pictures, 3D geometry, audio, notes or control signals. Patch left to right, right-click to add, and anything with a dot beside it can be modulated. Infinite has **372 node types** on macOS; the [Node library](#node-library) lists them by domain, and the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf) covers most of them.
 
 ### Pictures and video
 
-![Four frames from the Showcase patch: a 3D scene of instanced cubes, rings and particles over a blurred sky](docs/screenshots/v1/showcase-frames.png)
+![The Showcase patch on the Infinite node canvas, with its nodes wired together](docs/screenshots/v2/showcase-frames.png)
 
 A GPU texture pipeline (GLSL, OpenGL 3.2 Core): images, video and camera, Syphon, Spout and NDI sources, shapes, noise and Field Pixel shaders, 32 blend modes, blur, bloom, glitch, halftone, curves, LUTs, reaction-diffusion, feedback loops and on-device background removal. The frames above are four seconds of the bundled Showcase patch, rendered headless.
 
@@ -135,9 +135,9 @@ A note editor (Shift + R) for MIDI lanes on the Timeline, played by the Piano Ro
 
 ### Mod Matrix and Performance
 
-<img src="docs/screenshots/v1/mod-matrix.png" alt="Mod Matrix listing every modulation in the patch" width="100%">
+<img src="docs/screenshots/v2/mod-matrix.png" alt="Mod Matrix listing every modulation in the patch" width="100%">
 
-<img src="docs/screenshots/v1/performance.png" alt="The Performance panel in Perform mode: knobs, faders and number boxes for the showcase patch" width="100%">
+<img src="docs/screenshots/v2/performance.png" alt="The Performance panel in Perform mode: knobs, faders and number boxes for the showcase patch" width="100%">
 
 The Mod Matrix (Shift + M) lists every modulation in the patch in one table: source, destination, range, curve and invert, with each source's live signal. The Performance panel (Shift + P) is a surface for playing a patch: pages of knobs, faders, XY pads, toggles, triggers, radio selectors and step gates, each assigned to any parameter, with MIDI learn and a response curve per control. Edit mode lays it out; Perform mode plays it.
 

@@ -25,13 +25,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 e = html.escape
 
 CAT_LABEL = {"AudioEffects": "Audio effects", "3D": "3D", "Source": "Source", "Compositing": "Compositing", "Effects": "Effects", "Modulators": "Modulators",
-             "Prediction": "Prediction", "Macros": "Macros", "Utility": "Utility", "Notes": "Notes", "Synths": "Synths"}
+             "Prediction": "Prediction", "Macros": "Macros", "Utility": "Utility", "Notes": "Notes", "Synths": "Synths", "Shader": "Shader"}
 CAT_COLOR = {"Source": "#4ADE80", "3D": "#38BDF8", "Compositing": "#818CF8", "Effects": "#FACC15", "Modulators": "#A3E635", "Prediction": "#22D388",
-             "Macros": "#FC963C", "Utility": "#A3A9BA", "Notes": "#4CD964", "Synths": "#6992F6", "AudioEffects": "#53C7E3"}
+             "Macros": "#FC963C", "Utility": "#A3A9BA", "Notes": "#4CD964", "Synths": "#6992F6", "AudioEffects": "#53C7E3", "Shader": "#F472B6"}
 CAT_BLURB = {
     "Source": "a source node: it makes a picture from nothing, so it sits at the start of a visual chain",
     "3D": "a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture",
     "Compositing": "a compositing node: it layers, masks and routes pictures",
+    "Shader": "a shader node: it works out how a surface looks, from light, normals and textures",
     "Effects": "an image effect: it changes the picture that flows through it",
     "Modulators": "a modulator: it makes a moving value that can drive any control on the canvas",
     "Prediction": "a prediction node: it guesses where a value or a phrase goes next and drifts around that guess",
@@ -348,7 +349,9 @@ def build():
         refresh_pdf_cards()
     types, cards = engine(refresh), guide_cards()
     pages_txt = pdf_pages()
-    lib = library() + [(n, types[NORM(n)]["category"]) for n in EXTRA if NORM(n) in types]
+    lib = library()
+    listed = {NORM(n) for n, _ in lib}
+    lib += [(n, types[NORM(n)]["category"]) for n in EXTRA if NORM(n) in types and NORM(n) not in listed]
     items = []
     for name, cat in lib:
         t = types[NORM(name)]
@@ -393,6 +396,22 @@ def build():
     open(os.path.join(W, "nodes", "index.html"), "w", encoding="utf-8").write(index_page(items))
     json.dump({"nodes": {it["name"]: {"s": it["slug"], "d": first_sentence(it["desc"]) if len(it["desc"]) > 220 else it["desc"], "p": bool(it["patch"])} for it in items}},
               open(os.path.join(W, "assets/nodes/index.json"), "w"), ensure_ascii=False, separators=(",", ":"))
+    # Orphans: files left by a node that was removed from the list (their pages, patches and pictures would otherwise stay).
+    slugs = {it["slug"] for it in items}
+    shots_kept = {it["shot"][0] for it in items if it.get("shot")}
+    for d, keep in ((os.path.join(W, "nodes"), lambda f: f == "index.html" or f[:-5] in slugs and f.endswith(".html")),
+                    (os.path.join(W, "assets/nodes/patches"), lambda f: f[:-4] in slugs and f.endswith(".inf")),
+                    (os.path.join(W, "assets/nodes/hd"), lambda f: f in shots_kept),
+                    (os.path.join(W, "assets/nodes/ring"), lambda f: f in shots_kept)):
+        for f in os.listdir(d):
+            if not keep(f):
+                os.remove(os.path.join(d, f)); print("  removed orphan", os.path.relpath(os.path.join(d, f), W))
+    # The homepage count is the number of node pages, so it cannot drift from the list.
+    ip = os.path.join(W, "index.html")
+    h = open(ip, encoding="utf-8").read()
+    h2 = re.sub(r'<b id="node-count">\d+</b>', '<b id="node-count">%d</b>' % len(items), h)
+    if h2 != h:
+        open(ip, "w", encoding="utf-8").write(h2)
     print("%d node pages; %d with a Field Guide card; %d patches validated; %d without a patch" % (len(items), sum(i["guide"] for i in items), sum(bool(i["patch"]) for i in items), len(bad)))
     for n, w in bad: print("  no patch:", n, "-", w)
     return items
@@ -405,7 +424,8 @@ def shots(items):
     files = {NORM(f[:-4]): f for f in os.listdir(src) if f.endswith(".png")}
     out = os.path.join(W, "assets/nodes/hd")
     for it in items:
-        f = files.get(NORM(it["type"])) or files.get(NORM(it["name"]))
+        # Category first: Invert (Modulators) and invert (Compositing) are separate pictures; the plain name is for the rest.
+        f = files.get(NORM(f"{it['name']} ({it['cat']})")) or files.get(NORM(it["type"])) or files.get(NORM(it["name"]))
         if not f:
             it["shot"] = None; continue
         fs = re.sub(r"[^a-z0-9]+", "-", f[:-4].lower()).strip("-")
@@ -604,7 +624,7 @@ def index_page(items):
     url = BASE + "nodes/"
     title = "Every Infinite node: %d nodes with controls and patches" % len(items)
     desc = "All %d nodes in Infinite, the free audiovisual workstation: sources, 3D, effects, synths, notes and modulators, each with its controls and a patch." % len(items)
-    order = ["Source", "Compositing", "Effects", "3D", "Synths", "AudioEffects", "Notes", "Modulators", "Prediction", "Macros", "Utility"]
+    order = ["Source", "Compositing", "Shader", "Effects", "3D", "Synths", "AudioEffects", "Notes", "Modulators", "Prediction", "Macros", "Utility"]
     ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite nodes", "url": url, "description": desc, "isPartOf": {"@type": "WebSite", "url": BASE},
           "mainEntity": {"@type": "ItemList", "numberOfItems": len(items), "itemListElement": [
               {"@type": "ListItem", "position": n + 1, "url": BASE + "nodes/" + i["slug"] + ".html", "name": i["name"]} for n, i in enumerate(items)]}}
