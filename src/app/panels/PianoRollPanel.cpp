@@ -46,7 +46,7 @@ namespace
 {
    constexpr float kMinHeight = 240.0f;
    constexpr float kIconW = tok::control_h;
-   constexpr float kKeysW = 44.0f, kRulerH = 16.0f, kStripH = 16.0f;
+   constexpr float kKeysW = 44.0f, kRulerH = 16.0f, kStripH = 10.0f;
    constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
    constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
    constexpr double kMinPxPerTick = 0.002, kMaxPxPerTick = 2.0;
