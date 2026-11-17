@@ -28,10 +28,10 @@ ROUNDING = re.compile(
 POPUP = re.compile(r"ImGui::BeginPopup\(")
 ALLOW = {"src/app/ui/design/", "src/app/selftest/UiAudit.cpp"}  # components themselves; UiAudit draws raw widgets on purpose as canaries
 
-def counts(rx=RX, allow=None):
+def counts(rx=RX, allow=None, bases=("src/app", "src/arrange")):
     allow = ALLOW if allow is None else allow
     out = {}
-    for base in ("src/app", "src/arrange"):
+    for base in bases:
         for f in sorted((ROOT / base).rglob("*")):
             if f.suffix not in (".cpp", ".h", ".mm"): continue
             rel = str(f.relative_to(ROOT))
@@ -53,7 +53,14 @@ def store(c, w, z, f, rn, pp):
     print(f"ratchet: {sum(c.values())} literal colours, {sum(w.values())} raw widget calls, {sum(z.values())} size literals, {sum(f.values())} font scales, {sum(rn.values())} rounding literals, {sum(pp.values())} raw popups")
 
 def main():
-    cur_c, cur_w, cur_z, cur_f, cur_r, cur_p = counts(RX), counts(RAW), counts(SIZE, set()), counts(FONT_SCALE), counts(ROUNDING, set()), counts(POPUP)
+    cur_c, cur_w, cur_z, cur_f, cur_r, cur_p = (
+        counts(RX, bases=("src/app", "src/arrange", "src/nodes")),
+        counts(RAW),
+        counts(SIZE, set()),
+        counts(FONT_SCALE),
+        counts(ROUNDING, set()),
+        counts(POPUP),
+    )
     old_c, old_w, old_z, old_f, old_r, old_p = load()
     if "--reset" in sys.argv:
         store(cur_c, cur_w, cur_z, cur_f, cur_r, cur_p); return 0
