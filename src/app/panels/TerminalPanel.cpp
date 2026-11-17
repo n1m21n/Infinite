@@ -670,10 +670,17 @@ namespace
    }
 
    // Right-click on the panel. A program that takes the mouse keeps the click over its cells; Shift gets the menu.
-   void DrawDockMenu(bool overCells, const term::Snapshot* snap)
+   // A tab under the mouse this frame: its right-click is the tab's, never the dock menu's.
+   bool sTabHovered = false;
+
+   // chat = the Chat face: the menu opens on free space only (not over a message, thread or field)
+   // and its Close row names Chat.
+   void DrawDockMenu(bool overCells, const term::Snapshot* snap, bool chat = false)
    {
       const bool reported = overCells && snap != nullptr && snap->mouseMode != 0 && !ImGui::GetIO().KeyShift;
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !reported &&
+      const bool overItem = chat ? ImGui::IsAnyItemHovered() : sTabHovered;
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !reported && !overItem &&
+          !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
          ImGui::OpenPopup("##terminalDockMenu");
       if (!MenuParts::BeginPopup("##terminalDockMenu"))
@@ -703,6 +710,7 @@ namespace
       const ImU32 dimColor = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       float x = start.x;
       int closeIndex = -1;
+      sTabHovered = false;
       for (int i = 0; i < (int)sTabs.size(); ++i)
       {
          Tab& tab = *sTabs[(size_t)i];
@@ -721,6 +729,7 @@ namespace
          ImGui::SetCursorScreenPos(ImVec2(x, start.y));
          ImGui::InvisibleButton("##tab", ImVec2(width, kTabRowH));
          const bool hovered = ImGui::IsItemHovered();
+         sTabHovered = sTabHovered || hovered;
          // The close mark is part of this button: a second button on top of it never gets the hover.
          const ImVec2 closeMin(x + width - 20.0f, start.y + 3.0f), closeMax(closeMin.x + 16.0f, closeMin.y + 16.0f);
          const bool overClose = hovered && ImGui::IsMouseHoveringRect(closeMin, closeMax);
@@ -931,7 +940,7 @@ namespace
          if (!gChatSideTerminal)
          {
             DrawChatPanel();
-            DrawDockMenu(false, nullptr);   // right-click: Dock Position and Close, as on every panel
+            DrawDockMenu(false, nullptr, true);   // right-click: Dock Position and Close, as on every panel
             return;
          }
          // The terminal opens beside the chat, as the side terminal does in Claude: chat left, shell right.
@@ -940,7 +949,7 @@ namespace
          const float left = std::floor((avail.x - gap) * 0.55f);
          ImGui::BeginChild("##chatside", ImVec2(left, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawChatPanel();
-         DrawDockMenu(false, nullptr);
+         DrawDockMenu(false, nullptr, true);
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
             gTerminalFocus = false;
          ImGui::EndChild();

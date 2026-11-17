@@ -1691,10 +1691,15 @@ namespace app
          const ImVec2 mouse = ImGui::GetIO().MousePos;
          const bool overToolbar = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
                                   mouse.y >= arrangeToolbarTop && mouse.y < arrangeToolbarBottom;
-         if (overToolbar && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
-             ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangedockctx"))
+         if (overToolbar && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::IsAnyItemHovered() &&
+             ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangedockctx"))
             ImGui::OpenPopup("##arrangedockctx");
       }
+      // The monitor child asks for the viewport menu; it opens here, in the same ID scope as the chip's.
+      static bool sViewportCtxRequest = false;
+      if (sViewportCtxRequest && !ImGui::IsPopupOpen("##arrangeviewportctx"))
+         ImGui::OpenPopup("##arrangeviewportctx");
+      sViewportCtxRequest = false;
       if (MenuParts::BeginPopup("##arrangedockctx"))
       {
          if (MenuParts::SubMenu(L("Dock Position")))
@@ -1848,22 +1853,8 @@ namespace app
 
          // Right-click anywhere on the monitor to reach the Viewport Position menu
          // (Dock Left / Dock Right).
-         if (ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Right) &&
-             !ImGui::IsPopupOpen("##arrangeviewportctx"))
-            ImGui::OpenPopup("##arrangeviewportctx");
-
-         if (MenuParts::BeginPopup("##arrangeviewportctx"))
-         {
-            if (MenuParts::SubMenu(L("Viewport Position")))
-            {
-               if (MenuParts::Item(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
-                  gArrangeViewportOnRight = false;
-               if (MenuParts::Item(L("Dock Right"), nullptr, gArrangeViewportOnRight))
-                  gArrangeViewportOnRight = true;
-               ImGui::EndMenu();
-            }
-            MenuParts::EndPopup();
-         }
+         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            sViewportCtxRequest = true;
 
          ImGui::EndChild();
       };

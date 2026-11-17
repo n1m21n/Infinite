@@ -8808,7 +8808,11 @@ namespace
             }
             ImGui::EndDragDropTarget();
          }
-         if (MenuParts::BeginContextItem("##rowmenu"))
+         // The whole row opens the menu: eye, fold arrow and thumbnail included.
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsWindowHovered() &&
+             ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w, p.y + rowH)) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
+            ImGui::OpenPopup("##rowmenu");
+         if (MenuParts::BeginPopup("##rowmenu"))
          {
             if (!Selected(id))
                SelectOnly(id);

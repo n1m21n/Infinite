@@ -481,7 +481,9 @@ namespace app
       const ImVec2 mouse = ImGui::GetIO().MousePos;
       const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + strip.x &&
                              mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + strip.y;
-      if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+      if (overPanel && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
+          ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
+          !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
          ImGui::OpenPopup("##viewportpanelctx");
 
       if (MenuParts::BeginPopup("##viewportpanelctx"))

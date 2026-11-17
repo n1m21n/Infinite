@@ -110,6 +110,10 @@ namespace app
          MenuParts::EndPopup();
       }
       int sSceneCtxRow = -1;
+      // Row and slot menus are requested inside PushID scopes and opened next to their BeginPopup,
+      // so the popup ID matches.
+      bool sSceneCtxOpen = false;
+      bool sSlotCtxOpen = false;
       int sTrackDragFrom = -1;   // track column being dragged to a new place
       int sSceneDragFrom = -1;   // scene row being dragged to a new place
       char sSceneNameBuf[64] = {};
@@ -313,6 +317,9 @@ namespace app
 
       void DrawSlotMenu()
       {
+         if (sSlotCtxOpen)
+            ImGui::OpenPopup("##sessionslotctx");
+         sSlotCtxOpen = false;
          if (!MenuParts::BeginPopup("##sessionslotctx"))
             return;
          Arrange::Lane* lane = Arrange::FindLane(gArrange, sCtxLaneId);
@@ -452,6 +459,9 @@ namespace app
 
       void DrawSceneMenu()
       {
+         if (sSceneCtxOpen)
+            ImGui::OpenPopup("##sessionscenectx");
+         sSceneCtxOpen = false;
          if (!MenuParts::BeginPopup("##sessionscenectx"))
             return;
          const int row = sSceneCtxRow;
@@ -691,7 +701,7 @@ namespace app
             const std::string nm = realScene ? gArrange.scenes[(size_t)row].name : std::string();
             snprintf(sSceneNameBuf, sizeof(sSceneNameBuf), "%s", nm.c_str());
             sSceneTempoEdit = realScene ? gArrange.scenes[(size_t)row].tempo : 0.0f;
-            ImGui::OpenPopup("##sessionscenectx");
+            sSceneCtxOpen = true;
          }
          if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f))
             sSceneDragFrom = row;
@@ -852,7 +862,7 @@ namespace app
                   sClipCtxRequest = true;
                }
                else
-                  ImGui::OpenPopup("##sessionslotctx");
+                  sSlotCtxOpen = true;
             }
             const float cy = (a.y + b.y) * 0.5f;
             const float th = ImGui::GetTextLineHeight();
@@ -1839,8 +1849,8 @@ namespace app
             const ImVec2 m = ImGui::GetIO().MousePos;
             const ImVec2 o = ImGui::GetWindowPos();
             if (m.y >= toolbarTop && m.y < toolbarBottom && m.x >= o.x && m.x < o.x + panelSize.x &&
-                ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseReleased(ImGuiMouseButton_Right) &&
-                !ImGui::IsPopupOpen("##sessiondockctx"))
+                ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::IsAnyItemHovered() &&
+                ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##sessiondockctx"))
                ImGui::OpenPopup("##sessiondockctx");
          }
          DrawArrangeRenderDialogs();

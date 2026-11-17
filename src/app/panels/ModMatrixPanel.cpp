@@ -976,7 +976,9 @@ namespace app
       const ImVec2 mouse = ImGui::GetIO().MousePos;
       const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
                              mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + panelSize.y;
-      if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+      // Free space only: a row or chip that owns its own menu (the curve menu) keeps the click.
+      if (overPanel && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
+          !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
          ImGui::OpenPopup("##modmatrixctx");
 
       if (MenuParts::BeginPopup("##modmatrixctx"))
