@@ -3713,4 +3713,5 @@ Turn on Sample Audio to hear a slice	Sample Audio einschalten, um einen Ausschni
 Shift-drag: stretch or compact the slice (pitch kept)	Umschalt-Ziehen: Ausschnitt dehnen oder stauchen (Tonhöhe bleibt)
 Drag: move the cut; Shift-drag: stretch the slice; double-click: remove it	Ziehen: Schnitt verschieben; Umschalt-Ziehen: Ausschnitt dehnen; Doppelklick: entfernen
 Click: place the playhead; double-click: a new slice here	Klick: Abspielkopf setzen; Doppelklick: neuer Ausschnitt hier
-Paste at playhead	Am Abspielkopf einfügen
+Copy Scene	Szene kopieren
+Paste Scene	Szene einfügen

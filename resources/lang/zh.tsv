@@ -3713,4 +3713,5 @@ Turn on Sample Audio to hear a slice	开启 Sample Audio 以试听切片
 Shift-drag: stretch or compact the slice (pitch kept)	Shift 拖动:拉伸或压缩切片(音高不变)
 Drag: move the cut; Shift-drag: stretch the slice; double-click: remove it	拖动:移动切点;Shift 拖动:拉伸切片;双击:删除
 Click: place the playhead; double-click: a new slice here	单击:放置播放头;双击:在此新建切片
-Paste at playhead	在播放头处粘贴
+Copy Scene	复制场景
+Paste Scene	粘贴场景

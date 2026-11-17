@@ -75,7 +75,7 @@ def main():
         print(f"menu_walk: timed out after {a.timeout} s")
     lines = log.read_text(errors="ignore").replace("\r", "").splitlines()
     for line in lines:
-        if line.startswith(("MENUALIVE", "  menu with fails")) or "[FAIL]" in line or "[fail]" in line:
+        if line.startswith(("MENUALIVE", "MENUORDER", "  menu with fails", "  [ORDER]", "  [NAMES]")) or "[FAIL]" in line or "[fail]" in line:
             print(line)
     print("menu_walk: log", log)
     return 0 if any(l.startswith("MENUALIVETEST OK") for l in lines) else 1

@@ -3713,4 +3713,5 @@ Turn on Sample Audio to hear a slice	Включите Sample Audio, чтобы �
 Shift-drag: stretch or compact the slice (pitch kept)	Shift-перетаскивание: растянуть или сжать фрагмент (высота сохраняется)
 Drag: move the cut; Shift-drag: stretch the slice; double-click: remove it	Перетащить: сдвинуть разрез; Shift-перетаскивание: растянуть фрагмент; двойной щелчок: убрать
 Click: place the playhead; double-click: a new slice here	Щелчок: поставить маркер воспроизведения; двойной щелчок: новый фрагмент здесь
-Paste at playhead	Вставить у маркера воспроизведения
+Copy Scene	Копировать сцену
+Paste Scene	Вставить сцену

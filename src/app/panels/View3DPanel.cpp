@@ -8016,14 +8016,14 @@ namespace
       MenuParts::Separator();
       if (MenuParts::Item(T("New scene")))
          sPending.what = Pending::Scene;
-      if (MenuParts::Item(T("Copy scene"), MODKEY "+C"))
+      if (MenuParts::Item(T("Copy Scene"), MODKEY "+C"))
          sCopiedScene = scene->SceneText();
-      if (MenuParts::Item(T("Paste scene"), MODKEY "+V", false, !sCopiedScene.empty()))
+      if (MenuParts::Item(T("Paste Scene"), MODKEY "+V", false, !sCopiedScene.empty()))
          sPending.what = Pending::PasteScene;
-      if (MenuParts::Item(T("Duplicate scene"), MODKEY "+D"))
+      if (MenuParts::Item(T("Duplicate Scene"), MODKEY "+D"))
          sPending.what = Pending::DuplicateScene;
       MenuParts::Separator();
-      if (MenuParts::Item(T("Delete scene")))
+      if (MenuParts::Item(T("Delete Scene")))
          sPending.what = Pending::DeleteScene;
    }
 

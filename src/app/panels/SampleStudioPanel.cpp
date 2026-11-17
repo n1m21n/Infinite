@@ -2223,7 +2223,7 @@ namespace
       const bool any = !s.sel.empty();
       if (MenuParts::Item(T("Copy"), MODKEY "+C", false, any))
          CopySelected();
-      if (MenuParts::Item(T("Paste at playhead"), MODKEY "+V", false, s.clip.has_value()))
+      if (MenuParts::Item(T("Paste at Playhead"), MODKEY "+V", false, s.clip.has_value()))
          Paste();
       MenuParts::Separator();
       if (MenuParts::Item(T("Mute"), "M", false, any))
@@ -2244,7 +2244,10 @@ namespace
       if (MenuParts::Item(T("Join"), "J", false, any && s.doc.Count() > 1))
          JoinSelected();
       if (MenuParts::Item(T("Play slice"), "Q", false, any))
+      {
+         SetStudioAudio(true); // asked for by name: the Studio's own audio comes on, as Space does
          Audition(s.doc.IndexOfId(s.primary));
+      }
       if (MenuParts::Item(T("Convert to node"), nullptr, false, any))
          SelectedToSamplers();
       MenuParts::Separator();

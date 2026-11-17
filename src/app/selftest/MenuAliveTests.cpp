@@ -272,6 +272,112 @@ namespace
          s += " > (no click)";
       return s;
    }
+   bool starts_with_ci(const std::string& a, const char* b)
+   {
+      size_t i = 0;
+      for (; b[i] != 0; i++)
+         if (i >= a.size() || std::tolower((unsigned char)a[i]) != std::tolower((unsigned char)b[i]))
+            return false;
+      return true;
+   }
+
+   // ---- order and names, on the rows the menu really drew (helper-built and computed rows included)
+   // One canonical order (docs/quality/context-menu-order.md): Rename, Cut, Copy, Paste, Duplicate, state toggles,
+   // the rest, Delete, Settings last. Mirrors tools/design/context_menu_order.py, which reads the same rules off the source.
+   int OrderRank(const std::string& n)
+   {
+      auto is = [&](const char* w) { return n == w; };
+      auto starts = [&](const char* w) { return n.rfind(w, 0) == 0; };
+      if (is("Settings") || is("Clip Settings") || is("Settings...")) return 95;
+      if (starts("Delete") && n.find("Mask") == std::string::npos) return 90;
+      if (is("Rename") || starts("Rename ") || is("Edit Note")) return 10;
+      if (is("Cut")) return 20;
+      if (is("Copy") || is("Copy scene")) return 21;
+      if (starts("Paste")) return 22;
+      if (is("Duplicate") || is("Duplicate Layer") || is("Duplicate Track") || is("Duplicate Group") || is("Duplicate Page") || is("Duplicate Scene")) return 23;
+      if (is("Mute") || is("Solo") || is("Active") || is("Hide") || starts("Bypass") || is("Enable Node") || is("Toggle Enabled") || starts("Turn Group"))
+         return 30;
+      return -1;
+   }
+   // Canonical wording and hint; "" = fine.
+   std::string WordingFault(const std::string& n, const std::string& hint)
+   {
+      static const std::pair<const char*, const char*> kBad[] = { { "Clone", "Duplicate" }, { "Dupe", "Duplicate" }, { "Copy Here", "Duplicate" },
+         { "Erase", "Delete" }, { "Trash", "Delete" }, { "Preferences", "Settings" }, { "Remove Selected", "Delete" } };
+      for (const auto& b : kBad)
+         if (n == b.first)
+            return std::string("say \"") + b.second + "\" not \"" + n + "\"";
+      if (n.size() > 3 && n.compare(n.size() - 3, 3, "...") == 0 && n.find("\xE2\x80\xA6") != std::string::npos)
+         return "one ellipsis style";
+      if (starts_with_ci(n, "delete") && OrderRank(n) == 90 && !hint.empty() && hint != "Backspace" && hint != "X" && hint != "Delete")
+         return "Delete shows " + hint + ", canonical Backspace";
+      if (n == "Duplicate" && !hint.empty() && hint != "Shift+D" && hint.find("D") == std::string::npos)
+         return "Duplicate shows " + hint + ", canonical D";
+      if (n == "Cut" && !hint.empty() && hint.find("X") == std::string::npos) return "Cut shows " + hint;
+      if (n == "Copy" && !hint.empty() && hint.find("C") == std::string::npos) return "Copy shows " + hint;
+      if (n == "Paste" && !hint.empty() && hint.find("V") == std::string::npos) return "Paste shows " + hint;
+      return "";
+   }
+   std::map<std::string, std::set<std::string>> sSpellings;   // lower-case label -> spellings seen, with where
+   std::map<std::string, std::string> sSpellingWhere;
+   int sOrderFaults = 0;
+   void CheckRows(const std::string& menuName, const std::string& levelPath, const std::vector<MenuParts::ProbeRow>& rows)
+   {
+      int hi = -1, lastRank = -1;
+      std::string hiName;
+      for (const auto& r : rows)
+      {
+         const std::string n = Name(r.label);
+         // Names across every menu: the same words spelled two ways (case, ellipsis) are one fault.
+         std::string key;
+         for (char c : n) key += (char)std::tolower((unsigned char)c);
+         sSpellings[key].insert(n);
+         sSpellingWhere[key + "|" + n] = menuName;
+         if (!r.sub)
+         {
+            const std::string w = WordingFault(n, r.hint);
+            if (!w.empty())
+            {
+               printf("  [ORDER] %s%s: \"%s\": %s\n", menuName.c_str(), levelPath.c_str(), n.c_str(), w.c_str());
+               sOrderFaults++;
+            }
+         }
+         const int rk = r.sub ? -1 : OrderRank(n);
+         if (lastRank == 95)
+         {
+            printf("  [ORDER] %s%s: \"%s\" comes after Settings (Settings is last)\n", menuName.c_str(), levelPath.c_str(), n.c_str());
+            sOrderFaults++;
+         }
+         else if (lastRank == 90 && rk != 95)
+         {
+            printf("  [ORDER] %s%s: \"%s\" comes after Delete (Delete is last, only Settings may follow)\n", menuName.c_str(), levelPath.c_str(), n.c_str());
+            sOrderFaults++;
+         }
+         else if (rk >= 0 && hi > rk && rk != 90 && rk != 95)
+         {
+            printf("  [ORDER] %s%s: \"%s\" should come before \"%s\"\n", menuName.c_str(), levelPath.c_str(), n.c_str(), hiName.c_str());
+            sOrderFaults++;
+         }
+         if (rk >= 0)
+         {
+            if (rk > hi && rk < 90) { hi = rk; hiName = n; }
+            if (rk >= 90 || lastRank < 90)
+               lastRank = rk;
+         }
+      }
+   }
+   void ReportSpellings()
+   {
+      for (const auto& kv : sSpellings)
+         if (kv.second.size() > 1)
+         {
+            std::string all;
+            for (const std::string& sp : kv.second)
+               all += "\"" + sp + "\" (" + sSpellingWhere[kv.first + "|" + sp] + ") ";
+            printf("  [NAMES] one label, several spellings: %s\n", all.c_str());
+            sOrderFaults++;
+         }
+   }
    void Report(const Job& j, const std::string& what, bool pass)
    {
       printf("  [%s] %s%s\n", pass ? "pass" : "FAIL", PathText(j).c_str(), what.c_str());
@@ -594,6 +700,12 @@ namespace
                Job c{ j.menu, {}, false, false, true };
                sJobs.push_back(c);
             }
+            {
+               std::string lp;
+               for (const std::string& p : j.path) lp += " > " + Name(p);
+               if (j.path.empty()) // the top level: submenus hold choices (a blend mode named Erase), not the menu's verbs
+                  CheckRows(m.name, lp, rows);
+            }
             for (const auto& r : rows)
             {
                Job n{ j.menu, j.path, !r.sub, r.checked, false };
@@ -752,7 +864,9 @@ void RunMenuAliveTest(int frameId, GLFWwindow* window)
       printf("%d alive, %d dead, %d greyed, %d skipped in %.0f s\n", sPass, sFail, sGrey, sSkip, ImGui::GetTime());
       for (const std::string& n : sBadMenus)
          printf("  menu with fails: %s\n", n.c_str());
-      printf("MENUALIVETEST %s\n", sFail == 0 && sPass > 0 ? "OK" : "FAIL");
+      ReportSpellings();
+      printf("MENUORDER: %d faults in the rows the menus drew\n", sOrderFaults);
+      printf("MENUALIVETEST %s\n", sFail == 0 && sPass > 0 && sOrderFaults == 0 ? "OK" : "FAIL");
       fflush(stdout);
       glfwSetWindowShouldClose(window, GLFW_TRUE);
       return;

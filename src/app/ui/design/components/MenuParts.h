@@ -71,7 +71,7 @@ namespace MenuParts
 #ifdef IMGUI_ENABLE_TEST_ENGINE
    struct ProbeRow
    {
-      std::string root, label;
+      std::string root, label, hint;
       int depth = 0;
       bool sub = false, enabled = true, checked = false;
       ImVec2 mn, mx;
@@ -86,7 +86,7 @@ namespace MenuParts
          d++;
       return d;
    }
-   inline void ProbeNote(const char* label, bool sub, bool enabled, ImGuiWindow* w, bool checked = false)
+   inline void ProbeNote(const char* label, bool sub, bool enabled, ImGuiWindow* w, bool checked = false, const char* hint = nullptr)
    {
       if (ProbeRoot().empty())
          return;
@@ -94,7 +94,7 @@ namespace MenuParts
       const int f = ImGui::GetFrameCount();
       if (!v.empty() && v.back().frame != f)
          v.erase(std::remove_if(v.begin(), v.end(), [f](const ProbeRow& r) { return r.frame < f - 1; }), v.end());
-      v.push_back({ ProbeRoot(), label, ProbeDepth(w), sub, enabled, checked, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), f });
+      v.push_back({ ProbeRoot(), label, hint != nullptr ? hint : "", ProbeDepth(w), sub, enabled, checked, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), f });
    }
    // MENUALIVETEST asks for one right-click menu by its popup id. The panel's open site calls TestOpen(id) next to
    // its own right-click check; true (once) means: pick the first fitting target, as a right-click on it would,
@@ -108,7 +108,7 @@ namespace MenuParts
       return true;
    }
 #else
-   inline void ProbeNote(const char*, bool, bool, ImGuiWindow*, bool = false) {}
+   inline void ProbeNote(const char*, bool, bool, ImGuiWindow*, bool = false, const char* = nullptr) {}
    inline bool TestOpen(const char*) { return false; }
 #endif
 
@@ -131,7 +131,7 @@ namespace MenuParts
                               ImGui::GetColorU32(dim), shortcut);
       }
       Wash(enabled && ImGui::IsItemHovered(), enabled && ImGui::IsItemActive(), false);
-      ProbeNote(label, false, enabled, ImGui::GetCurrentWindow(), selected);
+      ProbeNote(label, false, enabled, ImGui::GetCurrentWindow(), selected, shortcut);
       return r;
    }
 
