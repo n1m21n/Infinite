@@ -460,6 +460,32 @@ namespace app
             gMinimapSize = std::strtof(val.c_str(), nullptr);
          else if (key == "minimapOpacity")
             gMinimapOpacity = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.miniAxes")
+            gView3DPrefs.miniAxes = atoi(val.c_str());
+         else if (key == "v3d.miniSize")
+            gView3DPrefs.miniSize = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.miniBright")
+            gView3DPrefs.miniBright = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.gizmoNavSize")
+            gView3DPrefs.gizmoNavSize = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.gizmoSize")
+            gView3DPrefs.gizmoSize = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.smoothTime")
+            gView3DPrefs.smoothTime = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.rotStep")
+            gView3DPrefs.rotStep = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.autoPerspective")
+            gView3DPrefs.autoPerspective = (val != "0");
+         else if (key == "v3d.continuousGrab")
+            gView3DPrefs.continuousGrab = (val != "0");
+         else if (key == "v3d.orbitSens")
+            gView3DPrefs.orbitSens = std::strtof(val.c_str(), nullptr);
+         else if (key == "v3d.zoomToMouse")
+            gView3DPrefs.zoomToMouse = (val != "0");
+         else if (key == "v3d.orbitSelection")
+            gView3DPrefs.orbitSelection = (val != "0");
+         else if (key == "v3d.invertZoom")
+            gView3DPrefs.invertZoom = (val != "0");
          else if (key == "cableVisibilityMask")
             gCableVisibilityMask = atoi(val.c_str());
          else if (key == "panelNodeOpen")
@@ -571,6 +597,19 @@ namespace app
       file << "minimapCorner=" << gMinimapCorner << "\n";
       file << "minimapSize=" << gMinimapSize << "\n";
       file << "minimapOpacity=" << gMinimapOpacity << "\n";
+      file << "v3d.miniAxes=" << gView3DPrefs.miniAxes << "\n";
+      file << "v3d.miniSize=" << gView3DPrefs.miniSize << "\n";
+      file << "v3d.miniBright=" << gView3DPrefs.miniBright << "\n";
+      file << "v3d.gizmoNavSize=" << gView3DPrefs.gizmoNavSize << "\n";
+      file << "v3d.gizmoSize=" << gView3DPrefs.gizmoSize << "\n";
+      file << "v3d.smoothTime=" << gView3DPrefs.smoothTime << "\n";
+      file << "v3d.rotStep=" << gView3DPrefs.rotStep << "\n";
+      file << "v3d.autoPerspective=" << (gView3DPrefs.autoPerspective ? 1 : 0) << "\n";
+      file << "v3d.continuousGrab=" << (gView3DPrefs.continuousGrab ? 1 : 0) << "\n";
+      file << "v3d.orbitSens=" << gView3DPrefs.orbitSens << "\n";
+      file << "v3d.zoomToMouse=" << (gView3DPrefs.zoomToMouse ? 1 : 0) << "\n";
+      file << "v3d.orbitSelection=" << (gView3DPrefs.orbitSelection ? 1 : 0) << "\n";
+      file << "v3d.invertZoom=" << (gView3DPrefs.invertZoom ? 1 : 0) << "\n";
       file << "cableVisibilityMask=" << gCableVisibilityMask << "\n";
       file << "panelNodeOpen=" << (gNodePanelOpen ? 1 : 0) << "\n";
       file << "panelViewportOpen=" << (gViewportPanelOpen ? 1 : 0) << "\n";

@@ -5787,9 +5787,14 @@ namespace
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
-      ImGui::PushClipRect(p, ImVec2(p.x + FieldLabelW() - ImGui::GetCursorPosX() - 4.0f, p.y + h), true);
-      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", text);
+      // A label longer than its column ends in an ellipsis and shows whole in a tip, never cut mid-letter.
+      const float room = FieldLabelW() - ImGui::GetCursorPosX() - 4.0f;
+      const std::string full = FormParts::Visible(text), shown = app::TruncateWithEllipsis(full, room);
+      ImGui::PushClipRect(p, ImVec2(p.x + room, p.y + h), true);
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", shown.c_str());
       ImGui::PopClipRect();
+      if (shown != full && ImGui::IsItemHovered())
+         app::HelpTip("%s", full.c_str());
       FormParts::Inline(FieldLabelW());
    }
 
@@ -5909,6 +5914,30 @@ namespace
       return true;
    }
 
+   // A run of on/off settings as one grid (PanelKit::CheckGrid): columns as wide as the longest label allows.
+   bool Checks(const char* id, std::initializer_list<std::pair<const char*, bool*>> items, int maxCols = 3,
+               const char* undo = "Edit in 3D View")
+   {
+      std::vector<const char*> labels;
+      std::vector<char> vals;
+      for (const auto& [l, v] : items)
+      {
+         labels.push_back(l);
+         vals.push_back(*v ? 1 : 0);
+      }
+      bool tmp[64] = {};
+      const int n = std::min((int)labels.size(), 64);
+      for (int i = 0; i < n; i++)
+         tmp[i] = vals[i] != 0;
+      const int hit = PanelKit::CheckGrid((sCard + "/" + id).c_str(), labels.data(), tmp, n, maxCols);
+      if (hit < 0)
+         return false;
+      PushUndoCheckpoint(undo);
+      bool* v = (items.begin() + hit)->second;
+      *v = !*v;
+      return true;
+   }
+
    bool ColorRow(const char* label, float* rgb, const char* undo = "Edit in 3D View")
    {
       FieldLabel(label);
@@ -5939,6 +5968,7 @@ namespace
       if (ImGui::InvisibleButton("##head", ImVec2(w, h)))
          open = !open;
       sOpen[title] = open;
+      open = open || PanelKit::AuditOpenAll();
       const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + 5.0f, p.y + h * 0.5f);
@@ -6015,16 +6045,20 @@ namespace
       if (Card(T("Filter"), nullptr, false))
       {
          Scene3DNode::Settings& f = *sSet;
-         BoolRow(T("Match case"), &f.listCase);
-         BoolRow(T("Exact match"), &f.listComplete);
-         BoolRow(T("Sort A to Z"), &f.listSort);
-         BoolRow(T("Objects"), &f.listObjects);
-         BoolRow(T("Lights"), &f.listLights);
-         BoolRow(T("Cameras"), &f.listCameras);
+         Checks("##checks1", {
+            { T("Match case"), &f.listCase },
+            { T("Exact match"), &f.listComplete },
+            { T("Sort A to Z"), &f.listSort },
+            { T("Objects"), &f.listObjects },
+            { T("Lights"), &f.listLights },
+            { T("Cameras"), &f.listCameras },
+         });
          ComboRow(T("State"), &f.listState, std::vector<std::string>{ T("All"), T("Visible"), T("Selected"), T("Active"), T("Selectable") });
-         BoolRow(T("Invert filter"), &f.listInvert);
-         BoolRow(T("Selectable column"), &f.colSelect);
-         BoolRow(T("Render column"), &f.colRender);
+         Checks("##checks2", {
+            { T("Invert filter"), &f.listInvert },
+            { T("Selectable column"), &f.colSelect },
+            { T("Render column"), &f.colRender },
+         });
       }
       bool scrollToActive = false;
       if (ActionButton::Draw(L("Show Active"), ImVec2(availW, 0)))
@@ -6338,8 +6372,10 @@ namespace
       if (light->type == 1 || light->type == 4 || light->type == 5)
       {
          FloatRow(T("Falloff"), &light->falloff, 0.0f, 4.0f, "%.2f");
-         BoolRow(T("Soft falloff"), &light->softFalloff);
-         BoolRow(T("Custom distance"), &light->useCutoff);
+         Checks("##checks3", {
+            { T("Soft falloff"), &light->softFalloff },
+            { T("Custom distance"), &light->useCutoff },
+         });
          if (light->useCutoff)
             FloatRow(T("Cutoff"), &light->cutoffDistance, 0.01f, 100.0f, "%.2f");
       }
@@ -6510,10 +6546,12 @@ namespace
       if (Card(T("Viewport Display")))
       {
          FloatRow(T("Size"), &cam->displaySize, 0.01f, 10.0f, "%.2f");
-         BoolRow(T("Limits"), &cam->showLimits);
-         BoolRow(T("Mist"), &cam->showMist);
-         BoolRow(T("Name"), &cam->showName);
-         BoolRow(T("Sensor"), &cam->showSensor);
+         Checks("##checks4", {
+            { T("Limits"), &cam->showLimits },
+            { T("Mist"), &cam->showMist },
+            { T("Name"), &cam->showName },
+            { T("Sensor"), &cam->showSensor },
+         });
       }
       Scene3DNode::Backdrop& back = item->backdrop;
       bool backShow = back.show;
@@ -6794,44 +6832,37 @@ namespace
       }
       if (Card(T("Lock")))
       {
-         const char* axes[3] = { "X", "Y", "Z" };
          const char* names[3] = { T("Location"), T("Rotation"), T("Scale") };
          for (int row = 0; row < 3; row++)
          {
             FieldLabel(names[row]);
+            const char* axes[3] = { "X", "Y", "Z" };
+            bool on[3];
+            unsigned bits[3];
             for (int a = 0; a < 3; a++)
             {
-               const unsigned bit = (1u << kDisp[a]) << (row * 3);
-               bool on = (item->lock & bit) != 0;
-               const std::string id = std::string("##v3dlock") + std::to_string(row) + axes[a];
-               if (CheckBox::Box(id.c_str(), &on))
-               {
-                  PushUndoCheckpoint("Lock in 3D View");
-                  item->lock = on ? (item->lock | bit) : (item->lock & ~bit);
-                  scene->Commit();
-               }
-               FormParts::Inline(0.0f, tok::space_1);
-               ImGui::AlignTextToFramePadding();
-               ImGui::TextDisabled("%s", axes[a]);
-               if (a < 2)
-                  FormParts::Inline(0.0f, tok::space_3);
+               bits[a] = (1u << kDisp[a]) << (row * 3);
+               on[a] = (item->lock & bits[a]) != 0;
+            }
+            const int hit = PanelKit::CheckGrid((std::string("##v3dlock") + std::to_string(row)).c_str(), axes, on, 3);
+            if (hit >= 0)
+            {
+               PushUndoCheckpoint("Lock in 3D View");
+               item->lock ^= bits[hit];
+               scene->Commit();
             }
          }
       }
       if (Card(T("Visibility")))
       {
-         if (BoolRow(T("Show in renders"), &item->render, "Show in renders"))
-            scene->Commit();
-         if (BoolRow(T("Cast shadows"), &item->castShadow, "Cast shadows"))
-            scene->Commit();
-         if (BoolRow(T("Hide selection"), &item->hideSelect, "Hide selection"))
+         if (Checks("##vis", { { T("Show in renders"), &item->render }, { T("Cast shadows"), &item->castShadow },
+                               { T("Hide selection"), &item->hideSelect } }, 3, "Object visibility"))
             scene->Commit();
       }
       if (Card(T("Viewport Display")))
       {
-         bool changed = BoolRow(T("Name"), &item->showName, "Show name");
-         changed |= BoolRow(T("Axes"), &item->showAxes, "Show axes");
-         changed |= BoolRow(T("Bounds"), &item->showBounds, "Show bounds");
+         bool changed = Checks("##disp", { { T("Name"), &item->showName }, { T("Axes"), &item->showAxes },
+                                          { T("Bounds"), &item->showBounds } }, 3, "Viewport display");
          if (item->showBounds)
             changed |= ComboRow(T("Shape"), &item->boundsType, { T("Box"), T("Sphere"), T("Cylinder"), T("Cone"), T("Capsule") }, "Bounds shape");
          if (changed)
@@ -7506,15 +7537,17 @@ namespace
       }
       if (Card(T("Stamp"), &sSet->stamp) && sSet->stamp)   // off: rows hidden, not greyed (Block 4b)
       {
-         BoolRow(T("Date"), &sSet->stampDate);
-         BoolRow(T("Time"), &sSet->stampTime);
-         BoolRow(T("Frame"), &sSet->stampFrame);
-         BoolRow(T("Frame range"), &sSet->stampRange);
-         BoolRow(T("Camera"), &sSet->stampCamera);
-         BoolRow(T("Lens"), &sSet->stampLens);
-         BoolRow(T("Scene"), &sSet->stampScene);
-         BoolRow(T("Render time"), &sSet->stampRender);
-         BoolRow(T("Note"), &sSet->stampNote);
+         Checks("##checks5", {
+            { T("Date"), &sSet->stampDate },
+            { T("Time"), &sSet->stampTime },
+            { T("Frame"), &sSet->stampFrame },
+            { T("Frame range"), &sSet->stampRange },
+            { T("Camera"), &sSet->stampCamera },
+            { T("Lens"), &sSet->stampLens },
+            { T("Scene"), &sSet->stampScene },
+            { T("Render time"), &sSet->stampRender },
+            { T("Note"), &sSet->stampNote },
+         });
          if (sSet->stampNote)
          {
             char buf[128];
@@ -7610,19 +7643,6 @@ namespace
             DeleteOrientation();
          ImGui::EndDisabled();
       }
-      if (Card(T("Preferences"), nullptr, false))
-      {
-         ComboRow(T("Mini axes"), &set.miniAxes, std::vector<std::string>{ T("Off"), T("Simple axes"), T("Navigation") });
-         FloatRow(T("Mini axes size"), &set.miniSize, 40.0f, 160.0f, "%.0f");
-         FloatRow(T("Mini axes brightness"), &set.miniBright, 0.0f, 1.0f, "%.2f");
-         FloatRow(T("Navigation gizmo size"), &set.gizmoNavSize, 40.0f, 160.0f, "%.0f");
-         FloatRow(T("Transform gizmo size"), &set.gizmoSize, 40.0f, 160.0f, "%.0f");
-         FloatRow(T("Smooth view"), &set.smoothTime, 0.0f, 1.0f, "%.2f s");
-         FloatRow(T("Rotation step"), &set.rotStep, 1.0f, 90.0f, "%.0f");
-         BoolRow(T("Auto perspective"), &set.autoPerspective);
-         BoolRow(T("Continuous grab"), &set.continuousGrab);
-         FloatRow(T("Orbit sensitivity"), &set.orbitSens, 0.1f, 5.0f, "%.2f");
-      }
       if (Card(T("Units")))
       {
          ComboRow(T("System"), &set.unitSystem, std::vector<std::string>{ T("None"), T("Metric"), T("Imperial") });
@@ -7639,15 +7659,19 @@ namespace
          FloatRow(T("Move"), &set.snapMove, 0.01f, 5.0f, "%.2f");
          FloatRow(T("Rotate"), &set.snapRot, 1.0f, 90.0f, "%.0f");
          FloatRow(T("Scale"), &set.snapScale, 0.01f, 1.0f, "%.2f");
-         BoolRow(T("To other objects"), &set.snapObjects);
-         BoolRow(T("Use for move"), &set.snapTranslate);
-         BoolRow(T("Use for rotate"), &set.snapRotate);
-         BoolRow(T("Use for scale"), &set.snapScaleOn);
-         BoolRow(T("Absolute increment"), &set.snapAbsolute);
+         Checks("##checks7", {
+            { T("To other objects"), &set.snapObjects },
+            { T("Use for move"), &set.snapTranslate },
+            { T("Use for rotate"), &set.snapRotate },
+            { T("Use for scale"), &set.snapScaleOn },
+            { T("Absolute increment"), &set.snapAbsolute },
+         });
          FloatRow(T("Rotate precision"), &set.snapRotFine, 0.1f, 15.0f, "%.1f");
          ComboRow(T("Snap target"), &set.snapTarget, std::vector<std::string>{ T("Closest"), T("Center"), T("Median"), T("Active") });
-         BoolRow(T("Selectable only"), &set.snapSelectable);
-         BoolRow(T("Align rotation to target"), &set.snapAlign);
+         Checks("##checks8", {
+            { T("Selectable only"), &set.snapSelectable },
+            { T("Align rotation to target"), &set.snapAlign },
+         });
       }
       if (Card(T("Proportional Editing")))
       {
@@ -7732,40 +7756,32 @@ namespace
       }
       if (Card(T("Viewport Visibility"), nullptr, false))
       {
-         BoolRow(T("Cameras shown"), &set.showCameras);
-         BoolRow(T("Cameras selectable"), &set.pickCameras);
-         BoolRow(T("Lights shown"), &set.showLights);
-         BoolRow(T("Lights selectable"), &set.pickLights);
-      }
-      if (Card(T("Navigation")))
-      {
-         BoolRow(T("Zoom to mouse"), &set.zoomToMouse);
-         BoolRow(T("Orbit around selection"), &set.orbitSelection);
-         BoolRow(T("Invert zoom direction"), &set.invertZoom);
+         Checks("##checks9", {
+            { T("Cameras shown"), &set.showCameras },
+            { T("Cameras selectable"), &set.pickCameras },
+            { T("Lights shown"), &set.showLights },
+            { T("Lights selectable"), &set.pickLights },
+         });
       }
       if (Card(T("Overlays")))
       {
-         BoolRow(T("Text info"), &set.textInfo);
-         BoolRow(T("Statistics"), &set.stats);
-         BoolRow(T("Origins (all)"), &set.originsAll);
-         BoolRow(T("3D cursor"), &set.showCursor);
-         BoolRow(T("Extras"), &set.showExtras);
-         BoolRow(T("Light colors"), &set.lightColors);
-         BoolRow(T("Outline selected"), &set.outlineSel);
-         BoolRow(T("Wireframe"), &set.wireOver);
-         BoolRow(T("Performance"), &set.showPerf);
+         Checks("##checks11", {
+            { T("Text info"), &set.textInfo },
+            { T("Statistics"), &set.stats },
+            { T("Origins (all)"), &set.originsAll },
+            { T("3D cursor"), &set.showCursor },
+            { T("Extras"), &set.showExtras },
+            { T("Light colors"), &set.lightColors },
+            { T("Outline selected"), &set.outlineSel },
+            { T("Wireframe"), &set.wireOver },
+            { T("Performance"), &set.showPerf },
+         });
       }
       if (Card(T("Grid"), nullptr, false))
       {
          BoolRow(T("Orthographic grid"), &set.orthoGrid);
          FieldLabel(T("Axes"));
-         ImGui::PushID("gridaxes");
-         BoolRow("X", &set.axisX);
-         ImGui::SameLine(0.0f, tok::space_3);
-         BoolRow("Y", &set.axisY);
-         ImGui::SameLine(0.0f, tok::space_3);
-         BoolRow("Z", &set.axisZ);
-         ImGui::PopID();
+         Checks("##gridaxes", { { "X", &set.axisX }, { "Y", &set.axisY }, { "Z", &set.axisZ } });
          FloatRow(T("Scale"), &set.gridScale, 0.001f, 1000.0f, "%.3f");
          if (IntInputRow(T("Lines"), &set.gridLines))
             set.gridLines = std::clamp(set.gridLines, 1, 200);
@@ -7774,12 +7790,14 @@ namespace
       }
       if (Card(T("Gizmos")))
       {
-         BoolRow(T("Navigate"), &set.gizmoNav);
-         BoolRow(T("Move, rotate, scale"), &set.gizmoMove);
-         BoolRow(T("Light size"), &set.gizmoLightSize);
-         BoolRow(T("Light look-at"), &set.gizmoLightLook);
-         BoolRow(T("Camera lens"), &set.gizmoCamLens);
-         BoolRow(T("Camera focus distance"), &set.gizmoCamFocus);
+         Checks("##checks12", {
+            { T("Navigate"), &set.gizmoNav },
+            { T("Move, rotate, scale"), &set.gizmoMove },
+            { T("Light size"), &set.gizmoLightSize },
+            { T("Light look-at"), &set.gizmoLightLook },
+            { T("Camera lens"), &set.gizmoCamLens },
+            { T("Camera focus distance"), &set.gizmoCamFocus },
+         });
       }
       if (Card(T("Passepartout")))
          FloatRow(T("Opacity"), &set.passAlpha, 0.0f, 1.0f, "%.2f");
@@ -7792,14 +7810,16 @@ namespace
       if (Card(T("Composition Guides")))
       {
          ColorRow(T("Colour"), set.guideColor);
-         BoolRow(T("Thirds"), &set.thirds);
-         BoolRow(T("Center"), &set.center);
-         BoolRow(T("Diagonal"), &set.diagonal);
-         BoolRow(T("Golden"), &set.golden);
-         BoolRow(T("Golden triangle A"), &set.goldenTriA);
-         BoolRow(T("Golden triangle B"), &set.goldenTriB);
-         BoolRow(T("Harmonious triangle A"), &set.harmonyTriA);
-         BoolRow(T("Harmonious triangle B"), &set.harmonyTriB);
+         Checks("##checks13", {
+            { T("Thirds"), &set.thirds },
+            { T("Center"), &set.center },
+            { T("Diagonal"), &set.diagonal },
+            { T("Golden"), &set.golden },
+            { T("Golden triangle A"), &set.goldenTriA },
+            { T("Golden triangle B"), &set.goldenTriB },
+            { T("Harmonious triangle A"), &set.harmonyTriA },
+            { T("Harmonious triangle B"), &set.harmonyTriB },
+         });
       }
    }
 
@@ -8299,6 +8319,24 @@ namespace
             }
       }
       sSet = scene != nullptr ? &scene->settings : &sNoScene;
+      if (scene != nullptr)
+      {
+         // The user's 3D View habits (Settings > 3D View) win over what the patch saved.
+         const View3DPrefs& p = gView3DPrefs;
+         scene->settings.miniAxes = p.miniAxes;
+         scene->settings.miniSize = p.miniSize;
+         scene->settings.miniBright = p.miniBright;
+         scene->settings.gizmoNavSize = p.gizmoNavSize;
+         scene->settings.gizmoSize = p.gizmoSize;
+         scene->settings.smoothTime = p.smoothTime;
+         scene->settings.rotStep = p.rotStep;
+         scene->settings.autoPerspective = p.autoPerspective;
+         scene->settings.continuousGrab = p.continuousGrab;
+         scene->settings.orbitSens = p.orbitSens;
+         scene->settings.zoomToMouse = p.zoomToMouse;
+         scene->settings.orbitSelection = p.orbitSelection;
+         scene->settings.invertZoom = p.invertZoom;
+      }
       if (scene == nullptr)
       {
          gView3DClaimedKeys = false;

@@ -861,6 +861,8 @@ bool gHeadlessNeedProbe = false;
 
    float gMinimapOpacity = 0.85f;
 
+   View3DPrefs gView3DPrefs;
+
    float gZoomSensitivity = 0.5f;
 
    bool gHoveringItem = false;

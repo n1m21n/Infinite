@@ -1375,6 +1375,18 @@ extern float gMinimapSize;
 
 extern float gMinimapOpacity;
 
+// 3D View habits (Settings > 3D View): the user's, not the scene's, so they hold in every patch. Applied onto each
+// scene's Scene3DNode::Settings as the 3D View draws it.
+struct View3DPrefs
+{
+   int miniAxes = 2;
+   float miniSize = 80.0f, miniBright = 1.0f, gizmoNavSize = 80.0f, gizmoSize = 75.0f, smoothTime = 0.2f, rotStep = 15.0f;
+   bool autoPerspective = true, continuousGrab = true;
+   float orbitSens = 1.0f;
+   bool zoomToMouse = false, orbitSelection = false, invertZoom = false;
+};
+extern View3DPrefs gView3DPrefs;
+
 extern float gZoomSensitivity;
 
 extern bool gHoveringItem;

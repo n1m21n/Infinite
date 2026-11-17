@@ -39,7 +39,7 @@ namespace app
          { "autosave", 3, "Autosave" }, { "performance", 3, "Performance & Rendering" }, { "movement-log", 3, "Movement Log" },
          { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" }, { "daw-plugin", 9, nullptr }, { "daw-sync", 9, nullptr },
          { "field", 4, nullptr }, { "globals", 5, nullptr }, { "extensions", 6, nullptr }, { "plugins", 7, nullptr },
-         { "agents", 8, nullptr }, { "terminal", 8, nullptr },
+         { "agents", 8, nullptr }, { "terminal", 8, nullptr }, { "3d-view", 10, nullptr },
       };
    }
 
@@ -94,7 +94,8 @@ namespace app
       static const char* const kTabs[] = { I18N_KEY("Appearance"), I18N_KEY("Canvas & Workspace"), I18N_KEY("Audio"),
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
                                            I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins"),
-                                           I18N_KEY("Agents & Terminal"), I18N_KEY("Infinite as VST3/AU") };
+                                           I18N_KEY("Agents & Terminal"), I18N_KEY("Infinite as VST3/AU"),
+                                           I18N_KEY("3D View") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -1854,6 +1855,48 @@ namespace app
             ImGui::PopTextWrapPos();
             FormParts::PopReferenceStyle();
             LibraryParts::EndWell();
+            SectionCard::End();
+         }
+
+         // 11. "3D View" Tab: the user's viewport habits, the same in every patch (gView3DPrefs).
+         if (sTab == 10)
+         {
+            View3DPrefs& v = gView3DPrefs;
+            auto saved = [] { if (ImGui::IsItemDeactivatedAfterEdit()) SaveWorkspaceSettings(); };
+            ImGui::Spacing();
+            FormParts::Section(T("Viewport"));
+            {
+               const std::string items = std::string(T("Off")) + '\0' + T("Simple axes") + '\0' + T("Navigation") + '\0';
+               if (FormParts::Combo(L("Mini axes"), &v.miniAxes, items.c_str()))
+                  SaveWorkspaceSettings();
+            }
+            FormParts::SliderFloat(L("Mini axes size"), &v.miniSize, 40.0f, 160.0f, "%.0f");
+            saved();
+            FormParts::SliderFloat(L("Mini axes brightness"), &v.miniBright, 0.0f, 1.0f, "%.2f");
+            saved();
+            FormParts::SliderFloat(L("Navigation gizmo size"), &v.gizmoNavSize, 40.0f, 160.0f, "%.0f");
+            saved();
+            FormParts::SliderFloat(L("Transform gizmo size"), &v.gizmoSize, 40.0f, 160.0f, "%.0f");
+            saved();
+            SectionCard::End();
+            ImGui::Spacing();
+            FormParts::Section(T("Navigation"));
+            FormParts::SliderFloat(L("Smooth view"), &v.smoothTime, 0.0f, 1.0f, "%.2f s");
+            saved();
+            FormParts::SliderFloat(L("Rotation step"), &v.rotStep, 1.0f, 90.0f, "%.0f");
+            saved();
+            FormParts::SliderFloat(L("Orbit sensitivity"), &v.orbitSens, 0.1f, 5.0f, "%.2f");
+            saved();
+            if (FormParts::Switch(L("Auto perspective"), &v.autoPerspective))
+               SaveWorkspaceSettings();
+            if (FormParts::Switch(L("Continuous grab"), &v.continuousGrab))
+               SaveWorkspaceSettings();
+            if (FormParts::Switch(L("Zoom to mouse"), &v.zoomToMouse))
+               SaveWorkspaceSettings();
+            if (FormParts::Switch(L("Orbit around selection"), &v.orbitSelection))
+               SaveWorkspaceSettings();
+            if (FormParts::Switch(L("Invert zoom direction"), &v.invertZoom))
+               SaveWorkspaceSettings();
             SectionCard::End();
          }
 
