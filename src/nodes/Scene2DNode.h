@@ -463,6 +463,8 @@ public:
    bool PictureUnder(int id, int effect, int frameId, std::vector<uint8_t>& rgba);
    // Every layer under this one (it and the layers over it hidden), composited and finished.
    bool RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba);
+   // Only these layers (and what they hold) drawn as they look, the groups holding them passed through.
+   bool RenderSet(const std::vector<int>& set, int frameId, std::vector<uint8_t>& rgba);
 
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
@@ -590,6 +592,9 @@ public:
    bool RasterizeLayer(int id);
    // An image / node layer as a paint layer in its place (the layer drawn alone at document size); the new id, 0 when it cannot.
    int RasterizeNodeLayer(int id, int frameId);
+   // Sibling layers drawn together become one Normal paint layer in the lowest one's place (Merge Down / Visible,
+   // Flatten); hidden ones in the set are dropped. The new id, 0 when it cannot (layers at different levels).
+   int MergeLayers(const std::vector<int>& ids, int frameId);
    int AddTextLayer(const std::string& text, float x, float y, float boxW, int above = 0);
    // Document px <-> the layer's box px.
    void DocToBox(const Layer& l, float x, float y, float& bx, float& by);

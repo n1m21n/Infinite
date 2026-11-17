@@ -255,7 +255,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -2232,6 +2232,7 @@ namespace
             sPending.what = Pending::Delete;
       }
       if (cmd && !shift && key(ImGuiKey_J)) sPending.what = Pending::Duplicate;
+      if (cmd && !alt && key(ImGuiKey_E)) sPending.what = shift ? Pending::MergeVisible : Pending::MergeDown;
       if (cmd && shift && key(ImGuiKey_J) && SelectionActsOnPixels(doc))
       {
          PushUndoCheckpoint("Layer via cut");
@@ -2712,6 +2713,22 @@ namespace
    int sRasterAsk = 0;             // the text or vector layer a pixel tool was tried on
    ImVec2 sRasterAskMn, sRasterAskMx; // last frame's chip rect: the canvas under it gives the click to the chip
    double sRasterAskAt = 0.0;
+
+   // The sibling just under a layer (0: it is the lowest at its level), for Merge Down.
+   int LayerUnder(Scene2DNode* doc, int id)
+   {
+      const Layer* l = doc != nullptr ? doc->FindLayer(id) : nullptr;
+      if (l == nullptr)
+         return 0;
+      int under = 0;
+      for (int c : doc->ChildrenOf(l->parent))
+      {
+         if (c == id)
+            return under;
+         under = c;
+      }
+      return 0;
+   }
 
    void RasterizeLayer(Scene2DNode* doc, int id)
    {
@@ -9282,6 +9299,13 @@ namespace
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
             if (MenuParts::Item(T("Duplicate Layer"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
             MenuParts::Separator();
+            // Photoshop's merges: the picture as it looks, into one pixel layer.
+            if (sSel.size() > 1 ? MenuParts::Item(T("Merge Layers"), Sc("Ctrl+E"))
+                                : MenuParts::Item(T("Merge Down"), Sc("Ctrl+E"), false, LayerUnder(doc, id) != 0))
+               sPending.what = Pending::MergeDown;
+            if (MenuParts::Item(T("Merge Visible"), Sc("Shift+Ctrl+E"))) sPending.what = Pending::MergeVisible;
+            if (MenuParts::Item(T("Flatten Image"), nullptr)) sPending.what = Pending::Flatten;
+            MenuParts::Separator();
             if (MenuParts::Item(T("Group Layers"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
             if (l->kind == Kind::Group && MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
             if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), Sc("Alt+Ctrl+G")))
@@ -11321,6 +11345,37 @@ namespace
                sSel = kids;
             }
          break;
+      case Pending::MergeDown:
+      case Pending::MergeVisible:
+      case Pending::Flatten:
+      {
+         // Merge Down: the active layer and the one under it (Merge Layers when more are selected). Merge Visible:
+         // every shown top-level layer, hidden ones kept. Flatten: everything, hidden ones dropped. One undo step.
+         std::vector<int> ids;
+         if (todo.what == Pending::MergeDown)
+         {
+            if (sSel.size() > 1)
+               ids = sSel;
+            else if (Layer* a = Active(doc))
+               if (const int under = LayerUnder(doc, a->id))
+                  ids = { under, a->id };
+         }
+         else
+            for (int c : doc->ChildrenOf(0))
+               if (const Layer* l = doc->FindLayer(c))
+                  if (todo.what == Pending::Flatten || doc->Shown(*l))
+                     ids.push_back(c);
+         if (ids.size() < 2 && todo.what != Pending::Flatten)
+            break;
+         if (ids.empty())
+            break;
+         static int sMergeFrame = 1 << 24;
+         PushUndoCheckpoint(todo.what == Pending::Flatten ? "Flatten image" : todo.what == Pending::MergeVisible ? "Merge visible" : "Merge layers");
+         if (const int nid = doc->MergeLayers(ids, ++sMergeFrame))
+            SelectOnly(nid);
+         Touch();
+         break;
+      }
       case Pending::Duplicate:
          if (SelectionActsOnPixels(doc))
          {

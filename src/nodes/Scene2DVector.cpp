@@ -1572,6 +1572,38 @@ bool Scene2DNode::RasterizeLayer(int id)
    return true;
 }
 
+namespace
+{
+   // A document-size picture (rows top-down) cut into paint tiles (GL rows, bottom first); "-" for an empty tile.
+   std::vector<std::string> TilesOfPicture(const std::vector<uint8_t>& top, int w, int h, bool& anyPixel)
+   {
+      const int kT = TileStore::kTile, cols = (w + kT - 1) / kT, rows = (h + kT - 1) / kT;
+      std::vector<uint8_t> tile;
+      std::vector<std::string> keys((size_t)cols * rows, "-");
+      anyPixel = false;
+      for (size_t i = 0; i < keys.size(); i++)
+      {
+         const int x0 = (int)(i % cols) * kT, y0 = (int)(i / cols) * kT;
+         const int tw = std::min(kT, w - x0), th = std::min(kT, h - y0);
+         tile.resize((size_t)tw * th * 4);
+         bool any = false;
+         for (int y = 0; y < th; y++)
+         {
+            const int srcRow = h - 1 - (y0 + y);
+            std::memcpy(&tile[(size_t)y * tw * 4], &top[((size_t)srcRow * w + x0) * 4], (size_t)tw * 4);
+            for (int x = 0; x < tw && !any; x++)
+               any = tile[((size_t)y * tw + x) * 4 + 3] != 0;
+         }
+         if (any)
+         {
+            keys[i] = TileStore::Put(tile.data(), tw, th);
+            anyPixel = true;
+         }
+      }
+      return keys;
+   }
+}
+
 // An image / node layer turned into pixels: the layer drawn alone at document size becomes a paint layer in its place
 // (name, opacity, blend and place in the stack kept), so the eraser, wand and retouch tools can work on it.
 int Scene2DNode::RasterizeNodeLayer(int id, int frameId)
@@ -1583,29 +1615,8 @@ int Scene2DNode::RasterizeNodeLayer(int id, int frameId)
    std::vector<uint8_t> top;
    if (!RenderLayerAlone(id, frameId, top) || top.size() != (size_t)mDoc.w * mDoc.h * 4)
       return 0;
-   const int w = mDoc.w, h = mDoc.h, kT = TileStore::kTile, cols = (w + kT - 1) / kT, rows = (h + kT - 1) / kT;
-   std::vector<uint8_t> tile;
-   std::vector<std::string> keys((size_t)cols * rows, "-");
    bool anyPixel = false;
-   for (size_t i = 0; i < keys.size(); i++)
-   {
-      const int x0 = (int)(i % cols) * kT, y0 = (int)(i / cols) * kT;
-      const int tw = std::min(kT, w - x0), th = std::min(kT, h - y0);
-      tile.resize((size_t)tw * th * 4);
-      bool any = false;
-      for (int y = 0; y < th; y++)
-      {
-         const int srcRow = h - 1 - (y0 + y);   // tiles are GL rows, bottom first
-         std::memcpy(&tile[(size_t)y * tw * 4], &top[((size_t)srcRow * w + x0) * 4], (size_t)tw * 4);
-         for (int x = 0; x < tw && !any; x++)
-            any = tile[((size_t)y * tw + x) * 4 + 3] != 0;
-      }
-      if (any)
-      {
-         keys[i] = TileStore::Put(tile.data(), tw, th);
-         anyPixel = true;
-      }
-   }
+   std::vector<std::string> keys = TilesOfPicture(top, mDoc.w, mDoc.h, anyPixel);
    // Nothing visible inside the document (the picture is off the page, or the node gave no frame): keep the layer
    // as it is rather than swap it for an empty one that looks like it vanished.
    if (!anyPixel)
@@ -1622,6 +1633,54 @@ int Scene2DNode::RasterizeNodeLayer(int id, int frameId)
    nl.visible = visible;
    const int nid = nl.id;
    RemoveLayer(id);
+   Commit();
+   return nid;
+}
+
+// Merge (Photoshop's Merge Down / Merge Layers / Merge Visible / Flatten): sibling layers drawn together, as they look,
+// become one Normal paint layer in the lowest one's place, with its name. Any kind merges (text, shapes, nodes, groups,
+// adjustments). A hidden layer in the set is dropped, as Photoshop drops it. The new id, 0 when it cannot.
+int Scene2DNode::MergeLayers(const std::vector<int>& ids, int frameId)
+{
+   Layers();
+   std::vector<int> set;
+   int parent = -1;
+   for (int id : ids)
+   {
+      const Layer* l = FindConst(id);
+      if (l == nullptr)
+         continue;
+      if (parent < 0)
+         parent = l->parent;
+      else if (l->parent != parent)
+         return 0;   // one level at a time
+      set.push_back(id);
+   }
+   if (set.empty())
+      return 0;
+   int lowest = 0;
+   for (int c : ChildrenOf(parent))
+      if (std::find(set.begin(), set.end(), c) != set.end())
+      {
+         lowest = c;
+         break;
+      }
+   if (lowest == 0)
+      return 0;
+   std::vector<uint8_t> top;
+   if (!RenderSet(set, frameId, top))
+      return 0;
+   if (top.size() != (size_t)mDoc.w * mDoc.h * 4)
+      return 0;
+   bool anyPixel = false;
+   std::vector<std::string> keys = TilesOfPicture(top, mDoc.w, mDoc.h, anyPixel);
+   const std::string name = FindConst(lowest)->name;
+   Layer& nl = AddLayer(Kind::Paint, 0, lowest);
+   nl.tiles = std::move(keys);
+   nl.name = name;
+   const int nid = nl.id;
+   for (int s : set)
+      RemoveLayer(s);
    Commit();
    return nid;
 }

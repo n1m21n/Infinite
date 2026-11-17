@@ -809,6 +809,8 @@ namespace app
       { I18N_KEY("2D View"), I18N_KEY("Zoom 2D View"), MODKEY "+= / " MODKEY "+-", I18N_KEY("Zoom in or out; {mod} or Alt with the wheel zooms at the pointer") },
       { I18N_KEY("2D View"), I18N_KEY("Nudge"), "Arrows / Shift+Arrows", I18N_KEY("Move the selection 1 or 10 pixels") },
       { I18N_KEY("2D View"), I18N_KEY("Duplicate Layer"), MODKEY "+J", I18N_KEY("Duplicate the active layer") },
+      { I18N_KEY("2D View"), I18N_KEY("Merge Down"), MODKEY "+E", I18N_KEY("Merge the active layer into the one under it; with more selected, merge those") },
+      { I18N_KEY("2D View"), I18N_KEY("Merge Visible"), MODKEY "+Shift+E", I18N_KEY("Merge every shown layer into one pixel layer; hidden layers stay") },
       { I18N_KEY("2D View"), I18N_KEY("Copy / Cut / Paste"), MODKEY "+C / " MODKEY "+X / " MODKEY "+V", I18N_KEY("Copy or cut the selected layers, or the selected pixels, or paste them") },
       { I18N_KEY("2D View"), I18N_KEY("Layer via Cut"), "Shift+" MODKEY "+J", I18N_KEY("Move the selected pixels to a new layer") },
       { I18N_KEY("2D View"), I18N_KEY("Fill the Window"), MODKEY "+Shift+F", I18N_KEY("Grow the 2D View to fill the window, or put it back") },
