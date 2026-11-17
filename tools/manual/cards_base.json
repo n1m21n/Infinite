@@ -585,7 +585,7 @@
    [
     "Material",
     "3D · IN/OUT",
-    "Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, iridescence, and can take up to eight image inputs to paint any of those channels from a texture.",
+    "Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, and iridescence: a thin-film colour shift, like a soap bubble or oil slick, set by IOR and film thickness in nanometres. The path tracer ignores iridescence. It can take up to eight image inputs to paint any of those channels from a texture.",
     "feed a Noise texture into the roughness map input to give a single flat color a hand-worn, uneven sheen.",
     [
      "Cube",
@@ -882,7 +882,7 @@
    [
     "Render 3D",
     "3D · IMAGE OUT",
-    "The camera and lighting engine that turns every 3D node into a real picture, physically-based Cook-Torrance/GGX materials, ACES tonemapping, and MSAA antialiasing, all live, with up to 4 geometry inputs plus camera, light, and HDRI. This is where the green Geometry cables turn back into a peach Image cable.",
+    "The camera and lighting engine that turns every 3D node into a real picture, physically-based Cook-Torrance/GGX materials, ACES tonemapping, and MSAA antialiasing, all live, with up to 4 geometry inputs plus camera, light, and HDRI. This is where the green Geometry cables turn back into a peach Image cable. The path trace engine denoises its picture as it settles, with no setting of its own.",
     "plug in geometry, a material, a light, and an HDRI, then send the result straight into Bloom.",
     [
      "Geometry + Material + Light + HDRI",
