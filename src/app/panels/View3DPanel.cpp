@@ -1635,26 +1635,55 @@ namespace
    }
 
    // Drops every other selected item, in list order.
+   // A group counts as one: its members select together.
+   int UnitKey(const Item& it) { return it.group != 0 ? -it.group : it.id; }
+   int SelectedUnits(Scene3DNode* scene)
+   {
+      std::vector<int> seen;
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+            if (std::find(seen.begin(), seen.end(), UnitKey(*it)) == seen.end())
+               seen.push_back(UnitKey(*it));
+      return (int)seen.size();
+   }
+
+   // Keeps every other selected item, a group counting as one.
    void SelectChecker(Scene3DNode* scene)
    {
-      std::vector<int> now;
-      int n = 0;
+      std::vector<int> keep, now;
       for (const Item& it : scene->Items())
-         if (Selected(it.id) && (n++ % 2) == 0)
-            now.push_back(it.id);
+         if (Selected(it.id))
+         {
+            const int k = UnitKey(it);
+            auto at = std::find(keep.begin(), keep.end(), k);
+            if (at == keep.end())
+            {
+               keep.push_back(k);
+               at = keep.end() - 1;
+            }
+            if (((at - keep.begin()) % 2) == 0)
+               now.push_back(it.id);
+         }
       sSel = now;
    }
 
-   // Adds whatever shares a group with the selection.
+   // Adds what shows the same node as the selection (duplicates), and what shares a group with it.
    void SelectLinked(Scene3DNode* scene)
    {
       std::vector<int> groups;
+      std::vector<uint64_t> uids;
       for (int id : sSel)
          if (const Item* it = scene->FindItem(id))
+         {
             if (it->group != 0)
                groups.push_back(it->group);
+            if (it->uid != 0)
+               uids.push_back(it->uid);
+         }
       for (const Item& it : scene->Items())
-         if (Pickable(scene, it) && !Selected(it.id) && std::find(groups.begin(), groups.end(), it.group) != groups.end())
+         if (Pickable(scene, it) && !Selected(it.id) &&
+             ((it.group != 0 && std::find(groups.begin(), groups.end(), it.group) != groups.end()) ||
+              (it.uid != 0 && std::find(uids.begin(), uids.end(), it.uid) != uids.end())))
             sSel.insert(sSel.begin(), it.id);
    }
 
@@ -2024,6 +2053,8 @@ namespace
 
    // Move to the ground point under the last place the pointer was over the view.
    ImVec2 sViewMouse(-1, -1);
+   ImVec2 sViewMn(0, 0), sViewMx(0, 0);   // the view's screen rect, last frame
+   int sGoToNode = 0;                     // Go to node requests (self-test fingerprint)
    void MoveToMouse(Scene3DNode* scene)
    {
       if (sSel.empty() || sViewMouse.x < 0)
@@ -2095,7 +2126,7 @@ namespace
       if (MenuParts::Item(T("Invert"), MODKEY "+I")) SelectInvert(scene);
       MenuParts::Separator();
       if (MenuParts::Item(T("Select Random"))) SelectRandom(scene, 0.5f);
-      if (MenuParts::Item(T("Checker Deselect"), nullptr, false, sSel.size() > 1)) SelectChecker(scene);
+      if (MenuParts::Item(T("Checker Deselect"), nullptr, false, SelectedUnits(scene) > 1)) SelectChecker(scene);
       MenuParts::Separator();
       if (MenuParts::Item(T("Select Linked"), nullptr, false, any)) SelectLinked(scene);
       if (MenuParts::Item(T("Select Same Type"), nullptr, false, any)) SelectSameType(scene);
@@ -2218,7 +2249,7 @@ namespace
          const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
          rigSelected = it != nullptr && PoseModel(*it, world) != nullptr;
       }
-      if (MenuParts::Item(T("Pose Mode"), rigSelected ? "Ctrl+Tab" : nullptr, sPose.on, any || sPose.on)) TogglePose(scene);
+      if (MenuParts::Item(T("Pose Mode"), rigSelected ? "Ctrl+Tab" : nullptr, sPose.on, rigSelected || sPose.on)) TogglePose(scene);
       if (MenuParts::Item(T("Sculpt Mode"), rigSelected ? nullptr : "Ctrl+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
       if (MenuParts::Item(T("Edit Mode"), "Tab", sEdit.on, any || sEdit.on)) ToggleEdit(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
@@ -2230,7 +2261,9 @@ namespace
          PoseArmature(scene)->ClearPaint();
       }
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
-      if (MenuParts::Item(T("Paste Transform"), nullptr, false, any)) PasteGlobalTransform(scene);
+      const char* clip = ImGui::GetClipboardText();
+      const bool hasTransform = clip != nullptr && strncmp(clip, "infinite-transform ", 19) == 0;
+      if (MenuParts::Item(T("Paste Transform"), nullptr, false, any && hasTransform)) PasteGlobalTransform(scene);
       if (MenuParts::Item(T("Randomize Transform"), nullptr, false, any)) RandomizeTransform(scene);
       if (MenuParts::Item(T("Move to Mouse"), nullptr, false, any)) MoveToMouse(scene);
       MenuParts::Separator();
@@ -5209,6 +5242,8 @@ namespace
          dl->AddImage((ImTextureID)(intptr_t)tex, mn, mx, ImVec2(0, 1), ImVec2(1, 0));
 
       const ImVec2 mouse = io.MousePos;
+      sViewMn = mn;
+      sViewMx = mx;
       if (hovered)
          sViewMouse = mouse;
       int selCount = 0;
@@ -8001,6 +8036,8 @@ namespace
          DrawAddItems(scene);
          MenuParts::EndPopup();
       }
+      if (MenuParts::TestOpen("##v3dcontext"))
+         ImGui::OpenPopup("##v3dcontext");
       if (MenuParts::BeginPopup("##v3dcontext"))
       {
          // On an object: what to do with it. On empty space: add, select, view.
@@ -8042,6 +8079,7 @@ namespace
                   {
                      gRequestSelectNodeIndex = gn->index;
                      gRequestFitViewNodeIndex = gn->index;
+                     sGoToNode++;
                   }
             }
          }
@@ -8291,6 +8329,8 @@ namespace
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##v3ddockmenu");
+      if (MenuParts::TestOpen("##v3ddockmenu"))
+         ImGui::OpenPopup("##v3ddockmenu");
       if (MenuParts::BeginPopup("##v3ddockmenu"))
       {
          if (MenuParts::SubMenu(T("Dock Position")))
@@ -8367,6 +8407,16 @@ namespace
             }
       }
       sPickedUid = 0;
+      // Another scene (a new or opened patch): its item ids are its own, so the old selection and local view go.
+      static uint64_t sLastScene = 0;
+      const GraphNode* sceneGn = SceneGraphNode();
+      const uint64_t sceneUid = sceneGn != nullptr ? sceneGn->uid : 0;
+      if (sceneUid != sLastScene)
+      {
+         sLastScene = sceneUid;
+         sSel.clear();
+         sLocal.clear();
+      }
       sLocal.erase(std::remove_if(sLocal.begin(), sLocal.end(), [&](int id) { return scene->FindItem(id) == nullptr; }), sLocal.end());
       static Scene3DNode::Settings sSeen;
       std::memcpy(&sSeen, sSet, sizeof(sSeen));
@@ -8434,6 +8484,8 @@ void View3DTestOpenMenu(bool onItem)
       sSel = { scene->Items().front().id };
    sMenuOnItem = onItem;
    sOpenMenu = true;
+   // Where a person right-clicked: the middle of the view (Move to Mouse reads it).
+   sViewMouse = ImVec2((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
 }
 
 void View3DTestPose()
@@ -8446,9 +8498,33 @@ void View3DTestPose()
    std::copy(pos, pos + 3, it.pos);
    std::copy(rot, rot + 3, it.rot);
    std::copy(sc, sc + 3, it.scale);
-   scene->Commit();
+   // Items 0 and 1 (when there) are grouped; item 2 shows item 0's node, so Select Linked has a duplicate to add.
+   if (scene->Items().size() >= 3)
+   {
+      scene->Items()[0].group = scene->Items()[1].group = 7001;
+      scene->Items()[2].uid = scene->Items()[0].uid;
+      scene->Items()[1].pos[0] = -1.5f;
+      scene->Items()[2].pos[0] = 2.5f;
+   }
+   // The cursor before the commit, so the patch holds it from the first frame (a later write reads as drift).
    const float cur[3] = { -0.6f, 0.3f, 0.45f };
    std::copy(cur, cur + 3, sSet->cursor);
+   scene->Commit();
+   // The same start for every click: first item selected, the view off to one side, no mode, no glide.
+   sSel = { it.id };
+   sLocal.clear();
+   sGlide.on = false;
+   sCameraView = false;
+   sOrtho = false;
+   sAz = 0.4f;
+   sEl = 0.3f;
+   sDist = 25.0f;
+   sTarget[0] = 6.0f, sTarget[1] = 2.0f, sTarget[2] = -4.0f;
+   sRoll = 0.0f;
+   sPose = {};
+   sEdit.on = false;
+   sSculpt.on = false;
+   ImGui::SetClipboardText("");   // a copy shows as a change even when an earlier click copied the same text
 }
 
 std::string View3DTestFingerprint()
@@ -8457,8 +8533,7 @@ std::string View3DTestFingerprint()
    char b[512];
    if (Scene3DNode* scene = FindScene())
    {
-      scene->Commit(); // Serialize() is private; Commit() calls it
-      f += scene->SceneText();
+      f += scene->SceneText();   // kept current by every Commit
    }
    for (int id : sSel)
       f += " sel" + std::to_string(id);
@@ -8472,6 +8547,11 @@ std::string View3DTestFingerprint()
             sEdit.on ? 1 : 0, sPose.on ? 1 : 0, sPose.paint ? 1 : 0, sSculpt.on ? 1 : 0, sRulers.size(), sLockCam ? 1 : 0,
             sLockActive ? 1 : 0);
    f += b;
+   f += " go" + std::to_string(sGoToNode);
+   snprintf(b, sizeof b, " cur%.4f,%.4f,%.4f", sSet->cursor[0], sSet->cursor[1], sSet->cursor[2]);
+   f += b;
+   if (const char* clip = ImGui::GetClipboardText())
+      f += std::string(" clip:") + clip;
    return f;
 }
 

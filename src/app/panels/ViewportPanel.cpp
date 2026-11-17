@@ -486,6 +486,8 @@ namespace app
           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
          ImGui::OpenPopup("##viewportpanelctx");
 
+      if (MenuParts::TestOpen("##viewportpanelctx"))
+         ImGui::OpenPopup("##viewportpanelctx");
       if (MenuParts::BeginPopup("##viewportpanelctx"))
       {
          static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };

@@ -530,6 +530,8 @@ namespace
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##pianoDockMenu");
+      if (MenuParts::TestOpen("##pianoDockMenu"))
+         ImGui::OpenPopup("##pianoDockMenu");
       if (MenuParts::BeginPopup("##pianoDockMenu"))
       {
          if (MenuParts::SubMenu(L("Dock Position")))

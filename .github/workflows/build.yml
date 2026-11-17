@@ -98,6 +98,10 @@ jobs:
         run: python3 tools/design/keys_gate.py
       - name: Menus hold verbs, not fields
         run: python3 tools/design/menu_lint.py
+      - name: Every right-click menu is walked
+        run: python3 tools/design/menu_alive_coverage.py
+      - name: Right-click menus hold their reference verbs
+        run: python3 tools/design/menu_grounding.py
       - name: One way to say empty
         run: python3 tools/design/empty_lint.py
       # W1: Windows reads narrow paths in the ANSI code page; every open goes through AppPaths.

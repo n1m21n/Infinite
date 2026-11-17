@@ -8,6 +8,7 @@
 
 namespace app
 {
+void MenuAliveAfterRender();
 std::string gShotNowPath;
 int gShotNowRect[4] = {};
 
@@ -734,6 +735,7 @@ int DrawTestsB(FrameCtx& fc)
          ConditionalStageTimer timerImGuiRender(benchStagesCpuSample ? &sStageImGuiRender : nullptr, Bench::FrameTail::kImGuiRender);
          Bench::ConditionalGpuStageTimer timerImGuiRenderGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "imgui_render", frameId);
          ImGui::Render();
+         MenuAliveAfterRender();
          glViewport(0, 0, fbW, fbH);
          // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
          // by default, see ApplyTheme) - any panel that skips

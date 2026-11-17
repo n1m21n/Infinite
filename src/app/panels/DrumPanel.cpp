@@ -384,6 +384,8 @@ namespace app
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
              ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
             ImGui::OpenPopup("##drumDockMenu");
+         if (MenuParts::TestOpen("##drumDockMenu"))
+            ImGui::OpenPopup("##drumDockMenu");
          if (MenuParts::BeginPopup("##drumDockMenu"))
          {
             if (MenuParts::SubMenu(L("Dock Position")))

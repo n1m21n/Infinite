@@ -182,6 +182,7 @@ namespace
       double playTempo = 0.0, playTransport = 0.0;    // the tempos the last render was made for
       double renderAt = -1.0;                         // when the last render started (ImGui time)
       std::optional<Clip> clip;
+      int auditions = 0; // slices sent to the preview voice (MENUALIVETEST reads it)
       std::shared_ptr<OnsetJob> onsetJob;
       int onsetMax = 16;
       // An auto-slice that would replace hand-placed slices waits here for the confirm dialog.
@@ -1352,6 +1353,7 @@ namespace
       std::copy(l.begin(), l.end(), buf->channelData.begin());
       std::copy(r.begin(), r.end(), buf->channelData.begin() + (std::ptrdiff_t)l.size());
       AudioEngine::Instance().Preview().Play(buf);
+      s.auditions++;
    }
 
    // ---- slice edits from keys and menus ----
@@ -2125,15 +2127,20 @@ namespace
             ImGui::CloseCurrentPopup();
          ImGui::EndMenu();
       }
-      if (MenuParts::Item(T("Settings"), "Double-click", false, any))
-         s.settingsOpen = true;
+      // Shows or hides the settings side, as its toolbar chip does.
+      if (MenuParts::Item(T("Settings"), "Double-click", s.settingsOpen, any))
+         s.settingsOpen = !s.settingsOpen;
       MenuParts::Separator();
       if (MenuParts::Item(T("Convert to node"), nullptr, false, any))
          SelectedToSamplers();
       MenuParts::Separator();
-      if (MenuParts::Item(T("Zoom to selection"), "Z", false, any))
+      const bool showsAll = s.viewStart <= 0.0 && s.viewLen >= (double)std::max<int64_t>(1, Frames());
+      // A selection that is the whole take, already in view, has nowhere to zoom.
+      const std::vector<int> selIdx = SelectedIndices();
+      const bool selIsAll = !selIdx.empty() && s.doc.slices[(size_t)selIdx.front()].start <= 0 && s.doc.EndOf(selIdx.back()) >= Frames();
+      if (MenuParts::Item(T("Zoom to selection"), "Z", false, any && !(selIsAll && showsAll)))
          ZoomToSelection();
-      if (MenuParts::Item(T("Zoom out"), "Shift+Z"))
+      if (MenuParts::Item(T("Zoom out"), "Shift+Z", false, !showsAll))
          ViewAll();
       MenuParts::EndPopup();
    }
@@ -2220,6 +2227,15 @@ namespace
       static double sMenuFrame = 0.0;
       if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          sMenuFrame = menuFrame;
+      // MENUALIVETEST: a right-click in the middle of the view, as above.
+      if (s.doc.Count() > 0 && MenuParts::TestOpen("##studioWaveMenu"))
+      {
+         sMenuFrame = s.viewStart + s.viewLen * 0.37;
+         const int i = s.doc.IndexAt((int64_t)sMenuFrame);
+         if (!IsSel(s.doc.slices[(size_t)i].id))
+            SelectOnly(i);
+         ImGui::OpenPopup("##studioWaveMenu");
+      }
       DrawWaveContextMenu(sMenuFrame);
 
       FieldWell::Draw(dl, g.mn, g.mx, false, false);
@@ -3230,6 +3246,8 @@ namespace
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(tbMin, tbMax) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##studioDockMenu");
+      if (MenuParts::TestOpen("##studioDockMenu"))
+         ImGui::OpenPopup("##studioDockMenu");
       if (MenuParts::BeginPopup("##studioDockMenu"))
       {
          if (MenuParts::SubMenu(L("Dock Position")))
@@ -3460,6 +3478,18 @@ void SampleStudioStatus(bool& busy, bool& ready, std::string& name, double& seco
    ready = s.src != nullptr && !s.busy;
    name = s.src ? SourceName() : std::string();
    seconds = s.src ? (double)Frames() / Sr() : 0.0;
+}
+
+// MENUALIVETEST: the Studio's own clipboard and the auditions so far, so Copy and Play slice read as alive.
+std::string SampleStudioTestFingerprint()
+{
+   const Studio& s = S();
+   return "studio clip " + std::to_string(s.clip.has_value()) + " auditions " + std::to_string(s.auditions);
+}
+
+void SampleStudioTestReset()
+{
+   S().clip.reset();
 }
 
 // The edit as heard, as a 24-bit wav at `path` (empty: the Recordings folder). "" when nothing is there.
