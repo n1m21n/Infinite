@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include <unordered_map>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -1631,6 +1632,16 @@ void DrawNodeBodies(FrameCtx& fc)
       // collision-free space across image/audio/note/modulation/palette
       // cables, same as before; only the offset changed.
       gLinks.clear();
+      // One node-pointer lookup for every cable below (each used to scan gNodes);
+      // the first node in order wins, as the scans did.
+      std::unordered_map<const void*, GraphNode*> nodeByPtr;
+      nodeByPtr.reserve(gNodes.size());
+      for (GraphNode& src : gNodes)
+         nodeByPtr.emplace((const void*)src.node.get(), &src);
+      const auto sourceOf = [&](const void* p) -> GraphNode* {
+         const auto it = nodeByPtr.find(p);
+         return it == nodeByPtr.end() ? nullptr : it->second;
+      };
       for (GraphNode& gn : gNodes)
       {
          int inputs = InputCountFor(gn);
@@ -1640,45 +1651,27 @@ void DrawNodeBodies(FrameCtx& fc)
             if (cable == nullptr || !cable->IsConnected())
                continue;
 
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(cable->GetSourceOutput()), gn.InputPinId(slot) });
-                  break;
-               }
-            }
+            if (GraphNode* src = sourceOf((const void*)cable->GetSource()))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  src->OutputPinId(cable->GetSourceOutput()), gn.InputPinId(slot) });
          }
          for (int slot = 0; slot < kMaxAudioSlots; slot++)
          {
             AudioCable* cable = gn.node->AudioInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
-                  break;
-               }
-            }
+            if (GraphNode* src = sourceOf((const void*)cable->GetSource()))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  src->OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
          }
          for (int slot = 0; slot < kMaxNoteSlots; slot++)
          {
             NoteCable* cable = gn.node->NoteInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
-                  break;
-               }
-            }
+            if (GraphNode* src = sourceOf((const void*)cable->GetSource()))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  src->OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
          }
       }}
 }
