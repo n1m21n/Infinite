@@ -199,7 +199,10 @@ namespace app
             MenuParts::Separator();
             // Values (fades, gain, pan, pitch, tempo, opacity, grade) live in the Clip Settings inspector, never in
             // this menu: menus hold verbs (lint: no sliders inside a menu).
-            if (MenuParts::Item(L("Clip Settings"), T("Double-click"), gArrangeClipSettingsPanelOpen && gArrangeSettingsPanelTarget == cid))
+            // Checked while the inspector shows this clip: the Session's inspector follows the selected slot.
+            const bool inspectorOnThis = gArrangeClipSettingsPanelOpen &&
+               (gArrangeSettingsPanelTarget == cid || (ctxIsSlot && ArrangeSelectedSlotId() == cid));
+            if (MenuParts::Item(L("Clip Settings"), T("Double-click"), inspectorOnThis))
             {
                gArrangeClipSettingsPanelOpen = true;
                gArrangeSettingsPanelTarget = cid;
@@ -220,15 +223,19 @@ namespace app
                   {
                      ArrangeEdit([&]()
                      {
-                        for (uint64_t id : ArrangeSelectionIds())
+                        // The selection holds Timeline clips only; a Session slot's clip is the one under the menu.
+                        const std::vector<uint64_t> ids = ctxIsSlot ? std::vector<uint64_t>{ cid } : ArrangeSelectionIds();
+                        for (uint64_t id : ids)
                         {
+                           // A Timeline clip or a Session slot's clip: both lay over the lanes below.
                            const Arrange::Loc loc = Arrange::Find(gArrange, id);
-                           if (!loc.Valid() || gArrange.lanes[loc.lane].type != Arrange::kLaneVideo)
+                           const int lane = loc.Valid() ? loc.lane : Arrange::FindSlot(gArrange, id).lane;
+                           Arrange::Clip* c = Arrange::FindClip(gArrange, id);
+                           if (c == nullptr || lane < 0 || gArrange.lanes[(size_t)lane].type != Arrange::kLaneVideo)
                               continue;
-                           Arrange::Clip& c = gArrange.lanes[loc.lane].clips[loc.index];
-                           if (c.blendMode == m)
+                           if (c->blendMode == m)
                               continue;
-                           c.blendMode = m;
+                           c->blendMode = m;
                            gArrange.revision++;
                         }
                      });
@@ -311,6 +318,19 @@ namespace app
             // Group, Ungroup, and Delete: available for both multi-selection and single-clip / group-selection
             if (!ctxIsSlot)
             {
+            MenuParts::Separator();
+            // The clip verbs every timeline offers (Ableton Arrangement, Premiere), on the same keys.
+            const Arrange::Tick ctxPlay = ArrangePlayTick();
+            bool canSplit = false;
+            for (uint64_t id : ctxSelIds)
+               if (const Arrange::Clip* sc = Arrange::FindClip(gArrange, id))
+                  canSplit = canSplit || (ctxPlay > sc->start && ctxPlay < sc->start + sc->length);
+            if (MenuParts::Item(L("Copy"), MODKEY "+C", false, !ctxSelIds.empty()))
+               ArrangeCopySelection();
+            if (MenuParts::Item(L("Duplicate"), MODKEY "+D", false, !ctxSelIds.empty()))
+               ArrangeDuplicateSelection();
+            if (MenuParts::Item(L("Split at Playhead"), MODKEY "+E", false, canSplit))
+               ArrangeSplitSelectionAt(ctxPlay);
             MenuParts::Separator();
             if (MenuParts::Item(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
                ArrangeGroupSelection();
@@ -1467,6 +1487,10 @@ namespace app
       }
       // The monitor child asks for the viewport menu; it opens here, in the same ID scope as the chip's.
       static bool sViewportCtxRequest = false;
+      if (MenuParts::TestOpen("##arrangeviewportctx"))
+         sViewportCtxRequest = true;
+      if (MenuParts::TestOpen("##arrangeDockMenu"))
+         ImGui::OpenPopup("##arrangeDockMenu");
       if (sViewportCtxRequest && !ImGui::IsPopupOpen("##arrangeviewportctx"))
          ImGui::OpenPopup("##arrangeviewportctx");
       sViewportCtxRequest = false;
@@ -2060,6 +2084,18 @@ namespace app
       if (mouseInRuler && !markerHoveredAny && gArrange.settings.loop.enabled && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
          ArrangeSetLoop(false, gArrange.settings.loop.start, gArrange.settings.loop.end);
 
+      if (!gArrange.markers.empty() && MenuParts::TestOpen("##arrangemarkerctx"))
+      {
+         // The first flag in view: a person can only right-click one they see.
+         gArrangeCtxMarkerId = gArrange.markers.front().id;
+         for (const Arrange::Marker& mk : gArrange.markers)
+            if (tickToX(mk.pos) >= rulerStartX && tickToX(mk.pos) < rulerStartX + rulerWidth - 40.0f)
+            {
+               gArrangeCtxMarkerId = mk.id;
+               break;
+            }
+         openMarkerCtx = true;
+      }
       if (openMarkerCtx)
          ImGui::OpenPopup("##arrangemarkerctx");
       if (MenuParts::BeginPopup("##arrangemarkerctx"))
@@ -3822,6 +3858,16 @@ namespace app
       }
       dl->PopClipRect();
 
+      // Self-test: the first clip, selected, as a right-click on it would.
+      if (MenuParts::TestOpen("##arrangeclipctx"))
+         for (const Arrange::Lane& l : gArrange.lanes)
+            if (!l.clips.empty() && !openClipCtx)
+            {
+               gArrangeCtxClipId = l.clips.front().id;
+               gArrangeSel = { gArrangeCtxClipId };
+               gArrangeSelAnchor = gArrangeCtxClipId;
+               openClipCtx = true;
+            }
       DrawArrangeClipContextMenu(openClipCtx);
 
       // ---- "Add Clip" on an empty lane spot ----
@@ -3839,6 +3885,11 @@ namespace app
       }
 
       // ---- lane group-membership context menu (from the drag-handle) ----
+      if (!gArrange.lanes.empty() && MenuParts::TestOpen("##arrangelanectx"))
+      {
+         ctxLaneId = gArrange.lanes.front().id;
+         openLaneCtx = true;
+      }
       if (openLaneCtx)
          ImGui::OpenPopup("##arrangelanectx");
       if (MenuParts::BeginPopup("##arrangelanectx"))
@@ -3937,6 +3988,11 @@ namespace app
       }
 
       // ---- track-group header context menu ----
+      if (!gArrange.trackGroups.empty() && MenuParts::TestOpen("##arrangegroupctx"))
+      {
+         ctxGroupId = gArrange.trackGroups.front().id;
+         openGroupCtx = true;
+      }
       if (openGroupCtx)
          ImGui::OpenPopup("##arrangegroupctx");
       if (MenuParts::BeginPopup("##arrangegroupctx"))
@@ -4198,6 +4254,8 @@ namespace app
             ImGui::OpenPopup("##arrangeemptyspacectx");
          }
       }
+      if (MenuParts::TestOpen("##arrangeemptyspacectx"))
+         ImGui::OpenPopup("##arrangeemptyspacectx");
       if (MenuParts::BeginPopup("##arrangeemptyspacectx"))
       {
          if (MenuParts::Item(L("Add Video Track")))
@@ -4206,6 +4264,9 @@ namespace app
             ArrangeEdit([&]() { Arrange::AddLane(gArrange, Arrange::kLaneAudio); });
          if (MenuParts::Item(L("Add Track Group")))
             ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, {}, "New Group"); });
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Paste at Playhead"), MODKEY "+V", false, !gArrangeClipboard.items.empty()))
+            ArrangePasteAt(ArrangePlayTick());
          MenuParts::EndPopup();
       }
 

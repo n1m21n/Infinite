@@ -116,6 +116,16 @@ void DrawPopupsA(FrameCtx& fc)
             if (MenuParts::Item(g->on ? L("Turn Group Off") : L("Turn Group On")))
                g->on = !g->on;
             view3DItems(*gn);
+            // Copy: the Edit menu's command on this node (or the selection it is part of).
+            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCopy = true;
+            }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -172,6 +182,16 @@ void DrawPopupsA(FrameCtx& fc)
                gColor.justOpened = true;
             }
             view3DItems(*gn);
+            // Copy: the Edit menu's command on this node (or the selection it is part of).
+            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCopy = true;
+            }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -229,6 +249,16 @@ void DrawPopupsA(FrameCtx& fc)
                }
             }
             view3DItems(*gn);
+            // Copy: the Edit menu's command on this node (or the selection it is part of).
+            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCopy = true;
+            }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))

@@ -1307,12 +1307,24 @@ namespace
 
    void DrawCurveMenu(MSEGNode& n)
    {
+      if (MenuParts::TestOpen("##curveMenu"))
+         ImGui::OpenPopup("##curveMenu");
       if (!MenuParts::BeginPopup("##curveMenu"))
          return;
+      // The shape and handle every point in the span shares carries the check, as in a graph editor's
+      // interpolation menu; a mixed span checks none.
+      const auto [spanA, spanB] = SelectionSpan(n);
+      int shared = -1, sharedHandle = -1;
+      for (int i = std::max(0, spanA); i <= spanB && i < (int)n.points.size(); i++)
+      {
+         const int ip = n.points[(size_t)i].interp, hd = n.points[(size_t)i].handle;
+         shared = i == std::max(0, spanA) ? ip : (shared == ip ? shared : -2);
+         sharedHandle = i == std::max(0, spanA) ? hd : (sharedHandle == hd ? sharedHandle : -2);
+      }
       static const char* kInterp[] = { "Constant", "Linear", "Bend", "Bezier", "Easing" };
       static const char* kKeys[] = { "1", "2", "3", "4", "5" };
       for (int i = 0; i < ModShapes::kInterpCount; i++)
-         if (MenuParts::Item(T(kInterp[i]), kKeys[i]))
+         if (MenuParts::Item(T(kInterp[i]), kKeys[i], shared == i))
             SetInterp(n, i);
       MenuParts::Separator();
       if (MenuParts::SubMenu(T("Handles")))
@@ -1320,15 +1332,20 @@ namespace
          static const char* kHandles[] = { "Auto Clamped", "Auto", "Vector", "Aligned", "Free" };
          static const char* kHKeys[] = { "Shift+1", "Shift+2", "Shift+3", "Shift+4", "Shift+5" };
          for (int i = 0; i < ModShapes::kHandleCount; i++)
-            if (MenuParts::Item(T(kHandles[i]), kHKeys[i]))
+            if (MenuParts::Item(T(kHandles[i]), kHKeys[i], sharedHandle == i))
                SetHandle(n, i);
          ImGui::EndMenu();
       }
       if (MenuParts::Item(T("Quantise to Grid"), "Q"))
          Quantise(n);
+      // Normalise stretches the curve to the full 0..1 range; a curve already spanning it has nothing to stretch.
+      float lo = 1.0f, hi = 0.0f;
+      for (const MSEGNode::Point& p : n.points)
+         lo = std::min(lo, p.y), hi = std::max(hi, p.y);
+      const bool canNormalise = hi - lo >= 1.0e-6f && (lo > 1.0e-4f || hi < 1.0f - 1.0e-4f);
       static const char* commands[] = { "Reverse", "Invert", "Mirror", "Simplify", "Humanize", "Duplicate to Fill", "Normalise", "Smooth" };
       for (int command=0;command<8;++command)
-         if (MenuParts::Item(T(commands[command])))
+         if (MenuParts::Item(T(commands[command]), nullptr, false, command != 6 || canNormalise))
          {
             PushUndoCheckpoint(commands[command]);
             if(command==0) CurveEdit::Reverse(n.points);
@@ -2553,6 +2570,8 @@ namespace
       const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::Chip() + tok::space_3);
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+         ImGui::OpenPopup("##curveDockMenu");
+      if (MenuParts::TestOpen("##curveDockMenu"))
          ImGui::OpenPopup("##curveDockMenu");
       if (MenuParts::BeginPopup("##curveDockMenu"))
       {
