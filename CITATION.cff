@@ -9,6 +9,8 @@ authors:
     alias: "n1m21n"
 repository-code: "https://github.com/n1m21n/Infinite"
 url: "https://infinitedevices.org/"
+version: 2.0.0
+date-released: 2026-11-17
 license: MIT
 keywords:
   - audiovisual
