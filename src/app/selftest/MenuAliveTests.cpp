@@ -11,6 +11,9 @@
 // A menu whose setup has nothing to right-click fails ("did not open"). A crash ends the run without the OK line.
 //   INFINITE_MENUALIVE_MENU=<text>  only menus whose name holds it
 //   INFINITE_MENUALIVE_ONLY=<text>  only click rows whose path holds it (submenus are still walked)
+//   INFINITE_MENUALIVE_ROOTS=<ids>  only menus whose popup id is in the comma list (tools/design/menu_walk.py sets it
+//                                   to the menus in the files changed since main)
+// The walk counts frames, never seconds, so it lifts the Target FPS cap while it runs and puts it back at the end.
 // Plan: internal/plans/ui-system/lint-plan.md (D10, Block E).
 #include "app/AppShared.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -713,6 +716,7 @@ void MenuAliveAfterRender()
 void RunMenuAliveTest(int frameId, GLFWwindow* window)
 {
    static bool sBuilt = false;
+   static int sKeptFps = 0, sMenuCount = 0;
    ImGuiIO& io = ImGui::GetIO();
    if (!sBuilt)
    {
@@ -723,10 +727,16 @@ void RunMenuAliveTest(int frameId, GLFWwindow* window)
       io.ConfigInputTrickleEventQueue = false;
       GImGui->TestEngineHookItems = true;
       BuildTable();
+      sKeptFps = gTargetFps;
+      gTargetFps = 0;
       const char* only = getenv("INFINITE_MENUALIVE_MENU");
+      const char* rootsEnv = getenv("INFINITE_MENUALIVE_ROOTS");
+      const std::string roots = rootsEnv != nullptr ? "," + std::string(rootsEnv) + "," : "";
       for (int i = 0; i < (int)sMenus.size(); i++)
-         if (only == nullptr || sMenus[(size_t)i].name.find(only) != std::string::npos)
+         if ((only == nullptr || sMenus[(size_t)i].name.find(only) != std::string::npos) &&
+             (rootsEnv == nullptr || roots.find("," + sMenus[(size_t)i].root + ",") != std::string::npos))
             sJobs.push_back({ i, {}, false, false, false });
+      sMenuCount = (int)sJobs.size();
    }
    GImGui->TestEngineHookItems = true;
    io.AddMousePosEvent(sMouse.x, sMouse.y);
@@ -737,7 +747,9 @@ void RunMenuAliveTest(int frameId, GLFWwindow* window)
    if (sJobs.empty())
    {
       sDone = true;
-      printf("MENUALIVE: %d alive, %d dead, %d greyed, %d skipped in %.0f s\n", sPass, sFail, sGrey, sSkip, ImGui::GetTime());
+      gTargetFps = sKeptFps;
+      printf("MENUALIVE: %d menus, %d frames, ", sMenuCount, frameId);
+      printf("%d alive, %d dead, %d greyed, %d skipped in %.0f s\n", sPass, sFail, sGrey, sSkip, ImGui::GetTime());
       for (const std::string& n : sBadMenus)
          printf("  menu with fails: %s\n", n.c_str());
       printf("MENUALIVETEST %s\n", sFail == 0 && sPass > 0 ? "OK" : "FAIL");

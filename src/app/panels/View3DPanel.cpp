@@ -1737,6 +1737,32 @@ namespace
       scene->Commit();
    }
 
+   // A selected item off the grid (Selection to Grid has something to move) / following another (Clear Follow has
+   // something to clear): the rows grey otherwise.
+   bool SelectionOffGrid(Scene3DNode* scene)
+   {
+      const float step = sSet->snapMove > 0.0f ? sSet->snapMove : 1.0f;
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+         {
+            float c[3];
+            scene->ItemCenter(*it, c);
+            for (int k = 0; k < 3; k++)
+               if (std::fabs(SnapTo(c[k], step) - c[k]) > 1.0e-5f)
+                  return true;
+         }
+      return false;
+   }
+
+   bool SelectionFollows(Scene3DNode* scene)
+   {
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+            if (it->follow != 0)
+               return true;
+      return false;
+   }
+
    void SelectionToGrid(Scene3DNode* scene)
    {
       const float step = sSet->snapMove > 0.0f ? sSet->snapMove : 1.0f;
@@ -2145,7 +2171,7 @@ namespace
    void DrawSnapItems(Scene3DNode* scene)
    {
       const bool any = !sSel.empty();
-      if (MenuParts::Item(T("Selection to Grid"), nullptr, false, any)) SelectionToGrid(scene);
+      if (MenuParts::Item(T("Selection to Grid"), nullptr, false, any && SelectionOffGrid(scene))) SelectionToGrid(scene);
       if (MenuParts::Item(T("Selection to Cursor"), nullptr, false, any)) SelectionToCursor(scene);
       if (MenuParts::Item(T("Selection to Cursor (Keep Offset)"), nullptr, false, any)) SelectionToCursorKeepOffset(scene);
       if (MenuParts::Item(T("Selection to Active"), nullptr, false, sSel.size() > 1)) SelectionToActive(scene);
@@ -2241,7 +2267,7 @@ namespace
          ImGui::EndMenu();
       }
       if (MenuParts::Item(T("Follow Active"), MODKEY "+P", false, sSel.size() > 1)) FollowActive(scene, false);
-      if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any)) FollowActive(scene, true);
+      if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any && SelectionFollows(scene))) FollowActive(scene, true);
       // Cmd/Ctrl+Tab poses a rig and sculpts anything else, so the key shows on the row it runs.
       bool rigSelected = false;
       {
