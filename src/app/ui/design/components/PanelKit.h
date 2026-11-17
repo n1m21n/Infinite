@@ -13,6 +13,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/CheckBox.h"
 #include "app/selftest/UiAudit.h"
 
 namespace PanelKit
@@ -49,7 +50,9 @@ namespace PanelKit
          return clicked;
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
       const ImVec2 gc((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-      const float roleGs = tok::icon_control;
+      // One icon size per chip size: 0.72 of the chip, capped at the control icon, so a compact strip's glyphs do
+      // not fill their chips edge to edge (16 in an 18 chip read as oversized).
+      const float roleGs = std::min(tok::icon_control, std::round(h * 0.72f));
       const float gs = glyph::FitSize(gc, roleGs, glyphStr);
       glyph::Draw(ImGui::GetWindowDrawList(), gc, gs, on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
 #ifdef IMGUI_ENABLE_TEST_ENGINE
@@ -89,6 +92,14 @@ namespace PanelKit
 
    // ---- sections
 
+   // Set by the UI audit's crawl: every folding section draws open (nothing is stored), so the audit sees the rows
+   // a closed section hides. Every fold header in a panel reads it.
+   inline bool& AuditOpenAll()
+   {
+      static bool b = false;
+      return b;
+   }
+
    // A folding section header, remembered per text. Returns whether the section is open.
    inline bool FoldHeader(const char* text, bool first = false, bool startOpen = true)
    {
@@ -105,6 +116,7 @@ namespace PanelKit
       const bool hov = ImGui::IsItemHovered();
       ImGui::PopID();
       sOpen[text] = open;
+      open = open || AuditOpenAll();
       const ImU32 col = ImGui::GetColorU32(hov ? ImGuiCol_Text : ImGuiCol_TextDisabled);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + 5.0f, p.y + h * 0.5f);
@@ -162,11 +174,34 @@ namespace PanelKit
       return col == g.cols - 1 ? g.total - (g.cols - 1) * (w + tok::space_1) : w;
    }
 
-   // "Label " + fmt, with any % in the label doubled so the format still reads.
-   inline std::string InWellFormat(const char* label, const char* fmt)
+   // "Label " + fmt, with any % in the label doubled so the format still reads. With a cell width, a label that would
+   // push the value past the well ends in an ellipsis (room measured with the format at 0 and a sign).
+   inline std::string InWellFormat(const char* label, const char* fmt, float cellW = 0.0f)
    {
       std::string s;
+      std::string fitted;
       const char* end = ImGui::FindRenderedTextEnd(label);
+      if (cellW > 0.0f)
+      {
+         // An int format takes an int, a float format a double: find the conversion first.
+         bool isInt = false;
+         for (const char* c = std::strchr(fmt, '%'); c != nullptr && *c; c++)
+            if (std::strchr("diuxX", *c) != nullptr) { isInt = true; break; }
+            else if (std::strchr("fFeEgG", *c) != nullptr) break;
+         char sample[64];
+         if (isInt)
+            snprintf(sample, sizeof sample, fmt, 0);
+         else
+            snprintf(sample, sizeof sample, fmt, -0.0);
+         std::string probe = std::string("-") + sample;
+         for (char& c : probe)
+            if (c >= '1' && c <= '9')
+               c = '0';
+         const float room = cellW - 2.0f * tok::space_2 - ImGui::CalcTextSize(probe.c_str()).x - ImGui::CalcTextSize(" ").x;
+         fitted = app::TruncateWithEllipsis(std::string(label, end), std::max(0.0f, room));
+         label = fitted.c_str();
+         end = label + fitted.size();
+      }
       for (const char* c = label; c < end; c++)
       {
          s += *c;
@@ -181,5 +216,64 @@ namespace PanelKit
          f.erase(px);
       s += f;
       return s;
+   }
+
+   // ---- check grid
+
+   // Several on/off settings as one block: columns sized to the widest label (1..maxCols, as many as fit the width),
+   // each cell a box and its label, the whole cell one hit. Returns the index clicked, -1 for none; the caller flips
+   // it after its own undo step. Use it for any run of checks (overlays, stamp fields, X/Y/Z) instead of one check
+   // per row or hand-placed boxes on one line.
+   inline int CheckGrid(const char* id, const char* const* labels, const bool* values, int n, int maxCols = 3)
+   {
+      if (n <= 0)
+         return -1;
+      const float box = CheckBox::Size(), gapIn = tok::space_2, gapCol = tok::space_3, rowH = Row(), gapRow = RowGap();
+      float widest = 0.0f;
+      for (int i = 0; i < n; i++)
+         widest = std::max(widest, ImGui::CalcTextSize(labels[i], ImGui::FindRenderedTextEnd(labels[i])).x);
+      const float avail = std::max(1.0f, ImGui::GetContentRegionAvail().x);
+      const float cellMin = box + gapIn + widest;
+      const int cols = std::clamp((int)std::floor((avail + gapCol) / (cellMin + gapCol)), 1, std::min(maxCols, n));
+      const float cellW = std::floor((avail - gapCol * (cols - 1)) / (float)cols);
+      const int rows = (n + cols - 1) / cols;
+      const ImVec2 o = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      int hit = -1;
+      ImGui::PushID(id);
+      for (int i = 0; i < n; i++)
+      {
+         // Column-major: a column reads top to bottom, as a list does.
+         const int col = i / rows, row = i % rows;
+         const ImVec2 p(o.x + col * (cellW + gapCol), o.y + row * (rowH + gapRow));
+         ImGui::SetCursorScreenPos(p);
+         ImGui::PushID(i);
+         const bool clicked = ImGui::InvisibleButton((std::string(labels[i]) + "##cell").c_str(), ImVec2(cellW, rowH));
+         const bool hovered = ImGui::IsItemHovered();
+         const ImGuiID iid = ImGui::GetItemID();
+         UiAudit::NoteKind("gridcheck", labels[i]);   // a checkbox already in a grid
+         ImGui::PopID();
+         if (clicked)
+            hit = i;
+         const bool on = values[i] != clicked;   // drawn as it will be, so the tick starts this frame
+         const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
+         const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, on, tok::motion_on, tok::motion_off);
+         CheckBox::Draw(dl, ImVec2(p.x, std::round(p.y + (rowH - box) * 0.5f)), onv, hv);
+         const char* end = ImGui::FindRenderedTextEnd(labels[i]);
+         const ImVec2 tp(p.x + box + gapIn, std::round(p.y + (rowH - ImGui::GetFontSize()) * 0.5f));
+         const ImVec2 tmax(p.x + cellW, p.y + rowH);
+         dl->PushClipRect(tp, tmax, true);
+         dl->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hovered ? 0.9f : 0.72f)), labels[i], end);
+         dl->PopClipRect();
+         const float tw = ImGui::CalcTextSize(labels[i], end).x;
+         UiAudit::NoteInk(4, tp, ImVec2(tp.x + tw, tp.y + ImGui::GetFontSize()), 0.0f, labels[i]);
+         if (hovered && tp.x + tw > tmax.x)
+            HelpTip("%.*s", (int)(end - labels[i]), labels[i]);
+      }
+      ImGui::PopID();
+      ImGui::SetCursorScreenPos(o);
+      ImGui::Dummy(ImVec2(avail, rows * rowH + (rows - 1) * gapRow));
+      return hit;
    }
 }

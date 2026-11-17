@@ -23,6 +23,7 @@
 #include "core/CategoryColors.h"
 #include "core/NodeFactory.h"
 #include "app/ui/design/Tokens.gen.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "json.hpp"
 #include <filesystem>
 #include <sstream>
@@ -408,6 +409,90 @@ namespace
 
    // Layer 2: every item of one frame, no input. `scope` is a node type name while one node sits alone on the
    // canvas: its items are then told apart from every other window's by that name.
+   // One window's controls side by side: an icon fits its chip, checkboxes and sliders keep one size, and a long
+   // single column of checkboxes is a grid (PanelKit::CheckGrid).
+   float ModeOf(std::vector<float> v)
+   {
+      std::map<int, int> n;
+      int best = 0, at = 0;
+      for (float x : v)
+         if (++n[(int)std::lround(x)] > best)
+         {
+            best = n[(int)std::lround(x)];
+            at = (int)std::lround(x);
+         }
+      return (float)at;
+   }
+   void WindowRules(const std::string& state, std::unordered_map<std::string, std::vector<const Rec*>>& byWindow)
+   {
+      for (const Ink& k : sInksLast)
+      {
+         if (k.kind != 1 || k.item == 0)
+            continue;
+         const float chip = std::min(k.itemBb.GetWidth(), k.itemBb.GetHeight());
+         const float ink = std::max(k.r.GetWidth(), k.r.GetHeight());
+         if (chip < 12.0f || ink <= 0.0f)
+            continue;
+         if (ink > chip * 0.8f + 0.5f || ink > tok::icon_control * 1.25f + 0.5f)
+         {
+            Rec r = {};
+            r.window = k.window;
+            r.label = k.tip.empty() ? k.glyph : k.tip;
+            Add("icon too big", state, r, "%.0f px ink in a %.0f px chip", ink, chip);
+         }
+      }
+      for (auto& [w, items] : byWindow)
+      {
+         std::vector<const Rec*> boxes, sliders, loose;   // loose: checkboxes not already in a CheckGrid
+         for (const Rec* r : items)
+         {
+            const auto n = sNotesLast.find(r->id);
+            const char* kind = n != sNotesLast.end() ? n->second.kind : nullptr;
+            const bool grid = kind != nullptr && strcmp(kind, "gridcheck") == 0;
+            const bool box = grid || (kind != nullptr && strcmp(kind, "checkbox") == 0) || r->checkable;
+            if (box)
+               boxes.push_back(r);
+            if (box && !grid)
+               loose.push_back(r);
+            else if (sSlidersLast.count(r->id) != 0)
+               sliders.push_back(r);
+         }
+         auto sameSize = [&](const std::vector<const Rec*>& v, const char* check, const char* what)
+         {
+            if (v.size() < 2)
+               return;
+            std::vector<float> hs;
+            for (const Rec* r : v)
+               hs.push_back(r->bb.GetHeight());
+            const float m = ModeOf(hs);
+            for (const Rec* r : v)
+               if (std::fabs(r->bb.GetHeight() - m) > 1.0f)
+                  Add(check, state, *r, "%.0f px tall among %.0f px %s", r->bb.GetHeight(), m, what);
+         };
+         sameSize(boxes, "checkbox size", "checkboxes");
+         sameSize(sliders, "slider size", "sliders");
+         // A column: same left edge, one under the next, nothing else beside it on its row.
+         std::sort(loose.begin(), loose.end(), [](const Rec* a, const Rec* b) { return a->bb.Min.y < b->bb.Min.y; });
+         auto alone = [&](const Rec* r)
+         {
+            for (const Rec* o : loose)
+               if (o != r && std::fabs(o->bb.GetCenter().y - r->bb.GetCenter().y) < 2.0f && std::fabs(o->bb.Min.x - r->bb.Min.x) > 1.0f)
+                  return false;
+            return true;
+         };
+         for (size_t i = 0; i < loose.size();)
+         {
+            size_t j = i + 1;
+            while (j < loose.size() && std::fabs(loose[j]->bb.Min.x - loose[i]->bb.Min.x) <= 1.0f &&
+                   loose[j]->bb.Min.y - loose[j - 1]->bb.Min.y <= loose[j - 1]->bb.GetHeight() * 1.8f + 1.0f && alone(loose[j]))
+               j++;
+            if (j - i >= 4 && alone(loose[i]))
+               Add("checkbox column", state, *loose[i], "%d checkloose stacked; a grid fits", (int)(j - i));
+            i = j;
+         }
+      }
+   }
+
    void Snapshot(const std::string& state, const std::string& scope = std::string())
    {
       std::vector<Rec> recs = sLast;
@@ -533,6 +618,7 @@ namespace
                    !items[i]->overlapOk && !items[j]->overlapOk)
                   Add("overlap", state, *items[j], "with %s, %.0f x %.0f", items[i]->label.c_str(), ox, oy);
             }
+      WindowRules(state, byWindow);
    }
 
 
@@ -1357,7 +1443,7 @@ namespace
    {
       const auto note = sNotesLast.find(r.id);
       if (note != sNotesLast.end() && note->second.kind != nullptr)
-         return note->second.kind;
+         return strcmp(note->second.kind, "gridcheck") == 0 ? "checkbox" : note->second.kind;
       if (sSlidersLast.count(r.id) != 0)
          return "slider";
       if (r.checkable)
@@ -1585,7 +1671,7 @@ namespace
             k.kind = Kind::Popup;
             sQueue.insert(sQueue.begin(), k);
          }
-         else if (kind != nullptr && strcmp(kind, "checkbox") == 0 || r.checkable)
+         else if ((kind != nullptr && (strcmp(kind, "checkbox") == 0 || strcmp(kind, "gridcheck") == 0)) || r.checkable)
          {
             k.kind = Kind::Toggle;
             sQueue.insert(sQueue.begin(), k);
@@ -1659,6 +1745,7 @@ void FrameTest_UIAUDIT(int frameId, GLFWwindow* window)
       hook.Type = ImGuiContextHookType_NewFramePre;
       hook.Callback = OwnMouse;
       ImGui::AddContextHook(GImGui, &hook);
+      PanelKit::AuditOpenAll() = true;          // folded sections draw nothing: open them all so the audit sees them
       SetCanvasSwapInterval(0);
       if (const char* only = getenv("INFINITE_UIAUDIT_NODES"))
          sOnly = only;
@@ -2455,6 +2542,7 @@ void FrameTest_CRAWL(int frameId, GLFWwindow* window)
       hook.Callback = OwnMouse;
       ImGui::AddContextHook(GImGui, &hook);
       SetCanvasSwapInterval(0);
+      PanelKit::AuditOpenAll() = true;          // folded sections draw nothing: open them all so the audit sees them
       setenv("INFINITE_NO_DIALOGS", "1", 1);   // Platform's file dialogs answer Cancel
       gModulationFrozen = true;                 // bound values hold still: a change after a click was the click
       if (const char* sk = getenv("INFINITE_CRAWL_SKIP"))
