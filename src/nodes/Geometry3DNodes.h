@@ -575,7 +575,6 @@ private:
    ImageCable mTextureInput;
    GLUtil::Fbo mPreview;
    int mLastCookFrame = -1;
-   bool mPreviewFailed = false;
 };
 
 // --- Render 3D ----------------------------------------------------------

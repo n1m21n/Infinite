@@ -757,15 +757,6 @@ void DrawMenuBar(FrameCtx& fc)
          auto TopBarSameLine = [](float spacing = 4.0f) {
             ImGui::SameLine(0.0f, spacing);
          };
-         auto TopBarLabel = [](const char* text, bool disabled = false) {
-            ImGuiWindow* window = ImGui::GetCurrentWindow();
-            window->DC.CurrLineTextBaseOffset = ImGui::GetStyle().FramePadding.y;
-            if (disabled)
-               ImGui::TextDisabled("%s", text);
-            else
-               ImGui::TextUnformatted(text);
-         };
-         const bool isLight = IsThemeLight();
          // A live number: tabular digits in a slot as wide as its widest value, so it never
          // shifts what sits beside it. `widest` is the longest text it can show.
          auto TabLabel = [](const char* key, const char* text, const char* widest, bool dim)

@@ -223,11 +223,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    auto& searchPopupCentered = fc.searchPopupCentered;
    auto& searchPopupOpen = fc.searchPopupOpen;
    auto& searchRequestClose = fc.searchRequestClose;
-   auto& clipboard = fc.clipboard;
-   auto& clipboardSources = fc.clipboardSources;
-   auto& clipboardOrigIndex = fc.clipboardOrigIndex;
-   auto& clipboardOrigGroup = fc.clipboardOrigGroup;
-   auto& clipboardCluster = fc.clipboardCluster;
    auto& tSettingsInit = fc.tSettingsInit;
    auto& sFirstFrameEndMs = fc.sFirstFrameEndMs;
    auto& frameId = fc.frameId;
@@ -240,7 +235,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // The user's own per-genre kits (tools/drumkits/build_kits.py); absent folder = bundled kit only.
    if (const std::string sup = AppPaths::AppSupportDir(); !sup.empty())
       DrumSequencerNode::SetUserKitRoot(sup + "/kits");
-   const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
    sMainRssStartMb = Bench::ProcessRssMb();
    sMainFootStartMb = Bench::ProcessFootprintMb();
    
@@ -325,8 +319,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    // B6 Canvas navigation fixture state (docs/plans/perf/benchmark-suite.md §4)
    
-   
-   static int sBenchB6NodeCount = 300;
    
    static bool sBenchB6Collapsed = false;
    
@@ -2848,9 +2840,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          auto* mat = static_cast<MaterialNode*>(gNodes[2].node.get());
          auto* render = static_cast<Render3DNode*>(gNodes[5].node.get());
          auto* out = static_cast<OutputNode*>(gNodes[6].node.get());
-         auto* path = static_cast<PathNode*>(gNodes[7].node.get());
          auto* palette = static_cast<PaletteNode*>(gNodes[8].node.get());
-         auto* ramp = static_cast<RampNode*>(gNodes[9].node.get());
          auto* wave = static_cast<WavetableNode*>(gNodes[10].node.get());
          auto* midi = static_cast<MidiNotesNode*>(gNodes[11].node.get());
          auto* filter = static_cast<NoteFilterNode*>(gNodes[12].node.get());
@@ -4196,7 +4186,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             if (strlen(b6Arg) > 0 && strcmp(b6Arg, "1") != 0 && std::atoi(b6Arg) > 0)
                nodeCount = std::atoi(b6Arg);
          }
-         sBenchB6NodeCount = nodeCount;
+         (void)nodeCount;
 
          sBenchB6TotalFrames = getenv("INFINITE_BENCH_B6FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B6FRAMES"))) : 600;
 
@@ -4745,6 +4735,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          Splash::Begin(0.0f); // the card window failed: fall back to the in-window splash
    }
    else if (splashEnabled)
-      Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);   return -1;
+      Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);
+   return -1;
 }
 }

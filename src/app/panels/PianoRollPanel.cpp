@@ -50,7 +50,6 @@ namespace
    constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
    constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
    constexpr double kMinPxPerTick = 0.002, kMaxPxPerTick = 2.0;
-   constexpr int kPaletteSize = 12;
    using Arrange::Tick;
 
    // One note as it lands on the timeline: looped clips show every pass, the first pass is the note itself.
@@ -208,7 +207,7 @@ namespace
       return l.noteNodeUid != 0 ? FindNodeByUid(l.noteNodeUid) : nullptr;
    }
 
-   std::string NodeLabel(const GraphNode& gn)
+   [[maybe_unused]] std::string NodeLabel(const GraphNode& gn)
    {
       auto* n = dynamic_cast<PianoRollNode*>(gn.node.get());
       if (n != nullptr && !n->laneName.empty())
@@ -1016,7 +1015,7 @@ namespace
       return q.num == 0 ? GridOrBeatSixteenth() : (Tick)((int64_t)Arrange::kTicksPerBar * q.num / q.den);
    }
 
-   const char* QuantLabel()
+   [[maybe_unused]] const char* QuantLabel()
    {
       const QuantChoice& q = kQuant[std::clamp(S().quantIdx, 0, kQuantCount - 1)];
       return q.num == 0 ? T("Grid") : T(q.label);

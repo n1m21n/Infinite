@@ -2716,9 +2716,7 @@ void DrawBenchHarness(FrameCtx& fc)
       FrameTest_INPUTTEST_2(frameId, window);
 
       fc.timerNodeBodies.emplace(benchStagesCpuSample ? &sStageNodeBodies : nullptr, Bench::FrameTail::kNodeBodies);
-   auto& timerNodeBodies = *fc.timerNodeBodies;
       fc.timerNodeBodiesGpu.emplace(benchStagesSample ? &sGpuTimerRing : nullptr, "node_bodies", frameId);
-   auto& timerNodeBodiesGpu = *fc.timerNodeBodiesGpu;
       PruneDeadGroups();
 
       b6TrackVis = isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames);

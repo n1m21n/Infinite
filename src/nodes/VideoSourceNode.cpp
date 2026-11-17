@@ -29,7 +29,7 @@ namespace
    // Frames of drift between the free-running read position and a freshly
    // published one beyond which this is treated as a seek/loop-wrap rather
    // than ordinary playback, and the read position snaps instead of ramping.
-   constexpr double kDiscontinuitySeconds = 0.08;
+   [[maybe_unused]] constexpr double kDiscontinuitySeconds = 0.08;
 }
 
 // ------------------------------------------------------------- audio thread

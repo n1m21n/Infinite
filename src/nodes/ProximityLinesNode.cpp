@@ -356,7 +356,6 @@ void ProximityLinesNode::FindLinks(const float* xyz, size_t count, float radius,
    const unsigned int workers = count >= 20000 ? hw : 1u;
    {
       std::vector<std::thread> pool;
-      const size_t chunk = (count + workers - 1) / workers;
       for (unsigned int w = 1; w < workers; w++)
          pool.emplace_back(reach);
       reach();

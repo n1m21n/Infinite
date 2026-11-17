@@ -3454,7 +3454,7 @@ static bool RunLooperFixture()
    //    the loop, so it plays comp frames earlier than an uncompensated take.
    {
       const int clickAt = 2000;
-      auto clickFeed = [clickAt](int i) { return i == clickAt ? 0.9f : 0.0f; };
+      auto clickFeed = [](int i) { return i == clickAt ? 0.9f : 0.0f; };
       int onset[2] = { -1, -1 };
       const int comps[2] = { 0, 480 };
       for (int k = 0; k < 2; k++)
@@ -3563,7 +3563,7 @@ static bool RunLooperFixture()
       transport.NotifyAudioEngineStarted((double)kSr);
       const int bar = 96000;
       auto n = MakeLooper(MusicTime::k1Bar + 1, true, 0);
-      auto feed = [bar](int i) { return i == bar + 100 ? 0.9f : 0.0f; };
+      auto feed = [](int i) { return i == bar + 100 ? 0.9f : 0.0f; };
       Run(*n, 0, 100 * kBlock, feed, true, &cook);
       Press(*n, LooperNode::kRec);
       Run(*n, 100 * kBlock, 20 * kBlock, feed, true, &cook);
@@ -3595,7 +3595,7 @@ static bool RunLooperFixture()
          transport.Rewind();
          transport.NotifyAudioEngineStarted((double)kSr);
          auto n = MakeLooper(MusicTime::k1Bar + 1, true, 0);
-         auto feed = [bar](int i) { return i == bar + 100 ? 0.9f : 0.0f; };
+         auto feed = [](int i) { return i == bar + 100 ? 0.9f : 0.0f; };
          const int pressAt = k == 0 ? bar + 19 * kBlock : bar + 57 * kBlock; // ~101 ms / ~304 ms late
          Run(*n, 0, pressAt, feed, true, &cook);
          Press(*n, LooperNode::kRec);

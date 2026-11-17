@@ -1410,7 +1410,7 @@ namespace
    }
 
    // One strip-high text line: the text sits on the chips' centre line, not on their top edge.
-   void RowText(const char* fmt, ...) IM_FMTARGS(1);
+   [[maybe_unused]] void RowText(const char* fmt, ...) IM_FMTARGS(1);
    void RowText(const char* fmt, ...)
    {
       char buf[512];

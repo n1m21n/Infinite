@@ -55,7 +55,7 @@ namespace Field
       AstLiteral(double val, SourceSpan sp = {})
          : AstNode(AstKind::Literal, sp), numberValue(val) {}
       AstLiteral(bool b, SourceSpan sp = {})
-         : AstNode(AstKind::Literal, sp), isBool(true), boolValue(b), numberValue(b ? 1.0 : 0.0) {}
+         : AstNode(AstKind::Literal, sp), numberValue(b ? 1.0 : 0.0), isBool(true), boolValue(b) {}
       AstLiteral(std::string s, SourceSpan sp, bool /*stringTag*/)
          : AstNode(AstKind::Literal, sp), isString(true), stringValue(std::move(s)) {}
    };

@@ -139,7 +139,6 @@ void FrameTest_WTDRAGTEST(int frameId, GLFWwindow* window)
                                             wt->engines[1].filterSustain, wt->engines[1].filterRelease);
          const float fbAttackX = fbL.pA.x;
          const float fbTopY = fbL.pA.y;
-         const float fbSeg = fbL.wA;
 
          auto Aim = [](float sx, float sy) { return ImVec2(sx, sy); }; // already screen space
          const float fw = framesA.z - framesA.x;

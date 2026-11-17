@@ -1770,7 +1770,6 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const float inset = tok::radius_control * 2.0f;  // the composer's corner: the tray meets its straight edge
-         const float pad = tok::space_3;                // the composer's own inset
          const ImVec2 t0(at.x + inset, at.y), t1(at.x + width - inset, at.y + QueueHeight());
          dl->AddRectFilled(t0, t1, TextTint(0.04f), tok::radius_control * 2.0f, ImDrawFlags_RoundCornersTop);
          {  // open outline (no bottom edge: the tray sits on the composer)
@@ -3119,7 +3118,6 @@ namespace app
             const std::string count = chat::TokenCount(e.tokens) + " " + T("tokens");
             const float x = at.x + 22.0f + ImGui::CalcTextSize(AgentName(e.agent)).x + 8.0f;
             dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_TextDisabled), count.c_str());
-            const ImVec2 sz = ImGui::CalcTextSize(count.c_str());
          }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 4.0f));
       }
@@ -4308,9 +4306,8 @@ namespace app
          for (int i = 0; i < (int)sThread.entries.size(); i++)
             if (sThread.entries[(size_t)i].kind == Entry::Kind::Change)
                lastChange = i;
-         int agents = 1;
-         for (const auto& [id, s] : sThread.sessions)
-            agents = std::max(agents, (int)sThread.sessions.size());
+         const int agents = std::max(1, (int)sThread.sessions.size());
+         (void)agents;
          for (int i = 0; i < (int)sThread.entries.size(); i++)
          {
             Entry& e = sThread.entries[(size_t)i];
@@ -5535,7 +5532,6 @@ namespace app
       DrawHeader(width);
       ImGui::Dummy(ImVec2(0.0f, tok::space_2));  // air under the header, as in Claude
       const float composerW = std::min(width - 2.0f * tok::space_3, 760.0f);
-      const float fs = ImGui::GetFontSize();
       // The composer's height is known before it draws: the log takes the rest.
       const float composerH = Geom(composerW).totalH;
       const float queueH = QueueHeight();

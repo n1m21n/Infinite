@@ -1458,7 +1458,6 @@ target_include_directories(Infinite PRIVATE
     src src/core src/nodes src/platform src/audio
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
-    ${STB_DIR}
     ${CGLTF_DIR}
     external
     external/json
@@ -1469,6 +1468,7 @@ target_include_directories(Infinite PRIVATE
     external/ndi/include
     src/platform/ndi
 )
+target_include_directories(Infinite SYSTEM PRIVATE ${STB_DIR})
 
 target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib vterm_lib)
 target_link_libraries(Infinite PRIVATE infinite_plugin_ipc)
@@ -2108,4 +2108,24 @@ endif()
 # RIGTEST finds its fixture from the checkout root (__FILE__ can be build-dir relative).
 set_source_files_properties(src/app/selftest/RigTests.cpp PROPERTIES
     COMPILE_DEFINITIONS "INFINITE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+
+if(DEFINED ENV{CI})
+    set(_infinite_werror_default ON)
+else()
+    set(_infinite_werror_default OFF)
+endif()
+option(INFINITE_WERROR "Treat compiler warnings as errors in strict-warning directories" ${_infinite_werror_default})
+if(NOT MSVC)
+    get_target_property(_infinite_srcs Infinite SOURCES)
+    foreach(_src IN LISTS _infinite_srcs)
+        if(_src MATCHES "^src/(app|core|nodes)/.*\\.(cpp|c|mm|m)$")
+            if(INFINITE_WERROR)
+                set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -Wall -Werror)
+            else()
+                set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -Wall)
+            endif()
+        endif()
+    endforeach()
+endif()
+
 

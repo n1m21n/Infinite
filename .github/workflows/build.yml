@@ -121,7 +121,7 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DINFINITE_WERROR=ON
 
       - name: Build
         run: cmake --build build -j3

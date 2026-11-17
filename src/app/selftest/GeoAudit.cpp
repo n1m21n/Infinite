@@ -256,7 +256,7 @@ namespace
       return g.GetMesh();
    }
 
-   std::string ShapeName(int shape) { return GeometryNode::ShapeNames()[(size_t)shape]; }
+   [[maybe_unused]] std::string ShapeName(int shape) { return GeometryNode::ShapeNames()[(size_t)shape]; }
 
    void Report(Flags& f, const char* sec, const std::string& name, const Stats& s, bool expectClosed, bool& ok)
    {
@@ -1348,6 +1348,7 @@ namespace
       const Stats b4 = stats("Bevel cube 0.1 round x4", MeshOps::BevelEdges(cube, 0.1f * (float)edge, 4, 30.0f), true);
       const Stats bw = stats("Bevel cube 0.2 chamfer", MeshOps::BevelEdges(cube, 0.2f * (float)edge, 1, 30.0f), true);
       const Stats bh = stats("Bevel cube 99 (clamped)", MeshOps::BevelEdges(cube, 99.0f, 2, 30.0f), true);
+      (void)bh;
       if (!(b1.volume < base.volume))
          f.Flag("BEVEL", "Bevel cube chamfer", "volume did not shrink", b1.volume - base.volume);
       if (!(bw.volume < b1.volume))

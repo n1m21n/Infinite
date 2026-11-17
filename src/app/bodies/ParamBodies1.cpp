@@ -1832,7 +1832,6 @@ namespace app
       const float btnW = (kMacroWideCell - (count - 1) * gap) / (float)count;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
 
-      const bool isLight = IsThemeLight();
       for (int b = 0; b < count; b++)
       {
          ImGui::SetCursorScreenPos(ImVec2(origin.x + b * (btnW + gap), origin.y));
@@ -1870,7 +1869,6 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
       const int playStep = n->CurrentStep();
 
       for (int s = 0; s < 8; s++)

@@ -30,6 +30,7 @@ namespace LibraryParts
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float padL = tok::space_2 + 16.0f + tok::space_1;   // well edge + magnifier + gap
       const float padR = tok::space_2 + 16.0f;                  // room for the clear button
+      (void)padR;
 
       ImGui::PushID(id);
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padL, (kFieldH - ImGui::GetFontSize()) * 0.5f));

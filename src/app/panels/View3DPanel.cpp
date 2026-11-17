@@ -55,7 +55,6 @@ ImVec2 gView3DRectMin, gView3DRectMax;
 
 namespace
 {
-   constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kPi = 3.14159265f;
    constexpr float kFov = 45.0f;
@@ -322,7 +321,6 @@ namespace
       ed::SetCurrentEditor(gEditor);
       // Only a new selection moves it, so the panel's own scene picker holds while a node stays selected.
       static uint64_t sFollowed = 0;
-      static uint64_t sLastNode = 0;
       uint64_t selected = 0, anyNode = 0;
       for (GraphNode& gn : gNodes)
          if (ed::IsNodeSelected(gn.NodeId()))
@@ -330,7 +328,7 @@ namespace
             anyNode = gn.uid;
             break;
          }
-      sLastNode = anyNode;
+      (void)anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
          {

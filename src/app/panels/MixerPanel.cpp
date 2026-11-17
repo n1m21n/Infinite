@@ -93,18 +93,14 @@ namespace app
       constexpr float kStripW = 92.0f; // control width inside a strip
       constexpr float kStripFaceW = 112.0f; // a strip's full width: wide, fixed, the console scrolls
       constexpr float kStripGap = 4.0f;
-      constexpr float kRenderW = 196.0f;
                   constexpr float kButtonsH = tok::control_h;
       constexpr float kRowGap = 4.0f;
-      constexpr float kStripMaxH = 520.0f;
       constexpr float kMinFaderH = 40.0f;
       constexpr int kMaxGroupDepth = 4;
       constexpr float kSendH = 18.0f;     // §4.2 sends row: four mini knobs between name and trim
       constexpr float kSendKnobD = 13.0f;
-      constexpr float kReturnGap = 14.0f; // returns sit in their own section right of the strips
       constexpr int kInsertRows = 3;      // §4.2 inserts: chips, the last row holds "+"
       constexpr float kInsertRowH = 14.0f;
-      constexpr float kInsertsH = kInsertRows * kInsertRowH + (kInsertRows - 1) * 1.0f;
 
       struct Page { int outIndex; int topIndex; uint64_t topUid; };
 

@@ -69,7 +69,7 @@ namespace Sculpt
 
       uint64_t CellKey(int x, int y, int z)
       {
-         return (uint64_t)(x + (1 << 20)) & 0x1FFFFF | ((uint64_t)(y + (1 << 20)) & 0x1FFFFF) << 21 |
+         return ((uint64_t)(x + (1 << 20)) & 0x1FFFFF) | ((uint64_t)(y + (1 << 20)) & 0x1FFFFF) << 21 |
                 ((uint64_t)(z + (1 << 20)) & 0x1FFFFF) << 42;
       }
       int CellOf(float v, float cell) { return (int)std::floor(v / cell); }

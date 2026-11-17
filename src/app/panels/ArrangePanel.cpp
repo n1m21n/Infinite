@@ -562,15 +562,6 @@ namespace app
    static bool sArrangePendingStartNow = false;
    static bool sArrangeOpenOverwrite = false;
 
-   const Arrange::Tick renderableEnd = ArrangeRenderableEndTick();
-
-   // Is there anything for a timeline *video* source to draw in a
-   // given range? Decides the video source's default and whether
-   // "Timeline clips" is offered at all.
-   auto rangeHasVideoClips = [](Arrange::Tick a, Arrange::Tick b) -> int {
-      return ArrangeRenderVideoClipsInRange(a, b);
-   };
-
    // The range the current settings describe, in ticks.
    auto currentRange = [&](Arrange::Tick& outA, Arrange::Tick& outB) {
       ArrangeRenderResolveRange(rset.renderRangeKind, sArrangeRenderMarkerA, sArrangeRenderMarkerB,
@@ -583,9 +574,6 @@ namespace app
    // -1 means "decide at draw time", which is what makes the default
    // track the monitoring mode instead of freezing whatever it was
    // when the patch was saved ("render what you hear", WP7 #6b).
-   auto effectiveAudioSource = []() -> int {
-      return ArrangeRenderEffectiveAudioSource();
-   };
    auto effectiveVideoSource = [&]() -> int {
       return ArrangeRenderEffectiveVideoSource(rangeA, rangeB);
    };
@@ -1246,7 +1234,6 @@ namespace app
       const float arrangeToolbarTop = ImGui::GetCursorScreenPos().y;
       float arrangeToolbarBottom = arrangeToolbarTop;
       {
-         const bool arrangeToolbarLight = IsThemeLight();
          const ImU32 arrangeIconCol = ImGui::GetColorU32(ImGuiCol_Text);
 
          // Timeline audio mode toggle, pinned top-right of the panel. It owns
@@ -1352,7 +1339,6 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = viewportWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             const float bw = 13.0f, bh = 9.0f;
@@ -1386,7 +1372,6 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_control;
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = arrangeIsPlaying ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             if (arrangeIsPlaying)
                glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), center, iconSize, icol);
@@ -1407,7 +1392,6 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_control;
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = arrangeIconCol;
             glyph::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
@@ -1462,7 +1446,6 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const float iconSize = tok::icon_control;
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             switch (gArrangeTool)
@@ -1541,7 +1524,6 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_control;
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = snapWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawMagnet(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
@@ -1600,7 +1582,6 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_control;
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
@@ -1619,7 +1600,6 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = arrangeIconCol;
             glyph::DrawFlag(ImGui::GetWindowDrawList(), center, tok::icon_control, icol);
          }
@@ -1673,7 +1653,6 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = inspectorWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawEdit(ImGui::GetWindowDrawList(), center, tok::icon_control, icol);
          }
@@ -1748,7 +1727,6 @@ namespace app
       const float kViewportW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : panelSize.x;
       // Clip Settings takes more columns while the timeline keeps at least 420 pt.
       const float kSettingsW = ArrangeClipSettingsWidth(std::max(244.0f, panelSize.x - (showVp ? kViewportW : 0.0f) - 420.0f));
-      const float kViewportH = isWide ? std::max(120.0f, panelSize.y - 40.0f) : 140.0f;
 
       const float kHeaderWidth = 175.0f; // Mix strip (S M pan gain / opacity), name box, drag handle
       const float kMarkerStripH = 14.0f; // marker flags (WP6), above the tick/label strip
@@ -2376,7 +2354,6 @@ namespace app
       // dead space (see the empty-track-region fill below). The loop
       // highlight band and playhead line should reach exactly this far too,
       // not stop dead at the last real lane.
-      const float arrangeFullBottom = std::max(lanesContentBottom, scrollTL.y + avail.y);
       // Reverse lookup: which lane row (if any) a screen Y falls in. Returns
       // -1 past the end, so callers must clamp/guard same as before.
       auto laneRowAt = [&](float y) -> int
@@ -3057,7 +3034,6 @@ namespace app
          const float kMixCtl = 18.0f, kMixGap = 3.0f;
          const float kMixKnobGap = 9.0f; // knob arcs reach past their 18px box
          const float kMixStripW = kMixCtl * 4.0f + kMixGap + 6.0f + kMixKnobGap; // 90px
-         const bool isVideoForName = lane.type == Arrange::kLaneVideo;
 
          const float contentStartX = headerStartX + 4.0f + (float)laneDepth * kGroupIndent;
          const float nameBoxW = std::max(35.0f, rulerStartX - contentStartX - kMixStripW - 6.0f);
