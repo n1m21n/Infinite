@@ -798,7 +798,7 @@ namespace
             break;
          }
       }
-      ImGui::EndChild();
+      EndChildSafe();
 
       return added;
    }
@@ -1228,7 +1228,7 @@ namespace
             s.railFamily = -1;
          ImGui::PopID();
       }
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // ---- inspector: Code and Box
@@ -1329,7 +1329,7 @@ namespace
          }
       }
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // ---- scratch export (§8.10)
@@ -1690,7 +1690,7 @@ namespace
       const float canvasW = std::max(80.0f, avail.x - tok::control_h - inspW - 2.0f * gap);
       ImGui::BeginChild("##fpCanvasWrap", ImVec2(canvasW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawCanvas(*p, h, ImVec2(canvasW, bodyH));
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::Inline(0.0f, gap);
       DrawInspector(*p, h, ImVec2(inspW, bodyH));
       DrawFooter(*p, h);
@@ -1851,7 +1851,7 @@ void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
       grip();
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 }

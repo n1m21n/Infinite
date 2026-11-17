@@ -2341,9 +2341,9 @@ namespace
       sFieldW = std::max(60.0f, ImGui::GetContentRegionAvail().x - FieldLabelW());
       DrawInspector(gn, n);
       SectionCard::EndWindow();
-      ImGui::EndChild();
+      EndChildSafe();
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // The editing controls the header carries after the pages: snap, grid, Draw's thinning, Assign.
@@ -2671,7 +2671,7 @@ namespace
       const float bodyH = std::max(1.0f, avail.y);
       ImGui::BeginChild("##ceRail", ImVec2(kIconW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawToolButtons(false);
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::Inline(0.0f, gap);
       const float sideW = s.sideOpen ? std::min(kSideW, avail.x * 0.4f) : 0.0f;
       const float graphW = std::max(80.0f, avail.x - kIconW - gap - (s.sideOpen ? sideW + gap : 0.0f));
@@ -2762,7 +2762,7 @@ void DrawCurveEditorDocked(const char* id, const ImVec2& size)
    }
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 }

@@ -168,7 +168,7 @@ namespace app
                      ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
       }
       ImGui::GetStyle().ItemSpacing = oldItemSpacing;
-      ImGui::EndChild();
+      EndChildSafe();
       {
          // The section list sits in its own well, the same one the cards use, kPad outside the tiles all round.
          const ImVec2 navMin = ImGui::GetItemRectMin(), navMax = ImGui::GetItemRectMax();
@@ -1943,7 +1943,7 @@ namespace app
       }
 
       SectionCard::EndWindow();
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();

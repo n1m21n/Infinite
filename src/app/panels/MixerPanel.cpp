@@ -1444,7 +1444,7 @@ namespace app
                gMixerStripsMin = wmn;
                gMixerStripsMax = ImVec2(wmn.x + ImGui::GetWindowWidth(), wmn.y + ImGui::GetWindowHeight());
             }
-            ImGui::EndChild();
+            EndChildSafe();
             gMixerPanelStripCount = (int)strips.size();
             const ImVec2 masterAt(bodyMax.x - stripW, bodyMin.y);
             DrawMaster(ImGui::GetWindowDrawList(), masterAt, stripW, colH, page.topIndex);
@@ -2174,7 +2174,7 @@ namespace app
       // Zeroed only around EndChild so no ItemSpacing strip shows between this panel and the next row.
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 

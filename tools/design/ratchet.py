@@ -86,7 +86,15 @@ def main():
     print(f"ratchet: colours {sum(cur_c.values())} (stored {sum(old_c.values())}), raw widgets {sum(cur_w.values())} (stored {sum(old_w.values())}), "
           f"sizes {sum(cur_z.values())} (stored {sum(old_z.values())}), font scales {sum(cur_f.values())} (stored {sum(old_f.values())}), "
           f"roundings {sum(cur_r.values())} (stored {sum(old_r.values())}), popups {sum(cur_p.values())} (stored {sum(old_p.values())})")
-    return 1 if bad or badw or badz or badf or badr or badp or r.returncode else 0
+    # A bare EndChild aborts when the child's last act was a SetCursorPos (crash 2026-11-17): always 0, no baseline.
+    rawend = []
+    for f in sorted((ROOT / "src/app").rglob("*.[ch]*")):
+        for i, line in enumerate(f.read_text(errors="ignore").splitlines(), 1):
+            if "ImGui::EndChild()" in line and "inline void EndChildSafe" not in line and f.name != "AppCommon.h":
+                rawend.append(f"{f.relative_to(ROOT)}:{i}")
+    for x in rawend: print(f"RATCHET: {x} calls ImGui::EndChild(): use EndChildSafe()")
+    print(f"ratchet: raw EndChild {len(rawend)} (allowed 0)")
+    return 1 if bad or badw or badz or badf or badr or badp or rawend or r.returncode else 0
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -77,7 +77,7 @@ int DrawFloating(FrameCtx& fc)
                   ImGui::PopID();
                }
             }
-            ImGui::EndChild();
+            EndChildSafe();
          }
          ImGui::End();
       }

@@ -8042,7 +8042,7 @@ namespace
                if (ImGui::IsItemHovered())
                   hovered = &f;
             }
-         ImGui::EndChild();
+         EndChildSafe();
          MenuParts::Separator();
          std::string added;
          bool add = false;
@@ -8588,7 +8588,7 @@ namespace
          ImGui::OpenPopup("##v2dtoolpick");
       DrawToolPicker();
       ImGui::PopStyleVar();
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // Text centred on the chip row, so labels share the chips' centre line.
@@ -8926,7 +8926,7 @@ namespace
          const ImGuiID before = ImGui::GetItemID();
          DrawContextBar(doc);
          sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
-         ImGui::EndChild();
+         EndChildSafe();
          FormParts::Inline(0.0f, tok::space_1);
          if (TextChip(L("More..##v2dmore"), false, T("The rest of the bar")))
             ImGui::OpenPopup("##v2dbarmore");
@@ -9486,7 +9486,7 @@ namespace
          }
          ImGui::EndDragDropTarget();
       }
-      ImGui::EndChild();
+      EndChildSafe();
       // The strip under the list, as in every layers panel, centred under it.
       const float footW = 9 * sChip + 8 * tok::space_1;
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
@@ -11055,7 +11055,7 @@ namespace
          const float roomH = ImGui::GetContentRegionAvail().y;
          DrawLayersCard(doc, availW, std::max(3.0f * (kRowH + 1.0f), roomH - 4.0f));
          ImGui::PopStyleVar();
-         ImGui::EndChild();
+         EndChildSafe();
       }
       else
       {
@@ -11077,10 +11077,10 @@ namespace
          ImGui::Dummy(ImVec2(0.0f, tok::space_5));   // room under the last card so a scroll never ends on the edge
          ImGui::PopStyleVar(2);
          SectionCard::EndWindow();
-         ImGui::EndChild();
+         EndChildSafe();
       }
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
       sChip = tok::control_h;   // the compact scope is still alive here: back to the regular chip explicitly
       sLabelW = kLabelW;
    }
@@ -14270,7 +14270,7 @@ void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height,
          FormParts::Inline();
       grip();
    }
-   ImGui::EndChild();
+   EndChildSafe();
 }
 
 void DrawView2DDocked(const char* id, const ImVec2& size)

@@ -86,5 +86,5 @@ namespace PanelFrame
       if (gripAbove)
          ImGui::SetCursorPosY(tok::space_1);
    }
-   inline void EndCard() { ImGui::EndChild(); }
+   inline void EndCard() { EndChildSafe(); }
 }

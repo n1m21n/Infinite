@@ -6262,7 +6262,7 @@ namespace
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          sListActive = listHovered;
       if (count > 0)
-         ImGui::EndChild();
+         EndChildSafe();
       if ((listHovered || sListActive) && sRename == 0 && !io.WantTextInput && !sSel.empty())
       {
          const bool command = io.KeyCtrl || io.KeySuper;
@@ -7839,7 +7839,7 @@ namespace
    void EndCardColumn()
    {
       SectionCard::EndWindow();
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    void DrawSide(Scene3DNode* scene, float panelW)
@@ -7912,7 +7912,7 @@ namespace
       else DrawViewTab(scene, availW);
       EndCardColumn();
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    void DrawAddItems(Scene3DNode* scene)

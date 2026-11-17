@@ -694,7 +694,7 @@ namespace app
          ImGui::PopID();
          }
       }
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::PopStyleVar();
 
       ImGui::PopID();
@@ -1143,7 +1143,7 @@ namespace app
 
          ImGui::PopID();
       }
-      ImGui::EndChild();
+      EndChildSafe();
 
       ImGui::PopID();
    }
@@ -1345,7 +1345,7 @@ namespace app
          }
       }
 
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::PopID();
    }
 }

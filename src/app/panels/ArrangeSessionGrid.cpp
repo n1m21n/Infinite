@@ -1068,7 +1068,7 @@ namespace app
       ImGui::Dummy(ImVec2(gridW, footerTop + kFooterH - o.y));
       (void)mouse;
       (void)gridHovered;
-      ImGui::EndChild();
+      EndChildSafe();
       // A browser drop that missed every cell is done with either way.
       gArrangePendingBrowserDrop.pending = false;
    }
@@ -1519,7 +1519,7 @@ namespace app
                dl->AddImage((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
          }
          ImGui::Dummy(avail);
-         ImGui::EndChild();
+         EndChildSafe();
       }
 
       // ---- keyboard: the Session panel's shortcuts, live only while it owns the keys (a click inside it claims
@@ -1949,7 +1949,7 @@ namespace app
          grip();
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 }

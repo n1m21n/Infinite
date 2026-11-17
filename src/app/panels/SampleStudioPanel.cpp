@@ -2774,7 +2774,7 @@ namespace
 
       SectionCard::EndWindow();
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // ---- the toolbar ----
@@ -3526,7 +3526,7 @@ void DrawSampleStudioDocked(const char* id, const ImVec2& size)
       grip();
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 }

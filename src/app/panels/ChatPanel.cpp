@@ -4414,7 +4414,7 @@ namespace app
             ImGui::SetScrollHereY(1.0f);
             sScrollToEnd = false;
          }
-         ImGui::EndChild();
+         EndChildSafe();
       }
 
       // The tint behind each exact name in the composer: a node in its colour, a param on a quiet well, an
@@ -5208,7 +5208,7 @@ namespace app
                OpenThread(t.path);
             ImGui::PopID();
          }
-         ImGui::EndChild();
+         EndChildSafe();
          if (!removeId.empty())
          {
             chat::DeleteThread(ChatsDir(), removeId);
@@ -5286,7 +5286,7 @@ namespace app
             }
          clip.End();
          ImGui::PopFont();
-         ImGui::EndChild();
+         EndChildSafe();
       }
 
       void DrawHeader(float width)
@@ -5488,11 +5488,11 @@ namespace app
          ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + all.x, origin.y + all.y), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
          ImGui::BeginChild("##chatrail", ImVec2(railW, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
          DrawRail(railW, all.y);
-         ImGui::EndChild();
+         EndChildSafe();
          FormParts::Inline(0.0f, 0.0f);
          ImGui::BeginChild("##chatmain", ImVec2(0.0f, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawChatWithCode();
-         ImGui::EndChild();
+         EndChildSafe();
          return;
       }
       DrawChatWithCode();
@@ -5517,11 +5517,11 @@ namespace app
       const ImGuiWindowFlags flags = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
       ImGui::BeginChild("##chatleft", ImVec2(avail.x - codeW - gap, avail.y), false, flags);
       DrawChatBody();
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::Inline(0.0f, gap);
       ImGui::BeginChild("##coderight", ImVec2(codeW, avail.y), false, flags);
       DrawCodePane(codeW, avail.y);
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    void DrawChatBody()

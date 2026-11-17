@@ -2436,7 +2436,7 @@ namespace app
       {
          ImGui::Dummy(ImVec2(maxElemX, maxElemY));
       }
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
 
@@ -2526,7 +2526,7 @@ namespace app
       // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
 
       // No divider line along the canvas-facing edge, in either theme. This

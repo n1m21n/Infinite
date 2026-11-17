@@ -1246,7 +1246,7 @@ namespace app
 
       SectionCard::EndWindow();
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
 

@@ -952,11 +952,11 @@ namespace
          DrawDockMenu(false, nullptr, true);
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
             gTerminalFocus = false;
-         ImGui::EndChild();
+         EndChildSafe();
          FormParts::Inline(0.0f, gap);
          ImGui::BeginChild("##shellside", ImVec2(0.0f, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawTerminalBody();
-         ImGui::EndChild();
+         EndChildSafe();
          return;
       }
       DrawTerminalBody();
@@ -1162,7 +1162,7 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    }
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 

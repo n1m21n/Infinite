@@ -373,7 +373,7 @@ namespace PagePicker
             }
             MenuParts::EndPopup();
          }
-         ImGui::EndChild();
+         EndChildSafe();
       }
       {
          if (!pages.empty())

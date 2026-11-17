@@ -386,7 +386,7 @@ namespace app
       }
 
       ImGui::Dummy(imageSize);
-      ImGui::EndChild();
+      EndChildSafe();
       PopDockedPanelStyle();
 
       if (closeRequested)
@@ -467,7 +467,7 @@ namespace app
          EmptyState::DrawInWindow(T("No active viewport cards"), T("Select nodes & press Shift+V or right-click to add"));
       }
 
-      ImGui::EndChild();
+      EndChildSafe();
 
       // Right-click anywhere on the panel - empty space or a card - to
       // reposition or close it. Replaces the dock-combo/close-button header
@@ -609,7 +609,7 @@ namespace app
       // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
 
       // No divider line along the canvas-facing edge, in either theme. This

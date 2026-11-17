@@ -1347,7 +1347,7 @@ namespace app
          SectionCard::S().desk = false;
          ImGui::PopStyleColor(2);
          compact.End(); // before the child closes: the pushes were made inside it
-         ImGui::EndChild();
+         EndChildSafe();
       }
 
       void DrawEmpty(ImVec2 mn, ImVec2 mx)
@@ -1475,7 +1475,7 @@ namespace app
          grip();
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 }

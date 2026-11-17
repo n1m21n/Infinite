@@ -1834,7 +1834,7 @@ namespace app
          if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
             sViewportCtxRequest = true;
 
-         ImGui::EndChild();
+         EndChildSafe();
       };
 
       if (showVp && !gArrangeViewportOnRight)
@@ -4416,7 +4416,7 @@ namespace app
       ImGui::SetCursorScreenPos(scrollTL);
       ImGui::Dummy(ImVec2(avail.x, totalH));
 
-      ImGui::EndChild();
+      EndChildSafe();
 
       // "Rendering - timeline locked" (WP7). The click-catcher the progress
       // dialog puts across the viewport already stops every mouse gesture in
@@ -4525,7 +4525,7 @@ namespace app
       // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 }

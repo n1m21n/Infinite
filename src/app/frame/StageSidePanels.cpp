@@ -634,7 +634,7 @@ void DrawSidePanels(FrameCtx& fc)
                   }
                }
             }
-            ImGui::EndChild();
+            EndChildSafe();
 
             if (!spawnName.empty())
             {
@@ -677,7 +677,7 @@ void DrawSidePanels(FrameCtx& fc)
          // above every kind of bottom-docked panel regardless of which one -
          // it never had anything to do with the bottom panel at all.
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-         ImGui::EndChild();
+         EndChildSafe();
          ImGui::PopStyleVar();
       }
 

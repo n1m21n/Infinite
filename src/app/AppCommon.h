@@ -78,6 +78,17 @@
    #define MODKEY "Ctrl"
 #endif
 
+// Every child window ends here, never with a bare ImGui::EndChild (ratchet "raw EndChild" = 0). If the last thing
+// drawn moved the cursor with SetCursorPos and drew nothing after, ImGui aborts on EndChild ("submit an item e.g.
+// Dummy()"): that crashed the Timeline and Sample Studio inspectors. The empty item commits the move; otherwise
+// nothing changes.
+inline void EndChildSafe()
+{
+   if (ImGui::GetCurrentWindow()->DC.IsSetPos)
+      ImGui::Dummy(ImVec2(0.0f, 0.0f));
+   ImGui::EndChild();
+}
+
 // Test fixtures live in the OS temp directory; /tmp was hardcoded before
 // the Windows port.
 inline std::string TmpPath(const std::string& name)

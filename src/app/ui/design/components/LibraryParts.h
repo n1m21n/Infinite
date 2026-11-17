@@ -353,5 +353,5 @@ namespace LibraryParts
       ImGui::PopStyleVar();
       ImGui::PopStyleColor();
    }
-   inline void EndWell() { ImGui::EndChild(); }
+   inline void EndWell() { EndChildSafe(); }
 }
