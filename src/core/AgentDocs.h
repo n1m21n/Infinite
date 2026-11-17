@@ -217,7 +217,7 @@ Try: import a character model and spin it live using a rotation modulated by an 
 Chain: Model 3D -> Material -> Render 3D
 
 ### Material
-3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, iridescence, and can take up to eight image inputs to paint any of those channels from a texture.
+3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, and iridescence: a thin-film colour shift, like a soap bubble or oil slick, set by IOR and film thickness in nanometres. The path tracer ignores iridescence. It can take up to eight image inputs to paint any of those channels from a texture.
 Try: feed a Noise texture into the roughness map input to give a single flat color a hand-worn, uneven sheen.
 Chain: Cube -> Material -> Render 3D
 
@@ -303,9 +303,9 @@ Chain: Icosphere -> Resynthesize 3D -> Render 3D
 Physics, the camera, the lights, and the render pass that turns geometry into a picture.
 
 ### Ocean Surface
-3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm.
 )AGENTDOC"
-R"AGENTDOC(Try: drive wave amplitude straight from your track's bass so the sea swells with the low end.
+R"AGENTDOC(3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm.
+Try: drive wave amplitude straight from your track's bass so the sea swells with the low end.
 Chain: Audio Analyze (Bass) -> Ocean (Amplitude) -> Render 3D
 
 ### Cloth Simulation
@@ -349,7 +349,7 @@ Try: route a vocal track in and place several ribbons at different rotations to 
 Chain: Audio In -> Audio Ribbon -> Render 3D
 
 ### Render 3D
-3D · IMAGE OUT. The camera and lighting engine that turns every 3D node into a real picture, physically-based Cook-Torrance/GGX materials, ACES tonemapping, and MSAA antialiasing, all live, with up to 4 geometry inputs plus camera, light, and HDRI. This is where the green Geometry cables turn back into a peach Image cable.
+3D · IMAGE OUT. The camera and lighting engine that turns every 3D node into a real picture, physically-based Cook-Torrance/GGX materials, ACES tonemapping, and MSAA antialiasing, all live, with up to 4 geometry inputs plus camera, light, and HDRI. This is where the green Geometry cables turn back into a peach Image cable. The path trace engine denoises its picture as it settles, with no setting of its own.
 Try: plug in geometry, a material, a light, and an HDRI, then send the result straight into Bloom.
 Chain: Geometry + Material + Light + HDRI -> Render 3D -> Bloom
 
@@ -446,13 +446,13 @@ Chain: Melody Synth -> Delay (1/8 Dotted) -> Audio Out
 
 ### Reverb
 AUDIOEFFECTS · IN/OUT. An algorithmic reverb with room size, decay time, damping, pre-delay, and stereo width, a wash big enough to sound like a cathedral, or small enough to feel like a tiled room.
-Try: stack Reverb after Delay for echoes that themselves bloom into space.
+)AGENTDOC"
+R"AGENTDOC(Try: stack Reverb after Delay for echoes that themselves bloom into space.
 Chain: Delay -> Reverb (Cathedral) -> Audio Out
 
 ### Drive
 AUDIOEFFECTS · IN/OUT. Warm analog-style tube-and-transistor saturation with drive, bias, tone, and color controls, a gentle glow at low settings, real grit when you push it.
-)AGENTDOC"
-R"AGENTDOC(Try: hit a drum mix with a few dB of Drive for extra punch and glue.
+Try: hit a drum mix with a few dB of Drive for extra punch and glue.
 Chain: Drum Mix -> Drive -> Audio Out
 
 ### Bitcrush
@@ -605,10 +605,10 @@ Try: set a narrow pitch range with a small max step for a meandering, ambient me
 Chain: Random Note Generator -> Wavetable Synth
 
 ### Note Stack
-NOTES · IN/OUT. Layers up to 8 extra transposed copies on top of every note that passes through, with the original note always passing through underneath. Each voice has its own semitone offset and on/off switch.
-Try: enable the +12 and +7 voice offsets to turn single played notes into instant octave-and-fifth power chords.
 )AGENTDOC"
-R"AGENTDOC(Chain: MIDI Notes -> Note Stack -> Wavetable Synth
+R"AGENTDOC(NOTES · IN/OUT. Layers up to 8 extra transposed copies on top of every note that passes through, with the original note always passing through underneath. Each voice has its own semitone offset and on/off switch.
+Try: enable the +12 and +7 voice offsets to turn single played notes into instant octave-and-fifth power chords.
+Chain: MIDI Notes -> Note Stack -> Wavetable Synth
 
 ### Note Capturer
 NOTES · IN/OUT. Records whatever note stream feeds it, with tempo-relative timing so it stays in sync even if the BPM changes, then loops that recording back on top of the live input, which always keeps passing through.
@@ -775,13 +775,13 @@ Try: sample 8 points off a spinning Torus and drive 8 separate effect params str
 Chain: Torus -> Geometry Table -> (8x Mod Depth)
 
 ### Vibrato
-MODULATORS · OUT. A simple free-running sine LFO with one control, rate in Hz, meant as a substitute for true per-note vibrato, since note events have no continuous pitch channel of their own.
+)AGENTDOC"
+R"AGENTDOC(MODULATORS · OUT. A simple free-running sine LFO with one control, rate in Hz, meant as a substitute for true per-note vibrato, since note events have no continuous pitch channel of their own.
 Try: patch it into an oscillator's fine-tune modulation input for a subtle, continuous pitch wobble.
 Chain: Vibrato -> Oscillator Fine-Tune
 
 ### Envelope
-)AGENTDOC"
-R"AGENTDOC(MODULATORS · OUT. Applies a classic ADSR contour to a continuous modulation signal rather than a note trigger, the "gate" is derived from the input crossing a threshold rather than a note-on/off.
+MODULATORS · OUT. Applies a classic ADSR contour to a continuous modulation signal rather than a note trigger, the "gate" is derived from the input crossing a threshold rather than a note-on/off.
 Try: feed a slow LFO in to get a rhythmic swell-and-release pulse instead of a raw sine wave.
 Chain: LFO -> Envelope -> Mod Depth
 
@@ -929,13 +929,13 @@ Chain: Video -> Luma Key -> Alpha Invert -> Output
 
 ### Alpha from Luma
 COMPOSITING · IN/OUT. Builds a new alpha channel from the picture's own brightness, so a black background becomes see-through with nothing to key against. Invert flips which end is solid, for a white-on-black source.
-Try: run fire or smoke footage through it to lift the flames off their black backdrop.
+)AGENTDOC"
+R"AGENTDOC(Try: run fire or smoke footage through it to lift the flames off their black backdrop.
 Chain: Video -> Alpha from Luma -> Blend
 
 ### Alpha Levels
 COMPOSITING · IN/OUT. The Levels remap, applied to the alpha channel only. Low and High clamp and stretch the matte's range (choking a soft edge tighter, or spreading it wider) and Gamma bends the falloff in between. The go-to cleanup pass after Chroma Key or Alpha from Luma.
-)AGENTDOC"
-R"AGENTDOC(Try: raise Low a touch after a key to remove the faint haze left around a subject.
+Try: raise Low a touch after a key to remove the faint haze left around a subject.
 Chain: Chroma Key -> Alpha Levels -> Output
 
 ### Premultiply
@@ -1110,9 +1110,9 @@ Try: record a one-bar drum pattern, then Dub a bassline on top of it.
 Chain: Audio File -> Looper -> Audio Out
 
 ### MPC
-SYNTHS · AUDIO OUT. A 16-pad sample player in the spirit of an MPC. Each pad holds one sample and one play mode: One shot plays the whole sample, Gate plays while the pad is held, and Loop toggles a looping playback on and off. Hit pads with the mouse, with a MIDI controller, or with notes 36 to 51 on the note input, the usual pad-controller layout. Every pad is its own voice with its own volume, pitch, pan, speed, fine tune and fades, and a pad can be Synced to a musical division so a hit waits for the next grid line. All pads mix to one stereo output.
 )AGENTDOC"
-R"AGENTDOC(Try: load a kick, snare and hat on three pads and play them from a MIDI pad controller through a MIDI Notes node.
+R"AGENTDOC(SYNTHS · AUDIO OUT. A 16-pad sample player in the spirit of an MPC. Each pad holds one sample and one play mode: One shot plays the whole sample, Gate plays while the pad is held, and Loop toggles a looping playback on and off. Hit pads with the mouse, with a MIDI controller, or with notes 36 to 51 on the note input, the usual pad-controller layout. Every pad is its own voice with its own volume, pitch, pan, speed, fine tune and fades, and a pad can be Synced to a musical division so a hit waits for the next grid line. All pads mix to one stereo output.
+Try: load a kick, snare and hat on three pads and play them from a MIDI pad controller through a MIDI Notes node.
 Chain: MIDI Notes -> MPC -> Audio Out
 
 ### Resonator Bank
@@ -1252,7 +1252,8 @@ Try: set three levels with an 8x8 matrix for a retro print look.
 Chain: Video -> Dither -> Output
 
 ### NDI In
-UTILITY · IMAGE OUT. Receives any NDI video source on the network as an image. Pick it from the list, which rescans in the background. Video only. Needs the free NDI runtime from ndi.video.
+)AGENTDOC"
+R"AGENTDOC(UTILITY · IMAGE OUT. Receives any NDI video source on the network as an image. Pick it from the list, which rescans in the background. Video only. Needs the free NDI runtime from ndi.video.
 Try: pull a second computer's screen in and feed it through effects.
 Chain: NDI In -> Bloom -> Output
 
@@ -1262,8 +1263,7 @@ Try: send your finished patch to OBS with no capture card.
 Chain: Video -> NDI Out
 
 ## New Instruments, Effects & Modulators
-)AGENTDOC"
-R"AGENTDOC(The sound side of v0.6: four new synths, a designed-room reverb, a three-stage saturator, spectral tools, and modulators that give every note its own value.
+The sound side of v0.6: four new synths, a designed-room reverb, a three-stage saturator, spectral tools, and modulators that give every note its own value.
 
 ### FM
 AUDIO · SYNTH. A 4-operator FM synth: four sine operators wired by one of 11 algorithms, from a 4>3>2>1 stack to four carriers side by side. Each operator follows the note at a ratio or sits at a fixed frequency, and has its own level and envelope. Feedback lets operator 4 modulate itself, from a brighter sine to a buzz.
@@ -1409,7 +1409,8 @@ Try: project a Cylinder map onto a vase so the pattern wraps around it.
 Chain: Sphere -> UV Project -> Render 3D
 
 ### Bevel
-3D · GEOMETRY OUT. Rounds or chamfers every sharp edge above the sharp angle. Width is the bevel size; one segment gives a flat chamfer and more give a smooth round.
+)AGENTDOC"
+R"AGENTDOC(3D · GEOMETRY OUT. Rounds or chamfers every sharp edge above the sharp angle. Width is the bevel size; one segment gives a flat chamfer and more give a smooth round.
 Try: bevel a box so its edges catch highlights.
 Chain: Cube -> Bevel -> Render 3D
 
@@ -1421,8 +1422,7 @@ Chain: Sphere -> Extrude -> Render 3D
 ### Twist
 3D · GEOMETRY OUT. Twists the mesh around a chosen axis by Angle: the further a point is along the axis, the more it rotates.
 Try: animate Angle with an LFO to wring a tall box like a towel.
-)AGENTDOC"
-R"AGENTDOC(Chain: Cube -> Twist -> Render 3D
+Chain: Cube -> Twist -> Render 3D
 
 ### Cone
 3D · GEOMETRY OUT. A cone. Sides sets how many-sided it is.
