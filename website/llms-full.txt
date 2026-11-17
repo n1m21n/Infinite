@@ -82,7 +82,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 ### Infinite VST3 & AU Plugin (Run inside any DAW)
 
 - [Infinite Plugin Overview](https://infinitedevices.org/plugin.html) | [Buy / Pre-order](https://infinitedevices.org/buy.html)
-- Formats: 64-bit VST3 and Audio Unit (AUv2), macOS first (Apple Silicon & Intel Universal), Windows and Linux to follow.
+- Formats: 64-bit VST3 and Audio Unit (AUv2), macOS (Apple Silicon & Intel Universal), Windows (x64) and Linux (x86_64).
 - Hosts: Ableton Live, Logic Pro, FL Studio, Reaper, Bitwig Studio, Cubase, Studio One.
 - Pricing: One-time perpetual purchase of $149 ($99 launch price). Zero subscriptions.
 - Licensing: Offline Ed25519 cryptographic licence key (`.inflic`), valid on 2 computers simultaneously, works 100% offline with no account login or phoning home. Free updates for all 1.x releases.

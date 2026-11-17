@@ -340,6 +340,9 @@ def pdf_pages():
 
 
 def build():
+    # Safety: without a binary every validate() fails and the patch loop below deletes every .inf. Refuse first.
+    if not os.path.exists(BIN):
+        sys.exit("gen_nodes: no binary at %s; refusing to run (it would delete the patches). Pass a built app." % BIN)
     refresh = "--refresh" in sys.argv
     if refresh or not os.path.exists(os.path.join(DATA, "pdf_cards.json")):
         refresh_pdf_cards()
