@@ -1,5 +1,32 @@
 [
  {
+  "slug": "2d-view-non-destructive-layer-compositing-in-infinite",
+  "title": "Non-destructive 2D layer compositing in Infinite",
+  "description": "How Infinite's 2D View combines non-destructive 2D layer compositing with live node outputs, 36 blend modes, 28 adjustment layers, and PSD/ORA export.",
+  "date": "2026-11-17",
+  "updated": "2026-11-17",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/2d-view-non-destructive-layer-compositing-in-infinite.html"
+ },
+ {
+  "slug": "3d-view-blender-keymap-scene-composition-in-infinite",
+  "title": "Blender keymap 3D scene composition in Infinite's 3D View",
+  "description": "Use the Blender keymap 3D scene composition workflow in Infinite's 3D View with 6 light types, Principled BSDF materials, HDRI worlds, and Metal path tracing.",
+  "date": "2026-11-17",
+  "updated": "2026-11-17",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/3d-view-blender-keymap-scene-composition-in-infinite.html"
+ },
+ {
+  "slug": "field-patcher-visual-box-and-wire-dsp-shader-editor",
+  "title": "Field Patcher: a visual DSP and shader patcher for Field",
+  "description": "Field Patcher is a docked visual DSP and shader patcher in Infinite, keeping boxes, wires, and Field code in two-way sync for audio, shaders, 3D, and notes.",
+  "date": "2026-11-17",
+  "updated": "2026-11-17",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/field-patcher-visual-box-and-wire-dsp-shader-editor.html"
+ },
+ {
   "slug": "binaural-hrtf-spatial-audio-mixer-dsp",
   "title": "Binaural HRTF spatial audio and head tracking in real-time DSP",
   "description": "How Infinite's Spatial Mixer renders 12 3D audio objects on the audio thread with MIT KEMAR HRTF convolution, Woodworth ITD, head tracking, and BS.1770-4 metering.",
@@ -38,7 +65,7 @@
  {
   "slug": "modal-synthesis-and-physical-modelling-of-metallic-percussion",
   "title": "Modal synthesis and metallic percussion in real time",
-  "description": "How real-time modal synthesis models metallic percussion: mallet strike exciters, banks of inharmonic second-order resonators, dispersive waveguides, and Chladni plates.",
+  "description": "How real-time modal synthesis models metallic percussion: mallet strike exciters, inharmonic second-order resonators, waveguides, and Chladni plates.",
   "date": "2026-11-12",
   "updated": "2026-11-12",
   "category": "creative",
@@ -74,7 +101,7 @@
  {
   "slug": "audio-reactive-particle-systems-in-real-time",
   "title": "Audio-reactive 3D particle systems in real time",
-  "description": "How to build audio-reactive 3D particle systems: Euler physics, turbulent 3D noise force fields, spectral transient triggers, and GPU point rendering on a modular canvas.",
+  "description": "How to build audio-reactive 3D particle systems: Euler physics, 3D noise force fields, transient triggers, and GPU point rendering on a modular canvas.",
   "date": "2026-11-07",
   "updated": "2026-11-07",
   "category": "creative",

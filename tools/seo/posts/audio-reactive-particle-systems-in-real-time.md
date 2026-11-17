@@ -1,7 +1,7 @@
 ---
 title: Audio-reactive 3D particle systems in real time
 seo_title: Audio-Reactive 3D Particle Systems in Real Time | Infinite
-description: How to build audio-reactive 3D particle systems: Euler physics, turbulent 3D noise force fields, spectral transient triggers, and GPU point rendering on a modular canvas.
+description: How to build audio-reactive 3D particle systems: Euler physics, 3D noise force fields, transient triggers, and GPU point rendering on a modular canvas.
 date: 2026-11-07
 category: creative
 tags: [particles, creative coding, audio-reactive, visuals, 3d]
