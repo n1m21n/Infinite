@@ -163,7 +163,7 @@ The Scripting Node UI adheres directly to the rules in `docs/CODE_STANDARDS.md`:
    - **Note Pin (Yellow/Cyan)**: Connects to Note Sequencers, Wavetable synths, AU/VST3 hosted plugins (`INoteSource`).
    - **Modulation / CV Pins**: Connects to LFOs, Envelopes, and Math modulators.
 3. **Patch Serialization & Save/Load (`ParamVisitor`)**:
-   - Serializes script text (or external file path) and all dynamic parameter values cleanly into the `.infinite` patch file format.
+   - Serializes script text (or external file path) and all dynamic parameter values cleanly into the `.inf` patch file format.
 
 ---
 

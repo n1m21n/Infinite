@@ -378,14 +378,14 @@ namespace Platform
       ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
-         "*.infinite", "*.inf"
+         "*.inf", "*.infinite"
       };
       const char* res = tinyfd_openFileDialog(
          "Open Patch",
          "",
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
-         "Infinite patches (*.infinite, *.inf)",
+         "Infinite patches (*.inf, *.infinite)",
          0
       );
       return res ? std::string(res) : std::string();
@@ -397,20 +397,20 @@ namespace Platform
       ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
-         "*.infinite"
+         "*.inf"
       };
-      std::string defaultPath = suggestedName.empty() ? "Untitled.infinite" : suggestedName;
-      defaultPath = AppendExtensionIfMissing(defaultPath, ".infinite");
+      std::string defaultPath = suggestedName.empty() ? "Untitled.inf" : suggestedName;
+      defaultPath = AppendExtensionIfMissing(defaultPath, ".inf");
 
       const char* res = tinyfd_saveFileDialog(
          "Save Patch",
          defaultPath.c_str(),
          1,
          filterPatterns,
-         "Infinite patch (*.infinite)"
+         "Infinite patch (*.inf)"
       );
       if (!res) return "";
-      return AppendExtensionIfMissing(std::string(res), ".infinite");
+      return AppendExtensionIfMissing(std::string(res), ".inf");
    }
 
    std::string OpenDeviceDialog()
