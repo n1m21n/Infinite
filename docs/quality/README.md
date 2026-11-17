@@ -99,6 +99,14 @@ python3 tools/quality/quality.py board
 
 Record (`ingest`) after a fix, a new competitor run or a release, not after every run.
 
+## Design lints that read a generated registry (not QUALITY rows)
+
+`tools/design/density_lint.py` (panel row pitch, controls per row, control height) is not a quality row
+producer and does not feed `registry.tsv`. Its input, `ui-audit-view2d/registry.json`, is written by
+`tools/ui-audit/run.py --view2d`, which runs the debug app (`scripts/ibuild.py build --mode dev`) and
+is not committed. Without that file the lint exits 2 and prints the command to make it. Do not
+hand-write the registry: its rows are the app's own control boxes.
+
 ## Rollout
 
 | Step | Area | State |
