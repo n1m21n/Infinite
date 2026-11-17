@@ -12074,5 +12074,15 @@
    "width": 4238
   }
  },
- "version": "2.0.0"
+ "version": "2.0.0",
+ "exceptions": {
+  "3D/Intersect": "Red error outline with both inputs wired (sphere and cube feeds). Also red when unwired. Kept as honest state; see docs/release/known-issues-2.0.md.",
+  "3D/Union": "Same as Intersect: red outline wired and unwired. See known-issues.",
+  "3D/Difference": "Red outline on the open state with two wired inputs. See known-issues.",
+  "3D/Instance on Points": "Red outline on the open state (closed also flagged in one run). See known-issues."
+ },
+ "captions": {
+  "node/Source/Video In/c": "The warning chip shows until camera permission is granted; this is the first-run state.",
+  "node/Source/Video In/o": "The warning chip shows until camera permission is granted; this is the first-run state."
+ }
 }
