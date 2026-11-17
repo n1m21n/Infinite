@@ -948,7 +948,6 @@
   <url><loc>https://infinitedevices.org/nodes/decimate.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/delaunay-mesh.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/delay.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/nodes/delete-selected.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/delete.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/depth-projection.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/difference.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
@@ -976,13 +975,11 @@
   <url><loc>https://infinitedevices.org/nodes/equation-synth.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/explode.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/exposure.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/nodes/extrude-selected.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/extrude.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/face-track.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/feedback-3d.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/feedback.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-effect.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/nodes/field-graph.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-modifier.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-modulator.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-notes.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
@@ -1011,7 +1008,6 @@
   <url><loc>https://infinitedevices.org/nodes/grain-molder.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/granular.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/group-3d.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/nodes/group.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/halftone.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/hand-track.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/hdri.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
@@ -1234,7 +1230,6 @@
   <url><loc>https://infinitedevices.org/nodes/torus.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/trails.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/transform-3d.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
-  <url><loc>https://infinitedevices.org/nodes/transform-selected.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/transform.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/transient-shaper.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/tremolo.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>

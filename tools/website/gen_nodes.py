@@ -396,6 +396,22 @@ def build():
     open(os.path.join(W, "nodes", "index.html"), "w", encoding="utf-8").write(index_page(items))
     json.dump({"nodes": {it["name"]: {"s": it["slug"], "d": first_sentence(it["desc"]) if len(it["desc"]) > 220 else it["desc"], "p": bool(it["patch"])} for it in items}},
               open(os.path.join(W, "assets/nodes/index.json"), "w"), ensure_ascii=False, separators=(",", ":"))
+    # Orphans: files left by a node that was removed from the list (their pages, patches and pictures would otherwise stay).
+    slugs = {it["slug"] for it in items}
+    shots_kept = {it["shot"][0] for it in items if it.get("shot")}
+    for d, keep in ((os.path.join(W, "nodes"), lambda f: f == "index.html" or f[:-5] in slugs and f.endswith(".html")),
+                    (os.path.join(W, "assets/nodes/patches"), lambda f: f[:-4] in slugs and f.endswith(".inf")),
+                    (os.path.join(W, "assets/nodes/hd"), lambda f: f in shots_kept),
+                    (os.path.join(W, "assets/nodes/ring"), lambda f: f in shots_kept)):
+        for f in os.listdir(d):
+            if not keep(f):
+                os.remove(os.path.join(d, f)); print("  removed orphan", os.path.relpath(os.path.join(d, f), W))
+    # The homepage count is the number of node pages, so it cannot drift from the list.
+    ip = os.path.join(W, "index.html")
+    h = open(ip, encoding="utf-8").read()
+    h2 = re.sub(r'<b id="node-count">\d+</b>', '<b id="node-count">%d</b>' % len(items), h)
+    if h2 != h:
+        open(ip, "w", encoding="utf-8").write(h2)
     print("%d node pages; %d with a Field Guide card; %d patches validated; %d without a patch" % (len(items), sum(i["guide"] for i in items), sum(bool(i["patch"]) for i in items), len(bad)))
     for n, w in bad: print("  no patch:", n, "-", w)
     return items
