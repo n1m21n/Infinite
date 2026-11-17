@@ -26,7 +26,7 @@ PAGES = {
 <h2>Your license</h2>
 <ul>
 <li>One purchase gives you a personal, non-exclusive, perpetual license for the plugin on up to 2 computers you own or use.</li>
-<li>It includes every update within the major version you bought (1.x for a 1.x purchase). A later major version may be sold separately.</li>
+<li>It includes every update for the lifetime of the product, including all future major versions, at no extra charge.</li>
 <li>Music, video and other work you make with Infinite belongs to you. You may release it commercially.</li>
 <li>Do not share, publish or resell your license key or license file.</li>
 </ul>

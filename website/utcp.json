@@ -23,7 +23,7 @@
       "launch_price": 99.00,
       "launch_code": "LAUNCH99",
       "currency": "USD",
-      "license": "Perpetual commercial license, offline Ed25519 key, 2 computers, all 2.x updates included",
+      "license": "Perpetual commercial license, offline Ed25519 key, 2 computers, free lifetime updates for every version included",
       "platforms": ["macOS (Apple Silicon & Intel)", "Windows (x64)", "Linux (x86_64)"],
       "url": "https://infinitedevices.org/plugin.html",
       "buy_url": "https://infinitedevices.org/buy.html"
