@@ -2934,3 +2934,768 @@ Zoom around the pointer, or pan; middle-drag also pans	以指针为中心缩放�
 Zoom the value axis around the pointer	以指针为中心缩放数值轴
 param 	参数 
 trig input	trig 输入
+%+.1f dB	=en
+%.1f s %s	=en
+%d x %d, %d layers	%d x %d，%d 层
+%d x %d, F12	=en
+%s %+.1f dB	=en
+%s %d  %+.1f dB  %s	=en
+%s %d: %s\n%s	=en
+(loop)	(循环)
+(whole)	(整段)
+-inf dB	=en
+10% to 100%	10% 至 100%
+2D View	2D 视图
+2D View - lay out node outputs as layers and render a picture (Shift+2)	2D 视图 - 将节点输出排列为图层并渲染图片 (Shift+2)
+2D View Panel	2D 视图面板
+3D	=en
+API key	API 密钥
+Above	上方
+Absolute	绝对
+Accent / Erase	重音 / 擦除
+Accumulation	累积
+Actual Pixels	实际像素
+Actual pixels (Ctrl+1)	实际像素 (Ctrl+1)
+Add Box	添加方框
+Add Layer Mask	添加图层蒙版
+Add Node as Layer	将节点添加为图层
+Add Vector Mask	添加矢量蒙版
+Add a layer mask (from the selection when there is one)	添加图层蒙版（有选区时从选区生成）
+Add a node from the canvas as a layer	将画布中的节点添加为图层
+Add an outlet to make a node	添加一个输出端以创建节点
+Add another	再添加一个
+Add effect	添加效果
+Add font	添加字体
+Add font...	添加字体...
+Add insert	添加插入效果
+Add to 2D View	添加到 2D 视图
+Add to Canvas	添加到画布
+Adjustment	调整
+Adjustments	调整
+Aligned	对齐
+All fonts	所有字体
+All four sends are in use	四个发送全部在用
+All lanes	所有轨道
+All layers	所有图层
+All pages	所有页面
+All pages writes one file: every page summed.	「所有页面」写入一个文件：所有页面相加。
+All styles are on	所有样式已开启
+Alpha	透明度
+Alt-click to set the source	Alt-点击设置源
+Alt-click toggles an accent (full velocity); right-drag erases steps	Alt-点击切换重音（最大力度）；右键拖动擦除步骤
+Analyzing...	分析中...
+Anchor	锚点
+Angle	角度
+Angle##v2dvfa	角度##v2dvfa
+Animation	动画
+Antialias	抗锯齿
+Apply (Enter)	应用 (Enter)
+Apply / Cancel Crop	应用/取消裁剪
+Apply style	应用样式
+Arrange	排列
+Arrange Layer	排列图层
+Arrange range	排列范围
+Audio is off. Start audio, or use Fast.	音频已关闭。请启动音频，或使用快速模式。
+Auto	自动
+Auto clean	自动清理
+Auto-select	自动选择
+Back to the document centre, scale 1, no rotation	回到文档中心，缩放 1，无旋转
+Background colour to foreground	背景色设为前景色
+Balance	平衡
+Balanced	平衡
+Band	频段
+Base URL	基础 URL
+Baseline	基线
+Behind	后方
+Below	下方
+Bitmap	位图
+Black	黑色
+Blacks	黑位
+Blend Mode	混合模式
+Blend in linear light	在线性光中混合
+Blend the patch with what is there	将补丁与现有内容混合
+Block off	块已关闭
+Blue	蓝色
+Blues	蓝色
+Box width	方框宽度
+Boxes	方框
+Brightness	亮度
+Bring Forward	上移一层
+Bring to Front	置于顶层
+Brush Opacity	画笔不透明度
+Brush Size / Hardness	画笔大小 / 硬度
+Builds a vector or colour from three values: RGB / XYZ, or hue, saturation, value in HSV mode. Patch a pin to drive that channel.	由三个值构建矢量或颜色：RGB / XYZ，或 HSV 模式下的色相、饱和度、明度。连接一个引脚即可驱动对应通道。
+Bypass	旁通
+Bypassed	已旁通
+Can't connect	无法连接
+Can't group a strip that sends	无法编组带发送的通道
+Can't return there	无法返回那里
+Can't ungroup	无法取消编组
+Cancel (Esc)	取消 (Esc)
+Canvas size	画布尺寸
+Centre	居中
+Centre Guides	中心参考线
+Ch	通道
+Chance the hit plays each time round	每轮敲击播放的概率
+Channel	通道
+Choose	选择
+Choose image	选择图像
+Choose...	选择...
+Chrome	铬
+Clear Cards	清除卡片
+Clear Guides	清除参考线
+Clear Solos	清除独奏
+Clear every solo on the console	清除控制台上的所有独奏
+Clear paint	清除绘画
+Click a	点击一个
+Click a box	点击一个方框
+Click a step on or off, drag to paint, drag up or down on a lit step for velocity	点击步骤开关，拖动绘制，在已点亮的步骤上上下拖动调整力度
+Click corners; Enter closes	点击角点；Enter 闭合
+Click to play and select (Alt = accent). Keys 1-8 too.	点击播放并选中（Alt = 重音）。也可用按键 1-8。
+Click: key on/off. Drag: paint. Drag up/down on a lit key: velocity.\nAlt-click: accent. Right-drag: erase. Shift-click: open on the Step page.	点击：开关音符。拖动：绘制。在点亮的音符上上下拖动：力度。\nAlt-点击：重音。右键拖动：擦除。Shift-点击：在步骤页中打开。
+Clip Settings	片段设置
+Clip the active layer to the layer below	将当前图层剪切到下方图层
+Clip to layer below	剪切到下方图层
+Clipping Mask	剪切蒙版
+Close 2D View	关闭 2D 视图
+Close Chat	关闭聊天
+Close Drums	关闭鼓面板
+Close Field Patcher	关闭 Field 编辑器
+Close Mixer	关闭混音器
+Close Mod Matrix	关闭调制矩阵
+Close Performance	关闭演奏
+Close Timeline	关闭时间线
+Close Viewport	关闭视口
+Colour Depth	色深
+Colour Management	色彩管理
+Colour Tint	色调
+Colour lookup	颜色查找
+Colours	颜色
+Compression	压缩
+Condition	条件
+Conical	锥形
+Contiguous	连续
+Contour	轮廓
+Convert to Draw Node	转换为绘制节点
+Convert to Shapes	转换为形状
+Convert to Sketch Node	转换为 Sketch 节点
+Convert to Text Node	转换为文本节点
+Convert to shapes	转换为形状
+Copy / Clear Selection	复制 / 清除选区
+Copy / Cut / Paste	复制 / 剪切 / 粘贴
+Copy / Cut / Paste Boxes	复制 / 剪切 / 粘贴方框
+Copy from the whole picture	从整幅图像复制
+Copy or cut the selected boxes, or paste them	复制或剪切所选方框，或粘贴
+Copy or cut the selected layers, or the selected pixels, or paste them	复制或剪切所选图层或像素，或粘贴
+Copy the selected words of a message, or drop the selection	复制消息中所选的文字，或取消选择
+Corners	圆角
+Could not make one	无法创建
+Couldn't create the file.	无法创建文件。
+Create Clipping Mask	创建剪切蒙版
+Crop layer	裁剪图层
+Crop the document (Enter)	裁剪文档 (Enter)
+Custom agent	自定义代理
+Cyan	青色
+Cyan - Red	青 - 红
+Cyans	青色调
+Darken	变暗
+Dash	虚线
+Delete Box or Wire	删除方框或连线
+Delete Document	删除文档
+Delete Layer	删除图层
+Delete Layer Mask	删除图层蒙版
+Delete Vector Mask	删除矢量蒙版
+Delete Wire	删除连线
+Delete layer	删除图层
+Delete the layer mask	删除图层蒙版
+Delete the vector mask	删除矢量蒙版
+Deselect	取消选择
+Deselect / Invert	取消选择 / 反选
+Diamond	菱形
+Dim	衰减
+Dim -20 dB. Speakers only: never in a render.	衰减 -20 dB。仅用于扬声器：绝不会出现在渲染中。
+Dim outside the crop	裁剪区域外变暗
+Disconnect	断开
+Document	文档
+Double pattern	双倍图案
+Double-click	双击
+Drag the selection's pixels onto another place	将选区内的像素拖到其他位置
+Drag to measure	拖动以测量
+Draw into the vector mask	在矢量蒙版中绘制
+Draw mask	绘制蒙版
+Drive	驱动
+Drop the pixel selection, or invert it	取消像素选区，或反选
+Drums - play and edit Drum Sequencers (Shift+J)	鼓：演奏和编辑鼓序列器 (Shift+J)
+Drums at Bottom	鼓面板在底部
+Drums at Top	鼓面板在顶部
+Dual tip	双笔尖
+Duplicate (Ctrl+J)	复制 (Ctrl+J)
+Duplicate Boxes	复制方框
+Duplicate Document	复制文档
+Duplicate Layer	复制图层
+Duplicate the active layer	复制当前图层
+Duplicate the selected boxes	复制所选方框
+Dynamics	动态
+Each stroke starts with clean paint	每一笔都从干净的颜料开始
+Earlier	更早
+Edit Adjustment...	编辑调整...
+Edit Fill...	编辑填充...
+Edit Text	编辑文本
+Edit it on the canvas.	请在画布上编辑。
+Effect on Below	对下方的效果
+Ellipse	椭圆
+Empty	空
+Empty page	空页面
+Enable	启用
+Enabled	已启用
+Esc	Esc
+Essentials	基础
+Even dashes round a closed shape	闭合形状周围的均匀虚线
+Every 2nd	每 2 个
+Every 4th	每 4 个
+Every 8th	每 8 个
+Every step	每一步
+Export ORA...	导出 ORA...
+Export PSD...	导出 PSD...
+Extra time after the length, with the transport stopped, so reverbs and delays ring out.	长度之后的额外时间（传输停止时），让混响和延迟得以余音延续。
+Fast	快速
+Fast can't render a live source (camera, MIDI, audio in). Use Live.	快速模式无法渲染实时源（摄像头、MIDI、音频输入）。请使用实时模式。
+Fast isn't available right now. Use Live.	快速模式目前不可用。请使用实时模式。
+Fast needs a length.	快速模式需要设置长度。
+Field Patcher	Field 编辑器
+Field Patcher Panel	Field 编辑器面板
+Field patcher - Field as boxes (Shift+F)	Field 编辑器 - 以方框显示 Field (Shift+F)
+Field patches	Field 补丁
+File missing - drop a clip or Clear	文件缺失：拖入片段或点击清除
+Fill gradient	填充渐变
+Fill on or off	填充开关
+Fill the Window	铺满窗口
+Fill the window (Ctrl+Shift+F)	铺满窗口 (Ctrl+Shift+F)
+Fill with a choice of colour, the foreground, or the background; inside the selection when there is one	用所选颜色、前景色或背景色填充；有选区时仅填充选区内
+Fill...	填充...
+First line	第一行
+Fit / Actual Pixels	适应 / 实际像素
+Fit All	全部适应
+Fit on Screen	适应屏幕
+Fit on screen (Ctrl+0)	适应屏幕 (Ctrl+0)
+Fit the document on screen, or show it at 100%	将文档适应屏幕，或以 100% 显示
+Flatten Image	拼合图像
+Flip H	水平翻转
+Flip Horizontal	水平翻转
+Flip V	垂直翻转
+Flip Vertical	垂直翻转
+Flip X	X 翻转
+Flip Y	Y 翻转
+Flip horizontal	水平翻转
+Flip vertical	垂直翻转
+Flow	流量
+Follow stroke	跟随笔划
+Font	字体
+Frame every box on the page	框住页面上的所有方框
+Free Transform	自由变换
+Freehand	自由绘制
+From a node	来自节点
+From centre	从中心
+From start	从开始
+Generate again	重新生成
+Generating	生成中
+Gradient	渐变
+Grain	颗粒
+Grain depth	颗粒深度
+Grain mode	颗粒模式
+Grain scale	颗粒尺度
+Green	绿色
+Greens	绿色调
+Grey	灰色
+Groove	律动
+Groove: pick from the library	律动：从库中选择
+Group (Ctrl+G)	编组 (Ctrl+G)
+Group Colour	编组颜色
+Group Layers	编组图层
+Group the selected layers, or dissolve the group	编组所选图层，或解散编组
+Grow or shrink the document; layers keep their place	放大或缩小文档；图层保持原位
+Grow the 2D View to fill the window, or put it back	将 2D 视图放大至铺满窗口，或恢复
+Grow the 3D View to fill the window, or put it back	将 3D 视图放大至铺满窗口，或恢复
+Guides	参考线
+HAP clip - no filmstrip	HAP 片段 - 无胶片条
+Hard	硬
+Hard edge	硬边
+Hardness	硬度
+Hide from Canvas	从画布隐藏
+Highlight	高光
+Highlights	高光
+Highlights Hue	高光色相
+Highlights Saturation	高光饱和度
+Hold FILL to play Fill steps and mute !Fill steps; Shift-click latches it	按住 FILL 播放 Fill 步骤并静音 !Fill 步骤；Shift-点击可锁定
+Hold: steps set to Fill play, !Fill rest. Shift-click latches.	按住：Fill 步骤播放，!Fill 步骤休止。Shift-点击锁定。
+Hue	色相
+Humanize velocity	人性化力度
+Image	图像
+Image size	图像尺寸
+In export	导出中
+Indent left	左缩进
+Indent right	右缩进
+Ink stipple	墨点
+Input black	输入黑场
+Input white	输入白场
+Inside	内部
+Invert polarity	反转极性
+Jitter	抖动
+Justify text	两端对齐文本
+Keep light above 1.0	保留高于 1.0 的亮度
+Keep lightness	保持明度
+Keep proportions	保持比例
+Kerning	字距调整
+Keys	琴键
+Kit	套件
+Label	标签
+Lane	轨道
+Lane length. 0 follows the pattern; other lengths loop on their own (polymeter)	轨道长度。0 跟随图案；其他长度独立循环（复合节拍）
+Lanes in one choke group cut each other off (closed hat stops the open hat)	同一闭音组的轨道互相截断（闭合踩镲会切断开放踩镲）
+Layer	图层
+Layer as Output	图层作为输出
+Layer mask	图层蒙版
+Layer mask: click to paint it, Shift-click to turn it off	图层蒙版：点击绘制，Shift-点击关闭
+Layer via Cut	剪切为图层
+Layers and properties	图层与属性
+Leading	行距
+Light height	光源高度
+Lightness	明度
+Live	实时
+Live records what plays. Fast renders offline, quicker than real time; live inputs can't be rendered that way.	实时模式录制正在播放的内容。快速模式离线渲染，快于实时；实时输入无法以此方式渲染。
+Load	加载
+Load stack	加载堆栈
+Loading preview...	正在加载预览...
+Lock alpha	锁定透明度
+Lookup	查找
+Luminance	亮度
+Magenta	品红
+Magenta - Green	品红 - 绿
+Magentas	品红色调
+Map colours	映射颜色
+Marbling	大理石纹
+Marquee, Lasso; W cycles Magic Wand, Selection Brush, Object Selection. Shift adds, Alt subtracts. Enter closes a polygon lasso, Esc drops it	选框、套索；W 循环切换魔棒、选择画笔、对象选择。Shift 加选，Alt 减选。Enter 闭合多边形套索，Esc 放弃
+Mask	蒙版
+Mask from	蒙版来自
+Mask from Selection	从选区生成蒙版
+Master	主控
+Max	最大
+Maximise (Esc returns)	最大化（Esc 返回）
+Merge Down	向下合并
+Merge Layers	合并图层
+Merge Visible	合并可见图层
+Merge every shown layer into one pixel layer; hidden layers stay	将所有可见图层合并为一个像素图层；隐藏图层保持不变
+Merge the active layer into the one under it; with more selected, merge those	将当前图层与下方图层合并；若选中多个，则合并这些图层
+Mirror strokes across the object	跨对象镜像笔划
+Missing	缺失
+Mix	混合
+Mixer	混音器
+Mixer - every Mixer node as a console (Shift+L)	混音器 - 将每个 Mixer 节点显示为控制台 (Shift+L)
+Mixer at Bottom	混音器在底部
+Mixer at Top	混音器在顶部
+Model ID	模型 ID
+Molding...	塑形中...
+Mono	单声道
+Mono check. Speakers only: never in a render.	单声道检查。仅用于扬声器：绝不会出现在渲染中。
+Monochrome	单色
+More settings	更多设置
+More tools. Tick the ones to show	更多工具。勾选要显示的工具
+More..	更多...
+Move Left	左移
+Move Right	右移
+Move down	下移
+Move the layer down or up; with Shift to the bottom or top	上下移动图层；按住 Shift 移至最底或最顶
+Move the selected pixels to a new layer	将所选像素移至新图层
+Move the selection 1 or 10 pixels	以 1 或 10 像素移动选区
+Move up	上移
+Move, Crop, Hand, Zoom; hold Space for the hand	移动、裁剪、抓手、缩放；按住空格切换抓手
+Move, scale and turn the selected layers as one step; Enter keeps it, Esc puts them back	一步移动、缩放并旋转所选图层；Enter 确认，Esc 还原
+My grooves	我的律动
+Nearest	最近邻
+Neutrals	中性色
+New Document	新建文档
+New Drum Sequencer	新建鼓序列器
+New Mixer	新建混音器
+New Piano Roll page	新建钢琴卷帘页面
+New adjustment layer	新建调整图层
+New drum page	新建鼓页面
+New fill layer	新建填充图层
+New layer	新建图层
+New mixer page	新建混音器页面
+New scratch page	新建刮擦页面
+New send FX	新建发送效果
+New vector layer	新建矢量图层
+New, duplicate or delete a document	新建、复制或删除文档
+Next groove	下一个律动
+No Drum Sequencer yet	还没有鼓序列器
+No Mixer feeds an Audio Out	没有混音器输入到音频输出
+No Mixer yet	还没有混音器
+No break	无中断
+No box selected	未选择方框
+No clip loaded	未加载片段
+No effects here	这里没有效果
+No fitting nodes	没有合适的节点
+No free strip for the return	没有可用于返回的空闲通道
+No geometry	无几何体
+No input	无输入
+No layer selected	未选择图层
+No layers	无图层
+No loop yet	还没有循环
+No matches	无匹配
+No preview	无预览
+No sample	无采样
+No sample loaded	未加载采样
+No sample yet	还没有采样
+No sample · drop or click	无采样 · 拖入或点击
+Node gone	节点已删除
+Noise	噪声
+Noise##v2dvfnoise	噪声##v2dvfnoise
+Normal	正常
+Not selected	未选中
+Not tested	未测试
+Nothing in the 2D View yet	2D 视图中还没有内容
+Nothing to transform	没有可变换的内容
+Now	现在
+Nudge	微调
+Offbeats	反拍
+Offset	偏移
+%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   宽 %.0f  高 %.0f
+Layer styles	图层样式
+Metal	金属
+Midtones	中间调
+Min	最小
+No banding	无色带
+Only touching pixels	仅相邻像素
+Open	打开
+Open PSD or ORA...	打开 PSD 或 ORA...
+Open grooves folder	打开律动文件夹
+Open in 2D View	在 2D 视图中打开
+Open in Drum panel	在鼓面板中打开
+Open in Mixer panel	在混音器面板中打开
+Optical align	光学对齐
+Optional for local Ollama; stored in Keychain	本地 Ollama 可选；保存在钥匙串中
+Orange	橙色
+Orthographic: click for perspective (5)	正交：点击切换为透视 (5)
+Outline colour	轮廓颜色
+Outline width	轮廓宽度
+Outlines as a vector layer	轮廓作为矢量图层
+Output black	输出黑场
+Output white	输出白场
+Outside	外部
+PAN	=en
+Paint	绘制
+Paint Tools	绘画工具
+Paint a straight line from the last point	从上一个点绘制直线
+Paint into the selection	在选区内绘制
+Paint mask	绘制蒙版
+Paint on surface	在表面上绘制
+Paint out of the selection (Alt)	在选区外绘制 (Alt)
+Paint the mask	绘制蒙版
+Paint the selection with the brush; press again to leave	用画笔绘制选区；再次按下退出
+Part	部分
+Pass Through	直通
+Paste at Playhead	粘贴到播放头处
+Pattern	图案
+Pattern tools for the selected lane	所选轨道的图案工具
+Peak, integrated loudness, length and size of the file.	文件的峰值、综合响度、长度和大小。
+Pen and shapes draw the mask	钢笔和形状绘制蒙版
+Pen pressure	笔压
+Pen, Node, Shape, Text. Pen: click the first point to close, Enter or Esc ends the path. Node: Alt-click makes a corner, Delete removes the shape	钢笔、节点、形状、文本。钢笔：点击第一个点闭合，Enter 或 Esc 结束路径。节点：Alt-点击创建角点，Delete 删除形状
+Perspective: click for orthographic (5)	透视：点击切换为正交 (5)
+Pick	拾取
+Pick a groove	选择律动
+Pick a layer	选择图层
+Pick a part and generate	选择部分并生成
+Pick on Canvas	在画布上拾取
+Pick on picture	在图片上拾取
+Picking	拾取中
+Pin page	固定页面
+Pixel aspect	像素宽高比
+Place this page as a node	将此页面放为节点
+Plain	普通
+Plasticine	橡皮泥
+Play Pads	演奏打击垫
+Play and select lanes 1-8 while the pointer is over the Drum panel (Shift = accent)	指针位于鼓面板上时，演奏并选择轨道 1-8（Shift = 重音）
+Polygon	多边形
+Pre-fader sends	推子前发送
+Previous groove	上一个律动
+Profile	配置
+Protect alpha	保护透明度
+Protect hue	保护色相
+Put this document on the canvas	将此文档放到画布上
+Quick Mask	快速蒙版
+REC %.1f s  %.1f MB	REC %.1f 秒  %.1f MB
+RGB	=en
+Radial	径向
+Radius in px, not % of the shape	=en
+Ramp velocity	力度渐变
+Randomise	随机化
+Rasterize Layer	栅格化图层
+Rasterize?	栅格化？
+Reassign...	重新分配...
+Recent	最近
+Rectangle	矩形
+Red	红色
+Reds	红色调
+Refill	重新填充
+Reflected	反射
+Release Clipping Mask	释放剪切蒙版
+Relief	浮雕
+Remove all paint from the surface	清除表面的所有颜料
+Remove effect	移除效果
+Remove the selected boxes or wires; the code updates as one undo step	删除所选方框或连线；代码作为一步撤销更新
+Render Image / Animation	渲染图像 / 动画
+Render an image (F12) or the animation (Ctrl+F12)	渲染图像 (F12) 或动画 (Ctrl+F12)
+Render folder	渲染文件夹
+Render the document through an Output node	通过输出节点渲染文档
+Repeat	重复
+Repeat strokes across the picture	在整幅图片上重复笔划
+Replace with	替换为
+Replaces the pattern, rate, swing and steps; fills empty lanes from the kit	替换图案、速率、摇摆和步数；用套件填充空轨道
+Resample nearest neighbour, no smoothing	最近邻重采样，不平滑
+Reset Distort	重置变形
+Reset Rotation	重置旋转
+Reset name	重置名称
+Reset strip	重置通道
+Reset trig	重置触发
+Restore Size	恢复尺寸
+Retouch Tools	修饰工具
+Return a maximised Field Patcher to its docked size	将最大化的 Field 编辑器恢复为停靠尺寸
+Return to Start	回到开头
+Reveal##folder	显示##folder
+Right-click any node and choose Add to 2D View.	右键点击任意节点，选择「添加到 2D 视图」。
+Ring	环形
+Roll down	向下滚动
+Roll up	向上滚动
+Rotate 180°	旋转 180°
+Rotate 90° Clockwise	顺时针旋转 90°
+Rotate 90° Counter Clockwise	逆时针旋转 90°
+Rotate View	旋转视图
+Roundness	圆度
+Rule of thirds guides	三分法参考线
+Rulers	标尺
+Rulers / Grid / Guides	标尺 / 网格 / 参考线
+Rulers, guides, grid	标尺、参考线、网格
+Run	运行
+Run this sequencer's steps (the transport keeps going)	运行此序列器的步骤（传输继续）
+Same for all##v2dvcrall	全部相同##v2dvcrall
+Sample the whole picture	采样整幅图像
+Saturation	饱和度
+Save Selection	保存选区
+Save stack	保存堆栈
+Save style	保存样式
+Scale the document and every layer with it	连同所有图层一起缩放文档
+Scatter	散布
+Scatter Y	Y 散布
+Scratch	刮擦
+Search boxes	搜索方框
+Search nodes	搜索节点
+Search the boxes this page's node can run; a dropped wire connects the new box	此页节点可运行的方框搜索；拖放的连线会连接新方框
+Second colour	第二颜色
+Second scatter	第二散布
+Second size	第二尺寸
+Second tip	第二笔尖
+Select All Boxes	全选方框
+Select All Layers	全选图层
+Select every box on the page	选择页面上的所有方框
+Select every top-level layer; with a paint or selection tool, every pixel	选择所有顶层图层；使用绘制或选择工具时选择所有像素
+Selected in chat	在聊天中选中
+Selection	选区
+Selection Tools	选择工具
+Selection is source	选区即为源
+Send Backward	下移一层
+Send to Back	置于底层
+Set a length first.	请先设置长度。
+Shadows Hue	阴影色相
+Shadows Saturation	阴影饱和度
+Shared	共享
+Shared chain	共享链
+Shared chain: edit it on the canvas	共享链：请在画布上编辑
+Shear	错切
+Shift	Shift
+Shift left	左移
+Shift right	右移
+Shift-click a step to open it on the Step page: velocity, chance, nudge and condition	Shift-点击步骤可在步骤页中打开：力度、概率、微调和条件
+Show 2D View	显示 2D 视图
+Show Drums	显示鼓
+Show Field Patcher	显示 Field 编辑器
+Show Mixer	显示混音器
+Show all tools	显示所有工具
+Show essentials only	仅显示基础项
+Show on Canvas	在画布上显示
+Show or hide the 2D View. Every other key in this section needs the pointer over the view	显示或隐藏 2D 视图。本节其他按键都需要指针位于视图上
+Show or hide them; drag from a ruler to pull a guide, drag it back to remove it	显示或隐藏；从标尺拖出参考线，拖回即可删除
+Show outside the crop	显示裁剪外的部分
+Show the whole sample	显示整个采样
+Size##img	尺寸##img
+Skin	肤色
+Smaller or larger brush; with Shift softer or harder	缩小或放大画笔；按住 Shift 可更柔或更硬
+Smoothing	平滑
+Soft	柔和
+Soft edges	柔边
+Solid	实心
+Solo (Alt-click: clear all, right-click: solo safe)	独奏（Alt-点击：全部清除；右键：安全独奏）
+Solo safe	安全独奏
+Solo safe (right-click)	安全独奏（右键）
+Sound	声音
+Spacing	间距
+Spectral field editor	频谱场编辑器
+Spokes	辐条
+Spread	扩散
+Stabiliser	防抖
+Stack	堆栈
+Step Page	步骤页
+Stipple	点画
+Stop alpha	停止透明度
+Straight Line	直线
+Strike	敲击
+Strike colour	敲击颜色
+Strike line	敲击线
+Stroke	描边
+Stroke on or off	描边开关
+Stroke options	描边选项
+Stroke under the fill	描边位于填充之下
+Stroke width scales with the layer	描边宽度随图层缩放
+Style	样式
+Subscript	下标
+Subtract	减去
+Superscript	上标
+Swap the two colours, or reset them to black and white	交换两种颜色，或重置为黑白
+Swatches	色板
+Symmetry	对称
+TRIM	=en
+Tail	尾音
+Take the selected layers out; the nodes stay on the canvas	移出所选图层；节点保留在画布上
+Taper in	起始渐细
+Taper out	结束渐细
+Target	目标
+Test connection	测试连接
+Testing…	测试中…
+Texture	纹理
+That would feed the audio back into itself.	这会把音频反馈到自身。
+That would feed the send back into itself.	这会把发送反馈到自身。
+The arrangement is empty.	编排为空。
+The brush paints the mask	画笔绘制蒙版
+The Mixer panel's console is driving audio. Click to hand it back to the canvas.	混音器面板的控制台正在驱动音频。点击可交还给画布。
+The Mixer panel's console will drive audio once the engine is started.	引擎启动后，混音器面板的控制台将驱动音频。
+The Mixer would pass 32 strips.	混音器将包含 32 个通道。
+The group has inserts, sends or a second cable. Edit it on the canvas.	该编组包含插入、发送或第二条连线。请在画布上编辑。
+The rest of the bar	本小节的其余部分
+The source moves with each stroke	源随每一笔移动
+The top Mixer already has 32 strips.	顶部混音器已有 32 个通道。
+This Audio Out is already recording.	此音频输出已在录制。
+This page	此页面
+Tines	音叉齿
+Tip	笔尖
+To	到
+Toggle the Drum panel	切换鼓面板
+Toggle the Mixer panel	切换混音器面板
+Tone	音色
+Tool: Mute - click to choose a tool	工具：静音 - 点击选择工具
+Tools on the strip	通道上的工具
+Tracking	字间距
+Turn its sends off first.	请先关闭其发送。
+Turn on	开启
+Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	キャンバスを回転、または元に戻す。トラックパッドの2本指回転も使えます
+Turn this layer into pixels so the tool can work on it	将此图层转为像素，以便工具处理
+Underline	下划线
+Underline colour	下划线颜色
+Unpin page	取消固定页面
+Until stop	直到停止
+Use an existing send knob on this strip.	使用此通道上现有的发送旋钮。
+Use in chat	在聊天中使用
+Vector	矢量
+Vector Tools	矢量工具
+Vector mask	矢量蒙版
+Viewport Colour	视口颜色
+Violet	紫色
+Waiting for play	等待播放
+Waiting for the next grid line	等待下一条网格线
+Warp	扭曲
+Wet edges	湿边
+Wet mix	湿声混合
+White	白色
+White Balance	白平衡
+Whites	白位
+With play	随播放
+With the Crop tool	使用裁剪工具时
+Yellow	黄色
+Yellow - Blue	黄 - 蓝
+Yellows	黄色调
+Your predictive macro faders: few faders drive many parameters based on learned co-movement PCA.	预测式宏推子：少量推子基于学习到的协同运动（PCA）驱动大量参数。
+Zoom - type a percentage	缩放 - 输入百分比
+Zoom 2D View	缩放 2D 视图
+Zoom in (Ctrl++)	放大 (Ctrl++)
+Zoom out (Ctrl+-)	缩小 (Ctrl+-)
+Zoom in or out; {mod} or Alt with the wheel zooms at the pointer	缩放；{mod} 或 Alt + 滚轮在指针处缩放
+boxes	方框
+code	代码
+default	默认
+field	=en
+items	项目
+knob	旋钮
+lane	轨道
+last good ·	上次正常 ·
+max	最大
+min	最小
+more	更多
+name	名称
+no groove	无律动
+node	节点
+off	关
+picture node	图像节点
+pixels	像素
+post	后
+pre	前
+refused: publish output is still wired	已拒绝：publish 输出仍已连接
+sound node	声音节点
+source node	源节点
+steps	步
+value	值
+velocity	力度
+{patch} {take} {date} {time}. An existing file is never overwritten.	{patch} {take} {date} {time}。不会覆盖已有文件。
+3D cell noise on the coordinate patched into vector (Generated when empty), times scale. Distance to the nearest point, Second nearest, Edge (the gap between the two), Cell (one grey per cell) or Colour (one colour per cell). Patch it into a Material's field input.	作用于 vector 所接入坐标（为空时使用 Generated）并乘以 scale 的 3D 元胞噪声。可选：到最近点的距离、Second nearest、Edge（两者之间的间隙）、Cell（每个单元一个灰度）或 Colour（每个单元一个颜色）。接入材质的 field 输入。
+A 3D checker of two colours on the coordinate patched into vector (Generated when empty), times scale. Patch it into a Material's field input to drive the base colour; the Material's other knobs still apply.	作用于 vector 所接入坐标（为空时使用 Generated）并乘以 scale 的双色 3D 棋盘格。接入材质的 field 输入即可驱动基础色；材质的其他参数仍然有效。
+A blend weight by view angle, Fresnel or Facing. Blend sets how much of the surface is weighted.	按视角得出的混合权重，可选 Fresnel 或 Facing。Blend 设定表面的加权程度。
+A colour ramp of 2 to 8 stops read at the factor: Linear, Ease, Constant or B-Spline. Below the first stop and above the last the end colours hold.	2 至 8 个色标的颜色渐变，按 factor 取值：Linear、Ease、Constant 或 B-Spline。低于第一个色标和高于最后一个色标时保持端点颜色。
+A grey ramp of the coordinate patched into vector (Generated when empty), times scale: Linear, Quadratic, Easing, Diagonal, Spherical, Quadratic Sphere, Radial, Wave (bands along x) or Magic (interfering waves). Patch it into a Material's field input.	作用于 vector 所接入坐标（为空时使用 Generated）并乘以 scale 的灰度渐变：Linear、Quadratic、Easing、Diagonal、Spherical、Quadratic Sphere、Radial、Wave（沿 x 的条纹）或 Magic（干涉波）。接入材质的 field 输入。
+A height bends the normal by strength over distance; invert flips it. Wire it into Material's normal pin.	高度会按 strength 随距离弯曲法线；invert 将其反转。接入材质的 normal 引脚。
+A modulator written in Field code: publish is its value, 0..1. Patch it in the Field Patcher, or start from Slow LFO, Triangle LFO, Pulse train or Skipping beat.	用 Field 代码编写的调制器：publish 为其值，范围 0..1。可在 Field Patcher 中接线，或从 Slow LFO、Triangle LFO、Pulse train 或 Skipping beat 开始。
+A note node whose body is a Field script. The script runs per sample against the transport beat; note(pitch, vel, len) inside an if sends a note out (len in beats, 0 holds as long as the incoming note). tick(div) fires on each beat division, deg(d) is a scale degree under Root/Scale, rand() is 0..1. Wire it into any synth or MIDI-out. publish scalar output adds a modulator pin carrying whatever publish holds. Boxes opens it in the Field Patcher.	音符节点，其主体为 Field 脚本。脚本按采样运行，与传输的节拍同步；if 内的 note(pitch, vel, len) 会发出一个音符（len 以拍为单位，0 表示在输入音符按住期间持续）。tick(div) 在每个节拍分割处触发，deg(d) 为 Root/Scale 下的音阶度数，rand() 为 0..1。接入任意合成器或 MIDI 输出。publish 的 scalar 输出会添加一个调制引脚，承载 publish 的值。Boxes 在 Field Patcher 中打开它。
+A shading node - builds a surface per shading point, the way Blender's shader nodes do. Chain it into a Material's pins; the Material compiles the chain into one program for every Render 3D engine.	一个着色节点：像 Blender 的着色器节点一样，为每个着色点构建表面。将其串接到材质的引脚上；材质会把整条链编译为一个程序，供每个 Render 3D 引擎使用。
+A spectral effect whose kernel you write in the node and which runs once per FFT bin: filters, freezes, pitch and frequency shifts, flips, robot and whisper voices, cross-synthesis.	一种频谱效果，其内核在节点中编写，并对每个 FFT 频点运行一次：滤波、冻结、音高与频率偏移、翻转、机器人与耳语人声、交叉合成。
+A tangent-space normal map colour (Shade Image set to Data) as a normal for Material's normal pin. Strength scales the tilt.	切线空间法线贴图颜色（Shade Image 设为 Data），用作材质 normal 引脚的法线。Strength 缩放倾斜程度。
+A texture coordinate for the shading nodes: UV, Object, World, Generated (0 to 1 across the mesh's bounds), Normal, View or Reflection. Patch it into a Shade Mapping or a texture's vector input; the chain ends in a Material's field input.	着色节点使用的纹理坐标：UV、Object、World、Generated（在网格边界内 0 到 1）、Normal、View 或 Reflection。接入 Shade Mapping 或纹理的 vector 输入；整条链最终接入材质的 field 输入。
+An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the small 1-16 | 17-32 pill at the right of the line under it switches pages once steps goes past 16 - greyed out until then; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the small A B C pill at the end of the row; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern. A .mid file can become the pattern: drop it on the node, or keep .mid files in the My grooves folder (the last category in the groove picker, whose last row opens the folder). Its first two bars are placed on a 1/16 grid as 16 or 32 steps - General MIDI drum notes go to the matching lanes, and a melodic file gives its 8 lowest pitches to lanes 1-8 - at rate 1/16 with no swing, and the pattern takes the file's name. Each step also has a chance (how often it plays), a nudge (early or late, up to half a step) and a condition: Fill / !Fill follow the Drum panel's FILL button, 1st / !1st the first time round, and A:B plays on loop A of every B. Each lane can have its own length (polymeter), play its sample reversed, and run through a low-pass or high-pass filter with cutoff and resonance; these sit in the Drum panel (Shift+J).	一个 8 轨、最多 32 步的鼓机：上方是 8 个轨道卡片（波形 + 瞬态/衰减/音高/微调/音量/声像），下方是 8 轨步进网格，一次显示 16 步（其下方一行右侧的小 1-16 | 17-32 按钮在步数超过 16 后切换页面，之前为灰色；圆点标示播放头所在的页）。点击卡片的波形可加载其采样（也可从 Samples 面板拖入或拖放系统文件），或拖动其边缘手柄裁剪播放范围；x 清除，choke 按钮循环切换其切断组（0 = 无：同一组的两条轨道会互相切断，例如闭合/开放踩镲）。在网格中，R 随机化该轨的填充，M/S 为静音或独奏。点击一步可切换开关；在已点亮的步上纵向拖动设置力度；横向拖动可连续涂抹开/关。在轨道卡片与网格之间，律动选择器内置 10 个类别共 141 种律动：选择类别（跳转到其第一个律动）或律动（列表分组并带筛选框），用 < 和 > 逐个切换；用行末的小 A B C 按钮切换律动的 A 主歌 / B 过渡 / C 副歌段落；选择律动会在一次撤销中替换图案、速率、摇摆和步数，并用附带的套件填充空轨道（你自己加载的轨道永远不会被改动）。底部几行作用于整个图案：速率/步数/摇摆/输出，然后是四个偏移（瞬态/衰减/音高/声像），叠加在每个轨道自身的值之上。接入后立即播放，与传输锁相；没有音符输入，只有由 Transport 推导出的自身序列。run 停止此节点自身的步进触发而不影响传输；randomise 生成音乐性的底鼓/军鼓/踩镲起始图案。一个 .mid 文件可以变成图案：拖到节点上，或把 .mid 文件放入 My grooves 文件夹（律动选择器中的最后一个类别，其最后一行可打开该文件夹）。其前两小节以 1/16 网格放置为 16 或 32 步——General MIDI 鼓音符进入对应轨道，旋律类文件把最低的 8 个音高分配给轨道 1-8——速率为 1/16 且无摇摆，图案采用文件名。每一步还有概率（播放的频率）、微调（提前或延后，最多半步）和条件：Fill / !Fill 跟随鼓面板的 FILL 按钮，1st / !1st 仅第一次经过时，A:B 在每 B 次中的第 A 次播放。每个轨道可有自己的长度（复合节拍），可倒放采样，并可通过带截止与共振的低通或高通滤波器；这些位于鼓面板（Shift+J）中。
+Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sample Player. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload.	分析/基因组再合成：将加载或录制的采样分解为被追踪的谐波分音加上真实的残差波形；Roll 会变异参数基因组并据此重新渲染新采样——每次 Roll 都是从上一次而非原始采样出发继续偏移。Iterate 将上一次渲染作为新来源再次输入并重新分析（逐步“吞噬”声音）；Reset 完全恢复到最初加载或录制的采样——代数回到 0，六个塑形旋钮（tone/air/snap/stretch/time/pitch）回到中性，分析本身也恢复，撤销所有 Iterate。chaos 设定下一次 Roll 的跳跃幅度；pitch 叠加在基因组自身的音高漂移之上；tone 平衡分音与残差；air/snap 分别是残差的稳定嘶声与瞬态起音电平；stretch 随谐波间距一同缩放非谐性；time 调整起音/衰减时序，但不改变采样长度。这是声音设计工具，而非可演奏的乐器——不接收音符输入，只有一个自触发的声部，带有起止范围、循环、倒放和乒乓模式，与 Sample Player 使用相同的传输。分析与渲染都在后台线程运行，因此 Roll 不会让界面卡顿。读数中的 seed/gen/f0/harm 是精确的基因组（种子 + 代数）以及分析出的音高——两个整数即可在重新加载时完全复现任何 Roll 出的声音。
+Any image cable as a texture on the surface. Flat reads it at the vector (UV when unwired); Box projects it from three sides and blends by the normal. Colour decodes sRGB, Data reads raw values. Up to four pictures per material.	任意图像连线都可作为表面上的纹理。Flat 在 vector 处读取（未接线时使用 UV）；Box 从三个方向投影并按法线混合。Colour 解码 sRGB，Data 读取原始值。每个材质最多四张图片。
+Applies shading, colour, metallic/roughness/opacity and emission to a geometry input, plus an optional normal map input (its strength slider only appears once something is patched into it). Detail scale reads the normal map a second time at a finer scale, Detail strength sets its tilt: weave or pores over the large folds. Model Hair shades a Fur mesh's strands as fibres, coloured by melanin. Translucency passes light through to the far side: leaves, sails, paper. Layer lays a second Material over this one where Mask is white, by Layer mix: paint over metal, dirt over paint, up to four deep.	为几何输入应用着色、颜色、金属度/粗糙度/不透明度和自发光，另有可选的法线贴图输入（其强度滑块仅在接入内容后出现）。Detail scale 以更细的尺度第二次读取法线贴图，Detail strength 设置其倾斜：在大褶皱上叠加纹理或毛孔。Model Hair 将 Fur 网格的毛发当作纤维着色，颜色由黑色素决定。Translucency 让光线穿透到背面：树叶、帆布、纸张。Layer 在 Mask 为白色的区域叠加第二个材质，由 Layer mix 决定：金属上的油漆、油漆上的污渍，最多四层。
+Blender's scalar maths on a, b and c: add to power, logs, rounding, modulo, trigonometry, compare and smooth min/max. Only the operands the operation reads are shown. Clamp limits the result to 0..1.	对 a、b、c 进行 Blender 式标量运算：加法到幂、对数、取整、取模、三角函数、比较以及平滑 min/max。只显示该运算实际读取的操作数。Clamp 将结果限制在 0..1。
+Blends a to b by factor, as a float, a vector or a colour. Colour runs b through one of the 30 blend modes first. Clamp factor holds the factor to 0..1.	按 factor 将 a 混合到 b，可为浮点、向量或颜色。Colour 模式会先对 b 应用 30 种混合模式之一。Clamp factor 将 factor 限制在 0..1。
+Bricks in the x and y of the coordinate patched into vector (Generated when empty), times scale. Width and height size one brick, offset shifts every second row, mortar size is the gap, tint mixes each brick between colour 1 and colour 2 at random. Patch it into a Material's field input.	作用于 vector 所接入坐标（为空时使用 Generated）并乘以 scale 的 x、y 方向砖块。Width 和 height 设定单块砖尺寸，offset 使每隔一行错位，mortar size 为缝隙宽度，tint 在颜色 1 和颜色 2 之间随机混合每块砖。接入材质的 field 输入。
+Generates procedural 3D point geometry from scratch using a per-element Field kernel (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot). value turns it into a value source: no mesh, publish is its output. Boxes opens it in the Field Patcher.	使用逐元素的 Field 内核从零生成程序化 3D 点几何（Circle、Spiral、Grid Lattice、Fibonacci Sphere、Helix、Torus Knot）。value 将其转为数值源：无网格，publish 为其输出。Boxes 在 Field Patcher 中打开。
+How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sample Player. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load.	用法：将 out 接入 Audio Out，把音频文件拖到打击垫上（或点击空打击垫，或用 Load... / Folder... 加载文件夹中的前 16 个文件），然后点击打击垫，或向 notes 输入发送音符——音符 36 至 51 分别触发打击垫 1 至 16。这是一个 16 垫采样播放器：打击垫 1 位于左下角，与硬件 MPC 一致；每个打击垫都是方形图块，显示其波形、编号和模式，且每个打击垫都有自己的 CV 引脚，因此 MIDI CC / Note 调制器或任何门信号都可以驱动它。每个打击垫都是独立的声部，所以多个打击垫可以同时发声，点击会立即发声。一次击打遵循打击垫的模式：one shot 播放整个采样，新的击打会重新开始；gate 在按住期间（鼠标按下、CV 为高电平或音符保持）播放，松开即停止；loop 在每次击打时切换循环播放。点击选中打击垫（右键选中但不发声）；打击垫下方的各行编辑所选打击垫：sync 与 rate、fine tune（音分）、pitch（半音）、speed（负值为倒放）、音量、声像、mode，以及 fade in / fade out（毫秒，位于每次播放的开头和结尾），定义与 Sample Player 相同。sync 按打击垫设置：Free（默认）立即播放击打；Synced 锁存击打，并在所选速率的下一条传输网格线上触发（1/4、1/8、1 小节……与其他节点相同的划分），精确到采样；恰好在网格线上的击打会在该线上触发，传输停止时立即触发，在 gate 模式下，在网格线之前松开会取消击打。在 loop 模式下，同步的打击垫在开启期间每个划分都会重新触发采样（每个划分播放一遍：较长的采样在网格线处被截断，较短的则留下空隙），传输停止时则作为普通循环播放。打击垫处于 Free 时速率控件呈灰色。每个打击垫的每个参数随时都可以被调制：选择另一个打击垫时，连线仍然绑定其原本的打击垫；图块上的橙色圆点表示该打击垫有被调制的参数。图块会显示模式，若已同步则显示速率。节点的音频输出是所有打击垫的混合。已加载的采样路径和打击垫设置随补丁一起保存；加载时会重新读取音频。
+How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sample Player's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened.	用法：将声音接入 loop 输入，并将 out 接到 Audio Out，按下 Rec（传输运行且 sync 开启时会等待下一小节；即使晚按 200 毫秒，录音仍会从刚过去的那条线开始），录音在达到录音长度后自动结束，然后循环播放；Play 停止并重新开始，Dub 将输入叠加在其上，Clear 清空。波形显示带播放头和节拍网格的循环，标题下方的一行说明 looper 正在做什么。每个按钮都有 CV 引脚，因此脚踏开关或 MIDI 音符都可以驱动它们（上升沿即按下）。take 设置长度：音乐划分（默认 1 小节），或 free，此时下一次 Rec 按下即结束录音。录音时按下 Dub 会结束录音并直接进入叠加录制。Undo 逐层回退（最后一次录音、叠加或 Clear，最多 8 步），循环继续播放；在叠加过程中按下则丢弃该层。播放具有 Sample Player 的控制：finetune（音分）、pitch（半音）、speed（负值为倒放）、音量，以及每次播放开头和结尾的 fade in / fade out（毫秒）。在恰好 1.00x 时循环保持在网格上；以其他任何速率播放时，它按 length / rate 播放并与传输产生漂移，此时 Dub 暂停（各层仅以其录制时的速率写入）。thru 监听实时输入。每次录音都会按音频接口测得的往返延迟进行偏移，因此按节拍演奏的循环会落在网格上。循环（最长 60 秒）以 WAV 格式保存在你的 Recordings 文件夹中，打开补丁时会以停止状态恢复。
+Layered 3D noise on the coordinate patched into vector (Generated when empty), times scale. Detail adds octaves, roughness sets how strong each finer octave is, distortion warps the coordinate. Value is grey, Colour gives three different noises. Patch it into a Material's field input.	作用于 vector 所接入坐标（为空时使用 Generated）并乘以 scale 的分层 3D 噪声。Detail 增加倍频，roughness 设定每个更细倍频的强度，distortion 扭曲坐标。Value 为灰度，Colour 给出三种不同的噪声。接入材质的 field 输入。
+On any other item: sculpt it with the brush. Ctrl+Tab or Esc leaves	在其他任何项目上：用画笔雕刻。Ctrl+Tab 或 Esc 退出
+One curve through 2 to 8 points, applied to each channel of the patched colour and blended in by factor. The default (0,0) to (1,1) leaves the colour unchanged.	一条经过 2 至 8 个点的曲线，应用于所接入颜色的每个通道，并按 factor 混合。默认的 (0,0) 到 (1,1) 保持颜色不变。
+Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sample Player) from the end of the chain.	音符链的一部分：通过 'notes' 引脚接收音符事件，修改后再输出。从链的末端为合成器（Wavetable、Sample Player）提供输入。
+Per-component vector maths on a, b and c, plus cross, project, reflect, refract, dot, distance, length and normalize. Dot, distance and length give a grey value. Scale only shows for Scale and Refract.	对 a、b、c 进行逐分量向量运算，另有 cross、project、reflect、refract、dot、distance、length 和 normalize。Dot、distance 和 length 输出灰度值。Scale 仅在 Scale 和 Refract 时显示。
+Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or Field Pixel.	将任意 Field 内核的输出绘制为曲线或曲面，让你在接入 Field Effect、Field Synth 或 Field Pixel 之前看到内核的效果。
+Position, normal, tangent, incoming, backfacing, curvature, cavity and per-object random, one per output.	位置、法线、切线、入射、背面、曲率、凹腔以及每个对象的随机值，每项对应一个输出。
+Press again to cycle. B: Brush, Paint Mixer, Colour Replace. E: Eraser, Background Erase, Flood Erase. G: Fill, Gradient. I: Eyedropper, Style Picker, Measure. Alt-click picks a colour with the brush or fill	再次按下可循环切换。B：画笔、Paint Mixer、Colour Replace。E：橡皮擦、Background Erase、Flood Erase。G：填充、渐变。I：吸管、Style Picker、测量。Alt-点击可用画笔或填充拾取颜色
+Press again to cycle. S: Clone, Undo Brush. J: Heal, Blemish, Patch, Inpaint, Red Eye. R: Blur, Sharpen, Median. O: Dodge, Burn, Sponge	再次按下可循环切换。S：克隆、Undo Brush。J：修复、Blemish、Patch、Inpaint、红眼。R：模糊、锐化、中值。O：减淡、加深、海绵
+Reflectance of a dielectric of this IOR by view angle: low face-on, rising to 1 at grazing angles.	该 IOR 的电介质按视角的反射率：正对时较低，掠射角时升至 1。
+Remaps a value from the from range to the to range: Linear, Stepped (steps), Smoothstep or Smootherstep. Clamp limits the result to the to range.	将数值从 from 范围重映射到 to 范围：Linear、Stepped（步进）、Smoothstep 或 Smootherstep。Clamp 将结果限制在 to 范围内。
+Runs a Field kernel once per frequency bin: audio in, STFT, your kernel, inverse STFT, audio out. Read `bin`, `bins`, `binhz`, `hop`, `sr`; write `mag`, `phase` or `freq`. `mag.at(k)` reads another bin, `state` keeps per-bin memory, `input bin audio B` adds a second spectrum for cross-synthesis. Size trades time for frequency detail; latency is one Size.	对每个频点运行一次 Field 内核：音频输入、STFT、你的内核、逆 STFT、音频输出。读取 `bin`、`bins`、`binhz`、`hop`、`sr`；写入 `mag`、`phase` 或 `freq`。`mag.at(k)` 读取另一个频点，`state` 保存每个频点的记忆，`input bin audio B` 为交叉合成添加第二个频谱。Size 在时间与频率细节之间权衡；延迟为一个 Size。
+Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution. It also runs over point clouds (compiled to GLSL when the input has GPU points), where life is available as an attribute; the point presets include Limit to Box and Project onto Shape. Boxes opens it in the Field Patcher.	对几何体逐顶点运行 Field 内核，修改 P、N、uv、Cd 和自定义属性，执行方式由速率推断。也可作用于点云（当输入具有 GPU 点时编译为 GLSL），其中 life 可作为属性使用；点预设包括 Limit to Box 和 Project onto Shape。Boxes 在 Field Patcher 中打开。
+Runs once per bin. Read: bin, bins, binhz, hop, sr. Write: mag, phase, freq. X.at(k) reads another bin.	每个频点运行一次。读取：bin、bins、binhz、hop、sr。写入：mag、phase、freq。X.at(k) 读取另一个频点。
+Select, Draw, Erase, Blade and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	选择、绘制、擦除、切割和手型（拖动以平移）工具，与时间线和 Sample Studio 使用相同按键，前提是指针位于钢琴卷帘上（Esc 也返回选择）。工具下拉菜单与缩放一同包含它们。本节中的每个按键都需要指针位于该处
+Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight and Geometry build a surface per shading point, the way Blender's shader nodes do. Chain them into a Material's field, albedo, roughness, metallic, normal, emission or opacity pin; the Material compiles the chain into one program for every Render 3D engine.	Shade Coord、Mapping、Image、Noise、Voronoi、Gradient、Brick、Checker、Math、Vector Math、Mix、Ramp、Map Range、Separate、Combine、Curves、Bump、Normal Map、Fresnel、Layer Weight、Geometry 均会按照 Blender 着色器节点的方式，为每个着色点构建表面。将它们串接到材质的 field、albedo、roughness、metallic、normal、emission 或 opacity 引脚上；材质会把整条链编译为一个程序，供每个 Render 3D 引擎使用。
+Show or hide the docked Field Patcher; it opens the Field Notes, Field Primitive or Field Modifier node selected on the canvas	显示或隐藏停靠的 Field Patcher；它会打开画布上选中的 Field Notes、Field Primitive 或 Field Modifier 节点
+Takes one channel of a vector or colour as a grey value: R, G, B (or X, Y, Z), or hue, saturation, value in HSV mode.	将向量或颜色的一个通道作为灰度值输出：R、G、B（或 X、Y、Z），HSV 模式下为色相、饱和度、明度。
+The 2D View's document: node outputs, fills and groups stacked into one picture at the document's size. Right-click any node with a picture and choose Add to 2D View, then lay it out in the 2D View panel (Shift+2): V moves, C crops, H pans, Z zooms, B paints on a paint layer (pen pressure works), M, L and W select pixels; drag a handle to scale (Shift for free), drag outside a corner to rotate. Each layer has a blend mode, opacity, fill, lock, colour label, an optional node or painted pixel mask and clip to the layer below; a paint layer can be turned into a Draw node from its menu; groups pass through or isolate. P draws pen paths, U live shapes (rectangle, ellipse, polygon, star, line) with fill, stroke, dash and booleans, A edits points, T types point or box text; vector and text layers stay editable after reopen, take a vector mask, and turn into a Sketch or Text node from their menu. Drop an SVG on the 2D View to make it a vector layer. A layer only points at its node, so the node keeps animating and is never changed; a deleted node leaves its layer as source missing. F12 renders a picture and {mod}+F12 the animation, through an Output node.	2D 视图的文档：节点输出、填充和分组堆叠成一张与文档尺寸相同的图片。右键点击任意带图片的节点并选择「添加到 2D 视图」，然后在 2D 视图面板（Shift+2）中排版：V 移动，C 裁剪，H 平移，Z 缩放，B 在绘制图层上绘画（支持笔压），M、L 和 W 选择像素；拖动手柄进行缩放（按住 Shift 可自由缩放），在角外拖动即可旋转。每个图层都有混合模式、不透明度、填充、锁定、颜色标签、可选的节点或绘制像素蒙版，并可剪切到下方图层；绘制图层可通过其菜单转换为 Draw 节点；分组可直通或隔离。P 绘制钢笔路径，U 绘制实时形状（矩形、椭圆、多边形、星形、直线），支持填充、描边、虚线和布尔运算，A 编辑点，T 输入点文本或框文本；矢量和文本图层在重新打开后仍可编辑，可添加矢量蒙版，并可通过其菜单转换为 Sketch 或 Text 节点。将 SVG 拖到 2D 视图上即可将其变为矢量图层。图层只指向其节点，因此节点继续动画且不会被修改；删除节点后，其图层会显示源缺失。F12 渲染图片，{mod}+F12 通过 Output 节点渲染动画。
+The only node that sums audio - every other audio input pin takes exactly one cable, so any time two signals have to meet, they meet here. Four to eight slots, each with its own gain, pan, mute and solo, summed to one output. The Mixer panel (Shift+L) shows every Mixer that feeds an Audio Out as a console: inserts and sends per strip, right-click a strip name to group, ungroup or move it, and the master strip reads true peak and loudness (momentary, short-term, integrated; click the readout to reset). Render in the panel header records the console to a file: Live records what plays for a set length plus a tail, Fast renders the same take offline, quicker than real time. Fast can't render live inputs (camera, MIDI, audio in). Files are named from a template ({patch} {take} {date} {time}) and never overwrite.	唯一对音频求和的节点——其他音频输入引脚都只接受一根线，因此任何两个信号需要汇合时，都在这里汇合。四到八个插槽，各自带有增益、声像、静音和独奏，最终求和为一个输出。Mixer 面板（Shift+L）将每个连接到 Audio Out 的 Mixer 显示为一个调音台：每个通道的插入与发送；右键点击通道名称可分组、取消分组或移动；总线通道显示真实峰值和响度（瞬时、短期、综合；点击读数可复位）。面板标题栏中的 Render 会将调音台录制为文件：Live 录制设定时长加尾音期间的实际播放内容，Fast 以离线方式渲染同一个录音，比实时更快。Fast 无法渲染实时输入（摄像头、MIDI、音频输入）。文件按模板命名（{patch} {take} {date} {time}），且从不覆盖。
+Translates, rotates (degrees, X then Y then Z) and scales a shading coordinate. Point moves the coordinate, Texture moves the pattern (the inverse), Vector skips the translate, Normal keeps unit length. With nothing patched in it uses Generated.	对着色坐标进行平移、旋转（角度，依次为 X、Y、Z）和缩放。Point 移动坐标，Texture 移动图案（与之相反），Vector 跳过平移，Normal 保持单位长度。未接线时使用 Generated。
+True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset.	真峰值（dBTP）和响度（LUFS）：瞬时、短期、综合。点击复位。
+Your predictive macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style.	你的预测式宏推子：利用 PCA 对变化量提取多旋钮动作的主轴，让少数宏推子以你的风格共同驱动许多耦合参数。
