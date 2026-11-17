@@ -44,7 +44,7 @@ STEPS=(
   "motion-lint|I|P1|yes|no|motion lint|python3 tools/design/motion_lint.py"
   "contrast|I|P1|yes|no|text contrast pairs in both themes|python3 tools/design/contrast.py"
   "i18n-lint|I|P1|yes|no|unwrapped UI strings|python3 tools/i18n/lint.py"
-  "shortcuts-static|I|P1|yes|no|shortcuts match the help window|python3 $SW/shortcuts-sweep/check.py --quiet"
+  "shortcuts-static|I|P1|yes|no|shortcuts match the help window|python3 tools/design/keys_gate.py --quiet"
   "cable-static|I|P1|yes|no|cable logic static check|python3 $SW/cable-logic-sweep/check.py"
   "compositing-static|E|P1|yes|no|compositing pipeline static check|python3 $SW/compositing-pipeline-sweep/check.py"
   "output-static|E|P1|yes|no|output/projection static check|python3 $SW/output-projection-sweep/check.py"
