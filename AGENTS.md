@@ -40,11 +40,11 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `geometry-transform-sweep` | Sweep | Transform propagation for geometry nodes |
 | `modulation-sweep` | Sweep | Modulation sources/destinations/bindings end to end |
 | `node-ui-sweep` | Sweep | Node UI regression sweep |
+| (no skill) `tools/design/keys_gate.py` | Sweep | Keyboard shortcuts checks; replaces the retired `shortcuts-sweep` skill (commit B1) |
 | `output-projection-sweep` | Sweep | Output/projection node checks |
 | `panels-sweep` | Sweep | Panels subsystem checks |
 | `rate-analysis-sweep` | Sweep | Sample/frame rate analysis |
 | `render-pipeline-sweep` | Sweep | Render pipeline checks |
-| `shortcuts-sweep` | Sweep | Keyboard shortcuts checks |
 | `audio-node-ui` | UI | Layout/widget grammar for audio node UI |
 | `node-ui-pillars` | UI | Symmetry/contrast rules for all node UI (load before any node UI edit) |
 | `infinite-design-system` | UI | How every element looks/moves: tokens, components, icons, motion, CI ratchet (load before any style/icon/chrome change) |
