@@ -1795,7 +1795,7 @@ The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, m
 Picture: 3D View docked at the bottom with the Scene list open.
 
 ## 2D View
-The 2D View (`view2d`) is a layered 2D canvas backed by a **Scene 2D** node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. Right-click any picture node and choose **Add to 2D View**, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. Docks bottom, right, left, top or fill; driven from the CLI with `infinite view2d`.
+The 2D View (`view2d`) is a layered 2D canvas backed by a **Scene 2D** node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. Right-click any picture node and choose **Add to 2D View**, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. **Free Transform** (Cmd+T) moves, scales and turns the selected layers as one step. **Merge Down** and **Merge Layers** (Cmd+E), **Merge Visible** (Cmd+Shift+E) and **Flatten Image** merge layers the way Photoshop does, in one undo step. Docks bottom, right, left, top or fill; driven from the CLI with `infinite view2d`.
 
 ## Mixer panel
 The Mixer panel (`mixer`) is a hardware-style mixing desk for Mixer and audio channels. It shares the standard page strip and 7-row page menu (`Cmd+R` renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. Right-click a Mixer node and choose **Open in Mixer panel**, or open it from the rail.
@@ -1808,6 +1808,9 @@ The Field Patcher (`fieldpatcher`) is a visual node-box editor for building Fiel
 
 ## Curve Editor
 The Curve Editor (`curveeditor`) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.
+
+## Canvas Link
+Canvas Link is the one way a panel takes a node from the canvas. Piano Roll pages, 2D layer sources, 3D View objects and Session clips each show a link field: choose the node from the list, or press **Pick** and click it on the canvas. While a pick is armed the canvas dims the nodes that cannot be picked and rings the one under the pointer. Esc cancels.
 
 ## Windows and dialogs
 Picture: All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.

@@ -175,7 +175,7 @@ Owner key: **Auto** = a script gates it; **Claude** = Claude runs it and judges;
 - Design lints: `tools/design/ratchet.py`, `lint_icons.py`, `motion_lint.py`, `contrast.py` (Auto): no ratchet increase.
 - Component goldens: `driver.sh --group ui` vs `tests/ui-golden` (Auto).
 - Screenshot-judge every node, closed/open, dark/light: `tools/design/gallery` (`shoot.py`, `sheet.py`, `sizes.sh`, `widen.py`), against the baseline shots (Claude judges, Owner spot-checks). Per-node checklist: section 8.
-- `SW node-ui-sweep`, `SW panels-sweep`, `SW shortcuts-sweep` (`check.py`), `SW cable-logic-sweep`; `PINDUPTEST`, `SIZETEST`, `TEXTFIT`, `KB*TEST`, `NAVTEST` (Auto).
+- `SW node-ui-sweep`, `SW panels-sweep`, `SW keys_gate` (`tools/design/keys_gate.py`), `SW cable-logic-sweep`; `PINDUPTEST`, `SIZETEST`, `TEXTFIT`, `KB*TEST`, `NAVTEST` (Auto).
 - i18n: `I18NTEST`, `tools/i18n/lint.py` (Auto).
 - First run, error messages and empty states, hi-DPI/small window: user checklist (Owner); refusal list `[new]` (Claude).
 

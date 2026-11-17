@@ -41,7 +41,7 @@ Start from a working patch instead of an empty canvas. 15 **Starters** each teac
 
 ![The Infinite node canvas](docs/screenshots/v1/node-graph.png)
 
-Everything is a node, and every cable carries one kind of thing: pictures, 3D geometry, audio, notes or control signals. Patch left to right, right-click to add, and anything with a dot beside it can be modulated. Infinite has **347 node types**; the [Node library](#node-library) lists them by domain, and the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf) documents each one.
+Everything is a node, and every cable carries one kind of thing: pictures, 3D geometry, audio, notes or control signals. Patch left to right, right-click to add, and anything with a dot beside it can be modulated. Infinite has **347 node types**; the [Node library](#node-library) lists them by domain, and the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf) covers most of them.
 
 ### Pictures and video
 
@@ -57,7 +57,7 @@ Procedural meshes, imports (USD, OBJ, PLY, STL, glTF), booleans, Voronoi and Del
 
 ![Piano, Analog, Granular and Generate Samples nodes](docs/screenshots/v1/gallery-sound.png)
 
-A sample-accurate, pull-based audio graph on the same BPM transport as the pictures. Synths and physical models (Analog, FM, Wavetable, Metallic, String, **Piano**, **Wind**, Granular, PaulStretch, Molder, Sampler, Slicer, 8-track Drum Sequencer, Looper), a full effects rack, AU and VST3 plugin hosting with native windows and modulatable parameters, and **Generate Samples**, a player whose sample is made rather than loaded: pick a part (drums, bass, pads, plucks, leads and more, 18 in all), press generate, and a loop of 1, 2, 4 or 8 bars is rendered from Infinite's own instruments. It saves as a recipe, not as audio.
+A sample-accurate, pull-based audio graph on the same BPM transport as the pictures. Synths and physical models (Analog, FM, Wavetable, Metallic, String, **Piano**, **Wind**, Granular, PaulStretch, Molder, Sampler, Slicer, 8-track Drum Sequencer, Looper), a full effects rack, AU and VST3 plugin hosting with native windows and modulatable parameters, and **Generate Samples**, a player whose sample is made rather than loaded: pick one of 60 music styles and a part (all, synths, pads, plucks, percussion or drums), press generate, and a loop of 1, 2, 4 or 8 bars is rendered from Infinite's own instruments. It saves as a recipe, not as audio.
 
 ### Notes and control
 
@@ -71,16 +71,16 @@ Infinite has **347 node types**:
 
 | Domain | Key nodes |
 |---|---|
-| **2D and video** | Image, folder Slideshow, Video (hardware-accelerated), Syphon In / Spout In, NDI In, Paint/Draw canvas, GLSL Formula editor, Sketch (JavaScript-drawn images, with SVG animation), Shapes (SDF), Noise and Gradient Ramps |
+| **2D and video** | Image, folder Slideshow, Video (hardware-accelerated), Syphon In / Spout In, NDI In, Paint/Draw canvas, GLSL Formula editor, Sketch (JavaScript-drawn images, with SVG animation), Shapes (SDF), Noise and Ramp (gradient) |
 | **2D FX and grading** | Blur, Bloom, Glitch (6 modes), Twirl, Ripple, Displace, Halftone, Curves (RGB/Luma splines), Dither, Color Ramp, .cube LUTs, Gradient Map, Palette extraction |
-| **Compositing and masks** | Blend (32 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction-Diffusion, Resynthesize |
-| **3D geometry and FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Point Distribution, Sketch 3D (JavaScript-built meshes), Mesh Deconstruction, Delaunay Mesh, Voronoi Cells, Decimate, Curve Ops, Armature, Taubin Smooth, Array, Instancing, Metaballs, Point Trails |
-| **3D scene and render** | 3D View, Camera (orbit/perspective/ortho), Lights, 32-bit HDRI Environment, PBR Materials, ACES tonemapping, multisampled antialiasing |
+| **Compositing and masks** | Blend (32 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction Diffusion, Resynthesize |
+| **3D geometry and FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Distribute Points in Grid / on Faces, Sketch 3D (JavaScript-built meshes), Mesh to Edges / Faces / Points, Delaunay Mesh, Voronoi Cells, Decimate, Curve Ops, Armature, Smooth, Array, Instancing, Metaballs, Point Trails |
+| **3D scene and render** | 3D View, Camera (orbit/perspective/ortho), Light, 32-bit HDRI Environment, PBR Materials, ACES tonemapping, multisampled antialiasing |
 | **Synths and sound** | Wavetable, Metallic modal resonator, String, Piano, Wind, Generate Samples, Granular, PaulStretch, Molder / Grain Molder (spectral resynthesis), Sampler, Slicer (onset-detecting sample chopper), 8-track Drum Sequencer, 16-pad MPC sampler, Looper (record and overdub, tempo-synced, latency-compensated), multi-waveform Oscillator |
 | **Field language** | Field Modifier, Field Primitive, Field Effect, Field Synth, Field Pixel, Field Notes, Field Graph (see [below](#field-and-code)) |
-| **Notes and MIDI** | Piano Roll, live MIDI input and clock, Arpeggiator, Note Sequencer, Chorder, Strum, Bouncing Balls (physics notes), Humanizer, Quantizer, MIDI File player, MIDI Out (hardware and virtual ports, CC and clock) |
-| **Audio FX and plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Lookahead Limiter, Delay, Reverb, Drive/Saturation, Pitch and Frequency Shifters, Chorus, Phaser, Formant |
-| **Modulators and analysis** | LFO, Random, Pattern CV, Envelope Follower, Math, XY Pad, Audio Analyze (8-band FFT, onset), Image Analyze (luminance, motion), Hand / Face / Pose Track (camera to modulators, via the Tracking pack) |
+| **Notes and MIDI** | Piano Roll, live MIDI input and clock, Arpeggiator, Note Sequencer, Chorder, Note Strum, Bouncing Balls (physics notes), Humanizer, Quantizer, MIDI File player, MIDI Out (hardware and virtual ports, CC and clock) |
+| **Audio FX and plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Limiter, Delay, Reverb, Drive/Saturation, Pitch and Frequency Shifters, Chorus, Phaser, Formant |
+| **Modulators and analysis** | LFO, Random, Pattern, Envelope, Math, XY Pad, Audio Analyze (8-band FFT, onset), Image Analyze (luminance, motion), Hand / Face / Pose Track (camera to modulators, via the Tracking pack) |
 | **Output and I/O** | Spatial Mixer (3D headphone mix with head tracking), PNG snapshot, H.264/MOV recording with synchronised audio, Syphon Out / Spout Out, NDI Out |
 
 ---
@@ -93,7 +93,7 @@ Panels dock to the edges of the node canvas and open from the rail or a key; eve
 
 <img src="docs/screenshots/v1/2d-view.png" alt="2D View compositing layers, masks, tools and node outputs" width="100%">
 
-A non-destructive 2D layer and node compositor (Shift + 2). Stack seven layer kinds (`Node`, `Fill`, `Group`, `Paint`, `Vector`, `Text` and `Adjust`, plus After-Effects-style 3D card layers) across 39 tools (Move, Marquee, Lasso, Magic Wand, Selection Brush, Healing, Brush, Clone Stamp, Eraser, Gradient, Pen, Shape, Text and more), 36 blend modes, 28 adjustment layers (with `Drive A..D` modulation), 10 layer styles and a drag-to-reorder Smart Filter stack of 18 GPU node effects. Live `Node` layers keep animating from the graph, and PSD and ORA files import and export with layers intact.
+A non-destructive 2D layer and node compositor (Shift + 2). Stack seven layer kinds (`Node`, `Fill`, `Group`, `Paint`, `Vector`, `Text` and `Adjust`, plus After-Effects-style 3D card layers) across 39 tools (Move, Marquee, Lasso, Magic Wand, Selection Brush, Healing, Brush, Clone Stamp, Eraser, Gradient, Pen, Shape, Text and more), 32 blend modes (and four legacy modes kept for older patches), 28 adjustment layers (with `Drive A..D` modulation), 10 layer styles and a drag-to-reorder Smart Filter stack of 18 GPU node effects. Live `Node` layers keep animating from the graph, and PSD and ORA files import and export with layers intact. Free Transform (Cmd+T) moves, scales and turns the selected layers as one step. Merge Down and Merge Layers (Cmd+E), Merge Visible (Cmd+Shift+E) and Flatten Image merge layers the way Photoshop does, in one undo step. A layer's source can be a Canvas Link pick: choose a node from the list, or click it on the canvas.
 
 ### 3D View
 
@@ -124,14 +124,14 @@ A self-contained sample editor (Shift + W). Open a file, drop one in, record fro
 
 <img src="docs/screenshots/v1/piano-roll.png" alt="Piano Roll with notes in a scale" width="100%">
 
-A note editor (Shift + R) for MIDI lanes on the Timeline, played by the Piano Roll node. Draw, erase, select and quantise notes, snap to the project's scale (in-scale lanes are coloured), and transform them with Humanize, Strum, Legato, Chop to Grid, Velocity Ramp, Reverse, Invert and half or double speed. Record from a MIDI input, import a `.mid` file, or press Generate (G) to write notes in the page's key.
+A note editor (Shift + R) for MIDI lanes on the Timeline, played by the Piano Roll node. Draw, erase, select and quantise notes, snap to the project's scale (in-scale lanes are coloured), and transform them with Humanize, Strum, Legato, Chop to Grid, Velocity Ramp, Reverse, Invert and half or double speed. Record from a MIDI input, import a `.mid` file, or press Generate (G) to write notes in the page's key. The page takes the node it plays through Canvas Link, the same pick that 2D layers and session clips use.
 
 ### Session and Timeline
 
 | Session | Timeline |
 |---|---|
 | <img src="docs/screenshots/v1/session-clips.png" alt="Session view with scenes of clips" width="100%"> | <img src="docs/screenshots/v1/timeline.png" alt="Timeline arrangement with audio and video tracks" width="100%"> |
-| A clip launcher for live sets (Shift + S): audio and video clips in scenes, launch quantize (1 bar by default), Trigger and Gate launch modes, follow actions and "Then Play Next Scene". Record writes your performance into the Timeline, and Render Take renders that span, audio and video, to a folder. | The arrangement (Shift + T): clips on tracks against the same BPM transport, a blade tool, track groups, markers, loop and snap, drag-and-drop media import, live waveforms and video thumbnails, and a render queue. |
+| A clip launcher for live sets (Shift + S): audio and video clips in scenes, launch quantize (1 bar by default), Trigger and Gate launch modes, follow actions and "Then Play Next Scene". Record writes your performance into the Timeline, and Render Take renders that span, audio and video, to a folder. A clip's source can be picked with Canvas Link, as on the Piano Roll and in 2D layers. | The arrangement (Shift + T): clips on tracks against the same BPM transport, a blade tool, track groups, markers, loop and snap, drag-and-drop media import, live waveforms and video thumbnails, and a render queue. |
 
 ### Mod Matrix and Performance
 
@@ -241,6 +241,9 @@ npx -y infinite-engine init
 | `infinite_render_sketch3d` | Renders JavaScript-built 3D geometry to a PNG |
 | `infinite_validate_patch` | Checks a `.inf` patch against the engine |
 | `infinite_render_video` | Renders an MP4 from a `.inf` patch |
+| `infinite_compare_frames` | Compares two pictures (PNG, `.inf` or patch text) and says whether they match, in plain words |
+| `infinite_find_knob` | Finds which node and param move gives a wanted picture change, from measured renders |
+| `infinite_node_effects` | Gives the measured effect of an Effects or colour node: what adding it does, and what each param does |
 
 Tool schemas and prompts: [`tools/npm/infinite-engine/README.md`](tools/npm/infinite-engine/README.md) and [`AGENT.md`](AGENT.md).
 
@@ -262,14 +265,20 @@ Every keyboard shortcut is listed in the app under **All shortcuts...** in the m
 
 | Key | Panel |
 |---|---|
-| Shift + T | Timeline |
+| Shift + 2 | 2D View |
+| Shift + 3 | 3D View |
+| Shift + F | Field Patcher |
+| Shift + E | Curve Editor |
 | Shift + S | Session |
+| Shift + T | Timeline |
+| Shift + L | Mixer |
+| Shift + J | Drums |
 | Shift + R | Piano Roll |
 | Shift + W | Sample Studio |
 | Shift + M | Mod Matrix |
 | Shift + P | Performance |
-| Shift + 3 | 3D View |
 | Shift + U | History |
+| Shift + K | Audio engine on or off (on the canvas) |
 | Ctrl + \` | Terminal |
 
 ---
@@ -277,7 +286,7 @@ Every keyboard shortcut is listed in the app under **All shortcuts...** in the m
 ## Installation
 
 ### Pre-built app (macOS, Windows and Linux)
-Download the latest build from [GitHub Releases](https://github.com/n1m21n/Infinite/releases): `Infinite.dmg` for macOS, `Infinite-windows-x64.zip` / `Infinite-windows-ARM64.zip` for Windows, or `Infinite-x86_64.AppImage` for Linux.
+Download the latest build from [GitHub Releases](https://github.com/n1m21n/Infinite/releases): `Infinite.dmg` for macOS, `Infinite-windows-x64.zip` / `Infinite-windows-ARM64.zip` for Windows (or the `Infinite-Setup-windows-x64.exe` / `Infinite-Setup-windows-ARM64.exe` installer), or `Infinite-x86_64.AppImage` for Linux.
 
 **macOS** (Infinite is not notarised by Apple, so the first launch needs one extra step)
 
