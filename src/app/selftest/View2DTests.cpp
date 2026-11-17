@@ -2594,6 +2594,39 @@ void RunView2DTest()
          pic.Commit();
       }
 
+      // D12 Merge Down: two shape layers (the top one at half strength) become one paint layer that looks the same.
+      {
+         auto boxLayer = [&](float x0, float rgb0, float rgb2, float opacity) {
+            const int id = pic.AddVectorLayer();
+            Shape box;
+            box.type = Shape::kRect;
+            box.x0 = x0; box.y0 = 20; box.x1 = x0 + 100; box.y1 = 90;
+            box.fillC[0] = rgb0; box.fillC[1] = 0.0f; box.fillC[2] = rgb2;
+            pic.FindLayer(id)->shapes.push_back(box);
+            pic.FindLayer(id)->opacity = opacity;
+            return id;
+         };
+         const int lo = boxLayer(200, 1.0f, 0.0f, 1.0f), hi = boxLayer(250, 0.0f, 1.0f, 0.5f);
+         pic.Commit();
+         Cook(&pic);
+         const size_t n0 = pic.Layers().size();
+         const std::vector<float> a0 = Pixel(&pic, 225, 50), b0 = Pixel(&pic, 275, 50), c0 = Pixel(&pic, 325, 50);
+         const int m = pic.MergeLayers({ lo, hi }, 1 << 24);
+         Cook(&pic);
+         const std::vector<float> a1 = Pixel(&pic, 225, 50), b1 = Pixel(&pic, 275, 50), c1 = Pixel(&pic, 325, 50);
+         auto same = [](const std::vector<float>& x, const std::vector<float>& y) {
+            return std::fabs(x[0] - y[0]) < 0.03f && std::fabs(x[1] - y[1]) < 0.03f && std::fabs(x[2] - y[2]) < 0.03f;
+         };
+         printf("  D12 merge: overlap %.2f %.2f %.2f -> %.2f %.2f %.2f\n", b0[0], b0[1], b0[2], b1[0], b1[1], b1[2]);
+         Check("D12: merge down leaves one paint layer in place of two", m != 0 && pic.Layers().size() == n0 - 1 &&
+                                                                      pic.FindLayer(m)->kind == Kind::Paint && pic.FindLayer(lo) == nullptr);
+         Check("D12: the merged layer looks as the two did (red, overlap, half blue)", same(a0, a1) && same(b0, b1) && same(c0, c1) &&
+                                                                                    b0[0] > 0.3f && b0[2] > 0.3f);
+         if (m != 0)
+            pic.RemoveLayer(m);
+         pic.Commit();
+      }
+
       // #5 #6 GL leak check: 50 layers added, drawn and removed leave no textures behind.
       {
          Cook(&pic);

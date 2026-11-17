@@ -564,6 +564,56 @@ bool Scene2DNode::RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba)
    return !rgba.empty();
 }
 
+bool Scene2DNode::RenderSet(const std::vector<int>& set, int frameId, std::vector<uint8_t>& rgba)
+{
+   Layers();
+   if (!EnsureShaders() || mFinishProgram == 0)
+      return false;
+   SyncSurfaces();
+   SyncRasters();
+   const std::vector<Layer> keep = mLayers;
+   auto inSet = [&](int id)
+   {
+      for (int s : set)
+         if (IsInside(id, s))
+            return true;
+      return false;
+   };
+   for (const Layer& k : keep)
+   {
+      Layer* m = FindLayer(k.id);
+      if (m == nullptr || inSet(k.id))
+         continue;
+      bool holds = false;   // a group the set sits in: shown, at full strength, passing its children through
+      for (int s : set)
+         holds = holds || IsInside(s, k.id);
+      if (holds)
+      {
+         m->visible = true;
+         m->opacity = 1.0f;
+         m->blend = kPassThrough;
+      }
+      else
+         m->visible = false;
+   }
+   const bool keepOpaque = mAccOpaque;
+   const int keepSolo = soloLayer;
+   soloLayer = 0;
+   mIsolating = true;
+   mAccOpaque = false;
+   const float none[4] = { 0, 0, 0, 0 };
+   Clear(PairAt(0), none);
+   DrawList(0, 0, frameId, 1.0f);
+   FlushQueue();
+   mIsolating = false;
+   mAccOpaque = keepOpaque;
+   soloLayer = keepSolo;
+   rgba.clear();
+   ReadFinished(PairAt(0).Tex(), mFinishProgram, mDoc.w, mDoc.h, mDoc.linear, mDoc.headroom, rgba);
+   mLayers = keep;
+   return rgba.size() == (size_t)mDoc.w * mDoc.h * 4;
+}
+
 bool Scene2DNode::PictureUnder(int id, int effect, int frameId, std::vector<uint8_t>& rgba)
 {
    const Layer* l = FindConst(id);
