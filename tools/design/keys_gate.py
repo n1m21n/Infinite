@@ -10,6 +10,7 @@ checks (formerly shortcuts-sweep/check.py) into one script:
   5. Table vs code drift:
      - Documented in kShortcuts but no IsKeyPressed/IsKeyDown handler in src/.
      - Handled in src/ but absent from kShortcuts (and not in LOCAL_KEYS).
+  7. Habits: Blender keys in the 3D View, Photoshop keys in the 2D View (HABITS).
   6. macOS-only modifier: KeySuper/ImGuiMod_Super without KeyCtrl/ImGuiMod_Ctrl (unless in SUPER_ALLOW).
 
 Exit 0 when clean, 1 on any problem. Pass --quiet for a single-line summary.
@@ -527,6 +528,54 @@ def check_menu_text():
     return n, list(dict.fromkeys(bad))
 
 
+# 7. Habits: inside an area, the keys people bring from the app that area is modelled on (Blender for the 3D View,
+# Photoshop for the 2D View) do what they do there. chord (macOS spelling) -> the kShortcuts action(s) it must belong to.
+HABITS = {
+    "3D View": {   # Blender
+        "Tab": {"Edit Mode"}, "Ctrl+Tab": {"Pose Mode", "Sculpt Mode"},
+        "G": {"Move / Rotate / Scale"}, "R": {"Move / Rotate / Scale"}, "S": {"Move / Rotate / Scale"},
+        "Alt+G": {"Clear Transform"}, "Alt+R": {"Clear Transform"}, "Alt+S": {"Clear Transform"},
+        "Shift+A": {"Add to the View"}, "Shift+D": {"Duplicate"}, "X": {"Remove"}, "Delete": {"Remove"},
+        "H": {"Hide / Show"}, "Shift+H": {"Hide / Show"}, "Alt+H": {"Hide / Show"},
+        "A": {"Select All / None"}, "Alt+A": {"Select All / None"}, "Cmd+I": {"Invert Selection"},
+        "Cmd+P": {"Follow / Clear Follow"}, "Alt+P": {"Follow / Clear Follow"}, "Cmd+L": {"Copy Transforms"},
+        "F": {"Frame"}, "Home": {"Frame"}, "F2": {"Rename Item"}, "N": {"Sidebar"}, "/": {"Local View"},
+        "0": {"Camera View"}, "1": {"Axis Views"}, "3": {"Axis Views"}, "7": {"Axis Views"},
+        "Shift+C": {"Reset 3D Cursor"}, "Shift+R": {"Repeat Last"}, "O": {"Proportional Editing"},
+        "Alt+Z": {"X-ray / Overlays"}, "F12": {"Render"},
+    },
+    "2D View": {   # Photoshop
+        "V": {"Tools"}, "B": {"Paint Tools"}, "M": {"Selection Tools"}, "L": {"Selection Tools"}, "P": {"Vector Tools"},
+        "T": {"Vector Tools"}, "[": {"Brush Size / Hardness"}, "]": {"Brush Size / Hardness"}, "X": {"Colours"},
+        "D": {"Colours"}, "Q": {"Quick Mask"}, "Cmd+D": {"Deselect / Invert"}, "Cmd+Shift+I": {"Deselect / Invert"},
+        "Cmd+0": {"Fit / Actual Pixels"}, "Cmd+1": {"Fit / Actual Pixels"}, "Cmd+T": {"Free Transform"},
+        "Cmd+J": {"Duplicate Layer"}, "Cmd+Shift+J": {"Layer via Cut"}, "Cmd+G": {"Group / Ungroup"},
+        "Cmd+Shift+G": {"Group / Ungroup"}, "Cmd+Alt+G": {"Clipping Mask"}, "Cmd+E": {"Merge Down"},
+        "Cmd+Shift+E": {"Merge Visible"}, "Cmd+A": {"Select All"}, "Cmd+R": {"Rulers / Grid / Guides"},
+    },
+}
+
+
+def check_habits():
+    norm = lambda c: "+".join(sorted(c.split("+")[:-1], key=lambda x: MODS.index(x) if x in MODS else 99) + [c.split("+")[-1]]).lower()
+    have = {}
+    for m in ROW_RX.finditer(SRC_HELP.read_text()):
+        cat, act, expr = m.group(1), m.group(2), m.group(3)
+        if cat in HABITS:
+            for c in chords(key_text(expr, "macOS")):
+                have.setdefault((cat, norm(c)), set()).add(act)
+    issues, n = [], 0
+    for cat, table in HABITS.items():
+        for chord, want in table.items():
+            n += 1
+            got = have.get((cat, norm(chord)), set())
+            if not got:
+                issues.append(f"{cat}: {chord} does nothing; people expect {' or '.join(sorted(want))}")
+            elif not got & want:
+                issues.append(f"{cat}: {chord} is {', '.join(sorted(got))}; people expect {' or '.join(sorted(want))}")
+    return n, issues
+
+
 def main():
     quiet = "--quiet" in sys.argv
     n_chords, areas, overlap_bad = check_overlap_and_os()
@@ -535,8 +584,9 @@ def main():
     stats, drift_bad = check_drift(quiet=quiet)
     k_rows, s_rows, settings_bad = check_settings_keys(stats["rows"] if stats else 0)
     n_menu, menu_bad = check_menu_text()
+    n_habit, habit_bad = check_habits()
 
-    total_bad = len(overlap_bad) + len(verb_bad) + len(focus_bad) + len(drift_bad) + len(settings_bad) + len(menu_bad)
+    total_bad = len(overlap_bad) + len(verb_bad) + len(focus_bad) + len(drift_bad) + len(settings_bad) + len(menu_bad) + len(habit_bad)
     if not quiet:
         print(f"keys gate [overlap/os]: {n_chords} chords in {areas} areas x {len(PLATFORMS)} OS, {len(overlap_bad)} problem(s)")
         for b in overlap_bad:
@@ -553,6 +603,9 @@ def main():
         print(f"keys gate [menu text]: {n_menu} menu keys checked, {len(menu_bad)} problem(s)")
         for mb in menu_bad:
             print(" ", mb)
+        print(f"keys gate [habits]: {n_habit} Blender / Photoshop keys checked, {len(habit_bad)} problem(s)")
+        for hb in habit_bad:
+            print(" ", hb)
         if stats:
             print(
                 f"keys gate [drift]: {stats['rows']} documented rows, {stats['handled']} handled keys, "
