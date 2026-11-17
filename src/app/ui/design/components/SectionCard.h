@@ -15,7 +15,7 @@
 namespace SectionCard
 {
    constexpr float kPad = tok::space_2;     // card edge to content, and how far a card reaches into the window padding
-   constexpr float kLabelW = 72.0f;         // field label column
+   constexpr float kLabelW = tok::label_w;  // field label column
    // The same two at the current density (UiDensity): use these inside a panel's settings.
    inline float Pad() { return UiDensity::M().pad; }
    inline float LabelW() { return UiDensity::M().label; }

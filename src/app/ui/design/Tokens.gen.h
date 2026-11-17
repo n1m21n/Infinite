@@ -41,6 +41,8 @@ namespace tok
    constexpr float dropdown_w_s = 96.0f;
    constexpr float dropdown_w_m = 144.0f;
    constexpr float label_col = 96.0f;
+   constexpr float label_w = 96.0f;
+   constexpr float label_w_wide = 200.0f;
    constexpr float check_box = 16.0f;
    constexpr float switch_w = 30.0f;
    constexpr float switch_h = 16.0f;

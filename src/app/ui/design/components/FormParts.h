@@ -21,7 +21,7 @@
 
 namespace FormParts
 {
-   constexpr float kLabelW = 200.0f;
+   constexpr float kLabelW = tok::label_w_wide;
    constexpr float kControlW = 150.0f;
    constexpr float kSliderW = kControlW;   // sliders, dropdowns and inputs share one width in Settings
    constexpr float kRowH = tok::control_h + tok::row_gap;   // a settings row: one control plus the row gap
@@ -33,10 +33,10 @@ namespace FormParts
    struct Narrow
    {
       float savedW; bool savedFill;
-      // labelW < 0: the label column at the current density (92 regular, SectionCard::LabelW() in a compact strip).
+      // labelW < 0: the label column at the current density (tok::label_w regular, SectionCard::LabelW() in a compact strip).
       explicit Narrow(float labelW = -1.0f) : savedW(gLabelW), savedFill(gFill)
       {
-         gLabelW = labelW >= 0.0f ? labelW : UiDensity::IsCompact() ? SectionCard::LabelW() : 92.0f;
+         gLabelW = labelW >= 0.0f ? labelW : UiDensity::IsCompact() ? SectionCard::LabelW() : tok::label_w;
          gFill = true;
       }
       ~Narrow() { gLabelW = savedW; gFill = savedFill; }

@@ -1009,7 +1009,7 @@ namespace
    // Field widths by content class (plan §3): S numbers, M short words, L labelled sliders and names.
    constexpr float kWellS = 56.0f, kWellM = 72.0f, kWellL = 110.0f;
    float sFieldW = 160.0f;
-   constexpr float kLabelW = 84.0f;
+   constexpr float kLabelW = tok::label_w;
    float sLabelW = kLabelW;   // the More.. forms widen it for their longer names
 
    // rowH > 0: centred on a row of chips that tall (chips are not frames, so frame padding would sit it high).
