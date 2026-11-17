@@ -54,6 +54,7 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | Side panel module (search) | `src/app/frame/StageSidePanels.cpp:560` | Remove from favourites / (computed) |
 | Side panel module (category) | `src/app/frame/StageSidePanels.cpp:622` | Remove from favourites / (computed) |
 | Arrange clip (timeline + session slot) | `src/app/panels/ArrangePanel.cpp:77` | Rename `MODKEY+R` / Colour Tint > / Assign Node... / Rename `MODKEY+R` / Active / Blend Mode > / Colour Tint > / Assign Node... / Output > / Split at Playhead `MODKEY+E` / Group `MODKEY+G` / Ungroup `MODKEY+Shift+G` / Delete `Backspace` |
+| Arrange dock | `src/app/panels/ArrangePanel.cpp:1532` | Dock Position > / Close Timeline |
 | Arrange viewport dock | `src/app/panels/ArrangePanel.cpp:1558` | Viewport Position > |
 | Arrange marker | `src/app/panels/ArrangePanel.cpp:2136` | Rename / Colour > / Delete Marker |
 | Arrange track header | `src/app/panels/ArrangePanel.cpp:3930` | Rename Track `MODKEY+R` / Duplicate Track `MODKEY+D` / Add Video Track / Add Audio Track / Remove from Group / Convert to Group / Group Selected / Render Track / Delete Track |
@@ -64,6 +65,7 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | Session scene | `src/app/panels/ArrangeSessionGrid.cpp:497` | Launch Quantize > / Keep Other Tracks Playing [x] / Then Play Next Scene [x] / Next Scene After > / Stop Scene / Send Scene to Timeline / Insert Scene Above / Duplicate Scene `MODKEY+D` / Delete Scene `Backspace` |
 | Session dock | `src/app/panels/ArrangeSessionGrid.cpp:1952` | Dock Position > / Close Session |
 | Curve editor | `src/app/panels/CurveEditorPanel.cpp:1360` | (computed) / Handles > / Quantise to Grid `Q` / (computed) / Copy `MODKEY+C` / Paste `MODKEY+V` / Delete `Backspace` |
+| Curve editor dock | `src/app/panels/CurveEditorPanel.cpp:2632` | Dock Position > / Reopen Page > / Close Curve Editor |
 | Drum dock | `src/app/panels/DrumPanel.cpp:389` | Dock Position > / Close Drums |
 | Field patcher dock | `src/app/panels/FieldPatcherPanel.cpp:741` | (items drawn by helper) |
 | Field patcher node | `src/app/panels/FieldPatcherPanel.cpp:1165` | Rename / Cut / Copy / Duplicate / Disconnect / Delete |
@@ -81,8 +83,10 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | Mod matrix dock | `src/app/panels/ModMatrixPanel.cpp:986` | Dock Position > / Close Mod Matrix |
 | Performance control | `src/app/panels/PerfPanel.cpp:501` | Rename / Type > / Assign X Axis... / Assign Y Axis... / Clear Destinations / Listening X... (Move MIDI CC) / (computed) / Listening Y... (Move MIDI CC) / (computed) / Clear MIDI Bindings / Assign Parameter... / Clear Destination / (computed) / (computed) / Clear MIDI Binding / Colour Tint > |
 | Performance canvas | `src/app/panels/PerfPanel.cpp:2357` | Dock Position > / + Add Control > / Clear Page Controls / Close Performance |
+| Piano roll dock | `src/app/panels/PianoRollPanel.cpp:535` | Dock Position > / Close Piano Roll |
 | Piano roll note / clip / empty stretch | `src/app/panels/PianoRollPanel.cpp:1174` | Add Note / Add Clip / Duplicate `Shift+D` / Mute `0` / Quantise > / Fx > / Delete `Backspace` / Settings |
 | Sample studio waveform / slice | `src/app/panels/SampleStudioPanel.cpp:2221` | Copy `MODKEY+C` / Paste at playhead `MODKEY+V` / Mute `M` / Solo `S` / Reverse `V` / Colour > / Split here `Double-click top` / Join `J` / Play slice `Q` / Convert to node / Zoom to selection `Z` / Zoom out `Shift+Z` / Delete `Backspace` / Settings `Double-click` |
+| Sample studio dock | `src/app/panels/SampleStudioPanel.cpp:3372` | Dock Position > / Close Sample Studio |
 | Terminal dock | `src/app/panels/TerminalPanel.cpp:688` | Dock Position > / Close Chat |
 | 2D view canvas | `src/app/panels/View2DPanel.cpp:5542` | Cut / Copy / Paste / Duplicate / Layer via Cut / Free Transform / Mask from Selection / Deselect / Invert Selection / Fill... `Shift+F5` / Convert to Draw Node / Rasterize Layer / Effect on Below / Edit Text / Rasterize Layer / Convert to Shapes / Convert to Text Node / Rasterize Layer / Convert to Sketch Node / Ungroup / Edit Fill... / Add Layer Mask / Delete Layer Mask / Group / Arrange > / Select All Layers / Fit on Screen / Actual Pixels / Reset Rotation / Delete `Delete` |
 | 2D view layer row | `src/app/panels/View2DPanel.cpp:9299` | Rename / Cut / Copy / Paste / Duplicate Layer / Merge Layers / Merge Down / Merge Visible / Flatten Image / Group Layers / Ungroup / Release Clipping Mask / Add Layer Mask / Mask from Selection / Delete Layer Mask / Add Vector Mask / Delete Vector Mask / Edit Fill... / Convert to Draw Node / Rasterize Layer / Rasterize Layer / Convert to Sketch Node / Convert to Text Node / Convert to Shapes / Layer as Output / Effect on Below / Reset Distort / Delete Layer `Delete` |
@@ -90,4 +94,5 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | 3D view select tool | `src/app/panels/View3DPanel.cpp:5748` | (computed) / Clear Rulers |
 | 3D view Add (+ scene) items | `src/app/panels/View3DPanel.cpp:7979` | From canvas > / Camera / (computed) / HDRI... / New scene / Copy scene `MODKEY+C` / Paste scene `MODKEY+V` / Duplicate scene `MODKEY+D` / Delete scene |
 | 3D view (object / empty space) | `src/app/panels/View3DPanel.cpp:8068` | Rename `F2` / Copy / Paste / Duplicate `Shift+D` / Hide `H` / Frame `F` / Group `MODKEY+G` / Ungroup `MODKEY+Shift+G` / Source > / Object > / Go to node / Remove `X` / Add > / Select > / Frame all `Home` / View > |
+| 3D view dock | `src/app/panels/View3DPanel.cpp:8362` | Dock Position > / Close 3D View |
 | Viewport panel dock | `src/app/panels/ViewportPanel.cpp:491` | Dock Position > / Clear Cards / Close Viewport |

@@ -71,6 +71,11 @@ MENUS = {
     "##v2dcanvasmenu": "2D view canvas",
     "##v2ddockmenu": "2D view dock",
     "##rowmenu": "2D view layer row",
+    "##v3ddockmenu": "3D view dock",
+    "##studioDockMenu": "Sample studio dock",
+    "##pianoDockMenu": "Piano roll dock",
+    "##curveDockMenu": "Curve editor dock",
+    "##arrangeDockMenu": "Arrange dock",
 }
 # Menus that are a function body, not a popup block: id -> (file, function name).
 FRAGMENTS = {
@@ -369,6 +374,16 @@ def scan():
     for pid in MENUS:
         if pid not in seen_ids:
             prob.append(f"registry: popup \"{pid}\" is in MENUS but no longer found in src (remove it)")
+    # Every right-click root the menu-alive scan finds (it follows the right mouse click, not the id's spelling)
+    # must be ordered here too, or be exempt there as not a verb menu.
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    try:
+        import menu_alive_coverage as mac
+        for pid, where in sorted(mac.roots().items()):
+            if pid not in MENUS and pid not in mac.EXEMPT:
+                prob.append(f"registry: right-click menu \"{pid}\" ({where}) is not in MENUS (context_menu_order.py)")
+    except Exception as e:  # the sibling scan failing must not hide the order lint
+        prob.append(f"registry: menu_alive_coverage roots() failed: {e}")
     for fid in FRAGMENTS:
         if fid not in seen_ids:
             prob.append(f"registry: fragment {fid} not found")
