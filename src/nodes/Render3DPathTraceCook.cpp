@@ -445,6 +445,19 @@ void Render3DNode::UpdateProbes(const SceneSignature& sig)
          g.hi[a] = std::min(all.hi[a], core.hi[a] + grow);
       }
 
+   // The grid reaches one cell past the subject on every side. Flush with the surface, the fade at the
+   // grid's edge (probeIrr) lands on the object itself and shows as a lighter inset on every face.
+   {
+      float lg = 0.0f;
+      for (int a = 0; a < 3; a++)
+         lg = std::max(lg, g.hi[a] - g.lo[a]);
+      const float pad = std::max(lg, 1e-3f) / 14.0f;
+      for (int a = 0; a < 3; a++)
+      {
+         g.lo[a] -= pad;
+         g.hi[a] += pad;
+      }
+   }
    // 16 probes along the longest side, at least 2 on each, at most 4096 in all.
    float ext[3], longest = 0.0f;
    for (int a = 0; a < 3; a++)
