@@ -1,0 +1,12 @@
+infinite-patch 1
+rev 2
+# 3D View: a starting patch for the 3D View node
+node 1 3D 3D View
+  id node
+  pos 520 300
+end
+node 2 Utility Output
+  id out
+  pos 1080 300
+end
+cable out 0 node

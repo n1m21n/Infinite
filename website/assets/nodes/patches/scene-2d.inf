@@ -1,0 +1,12 @@
+infinite-patch 1
+rev 2
+# Scene 2D: a starting patch for the Scene 2D node
+node 1 Compositing Scene 2D
+  id node
+  pos 520 300
+end
+node 2 Utility Output
+  id out
+  pos 1080 300
+end
+cable out 0 node
