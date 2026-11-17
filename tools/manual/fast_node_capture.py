@@ -24,6 +24,27 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+STALL_S = 45      # seconds one RPC may take before the node is logged as a stall and skipped
+# Neutral path params per node, set right after create so no real or scratch folder shows in a shot.
+NEUTRAL_PATHS = {
+    "Output": {"exportImagePath": "Movies/my-export.png", "recordVideoPath": "Movies/my-export.mp4"},
+    "Audio Out": {"recordDirectory": "Music/Recordings"},        # default was the Desktop folder
+    "Spatial Mixer": {"recordDirectory": "Music/Recordings"},
+}
+# Nodes that show a red error outline without an input (found by tools/manual/error_scan.py). Each entry: the feeder
+# chain [(type, category)] and the input slot the last feeder goes into.
+FEEDS = {
+    # Each node: list of (feeder chain [(type, category)], input slot the chain's last node goes into).
+    "Armature": [([("Curve", "3D")], 1)],                      # path input takes a curve
+    "Voronoi Cells": [([("Sphere", "3D"), ("Mesh to Points", "3D")], 0)],   # points input takes a point cloud
+    "Instance on Points": [([("Sphere", "3D"), ("Mesh to Points", "3D")], 0), ([("Sphere", "3D")], 1)],
+    "Intersect": [([("Sphere", "3D")], 0), ([("Cube", "3D")], 1)],   # boolean: two geometry inputs
+    "Union": [([("Sphere", "3D")], 0), ([("Cube", "3D")], 1)],
+    "Metaballs": [([("Sphere", "3D"), ("Mesh to Points", "3D")], 0)],
+    "Revolve": [([("Curve", "3D")], 0)],                        # profile takes a curve
+    "Sweep": [([("Curve", "3D")], 0), ([("Curve", "3D")], 1)],  # profile and path take curves
+    "Path": [([("Curve", "3D")], 0), ([("Sphere", "3D")], 1)],  # modulator path: curve, geo
+}
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 sys.path.insert(0, os.path.join(ROOT, "tools", "docs-shots"))
@@ -32,6 +53,7 @@ import shot_plan  # noqa: E402
 import common as C  # noqa: E402
 import capture  # noqa: E402
 from node_screenshot import RpcClient  # noqa: E402
+from PIL import Image  # noqa: E402
 
 
 def app_version(app):
@@ -58,6 +80,13 @@ class App:
 
     def __init__(self, binary, home, port, log):
         self.port = port
+        # A leftover autosave plus session marker makes the app open its "didn't close properly" dialog over
+        # every shot. Clear both in the scratch HOME before each launch (never the gate's HOME).
+        appsup = os.path.join(home, "Library", "Application Support", "Infinite")
+        for stale in ("Infinite.autosave.inf", "Infinite.session-active"):
+            p = os.path.join(appsup, stale)
+            if os.path.exists(p):
+                os.remove(p)
         env = dict(os.environ, HOME=home, INFINITE_NO_SINGLE_INSTANCE="1", INFINITE_NOSPLASH="1",
                    INFINITE_NO_UPDATE_CHECK="1", INFINITE_HIDE_TELEMETRY="1", INFINITE_CONTROL_PORT=str(port))
         self.proc = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES"], env=env,
@@ -68,6 +97,7 @@ class App:
         if not tok:
             raise RuntimeError("no control token for this app")
         self.rpc = RpcClient("127.0.0.1", port, tok)
+        self.rpc.sock.settimeout(STALL_S)   # per-RPC limit: a wedged shot raises instead of hanging the run
         time.sleep(3)   # first frames: let the canvas come up before the first node
 
     def close(self):
@@ -81,24 +111,44 @@ class App:
             self.proc.kill()
 
 
+def node_done(manifest, sid):
+    """Done only when the manifest entry AND both files it names (raw and framed) are on disk."""
+    e = manifest["shots"].get(sid)
+    if not e or not e.get("raw") or not e.get("framed"):
+        return False
+    return os.path.exists(os.path.join(ROOT, e["raw"])) and os.path.exists(os.path.join(ROOT, e["framed"]))
+
+
 def shoot_one(app, cat, name, manifest, force, settle):
     """Create the node once, shoot closed then open, delete it. Returns the list of finished sids."""
     done = []
     sid_c = f"node/{cat}/{name}/c"
     sid_o = f"node/{cat}/{name}/o"
-    held = name in capture.HELD_PERSONAL_PATH
-    need_c = force or not capture.done_already(manifest, sid_c)
-    need_o = (force or not capture.done_already(manifest, sid_o)) and not held
+    need_c = force or not node_done(manifest, sid_c)
+    need_o = force or not node_done(manifest, sid_o)
     if not (need_c or need_o):
         return ["skip"]
     created = app.rpc.call("create_node", typeName=name, category=cat, x=40.0, y=40.0)
     idx = created["index"]
+    for key, value in NEUTRAL_PATHS.get(name, {}).items():
+        # Replace defaults that come from the Desktop / scratch HOME with neutral paths before any shot.
+        app.rpc.call("set_param", index=idx, name=key, value=value)
     feeders = []
     try:
         wired = app.rpc.call("auto_wire_inputs", index=idx)
         feeders = wired.get("feederIndices", [])
     except Exception:
         pass
+    for chain, slot in FEEDS.get(name, []):
+        # The node needs valid inputs to show no error (red outline / "needs" tooltip): build a minimal chain per slot.
+        prev = None
+        for ftype, fcat in chain:
+            fi = app.rpc.call("create_node", typeName=ftype, category=fcat, x=-200.0, y=40.0)["index"]
+            feeders.append(fi)
+            if prev is not None:
+                app.rpc.call("connect", srcIndex=prev, srcOutput=0, dstIndex=fi, dstSlot=0)
+            prev = fi
+        app.rpc.call("connect", srcIndex=prev, srcOutput=0, dstIndex=idx, dstSlot=slot)
     try:
         app.rpc.call("fit_view_node", index=idx, zoom=True)
         time.sleep(settle)
@@ -126,13 +176,24 @@ def snap(app, idx, cat, name, state, manifest):
     if os.path.exists(raw):
         os.remove(raw)
     res = app.rpc.call("screenshot_node", index=idx, path=raw, padding=12)
+    if os.path.exists(raw):
+        w0 = Image.open(raw).size[0]
+        if w0 < cfg.ZOOM_MIN_WIDTH:
+            # Narrow node (e.g. a short params column): widen the frame with background, never downscale.
+            extra = (cfg.ZOOM_MIN_WIDTH - w0) // 2 + 8
+            os.remove(raw)
+            res = app.rpc.call("screenshot_node", index=idx, path=raw, padding=12 + extra)
     if not os.path.exists(raw):
         print("FAIL", sid, "no file", flush=True)
+        manifest["shots"].pop(sid, None)   # never leave an entry pointing at a file that is not there
+        C.save_manifest(manifest)
         return "fail"
     try:
         w, h = cfg.assert_pixels(raw, "zoom")
     except AssertionError as e:
         print("FAIL", sid, e, flush=True)
+        manifest["shots"].pop(sid, None)
+        C.save_manifest(manifest)
         return "fail"
     capture.finish(raw, sid, dict(kind="node", category=cat, name=name, state=state, theme="dark",
                                   source_px=[w, h]), manifest)
@@ -148,9 +209,10 @@ def main():
     ap.add_argument("--port", type=int, default=7795)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--start", type=int, default=0, help="skip this many nodes in the plan order")
-    ap.add_argument("--relaunch-every", type=int, default=100)
+    ap.add_argument("--relaunch-every", type=int, default=50, help="nodes per launch (50 nodes = about 100 shots)")
     ap.add_argument("--settle", type=float, default=0.5)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--only", default="", help="comma list of node names to shoot (for recaptures)")
     a = ap.parse_args()
 
     binary = os.path.join(a.app, "Contents", "MacOS", "Infinite")
@@ -163,6 +225,9 @@ def main():
     manifest["app"] = a.app
     manifest["version"] = app_version(a.app)
     nodes = shot_plan.nodes()[a.start:]
+    if a.only:
+        wanted = set(a.only.split(","))
+        nodes = [n for n in nodes if n[1] in wanted]
     if a.limit:
         nodes = nodes[:a.limit]
     t0 = time.time()
@@ -180,8 +245,13 @@ def main():
                 i += 1
                 try:
                     res = shoot_one(app, cat, name, manifest, a.force, a.settle)
-                except Exception as e:   # the app died or refused: relaunch and resume
-                    print("ERR ", cat, name, e, flush=True)
+                except Exception as e:   # stall, crash or refusal: log the node as skipped, relaunch, carry on
+                    kind = "stall" if isinstance(e, socket.timeout) else "crash"
+                    print(f"{kind.upper():5} {cat}/{name}: {e}", flush=True)
+                    manifest.setdefault("stalls", []).append(
+                        dict(node=f"node/{cat}/{name}", kind=kind, error=str(e)[:200],
+                             at=time.strftime("%Y-%m-%d %H:%M:%S"), app=a.app, pid=app.proc.pid))
+                    C.save_manifest(manifest)
                     fails += 1
                     break
                 shots += sum(1 for r in res if r == "ok")
