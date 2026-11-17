@@ -809,7 +809,7 @@ namespace
    {
       glActiveTexture(GL_TEXTURE0 + unit);
       glBindTexture(GL_TEXTURE_2D, tex);
-      glUniform1i(glGetUniformLocation(program, name), unit);
+      glUniform1i(GLUtil::UniformLoc(program, name), unit);
    }
 }
 
@@ -1025,33 +1025,33 @@ void ParticleSystemNode::GpuStep(float dt, int births)
       BindSampler(prog, "uEmitTable", 3, emitMode == 1 ? mEmitTex : 0);
       BindSampler(prog, "uEmitPos", 4, emitMode == 2 ? mEmitGpu->posTex : 0);
       BindSampler(prog, "uEmitColor", 5, emitMode == 2 ? mEmitGpu->colorTex : 0);
-      glUniform1i(glGetUniformLocation(prog, "uEmitMode"), emitMode);
-      glUniform1i(glGetUniformLocation(prog, "uEmitCount"),
+      glUniform1i(GLUtil::UniformLoc(prog, "uEmitMode"), emitMode);
+      glUniform1i(GLUtil::UniformLoc(prog, "uEmitCount"),
                   emitMode == 1 ? std::max(1, mEmitTexCount) : emitMode == 2 ? std::max(1, mEmitGpu->count) : 1);
-      glUniform1i(glGetUniformLocation(prog, "uEmitTexW"), emitMode == 2 ? std::max(1, mEmitGpu->texW) : 1024);
-      glUniformMatrix4fv(glGetUniformLocation(prog, "uEmitModel"), 1, GL_FALSE, mEmitGpuModel.m);
-      glUniform1i(glGetUniformLocation(prog, "uTexW"), mGpuPoints.texW);
-      glUniform1i(glGetUniformLocation(prog, "uCap"), cap);
-      glUniform1i(glGetUniformLocation(prog, "uCursor"), cap > 0 ? (int)(mBirths % (unsigned long long)cap) : 0);
-      glUniform1i(glGetUniformLocation(prog, "uBirths"), births);
-      glUniform1ui(glGetUniformLocation(prog, "uBirthStart"), (unsigned int)mBirths);
-      glUniform1ui(glGetUniformLocation(prog, "uSeed"), seedHash);
-      glUniform1i(glGetUniformLocation(prog, "uShape"), emitShape);
-      glUniform1f(glGetUniformLocation(prog, "uRadius"), emitRadius);
-      glUniform3f(glGetUniformLocation(prog, "uDir"), dir[0], dir[1], dir[2]);
-      glUniform1f(glGetUniformLocation(prog, "uSpread"), spread);
-      glUniform1f(glGetUniformLocation(prog, "uSpeed"), initialSpeed);
-      glUniform1f(glGetUniformLocation(prog, "uSpeedRandom"), speedRandom);
-      glUniform1f(glGetUniformLocation(prog, "uSpeedAlongNormal"), speedAlongNormal);
-      glUniform1f(glGetUniformLocation(prog, "uLifetime"), lifetime);
-      glUniform1f(glGetUniformLocation(prog, "uLifetimeRandom"), lifetimeRandom);
-      glUniform3f(glGetUniformLocation(prog, "uStartColor"), startColor[0], startColor[1], startColor[2]);
-      glUniform1i(glGetUniformLocation(prog, "uCopyColor"), (emitMode != 0 && copySourceColor) ? 1 : 0);
-      glUniform3f(glGetUniformLocation(prog, "uGravity"), gravityX, gravityY, gravityZ);
-      glUniform1f(glGetUniformLocation(prog, "uDragFactor"), std::max(0.0f, 1.0f - drag * invMass * dt));
-      glUniform1f(glGetUniformLocation(prog, "uTurb"), turbulence * invMass);
-      glUniform1f(glGetUniformLocation(prog, "uTurbScale"), turbulenceScale);
-      glUniform1f(glGetUniformLocation(prog, "uDt"), dt);
+      glUniform1i(GLUtil::UniformLoc(prog, "uEmitTexW"), emitMode == 2 ? std::max(1, mEmitGpu->texW) : 1024);
+      glUniformMatrix4fv(GLUtil::UniformLoc(prog, "uEmitModel"), 1, GL_FALSE, mEmitGpuModel.m);
+      glUniform1i(GLUtil::UniformLoc(prog, "uTexW"), mGpuPoints.texW);
+      glUniform1i(GLUtil::UniformLoc(prog, "uCap"), cap);
+      glUniform1i(GLUtil::UniformLoc(prog, "uCursor"), cap > 0 ? (int)(mBirths % (unsigned long long)cap) : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uBirths"), births);
+      glUniform1ui(GLUtil::UniformLoc(prog, "uBirthStart"), (unsigned int)mBirths);
+      glUniform1ui(GLUtil::UniformLoc(prog, "uSeed"), seedHash);
+      glUniform1i(GLUtil::UniformLoc(prog, "uShape"), emitShape);
+      glUniform1f(GLUtil::UniformLoc(prog, "uRadius"), emitRadius);
+      glUniform3f(GLUtil::UniformLoc(prog, "uDir"), dir[0], dir[1], dir[2]);
+      glUniform1f(GLUtil::UniformLoc(prog, "uSpread"), spread);
+      glUniform1f(GLUtil::UniformLoc(prog, "uSpeed"), initialSpeed);
+      glUniform1f(GLUtil::UniformLoc(prog, "uSpeedRandom"), speedRandom);
+      glUniform1f(GLUtil::UniformLoc(prog, "uSpeedAlongNormal"), speedAlongNormal);
+      glUniform1f(GLUtil::UniformLoc(prog, "uLifetime"), lifetime);
+      glUniform1f(GLUtil::UniformLoc(prog, "uLifetimeRandom"), lifetimeRandom);
+      glUniform3f(GLUtil::UniformLoc(prog, "uStartColor"), startColor[0], startColor[1], startColor[2]);
+      glUniform1i(GLUtil::UniformLoc(prog, "uCopyColor"), (emitMode != 0 && copySourceColor) ? 1 : 0);
+      glUniform3f(GLUtil::UniformLoc(prog, "uGravity"), gravityX, gravityY, gravityZ);
+      glUniform1f(GLUtil::UniformLoc(prog, "uDragFactor"), std::max(0.0f, 1.0f - drag * invMass * dt));
+      glUniform1f(GLUtil::UniformLoc(prog, "uTurb"), turbulence * invMass);
+      glUniform1f(GLUtil::UniformLoc(prog, "uTurbScale"), turbulenceScale);
+      glUniform1f(GLUtil::UniformLoc(prog, "uDt"), dt);
    });
    for (int unit = 5; unit >= 0; unit--)
    {
@@ -1085,14 +1085,14 @@ void ParticleSystemNode::GpuPresent()
       BindSampler(prog, "uStateA", 0, mSimTex[mSimRead][0]);
       BindSampler(prog, "uStateB", 1, mSimTex[mSimRead][1]);
       BindSampler(prog, "uStateC", 2, mSimTex[mSimRead][2]);
-      glUniform1i(glGetUniformLocation(prog, "uCopyColor"), keepColor ? 1 : 0);
-      glUniform3f(glGetUniformLocation(prog, "uStartColor"), startColor[0], startColor[1], startColor[2]);
-      glUniform3f(glGetUniformLocation(prog, "uEndColor"), endColor[0], endColor[1], endColor[2]);
-      glUniform1f(glGetUniformLocation(prog, "uStartSize"), startSize);
-      glUniform1f(glGetUniformLocation(prog, "uEndSize"), endSize);
-      glUniform1f(glGetUniformLocation(prog, "uSizeCurve"), std::max(0.05f, sizeCurve));
-      glUniform1f(glGetUniformLocation(prog, "uColorCurve"), std::max(0.05f, colorCurve));
-      glUniform1f(glGetUniformLocation(prog, "uBaseSize"), PointBaseSize());
+      glUniform1i(GLUtil::UniformLoc(prog, "uCopyColor"), keepColor ? 1 : 0);
+      glUniform3f(GLUtil::UniformLoc(prog, "uStartColor"), startColor[0], startColor[1], startColor[2]);
+      glUniform3f(GLUtil::UniformLoc(prog, "uEndColor"), endColor[0], endColor[1], endColor[2]);
+      glUniform1f(GLUtil::UniformLoc(prog, "uStartSize"), startSize);
+      glUniform1f(GLUtil::UniformLoc(prog, "uEndSize"), endSize);
+      glUniform1f(GLUtil::UniformLoc(prog, "uSizeCurve"), std::max(0.05f, sizeCurve));
+      glUniform1f(GLUtil::UniformLoc(prog, "uColorCurve"), std::max(0.05f, colorCurve));
+      glUniform1f(GLUtil::UniformLoc(prog, "uBaseSize"), PointBaseSize());
    });
    if (query)
    {
@@ -1121,8 +1121,8 @@ void ParticleSystemNode::GpuPresent()
          {
             BindSampler(bp, "uSrcA", 0, srcA);
             BindSampler(bp, "uSrcB", 1, srcB);
-            glUniform2i(glGetUniformLocation(bp, "uSrcSize"), srcW, srcH);
-            glUniform1i(glGetUniformLocation(bp, "uFirst"), l == 0 ? 1 : 0);
+            glUniform2i(GLUtil::UniformLoc(bp, "uSrcSize"), srcW, srcH);
+            glUniform1i(GLUtil::UniformLoc(bp, "uFirst"), l == 0 ? 1 : 0);
          });
       }
       GLint prevFbo = 0;

@@ -414,61 +414,61 @@ void TextureNode::CookIfNeeded(int frameId)
    NodeWorkCounter()++;
    GLUtil::RunShaderPass(mOut, mProgram, [this]()
    {
-      glUniform1i(glGetUniformLocation(mProgram, "uType"), textureType);
-      glUniform1f(glGetUniformLocation(mProgram, "uScale"), scale);
-      glUniform1f(glGetUniformLocation(mProgram, "uSeed"), seed);
-      glUniform1f(glGetUniformLocation(mProgram, "uContrast"), contrast);
-      glUniform1f(glGetUniformLocation(mProgram, "uBrightness"), brightness);
-      glUniform3f(glGetUniformLocation(mProgram, "uLowColor"), lowColor[0], lowColor[1], lowColor[2]);
-      glUniform3f(glGetUniformLocation(mProgram, "uHighColor"), highColor[0], highColor[1], highColor[2]);
-      glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uType"), textureType);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uScale"), scale);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSeed"), seed);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uContrast"), contrast);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrightness"), brightness);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uLowColor"), lowColor[0], lowColor[1], lowColor[2]);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uHighColor"), highColor[0], highColor[1], highColor[2]);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
 
-      glUniform1i(glGetUniformLocation(mProgram, "uVDistance"), voronoiDistance);
-      glUniform1i(glGetUniformLocation(mProgram, "uVFeature"), voronoiFeature);
-      glUniform1f(glGetUniformLocation(mProgram, "uVRandomness"), voronoiRandomness);
-      glUniform1f(glGetUniformLocation(mProgram, "uVMinkowski"), voronoiMinkowskiExponent);
-      glUniform1f(glGetUniformLocation(mProgram, "uVSmoothness"), voronoiSmoothness);
-      glUniform1i(glGetUniformLocation(mProgram, "uVCellColor"), voronoiCellColor ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uVDistance"), voronoiDistance);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uVFeature"), voronoiFeature);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uVRandomness"), voronoiRandomness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uVMinkowski"), voronoiMinkowskiExponent);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uVSmoothness"), voronoiSmoothness);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uVCellColor"), voronoiCellColor ? 1 : 0);
 
-      glUniform1f(glGetUniformLocation(mProgram, "uBrickWidth"), brickWidth);
-      glUniform1f(glGetUniformLocation(mProgram, "uBrickHeight"), brickHeight);
-      glUniform1f(glGetUniformLocation(mProgram, "uBrickRowOffset"), brickRowOffset);
-      glUniform1f(glGetUniformLocation(mProgram, "uBrickMortarSize"), brickMortarSize);
-      glUniform1f(glGetUniformLocation(mProgram, "uBrickMortarSmooth"), brickMortarSmooth);
-      glUniform1f(glGetUniformLocation(mProgram, "uBrickBias"), brickBias);
-      glUniform3f(glGetUniformLocation(mProgram, "uMortarColor"), mortarColor[0], mortarColor[1], mortarColor[2]);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrickWidth"), brickWidth);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrickHeight"), brickHeight);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrickRowOffset"), brickRowOffset);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrickMortarSize"), brickMortarSize);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrickMortarSmooth"), brickMortarSmooth);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrickBias"), brickBias);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uMortarColor"), mortarColor[0], mortarColor[1], mortarColor[2]);
 
-      glUniform1f(glGetUniformLocation(mProgram, "uMagicDepth"), magicDepth);
-      glUniform1f(glGetUniformLocation(mProgram, "uMagicDistortion"), magicDistortion);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMagicDepth"), magicDepth);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMagicDistortion"), magicDistortion);
 
-      glUniform1i(glGetUniformLocation(mProgram, "uWaveType"), waveType);
-      glUniform1i(glGetUniformLocation(mProgram, "uWaveProfile"), waveProfile);
-      glUniform1i(glGetUniformLocation(mProgram, "uWaveBandsDir"), waveBandsDirection);
-      glUniform1f(glGetUniformLocation(mProgram, "uWaveDistortion"), waveDistortion);
-      glUniform1f(glGetUniformLocation(mProgram, "uWaveDetail"), waveDetail);
-      glUniform1f(glGetUniformLocation(mProgram, "uWaveDetailScale"), waveDetailScale);
-      glUniform1f(glGetUniformLocation(mProgram, "uWavePhase"), wavePhaseOffset);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uWaveType"), waveType);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uWaveProfile"), waveProfile);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uWaveBandsDir"), waveBandsDirection);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWaveDistortion"), waveDistortion);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWaveDetail"), waveDetail);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWaveDetailScale"), waveDetailScale);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWavePhase"), wavePhaseOffset);
 
-      glUniform1i(glGetUniformLocation(mProgram, "uMusType"), musgraveType);
-      glUniform1f(glGetUniformLocation(mProgram, "uMusDimension"), musgraveDimension);
-      glUniform1f(glGetUniformLocation(mProgram, "uMusLacunarity"), musgraveLacunarity);
-      glUniform1f(glGetUniformLocation(mProgram, "uMusOctaves"), musgraveOctaves);
-      glUniform1f(glGetUniformLocation(mProgram, "uMusGain"), musgraveGain);
-      glUniform1f(glGetUniformLocation(mProgram, "uMusOffset"), musgraveOffset);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uMusType"), musgraveType);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMusDimension"), musgraveDimension);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMusLacunarity"), musgraveLacunarity);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMusOctaves"), musgraveOctaves);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMusGain"), musgraveGain);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMusOffset"), musgraveOffset);
 
-      glUniform1i(glGetUniformLocation(mProgram, "uGradType"), gradientType);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uGradType"), gradientType);
 
-      glUniform1f(glGetUniformLocation(mProgram, "uCloudsDepth"), cloudsDepth);
-      glUniform1i(glGetUniformLocation(mProgram, "uCloudsHard"), cloudsHard ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uCloudsDepth"), cloudsDepth);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uCloudsHard"), cloudsHard ? 1 : 0);
 
-      glUniform1i(glGetUniformLocation(mProgram, "uMarbleType"), marbleType);
-      glUniform1f(glGetUniformLocation(mProgram, "uMarbleTurbulence"), marbleTurbulence);
-      glUniform1f(glGetUniformLocation(mProgram, "uMarbleNoiseScale"), marbleNoiseScale);
-      glUniform1f(glGetUniformLocation(mProgram, "uMarbleNoiseDepth"), marbleNoiseDepth);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uMarbleType"), marbleType);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMarbleTurbulence"), marbleTurbulence);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMarbleNoiseScale"), marbleNoiseScale);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMarbleNoiseDepth"), marbleNoiseDepth);
 
-      glUniform1i(glGetUniformLocation(mProgram, "uWoodType"), woodType);
-      glUniform1f(glGetUniformLocation(mProgram, "uWoodTurbulence"), woodTurbulence);
-      glUniform1f(glGetUniformLocation(mProgram, "uWoodNoiseScale"), woodNoiseScale);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uWoodType"), woodType);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWoodTurbulence"), woodTurbulence);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWoodNoiseScale"), woodNoiseScale);
    });
    mBuiltParams = std::move(params);
    mHasBuilt = true;

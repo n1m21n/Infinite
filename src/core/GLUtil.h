@@ -36,6 +36,15 @@ namespace GLUtil
       return v > (float)kMaxTargetSide ? kMaxTargetSide : (int)v;
    }
 
+   // glGetUniformLocation with a per-thread memo keyed by (program, name).
+   // The driver call is a string hash on every use and the locations never
+   // change between links, so hot render paths look each name up once.
+   // Returns exactly what glGetUniformLocation returns (including -1).
+   // Every glLinkProgram must be followed by ForgetUniformLocations(): a
+   // relink changes locations and a deleted program's id can be reused.
+   int UniformLoc(unsigned int program, const char* name);
+   void ForgetUniformLocations();
+
    bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8,
                   const char* label = "Fbo");
    void DestroyFbo(Fbo& fbo);

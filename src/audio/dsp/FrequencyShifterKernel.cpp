@@ -60,11 +60,14 @@ void FrequencyShifterKernel::ProcessBlock(const AudioBuffer& in, const AudioBuff
          const float freqHz = (ch == 1) ? (baseShiftHz + spreadHz) : baseShiftHz;
 
          // Single-sideband modulation: x(t)*cos(phi) - x_hat(t)*sin(phi)
-         float shifted = xB * cosf((float)mPhase[ch]) - xA * sinf((float)mPhase[ch]);
+         const float phaseCycles = (float)(mPhase[ch] * (1.0 / (2.0 * M_PI)));
+         const float carrierCos = DspMath::FastSinCycles(phaseCycles + 0.25f);
+         const float carrierSin = DspMath::FastSinCycles(phaseCycles);
+         float shifted = xB * carrierCos - xA * carrierSin;
 
          if (analog)
          {
-            const float carrierBleed = cosf((float)mPhase[ch]) * 0.008f * std::min(1.0f, mEnvFollower * 4.0f);
+            const float carrierBleed = carrierCos * 0.008f * std::min(1.0f, mEnvFollower * 4.0f);
             shifted = AnalogDsp::AsymTanh(shifted + carrierBleed, 0.06f);
          }
 

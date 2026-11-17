@@ -9,13 +9,53 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <unordered_map>
 
 namespace GLUtil
 {
+   namespace
+   {
+      std::atomic<unsigned> gUniformGeneration { 0 };
+
+      struct UniformMemo
+      {
+         unsigned generation = 0;
+         std::unordered_map<unsigned long long, int> map;
+      };
+   }
+
+   void ForgetUniformLocations()
+   {
+      gUniformGeneration.fetch_add(1, std::memory_order_relaxed);
+   }
+
+   int UniformLoc(unsigned int program, const char* name)
+   {
+      thread_local UniformMemo memo;
+      const unsigned gen = gUniformGeneration.load(std::memory_order_relaxed);
+      if (memo.generation != gen)
+      {
+         memo.map.clear();
+         memo.generation = gen;
+      }
+      // 64-bit FNV-1a of the name, mixed with the program id.
+      unsigned long long h = 1469598103934665603ull;
+      for (const char* c = name; *c; ++c)
+         h = (h ^ (unsigned char)*c) * 1099511628211ull;
+      h ^= (unsigned long long)program * 0x9E3779B97F4A7C15ull;
+      auto it = memo.map.find(h);
+      if (it != memo.map.end())
+         return it->second;
+      const int loc = glGetUniformLocation(program, name);
+      memo.map.emplace(h, loc);
+      return loc;
+   }
+
    static const char* kVertSrc =
       "#version 150\n"
       "in vec2 aPos;\n"
@@ -391,6 +431,7 @@ namespace GLUtil
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
+      ForgetUniformLocations();
 
       // The linked program keeps its own copy; the stages stay in the cache.
       glDetachShader(program, vert);

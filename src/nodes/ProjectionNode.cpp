@@ -227,6 +227,7 @@ bool ProjectionNode::EnsureShader()
    glBindAttribLocation(mProgram, 0, "aPos");
    glBindAttribLocation(mProgram, 1, "aUv");
    glLinkProgram(mProgram);
+   GLUtil::ForgetUniformLocations();
 
    glDeleteShader(vs);
    glDeleteShader(fs);

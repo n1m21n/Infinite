@@ -40,7 +40,7 @@ public:
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
       {
-         const float linear = DspMath::DbToLinear(mMailbox.SmoothedValue(kGainDbParam));
+         const float linear = mGainCache.Get(mMailbox.SmoothedValue(kGainDbParam));
          for (int ch = 0; ch < buffer.numChannels; ch++)
          {
             const float s = (in != nullptr) ? in->channels[ch][i] : 0.0f;
@@ -63,6 +63,7 @@ public:
 
 private:
    ParamMailbox mMailbox;
+   DspMath::DbLinCache mGainCache; // gain dB -> linear: powf only when the knob moves
    MeterRing mMeter;
    std::atomic<float> mGainDb { 0.0f };
 };
@@ -1122,7 +1123,7 @@ public:
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
       {
-         const float linear = DspMath::DbToLinear(mMailbox.SmoothedValue(kGainDbParam));
+         const float linear = mGainCache.Get(mMailbox.SmoothedValue(kGainDbParam));
          for (int ch = 0; ch < buffer.numChannels; ch++)
          {
             const float s = (captured > 0 && i < frames) ? mScratch[std::min(ch, 1)][i] : 0.0f;
@@ -1149,6 +1150,7 @@ private:
    static constexpr int kMaxCaptureFrames = kAudioMaxBlockFrames;
 
    ParamMailbox mMailbox;
+   DspMath::DbLinCache mGainCache; // gain dB -> linear: powf only when the knob moves
    MeterRing mMeter;
    std::atomic<float> mGainDb { 0.0f };
    std::atomic<int> mChannelMode { 0 };

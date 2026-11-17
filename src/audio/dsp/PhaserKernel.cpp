@@ -48,8 +48,8 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       if (analog)
       {
          const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.04f, mSampleRate) * 0.04f;
-         const float fcL = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + lfoDrift)));
-         const float fcR = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f + lfoDrift)));
+         const float fcL = cutoffHz * powf(2.0f, octaves * DspMath::FastSinCycles(((float)mPhase + lfoDrift)));
+         const float fcR = cutoffHz * powf(2.0f, octaves * DspMath::FastSinCycles(((float)mPhase + spread * 0.5f + lfoDrift)));
          const float aL = AllpassCoeff(fcL, (float)mSampleRate);
          const float aR = AllpassCoeff(fcR, (float)mSampleRate);
 
@@ -71,8 +71,8 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       }
       else
       {
-         const float fcL = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * (float)mPhase));
-         const float fcR = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f)));
+         const float fcL = cutoffHz * powf(2.0f, octaves * DspMath::FastSinCycles((float)mPhase));
+         const float fcR = cutoffHz * powf(2.0f, octaves * DspMath::FastSinCycles(((float)mPhase + spread * 0.5f)));
          const float aL = AllpassCoeff(fcL, (float)mSampleRate);
          const float aR = AllpassCoeff(fcR, (float)mSampleRate);
 

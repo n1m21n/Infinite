@@ -67,8 +67,8 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
             const float lPhase = (float)mPhase + voiceOffset + lfoDrift;
             const float rPhase = (float)mPhase + voiceOffset + spread * 0.5f + lfoDrift;
 
-            const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * lPhase), 0.5f, lineCapacityMs);
-            const float rMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * rPhase), 0.5f, lineCapacityMs);
+            const float lMs = std::clamp(delayMs + depthMs * DspMath::FastSinCycles(lPhase), 0.5f, lineCapacityMs);
+            const float rMs = std::clamp(delayMs + depthMs * DspMath::FastSinCycles(rPhase), 0.5f, lineCapacityMs);
 
             wetL += mLineL.Read(lMs * 0.001f * (float)mSampleRate);
             wetR += mLineR.Read(rMs * 0.001f * (float)mSampleRate);
@@ -97,8 +97,8 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
             const float lPhase = (float)mPhase + voiceOffset;
             const float rPhase = (float)mPhase + voiceOffset + spread * 0.5f;
 
-            const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * lPhase), 0.5f, lineCapacityMs);
-            const float rMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * rPhase), 0.5f, lineCapacityMs);
+            const float lMs = std::clamp(delayMs + depthMs * DspMath::FastSinCycles(lPhase), 0.5f, lineCapacityMs);
+            const float rMs = std::clamp(delayMs + depthMs * DspMath::FastSinCycles(rPhase), 0.5f, lineCapacityMs);
 
             wetL += mLineL.Read(lMs * 0.001f * (float)mSampleRate);
             wetR += mLineR.Read(rMs * 0.001f * (float)mSampleRate);

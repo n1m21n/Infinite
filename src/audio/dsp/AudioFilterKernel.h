@@ -336,7 +336,7 @@ public:
             }
             const bool negative = AudioFilterDsp::CombIsNegative(type);
             const float fbAmount = DspMath::CombFeedbackFromQ(q);
-            const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputGainSlot));
+            const float outputGain = mOutGainCache.Get(mMailbox.SmoothedValue(kOutputGainSlot));
             for (int ch = 0; ch < numChannels; ch++)
             {
                mComb[ch].SetParams(freqMod, fbAmount, negative, mSampleRate);
@@ -360,7 +360,7 @@ public:
                                                     (float)mSampleRate * 0.45f);
             const float k = FilterModels::KFromResonance(model, res);
             const float inGain = 1.0f + 15.0f * std::clamp(mMailbox.SmoothedValue(kDriveSlot), 0.0f, 1.0f);
-            const float outGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputGainSlot)) *
+            const float outGain = mOutGainCache.Get(mMailbox.SmoothedValue(kOutputGainSlot)) *
                                   FilterModels::MakeupGain(model, res) / inGain;
             for (int ch = 0; ch < numChannels; ch++)
             {
@@ -438,8 +438,7 @@ public:
             }
          }
 
-         const float outputGain =
-            DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputGainSlot));
+         const float outputGain = mOutGainCache.Get(mMailbox.SmoothedValue(kOutputGainSlot));
 
          for (int ch = 0; ch < numChannels; ch++)
          {
@@ -510,6 +509,7 @@ public:
 
 private:
    ParamMailbox mMailbox;
+   DspMath::DbLinCache mOutGainCache; // output gain dB -> linear: powf only when the knob moves
    double mSampleRate = 44100.0;
 
    std::atomic<int> mType {};

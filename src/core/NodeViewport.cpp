@@ -1,6 +1,7 @@
 #include "NodeViewport.h"
 
 #include "gl3.h"
+#include "GLUtil.h"
 #include "BenchReport.h"
 #include <algorithm>
 #include <cmath>
@@ -230,6 +231,7 @@ namespace
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
+      GLUtil::ForgetUniformLocations();
       glDeleteShader(vert);
       glDeleteShader(frag);
 
@@ -261,6 +263,7 @@ namespace
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
+      GLUtil::ForgetUniformLocations();
       glDeleteShader(vert);
       glDeleteShader(frag);
 
@@ -290,6 +293,7 @@ namespace
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
+      GLUtil::ForgetUniformLocations();
       glDeleteShader(vert);
       glDeleteShader(frag);
 

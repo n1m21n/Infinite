@@ -1095,6 +1095,7 @@ namespace
       glAttachShader(prog, vs);
       glAttachShader(prog, fs);
       glLinkProgram(prog);
+      GLUtil::ForgetUniformLocations();
       glDeleteShader(vs);
       glDeleteShader(fs);
       GLint linked = 0;
