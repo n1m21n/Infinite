@@ -477,3 +477,4 @@ Generate Samples|energy|a recipe param, read only by generate's offline render (
 Generate Samples|space|a recipe param, read only by generate's offline render (CurrentRecipe -> Recipe.space); GENSAMPLETEST covers the render
 Generate Samples|mood|a recipe param, read only by generate's offline render (CurrentRecipe -> Recipe.mood); GENSAMPLETEST covers the render
 Generate Samples|keepSeed|a recipe param: only decides whether Generate() pins the seed (mJob->pinned), never the audio thread; GENSAMPLETEST covers the render
+Piano|tremolo|tremolo is read only by ElectricPiano (PianoNode.cpp ProcessElectric, reached only when model is electric); the sweep rig's Piano uses the default kGrand model (PianoNode.h: tremolo comment 'electric only'), so the param cannot reach the picture or output in the rig

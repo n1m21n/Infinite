@@ -741,7 +741,7 @@ void RunPageMenuTest(int frameId, GLFWwindow* window)
 #else
 void RunPageMenuTest(int, GLFWwindow*)
 {
-   printf("PAGEMENUTEST FAIL (needs a dev build: the test engine hooks)\n");
+   printf("PAGEMENUTEST SKIP (dev-only: needs a Debug build; the ImGui test engine is compiled out of release)\n");
 }
 #endif
 }
