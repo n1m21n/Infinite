@@ -597,7 +597,7 @@ namespace app
                if (m->sendDb[b][s] <= MixerNode::kSendOffDb)
                   HelpTip("%s %d  %s  %s", T("Send"), b + 1, T("off"), m->sendPre[s] ? T("pre") : T("post"));
                else
-                  HelpTip("%s %d  %+.1f dB  %s", T("Send"), b + 1, m->sendDb[b][s], m->sendPre[s] ? T("pre") : T("post"));
+                  HelpTip(T("%s %d  %+.1f dB  %s"), T("Send"), b + 1, m->sendDb[b][s], m->sendPre[s] ? T("pre") : T("post"));
             }
             ImGui::PopID();
          }
@@ -923,9 +923,9 @@ namespace app
                *db = 0.0f;
             }
             if (*db <= -60.0f)
-               HelpTip("-inf dB");
+               HelpTip("%s", T("-inf dB"));
             else
-               HelpTip("%+.1f dB", *db);
+               HelpTip(T("%+.1f dB"), *db);
          }
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const float capY = bottom - pos01(*db) * (bottom - top);
@@ -1069,7 +1069,7 @@ namespace app
          Pot("##trim", &m->trimDb[s], -24.0f, 24.0f, 0.0f, true, cell, col, T("TRIM"));
          UndoOnActivate(&m->trimDb[s], before);
          if (ImGui::IsItemHovered())
-            HelpTip("%s %+.1f dB", T("Trim"), m->trimDb[s]);
+            HelpTip(T("%s %+.1f dB"), T("Trim"), m->trimDb[s]);
          ImGui::SetCursorScreenPos(ImVec2(cx + cell, y));
          before = m->pan[s];
          Pot("##pan", &m->pan[s], -1.0f, 1.0f, 0.0f, true, cell, col, T("PAN"));

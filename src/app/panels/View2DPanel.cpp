@@ -7339,7 +7339,7 @@ namespace
          {
             const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
             ImGui::AlignTextToFramePadding();
-            ImGui::Text("%.1f px   %.1f\xC2\xB0   W %.0f  H %.0f", std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f, std::fabs(dx),
+            ImGui::Text(T("%.1f px   %.1f\xC2\xB0   W %.0f  H %.0f"), std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f, std::fabs(dx),
                         std::fabs(dy));
             next();
             if (TextChip(L("Clear##v2dmclear"), false, nullptr))
@@ -10968,7 +10968,7 @@ namespace
       if (ActionButton::Draw(L("Render Image##v2dimg"), ImVec2(availW, 0)))
          sPending.what = Pending::RenderImage;
       ImGui::EndDisabled();
-      ImGui::TextDisabled("%d x %d, F12", d.w, d.h);
+      ImGui::TextDisabled(T("%d x %d, F12"), d.w, d.h);
       SectionCard::Begin(T("Animation"));
       ComboRow(T("Video"), &sVideoFormat, { "MP4", "MOV" });
       {
@@ -14189,7 +14189,7 @@ void DrawScene2DBody(GraphNode& gn)
    auto* doc = dynamic_cast<Scene2DNode*>(gn.node.get());
    if (doc == nullptr)
       return;
-   ImGui::TextDisabled("%d x %d, %d layers", doc->Doc().w, doc->Doc().h, (int)doc->Layers().size());
+   ImGui::TextDisabled(T("%d x %d, %d layers"), doc->Doc().w, doc->Doc().h, (int)doc->Layers().size());
    if (ActionButton::Draw(L("Open in 2D View"), ImVec2(160.0f, 0)))
    {
       sDocUid = gn.uid;
