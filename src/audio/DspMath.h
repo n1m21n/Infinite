@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 
 // Header-only DSP building blocks shared by every audio node. Each piece is
 // implemented directly from its primary reference (cited per-function below)
@@ -87,6 +88,24 @@ namespace DspMath
    {
       return powf(10.0f, db / 20.0f);
    }
+
+   // DbToLinear with a one-entry memo: powf runs only when the dB value
+   // changes, so a settled knob costs one compare per sample. Output is
+   // bit-identical to DbToLinear (the NaN start never equals a real key).
+   struct DbLinCache
+   {
+      float db = std::numeric_limits<float>::quiet_NaN();
+      float lin = 1.0f;
+      float Get(float v)
+      {
+         if (!(v == db))
+         {
+            db = v;
+            lin = DbToLinear(v);
+         }
+         return lin;
+      }
+   };
 
    // ------------------------------------------------------------- Equal-power pan
    // Quarter-sine-wave law: pan in [-1, 1], 0 = center. Constant total power

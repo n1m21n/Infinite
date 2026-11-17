@@ -61,10 +61,10 @@ public:
       float outPeak = 0.0f;
       for (int i = 0; i < out.numFrames; i++)
       {
-         const float ceiling = DspMath::DbToLinear(mMailbox.SmoothedValue(kThreshold));
+         const float ceiling = mCeilingCache.Get(mMailbox.SmoothedValue(kThreshold));
          const float releaseMs = std::max(1.0f, mMailbox.SmoothedValue(kReleaseMs));
-         const float inGainLin = DspMath::DbToLinear(mMailbox.SmoothedValue(kInGainDb));
-         const float outGainLin = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutGainDb));
+         const float inGainLin = mInGainCache.Get(mMailbox.SmoothedValue(kInGainDb));
+         const float outGainLin = mOutGainCache.Get(mMailbox.SmoothedValue(kOutGainDb));
          if (releaseMs != mCachedReleaseMs)
          {
             mCachedReleaseMs = releaseMs;
@@ -98,6 +98,7 @@ public:
 
 private:
    ParamMailbox mMailbox;
+   DspMath::DbLinCache mCeilingCache, mInGainCache, mOutGainCache; // dB -> linear, powf only on change
    double mSampleRate = 44100.0; // written by PrepareToPlay only (audio-thread owned)
 
    PeakLimiter mLimiter;
