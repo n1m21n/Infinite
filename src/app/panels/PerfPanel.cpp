@@ -760,15 +760,15 @@ namespace app
          ImGui::SetNextItemWidth(cardSize.x - 8.0f);
          ImGui::SetKeyboardFocusHere();
          if (FieldWell::InputText("##renamingelemfield", gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer),
-                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll) ||
+             (ImGui::IsItemDeactivated() && gPerfRenamingElementIdx == (int)elemIdx))
          {
-            PushUndoCheckpoint();
-            elem.label = gPerfRenameElementBuffer;
-            gPerfRenamingElementIdx = -1;
-         }
-         if (ImGui::IsItemDeactivated() && gPerfRenamingElementIdx == (int)elemIdx)
-         {
-            elem.label = gPerfRenameElementBuffer;
+            // Enter or leaving the field: either way the rename is one undo step.
+            if (elem.label != gPerfRenameElementBuffer)
+            {
+               PushUndoCheckpoint("Performance: Rename Control");
+               elem.label = gPerfRenameElementBuffer;
+            }
             gPerfRenamingElementIdx = -1;
          }
       }

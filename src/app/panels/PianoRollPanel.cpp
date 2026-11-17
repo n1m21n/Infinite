@@ -2718,13 +2718,20 @@ namespace
       const ImVec4 shown = page.colorR + page.colorG + page.colorB > 0.0f ? ImVec4(page.colorR, page.colorG, page.colorB, 1.0f)
                                                                          : ClipColor(Arrange::Clip {}, page);
       float rgb[3] = { shown.x, shown.y, shown.z };
+      // One undo step per colour pick, as the clip colour above.
       if (FormParts::ColorDot("##pageColour", rgb, 15.0f, FormParts::kRowH))
       {
+         if (!gArrangeGestureOpen)
+            ArrangeGestureBegin();
          page.colorR = rgb[0];
          page.colorG = rgb[1];
          page.colorB = rgb[2];
+         gArrange.revision++;
          ArrangeCommitEdit();
       }
+      else if (gArrangeGestureOpen && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && s.drag == Drag::None &&
+               !ImGui::IsAnyItemActive())
+         ArrangeGestureEnd();
       bool snap = page.scaleSnap;
       if (FormParts::Switch(T("Scale snap"), &snap))
       {

@@ -1483,17 +1483,8 @@ namespace
                s.front = i;
          break;
       }
-      case PagePicker::Act::Delete:
-         if (rp->uid != 0)
-         {
-            if (GraphNode* gn = FindNodeByUid(rp->uid))
-            {
-               PushUndoCheckpoint("Delete Field Node");
-               RemoveNodeByIndex(gn->index);
-            }
-         }
-         else
-            ClosePage(r.index);
+      case PagePicker::Act::Delete:   // one behaviour for every page: it leaves the strip, the canvas node stays
+         ClosePage(r.index);
          break;
       case PagePicker::Act::Close: closeAt = r.index; break;
       default: break;
@@ -1708,7 +1699,7 @@ void FieldPatcherOpenStarter(int index)
    AddScratch(T(st.name), st.code);
 }
 
-// Saved with the patch: one line per scratch page (name, then the source with \n and \\ escaped), and pins.
+// Saved with the patch: one line per scratch page (name, then the source with \n and \\ escaped), pins, and page colours.
 std::string FieldPatcherSaveState()
 {
    auto esc = [](const std::string& x) {
@@ -1733,6 +1724,10 @@ std::string FieldPatcherSaveState()
          out += "s\t" + esc(p->scratchName) + "\t" + esc(p->scratchCode) + "\n";
       else if (p->pinned)
          out += "p\t" + std::to_string(p->uid) + "\n";
+      else
+         continue;
+      if (p->color != 0)   // the chip colour of the page on the line above
+         out += "c\t" + std::to_string(p->color) + "\n";
    }
    for (const auto& kv : S().nodeNames)
       out += "r\t" + std::to_string(kv.first) + "\t" + esc(kv.second) + "\n";
@@ -1762,6 +1757,7 @@ void FieldPatcherLoadState(const std::string& text)
       }
       return o;
    };
+   Page* last = nullptr;   // the page a "c" line colours
    size_t at = 0;
    while (at < text.size())
    {
@@ -1775,7 +1771,12 @@ void FieldPatcherLoadState(const std::string& text)
          const size_t tab = line.find('\t', 2);
          if (tab == std::string::npos)
             continue;
-         AddScratch(unesc(line.substr(2, tab - 2)), unesc(line.substr(tab + 1)));
+         last = &AddScratch(unesc(line.substr(2, tab - 2)), unesc(line.substr(tab + 1)));
+      }
+      else if (line.size() > 2 && line[0] == 'c' && line[1] == '\t')
+      {
+         if (last != nullptr)
+            last->color = (unsigned int)std::strtoul(line.c_str() + 2, nullptr, 10);
       }
       else if (line.size() > 2 && line[0] == 'r' && line[1] == '\t')
       {
@@ -1787,8 +1788,9 @@ void FieldPatcherLoadState(const std::string& text)
       {
          const uint64_t uid = std::strtoull(line.c_str() + 2, nullptr, 10);
          ShowNodePage(uid);
-         if (Page* p = Front())
-            p->pinned = true;
+         last = Front();
+         if (last != nullptr)
+            last->pinned = true;
       }
    }
 }
@@ -1958,7 +1960,7 @@ int FieldPatcherSelfCheck()
    }
 
    // 3. Scratch pages and pins survive save and load, through the .inf text itself.
-   AddScratch("Keep me", "x = 1\n\ty = x\n");
+   AddScratch("Keep me", "x = 1\n\ty = x\n").color = 0x40A0E0u;
    const int pagesBefore = (int)s.pages.size();
    Patch::Data written;
    written.fieldPages = FieldPatcherSaveState();
@@ -1976,8 +1978,8 @@ int FieldPatcherSelfCheck()
    FieldPatcherLoadState(reread.fieldPages);
    bool found = false;
    for (const auto& p : s.pages)
-      found = found || (p->uid == 0 && p->scratchName == "Keep me" && p->scratchCode == "x = 1\n\ty = x\n");
-   expect("a scratch page survives save and load", found);
+      found = found || (p->uid == 0 && p->scratchName == "Keep me" && p->scratchCode == "x = 1\n\ty = x\n" && p->color == 0x40A0E0u);
+   expect("a scratch page and its colour survive save and load", found);
    expect("pages come back in number", (int)s.pages.size() <= pagesBefore && !s.pages.empty());
 
    // 4. Every starter compiles box-only through the page path.

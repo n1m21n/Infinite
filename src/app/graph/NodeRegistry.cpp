@@ -537,6 +537,8 @@ namespace app
              la.gainDb != lb.gainDb || la.pan != lb.pan || la.enabled != lb.enabled || la.groupId != lb.groupId ||
              la.mute != lb.mute || la.solo != lb.solo || la.rowHeight != lb.rowHeight ||
              la.name != lb.name || la.noteNodeUid != lb.noteNodeUid || la.scaleSnap != lb.scaleSnap || la.drumRows != lb.drumRows || la.pageOrder != lb.pageOrder ||
+             // Page colour: without it a colour picked in a gesture (the Piano Roll inspector) left no undo step.
+             la.colorR != lb.colorR || la.colorG != lb.colorG || la.colorB != lb.colorB ||
              la.clips.size() != lb.clips.size())
             return false;
          for (size_t k = 0; k < la.clips.size(); k++)
