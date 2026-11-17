@@ -1431,9 +1431,18 @@ namespace app
                });
          ImGui::EndMenu();
       }
-      MenuParts::Separator();
-      // Destructive rows are queued, not run: the shared menu still holds pointers into the slot and lane vectors
-      // and keeps reading them for the rest of this frame. ArrangeSessionApplyMenuAction() runs them after it closes.
+   }
+
+   // The slot's edit rows (Cut, Copy, Paste, Duplicate), drawn after Rename in the shared clip menu.
+   // Rows are queued, not run: the shared menu still holds pointers into the slot and lane vectors and keeps reading
+   // them for the rest of this frame. ArrangeSessionApplyMenuAction() runs them after it closes.
+   void DrawArrangeSessionSlotEditItems(uint64_t clipId)
+   {
+      const Arrange::Loc loc = Arrange::FindSlot(gArrange, clipId);
+      if (loc.lane < 0 || loc.slot < 0)
+         return;
+      const uint64_t laneId = gArrange.lanes[(size_t)loc.lane].id;
+      const int row = loc.slot;
       if (MenuParts::Item(L("Cut"), MODKEY "+X"))
          sMenuAction = {MenuAction::Cut, laneId, row};
       if (MenuParts::Item(L("Copy"), MODKEY "+C"))
@@ -1443,11 +1452,26 @@ namespace app
          sMenuAction = {MenuAction::Paste, laneId, row};
       if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
          sMenuAction = {MenuAction::Duplicate, laneId, row};
-      if (MenuParts::Item(L("Delete"), "Backspace"))
-         sMenuAction = {MenuAction::Clear, laneId, row};
-      MenuParts::Separator();
+   }
+
+   // The slot's Place on Timeline row (an "other action", after the toggles in the shared clip menu).
+   void DrawArrangeSessionSlotPlaceItem(uint64_t clipId)
+   {
+      const Arrange::Loc loc = Arrange::FindSlot(gArrange, clipId);
+      if (loc.lane < 0 || loc.slot < 0)
+         return;
       if (MenuParts::Item(L("Place on Timeline at Playhead")))
-         sMenuAction = {MenuAction::PlaceOnTimeline, laneId, row};
+         sMenuAction = {MenuAction::PlaceOnTimeline, gArrange.lanes[(size_t)loc.lane].id, loc.slot};
+   }
+
+   // The slot's Delete row, last in the shared clip menu (queued like the edit rows).
+   void DrawArrangeSessionSlotDeleteItem(uint64_t clipId)
+   {
+      const Arrange::Loc loc = Arrange::FindSlot(gArrange, clipId);
+      if (loc.lane < 0 || loc.slot < 0)
+         return;
+      if (MenuParts::Item(L("Delete"), "Backspace"))
+         sMenuAction = {MenuAction::Clear, gArrange.lanes[(size_t)loc.lane].id, loc.slot};
    }
 
    // The inspector's Launch card for a session slot: how a click plays it, where it lands, how long it runs and

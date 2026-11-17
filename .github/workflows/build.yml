@@ -104,6 +104,8 @@ jobs:
         run: python3 tools/design/menu_grounding.py
       - name: One way to say empty
         run: python3 tools/design/empty_lint.py
+      - name: Context-menu item order (Delete last, Settings first)
+        run: python3 tools/design/context_menu_order.py
       # W1: Windows reads narrow paths in the ANSI code page; every open goes through AppPaths.
       - name: No narrow file opens (UTF-8 paths on Windows)
         run: python3 scripts/check_utf8_paths.py

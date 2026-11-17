@@ -3434,17 +3434,6 @@ namespace
                gArrange.revision++;
             });
       }
-      if (MenuParts::Item(L("Delete"), "Del"))
-      {
-         if (s.menuKind == 1)
-         {
-            const std::vector<uint64_t> doomed(s.clips.begin(), s.clips.end());
-            ArrangeEdit([&] { Arrange::Delete(gArrange, doomed); });
-            s.clips.clear();
-         }
-         else
-            DeleteSelection();
-      }
       if (s.menuKind == 1 && !s.clips.empty())
       {
          MenuParts::Separator();
@@ -3486,6 +3475,18 @@ namespace
       {
          DrawFunctionItems(page);
          ImGui::EndMenu();
+      }
+      MenuParts::Separator();
+      if (MenuParts::Item(L("Delete"), "Backspace"))
+      {
+         if (s.menuKind == 1)
+         {
+            const std::vector<uint64_t> doomed(s.clips.begin(), s.clips.end());
+            ArrangeEdit([&] { Arrange::Delete(gArrange, doomed); });
+            s.clips.clear();
+         }
+         else
+            DeleteSelection();
       }
    }
 
