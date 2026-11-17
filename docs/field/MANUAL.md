@@ -432,11 +432,11 @@ the boxes side by side and either one can be edited.
               |                 |
               v   select one    v
  +-- Field Patcher -----------------------------------------------+
- | ♪ Field Notes 1 | ✦ Field Primitive 2 | ◌ Scratch 1 | + | ⤢     |
+ | Field Notes 1 | Field Primitive 2 | Scratch 1 | + |       |
  | rail | box canvas                          | Code | Box         |
- |  ●   |  [time]--->[*]--->[floor]--->[...]  | step = floor(t*4)  |
- |  ●   |                                     | ...                |
- | Field Primitive  ✓   9 boxes                                    |
+ |  o   |  [time]--->[*]--->[floor]--->[...]  | step = floor(t*4)  |
+ |  o   |                                     | ...                |
+ | Field Primitive  (ok)   9 boxes                                    |
  +----------------------------------------------------------------+
 ```
 
@@ -452,7 +452,7 @@ the boxes side by side and either one can be edited.
 ### 14.2 Pages
 
 One page per node. Right-click a page to pin it (it then stays in front whatever you select), close it, move it, or
-delete the node. A **scratch page** (+) belongs to no node yet. When it has an outlet, the footer offers **⤓** to place
+delete the node. A **scratch page** (+) belongs to no node yet. When it has an outlet, the footer offers **the down-arrow icon** to place
 it as a node:
 
 | The page has | It becomes |

@@ -42,7 +42,34 @@ def _dims(tid):
     return _size[tid]
 
 
+_MAN = os.path.join(os.path.dirname(os.path.dirname(HERE)), "docs", "shots", "manifest.json")
+
+
+def _manifest_nodes():
+    """2.0 node shots: name -> [(id, framed png, w, h)] for the closed and open states, from docs/shots/manifest.json."""
+    out = {}
+    if not os.path.exists(_MAN):
+        return out
+    shots_ = json.load(open(_MAN)).get("shots", {})
+    for sid in sorted(shots_):
+        e = shots_[sid]
+        if e.get("kind") != "node" or not e.get("framed"):
+            continue
+        path = os.path.join(os.path.dirname(os.path.dirname(HERE)), e["framed"])
+        if os.path.exists(path):
+            out.setdefault(e["name"], []).append((sid, path, e["width"], e["height"]))
+    for v in out.values():
+        v.sort(key=lambda t: t[0].endswith("/o"))   # closed first, then open
+    return out
+
+
+_M2 = _manifest_nodes()
+CAPTIONS = json.load(open(_MAN)).get("captions", {}) if os.path.exists(_MAN) else {}
+
+
 def find(name):
+    if name in _M2:
+        return _M2[name]
     ids = ALIASES.get(name) or [name]
     out = []
     for i in ids:
