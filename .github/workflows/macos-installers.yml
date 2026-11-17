@@ -1,0 +1,45 @@
+name: macOS installers
+
+# Builds the macOS buyer installers on a hosted runner: Infinite.dmg (package.sh, universal, ad-hoc
+# signed) and Infinite.pkg (tools/installer/mac/build_pkg.sh). Manual only, because a universal
+# two-architecture build is slow and the release owner runs it once per release. The artifact is
+# then attached to the release with attach-release-assets.yml (input mac_run_id).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build
+        required: true
+        default: release/2.0
+
+permissions:
+  contents: read
+
+jobs:
+  installers:
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          submodules: recursive
+
+      - name: Build DMG and PKG
+        run: ./package.sh
+
+      - name: Check the installers exist and are non-empty
+        run: |
+          test -s dist/Infinite.dmg
+          test -s dist/Infinite.pkg
+          shasum -a 256 dist/Infinite.dmg dist/Infinite.pkg
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-macos-installers
+          path: |
+            dist/Infinite.dmg
+            dist/Infinite.pkg
+          if-no-files-found: error
+          retention-days: 90

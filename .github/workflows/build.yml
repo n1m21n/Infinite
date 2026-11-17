@@ -127,6 +127,33 @@ jobs:
       - name: MCP package unit tests
         run: cd tools/npm/infinite-engine && npm test
 
+  # tests/platform, tests/website on hosted runners. tests/plugin and the chat finder evals do not run here:
+  # see docs/ci/HOSTED_TESTS.md (plugin needs a built plugin and an audio device; chat evals run in the linux job).
+  hosted-suites:
+    name: Platform, website and UI audits
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Single-instance test (tests/platform)
+        run: |
+          g++ -std=c++17 -I src tests/platform/single_instance_test.cpp -o "$RUNNER_TEMP/si_test"
+          "$RUNNER_TEMP/si_test"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install website test dependencies
+        run: cd tests/website && npm ci
+      - name: Website UI audits (tests/website, system Chrome)
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: |
+          cd tests/website
+          for s in ui_audit.mjs ui_scale.mjs ui_type.mjs ui_contrast.mjs; do
+            echo "=== $s ==="
+            node "$s"
+          done
+
   macos:
     name: macOS (arm64)
     runs-on: macos-15
@@ -151,6 +178,28 @@ jobs:
 
       - name: Headless self-tests
         run: ./.github/scripts/headless-tests.sh build/Infinite.app/Contents/MacOS/Infinite
+
+      # Audio Unit validation with auval (tools/plugin/validate.sh, M-3). Builds the AU
+      # components the same way the Windows/Linux jobs build their VST3s. Skips cleanly when
+      # no AU component is produced, so a change that drops the AU build does not fail here.
+      - name: Audio Unit validation (auval)
+        run: |
+          cmake -S src/plugin/shell -B build-plugin -DCMAKE_BUILD_TYPE=Release -DINFINITE_LICENSE_TEST_KEY=ON
+          cmake --build build-plugin --config Release --target InfiniteInstrument_au InfiniteFX_au -j3
+          if ! ls -d build-plugin/AU/*.component >/dev/null 2>&1; then
+            echo "SKIP: no Audio Unit component was built; auval not run"
+            exit 0
+          fi
+          mkdir -p plugin-logs
+          INFINITE_PLUGIN_ENGINE="$PWD/build/Infinite.app" LOGDIR="$PWD/plugin-logs" \
+            tools/plugin/validate.sh --build build-plugin --skip-pluginval --licensed
+      - name: Upload plugin logs (macOS)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-logs-macos
+          path: plugin-logs
+          if-no-files-found: ignore
 
       # Informational: the hosted macOS runner has no GPU, so glfwCreateWindow fails and every
       # case fails with it (first CI run of this script, 2026-10-01). Read, not gated.
@@ -316,6 +365,15 @@ jobs:
         timeout-minutes: 2
         shell: bash
         run: python3 tools/design/golden.py --binary build/Release/Infinite.exe --render-out artifacts-windows/ui-golden
+
+      # Windows goldens are not committed yet; see docs/ci/HOSTED_TESTS.md (adopting the artifact).
+      - name: Note when the Windows golden is not committed
+        if: always() && matrix.arch == 'x64'
+        shell: bash
+        run: |
+          if [ ! -f tests/ui-golden/windows/gallery-light.png ]; then
+            echo "::warning::no committed tests/ui-golden/windows; the ui-golden-windows artifact is not compared (see docs/ci/HOSTED_TESTS.md)"
+          fi
 
       - name: Upload Windows UI golden artifacts
         if: always() && matrix.arch == 'x64'
@@ -619,6 +677,16 @@ jobs:
         run: |
           xvfb-run -a scripts/headless_smoke.sh build-linux/Infinite
 
+      # Finder quality gate (tests/chat). The min-hits are the 2026-11-05 scores in src/core/chat/FindEval.cpp:
+      # a drop below them fails the job. find_holdout is never tuned on.
+      - name: Chat finder evals (tests/chat)
+        if: matrix.compiler == 'clang'
+        run: |
+          build-linux/find-eval tests/chat/find_eval.tsv 75
+          build-linux/find-eval tests/chat/find_holdout.tsv 16
+          build-linux/find-eval tests/chat/find_glossary.tsv 221
+          build-linux/find-eval tests/chat/find_nodes.tsv 254
+
       - name: Render goldens (Xvfb)
         if: matrix.compiler == 'clang'
         run: xvfb-run -a python3 tools/render-check.py --binary build-linux/Infinite
@@ -634,6 +702,14 @@ jobs:
           name: ui-golden-linux
           path: artifacts-linux/ui-golden
           if-no-files-found: ignore
+
+      - name: Note when the Linux golden is not committed
+        if: always() && matrix.compiler == 'clang'
+        shell: bash
+        run: |
+          if [ ! -f tests/ui-golden/linux/gallery-light.png ]; then
+            echo "::warning::no committed tests/ui-golden/linux; the ui-golden-linux artifact is not compared (see docs/ci/HOSTED_TESTS.md)"
+          fi
 
       # media group carries VST3SCANTEST / VST3EDITORSHOTTEST /
       # VST3BLOCKLISTTEST (task 4.4) plus the pre-existing plugin/media drag
