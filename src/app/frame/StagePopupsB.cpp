@@ -8,6 +8,7 @@
 #include "imgui_internal.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiType.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 
@@ -171,12 +172,12 @@ void DrawPopupsB(FrameCtx& fc)
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
             ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f * commentZoom);
-            ImGui::SetWindowFontScale(commentZoom * fontScale);
+            ImGui::PushFont(UiType::Font(UiType::Weight::Regular), UiType::Px(UiType::Size::Body) * commentZoom * fontScale);
 
             // Filling the whole popup cleanly at 1:1 scale with the canvas card
             FieldWell::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
 
-            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopFont();
             ImGui::PopStyleVar(3);
             ImGui::PopStyleColor(6);
 

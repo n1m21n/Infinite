@@ -246,7 +246,7 @@ namespace app
          char valBuf[16];
          snprintf(valBuf, sizeof(valBuf), "%+.2f", *curve);
          ImFont* font = ImGui::GetFont();
-         const float tinySize = ImGui::GetFontSize() * 0.62f;
+         const float tinySize = UiType::Px(UiType::Size::Caption);
          const ImU32 valCol = tok::U32(tok::curve_value_text, isLight);
          dl->AddText(font, tinySize, ImVec2(pos.x + 2.0f, pos.y + 1.0f), valCol, valBuf);
       }

@@ -2352,7 +2352,7 @@ namespace app
       const ImU32 litText = tok::U32(tok::pal::c_0B0C10FF);
       static const char* const kTypeLabels[NoteTheory::kNumChordTypes] = { "\xC2\xB7", "7", "sus2", "sus4" };
 
-      ImGui::SetWindowFontScale(tok::type_caption / ImGui::GetFontSize());
+      UiType::Push(UiType::Size::Caption);
       for (int c = 0; c < kCells; c++)
       {
          const float x0 = origin.x + (float)c * (cellW + gap);
@@ -2414,7 +2414,7 @@ namespace app
 
          ImGui::PopID();
       }
-      ImGui::SetWindowFontScale(1.0f);
+      UiType::Pop();
       (void)light;
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, chordH + gap + typeH + 4.0f));
@@ -2521,7 +2521,7 @@ namespace app
       const float y0 = ImGui::GetCursorScreenPos().y;
       const float cellW = gAudioContentW / 4.0f;
       const float btnW = 36.0f;
-      ImGui::SetWindowFontScale(tok::type_caption / ImGui::GetFontSize());
+      UiType::Push(UiType::Size::Caption);
       const float btnH = ImGui::GetFrameHeight();
       for (int i = 0; i < 4; i++)
       {
@@ -2537,7 +2537,7 @@ namespace app
             n->enabled[v] = en;
          }
       }
-      ImGui::SetWindowFontScale(1.0f);
+      UiType::Pop();
       ImGui::SetCursorScreenPos(ImVec2(x0, y0 + btnH + 6.0f));
       ImGui::Dummy(ImVec2(0.0f, 0.0f)); // the moved cursor must end on an item or ImGui flags the window growing
    }

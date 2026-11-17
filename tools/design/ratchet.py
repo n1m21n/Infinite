@@ -18,6 +18,7 @@ RAW = re.compile(r"ImGui::(Button|SmallButton|Separator|SameLine|PushStyleColor|
 # constants set to a literal and rect corners given as a literal. Components count too.
 SIZE = re.compile(r"(?:constexpr|const)\s+float\s+k\w*(?:H|Height|Row\w*|Radius|Rounding|Icon\w*|Chip\w*|Btn\w*)\s*=\s*[0-9][0-9.]*f?\s*;"
                   r"|AddRect(?:Filled)?\([^;]*?,\s*[0-9][0-9.]*f\s*\)\s*;")
+FONT_SCALE = re.compile(r"ImGui::SetWindowFontScale\(|ImGui::GetFontSize\(\)\s*\*\s*0\.(?!5f|74f)[0-9]+f?")
 ALLOW = {"src/app/ui/design/", "src/app/selftest/UiAudit.cpp"}  # components themselves; UiAudit draws raw widgets on purpose as canaries
 
 def counts(rx=RX, allow=None):
@@ -36,34 +37,36 @@ def load():
     raw = json.loads(STORE.read_text()) if STORE.exists() else {}
     if "colours" not in raw and "widgets" not in raw:   # old flat format
         raw = {"colours": raw, "widgets": {}}
-    return raw.get("colours", {}), raw.get("widgets", {}), raw.get("sizes", {})
+    return raw.get("colours", {}), raw.get("widgets", {}), raw.get("sizes", {}), raw.get("font_scales", {})
 
-def store(c, w, z):
+def store(c, w, z, f):
     STORE.write_text(json.dumps({"colours": dict(sorted(c.items())), "widgets": dict(sorted(w.items())),
-                                 "sizes": dict(sorted(z.items()))}, indent=1) + "\n")
-    print(f"ratchet: {sum(c.values())} literal colours, {sum(w.values())} raw widget calls, {sum(z.values())} size literals")
+                                 "sizes": dict(sorted(z.items())), "font_scales": dict(sorted(f.items()))}, indent=1) + "\n")
+    print(f"ratchet: {sum(c.values())} literal colours, {sum(w.values())} raw widget calls, {sum(z.values())} size literals, {sum(f.values())} font scales")
 
 def main():
-    cur_c, cur_w, cur_z = counts(RX), counts(RAW), counts(SIZE, set())
-    old_c, old_w, old_z = load()
+    cur_c, cur_w, cur_z, cur_f = counts(RX), counts(RAW), counts(SIZE, set()), counts(FONT_SCALE)
+    old_c, old_w, old_z, old_f = load()
     if "--reset" in sys.argv:
-        store(cur_c, cur_w, cur_z); return 0
+        store(cur_c, cur_w, cur_z, cur_f); return 0
     if "--update" in sys.argv:
         low = lambda cur, old: {k: min(v, old.get(k, v)) for k, v in cur.items()}
-        store(low(cur_c, old_c), low(cur_w, old_w), low(cur_z, old_z)); return 0
+        store(low(cur_c, old_c), low(cur_w, old_w), low(cur_z, old_z), low(cur_f, old_f)); return 0
     bad = [(k, v, old_c.get(k, 0)) for k, v in cur_c.items() if v > old_c.get(k, 0)]
     for k, v, o in bad: print(f"RATCHET: {k} has {v} literal colours (allowed {o}): use a role token")
     badw = [(k, v, old_w.get(k, 0)) for k, v in cur_w.items() if v > old_w.get(k, 0)]
     for k, v, o in badw: print(f"RATCHET: {k} has {v} raw widget calls (allowed {o}): use a component from ui/design/components")
     badz = [(k, v, old_z.get(k, 0)) for k, v in cur_z.items() if v > old_z.get(k, 0)]
     for k, v, o in badz: print(f"RATCHET: {k} has {v} size literals (allowed {o}): use control_h / row_h / radius_* / icon_control")
-    for name, cur in (("literal colours", cur_c), ("raw widget calls", cur_w), ("size literals", cur_z)):
+    badf = [(k, v, old_f.get(k, 0)) for k, v in cur_f.items() if v > old_f.get(k, 0)]
+    for k, v, o in badf: print(f"RATCHET: {k} has {v} font scales (allowed {o}): use UiType::Push / UiType::Px")
+    for name, cur in (("literal colours", cur_c), ("raw widget calls", cur_w), ("size literals", cur_z), ("font scales", cur_f)):
         top = sorted(cur.items(), key=lambda kv: -kv[1])[:10]
         print(f"top {name}: " + ", ".join(f"{pathlib.Path(k).name} {v}" for k, v in top))
     r = subprocess.run([sys.executable, str(ROOT / "tools/design/build_tokens.py"), "--check"])
     print(f"ratchet: colours {sum(cur_c.values())} (stored {sum(old_c.values())}), raw widgets {sum(cur_w.values())} (stored {sum(old_w.values())}), "
-          f"sizes {sum(cur_z.values())} (stored {sum(old_z.values())})")
-    return 1 if bad or badw or badz or r.returncode else 0
+          f"sizes {sum(cur_z.values())} (stored {sum(old_z.values())}), font scales {sum(cur_f.values())} (stored {sum(old_f.values())})")
+    return 1 if bad or badw or badz or badf or r.returncode else 0
 
 if __name__ == "__main__":
     sys.exit(main())

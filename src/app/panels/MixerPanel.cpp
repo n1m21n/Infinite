@@ -694,7 +694,7 @@ namespace app
             MenuParts::EndPopup();
          }
          dl->PushClipRect(ImVec2(p.x + 11.0f, p.y), ImVec2(q.x - 2.0f, q.y), true);
-         dl->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f, ImVec2(p.x + 12.0f, p.y + 1.0f),
+         dl->AddText(ImGui::GetFont(), UiType::Px(UiType::Size::Caption), ImVec2(p.x + 12.0f, p.y + 1.0f),
                      ImGui::GetColorU32(off ? ImGuiCol_TextDisabled : ImGuiCol_Text), name.c_str());
          dl->PopClipRect();
          ImGui::PopID();
@@ -712,7 +712,7 @@ namespace app
             ImGui::InvisibleButton("##shared", ImVec2(w, kInsertRowH));
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Shared chain: edit it on the canvas"));
-            dl->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f, ImVec2(x + 3.0f, p.y + 1.0f),
+            dl->AddText(ImGui::GetFont(), UiType::Px(UiType::Size::Caption), ImVec2(x + 3.0f, p.y + 1.0f),
                         ImGui::GetColorU32(ImGuiCol_TextDisabled), T("Shared"));
             return;
          }
@@ -890,7 +890,7 @@ namespace app
          dl->AddCircle(c, cr, Lo(170), 24, 1.0f);
          dl->AddLine(ImVec2(c.x + cosf(ang) * 2.0f, c.y + sinf(ang) * 2.0f), ImVec2(c.x + cosf(ang) * (cr - 0.5f), c.y + sinf(ang) * (cr - 0.5f)),
                      col, 2.2f);
-         const float fs = ImGui::GetFontSize() * 0.72f;
+         const float fs = UiType::Px(UiType::Size::Caption);
          const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, tag).x;
          dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (cellW - tw) * 0.5f, p.y + kPotD + 3.0f), Ink(140), tag);
          return changed;
@@ -935,7 +935,7 @@ namespace app
          // scale
          static const float kMarks[] = { 12.0f, 0.0f, -10.0f, -20.0f, -30.0f, -60.0f };
          static const char* kLabels[] = { "+12", "0", "10", "20", "30", "-60" };
-         const float fs = ImGui::GetFontSize() * 0.68f;
+         const float fs = UiType::Px(UiType::Size::Caption);
          for (int i = 0; i < 6; i++)
          {
             const float y = bottom - pos01(kMarks[i]) * (bottom - top);
@@ -992,7 +992,7 @@ namespace app
             dl->AddRect(p, q, Ink(70), 3.0f);
          char num[8];
          snprintf(num, sizeof(num), "%d", number);
-         const float nfs = ImGui::GetFontSize() * 0.78f;
+         const float nfs = UiType::Px(UiType::Size::Caption);
          if (number > 0)
             dl->AddText(ImGui::GetFont(), nfs, ImVec2(p.x + 4.0f, p.y + 7.0f), Tint(col, app::IsThemeLight() ? 0.7f : 1.25f), num);
          const ImVec2 ts = ImGui::CalcTextSize(name);
@@ -1181,7 +1181,7 @@ namespace app
                HelpTip("%s", T("True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset."));
             const char* tags[4] = { "TP", "M", "S", "I" };
             const float vals[4] = { m->TruePeakDb(), m->LoudnessMomentary(), m->LoudnessShort(), m->LoudnessIntegrated() };
-            const float fs = ImGui::GetFontSize() * 0.78f;
+            const float fs = UiType::Px(UiType::Size::Caption);
             const float rowH = dispH * 0.5f;
             for (int i = 0; i < 4; i++)
             {
