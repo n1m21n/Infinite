@@ -20,9 +20,10 @@ and every request is about that patch unless they name a file.
    | pick the right node | `infinite find <plain words>` (ranks every node card; pick from it, not from memory) |
    | add a node | `infinite add <Type>` |
    | wire two nodes | `infinite connect <src[:out]> <dst[:slot]>` |
-   | set a value | `infinite set <node> <key> <value>` |
+   | set a value | `infinite set <node> <key> <value>` (or `infinite reset <node> <key>` for default) |
    | modulate a value | `infinite mod <src[:out]> <dst> <key> [lo hi]` |
    | expression on a value | `infinite expr <node> <key> "=sin(t)"` |
+   | edit 2D View (Scene 2D) | `infinite view2d layers\|fields\|'<json>'` |
    | many changes, one undo | `infinite batch -` (JSON array of {method, params} on stdin) |
    | take it back | `infinite undo` |
 

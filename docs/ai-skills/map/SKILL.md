@@ -20,6 +20,7 @@ command, never your memory.
 | What a node is for, a thing to try, a chain it fits | `infinite docs nodes <Type>` |
 | Keyboard shortcuts | `infinite docs shortcuts` |
 | Panels and how to open them | `infinite docs panels` |
+| What every panel, menu, column and button does | `infinite docs ui [part]` |
 | What can be cabled into what | `infinite docs connections` |
 | Field language, full manual | `infinite docs field`; quick reference `infinite code docs field` |
 | Sketch (JS 2D), Sketch 3D (three.js style), GLSL, expressions | `infinite code docs sketch\|sketch3d\|glsl\|expressions` |
@@ -67,8 +68,9 @@ Never hand the user code that has not passed its check.
 | Effects | change a picture | gaussianblur, bloom, glitch, kaleidoscope, displace, halftone, pixelate, ripple, edge outline |
 | Compositing | colour, layers, time | Blend, Layer Stack, Curves, Color Ramp, Feedback, Trails, Fluid, Reaction Diffusion, chroma key |
 | 3D | geometry to a render | primitives, Model 3D, Instance on Points, Particle System, Field Modifier, Sketch 3D, Material, Camera, Light, Render 3D |
+| Shader | procedural material graphs | Shade Coord, Shade Mapping, Shade Checker, Shade Noise, Shade Voronoi, Shade Gradient, Shade Brick, Shade Image, Bump, Normal Map, Fresnel, Layer Weight, Geometry, Math, Vector Math, Mix, Ramp, Map Range |
 | Synths | make sound | Analog, FM, Wavetable, Piano, String, Sampler, Granular, Drum Sequencer, Field Synth |
-| AudioEffects | change sound | Audio Filter, EQ, Dynamics, Delay, Reverb, Drive, Chorus, Stutter, Convolution Reverb |
+| AudioEffects | change sound | Audio Filter, EQ, Dynamics, Delay, Reverb, Drive, Chorus, Stutter, Convolution Reverb, Spectral Field |
 | Notes | notes and MIDI | MIDI Notes, Note Sequencer, Arpeggiator, Chorder, Piano Roll, Quantizer, Humanizer |
 | Modulators | move a value over time | LFO, Random, MSEG, Envelope, Audio Analyze, Audio to CV, Smoothing, Image Analyze, Hand Track |
 | Macros | knobs for playing live | Macro Knob, Macro XY, Macro Trigger |

@@ -119,8 +119,8 @@ namespace chat
                 "then report what is wrong in one line each, with a button to fix what you can.";
       if (name == "docs")
          return arg.empty() ? std::string()
-                            : "Answer from the manuals, not from memory: find it with `infinite docs` (topics: nodes, field, headless, connections, "
-                              "patch-format, geometry, sketch, glsl, expressions, shortcuts). Question: " + arg;
+                            : "Answer from the manuals, not from memory: find it with `infinite docs` (topics: nodes, ui, field, headless, connections, "
+                              "patch-format, geometry, sketch, sketch3d, glsl, expressions, shortcuts, panels, map, visual, sound, film). Question: " + arg;
       return std::string();
    }
 
@@ -141,10 +141,10 @@ namespace chat
    {
       return std::string("You are working inside Infinite (") + kSite + ", " + kRepo + "), a free open-source workstation for visuals, music and code. "
              "The user talks to you from its chat. Answer from the source, never from memory:\n"
-             "- `infinite docs` lists the manuals: nodes (Node Field Guide), field, headless, connections, patch-format, geometry, sketch, sketch3d, glsl, "
-             "expressions, shortcuts, panels, map. `infinite context` shows the open patch.\n"
+             "- `infinite docs` lists the manuals: nodes (Node Field Guide), ui (every panel and control), field, headless, connections, patch-format, geometry, sketch, sketch3d, glsl, "
+             "expressions, shortcuts, panels, map, visual, sound, film. `infinite context` shows the open patch and `attention`.\n"
              "- Check code before you say it works: `infinite code check <file>`, `infinite patch check <p.inf>`, `infinite code errors`.\n"
-             "- Change the open window with `infinite` commands only; never write a new .inf unless asked.\n"
+             "- Change the open window with `infinite` commands only (`set`, `reset`, `mod`, `expr`, `view2d`, `timeline`, `session`, `notes`, `perf`, `panel`); never write a new .inf unless asked.\n"
              "- Pick nodes with `infinite find <plain words>`, which ranks every node card, not from memory.\n"
              "- Asked for a sample or sound: `infinite studio generate <part>` (Sample studio), then `studio export` for a wav or "
              "`studio node Sampler|Slicer|PaulStretch|...`. Asked for MIDI, chords, a melody or a beat: `infinite notes generate <type>` "

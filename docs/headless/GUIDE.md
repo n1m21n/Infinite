@@ -94,6 +94,7 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--validate patch.inf [--for-render] [--lenient] [--json file]` | Check the file loads; report every problem |
 | `--explain patch.inf [--json] [--all] [--lenient]` | Print the built graph: nodes, non-default controls, wires, modulation ranges, world bounding boxes of geometry. `--all` lists every control |
 | `--frame patch.inf T[,T...] out.png or dir/` | Still images at the given times in seconds. Several times need a folder |
+| `--frame --batch jobs.json` | Run multiple frame renders in one process (`[{patch, t, out, size, node, ...}]`) |
 | `--frames-dir patch.inf out_dir --duration S` | A numbered PNG sequence. Options: `--start S`, `--fps N`, `--alpha`, `--depth 8 or 16` |
 | `--render patch.inf out.mp4 or out.mov` | A video with audio |
 | `--audio-summary patch.inf out.json` | The sound as numbers: loudness, peaks, clipping, silence, spectrum, tempo guess |
@@ -113,13 +114,17 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--codec h264 or prores4444` | render | Video codec. Use `prores4444` (in a `.mov`) when you need transparency |
 | `--no-audio` | render | Write a silent video |
 | `--node index[:output]` | frame, frames-dir, render | Render this node instead of the Output. Great for checking one stage |
+| `--geometry node` | frame, frames-dir | Also report world bounding-box stats for a geometry node |
 | `--set node.param=value` | frame, frames-dir, render | Override one control for this run without editing the file |
 | `--output node` | audio-summary | Measure one Audio Out or Output instead of the whole mix |
 | `--wav out.wav` | audio-summary | Also write the audio as a WAV |
 | `--stems id,id --stems-dir dir` | audio-summary | Write one WAV per named node |
 | `--notes events.json --note-map map.json` | audio-summary | Play your own note events into the patch |
-| `--timeline` | audio-summary | Play the arrangement's audio lanes instead of the node graph alone |
+| `--timeline` | render, audio-summary | Render or measure the Timeline arrangement instead of the canvas graph alone |
 | `--plugin-params` | render, audio-summary | List every loaded plugin's parameters (address, name, real range, default) in the `plugins` block of the result |
+| `--plugin-state` | render, audio-summary | Include plugin state blobs in the result |
+| `--batch jobs.json` | frame, audio-summary | Run a JSON array of frame or audio-summary jobs in one process |
+| `--repeat 1-8` | frame | Repeat the frame render N times (determinism / warmup check) |
 | `--contact-sheet sheet.png` | frame | One image holding every requested frame |
 | `--png-level 0-9` | frame, frames-dir | PNG compression |
 | `--lenient` | all | Treat unknown keys and removed nodes as warnings, not errors |
@@ -150,20 +155,22 @@ prints the open patch, the selection and any code errors in one answer.
 | Group | Verbs |
 |---|---|
 | Look | `graph`, `explain`, `params`, `selection`, `status`, `nodes`, `describe` |
-| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `mod`, `expr`, `bypass`, `batch`, `undo`, `redo` |
-| Patch | `new`, `open`, `save`, `validate`, `canonicalize`, `apply` |
+| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d` |
+| Patch | `new`, `recent`, `open`, `save`, `import`, `files`, `reveal`, `validate`, `canonicalize`, `apply` |
 | Play | `play`, `stop`, `rewind`, `seek`, `tempo` |
 | Timeline | `timeline` prints it all; `timeline track`, `clip`, `marker`, `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
 | Session | `session scene`, `launch`, `launchrow`, `stop`, `add`, `insert`, `duplicatescene`, `deletescene`, `send`, `sceneset`, `slot`, `place`, `duplicate`, `clear`, `copy`, `paste`, `cut`, `quantize` |
-| Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>` |
+| Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>`, `export <clip>`, `generate <type> [key=value]` |
 | Performance Matrix | `perf get`, `add <kind> [label]`, `remove`, `assign`, `clear`, `unmidi`, `set`, `edit`, `page add|go|rename|delete|duplicate` |
-| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library`, `mod curve`, `studio get|set` |
+| Make | `studio generate <part> [bars=n]`, `studio status|export|node <type>|get|set` |
+| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library list|add|remove|refresh` |
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
-| Learn | `context`, `guide` |
+| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings`, `show`, `view`, `quit` |
+| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>` |
 | Watch | `watch` prints a JSON line for each change |
-| Terminal | `term list`, `read`, `send`, `run` |
+| Terminal | `term open`, `list`, `read`, `send`, `run` |
 
 A `<node>` is an index, `selected`, or a title or type only one node has. Exit codes match 4.4, plus 7: no
 running app answered. Each terminal is tied to its own app, so two running apps do not cross.

@@ -16,7 +16,11 @@ def section(name):
 failed = False
 for name, engine in (("Sketch", "SketchEngine.cpp"), ("Sketch3D", "Sketch3DEngine.cpp")):
     text = section(name).split("## Wrong and right")[0]
-    registered = set(re.findall(r'Reg\(c, g, "(\w+)"', (root / "src/core/sketch" / engine).read_text()))
+    src = (root / "src/core/sketch" / engine).read_text()
+    registered = set(re.findall(r'Reg\(c, g, "(\w+)"', src))
+    registered.update(re.findall(r'globalThis\.(\w+)\s*=\s*\(', src))
+    if name == "Sketch":
+        registered.add("floor")  # used in fract(x) comment: x - floor(x)
     named = set(re.findall(r"\b([a-zA-Z]\w*)\(", text)) - {"function", "if", "for", "draw", "code", "sin"}
     for word in sorted(named - registered):
         print(f"{name}: docs name {word}() but {engine} does not register it")
