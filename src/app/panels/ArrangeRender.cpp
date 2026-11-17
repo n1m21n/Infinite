@@ -825,7 +825,7 @@ namespace app
          }
 
          ImGui::Spacing();
-         SectionHeader(T("Color Tint"));
+         SectionHeader(T("Colour Tint"));
          const float clipRGB[3] = { clip->colorR, clip->colorG, clip->colorB };
          drawPaletteSwatches([&](int pi) {
             ArrangeEdit([&]() {
@@ -986,7 +986,7 @@ namespace app
          }
 
          ImGui::Spacing();
-         SectionHeader(T("Color Tint"));
+         SectionHeader(T("Colour Tint"));
          drawPaletteSwatches([&](int pi) {
             ArrangeEdit([&]() {
                const ImVec4 cv = paletteRGB(pi);
@@ -1132,7 +1132,7 @@ namespace app
             }
 
             ImGui::Spacing();
-            SectionHeader(T("Track Tint"));
+            SectionHeader(T("Colour Tint"));
             drawPaletteSwatches([&](int pi) {
                ArrangeEdit([&]() {
                   if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
@@ -1190,7 +1190,7 @@ namespace app
             }
 
             ImGui::Spacing();
-            SectionHeader(T("Group Color"));
+            SectionHeader(T("Group Colour"));
             drawPaletteSwatches([&](int pi) {
                ArrangeEdit([&]() {
                   Arrange::RecolorTrackGroup(gArrange, rowId, ArrangeMarkerRGBA(kArrangePalette[pi].col));

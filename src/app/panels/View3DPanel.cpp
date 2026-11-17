@@ -6827,7 +6827,7 @@ namespace
          if (BoolRow(T("Hide selection"), &item->hideSelect, "Hide selection"))
             scene->Commit();
       }
-      if (Card(T("Viewport display")))
+      if (Card(T("Viewport Display")))
       {
          bool changed = BoolRow(T("Name"), &item->showName, "Show name");
          changed |= BoolRow(T("Axes"), &item->showAxes, "Show axes");
@@ -6842,9 +6842,9 @@ namespace
          if (BoolRow(T("Lit"), &item->pictureLit, "Picture lit"))
             scene->Commit();
       }
-      if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Viewport Display")))
+      if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Viewport Colour")))
       {
-         if (ColorRow(T("Color"), item->color, "Edit in 3D View"))
+         if (ColorRow(T("Colour"), item->color, "Edit in 3D View"))
             scene->Commit();
       }
       if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Pass Index")))
@@ -7208,7 +7208,7 @@ namespace
          }
          if (mode == 1)
          {
-            if (ColorRow(T("Color"), scene->worldColor, "3D View world"))
+            if (ColorRow(T("Colour"), scene->worldColor, "3D View world"))
                scene->Commit();
             if (FloatRow(T("Strength"), &scene->worldStrength, 0.0f, 10.0f, "%.3f", "3D View world"))
                scene->Commit();
@@ -7392,7 +7392,7 @@ namespace
                   FloatRow(T("Rotation"), &look.studioRotation, -180.0f, 180.0f, "%.0f");
                BoolRow(T("Specular"), &look.solidSpecular);
             }
-            ComboRow(T("Color"), &look.solidColor, Render3DNode::SolidColorNames());
+            ComboRow(T("Colour"), &look.solidColor, Render3DNode::SolidColorNames());
             if (look.solidColor == 2)
                ColorRow(T("Single color"), look.solidSingle);
             BoolRow(T("Outline"), &sSet->outline);
@@ -7447,7 +7447,7 @@ namespace
             BoolRow(T("Crop to region"), &sSet->crop);
          }
       }
-      if (Card(T("Color Management")))
+      if (Card(T("Colour Management")))
       {
          ComboRow(T("View"), &look.tonemap, Render3DNode::TonemapNames());
          FloatRow(T("Exposure"), &look.exposure, 0.1f, 4.0f, "%.2f");
@@ -7534,7 +7534,7 @@ namespace
       {
          static const std::vector<std::string> kDepths = { "8", "16" };
          int depth = look.floatOutput ? 1 : 0;
-         if (ComboRow(T("Color depth"), &depth, kDepths))
+         if (ComboRow(T("Colour Depth"), &depth, kDepths))
             look.floatOutput = depth == 1;
          ComboRow(T("Pass"), &look.renderPass, Render3DNode::RenderPassNames());
          if (look.renderPass >= 1 && look.renderPass <= 9)

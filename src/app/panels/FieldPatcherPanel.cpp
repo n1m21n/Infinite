@@ -1129,7 +1129,7 @@ namespace
       }
       if (MenuParts::BeginPopup("##fpLinkMenu"))
       {
-         if (MenuParts::Item(T("Delete wire")))
+         if (MenuParts::Item(T("Delete Wire")))
          {
             auto& w = p.graph.wires;
             const int lid = s.ctxLink;

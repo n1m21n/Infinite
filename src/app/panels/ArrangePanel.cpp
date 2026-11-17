@@ -136,7 +136,7 @@ namespace app
                         gArrangeRenameTargetIds.push_back(id);
                   snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
                }
-               if (MenuParts::SubMenu(L("Color Tint")))
+               if (MenuParts::SubMenu(L("Colour Tint")))
                {
                   const auto& kPaletteColors = kArrangePalette;
                   for (int ci2 = 0; ci2 < 10; ci2++)
@@ -396,7 +396,7 @@ namespace app
                ImGui::EndMenu();
             }
 
-            if (ctxLaneType == Arrange::kLaneVideo && MenuParts::SubMenu(L("Color Grade")))
+            if (ctxLaneType == Arrange::kLaneVideo && MenuParts::SubMenu(L("Colour Grade")))
             {
                // Basic grade only: brightness/contrast/saturation, consumed
                // by the compositor as a per-clip shader pass. Defaults are a
@@ -440,7 +440,7 @@ namespace app
                ImGui::EndMenu();
             }
 
-            if (MenuParts::SubMenu(L("Color Tint")))
+            if (MenuParts::SubMenu(L("Colour Tint")))
             {
                const auto& kPaletteColors = kArrangePalette; // shared with the marker colours
                for (int ci2 = 0; ci2 < 10; ci2++)

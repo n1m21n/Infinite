@@ -1534,12 +1534,12 @@ namespace
             AddPage();
          break;
       case PagePicker::Act::Rename:
-         PushUndoCheckpoint("Rename curve");
+         PushUndoCheckpoint("Rename Curve");
          AsMseg(gn)->pageName = r.name;
          gPatchDirty = true;
          break;
       case PagePicker::Act::Recolor:
-         PushUndoCheckpoint("Colour curve");
+         PushUndoCheckpoint("Colour Curve");
          AsMseg(gn)->pageColor = r.color;
          gPatchDirty = true;
          break;

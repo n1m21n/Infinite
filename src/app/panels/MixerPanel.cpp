@@ -541,9 +541,9 @@ namespace app
                m->mute[r.slot] = m->solo[r.slot] = m->phase[r.slot] = false;
             }
             MenuParts::Separator();
-            if (MenuParts::Item(T("Move left"), nullptr, false, r.slot > 0))
+            if (MenuParts::Item(T("Move Left"), nullptr, false, r.slot > 0))
                MixerPanelStripMove(r.mixerIndex, r.slot, r.slot - 1);
-            if (MenuParts::Item(T("Move right"), nullptr, false, r.slot < n - 1))
+            if (MenuParts::Item(T("Move Right"), nullptr, false, r.slot < n - 1))
                MixerPanelStripMove(r.mixerIndex, r.slot, r.slot + 1);
             MenuParts::EndPopup();
          }
@@ -1348,7 +1348,7 @@ namespace app
             sPendingDelete = 0;
             if (gn != nullptr)
             {
-               PushUndoCheckpoint("Delete mixer page");
+               PushUndoCheckpoint("Delete Mixer Page");
                sPageUid = 0;
                RemoveNodeByIndex(gn->index);
                RebuildAudioTopology();
@@ -1387,14 +1387,14 @@ namespace app
          case PagePicker::Act::Rename:
             if (m != nullptr)
             {
-               PushUndoCheckpoint("Rename mixer page");
+               PushUndoCheckpoint("Rename Mixer Page");
                m->pageName = r.name;
             }
             break;
          case PagePicker::Act::Recolor:
             if (m != nullptr)
             {
-               PushUndoCheckpoint("Colour mixer page");
+               PushUndoCheckpoint("Colour Mixer Page");
                m->pageColor = r.color;
             }
             break;
@@ -1412,7 +1412,7 @@ namespace app
             const Page moving = order[r.index];
             order.erase(order.begin() + r.index);
             order.insert(order.begin() + r.to, moving);
-            PushUndoCheckpoint("Reorder mixer pages");
+            PushUndoCheckpoint("Reorder Mixer Pages");
             for (size_t i = 0; i < order.size(); i++)
                if (MixerNode* om = PageMixer(order[i]))
                   om->pageOrder = (int)i;
@@ -1682,7 +1682,7 @@ namespace app
    int MixerPanelAddPage()
    {
       const ImVec2 at = FreeCanvasSpot();
-      PushUndoCheckpoint("New mixer page");
+      PushUndoCheckpoint("New Mixer Page");
       const bool wasSuppressed = gSuppressUndoCheckpoints;
       gSuppressUndoCheckpoints = true;
       const int mix = SpawnAt("Mixer", at.x, at.y);

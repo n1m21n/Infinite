@@ -392,7 +392,7 @@ void DrawMenuBar(FrameCtx& fc)
                                            kViewportPanelMinHeight, 800.0f, "%.0f px");
                      }
                      MenuParts::Separator();
-                     if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear cards")))
+                     if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear Cards")))
                         gViewportPanelNodes.clear();
                      if (MenuParts::Item(L("Close Viewport")))
                         gViewportPanelOpen = false;

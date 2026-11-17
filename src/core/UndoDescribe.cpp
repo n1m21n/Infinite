@@ -174,11 +174,11 @@ std::string Change(const Patch::Data& before, const Patch::Data& after)
          return "Performance: Edit " + std::to_string(changed) + " controls";
    }
    if (before.perfLayout.pageCount != after.perfLayout.pageCount)
-      return after.perfLayout.pageCount > before.perfLayout.pageCount ? "Performance: Add page" : "Performance: Remove page";
+      return after.perfLayout.pageCount > before.perfLayout.pageCount ? "Performance: Add Page" : "Performance: Remove Page";
    if (before.perfLayout.pageNames != after.perfLayout.pageNames)
-      return "Performance: Rename page";
+      return "Performance: Rename Page";
    if (before.perfLayout.pageColors != after.perfLayout.pageColors)
-      return "Performance: Colour page";
+      return "Performance: Colour Page";
    if (before.perfLayout.cellSize != after.perfLayout.cellSize)
       return "Performance: Resize grid";
    if (before.palette.size() != after.palette.size())

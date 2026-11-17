@@ -142,7 +142,7 @@ namespace app
    {
       if (src == dst || src < 0 || dst < 0 || src >= gPerfLayout.pageCount || dst >= gPerfLayout.pageCount)
          return;
-      PushUndoCheckpoint("Performance: Reorder pages");
+      PushUndoCheckpoint("Performance: Reorder Pages");
       while ((int)gPerfLayout.pageNames.size() < gPerfLayout.pageCount)
          gPerfLayout.pageNames.push_back("Page " + std::to_string((int)gPerfLayout.pageNames.size() + 1));
 
@@ -702,7 +702,7 @@ namespace app
             }
 
             MenuParts::Separator();
-            if (MenuParts::SubMenu(L("Color Tint")))
+            if (MenuParts::SubMenu(L("Colour Tint")))
             {
                static const struct { const char* name; ImU32 col; } kPaletteColors[10] = {
                   { "Default", tok::U32(tok::pal::c_6E788CFF) },
@@ -2241,19 +2241,19 @@ namespace app
          case PagePicker::Act::Select: gPerfActivePage = p; break;
          case PagePicker::Act::Add:
          {
-            PushUndoCheckpoint("Performance: Add page");
+            PushUndoCheckpoint("Performance: Add Page");
             int newP = gPerfLayout.pageCount++;
             gPerfLayout.pageNames.push_back("Page " + std::to_string(newP + 1));
             gPerfActivePage = newP;
             break;
          }
          case PagePicker::Act::Rename:
-            PushUndoCheckpoint("Performance: Rename page");
+            PushUndoCheckpoint("Performance: Rename Page");
             if (p >= 0 && p < (int)gPerfLayout.pageNames.size())
                gPerfLayout.pageNames[p] = r.name;
             break;
          case PagePicker::Act::Recolor:
-            PushUndoCheckpoint("Performance: Colour page");
+            PushUndoCheckpoint("Performance: Colour Page");
             gPerfLayout.pageColors.resize((size_t)gPerfLayout.pageCount, 0u);
             if (p >= 0 && p < gPerfLayout.pageCount)
                gPerfLayout.pageColors[p] = r.color;
@@ -2261,7 +2261,7 @@ namespace app
          case PagePicker::Act::Move: ReorderPerfPages(p, r.to); break;
          case PagePicker::Act::Duplicate:
          {
-            PushUndoCheckpoint("Performance: Duplicate page");
+            PushUndoCheckpoint("Performance: Duplicate Page");
             int newP = gPerfLayout.pageCount++;
             gPerfLayout.pageNames.push_back(entries[p].name + " Copy");
             gPerfLayout.pageColors.resize((size_t)gPerfLayout.pageCount, 0u);
@@ -2278,7 +2278,7 @@ namespace app
             break;
          }
          case PagePicker::Act::Delete:
-            PushUndoCheckpoint("Performance: Delete page");
+            PushUndoCheckpoint("Performance: Delete Page");
             gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
                                                [p](const Patch::PerfRecord& r) { return r.page == p; }),
                                 gPerfElements.end());

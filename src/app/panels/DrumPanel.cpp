@@ -227,7 +227,7 @@ namespace app
          }
          if (any)
             x += 420.0f;
-         PushUndoCheckpoint("New drum page");
+         PushUndoCheckpoint("New Drum Page");
          const bool wasSuppressed = gSuppressUndoCheckpoints;
          gSuppressUndoCheckpoints = true;
          GraphNode* drum = SpawnNode("Drum Sequencer", "Synths", x, y);
@@ -510,7 +510,7 @@ namespace app
             sPendingDelete = 0;
             if (gn != nullptr)
             {
-               PushUndoCheckpoint("Delete drum page");
+               PushUndoCheckpoint("Delete Drum Page");
                sPageUid = 0;
                RemoveNodeByIndex(gn->index);
                RebuildAudioTopology();
@@ -547,14 +547,14 @@ namespace app
          case PagePicker::Act::Rename:
             if (d != nullptr)
             {
-               PushUndoCheckpoint("Rename drum page");
+               PushUndoCheckpoint("Rename Drum Page");
                d->pageName = r.name;
             }
             break;
          case PagePicker::Act::Recolor:
             if (d != nullptr)
             {
-               PushUndoCheckpoint("Colour drum page");
+               PushUndoCheckpoint("Colour Drum Page");
                d->pageColor = r.color;
             }
             break;
@@ -568,7 +568,7 @@ namespace app
             GraphNode* moving = order[r.index];
             order.erase(order.begin() + r.index);
             order.insert(order.begin() + r.to, moving);
-            PushUndoCheckpoint("Reorder drum pages");
+            PushUndoCheckpoint("Reorder Drum Pages");
             for (size_t i = 0; i < order.size(); i++)
                if (DrumSequencerNode* d = DrumOf(order[i]))
                   d->pageOrder = (int)i;
