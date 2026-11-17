@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Koto Glass Plucked Koto Synth",
+    "author": "Infinite",
+    "description": "Silk-string koto modal pluck synthesizer with bridge buzz dispersion, three-partial harmonic FM, and paulownia soundboard resonance.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pluckBright = 0.68 [0.15, 1.0];\nparam float bridgeBuzz = 0.34 [0.0, 0.85];\nparam float decay = 0.99935 [0.996, 0.99975];\nparam float bodyHz = 540.0 [220.0, 1400.0];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float bp = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.16, env * decay);\nf0 = clamp(freq, 55.0, 3200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.004) / sr) % 1.0;\np3 = (p3 + (f0 * 3.012) / sr) % 1.0;\n\n# Bridge dispersion FM + nonlinear silk-bridge buzz\nraw = sin(6.2831853 * p1 + sin(6.2831853 * p2) * (0.35 + pluckBright * 1.4) * env) + sin(6.2831853 * p2) * 0.42 + sin(6.2831853 * p3) * (0.18 + 0.25 * pluckBright) * env;\nstrSig = raw * (1.0 - bridgeBuzz * 0.2) + sin(raw * (1.0 + bridgeBuzz * 2.2 * env)) * bridgeBuzz * 0.35;\n\n# Paulownia soundboard SVF bandpass resonance\ng = clamp(2.0 * sin(3.14159265 * bodyHz / sr), 0.02, 0.85);\nbp = bp + g * (strSig - lp - 0.58 * bp);\nlp = lp + g * bp;\nsig = (strSig * 0.66 + bp * 0.52) * env * 0.28;\nout = sig / (1.0 + abs(sig) * 0.45);\n",
+    "params": {
+      "pluckBright": 0.68,
+      "bridgeBuzz": 0.34,
+      "decay": 0.99935,
+      "bodyHz": 540.0
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

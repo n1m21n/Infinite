@@ -1,0 +1,77 @@
+infinite-patch 1
+# Doppler Rotary Horn Cabinet FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 55
+  i note2 60
+  i note3 63
+  i note4 55
+  i note5 60
+  i note6 67
+  i note7 63
+  i note8 50
+  i note9 57
+  i note10 62
+  i note11 65
+  i note12 57
+  i note13 62
+  i note14 69
+  i note15 65
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2200.0
+  f resonance 0.28
+  f decay 0.52
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float hornHz = 5.4 [0.6, 8.5];\nparam float drumHz = 0.85 [0.2, 3.0];\nparam float dopplerDepth = 0.72 [0.1, 1.0];\nparam float tubeDrive = 1.45 [0.8, 2.8];\nparam float mix = 0.78 [0.0, 1.0];\nstate float phH = 0;\nstate float phD = 0;\nstate float lpX = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float cabBp = 0; state float cabLp = 0;\n\nphH = (phH + hornHz / sr) % 1.0;\nphD = (phD + drumHz / sr) % 1.0;\n\ntau = 6.2831853;\nlfoH = sin(tau * phH);\nlfoD = sin(tau * phD);\n\n# 800 Hz crossover split between low drum rotor and high horn rotor\nlpX = lpX + (in - lpX) * 0.095;\nhi = in - lpX;\n\n# Horn acoustic Doppler phase dispersion via 4-stage modulated allpass\ngH = clamp(0.18 + lfoH * 0.56 * dopplerDepth, -0.82, 0.82);\ny1 = -gH * hi + a1; a1 = hi + gH * y1;\ny2 = -gH * y1 + a2; a2 = y1 + gH * y2;\ny3 = -gH * y2 + a3; a3 = y2 + gH * y3;\ny4 = -gH * y3 + a4; a4 = y3 + gH * y4;\n\n# Horn directional beaming AM + low-drum rotor amplitude throb\nhBeam = 0.76 + 0.24 * cos(tau * phH + 0.4);\ndBeam = 0.84 + 0.16 * lfoD;\nhornSig = y4 * hBeam;\ndrumSig = lpX * dBeam;\n\n# Birch cabinet resonance around 380 Hz + 12AX7 tube saturation\ncomb = hornSig + drumSig;\ngCab = 0.05;\ncabBp = cabBp + gCab * (comb - cabLp - 0.65 * cabBp);\ncabLp = cabLp + gCab * cabBp;\n\ndrv = (comb * 0.82 + cabBp * 0.28) * tubeDrive;\nsat = drv / (1.0 + abs(drv) * 0.45);\nout = (in * (1.0 - mix) + sat * mix) * 0.78;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.22 0.18
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Doppler Rotary Horn Cabinet FX. Dual-rotor Leslie horn Doppler dispersion processor with crossover baffle split, resonant birch cabinet coloration, and warm tube preamp saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

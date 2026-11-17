@@ -139,7 +139,7 @@
     {
       "slug": "hyperbolic-kaleidoscope",
       "title": "Hyperbolic Kaleidoscope",
-      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
+      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
     },
     {
       "slug": "bioluminescent-abyss",
@@ -189,7 +189,7 @@
     {
       "slug": "hyperbolic-tessellation",
       "title": "Hyperbolic Tessellation",
-      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
+      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
     },
     {
       "slug": "accretion-disk",
@@ -204,7 +204,7 @@
     {
       "slug": "hyperbolic-disk-fractal",
       "title": "Hyperbolic Disk Fractal",
-      "description": "Conformal hyperbolic Poincar\u00e9 disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices."
+      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices."
     },
     {
       "slug": "magnetar-quantum-flux",
@@ -468,8 +468,8 @@
     },
     {
       "slug": "op-art-concentric-moire-interference",
-      "title": "Op-Art Concentric Moir\u00e9 Interference",
-      "description": "Audio-reactive kinetic Op-Art visualizer featuring dual interfering circular wavefields that generate pulsating moir\u00e9 interference bands. Bass frequencies swell wave amplitude and radial spacing, mid frequencies modulate optical interference frequency, and high frequencies ignite vibrant electric crimson edge fringes."
+      "title": "Op-Art Concentric Moiré Interference",
+      "description": "Audio-reactive kinetic Op-Art visualizer featuring dual interfering circular wavefields that generate pulsating moiré interference bands. Bass frequencies swell wave amplitude and radial spacing, mid frequencies modulate optical interference frequency, and high frequencies ignite vibrant electric crimson edge fringes."
     },
     {
       "slug": "op-art-hypnotic-checkerboard-warp",
@@ -635,6 +635,16 @@
       "slug": "dichroic-fresnel-prismatic-caustics",
       "title": "Dichroic Fresnel Prismatic Caustics",
       "description": "Audio-reactive dichroic beam-splitter prism. Bass pulses beam aperture, mids rotate the optical cube, and highs ignite prismatic caustic filaments."
+    },
+    {
+      "slug": "raku-craquelure-celadon-veins",
+      "title": "Raku Craquelure Celadon Veins",
+      "description": "Audio-reactive Goryeo celadon ceramic crackle glaze with Voronoi fracture plates and molten gold-leaf veins."
+    },
+    {
+      "slug": "raku-craquelure-copper-kiln-glaze",
+      "title": "Raku Craquelure Copper Kiln Glaze",
+      "description": "Audio-reactive copper-red and smoky carbon reduction raku glaze with Voronoi thermal-shock fissures and metallic luster."
     }
   ]
 }

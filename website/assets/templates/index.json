@@ -3225,6 +3225,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "koto-glass-plucked-koto-synth",
+      "name": "Koto Glass Plucked Koto Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Silk-string koto modal pluck synthesizer with bridge buzz dispersion, three-partial harmonic FM, and paulownia soundboard resonance.",
+      "price": 0,
+      "preview": "assets/templates/koto-glass-plucked-koto-synth.webp",
+      "file": "assets/templates/koto-glass-plucked-koto-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "koto-glass-harmonic-marimba-synth",
+      "name": "Koto Glass Harmonic Marimba Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Tuned glass and rosewood bar percussion synthesizer with 1:3.98:9.2 modal overtones, mallet hardness transient, and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/koto-glass-harmonic-marimba-synth.webp",
+      "file": "assets/templates/koto-glass-harmonic-marimba-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "doppler-rotary-horn-cabinet-fx",
+      "name": "Doppler Rotary Horn Cabinet FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-rotor Leslie horn Doppler dispersion processor with crossover baffle split, resonant birch cabinet coloration, and warm tube preamp saturation.",
+      "price": 0,
+      "preview": "assets/templates/doppler-rotary-horn-cabinet-fx.webp",
+      "file": "assets/templates/doppler-rotary-horn-cabinet-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "doppler-rotary-leslie-chorale-fx",
+      "name": "Doppler Rotary Leslie Chorale FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Slow chorale-speed rotary baffle dispersion with asymmetric six-stage allpass phase drift, warm horn-throat rolloff, and soft transformer saturation.",
+      "price": 0,
+      "preview": "assets/templates/doppler-rotary-leslie-chorale-fx.webp",
+      "file": "assets/templates/doppler-rotary-leslie-chorale-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

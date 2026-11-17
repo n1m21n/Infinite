@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Raku Craquelure Copper Kiln Glaze",
+    "author": "Infinite",
+    "description": "Iridescent copper-red and smoky carbon reduction raku glaze with Voronoi thermal-shock fissures and metallic luster.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float cellScale = 4.6 [2.5, 10.0];\nparam float crackWidth = 0.055 [0.02, 0.12];\nparam float luster = 1.3 [0.4, 2.2];\nparam float carbon = 0.45 [0.1, 0.85];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\nwarp = vec2(cos(p.y * 3.5 - t * 0.2), sin(p.x * 3.5 + t * 0.24)) * 0.16;\nq = (p + warp) * cellScale;\niq = floor(q);\nfq = fract(q);\n\nc0 = iq + vec2(-1.0, -1.0);\nh0 = fract(sin(vec2(dot(c0, vec2(127.1, 311.7)), dot(c0, vec2(269.5, 183.3)))) * 43758.5453);\no0 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h0);\nd0 = length(vec2(-1.0, -1.0) + o0 - fq);\nc1 = iq + vec2(0.0, -1.0);\nh1 = fract(sin(vec2(dot(c1, vec2(127.1, 311.7)), dot(c1, vec2(269.5, 183.3)))) * 43758.5453);\no1 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h1);\nd1 = length(vec2(0.0, -1.0) + o1 - fq);\nc2 = iq + vec2(1.0, -1.0);\nh2 = fract(sin(vec2(dot(c2, vec2(127.1, 311.7)), dot(c2, vec2(269.5, 183.3)))) * 43758.5453);\no2 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h2);\nd2 = length(vec2(1.0, -1.0) + o2 - fq);\nc3 = iq + vec2(-1.0, 0.0);\nh3 = fract(sin(vec2(dot(c3, vec2(127.1, 311.7)), dot(c3, vec2(269.5, 183.3)))) * 43758.5453);\no3 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h3);\nd3 = length(vec2(-1.0, 0.0) + o3 - fq);\nc4 = iq + vec2(0.0, 0.0);\nh4 = fract(sin(vec2(dot(c4, vec2(127.1, 311.7)), dot(c4, vec2(269.5, 183.3)))) * 43758.5453);\no4 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h4);\nd4 = length(vec2(0.0, 0.0) + o4 - fq);\nc5 = iq + vec2(1.0, 0.0);\nh5 = fract(sin(vec2(dot(c5, vec2(127.1, 311.7)), dot(c5, vec2(269.5, 183.3)))) * 43758.5453);\no5 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h5);\nd5 = length(vec2(1.0, 0.0) + o5 - fq);\nc6 = iq + vec2(-1.0, 1.0);\nh6 = fract(sin(vec2(dot(c6, vec2(127.1, 311.7)), dot(c6, vec2(269.5, 183.3)))) * 43758.5453);\no6 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h6);\nd6 = length(vec2(-1.0, 1.0) + o6 - fq);\nc7 = iq + vec2(0.0, 1.0);\nh7 = fract(sin(vec2(dot(c7, vec2(127.1, 311.7)), dot(c7, vec2(269.5, 183.3)))) * 43758.5453);\no7 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h7);\nd7 = length(vec2(0.0, 1.0) + o7 - fq);\nc8 = iq + vec2(1.0, 1.0);\nh8 = fract(sin(vec2(dot(c8, vec2(127.1, 311.7)), dot(c8, vec2(269.5, 183.3)))) * 43758.5453);\no8 = 0.5 + 0.42 * sin(t * 0.22 + 6.2831 * h8);\nd8 = length(vec2(1.0, 1.0) + o8 - fq);\nf1 = min(min(min(d0, d1), min(d2, d3)), min(min(d4, d5), min(min(d6, d7), d8)));\ne0 = if(d0 <= f1 + 0.0001, 10.0, d0); e1 = if(d1 <= f1 + 0.0001, 10.0, d1); e2 = if(d2 <= f1 + 0.0001, 10.0, d2);\ne3 = if(d3 <= f1 + 0.0001, 10.0, d3); e4 = if(d4 <= f1 + 0.0001, 10.0, d4); e5 = if(d5 <= f1 + 0.0001, 10.0, d5);\ne6 = if(d6 <= f1 + 0.0001, 10.0, d6); e7 = if(d7 <= f1 + 0.0001, 10.0, d7); e8 = if(d8 <= f1 + 0.0001, 10.0, d8);\nf2 = min(min(min(e0, e1), min(e2, e3)), min(min(e4, e5), min(min(e6, e7), e8)));\ncellId = if(d0 <= f1 + 0.0001, h0.y, if(d1 <= f1 + 0.0001, h1.y, if(d2 <= f1 + 0.0001, h2.y, if(d3 <= f1 + 0.0001, h3.y, if(d4 <= f1 + 0.0001, h4.y, if(d5 <= f1 + 0.0001, h5.y, if(d6 <= f1 + 0.0001, h6.y, if(d7 <= f1 + 0.0001, h7.y, h8.y))))))));\n\nedge = f2 - f1;\ncOxblood = vec3(0.490, 0.141, 0.118);\ncCopper = vec3(0.761, 0.369, 0.196);\ncVerdigris = vec3(0.243, 0.420, 0.376);\ncCarbon = vec3(0.063, 0.059, 0.055);\ncEmber = vec3(0.957, 0.678, 0.310);\n\nband = 0.5 + 0.5 * sin(cellId * 6.2831 + r * 2.4 - t * 0.35);\nplate = mix(cOxblood, cCopper, band);\nplate = mix(plate, cVerdigris, smoothstep(0.60, 1.0, cellId) * 0.60);\n\nsmoke = smoothstep(0.32, 1.15, r) * carbon;\nplate = mix(plate, cCarbon, smoke);\nspec = pow(clamp(1.0 - abs(f1 - 0.28) * 3.5, 0.0, 1.0), 2.5) * 0.24 * luster;\nplate = plate + vec3(spec * 0.9, spec * 0.7, spec * 0.5);\n\nfissure = 1.0 - smoothstep(crackWidth * 0.4, crackWidth * 1.65, edge);\nseam = 1.0 - smoothstep(0.0, crackWidth * 0.55, edge);\ncol = mix(plate, cCarbon, fissure * 0.92);\ncol = col + cEmber * seam * luster * (0.65 + 0.35 * cos(t * 1.1 + cellId * 5.0));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "cellScale": 4.6,
+      "crackWidth": 0.055,
+      "luster": 1.3,
+      "carbon": 0.45
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

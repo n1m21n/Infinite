@@ -3652,6 +3652,380 @@
       "groove": 0.78,
       "fill": 0.35,
       "gain": -9.0
+    },
+    {
+      "id": "doppler_rotary_speaker",
+      "family": "experimental",
+      "bpm": [
+        96,
+        118
+      ],
+      "swing": 0.08,
+      "scale": [
+        0,
+        3,
+        7
+      ],
+      "drums": {
+        "kick": "x.......o.......",
+        "snare": "....o.......o...",
+        "chat": "..o...o...o...o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": "x.....o.....x..."
+      },
+      "bass": "0...0...3...5...",
+      "fx": [
+        "Chorus",
+        "Delay",
+        "Saturator"
+      ],
+      "synth": [
+        "Wind",
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.65,
+      "refs": [
+        "Leslie Model 122 dual-rotor horn acoustic Doppler pitch & amplitude modulation",
+        "Overused Grotesk & Satoshi studio hardware plate typography"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 10,
+        "human": 4
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Analog"
+        ],
+        "density": 0.6,
+        "octave": 3,
+        "gate": 65,
+        "gain": -9.5,
+        "rate": 0.5,
+        "range": 6
+      },
+      "groove": 0.5,
+      "fill": 0.25,
+      "gain": -8.5
+    },
+    {
+      "id": "afrobeat_brass_funk",
+      "family": "breaks",
+      "bpm": [
+        110,
+        122
+      ],
+      "swing": 0.14,
+      "scale": [
+        7,
+        4,
+        10
+      ],
+      "drums": {
+        "kick": "x..o..x..o.x..o.",
+        "snare": "....x..o....x..o",
+        "chat": "x.oxx.oxx.oxx.ox",
+        "ohat": "..o.......o.....",
+        "clap": "",
+        "tom": "...o.....o....o.",
+        "htom": "......o.......x.",
+        "bell": "x..x..o.x..x..o."
+      },
+      "bass": "0.0..3.5.0.4..2.",
+      "fx": [
+        "Saturator",
+        "Phaser",
+        "Reverb",
+        "EQ"
+      ],
+      "synth": [
+        "Wind",
+        "Piano",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Fela Kuti & Africa 70 horn stabs and Tony Allen interlocking pocket",
+        "Antibalas polyrhythmic funk brass"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 2.0,
+        "strum": 28,
+        "human": 18
+      },
+      "notefx": [
+        "Note Strum",
+        "Humanizer",
+        "Velocity Curve"
+      ],
+      "motif": {
+        "synth": [
+          "Wind",
+          "Piano"
+        ],
+        "density": 0.6,
+        "octave": 2,
+        "gate": 52,
+        "gain": -9.5,
+        "rate": 0.25,
+        "range": 7,
+        "notefx": [
+          "Humanizer"
+        ]
+      },
+      "groove": 0.92,
+      "fill": 0.65,
+      "gain": -7.5
+    },
+    {
+      "id": "tuareg_pentatonic_guitar",
+      "family": "experimental",
+      "bpm": [
+        96,
+        114
+      ],
+      "swing": 0.2,
+      "scale": [
+        10,
+        4,
+        11
+      ],
+      "drums": {
+        "kick": "x..o..x..o..x...",
+        "snare": "...o.....x.....o",
+        "chat": "x.ox.ox.ox.ox.o.",
+        "ohat": "",
+        "clap": "....x.......x...",
+        "tom": "..o....o..o.....",
+        "htom": "......o.......o.",
+        "bell": "x...x...x...x..."
+      },
+      "bass": "0..2.0.3..5.3.0.",
+      "fx": [
+        "Drive",
+        "Tremolo",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "String",
+        "Analog",
+        "Wind"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.55,
+      "refs": [
+        "Tinariwen / Mdou Moctar Saharan pentatonic call-and-response",
+        "Bombino 12/8 desert blues"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "strum": 40,
+        "human": 16
+      },
+      "notefx": [
+        "Glide",
+        "Humanizer",
+        "Note Echo"
+      ],
+      "motif": {
+        "synth": [
+          "String",
+          "Analog"
+        ],
+        "density": 0.68,
+        "octave": 2,
+        "gate": 46,
+        "gain": -9.5,
+        "rate": 0.25,
+        "range": 8
+      },
+      "groove": 0.88,
+      "fill": 0.55,
+      "gain": -7.5
+    },
+    {
+      "id": "shoegaze_chorus_wall",
+      "family": "downtempo",
+      "bpm": [
+        78,
+        98
+      ],
+      "swing": 0.04,
+      "scale": [
+        0,
+        6,
+        4
+      ],
+      "drums": {
+        "kick": "x..o....x.o.....",
+        "snare": "....x.......x...",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "......o.......o.",
+        "clap": "",
+        "tom": "",
+        "htom": "..o.......o.....",
+        "bell": ""
+      },
+      "bass": "0...0...3...5...",
+      "fx": [
+        "Chorus",
+        "Flanger",
+        "Drive",
+        "Convolution Reverb",
+        "Stereo"
+      ],
+      "synth": [
+        "String",
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrush",
+        "Stutter"
+      ],
+      "glitch": 0.02,
+      "mod": 0.72,
+      "refs": [
+        "My Bloody Valentine glide-guitar wash",
+        "Slowdive Souvlaki chorus wall"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "strum": 55,
+        "human": 20
+      },
+      "notefx": [
+        "Glide",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "String",
+          "Field Synth"
+        ],
+        "density": 0.38,
+        "octave": 2,
+        "gate": 78,
+        "gain": -10,
+        "rate": 0.5,
+        "range": 6
+      },
+      "groove": 0.62,
+      "fill": 0.4,
+      "gain": -8.0
+    },
+    {
+      "id": "footwork_juke_rhodes",
+      "family": "bass_music",
+      "bpm": [
+        156,
+        164
+      ],
+      "swing": 0.08,
+      "scale": [
+        1,
+        4,
+        11
+      ],
+      "drums": {
+        "kick": "x..x..x...x..x..",
+        "snare": "....o.......x..o",
+        "chat": "x.oxx.oxx.oxx.ox",
+        "ohat": "..o.......o.....",
+        "clap": "........x.......",
+        "tom": ".o....o....o....",
+        "htom": "......o.......o.",
+        "bell": ""
+      },
+      "bass": "0..0..3..0.5..3.",
+      "fx": [
+        "Transient Shaper",
+        "Saturator",
+        "Delay",
+        "EQ"
+      ],
+      "synth": [
+        "Piano",
+        "FM",
+        "Wavetable"
+      ],
+      "ban": [
+        "Chorus"
+      ],
+      "glitch": 0.35,
+      "mod": 0.58,
+      "refs": [
+        "DJ Rashad Double Cup jazz-chopped footwork",
+        "Jlin polyrhythmic Rhodes juke"
+      ],
+      "sidechain": true,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 1.5,
+        "strum": 20,
+        "human": 14
+      },
+      "notefx": [
+        "Velocity Curve",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Piano",
+          "FM"
+        ],
+        "density": 0.58,
+        "octave": 2,
+        "gate": 42,
+        "gain": -9.5,
+        "rate": 0.25,
+        "range": 7
+      },
+      "groove": 0.88,
+      "fill": 0.7,
+      "gain": -7.5
     }
   ]
 }

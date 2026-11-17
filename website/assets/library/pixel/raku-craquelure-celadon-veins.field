@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Raku Craquelure Celadon Veins",
+    "author": "Infinite",
+    "description": "Goryeo celadon ceramic crackle glaze with Voronoi fracture plates, dark iron craze lines, and molten gold-leaf veins.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float cellScale = 5.5 [3.0, 12.0];\nparam float crackWidth = 0.048 [0.015, 0.12];\nparam float goldGlow = 1.15 [0.2, 2.2];\nparam float warpAmt = 0.14 [0.0, 0.35];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nwarp = vec2(sin(p.y * 4.2 + t * 0.25), cos(p.x * 4.2 - t * 0.22)) * warpAmt;\nq = (p + warp) * cellScale;\niq = floor(q);\nfq = fract(q);\n\nc0 = iq + vec2(-1.0, -1.0);\nh0 = fract(sin(vec2(dot(c0, vec2(127.1, 311.7)), dot(c0, vec2(269.5, 183.3)))) * 43758.5453);\no0 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h0);\nd0 = length(vec2(-1.0, -1.0) + o0 - fq);\nc1 = iq + vec2(0.0, -1.0);\nh1 = fract(sin(vec2(dot(c1, vec2(127.1, 311.7)), dot(c1, vec2(269.5, 183.3)))) * 43758.5453);\no1 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h1);\nd1 = length(vec2(0.0, -1.0) + o1 - fq);\nc2 = iq + vec2(1.0, -1.0);\nh2 = fract(sin(vec2(dot(c2, vec2(127.1, 311.7)), dot(c2, vec2(269.5, 183.3)))) * 43758.5453);\no2 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h2);\nd2 = length(vec2(1.0, -1.0) + o2 - fq);\nc3 = iq + vec2(-1.0, 0.0);\nh3 = fract(sin(vec2(dot(c3, vec2(127.1, 311.7)), dot(c3, vec2(269.5, 183.3)))) * 43758.5453);\no3 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h3);\nd3 = length(vec2(-1.0, 0.0) + o3 - fq);\nc4 = iq + vec2(0.0, 0.0);\nh4 = fract(sin(vec2(dot(c4, vec2(127.1, 311.7)), dot(c4, vec2(269.5, 183.3)))) * 43758.5453);\no4 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h4);\nd4 = length(vec2(0.0, 0.0) + o4 - fq);\nc5 = iq + vec2(1.0, 0.0);\nh5 = fract(sin(vec2(dot(c5, vec2(127.1, 311.7)), dot(c5, vec2(269.5, 183.3)))) * 43758.5453);\no5 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h5);\nd5 = length(vec2(1.0, 0.0) + o5 - fq);\nc6 = iq + vec2(-1.0, 1.0);\nh6 = fract(sin(vec2(dot(c6, vec2(127.1, 311.7)), dot(c6, vec2(269.5, 183.3)))) * 43758.5453);\no6 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h6);\nd6 = length(vec2(-1.0, 1.0) + o6 - fq);\nc7 = iq + vec2(0.0, 1.0);\nh7 = fract(sin(vec2(dot(c7, vec2(127.1, 311.7)), dot(c7, vec2(269.5, 183.3)))) * 43758.5453);\no7 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h7);\nd7 = length(vec2(0.0, 1.0) + o7 - fq);\nc8 = iq + vec2(1.0, 1.0);\nh8 = fract(sin(vec2(dot(c8, vec2(127.1, 311.7)), dot(c8, vec2(269.5, 183.3)))) * 43758.5453);\no8 = 0.5 + 0.42 * sin(t * 0.18 + 6.2831 * h8);\nd8 = length(vec2(1.0, 1.0) + o8 - fq);\nf1 = min(min(min(d0, d1), min(d2, d3)), min(min(d4, d5), min(min(d6, d7), d8)));\ne0 = if(d0 <= f1 + 0.0001, 10.0, d0); e1 = if(d1 <= f1 + 0.0001, 10.0, d1); e2 = if(d2 <= f1 + 0.0001, 10.0, d2);\ne3 = if(d3 <= f1 + 0.0001, 10.0, d3); e4 = if(d4 <= f1 + 0.0001, 10.0, d4); e5 = if(d5 <= f1 + 0.0001, 10.0, d5);\ne6 = if(d6 <= f1 + 0.0001, 10.0, d6); e7 = if(d7 <= f1 + 0.0001, 10.0, d7); e8 = if(d8 <= f1 + 0.0001, 10.0, d8);\nf2 = min(min(min(e0, e1), min(e2, e3)), min(min(e4, e5), min(min(e6, e7), e8)));\ncellId = if(d0 <= f1 + 0.0001, h0.x, if(d1 <= f1 + 0.0001, h1.x, if(d2 <= f1 + 0.0001, h2.x, if(d3 <= f1 + 0.0001, h3.x, if(d4 <= f1 + 0.0001, h4.x, if(d5 <= f1 + 0.0001, h5.x, if(d6 <= f1 + 0.0001, h6.x, if(d7 <= f1 + 0.0001, h7.x, h8.x))))))));\n\nedge = f2 - f1;\ncJade = vec3(0.243, 0.345, 0.282);\ncCeladon = vec3(0.565, 0.663, 0.565);\ncCream = vec3(0.796, 0.843, 0.761);\ncIron = vec3(0.075, 0.088, 0.080);\ncGold = vec3(0.878, 0.647, 0.259);\n\nglaze = mix(cJade, cCeladon, 0.25 + 0.75 * cellId);\nglaze = mix(glaze, cCream, smoothstep(0.32, 0.0, f1) * 0.45);\nsheen = pow(clamp(1.0 - length(p - vec2(-0.32, 0.36)) * 0.85, 0.0, 1.0), 3.0);\nglaze = glaze + vec3(0.16, 0.18, 0.15) * sheen;\n\nironMask = 1.0 - smoothstep(crackWidth * 0.45, crackWidth * 1.65, edge);\ngoldMask = 1.0 - smoothstep(0.0, crackWidth * 0.65, edge);\n\ncol = mix(glaze, cIron, ironMask * 0.90);\ncol = col + cGold * goldMask * goldGlow * (0.65 + 0.35 * sin(t * 1.4 + cellId * 6.28));\nvig = 1.0 - smoothstep(0.72, 1.45, length(p)) * 0.42;\ncol = clamp(col * vig, 0.0, 1.0);\n",
+    "params": {
+      "cellScale": 5.5,
+      "crackWidth": 0.048,
+      "goldGlow": 1.15,
+      "warpAmt": 0.14
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

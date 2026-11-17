@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Doppler Rotary Leslie Chorale FX",
+    "author": "Infinite",
+    "description": "Slow chorale-speed rotary baffle dispersion with asymmetric six-stage allpass phase drift, warm horn-throat rolloff, and soft transformer saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float choraleHz = 0.78 [0.15, 2.5];\nparam float sweep = 0.76 [0.1, 1.0];\nparam float feedback = 0.28 [0.0, 0.72];\nparam float mix = 0.74 [0.0, 1.0];\nstate float ph = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float a4 = 0; state float a5 = 0; state float a6 = 0;\nstate float fb = 0;\nstate float lp = 0;\n\nph = (ph + choraleHz / sr) % 1.0;\ntau = 6.2831853;\n# Asymmetric rotor inertia modulation\ns1 = sin(tau * ph) + 0.18 * sin(tau * ph * 2.0 + 0.7);\ng = clamp(0.12 + s1 * 0.52 * sweep, -0.84, 0.84);\n\nx = in + fb * feedback * 0.35;\ny1 = -g * x + a1;  a1 = x + g * y1;\ny2 = -g * y1 + a2; a2 = y1 + g * y2;\ny3 = -g * y2 + a3; a3 = y2 + g * y3;\ny4 = -g * y3 + a4; a4 = y3 + g * y4;\ny5 = -g * y4 + a5; a5 = y4 + g * y5;\ny6 = -g * y5 + a6; a6 = y5 + g * y6;\n\n# Horn-throat gentle high-frequency rolloff\nlp = lp + (y6 - lp) * 0.42;\nfb = clamp(lp, -0.9, 0.9);\n\n# Acoustic lobe amplitude shimmer + transformer warmth\nlobe = 0.85 + 0.15 * cos(tau * ph + 0.8);\nwet = (in * 0.38 + lp * 0.78) * lobe;\nsat = wet / (1.0 + abs(wet) * 0.36);\nout = (in * (1.0 - mix) + sat * mix) * 0.82;\n",
+    "params": {
+      "choraleHz": 0.78,
+      "sweep": 0.76,
+      "feedback": 0.28,
+      "mix": 0.74
+    }
+  }
+}

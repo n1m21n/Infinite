@@ -1,0 +1,77 @@
+infinite-patch 1
+# Doppler Rotary Leslie Chorale FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 45
+  i note1 52
+  i note2 57
+  i note3 60
+  i note4 52
+  i note5 57
+  i note6 64
+  i note7 60
+  i note8 47
+  i note9 54
+  i note10 59
+  i note11 62
+  i note12 54
+  i note13 59
+  i note14 66
+  i note15 62
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 1850.0
+  f resonance 0.22
+  f decay 0.58
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float choraleHz = 0.78 [0.15, 2.5];\nparam float sweep = 0.76 [0.1, 1.0];\nparam float feedback = 0.28 [0.0, 0.72];\nparam float mix = 0.74 [0.0, 1.0];\nstate float ph = 0;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float a4 = 0; state float a5 = 0; state float a6 = 0;\nstate float fb = 0;\nstate float lp = 0;\n\nph = (ph + choraleHz / sr) % 1.0;\ntau = 6.2831853;\n# Asymmetric rotor inertia modulation\ns1 = sin(tau * ph) + 0.18 * sin(tau * ph * 2.0 + 0.7);\ng = clamp(0.12 + s1 * 0.52 * sweep, -0.84, 0.84);\n\nx = in + fb * feedback * 0.35;\ny1 = -g * x + a1;  a1 = x + g * y1;\ny2 = -g * y1 + a2; a2 = y1 + g * y2;\ny3 = -g * y2 + a3; a3 = y2 + g * y3;\ny4 = -g * y3 + a4; a4 = y3 + g * y4;\ny5 = -g * y4 + a5; a5 = y4 + g * y5;\ny6 = -g * y5 + a6; a6 = y5 + g * y6;\n\n# Horn-throat gentle high-frequency rolloff\nlp = lp + (y6 - lp) * 0.42;\nfb = clamp(lp, -0.9, 0.9);\n\n# Acoustic lobe amplitude shimmer + transformer warmth\nlobe = 0.85 + 0.15 * cos(tau * ph + 0.8);\nwet = (in * 0.38 + lp * 0.78) * lobe;\nsat = wet / (1.0 + abs(wet) * 0.36);\nout = (in * (1.0 - mix) + sat * mix) * 0.82;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.22 0.26 0.24
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Doppler Rotary Leslie Chorale FX. Slow chorale-speed rotary baffle dispersion with asymmetric six-stage allpass phase drift, warm horn-throat rolloff, and soft transformer saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

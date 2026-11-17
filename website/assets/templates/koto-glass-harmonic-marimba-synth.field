@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Koto Glass Harmonic Marimba Synth",
+    "author": "Infinite",
+    "description": "Tuned glass and rosewood bar percussion synthesizer with 1:3.98:9.2 modal overtones, mallet hardness transient, and warm saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float malletHard = 0.62 [0.1, 1.0];\nparam float shimmer = 0.44 [0.0, 0.9];\nparam float decay = 0.99945 [0.997, 0.9998];\nparam float warmth = 1.25 [0.6, 2.2];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float p3 = 0;\nstate float env = 0;\nstate float strike = 0;\nstate float prevGate = 0;\nstate float lp = 0;\n\ntrig = if(gate > 0.5 && prevGate <= 0.5, 1.0, 0.0);\nprevGate = gate;\nstrike = if(trig > 0.5, 1.0, strike * 0.986);\ntarget = if(gate > 0.5, 1.0, 0.0);\nenv = if(target > env, env + (target - env) * 0.22, env * decay);\n\nf0 = clamp(freq, 60.0, 2800.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 3.982) / sr) % 1.0;\np3 = (p3 + (f0 * 9.18) / sr) % 1.0;\n\ntau = 6.2831853;\n# Fundamental resonant bar + 4x marimba overtone + 9.2x glass shimmer\nbar1 = sin(tau * p1 + sin(tau * p2) * 0.22 * strike);\nbar2 = sin(tau * p2) * (0.28 + 0.36 * shimmer) * (0.35 + 0.65 * strike);\nbar3 = sin(tau * p3) * malletHard * 0.32 * strike * strike;\n\nsig = (bar1 * 0.72 + bar2 + bar3) * env * warmth;\n# Gentle one-pole wood-chamber smoothing\nlp = lp + (sig - lp) * clamp(0.18 + malletHard * 0.45, 0.1, 0.85);\ndrv = lp * 0.85;\nout = (drv / (1.0 + abs(drv) * 0.42)) * 0.72;\n",
+    "params": {
+      "malletHard": 0.62,
+      "shimmer": 0.44,
+      "decay": 0.99945,
+      "warmth": 1.25
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
