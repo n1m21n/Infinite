@@ -59,13 +59,14 @@ namespace app
       constexpr int kMaxSteps = DrumSequencerNode::kMaxSteps;
       constexpr int kPageSteps = DrumSequencerNode::kEditPageSteps;
       constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
-      constexpr float kRowH = tok::row_h;  // a lane row: fixed, so the grid never squashes as the panel shrinks
+      constexpr float kRowH = tok::cell_h;  // a lane row: one grid cell tall (the Session grid's cells too)
       constexpr float kLabelW = 178.0f;  // lane name + M S, left of the grid
       constexpr float kRulerH = tok::row_h;
       constexpr float kGroupGap = 4.0f; // extra space between four-step key groups
       constexpr float kRowGap = tok::row_gap;
       constexpr float kCellGap = 2.0f;
-      constexpr float kCellW = 30.0f;   // a step key: fixed, the panel size never stretches or squashes the grid
+      constexpr float kCellW = 30.0f;   // a step key at its narrowest; wider panels share the free width among the steps
+      constexpr float kCellWMax = 56.0f;
       constexpr float kDefaultVel = 0.8f;
 
       uint64_t sPageUid = 0;
@@ -738,8 +739,9 @@ namespace app
          GridGeom g;
          g.cols = paged ? kPageSteps : maxLen;
          g.x0 = p.x;
-         (void)w;
-         g.cellW = kCellW;
+         // Cells are sized for a full page of 16, so a shorter pattern keeps the same keys.
+         g.cellW = std::clamp((w - kCellGap * (float)(kPageSteps - 1) - kGroupGap * (float)((kPageSteps - 1) / 4)) / (float)kPageSteps,
+                              kCellW, kCellWMax);
          const int play = PlayStep(n);
          const float gridY = p.y + kRulerH;
          const float gridH = (float)kLanes * (rowH + kRowGap) - kRowGap;
@@ -1407,10 +1409,14 @@ namespace app
             const float seqH = bodyMax.y - seqMin.y;
             const float gridX0 = seqMin.x + kLabelW + tok::space_2;
             const int cols = kPageSteps;
-            const float gridW = (float)cols * kCellW + kCellGap * (float)(cols - 1) + kGroupGap * (float)((cols - 1) / 4);
-            const float leftX1 = gridX0 + gridW + tok::space_1;
             const bool inspector = true;
             const float inspW = kInspectorW;
+            // The steps share the width left of the inspector; the lanes end where the steps end.
+            const float gaps = kCellGap * (float)(cols - 1) + kGroupGap * (float)((cols - 1) / 4);
+            const float freeW = bodyMax.x - gridX0 - tok::space_1 - tok::space_2 - 4.0f - inspW;
+            const float cellW = std::clamp((freeW - gaps) / (float)cols, kCellW, kCellWMax);
+            const float gridW = (float)cols * cellW + gaps;
+            const float leftX1 = gridX0 + gridW + tok::space_1;
             const float rowH = kRowH;
             // What the panel needs around the grid, measured, so the layout can stop the panel at the grid's foot.
             gDrumPanelNaturalH = (gDrumPanelHeight - seqH) + kRulerH + (float)kLanes * kRowH + (float)(kLanes - 1) * kRowGap + 6.0f;
@@ -1418,7 +1424,7 @@ namespace app
             DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(seqMin.x + 1.0f, seqMin.y + 1.0f));
             DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(leftX1 - 1.0f, seqMin.y + 1.0f));
             DrawLabels(gn, n, seqMin, rowH, leftX1);
-            DrawGrid(gn, n, ImVec2(gridX0, seqMin.y), leftX1 - gridX0, rowH);
+            DrawGrid(gn, n, ImVec2(gridX0, seqMin.y), gridW, rowH);
             if (inspector)
                DrawInspector(gn, n, ImVec2(leftX1 + tok::space_2 + 4.0f, bodyMin.y), ImVec2(inspW, bodyH));
          }

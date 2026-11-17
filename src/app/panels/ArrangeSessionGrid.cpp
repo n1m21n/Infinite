@@ -25,7 +25,7 @@ namespace app
       constexpr float kColMinW = 112.0f;
       constexpr float kColMaxW = 176.0f;
       constexpr float kHeaderH = tok::row_h;
-      constexpr float kRowH = tok::row_h;
+      constexpr float kRowH = tok::cell_h;   // a clip or scene cell: taller than a list row so a clip name and its state read
       constexpr float kFooterH = tok::row_h;
       constexpr float kGap = 2.0f;
       constexpr int kMinRows = 6;
