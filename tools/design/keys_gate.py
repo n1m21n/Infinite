@@ -308,6 +308,82 @@ def check_core_verbs():
     return issues
 
 
+def check_panel_focus():
+    """Verify every panel file's key handlers sit behind a focus/hover/modal guard."""
+    # Each panel area's primary focus/hover guard symbol(s)
+    PANEL_GUARDS = {
+        "ArrangePanel.cpp": "gArrangeFocused",
+        "ArrangeSessionGrid.cpp": "gSessionClaimedKeys",
+        "ChatPanel.cpp": "sInputWasActive",
+        "CurveEditorPanel.cpp": "gCurveEditorClaimedKeys",
+        "FieldPatcherPanel.cpp": "gFieldPatcherClaimedKeys",
+        "FindOverlay.cpp": "sOpen",
+        "MixerPanel.cpp": "IsWindowHovered",
+        "PerfPanel.cpp": "gPerfMatrixFocused",
+        "PianoRollPanel.cpp": "gPianoRollClaimedKeys",
+        "SampleStudioPanel.cpp": "hovered",
+        "TerminalPanel.cpp": "gTerminalFocus",
+        "View2DPanel.cpp": "gView2DClaimedKeys",
+        "View3DPanel.cpp": "gView3DClaimedKeys",
+    }
+    key_rx = re.compile(r"(?:IsKey(?:Pressed|Down)|\bpressed|\bkey|\brepeated)\(ImGuiKey_")
+    focus_rx = re.compile(
+        r"IsWindowFocused|IsWindowHovered|IsItemFocused|IsItemHovered|IsItemActive|"
+        r"gArrangeFocused|gPerfMatrixFocused|gSessionClaimedKeys|gTerminalFocus|"
+        r"gView2DClaimedKeys|gView3DClaimedKeys|gFieldPatcherClaimedKeys|"
+        r"gSampleStudioClaimedKeys|gPianoRollClaimedKeys|gCurveEditorClaimedKeys|"
+        r"hovered|focused|hasFocus|BeginPopup|IsPopupOpen|WantTextInput|"
+        r"sInputWasActive|DropdownOpen|gPerfMidiLearnIdx|gArrangeScrubbing|"
+        r"sOpen|active|HandleKeyboard\(|HandleLayerKeys\(|HandlePixelKeys\(|HandleVectorKeys\(|View2DTest|Escape"
+    )
+    issues = []
+    panels_dir = ROOT / "src/app/panels"
+    for p in sorted(panels_dir.glob("*.cpp")):
+        text = p.read_text(errors="ignore")
+        if p.name in PANEL_GUARDS and PANEL_GUARDS[p.name] not in text:
+            issues.append(f"panel focus: {p.name} missing expected focus/hover guard '{PANEL_GUARDS[p.name]}'")
+        lines = text.splitlines()
+        # Track brace-delimited scopes and function-level early-return focus guards
+        stack = []  # (depth, header_text)
+        func_guarded_depth = None
+        depth = 0
+        for idx, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if stripped.startswith("//"):
+                continue
+            # Detect early-return guard at function body level (depth >= 1)
+            if "return;" in stripped and idx >= 2:
+                guard_ctx = " ".join(lines[max(0, idx - 4):idx])
+                if focus_rx.search(guard_ctx) and "!" in guard_ctx:
+                    if func_guarded_depth is None or depth < func_guarded_depth:
+                        func_guarded_depth = depth
+            if key_rx.search(line):
+                # Check if inside a guarded scope, after a function-level early return, on a multi-line if, or in a gated helper
+                prev_ctx = " ".join(lines[max(0, idx - 3):idx])
+                active = " ".join(h for _, h in stack) + " " + prev_ctx
+                in_guarded_func = func_guarded_depth is not None and depth >= func_guarded_depth
+                in_gated_helper = (
+                    (p.name == "TerminalPanel.cpp" and any("HandleKeyboard" in h for _, h in stack))
+                    or (p.name == "View2DPanel.cpp" and any(fn in h for _, h in stack for fn in ("HandleLayerKeys", "HandlePixelKeys", "HandleVectorKeys")))
+                )
+                if not focus_rx.search(active) and not in_guarded_func and not in_gated_helper:
+                    issues.append(f"ungated panel key in {p.name}:{idx}: {stripped[:90]}")
+            opens = line.count("{")
+            closes = line.count("}")
+            if opens > 0:
+                hdr = " ".join(lines[max(0, idx - 6):idx])
+                for _ in range(opens):
+                    depth += 1
+                    stack.append((depth, hdr))
+            for _ in range(closes):
+                if stack:
+                    stack.pop()
+                depth = max(0, depth - 1)
+                if func_guarded_depth is not None and depth < func_guarded_depth:
+                    func_guarded_depth = None
+    return len(PANEL_GUARDS), issues
+
+
 def check_drift(quiet=False):
     src, locate = appsrc.read_indexed(str(ROOT))
     tbl = re.search(r"static const ShortcutEntry kShortcuts\[\] = \{(.*?)\n      \};", src, re.S)
@@ -378,9 +454,10 @@ def main():
     quiet = "--quiet" in sys.argv
     n_chords, areas, overlap_bad = check_overlap_and_os()
     verb_bad = check_core_verbs()
+    n_panels, focus_bad = check_panel_focus()
     stats, drift_bad = check_drift(quiet=quiet)
 
-    total_bad = len(overlap_bad) + len(verb_bad) + len(drift_bad)
+    total_bad = len(overlap_bad) + len(verb_bad) + len(focus_bad) + len(drift_bad)
     if not quiet:
         print(f"keys gate [overlap/os]: {n_chords} chords in {areas} areas x {len(PLATFORMS)} OS, {len(overlap_bad)} problem(s)")
         for b in overlap_bad:
@@ -388,6 +465,9 @@ def main():
         print(f"keys gate [core verbs]: {len(CORE_VERBS)} verbs checked, {len(verb_bad)} problem(s)")
         for v in verb_bad:
             print(" ", v)
+        print(f"keys gate [panel focus]: {n_panels} panel areas checked, {len(focus_bad)} problem(s)")
+        for f in focus_bad:
+            print(" ", f)
         if stats:
             print(
                 f"keys gate [drift]: {stats['rows']} documented rows, {stats['handled']} handled keys, "
