@@ -2399,7 +2399,9 @@ void ed::EditorContext::SetUserContext(bool globalSpace)
         //ImGui::SetCursorScreenPos(ImFloor(mousePos));
         //ImGui::SetCursorScreenPos(ImVec2(floorf(mousePos.x), floorf(mousePos.y)));
 
-    if (!IsSuspended())
+    // Infinite: a panel drawn into the editor window can merge its channels mid-frame;
+    // a right-click then asked for a channel that no longer exists (SIGABRT). Skip instead.
+    if (!IsSuspended() && m_DrawList->_Splitter._Count > c_UserChannel_Content)
     {
         m_DrawList->ChannelsSetCurrent(c_UserChannel_Content);
     }
