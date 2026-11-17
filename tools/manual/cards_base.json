@@ -120,6 +120,28 @@
      "Feedback",
      "Output"
     ]
+   ],
+   [
+    "Shadertoy",
+    "SOURCE · IMAGE OUT",
+    "Runs a shader pasted from shadertoy.com as it is: the mainImage code, Buffers A to D and the Common tab, all live. iChannel0 to iChannel3 are image inputs for feeding pictures in, and an unwired channel reads its buffer. Each 'uniform float name; // lo..hi' line in the shader becomes a knob you can modulate, so a shader's own controls work like any other dial. Also called a GLSL shader, a fragment shader or a shader toy: the way to bring generative code art into a patch.",
+    "paste a fractal shader and wire an LFO into one of its uniform knobs so it zooms on the beat.",
+    [
+     "Shadertoy",
+     "Bloom",
+     "Output"
+    ]
+   ],
+   [
+    "VMPC",
+    "SOURCE · IMAGE + AUDIO OUT",
+    "A 16-pad video sampler laid out like an MPC drum machine. Drop clips on the pads, then play them from a keyboard (notes 36 to 51 hit pads 1 to 16) or by clicking. Each pad has a mode: one shot plays its window once, gate plays while held and fades out on release, and loop keeps going. Transition sets how the picture changes between pads (cut, crossfade or dip to black). Every pad has its own sync and rate, start and end, speed (negative plays backwards), opacity and fade in and out, all modulatable. Also called a clip launcher, a video drum machine or a sample pad: footage you trigger live like beats.",
+    "load six loops onto the pads, sync them to a bar and gate them from a sequencer for a live video drum kit.",
+    [
+     "Piano Roll",
+     "VMPC",
+     "Output"
+    ]
    ]
   ],
   "rows": [],
@@ -238,6 +260,83 @@
      "Live Camera",
      "Kaleidoscope",
      "Color Adjustments"
+    ]
+   ],
+   [
+    "gaussianblur",
+    "EFFECTS · IN/OUT",
+    "The smooth, natural blur. It averages neighbouring pixels with a Gaussian weighting, so the softness falls off like a lens going out of focus rather than a flat box. Radius (0 to 10, default 2) sets how far it samples, and Quality set to Smooth samples every pixel for a cleaner result. Everyday use: soften a background, hide a detail or make a picture look out of focus. Also called a soft blur or defocus.",
+    "blur a busy video by 3 and wire an LFO into Radius so it racks focus on its own.",
+    [
+     "Video",
+     "gaussianblur",
+     "Output"
+    ]
+   ],
+   [
+    "boxblur",
+    "EFFECTS · IN/OUT",
+    "A flat box blur: each pixel becomes the average of a square of its neighbours. It is cheaper than Gaussian Blur and looks blockier, with a harder edge to the falloff. Radius (0 to 10, default 2) sets the box size. Use it for a fast, deliberately chunky soften. Also called a mean filter or an average blur.",
+    "use a high Radius inside a Feedback loop to smear a picture into a moving cloud.",
+    [
+     "Image Source",
+     "boxblur",
+     "Output"
+    ]
+   ],
+   [
+    "twirl",
+    "EFFECTS · IN/OUT",
+    "Twists the picture like water going down a drain: pixels rotate more the closer they sit to the centre. Angle (-2π to 2π radians, default 2) is how far they twist, Radius (0.05 to 1) how far the effect reaches, and Center X and Center Y place the whirlpool. Everyday use: a swirl or spiral distortion on a photo or logo. Also called a swirl or a whirlpool.",
+    "wire an LFO into Angle and the picture spins in and out of a whirlpool.",
+    [
+     "Image Source",
+     "twirl",
+     "Output"
+    ]
+   ],
+   [
+    "pinchpunch",
+    "EFFECTS · IN/OUT",
+    "Pulls pixels toward a centre point (pinch) or pushes them outward (punch). Amount below 1 pinches inward and above 1 punches outward; the default 1.5 punches. Radius (0.05 to 1) sets the reach, and Center X and Center Y set where it sits. Everyday use: a bulge or a fisheye-style lens warp. Also called a bulge, a pinch or a magnifying lens.",
+    "animate Amount between 0.5 and 2 with an LFO for a bulge that pulses in the middle of a face.",
+    [
+     "Video",
+     "pinchpunch",
+     "Output"
+    ]
+   ],
+   [
+    "ripple",
+    "EFFECTS · IN/OUT",
+    "Pushes pixels out from a centre in concentric waves, like a stone dropped in a pond. Amplitude (0 to 2) is the wave height, Wavelength (1 to 40) the spacing between rings, and Phase (0 to 20) moves them. Animate Phase to make the ripples travel, and move the Center to put the source anywhere. Everyday use: a water-ripple or wobble effect on a photo or video. Also called a wave distortion or a water effect.",
+    "let Phase rise slowly and the still photo becomes a looping pond.",
+    [
+     "Image Source",
+     "ripple",
+     "Output"
+    ]
+   ],
+   [
+    "bloom",
+    "EFFECTS · IN/OUT",
+    "Isolates pixels brighter than Threshold (0 to 1, default 0.6), blurs them outward by Radius (0.5 to 12, default 4), and adds the glow back at Intensity (0 to 5, default 1.4). This is the classic HDR-style light bloom around hot highlights, lamps and neon. Everyday use: make lights glow, a halo or a neon haze. Compare diffuseglow, which glows the whole picture evenly.",
+    "lower Threshold until a dark scene's lamps start to bloom, then raise Intensity for a neon haze.",
+    [
+     "Shape",
+     "bloom",
+     "Output"
+    ]
+   ],
+   [
+    "diffuseglow",
+    "EFFECTS · IN/OUT",
+    "Screens a blurred copy of the whole picture back over itself, so everything gets a soft, dreamy haze rather than just the bright spots. Amount (0 to 1, default 0.6) sets how strong the haze is and Radius (0.5 to 12, default 4) how wide. Everyday use: a soft-focus or dreamy glow filter for photos and video. Also called a soft glow or a halation.",
+    "set Amount low on a sharp photo for a faint soft-focus look.",
+    [
+     "Image Source",
+     "diffuseglow",
+     "Output"
     ]
    ]
   ],
@@ -491,6 +590,17 @@
     "A plain annotation box, it does no image processing at all and produces no output. It just holds a block of text plus its own size and background color so you can label or explain parts of a patch.",
     "drop one next to a complex chain to leave yourself a note about what a tricky setting does.",
     []
+   ],
+   [
+    "Scene 2D",
+    "COMPOSITING · IMAGE OUT",
+    "The 2D View's document: a page that stacks node outputs, shapes, text, paint and groups into one picture at the document's size. Right-click a node with a picture and choose Add to 2D View, then arrange it in the 2D View panel: move, crop, scale, rotate, paint, draw vector paths and type text. Layers have blend modes, opacity, masks and clipping. Four Drive sliders (A to D) can be modulated. Everyday use: a layout or poster canvas, an artboard for a patch. Also called a 2D composition or a canvas.",
+    "add a video and a drawn shape to the 2D View, clip the video to the shape and send the page to an Output.",
+    [
+     "Video",
+     "Scene 2D",
+     "Output"
+    ]
    ]
   ],
   "rows": [],
@@ -545,6 +655,29 @@
     [
      "Video / Shape",
      "Resynthesize",
+     "Output"
+    ]
+   ],
+   [
+    "Feedback",
+    "COMPOSITING · IN/OUT",
+    "Outputs the previous frame: a one-frame delay, which is what lets a picture feed back into itself. On its own it shows nothing; it only works inside a loop, with a downstream node's output patched back into its input. Delay Frames (default 1) sets how many frames it holds. Everyday use: echo, smear and the 'video feedback' look of pointing a camera at its own screen. Also called a delay, a previous frame or a frame buffer.",
+    "route the output back in through a small zoom and colour shift for the classic infinite tunnel.",
+    [
+     "Video In",
+     "Feedback",
+     "Blend",
+     "Output"
+    ]
+   ],
+   [
+    "Trails",
+    "COMPOSITING · IN/OUT",
+    "A ready-wired feedback loop with Decay (0.5 to 0.999, default 0.92), Zoom (0.9 to 1.1), Rotate, Drift X and Drift Y, Hue Shift, and a Blend of Max, Add or Screen. Decay sets how long the trail lingers, and Drift and Hue Shift push its colour. Everyday use: motion trails, light-painting streaks and a ghosting or echo look. Reach for it before wiring a Feedback loop by hand. Also called motion trails, an echo or ghosting.",
+    "set Decay to 0.98, Blend to Add and move a bright shape to paint light streaks.",
+    [
+     "Shape",
+     "Trails",
      "Output"
     ]
    ]
@@ -645,6 +778,245 @@
     [
      "Torus",
      "Null 3D",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Coord",
+    "SHADER · IMAGE OUT",
+    "A texture coordinate for the shading nodes: where on the surface each point sits. Output picks the space: UV (the mesh's own unwrap), Object, World, Generated (0 to 1 across the mesh bounds), Normal, View or Reflection. Patch it into a Shade Mapping or a texture's vector input, and end the chain in a Material's field input. Everyday use: decide how a pattern lines up on a 3D object. Also called texture coordinates or UVs.",
+    "use Generated and a Shade Checker to put a tile pattern across a sphere with no UV unwrap.",
+    [
+     "Shade Coord",
+     "Shade Checker",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Mapping",
+    "SHADER · IMAGE OUT",
+    "Moves, turns and scales a shading coordinate. Type sets what moves: Point shifts the coordinate, Texture shifts the pattern (the inverse), Vector skips the translation and Normal keeps unit length. X, Y and Z move it (-4 to 4), and Rotate X, Y and Z turn it in degrees (-180 to 180). With nothing patched in it uses Generated coordinates. Everyday use: slide, turn or tile a texture on a surface. Also called a texture transform or UV offset and rotate.",
+    "set Type to Texture and rotate Z to 45 to turn a brick pattern on a wall.",
+    [
+     "Shade Coord",
+     "Shade Mapping",
+     "Shade Brick",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Checker",
+    "SHADER · IMAGE OUT",
+    "A 3D checkerboard of two colours (Color 1 and Color 2) on the coordinate patched into Vector, or Generated when that is empty, multiplied by Scale (0.1 to 32, default 5). Patch it into a Material's field input to drive the base colour. Everyday use: a checkered or tiled floor texture. Also called a checkerboard or a chequer texture.",
+    "set Scale to 2 and Color 1 to a warm colour for a big-tile floor.",
+    [
+     "Shade Mapping",
+     "Shade Checker",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Noise",
+    "SHADER · IMAGE OUT",
+    "Layered 3D fractal noise, the kind behind cloud, marble and rock textures, on the coordinate patched into Vector (Generated when empty), times Scale (0.1 to 32, default 5). Detail (0 to 8, default 2) adds finer octaves, Roughness sets how strong each octave is, and Distortion (0 to 4) warps the coordinate before it is sampled. Output is Value (grey) or Colour (three decorrelated noises). Patch it into a Material's field input. Everyday use: cloud, marble, dirt or rock texture for a 3D surface. Also called fractal noise.",
+    "set Output to Colour and Distortion to 1 for a swirling marble.",
+    [
+     "Shade Coord",
+     "Shade Noise",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Voronoi",
+    "SHADER · IMAGE OUT",
+    "Cell noise on the coordinate patched into Vector (Generated when empty), times Scale (0.1 to 32, default 5). Output picks what to show: Distance to the nearest cell point, Second (distance to the second nearest), Edge (the gap between the two), Cell (one grey per cell) or Colour (one colour per cell). Everyday use: cracked stone, scales, mosaics and crackle textures. Also called Worley or cellular noise.",
+    "pick Edge and feed it into a Shade Bump for cracked stone.",
+    [
+     "Shade Coord",
+     "Shade Voronoi",
+     "Shade Bump",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Gradient",
+    "SHADER · IMAGE OUT",
+    "A grey ramp across the coordinate patched into Vector (Generated when empty), times Scale (default 1). Type picks the shape: Linear, Quadratic, Easing, Diagonal, Spherical, Quadratic Sphere, Radial, Wave (bands along x) or Magic (interfering waves). Everyday use: a falloff or a mask for mixing two materials. Also called a gradient or a ramp mask.",
+    "use Radial and feed it into a Shade Mix factor to fade one material into another from the centre out.",
+    [
+     "Shade Coord",
+     "Shade Gradient",
+     "Shade Mix",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Brick",
+    "SHADER · IMAGE OUT",
+    "A brick-wall pattern on the coordinate patched into Vector (Generated when empty), times Scale (default 5). Width and Height (0.05 to 2) size one brick, Offset (0 to 1) shifts every second row, Mortar (0 to 0.125) sets the gap, and Tint (0 to 1) mixes each brick at random between Color 1 and Color 2. Everyday use: a brick, tile or stone wall texture. Also called a brick texture or masonry.",
+    "set Offset to 0.5 and Tint to 0.3 for a weathered brick wall.",
+    [
+     "Shade Coord",
+     "Shade Brick",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Image",
+    "SHADER · IMAGE OUT",
+    "Puts any image cable on the surface as a texture. Projection Flat reads it at the vector (UV when unwired). Box projects it from three sides and blends by the normal, so it wraps a cube with no unwrap. Space Colour decodes sRGB, and Data reads raw values for masks and normal maps. Blend (default 0.2) sets the Box blend. Up to four pictures per material. Everyday use: put a photo, logo or video frame on a 3D object. Also called an image texture.",
+    "wire a video into Image, set Projection to Box and it wraps a cube with no unwrap.",
+    [
+     "Video",
+     "Shade Image",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Math",
+    "SHADER · IMAGE OUT",
+    "Scalar maths on A, B and C: add, subtract, multiply, divide, power, logarithm, roots, absolute value, min and max, comparisons, smooth min and max, rounding, modulo, wrap, snap, ping-pong, sine, cosine, tangent and their inverses, hyperbolic functions, and degree-to-radian conversion. Only the operands the operation reads are shown. A and B (-10 to 10, default 0.5), C (default 0). Clamp limits the result to 0 to 1. Everyday use: turn one number into another, like scaling a value or wrapping an angle. Also called a calculator.",
+    "set Operation to Wrap and feed a ramp into A for a repeating stripe.",
+    [
+     "Shade Coord",
+     "Shade Math",
+     "Shade Mix",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Vector Math",
+    "SHADER · IMAGE OUT",
+    "Per-component vector maths on A, B and C (each an X, Y, Z triple): add, subtract, multiply, divide, cross product, project, reflect, refract, faceforward, dot product, distance, length, scale, normalize, and the per-axis rounding and trig operations. Dot, Distance and Length come out as a grey value. Scale only appears for Scale and Refract. Everyday use: bend or reflect a direction, such as a mirror direction for a reflection lookup. Also called a vector calculator.",
+    "use Reflect on the view direction and the surface normal to get a mirror direction.",
+    [
+     "Shade Geometry",
+     "Shade Vector Math",
+     "Shade Image",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Mix",
+    "SHADER · IMAGE OUT",
+    "Blends A into B by Factor (0 to 1, default 0.5), as a float, a vector or a colour. The Colour type runs B through one of 30 blend modes first (Normal, Multiply, Screen, Overlay, Difference, Hue, Saturation and so on). Clamp Factor holds the factor to 0 to 1. Everyday use: mix two textures or colours like a layer blend mode, or crossfade two materials with a mask. Also called a blend or a layer blend.",
+    "feed a Shade Gradient into Factor to fade a rust texture over clean metal.",
+    [
+     "Shade Gradient",
+     "Shade Mix",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Ramp",
+    "SHADER · IMAGE OUT",
+    "A colour ramp of 2 to 8 stops (default 2), read at Factor (0 to 1). Interpolation is Linear, Ease, Constant or B-Spline, and each stop has its own position and colour. Below the first stop and above the last, the end colours hold. Everyday use: remap a grey value to a palette, like a gradient map or a heat map. Also called a colour gradient or a colour ramp.",
+    "wire a Shade Gradient into Factor and build a three-stop ramp from black through red to white.",
+    [
+     "Shade Gradient",
+     "Shade Ramp",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Map Range",
+    "SHADER · IMAGE OUT",
+    "Remaps a value from the From Min to From Max range into the To Min to To Max range. Interpolation is Linear, Stepped (set by Steps, default 4), Smoothstep or Smootherstep. Clamp limits the output to the To range. Everyday use: rescale a number into a new range, such as a 0 to 1 signal into a 0 to 90 range. Also called a rescale or a remap.",
+    "choose Stepped with 4 steps to turn a smooth gradient into four flat bands.",
+    [
+     "Shade Coord",
+     "Shade Map Range",
+     "Shade Ramp",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Separate",
+    "SHADER · IMAGE OUT",
+    "Takes one channel from a vector or colour as a grey value. Mode RGB / XYZ gives R, G or B (or X, Y, Z), and HSV gives Hue, Saturation or Value. Channel picks which one. Everyday use: pull out just the red channel of a colour, or the height of a position. Also called split channels or extract channel.",
+    "take Hue from a colour and drive a colour cycle with it.",
+    [
+     "Shade Image",
+     "Shade Separate",
+     "Shade Map Range",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Combine",
+    "SHADER · IMAGE OUT",
+    "Builds a vector or colour from three values: X, Y and Z in RGB / XYZ mode, or Hue, Saturation and Value in HSV mode. Patch a pin to drive that channel; an unpatched channel uses its own value. Everyday use: assemble a colour from three signals, such as three knobs. Also called merge channels or compose colour.",
+    "drive Hue from an LFO and keep Saturation and Value fixed for a colour cycle.",
+    [
+     "LFO",
+     "Shade Combine",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Curves",
+    "SHADER · IMAGE OUT",
+    "One curve through 2 to 8 points (default 2, from (0,0) to (1,1)), applied to each channel of the colour patched in and blended in by Factor (0 to 1, default 1). The default curve leaves the colour unchanged, so pull a point to lift the shadows or crush the highlights. Everyday use: a tone curve for contrast, like the curves tool in a photo editor. Also called a tone curve or RGB curves.",
+    "lift the low end of the curve to brighten the shadows on a texture.",
+    [
+     "Shade Image",
+     "Shade Curves",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Bump",
+    "SHADER · IMAGE OUT",
+    "A height that bends the surface normal to fake small bumps. Strength (0 to 1, default 1) sets how far the normal tilts, Distance (0 to 1, default 0.1) how far the height is sampled, and Invert flips bumps into dents. Wire it into a Material's normal input. Everyday use: add fake surface detail such as bricks, dents or scratches without extra geometry. Also called bump mapping.",
+    "feed a Shade Voronoi into the height and keep Strength low for a subtle pitted surface.",
+    [
+     "Shade Voronoi",
+     "Shade Bump",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Normal Map",
+    "SHADER · IMAGE OUT",
+    "Turns a tangent-space normal map (the bluish texture of surface detail) into a normal for the Material's normal input. Feed it a Shade Image set to Data, since a normal map must not be colour-decoded. Strength (0 to 2, default 1) scales the tilt. Everyday use: the surface detail that artists bake from high-poly models. Also called a normal map or a bump texture.",
+    "load a normal-map PNG into Shade Image on Data and raise Strength to 1.5 for deeper relief.",
+    [
+     "Shade Image",
+     "Shade Normal Map",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Fresnel",
+    "SHADER · IMAGE OUT",
+    "The reflectance of a clear dielectric, such as glass or water, at the IOR patched into it. It is low when you look straight on and rises toward 1 at grazing angles: the edge glow you see on a lake or a glass pane. Everyday use: make a surface read as glass, water or glossy plastic. Also called the Fresnel effect or edge reflection.",
+    "wire a constant of 1.5 into IOR (about the value of glass) and use the output to brighten the edges of a sphere.",
+    [
+     "Shade Fresnel",
+     "Shade Mix",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Layer Weight",
+    "SHADER · IMAGE OUT",
+    "A blend weight by view angle. Output Fresnel gives the glassy-edge weighting and Facing gives 0 at the edges to 1 facing the camera. Blend (0 to 1, default 0.5) sets how much of the surface is weighted. Everyday use: a rim or edge highlight, like an edge-lit look on a product render. Also called a rim weight or facing ratio.",
+    "use Facing to fade a second colour in at the silhouette of a sphere.",
+    [
+     "Shade Layer Weight",
+     "Shade Mix",
+     "Material"
+    ]
+   ],
+   [
+    "Shade Geometry",
+    "SHADER · IMAGE OUT",
+    "Reads the surface itself. Output picks one of Position, Normal, Tangent, Incoming (the view direction), Backfacing, Curvature, Cavity or a per-object Random value. Curvature and Cavity come from Mesh Wear, which scores each mesh's ridges, creases and occlusion, and only works out when a material reads them. Everyday use: make a material react to the shape of the object, such as dirt in creases or wear on edges. Also called geometry info.",
+    "pick Cavity into a Shade Mix to darken the creases on a sculpted mesh.",
+    [
+     "Cube",
+     "Shade Geometry",
+     "Shade Mix",
      "Material"
     ]
    ]
@@ -770,6 +1142,73 @@
      "Resynthesize 3D",
      "Render 3D"
     ]
+   ],
+   [
+    "Array",
+    "3D · IN/OUT",
+    "Duplicates the input mesh in a line, or in a radial ring when Radial is on. Count (1 to 128, default 5) sets how many copies. Radial spaces them around by Radius (default 1); linear spacing uses Offset X, Y and Z (X defaults to 0.6). Rot / Step and Scale / Step add a little rotation and scale to each copy, so every copy differs from the last, and Pivot and Spin place the rotation. The Operation dropdown holds the whole mesh-operator family and opens on Array. Everyday use: repeat an object into a row, a fence, a ring of columns or a spiral. Also called a repeat, a clone or copy-and-offset.",
+    "set Count to 12, turn Radial on and set Radius to 2 for a ring of twelve cubes.",
+    [
+     "Cube",
+     "Array",
+     "Render 3D"
+    ]
+   ],
+   [
+    "Select",
+    "3D · IN/OUT",
+    "Marks a subset of faces so the operations after it act on just those. Mode picks the test: All, By index (a start and a stride), By position (between two values on an X, Y or Z axis), By normal (faces pointing within a facing threshold, with a sign), Random (a chance) or By radius (within a distance of a centre). Invert flips the selection and Add to Selection unions it with what was already selected. Mesh operators act on the marked faces when Selection only is on. The older Delete, Transform and Extrude Selected nodes are deprecated; use Selection only instead. Everyday use: pick only the top of a box, or a random scatter of faces, to change. Also called face selection.",
+    "select the faces that point up (By normal, facing 0.5), then turn on Selection only on Inset to bevel just the tops.",
+    [
+     "Cube",
+     "Select",
+     "Inset",
+     "Render 3D"
+    ]
+   ],
+   [
+    "Inset",
+    "3D · IN/OUT",
+    "Shrinks each face region inward by Width and raises or sinks it by Depth, leaving a wall around it, like pressing a stamp into clay. Width (0.001 to 0.5, default 0.05) is how far in, Depth (-0.5 to 0.5, default 0) how far up (negative sinks it), and Patch angle (1 to 120 degrees, default 30). Selection only (off by default) limits it to the faces marked by Select; with it off, every face is inset. Everyday use: a panel or recessed-frame look on a box. Also called a face inset or a recess.",
+    "select the top faces, set Width to 0.1 and Depth to -0.05, and the top is pressed into a panel.",
+    [
+     "Cube",
+     "Select",
+     "Inset",
+     "Render 3D"
+    ]
+   ],
+   [
+    "Fur",
+    "3D · IN/OUT",
+    "Grows strands on the faces as thin ribbons: fur, fleece, grass or hair. Density (1 to 400, default 40) sets strands per area and Max Strands caps the total (default 150,000). Length (0 to 0.5, default 0.012) and Length Jitter vary the strand length, and Width sets how thick each ribbon is. Gravity droops the tips, Clump pulls them together, Curl twists them, and Comb X, Y and Z lean the roots. Plug a curve into the guide input and every strand follows its shape, for styled long hair. Normals is Ribbon or Tangent (Tangent is for a Hair material). Selection only limits the fur to Select's faces. Everyday use: a furry, hairy or grassy surface on any 3D object. Also called a hair or grass generator.",
+    "plug a curve into guide, raise Clump and Gravity, and render with a Hair material for a styled ponytail.",
+    [
+     "Sphere",
+     "Fur",
+     "Render 3D"
+    ]
+   ],
+   [
+    "Point Trails",
+    "3D · IN/OUT",
+    "Draws where each point has been. Points go in and a mesh of tails comes out, so Particle System, then Point Trails, then Render 3D gives comet-style tails you can fly the camera through. Length (2 to 240, default 30) is how many past positions each tail keeps, and Sample Every (1 to 10) takes every Nth frame for longer tails at the same cost. Width, Fade and Taper shape the tail. Colour is From points or a head-to-tail gradient over age. Match By Particle ID starts a new tail when a particle is reborn; Index follows each slot. Point Limit (default 10000) caps the points. It draws only the tails, so wire the source into Render 3D too to see the points. Everyday use: light trails, sparks and streaks behind moving particles. Also called motion trails or particle tails.",
+    "feed a particle emitter into Point Trails with Length 80 and Gradient over age for glowing comet streaks.",
+    [
+     "Particle System",
+     "Point Trails",
+     "Render 3D"
+    ]
+   ],
+   [
+    "Sweep",
+    "3D · IN/OUT",
+    "Carries a profile shape along a path curve to make a surface: pipes, rails, rims, cables and ribbons. Patch the profile into the first input and the route into the second. With no profile it sweeps a round one, so a path alone gives a tube (Profile Radius 0.002 to 2, default 0.1; Profile Sides 3 to 64, default 12). Start Scale and End Scale (0 to 4) taper it, Twist (-1080 to 1080) turns it along the way, and Caps closes the ends of a closed profile on an open path. Everyday use: a pipe, cable or neon tube along a drawn curve. Also called extrude along a path.",
+    "draw a curve, sweep a tube with End Scale 0 and get a wire that fades to a point.",
+    [
+     "Sweep",
+     "Render 3D"
+    ]
    ]
   ],
   "rows": [],
@@ -888,6 +1327,51 @@
      "Geometry + Material + Light + HDRI",
      "Render 3D",
      "Bloom"
+    ]
+   ],
+   [
+    "Ocean",
+    "3D · GEOMETRY OUT",
+    "A simulated ocean surface mesh built from Gerstner-style waves. Resolution (8 to 300, default 96) sets the grid and Size (0.5 to 20, default 4) its footprint. Amplitude (0 to 1, default 0.12) is the wave height, Wavelength (0.1 to 8, default 2) the spacing, Steepness (0 to 2) how peaked the crests get, and Choppiness (0 to 2) how far they pinch. Direction (degrees, default 34.4) is the heading, Octaves (1 to 8, default 4) layers finer swell on top, Speed (-3 to 3) sets how fast it moves, and Horizon (1 to 100) how far the surface reaches. Everyday use: a sea or lake behind a boat in a 3D scene. Also called water, waves or a sea surface.",
+    "raise Octaves to 6 and Steepness to 1.4 for a choppy sea under a sky.",
+    [
+     "Ocean",
+     "Render 3D"
+    ]
+   ],
+   [
+    "Cloth",
+    "3D · GEOMETRY OUT",
+    "A cloth simulation over an input mesh: fabric, flags, sails. Pinned sets which part stays fixed (None, Top edge, Corners or Border). Stiffness (0 to 1, default 0.9) and Bending (0 to 1, default 0.1) set how the fabric holds, Iterations (1 to 40, default 6) sets solver accuracy, and Damping and Mass set how it settles. Gravity X, Y and Z (Y defaults to -9.8), Wind X, Y and Z (-20 to 20) and Turbulence (0 to 20) push it. Collide with ground turns on ground contact; Hold Shape (0 to 1) keeps it near its rest pose. An optional collider mesh drapes it over an object, with Distance and Friction for the contact. Reset re-drops the cloth. Everyday use: a flag, a tablecloth or a dress draped over a body. Also called fabric simulation.",
+    "pin the top edge, add wind on X and feed a box into the collider to drape a flag over it.",
+    [
+     "Plane",
+     "Cloth",
+     "Render 3D"
+    ]
+   ],
+   [
+    "Feedback 3D",
+    "3D · GEOMETRY OUT",
+    "A one-frame delay for geometry, so a 3D chain can loop back on itself. Patch the starting shape into Seed and the end of the chain into Loop. Each frame it outputs what the loop made from the frame before, so shapes can grow, drift and build up, a home-made growth or particle sim. It restarts from Seed on a rewind, holds while the transport is paused, and resets if the loop blows up to infinity. Reset starts over from the seed; with nothing in Loop it passes the seed through. Everyday use: a shape that grows or evolves over time. Also called geometry feedback or a 3D delay.",
+    "seed a small cube and loop a transform that scales it up each frame for a shape that grows.",
+    [
+     "Cube",
+     "Feedback 3D",
+     "Transform",
+     "Render 3D"
+    ]
+   ],
+   [
+    "3D View",
+    "3D · IMAGE OUT",
+    "The final stage of a 3D patch: it holds the objects you bring in and renders them to a picture. Right-click any 3D node and choose Add to 3D View, then arrange it in the 3D View panel (G moves, R rotates, S scales; Shift+3 opens the panel). Its settings are the picture's: Width and Height (1920 by 1080 by default), Samples for anti-aliasing (default 2), Shadows, Exposure, Bloom, ambient occlusion, depth of field and motion blur. Projection options include a dome, a fisheye and a lat-long panorama (Lat and Lon min and max). An optional path-traced Engine takes Path Samples (default 128) and Bounces (default 6). It stays transparent until you set a world in its World tab. F12 renders a picture through an Output node. Everyday use: the camera and render settings for a 3D scene. Also called a 3D viewport or a 3D stage.",
+    "add a cube and a sphere to the 3D View, turn on Shadows and Bloom, then press F12 through an Output node.",
+    [
+     "Cube",
+     "Sphere",
+     "3D View",
+     "Output"
     ]
    ]
   ],
@@ -1041,6 +1525,28 @@
     "send the kick lane's trigger into a Glitch node so the picture stutters with the beat.",
     [
      "Drum Sequencer",
+     "Audio Out"
+    ]
+   ],
+   [
+    "Wavetable",
+    "SYNTHS · AUDIO OUT",
+    "A two-engine wavetable synth. Each engine (A and B) reads one of about 60 named tables (Basic Shapes, Harmonics, Formant, Vocal, Bell, Choir, Vibraphone, Plucked String and more), and Mix (A to B) blends them. Per engine: Position through the table, Volume, Pan, Unison (1 to 8 voices) with Detune, Stereo Width, Octave, Semitone and Fine tune, Phase, a Warp menu (FM, AM, ring mod, hard sync, bend, mirror, quantize, and more) with Warp and Warp Ratio, and a filter (low-pass, high-pass or band-pass at 12, 24 or 36 dB per octave, notch or comb) with Cutoff and Resonance. Pitch, filter and amp envelopes (Attack, Decay, Sustain, Release in ms) shape each note. With no note cable it free-runs at Frequency (220 Hz by default) with a Glide time; wire in notes and it becomes polyphonic. An FM in input takes audio, with FM Depth (0 to 2) and FM Mode (PM or FM) setting how it modulates. Everyday use: a digital synth pad, lead, bass or bell sound. Also called a wavetable synth or a digital oscillator.",
+    "set Mix to halfway, A to Vocal and B to Bell, then wire a note cable in for a chord pad.",
+    [
+     "Piano Roll",
+     "Wavetable",
+     "Audio Out"
+    ]
+   ],
+   [
+    "Generate Samples",
+    "SYNTHS · AUDIO OUT",
+    "Makes a sample instead of loading one. Pick a music style (deep house, dub techno, lofi beats and about 30 more), a seed, a length of 1, 2, 4 or 8 bars, and press generate. A private patch built from that style renders a seamless loop on a background thread while the canvas keeps running. Part picks the whole mix or one layer of it from the same seed: synths, pads, plucks, percussion or drums. Variation (0 to 1, default 0.5) sets how far each part strays, the dice picks a new seed, and Follow Transport and Follow Scale take the patch's tempo and key. Every loop is normalised to -14 LUFS with a -1 dB true-peak ceiling. Pitch, Speed, Start, End, Loop, Reverse and Ping-pong then play it like any sample player. Keep as file writes the loop to a WAV. The patch saves the recipe, not the audio. Everyday use: a royalty-free loop or beat made on demand. Also called a loop maker or a beat generator.",
+    "pick a dub techno style, set Part to drums and press generate, then keep as file for a WAV.",
+    [
+     "Piano Roll",
+     "Generate Samples",
      "Audio Out"
     ]
    ]
@@ -1422,6 +1928,17 @@
      "MIDI Notes",
      "Note Echo",
      "Wavetable"
+    ]
+   ],
+   [
+    "Piano Roll",
+    "NOTES · NOTE OUT",
+    "Plays the notes of a Piano Roll page linked to it: a MIDI lane in the Timeline, drawn as clips you can cut and loop like any other clip. It follows the transport, plays each clip as drawn (loops unrolled, chance rolled fresh on every play), and sends pitch bend, pressure and timbre curves with its notes. Transpose (-48 to 48 semitones) and Velocity (0 to 2) act on everything it plays. Its notes input passes through and merges in unless Thru is off. Global Scale snaps every played note to the project key and scale. Everyday use: a drawn MIDI melody or chord progression you can loop and transpose. Also called a MIDI clip or a note sequencer.",
+    "draw a four-bar melody, set Transpose to +7 and route it into Wavetable for a fifth-up copy.",
+    [
+     "Piano Roll",
+     "Wavetable",
+     "Audio Out"
     ]
    ]
   ],
@@ -2086,6 +2603,28 @@
     [
      "Audio Source",
      "Field Effect",
+     "Audio Out"
+    ]
+   ],
+   [
+    "Field Modulator",
+    "MODULATORS · OUT",
+    "A modulator written in Field code. Its code publishes a value from 0 to 1 that drives any knob it is patched into. Count and Max Elements (default 65536) set the field's size, and Size, Height, Freq and Speed are exposed controls you can modulate (Size 0.5 to 10, Height 0 to 2, Freq 0.5 to 8, Speed 0 to 5). Patch it in the Field Patcher, or start from Slow LFO, Triangle LFO, Pulse Train or Skipping Beat. Save, Export and Import keep the code. Everyday use: a custom LFO or animated curve when the built-in modulators are not enough. Also called a custom LFO or formula modulator. See the Field Language chapter.",
+    "start from Slow LFO, change the publish line to a square wave and wire it into a knob.",
+    [
+     "Field Modulator",
+     "Shape (Size)",
+     "Output"
+    ]
+   ],
+   [
+    "Spectral Field",
+    "AUDIOEFFECTS · IN/OUT",
+    "Runs a Field kernel once per frequency bin. Audio goes in, is cut into a spectrum (STFT), your kernel runs on every bin, and the result is turned back into sound. Inside the kernel read bin, bins, binhz, hop and sr, and write mag, phase or freq. mag.at(k) reads another bin, state keeps memory per bin, and a second audio input adds a spectrum for cross-synthesis. Size (512 to 8192, default 2048) trades time for frequency detail, and latency is one Size. Cutoff (20 to 20000 Hz, default 2000) and Mix are exposed. The starter kernel is a low-pass. Everyday use: a custom EQ, a spectral filter or a robot-voice effect. Also called an FFT effect or a spectral processor.",
+    "keep the starter low-pass, drop Size to 512 and sweep Cutoff for a fast, tight filter.",
+    [
+     "Audio In",
+     "Spectral Field",
      "Audio Out"
     ]
    ]
