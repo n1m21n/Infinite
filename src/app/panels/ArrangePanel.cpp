@@ -1692,15 +1692,15 @@ namespace app
          const bool overToolbar = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
                                   mouse.y >= arrangeToolbarTop && mouse.y < arrangeToolbarBottom;
          if (overToolbar && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::IsAnyItemHovered() &&
-             ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangedockctx"))
-            ImGui::OpenPopup("##arrangedockctx");
+             ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangeDockMenu"))
+            ImGui::OpenPopup("##arrangeDockMenu");
       }
       // The monitor child asks for the viewport menu; it opens here, in the same ID scope as the chip's.
       static bool sViewportCtxRequest = false;
       if (sViewportCtxRequest && !ImGui::IsPopupOpen("##arrangeviewportctx"))
          ImGui::OpenPopup("##arrangeviewportctx");
       sViewportCtxRequest = false;
-      if (MenuParts::BeginPopup("##arrangedockctx"))
+      if (MenuParts::BeginPopup("##arrangeDockMenu"))
       {
          if (MenuParts::SubMenu(L("Dock Position")))
          {

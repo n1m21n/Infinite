@@ -723,6 +723,19 @@ namespace
          gFieldPatcherOpen = false;
    }
 
+   void DrawDockMenu()
+   {
+      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::Chip() + tok::space_3);
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+          ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+         ImGui::OpenPopup("##fpDockMenu");
+      if (MenuParts::BeginPopup("##fpDockMenu"))
+      {
+         DockItem();
+         MenuParts::EndPopup();
+      }
+   }
+
    // Boxes only: paste, select all and the dock live on keys and the strip.
    bool PickMenu(Page& p, Host& h, ImVec2 at, int fromPin, int family)
    {
@@ -1654,6 +1667,7 @@ namespace
       PrunePages();
       FollowCanvasSelection();
       DrawStrip();
+      DrawDockMenu();
       Page* p = Front();
       if (p == nullptr)
       {
