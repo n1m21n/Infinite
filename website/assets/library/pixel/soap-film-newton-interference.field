@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Soap Film Newton Interference",
+    "author": "Infinite",
+    "description": "Thin-film optical interference in a swirling surfactant soap membrane with spectral Newton rings and audio-reactive ripples.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float flowSpeed = 0.42 [0.05, 1.5];\nparam float filmScale = 3.4 [1.2, 8.0];\nparam float thickness = 2.2 [0.5, 5.0];\nparam float contrast = 1.15 [0.5, 2.0];\nparam float rippleAmt = 0.35 [0.0, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\ntt = t * flowSpeed;\nq1 = vec2(sin(p.y * filmScale + tt), cos(p.x * filmScale - tt * 0.85));\nq2 = vec2(sin((p.x + q1.x) * filmScale * 1.7 - tt * 1.2), cos((p.y + q1.y) * filmScale * 1.7 + tt));\nw = p + q1 * 0.28 + q2 * 0.16;\nr = length(w);\nd = (0.55 + 0.45 * sin(w.x * 2.8 + w.y * 2.1 + sin(r * 4.5 - tt * 1.4))) * thickness + rippleAmt * 0.3 * cos(r * 9.0 - tt * 2.0);\n\n# Spectral thin-film interference phase across RGB wavelengths\nphase = d * 6.2831853 + vec3(0.0, 2.094, 4.188);\nfilm = 0.5 + 0.5 * cos(phase);\nfilm = pow(clamp(film, 0.0, 1.0), vec3(0.85));\n\n# Dark soap-chamber rim & specular membrane sheen\nrim = 1.0 - smoothstep(0.62, 1.22, length(p));\nsheen = pow(clamp(1.0 - length(p - vec2(-0.35, 0.35)) * 0.9, 0.0, 1.0), 4.0) * 0.22;\ncol = clamp((film * contrast * (0.28 + 0.72 * rim)) + vec3(sheen), 0.0, 1.0);\n",
+    "params": {
+      "flowSpeed": 0.42,
+      "filmScale": 3.4,
+      "thickness": 2.2,
+      "contrast": 1.15,
+      "rippleAmt": 0.35
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

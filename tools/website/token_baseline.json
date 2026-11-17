@@ -600,6 +600,14 @@
   "embeds/ferrofluid-thinfilm-bismuth-corona.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/soap-film-newton-interference.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/mineral-birefringence-thin-section.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

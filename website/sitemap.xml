@@ -179,6 +179,8 @@
   <url><loc>https://infinitedevices.org/embeds/dichroic-fresnel-prismatic-caustics.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/raku-craquelure-celadon-veins.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/raku-craquelure-copper-kiln-glaze.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/soap-film-newton-interference.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/mineral-birefringence-thin-section.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-17</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-17</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
@@ -396,6 +398,10 @@
   <url><loc>https://infinitedevices.org/library/koto-glass-harmonic-marimba-synth.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/doppler-rotary-horn-cabinet-fx.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tuareg-desert-pentatonic-lute-synth.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/prepared-piano-bolt-harmonic-synth.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/shoegaze-chorus-wall-ensemble-fx.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/uk-dub-steppers-spring-filter-fx.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
@@ -1050,6 +1056,16 @@
   <url><loc>https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/raku-craquelure-celadon-veins.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/raku-craquelure-copper-kiln-glaze.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/zellij-girih-star-rosette.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hilma-svanen-orbital-diagram.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/qrd-basalt-acoustic-diffuser-3d.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gaudi-catenary-paraboloid-vault-3d.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tuareg-desert-pentatonic-lute-synth.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/prepared-piano-bolt-harmonic-synth.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/shoegaze-chorus-wall-ensemble-fx.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/uk-dub-steppers-spring-filter-fx.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/soap-film-newton-interference.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/mineral-birefringence-thin-section.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-17</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-17</lastmod><priority>0.5</priority></url>

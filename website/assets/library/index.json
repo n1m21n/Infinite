@@ -11044,7 +11044,217 @@
       "file": "assets/library/pixel/raku-craquelure-copper-kiln-glaze.field",
       "preview": "assets/library/previews/raku-craquelure-copper-kiln-glaze.jpg",
       "bytes": 4466
+    },
+    {
+      "id": "zellij-girih-star-rosette",
+      "name": "Zellij Girih Star Rosette",
+      "kind": "Generator",
+      "tags": [
+        "sketch",
+        "zellij",
+        "girih",
+        "tessellation",
+        "islamic",
+        "geometric"
+      ],
+      "description": "Moroccan Fez zellij glazed tilework with 8-fold and 16-fold star rosettes, interlaced strapwork, and bone-ivory mortar seams.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/zellij-girih-star-rosette.js",
+      "preview": "assets/library/previews/zellij-girih-star-rosette.jpg",
+      "bytes": 3589
+    },
+    {
+      "id": "hilma-svanen-orbital-diagram",
+      "name": "Hilma Svanen Orbital Diagram",
+      "kind": "Generator",
+      "tags": [
+        "sketch",
+        "hilma",
+        "diagrammatic",
+        "modernist",
+        "geometric",
+        "orbital"
+      ],
+      "description": "Hilma af Klint spiritualist geometric plate with vermilion ground, split-hemisphere colour wheels, and fine compass construction arcs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/hilma-svanen-orbital-diagram.js",
+      "preview": "assets/library/previews/hilma-svanen-orbital-diagram.jpg",
+      "bytes": 4183
+    },
+    {
+      "id": "qrd-basalt-acoustic-diffuser-3d",
+      "name": "QRD Basalt Acoustic Diffuser 3D",
+      "kind": "Generator",
+      "tags": [
+        "sketch-3d",
+        "qrd",
+        "acoustics",
+        "basalt",
+        "architecture",
+        "diffuser"
+      ],
+      "description": "Schroeder N=13 quadratic residue acoustic diffuser sculpted as stepped hexagonal basalt columns with warm rim relief.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/qrd-basalt-acoustic-diffuser-3d.js",
+      "preview": "assets/library/previews/qrd-basalt-acoustic-diffuser-3d.jpg",
+      "bytes": 1616
+    },
+    {
+      "id": "gaudi-catenary-paraboloid-vault-3d",
+      "name": "Gaudi Catenary Paraboloid Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "sketch-3d",
+        "gaudi",
+        "catenary",
+        "vault",
+        "architecture",
+        "paraboloid"
+      ],
+      "description": "Antoni Gaudi hanging-chain catenary colonnade and branching hyperboloid vault ribs in warm limestone and terracotta.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/gaudi-catenary-paraboloid-vault-3d.js",
+      "preview": "assets/library/previews/gaudi-catenary-paraboloid-vault-3d.jpg",
+      "bytes": 2411
+    },
+    {
+      "id": "tuareg-desert-pentatonic-lute-synth",
+      "name": "Tuareg Desert Pentatonic Lute Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "tuareg",
+        "desert",
+        "pentatonic",
+        "plucked",
+        "dsp"
+      ],
+      "description": "Desert blues plucked lute synthesizer with micro-bend pitch envelope, fret-buzz harmonic FM, and warm cedar body resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/tuareg-desert-pentatonic-lute-synth.inf",
+      "preview": "assets/library/previews/tuareg-desert-pentatonic-lute-synth.jpg",
+      "bytes": 1957
+    },
+    {
+      "id": "prepared-piano-bolt-harmonic-synth",
+      "name": "Prepared Piano Bolt Harmonic Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "prepared-piano",
+        "modal",
+        "inharmonic",
+        "percussion",
+        "dsp"
+      ],
+      "description": "Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/prepared-piano-bolt-harmonic-synth.inf",
+      "preview": "assets/library/previews/prepared-piano-bolt-harmonic-synth.jpg",
+      "bytes": 2192
+    },
+    {
+      "id": "shoegaze-chorus-wall-ensemble-fx",
+      "name": "Shoegaze Chorus Wall Ensemble FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "shoegaze",
+        "chorus",
+        "ensemble",
+        "allpass",
+        "dsp"
+      ],
+      "description": "Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/shoegaze-chorus-wall-ensemble-fx.inf",
+      "preview": "assets/library/previews/shoegaze-chorus-wall-ensemble-fx.jpg",
+      "bytes": 2158
+    },
+    {
+      "id": "uk-dub-steppers-spring-filter-fx",
+      "name": "UK Dub Steppers Spring Filter FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "dub",
+        "steppers",
+        "filter",
+        "spring",
+        "dsp"
+      ],
+      "description": "Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/uk-dub-steppers-spring-filter-fx.inf",
+      "preview": "assets/library/previews/uk-dub-steppers-spring-filter-fx.jpg",
+      "bytes": 2178
+    },
+    {
+      "id": "soap-film-newton-interference",
+      "name": "Soap Film Newton Interference",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "soap-film",
+        "interference",
+        "optics",
+        "iridescent",
+        "shader"
+      ],
+      "description": "Thin-film optical interference in a swirling surfactant soap membrane with spectral Newton rings and audio-reactive ripples.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/soap-film-newton-interference.field",
+      "preview": "assets/library/previews/soap-film-newton-interference.jpg",
+      "bytes": 1670
+    },
+    {
+      "id": "mineral-birefringence-thin-section",
+      "name": "Mineral Birefringence Thin Section",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "mineral",
+        "birefringence",
+        "polarized",
+        "voronoi",
+        "shader"
+      ],
+      "description": "Cross-polarized petrographic microscopy of Voronoi crystal domains with Michel-Levy interference bands and analyzer rotation.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/mineral-birefringence-thin-section.field",
+      "preview": "assets/library/previews/mineral-birefringence-thin-section.jpg",
+      "bytes": 4009
     }
   ],
-  "count": 540
+  "count": 550
 }

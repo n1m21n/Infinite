@@ -325,6 +325,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Koto Glass Harmonic Marimba Synth](https://infinitedevices.org/library/koto-glass-harmonic-marimba-synth.html): Tuned glass and rosewood bar percussion synthesizer with 1:3.98:9.2 modal overtones, mallet hardness transient, and warm saturation. (file: https://infinitedevices.org/assets/templates/koto-glass-harmonic-marimba-synth.inf)
 - [Doppler Rotary Horn Cabinet FX](https://infinitedevices.org/library/doppler-rotary-horn-cabinet-fx.html): Dual-rotor Leslie horn Doppler dispersion processor with crossover baffle split, resonant birch cabinet coloration, and warm tube preamp saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-horn-cabinet-fx.inf)
 - [Doppler Rotary Leslie Chorale FX](https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html): Slow chorale-speed rotary baffle dispersion with asymmetric six-stage allpass phase drift, warm horn-throat rolloff, and soft transformer saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-leslie-chorale-fx.inf)
+- [Tuareg Desert Pentatonic Lute Synth](https://infinitedevices.org/library/tuareg-desert-pentatonic-lute-synth.html): Desert blues plucked lute synthesizer with micro-bend pitch envelope, fret-buzz harmonic FM, and warm cedar body resonance. (file: https://infinitedevices.org/assets/templates/tuareg-desert-pentatonic-lute-synth.inf)
+- [Prepared Piano Bolt Harmonic Synth](https://infinitedevices.org/library/prepared-piano-bolt-harmonic-synth.html): Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail. (file: https://infinitedevices.org/assets/templates/prepared-piano-bolt-harmonic-synth.inf)
+- [Shoegaze Chorus Wall Ensemble FX](https://infinitedevices.org/library/shoegaze-chorus-wall-ensemble-fx.html): Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation. (file: https://infinitedevices.org/assets/templates/shoegaze-chorus-wall-ensemble-fx.inf)
+- [UK Dub Steppers Spring Filter FX](https://infinitedevices.org/library/uk-dub-steppers-spring-filter-fx.html): Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation. (file: https://infinitedevices.org/assets/templates/uk-dub-steppers-spring-filter-fx.inf)
 
 ## Library: Community
 
@@ -569,6 +573,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Dichroic Fresnel Prismatic Caustics](https://infinitedevices.org/library/dichroic-fresnel-prismatic-caustics.html): Crossed dichroic beam-splitter cube splitting incident rays into textured amber, cyan, and violet interference beams over obsidian. (file: https://infinitedevices.org/assets/library/pixel/dichroic-fresnel-prismatic-caustics.field)
 - [Raku Craquelure Celadon Veins](https://infinitedevices.org/library/raku-craquelure-celadon-veins.html): Goryeo celadon ceramic crackle glaze with Voronoi fracture plates, dark iron craze lines, and molten gold-leaf veins. (file: https://infinitedevices.org/assets/library/pixel/raku-craquelure-celadon-veins.field)
 - [Raku Craquelure Copper Kiln Glaze](https://infinitedevices.org/library/raku-craquelure-copper-kiln-glaze.html): Iridescent copper-red and smoky carbon reduction raku glaze with Voronoi thermal-shock fissures and metallic luster. (file: https://infinitedevices.org/assets/library/pixel/raku-craquelure-copper-kiln-glaze.field)
+- [Soap Film Newton Interference](https://infinitedevices.org/library/soap-film-newton-interference.html): Thin-film optical interference in a swirling surfactant soap membrane with spectral Newton rings and audio-reactive ripples. (file: https://infinitedevices.org/assets/library/pixel/soap-film-newton-interference.field)
+- [Mineral Birefringence Thin Section](https://infinitedevices.org/library/mineral-birefringence-thin-section.html): Cross-polarized petrographic microscopy of Voronoi crystal domains with Michel-Levy interference bands and analyzer rotation. (file: https://infinitedevices.org/assets/library/pixel/mineral-birefringence-thin-section.field)
 
 ## Library: Sketch
 
@@ -682,6 +688,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Harmonograph Pendulum Rotary Rosette](https://infinitedevices.org/library/harmonograph-pendulum-rotary-rosette.html): Rotary-table lateral harmonograph tracing dual counter-oscillating charcoal and vermilion ink rosettes inside a polar goniometer reticle. (file: https://infinitedevices.org/assets/library/sketch/harmonograph-pendulum-rotary-rosette.js)
 - [Astrolabe Planisphere Almucantar Projection](https://infinitedevices.org/library/astrolabe-planisphere-almucantar-projection.html): Stereographic astrolabe tympan plate with nested almucantar altitude circles, curved azimuth arcs, degree vernier ticks, and rotating alidade rule. (file: https://infinitedevices.org/assets/library/sketch/astrolabe-planisphere-almucantar-projection.js)
 - [Astrolabe Planisphere Ecliptic Rete](https://infinitedevices.org/library/astrolabe-planisphere-ecliptic-rete.html): Rotating pierced ecliptic zodiac rete with eccentric celestial ring, unequal planetary hour arcs, and flame-like brass star pointers. (file: https://infinitedevices.org/assets/library/sketch/astrolabe-planisphere-ecliptic-rete.js)
+- [Zellij Girih Star Rosette](https://infinitedevices.org/library/zellij-girih-star-rosette.html): Moroccan Fez zellij glazed tilework with 8-fold and 16-fold star rosettes, interlaced strapwork, and bone-ivory mortar seams. (file: https://infinitedevices.org/assets/library/sketch/zellij-girih-star-rosette.js)
+- [Hilma Svanen Orbital Diagram](https://infinitedevices.org/library/hilma-svanen-orbital-diagram.html): Hilma af Klint spiritualist geometric plate with vermilion ground, split-hemisphere colour wheels, and fine compass construction arcs. (file: https://infinitedevices.org/assets/library/sketch/hilma-svanen-orbital-diagram.js)
 
 ## Library: Sketch 3D
 
@@ -790,6 +798,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Nervi Ferrocement Hyperbolic Shell 3D](https://infinitedevices.org/library/nervi-ferrocement-hyperbolic-shell-3d.html): Twin-curved hyperbolic paraboloid ferrocement canopy with ruled concrete rib generators, edge fascia beams, and bronze tension ties. (file: https://infinitedevices.org/assets/library/sketch/nervi-ferrocement-hyperbolic-shell-3d.js)
 - [Metabolist Capsule Nakagin Tower 3D](https://infinitedevices.org/library/metabolist-capsule-nakagin-tower-3d.html): Dual-core Japanese Metabolist tower with cantilevered precast concrete capsules, recessed circular porthole bezels, and tungsten interior apertures. (file: https://infinitedevices.org/assets/library/sketch/metabolist-capsule-nakagin-tower-3d.js)
 - [Metabolist Capsule Helical Cluster 3D](https://infinitedevices.org/library/metabolist-capsule-helical-cluster-3d.html): Helical Metabolist megastructure spine with spiralling cantilevered concrete pods, steel ring collars, and circular porthole windows. (file: https://infinitedevices.org/assets/library/sketch/metabolist-capsule-helical-cluster-3d.js)
+- [QRD Basalt Acoustic Diffuser 3D](https://infinitedevices.org/library/qrd-basalt-acoustic-diffuser-3d.html): Schroeder N=13 quadratic residue acoustic diffuser sculpted as stepped hexagonal basalt columns with warm rim relief. (file: https://infinitedevices.org/assets/library/sketch/qrd-basalt-acoustic-diffuser-3d.js)
+- [Gaudi Catenary Paraboloid Vault 3D](https://infinitedevices.org/library/gaudi-catenary-paraboloid-vault-3d.html): Antoni Gaudi hanging-chain catenary colonnade and branching hyperboloid vault ribs in warm limestone and terracotta. (file: https://infinitedevices.org/assets/library/sketch/gaudi-catenary-paraboloid-vault-3d.js)
 
 ## Library: Synths
 
@@ -898,6 +908,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Trautonium Subharmonic Formant Bow Synth](https://infinitedevices.org/library/trautonium-subharmonic-formant-bow-synth.html): Bowed subharmonic Trautonium synthesizer with smooth portamento glide, wavefolded upper partials, and swept vocal formant bank. (file: https://infinitedevices.org/assets/templates/trautonium-subharmonic-formant-bow-synth.inf)
 - [Koto Glass Plucked Koto Synth](https://infinitedevices.org/library/koto-glass-plucked-koto-synth.html): Silk-string koto modal pluck synthesizer with bridge buzz dispersion, three-partial harmonic FM, and paulownia soundboard resonance. (file: https://infinitedevices.org/assets/templates/koto-glass-plucked-koto-synth.inf)
 - [Koto Glass Harmonic Marimba Synth](https://infinitedevices.org/library/koto-glass-harmonic-marimba-synth.html): Tuned glass and rosewood bar percussion synthesizer with 1:3.98:9.2 modal overtones, mallet hardness transient, and warm saturation. (file: https://infinitedevices.org/assets/templates/koto-glass-harmonic-marimba-synth.inf)
+- [Tuareg Desert Pentatonic Lute Synth](https://infinitedevices.org/library/tuareg-desert-pentatonic-lute-synth.html): Desert blues plucked lute synthesizer with micro-bend pitch envelope, fret-buzz harmonic FM, and warm cedar body resonance. (file: https://infinitedevices.org/assets/templates/tuareg-desert-pentatonic-lute-synth.inf)
+- [Prepared Piano Bolt Harmonic Synth](https://infinitedevices.org/library/prepared-piano-bolt-harmonic-synth.html): Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail. (file: https://infinitedevices.org/assets/templates/prepared-piano-bolt-harmonic-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1009,6 +1021,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Magnetic Wire Hysteresis FX](https://infinitedevices.org/library/magnetic-wire-hysteresis-fx.html): 1940s Peirce steel-wire magnetic recorder processor with asymmetric hysteresis saturation, capstan flutter, and coil bandpass. (file: https://infinitedevices.org/assets/templates/magnetic-wire-hysteresis-fx.inf)
 - [Doppler Rotary Horn Cabinet FX](https://infinitedevices.org/library/doppler-rotary-horn-cabinet-fx.html): Dual-rotor Leslie horn Doppler dispersion processor with crossover baffle split, resonant birch cabinet coloration, and warm tube preamp saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-horn-cabinet-fx.inf)
 - [Doppler Rotary Leslie Chorale FX](https://infinitedevices.org/library/doppler-rotary-leslie-chorale-fx.html): Slow chorale-speed rotary baffle dispersion with asymmetric six-stage allpass phase drift, warm horn-throat rolloff, and soft transformer saturation. (file: https://infinitedevices.org/assets/templates/doppler-rotary-leslie-chorale-fx.inf)
+- [Shoegaze Chorus Wall Ensemble FX](https://infinitedevices.org/library/shoegaze-chorus-wall-ensemble-fx.html): Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation. (file: https://infinitedevices.org/assets/templates/shoegaze-chorus-wall-ensemble-fx.inf)
+- [UK Dub Steppers Spring Filter FX](https://infinitedevices.org/library/uk-dub-steppers-spring-filter-fx.html): Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation. (file: https://infinitedevices.org/assets/templates/uk-dub-steppers-spring-filter-fx.inf)
 
 ## Nodes
 
@@ -1322,7 +1336,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 129 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 131 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1452,3 +1466,5 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Dichroic Fresnel Prismatic Caustics](https://infinitedevices.org/embeds/dichroic-fresnel-prismatic-caustics.html): Audio-reactive dichroic beam-splitter prism. Bass pulses beam aperture, mids rotate the optical cube, and highs ignite prismatic caustic filaments.
 - [Raku Craquelure Celadon Veins](https://infinitedevices.org/embeds/raku-craquelure-celadon-veins.html): Audio-reactive Goryeo celadon ceramic crackle glaze with Voronoi fracture plates and molten gold-leaf veins.
 - [Raku Craquelure Copper Kiln Glaze](https://infinitedevices.org/embeds/raku-craquelure-copper-kiln-glaze.html): Audio-reactive copper-red and smoky carbon reduction raku glaze with Voronoi thermal-shock fissures and metallic luster.
+- [Soap Film Newton Interference](https://infinitedevices.org/embeds/soap-film-newton-interference.html): Audio-reactive thin-film soap membrane optical interference with swirling Newton rings.
+- [Mineral Birefringence Thin Section](https://infinitedevices.org/embeds/mineral-birefringence-thin-section.html): Audio-reactive cross-polarized mineral thin-section birefringence and Michel-Levy interference.

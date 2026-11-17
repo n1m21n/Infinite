@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Shoegaze Chorus Wall Ensemble FX",
+    "author": "Infinite",
+    "description": "Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rateHz = 0.65 [0.1, 4.0];\nparam float depth = 0.68 [0.05, 1.0];\nparam float smear = 0.54 [0.0, 0.88];\nparam float drive = 1.35 [0.8, 2.5];\nparam float mix = 0.80 [0.0, 1.0];\nstate float ph1 = 0; state float ph2 = 0.33;\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float fb = 0; state float lp = 0;\n\nph1 = (ph1 + rateHz / sr) % 1.0;\nph2 = (ph2 + (rateHz * 1.37) / sr) % 1.0;\nlfo1 = sin(6.2831853 * ph1);\nlfo2 = cos(6.2831853 * ph2);\n\nx = in + fb * smear * 0.48;\ng1 = clamp(0.28 + lfo1 * 0.42 * depth, -0.84, 0.84);\ng2 = clamp(-0.26 + lfo2 * 0.44 * depth, -0.84, 0.84);\ny1 = -g1 * x + a1; a1 = x + g1 * y1;\ny2 = -g2 * y1 + a2; a2 = y1 + g2 * y2;\ny3 = -g1 * y2 + a3; a3 = y2 + g1 * y3;\ny4 = -g2 * y3 + a4; a4 = y3 + g2 * y4;\n\nlp = lp + (y4 - lp) * 0.24;\nfb = lp;\nwet = (y4 * 0.68 + lp * 0.45) * drive;\nsat = wet / (1.0 + abs(wet) * 0.42);\nout = (in * (1.0 - mix) + sat * mix) * 0.82;\n",
+    "params": {
+      "rateHz": 0.65,
+      "depth": 0.68,
+      "smear": 0.54,
+      "drive": 1.35,
+      "mix": 0.8
+    }
+  }
+}

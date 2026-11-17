@@ -1,0 +1,77 @@
+infinite-patch 1
+# UK Dub Steppers Spring Filter FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 43
+  i note1 43
+  i note2 50
+  i note3 43
+  i note4 46
+  i note5 43
+  i note6 55
+  i note7 43
+  i note8 43
+  i note9 48
+  i note10 50
+  i note11 43
+  i note12 46
+  i note13 50
+  i note14 53
+  i note15 43
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2200.0
+  f resonance 0.28
+  f decay 0.52
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float sweepHz = 1.6 [0.2, 6.0];\nparam float cutoffHz = 1400.0 [240.0, 4500.0];\nparam float res = 0.48 [0.1, 0.85];\nparam float springMix = 0.56 [0.0, 1.0];\nparam float mix = 0.82 [0.0, 1.0];\nstate float ph = 0;\nstate float bp = 0; state float lp = 0;\nstate float s1 = 0; state float s2 = 0; state float s3 = 0; state float fb = 0;\n\nph = (ph + sweepHz / sr) % 1.0;\nmodHz = clamp(cutoffHz * (0.55 + 0.45 * sin(6.2831853 * ph)), 140.0, 6000.0);\ng = clamp(2.0 * sin(3.14159265 * modHz / sr), 0.02, 0.88);\nq = 1.15 - res * 0.92;\nbp = bp + g * (in - lp - q * bp);\nlp = lp + g * bp;\nfilt = lp * 0.78 + bp * 0.36;\n\n# Spring tank 3-stage allpass dispersion\nsx = filt + fb * 0.34;\ngs = 0.62;\ny1 = -gs * sx + s1; s1 = sx + gs * y1;\ny2 = -gs * y1 + s2; s2 = y1 + gs * y2;\ny3 = -gs * y2 + s3; s3 = y2 + gs * y3;\nfb = y3;\ncomb = filt * (1.0 - springMix * 0.35) + y3 * springMix * 0.65;\nsat = comb * 1.25 / (1.0 + abs(comb) * 0.48);\nout = (in * (1.0 - mix) + sat * mix) * 0.82;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.22 0.24 0.30
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text UK Dub Steppers Spring Filter FX. Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

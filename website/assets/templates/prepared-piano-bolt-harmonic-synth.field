@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Prepared Piano Bolt Harmonic Synth",
+    "author": "Infinite",
+    "description": "Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float boltRatio = 2.756 [1.5, 4.2];\nparam float clangMix = 0.58 [0.1, 1.0];\nparam float decay = 0.9995 [0.997, 0.99982];\nparam float frameHz = 460.0 [180.0, 1200.0];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float thudEnv = 0; state float bp = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.22, env * decay);\nthudEnv = if(gate > 0.5, 1.0, thudEnv * 0.994);\nf0 = clamp(freq, 45.0, 2800.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * boltRatio) / sr) % 1.0;\np3 = (p3 + (f0 * (boltRatio * 1.51)) / sr) % 1.0;\n\n# Metallic bolt-on-string FM + rubber-damper low thud\nclang = sin(6.2831853 * p2) * (0.65 + clangMix * 1.9) * env;\nbody = sin(6.2831853 * p1 + clang) * 0.72 + sin(6.2831853 * p3) * 0.34 * clangMix;\nthud = sin(6.2831853 * p1 * 0.5) * thudEnv * 0.42;\nraw = body + thud;\n\n# Cast-iron harp frame SVF resonance\ng = clamp(2.0 * sin(3.14159265 * frameHz / sr), 0.02, 0.85);\nbp = bp + g * (raw - lp - 0.52 * bp);\nlp = lp + g * bp;\nsig = (raw * 0.62 + bp * 0.56) * env * 0.34;\nout = sig / (1.0 + abs(sig) * 0.42);\n",
+    "params": {
+      "boltRatio": 2.756,
+      "clangMix": 0.58,
+      "decay": 0.9995,
+      "frameHz": 460.0
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
