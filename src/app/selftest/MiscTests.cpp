@@ -3859,12 +3859,17 @@ void RunView3DTest()
             return s;
       return nullptr;
    };
+   // RenderView draws only what the last cook synced, so cook on a fresh frame first,
+   // the way the app's per-frame loop does (cook, then draw). Drawing in the frame the
+   // scene was made would find nothing synced yet.
+   static int sDrawFrame = 2000000;
    auto Draw = [&]()
    {
       Scene3DNode* s = Scene();
       const float eye[3] = { 3, 2, 5 }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
       if (s == nullptr)
          return false;
+      s->CookIfNeeded(++sDrawFrame);
       Scene3DNode::View view;
       view.view = Mat4::LookAt(eye, target, up);
       view.proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 2000.0f);

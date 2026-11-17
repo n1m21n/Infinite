@@ -109,16 +109,41 @@ public:
 
    // Strips past the default channel count are not in the mix until "channels"
    // reaches them, so the sweep raises it before probing their params.
+   // What each gated param needs before its effect can reach the output at all:
+   //  - a strip past the default channel count needs `channels` raised,
+   //  - solosafe only protects a strip while another strip is soloed,
+   //  - panlaw only changes a strip that is panned off centre,
+   //  - sendpre only differs from post-fader when the strip's fader is off unity,
+   //  - a send only reaches a bus once `sendbuses` covers that bus.
    std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
    {
+      std::vector<SweepParamPrereq> out;
       static const char* kStripPrefixes[] = { "gain", "pan", "mute", "solo", "trim", "phase", "solosafe" };
       for (const char* prefix : kStripPrefixes)
       {
          const size_t n = strlen(prefix);
          if (paramName.compare(0, n, prefix) == 0 && paramName.size() > n && atoi(paramName.c_str() + n) >= 8)
-            return { { "channels", (float)kMaxSlots } };
+         {
+            out.push_back({ "channels", (float)kMaxSlots });
+            break;
+         }
       }
-      return {};
+      if (paramName.compare(0, 8, "solosafe") == 0 && paramName.size() > 8)
+      {
+         const int strip = atoi(paramName.c_str() + 8);
+         out.push_back({ "solo" + std::to_string(strip == 0 ? 1 : 0), 1.0f });
+      }
+      if (paramName == "panlaw")
+         out.push_back({ "pan0", 0.5f });
+      if (paramName.compare(0, 7, "sendpre") == 0 && paramName.size() > 7)
+      {
+         const int strip = atoi(paramName.c_str() + 7);
+         out.push_back({ "gain" + std::to_string(strip), -12.0f });
+         out.push_back({ "sendbuses", (float)kSendBuses });
+      }
+      else if (paramName.size() > 5 && paramName.compare(0, 4, "send") == 0 && paramName[4] >= 'A' && paramName[4] <= 'D')
+         out.push_back({ "sendbuses", (float)kSendBuses });
+      return out;
    }
 
    // Master loudness and true peak (mixer-panel plan B4). The meter runs only while something asks:

@@ -218,6 +218,11 @@ namespace AudioParamSweep
       float driveR[512] = {};
       float scratchL[512] = {};
       float scratchR[512] = {};
+      // Extra outputs a multi-output node writes (a Mixer's send buses). Read into these
+      // and folded into the measured block, or a send change never reaches the rig.
+      static constexpr int kRigBuses = 4;
+      float busL[kRigBuses][512] = {};
+      float busR[kRigBuses][512] = {};
    };
 
    // R carries a 90-degree phase offset from L rather than an identical
@@ -331,7 +336,33 @@ namespace AudioParamSweep
       out.numFrames = numFrames;
       if (rig.advanceClock)
          Transport::Instance().Tick(SweepClockDt(numFrames)); // headless: no audio clock, Tick moves Beats()
-      rig.audio->ProcessBlock(rig.numInputs > 0 ? rig.driveInputs : nullptr, rig.numInputs, out);
+      const int outputs = std::min(rig.audio->AudioOutputCount(), 1 + Rig::kRigBuses);
+      if (outputs > 1)
+      {
+         AudioBuffer bufs[1 + Rig::kRigBuses];
+         AudioBuffer* ptrs[1 + Rig::kRigBuses];
+         bufs[0] = out;
+         ptrs[0] = &bufs[0];
+         for (int b = 1; b < outputs; b++)
+         {
+            float* chans[2] = { rig.busL[b - 1], rig.busR[b - 1] };
+            std::fill(rig.busL[b - 1], rig.busL[b - 1] + numFrames, 0.0f);
+            std::fill(rig.busR[b - 1], rig.busR[b - 1] + numFrames, 0.0f);
+            bufs[b].channels = chans;
+            bufs[b].numChannels = 2;
+            bufs[b].numFrames = numFrames;
+            ptrs[b] = &bufs[b];
+         }
+         rig.audio->ProcessBlockMulti(rig.numInputs > 0 ? rig.driveInputs : nullptr, rig.numInputs, ptrs, outputs);
+         for (int b = 0; b < outputs - 1; b++)
+            for (int i = 0; i < numFrames; i++)
+            {
+               rig.scratchL[i] += rig.busL[b][i];
+               rig.scratchR[i] += rig.busR[b][i];
+            }
+      }
+      else
+         rig.audio->ProcessBlock(rig.numInputs > 0 ? rig.driveInputs : nullptr, rig.numInputs, out);
 
       switch (rig.mode)
       {
