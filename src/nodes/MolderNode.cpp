@@ -8,6 +8,7 @@
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
+#include "platform/AppPaths.h"
 #include "audio/AudioVoice.h"
 #include "audio/MeterRing.h"
 #include "audio/SampleSlot.h"
@@ -602,8 +603,7 @@ bool MolderNode::LoadFile(const std::string& path, bool keepGenome)
       return false;
    }
 
-   const size_t slash = path.find_last_of('/');
-   const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   const std::string name = AppPaths::FsPath(path).filename().u8string();
 
    const double sr = decoded->sampleRate;
    std::vector<float> mono(decoded->numFrames, 0.0f);

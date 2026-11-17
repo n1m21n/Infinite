@@ -14,6 +14,7 @@
 #include "nodes/BakeNode.h"
 #include "nodes/ModelSourceNode.h"
 #include "nodes/SculptNode.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -132,8 +133,7 @@ bool RunThreeDFlowTest()
       start = comma == std::string::npos ? list.size() : comma + 1;
       if (path.empty() || path == "1")
          continue;
-      const size_t slash = path.find_last_of('/');
-      const std::string name = path.substr(slash == std::string::npos ? 0 : slash + 1);
+      const std::string name = AppPaths::FsPath(path).filename().u8string();
       printf(" %s\n", name.c_str());
 
       NewPatch();

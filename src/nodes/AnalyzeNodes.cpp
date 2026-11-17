@@ -6,6 +6,7 @@
 #include "dsp/PortableFft.h"
 #endif
 #include "gl3.h"
+#include "platform/AppPaths.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -1333,8 +1334,7 @@ bool AudioFileNode::OpenFromDecoded(const std::string& path, Platform::SampleBuf
    mAudioNode->PushParams(volume, gain, attack, release, loop, monitor, pitch);
    mAudioNode->RequestRestart();
 
-   const size_t slash = path.find_last_of('/');
-   mFileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   mFileName = AppPaths::FsPath(path).filename().u8string();
    mFilePath = path;
    mStatus = "loaded";
    mLoaded = true;

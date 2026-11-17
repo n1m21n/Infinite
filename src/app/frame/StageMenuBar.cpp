@@ -17,6 +17,7 @@
 #include "plugin/engine/HostAudio.h"
 #include "plugin/engine/PluginView.h"
 #include "app/ui/design/BrandLogo.gen.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -282,9 +283,7 @@ void DrawMenuBar(FrameCtx& fc)
                const std::vector<std::string> recents = Patch::Recents();
                for (const std::string& entry : recents)
                {
-                  const size_t slash = entry.find_last_of('/');
-                  const std::string name =
-                     (slash == std::string::npos) ? entry : entry.substr(slash + 1);
+                  const std::string name = AppPaths::FsPath(entry).filename().u8string();
                   if (MenuParts::Item(name.c_str()))
                      GuardUnsavedChanges([entry]() { LoadPatchFrom(entry); });
                }
@@ -308,10 +307,8 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 260.0f);
                if (!gPatchPath.empty())
                {
-                  const size_t slash = gPatchPath.find_last_of('/');
-                  ImGui::TextDisabled("%s", (slash == std::string::npos)
-                                               ? gPatchPath.c_str()
-                                               : gPatchPath.c_str() + slash + 1);
+                  const std::string base = AppPaths::FsPath(gPatchPath).filename().u8string();
+                  ImGui::TextDisabled("%s", base.c_str());
                }
                if (!gPatchStatus.empty())
                   ImGui::TextDisabled("%s", gPatchStatus.c_str());

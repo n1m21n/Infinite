@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include "platform/AppPaths.h"
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -787,8 +788,7 @@ bool PaulStretchNode::LoadFile(const std::string& path)
       return false;
    }
 
-   const size_t slash = path.find_last_of('/');
-   const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   const std::string name = AppPaths::FsPath(path).filename().u8string();
    FinishBuffer(decoded, name, path, "loaded");
    return true;
 }

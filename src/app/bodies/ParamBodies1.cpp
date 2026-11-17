@@ -8,6 +8,7 @@
 #include "app/ui/design/components/StepCell.h"
 #include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -68,10 +69,7 @@ namespace app
       }
       else if (!n->LoadedPath().empty())
       {
-         std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
-         if (slash != std::string::npos)
-            file = file.substr(slash + 1);
+         const std::string file = AppPaths::FsPath(n->LoadedPath()).filename().u8string();
          PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("%s  (%dx%d)", file.c_str(), n->GetOutputWidth(), n->GetOutputHeight());
          PopTextWrapWidth();
@@ -326,10 +324,7 @@ namespace app
       }
       else if (!n->LoadedPath().empty())
       {
-         std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
-         if (slash != std::string::npos)
-            file = file.substr(slash + 1);
+         const std::string file = AppPaths::FsPath(n->LoadedPath()).filename().u8string();
          PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("%s  (%dx%d)", file.c_str(), n->GetOutputWidth(), n->GetOutputHeight());
          PopTextWrapWidth();
@@ -518,10 +513,7 @@ namespace app
       }
       else if (!n->LoadedPath().empty())
       {
-         std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
-         if (slash != std::string::npos)
-            file = file.substr(slash + 1);
+         const std::string file = AppPaths::FsPath(n->LoadedPath()).filename().u8string();
          PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("%s", file.c_str());
          PopTextWrapWidth();

@@ -203,7 +203,7 @@ namespace app
    // reported free.
    std::string DefaultRecordingFileName(const std::string& dir, const std::string& ext = "wav")
    {
-      std::string base = gPatchPath.empty() ? "Untitled" : gPatchPath.substr(gPatchPath.find_last_of('/') + 1);
+      std::string base = gPatchPath.empty() ? "Untitled" : AppPaths::FsPath(gPatchPath).filename().u8string();
       const size_t dot = base.find_last_of('.');
       if (dot != std::string::npos)
          base = base.substr(0, dot);

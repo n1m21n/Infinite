@@ -213,8 +213,8 @@ namespace
          return snap->title;
       if (!snap->cwd.empty())
       {
-         const size_t slash = snap->cwd.find_last_of('/');
-         return slash == std::string::npos || slash + 1 == snap->cwd.size() ? snap->cwd : snap->cwd.substr(slash + 1);
+         const std::string base = AppPaths::FsPath(snap->cwd).filename().u8string();
+         return base.empty() ? snap->cwd : base;
       }
       return "shell";
    }

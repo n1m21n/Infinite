@@ -711,8 +711,8 @@ namespace Platform
       // helper OpenExternalUrl uses - no selection, but the file is at
       // least visible rather than never opened at all. Never hand the file
       // itself to xdg-open here: a reveal must not open or execute it.
-      const size_t slash = path.find_last_of('/');
-      const std::string parentDir = (slash == std::string::npos) ? "." : path.substr(0, slash);
+      const std::string parent = AppPaths::FsPath(path).parent_path().u8string();
+      const std::string parentDir = parent.empty() ? "." : parent;
       pid_t pid;
       char* argv[] = {
          const_cast<char*>("xdg-open"),
@@ -832,7 +832,7 @@ namespace Platform
       out.opener = DesktopExec(id);
       if (out.opener.empty())
          out.opener = id;
-      const std::string name = out.opener.substr(out.opener.find_last_of('/') + 1);
+      const std::string name = AppPaths::FsPath(out.opener).filename().u8string();
       std::string lower = name + " " + id;
       std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return (char)std::tolower(c); });
       out.isSelf = out.opener == out.self;
@@ -920,7 +920,7 @@ namespace Platform
       const std::string self = SelfAppImage();
       if (self.empty())
          whyNot = "Only the AppImage updates itself.";
-      else if (access(self.substr(0, self.find_last_of('/')).c_str(), W_OK) != 0 || access(self.c_str(), W_OK) != 0)
+      else if (access(AppPaths::FsPath(self).parent_path().u8string().c_str(), W_OK) != 0 || access(self.c_str(), W_OK) != 0)
          whyNot = "This account can't write to the folder Infinite is in.";
       return whyNot.empty();
    }
@@ -944,7 +944,7 @@ namespace Platform
          }
       }
       const std::string self = SelfAppImage();
-      const std::string staged = self.substr(0, self.find_last_of('/')) + "/.Infinite-update.AppImage";
+      const std::string staged = (AppPaths::FsPath(self).parent_path() / ".Infinite-update.AppImage").u8string();
       std::error_code ec;
       std::filesystem::remove(staged, ec);
       // Copied (not moved) so it lands on this copy's own filesystem and the final swap is one rename.
@@ -1273,10 +1273,9 @@ namespace Platform
 
    std::string ScannerExecutablePath()
    {
-      std::string exe = ExecutablePath();
-      size_t slash = exe.find_last_of('/');
-      std::string dir = (slash != std::string::npos) ? exe.substr(0, slash) : ".";
-      return dir + "/infinite-vst3-scanner";
+      const std::string exe = ExecutablePath();
+      const std::string dir = AppPaths::FsPath(exe).parent_path().u8string();
+      return (dir.empty() ? std::string(".") : dir) + "/infinite-vst3-scanner";
    }
 
    void SuppressAppUIForHeadlessProcess()
@@ -1294,11 +1293,11 @@ namespace Platform
 
    std::string MattingModelPath()
    {
-      std::string exe = ExecutablePath();
-      size_t slash = exe.find_last_of('/');
-      if (slash == std::string::npos)
+      const std::string exe = ExecutablePath();
+      const std::filesystem::path dir = AppPaths::FsPath(exe).parent_path();
+      if (dir.empty())
          return {};
-      return exe.substr(0, slash + 1) + "assets/models/u2netp.onnx";
+      return (dir / "assets/models/u2netp.onnx").u8string();
    }
 
    bool SubjectMask(const std::vector<unsigned char>& inputRgba, int width, int height,
