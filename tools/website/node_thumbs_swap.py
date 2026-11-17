@@ -14,6 +14,13 @@ from PIL import Image
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MIN_W = 250
+PLAN = os.path.join(ROOT, "docs", "release", "shot-plan-2.0.json")
+
+
+def plan_ids(plan):
+    shots = plan["shots"]
+    vals = shots.values() if isinstance(shots, dict) else shots
+    return [v.get("id", "") for v in vals]
 
 
 def main():
@@ -21,18 +28,27 @@ def main():
     ap.add_argument("--scratch", required=True)
     ap.add_argument("--swap", action="store_true")
     ap.add_argument("--expect", type=int, default=372)
+    ap.add_argument("--manifest", default=os.path.join(ROOT, "docs", "shots", "manifest.json"),
+                    help="the manifest the shots were written to (its raw paths are relative to its own worktree)")
     a = ap.parse_args()
-    man = json.load(open(os.path.join(ROOT, "docs", "shots", "manifest.json")))
+    mroot = os.path.abspath(os.path.join(os.path.dirname(a.manifest), "..", ".."))
+    man = json.load(open(a.manifest))
+    # The plan's spawnable nodes are the authority; manifest extras (selection-only types) are ignored.
+    plan = json.load(open(PLAN))
+    want = {sid.split("/", 2)[2].rsplit("/", 1)[0] for sid in plan_ids(plan) if sid.startswith("node/") and sid.endswith("/c")}
     rows = {}
     for sid, e in man["shots"].items():
-        if e.get("kind") == "node" and e.get("state") == "c":
+        if e.get("kind") == "node" and e.get("state") == "c" and e.get("name") in want:
             rows[e["name"]] = e
+    missing = sorted(want - set(rows))
+    if missing:
+        print("missing closed shots for plan nodes:", missing)
     if os.path.isdir(a.scratch) and os.listdir(a.scratch):
         sys.exit("scratch folder must be empty: " + a.scratch)
     os.makedirs(a.scratch, exist_ok=True)
     widths, bad = [], []
     for name, e in sorted(rows.items()):
-        src = os.path.join(ROOT, e["raw"])
+        src = os.path.join(mroot, e["raw"])
         if not os.path.exists(src):
             bad.append((name, "missing raw")); continue
         w, h = Image.open(src).size
