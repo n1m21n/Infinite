@@ -23,7 +23,7 @@ ALLOW = {"src/app/ui/design/", "src/app/selftest/UiAudit.cpp"}  # components the
 def counts(rx=RX, allow=None):
     allow = ALLOW if allow is None else allow
     out = {}
-    for base in ("src/app", "src/arrange"):
+    for base in ("src/app", "src/arrange", "src/nodes"):
         for f in sorted((ROOT / base).rglob("*")):
             if f.suffix not in (".cpp", ".h", ".mm"): continue
             rel = str(f.relative_to(ROOT))
