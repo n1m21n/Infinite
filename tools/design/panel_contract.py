@@ -38,7 +38,7 @@ def gate_for(letter):
 
 def main():
     bad = 0
-    print(f"{'panel':<14} {'title':<6} {'pages':<6} {'fields':<6} {'dock':<5} {'keys':<5} shift-clash")
+    print(f"{'panel':<14} {'title':<6} {'pages':<6} {'fields':<6} {'card':<5} {'dock':<5} {'keys':<5} shift-clash")
     for name, files, claim, paged, headers in SPEC:
         src = "\n".join((PANELS / f).read_text() for f in files if (PANELS / f).exists())
         # 1: the panel name drawn as text (floating window titles and menus are fine)
@@ -46,6 +46,7 @@ def main():
         title = re.search(r'(TextUnformatted|[^:]Text|AddText)\([^;]*T\("' + re.escape(name) + r'"\)', src)
         pages = "PagePicker::Draw" in src
         fields = all("pageName" in (ROOT / h).read_text() and "pageColor" in (ROOT / h).read_text() for h in headers) if headers else None
+        card = "PushDockedPanelStyle" in src
         dock = bool(re.search(r"Dock(Menu|Labels)|##\w*[Dd]ock\w*[Mm]enu", src))
         keys = claim in src and claim in KEYS
         # 8: panel handlers that take Shift+<app letter> without the app gating that key for the panel
@@ -64,10 +65,10 @@ def main():
                 if shift_on and not cmd_on:
                     clash.append(letter)
                     break
-        row_bad = bool(title) or (paged and not pages) or (fields is False) or not keys or bool(clash)
+        row_bad = bool(title) or (paged and not pages) or (fields is False) or not card or not keys or bool(clash)
         bad += row_bad
         yn = lambda v: "-" if v is None else ("yes" if v else "NO")
-        print(f"{name:<14} {'NO' if title else 'ok':<6} {yn(pages) if paged else '-':<6} {yn(fields):<6} {yn(dock):<5} {yn(keys):<5} "
+        print(f"{name:<14} {'NO' if title else 'ok':<6} {yn(pages) if paged else '-':<6} {yn(fields):<6} {yn(card):<5} {yn(dock):<5} {yn(keys):<5} "
               f"{','.join('Shift+' + c for c in clash) or 'ok'}")
     # 9: canvas-only keys stay off while any panel has the keys
     for letter in ("H", "Y"):

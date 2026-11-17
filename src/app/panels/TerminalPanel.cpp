@@ -1141,7 +1141,9 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
       case 2: in.r = 0.0f; break;
       default: in.b = 0.0f; break;
    }
+   PushDockedPanelStyle(/*isChild=*/true);
    PanelFrame::BeginCard("##terminalcontent", cardSize, in);
+   PopDockedPanelStyle();
    const auto drawStart = std::chrono::steady_clock::now();
    DrawPanel();
    const double drawn = std::chrono::duration<double>(std::chrono::steady_clock::now() - drawStart).count();

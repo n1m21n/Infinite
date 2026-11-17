@@ -1827,7 +1827,9 @@ void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
       in.t = 0.0f;
    else
       in.b = 0.0f;
+   PushDockedPanelStyle(/*isChild=*/true);
    PanelFrame::BeginCard("##fpcontent", cardSize, in, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+   PopDockedPanelStyle();
    DrawPanel();
    PanelFrame::EndCard();
    if (!gripFirst && !gFieldPatcherMaximised)

@@ -3694,7 +3694,9 @@ void DrawPianoRollDocked(const char* id, const ImVec2& size)
    }
    else
       in.b = 0.0f;
+   PushDockedPanelStyle(/*isChild=*/true);
    PanelFrame::BeginCard("##pianopanelcontent", cardSize, in);
+   PopDockedPanelStyle();
    DrawPanel();
    PanelFrame::EndCard();
    if (!gripFirst)
