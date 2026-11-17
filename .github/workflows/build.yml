@@ -157,6 +157,18 @@ jobs:
         continue-on-error: true
         run: python3 tools/render-check.py --binary build/Infinite.app/Contents/MacOS/Infinite
 
+      - name: UI gallery goldens (informational)
+        continue-on-error: true
+        run: python3 tools/design/golden.py --binary build/Infinite.app/Contents/MacOS/Infinite --render-out artifacts-macos/ui-golden
+
+      - name: Upload macOS UI golden artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-golden-macos
+          path: artifacts-macos/ui-golden
+          if-no-files-found: ignore
+
   windows:
     name: Windows (${{ matrix.arch }})
     needs: detect
@@ -289,6 +301,21 @@ jobs:
         timeout-minutes: 2
         shell: bash
         run: python3 tools/render-check.py --binary build/Release/Infinite.exe
+
+      - name: UI gallery goldens (informational)
+        if: matrix.arch == 'x64'
+        continue-on-error: true
+        timeout-minutes: 2
+        shell: bash
+        run: python3 tools/design/golden.py --binary build/Release/Infinite.exe --render-out artifacts-windows/ui-golden
+
+      - name: Upload Windows UI golden artifacts
+        if: always() && matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-golden-windows
+          path: artifacts-windows/ui-golden
+          if-no-files-found: ignore
 
       # The exe is handed to people as a single portable file, so it must not
       # import the Visual C++ redistributable's CRT - a /MD build dies at
@@ -587,6 +614,18 @@ jobs:
       - name: Render goldens (Xvfb)
         if: matrix.compiler == 'clang'
         run: xvfb-run -a python3 tools/render-check.py --binary build-linux/Infinite
+
+      - name: UI gallery goldens (Xvfb)
+        if: matrix.compiler == 'clang'
+        run: xvfb-run -a python3 tools/design/golden.py --binary build-linux/Infinite --render-out artifacts-linux/ui-golden
+
+      - name: Upload Linux UI golden artifacts
+        if: always() && matrix.compiler == 'clang'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-golden-linux
+          path: artifacts-linux/ui-golden
+          if-no-files-found: ignore
 
       # media group carries VST3SCANTEST / VST3EDITORSHOTTEST /
       # VST3BLOCKLISTTEST (task 4.4) plus the pre-existing plugin/media drag
