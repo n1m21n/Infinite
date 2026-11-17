@@ -1,3 +1,4 @@
+#include <set>
 // Per-frame modulation + palette application (runtime code that sat among the fixtures in main.cpp).
 #include "app/graph/LearningLog.h"
 #include "app/AppShared.h"
@@ -205,10 +206,18 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // without depending on the order params happened to draw in - and it
    // means a cycle between two expressions just settles a frame late
    // rather than reading half-updated state mid-pass.
+   // Only nodes that carry an expression are snapshotted: nothing else reads the
+   // snapshot, and the common patch has none, so it costs no allocation at all.
    std::map<int, std::map<std::string, float>> paramSnapshot;
-   for (const ParamRef& ref : modulation.FrameParams())
-      if (ref.value != nullptr)
-         paramSnapshot[ref.nodeIndex][ref.name] = *ref.value;
+   if (!modulation.Expressions().empty())
+   {
+      std::set<int> exprNodes;
+      for (const auto& e : modulation.Expressions())
+         exprNodes.insert(e.first.first);
+      for (const ParamRef& ref : modulation.FrameParams())
+         if (ref.value != nullptr && exprNodes.count(ref.nodeIndex) != 0)
+            paramSnapshot[ref.nodeIndex][ref.name] = *ref.value;
+   }
 
    // Fixture only: put one envelope field into the expression state, so
    // the UI fixture also covers the fx badge and the clear button - the
