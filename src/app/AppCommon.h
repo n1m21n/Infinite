@@ -27,7 +27,6 @@
 // cursor/selection state explicitly once the field is confirmed active.
 #include "imgui_internal.h"
 #include <cstdarg>
-#include "TablerIcons.h"
 
 #include "stb_image_write.h"
 #include "stb_image.h"
@@ -45,7 +44,6 @@
 #include <sys/stat.h>
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
-#include "IconsLucide.h"
 #include "core/SysInfo.h"
 #include "core/BenchReport.h"
 #include "core/BenchFrameTail.h"

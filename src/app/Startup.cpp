@@ -117,7 +117,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    }
    if (uiFont == nullptr)
       io.Fonts->AddFontDefault();
-   // Every weight is its own ImFont, so each carries the same merged stack: CJK, Lucide, Infinite Glyphs.
+   // Every weight is its own ImFont, so each carries the same merged stack: CJK, Infinite Glyphs.
    auto mergeExtras = [&]()
    {
       // CJK: Inter has no Han/kana, so a subsetted Noto face is merged for exactly the glyphs the
@@ -137,33 +137,9 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
             io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg);
          }
       }
-      // Merge a small slice of the Lucide icon font (external/icons/Lucide,
-      // ISC license) into the same atlas at PUA codepoints, so icon glyphs
-      // can be dropped into ordinary ImGui::Text/Button calls alongside UI
-      // text (see IconsLucide.h). MergeMode=true means it rides the same
-      // baseline/line-height as the font just loaded rather than becoming a
-      // separate selectable font - the standard ImGui icon-font idiom.
-      // Restricted to one explicit range (currently just the "search" glyph,
-      // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
-      // pays texture memory for glyphs actually in use.
-      if (true)
-      {
-         const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
-         if (!bundledLucide.empty())
-         {
-            static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
-            ImFontConfig iconCfg;
-            iconCfg.MergeMode = true;
-            iconCfg.PixelSnapH = true;
-            iconCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
-#ifndef NDEBUG
-            iconCfg.SizePixels = UiScale::kBaseFontSize; // Debug ImGui asserts a reference size beside GlyphMinAdvanceX
-#endif
-            io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
-         }
-      }
-      // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged the
-      // same way as Lucide above. Codepoints come from the generated Glyphs.gen.h.
+      // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged into
+      // the same atlas at PUA codepoints with MergeMode=true so glyphs ride the same baseline/line-height
+      // as the UI text. Codepoints come from the generated Glyphs.gen.h.
       if (true)
       {
          const std::string bundledGlyphs = BundledResourcePath("icons/infinite-glyphs.ttf");
