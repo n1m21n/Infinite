@@ -1421,7 +1421,8 @@ Try: hover the node and play a melody with the Z, X and C keys.
 Chain: Keyboard -> Analog -> Audio Out
 
 ## New Compositing, 3D & Mesh Tools
-The visual side of v0.6: motion analysis, fluid and fog, physics, plants from text, and the primitives and mesh operators earlier editions of this guide missed.
+)AGENTDOC"
+R"AGENTDOC(The visual side of v0.6: motion analysis, fluid and fog, physics, plants from text, and the primitives and mesh operators earlier editions of this guide missed.
 
 ### Optical Flow
 COMPOSITING · IMAGE IN/OUT. How far each part of the picture moved since the last frame, as a vector per pixel (red and green carry x and y, blue is speed). Pyramidal Lucas-Kanade on the GPU. View Colour shows direction as hue and speed as brightness.
@@ -1429,8 +1430,7 @@ Try: displace a second picture along the motion of a video.
 Chain: Video -> Optical Flow -> Displace
 
 ### Time Machine
-)AGENTDOC"
-R"AGENTDOC(COMPOSITING · IMAGE IN/OUT. Shows each pixel from a different moment: it keeps the last frames and a grey map (the second input) says how far back every pixel looks. A left-to-right ramp, the default, gives a slit-scan. Length sets how many frames are kept, up to 60.
+COMPOSITING · IMAGE IN/OUT. Shows each pixel from a different moment: it keeps the last frames and a grey map (the second input) says how far back every pixel looks. A left-to-right ramp, the default, gives a slit-scan. Length sets how many frames are kept, up to 60.
 Try: feed it a radial gradient so the middle of the picture lags behind the edges.
 Chain: Video -> Time Machine -> Output
 
@@ -1500,8 +1500,7 @@ Try: project a Cylinder map onto a vase so the pattern wraps around it.
 Chain: Sphere -> UV Project -> Render 3D
 
 ### Bevel
-)AGENTDOC"
-R"AGENTDOC(3D · GEOMETRY OUT. Rounds or chamfers every sharp edge above the sharp angle. Width is the bevel size; one segment gives a flat chamfer and more give a smooth round.
+3D · GEOMETRY OUT. Rounds or chamfers every sharp edge above the sharp angle. Width is the bevel size; one segment gives a flat chamfer and more give a smooth round.
 Try: bevel a box so its edges catch highlights.
 Chain: Cube -> Bevel -> Render 3D
 
@@ -1637,7 +1636,8 @@ Chain: Image Source -> Displace -> Output
 
 ### Unsharp Mask
 PICTURE · EFFECT. Sharpens by adding back the difference between the picture and a blurred copy, which exaggerates the edges. Amount is the strength, Radius the width of edges it reacts to.
-Try: raise Amount to 1.5 on a soft photo.
+)AGENTDOC"
+R"AGENTDOC(Try: raise Amount to 1.5 on a soft photo.
 Chain: Image Source -> Unsharp Mask -> Output
 
 ### Add Noise
@@ -1648,8 +1648,7 @@ Chain: Image Source -> Add Noise -> Output
 ### Lens Distortion
 PICTURE · EFFECT. Simulates a camera lens. Barrel bows the picture in or out, Chromatic splits the colours for fringing, and Zoom scales the result.
 Try: set Barrel slightly negative and Chromatic small for a wide-angle lens.
-)AGENTDOC"
-R"AGENTDOC(Chain: Image Source -> Lens Distortion -> Output
+Chain: Image Source -> Lens Distortion -> Output
 
 ### Convolve
 PICTURE · EFFECT. A 3 by 3 grid of numbers that defines a filter. Blur, sharpen and edge detection are all just different grids; Mix blends the result with the original.
@@ -2710,8 +2709,8 @@ prints the open patch, the selection and any code errors in one answer.
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
-| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings`, `show`, `view`, `quit` |
-| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>` |
+| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings [key [value]]`, `settings devices\|midi\|apply\|updates\|reset\|logs\|gpu [n]\|global [name [expr]]\|extension <file>`, `show list\|next\|prev\|go <n>\|lock\|panic\|check\|add\|remove <n>\|clear\|open\|save\|fade <ms>\|quantize <n>\|launch <n>`, `view fit\|params on\|off\|clearcards\|metronome [on\|off]`, `quit` |
+| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>`, `version` |
 | Watch | `watch` prints a JSON line for each change |
 | Terminal | `term open`, `list`, `read`, `send`, `run` |
 
@@ -2735,15 +2734,15 @@ node <index> <category> <type name>
   id <word>                 optional name you can use instead of the index
   f <key> <float>           a number
   i <key> <int or option>   a whole number or dropdown choice (i shapeType Star)
-  b <key> <0 or 1>          on/off
+)AGENTDOC"
+R"AGENTDOC(  b <key> <0 or 1>          on/off
   c <key> <r> <g> <b>       a colour, each 0 to 1
   s <key> <text>            text, to the end of the line
 end
 cable <dst> <slot> <src>    image wire
 geo   <dst> <slot> <src>    geometry, camera or light wire
 aud   <dst> <slot> <src>    audio wire
-)AGENTDOC"
-R"AGENTDOC(note  <dst> <slot> <src>    note wire
+note  <dst> <slot> <src>    note wire
 mod   <dst> <key> <src> <srcOutput> <polarity> <depth> <centre> [<lo> <hi>]
 expr  <dst> <key> <expression>
 glob  <name> <expression>
