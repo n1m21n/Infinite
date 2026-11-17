@@ -188,7 +188,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::dropdown_active, isLight));
       ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::dropdown_text, isLight));
       ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
@@ -245,7 +245,7 @@ namespace app
       // pushing this unconditionally is harmless for them - kept
       // unconditional (rather than gated on isChild) so the push/pop count
       // here stays a fixed constant regardless of which path runs.
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, isChild ? ImGui::GetStyle().WindowRounding : 12.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, isChild ? ImGui::GetStyle().WindowRounding : tok::radius_container);
    }
 
 

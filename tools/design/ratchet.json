@@ -85,5 +85,6 @@
   "src/app/ui/design/components/TransportDisplay.h": 1,
   "src/app/ui/design/components/VFader.h": 3
  },
- "font_scales": {}
+ "font_scales": {},
+ "roundings": {}
 }

@@ -875,7 +875,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? tok::V4(tok::palf::v_200_550_950_1000) : tok::V4(tok::palf::v_550_820_1000_1000));
       ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
@@ -939,7 +939,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, isLight ? tok::V4(tok::palf::v_140_450_850_1000) : tok::V4(tok::palf::v_700_900_1000_1000));
       ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 

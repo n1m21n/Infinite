@@ -283,7 +283,7 @@ namespace FormParts
    }
 
    // Hairline outline on a floating window; call just before ImGui::End().
-   inline void WindowEdge(float rounding = 12.0f)
+   inline void WindowEdge(float rounding = tok::radius_container)
    {
       const ImVec2 p = ImGui::GetWindowPos(), z = ImGui::GetWindowSize();
       ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x + 0.5f, p.y + 0.5f), ImVec2(p.x + z.x - 0.5f, p.y + z.y - 0.5f),

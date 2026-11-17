@@ -188,7 +188,7 @@ void DrawNodeBodies(FrameCtx& fc)
             ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
             ed::PushStyleVar(ed::StyleVar_NodePadding, ImVec4(0, 0, 0, 0));
             ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 0.0f);
-            ed::PushStyleVar(ed::StyleVar_NodeRounding, 6.0f);
+            ed::PushStyleVar(ed::StyleVar_NodeRounding, tok::radius_control);
          }
          else
          {
