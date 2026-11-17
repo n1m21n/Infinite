@@ -5039,7 +5039,7 @@ namespace app
          // A paste that attaches takes the key, so the field does not also paste a file's name.
          static bool sInputWasActive = false;
          const ImGuiIO& io = ImGui::GetIO();
-         if (sInputWasActive && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && PasteAttachments())
+         if (sInputWasActive && (io.KeyCtrl || io.KeySuper) && ImGui::IsKeyPressed(ImGuiKey_V, false) && PasteAttachments())
             ImGui::SetKeyOwner(ImGuiKey_V, ImGui::GetID("##chatpaste"), ImGuiInputFlags_LockThisFrame);
          const ImGuiInputTextFlags flags = ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_EnterReturnsTrue |
                                            ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion;

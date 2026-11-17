@@ -878,7 +878,7 @@ namespace app
       { I18N_KEY("Chat"), I18N_KEY("Pick @ or /"), "Up / Down, Return", I18N_KEY("Move through the node or command list, then take the highlighted one. Esc closes it") },
       { I18N_KEY("Chat"), I18N_KEY("Attach from Clipboard"), MODKEY "+V", I18N_KEY("Paste copied files or a copied picture into the message; copied text still pastes as text") },
       { I18N_KEY("Chat"), I18N_KEY("Close Picture"), "Esc", I18N_KEY("Close a picture opened full size") },
-      { I18N_KEY("Chat"), I18N_KEY("Copy / Clear Selection"), "Ctrl+C / Esc", I18N_KEY("Copy the selected words of a message, or drop the selection") },
+      { I18N_KEY("Chat"), I18N_KEY("Copy / Clear Selection"), MODKEY "+C / Esc", I18N_KEY("Copy the selected words of a message, or drop the selection") },
    };
 
    // The table as plain text for the agents (`infinite docs shortcuts`), English, this OS's keys.
