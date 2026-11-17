@@ -261,9 +261,9 @@ void Scene2DNode::StopUniforms(unsigned prog, const std::vector<GradStop>& st, f
       for (int k = 0; k < 4; k++)
          c[i * 4 + k] = conv != nullptr && k < 3 ? conv(st[(size_t)i].c[k], lin) : st[(size_t)i].c[k];
    }
-   glUniform1i(glGetUniformLocation(prog, "uStopN"), n);
-   glUniform1fv(glGetUniformLocation(prog, "uStopT"), kMaxStops, t);
-   glUniform4fv(glGetUniformLocation(prog, "uStopC"), kMaxStops, c);
+   glUniform1i(GLUtil::UniformLoc(prog, "uStopN"), n);
+   glUniform1fv(GLUtil::UniformLoc(prog, "uStopT"), kMaxStops, t);
+   glUniform4fv(GLUtil::UniformLoc(prog, "uStopC"), kMaxStops, c);
 }
 
 void Scene2DNode::CurveLut(const std::vector<float>& pts, float* lut, int n)
@@ -2261,74 +2261,74 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
                        a.gamma == 1.0f;
    const auto setup = [&]()
    {
-      glUniform1i(glGetUniformLocation(prog, "uDirect"), direct ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uDirect"), direct ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, direct ? 0u : acc);
-      glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uAcc"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, a.tex);
-      glUniform1i(glGetUniformLocation(prog, "uTex"), 1);
+      glUniform1i(GLUtil::UniformLoc(prog, "uTex"), 1);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, a.mask);
-      glUniform1i(glGetUniformLocation(prog, "uMask"), 2);
+      glUniform1i(GLUtil::UniformLoc(prog, "uMask"), 2);
       glActiveTexture(GL_TEXTURE3);
       glBindTexture(GL_TEXTURE_2D, a.pmask);
-      glUniform1i(glGetUniformLocation(prog, "uPMask"), 3);
-      glUniform1i(glGetUniformLocation(prog, "uHasPMask"), a.pmask != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uPMask"), 3);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasPMask"), a.pmask != 0 ? 1 : 0);
       glActiveTexture(GL_TEXTURE4);
       glBindTexture(GL_TEXTURE_2D, a.vmask);
-      glUniform1i(glGetUniformLocation(prog, "uVMask"), 4);
-      glUniform1i(glGetUniformLocation(prog, "uHasVMask"), a.vmask != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uVMask"), 4);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasVMask"), a.vmask != 0 ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
-      glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
-      glUniform3f(glGetUniformLocation(prog, "uInvA"), a.inv[0], a.inv[1], a.inv[2]);
-      glUniform3f(glGetUniformLocation(prog, "uInvB"), a.inv[3], a.inv[4], a.inv[5]);
-      glUniform3f(glGetUniformLocation(prog, "uInvC"), a.inv[6], a.inv[7], a.inv[8]);
-      glUniform1i(glGetUniformLocation(prog, "uDepthMode"), depthMode);
+      glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
+      glUniform3f(GLUtil::UniformLoc(prog, "uInvA"), a.inv[0], a.inv[1], a.inv[2]);
+      glUniform3f(GLUtil::UniformLoc(prog, "uInvB"), a.inv[3], a.inv[4], a.inv[5]);
+      glUniform3f(GLUtil::UniformLoc(prog, "uInvC"), a.inv[6], a.inv[7], a.inv[8]);
+      glUniform1i(GLUtil::UniformLoc(prog, "uDepthMode"), depthMode);
       glActiveTexture(GL_TEXTURE6);
       glBindTexture(GL_TEXTURE_2D, a.geoDepth);
-      glUniform1i(glGetUniformLocation(prog, "uGeoDepth"), 6);
-      glUniform1i(glGetUniformLocation(prog, "uHasGeoDepth"), a.geoDepth != 0 ? 1 : 0);
-      glUniform2f(glGetUniformLocation(prog, "uGeoNF"), a.geoNF[0], a.geoNF[1]);
-      glUniform4f(glGetUniformLocation(prog, "uGeoUv"), a.geoUv[0], a.geoUv[1], a.geoUv[2], a.geoUv[3]);
+      glUniform1i(GLUtil::UniformLoc(prog, "uGeoDepth"), 6);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasGeoDepth"), a.geoDepth != 0 ? 1 : 0);
+      glUniform2f(GLUtil::UniformLoc(prog, "uGeoNF"), a.geoNF[0], a.geoNF[1]);
+      glUniform4f(GLUtil::UniformLoc(prog, "uGeoUv"), a.geoUv[0], a.geoUv[1], a.geoUv[2], a.geoUv[3]);
       glActiveTexture(GL_TEXTURE0);
       if (depthMode != 0)
       {
          glActiveTexture(GL_TEXTURE5);
          glBindTexture(GL_TEXTURE_2D, mDepth[depth].tex[p.cur]);
-         glUniform1i(glGetUniformLocation(prog, "uDepthIn"), 5);
+         glUniform1i(GLUtil::UniformLoc(prog, "uDepthIn"), 5);
          glActiveTexture(GL_TEXTURE0);
          const GLenum bufs[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
          glDrawBuffers(2, bufs);
       }
-      glUniform1i(glGetUniformLocation(prog, "uBif"), a.bif != nullptr ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uBif"), a.bif != nullptr ? 1 : 0);
       if (a.bif != nullptr)
       {
-         glUniform4fv(glGetUniformLocation(prog, "uBifT"), 1, a.bif->bifT);
-         glUniform4fv(glGetUniformLocation(prog, "uBifU"), 1, a.bif->bifU);
+         glUniform4fv(GLUtil::UniformLoc(prog, "uBifT"), 1, a.bif->bifT);
+         glUniform4fv(GLUtil::UniformLoc(prog, "uBifU"), 1, a.bif->bifU);
       }
-      glUniform2f(glGetUniformLocation(prog, "uBox"), std::max(1e-3f, a.box[0]), std::max(1e-3f, a.box[1]));
-      glUniform4f(glGetUniformLocation(prog, "uCrop"), a.crop[0], a.crop[1], a.crop[2], a.crop[3]);
-      glUniform2f(glGetUniformLocation(prog, "uTexSize"), (float)std::max(1, a.texW), (float)std::max(1, a.texH));
-      glUniform1i(glGetUniformLocation(prog, "uKind"), a.kind);
-      glUniform1i(glGetUniformLocation(prog, "uMode"), a.blend);
-      glUniform1i(glGetUniformLocation(prog, "uClip"), a.clipMode ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uNearest"), a.nearest ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uSrgb"), a.srgb ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uHasMask"), a.mask != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uMaskChan"), a.maskChannel);
-      glUniform1i(glGetUniformLocation(prog, "uMaskInv"), a.maskInvert ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uHead"), mDoc.headroom ? 1 : 0);
-      glUniform1f(glGetUniformLocation(prog, "uOpacity"), std::clamp(a.opacity, 0.0f, 1.0f));
-      glUniform1f(glGetUniformLocation(prog, "uMaskDensity"), std::clamp(a.maskDensity, 0.0f, 1.0f));
-      glUniform1f(glGetUniformLocation(prog, "uGamma"), std::clamp(a.gamma, 0.05f, 5.0f));
-      glUniform1f(glGetUniformLocation(prog, "uFillNoise"), a.fill != nullptr ? std::clamp(a.fill->fillNoise, 0.0f, 1.0f) : 0.0f);
+      glUniform2f(GLUtil::UniformLoc(prog, "uBox"), std::max(1e-3f, a.box[0]), std::max(1e-3f, a.box[1]));
+      glUniform4f(GLUtil::UniformLoc(prog, "uCrop"), a.crop[0], a.crop[1], a.crop[2], a.crop[3]);
+      glUniform2f(GLUtil::UniformLoc(prog, "uTexSize"), (float)std::max(1, a.texW), (float)std::max(1, a.texH));
+      glUniform1i(GLUtil::UniformLoc(prog, "uKind"), a.kind);
+      glUniform1i(GLUtil::UniformLoc(prog, "uMode"), a.blend);
+      glUniform1i(GLUtil::UniformLoc(prog, "uClip"), a.clipMode ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uNearest"), a.nearest ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSrgb"), a.srgb ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasMask"), a.mask != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uMaskChan"), a.maskChannel);
+      glUniform1i(GLUtil::UniformLoc(prog, "uMaskInv"), a.maskInvert ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHead"), mDoc.headroom ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(prog, "uOpacity"), std::clamp(a.opacity, 0.0f, 1.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uMaskDensity"), std::clamp(a.maskDensity, 0.0f, 1.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uGamma"), std::clamp(a.gamma, 0.05f, 5.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uFillNoise"), a.fill != nullptr ? std::clamp(a.fill->fillNoise, 0.0f, 1.0f) : 0.0f);
       if (a.fill != nullptr)
       {
-         glUniform4fv(glGetUniformLocation(prog, "uColA"), 1, a.fill->colorA);
-         glUniform4fv(glGetUniformLocation(prog, "uColB"), 1, a.fill->colorB);
-         glUniform1f(glGetUniformLocation(prog, "uFillAngle"), a.fill->fillAngle);
+         glUniform4fv(GLUtil::UniformLoc(prog, "uColA"), 1, a.fill->colorA);
+         glUniform4fv(GLUtil::UniformLoc(prog, "uColB"), 1, a.fill->colorB);
+         glUniform1f(GLUtil::UniformLoc(prog, "uFillAngle"), a.fill->fillAngle);
       }
       StopUniforms(prog, a.fill != nullptr ? a.fill->stops : std::vector<GradStop>());
    };
@@ -2450,8 +2450,13 @@ bool Scene2DNode::Batchable(int depth, const PassArgs& a) const
           a.blend != BlendModes::kEraseMode && a.blend != BlendModes::kAntiEraseMode;
 }
 
+// The batch shader's sampler names, built once (they were a heap string per layer per flush).
+static const char* const kBatchSamplerNames[15] = { "uT0", "uT1", "uT2", "uT3", "uT4", "uT5", "uT6", "uT7",
+                                                    "uT8", "uT9", "uT10", "uT11", "uT12", "uT13", "uT14" };
+
 void Scene2DNode::FlushQueue()
 {
+   static_assert(kBatch == 15, "kBatchSamplerNames covers kBatch samplers");
    if (mQueue.empty())
       return;
    std::vector<PassArgs> q;
@@ -2505,29 +2510,29 @@ void Scene2DNode::FlushQueue()
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, acc);
-      glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uAcc"), 0);
       for (int k = 0; k < n; k++)
       {
          glActiveTexture(GL_TEXTURE1 + k);
          glBindTexture(GL_TEXTURE_2D, q[k].tex);
-         glUniform1i(glGetUniformLocation(prog, ("uT" + std::to_string(k)).c_str()), 1 + k);
+         glUniform1i(GLUtil::UniformLoc(prog, kBatchSamplerNames[k]), 1 + k);
       }
       glActiveTexture(GL_TEXTURE0);
-      glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
-      glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uHead"), mDoc.headroom ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uCount"), n);
-      glUniform3fv(glGetUniformLocation(prog, "uInvA"), n, inv[0]);
-      glUniform3fv(glGetUniformLocation(prog, "uInvB"), n, inv[1]);
-      glUniform3fv(glGetUniformLocation(prog, "uInvC"), n, inv[2]);
-      glUniform2fv(glGetUniformLocation(prog, "uBox"), n, box);
-      glUniform4fv(glGetUniformLocation(prog, "uCrop"), n, crop);
-      glUniform4fv(glGetUniformLocation(prog, "uRect"), n, rect);
-      glUniform2fv(glGetUniformLocation(prog, "uTexSize"), n, ts);
-      glUniform1fv(glGetUniformLocation(prog, "uOpacity"), n, op);
-      glUniform1iv(glGetUniformLocation(prog, "uMode"), n, mode);
-      glUniform1iv(glGetUniformLocation(prog, "uNearest"), n, nearest);
-      glUniform1iv(glGetUniformLocation(prog, "uSrgb"), n, srgb);
+      glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
+      glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHead"), mDoc.headroom ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uCount"), n);
+      glUniform3fv(GLUtil::UniformLoc(prog, "uInvA"), n, inv[0]);
+      glUniform3fv(GLUtil::UniformLoc(prog, "uInvB"), n, inv[1]);
+      glUniform3fv(GLUtil::UniformLoc(prog, "uInvC"), n, inv[2]);
+      glUniform2fv(GLUtil::UniformLoc(prog, "uBox"), n, box);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uCrop"), n, crop);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uRect"), n, rect);
+      glUniform2fv(GLUtil::UniformLoc(prog, "uTexSize"), n, ts);
+      glUniform1fv(GLUtil::UniformLoc(prog, "uOpacity"), n, op);
+      glUniform1iv(GLUtil::UniformLoc(prog, "uMode"), n, mode);
+      glUniform1iv(GLUtil::UniformLoc(prog, "uNearest"), n, nearest);
+      glUniform1iv(GLUtil::UniformLoc(prog, "uSrgb"), n, srgb);
    };
    // The part of the frame any of them can touch (a layer with no rect touches all of it).
    extern bool gScene2DBounds;
@@ -2913,11 +2918,11 @@ unsigned Scene2DNode::ShadeRelief(const Layer& l, unsigned tex, int w, int h)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, tex);
-      glUniform1i(glGetUniformLocation(prog, "uSurf"), 0);
-      glUniform2f(glGetUniformLocation(prog, "uTexel"), 1.0f / w, 1.0f / h);
-      glUniform3f(glGetUniformLocation(prog, "uLight"), std::cos(el) * std::cos(az), std::cos(el) * std::sin(az), std::sin(el));
-      glUniform1f(glGetUniformLocation(prog, "uDepth"), std::max(0.0f, l.reliefDepth));
-      glUniform1i(glGetUniformLocation(prog, "uMat"), std::clamp(l.reliefMat, 0, 3));
+      glUniform1i(GLUtil::UniformLoc(prog, "uSurf"), 0);
+      glUniform2f(GLUtil::UniformLoc(prog, "uTexel"), 1.0f / w, 1.0f / h);
+      glUniform3f(GLUtil::UniformLoc(prog, "uLight"), std::cos(el) * std::cos(az), std::cos(el) * std::sin(az), std::sin(el));
+      glUniform1f(GLUtil::UniformLoc(prog, "uDepth"), std::max(0.0f, l.reliefDepth));
+      glUniform1i(GLUtil::UniformLoc(prog, "uMat"), std::clamp(l.reliefMat, 0, 3));
    });
    if (blendOn)
       glEnable(GL_BLEND);
@@ -2942,37 +2947,37 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, src);
-      glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
-      glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
-      glUniform1i(glGetUniformLocation(prog, "uType"), l.adjType);
-      glUniform1f(glGetUniformLocation(prog, "uAmt"), AdjAmount(l));
-      glUniform1i(glGetUniformLocation(prog, "uMap"), l.adjMap ? 1 : 0);
-      glUniform4fv(glGetUniformLocation(prog, "uColA"), 1, l.colorA);
-      glUniform4fv(glGetUniformLocation(prog, "uColB"), 1, l.colorB);
-      glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
-      glUniform4fv(glGetUniformLocation(prog, "uLevels"), 1, l.levels);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSrc"), 0);
+      glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
+      glUniform1i(GLUtil::UniformLoc(prog, "uType"), l.adjType);
+      glUniform1f(GLUtil::UniformLoc(prog, "uAmt"), AdjAmount(l));
+      glUniform1i(GLUtil::UniformLoc(prog, "uMap"), l.adjMap ? 1 : 0);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uColA"), 1, l.colorA);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uColB"), 1, l.colorB);
+      glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uLevels"), 1, l.levels);
       float lut[64];
       CurveLut(l.curve, lut, 64);
-      glUniform1fv(glGetUniformLocation(prog, "uLut"), 64, lut);
+      glUniform1fv(GLUtil::UniformLoc(prog, "uLut"), 64, lut);
       float lutC[192];
       for (int ch = 0; ch < 3; ch++)
          CurveLut(l.curveCh[ch], lutC + ch * 64, 64);
-      glUniform1fv(glGetUniformLocation(prog, "uLutC"), 192, lutC);
-      glUniform4fv(glGetUniformLocation(prog, "uLvCh"), 3, &l.levelsCh[0][0]);
+      glUniform1fv(GLUtil::UniformLoc(prog, "uLutC"), 192, lutC);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uLvCh"), 3, &l.levelsCh[0][0]);
       float p[36] = {};
       const std::vector<float> def = AdjParamDefault(l.adjType);
       for (size_t i = 0; i < def.size() && i < 36; i++)
          p[i] = i < l.adjP.size() ? l.adjP[i] : def[i];
       if (l.adjType == kAdjWhiteBalance)
          WhiteBalanceMatrix(p[0], p[1], p + 2);
-      glUniform1fv(glGetUniformLocation(prog, "uP"), 36, p);
+      glUniform1fv(GLUtil::UniformLoc(prog, "uP"), 36, p);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_3D, cube);
-      glUniform1i(glGetUniformLocation(prog, "uCube"), 1);
-      glUniform1f(glGetUniformLocation(prog, "uCubeN"), cube != 0 ? (float)mLutSize : 0.0f);
+      glUniform1i(GLUtil::UniformLoc(prog, "uCube"), 1);
+      glUniform1f(GLUtil::UniformLoc(prog, "uCubeN"), cube != 0 ? (float)mLutSize : 0.0f);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, blurL);
-      glUniform1i(glGetUniformLocation(prog, "uBlurL"), 2);
+      glUniform1i(GLUtil::UniformLoc(prog, "uBlurL"), 2);
       glActiveTexture(GL_TEXTURE0);
    });
    glActiveTexture(GL_TEXTURE1);
@@ -3050,7 +3055,10 @@ namespace
 // and the shared state it reads. `global` takes the lines that touch every layer.
 void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<unsigned long long>& out, unsigned long long& global)
 {
-   std::map<int, unsigned long long> lines;
+   if (mTopHashLayerCount != mLayers.size() || mTopHashText != mText)
+   {
+   std::unordered_map<int, unsigned long long>& lines = mTopHashLines;
+   lines.clear();
    global = 1469598103934665603ull;
    size_t pos = 0;
    while (pos < mText.size())
@@ -3072,6 +3080,11 @@ void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<u
       }
       pos = eol + 1;
    }
+   mTopHashDoc = global;
+   mTopHashText = mText;
+   mTopHashLayerCount = mLayers.size();
+   }
+   global = mTopHashDoc;
    global = Mix(global, (unsigned long long)soloLayer);
    const CompCam cam = Camera();
    out.assign(kids.size(), 0);
@@ -3082,7 +3095,8 @@ void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<u
       {
          if (!IsInside(l.id, kids[i]->id))
             continue;
-         h = Mix(Mix(h, (unsigned long long)l.id), lines[l.id]);
+         const auto lineIt = mTopHashLines.find(l.id);
+         h = Mix(Mix(h, (unsigned long long)l.id), lineIt == mTopHashLines.end() ? 0ull : lineIt->second);
          h = Mix(h, EffectsHash(l, -1));
          for (INode* n : { Source(l), l.maskOn ? MaskSource(l) : nullptr })
             if (n != nullptr)
@@ -3420,8 +3434,8 @@ void Scene2DNode::CookIfNeeded(int frameId)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, acc);
-      glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
-      glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uAcc"), 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
       GLUtil::SetImageHeadroom(prog, mDoc.headroom);
    });
    // Output layers: each drawn alone on transparent, shown even when hidden in the comp.
@@ -3460,8 +3474,8 @@ void Scene2DNode::CookIfNeeded(int frameId)
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, one);
-         glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
-         glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(prog, "uAcc"), 0);
+         glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
          GLUtil::SetImageHeadroom(prog, mDoc.headroom);
       });
    }

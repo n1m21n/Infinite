@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "INode.h"
@@ -877,6 +878,12 @@ private:
    unsigned long long mGlobalHash = 0;
    std::vector<unsigned long long> mKidHash;
    void TopHashes(const std::vector<const Layer*>& kids, std::vector<unsigned long long>& out, unsigned long long& global);
+   // TopHashes' parse of mText (per-layer line hashes + the document hash), reused until mText
+   // or the layer count changes: the text is re-scanned only on an edit, not every composite frame.
+   std::string mTopHashText;
+   size_t mTopHashLayerCount = (size_t)-1;
+   std::unordered_map<int, unsigned long long> mTopHashLines;
+   unsigned long long mTopHashDoc = 0;
    unsigned long long BelowKey(const std::vector<const Layer*>& kids, const std::vector<unsigned long long>& hashes, size_t at,
                                unsigned long long global);
 public:

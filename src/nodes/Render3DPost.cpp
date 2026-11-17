@@ -5,6 +5,7 @@
 #include "Geometry3DNodes.h"
 
 #include "gl3.h"
+#include "GLUtil.h"
 #include <algorithm>
 #include <cmath>
 #include "Transport.h"
@@ -252,7 +253,7 @@ namespace
    {
       glActiveTexture(GL_TEXTURE0 + unit);
       glBindTexture(GL_TEXTURE_2D, tex);
-      glUniform1i(glGetUniformLocation(prog, name), unit);
+      glUniform1i(GLUtil::UniformLoc(prog, name), unit);
    }
 
    // Motion blur (after McGuire et al. 2012, reduced to one pass): find the fastest motion
@@ -372,8 +373,8 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
    const int orthoI = ortho ? 1 : 0;
    const float sz[2] = { (float)w, (float)h };
    auto setProj = [&](unsigned int prog) {
-      glUniform4fv(glGetUniformLocation(prog, "uProj"), 1, projVec);
-      glUniform1i(glGetUniformLocation(prog, "uOrtho"), orthoI);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uProj"), 1, projVec);
+      glUniform1i(GLUtil::UniformLoc(prog, "uOrtho"), orthoI);
    };
    const float radius = std::max(0.001f, aoRadius);
 
@@ -382,8 +383,8 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
       GLUtil::RunShaderPass(mPostAo[0], mProgAo, [&]() {
          Bind(mProgAo, 0, mDepthTex, "uDepth");
          setProj(mProgAo);
-         glUniform2fv(glGetUniformLocation(mProgAo, "uSize"), 1, sz);
-         glUniform1f(glGetUniformLocation(mProgAo, "uRadius"), radius);
+         glUniform2fv(GLUtil::UniformLoc(mProgAo, "uSize"), 1, sz);
+         glUniform1f(GLUtil::UniformLoc(mProgAo, "uRadius"), radius);
       });
       for (int pass = 0; pass < 2; pass++)
       {
@@ -392,8 +393,8 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
          const float step[2] = { pass == 0 ? 1.0f / (float)mPostAo[0].w : 0.0f, pass == 0 ? 0.0f : 1.0f / (float)mPostAo[0].h };
          GLUtil::RunShaderPass(dst, mProgAoBlur, [&]() {
             Bind(mProgAoBlur, 0, GLUtil::FboTexture(src), "uSrc");
-            glUniform2fv(glGetUniformLocation(mProgAoBlur, "uStep"), 1, step);
-            glUniform1f(glGetUniformLocation(mProgAoBlur, "uRange"), radius * 0.3f);
+            glUniform2fv(GLUtil::UniformLoc(mProgAoBlur, "uStep"), 1, step);
+            glUniform1f(GLUtil::UniformLoc(mProgAoBlur, "uRange"), radius * 0.3f);
          });
       }
    }
@@ -404,20 +405,20 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
       Bind(mProgPost, 1, mDepthTex, "uDepth");
       Bind(mProgPost, 2, aoOn ? GLUtil::FboTexture(mPostAo[0]) : mColorTex, "uAo"); // a real texture even when unused
       setProj(mProgPost);
-      glUniform2fv(glGetUniformLocation(mProgPost, "uSize"), 1, sz);
-      glUniform1i(glGetUniformLocation(mProgPost, "uAoOn"), aoOn ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgPost, "uAoStrength"), std::min(1.0f, aoStrength));
-      glUniform1f(glGetUniformLocation(mProgPost, "uAoRange"), radius * 0.3f);
-      glUniform1i(glGetUniformLocation(mProgPost, "uDofOn"), dofOn ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgPost, "uFocus"), focusDistance);
-      glUniform1f(glGetUniformLocation(mProgPost, "uAperturePx"), dofAperture * 12.0f * hScale); // 24 px is the diameter
-      glUniform1f(glGetUniformLocation(mProgPost, "uMaxCoc"), std::max(2.0f, 0.03f * (float)h));
-      glUniform3f(glGetUniformLocation(mProgPost, "uBokeh"), dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f,
+      glUniform2fv(GLUtil::UniformLoc(mProgPost, "uSize"), 1, sz);
+      glUniform1i(GLUtil::UniformLoc(mProgPost, "uAoOn"), aoOn ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgPost, "uAoStrength"), std::min(1.0f, aoStrength));
+      glUniform1f(GLUtil::UniformLoc(mProgPost, "uAoRange"), radius * 0.3f);
+      glUniform1i(GLUtil::UniformLoc(mProgPost, "uDofOn"), dofOn ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgPost, "uFocus"), focusDistance);
+      glUniform1f(GLUtil::UniformLoc(mProgPost, "uAperturePx"), dofAperture * 12.0f * hScale); // 24 px is the diameter
+      glUniform1f(GLUtil::UniformLoc(mProgPost, "uMaxCoc"), std::max(2.0f, 0.03f * (float)h));
+      glUniform3f(GLUtil::UniformLoc(mProgPost, "uBokeh"), dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f,
                   dofRotation * 3.14159265f / 180.0f, std::clamp(dofRatio, 0.01f, 2.0f));
-      glUniform1i(glGetUniformLocation(mProgPost, "uAoOnly"), aoOnly ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgPost, "uCavity"), cavityBits);
-      glUniform4f(glGetUniformLocation(mProgPost, "uCavityK"), cavityRidge, cavityValley, curvatureRidge, curvatureValley);
-      glUniform1f(glGetUniformLocation(mProgPost, "uCavityDist"), std::max(0.001f, cavityDistance));
+      glUniform1i(GLUtil::UniformLoc(mProgPost, "uAoOnly"), aoOnly ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgPost, "uCavity"), cavityBits);
+      glUniform4f(GLUtil::UniformLoc(mProgPost, "uCavityK"), cavityRidge, cavityValley, curvatureRidge, curvatureValley);
+      glUniform1f(GLUtil::UniformLoc(mProgPost, "uCavityDist"), std::max(0.001f, cavityDistance));
    });
    glActiveTexture(GL_TEXTURE0);
 
@@ -454,12 +455,12 @@ void Render3DNode::RunMotionBlur(const Mat4& proj, const Mat4& viewProj, int w, 
       Bind(mProgMotion, 0, mColorTex, "uColor");
       Bind(mProgMotion, 1, mDepthTex, "uDepth");
       Bind(mProgMotion, 2, GLUtil::FboTexture(mVelocity), "uVel");
-      glUniform4fv(glGetUniformLocation(mProgMotion, "uProj"), 1, projVec);
-      glUniform1i(glGetUniformLocation(mProgMotion, "uOrtho"), proj.m[11] == 0.0f ? 1 : 0);
-      glUniform2f(glGetUniformLocation(mProgMotion, "uSize"), (float)w, (float)h);
-      glUniform1f(glGetUniformLocation(mProgMotion, "uReach"), std::max(1.0f, motionMax * (float)h / 1080.0f));
-      glUniform2f(glGetUniformLocation(mProgMotion, "uShutter"), open, open + s);
-      glUniformMatrix4fv(glGetUniformLocation(mProgMotion, "uReproj"), 1, GL_FALSE, reproj.m);
+      glUniform4fv(GLUtil::UniformLoc(mProgMotion, "uProj"), 1, projVec);
+      glUniform1i(GLUtil::UniformLoc(mProgMotion, "uOrtho"), proj.m[11] == 0.0f ? 1 : 0);
+      glUniform2f(GLUtil::UniformLoc(mProgMotion, "uSize"), (float)w, (float)h);
+      glUniform1f(GLUtil::UniformLoc(mProgMotion, "uReach"), std::max(1.0f, motionMax * (float)h / 1080.0f));
+      glUniform2f(GLUtil::UniformLoc(mProgMotion, "uShutter"), open, open + s);
+      glUniformMatrix4fv(GLUtil::UniformLoc(mProgMotion, "uReproj"), 1, GL_FALSE, reproj.m);
    });
    glActiveTexture(GL_TEXTURE0);
 
@@ -509,7 +510,7 @@ bool Render3DNode::Accumulate(int frameId)
       GLUtil::RunShaderPass(mAccum[cur], mProgAccum, [&]() {
          Bind(mProgAccum, 0, GLUtil::FboTexture(mAccum[prev]), "uPrev");
          Bind(mProgAccum, 1, mColorTex, "uCur");
-         glUniform1i(glGetUniformLocation(mProgAccum, "uFirst"), i == 0 ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(mProgAccum, "uFirst"), i == 0 ? 1 : 0);
       });
       glActiveTexture(GL_TEXTURE0);
    }
@@ -521,7 +522,7 @@ bool Render3DNode::Accumulate(int frameId)
    target.internalFormat = mFloatTarget ? GL_RGBA16F : GL_RGBA8;
    GLUtil::RunShaderPass(target, mProgAccumDone, [&]() {
       Bind(mProgAccumDone, 0, GLUtil::FboTexture(mAccum[cur]), "uSum");
-      glUniform1f(glGetUniformLocation(mProgAccumDone, "uInvN"), 1.0f / (float)n);
+      glUniform1f(GLUtil::UniformLoc(mProgAccumDone, "uInvN"), 1.0f / (float)n);
    });
    glActiveTexture(GL_TEXTURE0);
    if (wasDepth) glEnable(GL_DEPTH_TEST);
