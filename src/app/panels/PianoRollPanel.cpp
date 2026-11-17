@@ -44,7 +44,7 @@ namespace app
 namespace
 {
    constexpr float kMinHeight = 240.0f;
-   constexpr float kIconW = tok::control_h, kPageW = 140.0f;
+   constexpr float kIconW = tok::control_h;
    constexpr float kKeysW = 44.0f, kRulerH = 16.0f, kStripH = 16.0f;
    constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
    constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
@@ -173,8 +173,6 @@ namespace
       std::set<uint64_t> clips;  // clips being edited; none = all
       std::set<std::pair<uint64_t, uint32_t>> notes; // selected notes (clip, note)
       uint64_t renameLane = 0;   // a tab being renamed
-      char renameBuf[64] = {};
-      bool renameFocus = false;
       bool pickOnCanvas = false; // the page settings' "Assign": the next Piano Roll node clicked on the canvas links
       uint64_t pendingDuplicate = 0; // page duplicate: the Timeline's Duplicate Track, next frame
       bool pendingAdd = false;   // page add and delete move lane pointers: they run at the top of the next frame
@@ -3158,8 +3156,6 @@ namespace
       else if (cmd && !shift && key(ImGuiKey_R))
       {
          s.renameLane = page.id;
-         std::snprintf(s.renameBuf, sizeof s.renameBuf, "%s", page.name.c_str());
-         s.renameFocus = true;
       }
       else if (cmd && shift && key(ImGuiKey_G))
       {
