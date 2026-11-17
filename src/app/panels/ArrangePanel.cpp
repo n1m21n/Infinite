@@ -1482,7 +1482,7 @@ namespace app
                gArrangeTool = ArrangeTool::Pencil;
                gArrangeBladeOn = false;
             }
-            if (MenuParts::Item(L("Cut"), "B", gArrangeTool == ArrangeTool::Blade))
+            if (MenuParts::Item(L("Blade"), "B", gArrangeTool == ArrangeTool::Blade))
             {
                gArrangeTool = ArrangeTool::Blade;
                gArrangeBladeOn = true;

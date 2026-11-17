@@ -470,6 +470,63 @@ def check_drift(quiet=False):
     return stats, issues
 
 
+# ---------------------------------------------------------------------------
+# 6. Menu text: the keys a menu row prints must be keys the table gives that action, and never an OS key
+#    (Sculpt Mode printed Cmd+Tab while the table said Ctrl+Tab, 2026-11-17).
+# ---------------------------------------------------------------------------
+MENU_RX = re.compile(r'MenuParts::Item\(\s*[TL]\("([^"#]*)(?:##[^"]*)?"\)\s*,\s*((?:[^,()]|\([^()]*\))*)')
+KEYS_IN_ARG = re.compile(r'((?:(?:MODKEY|TERMKEY)\s*)?"(?:[^"\\]|\\.)*")')
+# Which table area a file's menus belong to. Files not listed are only checked for OS keys.
+MENU_AREA = {
+    "View3DPanel.cpp": ["3D View"], "View2DPanel.cpp": ["2D View"], "CurveEditorPanel.cpp": ["Curve Editor"],
+    "PianoRollPanel.cpp": ["Piano Roll"], "ArrangePanel.cpp": ["Arrangement Timeline"], "PerfPanel.cpp": ["Session"],
+    "ArrangeSessionGrid.cpp": ["Session"], "SampleStudioPanel.cpp": ["Sample Studio"], "DrumPanel.cpp": ["Drums"],
+    "FieldPatcherPanel.cpp": ["Field Patcher"], "TerminalPanel.cpp": ["Terminal"], "ChatPanel.cpp": ["Chat"],
+    "MixerPanel.cpp": ["Mixer"],
+}
+KEY_SAME = {"del": "delete", "bksp": "backspace", "esc": "escape", "return": "enter", "option": "alt"}
+
+
+def chord_id(c):
+    parts = [KEY_SAME.get(x.strip().lower(), x.strip().lower()) for x in c.split("+")]
+    return (frozenset(parts[:-1]), parts[-1])
+
+
+def check_menu_text():
+    text = SRC_HELP.read_text()
+    table = {}   # (area, action word) -> {chord ids}
+    for m in ROW_RX.finditer(text):
+        ids = {chord_id(c) for c in chords(key_text(m.group(3)))}
+        for word in m.group(2).split(" / "):
+            table.setdefault((m.group(1), word.strip().lower()), set()).update(ids)
+    bad, n = [], 0
+    for f in sorted((ROOT / "src/app").rglob("*.cpp")):
+        src = f.read_text(errors="ignore")
+        areas = MENU_AREA.get(f.name, [])
+        for m in MENU_RX.finditer(src):
+            label, arg = m.group(1), m.group(2)
+            line = src.count("\n", 0, m.start()) + 1
+            for k in KEYS_IN_ARG.findall(arg):
+                if re.search(r"Sc\(\s*" + re.escape(k), arg):
+                    k = k.replace('"Ctrl', 'MODKEY "').replace('+Ctrl', '+" MODKEY "')   # Sc() prints Ctrl as Cmd on macOS
+                shown = key_text(k)
+                if not re.search(r"[A-Za-z0-9]", shown) or re.search(r"Click|Drag|Scroll", shown):
+                    continue
+                n += 1
+                for plat in PLATFORMS:
+                    c = key_text(k, plat)
+                    if c.lower() in {r.lower() for r in RESERVED[plat]} and label not in OS_OWN:
+                        bad.append(f"{f.relative_to(ROOT)}:{line}: menu '{label}' shows {c}, a key {plat} keeps for itself")
+                for area in areas:
+                    want = None
+                    for (ar, word), ids in table.items():
+                        if ar == area and (word == label.lower() or word == label.lower() + " item" or word == label.lower() + " layer"):
+                            want = ids
+                    if want is not None and not {chord_id(c) for c in chords(shown)} & want:
+                        bad.append(f"{f.relative_to(ROOT)}:{line}: menu '{label}' shows {shown}; {area}'s table row says otherwise")
+    return n, list(dict.fromkeys(bad))
+
+
 def main():
     quiet = "--quiet" in sys.argv
     n_chords, areas, overlap_bad = check_overlap_and_os()
@@ -477,8 +534,9 @@ def main():
     n_panels, focus_bad = check_panel_focus()
     stats, drift_bad = check_drift(quiet=quiet)
     k_rows, s_rows, settings_bad = check_settings_keys(stats["rows"] if stats else 0)
+    n_menu, menu_bad = check_menu_text()
 
-    total_bad = len(overlap_bad) + len(verb_bad) + len(focus_bad) + len(drift_bad) + len(settings_bad)
+    total_bad = len(overlap_bad) + len(verb_bad) + len(focus_bad) + len(drift_bad) + len(settings_bad) + len(menu_bad)
     if not quiet:
         print(f"keys gate [overlap/os]: {n_chords} chords in {areas} areas x {len(PLATFORMS)} OS, {len(overlap_bad)} problem(s)")
         for b in overlap_bad:
@@ -492,6 +550,9 @@ def main():
         print(f"keys gate [settings]: kShortcuts={k_rows} rows, Settings>Keys={s_rows} rows, {len(settings_bad)} problem(s)")
         for sb in settings_bad:
             print(" ", sb)
+        print(f"keys gate [menu text]: {n_menu} menu keys checked, {len(menu_bad)} problem(s)")
+        for mb in menu_bad:
+            print(" ", mb)
         if stats:
             print(
                 f"keys gate [drift]: {stats['rows']} documented rows, {stats['handled']} handled keys, "

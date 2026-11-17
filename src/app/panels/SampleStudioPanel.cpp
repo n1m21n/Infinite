@@ -2994,7 +2994,7 @@ namespace
          {
             if (MenuParts::Item(L("Select"), "A", s.tool == 0))
                s.tool = 0;
-            if (MenuParts::Item(L("Cut"), "B", s.tool == 1))
+            if (MenuParts::Item(L("Blade"), "B", s.tool == 1))
                s.tool = 1;
             if (MenuParts::Item(L("Hand"), "H", s.tool == 2))
                s.tool = 2;

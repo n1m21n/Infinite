@@ -2218,8 +2218,8 @@ namespace
          const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
          rigSelected = it != nullptr && PoseModel(*it, world) != nullptr;
       }
-      if (MenuParts::Item(T("Pose Mode"), rigSelected ? MODKEY "+Tab" : nullptr, sPose.on, any || sPose.on)) TogglePose(scene);
-      if (MenuParts::Item(T("Sculpt Mode"), rigSelected ? nullptr : MODKEY "+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
+      if (MenuParts::Item(T("Pose Mode"), rigSelected ? "Ctrl+Tab" : nullptr, sPose.on, any || sPose.on)) TogglePose(scene);
+      if (MenuParts::Item(T("Sculpt Mode"), rigSelected ? nullptr : "Ctrl+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
       if (MenuParts::Item(T("Edit Mode"), "Tab", sEdit.on, any || sEdit.on)) ToggleEdit(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
       if (MenuParts::Item(T("Clear IK"), "Alt+I", false, sPose.on)) PoseIk(scene, true);
@@ -2407,7 +2407,7 @@ namespace
       }
       if (io.KeyShift && !command && pressed(ImGuiKey_B))
          sZoomArmed = true;
-      if (command && !io.KeyShift && pressed(ImGuiKey_Tab))
+      if (io.KeyCtrl && !io.KeySuper && !io.KeyShift && pressed(ImGuiKey_Tab))   // Ctrl on every OS: Cmd+Tab is the macOS app switcher
       {
          // A rig poses; anything else sculpts.
          Mat4 world;
@@ -3285,7 +3285,7 @@ namespace
       if (!hovered || io.WantTextInput)
          return true;
       const bool command = io.KeyCtrl || io.KeySuper;
-      if ((command && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
+      if ((io.KeyCtrl && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
       {
          sPose = {};
          return true;
@@ -3629,7 +3629,7 @@ namespace
       if (sSculpt.stroking || !hovered || io.WantTextInput)
          return true;
       const bool command = io.KeyCtrl || io.KeySuper;
-      if ((command && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
+      if ((io.KeyCtrl && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
       {
          sSculpt.on = false;
          return true;
@@ -8021,7 +8021,7 @@ namespace
                if (const Item* it = scene->FindItem(id); it != nullptr && it->group != 0)
                   grouped = true;
             if (sSel.size() > 1 && MenuParts::Item(T("Group"), MODKEY "+G")) GroupSelected(scene, true);
-            if (grouped && MenuParts::Item(T("Ungroup"), MODKEY "+Alt+G")) GroupSelected(scene, false);
+            if (grouped && MenuParts::Item(T("Ungroup"), MODKEY "+Shift+G")) GroupSelected(scene, false);
             if (one != nullptr && MenuParts::SubMenu(T("Source"), true))
             {
                for (GraphNode* gn : SourceChoices(scene, *one))

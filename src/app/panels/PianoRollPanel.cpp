@@ -835,7 +835,7 @@ namespace
          s.tool = Tool::Draw;
       if (MenuParts::Item(L("Erase"), "E", s.tool == Tool::Erase))
          s.tool = Tool::Erase;
-      if (MenuParts::Item(L("Cut"), "B", s.tool == Tool::Blade))
+      if (MenuParts::Item(L("Blade"), "B", s.tool == Tool::Blade))
          s.tool = Tool::Blade;
       if (MenuParts::Item(L("Mute"), nullptr, s.tool == Tool::Mute))
          s.tool = Tool::Mute;
