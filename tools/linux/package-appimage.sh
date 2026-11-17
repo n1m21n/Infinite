@@ -267,7 +267,7 @@ LINUXDEPLOY="$WORK/linuxdeploy-${TOOL_ARCH}.AppImage"
 APPIMAGETOOL="$WORK/appimagetool-${TOOL_ARCH}.AppImage"
 
 echo "==> Downloading linuxdeploy ($TOOL_ARCH)"
-curl -fSL -o "$LINUXDEPLOY" \
+curl -fSL --retry 4 --retry-delay 10 --retry-all-errors -o "$LINUXDEPLOY" \
   "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-${TOOL_ARCH}.AppImage"
 if [ "${LINUXDEPLOY_SHA256[$TOOL_ARCH]}" != "__NOT_PINNED__" ]; then
   sha_check "$LINUXDEPLOY" "${LINUXDEPLOY_SHA256[$TOOL_ARCH]}"
@@ -277,7 +277,7 @@ fi
 chmod +x "$LINUXDEPLOY"
 
 echo "==> Downloading appimagetool ($TOOL_ARCH)"
-curl -fSL -o "$APPIMAGETOOL" \
+curl -fSL --retry 4 --retry-delay 10 --retry-all-errors -o "$APPIMAGETOOL" \
   "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-${TOOL_ARCH}.AppImage"
 if [ "${APPIMAGETOOL_SHA256[$TOOL_ARCH]}" != "__NOT_PINNED__" ]; then
   sha_check "$APPIMAGETOOL" "${APPIMAGETOOL_SHA256[$TOOL_ARCH]}"

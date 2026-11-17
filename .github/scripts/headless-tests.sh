@@ -58,22 +58,46 @@ fi
 # --- verdict-line gated ----------------------------------------------------
 # Each of these always exits 0, so grep the printf line instead.
 
+# Every verdict check runs under a watchdog. INFINITE_RECEXPORTTEST hung on the
+# Windows runner for the whole 10-minute step (6 runs, Oct 31 - Nov 15), and the
+# step timeout then killed every check after it. Now a wedged check fails by
+# itself and the rest still run. Output goes to a file rather than a $(...)
+# capture so the last lines a hung test printed survive the kill.
+VERDICT_TIMEOUT_S=300
+
+# run_bounded SECONDS LOGFILE CMD...: runs CMD with stdout and stderr in LOGFILE,
+# kills it after SECONDS, and returns its exit status (137 when killed).
+run_bounded() {
+   local secs="$1" log="$2"
+   shift 2
+   "$@" >"$log" 2>&1 &
+   local pid=$!
+   (sleep "$secs"; kill -9 "$pid" 2>/dev/null) >/dev/null 2>&1 &
+   local watchdog=$!
+   local rc=0
+   wait "$pid" || rc=$?
+   kill "$watchdog" 2>/dev/null
+   wait "$watchdog" 2>/dev/null
+   return "$rc"
+}
+
 check_verdict() {
-   local var="$1" expect="$2" out
+   local var="$1" expect="$2" log rc=0
    echo "== $var"
-   if ! out="$(env "$var=1" "$BIN" 2>&1)"; then
-      echo "   FAIL (crashed, exit $?)"
-      printf '%s\n' "$out" | tail -20
+   log="$(mktemp 2>/dev/null || echo "/tmp/verdict-$var-$$.log")"
+   (export "$var=1"; run_bounded "$VERDICT_TIMEOUT_S" "$log" "$BIN") || rc=$?
+   if [ "$rc" -ne 0 ]; then
+      echo "   FAIL (crashed, timed out after ${VERDICT_TIMEOUT_S}s, or exit $rc)"
+      tail -20 "$log"
       status=1
-      return
-   fi
-   if printf '%s\n' "$out" | grep -q "$expect"; then
+   elif grep -q "$expect" "$log"; then
       echo "   pass"
    else
       echo "   FAIL (no '$expect' in output)"
-      printf '%s\n' "$out" | tail -20
+      tail -20 "$log"
       status=1
    fi
+   rm -f "$log"
 }
 
 check_verdict INFINITE_AUDIOPDCTEST "AUDIOPDCTEST OK"
