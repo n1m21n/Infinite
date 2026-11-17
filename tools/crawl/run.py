@@ -104,6 +104,12 @@ def main():
     if not os.path.exists(a.app or BIN):
         print("no debug build at %s" % (a.app or BIN))
         return 2
+    # The crawler lives behind IMGUI_ENABLE_TEST_ENGINE (src/app/selftest/UiAudit.cpp); a release
+    # binary has a no-op stub, never writes progress.txt, and would sit until the budget kills it.
+    with open(a.app or BIN, "rb") as fh:
+        if b"INFINITE_CRAWL_SKIP" not in fh.read():
+            print("crawl needs the dev build (IMGUI_ENABLE_TEST_ENGINE); %s has no crawler code" % (a.app or BIN))
+            return 2
 
     runs = []
     if a.replay >= 0:

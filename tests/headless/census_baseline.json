@@ -337,7 +337,7 @@
   "cat": "Utility",
   "out": "image",
   "issues": [
-   "frame:E_RENDER"
+   "frame:E_NO_OUTPUT"
   ]
  },
  {
@@ -345,7 +345,7 @@
   "cat": "Utility",
   "out": "image",
   "issues": [
-   "frame:E_RENDER"
+   "frame:E_NO_OUTPUT"
   ]
  },
  {
@@ -380,7 +380,7 @@
   "cat": "Utility",
   "out": "image",
   "issues": [
-   "frame:E_RENDER"
+   "frame:E_NO_OUTPUT"
   ]
  },
  {
@@ -399,7 +399,7 @@
   "cat": "Utility",
   "out": "image",
   "issues": [
-   "frame:E_RENDER"
+   "frame:E_NO_OUTPUT"
   ]
  },
  {
@@ -427,7 +427,7 @@
   "cat": "Utility",
   "out": "image",
   "issues": [
-   "frame:E_RENDER"
+   "frame:E_NO_OUTPUT"
   ]
  },
  {
@@ -1413,7 +1413,7 @@
   "cat": "Compositing",
   "out": "image",
   "issues": [
-   "frame:E_RENDER"
+   "frame:E_NO_OUTPUT"
   ]
  },
  {
@@ -1421,7 +1421,7 @@
   "cat": "Compositing",
   "out": "image",
   "issues": [
-   "frame:E_RENDER"
+   "frame:E_NO_OUTPUT"
   ]
  },
  {
@@ -2854,5 +2854,21 @@
   "animates": false,
   "render_vs_frame": 0.0,
   "peak": 0.964
+ },
+ {
+  "type": "VMPC",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "black"
+  ]
+ },
+ {
+  "type": "Generate Samples",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ]
  }
 ]

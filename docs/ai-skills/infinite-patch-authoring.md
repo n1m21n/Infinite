@@ -396,7 +396,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `LFO` | trig:modulator | out:modulator | 11 | bypass |
 | `MIDI CC` | none | out:modulator | 7 | hardware: refused headless, bypass |
 | `MIDI Trigger` | none | out:modulator | 6 | hardware: refused headless, bypass |
-| `MSEG` | trig:modulator | out:modulator | 19 | bypass |
+| `MSEG` | trig:modulator | out:modulator | 21 | bypass |
 | `Math` | input:modulator, input_2:modulator | out:modulator | 6 |  |
 | `Mod Curve` | in:modulator | out:modulator | 3 | bypass |
 | `Mod Depth` | in:modulator | out:modulator | 2 | bypass |
@@ -529,7 +529,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
 | `Analog` | notes:note | out:audio | 33 | bypass |
-| `Drum Sequencer` | none | out:audio, 1:audio, 2:audio, 3:audio, 4:audio, 5:audio, 6:audio, 7:audio, 8:audio | 430 | bypass |
+| `Drum Sequencer` | none | out:audio, 1:audio, 2:audio, 3:audio, 4:audio, 5:audio, 6:audio, 7:audio, 8:audio | 439 | bypass |
 | `Equation Synth` | notes:note | out:audio | 31 | bypass |
 | `FM` | notes:note | out:audio | 35 | bypass |
 | `Field Synth` | notes:note, in:audio | out:audio | 13 | bypass |
@@ -563,7 +563,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Field Graph` | none | out:image | 7 | bypass |
 | `Gain` | audio:audio | out:audio | 1 | bypass |
 | `MIDI Out` | notes:note | out:image | 16 | bypass |
-| `Mixer` | in_1:audio, in_2:audio, in_3:audio, in_4:audio, in_5:audio, in_6:audio, in_7:audio, in_8:audio | out:audio | 463 |  |
+| `Mixer` | in_1:audio, in_2:audio, in_3:audio, in_4:audio, in_5:audio, in_6:audio, in_7:audio, in_8:audio | out:audio | 464 |  |
 | `NDI In` | none | out:image | 1 | hardware: refused headless, bypass |
 | `NDI Out` | in:image | out:image | 1 | bypass |
 | `OSC Receive` | none | out:modulator | 4 | bypass |

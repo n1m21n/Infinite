@@ -72,13 +72,16 @@ def build(t):
             if k == "note" and t["type"] in NOTE_RANGE:
                 lo, hi = NOTE_RANGE[t["type"]]
                 extra = f"  i rangeLow {lo}\n  i rangeHigh {hi}\n  b useGlobalScale 0\n  i scale 13\n"
-            src = add(FEED[k], extra)
+            # A Shade node's image pins take a Shade expression (vector), not a picture: feed Shade Coord.
+            feeder = "Shader Shade Coord" if t["type"].startswith("Shade ") and k == "image" else FEED[k]
+            src = add(feeder, extra)
             links.append(f"{TAG[k]} 1 {s['slot']} {src}" + (" 0" if k == "note" else ""))
     kind = t["outputs"][0]["kind"] if t["outputs"] else "none"
     if t["type"] == "Output":
         return "\n".join(lines + links) + "\n", "image"  # the node under test is the output
     out = add("Utility Output")
-    if t["category"] == "3D" and t["type"].startswith("Shade ") and kind == "image":
+    # Shade nodes register under category "Shader" (NodeRegistry.cpp), not "3D": match by name.
+    if t["type"].startswith("Shade ") and kind == "image":
         # shader nodes only mean something inside a material: feed its albedo on a lit cube
         cube, mat = add("3D Cube"), add("3D Material")
         r = add("3D Render 3D", "  f width 512\n  f height 512\n")

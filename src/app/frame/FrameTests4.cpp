@@ -2354,7 +2354,9 @@ void FrameTest_CLOTHTEST(int frameId, GLFWwindow* window)
                               ? "CLOTH OK" : "SUSPECT");
             Transport::Instance().Rewind();
          }
-         if (frameId == 63)
+         // Reset() restores the rest mesh on the first cook after the rewind, so check that
+         // frame. By frame 63 the cloth has fallen again under gravity (stretch ~1.03-1.05).
+         if (frameId == 61)
          {
             const float stretch = maxStretch();
             printf("after rewind: max stretch %.3f  %s\n", stretch,
