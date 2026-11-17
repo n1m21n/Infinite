@@ -100,8 +100,25 @@ def main():
 
     # --- 1 ------------------------------------------------------------------
     img = classes_with("ImageCable", headers)
+    # A class is reached by CableFor when it, or any base it derives from, is
+    # named there - e.g. CableFor's dynamic_cast<ShadeNode*> covers every
+    # Shade* subclass, which never appear by name.
+    bases = {}
+    for h in headers:
+        s = open(h, encoding="utf-8", errors="replace").read()
+        bases.update(re.findall(r"\bclass\s+(\w+)\s*(?:final\s*)?:\s*public\s+(\w+)", s))
+
+    def reached(c):
+        seen = set()
+        while c and c not in seen:
+            if c in in_cable:
+                return True
+            seen.add(c)
+            c = bases.get(c)
+        return False
+
     missing = [c for c in sorted(img)
-               if c not in in_cable and c not in BASE_COVERED and c not in OUTPUT_FORWARDING_ONLY]
+               if not reached(c) and c not in BASE_COVERED and c not in OUTPUT_FORWARDING_ONLY]
     print("=== classes with an ImageCable member but absent from CableFor ===")
     for c in missing:
         print(f"  {c:28} {img[c][0]} ({img[c][1]} cable(s)) - its pin will accept a link and drop it")

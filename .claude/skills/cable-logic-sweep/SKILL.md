@@ -60,6 +60,8 @@ first matching branch decides:
    3D cables only go into 3D nodes.
 9. `ModulatorInputSlot(slot)` exists (and the destination is not
    `ImageAnalyzeNode`) → modulator only.
+9a. Destination is a Shade node (not Shade Image's slot 1) → Shade output
+   only. A plain picture is refused, because `ShadeBuild::Input` would drop it.
 10. Otherwise → **image**.
 
 Two further rules live outside that function and are just as load-bearing:
