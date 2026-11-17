@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import REPO, RE_OUTPUT, SelfTest, md_table, write_out  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLAN = os.path.join(REPO, "docs/plans/v0.6-quality/README.md")
+PLAN = os.path.join(REPO, "internal/plans/v0.6-quality/README.md")
 REGISTRY = os.path.join(REPO, "docs/quality/registry.tsv")
 PARAM_DIFF = os.path.join(HERE, "param_diff.py")
 COMMUNITY = os.path.join(REPO, "tools/website/community.json")
@@ -54,15 +54,15 @@ LEDGER = {
     "cables": D("cables_extractor.py", "competitor", [("plan", "3.8")]),
     "logic": D("logic_extractor.py", "competitor", [("spec", "logic"), ("plan", "2.9")]),
     "modulation": D("modulation_map.py", "competitor",
-                    [("doc", "docs/plans/modulation/BITWIG-GAPS-AND-OUTPACE.md", "modulation_map")]),
+                    [("doc", "internal/plans/modulation/BITWIG-GAPS-AND-OUTPACE.md", "modulation_map")]),
     "pixelmator": D("pixelmator_extractor.py", "competitor", [("plan", "3.5")]),
     "plugins": D("commercial_plugin_extractor.py", "competitor", [("spec", "plugin"), ("plan", "2.11")]),
     "touchdesigner": D("touchdesigner_map.py", "competitor", [("plan", "3.1")]),
-    "inventory": D("inventory.py", "competitor", [("doc", "docs/plans/re-survey/README.md", "inventory")]),
+    "inventory": D("inventory.py", "competitor", [("doc", "internal/plans/re-survey/README.md", "inventory")]),
     "capability-map": D("capability_map.py", "competitor", [("plan", "2.31")]),
     "ui-map": D("ui_map.py", "competitor", [("plan", "2.3")]),
-    "plugin-probe": D("plugin_probe.py", "competitor", [("plan", "2.11"), ("doc", "docs/plans/re-survey/dossiers/C.md", "plugin_probe")]),
-    "cables-app-rea-analysis.json.gz": D("readers.py", "study", [("doc", "docs/plans/re-survey/README.md", "cables-app-rea")]),
+    "plugin-probe": D("plugin_probe.py", "competitor", [("plan", "2.11"), ("doc", "internal/plans/re-survey/dossiers/C.md", "plugin_probe")]),
+    "cables-app-rea-analysis.json.gz": D("readers.py", "study", [("doc", "internal/plans/re-survey/README.md", "cables-app-rea")]),
     "cables-ops-catalog.json.gz": D("readers.py", "superseded", by="cables"),
     # Measured on Infinite
     "builtins-kit": D("builtins_kit.py", "infinite", [("quality", "builtins_kit"), ("plan", "1.9")],
@@ -75,7 +75,7 @@ LEDGER = {
                       "python3 tools/re-survey/stretch_kit.py analyse ~/re-output/stretch-kit/Infinite --out ~/re-output/stretch-kit/infinite.md"]),
     "synth-probe": D("synth_probe.py", "infinite", [("quality", "synth_probe")], [T + "synth_probe.py"],
                      ["python3 tools/re-survey/synth_probe.py run node:Wavetable node:Analog"]),
-    "stress": D("stress_kit.py", "infinite", [("quality", "stress_kit"), ("doc", "docs/plans/re-survey/ROBUSTNESS.md", "stress_kit")],
+    "stress": D("stress_kit.py", "infinite", [("quality", "stress_kit"), ("doc", "internal/plans/re-survey/ROBUSTNESS.md", "stress_kit")],
                 [T + "stress_kit.py"] + PATCH, ["python3 tools/re-survey/stress_kit.py all"]),
     "host-audit": D("host_audit.py", "infinite", [("quality", "host_audit"), ("plan", "1.12")],
                     [T + "host_audit.py", "src/platform/PluginVST3.mm", "src/nodes/AudioPluginNode.cpp"],
@@ -91,13 +91,13 @@ LEDGER = {
                   ["python3 tools/re-survey/av_bench.py infinite"], quiet=True),
     "blender-bench": D("blender_bench.py", "infinite", [("quality", "blender_bench")], [T + "blender_bench.py"],
                        ["python3 tools/re-survey/blender_bench.py infinite"], quiet=True),
-    "render-bench": D("render_bench.py", "infinite", [("quality", "render_bench"), ("plan", "3.5"), ("doc", "docs/plans/re-survey/dossiers/D.md", "render-bench")],
+    "render-bench": D("render_bench.py", "infinite", [("quality", "render_bench"), ("plan", "3.5"), ("doc", "internal/plans/re-survey/dossiers/D.md", "render-bench")],
                       [T + "render_bench.py"], ["python3 tools/re-survey/render_bench.py infinite"], quiet=True),
     # One-off studies and kit inputs
-    "app-bench": D("app_bench.py", "study", [("doc", "docs/plans/re-survey/PROTOCOL-load.md", "app_bench")]),
-    "au-oop": D("au_oop.py", "study", [("doc", "docs/plans/re-survey/dossiers/A.md", "au_oop")]),
-    "bounce-kit": D("bounce_kit.py", "study", [("doc", "docs/plans/re-survey/coverage.md", "bounce_kit")]),
-    "latency": D("latency_probe.py", "study", [("doc", "docs/plans/re-survey/PROTOCOL-latency.md", "latency")]),
+    "app-bench": D("app_bench.py", "study", [("doc", "internal/plans/re-survey/PROTOCOL-load.md", "app_bench")]),
+    "au-oop": D("au_oop.py", "study", [("doc", "internal/plans/re-survey/dossiers/A.md", "au_oop")]),
+    "bounce-kit": D("bounce_kit.py", "study", [("doc", "internal/plans/re-survey/coverage.md", "bounce_kit")]),
+    "latency": D("latency_probe.py", "study", [("doc", "internal/plans/re-survey/PROTOCOL-latency.md", "latency")]),
     "workflow-cost": D("workflow_cost.py", "study", [("plan", "2.1"), ("plan", "2.2")]),
     # Not data
     "bin": D("", "scratch"), "tmp": D("", "scratch"),
@@ -138,6 +138,8 @@ def consumer_ok(c, reg, plan, pdiff):
     if kind == "spec":
         return "" if '"%s:' % c[1] in pdiff else "param_diff.py has no %s: source" % c[1]
     if kind == "plan":
+        if not plan:
+            return "plan file missing: %s" % os.path.relpath(PLAN, REPO)
         return "" if re.search(r"^\| %s \|" % re.escape(c[1]), plan, re.M) else "plan has no item %s" % c[1]
     if kind in ("doc", "tool"):
         text = read(os.path.join(REPO, c[1]))
