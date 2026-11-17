@@ -167,8 +167,8 @@ prints the open patch, the selection and any code errors in one answer.
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
-| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings`, `show`, `view`, `quit` |
-| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>` |
+| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings [key [value]]`, `settings devices\|midi\|apply\|updates\|reset\|logs\|gpu [n]\|global [name [expr]]\|extension <file>`, `show list\|next\|prev\|go <n>\|lock\|panic\|check\|add\|remove <n>\|clear\|open\|save\|fade <ms>\|quantize <n>\|launch <n>`, `view fit\|params on\|off\|clearcards\|metronome [on\|off]`, `quit` |
+| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>`, `version` |
 | Watch | `watch` prints a JSON line for each change |
 | Terminal | `term open`, `list`, `read`, `send`, `run` |
 

@@ -41,6 +41,7 @@ def check_verbs():
     guide = read("docs/headless/GUIDE.md")
     gaps = []
     for v in dispatched:
+        v = v.lstrip("-")  # --version is the flag form of the version verb; one word to document
         if not re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(v), help_text):
             gaps.append((v, "not in `infinite` help text"))
         if not re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(v), guide):
