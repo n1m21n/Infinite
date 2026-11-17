@@ -30,7 +30,7 @@ frozen PDF with no source. The audit below uses chapter 29 for UI surfaces and t
 | Settings tabs | 12: Appearance, Canvas & Workspace, Audio, General & Performance, Field Language, Expression Globals, Extensions, Plugins, Agents & Terminal, Infinite as VST3/AU, 3D View, Keys | `src/app/panels/SettingsWindow.cpp` L94 |
 | Settings section cards | 27 `FormParts::Section` headings | `SettingsWindow.cpp` |
 | Popup / context / dropdown IDs | 90 distinct literal `OpenPopup` / `BeginPopup` IDs (195 incl. menus and combos) | `src/app` |
-| Combo boxes | 38 distinct | `src/app` |
+| Combo boxes | 75 distinct (scan of `BeginCombo` / `BareCombo` / `Combo` with literal or `T()` / `L()`-wrapped ids; an earlier count of 38 used a narrower regex and missed the wrapped ids) | `src/app` |
 | Dialogs and floating windows | About, Collect diagnostics, Check for updates, Unsaved changes, Autosave recovery, Share Patch, Template library, Pre-show check, Terminal quit, Shortcuts, Help, UI Style Editor, UI Debugger | `StageFloating.cpp`, `StageMenuBar.cpp`, `HelpWindows.cpp` |
 | Node spawnable types | 372 (377 registered), per the brief | `NODELIST` of the release binary (not re-counted: the app is busy) |
 | MCP tools | npm 12, Python plugin 14 | per the brief |
@@ -88,7 +88,7 @@ Popup IDs with no figure, grouped by panel:
 - Modulation matrix: `##modmatrixctx`, `##modbind`, `##rowmenu`.
 - Mixer: `##mixerpanelctx`. Terminal: `##terminalDockMenu`, `##terminalquit`.
 - Transport and canvas: `##metronomePopup`, `##sharepatch`, `##slotsmap`, `##fielddevicesave`, `##perfaddcontrolmenu`.
-- Also the 38 combo boxes in src/app (see the counts above) and the search overlay (6 `search` popups).
+- Also the 75 combo boxes in src/app (see the counts above; corrected from 38) and the search overlay (6 `search` popups).
 
 ## Shot budget (estimate)
 
