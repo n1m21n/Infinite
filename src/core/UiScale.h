@@ -18,7 +18,7 @@
 // scale with no bake size; the font is always kBaseFontSize units.
 namespace UiScale
 {
-   constexpr float kBaseFontSize = 15.0f;
+   constexpr float kBaseFontSize = 13.0f;   // = tok::type_body: text sized to the 16 pt icon (owner 2026-11-17)
 
    struct Result
    {

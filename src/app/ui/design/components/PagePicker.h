@@ -1,7 +1,9 @@
 // PagePicker: the page strip every paged panel shares (the Performance grammar). One chip per page (colour dot,
 // optional glyph, name clipped at kW), then +. Click switches, double-click renames in place, drag reorders,
-// right-click: Rename, Duplicate, Colour, Delete Page. The strip scrolls sideways (wheel) when the pages outgrow
-// maxW. The panel owns the pages: Draw only reports what was asked.
+// middle-click closes (canClose panels). Right-click, always these rows in this order:
+// Rename | Duplicate | Colour > | Move Left | Move Right | --- | Delete Page. A row that can't run is greyed, never
+// hidden, and + is always drawn. The strip scrolls sideways (wheel) when the pages outgrow maxW. Sizes are the
+// "page" group of tokens.json. The panel owns the pages: Draw only reports what was asked.
 #pragma once
 #include <algorithm>
 #include <cstdio>
@@ -23,8 +25,13 @@ namespace PagePicker
    using app::L;
    using app::T;
 
-   constexpr float kW = 140.0f;  // widest chip: a long name clips
-   constexpr float kMinW = 56.0f; // narrowest chip
+   constexpr float kW = tok::page_chip_max_w;    // widest chip: a long name clips
+   constexpr float kMinW = tok::page_chip_min_w; // narrowest chip
+#ifdef __APPLE__
+   constexpr const char* kRenameKey = "Cmd+R";
+#else
+   constexpr const char* kRenameKey = "Ctrl+R";
+#endif
 
    struct Entry
    {
@@ -42,7 +49,8 @@ namespace PagePicker
       Recolor,
       Delete,
       Duplicate,
-      Move
+      Move,
+      Close // middle-click on a chip: hide the page, keep what it shows (panels with canClose)
    };
 
    struct Result
@@ -56,14 +64,15 @@ namespace PagePicker
 
    struct Options
    {
-      float maxW = 420.0f;    // the strip scrolls past this
-      bool duplicate = true;  // Duplicate in the menu
-      bool colour = true;     // Colour in the menu
-      bool reorder = true;    // drag to reorder
-      bool canDelete = true;  // Delete Page in the menu (a panel may need one page left)
-      bool canAdd = true;     // the + chip
-      const char* deleteLabel = nullptr;     // default "Delete Page"
-      std::function<void(int)> extraMenu;    // more rows at the end of a chip's menu
+      // Every paged panel shows the same six rows in the same order:
+      // Rename, Duplicate, Colour, Move Left, Move Right, | Delete Page.
+      // A row that can't run right now is greyed, never hidden.
+      float maxW = tok::page_strip_max_w; // the strip scrolls past this
+      bool duplicate = true;  // Duplicate enabled
+      bool reorder = true;    // Move Left/Right and drag enabled
+      bool canDelete = true;  // Delete Page enabled (a panel may need one page left)
+      bool canAdd = true;     // the + chip enabled
+      bool canClose = false;  // middle-click closes a page (Curve, Field Patcher)
    };
 
    struct RenameState
@@ -79,13 +88,57 @@ namespace PagePicker
       return m[id];
    }
 
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+   // Self-test probe (PageMenuTests.cpp): what the strip drew last frame, keyed by its id. Debug builds only.
+   struct ProbeRow
+   {
+      std::string label, key;
+      ImVec2 mn, mx;
+      bool enabled = true;
+   };
+   struct Probe
+   {
+      int frame = -1;
+      std::vector<Entry> entries;
+      std::vector<ImVec2> chipMn, chipMx;
+      ImVec2 addMn, addMx;
+      int current = -1, renaming = -1, menuFor = -1;
+      bool menuOpen = false, colourOpen = false;
+      std::vector<ProbeRow> rows;
+      std::vector<ImVec2> swatchMn, swatchMx;
+   };
+   inline std::unordered_map<std::string, Probe>& Probes()
+   {
+      static std::unordered_map<std::string, Probe> m;
+      return m;
+   }
+   inline Probe*& ProbeNow()
+   {
+      static Probe* p = nullptr;
+      return p;
+   }
+   // The row as shown: L() labels read "shown###original".
+   inline void ProbeRowAdd(const char* label, const char* key, bool enabled, const char* suffix = "")
+   {
+      if (Probe* p = ProbeNow())
+      {
+         std::string shown = label;
+         shown = shown.substr(0, shown.find("###")) + suffix;
+         p->rows.push_back({ shown, key != nullptr ? key : "", ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), enabled });
+      }
+   }
+#define PAGEPICKER_PROBE(stmt) stmt
+#else
+#define PAGEPICKER_PROBE(stmt)
+#endif
+
    inline ImU32 U32(unsigned int rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 255); }
 
    inline float ChipW(const Entry& e)
    {
       float w = ImGui::CalcTextSize(e.name.c_str()).x + 2.0f * tok::space_3;
       if (e.color != 0)
-         w += 8.0f + tok::space_2;
+         w += tok::page_dot + tok::space_2;
       if (e.glyph != nullptr)
          w += tok::icon_control + tok::space_1;
       return std::clamp(w, kMinW, kW);
@@ -106,14 +159,16 @@ namespace PagePicker
    {
       // The clip colours of the Timeline, plus None.
       static const unsigned int kColours[] = { 0xE5534B, 0xF08C3A, 0xE8C547, 0x6CC46A, 0x3FB6A8, 0x4A8FE7, 0x8C6BE0, 0xD45DB0 };
-      const float d = 16.0f;
+      const float d = tok::page_swatch;
       for (int c = 0; c < 8; c++)
       {
          if (c > 0)
             ImGui::SameLine(0.0f, tok::space_1);
          ImGui::PushID(c);
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         if (ImGui::InvisibleButton("##sw", ImVec2(d, d)))
+         const bool hit = ImGui::InvisibleButton("##sw", ImVec2(d, d));
+         PAGEPICKER_PROBE(if (Probe* pr = ProbeNow()) { pr->colourOpen = true; pr->swatchMn.push_back(ImGui::GetItemRectMin()); pr->swatchMx.push_back(ImGui::GetItemRectMax()); })
+         if (hit)
          {
             out.act = Act::Recolor;
             out.index = index;
@@ -145,6 +200,8 @@ namespace PagePicker
          std::snprintf(rn.buf, sizeof rn.buf, "%s", pages[i].name.c_str());
       };
       ImGui::PushID(id);
+      PAGEPICKER_PROBE(Probe& probe = Probes()[id]; probe = Probe(); probe.frame = ImGui::GetFrameCount(); probe.entries = pages;
+                       probe.current = current; probe.renaming = rn.index; ProbeNow() = &probe;)
 
       float natural = 0.0f;
       for (size_t i = 0; i < pages.size(); i++)
@@ -156,7 +213,10 @@ namespace PagePicker
       {
          ImGui::BeginChild("##strip", ImVec2(stripW, tok::control_h), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          if (scrolls && ImGui::IsWindowHovered() && ImGui::GetIO().MouseWheel != 0.0f)
-            ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 40.0f);
+            ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * tok::page_wheel_step);
+         // Taken before the chips' PushID(i): OpenPopup inside the loop would hash the chip's index into the ID
+         // and the menu below (drawn outside the loop) would never open.
+         const ImGuiID menuId = ImGui::GetID("##pageMenu");
          for (int i = 0; i < (int)pages.size(); i++)
          {
             if (i > 0)
@@ -168,8 +228,9 @@ namespace PagePicker
             {
                if (rn.focus)
                   ImGui::SetKeyboardFocusHere();
-               ImGui::SetNextItemWidth(std::max(w, 96.0f));
+               ImGui::SetNextItemWidth(std::max(w, tok::page_rename_min_w));
                const bool done = FieldWell::InputText("##rename", rn.buf, sizeof rn.buf, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               PAGEPICKER_PROBE(probe.chipMn.resize(pages.size()); probe.chipMx.resize(pages.size()); probe.chipMn[i] = ImGui::GetItemRectMin(); probe.chipMx[i] = ImGui::GetItemRectMax();)
                const bool lost = !rn.focus && !ImGui::IsItemActive();
                rn.focus = false;
                if (done || lost)
@@ -195,10 +256,15 @@ namespace PagePicker
             ActionButton::Scoped() = ActionButton::Kind::Plain;
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                startRename(i);
+            if (opt.canClose && ImGui::IsItemClicked(ImGuiMouseButton_Middle))
+            {
+               out.act = Act::Close;
+               out.index = i;
+            }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
                rn.menu = i;
-               ImGui::OpenPopup("##pageMenu");
+               ImGui::OpenPopup(menuId);
             }
             if (opt.reorder && pages.size() > 1)
             {
@@ -224,14 +290,15 @@ namespace PagePicker
                }
             }
             const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+            PAGEPICKER_PROBE(probe.chipMn.resize(pages.size()); probe.chipMx.resize(pages.size()); probe.chipMn[i] = bmin; probe.chipMx[i] = bmax;)
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const float cy = (bmin.y + bmax.y) * 0.5f;
             const ImU32 col = on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
             float tx = bmin.x + tok::space_3;
             if (e.color != 0)
             {
-               dl->AddCircleFilled(ImVec2(tx + 4.0f, cy), 4.0f, U32(e.color), 24);
-               tx += 8.0f + tok::space_2;
+               dl->AddCircleFilled(ImVec2(tx + tok::page_dot * 0.5f, cy), tok::page_dot * 0.5f, U32(e.color), 24);
+               tx += tok::page_dot + tok::space_2;
             }
             if (e.glyph != nullptr)
             {
@@ -246,45 +313,70 @@ namespace PagePicker
          if (MenuParts::BeginPopup("##pageMenu"))
          {
             const int m = rn.menu;
+            PAGEPICKER_PROBE(probe.menuOpen = true; probe.menuFor = m;)
             if (m >= 0 && m < (int)pages.size())
             {
-               if (MenuParts::Item(L("Rename"), m == current ? "Cmd+R" : nullptr))
+               const char* renameKey = m == current ? kRenameKey : nullptr;
+               const bool renameHit = MenuParts::Item(L("Rename"), renameKey);
+               PAGEPICKER_PROBE(ProbeRowAdd(L("Rename"), renameKey, true);)
+               if (renameHit)
                   startRename(m);
-               if (opt.duplicate && MenuParts::Item(L("Duplicate")))
+               const bool dupHit = MenuParts::Item(L("Duplicate"), nullptr, false, opt.duplicate);
+               PAGEPICKER_PROBE(ProbeRowAdd(L("Duplicate"), nullptr, opt.duplicate);)
+               if (dupHit)
                {
                   out.act = Act::Duplicate;
                   out.index = m;
                }
-               if (opt.colour && MenuParts::SubMenu(L("Colour")))
+               const bool colourOpen = MenuParts::SubMenu(L("Colour"));
+               PAGEPICKER_PROBE(ProbeRowAdd(L("Colour"), nullptr, true, " >");)
+               if (colourOpen)
                {
                   ColourRow(pages[m], m, out);
                   ImGui::EndMenu();
                }
-               if (opt.extraMenu)
-                  opt.extraMenu(m);
-               if (opt.canDelete)
+               const bool canLeft = opt.reorder && m > 0, canRight = opt.reorder && m + 1 < (int)pages.size();
+               const bool leftHit = MenuParts::Item(L("Move Left"), nullptr, false, canLeft);
+               PAGEPICKER_PROBE(ProbeRowAdd(L("Move Left"), nullptr, canLeft);)
+               if (leftHit)
                {
-                  MenuParts::Separator();
-                  if (MenuParts::Item(opt.deleteLabel != nullptr ? opt.deleteLabel : L("Delete Page")))
-                  {
-                     out.act = Act::Delete;
-                     out.index = m;
-                  }
+                  out.act = Act::Move;
+                  out.index = m;
+                  out.to = m - 1;
+               }
+               const bool rightHit = MenuParts::Item(L("Move Right"), nullptr, false, canRight);
+               PAGEPICKER_PROBE(ProbeRowAdd(L("Move Right"), nullptr, canRight);)
+               if (rightHit)
+               {
+                  out.act = Act::Move;
+                  out.index = m;
+                  out.to = m + 1;
+               }
+               MenuParts::Separator();
+               PAGEPICKER_PROBE(if (ProbeNow()) ProbeNow()->rows.push_back({ "---", "", {}, {}, false });)
+               const bool delHit = MenuParts::Item(L("Delete Page"), nullptr, false, opt.canDelete);
+               PAGEPICKER_PROBE(ProbeRowAdd(L("Delete Page"), nullptr, opt.canDelete);)
+               if (delHit)
+               {
+                  out.act = Act::Delete;
+                  out.index = m;
                }
             }
             MenuParts::EndPopup();
          }
          ImGui::EndChild();
       }
-      if (opt.canAdd)
       {
          if (!pages.empty())
             ImGui::SameLine(0.0f, tok::space_1);
+         ImGui::BeginDisabled(!opt.canAdd);
          if (ActionButton::Draw("##add", ImVec2(tok::control_h, tok::control_h)))
             out.act = Act::Add;
-         if (ImGui::IsItemHovered())
+         ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             HelpTip("%s", addTip != nullptr ? addTip : T("New Page"));
          const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+         PAGEPICKER_PROBE(probe.addMn = a; probe.addMx = b; ProbeNow() = nullptr;)
          glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::Plus);
       }
       ImGui::PopID();

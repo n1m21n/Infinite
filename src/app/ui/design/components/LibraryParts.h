@@ -129,7 +129,7 @@ namespace LibraryParts
    // Small square icon action (refresh / remove) on a folder row.
    inline bool IconButton(const char* id, Icon icon, bool enabled = true, bool danger = false)
    {
-      const float s = 24.0f;
+      const float s = tok::control_h;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::PushID(id);
       if (!enabled)

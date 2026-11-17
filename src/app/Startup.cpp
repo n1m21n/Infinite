@@ -1497,7 +1497,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    glfwSetWindowContentScaleCallback(window, [](GLFWwindow*, float, float) { UiScale::RequestRescale(); });
 
    ImGuiStyle& style = ImGui::GetStyle();
-   style.FrameRounding = tok::radius_control;   // UI system sheet 2f: every 24 pt control
+   style.FrameRounding = tok::radius_control;   // UI system sheet 2f: every control (tok::control_h)
    style.SelectableRounding = style.FrameRounding; // was a vendored ImGui patch before 1.92
    style.GrabRounding = tok::radius_control;
    style.WindowRounding = 4.0f;
@@ -1507,7 +1507,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (const char* rg = getenv("INFINITE_ROW_GAP"))
       style.ItemSpacing.y = (float)atof(rg);
 #endif
-   // UI system sheet: every frame (button, field, slider, dropdown, check row) is one control tall, 24 pt.
+   // UI system sheet: every frame (button, field, slider, dropdown, check row) is one control tall (tok::control_h).
    style.FramePadding.y = (tok::control_h - UiScale::kBaseFontSize) * 0.5f;
    // Popups/context menus and scrollbars are chrome, not node bodies - they
    // don't share WindowRounding/FrameRounding's blast radius (node-ui-pillars
@@ -4486,7 +4486,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       if (o.find("arrangedemo") != std::string::npos)
       {
          gArrangePanelOpen = true;
-         gArrangePanelHeight = 900.0f;
+         gArrangePanelHeight = o.find("arrshort") != std::string::npos ? 480.0f : 900.0f;   // arrshort: Clip Settings overflows into columns
          size_t firstAudio = 0;
          while (firstAudio < gArrange.lanes.size() && gArrange.lanes[firstAudio].type != Arrange::kLaneAudio) ++firstAudio;
          if (firstAudio + 1 < gArrange.lanes.size()) gArrange.lanes[firstAudio + 1].solo = true;

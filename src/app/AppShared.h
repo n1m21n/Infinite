@@ -212,6 +212,8 @@ void DrawArrangeWavRenderProgressWindow();
 
 void DrawArrangeClipSettingsChild(float panelW);
 
+float ArrangeClipSettingsWidth(float maxW);
+
 void ArrangeCollectClipModBindings(const GraphNode& node,
                                       std::vector<std::pair<int, std::string>>& out);
 
@@ -5259,6 +5261,8 @@ void ArrangeRenderCancelAll();
 
 void DrawArrangeClipSettingsChild(float panelW);
 
+float ArrangeClipSettingsWidth(float maxW);
+
 void ArrangeRenderQueuePosition(int& outIndex, int& outTotal);
 
 bool ArrangeRenderBusy();
@@ -6056,6 +6060,18 @@ extern ImVec2 gView2DRectMin, gView2DRectMax;
 void DrawView2DDocked(const char* id, const ImVec2& size);
 bool View2DCanAdd(const GraphNode& gn);
 void View2DAddNode(GraphNode& gn);
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+// Self-test probe (PageMenuTests.cpp): each More.. form's chip last drawn, and its popover when open.
+struct View2DMoreProbe
+{
+   int frame = -1;
+   ImVec2 chipMn, chipMx;
+   bool open = false;
+   float winW = 0.0f, contentW = 0.0f;
+};
+std::map<std::string, View2DMoreProbe>& View2DMoreProbes();
+#endif
+
 // RPC "view2d": read the open 2D document's layers, or write them in one gated batch (one undo step).
 bool View2DRpc(const nlohmann::json& params, nlohmann::json& out, std::string& error);
 OutputNode* View2DEnsureOutput();

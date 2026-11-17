@@ -15,6 +15,7 @@
 #include "app/graph/LearningLog.h"
 #include "app/graph/NodeClipboard.h"
 #include "app/graph/SampleStyles.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/TimeRuler.h"
@@ -69,7 +70,7 @@ namespace app
 namespace
 {
    constexpr float kMinHeight = 180.0f;
-   constexpr float kSettingsW = 264.0f;
+   constexpr float kSettingsW = UiDensity::kInspectorW + 2.0f * tok::space_3;   // one compact strip
    constexpr double kRate = GenerateSamplesNode::kLoopRate;
    constexpr int kPaletteSize = 12;
    constexpr size_t kUndoDepth = 64;
@@ -2736,9 +2737,10 @@ namespace
       ImGui::BeginChild("##studiosettings_child", ImVec2(panelW, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, 0);
       ImGui::GetStyle().WindowPadding = savedPad;
       PopDockedPanelStyle();
+      UiDensity::Compact compact;
       SectionCard::BeginWindow();
       const float availW = ImGui::GetContentRegionAvail().x;
-      const float fieldW = std::max(70.0f, availW - SectionCard::kLabelW);
+      const float fieldW = std::max(60.0f, availW - SectionCard::LabelW());
 
       PruneSelection();
       char title[64];
@@ -2771,11 +2773,12 @@ namespace
          DrawSliceInspector(fieldW);
 
       SectionCard::EndWindow();
+      compact.End(); // before the child closes: the pushes were made inside it
       ImGui::EndChild();
    }
 
    // ---- the toolbar ----
-   // One height (PanelKit::kChip) for every item, one gap inside a group (space_1) and one between groups (space_3).
+   // One height (PanelKit::Chip()) for every item, one gap inside a group (space_1) and one between groups (space_3).
 
    void PushToolbarChip(bool on, bool green = false)
    {
@@ -2783,7 +2786,7 @@ namespace
    }
    void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
 
-   constexpr float kIconW = PanelKit::kChip;
+   constexpr float kIconW = tok::control_h;
 
    float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
 
@@ -2791,7 +2794,7 @@ namespace
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {
       PushToolbarChip(on, green);
-      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, PanelKit::kChip));
+      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, PanelKit::Chip()));
       PopToolbarChip();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", tip);
@@ -2804,7 +2807,7 @@ namespace
 
    bool TextChip(const char* label, ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
-      return ActionButton::Draw(label, ImVec2(TextW(label), PanelKit::kChip), kind);
+      return ActionButton::Draw(label, ImVec2(TextW(label), PanelKit::Chip()), kind);
    }
 
    // A dropdown chip: the value, clipped to the chip, and the list below. The list fades and settles in
@@ -2814,7 +2817,7 @@ namespace
       static ImGuiID sOpenId = 0;
       static double sOpenedAt = -1.0;
       const ImGuiID pid = ImGui::GetID(id);
-      if (ActionButton::Draw(id, ImVec2(w, PanelKit::kChip)))
+      if (ActionButton::Draw(id, ImVec2(w, PanelKit::Chip())))
       {
          ImGui::OpenPopup(id);
          sOpenId = pid;
@@ -2975,7 +2978,7 @@ namespace
          // The tool dropdown, the same as the Timeline's and the Piano Roll's.
          const bool nonDefault = s.tool != 0;
          ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         const bool clicked = ActionButton::Draw("##studioToolPicker", ImVec2(PanelKit::kChip, PanelKit::kChip));
+         const bool clicked = ActionButton::Draw("##studioToolPicker", ImVec2(PanelKit::Chip(), PanelKit::Chip()));
          ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool"));
@@ -3086,7 +3089,7 @@ namespace
          HelpTip("%s", T("Put the edit on the canvas: the patch that made it, or a node that plays it"));
       ImGui::EndDisabled();
       FormParts::Inline(0.0f, in);
-      if (ChipButton::Draw(audioL, studioMode, PanelKit::kChip))
+      if (ChipButton::Draw(audioL, studioMode, PanelKit::Chip()))
          SetStudioAudio(!studioMode);
       if (ImGui::IsItemHovered())
          HelpTip("%s", !gAudioStartError.empty() && AudioEngine::Instance().SampleRate() <= 0.0
@@ -3258,12 +3261,13 @@ namespace
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const float h = std::max(40.0f, avail.y);
       const float gap = ImGui::GetStyle().ItemSpacing.x;
-      const float settingsW = s.settingsOpen ? kSettingsW + gap : 0.0f;
+      const float panelW = kSettingsW;
+      const float settingsW = s.settingsOpen ? panelW + gap : 0.0f;
       DrawWave(origin, ImVec2(std::max(40.0f, avail.x - settingsW), h));
       if (s.settingsOpen)
       {
-         ImGui::SetCursorScreenPos(ImVec2(origin.x + avail.x - kSettingsW, origin.y));
-         DrawSettings(kSettingsW);
+         ImGui::SetCursorScreenPos(ImVec2(origin.x + avail.x - panelW, origin.y));
+         DrawSettings(panelW);
       }
    }
 

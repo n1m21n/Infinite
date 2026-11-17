@@ -11,6 +11,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/selftest/UiAudit.h"
 
@@ -19,23 +20,24 @@ namespace PanelKit
    using app::HelpTip;
 
    // ---- tokens (panels only; nodes keep their own sizes)
-   constexpr float kChip = tok::control_h;        // every chip and button, app-wide (UI system sheet 2c)
-   constexpr float kRow = tok::control_h;        // a settings row: wells, sliders, checks
-   constexpr float kRowGap = tok::row_gap;       // between rows
+   // Sizes at the current density (UiDensity): one control tall, the row gap between.
+   inline float Chip() { return UiDensity::M().row; }     // every chip and button
+   inline float Row() { return UiDensity::M().row; }      // a settings row: wells, sliders, checks
+   inline float RowGap() { return UiDensity::M().gap; }   // between rows
    constexpr float kSection = tok::section_gap;  // before a section header
 
-   // The frame padding that makes an ImGui frame kRow tall at the current font.
-   inline float FramePadY() { return std::max(1.0f, (kRow - ImGui::GetFontSize()) * 0.5f); }
+   // The frame padding that makes an ImGui frame Row() tall at the current font.
+   inline float FramePadY() { return std::max(1.0f, (Row() - ImGui::GetFontSize()) * 0.5f); }
 
    // ---- chips
 
-   // An icon chip, w x h (0 = square kChip). The glyph is scaled to the icon set's ink (0.9 of the em, what most glyphs draw at), so a bar
+   // An icon chip, w x h (0 = square Chip()). The glyph is scaled to the icon set's ink (0.9 of the em, what most glyphs draw at), so a bar
    // of icons reads as one size. `tip` is also the audit's name for it.
    inline bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, float w = 0.0f, float h = 0.0f,
                         ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
       if (h <= 0.0f)
-         h = kChip;
+         h = Chip();
       if (w <= 0.0f)
          w = h;
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
@@ -63,7 +65,7 @@ namespace PanelKit
                         ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
       if (h <= 0.0f)
-         h = kChip;
+         h = Chip();
       if (w <= 0.0f)
          w = ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_2;
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
@@ -92,7 +94,7 @@ namespace PanelKit
    {
       static std::map<std::string, bool> sOpen;
       if (!first)
-         ImGui::Dummy(ImVec2(0.0f, kSection - kRowGap * 2.0f));
+         ImGui::Dummy(ImVec2(0.0f, kSection - RowGap() * 2.0f));
       auto it = sOpen.find(text);
       bool open = it != sOpen.end() ? it->second : startOpen;
       ImGui::PushID(text);

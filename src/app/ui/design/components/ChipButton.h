@@ -7,19 +7,22 @@
 #include <string>
 #include "app/AppShared.h"
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/UiDensity.h"
 
 namespace ChipButton
 {
-   constexpr float kHeight = tok::control_h;
+   inline float Height() { return UiDensity::M().row; }   // one control tall at the current density
 
    // Returns true when clicked. `onCol` overrides the accent used when on (e.g. solo amber).
-   //  `h` is the chip height, `minW` an optional width floor (0 = hug the label).
-   inline bool Draw(const char* label, bool on, float h = kHeight, float minW = 0.0f, bool soft = false, const ImVec4* onCol = nullptr)
+   //  `h` is the chip height (0 = one control tall), `minW` an optional width floor (0 = hug the label).
+   inline bool Draw(const char* label, bool on, float h = 0.0f, float minW = 0.0f, bool soft = false, const ImVec4* onCol = nullptr)
    {
+      if (h <= 0.0f)
+         h = Height();
       const char* key = std::strstr(label, "##");
       const std::string shown = key != nullptr ? std::string(label, key) : std::string(label);
       const ImVec2 ts = ImGui::CalcTextSize(shown.c_str());
-      const ImVec2 sz(std::max(minW, ts.x + 2.0f * tok::space_2), h);
+      const ImVec2 sz(std::max(minW, ts.x + 2.0f * (UiDensity::IsCompact() ? 6.0f : tok::space_2)), h);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const bool clicked = ImGui::InvisibleButton(label, sz);
       const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);

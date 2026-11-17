@@ -6,6 +6,7 @@
 #include "app/panels/FieldPatcherPanel.h"
 
 #include "app/AppShared.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -14,6 +15,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "core/Modulation.h"
 #include "core/Patch.h"
@@ -51,7 +53,7 @@ float gFieldPatcherShownHeight = 380.0f;
 namespace
 {
    constexpr float kMinHeight = 220.0f;
-   constexpr float kInspectorW = 268.0f;
+   constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
    constexpr int kPinStride = 128; // pin ids: box * stride + 1 + inlet, outlets from +64
 
    // ---- hosts: the three Field nodes a page can show
@@ -161,6 +163,7 @@ namespace
       std::string scratchCode;   // scratch pages only: the source the page holds
       std::string scratchName;
       bool pinned = false;
+      unsigned int color = 0;    // page chip colour, 0xRRGGBB
       ed::EditorContext* ctx = nullptr;
       Field::BoxGraph graph;
       std::string parsedFrom;    // the source text the graph was built from
@@ -256,6 +259,8 @@ namespace
          s.closed.insert(p.uid);
       DropContext(p);
       s.pages.erase(s.pages.begin() + i);
+      if (i < s.front)
+         s.front--; // the page in front keeps its place
       if (s.front >= (int)s.pages.size())
          s.front = (int)s.pages.size() - 1;
    }
@@ -1218,6 +1223,7 @@ namespace
    {
       State& s = S();
       ImGui::BeginChild("##fpInspector", size, false, ImGuiWindowFlags_NoScrollbar);
+      UiDensity::Compact compact;
       if (ChipButton::Draw(T("Code"), s.inspectorTab == 0))
          s.inspectorTab = 0;
       FormParts::Inline(0.0f, tok::space_1);
@@ -1308,6 +1314,7 @@ namespace
             }
          }
       }
+      compact.End(); // before the child closes: the pushes were made inside it
       ImGui::EndChild();
    }
 
@@ -1402,35 +1409,6 @@ namespace
       return std::string(T(name.c_str())) + " " + std::to_string(gn != nullptr ? gn->index : 0);
    }
 
-   void StartRename(int i)
-   {
-      State& s = S();
-      s.renaming = i;
-      s.renameFocus = true;
-      std::snprintf(s.renameBuf, sizeof(s.renameBuf), "%s", PageTitle(*s.pages[i]).c_str());
-   }
-
-   // Enter or a click away keeps the name; Esc drops it; an empty name returns the tab to its own.
-   void FinishRename(bool keep)
-   {
-      State& s = S();
-      if (keep && s.renaming >= 0 && s.renaming < (int)s.pages.size())
-      {
-         Page& p = *s.pages[s.renaming];
-         std::string n = s.renameBuf;
-         if (p.uid == 0)
-         {
-            if (!n.empty())
-               p.scratchName = n;
-         }
-         else if (n.empty())
-            s.nodeNames.erase(p.uid);
-         else
-            s.nodeNames[p.uid] = n;
-      }
-      s.renaming = -1;
-   }
-
    // One strip-high text line: the text sits on the chips' centre line, not on their top edge.
    void RowText(const char* fmt, ...) IM_FMTARGS(1);
    void RowText(const char* fmt, ...)
@@ -1440,7 +1418,7 @@ namespace
       va_start(args, fmt);
       std::vsnprintf(buf, sizeof(buf), fmt, args);
       va_end(args);
-      const float dy = std::max(0.0f, (ChipButton::kHeight - ImGui::GetTextLineHeight()) * 0.5f);
+      const float dy = std::max(0.0f, (ChipButton::Height() - ImGui::GetTextLineHeight()) * 0.5f);
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + dy);
       ImGui::TextDisabled("%s", buf);
       ImGui::SameLine(0.0f, tok::space_2);
@@ -1450,72 +1428,71 @@ namespace
    void DrawStrip()
    {
       State& s = S();
-      for (int i = 0; i < (int)s.pages.size(); i++)
+      // The shared page strip: same menu, same order as every paged panel. Middle-click closes
+      // a page; Pin is the pin tile at the strip's end.
+      std::vector<PagePicker::Entry> entries;
+      entries.reserve(s.pages.size());
+      for (auto& pp : s.pages)
       {
-         Page& p = *s.pages[i];
-         ImGui::PushID(i);
-         if (s.renaming == i)
-         {
-            ImGui::SetNextItemWidth(150.0f);
-            if (s.renameFocus)
-            {
-               ImGui::SetKeyboardFocusHere();
-               s.renameFocus = false;
-            }
-            FieldWell::PushStyle();
-            const bool enter = ImGui::InputText("##fpRename", s.renameBuf, sizeof(s.renameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
-            FieldWell::PopStyle();
-            if (enter)
-               FinishRename(true);
-            else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
-               FinishRename(false);
-            else if (!ImGui::IsItemActive() && !ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-               FinishRename(true);
-            FormParts::Inline(0.0f, tok::space_1);
-            ImGui::PopID();
-            continue;
-         }
-         const std::string title = PageTitle(p) + (p.pinned ? " •" : "");
-         if (ChipButton::Draw(title.c_str(), i == s.front))
-            s.front = i;
-         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-            StartRename(i);
-         if (MenuParts::BeginContextItem("##fpPageMenu"))
-         {
-            if (MenuParts::Item(T("Rename")))
-               StartRename(i);
-            if (MenuParts::Item(p.pinned ? T("Unpin") : T("Pin")))
-               p.pinned = !p.pinned;
-            if (MenuParts::Item(T("Close page")))
-            {
-               MenuParts::EndPopup();
-               ImGui::PopID();
-               ClosePage(i);
-               return;
-            }
-            if (p.uid != 0 && MenuParts::Item(T("Delete node")))
-            {
-               if (GraphNode* gn = FindNodeByUid(p.uid))
-               {
-                  PushUndoCheckpoint("Delete Field Node");
-                  RemoveNodeByIndex(gn->index);
-               }
-            }
-            if (i > 0 && MenuParts::Item(T("Move left")))
-               std::swap(s.pages[i], s.pages[i - 1]), s.front = i - 1;
-            if (i + 1 < (int)s.pages.size() && MenuParts::Item(T("Move right")))
-               std::swap(s.pages[i], s.pages[i + 1]), s.front = i + 1;
-            MenuParts::Separator();
-            DockItem();
-            MenuParts::EndPopup();
-         }
-         FormParts::Inline(0.0f, tok::space_1);
-         ImGui::PopID();
+         PagePicker::Entry e;
+         e.name = PageTitle(*pp) + (pp->pinned ? " \xE2\x80\xA2" : "");
+         e.color = pp->color;
+         entries.push_back(std::move(e));
       }
-      if (ChipButton::Draw("+##fpAdd", false))
-         ImGui::OpenPopup("##fpNew");
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("New scratch page"));
+      PagePicker::Options opt;
+      opt.maxW = std::max(1.0f, ImGui::GetContentRegionAvail().x - 3.0f * (tok::control_h + tok::space_1) - 8.0f);
+      opt.canClose = true;
+      int closeAt = -1;
+      const PagePicker::Result r = PagePicker::Draw("##fpPages", entries, s.front, T("New scratch page"), opt);
+      Page* rp = r.index >= 0 && r.index < (int)s.pages.size() ? s.pages[r.index].get() : nullptr;
+      switch (r.act)
+      {
+      case PagePicker::Act::Select: s.front = r.index; break;
+      case PagePicker::Act::Add: ImGui::OpenPopup("##fpNew"); break;
+      case PagePicker::Act::Rename:
+         if (rp->uid == 0)
+            rp->scratchName = r.name;
+         else
+            s.nodeNames[rp->uid] = r.name;
+         break;
+      case PagePicker::Act::Recolor: rp->color = r.color; break;
+      case PagePicker::Act::Duplicate:
+      {
+         const std::string code = rp->uid == 0 ? rp->scratchCode : rp->parsedFrom;
+         const unsigned int col = rp->color;
+         Page& d = AddScratch(PageTitle(*rp) + " " + T("copy"), code);
+         d.color = col;
+         break;
+      }
+      case PagePicker::Act::Move:
+      {
+         // The page in front stays in front, wherever it lands.
+         const Page* front = s.front >= 0 && s.front < (int)s.pages.size() ? s.pages[s.front].get() : nullptr;
+         auto moved = std::move(s.pages[r.index]);
+         s.pages.erase(s.pages.begin() + r.index);
+         s.pages.insert(s.pages.begin() + r.to, std::move(moved));
+         for (int i = 0; i < (int)s.pages.size(); i++)
+            if (s.pages[i].get() == front)
+               s.front = i;
+         break;
+      }
+      case PagePicker::Act::Delete:
+         if (rp->uid != 0)
+         {
+            if (GraphNode* gn = FindNodeByUid(rp->uid))
+            {
+               PushUndoCheckpoint("Delete Field Node");
+               RemoveNodeByIndex(gn->index);
+            }
+         }
+         else
+            ClosePage(r.index);
+         break;
+      case PagePicker::Act::Close: closeAt = r.index; break;
+      default: break;
+      }
+      if (closeAt >= 0)
+         ClosePage(closeAt);
       if (MenuParts::BeginPopup("##fpNew"))
       {
          if (MenuParts::Item(T("Empty page")))
@@ -1531,7 +1508,16 @@ namespace
          MenuParts::EndPopup();
       }
       FormParts::Inline(0.0f, tok::space_1);
-      if (IconTile::Draw("##fpMax", IconsInfinite::PopOut, IconsInfinite::PopOut, gFieldPatcherMaximised, ChipButton::kHeight))
+      if (Page* fp = Front())
+      {
+         // Pin: the front page stays put when the canvas selection changes.
+         if (IconTile::Draw("##fpPin", IconsInfinite::Lock, IconsInfinite::Lock, fp->pinned, ChipButton::Height()))
+            fp->pinned = !fp->pinned;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", fp->pinned ? T("Unpin page") : T("Pin page"));
+         FormParts::Inline(0.0f, tok::space_1);
+      }
+      if (IconTile::Draw("##fpMax", IconsInfinite::PopOut, IconsInfinite::PopOut, gFieldPatcherMaximised, ChipButton::Height()))
          gFieldPatcherMaximised = !gFieldPatcherMaximised;
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Maximise (Esc returns)"));
@@ -1540,7 +1526,7 @@ namespace
       const float freeW = ImGui::GetContentRegionAvail().x;
       if (freeW > 8.0f)
       {
-         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, ChipButton::kHeight));
+         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, ChipButton::Height()));
          if (MenuParts::BeginContextItem("##fpStripMenu"))
          {
             DockItem();
@@ -1554,7 +1540,7 @@ namespace
       const int boxes = (int)p.graph.boxes.size();
       const int codeBoxes = p.graph.CountCodeBoxes();
       const ImVec4 warn = ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered));
-      const float dy = std::max(0.0f, (ChipButton::kHeight - ImGui::GetTextLineHeight()) * 0.5f);
+      const float dy = std::max(0.0f, (ChipButton::Height() - ImGui::GetTextLineHeight()) * 0.5f);
       const float y0 = ImGui::GetCursorPosY();
       // Every item of the row shares one centre line: chips are kHeight tall, text is nudged to match.
       auto text = [&](const char* t, const ImVec4* col = nullptr) {
@@ -1609,7 +1595,7 @@ namespace
       const float freeW = ImGui::GetContentRegionAvail().x;
       if (freeW > 8.0f)
       {
-         ImGui::InvisibleButton("##fpFooterFree", ImVec2(freeW, ChipButton::kHeight));
+         ImGui::InvisibleButton("##fpFooterFree", ImVec2(freeW, ChipButton::Height()));
          if (MenuParts::BeginContextItem("##fpFooterMenu"))
          {
             DockItem();
@@ -1620,45 +1606,46 @@ namespace
          ImGui::NewLine();
    }
 
+   // No page: a bare canvas, as Max and Pd open on an empty patcher. Double-click starts an empty page; right-click
+   // lists the starters by kind.
    void DrawEmpty()
    {
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const ImVec2 mn = ImGui::GetCursorScreenPos();
-      EmptyState::Draw(mn, ImVec2(mn.x + avail.x, mn.y + avail.y * 0.4f), T("New patch"), T("Select a Field node, or start from one of these"));
-      // Empty page on top, then one column per kind (Primitive, Modulator, Notes, Pixel, Effect), four starters each.
-      static const char* kKinds[] = { "Primitive", "Modulator", "Notes", "Pixel", "Effect" };
-      constexpr int kKindCount = 5;
-      const int perKind = Field::kPatcherStarterCount / kKindCount;
-      const float gap = tok::space_2;
-      const float bw = std::clamp((avail.x - (kKindCount - 1) * gap - 2.0f * gap) / kKindCount, 84.0f, 150.0f);
-      const float gridW = kKindCount * bw + (kKindCount - 1) * gap;
-      const float x0 = mn.x + std::max(0.0f, (avail.x - gridW) * 0.5f);
-      const float rowH = ImGui::GetFrameHeight() + gap;
-      float y = mn.y + avail.y * 0.4f + tok::space_2;
-      ImGui::SetCursorScreenPos(ImVec2(x0 + (gridW - bw) * 0.5f, y));
-      if (ActionButton::Draw(T("Empty page"), ImVec2(bw, 0)))
+      const ImVec2 mx(mn.x + std::max(1.0f, avail.x), mn.y + std::max(1.0f, avail.y));
+      ImU32 bg = IM_COL32(0, 0, 0, 255);
+      if (gEditor != nullptr)
+      {
+         ed::EditorContext* prev = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+         bg = ImGui::GetColorU32(ed::GetStyle().Colors[ed::StyleColor_Bg]);
+         ed::SetCurrentEditor(prev);
+      }
+      ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, bg, tok::radius_container);
+      ImGui::InvisibleButton("##fpEmptyCanvas", ImVec2(mx.x - mn.x, mx.y - mn.y));
+      if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          AddScratch("", "");
-      y += rowH + gap;
-      for (int c = 0; c < kKindCount; c++)
+      if (MenuParts::BeginContextItem("##fpEmptyMenu"))
       {
-         const char* head = T(kKinds[c]);
-         const float tw = ImGui::CalcTextSize(head).x;
-         ImGui::SetCursorScreenPos(ImVec2(x0 + c * (bw + gap) + (bw - tw) * 0.5f, y));
-         ImGui::TextDisabled("%s", head);
+         if (MenuParts::Item(T("Empty page")))
+            AddScratch("", "");
+         MenuParts::Separator();
+         static const char* kKinds[] = { "Primitive", "Modulator", "Notes", "Pixel", "Effect" };
+         constexpr int kKindCount = 5;
+         const int perKind = Field::kPatcherStarterCount / kKindCount;
+         for (int c = 0; c < kKindCount; c++)
+         {
+            if (!MenuParts::SubMenu(T(kKinds[c])))
+               continue;
+            for (int k = c * perKind; k < Field::kPatcherStarterCount && (k < (c + 1) * perKind || c == kKindCount - 1); k++)
+               if (MenuParts::Item(T(Field::kPatcherStarters[k].name)))
+                  FieldPatcherOpenStarter(k);
+            ImGui::EndMenu();
+         }
+         MenuParts::Separator();
+         DockItem();
+         MenuParts::EndPopup();
       }
-      y += ImGui::GetTextLineHeight() + gap;
-      for (int k = 0; k < Field::kPatcherStarterCount; k++)
-      {
-         const int c = std::min(k / perKind, kKindCount - 1), r = k - c * perKind;
-         ImGui::SetCursorScreenPos(ImVec2(x0 + c * (bw + gap), y + r * rowH));
-         ImGui::PushID(k);
-         if (ActionButton::Draw(T(Field::kPatcherStarters[k].name), ImVec2(bw, 0)))
-            FieldPatcherOpenStarter(k);
-         ImGui::PopID();
-      }
-      y += (perKind - 1) * rowH;
-      ImGui::SetCursorScreenPos(ImVec2(mn.x, y + ImGui::GetFrameHeight()));
-      ImGui::Dummy(ImVec2(0.0f, 0.0f));
    }
 
    void DrawPanel()

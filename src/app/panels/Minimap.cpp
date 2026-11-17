@@ -67,7 +67,9 @@ namespace app
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
       const bool isLight = (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
 
-      ImDrawList* dl = ImGui::GetForegroundDrawList();
+      // The graph window's own list (drawn while the editor is suspended): above the nodes, under every popup and
+      // panel. The foreground list painted it over the Field Patcher's page menu.
+      ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h),
                         IM_COL32((int)(t.panelBg.r * 255), (int)(t.panelBg.g * 255), (int)(t.panelBg.b * 255), (int)(gMinimapOpacity * 255)), tok::radius_control);
       dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h),

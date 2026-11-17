@@ -327,8 +327,8 @@ void DrawLayout(FrameCtx& fc)
          gDrumPanelDock = 0; // bottom or top only
       if (gDrumPanelOpen)
       {
-         // Fixed at the lanes' natural height (rows never squash, no empty desk below); only a short window trims it.
-         gDrumPanelHeight = std::clamp(gDrumPanelNaturalH, 200.0f, std::max(200.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         // User-sized by the grip; a short window trims it.
+         gDrumPanelHeight = std::clamp(gDrumPanelHeight, 160.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
          topBottom += gDrumPanelHeight;
          topBottomRows++;
       }
@@ -409,6 +409,17 @@ void DrawLayout(FrameCtx& fc)
             DrawView3DDocked("##view3d_fill", ImVec2(0, graphHeight));
          else
             DrawView2DDocked("##view2d_fill", ImVec2(0, graphHeight));
+         {
+            // Full means full: the margins around the filling view are painted solid, so nothing behind (the
+            // canvas's cables, the stage backdrop) shows through. The parent's draw list sits under the view's child.
+            ImGuiWindow* w = ImGui::GetCurrentWindow();
+            // The whole shell below the bar is painted, not a band round the view: the gaps between the view and the
+            // rows docked under it showed the graph canvas through. Docked rows are child windows and draw on top.
+            ImDrawList* bl = w->DrawList;
+            bl->PushClipRect(w->Rect().Min, w->Rect().Max, false);
+            bl->AddRectFilled(ImVec2(w->Pos.x, w->InnerRect.Min.y), w->Rect().Max, ImGui::GetColorU32(ImGuiCol_WindowBg));
+            bl->PopClipRect();
+         }
          fc.viewFillResume = ImGui::GetCursorPos();
          fc.viewFillMax = ImGui::GetCurrentWindow()->DC.CursorMaxPos;
          ImGui::SetCursorPosY(fc.viewFillResume.y + ImGui::GetIO().DisplaySize.y + 4000.0f);

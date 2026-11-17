@@ -1612,7 +1612,7 @@ Right-click an empty spot on a track and choose **Add Clip**. The menu shows the
 Picture: Right-click a lane: Add Clip at the clicked bar and beat.
 
 ### Assigning a clip to a node
-Three ways: right-click a node on the canvas and choose **Add to Timeline** (creates an assigned clip at the playhead), choose **Assign Node...** in the clip's right-click menu, or use **Assign Different Node...** in the inspector. An assigned clip takes the node's name and a thumbnail, and the viewport monitor shows its output as the playhead crosses it.Picture: The Stage clip selected (outlined); the monitor on the left shows the timeline output.
+Three ways: right-click a node on the canvas and choose **Add to Timeline** (creates an assigned clip at the playhead), choose **Assign Node...** in the clip's right-click menu, or use **Reassign...** in the inspector. An assigned clip takes the node's name and a thumbnail, and the viewport monitor shows its output as the playhead crosses it.Picture: The Stage clip selected (outlined); the monitor on the left shows the timeline output.
 
 ### Right-clicking a clip
 Picture: The clip menu.
@@ -1640,7 +1640,7 @@ Picture: Video Track: name, Active, opacity, Track Tint, Duplicate, Delete.
 R"AGENTDOC(- **Blend / Opacity / Bright / Contrast / Sat**: How the clip composites over tracks beneath it.
 - **Color Tint**: The swatches colour the clip block.
 - **Source Node**: The node and node type the clip plays.
-- **Assign Different Node... / Clear Source**: Swap the node or make the clip unassigned again.
+- **Reassign... / Clear Source**: Swap the node or make the clip unassigned again.
 
 ### Selecting several clips and grouping
 To move or colour several clips at once, press **R** for the Range Selection tool and drag a box over them, then press **A** to return to Select. Clips grouped with Group (Cmd+G) move as one.

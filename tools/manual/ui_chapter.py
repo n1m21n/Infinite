@@ -204,7 +204,7 @@ def html_chapter(P):
                   "A clip with no node yet is shown hatched.</p>",
                   fig("tl_lane_menu", "Right-click a lane: Add Clip at the clicked bar and beat.", box=(340, 140, 900, 270), width="70%"),
                   "<h3>Assigning a clip to a node</h3><p>Three ways: right-click a node on the canvas and choose <b>Add to Timeline</b> (creates an assigned clip at the playhead), "
-                  "choose <b>Assign Node...</b> in the clip's right-click menu, or use <b>Assign Different Node...</b> in the inspector. "
+                  "choose <b>Assign Node...</b> in the clip's right-click menu, or use <b>Reassign...</b> in the inspector. "
                   "An assigned clip takes the node's name and a thumbnail, and the viewport monitor shows its output as the playhead crosses it.",
                   fig("tl_clip_selected", "The Stage clip selected (outlined); the monitor on the left shows the timeline output.", box=(0, 60, 1290, 560), width="72%")))
 
@@ -232,7 +232,7 @@ def html_chapter(P):
                       ("Blend / Opacity / Bright / Contrast / Sat", "How the clip composites over tracks beneath it."),
                       ("Color Tint", "The swatches colour the clip block."),
                       ("Source Node", "The node and node type the clip plays."),
-                      ("Assign Different Node... / Clear Source", "Swap the node or make the clip unassigned again."),
+                      ("Reassign... / Clear Source", "Swap the node or make the clip unassigned again."),
                   ]), 3))))
 
     b.append(page("<h3>Selecting several clips and grouping</h3>",

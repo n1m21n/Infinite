@@ -4,6 +4,7 @@
 #include "app/panels/CurveEditorPanel.h"
 
 #include "app/AppShared.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PanelKit.h"
@@ -53,7 +54,7 @@ bool gCurveRecordPicking = false;
 namespace
 {
    constexpr float kMinHeight = 220.0f, kMinWidth = 360.0f;
-   constexpr float kIconW = PanelKit::kChip, kPageW = 140.0f, kSideW = 300.0f, kRulerH = 16.0f;
+   constexpr float kIconW = tok::control_h, kPageW = 140.0f, kSideW = UiDensity::kInspectorW + 2.0f * tok::space_3, kRulerH = 16.0f;
    constexpr float kPad = 8.0f;     // graph edge to the 0 and 1 value lines
    constexpr float kHit = 7.0f;     // px a point or handle grabs from
    constexpr float kEraseR = 9.0f;  // px the eraser rubs out
@@ -487,12 +488,12 @@ namespace
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip)
    {
-      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::kChip);
+      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::Chip());
    }
 
    bool PickerFace(const char* id, const char* value, float w, const char* tip, ImVec2& bmin, ImVec2& bmax)
    {
-      const bool clicked = ActionButton::Draw(id, ImVec2(w, PanelKit::kChip));
+      const bool clicked = ActionButton::Draw(id, ImVec2(w, PanelKit::Chip()));
       if (tip != nullptr && ImGui::IsItemHovered())
          HelpTip("%s", tip);
       bmin = ImGui::GetItemRectMin();
@@ -1492,8 +1493,15 @@ namespace
       return WasRecorded(gn.uid) ? IconsInfinite::RecordFill : IconsInfinite::Curve;
    }
 
+   uint64_t sPendingDelete = 0;   // Delete Curve: done at the next strip draw, so this frame never holds a dead node
+
    void DrawPageStrip(float width)
    {
+      if (sPendingDelete != 0)
+      {
+         DeletePage(sPendingDelete);
+         sPendingDelete = 0;
+      }
       State& s = S();
       const std::vector<GraphNode*> pages = ModePages();
       std::vector<PagePicker::Entry> entries;
@@ -1510,13 +1518,9 @@ namespace
             current = i;
       }
       PagePicker::Options opt;
-      opt.deleteLabel = T("Delete Curve");
-      opt.maxW = std::max(1.0f, width - PanelKit::kChip - tok::space_1);
+      opt.maxW = std::max(1.0f, width - PanelKit::Chip() - tok::space_1);
+      opt.canClose = true; // middle-click a chip: close the page, the node stays
       uint64_t closeUid = 0;
-      opt.extraMenu = [&](int i) {
-         if (MenuParts::Item(T("Close Page")))
-            closeUid = pages[i]->uid;
-      };
       const PagePicker::Result r = PagePicker::Draw("##cePages", entries, current, T("New curve"), opt);
       GraphNode* gn = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
       switch (r.act)
@@ -1547,7 +1551,10 @@ namespace
          {
             PushUndoCheckpoint("Reorder Curves");
             ordered.erase(source);
-            ordered.insert(std::find(ordered.begin(), ordered.end(), target), gn);
+            auto at = std::find(ordered.begin(), ordered.end(), target);
+            if (r.to > r.index && at != ordered.end())
+               ++at; // moving right lands after the target
+            ordered.insert(at, gn);
             for (size_t i = 0; i < ordered.size(); ++i)
                AsMseg(ordered[i])->editorOrder = (int)i;
             gPatchDirty = true;
@@ -1566,7 +1573,8 @@ namespace
             gRequestDuplicate = true;
          }
          break;
-      case PagePicker::Act::Delete: DeletePage(gn->uid); break;
+      case PagePicker::Act::Delete: sPendingDelete = gn->uid; break;
+      case PagePicker::Act::Close: closeUid = gn->uid; break;
       default: break;
       }
       if (closeUid != 0)
@@ -1593,7 +1601,7 @@ namespace
 
    // ---- side panel rows: the 3D View's (View3DPanel.cpp Card/FieldLabel/...Row), so both panels read the same.
 
-   constexpr float kFieldLabelW = 100.0f;
+   inline float FieldLabelW() { return UiDensity::IsCompact() ? 74.0f : 100.0f; }
    float sFieldW = 160.0f;
    std::string sCard; // the open card: rows share labels across cards ("Start" in Loop and Point)
 
@@ -1605,6 +1613,7 @@ namespace
       auto found = sOpen.find(title);
       bool open = found != sOpen.end() ? found->second : startOpen;
       SectionCard::Begin();
+      SectionCard::MarkHeader();
       sCard = title;
       ImGui::PushID(title);
       const float h = ImGui::GetTextLineHeight() + 2.0f;
@@ -1631,10 +1640,10 @@ namespace
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
-      ImGui::PushClipRect(p, ImVec2(p.x + kFieldLabelW - ImGui::GetCursorPosX() - 4.0f, p.y + h), true);
+      ImGui::PushClipRect(p, ImVec2(p.x + FieldLabelW() - ImGui::GetCursorPosX() - 4.0f, p.y + h), true);
       ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", text);
       ImGui::PopClipRect();
-      FormParts::Inline(kFieldLabelW);
+      FormParts::Inline(FieldLabelW());
    }
 
    // The checkpoint holds the value from before the grab, though the first frame of a drag already moved it.
@@ -1683,7 +1692,7 @@ namespace
    bool BoolRow(const char* label, bool* v, const char* undo = "Edit Curve")
    {
       const float rowY = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
+      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
       bool on = *v;
       bool hit = CheckBox::Box(RowId(label).c_str(), &on);
       FormParts::Inline(0.0f, tok::space_2);
@@ -2305,6 +2314,7 @@ namespace
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       ImGui::GetStyle().WindowPadding = savedPad;
       PopDockedPanelStyle();
+      UiDensity::Compact compact;
       const float availW = ImGui::GetContentRegionAvail().x;
       SectionCard::Title(T("Curve"));
       FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
@@ -2317,13 +2327,14 @@ namespace
                       ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled));
       }
       // A child whose first card touches its top and sides (the 3D View's BeginCardColumn); only it scrolls.
-      FormParts::BeginChildPadX("##ceProps", SectionCard::kPad);
+      FormParts::BeginChildPadX("##ceProps", SectionCard::Pad());
       SectionCard::BeginWindow();
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
-      sFieldW = std::max(70.0f, ImGui::GetContentRegionAvail().x - kFieldLabelW);
+      sFieldW = std::max(60.0f, ImGui::GetContentRegionAvail().x - FieldLabelW());
       DrawInspector(gn, n);
       SectionCard::EndWindow();
       ImGui::EndChild();
+      compact.End(); // before the child closes: the pushes were made inside it
       ImGui::EndChild();
    }
 
@@ -2464,7 +2475,7 @@ namespace
       }
       row.Next(tok::space_1);
       const bool armed = gCurveAssignUid == gn.uid;
-      if (ActionButton::Draw(AssignLabel(), ImVec2(AssignW(), PanelKit::kChip), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(AssignLabel(), ImVec2(AssignW(), PanelKit::Chip()), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
          gCurveAssignUid = armed ? 0 : gn.uid;
       if (ImGui::IsItemHovered())
       {
@@ -2497,7 +2508,7 @@ namespace
                row.Next(tok::space_1);
             ActionButton::Scoped() = s.motion == (k == 1) ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
             const std::string id = std::string(label) + "##ceKind" + std::to_string(k);
-            if (ActionButton::Draw(id.c_str(), ImVec2(w, PanelKit::kChip)) && s.motion != (k == 1))
+            if (ActionButton::Draw(id.c_str(), ImVec2(w, PanelKit::Chip())) && s.motion != (k == 1))
             {
                s.motion = k == 1;
                const std::vector<GraphNode*> pages = ModePages();
@@ -2531,7 +2542,7 @@ namespace
 
    void DrawDockMenu()
    {
-      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::kChip + tok::space_3);
+      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::Chip() + tok::space_3);
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##curveDockMenu");
@@ -2614,6 +2625,7 @@ namespace
 
       const bool side = gCurveEditorDock == 1 || gCurveEditorDock == 2;
       DrawHeader(gn, n, side);
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));   // breathing room between the header chips and the ruler / side card
       if (n == nullptr)
       {
          const ImVec2 avail = ImGui::GetContentRegionAvail();

@@ -6,17 +6,19 @@
 #include <cmath>
 #include "app/AppShared.h"
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/UiDensity.h"
 
 namespace CheckBox
 {
-   constexpr float kSize = 16.0f;
+   // The box edge at the current density (16 regular, smaller in a compact inspector).
+   inline float Size() { return UiDensity::M().check; }
 
    // Box at `p`; `onv` and `hv` are the eased on / hover values in 0..1.
    // `tint` (optional) replaces the accent fill, e.g. the amber of a modulated box.
    inline void Draw(ImDrawList* dl, ImVec2 p, float onv, float hv, const ImVec4* tint = nullptr)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      const ImVec2 q(p.x + kSize, p.y + kSize);
+      const ImVec2 q(p.x + Size(), p.y + Size());
       UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, 0.06f));
       dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f + 0.06f * hv)), tok::radius_control);
       dl->AddRect(p, q, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.10f) : ImVec4(1, 1, 1, 0.08f)),
@@ -27,9 +29,9 @@ namespace CheckBox
       a.w *= onv;
       dl->AddRectFilled(p, q, ImGui::GetColorU32(a), tok::radius_control);
       // Tick: two strokes, drawn along their length by `onv`.
-      const ImVec2 a0(p.x + kSize * 0.24f, p.y + kSize * 0.52f);
-      const ImVec2 a1(p.x + kSize * 0.43f, p.y + kSize * 0.71f);
-      const ImVec2 a2(p.x + kSize * 0.77f, p.y + kSize * 0.31f);
+      const ImVec2 a0(p.x + Size() * 0.24f, p.y + Size() * 0.52f);
+      const ImVec2 a1(p.x + Size() * 0.43f, p.y + Size() * 0.71f);
+      const ImVec2 a2(p.x + Size() * 0.77f, p.y + Size() * 0.31f);
       const float l1 = 0.27f, l2 = 0.53f;                   // stroke lengths, in box units
       const float d = onv * (l1 + l2);
       const ImU32 col = ImGui::GetColorU32(ImVec4(1, 1, 1, std::min(1.0f, onv * 1.4f)));
@@ -49,22 +51,22 @@ namespace CheckBox
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
       // G16: hit area 24x24 around the 16 box; layout keeps the 16 box (Dummy below).
-      constexpr float kHit = 24.0f;
-      ImGui::SetCursorScreenPos(ImVec2(p.x - (kHit - kSize) * 0.5f, p.y - (kHit - kSize) * 0.5f));
+      const float kHit = std::max(UiDensity::M().row, Size() + 4.0f);
+      ImGui::SetCursorScreenPos(ImVec2(p.x - (kHit - Size()) * 0.5f, p.y - (kHit - Size()) * 0.5f));
       const bool clicked = ImGui::InvisibleButton(id, ImVec2(kHit, kHit));
       const bool hovered = ImGui::IsItemHovered();
       const bool focused = ImGui::IsItemFocused();
       const ImGuiID iid = ImGui::GetItemID();
       UiAudit::NoteKind("checkbox", id);
       ImGui::SetCursorScreenPos(p);
-      ImGui::Dummy(ImVec2(kSize, kSize));
+      ImGui::Dummy(ImVec2(Size(), Size()));
       if (clicked)
          *v = !*v;
       const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
       const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
       Draw(ImGui::GetWindowDrawList(), p, onv, hv);
       if (focused && ImGui::GetIO().NavVisible)
-         ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x - 2, p.y - 2), ImVec2(p.x + kSize + 2, p.y + kSize + 2),
+         ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x - 2, p.y - 2), ImVec2(p.x + Size() + 2, p.y + Size() + 2),
                                              ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 1.5f);
       return clicked;
    }

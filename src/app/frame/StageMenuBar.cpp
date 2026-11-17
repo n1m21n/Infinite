@@ -194,10 +194,13 @@ void DrawMenuBar(FrameCtx& fc)
       // The bar is tok::bar_h tall: ImGui sizes it from FramePadding.y at Begin.
       const float barPadY = (tok::bar_h - ImGui::GetFontSize()) * 0.5f;
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, barPadY));
+      // A 2D or 3D View on Fill takes the whole window, top bar included (Blender's Fullscreen Area, Photoshop's
+      // full screen mode); its own Fill icon brings the bar back.
+      const bool viewFills = (gView2DOpen && gView2DDock == 4) || (gView3DOpen && gView3DDock == 4);
       ImGui::Begin("Infinite", nullptr,
                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                   ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar |
+                   (viewFills ? 0 : ImGuiWindowFlags_MenuBar) | ImGuiWindowFlags_NoScrollbar |
                    ImGuiWindowFlags_NoScrollWithMouse);
       ImGui::PopStyleVar(2);
 

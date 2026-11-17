@@ -697,7 +697,7 @@ namespace app
          ImGui::SetNextItemWidth(std::max(80.0f, width - btnW - tok::space_1));
          const bool enter = ImGui::InputTextWithHint("##signincode", T("Paste the code"), &s.codeInput, ImGuiInputTextFlags_EnterReturnsTrue);
          FormParts::Inline(0.0f, tok::space_1);
-         const bool press = ChipButton::Draw(T("Submit"), true, 26.0f);
+         const bool press = ChipButton::Draw(T("Submit"), true, tok::control_h);
          if (!(enter || press))
             return;
          std::string code = s.codeInput;
@@ -3015,7 +3015,7 @@ namespace app
          const float icon = tok::icon_control;
          const float pad = tok::space_2;
          const ImVec2 ts = ImGui::CalcTextSize(label);
-         const ImVec2 sz(pad + icon + 6.0f + ts.x + pad, ChipButton::kHeight);
+         const ImVec2 sz(pad + icon + 6.0f + ts.x + pad, ChipButton::Height());
          const ImVec2 p = ImGui::GetCursorScreenPos();
          if (ImGui::InvisibleButton(id, sz))
             OpenCode(title, code);
@@ -3322,7 +3322,7 @@ namespace app
             Weight cap(UiType::Weight::Medium);
             // The heading row is as tall as the Undo chip, so the mark, the word and the chip share one centre line.
             const ImVec2 h = ImGui::GetCursorScreenPos();
-            const float headH = ChipButton::kHeight;
+            const float headH = ChipButton::Height();
             const ImU32 accent = e.undone ? Dim() : (e.ok ? ImGui::GetColorU32(AccentEmphasisSelected()) : Red());
             glyph::Draw(dl, ImVec2(h.x + 6.0f, h.y + headH * 0.5f), tok::icon_control, accent, IconsInfinite::Bolt);
             dl->AddText(ImVec2(h.x + 16.0f, std::round(h.y + (headH - ImGui::GetFontSize()) * 0.5f)), Dim(), e.undone ? T("Undone") : (e.ok ? T("Changed") : T("Did not run")));
@@ -4199,7 +4199,7 @@ namespace app
             {
                const Piece& hp = sPieces[(size_t)idx[(size_t)hi.piece]];
                const Piece& lp = sPieces[(size_t)idx[(size_t)lo.piece]];
-               const float h = ChipButton::kHeight, pad = 3.0f;
+               const float h = ChipButton::Height(), pad = 3.0f;
                const float w = ImGui::CalcTextSize(T("Copy")).x + ImGui::CalcTextSize(T("Reply")).x + 4.0f * tok::space_2 + 3.0f * pad;
                ImVec2 at(XOf(hp, hi.ch) - w * 0.5f, hp.max.y + tok::space_1);
                if (at.y + h + 2.0f * pad > win->InnerRect.Max.y)
@@ -4374,7 +4374,7 @@ namespace app
                      }
                      if (!e.detail.empty())
                      {
-                        if (ChipButton::Draw(ui.open ? T("Hide details") : T("Details"), false, ChipButton::kHeight, 0.0f, true))
+                        if (ChipButton::Draw(ui.open ? T("Hide details") : T("Details"), false, ChipButton::Height(), 0.0f, true))
                            ui.open = !ui.open;
                         if (ui.open)
                         {

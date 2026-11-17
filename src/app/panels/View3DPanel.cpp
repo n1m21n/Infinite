@@ -6,6 +6,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/PanelKit.h"
 #include <set>
 #include <sstream>
@@ -54,10 +55,10 @@ ImVec2 gView3DRectMin, gView3DRectMax;
 namespace
 {
    constexpr float kMinHeight = 300.0f;
-   constexpr float kSideW = 340.0f;
+   constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kPi = 3.14159265f;
    constexpr float kFov = 45.0f;
-   constexpr float kIconW = PanelKit::kChip;
+   constexpr float kIconW = tok::control_h;
    constexpr float kGizmoPx = 84.0f;
 
    // Overlay colours are Blender's factory theme, not the app's: a 3D viewport is
@@ -5644,7 +5645,7 @@ namespace
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip)
    {
-      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::kChip);
+      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::Chip());
    }
 
    void DrawHeader(Scene3DNode* scene)
@@ -5725,7 +5726,7 @@ namespace
          const char* convertL = L("Convert##v3dconvert");
          const float convertW = ImGui::CalcTextSize(convertL, ImGui::FindRenderedTextEnd(convertL)).x + 2.0f * tok::space_3;
          ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX - tok::space_1 - convertW));
-         if (ActionButton::Draw(convertL, ImVec2(convertW, PanelKit::kChip)))
+         if (ActionButton::Draw(convertL, ImVec2(convertW, PanelKit::Chip())))
             sPending.what = Pending::ConvertScene;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Put this scene on the canvas"));
@@ -5770,7 +5771,8 @@ namespace
    std::string sCard;   // the open card: rows share labels across cards ("Strength" in Shadows and AO)
 
    std::string RowId(const char* label) { return FormParts::Id((sCard + "/" + label).c_str()); }
-   constexpr float kFieldLabelW = 100.0f;   // the shared column is too narrow for Resolution X or Field of view
+   // Wider than the shared column: Resolution X and Field of view need it.
+   inline float FieldLabelW() { return UiDensity::IsCompact() ? 74.0f : 100.0f; }
 
    void FieldLabel(const char* text)
    {
@@ -5778,10 +5780,10 @@ namespace
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
-      ImGui::PushClipRect(p, ImVec2(p.x + kFieldLabelW - ImGui::GetCursorPosX() - 4.0f, p.y + h), true);
+      ImGui::PushClipRect(p, ImVec2(p.x + FieldLabelW() - ImGui::GetCursorPosX() - 4.0f, p.y + h), true);
       ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", text);
       ImGui::PopClipRect();
-      FormParts::Inline(kFieldLabelW);
+      FormParts::Inline(FieldLabelW());
    }
 
    void Hint(const char* text)
@@ -5880,7 +5882,7 @@ namespace
    {
       // Box first and the label beside it, so a long label has the whole row.
       const float rowY = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
+      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
       bool on = *v;
       bool hit = CheckBox::Box(RowId(label).c_str(), &on);
       FormParts::Inline(0.0f, tok::space_2);
@@ -5919,6 +5921,7 @@ namespace
       auto found = sOpen.find(title);
       bool open = found != sOpen.end() ? found->second : startOpen;
       SectionCard::Begin();
+      SectionCard::MarkHeader();
       sCard = title;
       ImGui::PushID(title);
       const float h = ImGui::GetTextLineHeight() + 2.0f;
@@ -6037,7 +6040,7 @@ namespace
          return hit != lf.listInvert;
       };
       const ImGuiIO& io = ImGui::GetIO();
-      const float rowH = 24.0f;
+      const float rowH = tok::row_h;
       // Fills the tab below the search box, then scrolls.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
@@ -6154,12 +6157,12 @@ namespace
          }
          if (it.id == scene->activeCamera)
             glyph::Draw(dl, ImVec2(p.x + availW - 36.0f, midY), tok::icon_control, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
-         float colX = availW - 24.0f;
+         float colX = availW - tok::control_h;
          if (lf.colRender)
          {
-            colX -= 24.0f;
+            colX -= tok::control_h;
             ImGui::SetCursorScreenPos(ImVec2(p.x + colX, p.y));
-            if (ImGui::InvisibleButton("##rnd", ImVec2(24.0f, rowH)))
+            if (ImGui::InvisibleButton("##rnd", ImVec2(tok::control_h, rowH)))
             {
                PushUndoCheckpoint("Render toggle in 3D View");
                it.render = !it.render;
@@ -6169,9 +6172,9 @@ namespace
          }
          if (lf.colSelect)
          {
-            colX -= 24.0f;
+            colX -= tok::control_h;
             ImGui::SetCursorScreenPos(ImVec2(p.x + colX, p.y));
-            if (ImGui::InvisibleButton("##sel", ImVec2(24.0f, rowH)))
+            if (ImGui::InvisibleButton("##sel", ImVec2(tok::control_h, rowH)))
             {
                PushUndoCheckpoint("Selectable toggle in 3D View");
                it.hideSelect = !it.hideSelect;
@@ -6179,8 +6182,8 @@ namespace
             }
             glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_control, text, it.hideSelect ? IconsInfinite::EyeOff : IconsInfinite::Cube);
          }
-         ImGui::SetCursorScreenPos(ImVec2(p.x + availW - 24.0f, p.y));
-         if (ImGui::InvisibleButton("##eye", ImVec2(24.0f, rowH)))
+         ImGui::SetCursorScreenPos(ImVec2(p.x + availW - tok::control_h, p.y));
+         if (ImGui::InvisibleButton("##eye", ImVec2(tok::control_h, rowH)))
          {
             PushUndoCheckpoint("Show or hide in 3D View");
             it.visible = !it.visible;
@@ -7796,7 +7799,7 @@ namespace
    // A child whose first card touches its top and sides, so the card lines up with the rail.
    void BeginCardColumn(const char* id, ImGuiChildFlags flags)
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::kPad, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::Pad(), 0.0f));
       ImGui::BeginChild(id, ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding | flags);
       ImGui::PopStyleVar();
       SectionCard::BeginWindow();
@@ -7818,6 +7821,7 @@ namespace
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       ImGui::GetStyle().WindowPadding = savedPad;
       PopDockedPanelStyle();
+      UiDensity::Compact compact;   // the settings are a compact strip (Photoshop / Affinity Properties size)
       float availW = ImGui::GetContentRegionAvail().x;
       SectionCard::Title(T("3D View"));
       FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
@@ -7865,8 +7869,8 @@ namespace
       ImGui::EndGroup();
       ActionButton::RowNext();
       BeginCardColumn("##v3dprops", ImGuiChildFlags_None);
-      availW = ImGui::GetContentRegionAvail().x;
-      sFieldW = std::max(70.0f, availW - kFieldLabelW);
+      availW = std::floor(ImGui::GetContentRegionAvail().x);
+      sFieldW = std::max(60.0f, availW - FieldLabelW());
       sCard.clear();
       if (sTab == kSceneTab) DrawOutliner(scene, availW, ImGui::GetContentRegionAvail().y);
       else if (sTab == 0) DrawRenderTab(scene);
@@ -7877,6 +7881,7 @@ namespace
       else if (sTab == kMaterialTab) DrawMaterialTab(scene, availW);
       else DrawViewTab(scene, availW);
       EndCardColumn();
+      compact.End(); // before the child closes: the pushes were made inside it
       ImGui::EndChild();
    }
 
@@ -8323,7 +8328,8 @@ namespace
       DrawDockMenu(headTop, ImGui::GetCursorScreenPos().y);
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
-      const float sideW = sSideOpen ? std::min(kSideW, avail.x * 0.5f) : 0.0f;
+      const float sideBase = std::min(kSideW, avail.x * 0.5f);
+      const float sideW = sSideOpen ? sideBase : 0.0f;
       const float viewW = std::max(120.0f, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
       DrawViewport(scene, ImVec2(viewW, std::max(80.0f, avail.y)));
       if (sSideOpen)

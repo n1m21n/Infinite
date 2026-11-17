@@ -9,6 +9,7 @@
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/TextButton.h"
@@ -315,10 +316,10 @@ namespace app
             const float avail = ImGui::GetContentRegionAvail().x;
             if (avail > total)
                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - total);
-            if (ChipButton::Draw(L("Cancel"), false, 24.0f, cancelW))
+            if (ChipButton::Draw(L("Cancel"), false, tok::control_h, cancelW))
                ImGui::CloseCurrentPopup();
             FormParts::Inline(0.0f, tok::space_2);
-            if (ChipButton::Draw(L("Delete"), true, 24.0f, deleteW))
+            if (ChipButton::Draw(L("Delete"), true, tok::control_h, deleteW))
             {
                ChatClearHistory();
                ImGui::CloseCurrentPopup();
@@ -369,12 +370,12 @@ namespace app
          const chat::CustomPreset* curPreset = chat::FindCustomPreset(prefs.customPreset);
          const char* preview = curPreset ? curPreset->name : "Custom";
          ImGui::SetNextItemWidth(-1.0f);
-         if (ImGui::BeginCombo("##custompreset", preview))
+         if (MenuParts::BeginCombo("##custompreset", preview))
          {
             for (const chat::CustomPreset& p : presets)
             {
                const bool sel = (prefs.customPreset == p.id);
-               if (ImGui::Selectable(p.name, sel))
+               if (MenuParts::Choice(p.name, sel))
                {
                   prefs.customPreset = p.id;
                   if (p.baseUrl[0] != '\0')
@@ -386,7 +387,7 @@ namespace app
                   SaveConfig(cpaths.config, prefs);
                }
             }
-            ImGui::EndCombo();
+            MenuParts::EndCombo();
          }
 
          FormParts::Label(L("Base URL"));

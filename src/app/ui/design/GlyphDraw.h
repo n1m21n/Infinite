@@ -5,6 +5,7 @@
 #include "imgui.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace glyph
 {
@@ -59,6 +60,10 @@ namespace glyph
    // Glyphs that already fill it keep `role`; thin ones grow by at most 1.4x.
    inline float FitSize(ImVec2 center, float role, const char* g)
    {
+      // + and x are drawn small in the set on purpose (as in Lucide/SF Symbols): two strokes reaching the box edges read
+      // heavier than a filled icon of the same ink box, so they keep their drawn size instead of being stretched.
+      if (std::strcmp(g, IconsInfinite::Plus) == 0 || std::strcmp(g, IconsInfinite::Close) == 0)
+         return role;
       ImVec2 mn, mx;
       InkBox(center, role, g, mn, mx);
       const float ink = std::max(mx.x - mn.x, mx.y - mn.y), target = 0.9f * role;

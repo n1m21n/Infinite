@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include "app/AppShared.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "core/TablerIcons.h"
 #include "app/ui/design/UiType.h"
@@ -32,7 +33,12 @@ namespace FormParts
    struct Narrow
    {
       float savedW; bool savedFill;
-      explicit Narrow(float labelW = 92.0f) : savedW(gLabelW), savedFill(gFill) { gLabelW = labelW; gFill = true; }
+      // labelW < 0: the label column at the current density (92 regular, SectionCard::LabelW() in a compact strip).
+      explicit Narrow(float labelW = -1.0f) : savedW(gLabelW), savedFill(gFill)
+      {
+         gLabelW = labelW >= 0.0f ? labelW : UiDensity::IsCompact() ? SectionCard::LabelW() : 92.0f;
+         gFill = true;
+      }
       ~Narrow() { gLabelW = savedW; gFill = savedFill; }
    };
    // The control width after Label(): the Settings column, or what is left of the row in a Narrow scope.
@@ -104,7 +110,7 @@ namespace FormParts
    {
       Label(label);
       // Row height matches the other controls so rows keep one rhythm.
-      const float pad = (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f;
+      const float pad = (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f;
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
       const bool r = CheckBox::Box(Id(label).c_str(), v);
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
@@ -230,7 +236,7 @@ namespace FormParts
    // Action button: a chip, tok::control_h tall. A size's x is a width floor.
    inline bool Button(const char* label, ImVec2 size = ImVec2(0, 0))
    {
-      return ChipButton::Draw(label, false, kRowH, size.x);
+      return ChipButton::Draw(label, false, 0.0f, size.x);
    }
 
    // Frame tint for a tab bar so the tabs read as chips: quiet at rest, a text-tinted well when selected.

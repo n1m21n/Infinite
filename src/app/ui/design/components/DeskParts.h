@@ -67,14 +67,19 @@ namespace DeskParts
 
    // A key cap, drawn only: a raised cap with an LED bar above the legend. `ledLit` 0..1 is how bright the bar is.
    inline void KeyCap(ImDrawList* dl, ImVec2 p, ImVec2 q, bool hovered, bool down, float ledLit, ImU32 led, const char* legend = nullptr,
-                      bool small = false, float lamp = 0.0f)
+                      bool small = false, float lamp = 0.0f, ImU32 cap = 0)
    {
       const float ledH = small ? 2.0f : 2.5f;
       dl->AddRectFilled(ImVec2(p.x, p.y + 1), ImVec2(q.x, q.y + 1), Lo(150), 3.0f);
       const float dip = down ? 1.0f : 0.0f;
       const ImVec2 a(p.x, p.y + dip), b(q.x, q.y - 1.0f + dip);
-      const ImU32 top = hovered ? Tint(Role(tok::desk_cap_hi), 1.14f) : Role(tok::desk_cap_hi);
-      dl->AddRectFilledMultiColor(a, b, top, top, Role(tok::desk_cap), Role(tok::desk_cap));
+      // cap != 0: a coloured key plastic (TR step keys), lit from above: lighter top, darker foot, a bevel line under the face.
+      const ImU32 capHi = cap != 0 ? Tint(cap, 1.08f) : Role(tok::desk_cap_hi);
+      const ImU32 capLo = cap != 0 ? Tint(cap, 0.72f) : Role(tok::desk_cap);
+      const ImU32 top = hovered ? Tint(capHi, 1.14f) : capHi;
+      dl->AddRectFilledMultiColor(a, b, top, top, capLo, capLo);
+      if (cap != 0)
+         dl->AddLine(ImVec2(a.x + 2, b.y - 2.5f), ImVec2(b.x - 2, b.y - 2.5f), Lo(70), 1.5f);
       dl->AddRect(a, b, Lo(220), 3.0f, 0, 1.0f);
       dl->AddLine(ImVec2(a.x + 2, a.y + 1.5f), ImVec2(b.x - 2, a.y + 1.5f), Hi(60), 1.0f);
       if (lamp > 0.0f) // the whole cap lights in the key colour, brightness = lamp (0..1)

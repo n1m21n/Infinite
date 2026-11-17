@@ -2161,7 +2161,7 @@ namespace app
          row.Skip();
          row.End();
       }
-      if (ChipButton::Draw("Open##pianoOpen", false, ChipButton::kHeight, gAudioBodyW))
+      if (ChipButton::Draw("Open##pianoOpen", false, ChipButton::Height(), gAudioBodyW))
          PianoRollOpenPage(n->laneId);
 
       EndAudioBody();

@@ -776,13 +776,13 @@ namespace app
       {
          const int fmtActive = rset.renderFormat == 1 ? 1 : 0;
          SectionCard::RowLabel(T("Format"));
-         if (ChipButton::Draw(".mp4##arrRenderMp4", fmtActive == 0, 24.0f, 56.0f))
+         if (ChipButton::Draw(".mp4##arrRenderMp4", fmtActive == 0, tok::control_h, 56.0f))
          {
             rset.renderFormat = 0;
             gPatchDirty = true;
          }
          ImGui::SameLine(0.0f, tok::space_1);
-         if (ChipButton::Draw(".mov##arrRenderMov", fmtActive == 1, 24.0f, 56.0f))
+         if (ChipButton::Draw(".mov##arrRenderMov", fmtActive == 1, tok::control_h, 56.0f))
          {
             rset.renderFormat = 1;
             gPatchDirty = true;
@@ -837,14 +837,14 @@ namespace app
       // missing.
       const bool canRender = !sArrangeRenderFileName.empty();
       ImGui::BeginDisabled(!canRender || ArrangeRenderBusy());
-      if (ChipButton::Draw(L("Render Now"), true, 28.0f, 140.0f))
+      if (ChipButton::Draw(L("Render Now"), true, tok::control_h, 140.0f))
       {
          submitJob(true);
          ImGui::CloseCurrentPopup();
       }
       ImGui::EndDisabled();
       ImGui::SameLine(0.0f, tok::space_2);
-      if (ChipButton::Draw(L("Cancel"), false, 28.0f, 88.0f))
+      if (ChipButton::Draw(L("Cancel"), false, tok::control_h, 88.0f))
          ImGui::CloseCurrentPopup();
       SectionCard::EndWindow();
       FieldWell::PopStyle();
@@ -1734,13 +1734,15 @@ namespace app
          MenuParts::EndPopup();
       }
 
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));   // toolbar to hairline = seam to toolbar (grip + space_1)
       ImGui::Separator();
 
       // Layout: Global Viewport Monitor alongside / above timeline lanes
       const bool isWide = panelSize.x >= 720.0f;
       const bool showVp = isWide && gArrangeShowViewport;
-      const float kSettingsW = 244.0f;
       const float kViewportW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : panelSize.x;
+      // Clip Settings takes more columns while the timeline keeps at least 420 pt.
+      const float kSettingsW = ArrangeClipSettingsWidth(std::max(244.0f, panelSize.x - (showVp ? kViewportW : 0.0f) - 420.0f));
       const float kViewportH = isWide ? std::max(120.0f, panelSize.y - 40.0f) : 140.0f;
 
       const float kHeaderWidth = 175.0f; // Mix strip (S M pan gain / opacity), name box, drag handle
@@ -4406,7 +4408,7 @@ namespace app
       if (!gArrange.lanes.empty())
       {
          ImGui::SetCursorScreenPos(ImVec2(headerStartX + 4.0f, lanesContentBottom + 4.0f));
-         if (ChipButton::Draw(L("+ Add Track"), false, 24.0f, kHeaderWidth - 8.0f))
+         if (ChipButton::Draw(L("+ Add Track"), false, tok::control_h, kHeaderWidth - 8.0f))
          {
             gArrangeAddTrackInsertAfter = -1;
             ImGui::OpenPopup("##arrangeaddtrackpopup");

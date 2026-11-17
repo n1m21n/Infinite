@@ -9,6 +9,7 @@
 //           (Lane, Step or Kit). Lanes are generic: the name is the loaded sample, "Empty" otherwise.
 // Drawn in the Mixer's language: FrameBg wells, one SliderGrab accent, ring/dot LEDs, no bevels.
 #include "app/AppShared.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiType.h"
@@ -56,7 +57,7 @@ namespace app
       constexpr int kLanes = DrumSequencerNode::kNumLanes;
       constexpr int kMaxSteps = DrumSequencerNode::kMaxSteps;
       constexpr int kPageSteps = DrumSequencerNode::kEditPageSteps;
-      constexpr float kInspectorW = 268.0f;
+      constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
       constexpr float kRowH = tok::row_h;  // a lane row: fixed, so the grid never squashes as the panel shrinks
       constexpr float kLabelW = 178.0f;  // lane name + M S, left of the grid
       constexpr float kRulerH = tok::row_h;
@@ -93,6 +94,8 @@ namespace app
          for (GraphNode& gn : gNodes)
             if (DrumOf(&gn) != nullptr)
                out.push_back(&gn);
+         // The page strip's own order (Move Left/Right, drag); ties keep canvas order.
+         std::stable_sort(out.begin(), out.end(), [](GraphNode* a, GraphNode* b) { return DrumOf(a)->pageOrder < DrumOf(b)->pageOrder; });
          return out;
       }
 
@@ -174,6 +177,16 @@ namespace app
 
       // One accent for lit keys, LEDs and strip bars: the Mixer's fader colour.
       ImU32 Accent(float alpha = 1.0f) { return ImGui::GetColorU32(ImGuiCol_SliderGrab, alpha); }
+
+      // The rhythm-composer step keys: four groups of four in red, orange, yellow and cream, a red LED on each.
+      // Off keys sit dim in their group colour; a set step lights its key and LED, brightness = velocity.
+      ImU32 TrKey(int step, float k)
+      {
+         static const ImU32 kGroup[4] = { IM_COL32(196, 58, 44, 255), IM_COL32(226, 120, 38, 255), IM_COL32(230, 192, 64, 255),
+                                          IM_COL32(226, 220, 200, 255) };
+         return DeskParts::Tint(kGroup[(step / 4) & 3], k);
+      }
+      constexpr ImU32 kTrLed = IM_COL32(255, 52, 36, 255);
 
       std::string LaneName(DrumSequencerNode* n, int lane)
       {
@@ -523,8 +536,6 @@ namespace app
          if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
             PagePicker::BeginRename("##drumPage", entries, current);
          PagePicker::Options opt;
-         opt.reorder = false; // the pages are the canvas's Drum Sequencers, in canvas order
-         opt.maxW = 360.0f;
          const PagePicker::Result r = PagePicker::Draw("##drumPage", entries, current, T("New drum page"), opt);
          GraphNode* gn = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
          DrumSequencerNode* d = DrumOf(gn);
@@ -553,6 +564,19 @@ namespace app
             if (gn != nullptr)
                sPendingDelete = gn->uid; // next frame: the rest of this frame still draws the page
             break;
+         case PagePicker::Act::Move:
+         {
+            std::vector<GraphNode*> order = pages;
+            GraphNode* moving = order[r.index];
+            order.erase(order.begin() + r.index);
+            order.insert(order.begin() + r.to, moving);
+            PushUndoCheckpoint("Reorder drum pages");
+            for (size_t i = 0; i < order.size(); i++)
+               if (DrumSequencerNode* d = DrumOf(order[i]))
+                  d->pageOrder = (int)i;
+            gPatchDirty = true;
+            break;
+         }
          case PagePicker::Act::Duplicate:
             if (gn != nullptr)
             {
@@ -879,7 +903,7 @@ namespace app
                   const bool accent = vel >= 0.99f;
                   const float prob = n->stepProb[lane][s];
                   const float lit = std::clamp((0.45f + 0.55f * vel) * (prob < 1.0f ? 0.5f + 0.5f * prob : 1.0f), 0.0f, 1.0f);
-                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, Accent(1.0f), nullptr, true, lit);
+                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, kTrLed, nullptr, true, 0.0f, TrKey(s, 0.75f + 0.35f * lit));
                   if (now)
                   {
                      dl->AddRectFilled(cMin, cMax, DeskParts::Ink(90), 3.0f);
@@ -912,7 +936,7 @@ namespace app
                }
                else
                {
-                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, 0.0f, Accent(1.0f), nullptr, true);
+                  DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, 0.0f, kTrLed, nullptr, true, 0.0f, TrKey(s, 0.38f));
                   if (now)
                   {
                      dl->AddRectFilled(cMin, cMax, DeskParts::Ink(50), 3.0f);
@@ -1326,6 +1350,7 @@ namespace app
          ImDrawList* pdl = ImGui::GetWindowDrawList();
          DeskParts::Chassis(pdl, ImVec2(at.x - 4.0f, at.y - 4.0f), ImVec2(at.x + size.x + 4.0f, at.y + size.y));
          ImGui::BeginChild("##drumInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+         UiDensity::Compact compact;
          // Text and cards inside the desk use the desk tones (light desk in light mode).
          ImGui::PushStyleColor(ImGuiCol_Text, DeskParts::Ink(228));
          ImGui::PushStyleColor(ImGuiCol_TextDisabled, DeskParts::Ink(140));
@@ -1341,6 +1366,7 @@ namespace app
          SectionCard::EndWindow();
          SectionCard::S().desk = false;
          ImGui::PopStyleColor(2);
+         compact.End(); // before the child closes: the pushes were made inside it
          ImGui::EndChild();
       }
 
@@ -1396,12 +1422,13 @@ namespace app
             for (int l = 0; l < kLanes; l++)
                sPadFlash[l] = std::max(0.0f, sPadFlash[l] - dt * 6.0f);
             const bool inspector = avail.x >= kLabelW + kInspectorW + 240.0f;
-            const float leftX1 = inspector ? bodyMax.x - kInspectorW - tok::space_2 : bodyMax.x;
+            const float inspW = inspector ? kInspectorW : 0.0f;
+            const float leftX1 = inspector ? bodyMax.x - inspW - tok::space_2 : bodyMax.x;
             const ImVec2 seqMin = bodyMin;
             const float seqH = bodyMax.y - seqMin.y;
             const float gridX0 = seqMin.x + kLabelW + tok::space_2;
-            // Rows keep kRowH; they only give way when the window itself is too short for the panel.
-            const float rowH = std::clamp((seqH - kRulerH - (float)(kLanes - 1) * kRowGap) / (float)kLanes, 14.0f, kRowH);
+            // Rows follow the panel height the grip sets.
+            const float rowH = std::clamp((seqH - kRulerH - (float)(kLanes - 1) * kRowGap) / (float)kLanes, 14.0f, kRowH * 3.0f);
             // What the panel needs around the grid, measured, so the layout can stop the panel at the grid's foot.
             gDrumPanelNaturalH = (gDrumPanelHeight - seqH) + kRulerH + (float)kLanes * kRowH + (float)(kLanes - 1) * kRowGap + 6.0f;
             DeskParts::Chassis(ImGui::GetWindowDrawList(), ImVec2(seqMin.x - 4.0f, seqMin.y - 4.0f), ImVec2(leftX1 + 4.0f, bodyMax.y));
@@ -1410,7 +1437,7 @@ namespace app
             DrawLabels(gn, n, seqMin, rowH, leftX1);
             DrawGrid(gn, n, ImVec2(gridX0, seqMin.y), leftX1 - gridX0, rowH);
             if (inspector)
-               DrawInspector(gn, n, ImVec2(bodyMax.x - kInspectorW, bodyMin.y), ImVec2(kInspectorW, bodyH));
+               DrawInspector(gn, n, ImVec2(bodyMax.x - inspW, bodyMin.y), ImVec2(inspW, bodyH));
          }
          gDrumClaimedKeys = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::GetIO().WantTextInput;
          DrawKeys(n);
@@ -1440,7 +1467,12 @@ namespace app
       {
          ImGui::InvisibleButton("##drumgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
          DrawPanelSeam(false, gripFirst);
-         // No drag: the panel is as tall as its eight lanes (gDrumPanelNaturalH), set by the stage layout.
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+         if (ImGui::IsItemActive())
+            gDrumPanelHeight = std::max(160.0f, gDrumPanelHeight + (gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y));
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+            gDrumPanelHeight = gDrumPanelNaturalH; // double-click: fit the lanes
       };
       if (gripFirst)
          grip();

@@ -90,7 +90,7 @@ namespace MenuParts
    // Toggle row: the app checkbox at the left edge, label after it; the menu stays open.
    inline bool Check(const char* label, bool* v)
    {
-      const float boxW = CheckBox::kSize + tok::space_2;
+      const float boxW = CheckBox::Size() + tok::space_2;
       const float rowW = std::max(ImGui::GetContentRegionAvail().x, ImGui::CalcTextSize(label, nullptr, true).x + boxW + tok::space_4);
       const std::string id = std::string("##chk") + label;
       const bool r = ImGui::Selectable(id.c_str(), false, ImGuiSelectableFlags_DontClosePopups, ImVec2(rowW, 0));
@@ -102,7 +102,7 @@ namespace MenuParts
       const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
       const float hv = UiAnim::Hover(gid, ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
       const float onv = UiAnim::Hover(gid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
-      CheckBox::Draw(w->DrawList, ImVec2(mn.x, std::floor((mn.y + mx.y - CheckBox::kSize) * 0.5f)), onv, hv);
+      CheckBox::Draw(w->DrawList, ImVec2(mn.x, std::floor((mn.y + mx.y - CheckBox::Size()) * 0.5f)), onv, hv);
       const char* end = std::strstr(label, "##");
       w->DrawList->AddText(ImVec2(mn.x + boxW, std::floor((mn.y + mx.y - ImGui::GetTextLineHeight()) * 0.5f)),
                            ImGui::GetColorU32(ImGuiCol_Text), label, end);

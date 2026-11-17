@@ -899,7 +899,7 @@ namespace app
       const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *value, tok::motion_on, tok::motion_off);
       const ImVec4 amber = IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000) : tok::V4(tok::palf::v_1000_750_350_1000);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 bp(p.x + (box - CheckBox::kSize) * 0.5f, p.y + (box - CheckBox::kSize) * 0.5f);
+      const ImVec2 bp(p.x + (box - CheckBox::Size()) * 0.5f, p.y + (box - CheckBox::Size()) * 0.5f);
       CheckBox::Draw(dl, bp, onv, hv, modulated ? &amber : nullptr);
       if (textW > 0.0f)
       {
@@ -907,7 +907,7 @@ namespace app
          dl->AddText(ImVec2(p.x + box + st.ItemInnerSpacing.x, p.y + st.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Text), label, end);
       }
       if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
-         dl->AddRect(ImVec2(bp.x - 2, bp.y - 2), ImVec2(bp.x + CheckBox::kSize + 2, bp.y + CheckBox::kSize + 2),
+         dl->AddRect(ImVec2(bp.x - 2, bp.y - 2), ImVec2(bp.x + CheckBox::Size() + 2, bp.y + CheckBox::Size() + 2),
                      ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 1.5f);
       return clicked;
    }

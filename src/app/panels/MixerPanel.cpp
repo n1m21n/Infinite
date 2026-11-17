@@ -93,7 +93,7 @@ namespace app
       constexpr float kStripFaceW = 112.0f; // a strip's full width: wide, fixed, the console scrolls
       constexpr float kStripGap = 4.0f;
       constexpr float kRenderW = 196.0f;
-                  constexpr float kButtonsH = 26.0f;
+                  constexpr float kButtonsH = tok::control_h;
       constexpr float kRowGap = 4.0f;
       constexpr float kStripMaxH = 520.0f;
       constexpr float kMinFaderH = 40.0f;
@@ -233,6 +233,8 @@ namespace app
          return n;
       }
 
+      MixerNode* PageMixer(const Page& p); // defined with the page picker
+
       std::vector<Page> CollectPages()
       {
          std::vector<Page> pages;
@@ -253,6 +255,12 @@ namespace app
             if (!dup)
                pages.push_back({ gn.index, top->index, top->uid });
          }
+         // The page strip's own order (Move Left/Right, drag); ties keep canvas order.
+         std::stable_sort(pages.begin(), pages.end(), [](const Page& a, const Page& b) {
+            const MixerNode* ma = PageMixer(a);
+            const MixerNode* mb = PageMixer(b);
+            return (ma != nullptr ? ma->pageOrder : 0) < (mb != nullptr ? mb->pageOrder : 0);
+         });
          return pages;
       }
 
@@ -1369,9 +1377,6 @@ namespace app
              ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
             PagePicker::BeginRename("##mixerPage", entries, current);
          PagePicker::Options opt;
-         opt.reorder = false;   // a page is a top Mixer on the canvas
-         opt.duplicate = false; // a copy would be a Mixer with no sources
-         opt.maxW = 360.0f;
          const PagePicker::Result r = PagePicker::Draw("##mixerPage", entries, current, T("New mixer page"), opt);
          const Page* pg = r.index >= 0 && r.index < (int)pages.size() ? &pages[r.index] : nullptr;
          MixerNode* m = pg != nullptr ? PageMixer(*pg) : nullptr;
@@ -1399,6 +1404,44 @@ namespace app
                // The page is its top Mixer; the sources and the Audio Out stay on the canvas. Next frame, so
                // nothing drawn after the header this frame holds a removed node.
                sPendingDelete = pg->topUid;
+            }
+            break;
+         case PagePicker::Act::Move:
+         {
+            std::vector<Page> order = pages;
+            const Page moving = order[r.index];
+            order.erase(order.begin() + r.index);
+            order.insert(order.begin() + r.to, moving);
+            PushUndoCheckpoint("Reorder mixer pages");
+            for (size_t i = 0; i < order.size(); i++)
+               if (MixerNode* om = PageMixer(order[i]))
+                  om->pageOrder = (int)i;
+            break;
+         }
+         case PagePicker::Act::Duplicate:
+            if (GraphNode* top = pg != nullptr ? FindNodeByIndex(pg->topIndex) : nullptr)
+            {
+               // The canvas duplicate (Shift+D) on this page's Mixer and everything from it to its output: a page is
+               // a Mixer that reaches an output, so a copy of the Mixer alone would not be a page.
+               if (gEditor != nullptr)
+               {
+                  ed::EditorContext* prev = ed::GetCurrentEditor();
+                  ed::SetCurrentEditor(gEditor);
+                  ed::ClearSelection();
+                  GraphNode* at = FindNodeByIndex(pg->outIndex);
+                  for (int guard = 0; at != nullptr && guard < 64; guard++)
+                  {
+                     ed::SelectNode(at->NodeId(), true);
+                     if (at == top)
+                        break;
+                     AudioCable* in = at->node ? at->node->AudioInputSlot(0) : nullptr;
+                     at = in != nullptr && in->IsConnected() ? GraphNodeOf(in->GetSource()) : nullptr;
+                  }
+                  ed::SelectNode(top->NodeId(), true);
+                  ed::SetCurrentEditor(prev);
+                  sLastSelectedUid = sHighlightUid = top->uid;
+                  gRequestDuplicate = true;
+               }
             }
             break;
          default: break;
@@ -1522,7 +1565,8 @@ namespace app
          const bool overPanel = mouse.x >= origin.x && mouse.x < origin.x + avail.x &&
                                 mouse.y >= origin.y && mouse.y < origin.y + avail.y;
          gMixerClaimedKeys = overPanel && !ImGui::GetIO().WantTextInput;
-         if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
+         if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
+             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))   // a page/strip menu opened on the click
             ImGui::OpenPopup("##mixerpanelctx");
          if (MenuParts::BeginPopup("##mixerpanelctx"))
          {

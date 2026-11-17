@@ -27,6 +27,16 @@ def build():
     if "system" in b:
         L.append("   static_assert(control_h >= hit_min, \"a control is never smaller than the hit minimum\");")
         L.append("   static_assert(row_h == control_h, \"a list row is one control tall\");")
+    # Compact density: the settings strips and More.. popovers (UiDensity::Compact reads these).
+    for k, v in b.get("compact", {}).items():
+        if not k.startswith("_"):
+            L.append(f"   constexpr float compact_{k} = {float(v)}f;")
+    if "compact" in b:
+        L.append("   static_assert(compact_row > compact_text, \"a compact row fits its text\");")
+    # The page strip (PagePicker): chip widths, colour dot and swatch.
+    for k, v in b.get("page", {}).items():
+        if not k.startswith("_"):
+            L.append(f"   constexpr float page_{k} = {float(v)}f;")
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
     for k, v in r["pairs"].items():

@@ -8,6 +8,7 @@
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/FieldWell.h"
 
 namespace app
@@ -215,12 +216,12 @@ namespace app
          SectionCard::Progress(frac, 300.0f);
 
       ImGui::BeginDisabled(n->IsOfflineFinalizing());
-      if (ChipButton::Draw(L("Cancel"), false, 28.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel"), false, 0.0f, 100.0f))
          n->RequestFinishOfflineRender(true);
       ImGui::EndDisabled();
       ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ChipButton::Draw(L("Cancel All"), false, 28.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, 100.0f))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
 
@@ -283,12 +284,12 @@ namespace app
          ImGui::TextDisabled(T("Job %d of %d"), qIdx, qTotal);
       SectionCard::Progress(frac, 300.0f);
       ImGui::BeginDisabled(gArrangeWavRender.cancelRequested);
-      if (ChipButton::Draw(L("Cancel"), false, 28.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel"), false, 0.0f, 100.0f))
          ArrangeRenderCancelActive();
       ImGui::EndDisabled();
       ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ChipButton::Draw(L("Cancel All"), false, 28.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, 100.0f))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
       ImGui::End();
@@ -384,7 +385,7 @@ namespace app
    // Toggle as a chip (replaces ImGui::Checkbox in the inspector): flips *v and returns true when clicked.
    static bool ToggleChip(const char* label, bool* v, float w, const ImVec4* onCol = nullptr)
    {
-      if (!ChipButton::Draw(label, *v, 24.0f, w, false, onCol)) return false;
+      if (!ChipButton::Draw(label, *v, 0.0f, w, false, onCol)) return false;
       *v = !*v;
       return true;
    }
@@ -394,7 +395,7 @@ namespace app
    static void InspectorCardEnd() { SectionCard::End(); }
    static void InspectorCardBegin() { SectionCard::Begin(); }
    static void SectionHeader(const char* text) { SectionCard::Begin(text); }
-   static constexpr float kCardPad = SectionCard::kPad;
+   static float CardPad() { return SectionCard::Pad(); }
 
    // Plain muted message (empty states), not a card.
    static void InspectorNote(const char* text)
@@ -407,8 +408,11 @@ namespace app
       ImGui::PopTextWrapPos();
    }
 
-   static constexpr float kRowLabelW = SectionCard::kLabelW;
+   static float RowLabelW() { return SectionCard::LabelW(); }
    static void RowLabel(const char* text) { SectionCard::RowLabel(text); }
+
+   // Clip Settings is one narrow vertical strip in the compact inspector size (UiDensity::Compact).
+   float ArrangeClipSettingsWidth(float maxW) { return std::min(maxW, UiDensity::kInspectorW); }
 
    void DrawArrangeClipSettingsChild(float panelW)
    {
@@ -421,7 +425,9 @@ namespace app
       gArrangeInspectorMax = ImVec2(gArrangeInspectorMin.x + ImGui::GetWindowSize().x, gArrangeInspectorMin.y + ImGui::GetWindowSize().y);
       SectionCard::BeginWindow();
 
-      const float availW = ImGui::GetContentRegionAvail().x;
+      UiDensity::Compact compact;
+      const float wholeW = ImGui::GetContentRegionAvail().x;
+      const float availW = wholeW;
 
       auto DrawCloseBtn = []() -> bool
       {
@@ -442,7 +448,7 @@ namespace app
       {
          char buf[96];
          snprintf(buf, sizeof(buf), "%s###%s", enabled ? labelActive : labelBypassed, id);
-         return ChipButton::Draw(buf, enabled, 24.0f, availW);
+         return ChipButton::Draw(buf, enabled, 0.0f, availW);
       };
 
       uint64_t clipId = 0;
@@ -450,7 +456,7 @@ namespace app
          clipId = *gArrangeSel.begin();
       Arrange::Clip* clip = clipId != 0 ? Arrange::FindClip(gArrange, clipId) : nullptr;
 
-      const float fieldW = std::max(70.0f, availW - kRowLabelW);
+      const float fieldW = std::max(70.0f, availW - RowLabelW());
 
       auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
                            ArrangeTickUnit unit, Arrange::Tick* out) -> bool
@@ -497,7 +503,7 @@ namespace app
             ? (isSample ? "Video Sample" : "Video Clip")
             : (isSample ? "Audio Sample" : "Audio Clip");
          InspectorTitle(clipKindLabel);
-         ImGui::SameLine(availW - 18.0f);
+         ImGui::SameLine(wholeW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -505,7 +511,9 @@ namespace app
          // Name
          char nameBuf[128];
          snprintf(nameBuf, sizeof(nameBuf), "%s", clip->name.c_str());
-         ImGui::SetNextItemWidth(-FLT_MIN);
+         // Name and Active share a row (Logic's region inspector: name, then the switches beside it).
+         const float activeW = 72.0f;
+         ImGui::SetNextItemWidth(std::max(60.0f, availW - activeW - ImGui::GetStyle().ItemSpacing.x));
          if (FieldWell::InputText("##clipinspname", nameBuf, sizeof(nameBuf)))
          {
             ArrangeEdit([&]() {
@@ -517,9 +525,8 @@ namespace app
             });
          }
 
-         // Bypass button below name
-         ImGui::Spacing();
-         if (DrawBypassButton("##clipbypassbtn", clip->enabled, "Active", "Bypassed"))
+         ImGui::SameLine();
+         if (ChipButton::Draw(clip->enabled ? "Active###clipbypassbtn" : "Bypassed###clipbypassbtn", clip->enabled, 0.0f, activeW))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -598,7 +605,7 @@ namespace app
                "the clip - and where they overlap the upper track hides this one's blend mode, "
                "opacity and grade.\n\nMake Unique gives this clip its own copy of the node, fed "
                "by the same inputs and carrying the same modulations.");
-            if (ChipButton::Draw(L("Make Unique##clipuniquevideo"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Make Unique##clipuniquevideo"), false, 0.0f, ImGui::GetContentRegionAvail().x))
                ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
@@ -618,7 +625,7 @@ namespace app
                "whichever is summed last wins and this clip can end up playing the other one's "
                "position.\n\nMake Unique gives this clip its own copy of the node, fed by the "
                "same inputs and carrying the same modulations.");
-            if (ChipButton::Draw(L("Make Unique##clipuniqueaudio"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Make Unique##clipuniqueaudio"), false, 0.0f, ImGui::GetContentRegionAvail().x))
                ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
@@ -633,12 +640,7 @@ namespace app
             RowLabel("Blend");
             ImGui::SetNextItemWidth(fieldW);
             FieldWell::PushStyle();
-            const bool blendOpen = MenuParts::BeginCombo("##clipblend", curBlendName, ImGuiComboFlags_NoArrowButton);
-            {
-               const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-               glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
-                                      ImGui::GetColorU32(ImGuiCol_TextDisabled));
-            }
+            const bool blendOpen = MenuParts::BeginCombo("##clipblend", curBlendName);  // field well + value, no chevron
             FieldWell::PopStyle();
             if (blendOpen)
             {
@@ -843,8 +845,10 @@ namespace app
          GraphNode* srcNode = FindNodeByUid(clip->srcUid);
          if (srcNode != nullptr)
          {
-            ImGui::Text(T("Node: %s"), NodeTitleWithInstance(*srcNode).c_str());
-            ImGui::TextDisabled(T("Type: %s"), srcNode->typeName.c_str());
+            RowLabel("Node");
+            ImGui::TextUnformatted(NodeTitleWithInstance(*srcNode).c_str());
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", srcNode->typeName.c_str());
             // --- per-clip modulation bypass -----------------------------
             // Every modulation currently bound to this clip's source node,
             // each with a checkbox saying whether THIS clip wants it. The
@@ -896,9 +900,11 @@ namespace app
             // ArrangeModel.h). Only Audio/Video Clip can be reassigned.
             if (!isSample)
             {
-               if (ChipButton::Draw(L("Assign Different Node..."), false, 24.0f, ImGui::GetContentRegionAvail().x))
+               const float half = std::floor((ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
+               if (ChipButton::Draw(L("Reassign..."), false, 0.0f, half))
                   gArrangeAssigningClipId = clipId;
-               if (ChipButton::Draw(L("Clear Source"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+               ImGui::SameLine();
+               if (ChipButton::Draw(L("Clear Source"), false, 0.0f, half))
                {
                   ArrangeEdit([&]() {
                      if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -914,7 +920,7 @@ namespace app
          else if (!isSample)
          {
             InspectorNote(T("(unassigned)"));
-            if (ChipButton::Draw(L("Assign Node..."), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Assign Node..."), false, 0.0f, ImGui::GetContentRegionAvail().x))
                gArrangeAssigningClipId = clipId;
          }
          else
@@ -929,7 +935,7 @@ namespace app
             snprintf(mt, sizeof(mt), T("Multiple Clips (%d)"), (int)gArrangeSel.size());
             InspectorTitle(mt);
          }
-         ImGui::SameLine(availW - 18.0f);
+         ImGui::SameLine(wholeW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -1007,13 +1013,13 @@ namespace app
          if (anyGrouped)
          {
             ImGui::Spacing();
-            if (ChipButton::Draw(L("Ungroup"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Ungroup"), false, 0.0f, ImGui::GetContentRegionAvail().x))
                ArrangeUngroupSelection();
          }
 
          InspectorCardEnd();
          ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-         if (ChipButton::Draw(L("Delete Selected Clips"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+         if (ChipButton::Draw(L("Delete Selected Clips"), false, 0.0f, ImGui::GetContentRegionAvail().x))
          {
             ArrangeEdit([&]() {
                Arrange::Delete(gArrange, std::vector<uint64_t>(gArrangeSel.begin(), gArrangeSel.end()));
@@ -1028,7 +1034,7 @@ namespace app
          {
             const bool isVideo = lane->type == Arrange::kLaneVideo;
             InspectorTitle(isVideo ? "Video Track" : "Audio Track");
-            ImGui::SameLine(availW - 18.0f);
+            ImGui::SameLine(wholeW - 18.0f);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
             InspectorCardBegin();
@@ -1142,13 +1148,13 @@ namespace app
 
             InspectorCardEnd();
             ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-            if (ChipButton::Draw(L("Duplicate Track"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Duplicate Track"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::DuplicateLane(gArrange, rowId);
                });
             }
-            if (ChipButton::Draw(L("Delete Track"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Delete Track"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveLane(gArrange, rowId);
@@ -1159,7 +1165,7 @@ namespace app
          else if (const Arrange::TrackGroup* grp = Arrange::FindTrackGroup(gArrange, rowId))
          {
             InspectorTitle("Track Group");
-            ImGui::SameLine(availW - 18.0f);
+            ImGui::SameLine(wholeW - 18.0f);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
             InspectorCardBegin();
@@ -1193,28 +1199,28 @@ namespace app
 
             InspectorCardEnd();
             ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-            if (ChipButton::Draw(L("Add Video Track to Group"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Add Video Track to Group"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   const uint64_t newLaneId = Arrange::AddLane(gArrange, Arrange::kLaneVideo);
                   Arrange::SetLaneTrackGroup(gArrange, newLaneId, rowId);
                });
             }
-            if (ChipButton::Draw(L("Add Audio Track to Group"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Add Audio Track to Group"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   const uint64_t newLaneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
                   Arrange::SetLaneTrackGroup(gArrange, newLaneId, rowId);
                });
             }
-            if (ChipButton::Draw(L("Ungroup (Keep Tracks)"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Ungroup (Keep Tracks)"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveTrackGroup(gArrange, rowId, false);
                });
                gArrangeRowSel.clear();
             }
-            if (ChipButton::Draw(L("Delete Group + Tracks"), false, 24.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Delete Group + Tracks"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveTrackGroup(gArrange, rowId, true);
@@ -1230,7 +1236,7 @@ namespace app
       else
       {
          InspectorTitle(T("Inspector"));
-         ImGui::SameLine(availW - 18.0f);
+         ImGui::SameLine(wholeW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -1238,6 +1244,7 @@ namespace app
       }
 
       SectionCard::EndWindow();
+      compact.End(); // before the child closes: the pushes were made inside it
       ImGui::EndChild();
    }
 

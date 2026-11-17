@@ -137,7 +137,7 @@ namespace app
       const float wellTop = ImGui::GetStyle().ItemSpacing.y * 2.0f;
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + wellTop + SectionCard::kPad);
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
-      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::space_2);
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::row_gap);  // tabs on the same 24 + 3 pitch as the setting rows
       // Inside a DAW: the host owns audio and MIDI devices, there is no plugin hosting and no shell, so the Audio,
       // Plugins and Agents & Terminal tabs go.
       auto hiddenInDaw = [](int tab) { return Platform::PluginModeActive() && (tab == 2 || tab == 7 || tab == 8); };

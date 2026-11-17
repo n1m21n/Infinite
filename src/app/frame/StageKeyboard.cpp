@@ -8,6 +8,7 @@ namespace app
 {
    static std::string gOwnNodeClipboardText;
 extern int gView3DTestMenuNode;
+extern int gView2DMenuEdit; // Edit menu Copy (1) / Paste (2) handed to the 2D View (View2DPanel.cpp)
 extern bool gShotNodeMenu;
 
 void DrawKeyboard(FrameCtx& fc)
@@ -781,6 +782,12 @@ void DrawKeyboard(FrameCtx& fc)
          }
       }
 
+      // The Edit menu's Copy / Paste act on the 2D View's pixels and layers while it holds the keys.
+      if (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4) && (gRequestCopy || gRequestPaste))
+      {
+         gView2DMenuEdit = gRequestCopy ? 1 : 2;
+         gRequestCopy = gRequestPaste = false;
+      }
       const bool doCopy = gRequestCopy || (!typing && !gPerfMatrixFocused && !gArrangeFocused && gChatSelectionFrame < ImGui::GetFrameCount() - 1 && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false));
       gRequestCopy = false;
       if (doCopy)

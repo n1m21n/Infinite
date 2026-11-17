@@ -62,8 +62,19 @@ namespace PanelFrame
    // Call after PushDockedPanelStyle(true) so ChildBg carries the panel fill the surface samples. `size` is the
    // outer size (both axes > 0); the child is the card rect itself, so content sits space_2 inside the card edge
    // on every side, whichever insets are 0.
+   //
+   // in.t == 0 means a resize grip sits right above the card: the grip is the whole gap, so the card starts
+   // without the item spacing under the grip and its content starts space_1 down. A top bar then sits as far
+   // from the seam (grip + space_1) as from the hairline under it.
    inline void BeginCard(const char* id, ImVec2 size, Insets in = {}, ImGuiWindowFlags flags = 0)
    {
+      const bool gripAbove = in.t == 0.0f;
+      if (gripAbove)
+      {
+         const float sp = ImGui::GetStyle().ItemSpacing.y;
+         ImGui::SetCursorPosY(ImGui::GetCursorPosY() - sp);
+         size.y += sp;
+      }
       DrawSurface(size, in);
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(p0.x + in.l, p0.y + in.t));
@@ -72,6 +83,8 @@ namespace PanelFrame
       ImGui::BeginChild(id, ImVec2(size.x - in.l - in.r, size.y - in.t - in.b), ImGuiChildFlags_AlwaysUseWindowPadding, flags);
       ImGui::PopStyleVar();
       ImGui::PopStyleColor();
+      if (gripAbove)
+         ImGui::SetCursorPosY(tok::space_1);
    }
    inline void EndCard() { ImGui::EndChild(); }
 }

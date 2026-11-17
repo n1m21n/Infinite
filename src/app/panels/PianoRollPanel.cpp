@@ -4,6 +4,7 @@
 #include "app/AppShared.h"
 #include "app/graph/NoteGen.h"
 #include "app/graph/SampleStyles.h"
+#include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PanelKit.h"
@@ -43,9 +44,9 @@ namespace app
 namespace
 {
    constexpr float kMinHeight = 240.0f;
-   constexpr float kIconW = PanelKit::kChip, kPageW = 140.0f;
+   constexpr float kIconW = tok::control_h, kPageW = 140.0f;
    constexpr float kKeysW = 44.0f, kRulerH = 16.0f, kStripH = 16.0f;
-   constexpr float kInspectorW = 268.0f;
+   constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
    constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
    constexpr double kMinPxPerTick = 0.002, kMaxPxPerTick = 2.0;
    constexpr int kPaletteSize = 12;
@@ -175,6 +176,7 @@ namespace
       char renameBuf[64] = {};
       bool renameFocus = false;
       bool pickOnCanvas = false; // the page settings' "Assign": the next Piano Roll node clicked on the canvas links
+      uint64_t pendingDuplicate = 0; // page duplicate: the Timeline's Duplicate Track, next frame
       bool pendingAdd = false;   // page add and delete move lane pointers: they run at the top of the next frame
       uint64_t pendingDelete = 0;
       uint64_t lastSelectedNode = 0;
@@ -192,6 +194,8 @@ namespace
       for (Arrange::Lane& l : gArrange.lanes)
          if (l.type == Arrange::kLaneMidi)
             out.push_back(&l);
+      // The page strip's own order (Move Left/Right, drag); ties keep Timeline order.
+      std::stable_sort(out.begin(), out.end(), [](const Arrange::Lane* a, const Arrange::Lane* b) { return a->pageOrder < b->pageOrder; });
       return out;
    }
 
@@ -535,7 +539,7 @@ namespace
 
    void DrawDockMenu()
    {
-      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::kChip + tok::space_3);
+      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::Chip() + tok::space_3);
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##pianoDockMenu");
@@ -738,7 +742,7 @@ namespace
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {
-      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::kChip, green ? ActionButton::Kind::Go : ActionButton::Kind::Plain);
+      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::Chip(), green ? ActionButton::Kind::Go : ActionButton::Kind::Plain);
    }
 
    float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
@@ -746,7 +750,7 @@ namespace
    bool TextChip(const char* label, bool on = false, ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw(label, ImVec2(TextW(label), PanelKit::kChip), kind);
+      const bool clicked = ActionButton::Draw(label, ImVec2(TextW(label), PanelKit::Chip()), kind);
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       return clicked;
    }
@@ -754,7 +758,7 @@ namespace
    // A dropdown face in the Sample Studio's grammar: the value in a field well.
    bool PickerFace(const char* id, const char* value, float w, const char* tip, ImVec2& bmin, ImVec2& bmax)
    {
-      const bool clicked = ActionButton::Draw(id, ImVec2(w, PanelKit::kChip));
+      const bool clicked = ActionButton::Draw(id, ImVec2(w, PanelKit::Chip()));
       if (ImGui::IsItemHovered())
          HelpTip("%s", tip);
       bmin = ImGui::GetItemRectMin();
@@ -825,7 +829,7 @@ namespace
       State& s = S();
       const bool nonDefault = s.tool != Tool::Select;
       ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw("##pianoToolPicker", ImVec2(kIconW, PanelKit::kChip));
+      const bool clicked = ActionButton::Draw("##pianoToolPicker", ImVec2(kIconW, PanelKit::Chip()));
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       if (ImGui::IsItemHovered())
          HelpTip("%s", ToolTip(s.tool));
@@ -886,9 +890,6 @@ namespace
          s.renameLane = 0;
       }
       PagePicker::Options opt;
-      opt.reorder = false;   // the pages are Timeline lanes, in Timeline order
-      opt.duplicate = false; // a page is a lane plus its linked node
-      opt.maxW = 360.0f;
       const PagePicker::Result r = PagePicker::Draw("##pianoPage", entries, current, T("New Piano Roll page"), opt);
       Arrange::Lane* page = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
       switch (r.act)
@@ -910,6 +911,23 @@ namespace
          });
          break;
       case PagePicker::Act::Delete: s.pendingDelete = page->id; break;
+      case PagePicker::Act::Duplicate: s.pendingDuplicate = page->id; break;
+      case PagePicker::Act::Move:
+      {
+         std::vector<uint64_t> ids;
+         for (const Arrange::Lane* l : pages)
+            ids.push_back(l->id);
+         const uint64_t moving = ids[r.index];
+         ids.erase(ids.begin() + r.index);
+         ids.insert(ids.begin() + r.to, moving);
+         ArrangeEdit([&] {
+            for (size_t i = 0; i < ids.size(); i++)
+               if (Arrange::Lane* l = Arrange::FindLane(gArrange, ids[i]))
+                  l->pageOrder = (int)i;
+            gArrange.revision++;
+         });
+         break;
+      }
       default: break;
       }
    }
@@ -2813,6 +2831,7 @@ namespace
    {
       State& s = S();
       ImGui::BeginChild("##pianoInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+      UiDensity::Compact compact;
       SectionCard::BeginWindow();
       const FormParts::Narrow narrow;
       if (TextChip(T("Settings"), !s.genOpen))
@@ -2831,6 +2850,7 @@ namespace
          DrawPageInspector(page);
       SectionCard::EndWindow();
       s.inspectorHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+      compact.End(); // before the child closes: the pushes were made inside it
       ImGui::EndChild();
    }
 
@@ -3197,15 +3217,18 @@ namespace
    {
       State& s = S();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const float toolbarH = PanelKit::kChip + ImGui::GetStyle().ItemSpacing.y;
+      const float toolbarH = PanelKit::Chip() + ImGui::GetStyle().ItemSpacing.y;
       {
          const ImVec2 room = ImGui::GetContentRegionAvail();
          DrawToolbar(page, room.x - kKeysW, room.y - toolbarH - kRulerH - kStripH);
       }
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));   // toolbar to ruler = seam to toolbar (grip + space_1)
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       Areas a;
-      const float inspectorW = s.settingsOpen || s.genOpen ? std::min(kInspectorW, avail.x * 0.4f) : 0.0f;
+      const float inspectorBase = std::min(kInspectorW, avail.x * 0.4f);
+      const float inspectorW = s.settingsOpen || s.genOpen
+         ? inspectorBase : 0.0f;
       a.x0 = origin.x + kKeysW;
       a.x1 = origin.x + avail.x - (inspectorW > 0.0f ? inspectorW + tok::space_2 : 0.0f);
       a.rulerY = origin.y;
@@ -3447,6 +3470,15 @@ namespace
          st.pendingAdd = false;
          AddPage();
       }
+      if (st.pendingDuplicate != 0)
+      {
+         const uint64_t src = st.pendingDuplicate;
+         st.pendingDuplicate = 0;
+         uint64_t copy = 0;
+         ArrangeEdit([&] { Arrange::DuplicateLane(gArrange, src, &copy); });
+         if (copy != 0)
+            st.lane = copy;
+      }
       if (st.pendingDelete != 0)
       {
          const uint64_t doomed = st.pendingDelete;
@@ -3644,10 +3676,12 @@ void DrawPianoRollDocked(const char* id, const ImVec2& size)
    if (gripFirst)
       grip();
    const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-   const ImVec2 cardSize(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+   ImVec2 cardSize(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
    PanelFrame::Insets in;
    if (gripFirst)
-      in.t = 0.0f;
+   {
+      in.t = 0.0f;   // BeginCard drops the item spacing under the grip
+   }
    else
       in.b = 0.0f;
    PanelFrame::BeginCard("##pianopanelcontent", cardSize, in);

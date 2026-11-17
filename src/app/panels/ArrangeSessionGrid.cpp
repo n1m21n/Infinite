@@ -1881,7 +1881,7 @@ namespace app
          const bool isWide = panelSize.x >= 720.0f;
          const bool showMon = isWide && sSessionShowMonitor;
          const float monW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : 0.0f;
-         constexpr float kInspectorW = 244.0f;
+         const float kInspectorW = ArrangeClipSettingsWidth(std::max(244.0f, ImGui::GetContentRegionAvail().x * 0.5f));
          // The inspector shows the selected slot clip; it opens from a cell (double-click) and closes with its own X.
          const bool showInspector = gArrangeClipSettingsPanelOpen && ArrangeSelectedSlotId() != 0;
          const float spacing = ImGui::GetStyle().ItemSpacing.x;

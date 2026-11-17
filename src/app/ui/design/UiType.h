@@ -3,6 +3,7 @@
 // fonts registered by Startup. ImGui 1.92 rasterizes each (font, size) on demand, so any size is sharp.
 #pragma once
 #include "app/ui/design/Tokens.gen.h"
+#include "app/ui/design/UiDensity.h"
 #include "imgui.h"
 
 namespace UiType
@@ -15,8 +16,8 @@ namespace UiType
    {
       switch (s)
       {
-      case Size::Caption: return tok::type_caption;
-      case Size::Body: return tok::type_body;
+      case Size::Caption: return UiDensity::IsCompact() ? UiDensity::M().text - 1.0f : tok::type_caption;
+      case Size::Body: return UiDensity::M().text;
       case Size::Display: return tok::type_display;
       }
       return tok::type_body;

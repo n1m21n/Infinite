@@ -142,13 +142,17 @@ namespace app
    {
       if (src == dst || src < 0 || dst < 0 || src >= gPerfLayout.pageCount || dst >= gPerfLayout.pageCount)
          return;
-      PushUndoCheckpoint();
+      PushUndoCheckpoint("Performance: Reorder pages");
       while ((int)gPerfLayout.pageNames.size() < gPerfLayout.pageCount)
          gPerfLayout.pageNames.push_back("Page " + std::to_string((int)gPerfLayout.pageNames.size() + 1));
 
       std::string movingName = gPerfLayout.pageNames[src];
       gPerfLayout.pageNames.erase(gPerfLayout.pageNames.begin() + src);
       gPerfLayout.pageNames.insert(gPerfLayout.pageNames.begin() + dst, movingName);
+      gPerfLayout.pageColors.resize((size_t)gPerfLayout.pageCount, 0u);
+      const unsigned int movingColor = gPerfLayout.pageColors[src];
+      gPerfLayout.pageColors.erase(gPerfLayout.pageColors.begin() + src);
+      gPerfLayout.pageColors.insert(gPerfLayout.pageColors.begin() + dst, movingColor);
 
       for (auto& el : gPerfElements)
       {
@@ -1215,7 +1219,7 @@ namespace app
          if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
 
          float boxW = cardSize.x - 16.0f;
-         float boxH = 26.0f;
+         float boxH = tok::control_h;
          float centerX = cellPos.x + 8.0f;
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - boxH) * 0.5f;
 
@@ -1273,7 +1277,7 @@ namespace app
             curIndex = std::clamp((int)std::round((val - minV) / (maxV - minV) * (float)(count - 1)), 0, count - 1);
 
          float areaW = cardSize.x - 16.0f;
-         float btnH = 24.0f;
+         float btnH = tok::control_h;
          float startY = cellPos.y + 20.0f + (cardSize.y - 20.0f - btnH) * 0.5f;
          float btnW = (areaW - (count - 1) * 3.0f) / (float)count;
 
@@ -2160,8 +2164,8 @@ namespace app
             if (ImGui::CalcTextSize(hint).x <= room)
                sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.4f)), hint);
          }
-         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - 76.0f, sp.y + (stripH - ChipButton::kHeight) * 0.5f));
-         if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::kHeight, 68.0f))
+         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - 76.0f, sp.y + (stripH - ChipButton::Height()) * 0.5f));
+         if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::Height(), 68.0f))
             gPerfMidiLearnIdx = -1;
          ImGui::SetCursorScreenPos(ImVec2(sp.x, sp.y));
          ImGui::Dummy(ImVec2(stripW, stripH + tok::space_2));
@@ -2218,37 +2222,49 @@ namespace app
          std::vector<PagePicker::Entry> entries;
          for (int p = 0; p < gPerfLayout.pageCount; p++)
             entries.push_back({ p < (int)gPerfLayout.pageNames.size() && !gPerfLayout.pageNames[p].empty() ? gPerfLayout.pageNames[p]
-                                                                                                          : "Page " + std::to_string(p + 1) });
+                                                                                                          : "Page " + std::to_string(p + 1),
+                                p < (int)gPerfLayout.pageColors.size() ? gPerfLayout.pageColors[p] : 0u });
          PagePicker::Options opt;
-         opt.colour = false;
          opt.canAdd = gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages;
          opt.duplicate = opt.canAdd;
          opt.canDelete = gPerfLayout.pageCount > 1;
          opt.maxW = std::max(120.0f, ImGui::GetContentRegionAvail().x - tok::control_h - tok::space_2);
          const PagePicker::Result r = PagePicker::Draw("##perfPages", entries, gPerfActivePage, T("Add New Page"), opt);
          const int p = r.index;
+         // Names and colours are kept one per page, so an edit below always lands on its own page.
+         if (r.act != PagePicker::Act::None && r.act != PagePicker::Act::Select)
+            while ((int)gPerfLayout.pageNames.size() < gPerfLayout.pageCount)
+               gPerfLayout.pageNames.push_back("Page " + std::to_string((int)gPerfLayout.pageNames.size() + 1));
          switch (r.act)
          {
          case PagePicker::Act::Select: gPerfActivePage = p; break;
          case PagePicker::Act::Add:
          {
-            PushUndoCheckpoint();
+            PushUndoCheckpoint("Performance: Add page");
             int newP = gPerfLayout.pageCount++;
             gPerfLayout.pageNames.push_back("Page " + std::to_string(newP + 1));
             gPerfActivePage = newP;
             break;
          }
          case PagePicker::Act::Rename:
-            PushUndoCheckpoint();
-            if (p < (int)gPerfLayout.pageNames.size())
+            PushUndoCheckpoint("Performance: Rename page");
+            if (p >= 0 && p < (int)gPerfLayout.pageNames.size())
                gPerfLayout.pageNames[p] = r.name;
+            break;
+         case PagePicker::Act::Recolor:
+            PushUndoCheckpoint("Performance: Colour page");
+            gPerfLayout.pageColors.resize((size_t)gPerfLayout.pageCount, 0u);
+            if (p >= 0 && p < gPerfLayout.pageCount)
+               gPerfLayout.pageColors[p] = r.color;
             break;
          case PagePicker::Act::Move: ReorderPerfPages(p, r.to); break;
          case PagePicker::Act::Duplicate:
          {
-            PushUndoCheckpoint();
+            PushUndoCheckpoint("Performance: Duplicate page");
             int newP = gPerfLayout.pageCount++;
             gPerfLayout.pageNames.push_back(entries[p].name + " Copy");
+            gPerfLayout.pageColors.resize((size_t)gPerfLayout.pageCount, 0u);
+            gPerfLayout.pageColors[newP] = entries[p].color;
             const size_t n = gPerfElements.size();
             for (size_t i = 0; i < n; i++)
                if (gPerfElements[i].page == p)
@@ -2261,7 +2277,7 @@ namespace app
             break;
          }
          case PagePicker::Act::Delete:
-            PushUndoCheckpoint();
+            PushUndoCheckpoint("Performance: Delete page");
             gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
                                                [p](const Patch::PerfRecord& r) { return r.page == p; }),
                                 gPerfElements.end());
@@ -2270,6 +2286,8 @@ namespace app
             gPerfLayout.pageCount--;
             if (p < (int)gPerfLayout.pageNames.size())
                gPerfLayout.pageNames.erase(gPerfLayout.pageNames.begin() + p);
+            if (p < (int)gPerfLayout.pageColors.size())
+               gPerfLayout.pageColors.erase(gPerfLayout.pageColors.begin() + p);
             if (gPerfActivePage >= gPerfLayout.pageCount)
                gPerfActivePage = gPerfLayout.pageCount - 1;
             break;
