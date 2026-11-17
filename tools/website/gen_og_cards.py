@@ -29,7 +29,7 @@ PAGES = {
     "samples/visuals/index.html": ("samples-visuals", "Free visual samples", "Visual samples", "Visual", "Looping visuals to drop into your own work.", BALL),
     "library.html": ("library", "Infinite library", "The library", "library", "Templates, shaders, sounds and skills.", PATCH),
     "blog/index.html": ("blog", "Infinite blog", "Notes from the canvas", "canvas", "Audio-reactive visuals, music and code.", NODE),
-    "nodes/index.html": ("nodes", "Every node", "308 nodes", "nodes", "Controls and patches for each one.", LFO),
+    "nodes/index.html": ("nodes", "Every node", "377 nodes", "nodes", "Controls and patches for each one.", LFO),
     "embeds/index.html": ("embeds", "Audio-reactive visuals", "Visuals that listen", "listen", "Free to embed on any page.", BALL),
     "musicians.html": ("musicians", "Infinite for musicians", "For musicians", "musicians", "Synths, effects and plugins on one canvas.", LFO),
     "artists.html": ("artists", "Infinite for artists", "For artists", "artists", "Images that move, made on one canvas.", FIELD),

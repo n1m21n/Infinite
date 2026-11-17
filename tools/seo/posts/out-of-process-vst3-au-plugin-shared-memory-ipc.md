@@ -13,7 +13,7 @@ status: published
 
 An out-of-process VST3 plugin keeps a modular audio-visual engine from crashing or stalling the host DAW. Recent open-source audio releases, from cross-platform CLAP/VST3/AU sample libraries like Floe to Rust-based workstations like Transit and browser AudioWorklet experiments, show how much engineering effort goes into keeping plugin hosts stable while running rich DSP and custom interfaces.
 
-When a plugin only runs a few biquad filters and draws sliders with a CPU canvas, living inside the DAW's address space is straightforward. When the plugin is an entire modular workstation with 351 nodes, 23 synthesisers, 29 audio effects, live GLSL shaders, and a 3D renderer, running in-process creates two immediate hazards: GPU context collisions with the host windowing system, and audio thread stalls if a dynamic graph or shader compilation hiccups.
+When a plugin only runs a few biquad filters and draws sliders with a CPU canvas, living inside the DAW's address space is straightforward. When the plugin is an entire modular workstation with 377 nodes, 23 synthesisers, 29 audio effects, live GLSL shaders, and a 3D renderer, running in-process creates two immediate hazards: GPU context collisions with the host windowing system, and audio thread stalls if a dynamic graph or shader compilation hiccups.
 
 The [Infinite VST3 and AU plugin](https://infinitedevices.org/plugin.html) solves both problems by splitting the plugin into two OS processes: a minimal native shell loaded by the DAW, and a separate engine process that runs the node graph, DSP, and GPU rendering.
 
@@ -61,4 +61,4 @@ This split design brings real trade-offs that are worth stating plainly:
 - **Format coverage**: the plugin ships as VST3 and AU on macOS, and VST3 on Windows and Linux. AAX (Pro Tools) is not supported.
 - **Readback bandwidth**: when the embedded plugin window is open at high DPI, copying BGRA frames over shared memory uses extra memory bandwidth compared to native single-process rendering, though closing the editor or popping out the window removes it.
 
-All 351 nodes, 142 factory presets, and full standalone parity are available in the [Infinite VST3 and AU plugin](https://infinitedevices.org/plugin.html), and you can inspect our real-time DSP and frame-rate measurements on the [Infinite benchmarks page](https://infinitedevices.org/benchmarks.html).
+All 377 nodes, 142 factory presets, and full standalone parity are available in the [Infinite VST3 and AU plugin](https://infinitedevices.org/plugin.html), and you can inspect our real-time DSP and frame-rate measurements on the [Infinite benchmarks page](https://infinitedevices.org/benchmarks.html).

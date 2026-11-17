@@ -2934,3 +2934,768 @@ Zoom around the pointer, or pan; middle-drag also pans	Масштаб вокру
 Zoom the value axis around the pointer	Масштаб оси значений вокруг указателя
 param 	парам. 
 trig input	вход trig
+%+.1f dB	=en
+%.1f s %s	=en
+%d x %d, %d layers	%d x %d, слоёв: %d
+%d x %d, F12	=en
+%s %+.1f dB	=en
+%s %d  %+.1f dB  %s	=en
+%s %d: %s\n%s	=en
+(loop)	(цикл)
+(whole)	(целиком)
+-inf dB	=en
+10% to 100%	от 10% до 100%
+2D View	2D-вид
+2D View - lay out node outputs as layers and render a picture (Shift+2)	2D-вид: расположить выходы узлов как слои и отрендерить изображение (Shift+2)
+2D View Panel	Панель 2D-вида
+3D	=en
+API key	Ключ API
+Above	Сверху
+Absolute	Абсолютно
+Accent / Erase	Акцент / стереть
+Accumulation	Накопление
+Actual Pixels	Реальные пиксели
+Actual pixels (Ctrl+1)	Реальные пиксели (Ctrl+1)
+Add Box	Добавить блок
+Add Layer Mask	Добавить маску слоя
+Add Node as Layer	Добавить узел как слой
+Add Vector Mask	Добавить векторную маску
+Add a layer mask (from the selection when there is one)	Добавить маску слоя (из выделения, если оно есть)
+Add a node from the canvas as a layer	Добавить узел с холста как слой
+Add an outlet to make a node	Добавьте выход, чтобы создать узел
+Add another	Добавить ещё
+Add effect	Добавить эффект
+Add font	Добавить шрифт
+Add font...	Добавить шрифт...
+Add insert	Добавить инсерт
+Add to 2D View	Добавить в 2D-вид
+Add to Canvas	Добавить на холст
+Adjustment	Корректировка
+Adjustments	Корректировки
+Aligned	Выровнено
+All fonts	Все шрифты
+All four sends are in use	Все четыре send заняты
+All lanes	Все дорожки
+All layers	Все слои
+All pages	Все страницы
+All pages writes one file: every page summed.	«Все страницы» записывает один файл: все страницы суммированы.
+All styles are on	Все стили включены
+Alpha	Альфа
+Alt-click to set the source	Alt-клик, чтобы задать источник
+Alt-click toggles an accent (full velocity); right-drag erases steps	Alt-клик переключает акцент (полная velocity); перетаскивание правой кнопкой стирает шаги
+Analyzing...	Анализ...
+Anchor	Якорь
+Angle	Угол
+Angle##v2dvfa	Угол##v2dvfa
+Animation	Анимация
+Antialias	Сглаживание
+Apply (Enter)	Применить (Enter)
+Apply / Cancel Crop	Применить / отменить обрезку
+Apply style	Применить стиль
+Arrange	Упорядочить
+Arrange Layer	Упорядочить слой
+Arrange range	Упорядочить диапазон
+Audio is off. Start audio, or use Fast.	Аудио выключено. Запустите аудио или используйте «Быстро».
+Auto	Авто
+Auto clean	Автоочистка
+Auto-select	Автовыбор
+Back to the document centre, scale 1, no rotation	Вернуть к центру документа, масштаб 1, без поворота
+Background colour to foreground	Цвет фона → на передний план
+Balance	Баланс
+Balanced	Сбалансировано
+Band	Полоса
+Base URL	Базовый URL
+Baseline	Базовая линия
+Behind	Позади
+Below	Ниже
+Bitmap	Растр
+Black	Чёрный
+Blacks	Чёрные
+Blend Mode	Режим наложения
+Blend in linear light	Смешивать в линейном свете
+Blend the patch with what is there	Смешать патч с существующим
+Block off	Блок выкл.
+Blue	Синий
+Blues	Синие
+Box width	Ширина блока
+Boxes	Блоки
+Brightness	Яркость
+Bring Forward	Переместить вперёд
+Bring to Front	На передний план
+Brush Opacity	Непрозрачность кисти
+Brush Size / Hardness	Размер / жёсткость кисти
+Builds a vector or colour from three values: RGB / XYZ, or hue, saturation, value in HSV mode. Patch a pin to drive that channel.	Строит вектор или цвет из трёх значений: RGB / XYZ или, в режиме HSV, тон, насыщенность, яркость. Подключите пин, чтобы управлять каналом.
+Bypass	Байпас
+Bypassed	В байпасе
+Can't connect	Нельзя подключить
+Can't group a strip that sends	Нельзя сгруппировать канал с send'ами
+Can't return there	Туда нельзя вернуться
+Can't ungroup	Нельзя разгруппировать
+Cancel (Esc)	Отмена (Esc)
+Canvas size	Размер холста
+Centre	По центру
+Centre Guides	Центральные направляющие
+Ch	Кан
+Chance the hit plays each time round	Вероятность звучания удара на каждом круге
+Channel	Канал
+Choose	Выбрать
+Choose image	Выбрать изображение
+Choose...	Выбрать...
+Chrome	Хром
+Clear Cards	Очистить карточки
+Clear Guides	Убрать направляющие
+Clear Solos	Сбросить соло
+Clear every solo on the console	Сбросить все соло на пульте
+Clear paint	Очистить краску
+Click a	Нажмите
+Click a box	Нажмите блок
+Click a step on or off, drag to paint, drag up or down on a lit step for velocity	Клик включает/выключает шаг, перетаскивание рисует, перетаскивание вверх/вниз на включённом шаге меняет velocity
+Click corners; Enter closes	Щёлкайте углы; Enter замыкает
+Click to play and select (Alt = accent). Keys 1-8 too.	Клик — играть и выбрать (Alt = акцент). Клавиши 1-8 тоже.
+Click: key on/off. Drag: paint. Drag up/down on a lit key: velocity.\nAlt-click: accent. Right-drag: erase. Shift-click: open on the Step page.	Клик: клавиша вкл/выкл. Перетаскивание: рисование. Вверх/вниз на включённой клавише: velocity.\nAlt-клик: акцент. Правое перетаскивание: стереть. Shift-клик: открыть на странице шагов.
+Clip Settings	Настройки клипа
+Clip the active layer to the layer below	Обрезать активный слой по слою ниже
+Clip to layer below	Обрезать по слою ниже
+Clipping Mask	Обтравочная маска
+Close 2D View	Закрыть 2D-вид
+Close Chat	Закрыть чат
+Close Drums	Закрыть ударные
+Close Field Patcher	Закрыть Field Patcher
+Close Mixer	Закрыть микшер
+Close Mod Matrix	Закрыть матрицу модуляций
+Close Performance	Закрыть исполнение
+Close Timeline	Закрыть таймлайн
+Close Viewport	Закрыть вьюпорт
+Colour Depth	Глубина цвета
+Colour Management	Управление цветом
+Colour Tint	Оттенок цвета
+Colour lookup	Поиск цвета
+Colours	Цвета
+Compression	Сжатие
+Condition	Условие
+Conical	Конический
+Contiguous	Смежные
+Contour	Контур
+Convert to Draw Node	Преобразовать в узел Draw
+Convert to Shapes	Преобразовать в фигуры
+Convert to Sketch Node	Преобразовать в узел Sketch
+Convert to Text Node	Преобразовать в текстовый узел
+Convert to shapes	Преобразовать в фигуры
+Copy / Clear Selection	Копировать / очистить выделение
+Copy / Cut / Paste	Копировать / вырезать / вставить
+Copy / Cut / Paste Boxes	Копировать / вырезать / вставить блоки
+Copy from the whole picture	Копировать со всего изображения
+Copy or cut the selected boxes, or paste them	Копирование, вырезание или вставка выбранных блоков
+Copy or cut the selected layers, or the selected pixels, or paste them	Копирование, вырезание или вставка выбранных слоёв или пикселей
+Copy the selected words of a message, or drop the selection	Скопировать выбранные слова сообщения или снять выделение
+Corners	Углы
+Could not make one	Не удалось создать
+Couldn't create the file.	Не удалось создать файл.
+Create Clipping Mask	Создать обтравочную маску
+Crop layer	Обрезать слой
+Crop the document (Enter)	Обрезать документ (Enter)
+Custom agent	Свой агент
+Cyan	Голубой
+Cyan - Red	Голубой - красный
+Cyans	Голубые
+Darken	Затемнение
+Dash	Штрих
+Delete Box or Wire	Удалить блок или провод
+Delete Document	Удалить документ
+Delete Layer	Удалить слой
+Delete Layer Mask	Удалить маску слоя
+Delete Vector Mask	Удалить векторную маску
+Delete Wire	Удалить провод
+Delete layer	Удалить слой
+Delete the layer mask	Удалить маску слоя
+Delete the vector mask	Удалить векторную маску
+Deselect	Снять выделение
+Deselect / Invert	Снять / инвертировать выделение
+Diamond	Ромб
+Dim	Приглушить
+Dim -20 dB. Speakers only: never in a render.	Приглушение −20 dB. Только для динамиков: никогда не попадает в рендер.
+Dim outside the crop	Затемнять за пределами обрезки
+Disconnect	Отключить
+Document	Документ
+Double pattern	Двойной паттерн
+Double-click	Двойной клик
+Drag the selection's pixels onto another place	Перетащите пиксели выделения в другое место
+Drag to measure	Перетащите для измерения
+Draw into the vector mask	Рисовать в векторной маске
+Draw mask	Рисовать маску
+Drive	Драйв
+Drop the pixel selection, or invert it	Снять выделение пикселей или инвертировать
+Drums - play and edit Drum Sequencers (Shift+J)	Ударные: игра и редактирование драм-секвенсоров (Shift+J)
+Drums at Bottom	Ударные внизу
+Drums at Top	Ударные вверху
+Dual tip	Двойной наконечник
+Duplicate (Ctrl+J)	Дублировать (Ctrl+J)
+Duplicate Boxes	Дублировать блоки
+Duplicate Document	Дублировать документ
+Duplicate Layer	Дублировать слой
+Duplicate the active layer	Дублировать активный слой
+Duplicate the selected boxes	Дублировать выбранные блоки
+Dynamics	Динамика
+Each stroke starts with clean paint	Каждый мазок начинается с чистой краски
+Earlier	Раньше
+Edit Adjustment...	Редактировать корректировку...
+Edit Fill...	Редактировать заливку...
+Edit Text	Редактировать текст
+Edit it on the canvas.	Редактируйте на холсте.
+Effect on Below	Эффект на слой ниже
+Ellipse	Эллипс
+Empty	Пусто
+Empty page	Пустая страница
+Enable	Включить
+Enabled	Включено
+Esc	Esc
+Essentials	Основное
+Even dashes round a closed shape	Ровные штрихи по замкнутой фигуре
+Every 2nd	Каждый 2-й
+Every 4th	Каждый 4-й
+Every 8th	Каждый 8-й
+Every step	Каждый шаг
+Export ORA...	Экспорт ORA...
+Export PSD...	Экспорт PSD...
+Extra time after the length, with the transport stopped, so reverbs and delays ring out.	Дополнительное время после длины при остановленном транспорте, чтобы реверберация и задержки затихли.
+Fast	Быстро
+Fast can't render a live source (camera, MIDI, audio in). Use Live.	«Быстро» не может рендерить живой источник (камера, MIDI, аудиовход). Используйте «Живой».
+Fast isn't available right now. Use Live.	«Быстро» сейчас недоступно. Используйте «Живой».
+Fast needs a length.	«Быстро» требует длины.
+Field Patcher	Field Patcher
+Field Patcher Panel	Панель Field Patcher
+Field patcher - Field as boxes (Shift+F)	Field Patcher - Field в виде блоков (Shift+F)
+Field patches	Патчи Field
+File missing - drop a clip or Clear	Файл не найден: перетащите клип или нажмите «Очистить»
+Fill gradient	Градиентная заливка
+Fill on or off	Заливка вкл./выкл.
+Fill the Window	Заполнить окно
+Fill the window (Ctrl+Shift+F)	Заполнить окно (Ctrl+Shift+F)
+Fill with a choice of colour, the foreground, or the background; inside the selection when there is one	Заливка выбранным цветом, цветом переднего или заднего плана; внутри выделения, если оно есть
+Fill...	Заливка...
+First line	Первая строка
+Fit / Actual Pixels	По размеру / реальные пиксели
+Fit All	Все по размеру
+Fit on Screen	По экрану
+Fit on screen (Ctrl+0)	По экрану (Ctrl+0)
+Fit the document on screen, or show it at 100%	Вписать документ в экран или показать в 100%
+Flatten Image	Выполнить сведение
+Flip H	Отразить по гор.
+Flip Horizontal	Отразить по горизонтали
+Flip V	Отразить по верт.
+Flip Vertical	Отразить по вертикали
+Flip X	Отразить X
+Flip Y	Отразить Y
+Flip horizontal	Отразить по горизонтали
+Flip vertical	Отразить по вертикали
+Flow	Поток
+Follow stroke	Следовать за мазком
+Font	Шрифт
+Frame every box on the page	Вместить все блоки страницы в кадр
+Free Transform	Свободная трансформация
+Freehand	От руки
+From a node	Из узла
+From centre	От центра
+From start	От начала
+Generate again	Сгенерировать снова
+Generating	Генерация
+Gradient	Градиент
+Grain	Зерно
+Grain depth	Глубина зерна
+Grain mode	Режим зерна
+Grain scale	Масштаб зерна
+Green	Зелёный
+Greens	Зелёные
+Grey	Серый
+Groove	Грув
+Groove: pick from the library	Грув: выбрать из библиотеки
+Group (Ctrl+G)	Сгруппировать (Ctrl+G)
+Group Colour	Цвет группы
+Group Layers	Сгруппировать слои
+Group the selected layers, or dissolve the group	Сгруппировать выбранные слои или расформировать группу
+Grow or shrink the document; layers keep their place	Увеличить или уменьшить документ; слои сохраняют положение
+Grow the 2D View to fill the window, or put it back	Развернуть 2D-вид на всё окно или вернуть обратно
+Grow the 3D View to fill the window, or put it back	Развернуть 3D-вид на всё окно или вернуть обратно
+Guides	Направляющие
+HAP clip - no filmstrip	Клип HAP - без киноленты
+Hard	Жёсткий
+Hard edge	Жёсткий край
+Hardness	Жёсткость
+Hide from Canvas	Скрыть с холста
+Highlight	Выделить
+Highlights	Света
+Highlights Hue	Тон светов
+Highlights Saturation	Насыщенность светов
+Hold FILL to play Fill steps and mute !Fill steps; Shift-click latches it	Удерживайте FILL, чтобы играть шаги Fill и глушить !Fill; Shift-клик фиксирует
+Hold: steps set to Fill play, !Fill rest. Shift-click latches.	Удержание: шаги Fill играют, !Fill молчат. Shift-клик фиксирует.
+Hue	Тон
+Humanize velocity	Гуманизация velocity
+Image	Изображение
+Image size	Размер изображения
+In export	В экспорте
+Indent left	Отступ слева
+Indent right	Отступ справа
+Ink stipple	Точечная штриховка тушью
+Input black	Чёрный вход
+Input white	Белый вход
+Inside	Внутри
+Invert polarity	Инвертировать полярность
+Jitter	Джиттер
+Justify text	Выровнять текст по ширине
+Keep light above 1.0	Сохранять свет выше 1.0
+Keep lightness	Сохранять яркость
+Keep proportions	Сохранять пропорции
+Kerning	Кернинг
+Keys	Клавиши
+Kit	Набор
+Label	Метка
+Lane	Дорожка
+Lane length. 0 follows the pattern; other lengths loop on their own (polymeter)	Длина дорожки. 0 следует паттерну; другие значения зацикливаются сами (полиметр)
+Lanes in one choke group cut each other off (closed hat stops the open hat)	Дорожки одной группы choke обрывают друг друга (закрытый хэт обрывает открытый)
+Layer	Слой
+Layer as Output	Слой как выход
+Layer mask	Маска слоя
+Layer mask: click to paint it, Shift-click to turn it off	Маска слоя: клик — рисовать, Shift-клик — выключить
+Layer via Cut	Слой через вырезание
+Layers and properties	Слои и свойства
+Leading	Межстрочный интервал
+Light height	Высота света
+Lightness	Светлота
+Live	Живой
+Live records what plays. Fast renders offline, quicker than real time; live inputs can't be rendered that way.	«Живой» записывает то, что играет. «Быстро» рендерит офлайн, быстрее реального времени; живые входы так не рендерятся.
+Load	Загрузить
+Load stack	Загрузить стек
+Loading preview...	Загрузка предпросмотра...
+Lock alpha	Заблокировать альфу
+Lookup	Поиск
+Luminance	Яркость
+Magenta	Пурпурный
+Magenta - Green	Пурпурный - зелёный
+Magentas	Пурпурные
+Map colours	Сопоставить цвета
+Marbling	Мраморность
+Marquee, Lasso; W cycles Magic Wand, Selection Brush, Object Selection. Shift adds, Alt subtracts. Enter closes a polygon lasso, Esc drops it	Выделение прямоугольником, лассо; W переключает волшебную палочку, кисть выделения, выбор объекта. Shift — добавить, Alt — вычесть. Enter замыкает полигональное лассо, Esc отменяет
+Mask	Маска
+Mask from	Маска из
+Mask from Selection	Маска из выделения
+Master	Мастер
+Max	Макс
+Maximise (Esc returns)	Развернуть (Esc — вернуть)
+Merge Down	Объединить с нижним
+Merge Layers	Объединить слои
+Merge Visible	Объединить видимые
+Merge every shown layer into one pixel layer; hidden layers stay	Объединить все видимые слои в один растровый; скрытые остаются
+Merge the active layer into the one under it; with more selected, merge those	Объединить активный слой с нижним; если выбрано больше, объединить их
+Mirror strokes across the object	Зеркалить мазки по объекту
+Missing	Отсутствует
+Mix	Микс
+Mixer	Микшер
+Mixer - every Mixer node as a console (Shift+L)	Микшер - каждый узел Mixer как пульт (Shift+L)
+Mixer at Bottom	Микшер внизу
+Mixer at Top	Микшер вверху
+Model ID	ID модели
+Molding...	Формовка...
+Mono	Моно
+Mono check. Speakers only: never in a render.	Проверка моно. Только для динамиков: никогда не попадает в рендер.
+Monochrome	Монохром
+More settings	Дополнительные настройки
+More tools. Tick the ones to show	Ещё инструменты. Отметьте, что показывать
+More..	Ещё...
+Move Left	Сдвинуть влево
+Move Right	Сдвинуть вправо
+Move down	Вниз
+Move the layer down or up; with Shift to the bottom or top	Переместить слой вверх или вниз; с Shift — в самый низ или верх
+Move the selected pixels to a new layer	Переместить выбранные пиксели на новый слой
+Move the selection 1 or 10 pixels	Сдвинуть выделение на 1 или 10 пикселей
+Move up	Вверх
+Move, Crop, Hand, Zoom; hold Space for the hand	Перемещение, обрезка, рука, масштаб; удерживайте Пробел для руки
+Move, scale and turn the selected layers as one step; Enter keeps it, Esc puts them back	Перемещение, масштаб и поворот выбранных слоёв одним шагом; Enter — применить, Esc — вернуть
+My grooves	Мои грувы
+Nearest	Ближайший
+Neutrals	Нейтральные
+New Document	Новый документ
+New Drum Sequencer	Новый драм-секвенсор
+New Mixer	Новый микшер
+New Piano Roll page	Новая страница Piano Roll
+New adjustment layer	Новый корректирующий слой
+New drum page	Новая драм-страница
+New fill layer	Новый слой заливки
+New layer	Новый слой
+New mixer page	Новая страница микшера
+New scratch page	Новая страница scratch
+New send FX	Новый send-эффект
+New vector layer	Новый векторный слой
+New, duplicate or delete a document	Создать, дублировать или удалить документ
+Next groove	Следующий грув
+No Drum Sequencer yet	Драм-секвенсора пока нет
+No Mixer feeds an Audio Out	Ни один микшер не подаёт на Audio Out
+No Mixer yet	Микшера пока нет
+No break	Без паузы
+No box selected	Блок не выбран
+No clip loaded	Клип не загружен
+No effects here	Здесь нет эффектов
+No fitting nodes	Нет подходящих узлов
+No free strip for the return	Нет свободного канала для возврата
+No geometry	Нет геометрии
+No input	Нет входа
+No layer selected	Слой не выбран
+No layers	Нет слоёв
+No loop yet	Цикла пока нет
+No matches	Нет совпадений
+No preview	Нет предпросмотра
+No sample	Нет сэмпла
+No sample loaded	Сэмпл не загружен
+No sample yet	Сэмпла пока нет
+No sample · drop or click	Нет сэмпла · перетащите или нажмите
+Node gone	Узел удалён
+Noise	Шум
+Noise##v2dvfnoise	Шум##v2dvfnoise
+Normal	Обычный
+Not selected	Не выбрано
+Not tested	Не проверено
+Nothing in the 2D View yet	В 2D-виде пока ничего нет
+Nothing to transform	Нечего трансформировать
+Now	Сейчас
+Nudge	Сдвиг
+Offbeats	Офбиты
+Offset	Смещение
+%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   Ш %.0f  В %.0f
+Layer styles	Стили слоя
+Metal	Металл
+Midtones	Средние тона
+Min	Мин
+No banding	Без полос
+Only touching pixels	Только соприкасающиеся пиксели
+Open	Открыть
+Open PSD or ORA...	Открыть PSD или ORA...
+Open grooves folder	Открыть папку грувов
+Open in 2D View	Открыть в 2D-виде
+Open in Drum panel	Открыть в панели ударных
+Open in Mixer panel	Открыть в панели микшера
+Optical align	Оптическое выравнивание
+Optional for local Ollama; stored in Keychain	Необязательно для локального Ollama; хранится в Keychain
+Orange	Оранжевый
+Orthographic: click for perspective (5)	Ортографическая: клик — перспектива (5)
+Outline colour	Цвет контура
+Outline width	Толщина контура
+Outlines as a vector layer	Контуры как векторный слой
+Output black	Чёрный выход
+Output white	Белый выход
+Outside	Снаружи
+PAN	=en
+Paint	Рисование
+Paint Tools	Инструменты рисования
+Paint a straight line from the last point	Нарисовать прямую линию от последней точки
+Paint into the selection	Рисовать внутри выделения
+Paint mask	Маска рисования
+Paint on surface	Рисовать на поверхности
+Paint out of the selection (Alt)	Рисовать вне выделения (Alt)
+Paint the mask	Нарисовать маску
+Paint the selection with the brush; press again to leave	Рисовать кистью по выделению; нажмите снова, чтобы выйти
+Part	Часть
+Pass Through	Сквозной проход
+Paste at Playhead	Вставить у playhead
+Pattern	Паттерн
+Pattern tools for the selected lane	Инструменты паттерна для выбранной дорожки
+Peak, integrated loudness, length and size of the file.	Пик, интегральная громкость, длительность и размер файла.
+Pen and shapes draw the mask	Перо и фигуры рисуют маску
+Pen pressure	Нажим пера
+Pen, Node, Shape, Text. Pen: click the first point to close, Enter or Esc ends the path. Node: Alt-click makes a corner, Delete removes the shape	Перо, узел, фигура, текст. Перо: клик по первой точке замыкает, Enter или Esc завершает контур. Узел: Alt-клик создаёт угол, Delete удаляет фигуру
+Perspective: click for orthographic (5)	Перспектива: клик — ортографическая (5)
+Pick	Выбрать
+Pick a groove	Выберите грув
+Pick a layer	Выберите слой
+Pick a part and generate	Выберите часть и сгенерируйте
+Pick on Canvas	Выбрать на холсте
+Pick on picture	Выбрать на изображении
+Picking	Выбор
+Pin page	Закрепить страницу
+Pixel aspect	Пиксельное соотношение
+Place this page as a node	Разместить эту страницу как узел
+Plain	Простой
+Plasticine	Пластилин
+Play Pads	Играть пэды
+Play and select lanes 1-8 while the pointer is over the Drum panel (Shift = accent)	Играйте и выбирайте дорожки 1-8, когда указатель над панелью ударных (Shift = акцент)
+Polygon	Многоугольник
+Pre-fader sends	Send до фейдера
+Previous groove	Предыдущий грув
+Profile	Профиль
+Protect alpha	Защитить альфу
+Protect hue	Защитить тон
+Put this document on the canvas	Поместить этот документ на холст
+Quick Mask	Быстрая маска
+REC %.1f s  %.1f MB	REC %.1f с  %.1f МБ
+RGB	=en
+Radial	Радиальный
+Radius in px, not % of the shape	=en
+Ramp velocity	Нарастание velocity
+Randomise	Рандомизировать
+Rasterize Layer	Растрировать слой
+Rasterize?	Растрировать?
+Reassign...	Переназначить...
+Recent	Недавние
+Rectangle	Прямоугольник
+Red	Красный
+Reds	Красные
+Refill	Заполнить заново
+Reflected	Отражённый
+Release Clipping Mask	Снять обтравочную маску
+Relief	Рельеф
+Remove all paint from the surface	Удалить всю краску с поверхности
+Remove effect	Удалить эффект
+Remove the selected boxes or wires; the code updates as one undo step	Удалить выбранные блоки или провода; код обновляется одним шагом отмены
+Render Image / Animation	Рендер изображения / анимации
+Render an image (F12) or the animation (Ctrl+F12)	Рендер изображения (F12) или анимации (Ctrl+F12)
+Render folder	Папка рендера
+Render the document through an Output node	Рендер документа через узел Output
+Repeat	Повтор
+Repeat strokes across the picture	Повторять мазки по всему изображению
+Replace with	Заменить на
+Replaces the pattern, rate, swing and steps; fills empty lanes from the kit	Заменяет паттерн, темп, свинг и шаги; заполняет пустые дорожки из набора
+Resample nearest neighbour, no smoothing	Передискретизация ближайшим соседом, без сглаживания
+Reset Distort	Сбросить искажение
+Reset Rotation	Сбросить поворот
+Reset name	Сбросить имя
+Reset strip	Сбросить канал
+Reset trig	Сбросить триггер
+Restore Size	Восстановить размер
+Retouch Tools	Инструменты ретуши
+Return a maximised Field Patcher to its docked size	Вернуть развёрнутый Field Patcher к обычному размеру
+Return to Start	Вернуться к началу
+Reveal##folder	Показать##folder
+Right-click any node and choose Add to 2D View.	Щёлкните правой кнопкой по любому узлу и выберите «Добавить в 2D-вид».
+Ring	Кольцо
+Roll down	Прокрутить вниз
+Roll up	Прокрутить вверх
+Rotate 180°	Повернуть на 180°
+Rotate 90° Clockwise	Повернуть на 90° по часовой стрелке
+Rotate 90° Counter Clockwise	Повернуть на 90° против часовой стрелки
+Rotate View	Повернуть вид
+Roundness	Округлость
+Rule of thirds guides	Направляющие правила третей
+Rulers	Линейки
+Rulers / Grid / Guides	Линейки / сетка / направляющие
+Rulers, guides, grid	Линейки, направляющие, сетка
+Run	Запуск
+Run this sequencer's steps (the transport keeps going)	Запустить шаги этого секвенсора (транспорт продолжает работу)
+Same for all##v2dvcrall	Одинаково для всех##v2dvcrall
+Sample the whole picture	Сэмплировать всё изображение
+Saturation	Насыщенность
+Save Selection	Сохранить выделение
+Save stack	Сохранить стек
+Save style	Сохранить стиль
+Scale the document and every layer with it	Масштабировать документ и все слои вместе с ним
+Scatter	Разброс
+Scatter Y	Разброс Y
+Scratch	Scratch
+Search boxes	Поиск блоков
+Search nodes	Поиск узлов
+Search the boxes this page's node can run; a dropped wire connects the new box	Поиск блоков, которые может выполнять узел страницы; брошенный провод подключает новый блок
+Second colour	Второй цвет
+Second scatter	Второй разброс
+Second size	Второй размер
+Second tip	Второй наконечник
+Select All Boxes	Выбрать все блоки
+Select All Layers	Выбрать все слои
+Select every box on the page	Выбрать все блоки на странице
+Select every top-level layer; with a paint or selection tool, every pixel	Выбрать все верхние слои; с инструментом рисования или выделения — все пиксели
+Selected in chat	Выбрано в чате
+Selection	Выделение
+Selection Tools	Инструменты выделения
+Selection is source	Выделение — источник
+Send Backward	Переместить назад
+Send to Back	В самый низ
+Set a length first.	Сначала задайте длину.
+Shadows Hue	Тон теней
+Shadows Saturation	Насыщенность теней
+Shared	Общий
+Shared chain	Общая цепочка
+Shared chain: edit it on the canvas	Общая цепочка: редактируйте на холсте
+Shear	Наклон
+Shift	Shift
+Shift left	Сдвиг влево
+Shift right	Сдвиг вправо
+Shift-click a step to open it on the Step page: velocity, chance, nudge and condition	Shift-клик по шагу открывает его на странице шагов: velocity, вероятность, сдвиг и условие
+Show 2D View	Показать 2D-вид
+Show Drums	Показать ударные
+Show Field Patcher	Показать Field Patcher
+Show Mixer	Показать микшер
+Show all tools	Показать все инструменты
+Show essentials only	Показать только основное
+Show on Canvas	Показать на холсте
+Show or hide the 2D View. Every other key in this section needs the pointer over the view	Показать или скрыть 2D-вид. Остальные клавиши этого раздела работают, когда указатель над видом
+Show or hide them; drag from a ruler to pull a guide, drag it back to remove it	Показать или скрыть; тяните от линейки, чтобы создать направляющую, верните её, чтобы удалить
+Show outside the crop	Показывать за пределами обрезки
+Show the whole sample	Показать весь сэмпл
+Size##img	Размер##img
+Skin	Кожа
+Smaller or larger brush; with Shift softer or harder	Кисть меньше или больше; с Shift — мягче или жёстче
+Smoothing	Сглаживание
+Soft	Мягкий
+Soft edges	Мягкие края
+Solid	Сплошной
+Solo (Alt-click: clear all, right-click: solo safe)	Соло (Alt-клик: сбросить все, правый клик: безопасное соло)
+Solo safe	Безопасное соло
+Solo safe (right-click)	Безопасное соло (правый клик)
+Sound	Звук
+Spacing	Интервал
+Spectral field editor	Редактор спектрального поля
+Spokes	Спицы
+Spread	Разброс
+Stabiliser	Стабилизатор
+Stack	Стек
+Step Page	Страница шагов
+Stipple	Точечная штриховка
+Stop alpha	Остановить альфу
+Straight Line	Прямая линия
+Strike	Удар
+Strike colour	Цвет удара
+Strike line	Линия удара
+Stroke	Обводка
+Stroke on or off	Обводка вкл./выкл.
+Stroke options	Параметры обводки
+Stroke under the fill	Обводка под заливкой
+Stroke width scales with the layer	Толщина обводки масштабируется вместе со слоем
+Style	Стиль
+Subscript	Подстрочный
+Subtract	Вычесть
+Superscript	Надстрочный
+Swap the two colours, or reset them to black and white	Поменять два цвета местами или сбросить в чёрный и белый
+Swatches	Образцы
+Symmetry	Симметрия
+TRIM	=en
+Tail	Хвост
+Take the selected layers out; the nodes stay on the canvas	Вынести выбранные слои; узлы останутся на холсте
+Taper in	Сужение в начале
+Taper out	Сужение в конце
+Target	Цель
+Test connection	Проверить соединение
+Testing…	Проверка…
+Texture	Текстура
+That would feed the audio back into itself.	Это замкнёт аудио само на себя.
+That would feed the send back into itself.	Это замкнёт send сам на себя.
+The arrangement is empty.	Аранжировка пуста.
+The brush paints the mask	Кисть рисует маску
+The Mixer panel's console is driving audio. Click to hand it back to the canvas.	Пульт панели микшера управляет звуком. Нажмите, чтобы вернуть его холсту.
+The Mixer panel's console will drive audio once the engine is started.	Пульт панели микшера будет управлять звуком после запуска движка.
+The Mixer would pass 32 strips.	Микшер получит 32 канала.
+The group has inserts, sends or a second cable. Edit it on the canvas.	У группы есть инсерты, send'ы или второй провод. Редактируйте на холсте.
+The rest of the bar	Остаток такта
+The source moves with each stroke	Источник смещается с каждым мазком
+The top Mixer already has 32 strips.	Верхний микшер уже содержит 32 канала.
+This Audio Out is already recording.	Этот Audio Out уже записывает.
+This page	Эта страница
+Tines	Зубцы
+Tip	Наконечник
+To	До
+Toggle the Drum panel	Переключить панель ударных
+Toggle the Mixer panel	Переключить панель микшера
+Tone	Тон
+Tool: Mute - click to choose a tool	Инструмент: Mute — нажмите, чтобы выбрать инструмент
+Tools on the strip	Инструменты на канале
+Tracking	Трекинг
+Turn its sends off first.	Сначала выключите его send'ы.
+Turn on	Включить
+Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	Поворот холста или возврат в исходное положение; работает и поворот двумя пальцами на трекпаде
+Turn this layer into pixels so the tool can work on it	Превратить этот слой в пиксели, чтобы инструмент мог с ним работать
+Underline	Подчёркивание
+Underline colour	Цвет подчёркивания
+Unpin page	Открепить страницу
+Until stop	До остановки
+Use an existing send knob on this strip.	Используйте существующую ручку send на этом канале.
+Use in chat	Использовать в чате
+Vector	Вектор
+Vector Tools	Векторные инструменты
+Vector mask	Векторная маска
+Viewport Colour	Цвет вьюпорта
+Violet	Фиолетовый
+Waiting for play	Ожидание воспроизведения
+Waiting for the next grid line	Ожидание следующей линии сетки
+Warp	Деформация
+Wet edges	Влажные края
+Wet mix	Wet-микс
+White	Белый
+White Balance	Баланс белого
+Whites	Белые
+With play	С воспроизведением
+With the Crop tool	С инструментом обрезки
+Yellow	Жёлтый
+Yellow - Blue	Жёлтый - синий
+Yellows	Жёлтые
+Your predictive macro faders: few faders drive many parameters based on learned co-movement PCA.	Прогнозирующие макро-фейдеры: несколько фейдеров управляют многими параметрами по выученной совместной динамике (PCA).
+Zoom - type a percentage	Масштаб: введите процент
+Zoom 2D View	Масштаб 2D-вида
+Zoom in (Ctrl++)	Приблизить (Ctrl++)
+Zoom out (Ctrl+-)	Отдалить (Ctrl+-)
+Zoom in or out; {mod} or Alt with the wheel zooms at the pointer	Масштаб; {mod} или Alt с колесом — масштаб у указателя
+boxes	блоки
+code	код
+default	по умолчанию
+field	=en
+items	элементы
+knob	ручка
+lane	дорожка
+last good ·	последнее верное ·
+max	макс
+min	мин
+more	ещё
+name	имя
+no groove	без грува
+node	узел
+off	выкл.
+picture node	узел изображения
+pixels	пиксели
+post	post
+pre	pre
+refused: publish output is still wired	отклонено: выход publish всё ещё подключён
+sound node	звуковой узел
+source node	исходный узел
+steps	шаги
+value	значение
+velocity	velocity
+{patch} {take} {date} {time}. An existing file is never overwritten.	{patch} {take} {date} {time}. Существующий файл никогда не перезаписывается.
+3D cell noise on the coordinate patched into vector (Generated when empty), times scale. Distance to the nearest point, Second nearest, Edge (the gap between the two), Cell (one grey per cell) or Colour (one colour per cell). Patch it into a Material's field input.	3D-шумы Cell по координате, поданной в vector (Generated, если пусто), умноженной на scale. Distance до ближайшей точки, Second nearest, Edge (разница между ними), Cell (серый на ячейку) или Colour (цвет на ячейку). Подключите к входу field материала.
+A 3D checker of two colours on the coordinate patched into vector (Generated when empty), times scale. Patch it into a Material's field input to drive the base colour; the Material's other knobs still apply.	3D-шахматная текстура из двух цветов по координате, поданной в vector (Generated, если пусто), умноженной на scale. Подключите к входу field материала, чтобы управлять базовым цветом; остальные настройки материала продолжают действовать.
+A blend weight by view angle, Fresnel or Facing. Blend sets how much of the surface is weighted.	Вес смешивания по углу обзора: Fresnel или Facing. Blend задаёт, какая доля поверхности получает вес.
+A colour ramp of 2 to 8 stops read at the factor: Linear, Ease, Constant or B-Spline. Below the first stop and above the last the end colours hold.	Цветовой градиент из 2–8 точек, читаемый по factor: Linear, Ease, Constant или B-Spline. Ниже первой и выше последней точки действуют крайние цвета.
+A grey ramp of the coordinate patched into vector (Generated when empty), times scale: Linear, Quadratic, Easing, Diagonal, Spherical, Quadratic Sphere, Radial, Wave (bands along x) or Magic (interfering waves). Patch it into a Material's field input.	Серый градиент по координате, поданной в vector (Generated, если пусто), умноженной на scale: Linear, Quadratic, Easing, Diagonal, Spherical, Quadratic Sphere, Radial, Wave (полосы по x) или Magic (интерферирующие волны). Подключите к входу field материала.
+A height bends the normal by strength over distance; invert flips it. Wire it into Material's normal pin.	Высота изгибает нормаль на величину strength по расстоянию; invert меняет направление. Подключите к контакту normal материала.
+A modulator written in Field code: publish is its value, 0..1. Patch it in the Field Patcher, or start from Slow LFO, Triangle LFO, Pulse train or Skipping beat.	Модулятор на коде Field: publish — его значение, 0..1. Настройте в Field Patcher или начните с Slow LFO, Triangle LFO, Pulse train или Skipping beat.
+A note node whose body is a Field script. The script runs per sample against the transport beat; note(pitch, vel, len) inside an if sends a note out (len in beats, 0 holds as long as the incoming note). tick(div) fires on each beat division, deg(d) is a scale degree under Root/Scale, rand() is 0..1. Wire it into any synth or MIDI-out. publish scalar output adds a modulator pin carrying whatever publish holds. Boxes opens it in the Field Patcher.	Узел нот, тело которого — скрипт Field. Скрипт выполняется для каждого сэмпла относительно бита транспорта; note(pitch, vel, len) внутри if отправляет ноту (len в битах, 0 — удерживать, пока есть входящая нота). tick(div) срабатывает на каждом делении бита, deg(d) — ступень строя под Root/Scale, rand() — 0..1. Подключите к любому синту или MIDI-out. Выход scalar у publish добавляет контакт модулятора с текущим значением publish. Boxes открывает его в Field Patcher.
+A shading node - builds a surface per shading point, the way Blender's shader nodes do. Chain it into a Material's pins; the Material compiles the chain into one program for every Render 3D engine.	Узел шейдинга — строит поверхность в каждой точке затенения, как шейдерные узлы Blender. Соедините цепочку с контактами материала; материал компилирует цепочку в одну программу для каждого движка Render 3D.
+A spectral effect whose kernel you write in the node and which runs once per FFT bin: filters, freezes, pitch and frequency shifts, flips, robot and whisper voices, cross-synthesis.	Спектральный эффект: ядро пишется в узле и выполняется один раз на каждый бин FFT. Фильтры, заморозка, сдвиг высоты и частоты, инверсии, голоса робота и шёпота, кросс-синтез.
+A tangent-space normal map colour (Shade Image set to Data) as a normal for Material's normal pin. Strength scales the tilt.	Цвет карты нормалей в касательном пространстве (Shade Image в режиме Data) как нормаль для контакта normal материала. Strength масштабирует наклон.
+A texture coordinate for the shading nodes: UV, Object, World, Generated (0 to 1 across the mesh's bounds), Normal, View or Reflection. Patch it into a Shade Mapping or a texture's vector input; the chain ends in a Material's field input.	Координата текстуры для узлов шейдинга: UV, Object, World, Generated (от 0 до 1 по границам меша), Normal, View или Reflection. Подключите к Shade Mapping или входу vector текстуры; цепочка заканчивается на входе field материала.
+An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the small 1-16 | 17-32 pill at the right of the line under it switches pages once steps goes past 16 - greyed out until then; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the small A B C pill at the end of the row; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern. A .mid file can become the pattern: drop it on the node, or keep .mid files in the My grooves folder (the last category in the groove picker, whose last row opens the folder). Its first two bars are placed on a 1/16 grid as 16 or 32 steps - General MIDI drum notes go to the matching lanes, and a melodic file gives its 8 lowest pitches to lanes 1-8 - at rate 1/16 with no swing, and the pattern takes the file's name. Each step also has a chance (how often it plays), a nudge (early or late, up to half a step) and a condition: Fill / !Fill follow the Drum panel's FILL button, 1st / !1st the first time round, and A:B plays on loop A of every B. Each lane can have its own length (polymeter), play its sample reversed, and run through a low-pass or high-pass filter with cutoff and resonance; these sit in the Drum panel (Shift+J).	Барабанная машина: 8 дорожек, до 32 шагов: 8 карточек дорожек (волна + transient/decay/pitch/тонкая настройка/громкость/панорама) над сеткой шагов на 8 дорожек, показывающей по 16 шагов за раз (маленькая капсула 1-16 | 17-32 справа от строки под ней переключает страницы, когда шагов больше 16 — серая до этого; точка отмечает страницу, где находится playhead). Щелчок по волне карточки загружает её сэмпл (также работают перетаскивание из панели Samples или перетаскивание файла из ОС), либо перетаскивайте края, чтобы обрезать диапазон воспроизведения; x очищает его, а кнопка choke переключает группу choke (0 = нет: две дорожки одной группы обрывают друг друга, как закрытый и открытый хай-хэт). В сетке R рандомизирует заполнение дорожки, M/S — выключает звук или соло. Щелчок по шагу переключает его; вертикальное перетаскивание по включённому шагу задаёт velocity; горизонтальное — закрашивает ряд шагов вкл./выкл. Между карточками дорожек и сеткой выбор грува содержит встроенную библиотеку из 141 грува в 10 категориях: выберите категорию (переход к её первому групу) или грув (список сгруппирован и имеет поле фильтра), листайте стрелками < и >, а маленькой капсулой A B C в конце строки переключайте часть грува: A куплет / B бридж / C припев. Выбор заменяет паттерн, темп, свинг и число шагов одним шагом отмены и заполняет пустые дорожки из встроенного набора (дорожку, которую вы загрузили сами, никогда не трогают). Нижние строки действуют на весь паттерн: темп/шаги/свинг/выход, затем четыре смещения (transient/decay/pitch/pan), накладываемые на значение каждой дорожки. Играет сразу после подключения, фазово привязан к транспорту; ввода нот нет, только собственная последовательность, выводимая из Transport. run останавливает запуск шагов этого узла, не трогая транспорт; randomise задаёт музыкальный стартовый паттерн kick/snare/hat. Файл .mid может стать паттерном: перетащите его на узел или храните .mid-файлы в папке My grooves (последняя категория в выборе грува, её последняя строка открывает папку). Первые два такта размещаются на сетке 1/16 как 16 или 32 шага — ударные ноты General MIDI идут в соответствующие дорожки, а мелодический файл отдаёт 8 самых низких высот дорожкам 1-8 — при темпе 1/16 без свинга; паттерн берёт имя файла. У каждого шага также есть шанс (как часто он играет), nudge (раньше или позже, до половины шага) и условие: Fill / !Fill следуют кнопке FILL панели ударных, 1st / !1st — только при первом проходе, а A:B играет на проходе A из каждых B. У каждой дорожки может быть своя длина (полиметр), воспроизведение сэмпла задом наперёд и фильтр low-pass или high-pass с cutoff и resonance; они находятся в панели ударных (Shift+J).
+Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sample Player. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload.	Ресинтез анализа/генома: раскладывает загруженный или записанный сэмпл на отслеженные гармонические парциалы и реальную остаточную волну; Roll мутирует геном параметров и заново рендерит из него новый сэмпл — каждый бросок уходит дальше от предыдущего, а не от оригинала. Iterate подаёт последний рендер обратно как новый источник и заново анализирует его (постепенно «съедая» звук); Reset полностью возвращает загруженный или записанный оригинальный сэмпл — поколение 0 и шесть ручек формы (tone/air/snap/stretch/time/pitch) в нейтральное положение, а сам анализ восстанавливается, отменяя любой Iterate. chaos задаёт, насколько далеко прыгнет следующий бросок; pitch добавляет смещение к собственному движению высоты генома; tone балансирует парциалы и остаток; air/snap — уровни постоянного шипения и transient-атаки остатка; stretch масштабирует inharmonicity вместе с гармоническим интервалом; time сдвигает тайминг attack/decay, не меняя длину сэмпла. Это звуковой дизайнер, а не играемый инструмент: он не принимает нот, только один самозапускаемый голос с диапазоном start/end, loop, reverse и ping-pong, с тем же транспортом, что у Sample Player. Анализ и рендер выполняются в фоновом потоке, поэтому броски никогда не замораживают интерфейс. seed/gen/f0/harm в показаниях — точный геном (seed + число поколений) и проанализированная высота: двух целых чисел достаточно, чтобы точно воспроизвести любой брошенный звук после перезагрузки.
+Any image cable as a texture on the surface. Flat reads it at the vector (UV when unwired); Box projects it from three sides and blends by the normal. Colour decodes sRGB, Data reads raw values. Up to four pictures per material.	Любой кабель изображения как текстура на поверхности. Flat читает по vector (UV, если не подключено); Box проецирует с трёх сторон и смешивает по нормали. Colour декодирует sRGB, Data читает сырые значения. До четырёх изображений на материал.
+Applies shading, colour, metallic/roughness/opacity and emission to a geometry input, plus an optional normal map input (its strength slider only appears once something is patched into it). Detail scale reads the normal map a second time at a finer scale, Detail strength sets its tilt: weave or pores over the large folds. Model Hair shades a Fur mesh's strands as fibres, coloured by melanin. Translucency passes light through to the far side: leaves, sails, paper. Layer lays a second Material over this one where Mask is white, by Layer mix: paint over metal, dirt over paint, up to four deep.	Применяет затенение, цвет, metallic/roughness/opacity и emission к геометрическому входу, а также к необязательному входу карты нормалей (его ползунок силы появляется только после подключения). Detail scale читает карту нормалей второй раз в более мелком масштабе, Detail strength задаёт её наклон: текстура или поры поверх больших складок. Model Hair затеняет пряди меша Fur как волокна, окрашенные меланином. Translucency пропускает свет на обратную сторону: листья, паруса, бумага. Layer накладывает второй материал поверх этого там, где Mask белый, по Layer mix: краска на металле, грязь на краске, до четырёх слоёв.
+Blender's scalar maths on a, b and c: add to power, logs, rounding, modulo, trigonometry, compare and smooth min/max. Only the operands the operation reads are shown. Clamp limits the result to 0..1.	Скалярная математика Blender над a, b и c: сложение до степени, логарифмы, округление, остаток, тригонометрия, сравнение и сглаженные min/max. Показываются только операнды, которые читает операция. Clamp ограничивает результат диапазоном 0..1.
+Blends a to b by factor, as a float, a vector or a colour. Colour runs b through one of the 30 blend modes first. Clamp factor holds the factor to 0..1.	Смешивает a и b по factor — как float, вектор или цвет. Colour сначала применяет к b один из 30 режимов смешивания. Clamp factor ограничивает factor диапазоном 0..1.
+Bricks in the x and y of the coordinate patched into vector (Generated when empty), times scale. Width and height size one brick, offset shifts every second row, mortar size is the gap, tint mixes each brick between colour 1 and colour 2 at random. Patch it into a Material's field input.	Кирпичи по x и y координаты, поданной в vector (Generated, если пусто), умноженной на scale. Width и height задают размер кирпича, offset смещает каждый второй ряд, mortar size — ширину шва, tint случайно смешивает каждый кирпич между colour 1 и colour 2. Подключите к входу field материала.
+Generates procedural 3D point geometry from scratch using a per-element Field kernel (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot). value turns it into a value source: no mesh, publish is its output. Boxes opens it in the Field Patcher.	Генерирует процедурную 3D-геометрию точек с нуля с помощью поэлементного ядра Field (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot). value превращает его в источник значения: без меша, выход — publish. Boxes открывает его в Field Patcher.
+How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sample Player. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load.	Использование: подключите out к Audio Out, перетащите аудиофайлы на пэды (или щёлкните пустой пэд, либо используйте Load... / Folder... для первых 16 файлов папки), затем щёлкните по пэду или отправляйте ноты на вход notes — ноты 36–51 играют пэды 1–16. Сэмплер на 16 пэдов: пэд 1 находится внизу слева, как на аппаратной MPC; каждый пэд — квадратная плитка с волной, номером и режимом, и у каждого пэда свой CV-контакт, так что его может запускать модулятор MIDI CC / Note или любой гейт. Каждый пэд — отдельный голос, поэтому пэды звучат вместе, а щелчок играет сразу. Удар следует режиму пэда: one shot проигрывает весь сэмпл, а новый удар перезапускает его; gate играет, пока удерживается (кнопка мыши, CV в высоком уровне или удерживаемая нота), и останавливается при отпускании; loop включает зацикленное воспроизведение на каждом ударе. Щелчок выбирает пэд (правый клик выбирает без воспроизведения); строки под пэдами редактируют выбранный пэд: sync и rate, fine tune (центы), pitch (полутоны), speed (отрицательное — проигрывание назад), громкость, панорама, mode, а также fade in / fade out (мс, в начале и конце каждого прохода), определённые так же, как в Sample Player. sync задаётся для каждого пэда: Free (по умолчанию) играет удар сразу; Synced фиксирует удар и запускает его на следующей линии сетки транспорта с выбранной скоростью (1/4, 1/8, 1 такт… те же деления, что у любого другого узла) с точностью до сэмпла; удар точно на линии срабатывает на ней, при остановленном транспорте срабатывает сразу, а в режиме gate отпускание до линии отменяет удар. В режиме loop синхронизированный пэд повторно запускает сэмпл на каждом делении, пока включён (один проход на деление: более длинный сэмпл обрезается на линии, более короткий оставляет паузу), а при остановленном транспорте играет как обычная петля. Регулятор rate неактивен, пока пэд в режиме Free. Любой параметр любого пэда можно модулировать в любой момент: кабель остаётся привязанным к своему пэду, когда вы выбираете другой, а оранжевая точка на плитке показывает, что у пэда есть модулируемый параметр. Плитка показывает режим и, если синхронизировано, скорость. Аудиовыход узла — микс всех пэдов. Пути к загруженным сэмплам и настройки пэдов сохраняются вместе с патчем; аудио перечитывается при загрузке.
+How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sample Player's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened.	Использование: подключите звук ко входу loop, а out — к Audio Out, нажмите Rec (при работающем транспорте и включённом sync запись ждёт следующего такта; если нажать с опозданием до 200 мс, запись всё равно начнётся на только что пройденной линии); запись сама завершается по истечении take length и затем зацикливается; Play останавливает и запускает заново, Dub накладывает входящий звук поверх, Clear очищает. Волна показывает петлю с playhead и сеткой ритма, а строка под заголовком говорит, что делает looper. У каждой кнопки есть CV-контакт, поэтому педалью или MIDI-нотой можно нажимать их (срабатывает восходящий фронт). take задаёт длину: музыкальное деление (по умолчанию 1 такт) или free, где следующее нажатие Rec завершает запись. Нажатие Dub во время записи завершает её и сразу переходит к overdub. Undo откатывает по одному слою (последний дубль, overdub или Clear, до 8 шагов), а петля продолжает играть; нажатие во время overdub отбрасывает этот слой. Воспроизведение имеет те же регуляторы, что Sample Player: finetune (центы), pitch (полутоны), speed (отрицательное — назад), громкость, а также fade in / fade out (мс) в начале и конце каждого прохода. Ровно при 1,00x петля остаётся на сетке; при любой другой скорости она играет за length / rate и ДРЕЙФУЕТ относительно транспорта, а Dub при этом приостановлен (слои записываются только на той скорости, на которой были записаны). thru контролирует живой вход. Каждый дубль всегда сдвигается на измеренную задержку round-trip аудиоинтерфейса, поэтому петля, сыгранная в такт, сидит на сетке. Петля (до 60 с) сохраняется как WAV в папке Recordings и при открытии патча возвращается остановленной.
+Layered 3D noise on the coordinate patched into vector (Generated when empty), times scale. Detail adds octaves, roughness sets how strong each finer octave is, distortion warps the coordinate. Value is grey, Colour gives three different noises. Patch it into a Material's field input.	Многослойный 3D-шум по координате, поданной в vector (Generated, если пусто), умноженной на scale. Detail добавляет октавы, roughness задаёт силу каждой более мелкой октавы, distortion искажает координату. Value — серый, Colour даёт три разных шума. Подключите к входу field материала.
+On any other item: sculpt it with the brush. Ctrl+Tab or Esc leaves	На любом другом объекте: лепите кистью. Ctrl+Tab или Esc выходит
+One curve through 2 to 8 points, applied to each channel of the patched colour and blended in by factor. The default (0,0) to (1,1) leaves the colour unchanged.	Одна кривая через 2–8 точек, применяется к каждому каналу подключённого цвета и смешивается по factor. Значения по умолчанию (0,0) — (1,1) не меняют цвет.
+Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sample Player) from the end of the chain.	Часть цепочки нот: принимает события нот на контакте 'notes' и передаёт их дальше, изменённые. Подайте в синт (Wavetable, Sample Player) с конца цепочки.
+Per-component vector maths on a, b and c, plus cross, project, reflect, refract, dot, distance, length and normalize. Dot, distance and length give a grey value. Scale only shows for Scale and Refract.	Покомпонентная векторная математика над a, b и c, а также cross, project, reflect, refract, dot, distance, length и normalize. Dot, distance и length дают серое значение. Scale показывается только для Scale и Refract.
+Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or Field Pixel.	Строит вывод любого ядра Field как кривую или поверхность, чтобы вы видели, что делает ядро, прежде чем подключать его к Field Effect, Field Synth или Field Pixel.
+Position, normal, tangent, incoming, backfacing, curvature, cavity and per-object random, one per output.	Позиция, нормаль, касательная, входящее направление, обратная сторона, кривизна, полость и случайное значение для объекта — по одному выходу на каждое.
+Press again to cycle. B: Brush, Paint Mixer, Colour Replace. E: Eraser, Background Erase, Flood Erase. G: Fill, Gradient. I: Eyedropper, Style Picker, Measure. Alt-click picks a colour with the brush or fill	Повторное нажатие переключает. B: Кисть, Paint Mixer, Colour Replace. E: Ластик, Background Erase, Flood Erase. G: Заливка, Градиент. I: Пипетка, Style Picker, Измерение. Alt-клик берёт цвет кистью или заливкой
+Press again to cycle. S: Clone, Undo Brush. J: Heal, Blemish, Patch, Inpaint, Red Eye. R: Blur, Sharpen, Median. O: Dodge, Burn, Sponge	Повторное нажатие переключает. S: Клон, Undo Brush. J: Лечение, Blemish, Patch, Inpaint, Красные глаза. R: Размытие, Резкость, Медиана. O: Осветление, Затемнение, Губка
+Reflectance of a dielectric of this IOR by view angle: low face-on, rising to 1 at grazing angles.	Отражательная способность диэлектрика с этим IOR по углу обзора: низкая при взгляде прямо, растёт до 1 при скользящих углах.
+Remaps a value from the from range to the to range: Linear, Stepped (steps), Smoothstep or Smootherstep. Clamp limits the result to the to range.	Переназначает значение из диапазона from в диапазон to: Linear, Stepped (шаги), Smoothstep или Smootherstep. Clamp ограничивает результат диапазоном to.
+Runs a Field kernel once per frequency bin: audio in, STFT, your kernel, inverse STFT, audio out. Read `bin`, `bins`, `binhz`, `hop`, `sr`; write `mag`, `phase` or `freq`. `mag.at(k)` reads another bin, `state` keeps per-bin memory, `input bin audio B` adds a second spectrum for cross-synthesis. Size trades time for frequency detail; latency is one Size.	Запускает ядро Field один раз на частотный бин: аудио на входе, STFT, ваше ядро, обратный STFT, аудио на выходе. Читает `bin`, `bins`, `binhz`, `hop`, `sr`; пишет `mag`, `phase` или `freq`. `mag.at(k)` читает другой бин, `state` хранит память для каждого бина, `input bin audio B` добавляет второй спектр для кросс-синтеза. Size обменивает время на детализацию по частоте; задержка равна одному Size.
+Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution. It also runs over point clouds (compiled to GLSL when the input has GPU points), where life is available as an attribute; the point presets include Limit to Box and Project onto Shape. Boxes opens it in the Field Patcher.	Выполняет ядро Field для каждой вершины геометрии, изменяя P, N, uv, Cd и пользовательские атрибуты с выполнением, выведенным по частоте. Также работает с облаками точек (компилируется в GLSL, если вход содержит GPU-точки), где life доступен как атрибут; пресеты точек включают Limit to Box и Project onto Shape. Boxes открывает его в Field Patcher.
+Runs once per bin. Read: bin, bins, binhz, hop, sr. Write: mag, phase, freq. X.at(k) reads another bin.	Выполняется один раз на бин. Читает: bin, bins, binhz, hop, sr. Пишет: mag, phase, freq. X.at(k) читает другой бин.
+Select, Draw, Erase, Blade and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	Выделение, Рисование, Стирание, Нож и Рука (перетаскивание для панорамирования), те же клавиши, что в Timeline и Sample Studio, пока указатель над Piano Roll (Esc также возвращает к выделению). Выпадающий список инструментов содержит их вместе с масштабом. Каждая клавиша этого раздела требует, чтобы указатель был там
+Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight and Geometry build a surface per shading point, the way Blender's shader nodes do. Chain them into a Material's field, albedo, roughness, metallic, normal, emission or opacity pin; the Material compiles the chain into one program for every Render 3D engine.	Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight и Geometry строят поверхность в каждой точке затенения, как шейдерные узлы Blender. Соедините их с контактами материала field, albedo, roughness, metallic, normal, emission или opacity; материал компилирует цепочку в одну программу для каждого движка Render 3D.
+Show or hide the docked Field Patcher; it opens the Field Notes, Field Primitive or Field Modifier node selected on the canvas	Показывает или скрывает закреплённый Field Patcher; открывает узел Field Notes, Field Primitive или Field Modifier, выбранный на холсте
+Takes one channel of a vector or colour as a grey value: R, G, B (or X, Y, Z), or hue, saturation, value in HSV mode.	Берёт один канал вектора или цвета как серое значение: R, G, B (или X, Y, Z), либо hue, saturation, value в режиме HSV.
+The 2D View's document: node outputs, fills and groups stacked into one picture at the document's size. Right-click any node with a picture and choose Add to 2D View, then lay it out in the 2D View panel (Shift+2): V moves, C crops, H pans, Z zooms, B paints on a paint layer (pen pressure works), M, L and W select pixels; drag a handle to scale (Shift for free), drag outside a corner to rotate. Each layer has a blend mode, opacity, fill, lock, colour label, an optional node or painted pixel mask and clip to the layer below; a paint layer can be turned into a Draw node from its menu; groups pass through or isolate. P draws pen paths, U live shapes (rectangle, ellipse, polygon, star, line) with fill, stroke, dash and booleans, A edits points, T types point or box text; vector and text layers stay editable after reopen, take a vector mask, and turn into a Sketch or Text node from their menu. Drop an SVG on the 2D View to make it a vector layer. A layer only points at its node, so the node keeps animating and is never changed; a deleted node leaves its layer as source missing. F12 renders a picture and {mod}+F12 the animation, through an Output node.	Документ 2D-вида: выходы узлов, заливки и группы, сложенные в одну картинку размером с документ. Щёлкните правой кнопкой по любому узлу с изображением и выберите «Добавить в 2D-вид», затем расположите его в панели 2D View (Shift+2): V — перемещение, C — обрезка, H — панорама, Z — масштаб, B — рисование на слое рисования (работает нажим пера), M, L и W — выбор пикселей; перетащите маркер для масштабирования (Shift — свободно), потяните за пределами угла для поворота. У каждого слоя есть режим смешивания, непрозрачность, заливка, блокировка, цветная метка, необязательная маска узла или нарисованных пикселей и обтравка по слою ниже; слой рисования можно превратить в узел Draw через его меню; группы пропускают или изолируют содержимое. P рисует контуры пером, U — живые фигуры (прямоугольник, эллипс, многоугольник, звезда, линия) с заливкой, обводкой, штрихом и булевыми операциями, A редактирует точки, T вводит текст точки или блока; векторные и текстовые слои остаются редактируемыми после повторного открытия, получают векторную маску и превращаются в узел Sketch или Text через меню. Перетащите SVG на 2D View, чтобы сделать его векторным слоем. Слой указывает только на свой узел, поэтому узел продолжает анимироваться и никогда не изменяется; удалённый узел оставляет слой с пропавшим источником. F12 рендерит изображение, {mod}+F12 — анимацию через узел Output.
+The only node that sums audio - every other audio input pin takes exactly one cable, so any time two signals have to meet, they meet here. Four to eight slots, each with its own gain, pan, mute and solo, summed to one output. The Mixer panel (Shift+L) shows every Mixer that feeds an Audio Out as a console: inserts and sends per strip, right-click a strip name to group, ungroup or move it, and the master strip reads true peak and loudness (momentary, short-term, integrated; click the readout to reset). Render in the panel header records the console to a file: Live records what plays for a set length plus a tail, Fast renders the same take offline, quicker than real time. Fast can't render live inputs (camera, MIDI, audio in). Files are named from a template ({patch} {take} {date} {time}) and never overwrite.	Единственный узел, который суммирует аудио: каждый другой аудиовход принимает ровно один кабель, поэтому любые два сигнала, которым нужно встретиться, встречаются здесь. От четырёх до восьми слотов, у каждого свои гейн, панорама, mute и solo, сумма выводится на один выход. Панель Mixer (Shift+L) показывает каждый Mixer, питающий Audio Out, как пульт: инсерты и send'ы на каждом канале; щёлкните правой кнопкой по имени канала, чтобы сгруппировать, разгруппировать или переместить его; мастер-канал показывает истинный пик и громкость (momentary, short-term, integrated; щелчок по показаниям сбрасывает их). Render в заголовке панели записывает пульт в файл: Live записывает то, что играет, за заданное время плюс хвост, Fast рендерит тот же дубль офлайн, быстрее реального времени. Fast не может рендерить живые входы (камера, MIDI, аудиовход). Файлы называются по шаблону ({patch} {take} {date} {time}) и никогда не перезаписываются.
+Translates, rotates (degrees, X then Y then Z) and scales a shading coordinate. Point moves the coordinate, Texture moves the pattern (the inverse), Vector skips the translate, Normal keeps unit length. With nothing patched in it uses Generated.	Перемещает, поворачивает (градусы, по X, затем Y, затем Z) и масштабирует координату затенения. Point двигает координату, Texture двигает узор (обратное), Vector пропускает перенос, Normal сохраняет единичную длину. Без подключения используется Generated.
+True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset.	Истинный пик (dBTP) и громкость (LUFS): momentary, short-term, integrated. Щёлкните для сброса.
+Your predictive macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style.	Прогнозирующие макро-фейдеры: выделяют главные оси ваших жестов с несколькими ручками методом PCA по изменениям, позволяя нескольким макро-фейдерам совместно управлять многими связанными параметрами в вашем стиле.

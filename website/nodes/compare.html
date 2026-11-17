@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Compare node: controls, inputs and a free patch</title>
-  <meta name="description" content="Tests two modulator inputs against each other using &gt;, &gt;=, &lt;, &lt;=, ==, or != and outputs a hard 1 or 0, with a tolerance value for the equality checks.">
+  <meta name="description" content="Compares two modulator inputs with greater, less or equal tests and outputs a hard 1 or 0, with a tolerance for the equality checks.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/compare.html">
   <meta property="og:title" content="Compare node: controls, inputs and a free patch">
-  <meta property="og:description" content="Tests two modulator inputs against each other using &gt;, &gt;=, &lt;, &lt;=, ==, or != and outputs a hard 1 or 0, with a tolerance value for the equality checks.">
+  <meta property="og:description" content="Compares two modulator inputs with greater, less or equal tests and outputs a hard 1 or 0, with a tolerance for the equality checks.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/compare.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/compare.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Compare node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Tests two modulator inputs against each other using &gt;, &gt;=, &lt;, &lt;=, ==, or != and outputs a hard 1 or 0, with a tolerance value for the equality checks.">
+  <meta name="twitter:description" content="Compares two modulator inputs with greater, less or equal tests and outputs a hard 1 or 0, with a tolerance for the equality checks.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/compare.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Compare node: controls, inputs and a free patch", "description": "Tests two modulator inputs against each other using >, >=, <, <=, ==, or != and outputs a hard 1 or 0, with a tolerance value for the equality checks.", "url": "https://infinitedevices.org/nodes/compare.html", "image": "https://infinitedevices.org/assets/nodes/hd/compare.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Modulators", "mainEntityOfPage": "https://infinitedevices.org/nodes/compare.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Compare node: controls, inputs and a free patch", "description": "Compares two modulator inputs with greater, less or equal tests and outputs a hard 1 or 0, with a tolerance for the equality checks.", "url": "https://infinitedevices.org/nodes/compare.html", "image": "https://infinitedevices.org/assets/nodes/hd/compare.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Modulators", "mainEntityOfPage": "https://infinitedevices.org/nodes/compare.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Compare", "item": "https://infinitedevices.org/nodes/compare.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Compare Node", "description": "Tests two modulator inputs against each other using >, >=, <, <=, ==, or != and outputs a hard 1 or 0, with a tolerance value for the equality checks.", "image": "https://infinitedevices.org/assets/nodes/hd/compare.webp", "category": "Modulators", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/compare.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Compare Node", "description": "Compares two modulator inputs with greater, less or equal tests and outputs a hard 1 or 0, with a tolerance for the equality checks.", "image": "https://infinitedevices.org/assets/nodes/hd/compare.webp", "category": "Modulators", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/compare.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -116,7 +116,7 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#A3E635">Modulators node</p>
           <h1>Compare</h1>
-          <p class="post-lede">Tests two modulator inputs against each other using &gt;, &gt;=, &lt;, &lt;=, ==, or != and outputs a hard 1 or 0, with a tolerance value for the equality checks.</p>
+          <p class="post-lede">Compares two modulator inputs with greater, less or equal tests and outputs a hard 1 or 0, with a tolerance for the equality checks.</p>
           <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/compare.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/The_Node_Field_Guide.pdf#page=63" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
         </header>
         <figure class="np-shot" style="--cat:#A3E635"><img src="../assets/nodes/hd/compare.webp" alt="The Compare node in Infinite, showing its inputs, controls and outputs." width="746" height="1100" decoding="async"></figure>
@@ -159,7 +159,7 @@ cable out 0 shape</code></pre>
           <p class="hand">your turn</p>
           <h2>Patch it yourself</h2>
           <p>Infinite is free and open source for macOS, Windows and Linux. Drop Compare on the canvas, wire it to anything and play.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="./">All 308 nodes</a></p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="./">All 377 nodes</a></p>
         </aside>
         <section class="post-related" aria-label="More nodes"><h2>More modulators nodes</h2><div class="rel-grid"><a class="rel-card" href="math.html"><span class="mono">Modulators</span><b>Math</b></a><a class="rel-card" href="range-to-range.html"><span class="mono">Modulators</span><b>Range to Range</b></a><a class="rel-card" href="pattern.html"><span class="mono">Modulators</span><b>Pattern</b></a><a class="rel-card" href="smoothing.html"><span class="mono">Modulators</span><b>Smoothing</b></a><a class="rel-card" href="random.html"><span class="mono">Modulators</span><b>Random</b></a><a class="rel-card" href="invert.html"><span class="mono">Modulators</span><b>Invert</b></a><a class="rel-card" href="lfo.html"><span class="mono">Modulators</span><b>LFO</b></a><a class="rel-card" href="mod-depth.html"><span class="mono">Modulators</span><b>Mod Depth</b></a></div></section>
       </div>

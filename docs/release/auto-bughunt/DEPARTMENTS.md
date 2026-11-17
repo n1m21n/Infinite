@@ -20,7 +20,7 @@ The software is split into departments. For each one the question is the same: *
 | 5 | Video and 2D compositing, picture nodes, Scene 2D | src/engine, src/nodes picture | compositing-pipeline-sweep, render-pipeline-sweep, tests/render, tests/render3d, tools/render-check.py, determinism-check.py, frame_fuzz |
 | 6 | 3D (geometry, transforms, sculpt, rigs, renderer) | src/engine, src/nodes 3D | geometry-transform-sweep, tests/headless/render3d, tests/render3d, frame_fuzz |
 | 7 | Field language and Field nodes | src/core field parts, src/nodes Field* | tests/field, tests/headless/field, corpus.txt, infinite-field-language skill, data-accuracy-sweep |
-| 8 | UI: panels, shortcuts, node cards, dock, browser, i18n | src/app | panels-sweep, node-ui-sweep, shortcuts-sweep, tests/ui-golden, tools/design/*, tools/i18n/lint.py |
+| 8 | UI: panels, shortcuts, node cards, dock, browser, i18n | src/app | panels-sweep, node-ui-sweep, keys_gate (`tools/design/keys_gate.py`), tests/ui-golden, tools/design/*, tools/i18n/lint.py |
 | 9 | Plugins hosting, MIDI, OSC, network, self-update | src/plugin, src/core io | tests/plugin (daw, soak, baseline), plugin_probe, scripts/selfupdate_swap_test.sh |
 | 10 | Output, projection, export, render-to-file, headless CLI | src/engine, src/main.cpp, src/cli_* | output-projection-sweep, headless_smoke.sh, tests/headless, CLI contract in docs/headless |
 | 11 | Platform (macOS, Windows, Linux) | src/platform | pillar-parity-audit/static-checks.sh, tests/platform, CI jobs, docs/WINDOWS_VERIFICATION.md |
@@ -44,7 +44,7 @@ Each block: skills to read first (`.claude/skills/<name>/SKILL.md`) and the depa
 
 **7 Field language.** Skills: field-language, field-compiler, field-domains, field-state, field-realtime, field-integration, field-testing, field-modifier-presets, field-pixel-presets. Checks: run the tests/field corpus golden harness; state cells reset on seek and loop and serialize; no heap or branching cost trap in real-time kernels; VM, GLSL and sample backends agree on the same kernel; presets use reserved names correctly.
 
-**8 UI.** Skills: node-ui-sweep, panels-sweep, shortcuts-sweep, node-ui-pillars, audio-node-ui, infinite-design-system, new-modulator-node. Checks: all of TECHNIQUES.md 10, plus drag, copy and paste, groups, undo of UI actions, pins and cables hit-testing in a panned and zoomed canvas, docking, shortcuts versus the help window, i18n wrapping, first run, empty and error states.
+**8 UI.** Skills: node-ui-sweep, panels-sweep, keys_gate (`tools/design/keys_gate.py`), node-ui-pillars, audio-node-ui, infinite-design-system, new-modulator-node. Checks: all of TECHNIQUES.md 10, plus drag, copy and paste, groups, undo of UI actions, pins and cables hit-testing in a panned and zoomed canvas, docking, shortcuts versus the help window, i18n wrapping, first run, empty and error states.
 
 **9 Plugins, MIDI, OSC, network, update.** Skills: plugin-host-hardening, new-utility-node. Checks: a crashing or hanging plugin cannot take the app down or silence it; malformed MIDI or OSC input is dropped, never crashes; state save and restore for plugins; self-update verifies what it downloads and can roll back; no secrets in the bundle or logs.
 

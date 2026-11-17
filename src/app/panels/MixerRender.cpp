@@ -597,7 +597,7 @@ namespace app
          const bool any = MixerRenderArrangeSpan(startSec, lengthSec);
          FormParts::Label("##lenrange");
          if (any)
-            ImGui::TextDisabled("%.1f s %s", lengthSec, gArrange.settings.loop.enabled ? T("(loop)") : T("(whole)"));
+            ImGui::TextDisabled(T("%.1f s %s"), lengthSec, gArrange.settings.loop.enabled ? T("(loop)") : T("(whole)"));
          else
             ImGui::TextDisabled("%s", T("Empty"));
       }

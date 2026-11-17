@@ -269,7 +269,7 @@ namespace PanelKit
          const float tw = ImGui::CalcTextSize(labels[i], end).x;
          UiAudit::NoteInk(4, tp, ImVec2(tp.x + tw, tp.y + ImGui::GetFontSize()), 0.0f, labels[i]);
          if (hovered && tp.x + tw > tmax.x)
-            HelpTip("%.*s", (int)(end - labels[i]), labels[i]);
+            HelpTip("%s", std::string(labels[i], end).c_str());
       }
       ImGui::PopID();
       ImGui::SetCursorScreenPos(o);

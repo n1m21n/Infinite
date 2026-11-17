@@ -6,7 +6,26 @@ A Model Context Protocol (MCP) server that enables AI agents (Claude, Cursor, An
 
 ## Where it lives
 
-The server is a Claude plugin with its own repository: https://github.com/n1m21n/infinite-claude-plugin (11 tools wrapping every headless command, with bundled docs and examples). Load it with `claude --plugin-dir ./infinite-claude-plugin`, or point any MCP client at its `server.py`.
+The server is a Claude plugin with its own repository: https://github.com/n1m21n/infinite-claude-plugin (14 tools wrapping every headless command, with bundled docs and examples; the list is below). Load it with `claude --plugin-dir ./infinite-claude-plugin`, or point any MCP client at its `server.py`.
+
+## Tools
+
+The plugin server (`server.py` in the external repo, Python) registers these 14 tools:
+
+- `infinite_docs`
+- `infinite_describe`
+- `infinite_write_patch`
+- `infinite_validate_patch`
+- `infinite_explain_patch`
+- `infinite_canonicalize_patch`
+- `infinite_render_frame`
+- `infinite_render_frames_dir`
+- `infinite_render_video`
+- `infinite_audio_summary`
+- `infinite_version`
+- `infinite_generate_notes`
+- `infinite_generate_sample`
+- `infinite_render_mesh`
 
 ---
 

@@ -155,20 +155,20 @@ prints the open patch, the selection and any code errors in one answer.
 | Group | Verbs |
 |---|---|
 | Look | `graph`, `explain`, `params`, `selection`, `status`, `nodes`, `describe` |
-| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d` |
+| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d-add`, `view2d` |
 | Patch | `new`, `recent`, `open`, `save`, `import`, `files`, `reveal`, `validate`, `canonicalize`, `apply` |
 | Play | `play`, `stop`, `rewind`, `seek`, `tempo` |
-| Timeline | `timeline` prints it all; `timeline track`, `clip`, `marker`, `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
+| Timeline | `timeline` prints it all; `timeline track`, `clip` (`copy`, `paste`, `duplicate ... selection=true`, `split <id> playhead`, `inspect`), `marker` (`color <id> RRGGBB`), `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
 | Session | `session scene`, `launch`, `launchrow`, `stop`, `add`, `insert`, `duplicatescene`, `deletescene`, `send`, `sceneset`, `slot`, `place`, `duplicate`, `clear`, `copy`, `paste`, `cut`, `quantize` |
 | Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>`, `export <clip>`, `generate <type> [key=value]` |
 | Performance Matrix | `perf get`, `add <kind> [label]`, `remove`, `assign`, `clear`, `unmidi`, `set`, `edit`, `page add|go|rename|delete|duplicate` |
 | Make | `studio generate <part> [bars=n]`, `studio status|export|node <type>|get|set` |
-| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library list|add|remove|refresh` |
+| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset|drum|mixer`, `library list|add|remove|refresh` (`drum open|close|dock|lanes|fill|grooves|groove|folder`) |
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
-| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings`, `show`, `view`, `quit` |
-| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>` |
+| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings [key [value]]`, `settings devices\|midi\|apply\|updates\|reset\|logs\|gpu [n]\|global [name [expr]]\|extension <file>`, `show list\|next\|prev\|go <n>\|lock\|panic\|check\|add\|remove <n>\|clear\|open\|save\|fade <ms>\|quantize <n>\|launch <n>`, `view fit\|params on\|off\|clearcards\|metronome [on\|off]`, `quit` |
+| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>`, `version` |
 | Watch | `watch` prints a JSON line for each change |
 | Terminal | `term open`, `list`, `read`, `send`, `run` |
 

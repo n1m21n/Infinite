@@ -690,7 +690,7 @@ namespace app
             if (hov)
             {
                dl->AddRect(mn, mx, DeskParts::Ink(70), 3.0f);
-               HelpTip("%s %d: %s\n%s", T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
+               HelpTip(T("%s %d: %s\n%s"), T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
             }
             float x = scribbleX1 + pad;
             ImGui::SetCursorScreenPos(ImVec2(x, cy - keyH * 0.5f));
@@ -1443,6 +1443,104 @@ namespace app
       sLastSelectedUid = SelectedNodeUid(); // the menu's own selection must not move the page again
       if (DrumOf(gn) != nullptr)
          sPageUid = gn->uid;
+   }
+
+   // The terminal's `node <node> drum ...`: the Drum panel's own Tools, Dock, Close and groove items, on this node.
+   bool DrumPanelRun(int nodeIndex, const std::string& what, const std::string& arg, nlohmann::json& outResult, std::string& outError)
+   {
+      DrumSequencerNode* n = DrumOf(FindNodeByIndex(nodeIndex));
+      if (n == nullptr)
+      {
+         outError = "drum wants a Drum Sequencer node";
+         return false;
+      }
+      if (what == "open")
+      {
+         DrumPanelShowNode(nodeIndex);
+         return true;
+      }
+      if (what == "close")
+      {
+         gDrumPanelOpen = false;
+         return true;
+      }
+      if (what == "dock")
+      {
+         if (arg != "bottom" && arg != "top")
+         {
+            outError = "drum dock bottom|top";
+            return false;
+         }
+         gDrumPanelDock = arg == "top" ? 3 : 0;
+         return true;
+      }
+      if (what == "lanes")
+      {
+         if (arg != "all" && arg != "one")
+         {
+            outError = "drum lanes all|one";
+            return false;
+         }
+         sFillAll = arg == "all";
+         return true;
+      }
+      if (what == "fill")
+      {
+         // The Tools menu's items, applied to the panel's current lane (or every lane under lanes all).
+         struct Named { const char* name; Fill f; };
+         static const Named kNamed[] = {
+            { "every1", Fill::Every1 },     { "every2", Fill::Every2 },   { "every4", Fill::Every4 },
+            { "every8", Fill::Every8 },     { "offbeats", Fill::Offbeats }, { "euclid3", Fill::Euclid3 },
+            { "euclid5", Fill::Euclid5 },   { "euclid7", Fill::Euclid7 }, { "rollup", Fill::RollUp },
+            { "rolldown", Fill::RollDown }, { "rampvel", Fill::RampVel }, { "humanize", Fill::Humanize },
+            { "shiftleft", Fill::ShiftLeft }, { "shiftright", Fill::ShiftRight }, { "reverse", Fill::Reverse },
+            { "invert", Fill::Invert },     { "randomise", Fill::Randomise }, { "clear", Fill::Clear },
+         };
+         if (arg == "double")
+         {
+            if (n->numSteps * 2 > kMaxSteps)
+            {
+               outError = "drum fill double: the pattern is already full length";
+               return false;
+            }
+            DoublePattern(n);
+            return true;
+         }
+         for (const Named& e : kNamed)
+            if (arg == e.name)
+            {
+               ApplyFill(n, e.f, e.name);
+               return true;
+            }
+         outError = "drum fill every1|every2|every4|every8|offbeats|euclid3|euclid5|euclid7|rollup|rolldown|rampvel|humanize|shiftleft|shiftright|reverse|invert|randomise|clear|double";
+         return false;
+      }
+      if (what == "grooves")
+      {
+         nlohmann::json names = nlohmann::json::array();
+         for (const std::string& file : ScanDrumGrooveFiles())
+            names.push_back(DrumGrooveStem(file));
+         outResult = { { "grooves", names } };
+         return true;
+      }
+      if (what == "groove")
+      {
+         for (const std::string& file : ScanDrumGrooveFiles())
+            if (DrumGrooveStem(file) == arg)
+            {
+               ApplyDrumGrooveFile(n, file);
+               return true;
+            }
+         outError = "no groove '" + arg + "' in the grooves folder (drum grooves lists them)";
+         return false;
+      }
+      if (what == "folder")
+      {
+         RevealDrumGrooveDir();
+         return true;
+      }
+      outError = "drum open|close|dock|lanes|fill|grooves|groove|folder";
+      return false;
    }
 
    void DrawDrumPanelDocked(const char* id, const ImVec2& size)

@@ -7,6 +7,8 @@
   "updated": "2026-11-17",
   "category": "creative",
   "url": "https://infinitedevices.org/blog/opengl-41-path-tracing-bvh-texture-buffers-agx.html"
+ },
+ {
   "slug": "2d-view-non-destructive-layer-compositing-in-infinite",
   "title": "Non-destructive 2D layer compositing in Infinite",
   "description": "How Infinite's 2D View combines non-destructive 2D layer compositing with live node outputs, 36 blend modes, 28 adjustment layers, and PSD/ORA export.",

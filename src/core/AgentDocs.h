@@ -217,7 +217,7 @@ Try: import a character model and spin it live using a rotation modulated by an 
 Chain: Model 3D -> Material -> Render 3D
 
 ### Material
-3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, iridescence, and can take up to eight image inputs to paint any of those channels from a texture.
+3D · IN/OUT. Overrides the surface material of whatever geometry passes through it, so one authored look can be shared by several shapes. Exposes a full PBR set, color, metallic, roughness, opacity, emission, IOR, transmission, clearcoat, sheen, and iridescence: a thin-film colour shift, like a soap bubble or oil slick, set by IOR and film thickness in nanometres. The path tracer ignores iridescence. It can take up to eight image inputs to paint any of those channels from a texture.
 Try: feed a Noise texture into the roughness map input to give a single flat color a hand-worn, uneven sheen.
 Chain: Cube -> Material -> Render 3D
 
@@ -303,9 +303,9 @@ Chain: Icosphere -> Resynthesize 3D -> Render 3D
 Physics, the camera, the lights, and the render pass that turns geometry into a picture.
 
 ### Ocean Surface
-3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm.
 )AGENTDOC"
-R"AGENTDOC(Try: drive wave amplitude straight from your track's bass so the sea swells with the low end.
+R"AGENTDOC(3D · GEOMETRY OUT. A physically-inspired ocean built from real Gerstner wave mathematics, tune amplitude, wavelength, steepness, direction, choppiness, and speed for anything from glassy calm to a churning storm.
+Try: drive wave amplitude straight from your track's bass so the sea swells with the low end.
 Chain: Audio Analyze (Bass) -> Ocean (Amplitude) -> Render 3D
 
 ### Cloth Simulation
@@ -349,7 +349,7 @@ Try: route a vocal track in and place several ribbons at different rotations to 
 Chain: Audio In -> Audio Ribbon -> Render 3D
 
 ### Render 3D
-3D · IMAGE OUT. The camera and lighting engine that turns every 3D node into a real picture, physically-based Cook-Torrance/GGX materials, ACES tonemapping, and MSAA antialiasing, all live, with up to 4 geometry inputs plus camera, light, and HDRI. This is where the green Geometry cables turn back into a peach Image cable.
+3D · IMAGE OUT. The camera and lighting engine that turns every 3D node into a real picture, physically-based Cook-Torrance/GGX materials, ACES tonemapping, and MSAA antialiasing, all live, with up to 4 geometry inputs plus camera, light, and HDRI. This is where the green Geometry cables turn back into a peach Image cable. The path trace engine denoises its picture as it settles, with no setting of its own.
 Try: plug in geometry, a material, a light, and an HDRI, then send the result straight into Bloom.
 Chain: Geometry + Material + Light + HDRI -> Render 3D -> Bloom
 
@@ -446,13 +446,13 @@ Chain: Melody Synth -> Delay (1/8 Dotted) -> Audio Out
 
 ### Reverb
 AUDIOEFFECTS · IN/OUT. An algorithmic reverb with room size, decay time, damping, pre-delay, and stereo width, a wash big enough to sound like a cathedral, or small enough to feel like a tiled room.
-Try: stack Reverb after Delay for echoes that themselves bloom into space.
+)AGENTDOC"
+R"AGENTDOC(Try: stack Reverb after Delay for echoes that themselves bloom into space.
 Chain: Delay -> Reverb (Cathedral) -> Audio Out
 
 ### Drive
 AUDIOEFFECTS · IN/OUT. Warm analog-style tube-and-transistor saturation with drive, bias, tone, and color controls, a gentle glow at low settings, real grit when you push it.
-)AGENTDOC"
-R"AGENTDOC(Try: hit a drum mix with a few dB of Drive for extra punch and glue.
+Try: hit a drum mix with a few dB of Drive for extra punch and glue.
 Chain: Drum Mix -> Drive -> Audio Out
 
 ### Bitcrush
@@ -605,10 +605,10 @@ Try: set a narrow pitch range with a small max step for a meandering, ambient me
 Chain: Random Note Generator -> Wavetable Synth
 
 ### Note Stack
-NOTES · IN/OUT. Layers up to 8 extra transposed copies on top of every note that passes through, with the original note always passing through underneath. Each voice has its own semitone offset and on/off switch.
-Try: enable the +12 and +7 voice offsets to turn single played notes into instant octave-and-fifth power chords.
 )AGENTDOC"
-R"AGENTDOC(Chain: MIDI Notes -> Note Stack -> Wavetable Synth
+R"AGENTDOC(NOTES · IN/OUT. Layers up to 8 extra transposed copies on top of every note that passes through, with the original note always passing through underneath. Each voice has its own semitone offset and on/off switch.
+Try: enable the +12 and +7 voice offsets to turn single played notes into instant octave-and-fifth power chords.
+Chain: MIDI Notes -> Note Stack -> Wavetable Synth
 
 ### Note Capturer
 NOTES · IN/OUT. Records whatever note stream feeds it, with tempo-relative timing so it stays in sync even if the BPM changes, then loops that recording back on top of the live input, which always keeps passing through.
@@ -775,13 +775,13 @@ Try: sample 8 points off a spinning Torus and drive 8 separate effect params str
 Chain: Torus -> Geometry Table -> (8x Mod Depth)
 
 ### Vibrato
-MODULATORS · OUT. A simple free-running sine LFO with one control, rate in Hz, meant as a substitute for true per-note vibrato, since note events have no continuous pitch channel of their own.
+)AGENTDOC"
+R"AGENTDOC(MODULATORS · OUT. A simple free-running sine LFO with one control, rate in Hz, meant as a substitute for true per-note vibrato, since note events have no continuous pitch channel of their own.
 Try: patch it into an oscillator's fine-tune modulation input for a subtle, continuous pitch wobble.
 Chain: Vibrato -> Oscillator Fine-Tune
 
 ### Envelope
-)AGENTDOC"
-R"AGENTDOC(MODULATORS · OUT. Applies a classic ADSR contour to a continuous modulation signal rather than a note trigger, the "gate" is derived from the input crossing a threshold rather than a note-on/off.
+MODULATORS · OUT. Applies a classic ADSR contour to a continuous modulation signal rather than a note trigger, the "gate" is derived from the input crossing a threshold rather than a note-on/off.
 Try: feed a slow LFO in to get a rhythmic swell-and-release pulse instead of a raw sine wave.
 Chain: LFO -> Envelope -> Mod Depth
 
@@ -929,13 +929,13 @@ Chain: Video -> Luma Key -> Alpha Invert -> Output
 
 ### Alpha from Luma
 COMPOSITING · IN/OUT. Builds a new alpha channel from the picture's own brightness, so a black background becomes see-through with nothing to key against. Invert flips which end is solid, for a white-on-black source.
-Try: run fire or smoke footage through it to lift the flames off their black backdrop.
+)AGENTDOC"
+R"AGENTDOC(Try: run fire or smoke footage through it to lift the flames off their black backdrop.
 Chain: Video -> Alpha from Luma -> Blend
 
 ### Alpha Levels
 COMPOSITING · IN/OUT. The Levels remap, applied to the alpha channel only. Low and High clamp and stretch the matte's range (choking a soft edge tighter, or spreading it wider) and Gamma bends the falloff in between. The go-to cleanup pass after Chroma Key or Alpha from Luma.
-)AGENTDOC"
-R"AGENTDOC(Try: raise Low a touch after a key to remove the faint haze left around a subject.
+Try: raise Low a touch after a key to remove the faint haze left around a subject.
 Chain: Chroma Key -> Alpha Levels -> Output
 
 ### Premultiply
@@ -1110,9 +1110,9 @@ Try: record a one-bar drum pattern, then Dub a bassline on top of it.
 Chain: Audio File -> Looper -> Audio Out
 
 ### MPC
-SYNTHS · AUDIO OUT. A 16-pad sample player in the spirit of an MPC. Each pad holds one sample and one play mode: One shot plays the whole sample, Gate plays while the pad is held, and Loop toggles a looping playback on and off. Hit pads with the mouse, with a MIDI controller, or with notes 36 to 51 on the note input, the usual pad-controller layout. Every pad is its own voice with its own volume, pitch, pan, speed, fine tune and fades, and a pad can be Synced to a musical division so a hit waits for the next grid line. All pads mix to one stereo output.
 )AGENTDOC"
-R"AGENTDOC(Try: load a kick, snare and hat on three pads and play them from a MIDI pad controller through a MIDI Notes node.
+R"AGENTDOC(SYNTHS · AUDIO OUT. A 16-pad sample player in the spirit of an MPC. Each pad holds one sample and one play mode: One shot plays the whole sample, Gate plays while the pad is held, and Loop toggles a looping playback on and off. Hit pads with the mouse, with a MIDI controller, or with notes 36 to 51 on the note input, the usual pad-controller layout. Every pad is its own voice with its own volume, pitch, pan, speed, fine tune and fades, and a pad can be Synced to a musical division so a hit waits for the next grid line. All pads mix to one stereo output.
+Try: load a kick, snare and hat on three pads and play them from a MIDI pad controller through a MIDI Notes node.
 Chain: MIDI Notes -> MPC -> Audio Out
 
 ### Resonator Bank
@@ -1252,7 +1252,8 @@ Try: set three levels with an 8x8 matrix for a retro print look.
 Chain: Video -> Dither -> Output
 
 ### NDI In
-UTILITY · IMAGE OUT. Receives any NDI video source on the network as an image. Pick it from the list, which rescans in the background. Video only. Needs the free NDI runtime from ndi.video.
+)AGENTDOC"
+R"AGENTDOC(UTILITY · IMAGE OUT. Receives any NDI video source on the network as an image. Pick it from the list, which rescans in the background. Video only. Needs the free NDI runtime from ndi.video.
 Try: pull a second computer's screen in and feed it through effects.
 Chain: NDI In -> Bloom -> Output
 
@@ -1262,8 +1263,7 @@ Try: send your finished patch to OBS with no capture card.
 Chain: Video -> NDI Out
 
 ## New Instruments, Effects & Modulators
-)AGENTDOC"
-R"AGENTDOC(The sound side of v0.6: four new synths, a designed-room reverb, a three-stage saturator, spectral tools, and modulators that give every note its own value.
+The sound side of v0.6: four new synths, a designed-room reverb, a three-stage saturator, spectral tools, and modulators that give every note its own value.
 
 ### FM
 AUDIO · SYNTH. A 4-operator FM synth: four sine operators wired by one of 11 algorithms, from a 4>3>2>1 stack to four carriers side by side. Each operator follows the note at a ratio or sits at a fixed frequency, and has its own level and envelope. Feedback lets operator 4 modulate itself, from a brighter sine to a buzz.
@@ -1330,8 +1330,99 @@ MODULATOR · SIGNAL OUT. Learns where you leave each knob and how fast you move 
 Try: play for a minute, let go, and watch the patch keep evolving.
 Chain: Drift -> Analog (Cutoff)
 
+### Chorus
+AUDIO · EFFECT. Thickens a sound by mixing in two or three slightly detuned copies, each wobbled by an LFO. Spread widens it across the stereo field.
+Try: put Depth low and Rate slow on a pad for a lush, wider sound.
+Chain: Analog -> Chorus -> Audio Out
+
+### Flanger
+AUDIO · EFFECT. The jet-plane swoosh: a very short delay with feedback, swept in time, which makes a moving comb of notches. Feedback past zero gives a hollower, nasal tone.
+Try: turn Feedback up and sweep Rate slowly under a drum loop.
+Chain: Audio In -> Flanger -> Audio Out
+
+### Phaser
+AUDIO · EFFECT. Sweeps a chain of allpass filters to carve moving notches into the sound. Order sets how many notches, from a gentle shimmer to a deep swirl.
+Try: raise Order to 8 and set Rate to one bar on a synth chord.
+Chain: Audio In -> Phaser -> Audio Out
+
+### Limiter
+AUDIO · EFFECT. A brickwall limiter: nothing passes above its ceiling. Gain pushes the signal into it, Release sets how fast it recovers, and the meter shows how much it is holding back.
+Try: push Gain up on a finished mix to get it loud without clipping.
+Chain: Audio In -> Limiter -> Audio Out
+
+### Dynamics
+AUDIO · EFFECT. A compressor: it turns the loud peaks down so quiet and loud parts sit closer together. Threshold, Ratio, Attack, Release and Makeup set how hard it works. A sidechain input can drive the detector from another sound.
+Try: send a kick into the sidechain input so the pad ducks under every hit.
+Chain: Audio In -> Dynamics -> Audio Out
+
+### Stereo
+AUDIO · EFFECT. Widens or narrows the stereo image. Width 0 makes the sound mono, 1 leaves it as it is, 2 exaggerates it. Bass mono keeps the low end in the centre so it survives a mono speaker.
+Try: set Width to 1.6 and turn Bass Mono on for a wider mix that still folds to mono.
+Chain: Audio In -> Stereo -> Audio Out
+
+### Tremolo
+AUDIO · EFFECT. Pulses the loudness up and down with a slow LFO, so the level wobbles while the pitch stays put. Stereo phase makes left and right pulse at different times.
+Try: set Rate to a sixteenth of the tempo for a choppy, gated pulse on a pad.
+Chain: Analog -> Tremolo -> Audio Out
+
+### Pitch Shifter
+AUDIO · EFFECT. Moves the pitch up or down in semitones without changing the speed. Grain size trades smoothness for tracking. There is no formant correction, so big shifts also change the timbre: voices sound chipmunk or deep.
+Try: drop a vocal down two semitones with a small grain for fast material.
+Chain: Audio In -> Pitch Shifter -> Audio Out
+
+### Transient Shaper
+AUDIO · EFFECT. Makes the hits (the attack) louder or softer than the sustain (the body) without a threshold or ratio to set. Good for punchier drums or rounder plucks.
+Try: raise Attack on a drum loop to add snap.
+Chain: Audio In -> Transient Shaper -> Audio Out
+
+### Stutter
+AUDIO · EFFECT. A beat-repeat glitch: it captures a short slice of each cycle and loops that slice for the rest of the cycle, then records fresh audio. Grain sets how much of the cycle it captures.
+Try: set the grain to a sixteenth and let it stutter a vocal line.
+Chain: Audio In -> Stutter -> Audio Out
+
+### Ring Mod
+AUDIO · EFFECT. Multiplies the sound by an oscillator. The original pitches are replaced by sum and difference tones: a metallic, robotic, bell-like sound.
+Try: ring-modulate a sine and play a chord for a clanging bell tone.
+Chain: Analog -> Ring Mod -> Audio Out
+
+### Frequency Shifter
+AUDIO · EFFECT. Moves every partial up or down by the same number of Hz, so the harmonics no longer line up: alien, barber-pole or inharmonic. Unlike Pitch Shifter, the intervals break.
+Try: shift a drone by a few Hz so it beats and shimmers.
+Chain: Audio In -> Frequency Shifter -> Audio Out
+
+### Formant Filter
+AUDIO · EFFECT. Three bandpass filters tuned to the formants of a vowel, morphed A-E-I-O-U by the vowel knob. It makes any sound speak like a vowel, not only voices.
+Try: run a saw synth through it and sweep the vowel for a talking synth.
+Chain: Analog -> Formant Filter -> Audio Out
+
+### Wavetable Shaper
+AUDIO · EFFECT. Reshapes a sound with a wavetable used as a transfer curve: quiet and loud parts are bent by different amounts. Drive pushes it harder into the curve.
+Try: raise Drive on a sine to turn it into a rich, buzzing tone.
+Chain: Audio In -> Wavetable Shaper -> Audio Out
+
+### Piano
+AUDIO · SYNTH. A physically modelled piano: a grand, a Rhodes or a Wurlitzer. Play harder and the hammer hits harder. The electric pianos make their sound through a steel tine or reed and a pickup.
+Try: choose Rhodes and play soft chords for an electric piano.
+Chain: MIDI Notes -> Piano -> Audio Out
+
+### Metallic
+AUDIO · SYNTH. A physical model of struck and plucked metal: bells, gongs, bars, plates, chimes and tines. The material picks the body, and the strike sets how bright it rings.
+Try: pick a bell material and play one note for a chime.
+Chain: MIDI Notes -> Metallic -> Audio Out
+
+### Wind
+AUDIO · SYNTH. A physically modelled wind instrument: a clarinet reed, a sax reed, a flute's air jet or brass lips. Breath is how hard you blow.
+Try: raise Breath slowly on a held note for a swelling wind line.
+Chain: MIDI Notes -> Wind -> Audio Out
+
+### Keyboard
+NOTES · SOURCE. A note source with no hardware: click and drag the on-screen piano, or hover the node and type on the laptop keyboard, where the bottom row is one octave.
+Try: hover the node and play a melody with the Z, X and C keys.
+Chain: Keyboard -> Analog -> Audio Out
+
 ## New Compositing, 3D & Mesh Tools
-The visual side of v0.6: motion analysis, fluid and fog, physics, plants from text, and the primitives and mesh operators earlier editions of this guide missed.
+)AGENTDOC"
+R"AGENTDOC(The visual side of v0.6: motion analysis, fluid and fog, physics, plants from text, and the primitives and mesh operators earlier editions of this guide missed.
 
 ### Optical Flow
 COMPOSITING · IMAGE IN/OUT. How far each part of the picture moved since the last frame, as a vector per pixel (red and green carry x and y, blue is speed). Pyramidal Lucas-Kanade on the GPU. View Colour shows direction as hue and speed as brightness.
@@ -1421,8 +1512,7 @@ Chain: Sphere -> Extrude -> Render 3D
 ### Twist
 3D · GEOMETRY OUT. Twists the mesh around a chosen axis by Angle: the further a point is along the axis, the more it rotates.
 Try: animate Angle with an LFO to wring a tall box like a towel.
-)AGENTDOC"
-R"AGENTDOC(Chain: Cube -> Twist -> Render 3D
+Chain: Cube -> Twist -> Render 3D
 
 ### Cone
 3D · GEOMETRY OUT. A cone. Sides sets how many-sided it is.
@@ -1463,6 +1553,142 @@ Chain: Cross -> Extrude -> Render 3D
 3D · GEOMETRY OUT. A circular wedge. Inner Ratio controls how much of the circle is cut away.
 Try: animate it into a loading ring.
 Chain: Pie -> Render 3D
+
+### Crop
+PICTURE · EFFECT. Trims the picture from each edge: Left, Right, Top and Bottom. Outside decides what fills the cut-away area: it stays transparent, the kept part zooms to fill the frame, or it takes a Fill colour.
+Try: crop 10 percent off each side and set Outside to zoom to fill the frame.
+Chain: Image Source -> Crop -> Output
+
+### Posterize
+PICTURE · COMPOSITING. Reduces the picture to a fixed number of tone levels per colour channel, giving flat, poster-style colour bands.
+Try: set Levels to 3 for a screen-print look.
+Chain: Image Source -> Posterize -> Output
+
+### Threshold
+PICTURE · COMPOSITING. Makes the picture pure black or white: anything brighter than the Threshold goes white, the rest goes black.
+Try: raise Threshold until only the highlights of a photo are left.
+Chain: Image Source -> Threshold -> Output
+
+### Drop Shadow
+PICTURE · COMPOSITING. A soft shadow behind the picture's shape, in a chosen Colour, with Offset X and Y and an Opacity.
+Try: offset the shadow down and to the right in a dark colour for a lifted look.
+Chain: Text -> Drop Shadow -> Output
+
+### Emboss
+PICTURE · EFFECT. Turns the edges into a raised, relief-like bump by comparing the picture with a shifted copy of itself. Its style keeps the colours or goes flat grey.
+Try: set the style to Grey and the angle to 45 for a carved-stone look.
+Chain: Image Source -> Emboss -> Output
+
+### Opacity
+PICTURE · COMPOSITING. Fades the whole picture's transparency without tinting it. The fade stays with the picture as it goes down the chain.
+Try: wire an LFO into Opacity to pulse a logo in and out.
+Chain: Image Source -> Opacity -> Output
+
+### Exposure
+PICTURE · COMPOSITING. Brightens or darkens the picture in camera stops. Each stop doubles or halves the light.
+Try: nudge Exposure up one stop on a dark photo.
+Chain: Image Source -> Exposure -> Output
+
+### Lookup
+PICTURE · COMPOSITING. Recolours the picture using a second image as a colour strip: each pixel's brightness picks a colour from that strip. Offset shifts the pick, Mix blends with the original.
+Try: patch a gradient into the second input for a false-colour map.
+Chain: Image Source -> Lookup -> Output
+
+### Vignette
+PICTURE · EFFECT. Darkens the picture toward its edges to frame the centre. Radius sets the size of the clear middle and Softness the falloff.
+Try: set Radius to 0.6 and Softness high on a portrait.
+Chain: Image Source -> Vignette -> Output
+
+### Halftone
+PICTURE · EFFECT. Renders the picture as a printed dot pattern. Scale sets the dot density and Angle rotates the grid. The Colour style uses three angled colour dot layers.
+Try: switch to Colour and set Scale small for a comic print.
+Chain: Image Source -> Halftone -> Output
+
+### Pixelate
+PICTURE · EFFECT. Breaks the picture into flat square blocks. Block Size sets how big each block is.
+Try: animate Block Size with an LFO for a pixel zoom.
+Chain: Image Source -> Pixelate -> Output
+
+### Symmetry
+PICTURE · EFFECT. Mirrors the picture across the X axis, the Y axis or both, from a chosen centre point. Flip reverses the picture before mirroring.
+Try: choose both axes for a four-way mirror.
+Chain: Image Source -> Symmetry -> Output
+
+### Gradient Map
+PICTURE · COMPOSITING. Remaps the picture's brightness onto a two-colour gradient from a Shadow colour to a Highlight colour. Mix blends with the original colour.
+Try: set the shadows to deep blue and the highlights to orange for a duotone.
+Chain: Image Source -> Gradient Map -> Output
+
+### Color Overlay
+PICTURE · COMPOSITING. Tints the whole picture toward a colour at a chosen opacity. Nothing else changes.
+Try: set a warm colour at 0.3 opacity for a sunset wash.
+Chain: Image Source -> Color Overlay -> Output
+
+### Outer Glow
+PICTURE · COMPOSITING. Adds a soft glow in a colour around the outline of the picture, spreading outward. Amount sets the strength.
+Try: put a bright cyan glow around a white logo.
+Chain: Text -> Outer Glow -> Output
+
+### Displace
+PICTURE · EFFECT. Pushes each pixel by a map: the red and green of a second image, or a built-in animated wave if nothing is patched. Map Scale sets how big the map is.
+Try: feed a noise image into the map input so the picture ripples like water.
+Chain: Image Source -> Displace -> Output
+
+### Unsharp Mask
+PICTURE · EFFECT. Sharpens by adding back the difference between the picture and a blurred copy, which exaggerates the edges. Amount is the strength, Radius the width of edges it reacts to.
+)AGENTDOC"
+R"AGENTDOC(Try: raise Amount to 1.5 on a soft photo.
+Chain: Image Source -> Unsharp Mask -> Output
+
+### Add Noise
+PICTURE · EFFECT. Adds random grain to every pixel, re-randomised each frame. Amount sets how strong it is.
+Try: use a small Amount over a dark gradient for film grain.
+Chain: Image Source -> Add Noise -> Output
+
+### Lens Distortion
+PICTURE · EFFECT. Simulates a camera lens. Barrel bows the picture in or out, Chromatic splits the colours for fringing, and Zoom scales the result.
+Try: set Barrel slightly negative and Chromatic small for a wide-angle lens.
+Chain: Image Source -> Lens Distortion -> Output
+
+### Convolve
+PICTURE · EFFECT. A 3 by 3 grid of numbers that defines a filter. Blur, sharpen and edge detection are all just different grids; Mix blends the result with the original.
+Try: type a grid that is all ones except the centre for a sharpen.
+Chain: Image Source -> Convolve -> Output
+
+### Circle
+PICTURE · SOURCE. A filled or stroked circle, with size, feather, stroke and background controls.
+Try: feather the edge and wire an LFO into the size for a pulsing dot.
+Chain: Circle -> Bloom -> Output
+
+### Triangle
+PICTURE · SOURCE. A filled or stroked triangle, with the same size, feather and stroke controls as the other shapes.
+Try: animate the rotation for a spinning arrow.
+Chain: Triangle -> Output
+
+### Star
+PICTURE · SOURCE. A star with Sides for the number of points and Inner Ratio for how deep the points cut in.
+Try: lower Inner Ratio for spiky stars and raise it for a flower.
+Chain: Star -> Output
+
+### Gear
+PICTURE · SOURCE. A cogwheel silhouette. Sides sets the tooth count.
+Try: set the tooth count to 12 and turn it with an LFO.
+Chain: Gear -> Output
+
+### Mirror
+3D · MESH. Mirrors a mesh across a plane perpendicular to a chosen Axis, at a given offset. Keep original keeps the source too, and weld seam joins the halves.
+Try: mirror on X with weld seam for a symmetric character.
+Chain: Cube -> Mirror -> Output
+
+### Smooth
+3D · MESH. Relaxes each vertex toward its neighbours, so the mesh softens. Iterations and Strength control how much.
+Try: run a few iterations on a noisy displacement to calm it.
+Chain: Displacement -> Smooth -> Output
+
+### Union
+3D · MESH. Fuses two or more closed solids into one, keeping their combined outer surface.
+Try: union a cube and a sphere into one blob.
+Chain: Cube -> Sphere -> Union -> Output
 )AGENTDOC";
 
    inline const char* kUiGuide =
@@ -1795,7 +2021,7 @@ The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, m
 Picture: 3D View docked at the bottom with the Scene list open.
 
 ## 2D View
-The 2D View (`view2d`) is a layered 2D canvas backed by a **Scene 2D** node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. Right-click any picture node and choose **Add to 2D View**, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. Docks bottom, right, left, top or fill; driven from the CLI with `infinite view2d`.
+The 2D View (`view2d`) is a layered 2D canvas backed by a **Scene 2D** node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. Right-click any picture node and choose **Add to 2D View**, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. **Free Transform** (Cmd+T) moves, scales and turns the selected layers as one step. **Merge Down** and **Merge Layers** (Cmd+E), **Merge Visible** (Cmd+Shift+E) and **Flatten Image** merge layers the way Photoshop does, in one undo step. Docks bottom, right, left, top or fill; driven from the CLI with `infinite view2d`.
 
 ## Mixer panel
 The Mixer panel (`mixer`) is a hardware-style mixing desk for Mixer and audio channels. It shares the standard page strip and 7-row page menu (`Cmd+R` renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. Right-click a Mixer node and choose **Open in Mixer panel**, or open it from the rail.
@@ -1808,6 +2034,9 @@ The Field Patcher (`fieldpatcher`) is a visual node-box editor for building Fiel
 
 ## Curve Editor
 The Curve Editor (`curveeditor`) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.
+
+## Canvas Link
+Canvas Link is the one way a panel takes a node from the canvas. Piano Roll pages, 2D layer sources, 3D View objects and Session clips each show a link field: choose the node from the list, or press **Pick** and click it on the canvas. While a pick is armed the canvas dims the nodes that cannot be picked and rings the one under the pointer. Esc cancels.
 
 ## Windows and dialogs
 Picture: All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.
@@ -2468,20 +2697,20 @@ prints the open patch, the selection and any code errors in one answer.
 | Group | Verbs |
 |---|---|
 | Look | `graph`, `explain`, `params`, `selection`, `status`, `nodes`, `describe` |
-| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d` |
+| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d-add`, `view2d` |
 | Patch | `new`, `recent`, `open`, `save`, `import`, `files`, `reveal`, `validate`, `canonicalize`, `apply` |
 | Play | `play`, `stop`, `rewind`, `seek`, `tempo` |
-| Timeline | `timeline` prints it all; `timeline track`, `clip`, `marker`, `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
+| Timeline | `timeline` prints it all; `timeline track`, `clip` (`copy`, `paste`, `duplicate ... selection=true`, `split <id> playhead`, `inspect`), `marker` (`color <id> RRGGBB`), `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
 | Session | `session scene`, `launch`, `launchrow`, `stop`, `add`, `insert`, `duplicatescene`, `deletescene`, `send`, `sceneset`, `slot`, `place`, `duplicate`, `clear`, `copy`, `paste`, `cut`, `quantize` |
 | Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>`, `export <clip>`, `generate <type> [key=value]` |
 | Performance Matrix | `perf get`, `add <kind> [label]`, `remove`, `assign`, `clear`, `unmidi`, `set`, `edit`, `page add|go|rename|delete|duplicate` |
 | Make | `studio generate <part> [bars=n]`, `studio status|export|node <type>|get|set` |
-| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library list|add|remove|refresh` |
+| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset|drum|mixer`, `library list|add|remove|refresh` (`drum open|close|dock|lanes|fill|grooves|groove|folder`) |
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
-| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings`, `show`, `view`, `quit` |
-| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>` |
+| App | `panel [name|settings/<place>] [open|close] [bottom|right|left|top|fill]`, `settings [key [value]]`, `settings devices\|midi\|apply\|updates\|reset\|logs\|gpu [n]\|global [name [expr]]\|extension <file>`, `show list\|next\|prev\|go <n>\|lock\|panic\|check\|add\|remove <n>\|clear\|open\|save\|fade <ms>\|quantize <n>\|launch <n>`, `view fit\|params on\|off\|clearcards\|metronome [on\|off]`, `quit` |
+| Learn | `context`, `attention`, `guide`, `docs [topic [name]]`, `find <words>`, `version` |
 | Watch | `watch` prints a JSON line for each change |
 | Terminal | `term open`, `list`, `read`, `send`, `run` |
 
@@ -2505,7 +2734,8 @@ node <index> <category> <type name>
   id <word>                 optional name you can use instead of the index
   f <key> <float>           a number
   i <key> <int or option>   a whole number or dropdown choice (i shapeType Star)
-  b <key> <0 or 1>          on/off
+)AGENTDOC"
+R"AGENTDOC(  b <key> <0 or 1>          on/off
   c <key> <r> <g> <b>       a colour, each 0 to 1
   s <key> <text>            text, to the end of the line
 end
@@ -2520,8 +2750,7 @@ glob  <name> <expression>
 
 Rules worth remembering:
 
-)AGENTDOC"
-R"AGENTDOC(- **Wires read destination first.** `cable out 0 shape` means "Output slot 0 is fed by shape".
+- **Wires read destination first.** `cable out 0 shape` means "Output slot 0 is fed by shape".
 - **Names work everywhere.** Use a node's `id` instead of its number, a slot's name (`input`, `input_2`) instead of its position, and a control's key in `mod` and `expr`.
 - **Leave defaults out.** A node needs only the keys it changes.
 - **Free text goes last** on its line.

@@ -415,7 +415,9 @@ def html_chapter(P):
     b.append(page("<h2>2D View</h2>",
                   "<p>The 2D View (<code>view2d</code>) is a layered 2D canvas backed by a <b>Scene 2D</b> node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. "
                   "Right-click any picture node and choose <b>Add to 2D View</b>, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). "
-                  "Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. Docks bottom, right, left, top or fill; driven from the CLI with <code>infinite view2d</code>.</p>"))
+                  "Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. "
+                  "<b>Free Transform</b> (Cmd+T) moves, scales and turns the selected layers as one step. <b>Merge Down</b> and <b>Merge Layers</b> (Cmd+E), <b>Merge Visible</b> (Cmd+Shift+E) and <b>Flatten Image</b> merge layers the way Photoshop does, in one undo step. "
+                  "Docks bottom, right, left, top or fill; driven from the CLI with <code>infinite view2d</code>.</p>"))
 
     b.append(page("<h2>Mixer panel</h2>",
                   "<p>The Mixer panel (<code>mixer</code>) is a hardware-style mixing desk for Mixer and audio channels. "
@@ -433,6 +435,10 @@ def html_chapter(P):
 
     b.append(page("<h2>Curve Editor</h2>",
                   "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>"))
+
+    b.append(page("<h2>Canvas Link</h2>",
+                  "<p>Canvas Link is the one way a panel takes a node from the canvas. Piano Roll pages, 2D layer sources, 3D View objects and Session clips each show a link field: "
+                  "choose the node from the list, or press <b>Pick</b> and click it on the canvas. While a pick is armed the canvas dims the nodes that cannot be picked and rings the one under the pointer. Esc cancels.</p>"))
 
     b.append(page("<h2>Windows and dialogs</h2>",
                   row((fig("window_shortcuts", "All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.", box=(440, 240, 1130, 750)), 1),
