@@ -4,6 +4,9 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
+#include "nodes/AudioTextureNode.h"
+#include "nodes/BakeNode.h"
+#include "nodes/ShadeNodes.h"
 #include "plugin/engine/PluginView.h"
 
 namespace app
@@ -661,6 +664,29 @@ int DrawTestsB(FrameCtx& fc)
             if (!CanShowInViewportPanel(gn) || dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
             {
                printf("%-22s [%-12s] no image out   OK\n", gn.typeName.c_str(), gn.category.c_str());
+               continue;
+            }
+
+            // Shade nodes emit values into a Material program, not a texture
+            // (ShadeNode::GetOutputTexture is 0 by design).
+            if (dynamic_cast<ShadeNode*>(gn.node.get()) != nullptr)
+            {
+               printf("%-22s [%-12s] shade value node  OK\n", gn.typeName.c_str(), gn.category.c_str());
+               continue;
+            }
+            // Audio Texture with no audio wired, and Bake with no mesh wired, have
+            // nothing to render: both stay 0x0 until their input is patched in.
+            if (auto* at = dynamic_cast<AudioTextureNode*>(gn.node.get()))
+            {
+               if (!at->RequiresAudioProcessing())
+               {
+                  printf("%-22s [%-12s] no audio wired  OK\n", gn.typeName.c_str(), gn.category.c_str());
+                  continue;
+               }
+            }
+            if (dynamic_cast<BakeNode*>(gn.node.get()) != nullptr && gn.node->GetOutputWidth() == 0)
+            {
+               printf("%-22s [%-12s] no mesh wired  OK\n", gn.typeName.c_str(), gn.category.c_str());
                continue;
             }
 
