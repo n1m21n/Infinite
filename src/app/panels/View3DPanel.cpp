@@ -7842,12 +7842,13 @@ namespace
       MenuParts::Separator();
       if (MenuParts::Item(T("New scene")))
          sPending.what = Pending::Scene;
-      if (MenuParts::Item(T("Duplicate scene"), MODKEY "+D"))
-         sPending.what = Pending::DuplicateScene;
       if (MenuParts::Item(T("Copy scene"), MODKEY "+C"))
          sCopiedScene = scene->SceneText();
       if (MenuParts::Item(T("Paste scene"), MODKEY "+V", false, !sCopiedScene.empty()))
          sPending.what = Pending::PasteScene;
+      if (MenuParts::Item(T("Duplicate scene"), MODKEY "+D"))
+         sPending.what = Pending::DuplicateScene;
+      MenuParts::Separator();
       if (MenuParts::Item(T("Delete scene")))
          sPending.what = Pending::DeleteScene;
    }
@@ -7895,12 +7896,11 @@ namespace
          Item* one = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
          if (sMenuOnItem && any)
          {
-            if (MenuParts::Item(T("Duplicate"), "Shift+D")) DuplicateSelected(scene, ImGui::GetIO().MousePos);
-            if (MenuParts::Item(T("Copy"))) sCopiedItems = SelectedItems(scene);
-            if (MenuParts::Item(T("Paste"), nullptr, false, !sCopiedItems.empty())) PasteItems(scene);
             if (one != nullptr && MenuParts::Item(T("Rename"), "F2")) StartRename(*one);
+            if (MenuParts::Item(T("Copy"), MODKEY "+C")) sCopiedItems = SelectedItems(scene);
+            if (MenuParts::Item(T("Paste"), MODKEY "+V", false, !sCopiedItems.empty())) PasteItems(scene);
+            if (MenuParts::Item(T("Duplicate"), MODKEY "+D")) DuplicateSelected(scene, ImGui::GetIO().MousePos);
             if (MenuParts::Item(T("Hide"), "H")) HideSelected(scene);
-            if (MenuParts::Item(T("Remove"), "X")) DeleteSelected(scene);
             MenuParts::Separator();
             if (MenuParts::Item(T("Frame"), "F")) FrameItems(scene, false);
             bool grouped = false;
@@ -7931,6 +7931,8 @@ namespace
                      gRequestFitViewNodeIndex = gn->index;
                   }
             }
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Delete"), "Backspace")) DeleteSelected(scene);
          }
          else
          {

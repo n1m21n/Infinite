@@ -136,6 +136,8 @@ namespace app
                         gArrangeRenameTargetIds.push_back(id);
                   snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
                }
+               if (ctxIsSlot)
+                  DrawArrangeSessionSlotEditItems(cid);
                if (MenuParts::SubMenu(L("Color Tint")))
                {
                   const auto& kPaletteColors = kArrangePalette;
@@ -196,6 +198,8 @@ namespace app
                gArrangeRenameTargetIds.clear();
                snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
             }
+            if (ctxIsSlot)
+               DrawArrangeSessionSlotEditItems(cid);
             if (MenuParts::Item(L("Active"), nullptr, cp->enabled))
             {
                if (ctxIsSlot)
@@ -525,8 +529,16 @@ namespace app
                ArrangeGroupSelection();
             if (MenuParts::Item(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
                ArrangeUngroupSelection();
+            MenuParts::Separator();
             if (MenuParts::Item(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
                ArrangeDeleteSelection();
+            }
+            else
+            {
+            // A session slot's own edit rows come from the grid; Delete stays last.
+            DrawArrangeSessionSlotPlaceItem(cid);
+            MenuParts::Separator();
+            DrawArrangeSessionSlotDeleteItem(cid);
             }
          }
          MenuParts::EndPopup();
@@ -4108,6 +4120,11 @@ namespace app
             for (size_t k = 0; k < gArrange.lanes.size(); k++)
                if (gArrange.lanes[k].id == ctxLaneId) { laneIdx = (int)k; break; }
 
+            if (MenuParts::Item(L("Rename Track"), MODKEY "+R"))
+            {
+               gArrangeRenamingLaneId = ctxLaneId;
+               gArrangeRenameJustStarted = true;
+            }
             if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = laneIdx;
@@ -4118,14 +4135,6 @@ namespace app
                gArrangeAddTrackInsertAfter = laneIdx;
                InsertArrangeTrack(false);
             }
-            if (MenuParts::Item(L("Rename Track"), MODKEY "+R"))
-            {
-               gArrangeRenamingLaneId = ctxLaneId;
-               gArrangeRenameJustStarted = true;
-            }
-            if (MenuParts::Item(L("Delete Track")))
-               laneToDelete = ctxLaneId;
-            MenuParts::Separator();
 
             const uint64_t curGroupId = ctxLane->groupId;
             if (curGroupId != 0 && MenuParts::Item(L("Remove from Group")))
@@ -4178,14 +4187,15 @@ namespace app
             }
 
 
-            if (!Platform::PluginModeActive())
-               MenuParts::Separator();
             if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
             {
                ArrangeRenderJob job = ArrangeBuildLaneScopedRenderJob(
                   { ctxLaneId }, ctxLane->name.empty() ? ("Track " + std::to_string(ctxLaneId)) : ctxLane->name);
                ArrangeCommitLaneScopedRenderJob(job);
             }
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Delete Track")))
+               laneToDelete = ctxLaneId;
          }
          MenuParts::EndPopup();
       }
@@ -4216,6 +4226,16 @@ namespace app
                for (size_t k = 0; k < gArrange.lanes.size(); k++)
                   if (gArrange.lanes[k].id == subtreeLanes.back()) { lastLaneIdx = (int)k; break; }
             }
+            if (MenuParts::Item(L("Rename Group"), MODKEY "+R"))
+            {
+               gArrangeRenamingLaneId = ctxGroupId;
+               gArrangeRenameJustStarted = true;
+            }
+            if (MenuParts::Item(L("Duplicate Group")))
+               ArrangeEdit([&]() { Arrange::DuplicateTrackGroup(gArrange, ctxGroupId); });
+            if (MenuParts::Item(L("Toggle Enabled"), nullptr, grpWasEnabled))
+               ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
+
             if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = lastLaneIdx;
@@ -4226,19 +4246,6 @@ namespace app
                gArrangeAddTrackInsertAfter = lastLaneIdx;
                InsertArrangeTrack(false, ctxGroupId);
             }
-            if (MenuParts::Item(L("Rename Group"), MODKEY "+R"))
-            {
-               gArrangeRenamingLaneId = ctxGroupId;
-               gArrangeRenameJustStarted = true;
-            }
-            MenuParts::Separator();
-
-            if (MenuParts::Item(L("Duplicate Group")))
-               ArrangeEdit([&]() { Arrange::DuplicateTrackGroup(gArrange, ctxGroupId); });
-            if (MenuParts::Item(L("Toggle Enabled"), nullptr, grpWasEnabled))
-               ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
-
-
             if (!Platform::PluginModeActive() && MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
             {
                const std::vector<uint64_t> subtreeLanes = Arrange::LanesInTrackGroupRecursive(gArrange, ctxGroupId);

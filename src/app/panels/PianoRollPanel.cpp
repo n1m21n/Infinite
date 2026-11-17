@@ -908,16 +908,20 @@ namespace
             s.lane = l->id;
       }
       MenuParts::Separator();
-      if (MenuParts::Item(L("New Page")))
-         s.pendingAdd = true;
-      if (page != nullptr && MenuParts::Item(L("Rename"), "Cmd+R"))
+      if (page != nullptr && MenuParts::Item(L("Rename"), MODKEY "+R"))
       {
          s.renameLane = page->id;
          s.renameFocus = true;
          std::snprintf(s.renameBuf, sizeof s.renameBuf, "%s", page->name.c_str());
       }
-      if (page != nullptr && MenuParts::Item(L("Delete Page")))
-         s.pendingDelete = page->id;
+      if (MenuParts::Item(L("New Page")))
+         s.pendingAdd = true;
+      if (page != nullptr)
+      {
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Delete Page")))
+            s.pendingDelete = page->id;
+      }
       MenuParts::EndPopup();
    }
 
@@ -3387,7 +3391,7 @@ namespace
          s.settingsOpen = true;
          s.genOpen = false;
       }
-      if (MenuParts::Item(L("Duplicate"), "Shift+D"))
+      if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
          DuplicateSelection();
       if (MenuParts::Item(L("Mute"), "0"))
       {
@@ -3404,8 +3408,6 @@ namespace
                gArrange.revision++;
             });
       }
-      if (MenuParts::Item(L("Delete"), "Del"))
-         DeleteSelection();
       if (s.menuKind == 2 && !s.notes.empty())
       {
          MenuParts::Separator();
@@ -3435,6 +3437,9 @@ namespace
          DrawFunctionItems(page);
          ImGui::EndMenu();
       }
+      MenuParts::Separator();
+      if (MenuParts::Item(L("Delete"), "Backspace"))
+         DeleteSelection();
    }
 
    void DrawPanel()

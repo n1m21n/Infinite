@@ -5101,6 +5101,11 @@ void ArrangeNoteSchedulesPublish();
    bool ArrangeSessionTakeClipCtxRequest();
    // The slot-only rows at the bottom of the clip menu: follow action, follow after, place on Timeline, clear.
    void DrawArrangeSessionSlotMenuItems(uint64_t clipId);
+   // The slot's Cut / Copy / Paste / Duplicate, Place on Timeline and Delete rows; the clip menu draws each where the
+   // context-menu order puts it (docs/quality/context-menu-order.md). All three queue their action like the rows above.
+   void DrawArrangeSessionSlotEditItems(uint64_t clipId);
+   void DrawArrangeSessionSlotPlaceItem(uint64_t clipId);
+   void DrawArrangeSessionSlotDeleteItem(uint64_t clipId);
    // Applies the slot action a menu row queued; call after the clip menu has ended.
    void ArrangeSessionApplyMenuAction();
    // The inspector's Launch card for a session slot clip; false (nothing drawn) for a Timeline clip.

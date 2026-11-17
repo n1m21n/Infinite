@@ -2097,20 +2097,14 @@ namespace
       if (!MenuParts::BeginPopup("##studioWaveMenu"))
          return;
       const bool any = !s.sel.empty();
-      if (MenuParts::Item(T("Split here"), "Double-click top"))
-         Split(GridFrame(frame));
-      if (MenuParts::Item(T("Join"), "J", false, any && s.doc.Count() > 1))
-         JoinSelected();
+      if (MenuParts::Item(T("Settings"), "Double-click", false, any))
+         s.settingsOpen = true;
       MenuParts::Separator();
-      if (MenuParts::Item(T("Copy"), "Cmd+C", false, any))
+      if (MenuParts::Item(T("Copy"), MODKEY "+C", false, any))
          CopySelected();
-      if (MenuParts::Item(T("Paste after"), "Cmd+V", false, s.clip.has_value()))
+      if (MenuParts::Item(T("Paste after"), MODKEY "+V", false, s.clip.has_value()))
          Paste();
-      if (MenuParts::Item(T("Delete"), "Delete", false, any && (int)s.sel.size() < s.doc.Count()))
-         DeleteSelected();
       MenuParts::Separator();
-      if (MenuParts::Item(T("Play slice"), "Q", false, any))
-         Audition(s.doc.IndexOfId(s.primary));
       if (MenuParts::Item(T("Mute"), "M", false, any))
          EditSelected([](SliceParams& p) { p.mute = !p.mute; });
       if (MenuParts::Item(T("Solo"), "S", false, any))
@@ -2123,9 +2117,13 @@ namespace
             ImGui::CloseCurrentPopup();
          ImGui::EndMenu();
       }
-      if (MenuParts::Item(T("Settings"), "Double-click", false, any))
-         s.settingsOpen = true;
       MenuParts::Separator();
+      if (MenuParts::Item(T("Split here"), "Double-click top"))
+         Split(GridFrame(frame));
+      if (MenuParts::Item(T("Join"), "J", false, any && s.doc.Count() > 1))
+         JoinSelected();
+      if (MenuParts::Item(T("Play slice"), "Q", false, any))
+         Audition(s.doc.IndexOfId(s.primary));
       if (MenuParts::Item(T("Convert to node"), nullptr, false, any))
          SelectedToSamplers();
       MenuParts::Separator();
@@ -2133,6 +2131,9 @@ namespace
          ZoomToSelection();
       if (MenuParts::Item(T("Zoom out"), "Shift+Z"))
          ViewAll();
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Delete"), "Backspace", false, any && (int)s.sel.size() < s.doc.Count()))
+         DeleteSelected();
       MenuParts::EndPopup();
    }
 
