@@ -78,7 +78,7 @@ A node has a card when a card or chapter row name, after lower-casing and droppi
 ## Source and --describe disagreements
 
 1. **Shade Noise `roughness`.** The body (`src/app/bodies/GeometryParams.cpp`, slider 0..1) and `ShadeNoiseNode` (`src/nodes/ShadeNodes.h`, default 0.5) both have it, but `--describe` lists no `roughness` row for Shade Noise. The card follows the source.
-2. **Mesh-op `op` range.** `--describe` reports `op` range 0..19 with 20 options, which omits the three deprecated ops (Select's neighbours Delete/Transform/Extrude Selected, indices 14-16). The source enum (`src/nodes/GeometryOpNodes.cpp`, `kOpNames`) runs 0..22. Inset's default op (20) and Fur's default op (22) fall outside the describe range, and option positions after index 13 do not line up with saved indices.
+2. **Mesh-op `op` range.** `--describe` reports `op` range 0..19 with 20 options, which omits the three deprecated ops (Delete, Transform and Extrude Selected, indices 14-16). The source enum (`src/nodes/GeometryOpNodes.cpp`, `kOpNames`) runs 0..22. Inset's default op (20) and Fur's default op (22) fall outside the describe range, and option positions after index 13 do not line up with saved indices.
 3. **Stale help text.** The Select help text names Delete Selected, Transform Selected and Extrude Selected as the consumers of its selection. Those nodes are deprecated (`IsSpawnable` is false); the replacement is the mesh operator with Selection only on. The card uses the replacement.
 4. **Unlabelled units.** Trails `rotate` and Wavetable `detune` have no unit in `--describe`. The cards describe them only as far as the source confirms.
 
