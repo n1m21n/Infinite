@@ -13,4 +13,6 @@ Repro: create the node, wire two closed sphere/cube primitives into its geometry
 
 Assessment: the red outline appears even when the inputs are valid closed solids, so it is likely a real bug (a boolean on valid inputs showing an error) and not a missing-input state. The node body still renders the boolean result, so the shot is kept and not replaced with an unwired picture. Treat as a bug to triage before 2.0 ships; the manual shot should be recaptured once the outline is fixed.
 
-Status: open. Recorded in docs/shots/manifest.json under "exceptions".
+Update (gate lane): the warning did NOT reproduce through the RPC probe. Sphere+Cube into Join Geometry under Intersect, Union and Difference, wired and unwired, report an empty cook warning, so the red outline in these shots is most likely a capture-harness artefact (node cooked outside a full patch), not a product bug. Instance on Points was not probed. Recapture or confirm before relying on these pictures.
+
+Status: open (low). Recorded in docs/shots/manifest.json under "exceptions".
