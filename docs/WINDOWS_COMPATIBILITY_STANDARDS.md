@@ -23,7 +23,7 @@ Infinite relies on a dual-DAG architecture (Visual/GL DAG and Real-Time Audio DA
 | **Inter-App Sharing**| Syphon (IOSurface / CGL) | Spout2 (DirectX11 / DXGI Shared Textures) | Zero-copy GPU texture bridge via `SpoutGLBridge` converting `GL_TEXTURE_2D` to `GL_TEXTURE_RECTANGLE`. |
 | **Typography / Text**| CoreText / CoreGraphics | GDI (`GetGlyphOutlineW` TTF/CFF) | Measure cap height from char `'H'`, NOT with `GGO_GLYPH_INDEX`. Step spline at `t = s / steps`. |
 | **Settings & Paths** | `~/Library/Application Support/Infinite` | `%APPDATA%\Infinite` | Never hardcode `$HOME` or `\`. Query `SHGetKnownFolderPath` for Desktop/Documents. |
-| **Patch Extension**  | `.inf` | `.infinite` | Default to `.infinite` on Windows to avoid clashing with Windows Setup Information files. |
+| **Patch Extension**  | `.inf` | `.inf` | Unified `.inf` save extension across platforms (`.infinite` accepted as a read-only alias). |
 
 ---
 
@@ -285,5 +285,5 @@ Every push triggers the Windows x64 and ARM64 CI matrix:
    - Native font rendering and text scale.
    - VST3 scanning and UI window embedding.
    - Audio device selection under WASAPI.
-   - File drag-and-drop (.infinite patches, .wav, .png, .obj).
+   - File drag-and-drop (.inf / .infinite patches, .wav, .png, .obj).
    - Projector multi-window topmost behavior.

@@ -1,4 +1,5 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include "app/ui/design/components/ColourChip.h"
 #include <cmath>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -705,47 +706,12 @@ namespace app
             MenuParts::Separator();
             if (MenuParts::SubMenu(L("Colour Tint")))
             {
-               static const struct { const char* name; ImU32 col; } kPaletteColors[10] = {
-                  { "Default", tok::U32(tok::pal::c_6E788CFF) },
-                  { "Crimson", tok::U32(tok::pal::c_EF4444FF) },
-                  { "Orange",  tok::U32(tok::pal::c_F97316FF) },
-                  { "Amber",   tok::U32(tok::pal::c_F59E0BFF) },
-                  { "Emerald", tok::U32(tok::pal::c_10B981FF) },
-                  { "Cyan",    tok::U32(tok::pal::c_06B6D4FF) },
-                  { "Blue",    tok::U32(tok::pal::c_3B82F6FF) },
-                  { "Purple",  tok::U32(tok::pal::c_8B5CF6FF) },
-                  { "Magenta", tok::U32(tok::pal::c_D946EFFF) },
-                  { "Rose",    tok::U32(tok::pal::c_F43F5EFF) }
-               };
-
-               ImU32 cols[10];
-               const char* names[10];
-               int selected = -1;
-               for (int ci = 0; ci < 10; ci++)
+               const int pick = ColourChip::TintDots(elem.colorR, elem.colorG, elem.colorB);
+               if (pick >= 0)
                {
-                  cols[ci] = kPaletteColors[ci].col;
-                  names[ci] = kPaletteColors[ci].name;
-                  const ImVec4 c = ImGui::ColorConvertU32ToFloat4(cols[ci]);
-                  const bool isDefault = ci == 0 && elem.colorR == 0.0f && elem.colorG == 0.0f && elem.colorB == 0.0f;
-                  if (isDefault || (ci > 0 && std::fabs(elem.colorR - c.x) < 0.01f && std::fabs(elem.colorG - c.y) < 0.01f &&
-                                    std::fabs(elem.colorB - c.z) < 0.01f))
-                     selected = ci;
-               }
-               for (int row = 0; row < 2; row++)
-               {
-                  const int hit = FieldWell::SwatchRow(cols + row * 5, names + row * 5, 5, selected - row * 5, 18.0f);
-                  if (hit >= 0)
-                  {
-                     const int ci = row * 5 + hit;
-                     PushUndoCheckpoint();
-                     if (ci == 0)
-                        elem.colorR = elem.colorG = elem.colorB = 0.0f;
-                     else
-                     {
-                        const ImVec4 c = ImGui::ColorConvertU32ToFloat4(cols[ci]);
-                        elem.colorR = c.x; elem.colorG = c.y; elem.colorB = c.z;
-                     }
-                  }
+                  PushUndoCheckpoint();
+                  const ImVec4 c = ColourChip::Tint(pick);
+                  elem.colorR = c.x; elem.colorG = c.y; elem.colorB = c.z;
                }
                ImGui::EndMenu();
             }
@@ -2374,7 +2340,7 @@ namespace app
             }
             else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false))
                PerfPasteRecords(gPerfClipboard);
-            else if (kio.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_D, false))
+            else if ((cmd || kio.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_D, false))
                PerfDuplicateSelection();
             else if (cmd && ImGui::IsKeyPressed(ImGuiKey_A, false))
                PerfSelectAllOnPage();
@@ -2436,7 +2402,7 @@ namespace app
       {
          ImGui::Dummy(ImVec2(maxElemX, maxElemY));
       }
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
 
@@ -2526,7 +2492,7 @@ namespace app
       // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
 
       // No divider line along the canvas-facing edge, in either theme. This

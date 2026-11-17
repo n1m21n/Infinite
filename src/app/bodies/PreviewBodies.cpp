@@ -614,7 +614,7 @@ namespace app
    const char* EmptyPreviewLabel(INode* node, const char* fallback)
    {
       if (node->bypassed)
-         return "bypassed";
+         return T("Bypassed");
       return fallback;
    }
 
@@ -643,7 +643,7 @@ namespace app
       // An off group sends nothing on, so its last frame would be a stale picture.
       if (node->blockOff)
       {
-         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), "block off");
+         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), T("Block off"));
       }
       else if (tex != 0 && shown->GetOutputWidth() > 0)
       {
@@ -658,7 +658,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(node, "no input"));
+         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(node, T("No input")));
       }
 
       if (!node->bypassed && !node->blockOff)

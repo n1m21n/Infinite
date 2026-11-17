@@ -8,6 +8,7 @@
 #include "imgui_internal.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiType.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 
@@ -171,12 +172,12 @@ void DrawPopupsB(FrameCtx& fc)
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
             ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f * commentZoom);
-            ImGui::SetWindowFontScale(commentZoom * fontScale);
+            ImGui::PushFont(UiType::Font(UiType::Weight::Regular), UiType::Px(UiType::Size::Body) * commentZoom * fontScale);
 
             // Filling the whole popup cleanly at 1:1 scale with the canvas card
             FieldWell::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
 
-            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopFont();
             ImGui::PopStyleVar(3);
             ImGui::PopStyleColor(6);
 
@@ -278,7 +279,7 @@ void DrawPopupsB(FrameCtx& fc)
             ImGui::GetCurrentContext()->NavCursorVisible = false;  // no focus ring until the keyboard navigates
             searchJustOpened = false;
          }
-         LibraryParts::SearchField("nodepicker", T("search nodes..."), searchBuf, sizeof(searchBuf));
+         LibraryParts::SearchField("nodepicker", T("Search nodes"), searchBuf, sizeof(searchBuf));
          MenuParts::Separator();
 
          std::string q(searchBuf);
@@ -429,7 +430,7 @@ void DrawPopupsB(FrameCtx& fc)
                }
             }
             if (shown == 0)
-               ImGui::TextDisabled("%s", T("no matches"));
+               ImGui::TextDisabled("%s", T("No matches"));
          }
 
          if (!spawnName.empty())
@@ -588,7 +589,7 @@ void DrawPopupsB(FrameCtx& fc)
          ImGui::OpenPopup("##fielddevicesave");
          gFieldDeviceSave.justOpened = false;
       }
-      if (ImGui::BeginPopup("##fielddevicesave"))
+      if (MenuParts::BeginPopup("##fielddevicesave"))
       {
          ImGui::TextDisabled("%s", T("Save device as:"));
          ImGui::SetNextItemWidth(220.0f);
@@ -611,7 +612,7 @@ void DrawPopupsB(FrameCtx& fc)
             }
             ImGui::CloseCurrentPopup();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       if (gAudioDropPicker.justOpened)

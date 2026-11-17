@@ -8,6 +8,7 @@
 #include "AssetCache.h"
 #include "GltfImport.h"
 #include "Platform.h"
+#include "platform/AppPaths.h"
 #include "PlyPoints.h"
 #include "Skinning.h"
 #include "Transport.h"
@@ -246,8 +247,7 @@ bool ModelSourceNode::Load(const std::string& path)
    mPosedTime = 0.0f;
    mAppliedPointSize = -1.0f; // ApplyPointSize writes the scales and moves the point revision
 
-   const size_t slash = path.find_last_of('/');
-   const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   const std::string name = AppPaths::FsPath(path).filename().u8string();
    if (mIsPoints)
       mStatus = name + " - " + std::to_string(mPoints.size()) + " points" + note;
    else

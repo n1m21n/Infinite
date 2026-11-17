@@ -17,6 +17,7 @@
 #include "plugin/engine/HostAudio.h"
 #include "plugin/engine/PluginView.h"
 #include "app/ui/design/BrandLogo.gen.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -282,9 +283,7 @@ void DrawMenuBar(FrameCtx& fc)
                const std::vector<std::string> recents = Patch::Recents();
                for (const std::string& entry : recents)
                {
-                  const size_t slash = entry.find_last_of('/');
-                  const std::string name =
-                     (slash == std::string::npos) ? entry : entry.substr(slash + 1);
+                  const std::string name = AppPaths::FsPath(entry).filename().u8string();
                   if (MenuParts::Item(name.c_str()))
                      GuardUnsavedChanges([entry]() { LoadPatchFrom(entry); });
                }
@@ -308,10 +307,8 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 260.0f);
                if (!gPatchPath.empty())
                {
-                  const size_t slash = gPatchPath.find_last_of('/');
-                  ImGui::TextDisabled("%s", (slash == std::string::npos)
-                                               ? gPatchPath.c_str()
-                                               : gPatchPath.c_str() + slash + 1);
+                  const std::string base = AppPaths::FsPath(gPatchPath).filename().u8string();
+                  ImGui::TextDisabled("%s", base.c_str());
                }
                if (!gPatchStatus.empty())
                   ImGui::TextDisabled("%s", gPatchStatus.c_str());
@@ -757,15 +754,6 @@ void DrawMenuBar(FrameCtx& fc)
          auto TopBarSameLine = [](float spacing = 4.0f) {
             ImGui::SameLine(0.0f, spacing);
          };
-         auto TopBarLabel = [](const char* text, bool disabled = false) {
-            ImGuiWindow* window = ImGui::GetCurrentWindow();
-            window->DC.CurrLineTextBaseOffset = ImGui::GetStyle().FramePadding.y;
-            if (disabled)
-               ImGui::TextDisabled("%s", text);
-            else
-               ImGui::TextUnformatted(text);
-         };
-         const bool isLight = IsThemeLight();
          // A live number: tabular digits in a slot as wide as its widest value, so it never
          // shifts what sits beside it. `widest` is the longest text it can show.
          auto TabLabel = [](const char* key, const char* text, const char* widest, bool dim)
@@ -1384,7 +1372,7 @@ void DrawMenuBar(FrameCtx& fc)
                   ImGui::OpenPopup("##slotsmap");
                if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("##slotsmap"))
                   ImGui::SetTooltip("%s", T("Host slots"));
-               if (ImGui::BeginPopup("##slotsmap"))
+               if (MenuParts::BeginPopup("##slotsmap"))
                {
                   int shown = 0;
                   for (int i = 0; i < PluginEngine::kSlotCount; i++)
@@ -1397,7 +1385,7 @@ void DrawMenuBar(FrameCtx& fc)
                   }
                   if (shown == 0)
                      ImGui::TextDisabled("%s", T("No Macro is on a host slot"));
-                  ImGui::EndPopup();
+                  MenuParts::EndPopup();
                }
                cursorX -= telemetryGap;
             }

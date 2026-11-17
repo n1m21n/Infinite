@@ -41,7 +41,7 @@ namespace app
          return ss.str();
       }
 
-      void DrawStepIcon(const CliSetup::StepStatus& s, float size)
+      [[maybe_unused]] void DrawStepIcon(const CliSetup::StepStatus& s, float size)
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -306,7 +306,7 @@ namespace app
             ImGui::OpenPopup("##clearchats");
          ImGui::EndDisabled();
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
-         if (ImGui::BeginPopup("##clearchats"))
+         if (MenuParts::BeginPopup("##clearchats"))
          {
             ImGui::TextUnformatted(T("Delete every saved chat?"));
             ImGui::Dummy(ImVec2(0.0f, tok::space_2));
@@ -324,7 +324,7 @@ namespace app
                ChatClearHistory();
                ImGui::CloseCurrentPopup();
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
          ImGui::PopStyleVar();
       }
@@ -345,7 +345,7 @@ namespace app
          static std::string sLoadedUrl, sLoadedModel;
          static std::mutex sTestMutex;
          static std::atomic<bool> sTesting{ false };
-         static bool sTestOk = false;
+         [[maybe_unused]] static bool sTestOk = false;
          static std::string sTestStatus;
 
          if (sLoadedUrl != prefs.customBaseUrl)

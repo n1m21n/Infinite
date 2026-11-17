@@ -12,6 +12,7 @@
 #include <sstream>
 
 #include "BlendModes.h"
+#include "platform/AppPaths.h"
 
 const char* const Scene2DNode::kEffBlendNames[5] = { "Normal", "Multiply", "Screen", "Overlay", "Luminosity" };
 
@@ -442,7 +443,7 @@ void Scene2DNode::DrawEffects(const Layer& l, int depth, int frameId, float opac
 
 bool Scene2DNode::ReadCube(const std::string& path, int& size, std::vector<float>& rgb)
 {
-   std::ifstream f(path);
+   std::ifstream f(AppPaths::FsPath(path));
    if (!f)
       return false;
    size = 0;

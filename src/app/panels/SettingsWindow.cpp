@@ -95,7 +95,7 @@ namespace app
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
                                            I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins"),
                                            I18N_KEY("Agents & Terminal"), I18N_KEY("Infinite as VST3/AU"),
-                                           I18N_KEY("3D View") };
+                                           I18N_KEY("3D View"), I18N_KEY("Keys") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -168,7 +168,7 @@ namespace app
                      ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
       }
       ImGui::GetStyle().ItemSpacing = oldItemSpacing;
-      ImGui::EndChild();
+      EndChildSafe();
       {
          // The section list sits in its own well, the same one the cards use, kPad outside the tiles all round.
          const ImVec2 navMin = ImGui::GetItemRectMin(), navMax = ImGui::GetItemRectMax();
@@ -572,6 +572,7 @@ namespace app
                ImGui::BeginDisabled();
 #else
             const bool asioMode = false;
+            (void)asioMode;
 #endif
             if (FormParts::BeginCombo(L("Input device"), inputLabel.c_str()))
             {
@@ -1933,10 +1934,16 @@ namespace app
             SectionCard::End();
          }
 
+         // 12. "Keys" Tab: every row of kShortcuts, searchable.
+         if (sTab == 11)
+         {
+            DrawShortcutsTableBody("settings_");
+         }
+
       }
 
       SectionCard::EndWindow();
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();

@@ -42,7 +42,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(gn.node.get(), "no geometry"));
+         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(gn.node.get(), T("No geometry")));
       }
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                   tok::U32(tok::pal::c_464A5AFF), tok::radius_control);
@@ -236,7 +236,7 @@ namespace app
       const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
       DrawCheckerboardBackdrop(dl, origin, br, tok::radius_control);
 
-      if (auto* geo = dynamic_cast<IGeometrySource*>(gn.node.get()))
+      if (dynamic_cast<IGeometrySource*>(gn.node.get()) != nullptr)
       {
          // Same solo mesh render as the inline mini viewport, including its
          // orbit/zoom input handling. cam is the same gNodeCameras entry the
@@ -249,7 +249,7 @@ namespace app
          if (tex != 0)
             dl->AddImageRounded((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
          else
-            EmptyState::DrawCaption(origin, br, EmptyPreviewLabel(gn.node.get(), "no geometry"));
+            EmptyState::DrawCaption(origin, br, EmptyPreviewLabel(gn.node.get(), T("No geometry")));
 
          ImGui::SetCursorScreenPos(origin);
          char btnId[32];
@@ -303,7 +303,7 @@ namespace app
          }
          else
          {
-            EmptyState::DrawCaption(origin, ImVec2(origin.x + imageSize.x, origin.y + imageSize.y), EmptyPreviewLabel(gn.node.get(), "no input"));
+            EmptyState::DrawCaption(origin, ImVec2(origin.x + imageSize.x, origin.y + imageSize.y), EmptyPreviewLabel(gn.node.get(), T("No input")));
          }
 
          // A Draw node's panel card is paintable, same as its inline preview
@@ -386,7 +386,7 @@ namespace app
       }
 
       ImGui::Dummy(imageSize);
-      ImGui::EndChild();
+      EndChildSafe();
       PopDockedPanelStyle();
 
       if (closeRequested)
@@ -467,7 +467,7 @@ namespace app
          EmptyState::DrawInWindow(T("No active viewport cards"), T("Select nodes & press Shift+V or right-click to add"));
       }
 
-      ImGui::EndChild();
+      EndChildSafe();
 
       // Right-click anywhere on the panel - empty space or a card - to
       // reposition or close it. Replaces the dock-combo/close-button header
@@ -609,7 +609,7 @@ namespace app
       // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
 
       // No divider line along the canvas-facing edge, in either theme. This

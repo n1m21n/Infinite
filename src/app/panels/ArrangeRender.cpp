@@ -396,7 +396,7 @@ namespace app
    static void InspectorCardEnd() { SectionCard::End(); }
    static void InspectorCardBegin() { SectionCard::Begin(); }
    static void SectionHeader(const char* text) { SectionCard::Begin(text); }
-   static float CardPad() { return SectionCard::Pad(); }
+   [[maybe_unused]] static float CardPad() { return SectionCard::Pad(); }
 
    // Plain muted message (empty states), not a card.
    static void InspectorNote(const char* text)
@@ -1246,7 +1246,7 @@ namespace app
 
       SectionCard::EndWindow();
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
 

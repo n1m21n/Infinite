@@ -55,7 +55,7 @@ bool gCurveRecordPicking = false;
 namespace
 {
    constexpr float kMinHeight = 220.0f, kMinWidth = 360.0f;
-   constexpr float kIconW = tok::control_h, kPageW = 140.0f, kSideW = UiDensity::kInspectorW + 2.0f * tok::space_3, kRulerH = 16.0f;
+   constexpr float kIconW = tok::control_h, kSideW = UiDensity::kInspectorW + 2.0f * tok::space_3, kRulerH = 16.0f;
    constexpr float kPad = 8.0f;     // graph edge to the 0 and 1 value lines
    constexpr float kHit = 7.0f;     // px a point or handle grabs from
    constexpr float kEraseR = 9.0f;  // px the eraser rubs out
@@ -1412,15 +1412,22 @@ namespace
       }
       if (plain && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
          DeleteSelection(n);
-      static const ImGuiKey kNum[] = { ImGuiKey_1, ImGuiKey_2, ImGuiKey_3, ImGuiKey_4, ImGuiKey_5 };
-      for (int i = 0; i < 5 && plain; i++)
-         if (ImGui::IsKeyPressed(kNum[i], false))
+      if (plain)
+      {
+         int numPick = -1;
+         if (ImGui::IsKeyPressed(ImGuiKey_1, false)) numPick = 0;
+         else if (ImGui::IsKeyPressed(ImGuiKey_2, false)) numPick = 1;
+         else if (ImGui::IsKeyPressed(ImGuiKey_3, false)) numPick = 2;
+         else if (ImGui::IsKeyPressed(ImGuiKey_4, false)) numPick = 3;
+         else if (ImGui::IsKeyPressed(ImGuiKey_5, false)) numPick = 4;
+         if (numPick >= 0)
          {
             if (io.KeyShift)
-               SetHandle(n, i);
-            else if (i < ModShapes::kInterpCount)
-               SetInterp(n, i);
+               SetHandle(n, numPick);
+            else if (numPick < ModShapes::kInterpCount)
+               SetInterp(n, numPick);
          }
+      }
       if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false))
       {
          s.sel.clear();
@@ -2334,9 +2341,9 @@ namespace
       sFieldW = std::max(60.0f, ImGui::GetContentRegionAvail().x - FieldLabelW());
       DrawInspector(gn, n);
       SectionCard::EndWindow();
-      ImGui::EndChild();
+      EndChildSafe();
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // The editing controls the header carries after the pages: snap, grid, Draw's thinning, Assign.
@@ -2664,7 +2671,7 @@ namespace
       const float bodyH = std::max(1.0f, avail.y);
       ImGui::BeginChild("##ceRail", ImVec2(kIconW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawToolButtons(false);
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::Inline(0.0f, gap);
       const float sideW = s.sideOpen ? std::min(kSideW, avail.x * 0.4f) : 0.0f;
       const float graphW = std::max(80.0f, avail.x - kIconW - gap - (s.sideOpen ? sideW + gap : 0.0f));
@@ -2755,7 +2762,7 @@ void DrawCurveEditorDocked(const char* id, const ImVec2& size)
    }
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 }

@@ -90,7 +90,7 @@ namespace app
          { "Voice Spread", I18N_KEY("A different value for each note of a chord. Cable it into an Analog or Wavetable knob (cutoff, pan, detune, ...) and every note gets its own setting between low and high, by its place among the keys held when it started: linear spaces them evenly, golden ratio scatters them so each new note lands in the biggest gap, primes spaces them unevenly, alternate goes out from the middle, one side then the other. After count notes the pattern repeats. Into anything that is not a synth knob it gives the first note's value.") },
          { "Note Expression", I18N_KEY("Each note's own MPE pressure or slide. Turn on mpe on MIDI Notes, then cable this into an Analog or Wavetable knob (cutoff, volume, wavetable position, ...): every voice follows the pressure or slide (CC74) of the finger playing it, between low and high, smoothed over 5 ms so it never zippers. Into anything that is not a synth knob it follows the channel moved last.") },
          { "Drift", I18N_KEY("Learns where you leave each knob and how fast you move it, then keeps the knob going after you let go, settles it into your usual places and wanders between them at your pace. Speed scales the learned pace, Stray widens or narrows the wandering, Momentum is how long a release carries on, Link lets your live hand activity stir it: quiet knobs wake up while you play and settle when you stop. Shift-drag a driven knob to take over; the dot on the knob shows how much history backs it and the faint marks show where it is likely to go next. Freeze stores the learned profile in the patch.") },
-         { "Moves", I18N_KEY("Your Moves macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style.") },
+         { "Moves", I18N_KEY("Your predictive macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style.") },
          { "Predictive Modulator", I18N_KEY("Wire a modulator in and press Learn: it passes the signal through while it listens, fits a small dynamical model (Dynamic Mode Decomposition) of its shape, then on Stop free-runs that model on its own - decoupled from the live cable - instead of replaying the exact recording. Rank sets how many delayed copies of the signal the fit is built from (2, 3, 4 or 8); the readout shows the fit's spectral radius, how close the learned pattern sits to the edge of instability.") },
          { "CV to Pitch", I18N_KEY("Quantizes a modulator to semitone steps over range low..high, shown as a large +/-N st readout. Still outputs 0..1 like any modulator - it just restricts where in 0..1 the value can land, so the span maps onto whole semitones. Scale/root snap to scale degrees instead of every semitone (chromatic = off); glide adds portamento between steps, passing through unquantized values in transit on purpose.") },
          { "Macro Knob", I18N_KEY("A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters.") },
@@ -119,11 +119,11 @@ namespace app
          { "Sampler", I18N_KEY("A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. fade in / fade out are lengths in ms applied at the start and end of every pass through the range (each loop lap, ping-pong leg or one-shot), so a loop dips at its seam instead of clicking; 3 ms each by default, 0 for a hard edge. Patches saved with the old loop xfade load with the defaults. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making.") },
          { "Generate Samples", I18N_KEY("Makes a sample instead of loading one. Pick a music style (deep house, dub techno, lofi beats and 31 more), a seed and a length of 1, 2, 4 or 8 bars, and press generate: a private patch built from that style - drums, bass, chords, a motif, each through its own synths and effects - renders a seamless loop on a background thread while the canvas keeps running. part picks the whole mix (all) or one layer of it from the same seed: synths (bass and the motif line), pads (the chords held on a slow-swelling voice), plucks (the chords arpeggiated on a short plucked voice), percussion (clap, toms, bell) or drums (kick, snare, hats). variation is how far each node strays from its defaults; the dice picks a new seed. follow transport makes the loop at the patch tempo, key and scale, card's own at the style's. The status line names what was made, its tempo, key and scale. Every loop comes out at -14 LUFS under a -1 dB true-peak ceiling; a seed that renders silent or broken is redrawn up to three times before the node says so. Changing a setting marks the sample stale until you generate again. The patch saves the recipe, not the audio, and renders it again when reopened; keep as file writes the loop to a wav, and from then on it is saved as that file. Playback is the sample player's: drag the waveform edges for start and end, pitch, gain and loop below it, and connect notes to play it from a keyboard.") },
          { "Slicer", I18N_KEY("Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second.") },
-         { "Molder", I18N_KEY("Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload.") },
+         { "Molder", I18N_KEY("Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sample Player. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload.") },
          { "Grain Molder", I18N_KEY("Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread.") },
          { "Drum Sequencer", I18N_KEY("An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the small 1-16 | 17-32 pill at the right of the line under it switches pages once steps goes past 16 - greyed out until then; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the small A B C pill at the end of the row; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern. A .mid file can become the pattern: drop it on the node, or keep .mid files in the My grooves folder (the last category in the groove picker, whose last row opens the folder). Its first two bars are placed on a 1/16 grid as 16 or 32 steps - General MIDI drum notes go to the matching lanes, and a melodic file gives its 8 lowest pitches to lanes 1-8 - at rate 1/16 with no swing, and the pattern takes the file's name. Each step also has a chance (how often it plays), a nudge (early or late, up to half a step) and a condition: Fill / !Fill follow the Drum panel's FILL button, 1st / !1st the first time round, and A:B plays on loop A of every B. Each lane can have its own length (polymeter), play its sample reversed, and run through a low-pass or high-pass filter with cutoff and resonance; these sit in the Drum panel (Shift+J).") },
-         { "MPC", I18N_KEY("How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sampler. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load.") },
-         { "Looper", I18N_KEY("How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sampler's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened.") },
+         { "MPC", I18N_KEY("How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sample Player. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load.") },
+         { "Looper", I18N_KEY("How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sample Player's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened.") },
          { "Audio In",I18N_KEY("Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't.") },
          { "Audio Filter", I18N_KEY("One filter, one of 17 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass, comb, and ladder, MS-20 and diode models that sing at the top of Q). Drag the handle on the response curve to set frequency and gain, Shift-drag to set Q - the picture is the control.") },
          { "Audio Color Ramp", I18N_KEY("Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead.") },
@@ -535,7 +535,7 @@ namespace app
       if (category == "Modulators") return I18N_KEY("Produces a changing number over time, not an image. Patch its output onto the small dot beside any slider to drive that parameter.");
       if (category == "Shader") return I18N_KEY("A shading node - builds a surface per shading point, the way Blender's shader nodes do. Chain it into a Material's pins; the Material compiles the chain into one program for every Render 3D engine.");
       if (category == "3D") return I18N_KEY("Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights. Right-click a 3D node and choose Add to 3D View to arrange it in the 3D View.");
-      if (category == "Notes") return I18N_KEY("Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.");
+      if (category == "Notes") return I18N_KEY("Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sample Player) from the end of the chain.");
       if (category == "Synths") return I18N_KEY("A sound source - it produces audio rather than an image. With a note cable connected it plays polyphonically; with nothing patched into its note pin it free-runs at its own frequency. Route its output into an audio effect chain and on to Audio Out.");
       if (category == "AudioEffects") return I18N_KEY("Processes audio: one cable in, one cable out. Audio input pins take exactly one cable each - use a Mixer to sum signals and a Splitter to fan one out. See Menu > Help > Module reference for the effect families.");
       if (category == "Macros") return I18N_KEY("A hand control whose only output is a modulator. Drag its output onto the small dot beside any slider to drive that parameter by hand, or onto several at once to make this one control the whole gesture.");
@@ -617,7 +617,7 @@ namespace app
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Duplicate"), MODKEY "+D / Shift+D", I18N_KEY("Duplicate selected nodes in-place. Canvas only - with the timeline focused, this duplicates clips instead") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete"), "Delete / Backspace / Shift+X", I18N_KEY("Delete selected nodes, groups, or links") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete Cable"), "X", I18N_KEY("Delete selected cable/link only") },
-      { I18N_KEY("Edit & Canvas"), I18N_KEY("Select All"), "Shift+A", I18N_KEY("Select all nodes on the canvas") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Select All"), MODKEY "+A / Shift+A", I18N_KEY("Select all nodes on the canvas") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("UI Scale"), MODKEY "+= / " MODKEY "+-", I18N_KEY("Make the whole interface bigger or smaller in 0.1 steps (0.5x to 2x); same setting as Settings > UI Scale") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Walk Params"), "Tab / Shift+Tab", I18N_KEY("Click a node, then Tab loops through that node's parameters (Shift+Tab goes backwards). Digits type a value; Esc leaves") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Nudge Param"), "Left / Right", I18N_KEY("With a param focused by Tab: Left/Down lowers it, Right/Up raises it one step; Alt = x10") },
@@ -659,7 +659,7 @@ namespace app
 
       // Performance Matrix - edit mode, panel clicked
       { I18N_KEY("Performance Matrix"), I18N_KEY("Copy / Cut / Paste Controls"), MODKEY "+C / " MODKEY "+X / " MODKEY "+V", I18N_KEY("In edit mode, with the panel clicked: copy or cut the selected controls, or paste them") },
-      { I18N_KEY("Performance Matrix"), I18N_KEY("Duplicate Controls"), "Shift+D", I18N_KEY("Duplicate the selected controls") },
+      { I18N_KEY("Performance Matrix"), I18N_KEY("Duplicate Controls"), MODKEY "+D / Shift+D", I18N_KEY("Duplicate the selected controls") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Select All Controls"), MODKEY "+A", I18N_KEY("Select every control on the page") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Delete Controls"), "Delete / Backspace", I18N_KEY("Delete the selected controls; Esc clears the selection") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
@@ -696,7 +696,7 @@ namespace app
       { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Ruler"), "Click / Shift+drag", I18N_KEY("The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Generate Range"), "Alt+drag", I18N_KEY("Drag on the ruler with Alt held to mark the range Generate fills") },
-      { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / H", I18N_KEY("Select, Draw, Erase, Cut and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / H", I18N_KEY("Select, Draw, Erase, Blade and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Record MIDI"), "R", I18N_KEY("Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Mute Notes"), "0 / Keypad 0", I18N_KEY("Mute the selected notes, or the selected clips, or bring them back") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Copy / Cut / Paste Notes"), MODKEY "+C / " MODKEY "+X / " MODKEY "+V", I18N_KEY("Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original") },
@@ -722,7 +722,7 @@ namespace app
       { I18N_KEY("Field Patcher"), I18N_KEY("Copy / Cut / Paste Boxes"), MODKEY "+C / " MODKEY "+X / " MODKEY "+V", I18N_KEY("Copy or cut the selected boxes, or paste them") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Duplicate Boxes"), MODKEY "+D", I18N_KEY("Duplicate the selected boxes") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Select All Boxes"), MODKEY "+A", I18N_KEY("Select every box on the page") },
-      { I18N_KEY("Field Patcher"), I18N_KEY("Fit Page"), "Shift+Y", I18N_KEY("Frame every box on the page") },
+      { I18N_KEY("Field Patcher"), I18N_KEY("Fit Page"), "F / Shift+Y", I18N_KEY("Frame every box on the page") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
 
       // Curve Editor
@@ -752,7 +752,7 @@ namespace app
       // the canvas's own Cmd+C/V/D/G and Delete stand down meanwhile.
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Video Track"), "Shift+J", I18N_KEY("Add a new video track below the selected track. Every key in this section needs the timeline panel focused - click inside it first") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Audio Track"), "Shift+K", I18N_KEY("Add a new audio track below the selected track (Shift+K toggles the audio engine when the canvas has focus)") },
-      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Select All Clips"), "Shift+A", I18N_KEY("Select every clip on the timeline") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Select All Clips"), MODKEY "+A / Shift+A", I18N_KEY("Select every clip on the timeline") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Timeline Tools"), "A / P / T / R / Z / H", I18N_KEY("Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Copy / Paste Clips"), MODKEY "+C / " MODKEY "+V", I18N_KEY("Copy the selected clips; paste at the playhead on the last-clicked clip's lane") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Duplicate Clips"), MODKEY "+D / Shift+D", I18N_KEY("Copy the selected block right after itself (the same keys duplicate nodes when the canvas has focus)") },
@@ -832,7 +832,7 @@ namespace app
       { I18N_KEY("3D View"), I18N_KEY("Duplicate"), "Shift+D", I18N_KEY("Duplicate the selected items") },
       { I18N_KEY("3D View"), I18N_KEY("Remove"), "X / Delete / Backspace", I18N_KEY("Take the selected items out of the view; the nodes stay on the canvas") },
       { I18N_KEY("3D View"), I18N_KEY("Hide / Show"), "H / Shift+H / Alt+H", I18N_KEY("Hide the selection, hide everything else, show everything") },
-      { I18N_KEY("3D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / " MODKEY "+Alt+G", I18N_KEY("Group the selected items, or dissolve the group") },
+      { I18N_KEY("3D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / " MODKEY "+Shift+G", I18N_KEY("Group the selected items, or dissolve the group") },
       { I18N_KEY("3D View"), I18N_KEY("Rename Item"), "F2", I18N_KEY("Rename the selected item") },
       { I18N_KEY("3D View"), I18N_KEY("Frame"), "F / Home", I18N_KEY("F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan") },
       { I18N_KEY("3D View"), I18N_KEY("Pivot to 3D Cursor"), "Shift+Double-click", I18N_KEY("Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away") },
@@ -878,7 +878,7 @@ namespace app
       { I18N_KEY("Chat"), I18N_KEY("Pick @ or /"), "Up / Down, Return", I18N_KEY("Move through the node or command list, then take the highlighted one. Esc closes it") },
       { I18N_KEY("Chat"), I18N_KEY("Attach from Clipboard"), MODKEY "+V", I18N_KEY("Paste copied files or a copied picture into the message; copied text still pastes as text") },
       { I18N_KEY("Chat"), I18N_KEY("Close Picture"), "Esc", I18N_KEY("Close a picture opened full size") },
-      { I18N_KEY("Chat"), I18N_KEY("Copy / Clear Selection"), "Ctrl+C / Esc", I18N_KEY("Copy the selected words of a message, or drop the selection") },
+      { I18N_KEY("Chat"), I18N_KEY("Copy / Clear Selection"), MODKEY "+C / Esc", I18N_KEY("Copy the selected words of a message, or drop the selection") },
    };
 
    // The table as plain text for the agents (`infinite docs shortcuts`), English, this OS's keys.
@@ -898,31 +898,13 @@ namespace app
       return out;
    }
 
-   void DrawShortcutsWindow(bool* open)
+   void DrawShortcutsTableBody(const char* idPrefix)
    {
-      // Every other floating dialog (Settings, Field editor, colour picker)
-      // goes through PushElevatedPanelStyle - this one didn't, which is why
-      // it was the one window still carrying a different backdrop/border/
-      // rounding than the rest of the "material above the canvas" family.
-      // Centering on first appearance matches Settings for the same reason
-      // (see DrawSettingsWindow).
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
-      PushElevatedPanelStyle(/*isChild=*/false);
-      FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
-      const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
-      FormParts::PopWindowPad();
-      if (!shortcutsVisible)
-      {
-         ImGui::End();
-         PopElevatedPanelStyle();
-         return;
-      }
-
-      SectionCard::BeginWindow();
       FormParts::PushReferenceStyle();
       static char filterBuf[128] = "";
-      FormParts::SearchInput("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
+      char filterId[64];
+      snprintf(filterId, sizeof(filterId), "##%sfilter", idPrefix);
+      FormParts::SearchInput(filterId, "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
       ImGui::SameLine();
       if (filterBuf[0] != '\0' && FormParts::Button(L("Clear")))
          filterBuf[0] = '\0';
@@ -931,7 +913,6 @@ namespace app
       std::string filter = filterBuf;
       for (char& c : filter)
          c = (char)tolower((unsigned char)c);
-
 
       const char* lastCat = nullptr;
       bool inTable = false;
@@ -963,8 +944,8 @@ namespace app
 
          if (!inTable)
          {
-            char tableId[64];
-            snprintf(tableId, sizeof(tableId), "tbl_%s", s.category);
+            char tableId[96];
+            snprintf(tableId, sizeof(tableId), "%stbl_%s", idPrefix, s.category);
             if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
             {
                ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 150.0f);
@@ -1000,8 +981,33 @@ namespace app
       if (inTable)
          ImGui::EndTable();
 
-      SectionCard::EndWindow();
       FormParts::PopReferenceStyle();
+   }
+
+   void DrawShortcutsWindow(bool* open)
+   {
+      // Every other floating dialog (Settings, Field editor, colour picker)
+      // goes through PushElevatedPanelStyle - this one didn't, which is why
+      // it was the one window still carrying a different backdrop/border/
+      // rounding than the rest of the "material above the canvas" family.
+      // Centering on first appearance matches Settings for the same reason
+      // (see DrawSettingsWindow).
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
+      PushElevatedPanelStyle(/*isChild=*/false);
+      FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
+      const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
+      FormParts::PopWindowPad();
+      if (!shortcutsVisible)
+      {
+         ImGui::End();
+         PopElevatedPanelStyle();
+         return;
+      }
+
+      SectionCard::BeginWindow();
+      DrawShortcutsTableBody("win_");
+      SectionCard::EndWindow();
       FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();
@@ -1165,7 +1171,7 @@ namespace app
                { "Video In", I18N_KEY("Live camera or capture input through AVFoundation - pick a device and a resolution from the node. macOS asks for camera permission the first time. Frames arrive on the device's own clock, so this one source does not pause with the transport.") },
 #endif
                { "Audio Texture", I18N_KEY("Turns live audio into an image - scrolling spectrogram, waveform or level field - so any image effect downstream becomes an audio visualiser.") },
-               { "FieldPixel", I18N_KEY("An image generated by a Field kernel you write yourself: the per-pixel counterpart of Field Effect, compiled rather than interpreted.") },
+               { "Field Pixel", I18N_KEY("An image generated by a Field kernel you write yourself: the per-pixel counterpart of Field Effect, compiled rather than interpreted.") },
                { "Sketch", I18N_KEY("An image drawn by a JavaScript sketch you write: the loop-and-recursion counterpart of Field Pixel. Its param() calls become modulatable knobs, and it can load and animate an SVG.") },
             } },
             { "3D", {
@@ -1240,8 +1246,8 @@ namespace app
                { "MSEG", I18N_KEY("A drawn shape played over time: breakpoints with a bend per segment, tempo-synced, with a loop or sustain point and retrigger from the trig input.") },
                { "Voice Spread", I18N_KEY("A value per note of a chord, spread across low..high: linear, golden ratio, primes or alternate.") },
                { "Note Expression", I18N_KEY("Each note's own MPE pressure or slide, per voice into a synth knob.") },
-               { "Drift", I18N_KEY("Learns where you leave a knob and how you move it, then continues, settles and wanders like you. Shift-drag a driven knob to correct it.") },
-               { "Moves", I18N_KEY("Your Moves macro faders: few faders drive many parameters based on learned co-movement PCA.") },
+               { "Predictive LFO", I18N_KEY("Learns where you leave a knob and how you move it, then continues, settles and wanders like you. Shift-drag a driven knob to correct it.") },
+               { "Predictive Macro", I18N_KEY("Your predictive macro faders: few faders drive many parameters based on learned co-movement PCA.") },
                { "Predictive Modulator", I18N_KEY("Learns a small dynamical model of a single patched-in modulator, then free-runs it on its own once Learn stops.") },
             } },
             { "Macros", {
@@ -1266,7 +1272,7 @@ namespace app
 #endif
                { "NDI In", I18N_KEY("Receives any NDI video source on the network as an image - pick it from the list, which rescans in the background. Video only, no audio. Needs the free NDI runtime from ndi.video. NDI(R) is a registered trademark of Vizrt NDI AB.") },
                { "Audio In", I18N_KEY("Live input from an audio device - the input side of the same engine Audio Out feeds. Choose the device in Settings > Audio.") },
-               { "Field Graph", I18N_KEY("Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or FieldPixel.") },
+               { "Field Graph", I18N_KEY("Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or Field Pixel.") },
                { "Projection", I18N_KEY("Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target.") },
                { "OSC Receive", I18N_KEY("Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin. To drive the patch itself from a script or controller instead - set, query or listen to any param, add, remove or connect nodes - send OSC to 127.0.0.1:9100 (/infinite/node/<index>/<param>); no node needed.") },
                { "OSC Send", I18N_KEY("Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own.") },
@@ -1293,7 +1299,7 @@ namespace app
                { "Wind", I18N_KEY("Physically modelled wind: clarinet, sax, flute or brass, blown by the note; breath, tone, noise and vibrato shape it.") },
                { "Piano", I18N_KEY("Physically modelled grand, Rhodes and Wurlitzer: hammers on stretched strings and a soundboard, or on a tine or reed read by its pickup through an amp; hardness, tone, decay and stiffness shape it.") },
                { "FM", I18N_KEY("4-operator FM synth: 11 algorithms, ratio or fixed frequency, a level and ADSR per operator, and feedback on operator 4.") },
-               { "Sampler", I18N_KEY("High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback.") },
+               { "Sample Player", I18N_KEY("High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback.") },
                { "Generate Samples", I18N_KEY("A sample player that makes its own loop: a music style, a part (all, synths, pads, plucks, percussion, drums), a seed and a length render 1-8 bars on a background thread, loudness-matched, saved as a recipe and rendered again on reopen, or kept as a wav.") },
                { "Drum Sequencer", I18N_KEY("8-lane, up to 32-step pattern drum sequencer with a 141-groove library and bundled kit, individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, decay envelopes, and .mid pattern import (drop a file or use the My grooves folder).") },
               { "MPC", I18N_KEY("16-pad sample player: per-pad mode (one shot / gate / loop), sync (free or quantised to a division), volume, pitch, pan, speed, fine tune, fade in / out; polyphonic; pads playable by mouse, CV pin or note 36-51.") },
@@ -1303,16 +1309,16 @@ namespace app
                { "Wave Terrain", I18N_KEY("2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform.") },
                { "Spectral Synth", I18N_KEY("Image-to-spectral additive resynthesis, MetaSynth-style: any image, drawing or live video patched in is read as a spectrogram and rebuilt from 64-256 sine partials - X is time, Y is frequency, brightness is amplitude, and hue can become stereo position.") },
                { "Granular", I18N_KEY("Granular synthesis over a loaded or recorded sample: grain length and density set the texture, position/scan and freeze set where the cloud reads from, and the random position/length/pitch/pan controls plus reverse probability are what make it a cloud rather than a stutter.") },
-               { "PaulStretch", I18N_KEY("Extreme time-stretching built for factors where seconds become minutes of evolving ambient texture, via large-window FFT with phase randomisation, plus spectral pitch shift, frequency shift and unison detune.") },
+               { "Paul Stretch", I18N_KEY("Extreme time-stretching built for factors where seconds become minutes of evolving ambient texture, via large-window FFT with phase randomisation, plus spectral pitch shift, frequency shift and unison detune.") },
                { "Metallic", I18N_KEY("Physical modelling for struck and plucked metal - bells, gongs, bars, plates, chimes, tines, strings - via extended Karplus-Strong waveguides and inharmonic modal resonator banks.") },
                { "Oscillator", I18N_KEY("Four classic waveforms (sine, triangle, saw, square) with an interactive amp envelope, unison, filter, hard sync and fine/coarse tuning.") },
                { "Molder & Grain Molder", I18N_KEY("Molder decomposes a sample into tracked harmonic partials plus a real residual, then mutates a parameter genome and re-renders from it, each roll walking further from the last. Grain Molder rearranges grains along a blend between original position and a per-grain metric (level, brightness, random).") },
                { "Field Notes", I18N_KEY("A note node whose body is a Field script. The script runs per sample against the transport beat; note(pitch, vel, len) inside an if sends a note out (len in beats, 0 holds as long as the incoming note). tick(div) fires on each beat division, deg(d) is a scale degree under Root/Scale, rand() is 0..1. Wire it into any synth or MIDI-out. publish scalar output adds a modulator pin carrying whatever publish holds. Boxes opens it in the Field Patcher.") },
                { "Field Synth", I18N_KEY("A polyphonic synth whose voice is a Field kernel you write yourself, compiled to a sample-domain register machine - the note-driven counterpart of Field Effect.") },
             } },
-            { "AudioEffects", {
+            { "Audio Effects", {
                { "Audio Filter", I18N_KEY("Multi-mode filter: state-variable (LP12/24/36, HP), BP, Notch, Peak, comb, and driven ladder, MS-20 and diode models with self-oscillating resonance.") },
-               { "Dynamics", I18N_KEY("A compressor in four styles (clean, bus, opto, FET) with peak or RMS detection, threshold, ratio, attack, release, makeup and an external sidechain input, over a live static transfer curve. Limiter is its own separate node.") },
+               { "Compressor", I18N_KEY("A compressor in four styles (clean, bus, opto, FET) with peak or RMS detection, threshold, ratio, attack, release, makeup and an external sidechain input, over a live static transfer curve. Limiter is its own separate node.") },
                { "Delay & Reverb", I18N_KEY("Tempo-synced ping-pong / stereo bounce delay, feedback filters, high-density Feedback Delay Network (FDN) reverberator with predelay and damping.") },
                { "Stutter & Glitch", I18N_KEY("Beat-synced buffer repeater, freeze, reverse playback, and granular slice retriggering.") },
                { "Wavetable Shaper", I18N_KEY("Non-linear transfer curve distortion, saturation drive, bias, and anti-aliased oversampled waveshaping.") },

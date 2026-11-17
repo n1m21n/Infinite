@@ -605,7 +605,6 @@ bool NodeViewport::PickSurface(IGeometrySource* geo, const SharedViewportCamera&
    const Mesh& mesh = geo->GetMesh();
    if (mesh.indices.size() < 3)
       return false;
-   const Mat4 model = geo->GetModelMatrix();
    const float aspect = (float)w / (float)h;
    const float az = cam.azimuth * 3.14159265f / 180.0f, el = cam.elevation * 3.14159265f / 180.0f;
    const float ce = std::cos(el);

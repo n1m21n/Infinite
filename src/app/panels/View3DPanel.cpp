@@ -55,7 +55,6 @@ ImVec2 gView3DRectMin, gView3DRectMax;
 
 namespace
 {
-   constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kPi = 3.14159265f;
    constexpr float kFov = 45.0f;
@@ -322,7 +321,6 @@ namespace
       ed::SetCurrentEditor(gEditor);
       // Only a new selection moves it, so the panel's own scene picker holds while a node stays selected.
       static uint64_t sFollowed = 0;
-      static uint64_t sLastNode = 0;
       uint64_t selected = 0, anyNode = 0;
       for (GraphNode& gn : gNodes)
          if (ed::IsNodeSelected(gn.NodeId()))
@@ -330,7 +328,7 @@ namespace
             anyNode = gn.uid;
             break;
          }
-      sLastNode = anyNode;
+      (void)anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
          {
@@ -2220,8 +2218,8 @@ namespace
          const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
          rigSelected = it != nullptr && PoseModel(*it, world) != nullptr;
       }
-      if (MenuParts::Item(T("Pose Mode"), rigSelected ? MODKEY "+Tab" : nullptr, sPose.on, any || sPose.on)) TogglePose(scene);
-      if (MenuParts::Item(T("Sculpt Mode"), rigSelected ? nullptr : MODKEY "+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
+      if (MenuParts::Item(T("Pose Mode"), rigSelected ? "Ctrl+Tab" : nullptr, sPose.on, any || sPose.on)) TogglePose(scene);
+      if (MenuParts::Item(T("Sculpt Mode"), rigSelected ? nullptr : "Ctrl+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
       if (MenuParts::Item(T("Edit Mode"), "Tab", sEdit.on, any || sEdit.on)) ToggleEdit(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
       if (MenuParts::Item(T("Clear IK"), "Alt+I", false, sPose.on)) PoseIk(scene, true);
@@ -2409,7 +2407,7 @@ namespace
       }
       if (io.KeyShift && !command && pressed(ImGuiKey_B))
          sZoomArmed = true;
-      if (command && !io.KeyShift && pressed(ImGuiKey_Tab))
+      if (io.KeyCtrl && !io.KeySuper && !io.KeyShift && pressed(ImGuiKey_Tab))   // Ctrl on every OS: Cmd+Tab is the macOS app switcher
       {
          // A rig poses; anything else sculpts.
          Mat4 world;
@@ -2444,7 +2442,7 @@ namespace
       if (command && pressed(ImGuiKey_GraveAccent))
          sOverlays = !sOverlays;
       if (command && pressed(ImGuiKey_G))
-         GroupSelected(scene, !io.KeyAlt);
+         GroupSelected(scene, !(io.KeyShift || io.KeyAlt));
       if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_C))
          sCopiedScene = scene->SceneText();
       if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_V) && !sCopiedScene.empty())
@@ -3287,7 +3285,7 @@ namespace
       if (!hovered || io.WantTextInput)
          return true;
       const bool command = io.KeyCtrl || io.KeySuper;
-      if ((command && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
+      if ((io.KeyCtrl && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
       {
          sPose = {};
          return true;
@@ -3631,7 +3629,7 @@ namespace
       if (sSculpt.stroking || !hovered || io.WantTextInput)
          return true;
       const bool command = io.KeyCtrl || io.KeySuper;
-      if ((command && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
+      if ((io.KeyCtrl && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
       {
          sSculpt.on = false;
          return true;
@@ -6264,7 +6262,7 @@ namespace
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          sListActive = listHovered;
       if (count > 0)
-         ImGui::EndChild();
+         EndChildSafe();
       if ((listHovered || sListActive) && sRename == 0 && !io.WantTextInput && !sSel.empty())
       {
          const bool command = io.KeyCtrl || io.KeySuper;
@@ -7841,7 +7839,7 @@ namespace
    void EndCardColumn()
    {
       SectionCard::EndWindow();
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    void DrawSide(Scene3DNode* scene, float panelW)
@@ -7914,7 +7912,7 @@ namespace
       else DrawViewTab(scene, availW);
       EndCardColumn();
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    void DrawAddItems(Scene3DNode* scene)
@@ -8023,7 +8021,7 @@ namespace
                if (const Item* it = scene->FindItem(id); it != nullptr && it->group != 0)
                   grouped = true;
             if (sSel.size() > 1 && MenuParts::Item(T("Group"), MODKEY "+G")) GroupSelected(scene, true);
-            if (grouped && MenuParts::Item(T("Ungroup"), MODKEY "+Alt+G")) GroupSelected(scene, false);
+            if (grouped && MenuParts::Item(T("Ungroup"), MODKEY "+Shift+G")) GroupSelected(scene, false);
             if (one != nullptr && MenuParts::SubMenu(T("Source"), true))
             {
                for (GraphNode* gn : SourceChoices(scene, *one))
@@ -8424,6 +8422,57 @@ bool View3DNavProbe(float out[18])
                    sNavProbe.hovered ? 1.0f : 0.0f, (float)sNavProbe.active, (float)sSel.size() };
    std::copy(v, v + 18, out);
    return ImGui::GetFrameCount() - sNavProbe.frame <= 2;
+}
+
+// Menu-alive test (MenuAliveTests.cpp): open the right-click menu on the selection or on empty space, and a print of
+// everything a menu item can change (scene, settings, selection, view, tool, modes, copy buffers, rename, requests).
+// Undo depth is left out: an item that only pushes a checkpoint has not done anything.
+void View3DTestOpenMenu(bool onItem)
+{
+   Scene3DNode* scene = FindScene();
+   if (onItem && sSel.empty() && scene != nullptr && !scene->Items().empty())
+      sSel = { scene->Items().front().id };
+   sMenuOnItem = onItem;
+   sOpenMenu = true;
+}
+
+void View3DTestPose()
+{
+   Scene3DNode* scene = FindScene();
+   if (scene == nullptr || scene->Items().empty())
+      return;
+   Item& it = scene->Items().front();
+   const float pos[3] = { 1.0f, 0.5f, -0.75f }, rot[3] = { 20.0f, 35.0f, 10.0f }, sc[3] = { 1.5f, 1.25f, 0.8f };
+   std::copy(pos, pos + 3, it.pos);
+   std::copy(rot, rot + 3, it.rot);
+   std::copy(sc, sc + 3, it.scale);
+   scene->Commit();
+   const float cur[3] = { -0.6f, 0.3f, 0.45f };
+   std::copy(cur, cur + 3, sSet->cursor);
+}
+
+std::string View3DTestFingerprint()
+{
+   std::string f;
+   char b[512];
+   if (Scene3DNode* scene = FindScene())
+   {
+      scene->Serialize();
+      f += scene->SceneText();
+   }
+   for (int id : sSel)
+      f += " sel" + std::to_string(id);
+   for (int id : sLocal)
+      f += " loc" + std::to_string(id);
+   snprintf(b, sizeof b, " sh%d cv%d gr%d or%d tab%d side%d tool%d selm%d ov%d az%.4f el%.4f d%.4f t%.4f,%.4f,%.4f roll%.3f view%d "
+                         "pend%d ren%d copy%zu copyscene%zu buf%zu nodes%zu req%d,%d edit%d pose%d,%d sculpt%d rulers%zu lock%d,%d",
+            (int)sShading, sCameraView, sGrid, sOrtho, sTab, sSideOpen, sTool, sSelMode, sOverlays, sAz, sEl, sDist,
+            sTarget[0], sTarget[1], sTarget[2], sRoll, sViewName, (int)sPending.what, sRename, sCopiedItems.size(),
+            sCopiedScene.size(), sBuffer.size(), gNodes.size(), gRequestSelectNodeIndex, gRequestFitViewNodeIndex,
+            sEdit.on ? 1 : 0, sPose.on ? 1 : 0, sPose.paint ? 1 : 0, sSculpt.on ? 1 : 0, sRulers.size(), sLockCam ? 1 : 0,
+            sLockActive ? 1 : 0);
+   f += b;
+   return f;
 }
 
 void View3DAddCamera()

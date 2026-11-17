@@ -6,6 +6,7 @@
 #include "dsp/PortableFft.h"
 #endif
 #include "gl3.h"
+#include "platform/AppPaths.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -287,7 +288,6 @@ void ImageAnalyzeNode::Analyze()
    double sumR = 0, sumG = 0, sumB = 0, sumA = 0, sumLum = 0, sumLum2 = 0, sumSat = 0;
    double weightedX = 0, weightedY = 0, weightTotal = 0, motion = 0;
    double sampleWeightTotal = 0.0;
-   const int count = size * size;
 
    const float pu = std::clamp(probeU, 0.0f, 1.0f);
    const float pv = std::clamp(probeV, 0.0f, 1.0f);
@@ -1333,8 +1333,7 @@ bool AudioFileNode::OpenFromDecoded(const std::string& path, Platform::SampleBuf
    mAudioNode->PushParams(volume, gain, attack, release, loop, monitor, pitch);
    mAudioNode->RequestRestart();
 
-   const size_t slash = path.find_last_of('/');
-   mFileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   mFileName = AppPaths::FsPath(path).filename().u8string();
    mFilePath = path;
    mStatus = "loaded";
    mLoaded = true;

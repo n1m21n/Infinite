@@ -104,15 +104,7 @@ namespace app
       }
 #endif
    }
-#if defined(__APPLE__)
-
    constexpr const char* kPatchExtension = ".inf";
-#endif
-#if defined(__APPLE__)
-#else
-
-   constexpr const char* kPatchExtension = ".infinite";
-#endif
 
 
    void SavePatchInteractive(bool forceDialog)

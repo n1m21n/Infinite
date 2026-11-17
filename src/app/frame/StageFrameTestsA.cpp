@@ -11,6 +11,7 @@ void RunEditMeshRefineTest(int frameId);
 void RunFurTest(int frameId);
 void RunView3DPivotTest(int frameId);
 void RunPageMenuTest(int frameId, GLFWwindow* window);
+void RunMenuAliveTest(int frameId, GLFWwindow* window);
 
 void DrawFrameTestsA(FrameCtx& fc)
 {
@@ -2017,6 +2018,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunView2DTest();
       if (getenv("INFINITE_PAGEMENUTEST") != nullptr)
          RunPageMenuTest(frameId, window);
+      if (getenv("INFINITE_MENUALIVETEST") != nullptr)
+         RunMenuAliveTest(frameId, window);
       if (getenv("INFINITE_VIEW3DNAVTEST") != nullptr)
          RunView3DNavTest(frameId);
       if (getenv("INFINITE_VIEW3DEDITTEST") != nullptr)

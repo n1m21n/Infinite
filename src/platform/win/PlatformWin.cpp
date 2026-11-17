@@ -485,7 +485,7 @@ namespace Platform
       std::string err;
       return RunSaveDialog(L"Save Patch",
                            {
-                              { L"Infinite patch", L"*.infinite" },
+                              { L"Infinite patch", L"*.inf" },
                            },
                            suggestedName, err);
    }
@@ -1247,7 +1247,7 @@ namespace Platform
       out.selfTemporary = StrStrIW(self.c_str(), L"\\AppData\\Local\\Temp\\") != nullptr;
       wchar_t exe[MAX_PATH * 2] = {};
       DWORD len = (DWORD)(sizeof(exe) / sizeof(exe[0]));
-      if (FAILED(AssocQueryStringW(ASSOCF_INIT_IGNOREUNKNOWN, ASSOCSTR_EXECUTABLE, L".infinite", L"open", exe, &len)))
+      if (FAILED(AssocQueryStringW(ASSOCF_INIT_IGNOREUNKNOWN, ASSOCSTR_EXECUTABLE, L".inf", L"open", exe, &len)))
          return true;   // nothing registered
       const std::wstring opener(exe);
       out.opener = WinCommon::WideToUtf8(opener);
@@ -1279,7 +1279,8 @@ namespace Platform
       }
       // Per user, no admin prompt: HKCU\Software\Classes overrides HKLM for this account only.
       const std::wstring exe = WinCommon::Utf8ToWide(current.self);
-      const bool ok = SetUserKey(L".infinite", L"Infinite.Patch") && SetUserKey(L"Infinite.Patch", L"Infinite patch") &&
+      const bool ok = SetUserKey(L".inf", L"Infinite.Patch") && SetUserKey(L".infinite", L"Infinite.Patch") &&
+                      SetUserKey(L"Infinite.Patch", L"Infinite patch") &&
                       SetUserKey(L"Infinite.Patch\\DefaultIcon", L"\"" + exe + L"\",0") &&
                       SetUserKey(L"Infinite.Patch\\shell\\open\\command", L"\"" + exe + L"\" \"%1\"");
       SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
@@ -1292,7 +1293,7 @@ namespace Platform
       if (!QueryPatchOpener(after) || !after.isSelf)
       {
          // UserChoice (an "Always use this app" pick) is hash-protected and outranks the ProgId on purpose.
-         outError = "Windows keeps your own choice for .infinite files. Right-click a patch > Open with > "
+         outError = "Windows keeps your own choice for .inf files. Right-click a patch > Open with > "
                     "Choose another app > this Infinite.exe > Always.";
          return false;
       }

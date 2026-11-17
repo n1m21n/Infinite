@@ -2,6 +2,7 @@
 // A3 is the shell (five docks, persist, the "Enable Mixer Audio" chip). A4 is the console: page
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
+#include "app/ui/design/components/ColourChip.h"
 #include "app/frame/CanvasLink.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PagePicker.h"
@@ -93,18 +94,14 @@ namespace app
       constexpr float kStripW = 92.0f; // control width inside a strip
       constexpr float kStripFaceW = 112.0f; // a strip's full width: wide, fixed, the console scrolls
       constexpr float kStripGap = 4.0f;
-      constexpr float kRenderW = 196.0f;
                   constexpr float kButtonsH = tok::control_h;
       constexpr float kRowGap = 4.0f;
-      constexpr float kStripMaxH = 520.0f;
       constexpr float kMinFaderH = 40.0f;
       constexpr int kMaxGroupDepth = 4;
       constexpr float kSendH = 18.0f;     // §4.2 sends row: four mini knobs between name and trim
       constexpr float kSendKnobD = 13.0f;
-      constexpr float kReturnGap = 14.0f; // returns sit in their own section right of the strips
       constexpr int kInsertRows = 3;      // §4.2 inserts: chips, the last row holds "+"
       constexpr float kInsertRowH = 14.0f;
-      constexpr float kInsertsH = kInsertRows * kInsertRowH + (kInsertRows - 1) * 1.0f;
 
       struct Page { int outIndex; int topIndex; uint64_t topUid; };
 
@@ -521,20 +518,20 @@ namespace app
             }
             if (MenuParts::SubMenu(T("Colour")))
             {
+               ImU32 dots[12];
+               int cur = -1;
                for (int i = 0; i < 12; i++)
                {
-                  ImGui::PushID(i);
-                  if (i % 6 != 0)
-                     ImGui::SameLine(0.0f, 4.0f);
                   const unsigned c = kPalette[i];
-                  if (ImGui::ColorButton("##c", ImVec4((float)((c >> 16) & 0xFF) / 255.0f, (float)((c >> 8) & 0xFF) / 255.0f, (float)(c & 0xFF) / 255.0f, 1.0f),
-                                         ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoAlpha, ImVec2(18.0f, 18.0f)))
-                  {
-                     PushUndoCheckpoint("Channel colour");
-                     m->chColor[r.slot] = c;
-                     ImGui::CloseCurrentPopup();
-                  }
-                  ImGui::PopID();
+                  dots[i] = IM_COL32((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, 0xFF);
+                  if (m->chColor[r.slot] == c)
+                     cur = i;
+               }
+               if (const int pick = ColourChip::Dots(dots, nullptr, 12, cur, 6); pick >= 0)
+               {
+                  PushUndoCheckpoint("Channel colour");
+                  m->chColor[r.slot] = kPalette[pick];
+                  ImGui::CloseCurrentPopup();
                }
                if (MenuParts::Item(T("Auto"), nullptr, m->chColor[r.slot] == 0))
                {
@@ -694,7 +691,7 @@ namespace app
             MenuParts::EndPopup();
          }
          dl->PushClipRect(ImVec2(p.x + 11.0f, p.y), ImVec2(q.x - 2.0f, q.y), true);
-         dl->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f, ImVec2(p.x + 12.0f, p.y + 1.0f),
+         dl->AddText(ImGui::GetFont(), UiType::Px(UiType::Size::Caption), ImVec2(p.x + 12.0f, p.y + 1.0f),
                      ImGui::GetColorU32(off ? ImGuiCol_TextDisabled : ImGuiCol_Text), name.c_str());
          dl->PopClipRect();
          ImGui::PopID();
@@ -712,7 +709,7 @@ namespace app
             ImGui::InvisibleButton("##shared", ImVec2(w, kInsertRowH));
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Shared chain: edit it on the canvas"));
-            dl->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f, ImVec2(x + 3.0f, p.y + 1.0f),
+            dl->AddText(ImGui::GetFont(), UiType::Px(UiType::Size::Caption), ImVec2(x + 3.0f, p.y + 1.0f),
                         ImGui::GetColorU32(ImGuiCol_TextDisabled), T("Shared"));
             return;
          }
@@ -890,7 +887,7 @@ namespace app
          dl->AddCircle(c, cr, Lo(170), 24, 1.0f);
          dl->AddLine(ImVec2(c.x + cosf(ang) * 2.0f, c.y + sinf(ang) * 2.0f), ImVec2(c.x + cosf(ang) * (cr - 0.5f), c.y + sinf(ang) * (cr - 0.5f)),
                      col, 2.2f);
-         const float fs = ImGui::GetFontSize() * 0.72f;
+         const float fs = UiType::Px(UiType::Size::Caption);
          const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, tag).x;
          dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (cellW - tw) * 0.5f, p.y + kPotD + 3.0f), Ink(140), tag);
          return changed;
@@ -935,7 +932,7 @@ namespace app
          // scale
          static const float kMarks[] = { 12.0f, 0.0f, -10.0f, -20.0f, -30.0f, -60.0f };
          static const char* kLabels[] = { "+12", "0", "10", "20", "30", "-60" };
-         const float fs = ImGui::GetFontSize() * 0.68f;
+         const float fs = UiType::Px(UiType::Size::Caption);
          for (int i = 0; i < 6; i++)
          {
             const float y = bottom - pos01(kMarks[i]) * (bottom - top);
@@ -992,7 +989,7 @@ namespace app
             dl->AddRect(p, q, Ink(70), 3.0f);
          char num[8];
          snprintf(num, sizeof(num), "%d", number);
-         const float nfs = ImGui::GetFontSize() * 0.78f;
+         const float nfs = UiType::Px(UiType::Size::Caption);
          if (number > 0)
             dl->AddText(ImGui::GetFont(), nfs, ImVec2(p.x + 4.0f, p.y + 7.0f), Tint(col, app::IsThemeLight() ? 0.7f : 1.25f), num);
          const ImVec2 ts = ImGui::CalcTextSize(name);
@@ -1181,7 +1178,7 @@ namespace app
                HelpTip("%s", T("True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset."));
             const char* tags[4] = { "TP", "M", "S", "I" };
             const float vals[4] = { m->TruePeakDb(), m->LoudnessMomentary(), m->LoudnessShort(), m->LoudnessIntegrated() };
-            const float fs = ImGui::GetFontSize() * 0.78f;
+            const float fs = UiType::Px(UiType::Size::Caption);
             const float rowH = dispH * 0.5f;
             for (int i = 0; i < 4; i++)
             {
@@ -1448,7 +1445,7 @@ namespace app
                gMixerStripsMin = wmn;
                gMixerStripsMax = ImVec2(wmn.x + ImGui::GetWindowWidth(), wmn.y + ImGui::GetWindowHeight());
             }
-            ImGui::EndChild();
+            EndChildSafe();
             gMixerPanelStripCount = (int)strips.size();
             const ImVec2 masterAt(bodyMax.x - stripW, bodyMin.y);
             DrawMaster(ImGui::GetWindowDrawList(), masterAt, stripW, colH, page.topIndex);
@@ -2178,7 +2175,7 @@ namespace app
       // Zeroed only around EndChild so no ItemSpacing strip shows between this panel and the next row.
       const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-      ImGui::EndChild();
+      EndChildSafe();
       ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 

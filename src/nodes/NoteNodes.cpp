@@ -2733,7 +2733,7 @@ public:
          }
          else
          {
-            if (VoiceInfo* info = mSourceSlot.Find(e.voiceId))
+            if (mSourceSlot.Find(e.voiceId) != nullptr)
             {
                NoteEvent out = e;
                out.source = this;

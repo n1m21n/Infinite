@@ -7,7 +7,6 @@ void DrawPresent(FrameCtx& fc)
 {
    auto& window = fc.window;
    auto& frameId = fc.frameId;
-   auto& now = fc.now;
 
       // The projectors timer above has closed, so this frame's record is complete.
       if (sTailProjIntervalMs > 0.0)

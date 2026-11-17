@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "audio/AudioBuffer.h"
+#include "platform/AppPaths.h"
 #include "audio/AudioNode.h"
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
@@ -875,8 +876,7 @@ bool SlicerNode::LoadFile(const std::string& path)
       return false;
    }
 
-   const size_t slash = path.find_last_of('/');
-   const std::string fileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   const std::string fileName = AppPaths::FsPath(path).filename().u8string();
    FinishBuffer(decoded, fileName, path, "loaded");
    return true;
 }

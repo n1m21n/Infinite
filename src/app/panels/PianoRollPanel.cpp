@@ -50,7 +50,6 @@ namespace
    constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
    constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
    constexpr double kMinPxPerTick = 0.002, kMaxPxPerTick = 2.0;
-   constexpr int kPaletteSize = 12;
    using Arrange::Tick;
 
    // One note as it lands on the timeline: looped clips show every pass, the first pass is the note itself.
@@ -208,7 +207,7 @@ namespace
       return l.noteNodeUid != 0 ? FindNodeByUid(l.noteNodeUid) : nullptr;
    }
 
-   std::string NodeLabel(const GraphNode& gn)
+   [[maybe_unused]] std::string NodeLabel(const GraphNode& gn)
    {
       auto* n = dynamic_cast<PianoRollNode*>(gn.node.get());
       if (n != nullptr && !n->laneName.empty())
@@ -836,7 +835,7 @@ namespace
          s.tool = Tool::Draw;
       if (MenuParts::Item(L("Erase"), "E", s.tool == Tool::Erase))
          s.tool = Tool::Erase;
-      if (MenuParts::Item(L("Cut"), "B", s.tool == Tool::Blade))
+      if (MenuParts::Item(L("Blade"), "B", s.tool == Tool::Blade))
          s.tool = Tool::Blade;
       if (MenuParts::Item(L("Mute"), nullptr, s.tool == Tool::Mute))
          s.tool = Tool::Mute;
@@ -1016,7 +1015,7 @@ namespace
       return q.num == 0 ? GridOrBeatSixteenth() : (Tick)((int64_t)Arrange::kTicksPerBar * q.num / q.den);
    }
 
-   const char* QuantLabel()
+   [[maybe_unused]] const char* QuantLabel()
    {
       const QuantChoice& q = kQuant[std::clamp(S().quantIdx, 0, kQuantCount - 1)];
       return q.num == 0 ? T("Grid") : T(q.label);
@@ -2844,7 +2843,7 @@ namespace
       SectionCard::EndWindow();
       s.inspectorHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // The clip a take lands on and whose takes show: the one selected, or the one under the playhead.
@@ -3694,14 +3693,16 @@ void DrawPianoRollDocked(const char* id, const ImVec2& size)
    }
    else
       in.b = 0.0f;
+   PushDockedPanelStyle(/*isChild=*/true);
    PanelFrame::BeginCard("##pianopanelcontent", cardSize, in);
+   PopDockedPanelStyle();
    DrawPanel();
    PanelFrame::EndCard();
    if (!gripFirst)
       grip();
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 }

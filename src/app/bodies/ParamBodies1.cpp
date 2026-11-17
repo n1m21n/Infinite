@@ -8,6 +8,7 @@
 #include "app/ui/design/components/StepCell.h"
 #include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -68,10 +69,7 @@ namespace app
       }
       else if (!n->LoadedPath().empty())
       {
-         std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
-         if (slash != std::string::npos)
-            file = file.substr(slash + 1);
+         const std::string file = AppPaths::FsPath(n->LoadedPath()).filename().u8string();
          PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("%s  (%dx%d)", file.c_str(), n->GetOutputWidth(), n->GetOutputHeight());
          PopTextWrapWidth();
@@ -326,10 +324,7 @@ namespace app
       }
       else if (!n->LoadedPath().empty())
       {
-         std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
-         if (slash != std::string::npos)
-            file = file.substr(slash + 1);
+         const std::string file = AppPaths::FsPath(n->LoadedPath()).filename().u8string();
          PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("%s  (%dx%d)", file.c_str(), n->GetOutputWidth(), n->GetOutputHeight());
          PopTextWrapWidth();
@@ -518,10 +513,7 @@ namespace app
       }
       else if (!n->LoadedPath().empty())
       {
-         std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
-         if (slash != std::string::npos)
-            file = file.substr(slash + 1);
+         const std::string file = AppPaths::FsPath(n->LoadedPath()).filename().u8string();
          PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("%s", file.c_str());
          PopTextWrapWidth();
@@ -1832,7 +1824,6 @@ namespace app
       const float btnW = (kMacroWideCell - (count - 1) * gap) / (float)count;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
 
-      const bool isLight = IsThemeLight();
       for (int b = 0; b < count; b++)
       {
          ImGui::SetCursorScreenPos(ImVec2(origin.x + b * (btnW + gap), origin.y));
@@ -1870,7 +1861,6 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
       const int playStep = n->CurrentStep();
 
       for (int s = 0; s < 8; s++)

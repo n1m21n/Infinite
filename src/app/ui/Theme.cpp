@@ -9,9 +9,9 @@ namespace app
    // half of kParamWidth minus a 4px gutter, so two of these plus
    // ImGui::SameLine's default spacing sit inside the same node body width
    // a full-width ModSlider already uses.
-   const float kCompactParamWidth = 82.0f;
+   [[maybe_unused]] const float kCompactParamWidth = 82.0f;
 
-   const float kAudioHalfWidth = 214.0f;
+   [[maybe_unused]] const float kAudioHalfWidth = 214.0f;
 
    // Mixer needs a wider body than the standard 440: with 8 strips, cellW =
    // gAudioContentW / MixerNode::kSlots must leave room for both a 56px knob
@@ -20,7 +20,7 @@ namespace app
    // => body >= 768. 800 is the smallest round number above that floor -
    // don't shrink this back toward 440, the pin-clamp bug it fixes re-engages
    // below 768.
-   const float kAudioMixerWidth = 800.0f;
+   [[maybe_unused]] const float kAudioMixerWidth = 800.0f;
  // generous click target - small dots were unhittable
 
    bool IsThemeLight()
@@ -188,7 +188,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::dropdown_active, isLight));
       ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::dropdown_text, isLight));
       ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
@@ -245,7 +245,7 @@ namespace app
       // pushing this unconditionally is harmless for them - kept
       // unconditional (rather than gated on isChild) so the push/pop count
       // here stays a fixed constant regardless of which path runs.
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, isChild ? ImGui::GetStyle().WindowRounding : 12.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, isChild ? ImGui::GetStyle().WindowRounding : tok::radius_container);
    }
 
 
@@ -275,7 +275,6 @@ namespace app
    void PushDockedPanelStyle(bool isChild)
    {
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
-      const bool isLight = IsThemeLight();
       // Opaque: at 0.97 the bright chat text behind Settings read through as ghost lines.
       const ImVec4 bg = ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f);
       ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);

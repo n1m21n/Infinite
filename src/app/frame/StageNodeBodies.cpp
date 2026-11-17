@@ -39,7 +39,6 @@ void DrawNodeBodies(FrameCtx& fc)
    // Every envelope panel publishes its rect here each frame (PublishWtTestRect), not only the
    // Wavetable body that clears it, so a patch with no Wavetable grew it forever (~1 MB/min).
    gWtTestRects.clear();
-   ImGuiIO& io = ImGui::GetIO();
    auto& frameId = fc.frameId;
    auto& benchB6Stages = fc.benchB6Stages;
    auto& benchStagesSample = fc.benchStagesSample;
@@ -188,7 +187,7 @@ void DrawNodeBodies(FrameCtx& fc)
             ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
             ed::PushStyleVar(ed::StyleVar_NodePadding, ImVec4(0, 0, 0, 0));
             ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 0.0f);
-            ed::PushStyleVar(ed::StyleVar_NodeRounding, 6.0f);
+            ed::PushStyleVar(ed::StyleVar_NodeRounding, tok::radius_control);
          }
          else
          {
@@ -1615,9 +1614,7 @@ void DrawNodeBodies(FrameCtx& fc)
       }
 
       fc.timerLinks.emplace((benchB6Stages && benchStagesCpuSample) ? &sStageLinks : nullptr, Bench::FrameTail::kLinks);
-   auto& timerLinks = *fc.timerLinks;
       fc.timerLinksGpu.emplace((benchB6Stages && benchStagesSample) ? &sGpuTimerRing : nullptr, "links", frameId);
-   auto& timerLinksGpu = *fc.timerLinksGpu;
 
       // ---- draw existing links ----
       // Link ids are derived from the destination pin id (kLinkIdBase +

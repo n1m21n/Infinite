@@ -1251,7 +1251,6 @@ private:
       v.velocity = velocity;
       v.bend = bendSemitones;
       v.age = mNextAge++;
-      const float targetHz = NoteToHz((float)note);
       if (fresh)
       {
          // A new note starts its phase where the engine's `phase` param says,

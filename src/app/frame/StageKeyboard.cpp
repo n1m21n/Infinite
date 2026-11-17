@@ -27,6 +27,27 @@ void DrawKeyboard(FrameCtx& fc)
    auto& typing = fc.typing;
    auto& cmdOrCtrl = fc.cmdOrCtrl;
 
+      // Compute panel focus flags before any key handler runs so a click or
+      // panel close in the previous/current layout step takes effect this frame.
+      if (!gPerfPanelOpen)
+      {
+         gPerfMatrixClaimedKeys = false;
+         gPerfMatrixFocused = false;
+      }
+      else
+      {
+         gPerfMatrixFocused = gPerfMatrixClaimedKeys && gPerfEditMode;
+      }
+
+      if (!gArrangePanelOpen)
+         gArrangeClaimedKeys = false;
+      if (!gSessionPanelOpen)
+         gSessionClaimedKeys = false;
+      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
+                        (gCurveEditorOpen && gCurveEditorClaimedKeys) || (gDrumPanelOpen && gDrumClaimedKeys) ||
+                        (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
+
 
       // "/" drops a comment under the pointer and puts the caret straight into
       // it, so annotating a patch is one keystroke and then typing. Not gated on
@@ -62,7 +83,7 @@ void DrawKeyboard(FrameCtx& fc)
       // Space toggles play/pause on the transport, mirroring the Play/Pause
       // button, so the timeline can be started or paused without reaching
       // for the mouse.
-      if (!typing && !cmdOrCtrl && !io.KeyShift &&
+      if (!typing && !cmdOrCtrl && !io.KeyShift && !(gView2DOpen && gView2DClaimedKeys) &&
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
          LaunchRequestTogglePlay();
 
@@ -245,8 +266,8 @@ void DrawKeyboard(FrameCtx& fc)
       // (DrawArrangePanelContent's own keyboard block), a different action
       // that must not also pop the canvas node picker open underneath it.
       const bool doAddNode = gRequestAddNode ||
-         (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) && gCommentEdit.target == nullptr &&
-          ImGui::IsKeyPressed(ImGuiKey_N, false));
+         (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) && (!gArrangeFocused || searchPopupOpen) &&
+          gCommentEdit.target == nullptr && ImGui::IsKeyPressed(ImGuiKey_N, false));
       gRequestAddNode = false;
       if (doAddNode)
       {
@@ -361,33 +382,6 @@ void DrawKeyboard(FrameCtx& fc)
             }
          }
       }
-
-      // gPerfMatrixFocused: the performance matrix is in edit mode and has
-      // keyboard focus, so these keys belong to its controls, not to the graph.
-      // It is set from the matrix window, which draws later in the frame than
-      // this block, so a closed matrix would otherwise keep the last value it
-      // wrote.
-      if (!gPerfPanelOpen)
-      {
-         gPerfMatrixClaimedKeys = false;
-         gPerfMatrixFocused = false;
-      }
-      else
-      {
-         gPerfMatrixFocused = gPerfMatrixClaimedKeys && gPerfEditMode;
-      }
-
-      // Arrangement Timeline focus guard: when arrangement timeline owns the
-      // keyboard focus, keystrokes (Delete, Backspace, Cmd+C, Cmd+V, Cmd+D)
-      // belong strictly to the timeline clips, not the graph canvas.
-      if (!gArrangePanelOpen)
-         gArrangeClaimedKeys = false;
-      if (!gSessionPanelOpen)
-         gSessionClaimedKeys = false;
-      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && (gView3DClaimedKeys || gView3DDock == 4)) || (gView2DOpen && (gView2DClaimedKeys || gView2DDock == 4)) || (gMixerPanelOpen && gMixerClaimedKeys) ||
-                        (gCurveEditorOpen && gCurveEditorClaimedKeys) || (gDrumPanelOpen && gDrumClaimedKeys) ||
-                        (gFieldPatcherOpen && gFieldPatcherClaimedKeys);
 
       bool doDelete = gRequestDelete ||
          (!typing && !gPerfMatrixFocused && !gArrangeFocused && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||

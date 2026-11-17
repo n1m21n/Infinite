@@ -414,6 +414,12 @@ namespace Field
             }
             case IRStmtKind::DeclAttrib:
             case IRStmtKind::DeclState:
+            case IRStmtKind::DeclOutput:
+            case IRStmtKind::DeclInput:
+            case IRStmtKind::Emit:
+            case IRStmtKind::Connect:
+            case IRStmtKind::SetParam:
+            case IRStmtKind::Place:
                break;
          }
       }

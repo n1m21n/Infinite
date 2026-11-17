@@ -27,7 +27,7 @@
   "src/app/panels/FieldPatcherPanel.cpp": 3,
   "src/app/panels/HelpWindows.cpp": 2,
   "src/app/panels/LibraryPanels.cpp": 6,
-  "src/app/panels/MixerPanel.cpp": 5,
+  "src/app/panels/MixerPanel.cpp": 3,
   "src/app/panels/MixerRender.cpp": 1,
   "src/app/panels/ModMatrixPanel.cpp": 13,
   "src/app/panels/PerfPanel.cpp": 10,
@@ -53,7 +53,6 @@
   "src/app/bodies/SamplerBodies.cpp": 1,
   "src/app/bodies/VmpcBody.cpp": 1,
   "src/app/frame/StageNodeBodies.cpp": 3,
-  "src/app/frame/StagePopupsB.cpp": 1,
   "src/app/graph/PatchLoad.cpp": 2,
   "src/app/graph/Wiring.cpp": 1,
   "src/app/panels/ArrangePanel.cpp": 17,
@@ -62,14 +61,13 @@
   "src/app/panels/DrumPanel.cpp": 9,
   "src/app/panels/FieldPatcherPanel.cpp": 1,
   "src/app/panels/Minimap.cpp": 4,
-  "src/app/panels/MixerPanel.cpp": 18,
+  "src/app/panels/MixerPanel.cpp": 17,
   "src/app/panels/ModMatrixPanel.cpp": 3,
   "src/app/panels/PerfPanel.cpp": 7,
   "src/app/panels/PianoRollPanel.cpp": 1,
   "src/app/panels/SampleStudioPanel.cpp": 4,
   "src/app/panels/TerminalPanel.cpp": 3,
-  "src/app/panels/View2DPanel.cpp": 5,
-  "src/app/panels/View3DPanel.cpp": 1,
+  "src/app/panels/View2DPanel.cpp": 4,
   "src/app/panels/ViewportPanel.cpp": 3,
   "src/app/ui/ParamWidgets.cpp": 1,
   "src/app/ui/design/components/CheckBox.h": 1,
@@ -85,5 +83,11 @@
   "src/app/ui/design/components/TimeRuler.h": 1,
   "src/app/ui/design/components/TransportDisplay.h": 1,
   "src/app/ui/design/components/VFader.h": 3
+ },
+ "font_scales": {},
+ "roundings": {},
+ "popups": {
+  "src/app/frame/StagePopupsB.cpp": 1,
+  "src/app/panels/ArrangePanel.cpp": 1
  }
 }

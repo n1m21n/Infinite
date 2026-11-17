@@ -951,7 +951,6 @@ bool RunEngineTest()
       auto A = [&](int x) { return -2.0 + 4.5 * U(x); };
       auto B = [&](int y) { return -1.5 + 4.0 * U(y); };
       const double C = 0.3;
-      auto fr = [](double x) { return x - std::floor(x); };
 
       // Shade Math
       {

@@ -327,7 +327,7 @@ namespace chat
       }
       if (w.empty())
          return std::string();
-      auto base = [](const std::string& t) { const size_t s = t.find_last_of('/'); return s == std::string::npos ? t : t.substr(s + 1); };
+      auto base = [](const std::string& t) { const std::string f = AppPaths::FsPath(t).filename().u8string(); return f.empty() ? t : f; };
       auto arg = [&](size_t i) { return i < w.size() ? w[i] : std::string(); };
       auto mark = [&](bool e) { if (edits != nullptr) *edits = e; };
       const std::string tool = base(w[0]);

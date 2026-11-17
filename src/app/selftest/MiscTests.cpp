@@ -555,7 +555,7 @@ bool RunBrowserSortTest()
          SampleScanner::Entry e;
          e.path = path;
          e.folderRoot = "/lib";
-         e.fileName = path.substr(path.find_last_of('/') + 1);
+         e.fileName = AppPaths::FsPath(path).filename().u8string();
          e.fileNameLower = e.fileName;
          std::transform(e.fileNameLower.begin(), e.fileNameLower.end(), e.fileNameLower.begin(), ::tolower);
          e.extension = "wav";

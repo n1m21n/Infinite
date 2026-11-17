@@ -14,6 +14,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/IconTile.h"
+#include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -723,19 +724,35 @@ namespace
          gFieldPatcherOpen = false;
    }
 
+   void DrawDockMenu()
+   {
+      const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + ChipButton::Height() + tok::space_3);
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+          ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+         ImGui::OpenPopup("##fpDockMenu");
+      if (MenuParts::BeginPopup("##fpDockMenu"))
+      {
+         DockItem();
+         MenuParts::EndPopup();
+      }
+   }
+
    // Boxes only: paste, select all and the dock live on keys and the strip.
    bool PickMenu(Page& p, Host& h, ImVec2 at, int fromPin, int family)
    {
       State& s = S();
       bool added = false;
-      ImGui::SetNextItemWidth(150.0f);
+      // The canvas node search's look: the same search field, a separator, families as submenus until you type,
+      // then one row per match with its Field word where the canvas shows the category.
       if (ImGui::IsWindowAppearing())
       {
          s.search[0] = 0; // a stale query from last time would open on an empty list
          ImGui::SetKeyboardFocusHere();
       }
-      FieldWell::InputTextWithHint("##fpSearch", T("Box name or Field word"), s.search, sizeof(s.search));
-      const bool enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+      ImGui::Dummy(ImVec2(260.0f, 0.0f));
+      LibraryParts::SearchField("fpSearch", T("Search boxes"), s.search, sizeof(s.search));
+      const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+      MenuParts::Separator();
       const uint32_t mask = MaskOf(p, h);
       std::vector<const Field::BoxSpec*> list = Field::FindBoxSpecsByQuery(s.search, 0);
 
@@ -758,34 +775,50 @@ namespace
          ImGui::CloseCurrentPopup();
       };
 
+      auto row = [&](const Field::BoxSpec& spec) {
+         const bool runs = (spec.hostMask & mask) != 0;
+         const std::string label = std::string(T(spec.label.c_str())) + "##" + spec.id;
+         const char* word = spec.fieldWord != spec.label ? spec.fieldWord.c_str() : nullptr;
+         if (MenuParts::Item(label.c_str(), word, false, runs))
+            place(spec);
+      };
+      auto listed = [&](const Field::BoxSpec& spec) {
+         return (family < 0 || (int)spec.family == family) && spec.id != "assign_var" && spec.id != "ident";
+      };
       // The list scrolls in a window of about ten rows, so the menu never runs off the screen.
       const float rowH = ImGui::GetTextLineHeightWithSpacing() + 4.0f;
       ImGui::BeginChild("##fpPickList", ImVec2(260.0f, rowH * 10.0f), false);
-      bool first = true;
-      for (const Field::BoxSpec* spec : list)
+      if (s.search[0] == 0 && family < 0)
       {
-         if (family >= 0 && (int)spec->family != family)
-            continue;
-         if (spec->id == "assign_var" || spec->id == "ident")
-            continue;
-         const bool runs = (spec->hostMask & mask) != 0;
-         if (enter && first && runs && !added)
+         for (int f = 0; f < (int)Field::BoxFamily::Count && !added; f++)
          {
-            place(*spec);
-            break;
-         }
-         first = false;
-         std::string row = std::string(T(spec->label.c_str()));
-         if (spec->fieldWord != spec->label)
-            row += "   " + spec->fieldWord;
-         row += "##" + spec->id;
-         if (MenuParts::Item(row.c_str(), nullptr, false, runs))
-         {
-            place(*spec);
-            break;
+            if (!MenuParts::SubMenu(T(Field::BoxFamilyName((Field::BoxFamily)f))))
+               continue;
+            for (const Field::BoxSpec* spec : list)
+               if ((int)spec->family == f && listed(*spec) && !added)
+                  row(*spec);
+            ImGui::EndMenu();
          }
       }
-      ImGui::EndChild();
+      else
+      {
+         int shown = 0;
+         for (const Field::BoxSpec* spec : list)
+         {
+            if (!listed(*spec) || added)
+               continue;
+            if (enter && shown == 0 && (spec->hostMask & mask) != 0)
+            {
+               place(*spec);
+               break;
+            }
+            ++shown;
+            row(*spec);
+         }
+         if (shown == 0 && !added)
+            ImGui::TextDisabled("%s", T("No matches"));
+      }
+      EndChildSafe();
 
       return added;
    }
@@ -1057,8 +1090,9 @@ namespace
          }
          else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
             ed::ClearSelection();
-         else if (io.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_Y, false))
-            ed::NavigateToContent(0.2f); // Shift+Y fits the view, as on the main canvas
+         else if ((!cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F, false)) ||
+                  (io.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_Y, false)))
+            ed::NavigateToContent(0.2f); // F / Shift+Y fits the view, as on the main canvas
       }
 
       ed::Suspend();
@@ -1214,7 +1248,7 @@ namespace
             s.railFamily = -1;
          ImGui::PopID();
       }
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // ---- inspector: Code and Box
@@ -1315,7 +1349,7 @@ namespace
          }
       }
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // ---- scratch export (§8.10)
@@ -1410,7 +1444,7 @@ namespace
    }
 
    // One strip-high text line: the text sits on the chips' centre line, not on their top edge.
-   void RowText(const char* fmt, ...) IM_FMTARGS(1);
+   [[maybe_unused]] void RowText(const char* fmt, ...) IM_FMTARGS(1);
    void RowText(const char* fmt, ...)
    {
       char buf[512];
@@ -1505,32 +1539,35 @@ namespace
          }
          MenuParts::EndPopup();
       }
+      // The free strip, then Pin and Pop Out pinned at the right end like every panel's view toggles.
       FormParts::Inline(0.0f, tok::space_1);
-      if (Page* fp = Front())
-      {
-         // Pin: the front page stays put when the canvas selection changes.
-         if (IconTile::Draw("##fpPin", IconsInfinite::Lock, IconsInfinite::Lock, fp->pinned, ChipButton::Height()))
-            fp->pinned = !fp->pinned;
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", fp->pinned ? T("Unpin page") : T("Pin page"));
-         FormParts::Inline(0.0f, tok::space_1);
-      }
-      if (IconTile::Draw("##fpMax", IconsInfinite::PopOut, IconsInfinite::PopOut, gFieldPatcherMaximised, ChipButton::Height()))
-         gFieldPatcherMaximised = !gFieldPatcherMaximised;
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Maximise (Esc returns)"));
-      // The free strip to the right: right-click for the dock switch.
-      FormParts::Inline(0.0f, tok::space_1);
-      const float freeW = ImGui::GetContentRegionAvail().x;
+      const float tile = ChipButton::Height();
+      Page* fp = Front();
+      const float tailW = (fp != nullptr ? tile + tok::space_1 : 0.0f) + tile;
+      const float freeW = ImGui::GetContentRegionAvail().x - tailW - tok::space_1;
       if (freeW > 8.0f)
       {
-         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, ChipButton::Height()));
+         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, tile));
          if (MenuParts::BeginContextItem("##fpStripMenu"))
          {
             DockItem();
             MenuParts::EndPopup();
          }
+         FormParts::Inline(0.0f, tok::space_1);
       }
+      if (fp != nullptr)
+      {
+         // Pin: the front page stays put when the canvas selection changes.
+         if (IconTile::Draw("##fpPin", IconsInfinite::Lock, IconsInfinite::Lock, fp->pinned, tile))
+            fp->pinned = !fp->pinned;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", fp->pinned ? T("Unpin page") : T("Pin page"));
+         FormParts::Inline(0.0f, tok::space_1);
+      }
+      if (IconTile::Draw("##fpMax", IconsInfinite::PopOut, IconsInfinite::PopOut, gFieldPatcherMaximised, tile))
+         gFieldPatcherMaximised = !gFieldPatcherMaximised;
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Maximise (Esc returns)"));
    }
 
    void DrawFooter(Page& p, Host& h)
@@ -1654,6 +1691,7 @@ namespace
       PrunePages();
       FollowCanvasSelection();
       DrawStrip();
+      DrawDockMenu();
       Page* p = Front();
       if (p == nullptr)
       {
@@ -1675,7 +1713,7 @@ namespace
       const float canvasW = std::max(80.0f, avail.x - tok::control_h - inspW - 2.0f * gap);
       ImGui::BeginChild("##fpCanvasWrap", ImVec2(canvasW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawCanvas(*p, h, ImVec2(canvasW, bodyH));
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::Inline(0.0f, gap);
       DrawInspector(*p, h, ImVec2(inspW, bodyH));
       DrawFooter(*p, h);
@@ -1827,14 +1865,16 @@ void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
       in.t = 0.0f;
    else
       in.b = 0.0f;
+   PushDockedPanelStyle(/*isChild=*/true);
    PanelFrame::BeginCard("##fpcontent", cardSize, in, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+   PopDockedPanelStyle();
    DrawPanel();
    PanelFrame::EndCard();
    if (!gripFirst && !gFieldPatcherMaximised)
       grip();
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 }

@@ -45,7 +45,7 @@ namespace CodeBlock
       const char* tip = nullptr;
       if (ImGui::IsItemHovered())
          tip = sCopied == ImGui::GetItemID() && ImGui::GetTime() - sCopiedAt < 1.5 ? I18n::T("Copied") : I18n::T("Copy");
-      ImGui::EndChild();
+      EndChildSafe();
       if (tip != nullptr)
          ImGui::SetTooltip("%s", tip);
       ImGui::PopStyleVar(2);

@@ -1523,9 +1523,6 @@ bool RunMovementLogTest()
    mod.ClearFrameParams();
 
    // Frame 0..119 simulation
-   int handWriteCount = 0;
-   int modWriteCount = 0;
-
    for (int f = 0; f < 120; f++)
    {
       double t = f * (1.0 / 60.0);
@@ -1544,7 +1541,6 @@ bool RunMovementLogTest()
          mod.RegisterParam(ref);
       }
       NoteWriter(0, 0, Source::Hand);
-      handWriteCount++;
 
       // Modulator driven param (node 0, param 1)
       modVal = std::sin(f * 0.1f) * 0.5f + 0.5f;
@@ -1559,7 +1555,6 @@ bool RunMovementLogTest()
          mod.RegisterParam(ref);
       }
       NoteWriter(0, 1, Source::Modulator);
-      modWriteCount++;
 
       // Two same-named params on one node
       {
@@ -1595,7 +1590,6 @@ bool RunMovementLogTest()
    // Check that .mlog was compressed into .mlog.z
    bool foundZ = false;
    std::string zPath;
-   uint64_t compSize = 0;
    for (const auto& entry : std::filesystem::directory_iterator(testDir, ec))
    {
       if (entry.path().extension() == ".z" &&
@@ -1603,7 +1597,6 @@ bool RunMovementLogTest()
       {
          foundZ = true;
          zPath = entry.path().string();
-         compSize = entry.file_size(ec);
          break;
       }
    }

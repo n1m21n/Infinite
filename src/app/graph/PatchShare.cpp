@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "core/Notices.h"
 #include "core/ShareBundle.h"
 #include "core/SplashScreen.h"
@@ -217,7 +218,7 @@ namespace app
          ImGui::OpenPopup("##sharepatch");
          gSharePatch.justOpened = false;
       }
-      if (ImGui::BeginPopup("##sharepatch"))
+      if (MenuParts::BeginPopup("##sharepatch"))
       {
          ImGui::TextDisabled("%s", T("Share patch as:"));
          ImGui::SetNextItemWidth(260.0f);
@@ -255,7 +256,7 @@ namespace app
                ImGui::CloseCurrentPopup();
             }
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       if (gShareJob.finished.exchange(false))

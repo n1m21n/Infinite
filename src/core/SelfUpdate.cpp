@@ -61,7 +61,7 @@ namespace
    }
 
    // Windows release zip: every entry under Infinite/. Unpacks to `dest`, returns dest/Infinite.
-   bool Unzip(const std::string& zipPath, const std::string& dest, std::string& outDir, std::string& err)
+   [[maybe_unused]] bool Unzip(const std::string& zipPath, const std::string& dest, std::string& outDir, std::string& err)
    {
       mz_zip_archive zip;
       memset(&zip, 0, sizeof(zip));
@@ -139,7 +139,7 @@ void Start()
       fs::remove_all(AppPaths::FsPath(dir), ec);
       if (!AppPaths::EnsureDir(dir))
          return Set(Stage::Failed, "Could not create " + dir + ".");
-      const std::string name = url.substr(url.find_last_of('/') + 1);
+      const std::string name = AppPaths::FsPath(url).filename().u8string();
       const std::string file = dir + "/" + (name.empty() ? std::string("download") : name);
       std::string err;
       const bool got = Platform::HttpDownload(url, std::string("Infinite/") + INFINITE_VERSION_STRING, file,

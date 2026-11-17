@@ -832,6 +832,14 @@ namespace Field
                   EmitExpr(stmt->expr);
                   break;
                }
+
+               case IRStmtKind::DeclOutput:
+               case IRStmtKind::DeclInput:
+               case IRStmtKind::Emit:
+               case IRStmtKind::Connect:
+               case IRStmtKind::SetParam:
+               case IRStmtKind::Place:
+                  break;
             }
          }
       };

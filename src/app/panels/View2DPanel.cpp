@@ -75,7 +75,6 @@ namespace
    bool OpenLayeredFile(const std::string& path, ImVec2 at);   // PSD or ORA as a new document
    void ExportLayered(Scene2DNode* doc, const char* ext);
 
-   constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kIconW = tok::control_h;   // icon chips are square, one panel chip
    inline float SideChip() { return PanelKit::Chip(); }   // the side panel's chips: one control tall at its density
@@ -118,7 +117,7 @@ namespace
              t == kRedEye || t == kInpaint;
    }
    bool BrushTool(int t) { return t == kBrush || t == kEraser || t == kMixer || t == kSelBrush || RetouchTool(t); }
-   bool PaintTool(int t) { return BrushTool(t) || t == kFill || t == kGradient; }
+   [[maybe_unused]] bool PaintTool(int t) { return BrushTool(t) || t == kFill || t == kGradient; }
    bool PixelTool(int t) { return (t >= kBrush && t <= kWand) || (t >= kGradient && t != kPerspective && t != kStylePick); }
 
    // Paint tools. The brush and the eraser keep their own settings.
@@ -154,6 +153,11 @@ namespace
    bool sCloneAll = false;         // clone / heal: copy from the whole picture
    bool sGradReverse = false;      // gradient runs background to foreground
    double sCloneAsk = -10.0;       // clone stamp pressed without a source: a canvas note says how to set one
+   double sGroupPickAsk = -10.0;   // eraser/retouch on an empty/locked group: a canvas note says "Pick a layer"
+   struct GroupStrokePt { float x = 0.0f, y = 0.0f, p = 1.0f; };
+   std::vector<int> sGroupStrokeIds;
+   std::vector<GroupStrokePt> sGroupStrokePts;
+   BrushEngine::Brush sGroupStrokeBrush;
    bool sMeshNearest = false;      // mesh warp: nearest-neighbour resampling (off: bilinear)
    bool sObjSoft = false;          // object selection: feathered edge
    bool sRadiusAbs = true;         // shape radius in px (off: % of the short side)
@@ -306,7 +310,6 @@ namespace
       ed::EditorContext* prev = ed::GetCurrentEditor();
       ed::SetCurrentEditor(gEditor);
       static uint64_t sFollowed = 0;
-      static uint64_t sLastNode = 0;
       uint64_t selected = 0, anyNode = 0;
       for (GraphNode& gn : gNodes)
          if (ed::IsNodeSelected(gn.NodeId()))
@@ -314,7 +317,7 @@ namespace
             anyNode = gn.uid;
             break;
          }
-      sLastNode = anyNode;
+      (void)anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene2DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
          {
@@ -1004,7 +1007,7 @@ namespace
    // Field widths by content class (plan §3): S numbers, M short words, L labelled sliders and names.
    constexpr float kWellS = 56.0f, kWellM = 72.0f, kWellL = 110.0f;
    float sFieldW = 160.0f;
-   constexpr float kLabelW = 84.0f;
+   constexpr float kLabelW = tok::label_w;
    float sLabelW = kLabelW;   // the More.. forms widen it for their longer names
 
    // rowH > 0: centred on a row of chips that tall (chips are not frames, so frame padding would sit it high).
@@ -1915,7 +1918,7 @@ namespace
       return text.size() >= n && text.compare(text.size() - n, n, tail) == 0;
    }
 
-   int sAuditDialogs = 0;   // UI audit: native dialogs it asked for (and did not open)
+   [[maybe_unused]] int sAuditDialogs = 0;   // UI audit: native dialogs it asked for (and did not open)
    bool AuditNoDialog()
    {
 #ifdef IMGUI_ENABLE_TEST_ENGINE
@@ -2223,7 +2226,6 @@ namespace
          ClearOrFill(doc, alt ? 1 : 2);
       else if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
       {
-         const Layer* a = Active(doc);
          if (SelectionActsOnPixels(doc))
             ClearOrFill(doc, 0);
          else
@@ -2502,7 +2504,7 @@ namespace
    }
    void LoadBrushes()
    {
-      std::ifstream in(BrushFile());
+      std::ifstream in(AppPaths::FsPath(BrushFile()));
       std::string line;
       while (std::getline(in, line))
       {
@@ -2541,7 +2543,7 @@ namespace
       last = now;
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::AppSupportDir(), ec);
-      std::ofstream(BrushFile()) << now;
+      std::ofstream(AppPaths::FsPath(BrushFile())) << now;
    }
 
    void InitBrushes()
@@ -2995,6 +2997,62 @@ namespace
       if (!painter && !doc->quickMask)
       {
          Layer* a = Active(doc);
+         if (a != nullptr && a->kind == Kind::Group && !sEditMask)
+         {
+            std::vector<int> targets;
+            for (const Layer& l : doc->Layers())
+               if (l.kind == Kind::Paint && doc->IsInside(l.id, a->id) && doc->Shown(l) &&
+                   (l.lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) == 0)
+                  targets.push_back(l.id);
+            if (targets.empty())
+            {
+               sGroupPickAsk = ImGui::GetTime();
+               return;
+            }
+            PushUndoCheckpoint(sTool == kEraser ? "Erase" : "Retouch");
+            BrushEngine::Brush b = ToolBrush();
+            if (spotHeal)
+               b.mode = BrushEngine::kInpaint;
+            if (sTool == kColourReplace || sTool == kBgErase)
+            {
+               float k[3] = { 0, 0, 0 };
+               if (doc->Pick(at.x, at.y, k, 1, sAllLayers ? 0 : targets[0]))
+                  std::copy(k, k + 3, b.key);
+            }
+            if (cloning)
+            {
+               if (!sCloneOffsetSet || !sCloneAligned)
+               {
+                  sCloneOffset = ImVec2(sCloneSrc.x - at.x, sCloneSrc.y - at.y);
+                  sCloneAnchor = at;
+                  sCloneOffsetSet = true;
+               }
+               b.sourceOffset[0] = sCloneOffset.x;
+               b.sourceOffset[1] = sCloneOffset.y;
+               b.sourceAnchor[0] = sCloneAnchor.x;
+               b.sourceAnchor[1] = sCloneAnchor.y;
+               b.sampleAll = sCloneAll;
+            }
+            const ImVec2 from = line && sHaveLast ? sLastPaint : at;
+            const float pen = PenNow();
+            if (!doc->BeginPaint(targets[0], 0, b, from.x, from.y, pen))
+               return;
+            sOp = Op();
+            sOp.kind = 7;
+            sOp.docStart = at;
+            sGroupStrokeIds.assign(targets.begin() + 1, targets.end());
+            sGroupStrokePts.clear();
+            if (!sGroupStrokeIds.empty())
+            {
+               sGroupStrokeBrush = b;
+               sGroupStrokePts.push_back({ from.x, from.y, pen });
+               if (line && sHaveLast)
+                  sGroupStrokePts.push_back({ at.x, at.y, pen });
+            }
+            if (line && sHaveLast)
+               doc->PaintTo(at.x, at.y, pen);
+            return;
+         }
          const bool live = a != nullptr && (a->kind == Kind::Node || a->kind == Kind::Text || a->kind == Kind::Vector) &&
                            !(a->kind == Kind::Node && a->HasSkin());
          if (live && !sEditMask && sTool == kEraser)
@@ -3115,6 +3173,20 @@ namespace
       sSurfaceStroke = false;
       if (doc->Painting())
          doc->EndPaint();
+      if (!sGroupStrokeIds.empty() && !sGroupStrokePts.empty())
+      {
+         for (int gid : sGroupStrokeIds)
+         {
+            if (doc->BeginPaint(gid, 0, sGroupStrokeBrush, sGroupStrokePts[0].x, sGroupStrokePts[0].y, sGroupStrokePts[0].p))
+            {
+               for (size_t i = 1; i < sGroupStrokePts.size(); ++i)
+                  doc->PaintTo(sGroupStrokePts[i].x, sGroupStrokePts[i].y, sGroupStrokePts[i].p);
+               doc->EndPaint();
+            }
+         }
+      }
+      sGroupStrokeIds.clear();
+      sGroupStrokePts.clear();
       sLastPaint = sMouseDoc;
       sHaveLast = true;
    }
@@ -3186,7 +3258,7 @@ namespace
       }
       else if (id > 0 && target == 0)
          doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sAllLayers);
-         NoteColourUsed(sFg);
+      NoteColourUsed(sFg);
    }
 
    void GradientTo(Scene2DNode* doc, ImVec2 a, ImVec2 b)
@@ -4015,6 +4087,13 @@ namespace
       if (sTool == kClone && ImGui::GetTime() - sCloneAsk < 2.5)
       {
          const char* t = T("Alt-click to set the source");
+         const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
+         dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
+         dl->AddText(at, ink, t);
+      }
+      if (ImGui::GetTime() - sGroupPickAsk < 2.5)
+      {
+         const char* t = T("Pick a layer");
          const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
@@ -6336,7 +6415,10 @@ namespace
             {
                if (sTool == kBrush)
                   doc->PaintFollow(sBrush);
-               doc->PaintTo(sMouseDoc.x, sMouseDoc.y, PenNow());
+               const float pen = PenNow();
+               doc->PaintTo(sMouseDoc.x, sMouseDoc.y, pen);
+               if (!sGroupStrokeIds.empty())
+                  sGroupStrokePts.push_back({ sMouseDoc.x, sMouseDoc.y, pen });
                NotePenSample(sMouseDoc);
             }
          }
@@ -7960,7 +8042,7 @@ namespace
                if (ImGui::IsItemHovered())
                   hovered = &f;
             }
-         ImGui::EndChild();
+         EndChildSafe();
          MenuParts::Separator();
          std::string added;
          bool add = false;
@@ -8315,7 +8397,7 @@ namespace
       dl->AddRectFilled(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), tok::U32(tok::canvas_shade));
       dl->AddRect(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), edge);
       for (int i = 0; i < 2; i++)
-         if (ImGui::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
+         if (MenuParts::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
          {
             float* col = i == 0 ? sFg : sBg;
             ImGui::ColorPicker3("##pick", col, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview);
@@ -8349,7 +8431,7 @@ namespace
                sw.erase(sw.begin() + removed);
                SetSwatches(sw);
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
    }
 
@@ -8506,11 +8588,11 @@ namespace
          ImGui::OpenPopup("##v2dtoolpick");
       DrawToolPicker();
       ImGui::PopStyleVar();
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    // Text centred on the chip row, so labels share the chips' centre line.
-   void RowLabel(const char* text)
+   [[maybe_unused]] void RowLabel(const char* text)
    {
       const float y = ImGui::GetCursorPosY();
       ImGui::SetCursorPosY(y + (sRowH - ImGui::GetTextLineHeight()) * 0.5f);
@@ -8844,7 +8926,7 @@ namespace
          const ImGuiID before = ImGui::GetItemID();
          DrawContextBar(doc);
          sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
-         ImGui::EndChild();
+         EndChildSafe();
          FormParts::Inline(0.0f, tok::space_1);
          if (TextChip(L("More..##v2dmore"), false, T("The rest of the bar")))
             ImGui::OpenPopup("##v2dbarmore");
@@ -8999,7 +9081,7 @@ namespace
                                 tok::U32(tok::label_green), tok::U32(tok::label_blue), tok::U32(tok::label_violet),
                                 tok::U32(tok::label_grey) };
 
-   int CountRows(Scene2DNode* doc, int parent)
+   [[maybe_unused]] int CountRows(Scene2DNode* doc, int parent)
    {
       int n = 0;
       for (int id : doc->ChildrenOf(parent))
@@ -9404,7 +9486,7 @@ namespace
          }
          ImGui::EndDragDropTarget();
       }
-      ImGui::EndChild();
+      EndChildSafe();
       // The strip under the list, as in every layers panel, centred under it.
       const float footW = 9 * sChip + 8 * tok::space_1;
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
@@ -10274,7 +10356,7 @@ namespace
       {
          std::error_code ec;
          std::filesystem::create_directories(EffPresetDir(), ec);
-         std::ofstream f(EffPresetDir() + "/" + name + ".inf2dfx");
+         std::ofstream f(AppPaths::FsPath(EffPresetDir() + "/" + name + ".inf2dfx"));
          f << Scene2DNode::EffectsText(l) << "\n--params\n" << EffectParamsText(l);
       }
       std::vector<std::string> files;
@@ -10293,7 +10375,7 @@ namespace
          pick = shown - 1;
       if (pick < 0)
          return;
-      std::ifstream f(EffPresetDir() + "/" + files[(size_t)pick] + ".inf2dfx");
+      std::ifstream f(AppPaths::FsPath(EffPresetDir() + "/" + files[(size_t)pick] + ".inf2dfx"));
       std::stringstream ss;
       ss << f.rdbuf();
       std::string text = ss.str(), params;
@@ -10545,7 +10627,7 @@ namespace
       {
          std::error_code ec;
          std::filesystem::create_directories(StylePresetDir(), ec);
-         std::ofstream(StylePresetDir() + "/" + name + ".inf2dstyle") << Scene2DNode::StyleText(l);
+         std::ofstream(AppPaths::FsPath(StylePresetDir() + "/" + name + ".inf2dstyle")) << Scene2DNode::StyleText(l);
       }
       std::vector<std::string> files;
       std::error_code ec;
@@ -10560,7 +10642,7 @@ namespace
       int shown = 0;
       if (!ComboRow(T("Apply"), &shown, names) || shown <= 0)
          return;
-      std::ifstream f(StylePresetDir() + "/" + files[(size_t)shown - 1] + ".inf2dstyle");
+      std::ifstream f(AppPaths::FsPath(StylePresetDir() + "/" + files[(size_t)shown - 1] + ".inf2dstyle"));
       std::stringstream ss;
       ss << f.rdbuf();
       Layer got = l;
@@ -10973,7 +11055,7 @@ namespace
          const float roomH = ImGui::GetContentRegionAvail().y;
          DrawLayersCard(doc, availW, std::max(3.0f * (kRowH + 1.0f), roomH - 4.0f));
          ImGui::PopStyleVar();
-         ImGui::EndChild();
+         EndChildSafe();
       }
       else
       {
@@ -10995,10 +11077,10 @@ namespace
          ImGui::Dummy(ImVec2(0.0f, tok::space_5));   // room under the last card so a scroll never ends on the edge
          ImGui::PopStyleVar(2);
          SectionCard::EndWindow();
-         ImGui::EndChild();
+         EndChildSafe();
       }
       compact.End(); // before the child closes: the pushes were made inside it
-      ImGui::EndChild();
+      EndChildSafe();
       sChip = tok::control_h;   // the compact scope is still alive here: back to the regular chip explicitly
       sLabelW = kLabelW;
    }
@@ -11624,7 +11706,7 @@ static bool ImportSvgInto(Scene2DNode* doc, const std::string& path)
 {
    if (doc == nullptr)
       return false;
-   std::ifstream f(path, std::ios::binary);
+   std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
    if (!f)
       return false;
    const std::string svg((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
@@ -13238,6 +13320,45 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("a document switch drops crop, text edit and drag", !sCropOn && sTextEdit == 0 && sOp.kind == 0);
       doc->RemoveLayer(id);
       doc->Commit();
+
+      // Eraser on a group acts on every paint layer inside it in one undo step,
+      // and on an empty group shows the "Pick a layer" note.
+      {
+         const int ga = doc->AddPaintLayer();
+         const int gb = doc->AddPaintLayer();
+         BrushEngine::Brush fill;
+         fill.size = 80.0f;
+         fill.color[0] = 0.9f;
+         if (doc->BeginPaint(ga, 0, fill, W * 0.5f, H * 0.5f, 1.0f))
+            doc->EndPaint();
+         if (doc->BeginPaint(gb, 0, fill, W * 0.5f, H * 0.5f, 1.0f))
+            doc->EndPaint();
+         const int grp = doc->GroupLayers({ ga, gb });
+         doc->Commit();
+         SelectOnly(grp);
+         const std::vector<uint8_t> beforeGrp = picture(doc);
+         const size_t u0Grp = gUndoStack.size();
+         const int prevTool = sTool;
+         sTool = kEraser;
+         BeginStroke(doc, ImVec2(W * 0.5f, H * 0.5f), false);
+         EndStroke(doc);
+         const std::vector<uint8_t> afterGrp = picture(doc);
+         expect("eraser on a group changes pixels", afterGrp != beforeGrp);
+         expect("eraser on a group pushes one undo step", gUndoStack.size() == u0Grp + 1);
+         Undo();
+         doc = FindDoc();
+         expect("eraser on a group undoes in one step", doc != nullptr && picture(doc) == beforeGrp);
+         doc->RemoveLayer(grp);
+         const int emptyGrp = doc->AddLayer(Kind::Group, 0).id;
+         doc->Commit();
+         SelectOnly(emptyGrp);
+         sGroupPickAsk = -10.0;
+         BeginStroke(doc, ImVec2(W * 0.5f, H * 0.5f), false);
+         expect("eraser on an empty group sets Pick a layer note", ImGui::GetTime() - sGroupPickAsk < 1.0);
+         sTool = prevTool;
+         doc->RemoveLayer(emptyGrp);
+         doc->Commit();
+      }
    }
    return fails;
 }
@@ -13250,7 +13371,7 @@ static std::string UserFontList()
 
 void LoadUserFonts()
 {
-   std::ifstream in(UserFontList());
+   std::ifstream in(AppPaths::FsPath(UserFontList()));
    std::string line, fam;
    while (std::getline(in, line))
       if (!line.empty())
@@ -13263,7 +13384,7 @@ bool AddUserFont(const std::string& path, std::string& family)
       return false;
    std::vector<std::string> have;
    {
-      std::ifstream in(UserFontList());
+      std::ifstream in(AppPaths::FsPath(UserFontList()));
       std::string line;
       while (std::getline(in, line))
          if (!line.empty())
@@ -13271,7 +13392,7 @@ bool AddUserFont(const std::string& path, std::string& family)
    }
    if (std::find(have.begin(), have.end(), path) == have.end())
    {
-      std::ofstream out(UserFontList(), std::ios::app);
+      std::ofstream out(AppPaths::FsPath(UserFontList()), std::ios::app);
       out << path << "\n";
    }
    return true;
@@ -14149,7 +14270,7 @@ void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height,
          FormParts::Inline();
       grip();
    }
-   ImGui::EndChild();
+   EndChildSafe();
 }
 
 void DrawView2DDocked(const char* id, const ImVec2& size)

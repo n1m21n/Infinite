@@ -7,6 +7,7 @@
 #include <cfloat>
 #include <cstring>
 #include <string>
+#include <vector>
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiAnim.h"
@@ -65,6 +66,40 @@ namespace MenuParts
 
    // A shortcut ends flush with the row's right text inset, mirroring the label's left inset; ImGui still sizes
    // the popup for it. A checked row keeps ImGui's own column so the check never lands on the shortcut.
+   // Self-test probe (MenuAliveTests.cpp, dev builds): every row drawn inside a MenuParts popup, with the popup's id,
+   // its submenu depth and its rect, so a test can open each submenu and click each item.
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+   struct ProbeRow
+   {
+      std::string root, label;
+      int depth = 0;
+      bool sub = false, enabled = true;
+      ImVec2 mn, mx;
+      int frame = 0;
+   };
+   inline std::vector<ProbeRow>& ProbeRows() { static std::vector<ProbeRow> v; return v; }
+   inline std::string& ProbeRoot() { static std::string s; return s; }
+   inline int ProbeDepth(ImGuiWindow* w)
+   {
+      int d = 0;
+      for (; w != nullptr && (w->Flags & ImGuiWindowFlags_ChildMenu); w = w->ParentWindow)
+         d++;
+      return d;
+   }
+   inline void ProbeNote(const char* label, bool sub, bool enabled, ImGuiWindow* w)
+   {
+      if (ProbeRoot().empty())
+         return;
+      auto& v = ProbeRows();
+      const int f = ImGui::GetFrameCount();
+      if (!v.empty() && v.back().frame != f)
+         v.erase(std::remove_if(v.begin(), v.end(), [f](const ProbeRow& r) { return r.frame < f - 1; }), v.end());
+      v.push_back({ ProbeRoot(), label, ProbeDepth(w), sub, enabled, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), f });
+   }
+#else
+   inline void ProbeNote(const char*, bool, bool, ImGuiWindow*) {}
+#endif
+
    inline bool Item(const char* label, const char* shortcut = nullptr, bool selected = false, bool enabled = true)
    {
       const bool ours = shortcut != nullptr && shortcut[0] != 0 && !selected;
@@ -84,6 +119,7 @@ namespace MenuParts
                               ImGui::GetColorU32(dim), shortcut);
       }
       Wash(enabled && ImGui::IsItemHovered(), enabled && ImGui::IsItemActive(), false);
+      ProbeNote(label, false, enabled, ImGui::GetCurrentWindow());
       return r;
    }
 
@@ -129,6 +165,7 @@ namespace MenuParts
       ImGui::PopStyleVar();
       // Item rect is the parent row. An open submenu has become the current window, so the wash goes to the parent's draw list.
       Wash(enabled && (open || ImGui::IsItemHovered()), false, open, parent);
+      ProbeNote(label, true, enabled, parent);
       return open;
    }
 
@@ -151,6 +188,9 @@ namespace MenuParts
       ImGui::PopStyleVar();
       if (open)
       {
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+         ProbeRoot() = id;
+#endif
          BeginContent();
       }
       return open;
@@ -178,6 +218,9 @@ namespace MenuParts
 
    inline void EndPopup()
    {
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+      ProbeRoot().clear();
+#endif
       EndContent();
       ImGui::EndPopup();
    }

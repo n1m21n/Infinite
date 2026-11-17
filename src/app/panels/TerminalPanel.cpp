@@ -213,8 +213,8 @@ namespace
          return snap->title;
       if (!snap->cwd.empty())
       {
-         const size_t slash = snap->cwd.find_last_of('/');
-         return slash == std::string::npos || slash + 1 == snap->cwd.size() ? snap->cwd : snap->cwd.substr(slash + 1);
+         const std::string base = AppPaths::FsPath(snap->cwd).filename().u8string();
+         return base.empty() ? snap->cwd : base;
       }
       return "shell";
    }
@@ -952,11 +952,11 @@ namespace
          DrawDockMenu(false, nullptr, true);
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
             gTerminalFocus = false;
-         ImGui::EndChild();
+         EndChildSafe();
          FormParts::Inline(0.0f, gap);
          ImGui::BeginChild("##shellside", ImVec2(0.0f, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawTerminalBody();
-         ImGui::EndChild();
+         EndChildSafe();
          return;
       }
       DrawTerminalBody();
@@ -1062,6 +1062,7 @@ namespace
 }
 
 ImFont* TerminalMonoFont() { return sFont; }
+void MergePlatformFallbackFonts(ImGuiIO& io, float bakedPx, bool ja);
 
 void TerminalLoadFonts(float bakedPx)
 {
@@ -1072,7 +1073,8 @@ void TerminalLoadFonts(float bakedPx)
    if (regular.empty())
       return;
    // Dynamic atlas: only glyphs that are drawn get rasterized, so the whole faces and their fallback can be merged.
-   const std::string noto = BundledResourcePath("fonts/NotoSansSC-Subset.otf");
+   const bool ja = I18n::CurrentLanguage() == "ja";
+   const std::string noto = BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
    const std::string inter = BundledResourcePath("fonts/Inter-Regular.ttf");
    const auto load = [&](const std::string& path)
    {
@@ -1085,6 +1087,7 @@ void TerminalLoadFonts(float bakedPx)
          io.Fonts->AddFontFromFileTTF(inter.c_str(), bakedPx, &merge);
       if (!noto.empty())
          io.Fonts->AddFontFromFileTTF(noto.c_str(), bakedPx, &merge);
+      MergePlatformFallbackFonts(io, bakedPx, ja);
       return font;
    };
    sFont = load(regular);
@@ -1141,7 +1144,9 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
       case 2: in.r = 0.0f; break;
       default: in.b = 0.0f; break;
    }
+   PushDockedPanelStyle(/*isChild=*/true);
    PanelFrame::BeginCard("##terminalcontent", cardSize, in);
+   PopDockedPanelStyle();
    const auto drawStart = std::chrono::steady_clock::now();
    DrawPanel();
    const double drawn = std::chrono::duration<double>(std::chrono::steady_clock::now() - drawStart).count();
@@ -1157,7 +1162,7 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    }
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 

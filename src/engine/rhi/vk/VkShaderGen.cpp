@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <string>
 
+#include "platform/AppPaths.h"
+
 #include "nodes/Render3DBsdf.h"
 #include "nodes/Render3DFresnel.h"
 #include "nodes/Render3DMaterial.h"
@@ -467,7 +469,7 @@ void main() { oC = vec4(pc.c.rgb, 1.0); }
 bool Put(const std::string& dir, const char* name, const std::string& text)
 {
    const std::string p = dir + "/" + name;
-   FILE* f = std::fopen(p.c_str(), "wb");
+   FILE* f = AppPaths::OpenFile(p, "wb");
    if (!f)
       return false;
    std::fwrite(text.data(), 1, text.size(), f);

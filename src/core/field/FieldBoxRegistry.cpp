@@ -43,11 +43,11 @@ namespace Field
          case BoxFamily::Range:         return "Range";
          case BoxFamily::Waves:         return "Waves";
          case BoxFamily::Logic:         return "Logic";
-         case BoxFamily::TimeMemory:    return "Time & memory";
+         case BoxFamily::TimeMemory:    return "Time & Memory";
          case BoxFamily::Random:        return "Random";
          case BoxFamily::Geometry:      return "Geometry";
          case BoxFamily::Music:         return "Music";
-         case BoxFamily::InletsOutlets: return "Inlets / outlets";
+         case BoxFamily::InletsOutlets: return "Inlets / Outlets";
          default:                       return "Unknown";
       }
    }

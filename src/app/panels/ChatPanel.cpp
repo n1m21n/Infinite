@@ -14,6 +14,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/GlyphToggle.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/Switch.h"
 #include "core/CategoryColors.h"
 #include "core/CliSetup.h"
@@ -1770,7 +1771,6 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const float inset = tok::radius_control * 2.0f;  // the composer's corner: the tray meets its straight edge
-         const float pad = tok::space_3;                // the composer's own inset
          const ImVec2 t0(at.x + inset, at.y), t1(at.x + width - inset, at.y + QueueHeight());
          dl->AddRectFilled(t0, t1, TextTint(0.04f), tok::radius_control * 2.0f, ImDrawFlags_RoundCornersTop);
          {  // open outline (no bottom edge: the tray sits on the composer)
@@ -3119,7 +3119,6 @@ namespace app
             const std::string count = chat::TokenCount(e.tokens) + " " + T("tokens");
             const float x = at.x + 22.0f + ImGui::CalcTextSize(AgentName(e.agent)).x + 8.0f;
             dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_TextDisabled), count.c_str());
-            const ImVec2 sz = ImGui::CalcTextSize(count.c_str());
          }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 4.0f));
       }
@@ -4308,9 +4307,8 @@ namespace app
          for (int i = 0; i < (int)sThread.entries.size(); i++)
             if (sThread.entries[(size_t)i].kind == Entry::Kind::Change)
                lastChange = i;
-         int agents = 1;
-         for (const auto& [id, s] : sThread.sessions)
-            agents = std::max(agents, (int)sThread.sessions.size());
+         const int agents = std::max(1, (int)sThread.sessions.size());
+         (void)agents;
          for (int i = 0; i < (int)sThread.entries.size(); i++)
          {
             Entry& e = sThread.entries[(size_t)i];
@@ -4416,7 +4414,7 @@ namespace app
             ImGui::SetScrollHereY(1.0f);
             sScrollToEnd = false;
          }
-         ImGui::EndChild();
+         EndChildSafe();
       }
 
       // The tint behind each exact name in the composer: a node in its colour, a param on a quiet well, an
@@ -4863,7 +4861,7 @@ namespace app
          ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
          ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
          BeginMenuStyle();
-         if (ImGui::BeginPopup("##chatmodelmenu"))
+         if (MenuParts::BeginPopup("##chatmodelmenu"))
          {
             bool anyReady = false;
             for (const CliSetup::Agent& a : CliSetup::Agents())
@@ -4911,7 +4909,7 @@ namespace app
                      Do(a.id, v.act);
                   ImGui::PopID();
                }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
          EndMenuStyle();
       }
@@ -5039,7 +5037,7 @@ namespace app
          // A paste that attaches takes the key, so the field does not also paste a file's name.
          static bool sInputWasActive = false;
          const ImGuiIO& io = ImGui::GetIO();
-         if (sInputWasActive && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && PasteAttachments())
+         if (sInputWasActive && (io.KeyCtrl || io.KeySuper) && ImGui::IsKeyPressed(ImGuiKey_V, false) && PasteAttachments())
             ImGui::SetKeyOwner(ImGuiKey_V, ImGui::GetID("##chatpaste"), ImGuiInputFlags_LockThisFrame);
          const ImGuiInputTextFlags flags = ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_EnterReturnsTrue |
                                            ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion;
@@ -5210,7 +5208,7 @@ namespace app
                OpenThread(t.path);
             ImGui::PopID();
          }
-         ImGui::EndChild();
+         EndChildSafe();
          if (!removeId.empty())
          {
             chat::DeleteThread(ChatsDir(), removeId);
@@ -5288,7 +5286,7 @@ namespace app
             }
          clip.End();
          ImGui::PopFont();
-         ImGui::EndChild();
+         EndChildSafe();
       }
 
       void DrawHeader(float width)
@@ -5490,11 +5488,11 @@ namespace app
          ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + all.x, origin.y + all.y), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
          ImGui::BeginChild("##chatrail", ImVec2(railW, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
          DrawRail(railW, all.y);
-         ImGui::EndChild();
+         EndChildSafe();
          FormParts::Inline(0.0f, 0.0f);
          ImGui::BeginChild("##chatmain", ImVec2(0.0f, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawChatWithCode();
-         ImGui::EndChild();
+         EndChildSafe();
          return;
       }
       DrawChatWithCode();
@@ -5519,11 +5517,11 @@ namespace app
       const ImGuiWindowFlags flags = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
       ImGui::BeginChild("##chatleft", ImVec2(avail.x - codeW - gap, avail.y), false, flags);
       DrawChatBody();
-      ImGui::EndChild();
+      EndChildSafe();
       FormParts::Inline(0.0f, gap);
       ImGui::BeginChild("##coderight", ImVec2(codeW, avail.y), false, flags);
       DrawCodePane(codeW, avail.y);
-      ImGui::EndChild();
+      EndChildSafe();
    }
 
    void DrawChatBody()
@@ -5535,7 +5533,6 @@ namespace app
       DrawHeader(width);
       ImGui::Dummy(ImVec2(0.0f, tok::space_2));  // air under the header, as in Claude
       const float composerW = std::min(width - 2.0f * tok::space_3, 760.0f);
-      const float fs = ImGui::GetFontSize();
       // The composer's height is known before it draws: the log takes the rest.
       const float composerH = Geom(composerW).totalH;
       const float queueH = QueueHeight();

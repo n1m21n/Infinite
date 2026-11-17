@@ -105,7 +105,7 @@ namespace
             }
          }
       }
-      ImGui::EndChild();
+      EndChildSafe();
    }
 }
 
@@ -143,7 +143,7 @@ void DrawHistoryDocked(const char* id, const ImVec2& size)
 
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
-   ImGui::EndChild();
+   EndChildSafe();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
 }
 }

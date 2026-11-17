@@ -171,9 +171,9 @@ extern bool gMetronomeAccent;
 
 extern bool gMetronomeDirty;
 
-void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f);
+void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = tok::radius_control);
 
-void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = 4.0f);
+void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = tok::radius_control);
 
 bool TextFocusClaimed();
 
@@ -5045,6 +5045,7 @@ const char* HelpT(const char* key);
 void DrawSettingsWindow(bool* open);
 
 void DrawShortcutsWindow(bool* open);
+void DrawShortcutsTableBody(const char* idPrefix);
 // The shortcut table as plain text, English, this system's keys (the `shortcuts` RPC).
 std::string ShortcutsText();
 

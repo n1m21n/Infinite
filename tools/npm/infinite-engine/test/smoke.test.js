@@ -114,3 +114,33 @@ test("effect table: node effects, knob finder and PNG facts work without the app
   assert.ok(Math.abs(facts.alpha - (2 + 128 / 255) / 4 * 100) < 1e-9);
   assert.deepStrictEqual(m.bucket(facts, facts), {});
 });
+
+test("when INFINITE_BIN is set, validate and render_video succeed on a patch", (t) => {
+  const bin = process.env.INFINITE_BIN;
+  if (!bin || !fs.existsSync(bin)) {
+    t.skip("INFINITE_BIN not set");
+    return;
+  }
+  const repoRoot = path.resolve(__dirname, "../../../..");
+  const patchPath = path.join(repoRoot, "tests/render/audio.inf");
+  const patchText = fs.readFileSync(patchPath, "utf-8");
+  const outMp4 = path.join(home(), "smoke.mp4");
+  const cli = path.join(__dirname, "../bin/cli.js");
+  const msgs = [
+    { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+    { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "infinite_validate_patch", arguments: { patch_text: patchText } } },
+    { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "infinite_render_video", arguments: { patch_path: patchPath, out_mp4: outMp4, duration: 1 } } }
+  ];
+  const r = spawnSync(process.execPath, [cli, "serve"], {
+    input: msgs.map((x) => JSON.stringify(x)).join("\n") + "\n",
+    encoding: "utf-8",
+    timeout: 120000
+  });
+  assert.strictEqual(r.status, 0, r.stderr);
+  const lines = r.stdout.trim().split("\n").map((l) => JSON.parse(l));
+  const valOut = JSON.parse(lines[1].result.content[0].text);
+  assert.strictEqual(valOut.ok, true, "validate ok");
+  const renOut = JSON.parse(lines[2].result.content[0].text);
+  assert.strictEqual(renOut.status, "success", "render_video success");
+  assert.ok(fs.existsSync(outMp4) && fs.statSync(outMp4).size > 0, "rendered mp4 exists and is non-empty");
+});
