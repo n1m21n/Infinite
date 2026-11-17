@@ -633,7 +633,7 @@ namespace app
                            ImVec2(tl.x + (chipW - 2.0f) * std::min(1.0f, weight), br.y + 7.0f),
                            tok::U32(tok::pal::c_969CB0FF));
 
-         char idx[8];
+         char idx[16];
          snprintf(idx, sizeof(idx), "%d", i + 1);
          dl->AddText(ImVec2(tl.x + 2.0f, br.y + 9.0f), tok::U32(tok::pal::c_767C90FF), idx);
       }

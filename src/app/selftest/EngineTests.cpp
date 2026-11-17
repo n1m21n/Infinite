@@ -31,7 +31,7 @@ namespace
       GeometryNode geo;
    };
 
-   engine::MeshData ToMeshData(const Mesh& m)
+   [[maybe_unused]] engine::MeshData ToMeshData(const Mesh& m)
    {
       engine::MeshData d;
       d.posNormal.reserve(m.vertices.size() * 6);
@@ -43,7 +43,7 @@ namespace
       return d;
    }
 
-   int ShapeIndex(const char* name)
+   [[maybe_unused]] int ShapeIndex(const char* name)
    {
       const auto& names = GeometryNode::ShapeNames();
       for (size_t i = 0; i < names.size(); i++)
@@ -52,7 +52,7 @@ namespace
       return 1;
    }
 
-   bool ReadRect(unsigned int tex, int w, int h, std::vector<float>& px)
+   [[maybe_unused]] bool ReadRect(unsigned int tex, int w, int h, std::vector<float>& px)
    {
       GLuint fbo = 0;
       glGenFramebuffers(1, &fbo);
@@ -183,7 +183,7 @@ namespace
       return true;
    }
 
-   void FieldMslRows(rhi::Device& dev, const std::function<void(bool, const char*, double, double)>& check)
+   [[maybe_unused]] void FieldMslRows(rhi::Device& dev, const std::function<void(bool, const char*, double, double)>& check)
    {
       const auto& presets = FieldPixelNode::Presets();
       int compiled = 0;
@@ -283,7 +283,7 @@ namespace
    // are judged on an absolute scale instead of blowing up.
    bool Within2(double ref, double v, double floor) { return std::fabs(v - ref) <= 0.02 * std::max(std::fabs(ref), floor); }
 
-   void NoiseRows(rhi::Device& dev, const std::function<void(bool, const char*, double, double)>& check)
+   [[maybe_unused]] void NoiseRows(rhi::Device& dev, const std::function<void(bool, const char*, double, double)>& check)
    {
       struct Case { const char* name; const char* expr; };
       // expr is over u, v (pixel centre uv); the kernel and the CPU VM evaluate the same text.
@@ -355,7 +355,7 @@ namespace
             worstStat * 100.0, 2.0);
    }
 
-   double NowMs()
+   [[maybe_unused]] double NowMs()
    {
       return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
    }

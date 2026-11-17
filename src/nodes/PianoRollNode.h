@@ -47,6 +47,11 @@ public:
    // it does not (deleted, or shortened past the playhead).
    void SetSchedule(std::unique_ptr<Arrange::NoteSchedule> s);
    const Arrange::NoteSchedule* Schedule() const { return mCurrent; }
+   // What the card draws: the linked page's own notes, whatever the audio mode. Session audio strips the page's
+   // timeline clips from the playing schedule, so the card must not read that one.
+   void SetDisplaySchedule(std::unique_ptr<Arrange::NoteSchedule> s);
+   const Arrange::NoteSchedule* DisplaySchedule() const { return mDisplay.get(); }
+   uint64_t displayKey = 0;
    // The linked lane's name, for the body ("" = no lane linked).
    std::string laneName;
    uint64_t laneId = 0;
@@ -64,6 +69,7 @@ private:
    // thread's hands. The last one is current.
    std::vector<std::unique_ptr<Arrange::NoteSchedule>> mSchedules;
    const Arrange::NoteSchedule* mCurrent = nullptr;
+   std::unique_ptr<Arrange::NoteSchedule> mDisplay; // main thread only; never reaches the audio thread
    uint64_t mNextGen = 1;
    long long mBlocksSeen = -1;     // audio block counter at the last check
    long long mBlocksStillMs = 0;   // when that counter last moved

@@ -209,7 +209,7 @@ namespace app
                hit = i;
          }
          const int note = SlicerNode::kBaseNote + hit;
-         char val[48];
+         char val[96];
          snprintf(val, sizeof(val), "slice %d - %s%d - click to audition", hit + 1,
                   kPitchClass[note % 12], note / 12 - 1);
          SetAudioReadout("#", val);
@@ -257,7 +257,7 @@ namespace app
 
             const float nextX = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
             const int note = SlicerNode::kBaseNote + i;
-            char label[8];
+            char label[24];
             snprintf(label, sizeof(label), "%s%d", kPitchClass[note % 12], note / 12 - 1);
             const ImVec2 ts = ImGui::CalcTextSize(label);
             if (nextX - x > ts.x + 6.0f)

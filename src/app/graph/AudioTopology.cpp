@@ -356,6 +356,24 @@ namespace app
                lane = &l;
                break;
             }
+         // The card shows the page's own notes: built from gArrange, so Session audio (which strips the
+         // timeline clips from the playing model) does not empty it.
+         {
+            const Arrange::Lane* own = lane ? Arrange::FindLane(gArrange, lane->id) : nullptr;
+            const uint64_t dkey = own ? ((gArrange.revision * 0x9E3779B97F4A7C15ull) ^ own->id) | 1 : 0;
+            if (dkey != pr->displayKey)
+            {
+               pr->displayKey = dkey;
+               if (own)
+               {
+                  auto d = std::make_unique<Arrange::NoteSchedule>();
+                  Arrange::BuildNoteSchedule(*own, *d);
+                  pr->SetDisplaySchedule(std::move(d));
+               }
+               else
+                  pr->SetDisplaySchedule(nullptr);
+            }
+         }
          uint64_t key = 0;
          if (lane)
          {

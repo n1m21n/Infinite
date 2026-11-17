@@ -344,6 +344,11 @@ private:
 PianoRollNode::PianoRollNode() = default;
 PianoRollNode::~PianoRollNode() = default;
 
+void PianoRollNode::SetDisplaySchedule(std::unique_ptr<NoteSchedule> s)
+{
+   mDisplay = std::move(s);
+}
+
 void PianoRollNode::SetSchedule(std::unique_ptr<NoteSchedule> s)
 {
    if (!mAudioNode)

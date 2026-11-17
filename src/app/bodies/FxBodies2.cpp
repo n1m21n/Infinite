@@ -952,7 +952,7 @@ namespace app
          }
       }
 
-      char valBuf[64];
+      char valBuf[96];
       auto FmtFreq = [](float f, char* b, size_t sz, bool withSign) {
          if (std::fabs(f) >= 1000.0f)
             snprintf(b, sz, withSign ? "%+.2f kHz" : "%.2f kHz", f / 1000.0f);

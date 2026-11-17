@@ -2081,7 +2081,7 @@ namespace app
    // the lane's span, the transport playhead, and the node's four controls.
    void DrawPianoRollBody(GraphNode& gn, PianoRollNode* n)
    {
-      const Arrange::NoteSchedule* s = n->Schedule();
+      const Arrange::NoteSchedule* s = n->DisplaySchedule();
       char stat[96];
       if (n->laneId == 0)
          snprintf(stat, sizeof(stat), "no page linked");
