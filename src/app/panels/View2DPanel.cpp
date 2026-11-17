@@ -997,22 +997,27 @@ namespace
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const char* end = ImGui::FindRenderedTextEnd(text);   // "Width##img" shows as "Width"
+      // Longer than the label column: an ellipsis and the whole label in a tip, never text under the field.
+      const std::string full(text, end);
+      const std::string shown = app::TruncateWithEllipsis(full, sLabelW - ImGui::GetCursorPosX() - tok::space_1);
       if (rowH > 0.0f)
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         const ImVec2 sz = ImGui::CalcTextSize(text, end);
+         const ImVec2 sz = ImGui::CalcTextSize(shown.c_str());
          const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
          const ImVec2 tp(p.x, std::round((p.y + (rowH - sz.y) * 0.5f) * px) / px);
-         ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.72f)), text, end);
-         UiAudit::NoteInk(3, tp, ImVec2(tp.x + sz.x, tp.y + sz.y), 0.0f, std::string(text, end).c_str());
+         ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.72f)), shown.c_str());
+         UiAudit::NoteInk(3, tp, ImVec2(tp.x + sz.x, tp.y + sz.y), 0.0f, full.c_str());
          ImGui::Dummy(ImVec2(sz.x, rowH));
       }
       else
       {
          ImGui::AlignTextToFramePadding();
-         ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%.*s", (int)(end - text), text);
-         UiAudit::NoteInk(3, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, std::string(text, end).c_str());
+         ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", shown.c_str());
+         UiAudit::NoteInk(3, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, full.c_str());
       }
+      if (shown != full && ImGui::IsItemHovered())
+         HelpTip("%s", full.c_str());
       FormParts::Inline(sLabelW);
    }
 
@@ -1024,7 +1029,7 @@ namespace
       if (cw > 0.0f)
       {
          ImGui::SetNextItemWidth(cw);
-         sCellFmt = PanelKit::InWellFormat(label, fmt != nullptr ? fmt : "");
+         sCellFmt = PanelKit::InWellFormat(label, fmt != nullptr ? fmt : "", cw);
          return sCellFmt.c_str();
       }
       FieldLabel(label);
@@ -8159,7 +8164,33 @@ namespace
       if (!MenuParts::BeginPopup("##v2dtoolpick"))
          return;
       ParseStrip();
+      // Header: the title, then the two set-alls as chips on the right.
+      ImGui::AlignTextToFramePadding();
       ImGui::TextDisabled("%s", T("Tools on the strip"));
+      {
+         const char* a = T("Essentials");
+         const char* b = T("All");
+         const float pad = 2.0f * tok::space_2;
+         const float wa = ImGui::CalcTextSize(a).x + pad, wb = ImGui::CalcTextSize(b).x + pad;
+         ImGui::SameLine();
+         const float x = ImGui::GetWindowContentRegionMax().x - wa - wb - tok::space_1;
+         if (x > ImGui::GetCursorPosX())
+            ImGui::SetCursorPosX(x);
+         if (TextChip(L("Essentials##v2dpickess"), false, T("Show essentials only"), wa))
+         {
+            gView2DTools.clear();
+            ParseStrip();
+            sStripParsed = "\x01";
+            SaveWorkspaceSettings();
+         }
+         FormParts::Inline(0.0f, tok::space_1);
+         if (TextChip(L("All##v2dpickall"), false, T("Show all tools"), wb))
+         {
+            for (int i = 0; i < kToolCount; i++)
+               sStripHidden[i] = false;
+            SaveStrip();
+         }
+      }
       ImGui::Spacing();
       if (ImGui::BeginTable("##v2dpicktbl", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
       {
@@ -8178,41 +8209,35 @@ namespace
                         idx = i;
                   if (idx < 0)
                      continue;
-                  bool on = !sStripHidden[idx];
+                  const bool on = !sStripHidden[idx];
                   ImGui::PushID(idx);
-                  if (CheckBox::Box("##tick", &on))
+                  // The whole row is the toggle: the icon and name dim when the tool is off the strip.
+                  const char* name = T(ToolTitle(kTools[idx].tip));
+                  const float rh = ImGui::GetFrameHeight();
+                  const float rw = std::max(ImGui::GetContentRegionAvail().x, 18.0f + tok::space_2 + ImGui::CalcTextSize(name).x + tok::space_2);
+                  const ImVec2 rp = ImGui::GetCursorScreenPos();
+                  if (ImGui::InvisibleButton("##row", ImVec2(rw, rh)))
                   {
-                     sStripHidden[idx] = !on;
+                     sStripHidden[idx] = on;
                      SaveStrip();
                   }
-                  FormParts::Inline(0.0f, tok::space_2);
-                  const ImVec2 gp = ImGui::GetCursorScreenPos();
-                  glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + 8.0f, gp.y + ImGui::GetFrameHeight() * 0.5f), tok::icon_control,
-                              ImGui::GetColorU32(ImGuiCol_Text), kTools[idx].glyph);
-                  ImGui::Dummy(ImVec2(18.0f, 0.0f));
-                  FormParts::Inline(0.0f, tok::space_1);
-                  ImGui::AlignTextToFramePadding();
-                  ImGui::TextUnformatted(T(ToolTitle(kTools[idx].tip)));
+                  UiAudit::NoteKind("toggle", name);
+                  if (on)
+                     UiAudit::NoteOn();
+                  ImDrawList* pdl = ImGui::GetWindowDrawList();
+                  if (ImGui::IsItemHovered())
+                     pdl->AddRectFilled(rp, ImVec2(rp.x + rw, rp.y + rh), ImGui::GetColorU32(ImGuiCol_HeaderHovered), tok::radius_control);
+                  const ImU32 ink = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, on ? 1.0f : 0.6f);
+                  glyph::Draw(pdl, ImVec2(rp.x + tok::space_1 + 8.0f, rp.y + rh * 0.5f), tok::icon_control, ink, kTools[idx].glyph);
+                  const ImVec2 tp(rp.x + tok::space_1 + 18.0f + tok::space_2, rp.y + (rh - ImGui::GetTextLineHeight()) * 0.5f);
+                  pdl->AddText(tp, ink, name);
+                  UiAudit::NoteInk(0, tp, ImVec2(tp.x + ImGui::CalcTextSize(name).x, tp.y + ImGui::GetTextLineHeight()));
                   ImGui::PopID();
                }
                ImGui::Dummy(ImVec2(0.0f, tok::space_1));
             }
          }
          ImGui::EndTable();
-      }
-      ImGui::Separator();
-      if (MenuParts::Item(T("Show essentials only")))
-      {
-         gView2DTools.clear();
-         ParseStrip();
-         sStripParsed = "\x01";
-         SaveWorkspaceSettings();
-      }
-      if (MenuParts::Item(T("Show all tools")))
-      {
-         for (int i = 0; i < kToolCount; i++)
-            sStripHidden[i] = false;
-         SaveStrip();
       }
       MenuParts::EndPopup();
    }
@@ -9130,7 +9155,7 @@ namespace
             l->nearest = sampling == 1;
       }
       int label = l->label;
-      if (ComboRow(T("Colour"), &label, { T("None"), T("Red"), T("Orange"), T("Yellow"), T("Green"), T("Blue"), T("Violet"), T("Grey") }))
+      if (ComboRow(T("Label"), &label, { T("None"), T("Red"), T("Orange"), T("Yellow"), T("Green"), T("Blue"), T("Violet"), T("Grey") }))
          l->label = label;
       BoolRow(T("Clip to layer below"), &l->clip);
       SliderRow(T("Gamma"), &l->blendGamma, 0.1f, 10.0f, "%.2f");
@@ -9574,7 +9599,7 @@ namespace
    const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Stylize", "Colour", "Time", "Sim", "Code", "Mask" };
 
    struct EffAdd { int layer = 0; int native = -1; int node = -1; uint64_t doc = 0; } sEffAdd;
-   struct EffOp { int layer = 0; int index = -1; int op = 0; uint64_t doc = 0; } sEffOp;   // 1 up, 2 down, 3 delete
+   struct EffOp { int layer = 0; int index = -1; int op = 0; uint64_t doc = 0; int to = -1; } sEffOp;   // 1 up, 2 down, 3 delete, 4 move to `to`
 
    // Spawns an entry's node (hidden) and its recipe helper (on the canvas, wired into the second input); 0 on failure.
    uint64_t SpawnEffectNode(const NodeEffectEntry& ne, float x, float y)
@@ -9683,6 +9708,25 @@ namespace
       const float fh = ImGui::GetFrameHeight();
       if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
          folded = !folded;
+      // Drag the header onto another header to move the effect there.
+      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+      {
+         const int pay[2] = { l.id, i };
+         ImGui::SetDragDropPayload("V2DEFF", pay, sizeof(pay));
+         ImGui::EndDragDropSource();
+      }
+      if (ImGui::BeginDragDropTarget())
+      {
+         if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("V2DEFF"))
+         {
+            const int* pay = (const int*)p->Data;
+            if (pay[0] == l.id && pay[1] != i)
+               sEffOp = { l.id, pay[1], 4, sDocUid, i };
+         }
+         ImGui::EndDragDropTarget();
+      }
+      if (PanelKit::AuditOpenAll())
+         folded = false;
       {
          const bool hov = ImGui::IsItemHovered();
          const ImU32 col = ImGui::GetColorU32(e.on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !e.on ? 1.0f : 0.85f);
@@ -9999,6 +10043,12 @@ namespace
                   std::swap(l->effects[(size_t)i], l->effects[(size_t)i - 1]);
                else if (sEffOp.op == 2 && i + 1 < n)
                   std::swap(l->effects[(size_t)i], l->effects[(size_t)i + 1]);
+               else if (sEffOp.op == 4 && sEffOp.to >= 0 && sEffOp.to < n && sEffOp.to != i)
+               {
+                  auto moved = std::move(l->effects[(size_t)i]);
+                  l->effects.erase(l->effects.begin() + i);
+                  l->effects.insert(l->effects.begin() + sEffOp.to, std::move(moved));
+               }
                else if (sEffOp.op == 3)
                {
                   const uint64_t uid = l->effects[(size_t)i].uid;
