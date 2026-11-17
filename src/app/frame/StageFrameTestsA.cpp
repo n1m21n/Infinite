@@ -2521,6 +2521,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // Field Patcher: box edits reach the node, scratch pages export, Value mode, pages survive save.
       FrameTest_FIELDPATCHERTEST(frameId, window);
 
+      // Canvas Link: arm, a real canvas click picks (ineligible ignored), Esc cancels, one pick at a time.
+      FrameTest_CANVASLINKTEST(frameId, window);
+
       // The Timeline export in the app, for comparing with --render --timeline (H2).
       FrameTest_TIMELINEEXPORTTEST(frameId, window);
 

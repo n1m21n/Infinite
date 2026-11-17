@@ -2,6 +2,7 @@
 // MIDI lane. A page edits the lane's clips and notes through the Arrange note ops; the linked Piano Roll node plays
 // them. Edits are timeline undo entries; page add and delete touch a node too, so they are patch undo steps.
 #include "app/AppShared.h"
+#include "app/frame/CanvasLink.h"
 #include "app/graph/NoteGen.h"
 #include "app/graph/SampleStyles.h"
 #include "app/ui/design/UiDensity.h"
@@ -173,7 +174,6 @@ namespace
       std::set<uint64_t> clips;  // clips being edited; none = all
       std::set<std::pair<uint64_t, uint32_t>> notes; // selected notes (clip, note)
       uint64_t renameLane = 0;   // a tab being renamed
-      bool pickOnCanvas = false; // the page settings' "Assign": the next Piano Roll node clicked on the canvas links
       uint64_t pendingDuplicate = 0; // page duplicate: the Timeline's Duplicate Track, next frame
       bool pendingAdd = false;   // page add and delete move lane pointers: they run at the top of the next frame
       uint64_t pendingDelete = 0;
@@ -502,7 +502,7 @@ namespace
       s.clips.swap(clips);
    }
 
-   // Selecting a Piano Roll node jumps to its page, or finishes "Pick on canvas".
+   // Selecting a Piano Roll node jumps to its page.
    void FollowCanvasSelection()
    {
       State& s = S();
@@ -522,16 +522,6 @@ namespace
       s.lastSelectedNode = uid;
       if (uid == 0)
          return;
-      if (s.pickOnCanvas)
-      {
-         s.pickOnCanvas = false;
-         if (Page() != nullptr)
-         {
-            const uint64_t lane = s.lane;
-            ArrangeEdit([&] { Arrange::LinkLane(gArrange, lane, uid); });
-         }
-         return;
-      }
       for (const Arrange::Lane& l : gArrange.lanes)
          if (l.type == Arrange::kLaneMidi && l.noteNodeUid == uid)
             s.lane = l.id;
@@ -2754,16 +2744,14 @@ namespace
       FormParts::Label(T("Grid"));
       DrawGridChip();
       SectionCard::Begin(T("Piano Roll node"));
-      const bool linked = page.noteNodeUid != 0 && FindNodeByUid(page.noteNodeUid) != nullptr;
-      if (ActionButton::Draw(s.pickOnCanvas ? T("Click a node on the canvas...") : linked ? T("Assign another Piano Roll") : T("Assign Piano Roll"),
-                             ImVec2(-1.0f, 0.0f), s.pickOnCanvas ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
-         s.pickOnCanvas = !s.pickOnCanvas;
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Then click a Piano Roll node on the canvas: this page plays through it"));
-      if (linked && ActionButton::Draw(T("Unlink"), ImVec2(-1.0f, 0.0f)))
       {
          const uint64_t lane = page.id;
-         ArrangeEdit([&] { Arrange::LinkLane(gArrange, lane, 0); });
+         CanvasLink::Spec spec;
+         spec.owner = "pianoroll.page";
+         spec.kind = T("Piano Roll");
+         spec.accepts = [](const GraphNode& gn) { return dynamic_cast<const PianoRollNode*>(gn.node.get()) != nullptr; };
+         spec.onPicked = [lane](uint64_t uid) { ArrangeEdit([&] { Arrange::LinkLane(gArrange, lane, uid); }); };
+         CanvasLink::Field("##prnode", page.noteNodeUid, spec, true);
       }
       DrawQuantiseCard(page);
       DrawFunctionSliders();
@@ -3470,6 +3458,25 @@ namespace
       FollowCanvasSelection();
       DrawDockMenu();
       State& st = S();
+      // Review shots (INFINITE_CLSHOT=card|pick): a page with its settings open; "pick" also arms the node pick.
+      if (const char* sh = getenv("INFINITE_CLSHOT"); sh != nullptr && ImGui::GetFrameCount() > 6)
+      {
+         static int sShot = 0;
+         if (sShot == 0 && Pages().empty())
+            AddPage();
+         if (sShot++ == 20 && Page() != nullptr)
+         {
+            st.settingsOpen = true;
+            if (std::string(sh) == "pick")
+            {
+               CanvasLink::Spec spec;
+               spec.owner = "pianoroll.page";
+               spec.kind = T("Piano Roll");
+               spec.accepts = [](const GraphNode& gn) { return dynamic_cast<const PianoRollNode*>(gn.node.get()) != nullptr; };
+               CanvasLink::Arm(spec);
+            }
+         }
+      }
       if (st.pendingAdd)
       {
          st.pendingAdd = false;

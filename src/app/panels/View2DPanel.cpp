@@ -4,6 +4,7 @@
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
 #include "app/AppShared.h"
+#include "app/frame/CanvasLink.h"
 #include "ImageCable.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -256,8 +257,23 @@ namespace
    } sPending;
 
    // Click-a-node-on-the-canvas mode, as the 3D View has: 0 off, 1 add the picked node as a layer, 2 replace the active layer's source.
-   int sPickMode = 0;
-   uint64_t sPickedUid = 0;
+   // Canvas Link picks: add a node as a layer, or replace the selected layer's source (CanvasLink.h).
+   CanvasLink::Spec PickSpec(bool replace)
+   {
+      CanvasLink::Spec spec;
+      spec.owner = replace ? "v2d.replace" : "v2d.addnode";
+      spec.kind = T("picture node");
+      spec.accepts = [](const GraphNode& gn) { return dynamic_cast<const Scene2DNode*>(gn.node.get()) == nullptr && View2DCanAdd(gn); };
+      spec.onPicked = [replace](uint64_t uid)
+      {
+         if (uid == 0)
+            return;
+         sPending.what = replace ? Pending::ReplaceNode : Pending::AddNode;
+         sPending.uid = uid;
+      };
+      return spec;
+   }
+   int PickModeNow() { return CanvasLink::Armed("v2d.addnode") ? 1 : CanvasLink::Armed("v2d.replace") ? 2 : 0; }
 
    ImU32 Hex(unsigned rgb, float a = 1.0f)
    {
@@ -297,8 +313,6 @@ namespace
             anyNode = gn.uid;
             break;
          }
-      if (anyNode != 0 && anyNode != sLastNode && sPickMode != 0 && View2DCanAdd(*FindNodeByUid(anyNode)))
-         sPickedUid = anyNode;
       sLastNode = anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene2DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
@@ -8865,8 +8879,7 @@ namespace
             if (l->kind == Kind::Node)
             {
                NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, l->uid);
-               if (MenuParts::Item(T("Replace by Clicking a Node"), nullptr, sPickMode == 2))
-                  sPickMode = sPickMode == 2 ? 0 : 2;
+               CanvasLink::PickMenuItem(PickSpec(true));
             }
             if ((l->kind == Kind::Fill || l->kind == Kind::Adjust) &&
                 MenuParts::Item(l->kind == Kind::Fill ? T("Edit Fill...") : T("Edit Adjustment..."), nullptr))
@@ -9076,12 +9089,11 @@ namespace
       if (IconChip("##v2dnewvec", IconsInfinite::PenTool, false, T("New vector layer")))
          sPending.what = Pending::AddVector;
       FormParts::Inline(0.0f, tok::space_1);
-      if (IconChip("##v2dnewnode", IconsInfinite::Plus, sPickMode == 1, T("Add a node from the canvas as a layer")))
+      if (IconChip("##v2dnewnode", IconsInfinite::Plus, PickModeNow() == 1, T("Add a node from the canvas as a layer")))
          ImGui::OpenPopup("##v2dnodepop");
       if (MenuParts::BeginPopup("##v2dnodepop"))
       {
-         if (MenuParts::Item(T("Click a Node on the Canvas"), nullptr, sPickMode == 1))
-            sPickMode = sPickMode == 1 ? 0 : 1;
+         CanvasLink::PickMenuItem(PickSpec(false));
          MenuParts::Separator();
          bool any = false;
          for (GraphNode& gn : gNodes)
@@ -9140,10 +9152,8 @@ namespace
       SectionCard::Begin(T("Layer"));
       if (l->kind == Kind::Node)
       {
-         NodeRow(T("Source"), &l->uid, false, doc);
-         if (ActionButton::Draw(sPickMode == 2 ? T("Click a node on the canvas...") : T("Replace from canvas..."), ImVec2(-1.0f, 0.0f),
-                                sPickMode == 2 ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
-            sPickMode = sPickMode == 2 ? 0 : 2;
+         FieldLabel(T("Source"));
+         CanvasLink::Field("##v2dsrc", l->uid, PickSpec(true), false, sFieldW);
          int fit = l->fit;
          if (ComboRow(T("Fit"), &fit, { T("None"), T("Fit"), T("Fill"), T("Stretch") }))
          {
@@ -11256,22 +11266,6 @@ namespace
       if (sDirty)
          doc->Commit();
       TakeDroppedFiles(doc);
-      if (sPickedUid != 0)
-      {
-         // A node clicked on the canvas while a pick mode was on.
-         if (sPickMode == 1)
-         {
-            sPending.what = Pending::AddNode;
-            sPending.uid = sPickedUid;
-         }
-         else if (sPickMode == 2)
-         {
-            sPending.what = Pending::ReplaceNode;
-            sPending.uid = sPickedUid;
-         }
-         sPickedUid = 0;
-         sPickMode = 0;
-      }
       RunPending(doc);
    }
 }
@@ -13089,7 +13083,7 @@ std::string View2DAuditPanelState()
             "retouch %.2f %.3f %.3f %.3f %d %d chip %d dialogs %d",
             sTool, sTab, sSideOpen, gView2DDock, sZoom, sPan.x, sPan.y, sFg[0], sFg[1], sFg[2], sBg[0], sBg[1], sBg[2], sFillKind, sTolerance,
             sContiguous, sAllLayers, sMarqueeShape, sLassoKind, sFeather, sSelOp, sSurfacePaint, sSkinSide, sEditMask, sAutoSelect,
-            sImageFormat, sVideoFormat, sGizmoMode, sPickMode, b.tip, b.size, b.hardness, b.opacity, b.flow, b.spacing, b.jitter, b.angle,
+            sImageFormat, sVideoFormat, sGizmoMode, PickModeNow(), b.tip, b.size, b.hardness, b.opacity, b.flow, b.spacing, b.jitter, b.angle,
             b.roundness, b.smoothing, b.pencil, b.pressureSize, b.pressureOpacity, b.mode, b.follow, b.lockAlpha, e.size, e.hardness, e.mode,
             e.pressureSize, e.pressureOpacity, e.follow, e.spacing, e.jitter, e.smoothing, e.angle, sRetouch.size, sRetouch.hardness,
             sRetouch.opacity, sRetouch.spacing, sRetouch.pressureSize, sRetouch.pressureOpacity, sBrushPreset, sAuditDialogs);

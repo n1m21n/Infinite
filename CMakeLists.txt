@@ -500,6 +500,7 @@ set(COMMON_SOURCES
     src/app/frame/StagePopupsB.cpp
     src/app/frame/StagePresent.cpp
     src/app/frame/StageSidePanels.cpp
+    src/app/frame/CanvasLink.cpp
     src/app/frame/StageTestsB.cpp
     src/app/graph/AudioTopology.cpp
     src/app/graph/Core.cpp

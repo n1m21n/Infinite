@@ -1,6 +1,8 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/AppShared.h"
+#include "app/frame/CanvasLink.h"
+#include "nodes/PianoRollNode.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "core/field/MaterialRegistry.h"
 #include "nodes/ShadeNodes.h"
@@ -3639,6 +3641,111 @@ void FrameTest_TIMELINEEXPORTTEST(int frameId, GLFWwindow* window)
          sId = 0;
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
+   }
+}
+
+// Canvas Link: a real canvas click. Arm a Piano-Roll-only pick, click an Oscillator (dimmed, ignored), click the
+// Piano Roll (picked, disarmed), arm again and press Esc (cancelled), arm one pick over another (the first cancels).
+void FrameTest_CANVASLINKTEST(int frameId, GLFWwindow* window)
+{
+   // Review shots (INFINITE_CLSHOT, with IMAGERESYNTH_SCREENSHOT): the Piano Roll panel open, an Oscillator beside
+   // its node; the panel arms the pick itself. The pointer rests on the Piano Roll node while armed.
+   if (getenv("INFINITE_CLSHOT") != nullptr)
+   {
+      if (frameId == 4)
+      {
+         NewPatch();
+         SpawnNode("Oscillator", "Synths", -380.0f, 40.0f);
+         gPianoRollOpen = true;
+      }
+      for (const GraphNode& gn : gNodes)
+      {
+         ImVec2 mn, mx;
+         if (frameId > 30 && dynamic_cast<const PianoRollNode*>(gn.node.get()) != nullptr && CanvasLink::ScreenRectForTest(gn.uid, mn, mx))
+         {
+            const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
+            ImGui::GetIO().AddMousePosEvent(c.x, c.y);
+            glfwSetCursorPos(window, (double)(c.x * ImGui_ImplGlfw_GetPointScale()), (double)(c.y * ImGui_ImplGlfw_GetPointScale()));
+         }
+      }
+      return;
+   }
+   if (getenv("INFINITE_CANVASLINKTEST") == nullptr)
+      return;
+   static int sFails = 0;
+   static uint64_t sPr = 0, sOsc = 0, sPicked = 0;
+   static int sCancels = 0;
+   auto check = [&](const char* what, bool pass) {
+      printf("CANVASLINK %-52s %s\n", what, pass ? "OK" : "FAIL");
+      sFails += pass ? 0 : 1;
+   };
+   auto spec = [&](const char* owner) {
+      CanvasLink::Spec s;
+      s.owner = owner;
+      s.kind = "Piano Roll";
+      s.accepts = [](const GraphNode& gn) { return dynamic_cast<const PianoRollNode*>(gn.node.get()) != nullptr; };
+      s.onPicked = [](uint64_t uid) { sPicked = uid; };
+      s.onCancel = [] { ++sCancels; };
+      return s;
+   };
+   ImGuiIO& io = ImGui::GetIO();
+   auto pointAt = [&](uint64_t uid) {
+      ImVec2 mn, mx;
+      if (!CanvasLink::ScreenRectForTest(uid, mn, mx))
+         return false;
+      const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
+      io.ConfigInputTrickleEventQueue = false;
+      io.AddFocusEvent(true);
+      io.AddMousePosEvent(c.x, c.y);
+      glfwSetCursorPos(window, (double)(c.x * ImGui_ImplGlfw_GetPointScale()), (double)(c.y * ImGui_ImplGlfw_GetPointScale()));
+      return true;
+   };
+   if (frameId == 4)
+   {
+      NewPatch();
+      GraphNode* pr = SpawnNode("Piano Roll", "Notes", 0.0f, 0.0f);
+      sPr = pr ? pr->uid : 0; // read now: the next spawn can move gNodes
+      GraphNode* osc = SpawnNode("Oscillator", "Synths", 420.0f, 0.0f);
+      sOsc = osc ? osc->uid : 0;
+      check("spawned a Piano Roll and an Oscillator", sPr != 0 && sOsc != 0);
+      CanvasLink::Show({ sPr, sOsc });
+   }
+   if (frameId == 30)
+      CanvasLink::Arm(spec("test.a"));
+   if (frameId >= 32 && frameId < 40)
+      pointAt(sOsc);
+   if (frameId == 36)
+      io.AddMouseButtonEvent(0, true);
+   if (frameId == 37)
+      io.AddMouseButtonEvent(0, false);
+   if (frameId == 40)
+      check("a click on a node the pick can't take is ignored", sPicked == 0 && CanvasLink::Armed("test.a"));
+   if (frameId >= 42 && frameId < 50)
+      pointAt(sPr);
+   if (frameId == 46)
+      io.AddMouseButtonEvent(0, true);
+   if (frameId == 47)
+      io.AddMouseButtonEvent(0, false);
+   if (frameId == 50)
+   {
+      check("a click on the Piano Roll picks it", sPicked == sPr);
+      check("the pick disarms after the click", !CanvasLink::Armed());
+      check("a pick is not a cancel", sCancels == 0);
+      CanvasLink::Arm(spec("test.b"));
+   }
+   if (frameId == 52)
+      io.AddKeyEvent(ImGuiKey_Escape, true);
+   if (frameId == 53)
+      io.AddKeyEvent(ImGuiKey_Escape, false);
+   if (frameId == 56)
+   {
+      check("Esc cancels an armed pick", !CanvasLink::Armed() && sCancels == 1);
+      CanvasLink::Arm(spec("test.c"));
+      CanvasLink::Arm(spec("test.d"));
+      check("arming a second pick cancels the first", CanvasLink::Armed("test.d") && !CanvasLink::Armed("test.c") && sCancels == 2);
+      CanvasLink::Cancel();
+      printf("CANVASLINK %s\n", sFails == 0 ? "PASS" : "FAIL");
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
    }
 }
 }

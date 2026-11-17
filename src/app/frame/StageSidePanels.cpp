@@ -9,6 +9,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
+#include "app/frame/CanvasLink.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
 
@@ -164,69 +165,47 @@ void DrawSidePanels(FrameCtx& fc)
    auto& timerNodeBodiesGpu = *fc.timerNodeBodiesGpu;
 
 
-      // Arrangement clip "Assign Node..." canvas picker - same click-to-assign
-      // UX as gPerfAssigningElemIdx above, but whole-node instead of
-      // per-parameter: hovering a compatible node glows its whole bounding
-      // box (via ed::GetNodePosition/GetNodeSize, both canvas-space here
-      // just like the param picker's mp above) and a click assigns it as the
-      // clip's source.
+      // Arrangement clip "Assign Node...": the arrange code still sets gArrangeAssigningClipId; this bridges it into
+      // the shared Canvas Link pick (dim, ring, prompt, click, Esc) so it looks and behaves like every other pick.
       // A MIDI clip has no source node to assign (its lane links a Piano Roll node).
       if (gArrangeAssigningClipId != 0)
          if (const Arrange::Lane* al = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId); al == nullptr || al->type == Arrange::kLaneMidi)
             gArrangeAssigningClipId = 0;
-      if (gArrangeAssigningClipId != 0)
       {
-         const Arrange::Lane* assignLane = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId);
-         const bool assignIsVideo = assignLane->type == Arrange::kLaneVideo;
-         const ImVec2 mp = ImGui::GetMousePos();
-
-         GraphNode* hoveredCompatible = nullptr;
-         ImVec2 hoveredP(0, 0), hoveredS(0, 0);
-         for (GraphNode& gn : gNodes)
+         static uint64_t sBridgedClip = 0;
+         if (gArrangeAssigningClipId != 0 && (!CanvasLink::Armed("arrange.clip") || sBridgedClip != gArrangeAssigningClipId))
          {
-            const bool match = assignIsVideo ? IsNodeVideoCompatible(gn) : IsNodeAudioCompatible(gn);
-            if (!match)
-               continue;
-            const ImVec2 p = ed::GetNodePosition(gn.NodeId());
-            const ImVec2 s = ed::GetNodeSize(gn.NodeId());
-            if (mp.x >= p.x && mp.x <= p.x + s.x && mp.y >= p.y && mp.y <= p.y + s.y)
+            const bool isVideo = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId)->type == Arrange::kLaneVideo;
+            CanvasLink::Spec spec;
+            spec.owner = "arrange.clip";
+            spec.kind = isVideo ? T("picture node") : T("sound node");
+            spec.accepts = [isVideo](const GraphNode& gn) { return isVideo ? IsNodeVideoCompatible(gn) : IsNodeAudioCompatible(gn); };
+            spec.onPicked = [](uint64_t uid)
             {
-               hoveredCompatible = &gn;
-               hoveredP = p;
-               hoveredS = s;
-               break;
-            }
-         }
-
-         if (hoveredCompatible != nullptr)
-         {
-            ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-            StateRing::Draw(hoverDl, hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), StateRing::Kind::Target, IsThemeLight());
-
-            ed::Suspend();
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip(T("Assign clip source -> %s"), NodeTitleWithInstance(*hoveredCompatible).c_str());
-            ed::Resume();
-
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-            {
-               // By uid, through the model - one call (one undo entry) per
-               // target clip, so a multi-select Assign Node... points every
-               // selected clip of this lane type at the same node.
-               ArrangeAssignClipSource(gArrangeAssigningClipId, hoveredCompatible->uid);
+               // By uid, through the model - one call (one undo entry) per target clip, so a multi-select
+               // Assign Node... points every selected clip of this lane type at the same node.
+               ArrangeAssignClipSource(gArrangeAssigningClipId, uid);
                for (uint64_t targetId : gArrangeAssignTargetIds)
-                  ArrangeAssignClipSource(targetId, hoveredCompatible->uid);
+                  ArrangeAssignClipSource(targetId, uid);
                gArrangeAssigningClipId = 0;
                gArrangeAssignTargetIds.clear();
-            }
+            };
+            spec.onCancel = []
+            {
+               gArrangeAssigningClipId = 0;
+               gArrangeAssignTargetIds.clear();
+            };
+            const uint64_t keep = gArrangeAssigningClipId;
+            const auto keepTargets = gArrangeAssignTargetIds;
+            CanvasLink::Arm(std::move(spec)); // re-arming cancels the old bridge, which clears the pick: put it back
+            gArrangeAssigningClipId = keep;
+            gArrangeAssignTargetIds = keepTargets;
+            sBridgedClip = keep;
          }
-
-         if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         {
-            gArrangeAssigningClipId = 0;
-            gArrangeAssignTargetIds.clear();
-         }
+         else if (gArrangeAssigningClipId == 0 && CanvasLink::Armed("arrange.clip"))
+            CanvasLink::Cancel(); // the arrange panel dropped the pick itself
       }
+      CanvasLink::CanvasHook();
 
       timerNodeBodies.Stop();
       timerNodeBodiesGpu.Stop();
