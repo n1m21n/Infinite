@@ -30,9 +30,9 @@ OUT_WEB = os.path.join(ROOT, "website", "assets", "Infinite_Node_Reference_Manua
 OUT_KIT = os.path.join(ROOT, "press_kit", "manuals", "Infinite_Node_Reference_Manual.pdf")
 FOOT_R = "INFINITE / NODE FIELD GUIDE"
 
-# Counts come from `Infinite --describe` (352 registered) minus the five types the spawn menu hides
-# (Delete Selected, Transform Selected, Extrude Selected, Group, Field Graph).
-SPAWNABLE = 347
+# Counts come from src/core/chat/NodeVocab.gen.h (377 registered types, macOS build) minus the five types
+# IsUserSpawnable() hides on every platform (Delete Selected, Transform Selected, Extrude Selected, Group, Field Graph).
+SPAWNABLE = 372
 BASE = json.load(open(os.path.join(HERE, "cards_base.json")))
 NEW_NODES = sum(len(c["cards"]) for c in NEW_CHAPTERS)
 

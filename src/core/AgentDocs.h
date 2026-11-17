@@ -1263,7 +1263,7 @@ Try: send your finished patch to OBS with no capture card.
 Chain: Video -> NDI Out
 
 ## New Instruments, Effects & Modulators
-The sound side of v0.6: four new synths, a designed-room reverb, a three-stage saturator, spectral tools, and modulators that give every note its own value.
+The sound side of the later additions: four new synths, a designed-room reverb, a three-stage saturator, spectral tools, and modulators that give every note its own value.
 
 ### FM
 AUDIO · SYNTH. A 4-operator FM synth: four sine operators wired by one of 11 algorithms, from a 4>3>2>1 stack to four carriers side by side. Each operator follows the note at a ratio or sits at a fixed frequency, and has its own level and envelope. Feedback lets operator 4 modulate itself, from a brighter sine to a buzz.
@@ -1422,7 +1422,7 @@ Chain: Keyboard -> Analog -> Audio Out
 
 ## New Compositing, 3D & Mesh Tools
 )AGENTDOC"
-R"AGENTDOC(The visual side of v0.6: motion analysis, fluid and fog, physics, plants from text, and the primitives and mesh operators earlier editions of this guide missed.
+R"AGENTDOC(The visual side of the later additions: motion analysis, fluid and fog, physics, plants from text, and the primitives and mesh operators earlier editions of this guide missed.
 
 ### Optical Flow
 COMPOSITING · IMAGE IN/OUT. How far each part of the picture moved since the last frame, as a vector per pixel (red and green carry x and y, blue is speed). Pyramidal Lucas-Kanade on the GPU. View Colour shows direction as hue and speed as brightness.
