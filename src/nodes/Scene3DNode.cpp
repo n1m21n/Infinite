@@ -1851,6 +1851,8 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
    // The cook already ran this frame, so the sources it asks for are no-ops.
    mSyncedFrame = -1;
    Sync(mLastCookFrame);
+   if (!mRoot || !mLocalRoot)
+      return 0;   // not synced yet (a scene made this frame): nothing to draw
    if (!mEditor)
    {
       mEditor = std::make_unique<Render3DNode>();

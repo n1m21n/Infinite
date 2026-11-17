@@ -3,7 +3,7 @@
 // moved, turned and scaled off the origin, 3D cursor off the origin too). An item passes when its click changed
 // something a person could see: the scene, the selection, the view, a mode, a copy buffer, a rename, a request to the
 // canvas, or a dialog or popup it opened. Greyed items are listed, not clicked; items that open a file dialog ("...")
-// are skipped. A crash or assert on a click ends the run without the OK line.
+// are skipped. A checked choice clicked again, or Select Random, may land where it started. A crash or assert on a click ends the run without the OK line.
 // Plan: internal/plans/ui-system/lint-plan.md (D10).
 #include "app/AppShared.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -35,7 +35,10 @@ namespace
       bool onItem = true;
       std::vector<std::string> path;   // submenus to open, then (for a click job) the item
       bool click = false;
+      bool checked = false;   // the row is the current choice: clicking it again may rightly change nothing
    };
+   // Rows whose effect is random and may land where it started.
+   bool MayKeep(const std::string& name) { return name == "Select Random"; }
 
    std::deque<Job> sJobs;
    int sPhase = 0, sWaitUntil = 0, sStep = 0, sTries = 0;
@@ -103,8 +106,13 @@ namespace
          NewPatch();
          gView3DOpen = true;
          sMouse = ImVec2(-1.0f, -1.0f);
+         // Two cubes and a sphere: Select All, Same Type and Linked (the cubes are grouped) each have work to do.
          if (GraphNode* cube = SpawnNode("Cube", "3D", 0.0f, 0.0f))
             View3DAddNode(*cube);
+         if (GraphNode* cube = SpawnNode("Cube", "3D", 0.0f, 200.0f))
+            View3DAddNode(*cube);
+         if (GraphNode* ball = SpawnNode("Sphere", "3D", 0.0f, 400.0f))
+            View3DAddNode(*ball);
          sPhase = 1;
          wait(8);
          return false;
@@ -144,7 +152,7 @@ namespace
                return false;
             for (const auto& r : rows)
             {
-               Job n{ j.onItem, j.path, !r.sub };
+               Job n{ j.onItem, j.path, !r.sub, r.checked };
                n.path.push_back(r.label);
                if (!r.enabled)
                {
@@ -159,6 +167,10 @@ namespace
                   sSkip++;
                   continue;
                }
+               // INFINITE_MENUALIVE_ONLY=<text>: click only rows whose path holds it (submenus are still walked).
+               const char* only = getenv("INFINITE_MENUALIVE_ONLY");
+               if (n.click && only != nullptr && PathText(n).find(only) == std::string::npos)
+                  continue;
                sJobs.push_back(n);
             }
             sPhase = 0;
@@ -198,7 +210,14 @@ namespace
                 !(p.Window->Flags & ImGuiWindowFlags_ChildMenu))
                ownPopup = true;
          const std::string after = View3DTestFingerprint();
-         Report(PathText(j), after != sBefore || ownPopup);
+         const bool changed = after != sBefore || ownPopup;
+         if (!changed && (j.checked || MayKeep(Name(j.path.back()))))
+         {
+            printf("  [same] %s (%s)\n", PathText(j).c_str(), j.checked ? "already the choice" : "random");
+            sPass++;
+         }
+         else
+            Report(PathText(j), changed);
          sPhase = 0;
          return true;
       }

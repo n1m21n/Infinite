@@ -2024,6 +2024,8 @@ namespace
 
    // Move to the ground point under the last place the pointer was over the view.
    ImVec2 sViewMouse(-1, -1);
+   ImVec2 sViewMn(0, 0), sViewMx(0, 0);   // the view's screen rect, last frame
+   int sGoToNode = 0;                     // Go to node requests (self-test fingerprint)
    void MoveToMouse(Scene3DNode* scene)
    {
       if (sSel.empty() || sViewMouse.x < 0)
@@ -2218,7 +2220,7 @@ namespace
          const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
          rigSelected = it != nullptr && PoseModel(*it, world) != nullptr;
       }
-      if (MenuParts::Item(T("Pose Mode"), rigSelected ? "Ctrl+Tab" : nullptr, sPose.on, any || sPose.on)) TogglePose(scene);
+      if (MenuParts::Item(T("Pose Mode"), rigSelected ? "Ctrl+Tab" : nullptr, sPose.on, rigSelected || sPose.on)) TogglePose(scene);
       if (MenuParts::Item(T("Sculpt Mode"), rigSelected ? nullptr : "Ctrl+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
       if (MenuParts::Item(T("Edit Mode"), "Tab", sEdit.on, any || sEdit.on)) ToggleEdit(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
@@ -5209,6 +5211,8 @@ namespace
          dl->AddImage((ImTextureID)(intptr_t)tex, mn, mx, ImVec2(0, 1), ImVec2(1, 0));
 
       const ImVec2 mouse = io.MousePos;
+      sViewMn = mn;
+      sViewMx = mx;
       if (hovered)
          sViewMouse = mouse;
       int selCount = 0;
@@ -8042,6 +8046,7 @@ namespace
                   {
                      gRequestSelectNodeIndex = gn->index;
                      gRequestFitViewNodeIndex = gn->index;
+                     sGoToNode++;
                   }
             }
          }
@@ -8367,6 +8372,16 @@ namespace
             }
       }
       sPickedUid = 0;
+      // Another scene (a new or opened patch): its item ids are its own, so the old selection and local view go.
+      static uint64_t sLastScene = 0;
+      const GraphNode* sceneGn = SceneGraphNode();
+      const uint64_t sceneUid = sceneGn != nullptr ? sceneGn->uid : 0;
+      if (sceneUid != sLastScene)
+      {
+         sLastScene = sceneUid;
+         sSel.clear();
+         sLocal.clear();
+      }
       sLocal.erase(std::remove_if(sLocal.begin(), sLocal.end(), [&](int id) { return scene->FindItem(id) == nullptr; }), sLocal.end());
       static Scene3DNode::Settings sSeen;
       std::memcpy(&sSeen, sSet, sizeof(sSeen));
@@ -8434,6 +8449,8 @@ void View3DTestOpenMenu(bool onItem)
       sSel = { scene->Items().front().id };
    sMenuOnItem = onItem;
    sOpenMenu = true;
+   // Where a person right-clicked: the middle of the view (Move to Mouse reads it).
+   sViewMouse = ImVec2((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
 }
 
 void View3DTestPose()
@@ -8446,9 +8463,30 @@ void View3DTestPose()
    std::copy(pos, pos + 3, it.pos);
    std::copy(rot, rot + 3, it.rot);
    std::copy(sc, sc + 3, it.scale);
+   // Items 1 and 2 (when there) are grouped, so Select Linked has something to add.
+   if (scene->Items().size() >= 3)
+   {
+      scene->Items()[0].group = scene->Items()[1].group = 7001;
+      scene->Items()[1].pos[0] = -1.5f;
+      scene->Items()[2].pos[0] = 2.5f;
+   }
    scene->Commit();
    const float cur[3] = { -0.6f, 0.3f, 0.45f };
    std::copy(cur, cur + 3, sSet->cursor);
+   // The same start for every click: first item selected, the view off to one side, no mode, no glide.
+   sSel = { it.id };
+   sLocal.clear();
+   sGlide.on = false;
+   sCameraView = false;
+   sOrtho = false;
+   sAz = 0.4f;
+   sEl = 0.3f;
+   sDist = 25.0f;
+   sTarget[0] = 6.0f, sTarget[1] = 2.0f, sTarget[2] = -4.0f;
+   sRoll = 0.0f;
+   sPose = {};
+   sEdit.on = false;
+   sSculpt.on = false;
 }
 
 std::string View3DTestFingerprint()
@@ -8471,6 +8509,9 @@ std::string View3DTestFingerprint()
             sEdit.on ? 1 : 0, sPose.on ? 1 : 0, sPose.paint ? 1 : 0, sSculpt.on ? 1 : 0, sRulers.size(), sLockCam ? 1 : 0,
             sLockActive ? 1 : 0);
    f += b;
+   f += " go" + std::to_string(sGoToNode);
+   if (const char* clip = ImGui::GetClipboardText())
+      f += std::string(" clip:") + clip;
    return f;
 }
 

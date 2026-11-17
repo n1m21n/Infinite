@@ -73,7 +73,7 @@ namespace MenuParts
    {
       std::string root, label;
       int depth = 0;
-      bool sub = false, enabled = true;
+      bool sub = false, enabled = true, checked = false;
       ImVec2 mn, mx;
       int frame = 0;
    };
@@ -86,7 +86,7 @@ namespace MenuParts
          d++;
       return d;
    }
-   inline void ProbeNote(const char* label, bool sub, bool enabled, ImGuiWindow* w)
+   inline void ProbeNote(const char* label, bool sub, bool enabled, ImGuiWindow* w, bool checked = false)
    {
       if (ProbeRoot().empty())
          return;
@@ -94,10 +94,10 @@ namespace MenuParts
       const int f = ImGui::GetFrameCount();
       if (!v.empty() && v.back().frame != f)
          v.erase(std::remove_if(v.begin(), v.end(), [f](const ProbeRow& r) { return r.frame < f - 1; }), v.end());
-      v.push_back({ ProbeRoot(), label, ProbeDepth(w), sub, enabled, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), f });
+      v.push_back({ ProbeRoot(), label, ProbeDepth(w), sub, enabled, checked, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), f });
    }
 #else
-   inline void ProbeNote(const char*, bool, bool, ImGuiWindow*) {}
+   inline void ProbeNote(const char*, bool, bool, ImGuiWindow*, bool = false) {}
 #endif
 
    inline bool Item(const char* label, const char* shortcut = nullptr, bool selected = false, bool enabled = true)
@@ -119,7 +119,7 @@ namespace MenuParts
                               ImGui::GetColorU32(dim), shortcut);
       }
       Wash(enabled && ImGui::IsItemHovered(), enabled && ImGui::IsItemActive(), false);
-      ProbeNote(label, false, enabled, ImGui::GetCurrentWindow());
+      ProbeNote(label, false, enabled, ImGui::GetCurrentWindow(), selected);
       return r;
    }
 
