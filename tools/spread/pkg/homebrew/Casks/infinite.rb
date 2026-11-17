@@ -1,6 +1,6 @@
 cask "infinite" do
-  version "1.2.0"
-  sha256 "21b513af75f0f86acc61fbff8574eec99ba15b4d60039de2610ea2396848b759"
+  version "2.0.0"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # PLACEHOLDER: release fills this (update-package-managers.yml homebrew job, or tools/spread/pkg/bump.py v2.0.0)
 
   url "https://github.com/n1m21n/Infinite/releases/download/v#{version}/Infinite.dmg",
       verified: "github.com/n1m21n/Infinite/"
