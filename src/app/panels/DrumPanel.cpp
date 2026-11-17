@@ -690,7 +690,7 @@ namespace app
             if (hov)
             {
                dl->AddRect(mn, mx, DeskParts::Ink(70), 3.0f);
-               HelpTip("%s %d: %s\n%s", T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
+               HelpTip(T("%s %d: %s\n%s"), T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
             }
             float x = scribbleX1 + pad;
             ImGui::SetCursorScreenPos(ImVec2(x, cy - keyH * 0.5f));
