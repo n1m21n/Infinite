@@ -293,6 +293,8 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gSampleStudioHeight;
          topBottomRows++;
       }
+      else
+         SampleStudioWhenClosed();
       // The 2D and 3D Views dock on any side, or Fill (4): the view takes the canvas's place.
       gView3DDock = std::clamp(gView3DDock, 0, 4);
       gView2DDock = std::clamp(gView2DDock, 0, 4);

@@ -5946,6 +5946,7 @@ extern bool gSampleStudioOpen;
 extern float gSampleStudioHeight;
 extern int gSampleStudioDock; // 0 = bottom, 3 = top (the Timeline's codes)
 void DrawSampleStudioDocked(const char* id, const ImVec2& size);
+void SampleStudioWhenClosed(); // silences the Studio's audio and preview once it is closed
 // The Studio's work as text for the patch (`studio` lines), and back; empty text clears it.
 std::string SampleStudioSerialize();
 void SampleStudioApply(const std::string& text);
