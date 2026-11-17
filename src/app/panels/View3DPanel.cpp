@@ -8457,8 +8457,7 @@ std::string View3DTestFingerprint()
    char b[512];
    if (Scene3DNode* scene = FindScene())
    {
-      scene->Serialize();
-      f += scene->SceneText();
+      f += scene->SceneText();   // kept current by every Commit
    }
    for (int id : sSel)
       f += " sel" + std::to_string(id);
