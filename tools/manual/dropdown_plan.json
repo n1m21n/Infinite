@@ -1,0 +1,2544 @@
+{
+  "stats": {
+    "nodes": 204,
+    "dropdowns": 184,
+    "resolved": 140,
+    "unresolved": 44
+  },
+  "dropdowns": [
+    {
+      "node": "3D View",
+      "class": "Scene3DNode",
+      "draw": "DrawScene3DParams",
+      "control": "motion of",
+      "param_index": 0,
+      "options": [
+        "Levels",
+        "Scanlines / Interlace",
+        "Lens Dirt + Flare",
+        "Polar Coords",
+        "Chromatic Aberration",
+        "Zoom Blur"
+      ],
+      "source": "DrawScene3DParams in src (line 16217)",
+      "status": "resolved"
+    },
+    {
+      "node": "Armature",
+      "class": "ArmatureNode",
+      "draw": "DrawArmatureParams",
+      "control": "axis",
+      "param_index": 0,
+      "options": [
+        "x",
+        "y",
+        "z"
+      ],
+      "source": "DrawArmatureParams in src (line 15266)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Displacement",
+      "class": "AudioDisplacementNode",
+      "draw": "DrawAudioDisplacementParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawAudioDisplacementParams in src (line 15895)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Displacement",
+      "class": "AudioDisplacementNode",
+      "draw": "DrawAudioDisplacementParams",
+      "control": "axis",
+      "param_index": 8,
+      "options": [
+        "X Axis",
+        "Y Axis",
+        "Z Axis"
+      ],
+      "source": "DrawAudioDisplacementParams in src (line 15895)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Displacement",
+      "class": "AudioDisplacementNode",
+      "draw": "DrawAudioDisplacementParams",
+      "control": "shading",
+      "param_index": 12,
+      "options": [
+        "Lit",
+        "Normals",
+        "UV",
+        "Flat"
+      ],
+      "source": "DrawAudioDisplacementParams in src (line 15895)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Ribbon",
+      "class": "AudioRibbonNode",
+      "draw": "DrawAudioRibbonParams",
+      "control": "shading",
+      "param_index": 14,
+      "options": [
+        "Lit",
+        "Normals",
+        "UV",
+        "Flat"
+      ],
+      "source": "DrawAudioRibbonParams in src (line 16129)",
+      "status": "resolved"
+    },
+    {
+      "node": "Bake",
+      "class": "BakeNode",
+      "draw": "DrawBakeParams",
+      "control": "bake",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawBakeParams in src (line 15322)",
+      "status": "resolved"
+    },
+    {
+      "node": "Bake",
+      "class": "BakeNode",
+      "draw": "DrawBakeParams",
+      "control": "size",
+      "param_index": 1,
+      "options": [
+        "256",
+        "512",
+        "1024",
+        "2048"
+      ],
+      "source": "DrawBakeParams in src (line 15322)",
+      "status": "resolved"
+    },
+    {
+      "node": "Camera",
+      "class": "CameraNode",
+      "draw": "DrawCameraParams",
+      "control": "projection",
+      "param_index": 0,
+      "options": [
+        "Perspective",
+        "Planar (Ortho)",
+        "Radial (LiDAR)",
+        "Cylindrical (360)"
+      ],
+      "source": "DrawCameraParams in src (line 16257)",
+      "status": "resolved"
+    },
+    {
+      "node": "Cloth",
+      "class": "ClothNode",
+      "draw": "DrawClothParams",
+      "control": "pinned",
+      "param_index": 0,
+      "options": [
+        "None",
+        "Top edge",
+        "Corners",
+        "Border"
+      ],
+      "source": "DrawClothParams in src (line 14345)",
+      "status": "resolved"
+    },
+    {
+      "node": "Curve",
+      "class": "CurveNode",
+      "draw": "DrawCurveParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "Catmull-Rom",
+        "Bezier",
+        "B-Spline",
+        "Linear"
+      ],
+      "source": "DrawCurveParams in src (line 14207)",
+      "status": "resolved"
+    },
+    {
+      "node": "Curve",
+      "class": "CurveNode",
+      "draw": "DrawCurveParams",
+      "control": "preset",
+      "param_index": 1,
+      "options": [
+        "HD 1280 x 720",
+        "Full HD 1920 x 1080",
+        "QHD 2560 x 1440",
+        "4K 3840 x 2160",
+        "Square 1080",
+        "Portrait 1080 x 1350",
+        "Story 1080 x 1920",
+        "Square 2048",
+        "A4 300 dpi",
+        "A4 landscape 300 dpi"
+      ],
+      "source": "DrawCurveParams in src (line 14207)",
+      "status": "resolved"
+    },
+    {
+      "node": "Curve Ops",
+      "class": "CurveOpsNode",
+      "draw": "DrawCurveOpsParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawCurveOpsParams in src (line 15208)",
+      "status": "resolved"
+    },
+    {
+      "node": "Delaunay Mesh",
+      "class": "DelaunayMeshNode",
+      "draw": "DrawDelaunayParams",
+      "control": "plane",
+      "param_index": 0,
+      "options": [
+        "XY",
+        "XZ",
+        "YZ"
+      ],
+      "source": "DrawDelaunayParams in src (line 15288)",
+      "status": "resolved"
+    },
+    {
+      "node": "Depth Projection",
+      "class": "DepthProjectionNode",
+      "draw": "DrawDepthProjectionParams",
+      "control": "projection",
+      "param_index": 0,
+      "options": [
+        "Perspective",
+        "Planar (Ortho)",
+        "Radial (LiDAR)",
+        "Cylindrical (360)"
+      ],
+      "source": "DrawDepthProjectionParams in src (line 15079)",
+      "status": "resolved"
+    },
+    {
+      "node": "Depth Projection",
+      "class": "DepthProjectionNode",
+      "draw": "DrawDepthProjectionParams",
+      "control": "output",
+      "param_index": 1,
+      "options": [
+        "Points",
+        "Mesh"
+      ],
+      "source": "DrawDepthProjectionParams in src (line 15079)",
+      "status": "resolved"
+    },
+    {
+      "node": "Depth Projection",
+      "class": "DepthProjectionNode",
+      "draw": "DrawDepthProjectionParams",
+      "control": "source",
+      "param_index": 2,
+      "options": [
+        "Luminance",
+        "Red",
+        "Alpha",
+        "Green",
+        "Blue",
+        "Inv Luminance"
+      ],
+      "source": "DrawDepthProjectionParams in src (line 15079)",
+      "status": "resolved"
+    },
+    {
+      "node": "Depth Projection",
+      "class": "DepthProjectionNode",
+      "draw": "DrawDepthProjectionParams",
+      "control": "color",
+      "param_index": 19,
+      "options": [
+        "Color Input",
+        "Turbo",
+        "Viridis",
+        "Thermal",
+        "Ocean",
+        "Solid Tint"
+      ],
+      "source": "DrawDepthProjectionParams in src (line 15079)",
+      "status": "resolved"
+    },
+    {
+      "node": "Displacement",
+      "class": "DisplacementNode",
+      "draw": "DrawDisplacementParams",
+      "control": "source",
+      "param_index": 0,
+      "options": [
+        "Texture",
+        "Noise"
+      ],
+      "source": "DrawDisplacementParams in src (line 15848)",
+      "status": "resolved"
+    },
+    {
+      "node": "Displacement",
+      "class": "DisplacementNode",
+      "draw": "DrawDisplacementParams",
+      "control": "mode",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawDisplacementParams in src (line 15848)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Displacement",
+      "class": "DisplacementNode",
+      "draw": "DrawDisplacementParams",
+      "control": "type",
+      "param_index": 4,
+      "options": [
+        "Smooth",
+        "Fractal",
+        "Curl (flow)",
+        "Ridged",
+        "Cells"
+      ],
+      "source": "DrawDisplacementParams in src (line 15848)",
+      "status": "resolved"
+    },
+    {
+      "node": "Displacement",
+      "class": "DisplacementNode",
+      "draw": "DrawDisplacementParams",
+      "control": "affects",
+      "param_index": 5,
+      "options": [
+        "Position",
+        "Colour (points)",
+        "Size (points)"
+      ],
+      "source": "DrawDisplacementParams in src (line 15848)",
+      "status": "resolved"
+    },
+    {
+      "node": "Distribute Points on Faces",
+      "class": "DistributePointsOnFacesNode",
+      "draw": "DrawDistributePointsOnFacesParams",
+      "control": "method",
+      "param_index": 1,
+      "options": [
+        "Random",
+        "Poisson Disk"
+      ],
+      "source": "DrawDistributePointsOnFacesParams in src (line 15146)",
+      "status": "resolved"
+    },
+    {
+      "node": "Field Primitive",
+      "class": "FieldPrimitiveNode",
+      "draw": "DrawFieldPrimitiveParams",
+      "control": "topology",
+      "param_index": 1,
+      "options": [
+        "Points",
+        "Plane (Grid)",
+        "Sphere",
+        "Cylinder",
+        "Torus",
+        "Disc"
+      ],
+      "source": "DrawFieldPrimitiveParams in src (line 8965)",
+      "status": "resolved"
+    },
+    {
+      "node": "Geometry",
+      "class": "GeometryNode",
+      "draw": "DrawGeometryParams",
+      "control": "shape",
+      "param_index": 0,
+      "options": [
+        "shape"
+      ],
+      "source": "DrawGeometryParams in src (line 15471)",
+      "status": "resolved"
+    },
+    {
+      "node": "HDRI",
+      "class": "EnvironmentNode",
+      "draw": "DrawEnvironmentParams",
+      "control": "source",
+      "param_index": 0,
+      "options": [
+        "Image",
+        "Physical sky"
+      ],
+      "source": "DrawEnvironmentParams in src (line 23326)",
+      "status": "resolved"
+    },
+    {
+      "node": "Image to Points",
+      "class": "ImageToPointsNode",
+      "draw": "DrawImageToPointsParams",
+      "control": "from",
+      "param_index": 3,
+      "options": [
+        "Luminance",
+        "Red",
+        "Alpha",
+        "Green",
+        "Blue",
+        "Inv Luminance"
+      ],
+      "source": "DrawImageToPointsParams in src (line 15058)",
+      "status": "resolved"
+    },
+    {
+      "node": "Instance on Points",
+      "class": "InstanceOnPointsNode",
+      "draw": "DrawInstanceParams",
+      "control": "points from",
+      "param_index": 0,
+      "options": [
+        "Texture",
+        "Noise"
+      ],
+      "source": "DrawInstanceParams in src (line 16197)",
+      "status": "resolved"
+    },
+    {
+      "node": "Join Geometry",
+      "class": "JoinGeometryNode",
+      "draw": "DrawJoinGeometryParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawJoinGeometryParams in src (line 14285)",
+      "status": "resolved"
+    },
+    {
+      "node": "Light",
+      "class": "LightNode",
+      "draw": "DrawLightParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "chords",
+        "comp",
+        "pads",
+        "strum",
+        "arp",
+        "bass",
+        "melody",
+        "drums"
+      ],
+      "source": "DrawLightParams in src (line 16278)",
+      "status": "resolved"
+    },
+    {
+      "node": "Mapping",
+      "class": "MappingNode",
+      "draw": "DrawMappingParams",
+      "control": "space",
+      "param_index": 0,
+      "options": [
+        "Fixed",
+        "Bounds"
+      ],
+      "source": "DrawMappingParams in src (line 14767)",
+      "status": "resolved"
+    },
+    {
+      "node": "Material",
+      "class": "MaterialNode",
+      "draw": "DrawMaterialParams",
+      "control": "shading",
+      "param_index": 4,
+      "options": [
+        "Lit",
+        "Normals",
+        "UV",
+        "Flat"
+      ],
+      "source": "DrawMaterialParams in src (line 14637)",
+      "status": "resolved"
+    },
+    {
+      "node": "Material",
+      "class": "MaterialNode",
+      "draw": "DrawMaterialParams",
+      "control": "wrap",
+      "param_index": 5,
+      "options": [],
+      "source": "DrawMaterialParams in src (line 14637)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Material",
+      "class": "MaterialNode",
+      "draw": "DrawMaterialParams",
+      "control": "model",
+      "param_index": 30,
+      "options": [
+        "Principled",
+        "Hair"
+      ],
+      "source": "DrawMaterialParams in src (line 14637)",
+      "status": "resolved"
+    },
+    {
+      "node": "Material",
+      "class": "MaterialNode",
+      "draw": "DrawMaterialParams",
+      "control": "hair colour",
+      "param_index": 31,
+      "options": [
+        "Melanin",
+        "Colour"
+      ],
+      "source": "DrawMaterialParams in src (line 14637)",
+      "status": "resolved"
+    },
+    {
+      "node": "Model 3D",
+      "class": "ModelSourceNode",
+      "draw": "DrawModelParams",
+      "control": "clip",
+      "param_index": 2,
+      "options": [],
+      "source": "DrawModelParams in src (line 15406)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Model 3D",
+      "class": "ModelSourceNode",
+      "draw": "DrawModelParams",
+      "control": "sync",
+      "param_index": 5,
+      "options": [
+        "seconds",
+        "beats"
+      ],
+      "source": "DrawModelParams in src (line 15406)",
+      "status": "resolved"
+    },
+    {
+      "node": "Particle System",
+      "class": "ParticleSystemNode",
+      "draw": "DrawParticleSystemParams",
+      "control": "shape",
+      "param_index": 0,
+      "options": [
+        "Point",
+        "Sphere",
+        "Box",
+        "Disc"
+      ],
+      "source": "DrawParticleSystemParams in src (line 14463)",
+      "status": "resolved"
+    },
+    {
+      "node": "Point Trails",
+      "class": "PointTrailsNode",
+      "draw": "DrawPointTrailsParams",
+      "control": "colour",
+      "param_index": 3,
+      "options": [
+        "Color Input",
+        "Turbo",
+        "Viridis",
+        "Thermal",
+        "Ocean",
+        "Solid Tint"
+      ],
+      "source": "DrawPointTrailsParams in src (line 15177)",
+      "status": "resolved"
+    },
+    {
+      "node": "Point Trails",
+      "class": "PointTrailsNode",
+      "draw": "DrawPointTrailsParams",
+      "control": "match by",
+      "param_index": 4,
+      "options": [],
+      "source": "DrawPointTrailsParams in src (line 15177)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "engine",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "pass",
+      "param_index": 1,
+      "options": [
+        "Color",
+        "Depth (Linear)",
+        "Depth (Raw Z)",
+        "Normals",
+        "Position",
+        "Mist",
+        "Object Index",
+        "Emission",
+        "Shadow",
+        "AO",
+        "Environment"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "mist falloff",
+      "param_index": 6,
+      "options": [
+        "Quadratic",
+        "Linear",
+        "Inverse Quadratic"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "antialias",
+      "param_index": 11,
+      "options": [
+        "Off",
+        "2x",
+        "4x",
+        "8x"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "tonemap",
+      "param_index": 12,
+      "options": [
+        "None",
+        "ACES",
+        "Reinhard",
+        "AgX",
+        "Neutral"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "projection",
+      "param_index": 17,
+      "options": [
+        "Perspective",
+        "Planar (Ortho)",
+        "Radial (LiDAR)",
+        "Cylindrical (360)"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "lens",
+      "param_index": 22,
+      "options": [
+        "Equidistant",
+        "Equisolid"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "sprite shape",
+      "param_index": 33,
+      "options": [
+        "Circle",
+        "Square"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "sprite size",
+      "param_index": 34,
+      "options": [
+        "World",
+        "Screen"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "resolution",
+      "param_index": 42,
+      "options": [
+        "1024",
+        "2048",
+        "4096"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "shading",
+      "param_index": 50,
+      "options": [
+        "Rendered",
+        "Solid"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "solid lighting",
+      "param_index": 51,
+      "options": [
+        "Studio",
+        "MatCap",
+        "Flat"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "matcap",
+      "param_index": 52,
+      "options": [
+        "Clay",
+        "Metal",
+        "Toon",
+        "Gloss"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "solid color",
+      "param_index": 56,
+      "options": [
+        "Material",
+        "Attribute",
+        "Single",
+        "Random",
+        "Texture",
+        "Object"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "cavity type",
+      "param_index": 58,
+      "options": [
+        "World",
+        "Screen",
+        "Both"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Render 3D",
+      "class": "Render3DNode",
+      "draw": "DrawRender3DParams",
+      "control": "motion position",
+      "param_index": 77,
+      "options": [
+        "Start on Frame",
+        "Center on Frame",
+        "End on Frame"
+      ],
+      "source": "DrawRender3DParams in src (line 16427)",
+      "status": "resolved"
+    },
+    {
+      "node": "Revolve",
+      "class": "RevolveNode",
+      "draw": "DrawRevolveParams",
+      "control": "axis",
+      "param_index": 0,
+      "options": [
+        "x",
+        "y",
+        "z"
+      ],
+      "source": "DrawRevolveParams in src (line 15235)",
+      "status": "resolved"
+    },
+    {
+      "node": "Rigid Bodies",
+      "class": "RigidBodyNode",
+      "draw": "DrawRigidBodyParams",
+      "control": "collider",
+      "param_index": 0,
+      "options": [
+        "Box",
+        "Sphere",
+        "Convex hull"
+      ],
+      "source": "DrawRigidBodyParams in src (line 14414)",
+      "status": "resolved"
+    },
+    {
+      "node": "Set Vertex Color",
+      "class": "SetColorNode",
+      "draw": "DrawSetColorParams",
+      "control": "source",
+      "param_index": 0,
+      "options": [
+        "Texture",
+        "Noise"
+      ],
+      "source": "DrawSetColorParams in src (line 16162)",
+      "status": "resolved"
+    },
+    {
+      "node": "Switcher 3D",
+      "class": "Switcher3DNode",
+      "draw": "DrawSwitcher3DParams",
+      "control": "unit",
+      "param_index": 0,
+      "options": [
+        "beats",
+        "seconds"
+      ],
+      "source": "DrawSwitcher3DParams in src (line 14296)",
+      "status": "resolved"
+    },
+    {
+      "node": "Text 3D",
+      "class": "Text3DNode",
+      "draw": "DrawText3DParams",
+      "control": "font",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawText3DParams in src (line 15363)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Wrap",
+      "class": "WrapNode",
+      "draw": "DrawWrapParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawWrapParams in src (line 14314)",
+      "status": "resolved"
+    },
+    {
+      "node": "Wrap",
+      "class": "WrapNode",
+      "draw": "DrawWrapParams",
+      "control": "axis",
+      "param_index": 1,
+      "options": [
+        "x",
+        "y",
+        "z"
+      ],
+      "source": "DrawWrapParams in src (line 14314)",
+      "status": "resolved"
+    },
+    {
+      "node": "Spectral Field",
+      "class": "SpectralFieldNode",
+      "draw": "DrawSpectralFieldParams",
+      "control": "size",
+      "param_index": 0,
+      "options": [
+        "256",
+        "512",
+        "1024",
+        "2048"
+      ],
+      "source": "DrawSpectralFieldParams in src (line 9123)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Color Ramp",
+      "class": "AudioColorRampNode",
+      "draw": "DrawAudioColorRampParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawAudioColorRampParams in src (line 16092)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Color Ramp",
+      "class": "AudioColorRampNode",
+      "draw": "DrawAudioColorRampParams",
+      "control": "interpolation",
+      "param_index": 1,
+      "options": [
+        "Linear",
+        "Constant",
+        "Smooth"
+      ],
+      "source": "DrawAudioColorRampParams in src (line 16092)",
+      "status": "resolved"
+    },
+    {
+      "node": "Blend",
+      "class": "BlendNode",
+      "draw": "DrawBlendParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawBlendParams in src (line 16795)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Color Ramp",
+      "class": "ColorRampNode",
+      "draw": "DrawColorRampParams",
+      "control": "interpolation",
+      "param_index": 0,
+      "options": [
+        "Linear",
+        "Constant",
+        "Smooth"
+      ],
+      "source": "DrawColorRampParams in src (line 25978)",
+      "status": "resolved"
+    },
+    {
+      "node": "Curves",
+      "class": "CurvesNode",
+      "draw": "DrawCurvesParams",
+      "control": "channel",
+      "param_index": 0,
+      "options": [
+        "RGB",
+        "Red",
+        "Green",
+        "Blue"
+      ],
+      "source": "DrawCurvesParams in src (line 25216)",
+      "status": "resolved"
+    },
+    {
+      "node": "Fit",
+      "class": "FitNode",
+      "draw": "DrawFitParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawFitParams in src (line 23625)",
+      "status": "resolved"
+    },
+    {
+      "node": "Fluid",
+      "class": "FluidNode",
+      "draw": "DrawFluidParams",
+      "control": "view",
+      "param_index": 0,
+      "options": [
+        "Dye",
+        "Velocity",
+        "Pressure",
+        "Obstacles"
+      ],
+      "source": "DrawFluidParams in src (line 25572)",
+      "status": "resolved"
+    },
+    {
+      "node": "Fluid",
+      "class": "FluidNode",
+      "draw": "DrawFluidParams",
+      "control": "resolution",
+      "param_index": 1,
+      "options": [
+        "Full",
+        "Half",
+        "Quarter"
+      ],
+      "source": "DrawFluidParams in src (line 25572)",
+      "status": "resolved"
+    },
+    {
+      "node": "Fluid",
+      "class": "FluidNode",
+      "draw": "DrawFluidParams",
+      "control": "stirrer",
+      "param_index": 2,
+      "options": [
+        "Off",
+        "Orbit",
+        "Pulse",
+        "Spin"
+      ],
+      "source": "DrawFluidParams in src (line 25572)",
+      "status": "resolved"
+    },
+    {
+      "node": "Layer Stack",
+      "class": "LayerStackNode",
+      "draw": "DrawLayerStackParams",
+      "control": "fit",
+      "param_index": 0,
+      "options": [
+        "Stretch",
+        "Fit",
+        "Fill"
+      ],
+      "source": "DrawLayerStackParams in src (line 16804)",
+      "status": "resolved"
+    },
+    {
+      "node": "Layer Stack",
+      "class": "LayerStackNode",
+      "draw": "DrawLayerStackParams",
+      "control": "?",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawLayerStackParams in src (line 16804)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Optical Flow",
+      "class": "OpticalFlowNode",
+      "draw": "DrawOpticalFlowParams",
+      "control": "view",
+      "param_index": 0,
+      "options": [
+        "Vectors",
+        "Colour"
+      ],
+      "source": "DrawOpticalFlowParams in src (line 25550)",
+      "status": "resolved"
+    },
+    {
+      "node": "Optical Flow",
+      "class": "OpticalFlowNode",
+      "draw": "DrawOpticalFlowParams",
+      "control": "resolution",
+      "param_index": 1,
+      "options": [
+        "Full",
+        "Half",
+        "Quarter"
+      ],
+      "source": "DrawOpticalFlowParams in src (line 25550)",
+      "status": "resolved"
+    },
+    {
+      "node": "Reaction Diffusion",
+      "class": "ReactionDiffusionNode",
+      "draw": "DrawReactionDiffusionParams",
+      "control": "preset",
+      "param_index": 0,
+      "options": [
+        "HD 1280 x 720",
+        "Full HD 1920 x 1080",
+        "QHD 2560 x 1440",
+        "4K 3840 x 2160",
+        "Square 1080",
+        "Portrait 1080 x 1350",
+        "Story 1080 x 1920",
+        "Square 2048",
+        "A4 300 dpi",
+        "A4 landscape 300 dpi"
+      ],
+      "source": "DrawReactionDiffusionParams in src (line 25651)",
+      "status": "resolved"
+    },
+    {
+      "node": "Remove Background",
+      "class": "RemoveBgNode",
+      "draw": "DrawRemoveBgParams",
+      "control": "detect",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawRemoveBgParams in src (line 25501)",
+      "status": "resolved"
+    },
+    {
+      "node": "Remove Background",
+      "class": "RemoveBgNode",
+      "draw": "DrawRemoveBgParams",
+      "control": "output",
+      "param_index": 1,
+      "options": [
+        "Cutout",
+        "Mask only",
+        "Background only"
+      ],
+      "source": "DrawRemoveBgParams in src (line 25501)",
+      "status": "resolved"
+    },
+    {
+      "node": "Switcher",
+      "class": "SwitcherNode",
+      "draw": "DrawSwitcherParams",
+      "control": "unit",
+      "param_index": 0,
+      "options": [
+        "beats",
+        "seconds"
+      ],
+      "source": "DrawSwitcherParams in src (line 24430)",
+      "status": "resolved"
+    },
+    {
+      "node": "Time Machine",
+      "class": "TimeMachineNode",
+      "draw": "DrawTimeMachineParams",
+      "control": "resolution",
+      "param_index": 0,
+      "options": [
+        "Full",
+        "Half",
+        "Quarter"
+      ],
+      "source": "DrawTimeMachineParams in src (line 25563)",
+      "status": "resolved"
+    },
+    {
+      "node": "Trails",
+      "class": "TrailsNode",
+      "draw": "DrawTrailsParams",
+      "control": "blend",
+      "param_index": 0,
+      "options": [
+        "Max",
+        "Add",
+        "Screen"
+      ],
+      "source": "DrawTrailsParams in src (line 25535)",
+      "status": "resolved"
+    },
+    {
+      "node": "Volume",
+      "class": "VolumeNode",
+      "draw": "DrawVolumeParams",
+      "control": "shape",
+      "param_index": 0,
+      "options": [
+        "shape"
+      ],
+      "source": "DrawVolumeParams in src (line 25592)",
+      "status": "resolved"
+    },
+    {
+      "node": "Resynthesize",
+      "class": "ResynthNode",
+      "draw": "DrawResynthParams",
+      "control": "?",
+      "param_index": 5,
+      "options": [],
+      "source": "DrawResynthParams in src (line 24512)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Audio to CV",
+      "class": "AudioToCVNode",
+      "draw": "DrawAudioToCVBody",
+      "control": "mode",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawAudioToCVBody in src (line 19822)",
+      "status": "unresolved"
+    },
+    {
+      "node": "CV to Pitch",
+      "class": "CVToPitchNode",
+      "draw": "DrawCVToPitchParams",
+      "control": "scale",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawCVToPitchParams in src (line 17821)",
+      "status": "unresolved"
+    },
+    {
+      "node": "CV to Pitch",
+      "class": "CVToPitchNode",
+      "draw": "DrawCVToPitchParams",
+      "control": "root",
+      "param_index": 2,
+      "options": [
+        "C",
+        "C#",
+        "D",
+        "D#",
+        "E",
+        "F",
+        "F#",
+        "G",
+        "G#",
+        "A",
+        "A#",
+        "B"
+      ],
+      "source": "DrawCVToPitchParams in src (line 17821)",
+      "status": "resolved"
+    },
+    {
+      "node": "Compare",
+      "class": "CompareNode",
+      "draw": "DrawCompareParams",
+      "control": "operation",
+      "param_index": 0,
+      "options": [
+        "displace",
+        "jitter",
+        "smooth",
+        "twist",
+        "bulge",
+        "extrude faces",
+        "subdivide",
+        "squash"
+      ],
+      "source": "DrawCompareParams in src (line 24234)",
+      "status": "resolved"
+    },
+    {
+      "node": "Envelope",
+      "class": "EnvelopeNode",
+      "draw": "DrawEnvelopeBody",
+      "control": "output",
+      "param_index": 4,
+      "options": [
+        "centred",
+        "ADSR"
+      ],
+      "source": "DrawEnvelopeBody in src (line 19849)",
+      "status": "resolved"
+    },
+    {
+      "node": "Geometry Table",
+      "class": "GeometryTableNode",
+      "draw": "DrawGeometryTableParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Global Average",
+        "Point Probe",
+        "Region of Interest",
+        "Center Weighted"
+      ],
+      "source": "DrawGeometryTableParams in src (line 14147)",
+      "status": "resolved"
+    },
+    {
+      "node": "Geometry Table",
+      "class": "GeometryTableNode",
+      "draw": "DrawGeometryTableParams",
+      "control": "sort",
+      "param_index": 1,
+      "options": [
+        "None",
+        "X",
+        "Y",
+        "Z",
+        "Distance",
+        "Angle"
+      ],
+      "source": "DrawGeometryTableParams in src (line 14147)",
+      "status": "resolved"
+    },
+    {
+      "node": "Geometry Table",
+      "class": "GeometryTableNode",
+      "draw": "DrawGeometryTableParams",
+      "control": "axis",
+      "param_index": 3,
+      "options": [
+        "x",
+        "y",
+        "z"
+      ],
+      "source": "DrawGeometryTableParams in src (line 14147)",
+      "status": "resolved"
+    },
+    {
+      "node": "Geometry Table",
+      "class": "GeometryTableNode",
+      "draw": "DrawGeometryTableParams",
+      "control": "space",
+      "param_index": 6,
+      "options": [
+        "Fixed",
+        "Bounds"
+      ],
+      "source": "DrawGeometryTableParams in src (line 14147)",
+      "status": "resolved"
+    },
+    {
+      "node": "Image Analyze",
+      "class": "ImageAnalyzeNode",
+      "draw": "DrawImageAnalyzeParams",
+      "control": "sample mode",
+      "param_index": 0,
+      "options": [
+        "Global Average",
+        "Point Probe",
+        "Region of Interest",
+        "Center Weighted"
+      ],
+      "source": "DrawImageAnalyzeParams in src (line 25987)",
+      "status": "resolved"
+    },
+    {
+      "node": "Image Analyze",
+      "class": "ImageAnalyzeNode",
+      "draw": "DrawImageAnalyzeParams",
+      "control": "operation",
+      "param_index": 4,
+      "options": [
+        "Custom Expression",
+        "Red",
+        "Green",
+        "Blue",
+        "Alpha",
+        "Luminance",
+        "Average",
+        "Sum",
+        "Product",
+        "Max",
+        "Min",
+        "Range",
+        "R - G",
+        "R - B",
+        "G - B",
+        "|R - G|",
+        "|R - B|",
+        "|G - B|",
+        "Saturation",
+        "Hue",
+        "Euclidean Norm",
+        "Delta / Motion"
+      ],
+      "source": "DrawImageAnalyzeParams in src (line 25987)",
+      "status": "resolved"
+    },
+    {
+      "node": "LFO",
+      "class": "LFONode",
+      "draw": "DrawLFOParams",
+      "control": "shape",
+      "param_index": 0,
+      "options": [
+        "shape"
+      ],
+      "source": "DrawLFOParams in src (line 23933)",
+      "status": "resolved"
+    },
+    {
+      "node": "LFO",
+      "class": "LFONode",
+      "draw": "DrawLFOParams",
+      "control": "rate in",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawLFOParams in src (line 23933)",
+      "status": "unresolved"
+    },
+    {
+      "node": "LFO",
+      "class": "LFONode",
+      "draw": "DrawLFOParams",
+      "control": "phase from",
+      "param_index": 6,
+      "options": [
+        "transport",
+        "free",
+        "retrigger"
+      ],
+      "source": "DrawLFOParams in src (line 23933)",
+      "status": "resolved"
+    },
+    {
+      "node": "MIDI Trigger",
+      "class": "MidiTriggerNode",
+      "draw": "DrawMidiTriggerParams",
+      "control": "device type",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawMidiTriggerParams in src (line 24952)",
+      "status": "resolved"
+    },
+    {
+      "node": "MSEG",
+      "class": "MSEGNode",
+      "draw": "DrawMSEGParams",
+      "control": "rate in",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawMSEGParams in src (line 25474)",
+      "status": "unresolved"
+    },
+    {
+      "node": "MSEG",
+      "class": "MSEGNode",
+      "draw": "DrawMSEGParams",
+      "control": "play",
+      "param_index": 2,
+      "options": [],
+      "source": "DrawMSEGParams in src (line 25474)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Math",
+      "class": "MathNode",
+      "draw": "DrawMathParams",
+      "control": "operation",
+      "param_index": 0,
+      "options": [
+        "displace",
+        "jitter",
+        "smooth",
+        "twist",
+        "bulge",
+        "extrude faces",
+        "subdivide",
+        "squash"
+      ],
+      "source": "DrawMathParams in src (line 24217)",
+      "status": "resolved"
+    },
+    {
+      "node": "Note Expression",
+      "class": "NoteExpressionNode",
+      "draw": "DrawNoteExpressionParams",
+      "control": "source",
+      "param_index": 0,
+      "options": [
+        "Texture",
+        "Noise"
+      ],
+      "source": "DrawNoteExpressionParams in src (line 23980)",
+      "status": "resolved"
+    },
+    {
+      "node": "Palette",
+      "class": "PaletteNode",
+      "draw": "DrawPaletteParams",
+      "control": "order",
+      "param_index": 0,
+      "options": [
+        "Luminance",
+        "Weight",
+        "Hue"
+      ],
+      "source": "DrawPaletteParams in src (line 25727)",
+      "status": "resolved"
+    },
+    {
+      "node": "Palette",
+      "class": "PaletteNode",
+      "draw": "DrawPaletteParams",
+      "control": "blend",
+      "param_index": 10,
+      "options": [
+        "Steps",
+        "Smooth"
+      ],
+      "source": "DrawPaletteParams in src (line 25727)",
+      "status": "resolved"
+    },
+    {
+      "node": "Path",
+      "class": "PathNode",
+      "draw": "DrawPathParams",
+      "control": "shape",
+      "param_index": 0,
+      "options": [
+        "shape"
+      ],
+      "source": "DrawPathParams in src (line 14026)",
+      "status": "resolved"
+    },
+    {
+      "node": "Path",
+      "class": "PathNode",
+      "draw": "DrawPathParams",
+      "control": "mode",
+      "param_index": 4,
+      "options": [
+        "Boundary",
+        "Slice"
+      ],
+      "source": "DrawPathParams in src (line 14026)",
+      "status": "resolved"
+    },
+    {
+      "node": "Path",
+      "class": "PathNode",
+      "draw": "DrawPathParams",
+      "control": "axis",
+      "param_index": 5,
+      "options": [
+        "x",
+        "y",
+        "z"
+      ],
+      "source": "DrawPathParams in src (line 14026)",
+      "status": "resolved"
+    },
+    {
+      "node": "Random",
+      "class": "RandomNode",
+      "draw": "DrawRandomParams",
+      "control": "rate in",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawRandomParams in src (line 23959)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Smoothing",
+      "class": "SmoothNode",
+      "draw": "DrawSmoothParams",
+      "control": "mode",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawSmoothParams in src (line 24264)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Voice Spread",
+      "class": "VoiceSpreadNode",
+      "draw": "DrawVoiceSpreadParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawVoiceSpreadParams in src (line 23970)",
+      "status": "resolved"
+    },
+    {
+      "node": "Arpeggiator",
+      "class": "ArpeggiatorNode",
+      "draw": "DrawArpeggiatorBody",
+      "control": "preset",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawArpeggiatorBody in src (line 18761)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Arpeggiator",
+      "class": "ArpeggiatorNode",
+      "draw": "DrawArpeggiatorBody",
+      "control": "mode",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawArpeggiatorBody in src (line 18761)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Bouncing Balls",
+      "class": "BouncingBallsNode",
+      "draw": "DrawBouncingBallsBody",
+      "control": "shape",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawBouncingBallsBody in src (line 19774)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Chorder",
+      "class": "ChorderNode",
+      "draw": "DrawChorderBody",
+      "control": "scale",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawChorderBody in src (line 19456)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Chorder",
+      "class": "ChorderNode",
+      "draw": "DrawChorderBody",
+      "control": "root",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawChorderBody in src (line 19456)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Chorder",
+      "class": "ChorderNode",
+      "draw": "DrawChorderBody",
+      "control": "rate",
+      "param_index": 2,
+      "options": [],
+      "source": "DrawChorderBody in src (line 19456)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Chorder",
+      "class": "ChorderNode",
+      "draw": "DrawChorderBody",
+      "control": "chords",
+      "param_index": 3,
+      "options": [],
+      "source": "DrawChorderBody in src (line 19456)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Note Router",
+      "class": "NoteRouterNode",
+      "draw": "DrawNoteRouterBody",
+      "control": "mode",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawNoteRouterBody in src (line 18649)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Quantizer",
+      "class": "QuantizerNode",
+      "draw": "DrawQuantizerBody",
+      "control": "grid",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawQuantizerBody in src (line 18279)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Random Note Generator",
+      "class": "RandomNoteGeneratorNode",
+      "draw": "DrawRandomNoteGeneratorBody",
+      "control": "scale",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawRandomNoteGeneratorBody in src (line 19306)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Random Note Generator",
+      "class": "RandomNoteGeneratorNode",
+      "draw": "DrawRandomNoteGeneratorBody",
+      "control": "root",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawRandomNoteGeneratorBody in src (line 19306)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Predictive Rhythm",
+      "class": "PredictiveRhythmNode",
+      "draw": "DrawPredictiveRhythmBody",
+      "control": "root",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawPredictiveRhythmBody in src (line 18385)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Shade Combine",
+      "class": "ShadeCombineNode",
+      "draw": "DrawShadeCombineParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawShadeCombineParams in src (line 14975)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Coord",
+      "class": "ShadeCoordNode",
+      "draw": "DrawShadeCoordParams",
+      "control": "output",
+      "param_index": 0,
+      "options": [
+        "UV",
+        "Object",
+        "World",
+        "Generated",
+        "Normal",
+        "View",
+        "Reflection"
+      ],
+      "source": "DrawShadeCoordParams in src (line 14801)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Geometry",
+      "class": "ShadeGeometryNode",
+      "draw": "DrawShadeGeometryParams",
+      "control": "output",
+      "param_index": 0,
+      "options": [
+        "UV",
+        "Object",
+        "World",
+        "Generated",
+        "Normal",
+        "View",
+        "Reflection"
+      ],
+      "source": "DrawShadeGeometryParams in src (line 15029)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Gradient",
+      "class": "ShadeGradientNode",
+      "draw": "DrawShadeGradientParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "Catmull-Rom",
+        "Bezier",
+        "B-Spline",
+        "Linear"
+      ],
+      "source": "DrawShadeGradientParams in src (line 14853)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Image",
+      "class": "ShadeImageNode",
+      "draw": "DrawShadeImageParams",
+      "control": "projection",
+      "param_index": 0,
+      "options": [
+        "Perspective",
+        "Planar (Ortho)",
+        "Radial (LiDAR)",
+        "Cylindrical (360)"
+      ],
+      "source": "DrawShadeImageParams in src (line 14874)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Image",
+      "class": "ShadeImageNode",
+      "draw": "DrawShadeImageParams",
+      "control": "space",
+      "param_index": 1,
+      "options": [
+        "Fixed",
+        "Bounds"
+      ],
+      "source": "DrawShadeImageParams in src (line 14874)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Layer Weight",
+      "class": "ShadeLayerWeightNode",
+      "draw": "DrawShadeLayerWeightParams",
+      "control": "output",
+      "param_index": 0,
+      "options": [
+        "UV",
+        "Object",
+        "World",
+        "Generated",
+        "Normal",
+        "View",
+        "Reflection"
+      ],
+      "source": "DrawShadeLayerWeightParams in src (line 15022)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Map Range",
+      "class": "ShadeMapRangeNode",
+      "draw": "DrawShadeMapRangeParams",
+      "control": "interpolation",
+      "param_index": 0,
+      "options": [
+        "Linear",
+        "Constant",
+        "Smooth"
+      ],
+      "source": "DrawShadeMapRangeParams in src (line 14953)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Mapping",
+      "class": "ShadeMappingNode",
+      "draw": "DrawShadeMappingParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "Catmull-Rom",
+        "Bezier",
+        "B-Spline",
+        "Linear"
+      ],
+      "source": "DrawShadeMappingParams in src (line 14807)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Math",
+      "class": "ShadeMathNode",
+      "draw": "DrawShadeMathParams",
+      "control": "op",
+      "param_index": 0,
+      "options": [
+        "displace",
+        "jitter",
+        "smooth",
+        "twist",
+        "bulge",
+        "extrude faces",
+        "subdivide",
+        "squash"
+      ],
+      "source": "DrawShadeMathParams in src (line 14883)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Mix",
+      "class": "ShadeMixNode",
+      "draw": "DrawShadeMixParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "Float",
+        "Vector",
+        "Colour"
+      ],
+      "source": "DrawShadeMixParams in src (line 14909)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Mix",
+      "class": "ShadeMixNode",
+      "draw": "DrawShadeMixParams",
+      "control": "mode",
+      "param_index": 1,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawShadeMixParams in src (line 14909)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Noise",
+      "class": "ShadeNoiseNode",
+      "draw": "DrawShadeNoiseParams",
+      "control": "output",
+      "param_index": 0,
+      "options": [
+        "UV",
+        "Object",
+        "World",
+        "Generated",
+        "Normal",
+        "View",
+        "Reflection"
+      ],
+      "source": "DrawShadeNoiseParams in src (line 14836)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Ramp",
+      "class": "ShadeRampNode",
+      "draw": "DrawShadeRampParams",
+      "control": "interpolation",
+      "param_index": 0,
+      "options": [
+        "Linear",
+        "Constant",
+        "Smooth"
+      ],
+      "source": "DrawShadeRampParams in src (line 14937)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Separate",
+      "class": "ShadeSeparateNode",
+      "draw": "DrawShadeSeparateParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawShadeSeparateParams in src (line 14968)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Separate",
+      "class": "ShadeSeparateNode",
+      "draw": "DrawShadeSeparateParams",
+      "control": "channel",
+      "param_index": 1,
+      "options": [
+        "RGB",
+        "Red",
+        "Green",
+        "Blue"
+      ],
+      "source": "DrawShadeSeparateParams in src (line 14968)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Vector Math",
+      "class": "ShadeVectorMathNode",
+      "draw": "DrawShadeVectorMathParams",
+      "control": "op",
+      "param_index": 0,
+      "options": [
+        "displace",
+        "jitter",
+        "smooth",
+        "twist",
+        "bulge",
+        "extrude faces",
+        "subdivide",
+        "squash"
+      ],
+      "source": "DrawShadeVectorMathParams in src (line 14894)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shade Voronoi",
+      "class": "ShadeVoronoiNode",
+      "draw": "DrawShadeVoronoiParams",
+      "control": "output",
+      "param_index": 0,
+      "options": [
+        "UV",
+        "Object",
+        "World",
+        "Generated",
+        "Normal",
+        "View",
+        "Reflection"
+      ],
+      "source": "DrawShadeVoronoiParams in src (line 14846)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Texture",
+      "class": "AudioTextureNode",
+      "draw": "DrawAudioTextureParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Scalar (along normal)",
+        "Vector (RGB = XYZ)"
+      ],
+      "source": "DrawAudioTextureParams in src (line 15940)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Texture",
+      "class": "AudioTextureNode",
+      "draw": "DrawAudioTextureParams",
+      "control": "window",
+      "param_index": 1,
+      "options": [
+        "512",
+        "1024",
+        "2048",
+        "4096"
+      ],
+      "source": "DrawAudioTextureParams in src (line 15940)",
+      "status": "resolved"
+    },
+    {
+      "node": "Audio Texture",
+      "class": "AudioTextureNode",
+      "draw": "DrawAudioTextureParams",
+      "control": "window (1024)",
+      "param_index": 2,
+      "options": [
+        "512",
+        "1024",
+        "2048",
+        "4096"
+      ],
+      "source": "DrawAudioTextureParams in src (line 15940)",
+      "status": "resolved"
+    },
+    {
+      "node": "Draw",
+      "class": "DrawNode",
+      "draw": "DrawDrawParams",
+      "control": "brush",
+      "param_index": 0,
+      "options": [
+        "Soft Round",
+        "Hard Round",
+        "Square",
+        "Spray",
+        "Chalk",
+        "Ink Bleed"
+      ],
+      "source": "DrawDrawParams in src (line 26700)",
+      "status": "resolved"
+    },
+    {
+      "node": "FieldPixel",
+      "class": "FieldPixelNode",
+      "draw": "DrawFieldPixelParams",
+      "control": "domain",
+      "param_index": 0,
+      "options": [
+        "[0, 1] Normalized",
+        "[-pi, pi] Angular",
+        "[-1, 1] Bipolar"
+      ],
+      "source": "DrawFieldPixelParams in src (line 9376)",
+      "status": "resolved"
+    },
+    {
+      "node": "Formula",
+      "class": "FormulaNode",
+      "draw": "DrawFormulaParams",
+      "control": "buffers",
+      "param_index": 0,
+      "options": [
+        "no buffers",
+        "buffer A",
+        "buffers A + B",
+        "buffers A - D"
+      ],
+      "source": "DrawFormulaParams in src (line 23417)",
+      "status": "resolved"
+    },
+    {
+      "node": "Noise",
+      "class": "NoiseNode",
+      "draw": "DrawNoiseParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "chords",
+        "comp",
+        "pads",
+        "strum",
+        "arp",
+        "bass",
+        "melody",
+        "drums"
+      ],
+      "source": "DrawNoiseParams in src (line 24308)",
+      "status": "resolved"
+    },
+    {
+      "node": "Ramp",
+      "class": "RampNode",
+      "draw": "DrawRampParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "chords",
+        "comp",
+        "pads",
+        "strum",
+        "arp",
+        "bass",
+        "melody",
+        "drums"
+      ],
+      "source": "DrawRampParams in src (line 25777)",
+      "status": "resolved"
+    },
+    {
+      "node": "Ramp",
+      "class": "RampNode",
+      "draw": "DrawRampParams",
+      "control": "repeat",
+      "param_index": 1,
+      "options": [
+        "Clamp",
+        "Repeat",
+        "Mirror"
+      ],
+      "source": "DrawRampParams in src (line 25777)",
+      "status": "resolved"
+    },
+    {
+      "node": "Shape",
+      "class": "ShapeNode",
+      "draw": "DrawShapeParams",
+      "control": "shape",
+      "param_index": 0,
+      "options": [
+        "shape"
+      ],
+      "source": "DrawShapeParams in src (line 23371)",
+      "status": "resolved"
+    },
+    {
+      "node": "Slideshow",
+      "class": "SlideshowNode",
+      "draw": "DrawSlideshowParams",
+      "control": "transition",
+      "param_index": 0,
+      "options": [
+        "Fade",
+        "Slide Left",
+        "Slide Right",
+        "Wipe Left",
+        "Wipe Right",
+        "Zoom Fade"
+      ],
+      "source": "DrawSlideshowParams in src (line 23103)",
+      "status": "resolved"
+    },
+    {
+      "node": "Slideshow",
+      "class": "SlideshowNode",
+      "draw": "DrawSlideshowParams",
+      "control": "fit",
+      "param_index": 3,
+      "options": [
+        "Native Size",
+        "Best Fit",
+        "Proportional Fit"
+      ],
+      "source": "DrawSlideshowParams in src (line 23103)",
+      "status": "resolved"
+    },
+    {
+      "node": "Text",
+      "class": "TextNode",
+      "draw": "DrawTextParams",
+      "control": "font",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawTextParams in src (line 23468)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Text",
+      "class": "TextNode",
+      "draw": "DrawTextParams",
+      "control": "align",
+      "param_index": 5,
+      "options": [
+        "Left",
+        "Center",
+        "Right",
+        "Justified"
+      ],
+      "source": "DrawTextParams in src (line 23468)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "type",
+      "param_index": 0,
+      "options": [
+        "chords",
+        "comp",
+        "pads",
+        "strum",
+        "arp",
+        "bass",
+        "melody",
+        "drums"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "distance",
+      "param_index": 5,
+      "options": [
+        "Euclidean",
+        "Manhattan",
+        "Chebyshev",
+        "Minkowski"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "feature",
+      "param_index": 6,
+      "options": [
+        "F1",
+        "F2",
+        "Smooth F1",
+        "Distance to Edge",
+        "N-Sphere Radius"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "wave type",
+      "param_index": 19,
+      "options": [
+        "Bands",
+        "Rings"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "bands direction",
+      "param_index": 20,
+      "options": [
+        "X",
+        "Y",
+        "Diagonal"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "profile",
+      "param_index": 21,
+      "options": [
+        "Sine",
+        "Saw",
+        "Triangle"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "musgrave type",
+      "param_index": 26,
+      "options": [
+        "fBm",
+        "Multifractal",
+        "Hybrid Multifractal",
+        "Ridged Multifractal",
+        "Hetero Terrain"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "gradient type",
+      "param_index": 32,
+      "options": [
+        "Linear",
+        "Quadratic",
+        "Easing",
+        "Diagonal",
+        "Radial",
+        "Spherical",
+        "Quadratic Sphere"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "marble type",
+      "param_index": 35,
+      "options": [
+        "Soft",
+        "Sharp",
+        "Sharper"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "Texture",
+      "class": "TextureNode",
+      "draw": "DrawTextureParams",
+      "control": "wood type",
+      "param_index": 39,
+      "options": [
+        "Bands",
+        "Rings",
+        "Band Noise",
+        "Ring Noise"
+      ],
+      "source": "DrawTextureParams in src (line 24337)",
+      "status": "resolved"
+    },
+    {
+      "node": "VMPC",
+      "class": "VmpcNode",
+      "draw": "DrawVmpcBody",
+      "control": "?",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawVmpcBody in src (line 30524)",
+      "status": "unresolved"
+    },
+    {
+      "node": "VMPC",
+      "class": "VmpcNode",
+      "draw": "DrawVmpcBody",
+      "control": "transition",
+      "param_index": 2,
+      "options": [],
+      "source": "DrawVmpcBody in src (line 30524)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Video In",
+      "class": "VideoInNode",
+      "draw": "DrawVideoInParams",
+      "control": "device",
+      "param_index": 2,
+      "options": [],
+      "source": "DrawVideoInParams in src (line 23571)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Video In",
+      "class": "VideoInNode",
+      "draw": "DrawVideoInParams",
+      "control": "res",
+      "param_index": 3,
+      "options": [
+        "Auto",
+        "1080p",
+        "720p",
+        "480p"
+      ],
+      "source": "DrawVideoInParams in src (line 23571)",
+      "status": "resolved"
+    },
+    {
+      "node": "Drum Sequencer",
+      "class": "DrumSequencerNode",
+      "draw": "DrawDrumSequencerBody",
+      "control": "rate",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawDrumSequencerBody in src (line 28883)",
+      "status": "unresolved"
+    },
+    {
+      "node": "FM",
+      "class": "FMNode",
+      "draw": "DrawFMBody",
+      "control": "algorithm",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawFMBody in src (line 21795)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Looper",
+      "class": "LooperNode",
+      "draw": "DrawLooperBody",
+      "control": "take",
+      "param_index": 7,
+      "options": [],
+      "source": "DrawLooperBody in src (line 29397)",
+      "status": "unresolved"
+    },
+    {
+      "node": "MPC",
+      "class": "MpcNode",
+      "draw": "DrawMpcBody",
+      "control": "?",
+      "param_index": 1,
+      "options": [],
+      "source": "DrawMpcBody in src (line 29622)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Piano",
+      "class": "PianoNode",
+      "draw": "DrawPianoBody",
+      "control": "model",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawPianoBody in src (line 22144)",
+      "status": "unresolved"
+    },
+    {
+      "node": "String",
+      "class": "StringNode",
+      "draw": "DrawStringBody",
+      "control": "exciter",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawStringBody in src (line 21991)",
+      "status": "unresolved"
+    },
+    {
+      "node": "String",
+      "class": "StringNode",
+      "draw": "DrawStringBody",
+      "control": "body type",
+      "param_index": 3,
+      "options": [],
+      "source": "DrawStringBody in src (line 21991)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Wind",
+      "class": "WindNode",
+      "draw": "DrawWindBody",
+      "control": "instrument",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawWindBody in src (line 22084)",
+      "status": "unresolved"
+    },
+    {
+      "node": "MIDI Out",
+      "class": "MidiOutNode",
+      "draw": "DrawMidiOutParams",
+      "control": "device",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawMidiOutParams in src (line 17876)",
+      "status": "unresolved"
+    },
+    {
+      "node": "NDI In",
+      "class": "NdiInNode",
+      "draw": "DrawNdiInParams",
+      "control": "?",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawNdiInParams in src (line 23259)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Projection",
+      "class": "ProjectionNode",
+      "draw": "DrawProjectionParams",
+      "control": "mode",
+      "param_index": 0,
+      "options": [
+        "Corner Pin (Perspective)",
+        "Mesh Grid"
+      ],
+      "source": "DrawProjectionParams in src (line 23782)",
+      "status": "resolved"
+    },
+    {
+      "node": "Projection",
+      "class": "ProjectionNode",
+      "draw": "DrawProjectionParams",
+      "control": "pattern",
+      "param_index": 1,
+      "options": [
+        "Off (Live Input)",
+        "Grid",
+        "Crosshairs & Diagonals",
+        "Color Bars",
+        "Combined Target"
+      ],
+      "source": "DrawProjectionParams in src (line 23782)",
+      "status": "resolved"
+    },
+    {
+      "node": "Splitter",
+      "class": "SplitterNode",
+      "draw": "DrawSplitterBody",
+      "control": "bands",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawSplitterBody in src (line 17372)",
+      "status": "unresolved"
+    },
+    {
+      "node": "Syphon In",
+      "class": "SyphonInNode",
+      "draw": "DrawSyphonInParams",
+      "control": "?",
+      "param_index": 0,
+      "options": [],
+      "source": "DrawSyphonInParams in src (line 23175)",
+      "status": "unresolved"
+    }
+  ]
+}
