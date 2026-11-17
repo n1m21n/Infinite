@@ -338,6 +338,7 @@ bool gHeadlessNeedProbe = false;
    bool gRequestBypass = false;
 
    bool gRequestCopy = false;
+   bool gRequestCut = false;   // copy the selection as text, then delete it
 
    bool gRequestPaste = false;
 

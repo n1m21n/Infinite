@@ -325,6 +325,8 @@ namespace app
             for (uint64_t id : ctxSelIds)
                if (const Arrange::Clip* sc = Arrange::FindClip(gArrange, id))
                   canSplit = canSplit || (ctxPlay > sc->start && ctxPlay < sc->start + sc->length);
+            if (MenuParts::Item(L("Cut"), MODKEY "+X", false, !ctxSelIds.empty()) && ArrangeCopySelection())
+               ArrangeDeleteSelection();
             if (MenuParts::Item(L("Copy"), MODKEY "+C", false, !ctxSelIds.empty()))
                ArrangeCopySelection();
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D", false, !ctxSelIds.empty()))
@@ -918,6 +920,11 @@ namespace app
          }
          else if (cmd && ImGui::IsKeyPressed(ImGuiKey_C, false))
             ArrangeCopySelection();
+         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_X, false))
+         {
+            if (ArrangeCopySelection())
+               ArrangeDeleteSelection();
+         }
          else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false))
             ArrangePasteAt(playTick);
          // Shift+D / Delete / Cmd+G / Cmd+Shift+G: the header-row selection
@@ -3920,6 +3927,9 @@ namespace app
                gArrangeRenamingLaneId = ctxLaneId;
                gArrangeRenameJustStarted = true;
             }
+            // Duplicate Track: the row's own Cmd+D, on this track (Ableton: Duplicate on a track header).
+            if (MenuParts::Item(L("Duplicate Track"), MODKEY "+D"))
+               ArrangeEdit([&]() { Arrange::DuplicateLane(gArrange, ctxLaneId); });
             if (MenuParts::Item(L("Delete Track")))
                laneToDelete = ctxLaneId;
             MenuParts::Separator();

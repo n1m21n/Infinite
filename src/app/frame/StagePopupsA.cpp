@@ -126,6 +126,15 @@ void DrawPopupsA(FrameCtx& fc)
                }
                gRequestCopy = true;
             }
+            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCut = true;
+            }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -191,6 +200,15 @@ void DrawPopupsA(FrameCtx& fc)
                   ed::SelectNode(gn->NodeId());
                }
                gRequestCopy = true;
+            }
+            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCut = true;
             }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
@@ -258,6 +276,15 @@ void DrawPopupsA(FrameCtx& fc)
                   ed::SelectNode(gn->NodeId());
                }
                gRequestCopy = true;
+            }
+            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestCut = true;
             }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {

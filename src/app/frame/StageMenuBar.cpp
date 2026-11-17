@@ -332,7 +332,9 @@ void DrawMenuBar(FrameCtx& fc)
                MenuParts::Check(L("History"), &gHistoryOpen);
             }
             MenuParts::Separator();
-            if (MenuParts::Item(L("Cut / Copy"), MODKEY "+C"))
+            if (MenuParts::Item(L("Cut"), MODKEY "+X"))
+               gRequestCut = true;
+            if (MenuParts::Item(L("Copy"), MODKEY "+C"))
                gRequestCopy = true;
             if (MenuParts::Item(L("Paste"), MODKEY "+V"))
                gRequestPaste = true;

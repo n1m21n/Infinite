@@ -691,6 +691,7 @@ extern bool gRequestUngroup;
 extern bool gRequestBypass;
 
 extern bool gRequestCopy;
+extern bool gRequestCut;
 
 extern bool gRequestPaste;
 

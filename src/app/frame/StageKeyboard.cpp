@@ -783,7 +783,10 @@ void DrawKeyboard(FrameCtx& fc)
          gView2DMenuEdit = gRequestCopy ? 1 : 2;
          gRequestCopy = gRequestPaste = false;
       }
-      const bool doCopy = gRequestCopy || (!typing && !gPerfMatrixFocused && !gArrangeFocused && gChatSelectionFrame < ImGui::GetFrameCount() - 1 && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false));
+      const bool canvasKeys = !typing && !gPerfMatrixFocused && !gArrangeFocused && gChatSelectionFrame < ImGui::GetFrameCount() - 1 && cmdOrCtrl;
+      const bool doCut = (gRequestCut || (canvasKeys && ImGui::IsKeyPressed(ImGuiKey_X, false))) && !ShowLockBlocks();
+      gRequestCut = false;
+      const bool doCopy = gRequestCopy || doCut || (canvasKeys && ImGui::IsKeyPressed(ImGuiKey_C, false));
       gRequestCopy = false;
       if (doCopy)
       {
@@ -831,6 +834,16 @@ void DrawKeyboard(FrameCtx& fc)
             gOwnNodeClipboardText = NodeClipboardSerialize(toCopy);
             if (!gOwnNodeClipboardText.empty())
                ImGui::SetClipboardText(gOwnNodeClipboardText.c_str());
+            // Cut: the nodes go next frame, so the paste must come from the text, not from live nodes.
+            if (doCut && !gOwnNodeClipboardText.empty())
+            {
+               clipboard.clear();
+               clipboardSources.clear();
+               clipboardOrigIndex.clear();
+               clipboardOrigGroup.clear();
+               gOwnNodeClipboardText.clear();
+               gRequestDelete = true;
+            }
          }
       }
 
