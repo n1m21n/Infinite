@@ -141,6 +141,21 @@ namespace Field
    // What the element-domain opcodes need in order to touch an element. The frame
    // prologue runs with inElementLoop == false and null lane pointers, so a genuinely
    // element-only opcode reaching it is reported rather than silently ignored.
+   // What one OpLoad* instruction in the element loop resolved to. The name lookups (state
+   // cell, element attribute, frame variable, environment) are the same for every element, so
+   // the first element resolves them and the rest read through the saved pointers. Valid for
+   // one Execute only: the pointers belong to that cook's store and state.
+   struct ElementLoadBind
+   {
+      enum Kind : unsigned char { Unresolved = 0, ElementCell, FrameCell, Attrib, FrameVar, EnvScalar };
+      Kind kind = Unresolved;
+      int lanes = 0;
+      const std::vector<float>* lane[4] = { nullptr, nullptr, nullptr, nullptr }; // ElementCell, Attrib
+      const float* frame[4] = { nullptr, nullptr, nullptr, nullptr };             // FrameCell
+      const VectorResult* frameVar = nullptr;                                      // FrameVar (map entry, stable)
+      double scalar = 0.0;                                                         // EnvScalar
+   };
+
    struct ElementExecContext
    {
       bool inElementLoop = false;
@@ -159,6 +174,11 @@ namespace Field
       float* cr = nullptr;
       float* cg = nullptr;
       float* cb = nullptr;
+
+      // Element loop only: one slot per loop instruction (null = resolve every time), and whether
+      // an environment scalar may be cached (false when the loop itself writes frame variables).
+      ElementLoadBind* binds = nullptr;
+      bool bindEnvScalars = false;
    };
 
    class ElementVM
@@ -217,6 +237,7 @@ namespace Field
 
       std::vector<VectorResult> mFrameRegisters;
       std::vector<VectorResult> mLoopRegisters;
+      std::vector<ElementLoadBind> mLoadBinds;
       std::unordered_map<std::string, VectorResult> mFrameVars;
    };
 }
