@@ -150,7 +150,7 @@ namespace app
       const float parked = std::clamp(n->position, n->start, n->end);
       const float playhead = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : parked;
       const TrimWaveInput in = DrawTrimWave("##samplerwave", n->wavePeaks, &n->start, &n->end, w, h, cursors,
-                                            numCursors, playhead, "no sample loaded");
+                                            numCursors, playhead, T("No sample · drop or click"));
       if (!n->wavePeaks.Empty() && (in.activated || in.active))
       {
          const float target = std::clamp(in.frac, n->start, n->end);
@@ -266,7 +266,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, br, "no sample loaded");
+         EmptyState::DrawCaption(origin, br, T("No sample loaded"));
       }
 
       dl->PopClipRect();
@@ -352,7 +352,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, br, "no sample loaded");
+         EmptyState::DrawCaption(origin, br, T("No sample loaded"));
       }
 
       dl->PopClipRect();
@@ -495,7 +495,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, br, "no sample loaded");
+         EmptyState::DrawCaption(origin, br, T("No sample loaded"));
       }
 
       dl->PopClipRect();

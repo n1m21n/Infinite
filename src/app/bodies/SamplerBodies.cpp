@@ -603,8 +603,8 @@ namespace app
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImGui::Dummy(ImVec2(AudioFullWidth(), 140.0f));
          EmptyState::Draw(p, ImVec2(p.x + AudioFullWidth(), p.y + 140.0f),
-                          state == State::Generating ? "generating" : state == State::Failed ? "could not make one" : "no sample yet",
-                          state == State::Failed ? "generate again" : state == State::Generating ? nullptr : "pick a part and generate");
+                          state == State::Generating ? T("Generating") : state == State::Failed ? T("Could not make one") : T("No sample yet"),
+                          state == State::Failed ? T("Generate again") : state == State::Generating ? nullptr : T("Pick a part and generate"));
       }
       else
          DrawSamplerWaveform(n, 140.0f, AudioFullWidth());
@@ -986,7 +986,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, br, n->IsAnalyzing() ? "analyzing..." : "no sample loaded");
+         EmptyState::DrawCaption(origin, br, n->IsAnalyzing() ? T("Analyzing...") : T("No sample loaded"));
       }
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -1263,7 +1263,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, br, n->IsRendering() ? "molding..." : "no sample loaded");
+         EmptyState::DrawCaption(origin, br, n->IsRendering() ? T("Molding...") : T("No sample loaded"));
       }
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -1590,7 +1590,7 @@ namespace app
          cursors[v] = { pos[v], amp[v] };
       const TrimWaveInput in = DrawTrimWave("##drumlanewave", n->lanePeaks[lane], &n->laneStart[lane],
                                             &n->laneEnd[lane], gAudioContentW, h, cursors,
-                                            DrumSequencerNode::kVoicesPerLane, -1.0f, "drop sample / click");
+                                            DrumSequencerNode::kVoicesPerLane, -1.0f, T("No sample · drop or click"));
       if (n->lanePeaks[lane].Empty() && in.activated)
       {
          PushUndoCheckpoint();
@@ -2373,9 +2373,9 @@ namespace app
       }
 
       if (st == LooperNode::kEmpty)
-         EmptyState::DrawCaption(origin, br, "no loop yet");
+         EmptyState::DrawCaption(origin, br, T("No loop yet"));
       else if (st == LooperNode::kArmed)
-         EmptyState::DrawCaption(origin, br, "waiting for the next grid line");
+         EmptyState::DrawCaption(origin, br, T("Waiting for the next grid line"));
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
@@ -2812,7 +2812,7 @@ namespace app
                }
             }
             else
-               EmptyState::DrawCaption(origin, br, "no sample loaded");
+               EmptyState::DrawCaption(origin, br, T("No sample loaded"));
             dl->PopClipRect();
             AudioViz::Border(dl, origin, br, (!has && hov) ? (isLight ? tok::U32(tok::pal::c_3264E6FF) : tok::U32(tok::pal::c_6EA0FFFF)) : 0);
             if (!has && hov)

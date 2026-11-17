@@ -42,7 +42,7 @@ namespace app
       }
       else
       {
-         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(gn.node.get(), "no geometry"));
+         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(gn.node.get(), T("No geometry")));
       }
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                   tok::U32(tok::pal::c_464A5AFF), tok::radius_control);
@@ -249,7 +249,7 @@ namespace app
          if (tex != 0)
             dl->AddImageRounded((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
          else
-            EmptyState::DrawCaption(origin, br, EmptyPreviewLabel(gn.node.get(), "no geometry"));
+            EmptyState::DrawCaption(origin, br, EmptyPreviewLabel(gn.node.get(), T("No geometry")));
 
          ImGui::SetCursorScreenPos(origin);
          char btnId[32];
@@ -303,7 +303,7 @@ namespace app
          }
          else
          {
-            EmptyState::DrawCaption(origin, ImVec2(origin.x + imageSize.x, origin.y + imageSize.y), EmptyPreviewLabel(gn.node.get(), "no input"));
+            EmptyState::DrawCaption(origin, ImVec2(origin.x + imageSize.x, origin.y + imageSize.y), EmptyPreviewLabel(gn.node.get(), T("No input")));
          }
 
          // A Draw node's panel card is paintable, same as its inline preview

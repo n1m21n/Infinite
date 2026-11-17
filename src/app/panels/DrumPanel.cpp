@@ -193,7 +193,7 @@ namespace app
       {
          const std::string& fn = n->FileName(lane);
          if (fn.empty())
-            return T("Empty");
+            return T("No sample");
          const size_t dot = fn.find_last_of('.');
          return dot != std::string::npos && dot > 0 ? fn.substr(0, dot) : fn;
       }
@@ -1001,7 +1001,7 @@ namespace app
             cursors[v] = { pos[v], amp[v] };
          const float s0 = n->laneStart[lane], e0 = n->laneEnd[lane];
          const TrimWaveInput in = DrawTrimWave("##lanewave", n->lanePeaks[lane], &n->laneStart[lane], &n->laneEnd[lane], w, 84.0f, cursors,
-                                               DrumSequencerNode::kVoicesPerLane, -1.0f, T("drop sample / click to load"));
+                                               DrumSequencerNode::kVoicesPerLane, -1.0f, T("No sample · drop or click"));
          if (n->lanePeaks[lane].Empty() && in.activated)
          {
             const std::string path = Platform::OpenAudioDialog();
