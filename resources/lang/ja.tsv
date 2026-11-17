@@ -2934,3 +2934,768 @@ Zoom around the pointer, or pan; middle-drag also pans	ポインタ中心にズ�
 Zoom the value axis around the pointer	ポインタ中心に値軸をズーム
 param 	パラメータ 
 trig input	trig 入力
+%+.1f dB	=en
+%.1f s %s	=en
+%d x %d, %d layers	%d x %d、%d レイヤー
+%d x %d, F12	=en
+%s %+.1f dB	=en
+%s %d  %+.1f dB  %s	=en
+%s %d: %s\n%s	=en
+(loop)	(ループ)
+(whole)	(全体)
+-inf dB	=en
+10% to 100%	10% ～ 100%
+2D View	2D ビュー
+2D View - lay out node outputs as layers and render a picture (Shift+2)	2D ビュー - ノードの出力をレイヤーとして配置し、画像をレンダリング (Shift+2)
+2D View Panel	2D ビューパネル
+3D	=en
+API key	APIキー
+Above	上
+Absolute	絶対
+Accent / Erase	アクセント / 消去
+Accumulation	蓄積
+Actual Pixels	実ピクセル
+Actual pixels (Ctrl+1)	実ピクセル (Ctrl+1)
+Add Box	ボックスを追加
+Add Layer Mask	レイヤーマスクを追加
+Add Node as Layer	ノードをレイヤーとして追加
+Add Vector Mask	ベクターマスクを追加
+Add a layer mask (from the selection when there is one)	レイヤーマスクを追加（選択範囲があればそこから作成）
+Add a node from the canvas as a layer	キャンバスのノードをレイヤーとして追加
+Add an outlet to make a node	出力を追加してノードを作成
+Add another	さらに追加
+Add effect	エフェクトを追加
+Add font	フォントを追加
+Add font...	フォントを追加...
+Add insert	インサートを追加
+Add to 2D View	2D ビューに追加
+Add to Canvas	キャンバスに追加
+Adjustment	調整
+Adjustments	調整
+Aligned	整列
+All fonts	すべてのフォント
+All four sends are in use	4 つのセンドがすべて使用中
+All lanes	すべてのレーン
+All layers	すべてのレイヤー
+All pages	すべてのページ
+All pages writes one file: every page summed.	「すべてのページ」は全ページを合算した1つのファイルを書き出します。
+All styles are on	すべてのスタイルがオン
+Alpha	アルファ
+Alt-click to set the source	Alt-クリックでソースを設定
+Alt-click toggles an accent (full velocity); right-drag erases steps	Alt-クリックでアクセント（最大ベロシティ）を切替、右ドラッグでステップを消去
+Analyzing...	解析中...
+Anchor	アンカー
+Angle	角度
+Angle##v2dvfa	角度##v2dvfa
+Animation	アニメーション
+Antialias	アンチエイリアス
+Apply (Enter)	適用 (Enter)
+Apply / Cancel Crop	切り抜きを適用 / キャンセル
+Apply style	スタイルを適用
+Arrange	配置
+Arrange Layer	レイヤーを配置
+Arrange range	範囲を配置
+Audio is off. Start audio, or use Fast.	オーディオはオフです。オーディオを開始するか、高速を使ってください。
+Auto	自動
+Auto clean	自動クリーンアップ
+Auto-select	自動選択
+Back to the document centre, scale 1, no rotation	ドキュメントの中心に戻す、倍率1、回転なし
+Background colour to foreground	背景色を前景色に
+Balance	バランス
+Balanced	バランス
+Band	バンド
+Base URL	ベース URL
+Baseline	ベースライン
+Behind	背面
+Below	下
+Bitmap	ビットマップ
+Black	黒
+Blacks	黒レベル
+Blend Mode	描画モード
+Blend in linear light	リニア光で合成
+Blend the patch with what is there	パッチを既存の内容と合成
+Block off	ブロックオフ
+Blue	青
+Blues	青
+Box width	ボックスの幅
+Boxes	ボックス
+Brightness	明るさ
+Bring Forward	前面へ
+Bring to Front	最前面へ
+Brush Opacity	ブラシの不透明度
+Brush Size / Hardness	ブラシサイズ / 硬さ
+Builds a vector or colour from three values: RGB / XYZ, or hue, saturation, value in HSV mode. Patch a pin to drive that channel.	3 つの値からベクトルまたは色を作ります：RGB / XYZ、または HSV モードでは色相・彩度・明度。ピンを接続するとそのチャンネルを駆動します。
+Bypass	バイパス
+Bypassed	バイパス中
+Can't connect	接続できません
+Can't group a strip that sends	センドのあるストリップはグループ化できません
+Can't return there	そこには戻れません
+Can't ungroup	グループを解除できません
+Cancel (Esc)	キャンセル (Esc)
+Canvas size	キャンバスサイズ
+Centre	中央
+Centre Guides	中央のガイド
+Ch	Ch
+Chance the hit plays each time round	ヒットが毎回鳴る確率
+Channel	チャンネル
+Choose	選択
+Choose image	画像を選択
+Choose...	選択...
+Chrome	クローム
+Clear Cards	カードをクリア
+Clear Guides	ガイドをクリア
+Clear Solos	ソロを解除
+Clear every solo on the console	コンソール上のソロをすべて解除
+Clear paint	ペイントを消去
+Click a	一つクリック
+Click a box	ボックスをクリック
+Click a step on or off, drag to paint, drag up or down on a lit step for velocity	ステップをクリックでオン/オフ、ドラッグで塗り、点灯中のステップを上下にドラッグでベロシティ
+Click corners; Enter closes	角をクリック、Enter で閉じる
+Click to play and select (Alt = accent). Keys 1-8 too.	クリックで再生・選択（Alt = アクセント）。キー 1-8 も使えます。
+Click: key on/off. Drag: paint. Drag up/down on a lit key: velocity.\nAlt-click: accent. Right-drag: erase. Shift-click: open on the Step page.	クリック：キーのオン/オフ。ドラッグ：塗り。点灯中のキーを上下にドラッグ：ベロシティ。\nAlt-クリック：アクセント。右ドラッグ：消去。Shift-クリック：ステップページで開く。
+Clip Settings	クリップ設定
+Clip the active layer to the layer below	アクティブレイヤーを下のレイヤーにクリップ
+Clip to layer below	下のレイヤーにクリップ
+Clipping Mask	クリッピングマスク
+Close 2D View	2D ビューを閉じる
+Close Chat	チャットを閉じる
+Close Drums	ドラムを閉じる
+Close Field Patcher	Field Patcher を閉じる
+Close Mixer	ミキサーを閉じる
+Close Mod Matrix	モジュレーションマトリクスを閉じる
+Close Performance	パフォーマンスを閉じる
+Close Timeline	タイムラインを閉じる
+Close Viewport	ビューポートを閉じる
+Colour Depth	色深度
+Colour Management	カラーマネジメント
+Colour Tint	色合い
+Colour lookup	カラールックアップ
+Colours	カラー
+Compression	圧縮
+Condition	条件
+Conical	円錐
+Contiguous	隣接
+Contour	輪郭
+Convert to Draw Node	Draw ノードに変換
+Convert to Shapes	シェイプに変換
+Convert to Sketch Node	Sketch ノードに変換
+Convert to Text Node	Text ノードに変換
+Convert to shapes	シェイプに変換
+Copy / Clear Selection	コピー / 選択範囲を消去
+Copy / Cut / Paste	コピー / 切り取り / 貼り付け
+Copy / Cut / Paste Boxes	ボックスのコピー / 切り取り / 貼り付け
+Copy from the whole picture	画像全体からコピー
+Copy or cut the selected boxes, or paste them	選択したボックスのコピー・切り取り、または貼り付け
+Copy or cut the selected layers, or the selected pixels, or paste them	選択したレイヤーまたはピクセルのコピー・切り取り、または貼り付け
+Copy the selected words of a message, or drop the selection	メッセージの選択した語句をコピー、または選択解除
+Corners	角
+Could not make one	作成できませんでした
+Couldn't create the file.	ファイルを作成できませんでした。
+Create Clipping Mask	クリッピングマスクを作成
+Crop layer	レイヤーを切り抜き
+Crop the document (Enter)	ドキュメントを切り抜き (Enter)
+Custom agent	カスタムエージェント
+Cyan	シアン
+Cyan - Red	シアン - レッド
+Cyans	シアン系
+Darken	比較（暗）
+Dash	破線
+Delete Box or Wire	ボックスまたはワイヤーを削除
+Delete Document	ドキュメントを削除
+Delete Layer	レイヤーを削除
+Delete Layer Mask	レイヤーマスクを削除
+Delete Vector Mask	ベクターマスクを削除
+Delete Wire	ワイヤーを削除
+Delete layer	レイヤーを削除
+Delete the layer mask	レイヤーマスクを削除
+Delete the vector mask	ベクターマスクを削除
+Deselect	選択解除
+Deselect / Invert	選択解除 / 反転
+Diamond	ダイヤモンド
+Dim	ディム
+Dim -20 dB. Speakers only: never in a render.	ディム −20 dB。スピーカー専用で、書き出しには含まれません。
+Dim outside the crop	切り抜きの外を暗くする
+Disconnect	切断
+Document	ドキュメント
+Double pattern	ダブルパターン
+Double-click	ダブルクリック
+Drag the selection's pixels onto another place	選択範囲のピクセルを別の場所にドラッグ
+Drag to measure	ドラッグして測定
+Draw into the vector mask	ベクターマスクに描画
+Draw mask	マスクを描画
+Drive	ドライブ
+Drop the pixel selection, or invert it	ピクセル選択を解除、または反転
+Drums - play and edit Drum Sequencers (Shift+J)	ドラム - ドラムシーケンサーの再生と編集 (Shift+J)
+Drums at Bottom	ドラムを下部に
+Drums at Top	ドラムを上部に
+Dual tip	デュアル先端
+Duplicate (Ctrl+J)	複製 (Ctrl+J)
+Duplicate Boxes	ボックスを複製
+Duplicate Document	ドキュメントを複製
+Duplicate Layer	レイヤーを複製
+Duplicate the active layer	アクティブレイヤーを複製
+Duplicate the selected boxes	選択したボックスを複製
+Dynamics	ダイナミクス
+Each stroke starts with clean paint	ストロークごとにクリーンな絵の具から始まります
+Earlier	前へ
+Edit Adjustment...	調整を編集...
+Edit Fill...	塗りを編集...
+Edit Text	テキストを編集
+Edit it on the canvas.	キャンバス上で編集してください。
+Effect on Below	下のレイヤーへのエフェクト
+Ellipse	楕円
+Empty	空
+Empty page	空のページ
+Enable	有効にする
+Enabled	有効
+Esc	Esc
+Essentials	基本
+Even dashes round a closed shape	閉じた形状の周りを均等な破線に
+Every 2nd	2 つごと
+Every 4th	4 つごと
+Every 8th	8 つごと
+Every step	毎ステップ
+Export ORA...	ORA を書き出し...
+Export PSD...	PSD を書き出し...
+Extra time after the length, with the transport stopped, so reverbs and delays ring out.	長さのあとの追加時間（トランスポート停止時）。リバーブやディレイの余韻を含めます。
+Fast	高速
+Fast can't render a live source (camera, MIDI, audio in). Use Live.	高速では実時間入力（カメラ、MIDI、オーディオ入力）を書き出せません。リアルタイムを使ってください。
+Fast isn't available right now. Use Live.	高速は現在利用できません。リアルタイムを使ってください。
+Fast needs a length.	高速には長さの指定が必要です。
+Field Patcher	Field パッチャー
+Field Patcher Panel	Field パッチャーパネル
+Field patcher - Field as boxes (Shift+F)	Field パッチャー - Field をボックスで表示 (Shift+F)
+Field patches	Field パッチ
+File missing - drop a clip or Clear	ファイルがありません - クリップをドロップするか「クリア」
+Fill gradient	グラデーションで塗りつぶし
+Fill on or off	塗りのオン/オフ
+Fill the Window	ウィンドウいっぱいに表示
+Fill the window (Ctrl+Shift+F)	ウィンドウいっぱいに表示 (Ctrl+Shift+F)
+Fill with a choice of colour, the foreground, or the background; inside the selection when there is one	任意の色、前景色、背景色で塗りつぶし。選択範囲があればその内側
+Fill...	塗りつぶし...
+First line	1 行目
+Fit / Actual Pixels	フィット / 実ピクセル
+Fit All	すべてフィット
+Fit on Screen	画面に合わせる
+Fit on screen (Ctrl+0)	画面に合わせる (Ctrl+0)
+Fit the document on screen, or show it at 100%	ドキュメントを画面に合わせるか、100% で表示
+Flatten Image	画像を統合
+Flip H	左右反転
+Flip Horizontal	左右反転
+Flip V	上下反転
+Flip Vertical	上下反転
+Flip X	X 反転
+Flip Y	Y 反転
+Flip horizontal	左右反転
+Flip vertical	上下反転
+Flow	フロー
+Follow stroke	ストロークに追従
+Font	フォント
+Frame every box on the page	ページ上のすべてのボックスを表示範囲に収める
+Free Transform	自由変形
+Freehand	フリーハンド
+From a node	ノードから
+From centre	中心から
+From start	開始から
+Generate again	再生成
+Generating	生成中
+Gradient	グラデーション
+Grain	粒子
+Grain depth	粒子の深さ
+Grain mode	粒子モード
+Grain scale	粒子のスケール
+Green	緑
+Greens	緑系
+Grey	グレー
+Groove	グルーヴ
+Groove: pick from the library	グルーヴ：ライブラリから選択
+Group (Ctrl+G)	グループ化 (Ctrl+G)
+Group Colour	グループの色
+Group Layers	レイヤーをグループ化
+Group the selected layers, or dissolve the group	選択したレイヤーをグループ化、またはグループを解除
+Grow or shrink the document; layers keep their place	ドキュメントを拡大・縮小。レイヤーは位置を保持
+Grow the 2D View to fill the window, or put it back	2D ビューをウィンドウいっぱいに広げる、または元に戻す
+Grow the 3D View to fill the window, or put it back	3D ビューをウィンドウいっぱいに広げる、または元に戻す
+Guides	ガイド
+HAP clip - no filmstrip	HAP クリップ - フィルムストリップなし
+Hard	ハード
+Hard edge	ハードエッジ
+Hardness	硬さ
+Hide from Canvas	キャンバスから非表示
+Highlight	ハイライト
+Highlights	ハイライト
+Highlights Hue	ハイライトの色相
+Highlights Saturation	ハイライトの彩度
+Hold FILL to play Fill steps and mute !Fill steps; Shift-click latches it	FILL を押している間 Fill ステップを再生、!Fill ステップはミュート。Shift-クリックで固定
+Hold: steps set to Fill play, !Fill rest. Shift-click latches.	長押し：Fill に設定したステップが再生、!Fill は休符。Shift-クリックで固定。
+Hue	色相
+Humanize velocity	ベロシティをヒューマナイズ
+Image	画像
+Image size	画像サイズ
+In export	書き出し時
+Indent left	左インデント
+Indent right	右インデント
+Ink stipple	インクの点描
+Input black	入力の黒
+Input white	入力の白
+Inside	内側
+Invert polarity	極性を反転
+Jitter	ジッター
+Justify text	テキストを両端揃え
+Keep light above 1.0	1.0 以上の明るさを保持
+Keep lightness	明度を保持
+Keep proportions	縦横比を維持
+Kerning	カーニング
+Keys	キー
+Kit	キット
+Label	ラベル
+Lane	レーン
+Lane length. 0 follows the pattern; other lengths loop on their own (polymeter)	レーンの長さ。0 はパターンに従う。それ以外は独自にループ（ポリメーター）
+Lanes in one choke group cut each other off (closed hat stops the open hat)	同じチョークグループのレーンは互いを止めます（クローズドハイハットがオープンを止める）
+Layer	レイヤー
+Layer as Output	レイヤーを出力に
+Layer mask	レイヤーマスク
+Layer mask: click to paint it, Shift-click to turn it off	レイヤーマスク：クリックで描画、Shift-クリックでオフ
+Layer via Cut	切り取りでレイヤー
+Layers and properties	レイヤーとプロパティ
+Leading	行送り
+Light height	光の高さ
+Lightness	明度
+Live	リアルタイム
+Live records what plays. Fast renders offline, quicker than real time; live inputs can't be rendered that way.	リアルタイムは再生中の音を録音します。高速はオフラインで実時間より速く書き出します。実時間入力はこの方法では書き出せません。
+Load	読み込み
+Load stack	スタックを読み込む
+Loading preview...	プレビューを読み込み中...
+Lock alpha	アルファをロック
+Lookup	ルックアップ
+Luminance	輝度
+Magenta	マゼンタ
+Magenta - Green	マゼンタ - グリーン
+Magentas	マゼンタ系
+Map colours	色をマッピング
+Marbling	マーブリング
+Marquee, Lasso; W cycles Magic Wand, Selection Brush, Object Selection. Shift adds, Alt subtracts. Enter closes a polygon lasso, Esc drops it	矩形選択、なげなわ。W で自動選択・選択ブラシ・オブジェクト選択を切替。Shift で追加、Alt で減算。Enter で多角形なげなわを閉じる、Esc で破棄
+Mask	マスク
+Mask from	マスクの元
+Mask from Selection	選択範囲からマスク
+Master	マスター
+Max	最大
+Maximise (Esc returns)	最大化（Esc で戻る）
+Merge Down	下のレイヤーと結合
+Merge Layers	レイヤーを結合
+Merge Visible	表示中を結合
+Merge every shown layer into one pixel layer; hidden layers stay	表示中のすべてのレイヤーを1つのピクセルレイヤーに結合。非表示のレイヤーはそのまま
+Merge the active layer into the one under it; with more selected, merge those	アクティブレイヤーを下のレイヤーと結合。複数選択時は選択したレイヤーを結合
+Mirror strokes across the object	ストロークをオブジェクト越しに反転
+Missing	見つかりません
+Mix	ミックス
+Mixer	ミキサー
+Mixer - every Mixer node as a console (Shift+L)	ミキサー - 各 Mixer ノードをコンソールとして表示 (Shift+L)
+Mixer at Bottom	ミキサーを下部に
+Mixer at Top	ミキサーを上部に
+Model ID	モデル ID
+Molding...	成形中...
+Mono	モノ
+Mono check. Speakers only: never in a render.	モノチェック。スピーカー専用で、書き出しには含まれません。
+Monochrome	モノクロ
+More settings	その他の設定
+More tools. Tick the ones to show	その他のツール。表示するものにチェック
+More..	さらに...
+Move Left	左へ移動
+Move Right	右へ移動
+Move down	下へ
+Move the layer down or up; with Shift to the bottom or top	レイヤーを上下に移動。Shift で一番下・一番上へ
+Move the selected pixels to a new layer	選択したピクセルを新しいレイヤーへ移動
+Move the selection 1 or 10 pixels	選択範囲を1または10ピクセル移動
+Move up	上へ
+Move, Crop, Hand, Zoom; hold Space for the hand	移動、切り抜き、手のひら、ズーム。Space を押すと手のひら
+Move, scale and turn the selected layers as one step; Enter keeps it, Esc puts them back	選択したレイヤーを一度に移動・拡大縮小・回転。Enter で確定、Esc で元に戻す
+My grooves	マイグルーヴ
+Nearest	最近傍
+Neutrals	ニュートラル
+New Document	新規ドキュメント
+New Drum Sequencer	新規ドラムシーケンサー
+New Mixer	新規ミキサー
+New Piano Roll page	新規ピアノロールページ
+New adjustment layer	新規調整レイヤー
+New drum page	新規ドラムページ
+New fill layer	新規塗りつぶしレイヤー
+New layer	新規レイヤー
+New mixer page	新規ミキサーページ
+New scratch page	新規スクラッチページ
+New send FX	新規センドFX
+New vector layer	新規ベクターレイヤー
+New, duplicate or delete a document	ドキュメントの新規作成・複製・削除
+Next groove	次のグルーヴ
+No Drum Sequencer yet	ドラムシーケンサーはまだありません
+No Mixer feeds an Audio Out	オーディオ出力に接続されたミキサーはありません
+No Mixer yet	ミキサーはまだありません
+No break	ブレークなし
+No box selected	ボックスが選択されていません
+No clip loaded	クリップが読み込まれていません
+No effects here	ここにエフェクトはありません
+No fitting nodes	該当するノードがありません
+No free strip for the return	リターン用の空きストリップがありません
+No geometry	ジオメトリなし
+No input	入力なし
+No layer selected	レイヤーが選択されていません
+No layers	レイヤーなし
+No loop yet	ループはまだありません
+No matches	一致なし
+No preview	プレビューなし
+No sample	サンプルなし
+No sample loaded	サンプルが読み込まれていません
+No sample yet	サンプルはまだありません
+No sample · drop or click	サンプルなし · ドロップまたはクリック
+Node gone	ノードがありません
+Noise	ノイズ
+Noise##v2dvfnoise	ノイズ##v2dvfnoise
+Normal	通常
+Not selected	選択されていません
+Not tested	未テスト
+Nothing in the 2D View yet	2D ビューはまだ空です
+Nothing to transform	変形するものがありません
+Now	今
+Nudge	ナッジ
+Offbeats	裏拍
+Offset	オフセット
+%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   幅 %.0f  高さ %.0f
+Layer styles	レイヤースタイル
+Metal	メタル
+Midtones	中間調
+Min	最小
+No banding	バンディングなし
+Only touching pixels	接触するピクセルのみ
+Open	開く
+Open PSD or ORA...	PSD または ORA を開く...
+Open grooves folder	グルーヴフォルダを開く
+Open in 2D View	2D ビューで開く
+Open in Drum panel	ドラムパネルで開く
+Open in Mixer panel	ミキサーパネルで開く
+Optical align	光学的に整列
+Optional for local Ollama; stored in Keychain	ローカルの Ollama では任意。キーチェーンに保存
+Orange	オレンジ
+Orthographic: click for perspective (5)	正投影：クリックで透視投影 (5)
+Outline colour	輪郭の色
+Outline width	輪郭の幅
+Outlines as a vector layer	輪郭をベクターレイヤーに
+Output black	出力の黒
+Output white	出力の白
+Outside	外側
+PAN	=en
+Paint	ペイント
+Paint Tools	ペイントツール
+Paint a straight line from the last point	前の点から直線を描画
+Paint into the selection	選択範囲内に描画
+Paint mask	ペイントマスク
+Paint on surface	サーフェスに描画
+Paint out of the selection (Alt)	選択範囲の外に描画 (Alt)
+Paint the mask	マスクを描画
+Paint the selection with the brush; press again to leave	選択範囲をブラシで描画。もう一度押すと終了
+Part	パート
+Pass Through	パススルー
+Paste at Playhead	再生ヘッドに貼り付け
+Pattern	パターン
+Pattern tools for the selected lane	選択したレーンのパターンツール
+Peak, integrated loudness, length and size of the file.	ファイルのピーク、統合ラウドネス、長さ、サイズ。
+Pen and shapes draw the mask	ペンと図形でマスクを描画
+Pen pressure	筆圧
+Pen, Node, Shape, Text. Pen: click the first point to close, Enter or Esc ends the path. Node: Alt-click makes a corner, Delete removes the shape	ペン、ノード、シェイプ、テキスト。ペン：最初の点をクリックで閉じる、Enter か Esc で終了。ノード：Alt-クリックで角、Delete で図形を削除
+Perspective: click for orthographic (5)	透視投影：クリックで正投影 (5)
+Pick	ピック
+Pick a groove	グルーヴを選択
+Pick a layer	レイヤーを選択
+Pick a part and generate	パートを選んで生成
+Pick on Canvas	キャンバス上で選択
+Pick on picture	画像上で選択
+Picking	選択中
+Pin page	ページを固定
+Pixel aspect	ピクセルアスペクト比
+Place this page as a node	このページをノードとして配置
+Plain	プレーン
+Plasticine	プラスティシン
+Play Pads	パッドを演奏
+Play and select lanes 1-8 while the pointer is over the Drum panel (Shift = accent)	ポインタがドラムパネル上にあるとき、レーン 1-8 を演奏・選択（Shift = アクセント）
+Polygon	多角形
+Pre-fader sends	プリフェーダーセンド
+Previous groove	前のグルーヴ
+Profile	プロファイル
+Protect alpha	アルファを保護
+Protect hue	色相を保護
+Put this document on the canvas	このドキュメントをキャンバスに配置
+Quick Mask	クイックマスク
+REC %.1f s  %.1f MB	REC %.1f s  %.1f MB
+RGB	=en
+Radial	放射状
+Radius in px, not % of the shape	=en
+Ramp velocity	ベロシティのランプ
+Randomise	ランダム化
+Rasterize Layer	レイヤーをラスタライズ
+Rasterize?	ラスタライズしますか？
+Reassign...	割り当て直す...
+Recent	最近
+Rectangle	長方形
+Red	赤
+Reds	赤系
+Refill	再充填
+Reflected	反射
+Release Clipping Mask	クリッピングマスクを解除
+Relief	レリーフ
+Remove all paint from the surface	サーフェスからすべての絵の具を除去
+Remove effect	エフェクトを削除
+Remove the selected boxes or wires; the code updates as one undo step	選択したボックスまたはワイヤーを削除。コードは1回の取り消し操作で更新
+Render Image / Animation	画像 / アニメーションを書き出し
+Render an image (F12) or the animation (Ctrl+F12)	画像 (F12) またはアニメーション (Ctrl+F12) を書き出し
+Render folder	書き出しフォルダ
+Render the document through an Output node	Output ノードを通してドキュメントを書き出し
+Repeat	繰り返し
+Repeat strokes across the picture	画像全体にストロークを繰り返す
+Replace with	置き換え
+Replaces the pattern, rate, swing and steps; fills empty lanes from the kit	パターン、レート、スウィング、ステップを置き換え。空のレーンはキットで埋めます
+Resample nearest neighbour, no smoothing	最近傍補間、スムージングなし
+Reset Distort	歪みをリセット
+Reset Rotation	回転をリセット
+Reset name	名前をリセット
+Reset strip	ストリップをリセット
+Reset trig	トリガーをリセット
+Restore Size	サイズを元に戻す
+Retouch Tools	レタッチツール
+Return a maximised Field Patcher to its docked size	最大化した Field パッチャーを元のドッキングサイズに戻す
+Return to Start	開始位置に戻る
+Reveal##folder	表示##folder
+Right-click any node and choose Add to 2D View.	任意のノードを右クリックして「2D ビューに追加」を選択。
+Ring	リング
+Roll down	下へロール
+Roll up	上へロール
+Rotate 180°	180° 回転
+Rotate 90° Clockwise	90° 時計回りに回転
+Rotate 90° Counter Clockwise	90° 反時計回りに回転
+Rotate View	ビューを回転
+Roundness	丸み
+Rule of thirds guides	三分割ガイド
+Rulers	定規
+Rulers / Grid / Guides	定規 / グリッド / ガイド
+Rulers, guides, grid	定規、ガイド、グリッド
+Run	実行
+Run this sequencer's steps (the transport keeps going)	このシーケンサーのステップを実行（トランスポートは継続）
+Same for all##v2dvcrall	すべて同じ##v2dvcrall
+Sample the whole picture	画像全体をサンプリング
+Saturation	彩度
+Save Selection	選択範囲を保存
+Save stack	スタックを保存
+Save style	スタイルを保存
+Scale the document and every layer with it	ドキュメントとすべてのレイヤーを一緒に拡大縮小
+Scatter	散布
+Scatter Y	Y 散布
+Scratch	スクラッチ
+Search boxes	ボックスを検索
+Search nodes	ノードを検索
+Search the boxes this page's node can run; a dropped wire connects the new box	このページのノードが実行できるボックスを検索。ドロップしたワイヤーは新しいボックスに接続
+Second colour	2 つ目の色
+Second scatter	2 つ目の散布
+Second size	2 つ目のサイズ
+Second tip	2 つ目の先端
+Select All Boxes	すべてのボックスを選択
+Select All Layers	すべてのレイヤーを選択
+Select every box on the page	ページ上のすべてのボックスを選択
+Select every top-level layer; with a paint or selection tool, every pixel	最上位のレイヤーをすべて選択。ペイントまたは選択ツールではすべてのピクセル
+Selected in chat	チャットで選択
+Selection	選択範囲
+Selection Tools	選択ツール
+Selection is source	選択範囲がソース
+Send Backward	背面へ
+Send to Back	最背面へ
+Set a length first.	先に長さを設定してください。
+Shadows Hue	シャドウの色相
+Shadows Saturation	シャドウの彩度
+Shared	共有
+Shared chain	共有チェーン
+Shared chain: edit it on the canvas	共有チェーン：キャンバスで編集
+Shear	せん断
+Shift	Shift
+Shift left	左にシフト
+Shift right	右にシフト
+Shift-click a step to open it on the Step page: velocity, chance, nudge and condition	ステップを Shift-クリックするとステップページで開きます：ベロシティ、確率、ナッジ、条件
+Show 2D View	2D ビューを表示
+Show Drums	ドラムを表示
+Show Field Patcher	Field パッチャーを表示
+Show Mixer	ミキサーを表示
+Show all tools	すべてのツールを表示
+Show essentials only	基本のみ表示
+Show on Canvas	キャンバスに表示
+Show or hide the 2D View. Every other key in this section needs the pointer over the view	2D ビューの表示・非表示。このセクションの他のキーはポインタがビュー上にある必要があります
+Show or hide them; drag from a ruler to pull a guide, drag it back to remove it	表示・非表示。定規からドラッグしてガイドを作成、戻すと削除
+Show outside the crop	切り抜きの外も表示
+Show the whole sample	サンプル全体を表示
+Size##img	サイズ##img
+Skin	肌
+Smaller or larger brush; with Shift softer or harder	ブラシを小さく/大きく。Shift で柔らかく/硬く
+Smoothing	スムージング
+Soft	ソフト
+Soft edges	ソフトエッジ
+Solid	ソリッド
+Solo (Alt-click: clear all, right-click: solo safe)	ソロ（Alt-クリック：すべて解除、右クリック：セーフソロ）
+Solo safe	セーフソロ
+Solo safe (right-click)	セーフソロ（右クリック）
+Sound	サウンド
+Spacing	間隔
+Spectral field editor	スペクトルフィールドエディター
+Spokes	スポーク
+Spread	広がり
+Stabiliser	スタビライザー
+Stack	スタック
+Step Page	ステップページ
+Stipple	点描
+Stop alpha	アルファを停止
+Straight Line	直線
+Strike	ストライク
+Strike colour	ストライク色
+Strike line	ストライクライン
+Stroke	ストローク
+Stroke on or off	ストロークのオン/オフ
+Stroke options	ストロークオプション
+Stroke under the fill	塗りの下にストローク
+Stroke width scales with the layer	ストローク幅はレイヤーに合わせて拡大縮小
+Style	スタイル
+Subscript	下付き
+Subtract	減算
+Superscript	上付き
+Swap the two colours, or reset them to black and white	2 色を入れ替え、または黒と白に戻す
+Swatches	スウォッチ
+Symmetry	対称
+TRIM	=en
+Tail	テール
+Take the selected layers out; the nodes stay on the canvas	選択したレイヤーを取り出す。ノードはキャンバスに残ります
+Taper in	入りを先細り
+Taper out	出を先細り
+Target	ターゲット
+Test connection	接続をテスト
+Testing…	テスト中…
+Texture	テクスチャ
+That would feed the audio back into itself.	これではオーディオが自分自身にフィードバックされます。
+That would feed the send back into itself.	これではセンドが自分自身にフィードバックされます。
+The arrangement is empty.	アレンジメントは空です。
+The brush paints the mask	ブラシがマスクを描画
+The Mixer panel's console is driving audio. Click to hand it back to the canvas.	ミキサーパネルのコンソールがオーディオを駆動中です。クリックしてキャンバスに戻します。
+The Mixer panel's console will drive audio once the engine is started.	エンジンを開始すると、ミキサーパネルのコンソールがオーディオを駆動します。
+The Mixer would pass 32 strips.	ミキサーは 32 ストリップになります。
+The group has inserts, sends or a second cable. Edit it on the canvas.	グループにインサート、センド、または2本目のケーブルがあります。キャンバスで編集してください。
+The rest of the bar	小節の残り
+The source moves with each stroke	ストロークごとにソースが移動
+The top Mixer already has 32 strips.	上のミキサーにはすでに 32 ストリップあります。
+This Audio Out is already recording.	このオーディオ出力はすでに録音中です。
+This page	このページ
+Tines	トーン
+Tip	先端
+To	から
+Toggle the Drum panel	ドラムパネルの表示切替
+Toggle the Mixer panel	ミキサーパネルの表示切替
+Tone	トーン
+Tool: Mute - click to choose a tool	ツール：ミュート - クリックでツールを選択
+Tools on the strip	ストリップのツール
+Tracking	トラッキング
+Turn its sends off first.	先にセンドをオフにしてください。
+Turn on	オンにする
+Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	旋转画布，或将其转回正向；触控板双指旋转也可用
+Turn this layer into pixels so the tool can work on it	このレイヤーをピクセルに変換してツールで編集できるようにします
+Underline	下線
+Underline colour	下線の色
+Unpin page	ページの固定を解除
+Until stop	停止まで
+Use an existing send knob on this strip.	このストリップの既存のセンドノブを使ってください。
+Use in chat	チャットで使う
+Vector	ベクトル
+Vector Tools	ベクターツール
+Vector mask	ベクターマスク
+Viewport Colour	ビューポートの色
+Violet	紫
+Waiting for play	再生を待機中
+Waiting for the next grid line	次のグリッド線を待機中
+Warp	ワープ
+Wet edges	ウェットエッジ
+Wet mix	ウェット量
+White	白
+White Balance	ホワイトバランス
+Whites	白レベル
+With play	再生と同時
+With the Crop tool	切り抜きツールで
+Yellow	黄
+Yellow - Blue	イエロー - ブルー
+Yellows	黄系
+Your predictive macro faders: few faders drive many parameters based on learned co-movement PCA.	予測型マクロフェーダー：少数のフェーダーが学習済みの連動（PCA）に基づいて多数のパラメータを動かします。
+Zoom - type a percentage	ズーム - 割合を入力
+Zoom 2D View	2D ビューを拡大縮小
+Zoom in (Ctrl++)	拡大 (Ctrl++)
+Zoom out (Ctrl+-)	縮小 (Ctrl+-)
+Zoom in or out; {mod} or Alt with the wheel zooms at the pointer	拡大・縮小。{mod} または Alt + ホイールでポインタ位置を基準に拡大縮小
+boxes	ボックス
+code	コード
+default	デフォルト
+field	=en
+items	項目
+knob	ノブ
+lane	レーン
+last good ·	最後の正常値 ·
+max	最大
+min	最小
+more	さらに
+name	名前
+no groove	グルーヴなし
+node	ノード
+off	オフ
+picture node	画像ノード
+pixels	ピクセル
+post	ポスト
+pre	プレ
+refused: publish output is still wired	拒否：publish の出力がまだ接続されています
+sound node	サウンドノード
+source node	ソースノード
+steps	ステップ
+value	値
+velocity	ベロシティ
+{patch} {take} {date} {time}. An existing file is never overwritten.	{patch} {take} {date} {time}。既存のファイルは上書きされません。
+3D cell noise on the coordinate patched into vector (Generated when empty), times scale. Distance to the nearest point, Second nearest, Edge (the gap between the two), Cell (one grey per cell) or Colour (one colour per cell). Patch it into a Material's field input.	vector に接続した座標（空なら Generated）に scale を掛けた 3D セルノイズ。Distance は最近点までの距離、Second nearest、Edge（二つの距離の差）、Cell（セルごとのグレー）、Colour（セルごとの色）。Material の field 入力に接続します。
+A 3D checker of two colours on the coordinate patched into vector (Generated when empty), times scale. Patch it into a Material's field input to drive the base colour; the Material's other knobs still apply.	vector に接続した座標（空なら Generated）に scale を掛けた2色の 3D チェッカー。Material の field 入力に接続するとベースカラーを駆動します。Material の他のつまみも引き続き有効です。
+A blend weight by view angle, Fresnel or Facing. Blend sets how much of the surface is weighted.	視線角度による混合の重み。Fresnel または Facing。Blend は表面にどれだけ重みを掛けるかを設定します。
+A colour ramp of 2 to 8 stops read at the factor: Linear, Ease, Constant or B-Spline. Below the first stop and above the last the end colours hold.	factor で読み取る 2～8 個のストップのカラーランプ。Linear、Ease、Constant、B-Spline。最初のストップより下と最後のストップより上では端の色が保持されます。
+A grey ramp of the coordinate patched into vector (Generated when empty), times scale: Linear, Quadratic, Easing, Diagonal, Spherical, Quadratic Sphere, Radial, Wave (bands along x) or Magic (interfering waves). Patch it into a Material's field input.	vector に接続した座標（空なら Generated）に scale を掛けたグレーのランプ。Linear、Quadratic、Easing、Diagonal、Spherical、Quadratic Sphere、Radial、Wave（x 方向の帯）、Magic（干渉する波）。Material の field 入力に接続します。
+A height bends the normal by strength over distance; invert flips it. Wire it into Material's normal pin.	高さは strength に応じて距離にわたり法線を曲げます。invert で反転。Material の normal ピンに接続します。
+A modulator written in Field code: publish is its value, 0..1. Patch it in the Field Patcher, or start from Slow LFO, Triangle LFO, Pulse train or Skipping beat.	Field コードで書くモジュレーター。publish がその値（0..1）。Field Patcher で接続するか、Slow LFO、Triangle LFO、Pulse train、Skipping beat から始めます。
+A note node whose body is a Field script. The script runs per sample against the transport beat; note(pitch, vel, len) inside an if sends a note out (len in beats, 0 holds as long as the incoming note). tick(div) fires on each beat division, deg(d) is a scale degree under Root/Scale, rand() is 0..1. Wire it into any synth or MIDI-out. publish scalar output adds a modulator pin carrying whatever publish holds. Boxes opens it in the Field Patcher.	本体が Field スクリプトのノードです。スクリプトはトランスポートのビートに合わせてサンプルごとに実行されます。if 内の note(pitch, vel, len) でノートを送出（len は拍単位、0 は入力ノートが続く間保持）。tick(div) は各ビート分割で発火、deg(d) は Root/Scale 内の音階度数、rand() は 0..1。任意のシンセや MIDI 出力に接続します。publish の scalar 出力は publish の値を運ぶモジュレーターピンを追加します。Boxes で Field Patcher を開きます。
+A shading node - builds a surface per shading point, the way Blender's shader nodes do. Chain it into a Material's pins; the Material compiles the chain into one program for every Render 3D engine.	Blender のシェーダーノードのように、シェーディング点ごとにサーフェスを構築するノード。Material のピンに連結すると、Material が連鎖全体を Render 3D のすべてのエンジン向けの 1 つのプログラムにコンパイルします。
+A spectral effect whose kernel you write in the node and which runs once per FFT bin: filters, freezes, pitch and frequency shifts, flips, robot and whisper voices, cross-synthesis.	ノード内でカーネルを書き、FFT の各ビンごとに 1 回実行されるスペクトル効果。フィルター、フリーズ、ピッチ/周波数シフト、反転、ロボットやウィスパー音声、クロスシンセシス。
+A tangent-space normal map colour (Shade Image set to Data) as a normal for Material's normal pin. Strength scales the tilt.	接線空間の法線マップの色（Shade Image を Data に設定）を、Material の normal ピンの法線として使います。Strength で傾きの強さを調整。
+A texture coordinate for the shading nodes: UV, Object, World, Generated (0 to 1 across the mesh's bounds), Normal, View or Reflection. Patch it into a Shade Mapping or a texture's vector input; the chain ends in a Material's field input.	シェーディングノード用のテクスチャ座標。UV、Object、World、Generated（メッシュの境界内で 0～1）、Normal、View、Reflection。Shade Mapping またはテクスチャの vector 入力に接続します。連鎖は Material の field 入力で終わります。
+An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the small 1-16 | 17-32 pill at the right of the line under it switches pages once steps goes past 16 - greyed out until then; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the small A B C pill at the end of the row; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern. A .mid file can become the pattern: drop it on the node, or keep .mid files in the My grooves folder (the last category in the groove picker, whose last row opens the folder). Its first two bars are placed on a 1/16 grid as 16 or 32 steps - General MIDI drum notes go to the matching lanes, and a melodic file gives its 8 lowest pitches to lanes 1-8 - at rate 1/16 with no swing, and the pattern takes the file's name. Each step also has a chance (how often it plays), a nudge (early or late, up to half a step) and a condition: Fill / !Fill follow the Drum panel's FILL button, 1st / !1st the first time round, and A:B plays on loop A of every B. Each lane can have its own length (polymeter), play its sample reversed, and run through a low-pass or high-pass filter with cutoff and resonance; these sit in the Drum panel (Shift+J).	8 レーン、最大 32 ステップのドラムマシン。8 つのレーンカード（波形＋トランジェント/ディケイ/ピッチ/微調整/音量/パン）の下に、一度に 16 ステップを表示する 8 レーンのステップグリッドがあります（その下の行の右側にある小さな 1-16 | 17-32 のピルは、ステップが 16 を超えるとページを切り替えます。それまではグレーアウト。点はプレイヘッドのあるページを示します）。カードの波形をクリックするとサンプルを読み込みます（Samples パネルからのドラッグや OS からのファイルドロップも可）。またはエッジのハンドルをドラッグして再生範囲をトリミング。x でクリア、choke ボタンでチョークグループを切り替えます（0 = なし。同じグループの 2 つのレーンは互いを切り、クローズ/オープンのハイハットのような使い方）。グリッドでは、R がそのレーンの埋めをランダム化し、M/S でミュートまたはソロにします。ステップをクリックで切り替え、点灯したステップ上で縦にドラッグするとベロシティを設定、横にドラッグすると連続するステップをまとめてオン/オフできます。レーンカードとグリッドの間にあるグルーヴピッカーには、10 カテゴリ 141 種のグルーヴの内蔵ライブラリがあります。カテゴリを選ぶ（その最初のグルーヴへ移動）か、グルーヴを選ぶ（リストはグループ化され、フィルターボックス付き）。< と > で順に移動し、行末の小さな A B C ピルでグルーヴの A ヴァース / B ブリッジ / C コーラスのパートを切り替えます。選択すると、パターン、レート、スウィング、ステップ数を 1 回の取り消し操作で置き換え、空のレーンは付属キットで埋めます（自分で読み込んだレーンは決して変更されません）。下の行はパターン全体に作用します：レート/ステップ/スウィング/出力、続いて各レーン自身の値に重ねる 4 つのオフセット（トランジェント/ディケイ/ピッチ/パン）。接続した瞬間から再生され、トランスポートにフェーズロックされます。ノート入力はなく、トランスポートから導かれた独自のシーケンスのみです。run はトランスポートに触れずにこのノードのステップ発音を停止します。randomise は音楽的なキック/スネア/ハットの開始パターンをシードします。.mid ファイルをパターンにできます：ノードにドロップするか、My grooves フォルダ（グルーヴピッカーの最後のカテゴリ。その最後の行でフォルダを開く）に .mid ファイルを置きます。最初の 2 小節が 1/16 グリッドに 16 または 32 ステップとして配置されます。General MIDI のドラムノートは対応するレーンへ、メロディックなファイルは最も低い 8 つのピッチをレーン 1-8 へ割り当てます。レートは 1/16、スウィングなし、パターン名はファイル名になります。各ステップには、確率（再生される頻度）、ナッジ（早め・遅めに半ステップまで）、条件もあります。Fill / !Fill はドラムパネルの FILL ボタンに従い、1st / !1st は最初の一周のみ、A:B は B 回ごとの A 回目のループで再生します。各レーンは独自の長さ（ポリメーター）を持ち、サンプルを逆再生でき、カットオフとレゾナンスを持つローパスまたはハイパスフィルターを通せます。これらはドラムパネル（Shift+J）にあります。
+Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sample Player. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload.	分析／ゲノム再合成：読み込みまたは録音したサンプルを、追跡された倍音成分と実際の残差波形に分解します。Roll はパラメーターのゲノムを変異させ、そこから新しいサンプルを再レンダリングします。各 Roll は元ではなく直前の結果からさらに離れていきます。Iterate は直前のレンダリングを新しいソースとして戻し、再分析します（少しずつ音を食べていく）。Reset は読み込んだ／録音した元のサンプルに完全に戻します。世代 0 に戻り、6 つのシェイプノブ（tone/air/snap/stretch/time/pitch）はニュートラルに戻り、分析も復元されて、Iterate はすべて取り消されます。chaos は次の Roll がどれだけ飛ぶかを設定します。pitch はゲノム自体のピッチの動きに加算されます。tone は倍音成分と残差のバランスを取ります。air/snap は残差の定常的なヒスと、トランジェントのアタックの量です。stretch は倍音の間隔とともに非調和性をスケールします。time はサンプルの長さを変えずにアタック/ディケイのタイミングを歪めます。これは音のデザイナーであり、演奏できる楽器ではありません。ノート入力はなく、開始/終了範囲、ループ、逆再生、ピンポンを持つ単一の自己トリガー型ボイスのみで、Sample Player と同じトランスポートを使います。分析とレンダリングは両方とも背景スレッドで実行されるため、Roll が UI を止めることはありません。表示の seed/gen/f0/harm は正確なゲノム（シード＋世代数）と分析されたピッチです。二つの整数があれば、再読み込み時に Roll した音を正確に再現できます。
+Any image cable as a texture on the surface. Flat reads it at the vector (UV when unwired); Box projects it from three sides and blends by the normal. Colour decodes sRGB, Data reads raw values. Up to four pictures per material.	任意の画像ケーブルをサーフェスのテクスチャとして使えます。Flat は vector で読み取ります（未接続の場合は UV）。Box は 3 方向から投影し、法線でブレンドします。Colour は sRGB をデコードし、Data は生の値を読みます。マテリアルあたり最大 4 枚の画像。
+Applies shading, colour, metallic/roughness/opacity and emission to a geometry input, plus an optional normal map input (its strength slider only appears once something is patched into it). Detail scale reads the normal map a second time at a finer scale, Detail strength sets its tilt: weave or pores over the large folds. Model Hair shades a Fur mesh's strands as fibres, coloured by melanin. Translucency passes light through to the far side: leaves, sails, paper. Layer lays a second Material over this one where Mask is white, by Layer mix: paint over metal, dirt over paint, up to four deep.	ジオメトリ入力にシェーディング、カラー、メタリック/ラフネス/不透明度、エミッションを適用します。法線マップ入力（任意）もあり、その強度スライダーは何かを接続したときだけ表示されます。Detail scale は法線マップをより細かいスケールで再度読み込み、Detail strength はその傾きを設定します：大きなしわの上の織り目や毛穴。Model Hair は Fur メッシュの毛を繊維としてシェードし、メラニンで色付けします。Translucency は光を裏側へ通します：葉、帆、紙。Layer は Mask が白い部分に 2 つ目の Material を重ねます。Layer mix で制御し、金属の上の塗装、塗装の上の汚れなど、最大 4 段まで重ねられます。
+Blender's scalar maths on a, b and c: add to power, logs, rounding, modulo, trigonometry, compare and smooth min/max. Only the operands the operation reads are shown. Clamp limits the result to 0..1.	a、b、c に対する Blender のスカラー演算：加算から累乗、対数、丸め、剰余、三角関数、比較、スムーズ min/max まで。演算が読む入力だけが表示されます。Clamp は結果を 0..1 に制限します。
+Blends a to b by factor, as a float, a vector or a colour. Colour runs b through one of the 30 blend modes first. Clamp factor holds the factor to 0..1.	factor で a から b へブレンドします。float、vector、color のいずれか。Colour は先に b へ 30 種類のブレンドモードのいずれかを適用します。Clamp factor は factor を 0..1 に制限します。
+Bricks in the x and y of the coordinate patched into vector (Generated when empty), times scale. Width and height size one brick, offset shifts every second row, mortar size is the gap, tint mixes each brick between colour 1 and colour 2 at random. Patch it into a Material's field input.	vector に接続した座標（空なら Generated）に scale を掛けた x・y 方向のレンガ。Width と height は 1 個のレンガの大きさ、offset は 1 行おきにずらす量、mortar size は目地の幅、tint は各レンガを colour 1 と colour 2 の間でランダムに混ぜます。Material の field 入力に接続します。
+Generates procedural 3D point geometry from scratch using a per-element Field kernel (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot). value turns it into a value source: no mesh, publish is its output. Boxes opens it in the Field Patcher.	要素ごとの Field カーネルを使い、ゼロから手続き的な 3D 点群ジオメトリを生成（Circle、Spiral、Grid Lattice、Fibonacci Sphere、Helix、Torus Knot）。value を使うと値のソースになります：メッシュなし、出力は publish。Boxes で Field Patcher を開きます。
+How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sample Player. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load.	使い方：out を Audio Out に接続し、オーディオファイルをパッドにドロップします（空のパッドをクリック、または Load... / Folder... でフォルダの最初の 16 ファイルを読み込み）。その後パッドをクリックするか、notes 入力にノートを送ります。ノート 36 から 51 がパッド 1 から 16 を鳴らします。16 パッドのサンプルプレーヤーです。パッド 1 はハードウェア MPC と同様に左下にあります。各パッドは波形、番号、モードを表示する正方形のタイルで、それぞれ独自の CV ピンを持つので、MIDI CC / Note モジュレーターやゲートで鳴らせます。各パッドは独立したボイスなので、複数のパッドを同時に鳴らせます。クリックはすぐに鳴ります。ヒットはパッドのモードに従います：one shot はサンプル全体を再生し、新しいヒットで最初から再スタート。gate は押している間（マウスダウン、CV ハイ、またはノート保持中）再生し、離すと停止。loop は各ヒットでループ再生を切り替えます。クリックでパッドを選択します（右クリックは再生せずに選択）。パッドの下の行は選択中のパッドを編集します：sync と rate、fine tune（セント）、pitch（半音）、speed（負の値で逆再生）、音量、パン、mode、fade in / fade out（ミリ秒。各再生の開始と終了に適用。Sample Player と同じ定義）。sync はパッドごとの設定です。Free（既定）はヒットをすぐ鳴らします。Synced はヒットを保持し、選んだレート（1/4、1/8、1 小節…他のすべてのノードと同じ分割）でトランスポートの次のグリッド線に合わせて鳴らします（サンプル精度）。グリッド線上のヒットはその線で鳴ります。トランスポートが停止中ならすぐ鳴ります。gate モードでは、グリッド線の前に離すとヒットはキャンセルされます。loop モードでは、同期したパッドは有効な間、各分割でサンプルを再トリガーします（分割ごとに 1 回再生。長いサンプルは線で切られ、短いサンプルは隙間を残します）。トランスポート停止中は通常のループとして再生します。パッドが Free の間、rate コントロールはグレーアウトします。どのパッドのどのパラメーターも、いつでもモジュレーションできます。別のパッドを選択しても、ケーブルは元のパッドに紐付いたままです。タイル上のオレンジの点は、そのパッドにモジュレーションされたパラメーターがあることを示します。タイルにはモードと、同期時はレートが表示されます。ノードのオーディオ出力は全パッドのミックスです。読み込んだサンプルのパスとパッドの設定はパッチとともに保存されます。オーディオはロード時に再読み込みされます。
+How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sample Player's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened.	使い方：サウンドを loop 入力に、out を Audio Out に接続し、Rec を押します（トランスポートが再生中で sync がオンなら次の小節まで待機。200 ms 以内に遅れて押した場合は、直前に通過した線から録音が始まります）。テイクは take の長さが経過すると自動的に終わり、その後ループします。Play は停止して再スタート、Dub は入ってくる音を重ねて録音、Clear は空にします。波形はプレイヘッドとビートグリッド付きでループを表示し、タイトルの下の行はループャーが何をしているかを示します。各ボタンには CV ピンがあるため、フットスイッチや MIDI ノートで操作できます（立ち上がりエッジで押下）。take は長さを設定します：音楽的な分割（既定では 1 小節）、または free（次の Rec 押下で終了）。録音中に Dub を押すとテイクが終わり、そのままオーバーダブに入ります。Undo は一度に 1 層ずつ戻し（直前のテイク、オーバーダブ、または Clear。最大 8 ステップ）、ループは再生を続けます。オーバーダブ中に押すと、その層を破棄します。再生には Sample Player と同じコントロールがあります：finetune（セント）、pitch（半音）、speed（負の値で逆再生）、音量、そして各再生の開始と終了の fade in / fade out（ミリ秒）。ちょうど 1.00x のとき、ループはグリッドに沿ったままです。それ以外のレートでは length / rate で再生され、トランスポートに対して DRIFT（ずれ）、その間 Dub は一時停止します（各層は録音時のレートでのみ書き込まれます）。thru はライブ入力をモニターします。各テイクは常にオーディオインターフェースの計測済みラウンドトリップ遅延分だけずらされるので、タイミングよく演奏したループはグリッドに揃います。ループ（最大 60 秒）は Recordings フォルダに WAV として保存され、パッチを開くと停止状態で戻ります。
+Layered 3D noise on the coordinate patched into vector (Generated when empty), times scale. Detail adds octaves, roughness sets how strong each finer octave is, distortion warps the coordinate. Value is grey, Colour gives three different noises. Patch it into a Material's field input.	vector に接続した座標（空なら Generated）に scale を掛けた、階層化された 3D ノイズ。Detail はオクターブを追加し、roughness は細かいオクターブそれぞれの強さ、distortion は座標を歪めます。Value はグレー、Colour は 3 種類の異なるノイズを出します。Material の field 入力に接続します。
+On any other item: sculpt it with the brush. Ctrl+Tab or Esc leaves	他のアイテムでは：ブラシでスカルプト。Ctrl+Tab か Esc で終了
+One curve through 2 to 8 points, applied to each channel of the patched colour and blended in by factor. The default (0,0) to (1,1) leaves the colour unchanged.	2～8 点を通る 1 本のカーブ。接続した色の各チャンネルに適用し、factor でブレンドします。既定の (0,0) から (1,1) では色は変わりません。
+Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sample Player) from the end of the chain.	ノードチェーンの一部。'notes' ピンでノートイベントを受け取り、変更して出力します。チェーンの末尾からシンセ（Wavetable、Sample Player）に入力します。
+Per-component vector maths on a, b and c, plus cross, project, reflect, refract, dot, distance, length and normalize. Dot, distance and length give a grey value. Scale only shows for Scale and Refract.	a、b、c に対する成分ごとのベクトル演算。加えて cross、project、reflect、refract、dot、distance、length、normalize。Dot、distance、length はグレー値を出力します。Scale は Scale と Refract のときだけ表示されます。
+Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or Field Pixel.	任意の Field カーネルの出力を曲線または曲面としてプロットします。Field Effect、Field Synth、Field Pixel に接続する前に、カーネルの働きを確認できます。
+Position, normal, tangent, incoming, backfacing, curvature, cavity and per-object random, one per output.	位置、法線、接線、入射、裏面、曲率、キャビティ、オブジェクトごとのランダム。それぞれ 1 つの出力です。
+Press again to cycle. B: Brush, Paint Mixer, Colour Replace. E: Eraser, Background Erase, Flood Erase. G: Fill, Gradient. I: Eyedropper, Style Picker, Measure. Alt-click picks a colour with the brush or fill	もう一度押すと切り替わります。B：ブラシ、Paint Mixer、Colour Replace。E：消しゴム、Background Erase、Flood Erase。G：塗りつぶし、グラデーション。I：スポイト、Style Picker、計測。Alt-クリックでブラシまたは塗りつぶしの色を取得
+Press again to cycle. S: Clone, Undo Brush. J: Heal, Blemish, Patch, Inpaint, Red Eye. R: Blur, Sharpen, Median. O: Dodge, Burn, Sponge	もう一度押すと切り替わります。S：クローン、Undo Brush。J：修復、Blemish、Patch、Inpaint、赤目。R：ぼかし、シャープ、メディアン。O：覆い焼き、焼き込み、スポンジ
+Reflectance of a dielectric of this IOR by view angle: low face-on, rising to 1 at grazing angles.	この IOR の誘電体の視角による反射率。正面では低く、斜め（グレージング角）では 1 に近づきます。
+Remaps a value from the from range to the to range: Linear, Stepped (steps), Smoothstep or Smootherstep. Clamp limits the result to the to range.	値を from の範囲から to の範囲へ写像します：Linear、Stepped（ステップ数）、Smoothstep、Smootherstep。Clamp は結果を to の範囲に制限します。
+Runs a Field kernel once per frequency bin: audio in, STFT, your kernel, inverse STFT, audio out. Read `bin`, `bins`, `binhz`, `hop`, `sr`; write `mag`, `phase` or `freq`. `mag.at(k)` reads another bin, `state` keeps per-bin memory, `input bin audio B` adds a second spectrum for cross-synthesis. Size trades time for frequency detail; latency is one Size.	Field カーネルを周波数ビンごとに 1 回実行します：オーディオ入力、STFT、あなたのカーネル、逆 STFT、オーディオ出力。`bin`、`bins`、`binhz`、`hop`、`sr` を読み、`mag`、`phase`、`freq` に書き込みます。`mag.at(k)` は別のビンを読み、`state` はビンごとのメモリを保持、`input bin audio B` はクロスシンセシス用の 2 つ目のスペクトルを追加します。Size は時間と周波数の細かさを交換し、レイテンシは 1 Size です。
+Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution. It also runs over point clouds (compiled to GLSL when the input has GPU points), where life is available as an attribute; the point presets include Limit to Box and Project onto Shape. Boxes opens it in the Field Patcher.	ジオメトリに対して頂点ごとの Field カーネルを実行し、P、N、uv、Cd、カスタム属性を変更します。実行はレートから推定されます。点群にも実行でき（入力に GPU 点がある場合は GLSL にコンパイル）、その場合 life を属性として使えます。点のプリセットには Limit to Box と Project onto Shape があります。Boxes で Field Patcher を開きます。
+Runs once per bin. Read: bin, bins, binhz, hop, sr. Write: mag, phase, freq. X.at(k) reads another bin.	ビンごとに 1 回実行。読み取り：bin、bins、binhz、hop、sr。書き込み：mag、phase、freq。X.at(k) は別のビンを読みます。
+Select, Draw, Erase, Blade and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	選択、描画、消去、ブレード、ハンド（ドラッグでパン）。タイムラインと Sample Studio と同じキーで、ポインタがピアノロール上にあるときに有効です（Esc でも選択に戻ります）。ツールのドロップダウンにズームと一緒に含まれます。このセクションのキーはすべてポインタがそこにある必要があります
+Shade Coord, Mapping, Image, Noise, Voronoi, Gradient, Brick, Checker, Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves, Bump, Normal Map, Fresnel, Layer Weight and Geometry build a surface per shading point, the way Blender's shader nodes do. Chain them into a Material's field, albedo, roughness, metallic, normal, emission or opacity pin; the Material compiles the chain into one program for every Render 3D engine.	Shade Coord、Mapping、Image、Noise、Voronoi、Gradient、Brick、Checker、Math、Vector Math、Mix、Ramp、Map Range、Separate、Combine、Curves、Bump、Normal Map、Fresnel、Layer Weight、Geometry は、Blender のシェーダーノードと同じようにシェーディング点ごとにサーフェスを構築します。Material の field、albedo、roughness、metallic、normal、emission、opacity ピンに連結します。Material は連鎖全体を Render 3D のすべてのエンジン向けの 1 つのプログラムにコンパイルします。
+Show or hide the docked Field Patcher; it opens the Field Notes, Field Primitive or Field Modifier node selected on the canvas	ドッキングされた Field Patcher を表示・非表示にします。キャンバスで選択した Field Notes、Field Primitive、Field Modifier ノードを開きます
+Takes one channel of a vector or colour as a grey value: R, G, B (or X, Y, Z), or hue, saturation, value in HSV mode.	ベクトルまたは色の 1 チャンネルをグレー値として取り出します：R、G、B（または X、Y、Z）、HSV モードでは hue、saturation、value。
+The 2D View's document: node outputs, fills and groups stacked into one picture at the document's size. Right-click any node with a picture and choose Add to 2D View, then lay it out in the 2D View panel (Shift+2): V moves, C crops, H pans, Z zooms, B paints on a paint layer (pen pressure works), M, L and W select pixels; drag a handle to scale (Shift for free), drag outside a corner to rotate. Each layer has a blend mode, opacity, fill, lock, colour label, an optional node or painted pixel mask and clip to the layer below; a paint layer can be turned into a Draw node from its menu; groups pass through or isolate. P draws pen paths, U live shapes (rectangle, ellipse, polygon, star, line) with fill, stroke, dash and booleans, A edits points, T types point or box text; vector and text layers stay editable after reopen, take a vector mask, and turn into a Sketch or Text node from their menu. Drop an SVG on the 2D View to make it a vector layer. A layer only points at its node, so the node keeps animating and is never changed; a deleted node leaves its layer as source missing. F12 renders a picture and {mod}+F12 the animation, through an Output node.	2D ビューのドキュメント：ノードの出力、塗り、グループを、ドキュメントのサイズの 1 枚の画像に重ねたものです。画像のあるノードを右クリックして「2D ビューに追加」を選び、2D ビューパネル（Shift+2）でレイアウトします：V で移動、C で切り抜き、H でパン、Z でズーム、B でペイントレイヤーに描画（ペン筆圧対応）、M、L、W でピクセルを選択。ハンドルをドラッグして拡大縮小（Shift で自由に）、角の外でドラッグして回転。各レイヤーにはブレンドモード、不透明度、塗り、ロック、カラーラベル、任意のノードまたは描画ピクセルのマスク、下のレイヤーへのクリップがあります。ペイントレイヤーはメニューから Draw ノードに変換できます。グループはパススルーまたは分離します。P はペンパスを描き、U はライブ図形（矩形、楕円、多角形、星、線）を塗り・線・破線・ブール演算付きで描きます。A は点を編集し、T は点テキストまたはボックステキストを入力します。ベクターとテキストのレイヤーは再度開いても編集可能で、ベクターマスクを持ち、メニューから Sketch または Text ノードに変換できます。SVG を 2D ビューにドロップすると、ベクターレイヤーになります。レイヤーはノードを指しているだけなので、ノードはアニメーションを続け、変更されることはありません。削除されたノードは、そのレイヤーを「ソースがありません」の状態にします。F12 で画像を、{mod}+F12 で Output ノード経由のアニメーションをレンダリングします。
+The only node that sums audio - every other audio input pin takes exactly one cable, so any time two signals have to meet, they meet here. Four to eight slots, each with its own gain, pan, mute and solo, summed to one output. The Mixer panel (Shift+L) shows every Mixer that feeds an Audio Out as a console: inserts and sends per strip, right-click a strip name to group, ungroup or move it, and the master strip reads true peak and loudness (momentary, short-term, integrated; click the readout to reset). Render in the panel header records the console to a file: Live records what plays for a set length plus a tail, Fast renders the same take offline, quicker than real time. Fast can't render live inputs (camera, MIDI, audio in). Files are named from a template ({patch} {take} {date} {time}) and never overwrite.	オーディオを合算する唯一のノードです。他のオーディオ入力ピンは必ずケーブルを 1 本だけ受けるので、2 つの信号を合流させる必要があるときは、ここで合流します。4～8 個のスロットがあり、それぞれ独自のゲイン、パン、ミュート、ソロを持ち、1 つの出力に合算されます。Mixer パネル（Shift+L）は、Audio Out に送られる各 Mixer をコンソールとして表示します：ストリップごとのインサートとセンド。ストリップ名を右クリックしてグループ化、解除、移動できます。マスターストリップは真のピークとラウドネス（モメンタリー、ショートターム、インテグレーテッド。表示部をクリックでリセット）を表示します。パネルヘッダーの Render は、コンソールをファイルに記録します。Live は指定の長さと余韻分の再生内容を記録し、Fast は同じテイクをオフラインでレンダリングします（リアルタイムより高速）。Fast ではライブ入力（カメラ、MIDI、オーディオ入力）はレンダリングできません。ファイル名はテンプレート（{patch} {take} {date} {time}）から付けられ、上書きされることはありません。
+Translates, rotates (degrees, X then Y then Z) and scales a shading coordinate. Point moves the coordinate, Texture moves the pattern (the inverse), Vector skips the translate, Normal keeps unit length. With nothing patched in it uses Generated.	シェーディング座標を平行移動、回転（度数、X、Y、Z の順）、拡大縮小します。Point は座標を動かし、Texture はパターンを動かし（逆）、Vector は移動をスキップし、Normal は単位長を保ちます。何も接続されていない場合は Generated を使います。
+True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset.	トゥルーピーク（dBTP）とラウドネス（LUFS）：モメンタリー、ショートターム、インテグレーテッド。クリックでリセット。
+Your predictive macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style.	予測型マクロフェーダー：PCA を変化量に適用して複数ノブ操作の主軸を抽出し、少数のマクロフェーダーであなたのスタイルで多数の連動パラメーターを一緒に動かせます。
