@@ -56,7 +56,8 @@ Tools must stay **MIT-clean** (no GPL code pasted in), **three-platform aware** 
 | Field preset compiles? | `tools/field_preset_check.cpp` |
 | Quality registry, release gate, scoreboard (QUALITY rows from audits/probes/benches) | `tools/quality/quality.py` (`check`, `ingest`, `board`, `--self-test`; skill `quality-system`) |
 | Benchmarks / A/B | `tools/bench.py`, `scripts/bench/ab.sh`, `base.sh`, `compare.py`, `rgbadiff.py` |
-| Design tokens, glyphs, contrast, goldens | `tools/design/` (`contrast.py`, `golden.py`, `inventory.py`, ...) |
+| Design tokens, glyphs, contrast, goldens, ratchet | `tools/design/` (`contrast.py`, `golden.py`, `ratchet.py`, ...) |
+| Panel density (row pitch, per-row, height) | `tools/design/density_lint.py` (needs `tools/ui-audit/run.py --view2d`; see its header) |
 | i18n extract/lint | `tools/i18n/` |
 | Linux build + Xvfb rig | `tools/linux/` |
 | Architecture recall | `tools/semi-brain/` (`semi-brain`) |

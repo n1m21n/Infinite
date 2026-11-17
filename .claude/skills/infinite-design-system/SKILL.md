@@ -34,7 +34,7 @@ art/icons/src/*.svg ──build_glyphs.py──▶ font + Glyphs.gen.h ──▶
 | `components/EmptyState.h` | Dimmed message + caption hint centred in a list/panel with nothing to show (mod matrix, Samples, Plugins) |
 | `components/ColourChip.h` | Rounded colour field (replaces the raw colour button) |
 | `components/Switch.h`, `GlyphToggle.h`, `VFader.h` | Switch (Settings/panels, `FormParts::Switch`), bare-glyph header toggle, vertical fader drawing |
-| `tools/design/` | `build_tokens.py`, `build_glyphs.py`, `lint_icons.py`, `inventory.py`, `ratchet.json` |
+| `tools/design/` | `build_tokens.py`, `build_glyphs.py`, `lint_icons.py`, `ratchet.py`, `ratchet.json` |
 
 ## Colour roles (G14)
 
@@ -65,7 +65,7 @@ Known collisions are listed, not yet resolved; pair the colour with a glyph or l
 
 ## Before you commit
 
-1. `python3 tools/design/inventory.py`: counts for literal colours and raw widgets went down or stayed the same (ratchet).
+1. `python3 tools/design/ratchet.py`: literal colours, raw widgets, size literals and popups went down or stayed the same (CI runs it in `build.yml`).
 2. Generated headers match their sources.
 3. Gallery goldens: changed only where you meant to change them, in light and dark.
 4. Motion: nothing over 200 ms, values never animate, reduce-motion turns eases off (plan section 4b). Every `motion_ms` token is a note value at 120 BPM (1/16 = 125, 1/16T = 83, 1/8T = 167, 1/16D = 188); `tools/design/motion_lint.py` enforces it, laws in BRAND.md §8 / `tools/brand/motion.py`.
