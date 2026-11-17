@@ -7698,7 +7698,7 @@ namespace
          if (ImGui::IsItemActivated())
             undo();
          next();
-         if (TextChip(L("Absolute##v2dvrabs"), sRadiusAbs, T("Radius in px, not % of the shape")))
+         if (TextChip(L("Absolute##v2dvrabs"), sRadiusAbs, T("Radius in px, not a percentage of the shape")))
             sRadiusAbs = !sRadiusAbs;
          next();
          // Each corner on its own: radius (blank follows Radius) and type.
