@@ -1,0 +1,31 @@
+{
+ "id": "m_meshwarp_group",
+ "title": "Mesh warp on T while Other is active: the grid sits on T's ink (group)",
+ "ref": "Photoshop warp grid on layer bounds",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "group G T",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool MeshWarp"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "warp.box ~= 100 75 300 225",
+  "kind T == paint"
+ ]
+}

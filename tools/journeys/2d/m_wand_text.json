@@ -1,0 +1,32 @@
+{
+ "id": "m_wand_text",
+ "title": "Wand on T while Other is active selects on T and picks it (text)",
+ "ref": "Affinity flood select",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text HHH",
+  "textstyle 150 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Wand"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    208,
+    205
+   ]
+  }
+ ],
+ "expect": [
+  "ink HHH 208 205 == 1",
+  "active.name == HHH",
+  "selection == 1",
+  "kind HHH == text"
+ ]
+}

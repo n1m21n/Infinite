@@ -123,6 +123,9 @@ BH = {
     "bh_bg_erase": ("clears", (345, 105, 465, 135)), "bh_undo": ("restores", BH_BOX),
     "bh_redeye": ("not red", BH_BOX), "bh_gradient": ("ramp", None), "bh_gradient_repeat": ("repeats", None),
     "bh_undo_multiply": ("darkens", BH_BOX),
+    # Retouch: heal with a source, spot heal (no source), inpaint, blemish click at (400,520) r40, patch of (340,490)-(470,550) from 300 px up.
+    "bh_heal_stroke": ("changes", BH_BOX), "bh_heal_spot": ("changes", BH_BOX), "bh_inpaint": ("changes", BH_BOX),
+    "bh_blemish": ("changes", (380, 500, 420, 540)), "bh_patch": ("changes", (345, 495, 465, 545)),
 }
 OPS += [{"name": n, "proxy": False, "behaviour": True, "js": None} for n in BH]
 

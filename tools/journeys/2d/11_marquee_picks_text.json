@@ -1,0 +1,27 @@
+{
+ "id": "11_marquee_picks_text",
+ "title": "Marquee around a word: the text layer becomes the active layer",
+ "ref": "Affinity: selection tells the layer",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text hey",
+  "active Back",
+  "tool Marquee"
+ ],
+ "steps": [
+  {
+   "drag": [
+    120,
+    90,
+    280,
+    210
+   ]
+  }
+ ],
+ "expect": [
+  "active.name == hey"
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "id": "m_pick_image",
+ "title": "Colour picker on T takes T's colour (image)",
+ "ref": "Photoshop eyedropper (sample all layers)",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "image T fixtures/red.png",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Pick"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "fg ~= 1 0 0"
+ ]
+}

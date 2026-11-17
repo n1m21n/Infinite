@@ -477,8 +477,11 @@ namespace
 
 bool Scene2DNode::RenderLayerAlone(int id, int frameId, std::vector<uint8_t>& rgba)
 {
+   Layers();
    if (FindConst(id) == nullptr || !EnsureShaders() || mFinishProgram == 0)
       return false;
+   SyncSurfaces();   // outside a cook the paint surfaces and text/shape rasters may not exist yet
+   SyncRasters();
    // Shown, at full strength and Normal, its groups too; put back after.
    const std::vector<Layer> keep = mLayers;
    for (int at = id; at != 0;)
@@ -503,6 +506,7 @@ bool Scene2DNode::RenderLayerAlone(int id, int frameId, std::vector<uint8_t>& rg
    const float none[4] = { 0, 0, 0, 0 };
    Clear(PairAt(0), none);
    DrawList(0, 0, frameId, 1.0f);
+   FlushQueue();   // the last batched pass lands before the read back
    soloLayer = keepSolo;
    mIsolating = false;
    mAccOpaque = keepOpaque;
@@ -514,8 +518,11 @@ bool Scene2DNode::RenderLayerAlone(int id, int frameId, std::vector<uint8_t>& rg
 
 bool Scene2DNode::RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba)
 {
+   Layers();
    if (FindConst(id) == nullptr || !EnsureShaders() || mFinishProgram == 0)
       return false;
+   SyncSurfaces();   // outside a cook the paint surfaces and text/shape rasters may not exist yet
+   SyncRasters();
    // Hide the layer and everything drawn after it: later siblings at its level and at every group level above it.
    const std::vector<Layer> keep = mLayers;
    for (int at = id, level = 0; at != 0; level++)
@@ -546,6 +553,7 @@ bool Scene2DNode::RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba)
    const float none[4] = { 0, 0, 0, 0 };
    Clear(PairAt(0), none);
    DrawList(0, 0, frameId, 1.0f);
+   FlushQueue();   // the last batched pass lands before the read back
    mIsolating = false;
    mAccOpaque = keepOpaque;
    soloLayer = keepSolo;

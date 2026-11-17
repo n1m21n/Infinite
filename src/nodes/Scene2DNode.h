@@ -519,7 +519,9 @@ public:
    void SelectObject(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId);
    // Mesh warp: a paint layer's pixels pulled through a 4 x 4 grid. `from` is the layer's tiles when the warp
    // began; `moved` the 16 grid points' document positions, row by row from the layer's top left.
-   bool MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest = false);
+   // rest: where the 16 points sat when the warp began (document px); null = the whole surface's grid.
+   bool MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest = false,
+                 const float* rest = nullptr);
    // The grid's rest positions (document px) for a paint layer.
    bool MeshRest(int id, float out[32]);
    // Style picker: blend, opacity, fill and layer effects copied from one layer to another.
@@ -758,6 +760,11 @@ private:
       unsigned tex = 0;
       int w = 0, h = 0;
       unsigned long long key = 0;
+      // While one shape is being drawn: every shape under it, rasterised once (plutovg ARGB), and the
+      // picture so far; each frame only the last shape's box is redrawn and uploaded.
+      std::vector<uint8_t> base, work;
+      unsigned long long baseKey = 0;
+      int dirty[4] = { 0, 0, 0, 0 };
    };
    Raster* SyncRaster(std::map<int, Raster>& in, const Layer& l, bool mask);
    void SyncRasters();

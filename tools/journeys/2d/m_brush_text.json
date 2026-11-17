@@ -1,0 +1,34 @@
+{
+ "id": "m_brush_text",
+ "title": "Brush with T active: paint shows, a live T stays live (text)",
+ "ref": "Affinity Assistant: new pixel layer",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text HHH",
+  "textstyle 150 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "active HHH",
+  "tool Brush"
+ ],
+ "steps": [
+  {
+   "drag": [
+    158,
+    205,
+    258,
+    205
+   ]
+  }
+ ],
+ "expect": [
+  "px 208 205 ~= 0 0 1",
+  "kind HHH == text",
+  "active.kind == paint",
+  "layers == 4"
+ ]
+}

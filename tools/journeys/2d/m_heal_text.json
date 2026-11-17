@@ -1,0 +1,33 @@
+{
+ "id": "m_heal_text",
+ "title": "Heal with T active: a live T gets a rasterised copy above, original kept (text)",
+ "ref": "Affinity retouch rasterizes",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text HHH",
+  "textstyle 150 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "active HHH",
+  "tool Heal"
+ ],
+ "steps": [
+  {
+   "drag": [
+    158,
+    205,
+    258,
+    205
+   ]
+  }
+ ],
+ "expect": [
+  "kind HHH == text",
+  "active.kind == paint",
+  "layers == 4"
+ ]
+}

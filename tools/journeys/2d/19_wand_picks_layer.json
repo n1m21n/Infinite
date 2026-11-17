@@ -1,0 +1,28 @@
+{
+ "id": "19_wand_picks_layer",
+ "title": "Wand on a photo while another layer is picked: selects on the photo and picks it",
+ "ref": "Affinity flood select",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Photo",
+  "rect 0 0 200 300 1 0 0",
+  "layer paint Top",
+  "rect 300 0 400 100 0 1 0",
+  "tool Wand"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    100,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "ink Photo 100 150 == 1",
+  "selection == 1",
+  "active.name == Photo"
+ ]
+}

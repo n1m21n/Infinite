@@ -1947,20 +1947,28 @@ namespace Platform
       }
    }
 
+   static CGColorRef SrgbColor(CGColorSpaceRef space, CGFloat r, CGFloat g, CGFloat b, CGFloat a)
+   {
+      const CGFloat c[4] = { r, g, b, a };
+      return CGColorCreate(space, c);
+   }
+
    void RasterizeText(const TextRasterRequest& req, int width, int height,
                       unsigned char* outPixelsRGBA, float& outFittedSize)
    {
       @autoreleasepool
       {
-         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+         // sRGB for the bitmap and every colour: Generic RGB colours drawn into it were colour-matched, so a pure red
+         // came out (1, 0.15, 0).
+         CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
          CGContextRef ctx = CGBitmapContextCreate(
             outPixelsRGBA, width, height, 8, width * 4, colorSpace, kCGImageAlphaPremultipliedLast);
 
          if (ctx != nullptr)
          {
             CGColorRef fillColor =
-               CGColorCreateGenericRGB(req.color[0], req.color[1], req.color[2], 1.0);
-            CGColorRef strokeColor = CGColorCreateGenericRGB(
+               SrgbColor(colorSpace, req.color[0], req.color[1], req.color[2], 1.0);
+            CGColorRef strokeColor = SrgbColor(colorSpace, 
                req.outlineColor[0], req.outlineColor[1], req.outlineColor[2], 1.0);
 
             float strokeSetting = 0.0f;
@@ -2045,7 +2053,7 @@ namespace Platform
                CGColorRef ulColor = nullptr;
                if (req.underline && req.underlineOwn)
                {
-                  ulColor = CGColorCreateGenericRGB(req.underlineColor[0], req.underlineColor[1], req.underlineColor[2],
+                  ulColor = SrgbColor(colorSpace, req.underlineColor[0], req.underlineColor[1], req.underlineColor[2],
                                                     std::clamp(req.underlineColor[3], 0.0f, 1.0f));
                   keys[nAttr] = kCTUnderlineColorAttributeName;
                   values[nAttr++] = ulColor;

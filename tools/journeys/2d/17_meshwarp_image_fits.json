@@ -1,0 +1,24 @@
+{
+ "id": "17_meshwarp_image_fits",
+ "title": "Mesh warp on a photo smaller than the page: the grid hugs the photo",
+ "ref": "Affinity mesh warp",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Photo",
+  "rect 100 50 300 250 0 0 1",
+  "tool MeshWarp"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "warp.box ~= 100 50 300 250"
+ ]
+}

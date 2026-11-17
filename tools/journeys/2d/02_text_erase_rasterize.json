@@ -1,7 +1,7 @@
 {
  "id": "02_text_erase_rasterize",
- "title": "Eraser on a text layer asks to rasterize, then erases pixels",
- "ref": "Affinity: a pixel tool on text asks to rasterize",
+ "title": "Eraser on a text layer paints its mask; the text stays live",
+ "ref": "Photoshop: paint a mask instead of rasterizing type",
  "ref_steps": 4,
  "setup": [
   "doc 400 300",
@@ -18,21 +18,10 @@
     250,
     150
    ]
-  },
-  {
-   "click": "Rasterize?##v2drasterask"
-  },
-  {
-   "drag": [
-    150,
-    150,
-    250,
-    150
-   ]
   }
  ],
  "expect": [
-  "active.kind == paint",
+  "active.kind == text",
   "rasterask == 0"
  ]
 }

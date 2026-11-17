@@ -1,0 +1,27 @@
+{
+ "id": "16_meshwarp_text",
+ "title": "Mesh warp on text: the grid hugs the word, a pull bends it",
+ "ref": "Affinity mesh warp",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text hey",
+  "tool MeshWarp"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "active.kind == paint",
+  "warp.box != none",
+  "warp.box != 0 0 400 300"
+ ]
+}

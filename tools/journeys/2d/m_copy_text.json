@@ -1,0 +1,41 @@
+{
+ "id": "m_copy_text",
+ "title": "Marquee on T, Cmd+C, Cmd+V: a pixel layer with only the selected part, T kept (text)",
+ "ref": "Photoshop copy and paste selections",
+ "ref_steps": 3,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text HHH",
+  "textstyle 150 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Marquee"
+ ],
+ "steps": [
+  {
+   "drag": [
+    158,
+    155,
+    258,
+    255
+   ]
+  },
+  {
+   "key": "cmd+c"
+  },
+  {
+   "key": "cmd+v"
+  }
+ ],
+ "expect": [
+  "ink HHH 208 205 == 1",
+  "layers == 4",
+  "active.kind == paint",
+  "activepx 208 205 ~= 1 0 0",
+  "activepx 60 60 == none",
+  "kind HHH == text"
+ ]
+}

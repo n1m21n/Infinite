@@ -1,0 +1,27 @@
+{
+ "id": "12_fill_on_image_no_empty_layer",
+ "title": "Bucket on a photo while an empty layer is picked: the photo region fills, no empty layer",
+ "ref": "Affinity flood fill",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Photo",
+  "rect 0 0 200 300 1 0 0",
+  "layer paint Empty",
+  "tool Fill",
+  "fg 0 1 0"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    100,
+    100
+   ]
+  }
+ ],
+ "expect": [
+  "px 100 100 ~= 0 1 0",
+  "layers == 2"
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "id": "m_cut_vector",
+ "title": "Marquee on T, Cmd+X: the area goes from the picture, a live T stays live (vector)",
+ "ref": "Photoshop cut; mask on live layers",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer vector T",
+  "shape 100 75 300 225 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Marquee"
+ ],
+ "steps": [
+  {
+   "drag": [
+    150,
+    100,
+    250,
+    200
+   ]
+  },
+  {
+   "key": "cmd+x"
+  }
+ ],
+ "expect": [
+  "ink T 200 150 == 0",
+  "px 200 150 ~= 1 1 1",
+  "px 120 90 ~= 1 0 0",
+  "kind T == vector"
+ ]
+}

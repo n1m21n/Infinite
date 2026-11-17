@@ -1,0 +1,29 @@
+{
+ "id": "m_pick_text",
+ "title": "Colour picker on T takes T's colour (text)",
+ "ref": "Photoshop eyedropper (sample all layers)",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text HHH",
+  "textstyle 150 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Pick"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    208,
+    205
+   ]
+  }
+ ],
+ "expect": [
+  "fg ~= 1 0 0"
+ ]
+}

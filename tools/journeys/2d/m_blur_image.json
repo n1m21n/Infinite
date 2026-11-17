@@ -1,0 +1,33 @@
+{
+ "id": "m_blur_image",
+ "title": "Blur with T active: a live T gets a rasterised copy above, original kept (image)",
+ "ref": "Photoshop rasterize prompt",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "image T fixtures/red.png",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "active T",
+  "tool Blur"
+ ],
+ "steps": [
+  {
+   "drag": [
+    150,
+    150,
+    250,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "kind T == node",
+  "active.kind == paint",
+  "layers == 4",
+  "rasterask == 0"
+ ]
+}

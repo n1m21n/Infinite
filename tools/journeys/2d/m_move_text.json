@@ -1,0 +1,31 @@
+{
+ "id": "m_move_text",
+ "title": "Move drag on T moves T (a group moves whole) (text)",
+ "ref": "Photoshop Move Auto-Select",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text HHH",
+  "textstyle 150 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Move"
+ ],
+ "steps": [
+  {
+   "drag": [
+    208,
+    205,
+    208,
+    305
+   ]
+  }
+ ],
+ "expect": [
+  "kind HHH == text",
+  "kind HHH == text"
+ ]
+}

@@ -1,0 +1,26 @@
+{
+ "id": "15_brush_on_text_paints",
+ "title": "Brush with a text layer picked: paint lands on a new layer above, visible",
+ "ref": "Affinity: new pixel layer",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer text hey",
+  "tool Brush",
+  "fg 1 0 0"
+ ],
+ "steps": [
+  {
+   "drag": [
+    50,
+    50,
+    350,
+    50
+   ]
+  }
+ ],
+ "expect": [
+  "px 200 50 ~= 1 0 0",
+  "kind hey == text"
+ ]
+}

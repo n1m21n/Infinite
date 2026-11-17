@@ -1,0 +1,33 @@
+{
+ "id": "m_marquee_paint",
+ "title": "Marquee round T while Other is active picks T (paint)",
+ "ref": "Photoshop Auto-Select (Layer)",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Marquee"
+ ],
+ "steps": [
+  {
+   "drag": [
+    150,
+    100,
+    250,
+    200
+   ]
+  }
+ ],
+ "expect": [
+  "ink T 200 150 == 1",
+  "active.name == T",
+  "selection == 1",
+  "kind T == paint"
+ ]
+}

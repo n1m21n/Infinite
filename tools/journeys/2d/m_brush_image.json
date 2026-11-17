@@ -1,0 +1,33 @@
+{
+ "id": "m_brush_image",
+ "title": "Brush with T active: paint shows, a live T stays live (image)",
+ "ref": "Affinity Assistant: new pixel layer",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "image T fixtures/red.png",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "active T",
+  "tool Brush"
+ ],
+ "steps": [
+  {
+   "drag": [
+    150,
+    150,
+    250,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "px 200 150 ~= 0 0 1",
+  "kind T == node",
+  "active.kind == paint",
+  "layers == 4"
+ ]
+}

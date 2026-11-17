@@ -11,7 +11,7 @@ PRIVATE='session_history_corpus|antigravity_history_corpus|session_analysis_corp
 IDX=tools/semi-brain/1_extractors/output/knowledge_index.db
 fail=0
 # Paths that can change app behaviour or the ui group; everything else pushes without a build.
-V2D='^(src/app/panels/View2D|src/nodes/Scene2D|src/app/selftest/(UiAudit|View2D)|src/app/ui/design/components/(ActionButton|FieldWell)|tools/ui-audit/|tools/ui/golden)'
+V2D='^(src/app/panels/View2D|src/nodes/Scene2D|tools/journeys/|src/platform/Platform\.mm|src/app/selftest/(UiAudit|View2D)|src/app/ui/design/components/(ActionButton|FieldWell)|tools/ui-audit/|tools/ui/golden)'
 CODE='^(src/|CMakeLists\.txt|cmake/|external/|resources/|assets/|shaders/|tools/design/|\.claude/skills/run-infinite-hygiene/|scripts/(ibuild|bench))'
 while read -r lref lsha rref rsha; do
   [[ "$lsha" == "$ZERO" ]] && continue
@@ -46,8 +46,8 @@ while read -r lref lsha rref rsha; do
       echo "pre-push: BLOCKED - 2D View files changed; push the clean HEAD so the 2D audit can run on it" >&2; exit 1
     else
       echo "pre-push: 2D View changed - dev build + 2D audit + golden shots" >&2
-      ( cd "$ROOT" && python3 scripts/ibuild.py build --mode dev --target Infinite >/dev/null && python3 tools/ui/golden_view2d.py check ) 2>&1 | tail -4 >&2
-      [[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "pre-push: BLOCKED - 2D View audit or golden shots failed (ui-audit-view2d/report.md, golden.md)" >&2; exit 1; }
+      ( cd "$ROOT" && python3 scripts/ibuild.py build --mode dev --target Infinite >/dev/null && python3 tools/ui/golden_view2d.py check && python3 tools/journeys/run.py --area 2d --budget 600 ) 2>&1 | tail -4 >&2
+      [[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "pre-push: BLOCKED - 2D View audit, golden shots or tool journeys failed (ui-audit-view2d/report.md, golden.md, journeys report.md)" >&2; exit 1; }
       mkdir -p "$(dirname "$v2stamp")" && : > "$v2stamp"
     fi
   fi

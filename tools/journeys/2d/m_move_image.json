@@ -1,0 +1,30 @@
+{
+ "id": "m_move_image",
+ "title": "Move drag on T moves T (a group moves whole) (image)",
+ "ref": "Photoshop Move Auto-Select",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "image T fixtures/red.png",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Move"
+ ],
+ "steps": [
+  {
+   "drag": [
+    200,
+    150,
+    200,
+    250
+   ]
+  }
+ ],
+ "expect": [
+  "px 200 250 ~= 1 0 0",
+  "kind T == node"
+ ]
+}

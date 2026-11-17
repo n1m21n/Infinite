@@ -1,0 +1,33 @@
+{
+ "id": "m_eraser_paint",
+ "title": "Eraser on T while Other is active: T loses ink there, a live T stays live (mask) (paint)",
+ "ref": "Photoshop: mask instead of rasterize",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Eraser"
+ ],
+ "steps": [
+  {
+   "drag": [
+    196,
+    150,
+    204,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "ink T 200 150 == 0",
+  "px 200 150 ~= 1 1 1",
+  "kind T == paint",
+  "layers == 3"
+ ]
+}

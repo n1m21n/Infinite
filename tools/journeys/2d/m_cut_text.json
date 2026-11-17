@@ -1,0 +1,35 @@
+{
+ "id": "m_cut_text",
+ "title": "Marquee on T, Cmd+X: the area goes from the picture, a live T stays live (text)",
+ "ref": "Photoshop cut; mask on live layers",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer text HHH",
+  "textstyle 150 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Marquee"
+ ],
+ "steps": [
+  {
+   "drag": [
+    158,
+    155,
+    258,
+    255
+   ]
+  },
+  {
+   "key": "cmd+x"
+  }
+ ],
+ "expect": [
+  "ink HHH 208 205 == 0",
+  "px 208 205 ~= 1 1 1",
+  "kind HHH == text"
+ ]
+}

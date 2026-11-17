@@ -1,0 +1,25 @@
+{
+ "id": "14_brush_paints",
+ "title": "Brush on a paint layer paints the foreground",
+ "ref": "Photoshop brush",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint P",
+  "tool Brush",
+  "fg 1 0 0"
+ ],
+ "steps": [
+  {
+   "drag": [
+    100,
+    150,
+    300,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "layerpx P 200 150 ~= 1 0 0"
+ ]
+}

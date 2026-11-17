@@ -679,14 +679,16 @@ namespace
 
    // Every item, bottom to top, each combined with what is below by its boolean op.
    // Returns straight RGBA8, top row first.
-   void RasterShapes(const std::vector<Scene2DNode::Shape>& shapes, int w, int h, bool mask, std::vector<uint8_t>& out,
-                     float strokeK = 1.0f)
+   // The shapes onto a premultiplied ARGB buffer of w*h*4 (plutovg's own form; cleared by the caller).
+   void RasterShapesArgb(const Scene2DNode::Shape* first, size_t count, int w, int h, bool mask, uint8_t* argb,
+                         float strokeK = 1.0f)
    {
       using S = Scene2DNode::Shape;
-      plutovg_surface_t* surf = plutovg_surface_create(w, h);
+      plutovg_surface_t* surf = plutovg_surface_create_for_data(argb, w, h, w * 4);
       plutovg_canvas_t* cv = plutovg_canvas_create(surf);
-      for (const S& s : shapes)
+      for (size_t i = 0; i < count; i++)
       {
+         const S& s = first[i];
          if (s.op == S::kAdd)
          {
             DrawItem(cv, s, mask, strokeK);
@@ -710,9 +712,16 @@ namespace
          plutovg_surface_destroy(tmp);
       }
       plutovg_canvas_destroy(cv);
-      out.resize((size_t)w * h * 4);
-      plutovg_convert_argb_to_rgba(out.data(), plutovg_surface_get_data(surf), w, h, plutovg_surface_get_stride(surf));
       plutovg_surface_destroy(surf);
+   }
+
+   void RasterShapes(const std::vector<Scene2DNode::Shape>& shapes, int w, int h, bool mask, std::vector<uint8_t>& out,
+                     float strokeK = 1.0f)
+   {
+      std::vector<uint8_t> argb((size_t)w * h * 4, 0);
+      RasterShapesArgb(shapes.data(), shapes.size(), w, h, mask, argb.data(), strokeK);
+      out.resize(argb.size());
+      plutovg_convert_argb_to_rgba(out.data(), argb.data(), w, h, w * 4);
    }
 
    void Upload(unsigned& tex, int& tw, int& th, int w, int h, const std::vector<uint8_t>& topFirst)
@@ -1346,6 +1355,7 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
 {
    int w = 0, h = 0;
    unsigned long long key = 1469598103934665603ull;
+   unsigned long long prefix = 0;
    bool fixedStroke = false;
    float strokeK = 1.0f;
    if (l.kind == Kind::Text && !mask)
@@ -1360,8 +1370,12 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
       LayerBox(l, bw, bh);
       w = std::clamp((int)std::lround(bw), 1, GLUtil::kMaxTargetSide);
       h = std::clamp((int)std::lround(bh), 1, GLUtil::kMaxTargetSide);
-      for (const Shape& s : mask ? l.vmask : l.shapes)
+      const auto& all = mask ? l.vmask : l.shapes;
+      for (size_t i = 0; i < all.size(); i++)
       {
+         const Shape& s = all[i];
+         if (i + 1 == all.size())
+            prefix = key;
          key = HashShape(key, s);
          if (!s.scaleStroke && s.strokeOn)
             fixedStroke = true;
@@ -1397,10 +1411,95 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
    }
    else
    {
-      std::vector<uint8_t> px;
-      RasterShapes(mask ? l.vmask : l.shapes, w, h, mask, px, strokeK);
-      hard(px);
-      Upload(r.tex, r.w, r.h, w, h, px);
+      const auto& all = mask ? l.vmask : l.shapes;
+      const Shape* last = all.empty() ? nullptr : &all.back();
+      float lo[2], hi[2];
+      // A shape being drawn or dragged is the top one (Illustrator redraws only what changed): the shapes under
+      // it are drawn once, and each frame only the last shape's box is redrawn, converted and uploaded.
+      const bool local = last != nullptr && last->op == Shape::kAdd && last->type != Shape::kSvg && last->noise <= 0.0f &&
+                         ShapeBounds(*last, lo, hi);
+      const unsigned long long bk = H(H(H(H(prefix, (unsigned)w), (unsigned)h), (unsigned)l.aaMode), (unsigned)std::lround(strokeK * 4096.0f) + (mask ? 7u : 0u));
+      if (!local)
+      {
+         r.base.clear();
+         r.base.shrink_to_fit();
+         r.work.clear();
+         r.work.shrink_to_fit();
+         r.baseKey = 0;
+         std::vector<uint8_t> px;
+         RasterShapes(all, w, h, mask, px, strokeK);
+         hard(px);
+         Upload(r.tex, r.w, r.h, w, h, px);
+      }
+      else
+      {
+         const size_t bytes = (size_t)w * h * 4;
+         const bool reuse = r.baseKey == bk && r.base.size() == bytes && r.work.size() == bytes && r.tex != 0 && r.w == w && r.h == h;
+         if (!reuse)
+         {
+            r.base.assign(bytes, 0);
+            RasterShapesArgb(all.data(), all.size() - 1, w, h, mask, r.base.data(), strokeK);
+            r.work = r.base;
+            r.baseKey = bk;
+            r.dirty[0] = 0;
+            r.dirty[1] = 0;
+            r.dirty[2] = w;
+            r.dirty[3] = h;
+         }
+         // The last shape's box this frame (stroke joins and fixed-width strokes padded), unioned with last frame's.
+         const float pad = 2.0f + last->width * std::max(1.0f, strokeK) * std::max(1.0f, std::min(last->miter, 4.0f));
+         int nb[4] = { std::clamp((int)std::floor(lo[0] - pad), 0, w), std::clamp((int)std::floor(lo[1] - pad), 0, h),
+                       std::clamp((int)std::ceil(hi[0] + pad), 0, w), std::clamp((int)std::ceil(hi[1] + pad), 0, h) };
+         int d[4] = { std::min(nb[0], r.dirty[0]), std::min(nb[1], r.dirty[1]), std::max(nb[2], r.dirty[2]), std::max(nb[3], r.dirty[3]) };
+         if (reuse)
+         {
+            // Put back what the last frame's shape covered.
+            for (int y = r.dirty[1]; y < r.dirty[3]; y++)
+               std::memcpy(&r.work[((size_t)y * w + r.dirty[0]) * 4], &r.base[((size_t)y * w + r.dirty[0]) * 4], (size_t)(r.dirty[2] - r.dirty[0]) * 4);
+         }
+         else
+         {
+            d[0] = 0;
+            d[1] = 0;
+            d[2] = w;
+            d[3] = h;
+         }
+         {
+            plutovg_surface_t* ws = plutovg_surface_create_for_data(r.work.data(), w, h, w * 4);
+            plutovg_canvas_t* wc = plutovg_canvas_create(ws);
+            DrawItem(wc, *last, mask, strokeK);
+            plutovg_canvas_destroy(wc);
+            plutovg_surface_destroy(ws);
+         }
+         r.dirty[0] = nb[0];
+         r.dirty[1] = nb[1];
+         r.dirty[2] = nb[2];
+         r.dirty[3] = nb[3];
+         const int dw = d[2] - d[0], dh = d[3] - d[1];
+         if (dw > 0 && dh > 0)
+         {
+            std::vector<uint8_t> px((size_t)dw * dh * 4);
+            // bottom-up rows, as Upload flips
+            for (int y = 0; y < dh; y++)
+               plutovg_convert_argb_to_rgba(&px[(size_t)(dh - 1 - y) * dw * 4], &r.work[((size_t)(d[1] + y) * w + d[0]) * 4], dw, 1, w * 4);
+            hard(px);
+            if (r.tex == 0 || r.w != w || r.h != h)
+            {
+               std::vector<uint8_t> full((size_t)w * h * 4);
+               plutovg_convert_argb_to_rgba(full.data(), r.work.data(), w, h, w * 4);
+               hard(full);
+               Upload(r.tex, r.w, r.h, w, h, full);
+            }
+            else
+            {
+               glBindTexture(GL_TEXTURE_2D, r.tex);
+               glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+               glTexSubImage2D(GL_TEXTURE_2D, 0, d[0], h - d[3], dw, dh, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+               glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+               glBindTexture(GL_TEXTURE_2D, 0);
+            }
+         }
+      }
    }
    mPaintEdits++;
    return &r;

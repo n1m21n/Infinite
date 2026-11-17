@@ -1,0 +1,33 @@
+{
+ "id": "m_heal_vector",
+ "title": "Heal with T active: a live T gets a rasterised copy above, original kept (vector)",
+ "ref": "Affinity retouch rasterizes",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer vector T",
+  "shape 100 75 300 225 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "active T",
+  "tool Heal"
+ ],
+ "steps": [
+  {
+   "drag": [
+    150,
+    150,
+    250,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "kind T == vector",
+  "active.kind == paint",
+  "layers == 4"
+ ]
+}

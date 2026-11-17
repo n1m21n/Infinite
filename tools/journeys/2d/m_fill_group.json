@@ -1,0 +1,32 @@
+{
+ "id": "m_fill_group",
+ "title": "Bucket on T while Other is active: fills T's region, no empty layer (group)",
+ "ref": "Affinity flood fill",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "group G T",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Fill"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "px 200 150 ~= 0 0 1",
+  "kind T == paint",
+  "layers == 4"
+ ]
+}

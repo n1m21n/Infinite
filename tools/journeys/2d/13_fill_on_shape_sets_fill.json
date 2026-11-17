@@ -1,0 +1,28 @@
+{
+ "id": "13_fill_on_shape_sets_fill",
+ "title": "Bucket on a vector rectangle: its fill turns the foreground",
+ "ref": "Affinity fill tool on a shape",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer vector V",
+  "shape 100 100 300 200 1 0 0",
+  "layer paint Empty",
+  "tool Fill",
+  "fg 0 0 1"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "ink V 200 150 == 1",
+  "shape.fill.at V ~= 0 0 1",
+  "layers == 2"
+ ]
+}

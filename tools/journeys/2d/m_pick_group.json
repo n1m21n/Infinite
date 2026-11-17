@@ -1,0 +1,30 @@
+{
+ "id": "m_pick_group",
+ "title": "Colour picker on T takes T's colour (group)",
+ "ref": "Photoshop eyedropper (sample all layers)",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "group G T",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Pick"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "fg ~= 1 0 0"
+ ]
+}

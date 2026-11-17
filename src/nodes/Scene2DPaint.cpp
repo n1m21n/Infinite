@@ -237,10 +237,205 @@ namespace
                img[i * 4 + c] = lv[0].c[i * 5 + c];
    }
 
+
+   // Automatic heal (spot heal, inpaint, blemish): the hole is cut into tiles and each tile takes texture from its
+   // own best place nearby, as patch-based fills do; one offset for a long stroke always lands somewhere wrong.
+   // Base colour = the push-pull fill from the edge; texture = the source's detail above its own local mean, so a
+   // dark or bright source lends grain but never its tone. Tiles cross-fade bilinearly, so there are no seams.
+   bool HealTiled(std::vector<uint8_t>& px, int w, int h, const std::vector<float>& img, const std::vector<float>& orig,
+                  const std::vector<uint8_t>& hole, const std::vector<uint8_t>& m8, int cx0, int cy0, int cw, int chh,
+                  int hx0, int hy0, int bw, int bh, bool fixed, int fox, int foy)
+   {
+      (void)h;
+      const int big = std::max(bw, bh);
+      const int T = std::clamp(std::min(bw, bh), 12, 40);
+      const int lr = std::max(2, T / 3);
+      std::vector<float> low = img;
+      BoxBlurF(low, cw, chh, 4, lr);
+      auto inHole = [&](int x, int y) { return x < 0 || y < 0 || x >= cw || y >= chh || hole[(size_t)y * cw + x]; };
+      auto luma = [&](const std::vector<float>& a, int x, int y) { const float* c = &a[((size_t)y * cw + x) * 4]; return 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2]; };
+      const int nx = (bw + T - 1) / T, ny = (bh + T - 1) / T;
+      std::vector<int> tox((size_t)nx * ny, 0), toy((size_t)nx * ny, 0);
+      std::vector<uint8_t> tok((size_t)nx * ny, 0);
+      std::vector<float> tgain((size_t)nx * ny, 1.0f), twant((size_t)nx * ny, -1.0f);
+      const int st = std::max(1, T / 10), ringW = std::max(2, T / 4);
+      // Grain: mean luma step right and down over the points moved by (tx, ty).
+      auto grain = [&](const std::vector<std::pair<int, int>>& pts, int tx, int ty)
+      {
+         float g = 0;
+         int n = 0;
+         for (const auto& q : pts)
+         {
+            const int x = q.first + tx, y = q.second + ty;
+            if (x < 0 || y < 0 || x + 1 >= cw || y + 1 >= chh)
+               continue;
+            const float l0 = luma(orig, x, y);
+            g += std::fabs(luma(orig, x + 1, y) - l0) + std::fabs(luma(orig, x, y + 1) - l0);
+            n++;
+         }
+         return n > 0 ? g / n : 0.0f;
+      };
+      for (int j = 0; j < ny; j++)
+         for (int i = 0; i < nx; i++)
+         {
+            const int x0 = hx0 + i * T, y0 = hy0 + j * T;
+            std::vector<std::pair<int, int>> inner, ring;
+            for (int y = std::max(0, y0 - ringW); y < std::min(chh, y0 + T + ringW); y += st)
+               for (int x = std::max(0, x0 - ringW); x < std::min(cw, x0 + T + ringW); x += st)
+               {
+                  const bool in = x >= x0 && x < x0 + T && y >= y0 && y < y0 + T;
+                  if (hole[(size_t)y * cw + x])
+                  {
+                     if (in)
+                        inner.push_back({ x, y });
+                     continue;
+                  }
+                  bool near = false;
+                  for (int k = -ringW; k <= ringW && !near; k += std::max(1, ringW / 2))
+                     near = (x + k >= 0 && x + k < cw && hole[(size_t)y * cw + x + k]) || (y + k >= 0 && y + k < chh && hole[(size_t)(y + k) * cw + x]);
+                  if (near)
+                     ring.push_back({ x, y });
+               }
+            if (inner.empty())
+               continue;
+            const float want = ring.empty() ? -1.0f : grain(ring, 0, 0);
+            twant[(size_t)j * nx + i] = want;
+            if (fixed)   // the heal brush's or patch's own source: every tile takes it
+            {
+               tox[(size_t)j * nx + i] = fox;
+               toy[(size_t)j * nx + i] = foy;
+               tok[(size_t)j * nx + i] = 1;
+               tgain[(size_t)j * nx + i] = grain(inner, fox, foy);   // source grain for now, a gain below
+               continue;
+            }
+            float best = 1e30f;
+            for (int a = 0; a < 24; a++)
+            {
+               const float dx = std::cos(a * 0.2617994f), dy = std::sin(a * 0.2617994f);
+               for (float d = T * 0.75f; d <= big * 1.5f + T; d += std::max(2.0f, T / 3.0f))
+               {
+                  const int tx = (int)std::lround(dx * d), ty = (int)std::lround(dy * d);
+                  bool clear = true;
+                  for (const auto& q : inner)
+                     if (inHole(q.first + tx, q.second + ty))
+                     {
+                        clear = false;
+                        break;
+                     }
+                  if (!clear)
+                     continue;
+                  // Colour: the source against the edge-predicted colour here; seam: the ring against the moved ring.
+                  float e = 0;
+                  int n = 0;
+                  for (const auto& q : inner)
+                  {
+                     const int sx = q.first + tx, sy = q.second + ty;
+                     for (int c = 0; c < 3; c++)
+                     {
+                        const float dv = orig[((size_t)sy * cw + sx) * 4 + c] - img[((size_t)q.second * cw + q.first) * 4 + c];
+                        e += dv * dv;
+                     }
+                     n++;
+                  }
+                  float score = e / std::max(1, n);
+                  int rn = 0;
+                  float re = 0;
+                  for (const auto& q : ring)
+                  {
+                     const int sx = q.first + tx, sy = q.second + ty;
+                     if (inHole(sx, sy))
+                        continue;
+                     for (int c = 0; c < 3; c++)
+                     {
+                        const float dv = orig[((size_t)q.second * cw + q.first) * 4 + c] - orig[((size_t)sy * cw + sx) * 4 + c];
+                        re += dv * dv;
+                     }
+                     rn++;
+                  }
+                  if (rn > 0)
+                     score += re / rn;
+                  if (want >= 0.0f)
+                  {
+                     const float gd = grain(inner, tx, ty) - want;
+                     score += 4.0f * gd * gd;
+                  }
+                  score += 1e-3f * d / (float)big;
+                  if (score < best)
+                  {
+                     best = score;
+                     tox[(size_t)j * nx + i] = tx;
+                     toy[(size_t)j * nx + i] = ty;
+                     tok[(size_t)j * nx + i] = 1;
+                  }
+                  break;   // the nearest clear place in this direction only, farther ones are another texture
+               }
+            }
+            if (tok[(size_t)j * nx + i])
+               tgain[(size_t)j * nx + i] = grain(inner, tox[(size_t)j * nx + i], toy[(size_t)j * nx + i]);
+         }
+      // Gain: a source busier than the edge round the hole (a shadow line, a ridge) is turned down to the edge's
+      // grain, so it lends texture, not its structure. Deep tiles use the mean edge grain.
+      float wantSum = 0;
+      int wantN = 0;
+      for (float v : twant)
+         if (v >= 0.0f)
+         {
+            wantSum += v;
+            wantN++;
+         }
+      const float wantAll = wantN > 0 ? wantSum / wantN : 0.02f;
+      for (size_t t = 0; t < tgain.size(); t++)
+      {
+         const float want = twant[t] >= 0.0f ? twant[t] : wantAll;
+         tgain[t] = std::min(1.0f, (want * 1.25f + 0.004f) / std::max(1e-4f, tgain[t]));
+      }
+      for (int y = 0; y < chh; y++)
+         for (int x = 0; x < cw; x++)
+         {
+            const size_t di = (size_t)y * cw + x;
+            const float k = m8[di] / 255.0f;
+            if (k <= 0.0f)
+               continue;
+            // Bilinear weights over the four nearest tile centres.
+            const float fx = (x - hx0 + 0.5f) / T - 0.5f, fy = (y - hy0 + 0.5f) / T - 0.5f;
+            const int ix = (int)std::floor(fx), iy = (int)std::floor(fy);
+            const float ax = fx - ix, ay = fy - iy;
+            float det[4] = { 0, 0, 0, 0 }, wsum = 0;
+            for (int q = 0; q < 4; q++)
+            {
+               const int ti = std::clamp(ix + (q & 1), 0, nx - 1), tj = std::clamp(iy + (q >> 1), 0, ny - 1);
+               const size_t t = (size_t)tj * nx + ti;
+               if (!tok[t])
+                  continue;
+               // A source inside the hole steps on by the same offset (a clone chain) until it is clear.
+               int sx = x + tox[t], sy = y + toy[t];
+               for (int hop = 0; hop < 4 && sx >= 0 && sy >= 0 && sx < cw && sy < chh && hole[(size_t)sy * cw + sx]; hop++)
+               {
+                  sx += tox[t];
+                  sy += toy[t];
+               }
+               if (inHole(sx, sy))
+                  continue;
+               const float wq = ((q & 1) ? ax : 1 - ax) * ((q >> 1) ? ay : 1 - ay) + 1e-4f;
+               const size_t si = (size_t)sy * cw + sx;
+               for (int c = 0; c < 4; c++)
+                  det[c] += wq * tgain[t] * (orig[si * 4 + c] - low[si * 4 + c]);
+               wsum += wq;
+            }
+            for (int c = 0; c < 4; c++)
+            {
+               const float v = img[di * 4 + c] + (wsum > 0 ? det[c] / wsum : 0.0f);
+               const float o = orig[di * 4 + c] * (1.0f - k) + std::clamp(v, 0.0f, 1.0f) * k;
+               px[((size_t)(y + cy0) * w + (x + cx0)) * 4 + c] = (uint8_t)std::lround(std::clamp(o, 0.0f, 1.0f) * 255.0f);
+            }
+         }
+      return true;
+   }
+
 }   // namespace
 
-// The masked pixels (mask 0..255, the surface's size) rebuilt from around them: the smooth colour from a push-pull
-// fill, the texture from a clean patch `off` away (the best-matching one nearby when autoOff) healed onto it.
+// The masked pixels (mask 0..255, the surface's size) rebuilt from around them: the colour from a push-pull fill of
+// the edge, the texture from a clean place `off` away (per tile, the best-matching place nearby when autoOff).
 bool Scene2DNode::HealRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask, int ox, int oy, bool autoOff)
 {
    int bx0 = w, by0 = h, bx1 = -1, by1 = -1;
@@ -257,7 +452,7 @@ bool Scene2DNode::HealRegion(std::vector<uint8_t>& px, int w, int h, const std::
       return false;
    const int bw = bx1 - bx0 + 1, bh = by1 - by0 + 1, big = std::max(bw, bh);
    const int R = std::clamp(big / 8 + 2, 3, 24);
-   const int reach = autoOff ? big * 2 + R + 4 : std::max(std::abs(ox), std::abs(oy)) + R + 4;
+   const int reach = autoOff ? big * 2 + R + 4 : std::max(std::abs(ox), std::abs(oy)) * 5 + R + 4;   // room for the clone chain
    const int cx0 = std::max(0, bx0 - reach), cy0 = std::max(0, by0 - reach);
    const int cx1 = std::min(w, bx1 + 1 + reach), cy1 = std::min(h, by1 + 1 + reach);
    const int cw = cx1 - cx0, chh = cy1 - cy0;
@@ -274,84 +469,7 @@ bool Scene2DNode::HealRegion(std::vector<uint8_t>& px, int w, int h, const std::
       }
    const std::vector<float> orig = img;
    PushPull(img, hole, cw, chh);
-   auto inHole = [&](int x, int y) { return x < 0 || y < 0 || x >= cw || y >= chh || hole[(size_t)y * cw + x]; };
-   if (autoOff)
-   {
-      // The ring just outside the hole, matched against the same ring moved: the closest clean place wins.
-      std::vector<std::pair<int, int>> ring, inner;
-      const int step = std::max(1, big / 24);
-      for (int y = 0; y < chh; y += step)
-         for (int x = 0; x < cw; x += step)
-         {
-            if (hole[(size_t)y * cw + x])
-            {
-               inner.push_back({ x, y });
-               continue;
-            }
-            bool near = false;
-            for (int k = -R; k <= R && !near; k += std::max(1, R / 2))
-            {
-               const int xx = x + k, yy = y + k;
-               near = (xx >= 0 && xx < cw && hole[(size_t)y * cw + xx] != 0) || (yy >= 0 && yy < chh && hole[(size_t)yy * cw + x] != 0);
-            }
-            if (near)
-               ring.push_back({ x, y });
-         }
-      float best = 1e30f;
-      ox = oy = 0;
-      for (int ring_d = 0; ring_d < 3; ring_d++)
-         for (int a = 0; a < 16; a++)
-         {
-            const float d = big * (0.75f + 0.5f * ring_d) + R;
-            const int tx = (int)std::lround(std::cos(a * 0.3926991f) * d), ty = (int)std::lround(std::sin(a * 0.3926991f) * d);
-            bool ok = true;
-            for (const auto& q : inner)
-               if (inHole(q.first + tx, q.second + ty)) { ok = false; break; }
-            if (!ok)
-               continue;
-            float e = 0;
-            int n = 0;
-            for (const auto& q : ring)
-            {
-               const int sx = q.first + tx, sy = q.second + ty;
-               if (sx < 0 || sy < 0 || sx >= cw || sy >= chh)
-                  continue;
-               for (int c = 0; c < 3; c++)
-               {
-                  const float dv = orig[((size_t)q.second * cw + q.first) * 4 + c] - orig[((size_t)sy * cw + sx) * 4 + c];
-                  e += dv * dv;
-               }
-               n++;
-            }
-            e = n > 0 ? e / n + 1e-4f * (tx * tx + ty * ty) / (float)(big * big) : 1e30f;
-            if (e < best)
-            {
-               best = e;
-               ox = tx;
-               oy = ty;
-            }
-         }
-   }
-   std::vector<float> low = img;
-   BoxBlurF(low, cw, chh, 4, R);
-   for (int y = 0; y < chh; y++)
-      for (int x = 0; x < cw; x++)
-      {
-         const size_t di = (size_t)y * cw + x;
-         const float k = m8[di] / 255.0f;
-         if (k <= 0.0f)
-            continue;
-         const int sx = std::clamp(x + ox, 0, cw - 1), sy = std::clamp(y + oy, 0, chh - 1);
-         const size_t si = (size_t)sy * cw + sx;
-         const bool clean = (ox != 0 || oy != 0) && !hole[si];
-         for (int c = 0; c < 4; c++)
-         {
-            const float v = clean ? img[si * 4 + c] + low[di * 4 + c] - low[si * 4 + c] : img[di * 4 + c];
-            const float o = orig[di * 4 + c] * (1.0f - k) + std::clamp(v, 0.0f, 1.0f) * k;
-            px[((size_t)(y + cy0) * w + (x + cx0)) * 4 + c] = (uint8_t)std::lround(std::clamp(o, 0.0f, 1.0f) * 255.0f);
-         }
-      }
-   return true;
+   return HealTiled(px, w, h, img, orig, hole, m8, cx0, cy0, cw, chh, bx0 - cx0, by0 - cy0, bw, bh, !autoOff, ox, oy);
 }
 
 namespace
@@ -733,6 +851,12 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
 
 // ---- painting --------------------------------------------------------------
 
+namespace
+{
+   bool sHealFixed = false;   // the stroke in progress is a healing brush with a source (one stroke at a time)
+   int sHealOff[2] = { 0, 0 };   // its source offset, surface px
+}
+
 bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure)
 {
    Layers();
@@ -800,6 +924,17 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
          DocToSurface(target == 2 ? Layer() : *l, target, b.sourceAnchor[0], b.sourceAnchor[1], ax, ay, s3);
       brush.sourceAnchor[0] = ax;
       brush.sourceAnchor[1] = ay;
+   }
+   // Healing brush with a source: the stroke marks where to mend (the inpaint preview) and on release the marked
+   // pixels are rebuilt from the source with the membrane blend (HealRegion), as Affinity heals: texture from the
+   // source, tone from round the stroke. Dab-by-dab mixing washed the texture out.
+   sHealFixed = false;
+   if (target == 0 && brush.mode == BrushEngine::kHeal && !b.sampleAll)
+   {
+      sHealFixed = true;
+      sHealOff[0] = (int)std::lround(brush.sourceOffset[0]);
+      sHealOff[1] = (int)std::lround(brush.sourceOffset[1]);
+      brush.mode = BrushEngine::kInpaint;
    }
    // Paint lands only inside the selection, resampled to the surface when it is placed differently.
    unsigned sel = 0;
@@ -936,7 +1071,8 @@ void Scene2DNode::EndPaint()
       for (int y = 0; y < ch; y++)
          for (int x = 0; x < cw; x++)
             mask[(size_t)y * w + x] = cv[((size_t)y * cw + x) * 4 + 3] > 20 ? 255 : 0;
-      if (HealRegion(px, w, h, mask, 0, 0, true))
+      const bool fixedSrc = sHealFixed && (sHealOff[0] != 0 || sHealOff[1] != 0);
+      if (HealRegion(px, w, h, mask, fixedSrc ? sHealOff[0] : 0, fixedSrc ? sHealOff[1] : 0, !fixedSrc))
       {
          WriteRect(it->second.fbo, 0, 0, w, h, px.data());
          dirty[0] = dirty[1] = 0;
@@ -1662,8 +1798,9 @@ namespace
       "out vec4 fragColor;\n"
       "uniform sampler2D uSrc;\n"
       "uniform vec2 uD[16];\n"   // each grid point's move, in uv, row by row from the top
+      "uniform vec4 uR;\n"       // the grid's box in uv, y from the top (x0, y0, x1, y1)
       "vec2 disp(vec2 p) {\n"
-      "   vec2 g = clamp(vec2(p.x, 1.0 - p.y), 0.0, 1.0) * 3.0;\n"
+      "   vec2 g = clamp((vec2(p.x, 1.0 - p.y) - uR.xy) / max(uR.zw - uR.xy, vec2(1e-6)), 0.0, 1.0) * 3.0;\n"
       "   ivec2 i = ivec2(min(floor(g), vec2(2.0)));\n"
       "   vec2 f = g - vec2(i);\n"
       "   int k = i.y * 4 + i.x;\n"
@@ -1975,7 +2112,16 @@ bool Scene2DNode::MeshRest(int id, float out[32])
    Layers();
    const Layer* l = FindConst(id);
    float c[8];
-   if (l == nullptr || l->kind != Kind::Paint || !Corners(*l, c))
+   if (l == nullptr)
+      return false;
+   if (l->kind == Kind::Node && !l->HasSkin())
+   {
+      // An image / node layer is made into pixels the size of the page on the first pull, so its grid is the page's.
+      const float w = (float)mDoc.w, h = (float)mDoc.h;
+      const float pg[8] = { 0, 0, w, 0, w, h, 0, h };
+      std::copy(pg, pg + 8, c);
+   }
+   else if (l->kind != Kind::Paint || !Corners(*l, c))
       return false;
    for (int j = 0; j < 4; j++)
       for (int i = 0; i < 4; i++)
@@ -1988,7 +2134,8 @@ bool Scene2DNode::MeshRest(int id, float out[32])
    return true;
 }
 
-bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest)
+bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest,
+                           const float* rest)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -2004,14 +2151,34 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
    Surface* src = SyncSurface(mUndoSurf, -id, l->pw, l->ph, from);
    if (mWarpProgram == 0 || src == nullptr)
       return false;
-   float d[32];
+   // Each point's move in surface uv (y up), from where it rests: the grid fitted to the content when `rest` is
+   // given, else the whole surface.
+   float d[32], box[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+   if (rest != nullptr)
+   {
+      box[0] = box[1] = 1e30f;
+      box[2] = box[3] = -1e30f;
+   }
    for (int j = 0; j < 4; j++)
       for (int i = 0; i < 4; i++)
       {
+         const int k = (j * 4 + i) * 2;
          float sx = 0, sy = 0, s = 1;
-         DocToSurface(*l, 0, moved[(j * 4 + i) * 2], moved[(j * 4 + i) * 2 + 1], sx, sy, s);
-         d[(j * 4 + i) * 2] = sx / (float)l->pw - i / 3.0f;
-         d[(j * 4 + i) * 2 + 1] = sy / (float)l->ph - (1.0f - j / 3.0f);
+         DocToSurface(*l, 0, moved[k], moved[k + 1], sx, sy, s);
+         float ru = i / 3.0f, rv = 1.0f - j / 3.0f;
+         if (rest != nullptr)
+         {
+            float rx = 0, ry = 0, rs = 1;
+            DocToSurface(*l, 0, rest[k], rest[k + 1], rx, ry, rs);
+            ru = rx / (float)l->pw;
+            rv = ry / (float)l->ph;
+            box[0] = std::min(box[0], ru);
+            box[2] = std::max(box[2], ru);
+            box[1] = std::min(box[1], 1.0f - rv);
+            box[3] = std::max(box[3], 1.0f - rv);
+         }
+         d[k] = sx / (float)l->pw - ru;
+         d[k + 1] = sy / (float)l->ph - rv;
       }
    const unsigned prog = mWarpProgram, tex = src->fbo.tex;
    GLUtil::DrawPass(it->second.fbo, prog, [&]() {
@@ -2022,6 +2189,7 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filt);
       glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
       glUniform2fv(glGetUniformLocation(prog, "uD"), 16, d);
+      glUniform4fv(glGetUniformLocation(prog, "uR"), 1, box);
    });
    if (nearest)
    {

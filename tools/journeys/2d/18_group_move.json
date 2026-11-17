@@ -1,0 +1,29 @@
+{
+ "id": "18_group_move",
+ "title": "Move a group: every layer in it moves",
+ "ref": "Photoshop auto-select group",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint A",
+  "rect 50 50 100 100 1 0 0",
+  "layer paint B",
+  "rect 150 50 200 100 0 1 0",
+  "group G A B",
+  "tool Move"
+ ],
+ "steps": [
+  {
+   "drag": [
+    75,
+    75,
+    75,
+    175
+   ]
+  }
+ ],
+ "expect": [
+  "px 75 175 ~= 1 0 0",
+  "px 175 175 ~= 0 1 0"
+ ]
+}

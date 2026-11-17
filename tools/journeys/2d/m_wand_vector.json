@@ -1,0 +1,32 @@
+{
+ "id": "m_wand_vector",
+ "title": "Wand on T while Other is active selects on T and picks it (vector)",
+ "ref": "Affinity flood select",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer vector T",
+  "shape 100 75 300 225 1 0 0",
+  "layer paint Other",
+  "rect 0 0 40 40 0 1 0",
+  "fg 0 0 1",
+  "tool Wand"
+ ],
+ "steps": [
+  {
+   "click": "canvas",
+   "doc": [
+    200,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "ink T 200 150 == 1",
+  "active.name == T",
+  "selection == 1",
+  "kind T == vector"
+ ]
+}
