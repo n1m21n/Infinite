@@ -773,6 +773,12 @@ namespace app
    }
 
 
+   bool IsShadeSource(const INode* n)
+   {
+      return dynamic_cast<const ShadeNode*>(n) != nullptr;
+   }
+
+
    // Whether an output pin carrying the given src-side facts may connect into
    // `dstNode`'s input `slot`. Mirrors the geometry/camera/light/audio/render
    // input-pin rules every drag validation and drop-to-spawn suggestion needs,
@@ -784,7 +790,7 @@ namespace app
                                IGeometrySource* srcGeometry, CameraNode* srcCamera,
                                LightNode* srcLight,
                                bool srcIsEnvironment, bool srcIsAudioNode, bool srcIsNoteSource,
-                               bool srcIsPredictor)
+                               bool srcIsPredictor, bool srcIsShade)
    {
       if (dstNode == nullptr || dstNode->node == nullptr)
          return false;
@@ -866,6 +872,12 @@ namespace app
          return false; // 3D cables only go into 3D nodes
       else if (dstNode->node->ModulatorInputSlot(slot) != nullptr && !dstWantsImage)
          return srcIsModulator;
+      // A Shade field pin reads its input only as another Shade output (ShadeBuild::Input returns the fallback for
+      // any other picture), so a plain picture is refused here instead of being accepted and then silently dropped.
+      // Shade Image's picture pin (slot 1) is the exception: it reads any picture as a texture.
+      else if (dynamic_cast<ShadeNode*>(dstNode->node.get()) != nullptr &&
+               !(dynamic_cast<ShadeImageNode*>(dstNode->node.get()) != nullptr && slot == 1))
+         return srcIsShade && srcIsImage;
       else
          return srcIsImage;
    }
@@ -1081,6 +1093,7 @@ namespace app
       bool audio = false;
       bool note = false;
       bool predictor = false;
+      bool shade = false;
    };
 
 
@@ -1100,6 +1113,7 @@ namespace app
       c.audio = audioSource != nullptr && audioSource->IsAudioOutputIndex(srcOutputIndex);
       c.note = dynamic_cast<INoteSource*>(n) != nullptr;
       c.predictor = dynamic_cast<IPredictor*>(n) != nullptr;
+      c.shade = IsShadeSource(n);
       return c;
    }
 
@@ -1107,7 +1121,7 @@ namespace app
    bool CapsAcceptedBy(const SrcCaps& c, GraphNode* dst, int slot)
    {
       return IsInputSlotCompatible(dst, slot, c.modulator, c.palette, c.geometry, c.camera, c.light,
-                                   c.environment, c.audio, c.note, c.predictor);
+                                   c.environment, c.audio, c.note, c.predictor, c.shade);
    }
 
 
@@ -1579,13 +1593,14 @@ namespace app
       // catalogue is a legal drop target for it - suggesting anything here
       // would offer a link IsInputSlotCompatible then refuses.
       const bool srcIsPredictor = dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
+      const bool srcIsShade = IsShadeSource(srcNode->node.get());
 
       // The answer depends only on what kind of source this is, so it is kept per kind: building every node type
       // again on each cable drop cost a visible stall.
       const unsigned kindKey = (srcIsModulator ? 1u : 0u) | (srcPalette != nullptr ? 2u : 0u) | (srcGeometry != nullptr ? 4u : 0u) |
                                (dynamic_cast<MaterialNode*>(srcGeometry) != nullptr ? 8u : 0u) | (srcCamera != nullptr ? 16u : 0u) |
                                (srcLight != nullptr ? 32u : 0u) | (srcIsEnvironment ? 64u : 0u) | (srcIsAudioNode ? 128u : 0u) |
-                               (srcIsNoteSource ? 256u : 0u) | (srcIsPredictor ? 512u : 0u);
+                               (srcIsNoteSource ? 256u : 0u) | (srcIsPredictor ? 512u : 0u) | (srcIsShade ? 1024u : 0u);
       static std::map<unsigned, std::vector<std::pair<std::string, std::string>>> sByKind;
       static size_t sTypeCount = 0;
       size_t typeCount = 0;
@@ -1618,7 +1633,7 @@ namespace app
             {
                if (IsInputSlotCompatible(&probe, slot, srcIsModulator, srcPalette, srcGeometry,
                                           srcCamera, srcLight, srcIsEnvironment,
-                                          srcIsAudioNode, srcIsNoteSource, srcIsPredictor))
+                                          srcIsAudioNode, srcIsNoteSource, srcIsPredictor, srcIsShade))
                {
                   compatible = true;
                   break;

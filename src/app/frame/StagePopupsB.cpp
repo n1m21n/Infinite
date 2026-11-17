@@ -463,13 +463,14 @@ void DrawPopupsB(FrameCtx& fc)
                      dynamic_cast<INoteSource*>(dragSrcNode->node.get()) != nullptr;
                   const bool srcIsPredictor =
                      dynamic_cast<IPredictor*>(dragSrcNode->node.get()) != nullptr;
+                  const bool srcIsShade = IsShadeSource(dragSrcNode->node.get());
 
                   const int slotCount = InputCountFor(*spawned);
                   for (int slot = 0; slot < slotCount; ++slot)
                   {
                      if (IsInputSlotCompatible(spawned, slot, srcIsModulator, srcPalette, srcGeometry,
                                                 srcCamera, srcLight, srcIsEnvironment,
-                                                srcIsAudioNode, srcIsNoteSource, srcIsPredictor))
+                                                srcIsAudioNode, srcIsNoteSource, srcIsPredictor, srcIsShade))
                      {
                         // No PushUndoCheckpoint() here: SpawnNode() above already
                         // pushed one capturing the state before the node existed,

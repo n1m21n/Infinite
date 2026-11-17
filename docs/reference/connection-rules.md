@@ -57,6 +57,7 @@ decides**; nothing below it runs.
 | 12 | Set Color, slot 1 | image |
 | 13 | source is geometry/camera/light and none of the above matched | **refuse** — 3D cables only go into 3D nodes |
 | 14 | `ModulatorInputSlot(slot)` exists and the destination is not Image Analyze | modulator only |
+| 14a | Shade node, except Shade Image slot 1 | Shade output only (`srcIsShade`) — **refuse** a plain picture, which `ShadeBuild::Input` would otherwise drop silently |
 | 15 | otherwise | image |
 
 Slot 0 of Material, Displacement and Set Color is a geometry slot and is caught
