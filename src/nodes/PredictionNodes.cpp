@@ -986,7 +986,6 @@ bool RunPredFeedbackTest()
 {
    gFbFail = 0;
    const double dt = 1.0 / 60.0;
-   const int kB = MovementStats::kBins;
 
    // 1. Cold: a fresh key with no profile, role or family data is a narrow peak at its anchor (flat only
    //    with no anchor), and the value never leaves the declared range.

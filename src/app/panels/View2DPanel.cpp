@@ -75,7 +75,6 @@ namespace
    bool OpenLayeredFile(const std::string& path, ImVec2 at);   // PSD or ORA as a new document
    void ExportLayered(Scene2DNode* doc, const char* ext);
 
-   constexpr float kMinHeight = 300.0f;
    constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kIconW = tok::control_h;   // icon chips are square, one panel chip
    inline float SideChip() { return PanelKit::Chip(); }   // the side panel's chips: one control tall at its density
@@ -118,7 +117,7 @@ namespace
              t == kRedEye || t == kInpaint;
    }
    bool BrushTool(int t) { return t == kBrush || t == kEraser || t == kMixer || t == kSelBrush || RetouchTool(t); }
-   bool PaintTool(int t) { return BrushTool(t) || t == kFill || t == kGradient; }
+   [[maybe_unused]] bool PaintTool(int t) { return BrushTool(t) || t == kFill || t == kGradient; }
    bool PixelTool(int t) { return (t >= kBrush && t <= kWand) || (t >= kGradient && t != kPerspective && t != kStylePick); }
 
    // Paint tools. The brush and the eraser keep their own settings.
@@ -311,7 +310,6 @@ namespace
       ed::EditorContext* prev = ed::GetCurrentEditor();
       ed::SetCurrentEditor(gEditor);
       static uint64_t sFollowed = 0;
-      static uint64_t sLastNode = 0;
       uint64_t selected = 0, anyNode = 0;
       for (GraphNode& gn : gNodes)
          if (ed::IsNodeSelected(gn.NodeId()))
@@ -319,7 +317,7 @@ namespace
             anyNode = gn.uid;
             break;
          }
-      sLastNode = anyNode;
+      (void)anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene2DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
          {
@@ -1920,7 +1918,7 @@ namespace
       return text.size() >= n && text.compare(text.size() - n, n, tail) == 0;
    }
 
-   int sAuditDialogs = 0;   // UI audit: native dialogs it asked for (and did not open)
+   [[maybe_unused]] int sAuditDialogs = 0;   // UI audit: native dialogs it asked for (and did not open)
    bool AuditNoDialog()
    {
 #ifdef IMGUI_ENABLE_TEST_ENGINE
@@ -2228,7 +2226,6 @@ namespace
          ClearOrFill(doc, alt ? 1 : 2);
       else if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
       {
-         const Layer* a = Active(doc);
          if (SelectionActsOnPixels(doc))
             ClearOrFill(doc, 0);
          else
@@ -3261,7 +3258,7 @@ namespace
       }
       else if (id > 0 && target == 0)
          doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sAllLayers);
-         NoteColourUsed(sFg);
+      NoteColourUsed(sFg);
    }
 
    void GradientTo(Scene2DNode* doc, ImVec2 a, ImVec2 b)
@@ -8595,7 +8592,7 @@ namespace
    }
 
    // Text centred on the chip row, so labels share the chips' centre line.
-   void RowLabel(const char* text)
+   [[maybe_unused]] void RowLabel(const char* text)
    {
       const float y = ImGui::GetCursorPosY();
       ImGui::SetCursorPosY(y + (sRowH - ImGui::GetTextLineHeight()) * 0.5f);
@@ -9084,7 +9081,7 @@ namespace
                                 tok::U32(tok::label_green), tok::U32(tok::label_blue), tok::U32(tok::label_violet),
                                 tok::U32(tok::label_grey) };
 
-   int CountRows(Scene2DNode* doc, int parent)
+   [[maybe_unused]] int CountRows(Scene2DNode* doc, int parent)
    {
       int n = 0;
       for (int id : doc->ChildrenOf(parent))

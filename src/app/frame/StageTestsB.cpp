@@ -894,7 +894,7 @@ int DrawTestsB(FrameCtx& fc)
             // node's own orbit camera so all three agree on framing.
             unsigned int tex = 0;
             int texW = 0, texH = 0;
-            if (auto* geo = dynamic_cast<IGeometrySource*>(src->node.get()))
+            if (dynamic_cast<IGeometrySource*>(src->node.get()) != nullptr)
             {
                NodeViewport& viewport = gProjectorViewports[src->index];
                SharedViewportCamera& cam = gNodeCameras[src->index];

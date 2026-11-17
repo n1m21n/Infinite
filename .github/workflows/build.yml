@@ -29,8 +29,6 @@ on:
       - '**/*.md'
       - 'tools/website/**'
       - 'tools/seo/**'
-      - 'tools/npm/**'
-      - 'worker/**'
       - 'smithery.yaml'
       - '.cursorrules'
   pull_request:
@@ -40,8 +38,6 @@ on:
       - '**/*.md'
       - 'tools/website/**'
       - 'tools/seo/**'
-      - 'tools/npm/**'
-      - 'worker/**'
       - 'smithery.yaml'
       - '.cursorrules'
   workflow_dispatch:
@@ -108,6 +104,21 @@ jobs:
       - name: Drift checks (test lists, baselines, translations, workflows)
         run: python3 tools/ci/preflight.py --fast
 
+  worker-and-mcp-tests:
+    name: Worker & MCP unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: License worker tests
+        run: node worker/license/test.mjs
+      - name: Signup worker tests
+        run: node worker/signup/test.mjs
+      - name: MCP package unit tests
+        run: cd tools/npm/infinite-engine && npm test
+
   macos:
     name: macOS (arm64)
     runs-on: macos-15
@@ -121,7 +132,7 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DINFINITE_WERROR=ON
 
       - name: Build
         run: cmake --build build -j3
@@ -145,6 +156,18 @@ jobs:
       - name: Render goldens
         continue-on-error: true
         run: python3 tools/render-check.py --binary build/Infinite.app/Contents/MacOS/Infinite
+
+      - name: UI gallery goldens (informational)
+        continue-on-error: true
+        run: python3 tools/design/golden.py --binary build/Infinite.app/Contents/MacOS/Infinite --render-out artifacts-macos/ui-golden
+
+      - name: Upload macOS UI golden artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-golden-macos
+          path: artifacts-macos/ui-golden
+          if-no-files-found: ignore
 
   windows:
     name: Windows (${{ matrix.arch }})
@@ -278,6 +301,21 @@ jobs:
         timeout-minutes: 2
         shell: bash
         run: python3 tools/render-check.py --binary build/Release/Infinite.exe
+
+      - name: UI gallery goldens (informational)
+        if: matrix.arch == 'x64'
+        continue-on-error: true
+        timeout-minutes: 2
+        shell: bash
+        run: python3 tools/design/golden.py --binary build/Release/Infinite.exe --render-out artifacts-windows/ui-golden
+
+      - name: Upload Windows UI golden artifacts
+        if: always() && matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-golden-windows
+          path: artifacts-windows/ui-golden
+          if-no-files-found: ignore
 
       # The exe is handed to people as a single portable file, so it must not
       # import the Visual C++ redistributable's CRT - a /MD build dies at
@@ -503,6 +541,11 @@ jobs:
       - name: Headless self-tests
         run: ./.github/scripts/headless-tests.sh build-linux/Infinite
 
+      - name: MCP smoke test (validate + render)
+        run: |
+          cd tools/npm/infinite-engine
+          INFINITE_BIN="$OLDPWD/build-linux/Infinite" xvfb-run -a -s "-screen 0 1280x720x24" npm test
+
       # Task 4.4: a small, real Linux VST3 (DISTRHO's "Info" DPF example,
       # built from source at a pinned commit - see tools/linux/test-plugins.sh
       # for why DPF's own repo is used instead of the DPF-Examples repo named
@@ -571,6 +614,18 @@ jobs:
       - name: Render goldens (Xvfb)
         if: matrix.compiler == 'clang'
         run: xvfb-run -a python3 tools/render-check.py --binary build-linux/Infinite
+
+      - name: UI gallery goldens (Xvfb)
+        if: matrix.compiler == 'clang'
+        run: xvfb-run -a python3 tools/design/golden.py --binary build-linux/Infinite --render-out artifacts-linux/ui-golden
+
+      - name: Upload Linux UI golden artifacts
+        if: always() && matrix.compiler == 'clang'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-golden-linux
+          path: artifacts-linux/ui-golden
+          if-no-files-found: ignore
 
       # media group carries VST3SCANTEST / VST3EDITORSHOTTEST /
       # VST3BLOCKLISTTEST (task 4.4) plus the pre-existing plugin/media drag

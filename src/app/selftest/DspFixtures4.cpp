@@ -600,7 +600,7 @@ bool RunEffectMixAndLimiterFixture()
             auto node = makeCrush(bits, 0.0f);
             const int n = 1 << 16;
             std::vector<std::vector<float>> out;
-            DelayTest::RunSamples(*node, n, 1, [n](int i, int) { return -1.0f + 2.0f * (float)i / (float)n; }, &out);
+            DelayTest::RunSamples(*node, n, 1, [](int i, int) { return -1.0f + 2.0f * (float)i / (float)n; }, &out);
             std::vector<float> v = out[0];
             std::sort(v.begin(), v.end());
             const int levels = (int)(std::unique(v.begin(), v.end()) - v.begin());

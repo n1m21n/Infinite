@@ -56,14 +56,14 @@ namespace
       0.0f, 0.5f, 0.25f, 0.75f, 0.125f, 0.625f, 0.375f, 0.875f
    };
 
-   const char* kLaserVertSrc =
+   [[maybe_unused]] const char* kLaserVertSrc =
       "#version 150\n"
       "in vec2 aPos;\n"
       "void main() {\n"
       "   gl_Position = vec4(aPos.x * 2.0 - 1.0, aPos.y * 2.0 - 1.0, 0.0, 1.0);\n"
       "}\n";
 
-   const char* kLaserFragSrc =
+   [[maybe_unused]] const char* kLaserFragSrc =
       "#version 150\n"
       "out vec4 fragColor;\n"
       "uniform vec4 uColor;\n"

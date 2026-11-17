@@ -61,7 +61,7 @@ namespace
    }
 
    // Windows release zip: every entry under Infinite/. Unpacks to `dest`, returns dest/Infinite.
-   bool Unzip(const std::string& zipPath, const std::string& dest, std::string& outDir, std::string& err)
+   [[maybe_unused]] bool Unzip(const std::string& zipPath, const std::string& dest, std::string& outDir, std::string& err)
    {
       mz_zip_archive zip;
       memset(&zip, 0, sizeof(zip));

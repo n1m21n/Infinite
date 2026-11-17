@@ -76,7 +76,6 @@ namespace app
    {
       // a deleted modulator must also be cleared from any Math node feeding on it
       auto* dyingMod = dynamic_cast<IModulator*>(dying);
-      auto* dyingFile = dynamic_cast<AudioFileNode*>(dying);
       auto* dyingGeometry = dynamic_cast<IGeometrySource*>(dying);
       auto* dyingXY = dynamic_cast<MacroXYNode*>(dying);
       IModulator* dyingY = dyingXY ? dyingXY->YOutput() : nullptr;

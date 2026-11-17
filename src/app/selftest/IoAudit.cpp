@@ -94,7 +94,7 @@ namespace
    }
    double Db(double lin) { return 20.0 * std::log10(std::max(lin, 1e-12)); }
 
-   bool Finite(const Sig& s)
+   [[maybe_unused]] bool Finite(const Sig& s)
    {
       for (int i = 0; i < s.N(); i++)
          if (!std::isfinite(s.l[i]) || !std::isfinite(s.r[i]))

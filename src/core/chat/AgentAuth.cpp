@@ -75,7 +75,7 @@ namespace chat
             }
             else if (i + 1 < text.size() && text[i + 1] == ']')
             {
-               i += 2;  // OSC: up to BEL or ESC \
+               i += 2;  // OSC: up to BEL or ESC backslash
                while (i < text.size() && text[i] != 0x07 && !(text[i] == 0x1b && i + 1 < text.size() && text[i + 1] == '\\'))
                   i++;
                if (i < text.size() && text[i] == 0x1b)

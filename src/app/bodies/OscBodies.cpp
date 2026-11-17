@@ -2399,7 +2399,6 @@ namespace app
          dl->PushClipRect(origin, containerBr, true);
 
          const int frameCount = WaveTerrainNode::kDisplayFrameCount;
-         const int sampleCount = WaveTerrainNode::kDisplayFrameSize;
          const float framePos = std::clamp(n->position, 0.0f, 1.0f) * (float)(frameCount - 1);
 
          // Stack offset: each frame further from the current morph position

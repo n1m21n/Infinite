@@ -99,14 +99,14 @@ namespace
       }
    }
 
-   const char* kLineVertSrc =
+   [[maybe_unused]] const char* kLineVertSrc =
       "#version 150\n"
       "in vec2 aPos;\n"
       "void main() {\n"
       "   gl_Position = vec4(aPos * 2.0 - 1.0, 0.0, 1.0);\n"
       "}\n";
 
-   const char* kLineFragSrc =
+   [[maybe_unused]] const char* kLineFragSrc =
       "#version 150\n"
       "out vec4 fragColor;\n"
       "uniform vec4 uColor;\n"

@@ -23,12 +23,27 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      - uses: actions/checkout@v4
       - name: Download artifacts
         run: |
           mkdir dl
           for a in Infinite-windows-x64 Infinite-windows-ARM64 Infinite-x86_64.AppImage \
-                   Infinite-Setup-windows-x64 Infinite-Setup-windows-ARM64 Infinite-linux-x86_64.tar.gz; do
+                   Infinite-Setup-windows-x64 Infinite-Setup-windows-ARM64 Infinite-linux-x86_64.tar.gz \
+                   ui-golden-macos ui-golden-windows ui-golden-linux; do
             gh run download "${{ inputs.run_id }}" -n "$a" -D "dl/$a" || echo "no artifact $a"
+          done
+      - name: Compare UI goldens across platforms
+        run: |
+          pip install --quiet pillow || python3 -m pip install --quiet pillow
+          for plat in macos windows linux; do
+            cand="dl/ui-golden-$plat"
+            gold="tests/ui-golden/$plat"
+            if [ -f "$cand/gallery-light.png" ] && [ -f "$gold/gallery-light.png" ]; then
+              echo "=== Comparing $plat UI goldens ==="
+              python3 tools/design/golden.py --compare "$cand" "$gold"
+            else
+              echo "=== Skipping $plat UI goldens (artifact or committed golden absent) ==="
+            fi
           done
       - name: Zip the Windows builds
         run: |

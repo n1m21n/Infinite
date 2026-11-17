@@ -572,6 +572,7 @@ namespace app
                ImGui::BeginDisabled();
 #else
             const bool asioMode = false;
+            (void)asioMode;
 #endif
             if (FormParts::BeginCombo(L("Input device"), inputLabel.c_str()))
             {

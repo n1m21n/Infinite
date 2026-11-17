@@ -595,7 +595,6 @@ bool GrainMolderNode::LoadFile(const std::string& path)
    mSourceSR = decoded->sampleRate;
    mSourceMono.assign(decoded->numFrames, 0.0f);
 
-   const int channels = std::max(1, decoded->channels);
    if (mSourceIsStereo)
    {
       mSourceRight.assign(decoded->numFrames, 0.0f);

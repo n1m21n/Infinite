@@ -1108,7 +1108,7 @@ void RunView2DTest()
       pic.AddPixelMask(A);
       line(A, 1, 60.0f, 0, 0, 0);   // the mask hides the line
       Layer& wash = pic.AddLayer(Kind::Fill, 0);
-      const int W = wash.id;
+      (void)wash.id;
       wash.colorA[0] = 0.2f; wash.colorA[1] = 0.4f; wash.colorA[2] = 0.9f; wash.colorA[3] = 1.0f;
       wash.name = "Wash";
       wash.blend = 11;   // Overlay

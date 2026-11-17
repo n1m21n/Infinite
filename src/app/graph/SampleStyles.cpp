@@ -550,7 +550,7 @@ namespace
       return out;
    }
 
-   uint16_t EuclideanMask(int k, int rot)
+   [[maybe_unused]] uint16_t EuclideanMask(int k, int rot)
    {
       if (k <= 0) return 0;
       if (k >= 16) return 0xffffu;

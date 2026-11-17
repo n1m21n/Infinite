@@ -10,7 +10,6 @@
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
-#include "core/TablerIcons.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/MenuParts.h"

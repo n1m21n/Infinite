@@ -236,7 +236,7 @@ namespace app
       const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
       DrawCheckerboardBackdrop(dl, origin, br, tok::radius_control);
 
-      if (auto* geo = dynamic_cast<IGeometrySource*>(gn.node.get()))
+      if (dynamic_cast<IGeometrySource*>(gn.node.get()) != nullptr)
       {
          // Same solo mesh render as the inline mini viewport, including its
          // orbit/zoom input handling. cam is the same gNodeCameras entry the

@@ -1458,7 +1458,6 @@ target_include_directories(Infinite PRIVATE
     src src/core src/nodes src/platform src/audio
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
-    ${STB_DIR}
     ${CGLTF_DIR}
     external
     external/json
@@ -1469,6 +1468,7 @@ target_include_directories(Infinite PRIVATE
     external/ndi/include
     src/platform/ndi
 )
+target_include_directories(Infinite SYSTEM PRIVATE ${STB_DIR})
 
 target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib vterm_lib)
 target_link_libraries(Infinite PRIVATE infinite_plugin_ipc)
@@ -1681,9 +1681,6 @@ if(WIN32)
                 "${CMAKE_CURRENT_SOURCE_DIR}/resources/starter-profile"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/starter-profile"
         COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
-                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
-        COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -1747,9 +1744,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/resources/starter-profile"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/starter-profile"
-        COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
-                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
@@ -2070,7 +2064,6 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf")
     list(APPEND INFINITE_FONT_FILES ${INFINITE_NOTO_FILES})
     set(INFINITE_ICON_FONT_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf")
     target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES} ${INFINITE_LANG_FILES} ${INFINITE_STARTER_FILES})
     set_source_files_properties(${INFINITE_LANG_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang")
@@ -2108,4 +2101,24 @@ endif()
 # RIGTEST finds its fixture from the checkout root (__FILE__ can be build-dir relative).
 set_source_files_properties(src/app/selftest/RigTests.cpp PROPERTIES
     COMPILE_DEFINITIONS "INFINITE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+
+if(DEFINED ENV{CI})
+    set(_infinite_werror_default ON)
+else()
+    set(_infinite_werror_default OFF)
+endif()
+option(INFINITE_WERROR "Treat compiler warnings as errors in strict-warning directories" ${_infinite_werror_default})
+if(NOT MSVC)
+    get_target_property(_infinite_srcs Infinite SOURCES)
+    foreach(_src IN LISTS _infinite_srcs)
+        if(_src MATCHES "^src/(app|core|nodes)/.*\\.(cpp|c|mm|m)$")
+            if(INFINITE_WERROR)
+                set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -Wall -Werror)
+            else()
+                set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -Wall)
+            endif()
+        endif()
+    endforeach()
+endif()
+
 

@@ -13,14 +13,12 @@ namespace app
 {
 int DrawFloating(FrameCtx& fc)
 {
-   ImGuiStyle& style = ImGui::GetStyle();
    auto& window = fc.window;
    auto& frameId = fc.frameId;
    auto& isBenchB3 = fc.isBenchB3;
    auto& benchStagesSample = fc.benchStagesSample;
    auto& benchStagesCpuSample = fc.benchStagesCpuSample;
    auto& benchGpuPerNode = fc.benchGpuPerNode;
-   auto& vp = fc.vp;
 
 
       // Expression globals now live only in Settings > Expression Globals

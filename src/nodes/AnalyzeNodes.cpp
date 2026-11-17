@@ -288,7 +288,6 @@ void ImageAnalyzeNode::Analyze()
    double sumR = 0, sumG = 0, sumB = 0, sumA = 0, sumLum = 0, sumLum2 = 0, sumSat = 0;
    double weightedX = 0, weightedY = 0, weightTotal = 0, motion = 0;
    double sampleWeightTotal = 0.0;
-   const int count = size * size;
 
    const float pu = std::clamp(probeU, 0.0f, 1.0f);
    const float pv = std::clamp(probeV, 0.0f, 1.0f);

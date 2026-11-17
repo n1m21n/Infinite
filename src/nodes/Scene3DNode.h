@@ -333,7 +333,6 @@ private:
    GLUtil::Fbo mFinishFbo;
    float mCookMs = 0.0f;
    unsigned int mFinishProgram = 0, mStampTex = 0;
-   int mStampW = 0, mStampH = 0;
    std::string mStampKey;
    unsigned int mGridProgram = 0;
    unsigned int mOutTex = 0;

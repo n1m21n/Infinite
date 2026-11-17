@@ -41,7 +41,7 @@ namespace app
          return ss.str();
       }
 
-      void DrawStepIcon(const CliSetup::StepStatus& s, float size)
+      [[maybe_unused]] void DrawStepIcon(const CliSetup::StepStatus& s, float size)
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -345,7 +345,7 @@ namespace app
          static std::string sLoadedUrl, sLoadedModel;
          static std::mutex sTestMutex;
          static std::atomic<bool> sTesting{ false };
-         static bool sTestOk = false;
+         [[maybe_unused]] static bool sTestOk = false;
          static std::string sTestStatus;
 
          if (sLoadedUrl != prefs.customBaseUrl)

@@ -28,7 +28,7 @@ ROUNDING = re.compile(
 POPUP = re.compile(r"ImGui::BeginPopup\(")
 ALLOW = {"src/app/ui/design/", "src/app/selftest/UiAudit.cpp"}  # components themselves; UiAudit draws raw widgets on purpose as canaries
 
-def counts(rx=RX, allow=None, bases=("src/app", "src/arrange")):
+def counts(rx=RX, allow=None, bases=("src/app", "src/arrange", "src/nodes")):
     allow = ALLOW if allow is None else allow
     out = {}
     for base in bases:

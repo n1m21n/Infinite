@@ -45,6 +45,68 @@ bool RunCompAudit(); // selftest/CompAudit.cpp
 // to call again between frames: the atlas is rebuilt from scratch and, when the GL renderer
 // already exists, its font texture is recreated. Style metrics are never rescaled here -
 // they are in points like everything else, so there is nothing to compound.
+// Merges OS symbol and CJK fallback faces into the current ImFont (MergeMode=true) so
+// characters outside Inter and the bundled Noto subset never render as tofu on any OS.
+void MergePlatformFallbackFonts(ImGuiIO& io, float bakedPx, bool ja)
+{
+   std::vector<std::string> paths;
+   auto addPath = [&](const std::string& p)
+   {
+      if (p.empty())
+         return;
+      for (const std::string& existing : paths)
+         if (existing == p)
+            return;
+      std::error_code ec;
+      if (std::filesystem::exists(AppPaths::FsPath(p), ec))
+         paths.push_back(p);
+   };
+   [[maybe_unused]] auto addFamily = [&](const char* family) { addPath(Platform::FontFileForFamily(family)); };
+
+#if defined(_WIN32)
+   addPath("C:\\Windows\\Fonts\\seguisym.ttf");
+   addFamily("Segoe UI Symbol");
+   if (ja)
+   {
+      addPath("C:\\Windows\\Fonts\\YuGothR.ttc");
+      addFamily("Yu Gothic");
+   }
+   addPath("C:\\Windows\\Fonts\\msyh.ttc");
+   addFamily("Microsoft YaHei");
+   addPath("C:\\Windows\\Fonts\\YuGothR.ttc");
+   addPath("C:\\Windows\\Fonts\\msgothic.ttc");
+   addPath("C:\\Windows\\Fonts\\malgun.ttf");
+#elif defined(__APPLE__)
+   addPath("/System/Library/Fonts/Apple Symbols.ttf");
+   if (ja)
+      addPath("/System/Library/Fonts/Hiragino Sans GB.ttc");
+   addPath("/System/Library/Fonts/PingFang.ttc");
+   addPath("/System/Library/Fonts/Hiragino Sans GB.ttc");
+   addPath("/System/Library/Fonts/Supplemental/Arial Unicode.ttf");
+#else
+   addFamily("Noto Sans Symbols");
+   addFamily("Noto Sans Symbols 2");
+   addFamily("DejaVu Sans");
+   addPath("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+   addPath("/usr/share/fonts/TTF/DejaVuSans.ttf");
+   if (ja)
+      addFamily("Noto Sans CJK JP");
+   addFamily("Noto Sans CJK SC");
+   addFamily("Noto Sans CJK JP");
+   addFamily("WenQuanYi Zen Hei");
+   addPath("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc");
+   addPath("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc");
+   addPath("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc");
+#endif
+
+   for (const std::string& p : paths)
+   {
+      ImFontConfig cfg;
+      cfg.MergeMode = true;
+      io.Fonts->AddFontFromFileTTF(p.c_str(), bakedPx, &cfg);
+   }
+}
+
 void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 {
    // A queued language switch lands here, between frames, so no label pointer fetched earlier in
@@ -81,10 +143,20 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    const char* candidates[] = {
       chosenFontPath.c_str(), // empty for the default, or if the bundled file is missing
       bundledInter.c_str(),
+#if defined(_WIN32)
+      "C:\\Windows\\Fonts\\segoeui.ttf",
+      "C:\\Windows\\Fonts\\arial.ttf",
+#elif defined(__APPLE__)
       "/System/Library/Fonts/SFNS.ttf",
       "/System/Library/Fonts/HelveticaNeue.ttc",
       "/System/Library/Fonts/Helvetica.ttc",
       "/System/Library/Fonts/Supplemental/Arial.ttf",
+#else
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/TTF/DejaVuSans.ttf",
+      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+      "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+#endif
    };
    // ImGui bakes only Basic Latin + Latin-1 unless told otherwise, so names in other scripts
    // (ł, ő, Ж, λ, ạ) drew as '?'. Latin Extended-A/B, Greek, Cyrillic, Latin Extended
@@ -117,7 +189,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    }
    if (uiFont == nullptr)
       io.Fonts->AddFontDefault();
-   // Every weight is its own ImFont, so each carries the same merged stack: CJK, Lucide, Infinite Glyphs.
+   // Every weight is its own ImFont, so each carries the same merged stack: CJK, Infinite Glyphs.
    auto mergeExtras = [&]()
    {
       // CJK: Inter has no Han/kana, so a subsetted Noto face is merged for exactly the glyphs the
@@ -136,34 +208,11 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
             cjkCfg.MergeMode = true;
             io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg);
          }
+         MergePlatformFallbackFonts(io, bakedPx, ja);
       }
-      // Merge a small slice of the Lucide icon font (external/icons/Lucide,
-      // ISC license) into the same atlas at PUA codepoints, so icon glyphs
-      // can be dropped into ordinary ImGui::Text/Button calls alongside UI
-      // text (see IconsLucide.h). MergeMode=true means it rides the same
-      // baseline/line-height as the font just loaded rather than becoming a
-      // separate selectable font - the standard ImGui icon-font idiom.
-      // Restricted to one explicit range (currently just the "search" glyph,
-      // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
-      // pays texture memory for glyphs actually in use.
-      if (true)
-      {
-         const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
-         if (!bundledLucide.empty())
-         {
-            static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
-            ImFontConfig iconCfg;
-            iconCfg.MergeMode = true;
-            iconCfg.PixelSnapH = true;
-            iconCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
-#ifndef NDEBUG
-            iconCfg.SizePixels = UiScale::kBaseFontSize; // Debug ImGui asserts a reference size beside GlyphMinAdvanceX
-#endif
-            io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
-         }
-      }
-      // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged the
-      // same way as Lucide above. Codepoints come from the generated Glyphs.gen.h.
+      // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged into
+      // the same atlas at PUA codepoints with MergeMode=true so glyphs ride the same baseline/line-height
+      // as the UI text. Codepoints come from the generated Glyphs.gen.h.
       if (true)
       {
          const std::string bundledGlyphs = BundledResourcePath("icons/infinite-glyphs.ttf");
@@ -223,11 +272,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    auto& searchPopupCentered = fc.searchPopupCentered;
    auto& searchPopupOpen = fc.searchPopupOpen;
    auto& searchRequestClose = fc.searchRequestClose;
-   auto& clipboard = fc.clipboard;
-   auto& clipboardSources = fc.clipboardSources;
-   auto& clipboardOrigIndex = fc.clipboardOrigIndex;
-   auto& clipboardOrigGroup = fc.clipboardOrigGroup;
-   auto& clipboardCluster = fc.clipboardCluster;
    auto& tSettingsInit = fc.tSettingsInit;
    auto& sFirstFrameEndMs = fc.sFirstFrameEndMs;
    auto& frameId = fc.frameId;
@@ -240,7 +284,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // The user's own per-genre kits (tools/drumkits/build_kits.py); absent folder = bundled kit only.
    if (const std::string sup = AppPaths::AppSupportDir(); !sup.empty())
       DrumSequencerNode::SetUserKitRoot(sup + "/kits");
-   const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
    sMainRssStartMb = Bench::ProcessRssMb();
    sMainFootStartMb = Bench::ProcessFootprintMb();
    
@@ -325,8 +368,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    // B6 Canvas navigation fixture state (docs/plans/perf/benchmark-suite.md §4)
    
-   
-   static int sBenchB6NodeCount = 300;
    
    static bool sBenchB6Collapsed = false;
    
@@ -2848,9 +2889,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          auto* mat = static_cast<MaterialNode*>(gNodes[2].node.get());
          auto* render = static_cast<Render3DNode*>(gNodes[5].node.get());
          auto* out = static_cast<OutputNode*>(gNodes[6].node.get());
-         auto* path = static_cast<PathNode*>(gNodes[7].node.get());
          auto* palette = static_cast<PaletteNode*>(gNodes[8].node.get());
-         auto* ramp = static_cast<RampNode*>(gNodes[9].node.get());
          auto* wave = static_cast<WavetableNode*>(gNodes[10].node.get());
          auto* midi = static_cast<MidiNotesNode*>(gNodes[11].node.get());
          auto* filter = static_cast<NoteFilterNode*>(gNodes[12].node.get());
@@ -4196,7 +4235,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             if (strlen(b6Arg) > 0 && strcmp(b6Arg, "1") != 0 && std::atoi(b6Arg) > 0)
                nodeCount = std::atoi(b6Arg);
          }
-         sBenchB6NodeCount = nodeCount;
+         (void)nodeCount;
 
          sBenchB6TotalFrames = getenv("INFINITE_BENCH_B6FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B6FRAMES"))) : 600;
 
@@ -4745,6 +4784,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          Splash::Begin(0.0f); // the card window failed: fall back to the in-window splash
    }
    else if (splashEnabled)
-      Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);   return -1;
+      Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);
+   return -1;
 }
 }

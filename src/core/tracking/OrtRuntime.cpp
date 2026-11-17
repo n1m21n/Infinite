@@ -89,7 +89,7 @@ namespace Tracking
       const OrtApi* api = A(m_api);
       OrtSessionOptions* so = nullptr;
       if (!Check(api, api->CreateSessionOptions(&so), err)) return nullptr;
-      api->SetSessionGraphOptimizationLevel(so, ORT_ENABLE_ALL);
+      if (OrtStatus* st = api->SetSessionGraphOptimizationLevel(so, ORT_ENABLE_ALL)) api->ReleaseStatus(st);
       if (preferGpu && m_gpuFn)
       {
          using Fn = OrtStatus* (*)(OrtSessionOptions*, uint32_t);
@@ -111,7 +111,7 @@ namespace Tracking
       api->ReleaseSessionOptions(so);
 
       OrtAllocator* alloc = nullptr;
-      api->GetAllocatorWithDefaultOptions(&alloc);
+      if (OrtStatus* st = api->GetAllocatorWithDefaultOptions(&alloc)) api->ReleaseStatus(st);
       char* nm = nullptr;
       if (Check(api, api->SessionGetInputName(m->session, 0, alloc, &nm), err) && nm)
       {
@@ -119,7 +119,7 @@ namespace Tracking
          alloc->Free(alloc, nm);
       }
       size_t nOut = 0;
-      api->SessionGetOutputCount(m->session, &nOut);
+      if (OrtStatus* st = api->SessionGetOutputCount(m->session, &nOut)) api->ReleaseStatus(st);
       for (size_t i = 0; i < nOut; ++i)
       {
          char* o = nullptr;
@@ -171,13 +171,13 @@ namespace Tracking
          if (api->GetTensorTypeAndShape(res[i], &info) == nullptr)
          {
             size_t nd = 0;
-            api->GetDimensionsCount(info, &nd);
+            if (OrtStatus* st = api->GetDimensionsCount(info, &nd)) api->ReleaseStatus(st);
             outs[i].shape.resize(nd);
-            api->GetDimensions(info, outs[i].shape.data(), nd);
+            if (OrtStatus* st = api->GetDimensions(info, outs[i].shape.data(), nd)) api->ReleaseStatus(st);
             size_t n = 0;
-            api->GetTensorShapeElementCount(info, &n);
+            if (OrtStatus* st = api->GetTensorShapeElementCount(info, &n)) api->ReleaseStatus(st);
             float* p = nullptr;
-            api->GetTensorMutableData(res[i], reinterpret_cast<void**>(&p));
+            if (OrtStatus* st = api->GetTensorMutableData(res[i], reinterpret_cast<void**>(&p))) api->ReleaseStatus(st);
             if (p) outs[i].data.assign(p, p + n);
             api->ReleaseTensorTypeAndShapeInfo(info);
          }

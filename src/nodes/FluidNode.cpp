@@ -677,7 +677,7 @@ float FluidNode::MeasureDivergence()
    readback(mObs, o);
    const int w = mSimW, h = mSimH;
    auto solid = [&](int x, int y) { return o[((size_t)y * w + x) * 4] > 0.5f; };
-   float worst = 0.0f; int wx = 0, wy = 0;
+   float worst = 0.0f;
    for (int y = 2; y < h - 2; y++)
       for (int x = 2; x < w - 2; x++)
       {
@@ -685,7 +685,7 @@ float FluidNode::MeasureDivergence()
             continue;
          const float d = (v[((size_t)y * w + x + 1) * 4] - v[((size_t)y * w + x) * 4])
                        + (v[((size_t)(y + 1) * w + x) * 4 + 1] - v[((size_t)y * w + x) * 4 + 1]);
-         if (std::fabs(d) > worst) { worst = std::fabs(d); wx = x; wy = y; }
+         if (std::fabs(d) > worst) worst = std::fabs(d);
       }
    return worst;
 }

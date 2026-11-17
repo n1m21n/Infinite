@@ -235,8 +235,10 @@ namespace AnalogSynthCore
    constexpr int kFilterOversampleGroupDelay = 32;
 
    // AnalogWaveToDsp's DspMath ids are also BlepOsc's waveform ids.
-   static_assert(DspMath::kWaveSine == BlepOsc::kSine && DspMath::kWaveTriangle == BlepOsc::kTriangle &&
-                    DspMath::kWaveSaw == BlepOsc::kSaw && DspMath::kWaveSquare == BlepOsc::kSquare,
+   static_assert(static_cast<int>(DspMath::kWaveSine) == static_cast<int>(BlepOsc::kSine) &&
+                    static_cast<int>(DspMath::kWaveTriangle) == static_cast<int>(BlepOsc::kTriangle) &&
+                    static_cast<int>(DspMath::kWaveSaw) == static_cast<int>(BlepOsc::kSaw) &&
+                    static_cast<int>(DspMath::kWaveSquare) == static_cast<int>(BlepOsc::kSquare),
                  "BlepOsc waveform ids must match DspMath's");
 
    inline int AnalogWaveToDsp(int wave)

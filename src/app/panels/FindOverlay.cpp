@@ -122,7 +122,6 @@ void DrawFind()
    if (Lower(sBuf) != sLastQuery || gNodes.size() != sLastNodeCount)
       Rebuild();
 
-   const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
    const float w = 340.0f;
    const ImVec2 pos(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f, gGraphScreenTL.y + 14.0f);
    ImGui::SetNextWindowPos(pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
