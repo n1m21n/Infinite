@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/frame/CanvasLink.h"
 #include <set>
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -953,258 +954,157 @@ void DrawPopupsB(FrameCtx& fc)
           getenv("INFINITE_PREDBINDTEST") != nullptr) && frameId == 3)
          gRequestFitView = true;
 
-      if (gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size())
+      // Knob picks from panels (Perf element, Curve assign / record, Drift follow) all go through Canvas Link: one
+      // hit-test, one ring, one banner naming the knob under the pointer, Esc / right-click cancels.
       {
-         const auto& assignElem = gPerfElements[gPerfAssigningElemIdx];
-         // imgui-node-editor remaps io.MousePos into its own local/zoomed
-         // canvas space for the duration of ed::Begin()/ed::End() (see
-         // ImGuiEx::Canvas::EnterLocalSpace), so both GetMousePos() and
-         // GetIO().MousePos are canvas-space here, not real screen pixels.
-         // gGraphScreenTL/gGraphScreenSize were captured before ed::Begin(),
-         // in real screen space, so they have to be converted with
-         // ed::ScreenToCanvas before comparing against the mouse - comparing
-         // them directly (as this used to) left mouseOverGraph false at any
-         // pan/zoom other than the coincidental default, which silently
-         // broke every canvas-click parameter assignment.
-         const ImVec2 mp = ImGui::GetMousePos();
-         int hoveredPinIdx = -1;
-
-         const ImVec2 graphTL = ed::ScreenToCanvas(gGraphScreenTL);
-         const ImVec2 graphBR = ed::ScreenToCanvas(
-            ImVec2(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y));
-         const bool mouseOverGraph = (mp.x >= graphTL.x && mp.x <= graphBR.x &&
-                                      mp.y >= graphTL.y && mp.y <= graphBR.y);
-
-         if (mouseOverGraph)
-         {
-            for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
-            {
-               const auto& pInfo = gParamPinScreenList[pi];
-               bool inBounds = (mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x &&
-                                mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y);
-               float dx = mp.x - pInfo.screenPos.x;
-               float dy = mp.y - pInfo.screenPos.y;
-               if (inBounds || (dx * dx + dy * dy < 20.0f * 20.0f))
-               {
-                  hoveredPinIdx = (int)pi;
-               }
-            }
-         }
-
-         if (hoveredPinIdx >= 0)
-         {
-            const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
-            // Glowing box + ring around the hovered control, drawn while still
-            // inside ed::Begin/End so it rides the same local-space vertex
-            // transform as the row rect it's outlining - drawing it after
-            // ed::Suspend() below would place it in real screen space and it
-            // would land in the wrong spot at any pan/zoom.
-            {
-               ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-               if (pInfo.isCircle)
-                  StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
-               else
-                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
-            }
-            ed::Suspend();
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip(T("Assign to '%s' (%s) -> %s: %s"),
-                              assignElem.label.c_str(),
-                              gPerfAssigningAxis == 1 ? "Y Axis" : (assignElem.kind == 4 ? "X Axis" : "Param"),
-                              pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
-            ed::Resume();
-
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-            {
-               PushUndoCheckpoint();
-               auto& el = gPerfElements[gPerfAssigningElemIdx];
-               if (gPerfAssigningAxis == 0)
-               {
-                  el.dstIndex = pInfo.nodeIndex;
-                  el.dstParam = pInfo.paramIndex;
-                  el.targets.clear();
-                  el.targets.push_back({ pInfo.nodeIndex, pInfo.paramIndex, "" });
-                  if (el.label.empty() || el.label == "Knob" || el.label == "Fader" || el.label == "Slider" || el.label == "Toggle" || el.label == "XY Pad" || el.label == "Trigger" || el.label == "NumBox" || el.label == "Selector" || el.label == "Pan/Detent" || el.label == "Step Gate")
-                     el.label = pInfo.paramName;
-               }
-               else if (gPerfAssigningAxis == 1)
-               {
-                  el.dstParam2 = pInfo.paramIndex;
-                  el.targetsY.clear();
-                  el.targetsY.push_back({ pInfo.nodeIndex, pInfo.paramIndex, "" });
-               }
-               gPerfAssigningElemIdx = -1;
-            }
-         }
-
-         if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         {
-            gPerfAssigningElemIdx = -1;
-         }
+         const bool perfOn = gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size();
+         CanvasLink::Sync("perf.assign", perfOn ? "perf." + std::to_string(gPerfAssigningElemIdx) + "." + std::to_string(gPerfAssigningAxis) : "",
+            [] {
+               CanvasLink::Spec sp;
+               sp.target = CanvasLink::Target::Param;
+               sp.kind = T("knob");
+               const int elemIdx = gPerfAssigningElemIdx, axis = gPerfAssigningAxis;
+               const std::string key = "perf." + std::to_string(elemIdx) + "." + std::to_string(axis);
+               sp.onPickedParam = [elemIdx, axis](int n, int pi) {
+                  if (elemIdx < 0 || elemIdx >= (int)gPerfElements.size())
+                     return;
+                  const ParamPinScreenInfo* info = nullptr;
+                  for (const ParamPinScreenInfo& q : gParamPinScreenList)
+                     if (q.nodeIndex == n && q.paramIndex == pi)
+                        info = &q;
+                  PushUndoCheckpoint();
+                  auto& el = gPerfElements[elemIdx];
+                  if (axis == 0)
+                  {
+                     el.dstIndex = n;
+                     el.dstParam = pi;
+                     el.targets.clear();
+                     el.targets.push_back({ n, pi, "" });
+                     static const char* kDefaults[] = { "Knob", "Fader", "Slider", "Toggle", "XY Pad", "Trigger", "NumBox", "Selector", "Pan/Detent", "Step Gate" };
+                     bool generic = el.label.empty();
+                     for (const char* d : kDefaults)
+                        generic = generic || el.label == d;
+                     if (generic && info != nullptr)
+                        el.label = info->paramName;
+                  }
+                  else if (axis == 1)
+                  {
+                     el.dstParam2 = pi;
+                     el.targetsY.clear();
+                     el.targetsY.push_back({ n, pi, "" });
+                  }
+                  gPerfAssigningElemIdx = -1;
+               };
+               sp.onCancel = [key] {
+                  if ("perf." + std::to_string(gPerfAssigningElemIdx) + "." + std::to_string(gPerfAssigningAxis) == key)
+                     gPerfAssigningElemIdx = -1;
+               };
+               return sp;
+            });
       }
 
-      // Curve Editor Assign (docs/plans/curve-editor/README.md §8.6): the same click-to-pick UX, binding the armed
-      // MSEG to the knob clicked. Shift keeps it armed for more; Esc or right-click stops.
-      const ImGuiPayload* curvePayload = ImGui::GetDragDropPayload();
-      const bool curveDragged = curvePayload != nullptr && curvePayload->IsDataType("INFINITE_CURVE_PAGE") &&
-                                curvePayload->DataSize == sizeof(uint64_t);
-      const uint64_t curveUid = curveDragged ? *static_cast<const uint64_t*>(curvePayload->Data) : gCurveAssignUid;
-      if (curveUid != 0)
+      // Curve Editor Assign (docs/plans/curve-editor/README.md §8.6): binds the armed MSEG to the knob clicked. Shift
+      // keeps it armed for more. A curve page dragged onto a knob does the same on release (a drag, not a pick).
       {
-         GraphNode* srcGn = FindNodeByUid(curveUid);
-         if (srcGn == nullptr || dynamic_cast<MSEGNode*>(srcGn->node.get()) == nullptr)
-            gCurveAssignUid = 0;
-         else
+         auto curveAccepts = [](uint64_t uid) {
+            return [uid](int n, int) {
+               GraphNode* src = FindNodeByUid(uid);
+               return src != nullptr && n != src->index; // a curve never drives its own controls
+            };
+         };
+         auto bindCurve = [](uint64_t uid, int n, int pi) {
+            GraphNode* src = FindNodeByUid(uid);
+            if (src == nullptr)
+               return;
+            PushUndoCheckpoint("Assign Curve");
+            Modulation::Instance().Bind(n, pi, src->index, 0);
+            gPatchDirty = true;
+         };
+         if (gCurveAssignUid != 0)
          {
-            const ImVec2 mp = ImGui::GetMousePos();
-            const ImVec2 graphTL = ed::ScreenToCanvas(gGraphScreenTL);
-            const ImVec2 graphBR = ed::ScreenToCanvas(
-               ImVec2(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y));
-            int hoveredPinIdx = -1;
-            if (mp.x >= graphTL.x && mp.x <= graphBR.x && mp.y >= graphTL.y && mp.y <= graphBR.y)
-               for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
-               {
-                  const auto& pInfo = gParamPinScreenList[pi];
-                  if (pInfo.nodeIndex == srcGn->index)
-                     continue; // a curve never drives its own controls
-                  const bool inBounds = mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x && mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y;
-                  const float dx = mp.x - pInfo.screenPos.x, dy = mp.y - pInfo.screenPos.y;
-                  if (inBounds || dx * dx + dy * dy < 20.0f * 20.0f)
-                     hoveredPinIdx = (int)pi;
-               }
-            if (hoveredPinIdx >= 0)
-            {
-               const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
-               ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-               if (pInfo.isCircle)
-                  StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
-               else
-                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
-               const std::string srcTitle = NodeTitleWithInstance(*srcGn);
-               ed::Suspend();
-               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-               ImGui::SetTooltip(T("Assign %s -> %s: %s"), srcTitle.c_str(), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
-               ed::Resume();
-               if (curveDragged ? ImGui::IsMouseReleased(ImGuiMouseButton_Left) : ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-               {
-                  PushUndoCheckpoint("Assign Curve");
-                  Modulation::Instance().Bind(pInfo.nodeIndex, pInfo.paramIndex, srcGn->index, 0);
-                  gPatchDirty = true;
-                  if (!ImGui::GetIO().KeyShift)
-                     gCurveAssignUid = 0;
-               }
-            }
-            if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            GraphNode* srcGn = FindNodeByUid(gCurveAssignUid);
+            if (srcGn == nullptr || dynamic_cast<MSEGNode*>(srcGn->node.get()) == nullptr)
                gCurveAssignUid = 0;
          }
-      }
-
-      // Curve Editor Record, Any knob (§8.9): the knob clicked becomes the take's source; the same click starts its drag.
-      if (gCurveRecordPicking)
-      {
-         const ImVec2 mp = ImGui::GetMousePos();
-         int hoveredPinIdx = -1;
-         for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
+         CanvasLink::Sync("curve.assign", gCurveAssignUid != 0 ? "curve." + std::to_string(gCurveAssignUid) : "", [&] {
+            CanvasLink::Spec sp;
+            sp.target = CanvasLink::Target::Param;
+            sp.kind = T("knob");
+            const uint64_t uid = gCurveAssignUid;
+            sp.acceptsParam = curveAccepts(uid);
+            sp.onPickedParam = [uid, bindCurve](int n, int pi) {
+               bindCurve(uid, n, pi);
+               if (!ImGui::GetIO().KeyShift && gCurveAssignUid == uid)
+                  gCurveAssignUid = 0;
+            };
+            sp.onCancel = [uid] {
+               if (gCurveAssignUid == uid)
+                  gCurveAssignUid = 0;
+            };
+            return sp;
+         });
+         const ImGuiPayload* curvePayload = ImGui::GetDragDropPayload();
+         if (curvePayload != nullptr && curvePayload->IsDataType("INFINITE_CURVE_PAGE") && curvePayload->DataSize == sizeof(uint64_t))
          {
-            const auto& pInfo = gParamPinScreenList[pi];
-            const bool inBounds = mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x && mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y;
-            const float dx = mp.x - pInfo.screenPos.x, dy = mp.y - pInfo.screenPos.y;
-            if (inBounds || dx * dx + dy * dy < 20.0f * 20.0f)
-               hoveredPinIdx = (int)pi;
-         }
-         if (hoveredPinIdx >= 0)
-         {
-            const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
-            ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-            if (pInfo.isCircle)
-               StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
-            else
-               StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
-            ed::Suspend();
-            ImGui::SetTooltip(T("Record %s: %s"), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
-            ed::Resume();
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-               CurveEditorRecordPicked(pInfo.nodeIndex, pInfo.paramIndex);
-         }
-         if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-            gCurveRecordPicking = false;
-      }
-
-      // Predictive Drift Follow leader picker - identical click-to-assign UX to the
-      // performance-matrix picker just above, but resolves to a DriftNode's leaderNodeIndex/
-      // leaderParamIndex instead of a perf element target. Deliberately stores the target's
-      // *uid* (gNodes[nodeIndex].uid), not its index - an index is reused by
-      // RemoveNodeByIndex and would silently repoint Follow at a different node after an
-      // unrelated delete/undo, exactly the stability trap Modulation.h's own uid comment
-      // (ParamRef::uid) warns about.
-      if (gDriftFollowPickingUid != 0)
-      {
-         GraphNode* pickingGn = FindNodeByUid(gDriftFollowPickingUid);
-         DriftNode* pickingDrift = pickingGn != nullptr ? dynamic_cast<DriftNode*>(pickingGn->node.get()) : nullptr;
-         if (pickingDrift == nullptr)
-         {
-            gDriftFollowPickingUid = 0; // the node was deleted while picking
-         }
-         else
-         {
-            const ImVec2 mp = ImGui::GetMousePos();
-            int hoveredPinIdx = -1;
-            const ImVec2 graphTL = ed::ScreenToCanvas(gGraphScreenTL);
-            const ImVec2 graphBR = ed::ScreenToCanvas(
-               ImVec2(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y));
-            const bool mouseOverGraph = (mp.x >= graphTL.x && mp.x <= graphBR.x &&
-                                         mp.y >= graphTL.y && mp.y <= graphBR.y);
-            if (mouseOverGraph)
+            const uint64_t uid = *static_cast<const uint64_t*>(curvePayload->Data);
+            const int hit = CanvasLink::HoveredParam(curveAccepts(uid));
+            if (hit >= 0)
             {
-               for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
-               {
-                  const auto& pInfo = gParamPinScreenList[pi];
-                  // Can't follow yourself - a self-target would drive the same slot
-                  // it's reading, an infinite feedback loop with no way to break it.
-                  if (pInfo.nodeIndex >= 0 && pInfo.nodeIndex < (int)gNodes.size() &&
-                      gNodes[pInfo.nodeIndex].uid == gDriftFollowPickingUid)
-                     continue;
-                  const bool inBounds = (mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x &&
-                                         mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y);
-                  const float dx = mp.x - pInfo.screenPos.x;
-                  const float dy = mp.y - pInfo.screenPos.y;
-                  if (inBounds || (dx * dx + dy * dy < 20.0f * 20.0f))
-                     hoveredPinIdx = (int)pi;
-               }
+               CanvasLink::RingParam(hit);
+               if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+                  bindCurve(uid, gParamPinScreenList[hit].nodeIndex, gParamPinScreenList[hit].paramIndex);
             }
-            if (hoveredPinIdx >= 0)
-            {
-               const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
-               {
-                  ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-                  const ImU32 glowCol = tok::U32(tok::pal::c_78C8FF1C);
-                  const ImU32 ringCol = tok::U32(tok::pal::c_78C8FFAA);
-                  if (pInfo.isCircle)
-                  {
-                     hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);
-                     hoverDl->AddCircle(pInfo.shapeCenter, pInfo.shapeRadius, ringCol, 24, 1.0f);
-                  }
-                  else
-                  {
-                     hoverDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, glowCol, tok::radius_control);
-                     hoverDl->AddRect(pInfo.rowMin, pInfo.rowMax, ringCol, 4.0f, 0, 1.0f);
-                  }
-               }
-               ed::Suspend();
-               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-               ImGui::SetTooltip(T("Follow leader -> %s: %s"), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
-               ed::Resume();
-               if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && pInfo.nodeIndex >= 0 &&
-                   pInfo.nodeIndex < (int)gNodes.size())
+         }
+      }
+
+      // Curve Editor Record, Any knob (§8.9): the knob clicked becomes the take's source.
+      CanvasLink::Sync("curve.record", gCurveRecordPicking ? "curve.record" : "", [] {
+         CanvasLink::Spec sp;
+         sp.target = CanvasLink::Target::Param;
+         sp.kind = T("knob");
+         sp.onPickedParam = [](int n, int pi) { CurveEditorRecordPicked(n, pi); };
+         sp.onCancel = [] { gCurveRecordPicking = false; };
+         return sp;
+      });
+
+      // Predictive Drift Follow leader: stores the leader's *uid*, not its index - an index is reused by
+      // RemoveNodeByIndex and would repoint Follow at another node after an unrelated delete/undo (ParamRef::uid).
+      {
+         if (gDriftFollowPickingUid != 0)
+         {
+            GraphNode* pickingGn = FindNodeByUid(gDriftFollowPickingUid);
+            if (pickingGn == nullptr || dynamic_cast<DriftNode*>(pickingGn->node.get()) == nullptr)
+               gDriftFollowPickingUid = 0; // the node was deleted while picking
+         }
+         CanvasLink::Sync("drift.follow", gDriftFollowPickingUid != 0 ? "drift." + std::to_string(gDriftFollowPickingUid) : "", [] {
+            CanvasLink::Spec sp;
+            sp.target = CanvasLink::Target::Param;
+            sp.kind = T("knob");
+            const uint64_t self = gDriftFollowPickingUid;
+            // Can't follow yourself: a self-target would drive the slot it reads, a loop with no way out.
+            sp.acceptsParam = [self](int n, int) {
+               GraphNode* g = FindNodeByIndex(n);
+               return g != nullptr && g->uid != self;
+            };
+            sp.onPickedParam = [self](int n, int pi) {
+               GraphNode* me = FindNodeByUid(self);
+               DriftNode* drift = me != nullptr ? dynamic_cast<DriftNode*>(me->node.get()) : nullptr;
+               GraphNode* leader = FindNodeByIndex(n);
+               if (drift != nullptr && leader != nullptr)
                {
                   PushUndoCheckpoint();
-                  pickingDrift->leaderNodeIndex = (int)gNodes[pInfo.nodeIndex].uid;
-                  pickingDrift->leaderParamIndex = pInfo.paramIndex;
-                  gDriftFollowPickingUid = 0;
+                  drift->leaderNodeIndex = (int)leader->uid;
+                  drift->leaderParamIndex = pi;
                }
-            }
-            if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-               gDriftFollowPickingUid = 0;
-         }
-      }}
+               if (gDriftFollowPickingUid == self)
+                  gDriftFollowPickingUid = 0;
+            };
+            sp.onCancel = [self] {
+               if (gDriftFollowPickingUid == self)
+                  gDriftFollowPickingUid = 0;
+            };
+            return sp;
+         });
+      }
+      }
 }

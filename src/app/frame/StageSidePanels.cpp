@@ -171,40 +171,30 @@ void DrawSidePanels(FrameCtx& fc)
       if (gArrangeAssigningClipId != 0)
          if (const Arrange::Lane* al = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId); al == nullptr || al->type == Arrange::kLaneMidi)
             gArrangeAssigningClipId = 0;
+      CanvasLink::Sync("arrange.clip", gArrangeAssigningClipId != 0 ? "arrange.clip." + std::to_string(gArrangeAssigningClipId) : "", []
       {
-         static uint64_t sBridgedClip = 0;
-         if (gArrangeAssigningClipId != 0 && (!CanvasLink::Armed("arrange.clip") || sBridgedClip != gArrangeAssigningClipId))
+         const uint64_t clip = gArrangeAssigningClipId;
+         const bool isVideo = Arrange::LaneOfClip(gArrange, clip)->type == Arrange::kLaneVideo;
+         CanvasLink::Spec spec;
+         spec.kind = isVideo ? T("picture node") : T("sound node");
+         spec.accepts = [isVideo](const GraphNode& gn) { return isVideo ? IsNodeVideoCompatible(gn) : IsNodeAudioCompatible(gn); };
+         spec.onPicked = [clip](uint64_t uid)
          {
-            const bool isVideo = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId)->type == Arrange::kLaneVideo;
-            CanvasLink::Spec spec;
-            spec.owner = "arrange.clip";
-            spec.kind = isVideo ? T("picture node") : T("sound node");
-            spec.accepts = [isVideo](const GraphNode& gn) { return isVideo ? IsNodeVideoCompatible(gn) : IsNodeAudioCompatible(gn); };
-            spec.onPicked = [](uint64_t uid)
-            {
-               // By uid, through the model - one call (one undo entry) per target clip, so a multi-select
-               // Assign Node... points every selected clip of this lane type at the same node.
-               ArrangeAssignClipSource(gArrangeAssigningClipId, uid);
-               for (uint64_t targetId : gArrangeAssignTargetIds)
-                  ArrangeAssignClipSource(targetId, uid);
-               gArrangeAssigningClipId = 0;
-               gArrangeAssignTargetIds.clear();
-            };
-            spec.onCancel = []
-            {
-               gArrangeAssigningClipId = 0;
-               gArrangeAssignTargetIds.clear();
-            };
-            const uint64_t keep = gArrangeAssigningClipId;
-            const auto keepTargets = gArrangeAssignTargetIds;
-            CanvasLink::Arm(std::move(spec)); // re-arming cancels the old bridge, which clears the pick: put it back
-            gArrangeAssigningClipId = keep;
-            gArrangeAssignTargetIds = keepTargets;
-            sBridgedClip = keep;
-         }
-         else if (gArrangeAssigningClipId == 0 && CanvasLink::Armed("arrange.clip"))
-            CanvasLink::Cancel(); // the arrange panel dropped the pick itself
-      }
+            // By uid, through the model - one call (one undo entry) per target clip, so a multi-select
+            // Assign Node... points every selected clip of this lane type at the same node.
+            ArrangeAssignClipSource(clip, uid);
+            for (uint64_t targetId : gArrangeAssignTargetIds)
+               ArrangeAssignClipSource(targetId, uid);
+            if (gArrangeAssigningClipId == clip)
+               gArrangeAssigningClipId = 0, gArrangeAssignTargetIds.clear();
+         };
+         spec.onCancel = [clip]
+         {
+            if (gArrangeAssigningClipId == clip)
+               gArrangeAssigningClipId = 0, gArrangeAssignTargetIds.clear();
+         };
+         return spec;
+      });
       CanvasLink::CanvasHook();
 
       timerNodeBodies.Stop();
@@ -238,6 +228,17 @@ void DrawSidePanels(FrameCtx& fc)
          ed::End();
          ImGui::PopStyleColor(2);
          ImGui::PopStyleVar();
+         if (fc.viewFill)
+         {
+            // The editor draws into the shell's own draw list, after the Fill cover StageLayout laid down, so its
+            // nodes and cables showed round the view's card. Cover again now: above the canvas, under the view's
+            // child windows (which render after their parent).
+            ImGuiWindow* w = ImGui::GetCurrentWindow();
+            ImDrawList* bl = w->DrawList;
+            bl->PushClipRect(w->Rect().Min, w->Rect().Max, false);
+            bl->AddRectFilled(w->Rect().Min, w->Rect().Max, ImGui::GetColorU32(ImGuiCol_WindowBg));
+            bl->PopClipRect();
+         }
       }
       if (kEdPerf)
       {
@@ -560,7 +561,7 @@ void DrawSidePanels(FrameCtx& fc)
                   {
                      if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                         gBrowserFavorites.ToggleModule(match.first);
-                     if (MenuParts::Item(L("Add to canvas")))
+                     if (MenuParts::Item(CanvasLink::Label(CanvasLink::Verb::Add)))
                      {
                         spawnName = match.first;
                         spawnCategory = match.second;
@@ -622,7 +623,7 @@ void DrawSidePanels(FrameCtx& fc)
                      {
                         if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                            gBrowserFavorites.ToggleModule(name);
-                        if (MenuParts::Item(L("Add to canvas")))
+                        if (MenuParts::Item(CanvasLink::Label(CanvasLink::Verb::Add)))
                         {
                            spawnName = name;
                            spawnCategory = category;

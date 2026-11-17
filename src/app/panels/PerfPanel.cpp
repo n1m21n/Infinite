@@ -7,6 +7,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/components/ModeBanner.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/TokenColors.h"
@@ -2069,21 +2070,11 @@ namespace app
       if (dest == nullptr)
          return;
       const ParamRef* known = Modulation::Instance().KnownParam(dest->index, gParamMidiLearnParam);
-      char text[192];
-      snprintf(text, sizeof(text), "MIDI learn: %s > %s - move a knob, fader or pad (Esc to cancel)",
-               dest->typeName.c_str(), (known != nullptr && !known->name.empty()) ? known->name.c_str() : "parameter");
-      ImDrawList* dl = ImGui::GetForegroundDrawList();
-      const bool isLightT = CategoryColors::IsThemeLight();
-      const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      UiType::Scope ts(UiType::Size::Body);
-      const ImVec2 tsz = ImGui::CalcTextSize(text);
+      const std::string target = dest->typeName + " > " + ((known != nullptr && !known->name.empty()) ? known->name : std::string("parameter"));
+      // The shared mode strip (ModeBanner), as the canvas pick uses: under the top bar, centred.
       const ImGuiViewport* vp = ImGui::GetMainViewport();
-      // Same neutral strip as the performance panel's listening banner: recessed well, hairline, plain text.
-      const ImVec2 a(vp->Pos.x + (vp->Size.x - tsz.x) * 0.5f - tok::space_3, vp->Pos.y + 44.0f);
-      const ImVec2 b(a.x + tsz.x + 2.0f * tok::space_3, a.y + 30.0f);
-      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_container);
-      dl->AddRect(a, b, ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_container);
-      dl->AddText(ImVec2(a.x + tok::space_3, std::round(a.y + (30.0f - tsz.y) * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.9f)), text);
+      if (ModeBanner::Float("##midilearn.banner", ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + 44.0f), L("MIDI learn"), target.c_str()))
+         MidiLearnCancelAll();
    }
 
 

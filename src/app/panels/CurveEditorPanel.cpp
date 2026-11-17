@@ -1,6 +1,7 @@
 // Curve Editor panel (docs/plans/curve-editor/README.md §8.2-§8.7). Docks bottom or top; one page per
 // MSEG node, following the canvas selection. The node is the model: every edit goes through MSEGNode and
 // core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: pages, zoom, tool and selection.
+#include "app/frame/CanvasLink.h"
 #include "app/panels/CurveEditorPanel.h"
 
 #include "app/AppShared.h"
@@ -308,11 +309,7 @@ namespace
 
    GraphNode* SpawnPage()
    {
-      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
-      GraphNode* gn = SpawnNode("MSEG", "Modulators", at.x, at.y);
-      if (gn != nullptr)
-         RevealSpawned({ gn->uid });
-      return gn;
+      return CanvasLink::Add("MSEG", "Modulators");
    }
 
    void FreshView()

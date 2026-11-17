@@ -7,9 +7,11 @@
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/ModeBanner.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/StateRing.h"
 #include <imgui_node_editor.h>
+#include <map>
 #include <vector>
 
 namespace ed = ax::NodeEditor;
@@ -22,9 +24,30 @@ namespace CanvasLink
    {
       Spec sArmed;
       bool sIsArmed = false;
+      bool sBannerHovered = false; // last frame: the pointer is over the mode strip, so canvas clicks under it don't pick
       const std::string kNone;
       struct TestRect { uint64_t uid; ImVec2 mn, mx; };
       std::vector<TestRect> sTestRects; // screen rects of the last armed frame, for the self-test
+      struct TestPin { int node, param; ImVec2 at; };
+      std::vector<TestPin> sTestPins;
+
+      std::map<std::string, std::string> sSynced; // site -> the owner key it armed
+
+      // The pointer over the canvas you can see: inside the graph rect and not over a view docked on top of it.
+      bool PointerOnCanvas()
+      {
+         const ImVec2 m = ed::CanvasToScreen(ImGui::GetMousePos());
+         if (m.x < gGraphScreenTL.x || m.y < gGraphScreenTL.y || m.x > gGraphScreenTL.x + gGraphScreenSize.x ||
+             m.y > gGraphScreenTL.y + gGraphScreenSize.y)
+            return false;
+         struct Over { bool open; ImVec2 mn, mx; };
+         const Over overs[] = { { gPianoRollOpen, gPianoRollRectMin, gPianoRollRectMax }, { gView2DOpen, gView2DRectMin, gView2DRectMax },
+                                { gView3DOpen, gView3DRectMin, gView3DRectMax } };
+         for (const Over& o : overs)
+            if (o.open && m.x >= o.mn.x && m.x <= o.mx.x && m.y >= o.mn.y && m.y <= o.mx.y)
+               return false;
+         return true;
+      }
 
       std::string ArmedLabel(const Spec& s)
       {
@@ -86,16 +109,80 @@ namespace CanvasLink
       return sIsArmed ? sArmed.owner : kNone;
    }
 
+   int HoveredParam(const std::function<bool(int, int)>& accepts)
+   {
+      if (!PointerOnCanvas())
+         return -1;
+      const ImVec2 mp = ImGui::GetMousePos();
+      int hit = -1;
+      for (size_t i = 0; i < gParamPinScreenList.size(); i++)
+      {
+         const ParamPinScreenInfo& p = gParamPinScreenList[i];
+         if (accepts && !accepts(p.nodeIndex, p.paramIndex))
+            continue;
+         const bool in = mp.x >= p.rowMin.x && mp.x <= p.rowMax.x && mp.y >= p.rowMin.y && mp.y <= p.rowMax.y;
+         const float dx = mp.x - p.screenPos.x, dy = mp.y - p.screenPos.y;
+         if (in || dx * dx + dy * dy < 20.0f * 20.0f)
+            hit = (int)i; // the last drawn wins, as before
+      }
+      return hit;
+   }
+
+   void RingParam(int i)
+   {
+      if (i < 0 || i >= (int)gParamPinScreenList.size())
+         return;
+      const ParamPinScreenInfo& p = gParamPinScreenList[i];
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      if (p.isCircle)
+         StateRing::DrawCircle(dl, p.shapeCenter, p.shapeRadius, StateRing::Kind::Target, IsThemeLight());
+      else
+         StateRing::Draw(dl, p.rowMin, p.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_control);
+   }
+
+   void Sync(const char* site, const std::string& key, const std::function<Spec()>& make)
+   {
+      std::string& was = sSynced[site];
+      if (key.empty())
+      {
+         if (!was.empty() && Armed(was.c_str()))
+            Cancel();
+         was.clear();
+         return;
+      }
+      if (Armed(key.c_str()))
+         return;
+      if (!was.empty() && Armed(was.c_str()))
+         sArmed.onCancel = nullptr; // re-keyed: the panel already holds the new key
+      Spec spec = make();
+      spec.owner = key;
+      Arm(std::move(spec));
+      was = key;
+   }
+
    void CanvasHook()
    {
       if (!sIsArmed)
+      {
+         sBannerHovered = false;
          return;
+      }
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 mp = ImGui::GetMousePos();
       const ImU32 dim = ImGui::GetColorU32(ImGuiCol_WindowBg, 0.62f);
+      const bool params = sArmed.target == Target::Param;
+      const bool onCanvas = PointerOnCanvas();
       GraphNode* hovered = nullptr;
+      int hoveredPin = params && !sBannerHovered ? HoveredParam(sArmed.acceptsParam) : -1;
+      bool cancelNow = false;
       ImVec2 hp(0, 0), hs(0, 0);
       sTestRects.clear();
+      sTestPins.clear();
+      if (params)
+         for (const ParamPinScreenInfo& pin : gParamPinScreenList)
+            if (!sArmed.acceptsParam || sArmed.acceptsParam(pin.nodeIndex, pin.paramIndex))
+               sTestPins.push_back({ pin.nodeIndex, pin.paramIndex,
+                                     ed::CanvasToScreen(ImVec2((pin.rowMin.x + pin.rowMax.x) * 0.5f, (pin.rowMin.y + pin.rowMax.y) * 0.5f)) });
       for (GraphNode& gn : gNodes)
       {
          if (gn.hiddenFromCanvas)
@@ -105,13 +192,25 @@ namespace CanvasLink
          if (s.x <= 0.0f)
             continue;
          sTestRects.push_back({ gn.uid, ed::CanvasToScreen(p), ed::CanvasToScreen(ImVec2(p.x + s.x, p.y + s.y)) });
-         const bool ok = !sArmed.accepts || sArmed.accepts(gn);
+         bool ok = true;
+         if (params)
+         {
+            ok = false; // a node is lit when it has a control the pick takes
+            for (const ParamPinScreenInfo& pin : gParamPinScreenList)
+               if (pin.nodeIndex == gn.index && (!sArmed.acceptsParam || sArmed.acceptsParam(pin.nodeIndex, pin.paramIndex)))
+               {
+                  ok = true;
+                  break;
+               }
+         }
+         else
+            ok = !sArmed.accepts || sArmed.accepts(gn);
          if (!ok)
          {
             dl->AddRectFilled(p, ImVec2(p.x + s.x, p.y + s.y), dim, tok::radius_container);
             continue;
          }
-         if (hovered == nullptr && mp.x >= p.x && mp.x <= p.x + s.x && mp.y >= p.y && mp.y <= p.y + s.y)
+         if (!params && onCanvas && hovered == nullptr && !sBannerHovered && mp.x >= p.x && mp.x <= p.x + s.x && mp.y >= p.y && mp.y <= p.y + s.y)
          {
             hovered = &gn;
             hp = p;
@@ -120,11 +219,8 @@ namespace CanvasLink
       }
 
       ed::Suspend();
-      // The prompt, top centre of the canvas: what to click and how to stop.
+      // The prompt: the shared mode strip, top centre of the canvas you can see (under any docked view over it).
       {
-         const std::string msg = ArmedLabel(sArmed) + "   " + T("Esc cancels");
-         const ImVec2 ts = ImGui::CalcTextSize(msg.c_str());
-         // Top centre of the canvas you can see: under any docked view lying over it.
          const float cx = gGraphScreenTL.x + gGraphScreenSize.x * 0.5f;
          float top = gGraphScreenTL.y;
          struct Over { bool open; ImVec2 mn, mx; };
@@ -133,18 +229,18 @@ namespace CanvasLink
          for (const Over& o : overs)
             if (o.open && o.mx.y > o.mn.y && o.mn.y <= top + 1.0f && o.mx.y > top && o.mn.x <= cx && o.mx.x >= cx)
                top = o.mx.y;
-         const ImVec2 a(cx - ts.x * 0.5f - tok::space_3, top + tok::space_3);
-         const ImVec2 b(a.x + ts.x + 2.0f * tok::space_3, a.y + ts.y + 2.0f * tok::space_2);
-         ImDrawList* sdl = ImGui::GetWindowDrawList();
-         sdl->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_control);
-         StateRing::Draw(sdl, a, b, StateRing::Kind::Target, IsThemeLight());
-         sdl->AddText(ImVec2(a.x + tok::space_3, a.y + tok::space_2), ImGui::GetColorU32(ImGuiCol_Text), msg.c_str());
+         // Names what is under the pointer once there is something to take, else what to look for.
+         std::string what = sArmed.kind.empty() ? std::string(T("node")) : sArmed.kind;
+         const char* head = T("Click a");
+         if (hovered != nullptr)
+            what = NodeTitleWithInstance(*hovered), head = T("Pick");
+         else if (hoveredPin >= 0)
+            what = gParamPinScreenList[hoveredPin].nodeTitle + ": " + gParamPinScreenList[hoveredPin].paramName, head = T("Pick");
+         if (ModeBanner::Float("##canvaslink.banner", ImVec2(cx, top + tok::space_3), head, what.c_str(), &sBannerHovered))
+            cancelNow = true;
       }
-      if (hovered != nullptr)
-      {
+      if ((hovered != nullptr || hoveredPin >= 0) && !sBannerHovered)
          ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-         ImGui::SetTooltip("%s", NodeTitleWithInstance(*hovered).c_str());
-      }
       ed::Resume();
 
       if (hovered != nullptr)
@@ -161,7 +257,21 @@ namespace CanvasLink
             return;
          }
       }
-      if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (hoveredPin >= 0)
+      {
+         RingParam(hoveredPin);
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+         {
+            std::function<void(int, int)> picked = std::move(sArmed.onPickedParam);
+            const int n = gParamPinScreenList[hoveredPin].nodeIndex, p = gParamPinScreenList[hoveredPin].paramIndex;
+            sArmed = Spec();
+            sIsArmed = false;
+            if (picked)
+               picked(n, p);
+            return;
+         }
+      }
+      if (cancelNow || ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          Cancel();
    }
 
@@ -268,6 +378,18 @@ namespace CanvasLink
       if (changed && spec.onPicked)
          spec.onPicked(chosen);
       return changed;
+   }
+
+   bool ParamScreenPosForTest(int nodeIndex, ImVec2& at, int& paramIndex)
+   {
+      for (const TestPin& p : sTestPins)
+         if (p.node == nodeIndex)
+         {
+            at = p.at;
+            paramIndex = p.param;
+            return true;
+         }
+      return false;
    }
 
    bool ScreenRectForTest(uint64_t uid, ImVec2& mn, ImVec2& mx)

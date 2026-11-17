@@ -1817,39 +1817,28 @@ namespace
       }
    }
    // A node picker over every node that can be a layer; 0 = none (when allowed).
-   bool NodeRow(const char* label, uint64_t* uid, bool allowNone, Scene2DNode* doc)
+   // A node row as a Canvas Link field (choose from the list, pick on the canvas, show). A pick lands later, from
+   // the canvas, so it is parked under the row's key and applied the next time the row draws.
+   struct RowPick { std::string key; uint64_t uid = 0; bool has = false; } sRowPick;
+   bool NodeRow(const char* label, uint64_t* uid, bool allowNone, const std::string& key)
    {
       FieldLabel(label);
-      ImGui::SetNextItemWidth(sFieldW);
-      GraphNode* cur = *uid != 0 ? FindNodeByUid(*uid) : nullptr;
-      const std::string preview = cur != nullptr ? cur->typeName + " " + std::to_string(cur->index)
-                                  : *uid != 0 ? std::string(T("source missing")) : std::string(T("None"));
-      bool changed = false;
-      if (MenuParts::BeginCombo(FormParts::Id(label).c_str(), preview.c_str()))
-      {
-         if (allowNone && MenuParts::Choice(T("None"), *uid == 0) && *uid != 0)
-         {
-            PushUndoCheckpoint(kUndo);
-            *uid = 0;
-            changed = true;
-         }
-         for (GraphNode& gn : gNodes)
-         {
-            if (gn.node.get() == doc || !View2DCanAdd(gn))
-               continue;
-            const std::string name = gn.typeName + " " + std::to_string(gn.index) + "##n" + std::to_string(gn.uid);
-            if (MenuParts::Choice(name.c_str(), gn.uid == *uid) && gn.uid != *uid)
-            {
-               PushUndoCheckpoint(kUndo);
-               *uid = gn.uid;
-               changed = true;
-            }
-         }
-         MenuParts::EndCombo();
-      }
-      if (changed)
-         Touch();
-      return changed;
+      CanvasLink::Spec spec;
+      spec.owner = "v2d.row." + key;
+      spec.kind = T("picture node");
+      const uint64_t docUid = sDocUid;
+      spec.accepts = [docUid](const GraphNode& gn) { return gn.uid != docUid && View2DCanAdd(gn); };
+      spec.onPicked = [key](uint64_t u) { sRowPick = { key, u, true }; };
+      CanvasLink::Field(FormParts::Id(label).c_str(), *uid, spec, allowNone, sFieldW);
+      if (!sRowPick.has || sRowPick.key != key)
+         return false;
+      sRowPick.has = false;
+      if (sRowPick.uid == *uid)
+         return false;
+      PushUndoCheckpoint(kUndo);
+      *uid = sRowPick.uid;
+      Touch();
+      return true;
    }
 
    // 3x3 anchor picker (row major from top left).
@@ -3463,6 +3452,72 @@ namespace
    // The 8 handles of one layer's box, as box fractions.
    const float kHandleAt[8][2] = { { 0, 0 }, { 0.5f, 0 }, { 1, 0 }, { 1, 0.5f }, { 1, 1 }, { 0.5f, 1 }, { 0, 1 }, { 0, 0.5f } };
 
+   // What the transform box frames, in the layer's own box px: x0, y0, x1, y1. A paint layer's box is its painted
+   // pixels (transparent ones don't count, as in Photoshop), so a small cut-out on a big layer gets a small box. Any
+   // other layer, or an empty / warped / 3D / cropped one, is its whole box. Kept per layer and tiles (reads back).
+   void ContentRect(Scene2DNode* doc, const Layer& l, float r[4])
+   {
+      float bw = 1, bh = 1;
+      doc->LayerBox(l, bw, bh);
+      r[0] = 0, r[1] = 0, r[2] = bw, r[3] = bh;
+      if (l.kind != Kind::Paint || l.warpOn || l.is3d || l.cropOn)
+         return;
+      struct Entry { int id; std::vector<std::string> tiles; bool has; float r[4]; };
+      static std::vector<Entry> cache;
+      for (const Entry& e : cache)
+         if (e.id == l.id && e.tiles == l.tiles)
+         {
+            if (e.has)
+               std::copy(e.r, e.r + 4, r);
+            return;
+         }
+      Entry e{ l.id, l.tiles, false, { 0, 0, bw, bh } };
+      std::vector<uint8_t> px;
+      int w = 0, h = 0;
+      if (doc->ReadPaint(l.id, px, w, h) && w > 0 && h > 0 && px.size() >= (size_t)w * h * 4)
+      {
+         int x0 = w, y0 = h, x1 = -1, y1 = -1;
+         for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+               if (px[((size_t)y * w + x) * 4 + 3] > 8)
+               {
+                  x0 = std::min(x0, x); x1 = std::max(x1, x);
+                  y0 = std::min(y0, y); y1 = std::max(y1, y);
+               }
+         if (x1 >= x0)
+         {
+            // Rows come bottom first; the box runs top down.
+            const float kx = bw / (float)w, ky = bh / (float)h;
+            e.r[0] = x0 * kx, e.r[2] = (x1 + 1) * kx;
+            e.r[1] = (h - 1 - y1) * ky, e.r[3] = (h - y0) * ky;
+            e.has = true;
+         }
+      }
+      cache.erase(std::remove_if(cache.begin(), cache.end(), [&](const Entry& c) { return c.id == l.id; }), cache.end());
+      if (cache.size() > 32)
+         cache.erase(cache.begin());
+      cache.push_back(e);
+      if (e.has)
+         std::copy(e.r, e.r + 4, r);
+   }
+
+   // The content rect's four corners on the document (clockwise from top-left), for the outline and the rotate zone.
+   void ContentCorners(Scene2DNode* doc, const Layer& l, float c[8])
+   {
+      float r[4], m[6], bw = 1, bh = 1;
+      ContentRect(doc, l, r);
+      doc->LayerBox(l, bw, bh);
+      if (r[0] == 0 && r[1] == 0 && r[2] == bw && r[3] == bh)
+      {
+         doc->Corners(l, c);
+         return;
+      }
+      doc->LayerMatrix(l, m);
+      const float pts[8] = { r[0], r[1], r[2], r[1], r[2], r[3], r[0], r[3] };
+      for (int i = 0; i < 4; i++)
+         Apply(m, pts[i * 2], pts[i * 2 + 1], c[i * 2], c[i * 2 + 1]);
+   }
+
    void HandlePoint(Scene2DNode* doc, const Layer& l, float fx, float fy, ImVec2& out)
    {
       // A distorted layer: the handles sit on its pulled corners (and between them).
@@ -3474,10 +3529,10 @@ namespace
          out = ToScreen(doc, tx + (bx - tx) * fy, ty + (by - ty) * fy);
          return;
       }
-      float bw = 1, bh = 1, m[6], x, y;
-      doc->LayerBox(l, bw, bh);
+      float r[4], m[6], x, y;
+      ContentRect(doc, l, r);
       doc->LayerMatrix(l, m);
-      Apply(m, fx * bw, fy * bh, x, y);
+      Apply(m, r[0] + fx * (r[2] - r[0]), r[1] + fy * (r[3] - r[1]), x, y);
       out = ToScreen(doc, x, y);
    }
 
@@ -3499,7 +3554,7 @@ namespace
          if (dx * dx + dy * dy <= 22.0f * 22.0f)
          {
             float c[8];
-            doc->Corners(l, c);
+            ContentCorners(doc, l, c);
             if (!InQuad(c, ToDoc(doc, mouse)))
                return 8;
          }
@@ -3914,8 +3969,10 @@ namespace
       if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Fill || l->kind == Kind::Adjust)
          return;
       const Layer& l0 = sOp.l0;
-      float bw = 1, bh = 1, m0[6], inv[6];
-      doc->LayerBox(l0, bw, bh);
+      // Scaled about the content rect (what the handles frame), not the whole layer box.
+      float cr[4], m0[6], inv[6];
+      ContentRect(doc, l0, cr);
+      const float bx0 = cr[0], by0 = cr[1], bw = cr[2] - cr[0], bh = cr[3] - cr[1];
       doc->LayerMatrix(l0, m0);
       InverseOf(m0, inv);
       const ImVec2 md = ToDoc(doc, mouse);
@@ -3924,9 +3981,9 @@ namespace
       const float ox = sOp.fromCentre ? 0.5f : 1.0f - sOp.hx, oy = sOp.fromCentre ? 0.5f : 1.0f - sOp.hy;
       float kx = 1.0f, ky = 1.0f;
       if (std::fabs(sOp.hx - ox) > 1e-3f)
-         kx = (bx - ox * bw) / ((sOp.hx - ox) * bw);
+         kx = (bx - bx0 - ox * bw) / ((sOp.hx - ox) * bw);
       if (std::fabs(sOp.hy - oy) > 1e-3f)
-         ky = (by - oy * bh) / ((sOp.hy - oy) * bh);
+         ky = (by - by0 - oy * bh) / ((sOp.hy - oy) * bh);
       const bool corner = std::fabs(sOp.hx - 0.5f) > 0.1f && std::fabs(sOp.hy - 0.5f) > 0.1f;
       // Corners keep the proportions unless Shift is held, like current image editors.
       if (corner && !ImGui::GetIO().KeyShift)
@@ -3938,7 +3995,7 @@ namespace
       if (!corner && std::fabs(sOp.hy - 0.5f) < 0.1f) ky = 1.0f;
       // The fixed point stays where it was on the document.
       float fx0, fy0;
-      Apply(m0, ox * bw, oy * bh, fx0, fy0);
+      Apply(m0, bx0 + ox * bw, by0 + oy * bh, fx0, fy0);
       // Magnetic: the dragged handle's edge snaps to the page, guides and other layers' edges and centres, the same
       // targets a move uses. Upright 2D layers only (a turned box has no edge along the page's axes).
       sSnapX.clear();
@@ -3947,7 +4004,7 @@ namespace
       if (snap && !l0.is3d && std::fabs(std::remainder(l0.angle, 360.0f)) < 0.01f)
       {
          float hx0, hy0;
-         Apply(m0, sOp.hx * bw, sOp.hy * bh, hx0, hy0);
+         Apply(m0, bx0 + sOp.hx * bw, by0 + sOp.hy * bh, hx0, hy0);
          const std::vector<int> moving = { l0.id };
          float r[2] = { 1.0f, 1.0f };
          bool got[2] = { false, false };
@@ -3985,7 +4042,7 @@ namespace
       l->sy = l0.sy * ky;
       float m1[6], fx1, fy1;
       doc->LayerMatrix(*l, m1);
-      Apply(m1, ox * bw, oy * bh, fx1, fy1);
+      Apply(m1, bx0 + ox * bw, by0 + oy * bh, fx1, fy1);
       l->x += fx0 - fx1;
       l->y += fy0 - fy1;
       Touch();
@@ -5553,7 +5610,7 @@ namespace
                   continue;
                }
                float c[8];
-               doc->Corners(*l, c);
+               ContentCorners(doc, *l, c);
                ImVec2 q[4];
                for (int i = 0; i < 4; i++)
                   q[i] = ToScreen(doc, c[i * 2], c[i * 2 + 1]);
@@ -9558,7 +9615,7 @@ namespace
             if (TextChip(L("Delete##v2dvmdel"), false, T("Delete the vector mask")))
                sPending.what = Pending::RemoveVMask;
          }
-         NodeRow(T("Node"), &l->maskUid, true, doc);
+         NodeRow(T("Node"), &l->maskUid, true, "mask" + std::to_string(l->id));
          if (l->maskUid != 0)
          {
             BoolRow(T("Enabled"), &l->maskOn);
@@ -9803,7 +9860,7 @@ namespace
       }
       EffParamRows rows;
       gn->node->VisitParams(rows);
-      if (ActionButton::Draw((std::string(e.shown ? T("Hide from canvas") : T("Show on canvas")) + base + "show").c_str(), ImVec2(-1.0f, 0.0f),
+      if (ActionButton::Draw((std::string(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)) + base + "show").c_str(), ImVec2(-1.0f, 0.0f),
                              ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint("Show effect node");
@@ -10077,7 +10134,7 @@ namespace
       SectionCard::Begin(T("Stack"));
       AddEffectMenu(l);
       if (!l.effects.empty())
-         NodeRow(T("Mask from"), &l.effMaskUid, true, doc);
+         NodeRow(T("Mask from"), &l.effMaskUid, true, "effmask" + std::to_string(l.id));
       EffectPresets(l);
       for (int i = 0; i < (int)l.effects.size(); i++)
       {

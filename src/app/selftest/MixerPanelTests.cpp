@@ -90,7 +90,7 @@ namespace
       Check("leaving Mixer Audio returns to the canvas", gAudioMode == AudioMode::Canvas && gAudioTopologyTerminalCount == 2);
       Check("one page: the Mixer-fed Audio Out", MixerPanelPageCount() == 1);
       const int page2 = MixerPanelAddPage();
-      Check("+ page adds a Mixer + Audio Out pair", page2 > 0 && MixerPanelPageCount() == 2);
+      Check("+ page adds a Mixer", page2 > 0 && MixerPanelPageCount() == 2);
       NewPatch();
 
       // D13: two direct Audio Outs become one console feeding the first; the second is unplugged.
@@ -116,12 +116,13 @@ namespace
       const int grpB = SpawnNode("Mixer", "Utility", 200.0f, 400.0f)->index;
       const int loose = SpawnNode("Mixer", "Utility", 200.0f, 800.0f)->index;
       wired = ConnectNodes(topA, 0, outA, 0, err) && ConnectNodes(topB, 0, outB, 0, err) && ConnectNodes(grpB, 0, topB, 2, err);
-      Check("A5 patch wires up: two pages, a group on the second", wired && MixerPanelPageCount() == 2);
+      // A Mixer nothing consumes is a page of its own, so the loose one makes three.
+      Check("A5 patch wires up: three pages, a group on the second", wired && MixerPanelPageCount() == 3);
       gMixerPanelOpen = false;
       MixerPanelSelectPage(0);
       Check("Open in Mixer panel on a group finds its page", MixerPanelShowMixer(grpB) && gMixerPanelOpen);
       Check("the page shown is the group's console, folded open", MixerPanelCurrentPageTop() == topB && MixerPanelGroupOpen(grpB));
-      Check("a Mixer on no page still opens the panel", !MixerPanelShowMixer(loose) && gMixerPanelOpen);
+      Check("a lone Mixer opens as its own page", MixerPanelShowMixer(loose) && MixerPanelCurrentPageTop() == loose);
       gMixerPanelOpen = false;
       NewPatch();
    }
@@ -1139,41 +1140,8 @@ bool MixerPanelTestStep(int frameId)
       }
       return false;
    }
-   // Block C: the render column, on a wide dock and on a tall one, stays inside the card and clear of the strips.
-   if (sCase < 17)
-   {
-      static bool sRenderSet = false;
-      if (!sRenderSet)
-      {
-         sRenderSet = true;
-         gMixerRenderOpen = true;
-         gMixerPanelDock = 0;
-         sCaseAt = frameId;
-         return false;
-      }
-      if (frameId < sCaseAt + 3)
-         return false;
-      const ImVec2 cmn = gMixerPanelRectMin, cmx = gMixerPanelRectMax;
-      const ImVec2 rmn = gMixerRenderMin, rmx = gMixerRenderMax;
-      auto apart = [](ImVec2 amn, ImVec2 amx, ImVec2 bmn, ImVec2 bmx) {
-         return amx.x <= bmn.x + 0.5f || bmx.x <= amn.x + 0.5f || amx.y <= bmn.y + 0.5f || bmx.y <= amn.y + 0.5f;
-      };
-      const bool drawn = rmx.x - rmn.x >= 150.0f && rmx.y - rmn.y > 40.0f;
-      const bool inside = rmn.x >= cmn.x - 1.0f && rmx.x <= cmx.x + 1.0f && rmn.y >= cmn.y - 1.0f && rmx.y <= cmx.y + 1.0f &&
-                          gMixerStripsMax.x <= cmx.x + 1.0f && gMixerMasterMax.x <= cmx.x + 1.0f;
-      const bool clear = apart(rmn, rmx, gMixerStripsMin, gMixerStripsMax) && apart(rmn, rmx, gMixerMasterMin, gMixerMasterMax) &&
-                         apart(gMixerMasterMin, gMixerMasterMax, gMixerStripsMin, gMixerStripsMax);
-      char label[160];
-      snprintf(label, sizeof(label), "render column, %s: %.0f px wide, inside the card, clear of strips and master",
-               sCase == 15 ? "bottom" : "right", rmx.x - rmn.x);
-      Check(label, drawn && inside && clear && gMixerPanelStripCount == 32);
-      if (++sCase < 17)
-      {
-         gMixerPanelDock = 1;
-         sCaseAt = frameId;
-      }
-      return false;
-   }
+   // The render column is gone (the Mixer has no audio engine or render of its own); the case numbers stay.
+   sCase = 17;
    gMixerRenderOpen = false;
    NewPatch();
    gMixerPanelOpen = false;

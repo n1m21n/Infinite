@@ -1,4 +1,5 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
+#include "app/frame/CanvasLink.h"
 #include <unordered_set>
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -655,7 +656,7 @@ namespace app
                else
                   gBrowserFavorites.ToggleSample(entry.path);
             }
-            if (MenuParts::Item(L("Add to canvas")))
+            if (MenuParts::Item(CanvasLink::Label(CanvasLink::Verb::Add)))
             {
                const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                PushUndoCheckpoint();
@@ -1126,7 +1127,7 @@ namespace app
          {
             if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                gBrowserFavorites.TogglePlugin(entry.identifier);
-            if (MenuParts::Item(L("Add to canvas")))
+            if (MenuParts::Item(CanvasLink::Label(CanvasLink::Verb::Add)))
             {
                const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                PushUndoCheckpoint();
@@ -1332,7 +1333,7 @@ namespace app
             {
                if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                   gBrowserFavorites.ToggleFieldPreset(entry.name);
-               if (MenuParts::Item(L("Add to canvas")))
+               if (MenuParts::Item(CanvasLink::Label(CanvasLink::Verb::Add)))
                {
                   const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                   SpawnFieldPresetNode(entry, spawnPos.x, spawnPos.y);

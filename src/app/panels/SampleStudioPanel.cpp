@@ -10,6 +10,7 @@
 // the patch (`studio` lines) and has its own undo while the pointer is over the waveform.
 // The engine is a private Generate Samples node (never in the graph, never cooked): a take made here and one made
 // on the node are the same sound for the same recipe. Snap to scale re-renders the take's own seed pinned.
+#include "app/frame/CanvasLink.h"
 #include "app/AppShared.h"
 #include "app/graph/GenerateSamplesNode.h"
 #include "app/graph/LearningLog.h"
@@ -1194,12 +1195,10 @@ namespace
       const std::string wav = generator ? std::string() : WriteEdit(std::string(), "wav", AudioFileWriter::Format::Wav, 24, &res);
       if (!generator && wav.empty())
          return nullptr;
-      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas);
       PushUndoCheckpoint("Add sample from studio");
-      GraphNode* gn = SpawnNode(type, "Synths", at.x, at.y);
+      GraphNode* gn = CanvasLink::Add(type, "Synths");
       if (gn == nullptr)
          return nullptr;
-      RevealSpawned({ gn->uid });
       INode* node = gn->node.get();
       if (generator)
       {

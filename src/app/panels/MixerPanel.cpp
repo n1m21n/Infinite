@@ -2,6 +2,7 @@
 // A3 is the shell (five docks, persist, the "Enable Mixer Audio" chip). A4 is the console: page
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
+#include "app/frame/CanvasLink.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -254,6 +255,27 @@ namespace app
                dup = dup || p.topIndex == top->index;
             if (!dup)
                pages.push_back({ gn.index, top->index, top->uid });
+         }
+         // A Mixer nothing else takes in (no Audio Out yet, not a group of another Mixer) is a page too: a new
+         // page is just a Mixer, wired wherever the owner wants it to sound.
+         for (GraphNode& gn : gNodes)
+         {
+            if (dynamic_cast<MixerNode*>(gn.node.get()) == nullptr)
+               continue;
+            bool dup = false;
+            for (const Page& p : pages)
+               dup = dup || p.topIndex == gn.index;
+            bool fedOn = false;
+            for (GraphNode& other : gNodes)
+               for (int k = 0; !fedOn && other.node && k < 64; k++)
+               {
+                  AudioCable* c = other.node->AudioInputSlot(k);
+                  if (c == nullptr)
+                     break;
+                  fedOn = c->IsConnected() && ResolvedAudioSource(c->GetSource()) == gn.node.get();
+               }
+            if (!dup && !fedOn)
+               pages.push_back({ -1, gn.index, gn.uid });
          }
          // The page strip's own order (Move Left/Right, drag); ties keep canvas order.
          std::stable_sort(pages.begin(), pages.end(), [](const Page& a, const Page& b) {
@@ -1341,7 +1363,7 @@ namespace app
                   ed::EditorContext* prev = ed::GetCurrentEditor();
                   ed::SetCurrentEditor(gEditor);
                   ed::ClearSelection();
-                  GraphNode* at = FindNodeByIndex(pg->outIndex);
+                  GraphNode* at = pg->outIndex >= 0 ? FindNodeByIndex(pg->outIndex) : top;
                   for (int guard = 0; at != nullptr && guard < 64; guard++)
                   {
                      ed::SelectNode(at->NodeId(), true);
@@ -1370,29 +1392,9 @@ namespace app
          FollowCanvasSelection(pages);
          const int current = CurrentPage(pages);
 
-         // Header, as the other panels: the page dropdown left (no title: the rail icon names the panel),
-         // Render and Mixer Audio pinned right.
+         // Header, as the other panels: the page dropdown left (no title: the rail icon names the panel). The console
+         // has no audio engine or render of its own: it sounds and renders through the canvas like any node.
          DrawPagePicker(pages, current);
-         {
-            const bool mixerMode = gAudioMode == AudioMode::Mixer;
-            const char* audioLabel = mixerMode ? T("Mixer Audio On") : T("Enable Mixer Audio");
-            const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
-            const char* renderLabel = T("Render");
-            const float renderW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
-            ImGui::SameLine();
-            ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + avail.x - audioW - renderW - tok::space_2), origin.y));
-            if (ChipButton::Draw(renderLabel, gMixerRenderOpen || MixerRenderActive(), tok::control_h))
-               gMixerRenderOpen = !gMixerRenderOpen;
-            if (ImGui::IsItemHovered())
-               HelpTip("%s", T("Record this console to a file."));
-            ImGui::SameLine(0.0f, tok::space_2);
-            ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + avail.x - audioW), origin.y));
-            if (ChipButton::Draw(audioLabel, mixerMode, tok::control_h))
-               SetMixerAudio(!mixerMode);
-            if (ImGui::IsItemHovered())
-               HelpTip("%s", mixerMode ? T("Only the console reaches the speakers. Click to hand audio back to the canvas.")
-                                       : T("Hear only the console: other Audio Outs go silent."));
-         }
 
          const ImVec2 bodyMin(origin.x, ImGui::GetCursorScreenPos().y + tok::space_2);
          ImVec2 bodyMax(origin.x + avail.x, origin.y + avail.y);
@@ -1411,15 +1413,6 @@ namespace app
             strips.erase(std::remove_if(strips.begin(), strips.end(), [](const StripRef& r) { return r.depth > 0; }), strips.end());
             std::stable_sort(strips.begin(), strips.end(), [](const StripRef& a, const StripRef& b) { return a.slot < b.slot; });
 
-            // The render column takes the right edge when asked for and there is room.
-            const bool wantRender = gMixerRenderOpen || MixerRenderActive();
-            ImVec2 renderMin(0.0f, 0.0f), renderMax(0.0f, 0.0f);
-            if (wantRender && bodyMax.x - bodyMin.x >= kRenderW + 3.0f * kMinStripW + 4.0f * kStripGap)
-            {
-               renderMin = ImVec2(bodyMax.x - kRenderW, bodyMin.y);
-               renderMax = bodyMax;
-               bodyMax.x -= kRenderW + 2.0f * kStripGap;
-            }
             const float bodyW = bodyMax.x - bodyMin.x;
             const float bodyH = bodyMax.y - bodyMin.y;
             const int n = std::max(1, (int)strips.size());
@@ -1459,18 +1452,6 @@ namespace app
             gMixerPanelStripCount = (int)strips.size();
             const ImVec2 masterAt(bodyMax.x - stripW, bodyMin.y);
             DrawMaster(ImGui::GetWindowDrawList(), masterAt, stripW, colH, page.topIndex);
-            if (renderMax.x > renderMin.x && renderMax.y - renderMin.y > 40.0f)
-            {
-               std::vector<int> outs;
-               for (const Page& pg : pages)
-                  outs.push_back(pg.outIndex);
-               ImGui::SetCursorScreenPos(renderMin);
-               ImGui::BeginChild("##mixerrender", ImVec2(renderMax.x - renderMin.x, renderMax.y - renderMin.y), false);
-               DrawMixerRenderColumn(outs, page.outIndex);
-               ImGui::EndChild();
-               gMixerRenderMin = renderMin;
-               gMixerRenderMax = renderMax;
-            }
          }
 
          // Right-click empty panel space to move or close it (rect test, as the Mod Matrix does).
@@ -1591,25 +1572,14 @@ namespace app
          sPageUid = pages[page].topUid;
    }
 
-   // G8: a page is a Mixer feeding its own Audio Out. One undo step for the pair and its cable.
+   // G8: a page is a Mixer; no Audio Out of its own (the owner wires it where it should sound). One undo step.
    int MixerPanelAddPage()
    {
-      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
       PushUndoCheckpoint("New Mixer Page");
-      const bool wasSuppressed = gSuppressUndoCheckpoints;
-      gSuppressUndoCheckpoints = true;
-      const int mix = SpawnAt("Mixer", at.x, at.y);
-      const int out = SpawnAt("Audio Out", at.x + 320.0f, at.y);
-      GraphNode* mixGn = FindNodeByIndex(mix);
-      GraphNode* outGn = FindNodeByIndex(out);
-      if (mixGn && outGn)
-      {
-         WireInputSlot(*mixGn, *outGn, 0, 0);
+      GraphNode* mixGn = CanvasLink::Add("Mixer", "Utility");
+      const int mix = mixGn != nullptr ? mixGn->index : -1;
+      if (mixGn)
          sPageUid = mixGn->uid;
-         RevealSpawned({ mixGn->uid, outGn->uid });
-      }
-      gSuppressUndoCheckpoints = wasSuppressed;
-      RebuildAudioTopology();
       return mix;
    }
 
@@ -1676,15 +1646,18 @@ namespace app
             GraphNode* outGn = FindNodeByIndex(outIndex);
             GraphNode* topGn = FindNodeByIndex(newTop);
             mGn = FindNodeByIndex(mixerIndex);
-            if (outGn == nullptr || topGn == nullptr)
+            if (topGn == nullptr)
                break;
             auto* nt = static_cast<MixerNode*>(topGn->node.get());
             nt->numChannels = 1;
             nt->masterDb = m->masterDb; // the console's master fader moves up with the console
             m->masterDb = 0.0f;
             WireInputSlot(*mGn, *topGn, 0, 0);
-            DisconnectDstPin(outGn->InputPinId(0));
-            WireInputSlot(*topGn, *outGn, 0, 0);
+            if (outGn != nullptr) // a page with no Audio Out has nothing downstream to move
+            {
+               DisconnectDstPin(outGn->InputPinId(0));
+               WireInputSlot(*topGn, *outGn, 0, 0);
+            }
             sOpenGroups.insert(mGn->uid);
             sPageUid = topGn->uid;
             topIndex = newTop;

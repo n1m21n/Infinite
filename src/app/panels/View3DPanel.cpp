@@ -36,6 +36,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include "app/frame/CanvasLink.h"
 #include <string>
 #include <vector>
 
@@ -286,10 +287,32 @@ namespace
       return gn != nullptr ? dynamic_cast<Scene3DNode*>(gn->node.get()) : nullptr;
    }
 
-   // With two 3D View nodes, the panel shows the one last selected on the canvas.
-   // "Assign Node...": the next node clicked on the canvas becomes this item's source.
+   std::vector<GraphNode*> SourceChoices(Scene3DNode* scene, const Item& it);
+   // A picked / chosen source (CanvasLink), applied on the panel's next draw.
    int sPickItem = -1;
    uint64_t sPickedUid = 0;
+
+   // The object's source as a Canvas Link: choose from the list or pick on the canvas; applied on the panel's next draw.
+   CanvasLink::Spec SourceSpec(int itemId)
+   {
+      CanvasLink::Spec spec;
+      spec.owner = "v3d.source";
+      spec.kind = T("source node");
+      spec.accepts = [itemId](const GraphNode& gn) {
+         Scene3DNode* sc = FindScene();
+         const Item* it = sc != nullptr ? sc->FindItem(itemId) : nullptr;
+         if (it == nullptr)
+            return false;
+         for (GraphNode* c : SourceChoices(sc, *it))
+            if (c == &gn)
+               return true;
+         return false;
+      };
+      spec.onPicked = [itemId](uint64_t uid) { sPickItem = itemId, sPickedUid = uid; };
+      return spec;
+   }
+
+   // With two 3D View nodes, the panel shows the one last selected on the canvas.
 
    void FollowCanvasSelection()
    {
@@ -307,8 +330,6 @@ namespace
             anyNode = gn.uid;
             break;
          }
-      if (anyNode != 0 && anyNode != sLastNode && sPickItem >= 0)
-         sPickedUid = anyNode;
       sLastNode = anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
@@ -6658,24 +6679,8 @@ namespace
       scene->motionShown = item->id;
       if (Card(T("Source")))
       {
-         const std::vector<GraphNode*> nodes = SourceChoices(scene, *item);
-         GraphNode* current = FindNodeByUid(item->uid);
          FieldLabel(T("Node"));
-         ImGui::SetNextItemWidth(sFieldW);
-         auto title = [](const GraphNode& gn) { return gn.typeName + " " + std::to_string(gn.index); };
-         if (MenuParts::BeginCombo("##v3dsource", current != nullptr ? title(*current).c_str() : T("source missing")))
-         {
-            for (GraphNode* gn : nodes)
-               if (MenuParts::Choice(title(*gn).c_str(), gn == current) && gn != current)
-                  SetSource(scene, *item, gn->uid);
-            if (nodes.empty())
-               ImGui::TextDisabled("%s", T("No fitting nodes in this patch"));
-            MenuParts::EndCombo();
-         }
-         const bool picking = sPickItem == item->id;
-         if (ActionButton::Draw(picking ? T("Click a node on the canvas...") : current != nullptr ? T("Assign Different Node...") : T("Assign Node..."),
-                                ImVec2(-1.0f, 0.0f), picking ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
-            sPickItem = picking ? -1 : item->id;
+         CanvasLink::Field("##v3dsource", item->uid, SourceSpec(item->id), false, sFieldW);
       }
       if (Card(T("Transform")))
       {

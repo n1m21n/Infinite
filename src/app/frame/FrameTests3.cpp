@@ -3670,6 +3670,45 @@ void FrameTest_CANVASLINKTEST(int frameId, GLFWwindow* window)
       }
       return;
    }
+   // Review shot (INFINITE_FILLSHOT=3d|2d, with IMAGERESYNTH_SCREENSHOT): a busy, all-selected canvas under a view
+   // docked Fill, to check nothing of the canvas shows round the view's edges.
+   if (const char* fill = getenv("INFINITE_FILLSHOT"))
+   {
+      if (frameId == 4)
+      {
+         NewPatch();
+         for (int i = 0; i < 12; i++)
+            SpawnNode(i % 3 == 0 ? "Mixer" : "Oscillator", i % 3 == 0 ? "Utility" : "Synths", -1400.0f + 300.0f * (i % 6), -500.0f + 500.0f * (i / 6));
+      }
+      if (frameId == 8 && (std::strcmp(fill, "drum") == 0 || std::strcmp(fill, "mixer") == 0))
+      {
+         if (fill[0] == 'd')
+         {
+            SpawnNode("Drum Sequencer", "Synths", 0.0f, 900.0f);
+            gDrumPanelOpen = true;
+            gDrumPanelDock = 0;
+            gDrumPanelHeight = 520.0f;
+         }
+         else
+         {
+            MixerPanelAddPage();
+            gMixerPanelOpen = true;
+            gMixerPanelDock = 0;
+            gMixerPanelHeight = 420.0f;
+         }
+         return;
+      }
+      if (frameId == 8)
+      {
+         ed::SetCurrentEditor(gEditor);
+         for (const GraphNode& gn : gNodes)
+            ed::SelectNode(gn.NodeId(), true);
+         const bool three = std::strcmp(fill, "2d") != 0;
+         (three ? gView3DOpen : gView2DOpen) = true;
+         (three ? gView3DDock : gView2DDock) = 4;
+      }
+      return;
+   }
    if (getenv("INFINITE_CANVASLINKTEST") == nullptr)
       return;
    static int sFails = 0;
@@ -3744,6 +3783,53 @@ void FrameTest_CANVASLINKTEST(int frameId, GLFWwindow* window)
       CanvasLink::Arm(spec("test.d"));
       check("arming a second pick cancels the first", CanvasLink::Armed("test.d") && !CanvasLink::Armed("test.c") && sCancels == 2);
       CanvasLink::Cancel();
+   }
+   // A knob pick through Sync, as the Perf / Curve / Drift panels use it: the panel's own flag arms it, a click on a
+   // knob calls back with that control, and clearing the flag (here: the callback) disarms it.
+   static bool sWant = false;
+   static int sPickedNode = -1, sPickedParam = -1, sWantParam = -1;
+   if (frameId == 58)
+      sWant = true;
+   if (frameId >= 58 && frameId < 90)
+      CanvasLink::Sync("test.knob", sWant ? "test.knob.1" : "", [] {
+         CanvasLink::Spec s;
+         s.target = CanvasLink::Target::Param;
+         s.kind = "knob";
+         s.onPickedParam = [](int n, int p) { sPickedNode = n, sPickedParam = p, sWant = false; };
+         s.onCancel = [] { sWant = false; };
+         return s;
+      });
+   if (frameId == 62)
+      check("Sync arms a knob pick from the panel's flag", CanvasLink::Armed("test.knob.1"));
+   GraphNode* osc = FindNodeByUid(sOsc);
+   if (frameId >= 64 && frameId < 74 && osc != nullptr)
+   {
+      ImVec2 at;
+      if (CanvasLink::ParamScreenPosForTest(osc->index, at, sWantParam))
+      {
+         io.ConfigInputTrickleEventQueue = false;
+         io.AddFocusEvent(true);
+         io.AddMousePosEvent(at.x, at.y);
+         glfwSetCursorPos(window, (double)(at.x * ImGui_ImplGlfw_GetPointScale()), (double)(at.y * ImGui_ImplGlfw_GetPointScale()));
+      }
+   }
+   if (frameId == 70)
+      io.AddMouseButtonEvent(0, true);
+   if (frameId == 71)
+      io.AddMouseButtonEvent(0, false);
+   if (frameId == 76)
+   {
+      check("a click on a knob picks that control", osc != nullptr && sPickedNode == osc->index && sPickedParam == sWantParam && sWantParam >= 0);
+      check("the knob pick disarms and stays off", !CanvasLink::Armed() && !sWant);
+      sWant = true;
+   }
+   if (frameId == 80)
+   {
+      sWant = false; // the panel dropped it itself
+   }
+   if (frameId == 82)
+   {
+      check("clearing the panel's flag cancels the pick", !CanvasLink::Armed());
       printf("CANVASLINK %s\n", sFails == 0 ? "PASS" : "FAIL");
       glfwSetWindowShouldClose(window, GLFW_TRUE);
    }

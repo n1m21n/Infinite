@@ -23,19 +23,34 @@ namespace CanvasLink
    const char* Label(Verb v);   // "Pick on Canvas", "Show on Canvas", "Add to Canvas", "Unlink", "Hide from Canvas"
    const char* Glyph(Verb v);   // one glyph per verb, the same in every panel
 
+   enum class Target { Node, Param };
+
    struct Spec
    {
       std::string owner;                                   // who armed it, e.g. "pianoroll.page"
-      std::string kind;                                    // what to click, in words: "Piano Roll", "node"
-      std::function<bool(const GraphNode&)> accepts;       // empty = any node
-      std::function<void(uint64_t uid)> onPicked;          // runs once, on the click (wrap your own undo step)
-      std::function<void()> onCancel;                      // Esc, right-click, another pick armed, Cancel()
+      std::string kind;                                    // what to click, in words: "Piano Roll", "node", "knob"
+      Target target = Target::Node;
+      std::function<bool(const GraphNode&)> accepts;       // Node: empty = any node
+      std::function<void(uint64_t uid)> onPicked;          // Node: runs once, on the click (wrap your own undo step)
+      std::function<bool(int nodeIndex, int paramIndex)> acceptsParam; // Param: empty = any control
+      std::function<void(int nodeIndex, int paramIndex)> onPickedParam; // Param: runs once, on the click
+      std::function<void()> onCancel;                      // Esc, right-click, Cancel, another pick armed
    };
 
    void Arm(Spec spec);
    void Cancel();
    bool Armed(const char* owner = nullptr);                // any pick, or this owner's
    const std::string& ArmedOwner();
+
+   // For a panel that keeps its own "picking" flag: call every frame with the key it is picking for ("" = not
+   // picking). Arms when the key appears or changes, cancels when it goes. Re-keying a site doesn't fire the old
+   // key's onCancel, so the flag the panel just set survives.
+   void Sync(const char* site, const std::string& key, const std::function<Spec()>& make);
+
+   // The control under the pointer (index into gParamPinScreenList, -1 = none) and its ring; canvas space, inside
+   // the editor scope. For the drag-onto-a-knob gesture, which is not an armed pick.
+   int HoveredParam(const std::function<bool(int nodeIndex, int paramIndex)>& accepts);
+   void RingParam(int pinIndex);
 
    // Inside the canvas editor scope, once per frame (StageSidePanels): dims, rings, banner, click, cancel.
    void CanvasHook();
@@ -62,5 +77,7 @@ namespace CanvasLink
 
    // Self-test (INFINITE_CANVASLINKTEST): a node's screen rect as last drawn while armed.
    bool ScreenRectForTest(uint64_t uid, ImVec2& mn, ImVec2& mx);
+   // Self-test: the screen centre of a node's first control row the armed knob pick takes.
+   bool ParamScreenPosForTest(int nodeIndex, ImVec2& at, int& paramIndex);
 }
 }

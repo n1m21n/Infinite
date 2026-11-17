@@ -8,6 +8,7 @@
 //  body   : lane labels (Mixer name row: category bar, dot, name, M S) | step grid | inspector
 //           (Lane, Step or Kit). Lanes are generic: the name is the loaded sample, "Empty" otherwise.
 // Drawn in the Mixer's language: FrameBg wells, one SliderGrab accent, ring/dot LEDs, no bevels.
+#include "app/frame/CanvasLink.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -64,6 +65,7 @@ namespace app
       constexpr float kGroupGap = 4.0f; // extra space between four-step key groups
       constexpr float kRowGap = tok::row_gap;
       constexpr float kCellGap = 2.0f;
+      constexpr float kCellW = 30.0f;   // a step key: fixed, the panel size never stretches or squashes the grid
       constexpr float kDefaultVel = 0.8f;
 
       uint64_t sPageUid = 0;
@@ -215,24 +217,11 @@ namespace app
 
       GraphNode* AddPage()
       {
-         const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas); // beside what is on screen, never on top of it
-         const float x = at.x, y = at.y;
          PushUndoCheckpoint("New Drum Page");
-         const bool wasSuppressed = gSuppressUndoCheckpoints;
-         gSuppressUndoCheckpoints = true;
-         GraphNode* drum = SpawnNode("Drum Sequencer", "Synths", x, y);
-         const uint64_t drumUid = drum ? drum->uid : 0;
-         GraphNode* out = SpawnNode("Audio Out", "Utility", x + 960.0f, y);
-         drum = FindNodeByUid(drumUid); // the spawn may move gNodes
-         if (drum && out)
-            WireInputSlot(*drum, *out, 0, 0);
-         gSuppressUndoCheckpoints = wasSuppressed;
-         RebuildAudioTopology();
+         // Just the sequencer: the owner wires it where it should sound (no Audio Out, no cable of our own).
+         GraphNode* drum = CanvasLink::Add("Drum Sequencer", "Synths");
          if (drum)
-         {
             sPageUid = drum->uid;
-            RevealSpawned({ drum->uid, out ? out->uid : 0 });
-         }
          return drum;
       }
 
@@ -749,8 +738,8 @@ namespace app
          GridGeom g;
          g.cols = paged ? kPageSteps : maxLen;
          g.x0 = p.x;
-         const float gaps = kCellGap * (float)(g.cols - 1) + kGroupGap * (float)((g.cols - 1) / 4);
-         g.cellW = std::max(6.0f, (w - gaps) / (float)g.cols);
+         (void)w;
+         g.cellW = kCellW;
          const int play = PlayStep(n);
          const float gridY = p.y + kRulerH;
          const float gridH = (float)kLanes * (rowH + kRowGap) - kRowGap;
@@ -1412,14 +1401,17 @@ namespace app
             const float dt = ImGui::GetIO().DeltaTime;
             for (int l = 0; l < kLanes; l++)
                sPadFlash[l] = std::max(0.0f, sPadFlash[l] - dt * 6.0f);
-            const bool inspector = avail.x >= kLabelW + kInspectorW + 240.0f;
-            const float inspW = inspector ? kInspectorW : 0.0f;
-            const float leftX1 = inspector ? bodyMax.x - inspW - tok::space_2 : bodyMax.x;
+            // A fixed desk: labels, a grid of fixed keys (16 a page) and the inspector right beside it, the same size at
+            // any panel width or height; a smaller panel shows less of it, a bigger one leaves room around it.
             const ImVec2 seqMin = bodyMin;
             const float seqH = bodyMax.y - seqMin.y;
             const float gridX0 = seqMin.x + kLabelW + tok::space_2;
-            // Rows follow the panel height the grip sets.
-            const float rowH = std::clamp((seqH - kRulerH - (float)(kLanes - 1) * kRowGap) / (float)kLanes, 14.0f, kRowH * 3.0f);
+            const int cols = kPageSteps;
+            const float gridW = (float)cols * kCellW + kCellGap * (float)(cols - 1) + kGroupGap * (float)((cols - 1) / 4);
+            const float leftX1 = gridX0 + gridW + tok::space_1;
+            const bool inspector = true;
+            const float inspW = kInspectorW;
+            const float rowH = kRowH;
             // What the panel needs around the grid, measured, so the layout can stop the panel at the grid's foot.
             gDrumPanelNaturalH = (gDrumPanelHeight - seqH) + kRulerH + (float)kLanes * kRowH + (float)(kLanes - 1) * kRowGap + 6.0f;
             DeskParts::Chassis(ImGui::GetWindowDrawList(), ImVec2(seqMin.x - 4.0f, seqMin.y - 4.0f), ImVec2(leftX1 + 4.0f, bodyMax.y));
@@ -1428,7 +1420,7 @@ namespace app
             DrawLabels(gn, n, seqMin, rowH, leftX1);
             DrawGrid(gn, n, ImVec2(gridX0, seqMin.y), leftX1 - gridX0, rowH);
             if (inspector)
-               DrawInspector(gn, n, ImVec2(bodyMax.x - inspW, bodyMin.y), ImVec2(inspW, bodyH));
+               DrawInspector(gn, n, ImVec2(leftX1 + tok::space_2 + 4.0f, bodyMin.y), ImVec2(inspW, bodyH));
          }
          gDrumClaimedKeys = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::GetIO().WantTextInput;
          DrawKeys(n);

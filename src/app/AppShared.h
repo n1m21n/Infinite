@@ -798,7 +798,7 @@ INode* MixerPageTop(INode* resolvedSource); // the Mixer behind a terminal's sou
 inline constexpr int kMixerMasterSlot = -1; // MixerPanelInsert*: the chain between the top Mixer and its Audio Out
 int MixerPanelPageCount();
 void MixerPanelSelectPage(int page);
-int MixerPanelAddPage();              // spawns a Mixer + Audio Out pair; returns the Mixer's node index
+int MixerPanelAddPage();              // spawns a lone Mixer (no Audio Out); returns its node index
 bool MixerPanelCreateFromAudioOuts(); // D13: wraps every Audio Out's source into one new Mixer
 int MixerPanelNewSendFx(int mixerIndex, int slot, const char* fxType); // B1: send bus -> effect -> return on the top Mixer
 // D4 inserts of one Mixer slot (signal order, node indices); each edit is one undo step. A shared chain (G4) refuses.
