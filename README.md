@@ -41,7 +41,7 @@ Start from a working patch instead of an empty canvas. 15 **Starters** each teac
 
 ![The Infinite node canvas](docs/screenshots/v1/node-graph.png)
 
-Everything is a node, and every cable carries one kind of thing: pictures, 3D geometry, audio, notes or control signals. Patch left to right, right-click to add, and anything with a dot beside it can be modulated. Infinite has **347 node types**; the [Node library](#node-library) lists them by domain, and the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf) covers most of them.
+Everything is a node, and every cable carries one kind of thing: pictures, 3D geometry, audio, notes or control signals. Patch left to right, right-click to add, and anything with a dot beside it can be modulated. Infinite has **372 node types** on macOS; the [Node library](#node-library) lists them by domain, and the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf) covers most of them.
 
 ### Pictures and video
 
@@ -67,7 +67,7 @@ Note sequencers, arpeggiator, chorder, quantizer and MIDI in and out on one side
 
 ### Node library
 
-Infinite has **347 node types**:
+Infinite has **372 node types** on macOS (377 are registered; five internal types are hidden from the spawn menu):
 
 | Domain | Key nodes |
 |---|---|
