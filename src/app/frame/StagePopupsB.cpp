@@ -279,7 +279,7 @@ void DrawPopupsB(FrameCtx& fc)
             ImGui::GetCurrentContext()->NavCursorVisible = false;  // no focus ring until the keyboard navigates
             searchJustOpened = false;
          }
-         LibraryParts::SearchField("nodepicker", T("search nodes..."), searchBuf, sizeof(searchBuf));
+         LibraryParts::SearchField("nodepicker", T("Search nodes"), searchBuf, sizeof(searchBuf));
          MenuParts::Separator();
 
          std::string q(searchBuf);
@@ -430,7 +430,7 @@ void DrawPopupsB(FrameCtx& fc)
                }
             }
             if (shown == 0)
-               ImGui::TextDisabled("%s", T("no matches"));
+               ImGui::TextDisabled("%s", T("No matches"));
          }
 
          if (!spawnName.empty())
