@@ -2104,9 +2104,9 @@ namespace
       if (MenuParts::Item(T("Join"), "J", false, any && s.doc.Count() > 1))
          JoinSelected();
       MenuParts::Separator();
-      if (MenuParts::Item(T("Copy"), "Cmd+C", false, any))
+      if (MenuParts::Item(T("Copy"), MODKEY "+C", false, any))
          CopySelected();
-      if (MenuParts::Item(T("Paste after"), "Cmd+V", false, s.clip.has_value()))
+      if (MenuParts::Item(T("Paste after"), MODKEY "+V", false, s.clip.has_value()))
          Paste();
       if (MenuParts::Item(T("Delete"), "Delete", false, any && (int)s.sel.size() < s.doc.Count()))
          DeleteSelected();
@@ -2927,7 +2927,7 @@ namespace
          TogglePlay();
       ImGui::EndDisabled();
       FormParts::Inline(0.0f, in);
-      if (IconChip("##studioRewind", IconsInfinite::Rewind, false, T("Return to Start (Enter)")))
+      if (IconChip("##studioRewind", IconsInfinite::Rewind, false, T("Return to Start")))
       {
          s.headFrame = -1.0;
          if (playing)

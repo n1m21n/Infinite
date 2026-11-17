@@ -2190,10 +2190,17 @@ namespace
          if (MenuParts::Item(T("Z"))) AlignSelected(scene, 2);
          ImGui::EndMenu();
       }
-      if (MenuParts::Item(T("Follow Active"), "Ctrl+P", false, sSel.size() > 1)) FollowActive(scene, false);
+      if (MenuParts::Item(T("Follow Active"), MODKEY "+P", false, sSel.size() > 1)) FollowActive(scene, false);
       if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any)) FollowActive(scene, true);
-      if (MenuParts::Item(T("Pose Mode"), "Ctrl+Tab", sPose.on, any || sPose.on)) TogglePose(scene);
-      if (MenuParts::Item(T("Sculpt Mode"), "Ctrl+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
+      // Cmd/Ctrl+Tab poses a rig and sculpts anything else, so the key shows on the row it runs.
+      bool rigSelected = false;
+      {
+         Mat4 world;
+         const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+         rigSelected = it != nullptr && PoseModel(*it, world) != nullptr;
+      }
+      if (MenuParts::Item(T("Pose Mode"), rigSelected ? MODKEY "+Tab" : nullptr, sPose.on, any || sPose.on)) TogglePose(scene);
+      if (MenuParts::Item(T("Sculpt Mode"), rigSelected ? nullptr : MODKEY "+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
       if (MenuParts::Item(T("Edit Mode"), "Tab", sEdit.on, any || sEdit.on)) ToggleEdit(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
       if (MenuParts::Item(T("Clear IK"), "Alt+I", false, sPose.on)) PoseIk(scene, true);

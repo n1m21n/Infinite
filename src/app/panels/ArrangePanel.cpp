@@ -1401,7 +1401,7 @@ namespace app
          if (rewindClicked)
             LaunchRequestRewind();
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Return to Start (Enter)"));
+            HelpTip("%s", T("Return to Start"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();

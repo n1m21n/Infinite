@@ -817,7 +817,7 @@ namespace
       case Tool::Draw: return T("Tool: Draw (P) - click to choose a tool");
       case Tool::Erase: return T("Tool: Erase (E) - click to choose a tool");
       case Tool::Blade: return T("Tool: Cut (B) - click to choose a tool");
-      case Tool::Mute: return T("Tool: Mute (0) - click to choose a tool");
+      case Tool::Mute: return T("Tool: Mute - click to choose a tool");
       case Tool::Hand: return T("Tool: Hand (H) - click to choose a tool");
       default: return T("Tool: Select (A) - click to choose a tool");
       }
@@ -850,7 +850,7 @@ namespace
          s.tool = Tool::Erase;
       if (MenuParts::Item(L("Cut"), "B", s.tool == Tool::Blade))
          s.tool = Tool::Blade;
-      if (MenuParts::Item(L("Mute"), "0", s.tool == Tool::Mute))
+      if (MenuParts::Item(L("Mute"), nullptr, s.tool == Tool::Mute))
          s.tool = Tool::Mute;
       if (MenuParts::Item(L("Hand"), "H", s.tool == Tool::Hand))
          s.tool = Tool::Hand;
