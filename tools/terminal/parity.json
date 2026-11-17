@@ -351,7 +351,22 @@
   "frame/StagePopupsA.cpp:Reset": "reset <node> <key>",
   "frame/StagePopupsA.cpp:Copy": "copy",
   "frame/StagePopupsA.cpp:Cut": "copy, then remove",
-  "frame/StagePopupsA.cpp:Add to 2D View": "view2d-add <node>"
+  "frame/StagePopupsA.cpp:Add to 2D View": "view2d-add <node>",
+  "frame/StageMenuBar.cpp:Clear Cards": "view clearcards",
+  "frame/StageMenuBar.cpp:Close Viewport": "panel viewport close",
+  "frame/StageMenuBar.cpp:Field Patcher": "panel fieldpatcher",
+  "frame/StageMenuBar.cpp:Mixer": "panel mixer",
+  "frame/StageMenuBar.cpp:Show Field Patcher": "panel fieldpatcher open",
+  "frame/StageMenuBar.cpp:Show Mixer": "panel mixer open",
+  "panels/ViewportPanel.cpp:Clear Cards": "view clearcards",
+  "panels/ViewportPanel.cpp:Close Viewport": "panel viewport close",
+  "panels/ViewportPanel.cpp:Dock Position": "panel viewport right|left|top|bottom",
+  "panels/MixerPanel.cpp:Close Mixer": "panel mixer close",
+  "panels/MixerPanel.cpp:Dock Position": "panel mixer right|left|top|bottom",
+  "panels/ModMatrixPanel.cpp:Close Mod Matrix": "panel modmatrix close",
+  "panels/ModMatrixPanel.cpp:Dock Position": "panel modmatrix right|left|top|bottom",
+  "panels/PerfPanel.cpp:Close Performance": "panel perf close",
+  "panels/PerfPanel.cpp:Colour Tint": "perf set <control> color=<rgb number>"
  },
  "skip": {
   "frame/StagePopupsA.cpp:Reference in chat": "puts the node in the chat box as an @ reference; an agent already names nodes with @",
@@ -440,6 +455,8 @@
   "panels/SettingsWindow.cpp:Tempo": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
   "panels/SettingsWindow.cpp:Playhead": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
   "panels/SettingsWindow.cpp:Loop": "plugin mode only, where the Terminal is hidden; picks whether the DAW or Infinite owns tempo, playhead and loop",
-  "panels/ArrangePanel.cpp:Blade": "a mouse tool mode (the B key picks it), not a command: it changes how the next drag cuts"
+  "panels/ArrangePanel.cpp:Blade": "a mouse tool mode (the B key picks it), not a command: it changes how the next drag cuts",
+  "panels/View2DPanel.cpp:Add font...": "opens the operating system file dialog to pick a font file; a file chooser is for a person",
+  "panels/PianoRollPanel.cpp:Blade": "mouse tool mode; verbs name notes by id"
  }
 }
