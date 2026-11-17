@@ -647,6 +647,7 @@ namespace app
       { I18N_KEY("Canvas & View"), I18N_KEY("Find"), MODKEY "+F", I18N_KEY("Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas (keys)"), "W / A / S / D", I18N_KEY("Hold to pan the canvas up / left / down / right. Not while a hovered audio keyboard node is using the letters") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Preview Views"), "1 / 3 / 7 / 0", I18N_KEY("With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Pick on Canvas"), "Click a node", I18N_KEY("After a panel's Pick on Canvas, click the node it should use; the canvas dims the nodes it cannot take. Esc or right-click cancels") },
       // Transport & Audio
       { I18N_KEY("Transport & Audio"), I18N_KEY("Play / Pause"), "Space", I18N_KEY("Start / pause timeline and animations") },
       { I18N_KEY("Transport & Audio"), I18N_KEY("Next / Previous Show Patch"), "PageDown / PageUp", I18N_KEY("Switch to the next or previous patch of the show set, on its launch grid. Works in a projector window too") },
