@@ -662,6 +662,7 @@ namespace app
       { I18N_KEY("Performance Matrix"), I18N_KEY("Duplicate Controls"), "Shift+D", I18N_KEY("Duplicate the selected controls") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Select All Controls"), MODKEY "+A", I18N_KEY("Select every control on the page") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Delete Controls"), "Delete / Backspace", I18N_KEY("Delete the selected controls; Esc clears the selection") },
+      { I18N_KEY("Performance Matrix"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
 
       // Sample Studio - every key but the panel toggle needs the pointer over the waveform
       { I18N_KEY("Sample Studio"), I18N_KEY("Sample Studio"), "Shift+W", I18N_KEY("Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform") },
@@ -673,6 +674,7 @@ namespace app
       { I18N_KEY("Sample Studio"), I18N_KEY("Delete Slices"), "Delete / Backspace", I18N_KEY("Delete the selected slices") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Studio Tools"), "A / B / H", I18N_KEY("Select, Blade and Hand (drag to pan); Esc also returns to Select") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Zoom Sample Studio"), "= / - / Keypad + / Keypad - / F / Z", I18N_KEY("Zoom in, zoom out, fit the sample, zoom to the selection") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Fit All"), "Shift+Z", I18N_KEY("Show the whole sample") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Previous / Next Slice"), "Left / Right", I18N_KEY("Select the neighbouring slice; with Shift, stretch (Right) or compact (Left) the selected slices") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Audition Slice"), "Q", I18N_KEY("Play the selected slice, or the one under the pointer") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Mute / Solo Slice"), "M / S", I18N_KEY("Mute or solo the selected slices") },
@@ -684,12 +686,17 @@ namespace app
       { I18N_KEY("Drums"), I18N_KEY("Accent / Erase"), "Alt+click / right-drag", I18N_KEY("Alt-click toggles an accent (full velocity); right-drag erases steps") },
       { I18N_KEY("Drums"), I18N_KEY("Step Page"), "Shift+click", I18N_KEY("Shift-click a step to open it on the Step page: velocity, chance, nudge and condition") },
       { I18N_KEY("Drums"), I18N_KEY("Fill"), "Hold FILL", I18N_KEY("Hold FILL to play Fill steps and mute !Fill steps; Shift-click latches it") },
+      { I18N_KEY("Drums"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
+
+      // Mixer
+      { I18N_KEY("Mixer"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
+      { I18N_KEY("Mixer"), I18N_KEY("Clear Solos"), "Alt+click S", I18N_KEY("Clear every solo on the console") },
 
       // Piano Roll
       { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Ruler"), "Click / Shift+drag", I18N_KEY("The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Generate Range"), "Alt+drag", I18N_KEY("Drag on the ruler with Alt held to mark the range Generate fills") },
-      { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / 0 / H", I18N_KEY("Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / H", I18N_KEY("Select, Draw, Erase, Cut and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Record MIDI"), "R", I18N_KEY("Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Mute Notes"), "0 / Keypad 0", I18N_KEY("Mute the selected notes, or the selected clips, or bring them back") },
       { I18N_KEY("Piano Roll"), I18N_KEY("Copy / Cut / Paste Notes"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original") },
@@ -712,6 +719,11 @@ namespace app
       { I18N_KEY("Field Patcher"), I18N_KEY("Add Box"), "Right-click / drag a wire to empty space", I18N_KEY("Search the boxes this page's node can run; a dropped wire connects the new box") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Delete Box or Wire"), "Delete", I18N_KEY("Remove the selected boxes or wires; the code updates as one undo step") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Restore Size"), "Esc", I18N_KEY("Return a maximised Field Patcher to its docked size") },
+      { I18N_KEY("Field Patcher"), I18N_KEY("Copy / Cut / Paste Boxes"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected boxes, or paste them") },
+      { I18N_KEY("Field Patcher"), I18N_KEY("Duplicate Boxes"), MODKEY "+D", I18N_KEY("Duplicate the selected boxes") },
+      { I18N_KEY("Field Patcher"), I18N_KEY("Select All Boxes"), MODKEY "+A", I18N_KEY("Select every box on the page") },
+      { I18N_KEY("Field Patcher"), I18N_KEY("Fit Page"), "Shift+Y", I18N_KEY("Frame every box on the page") },
+      { I18N_KEY("Field Patcher"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
 
       // Curve Editor
       { I18N_KEY("Curve Editor"), I18N_KEY("Curve Editor Panel"), "Shift+E", I18N_KEY("Show or hide the docked Curve Editor; it opens the MSEG node selected on the canvas") },
@@ -733,6 +745,7 @@ namespace app
       { I18N_KEY("Curve Editor"), I18N_KEY("Select All Points"), MODKEY "+A", I18N_KEY("Select every point") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Delete Points"), "Delete / Backspace", I18N_KEY("Delete the selected points; the two ends stay") },
       { I18N_KEY("Curve Editor"), I18N_KEY("Assign"), "Click a knob", I18N_KEY("After Assign, click a knob on the canvas to drive it with the curve; Shift keeps picking, Esc stops") },
+      { I18N_KEY("Curve Editor"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
 
       // Arrangement Timeline - these fire only while the timeline panel
       // owns the keyboard (click inside it) and no text field is active;
@@ -796,6 +809,9 @@ namespace app
       { I18N_KEY("2D View"), I18N_KEY("Zoom 2D View"), MODKEY "+= / " MODKEY "+-", I18N_KEY("Zoom in or out; {mod} or Alt with the wheel zooms at the pointer") },
       { I18N_KEY("2D View"), I18N_KEY("Nudge"), "Arrows / Shift+Arrows", I18N_KEY("Move the selection 1 or 10 pixels") },
       { I18N_KEY("2D View"), I18N_KEY("Duplicate Layer"), MODKEY "+J", I18N_KEY("Duplicate the active layer") },
+      { I18N_KEY("2D View"), I18N_KEY("Copy / Cut / Paste"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected layers, or the selected pixels, or paste them") },
+      { I18N_KEY("2D View"), I18N_KEY("Layer via Cut"), "Shift+" MODKEY "+J", I18N_KEY("Move the selected pixels to a new layer") },
+      { I18N_KEY("2D View"), I18N_KEY("Fill the Window"), MODKEY "+Shift+F", I18N_KEY("Grow the 2D View to fill the window, or put it back") },
       { I18N_KEY("2D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / Shift+" MODKEY "+G", I18N_KEY("Group the selected layers, or dissolve the group") },
       { I18N_KEY("2D View"), I18N_KEY("Clipping Mask"), "Alt+" MODKEY "+G", I18N_KEY("Clip the active layer to the layer below") },
       { I18N_KEY("2D View"), I18N_KEY("Arrange Layer"), MODKEY "+[ / " MODKEY "+]", I18N_KEY("Move the layer down or up; with Shift to the bottom or top") },
@@ -840,7 +856,9 @@ namespace app
       { I18N_KEY("3D View"), I18N_KEY("Edit Mode"), "Tab", I18N_KEY("On a mesh item: edit its points, edges and faces in an Edit Mesh node. Tab or Esc leaves") },
       { I18N_KEY("3D View"), I18N_KEY("Points / Edges / Faces"), "Keys 1 to 3", I18N_KEY("In Edit Mode: pick what a click selects. A selects all, Alt+A selects none") },
       { I18N_KEY("3D View"), I18N_KEY("Edit Operations"), "E / I / X", I18N_KEY("In Edit Mode: E extrudes, I insets, X or Delete deletes the selected faces. G, R and S move, turn and scale the selection") },
-      { I18N_KEY("3D View"), I18N_KEY("Pose Mode"), "Ctrl+Tab", I18N_KEY("On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves") },
+      { I18N_KEY("3D View"), I18N_KEY("Pose Mode"), MODKEY "+Tab", I18N_KEY("On a skinned Model 3D item: show its bones; click one to pick it. {mod}+Tab or Esc leaves") },
+      { I18N_KEY("3D View"), I18N_KEY("Sculpt Mode"), MODKEY "+Tab", I18N_KEY("On any other item: sculpt it with the brush. {mod}+Tab or Esc leaves") },
+      { I18N_KEY("3D View"), I18N_KEY("Fill the Window"), MODKEY "+Shift+F", I18N_KEY("Grow the 3D View to fill the window, or put it back") },
       { I18N_KEY("3D View"), I18N_KEY("Turn / Clear Bone"), "R / Alt+R", I18N_KEY("In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node") },
       { I18N_KEY("3D View"), I18N_KEY("Add / Clear IK"), "Shift+I / Alt+I", I18N_KEY("In Pose Mode: the picked bone reaches for the last other selected item (one more selected item is the pole), or clear the IK") },
       { I18N_KEY("3D View"), I18N_KEY("Weight Paint"), "W", I18N_KEY("In Pose Mode on an Armature: drag paints the picked bone's weight, Ctrl+drag removes it, [ and ] size the brush. Saved on the Armature node") },
@@ -860,6 +878,7 @@ namespace app
       { I18N_KEY("Chat"), I18N_KEY("Pick @ or /"), "Up / Down, Return", I18N_KEY("Move through the node or command list, then take the highlighted one. Esc closes it") },
       { I18N_KEY("Chat"), I18N_KEY("Attach from Clipboard"), MODKEY "+V", I18N_KEY("Paste copied files or a copied picture into the message; copied text still pastes as text") },
       { I18N_KEY("Chat"), I18N_KEY("Close Picture"), "Esc", I18N_KEY("Close a picture opened full size") },
+      { I18N_KEY("Chat"), I18N_KEY("Copy / Clear Selection"), "Ctrl+C / Esc", I18N_KEY("Copy the selected words of a message, or drop the selection") },
    };
 
    // The table as plain text for the agents (`infinite docs shortcuts`), English, this OS's keys.
