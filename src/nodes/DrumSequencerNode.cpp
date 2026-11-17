@@ -978,6 +978,8 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       v.Bool(name, laneSolo[lane]);
       snprintf(name, sizeof(name), "lane%d_choke", lane);
       v.Int(name, laneChoke[lane]);
+      snprintf(name, sizeof(name), "lane%d_kit", lane);
+      v.Bool(name, laneKit[lane]);
       snprintf(name, sizeof(name), "lane%d_accentPitch", lane);
       v.Float(name, laneAccentPitch[lane]);
       snprintf(name, sizeof(name), "lane%d_accentLevel", lane);
@@ -1053,6 +1055,7 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       std::string col = pageColor ? hex : "";
       v.Text("pagecolor", col);
       pageColor = col.empty() ? 0u : (unsigned int)(strtoul(col.c_str(), nullptr, 16) & 0xFFFFFFu);
+      v.Int("pageorder", pageOrder);
    }
    v.Int("patternPart", patternPart);
    v.Float("globalTransient", globalTransient);
@@ -1216,6 +1219,7 @@ bool DrumSequencerNode::TryLoadLane(int lane, const std::string& path, std::stri
 bool DrumSequencerNode::LoadFileToLane(int lane, const std::string& path)
 {
    lane = Clamp(lane);
+   laneKit[lane] = false;   // the user's own sample from now on (ReloadFromPaths puts the flag back)
    std::string error;
    if (TryLoadLane(lane, path, error))
       return true;
@@ -1306,10 +1310,12 @@ void DrumSequencerNode::ReloadFromPaths()
    // the user's trim settings on every reload and undo checkpoint.
    float savedStart[kNumLanes];
    float savedEnd[kNumLanes];
+   bool savedKit[kNumLanes];
    for (int lane = 0; lane < kNumLanes; lane++)
    {
       savedStart[lane] = laneStart[lane];
       savedEnd[lane] = laneEnd[lane];
+      savedKit[lane] = laneKit[lane];
    }
    for (int lane = 0; lane < kNumLanes; lane++)
    {
@@ -1318,6 +1324,7 @@ void DrumSequencerNode::ReloadFromPaths()
          LoadFileToLane(lane, laneFilePath[lane]);
          laneStart[lane] = savedStart[lane];
          laneEnd[lane] = savedEnd[lane];
+         laneKit[lane] = savedKit[lane];
       }
       else if (!laneFileName[lane].empty())
       {
@@ -1418,6 +1425,7 @@ void DrumSequencerNode::ClearLane(int lane)
    mAudioNode->PushBuffer(lane, new Platform::SampleBuffer());
    laneFilePath[lane].clear();
    laneFileName[lane].clear();
+   laneKit[lane] = false;
    laneStatus[lane] = "--";
    laneWaveCount[lane] = 0;
    lanePeaks[lane].Clear();
@@ -1623,7 +1631,9 @@ void DrumSequencerNode::LoadKitIntoEmptyLanes(const DrumPatterns::Part& part, co
       // Empty = nothing loaded AND no path to a sample that is merely
       // missing: a lane the user loaded (even one whose file has since moved)
       // is theirs and is never replaced.
-      if (part.lanes[lane] == nullptr || !laneFilePath[lane].empty() || !laneFileName[lane].empty())
+      // A lane a kit filled is the groove's to change; a lane the user loaded is never touched.
+      const bool fromKit = laneKit[lane] && !laneFilePath[lane].empty();
+      if (part.lanes[lane] == nullptr || (!fromKit && (!laneFilePath[lane].empty() || !laneFileName[lane].empty())))
          continue;
       std::string error; // a missing kit is silent: lane status stays "--"
       if (hasUser && !user[lane].path.empty() && TryLoadLane(lane, user[lane].path, error))
@@ -1631,11 +1641,22 @@ void DrumSequencerNode::LoadKitIntoEmptyLanes(const DrumPatterns::Part& part, co
          // The kit's loudness match (gain_db against the lane's 0.8 default; lane volume tops out at 1).
          laneVolume[lane] = std::clamp(0.8f * std::pow(10.0f, user[lane].gainDb / 20.0f), 0.0f, 1.0f);
          lanePitch[lane] = std::clamp(user[lane].tune, -24.0f, 24.0f);
-         filled[lane] = true;
+         filled[lane] = laneKit[lane] = true;
          continue;
       }
-      if (!gKitDir.empty())
+      if (!gKitDir.empty() && (!fromKit || laneFilePath[lane] != base + DrumPatterns::KitFile(lane)))
+      {
          filled[lane] = TryLoadLane(lane, base + DrumPatterns::KitFile(lane), error);
+         if (filled[lane])
+         {
+            laneKit[lane] = true;
+            if (fromKit)   // the last kit's level and tuning were for its own sample
+            {
+               laneVolume[lane] = 0.8f;
+               lanePitch[lane] = 0.0f;
+            }
+         }
+      }
    }
    // Closed hat (lane 2) cuts the open hat (lane 3) - only when this call put
    // both there and the user has not set a choke group on either.

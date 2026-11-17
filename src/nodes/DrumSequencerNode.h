@@ -220,6 +220,7 @@ public:
    // The Drums panel's page: its name (empty shows the node title) and colour as 0xRRGGBB (0 = none).
    std::string pageName;
    unsigned int pageColor = 0;
+   int pageOrder = 0; // place in the panel's page strip; ties keep canvas order
    int patternPart = 0; // 0 = A, 1 = B, 2 = C
    bool run = true;
 
@@ -287,6 +288,9 @@ private:
 
    std::string laneFilePath[kNumLanes];
    std::string laneFileName[kNumLanes];
+   // The lane's sample came from a kit (a groove filled it), not from the user: the next groove may swap it for
+   // its own genre's kit, as Logic's Drummer changes kit with the style. A sample the user loads clears it.
+   bool laneKit[kNumLanes] = {};
    std::string laneStatus[kNumLanes] = { "--", "--", "--", "--", "--", "--", "--", "--" };
    // Captured at load time, main thread - the decay coefficient scales to
    // this. Reading it here rather than reaching into the audio thread's

@@ -1204,6 +1204,8 @@ namespace app
       gViewportPanelDock = 1;
       gViewportPanelWidth = 320.0f;
       gViewportPanelHeight = 260.0f;
+      gPerfLayout = Patch::PerfLayoutRecord(); // a new patch starts with one empty Performance page
+      gPerfActivePage = 0;
       gNextIndex = 1;
       // Unlike gNextIndex, this does NOT restart: uids are only useful because
       // they are never reused, and a fresh document that started minting 1, 2,

@@ -291,6 +291,8 @@ namespace app
 
    void DrawArrangeClipSettingsChild(float panelW);
 
+   float ArrangeClipSettingsWidth(float maxW);
+
    // Defined beside the modulation apply loop below (the other caller), and
    // forward-declared here because the Clip Settings panel above builds its
    // Modulations list from it.

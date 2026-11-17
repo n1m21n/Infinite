@@ -177,6 +177,8 @@ std::string Change(const Patch::Data& before, const Patch::Data& after)
       return after.perfLayout.pageCount > before.perfLayout.pageCount ? "Performance: Add page" : "Performance: Remove page";
    if (before.perfLayout.pageNames != after.perfLayout.pageNames)
       return "Performance: Rename page";
+   if (before.perfLayout.pageColors != after.perfLayout.pageColors)
+      return "Performance: Colour page";
    if (before.perfLayout.cellSize != after.perfLayout.cellSize)
       return "Performance: Resize grid";
    if (before.palette.size() != after.palette.size())

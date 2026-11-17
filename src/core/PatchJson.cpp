@@ -67,7 +67,8 @@ namespace PatchJson
       out["perfLayout"] = {
          {"cellSize", data.perfLayout.cellSize},
          {"pageCount", data.perfLayout.pageCount},
-         {"pageNames", data.perfLayout.pageNames}
+         {"pageNames", data.perfLayout.pageNames},
+         {"pageColors", data.perfLayout.pageColors}
       };
 
       out["performance"] = json::array();
@@ -200,6 +201,7 @@ namespace PatchJson
          {
             out["streams"].back()["noteNodeUid"] = s.noteNodeUid;
             out["streams"].back()["scaleSnap"] = s.scaleSnap;
+            out["streams"].back()["pageOrder"] = s.pageOrder;
          }
       }
 

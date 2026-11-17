@@ -135,6 +135,7 @@ public:
    // The Mixer panel's page: its name (empty shows the node title) and colour as 0xRRGGBB (0 = none).
    std::string pageName;
    unsigned int pageColor = 0;
+   int pageOrder = 0; // place in the panel's page strip; ties keep canvas order
    // Channel names, set from the Mixer panel. Empty shows the source node's title.
    std::string chName[kMaxSlots];
    // Strip colour as 0xRRGGBB; 0 follows the source node's category colour.

@@ -359,7 +359,8 @@ static void WriteBody(std::ostream& file, const Data& data)
    }
    for (const GlobalRecord& g : data.globals)
       file << "glob " << g.name << " " << EscapeLine(g.expr) << "\n";
-   if (data.perfLayout.cellSize != 76 || data.perfLayout.pageCount > 1 || !data.perfLayout.pageNames.empty())
+   if (data.perfLayout.cellSize != 76 || data.perfLayout.pageCount > 1 || !data.perfLayout.pageNames.empty() ||
+       !data.perfLayout.pageColors.empty())
    {
       // Names go on their own `perfname` lines, one per page, rather than as
       // trailing tokens here. EscapeLine escapes backslashes and newlines but
@@ -370,6 +371,13 @@ static void WriteBody(std::ostream& file, const Data& data)
       file << "perfui " << data.perfLayout.cellSize << " " << data.perfLayout.pageCount << "\n";
       for (size_t i = 0; i < data.perfLayout.pageNames.size(); i++)
          file << "perfname " << i << " " << EscapeLine(data.perfLayout.pageNames[i]) << "\n";
+      for (size_t i = 0; i < data.perfLayout.pageColors.size(); i++)
+         if (data.perfLayout.pageColors[i] != 0)
+         {
+            char hex[16];
+            std::snprintf(hex, sizeof(hex), "%06X", data.perfLayout.pageColors[i] & 0xFFFFFFu);
+            file << "perfcolor " << i << " " << hex << "\n";
+         }
    }
    for (const HostParamRecord& h : data.hostParams)
       file << "hostparam " << h.slot << " " << h.dstIndex << " " << h.dstParam << "\n";
@@ -440,6 +448,9 @@ static void WriteBody(std::ostream& file, const Data& data)
          file << "streammix " << i << " " << (s.mute ? 1 : 0) << " " << (s.solo ? 1 : 0) << "\n";
       if (s.rowHeight != 0.0f)
          file << "streamrowheight " << i << " " << FloatToString(s.rowHeight) << "\n";
+      if (s.colorR + s.colorG + s.colorB > 0.0f) // 0,0,0 = no colour
+         file << "streamcolor " << i << " " << FloatToString(s.colorR) << " " << FloatToString(s.colorG) << " "
+              << FloatToString(s.colorB) << "\n";
       for (const ClipRecord& c : s.clips)
          if (c.blendMode > 0)
             file << "clipblend " << i << " " << c.id << " " << c.blendMode << "\n";
@@ -514,6 +525,8 @@ static void WriteBody(std::ostream& file, const Data& data)
             if (s.drumRows) file << " 1";
             file << "\n";
          }
+         if (s.pageOrder != 0)
+            file << "streampage " << i << " " << s.pageOrder << "\n";
          for (const ClipRecord& c : s.clips)
          {
             file << "clipmidi " << i << " " << c.id << " " << c.nextNoteId << " " << c.contentOffset << " "
@@ -934,6 +947,17 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          while (in >> nameToken)
             outData.perfLayout.pageNames.push_back(UnescapeLine(nameToken));
       }
+      else if (tag == "perfcolor")
+      {
+         int page = -1;
+         std::string hex;
+         if (in >> page >> hex && page >= 0 && page < 1024)
+         {
+            if ((int)outData.perfLayout.pageColors.size() <= page)
+               outData.perfLayout.pageColors.resize(page + 1, 0u);
+            outData.perfLayout.pageColors[page] = (unsigned int)(std::strtoul(hex.c_str(), nullptr, 16) & 0xFFFFFFu);
+         }
+      }
       else if (tag == "perfname")
       {
          int page = -1;
@@ -1151,6 +1175,19 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
              std::isfinite(rowHeight))
             outData.streams[streamIdx].rowHeight = rowHeight;
       }
+      else if (tag == "streamcolor")
+      {
+         int streamIdx = -1;
+         float r = 0.0f, g = 0.0f, b = 0.0f;
+         if (in >> streamIdx >> r >> g >> b && streamIdx >= 0 && streamIdx < (int)outData.streams.size() &&
+             std::isfinite(r) && std::isfinite(g) && std::isfinite(b))
+         {
+            StreamRecord& st = outData.streams[streamIdx];
+            st.colorR = std::clamp(r, 0.0f, 1.0f);
+            st.colorG = std::clamp(g, 0.0f, 1.0f);
+            st.colorB = std::clamp(b, 0.0f, 1.0f);
+         }
+      }
       else if (tag == "blendfix")
          sawBlendFix = true;
       else if (tag == "rev")
@@ -1332,6 +1369,12 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                   c.reverse = reverse != 0;
                }
          }
+      }
+      else if (tag == "streampage")
+      {
+         int streamIdx = -1, order = 0;
+         if (in >> streamIdx >> order && streamIdx >= 0 && streamIdx < (int)outData.streams.size())
+            outData.streams[streamIdx].pageOrder = order;
       }
       else if (tag == "streamnote")
       {

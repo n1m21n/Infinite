@@ -140,6 +140,7 @@ namespace app
          s.noteNodeUid = lane.noteNodeUid;
          s.scaleSnap = lane.scaleSnap;
          s.drumRows = lane.drumRows;
+         s.pageOrder = lane.pageOrder;
          for (const Arrange::Clip& c : lane.clips)
             s.clips.push_back(ArrangeClipToRecord(c));
          // Session slots ride in the same list, flagged by sessionScene.
@@ -240,6 +241,7 @@ namespace app
          lane.noteNodeUid = s.noteNodeUid;
          lane.scaleSnap = s.scaleSnap;
          lane.drumRows = s.drumRows;
+         lane.pageOrder = s.pageOrder;
          lane.blendMode = 0; // legacy lane-wide mode migrates onto each clip below
          lane.opacity = s.opacity;
          lane.gainDb = s.gainDb;
@@ -1578,7 +1580,27 @@ namespace app
       // would offer a link IsInputSlotCompatible then refuses.
       const bool srcIsPredictor = dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
 
+      // The answer depends only on what kind of source this is, so it is kept per kind: building every node type
+      // again on each cable drop cost a visible stall.
+      const unsigned kindKey = (srcIsModulator ? 1u : 0u) | (srcPalette != nullptr ? 2u : 0u) | (srcGeometry != nullptr ? 4u : 0u) |
+                               (dynamic_cast<MaterialNode*>(srcGeometry) != nullptr ? 8u : 0u) | (srcCamera != nullptr ? 16u : 0u) |
+                               (srcLight != nullptr ? 32u : 0u) | (srcIsEnvironment ? 64u : 0u) | (srcIsAudioNode ? 128u : 0u) |
+                               (srcIsNoteSource ? 256u : 0u) | (srcIsPredictor ? 512u : 0u);
+      static std::map<unsigned, std::vector<std::pair<std::string, std::string>>> sByKind;
+      static size_t sTypeCount = 0;
+      size_t typeCount = 0;
       for (const std::string& category : NodeFactory::Instance().GetCategories())
+         typeCount += NodeFactory::Instance().GetNodesInCategory(category).size();
+      if (typeCount != sTypeCount)   // a plugin or macro type registered since: start over
+      {
+         sByKind.clear();
+         sTypeCount = typeCount;
+      }
+      auto cached = sByKind.find(kindKey);
+      const bool have = cached != sByKind.end();
+      if (have)
+         result = cached->second;
+      for (const std::string& category : have ? std::vector<std::string>() : NodeFactory::Instance().GetCategories())
       {
          for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
          {
@@ -1606,6 +1628,9 @@ namespace app
                result.emplace_back(name, category);
          }
       }
+
+      if (!have)
+         sByKind[kindKey] = result;
 
       // Rank suggestions so the most useful downstream nodes appear first:
       // 1) domain-specific primary sinks (e.g. Output/Blend for video, Scene/Render for 3D, AudioOut for audio)

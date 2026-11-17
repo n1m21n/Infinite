@@ -737,6 +737,7 @@ void MixerNode::VisitParams(ParamVisitor& v)
       std::string col = pageColor ? hex : "";
       v.Text("pagecolor", col);
       pageColor = col.empty() ? 0u : (unsigned int)(strtoul(col.c_str(), nullptr, 16) & 0xFFFFFFu);
+      v.Int("pageorder", pageOrder);
    }
    std::string fade = std::to_string(snapFadeMs);
    v.Text("snapfade", fade);

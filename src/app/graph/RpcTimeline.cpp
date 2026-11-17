@@ -714,6 +714,8 @@ namespace app
                gPerfLayout.pageCount--;
                if (p < (int)gPerfLayout.pageNames.size())
                   gPerfLayout.pageNames.erase(gPerfLayout.pageNames.begin() + p);
+               if (p < (int)gPerfLayout.pageColors.size())
+                  gPerfLayout.pageColors.erase(gPerfLayout.pageColors.begin() + p);
                gPerfActivePage = std::min(gPerfActivePage, gPerfLayout.pageCount - 1);
             }
             else if (what == "duplicate" && gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages && p >= 0 && p < gPerfLayout.pageCount)
@@ -721,6 +723,8 @@ namespace app
                PushUndoCheckpoint();
                const int made = gPerfLayout.pageCount++;
                gPerfLayout.pageNames.push_back((p < (int)gPerfLayout.pageNames.size() ? gPerfLayout.pageNames[(size_t)p] : std::string("Page")) + " Copy");
+               gPerfLayout.pageColors.resize((size_t)made + 1, 0u);
+               gPerfLayout.pageColors[(size_t)made] = p < (int)gPerfLayout.pageColors.size() - 1 ? gPerfLayout.pageColors[(size_t)p] : 0u;
                for (size_t i = 0, n = gPerfElements.size(); i < n; i++)
                   if (gPerfElements[i].page == p)
                   {

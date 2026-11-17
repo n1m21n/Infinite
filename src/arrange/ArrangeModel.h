@@ -379,6 +379,7 @@ namespace Arrange
       uint64_t noteNodeUid = 0;
       bool     scaleSnap   = false;
       bool     drumRows    = false; // named drum rows instead of keys
+      int      pageOrder   = 0;     // Piano Roll page order (own order, not Timeline order); ties keep lane order
    };
 
    // A track group: a named, colored container for lanes AND other track
