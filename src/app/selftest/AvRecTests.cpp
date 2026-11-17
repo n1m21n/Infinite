@@ -500,6 +500,8 @@ void RunRecExportTest(int width, int height, bool starved, const char* label)
       Platform::RecorderSetTestQueueByteBudget(rec, 10ull * 1024 * 1024);
    }
 
+   printf("  [phase] recorder started, rendering %.0fs of take\n", kTakeSeconds);
+   fflush(stdout);
    const int blockFrames = (int)(kRate / kRenderFps);
    const long long renderSteps = (long long)(kRenderFps * kTakeSeconds);
    std::vector<float> block((size_t)blockFrames * 2);
@@ -607,6 +609,10 @@ void RunRecExportTest(int width, int height, bool starved, const char* label)
       return;
    }
 
+   // Phase markers are flushed so a run that is killed by its CI watchdog
+   // still says which step it was in (the Windows hang was silent).
+   printf("  [phase] render loop done, stopping recorder\n");
+   fflush(stdout);
    int wrote = 0;
    int dropped = 0;
    const bool stopped = Platform::RecorderStop(rec, error, &wrote, &dropped);
@@ -649,6 +655,8 @@ void RunRecExportTest(int width, int height, bool starved, const char* label)
    Platform::SampleBuffer audio;
    std::string audioErr;
    std::vector<double> audioOnsets;
+   printf("  [phase] decoding the movie's audio track\n");
+   fflush(stdout);
    if (!Platform::DecodeVideoAudioTrackToBuffer(path, audio, audioErr) || audio.numFrames <= 0)
    {
       printf("  [FAIL] could not decode the movie's audio track: %s\n", audioErr.c_str());
