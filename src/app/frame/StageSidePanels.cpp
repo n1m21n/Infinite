@@ -735,7 +735,7 @@ void DrawSidePanels(FrameCtx& fc)
       // Field Patcher (View > Field Patcher or Shift+F): boxes for Field nodes, bottom or top.
       if (gFieldPatcherOpen && gFieldPatcherDock == 0)
          DrawFieldPatcherDocked("##fieldpatcher_bottom", ImVec2(0, gFieldPatcherShownHeight));
-      // Terminal (View > Terminal or Ctrl+`) docked at the bottom; the other sides draw with their row.
+      // Terminal (View > Terminal or Cmd+` / Ctrl+`) docked at the bottom; the other sides draw with their row.
       if (TerminalDocked() && gTerminalDock == 0)
          DrawTerminalDocked("##terminal_bottom", ImVec2(0, gTerminalHeight));
       if (!gTerminalOpen)

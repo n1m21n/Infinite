@@ -215,7 +215,7 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_W, false))
          gSampleStudioOpen = !gSampleStudioOpen;
 
-      // Ctrl+` opens the Terminal, moves the keyboard to it, or closes it; physical Ctrl on every OS.
+      // Cmd+` on macOS, Ctrl+` elsewhere, opens the Terminal, moves the keyboard to it, or closes it.
 #if defined(__APPLE__)
       const bool terminalChord = io.KeySuper && !io.KeyCtrl && !io.KeyShift && !io.KeyAlt;
 #else

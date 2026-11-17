@@ -1816,7 +1816,7 @@ namespace app
             if (sRef == 0 || sRef == 2)
             {
                FormParts::Heading(T("The Terminal panel"));
-               ImGui::TextWrapped("%s", T("A real shell inside Infinite, opened from the chat header or with Ctrl+`. It starts in the patch's folder, and infinite is on its PATH. Drag a node or file in to type its id or path."));
+               ImGui::TextWrapped("%s", T("A real shell inside Infinite, opened from the chat header or with " MODKEY "+`. It starts in the patch's folder, and infinite is on its PATH. Drag a node or file in to type its id or path."));
                ImGui::Spacing();
             }
             if (sRef == 0 || sRef == 3)

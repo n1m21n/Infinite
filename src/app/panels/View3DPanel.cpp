@@ -5804,7 +5804,7 @@ namespace
       next();
       if (IconChip("##v3dgrid", IconsInfinite::GridDots, sGrid, T("Grid"))) sGrid = !sGrid;
       next();
-      if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
+      if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (" MODKEY "+`)"))) sOverlays = !sOverlays;
       ActionButton::RowNext();
       // Pinned right like the Sample Studio's Convert.
       const float rightX = startX + availW - 2.0f * kIconW - tok::space_1;
