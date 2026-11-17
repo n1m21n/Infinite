@@ -21,8 +21,19 @@ The audit below was written from source before any capture. Current state:
   - The build copy at `infinte-base/build/Infinite.app` was being recompiled by the build lane, so the pass used the
     release copy at `/private/tmp/claude-501/shotrun/Infinite.app` (2.0 release, built 22:02) instead.
   - The 2.0 shot plan has zero "d" entries.
-  Covered: none of the dropdown or context-menu IDs in section E below. Next step is to build the enum list from the
-  node source (`Draw*Params` enum controls) and run one launch per dropdown after the build lane is done.
+  Covered: none of the dropdown or context-menu IDs in section E below.
+- Dropdown option plan (source, not `--describe`): `tools/manual/dropdown_plan.json`, written by
+  `tools/manual/dropdown_plan.py` from `docs/node_param_audit.md` and the `DropdownButton` calls in
+  `src/app/bodies` (options read from literal lists, `Class::Names()` functions and namespace-scope constants in
+  `src/nodes` and `src/app`). 184 dropdowns on 204 audited nodes: 140 have their options resolved, 44 do not.
+  The 44 unresolved are lists built at runtime (e.g. `BlendModes::NamesFor()`, font, device, MIDI and file lists)
+  and are listed in the plan with `status: "unresolved"`. Caveats for the later capture run:
+  - `param_index` is the control's position among the node's audited controls. It has not been checked against the
+    runtime index that `INFINITE_GALLERYOPENDD` uses. Check one node before a batch.
+  - 24 registered node types have no `Draw*` function in the audit (3D Group/Null, Compositing Group/Null/Viewport,
+    some modulators and sources, Output). They have no plan entries.
+- Capture of the dropdowns themselves is a docs-only follow-up after the 2.0 release; manuals are not tied to the
+  binary.
 - Video In caption: kept in the manifest, but Video In has no card in the chapter list, so the caption does not appear
   in the PDF text yet (stated gap).
 
