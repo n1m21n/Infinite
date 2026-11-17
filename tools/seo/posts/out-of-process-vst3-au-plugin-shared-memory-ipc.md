@@ -13,7 +13,7 @@ status: published
 
 An out-of-process VST3 plugin keeps a modular audio-visual engine from crashing or stalling the host DAW. Recent open-source audio releases, from cross-platform CLAP/VST3/AU sample libraries like Floe to Rust-based workstations like Transit and browser AudioWorklet experiments, show how much engineering effort goes into keeping plugin hosts stable while running rich DSP and custom interfaces.
 
-When a plugin only runs a few biquad filters and draws sliders with a CPU canvas, living inside the DAW's address space is straightforward. When the plugin is an entire modular workstation with 377 nodes, 23 synthesisers, 29 audio effects, live GLSL shaders, and a 3D renderer, running in-process creates two immediate hazards: GPU context collisions with the host windowing system, and audio thread stalls if a dynamic graph or shader compilation hiccups.
+When a plugin only runs a few biquad filters and draws sliders with a CPU canvas, living inside the DAW's address space is straightforward. When the plugin is an entire modular workstation with 372 nodes, live GLSL shaders, and a 3D renderer, running in-process creates two immediate hazards: GPU context collisions with the host windowing system, and audio thread stalls if a dynamic graph or shader compilation hiccups.
 
 The [Infinite VST3 and AU plugin](https://infinitedevices.org/plugin.html) solves both problems by splitting the plugin into two OS processes: a minimal native shell loaded by the DAW, and a separate engine process that runs the node graph, DSP, and GPU rendering.
 

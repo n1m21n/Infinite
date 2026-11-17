@@ -16,7 +16,7 @@ Note on location: private plans moved to `internal/plans/` in `458a1dd3`. This f
 | | |
 |---|---|
 | What ships | **Infinite Instrument** (MIDI in, audio out) and **Infinite FX** (audio in, audio out), each as VST3 (macOS, Windows, Linux) and AU (macOS) |
-| Who it is for | The pre-order buyers on Paddle ($99, $79 with LAUNCH79) and every DAW user after them |
+| Who it is for | The pre-order buyers on Paddle ($149 list, $99 launch price) and every DAW user after them |
 | What "done" means | A pre-order buyer downloads, installs without a developer account workaround they cannot follow, drops in `license.inflic`, and plays an Infinite patch inside Logic, Ableton, Reaper, FL or Bitwig; the bounce sounds like the playback; the project reopens with the patch |
 | Pillar / release goal | Income (owner order income > reach > art > learning, 2026-10-11). Pre-order money is already taken: the release goal of this work is "deliver what was sold" |
 
@@ -806,7 +806,7 @@ Total: about 9-11 weeks wall clock, ~185 agent hours.
 
 | When | Step | Who |
 |---|---|---|
-| T-7 days | Real card purchase on live Paddle with LAUNCH79, key arrives, drops into the plugin and verifies | Owner (an agent never enters card details) |
+| T-7 days | Real card purchase on live Paddle at the $99 launch price, key arrives, drops into the plugin and verifies | Owner (an agent never enters card details) |
 | T-7 days | Refund that purchase in Paddle; check the id appears in `GET /api/license/revoked`; plugin shows "This key was refunded" after a cache clear | Owner + agent checks |
 | T-5 days | Real x64 Windows PC run (8.8) | Owner or beta tester |
 | T-3 days | `release-notes-audit`; plugin help text in the four help tables (`project_node_help_coverage`) | Agent |

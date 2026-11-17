@@ -33,7 +33,7 @@
       for (var j = 0; j < s.n; j++) {
         var yy = s.y - j * S; if (yy < -S || yy > H + S) continue;
         if (s.c[j] === undefined || Math.random() < 0.02) s.c[j] = Math.random() < 0.5 ? '0' : '1';
-        cx.fillStyle = j === 0 ? 'rgba(124,138,255,' + (0.9 * k) + ')' : 'rgba(124,138,255,' + (0.5 * k * (1 - j / s.n)) + ')';
+        cx.fillStyle = j === 0 ? 'rgba(167, 177, 255,' + (0.9 * k) + ')' : 'rgba(167, 177, 255,' + (0.5 * k * (1 - j / s.n)) + ')';
         cx.fillText(s.c[j], s.x, yy);
       }
     }
