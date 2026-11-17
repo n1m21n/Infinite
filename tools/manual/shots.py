@@ -42,7 +42,14 @@ def _dims(tid):
     return _size[tid]
 
 
-def find(name):
+_CAT_NAMES = set(CATS.values())
+
+
+def find(name, cat=None):
+    """Pictures for a guide name. A name that exists in two categories (Invert, Transform) needs cat; without it
+    the lookup returns nothing for them rather than the other category's picture."""
+    if cat and f"{name} ({cat})" in _files:
+        return [(f"{name} ({cat})", _files[f"{name} ({cat})"]) + _dims(f"{name} ({cat})")]
     ids = ALIASES.get(name) or [name]
     out = []
     for i in ids:
@@ -58,4 +65,9 @@ def all_shots():
 
 
 def category(tid):
-    return CATS.get(tid, "Other")
+    if tid in CATS:
+        return CATS[tid]
+    m = re.match(r"^(.+) \(([^()]+)\)$", tid)
+    if m and m.group(2) in _CAT_NAMES:
+        return m.group(2)  # category-suffixed picture, e.g. "Invert (Modulators)"
+    return "Other"

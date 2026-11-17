@@ -405,7 +405,8 @@ def shots(items):
     files = {NORM(f[:-4]): f for f in os.listdir(src) if f.endswith(".png")}
     out = os.path.join(W, "assets/nodes/hd")
     for it in items:
-        f = files.get(NORM(it["type"])) or files.get(NORM(it["name"]))
+        # Category first: Invert (Modulators) and invert (Compositing) are separate pictures; the plain name is for the rest.
+        f = files.get(NORM(f"{it['name']} ({it['cat']})")) or files.get(NORM(it["type"])) or files.get(NORM(it["name"]))
         if not f:
             it["shot"] = None; continue
         fs = re.sub(r"[^a-z0-9]+", "-", f[:-4].lower()).strip("-")
