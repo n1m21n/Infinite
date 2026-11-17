@@ -2698,15 +2698,15 @@ prints the open patch, the selection and any code errors in one answer.
 | Group | Verbs |
 |---|---|
 | Look | `graph`, `explain`, `params`, `selection`, `status`, `nodes`, `describe` |
-| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d` |
+| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `reset`, `mod`, `mod clear`, `mod curve`, `expr`, `bypass`, `batch`, `undo`, `redo`, `select`, `focus`, `copy`, `paste`, `duplicate`, `group`, `ungroup`, `view3d-add`, `view2d-add`, `view2d` |
 | Patch | `new`, `recent`, `open`, `save`, `import`, `files`, `reveal`, `validate`, `canonicalize`, `apply` |
 | Play | `play`, `stop`, `rewind`, `seek`, `tempo` |
-| Timeline | `timeline` prints it all; `timeline track`, `clip`, `marker`, `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
+| Timeline | `timeline` prints it all; `timeline track`, `clip` (`copy`, `paste`, `duplicate ... selection=true`, `split <id> playhead`, `inspect`), `marker` (`color <id> RRGGBB`), `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
 | Session | `session scene`, `launch`, `launchrow`, `stop`, `add`, `insert`, `duplicatescene`, `deletescene`, `send`, `sceneset`, `slot`, `place`, `duplicate`, `clear`, `copy`, `paste`, `cut`, `quantize` |
 | Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>`, `export <clip>`, `generate <type> [key=value]` |
 | Performance Matrix | `perf get`, `add <kind> [label]`, `remove`, `assign`, `clear`, `unmidi`, `set`, `edit`, `page add|go|rename|delete|duplicate` |
 | Make | `studio generate <part> [bars=n]`, `studio status|export|node <type>|get|set` |
-| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library list|add|remove|refresh` |
+| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset|drum|mixer`, `library list|add|remove|refresh` (`drum open|close|dock|lanes|fill|grooves|groove|folder`) |
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
@@ -2742,7 +2742,8 @@ end
 cable <dst> <slot> <src>    image wire
 geo   <dst> <slot> <src>    geometry, camera or light wire
 aud   <dst> <slot> <src>    audio wire
-note  <dst> <slot> <src>    note wire
+)AGENTDOC"
+R"AGENTDOC(note  <dst> <slot> <src>    note wire
 mod   <dst> <key> <src> <srcOutput> <polarity> <depth> <centre> [<lo> <hi>]
 expr  <dst> <key> <expression>
 glob  <name> <expression>
@@ -2750,8 +2751,7 @@ glob  <name> <expression>
 
 Rules worth remembering:
 
-)AGENTDOC"
-R"AGENTDOC(- **Wires read destination first.** `cable out 0 shape` means "Output slot 0 is fed by shape".
+- **Wires read destination first.** `cable out 0 shape` means "Output slot 0 is fed by shape".
 - **Names work everywhere.** Use a node's `id` instead of its number, a slot's name (`input`, `input_2`) instead of its position, and a control's key in `mod` and `expr`.
 - **Leave defaults out.** A node needs only the keys it changes.
 - **Free text goes last** on its line.

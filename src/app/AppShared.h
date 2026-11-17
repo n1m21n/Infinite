@@ -6036,6 +6036,8 @@ extern ImVec2 gDrumPanelRectMin, gDrumPanelRectMax;
 void DrawDrumPanelDocked(const char* id, const ImVec2& size);
 // Opens the panel on this Drum Sequencer's page.
 void DrumPanelShowNode(int nodeIndex);
+// The terminal's node <node> drum ...: the panel's Tools, dock, close and groove items on this node.
+bool DrumPanelRun(int nodeIndex, const std::string& what, const std::string& arg, nlohmann::json& outResult, std::string& outError);
 extern bool gView3DOpen;
 extern float gView3DHeight;
 extern int gView3DDock; // 0 bottom, 1 right, 2 left, 3 top, 4 fill (the canvas is hidden)

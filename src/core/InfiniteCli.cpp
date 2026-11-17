@@ -1125,7 +1125,7 @@ Look     graph [p.inf]  explain [p.inf]  params <node> [--full]  selection  stat
 Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disconnect <dst[:slot]>
          set <node> <key> <value>  reset <node> <key>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>  mod curve <dst> <key> <-1..1>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
-         select <node>...|all|none  focus <node>  copy  paste  duplicate  group  ungroup  view3d-add <node>...
+         select <node>...|all|none  focus <node>  copy  paste  duplicate  group  ungroup  view3d-add <node>...  view2d-add <node>...
          view2d layers|fields|'<json call or [calls]>'|-   (one gated batch, one undo step)
 Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  import <file>... [into <node>]  files <words>  reveal <file>  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
 Play     play  stop  rewind  seek <seconds>  tempo <bpm>
@@ -1612,6 +1612,14 @@ map, and the visual, sound and film crafts.
          for (const std::string& node : args)
             nodes.push_back(NodeRef(node));
          return call("edit", { { "action", "view3d-add" }, { "nodes", nodes } });
+      }
+      if (verb == "view2d-add")
+      {
+         need(1, "view2d-add <node>...");
+         json nodes = json::array();
+         for (const std::string& node : args)
+            nodes.push_back(NodeRef(node));
+         return call("edit", { { "action", "view2d-add" }, { "nodes", nodes } });
       }
       if (verb == "view2d")
       {
