@@ -15,7 +15,7 @@ P = "src/app/panels/"
 GROUND = {
     "##nodecontext": ("src/app/frame/StagePopupsA.cpp", "TouchDesigner node", {
         "Rename": "Rename", "Duplicate": "Duplicate", "Bypass": "Bypass Node", "Delete": "Delete Node",
-        "Viewer": "Show viewport", "Help": "Help", "Copy": "Copy", "Cut": None}),
+        "Viewer": "Show viewport", "Help": "Help", "Copy": "Copy", "Cut": "Cut"}),
     "##sessionslotctx": (P + "ArrangeSessionGrid.cpp", "Ableton Session slot", {
         "Insert clip": "Add Clip", "Paste": "Paste", "Stop": "Stop Track", "Launch": "Launch Row in Group"}),
     "##sessionscenectx": (P + "ArrangeSessionGrid.cpp", "Ableton Session scene", {
@@ -23,17 +23,17 @@ GROUND = {
         "Delete": "Delete Scene", "Stop": "Stop Scene", "Follow action": "Then Play Next Scene"}),
     "##sessiontrackctx": (P + "ArrangeSessionGrid.cpp", "Ableton Session track", {
         "Insert Audio Track": "Add Audio Track", "Group Tracks": "Group This Track", "Ungroup": "Ungroup Track",
-        "Stop": "Stop Track", "Delete": "Delete Track", "Rename": None, "Duplicate": None}),
+        "Stop": "Stop Track", "Delete": "Delete Track", "Rename": "Rename Track", "Duplicate": "Duplicate Track"}),
     "##arrangeclipctx": (P + "ArrangePanel.cpp", "Ableton Arrangement / Premiere clip", {
         "Rename": "Rename", "Colour": "Colour Tint", "Copy": "Copy", "Duplicate": "Duplicate",
         "Split": "Split at Playhead", "Group": "Group", "Ungroup": "Ungroup", "Delete": "Delete",
-        "Enable": "Active", "Blend mode": "Blend Mode", "Clip properties": "Clip Settings", "Cut": None}),
+        "Enable": "Active", "Blend mode": "Blend Mode", "Clip properties": "Clip Settings", "Cut": "Cut"}),
     "##arrangelanectx": (P + "ArrangePanel.cpp", "Ableton Arrangement track", {
         "Rename": "Rename Track", "Delete": "Delete Track", "Insert Audio Track": "Add Audio Track",
-        "Group Tracks": "Group Selected", "Freeze / Bounce": "Render Track", "Duplicate": None}),
+        "Group Tracks": "Group Selected", "Freeze / Bounce": "Render Track", "Duplicate": "Duplicate Track"}),
     "##arrangegroupctx": (P + "ArrangePanel.cpp", "Ableton Arrangement group", {
         "Rename": "Rename Group", "Duplicate": "Duplicate Group", "Deactivate": "Toggle Enabled",
-        "Bounce": "Render Group", "Ungroup": None}),
+        "Bounce": "Render Group", "Ungroup": "Ungroup (Keep Tracks)"}),
     "##arrangemarkerctx": (P + "ArrangePanel.cpp", "Ableton locator / Premiere marker", {
         "Rename": "Rename", "Colour": "Colour", "Delete": "Delete Marker"}),
     "##arrangeemptyspacectx": (P + "ArrangePanel.cpp", "Ableton Arrangement empty space", {

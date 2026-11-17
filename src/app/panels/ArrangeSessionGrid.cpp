@@ -64,6 +64,8 @@ namespace app
       int sCtxRow = -1;
       bool sClipCtxRequest = false;
       uint64_t sTrackCtxLaneId = 0;
+      uint64_t sTrackRenameLaneId = 0;   // the track header showing its name field
+      char sTrackNameBuf[64] = {};
       constexpr float kAddColW = 40.0f;
 
       void AddTrackOfType(int type)
@@ -105,6 +107,13 @@ namespace app
             if (MenuParts::Item(L("Stop Track"), nullptr, false, ArrangeSessionLaneQuery(lid).playingSlot >= 0))
                ArrangeSessionStopLane(lid);
             MenuParts::Separator();
+            if (MenuParts::Item(L("Rename Track"), T("Double-click")))
+            {
+               sTrackRenameLaneId = lid;
+               snprintf(sTrackNameBuf, sizeof(sTrackNameBuf), "%s", l->name.c_str());
+            }
+            if (MenuParts::Item(L("Duplicate Track")))
+               ArrangeEdit([&]() { Arrange::DuplicateLane(gArrange, lid); });
             if (MenuParts::Item(L("Delete Track")))
             {
                ArrangeSessionStopLane(lid);
@@ -643,6 +652,8 @@ namespace app
          const std::string name = lane.name.empty() ? (lane.type == Arrange::kLaneVideo ? T("Video") : T("Audio"))
                                                     : lane.name;
          const float th = ImGui::GetTextLineHeight();
+         if (lane.id == sTrackRenameLaneId)
+            continue;
          dl->PushClipRect(a, ImVec2(b.x - 4.0f, b.y), true);
          dl->AddText(ImVec2(a.x + 9.0f, (a.y + b.y - th) * 0.5f),
                      Arrange::LaneEffectivelyEnabled(gArrange, lane) ? TextCol(0.92f) : TextCol(0.40f), name.c_str());
@@ -661,10 +672,44 @@ namespace app
          if (ImGui::IsItemHovered() && sTrackDragFrom < 0)
             HelpTip("%s", T("Drag to reorder tracks. Right-click for more."));
          ImGui::PopID();
+         const uint64_t hdrLaneId = gArrange.lanes[(size_t)li].id;
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         {
+            sTrackRenameLaneId = hdrLaneId;
+            snprintf(sTrackNameBuf, sizeof(sTrackNameBuf), "%s", gArrange.lanes[(size_t)li].name.c_str());
+         }
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          {
-            sTrackCtxLaneId = gArrange.lanes[(size_t)li].id;
+            sTrackCtxLaneId = hdrLaneId;
             ImGui::OpenPopup("##sessiontrackctx");
+         }
+         if (hdrLaneId == sTrackRenameLaneId)
+         {
+            static uint64_t sFocused = 0;
+            ImGui::SetCursorScreenPos(ImVec2(x0 + kGap + 4.0f, o.y + kGap + 3.0f));
+            ImGui::SetNextItemWidth(std::max(20.0f, colW - 2.0f * kGap - 8.0f));
+            if (sFocused != hdrLaneId)
+            {
+               ImGui::SetKeyboardFocusHere();
+               sFocused = hdrLaneId;
+            }
+            const bool commit = FieldWell::InputText("##sessrenametrack", sTrackNameBuf, sizeof(sTrackNameBuf),
+                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+            if (commit || ImGui::IsItemDeactivated())
+            {
+               const std::string newName = sTrackNameBuf;
+               if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+                  ArrangeEdit([&]() {
+                     if (Arrange::Lane* ln = Arrange::FindLane(gArrange, hdrLaneId))
+                        if (ln->name != newName)
+                        {
+                           ln->name = newName;
+                           gArrange.revision++;
+                        }
+                  });
+               sTrackRenameLaneId = 0;
+               sFocused = 0;
+            }
          }
       }
       {
@@ -1995,11 +2040,12 @@ namespace app
 std::string ArrangeSessionTestFingerprint()
 {
    return (sSlotClip.has ? "slotclip:" + std::to_string((int)sSlotClip.laneType) : std::string("slotclip:-")) +
-          " timelineclip:" + std::to_string(gArrangeClipboard.items.size());
+          " timelineclip:" + std::to_string(gArrangeClipboard.items.size()) + " trackrename:" + std::to_string(sTrackRenameLaneId);
 }
 void ArrangeSessionTestReset()
 {
    sSlotClip = {};
+   sTrackRenameLaneId = 0;
    gArrangeClipboard = {};
    gArrangeSel.clear();
 }
