@@ -26,6 +26,7 @@ namespace
       const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(out);
       const bool srcIsNoteSource = dynamic_cast<INoteSource*>(n) != nullptr;
       const bool srcIsPredictor = dynamic_cast<IPredictor*>(n) != nullptr;
+      const bool srcIsShade = IsShadeSource(n);
       if (GraphNode::IsParamPin(pin))
       {
          const int param = GraphNode::ParamIndexFromPin(pin);
@@ -37,7 +38,7 @@ namespace
       if (GraphNode::IsInputPin(pin))
          return IsInputSlotCompatible(dst, GraphNode::InputSlotFromPin(pin), srcIsModulator, srcPalette, srcGeometry,
                                        srcCamera, srcLight, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource,
-                                       srcIsPredictor);
+                                       srcIsPredictor, srcIsShade);
       return false;
    }
 
@@ -391,6 +392,7 @@ void DrawLinks(FrameCtx& fc)
                                              dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
                 const bool srcIsPredictor = srcNode != nullptr &&
                                             dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
+                const bool srcIsShade = srcNode != nullptr && IsShadeSource(srcNode->node.get());
 
                bool valid = false;
                const char* rejectReason = nullptr;
@@ -426,7 +428,7 @@ void DrawLinks(FrameCtx& fc)
                      valid = IsInputSlotCompatible(dstNode, GraphNode::InputSlotFromPin(b),
                                                     srcIsModulator, srcPalette, srcGeometry, srcCamera,
                                                     srcLight, srcIsEnvironment,
-                                                    srcIsAudioNode, srcIsNoteSource, srcIsPredictor);
+                                                    srcIsAudioNode, srcIsNoteSource, srcIsPredictor, srcIsShade);
                      if (valid && srcIsAudioNode &&
                          WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
                      {

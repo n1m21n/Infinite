@@ -2708,12 +2708,15 @@ void ArrangeRespawnCloneNode(uint64_t clipId);
 
 void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src, int srcOutput = 0);
 
+// True for a Shade node (the field-expression family). Callers pass it as srcIsShade.
+bool IsShadeSource(const INode* n);
+
 bool IsInputSlotCompatible(GraphNode* dstNode, int slot,
                                bool srcIsModulator, IPaletteSource* srcPalette,
                                IGeometrySource* srcGeometry, CameraNode* srcCamera,
                                LightNode* srcLight,
                                bool srcIsEnvironment, bool srcIsAudioNode, bool srcIsNoteSource,
-                               bool srcIsPredictor);
+                               bool srcIsPredictor, bool srcIsShade);
 
 void WireInputSlot(GraphNode& srcNode, GraphNode& dstNode, int slot, int srcOutputIndex = 0);
 
