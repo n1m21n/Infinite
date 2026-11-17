@@ -1412,15 +1412,22 @@ namespace
       }
       if (plain && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
          DeleteSelection(n);
-      static const ImGuiKey kNum[] = { ImGuiKey_1, ImGuiKey_2, ImGuiKey_3, ImGuiKey_4, ImGuiKey_5 };
-      for (int i = 0; i < 5 && plain; i++)
-         if (ImGui::IsKeyPressed(kNum[i], false))
+      if (plain)
+      {
+         int numPick = -1;
+         if (ImGui::IsKeyPressed(ImGuiKey_1, false)) numPick = 0;
+         else if (ImGui::IsKeyPressed(ImGuiKey_2, false)) numPick = 1;
+         else if (ImGui::IsKeyPressed(ImGuiKey_3, false)) numPick = 2;
+         else if (ImGui::IsKeyPressed(ImGuiKey_4, false)) numPick = 3;
+         else if (ImGui::IsKeyPressed(ImGuiKey_5, false)) numPick = 4;
+         if (numPick >= 0)
          {
             if (io.KeyShift)
-               SetHandle(n, i);
-            else if (i < ModShapes::kInterpCount)
-               SetInterp(n, i);
+               SetHandle(n, numPick);
+            else if (numPick < ModShapes::kInterpCount)
+               SetInterp(n, numPick);
          }
+      }
       if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false))
       {
          s.sel.clear();

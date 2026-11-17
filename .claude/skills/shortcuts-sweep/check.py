@@ -28,7 +28,7 @@ KEY_ALIASES = {
     "left": "LeftArrow", "right": "RightArrow", "up": "UpArrow", "down": "DownArrow",
     "home": "Home", "end": "End", "pagedown": "PageDown", "pageup": "PageUp",
     "=": "Equal", "-": "Minus", ".": "Period",
-    "`": "GraveAccent", "period": "Period", "comma": "Comma", "f2": "F2", "f12": "F12",
+    "`": "GraveAccent", "period": "Period", "comma": "Comma", "f2": "F2", "f5": "F5", "f12": "F12",
     "[": "LeftBracket", "]": "RightBracket", ";": "Semicolon", "'": "Apostrophe",
 }
 
