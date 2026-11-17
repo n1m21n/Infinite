@@ -1635,26 +1635,55 @@ namespace
    }
 
    // Drops every other selected item, in list order.
+   // A group counts as one: its members select together.
+   int UnitKey(const Item& it) { return it.group != 0 ? -it.group : it.id; }
+   int SelectedUnits(Scene3DNode* scene)
+   {
+      std::vector<int> seen;
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+            if (std::find(seen.begin(), seen.end(), UnitKey(*it)) == seen.end())
+               seen.push_back(UnitKey(*it));
+      return (int)seen.size();
+   }
+
+   // Keeps every other selected item, a group counting as one.
    void SelectChecker(Scene3DNode* scene)
    {
-      std::vector<int> now;
-      int n = 0;
+      std::vector<int> keep, now;
       for (const Item& it : scene->Items())
-         if (Selected(it.id) && (n++ % 2) == 0)
-            now.push_back(it.id);
+         if (Selected(it.id))
+         {
+            const int k = UnitKey(it);
+            auto at = std::find(keep.begin(), keep.end(), k);
+            if (at == keep.end())
+            {
+               keep.push_back(k);
+               at = keep.end() - 1;
+            }
+            if (((at - keep.begin()) % 2) == 0)
+               now.push_back(it.id);
+         }
       sSel = now;
    }
 
-   // Adds whatever shares a group with the selection.
+   // Adds what shows the same node as the selection (duplicates), and what shares a group with it.
    void SelectLinked(Scene3DNode* scene)
    {
       std::vector<int> groups;
+      std::vector<uint64_t> uids;
       for (int id : sSel)
          if (const Item* it = scene->FindItem(id))
+         {
             if (it->group != 0)
                groups.push_back(it->group);
+            if (it->uid != 0)
+               uids.push_back(it->uid);
+         }
       for (const Item& it : scene->Items())
-         if (Pickable(scene, it) && !Selected(it.id) && std::find(groups.begin(), groups.end(), it.group) != groups.end())
+         if (Pickable(scene, it) && !Selected(it.id) &&
+             ((it.group != 0 && std::find(groups.begin(), groups.end(), it.group) != groups.end()) ||
+              (it.uid != 0 && std::find(uids.begin(), uids.end(), it.uid) != uids.end())))
             sSel.insert(sSel.begin(), it.id);
    }
 
@@ -2097,7 +2126,7 @@ namespace
       if (MenuParts::Item(T("Invert"), MODKEY "+I")) SelectInvert(scene);
       MenuParts::Separator();
       if (MenuParts::Item(T("Select Random"))) SelectRandom(scene, 0.5f);
-      if (MenuParts::Item(T("Checker Deselect"), nullptr, false, sSel.size() > 1)) SelectChecker(scene);
+      if (MenuParts::Item(T("Checker Deselect"), nullptr, false, SelectedUnits(scene) > 1)) SelectChecker(scene);
       MenuParts::Separator();
       if (MenuParts::Item(T("Select Linked"), nullptr, false, any)) SelectLinked(scene);
       if (MenuParts::Item(T("Select Same Type"), nullptr, false, any)) SelectSameType(scene);
@@ -2232,7 +2261,9 @@ namespace
          PoseArmature(scene)->ClearPaint();
       }
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
-      if (MenuParts::Item(T("Paste Transform"), nullptr, false, any)) PasteGlobalTransform(scene);
+      const char* clip = ImGui::GetClipboardText();
+      const bool hasTransform = clip != nullptr && strncmp(clip, "infinite-transform ", 19) == 0;
+      if (MenuParts::Item(T("Paste Transform"), nullptr, false, any && hasTransform)) PasteGlobalTransform(scene);
       if (MenuParts::Item(T("Randomize Transform"), nullptr, false, any)) RandomizeTransform(scene);
       if (MenuParts::Item(T("Move to Mouse"), nullptr, false, any)) MoveToMouse(scene);
       MenuParts::Separator();
@@ -8463,10 +8494,11 @@ void View3DTestPose()
    std::copy(pos, pos + 3, it.pos);
    std::copy(rot, rot + 3, it.rot);
    std::copy(sc, sc + 3, it.scale);
-   // Items 1 and 2 (when there) are grouped, so Select Linked has something to add.
+   // Items 0 and 1 (when there) are grouped; item 2 shows item 0's node, so Select Linked has a duplicate to add.
    if (scene->Items().size() >= 3)
    {
       scene->Items()[0].group = scene->Items()[1].group = 7001;
+      scene->Items()[2].uid = scene->Items()[0].uid;
       scene->Items()[1].pos[0] = -1.5f;
       scene->Items()[2].pos[0] = 2.5f;
    }
@@ -8487,6 +8519,7 @@ void View3DTestPose()
    sPose = {};
    sEdit.on = false;
    sSculpt.on = false;
+   ImGui::SetClipboardText("");   // a copy shows as a change even when an earlier click copied the same text
 }
 
 std::string View3DTestFingerprint()
@@ -8510,6 +8543,8 @@ std::string View3DTestFingerprint()
             sLockActive ? 1 : 0);
    f += b;
    f += " go" + std::to_string(sGoToNode);
+   snprintf(b, sizeof b, " cur%.4f,%.4f,%.4f", sSet->cursor[0], sSet->cursor[1], sSet->cursor[2]);
+   f += b;
    if (const char* clip = ImGui::GetClipboardText())
       f += std::string(" clip:") + clip;
    return f;
