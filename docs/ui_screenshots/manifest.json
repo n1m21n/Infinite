@@ -70,6 +70,13 @@
    "kind": "ui",
    "width": 3200
   },
+  "menu_show_set": {
+   "app": "",
+   "file": "menu_show_set.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
   "panel_history_big": {
    "app": "",
    "file": "panel_history_big.png",
@@ -220,6 +227,13 @@
   "settings_terminal": {
    "app": "",
    "file": "settings_terminal.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "transport": {
+   "app": "",
+   "file": "transport.png",
    "height": 2000,
    "kind": "ui",
    "width": 3200

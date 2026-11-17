@@ -152,7 +152,7 @@ def scenes(s):
     return {
         "app_overview": wait(1.5),
         "transport": wait(1.5),
-        "menu_show_set": seq(click(166, 25), wait(0.6), move(163, 98), wait(0.8)),
+        "menu_show_set": seq(click(166, 25), wait(0.6), move(163, 98), wait(0.6), move(400, 373), wait(0.8)),
         "menu_file": seq(click(80, 25), wait(0.8)),
         "menu_edit": seq(click(112, 25), wait(0.8)),
         "menu_menu": seq(click(166, 25), wait(0.8)),
