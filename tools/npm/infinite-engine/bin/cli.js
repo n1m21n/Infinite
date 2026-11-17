@@ -45,7 +45,7 @@ if (command === "init" || command === "setup" || command === "install") {
     console.log("\nno app was set up. Install Claude Desktop, Cursor or Windsurf first, or run again with --all.");
     process.exit(1);
   }
-  console.log("\nrestart the app to load the server. Nine tools are available; see the README for the list.");
+  console.log("\nrestart the app to load the server. Twelve tools are available; see the README for the list.");
   process.exit(0);
 }
 

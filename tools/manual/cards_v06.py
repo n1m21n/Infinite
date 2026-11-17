@@ -197,3 +197,8 @@ CHAPTERS_V06 = [
         ],
     },
 ]
+
+# Everyday names that had no card of their own (tools/manual/cards_everyday.py), kept with their chapter.
+from cards_everyday import ADDED as _EVERYDAY  # noqa: E402
+for _ch in CHAPTERS_V06:
+    _ch["cards"] = _ch["cards"] + _EVERYDAY.get(_ch["n"], [])

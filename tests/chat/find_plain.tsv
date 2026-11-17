@@ -1,0 +1,35 @@
+# Everyday asks: plain words a non-musician or non-designer uses for what a node does. Coverage, not tuning: report the
+# score, fix only with grounded bridges (NodeFinder.cpp) or better cards. Right = the node's type or card in the top 3.
+# The bridges for the last six lines were added with this file and need a build to confirm (run find-eval on it).
+add reverb	Reverb|Convolution Reverb
+crop an image	Crop
+crop the picture	Crop
+remove the background	Remove Background
+remove background from my photo	Remove Background
+make a synth	Analog|Wavetable Synth|Wavetable|Oscillator|FM|Equation Synth
+make a synth sound	Analog|Wavetable Synth|Wavetable|Oscillator|FM
+blur	Gaussian / Box Blur|Motion Blur|Blur|Gaussian Blur|Box Blur|Radial Blur
+blur the image	Gaussian / Box Blur|Motion Blur|Blur|Gaussian Blur|Box Blur
+echo	Delay
+add an echo	Delay
+glitch	Glitch|Datamosh|Stutter|Pixel Sort|Bitcrush
+glitch the picture	Glitch|Datamosh|Pixel Sort|Displace|Pixelate
+compressor	Dynamics
+make it louder	Gain|Volume|Limiter
+make it sound thicker	Chorus|Unison|Voice Spread
+cut out the background	Remove Background
+erase the background	Remove Background
+trim the picture	Crop
+rotate the image	Transform|Rotate
+flip the image	Transform|Mirror
+change colours	Color Adjustments|Hue|Color Ramp|Colour Adjustments
+make it wobbly	Displace|Liquify|Wave|LFO
+make a drum loop	Drum Sequencer|MPC|VMPC
+bitcrush	Bitcrush
+distort the sound	Drive|Saturator|Bitcrush
+sharpen	Unsharp Mask
+fade in	Opacity|Feedback & Trails|Fade
+soften the image	Gaussian / Box Blur|Blur
+pixelate the image	Pixelate
+make a tremolo	Tremolo|LFO
+make a chorus	Chorus

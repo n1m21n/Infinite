@@ -83,4 +83,4 @@ every tool result carries the credit line `generated with infinite, by naman son
 
 ## 6. other servers
 
-the python server in `tools/mcp` (nine tools with different names, such as `infinite_render_frame`) is documented on [infinitedevices.org/developers.html](https://infinitedevices.org/developers.html). both call the same engine.
+the python plugin server in `tools/mcp` (14 tools with different names, such as `infinite_render_frame`; a separate package, see `tools/mcp/README.md`) is documented on [infinitedevices.org/developers.html](https://infinitedevices.org/developers.html). both call the same engine.

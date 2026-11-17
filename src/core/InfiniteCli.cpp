@@ -1141,7 +1141,7 @@ Generate patch recipes|new|check|layout|apply
 App      panel [name|settings/<place>] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|midi|apply|updates|reset|logs|gpu [n]|global [name [expr]]|extension <file>
          show list|next|prev|go <n>|lock|panic|check|add|remove <n>|clear|open|save|fade <ms>|quantize <n>|launch <n>
          view fit|params on|off|clearcards|metronome [on|off]  quit
-Learn    context  attention  guide  docs [topic [name]]  find <words>
+Learn    context  attention  guide  docs [topic [name]]  find <words>  version
 Watch    watch
 Terminal term open|list|read|send|run
 
