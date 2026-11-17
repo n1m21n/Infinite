@@ -60,7 +60,8 @@ void DrawKeyboard(FrameCtx& fc)
       // Space toggles play/pause on the transport, mirroring the Play/Pause
       // button, so the timeline can be started or paused without reaching
       // for the mouse.
-      if (!typing && !cmdOrCtrl && !io.KeyShift &&
+      // The Sample Studio's waveform plays its own edit on Space (TogglePlay there), so the canvas stays out.
+      if (!typing && !cmdOrCtrl && !io.KeyShift && !(gSampleStudioOpen && gSampleStudioClaimedKeys) &&
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
          LaunchRequestTogglePlay();
 

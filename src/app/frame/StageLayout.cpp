@@ -278,6 +278,8 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gSampleStudioHeight;
          topBottomRows++;
       }
+      else
+         SampleStudioWhenClosed();
       if (gView3DOpen)
       {
          gView3DHeight = std::clamp(gView3DHeight, 300.0f, std::max(300.0f, ImGui::GetContentRegionAvail().y * 0.8f));
