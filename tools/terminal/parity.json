@@ -310,7 +310,20 @@
   "panels/TerminalPanel.cpp:Dock Position": "panel terminal <side>",
   "panels/ViewportPanel.cpp:Clear all cards": "view clearcards",
   "panels/ViewportPanel.cpp:Close panel": "panel viewport close",
-  "panels/DawPluginSection.cpp": "`Infinite --install-plugins` / `--uninstall-plugins` copies, updates or removes the plugins and prints where they went"
+  "panels/DawPluginSection.cpp": "`Infinite --install-plugins` / `--uninstall-plugins` copies, updates or removes the plugins and prints where they went",
+  "panels/SettingsWindow.cpp:Mini axes": "settings view3dMiniAxes 0|1|2 (0 off, 1 simple axes, 2 navigation)",
+  "panels/SettingsWindow.cpp:Mini axes size": "settings view3dMiniAxesSize <40..160>",
+  "panels/SettingsWindow.cpp:Mini axes brightness": "settings view3dMiniAxesBrightness <0..1>",
+  "panels/SettingsWindow.cpp:Navigation gizmo size": "settings view3dNavGizmoSize <40..160>",
+  "panels/SettingsWindow.cpp:Transform gizmo size": "settings view3dGizmoSize <40..160>",
+  "panels/SettingsWindow.cpp:Smooth view": "settings view3dSmoothTime <0..1>",
+  "panels/SettingsWindow.cpp:Rotation step": "settings view3dRotationStep <1..90>",
+  "panels/SettingsWindow.cpp:Orbit sensitivity": "settings view3dOrbitSensitivity <0.1..5>",
+  "panels/SettingsWindow.cpp:Auto perspective": "settings view3dAutoPerspective true|false",
+  "panels/SettingsWindow.cpp:Continuous grab": "settings view3dContinuousGrab true|false",
+  "panels/SettingsWindow.cpp:Zoom to mouse": "settings view3dZoomToMouse true|false",
+  "panels/SettingsWindow.cpp:Orbit around selection": "settings view3dOrbitAroundSelection true|false",
+  "panels/SettingsWindow.cpp:Invert zoom direction": "settings view3dInvertZoom true|false"
  },
  "skip": {
   "frame/StagePopupsA.cpp:Reference in chat": "puts the node in the chat box as an @ reference; an agent already names nodes with @",

@@ -247,6 +247,20 @@ namespace app
                     SaveWorkspaceSettings();
                  }),
             Number("oversample", &gAudioOversample, 1.0f, 4.0f, SaveAudioSettings),
+            // Settings > 3D View (gView3DPrefs): the same values and ranges as the window's sliders and switches.
+            Number("view3dMiniAxes", &gView3DPrefs.miniAxes, 0, 2, SaveWorkspaceSettings),
+            Number("view3dMiniAxesSize", &gView3DPrefs.miniSize, 40.0f, 160.0f, SaveWorkspaceSettings),
+            Number("view3dMiniAxesBrightness", &gView3DPrefs.miniBright, 0.0f, 1.0f, SaveWorkspaceSettings),
+            Number("view3dNavGizmoSize", &gView3DPrefs.gizmoNavSize, 40.0f, 160.0f, SaveWorkspaceSettings),
+            Number("view3dGizmoSize", &gView3DPrefs.gizmoSize, 40.0f, 160.0f, SaveWorkspaceSettings),
+            Number("view3dSmoothTime", &gView3DPrefs.smoothTime, 0.0f, 1.0f, SaveWorkspaceSettings),
+            Number("view3dRotationStep", &gView3DPrefs.rotStep, 1.0f, 90.0f, SaveWorkspaceSettings),
+            Number("view3dOrbitSensitivity", &gView3DPrefs.orbitSens, 0.1f, 5.0f, SaveWorkspaceSettings),
+            Toggle("view3dAutoPerspective", &gView3DPrefs.autoPerspective, SaveWorkspaceSettings),
+            Toggle("view3dContinuousGrab", &gView3DPrefs.continuousGrab, SaveWorkspaceSettings),
+            Toggle("view3dZoomToMouse", &gView3DPrefs.zoomToMouse, SaveWorkspaceSettings),
+            Toggle("view3dOrbitAroundSelection", &gView3DPrefs.orbitSelection, SaveWorkspaceSettings),
+            Toggle("view3dInvertZoom", &gView3DPrefs.invertZoom, SaveWorkspaceSettings),
             { "audioThreads", [] { return json(gAudioThreads); },
               [](const json& v)
               {
