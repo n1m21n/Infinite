@@ -52,6 +52,9 @@ ALLOW = {
     # sketch-check is a developer CLI that takes its own argv.
     ("src/core/sketch/SketchCheck.cpp", 'if (FILE* fp = std::fopen(path.c_str(), "wb"))'),
     ("src/core/sketch/SketchCheck.cpp", 'if (FILE* fp = std::fopen(argv[1], "wb"))'),
+    # f and files.front() are std::filesystem::path.
+    ("src/app/panels/View2DPanel.cpp", "std::ofstream(f, std::ios::binary).write(bytes.data(), (std::streamsize)bytes.size());"),
+    ("src/nodes/DrumSequencerNode.cpp", "std::ifstream f(files.front());"),
 }
 
 

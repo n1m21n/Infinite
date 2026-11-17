@@ -2502,7 +2502,7 @@ namespace
    }
    void LoadBrushes()
    {
-      std::ifstream in(BrushFile());
+      std::ifstream in(AppPaths::FsPath(BrushFile()));
       std::string line;
       while (std::getline(in, line))
       {
@@ -2541,7 +2541,7 @@ namespace
       last = now;
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::AppSupportDir(), ec);
-      std::ofstream(BrushFile()) << now;
+      std::ofstream(AppPaths::FsPath(BrushFile())) << now;
    }
 
    void InitBrushes()
@@ -10274,7 +10274,7 @@ namespace
       {
          std::error_code ec;
          std::filesystem::create_directories(EffPresetDir(), ec);
-         std::ofstream f(EffPresetDir() + "/" + name + ".inf2dfx");
+         std::ofstream f(AppPaths::FsPath(EffPresetDir() + "/" + name + ".inf2dfx"));
          f << Scene2DNode::EffectsText(l) << "\n--params\n" << EffectParamsText(l);
       }
       std::vector<std::string> files;
@@ -10293,7 +10293,7 @@ namespace
          pick = shown - 1;
       if (pick < 0)
          return;
-      std::ifstream f(EffPresetDir() + "/" + files[(size_t)pick] + ".inf2dfx");
+      std::ifstream f(AppPaths::FsPath(EffPresetDir() + "/" + files[(size_t)pick] + ".inf2dfx"));
       std::stringstream ss;
       ss << f.rdbuf();
       std::string text = ss.str(), params;
@@ -10545,7 +10545,7 @@ namespace
       {
          std::error_code ec;
          std::filesystem::create_directories(StylePresetDir(), ec);
-         std::ofstream(StylePresetDir() + "/" + name + ".inf2dstyle") << Scene2DNode::StyleText(l);
+         std::ofstream(AppPaths::FsPath(StylePresetDir() + "/" + name + ".inf2dstyle")) << Scene2DNode::StyleText(l);
       }
       std::vector<std::string> files;
       std::error_code ec;
@@ -10560,7 +10560,7 @@ namespace
       int shown = 0;
       if (!ComboRow(T("Apply"), &shown, names) || shown <= 0)
          return;
-      std::ifstream f(StylePresetDir() + "/" + files[(size_t)shown - 1] + ".inf2dstyle");
+      std::ifstream f(AppPaths::FsPath(StylePresetDir() + "/" + files[(size_t)shown - 1] + ".inf2dstyle"));
       std::stringstream ss;
       ss << f.rdbuf();
       Layer got = l;
@@ -11624,7 +11624,7 @@ static bool ImportSvgInto(Scene2DNode* doc, const std::string& path)
 {
    if (doc == nullptr)
       return false;
-   std::ifstream f(path, std::ios::binary);
+   std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
    if (!f)
       return false;
    const std::string svg((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
@@ -13250,7 +13250,7 @@ static std::string UserFontList()
 
 void LoadUserFonts()
 {
-   std::ifstream in(UserFontList());
+   std::ifstream in(AppPaths::FsPath(UserFontList()));
    std::string line, fam;
    while (std::getline(in, line))
       if (!line.empty())
@@ -13263,7 +13263,7 @@ bool AddUserFont(const std::string& path, std::string& family)
       return false;
    std::vector<std::string> have;
    {
-      std::ifstream in(UserFontList());
+      std::ifstream in(AppPaths::FsPath(UserFontList()));
       std::string line;
       while (std::getline(in, line))
          if (!line.empty())
@@ -13271,7 +13271,7 @@ bool AddUserFont(const std::string& path, std::string& family)
    }
    if (std::find(have.begin(), have.end(), path) == have.end())
    {
-      std::ofstream out(UserFontList(), std::ios::app);
+      std::ofstream out(AppPaths::FsPath(UserFontList()), std::ios::app);
       out << path << "\n";
    }
    return true;

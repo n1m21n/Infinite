@@ -23,6 +23,7 @@
 #include "miniz.h"
 #include "stb_image.h"
 #include "stb_image_write.h"
+#include "platform/AppPaths.h"
 
 namespace
 {
@@ -1396,7 +1397,7 @@ unsigned Scene2DNode::FillTexture(const std::string& path, int& w, int& h)
       FillPic pic;
       int c = 0;
       stbi_set_flip_vertically_on_load_thread(0);
-      std::ifstream in(path, std::ios::binary);
+      std::ifstream in(AppPaths::FsPath(path), std::ios::binary);
       const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
       if (unsigned char* px = bytes.empty() ? nullptr
                                 : stbi_load_from_memory((const unsigned char*)bytes.data(), (int)bytes.size(), &pic.w, &pic.h, &c, 4))
