@@ -64,9 +64,9 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
       if (analog)
       {
          const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.05f, mSampleRate) * 0.05f;
-         const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + lfoDrift)), 0.2f, lineCapacityMs);
+         const float lMs = std::clamp(delayMs + depthMs * DspMath::FastSinCycles(((float)mPhase + lfoDrift)), 0.2f, lineCapacityMs);
          const float rMs = std::clamp(
-            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f + lfoDrift)), 0.2f, lineCapacityMs);
+            delayMs + depthMs * DspMath::FastSinCycles(((float)mPhase + spread * 0.5f + lfoDrift)), 0.2f, lineCapacityMs);
 
          float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
          float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);
@@ -88,9 +88,9 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
       }
       else
       {
-         const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * (float)mPhase), 0.2f, lineCapacityMs);
+         const float lMs = std::clamp(delayMs + depthMs * DspMath::FastSinCycles((float)mPhase), 0.2f, lineCapacityMs);
          const float rMs = std::clamp(
-            delayMs + depthMs * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f)), 0.2f, lineCapacityMs);
+            delayMs + depthMs * DspMath::FastSinCycles(((float)mPhase + spread * 0.5f)), 0.2f, lineCapacityMs);
 
          const float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
          const float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);

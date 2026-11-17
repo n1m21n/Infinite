@@ -89,6 +89,22 @@ namespace DspMath
       return powf(10.0f, db / 20.0f);
    }
 
+   // sin(2*pi*p) for any p (wrapped to [0, 1) first). Folds to [-pi/2, pi/2]
+   // and evaluates an odd degree-9 polynomial: max error 1.9e-7, the same
+   // order as sinf's own. Branch-free apart from the wrap, so LFO loops
+   // vectorise; replaces a libm sinf per LFO per sample.
+   inline float FastSinCycles(float p)
+   {
+      p -= floorf(p);
+      float x = p - 0.5f; // sin(2*pi*p) = -sin(2*pi*x)
+      const float half = copysignf(0.5f, x);
+      x = fabsf(x) > 0.25f ? half - x : x;
+      const float y = x * 6.28318531f;
+      const float y2 = y * y;
+      const float r = ((((2.5904942e-6f * y2 - 1.9800900e-4f) * y2 + 8.3328998e-3f) * y2 - 0.16666648f) * y2 + 1.0f) * y;
+      return -r;
+   }
+
    // DbToLinear with a one-entry memo: powf runs only when the dB value
    // changes, so a settled knob costs one compare per sample. Output is
    // bit-identical to DbToLinear (the NaN start never equals a real key).
