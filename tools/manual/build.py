@@ -101,7 +101,11 @@ def shot_html(name, cls="shot", max_w=150, max_h=300):
         dw, dh = round(w * k), round(h * k)
         parts.append(f'<img src="file://{sharp(path, dw, dh)}" width="{dw}" height="{dh}" alt="{esc(tid)}">')
     row = ' style="flex-direction:row;align-items:flex-start"' if len(imgs) > 1 else ""
-    return f'<div class="{cls}"{row}>{"".join(parts)}</div>'
+    cap = f'<p class="cap"><i>{esc(_CAP[name])}</i></p>' if name in _CAP else ""   # shown wherever the shot appears
+    return f'<div class="{cls}"{row}>{"".join(parts)}</div>{cap}'
+
+
+_CAP = {k.split("/")[2]: v for k, v in shots.CAPTIONS.items()}   # per-node shot captions from docs/shots/manifest.json
 
 
 def card_html(name, tag, desc, tryit, chain):
