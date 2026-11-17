@@ -532,9 +532,7 @@ namespace app
       void DrawPagePicker(const std::vector<GraphNode*>& pages, int current)
       {
          const std::vector<PagePicker::Entry> entries = PageEntries(pages);
-         const ImGuiIO& io = ImGui::GetIO();
-         if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
-            PagePicker::BeginRename("##drumPage", entries, current);
+         PagePicker::RenameKey("##drumPage", entries, current);
          PagePicker::Options opt;
          const PagePicker::Result r = PagePicker::Draw("##drumPage", entries, current, T("New drum page"), opt);
          GraphNode* gn = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;

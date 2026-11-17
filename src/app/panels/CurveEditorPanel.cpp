@@ -1521,6 +1521,7 @@ namespace
       opt.maxW = std::max(1.0f, width - PanelKit::Chip() - tok::space_1);
       opt.canClose = true; // middle-click a chip: close the page, the node stays
       uint64_t closeUid = 0;
+      PagePicker::RenameKey("##cePages", entries, current);
       const PagePicker::Result r = PagePicker::Draw("##cePages", entries, current, T("New curve"), opt);
       GraphNode* gn = r.index >= 0 && r.index < (int)pages.size() ? pages[r.index] : nullptr;
       switch (r.act)

@@ -155,6 +155,15 @@ namespace PagePicker
       std::snprintf(r.buf, sizeof r.buf, "%s", pages[index].name.c_str());
    }
 
+   // Cmd/Ctrl+R while the panel is hovered renames the current page: the key the page menu shows.
+   inline void RenameKey(const char* id, const std::vector<Entry>& pages, int current)
+   {
+      const ImGuiIO& io = ImGui::GetIO();
+      if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift &&
+          ImGui::IsKeyPressed(ImGuiKey_R, false))
+         BeginRename(id, pages, current);
+   }
+
    inline void ColourRow(const Entry& page, int index, Result& out)
    {
       // The clip colours of the Timeline, plus None.

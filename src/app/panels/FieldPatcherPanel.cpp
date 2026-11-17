@@ -1443,6 +1443,13 @@ namespace
       opt.maxW = std::max(1.0f, ImGui::GetContentRegionAvail().x - 3.0f * (tok::control_h + tok::space_1) - 8.0f);
       opt.canClose = true;
       int closeAt = -1;
+      {
+         // The rename field starts from the bare title, without the pin mark.
+         std::vector<PagePicker::Entry> bare = entries;
+         for (size_t i = 0; i < bare.size(); i++)
+            bare[i].name = PageTitle(*s.pages[i]);
+         PagePicker::RenameKey("##fpPages", bare, s.front);
+      }
       const PagePicker::Result r = PagePicker::Draw("##fpPages", entries, s.front, T("New scratch page"), opt);
       Page* rp = r.index >= 0 && r.index < (int)s.pages.size() ? s.pages[r.index].get() : nullptr;
       switch (r.act)

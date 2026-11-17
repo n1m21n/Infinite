@@ -2229,6 +2229,7 @@ namespace app
          opt.duplicate = opt.canAdd;
          opt.canDelete = gPerfLayout.pageCount > 1;
          opt.maxW = std::max(120.0f, ImGui::GetContentRegionAvail().x - tok::control_h - tok::space_2);
+         PagePicker::RenameKey("##perfPages", entries, gPerfActivePage);
          const PagePicker::Result r = PagePicker::Draw("##perfPages", entries, gPerfActivePage, T("Add New Page"), opt);
          const int p = r.index;
          // Names and colours are kept one per page, so an edit below always lands on its own page.
