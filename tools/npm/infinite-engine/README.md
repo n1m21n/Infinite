@@ -52,7 +52,7 @@ on windows, claude desktop needs `"command": "cmd", "args": ["/c", "npx", "-y", 
 
 ## 3. available tools for ai agents
 
-once connected, your ai agent has nine tools:
+once connected, your ai agent has twelve tools:
 
 | tool name | description |
 | :--- | :--- |
@@ -65,6 +65,9 @@ once connected, your ai agent has nine tools:
 | `infinite_render_field_pixel` | render audio-reactive or procedural pixel shaders directly to image frames. |
 | `infinite_validate_patch` | validate any line-based text patch against infinite's c++ compiler with full error diagnostics. |
 | `infinite_render_video` | headless mp4 video export from a patch file. |
+| `infinite_compare_frames` | compare two pictures (png, patch file or patch text) and say in words whether they match and what differs. |
+| `infinite_find_knob` | find which node and param move makes a wanted picture change, from measured renders. |
+| `infinite_node_effects` | measured effect table for Effects and Compositing colour nodes: what adding a node does and what each param does. |
 
 ---
 

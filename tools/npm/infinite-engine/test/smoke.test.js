@@ -59,7 +59,7 @@ test("windows config starts npx through cmd", () => {
   assert.strictEqual(serverEntry("win32").command, "cmd");
 });
 
-test("serve answers initialize and lists nine tools", () => {
+test("serve answers initialize and lists twelve tools", () => {
   const cli = path.join(__dirname, "../bin/cli.js");
   const input = [{ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }, { jsonrpc: "2.0", id: 2, method: "tools/list" }].map((x) => JSON.stringify(x)).join("\n") + "\n";
   const r = spawnSync(process.execPath, [cli, "serve"], { input, encoding: "utf-8", timeout: 10000 });
