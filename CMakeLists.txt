@@ -585,6 +585,7 @@ set(COMMON_SOURCES
     src/app/selftest/View2DTests.cpp
     src/app/selftest/MixerPanelTests.cpp
     src/app/selftest/PageMenuTests.cpp
+    src/app/selftest/MenuAliveTests.cpp
     src/app/selftest/EditMeshRefineTests.cpp
     src/app/selftest/FurTests.cpp
     src/app/selftest/CliSetupTests.cpp

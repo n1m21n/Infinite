@@ -8424,6 +8424,57 @@ bool View3DNavProbe(float out[18])
    return ImGui::GetFrameCount() - sNavProbe.frame <= 2;
 }
 
+// Menu-alive test (MenuAliveTests.cpp): open the right-click menu on the selection or on empty space, and a print of
+// everything a menu item can change (scene, settings, selection, view, tool, modes, copy buffers, rename, requests).
+// Undo depth is left out: an item that only pushes a checkpoint has not done anything.
+void View3DTestOpenMenu(bool onItem)
+{
+   Scene3DNode* scene = FindScene();
+   if (onItem && sSel.empty() && scene != nullptr && !scene->Items().empty())
+      sSel = { scene->Items().front().id };
+   sMenuOnItem = onItem;
+   sOpenMenu = true;
+}
+
+void View3DTestPose()
+{
+   Scene3DNode* scene = FindScene();
+   if (scene == nullptr || scene->Items().empty())
+      return;
+   Item& it = scene->Items().front();
+   const float pos[3] = { 1.0f, 0.5f, -0.75f }, rot[3] = { 20.0f, 35.0f, 10.0f }, sc[3] = { 1.5f, 1.25f, 0.8f };
+   std::copy(pos, pos + 3, it.pos);
+   std::copy(rot, rot + 3, it.rot);
+   std::copy(sc, sc + 3, it.scale);
+   scene->Commit();
+   const float cur[3] = { -0.6f, 0.3f, 0.45f };
+   std::copy(cur, cur + 3, sSet->cursor);
+}
+
+std::string View3DTestFingerprint()
+{
+   std::string f;
+   char b[512];
+   if (Scene3DNode* scene = FindScene())
+   {
+      scene->Serialize();
+      f += scene->SceneText();
+   }
+   for (int id : sSel)
+      f += " sel" + std::to_string(id);
+   for (int id : sLocal)
+      f += " loc" + std::to_string(id);
+   snprintf(b, sizeof b, " sh%d cv%d gr%d or%d tab%d side%d tool%d selm%d ov%d az%.4f el%.4f d%.4f t%.4f,%.4f,%.4f roll%.3f view%d "
+                         "pend%d ren%d copy%zu copyscene%zu buf%zu nodes%zu req%d,%d edit%d pose%d,%d sculpt%d rulers%zu lock%d,%d",
+            (int)sShading, sCameraView, sGrid, sOrtho, sTab, sSideOpen, sTool, sSelMode, sOverlays, sAz, sEl, sDist,
+            sTarget[0], sTarget[1], sTarget[2], sRoll, sViewName, (int)sPending.what, sRename, sCopiedItems.size(),
+            sCopiedScene.size(), sBuffer.size(), gNodes.size(), gRequestSelectNodeIndex, gRequestFitViewNodeIndex,
+            sEdit.on ? 1 : 0, sPose.on ? 1 : 0, sPose.paint ? 1 : 0, sSculpt.on ? 1 : 0, sRulers.size(), sLockCam ? 1 : 0,
+            sLockActive ? 1 : 0);
+   f += b;
+   return f;
+}
+
 void View3DAddCamera()
 {
    if (Scene3DNode* scene = FindScene())
