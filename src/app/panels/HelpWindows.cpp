@@ -668,7 +668,7 @@ namespace app
       { I18N_KEY("Sample Studio"), I18N_KEY("Sample Studio"), "Shift+W", I18N_KEY("Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Sample Studio Record"), "R", I18N_KEY("Start or stop recording the chosen audio input into a new sample") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Undo / Redo Studio Edit"), MODKEY "+Z / " MODKEY "+Shift+Z", I18N_KEY("Undo or redo the Studio's own edits; the patch's undo is not touched") },
-      { I18N_KEY("Sample Studio"), I18N_KEY("Split / Join Slices"), MODKEY "+E / " MODKEY "+J", I18N_KEY("Cut a slice at the pointer (on the grid); join the selected slices") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Split / Join Slices"), MODKEY "+E / J", I18N_KEY("Cut a slice at the pointer (on the grid); join the selected slices") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Copy / Cut / Paste Slices"), MODKEY "+C / " MODKEY "+X / " MODKEY "+V", I18N_KEY("Copy or cut the selected slices, or paste them") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Select All Slices"), MODKEY "+A", I18N_KEY("Select every slice") },
       { I18N_KEY("Sample Studio"), I18N_KEY("Delete Slices"), "Delete / Backspace", I18N_KEY("Delete the selected slices") },
