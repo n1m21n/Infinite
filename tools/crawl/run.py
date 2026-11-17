@@ -24,7 +24,7 @@ SLOW_BASE = os.path.join(ROOT, "tools/crawl/slow_baseline.tsv")
 
 # Source file substring -> surface name substring, for --changed.
 SOURCES = {
-    "MixerPanel": "panel-Mixer", "Drum": "panel-Drums", "SettingsPanel": "panel-Settings", "Help": "panel-Help",
+    "MixerPanel": "panel-Mixer", "Drum": "panel-Drums", "SettingsPanel": "panel-Settings", "SettingsWindow": "panel-Settings", "Help": "panel-Help",
     "Shortcuts": "panel-Shortcuts", "Templates": "panel-Templates", "History": "panel-History",
     "PianoRoll": "panel-Piano Roll", "CurveEditor": "panel-Curve Editor", "SampleStudio": "panel-Sample Studio",
     "ShowSet": "panel-Show Set", "NodePanel": "panel-Library", "Library": "panel-Library", "ViewportPanel": "panel-Viewport",

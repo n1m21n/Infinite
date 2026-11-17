@@ -5854,7 +5854,7 @@ namespace
       for (int i = 0; i < n; i++)
       {
          if (i > 0)
-            ImGui::SameLine(0.0f, tok::space_1);
+            FormParts::Inline(0.0f, tok::space_1);
          ImGui::SetNextItemWidth(i < n - 1 ? w : sFieldW - (w + tok::space_1) * (n - 1));
          const float was = *v[i];
          changed |= FieldWell::Slider((RowId(label) + (char)('a' + i)).c_str(), v[i], lo, hi, fmt[i]);
@@ -7502,7 +7502,7 @@ namespace
             ImGui::SetNextItemWidth(half);
             const bool cw = FieldWell::InputInt("##v3dresx", &w);
             Undoable("Edit in 3D View");
-            ImGui::SameLine(0.0f, tok::space_1);
+            FormParts::Inline(0.0f, tok::space_1);
             ImGui::SetNextItemWidth(sFieldW - half - tok::space_1);
             const bool ch = FieldWell::InputInt("##v3dresy", &h);
             Undoable("Edit in 3D View");
