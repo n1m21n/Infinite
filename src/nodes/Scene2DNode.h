@@ -573,6 +573,8 @@ public:
    bool RenderLayerAlone(int id, int frameId, std::vector<uint8_t>& rgba);
    // The paint surface's live texture (thumbnails), 0 when none.
    unsigned PaintTexture(int id);
+   // The layer's pixel mask as a texture (grey, white shows), 0 when none.
+   unsigned PixelMaskTexture(int id);
 
    // Symmetry copies of a document point (the point itself first).
    std::vector<std::pair<float, float>> SymmetryPoints(float x, float y);

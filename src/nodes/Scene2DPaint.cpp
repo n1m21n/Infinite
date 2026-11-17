@@ -1788,6 +1788,13 @@ unsigned Scene2DNode::PaintTexture(int id)
    return it == mSurfaces.end() ? 0u : it->second.fbo.tex;
 }
 
+unsigned Scene2DNode::PixelMaskTexture(int id)
+{
+   SyncSurfaces();
+   auto it = mMasks.find(id);
+   return it == mMasks.end() ? 0u : it->second.fbo.tex;
+}
+
 // ---- retouch tools ---------------------------------------------------------
 
 namespace

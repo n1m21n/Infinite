@@ -219,6 +219,7 @@ namespace
       float hx = 0, hy = 0;       // the dragged handle, as a box fraction
       int warpHandle = -1;        // kind 18: the handle (0..7) pulled; corners distort or perspective, edges skew
       bool perspective = false;
+      int warpStyle = 0;          // 18: 0 as the handle says, 1 a corner slides along one edge (skew), 2 an edge moves freely (distort)
       bool fromCentre = false;
       int guideAxis = 0;          // 0 vertical (x), 1 horizontal (y)
       int guideIndex = -1;
@@ -2122,7 +2123,12 @@ namespace
       Scene2DNode* doc = nullptr;
       std::vector<Layer> before;
       size_t undo0 = (size_t)-1;
+      int prevTool = 0;            // the tool to go back to when it ends (Cmd+T works from any tool)
    } sFreeT;
+   // What a handle drag does inside a free transform (its right-click menu, Photoshop's Edit > Transform).
+   enum FreeMode { kFreeAny = 0, kFreeScale, kFreeRotate, kFreeSkew, kFreeDistort, kFreePerspective, kFreeModes };
+   int sFreeMode = kFreeAny;
+   void FreeTransformMenu(Scene2DNode* doc);
 
    bool FreeTransformOn(Scene2DNode* doc) { return sFreeT.doc != nullptr && sFreeT.doc == doc; }
 
@@ -2136,6 +2142,8 @@ namespace
          return;
       sFreeT.doc = doc;
       sFreeT.undo0 = gUndoStack.size();
+      sFreeT.prevTool = sTool;
+      sFreeMode = kFreeAny;
       PushUndoCheckpoint("Free transform");
       sTool = kMove;
    }
@@ -2156,6 +2164,8 @@ namespace
             gUndoStack.pop_back();
          Touch();
       }
+      sTool = sFreeT.prevTool;
+      sFreeMode = kFreeAny;
       sFreeT = FreeTransform();
    }
 
@@ -2308,7 +2318,11 @@ namespace
       if (key(ImGuiKey_Escape) && sOp.kind != 0 && CancelOp(doc))
          return;
       if (sFreeT.doc != nullptr && (sFreeT.doc != doc || sTool != kMove))
-         EndFreeTransform(sFreeT.doc == doc ? doc : nullptr, true);   // leaving it keeps what was done
+      {
+         const int chosen = sTool;   // picking another tool keeps what was done and stays on that tool
+         EndFreeTransform(sFreeT.doc == doc ? doc : nullptr, true);
+         sTool = chosen;
+      }
       if (FreeTransformOn(doc) && sOp.kind == 0)
       {
          if (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter))
@@ -3694,6 +3708,70 @@ namespace
       Touch();
    }
 
+   // Flip (about the picked layers' middle) and quarter turns, for one layer or many. A mirrored box is the same box
+   // with its x (or y) scale negated and its angle negated; pulled corners mirror with it.
+   bool Flippable(const Layer& l) { return l.kind != Kind::Group && l.kind != Kind::Fill && l.kind != Kind::Adjust; }
+
+   void FlipSelection(Scene2DNode* doc, bool vertical)
+   {
+      float lo[2], hi[2];
+      if (!SelBounds(doc, lo, hi))
+         return;
+      const float px = (lo[0] + hi[0]) * 0.5f, py = (lo[1] + hi[1]) * 0.5f;
+      if (!FreeTransformOn(doc))
+         PushUndoCheckpoint(vertical ? "Flip vertical" : "Flip horizontal");
+      for (int id : MovingIds(doc))
+         if (Layer* l = doc->FindLayer(id); l != nullptr && Flippable(*l))
+         {
+            float bw = 1, bh = 1, m[6], cx, cy;
+            doc->LayerBox(*l, bw, bh);
+            doc->LayerMatrix(*l, m);
+            Apply(m, bw * 0.5f, bh * 0.5f, cx, cy);
+            if (vertical)
+               l->flipY = !l->flipY;
+            else
+               l->flipX = !l->flipX;
+            l->angle = l->angle == 0.0f ? 0.0f : -l->angle;
+            if (l->warpOn)
+               for (int k = 0; k < 4; k++)
+                  l->warp[k * 2 + (vertical ? 1 : 0)] = -l->warp[k * 2 + (vertical ? 1 : 0)];
+            float m1[6], nx, ny;
+            doc->LayerMatrix(*l, m1);
+            Apply(m1, bw * 0.5f, bh * 0.5f, nx, ny);
+            l->x += (vertical ? cx : 2.0f * px - cx) - nx;
+            l->y += (vertical ? 2.0f * py - cy : cy) - ny;
+         }
+      Touch();
+   }
+
+   void TurnSelection(Scene2DNode* doc, float deg)
+   {
+      float lo[2], hi[2];
+      if (!SelBounds(doc, lo, hi))
+         return;
+      const ImVec2 pivot((lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f);
+      if (!FreeTransformOn(doc))
+         PushUndoCheckpoint("Rotate layers");
+      for (int id : MovingIds(doc))
+         if (Layer* l = doc->FindLayer(id); l != nullptr && Flippable(*l))
+         {
+            const Layer b = *l;
+            PlaceInGroup(doc, *l, b, 1.0f, 1.0f, deg, pivot);
+            if (b.warpOn)
+            {
+               // Pulled corners are document offsets: they turn with the layer.
+               const float r = deg * kPi / 180.0f, cs = std::cos(r), sn = std::sin(r);
+               for (int k = 0; k < 4; k++)
+               {
+                  const float wx = b.warp[k * 2], wy = b.warp[k * 2 + 1];
+                  l->warp[k * 2] = wx * cs - wy * sn;
+                  l->warp[k * 2 + 1] = wx * sn + wy * cs;
+               }
+            }
+         }
+      Touch();
+   }
+
    bool CanWarp(Scene2DNode* doc)
    {
       const Layer* l = Active(doc);
@@ -3719,7 +3797,27 @@ namespace
       if (h % 2 == 0)
       {
          const int k = h == 0 ? 0 : h == 2 ? 1 : h == 4 ? 2 : 3;   // handle -> corner (TL TR BR BL)
-         if (!sOp.perspective)
+         if (sOp.warpStyle == 1)
+         {
+            // Skew: the corner slides along whichever of its two edges the drag follows more.
+            float best = 0.0f, bx = 0.0f, by = 0.0f;
+            for (int o : { k ^ 1, 3 - k })
+            {
+               float ex = c[o * 2] - c[k * 2], ey = c[o * 2 + 1] - c[k * 2 + 1];
+               const float len = std::max(1e-3f, std::sqrt(ex * ex + ey * ey));
+               ex /= len;
+               ey /= len;
+               const float t = dx * ex + dy * ey;
+               if (std::fabs(t) > std::fabs(best))
+               {
+                  best = t;
+                  bx = ex * t;
+                  by = ey * t;
+               }
+            }
+            pull(k, bx, by);
+         }
+         else if (!sOp.perspective)
             pull(k, dx, dy);
          else if (std::fabs(dx) >= std::fabs(dy))
          {
@@ -3736,6 +3834,13 @@ namespace
       {
          // An edge slides along itself: both its corners move by the drag along the edge.
          const int a = h == 1 ? 0 : h == 3 ? 1 : h == 5 ? 2 : 3, b = (a + 1) % 4;
+         if (sOp.warpStyle == 2)
+         {
+            pull(a, dx, dy);   // distort: the edge goes where it is dragged
+            pull(b, dx, dy);
+            Touch();
+            return;
+         }
          float ex = c[b * 2] - c[a * 2], ey = c[b * 2 + 1] - c[a * 2 + 1];
          const float len = std::max(1e-3f, std::sqrt(ex * ex + ey * ey));
          ex /= len;
@@ -5340,120 +5445,130 @@ namespace
       }
       if (MenuParts::BeginContextItem("##v2dcanvasmenu"))
       {
-         const bool any = !sSel.empty();
-         if (any && MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
-         if (any && MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
-         if (!sClip.empty() && MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
-         if (any && MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
-         if (SelectionActsOnPixels(doc))
-            if (MenuParts::Item(T("Layer via Cut"), Sc("Shift+Ctrl+J")))
-            {
-               PushUndoCheckpoint("Layer via cut");
-               if (const int nid = SelectionToLayer(doc, true))
-                  SelectOnly(nid);
-            }
-         if (any && MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"), FreeTransformOn(doc)))
-            FreeTransformOn(doc) ? EndFreeTransform(doc, true) : BeginFreeTransform(doc);
-         if (any && MenuParts::Item(T("Delete"), "Delete"))
+         if (FreeTransformOn(doc))
          {
-            if (SelectionActsOnPixels(doc))
-               ClearOrFill(doc, 0);
-            else
-               sPending.what = Pending::Delete;
+            FreeTransformMenu(doc);   // while transforming, the menu is the transform's (Photoshop)
+            MenuParts::EndPopup();
          }
-         MenuParts::Separator();
-         // What the active layer is decides what else is offered: pixels, image, text, shapes, group, fill or adjustment.
-         if (Layer* k = Active(doc))
+         else
          {
-            const bool picked = any && sSel.size() == 1;
-            if (doc->HasSelection())
-            {
-               if (k->kind != Kind::Group && MenuParts::Item(T("Mask from Selection"))) sPending.what = Pending::MaskFromSel;
-               if (MenuParts::Item(T("Deselect"), Sc("Ctrl+D")))
+            const bool any = !sSel.empty();
+            if (any && MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
+            if (any && MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
+            if (!sClip.empty() && MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
+            if (any && MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
+            if (SelectionActsOnPixels(doc))
+               if (MenuParts::Item(T("Layer via Cut"), Sc("Shift+Ctrl+J")))
                {
-                  SelStep("Deselect");
-                  doc->Deselect();
+                  PushUndoCheckpoint("Layer via cut");
+                  if (const int nid = SelectionToLayer(doc, true))
+                     SelectOnly(nid);
                }
-               if (MenuParts::Item(T("Invert Selection"), Sc("Shift+Ctrl+I")))
-               {
-                  SelStep("Invert selection");
-                  doc->InvertSelection();
-               }
-            }
-            // One Fill.. row: it fills the selection, or a pixel layer whole (tool-layer-matrix.md).
-            if ((doc->HasSelection() || k->kind == Kind::Paint) && MenuParts::Item(T("Fill..."), "Shift+F5")) sFillAsk = true;
-            switch (k->kind)
+            if (any && MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"), FreeTransformOn(doc)))
+               FreeTransformOn(doc) ? EndFreeTransform(doc, true) : BeginFreeTransform(doc);
+            if (any && MenuParts::Item(T("Delete"), "Delete"))
             {
-               case Kind::Paint:
-                  if (picked && MenuParts::Item(T("Convert to Draw Node"))) sPending.what = Pending::ToDraw;
-                  break;
-               case Kind::Node:
-                  if (!k->HasSkin() && MenuParts::Item(T("Rasterize Layer")))
-                     EnsurePixels(doc);
-                  if (doc->CanTakeBelow(*k) && MenuParts::Item(T("Effect on Below"), nullptr, k->below)) sPending.what = Pending::LayerBelow;
-                  NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, k->uid);
-                  break;
-               case Kind::Text:
-                  if (picked && MenuParts::Item(T("Edit Text"))) BeginTextEdit(doc, k->id);
-                  if (MenuParts::Item(T("Rasterize Layer"))) RasterizeLayer(doc, k->id);
-                  if (MenuParts::Item(T("Convert to Shapes"))) sPending.what = Pending::ToShapes;
-                  if (MenuParts::Item(T("Convert to Text Node"))) sPending.what = Pending::ToText;
-                  break;
-               case Kind::Vector:
-                  if (MenuParts::Item(T("Rasterize Layer"))) RasterizeLayer(doc, k->id);
-                  if (MenuParts::Item(T("Convert to Sketch Node"))) sPending.what = Pending::ToSketch;
-                  break;
-               case Kind::Group:
-                  if (MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
-                  break;
-               case Kind::Fill:
-               case Kind::Adjust:
-                  // A fill or adjustment has no pixels of its own: its settings live on the Layer tab.
-                  if (MenuParts::Item(k->kind == Kind::Fill ? T("Edit Fill...") : T("Edit Adjustment...")))
-                  {
-                     sTab = 1;
-                     sSideOpen = true;
-                  }
-                  break;
-               default: break;
-            }
-            if (k->kind != Kind::Group)
-            {
-               if (!k->HasPixelMask() && MenuParts::Item(T("Add Layer Mask"))) sPending.what = Pending::AddMask;
-               if (k->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"))) sPending.what = Pending::RemoveMask;
+               if (SelectionActsOnPixels(doc))
+                  ClearOrFill(doc, 0);
+               else
+                  sPending.what = Pending::Delete;
             }
             MenuParts::Separator();
+            // What the active layer is decides what else is offered: pixels, image, text, shapes, group, fill or adjustment.
+            if (Layer* k = Active(doc))
+            {
+               const bool picked = any && sSel.size() == 1;
+               if (doc->HasSelection())
+               {
+                  if (k->kind != Kind::Group && MenuParts::Item(T("Mask from Selection"))) sPending.what = Pending::MaskFromSel;
+                  if (MenuParts::Item(T("Deselect"), Sc("Ctrl+D")))
+                  {
+                     SelStep("Deselect");
+                     doc->Deselect();
+                  }
+                  if (MenuParts::Item(T("Invert Selection"), Sc("Shift+Ctrl+I")))
+                  {
+                     SelStep("Invert selection");
+                     doc->InvertSelection();
+                  }
+               }
+               // One Fill.. row: it fills the selection, or a pixel layer whole (tool-layer-matrix.md).
+               if ((doc->HasSelection() || k->kind == Kind::Paint) && MenuParts::Item(T("Fill..."), "Shift+F5")) sFillAsk = true;
+               switch (k->kind)
+               {
+                  case Kind::Paint:
+                     if (picked && MenuParts::Item(T("Convert to Draw Node"))) sPending.what = Pending::ToDraw;
+                     break;
+                  case Kind::Node:
+                     if (!k->HasSkin() && MenuParts::Item(T("Rasterize Layer")))
+                        EnsurePixels(doc);
+                     if (doc->CanTakeBelow(*k) && MenuParts::Item(T("Effect on Below"), nullptr, k->below)) sPending.what = Pending::LayerBelow;
+                     NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, k->uid);
+                     break;
+                  case Kind::Text:
+                     if (picked && MenuParts::Item(T("Edit Text"))) BeginTextEdit(doc, k->id);
+                     if (MenuParts::Item(T("Rasterize Layer"))) RasterizeLayer(doc, k->id);
+                     if (MenuParts::Item(T("Convert to Shapes"))) sPending.what = Pending::ToShapes;
+                     if (MenuParts::Item(T("Convert to Text Node"))) sPending.what = Pending::ToText;
+                     break;
+                  case Kind::Vector:
+                     if (MenuParts::Item(T("Rasterize Layer"))) RasterizeLayer(doc, k->id);
+                     if (MenuParts::Item(T("Convert to Sketch Node"))) sPending.what = Pending::ToSketch;
+                     break;
+                  case Kind::Group:
+                     if (MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
+                     break;
+                  case Kind::Fill:
+                  case Kind::Adjust:
+                     // A fill or adjustment has no pixels of its own: its settings live on the Layer tab.
+                     if (MenuParts::Item(k->kind == Kind::Fill ? T("Edit Fill...") : T("Edit Adjustment...")))
+                     {
+                        sTab = 1;
+                        sSideOpen = true;
+                     }
+                     break;
+                  default: break;
+               }
+               if (k->kind != Kind::Group)
+               {
+                  if (!k->HasPixelMask() && MenuParts::Item(T("Add Layer Mask")))
+                     sPending.what = doc->HasSelection() ? Pending::MaskFromSel : Pending::AddMask;
+                  if (k->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"))) sPending.what = Pending::RemoveMask;
+               }
+               MenuParts::Separator();
+            }
+            NodeChoiceMenu(T("Add Node as Layer"), doc, Pending::AddNode, 0);
+            MenuParts::Separator();
+            if (any && MenuParts::Item(T("Group"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
+            // Arrange as one submenu, as Photoshop's Layer > Arrange and Affinity's Arrange.
+            if (any && MenuParts::SubMenu(T("Arrange")))
+            {
+               if (MenuParts::Item(T("Bring to Front"), Sc("Shift+Ctrl+]"))) Restack(doc, 3);
+               if (MenuParts::Item(T("Bring Forward"), Sc("Ctrl+]"))) Restack(doc, 1);
+               if (MenuParts::Item(T("Send Backward"), Sc("Ctrl+["))) Restack(doc, 0);
+               if (MenuParts::Item(T("Send to Back"), Sc("Shift+Ctrl+["))) Restack(doc, 2);
+               ImGui::EndMenu();
+            }
+            MenuParts::Separator();
+            SelectionMenu(doc);
+            if (MenuParts::Item(T("Select All Layers"), Sc("Ctrl+A")))
+            {
+               sSel.clear();
+               for (const Layer& l : doc->Layers())
+                  if (l.parent == 0)
+                     sSel.push_back(l.id);
+            }
+            if (MenuParts::Item(T("Fit on Screen"), Sc("Ctrl+0"))) FitView(doc);
+            if (MenuParts::Item(T("Actual Pixels"), Sc("Ctrl+1")))
+            {
+               sZoom = 1.0f;
+               sPan = ImVec2(0, 0);
+            }
+            if (ViewTurned() && MenuParts::Item(T("Reset Rotation"), Sc("Ctrl+Shift+0")))
+               TurnViewAbout(doc, -sViewAngle, ImVec2((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f));
+            MenuParts::EndPopup();
+      
          }
-         NodeChoiceMenu(T("Add Node as Layer"), doc, Pending::AddNode, 0);
-         MenuParts::Separator();
-         if (any && MenuParts::Item(T("Group"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
-         // Arrange as one submenu, as Photoshop's Layer > Arrange and Affinity's Arrange.
-         if (any && MenuParts::SubMenu(T("Arrange")))
-         {
-            if (MenuParts::Item(T("Bring to Front"), Sc("Shift+Ctrl+]"))) Restack(doc, 3);
-            if (MenuParts::Item(T("Bring Forward"), Sc("Ctrl+]"))) Restack(doc, 1);
-            if (MenuParts::Item(T("Send Backward"), Sc("Ctrl+["))) Restack(doc, 0);
-            if (MenuParts::Item(T("Send to Back"), Sc("Shift+Ctrl+["))) Restack(doc, 2);
-            ImGui::EndMenu();
-         }
-         MenuParts::Separator();
-         SelectionMenu(doc);
-         if (MenuParts::Item(T("Select All Layers"), Sc("Ctrl+A")))
-         {
-            sSel.clear();
-            for (const Layer& l : doc->Layers())
-               if (l.parent == 0)
-                  sSel.push_back(l.id);
-         }
-         if (MenuParts::Item(T("Fit on Screen"), Sc("Ctrl+0"))) FitView(doc);
-         if (MenuParts::Item(T("Actual Pixels"), Sc("Ctrl+1")))
-         {
-            sZoom = 1.0f;
-            sPan = ImVec2(0, 0);
-         }
-         if (ViewTurned() && MenuParts::Item(T("Reset Rotation"), Sc("Ctrl+Shift+0")))
-            TurnViewAbout(doc, -sViewAngle, ImVec2((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f));
-         MenuParts::EndPopup();
       }
       const ImVec2 mp = ImGui::GetIO().MousePos;
       const bool inEditor = sTextEdit != 0 && mp.x >= sEditMn.x && mp.x <= sEditMx.x && mp.y >= sEditMn.y && mp.y <= sEditMx.y;
@@ -5784,7 +5899,12 @@ namespace
       // Cursor hints.
       int guideAxis = 0;
       const int hoverGuide = sTool == kMove && hovered ? HoverGuide(doc, mouse, guideAxis) : -1;
-      const int hoverHandle = !hovered || gizmo3d ? -1 : canTransform ? HoverHandle(doc, *active, mouse) : groupT ? HoverGroupHandle(doc, mouse) : -1;
+      int hoverHandle = !hovered || gizmo3d ? -1 : canTransform ? HoverHandle(doc, *active, mouse) : groupT ? HoverGroupHandle(doc, mouse) : -1;
+      // Free transform modes: Rotate turns from any handle, Scale never turns.
+      if (FreeTransformOn(doc) && sFreeMode == kFreeScale && hoverHandle == 8)
+         hoverHandle = -1;
+      else if (FreeTransformOn(doc) && sFreeMode == kFreeRotate && hoverHandle >= 0)
+         hoverHandle = 8;
       if (hovered && sOp.kind == 0)
       {
          if (panTool)
@@ -6076,6 +6196,9 @@ namespace
             TextClick(doc, mouse);
          else if (sTool == kMove)
          {
+            // Skew / Distort / Perspective pull the corners (one layer; a group or several layers keep scale and turn).
+            const int fm = FreeTransformOn(doc) ? sFreeMode : kFreeAny;
+            const bool pullMode = fm == kFreeSkew || fm == kFreeDistort || fm == kFreePerspective;
             if (sGizmoHot >= 0)
             {
                BeginOp(doc, 16, mouse, sGizmoMode == 0 ? "Move layer" : sGizmoMode == 1 ? "Rotate layer" : "Scale layer");
@@ -6092,13 +6215,14 @@ namespace
                   sOp.fromCentre = io.KeyAlt;
                }
             }
-            else if (hoverHandle >= 0 && hoverHandle < 8 && (io.KeyCtrl || io.KeySuper) && CanWarp(doc))
+            else if (hoverHandle >= 0 && hoverHandle < 8 && ((io.KeyCtrl || io.KeySuper) || pullMode) && CanWarp(doc))
             {
-               // Cmd/Ctrl: a corner distorts (with Alt+Shift, perspective), an edge skews.
+               // Cmd/Ctrl: a corner distorts (with Alt+Shift, perspective), an edge skews. The modes say it instead.
                const bool corner = hoverHandle % 2 == 0;
                BeginOp(doc, 18, mouse, corner ? "Distort layer" : "Skew layer");
                sOp.warpHandle = hoverHandle;
-               sOp.perspective = corner && io.KeyAlt && io.KeyShift;
+               sOp.perspective = corner && (fm == kFreePerspective || (fm == kFreeAny && io.KeyAlt && io.KeyShift));
+               sOp.warpStyle = fm == kFreeSkew && corner ? 1 : fm == kFreeDistort && !corner ? 2 : 0;
                sOp.docStart = ToDoc(doc, mouse);
             }
             else if (hoverHandle >= 0 && hoverHandle < 8)
@@ -8397,6 +8521,120 @@ namespace
    // The context bar: what the current tool can do (plan §5). Laid out on one tile row from the cursor.
    void DrawContextBarItems(Scene2DNode* doc);
 
+   const char* const kFreeModeNames[kFreeModes] = { "Free", "Scale", "Rotate", "Skew", "Distort", "Perspective" };
+
+   bool FreeTransformOne(Scene2DNode* doc) { const Layer* a = Active(doc); return a != nullptr && sSel.size() == 1 && Flippable(*a) && !a->is3d; }
+
+   void FreeTransformMenu(Scene2DNode* doc)
+   {
+      const bool pulls = FreeTransformOne(doc) && CanWarp(doc);
+      for (int m = kFreeScale; m < kFreeModes; m++)
+      {
+         const bool needsPull = m >= kFreeSkew;
+         if (MenuParts::Item(T(kFreeModeNames[m]), nullptr, sFreeMode == m, !needsPull || pulls))
+            sFreeMode = sFreeMode == m ? kFreeAny : m;
+      }
+      const Layer* a = Active(doc);
+      // Warp bends the picture on a grid: the Mesh Warp tool, on a paint layer.
+      if (MenuParts::Item(T("Warp"), nullptr, false, a != nullptr && sSel.size() == 1 && a->kind == Kind::Paint))
+      {
+         EndFreeTransform(doc, true);
+         sTool = kMeshWarp;
+      }
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Rotate 180\xc2\xb0"))) TurnSelection(doc, 180.0f);
+      if (MenuParts::Item(T("Rotate 90\xc2\xb0 Clockwise"))) TurnSelection(doc, 90.0f);
+      if (MenuParts::Item(T("Rotate 90\xc2\xb0 Counter Clockwise"))) TurnSelection(doc, -90.0f);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Flip Horizontal"))) FlipSelection(doc, false);
+      if (MenuParts::Item(T("Flip Vertical"))) FlipSelection(doc, true);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Apply"), "Enter")) EndFreeTransform(doc, true);
+      if (MenuParts::Item(T("Cancel"), "Esc")) EndFreeTransform(doc, false);
+   }
+
+   // A tick or a cross drawn in the last item, in the bar icons' ink.
+   void DrawTickCross(bool tick)
+   {
+      const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+      const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
+      const float k = 0.78f * tok::icon_control / 14.0f;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+      if (tick)
+      {
+         const ImVec2 pts[3] = { ImVec2(c.x - 6 * k, c.y), ImVec2(c.x - 2 * k, c.y + 4 * k), ImVec2(c.x + 6 * k, c.y - 5 * k) };
+         dl->AddPolyline(pts, 3, col, 0, 1.75f);
+      }
+      else
+      {
+         dl->AddLine(ImVec2(c.x - 5 * k, c.y - 5 * k), ImVec2(c.x + 5 * k, c.y + 5 * k), col, 1.75f);
+         dl->AddLine(ImVec2(c.x + 5 * k, c.y - 5 * k), ImVec2(c.x - 5 * k, c.y + 5 * k), col, 1.75f);
+      }
+   }
+
+   // Photoshop's transform options bar: where it is, how big against where it began, its angle; the mode; tick / cross.
+   void DrawFreeTransformBar(Scene2DNode* doc)
+   {
+      auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
+      Layer* a = Active(doc);
+      const Layer* b0 = nullptr;
+      for (const Layer& b : sFreeT.before)
+         if (a != nullptr && b.id == a->id)
+            b0 = &b;
+      if (FreeTransformOne(doc) && b0 != nullptr)
+      {
+         float bw = 1, bh = 1, m[6], cx, cy;
+         doc->LayerBox(*a, bw, bh);
+         doc->LayerMatrix(*a, m);
+         Apply(m, bw * 0.5f, bh * 0.5f, cx, cy);
+         float v[5] = { cx, cy, std::fabs(b0->sx) > 1e-6f ? a->sx / b0->sx * 100.0f : 100.0f,
+                        std::fabs(b0->sy) > 1e-6f ? a->sy / b0->sy * 100.0f : 100.0f, a->angle };
+         static const char* kId[5] = { "##ftx", "##fty", "##ftw", "##fth", "##fta" };
+         static const char* kFmt[5] = { "X %.0f", "Y %.0f", "W %.1f%%", "H %.1f%%", "%.1f\xc2\xb0" };
+         static const float kSpeed[5] = { 1.0f, 1.0f, 0.5f, 0.5f, 0.5f };
+         int changed = -1;
+         for (int i = 0; i < 5; i++)
+         {
+            ImGui::SetNextItemWidth(kWellM);
+            FieldWell::PushStyle();
+            if (ImGui::DragFloat(kId[i], &v[i], kSpeed[i], 0.0f, 0.0f, kFmt[i]))
+               changed = i;
+            FieldWell::PopStyle();
+            next();
+         }
+         if (changed >= 0)
+         {
+            if (changed == 2) a->sx = b0->sx * std::max(0.1f, v[2]) / 100.0f;
+            if (changed == 3) a->sy = b0->sy * std::max(0.1f, v[3]) / 100.0f;
+            if (changed == 4) a->angle = std::fmod(v[4] + 540.0f, 360.0f) - 180.0f;
+            // The middle stays put (or goes where X / Y say).
+            float m1[6], nx, ny;
+            doc->LayerMatrix(*a, m1);
+            Apply(m1, bw * 0.5f, bh * 0.5f, nx, ny);
+            a->x += (changed == 0 ? v[0] : cx) - nx;
+            a->y += (changed == 1 ? v[1] : cy) - ny;
+            Touch();
+         }
+         BarDivider();
+      }
+      if (!FreeTransformOne(doc) || !CanWarp(doc))
+         sFreeMode = std::min(sFreeMode, (int)kFreeRotate);
+      BarCombo("##ftmode", &sFreeMode, kFreeModeNames, FreeTransformOne(doc) && CanWarp(doc) ? kFreeModes : kFreeSkew, kWellL);
+      BarDivider();
+      if (ActionButton::Draw("##ftok", ImVec2(kIconW, sRowH)))
+         EndFreeTransform(doc, true);
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Apply (Enter)"));
+      DrawTickCross(true);
+      next();
+      if (ActionButton::Draw("##ftno", ImVec2(kIconW, sRowH)))
+         EndFreeTransform(doc, false);
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Cancel (Esc)"));
+      DrawTickCross(false);
+   }
+
    // Wells, combos and chips share one row height (the bar's sRowH): a well taller than its chips sat low and made
    // the chips look like they floated.
    void DrawContextBar(Scene2DNode* doc)
@@ -8411,6 +8649,11 @@ namespace
       auto gap = []() { BarDivider(); };
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
       Layer* a = Active(doc);
+      if (FreeTransformOn(doc))
+      {
+         DrawFreeTransformBar(doc);
+         return;
+      }
       if (sTool == kMove)
       {
          bool autoSel = sAutoSelect;
@@ -8506,21 +8749,13 @@ namespace
          }
          {
             gap();
-            const bool canFlip = a != nullptr && a->kind == Kind::Node;
+            const bool canFlip = a != nullptr && !sSel.empty() && (Flippable(*a) || a->kind == Kind::Group);
             ImGui::BeginDisabled(!canFlip);
-            if (TextChip(L("Flip H##v2dfh"), canFlip && a->flipX, T("Flip horizontal")))
-            {
-               PushUndoCheckpoint("Flip layer");
-               a->flipX = !a->flipX;
-               Touch();
-            }
+            if (TextChip(L("Flip H##v2dfh"), false, T("Flip horizontal")))
+               FlipSelection(doc, false);
             next();
-            if (TextChip(L("Flip V##v2dfv"), canFlip && a->flipY, T("Flip vertical")))
-            {
-               PushUndoCheckpoint("Flip layer");
-               a->flipY = !a->flipY;
-               Touch();
-            }
+            if (TextChip(L("Flip V##v2dfv"), false, T("Flip vertical")))
+               FlipSelection(doc, true);
             ImGui::EndDisabled();
          }
       }
@@ -8832,7 +9067,55 @@ namespace
             dl->AddLine(ImVec2(x, p.y + rowH - 6), ImVec2(x + 6, p.y + rowH - 6), col, 1.5f);
             x += 10.0f;
          }
-         DrawThumb(dl, doc, *l, ImVec2(x, p.y + 2), ImVec2(28, rowH - 4));
+         // Photoshop's pair: picture thumb, then the mask thumb. Click one to aim the brush at it (the framed one is
+         // the target); Shift-click the mask to turn it off and on.
+         const bool hasMask = l->kind != Kind::Group && l->HasPixelMask();
+         const bool aimMask = hasMask && sEditMask && Active(doc) == l;
+         const ImVec2 tsz(28, rowH - 4);
+         DrawThumb(dl, doc, *l, ImVec2(x, p.y + 2), tsz);
+         if (hasMask)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
+            if (ImGui::InvisibleButton("##pthumb", tsz))
+            {
+               SelectOnly(id);
+               sEditMask = false;
+            }
+            if (!aimMask && Active(doc) == l)
+               dl->AddRect(ImVec2(x - 1, p.y + 1), ImVec2(x + tsz.x + 1, p.y + 3 + tsz.y), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
+            x += tsz.x + 4.0f;
+            const ImVec2 m0(x, p.y + 2), m1(x + tsz.x, p.y + 2 + tsz.y);
+            dl->AddRectFilled(m0, m1, tok::U32(tok::backdrop_base, app::IsThemeLight()), tok::radius_cell);
+            const float mw = (float)std::max(1, l->mw), mh = (float)std::max(1, l->mh);
+            const float k = std::min(tsz.x / mw, tsz.y / mh);
+            const ImVec2 c(x + tsz.x * 0.5f, p.y + 2 + tsz.y * 0.5f), h(mw * k * 0.5f, mh * k * 0.5f);
+            if (const unsigned mt = doc->PixelMaskTexture(id))
+               dl->AddImage((ImTextureID)(intptr_t)mt, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
+            if (!l->pmaskOn)
+            {
+               dl->AddLine(ImVec2(m0.x + 3, m0.y + 3), ImVec2(m1.x - 3, m1.y - 3), tok::U32(tok::record), 2.0f);
+               dl->AddLine(ImVec2(m1.x - 3, m0.y + 3), ImVec2(m0.x + 3, m1.y - 3), tok::U32(tok::record), 2.0f);
+            }
+            if (aimMask)
+               dl->AddRect(ImVec2(m0.x - 1, m0.y - 1), ImVec2(m1.x + 1, m1.y + 1), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
+            ImGui::SetCursorScreenPos(m0);
+            if (ImGui::InvisibleButton("##mthumb", tsz))
+            {
+               if (io.KeyShift)
+               {
+                  PushUndoCheckpoint(l->pmaskOn ? "Turn mask off" : "Turn mask on");
+                  l->pmaskOn = !l->pmaskOn;
+                  Touch();
+               }
+               else
+               {
+                  SelectOnly(id);
+                  sEditMask = true;
+               }
+            }
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", T("Layer mask: click to paint it, Shift-click to turn it off"));
+         }
          x += 33.0f;
          ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - ImGui::GetFrameHeight()) * 0.5f));
          if (sRename == id)
@@ -8927,7 +9210,8 @@ namespace
             }
             if (l->kind != Kind::Group)
             {
-               if (!l->HasPixelMask() && MenuParts::Item(T("Add Layer Mask"), nullptr)) sPending.what = Pending::AddMask;
+               if (!l->HasPixelMask() && MenuParts::Item(T("Add Layer Mask"), nullptr))
+                  sPending.what = doc->HasSelection() ? Pending::MaskFromSel : Pending::AddMask;
                if (MenuParts::Item(T("Mask from Selection"), nullptr, false, doc->HasSelection())) sPending.what = Pending::MaskFromSel;
                if (l->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"), nullptr)) sPending.what = Pending::RemoveMask;
                if (!l->hasVMask && MenuParts::Item(T("Add Vector Mask"), nullptr)) sPending.what = Pending::AddVMask;
@@ -11011,6 +11295,7 @@ namespace
          {
             PushUndoCheckpoint("Add layer mask");
             doc->AddPixelMask(a->id);
+            sEditMask = true;   // like Photoshop: the new mask is what the brush paints
          }
          break;
       case Pending::MaskFromSel:
@@ -11019,6 +11304,7 @@ namespace
             PushUndoCheckpoint("Mask from selection");
             doc->MaskFromSelection(a->id);
             doc->Deselect();
+            sEditMask = true;
          }
          break;
       case Pending::RemoveMask:
@@ -11973,6 +12259,73 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       EndFreeTransform(doc, true);
       expect("Enter keeps the transform as one step", doc->FindLayer(id)->x == x0 + 40.0f && gUndoStack.size() == depth + 1);
       doc->FindLayer(id)->x = x0;
+   }
+   // Free transform from any tool goes back to it; flips and quarter turns undo themselves; the modes pull corners.
+   if (Layer* a = Active(doc); a != nullptr && Flippable(*a) && !a->is3d)
+   {
+      const int id = a->id;
+      const Layer keep = *a;
+      a->angle = a->shear = 0.0f;   // upright, so the corner checks read in document axes
+      a->warpOn = a->flipX = a->flipY = false;
+      std::fill(std::begin(a->warp), std::end(a->warp), 0.0f);
+      const Layer upright = *a;
+      auto near = [](float p, float q) { return std::fabs(p - q) < 0.05f; };
+      auto corners = [&](float c[8]) { doc->Corners(*doc->FindLayer(id), c); };
+      SelectOnly(id);
+      sTool = kBrush;
+      BeginFreeTransform(doc);
+      expect("Cmd+T from the brush shows the box", FreeTransformOn(doc) && sTool == kMove);
+      EndFreeTransform(doc, true);
+      expect("ending it goes back to the brush", sTool == kBrush);
+      float c0[8], c1[8];
+      corners(c0);
+      FlipSelection(doc, false);
+      corners(c1);
+      expect("Flip Horizontal mirrors the box about its middle",
+             near(c1[0], c0[2]) && near(c1[1], c0[3]) && near(c1[2], c0[0]) && near(c1[3], c0[1]));
+      FlipSelection(doc, false);
+      FlipSelection(doc, true);
+      FlipSelection(doc, true);
+      corners(c1);
+      bool same = true;
+      for (int i = 0; i < 8; i++)
+         same &= near(c0[i], c1[i]);
+      expect("two flips each way put it back", same && !doc->FindLayer(id)->flipX && !doc->FindLayer(id)->flipY);
+      for (int i = 0; i < 4; i++)
+         TurnSelection(doc, 90.0f);
+      corners(c1);
+      same = true;
+      for (int i = 0; i < 8; i++)
+         same &= std::fabs(c0[i] - c1[i]) < 0.5f;
+      expect("four quarter turns put it back", same);
+      *doc->FindLayer(id) = upright;
+      if (CanWarp(doc))
+      {
+         BeginFreeTransform(doc);
+         sFreeMode = kFreeSkew;
+         corners(c0);
+         BeginOp(doc, 18, ImVec2(0, 0), nullptr);
+         sOp.warpHandle = 2;   // top-right corner
+         sOp.warpStyle = 1;
+         sOp.docStart = ImVec2(0, 0);
+         WarpActive(doc, ToScreen(doc, 30.0f, 4.0f));
+         corners(c1);
+         expect("Skew slides a corner along one edge", near(c1[3], c0[3]) && std::fabs(c1[2] - c0[2] - 30.0f) < 1.0f && near(c1[0], c0[0]));
+         sOp = Op();
+         *doc->FindLayer(id) = upright;
+         BeginOp(doc, 18, ImVec2(0, 0), nullptr);
+         sOp.warpHandle = 1;   // top edge
+         sOp.warpStyle = 2;
+         sOp.docStart = ImVec2(0, 0);
+         WarpActive(doc, ToScreen(doc, 5.0f, 20.0f));
+         corners(c1);
+         expect("Distort moves an edge where it is dragged", near(c1[1] - c0[1], 20.0f) && near(c1[3] - c0[3], 20.0f) && near(c1[7], c0[7]));
+         sOp = Op();
+         EndFreeTransform(doc, false);
+         expect("Esc after a distort puts the layer back", !doc->FindLayer(id)->warpOn && sFreeMode == kFreeAny);
+      }
+      *doc->FindLayer(id) = keep;
+      sTool = kMove;
    }
    // Effects menu: each pick adds that adjustment, not always the first (Pixelate).
    for (int type : { (int)Scene2DNode::kAdjThreshold, (int)Scene2DNode::kAdjPosterize, (int)Scene2DNode::kAdjHalftone })
