@@ -647,7 +647,6 @@ namespace app
       { I18N_KEY("Canvas & View"), I18N_KEY("Find"), MODKEY "+F", I18N_KEY("Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas (keys)"), "W / A / S / D", I18N_KEY("Hold to pan the canvas up / left / down / right. Not while a hovered audio keyboard node is using the letters") },
       { I18N_KEY("Canvas & View"), I18N_KEY("Preview Views"), "1 / 3 / 7 / 0", I18N_KEY("With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom") },
-
       // Transport & Audio
       { I18N_KEY("Transport & Audio"), I18N_KEY("Play / Pause"), "Space", I18N_KEY("Start / pause timeline and animations") },
       { I18N_KEY("Transport & Audio"), I18N_KEY("Next / Previous Show Patch"), "PageDown / PageUp", I18N_KEY("Switch to the next or previous patch of the show set, on its launch grid. Works in a projector window too") },
@@ -798,7 +797,7 @@ namespace app
       { I18N_KEY("2D View"), I18N_KEY("Selection Tools"), "M / L / W", I18N_KEY("Marquee, Lasso; W cycles Magic Wand, Selection Brush, Object Selection. Shift adds, Alt subtracts. Enter closes a polygon lasso, Esc drops it") },
       { I18N_KEY("2D View"), I18N_KEY("Vector Tools"), "P / A / U / T", I18N_KEY("Pen, Node, Shape, Text. Pen: click the first point to close, Enter or Esc ends the path. Node: Alt-click makes a corner, Delete removes the shape") },
       { I18N_KEY("2D View"), I18N_KEY("Brush Size / Hardness"), "[ / ]", I18N_KEY("Smaller or larger brush; with Shift softer or harder") },
-      { I18N_KEY("2D View"), I18N_KEY("Brush Opacity"), "1 ... 0", I18N_KEY("10% to 100%") },
+      { I18N_KEY("2D View"), I18N_KEY("Brush Opacity"), "1 ... 0", I18N_KEY("Brush opacity 10% to 100%. With the Move tool the digits set the active layer's opacity instead") },
       { I18N_KEY("2D View"), I18N_KEY("Straight Line"), "Shift+Click", I18N_KEY("Paint a straight line from the last point") },
       { I18N_KEY("2D View"), I18N_KEY("Colours"), "X / D", I18N_KEY("Swap the two colours, or reset them to black and white") },
       { I18N_KEY("2D View"), I18N_KEY("Quick Mask"), "Q", I18N_KEY("Paint the selection with the brush; press again to leave") },
